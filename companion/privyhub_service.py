@@ -49,7 +49,9 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Optional
-from urllib.parse import quote, unquote, urlparse
+from urllib.parse import quote, unquote, urlparse, urlsplit
+
+from plugins import PLUGINS
 
 
 COMPANION_DIR = Path(__file__).resolve().parent
@@ -156,6 +158,7 @@ class SourceCatalog:
             if node_type == "category":
                 children = node.get("children", [])
                 dynamic = node.get("dynamic")
+                lazy_path = node.get("lazy_path")
 
                 if not isinstance(children, list):
                     raise CatalogError(
@@ -168,9 +171,23 @@ class SourceCatalog:
                         dynamic,
                     )
 
-                if not children and dynamic is None:
+                if lazy_path is not None:
+                    if (
+                        not isinstance(lazy_path, str)
+                        or not lazy_path.startswith("/plugins/")
+                    ):
+                        raise CatalogError(
+                            f"Category {node_id} has invalid lazy_path"
+                        )
+
+                if (
+                    not children
+                    and dynamic is None
+                    and lazy_path is None
+                ):
                     raise CatalogError(
-                        f"Category {node_id} needs children or dynamic config"
+                        f"Category {node_id} needs children, dynamic config, "
+                        "or lazy_path"
                     )
 
                 for child in children:
@@ -596,7 +613,7 @@ class SourceCatalog:
                     for child in dynamic_children
                 )
 
-            return {
+            public_node = {
                 "id": node["id"],
                 "name": node.get(
                     "name",
@@ -605,6 +622,13 @@ class SourceCatalog:
                 "node_type": "category",
                 "children": children,
             }
+
+            lazy_path = node.get("lazy_path")
+
+            if lazy_path is not None:
+                public_node["lazy_path"] = lazy_path
+
+            return public_node
 
         playback = node["playback"]
 
@@ -1403,7 +1427,7 @@ class PrivyHubController:
 
             return {
                 "service": "PrivyHub",
-                "api_version": 3,
+                "api_version": 4,
                 "project_root": str(
                     PROJECT_ROOT
                 ),
@@ -1459,7 +1483,7 @@ CONTROLLER = PrivyHubController()
 class PrivyHubRequestHandler(
     BaseHTTPRequestHandler
 ):
-    server_version = "PrivyHubControl/0.5"
+    server_version = "PrivyHubControl/0.6"
 
     def log_message(
         self,
@@ -1510,17 +1534,74 @@ class PrivyHubRequestHandler(
     def do_GET(
         self,
     ) -> None:
-        if self.path == "/status":
+        parsed = urlsplit(self.path)
+        request_path = parsed.path
+
+        if request_path == "/status":
             self._send_json(
                 200,
                 CONTROLLER.status(),
             )
             return
 
-        if self.path == "/sources":
+        if request_path == "/sources":
             self._send_json(
                 200,
                 CONTROLLER.catalog.public_catalog(),
+            )
+            return
+
+        parts = [
+            part
+            for part in request_path.split("/")
+            if part
+        ]
+
+        if (
+            len(parts) == 3
+            and parts[0] == "plugins"
+        ):
+            plugin_id = parts[1]
+            action = parts[2]
+            plugin = PLUGINS.get(plugin_id)
+
+            if plugin is None:
+                self._send_json(
+                    404,
+                    {
+                        "ok": False,
+                        "error": f"Unknown plugin: {plugin_id}",
+                    },
+                )
+                return
+
+            try:
+                payload = plugin.handle(
+                    action,
+                    parsed.query,
+                )
+            except ValueError as exc:
+                self._send_json(
+                    400,
+                    {
+                        "ok": False,
+                        "error": str(exc),
+                    },
+                )
+                return
+            except RuntimeError as exc:
+                self._send_json(
+                    502,
+                    {
+                        "ok": False,
+                        "error": str(exc),
+                    },
+                )
+                return
+
+            self._send_json(
+                200,
+                payload,
             )
             return
 
@@ -1536,6 +1617,79 @@ class PrivyHubRequestHandler(
         self,
     ) -> None:
         try:
+            parsed = urlsplit(self.path)
+            request_path = parsed.path
+
+            parts = [
+                part
+                for part in request_path.split("/")
+                if part
+            ]
+
+            if (
+                len(parts) == 3
+                and parts[0] == "plugins"
+            ):
+                plugin_id = parts[1]
+                action = parts[2]
+                plugin = PLUGINS.get(plugin_id)
+
+                if plugin is None:
+                    self._send_json(
+                        404,
+                        {
+                            "ok": False,
+                            "error": f"Unknown plugin: {plugin_id}",
+                        },
+                    )
+                    return
+
+                handler = getattr(
+                    plugin,
+                    "handle_post",
+                    None,
+                )
+
+                if handler is None:
+                    self._send_json(
+                        405,
+                        {
+                            "ok": False,
+                            "error": f"Plugin does not support POST: {plugin_id}",
+                        },
+                    )
+                    return
+
+                try:
+                    payload = handler(
+                        action,
+                        parsed.query,
+                    )
+                except ValueError as exc:
+                    self._send_json(
+                        400,
+                        {
+                            "ok": False,
+                            "error": str(exc),
+                        },
+                    )
+                    return
+                except RuntimeError as exc:
+                    self._send_json(
+                        503,
+                        {
+                            "ok": False,
+                            "error": str(exc),
+                        },
+                    )
+                    return
+
+                self._send_json(
+                    200,
+                    payload,
+                )
+                return
+
             if self.path == "/stop":
                 status = (
                     CONTROLLER.stop_source()
@@ -1660,6 +1814,7 @@ def main(
     print("Endpoints:")
     print("  GET  /status")
     print("  GET  /sources")
+    print("  GET  /plugins/<plugin>/<action>")
     print("  POST /sources/<id>/start")
     print("  POST /stop")
 

@@ -25,18 +25,20 @@
 
         android:gravity="center_vertical"
 
-        android:paddingStart="20dp"
-        android:paddingEnd="20dp"
-        android:paddingTop="12dp"
-        android:paddingBottom="8dp">
+        android:background="#0E0E0E"
+
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="6dp">
 
 
         <Button
 
             android:id="@+id/button_back"
 
-            android:layout_width="110dp"
-            android:layout_height="56dp"
+            android:layout_width="104dp"
+            android:layout_height="50dp"
 
             android:layout_marginEnd="10dp"
 
@@ -65,9 +67,12 @@
 
             android:textColor="#FFFFFF"
 
-            android:textSize="20sp"
+            android:textSize="18sp"
 
             android:textStyle="bold"
+
+            android:singleLine="true"
+            android:ellipsize="end"
 
             android:paddingStart="12dp"
             android:paddingEnd="12dp" />
@@ -77,8 +82,8 @@
 
             android:id="@+id/button_refresh"
 
-            android:layout_width="120dp"
-            android:layout_height="56dp"
+            android:layout_width="112dp"
+            android:layout_height="50dp"
 
             android:layout_marginEnd="10dp"
 
@@ -98,8 +103,8 @@
 
             android:id="@+id/button_settings"
 
-            android:layout_width="130dp"
-            android:layout_height="56dp"
+            android:layout_width="122dp"
+            android:layout_height="50dp"
 
             android:layout_marginEnd="10dp"
 
@@ -119,8 +124,8 @@
 
             android:id="@+id/button_stop"
 
-            android:layout_width="110dp"
-            android:layout_height="56dp"
+            android:layout_width="104dp"
+            android:layout_height="50dp"
 
             android:text="STOP"
 
@@ -150,12 +155,15 @@
 
         android:textColor="#D0D0D0"
 
-        android:textSize="16sp"
+        android:textSize="14sp"
 
-        android:paddingStart="28dp"
-        android:paddingEnd="28dp"
+        android:singleLine="true"
+        android:ellipsize="end"
+
+        android:paddingStart="22dp"
+        android:paddingEnd="22dp"
         android:paddingTop="2dp"
-        android:paddingBottom="8dp" />
+        android:paddingBottom="6dp" />
 
 
     <!-- Persistent Now Playing bar -->
@@ -165,7 +173,7 @@
         android:id="@+id/now_playing_bar"
 
         android:layout_width="match_parent"
-        android:layout_height="68dp"
+        android:layout_height="116dp"
 
         android:orientation="horizontal"
 
@@ -234,7 +242,7 @@
 
             android:id="@+id/now_playing_progress"
 
-            android:layout_width="190dp"
+            android:layout_width="150dp"
             android:layout_height="wrap_content"
 
             android:gravity="center"
@@ -246,26 +254,39 @@
             android:textSize="15sp" />
 
 
-        <Button
+        <FrameLayout
 
-            android:id="@+id/button_fullscreen"
+            android:id="@+id/now_playing_preview_host"
 
-            android:layout_width="145dp"
-            android:layout_height="52dp"
+            android:layout_width="184dp"
+            android:layout_height="104dp"
 
             android:layout_marginStart="8dp"
             android:layout_marginEnd="8dp"
 
-            android:text="FULL SCREEN"
+            android:background="#000000">
 
-            android:textSize="13sp"
-            android:textStyle="bold"
 
-            android:textColor="@color/mode_button_text"
+            <androidx.media3.ui.PlayerView
 
-            android:background="@drawable/mode_button_background"
+                android:id="@+id/player_view"
 
-            android:focusable="true" />
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+
+                android:keepScreenOn="true"
+
+                android:background="#000000"
+
+                android:clickable="true"
+                android:focusable="true"
+
+                app:show_buffering="when_playing"
+
+                app:use_controller="false" />
+
+
+        </FrameLayout>
 
 
         <Button
@@ -297,12 +318,18 @@
         android:id="@+id/source_scroll"
 
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
+
+        android:layout_weight="1"
 
         android:fillViewport="true"
 
-        android:paddingStart="18dp"
-        android:paddingEnd="18dp"
+        android:clipToPadding="false"
+        android:overScrollMode="never"
+
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="4dp"
         android:paddingBottom="8dp">
 
 
@@ -323,24 +350,20 @@
     </ScrollView>
 
 
-    <!-- Player -->
+    <!-- Fullscreen host. The same PlayerView is moved here on demand. -->
 
-    <androidx.media3.ui.PlayerView
+    <FrameLayout
 
-        android:id="@+id/player_view"
+        android:id="@+id/fullscreen_player_host"
 
         android:layout_width="match_parent"
         android:layout_height="0dp"
 
         android:layout_weight="1"
 
-        android:keepScreenOn="true"
+        android:background="#000000"
 
-        android:focusable="true"
-
-        app:show_buffering="when_playing"
-
-        app:use_controller="true" />
+        android:visibility="gone" />
 
 
 </LinearLayout>
