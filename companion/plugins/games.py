@@ -10,6 +10,8 @@ from urllib.parse import parse_qs, urlencode
 
 from games.emulator_manager import EmulatorError, EmulatorManager
 from games.stream_manager import StreamHostError, StreamManager
+from games.decoder_session_log import write_decoder_session_log
+from native_stream import NativeStreamError, NativeStreamManager
 
 
 class GamesPlugin:
@@ -54,6 +56,9 @@ class GamesPlugin:
             self.PROJECT_ROOT
         )
         self._stream = StreamManager(
+            self.PROJECT_ROOT
+        )
+        self._native_stream = NativeStreamManager(
             self.PROJECT_ROOT
         )
 
@@ -298,6 +303,12 @@ class GamesPlugin:
                 "node_type": "game",
                 "lazy_path": f"/plugins/{self.PLUGIN_ID}/stream-status",
             },
+            {
+                "id": "games_native_stream",
+                "name": "Native Streaming Alpha",
+                "node_type": "game",
+                "lazy_path": f"/plugins/{self.PLUGIN_ID}/native-stream-status",
+            },
         ]
 
         for system_id, config in self.SYSTEMS.items():
@@ -530,10 +541,14 @@ class GamesPlugin:
         if action == "status":
             payload = self._emulator.status()
             payload["stream_host"] = self._stream.status()
+            payload["native_stream"] = self._native_stream.status()
             return payload
 
         if action == "stream-status":
             return self._stream.status()
+
+        if action == "native-stream-status":
+            return self._native_stream.status()
 
         raise ValueError(
             f"Unknown Games plugin action: {action}"
@@ -557,6 +572,52 @@ class GamesPlugin:
 
         return game
 
+    def handle_post_request(
+        self,
+        action: str,
+        raw_query: str,
+        client_ip: str,
+    ) -> dict[str, Any]:
+        query = parse_qs(
+            raw_query,
+            keep_blank_values=False,
+        )
+
+        if action == "native-stream-start":
+            game_status = self._emulator.status()
+
+            if not game_status.get("active", False):
+                raise RuntimeError(
+                    "Launch a game before starting Native Video Alpha."
+                )
+
+            port = self._parse_int(
+                self._first(
+                    query,
+                    "port",
+                ),
+                NativeStreamManager.DEFAULT_PORT,
+            )
+
+            try:
+                return self._native_stream.start(
+                    client_ip=client_ip,
+                    port=port,
+                )
+            except NativeStreamError as exc:
+                raise RuntimeError(str(exc)) from exc
+
+        if action == "native-stream-stop":
+            try:
+                return self._native_stream.stop()
+            except NativeStreamError as exc:
+                raise RuntimeError(str(exc)) from exc
+
+        return self.handle_post(
+            action,
+            raw_query,
+        )
+
     def handle_post(
         self,
         action: str,
@@ -568,6 +629,17 @@ class GamesPlugin:
         )
 
         try:
+            if action == "decoder-session-log":
+                report = self._first(
+                    query,
+                    "report",
+                ).strip()
+
+                return write_decoder_session_log(
+                    self.PROJECT_ROOT,
+                    report,
+                )
+
             if action == "launch":
                 game_id = self._first(
                     query,

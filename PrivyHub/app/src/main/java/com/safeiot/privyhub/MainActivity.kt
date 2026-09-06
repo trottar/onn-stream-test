@@ -2,6 +2,8 @@ package com.safeiot.privyhub
 
 import android.content.Intent
 
+import com.safeiot.privyhub.streaming.NativeStreamActivity
+
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -5081,6 +5083,11 @@ class MainActivity : AppCompatActivity() {
                                 json
                             )
 
+                        "native_stream_host" ->
+                            buildNativeStreamMessage(
+                                json
+                            )
+
                         else ->
                             buildGameCatalogMessage(
                                 json
@@ -5219,6 +5226,53 @@ class MainActivity : AppCompatActivity() {
                                     setGameStreamHost(
                                         true
                                     )
+                                }
+                            }
+                        }
+
+                        "native_stream_host" -> {
+
+                            val active =
+                                json.optBoolean(
+                                    "active",
+                                    false
+                                )
+
+                            val ready =
+                                json.optBoolean(
+                                    "ready",
+                                    false
+                                )
+
+                            statusText.text =
+                                when {
+                                    active ->
+                                        "Native stream running"
+
+                                    ready ->
+                                        "Native stream ready"
+
+                                    else ->
+                                        "Native stream setup required"
+                                }
+
+                            if (ready) {
+
+                                builder.setPositiveButton(
+                                    "Open Native Alpha"
+                                ) { _, _ ->
+
+                                    openNativeGameStream()
+                                }
+                            }
+
+                            if (active) {
+
+                                builder.setNeutralButton(
+                                    "Stop Native Alpha"
+                                ) { _, _ ->
+
+                                    stopNativeGameStreamHost()
                                 }
                             }
                         }
@@ -5536,6 +5590,173 @@ class MainActivity : AppCompatActivity() {
         }
 
         return details.toString()
+    }
+
+
+    private fun buildNativeStreamMessage(
+        json: JSONObject
+    ): String {
+
+        val active =
+            json.optBoolean(
+                "active",
+                false
+            )
+
+        val ready =
+            json.optBoolean(
+                "ready",
+                false
+            )
+
+        return buildString {
+            append(
+                "Status: "
+            )
+
+            append(
+                when {
+                    active ->
+                        "RUNNING"
+
+                    ready ->
+                        "READY"
+
+                    else ->
+                        "SETUP REQUIRED"
+                }
+            )
+
+            append(
+                "\nProfile: "
+            )
+            append(
+                json.optInt(
+                    "width",
+                    1280
+                )
+            )
+            append(
+                "x"
+            )
+            append(
+                json.optInt(
+                    "height",
+                    720
+                )
+            )
+            append(
+                "@"
+            )
+            append(
+                json.optInt(
+                    "fps",
+                    60
+                )
+            )
+
+            append(
+                "\nCodec: H.264 NVENC"
+            )
+
+            append(
+                "\nTransport: RTP/UDP"
+            )
+
+            append(
+                "\nAudio: not implemented"
+            )
+
+            append(
+                "\nController: not implemented"
+            )
+
+            val message =
+                json.optString(
+                    "message",
+                    ""
+                )
+
+            if (message.isNotBlank()) {
+                append(
+                    "\n\n"
+                )
+                append(
+                    message
+                )
+            }
+        }
+    }
+
+
+    private fun openNativeGameStream() {
+
+        val host =
+            getCompanionHost()
+
+        if (host.isBlank()) {
+
+            showCompanionSettings()
+
+            return
+        }
+
+        startActivity(
+            Intent(
+                this,
+                NativeStreamActivity::class.java
+            ).apply {
+                putExtra(
+                    NativeStreamActivity.EXTRA_COMPANION_HOST,
+                    host
+                )
+            }
+        )
+    }
+
+
+    private fun stopNativeGameStreamHost() {
+
+        val host =
+            getCompanionHost()
+
+        if (host.isBlank()) {
+            return
+        }
+
+        statusText.text =
+            "Stopping native stream..."
+
+        networkExecutor.execute {
+
+            try {
+
+                httpPost(
+                    "http://$host:$CONTROL_PORT" +
+                        "/plugins/games/native-stream-stop"
+                )
+
+                runOnUiThread {
+
+                    statusText.text =
+                        "Native stream stopped"
+                }
+
+            } catch (error: Exception) {
+
+                Log.e(
+                    TAG,
+                    "Failed to stop native stream",
+                    error
+                )
+
+                runOnUiThread {
+
+                    statusText.text =
+                        "Native stream stop failed"
+                }
+            }
+        }
     }
 
 

@@ -1644,10 +1644,19 @@ class PrivyHubRequestHandler(
                     )
                     return
 
-                handler = getattr(
+                request_handler = getattr(
                     plugin,
-                    "handle_post",
+                    "handle_post_request",
                     None,
+                )
+
+                handler = (
+                    request_handler
+                    or getattr(
+                        plugin,
+                        "handle_post",
+                        None,
+                    )
                 )
 
                 if handler is None:
@@ -1661,10 +1670,17 @@ class PrivyHubRequestHandler(
                     return
 
                 try:
-                    payload = handler(
-                        action,
-                        parsed.query,
-                    )
+                    if request_handler is not None:
+                        payload = request_handler(
+                            action,
+                            parsed.query,
+                            self.client_address[0],
+                        )
+                    else:
+                        payload = handler(
+                            action,
+                            parsed.query,
+                        )
                 except ValueError as exc:
                     self._send_json(
                         400,
