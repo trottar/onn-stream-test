@@ -550,7 +550,7 @@ class NativeStreamActivity :
                         ) ==
                         true
                     ) {
-                        "Audio host: VB-CABLE -> PCM 48k stereo"
+                        "Audio host: process loopback -> PCM 48k stereo"
                     } else {
                         "Audio host: " +
                             (

@@ -21,741 +21,89 @@ class NativeSessionIOError(RuntimeError):
 
 
 class NativeAudioStreamer:
-    MAGIC = b"PHA1"
-    VERSION = 1
-    SAMPLE_RATE = 48_000
-    CHANNELS = 2
-    SAMPLE_BYTES = 2
-    FRAMES_PER_PACKET = 240  # 5 ms at 48 kHz
-    PAYLOAD_BYTES = (
-        FRAMES_PER_PACKET
-        * CHANNELS
-        * SAMPLE_BYTES
-    )
-    HEADER = struct.Struct("<4sBBHII")
-
-    TIMING_PROBE_VERSION = "audio_timing_probe_v0.17"
-    AUDIO_BUFFER_ARCHITECTURE = "bounded_reservoir_v0.18"
-    DIRECTSHOW_AUDIO_BUFFER_MS = 20
-
-    # Six 5 ms packets = a hard 30 ms host-side ceiling. Start sending once
-    # four packets are available so common 10-30 ms DirectShow batches can be
-    # smoothed without creating an unbounded latency queue.
-    RESERVOIR_CAPACITY_PACKETS = 6
-    RESERVOIR_START_PACKETS = 4
-    SENDER_INTERVAL_NS = 5_000_000
-
-    # Small scheduler lateness is absorbed by the normal sample clock. If a
-    # sender deadline is missed by more than 2 ms, rebase instead of emitting
-    # a compressed catch-up sequence.
-    SENDER_REBASE_LATE_NS = 2_000_000
-    TIMING_BURST_NS = 2_000_000
-    TIMING_LONG_GAP_NS = 10_000_000
-    TIMING_EVENT_LIMIT = 512
+    TIMING_PROBE_VERSION = "process_loopback_pair_pacer_v0.22"
+    AUDIO_BUFFER_ARCHITECTURE = "windows_process_loopback_pair_pacer_v0.22"
 
     def __init__(
         self,
         project_root: Path,
     ) -> None:
         self.project_root = project_root.resolve()
+        self.runtime_dir = (
+            self.project_root
+            / "runtime"
+            / "streaming"
+            / "process_audio"
+        )
+        self.helper_path = (
+            self.runtime_dir
+            / "PrivyHubProcessAudio.exe"
+        )
         self.log_dir = (
             self.project_root
             / "logs"
             / "games"
         )
-        self.log_path = (
-            self.log_dir
-            / "native_audio_alpha.log"
-        )
         self.timing_log_dir = (
             self.log_dir
             / "audio_timing"
         )
+        self.helper_log_path = (
+            self.log_dir
+            / "native_process_audio.log"
+        )
+        self.status_path = (
+            self.project_root
+            / "data"
+            / "games"
+            / "native_stream"
+            / "process_audio_status.json"
+        )
 
         self._process: subprocess.Popen[Any] | None = None
-        self._thread: threading.Thread | None = None
-        self._reader_thread: threading.Thread | None = None
-        self._socket: socket.socket | None = None
         self._log_handle = None
-        self._running = threading.Event()
         self._lock = threading.RLock()
-        self._reservoir_condition = threading.Condition()
-        self._reservoir: deque[bytes] = deque()
-        self._source_ended = False
 
-        self._device: str | None = None
+        self._target_pid: int | None = None
         self._client_ip: str | None = None
         self._client_port: int | None = None
-        self._packets = 0
-        self._bytes = 0
-        self._send_errors = 0
-
-        self._reservoir_packets_read = 0
-        self._reservoir_packets_sent = 0
-        self._reservoir_drop_oldest = 0
-        self._reservoir_max_depth = 0
-        self._reservoir_depth_samples = 0
-        self._reservoir_depth_total = 0
-        self._reservoir_underflows = 0
-        self._reservoir_sender_rebases = 0
-        self._reservoir_sender_max_late_ns = 0
-        self._reservoir_start_depth = 0
-
         self._timing_path: Path | None = None
-        self._timing_started_ns = 0
-        self._timing_last_read_done_ns = 0
-        self._timing_last_send_done_ns = 0
-        self._timing_read_calls = 0
-        self._timing_read_block_total_ns = 0
-        self._timing_read_block_max_ns = 0
-        self._timing_send_calls = 0
-        self._timing_send_call_total_ns = 0
-        self._timing_send_call_max_ns = 0
-        self._timing_read_interval_count = 0
-        self._timing_read_interval_total_ns = 0
-        self._timing_read_interval_min_ns = 0
-        self._timing_read_interval_max_ns = 0
-        self._timing_send_interval_count = 0
-        self._timing_send_interval_total_ns = 0
-        self._timing_send_interval_min_ns = 0
-        self._timing_send_interval_max_ns = 0
-        self._timing_read_interval_hist = self._new_timing_histogram()
-        self._timing_send_interval_hist = self._new_timing_histogram()
-        self._timing_read_block_hist = self._new_timing_histogram()
-        self._timing_send_call_hist = self._new_timing_histogram()
-        self._timing_read_burst_intervals = 0
-        self._timing_send_burst_intervals = 0
-        self._timing_read_long_gaps = 0
-        self._timing_send_long_gaps = 0
-        self._timing_current_read_burst_packets = 1
-        self._timing_max_read_burst_packets = 1
-        self._timing_current_send_burst_packets = 1
-        self._timing_max_send_burst_packets = 1
-        self._timing_events: list[dict[str, float | int | str]] = []
-
-    @staticmethod
-    def _new_timing_histogram() -> dict[str, int]:
-        return {
-            "lt_1ms": 0,
-            "1_2ms": 0,
-            "2_4ms": 0,
-            "4_6ms": 0,
-            "6_8ms": 0,
-            "8_12ms": 0,
-            "12_20ms": 0,
-            "20_30ms": 0,
-            "ge_30ms": 0,
-        }
-
-    @staticmethod
-    def _observe_histogram(
-        histogram: dict[str, int],
-        value_ns: int,
-    ) -> None:
-        if value_ns < 1_000_000:
-            key = "lt_1ms"
-        elif value_ns < 2_000_000:
-            key = "1_2ms"
-        elif value_ns < 4_000_000:
-            key = "2_4ms"
-        elif value_ns < 6_000_000:
-            key = "4_6ms"
-        elif value_ns < 8_000_000:
-            key = "6_8ms"
-        elif value_ns < 12_000_000:
-            key = "8_12ms"
-        elif value_ns < 20_000_000:
-            key = "12_20ms"
-        elif value_ns < 30_000_000:
-            key = "20_30ms"
-        else:
-            key = "ge_30ms"
-
-        histogram[key] += 1
-
-    @staticmethod
-    def _average_ms(
-        total_ns: int,
-        count: int,
-    ) -> float:
-        if count <= 0:
-            return 0.0
-
-        return round(
-            total_ns /
-            count /
-            1_000_000.0,
-            4,
-        )
-
-    def _reset_timing_probe(
-        self,
-    ) -> None:
-        stamp = time.strftime(
-            "%Y%m%d_%H%M%S"
-        )
-
-        self.timing_log_dir.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-        self._timing_path = (
-            self.timing_log_dir
-            / (
-                "audio_timing_"
-                + stamp
-                + ".json"
-            )
-        )
-
-        self._timing_started_ns = (
-            time.perf_counter_ns()
-        )
-        self._timing_last_read_done_ns = 0
-        self._timing_last_send_done_ns = 0
-        self._timing_read_calls = 0
-        self._timing_read_block_total_ns = 0
-        self._timing_read_block_max_ns = 0
-        self._timing_send_calls = 0
-        self._timing_send_call_total_ns = 0
-        self._timing_send_call_max_ns = 0
-        self._timing_read_interval_count = 0
-        self._timing_read_interval_total_ns = 0
-        self._timing_read_interval_min_ns = 0
-        self._timing_read_interval_max_ns = 0
-        self._timing_send_interval_count = 0
-        self._timing_send_interval_total_ns = 0
-        self._timing_send_interval_min_ns = 0
-        self._timing_send_interval_max_ns = 0
-        self._timing_read_interval_hist = (
-            self._new_timing_histogram()
-        )
-        self._timing_send_interval_hist = (
-            self._new_timing_histogram()
-        )
-        self._timing_read_block_hist = (
-            self._new_timing_histogram()
-        )
-        self._timing_send_call_hist = (
-            self._new_timing_histogram()
-        )
-        self._timing_read_burst_intervals = 0
-        self._timing_send_burst_intervals = 0
-        self._timing_read_long_gaps = 0
-        self._timing_send_long_gaps = 0
-        self._timing_current_read_burst_packets = 1
-        self._timing_max_read_burst_packets = 1
-        self._timing_current_send_burst_packets = 1
-        self._timing_max_send_burst_packets = 1
-        self._timing_events = []
-
-    def _record_timing_event(
-        self,
-        event_type: str,
-        interval_ns: int,
-        read_block_ns: int = 0,
-        send_call_ns: int = 0,
-    ) -> None:
-        if (
-            len(self._timing_events)
-            >= self.TIMING_EVENT_LIMIT
-        ):
-            return
-
-        elapsed_ms = (
-            (
-                time.perf_counter_ns()
-                - self._timing_started_ns
-            )
-            /
-            1_000_000.0
-            if self._timing_started_ns > 0
-            else 0.0
-        )
-
-        self._timing_events.append(
-            {
-                "elapsed_ms": round(
-                    elapsed_ms,
-                    3,
-                ),
-                "type": event_type,
-                "interval_ms": round(
-                    interval_ns /
-                    1_000_000.0,
-                    4,
-                ),
-                "read_block_ms": round(
-                    read_block_ns /
-                    1_000_000.0,
-                    4,
-                ),
-                "send_call_ms": round(
-                    send_call_ns /
-                    1_000_000.0,
-                    4,
-                ),
-            }
-        )
-
-    def _observe_read_timing(
-        self,
-        read_started_ns: int,
-        read_done_ns: int,
-    ) -> None:
-        block_ns = max(
-            0,
-            read_done_ns -
-            read_started_ns,
-        )
-
-        self._timing_read_calls += 1
-        self._timing_read_block_total_ns += (
-            block_ns
-        )
-        self._timing_read_block_max_ns = max(
-            self._timing_read_block_max_ns,
-            block_ns,
-        )
-
-        self._observe_histogram(
-            self._timing_read_block_hist,
-            block_ns,
-        )
-
-        previous = (
-            self._timing_last_read_done_ns
-        )
-
-        if previous > 0:
-            interval_ns = max(
-                0,
-                read_done_ns -
-                previous,
-            )
-
-            self._timing_read_interval_count += 1
-            self._timing_read_interval_total_ns += (
-                interval_ns
-            )
-
-            if (
-                self._timing_read_interval_min_ns == 0
-                or interval_ns <
-                self._timing_read_interval_min_ns
-            ):
-                self._timing_read_interval_min_ns = (
-                    interval_ns
-                )
-
-            self._timing_read_interval_max_ns = max(
-                self._timing_read_interval_max_ns,
-                interval_ns,
-            )
-
-            self._observe_histogram(
-                self._timing_read_interval_hist,
-                interval_ns,
-            )
-
-            if (
-                interval_ns <
-                self.TIMING_BURST_NS
-            ):
-                self._timing_read_burst_intervals += 1
-                self._timing_current_read_burst_packets += 1
-                self._timing_max_read_burst_packets = max(
-                    self._timing_max_read_burst_packets,
-                    self._timing_current_read_burst_packets,
-                )
-
-                self._record_timing_event(
-                    "read_burst",
-                    interval_ns,
-                    read_block_ns=block_ns,
-                )
-            else:
-                self._timing_current_read_burst_packets = 1
-
-            if (
-                interval_ns >=
-                self.TIMING_LONG_GAP_NS
-            ):
-                self._timing_read_long_gaps += 1
-
-                self._record_timing_event(
-                    "read_gap",
-                    interval_ns,
-                    read_block_ns=block_ns,
-                )
-
-        self._timing_last_read_done_ns = (
-            read_done_ns
-        )
-
-    def _observe_send_timing(
-        self,
-        send_started_ns: int,
-        send_done_ns: int,
-    ) -> None:
-        call_ns = max(
-            0,
-            send_done_ns -
-            send_started_ns,
-        )
-
-        self._timing_send_calls += 1
-        self._timing_send_call_total_ns += (
-            call_ns
-        )
-        self._timing_send_call_max_ns = max(
-            self._timing_send_call_max_ns,
-            call_ns,
-        )
-
-        self._observe_histogram(
-            self._timing_send_call_hist,
-            call_ns,
-        )
-
-        previous = (
-            self._timing_last_send_done_ns
-        )
-
-        if previous > 0:
-            interval_ns = max(
-                0,
-                send_done_ns -
-                previous,
-            )
-
-            self._timing_send_interval_count += 1
-            self._timing_send_interval_total_ns += (
-                interval_ns
-            )
-
-            if (
-                self._timing_send_interval_min_ns == 0
-                or interval_ns <
-                self._timing_send_interval_min_ns
-            ):
-                self._timing_send_interval_min_ns = (
-                    interval_ns
-                )
-
-            self._timing_send_interval_max_ns = max(
-                self._timing_send_interval_max_ns,
-                interval_ns,
-            )
-
-            self._observe_histogram(
-                self._timing_send_interval_hist,
-                interval_ns,
-            )
-
-            if (
-                interval_ns <
-                self.TIMING_BURST_NS
-            ):
-                self._timing_send_burst_intervals += 1
-                self._timing_current_send_burst_packets += 1
-                self._timing_max_send_burst_packets = max(
-                    self._timing_max_send_burst_packets,
-                    self._timing_current_send_burst_packets,
-                )
-
-                self._record_timing_event(
-                    "send_burst",
-                    interval_ns,
-                    send_call_ns=call_ns,
-                )
-            else:
-                self._timing_current_send_burst_packets = 1
-
-            if (
-                interval_ns >=
-                self.TIMING_LONG_GAP_NS
-            ):
-                self._timing_send_long_gaps += 1
-
-                self._record_timing_event(
-                    "send_gap",
-                    interval_ns,
-                    send_call_ns=call_ns,
-                )
-
-        self._timing_last_send_done_ns = (
-            send_done_ns
-        )
-
-    def _timing_payload(
-        self,
-    ) -> dict[str, Any]:
-        duration_ms = (
-            (
-                time.perf_counter_ns()
-                - self._timing_started_ns
-            )
-            /
-            1_000_000.0
-            if self._timing_started_ns > 0
-            else 0.0
-        )
-
-        return {
-            "schema": (
-                "privyhub_native_audio_timing_v1"
-            ),
-            "profiler_version": (
-                self.TIMING_PROBE_VERSION
-            ),
-            "duration_ms": round(
-                duration_ms,
-                3,
-            ),
-            "device": self._device,
-            "packet_ms": 5,
-            "frames_per_packet": (
-                self.FRAMES_PER_PACKET
-            ),
-            "payload_bytes": (
-                self.PAYLOAD_BYTES
-            ),
-            "directshow_audio_buffer_ms": (
-                self.DIRECTSHOW_AUDIO_BUFFER_MS
-            ),
-            "audio_buffer_architecture": (
-                self.AUDIO_BUFFER_ARCHITECTURE
-            ),
-            "reservoir": {
-                "capacity_packets": (
-                    self.RESERVOIR_CAPACITY_PACKETS
-                ),
-                "startup_target_packets": (
-                    self.RESERVOIR_START_PACKETS
-                ),
-                "packets_read": (
-                    self._reservoir_packets_read
-                ),
-                "packets_sent": (
-                    self._reservoir_packets_sent
-                ),
-                "drop_oldest": (
-                    self._reservoir_drop_oldest
-                ),
-                "max_depth": (
-                    self._reservoir_max_depth
-                ),
-                "avg_depth_at_send": round(
-                    self._reservoir_depth_total
-                    /
-                    max(
-                        1,
-                        self._reservoir_depth_samples,
-                    ),
-                    4,
-                ),
-                "underflows": (
-                    self._reservoir_underflows
-                ),
-                "sender_rebases": (
-                    self._reservoir_sender_rebases
-                ),
-                "sender_max_late_ms": round(
-                    self._reservoir_sender_max_late_ns
-                    /
-                    1_000_000.0,
-                    4,
-                ),
-                "startup_depth": (
-                    self._reservoir_start_depth
-                ),
-            },
-            "packets_sent": (
-                self._packets
-            ),
-            "payload_bytes_sent": (
-                self._bytes
-            ),
-            "send_errors": (
-                self._send_errors
-            ),
-            "read": {
-                "calls": (
-                    self._timing_read_calls
-                ),
-                "block_avg_ms": (
-                    self._average_ms(
-                        self._timing_read_block_total_ns,
-                        self._timing_read_calls,
-                    )
-                ),
-                "block_max_ms": round(
-                    self._timing_read_block_max_ns /
-                    1_000_000.0,
-                    4,
-                ),
-                "block_histogram": dict(
-                    self._timing_read_block_hist
-                ),
-                "completion_interval_count": (
-                    self._timing_read_interval_count
-                ),
-                "completion_interval_avg_ms": (
-                    self._average_ms(
-                        self._timing_read_interval_total_ns,
-                        self._timing_read_interval_count,
-                    )
-                ),
-                "completion_interval_min_ms": round(
-                    self._timing_read_interval_min_ns /
-                    1_000_000.0,
-                    4,
-                ),
-                "completion_interval_max_ms": round(
-                    self._timing_read_interval_max_ns /
-                    1_000_000.0,
-                    4,
-                ),
-                "completion_interval_histogram": dict(
-                    self._timing_read_interval_hist
-                ),
-                "burst_intervals_under_2ms": (
-                    self._timing_read_burst_intervals
-                ),
-                "long_gaps_ge_10ms": (
-                    self._timing_read_long_gaps
-                ),
-                "max_burst_packets": (
-                    self._timing_max_read_burst_packets
-                ),
-            },
-            "send": {
-                "calls": (
-                    self._timing_send_calls
-                ),
-                "call_avg_ms": (
-                    self._average_ms(
-                        self._timing_send_call_total_ns,
-                        self._timing_send_calls,
-                    )
-                ),
-                "call_max_ms": round(
-                    self._timing_send_call_max_ns /
-                    1_000_000.0,
-                    4,
-                ),
-                "call_histogram": dict(
-                    self._timing_send_call_hist
-                ),
-                "completion_interval_count": (
-                    self._timing_send_interval_count
-                ),
-                "completion_interval_avg_ms": (
-                    self._average_ms(
-                        self._timing_send_interval_total_ns,
-                        self._timing_send_interval_count,
-                    )
-                ),
-                "completion_interval_min_ms": round(
-                    self._timing_send_interval_min_ns /
-                    1_000_000.0,
-                    4,
-                ),
-                "completion_interval_max_ms": round(
-                    self._timing_send_interval_max_ns /
-                    1_000_000.0,
-                    4,
-                ),
-                "completion_interval_histogram": dict(
-                    self._timing_send_interval_hist
-                ),
-                "burst_intervals_under_2ms": (
-                    self._timing_send_burst_intervals
-                ),
-                "long_gaps_ge_10ms": (
-                    self._timing_send_long_gaps
-                ),
-                "max_burst_packets": (
-                    self._timing_max_send_burst_packets
-                ),
-            },
-            "events": list(
-                self._timing_events
-            ),
-            "event_limit": (
-                self.TIMING_EVENT_LIMIT
-            ),
-            "path": (
-                str(
-                    self._timing_path
-                )
-                if self._timing_path is not None
-                else ""
-            ),
-        }
-
-    def _persist_timing_probe(
-        self,
-    ) -> None:
-        path = (
-            self._timing_path
-        )
-
-        if (
-            path is None
-            or self._timing_started_ns <= 0
-        ):
-            return
-
-        payload = (
-            self._timing_payload()
-        )
-
-        path.parent.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-        temporary = path.with_suffix(
-            path.suffix +
-            ".tmp"
-        )
-
-        temporary.write_text(
-            json.dumps(
-                payload,
-                indent=2,
-            ),
-            encoding="utf-8",
-        )
-
-        os.replace(
-            temporary,
-            path,
-        )
+        self._last_status: dict[str, Any] = {}
 
     @staticmethod
     def _kill_process(
         process: subprocess.Popen[Any] | None,
     ) -> None:
-        if process is None or process.poll() is not None:
+        if (
+            process is None
+            or process.poll() is not None
+        ):
             return
 
         if os.name == "nt":
-            subprocess.run(
-                [
-                    "taskkill",
-                    "/PID",
-                    str(process.pid),
-                    "/T",
-                    "/F",
-                ],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                check=False,
-            )
+            try:
+                import signal
+
+                process.send_signal(
+                    signal.CTRL_BREAK_EVENT
+                )
+                process.wait(
+                    timeout=2.0
+                )
+                return
+            except Exception:
+                subprocess.run(
+                    [
+                        "taskkill",
+                        "/PID",
+                        str(process.pid),
+                        "/T",
+                        "/F",
+                    ],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                )
         else:
             try:
                 process.terminate()
@@ -764,7 +112,7 @@ class NativeAudioStreamer:
 
         try:
             process.wait(
-                timeout=3
+                timeout=2
             )
         except subprocess.TimeoutExpired:
             try:
@@ -772,84 +120,32 @@ class NativeAudioStreamer:
             except Exception:
                 pass
 
-    @staticmethod
-    def _read_exact(
-        stream,
-        size: int,
-    ) -> bytes:
-        chunks: list[bytes] = []
-        remaining = size
-
-        while remaining > 0:
-            chunk = stream.read(
-                remaining
-            )
-
-            if not chunk:
-                break
-
-            chunks.append(
-                chunk
-            )
-            remaining -= len(
-                chunk
-            )
-
-        return b"".join(
-            chunks
-        )
-
-    def _find_cable_output(
+    def _read_status(
         self,
-        ffmpeg: Path,
-    ) -> str | None:
+    ) -> dict[str, Any]:
+        if not self.status_path.is_file():
+            return {}
+
         try:
-            result = subprocess.run(
-                [
-                    str(ffmpeg),
-                    "-hide_banner",
-                    "-list_devices",
-                    "true",
-                    "-f",
-                    "dshow",
-                    "-i",
-                    "dummy",
-                ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                errors="replace",
-                timeout=8,
-                check=False,
+            payload = json.loads(
+                self.status_path.read_text(
+                    encoding="utf-8"
+                )
             )
+
+            if isinstance(
+                payload,
+                dict,
+            ):
+                self._last_status = (
+                    payload
+                )
+                return payload
         except Exception:
-            return None
+            pass
 
-        text = (
-            result.stdout
-            + "\n"
-            + result.stderr
-        )
-
-        candidates = re.findall(
-            r'"([^"\r\n]*CABLE Output[^"\r\n]*)"',
-            text,
-            flags=re.IGNORECASE,
-        )
-
-        if not candidates:
-            return None
-
-        preferred = [
-            candidate
-            for candidate in candidates
-            if "VB-Audio Virtual Cable" in candidate
-        ]
-
-        return (
-            preferred[0]
-            if preferred
-            else candidates[0]
+        return dict(
+            self._last_status
         )
 
     def start(
@@ -857,56 +153,91 @@ class NativeAudioStreamer:
         ffmpeg: Path,
         client_ip: str,
         client_port: int,
+        process_id: int,
     ) -> dict[str, Any]:
+        del ffmpeg
+
         with self._lock:
             self.stop()
 
-            device = (
-                self._find_cable_output(
-                    ffmpeg
+            if os.name != "nt":
+                raise NativeSessionIOError(
+                    "Windows process-loopback audio is Windows-only."
                 )
+
+            if not self.helper_path.is_file():
+                raise NativeSessionIOError(
+                    "PrivyHub process-loopback audio helper is missing. "
+                    "Re-apply the v0.21.1 audio probe patch."
+                )
+
+            process_id = int(
+                process_id
             )
 
-            if not device:
+            if process_id <= 0:
                 raise NativeSessionIOError(
-                    "VB-CABLE recording endpoint was not found. "
-                    "Expected a DirectShow audio source containing "
-                    "\"CABLE Output\"."
+                    "Managed RetroArch process ID is invalid."
                 )
 
-            self.log_dir.mkdir(
+            self.timing_log_dir.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+            self.status_path.parent.mkdir(
                 parents=True,
                 exist_ok=True,
             )
 
+            stamp = time.strftime(
+                "%Y%m%d_%H%M%S"
+            )
+            self._timing_path = (
+                self.timing_log_dir
+                / (
+                    "audio_process_loopback_"
+                    + stamp
+                    + ".json"
+                )
+            )
+
+            try:
+                self.status_path.unlink(
+                    missing_ok=True
+                )
+            except OSError:
+                pass
+
             self._log_handle = open(
-                self.log_path,
+                self.helper_log_path,
                 "ab",
                 buffering=0,
             )
 
             command = [
-                str(ffmpeg),
-                "-hide_banner",
-                "-loglevel",
-                "warning",
-                "-nostdin",
-                "-f",
-                "dshow",
-                "-audio_buffer_size",
-                "20",
-                "-i",
-                f"audio={device}",
-                "-vn",
-                "-ac",
-                str(self.CHANNELS),
-                "-ar",
-                str(self.SAMPLE_RATE),
-                "-c:a",
-                "pcm_s16le",
-                "-f",
-                "s16le",
-                "pipe:1",
+                str(
+                    self.helper_path
+                ),
+                "--pid",
+                str(
+                    process_id
+                ),
+                "--client-ip",
+                client_ip,
+                "--port",
+                str(
+                    int(
+                        client_port
+                    )
+                ),
+                "--log",
+                str(
+                    self._timing_path
+                ),
+                "--status",
+                str(
+                    self.status_path
+                ),
             ]
 
             creationflags = (
@@ -916,459 +247,201 @@ class NativeAudioStreamer:
             )
 
             try:
-                self._process = subprocess.Popen(
-                    command,
-                    cwd=str(
-                        self.project_root
-                    ),
-                    stdin=subprocess.DEVNULL,
-                    stdout=subprocess.PIPE,
-                    stderr=self._log_handle,
-                    bufsize=0,
-                    creationflags=creationflags,
+                self._process = (
+                    subprocess.Popen(
+                        command,
+                        cwd=str(
+                            self.project_root
+                        ),
+                        stdin=subprocess.DEVNULL,
+                        stdout=self._log_handle,
+                        stderr=self._log_handle,
+                        creationflags=creationflags,
+                    )
                 )
             except Exception as exc:
                 self.stop()
 
                 raise NativeSessionIOError(
-                    f"Unable to start VB-CABLE audio capture: {exc}"
+                    "Unable to start native Windows process-loopback "
+                    f"audio helper: {exc}"
                 ) from exc
 
-            time.sleep(
-                0.35
+            self._target_pid = (
+                process_id
+            )
+            self._client_ip = (
+                client_ip
+            )
+            self._client_port = int(
+                client_port
+            )
+            self._last_status = {}
+
+            deadline = (
+                time.monotonic()
+                + 5.0
             )
 
-            if (
-                self._process is None
-                or self._process.poll() is not None
-                or self._process.stdout is None
-            ):
-                self.stop()
-
-                raise NativeSessionIOError(
-                    "VB-CABLE audio capture exited during startup. "
-                    "See logs/games/native_audio_alpha.log."
-                )
-
-            self._device = device
-            self._client_ip = client_ip
-            self._client_port = client_port
-            self._packets = 0
-            self._bytes = 0
-            self._send_errors = 0
-
-            with self._reservoir_condition:
-                self._reservoir.clear()
-                self._source_ended = False
-                self._reservoir_packets_read = 0
-                self._reservoir_packets_sent = 0
-                self._reservoir_drop_oldest = 0
-                self._reservoir_max_depth = 0
-                self._reservoir_depth_samples = 0
-                self._reservoir_depth_total = 0
-                self._reservoir_underflows = 0
-                self._reservoir_sender_rebases = 0
-                self._reservoir_sender_max_late_ns = 0
-                self._reservoir_start_depth = 0
-
-            self._reset_timing_probe()
-
-            self._socket = socket.socket(
-                socket.AF_INET,
-                socket.SOCK_DGRAM,
-            )
-
-            self._running.set()
-
-            self._reader_thread = threading.Thread(
-                target=self._reader_loop,
-                name="PrivyHub-Native-Audio-Reader",
-                daemon=True,
-            )
-
-            self._thread = threading.Thread(
-                target=self._send_loop,
-                name="PrivyHub-Native-Audio-Sender",
-                daemon=True,
-            )
-
-            # Reader starts first so it can immediately drain FFmpeg's bursty
-            # stdout pipe. The sender independently consumes the bounded
-            # reservoir at the sample clock.
-            self._reader_thread.start()
-            self._thread.start()
-
-            return self.status()
-
-    def _reader_loop(
-        self,
-    ) -> None:
-        process = self._process
-
-        if (
-            process is None
-            or process.stdout is None
-        ):
-            with self._reservoir_condition:
-                self._source_ended = True
-                self._reservoir_condition.notify_all()
-            return
-
-        try:
-            while self._running.is_set():
-                read_started_ns = (
-                    time.perf_counter_ns()
-                )
-
-                payload = self._read_exact(
-                    process.stdout,
-                    self.PAYLOAD_BYTES,
-                )
-
-                read_done_ns = (
-                    time.perf_counter_ns()
-                )
-
-                self._observe_read_timing(
-                    read_started_ns,
-                    read_done_ns,
-                )
-
-                if len(payload) != self.PAYLOAD_BYTES:
-                    break
-
-                with self._reservoir_condition:
-                    if (
-                        len(self._reservoir)
-                        >= self.RESERVOIR_CAPACITY_PACKETS
-                    ):
-                        self._reservoir.popleft()
-                        self._reservoir_drop_oldest += 1
-
-                    self._reservoir.append(
-                        payload
-                    )
-
-                    self._reservoir_packets_read += 1
-                    self._reservoir_max_depth = max(
-                        self._reservoir_max_depth,
-                        len(self._reservoir),
-                    )
-
-                    self._reservoir_condition.notify_all()
-
-        finally:
-            with self._reservoir_condition:
-                self._source_ended = True
-                self._reservoir_condition.notify_all()
-
-    def _send_loop(
-        self,
-    ) -> None:
-        sock = self._socket
-        destination = (
-            self._client_ip,
-            self._client_port,
-        )
-
-        if (
-            sock is None
-            or destination[0] is None
-            or destination[1] is None
-        ):
-            return
-
-        sequence = 0
-        sample_timestamp = 0
-        next_send_ns = 0
-        started = False
-
-        try:
-            while self._running.is_set():
-                payload: bytes | None = None
-
-                with self._reservoir_condition:
-                    while (
-                        self._running.is_set()
-                        and not self._source_ended
-                        and (
-                            not self._reservoir
-                            or (
-                                not started
-                                and len(self._reservoir)
-                                < self.RESERVOIR_START_PACKETS
-                            )
-                        )
-                    ):
-                        self._reservoir_condition.wait(
-                            timeout=0.05
-                        )
-
-                    if not self._running.is_set():
-                        break
-
-                    if (
-                        not self._reservoir
-                        and self._source_ended
-                    ):
-                        break
-
-                    if not self._reservoir:
-                        self._reservoir_underflows += 1
-                        self._reservoir_condition.wait(
-                            timeout=0.01
-                        )
-                        continue
-
-                    if not started:
-                        started = True
-                        self._reservoir_start_depth = (
-                            len(self._reservoir)
-                        )
-                        next_send_ns = (
-                            time.perf_counter_ns()
-                        )
-
-                    payload = self._reservoir.popleft()
-
-                    self._reservoir_depth_samples += 1
-                    self._reservoir_depth_total += (
-                        len(self._reservoir)
-                    )
-
-                if payload is None:
-                    continue
-
-                now_ns = time.perf_counter_ns()
-
-                if next_send_ns <= 0:
-                    next_send_ns = now_ns
-
-                if now_ns < next_send_ns:
-                    time.sleep(
-                        (
-                            next_send_ns
-                            - now_ns
-                        )
-                        /
-                        1_000_000_000.0
-                    )
-
-                send_started_ns = (
-                    time.perf_counter_ns()
-                )
-
-                lateness_ns = max(
-                    0,
-                    send_started_ns
-                    - next_send_ns,
-                )
-
-                self._reservoir_sender_max_late_ns = max(
-                    self._reservoir_sender_max_late_ns,
-                    lateness_ns,
+            while time.monotonic() < deadline:
+                process = (
+                    self._process
                 )
 
                 if (
-                    lateness_ns
-                    > self.SENDER_REBASE_LATE_NS
+                    process is None
+                    or process.poll()
+                    is not None
                 ):
-                    self._reservoir_sender_rebases += 1
-                    next_send_ns = send_started_ns
-
-                packet = (
-                    self.HEADER.pack(
-                        self.MAGIC,
-                        self.VERSION,
-                        self.CHANNELS,
-                        sequence & 0xFFFF,
-                        sample_timestamp & 0xFFFFFFFF,
-                        self.FRAMES_PER_PACKET,
+                    status = (
+                        self._read_status()
                     )
-                    + payload
-                )
+                    detail = str(
+                        status.get(
+                            "error",
+                            "",
+                        )
+                    ).strip()
 
-                try:
-                    sock.sendto(
-                        packet,
-                        destination,
+                    self.stop()
+
+                    raise NativeSessionIOError(
+                        "Windows process-loopback audio helper exited "
+                        "during startup."
+                        + (
+                            " "
+                            + detail
+                            if detail
+                            else ""
+                        )
                     )
-                    self._packets += 1
-                    self._bytes += len(
-                        payload
+
+                status = (
+                    self._read_status()
+                )
+
+                if bool(
+                    status.get(
+                        "ready",
+                        False,
                     )
-                    self._reservoir_packets_sent += 1
-                except OSError:
-                    self._send_errors += 1
+                ):
+                    return self.status()
 
-                send_done_ns = (
-                    time.perf_counter_ns()
+                time.sleep(
+                    0.05
                 )
 
-                self._observe_send_timing(
-                    send_started_ns,
-                    send_done_ns,
-                )
+            self.stop()
 
-                sequence = (
-                    sequence + 1
-                ) & 0xFFFF
-
-                sample_timestamp = (
-                    sample_timestamp
-                    + self.FRAMES_PER_PACKET
-                ) & 0xFFFFFFFF
-
-                next_send_ns += (
-                    self.SENDER_INTERVAL_NS
-                )
-
-                # A source underrun is handled by waiting for real PCM. Once
-                # the reservoir refills, rebase the sender clock rather than
-                # trying to reproduce the missed wall-clock packets in a burst.
-                with self._reservoir_condition:
-                    if (
-                        not self._reservoir
-                        and not self._source_ended
-                    ):
-                        self._reservoir_underflows += 1
-
-                        while (
-                            self._running.is_set()
-                            and not self._source_ended
-                            and not self._reservoir
-                        ):
-                            self._reservoir_condition.wait(
-                                timeout=0.05
-                            )
-
-                        if self._reservoir:
-                            next_send_ns = (
-                                time.perf_counter_ns()
-                            )
-                            self._reservoir_sender_rebases += 1
-
-        finally:
-            self._running.clear()
-
-            with self._reservoir_condition:
-                self._reservoir_condition.notify_all()
+            raise NativeSessionIOError(
+                "Windows process-loopback audio helper did not become "
+                "ready within 5 seconds."
+            )
 
     def status(
         self,
     ) -> dict[str, Any]:
         process_active = (
             self._process is not None
-            and self._process.poll() is None
+            and self._process.poll()
+            is None
+        )
+
+        helper = (
+            self._read_status()
         )
 
         return {
             "active": (
                 process_active
-                and self._running.is_set()
+                and bool(
+                    helper.get(
+                        "ready",
+                        False,
+                    )
+                )
             ),
-            "device": self._device,
-            "sample_rate": self.SAMPLE_RATE,
-            "channels": self.CHANNELS,
+            "device": (
+                "managed_process_audio"
+            ),
+            "sample_rate": 48_000,
+            "channels": 2,
             "format": "pcm_s16le",
             "packet_ms": 5,
-            "packets_sent": self._packets,
-            "payload_bytes_sent": self._bytes,
-            "send_errors": self._send_errors,
+            "port": self._client_port,
+            "target_pid": (
+                self._target_pid
+            ),
+            "include_process_tree": True,
+            "capture_backend": (
+                "windows_wasapi_process_loopback"
+            ),
+            "helper": (
+                "NAudio.Wasapi 3.0.1"
+            ),
             "timing_probe": (
                 self.TIMING_PROBE_VERSION
             ),
             "audio_buffer_architecture": (
                 self.AUDIO_BUFFER_ARCHITECTURE
             ),
-            "directshow_audio_buffer_ms": (
-                self.DIRECTSHOW_AUDIO_BUFFER_MS
+            "packets_sent": int(
+                helper.get(
+                    "send",
+                    {},
+                ).get(
+                    "packets",
+                    0,
+                )
+                if isinstance(
+                    helper.get(
+                        "send",
+                        {},
+                    ),
+                    dict,
+                )
+                else 0
             ),
-            "reservoir_depth": len(
-                self._reservoir
-            ),
-            "reservoir_capacity_packets": (
-                self.RESERVOIR_CAPACITY_PACKETS
-            ),
-            "reservoir_drop_oldest": (
-                self._reservoir_drop_oldest
-            ),
-            "reservoir_underflows": (
-                self._reservoir_underflows
-            ),
-            "reservoir_sender_rebases": (
-                self._reservoir_sender_rebases
+            "send_errors": int(
+                helper.get(
+                    "send",
+                    {},
+                ).get(
+                    "errors",
+                    0,
+                )
+                if isinstance(
+                    helper.get(
+                        "send",
+                        {},
+                    ),
+                    dict,
+                )
+                else 0
             ),
             "timing_log": (
                 str(
                     self._timing_path
                 )
-                if self._timing_path is not None
+                if self._timing_path
+                is not None
                 else ""
             ),
-            "timing_read_bursts_under_2ms": (
-                self._timing_read_burst_intervals
-            ),
-            "timing_read_gaps_ge_10ms": (
-                self._timing_read_long_gaps
-            ),
-            "timing_send_bursts_under_2ms": (
-                self._timing_send_burst_intervals
-            ),
-            "timing_send_gaps_ge_10ms": (
-                self._timing_send_long_gaps
-            ),
-            "port": self._client_port,
+            "helper_status": helper,
         }
 
     def stop(
         self,
     ) -> None:
-        self._running.clear()
-
-        with self._reservoir_condition:
-            self._reservoir_condition.notify_all()
-
-        sock = self._socket
-        self._socket = None
-
-        if sock is not None:
-            try:
-                sock.close()
-            except OSError:
-                pass
-
-        self._kill_process(
+        process = (
             self._process
         )
         self._process = None
 
-        thread = self._thread
-        self._thread = None
-
-        reader_thread = self._reader_thread
-        self._reader_thread = None
-
-        if (
-            reader_thread is not None
-            and reader_thread is not threading.current_thread()
-        ):
-            reader_thread.join(
-                timeout=1
-            )
-
-        if (
-            thread is not None
-            and thread is not threading.current_thread()
-        ):
-            thread.join(
-                timeout=1
-            )
-
-        try:
-            self._persist_timing_probe()
-        except Exception:
-            pass
+        self._kill_process(
+            process
+        )
 
         if self._log_handle is not None:
             try:
@@ -1379,11 +452,7 @@ class NativeAudioStreamer:
         self._log_handle = None
         self._client_ip = None
         self._client_port = None
-
-        with self._reservoir_condition:
-            self._reservoir.clear()
-            self._source_ended = True
-
+        self._target_pid = None
 
 class NativeControllerBridge:
     MAGIC = b"PHI1"
@@ -1814,6 +883,7 @@ class NativeSessionIO:
         client_ip: str,
         audio_port: int,
         input_port: int,
+        process_id: int,
     ) -> dict[str, Any]:
         self.stop()
 
@@ -1835,6 +905,7 @@ class NativeSessionIO:
                 ffmpeg=ffmpeg,
                 client_ip=client_ip,
                 client_port=audio_port,
+                process_id=process_id,
             )
         except Exception as exc:
             self._audio_error = str(

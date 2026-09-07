@@ -1184,6 +1184,9 @@ class NativeStreamManager:
                 client_ip=client_ip,
                 audio_port=self.AUDIO_PORT,
                 input_port=self.INPUT_PORT,
+                process_id=int(
+                    capture_target["pid"]
+                ),
             )
 
             payload = self.status()
