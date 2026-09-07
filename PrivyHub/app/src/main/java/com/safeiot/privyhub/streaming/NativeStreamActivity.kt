@@ -222,6 +222,10 @@ class NativeStreamActivity :
                     "PrivyHub Native Video Alpha\nPreparing receiver..."
             }
 
+        // two_player_clean_presentation_poc_v0.1.1
+        statusView.visibility =
+            View.GONE
+
         val statusLayout =
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,

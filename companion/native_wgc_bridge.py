@@ -18,8 +18,8 @@ SOURCE_TICK_TO_MS = 1.0 / 10_000.0
 
 # Passive capture-compatibility diagnostics. These values do not
 # alter WGC, FFmpeg, FEC, decoder, audio, or controller behavior.
-DIAGNOSTIC_INTERVAL_SECONDS = 1.0
-BLACK_SAMPLE_EVERY_CALLBACKS = 60
+DIAGNOSTIC_INTERVAL_SECONDS = 5.0
+BLACK_SAMPLE_EVERY_CALLBACKS = 300
 BLACK_SAMPLE_PIXEL_BUDGET = 2048
 NEAR_BLACK_MEAN_RGB = 4.0
 NEAR_BLACK_NONBLACK_FRACTION = 0.01
@@ -279,6 +279,44 @@ def _normalize_bgra_to_envelope(
         width_delta,
         height_delta,
     ) <= 0.15:
+        # Fast case: the resized WGC surface is at least as large as the
+        # original raw-video envelope in both dimensions. Center-crop directly
+        # from the WGC ndarray and pack once into the immutable latest-frame
+        # bytes object. This removes the former full-frame zero canvas and
+        # extra ndarray copy. The 941x763 -> 881x763 compatibility case uses
+        # this path.
+        if (
+            source_width >= target_width
+            and source_height >= target_height
+        ):
+            source_x = (
+                source_width -
+                target_width
+            ) // 2
+
+            source_y = (
+                source_height -
+                target_height
+            ) // 2
+
+            return (
+                frame_buffer[
+                    source_y:
+                        source_y +
+                        target_height,
+                    source_x:
+                        source_x +
+                        target_width,
+                    :,
+                ].tobytes(
+                    order="C"
+                ),
+                "direct_crop",
+            )
+
+        # Padding is required when one or both source dimensions are smaller
+        # than the fixed raw-video envelope. Keep the proven compatibility
+        # behavior for that less common case.
         canvas = np.zeros(
             (
                 target_height,
@@ -880,6 +918,7 @@ def main() -> int:
     size_mismatch_frames = 0
     size_mismatch_drops = 0
     normalized_size_frames = 0
+    normalization_direct_crop_frames = 0
     normalization_crop_pad_frames = 0
     normalization_scaled_frames = 0
     normalization_failures = 0
@@ -928,11 +967,12 @@ def main() -> int:
 
     diagnostics: dict[str, object] = {
         "version": (
-            "PrivyHub WGC Dynamic Size Fix v0.13.1"
+            "PrivyHub WGC Capture Hotpath Optimization v0.14"
         ),
         "dynamic_size_fix": True,
+        "capture_hotpath_optimized": True,
         "normalization_policy": (
-            "small_center_crop_pad_large_aspect_fit"
+            "small_direct_crop_or_pad_large_aspect_fit"
         ),
         "started_unix_ms": int(
             time.time() *
@@ -1184,7 +1224,7 @@ def main() -> int:
                 ] = largest_hwnd
 
         if source_width <= 0:
-            return
+            return probe
 
         payload = {
             "ok": True,
@@ -1195,7 +1235,7 @@ def main() -> int:
                 "latest_frame_60hz_cadence_lock"
             ),
             "diagnostic_version": (
-                "capture_compatibility_v0.13"
+                "capture_hotpath_v0.14"
             ),
             "pixel_format": "bgra",
             "width": source_width,
@@ -1214,6 +1254,9 @@ def main() -> int:
             "size_mismatch_frames": size_mismatch_frames,
             "size_mismatch_drops": size_mismatch_drops,
             "normalized_size_frames": normalized_size_frames,
+            "normalization_direct_crop_frames": (
+                normalization_direct_crop_frames
+            ),
             "normalization_crop_pad_frames": (
                 normalization_crop_pad_frames
             ),
@@ -1222,6 +1265,43 @@ def main() -> int:
             ),
             "normalization_failures": normalization_failures,
             "late_ticks": late_ticks,
+            "frame_bytes": expected_bytes,
+            "raw_bytes_emitted": (
+                emitted_frames *
+                expected_bytes
+            ),
+            "copy_time_total_ms": round(
+                copy_time_total_ms,
+                3,
+            ),
+            "copy_time_avg_ms": round(
+                copy_time_total_ms /
+                max(
+                    1,
+                    callbacks,
+                ),
+                4,
+            ),
+            "copy_time_max_ms": round(
+                copy_time_max_ms,
+                3,
+            ),
+            "write_time_total_ms": round(
+                write_time_total_ms,
+                3,
+            ),
+            "write_time_avg_ms": round(
+                write_time_total_ms /
+                max(
+                    1,
+                    emitted_frames,
+                ),
+                4,
+            ),
+            "write_time_max_ms": round(
+                write_time_max_ms,
+                3,
+            ),
             "diagnostics": dict(
                 diagnostics
             ),
@@ -1246,6 +1326,8 @@ def main() -> int:
                 payload,
             )
 
+        return probe
+
     def diagnostic_loop() -> None:
         last_warning_state = None
 
@@ -1253,22 +1335,13 @@ def main() -> int:
             DIAGNOSTIC_INTERVAL_SECONDS
         ):
             try:
-                write_diagnostic_snapshot()
+                probe = write_diagnostic_snapshot()
 
-                if source_width <= 0:
+                if (
+                    source_width <= 0
+                    or probe is None
+                ):
                     continue
-
-                probe = _window_probe(
-                    int(
-                        args.hwnd
-                    ),
-                    int(
-                        diagnostics.get(
-                            "owner_pid",
-                            0,
-                        )
-                    ),
-                )
 
                 warning_state = (
                     bool(
@@ -1341,8 +1414,8 @@ def main() -> int:
     diagnostic.start()
 
     print(
-        "PrivyHub WGC Dynamic Size Fix v0.13.1 active; "
-        "stable-size fast path unchanged",
+        "PrivyHub WGC Capture Hotpath Optimization v0.14 active; "
+        "stable-size semantics unchanged",
         file=sys.stderr,
         flush=True,
     )
@@ -1375,6 +1448,7 @@ def main() -> int:
         nonlocal size_mismatch_frames
         nonlocal size_mismatch_drops
         nonlocal normalized_size_frames
+        nonlocal normalization_direct_crop_frames
         nonlocal normalization_crop_pad_frames
         nonlocal normalization_scaled_frames
         nonlocal normalization_failures
@@ -1562,6 +1636,11 @@ def main() -> int:
 
                     if (
                         normalization_strategy ==
+                        "direct_crop"
+                    ):
+                        normalization_direct_crop_frames += 1
+                    elif (
+                        normalization_strategy ==
                         "center_crop_pad"
                     ):
                         normalization_crop_pad_frames += 1
@@ -1612,8 +1691,8 @@ def main() -> int:
             ):
                 sample = _sample_bgra_content(
                     payload,
-                    width,
-                    height,
+                    source_width,
+                    source_height,
                 )
 
                 diagnostics[

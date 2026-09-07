@@ -30,47 +30,26 @@ class NativeControllerSender(
     private val port: Int
 ) {
     companion object {
-        private const val XUSB_DPAD_UP =
-            0x0001
+        const val TWO_PLAYER_POC_VERSION =
+            "two_player_poc_v0.1"
 
-        private const val XUSB_DPAD_DOWN =
-            0x0002
+        private const val PLAYER_COUNT =
+            2
 
-        private const val XUSB_DPAD_LEFT =
-            0x0004
-
-        private const val XUSB_DPAD_RIGHT =
-            0x0008
-
-        private const val XUSB_START =
-            0x0010
-
-        private const val XUSB_BACK =
-            0x0020
-
-        private const val XUSB_LEFT_THUMB =
-            0x0040
-
-        private const val XUSB_RIGHT_THUMB =
-            0x0080
-
-        private const val XUSB_LEFT_SHOULDER =
-            0x0100
-
-        private const val XUSB_RIGHT_SHOULDER =
-            0x0200
-
-        private const val XUSB_A =
-            0x1000
-
-        private const val XUSB_B =
-            0x2000
-
-        private const val XUSB_X =
-            0x4000
-
-        private const val XUSB_Y =
-            0x8000
+        private const val XUSB_DPAD_UP = 0x0001
+        private const val XUSB_DPAD_DOWN = 0x0002
+        private const val XUSB_DPAD_LEFT = 0x0004
+        private const val XUSB_DPAD_RIGHT = 0x0008
+        private const val XUSB_START = 0x0010
+        private const val XUSB_BACK = 0x0020
+        private const val XUSB_LEFT_THUMB = 0x0040
+        private const val XUSB_RIGHT_THUMB = 0x0080
+        private const val XUSB_LEFT_SHOULDER = 0x0100
+        private const val XUSB_RIGHT_SHOULDER = 0x0200
+        private const val XUSB_A = 0x1000
+        private const val XUSB_B = 0x2000
+        private const val XUSB_X = 0x4000
+        private const val XUSB_Y = 0x8000
     }
 
     private data class State(
@@ -87,8 +66,13 @@ class NativeControllerSender(
         var hatY: Int = 0
     )
 
-    private val state =
-        State()
+    private val states =
+        Array(PLAYER_COUNT) {
+            State()
+        }
+
+    private val devicePlayers =
+        mutableMapOf<String, Int>()
 
     private val lock =
         Any()
@@ -115,8 +99,15 @@ class NativeControllerSender(
             return
         }
 
-        running =
-            true
+        synchronized(lock) {
+            devicePlayers.clear()
+
+            for (state in states) {
+                resetState(state)
+            }
+        }
+
+        running = true
 
         worker =
             thread(
@@ -129,87 +120,42 @@ class NativeControllerSender(
     }
 
     fun stop() {
-        synchronized(
-            lock
-        ) {
-            state.buttons =
-                0
+        synchronized(lock) {
+            for (state in states) {
+                resetState(state)
+            }
 
-            state.lx =
-                0
-
-            state.ly =
-                0
-
-            state.rx =
-                0
-
-            state.ry =
-                0
-
-            state.lt =
-                0
-
-            state.rt =
-                0
-
-            state.digitalLt =
-                false
-
-            state.digitalRt =
-                false
-
-            state.hatX =
-                0
-
-            state.hatY =
-                0
+            devicePlayers.clear()
         }
 
-        running =
-            false
+        running = false
 
         try {
-            worker?.join(
-                500
-            )
+            worker?.join(500)
         } catch (_: InterruptedException) {
-            Thread.currentThread()
-                .interrupt()
+            Thread.currentThread().interrupt()
         }
 
-        worker =
-            null
+        worker = null
     }
 
     fun snapshot():
         NativeControllerMetrics {
         val current =
-            synchronized(
-                lock
-            ) {
-                state.copy()
+            synchronized(lock) {
+                states[0].copy()
             }
 
         return NativeControllerMetrics(
-            packetsSent =
-                packetsSent.get(),
-            sendErrors =
-                sendErrors.get(),
-            motionEvents =
-                motionEvents.get(),
-            lx =
-                current.lx.toInt(),
-            ly =
-                current.ly.toInt(),
-            rx =
-                current.rx.toInt(),
-            ry =
-                current.ry.toInt(),
-            hatX =
-                current.hatX,
-            hatY =
-                current.hatY
+            packetsSent = packetsSent.get(),
+            sendErrors = sendErrors.get(),
+            motionEvents = motionEvents.get(),
+            lx = current.lx.toInt(),
+            ly = current.ly.toInt(),
+            rx = current.rx.toInt(),
+            ry = current.ry.toInt(),
+            hatX = current.hatX,
+            hatY = current.hatY
         )
     }
 
@@ -217,139 +163,86 @@ class NativeControllerSender(
         event: KeyEvent
     ): Boolean {
         val bit =
-            when (
-                event.keyCode
-            ) {
-                KeyEvent.KEYCODE_DPAD_UP ->
-                    XUSB_DPAD_UP
-
-                KeyEvent.KEYCODE_DPAD_DOWN ->
-                    XUSB_DPAD_DOWN
-
-                KeyEvent.KEYCODE_DPAD_LEFT ->
-                    XUSB_DPAD_LEFT
-
-                KeyEvent.KEYCODE_DPAD_RIGHT ->
-                    XUSB_DPAD_RIGHT
-
-                KeyEvent.KEYCODE_BUTTON_START ->
-                    XUSB_START
-
-                KeyEvent.KEYCODE_BUTTON_SELECT ->
-                    XUSB_BACK
-
-                KeyEvent.KEYCODE_BUTTON_THUMBL ->
-                    XUSB_LEFT_THUMB
-
-                KeyEvent.KEYCODE_BUTTON_THUMBR ->
-                    XUSB_RIGHT_THUMB
-
-                KeyEvent.KEYCODE_BUTTON_L1 ->
-                    XUSB_LEFT_SHOULDER
-
-                KeyEvent.KEYCODE_BUTTON_R1 ->
-                    XUSB_RIGHT_SHOULDER
-
-                KeyEvent.KEYCODE_BUTTON_A ->
-                    XUSB_A
-
-                KeyEvent.KEYCODE_BUTTON_B ->
-                    XUSB_B
-
-                KeyEvent.KEYCODE_BUTTON_X ->
-                    XUSB_X
-
-                KeyEvent.KEYCODE_BUTTON_Y ->
-                    XUSB_Y
-
-                else ->
-                    0
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_UP -> XUSB_DPAD_UP
+                KeyEvent.KEYCODE_DPAD_DOWN -> XUSB_DPAD_DOWN
+                KeyEvent.KEYCODE_DPAD_LEFT -> XUSB_DPAD_LEFT
+                KeyEvent.KEYCODE_DPAD_RIGHT -> XUSB_DPAD_RIGHT
+                KeyEvent.KEYCODE_BUTTON_START -> XUSB_START
+                KeyEvent.KEYCODE_BUTTON_SELECT -> XUSB_BACK
+                KeyEvent.KEYCODE_BUTTON_THUMBL -> XUSB_LEFT_THUMB
+                KeyEvent.KEYCODE_BUTTON_THUMBR -> XUSB_RIGHT_THUMB
+                KeyEvent.KEYCODE_BUTTON_L1 -> XUSB_LEFT_SHOULDER
+                KeyEvent.KEYCODE_BUTTON_R1 -> XUSB_RIGHT_SHOULDER
+                KeyEvent.KEYCODE_BUTTON_A -> XUSB_A
+                KeyEvent.KEYCODE_BUTTON_B -> XUSB_B
+                KeyEvent.KEYCODE_BUTTON_X -> XUSB_X
+                KeyEvent.KEYCODE_BUTTON_Y -> XUSB_Y
+                else -> 0
             }
 
-        if (
-            bit != 0
-        ) {
-            synchronized(
-                lock
-            ) {
-                if (
-                    event.action ==
-                    KeyEvent.ACTION_DOWN
-                ) {
+        val isDigitalTrigger =
+            event.keyCode == KeyEvent.KEYCODE_BUTTON_L2 ||
+                event.keyCode == KeyEvent.KEYCODE_BUTTON_R2
+
+        if (bit == 0 && !isDigitalTrigger) {
+            return false
+        }
+
+        val device =
+            event.device
+                ?: return false
+
+        if (!isControllerDevice(device)) {
+            return false
+        }
+
+        val player =
+            playerForDevice(device)
+                ?: return false
+
+        synchronized(lock) {
+            val state = states[player]
+
+            if (bit != 0) {
+                if (event.action == KeyEvent.ACTION_DOWN) {
                     state.buttons =
-                        state.buttons or
-                            bit
-                } else if (
-                    event.action ==
-                    KeyEvent.ACTION_UP
-                ) {
+                        state.buttons or bit
+                } else if (event.action == KeyEvent.ACTION_UP) {
                     state.buttons =
-                        state.buttons and
-                            bit.inv()
+                        state.buttons and bit.inv()
                 }
             }
 
-            return true
-        }
-
-        if (
-            event.keyCode ==
-            KeyEvent.KEYCODE_BUTTON_L2
-        ) {
-            synchronized(
-                lock
-            ) {
+            if (event.keyCode == KeyEvent.KEYCODE_BUTTON_L2) {
                 state.digitalLt =
-                    event.action ==
-                        KeyEvent.ACTION_DOWN
+                    event.action == KeyEvent.ACTION_DOWN
             }
 
-            return true
-        }
-
-        if (
-            event.keyCode ==
-            KeyEvent.KEYCODE_BUTTON_R2
-        ) {
-            synchronized(
-                lock
-            ) {
+            if (event.keyCode == KeyEvent.KEYCODE_BUTTON_R2) {
                 state.digitalRt =
-                    event.action ==
-                        KeyEvent.ACTION_DOWN
+                    event.action == KeyEvent.ACTION_DOWN
             }
-
-            return true
         }
 
-        return false
+        return true
     }
 
     fun handleMotionEvent(
         event: MotionEvent
     ): Boolean {
-        if (
-            event.action !=
-            MotionEvent.ACTION_MOVE
-        ) {
+        if (event.action != MotionEvent.ACTION_MOVE) {
             return false
         }
 
-        val source =
-            event.source
+        val source = event.source
 
         val isJoystick =
-            (
-                source and
-                    InputDevice.SOURCE_JOYSTICK
-            ) ==
+            (source and InputDevice.SOURCE_JOYSTICK) ==
                 InputDevice.SOURCE_JOYSTICK
 
         val isGamepad =
-            (
-                source and
-                    InputDevice.SOURCE_GAMEPAD
-            ) ==
+            (source and InputDevice.SOURCE_GAMEPAD) ==
                 InputDevice.SOURCE_GAMEPAD
 
         val device =
@@ -374,13 +267,13 @@ class NativeControllerSender(
                     source
                 ) != null
 
-        if (
-            !isJoystick &&
-            !isGamepad &&
-            !hasGameAxes
-        ) {
+        if (!isJoystick && !isGamepad && !hasGameAxes) {
             return false
         }
+
+        val player =
+            playerForDevice(device)
+                ?: return false
 
         val lx =
             stickAxis(
@@ -474,67 +367,29 @@ class NativeControllerSender(
 
         val hatXDigital =
             when {
-                hatX <= -0.5f ->
-                    -1
-
-                hatX >= 0.5f ->
-                    1
-
-                else ->
-                    0
+                hatX <= -0.5f -> -1
+                hatX >= 0.5f -> 1
+                else -> 0
             }
 
         val hatYDigital =
             when {
-                hatY <= -0.5f ->
-                    -1
-
-                hatY >= 0.5f ->
-                    1
-
-                else ->
-                    0
+                hatY <= -0.5f -> -1
+                hatY >= 0.5f -> 1
+                else -> 0
             }
 
-        synchronized(
-            lock
-        ) {
-            state.lx =
-                toStick(
-                    lx
-                )
+        synchronized(lock) {
+            val state = states[player]
 
-            // Android joystick +Y is down; XInput +Y is up.
-            state.ly =
-                toStick(
-                    -ly
-                )
-
-            state.rx =
-                toStick(
-                    rx
-                )
-
-            state.ry =
-                toStick(
-                    -ry
-                )
-
-            state.lt =
-                toTrigger(
-                    lt
-                )
-
-            state.rt =
-                toTrigger(
-                    rt
-                )
-
-            state.hatX =
-                hatXDigital
-
-            state.hatY =
-                hatYDigital
+            state.lx = toStick(lx)
+            state.ly = toStick(-ly)
+            state.rx = toStick(rx)
+            state.ry = toStick(-ry)
+            state.lt = toTrigger(lt)
+            state.rt = toTrigger(rt)
+            state.hatX = hatXDigital
+            state.hatY = hatYDigital
 
             val dpadMask =
                 XUSB_DPAD_UP or
@@ -543,41 +398,87 @@ class NativeControllerSender(
                     XUSB_DPAD_RIGHT
 
             state.buttons =
-                state.buttons and
-                    dpadMask.inv()
+                state.buttons and dpadMask.inv()
 
-            if (
-                hatXDigital < 0
-            ) {
+            if (hatXDigital < 0) {
                 state.buttons =
-                    state.buttons or
-                        XUSB_DPAD_LEFT
-            } else if (
-                hatXDigital > 0
-            ) {
+                    state.buttons or XUSB_DPAD_LEFT
+            } else if (hatXDigital > 0) {
                 state.buttons =
-                    state.buttons or
-                        XUSB_DPAD_RIGHT
+                    state.buttons or XUSB_DPAD_RIGHT
             }
 
-            if (
-                hatYDigital < 0
-            ) {
+            if (hatYDigital < 0) {
                 state.buttons =
-                    state.buttons or
-                        XUSB_DPAD_UP
-            } else if (
-                hatYDigital > 0
-            ) {
+                    state.buttons or XUSB_DPAD_UP
+            } else if (hatYDigital > 0) {
                 state.buttons =
-                    state.buttons or
-                        XUSB_DPAD_DOWN
+                    state.buttons or XUSB_DPAD_DOWN
             }
         }
 
         motionEvents.incrementAndGet()
 
         return true
+    }
+
+    private fun isControllerDevice(
+        device: InputDevice
+    ): Boolean {
+        val sources = device.sources
+
+        return (
+            (sources and InputDevice.SOURCE_GAMEPAD) ==
+                InputDevice.SOURCE_GAMEPAD
+        ) || (
+            (sources and InputDevice.SOURCE_JOYSTICK) ==
+                InputDevice.SOURCE_JOYSTICK
+        )
+    }
+
+    private fun playerForDevice(
+        device: InputDevice
+    ): Int? {
+        val descriptor =
+            device.descriptor
+                ?.takeIf {
+                    it.isNotBlank()
+                }
+                ?: "id:${device.id}"
+
+        return synchronized(lock) {
+            devicePlayers[descriptor]
+                ?: run {
+                    val assigned =
+                        (0 until PLAYER_COUNT)
+                            .firstOrNull {
+                                it !in devicePlayers.values
+                            }
+
+                    if (assigned != null) {
+                        devicePlayers[descriptor] =
+                            assigned
+                    }
+
+                    assigned
+                }
+        }
+    }
+
+    private fun resetState(
+        state: State
+    ) {
+        state.buttons = 0
+        state.lx = 0
+        state.ly = 0
+        state.rx = 0
+        state.ry = 0
+        state.lt = 0
+        state.rt = 0
+        state.digitalLt = false
+        state.digitalRt = false
+        state.hatX = 0
+        state.hatY = 0
     }
 
     private fun stickAxis(
@@ -593,24 +494,12 @@ class NativeControllerSender(
                 ?: return 0f
 
         val value =
-            event.getAxisValue(
-                axis
-            )
+            event.getAxisValue(axis)
 
-        val flat =
-            range.flat
-
-        return if (
-            abs(
-                value
-            ) <= flat
-        ) {
+        return if (abs(value) <= range.flat) {
             0f
         } else {
-            value.coerceIn(
-                -1f,
-                1f
-            )
+            value.coerceIn(-1f, 1f)
         }
     }
 
@@ -620,8 +509,7 @@ class NativeControllerSender(
         primary: Int,
         fallback: Int
     ): Float {
-        val source =
-            event.source
+        val source = event.source
 
         val axis =
             if (
@@ -643,33 +531,18 @@ class NativeControllerSender(
                 ?: return 0f
 
         val raw =
-            event.getAxisValue(
-                axis
-            )
+            event.getAxisValue(axis)
 
         val span =
-            range.max -
-                range.min
+            range.max - range.min
 
-        if (
-            span <= 0f
-        ) {
-            return raw.coerceIn(
-                0f,
-                1f
-            )
+        if (span <= 0f) {
+            return raw.coerceIn(0f, 1f)
         }
 
         return (
-            (
-                raw -
-                    range.min
-            ) /
-                span
-        ).coerceIn(
-            0f,
-            1f
-        )
+            (raw - range.min) / span
+        ).coerceIn(0f, 1f)
     }
 
     private fun toStick(
@@ -677,10 +550,7 @@ class NativeControllerSender(
     ): Short {
         val scaled =
             (
-                value.coerceIn(
-                    -1f,
-                    1f
-                ) *
+                value.coerceIn(-1f, 1f) *
                     32767f
             ).roundToInt()
 
@@ -694,10 +564,7 @@ class NativeControllerSender(
         value: Float
     ): Int {
         return (
-            value.coerceIn(
-                0f,
-                1f
-            ) *
+            value.coerceIn(0f, 1f) *
                 255f
         ).roundToInt()
             .coerceIn(
@@ -709,21 +576,17 @@ class NativeControllerSender(
     private fun sendLoop() {
         val address =
             try {
-                InetAddress.getByName(
-                    host
-                )
+                InetAddress.getByName(host)
             } catch (_: Exception) {
                 sendErrors.incrementAndGet()
-                running =
-                    false
+                running = false
                 return
             }
 
         val socket =
             DatagramSocket()
 
-        var sequence =
-            0
+        var sequence = 0
 
         try {
             socket.connect(
@@ -732,116 +595,92 @@ class NativeControllerSender(
             )
 
             while (running) {
-                val snapshot =
-                    synchronized(
-                        lock
-                    ) {
-                        state.copy()
+                val snapshots =
+                    synchronized(lock) {
+                        Array(PLAYER_COUNT) {
+                            states[it].copy()
+                        }
                     }
 
-                val lt =
-                    maxOf(
-                        snapshot.lt,
-                        if (
-                            snapshot.digitalLt
-                        ) {
-                            255
-                        } else {
-                            0
-                        }
-                    )
+                for (
+                    player in
+                    0 until PLAYER_COUNT
+                ) {
+                    val snapshot =
+                        snapshots[player]
 
-                val rt =
-                    maxOf(
-                        snapshot.rt,
-                        if (
-                            snapshot.digitalRt
-                        ) {
-                            255
-                        } else {
-                            0
-                        }
-                    )
-
-                val data =
-                    ByteBuffer.allocate(
-                        36
-                    )
-                        .order(
-                            ByteOrder.LITTLE_ENDIAN
+                    val lt =
+                        maxOf(
+                            snapshot.lt,
+                            if (snapshot.digitalLt) {
+                                255
+                            } else {
+                                0
+                            }
                         )
-                        .apply {
-                            put(
-                                byteArrayOf(
-                                    'P'.code.toByte(),
-                                    'H'.code.toByte(),
-                                    'I'.code.toByte(),
-                                    '1'.code.toByte()
+
+                    val rt =
+                        maxOf(
+                            snapshot.rt,
+                            if (snapshot.digitalRt) {
+                                255
+                            } else {
+                                0
+                            }
+                        )
+
+                    val data =
+                        ByteBuffer.allocate(36)
+                            .order(
+                                ByteOrder.LITTLE_ENDIAN
+                            )
+                            .apply {
+                                put(
+                                    byteArrayOf(
+                                        'P'.code.toByte(),
+                                        'H'.code.toByte(),
+                                        'I'.code.toByte(),
+                                        '1'.code.toByte()
+                                    )
                                 )
-                            )
-                            put(
-                                1.toByte()
-                            )
-                            put(
-                                0.toByte()
-                            )
-                            putShort(
-                                0.toShort()
-                            )
-                            putInt(
-                                sequence
-                            )
-                            putLong(
-                                System.nanoTime() /
-                                    1000L
-                            )
-                            putInt(
-                                snapshot.buttons
-                            )
-                            putShort(
-                                snapshot.lx
-                            )
-                            putShort(
-                                snapshot.ly
-                            )
-                            putShort(
-                                snapshot.rx
-                            )
-                            putShort(
-                                snapshot.ry
-                            )
-                            putShort(
-                                lt.toShort()
-                            )
-                            putShort(
-                                rt.toShort()
-                            )
-                        }
-                        .array()
+                                put(1.toByte())
+                                put(player.toByte())
+                                putShort(0.toShort())
+                                putInt(sequence)
+                                putLong(
+                                    System.nanoTime() /
+                                        1000L
+                                )
+                                putInt(snapshot.buttons)
+                                putShort(snapshot.lx)
+                                putShort(snapshot.ly)
+                                putShort(snapshot.rx)
+                                putShort(snapshot.ry)
+                                putShort(lt.toShort())
+                                putShort(rt.toShort())
+                            }
+                            .array()
 
-                try {
-                    socket.send(
-                        DatagramPacket(
-                            data,
-                            data.size
+                    try {
+                        socket.send(
+                            DatagramPacket(
+                                data,
+                                data.size
+                            )
                         )
-                    )
 
-                    packetsSent.incrementAndGet()
-                } catch (_: Exception) {
-                    sendErrors.incrementAndGet()
+                        packetsSent.incrementAndGet()
+                    } catch (_: Exception) {
+                        sendErrors.incrementAndGet()
+                    }
+
+                    sequence += 1
                 }
 
-                sequence +=
-                    1
-
                 try {
-                    Thread.sleep(
-                        8
-                    )
+                    Thread.sleep(8)
                 } catch (_: InterruptedException) {
-                    Thread.currentThread()
-                        .interrupt()
+                    Thread.currentThread().interrupt()
                     break
                 }
             }

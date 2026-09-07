@@ -17,6 +17,7 @@ from ctypes import wintypes
 
 from native_session_io import NativeSessionIO
 from native_fec_relay import NativeVideoFecRelay
+from native_host_telemetry import NativeHostTelemetryProfiler
 
 
 class NativeStreamError(RuntimeError):
@@ -67,6 +68,9 @@ class NativeStreamManager:
         self._fec_relay = NativeVideoFecRelay(
             local_port=self.FEC_INPUT_PORT,
             group_size=self.FEC_GROUP_SIZE,
+        )
+        self._host_telemetry = NativeHostTelemetryProfiler(
+            self.project_root
         )
 
     def _find_ffmpeg(self) -> Path | None:
@@ -202,6 +206,7 @@ class NativeStreamManager:
                 "encoder": "h264_nvenc",
                 "transport": "rtp_udp_xor_fec",
                 "fec": self._fec_relay.status(),
+                "host_telemetry": self._host_telemetry.status(),
                 "fec_enabled": True,
                 "fec_group_size": self.FEC_GROUP_SIZE,
                 "source_bitrate_kbps": self.BITRATE_KBPS,
@@ -655,6 +660,9 @@ class NativeStreamManager:
         return text[-max_chars:].strip()
 
     def _stop_locked(self) -> None:
+        # Finalize resource telemetry while the managed processes still exist.
+        self._host_telemetry.stop()
+
         self._session_io.stop()
 
         ffmpeg = self._process
@@ -1146,6 +1154,30 @@ class NativeStreamManager:
                 time.sleep(
                     0.05
                 )
+
+            if (
+                self._capture_process is not None
+                and self._process is not None
+            ):
+                try:
+                    self._host_telemetry.start(
+                        capture_process=self._capture_process,
+                        ffmpeg_process=self._process,
+                        metadata_path=metadata_path,
+                        capture_target=(
+                            self._public_capture_target(
+                                capture_target
+                            )
+                        ),
+                    )
+                except Exception as exc:
+                    # Telemetry is strictly fail-open. Measurement must never
+                    # prevent an otherwise healthy game stream.
+                    self._log_handle.write(
+                        "Host telemetry startup warning: "
+                        f"{exc}\n"
+                    )
+                    self._log_handle.flush()
 
             self._session_io.start(
                 ffmpeg=ffmpeg,
