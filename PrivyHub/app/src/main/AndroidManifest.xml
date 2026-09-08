@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <queries>
         <package android:name="com.limelight" />
@@ -23,6 +26,27 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.PrivyHub"
         android:usesCleartextTraffic="true">
+
+        <activity
+            android:name=".diagnostics.UdpTransportProbeActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".diagnostics.UdpLoopbackProbeActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".diagnostics.UdpReverseTransportProbeActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:screenOrientation="landscape" />
 
         <activity
             android:name=".streaming.NativeStreamActivity"

@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "backend": "retroarch",
+  "retroarch": {
+    "version": "1.22.2",
+    "executable": "runtime/emulators/retroarch/retroarch.exe",
+    "cores_directory": "runtime/emulators/retroarch/cores",
+    "config": "data/games/retroarch/retroarch.cfg"
+  },
+  "systems": {
+    "nes": {
+      "name": "NES",
+      "core": "fceumm_libretro.dll",
+      "license": "GPL-2.0",
+      "extensions": [
+        ".nes"
+      ]
+    },
+    "snes": {
+      "name": "SNES",
+      "core": "bsnes_libretro.dll",
+      "license": "GPL-3.0",
+      "extensions": [
+        ".sfc",
+        ".smc"
+      ]
+    },
+    "genesis": {
+      "name": "Genesis",
+      "core": "blastem_libretro.dll",
+      "license": "GPL-3.0-or-later",
+      "extensions": [
+        ".md",
+        ".gen",
+        ".bin"
+      ]
+    },
+    "ps1": {
+      "name": "PlayStation",
+      "core": "mednafen_psx_hw_libretro.dll",
+      "license": "GPL-2.0",
+      "extensions": [
+        ".chd",
+        ".cue",
+        ".m3u"
+      ]
+    }
+  }
+}
