@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
@@ -11,12 +12,21 @@ internal static class Program
 {
     private const int SampleRate = 48_000;
     private const int Channels = 2;
-    private const int BytesPerSample = 2;
+    private const int NetworkBytesPerSample = 2;
+    private const int FloatBytesPerSample = 4;
     private const int FramesPerPacket = 240; // 5 ms
-    private const int PayloadBytes = FramesPerPacket * Channels * BytesPerSample;
+    private const int PayloadBytes =
+        FramesPerPacket * Channels * NetworkBytesPerSample;
     private const int HeaderBytes = 16;
     private const int QueueCapacityChunks = 256;
-    private const string ProbeVersion = "process_loopback_pair_pacer_v0.22";
+
+    // A4 host coexistence: keep RetroArch's local Windows render almost silent
+    // while preserving useful precision in process-loopback by capturing float.
+    private const float LocalSessionFactor = 0.01f;
+    private const float DigitalCompensation = 100.0f;
+
+    private const string ProbeVersion =
+        "process_loopback_float_local_suppression_v0.24";
 
     private sealed record CaptureChunk(
         long CallbackTicks,
@@ -37,6 +47,7 @@ internal static class Program
         public long CallbackCount;
         public long CallbackFrames;
         public long CallbackBytes;
+        public long ConvertedBytes;
         public long SilentCallbacks;
         public long CallbackBurstsUnder2ms;
         public long CallbackGapsGe10ms;
@@ -50,6 +61,11 @@ internal static class Program
         public long QpcRegressions;
         public long LastDevicePosition = -1;
         public long LastQpcPosition100ns = -1;
+
+        public long FloatSamples;
+        public long NonFiniteFloatSamples;
+        public long CompensatedClippedSamples;
+        public float CompensatedPeakAbsolute;
 
         public long QueueMaxDepth;
         public long QueueDroppedChunks;
@@ -84,12 +100,171 @@ internal static class Program
         public long IntraCallbackSpacingMinTicks;
         public long IntraCallbackSpacingMaxTicks;
         public readonly long[] IntraCallbackSpacingHistogram = new long[9];
-
         public readonly long[] CallbackIntervalHistogram = new long[9];
         public readonly long[] SendIntervalHistogram = new long[9];
 
         public string? StopError;
         public string? RecordingStoppedError;
+    }
+
+    private sealed record AudioSessionTarget(
+        AudioSessionControl Session,
+        float OriginalVolume,
+        bool OriginalMute
+    );
+
+    private sealed class LocalAudioSuppression : IDisposable
+    {
+        private readonly List<MMDevice> _devices = new();
+        private readonly List<AudioSessionTarget> _targets = new();
+        private bool _restored;
+
+        public bool Applied { get; private set; }
+        public bool Restored => _restored;
+        public int SessionCount => _targets.Count;
+
+        public float[] OriginalVolumes =>
+            _targets.Select(target => target.OriginalVolume).ToArray();
+
+        public bool[] OriginalMutes =>
+            _targets.Select(target => target.OriginalMute).ToArray();
+
+        public static LocalAudioSuppression CreateAndApply(int targetPid)
+        {
+            var suppression = new LocalAudioSuppression();
+
+            try
+            {
+                using var enumerator = new MMDeviceEnumerator();
+                using var devices = enumerator.EnumerateAudioEndPoints(
+                    DataFlow.Render,
+                    DeviceState.Active
+                );
+
+                for (var deviceIndex = 0;
+                     deviceIndex < devices.Count;
+                     deviceIndex++)
+                {
+                    var device = devices[deviceIndex];
+                    suppression._devices.Add(device);
+
+                    var sessions = device.AudioSessionManager.Sessions;
+
+                    for (var sessionIndex = 0;
+                         sessionIndex < sessions.Count;
+                         sessionIndex++)
+                    {
+                        AudioSessionControl? session = null;
+
+                        try
+                        {
+                            session = sessions[sessionIndex];
+
+                            if ((int)session.GetProcessID != targetPid)
+                            {
+                                session.Dispose();
+                                session = null;
+                                continue;
+                            }
+
+                            var volume = session.SimpleAudioVolume.Volume;
+                            var mute = session.SimpleAudioVolume.Mute;
+
+                            suppression._targets.Add(
+                                new AudioSessionTarget(
+                                    session,
+                                    volume,
+                                    mute
+                                )
+                            );
+
+                            session = null;
+                        }
+                        finally
+                        {
+                            session?.Dispose();
+                        }
+                    }
+                }
+
+                if (suppression._targets.Count == 0)
+                    throw new InvalidOperationException(
+                        "No active Windows render audio session owned by RetroArch was found."
+                    );
+
+                // Scale each target session relative to its existing user level.
+                // A stream request temporarily unmutes RetroArch locally, but only
+                // at 1% of that level. The exact original mute/volume are restored.
+                foreach (var target in suppression._targets)
+                {
+                    var targetVolume = Math.Clamp(
+                        target.OriginalVolume * LocalSessionFactor,
+                        0.000001f,
+                        1.0f
+                    );
+
+                    target.Session.SimpleAudioVolume.Mute = false;
+                    target.Session.SimpleAudioVolume.Volume = targetVolume;
+                }
+
+                suppression.Applied = true;
+                return suppression;
+            }
+            catch
+            {
+                suppression.Dispose();
+                throw;
+            }
+        }
+
+        public void Restore()
+        {
+            if (_restored)
+                return;
+
+            foreach (var target in _targets)
+            {
+                try
+                {
+                    target.Session.SimpleAudioVolume.Volume =
+                        target.OriginalVolume;
+                    target.Session.SimpleAudioVolume.Mute =
+                        target.OriginalMute;
+                }
+                catch
+                {
+                }
+            }
+
+            _restored = true;
+        }
+
+        public void Dispose()
+        {
+            Restore();
+
+            foreach (var target in _targets)
+            {
+                try
+                {
+                    target.Session.Dispose();
+                }
+                catch
+                {
+                }
+            }
+
+            foreach (var device in _devices)
+            {
+                try
+                {
+                    device.Dispose();
+                }
+                catch
+                {
+                }
+            }
+        }
     }
 
     private static int BucketForMilliseconds(double ms)
@@ -127,7 +302,9 @@ internal static class Program
 
     private static Dictionary<string, string> ParseArgs(string[] args)
     {
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, string>(
+            StringComparer.OrdinalIgnoreCase
+        );
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -171,7 +348,8 @@ internal static class Program
         bool ready,
         bool final,
         string? error,
-        string captureFormat)
+        string captureFormat,
+        LocalAudioSuppression? suppression)
     {
         lock (stats.Gate)
         {
@@ -205,18 +383,42 @@ internal static class Program
                 {
                     sample_rate = SampleRate,
                     channels = Channels,
-                    sample_format = "pcm_s16le",
+                    capture_sample_format = "float32le",
+                    network_sample_format = "pcm_s16le",
                     frames_per_packet = FramesPerPacket,
                     packet_ms = 5,
                     payload_bytes = PayloadBytes,
                     capture_format = captureFormat,
                 },
+                local_output = new
+                {
+                    policy = "relative_session_attenuation_plus_float_gain_restore",
+                    factor = LocalSessionFactor,
+                    compensation = DigitalCompensation,
+                    attenuation_db = Math.Round(
+                        20.0 * Math.Log10(LocalSessionFactor),
+                        3
+                    ),
+                    matched_sessions = suppression?.SessionCount ?? 0,
+                    applied = suppression?.Applied ?? false,
+                    restored = suppression?.Restored ?? false,
+                    original_volumes = suppression?.OriginalVolumes ?? Array.Empty<float>(),
+                    original_mutes = suppression?.OriginalMutes ?? Array.Empty<bool>(),
+                },
                 callback = new
                 {
                     count = stats.CallbackCount,
                     frames_total = stats.CallbackFrames,
-                    bytes_total = stats.CallbackBytes,
+                    source_bytes_total = stats.CallbackBytes,
+                    converted_pcm16_bytes_total = stats.ConvertedBytes,
                     silent_callbacks = stats.SilentCallbacks,
+                    float_samples = stats.FloatSamples,
+                    nonfinite_float_samples = stats.NonFiniteFloatSamples,
+                    compensated_clipped_samples = stats.CompensatedClippedSamples,
+                    compensated_peak_absolute = Math.Round(
+                        stats.CompensatedPeakAbsolute,
+                        6
+                    ),
                     interval_count = callbackIntervals,
                     interval_avg_ms = AverageTicksMs(
                         stats.CallbackIntervalTotalTicks,
@@ -260,7 +462,7 @@ internal static class Program
                 },
                 sender_policy = new
                 {
-                    architecture = "callback_local_pair_pacer_v0.22",
+                    architecture = "callback_local_pair_pacer_v0.22_preserved",
                     target_packet_spacing_ms = 5,
                     cumulative_clock = false,
                     rebasing = false,
@@ -326,8 +528,7 @@ internal static class Program
                 stop_error = stats.StopError ?? "",
                 os = Environment.OSVersion.VersionString,
                 process_architecture =
-                    System.Runtime.InteropServices.RuntimeInformation
-                        .ProcessArchitecture.ToString(),
+                    RuntimeInformation.ProcessArchitecture.ToString(),
                 log_path = Path.GetFullPath(logPath),
             };
         }
@@ -336,7 +537,8 @@ internal static class Program
     private static void ObserveCallback(
         ProbeStats stats,
         int frames,
-        int bytes,
+        int sourceBytes,
+        int convertedBytes,
         AudioClientBufferFlags flags,
         long devicePosition,
         long qpcPosition)
@@ -347,7 +549,8 @@ internal static class Program
         {
             stats.CallbackCount++;
             stats.CallbackFrames += frames;
-            stats.CallbackBytes += bytes;
+            stats.CallbackBytes += sourceBytes;
+            stats.ConvertedBytes += convertedBytes;
 
             if ((flags & AudioClientBufferFlags.Silent) != 0)
                 stats.SilentCallbacks++;
@@ -363,14 +566,19 @@ internal static class Program
             {
                 var delta = Math.Max(0, now - stats.LastCallbackTimestamp);
                 stats.CallbackIntervalTotalTicks += delta;
+
                 if (stats.CallbackIntervalMinTicks == 0 ||
                     delta < stats.CallbackIntervalMinTicks)
                     stats.CallbackIntervalMinTicks = delta;
-                stats.CallbackIntervalMaxTicks =
-                    Math.Max(stats.CallbackIntervalMaxTicks, delta);
+
+                stats.CallbackIntervalMaxTicks = Math.Max(
+                    stats.CallbackIntervalMaxTicks,
+                    delta
+                );
 
                 var ms = TicksToMs(delta);
                 stats.CallbackIntervalHistogram[BucketForMilliseconds(ms)]++;
+
                 if (ms < 2.0) stats.CallbackBurstsUnder2ms++;
                 if (ms >= 10.0) stats.CallbackGapsGe10ms++;
             }
@@ -393,6 +601,79 @@ internal static class Program
             if (qpcPosition > 0)
                 stats.LastQpcPosition100ns = qpcPosition;
         }
+    }
+
+    private static byte[] ConvertFloatToCompensatedPcm16(
+        ReadOnlySpan<byte> buffer,
+        ProbeStats stats)
+    {
+        if ((buffer.Length % FloatBytesPerSample) != 0)
+            throw new InvalidOperationException(
+                "Process-loopback float callback length is not 4-byte aligned."
+            );
+
+        var source = MemoryMarshal.Cast<byte, float>(buffer);
+        var output = new byte[source.Length * NetworkBytesPerSample];
+
+        long nonFinite = 0;
+        long clipped = 0;
+        float peak = 0.0f;
+
+        for (var index = 0; index < source.Length; index++)
+        {
+            var sample = source[index];
+
+            if (!float.IsFinite(sample))
+            {
+                sample = 0.0f;
+                nonFinite++;
+            }
+
+            var compensated = sample * DigitalCompensation;
+            peak = Math.Max(peak, Math.Abs(compensated));
+
+            if (compensated > 1.0f)
+            {
+                compensated = 1.0f;
+                clipped++;
+            }
+            else if (compensated < -1.0f)
+            {
+                compensated = -1.0f;
+                clipped++;
+            }
+
+            var scaled = compensated >= 0.0f
+                ? (int)Math.Round(compensated * 32767.0f)
+                : (int)Math.Round(compensated * 32768.0f);
+
+            scaled = Math.Clamp(
+                scaled,
+                short.MinValue,
+                short.MaxValue
+            );
+
+            BinaryPrimitives.WriteInt16LittleEndian(
+                output.AsSpan(
+                    index * NetworkBytesPerSample,
+                    NetworkBytesPerSample
+                ),
+                (short)scaled
+            );
+        }
+
+        lock (stats.Gate)
+        {
+            stats.FloatSamples += source.Length;
+            stats.NonFiniteFloatSamples += nonFinite;
+            stats.CompensatedClippedSamples += clipped;
+            stats.CompensatedPeakAbsolute = Math.Max(
+                stats.CompensatedPeakAbsolute,
+                peak
+            );
+        }
+
+        return output;
     }
 
     private static void ObserveSend(
@@ -431,14 +712,19 @@ internal static class Program
             {
                 var delta = Math.Max(0, done - stats.LastSendTimestamp);
                 stats.SendIntervalTotalTicks += delta;
+
                 if (stats.SendIntervalMinTicks == 0 ||
                     delta < stats.SendIntervalMinTicks)
                     stats.SendIntervalMinTicks = delta;
-                stats.SendIntervalMaxTicks =
-                    Math.Max(stats.SendIntervalMaxTicks, delta);
+
+                stats.SendIntervalMaxTicks = Math.Max(
+                    stats.SendIntervalMaxTicks,
+                    delta
+                );
 
                 var ms = TicksToMs(delta);
                 stats.SendIntervalHistogram[BucketForMilliseconds(ms)]++;
+
                 if (ms < 2.0) stats.SendBurstsUnder2ms++;
                 if (ms >= 10.0) stats.SendGapsGe10ms++;
             }
@@ -478,20 +764,12 @@ internal static class Program
 
             var remainingMs = TicksToMs(remaining);
 
-            // Sleep while comfortably away from the target, then use short
-            // yields/spins only for the final fraction of a millisecond.
             if (remainingMs > 1.5)
-            {
                 Thread.Sleep(1);
-            }
             else if (remainingMs > 0.25)
-            {
                 Thread.Yield();
-            }
             else
-            {
                 Thread.SpinWait(32);
-            }
         }
     }
 
@@ -566,23 +844,14 @@ internal static class Program
 
                 while (accumulator.Count >= PayloadBytes)
                 {
-                    // The WASAPI process-loopback callback is a stable 10 ms
-                    // source. Network packets remain 5 ms to stay well under
-                    // MTU, so pace only the second half of each callback.
-                    //
-                    // This deadline is local to this callback. It is never
-                    // carried into the next callback, never rebased, and never
-                    // used to catch up a missed wall-clock schedule.
+                    // Preserve the proven v0.22 pacing policy exactly:
+                    // first 5 ms packet immediately, second ~5 ms later.
                     if (packetsFromChunk > 0)
                     {
                         var target = chunkOriginTicks +
                             fiveMsTicks * packetsFromChunk;
 
-                        WaitUntil(
-                            target,
-                            stats,
-                            token
-                        );
+                        WaitUntil(target, stats, token);
 
                         if (token.IsCancellationRequested)
                             break;
@@ -616,10 +885,7 @@ internal static class Program
                         HeaderBytes,
                         PayloadBytes
                     );
-                    accumulator.RemoveRange(
-                        0,
-                        PayloadBytes
-                    );
+                    accumulator.RemoveRange(0, PayloadBytes);
 
                     var started = Stopwatch.GetTimestamp();
                     var success = true;
@@ -661,10 +927,6 @@ internal static class Program
                     );
                     previousChunkSendDone = done;
 
-                    // Sequence/timestamp advance even when a nonblocking
-                    // datagram is dropped. The Android client then sees one
-                    // ordinary missing 5 ms audio packet and can conceal it
-                    // instead of the host audio thread freezing.
                     sequence++;
                     sampleTimestamp += FramesPerPacket;
                     packetsFromChunk++;
@@ -734,8 +996,8 @@ internal static class Program
             StartedTimestamp = Stopwatch.GetTimestamp()
         };
 
-        var cts = new CancellationTokenSource();
-        var queue = new BlockingCollection<CaptureChunk>(
+        using var cts = new CancellationTokenSource();
+        using var queue = new BlockingCollection<CaptureChunk>(
             new ConcurrentQueue<CaptureChunk>(),
             QueueCapacityChunks
         );
@@ -755,17 +1017,25 @@ internal static class Program
         udp.Blocking = false;
 
         WasapiRecorder? recorder = null;
+        LocalAudioSuppression? suppression = null;
         Exception? startError = null;
         var captureFormat = "";
 
         try
         {
+            suppression = LocalAudioSuppression.CreateAndApply(targetPid);
+
             recorder = await new WasapiRecorderBuilder()
                 .WithProcessLoopback(
                     (uint)targetPid,
                     ProcessLoopbackMode.IncludeTargetProcessTree
                 )
-                .WithFormat(new WaveFormat(SampleRate, 16, Channels))
+                .WithFormat(
+                    WaveFormat.CreateIeeeFloatWaveFormat(
+                        SampleRate,
+                        Channels
+                    )
+                )
                 .WithBufferLength(10)
                 .BuildAsync();
 
@@ -778,24 +1048,40 @@ internal static class Program
                 qpcPosition
             ) =>
             {
-                var frames = buffer.Length / (Channels * BytesPerSample);
+                byte[] pcm16;
+
+                try
+                {
+                    pcm16 = ConvertFloatToCompensatedPcm16(
+                        buffer,
+                        stats
+                    );
+                }
+                catch
+                {
+                    cts.Cancel();
+                    return;
+                }
+
+                var frames = pcm16.Length /
+                    (Channels * NetworkBytesPerSample);
 
                 ObserveCallback(
                     stats,
                     frames,
                     buffer.Length,
+                    pcm16.Length,
                     flags,
                     devicePosition,
                     qpcPosition
                 );
 
-                var copy = buffer.ToArray();
                 var chunk = new CaptureChunk(
                     Stopwatch.GetTimestamp(),
                     devicePosition,
                     qpcPosition,
                     (int)flags,
-                    copy
+                    pcm16
                 );
 
                 if (!queue.TryAdd(chunk))
@@ -803,7 +1089,7 @@ internal static class Program
                     lock (stats.Gate)
                     {
                         stats.QueueDroppedChunks++;
-                        stats.QueueDroppedBytes += copy.Length;
+                        stats.QueueDroppedBytes += pcm16.Length;
                     }
                 }
                 else
@@ -837,35 +1123,29 @@ internal static class Program
 
         if (startError is not null || recorder is null)
         {
-            var error = startError?.ToString() ?? "Recorder was not created.";
-            WriteJsonAtomic(
-                statusPath,
-                BuildStatus(
-                    stats,
-                    targetPid,
-                    clientIpText,
-                    port,
-                    logPath,
-                    ready: false,
-                    final: true,
-                    error,
-                    captureFormat
-                )
-            );
-            WriteJsonAtomic(
+            suppression?.Restore();
+
+            var error = startError?.ToString() ??
+                "Recorder was not created.";
+
+            var failurePayload = BuildStatus(
+                stats,
+                targetPid,
+                clientIpText,
+                port,
                 logPath,
-                BuildStatus(
-                    stats,
-                    targetPid,
-                    clientIpText,
-                    port,
-                    logPath,
-                    ready: false,
-                    final: true,
-                    error,
-                    captureFormat
-                )
+                ready: false,
+                final: true,
+                error,
+                captureFormat,
+                suppression
             );
+
+            WriteJsonAtomic(statusPath, failurePayload);
+            WriteJsonAtomic(logPath, failurePayload);
+
+            suppression?.Dispose();
+
             Console.Error.WriteLine(error);
             return 4;
         }
@@ -881,7 +1161,8 @@ internal static class Program
                 ready: true,
                 final: false,
                 error: null,
-                captureFormat
+                captureFormat,
+                suppression
             )
         );
 
@@ -901,10 +1182,7 @@ internal static class Program
             {
                 try
                 {
-                    await Task.Delay(
-                        1000,
-                        cts.Token
-                    );
+                    await Task.Delay(1000, cts.Token);
                 }
                 catch (OperationCanceledException)
                 {
@@ -924,7 +1202,8 @@ internal static class Program
                             ready: true,
                             final: false,
                             error: null,
-                            captureFormat
+                            captureFormat,
+                            suppression
                         )
                     );
                 }
@@ -972,6 +1251,9 @@ internal static class Program
         {
         }
 
+        // Restore the exact Windows session volume/mute before reporting final.
+        suppression?.Restore();
+
         var finalPayload = BuildStatus(
             stats,
             targetPid,
@@ -981,12 +1263,14 @@ internal static class Program
             ready: false,
             final: true,
             error: null,
-            captureFormat
+            captureFormat,
+            suppression
         );
 
         WriteJsonAtomic(logPath, finalPayload);
         WriteJsonAtomic(statusPath, finalPayload);
 
+        suppression?.Dispose();
         return 0;
     }
 }

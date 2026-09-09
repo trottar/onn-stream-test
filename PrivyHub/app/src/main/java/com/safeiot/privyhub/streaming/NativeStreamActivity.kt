@@ -2,6 +2,7 @@ package com.safeiot.privyhub.streaming
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -10,6 +11,7 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.PixelCopy
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -19,6 +21,8 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
@@ -31,6 +35,23 @@ class NativeStreamActivity :
     companion object {
         const val EXTRA_COMPANION_HOST =
             "privyhub_companion_host"
+
+        const val EXTRA_GAME_TITLE =
+            "privyhub_game_title"
+
+        fun pausedFrameFileName(
+            gameTitle: String
+        ): String {
+
+            val token =
+                Integer.toHexString(
+                    gameTitle
+                        .trim()
+                        .hashCode()
+                )
+
+            return "privyhub_game_paused_$token.jpg"
+        }
 
         private const val CONTROL_PORT = 8765
         private const val VIDEO_PORT = 48100
@@ -147,6 +168,27 @@ class NativeStreamActivity :
     private var cachedSessionReport:
         String? =
         null
+
+    // PrivyHub A3 patch 11v2: capture the final rendered gameplay frame.
+    @Volatile
+    private var pausedFrameCaptureStatus =
+        "not_requested"
+
+    @Volatile
+    private var pausedFrameBytes =
+        0L
+
+    @Volatile
+    private var pausedFrameWidth =
+        0
+
+    @Volatile
+    private var pausedFrameHeight =
+        0
+
+    @Volatile
+    private var backExitInProgress =
+        false
 
     private val metricsTick =
         object : Runnable {
@@ -340,6 +382,16 @@ class NativeStreamActivity :
         sessionStarted = true
         stopping = false
         cachedSessionReport = null
+        pausedFrameCaptureStatus =
+            "not_requested"
+        pausedFrameBytes =
+            0L
+        pausedFrameWidth =
+            0
+        pausedFrameHeight =
+            0
+        backExitInProgress =
+            false
         hostMetadataComplete = false
         hostMetadataError = ""
         sessionStartedAtNs =
@@ -857,6 +909,22 @@ class NativeStreamActivity :
         root.put(
             "capture_description",
             captureDescription
+        )
+        root.put(
+            "paused_frame_capture_status",
+            pausedFrameCaptureStatus
+        )
+        root.put(
+            "paused_frame_bytes",
+            pausedFrameBytes
+        )
+        root.put(
+            "paused_frame_width",
+            pausedFrameWidth
+        )
+        root.put(
+            "paused_frame_height",
+            pausedFrameHeight
         )
 
         if (rtp != null) {
@@ -1554,12 +1622,269 @@ class NativeStreamActivity :
             }
     }
 
+    // PrivyHub A3 patch 11v2: capture before stream teardown.
+    private fun finishAfterPausedFrameCapture() {
+
+        if (!isFinishing) {
+            super.onBackPressed()
+        }
+    }
+
+
+    private fun persistPausedFrame(
+        source: Bitmap
+    ): Long {
+
+        val title =
+            intent.getStringExtra(
+                EXTRA_GAME_TITLE
+            )
+                ?.trim()
+                .orEmpty()
+
+        if (title.isBlank()) {
+            throw IllegalStateException(
+                "Game title is unavailable for paused-frame storage"
+            )
+        }
+
+        val target =
+            File(
+                cacheDir,
+                pausedFrameFileName(
+                    title
+                )
+            )
+
+        val temporary =
+            File(
+                cacheDir,
+                target.name + ".tmp"
+            )
+
+        val preview =
+            Bitmap.createScaledBitmap(
+                source,
+                480,
+                270,
+                true
+            )
+
+        try {
+            FileOutputStream(
+                temporary
+            ).use { output ->
+
+                val compressed =
+                    preview.compress(
+                        Bitmap.CompressFormat.JPEG,
+                        88,
+                        output
+                    )
+
+                if (!compressed) {
+                    throw IllegalStateException(
+                        "Bitmap compression failed"
+                    )
+                }
+
+                output.fd.sync()
+            }
+
+            if (
+                target.exists() &&
+                !target.delete()
+            ) {
+                throw IllegalStateException(
+                    "Unable to replace previous paused frame"
+                )
+            }
+
+            if (
+                !temporary.renameTo(
+                    target
+                )
+            ) {
+                temporary.copyTo(
+                    target,
+                    overwrite = true
+                )
+                temporary.delete()
+            }
+
+            val size =
+                target.length()
+
+            if (size <= 0L) {
+                throw IllegalStateException(
+                    "Paused-frame output was empty"
+                )
+            }
+
+            pausedFrameWidth =
+                preview.width
+
+            pausedFrameHeight =
+                preview.height
+
+            return size
+
+        } finally {
+            if (
+                preview !==
+                source
+            ) {
+                preview.recycle()
+            }
+
+            source.recycle()
+
+            try {
+                if (temporary.exists()) {
+                    temporary.delete()
+                }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+
+    private fun capturePausedFrameAndFinish() {
+
+        if (backExitInProgress) {
+            return
+        }
+
+        backExitInProgress =
+            true
+
+        pausedFrameCaptureStatus =
+            "requested"
+
+        if (
+            Build.VERSION.SDK_INT <
+            Build.VERSION_CODES.N
+        ) {
+            pausedFrameCaptureStatus =
+                "unsupported_api"
+
+            finishAfterPausedFrameCapture()
+            return
+        }
+
+        val width =
+            surfaceView.width
+
+        val height =
+            surfaceView.height
+
+        if (
+            width <= 0 ||
+            height <= 0 ||
+            !surfaceView.holder.surface.isValid
+        ) {
+            pausedFrameCaptureStatus =
+                "surface_unavailable"
+
+            finishAfterPausedFrameCapture()
+            return
+        }
+
+        val bitmap =
+            try {
+                Bitmap.createBitmap(
+                    width,
+                    height,
+                    Bitmap.Config.ARGB_8888
+                )
+            } catch (_: Exception) {
+                pausedFrameCaptureStatus =
+                    "bitmap_allocation_failed"
+
+                finishAfterPausedFrameCapture()
+                return
+            }
+
+        pausedFrameCaptureStatus =
+            "pixelcopy_pending"
+
+        PixelCopy.request(
+            surfaceView,
+            bitmap,
+            { result ->
+
+                if (
+                    result !=
+                    PixelCopy.SUCCESS
+                ) {
+                    pausedFrameCaptureStatus =
+                        "pixelcopy_error_$result"
+
+                    bitmap.recycle()
+
+                    finishAfterPausedFrameCapture()
+                    return@request
+                }
+
+                pausedFrameCaptureStatus =
+                    "pixelcopy_complete"
+
+                thread(
+                    start = true,
+                    isDaemon = true,
+                    name = "PrivyHub-Paused-Frame"
+                ) {
+                    try {
+                        pausedFrameBytes =
+                            persistPausedFrame(
+                                bitmap
+                            )
+
+                        pausedFrameCaptureStatus =
+                            "saved"
+
+                    } catch (error: Exception) {
+                        pausedFrameBytes =
+                            0L
+
+                        pausedFrameCaptureStatus =
+                            "write_error_" +
+                                error.javaClass.simpleName
+
+                        if (!bitmap.isRecycled) {
+                            bitmap.recycle()
+                        }
+                    }
+
+                    uiHandler.post {
+                        finishAfterPausedFrameCapture()
+                    }
+                }
+            },
+            uiHandler
+        )
+    }
+
+
     override fun dispatchKeyEvent(
         event: KeyEvent
     ): Boolean {
+
         if (
-            event.keyCode !=
-            KeyEvent.KEYCODE_BACK &&
+            event.keyCode ==
+            KeyEvent.KEYCODE_BACK
+        ) {
+            if (
+                event.action ==
+                KeyEvent.ACTION_UP
+            ) {
+                capturePausedFrameAndFinish()
+            }
+
+            return true
+        }
+
+        if (
             controllerSender?.handleKeyEvent(
                 event
             ) ==

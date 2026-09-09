@@ -491,6 +491,8 @@ class NativeControllerBridge:
         self._last_sequence: int | None = None
         self._last_packet_at = [0.0, 0.0]
         self._neutralized = [True, True]
+        self._forced_buttons = [0, 0]
+        self._meta_lock = threading.RLock()
 
     def _load_vgamepad(
         self,
@@ -542,6 +544,23 @@ class NativeControllerBridge:
                 int(value),
             ),
         )
+
+    # PrivyHub Phase A3 persistent game-session controller
+    def ensure_started(
+        self,
+        client_ip: str,
+        port: int,
+    ) -> dict[str, Any]:
+        active = bool(
+            self._running.is_set()
+            and self._socket is not None
+            and len(self._gamepads) == self.MAX_PLAYERS
+        )
+        if active and self._client_ip == client_ip and self._port == int(port):
+            return self.status()
+        result = self.start(client_ip=client_ip, port=port)
+        time.sleep(0.35)
+        return result
 
     def start(
         self,
@@ -610,6 +629,9 @@ class NativeControllerBridge:
         self._last_packet_at = [0.0, 0.0]
         self._neutralized = [True, True]
 
+        with self._meta_lock:
+            self._forced_buttons = [0, 0]
+
         self._running.set()
 
         self._thread = threading.Thread(
@@ -644,9 +666,19 @@ class NativeControllerBridge:
             gamepad = self._gamepads[index]
 
             try:
-                gamepad.reset()
-                gamepad.update()
-                self._neutralized[index] = True
+                # PrivyHub A2/A3 patch 01: timeout neutralization must not
+                # erase a companion-injected RetroArch meta hotkey mid-pulse.
+                with self._meta_lock:
+                    forced_buttons = self._forced_buttons[index]
+                    gamepad.reset()
+                    gamepad.report.wButtons = (
+                        int(forced_buttons)
+                        & 0xFFFF
+                    )
+                    gamepad.update()
+                    self._neutralized[index] = (
+                        forced_buttons == 0
+                    )
             except Exception:
                 pass
 
@@ -670,34 +702,163 @@ class NativeControllerBridge:
 
         gamepad = self._gamepads[player]
 
-        gamepad.report.wButtons = (
-            int(buttons)
-            & 0xFFFF
+        # PrivyHub A2/A3 patch 01: serialize real reports with the forced
+        # meta-button overlay so receiver traffic cannot erase a hotkey.
+        with self._meta_lock:
+            forced_buttons = self._forced_buttons[player]
+
+            gamepad.report.wButtons = (
+                (
+                    int(buttons)
+                    & 0xFFFF
+                )
+                | forced_buttons
+            )
+            gamepad.report.bLeftTrigger = (
+                self._clamp_trigger(lt)
+            )
+            gamepad.report.bRightTrigger = (
+                self._clamp_trigger(rt)
+            )
+            gamepad.report.sThumbLX = (
+                self._clamp_axis(lx)
+            )
+            gamepad.report.sThumbLY = (
+                self._clamp_axis(ly)
+            )
+            gamepad.report.sThumbRX = (
+                self._clamp_axis(rx)
+            )
+            gamepad.report.sThumbRY = (
+                self._clamp_axis(ry)
+            )
+
+            gamepad.update()
+
+            self._updates += 1
+            self._updates_by_player[player] += 1
+            self._neutralized[player] = False
+
+    # PrivyHub A2/A3 patch 02: stage RetroArch meta-hotkey edges.
+    # RetroArch treats input_enable_hotkey as a modifier. A human press
+    # naturally establishes Back/View before the action button; emitting both
+    # bits in one XInput report can be missed by the frontend. Keep the proven
+    # XInput mappings, but reproduce the physical chord ordering explicitly.
+    RETROARCH_HOTKEY_ENABLE = 0x0020  # Back / View
+    RETROARCH_META_ACTION_BUTTONS = {
+        "save": 0x0200,  # right shoulder
+        "load": 0x0100,  # left shoulder
+        "pause": 0x0080,  # right thumb
+        "quit": 0x0010,  # Start
+    }
+
+    def pulse_retroarch_hotkey(
+        self,
+        action: str,
+        *,
+        player: int = 0,
+        hold_seconds: float = 0.18,
+        modifier_settle_seconds: float = 0.08,
+        release_gap_seconds: float = 0.06,
+    ) -> dict[str, Any]:
+        normalized_action = (
+            str(action).strip().casefold()
         )
-        gamepad.report.bLeftTrigger = (
-            self._clamp_trigger(lt)
+        action_mask = (
+            self.RETROARCH_META_ACTION_BUTTONS.get(
+                normalized_action
+            )
         )
-        gamepad.report.bRightTrigger = (
-            self._clamp_trigger(rt)
+        if action_mask is None:
+            raise NativeSessionIOError(
+                f"Unknown RetroArch hotkey action: {action}"
+            )
+
+        if not self._running.is_set():
+            raise NativeSessionIOError(
+                "Native controller bridge is not running"
+            )
+        if not (0 <= player < len(self._gamepads)):
+            raise NativeSessionIOError(
+                "Requested virtual controller is unavailable"
+            )
+
+        gamepad = self._gamepads[player]
+        modifier_mask = int(
+            self.RETROARCH_HOTKEY_ENABLE
         )
-        gamepad.report.sThumbLX = (
-            self._clamp_axis(lx)
+        action_mask = int(action_mask)
+        hold = max(
+            0.08,
+            min(0.50, float(hold_seconds)),
         )
-        gamepad.report.sThumbLY = (
-            self._clamp_axis(ly)
+        settle = max(
+            0.04,
+            min(0.20, float(modifier_settle_seconds)),
         )
-        gamepad.report.sThumbRX = (
-            self._clamp_axis(rx)
-        )
-        gamepad.report.sThumbRY = (
-            self._clamp_axis(ry)
+        release_gap = max(
+            0.03,
+            min(0.20, float(release_gap_seconds)),
         )
 
-        gamepad.update()
+        # 1. Establish Back/View alone.
+        with self._meta_lock:
+            self._forced_buttons[player] |= modifier_mask
+            gamepad.report.wButtons = (
+                int(gamepad.report.wButtons)
+                | modifier_mask
+            ) & 0xFFFF
+            gamepad.update()
 
-        self._updates += 1
-        self._updates_by_player[player] += 1
-        self._neutralized[player] = False
+        time.sleep(settle)
+
+        # 2. Press the action while the modifier is already held.
+        with self._meta_lock:
+            self._forced_buttons[player] |= action_mask
+            gamepad.report.wButtons = (
+                int(gamepad.report.wButtons)
+                | action_mask
+            ) & 0xFFFF
+            gamepad.update()
+
+        time.sleep(hold)
+
+        # 3. Release the action first, preserving Back/View.
+        with self._meta_lock:
+            self._forced_buttons[player] &= ~action_mask
+            gamepad.report.wButtons = (
+                int(gamepad.report.wButtons)
+                & ~action_mask
+            ) & 0xFFFF
+            gamepad.update()
+
+        time.sleep(release_gap)
+
+        # 4. Release Back/View last so RetroArch sees a complete chord.
+        with self._meta_lock:
+            self._forced_buttons[player] &= ~modifier_mask
+            gamepad.report.wButtons = (
+                int(gamepad.report.wButtons)
+                & ~modifier_mask
+            ) & 0xFFFF
+            gamepad.update()
+
+        return {
+            "action": normalized_action,
+            "player": player + 1,
+            "modifier_mask": modifier_mask,
+            "action_mask": action_mask,
+            "mask": modifier_mask | action_mask,
+            "modifier_settle_ms": int(settle * 1000),
+            "hold_ms": int(hold * 1000),
+            "release_gap_ms": int(release_gap * 1000),
+            "edge_sequence": [
+                "modifier_down",
+                "action_down",
+                "action_up",
+                "modifier_up",
+            ],
+        }
 
     def _receive_loop(
         self,
@@ -856,6 +1017,9 @@ class NativeControllerBridge:
                 timeout=1
             )
 
+        with self._meta_lock:
+            self._forced_buttons = [0, 0]
+
         self._neutralize()
         self._gamepads = []
         self._client_ip = None
@@ -877,6 +1041,19 @@ class NativeSessionIO:
         self._audio_error: str | None = None
         self._controller_error: str | None = None
 
+    # PrivyHub Phase A3 persistent game-session controller
+    def ensure_controller(
+        self,
+        client_ip: str,
+        input_port: int,
+    ) -> dict[str, Any]:
+        self._controller_error = None
+        try:
+            return self.controller.ensure_started(client_ip=client_ip, port=input_port)
+        except Exception as exc:
+            self._controller_error = str(exc)
+            raise
+
     def start(
         self,
         ffmpeg: Path,
@@ -885,21 +1062,12 @@ class NativeSessionIO:
         input_port: int,
         process_id: int,
     ) -> dict[str, Any]:
-        self.stop()
-
+        self.audio.stop()
         self._audio_error = None
-        self._controller_error = None
-
         try:
-            self.controller.start(
-                client_ip=client_ip,
-                port=input_port,
-            )
-        except Exception as exc:
-            self._controller_error = str(
-                exc
-            )
-
+            self.ensure_controller(client_ip=client_ip, input_port=input_port)
+        except Exception:
+            pass
         try:
             self.audio.start(
                 ffmpeg=ffmpeg,
@@ -908,35 +1076,24 @@ class NativeSessionIO:
                 process_id=process_id,
             )
         except Exception as exc:
-            self._audio_error = str(
-                exc
-            )
-
+            self._audio_error = str(exc)
         return self.status()
 
-    def status(
-        self,
-    ) -> dict[str, Any]:
+    def status(self) -> dict[str, Any]:
         audio = self.audio.status()
         controller = self.controller.status()
-
         if self._audio_error:
-            audio["error"] = (
-                self._audio_error
-            )
-
+            audio["error"] = self._audio_error
         if self._controller_error:
-            controller["error"] = (
-                self._controller_error
-            )
+            controller["error"] = self._controller_error
+        return {"audio": audio, "controller": controller}
 
-        return {
-            "audio": audio,
-            "controller": controller,
-        }
+    def stop_stream(self) -> None:
+        self.audio.stop()
+        self._audio_error = None
 
-    def stop(
-        self,
-    ) -> None:
+    def stop(self) -> None:
         self.audio.stop()
         self.controller.stop()
+        self._audio_error = None
+        self._controller_error = None

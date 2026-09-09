@@ -145,6 +145,29 @@ class NativeStreamManager:
         if ffmpeg_exited or capture_exited or relay_exited:
             self._stop_locked()
 
+    # PrivyHub Phase A2 controller-hotkey state bridge
+    def retroarch_hotkey(
+        self,
+        action: str,
+    ) -> dict[str, Any]:
+        return self._session_io.controller.pulse_retroarch_hotkey(
+            action
+        )
+
+    # PrivyHub Phase A3 stream pause/resume lifecycle
+    def ensure_game_controller(self, client_ip: str) -> dict[str, Any]:
+        client_ip = self._validated_ipv4(client_ip)
+        try:
+            return self._session_io.ensure_controller(client_ip=client_ip, input_port=self.INPUT_PORT)
+        except Exception as exc:
+            raise NativeStreamError(f"Unable to start persistent game controller: {exc}") from exc
+
+    def end_game_session(self) -> dict[str, Any]:
+        with self._lock:
+            self._stop_locked()
+            self._session_io.stop()
+            return self.status()
+
     def status(self) -> dict[str, Any]:
         with self._lock:
             self._reap_locked()
@@ -253,14 +276,83 @@ class NativeStreamManager:
             raise NativeStreamError("Native stream UDP port is out of range")
         return port
 
+    # PrivyHub A2/A3 patch 09: configured RetroArch capture identity
     def _retroarch_executable(self) -> Path:
-        return (
+        config_path = (
             self.project_root
-            / "runtime"
-            / "emulators"
-            / "retroarch"
-            / "retroarch.exe"
+            / "companion"
+            / "games"
+            / "config"
+            / "emulators.json"
         ).resolve()
+
+        try:
+            config_path.relative_to(
+                self.project_root
+            )
+        except ValueError as exc:
+            raise NativeStreamError(
+                "Emulator configuration escaped the project root."
+            ) from exc
+
+        try:
+            payload = json.loads(
+                config_path.read_text(
+                    encoding="utf-8-sig"
+                )
+            )
+        except (
+            OSError,
+            json.JSONDecodeError,
+        ) as exc:
+            raise NativeStreamError(
+                f"Unable to read emulator configuration: {exc}"
+            ) from exc
+
+        retroarch = (
+            payload.get("retroarch")
+            if isinstance(payload, dict)
+            else None
+        )
+
+        if not isinstance(
+            retroarch,
+            dict,
+        ):
+            raise NativeStreamError(
+                "Emulator configuration has no RetroArch profile."
+            )
+
+        executable_rel = retroarch.get(
+            "executable"
+        )
+
+        if (
+            not isinstance(
+                executable_rel,
+                str,
+            )
+            or not executable_rel.strip()
+        ):
+            raise NativeStreamError(
+                "RetroArch executable is not configured."
+            )
+
+        candidate = (
+            self.project_root
+            / executable_rel
+        ).resolve()
+
+        try:
+            candidate.relative_to(
+                self.project_root
+            )
+        except ValueError as exc:
+            raise NativeStreamError(
+                "Configured RetroArch executable escaped the project root."
+            ) from exc
+
+        return candidate
 
     @staticmethod
     def _same_windows_path(
@@ -663,7 +755,7 @@ class NativeStreamManager:
         # Finalize resource telemetry while the managed processes still exist.
         self._host_telemetry.stop()
 
-        self._session_io.stop()
+        self._session_io.stop_stream()
 
         ffmpeg = self._process
         capture = self._capture_process

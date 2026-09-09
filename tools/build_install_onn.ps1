@@ -143,7 +143,10 @@ $OnlineDevices = @(
     ForEach-Object {
         $Line = $_.Trim()
 
-        if ($Line -match '^(\S+)\s+device$') {
+        # PRIVYHUB_A7_PATCH_11_A7_4_SOFTPATCH_MODS_ADB_FIX
+        # ADB mDNS instance names can contain spaces (for example a Windows
+        # duplicate service suffix). Parse the tab before the status field.
+        if ($Line -match '^(.*)\tdevice$') {
             $matches[1]
         }
     }

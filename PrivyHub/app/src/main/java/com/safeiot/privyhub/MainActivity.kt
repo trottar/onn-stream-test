@@ -1,6 +1,9 @@
 package com.safeiot.privyhub
 
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 
 import com.safeiot.privyhub.streaming.NativeStreamActivity
 
@@ -9,6 +12,7 @@ import android.os.Handler
 import android.os.Looper
 import android.text.InputType
 import android.util.Log
+import android.util.LruCache
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
@@ -17,6 +21,7 @@ import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.GridLayout
+import android.widget.ImageView
 import android.widget.TextView
 
 import androidx.appcompat.app.AlertDialog
@@ -41,8 +46,11 @@ import androidx.media3.ui.PlayerView
 import org.json.JSONArray
 import org.json.JSONObject
 
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -67,10 +75,22 @@ class MainActivity : AppCompatActivity() {
     private lateinit var settingsButton: Button
     private lateinit var stopButton: Button
 
-    private lateinit var nowPlayingBar: View
+    private lateinit var nowPlayingBar: ViewGroup
     private lateinit var nowPlayingTitle: TextView
     private lateinit var nowPlayingProgress: TextView
     private lateinit var restartButton: Button
+    private lateinit var gameSaveButton: Button
+    private lateinit var gameLoadButton: Button
+    private lateinit var gameEndButton: Button
+    private lateinit var gameSessionPreview: ImageView
+    private lateinit var gameSessionPreviewLabel: TextView
+    private var gameSessionPreviewBitmap: Bitmap? = null
+
+    // PrivyHub A2/A3 patch 01: persistent paused game-session banner.
+    // PrivyHub A3 patch 11v2: frozen gameplay banner frame.
+    private var gameSessionActive = false
+    private var gameSessionPaused = false
+    private var gameSessionTitle: String? = null
 
     private var isFullscreen =
         false
@@ -84,6 +104,29 @@ class MainActivity : AppCompatActivity() {
 
     private val networkExecutor: ExecutorService =
         Executors.newSingleThreadExecutor()
+
+    // PrivyHub Phase A6 box art: artwork loading is isolated from
+    // companion control requests so a slow/missing cover can never
+    // delay launch, Save/Load, or library navigation.
+    private val gameArtworkExecutor: ExecutorService =
+        Executors.newFixedThreadPool(2)
+
+    private val gameArtworkCache =
+        object : LruCache<String, Bitmap>(
+            12 * 1024
+        ) {
+
+            override fun sizeOf(
+                key: String,
+                value: Bitmap
+            ): Int {
+
+                return maxOf(
+                    1,
+                    value.byteCount / 1024
+                )
+            }
+        }
 
     private val navigationStack =
         mutableListOf<SourceNode>()
@@ -165,6 +208,10 @@ class MainActivity : AppCompatActivity() {
 
         private const val PREF_COMPANION_HOST =
             "companion_host"
+
+        // PrivyHub Phase A5: direct game-launch behavior.
+        private const val PREF_GAME_AUTO_OPEN_AFTER_LAUNCH =
+            "game_auto_open_after_launch"
 
         private const val PREF_TV_LANGUAGE =
             "tv_language"
@@ -250,7 +297,8 @@ class MainActivity : AppCompatActivity() {
         val nodeType: String,
         val children: List<SourceNode> = emptyList(),
         val playback: PlaybackInfo? = null,
-        val lazyPath: String? = null
+        val lazyPath: String? = null,
+        val artworkPath: String? = null
     )
 
 
@@ -438,6 +486,79 @@ class MainActivity : AppCompatActivity() {
             )
 
 
+        gameSessionPreview =
+            ImageView(this).apply {
+                scaleType =
+                    ImageView.ScaleType.FIT_CENTER
+                setBackgroundColor(
+                    0xFF101010.toInt()
+                )
+                isClickable = true
+                isFocusable = true
+                visibility = View.GONE
+            }
+
+        gameSessionPreviewLabel =
+            TextView(this).apply {
+                text = "RESUME\nPLAYING"
+                textSize = 15f
+                gravity = Gravity.CENTER
+                setTextColor(
+                    0xFFFFFFFF.toInt()
+                )
+                setBackgroundColor(
+                    0x66000000
+                )
+                isClickable = true
+                isFocusable = true
+                visibility = View.GONE
+            }
+
+        previewPlayerHost.addView(
+            gameSessionPreview,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
+
+        previewPlayerHost.addView(
+            gameSessionPreviewLabel,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
+
+
+        gameSaveButton =
+            createGameSessionActionButton(
+                "SAVE"
+            )
+
+        gameLoadButton =
+            createGameSessionActionButton(
+                "LOAD"
+            )
+
+        gameEndButton =
+            createGameSessionActionButton(
+                "END"
+            )
+
+        nowPlayingBar.addView(
+            gameSaveButton
+        )
+
+        nowPlayingBar.addView(
+            gameLoadButton
+        )
+
+        nowPlayingBar.addView(
+            gameEndButton
+        )
+
+
         backButton.setOnClickListener {
 
             navigateBack()
@@ -467,7 +588,11 @@ class MainActivity : AppCompatActivity() {
 
         stopButton.setOnClickListener {
 
-            stopPlaybackAndRemoteSource()
+            if (gameSessionActive) {
+                showGameEndDialog()
+            } else {
+                stopPlaybackAndRemoteSource()
+            }
         }
 
 
@@ -496,6 +621,51 @@ class MainActivity : AppCompatActivity() {
         restartButton.setOnClickListener {
 
             restartCurrentVod()
+        }
+
+
+        gameSessionPreview.setOnClickListener {
+
+            if (gameSessionActive) {
+                openNativeGameStream()
+            }
+        }
+
+        gameSessionPreviewLabel.setOnClickListener {
+
+            if (gameSessionActive) {
+                openNativeGameStream()
+            }
+        }
+
+
+        nowPlayingTitle.setOnClickListener {
+
+            if (gameSessionActive) {
+                openNativeGameStream()
+            }
+        }
+
+
+        gameSaveButton.setOnClickListener {
+
+            showGameSlotDialog(
+                action = "save-state"
+            )
+        }
+
+
+        gameLoadButton.setOnClickListener {
+
+            showGameSlotDialog(
+                action = "load-state"
+            )
+        }
+
+
+        gameEndButton.setOnClickListener {
+
+            showGameEndDialog()
         }
 
 
@@ -593,6 +763,38 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    // PrivyHub Phase A5: new game launches can enter the proven native
+    // fullscreen path automatically. The preference defaults on, while
+    // keeping the existing paused Game Session handoff available.
+    private fun getGameAutoOpenAfterLaunch(): Boolean {
+
+        return getSharedPreferences(
+            PREFS_NAME,
+            MODE_PRIVATE
+        ).getBoolean(
+            PREF_GAME_AUTO_OPEN_AFTER_LAUNCH,
+            true
+        )
+    }
+
+
+    private fun saveGameAutoOpenAfterLaunch(
+        enabled: Boolean
+    ) {
+
+        getSharedPreferences(
+            PREFS_NAME,
+            MODE_PRIVATE
+        )
+            .edit()
+            .putBoolean(
+                PREF_GAME_AUTO_OPEN_AFTER_LAUNCH,
+                enabled
+            )
+            .apply()
+    }
+
+
     private fun showCompanionSettings() {
 
         val input =
@@ -641,13 +843,48 @@ class MainActivity : AppCompatActivity() {
         )
 
 
+        val gameAutoOpenCheckBox =
+            CheckBox(this).apply {
+                text =
+                    "Open games automatically after launch"
+                isChecked =
+                    getGameAutoOpenAfterLaunch()
+            }
+
+        container.addView(
+            gameAutoOpenCheckBox,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+
+        val gameAutoOpenHint =
+            TextView(this).apply {
+                text =
+                    "Turn this off to keep newly launched games paused " +
+                        "in PrivyHub until you open the Game Session."
+                textSize =
+                    13f
+            }
+
+        container.addView(
+            gameAutoOpenHint,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+
         val dialog =
             AlertDialog.Builder(this)
                 .setTitle(
-                    "Companion Host"
+                    "PrivyHub Settings"
                 )
                 .setMessage(
-                    "Enter the IP address or hostname of the PrivyHub companion."
+                    "Set the companion host and game launch behavior."
                 )
                 .setView(
                     container
@@ -699,6 +936,10 @@ class MainActivity : AppCompatActivity() {
 
                 saveCompanionHost(
                     host
+                )
+
+                saveGameAutoOpenAfterLaunch(
+                    gameAutoOpenCheckBox.isChecked
                 )
 
                 dialog.dismiss()
@@ -984,6 +1225,13 @@ class MainActivity : AppCompatActivity() {
                             ""
                         ).takeIf {
                             it.isNotBlank()
+                        },
+                    artworkPath =
+                        json.optString(
+                            "artwork_path",
+                            ""
+                        ).takeIf {
+                            it.isNotBlank()
                         }
                 )
             }
@@ -1092,7 +1340,10 @@ class MainActivity : AppCompatActivity() {
             }
 
         val nodes =
-            if (isTvUiPage()) {
+            if (
+                isTvUiPage() ||
+                isGamesUiPage()
+            ) {
 
                 currentNodes
 
@@ -1671,13 +1922,17 @@ class MainActivity : AppCompatActivity() {
 
         layoutParams.height =
             dp(
-                if (isContinueWatchingSource) {
+                when {
 
-                    90
+                    node.nodeType == "game" &&
+                        node.artworkPath != null ->
+                        118
 
-                } else {
+                    isContinueWatchingSource ->
+                        90
 
-                    78
+                    else ->
+                        78
                 }
             )
 
@@ -1735,9 +1990,23 @@ class MainActivity : AppCompatActivity() {
 
                 "game" -> {
 
-                    showGameDetails(
-                        node
-                    )
+                    if (
+                        node.id ==
+                        "games_session_status"
+                    ) {
+                        openGameSessionNode(
+                            node
+                        )
+                    } else if (
+                        node.id ==
+                        "games_search"
+                    ) {
+                        showGameSearchDialog()
+                    } else {
+                        showGameDetails(
+                            node
+                        )
+                    }
                 }
 
 
@@ -1784,9 +2053,226 @@ class MainActivity : AppCompatActivity() {
         }
 
 
+        if (
+            node.nodeType == "game" &&
+            node.artworkPath != null
+        ) {
+            loadGameArtworkIntoButton(
+                button,
+                node
+            )
+        }
+
+
         return button
     }
 
+
+    // PrivyHub Phase A6 box art: fetch local cover images through the
+    // existing media server. Missing/invalid art is intentionally silent.
+    private fun loadGameArtworkIntoButton(
+        button: Button,
+        node: SourceNode
+    ) {
+
+        val artworkPath =
+            node.artworkPath
+                ?: return
+
+        val cached =
+            gameArtworkCache.get(
+                artworkPath
+            )
+
+        if (cached != null) {
+            applyGameArtworkToButton(
+                button,
+                node.id,
+                cached
+            )
+            return
+        }
+
+        val host =
+            getCompanionHost()
+
+        if (host.isBlank()) {
+            return
+        }
+
+        gameArtworkExecutor.execute {
+
+            var connection:
+                HttpURLConnection? =
+                null
+
+            try {
+
+                val url =
+                    URL(
+                        "http://$host:$DEFAULT_MEDIA_PORT$artworkPath"
+                    )
+
+                connection =
+                    url.openConnection()
+                        as HttpURLConnection
+
+                connection.requestMethod =
+                    "GET"
+
+                connection.connectTimeout =
+                    2_500
+
+                connection.readTimeout =
+                    5_000
+
+                connection.useCaches =
+                    true
+
+                val status =
+                    connection.responseCode
+
+                if (
+                    status !in
+                    200..299
+                ) {
+                    return@execute
+                }
+
+                val decoded =
+                    connection.inputStream.use {
+                        stream ->
+
+                        BitmapFactory.decodeStream(
+                            stream
+                        )
+                    }
+                        ?: return@execute
+
+                val bitmap =
+                    scaleGameArtwork(
+                        decoded
+                    )
+
+                if (bitmap !== decoded) {
+                    decoded.recycle()
+                }
+
+                gameArtworkCache.put(
+                    artworkPath,
+                    bitmap
+                )
+
+                runOnUiThread {
+                    applyGameArtworkToButton(
+                        button,
+                        node.id,
+                        bitmap
+                    )
+                }
+
+            } catch (error: Exception) {
+
+                Log.d(
+                    TAG,
+                    "Game box art unavailable: $artworkPath",
+                    error
+                )
+
+            } finally {
+                connection?.disconnect()
+            }
+        }
+    }
+
+
+    private fun scaleGameArtwork(
+        source: Bitmap
+    ): Bitmap {
+
+        val maxWidth =
+            dp(72)
+
+        val maxHeight =
+            dp(96)
+
+        if (
+            source.width <= maxWidth &&
+            source.height <= maxHeight
+        ) {
+            return source
+        }
+
+        val scale =
+            minOf(
+                maxWidth.toFloat() /
+                    source.width.toFloat(),
+                maxHeight.toFloat() /
+                    source.height.toFloat()
+            )
+
+        val width =
+            maxOf(
+                1,
+                (
+                    source.width *
+                        scale
+                ).toInt()
+            )
+
+        val height =
+            maxOf(
+                1,
+                (
+                    source.height *
+                        scale
+                ).toInt()
+            )
+
+        return Bitmap.createScaledBitmap(
+            source,
+            width,
+            height,
+            true
+        )
+    }
+
+
+    private fun applyGameArtworkToButton(
+        button: Button,
+        expectedNodeId: String,
+        bitmap: Bitmap
+    ) {
+
+        if (
+            button.tag != expectedNodeId
+        ) {
+            return
+        }
+
+        val drawable =
+            BitmapDrawable(
+                resources,
+                bitmap
+            )
+
+        drawable.setBounds(
+            0,
+            0,
+            bitmap.width,
+            bitmap.height
+        )
+
+        button.setCompoundDrawables(
+            drawable,
+            null,
+            null,
+            null
+        )
+
+        button.compoundDrawablePadding =
+            dp(12)
+    }
 
     private fun loadLazyCategory(
         node: SourceNode
@@ -1829,7 +2315,11 @@ class MainActivity : AppCompatActivity() {
                 val loadedNode =
                     node.copy(
                         children = children,
-                        lazyPath = null
+                        // PrivyHub A6.1 polish: retain the authoritative
+                        // backing path so this exact Games view can be
+                        // refreshed after library-state mutations without
+                        // discarding the navigation stack.
+                        lazyPath = lazyPath
                     )
 
 
@@ -1863,6 +2353,87 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+
+    // PrivyHub A6.1 polish: refresh only the currently displayed
+    // companion-backed Games category. This preserves the breadcrumb,
+    // navigation stack, and focused item instead of falling back to the
+    // global catalog Refresh action.
+    private fun refreshCurrentGameLibraryView() {
+
+        val currentNode =
+            navigationStack.lastOrNull()
+                ?: return
+
+        val lazyPath =
+            currentNode.lazyPath
+                ?: return
+
+        if (
+            !lazyPath.startsWith(
+                "/plugins/games/"
+            )
+        ) {
+            return
+        }
+
+        val host =
+            getCompanionHost()
+
+        if (host.isBlank()) {
+            return
+        }
+
+        val expectedNodeId =
+            currentNode.id
+
+        networkExecutor.execute {
+
+            try {
+
+                val response =
+                    httpGet(
+                        "http://$host:$CONTROL_PORT$lazyPath"
+                    )
+
+                val children =
+                    parseLazyNodes(
+                        response
+                    )
+
+                runOnUiThread {
+
+                    val activeNode =
+                        navigationStack.lastOrNull()
+
+                    if (
+                        activeNode == null ||
+                        activeNode.id != expectedNodeId ||
+                        activeNode.lazyPath != lazyPath
+                    ) {
+                        return@runOnUiThread
+                    }
+
+                    navigationStack[
+                        navigationStack.lastIndex
+                    ] =
+                        activeNode.copy(
+                            children = children,
+                            lazyPath = lazyPath
+                        )
+
+                    renderCurrentPage()
+                }
+
+            } catch (error: Exception) {
+
+                Log.d(
+                    TAG,
+                    "Games view auto-refresh failed",
+                    error
+                )
+            }
+        }
+    }
 
     /*
      * ----------------------------------------------------------------
@@ -1973,6 +2544,16 @@ class MainActivity : AppCompatActivity() {
             ) == true
     }
 
+
+    private fun isGamesUiPage(): Boolean {
+
+        return navigationStack.any {
+            it.id == "games" ||
+                it.id.startsWith(
+                    "games_"
+                )
+        }
+    }
 
     private fun isInTv(): Boolean {
 
@@ -5023,6 +5604,164 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    // PrivyHub A2/A3 patch 03: the Game Session / Resume Playing
+    // catalog entry is itself a fullscreen affordance when a game is active.
+    private fun openGameSessionNode(
+        node: SourceNode
+    ) {
+
+        val host =
+            getCompanionHost()
+
+        if (host.isBlank()) {
+            showCompanionSettings()
+            return
+        }
+
+        statusText.text =
+            "Opening game session..."
+
+        networkExecutor.execute {
+
+            try {
+                val json =
+                    JSONObject(
+                        httpGet(
+                            "http://$host:$CONTROL_PORT" +
+                                "/plugins/games/status"
+                        )
+                    )
+
+                val active =
+                    json.optBoolean(
+                        "active",
+                        false
+                    )
+
+                val paused =
+                    json.optBoolean(
+                        "paused",
+                        false
+                    )
+
+                val title =
+                    json.optJSONObject(
+                        "game"
+                    )
+                        ?.optString(
+                            "title",
+                            "Game"
+                        )
+                        ?: "Game"
+
+                runOnUiThread {
+                    if (active) {
+                        showGameSessionBanner(
+                            title,
+                            paused
+                        )
+                        openNativeGameStream()
+                    } else {
+                        showGameDetails(
+                            node
+                        )
+                    }
+                }
+
+            } catch (error: Exception) {
+                Log.e(
+                    TAG,
+                    "Failed to open game session",
+                    error
+                )
+                runOnUiThread {
+                    statusText.text =
+                        "Game session unavailable"
+                }
+            }
+        }
+    }
+
+
+    // PrivyHub Phase A6: companion-backed game search.
+    private fun showGameSearchDialog() {
+
+        val input =
+            android.widget.EditText(
+                this
+            )
+
+        input.hint =
+            "Title or system"
+
+        input.isSingleLine =
+            true
+
+        val dialog =
+            AlertDialog.Builder(
+                this
+            )
+                .setTitle(
+                    "Search Games"
+                )
+                .setView(
+                    input
+                )
+                .setPositiveButton(
+                    "Search",
+                    null
+                )
+                .setNegativeButton(
+                    "Cancel",
+                    null
+                )
+                .create()
+
+        dialog.setOnShowListener {
+
+            dialog
+                .getButton(
+                    AlertDialog.BUTTON_POSITIVE
+                )
+                .setOnClickListener {
+
+                    val query =
+                        input.text
+                            ?.toString()
+                            ?.trim()
+                            .orEmpty()
+
+                    if (query.isBlank()) {
+
+                        input.error =
+                            "Enter a title or system"
+
+                        return@setOnClickListener
+                    }
+
+                    val encodedQuery =
+                        URLEncoder.encode(
+                            query,
+                            StandardCharsets.UTF_8.name()
+                        )
+
+                    dialog.dismiss()
+
+                    loadLazyCategory(
+                        SourceNode(
+                            id = "games_search_results",
+                            name = "Search: $query",
+                            nodeType = "category",
+                            lazyPath =
+                                "/plugins/games/games?view=search&q=$encodedQuery"
+                        )
+                    )
+                }
+        }
+
+        dialog.show()
+    }
+
     private fun showGameDetails(
         node: SourceNode
     ) {
@@ -5111,6 +5850,23 @@ class MainActivity : AppCompatActivity() {
                                 null
                             )
 
+                    node.artworkPath
+                        ?.let { artworkPath ->
+
+                            gameArtworkCache.get(
+                                artworkPath
+                            )
+                        }
+                        ?.let { bitmap ->
+
+                            builder.setIcon(
+                                BitmapDrawable(
+                                    resources,
+                                    bitmap
+                                )
+                            )
+                        }
+
                     when (kind) {
 
                         "game_session" -> {
@@ -5118,6 +5874,12 @@ class MainActivity : AppCompatActivity() {
                             val active =
                                 json.optBoolean(
                                     "active",
+                                    false
+                                )
+
+                            val paused =
+                                json.optBoolean(
+                                    "paused",
                                     false
                                 )
 
@@ -5135,13 +5897,30 @@ class MainActivity : AppCompatActivity() {
                                     ?: false
 
                             statusText.text =
-                                if (active) {
-                                    "Game running on companion"
-                                } else {
-                                    "Games ready"
+                                when {
+                                    active && paused ->
+                                        "Game paused - Resume Playing"
+
+                                    active ->
+                                        "Game running on companion"
+
+                                    else ->
+                                        "Games ready"
                                 }
 
                             if (
+                                active &&
+                                paused
+                            ) {
+
+                                builder.setPositiveButton(
+                                    "Resume Playing"
+                                ) { _, _ ->
+
+                                    openNativeGameStream()
+                                }
+
+                            } else if (
                                 active &&
                                 streaming
                             ) {
@@ -5156,12 +5935,20 @@ class MainActivity : AppCompatActivity() {
 
                             if (active) {
 
-                                builder.setNeutralButton(
-                                    "Stop Game"
-                                ) { _, _ ->
+                                val activeTitle =
+                                    json.optJSONObject(
+                                        "game"
+                                    )
+                                        ?.optString(
+                                            "title",
+                                            "Game"
+                                        )
+                                        ?: "Game"
 
-                                    stopGameOnCompanion()
-                                }
+                                showGameSessionBanner(
+                                    activeTitle,
+                                    paused
+                                )
                             }
                         }
 
@@ -5292,9 +6079,23 @@ class MainActivity : AppCompatActivity() {
                                 "Launch on Companion"
                             ) { _, _ ->
 
-                                launchGameOnCompanion(
+                                showGameLaunchModeDialog(
                                     node.id,
                                     title
+                                )
+                            }
+
+                            // PrivyHub Phase A6: library-state actions live
+                            // behind one stable Options affordance so the
+                            // launch button remains uncluttered.
+                            builder.setNeutralButton(
+                                "Options"
+                            ) { _, _ ->
+
+                                showGameLibraryOptionsDialog(
+                                    node,
+                                    title,
+                                    json
                                 )
                             }
                         }
@@ -5321,6 +6122,903 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+
+
+    // PrivyHub Phase A6: persistent library-state controls. Favorites
+    // are owned by the companion so they survive Android reinstalls and can
+    // be shared by future PrivyHub clients.
+    private fun showGameLibraryOptionsDialog(
+        node: SourceNode,
+        title: String,
+        detailJson: JSONObject
+    ) {
+
+        val favorite =
+            detailJson.optBoolean(
+                "favorite",
+                false
+            )
+
+        val controllerSelectable =
+            detailJson.optBoolean(
+                "controller_profile_selectable",
+                false
+            )
+
+        val controllerLabel =
+            detailJson.optString(
+                "controller_profile_label",
+                "Controller"
+            )
+
+        val playerMode =
+            detailJson.optString(
+                "player_mode",
+                "unknown"
+            )
+                .trim()
+                .lowercase()
+
+        val playerModeSource =
+            detailJson.optString(
+                "player_mode_source",
+                "unknown"
+            )
+                .trim()
+                .lowercase()
+
+        val maxPlayers =
+            detailJson.optInt(
+                "max_players",
+                0
+            )
+
+        val playerLabel =
+            when (playerMode) {
+
+                "single" ->
+                    "Single Player"
+
+                "multi" ->
+                    if (maxPlayers > 1) {
+                        "Multiplayer ($maxPlayers)"
+                    } else {
+                        "Multiplayer"
+                    }
+
+                else ->
+                    "Unknown"
+            }
+
+        val playerSourceLabel =
+            when (playerModeSource) {
+
+                "manual" ->
+                    "Override"
+
+                "metadata" ->
+                    "Metadata"
+
+                else ->
+                    ""
+            }
+
+        val playerOption =
+            if (playerSourceLabel.isBlank()) {
+                "Players: $playerLabel"
+            } else {
+                "Players: $playerLabel - $playerSourceLabel"
+            }
+
+        val cheatFileCount =
+            detailJson.optInt(
+                "cheat_file_count",
+                0
+            )
+
+        val modFileCount =
+            detailJson.optInt(
+                "mod_file_count",
+                0
+            )
+
+        val options =
+            mutableListOf(
+                if (favorite) {
+                    "Remove from Favorites"
+                } else {
+                    "Add to Favorites"
+                },
+                playerOption
+            )
+
+        val userContentIndex =
+            options.size
+
+        options.add(
+            "Cheats / Mods: $cheatFileCount / $modFileCount"
+        )
+
+        val controllerIndex =
+            if (controllerSelectable) {
+
+                val index =
+                    options.size
+
+                options.add(
+                    "Controller: $controllerLabel"
+                )
+
+                index
+
+            } else {
+                -1
+            }
+
+        AlertDialog.Builder(this)
+            .setTitle(
+                "$title - Options"
+            )
+            .setItems(
+                options.toTypedArray()
+            ) { _, which ->
+
+                when {
+
+                    which == 0 -> {
+
+                        toggleGameFavorite(
+                            node,
+                            title
+                        )
+                    }
+
+                    which == 1 -> {
+
+                        showGamePlayerModeDialog(
+                            node,
+                            title,
+                            detailJson
+                        )
+                    }
+
+                    which == userContentIndex -> {
+
+                        showGameUserContentDialog(
+                            title,
+                            detailJson
+                        )
+                    }
+
+                    controllerSelectable &&
+                        which == controllerIndex -> {
+
+                        showGameControllerProfileDialog(
+                            node,
+                            title,
+                            detailJson
+                        )
+                    }
+                }
+            }
+            .setNegativeButton(
+                "Cancel",
+                null
+            )
+            .show()
+    }
+
+    // PrivyHub Phase A7.1: user-supplied cheat/mod catalog only.
+    // Nothing listed by this dialog is enabled or applied yet.
+    private fun showGameUserContentDialog(
+        title: String,
+        detailJson: JSONObject
+    ) {
+
+        val cheatFiles =
+            detailJson.optJSONArray(
+                "cheat_files"
+            )
+
+        val modFiles =
+            detailJson.optJSONArray(
+                "mod_files"
+            )
+
+        val cheatCount =
+            detailJson.optInt(
+                "cheat_file_count",
+                cheatFiles?.length()
+                    ?: 0
+            )
+
+        val modCount =
+            detailJson.optInt(
+                "mod_file_count",
+                modFiles?.length()
+                    ?: 0
+            )
+
+        val message =
+            StringBuilder()
+                .append(
+                    "Managed user content. Cheats and supported softpatch mods can be launched from Launch on Companion."
+                )
+                .append(
+                    "\n\nCheat files ($cheatCount):"
+                )
+
+        if (
+            cheatFiles == null ||
+            cheatFiles.length() == 0
+        ) {
+
+            message.append(
+                "\nNone found."
+            )
+
+        } else {
+
+            val shown =
+                minOf(
+                    cheatFiles.length(),
+                    20
+                )
+
+            for (index in 0 until shown) {
+
+                val item =
+                    cheatFiles.optJSONObject(
+                        index
+                    )
+
+                val name =
+                    item
+                        ?.optString(
+                            "name",
+                            ""
+                        )
+                        ?.takeIf {
+                            it.isNotBlank()
+                        }
+                        ?: "Unnamed cheat file"
+
+                message
+                    .append(
+                        "\n- "
+                    )
+                    .append(
+                        name
+                    )
+            }
+
+            if (
+                cheatFiles.length() > shown
+            ) {
+
+                message
+                    .append(
+                        "\n- ... "
+                    )
+                    .append(
+                        cheatFiles.length() - shown
+                    )
+                    .append(
+                        " more"
+                    )
+            }
+        }
+
+        message.append(
+            "\n\nMod patches ($modCount):"
+        )
+
+        if (
+            modFiles == null ||
+            modFiles.length() == 0
+        ) {
+
+            message.append(
+                "\nNone found."
+            )
+
+        } else {
+
+            val shown =
+                minOf(
+                    modFiles.length(),
+                    20
+                )
+
+            for (index in 0 until shown) {
+
+                val item =
+                    modFiles.optJSONObject(
+                        index
+                    )
+
+                val name =
+                    item
+                        ?.optString(
+                            "name",
+                            ""
+                        )
+                        ?.takeIf {
+                            it.isNotBlank()
+                        }
+                        ?: "Unnamed mod patch"
+
+                message
+                    .append(
+                        "\n- "
+                    )
+                    .append(
+                        name
+                    )
+            }
+
+            if (
+                modFiles.length() > shown
+            ) {
+
+                message
+                    .append(
+                        "\n- ... "
+                    )
+                    .append(
+                        modFiles.length() - shown
+                    )
+                    .append(
+                        " more"
+                    )
+            }
+        }
+
+        val managedHint =
+            detailJson.optString(
+                "user_content_managed_hint",
+                ""
+            )
+
+        val sidecarHint =
+            detailJson.optString(
+                "user_content_sidecar_hint",
+                ""
+            )
+
+        if (
+            managedHint.isNotBlank() ||
+            sidecarHint.isNotBlank()
+        ) {
+
+            message.append(
+                "\n\nPrivyHub locations:"
+            )
+
+            if (managedHint.isNotBlank()) {
+
+                message
+                    .append(
+                        "\nManaged: "
+                    )
+                    .append(
+                        managedHint
+                    )
+            }
+
+            if (sidecarHint.isNotBlank()) {
+
+                message
+                    .append(
+                        "\nBeside game: "
+                    )
+                    .append(
+                        sidecarHint
+                    )
+            }
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(
+                "$title - Cheats / Mods"
+            )
+            .setMessage(
+                message.toString()
+            )
+            .setPositiveButton(
+                "Close",
+                null
+            )
+            .show()
+    }
+
+    private fun toggleGameFavorite(
+        node: SourceNode,
+        title: String
+    ) {
+
+        val host =
+            getCompanionHost()
+
+        if (host.isBlank()) {
+
+            showCompanionSettings()
+
+            return
+        }
+
+        statusText.text =
+            "Updating $title..."
+
+        val encodedId =
+            URLEncoder.encode(
+                node.id,
+                StandardCharsets.UTF_8.name()
+            )
+
+        networkExecutor.execute {
+
+            try {
+
+                val response =
+                    httpPost(
+                        "http://$host:$CONTROL_PORT" +
+                            "/plugins/games/favorite?id=$encodedId"
+                    )
+
+                val json =
+                    JSONObject(
+                        response
+                    )
+
+                val favorite =
+                    json.optBoolean(
+                        "favorite",
+                        false
+                    )
+
+                runOnUiThread {
+
+                    statusText.text =
+                        if (favorite) {
+                            "Added to Favorites: $title"
+                        } else {
+                            "Removed from Favorites: $title"
+                        }
+
+                    // Refresh the visible Games category immediately.
+                    // Reopening this game's details later fetches fresh
+                    // favorite/controller metadata from the companion.
+                    refreshCurrentGameLibraryView()
+                }
+
+            } catch (error: Exception) {
+
+                Log.e(
+                    TAG,
+                    "Failed to update game favorite",
+                    error
+                )
+
+                runOnUiThread {
+
+                    statusText.text =
+                        "Favorite update failed"
+
+                    AlertDialog.Builder(
+                        this
+                    )
+                        .setTitle(
+                            "Favorite update failed"
+                        )
+                        .setMessage(
+                            error.message
+                                ?: "Unknown error"
+                        )
+                        .setPositiveButton(
+                            "OK",
+                            null
+                        )
+                        .show()
+                }
+            }
+        }
+    }
+
+
+    private fun showGamePlayerModeDialog(
+        node: SourceNode,
+        title: String,
+        detailJson: JSONObject
+    ) {
+
+        val currentMode =
+            detailJson.optString(
+                "player_mode",
+                "unknown"
+            )
+                .trim()
+                .lowercase()
+
+        val currentSource =
+            detailJson.optString(
+                "player_mode_source",
+                "unknown"
+            )
+                .trim()
+                .lowercase()
+
+        val automaticLabel =
+            when (currentMode) {
+
+                "single" ->
+                    if (currentSource == "metadata") {
+                        "Automatic (Single Player)"
+                    } else {
+                        "Automatic"
+                    }
+
+                "multi" ->
+                    if (currentSource == "metadata") {
+                        "Automatic (Multiplayer)"
+                    } else {
+                        "Automatic"
+                    }
+
+                else ->
+                    "Automatic"
+            }
+
+        val labels =
+            arrayOf(
+                automaticLabel,
+                "Single Player override",
+                "Multiplayer override"
+            )
+
+        val modes =
+            arrayOf(
+                "unknown",
+                "single",
+                "multi"
+            )
+
+        val checkedIndex =
+            if (currentSource == "manual") {
+
+                modes.indexOf(
+                    currentMode
+                )
+                    .takeIf {
+                        it > 0
+                    }
+                    ?: 0
+
+            } else {
+                0
+            }
+
+        AlertDialog.Builder(this)
+            .setTitle(
+                "$title - Players"
+            )
+            .setSingleChoiceItems(
+                labels,
+                checkedIndex
+            ) { dialog, which ->
+
+                dialog.dismiss()
+
+                updateGamePlayerMode(
+                    node,
+                    title,
+                    modes[which],
+                    when (which) {
+                        0 -> "Automatic"
+                        1 -> "Single Player override"
+                        else -> "Multiplayer override"
+                    }
+                )
+            }
+            .setNegativeButton(
+                "Cancel",
+                null
+            )
+            .show()
+    }
+
+    private fun updateGamePlayerMode(
+        node: SourceNode,
+        title: String,
+        mode: String,
+        label: String
+    ) {
+
+        val host =
+            getCompanionHost()
+
+        if (host.isBlank()) {
+
+            showCompanionSettings()
+
+            return
+        }
+
+        val encodedId =
+            URLEncoder.encode(
+                node.id,
+                StandardCharsets.UTF_8.name()
+            )
+
+        val encodedMode =
+            URLEncoder.encode(
+                mode,
+                StandardCharsets.UTF_8.name()
+            )
+
+        statusText.text =
+            "Updating $title..."
+
+        networkExecutor.execute {
+
+            try {
+
+                httpPost(
+                    "http://$host:$CONTROL_PORT" +
+                        "/plugins/games/player-mode?id=$encodedId&mode=$encodedMode"
+                )
+
+                runOnUiThread {
+
+                    statusText.text =
+                        "Players: $label - $title"
+
+                    refreshCurrentGameLibraryView()
+                }
+
+            } catch (error: Exception) {
+
+                Log.e(
+                    TAG,
+                    "Failed to update game player mode",
+                    error
+                )
+
+                runOnUiThread {
+
+                    statusText.text =
+                        "Player classification update failed"
+
+                    AlertDialog.Builder(
+                        this
+                    )
+                        .setTitle(
+                            "Player classification failed"
+                        )
+                        .setMessage(
+                            error.message
+                                ?: "Unknown error"
+                        )
+                        .setPositiveButton(
+                            "OK",
+                            null
+                        )
+                        .show()
+                }
+            }
+        }
+    }
+
+    // PrivyHub Phase A PS1 controller selector
+    private fun showGameControllerProfileDialog(
+        node: SourceNode,
+        title: String,
+        json: JSONObject
+    ) {
+
+        val options =
+            json.optJSONArray(
+                "controller_profile_options"
+            ) ?: return
+
+        val profileIds =
+            mutableListOf<String>()
+
+        val profileLabels =
+            mutableListOf<String>()
+
+        for (
+            index in
+            0 until options.length()
+        ) {
+
+            val option =
+                options.optJSONObject(
+                    index
+                ) ?: continue
+
+            val profileId =
+                option.optString(
+                    "id",
+                    ""
+                ).trim()
+
+            val label =
+                option.optString(
+                    "label",
+                    profileId
+                ).trim()
+
+            if (
+                profileId.isBlank() ||
+                label.isBlank()
+            ) {
+                continue
+            }
+
+            profileIds.add(
+                profileId
+            )
+
+            profileLabels.add(
+                label
+            )
+        }
+
+        if (profileIds.isEmpty()) {
+            return
+        }
+
+        val currentProfile =
+            json.optString(
+                "controller_profile",
+                ""
+            )
+
+        val checkedIndex =
+            profileIds.indexOf(
+                currentProfile
+            ).let {
+                if (it >= 0) {
+                    it
+                } else {
+                    0
+                }
+            }
+
+        AlertDialog.Builder(this)
+            .setTitle(
+                "$title Controller"
+            )
+            .setSingleChoiceItems(
+                profileLabels.toTypedArray(),
+                checkedIndex
+            ) { dialog, which ->
+
+                if (
+                    which in
+                    profileIds.indices
+                ) {
+
+                    val profile =
+                        profileIds[
+                            which
+                        ]
+
+                    dialog.dismiss()
+
+                    setGameControllerProfile(
+                        node,
+                        title,
+                        profile
+                    )
+                }
+            }
+            .setNegativeButton(
+                "Cancel",
+                null
+            )
+            .show()
+    }
+
+
+    private fun setGameControllerProfile(
+        node: SourceNode,
+        title: String,
+        profile: String
+    ) {
+
+        val host =
+            getCompanionHost()
+
+        if (host.isBlank()) {
+
+            showCompanionSettings()
+
+            return
+        }
+
+        statusText.text =
+            "Updating controller..."
+
+        networkExecutor.execute {
+
+            try {
+
+                val gameId =
+                    URLEncoder.encode(
+                        node.id,
+                        "UTF-8"
+                    )
+
+                val encodedProfile =
+                    URLEncoder.encode(
+                        profile,
+                        "UTF-8"
+                    )
+
+                val response =
+                    httpPost(
+                        "http://$host:$CONTROL_PORT" +
+                            "/plugins/games/controller-profile" +
+                            "?id=$gameId&profile=$encodedProfile"
+                    )
+
+                val result =
+                    JSONObject(
+                        response
+                    )
+
+                val label =
+                    result.optString(
+                        "label",
+                        profile
+                    )
+
+                runOnUiThread {
+
+                    statusText.text =
+                        "Controller: $label"
+
+                    showGameDetails(
+                        node
+                    )
+                }
+
+            } catch (error: Exception) {
+
+                Log.e(
+                    TAG,
+                    "Failed to update game controller profile",
+                    error
+                )
+
+                runOnUiThread {
+
+                    statusText.text =
+                        "Controller update failed"
+
+                    AlertDialog.Builder(
+                        this
+                    )
+                        .setTitle(
+                            "$title Controller"
+                        )
+                        .setMessage(
+                            error.message
+                                ?: "Unknown error"
+                        )
+                        .setPositiveButton(
+                            "OK",
+                            null
+                        )
+                        .show()
+                }
+            }
+        }
+    }
+
+
     private fun buildGameCatalogMessage(
         json: JSONObject
     ): String {
@@ -5331,11 +7029,282 @@ class MainActivity : AppCompatActivity() {
                 "Unknown"
             )
 
-        val relativePath =
+        val title =
             json.optString(
-                "relative_path",
+                "title",
                 ""
             )
+
+        val canonicalTitle =
+            json.optString(
+                "canonical_title",
+                ""
+            )
+
+        val metadataAvailable =
+            json.optBoolean(
+                "metadata_available",
+                false
+            )
+
+        val details =
+            StringBuilder()
+                .append(
+                    "System: "
+                )
+                .append(
+                    systemName
+                )
+
+        if (
+            metadataAvailable &&
+            canonicalTitle.isNotBlank() &&
+            canonicalTitle != title
+        ) {
+
+            details
+                .append(
+                    "\nCatalog title: "
+                )
+                .append(
+                    canonicalTitle
+                )
+        }
+
+        if (metadataAvailable) {
+
+            val region =
+                json.optString(
+                    "region",
+                    ""
+                )
+
+            val releaseYear =
+                json.optInt(
+                    "release_year",
+                    0
+                )
+
+            val genre =
+                json.optString(
+                    "genre",
+                    ""
+                )
+
+            val developer =
+                json.optString(
+                    "developer",
+                    ""
+                )
+
+            val publisher =
+                json.optString(
+                    "publisher",
+                    ""
+                )
+
+            val provider =
+                json.optString(
+                    "metadata_provider",
+                    ""
+                )
+
+            if (region.isNotBlank()) {
+
+                details
+                    .append(
+                        "\nRegion: "
+                    )
+                    .append(
+                        region
+                    )
+            }
+
+            if (releaseYear > 0) {
+
+                details
+                    .append(
+                        "\nReleased: "
+                    )
+                    .append(
+                        releaseYear
+                    )
+            }
+
+            if (genre.isNotBlank()) {
+
+                details
+                    .append(
+                        "\nGenre: "
+                    )
+                    .append(
+                        genre
+                    )
+            }
+
+            if (developer.isNotBlank()) {
+
+                details
+                    .append(
+                        "\nDeveloper: "
+                    )
+                    .append(
+                        developer
+                    )
+            }
+
+            if (publisher.isNotBlank()) {
+
+                details
+                    .append(
+                        "\nPublisher: "
+                    )
+                    .append(
+                        publisher
+                    )
+            }
+
+            if (provider.isNotBlank()) {
+
+                val providerLabel =
+                    when (
+                        provider
+                            .trim()
+                            .lowercase()
+                    ) {
+
+                        "libretro" ->
+                            "Libretro"
+
+                        else ->
+                            provider
+                    }
+
+                details
+                    .append(
+                        "\nMetadata: "
+                    )
+                    .append(
+                        providerLabel
+                    )
+            }
+        }
+
+        val playerMode =
+            json.optString(
+                "player_mode",
+                "unknown"
+            )
+                .trim()
+                .lowercase()
+
+        val playerModeSource =
+            json.optString(
+                "player_mode_source",
+                "unknown"
+            )
+                .trim()
+                .lowercase()
+
+        val maxPlayers =
+            json.optInt(
+                "max_players",
+                0
+            )
+
+        val playerLabel =
+            when (playerMode) {
+
+                "single" ->
+                    if (maxPlayers == 1) {
+                        "1 - Single Player"
+                    } else {
+                        "Single Player"
+                    }
+
+                "multi" ->
+                    if (maxPlayers > 1) {
+                        "Multiplayer (up to $maxPlayers players)"
+                    } else {
+                        "Multiplayer"
+                    }
+
+                else ->
+                    "Unknown"
+            }
+
+        details
+            .append(
+                "\nPlayers: "
+            )
+            .append(
+                playerLabel
+            )
+
+        when (playerModeSource) {
+
+            "manual" ->
+                details.append(
+                    " (override)"
+                )
+
+            "metadata" ->
+                details.append(
+                    " (metadata)"
+                )
+        }
+
+        val boxArtAvailable =
+            json.optBoolean(
+                "box_art_available",
+                false
+            )
+
+        details
+            .append(
+                "\nBox art: "
+            )
+            .append(
+                if (boxArtAvailable) {
+                    "Local cache"
+                } else {
+                    "Not available"
+                }
+            )
+
+        if (
+            json.optBoolean(
+                "user_content_catalog_only",
+                false
+            )
+        ) {
+
+            val cheatFileCount =
+                json.optInt(
+                    "cheat_file_count",
+                    0
+                )
+
+            val modFileCount =
+                json.optInt(
+                    "mod_file_count",
+                    0
+                )
+
+            details
+                .append(
+                    "\nCheat files: "
+                )
+                .append(
+                    cheatFileCount
+                )
+                .append(
+                    "\nMod patches: "
+                )
+                .append(
+                    modFileCount
+                )
+        }
 
         val format =
             json.optString(
@@ -5349,14 +7318,11 @@ class MainActivity : AppCompatActivity() {
                 0L
             )
 
-        val details =
-            StringBuilder()
-                .append(
-                    "System: "
-                )
-                .append(
-                    systemName
-                )
+        val relativePath =
+            json.optString(
+                "relative_path",
+                ""
+            )
 
         if (format.isNotBlank()) {
 
@@ -5393,6 +7359,71 @@ class MainActivity : AppCompatActivity() {
                 )
         }
 
+        val favorite =
+            json.optBoolean(
+                "favorite",
+                false
+            )
+
+        val playCount =
+            json.optInt(
+                "play_count",
+                0
+            )
+
+        val continueAvailable =
+            json.optBoolean(
+                "continue_available",
+                false
+            )
+
+        details
+            .append(
+                "\nFavorite: "
+            )
+            .append(
+                if (favorite) {
+                    "Yes"
+                } else {
+                    "No"
+                }
+            )
+
+        if (playCount > 0) {
+
+            details
+                .append(
+                    "\nPlay count: "
+                )
+                .append(
+                    playCount
+                )
+        }
+
+        if (continueAvailable) {
+
+            details.append(
+                "\nPrivyHub save state: Available"
+            )
+        }
+
+        val controllerLabel =
+            json.optString(
+                "controller_profile_label",
+                ""
+            )
+
+        if (controllerLabel.isNotBlank()) {
+
+            details
+                .append(
+                    "\nController: "
+                )
+                .append(
+                    controllerLabel
+                )
+        }
+
         details.append(
             "\n\nLaunch starts the game on the PrivyHub companion. " +
                 "If the Sunshine transport is configured, PrivyHub " +
@@ -5402,7 +7433,6 @@ class MainActivity : AppCompatActivity() {
         return details.toString()
     }
 
-
     private fun buildGameSessionMessage(
         json: JSONObject
     ): String {
@@ -5410,6 +7440,12 @@ class MainActivity : AppCompatActivity() {
         val active =
             json.optBoolean(
                 "active",
+                false
+            )
+
+        val paused =
+            json.optBoolean(
+                "paused",
                 false
             )
 
@@ -5423,7 +7459,12 @@ class MainActivity : AppCompatActivity() {
             StringBuilder()
 
         details.append(
-            if (active) {
+            if (
+                active &&
+                paused
+            ) {
+                "Game: PAUSED"
+            } else if (active) {
                 "Game: RUNNING"
             } else if (ready) {
                 "Game: READY"
@@ -5710,6 +7751,12 @@ class MainActivity : AppCompatActivity() {
                     NativeStreamActivity.EXTRA_COMPANION_HOST,
                     host
                 )
+
+                putExtra(
+                    NativeStreamActivity.EXTRA_GAME_TITLE,
+                    gameSessionTitle
+                        ?: "Game"
+                )
             }
         )
     }
@@ -5847,9 +7894,637 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    private fun launchGameOnCompanion(
+    // PrivyHub Phase A5 follow-up: choose the initial game state before
+    // performing the normal launch handoff. "Start Fresh" means the core's
+    // normal boot path; it does not erase native SRAM or memory-card data.
+
+
+
+    // PRIVYHUB_A7_PATCH_11_A7_4_SOFTPATCH_MODS_ADB_FIX
+    private fun showGameExtrasMenu(
         gameId: String,
         title: String
+    ) {
+        AlertDialog.Builder(this)
+            .setTitle("Extras — $title")
+            .setItems(arrayOf("Cheats", "Mods")) { _, which ->
+                when (which) {
+                    0 -> showGameCheatSelector(gameId, title)
+                    1 -> showGameModSelector(gameId, title)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showGameModSelector(
+        gameId: String,
+        title: String
+    ) {
+        val host = getCompanionHost()
+        if (host.isBlank()) {
+            showCompanionSettings()
+            return
+        }
+        statusText.text = "Loading mods for $title..."
+        networkExecutor.execute {
+            try {
+                val profileJson = JSONObject(
+                    httpPost(
+                        "http://$host:$CONTROL_PORT" +
+                            "/plugins/games/mod-profiles?id=$gameId"
+                    )
+                )
+                val catalogJson = JSONObject(
+                    httpPost(
+                        "http://$host:$CONTROL_PORT" +
+                            "/plugins/games/mod-catalog?id=$gameId"
+                    )
+                )
+                val profiles = profileJson.optJSONArray("profiles") ?: JSONArray()
+                val mods = catalogJson.optJSONArray("mods") ?: JSONArray()
+                val supported = catalogJson.optBoolean("supported", false)
+                val reason = catalogJson.optString("reason", "")
+                val managedDirectory = catalogJson.optString("managed_directory", "")
+                runOnUiThread {
+                    statusText.text = "Games ready"
+                    if (!supported) {
+                        AlertDialog.Builder(this)
+                            .setTitle("Mods unavailable")
+                            .setMessage(
+                                if (reason == "core_softpatching_unsupported") {
+                                    "The configured core for this system does not support RetroArch softpatching."
+                                } else {
+                                    "Softpatch mods are unavailable for this game."
+                                }
+                            )
+                            .setPositiveButton("OK", null)
+                            .show()
+                    } else if (profiles.length() <= 0 && mods.length() <= 0) {
+                        AlertDialog.Builder(this)
+                            .setTitle("Mods")
+                            .setMessage(
+                                "No IPS/BPS/UPS/XDelta mods were found.\n\n" +
+                                    "Managed folder:\n$managedDirectory"
+                            )
+                            .setPositiveButton("OK", null)
+                            .show()
+                    } else {
+                        showGameModProfileMenu(gameId, title, profiles, mods)
+                    }
+                }
+            } catch (error: Exception) {
+                Log.e(TAG, "Failed to load game mods", error)
+                runOnUiThread {
+                    statusText.text = "Mod catalog unavailable"
+                    AlertDialog.Builder(this)
+                        .setTitle("Mods unavailable")
+                        .setMessage(error.message ?: "Unknown error")
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            }
+        }
+    }
+
+    private fun showGameModProfileMenu(
+        gameId: String,
+        title: String,
+        profiles: JSONArray,
+        mods: JSONArray
+    ) {
+        val labels = mutableListOf<String>()
+        val profileObjects = mutableListOf<JSONObject>()
+        for (index in 0 until profiles.length()) {
+            val profile = profiles.optJSONObject(index) ?: continue
+            val filename = profile.optString("filename", "").trim()
+            val modIndex = profile.optInt("mod_index", -1)
+            if (filename.isBlank() || modIndex < 0) continue
+            val occupied = profile.optJSONArray("occupied_slots") ?: JSONArray()
+            val slots = mutableListOf<Int>()
+            for (slotIndex in 0 until occupied.length()) {
+                val slot = occupied.optInt(slotIndex, -1)
+                if (slot > 0) slots.add(slot)
+            }
+            val suffix = when {
+                slots.size == 1 -> " — Slot ${slots[0]}"
+                slots.size > 1 -> " — Slots ${slots.joinToString(", ")}"
+                profile.optBoolean("persistent_save_present", false) -> " — Game save present"
+                else -> " — No state saves"
+            }
+            labels.add("Mod: $filename$suffix")
+            profileObjects.add(profile)
+        }
+        if (mods.length() > 0) labels.add("New Mod Session")
+        if (labels.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("Mods")
+                .setMessage("No usable mod profiles or patch files are available.")
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Mods — $title")
+            .setItems(labels.toTypedArray()) { _, which ->
+                if (which < profileObjects.size) {
+                    showExistingGameModProfileDialog(
+                        gameId = gameId,
+                        title = title,
+                        profile = profileObjects[which]
+                    )
+                } else {
+                    showGameModEntryDialog(gameId, title, mods)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showExistingGameModProfileDialog(
+        gameId: String,
+        title: String,
+        profile: JSONObject
+    ) {
+        val modIndex = profile.optInt("mod_index", -1)
+        val filename = profile.optString("filename", "").trim()
+        if (modIndex < 0 || filename.isBlank()) {
+            AlertDialog.Builder(this)
+                .setTitle("Mod profile unavailable")
+                .setMessage("This saved mod profile cannot be reconstructed safely.")
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+        val profileLabel = "Mod: $filename"
+        val occupied = profile.optJSONArray("occupied_slots") ?: JSONArray()
+        val slots = mutableListOf<Int>()
+        for (index in 0 until occupied.length()) {
+            val slot = occupied.optInt(index, -1)
+            if (slot > 0) slots.add(slot)
+        }
+        val details = StringBuilder()
+            .append(profileLabel)
+            .append("\nFormat: ")
+            .append(profile.optString("format", "").uppercase())
+            .append("\nSave states: ")
+            .append(if (slots.isEmpty()) "None" else slots.joinToString(", ") { "Slot $it" })
+            .append("\nPersistent game save: ")
+            .append(if (profile.optBoolean("persistent_save_present", false)) "Present" else "None detected")
+        val builder = AlertDialog.Builder(this)
+            .setTitle("Existing Mod Profile")
+            .setMessage(details.toString())
+            .setPositiveButton("Start Fresh") { _, _ ->
+                launchGameOnCompanion(
+                    gameId = gameId,
+                    title = title,
+                    loadSaveAfterLaunch = false,
+                    cheatProfileLabel = profileLabel,
+                    modIndex = modIndex
+                )
+            }
+            .setNeutralButton("Cancel", null)
+        if (slots.isNotEmpty()) {
+            builder.setNegativeButton("Load Save") { _, _ ->
+                launchGameOnCompanion(
+                    gameId = gameId,
+                    title = title,
+                    loadSaveAfterLaunch = true,
+                    cheatProfileLabel = profileLabel,
+                    modIndex = modIndex
+                )
+            }
+        }
+        builder.show()
+    }
+
+    private fun showGameModEntryDialog(
+        gameId: String,
+        title: String,
+        mods: JSONArray
+    ) {
+        if (mods.length() <= 0) return
+        val usable = mutableListOf<JSONObject>()
+        val labels = mutableListOf<String>()
+        for (index in 0 until mods.length()) {
+            val mod = mods.optJSONObject(index) ?: continue
+            val modIndex = mod.optInt("mod_index", -1)
+            val filename = mod.optString("filename", "").trim()
+            if (modIndex < 0 || filename.isBlank()) continue
+            usable.add(mod)
+            val format = mod.optString("format", "").uppercase()
+            labels.add(if (format.isBlank()) filename else "$filename ($format)")
+        }
+        if (usable.isEmpty()) return
+        AlertDialog.Builder(this)
+            .setTitle("New Mod Session — $title")
+            .setItems(labels.toTypedArray()) { _, which ->
+                val mod = usable[which]
+                val modIndex = mod.optInt("mod_index", -1)
+                val filename = mod.optString("filename", "Mod")
+                val profileLabel = "Mod: $filename"
+                AlertDialog.Builder(this)
+                    .setTitle("Start $profileLabel?")
+                    .setMessage(
+                        "This launches an isolated mod profile. Normal saves and cheat profiles are not modified."
+                    )
+                    .setPositiveButton("Start Mod Session") { _, _ ->
+                        launchGameOnCompanion(
+                            gameId = gameId,
+                            title = title,
+                            loadSaveAfterLaunch = false,
+                            cheatProfileLabel = profileLabel,
+                            modIndex = modIndex
+                        )
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    // PRIVYHUB_A7_PATCH_10V3_ANDROID_CHEAT_GUI
+        // PRIVYHUB_A7_PATCH_10V4_EXISTING_CHEAT_PROFILES
+    private fun showGameCheatSelector(
+        gameId: String,
+        title: String
+    ) {
+        val host = getCompanionHost()
+        if (host.isBlank()) {
+            showCompanionSettings()
+            return
+        }
+
+        statusText.text = "Loading cheat profiles for $title..."
+        networkExecutor.execute {
+            try {
+                val profileResponse = httpPost(
+                    "http://$host:$CONTROL_PORT" +
+                        "/plugins/games/cheat-profiles?id=$gameId"
+                )
+                val catalogResponse = httpPost(
+                    "http://$host:$CONTROL_PORT" +
+                        "/plugins/games/cheat-catalog?id=$gameId"
+                )
+                val profileJson = JSONObject(profileResponse)
+                val catalogJson = JSONObject(catalogResponse)
+                val profiles = profileJson.optJSONArray("profiles") ?: JSONArray()
+                val sources = catalogJson.optJSONArray("sources") ?: JSONArray()
+
+                runOnUiThread {
+                    statusText.text = "Games ready"
+                    if (profiles.length() <= 0 && sources.length() <= 0) {
+                        AlertDialog.Builder(this)
+                            .setTitle("Cheats")
+                            .setMessage("No validated cheats are available for this game.")
+                            .setPositiveButton("OK", null)
+                            .show()
+                    } else {
+                        showGameCheatProfileMenu(
+                            gameId = gameId,
+                            title = title,
+                            profiles = profiles,
+                            sources = sources
+                        )
+                    }
+                }
+            } catch (error: Exception) {
+                Log.e(TAG, "Failed to load game cheat profiles", error)
+                runOnUiThread {
+                    statusText.text = "Cheat profiles unavailable"
+                    AlertDialog.Builder(this)
+                        .setTitle("Cheats unavailable")
+                        .setMessage(error.message ?: "Unknown error")
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            }
+        }
+    }
+
+    private fun showGameCheatProfileMenu(
+        gameId: String,
+        title: String,
+        profiles: JSONArray,
+        sources: JSONArray
+    ) {
+        val labels = mutableListOf<String>()
+        val profileObjects = mutableListOf<JSONObject>()
+
+        for (index in 0 until profiles.length()) {
+            val profile = profiles.optJSONObject(index) ?: continue
+            val enabled = profile.optJSONArray("enabled_cheats") ?: JSONArray()
+            val descriptions = mutableListOf<String>()
+            for (entryIndex in 0 until enabled.length()) {
+                val description = enabled
+                    .optJSONObject(entryIndex)
+                    ?.optString("description", "")
+                    ?.trim()
+                    .orEmpty()
+                if (description.isNotBlank()) {
+                    descriptions.add(description)
+                }
+            }
+            if (descriptions.isEmpty()) {
+                continue
+            }
+
+            val profileLabel = GameCheatUiState.buildProfileLabel(descriptions)
+            val occupied = profile.optJSONArray("occupied_slots") ?: JSONArray()
+            val slotNumbers = mutableListOf<Int>()
+            for (slotIndex in 0 until occupied.length()) {
+                val slot = occupied.optInt(slotIndex, -1)
+                if (slot > 0) {
+                    slotNumbers.add(slot)
+                }
+            }
+            val suffix = when {
+                slotNumbers.size == 1 -> " — Slot ${slotNumbers[0]}"
+                slotNumbers.size > 1 -> " — Slots ${slotNumbers.joinToString(", ")}"
+                profile.optBoolean("persistent_save_present", false) -> " — Game save present"
+                else -> " — No state saves"
+            }
+            labels.add(profileLabel + suffix)
+            profileObjects.add(profile)
+        }
+
+        if (sources.length() > 0) {
+            labels.add("New Cheat Session")
+        }
+
+        if (labels.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("Cheats")
+                .setMessage("No usable cheat profiles or validated cheat sources are available.")
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Cheats — $title")
+            .setItems(labels.toTypedArray()) { _, which ->
+                if (which < profileObjects.size) {
+                    showExistingGameCheatProfileDialog(
+                        gameId = gameId,
+                        title = title,
+                        profile = profileObjects[which]
+                    )
+                } else {
+                    showGameCheatSourceDialog(gameId, title, sources)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showExistingGameCheatProfileDialog(
+        gameId: String,
+        title: String,
+        profile: JSONObject
+    ) {
+        val sourceIndex = profile.optInt("source_index", -1)
+        val rawIndexes = profile.optJSONArray("enabled_cheat_indexes") ?: JSONArray()
+        val enabledIndexes = mutableListOf<Int>()
+        for (index in 0 until rawIndexes.length()) {
+            val value = rawIndexes.optInt(index, -1)
+            if (value >= 0) {
+                enabledIndexes.add(value)
+            }
+        }
+
+        val enabled = profile.optJSONArray("enabled_cheats") ?: JSONArray()
+        val descriptions = mutableListOf<String>()
+        for (index in 0 until enabled.length()) {
+            val description = enabled
+                .optJSONObject(index)
+                ?.optString("description", "")
+                ?.trim()
+                .orEmpty()
+            if (description.isNotBlank()) {
+                descriptions.add(description)
+            }
+        }
+
+        if (sourceIndex < 0 || enabledIndexes.isEmpty() || descriptions.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("Cheat profile unavailable")
+                .setMessage("This saved cheat profile is incomplete and cannot be launched safely.")
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+
+        val profileLabel = GameCheatUiState.buildProfileLabel(descriptions)
+        val occupied = profile.optJSONArray("occupied_slots") ?: JSONArray()
+        val occupiedSlots = mutableListOf<Int>()
+        for (index in 0 until occupied.length()) {
+            val slot = occupied.optInt(index, -1)
+            if (slot > 0) {
+                occupiedSlots.add(slot)
+            }
+        }
+
+        val details = StringBuilder()
+            .append(profileLabel)
+            .append("\nSource: ")
+            .append(profile.optString("source_filename", "Validated cheat source"))
+            .append("\nSave states: ")
+            .append(
+                if (occupiedSlots.isEmpty()) {
+                    "None"
+                } else {
+                    occupiedSlots.joinToString(", ") { "Slot $it" }
+                }
+            )
+            .append("\nPersistent game save: ")
+            .append(
+                if (profile.optBoolean("persistent_save_present", false)) {
+                    "Present"
+                } else {
+                    "None detected"
+                }
+            )
+
+        val builder = AlertDialog.Builder(this)
+            .setTitle("Existing Cheat Profile")
+            .setMessage(details.toString())
+            .setPositiveButton("Start Fresh") { _, _ ->
+                launchGameOnCompanion(
+                    gameId = gameId,
+                    title = title,
+                    loadSaveAfterLaunch = false,
+                    cheatSourceIndex = sourceIndex,
+                    cheatEnabledIndexes = enabledIndexes,
+                    cheatProfileLabel = profileLabel
+                )
+            }
+            .setNeutralButton("Cancel", null)
+
+        if (occupiedSlots.isNotEmpty()) {
+            builder.setNegativeButton("Load Save") { _, _ ->
+                launchGameOnCompanion(
+                    gameId = gameId,
+                    title = title,
+                    loadSaveAfterLaunch = true,
+                    cheatSourceIndex = sourceIndex,
+                    cheatEnabledIndexes = enabledIndexes,
+                    cheatProfileLabel = profileLabel
+                )
+            }
+        }
+
+        builder.show()
+    }
+
+    private fun showGameCheatSourceDialog(
+        gameId: String,
+        title: String,
+        sources: JSONArray
+    ) {
+        if (sources.length() == 1) {
+            showGameCheatEntryDialog(gameId, title, sources.getJSONObject(0))
+            return
+        }
+
+        var selectedSource = 0
+        val labels = Array(sources.length()) { index ->
+            val source = sources.getJSONObject(index)
+            val filename = source.optString("filename", "Cheat source ${index + 1}")
+            val count = source.optJSONArray("entries")?.length() ?: 0
+            "$filename ($count cheats)"
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Cheat source — $title")
+            .setSingleChoiceItems(labels, 0) { _, which -> selectedSource = which }
+            .setPositiveButton("Next") { _, _ ->
+                showGameCheatEntryDialog(
+                    gameId,
+                    title,
+                    sources.getJSONObject(selectedSource)
+                )
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showGameCheatEntryDialog(
+        gameId: String,
+        title: String,
+        source: JSONObject
+    ) {
+        val sourceIndex = source.optInt("source_index", -1)
+        val entries = source.optJSONArray("entries") ?: JSONArray()
+        if (sourceIndex < 0 || entries.length() <= 0) {
+            AlertDialog.Builder(this)
+                .setTitle("Cheats unavailable")
+                .setMessage("This cheat source has no selectable entries.")
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+
+        val labels = Array(entries.length()) { index ->
+            entries.getJSONObject(index).optString("description", "Cheat ${index + 1}")
+        }
+        val indexes = IntArray(entries.length()) { index ->
+            entries.getJSONObject(index).optInt("index", -1)
+        }
+        val checked = BooleanArray(entries.length())
+
+        AlertDialog.Builder(this)
+            .setTitle("Cheats — $title")
+            .setMultiChoiceItems(labels, checked) { _, which, enabled ->
+                checked[which] = enabled
+            }
+            .setPositiveButton("Launch Cheat Session") { _, _ ->
+                val selectedIndexes = mutableListOf<Int>()
+                val selectedDescriptions = mutableListOf<String>()
+                for (index in checked.indices) {
+                    if (checked[index] && indexes[index] >= 0) {
+                        selectedIndexes.add(indexes[index])
+                        selectedDescriptions.add(labels[index])
+                    }
+                }
+
+                if (selectedIndexes.isEmpty()) {
+                    AlertDialog.Builder(this)
+                        .setTitle("No cheats selected")
+                        .setMessage("Select at least one cheat, or use Start Fresh for a normal session.")
+                        .setPositiveButton("OK", null)
+                        .show()
+                } else {
+                    val profileLabel =
+                        GameCheatUiState.buildProfileLabel(selectedDescriptions)
+                    launchGameOnCompanion(
+                        gameId = gameId,
+                        title = title,
+                        loadSaveAfterLaunch = false,
+                        cheatSourceIndex = sourceIndex,
+                        cheatEnabledIndexes = selectedIndexes,
+                        cheatProfileLabel = profileLabel
+                    )
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showGameLaunchModeDialog(
+        gameId: String,
+        title: String
+    ) {
+
+        AlertDialog.Builder(this)
+            .setTitle(
+                "Start $title"
+            )
+            .setMessage(
+                "Start from the game's normal boot, or load one of its " +
+                    "PrivyHub save states?"
+            )
+            .setPositiveButton(
+                "Start Fresh"
+            ) { _, _ ->
+
+                launchGameOnCompanion(
+                    gameId = gameId,
+                    title = title,
+                    loadSaveAfterLaunch = false
+                )
+            }
+            .setNegativeButton(
+                "Load Save"
+            ) { _, _ ->
+
+                launchGameOnCompanion(
+                    gameId = gameId,
+                    title = title,
+                    loadSaveAfterLaunch = true
+                )
+            }
+            .setNeutralButton(
+                "Extras"
+            ) { _, _ ->
+                showGameExtrasMenu(
+                    gameId,
+                    title
+                )
+            }
+            .show()
+    }
+
+
+    private fun launchGameOnCompanion(
+        gameId: String,
+        title: String,
+        loadSaveAfterLaunch: Boolean = false,
+        cheatSourceIndex: Int? = null,
+        cheatEnabledIndexes: List<Int> = emptyList(),
+        cheatProfileLabel: String = "Normal",
+        modIndex: Int? = null
     ) {
 
         val host =
@@ -5865,6 +8540,28 @@ class MainActivity : AppCompatActivity() {
         statusText.text =
             "Launching $title..."
 
+        val cheatQuerySuffix =
+            if (
+                cheatSourceIndex != null &&
+                cheatSourceIndex >= 0 &&
+                cheatEnabledIndexes.isNotEmpty()
+            ) {
+                "&cheat_source=$cheatSourceIndex&cheat_indexes=" +
+                    cheatEnabledIndexes
+                        .distinct()
+                        .sorted()
+                        .joinToString(",")
+            } else {
+                ""
+            }
+
+        val modQuerySuffix =
+            if (modIndex != null && modIndex >= 0) {
+                "&mod_index=$modIndex"
+            } else {
+                ""
+            }
+
         networkExecutor.execute {
 
             try {
@@ -5872,7 +8569,7 @@ class MainActivity : AppCompatActivity() {
                 val response =
                     httpPost(
                         "http://$host:$CONTROL_PORT" +
-                            "/plugins/games/launch?id=$gameId"
+                            "/plugins/games/launch?id=$gameId$cheatQuerySuffix$modQuerySuffix"
                     )
 
                 val json =
@@ -5886,6 +8583,19 @@ class MainActivity : AppCompatActivity() {
                         false
                     )
 
+                val paused =
+                    json.optBoolean(
+                        "paused",
+                        false
+                    )
+
+
+                if (active) {
+                    GameCheatUiState.setProfileLabel(
+                        this@MainActivity,
+                        cheatProfileLabel
+                    )
+                }
                 val streamHost =
                     json.optJSONObject(
                         "stream_host"
@@ -5905,19 +8615,98 @@ class MainActivity : AppCompatActivity() {
                         ""
                     )
 
-                runOnUiThread {
+                // PrivyHub Phase A5: the launch request already waits for
+                // RetroArch command readiness, establishes the paused A3
+                // handoff, and returns native/A4 readiness metadata. Use
+                // that existing evidence before entering fullscreen.
+                val nativeStream =
+                    json.optJSONObject(
+                        "native_stream"
+                    )
 
-                    statusText.text =
-                        if (active) {
-                            "Running on companion: $title"
-                        } else {
-                            "Game launch did not remain active"
-                        }
+                val nativeReady =
+                    nativeStream
+                        ?.optBoolean(
+                            "ready",
+                            false
+                        )
+                        ?: false
+
+                val nativeMessage =
+                    nativeStream
+                        ?.optString(
+                            "message",
+                            ""
+                        )
+                        .orEmpty()
+
+                val hostWindowPolicy =
+                    json.optJSONObject(
+                        "host_window_policy"
+                    )
+
+                val hostWindowFound =
+                    hostWindowPolicy
+                        ?.optBoolean(
+                            "window_found",
+                            false
+                        )
+                        ?: false
+
+                val autoOpen =
+                    getGameAutoOpenAfterLaunch()
+
+                runOnUiThread {
 
                     if (
                         active &&
+                        paused
+                    ) {
+
+                        showGameSessionBanner(
+                            title,
+                            paused = true
+                        )
+
+                        if (loadSaveAfterLaunch) {
+
+                            statusText.text =
+                                "Choose a save for $title"
+
+                            showGameSlotDialog(
+                                action = "load-state",
+                                onSuccess = {
+
+                                    completeGameLaunchHandoff(
+                                        title = title,
+                                        autoOpen = autoOpen,
+                                        nativeReady = nativeReady,
+                                        nativeMessage = nativeMessage,
+                                        hostWindowFound = hostWindowFound,
+                                        streamWarning = streamWarning
+                                    )
+                                }
+                            )
+
+                        } else {
+
+                            completeGameLaunchHandoff(
+                                title = title,
+                                autoOpen = autoOpen,
+                                nativeReady = nativeReady,
+                                nativeMessage = nativeMessage,
+                                hostWindowFound = hostWindowFound,
+                                streamWarning = streamWarning
+                            )
+                        }
+
+                    } else if (
+                        active &&
                         streaming
                     ) {
+
+                        statusText.text =
+                            "Running on companion: $title"
 
                         AlertDialog.Builder(
                             this
@@ -5941,25 +8730,50 @@ class MainActivity : AppCompatActivity() {
                             )
                             .show()
 
-                    } else if (
-                        streamWarning.isNotBlank()
-                    ) {
+                    } else if (active) {
+
+                        statusText.text =
+                            "Game launch handoff unavailable"
 
                         AlertDialog.Builder(
                             this
                         )
                             .setTitle(
-                                "Game running locally"
+                                "Game launch incomplete"
                             )
                             .setMessage(
-                                "The game launched, but the streaming " +
-                                    "host is not ready:\n\n$streamWarning"
+                                "The game launched, but PrivyHub did not " +
+                                    "receive the required paused handoff. " +
+                                    "It was not opened automatically."
                             )
                             .setPositiveButton(
                                 "OK",
                                 null
                             )
                             .show()
+
+                    } else {
+
+                        statusText.text =
+                            "Game launch did not remain active"
+
+                        if (streamWarning.isNotBlank()) {
+
+                            AlertDialog.Builder(
+                                this
+                            )
+                                .setTitle(
+                                    "Game launch unavailable"
+                                )
+                                .setMessage(
+                                    streamWarning
+                                )
+                                .setPositiveButton(
+                                    "OK",
+                                    null
+                                )
+                                .show()
+                        }
                     }
                 }
 
@@ -5997,6 +8811,758 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    // PrivyHub A2/A3 patch 01: Live-TV-style paused game-session controls.
+    private fun createGameSessionActionButton(
+        label: String
+    ): Button {
+
+        val button =
+            Button(this)
+
+        button.text =
+            label
+
+        button.textSize =
+            13f
+
+        button.setTextColor(
+            ContextCompat.getColorStateList(
+                this,
+                R.color.mode_button_text
+            )
+        )
+
+        button.setBackgroundResource(
+            R.drawable.mode_button_background
+        )
+
+        button.isFocusable =
+            true
+
+        button.visibility =
+            View.GONE
+
+        button.layoutParams =
+            android.widget.LinearLayout.LayoutParams(
+                dp(104),
+                dp(52)
+            ).apply {
+                marginStart =
+                    dp(8)
+            }
+
+        return button
+    }
+
+
+    private fun showGameSessionBanner(
+        title: String,
+        paused: Boolean
+    ) {
+
+        gameSessionActive =
+            true
+
+        gameSessionPaused =
+            paused
+
+        gameSessionTitle =
+            title.ifBlank {
+                "Game"
+            }
+
+        if (player == null) {
+            updateNowPlayingUi()
+        }
+    }
+
+
+    private fun clearGameSessionBanner() {
+
+        clearGamePausedFrame()
+
+        gameSessionActive =
+            false
+
+        gameSessionPaused =
+            false
+
+        gameSessionTitle =
+            null
+
+        updateNowPlayingUi()
+    }
+
+
+    private fun refreshGameSessionBanner(
+        retry: Int = 0
+    ) {
+
+        val host =
+            getCompanionHost()
+
+        if (host.isBlank()) {
+            return
+        }
+
+        networkExecutor.execute {
+
+            try {
+
+                val json =
+                    JSONObject(
+                        httpGet(
+                            "http://$host:$CONTROL_PORT" +
+                                "/plugins/games/status"
+                        )
+                    )
+
+                val active =
+                    json.optBoolean(
+                        "active",
+                        false
+                    )
+
+                val paused =
+                    json.optBoolean(
+                        "paused",
+                        false
+                    )
+
+                val title =
+                    json.optJSONObject(
+                        "game"
+                    )
+                        ?.optString(
+                            "title",
+                            "Game"
+                        )
+                        ?: "Game"
+
+                runOnUiThread {
+
+                    if (active) {
+
+                        showGameSessionBanner(
+                            title,
+                            paused
+                        )
+
+                        if (
+                            !paused &&
+                            retry < 4
+                        ) {
+
+                            playbackUiHandler.postDelayed(
+                                {
+                                    refreshGameSessionBanner(
+                                        retry + 1
+                                    )
+                                },
+                                350L
+                            )
+                        }
+
+                    } else {
+
+                        clearGameSessionBanner()
+                    }
+                }
+
+            } catch (error: Exception) {
+
+                if (retry == 0) {
+                    Log.d(
+                        TAG,
+                        "Game-session refresh unavailable",
+                        error
+                    )
+                }
+            }
+        }
+    }
+
+
+    private fun completeGameLaunchHandoff(
+        title: String,
+        autoOpen: Boolean,
+        nativeReady: Boolean,
+        nativeMessage: String,
+        hostWindowFound: Boolean,
+        streamWarning: String
+    ) {
+
+        if (
+            autoOpen &&
+            nativeReady &&
+            hostWindowFound
+        ) {
+
+            statusText.text =
+                "Opening $title..."
+
+            openNativeGameStream()
+
+        } else if (autoOpen) {
+
+            statusText.text =
+                "Game paused - stream preflight unavailable"
+
+            val reasons =
+                mutableListOf<String>()
+
+            if (!nativeReady) {
+                reasons.add(
+                    nativeMessage.ifBlank {
+                        "Native streaming is not ready."
+                    }
+                )
+            }
+
+            if (!hostWindowFound) {
+                reasons.add(
+                    "The managed RetroArch window was not " +
+                        "confirmed by the host-coexistence preflight."
+                )
+            }
+
+            if (
+                reasons.isEmpty() &&
+                streamWarning.isNotBlank()
+            ) {
+                reasons.add(
+                    streamWarning
+                )
+            }
+
+            AlertDialog.Builder(
+                this
+            )
+                .setTitle(
+                    "Game ready, stream not opened"
+                )
+                .setMessage(
+                    reasons.joinToString(
+                        separator = "\n\n"
+                    ).ifBlank {
+                        "The game remains safely paused in PrivyHub."
+                    }
+                )
+                .setPositiveButton(
+                    "OK",
+                    null
+                )
+                .show()
+
+        } else {
+
+            statusText.text =
+                "Paused on companion: $title"
+        }
+    }
+
+
+    private fun showGameSlotDialog(
+        action: String,
+        endAfterSave: Boolean = false,
+        onSuccess: (() -> Unit)? = null
+    ) {
+
+        val saving =
+            action == "save-state"
+
+        val loading =
+            action == "load-state"
+
+        if (!saving && !loading) {
+            return
+        }
+
+        if (!gameSessionActive) {
+            return
+        }
+
+        val host =
+            getCompanionHost()
+
+        if (host.isBlank()) {
+            showCompanionSettings()
+            return
+        }
+
+        statusText.text =
+            "Checking save slots..."
+
+        networkExecutor.execute {
+
+            var details: JSONArray? =
+                null
+
+            try {
+                val status =
+                    JSONObject(
+                        httpGet(
+                            "http://$host:$CONTROL_PORT" +
+                                "/plugins/games/status"
+                        )
+                    )
+
+                details =
+                    status.optJSONArray(
+                        "save_state_slot_details"
+                    )
+            } catch (error: Exception) {
+                Log.d(
+                    TAG,
+                    "Save-slot metadata unavailable",
+                    error
+                )
+            }
+
+            runOnUiThread {
+                showGameSlotDialogResolved(
+                    action = action,
+                    endAfterSave = endAfterSave,
+                    details = details,
+                    onSuccess = onSuccess
+                )
+            }
+        }
+    }
+
+
+    private fun showGameSlotDialogResolved(
+        action: String,
+        endAfterSave: Boolean,
+        details: JSONArray?,
+        onSuccess: (() -> Unit)?
+    ) {
+
+        val saving =
+            action == "save-state"
+
+        val slots =
+            Array(3) { index ->
+                buildGameSlotLabel(
+                    slot = index + 1,
+                    details = details
+                )
+            }
+
+        statusText.text =
+            if (gameSessionPaused) {
+                "Game paused"
+            } else {
+                "Game running"
+            }
+
+        AlertDialog.Builder(this)
+            .setTitle(
+                GameCheatUiState.dialogTitle(
+                    this,
+                    if (saving) {
+                        "Save State"
+                    } else {
+                        "Load State"
+                    }
+                )
+            )
+            .setItems(
+                slots
+            ) { _, which ->
+
+                val slot =
+                    which + 1
+
+                val detail =
+                    findGameSlotDetail(
+                        slot,
+                        details
+                    )
+
+                if (
+                    !saving &&
+                    detail != null &&
+                    !detail.optBoolean(
+                        "exists",
+                        false
+                    )
+                ) {
+                    statusText.text =
+                        "Slot $slot is empty"
+                    return@setItems
+                }
+
+                requestGameStateAction(
+                    action = action,
+                    slot = slot,
+                    onSuccess =
+                        if (
+                            saving &&
+                            endAfterSave
+                        ) {
+                            {
+                                stopGameOnCompanion()
+                            }
+                        } else {
+                            onSuccess
+                        }
+                )
+            }
+            .setNegativeButton(
+                "Cancel",
+                null
+            )
+            .show()
+    }
+
+
+    private fun findGameSlotDetail(
+        slot: Int,
+        details: JSONArray?
+    ): JSONObject? {
+
+        if (details == null) {
+            return null
+        }
+
+        for (index in 0 until details.length()) {
+            val item =
+                details.optJSONObject(
+                    index
+                ) ?: continue
+
+            if (
+                item.optInt(
+                    "slot",
+                    0
+                ) == slot
+            ) {
+                return item
+            }
+        }
+
+        return null
+    }
+
+
+    // PrivyHub A2/A3 patch 07: game-qualified slot labels
+    private fun buildGameSlotLabel(
+        slot: Int,
+        details: JSONArray?
+    ): String {
+
+        val item =
+            findGameSlotDetail(
+                slot,
+                details
+            )
+
+        if (item == null) {
+            return "Slot $slot"
+        }
+
+        val gameTitle =
+            item.optString(
+                "game_title",
+                ""
+            ).trim()
+
+        val prefix =
+            if (gameTitle.isNotBlank()) {
+                "Slot $slot - $gameTitle"
+            } else {
+                "Slot $slot"
+            }
+
+        if (
+            item.optBoolean(
+                "ambiguous",
+                false
+            )
+        ) {
+            return "$prefix - Multiple matching saves"
+        }
+
+        if (
+            !item.optBoolean(
+                "exists",
+                false
+            )
+        ) {
+            return "$prefix - Empty"
+        }
+
+        val modifiedMs =
+            item.optLong(
+                "modified_unix_ms",
+                0L
+            )
+
+        val sizeBytes =
+            item.optLong(
+                "size_bytes",
+                0L
+            )
+
+        val savedText =
+            if (modifiedMs > 0L) {
+                java.text.DateFormat
+                    .getDateTimeInstance(
+                        java.text.DateFormat.SHORT,
+                        java.text.DateFormat.SHORT
+                    )
+                    .format(
+                        java.util.Date(
+                            modifiedMs
+                        )
+                    )
+            } else {
+                "Saved"
+            }
+
+        val sizeText =
+            formatGameStateSize(
+                sizeBytes
+            )
+
+        return "$prefix - $savedText - $sizeText"
+    }
+
+
+    private fun formatGameStateSize(
+        sizeBytes: Long
+    ): String {
+
+        if (sizeBytes <= 0L) {
+            return "unknown size"
+        }
+
+        val megabyte =
+            1024.0 * 1024.0
+
+        return if (
+            sizeBytes >= megabyte
+        ) {
+            String.format(
+                java.util.Locale.US,
+                "%.1f MB",
+                sizeBytes / megabyte
+            )
+        } else {
+            val kilobytes =
+                maxOf(
+                    1L,
+                    sizeBytes / 1024L
+                )
+
+            "$kilobytes KB"
+        }
+    }
+
+
+    private fun showGameEndDialog() {
+
+        if (!gameSessionActive) {
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(
+                "End Game"
+            )
+            .setMessage(
+                "Save a state before ending?"
+            )
+            .setPositiveButton(
+                "Save"
+            ) { _, _ ->
+
+                showGameSlotDialog(
+                    action = "save-state",
+                    endAfterSave = true
+                )
+            }
+            .setNegativeButton(
+                "Don't Save"
+            ) { _, _ ->
+
+                stopGameOnCompanion()
+            }
+            .setNeutralButton(
+                "Cancel",
+                null
+            )
+            .show()
+    }
+
+
+        // PRIVYHUB_A7_PATCH_10V5_CHEAT_SAVE_REPLACE_CONFIRMATION
+private fun requestGameStateAction(
+        action: String,
+        slot: Int,
+        onSuccess: (() -> Unit)? = null,
+        replace: Boolean = false
+    ) {
+
+        val endpoint =
+            when (action) {
+                "save-state" -> "save-state"
+                "load-state" -> "load-state"
+                else -> return
+            }
+
+        if (slot !in 1..3) {
+            return
+        }
+
+        val host =
+            getCompanionHost()
+
+        if (host.isBlank()) {
+            showCompanionSettings()
+            return
+        }
+
+        val loading =
+            endpoint == "load-state"
+
+        statusText.text =
+            if (loading) {
+                "Loading state slot $slot..."
+            } else {
+                "Saving state slot $slot..."
+            }
+
+        val replaceQuerySuffix =
+            if (endpoint == "save-state" && replace) {
+                "&replace=true"
+            } else {
+                ""
+            }
+
+        networkExecutor.execute {
+
+            try {
+
+                val result =
+                    JSONObject(
+                        httpPost(
+                            "http://$host:$CONTROL_PORT" +
+                                "/plugins/games/$endpoint" +
+                                "?slot=$slot$replaceQuerySuffix"
+                        )
+                    )
+
+                val slotDetail =
+                    result.optJSONObject(
+                        "slot_detail"
+                    )
+
+                val detailLabel =
+                    buildGameSlotLabel(
+                        slot = slot,
+                        details =
+                            if (slotDetail != null) {
+                                JSONArray().apply {
+                                    put(slotDetail)
+                                }
+                            } else {
+                                null
+                            }
+                    )
+
+                runOnUiThread {
+                    statusText.text =
+                        if (loading) {
+                            "Loaded $detailLabel"
+                        } else {
+                            "Saved $detailLabel"
+                        }
+
+                    if (!loading) {
+                        refreshCurrentGameLibraryView()
+                    }
+
+                    onSuccess?.invoke()
+                }
+
+            } catch (error: Exception) {
+                Log.e(
+                    TAG,
+                    "Game state action failed",
+                    error
+                )
+
+                val replacementRequired =
+                    endpoint == "save-state" &&
+                        !replace &&
+                        error.message
+                            ?.contains(
+                                "explicit replacement confirmation is required",
+                                ignoreCase = true
+                            ) == true
+
+                runOnUiThread {
+                    if (replacementRequired) {
+                        val profileLabel =
+                            GameCheatUiState.currentProfileLabel(this)
+
+                        statusText.text =
+                            "Profile save slot $slot is occupied"
+
+                        AlertDialog.Builder(this)
+                            .setTitle("Replace Profile Save?")
+                            .setMessage(
+                                "Slot $slot already contains a save in:\n\n" +
+                                    "$profileLabel\n\n" +
+                                    "Replace this slot completely?\n\n" +
+                                    "Normal saves and other profiles " +
+                                    "are not affected."
+                            )
+                            .setPositiveButton(
+                                "Replace Completely"
+                            ) { _, _ ->
+                                requestGameStateAction(
+                                    action = action,
+                                    slot = slot,
+                                    onSuccess = onSuccess,
+                                    replace = true
+                                )
+                            }
+                            .setNegativeButton(
+                                "Cancel",
+                                null
+                            )
+                            .show()
+                    } else {
+                        statusText.text =
+                            if (loading) {
+                                "Load state failed"
+                            } else {
+                                "Save state failed"
+                            }
+
+                        AlertDialog.Builder(this)
+                            .setTitle(
+                                "Game State"
+                            )
+                            .setMessage(
+                                error.message
+                                    ?: "Unknown error"
+                            )
+                            .setPositiveButton(
+                                "OK",
+                                null
+                            )
+                            .show()
+                    }
+                }
+            }
+        }
+    }
+
+
     private fun stopGameOnCompanion() {
 
         val host =
@@ -6007,35 +9573,100 @@ class MainActivity : AppCompatActivity() {
         }
 
         statusText.text =
-            "Stopping game..."
+            "Ending game..."
+
+        gameSaveButton.isEnabled =
+            false
+
+        gameLoadButton.isEnabled =
+            false
+
+        gameEndButton.isEnabled =
+            false
 
         networkExecutor.execute {
 
             try {
 
-                httpPost(
-                    "http://$host:$CONTROL_PORT" +
-                        "/plugins/games/stop"
-                )
+                val json =
+                    JSONObject(
+                        httpPost(
+                            "http://$host:$CONTROL_PORT" +
+                                "/plugins/games/stop"
+                        )
+                    )
+
+                val graceful =
+                    json.optBoolean(
+                        "graceful",
+                        false
+                    )
 
                 runOnUiThread {
 
+                    clearGameSessionBanner()
+
                     statusText.text =
-                        "Game stopped"
+                        if (graceful) {
+                            "Game ended"
+                        } else {
+                            "Game ended with forced shutdown"
+                        }
+
+                    if (!graceful) {
+
+                        AlertDialog.Builder(this)
+                            .setTitle(
+                                "Game Ended"
+                            )
+                            .setMessage(
+                                "RetroArch required a forced shutdown. " +
+                                    "Normal in-game save persistence is not " +
+                                    "considered verified for this run."
+                            )
+                            .setPositiveButton(
+                                "OK",
+                                null
+                            )
+                            .show()
+                    }
                 }
 
             } catch (error: Exception) {
 
                 Log.e(
                     TAG,
-                    "Failed to stop game",
+                    "Failed to end game",
                     error
                 )
 
                 runOnUiThread {
 
+                    gameSaveButton.isEnabled =
+                        gameSessionPaused
+
+                    gameLoadButton.isEnabled =
+                        gameSessionPaused
+
+                    gameEndButton.isEnabled =
+                        true
+
                     statusText.text =
-                        "Game stop failed"
+                        "Game end failed"
+
+                    AlertDialog.Builder(this)
+                        .setTitle(
+                            "End Game"
+                        )
+                        .setMessage(
+                            error.message
+                                ?: "Unknown error"
+                        )
+                        .setPositiveButton(
+                            "OK",
+                            null
+                        )
+                        .show()
                 }
             }
         }
@@ -7133,8 +10764,223 @@ class MainActivity : AppCompatActivity() {
         nowPlayingProgress.text =
             ""
 
+        playerView.visibility =
+            View.VISIBLE
+
+        gameSessionPreview.visibility =
+            View.GONE
+
+        gameSessionPreviewLabel.visibility =
+            View.GONE
+
+        releaseGamePausedFrameBitmap()
+
+        restartButton.visibility =
+            View.VISIBLE
+
         restartButton.isEnabled =
             false
+
+        gameSaveButton.visibility =
+            View.GONE
+
+        gameLoadButton.visibility =
+            View.GONE
+
+        gameEndButton.visibility =
+            View.GONE
+    }
+
+
+    // PrivyHub A3 patch 11v2: frozen gameplay banner frame.
+    private fun gamePausedFrameFile():
+        File? {
+
+        val title =
+            gameSessionTitle
+                ?.trim()
+                .orEmpty()
+
+        if (title.isBlank()) {
+            return null
+        }
+
+        return File(
+            cacheDir,
+            NativeStreamActivity.pausedFrameFileName(
+                title
+            )
+        )
+    }
+
+
+    private fun releaseGamePausedFrameBitmap() {
+
+        gameSessionPreview.setImageDrawable(
+            null
+        )
+
+        gameSessionPreviewBitmap
+            ?.recycle()
+
+        gameSessionPreviewBitmap =
+            null
+    }
+
+
+    private fun clearGamePausedFrame() {
+
+        releaseGamePausedFrameBitmap()
+
+        try {
+            gamePausedFrameFile()
+                ?.delete()
+        } catch (_: Exception) {
+        }
+    }
+
+
+    private fun loadGamePausedFrame():
+        Boolean {
+
+        if (!gameSessionPaused) {
+            releaseGamePausedFrameBitmap()
+            return false
+        }
+
+        val frame =
+            gamePausedFrameFile()
+                ?: run {
+                    releaseGamePausedFrameBitmap()
+                    return false
+                }
+
+        if (
+            !frame.isFile ||
+            frame.length() <= 0L
+        ) {
+            releaseGamePausedFrameBitmap()
+            return false
+        }
+
+        val bitmap =
+            try {
+                BitmapFactory.decodeFile(
+                    frame.absolutePath
+                )
+            } catch (_: Exception) {
+                null
+            }
+
+        if (bitmap == null) {
+            releaseGamePausedFrameBitmap()
+            return false
+        }
+
+        releaseGamePausedFrameBitmap()
+
+        gameSessionPreviewBitmap =
+            bitmap
+
+        gameSessionPreview.setImageBitmap(
+            bitmap
+        )
+
+        return true
+    }
+
+
+    private fun showGameSessionBannerUi() {
+
+        showNowPlaying()
+
+        nowPlayingTitle.text =
+            gameSessionTitle
+                ?: "Game"
+
+        nowPlayingProgress.text =
+            if (gameSessionPaused) {
+                "PAUSED"
+            } else {
+                "RUNNING"
+            }
+
+        playerView.visibility =
+            View.GONE
+
+        gameSessionPreview.visibility =
+            View.VISIBLE
+
+        val hasPausedFrame =
+            loadGamePausedFrame()
+
+        gameSessionPreviewLabel.text =
+            if (gameSessionPaused) {
+                "RESUME\nPLAYING"
+            } else {
+                "GAME\nRUNNING"
+            }
+
+        gameSessionPreviewLabel.visibility =
+            if (hasPausedFrame) {
+                View.GONE
+            } else {
+                View.VISIBLE
+            }
+
+        gameSessionPreview.isEnabled =
+            gameSessionActive
+
+        gameSessionPreviewLabel.isEnabled =
+            gameSessionActive
+
+        restartButton.visibility =
+            View.GONE
+
+        gameSaveButton.visibility =
+            View.VISIBLE
+
+        gameLoadButton.visibility =
+            View.VISIBLE
+
+        gameEndButton.visibility =
+            View.VISIBLE
+
+        gameSaveButton.isEnabled =
+            gameSessionPaused
+
+        gameLoadButton.isEnabled =
+            gameSessionPaused
+
+        gameEndButton.isEnabled =
+            gameSessionActive
+    }
+
+
+    private fun showMediaNowPlayingControls() {
+
+        playerView.visibility =
+            View.VISIBLE
+
+        gameSessionPreview.visibility =
+            View.GONE
+
+        gameSessionPreviewLabel.visibility =
+            View.GONE
+
+        releaseGamePausedFrameBitmap()
+
+        restartButton.visibility =
+            View.VISIBLE
+
+        gameSaveButton.visibility =
+            View.GONE
+
+        gameLoadButton.visibility =
+            View.GONE
+
+        gameEndButton.visibility =
+            View.GONE
     }
 
 
@@ -7185,13 +11031,19 @@ class MainActivity : AppCompatActivity() {
             playback == null
         ) {
 
-            hideNowPlaying()
+            if (gameSessionActive) {
+                showGameSessionBannerUi()
+            } else {
+                hideNowPlaying()
+            }
 
             return
         }
 
 
         showNowPlaying()
+
+        showMediaNowPlayingControls()
 
 
         nowPlayingTitle.text =
@@ -7932,6 +11784,20 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    override fun onResume() {
+
+        super.onResume()
+
+        playbackUiHandler.postDelayed(
+            {
+                refreshGameSessionBanner()
+                refreshCurrentGameLibraryView()
+            },
+            350L
+        )
+    }
+
+
     override fun onStop() {
 
         /*
@@ -7948,7 +11814,10 @@ class MainActivity : AppCompatActivity() {
 
         stopPlaybackUiTicker()
 
+        releaseGamePausedFrameBitmap()
+
         networkExecutor.shutdownNow()
+        gameArtworkExecutor.shutdownNow()
 
         super.onDestroy()
     }

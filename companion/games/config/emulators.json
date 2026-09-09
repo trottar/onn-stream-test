@@ -2,8 +2,8 @@
   "version": 1,
   "backend": "retroarch",
   "retroarch": {
-    "version": "1.22.2",
-    "executable": "runtime/emulators/retroarch/retroarch.exe",
+    "version": "nightly-2026-09-07",
+    "executable": "runtime/emulators/retroarch-nightly-20260907/retroarch.exe",
     "cores_directory": "runtime/emulators/retroarch/cores",
     "config": "data/games/retroarch/retroarch.cfg"
   },
@@ -14,7 +14,10 @@
       "license": "GPL-2.0",
       "extensions": [
         ".nes"
-      ]
+      ],
+      "controls": {
+        "analog_dpad": "left"
+      }
     },
     "snes": {
       "name": "SNES",
@@ -23,7 +26,10 @@
       "extensions": [
         ".sfc",
         ".smc"
-      ]
+      ],
+      "controls": {
+        "analog_dpad": "left"
+      }
     },
     "genesis": {
       "name": "Genesis",
@@ -33,7 +39,10 @@
         ".md",
         ".gen",
         ".bin"
-      ]
+      ],
+      "controls": {
+        "analog_dpad": "left"
+      }
     },
     "ps1": {
       "name": "PlayStation",
@@ -43,7 +52,21 @@
         ".chd",
         ".cue",
         ".m3u"
-      ]
+      ],
+      "controls": {
+        "analog_dpad": "none",
+        "controller_default": "digital",
+        "controller_profiles": {
+          "digital": {
+            "label": "PlayStation Controller",
+            "libretro_device": 1
+          },
+          "dualshock": {
+            "label": "DualShock",
+            "libretro_device": 517
+          }
+        }
+      }
     }
   }
 }
