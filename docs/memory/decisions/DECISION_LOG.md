@@ -99,3 +99,16 @@ manifest. The snapshot is immutable checkpoint evidence, not a general runtime
 data store.
 
 Do not use Git/Git LFS as PrivyHub user/runtime storage.
+
+### D-013 — Post-Phase-A roadmap prioritizes observability before adaptation
+
+**Status:** Accepted (2026-09-10)
+
+Build a unified diagnostic/health/self-test layer before Sunshine/Moonlight
+cleanup and before adaptive streaming. Adaptive local streaming is controlled by
+measured end-to-end LAN/Wi-Fi path health, not the router's Internet/WAN speed.
+Begin with bitrate-only adaptation while holding resolution and 60 fps stable.
+
+VOD artwork/metadata is a separate local-first media-library phase. OpenBIOS is
+a non-blocking portability/customization experiment and must preserve a
+compatibility BIOS fallback.

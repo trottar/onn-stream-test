@@ -61,3 +61,5 @@ This index records durable checkpoints and major patch lines; it does not invent
 - `privyhub_phase_a_a9_coverage_correction_01_2026-09-10` — diagnostic-only correction: invalidates NES/Genesis A9 prompt responses made without actual games, makes finish mode coverage-aware, and records zero-game systems as `SKIPPED_NO_LOCAL_FIXTURE` rather than pass/fail.
 
 - `privyhub_phase_a_final_checkpoint_push_01_2026-09-10` — final Phase A checkpoint/push package: records A9 checkpoint-ready state, adds repository evidence policy, ignores live raw evidence, creates sanitized compressed Phase A evidence snapshot, stages only approved Phase A source/memory/probe changes, validates, commits, and pushes.
+
+- `privyhub_roadmap_v2_push_01_2026-09-10` — docs-only roadmap update after Phase A checkpoint: replaces `docs/ROADMAP.md`, curates current/handoff/roadmap memory, and defines Diagnostics, adaptive streaming, VOD artwork, Linux scaling, OpenBIOS and future expansion phases.

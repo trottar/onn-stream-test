@@ -12,9 +12,16 @@ PrivyHub is a local-first, privacy-preserving, modular smart-home/media experime
 
 ## Current baseline
 
-`25e9a14` is the clean, pushed checkpoint completing A8 input mapping and profiles. It is the immutable pre-four-player baseline.
+`e65e8f89` is the clean, pushed checkpoint completing the Phase A
+emulator subsystem.
 
-Phase A features A1 through A8 are complete/runtime validated, including the P1-P4 controller/profile extension. Representative four-player Crash Bash gameplay with game-specific Beetle PSX HW Port-1 multitap is also complete/runtime validated. Post-extension 1P and 2P regressions passed. A9 full emulator regression/checkpoint is the only remaining Phase A gate.
+Phase A is closed absent regression evidence. SNES and extensive PS1 behavior
+are runtime validated. NES and Genesis had zero local A9 fixtures and remain
+supported/configured but explicitly not runtime validated until real content is
+added.
+
+`docs/ROADMAP.md` v2 is the authoritative post-Phase-A roadmap. Phase B
+Diagnostics & Clean Native Baseline is next.
 
 ## Stable Games path
 
@@ -44,9 +51,20 @@ A1 controller/analog, A2 Save/Load, A3 pause/resume, A4 host coexistence/audio l
 
 The severe prototype UDP burst/gap/duplication investigation is deferred to representative Linux/network infrastructure unless it again becomes a blocker.
 
-## Deferred roadmap
+## Post-Phase-A roadmap
 
-After four-player and A9: Phase B removes Sunshine/Moonlight legacy and proves native-only Games; Phase C generalizes streaming and adds explicit quality profiles; Phase D performs resource/Linux hardware characterization and replays the transport acceptance suite.
+Phase B first unifies diagnostics/self-test/support bundles, then removes
+Sunshine/Moonlight and proves a clean native-only baseline. Phase C makes stream
+profiles explicit and adds end-to-end telemetry, adaptive bitrate, optional
+adaptive FEC, 1080p60 characterization and generalized native sources. Phase D
+adds local-first VOD artwork/metadata UX. Phase E performs formal resource/Linux
+hardware characterization and replays the deferred UDP acceptance suite. Phase
+F is an optional OpenBIOS/open-platform portability track; Phase G is broader
+smart-home/client expansion.
+
+For local adaptive streaming, use measured LAN/Wi-Fi path health rather than
+router WAN/Internet capability. Preserve 60 fps/resolution initially and adapt
+bitrate first.
 
 ## Durable project rules
 
@@ -192,3 +210,26 @@ Available-library regression is complete. NES and Genesis have zero local
 fixtures and remain explicitly not runtime validated. SNES and PS1 have actual
 runtime coverage; PS1 includes validated 1P/2P/4P routing, lifecycle, profiles,
 cheats/mods, Crash Bash/CTR Port-1 multitap, and teardown.
+
+## Diagnostics architecture direction
+
+Existing subsystem probes/logs should converge on a structured diagnostic
+event/health model with stable codes, raw measurements kept separate from
+classifiers, bounded local history, GUI Diagnostics/Self-Test, and a one-click
+sanitized bundle. This is the next architectural foundation because adaptive
+streaming will require explainable state changes.
+
+## VOD artwork direction
+
+VOD artwork should be recursive and local-first. Prefer sidecar
+`<video-stem>`/`poster`/`folder` images, then optional cached metadata-provider
+art, then local thumbnail/generic fallback. Playback must never depend on an
+external metadata service.
+
+## OpenBIOS direction
+
+OpenBIOS is attractive for redistribution, region independence, source-level
+inspection/customization, and future appliance portability. It is not expected
+to materially improve normal game frame rate or stream latency. Keep the
+current compatibility BIOS path and evaluate OpenBIOS through an explicit
+compatibility/save/boot matrix before any broader default.
