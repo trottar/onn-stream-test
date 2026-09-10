@@ -134,97 +134,300 @@ Write-Host ""
 Write-Host "[2/4] Finding physical ONN ADB target..."
 
 
-$DeviceLines = & $Adb devices
+# PRIVYHUB_ADB_WIRELESS_RECOVERY_01
+# A paired Wireless debugging target can temporarily disappear from
+# `adb devices` and mDNS. Cache only the last successful target privately
+# outside the repository and never print it.
+$AdbPrivateRoot = Join-Path $env:LOCALAPPDATA "PrivyHub\adb"
+$AdbTargetCache = Join-Path $AdbPrivateRoot "last_wireless_target.txt"
 
 
-$OnlineDevices = @(
-    $DeviceLines |
-    Select-Object -Skip 1 |
-    ForEach-Object {
-        $Line = $_.Trim()
+function Get-OnlineAdbDevices {
+    $Lines = & $Adb devices
 
-        # PRIVYHUB_A7_PATCH_11_A7_4_SOFTPATCH_MODS_ADB_FIX
-        # ADB mDNS instance names can contain spaces (for example a Windows
-        # duplicate service suffix). Parse the tab before the status field.
-        if ($Line -match '^(.*)\tdevice$') {
-            $matches[1]
-        }
-    }
-)
-
-
-if ($OnlineDevices.Count -eq 0) {
-    throw @"
-No online ADB devices found.
-
-Enable Wireless debugging on the ONN and reconnect if needed.
-"@
-}
-
-
-$OnnCandidates = @(
-    $OnlineDevices |
-    Where-Object {
-        $_ -ne "emulator-5554" -and
-        (
-            $_ -match '^adb-.*\._adb-tls-connect\._tcp$' -or
-            $_ -match '^\d{1,3}(\.\d{1,3}){3}:\d+$'
-        )
-    }
-)
-
-
-if ($OnnCandidates.Count -eq 0) {
-    Write-Host ""
-    Write-Host "Online ADB devices:"
-
-    $OnlineDevices |
+    return @(
+        $Lines |
+        Select-Object -Skip 1 |
         ForEach-Object {
-            Write-Host "  $_"
-        }
-
-    throw "Could not identify the physical ONN automatically."
-}
-
-
-if ($OnnCandidates.Count -gt 1) {
-    $MdnsCandidate = @(
-        $OnnCandidates |
-        Where-Object {
-            $_ -match '^adb-.*\._adb-tls-connect\._tcp$'
-        }
-    ) | Select-Object -First 1
-
-
-    if ($MdnsCandidate) {
-        $Onn = $MdnsCandidate
-    }
-    else {
-        Write-Host ""
-        Write-Host "Multiple possible physical devices were found:"
-
-        $OnnCandidates |
-            ForEach-Object {
-                Write-Host "  $_"
+            $Line = $_.Trim()
+            if ($Line -match '^(.*)\tdevice$') {
+                $matches[1]
             }
+        }
+    )
+}
 
-        throw @"
-More than one physical ADB target is online.
-Disconnect the extra target and rerun this script.
-"@
+
+function Get-PhysicalOnnCandidates {
+    param([string[]]$OnlineDevices)
+
+    return @(
+        $OnlineDevices |
+        Where-Object {
+            $_ -ne "emulator-5554" -and
+            (
+                $_ -match '^adb-.*\._adb-tls-connect\._tcp$' -or
+                $_ -match '^\d{1,3}(\.\d{1,3}){3}:\d+$'
+            )
+        }
+    )
+}
+
+
+function Test-AdbTargetOnline {
+    param([string]$Target)
+
+    if ([string]::IsNullOrWhiteSpace($Target)) {
+        return $false
+    }
+
+    $State = (
+        & $Adb -s $Target get-state 2>$null |
+        Out-String
+    ).Trim()
+
+    return ($LASTEXITCODE -eq 0 -and $State -eq "device")
+}
+
+
+function Try-AdbConnectTarget {
+    param([string]$Target)
+
+    if ([string]::IsNullOrWhiteSpace($Target)) {
+        return $false
+    }
+
+    & $Adb connect $Target *> $null
+    Start-Sleep -Milliseconds 750
+
+    return Test-AdbTargetOnline $Target
+}
+
+
+function Read-CachedAdbTarget {
+    if (-not (Test-Path -LiteralPath $AdbTargetCache -PathType Leaf)) {
+        return $null
+    }
+
+    try {
+        $Value = (Get-Content -LiteralPath $AdbTargetCache -Raw).Trim()
+    }
+    catch {
+        return $null
+    }
+
+    if (
+        $Value -match '^adb-.*\._adb-tls-connect\._tcp$' -or
+        $Value -match '^\d{1,3}(\.\d{1,3}){3}:\d+$'
+    ) {
+        return $Value
+    }
+
+    return $null
+}
+
+
+function Save-CachedAdbTarget {
+    param([string]$Target)
+
+    if ([string]::IsNullOrWhiteSpace($Target)) {
+        return
+    }
+
+    try {
+        New-Item -ItemType Directory -Path $AdbPrivateRoot -Force |
+            Out-Null
+
+        Set-Content `
+            -LiteralPath $AdbTargetCache `
+            -Value $Target `
+            -NoNewline `
+            -Encoding UTF8
+    }
+    catch {
+        # Cache failure must never block a valid build/install.
     }
 }
-else {
-    $Onn = $OnnCandidates[0]
+
+
+function Get-MdnsConnectTargets {
+    $Lines = & $Adb mdns services 2>$null
+
+    if ($LASTEXITCODE -ne 0) {
+        return @()
+    }
+
+    return @(
+        $Lines |
+        ForEach-Object {
+            $Line = $_.Trim()
+
+            if ($Line -match '^(.*)\t(_adb-tls-connect\._tcp)\t(.+)$') {
+                $Instance = $matches[1].Trim()
+                $Service = $matches[2].Trim()
+
+                if ($Instance) {
+                    "$Instance.$Service"
+                }
+            }
+        } |
+        Where-Object { $_ } |
+        Select-Object -Unique
+    )
 }
 
+
+function Resolve-OnlineOnn {
+    $OnlineDevices = Get-OnlineAdbDevices
+    $Candidates = Get-PhysicalOnnCandidates $OnlineDevices
+
+    if ($Candidates.Count -eq 1) {
+        return $Candidates[0]
+    }
+
+    if ($Candidates.Count -gt 1) {
+        $MdnsCandidates = @(
+            $Candidates |
+            Where-Object {
+                $_ -match '^adb-.*\._adb-tls-connect\._tcp$'
+            }
+        )
+
+        if ($MdnsCandidates.Count -eq 1) {
+            return $MdnsCandidates[0]
+        }
+    }
+
+    return $null
+}
+
+
+function Resolve-OnnWithRecovery {
+    $Cached = Read-CachedAdbTarget
+
+    if ($Cached) {
+        if (
+            (Test-AdbTargetOnline $Cached) -or
+            (Try-AdbConnectTarget $Cached)
+        ) {
+            return @{
+                Target = $Cached
+                Source = "cached"
+            }
+        }
+    }
+
+    $Online = Resolve-OnlineOnn
+    if ($Online) {
+        return @{ Target = $Online; Source = "online" }
+    }
+
+    for ($Attempt = 1; $Attempt -le 3; $Attempt++) {
+        foreach ($Target in (Get-MdnsConnectTargets)) {
+            if (Try-AdbConnectTarget $Target) {
+                return @{ Target = $Target; Source = "mdns" }
+            }
+        }
+
+        $Online = Resolve-OnlineOnn
+        if ($Online) {
+            return @{ Target = $Online; Source = "online" }
+        }
+
+        if ($Attempt -lt 3) {
+            Start-Sleep -Seconds 2
+        }
+    }
+
+    & $Adb reconnect offline *> $null
+    Start-Sleep -Seconds 1
+
+    $Online = Resolve-OnlineOnn
+    if ($Online) {
+        return @{ Target = $Online; Source = "reconnect" }
+    }
+
+    & $Adb kill-server *> $null
+    Start-Sleep -Milliseconds 750
+    & $Adb start-server *> $null
+    Start-Sleep -Seconds 2
+
+    if ($Cached -and (Try-AdbConnectTarget $Cached)) {
+        return @{ Target = $Cached; Source = "cached-after-server-restart" }
+    }
+
+    for ($Attempt = 1; $Attempt -le 3; $Attempt++) {
+        $Online = Resolve-OnlineOnn
+        if ($Online) {
+            return @{ Target = $Online; Source = "online-after-server-restart" }
+        }
+
+        foreach ($Target in (Get-MdnsConnectTargets)) {
+            if (Try-AdbConnectTarget $Target) {
+                return @{
+                    Target = $Target
+                    Source = "mdns-after-server-restart"
+                }
+            }
+        }
+
+        if ($Attempt -lt 3) {
+            Start-Sleep -Seconds 2
+        }
+    }
+
+    return $null
+}
+
+
+$Resolved = Resolve-OnnWithRecovery
+
+
+if (-not $Resolved) {
+    Write-Host ""
+    Write-Host "The paired ONN is not currently discoverable."
+    Write-Host "On the ONN, toggle Wireless debugging Off, then On."
+    Write-Host "Do not remove or recreate the pairing."
+    Read-Host "After Wireless debugging is back On, press Enter to retry"
+
+    for ($Attempt = 1; $Attempt -le 5; $Attempt++) {
+        $Resolved = Resolve-OnnWithRecovery
+
+        if ($Resolved) {
+            break
+        }
+
+        if ($Attempt -lt 5) {
+            Start-Sleep -Seconds 2
+        }
+    }
+}
+
+
+if (-not $Resolved) {
+    throw @"
+No online physical ONN ADB target could be recovered.
+
+Leave the existing pairing intact, confirm Wireless debugging is On,
+and rerun this command.
+"@
+}
+
+
+$Onn = [string]$Resolved.Target
+$TargetSource = [string]$Resolved.Source
 
 $Model = (
     & $Adb -s $Onn shell getprop ro.product.model
 ).Trim()
 
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($Model)) {
+    throw "Recovered ADB target did not respond as a physical Android device."
+}
 
-Write-Host "ADB target: $Onn"
+Save-CachedAdbTarget $Onn
+
+Write-Host "ADB target: physical ONN ($TargetSource)"
 Write-Host "Model:      $Model"
 
 
@@ -252,5 +455,5 @@ Write-Host ""
 Write-Host "Done."
 Write-Host "PrivyHub was built, installed, and launched on:"
 Write-Host "  $Model"
-Write-Host "  $Onn"
+Write-Host "  physical ONN"
 Write-Host ""

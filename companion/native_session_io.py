@@ -457,8 +457,8 @@ class NativeAudioStreamer:
 class NativeControllerBridge:
     MAGIC = b"PHI1"
     VERSION = 1
-    MAX_PLAYERS = 2
-    POC_VERSION = "two_player_poc_v0.1"
+    MAX_PLAYERS = 4
+    POC_VERSION = "four_player_poc_v0.1"
     PACKET = struct.Struct(
         "<4sBBHIQIhhhhHH"
     )
@@ -487,11 +487,19 @@ class NativeControllerBridge:
         self._rejected_packets = 0
         self._bad_packets = 0
         self._updates = 0
-        self._updates_by_player = [0, 0]
+        self._updates_by_player = [
+            0 for _ in range(self.MAX_PLAYERS)
+        ]
         self._last_sequence: int | None = None
-        self._last_packet_at = [0.0, 0.0]
-        self._neutralized = [True, True]
-        self._forced_buttons = [0, 0]
+        self._last_packet_at = [
+            0.0 for _ in range(self.MAX_PLAYERS)
+        ]
+        self._neutralized = [
+            True for _ in range(self.MAX_PLAYERS)
+        ]
+        self._forced_buttons = [
+            0 for _ in range(self.MAX_PLAYERS)
+        ]
         self._meta_lock = threading.RLock()
 
     def _load_vgamepad(
@@ -588,7 +596,7 @@ class NativeControllerBridge:
                     pass
 
             raise NativeSessionIOError(
-                "Unable to create two temporary virtual X360 controllers. "
+                "Unable to create four temporary virtual X360 controllers. "
                 "ViGEmBus must already be installed on this Windows host."
             ) from exc
 
@@ -624,13 +632,21 @@ class NativeControllerBridge:
         self._rejected_packets = 0
         self._bad_packets = 0
         self._updates = 0
-        self._updates_by_player = [0, 0]
+        self._updates_by_player = [
+            0 for _ in range(self.MAX_PLAYERS)
+        ]
         self._last_sequence = None
-        self._last_packet_at = [0.0, 0.0]
-        self._neutralized = [True, True]
+        self._last_packet_at = [
+            0.0 for _ in range(self.MAX_PLAYERS)
+        ]
+        self._neutralized = [
+            True for _ in range(self.MAX_PLAYERS)
+        ]
 
         with self._meta_lock:
-            self._forced_buttons = [0, 0]
+            self._forced_buttons = [
+                0 for _ in range(self.MAX_PLAYERS)
+            ]
 
         self._running.set()
 
@@ -977,7 +993,7 @@ class NativeControllerBridge:
                     self._gamepads
                 ) == self.MAX_PLAYERS
             ),
-            "sink": "vigem_x360_dual_poc",
+            "sink": "vigem_x360_quad_poc",
             "transport": "udp_full_state",
             "poc_version": self.POC_VERSION,
             "players": self.MAX_PLAYERS,
@@ -1018,7 +1034,9 @@ class NativeControllerBridge:
             )
 
         with self._meta_lock:
-            self._forced_buttons = [0, 0]
+            self._forced_buttons = [
+                0 for _ in range(self.MAX_PLAYERS)
+            ]
 
         self._neutralize()
         self._gamepads = []

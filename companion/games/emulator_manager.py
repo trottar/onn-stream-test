@@ -516,9 +516,12 @@ class EmulatorManager:
     INPUT_PROFILE_DEFAULT_ID = "default"
     INPUT_PROFILE_MAX_CUSTOM = 64
     INPUT_PROFILE_MAX_NAME_LENGTH = 48
+    # PRIVYHUB_PHASE_A_FOUR_PLAYER_A8_PROFILE_EXTENSION
     INPUT_PROFILE_PLAYERS = (
         "player1",
         "player2",
+        "player3",
+        "player4",
     )
     # PRIVYHUB_A8_PATCH_04_DIRECTIONAL_ENDPOINTS
     INPUT_PROFILE_DIRECTIONAL_TARGETS = (
@@ -1931,15 +1934,37 @@ class EmulatorManager:
             payload = self._load_controller_overrides()
             games = payload["games"]
 
+            # PRIVYHUB_PHASE_A_PS1_MULTITAP_GAME_OPTIONS
+            existing = games.get(
+                game_id
+            )
+            if not isinstance(
+                existing,
+                dict,
+            ):
+                existing = {}
+            else:
+                existing = dict(
+                    existing
+                )
+
             if requested == default_profile:
-                games.pop(
-                    game_id,
+                existing.pop(
+                    "controller_profile",
                     None,
                 )
+                if existing:
+                    games[game_id] = existing
+                else:
+                    games.pop(
+                        game_id,
+                        None,
+                    )
             else:
-                games[game_id] = {
-                    "controller_profile": requested,
-                }
+                existing[
+                    "controller_profile"
+                ] = requested
+                games[game_id] = existing
 
             self._write_controller_overrides(
                 payload
@@ -1948,6 +1973,415 @@ class EmulatorManager:
             return self.controller_profile(
                 game
             )
+
+    # PRIVYHUB_PHASE_A_PS1_MULTITAP_GAME_OPTIONS
+    PS1_MULTITAP_CORE_LIBRARY = "Beetle PSX HW"
+    # PRIVYHUB_PHASE_A_PS1_MULTITAP_ONOFF_FLAG
+    # Product ceiling is four local players. PrivyHub therefore exposes only
+    # Port-1 multitap; Port 2 is always forced disabled.
+    PS1_MULTITAP_MODES = {
+        "off",
+        "port1",
+    }
+    PS1_MULTITAP_OPTION_KEYS = {
+        "port1": "beetle_psx_hw_enable_multitap_port1",
+        "port2": "beetle_psx_hw_enable_multitap_port2",
+    }
+
+    def ps1_multitap(
+        self,
+        game: dict[str, Any],
+    ) -> dict[str, Any]:
+        with self.lock:
+            system_id = str(
+                game.get(
+                    "system",
+                    "",
+                )
+            ).strip().casefold()
+
+            if system_id != "ps1":
+                return {
+                    "selectable": False,
+                    "enabled": False,
+                    "label": "Off",
+                    "source": "unsupported_system",
+                    "mode": "off",
+                }
+
+            game_id = self._input_profile_game_id(
+                game
+            )
+            payload = self._load_controller_overrides()
+            raw_override = payload[
+                "games"
+            ].get(
+                game_id
+            )
+
+            mode = ""
+            if isinstance(
+                raw_override,
+                dict,
+            ):
+                mode = str(
+                    raw_override.get(
+                        "ps1_multitap",
+                        "",
+                    )
+                ).strip().casefold()
+
+            if (
+                mode
+                and mode
+                not in self.PS1_MULTITAP_MODES
+            ):
+                raise EmulatorError(
+                    "Unsupported PS1 multitap mode: "
+                    f"{mode}"
+                )
+
+            enabled = (
+                mode
+                == "port1"
+            )
+
+            return {
+                "selectable": True,
+                "enabled": enabled,
+                "label": (
+                    "On"
+                    if enabled
+                    else "Off"
+                ),
+                "source": (
+                    "game_override"
+                    if mode
+                    else "default_off"
+                ),
+                "mode": (
+                    "port1"
+                    if enabled
+                    else "off"
+                ),
+            }
+
+    def set_ps1_multitap(
+        self,
+        game: dict[str, Any],
+        enabled: bool,
+    ) -> dict[str, Any]:
+        with self.lock:
+            system_id = str(
+                game.get(
+                    "system",
+                    "",
+                )
+            ).strip().casefold()
+
+            if system_id != "ps1":
+                raise EmulatorError(
+                    "PS1 multitap is only available for PlayStation games"
+                )
+
+            game_id = self._input_profile_game_id(
+                game
+            )
+            payload = self._load_controller_overrides()
+            games = payload[
+                "games"
+            ]
+
+            existing = games.get(
+                game_id
+            )
+            if not isinstance(
+                existing,
+                dict,
+            ):
+                existing = {}
+            else:
+                existing = dict(
+                    existing
+                )
+
+            # Store Off explicitly so a previously enabled title is still
+            # launched through a managed game-specific .opt with both ports
+            # deterministically disabled.
+            existing[
+                "ps1_multitap"
+            ] = (
+                "port1"
+                if bool(
+                    enabled
+                )
+                else "off"
+            )
+            games[
+                game_id
+            ] = existing
+
+            self._write_controller_overrides(
+                payload
+            )
+
+            return self.ps1_multitap(
+                game
+            )
+
+    def _prepare_ps1_multitap_options(
+        self,
+        game: dict[str, Any],
+        runtime: dict[str, Any],
+        content_path: Path,
+    ) -> dict[str, Any]:
+        game_id = self._input_profile_game_id(
+            game
+        )
+        overrides = self._load_controller_overrides()
+        raw_override = overrides[
+            "games"
+        ].get(
+            game_id
+        )
+
+        mode = ""
+        if isinstance(
+            raw_override,
+            dict,
+        ):
+            mode = str(
+                raw_override.get(
+                    "ps1_multitap",
+                    "",
+                )
+            ).strip().casefold()
+
+        if not mode:
+            return {
+                "managed": False,
+                "enabled": False,
+                "mode": "off",
+                "port1": False,
+                "port2": False,
+                "options_file": None,
+                "options_source": None,
+            }
+
+        system_id = str(
+            game.get(
+                "system",
+                "",
+            )
+        ).strip().casefold()
+        if system_id != "ps1":
+            raise EmulatorError(
+                "PS1 multitap override is only valid for PlayStation games"
+            )
+        if mode not in self.PS1_MULTITAP_MODES:
+            raise EmulatorError(
+                "Unsupported PS1 multitap mode: "
+                f"{mode or '<blank>'}"
+            )
+
+        executable = Path(
+            runtime[
+                "executable"
+            ]
+        ).resolve()
+        runtime_root = executable.parent.resolve()
+        options_directory = (
+            runtime_root
+            / "config"
+            / self.PS1_MULTITAP_CORE_LIBRARY
+        ).resolve()
+        try:
+            options_directory.relative_to(
+                self.project_root
+            )
+        except ValueError as exc:
+            raise EmulatorError(
+                "PS1 core-options directory escaped the project root"
+            ) from exc
+
+        base_options = (
+            options_directory
+            / (self.PS1_MULTITAP_CORE_LIBRARY + ".opt")
+        ).resolve()
+        target_options = (
+            options_directory
+            / (content_path.stem + ".opt")
+        ).resolve()
+        try:
+            base_options.relative_to(
+                options_directory
+            )
+            target_options.relative_to(
+                options_directory
+            )
+        except ValueError as exc:
+            raise EmulatorError(
+                "Generated PS1 core-options path escaped its core directory"
+            ) from exc
+
+        source_options = (
+            target_options
+            if target_options.is_file()
+            else base_options
+        )
+        if not source_options.is_file():
+            raise EmulatorError(
+                "Beetle PSX HW core-options file is unavailable for multitap launch"
+            )
+
+        try:
+            raw = source_options.read_bytes()
+        except OSError as exc:
+            raise EmulatorError(
+                f"Unable to read Beetle PSX HW core options: {exc}"
+            ) from exc
+        if len(raw) > 2 * 1024 * 1024:
+            raise EmulatorError(
+                "Beetle PSX HW core-options file exceeds PrivyHub safety limit"
+            )
+
+        bom = raw.startswith(b"\xef\xbb\xbf")
+        try:
+            text = raw.decode(
+                "utf-8-sig"
+            )
+        except UnicodeDecodeError as exc:
+            raise EmulatorError(
+                "Beetle PSX HW core-options file is not UTF-8"
+            ) from exc
+        newline = (
+            "\r\n"
+            if b"\r\n" in raw
+            else "\n"
+        )
+        text = text.replace(
+            "\r\n",
+            "\n",
+        ).replace(
+            "\r",
+            "\n",
+        )
+
+        port1 = (
+            mode
+            == "port1"
+        )
+        # Four-player product ceiling: never enable the second PS1 multitap.
+        port2 = False
+
+        for port, enabled in (
+            ("port1", port1),
+            ("port2", port2),
+        ):
+            key = self.PS1_MULTITAP_OPTION_KEYS[
+                port
+            ]
+            pattern = re.compile(
+                rf"(?m)^\s*{re.escape(key)}\s*=.*$"
+            )
+            matches = pattern.findall(
+                text
+            )
+            if len(matches) > 1:
+                raise EmulatorError(
+                    "Beetle PSX HW core options contain ambiguous "
+                    f"{key} assignments"
+                )
+            setting = (
+                f'{key} = "'
+                + (
+                    "enabled"
+                    if enabled
+                    else "disabled"
+                )
+                + '"'
+            )
+            if matches:
+                text = pattern.sub(
+                    setting,
+                    text,
+                    count=1,
+                )
+            else:
+                text = (
+                    text.rstrip("\n")
+                    + "\n"
+                    + setting
+                    + "\n"
+                )
+
+        normalized = text.rstrip(
+            "\n"
+        ) + "\n"
+        encoded_text = normalized.replace(
+            "\n",
+            newline,
+        ).encode(
+            "utf-8"
+        )
+        output = (
+            b"\xef\xbb\xbf"
+            if bom
+            else b""
+        ) + encoded_text
+
+        options_directory.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+        temporary = target_options.with_name(
+            target_options.name + ".privyhub.tmp"
+        )
+        try:
+            temporary.write_bytes(
+                output
+            )
+            if temporary.read_bytes() != output:
+                raise EmulatorError(
+                    "Generated PS1 game core options failed byte verification"
+                )
+            temporary.replace(
+                target_options
+            )
+        except Exception:
+            try:
+                temporary.unlink(
+                    missing_ok=True
+                )
+            except OSError:
+                pass
+            raise
+
+        if target_options.read_bytes() != output:
+            raise EmulatorError(
+                "Installed PS1 game core options failed byte verification"
+            )
+
+        return {
+            "managed": True,
+            "enabled": bool(
+                port1
+                or port2
+            ),
+            "mode": mode,
+            "port1": port1,
+            "port2": port2,
+            "options_file": str(
+                target_options.relative_to(
+                    self.project_root
+                )
+            ).replace("\\", "/"),
+            "options_source": (
+                "existing_game_options"
+                if source_options == target_options
+                else "active_core_options"
+            ),
+        }
 
     # PRIVYHUB_A8_PATCH_02_RETROARCH_INPUT_ADAPTER
     # PRIVYHUB_A8_PATCH_04_DIRECTIONAL_ENDPOINTS
@@ -2145,6 +2579,8 @@ class EmulatorManager:
         self,
         game: dict[str, Any],
         runtime: dict[str, Any],
+        *,
+        ps1_multitap: dict[str, Any] | None = None,
     ) -> tuple[Path, dict[str, Any]]:
         """Build the active RetroArch input/controller profile.
 
@@ -2260,13 +2696,30 @@ class EmulatorManager:
         lines = [
             "# PrivyHub Phase A controller profile",
             "# Generated for the active emulator system; do not edit.",
-            (
-                "input_player1_analog_dpad_mode = "
-                f'"{retroarch_value}"'
-            ),
-            (
-                "input_player2_analog_dpad_mode = "
-                f'"{retroarch_value}"'
+            *[
+                (
+                    f"input_player{player_index}_analog_dpad_mode = "
+                    f'"{retroarch_value}"'
+                )
+                for player_index in range(
+                    1,
+                    len(self.INPUT_PROFILE_PLAYERS) + 1,
+                )
+            ],
+            *(
+                ['game_specific_options = "true"']
+                if (
+                    isinstance(
+                        ps1_multitap,
+                        dict,
+                    )
+                    and bool(
+                        ps1_multitap.get(
+                            "managed"
+                        )
+                    )
+                )
+                else []
             ),
             # PrivyHub A2/A3 patch 03: use RetroArch's documented runtime
             # command interface instead of unproven controller meta binds.
@@ -4431,6 +4884,12 @@ class EmulatorManager:
                 runtime,
             )
 
+            ps1_multitap = self._prepare_ps1_multitap_options(
+                game,
+                runtime,
+                content_path,
+            )
+
             if cheat_source_index is None and cheat_enabled_indexes is not None:
                 raise EmulatorError(
                     "Cheat indexes require an explicit cheat source index"
@@ -4468,6 +4927,7 @@ class EmulatorManager:
                 self._prepare_input_override(
                     game,
                     runtime,
+                    ps1_multitap=ps1_multitap,
                 )
             )
 
@@ -4508,12 +4968,22 @@ class EmulatorManager:
                 libretro_device,
                 int,
             ):
-                command.extend(
-                    [
-                        f"--device=1:{libretro_device}",
-                        f"--device=2:{libretro_device}",
-                    ]
+                explicit_device_players = (
+                    len(self.INPUT_PROFILE_PLAYERS)
+                    if bool(
+                        ps1_multitap.get(
+                            "enabled"
+                        )
+                    )
+                    else 2
                 )
+                for player_index in range(
+                    1,
+                    explicit_device_players + 1,
+                ):
+                    command.append(
+                        f"--device={player_index}:{libretro_device}"
+                    )
 
             if entry_slot is not None:
                 try:
@@ -4583,6 +5053,31 @@ class EmulatorManager:
                 f"{input_profile['controller_label']} "
                 f"({input_profile['controller_source']})\n"
             )
+            if bool(
+                ps1_multitap.get(
+                    "managed"
+                )
+            ):
+                log_handle.write(
+                    "PS1 multitap: "
+                    + str(
+                        ps1_multitap.get(
+                            "mode",
+                            "off",
+                        )
+                    )
+                    + "\n"
+                )
+                log_handle.write(
+                    "PS1 game core options: "
+                    + str(
+                        ps1_multitap.get(
+                            "options_file",
+                            "",
+                        )
+                    )
+                    + "\n"
+                )
             log_handle.write("Command uses project-local paths only.\n\n")
             log_handle.flush()
 
@@ -4690,6 +5185,15 @@ class EmulatorManager:
             )
             payload["action"] = "launch"
             payload["input_profile"] = input_profile
+            payload["ps1_multitap"] = (
+                dict(ps1_multitap)
+                if bool(
+                    ps1_multitap.get(
+                        "managed"
+                    )
+                )
+                else None
+            )
             payload["cheat_session"] = (
                 dict(self._active_cheat_session)
                 if isinstance(self._active_cheat_session, dict)

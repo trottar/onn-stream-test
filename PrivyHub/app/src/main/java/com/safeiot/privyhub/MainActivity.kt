@@ -6151,6 +6151,29 @@ class MainActivity : AppCompatActivity() {
                 "Controller"
             )
 
+        // PRIVYHUB_PHASE_A_PS1_MULTITAP_ONOFF_UI
+        val multitapSelectable =
+            detailJson.optBoolean(
+                "ps1_multitap_selectable",
+                false
+            )
+
+        val multitapEnabled =
+            detailJson.optBoolean(
+                "ps1_multitap_enabled",
+                false
+            )
+
+        val multitapLabel =
+            detailJson.optString(
+                "ps1_multitap_label",
+                if (multitapEnabled) {
+                    "On"
+                } else {
+                    "Off"
+                }
+            )
+
         val playerMode =
             detailJson.optString(
                 "player_mode",
@@ -6263,6 +6286,22 @@ class MainActivity : AppCompatActivity() {
                 -1
             }
 
+        val multitapIndex =
+            if (multitapSelectable) {
+
+                val index =
+                    options.size
+
+                options.add(
+                    "Multitap: $multitapLabel"
+                )
+
+                index
+
+            } else {
+                -1
+            }
+
         AlertDialog.Builder(this)
             .setTitle(
                 "$title - Options"
@@ -6311,6 +6350,16 @@ class MainActivity : AppCompatActivity() {
                         which == controllerIndex -> {
 
                         showGameControllerProfileDialog(
+                            node,
+                            title,
+                            detailJson
+                        )
+                    }
+
+                    multitapSelectable &&
+                        which == multitapIndex -> {
+
+                        showGamePs1MultitapDialog(
                             node,
                             title,
                             detailJson
@@ -7020,6 +7069,150 @@ class MainActivity : AppCompatActivity() {
                     )
                         .setTitle(
                             "$title Controller"
+                        )
+                        .setMessage(
+                            error.message
+                                ?: "Unknown error"
+                        )
+                        .setPositiveButton(
+                            "OK",
+                            null
+                        )
+                        .show()
+                }
+            }
+        }
+    }
+
+
+    // PRIVYHUB_PHASE_A_PS1_MULTITAP_ONOFF_UI
+    private fun showGamePs1MultitapDialog(
+        node: SourceNode,
+        title: String,
+        json: JSONObject
+    ) {
+
+        val enabled =
+            json.optBoolean(
+                "ps1_multitap_enabled",
+                false
+            )
+
+        val labels =
+            arrayOf(
+                "Off",
+                "On"
+            )
+
+        val checkedIndex =
+            if (enabled) {
+                1
+            } else {
+                0
+            }
+
+        AlertDialog.Builder(this)
+            .setTitle(
+                "$title Multitap"
+            )
+            .setSingleChoiceItems(
+                labels,
+                checkedIndex
+            ) { dialog, which ->
+
+                dialog.dismiss()
+
+                setGamePs1Multitap(
+                    node,
+                    title,
+                    which == 1
+                )
+            }
+            .setNegativeButton(
+                "Cancel",
+                null
+            )
+            .show()
+    }
+
+
+    private fun setGamePs1Multitap(
+        node: SourceNode,
+        title: String,
+        enabled: Boolean
+    ) {
+
+        val host =
+            getCompanionHost()
+
+        if (host.isBlank()) {
+            showCompanionSettings()
+            return
+        }
+
+        statusText.text =
+            "Updating multitap..."
+
+        networkExecutor.execute {
+
+            try {
+
+                val gameId =
+                    URLEncoder.encode(
+                        node.id,
+                        "UTF-8"
+                    )
+
+                val response =
+                    httpPost(
+                        "http://$host:$CONTROL_PORT" +
+                            "/plugins/games/ps1-multitap" +
+                            "?id=$gameId&enabled=$enabled"
+                    )
+
+                val result =
+                    JSONObject(
+                        response
+                    )
+
+                val active =
+                    result.optBoolean(
+                        "enabled",
+                        enabled
+                    )
+
+                runOnUiThread {
+
+                    statusText.text =
+                        if (active) {
+                            "Multitap: On"
+                        } else {
+                            "Multitap: Off"
+                        }
+
+                    showGameDetails(
+                        node
+                    )
+                }
+
+            } catch (error: Exception) {
+
+                Log.e(
+                    TAG,
+                    "Failed to update PS1 multitap",
+                    error
+                )
+
+                runOnUiThread {
+
+                    statusText.text =
+                        "Multitap update failed"
+
+                    AlertDialog.Builder(
+                        this
+                    )
+                        .setTitle(
+                            "$title Multitap"
                         )
                         .setMessage(
                             error.message
@@ -8568,6 +8761,47 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    // PRIVYHUB_PHASE_A_FOUR_PLAYER_A8_PROFILE_EXTENSION
+    private fun inputProfilePlayers(
+        payload: JSONObject
+    ): List<String> {
+
+        return inputProfileStrings(
+            payload.optJSONObject(
+                "capabilities"
+            )
+                ?.optJSONArray(
+                    "players"
+                )
+        )
+    }
+
+
+    private fun inputProfilePlayerLabel(
+        player: String
+    ): String {
+
+        val normalized =
+            player.trim()
+                .lowercase()
+
+        val number =
+            normalized.removePrefix(
+                "player"
+            )
+                .toIntOrNull()
+
+        return if (
+            number != null &&
+            normalized == "player$number"
+        ) {
+            "Player $number"
+        } else {
+            player
+        }
+    }
+
+
     private fun inputProfileTargetLabel(
         target: String
     ): String {
@@ -8790,21 +9024,31 @@ class MainActivity : AppCompatActivity() {
                 payload
             )
 
-        return JSONObject()
-            .put(
-                "player1",
-                inputProfileMappingJson(
-                    defaultMapping
-                )
+        val players =
+            inputProfilePlayers(
+                payload
             )
-            .put(
-                "player2",
-                inputProfileMappingJson(
-                    defaultMapping
-                )
-            )
-    }
 
+        if (players.isEmpty()) {
+            throw IllegalStateException(
+                "Companion did not provide supported input-profile players."
+            )
+        }
+
+        val result =
+            JSONObject()
+
+        for (player in players) {
+            result.put(
+                player,
+                inputProfileMappingJson(
+                    defaultMapping
+                )
+            )
+        }
+
+        return result
+    }
 
     private fun inputProfileWorkingPlayerMapping(
         profile: JSONObject,
@@ -9177,37 +9421,24 @@ class MainActivity : AppCompatActivity() {
                     )
             }
 
-        val editPlayer1Index =
-            if (effectiveCustomProfile != null) {
+        val editPlayerIndexes =
+            linkedMapOf<Int, String>()
+
+        if (effectiveCustomProfile != null) {
+
+            for (player in inputProfilePlayers(payload)) {
 
                 val index =
                     labels.size
 
                 labels.add(
-                    "Edit Current Player 1 Mapping"
+                    "Edit Current ${inputProfilePlayerLabel(player)} Mapping"
                 )
 
-                index
-
-            } else {
-                -1
+                editPlayerIndexes[index] =
+                    player
             }
-
-        val editPlayer2Index =
-            if (effectiveCustomProfile != null) {
-
-                val index =
-                    labels.size
-
-                labels.add(
-                    "Edit Current Player 2 Mapping"
-                )
-
-                index
-
-            } else {
-                -1
-            }
+        }
 
         val createIndex =
             labels.size
@@ -9253,29 +9484,24 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     effectiveCustomProfile != null &&
-                        which ==
-                        editPlayer1Index -> {
+                        editPlayerIndexes.containsKey(
+                            which
+                        ) -> {
 
-                        showEditInputProfilePlayerDialog(
-                            gameId,
-                            title,
-                            effectiveCustomProfile,
-                            payload,
-                            "player1"
-                        )
-                    }
+                        val player =
+                            editPlayerIndexes[
+                                which
+                            ]
 
-                    effectiveCustomProfile != null &&
-                        which ==
-                        editPlayer2Index -> {
-
-                        showEditInputProfilePlayerDialog(
-                            gameId,
-                            title,
-                            effectiveCustomProfile,
-                            payload,
-                            "player2"
-                        )
+                        if (player != null) {
+                            showEditInputProfilePlayerDialog(
+                                gameId,
+                                title,
+                                effectiveCustomProfile,
+                                payload,
+                                player
+                            )
+                        }
                     }
 
                     which ==
@@ -9658,27 +9884,63 @@ class MainActivity : AppCompatActivity() {
             )
 
         val options =
-            arrayOf(
-                "Assign to This Game",
-                "Edit Player 1 Mapping",
-                "Edit Player 2 Mapping",
-                "Rename",
-                "Duplicate",
-                "Reset Mapping to Default",
-                "Delete"
+            mutableListOf<String>()
+
+        val editPlayerIndexes =
+            linkedMapOf<Int, String>()
+
+        options.add(
+            "Assign to This Game"
+        )
+
+        for (player in inputProfilePlayers(payload)) {
+
+            val index =
+                options.size
+
+            options.add(
+                "Edit ${inputProfilePlayerLabel(player)} Mapping"
             )
+
+            editPlayerIndexes[index] =
+                player
+        }
+
+        val renameIndex =
+            options.size
+        options.add(
+            "Rename"
+        )
+
+        val duplicateIndex =
+            options.size
+        options.add(
+            "Duplicate"
+        )
+
+        val resetIndex =
+            options.size
+        options.add(
+            "Reset Mapping to Default"
+        )
+
+        val deleteIndex =
+            options.size
+        options.add(
+            "Delete"
+        )
 
         AlertDialog.Builder(this)
             .setTitle(
                 "$profileName - Actions"
             )
             .setItems(
-                options
+                options.toTypedArray()
             ) { _, which ->
 
-                when (which) {
+                when {
 
-                    0 ->
+                    which == 0 ->
                         assignGameInputProfile(
                             gameId,
                             title,
@@ -9688,32 +9950,34 @@ class MainActivity : AppCompatActivity() {
                             )
                         )
 
-                    1 ->
-                        showEditInputProfilePlayerDialog(
-                            gameId,
-                            title,
-                            profile,
-                            payload,
-                            "player1"
-                        )
+                    editPlayerIndexes.containsKey(
+                        which
+                    ) -> {
 
-                    2 ->
-                        showEditInputProfilePlayerDialog(
-                            gameId,
-                            title,
-                            profile,
-                            payload,
-                            "player2"
-                        )
+                        val player =
+                            editPlayerIndexes[
+                                which
+                            ]
 
-                    3 ->
+                        if (player != null) {
+                            showEditInputProfilePlayerDialog(
+                                gameId,
+                                title,
+                                profile,
+                                payload,
+                                player
+                            )
+                        }
+                    }
+
+                    which == renameIndex ->
                         showRenameInputProfileDialog(
                             gameId,
                             title,
                             profile
                         )
 
-                    4 ->
+                    which == duplicateIndex ->
                         showDuplicateInputProfileDialog(
                             gameId,
                             title,
@@ -9721,7 +9985,7 @@ class MainActivity : AppCompatActivity() {
                             payload
                         )
 
-                    5 ->
+                    which == resetIndex ->
                         confirmResetInputProfile(
                             gameId,
                             title,
@@ -9729,7 +9993,7 @@ class MainActivity : AppCompatActivity() {
                             payload
                         )
 
-                    6 ->
+                    which == deleteIndex ->
                         confirmDeleteInputProfile(
                             gameId,
                             title,
@@ -9743,7 +10007,6 @@ class MainActivity : AppCompatActivity() {
             )
             .show()
     }
-
 
     private fun showRenameInputProfileDialog(
         gameId: String,
@@ -9872,7 +10135,7 @@ class MainActivity : AppCompatActivity() {
                 "Duplicate Input Profile"
             )
             .setMessage(
-                "The duplicate keeps the same Player 1 and Player 2 gameplay mapping."
+                "The duplicate keeps the same gameplay mapping for all supported players."
             )
             .setView(
                 input
@@ -9925,18 +10188,15 @@ class MainActivity : AppCompatActivity() {
                 inputProfileCompleteDefaultJson(
                     payload
                 )
-            mapping.put(
-                "player1",
-                defaults.optJSONObject(
-                    "player1"
+
+            for (player in inputProfilePlayers(payload)) {
+                mapping.put(
+                    player,
+                    defaults.optJSONObject(
+                        player
+                    )
                 )
-            )
-            mapping.put(
-                "player2",
-                defaults.optJSONObject(
-                    "player2"
-                )
-            )
+            }
         }
 
         networkExecutor.execute {
@@ -10030,11 +10290,9 @@ class MainActivity : AppCompatActivity() {
             }
 
         val playerLabel =
-            if (player == "player2") {
-                "Player 2"
-            } else {
-                "Player 1"
-            }
+            inputProfilePlayerLabel(
+                player
+            )
 
         val container =
             android.widget.LinearLayout(
@@ -10091,28 +10349,24 @@ class MainActivity : AppCompatActivity() {
             status
         )
 
-        val otherPlayer =
-            if (player == "player2") {
-                "player1"
-            } else {
-                "player2"
-            }
-
-        val otherPlayerLabel =
-            if (otherPlayer == "player2") {
-                "Player 2"
-            } else {
-                "Player 1"
-            }
+        val otherPlayers =
+            inputProfilePlayers(
+                payload
+            )
+                .filter { candidate ->
+                    candidate != player
+                }
 
         val syncButton =
             Button(
                 this
             ).apply {
                 text =
-                    "Sync $playerLabel with $otherPlayerLabel"
+                    "Copy Mapping From Another Player"
                 isAllCaps =
                     false
+                isEnabled =
+                    otherPlayers.isNotEmpty()
             }
 
         container.addView(
@@ -10350,27 +10604,56 @@ class MainActivity : AppCompatActivity() {
 
         syncButton.setOnClickListener {
 
-            val sourceMapping =
-                try {
-                    inputProfileWorkingPlayerMapping(
-                        profile,
-                        payload,
-                        otherPlayer
+            val labels =
+                otherPlayers.map { candidate ->
+                    inputProfilePlayerLabel(
+                        candidate
                     )
-                } catch (error: Exception) {
-                    showInputProfileNetworkError(
-                        "Unable to sync player mapping",
-                        error
-                    )
-                    return@setOnClickListener
+                }.toTypedArray()
+
+            AlertDialog.Builder(this)
+                .setTitle(
+                    "Copy $playerLabel Mapping From"
+                )
+                .setItems(
+                    labels
+                ) { _, which ->
+
+                    if (which in otherPlayers.indices) {
+
+                        val sourcePlayer =
+                            otherPlayers[
+                                which
+                            ]
+
+                        try {
+                            val sourceMapping =
+                                inputProfileWorkingPlayerMapping(
+                                    profile,
+                                    payload,
+                                    sourcePlayer
+                                )
+
+                            working.clear()
+                            working.putAll(
+                                sourceMapping
+                            )
+
+                            refreshRows()
+
+                        } catch (error: Exception) {
+                            showInputProfileNetworkError(
+                                "Unable to copy player mapping",
+                                error
+                            )
+                        }
+                    }
                 }
-
-            working.clear()
-            working.putAll(
-                sourceMapping
-            )
-
-            refreshRows()
+                .setNegativeButton(
+                    "Cancel",
+                    null
+                )
+                .show()
         }
 
         for (target in targets) {
@@ -10614,7 +10897,7 @@ class MainActivity : AppCompatActivity() {
                 "Reset ${profile.optString("name", "Input Profile")}?"
             )
             .setMessage(
-                "Restore the complete validated Default gameplay mapping for Player 1 and Player 2?"
+                "Restore the complete validated Default gameplay mapping for all supported players?"
             )
             .setPositiveButton(
                 "Reset"

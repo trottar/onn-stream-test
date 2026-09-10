@@ -30,11 +30,11 @@ class NativeControllerSender(
     private val port: Int
 ) {
     companion object {
-        const val TWO_PLAYER_POC_VERSION =
-            "two_player_poc_v0.1"
+        const val FOUR_PLAYER_POC_VERSION =
+            "four_player_poc_v0.1"
 
         private const val PLAYER_COUNT =
-            2
+            4
 
         private const val XUSB_DPAD_UP = 0x0001
         private const val XUSB_DPAD_DOWN = 0x0002

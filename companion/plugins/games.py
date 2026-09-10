@@ -2666,6 +2666,13 @@ class GamesPlugin:
             )
         )
 
+        # PRIVYHUB_PHASE_A_PS1_MULTITAP_ONOFF_API
+        multitap = (
+            self._emulator.ps1_multitap(
+                game
+            )
+        )
+
         user_content = (
             self._game_user_content(
                 game
@@ -2700,6 +2707,26 @@ class GamesPlugin:
             "controller_profile_options": (
                 controller[
                     "options"
+                ]
+            ),
+            "ps1_multitap_selectable": (
+                multitap[
+                    "selectable"
+                ]
+            ),
+            "ps1_multitap_enabled": (
+                multitap[
+                    "enabled"
+                ]
+            ),
+            "ps1_multitap_label": (
+                multitap[
+                    "label"
+                ]
+            ),
+            "ps1_multitap_source": (
+                multitap[
+                    "source"
                 ]
             ),
             "catalog_only": True,
@@ -3363,6 +3390,50 @@ class GamesPlugin:
                     "plugin": self.PLUGIN_ID,
                     "id": game_id,
                     **controller,
+                }
+
+            # PRIVYHUB_PHASE_A_PS1_MULTITAP_ONOFF_API
+            if action == "ps1-multitap":
+                game_id = self._first(
+                    query,
+                    "id",
+                ).strip()
+
+                enabled_text = self._first(
+                    query,
+                    "enabled",
+                ).strip()
+
+                if not game_id:
+                    raise ValueError(
+                        "Missing game id"
+                    )
+
+                if not enabled_text:
+                    raise ValueError(
+                        "Missing multitap enabled value"
+                    )
+
+                enabled = self._query_bool(
+                    query,
+                    "enabled",
+                    False,
+                )
+
+                game = self._find_game_by_id(
+                    game_id
+                )
+
+                multitap = self._emulator.set_ps1_multitap(
+                    game,
+                    enabled,
+                )
+
+                return {
+                    "ok": True,
+                    "plugin": self.PLUGIN_ID,
+                    "id": game_id,
+                    **multitap,
                 }
 
             # PrivyHub Phase A2 save-state actions
