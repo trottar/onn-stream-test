@@ -51,7 +51,10 @@ from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import quote, unquote, urlparse, urlsplit
 
-from plugins import PLUGINS
+from plugins import (
+    PLUGINS,
+    shutdown_plugins,
+)
 
 
 COMPANION_DIR = Path(__file__).resolve().parent
@@ -1877,6 +1880,18 @@ def main(
 
     finally:
         httpd.server_close()
+
+        # PRIVYHUB_A4_PLUGIN_LIFECYCLE_SHUTDOWN_V1
+        # Plugin-owned child processes must be stopped before the companion
+        # process exits. Games reuses its validated POST stop lifecycle.
+        plugin_shutdown_errors = shutdown_plugins()
+
+        for plugin_error in plugin_shutdown_errors:
+            print(
+                "Plugin shutdown warning: "
+                + plugin_error
+            )
+
         CONTROLLER.shutdown()
 
         print(

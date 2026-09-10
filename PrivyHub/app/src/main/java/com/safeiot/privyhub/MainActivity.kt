@@ -6239,6 +6239,14 @@ class MainActivity : AppCompatActivity() {
             "Cheats / Mods: $cheatFileCount / $modFileCount"
         )
 
+        val inputProfileIndex =
+            options.size
+
+        options.add(
+            "Input Profile"
+        )
+
+
         val controllerIndex =
             if (controllerSelectable) {
 
@@ -6289,6 +6297,15 @@ class MainActivity : AppCompatActivity() {
                             detailJson
                         )
                     }
+
+                    which == inputProfileIndex -> {
+
+                        showGameInputProfileDialog(
+                            node.id,
+                            title
+                        )
+                    }
+
 
                     controllerSelectable &&
                         which == controllerIndex -> {
@@ -8471,6 +8488,2319 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("Cancel", null)
             .show()
     }
+
+    // PRIVYHUB_A8_PATCH_03_ANDROID_INPUT_PROFILE_EDITOR
+    private fun inputProfileQuery(
+        values: Map<String, String>
+    ): String {
+
+        return values.entries.joinToString("&") { entry ->
+
+            URLEncoder.encode(
+                entry.key,
+                StandardCharsets.UTF_8.name()
+            ) +
+                "=" +
+                URLEncoder.encode(
+                    entry.value,
+                    StandardCharsets.UTF_8.name()
+                )
+        }
+    }
+
+
+    private fun postInputProfileAction(
+        action: String,
+        values: Map<String, String>
+    ): JSONObject {
+
+        val host =
+            getCompanionHost()
+
+        if (host.isBlank()) {
+
+            throw IllegalStateException(
+                "Companion host is not configured."
+            )
+        }
+
+        val query =
+            inputProfileQuery(
+                values
+            )
+
+        return JSONObject(
+            httpPost(
+                "http://$host:$CONTROL_PORT" +
+                    "/plugins/games/$action?$query"
+            )
+        )
+    }
+
+
+    private fun inputProfileStrings(
+        array: JSONArray?
+    ): List<String> {
+
+        if (array == null) {
+            return emptyList()
+        }
+
+        val values =
+            mutableListOf<String>()
+
+        for (index in 0 until array.length()) {
+
+            val value =
+                array.optString(
+                    index,
+                    ""
+                )
+                    .trim()
+                    .lowercase()
+
+            if (value.isNotBlank()) {
+                values.add(value)
+            }
+        }
+
+        return values
+    }
+
+
+    private fun inputProfileTargetLabel(
+        target: String
+    ): String {
+
+        return when (
+            target.trim().lowercase()
+        ) {
+
+            "up" -> "D-pad Up"
+            "down" -> "D-pad Down"
+            "left" -> "D-pad Left"
+            "right" -> "D-pad Right"
+            "a" -> "A"
+            "b" -> "B"
+            "x" -> "X"
+            "y" -> "Y"
+            "l" -> "LB"
+            "r" -> "RB"
+            "l2" -> "LT"
+            "r2" -> "RT"
+            "l3" -> "L3"
+            "r3" -> "R3"
+            "select" -> "Back"
+            "start" -> "Start"
+            "left_stick_left" -> "Left Stick Left"
+            "left_stick_right" -> "Left Stick Right"
+            "left_stick_up" -> "Left Stick Up"
+            "left_stick_down" -> "Left Stick Down"
+            "right_stick_left" -> "Right Stick Left"
+            "right_stick_right" -> "Right Stick Right"
+            "right_stick_up" -> "Right Stick Up"
+            "right_stick_down" -> "Right Stick Down"
+            else -> target
+        }
+    }
+
+    private fun inputProfileSourceLabel(
+        source: String
+    ): String {
+
+        return when (
+            source.trim().lowercase()
+        ) {
+
+            "up" -> "D-pad Up"
+            "down" -> "D-pad Down"
+            "left" -> "D-pad Left"
+            "right" -> "D-pad Right"
+            "a" -> "A"
+            "b" -> "B"
+            "x" -> "X"
+            "y" -> "Y"
+            "l" -> "LB"
+            "r" -> "RB"
+            "l2" -> "LT"
+            "r2" -> "RT"
+            "l3" -> "L3"
+            "r3" -> "R3"
+            "select" -> "Back"
+            "start" -> "Start"
+            "left_stick_left" -> "Left Stick Left"
+            "left_stick_right" -> "Left Stick Right"
+            "left_stick_up" -> "Left Stick Up"
+            "left_stick_down" -> "Left Stick Down"
+            "right_stick_left" -> "Right Stick Left"
+            "right_stick_right" -> "Right Stick Right"
+            "right_stick_up" -> "Right Stick Up"
+            "right_stick_down" -> "Right Stick Down"
+            else -> source
+        }
+    }
+
+    private fun inputProfileMappingCopy(
+        profile: JSONObject
+    ): JSONObject {
+
+        val existing =
+            profile.optJSONObject(
+                "mapping"
+            )
+
+        return if (existing == null) {
+            JSONObject()
+        } else {
+            JSONObject(
+                existing.toString()
+            )
+        }
+    }
+
+
+    // PRIVYHUB_A8_PATCH_03V4_COMPLETE_DIRECTIONAL_EDITOR
+    // PRIVYHUB_A8_PATCH_03V5_EDITOR_UI_REACHABILITY
+    private fun inputProfileEditorTargets(
+        payload: JSONObject
+    ): List<String> {
+
+        return inputProfileStrings(
+            payload.optJSONObject(
+                "capabilities"
+            )
+                ?.optJSONArray(
+                    "editor_targets"
+                )
+        )
+    }
+
+
+    private fun inputProfileEditorSources(
+        payload: JSONObject
+    ): List<String> {
+
+        return inputProfileStrings(
+            payload.optJSONObject(
+                "capabilities"
+            )
+                ?.optJSONArray(
+                    "editor_sources"
+                )
+        )
+    }
+
+
+    private fun inputProfileEditorDefaultMapping(
+        payload: JSONObject
+    ): LinkedHashMap<String, String> {
+
+        val targets =
+            inputProfileEditorTargets(
+                payload
+            )
+
+        val sources =
+            inputProfileEditorSources(
+                payload
+            )
+
+        val rawDefault =
+            payload.optJSONObject(
+                "capabilities"
+            )
+                ?.optJSONObject(
+                    "editor_default_mapping"
+                )
+                ?: throw IllegalStateException(
+                    "Companion did not provide the default directional mapping."
+                )
+
+        if (
+            targets.isEmpty() ||
+            sources.isEmpty() ||
+            targets.size != sources.size
+        ) {
+
+            throw IllegalStateException(
+                "Companion directional input capabilities are incomplete."
+            )
+        }
+
+        val result =
+            linkedMapOf<String, String>()
+
+        for (target in targets) {
+
+            val source =
+                rawDefault.optString(
+                    target,
+                    ""
+                )
+                    .trim()
+                    .lowercase()
+
+            if (source !in sources) {
+
+                throw IllegalStateException(
+                    "Default input mapping is invalid for $target."
+                )
+            }
+
+            result[target] = source
+        }
+
+        if (
+            result.values.toSet().size !=
+            sources.size
+        ) {
+
+            throw IllegalStateException(
+                "Default input mapping is not one-to-one."
+            )
+        }
+
+        return result
+    }
+
+
+    private fun inputProfileMappingJson(
+        mapping: Map<String, String>
+    ): JSONObject {
+
+        val result = JSONObject()
+
+        for ((target, source) in mapping) {
+            result.put(
+                target,
+                source
+            )
+        }
+
+        return result
+    }
+
+
+    private fun inputProfileCompleteDefaultJson(
+        payload: JSONObject
+    ): JSONObject {
+
+        val defaultMapping =
+            inputProfileEditorDefaultMapping(
+                payload
+            )
+
+        return JSONObject()
+            .put(
+                "player1",
+                inputProfileMappingJson(
+                    defaultMapping
+                )
+            )
+            .put(
+                "player2",
+                inputProfileMappingJson(
+                    defaultMapping
+                )
+            )
+    }
+
+
+    private fun inputProfileWorkingPlayerMapping(
+        profile: JSONObject,
+        payload: JSONObject,
+        player: String
+    ): LinkedHashMap<String, String> {
+
+        val working =
+            inputProfileEditorDefaultMapping(
+                payload
+            )
+
+        val rawPlayer =
+            profile.optJSONObject(
+                "mapping"
+            )
+                ?.optJSONObject(
+                    player
+                )
+                ?: return working
+
+        for (target in working.keys.toList()) {
+
+            if (rawPlayer.has(target)) {
+
+                working[target] =
+                    rawPlayer.optString(
+                        target,
+                        ""
+                    )
+                        .trim()
+                        .lowercase()
+            }
+        }
+
+        val legacyAxes =
+            mapOf(
+                "left_x" to Pair(
+                    "left_stick_left",
+                    "left_stick_right"
+                ),
+                "left_y" to Pair(
+                    "left_stick_up",
+                    "left_stick_down"
+                ),
+                "right_x" to Pair(
+                    "right_stick_left",
+                    "right_stick_right"
+                ),
+                "right_y" to Pair(
+                    "right_stick_up",
+                    "right_stick_down"
+                )
+            )
+
+        for ((legacyTarget, targetPair) in legacyAxes) {
+
+            if (!rawPlayer.has(legacyTarget)) {
+                continue
+            }
+
+            val legacySource =
+                rawPlayer.optString(
+                    legacyTarget,
+                    ""
+                )
+                    .trim()
+                    .lowercase()
+
+            val sourcePair =
+                legacyAxes[
+                    legacySource
+                ]
+                    ?: continue
+
+            working[targetPair.first] =
+                sourcePair.first
+
+            working[targetPair.second] =
+                sourcePair.second
+        }
+
+        return working
+    }
+
+
+    private fun inputProfileInvalidTargets(
+        targets: List<String>,
+        sources: List<String>,
+        working: Map<String, String>
+    ): Set<String> {
+
+        val counts =
+            mutableMapOf<String, Int>()
+
+        for (target in targets) {
+
+            val source =
+                working[target]
+                    .orEmpty()
+
+            if (source.isNotBlank()) {
+                counts[source] =
+                    (counts[source] ?: 0) + 1
+            }
+        }
+
+        return targets.filter { target ->
+
+            val source =
+                working[target]
+                    .orEmpty()
+
+            source.isBlank() ||
+                source !in sources ||
+                counts[source] != 1
+        }.toSet()
+    }
+
+
+    private fun inputProfileSavedMapping(
+        profile: JSONObject,
+        payload: JSONObject,
+        player: String,
+        working: Map<String, String>
+    ): JSONObject {
+
+        val result =
+            inputProfileMappingCopy(
+                profile
+            )
+
+        val playerMapping =
+            result.optJSONObject(
+                player
+            )
+                ?: JSONObject()
+
+        val removable =
+            mutableListOf<String>()
+
+        val iterator =
+            playerMapping.keys()
+
+        while (iterator.hasNext()) {
+
+            val key =
+                iterator.next()
+
+            if (
+                key in inputProfileEditorTargets(
+                    payload
+                ) ||
+                key in setOf(
+                    "left_x",
+                    "left_y",
+                    "right_x",
+                    "right_y"
+                )
+            ) {
+                removable.add(key)
+            }
+        }
+
+        for (key in removable) {
+            playerMapping.remove(key)
+        }
+
+        for ((target, source) in working) {
+            playerMapping.put(
+                target,
+                source
+            )
+        }
+
+        result.put(
+            player,
+            playerMapping
+        )
+
+        return result
+    }
+
+    private fun showGameInputProfileDialog(
+        gameId: String,
+        title: String
+    ) {
+
+        val host =
+            getCompanionHost()
+
+        if (host.isBlank()) {
+
+            showCompanionSettings()
+
+            return
+        }
+
+        statusText.text =
+            "Loading input profiles for $title..."
+
+        val encodedId =
+            URLEncoder.encode(
+                gameId,
+                StandardCharsets.UTF_8.name()
+            )
+
+        networkExecutor.execute {
+
+            try {
+
+                val payload =
+                    JSONObject(
+                        httpGet(
+                            "http://$host:$CONTROL_PORT" +
+                                "/plugins/games/input-profiles?id=$encodedId"
+                        )
+                    )
+
+                runOnUiThread {
+
+                    statusText.text =
+                        "Games ready"
+
+                    showGameInputProfileMenu(
+                        gameId,
+                        title,
+                        payload
+                    )
+                }
+
+            } catch (error: Exception) {
+
+                Log.e(
+                    TAG,
+                    "Failed to load input profiles",
+                    error
+                )
+
+                runOnUiThread {
+
+                    statusText.text =
+                        "Input profiles unavailable"
+
+                    AlertDialog.Builder(this)
+                        .setTitle(
+                            "Input profiles unavailable"
+                        )
+                        .setMessage(
+                            error.message
+                                ?: "Unknown error"
+                        )
+                        .setPositiveButton(
+                            "OK",
+                            null
+                        )
+                        .show()
+                }
+            }
+        }
+    }
+
+
+    private fun showGameInputProfileMenu(
+        gameId: String,
+        title: String,
+        payload: JSONObject
+    ) {
+
+        val profiles =
+            payload.optJSONArray(
+                "profiles"
+            )
+                ?: JSONArray()
+
+        val effective =
+            payload.optJSONObject(
+                "effective"
+            )
+
+        val effectiveId =
+            effective
+                ?.optString(
+                    "profile_id",
+                    "default"
+                )
+                ?.trim()
+                ?.lowercase()
+                ?: "default"
+
+        val effectiveName =
+            effective
+                ?.optString(
+                    "profile_name",
+                    "Default"
+                )
+                ?.takeIf {
+                    it.isNotBlank()
+                }
+                ?: "Default"
+
+        val profileObjects =
+            mutableListOf<JSONObject>()
+
+        val labels =
+            mutableListOf<String>()
+
+        for (
+            index in
+            0 until profiles.length()
+        ) {
+
+            val profile =
+                profiles.optJSONObject(
+                    index
+                )
+                    ?: continue
+
+            val profileId =
+                profile.optString(
+                    "id",
+                    ""
+                )
+                    .trim()
+                    .lowercase()
+
+            val profileName =
+                profile.optString(
+                    "name",
+                    profileId
+                )
+                    .takeIf {
+                        it.isNotBlank()
+                    }
+                    ?: profileId
+
+            if (
+                profileId.isBlank()
+            ) {
+                continue
+            }
+
+            labels.add(
+                if (
+                    profileId == effectiveId
+                ) {
+                    "Assign $profileName (Current)"
+                } else {
+                    "Assign $profileName"
+                }
+            )
+
+            profileObjects.add(
+                profile
+            )
+        }
+
+        val effectiveCustomProfile =
+            profileObjects.firstOrNull { profile ->
+
+                profile.optString(
+                    "id",
+                    ""
+                )
+                    .trim()
+                    .lowercase() == effectiveId &&
+                    !profile.optBoolean(
+                        "builtin",
+                        false
+                    )
+            }
+
+        val editPlayer1Index =
+            if (effectiveCustomProfile != null) {
+
+                val index =
+                    labels.size
+
+                labels.add(
+                    "Edit Current Player 1 Mapping"
+                )
+
+                index
+
+            } else {
+                -1
+            }
+
+        val editPlayer2Index =
+            if (effectiveCustomProfile != null) {
+
+                val index =
+                    labels.size
+
+                labels.add(
+                    "Edit Current Player 2 Mapping"
+                )
+
+                index
+
+            } else {
+                -1
+            }
+
+        val createIndex =
+            labels.size
+
+        labels.add(
+            "Create New Profile"
+        )
+
+        val manageIndex =
+            labels.size
+
+        labels.add(
+            "Manage Custom Profiles"
+        )
+
+        // PRIVYHUB_A8_PATCH_03V3_DIALOG_LIST_FIX
+        AlertDialog.Builder(this)
+            .setTitle(
+                "Input Profile - Current: $effectiveName"
+            )
+            .setItems(
+                labels.toTypedArray()
+            ) { _, which ->
+
+                when {
+
+                    which <
+                        profileObjects.size -> {
+
+                        val profile =
+                            profileObjects[
+                                which
+                            ]
+
+                        assignGameInputProfile(
+                            gameId,
+                            title,
+                            profile.optString(
+                                "id",
+                                "default"
+                            )
+                        )
+                    }
+
+                    effectiveCustomProfile != null &&
+                        which ==
+                        editPlayer1Index -> {
+
+                        showEditInputProfilePlayerDialog(
+                            gameId,
+                            title,
+                            effectiveCustomProfile,
+                            payload,
+                            "player1"
+                        )
+                    }
+
+                    effectiveCustomProfile != null &&
+                        which ==
+                        editPlayer2Index -> {
+
+                        showEditInputProfilePlayerDialog(
+                            gameId,
+                            title,
+                            effectiveCustomProfile,
+                            payload,
+                            "player2"
+                        )
+                    }
+
+                    which ==
+                        createIndex -> {
+
+                        showCreateInputProfileDialog(
+                            gameId,
+                            title,
+                            payload
+                        )
+                    }
+
+                    which ==
+                        manageIndex -> {
+
+                        showManageInputProfilesDialog(
+                            gameId,
+                            title,
+                            payload
+                        )
+                    }
+                }
+            }
+            .setNegativeButton(
+                "Cancel",
+                null
+            )
+            .show()
+    }
+
+
+    private fun assignGameInputProfile(
+        gameId: String,
+        title: String,
+        profileId: String
+    ) {
+
+        statusText.text =
+            "Assigning input profile..."
+
+        networkExecutor.execute {
+
+            try {
+
+                val result =
+                    postInputProfileAction(
+                        "input-profile-assign",
+                        mapOf(
+                            "id" to gameId,
+                            "profile_id" to profileId
+                        )
+                    )
+
+                val profileName =
+                    result.optString(
+                        "profile_name",
+                        "Input profile"
+                    )
+
+                runOnUiThread {
+
+                    statusText.text =
+                        "Input profile: $profileName"
+
+                    AlertDialog.Builder(this)
+                        .setTitle(
+                            "Input profile assigned"
+                        )
+                        .setMessage(
+                            "$profileName will be used the next time $title launches."
+                        )
+                        .setPositiveButton(
+                            "OK",
+                            null
+                        )
+                        .show()
+                }
+
+            } catch (error: Exception) {
+
+                showInputProfileNetworkError(
+                    "Unable to assign input profile",
+                    error
+                )
+            }
+        }
+    }
+
+
+    private fun showCreateInputProfileDialog(
+        gameId: String,
+        title: String,
+        payload: JSONObject
+    ) {
+
+        val input =
+            EditText(
+                this
+            )
+
+        input.setText(
+            "Custom Profile"
+        )
+
+        input.selectAll()
+
+        AlertDialog.Builder(this)
+            .setTitle(
+                "Create Input Profile"
+            )
+            .setMessage(
+                "Creates a complete one-to-one gameplay mapping from the validated Default layout."
+            )
+            .setView(
+                input
+            )
+            .setPositiveButton(
+                "Create"
+            ) { _, _ ->
+
+                val name =
+                    input.text
+                        .toString()
+                        .trim()
+
+                if (name.isBlank()) {
+
+                    AlertDialog.Builder(this)
+                        .setTitle(
+                            "Invalid profile name"
+                        )
+                        .setMessage(
+                            "Profile name cannot be blank."
+                        )
+                        .setPositiveButton(
+                            "OK",
+                            null
+                        )
+                        .show()
+
+                } else {
+
+                    createAndAssignInputProfile(
+                        gameId,
+                        title,
+                        name,
+                        payload
+                    )
+                }
+            }
+            .setNegativeButton(
+                "Cancel",
+                null
+            )
+            .show()
+    }
+
+    private fun createAndAssignInputProfile(
+        gameId: String,
+        title: String,
+        name: String,
+        payload: JSONObject
+    ) {
+
+        statusText.text =
+            "Creating input profile..."
+
+        val mapping =
+            try {
+                inputProfileCompleteDefaultJson(
+                    payload
+                )
+            } catch (error: Exception) {
+                showInputProfileNetworkError(
+                    "Unable to build default input mapping",
+                    error
+                )
+                return
+            }
+
+        networkExecutor.execute {
+
+            try {
+
+                val created =
+                    postInputProfileAction(
+                        "input-profile-create",
+                        mapOf(
+                            "name" to name,
+                            "mapping" to mapping.toString()
+                        )
+                    )
+
+                val profile =
+                    created.optJSONObject(
+                        "profile"
+                    )
+                        ?: throw IllegalStateException(
+                            "Companion did not return the created input profile."
+                        )
+
+                val profileId =
+                    profile.optString(
+                        "id",
+                        ""
+                    )
+                        .trim()
+
+                if (profileId.isBlank()) {
+                    throw IllegalStateException(
+                        "Created input profile is missing an id."
+                    )
+                }
+
+                postInputProfileAction(
+                    "input-profile-assign",
+                    mapOf(
+                        "id" to gameId,
+                        "profile_id" to profileId
+                    )
+                )
+
+                runOnUiThread {
+
+                    statusText.text =
+                        "Input profile: $name"
+
+                    showEditInputProfilePlayerDialog(
+                        gameId,
+                        title,
+                        profile,
+                        payload,
+                        "player1"
+                    )
+                }
+
+            } catch (error: Exception) {
+
+                showInputProfileNetworkError(
+                    "Unable to create input profile",
+                    error
+                )
+            }
+        }
+    }
+
+    private fun showManageInputProfilesDialog(
+        gameId: String,
+        title: String,
+        payload: JSONObject
+    ) {
+
+        val profiles =
+            payload.optJSONArray(
+                "profiles"
+            )
+                ?: JSONArray()
+
+        val customProfiles =
+            mutableListOf<JSONObject>()
+
+        val labels =
+            mutableListOf<String>()
+
+        for (
+            index in
+            0 until profiles.length()
+        ) {
+
+            val profile =
+                profiles.optJSONObject(
+                    index
+                )
+                    ?: continue
+
+            if (
+                profile.optBoolean(
+                    "builtin",
+                    false
+                )
+            ) {
+                continue
+            }
+
+            val name =
+                profile.optString(
+                    "name",
+                    "Custom Profile"
+                )
+
+            customProfiles.add(
+                profile
+            )
+
+            labels.add(
+                name
+            )
+        }
+
+        if (customProfiles.isEmpty()) {
+
+            AlertDialog.Builder(this)
+                .setTitle(
+                    "Custom Input Profiles"
+                )
+                .setMessage(
+                    "No custom input profiles exist yet."
+                )
+                .setPositiveButton(
+                    "Create"
+                ) { _, _ ->
+
+                    showCreateInputProfileDialog(
+                        gameId,
+                        title,
+                        payload
+                    )
+                }
+                .setNegativeButton(
+                    "Cancel",
+                    null
+                )
+                .show()
+
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(
+                "Custom Input Profiles"
+            )
+            .setItems(
+                labels.toTypedArray()
+            ) { _, which ->
+
+                if (
+                    which in
+                    customProfiles.indices
+                ) {
+
+                    showInputProfileActionsDialog(
+                        gameId,
+                        title,
+                        customProfiles[
+                            which
+                        ],
+                        payload
+                    )
+                }
+            }
+            .setPositiveButton(
+                "Create New"
+            ) { _, _ ->
+
+                showCreateInputProfileDialog(
+                    gameId,
+                    title,
+                    payload
+                )
+            }
+            .setNegativeButton(
+                "Cancel",
+                null
+            )
+            .show()
+    }
+
+
+    private fun showInputProfileActionsDialog(
+        gameId: String,
+        title: String,
+        profile: JSONObject,
+        payload: JSONObject
+    ) {
+
+        val profileName =
+            profile.optString(
+                "name",
+                "Custom Profile"
+            )
+
+        val options =
+            arrayOf(
+                "Assign to This Game",
+                "Edit Player 1 Mapping",
+                "Edit Player 2 Mapping",
+                "Rename",
+                "Duplicate",
+                "Reset Mapping to Default",
+                "Delete"
+            )
+
+        AlertDialog.Builder(this)
+            .setTitle(
+                "$profileName - Actions"
+            )
+            .setItems(
+                options
+            ) { _, which ->
+
+                when (which) {
+
+                    0 ->
+                        assignGameInputProfile(
+                            gameId,
+                            title,
+                            profile.optString(
+                                "id",
+                                ""
+                            )
+                        )
+
+                    1 ->
+                        showEditInputProfilePlayerDialog(
+                            gameId,
+                            title,
+                            profile,
+                            payload,
+                            "player1"
+                        )
+
+                    2 ->
+                        showEditInputProfilePlayerDialog(
+                            gameId,
+                            title,
+                            profile,
+                            payload,
+                            "player2"
+                        )
+
+                    3 ->
+                        showRenameInputProfileDialog(
+                            gameId,
+                            title,
+                            profile
+                        )
+
+                    4 ->
+                        showDuplicateInputProfileDialog(
+                            gameId,
+                            title,
+                            profile,
+                            payload
+                        )
+
+                    5 ->
+                        confirmResetInputProfile(
+                            gameId,
+                            title,
+                            profile,
+                            payload
+                        )
+
+                    6 ->
+                        confirmDeleteInputProfile(
+                            gameId,
+                            title,
+                            profile
+                        )
+                }
+            }
+            .setNegativeButton(
+                "Cancel",
+                null
+            )
+            .show()
+    }
+
+
+    private fun showRenameInputProfileDialog(
+        gameId: String,
+        title: String,
+        profile: JSONObject
+    ) {
+
+        val input =
+            EditText(
+                this
+            )
+
+        input.setText(
+            profile.optString(
+                "name",
+                ""
+            )
+        )
+
+        input.selectAll()
+
+        AlertDialog.Builder(this)
+            .setTitle(
+                "Rename Input Profile"
+            )
+            .setView(
+                input
+            )
+            .setPositiveButton(
+                "Rename"
+            ) { _, _ ->
+
+                val name =
+                    input.text
+                        .toString()
+                        .trim()
+
+                if (name.isNotBlank()) {
+
+                    updateInputProfileName(
+                        gameId,
+                        title,
+                        profile.optString(
+                            "id",
+                            ""
+                        ),
+                        name
+                    )
+                }
+            }
+            .setNegativeButton(
+                "Cancel",
+                null
+            )
+            .show()
+    }
+
+
+    private fun updateInputProfileName(
+        gameId: String,
+        title: String,
+        profileId: String,
+        name: String
+    ) {
+
+        statusText.text =
+            "Renaming input profile..."
+
+        networkExecutor.execute {
+
+            try {
+
+                postInputProfileAction(
+                    "input-profile-update",
+                    mapOf(
+                        "profile_id" to profileId,
+                        "name" to name
+                    )
+                )
+
+                runOnUiThread {
+
+                    statusText.text =
+                        "Games ready"
+
+                    showGameInputProfileDialog(
+                        gameId,
+                        title
+                    )
+                }
+
+            } catch (error: Exception) {
+
+                showInputProfileNetworkError(
+                    "Unable to rename input profile",
+                    error
+                )
+            }
+        }
+    }
+
+
+    private fun showDuplicateInputProfileDialog(
+        gameId: String,
+        title: String,
+        profile: JSONObject,
+        payload: JSONObject
+    ) {
+
+        val input =
+            EditText(
+                this
+            )
+
+        input.setText(
+            profile.optString(
+                "name",
+                "Custom Profile"
+            ) + " Copy"
+        )
+
+        input.selectAll()
+
+        AlertDialog.Builder(this)
+            .setTitle(
+                "Duplicate Input Profile"
+            )
+            .setMessage(
+                "The duplicate keeps the same Player 1 and Player 2 gameplay mapping."
+            )
+            .setView(
+                input
+            )
+            .setPositiveButton(
+                "Duplicate"
+            ) { _, _ ->
+
+                val name =
+                    input.text
+                        .toString()
+                        .trim()
+
+                if (name.isNotBlank()) {
+
+                    duplicateInputProfile(
+                        gameId,
+                        title,
+                        profile,
+                        payload,
+                        name
+                    )
+                }
+            }
+            .setNegativeButton(
+                "Cancel",
+                null
+            )
+            .show()
+    }
+
+    private fun duplicateInputProfile(
+        gameId: String,
+        title: String,
+        profile: JSONObject,
+        payload: JSONObject,
+        name: String
+    ) {
+
+        statusText.text =
+            "Duplicating input profile..."
+
+        val mapping =
+            inputProfileMappingCopy(
+                profile
+            )
+
+        if (mapping.length() == 0) {
+            val defaults =
+                inputProfileCompleteDefaultJson(
+                    payload
+                )
+            mapping.put(
+                "player1",
+                defaults.optJSONObject(
+                    "player1"
+                )
+            )
+            mapping.put(
+                "player2",
+                defaults.optJSONObject(
+                    "player2"
+                )
+            )
+        }
+
+        networkExecutor.execute {
+
+            try {
+
+                postInputProfileAction(
+                    "input-profile-create",
+                    mapOf(
+                        "name" to name,
+                        "mapping" to mapping.toString()
+                    )
+                )
+
+                runOnUiThread {
+
+                    statusText.text =
+                        "Games ready"
+
+                    showGameInputProfileDialog(
+                        gameId,
+                        title
+                    )
+                }
+
+            } catch (error: Exception) {
+
+                showInputProfileNetworkError(
+                    "Unable to duplicate input profile",
+                    error
+                )
+            }
+        }
+    }
+
+    // PRIVYHUB_A8_PATCH_03V6_SIMPLE_CURRENT_MAPPING_EDITOR
+    // PRIVYHUB_A8_PATCH_03V7_XBOX_LABELS_PLAYER_SYNC
+    // PRIVYHUB_A8_PATCH_03V8_CONFLICT_CHOICES_RED
+    private fun showEditInputProfilePlayerDialog(
+        gameId: String,
+        title: String,
+        profile: JSONObject,
+        payload: JSONObject,
+        player: String
+    ) {
+
+        val targets =
+            inputProfileEditorTargets(
+                payload
+            )
+
+        val sources =
+            inputProfileEditorSources(
+                payload
+            )
+
+        if (
+            targets.isEmpty() ||
+            sources.isEmpty()
+        ) {
+
+            AlertDialog.Builder(this)
+                .setTitle(
+                    "Input mapping unavailable"
+                )
+                .setMessage(
+                    "The companion did not provide directional mapping capabilities."
+                )
+                .setPositiveButton(
+                    "OK",
+                    null
+                )
+                .show()
+
+            return
+        }
+
+        val working =
+            try {
+                inputProfileWorkingPlayerMapping(
+                    profile,
+                    payload,
+                    player
+                )
+            } catch (error: Exception) {
+                showInputProfileNetworkError(
+                    "Unable to open input mapping",
+                    error
+                )
+                return
+            }
+
+        val playerLabel =
+            if (player == "player2") {
+                "Player 2"
+            } else {
+                "Player 1"
+            }
+
+        val container =
+            android.widget.LinearLayout(
+                this
+            ).apply {
+                orientation =
+                    android.widget.LinearLayout.VERTICAL
+                setPadding(
+                    24,
+                    16,
+                    24,
+                    16
+                )
+            }
+
+        val heading =
+            TextView(
+                this
+            ).apply {
+                text =
+                    "Current mapping"
+                textSize =
+                    18f
+                setPadding(
+                    8,
+                    8,
+                    8,
+                    8
+                )
+            }
+
+        container.addView(
+            heading
+        )
+
+        val status =
+            TextView(
+                this
+            ).apply {
+                text =
+                    "Tap Change for the control you want to update."
+                setPadding(
+                    8,
+                    0,
+                    8,
+                    20
+                )
+            }
+
+        val defaultStatusColors =
+            status.textColors
+
+        container.addView(
+            status
+        )
+
+        val otherPlayer =
+            if (player == "player2") {
+                "player1"
+            } else {
+                "player2"
+            }
+
+        val otherPlayerLabel =
+            if (otherPlayer == "player2") {
+                "Player 2"
+            } else {
+                "Player 1"
+            }
+
+        val syncButton =
+            Button(
+                this
+            ).apply {
+                text =
+                    "Sync $playerLabel with $otherPlayerLabel"
+                isAllCaps =
+                    false
+            }
+
+        container.addView(
+            syncButton,
+            android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        val targetLabels =
+            linkedMapOf<String, TextView>()
+
+        val currentLabels =
+            linkedMapOf<String, TextView>()
+
+        val changeButtons =
+            linkedMapOf<String, Button>()
+
+        val defaultTargetColors =
+            mutableMapOf<String, android.content.res.ColorStateList>()
+
+        val defaultCurrentColors =
+            mutableMapOf<String, android.content.res.ColorStateList>()
+
+        val defaultButtonColors =
+            mutableMapOf<String, android.content.res.ColorStateList>()
+
+        for (target in targets) {
+
+            val row =
+                android.widget.LinearLayout(
+                    this
+                ).apply {
+                    orientation =
+                        android.widget.LinearLayout.VERTICAL
+                    setPadding(
+                        8,
+                        8,
+                        8,
+                        20
+                    )
+                }
+
+            val targetLabel =
+                TextView(
+                    this
+                ).apply {
+                    text =
+                        inputProfileTargetLabel(
+                            target
+                        )
+                    textSize =
+                        17f
+                }
+
+            val currentLabel =
+                TextView(
+                    this
+                ).apply {
+                    setPadding(
+                        0,
+                        4,
+                        0,
+                        8
+                    )
+                }
+
+            val changeButton =
+                Button(
+                    this
+                ).apply {
+                    text =
+                        "Change"
+                    isAllCaps =
+                        false
+                }
+
+            targetLabels[target] =
+                targetLabel
+
+            currentLabels[target] =
+                currentLabel
+
+            changeButtons[target] =
+                changeButton
+
+            defaultTargetColors[target] =
+                targetLabel.textColors
+
+            defaultCurrentColors[target] =
+                currentLabel.textColors
+
+            defaultButtonColors[target] =
+                changeButton.textColors
+
+            row.addView(
+                targetLabel
+            )
+
+            row.addView(
+                currentLabel
+            )
+
+            row.addView(
+                changeButton,
+                android.widget.LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
+
+            container.addView(
+                row,
+                android.widget.LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
+        }
+
+        val scroll =
+            android.widget.ScrollView(
+                this
+            ).apply {
+                addView(
+                    container
+                )
+            }
+
+        val dialog =
+            AlertDialog.Builder(this)
+                .setTitle(
+                    "${profile.optString("name", "Input Profile")} - $playerLabel"
+                )
+                .setView(
+                    scroll
+                )
+                .setPositiveButton(
+                    "Save",
+                    null
+                )
+                .setNegativeButton(
+                    "Cancel",
+                    null
+                )
+                .create()
+
+        fun invalidTargets(): Set<String> {
+            return inputProfileInvalidTargets(
+                targets,
+                sources,
+                working
+            )
+        }
+
+        fun refreshRows() {
+
+            val invalid =
+                invalidTargets()
+
+            for (target in targets) {
+
+                val source =
+                    working[target]
+                        .orEmpty()
+
+                val targetLabel =
+                    targetLabels[target]
+                        ?: continue
+
+                val currentLabel =
+                    currentLabels[target]
+                        ?: continue
+
+                val changeButton =
+                    changeButtons[target]
+                        ?: continue
+
+                currentLabel.text =
+                    "Current: " +
+                        if (source.isBlank()) {
+                            "UNMAPPED"
+                        } else {
+                            inputProfileSourceLabel(
+                                source
+                            )
+                        }
+
+                if (target in invalid) {
+                    targetLabel.setTextColor(
+                        0xFFFF5252.toInt()
+                    )
+                    currentLabel.setTextColor(
+                        0xFFFF5252.toInt()
+                    )
+                    changeButton.setTextColor(
+                        0xFFFF5252.toInt()
+                    )
+                } else {
+                    targetLabel.setTextColor(
+                        defaultTargetColors[target]
+                            ?: targetLabel.textColors
+                    )
+                    currentLabel.setTextColor(
+                        defaultCurrentColors[target]
+                            ?: currentLabel.textColors
+                    )
+                    changeButton.setTextColor(
+                        defaultButtonColors[target]
+                            ?: changeButton.textColors
+                    )
+                }
+            }
+
+            if (invalid.isEmpty()) {
+                status.text =
+                    "Mapping valid - Save is enabled."
+                status.setTextColor(
+                    defaultStatusColors
+                )
+            } else {
+                status.text =
+                    "${invalid.size} row(s) need attention. Fix red rows before Save."
+                status.setTextColor(
+                    0xFFFF5252.toInt()
+                )
+            }
+
+            dialog.getButton(
+                android.content.DialogInterface.BUTTON_POSITIVE
+            )?.isEnabled =
+                invalid.isEmpty()
+        }
+
+        syncButton.setOnClickListener {
+
+            val sourceMapping =
+                try {
+                    inputProfileWorkingPlayerMapping(
+                        profile,
+                        payload,
+                        otherPlayer
+                    )
+                } catch (error: Exception) {
+                    showInputProfileNetworkError(
+                        "Unable to sync player mapping",
+                        error
+                    )
+                    return@setOnClickListener
+                }
+
+            working.clear()
+            working.putAll(
+                sourceMapping
+            )
+
+            refreshRows()
+        }
+
+        for (target in targets) {
+
+            changeButtons[target]
+                ?.setOnClickListener {
+
+                    val currentSource =
+                        working[target]
+                            .orEmpty()
+
+                    val overlapSources =
+                        working.entries
+                            .filter { entry ->
+                                entry.key != target &&
+                                    entry.value.isNotBlank()
+                            }
+                            .map { entry ->
+                                entry.value
+                            }
+                            .toSet()
+
+                    val labels =
+                        mutableListOf(
+                            if (currentSource.isBlank()) {
+                                "UNMAPPED (Current)"
+                            } else {
+                                "UNMAPPED"
+                            }
+                        )
+
+                    for (source in sources) {
+
+                        labels.add(
+                            inputProfileSourceLabel(
+                                source
+                            ) +
+                                if (source == currentSource) {
+                                    " (Current)"
+                                } else {
+                                    ""
+                                }
+                        )
+                    }
+
+                    val currentLabel =
+                        if (currentSource.isBlank()) {
+                            "UNMAPPED"
+                        } else {
+                            inputProfileSourceLabel(
+                                currentSource
+                            )
+                        }
+
+                    val normalTextValue =
+                        android.util.TypedValue()
+
+                    theme.resolveAttribute(
+                        android.R.attr.textColorPrimary,
+                        normalTextValue,
+                        true
+                    )
+
+                    val normalTextColor =
+                        if (normalTextValue.resourceId != 0) {
+                            ContextCompat.getColor(
+                                this,
+                                normalTextValue.resourceId
+                            )
+                        } else {
+                            normalTextValue.data
+                        }
+
+                    val sourceAdapter =
+                        object : android.widget.ArrayAdapter<String>(
+                            this,
+                            android.R.layout.simple_list_item_1,
+                            labels
+                        ) {
+
+                            override fun getView(
+                                position: Int,
+                                convertView: View?,
+                                parent: ViewGroup
+                            ): View {
+
+                                val view =
+                                    super.getView(
+                                        position,
+                                        convertView,
+                                        parent
+                                    )
+
+                                val textView =
+                                    view as? TextView
+
+                                val source =
+                                    if (position == 0) {
+                                        null
+                                    } else {
+                                        sources.getOrNull(
+                                            position - 1
+                                        )
+                                    }
+
+                                textView?.setTextColor(
+                                    if (
+                                        source != null &&
+                                        source in overlapSources
+                                    ) {
+                                        0xFFFF5252.toInt()
+                                    } else {
+                                        normalTextColor
+                                    }
+                                )
+
+                                return view
+                            }
+                        }
+
+                    AlertDialog.Builder(this)
+                        .setTitle(
+                            "Change ${inputProfileTargetLabel(target)} - Current: $currentLabel"
+                        )
+                        .setAdapter(
+                            sourceAdapter
+                        ) { _, which ->
+
+                            working[target] =
+                                if (which == 0) {
+                                    ""
+                                } else {
+                                    sources[
+                                        which - 1
+                                    ]
+                                }
+
+                            refreshRows()
+                        }
+                        .setNegativeButton(
+                            "Cancel",
+                            null
+                        )
+                        .show()
+                }
+        }
+
+        dialog.setOnShowListener {
+
+            dialog.getButton(
+                android.content.DialogInterface.BUTTON_POSITIVE
+            ).setOnClickListener {
+
+                val invalid =
+                    invalidTargets()
+
+                if (invalid.isNotEmpty()) {
+                    refreshRows()
+                    return@setOnClickListener
+                }
+
+                val mapping =
+                    inputProfileSavedMapping(
+                        profile,
+                        payload,
+                        player,
+                        working
+                    )
+
+                dialog.dismiss()
+
+                saveInputProfileMapping(
+                    gameId,
+                    title,
+                    profile.optString(
+                        "id",
+                        ""
+                    ),
+                    mapping
+                )
+            }
+
+            refreshRows()
+        }
+
+        dialog.show()
+    }
+
+    private fun saveInputProfileMapping(
+        gameId: String,
+        title: String,
+        profileId: String,
+        mapping: JSONObject
+    ) {
+
+        statusText.text =
+            "Saving input mapping..."
+
+        networkExecutor.execute {
+
+            try {
+
+                postInputProfileAction(
+                    "input-profile-update",
+                    mapOf(
+                        "profile_id" to profileId,
+                        "mapping" to mapping.toString()
+                    )
+                )
+
+                runOnUiThread {
+
+                    statusText.text =
+                        "Input mapping saved"
+
+                    showGameInputProfileDialog(
+                        gameId,
+                        title
+                    )
+                }
+
+            } catch (error: Exception) {
+
+                showInputProfileNetworkError(
+                    "Unable to save input mapping",
+                    error
+                )
+            }
+        }
+    }
+
+    private fun confirmResetInputProfile(
+        gameId: String,
+        title: String,
+        profile: JSONObject,
+        payload: JSONObject
+    ) {
+
+        AlertDialog.Builder(this)
+            .setTitle(
+                "Reset ${profile.optString("name", "Input Profile")}?"
+            )
+            .setMessage(
+                "Restore the complete validated Default gameplay mapping for Player 1 and Player 2?"
+            )
+            .setPositiveButton(
+                "Reset"
+            ) { _, _ ->
+
+                resetInputProfile(
+                    gameId,
+                    title,
+                    profile.optString(
+                        "id",
+                        ""
+                    ),
+                    payload
+                )
+            }
+            .setNegativeButton(
+                "Cancel",
+                null
+            )
+            .show()
+    }
+
+    private fun resetInputProfile(
+        gameId: String,
+        title: String,
+        profileId: String,
+        payload: JSONObject
+    ) {
+
+        statusText.text =
+            "Resetting input profile..."
+
+        val mapping =
+            try {
+                inputProfileCompleteDefaultJson(
+                    payload
+                )
+            } catch (error: Exception) {
+                showInputProfileNetworkError(
+                    "Unable to build default input mapping",
+                    error
+                )
+                return
+            }
+
+        networkExecutor.execute {
+
+            try {
+
+                postInputProfileAction(
+                    "input-profile-update",
+                    mapOf(
+                        "profile_id" to profileId,
+                        "mapping" to mapping.toString()
+                    )
+                )
+
+                runOnUiThread {
+
+                    statusText.text =
+                        "Games ready"
+
+                    showGameInputProfileDialog(
+                        gameId,
+                        title
+                    )
+                }
+
+            } catch (error: Exception) {
+
+                showInputProfileNetworkError(
+                    "Unable to reset input profile",
+                    error
+                )
+            }
+        }
+    }
+
+    private fun confirmDeleteInputProfile(
+        gameId: String,
+        title: String,
+        profile: JSONObject
+    ) {
+
+        AlertDialog.Builder(this)
+            .setTitle(
+                "Delete ${profile.optString("name", "Input Profile")}?"
+            )
+            .setMessage(
+                "Assigned profiles cannot be deleted. Reassign any games using this profile first."
+            )
+            .setPositiveButton(
+                "Delete"
+            ) { _, _ ->
+
+                deleteInputProfile(
+                    gameId,
+                    title,
+                    profile.optString(
+                        "id",
+                        ""
+                    )
+                )
+            }
+            .setNegativeButton(
+                "Cancel",
+                null
+            )
+            .show()
+    }
+
+
+    private fun deleteInputProfile(
+        gameId: String,
+        title: String,
+        profileId: String
+    ) {
+
+        statusText.text =
+            "Deleting input profile..."
+
+        networkExecutor.execute {
+
+            try {
+
+                postInputProfileAction(
+                    "input-profile-delete",
+                    mapOf(
+                        "profile_id" to profileId
+                    )
+                )
+
+                runOnUiThread {
+
+                    statusText.text =
+                        "Games ready"
+
+                    showGameInputProfileDialog(
+                        gameId,
+                        title
+                    )
+                }
+
+            } catch (error: Exception) {
+
+                showInputProfileNetworkError(
+                    "Unable to delete input profile",
+                    error
+                )
+            }
+        }
+    }
+
+
+    private fun showInputProfileNetworkError(
+        title: String,
+        error: Exception
+    ) {
+
+        Log.e(
+            TAG,
+            title,
+            error
+        )
+
+        runOnUiThread {
+
+            statusText.text =
+                "Input profile operation failed"
+
+            AlertDialog.Builder(this)
+                .setTitle(
+                    title
+                )
+                .setMessage(
+                    error.message
+                        ?: "Unknown error"
+                )
+                .setPositiveButton(
+                    "OK",
+                    null
+                )
+                .show()
+        }
+    }
+
 
     private fun showGameLaunchModeDialog(
         gameId: String,

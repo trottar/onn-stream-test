@@ -511,6 +511,1157 @@ class EmulatorManager:
                 f"Unable to write controller overrides: {exc}"
             ) from exc
 
+    # PRIVYHUB_A8_PATCH_01_INPUT_PROFILE_BACKEND
+    INPUT_PROFILE_SCHEMA = 1
+    INPUT_PROFILE_DEFAULT_ID = "default"
+    INPUT_PROFILE_MAX_CUSTOM = 64
+    INPUT_PROFILE_MAX_NAME_LENGTH = 48
+    INPUT_PROFILE_PLAYERS = (
+        "player1",
+        "player2",
+    )
+    # PRIVYHUB_A8_PATCH_04_DIRECTIONAL_ENDPOINTS
+    INPUT_PROFILE_DIRECTIONAL_TARGETS = (
+        "up",
+        "down",
+        "left",
+        "right",
+        "a",
+        "b",
+        "x",
+        "y",
+        "l",
+        "r",
+        "l2",
+        "r2",
+        "l3",
+        "r3",
+        "select",
+        "start",
+        "left_stick_left",
+        "left_stick_right",
+        "left_stick_up",
+        "left_stick_down",
+        "right_stick_left",
+        "right_stick_right",
+        "right_stick_up",
+        "right_stick_down",
+    )
+    INPUT_PROFILE_DIRECTIONAL_SOURCES = (
+        *INPUT_PROFILE_DIRECTIONAL_TARGETS,
+    )
+    INPUT_PROFILE_LEGACY_AXIS_TOKENS = (
+        "left_x",
+        "left_y",
+        "right_x",
+        "right_y",
+    )
+    INPUT_PROFILE_TARGETS = (
+        *INPUT_PROFILE_DIRECTIONAL_TARGETS,
+        *INPUT_PROFILE_LEGACY_AXIS_TOKENS,
+    )
+    INPUT_PROFILE_SOURCES = (
+        *INPUT_PROFILE_DIRECTIONAL_SOURCES,
+        *INPUT_PROFILE_LEGACY_AXIS_TOKENS,
+    )
+    # This reproduces RetroArch's validated Xbox/XInput autoconfig rather than
+    # assuming that libretro face-button names match the labels printed on an
+    # Xbox-style controller.
+    INPUT_PROFILE_EDITOR_DEFAULT_MAPPING = {
+        "up": "up",
+        "down": "down",
+        "left": "left",
+        "right": "right",
+        "a": "b",
+        "b": "a",
+        "x": "y",
+        "y": "x",
+        "l": "l",
+        "r": "r",
+        "l2": "l2",
+        "r2": "r2",
+        "l3": "l3",
+        "r3": "r3",
+        "select": "select",
+        "start": "start",
+        "left_stick_left": "left_stick_left",
+        "left_stick_right": "left_stick_right",
+        "left_stick_up": "left_stick_up",
+        "left_stick_down": "left_stick_down",
+        "right_stick_left": "right_stick_left",
+        "right_stick_right": "right_stick_right",
+        "right_stick_up": "right_stick_up",
+        "right_stick_down": "right_stick_down",
+    }
+
+    def _input_profiles_path(
+        self,
+    ) -> Path:
+        path = self._project_path(
+            "data/games/input_profiles.json"
+        )
+        path.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+        return path
+
+    @classmethod
+    def _empty_input_profiles_payload(
+        cls,
+    ) -> dict[str, Any]:
+        return {
+            "schema": cls.INPUT_PROFILE_SCHEMA,
+            "next_profile_sequence": 1,
+            "profiles": [],
+            "assignments": {},
+        }
+
+    @classmethod
+    def _normalize_input_profile_name(
+        cls,
+        value: Any,
+    ) -> str:
+        name = str(
+            value
+            if value is not None
+            else ""
+        ).strip()
+
+        if not name:
+            raise EmulatorError(
+                "Input profile name cannot be blank"
+            )
+
+        if len(name) > cls.INPUT_PROFILE_MAX_NAME_LENGTH:
+            raise EmulatorError(
+                "Input profile name is too long"
+            )
+
+        if any(
+            ord(character) < 32
+            for character in name
+        ):
+            raise EmulatorError(
+                "Input profile name contains control characters"
+            )
+
+        return name
+
+    @classmethod
+    def _normalize_input_mapping(
+        cls,
+        value: Any,
+    ) -> dict[str, dict[str, str]]:
+        if value is None:
+            value = {}
+
+        if not isinstance(
+            value,
+            dict,
+        ):
+            raise EmulatorError(
+                "Input profile mapping must be an object"
+            )
+
+        unknown_players = (
+            set(value.keys())
+            - set(cls.INPUT_PROFILE_PLAYERS)
+        )
+
+        if unknown_players:
+            raise EmulatorError(
+                "Input profile mapping contains unsupported player keys"
+            )
+
+        allowed_targets = set(
+            cls.INPUT_PROFILE_TARGETS
+        )
+        allowed_sources = set(
+            cls.INPUT_PROFILE_SOURCES
+        )
+
+        normalized: dict[
+            str,
+            dict[str, str],
+        ] = {
+            player: {}
+            for player in cls.INPUT_PROFILE_PLAYERS
+        }
+
+        for player in cls.INPUT_PROFILE_PLAYERS:
+            raw_player = value.get(
+                player,
+                {},
+            )
+
+            if raw_player is None:
+                raw_player = {}
+
+            if not isinstance(
+                raw_player,
+                dict,
+            ):
+                raise EmulatorError(
+                    f"Input mapping for {player} must be an object"
+                )
+
+            if len(raw_player) > len(
+                cls.INPUT_PROFILE_TARGETS
+            ):
+                raise EmulatorError(
+                    f"Input mapping for {player} has too many entries"
+                )
+
+            used_sources: set[str] = set()
+
+            for (
+                raw_target,
+                raw_source,
+            ) in raw_player.items():
+                target = str(
+                    raw_target
+                ).strip().casefold()
+
+                source = str(
+                    raw_source
+                ).strip().casefold()
+
+                if target not in allowed_targets:
+                    raise EmulatorError(
+                        "Unsupported RetroPad target in input profile: "
+                        f"{target or '<blank>'}"
+                    )
+
+                if source not in allowed_sources:
+                    raise EmulatorError(
+                        "Unsupported physical source in input profile: "
+                        f"{source or '<blank>'}"
+                    )
+
+                if source in used_sources:
+                    raise EmulatorError(
+                        f"Physical source {source} is mapped more than once "
+                        f"for {player}"
+                    )
+
+                used_sources.add(
+                    source
+                )
+                normalized[
+                    player
+                ][
+                    target
+                ] = source
+
+        return normalized
+
+    def _load_input_profiles(
+        self,
+    ) -> dict[str, Any]:
+        path = self._input_profiles_path()
+
+        if not path.is_file():
+            return (
+                self._empty_input_profiles_payload()
+            )
+
+        try:
+            payload = json.loads(
+                path.read_text(
+                    encoding="utf-8-sig"
+                )
+            )
+        except (
+            OSError,
+            json.JSONDecodeError,
+        ) as exc:
+            raise EmulatorError(
+                f"Unable to read input profiles: {exc}"
+            ) from exc
+
+        if not isinstance(
+            payload,
+            dict,
+        ):
+            raise EmulatorError(
+                "Input profiles root must be an object"
+            )
+
+        schema = payload.get(
+            "schema"
+        )
+
+        if (
+            not isinstance(schema, int)
+            or isinstance(schema, bool)
+            or schema != self.INPUT_PROFILE_SCHEMA
+        ):
+            raise EmulatorError(
+                "Unsupported input profile schema"
+            )
+
+        next_sequence = payload.get(
+            "next_profile_sequence"
+        )
+
+        if (
+            not isinstance(next_sequence, int)
+            or isinstance(next_sequence, bool)
+            or next_sequence < 1
+            or next_sequence > 999999
+        ):
+            raise EmulatorError(
+                "Invalid next input profile sequence"
+            )
+
+        raw_profiles = payload.get(
+            "profiles"
+        )
+        raw_assignments = payload.get(
+            "assignments"
+        )
+
+        if not isinstance(
+            raw_profiles,
+            list,
+        ):
+            raise EmulatorError(
+                "Input profiles entry must be an array"
+            )
+
+        if not isinstance(
+            raw_assignments,
+            dict,
+        ):
+            raise EmulatorError(
+                "Input profile assignments entry must be an object"
+            )
+
+        if len(
+            raw_profiles
+        ) > self.INPUT_PROFILE_MAX_CUSTOM:
+            raise EmulatorError(
+                "Too many custom input profiles"
+            )
+
+        profiles: list[
+            dict[str, Any]
+        ] = []
+        profile_ids: set[str] = set()
+        profile_names: set[str] = set()
+        maximum_sequence = 0
+
+        for raw_profile in raw_profiles:
+            if not isinstance(
+                raw_profile,
+                dict,
+            ):
+                raise EmulatorError(
+                    "Input profile entry must be an object"
+                )
+
+            if set(
+                raw_profile.keys()
+            ) != {
+                "id",
+                "name",
+                "mapping",
+            }:
+                raise EmulatorError(
+                    "Input profile entry contains unexpected fields"
+                )
+
+            profile_id = str(
+                raw_profile.get(
+                    "id",
+                    "",
+                )
+            ).strip().casefold()
+
+            match = re.fullmatch(
+                r"profile_(\d{6})",
+                profile_id,
+            )
+
+            if match is None:
+                raise EmulatorError(
+                    "Invalid custom input profile id"
+                )
+
+            if profile_id in profile_ids:
+                raise EmulatorError(
+                    "Duplicate custom input profile id"
+                )
+
+            sequence = int(
+                match.group(1)
+            )
+
+            if sequence < 1:
+                raise EmulatorError(
+                    "Invalid custom input profile sequence"
+                )
+
+            name = (
+                self._normalize_input_profile_name(
+                    raw_profile.get(
+                        "name"
+                    )
+                )
+            )
+
+            folded_name = (
+                name.casefold()
+            )
+
+            if folded_name == "default":
+                raise EmulatorError(
+                    "Custom input profile cannot use the reserved Default name"
+                )
+
+            if folded_name in profile_names:
+                raise EmulatorError(
+                    "Duplicate input profile name"
+                )
+
+            mapping = (
+                self._normalize_input_mapping(
+                    raw_profile.get(
+                        "mapping"
+                    )
+                )
+            )
+
+            profiles.append(
+                {
+                    "id": profile_id,
+                    "name": name,
+                    "mapping": mapping,
+                }
+            )
+            profile_ids.add(
+                profile_id
+            )
+            profile_names.add(
+                folded_name
+            )
+            maximum_sequence = max(
+                maximum_sequence,
+                sequence,
+            )
+
+        if next_sequence <= maximum_sequence:
+            raise EmulatorError(
+                "Input profile sequence is not monotonic"
+            )
+
+        assignments: dict[
+            str,
+            str,
+        ] = {}
+
+        for (
+            raw_game_id,
+            raw_profile_id,
+        ) in raw_assignments.items():
+            game_id = str(
+                raw_game_id
+            ).strip()
+
+            profile_id = str(
+                raw_profile_id
+            ).strip().casefold()
+
+            if (
+                not game_id
+                or not all(
+                    character.isalnum()
+                    or character in {
+                        "_",
+                        "-",
+                    }
+                    for character in game_id
+                )
+            ):
+                raise EmulatorError(
+                    "Invalid game id in input profile assignments"
+                )
+
+            if profile_id not in profile_ids:
+                raise EmulatorError(
+                    "Input profile assignment references a missing custom profile"
+                )
+
+            assignments[
+                game_id
+            ] = profile_id
+
+        return {
+            "schema": self.INPUT_PROFILE_SCHEMA,
+            "next_profile_sequence": next_sequence,
+            "profiles": profiles,
+            "assignments": assignments,
+        }
+
+    def _write_input_profiles(
+        self,
+        payload: dict[str, Any],
+    ) -> None:
+        path = self._input_profiles_path()
+        temporary = path.with_name(
+            path.name
+            + ".tmp"
+        )
+
+        try:
+            temporary.write_text(
+                json.dumps(
+                    payload,
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            temporary.replace(
+                path
+            )
+        except OSError as exc:
+            try:
+                temporary.unlink(
+                    missing_ok=True
+                )
+            except OSError:
+                pass
+
+            raise EmulatorError(
+                f"Unable to write input profiles: {exc}"
+            ) from exc
+
+    @classmethod
+    def _public_input_profile(
+        cls,
+        profile: dict[str, Any],
+        *,
+        builtin: bool,
+    ) -> dict[str, Any]:
+        mapping = (
+            cls._normalize_input_mapping(
+                profile.get(
+                    "mapping"
+                )
+            )
+        )
+
+        return {
+            "id": str(
+                profile.get(
+                    "id",
+                    "",
+                )
+            ),
+            "name": str(
+                profile.get(
+                    "name",
+                    "",
+                )
+            ),
+            "builtin": bool(
+                builtin
+            ),
+            "mapping": {
+                player: dict(
+                    mapping[
+                        player
+                    ]
+                )
+                for player
+                in cls.INPUT_PROFILE_PLAYERS
+            },
+        }
+
+    @classmethod
+    def _default_input_profile(
+        cls,
+    ) -> dict[str, Any]:
+        return (
+            cls._public_input_profile(
+                {
+                    "id": (
+                        cls.INPUT_PROFILE_DEFAULT_ID
+                    ),
+                    "name": "Default",
+                    "mapping": {},
+                },
+                builtin=True,
+            )
+        )
+
+    @staticmethod
+    def _input_profile_game_id(
+        game: dict[str, Any],
+    ) -> str:
+        game_id = str(
+            game.get(
+                "id",
+                "",
+            )
+        ).strip()
+
+        if (
+            not game_id
+            or not all(
+                character.isalnum()
+                or character
+                in {
+                    "_",
+                    "-",
+                }
+                for character in game_id
+            )
+        ):
+            raise EmulatorError(
+                "Game record is missing a valid stable id"
+            )
+
+        return game_id
+
+    def _effective_input_profile_unlocked(
+        self,
+        payload: dict[str, Any],
+        game: dict[str, Any],
+    ) -> dict[str, Any]:
+        game_id = (
+            self._input_profile_game_id(
+                game
+            )
+        )
+
+        assigned_id = str(
+            payload[
+                "assignments"
+            ].get(
+                game_id,
+                "",
+            )
+        ).strip().casefold()
+
+        if assigned_id:
+            selected = next(
+                (
+                    profile
+                    for profile
+                    in payload[
+                        "profiles"
+                    ]
+                    if profile[
+                        "id"
+                    ]
+                    == assigned_id
+                ),
+                None,
+            )
+
+            if selected is None:
+                raise EmulatorError(
+                    "Input profile assignment references a missing profile"
+                )
+
+            public = (
+                self._public_input_profile(
+                    selected,
+                    builtin=False,
+                )
+            )
+            source = (
+                "game_assignment"
+            )
+        else:
+            public = (
+                self._default_input_profile()
+            )
+            source = "default"
+
+        return {
+            "game_id": game_id,
+            "profile_id": public[
+                "id"
+            ],
+            "profile_name": public[
+                "name"
+            ],
+            "source": source,
+            "profile": public,
+        }
+
+    def input_profiles(
+        self,
+        game: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        with self.lock:
+            payload = (
+                self._load_input_profiles()
+            )
+
+            profiles = [
+                self._default_input_profile(),
+                *[
+                    self._public_input_profile(
+                        profile,
+                        builtin=False,
+                    )
+                    for profile
+                    in payload[
+                        "profiles"
+                    ]
+                ],
+            ]
+
+            effective = (
+                self._effective_input_profile_unlocked(
+                    payload,
+                    game,
+                )
+                if game is not None
+                else None
+            )
+
+            return {
+                "schema": (
+                    self.INPUT_PROFILE_SCHEMA
+                ),
+                "profiles": profiles,
+                "effective": effective,
+                "capabilities": {
+                    "players": list(
+                        self.INPUT_PROFILE_PLAYERS
+                    ),
+                    "targets": list(
+                        self.INPUT_PROFILE_TARGETS
+                    ),
+                    "sources": list(
+                        self.INPUT_PROFILE_SOURCES
+                    ),
+                    "editor_model": (
+                        "directional_permutation_v1"
+                    ),
+                    "editor_targets": list(
+                        self.INPUT_PROFILE_DIRECTIONAL_TARGETS
+                    ),
+                    "editor_sources": list(
+                        self.INPUT_PROFILE_DIRECTIONAL_SOURCES
+                    ),
+                    "editor_default_mapping": dict(
+                        self.INPUT_PROFILE_EDITOR_DEFAULT_MAPPING
+                    ),
+                    "editor_complete_mapping_required": True,
+                    "editor_unique_sources_required": True,
+                    "meta_controls_remapped": False,
+                    "runtime_application": (
+                        "a8_directional_session_adapter"
+                    ),
+                },
+            }
+
+    def input_profile_for_game(
+        self,
+        game: dict[str, Any],
+    ) -> dict[str, Any]:
+        with self.lock:
+            payload = (
+                self._load_input_profiles()
+            )
+            return (
+                self._effective_input_profile_unlocked(
+                    payload,
+                    game,
+                )
+            )
+
+    def create_input_profile(
+        self,
+        name: str,
+        mapping: Any = None,
+    ) -> dict[str, Any]:
+        with self.lock:
+            payload = (
+                self._load_input_profiles()
+            )
+
+            if len(
+                payload[
+                    "profiles"
+                ]
+            ) >= self.INPUT_PROFILE_MAX_CUSTOM:
+                raise EmulatorError(
+                    "Maximum custom input profile count reached"
+                )
+
+            normalized_name = (
+                self._normalize_input_profile_name(
+                    name
+                )
+            )
+
+            folded_name = (
+                normalized_name.casefold()
+            )
+
+            if folded_name == "default":
+                raise EmulatorError(
+                    "Default is a reserved input profile name"
+                )
+
+            if any(
+                str(
+                    profile[
+                        "name"
+                    ]
+                ).casefold()
+                == folded_name
+                for profile
+                in payload[
+                    "profiles"
+                ]
+            ):
+                raise EmulatorError(
+                    "An input profile with that name already exists"
+                )
+
+            normalized_mapping = (
+                self._normalize_input_mapping(
+                    mapping
+                )
+            )
+
+            sequence = int(
+                payload[
+                    "next_profile_sequence"
+                ]
+            )
+            existing_ids = {
+                str(
+                    profile[
+                        "id"
+                    ]
+                )
+                for profile
+                in payload[
+                    "profiles"
+                ]
+            }
+
+            while True:
+                if sequence > 999999:
+                    raise EmulatorError(
+                        "Input profile id space is exhausted"
+                    )
+
+                profile_id = (
+                    f"profile_{sequence:06d}"
+                )
+
+                if profile_id not in existing_ids:
+                    break
+
+                sequence += 1
+
+            profile = {
+                "id": profile_id,
+                "name": normalized_name,
+                "mapping": normalized_mapping,
+            }
+
+            payload[
+                "profiles"
+            ].append(
+                profile
+            )
+            payload[
+                "next_profile_sequence"
+            ] = (
+                sequence
+                + 1
+            )
+
+            self._write_input_profiles(
+                payload
+            )
+
+            return (
+                self._public_input_profile(
+                    profile,
+                    builtin=False,
+                )
+            )
+
+    def update_input_profile(
+        self,
+        profile_id: str,
+        *,
+        name: str | None = None,
+        mapping: Any = None,
+        mapping_supplied: bool = False,
+    ) -> dict[str, Any]:
+        with self.lock:
+            requested_id = str(
+                profile_id
+            ).strip().casefold()
+
+            if (
+                requested_id
+                == self.INPUT_PROFILE_DEFAULT_ID
+            ):
+                raise EmulatorError(
+                    "Default input profile is immutable"
+                )
+
+            payload = (
+                self._load_input_profiles()
+            )
+
+            profile = next(
+                (
+                    item
+                    for item
+                    in payload[
+                        "profiles"
+                    ]
+                    if item[
+                        "id"
+                    ]
+                    == requested_id
+                ),
+                None,
+            )
+
+            if profile is None:
+                raise EmulatorError(
+                    "Unknown input profile id"
+                )
+
+            if (
+                name is None
+                and not mapping_supplied
+            ):
+                raise EmulatorError(
+                    "Input profile update supplied no changes"
+                )
+
+            if name is not None:
+                normalized_name = (
+                    self._normalize_input_profile_name(
+                        name
+                    )
+                )
+
+                folded_name = (
+                    normalized_name.casefold()
+                )
+
+                if folded_name == "default":
+                    raise EmulatorError(
+                        "Default is a reserved input profile name"
+                    )
+
+                if any(
+                    other is not profile
+                    and str(
+                        other[
+                            "name"
+                        ]
+                    ).casefold()
+                    == folded_name
+                    for other
+                    in payload[
+                        "profiles"
+                    ]
+                ):
+                    raise EmulatorError(
+                        "An input profile with that name already exists"
+                    )
+
+                profile[
+                    "name"
+                ] = normalized_name
+
+            if mapping_supplied:
+                profile[
+                    "mapping"
+                ] = (
+                    self._normalize_input_mapping(
+                        mapping
+                    )
+                )
+
+            self._write_input_profiles(
+                payload
+            )
+
+            return (
+                self._public_input_profile(
+                    profile,
+                    builtin=False,
+                )
+            )
+
+    def delete_input_profile(
+        self,
+        profile_id: str,
+    ) -> dict[str, Any]:
+        with self.lock:
+            requested_id = str(
+                profile_id
+            ).strip().casefold()
+
+            if (
+                requested_id
+                == self.INPUT_PROFILE_DEFAULT_ID
+            ):
+                raise EmulatorError(
+                    "Default input profile cannot be deleted"
+                )
+
+            payload = (
+                self._load_input_profiles()
+            )
+
+            profile = next(
+                (
+                    item
+                    for item
+                    in payload[
+                        "profiles"
+                    ]
+                    if item[
+                        "id"
+                    ]
+                    == requested_id
+                ),
+                None,
+            )
+
+            if profile is None:
+                raise EmulatorError(
+                    "Unknown input profile id"
+                )
+
+            assigned_games = sorted(
+                game_id
+                for (
+                    game_id,
+                    assigned_id,
+                ) in payload[
+                    "assignments"
+                ].items()
+                if assigned_id
+                == requested_id
+            )
+
+            if assigned_games:
+                raise EmulatorError(
+                    "Input profile is assigned to "
+                    f"{len(assigned_games)} game(s); "
+                    "reassign them before deletion"
+                )
+
+            payload[
+                "profiles"
+            ] = [
+                item
+                for item
+                in payload[
+                    "profiles"
+                ]
+                if item[
+                    "id"
+                ]
+                != requested_id
+            ]
+
+            self._write_input_profiles(
+                payload
+            )
+
+            return {
+                "deleted": True,
+                "profile_id": requested_id,
+                "profile_name": str(
+                    profile[
+                        "name"
+                    ]
+                ),
+            }
+
+    def assign_input_profile(
+        self,
+        game: dict[str, Any],
+        profile_id: str,
+    ) -> dict[str, Any]:
+        with self.lock:
+            game_id = (
+                self._input_profile_game_id(
+                    game
+                )
+            )
+
+            requested_id = str(
+                profile_id
+            ).strip().casefold()
+
+            if not requested_id:
+                raise EmulatorError(
+                    "Missing input profile id"
+                )
+
+            payload = (
+                self._load_input_profiles()
+            )
+
+            if (
+                requested_id
+                == self.INPUT_PROFILE_DEFAULT_ID
+            ):
+                payload[
+                    "assignments"
+                ].pop(
+                    game_id,
+                    None,
+                )
+            else:
+                if not any(
+                    profile[
+                        "id"
+                    ]
+                    == requested_id
+                    for profile
+                    in payload[
+                        "profiles"
+                    ]
+                ):
+                    raise EmulatorError(
+                        "Unknown input profile id"
+                    )
+
+                payload[
+                    "assignments"
+                ][
+                    game_id
+                ] = requested_id
+
+            self._write_input_profiles(
+                payload
+            )
+
+            return (
+                self._effective_input_profile_unlocked(
+                    payload,
+                    game,
+                )
+            )
+
+
     def _controller_profile_catalog(
         self,
         game: dict[str, Any],
@@ -798,6 +1949,198 @@ class EmulatorManager:
                 game
             )
 
+    # PRIVYHUB_A8_PATCH_02_RETROARCH_INPUT_ADAPTER
+    # PRIVYHUB_A8_PATCH_04_DIRECTIONAL_ENDPOINTS
+    # Physical source tokens describe the canonical XUSB state emitted by the
+    # already-validated PHI1 -> ViGEm path. A8 remaps only RetroArch gameplay
+    # bindings; it does not modify controller transport.
+    A8_XINPUT_DIGITAL_SOURCES = {
+        "a": "0",
+        "b": "1",
+        "x": "2",
+        "y": "3",
+        "l": "4",
+        "r": "5",
+        "start": "6",
+        "select": "7",
+        "l3": "8",
+        "r3": "9",
+        "up": "h0up",
+        "down": "h0down",
+        "left": "h0left",
+        "right": "h0right",
+    }
+    A8_XINPUT_AXIS_DIRECTION_SOURCES = {
+        "l2": "+4",
+        "r2": "+5",
+        "left_stick_left": "-0",
+        "left_stick_right": "+0",
+        # XInput Y is positive upward; RetroArch's directional axis bindings
+        # therefore use +Y for physical up and -Y for physical down.
+        "left_stick_up": "+1",
+        "left_stick_down": "-1",
+        "right_stick_left": "-2",
+        "right_stick_right": "+2",
+        "right_stick_up": "+3",
+        "right_stick_down": "-3",
+    }
+    # Legacy whole-axis tokens remain accepted so existing A8.2 profiles keep
+    # working. The A8.3 v4 editor writes directional endpoints instead.
+    A8_XINPUT_STICK_SOURCES = {
+        "left_x": ("+0", "-0"),
+        "left_y": ("-1", "+1"),
+        "right_x": ("+2", "-2"),
+        "right_y": ("-3", "+3"),
+    }
+    A8_RETROPAD_AXIS_TARGETS = {
+        "left_x": ("l_x_plus", "l_x_minus"),
+        "left_y": ("l_y_plus", "l_y_minus"),
+        "right_x": ("r_x_plus", "r_x_minus"),
+        "right_y": ("r_y_plus", "r_y_minus"),
+    }
+    A8_RETROPAD_DIRECTION_TARGETS = {
+        "left_stick_left": "l_x_minus",
+        "left_stick_right": "l_x_plus",
+        "left_stick_up": "l_y_minus",
+        "left_stick_down": "l_y_plus",
+        "right_stick_left": "r_x_minus",
+        "right_stick_right": "r_x_plus",
+        "right_stick_up": "r_y_minus",
+        "right_stick_down": "r_y_plus",
+    }
+
+    @classmethod
+    def _a8_validate_runtime_mapping(
+        cls,
+        mapping: dict[str, dict[str, str]],
+    ) -> None:
+        for player in cls.INPUT_PROFILE_PLAYERS:
+            player_mapping = mapping.get(
+                player,
+                {},
+            )
+
+            if not isinstance(
+                player_mapping,
+                dict,
+            ):
+                raise EmulatorError(
+                    f"Input profile mapping for {player} is invalid"
+                )
+
+            for target, source in player_mapping.items():
+                if target in cls.A8_RETROPAD_AXIS_TARGETS:
+                    if source not in cls.A8_XINPUT_STICK_SOURCES:
+                        raise EmulatorError(
+                            "Legacy analog RetroPad targets require a whole "
+                            f"analog-stick source: {player}/{target} <- {source}"
+                        )
+                    continue
+
+                if (
+                    source not in cls.A8_XINPUT_DIGITAL_SOURCES
+                    and source not in cls.A8_XINPUT_AXIS_DIRECTION_SOURCES
+                ):
+                    raise EmulatorError(
+                        "Directional RetroPad targets require a button, D-pad, "
+                        "trigger, or stick-direction source: "
+                        f"{player}/{target} <- {source}"
+                    )
+
+    @classmethod
+    def _a8_retroarch_profile_lines(
+        cls,
+        effective: dict[str, Any],
+    ) -> list[str]:
+        profile = effective.get(
+            "profile"
+        )
+
+        if not isinstance(
+            profile,
+            dict,
+        ):
+            raise EmulatorError(
+                "Effective input profile is invalid"
+            )
+
+        mapping = cls._normalize_input_mapping(
+            profile.get(
+                "mapping"
+            )
+        )
+        cls._a8_validate_runtime_mapping(
+            mapping
+        )
+
+        lines: list[str] = []
+
+        for player_index, player in enumerate(
+            cls.INPUT_PROFILE_PLAYERS,
+            start=1,
+        ):
+            player_mapping = mapping[player]
+
+            for target in cls.INPUT_PROFILE_TARGETS:
+                source = player_mapping.get(
+                    target
+                )
+
+                if not source:
+                    continue
+
+                prefix = f"input_player{player_index}_"
+
+                legacy_axis_target = cls.A8_RETROPAD_AXIS_TARGETS.get(
+                    target
+                )
+
+                if legacy_axis_target is not None:
+                    source_axes = cls.A8_XINPUT_STICK_SOURCES[
+                        source
+                    ]
+                    plus_name, minus_name = legacy_axis_target
+                    plus_axis, minus_axis = source_axes
+                    lines.extend(
+                        [
+                            f'{prefix}{plus_name}_axis = "{plus_axis}"',
+                            f'{prefix}{plus_name}_btn = "nul"',
+                            f'{prefix}{minus_name}_axis = "{minus_axis}"',
+                            f'{prefix}{minus_name}_btn = "nul"',
+                        ]
+                    )
+                    continue
+
+                target_name = cls.A8_RETROPAD_DIRECTION_TARGETS.get(
+                    target,
+                    target,
+                )
+
+                if source in cls.A8_XINPUT_DIGITAL_SOURCES:
+                    lines.extend(
+                        [
+                            (
+                                f'{prefix}{target_name}_btn = '
+                                f'"{cls.A8_XINPUT_DIGITAL_SOURCES[source]}"'
+                            ),
+                            f'{prefix}{target_name}_axis = "nul"',
+                        ]
+                    )
+                    continue
+
+                lines.extend(
+                    [
+                        f'{prefix}{target_name}_btn = "nul"',
+                        (
+                            f'{prefix}{target_name}_axis = '
+                            f'"{cls.A8_XINPUT_AXIS_DIRECTION_SOURCES[source]}"'
+                        ),
+                    ]
+                )
+
+        return lines
+
+
     def _prepare_input_override(
         self,
         game: dict[str, Any],
@@ -875,6 +2218,21 @@ class EmulatorManager:
             game
         )
 
+
+        # PrivyHub A8.2: named gameplay profiles are resolved only at session
+        # preparation time. The Default profile produces no explicit binds,
+        # preserving RetroArch's validated controller autoconfiguration.
+        a8_input_profile = (
+            self.input_profile_for_game(
+                game
+            )
+        )
+        a8_profile_lines = (
+            self._a8_retroarch_profile_lines(
+                a8_input_profile
+            )
+        )
+
         config_directory = self._project_path(
             "data/games/retroarch/config"
         )
@@ -920,6 +2278,15 @@ class EmulatorManager:
             "libretro_device"
         )
 
+
+        if a8_profile_lines:
+            lines.extend(
+                [
+                    "# PrivyHub A8.2 named gameplay input profile",
+                    *a8_profile_lines,
+                ]
+            )
+
         config_text = (
             "\n".join(lines)
             + "\n"
@@ -945,6 +2312,27 @@ class EmulatorManager:
                 "controller_profile": controller["profile"],
                 "controller_label": controller["label"],
                 "controller_source": controller["source"],
+
+                "input_profile_id": (
+                    a8_input_profile[
+                        "profile_id"
+                    ]
+                ),
+                "input_profile_name": (
+                    a8_input_profile[
+                        "profile_name"
+                    ]
+                ),
+                "input_profile_source": (
+                    a8_input_profile[
+                        "source"
+                    ]
+                ),
+                "input_profile_override_count": (
+                    len(
+                        a8_profile_lines
+                    )
+                ),
                 "libretro_device": libretro_device,
                 "network_cmd_port": command_port,
             },

@@ -26,7 +26,7 @@ internal static class Program
     private const float DigitalCompensation = 100.0f;
 
     private const string ProbeVersion =
-        "process_loopback_float_local_suppression_v0.24";
+        "process_loopback_float_crash_safe_recovery_v0.25";
 
     private sealed record CaptureChunk(
         long CallbackTicks,
@@ -107,6 +107,16 @@ internal static class Program
         public string? RecordingStoppedError;
     }
 
+
+    // PRIVYHUB_A4_AUDIO_RECOVERY_V025
+    private sealed record SuppressionRecoveryState(
+        string Schema,
+        string Source,
+        float[] OriginalVolumes,
+        bool[] OriginalMutes,
+        float[] SuppressedVolumes
+    );
+
     private sealed record AudioSessionTarget(
         AudioSessionControl Session,
         float OriginalVolume,
@@ -115,13 +125,27 @@ internal static class Program
 
     private sealed class LocalAudioSuppression : IDisposable
     {
+        private const string RecoverySchema =
+            "privyhub_process_audio_suppression_recovery_v1";
+        private const float RecoveryVolumeTolerance = 0.00075f;
+
         private readonly List<MMDevice> _devices = new();
         private readonly List<AudioSessionTarget> _targets = new();
+        private readonly string _recoveryPath;
         private bool _restored;
+
+        private LocalAudioSuppression(string recoveryPath)
+        {
+            _recoveryPath = Path.GetFullPath(recoveryPath);
+        }
 
         public bool Applied { get; private set; }
         public bool Restored => _restored;
         public int SessionCount => _targets.Count;
+        public bool RecoveryMarkerFound { get; private set; }
+        public bool RecoveryApplied { get; private set; }
+        public string RecoverySource { get; private set; } = "";
+        public string RecoveryIgnoredReason { get; private set; } = "";
 
         public float[] OriginalVolumes =>
             _targets.Select(target => target.OriginalVolume).ToArray();
@@ -129,9 +153,130 @@ internal static class Program
         public bool[] OriginalMutes =>
             _targets.Select(target => target.OriginalMute).ToArray();
 
-        public static LocalAudioSuppression CreateAndApply(int targetPid)
+        private static bool CloseEnough(float left, float right) =>
+            Math.Abs(left - right) <= RecoveryVolumeTolerance;
+
+        private static SuppressionRecoveryState? ReadRecovery(
+            string recoveryPath)
         {
-            var suppression = new LocalAudioSuppression();
+            if (!File.Exists(recoveryPath))
+                return null;
+
+            try
+            {
+                return JsonSerializer.Deserialize<SuppressionRecoveryState>(
+                    File.ReadAllText(recoveryPath)
+                );
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private void TryRecoverPreviousSuppression()
+        {
+            if (!File.Exists(_recoveryPath))
+                return;
+
+            RecoveryMarkerFound = true;
+            var recovery = ReadRecovery(_recoveryPath);
+
+            if (recovery is null)
+            {
+                RecoveryIgnoredReason = "recovery_marker_unreadable";
+                return;
+            }
+
+            RecoverySource = recovery.Source ?? "";
+
+            if (!string.Equals(
+                    recovery.Schema,
+                    RecoverySchema,
+                    StringComparison.Ordinal))
+            {
+                RecoveryIgnoredReason = "recovery_schema_mismatch";
+                return;
+            }
+
+            if (recovery.OriginalVolumes.Length != _targets.Count ||
+                recovery.OriginalMutes.Length != _targets.Count ||
+                recovery.SuppressedVolumes.Length != _targets.Count)
+            {
+                RecoveryIgnoredReason = "recovery_session_count_mismatch";
+                return;
+            }
+
+            for (var index = 0; index < _targets.Count; index++)
+            {
+                var target = _targets[index];
+                var currentVolume = target.Session.SimpleAudioVolume.Volume;
+                var currentMute = target.Session.SimpleAudioVolume.Mute;
+
+                if (!CloseEnough(
+                        currentVolume,
+                        recovery.SuppressedVolumes[index]) ||
+                    currentMute)
+                {
+                    RecoveryIgnoredReason =
+                        "current_session_does_not_match_suppressed_state";
+                    return;
+                }
+            }
+
+            for (var index = 0; index < _targets.Count; index++)
+            {
+                var target = _targets[index];
+                var recoveredVolume = Math.Clamp(
+                    recovery.OriginalVolumes[index],
+                    0.0f,
+                    1.0f
+                );
+                var recoveredMute = recovery.OriginalMutes[index];
+
+                target.Session.SimpleAudioVolume.Volume = recoveredVolume;
+                target.Session.SimpleAudioVolume.Mute = recoveredMute;
+
+                _targets[index] = new AudioSessionTarget(
+                    target.Session,
+                    recoveredVolume,
+                    recoveredMute
+                );
+            }
+
+            RecoveryApplied = true;
+            RecoveryIgnoredReason = "";
+        }
+
+        private void WriteActiveRecoveryMarker()
+        {
+            var suppressedVolumes = _targets
+                .Select(
+                    target => Math.Clamp(
+                        target.OriginalVolume * LocalSessionFactor,
+                        0.000001f,
+                        1.0f
+                    )
+                )
+                .ToArray();
+
+            WriteJsonAtomic(
+                _recoveryPath,
+                new SuppressionRecoveryState(
+                    RecoverySchema,
+                    "active_helper",
+                    OriginalVolumes,
+                    OriginalMutes,
+                    suppressedVolumes
+                )
+            );
+        }
+
+        public static LocalAudioSuppression CreateAndApply(
+            int targetPid,
+            string recoveryPath)
+        {
+            var suppression = new LocalAudioSuppression(recoveryPath);
 
             try
             {
@@ -192,9 +337,11 @@ internal static class Program
                         "No active Windows render audio session owned by RetroArch was found."
                     );
 
-                // Scale each target session relative to its existing user level.
-                // A stream request temporarily unmutes RetroArch locally, but only
-                // at 1% of that level. The exact original mute/volume are restored.
+                suppression.TryRecoverPreviousSuppression();
+
+                // Persist exact recovery state before touching the mixer.
+                suppression.WriteActiveRecoveryMarker();
+
                 foreach (var target in suppression._targets)
                 {
                     var targetVolume = Math.Clamp(
@@ -222,6 +369,8 @@ internal static class Program
             if (_restored)
                 return;
 
+            var restoredAll = true;
+
             foreach (var target in _targets)
             {
                 try
@@ -233,10 +382,23 @@ internal static class Program
                 }
                 catch
                 {
+                    restoredAll = false;
                 }
             }
 
-            _restored = true;
+            if (restoredAll)
+            {
+                try
+                {
+                    File.Delete(_recoveryPath);
+                }
+                catch
+                {
+                    restoredAll = false;
+                }
+            }
+
+            _restored = restoredAll;
         }
 
         public void Dispose()
@@ -404,6 +566,13 @@ internal static class Program
                     restored = suppression?.Restored ?? false,
                     original_volumes = suppression?.OriginalVolumes ?? Array.Empty<float>(),
                     original_mutes = suppression?.OriginalMutes ?? Array.Empty<bool>(),
+                    recovery = new
+                    {
+                        marker_found = suppression?.RecoveryMarkerFound ?? false,
+                        applied = suppression?.RecoveryApplied ?? false,
+                        source = suppression?.RecoverySource ?? "",
+                        ignored_reason = suppression?.RecoveryIgnoredReason ?? "",
+                    },
                 },
                 callback = new
                 {
@@ -1023,7 +1192,20 @@ internal static class Program
 
         try
         {
-            suppression = LocalAudioSuppression.CreateAndApply(targetPid);
+            var statusFullPath = Path.GetFullPath(statusPath);
+            var statusDirectory = Path.GetDirectoryName(statusFullPath)
+                ?? throw new InvalidOperationException(
+                    "Process-audio status path has no parent directory."
+                );
+            var recoveryPath = Path.Combine(
+                statusDirectory,
+                "process_audio_suppression_recovery.json"
+            );
+
+            suppression = LocalAudioSuppression.CreateAndApply(
+                targetPid,
+                recoveryPath
+            );
 
             recorder = await new WasapiRecorderBuilder()
                 .WithProcessLoopback(

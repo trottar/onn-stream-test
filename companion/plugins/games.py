@@ -2727,6 +2727,34 @@ class GamesPlugin:
         if action == "details":
             return self.details(query)
 
+        # PRIVYHUB_A8_PATCH_01_INPUT_PROFILE_BACKEND
+        if action == "input-profiles":
+            game_id = self._first(
+                query,
+                "id",
+            ).strip()
+
+            game = (
+                self._find_game_by_id(
+                    game_id
+                )
+                if game_id
+                else None
+            )
+
+            payload = (
+                self._emulator.input_profiles(
+                    game
+                )
+            )
+
+            return {
+                "ok": True,
+                "plugin": self.PLUGIN_ID,
+                **payload,
+            }
+
+
         if action == "status":
             payload = self._emulator.status()
             payload["stream_host"] = self._stream.status()
@@ -2816,6 +2844,43 @@ class GamesPlugin:
             return False
         raise ValueError(f"{key} must be true or false")
 
+    # PRIVYHUB_A8_PATCH_01_INPUT_PROFILE_BACKEND
+    @staticmethod
+    def _parse_input_profile_mapping(
+        value: str,
+        *,
+        supplied: bool,
+    ) -> Any:
+        if not supplied:
+            return None
+
+        text = str(
+            value
+        ).strip()
+
+        if not text:
+            return {}
+
+        try:
+            mapping = json.loads(
+                text
+            )
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                "Input profile mapping must be valid JSON"
+            ) from exc
+
+        if not isinstance(
+            mapping,
+            dict,
+        ):
+            raise ValueError(
+                "Input profile mapping must be a JSON object"
+            )
+
+        return mapping
+
+
     def handle_post_request(
         self,
         action: str,
@@ -2868,10 +2933,37 @@ class GamesPlugin:
 
 
         if action == "launch":
-            payload = self.handle_post(action, raw_query)
+            # PRIVYHUB_A8_PATCH_02B_CONTROLLER_PREFLIGHT_ORDER_V1
+            try:
+                self._native_stream.ensure_game_controller(client_ip)
+            except Exception as exc:
+                try:
+                    self._native_stream.end_game_session()
+                except Exception:
+                    pass
+                raise RuntimeError(
+                    "Unable to establish game controller before launch: "
+                    f"{exc}"
+                ) from exc
+
+            try:
+                payload = self.handle_post(action, raw_query)
+            except Exception:
+                try:
+                    self._native_stream.end_game_session()
+                except Exception:
+                    pass
+                raise
+
+            if not payload.get("active", False):
+                try:
+                    self._native_stream.end_game_session()
+                except Exception:
+                    pass
+                return payload
+
             if payload.get("active", False):
                 try:
-                    self._native_stream.ensure_game_controller(client_ip)
                     paused = self._emulator.pause()
                 except Exception as exc:
                     try:
@@ -2976,6 +3068,181 @@ class GamesPlugin:
         )
 
         try:
+            # PRIVYHUB_A8_PATCH_01_INPUT_PROFILE_BACKEND
+            if action == "input-profile-create":
+                name = self._first(
+                    query,
+                    "name",
+                ).strip()
+
+                if not name:
+                    raise ValueError(
+                        "Missing input profile name"
+                    )
+
+                mapping_supplied = (
+                    "mapping"
+                    in query
+                )
+                mapping = (
+                    self._parse_input_profile_mapping(
+                        self._first(
+                            query,
+                            "mapping",
+                        ),
+                        supplied=(
+                            mapping_supplied
+                        ),
+                    )
+                )
+
+                profile = (
+                    self._emulator.create_input_profile(
+                        name,
+                        (
+                            mapping
+                            if mapping_supplied
+                            else {}
+                        ),
+                    )
+                )
+
+                return {
+                    "ok": True,
+                    "plugin": self.PLUGIN_ID,
+                    "profile": profile,
+                }
+
+            if action == "input-profile-update":
+                profile_id = self._first(
+                    query,
+                    "profile_id",
+                ).strip()
+
+                if not profile_id:
+                    raise ValueError(
+                        "Missing input profile id"
+                    )
+
+                name_supplied = (
+                    "name"
+                    in query
+                )
+                mapping_supplied = (
+                    "mapping"
+                    in query
+                )
+
+                if (
+                    not name_supplied
+                    and not mapping_supplied
+                ):
+                    raise ValueError(
+                        "Input profile update supplied no changes"
+                    )
+
+                name = (
+                    self._first(
+                        query,
+                        "name",
+                    ).strip()
+                    if name_supplied
+                    else None
+                )
+
+                mapping = (
+                    self._parse_input_profile_mapping(
+                        self._first(
+                            query,
+                            "mapping",
+                        ),
+                        supplied=(
+                            mapping_supplied
+                        ),
+                    )
+                )
+
+                profile = (
+                    self._emulator.update_input_profile(
+                        profile_id,
+                        name=name,
+                        mapping=mapping,
+                        mapping_supplied=(
+                            mapping_supplied
+                        ),
+                    )
+                )
+
+                return {
+                    "ok": True,
+                    "plugin": self.PLUGIN_ID,
+                    "profile": profile,
+                }
+
+            if action == "input-profile-delete":
+                profile_id = self._first(
+                    query,
+                    "profile_id",
+                ).strip()
+
+                if not profile_id:
+                    raise ValueError(
+                        "Missing input profile id"
+                    )
+
+                payload = (
+                    self._emulator.delete_input_profile(
+                        profile_id
+                    )
+                )
+
+                return {
+                    "ok": True,
+                    "plugin": self.PLUGIN_ID,
+                    **payload,
+                }
+
+            if action == "input-profile-assign":
+                game_id = self._first(
+                    query,
+                    "id",
+                ).strip()
+
+                profile_id = self._first(
+                    query,
+                    "profile_id",
+                ).strip()
+
+                if not game_id:
+                    raise ValueError(
+                        "Missing game id"
+                    )
+
+                if not profile_id:
+                    raise ValueError(
+                        "Missing input profile id"
+                    )
+
+                game = (
+                    self._find_game_by_id(
+                        game_id
+                    )
+                )
+
+                payload = (
+                    self._emulator.assign_input_profile(
+                        game,
+                        profile_id,
+                    )
+                )
+
+                return {
+                    "ok": True,
+                    "plugin": self.PLUGIN_ID,
+                    **payload,
+                }
+
+
             if action == "decoder-session-log":
                 report = self._first(
                     query,
