@@ -23,7 +23,8 @@ The completed C1 inventory memory/probe is checkpointed together with the Part 1
 current-state repair so it cannot be lost during Part 2 curation.
 
 Part 2 docs/memory curation is checkpointed/pushed with the superseded MEMORY snapshot preserved.
-Part 3 decisions/investigations normalization is next.
+Part 3 decisions/investigations normalization is checkpointed/pushed.
+Part 4 top-level docs/ledgers refresh is next.
 Do not begin C1 production implementation until the focused docs/memory cleanup completes.
 
 ## Development position

@@ -1,14 +1,14 @@
 ---
 memory_schema: 1
-as_of: 2026-09-10
-baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
+as_of: 2026-09-11
+baseline_commit: db59209578fc628fc602e707f5f7cd9091949edc
 ---
 
 # Deferred Investigations
 
 ## UDP transport pathology
 
-Severe burst/gap timing transformation and duplication was observed in both directions in the Prototype 1 environment. Application-level sender/capture evidence and Android-local loopback did not support blaming the normal production application path. Preserve the diagnostics and replay them on representative Linux/network infrastructure in Phase D unless a real blocker appears earlier.
+Severe burst/gap timing transformation and duplication was observed in both directions in the Prototype 1 environment. Application-level sender/capture evidence and Android-local loopback did not support blaming the normal production application path. Preserve the diagnostics. After Phase E establishes the representative native Linux baseline, replay the acceptance suite during Phase F Linux resource/transport characterization unless a real blocker appears earlier.
 
 ## Game Session banner latency
 
@@ -20,4 +20,9 @@ Supported through the current path but not individually promoted into new invest
 
 ## Full clean-machine Windows bootstrap
 
-Current runtime includes ignored/local dependencies. Defer comprehensive reproducibility work to the clean-baseline/Linux portability phases unless fresh-machine testing becomes necessary sooner.
+Current runtime includes ignored/local dependencies. Defer comprehensive clean-machine Windows reproducibility unless it becomes necessary sooner. Linux functional parity belongs to Phase E; representative Linux resource characterization belongs to Phase F.
+
+## Roadmap-v3 normalization note
+
+Part 3 updates phase references only. These investigations remain deferred; no
+deferred work is reactivated by this documentation change.

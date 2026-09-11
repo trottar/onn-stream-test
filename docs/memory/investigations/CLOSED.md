@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-09-10
-baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
+as_of: 2026-09-11
+baseline_commit: db59209578fc628fc602e707f5f7cd9091949edc
 ---
 
 # Closed Investigations
@@ -21,3 +21,36 @@ A temporary cover-art disappearance after repeated APK reinstall activity repopu
 ## Cheat/mod isolation
 
 Resolved and runtime validated: normal save/state namespaces are protected; cheat/mod profiles use isolated namespaces; deterministic IPS derived content is verified.
+
+## Part 3 normalization — resolved work migrated from ACTIVE
+
+The pre-Part-3 `ACTIVE.md` contained accumulated investigation chronology from
+completed Phase A and Phase B work. Its exact bytes are preserved at:
+
+`docs/memory/history/ACTIVE_INVESTIGATIONS_SUPERSEDED_THROUGH_2026-09-11.md`
+
+The following work is closed and must not be treated as active unless fresh
+contradictory evidence appears:
+
+- Phase A A9 regression/checkpoint;
+- PS1 library-wide manual Port-1-only Multitap On/Off generalization and CTR
+  validation;
+- NES/Genesis A9 identity issue, closed as invalid no-fixture test setup;
+- persistent wireless ADB recovery and post-patch validation;
+- Phase B B1.1-B1.13 diagnostics/health/client-feedback/classifier/GUI/retention
+  work;
+- B1/B2 completion-gap and source-context audits;
+- B2 Diagnostics action-feedback polish;
+- B3/B3.1 Sunshine/Moonlight dependency inventory and active-edge trace;
+- B4.1-B4.8 server/Android legacy-edge removal, orphan audit, code cleanup,
+  physical artifact cleanup, device package verification/removal and final
+  package-state verification;
+- B5 native-only regression and classifier correction;
+- B6 clean-native repository audit/checkpoint;
+- C1.1 explicit stream-parameter inventory.
+
+C1.1 completed with `C1_INVENTORY_COMPLETE`. The next technical work is schema
+design, not another inventory run.
+
+Historical intermediate states, including development-patch/runtime-pending
+labels that were true at the time, remain reference history only.

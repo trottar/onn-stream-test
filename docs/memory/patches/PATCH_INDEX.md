@@ -286,3 +286,18 @@ This index records durable checkpoints and major patch lines; it does not invent
   snapshot, advances current/handoff/manifest state to Part 2 checkpointed,
   validates the full durable-memory registry and staged diff, stages only the
   reviewed nine paths, commits, pushes, and verifies `origin/main == HEAD`.
+
+- `privyhub_docs_memory_part3_normalization_01_2026-09-11` — Part 3 durable-memory normalization. Exact-gates checkpoint
+  `db59209578fc`, renumbers only colliding decision headings to D-047
+  through D-057, adds explicit normalization/supersession status, preserves the
+  complete predecessor `ACTIVE.md` byte-for-byte in deep memory, replaces live
+  ACTIVE with current work only, summarizes resolved Phase A/B/C1 inventory work
+  in CLOSED, updates deferred roadmap-v3 wording, validates the full durable
+  memory registry, and performs no staging/commit/push.
+
+- `privyhub_docs_memory_part3_checkpoint_finalizer_01_2026-09-11` — exact-scope Part 3 checkpoint finalizer. Gates the ten
+  `PART3_CHECKPOINT_READY` paths by SHA-256, preserves the superseded ACTIVE
+  snapshot, advances current/handoff/ACTIVE/manifest state to Part 3
+  checkpointed, validates unique decision IDs and the full durable-memory
+  registry, stages only the reviewed ten paths, commits, pushes, and verifies
+  `origin/main == HEAD`.

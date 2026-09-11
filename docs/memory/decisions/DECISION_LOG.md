@@ -1,10 +1,28 @@
 ---
 memory_schema: 1
-as_of: 2026-09-10
-baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
+as_of: 2026-09-11
+baseline_commit: db59209578fc628fc602e707f5f7cd9091949edc
 ---
 
 # Decision Log
+
+## 2026-09-11 decision-ID normalization
+
+The original log reused several D-### identifiers for unrelated later decisions.
+The first durable occurrence of an existing ID is retained. Colliding detail
+headings are assigned D-047 through D-057 in chronological file order.
+
+Historical decision prose is preserved. Renumbered sections carry an explicit
+normalization status showing whether they are superseded, current, completed, or
+a runtime-validation update.
+
+Mapping:
+- original detail D-008 -> D-047;
+- original detail D-009 occurrences -> D-048 through D-052;
+- original detail D-010 occurrences -> D-053 through D-054;
+- second detail D-022 -> D-055;
+- second detail D-036 -> D-056;
+- second detail D-041 -> D-057.
 
 | ID | Date | Status | Decision | Evidence / rationale |
 | --- | --- | --- | --- | --- |
@@ -13,43 +31,55 @@ baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
 | D-003 | 2026-09-07 | Deferred | Do not tune product buffering around the Prototype 1 UDP burst/gap/duplication pathology; replay diagnostics on representative Linux/network hardware. | Bidirectional synthetic and production evidence localized transformation outside normal application pacing. |
 | D-004 | 2026-09-09 | Active | A4 audio lifecycle uses normal Games shutdown and crash-safe session-volume recovery; do not create parallel shutdown logic. | Runtime validation of TV audio, PC duplicate suppression, helper restoration. |
 | D-005 | 2026-09-09 | Active | A8 gameplay mapping belongs after canonical PHI1/ViGEm semantics and uses session-only RetroArch overrides. | Boundary probes and gameplay validation. |
-| D-006 | 2026-09-10 | Active | `25e9a14` is the immutable pre-four-player baseline; four-player extension precedes A9. | Clean checkpoint and user direction. |
-| D-007 | 2026-09-10 | Active / transport-enumeration runtime validated | Preserve PHI1 v1/36-byte format for the four-player extension; generalize the canonical player-count/state layer to four before touching A8 P3/P4 mapping. | Exact-local audit found no packet-format blocker; base slots, real Android assignment, and fresh RetroArch ports 1-4 are now runtime validated without XInput fallback. A8/gameplay validation remains. |
+| D-006 | 2026-09-10 | Historical / superseded by completed Phase A checkpoint | `25e9a14` is the immutable pre-four-player baseline; four-player extension precedes A9. | Clean checkpoint and user direction. |
+| D-007 | 2026-09-10 | Accepted / runtime validated | Preserve PHI1 v1/36-byte format for the four-player extension; generalize the canonical player-count/state layer to four before touching A8 P3/P4 mapping. | Exact-local audit found no packet-format blocker; base slots, real Android assignment, and fresh RetroArch ports 1-4 are now runtime validated without XInput fallback. A8/gameplay validation remains. |
 | D-008 | 2026-09-10 | Active | `docs/memory` is the durable project memory/communication layer; old docs remain evidence but newer status must carry freshness/provenance. | Documentation audit found stale top-level status mixed with newer runtime evidence. |
-| D-009 | 2026-09-10 | Active / development patch | Keep input-profile schema 1 while expanding A8 supported players from P1/P2 to P1-P4; treat missing legacy P3/P4 maps as default autoconfiguration and derive Android editor players from companion capabilities. | Backend normalization/generation already iterates the player tuple, so this is the narrowest backward-compatible extension and avoids resetting existing user profiles. |
-| D-010 | 2026-09-10 | Active / development patch | Reuse the existing per-game controller override store for PS1 multitap topology and apply it through RetroArch native content-specific core-option files; do not enable multitap globally. | Four-player host routing is proven, active Beetle options explicitly disable both multitap ports, and native `.opt` overrides isolate accessory topology per game while preserving other core settings. |
+| D-009 | 2026-09-10 | Accepted / runtime validated | Keep input-profile schema 1 while expanding A8 supported players from P1/P2 to P1-P4; treat missing legacy P3/P4 maps as default autoconfiguration and derive Android editor players from companion capabilities. | Backend normalization/generation already iterates the player tuple, so this is the narrowest backward-compatible extension and avoids resetting existing user profiles. |
+| D-010 | 2026-09-10 | Accepted / runtime validated | Reuse the existing per-game controller override store for PS1 multitap topology and apply it through RetroArch native content-specific core-option files; do not enable multitap globally. | Four-player host routing is proven, active Beetle options explicitly disable both multitap ports, and native `.opt` overrides isolate accessory topology per game while preserving other core settings. |
 
-### D-008 — Roll back first PS1 multitap patch for causal isolation
+### D-047 — Roll back first PS1 multitap patch for causal isolation
+
+**Normalization status:** Superseded by D-048 and D-049. Historical causal-isolation decision.
 
 **Status:** Active diagnostic decision (2026-09-10)
 
 The first game-specific multitap patch made Crash Bash expose four human players but immediately coincided with loss of physical P2-P4 input/controller connectivity during the active game stream. Controllers are charged. Restore the exact pre-patch `emulator_manager.py` and `controller_overrides.json` from the install backup and remove the generated Crash Bash `.opt`; then repeat the four-controller assignment probe. Do not make another production multitap change until that comparison is known.
 
-### D-009 — Re-enable PS1 multitap; separate controller-connectivity investigation
+### D-048 — Re-enable PS1 multitap; separate controller-connectivity investigation
+
+**Normalization status:** Superseded by D-049. Historical diagnostic decision.
 
 **Status:** Active (2026-09-10)
 
 The exact rollback removed multitap but P4 still failed at the physical Android assignment boundary while P1-P3 remained clean. This weakens D-008's causal suspicion of the multitap implementation. Reapply the same game-specific Crash Bash Port-1 multitap implementation and continue the controller-connectivity investigation independently, beginning with a different physical controller.
 
-### D-009 — Accept game-specific PS1 multitap and separate controller-specific dropout
+### D-049 — Accept game-specific PS1 multitap and separate controller-specific dropout
+
+**Normalization status:** Accepted. Establishes game-specific PS1 multitap acceptance after controller-specific dropout separation.
 
 **Status:** Accepted (2026-09-10)
 
 The exact rollback did not restore P4, while a replacement controller restored exact P1-P4 assignment with the same multitap implementation re-enabled. Final Crash Bash four-player gameplay then passed. Therefore keep game-specific Port-1 multitap and do not treat the earlier dropout as a software regression. Preserve the dropout as a hardware/pairing/transient observation and reopen only on representative reproduction.
 
-### D-009 — PS1 multitap is a Port-1-only On/Off per-game flag
+### D-050 — PS1 multitap is a Port-1-only On/Off per-game flag
+
+**Normalization status:** Superseded by D-051. Earlier product-rule formulation.
 
 **Status:** Accepted 2026-09-10.
 
 PrivyHub targets a maximum of four local players. Do not expose Port 2 or Both in the product. `Multitap: On` maps to Beetle PSX HW Port 1 enabled and Port 2 disabled. Metadata/checker output is recommendation-only; unknown or unconfigured games remain Off.
 
-### D-009 — PS1 multitap is manual On/Off, Port 1 only
+### D-051 — PS1 multitap is manual On/Off, Port 1 only
+
+**Normalization status:** Accepted / current PS1 multitap product rule.
 
 **Status:** Accepted (2026-09-10)
 
 PrivyHub supports at most four local players. Expose only `Multitap: On/Off` for PS1 games. On maps to Beetle PSX HW Port 1; Port 2 is always disabled and Port 2/Both are rejected as product modes. Do not auto-enable from current `max_players` metadata because the live 80-game PS1 audit identified zero candidates, including CTR and Crash Bash.
 
-### D-010 — Persist wireless ADB recovery in the build/install tool
+### D-053 — Persist wireless ADB recovery in the build/install tool
+
+**Normalization status:** Accepted / current wireless-ADB recovery tooling rule.
 
 **Status:** Accepted (2026-09-10)
 
@@ -61,7 +91,9 @@ A successful target is cached privately under LocalAppData and never logged.
 The final human action, only after automatic recovery is exhausted, is toggling
 Wireless debugging Off/On. Pairing is preserved and no address is requested.
 
-### D-010 validation update — wireless ADB recovery
+### D-054 validation update — wireless ADB recovery
+
+**Normalization status:** Runtime validation update for D-053.
 
 **Runtime status:** Validated (2026-09-10)
 
@@ -69,7 +101,9 @@ The post-patch ADB audit returned `ADB_TARGET_ALREADY_ONLINE` and measured one
 online transport plus recovered TLS-connect discovery. The cached-target/mDNS/
 reconnect recovery strategy remains accepted and is now runtime validated.
 
-### D-009 validation update — manual PS1 Multitap On/Off
+### D-052 validation update — manual PS1 Multitap On/Off
+
+**Normalization status:** Runtime validation update for D-051; confirms the accepted manual Port-1-only rule.
 
 **Runtime status:** Validated (2026-09-10)
 
@@ -236,7 +270,9 @@ capability-driven during Phase E.
 
 B1.9 dry-run proved the forward family could not reach its cap using eligible files: 322.048 MiB total, 8.870 MiB deletable, 313.178 MiB projected, `blocked=True`. A blocked family is diagnostic evidence, not permission to perform partial cleanup. Audit protected bytes/reasons first; no `--apply` while blocked.
 
-### D-022 — `pktmon_full.txt` is raw capture, not summary evidence
+### D-055 — `pktmon_full.txt` is raw capture, not summary evidence
+
+**Normalization status:** Accepted / current retention classification for pktmon_full.txt.
 
 **Status:** Accepted (2026-09-10)
 
@@ -399,7 +435,9 @@ capture exact per-file SHA-256 manifests. Also check Sunshine
 process/service/task/firewall state and the temporary Moonlight Android package
 on already-connected targets.
 
-### D-036 — B4.6 deletes exact B4.5 project groups; device package state stays separate
+### D-056 — B4.6 deletes exact B4.5 project groups; device package state stays separate
+
+**Normalization status:** Accepted / completed B4.6 physical-project cleanup execution rule.
 
 **Status:** Accepted (2026-09-11)
 
@@ -459,7 +497,9 @@ not inferred from package history and not produced by `git add .`.
 Root ROADMAP.md remains at the pushed v2 baseline during the audit and is
 updated only in the final checkpoint change.
 
-### D-041 — Evidence-backed inert B6 legacy-text exception
+### D-057 — Evidence-backed inert B6 legacy-text exception
+
+**Normalization status:** Accepted / completed B6 inert-text exception rule.
 
 **Status:** Accepted (2026-09-11)
 

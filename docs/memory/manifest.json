@@ -30,6 +30,7 @@
   "companion_behavior_changed": false,
   "current_phase": "Phase C",
   "current_step": "C1 minimal explicit stream profile schema design",
+  "decision_id_state": "unique durable IDs through D-057",
   "decoder_classifier_runtime_validated": true,
   "decoder_stale_policy": "informational unless decoder-local failure exists",
   "deep_memory_history": "docs/memory/history/",
@@ -38,7 +39,7 @@
   "diagnostic_event_history_capacity": 128,
   "diagnostics_gui": "standalone activity consuming GET /diagnostics/health",
   "diagnostics_health_schema": "privyhub_diagnostics_health_v1",
-  "docs_memory_cleanup_status": "Part 2 checkpointed/pushed; Part 3 decisions/investigations normalization next",
+  "docs_memory_cleanup_status": "Part 3 checkpointed/pushed; Part 4 top-level docs/ledgers refresh next",
   "durable_memory_updated": true,
   "files": [
     {
@@ -52,9 +53,9 @@
       "sha256": "2f3c393d42bf1629909e77cdecb9196befaf1b47141656f18ba4bfb2feaad930"
     },
     {
-      "bytes": 5315,
+      "bytes": 5382,
       "path": "CURRENT.md",
-      "sha256": "956dc226339e3a5e58d6f426142a898a62134d51f0b6a8e0221d9e371a375f6a"
+      "sha256": "10152e9e9cd880da36eb34dc634c7909ea97dbc6ba8e55295add81a068016587"
     },
     {
       "bytes": 2564,
@@ -127,9 +128,9 @@
       "sha256": "508ae66c526882e3a598403eb3b36228e576ffa1dd22d36fd85bc4f99f83890c"
     },
     {
-      "bytes": 25411,
+      "bytes": 27149,
       "path": "decisions/DECISION_LOG.md",
-      "sha256": "9920f264a715e49593de2d97e1b2aee8e7a5da50f8aa19d7376dee5001ef39db"
+      "sha256": "18ec041f1c9569f3e1170e39469a1a56fe7708c1b572fd9e6336a8575e065cd5"
     },
     {
       "bytes": 1129,
@@ -407,9 +408,14 @@
       "sha256": "7cd58c6b7e2b128e36b3a879fa151444790e9d95d9b12ec933f415bec19ef756"
     },
     {
-      "bytes": 6031,
+      "bytes": 6093,
       "path": "handoffs/CURRENT_HANDOFF.md",
-      "sha256": "4b6d9fa0a7b80dcb82f9ad8d02d2f3ff577f093e180b8ddbeb3b5d1c90b70228"
+      "sha256": "64332d797791558dcaf90dcb1c70739714b04582124a3f38337586079aba37a7"
+    },
+    {
+      "bytes": 20924,
+      "path": "history/ACTIVE_INVESTIGATIONS_SUPERSEDED_THROUGH_2026-09-11.md",
+      "sha256": "279f6c391fb27c79e58719dc62a42889f63d6b7a61e93d6e697c472af61b0245"
     },
     {
       "bytes": 38295,
@@ -422,9 +428,9 @@
       "sha256": "17179b3916be00b216a803bef7f798eaa59c246835ea85543b23929fa5ef18dc"
     },
     {
-      "bytes": 20924,
+      "bytes": 1440,
       "path": "investigations/ACTIVE.md",
-      "sha256": "279f6c391fb27c79e58719dc62a42889f63d6b7a61e93d6e697c472af61b0245"
+      "sha256": "3298aaddc6676a0ea1d1d36c6f52c9539106608b30a3904e5ec74f69d41cd9c5"
     },
     {
       "bytes": 1712,
@@ -432,14 +438,14 @@
       "sha256": "f523c870dedc6a886078ba6a94b1fc54e3a2f4936264e382e9738ab9338e06f3"
     },
     {
-      "bytes": 1034,
+      "bytes": 2537,
       "path": "investigations/CLOSED.md",
-      "sha256": "b3d238ce751279f5dc78f45f493ef1dd7c53f10622bc26b79d1f107d82b295e6"
+      "sha256": "28e663cd873901bbe7f939e5c71125332b54ccd8b63a410986a12c6f02aba7fe"
     },
     {
-      "bytes": 1205,
+      "bytes": 1520,
       "path": "investigations/DEFERRED.md",
-      "sha256": "6d168e126018b8cdc368ae511be3cae6a646e9b6ead2d01d54a1e3ea707bc217"
+      "sha256": "3b8f2601d8e5fb003919cd9af4425778e46b89092f63761dc6ed083c9a92f0fd"
     },
     {
       "bytes": 27117,
@@ -447,14 +453,14 @@
       "sha256": "df3aa331aa94cd503ba13164ea9a0461643d1e2e67f042c8499e92595f9ec044"
     },
     {
-      "bytes": 8738,
+      "bytes": 10380,
       "path": "memory/2026-09-11.md",
-      "sha256": "8b2333179f187f6c69fe2fe0ddffa7809a600249194ffcc9b994eac9f04d448c"
+      "sha256": "81ea8b249f42e0edfe53d5b48adfcb865ca2a94200f923def7c71ac91d4bf6e8"
     },
     {
-      "bytes": 22946,
+      "bytes": 23962,
       "path": "patches/PATCH_INDEX.md",
-      "sha256": "92ca274965cdeb5a09bac95cefbf76e5b82ef10a87e6dd5cc6a1d5f83e965646"
+      "sha256": "84838dfd67388ea07e2be4bf12dbc09bc2dace3b9a9b82086aed7f26fba746c0"
     },
     {
       "bytes": 1894,
@@ -496,6 +502,7 @@
   "games_post_sha256": "f1271c865cdf88b971da4116d7eb887bf9855864ce1ae848baafc7a3452e0f9c",
   "gui_collect_diagnostics": true,
   "health_endpoint": "GET /diagnostics/health",
+  "investigation_state": "ACTIVE current-only; predecessor ACTIVE preserved in deep memory",
   "main_activity_post_sha256": "394d2b839fdb01f2988a0054b42e139e419e02207728f914e1713287992733cc",
   "memory_backend": "repository docs/memory (ChatGPT account Memory unavailable in this project)",
   "memory_mode": "curated current facts/rules",
@@ -503,7 +510,8 @@
   "new_client_metrics_timer": false,
   "new_resource_sampler": false,
   "part2_status": "COMPLETE / CHECKPOINTED / PUSHED",
-  "part3_status": "NEXT",
+  "part3_status": "COMPLETE / CHECKPOINTED / PUSHED",
+  "part4_status": "NEXT",
   "phase_a_status": "COMPLETE / PUSHED",
   "phase_b_status": "COMPLETE / PUSHED",
   "phase_c_status": "ACTIVE",
