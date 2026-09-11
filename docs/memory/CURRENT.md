@@ -15,6 +15,7 @@ baseline_commit: 65d02012409440d5559c14beb2b28268b0b225bc
 - Part 3 decision/investigation normalization: **CHECKPOINTED / PUSHED**
 - Part 4 top-level docs/ledgers refresh: **CHECKPOINTED / PUSHED**
 - Docs/memory cleanup Parts 1-4: **COMPLETE / CHECKPOINTED**
+- Minor Games cleanup (startup metadata/art reconciliation + Alpha catalog removal): **RUNTIME VALIDATED / CHECKPOINTED / PUSHED**
 - Phase A: **COMPLETE / PUSHED**
 - Phase B: **COMPLETE / PUSHED**
 - Phase C: **ACTIVE**

@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, urlencode
 
 from games.emulator_manager import EmulatorError, EmulatorManager
 from games.decoder_session_log import write_decoder_session_log
+from games.startup_reconcile import run_startup_metadata_reconcile
 from native_stream import NativeStreamError, NativeStreamManager
 
 
@@ -74,6 +75,22 @@ class GamesPlugin:
         self._emulator.set_hotkey_sender(
             self._native_stream.retroarch_hotkey
         )
+
+        self._metadata_reconcile_thread = threading.Thread(
+            target=run_startup_metadata_reconcile,
+            kwargs={
+                "project_root": self.PROJECT_ROOT,
+                "invalidate_cache": self._invalidate_scan_cache,
+            },
+            name="PrivyHubGameMetadataReconcile",
+            daemon=True,
+        )
+        self._metadata_reconcile_thread.start()
+
+    def _invalidate_scan_cache(self) -> None:
+        with self._lock:
+            self._cached_at = 0.0
+            self._cached_games = []
 
     @staticmethod
     def _clean_name(path: Path) -> str:
@@ -1656,21 +1673,6 @@ class GamesPlugin:
                     ),
                 )
             )
-
-        # Preserve the existing diagnostic/status entries while moving
-        # them behind the player-facing library organization.
-        nodes.extend(
-            [
-                {
-                    "id": "games_native_stream",
-                    "name": "Native Streaming Alpha",
-                    "node_type": "game",
-                    "lazy_path": (
-                        f"/plugins/{self.PLUGIN_ID}/native-stream-status"
-                    ),
-                },
-            ]
-        )
 
         return {
             "ok": True,

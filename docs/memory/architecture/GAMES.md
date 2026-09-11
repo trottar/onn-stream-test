@@ -45,3 +45,62 @@ The existing game-specific Beetle core-options adapter remains the execution mec
 The per-game controller override record may contain both `controller_profile` and `ps1_multitap`; setters must preserve unrelated fields.
 
 The metadata checker is deferred rather than authoritative. The 2026-09-10 local audit found no >2-player PS1 metadata candidates even for known four-player titles, so no automatic enablement is permitted.
+
+## Startup library reconciliation and native-stream catalog cleanup — 2026-09-11
+
+Games metadata/art reconciliation is now a companion-start responsibility, but it
+must not block service startup.
+
+`GamesPlugin` launches a daemon reconciliation worker. The worker compares
+discovered stable game IDs with `data/games/metadata.json`. A full existing
+metadata update runs when the library changed, metadata is missing/invalid, or a
+previous provider/artwork failure is old enough for the existing provider-cache
+TTL retry window.
+
+Rules:
+- reuse `games.metadata_importer.run_metadata_update`;
+- do not force provider-cache refresh on every start;
+- download artwork for matched games;
+- full reconciliation naturally removes stale metadata records for removed
+  games;
+- do not automatically populate cheats;
+- do not automatically delete orphan artwork;
+- metadata/provider work is background-only and failure must not stop the
+  companion;
+- write `logs/games/game_metadata_startup_reconcile.txt` and `.json` with
+  count-only shareable startup status;
+- invalidate the Games scan cache after a successful metadata update.
+
+The old player-facing `games_native_stream` / `Native Streaming Alpha` catalog
+node is removed. This does **not** remove native streaming. The
+`native-stream-status`, `native-stream-start`, and `native-stream-stop` companion
+actions and Android `NativeStreamActivity` production path remain intact.
+
+## Startup reconciliation runtime validation — 2026-09-11
+
+The startup metadata/art reconciliation path is runtime validated.
+
+First changed-library startup:
+- result `RECONCILED`;
+- reason `library_changed`;
+- 124 discovered games;
+- 84 metadata entries before reconciliation;
+- 4 incomplete entries before reconciliation;
+- 124 games scanned and 124 matched;
+- 0 ambiguous, unmatched, or provider-unavailable results;
+- 39 artwork files downloaded;
+- 80 artwork files reused from cache;
+- 5 matched games had no usable artwork;
+- Games catalog cache invalidated.
+
+A subsequent startup returned `SKIPPED_CURRENT` with 124 discovered games and
+124 metadata entries, confirming unchanged libraries do not trigger a provider
+update.
+
+Operator runtime validation also confirmed:
+- `Native Streaming Alpha` is absent from the Games UI;
+- newly added games display metadata/cover art where available;
+- a normal game still has picture, process audio, and controller input.
+
+The five missing artwork results are provider/artwork availability gaps, not a
+startup-reconciliation failure.

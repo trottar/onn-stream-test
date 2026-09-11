@@ -17,8 +17,8 @@
   "b4_status": "COMPLETE / runtime validated",
   "b5_status": "COMPLETE / runtime validated",
   "b6_status": "COMPLETE / checkpointed / pushed",
-  "baseline_commit": "65d02012409440d5559c14beb2b28268b0b225bc",
-  "baseline_short": "65d02012",
+  "baseline_commit": "216c0b00bce8558e23eb977f80a32af278b70319",
+  "baseline_short": "216c0b00",
   "c1_inventory_status": "COMPLETE / C1_INVENTORY_COMPLETE",
   "c1_next_step": "C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA",
   "checkpoint_parent_commit": "a6dbf627dd32af7da975bf01a679350810026ca3",
@@ -27,7 +27,7 @@
   "client_health_interval_ms": 2000,
   "client_health_schema": "privyhub_client_health_v1",
   "client_health_storage": "latest only plus one delta baseline",
-  "companion_behavior_changed": false,
+  "companion_behavior_changed": true,
   "current_phase": "Phase C",
   "current_step": "C1 minimal explicit stream profile schema design",
   "decision_id_state": "unique durable IDs through D-057",
@@ -53,9 +53,9 @@
       "sha256": "2f3c393d42bf1629909e77cdecb9196befaf1b47141656f18ba4bfb2feaad930"
     },
     {
-      "bytes": 4555,
+      "bytes": 4686,
       "path": "CURRENT.md",
-      "sha256": "5dbf5e22e5842df8c8dc5b426a55971e9ef4e84a5d4f980b420bc754e4e6e3ae"
+      "sha256": "9ba5c449e2585a4e77bd0c7a1c942ed8a1e2d42e3e66a54a8f2167219b47fb82"
     },
     {
       "bytes": 2564,
@@ -98,9 +98,9 @@
       "sha256": "00a88d5852e069b94fd388d0292490798b4bd7b5e69dcced30619abebea81d2c"
     },
     {
-      "bytes": 4328,
+      "bytes": 6836,
       "path": "architecture/GAMES.md",
-      "sha256": "49de236520163250eaadb3df714a6b9a7bf98d0bcb812b0508536d8d4b5db961"
+      "sha256": "3cd4e54950b36ce797f3c3de7d004e4622fa24659bce7df3475ce85bf8d55269"
     },
     {
       "bytes": 1170,
@@ -408,9 +408,9 @@
       "sha256": "7cd58c6b7e2b128e36b3a879fa151444790e9d95d9b12ec933f415bec19ef756"
     },
     {
-      "bytes": 4231,
+      "bytes": 4793,
       "path": "handoffs/CURRENT_HANDOFF.md",
-      "sha256": "55eeb6962788ffe082bfc2800d96480f345f812673ec6ab83477b22aa3a84b94"
+      "sha256": "22be73216b0f74fb769c9c8b4c6dddb6e38f5b72c101a497571e24b45086cb4c"
     },
     {
       "bytes": 20924,
@@ -453,14 +453,14 @@
       "sha256": "df3aa331aa94cd503ba13164ea9a0461643d1e2e67f042c8499e92595f9ec044"
     },
     {
-      "bytes": 12134,
+      "bytes": 14173,
       "path": "memory/2026-09-11.md",
-      "sha256": "f4f1be39e7e7f2c39174e123b78ec561cf7ec6441ef130803b6ca09dc6e20f18"
+      "sha256": "f59c72926c4f1f629a98cf66c513ba8f8528d99c033e0d627b12a105e90a9c38"
     },
     {
-      "bytes": 24832,
+      "bytes": 25807,
       "path": "patches/PATCH_INDEX.md",
-      "sha256": "b8b3118cea958985902c89f5150c19c97f1884f5f9d4c716b8b907cb0ee56210"
+      "sha256": "7353cca98f22d32676c0a38ac9c6b97720add84a3b102684e68481b691d9da31"
     },
     {
       "bytes": 1894,
@@ -506,6 +506,9 @@
   "main_activity_post_sha256": "394d2b839fdb01f2988a0054b42e139e419e02207728f914e1713287992733cc",
   "memory_backend": "repository docs/memory (ChatGPT account Memory unavailable in this project)",
   "memory_mode": "curated current facts/rules",
+  "minor_games_cleanup_runtime": "RECONCILED 124/124 after library_changed; subsequent SKIPPED_CURRENT 124/124; Alpha node absent; game regression PASS",
+  "minor_games_cleanup_scope": "background startup metadata/art reconciliation + remove Native Streaming Alpha catalog node only",
+  "minor_games_cleanup_status": "RUNTIME VALIDATED / CHECKPOINTED / PUSHED",
   "name": "PrivyHub durable project memory",
   "new_client_metrics_timer": false,
   "new_resource_sampler": false,
@@ -518,7 +521,7 @@
   "phase_c_status": "ACTIVE",
   "physical_legacy_groups_deleted": 9,
   "predecessor": "C1 stream parameter inventory",
-  "production_behavior_changed": false,
+  "production_behavior_changed": true,
   "ps1_multitap_status": "complete / runtime validated on Crash Bash and CTR; Port 1 only",
   "repository_evidence_policy": "raw local/ignored; sanitized checkpoint snapshots committed",
   "repository_ledgers_status": "CODE_MAP/DEBT/CHAT_INDEX refreshed",

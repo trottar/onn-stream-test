@@ -25,6 +25,14 @@ Part 4 top-level docs/ledgers refresh is checkpointed/pushed.
 
 The focused docs/memory cleanup Parts 1-4 is complete.
 
+The minor Games startup/catalog cleanup is runtime validated and checkpointed:
+- startup reconciliation detected the changed library and reconciled 124/124 games;
+- 39 artwork files were downloaded, 80 were reused from cache, and 5 had no usable artwork;
+- a later startup returned `SKIPPED_CURRENT` with 124 discovered / 124 metadata entries;
+- the player-facing `Native Streaming Alpha` catalog node is removed;
+- native-stream status/start/stop endpoints and `NativeStreamActivity` remain preserved;
+- normal game picture/audio/controller regression passed.
+
 Resume technical work at:
 
 `C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA`

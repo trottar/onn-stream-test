@@ -313,3 +313,17 @@ This index records durable checkpoints and major patch lines; it does not invent
   byte-identical, advances Part 4/docs-cleanup state to complete, revalidates
   current content and the full durable-memory registry, stages only the reviewed
   thirteen paths, commits, pushes, and verifies `origin/main == HEAD`.
+
+- `privyhub_minor_cleanup_game_library_startup_alpha_02_2026-09-11` — minor Games cleanup development patch. Adds
+  background startup metadata/art reconciliation keyed to discovered stable game
+  IDs, bounded retry for old incomplete metadata/art, count-only startup logs,
+  and Games cache invalidation after successful reconciliation. Removes only the
+  player-facing `Native Streaming Alpha` catalog node while preserving native
+  stream endpoints/Activity. No Android source change. Runtime validation
+  pending.
+
+- `privyhub_minor_cleanup_checkpoint_finalizer_01_2026-09-11` — exact-scope checkpoint finalizer for the runtime-validated minor
+  Games cleanup. Records `RECONCILED` and subsequent `SKIPPED_CURRENT` startup
+  evidence, marks the cleanup runtime validated, stages only the reviewed eight
+  paths, commits, pushes, verifies a clean tree and `origin/main == HEAD`, and
+  returns the active technical step to `C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA`.
