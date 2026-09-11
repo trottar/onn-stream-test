@@ -273,3 +273,16 @@ This index records durable checkpoints and major patch lines; it does not invent
   `MEMORY.md`, `ACTIVE.md`, and the inventory probe byte-for-byte, updates only
   checkpoint-state durable memory, validates the full manifest and staged diff,
   stages no other paths, commits, pushes, and verifies remote `main`.
+
+- `privyhub_docs_memory_part2_curation_01_2026-09-11` — Part 2 durable-memory curation. Exact-gates clean checkpoint
+  `fa79d4f5feba`, snapshots the prior `MEMORY.md` byte-for-byte into
+  `history/`, installs curated current `MEMORY.md` and `AGENTS.md`, defines
+  deep-memory trust ordering, updates current/handoff/manifest/date/patch memory,
+  validates the complete durable-memory registry, and performs no staging,
+  commit or push.
+
+- `privyhub_docs_memory_part2_checkpoint_finalizer_01_2026-09-11` — exact-scope Part 2 checkpoint finalizer. Gates the nine
+  `PART2_CHECKPOINT_READY` paths by SHA-256, preserves the superseded MEMORY
+  snapshot, advances current/handoff/manifest state to Part 2 checkpointed,
+  validates the full durable-memory registry and staged diff, stages only the
+  reviewed nine paths, commits, pushes, and verifies `origin/main == HEAD`.

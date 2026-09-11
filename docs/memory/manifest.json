@@ -32,17 +32,19 @@
   "current_step": "C1 minimal explicit stream profile schema design",
   "decoder_classifier_runtime_validated": true,
   "decoder_stale_policy": "informational unless decoder-local failure exists",
+  "deep_memory_history": "docs/memory/history/",
+  "deep_memory_trust": "superseded reference only",
   "development_infrastructure_changed": true,
   "diagnostic_event_history_capacity": 128,
   "diagnostics_gui": "standalone activity consuming GET /diagnostics/health",
   "diagnostics_health_schema": "privyhub_diagnostics_health_v1",
-  "docs_memory_cleanup_status": "Part 1 checkpointed with C1 inventory; Part 2 curation next",
+  "docs_memory_cleanup_status": "Part 2 checkpointed/pushed; Part 3 decisions/investigations normalization next",
   "durable_memory_updated": true,
   "files": [
     {
-      "bytes": 2192,
+      "bytes": 5229,
       "path": "AGENTS.md",
-      "sha256": "a854619a7bb68c830392fd4b1c7636b2f6f38b39f57cd22ed0fcaded2db1c7ce"
+      "sha256": "254d5facda27a7895e08e628a6dc25f7e875c66ec06b09ed19fc6828324bcc16"
     },
     {
       "bytes": 1416,
@@ -50,9 +52,9 @@
       "sha256": "2f3c393d42bf1629909e77cdecb9196befaf1b47141656f18ba4bfb2feaad930"
     },
     {
-      "bytes": 5153,
+      "bytes": 5315,
       "path": "CURRENT.md",
-      "sha256": "5d9f7ecc19f8f441bdfcb912127cc83313b2add7a88662eb7e413ffdee3cde74"
+      "sha256": "956dc226339e3a5e58d6f426142a898a62134d51f0b6a8e0221d9e371a375f6a"
     },
     {
       "bytes": 2564,
@@ -60,9 +62,9 @@
       "sha256": "7957a58cd59456684c568bc85d8fe39c22d130b58ddaf9d9d636f7b063fa9698"
     },
     {
-      "bytes": 38295,
+      "bytes": 12306,
       "path": "MEMORY.md",
-      "sha256": "37cb35190c7d158e15b0873a7b6780a94e630a226a454f8cd40d5e1d68470825"
+      "sha256": "189546cd3c3b8d99ed47466577ddd52963760a3fbffb023916d830f15b94f2d5"
     },
     {
       "bytes": 3012,
@@ -405,9 +407,19 @@
       "sha256": "7cd58c6b7e2b128e36b3a879fa151444790e9d95d9b12ec933f415bec19ef756"
     },
     {
-      "bytes": 5925,
+      "bytes": 6031,
       "path": "handoffs/CURRENT_HANDOFF.md",
-      "sha256": "e434a60efb52fa67b71352844b0d99c24be25e349c7cfc079c7e022e7b9fc611"
+      "sha256": "4b6d9fa0a7b80dcb82f9ad8d02d2f3ff577f093e180b8ddbeb3b5d1c90b70228"
+    },
+    {
+      "bytes": 38295,
+      "path": "history/MEMORY_SUPERSEDED_THROUGH_2026-09-11.md",
+      "sha256": "37cb35190c7d158e15b0873a7b6780a94e630a226a454f8cd40d5e1d68470825"
+    },
+    {
+      "bytes": 1535,
+      "path": "history/README.md",
+      "sha256": "17179b3916be00b216a803bef7f798eaa59c246835ea85543b23929fa5ef18dc"
     },
     {
       "bytes": 20924,
@@ -435,14 +447,14 @@
       "sha256": "df3aa331aa94cd503ba13164ea9a0461643d1e2e67f042c8499e92595f9ec044"
     },
     {
-      "bytes": 7386,
+      "bytes": 8738,
       "path": "memory/2026-09-11.md",
-      "sha256": "864920a1bcd24e7ba905214e2ae0a8f7d455d466c05698b1271d551f90982ffe"
+      "sha256": "8b2333179f187f6c69fe2fe0ddffa7809a600249194ffcc9b994eac9f04d448c"
     },
     {
-      "bytes": 22072,
+      "bytes": 22946,
       "path": "patches/PATCH_INDEX.md",
-      "sha256": "fa89b5de3ce500c5c6e701f438965381372ddec98fde90041858f54f6902f6a0"
+      "sha256": "92ca274965cdeb5a09bac95cefbf76e5b82ef10a87e6dd5cc6a1d5f83e965646"
     },
     {
       "bytes": 1894,
@@ -486,9 +498,12 @@
   "health_endpoint": "GET /diagnostics/health",
   "main_activity_post_sha256": "394d2b839fdb01f2988a0054b42e139e419e02207728f914e1713287992733cc",
   "memory_backend": "repository docs/memory (ChatGPT account Memory unavailable in this project)",
+  "memory_mode": "curated current facts/rules",
   "name": "PrivyHub durable project memory",
   "new_client_metrics_timer": false,
   "new_resource_sampler": false,
+  "part2_status": "COMPLETE / CHECKPOINTED / PUSHED",
+  "part3_status": "NEXT",
   "phase_a_status": "COMPLETE / PUSHED",
   "phase_b_status": "COMPLETE / PUSHED",
   "phase_c_status": "ACTIVE",

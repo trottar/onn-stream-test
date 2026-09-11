@@ -22,8 +22,9 @@ Part 1 + C1 inventory checkpoint parent:
 The completed C1 inventory memory/probe is checkpointed together with the Part 1
 current-state repair so it cannot be lost during Part 2 curation.
 
-Immediate next work is **Part 2 docs/memory curation**. Do not begin C1
-production implementation until that focused cleanup is complete.
+Part 2 docs/memory curation is checkpointed/pushed with the superseded MEMORY snapshot preserved.
+Part 3 decisions/investigations normalization is next.
+Do not begin C1 production implementation until the focused docs/memory cleanup completes.
 
 ## Development position
 

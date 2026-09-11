@@ -13,7 +13,9 @@ baseline_commit: a6dbf627dd32af7da975bf01a679350810026ca3
 - Checkpoint parent: `a6dbf627dd32af7da975bf01a679350810026ca3`
 - Phase B clean-native baseline and Linux-first roadmap v3 are established
 - Phase C is active; C1 inventory is captured in Git before schema implementation
-- Part 2 docs/memory curation is next before C1 production code
+- Part 2 docs/memory curation: **CHECKPOINTED / PUSHED**
+- Administrative next: **Part 3 decisions/investigations normalization**
+- Technical next remains `C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA` after focused docs cleanup
 - Phase A: **COMPLETE / PUSHED**
 - Phase B: **COMPLETE / PUSHED**
 - Phase C: **ACTIVE**
