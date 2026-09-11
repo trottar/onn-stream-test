@@ -254,3 +254,8 @@ This index records durable checkpoints and major patch lines; it does not invent
   formalizes user-supplied game-content import; and records local-first,
   privacy-aware optional external AI providers. No production/runtime code
   changes.
+
+
+- `privyhub_c1_stream_parameter_inventory_01_2026-09-11` — C1 diagnostic-only stream parameter/ownership inventory.
+  Installs `tools/probe_c1_stream_parameter_inventory.py` and advances durable
+  memory to the C1.1 inventory step. No production streaming behavior changes.

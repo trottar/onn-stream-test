@@ -575,3 +575,15 @@ identity/deduplication, EPG matching/cache/timezone diagnostics, and guide UX.
 
 AI/home work stays local-first. External API providers are explicit opt-in and
 subject to data minimization, no-silent-fallback, and local action validation.
+
+
+## C1 active
+
+Run the diagnostic-only stream parameter inventory:
+`python .\tools\probe_c1_stream_parameter_inventory.py`
+
+Inspect:
+`logs/diagnostics/c1_stream_parameter_inventory.txt`
+
+The immediate goal is source ownership/schema evidence only. No production
+stream-profile implementation has begun.

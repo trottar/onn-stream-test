@@ -747,3 +747,26 @@ Key changes:
   explicit privacy/data-minimization boundaries.
 
 Immediate next step remains C1 inventory/profile-schema work.
+
+
+## C1.1 explicit stream parameter inventory active
+
+Phase C begins with a diagnostic-only inventory before introducing a profile
+schema.
+
+Question:
+Which exact stream parameters are hard-coded today, where are they owned, and
+which values are duplicated across host/client/FEC/audio?
+
+The inventory must preserve the current validated 720p60 behavior and modify no
+production source. It records the current host constants, FFmpeg/NVENC policy,
+FEC contract, Android receiver constants, capture/audio/input boundaries, and
+ownership duplication.
+
+Run:
+`python .\tools\probe_c1_stream_parameter_inventory.py`
+
+Return:
+`logs/diagnostics/c1_stream_parameter_inventory.txt`
+
+Do not implement stream profiles until this evidence is inspected.
