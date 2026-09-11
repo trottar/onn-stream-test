@@ -259,3 +259,17 @@ This index records durable checkpoints and major patch lines; it does not invent
 - `privyhub_c1_stream_parameter_inventory_01_2026-09-11` — C1 diagnostic-only stream parameter/ownership inventory.
   Installs `tools/probe_c1_stream_parameter_inventory.py` and advances durable
   memory to the C1.1 inventory step. No production streaming behavior changes.
+
+- `privyhub_docs_memory_part1_repair_02_2026-09-11` — docs/durable-memory Part 1 repair after the mis-scoped
+  checkpoint at `a6dbf627dd32`. Exact preflight proved the three C1 local files
+  were intact and uncommitted. Installer preserves those files byte-for-byte,
+  replaces only the current-state surfaces, appends durable repair history,
+  rebuilds manifest semantics/registry against the authoritative local tree,
+  validates the full manifest registry plus targeted Git whitespace state, and
+  performs no staging/commit/push.
+
+- `privyhub_docs_memory_part1_checkpoint_finalizer_01_2026-09-11` — exact-scope Part 1 + completed C1 inventory checkpoint finalizer.
+  Gates the nine `PART1_CHECKPOINT_READY` paths by SHA-256, preserves C1
+  `MEMORY.md`, `ACTIVE.md`, and the inventory probe byte-for-byte, updates only
+  checkpoint-state durable memory, validates the full manifest and staged diff,
+  stages no other paths, commits, pushes, and verifies remote `main`.

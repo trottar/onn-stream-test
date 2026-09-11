@@ -6,32 +6,37 @@
     "ps1": "runtime exercised extensively",
     "snes": "runtime exercised"
   },
-  "a9_status": "pending PS1 On/Off CTR validation; Android install temporarily blocked by ADB recovery tooling",
+  "a9_status": "complete / checkpointed; PS1 Multitap On/Off runtime validated; NES/Genesis no local fixtures",
   "android_behavior_changed": false,
   "android_manifest_post_sha256": "ab1140c3230582f9dbbbf3c179d8fa08363971d9289e08442487f3849c7ac8a2",
-  "android_moonlight_package_state": "unverified if ADB remains unavailable",
+  "android_moonlight_package_state": "absent / verified; PrivyHub remains present",
   "as_of": "2026-09-11",
   "b1_status": "complete / runtime validated",
   "b2_status": "complete / runtime and manual GUI validated",
-  "b3_status": "broad inventory captured; focused active-edge trace pending runtime evidence",
+  "b3_status": "COMPLETE / inventory and focused active-edge trace completed",
   "b4_status": "COMPLETE / runtime validated",
   "b5_status": "COMPLETE / runtime validated",
   "b6_status": "COMPLETE / checkpointed / pushed",
-  "baseline_commit": "6b7c74f417e2ef14e252b9ea19afc16bdefaa50a",
-  "baseline_short": "6b7c74f4",
+  "baseline_commit": "a6dbf627dd32af7da975bf01a679350810026ca3",
+  "baseline_short": "a6dbf627",
+  "c1_inventory_status": "COMPLETE / C1_INVENTORY_COMPLETE",
+  "c1_next_step": "C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA",
+  "checkpoint_parent_commit": "a6dbf627dd32af7da975bf01a679350810026ca3",
+  "checkpoint_scope": "Part 1 current-state repair + completed C1 inventory memory/probe",
   "classifier_changed": false,
   "client_health_interval_ms": 2000,
   "client_health_schema": "privyhub_client_health_v1",
   "client_health_storage": "latest only plus one delta baseline",
   "companion_behavior_changed": false,
   "current_phase": "Phase C",
-  "current_step": "C1.1 stream parameter inventory",
+  "current_step": "C1 minimal explicit stream profile schema design",
   "decoder_classifier_runtime_validated": true,
   "decoder_stale_policy": "informational unless decoder-local failure exists",
   "development_infrastructure_changed": true,
   "diagnostic_event_history_capacity": 128,
   "diagnostics_gui": "standalone activity consuming GET /diagnostics/health",
   "diagnostics_health_schema": "privyhub_diagnostics_health_v1",
+  "docs_memory_cleanup_status": "Part 1 checkpointed with C1 inventory; Part 2 curation next",
   "durable_memory_updated": true,
   "files": [
     {
@@ -45,9 +50,9 @@
       "sha256": "2f3c393d42bf1629909e77cdecb9196befaf1b47141656f18ba4bfb2feaad930"
     },
     {
-      "bytes": 32523,
+      "bytes": 5153,
       "path": "CURRENT.md",
-      "sha256": "c81655ab2a8fbffd3684a227772b7fca7ead9801910d7f2312ae98a7ef086773"
+      "sha256": "5d9f7ecc19f8f441bdfcb912127cc83313b2add7a88662eb7e413ffdee3cde74"
     },
     {
       "bytes": 2564,
@@ -400,9 +405,9 @@
       "sha256": "7cd58c6b7e2b128e36b3a879fa151444790e9d95d9b12ec933f415bec19ef756"
     },
     {
-      "bytes": 18909,
+      "bytes": 5925,
       "path": "handoffs/CURRENT_HANDOFF.md",
-      "sha256": "87965579fbddbe6ebab8d47281df90f6fb9826433fc75d306b625c82ce5ea4c5"
+      "sha256": "e434a60efb52fa67b71352844b0d99c24be25e349c7cfc079c7e022e7b9fc611"
     },
     {
       "bytes": 20924,
@@ -430,14 +435,14 @@
       "sha256": "df3aa331aa94cd503ba13164ea9a0461643d1e2e67f042c8499e92595f9ec044"
     },
     {
-      "bytes": 5001,
+      "bytes": 7386,
       "path": "memory/2026-09-11.md",
-      "sha256": "4e81a160598adaf16508ee38fea3c72aeb22d0df0724a7fec1770e9f8e5a5528"
+      "sha256": "864920a1bcd24e7ba905214e2ae0a8f7d455d466c05698b1271d551f90982ffe"
     },
     {
-      "bytes": 21095,
+      "bytes": 22072,
       "path": "patches/PATCH_INDEX.md",
-      "sha256": "70bf159d382941510c1bb2c53e46e2a4e15a4cbb494c6f0105a00a119ce93c94"
+      "sha256": "fa89b5de3ce500c5c6e701f438965381372ddec98fde90041858f54f6902f6a0"
     },
     {
       "bytes": 1894,
@@ -460,9 +465,9 @@
       "sha256": "21b9f707d66c70990ab8b091247ac4ada1fa7a7e0a5c671f2b007b96de689a79"
     },
     {
-      "bytes": 15504,
+      "bytes": 3244,
       "path": "roadmap/STATUS.md",
-      "sha256": "8e125b61235f764a4b4cf1a1e7b679b2bf88e58534d75dbad394cc844294fb6f"
+      "sha256": "8ae445d9ae625b2909a2da93bd0c645ba19c61e614e84b72f73c83bcc6c73c3b"
     },
     {
       "bytes": 750,
@@ -484,11 +489,11 @@
   "name": "PrivyHub durable project memory",
   "new_client_metrics_timer": false,
   "new_resource_sampler": false,
-  "phase_a_status": "complete / pushed",
+  "phase_a_status": "COMPLETE / PUSHED",
   "phase_b_status": "COMPLETE / PUSHED",
   "phase_c_status": "ACTIVE",
   "physical_legacy_groups_deleted": 9,
-  "predecessor": "B6 clean-native repository audit",
+  "predecessor": "C1 stream parameter inventory",
   "production_behavior_changed": false,
   "ps1_multitap_status": "complete / runtime validated on Crash Bash and CTR; Port 1 only",
   "repository_evidence_policy": "raw local/ignored; sanitized checkpoint snapshots committed",
@@ -503,7 +508,7 @@
   ],
   "roadmap_authoritative_path": "docs/ROADMAP.md",
   "roadmap_revision": "Linux-first merged roadmap v3",
-  "roadmap_version": "v2",
+  "roadmap_version": "v3",
   "schema": 1,
   "self_test_dedicated_checks": [
     "storage_writability",

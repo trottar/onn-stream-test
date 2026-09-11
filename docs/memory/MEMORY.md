@@ -707,3 +707,15 @@ external providers such as OpenAI or Anthropic are optional user-configured
 providers, never core dependencies. Local failure must never silently become a
 cloud upload. Models may request registered PrivyHub actions but do not receive
 arbitrary machine/device authority.
+
+
+## Phase C profile-design rule
+
+C1 starts with an exact inventory of the current validated stream before
+extracting configuration.
+
+The first explicit profile must reproduce current behavior exactly. Do not
+combine C1 with bitrate/FEC/1080p improvements.
+
+Separate likely profile-owned quality/latency values from session endpoint
+allocation, backend capability, source-audio policy, and C2 telemetry cadence.

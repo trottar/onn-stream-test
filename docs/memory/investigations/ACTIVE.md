@@ -525,3 +525,20 @@ No commit/push in this step.
 No Phase B investigation remains active.
 
 Next active development area: C1 explicit stream profiles.
+
+
+## C1.1 — explicit stream parameter inventory
+
+**Status:** ACTIVE / DIAGNOSTIC ONLY
+
+Hypothesis:
+the validated native stream behavior is currently split across host constants,
+FFmpeg/NVENC arguments, FEC relay defaults, Android receiver constants, and
+session A/V/input contracts. An exact inventory is required before defining the
+minimal profile boundary.
+
+Probe:
+`tools/probe_c1_stream_parameter_inventory.py`
+
+Expected clean classification:
+`C1_STREAM_PARAMETER_INVENTORY_CAPTURED`
