@@ -17,8 +17,8 @@
   "b4_status": "COMPLETE / runtime validated",
   "b5_status": "COMPLETE / runtime validated",
   "b6_status": "COMPLETE / checkpointed / pushed",
-  "baseline_commit": "a6dbf627dd32af7da975bf01a679350810026ca3",
-  "baseline_short": "a6dbf627",
+  "baseline_commit": "65d02012409440d5559c14beb2b28268b0b225bc",
+  "baseline_short": "65d02012",
   "c1_inventory_status": "COMPLETE / C1_INVENTORY_COMPLETE",
   "c1_next_step": "C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA",
   "checkpoint_parent_commit": "a6dbf627dd32af7da975bf01a679350810026ca3",
@@ -39,7 +39,7 @@
   "diagnostic_event_history_capacity": 128,
   "diagnostics_gui": "standalone activity consuming GET /diagnostics/health",
   "diagnostics_health_schema": "privyhub_diagnostics_health_v1",
-  "docs_memory_cleanup_status": "Part 3 checkpointed/pushed; Part 4 top-level docs/ledgers refresh next",
+  "docs_memory_cleanup_status": "Parts 1-4 complete / checkpointed / pushed",
   "durable_memory_updated": true,
   "files": [
     {
@@ -53,9 +53,9 @@
       "sha256": "2f3c393d42bf1629909e77cdecb9196befaf1b47141656f18ba4bfb2feaad930"
     },
     {
-      "bytes": 5382,
+      "bytes": 4555,
       "path": "CURRENT.md",
-      "sha256": "10152e9e9cd880da36eb34dc634c7909ea97dbc6ba8e55295add81a068016587"
+      "sha256": "5dbf5e22e5842df8c8dc5b426a55971e9ef4e84a5d4f980b420bc754e4e6e3ae"
     },
     {
       "bytes": 2564,
@@ -123,9 +123,9 @@
       "sha256": "c29964695e2dd3445205af42200c4813176d6e493d3e31b65a2e5d53d0042d77"
     },
     {
-      "bytes": 1933,
+      "bytes": 2916,
       "path": "chats/CHAT_INDEX.md",
-      "sha256": "508ae66c526882e3a598403eb3b36228e576ffa1dd22d36fd85bc4f99f83890c"
+      "sha256": "950432c56ea8454554952f5053248e2d464ba793d0d43bbd976a0b38660d52be"
     },
     {
       "bytes": 27149,
@@ -388,9 +388,9 @@
       "sha256": "8f1c1845bb244275c1a54998eed3bd04ae32a47a8b8f8d6428f1d9351dc39757"
     },
     {
-      "bytes": 6999,
+      "bytes": 5151,
       "path": "evidence/RUNTIME_VALIDATION.md",
-      "sha256": "bac6507c6cecae267eba68b349d863ed5a1a7a860b59f2b2bcd56eaafe9667b6"
+      "sha256": "62c06b0a0c4b7f4344c5431146f228efd672cea2fcd9e47eedae5eb33f675e38"
     },
     {
       "bytes": 376,
@@ -408,9 +408,9 @@
       "sha256": "7cd58c6b7e2b128e36b3a879fa151444790e9d95d9b12ec933f415bec19ef756"
     },
     {
-      "bytes": 6093,
+      "bytes": 4231,
       "path": "handoffs/CURRENT_HANDOFF.md",
-      "sha256": "64332d797791558dcaf90dcb1c70739714b04582124a3f38337586079aba37a7"
+      "sha256": "55eeb6962788ffe082bfc2800d96480f345f812673ec6ab83477b22aa3a84b94"
     },
     {
       "bytes": 20924,
@@ -453,14 +453,14 @@
       "sha256": "df3aa331aa94cd503ba13164ea9a0461643d1e2e67f042c8499e92595f9ec044"
     },
     {
-      "bytes": 10380,
+      "bytes": 12134,
       "path": "memory/2026-09-11.md",
-      "sha256": "81ea8b249f42e0edfe53d5b48adfcb865ca2a94200f923def7c71ac91d4bf6e8"
+      "sha256": "f4f1be39e7e7f2c39174e123b78ec561cf7ec6441ef130803b6ca09dc6e20f18"
     },
     {
-      "bytes": 23962,
+      "bytes": 24832,
       "path": "patches/PATCH_INDEX.md",
-      "sha256": "84838dfd67388ea07e2be4bf12dbc09bc2dace3b9a9b82086aed7f26fba746c0"
+      "sha256": "b8b3118cea958985902c89f5150c19c97f1884f5f9d4c716b8b907cb0ee56210"
     },
     {
       "bytes": 1894,
@@ -473,14 +473,14 @@
       "sha256": "07e3defdb7dc7d0ad6e87aca49171c8831be662471c7203dd9ad06ecec3ad95b"
     },
     {
-      "bytes": 1735,
+      "bytes": 3008,
       "path": "repository/CODE_MAP.md",
-      "sha256": "e5cfb7eebc0191c6a56a060cd6d26933611650bbcd919e56d1af65a6a7780b46"
+      "sha256": "f855171adb9cc88a72fe1422c837e68824b250c1b08426b6468237042abcc3ae"
     },
     {
-      "bytes": 1478,
+      "bytes": 1886,
       "path": "repository/DEBT.md",
-      "sha256": "21b9f707d66c70990ab8b091247ac4ada1fa7a7e0a5c671f2b007b96de689a79"
+      "sha256": "9b2d03a0a18fe45ea7ee607020d922232e1d15603f9bfb0eccd4e5165088cd12"
     },
     {
       "bytes": 3244,
@@ -509,9 +509,10 @@
   "name": "PrivyHub durable project memory",
   "new_client_metrics_timer": false,
   "new_resource_sampler": false,
+  "next_work": "C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA",
   "part2_status": "COMPLETE / CHECKPOINTED / PUSHED",
   "part3_status": "COMPLETE / CHECKPOINTED / PUSHED",
-  "part4_status": "NEXT",
+  "part4_status": "COMPLETE / CHECKPOINTED / PUSHED",
   "phase_a_status": "COMPLETE / PUSHED",
   "phase_b_status": "COMPLETE / PUSHED",
   "phase_c_status": "ACTIVE",
@@ -520,6 +521,7 @@
   "production_behavior_changed": false,
   "ps1_multitap_status": "complete / runtime validated on Crash Bash and CTR; Port 1 only",
   "repository_evidence_policy": "raw local/ignored; sanitized checkpoint snapshots committed",
+  "repository_ledgers_status": "CODE_MAP/DEBT/CHAT_INDEX refreshed",
   "resource_collection": "existing host telemetry only; no new sampler",
   "resource_snapshot_schema": "privyhub_resource_snapshot_v1",
   "retention_automatic": false,
@@ -531,7 +533,9 @@
   ],
   "roadmap_authoritative_path": "docs/ROADMAP.md",
   "roadmap_revision": "Linux-first merged roadmap v3",
+  "roadmap_status": "v3 authoritative / unchanged by Part 4",
   "roadmap_version": "v3",
+  "runtime_validation_ledger_status": "refreshed; NES/Genesis remain no-fixture gaps",
   "schema": 1,
   "self_test_dedicated_checks": [
     "storage_writability",
@@ -543,5 +547,6 @@
   "stream_manager_deleted": true,
   "streaming_behavior_changed": false,
   "streaming_data_path_changed": false,
-  "system_state_changed": false
+  "system_state_changed": false,
+  "top_level_docs_status": "refreshed to roadmap v3 / Phase C current state"
 }

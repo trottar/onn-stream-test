@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-11
-baseline_commit: a6dbf627dd32af7da975bf01a679350810026ca3
+baseline_commit: 65d02012409440d5559c14beb2b28268b0b225bc
 ---
 
 # Current Handoff
@@ -13,65 +13,51 @@ Authoritative local root:
 `L:\Projects\onn-stream-test`
 
 Local source is authoritative between checkpoints. GitHub is reference/history
-unless explicitly requested otherwise.
+unless a clean synchronized checkpoint is being verified.
 
-Part 1 + C1 inventory checkpoint parent:
+Last synchronized checkpoint before this local Part 4 install:
 
-`a6dbf627dd32af7da975bf01a679350810026ca3`
+`65d02012409440d5559c14beb2b28268b0b225bc`
 
-The completed C1 inventory memory/probe is checkpointed together with the Part 1
-current-state repair so it cannot be lost during Part 2 curation.
+Part 1, Part 2 and Part 3 docs/memory cleanup are checkpointed/pushed.
 
-Part 2 docs/memory curation is checkpointed/pushed with the superseded MEMORY snapshot preserved.
-Part 3 decisions/investigations normalization is checkpointed/pushed.
-Part 4 top-level docs/ledgers refresh is next.
-Do not begin C1 production implementation until the focused docs/memory cleanup completes.
+Part 4 top-level docs/ledgers refresh is checkpointed/pushed.
+
+The focused docs/memory cleanup Parts 1-4 is complete.
+
+Resume technical work at:
+
+`C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA`
+
+Do not rerun the completed C1 inventory unless source changes invalidate it.
 
 ## Development position
 
 - Phase A — Games / emulator subsystem: **COMPLETE / PUSHED**
 - Phase B — Diagnostics + clean native baseline: **COMPLETE / PUSHED**
 - Phase C — Adaptive native streaming: **ACTIVE**
-- Current item: **C1 explicit stream profiles**
-- C1 inventory: **COMPLETE**
-- Immediate next classification: `C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA`
+- C1 inventory: **COMPLETE / `C1_INVENTORY_COMPLETE`**
+- Part 4 docs refresh: **COMPLETE / CHECKPOINTED / PUSHED**
 
-Do not rerun the C1 inventory unless source changes invalidate it.
+## C1 design direction
 
-## C1 inventory result
-
-`C1_INVENTORY_COMPLETE`
-
-No inventory failures were reported.
-
-Validated native game path:
+Reference path:
 
 `WGC -> H.264 NVENC -> RTP-sized UDP -> 8+1 XOR FEC -> Android hardware AVC`
 
 Reference behavior:
-- 1280x720
-- 60 fps
-- 7000 kbps
-- GOP 15
-- B-frames 0
-- FEC group size 8
-- RTP payload type 96
-- packet size 1200 bytes
-- NVENC `p1` / ultra-low-latency / CBR / 1000k buffer / yuv420p
 
-Ownership:
-- `native_stream.py` owns capture/session setup, quality constants, encoder policy,
-  RTP/FEC/session ports.
-- `native_fec_relay.py` owns relay/FEC behavior and duplicates part of the wire contract.
-- `NativeStreamActivity.kt` duplicates width/height/fps and endpoint constants.
-- `RtpH264Receiver.kt` owns receive/FEC buffering.
-
-## C1 design direction
-
-The first implementation should be a narrow behavior-preserving extraction, not
-a generic streaming-framework rewrite.
+- 1280x720;
+- 60 fps;
+- 7000 kbps;
+- GOP 15;
+- B-frames 0;
+- FEC group size 8;
+- RTP PT 96;
+- packet size 1200 bytes.
 
 Likely portable profile fields:
+
 - `id`
 - `width`
 - `height`
@@ -82,81 +68,71 @@ Likely portable profile fields:
 - `bframes`
 - optional `fec_group_size`
 
-Keep outside the portable profile unless later evidence requires them:
-- NVENC codec/preset/tune/RC/buffer settings;
-- RTP payload type / packet size;
-- ports;
-- capture backend;
-- audio implementation;
-- controller/input protocol;
-- telemetry cadence.
+Keep backend/session policy outside the first portable profile unless evidence
+requires otherwise.
 
 First profile concept:
 
 `native_game_720p60_reference`
 
-Do not expose a GUI selector in the first C1 patch. Do not add bitrate adaptation
-until the explicit static profile is independently validated.
+First implementation is static extraction only. No GUI selector, adaptation or
+generic framework in that patch.
 
-## C1 regression contract
+## Regression contract
 
-The first C1 patch must reproduce:
-- 1280x720 @ 60 fps;
-- 7000 kbps;
-- GOP 15;
-- 8+1 FEC;
-- the same WGC/NVENC path;
-- the same Android hardware decoder path.
+Representative C1 runtime validation must preserve:
 
-Representative runtime validation must confirm:
 - picture;
-- audio;
-- controller;
+- process audio;
+- controller input;
 - Pause / Resume;
 - Save / Load;
 - End / teardown;
-- prior game/profile behavior.
+- validated game/profile behavior.
 
 ## Stable subsystems
 
-Do not disturb without evidence:
-- WGC native capture;
-- NVENC low-latency encoding;
-- process audio;
+Preserve unless fresh evidence requires change:
+
+- WGC/NVENC native video;
+- process-specific audio;
 - UDP/FEC;
-- Android hardware AVC decode;
+- Android hardware AVC;
 - PHI1/ViGEm P1-P4;
 - Save/Load/Pause/End;
-- A8 controller profiles;
-- PS1 Port-1-only multitap;
-- Phase B diagnostics / Self-Test / support-bundle pipeline.
+- A8 profiles;
+- PS1 manual Port-1-only multitap;
+- Phase B diagnostics/Self-Test/support bundle/retention.
 
-PS1 has the strongest game runtime coverage, including 1P/2P/4P, Crash Bash and
-CTR multitap, Save/Load, cheats/mods and input mapping. SNES was runtime
-exercised. NES and Genesis were supported/configured but had no local A9 fixture.
+Coverage:
+
+- PS1 — extensive;
+- SNES — runtime exercised;
+- NES — configured/supported, no local A9 fixture;
+- Genesis — configured/supported, no local A9 fixture.
 
 ## Phase B result
 
-Phase B delivered and validated:
-- unified health/resource model;
-- read-only health endpoint;
-- 2-second Android client feedback reusing the existing metrics cadence;
-- corrected decoder/network classifier semantics;
+Complete/runtime validated:
+
+- health/resource model and endpoint;
+- Android client health feedback;
+- classifier corrections;
 - bounded event history;
 - Diagnostics / Self-Test GUI;
-- sanitized support-bundle collection;
-- manual bounded retention;
-- Sunshine/Moonlight production-edge and artifact removal;
-- focused native-only regression;
-- clean-native repository checkpoint.
+- sanitized support bundle;
+- bounded/manual retention;
+- Sunshine/Moonlight production/artifact removal;
+- native-only regression and clean-native checkpoint.
 
-Raw measured evidence outranks classifier output when they disagree.
+Raw measurements outrank classifiers.
 
 ## Roadmap
 
 `docs/ROADMAP.md` roadmap v3 is authoritative.
 
 After C:
+
 - D Media Library / VOD / Live TV UX
 - E Linux Migration / Native Linux Baseline
 - F Linux Core Resource Characterization & Optimization
@@ -164,20 +140,12 @@ After C:
 - H Home Infrastructure / Client / Plugin Expansion
 - I Local Intelligence / Voice / Privacy-Aware AI
 
-Phase D includes remaining Live TV identity/deduplication,
-favorites/search/pagination, EPG matching/cache/timezone diagnostics and guide UX.
+Phase E uses the HP EliteDesk 805 G6 as the Linux reference machine. Phase F
+characterizes/optimizes PS1-and-below before cheaper Prototype 2 hardware is
+selected.
 
-Phase E moves the core server to the HP EliteDesk 805 G6 Linux reference machine.
-Phase F performs representative Linux optimization/resource characterization
-with PS1-and-below before selecting cheaper Prototype 2 hardware.
-
-OpenBIOS is retired from the roadmap. Future game-content import assumes users
-supply ROM/ISO/BIOS/firmware/keys; PrivyHub validates/hashes/copies them into the
-runtime layout and keeps them out of Git/support bundles.
-
-Local deterministic control remains the baseline for later intelligence work.
-External AI providers may be explicit user-configured options with privacy/data
-minimization and no silent fallback.
+OpenBIOS is retired as a dedicated phase. Users provide ROM/ISO/BIOS/firmware/
+keys through the future import boundary.
 
 ## Commands
 
@@ -196,10 +164,10 @@ Existing C1 inventory evidence:
 ## Working rules
 
 - Inspect exact current local source before patching.
-- Preserve current uncommitted C1 work.
-- Use exact predecessor hashes/state in installers.
+- Use exact predecessor hashes/state.
 - Back up changed files under `archive/patch_backups`.
-- Validate generated output before delivery.
+- Validate deterministic output before delivery.
 - Roll back exact bytes on deterministic validation failure.
+- Keep install and checkpoint/push as separate stages.
 - Update durable memory with meaningful work.
 - Never ask for or expose network addresses in shareable diagnostics.

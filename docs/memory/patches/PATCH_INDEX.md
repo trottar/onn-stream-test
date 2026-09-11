@@ -301,3 +301,15 @@ This index records durable checkpoints and major patch lines; it does not invent
   checkpointed, validates unique decision IDs and the full durable-memory
   registry, stages only the reviewed ten paths, commits, pushes, and verifies
   `origin/main == HEAD`.
+
+- `privyhub_docs_memory_part4_top_level_refresh_01_2026-09-11` — Part 4 top-level docs/ledgers refresh. Exact-gates
+  checkpoint `65d020124094` and the audited Part 4 candidates, keeps
+  `docs/ROADMAP.md` byte-identical, refreshes README/PROJECT_STATUS/KNOWN_ISSUES,
+  runtime validation, CODE_MAP, DEBT, CHAT_INDEX and current/handoff state,
+  validates the full durable-memory registry, and performs no staging/commit/push.
+
+- `privyhub_docs_memory_part4_checkpoint_finalizer_01_2026-09-11` — exact-scope Part 4 checkpoint finalizer. Gates the thirteen
+  `PART4_CHECKPOINT_READY` paths by SHA-256, verifies `docs/ROADMAP.md` remains
+  byte-identical, advances Part 4/docs-cleanup state to complete, revalidates
+  current content and the full durable-memory registry, stages only the reviewed
+  thirteen paths, commits, pushes, and verifies `origin/main == HEAD`.

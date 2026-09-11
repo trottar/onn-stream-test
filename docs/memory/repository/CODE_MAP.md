@@ -1,36 +1,77 @@
 ---
 memory_schema: 1
-as_of: 2026-09-10
-baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
+as_of: 2026-09-11
+baseline_commit: 65d02012409440d5559c14beb2b28268b0b225bc
 ---
 
 # Repository Code Map
 
 ## Root
 
-- `PrivyHub/`: Android TV application.
-- `companion/`: Windows companion/control/media/native-stream implementation.
-- `scripts/`: setup/start helpers, including deferred Sunshine/Moonlight legacy.
-- `tools/`: build/install helpers, probes, audit and diagnostics.
-- `docs/`: feature documentation, investigations, and durable memory.
+- `PrivyHub/` — Android TV application.
+- `companion/` — companion control/media/Games/native-stream implementation.
+- `scripts/` — setup/start and supporting development helpers.
+- `tools/` — build/install helpers, diagnostics, audits and targeted probes.
+- `docs/` — feature documentation, roadmap, investigations and durable memory.
+- `media/`, root game-content/runtime data, logs, archives and generated build
+  output — operational/user data; intentionally outside normal source tracking.
 
-Generated runtime/data/log/archive/media/game-content paths are intentionally outside normal source tracking.
+Sunshine/Moonlight production integration and physical project artifacts were
+removed in Phase B. Do not treat legacy streaming as a current architecture
+path.
 
 ## Android
 
-`MainActivity.kt` currently contains a large amount of application/UI orchestration. Native stream components are separated under `streaming/`: decoder, RTP/FEC receive, audio receive, controller sender, and stream Activity. UDP diagnostic Activities are under `diagnostics/`.
+Primary application orchestration remains concentrated in `MainActivity.kt`.
+
+Native stream components live under the Android streaming package and include:
+
+- `NativeStreamActivity.kt` — native stream Activity/session-side constants;
+- `RtpH264Receiver.kt` — RTP/H.264 receive and FEC buffering;
+- native audio receive;
+- controller sender;
+- decoder/session telemetry.
+
+Diagnostics include the standalone Diagnostics / Self-Test surface and bounded
+health/event presentation.
 
 ## Companion
 
-- `privyhub_service.py`: HTTP control/service entry point and plugin lifecycle.
-- `plugins/games.py`: Games API/orchestration and launch preflight.
-- `games/emulator_manager.py`: substantial RetroArch/game/profile/save/mod/cheat lifecycle logic.
-- `native_stream.py`: native streaming session orchestration.
-- `native_session_io.py`: process audio and controller bridge.
-- `native_wgc_bridge.py`: WGC capture integration.
-- `native_fec_relay.py`: video FEC relay.
-- `process_audio/`: Windows process-loopback helper.
+Important current paths include:
+
+- `companion/privyhub_service.py` — HTTP service entry point and plugin lifecycle;
+- `companion/plugins/games.py` — Games API/orchestration and launch preflight;
+- `companion/games/emulator_manager.py` — RetroArch/game/profile/save/mod/cheat
+  lifecycle;
+- `companion/games/native/native_stream.py` — WGC/native stream session,
+  reference quality constants, encoder/backend policy and transport/session
+  setup;
+- `companion/games/native/native_fec_relay.py` — video relay/FEC behavior;
+- `companion/games/native/native_session_io.py` — process audio/controller
+  session I/O;
+- native WGC/process-audio helpers;
+- diagnostics/health/resource/support-bundle/retention modules.
+
+C1 inventory found that portable stream parameters are currently split between
+the Windows native stream path and Android native stream Activity/receiver. The
+first C1 change should extract a minimal explicit profile without redesigning
+capture, audio, controller or lifecycle ownership.
+
+## Durable memory
+
+`docs/memory/` is the persistent development bridge:
+
+- `CURRENT.md` / `CURRENT_HANDOFF.md` — immediate state;
+- `MEMORY.md` — curated current durable facts;
+- `architecture/`, `decisions/`, `evidence/`, `investigations/`, `patches/`,
+  `repository/`, `roadmap/` — specific durable records;
+- `history/` — superseded reference snapshots.
 
 ## Maintainability note
 
-Several central files are large (`MainActivity.kt`, `emulator_manager.py`, and `plugins/games.py`). This is real modularization debt, but it is not a reason to refactor them during the four-player extension. Preserve working boundaries through Phase A; split only with a dedicated, testable objective later.
+Several central files remain large, especially `MainActivity.kt`,
+`emulator_manager.py` and `plugins/games.py`.
+
+That is real modularization debt, but broad refactoring is not part of C1.
+Preserve validated behavior and split modules only with a dedicated objective and
+regression contract.
