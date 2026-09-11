@@ -1,566 +1,88 @@
-# PrivyHub / Safe IoT Project Roadmap — v2
+# PrivyHub / Safe IoT Roadmap — Merged Linux-First Revision
 
-**As of:** 2026-09-10
-**Current checkpoint:** `e65e8f89604ce325e6e3e0537d0287070b8996c5`
-**Checkpoint meaning:** Phase A emulator subsystem complete and pushed.
-
-## 1. Project mission
-
-PrivyHub is a local-first, privacy-preserving, modular smart-home and media
-infrastructure experiment. The current prototype uses a Windows companion/server,
-an inexpensive onn Android TV client, and an isolated secondary network. The
-architecture is intended to evolve toward inexpensive Linux-capable server
-hardware, additional clients, broader media/smart-home services, and optional
-remote access without making cloud services, subscriptions, or proprietary
-infrastructure mandatory.
-
-The project develops incrementally:
-
-```text
-prove one narrow subsystem
-        ↓
-runtime-validate it
-        ↓
-preserve it as a stable boundary
-        ↓
-add the next modular capability
-```
-
-The local working tree remains authoritative between checkpoints. GitHub is the
-checkpoint/history layer.
+**Draft date:** 2026-09-11
+**Predecessor implementation checkpoint:** Phase B clean-native checkpoint `ae616352897d418360dc740ef37343ea72e88098`
+**Roadmap status:** Accepted project plan. Phase C is the active next phase.
 
 ---
 
-## 2. Current project position
+## 1. Current project position
 
 | Phase | Purpose | Status |
 |---|---|---|
 | **A — Emulator Subsystem** | Finish Games/emulation as a normal-use subsystem | **COMPLETE / PUSHED** |
-| **B — Diagnostics & Clean Native Baseline** | Make PrivyHub self-diagnosing, then remove Sunshine/Moonlight legacy | **COMPLETE / PUSHED** |
-| **C — Adaptive Streaming Architecture** | Explicit profiles, dynamic bitrate/network adaptation, 1080p, generalized native streaming | **NEXT** |
-| **D — Media Library / VOD UX** | Poster art, metadata, recursive VOD presentation, local-first library polish | **PLANNED** |
-| **E — Resource Scaling / Linux** | Benchmark the architecture, test inexpensive Linux tiers, capability scaling | **PLANNED** |
-| **F — Open Platform / Firmware Portability** | Evaluate OpenBIOS and other open replacements without sacrificing compatibility | **OPTIONAL / PARALLEL AFTER B** |
-| **G — Smart-Home & Client Expansion** | Cameras, devices, handhelds, remote PC gaming, broader home infrastructure | **FUTURE** |
+| **B — Diagnostics & Clean Native Baseline** | Make PrivyHub self-diagnosing and remove active Sunshine/Moonlight legacy | **COMPLETE / PUSHED** |
+| **C — Adaptive Streaming Architecture** | Explicit profiles, telemetry, adaptive bitrate/FEC, 1080p characterization, generalized native streaming | **NEXT** |
+| **D — Media Library, VOD & Live TV UX** | Local media polish plus a substantial Live TV/channel/guide rebuild | **PLANNED** |
+| **E — Linux Migration / Native Linux Baseline** | Move the core server to the HP EliteDesk Linux prototype and restore normal-use parity | **PLANNED** |
+| **F — Linux Core Resource Characterization & Optimization** | Optimize and measure the Linux core with PS1-and-below only; select Prototype 2 from evidence | **PLANNED** |
+| **G — Extended Emulation & User-Content Import** | Build safe user-content ingestion, then characterize N64, GameCube, and PS2 | **FUTURE AFTER F** |
+| **H — Home Infrastructure / Client / Plugin Expansion** | Handhelds, Home Assistant/devices, cameras/microphones, storage, remote access, Steam/external compute | **FUTURE** |
+| **I — Local Intelligence / Voice / Privacy-Aware AI** | Deterministic local automation, small local models, optional user-supplied cloud AI providers, bounded adaptive optimization | **FUTURE** |
 
-The phase letters express the preferred development sequence. Phase F is
-explicitly non-blocking and may be pulled forward when it is useful for Linux or
-distribution work.
+### Retired roadmap item
+
+The former OpenBIOS/Open Platform phase is removed from the main roadmap.
+
+PrivyHub will not provide, download, redistribute, or silently substitute ROMs,
+ISOs, BIOS/firmware, keys, or equivalent copyrighted/proprietary game content.
+
+Where an emulator requires user-provided firmware/content, PrivyHub will provide
+safe import/integration tooling instead.
+
+Open/local dependencies remain an architectural preference when they provide a
+practical benefit, but there is no dedicated OpenBIOS phase or Track O.
 
 ---
 
 # Phase A — Emulator Subsystem
 
-**Status: COMPLETE / CHECKPOINTED**
+**Status: COMPLETE / PUSHED**
 
-Checkpoint:
+The existing Phase A implementation and evidence remain authoritative.
 
-```text
-e65e8f89604ce325e6e3e0537d0287070b8996c5
-Checkpoint: complete Phase A emulator subsystem
-```
+Core validated architecture includes:
 
-Phase A established Games as a mature subsystem rather than a streaming proof of
-concept.
+- NES/SNES/Genesis/PS1 scope;
+- RetroArch-managed emulator lifecycle;
+- saves/states;
+- cheats/mod profiles;
+- input profiles;
+- four-controller architecture;
+- PS1 Port-1 multitap behavior;
+- local metadata/art;
+- normal End/teardown;
+- native PrivyHub streaming/client path.
 
-## A1 — Controller / analog
-
-**COMPLETE / RUNTIME VALIDATED**
-
-Validated capabilities include:
-
-- Android digital and analog controller state;
-- persistent ViGEm/XInput devices on Windows;
-- PHI1 full-state controller transport;
-- analog-stick-to-D-pad convenience for appropriate systems;
-- genuine PS1 analog behavior;
-- four physical controller assignment;
-- exact P1→1, P2→2, P3→3, P4→4 routing;
-- RetroArch ports 1–4 through XInput;
-- clean neutral release and teardown.
-
-PHI1 remains version 1. The four-player extension did not require a protocol
-format change.
-
-## A2 — Save / Load
-
-**COMPLETE / RUNTIME VALIDATED**
-
-Includes:
-
-- three save-state slots;
-- slot metadata;
-- stable game identity;
-- persistent RetroArch save/state directories;
-- SRAM/memory-card flush behavior;
-- nonzero/stable savestate verification;
-- actual load-result observation rather than acknowledgement-only success;
-- cheat/mod profile isolation.
-
-## A3 — Pause / Resume
-
-**COMPLETE / RUNTIME VALIDATED**
-
-Current user model:
-
-```text
-gameplay
-   ↓ Back
-freeze final frame
-   ↓
-pause RetroArch
-stop A/V/FEC
-   ↓
-Game Session UI
-
-click frozen frame
-   ↓
-native stream readiness
-   ↓
-resume RetroArch
-   ↓
-gameplay
-```
-
-Save, Load and End remain available from the paused session UI.
-
-## A4 — Host coexistence / audio lifecycle
-
-**COMPLETE / RUNTIME VALIDATED**
-
-The onn can continue playing while the Windows host remains usable. Capture
-targets the managed game window rather than requiring the emulator to dominate
-the desktop. Game audio is process-specific.
-
-## A5 — Direct launch
-
-**COMPLETE / RUNTIME VALIDATED**
-
-Normal library launch proceeds directly into native gameplay when readiness is
-satisfied. Readiness failures fail closed rather than blindly resuming a broken
-session.
-
-## A6 — Library / metadata / game artwork
-
-**COMPLETE / RUNTIME VALIDATED**
-
-Includes:
-
-- stable game IDs;
-- system identification;
-- game metadata;
-- box-art/library presentation;
-- search/organization;
-- per-game save identity;
-- user-content structure.
-
-Artwork remains metadata/cache and never mutates canonical game content.
-
-## A7 — Cheats / mods
-
-**COMPLETE / RUNTIME VALIDATED**
-
-Includes:
-
-- provider-backed cheat catalogs;
-- explicit cheat selection;
-- persistent isolated cheat profiles;
-- isolated save/state namespaces;
-- managed mod profiles;
-- deterministic IPS-derived ROM generation;
-- hash verification;
-- original ROM protection.
-
-## A8 — Input profiles
-
-**COMPLETE / RUNTIME VALIDATED**
-
-Named PrivyHub-owned gameplay profiles support Players 1–4 while preserving the
-known-good canonical controller transport.
-
-Profile mapping is applied between canonical XUSB semantics and RetroArch
-session bindings. Save/Load/Pause/End remain outside gameplay remapping.
-
-## A9 — Emulator regression / checkpoint
-
-**COMPLETE FOR AVAILABLE LIBRARY**
-
-Final classification:
-
-```text
-PHASE_A_A9_CHECKPOINT_READY_WITH_NO_FIXTURE_SKIPS
-```
-
-Current runtime coverage:
-
-- **SNES:** runtime exercised;
-- **PS1:** extensively runtime exercised, including 1P/2P/4P, lifecycle,
-  Save/Load, profiles, cheats, mods where applicable, and multitap;
-- **NES:** supported/configured but no local game fixture was present;
-- **Genesis:** supported/configured but no local game fixture was present.
-
-NES and Genesis are **not** claimed runtime validated. When content is added for
-either family, run that system's normal launch/input/teardown regression and
-upgrade its status then.
-
-## A10 — PS1 four-player topology
-
-**COMPLETE / RUNTIME VALIDATED**
-
-PrivyHub's supported PS1 local-player ceiling is four.
-
-User-facing behavior:
-
-```text
-Multitap: Off
-Multitap: On
-```
-
-`On` means:
-
-```text
-Beetle PSX HW Port 1 multitap = enabled
-Beetle PSX HW Port 2 multitap = disabled
-```
-
-Port 2/Both are intentionally not product options.
-
-Crash Bash and Crash Team Racing both validated four-player exposure and
-independent P1–P4 gameplay.
-
-## A11 — Wireless ADB build/install recovery
-
-**COMPLETE / RUNTIME VALIDATED**
-
-The build/install helper now tolerates transient paired-wireless-ADB discovery
-loss through bounded recovery and a private last-known target cache outside the
-repository. Network-bearing target values are not printed or committed.
+Do not reopen Phase A unless later platform migration produces new evidence.
 
 ---
 
 # Phase B — Diagnostics & Clean Native Baseline
 
-**Status: COMPLETE / CHECKPOINTED / PUSHED**
+**Status: COMPLETE / PUSHED**
 
-Phase B combines two related objectives:
-
-1. make PrivyHub capable of explaining its own state and failures;
-2. remove the obsolete Sunshine/Moonlight architecture with that observability
-   available.
-
-The diagnostics work comes first because every later phase becomes more dynamic
-and harder to troubleshoot.
-
----
-
-## B1 — Unified diagnostics substrate
-
-**Status: COMPLETE / RUNTIME VALIDATED**
-
-PrivyHub already has substantial instrumentation, but it is spread across
-subsystem-specific logs and probes. Consolidate it into a common diagnostic
-contract.
-
-Target architecture:
+Checkpoint:
 
 ```text
-Companion/service ─┐
-Capture/source ────┤
-Encoder ───────────┤
-Transport/FEC ─────┤
-Decoder ───────────┤
-Audio ─────────────┤
-Controllers ───────┤
-Games/RetroArch ───┤
-Media ─────────────┤
-Android/client ────┤
-ADB/tooling ───────┘
-         ↓
-PrivyHub diagnostic state/event model
-         ↓
- ┌────────────────┬────────────────────┐
- │ GUI diagnostics│ local diagnostics  │
- │ / self-test    │ / support bundle   │
- └────────────────┴────────────────────┘
+ae616352897d418360dc740ef37343ea72e88098
 ```
 
-### B1 requirements
-
-Define a stable structured diagnostic record containing, where appropriate:
-
-- timestamp;
-- session/run identifier;
-- subsystem;
-- severity;
-- stable error/event code;
-- human-readable summary;
-- raw measurements;
-- classifier/result;
-- causal predecessor/reference;
-- remediation hint;
-- privacy classification.
-
-Raw measurements and classifier conclusions must remain distinct. A classifier
-must never overwrite contradictory measurements.
-
-Example stable codes:
-
-```text
-GAME-LAUNCH-001
-GAME-INPUT-003
-VIDEO-CAPTURE-002
-VIDEO-DECODE-007
-AUDIO-SESSION-004
-NET-LOSS-002
-ADB-DISCOVERY-001
-MEDIA-CATALOG-003
-```
-
-The exact taxonomy should be designed from current real failure classes, not
-invented wholesale before inventorying existing instrumentation.
-
-### B1.1 — Existing instrumentation inventory
-
-Inventory the current:
-
-- game diagnostics;
-- decoder session JSON;
-- native video logs;
-- controller probes;
-- save/state probes;
-- transport probes;
-- ADB recovery diagnostics;
-- companion logs;
-- Android stream diagnostics.
-
-Classify each as:
-
-- durable production telemetry;
-- diagnostic probe;
-- redundant;
-- superseded;
-- privacy-sensitive;
-- candidate for the unified model.
-
-### B1.2 — Health snapshot
-
-Add one machine-readable current health snapshot covering major subsystems.
-
-Conceptual output:
-
-```text
-Companion            HEALTHY
-Capture              HEALTHY
-Encoder              NVENC / 720p60
-Transport            HEALTHY
-Decoder              HARDWARE AVC / HEALTHY
-Audio                HEALTHY
-Controllers          4 / 4
-Game session         ACTIVE
-RetroArch            HEALTHY
-Last error           NONE
-```
-
-The underlying representation should be structured JSON. Human-readable text is
-a presentation layer.
-
-### B1.3 — Diagnostic event history
-
-Maintain a bounded local event/ring history rather than unbounded logging.
-
-Important events include:
-
-- capture readiness changes;
-- encoder start/reconfigure/failure;
-- transport loss/recovery;
-- FEC recovery/unrecoverable loss;
-- decoder starvation/stale drops;
-- audio start/stop/failure;
-- controller attach/assign/drop;
-- RetroArch lifecycle;
-- save/load verification;
-- companion/API failure;
-- ADB recovery state.
-
-No network addresses should be required in ordinary diagnostics.
-
----
-
-## B2 — GUI Diagnostics / Self-Test
-
-**Status: COMPLETE / RUNTIME VALIDATED**
-
-Expose the diagnostics substrate through the onn GUI without making the GUI the
-only way to access it.
-
-Potential Diagnostics page:
-
-```text
-SYSTEM
-  Companion                 Healthy
-  Native streaming          Healthy
-  Network path              Good
-  Last session error        None
-
-CURRENT STREAM
-  Source                    Game
-  Resolution                1280x720 @ 60
-  Encoder target            7 Mbps
-  Recent wire rate          ~8 Mbps
-  Packet loss               0.0%
-  FEC recoveries            2
-  Unrecoverable groups      0
-  Stale video drops         0
-
-GAME
-  RetroArch                 Running
-  Controllers               4
-  XInput slots              1,2,3,4
-```
-
-The 7 Mbps encoder target and roughly 8 Mbps observed network rate are not
-contradictory: 8+1 FEC and protocol overhead raise wire traffic above the encoded
-video target.
-
-### B2.1 — Self-test
-
-Provide bounded, non-destructive checks for:
-
-- companion reachability;
-- control API;
-- native stream readiness;
-- decoder availability;
-- audio path;
-- controller bridge;
-- emulator/runtime prerequisites;
-- storage writability;
-- ADB/development tooling when applicable.
-
-A self-test should classify what it actually measured and avoid changing
-production state unless the user explicitly asks.
-
-### B2.2 — One-click sanitized diagnostics bundle
-
-From GUI and/or companion tooling:
-
-```text
-Collect Diagnostics
-        ↓
-sanitized bundle
-        ↓
-summary + machine-readable measurements
-```
-
-The bundle should:
-
-- automatically redact/exclude addresses and secrets;
-- include a manifest and hashes;
-- include relevant bounded recent telemetry;
-- identify software/runtime versions;
-- identify the failing subsystem when evidence supports it;
-- remain useful without access to any chat history.
-
-This becomes the preferred support/debug handoff.
-
----
-
-## B3 — Sunshine / Moonlight dependency inventory
-
-**Status: COMPLETE / RUNTIME VALIDATED**
-
-Do not begin by deleting files.
-
-Audit the exact current tree for:
-
-- Sunshine/Moonlight services/process assumptions;
-- firewall rules;
-- scheduled tasks;
-- install/setup/removal scripts;
-- Android package queries;
-- Android intents;
-- `StreamManager` or legacy streaming classes;
-- Games plugin references;
-- status/UI remnants;
-- portable runtime/configuration;
-- documentation that describes obsolete active behavior.
-
-Classify every occurrence as:
-
-```text
-ACTIVE DEPENDENCY
-DEAD COMPATIBILITY CODE
-INSTALL/UNINSTALL ARTIFACT
-DOCUMENTATION/HISTORY
-SAFE TO REMOVE
-MUST PRESERVE
-```
-
----
-
-## B4 — Remove legacy streaming infrastructure
-
-**Status: COMPLETE / RUNTIME VALIDATED**
-
-Make one coherent removal series based on B3 evidence.
-
-Do not disturb the stable native paths:
-
-- Windows Graphics Capture;
-- NVENC;
-- native audio;
-- UDP/FEC video transport;
-- Android hardware decoder;
-- PHI1/ViGEm controllers;
-- game lifecycle/meta controls.
-
-Remove Sunshine/Moonlight only where native PrivyHub has already superseded it.
-
----
-
-## B5 — Native-only regression
-
-**Status: COMPLETE / RUNTIME VALIDATED**
-
-Prove Games independently after legacy removal:
-
-```text
-library launch
-   ↓
-native capture/encode/transport/decode
-   ↓
-audio
-   ↓
-controller input
-   ↓
-pause/resume
-   ↓
-Save/Load
-   ↓
-cheat/mod/profile path
-   ↓
-End/teardown
-```
-
-This should be a focused dependency-removal regression, not a full repeat of
-every Phase A exploratory diagnostic.
-
----
-
-## B6 — Clean-native checkpoint
-
-**Status: COMPLETE / CHECKPOINTED / PUSHED**
-
-Acceptance:
-
-- unified diagnostics substrate established;
-- GUI/self-test path usable;
-- sanitized diagnostic bundle available;
-- Sunshine/Moonlight active dependencies removed;
-- native Games regression passes;
-- repository audit clean;
-- checkpoint/push.
-
-At this point the architectural statement should be:
+Phase B established:
+
+- unified health/diagnostic model;
+- event history;
+- Self-Test;
+- GUI diagnostics;
+- sanitized support bundle;
+- retention controls;
+- Android/client health feedback;
+- Sunshine/Moonlight dependency inventory and removal;
+- removal of the Moonlight Android package;
+- native-only Games regression;
+- clean repository/build checkpoint.
+
+Architectural statement:
 
 > PrivyHub native streaming is the only active Games streaming architecture.
 
@@ -570,31 +92,35 @@ At this point the architectural statement should be:
 
 **Status: NEXT**
 
-Phase C turns the current proven game streamer into a reusable, measurable,
-adaptive native streaming platform.
+Phase C turns the current proven native game stream into a reusable, measurable,
+adaptive streaming platform.
 
----
+The current Windows/GTX 970 system remains a valid development/reference host
+for this phase because Linux migration has not happened yet. Measurements here
+are intended to validate streaming architecture and client capability, **not**
+to establish the eventual Linux minimum hardware requirement.
 
 ## C1 — Explicit stream profiles
 
-Convert implicit constants into named, inspectable profiles.
+Convert current hard-coded behavior into named, inspectable profiles without
+changing the validated 720p60 behavior.
 
-Current validated reference:
+Reference profile:
 
 ```text
-Profile: Native Game 720p60
-Capture: 1280x720 @ 60
-Codec: H.264
-Encoder: NVENC
-Encoder target: ~7 Mbps
-Latency mode: P1 / ultra-low-latency
-GOP: 15
-B-frames: none
-Transport: RTP-sized UDP
-FEC: 8 data + 1 XOR parity
+Native Game 720p60
+1280x720 @ 60
+H.264
+NVENC
+~7 Mbps target
+P1 / ultra-low-latency
+GOP 15
+no B-frames
+RTP-sized UDP
+8 data + 1 XOR parity
 ```
 
-The profile system should separate:
+Profiles should separate:
 
 - capture resolution/framerate;
 - codec/encoder;
@@ -605,268 +131,131 @@ The profile system should separate:
 - audio policy;
 - source type.
 
-Do not make one universal profile for every source.
-
----
-
 ## C2 — End-to-end transport telemetry contract
 
-Adaptive behavior must be driven by the actual path, not assumptions about the
-router.
+Formalize the measurements that future adaptation consumes:
 
-For local streaming:
-
-```text
-PC/server
-   ↓
-GL-iNet / isolated LAN / Wi-Fi
-   ↓
-onn/client
-```
-
-The relevant capacity is the real **LAN/Wi-Fi end-to-end path**. The router's
-Internet/WAN speed is not the limiting variable for a local stream.
-
-For future remote streaming, WAN capacity and Internet path behavior become
-additional constraints.
-
-Measure or derive:
-
-- recent delivered bitrate/goodput;
+- delivered bitrate/goodput;
 - packet loss;
 - FEC recoveries;
-- unrecoverable FEC groups;
-- packet inter-arrival jitter;
+- unrecoverable groups;
+- jitter/inter-arrival behavior;
 - RTT/echo latency where useful;
 - sender pacing;
-- queue/buffer growth indicators;
+- queue/buffer growth;
 - decoder starvation;
-- decoder stale drops;
+- stale-frame drops;
 - rendered-frame continuity.
 
-Instrumentation from B should make every adaptation decision explainable.
+Every adaptation decision must be explainable from recorded measurements.
 
----
+## C3 — Adaptive bitrate
 
-## C3 — Adaptive bitrate controller
+Change bitrate first while keeping resolution and 60 fps fixed.
 
-**Primary dynamic-network feature**
+Required behavior:
 
-The first adaptive implementation should change **bitrate only** while holding
-resolution and 60 fps stable.
-
-Conceptual behavior:
-
-```text
-path degrades
-    ↓
-reduce target bitrate quickly
-    ↓
-protect latency / continuity
-
-path remains healthy
-    ↓
-raise bitrate slowly
-    ↓
-recover image quality
-```
-
-Required control properties:
-
-- bounded minimum and maximum bitrate;
+- bounded min/max;
 - fast decrease / slow increase;
 - hysteresis;
-- hold-down period after congestion;
-- no oscillation around thresholds;
-- explicit reason for each change;
-- fail-safe return to a known profile;
-- source-specific bounds.
+- congestion hold-down;
+- no rapid oscillation;
+- explicit diagnostics/reason codes;
+- safe fallback to a known profile.
 
-NVENC supports runtime encoder reconfiguration for bitrate control, but the
-PrivyHub implementation must still validate that its current encoder wrapper and
-session lifecycle expose that behavior safely.
+## C4 — Adaptive FEC
 
-### C3 acceptance
+Only after bitrate adaptation is stable.
 
-Under controlled impairment:
+Distinguish random packet loss from capacity pressure. Do not blindly increase
+parity during congestion.
 
-- congestion causes bitrate reduction before prolonged decode starvation;
-- queue/stale-frame behavior improves or remains bounded;
-- gameplay remains responsive;
-- bitrate recovers gradually after the path stabilizes;
-- adaptation decisions are visible in diagnostics;
-- healthy-network behavior does not regress.
+If fixed 8+1 remains the better engineering choice, explicitly defer dynamic FEC
+with evidence rather than adding complexity for its own sake.
 
----
+## C5 — 1080p60 capability characterization
 
-## C4 — Adaptive FEC policy
+Characterize 1080p60 using the current development host and onn client.
 
-Only after dynamic bitrate is stable.
+This is a **stream/client capability test**, not a future Linux resource-sizing
+benchmark.
 
-Possible later control:
-
-```text
-clean path        → lower FEC overhead
-lossy path        → stronger bounded FEC
-severe congestion → lower bitrate first; do not blindly add parity
-```
-
-FEC adaptation must distinguish random packet loss from congestion. Adding more
-parity during a capacity shortage can worsen the shortage.
-
-Do not change bitrate and FEC simultaneously in the first experiment unless the
-individual effects are already measurable.
-
----
-
-## C5 — 1080p60 profile and capability test
-
-Test the existing Windows/GTX 970 reference system and onn decoder.
-
-Measure:
-
-- encoder utilization;
-- host CPU/GPU;
-- bitrate requirements;
-- packet behavior;
-- latency;
-- decoder queue/render behavior;
-- thermal/stability behavior;
-- visual quality.
-
-1080p60 should become a capability-gated profile, not an assumption that every
-future host/client can sustain it.
-
----
+1080p60 should become capability-gated rather than universally assumed.
 
 ## C6 — Generalized native source abstraction
 
-Once Games streaming is clean and observable:
+Create reusable boundaries for:
 
 ```text
-Game window ───────┐
-Browser/app ───────┤
-Camera/live source ├→ Source/Capture abstraction
-Other source ──────┘
-                         ↓
-                 Native encoder/profile
-                         ↓
-                  Transport / FEC
-                         ↓
-                    Client decoder
+source/capture
+    ↓
+profile/encoder
+    ↓
+transport/FEC
+    ↓
+client decoder
 ```
 
-Shared infrastructure may include:
+Games, browser/app, cameras/live sources, and later sources may share lifecycle,
+transport, diagnostics, profile selection, and adaptation while preserving
+source-specific capture/audio/buffering requirements.
 
-- session lifecycle;
-- transport;
-- decoder;
-- diagnostics;
-- profile selection;
-- adaptation.
-
-Source-specific behavior may still differ:
-
-- latency target;
-- capture API;
-- audio source;
-- buffering;
-- resolution;
-- bitrate;
-- FEC.
-
-The goal is reuse, not forced uniformity.
-
----
-
-## C7 — Streaming architecture checkpoint
+## C7 — Phase C checkpoint
 
 Acceptance:
 
 - explicit profiles;
-- transport telemetry;
-- adaptive bitrate validated;
-- adaptive FEC decision either validated or explicitly deferred;
+- transport telemetry contract;
+- adaptive bitrate runtime validated;
+- adaptive FEC validated or explicitly deferred;
 - 1080p60 characterized;
-- generalized native source contract established;
-- Games remains stable;
-- checkpoint/push.
+- generalized source contract established;
+- Games regression passes;
+- clean checkpoint/push.
 
 ---
 
-# Phase D — Media Library / VOD UX
+# Phase D — Media Library, VOD & Live TV UX
 
 **Status: PLANNED**
 
-This phase improves locally stored media without making metadata services a
-playback dependency.
+Phase D now covers both local media-library polish and a deliberate Live TV
+cleanup/rebuild.
 
----
+The existing Live TV playback path should be preserved where it is stable, but
+the current channel organization and guide behavior should **not** be treated as
+finished architecture.
 
 ## D1 — Recursive VOD artwork
 
-Apply game-library-style visual organization to movies under:
+Support local sidecar art and directory-oriented movie layouts without rewriting
+canonical media.
 
-```text
-media/vod/
-```
+Priority may include:
 
-including subdirectories.
-
-Support local sidecar conventions such as:
-
-```text
-Movie Name (Year).mkv
-Movie Name (Year).jpg
-```
-
-and directory-oriented layouts such as:
-
-```text
-Movie Name (Year)/
-    Movie Name (Year).mkv
-    poster.jpg
-```
-
-Suggested local-art priority:
-
-1. exact `<video-stem>.jpg/.png/.webp`;
-2. `poster.jpg/.png/.webp`;
-3. `folder.jpg/.png/.webp`;
-4. cached metadata-provider poster;
-5. generated local frame thumbnail;
-6. generic VOD tile.
-
-Do not rewrite or relocate canonical media merely to obtain artwork.
-
----
+1. exact video-stem artwork;
+2. `poster.*`;
+3. `folder.*`;
+4. cached provider art;
+5. generated local thumbnail;
+6. generic tile.
 
 ## D2 — VOD metadata cache
 
 Potential fields:
 
-- title;
-- year;
-- runtime;
-- genre;
-- description;
+- title/year/runtime;
+- genre/description;
 - poster;
-- resolution;
-- video codec;
-- audio format/language;
-- subtitle availability.
+- resolution/codecs;
+- audio/subtitle information.
 
-External metadata lookup should be optional. Once acquired, useful metadata and
-art should be cached locally so normal browsing/playback remains local-first.
-
-Ambiguous matches must be reviewable rather than silently attaching incorrect
-metadata.
-
----
+External lookup remains optional and cacheable. Normal browsing/playback must
+remain local-first.
 
 ## D3 — Playback-state UX
 
-Potential later additions:
+Potential layers:
 
 - resume position;
 - watched/unwatched;
@@ -874,565 +263,1021 @@ Potential later additions:
 - favorites;
 - collections/series;
 - sort/filter/search;
-- per-user state if a future multi-user model requires it.
+- future per-user state.
 
-Keep these as metadata/state layers; canonical media files remain untouched.
+Canonical media files remain untouched.
 
----
+## D4 — Live TV channel normalization
 
-## D4 — Media-library checkpoint
+Treat the current channel catalog as data that needs normalization rather than
+as a finished list.
+
+Goals:
+
+- stable canonical channel identity;
+- duplicate detection/merging;
+- consistent display names;
+- group/category normalization;
+- source/provider provenance;
+- hidden-channel state that remains recoverable;
+- favorites;
+- search/filter;
+- deterministic sorting;
+- pagination that behaves like pagination rather than artificial channel-number
+  groups;
+- graceful handling of dead/unavailable streams.
+
+Do not bind user state to unstable provider ordering.
+
+## D5 — EPG / guide foundation
+
+Rebuild the guide around explicit identity/matching rather than best-effort UI
+assumptions.
+
+Required areas:
+
+- XMLTV/provider ingestion where used;
+- channel matching using stable IDs first and normalized-name fallback second;
+- timezone handling;
+- program start/end normalization;
+- cache/refresh policy;
+- stale-data behavior;
+- no-guide fallback;
+- diagnostics explaining unmatched channels;
+- deterministic handling of multiple candidate matches.
+
+The guide must remain optional to basic channel playback.
+
+## D6 — Live TV guide UX
+
+Once the underlying EPG data is trustworthy:
+
+- current/next program;
+- timeline/grid view where practical;
+- channel details;
+- jump to current time;
+- category/favorites filters;
+- clear "guide unavailable" behavior;
+- responsive onn-TV navigation.
+
+Do not hide data-quality failures behind empty UI.
+
+## D7 — Media/TV checkpoint
 
 Acceptance:
 
-- recursive VOD discovery remains stable;
-- local artwork works without Internet;
-- optional metadata lookup fails gracefully;
-- cached metadata survives provider unavailability;
-- browsing remains responsive on the onn;
+- recursive VOD library remains stable;
+- metadata/art work offline after caching;
+- Live TV channel list is normalized and manageable;
+- guide matching/refresh behavior is diagnosable;
+- normal channel playback does not depend on guide success;
 - checkpoint/push.
 
 ---
 
-# Phase E — Resource Scaling / Linux
+# Phase E — Linux Migration / Native Linux Baseline
 
-**Status: PLANNED**
+**Status: PLANNED AFTER D**
 
-Do formal hardware sizing only after diagnostics and streaming behavior are
-explicit enough to benchmark meaningfully.
-
----
-
-## E1 — Representative workload suite
-
-Build a repeatable suite from the mature architecture.
-
-Candidate workloads:
+Prototype 1 Linux server:
 
 ```text
-720p60 game streaming
-adaptive 720p60 under impairment
-1080p60 streaming
-VOD serving
-camera/live source streaming
-multiple background services
-concurrent media + smart-home activity
+HP EliteDesk 805 G6 Mini
+Ryzen 5 PRO 4650G
+16 GB RAM
+256 GB NVMe
 ```
 
-Each workload should have pass/fail and measurement criteria.
+The system was intentionally purchased with more headroom than the expected
+PS1-and-below requirement so migration can be separated from minimum-hardware
+optimization.
 
----
+Windows installed on the machine is not a project target.
 
-## E2 — Windows reference benchmark
+## E1 — Linux appliance baseline
 
-The current Windows machine becomes the reference implementation.
+Select and install a stable Linux base with:
 
-Measure:
+- minimal unnecessary services;
+- reproducible packages/runtime;
+- local-first networking;
+- predictable PrivyHub service ownership;
+- clean boot/start/stop;
+- current data/source-control boundaries;
+- diagnostics from the beginning.
 
-- CPU;
-- GPU;
-- hardware encoder load;
-- RAM;
-- storage I/O;
-- network goodput/loss/jitter;
-- server event-loop/service load;
-- client decode behavior;
-- latency/stability;
-- concurrent workload behavior.
+Record hardware details relevant to later measurement, including RAM topology,
+storage, firmware, thermals, and network interfaces.
 
-This establishes what the architecture costs before hardware substitution.
+## E2 — Migrate platform-neutral companion responsibilities
 
----
-
-## E3 — Cheap Linux-capable host tiers
-
-Test inexpensive Linux-capable systems empirically.
-
-Do not start with arbitrary product tiers. Derive them from measurements.
-
-Possible resulting model:
-
-```text
-Tier A
-  local services
-  VOD
-  720p60 where hardware encode permits
-
-Tier B
-  broader 720p60 / selected 1080p
-  media + smart-home concurrency
-
-Tier C
-  stronger 1080p / heavier concurrent workload
-  optional modern PC relay functions
-```
-
-A CPU-only host may still be useful even if it cannot replace the game encoder.
-Capabilities should be modular.
-
----
-
-## E4 — Capability detection / scaling
-
-PrivyHub should eventually probe:
-
-- CPU architecture/performance class;
-- RAM;
-- GPU/iGPU;
-- encoder availability;
-- decoder availability where relevant;
-- storage;
-- network interfaces/path;
-- supported profiles;
-- measured benchmark class.
-
-Then:
-
-```text
-hardware probe
-    ↓
-capability profile
-    ↓
-enabled PrivyHub features / stream profiles
-```
-
-The product should degrade gracefully rather than assuming one development PC.
-
----
-
-## E5 — Linux service migration
-
-Migrate companion/server responsibilities incrementally.
-
-Preserve platform-neutral contracts:
+Preserve established contracts:
 
 - source catalog;
 - control API;
 - session lifecycle;
-- diagnostics schema;
-- transport;
-- metadata;
-- storage layout;
-- capability model.
+- diagnostics/events;
+- game identity;
+- save/state ownership;
+- user-content boundaries;
+- plugin/provider contracts;
+- capability reporting.
 
-Keep Windows-only capture/encoder modules isolated behind interfaces rather than
-forcing them into Linux.
+Linux should replace implementation details without needlessly changing these
+contracts.
 
----
+## E3 — Replace Windows-specific backends
 
-## E6 — Replay deferred UDP acceptance suite
+Replace behind explicit platform boundaries:
 
-Replay the saved forward/reverse transport diagnostics on representative Linux
-and network hardware.
+```text
+Windows Graphics Capture → Linux capture backend
+NVENC                   → generic encoder API + Linux AMD hardware path
+WASAPI process audio     → Linux source/process audio
+ViGEm                    → Linux virtual input/uinput/evdev path
+Windows lifecycle        → Linux service/process lifecycle
+```
 
-Compare:
+Preserve behavior, not Windows APIs.
 
-- sender pacing;
-- burst/gap behavior;
-- Android kernel arrival;
-- loopback;
-- reverse path;
-- duplicate arrival;
-- packet loss/jitter;
-- FEC;
-- decoder starvation/stale drops.
+## E4 — Restore PS1-and-below Games on Linux
 
-Only then decide whether the earlier pathology was:
+Required scope:
 
-- specific to the Windows/USB-Wi-Fi test environment;
-- general consumer-network behavior;
-- or an architectural transport issue.
+```text
+NES
+SNES
+Genesis
+PS1
+```
 
-Do not encode a quirk of the original test environment into the product without
-representative evidence.
+Preserve:
 
----
+- discovery/launch;
+- video/audio/input;
+- four-player architecture where applicable;
+- PS1 multitap behavior;
+- saves/states;
+- pause/resume;
+- cheats/mod profiles;
+- input profiles;
+- metadata/art;
+- teardown/recovery.
 
-## E7 — Linux/resource checkpoint
+## E5 — Restore media/server functionality
+
+Migrate the post-Phase-D server functions without broadening scope:
+
+- companion/control API;
+- VOD;
+- Live TV/EPG;
+- browser/live source where active;
+- camera source where active;
+- diagnostics/Self-Test;
+- Phase C profile/adaptation infrastructure;
+- Phase D media state/cache.
+
+## E6 — Replay deferred UDP investigation
+
+Rerun the saved forward/reverse transport acceptance suite on the representative
+Linux host.
+
+Classify whether the prior packet timing/duplication pathology was:
+
+- specific to the old Windows/test environment;
+- reproduced on the new representative host/network path;
+- or indicative of a broader transport issue.
+
+Do not reopen beyond evidence.
+
+## E7 — Native Linux regression
+
+Minimum normal-use regression:
+
+```text
+server boot/start
+client discovery/control
+media
+Games launch
+video/audio/controller
+pause/resume
+Save/Load
+profiles/cheats/mod state
+End/teardown
+restart/recovery
+```
+
+## E8 — Linux baseline checkpoint
 
 Acceptance:
 
-- representative workloads defined;
-- Windows reference measured;
-- at least one inexpensive Linux tier tested;
-- capability profile implemented or concretely specified;
-- deferred transport question replayed where representative;
-- next hardware target selected from evidence;
-- checkpoint/push.
+- Linux is sufficient for normal core server operation;
+- PS1-and-below works through Linux-native A/V/input paths;
+- onn client remains functional;
+- media/Live TV remain functional;
+- deferred UDP suite replayed/reclassified;
+- no minimum-hardware claim yet;
+- clean checkpoint/push.
+
+Architectural statement:
+
+> PrivyHub has a working Linux-native core suitable for formal resource characterization.
 
 ---
 
-# Phase F — Open Platform / Firmware Portability
+# Phase F — Linux Core Resource Characterization & Optimization
 
-**Status: OPTIONAL / PARALLEL AFTER B**
+**Status: PLANNED AFTER E**
 
-This track reduces proprietary dependencies where doing so improves portability,
-distribution, inspectability, or control **without sacrificing validated
-compatibility**.
-
-It is not a requirement to replace a working proprietary component merely
-because an open alternative exists.
-
----
-
-## F1 — PS1 OpenBIOS evaluation
-
-Current Beetle PSX HW supports PCSX-Redux OpenBIOS as a region-free BIOS path.
-OpenBIOS is open source and can be inspected/customized, making it attractive
-for a portable/local-first system.
-
-Potential benefits:
-
-- freely redistributable/open firmware path;
-- region-free behavior;
-- source-level inspectability;
-- reproducible builds;
-- debugging symbols/development visibility;
-- possible custom boot/diagnostic behavior;
-- easier appliance-style deployment where a user-supplied retail BIOS would
-  otherwise be required.
-
-### What OpenBIOS is not
-
-Do **not** treat OpenBIOS as a game-performance optimization.
-
-The BIOS is primarily boot/runtime firmware support; replacing it is unlikely to
-materially improve normal game frame rate or PrivyHub streaming latency.
-OpenBIOS also has known compatibility exceptions, so a global replacement would
-violate the preserve-working-path rule.
-
----
-
-## F2 — OpenBIOS audit before implementation
-
-First determine the exact current Beetle behavior:
-
-- whether the active core already carries/falls back to an internal OpenBIOS;
-- which BIOS is actually selected in current PrivyHub sessions;
-- how the core's BIOS override option interacts with external firmware;
-- current known compatibility exceptions;
-- save/memory-card behavior;
-- region behavior;
-- boot timing;
-- interaction with game-specific core options.
-
-Do not assume that dropping an arbitrary external `openbios.bin` into the system
-directory is equivalent to the current core's internal/fallback behavior.
-
----
-
-## F3 — Optional BIOS mode
-
-If the audit is favorable, expose something like:
+Phase F deliberately limits the core emulator workload to:
 
 ```text
-PS1 BIOS
-  Compatibility / Existing
-  OpenBIOS
+NES
+SNES
+Genesis
+PS1
 ```
 
-Potential later extension:
+N64/GameCube/PS2 are excluded until the optimized core baseline exists.
+
+The goal is not merely to benchmark the EliteDesk. It is to **optimize the Linux
+implementation as far as worthwhile, measure the complete system, and derive a
+lower-cost Prototype 2 from evidence**.
+
+## F1 — Freeze the workload suite
+
+Representative workloads should include, where present:
+
+- idle Linux + PrivyHub;
+- Live TV;
+- VOD;
+- browser/live source;
+- camera/live source;
+- NES/SNES/Genesis;
+- PS1 local emulation;
+- PS1 + native streaming;
+- 720p60 reference profile;
+- higher Phase-C profiles where applicable;
+- metadata/storage work;
+- representative concurrent core workloads.
+
+## F2 — Whole-system measurements
+
+Measure:
+
+- total/per-core CPU;
+- process CPU;
+- RAM/working sets;
+- swap;
+- iGPU/render utilization;
+- hardware video engine utilization;
+- encoder headroom;
+- storage latency/throughput;
+- network/FEC/decoder telemetry;
+- end-to-end latency;
+- temperatures/throttling;
+- wall/idle power where practical;
+- concurrency behavior.
+
+Do not infer lower-tier hardware requirements from one aggregate CPU percentage.
+
+## F3 — Optimization loop
+
+Use:
 
 ```text
-per-game BIOS override
+measured bottleneck
+      ↓
+narrow hypothesis
+      ↓
+one optimization
+      ↓
+fresh benchmark
+      ↓
+accept / reject
 ```
 
-Rules:
+Potential areas:
 
-- existing known-good BIOS path remains available;
-- OpenBIOS never silently replaces the compatibility path;
-- incompatible titles can fall back;
-- selected OpenBIOS build is versioned and hashed;
-- any customized build is reproducible;
-- normal save/memory-card namespaces remain stable.
+- unnecessary services;
+- scheduling/priorities;
+- memory footprint;
+- avoidable copies;
+- capture path;
+- hardware encoder path;
+- buffering;
+- storage/cache behavior;
+- plugin lifecycle;
+- idle/background work;
+- network pacing/buffers;
+- concurrency policies.
+
+Optimize before deriving the hardware floor.
+
+## F4 — Core Linux resource envelope
+
+Produce:
+
+- **Known-good reference:** 4650G/16 GB prototype;
+- **Measured floor:** lowest demonstrated capability for defined workloads;
+- **Recommended alpha:** floor plus reliability/update/concurrency headroom;
+- **Optional higher tier:** stronger profiles without redefining Core.
+
+## F5 — Capability detection and graceful scaling
+
+PrivyHub should classify:
+
+- CPU/RAM/storage;
+- GPU/iGPU;
+- hardware encode/decode;
+- validated stream profiles;
+- emulator tiers;
+- concurrency headroom;
+- network capabilities.
+
+Features should enable only where the host/client pair is known to support them.
+
+## F6 — Select Prototype 2 / friend-alpha hardware
+
+Select from measured evidence, considering:
+
+- price/availability;
+- Linux compatibility;
+- idle power;
+- thermals/noise;
+- hardware video acceleration;
+- storage/RAM practicality;
+- network reliability;
+- margin above the measured floor.
+
+Do not select the absolute cheapest machine merely because it has a superficially
+similar benchmark score.
+
+## F7 — Resource checkpoint
+
+Acceptance:
+
+- repeatable workload suite;
+- PS1-and-below scope preserved;
+- worthwhile bottlenecks optimized;
+- resource/power envelope documented;
+- capability model established;
+- Prototype 2 class selected from evidence;
+- clean checkpoint/push.
 
 ---
 
-## F4 — Custom OpenBIOS experiment
+# Phase G — Extended Emulation & User-Content Import
 
-Only after stock OpenBIOS compatibility is characterized.
+**Status: FUTURE AFTER F**
 
-Possible experiments:
+This phase adds the user-owned content pipeline before introducing heavier
+console workloads.
 
-- faster/simpler boot presentation;
-- PrivyHub-branded boot screen;
-- diagnostic boot information;
-- development hooks;
-- instrumentation useful to emulator research.
+PrivyHub will **not** provide or fetch ROMs, ISOs, BIOS/firmware, keys, or similar
+game content.
 
-Customization should remain optional and should not turn PrivyHub into a fork
-that is difficult to update.
+## G0 — User-content import contract
+
+Define a removable-media import layout, for example:
+
+```text
+PrivyHub-Import/
+    bios/
+        ps1/
+        ps2/
+        ...
+    roms/
+        n64/
+        ...
+    isos/
+        gamecube/
+        ps2/
+        ...
+    artwork/
+    metadata/
+```
+
+Exact system folders should match emulator/storage requirements rather than this
+example blindly.
+
+The import system should:
+
+- support ordinary USB mass storage;
+- inspect before copying;
+- provide a dry-run/manifest;
+- hash files;
+- detect duplicates;
+- validate allowed extensions/types;
+- perform stronger format/signature validation where practical;
+- map content to the existing PrivyHub user-data layout;
+- copy atomically;
+- verify copied bytes;
+- be safely repeatable/idempotent;
+- never delete source USB files by default;
+- preserve user saves/states separately;
+- reject ambiguous/unknown files instead of guessing;
+- keep ROM/ISO/BIOS content out of Git and support bundles;
+- log sanitized import results without exposing private filenames/content where
+  not required.
+
+The import tooling should integrate content **into the existing infrastructure**
+rather than create a second game-library path.
+
+## G1 — N64
+
+Evaluate representative N64 emulation, controllers, saves, local rendering,
+native streaming, CPU/iGPU cost, latency, and compatibility.
+
+Question:
+
+> Does the optimized core/alpha hardware already have enough margin for N64?
+
+## G2 — GameCube
+
+Evaluate bounded representative titles:
+
+- native/default rendering first;
+- modest upscale only after baseline;
+- CPU/iGPU pressure;
+- stream/encoder interaction;
+- latency/stability;
+- thermals;
+- compatibility outliers.
+
+## G3 — PS2
+
+Evaluate representative easy/moderate/heavy titles:
+
+- CPU thread pressure;
+- iGPU pressure;
+- hardware renderer;
+- native/default resolution first;
+- streaming overhead;
+- game-specific compatibility;
+- sustained thermal behavior.
+
+User-supplied PS2 BIOS should enter only through the G0 import boundary.
+
+## G4 — Extended-emulation tiers
+
+Possible evidence-driven outcome:
+
+```text
+CORE
+  NES / SNES / Genesis / PS1
+
+EXTENDED
+  + N64
+
+ENHANCED
+  + selected GameCube / PS2
+```
+
+The actual boundaries come from runtime evidence.
+
+## G5 — Extended-emulation checkpoint
+
+Acceptance:
+
+- content import pipeline validated;
+- no project-supplied ROM/ISO/BIOS requirement;
+- N64 characterized;
+- GameCube characterized;
+- PS2 characterized;
+- incremental resource costs compared with Phase F;
+- compatibility claims limited to tested evidence;
+- base Core hardware remains independent unless evidence strongly justifies a
+  change;
+- clean checkpoint/push.
 
 ---
 
-## F5 — Broader open-dependency audit
+# Phase H — Home Infrastructure / Client / Plugin Expansion
 
-As Linux/appliance work progresses, review major dependencies for:
+**Status: FUTURE**
 
-- redistribution;
-- licensing;
-- architecture support;
-- offline operation;
-- source availability;
-- maintenance activity;
-- hardware lock-in.
+PrivyHub expands from TV/media/games into a private local home-coordination
+layer.
 
-Replace dependencies only when there is a practical architectural benefit.
+## H1 — First-class plugin/provider architecture
 
----
+Capabilities should be exposed once and callable from GUI, remote/control API,
+automation, voice, or AI:
 
-# Phase G — Smart-Home & Client Expansion
+```text
+games.launch()
+vod.play()
+tv.channel()
+camera.show()
+home.light.set()
+home.scene.activate()
+timer.create()
+steam.launch()
+```
 
-**Status: FUTURE / SEQUENCE INTENTIONALLY FLEXIBLE**
+Interfaces should invoke registered capabilities rather than duplicate device
+logic.
 
-Once the native server/client foundation is observable, portable and scalable,
-expand PrivyHub beyond the current TV/games focus.
+## H2 — Handheld client
 
-Candidate tracks:
+Evaluate X28-class Android handheld:
 
-## G1 — Camera infrastructure
+- reuse Android client;
+- hardware AVC decoding;
+- 720p60 behavior;
+- built-in controls;
+- Games/VOD/TV browsing;
+- session/pause UI;
+- battery/network behavior;
+- discovery;
+- optional dock/TV use.
 
-- local camera discovery/registration;
-- live native streaming through the generalized source layer;
-- local recording;
-- retention policy;
-- motion/event metadata;
-- no mandatory vendor cloud.
+## H3 — Existing-PC / Steam provider
 
-## G2 — Smart-home devices
+Use an existing gaming PC/laptop as optional external compute.
 
-- lights;
-- switches;
+PrivyHub should provide discovery, readiness, library/orchestration, permissions,
+and session UX.
+
+Prefer a direct PC→client media path when the external provider already solves it
+better than routing video through the Linux hub.
+
+## H4 — Home Assistant / device provider
+
+Integrate mature local-first smart-home infrastructure rather than recreating
+every protocol.
+
+Potential capabilities:
+
+- lights/switches;
 - sensors;
-- other isolated-IoT controls;
-- local automation rules;
-- explicit device permissions/capabilities.
+- climate;
+- scenes;
+- blinds;
+- Matter/Zigbee devices exposed by the home stack;
+- automation state.
 
-## G3 — Local storage / media server
+## H5 — Camera and microphone infrastructure
 
-- larger VOD/DVD library;
-- indexed local storage;
-- remote streaming where explicitly enabled;
-- no subscription dependency.
+Treat cameras/microphones as explicit private device classes:
 
-## G4 — Remote access
+- local registration;
+- live access;
+- local recording where applicable;
+- retention;
+- local event/motion/audio metadata;
+- explicit per-device permissions;
+- no mandatory vendor cloud;
+- intelligence layer separated from raw device access.
 
-Add secure remote use without making external connectivity mandatory.
+Microphones should support local deterministic/voice workflows without requiring
+cloud transmission.
+
+## H6 — Storage / larger media server
+
+Expand household storage:
+
+- indexed media;
+- larger DVD/VOD libraries;
+- storage health;
+- backup/maintenance;
+- optional remote streaming.
+
+Storage capacity and compute sizing remain separate questions.
+
+## H7 — Secure optional remote access
 
 Possible targets:
 
 - VOD;
 - cameras;
 - home controls;
-- game sessions.
+- game/session control.
 
-Remote transport/security should be designed after the local architecture is
-stable and measurable.
+Local operation must remain functional when remote connectivity is absent.
 
-## G5 — Existing PC modern-game relay
+---
 
-A future optional plugin can use the existing gaming PC as a source while
-PrivyHub remains the control/transport/security layer:
+# Phase I — Local Intelligence / Voice / Privacy-Aware AI
+
+**Status: FUTURE**
+
+PrivyHub intelligence should be layered from deterministic/local to optional
+external providers. No cloud AI provider is mandatory.
+
+## I1 — Deterministic local automation first
+
+Simple home behavior should remain explicit and inspectable:
 
 ```text
-PC game
+sensor/event
    ↓
-PrivyHub capture/stream source
+local rule
    ↓
-PrivyHub server/network policy
-   ↓
-onn / handheld client
+registered PrivyHub action
 ```
 
-This preserves modern PC gaming without requiring the inexpensive Linux server
-itself to render the game.
+Examples:
 
-## G6 — Handheld client
+- lights;
+- timers;
+- scenes;
+- media controls;
+- camera display;
+- scheduled routines.
 
-Evaluate inexpensive handheld hardware as another PrivyHub client:
+## I2 — Local voice foundation
 
-- Linux or Android;
-- built-in display/controllers;
-- optional TV/dock output;
-- same source catalog/session concepts;
-- hardware capability-driven decoding;
-- no separate incompatible ecosystem.
+Default path:
 
-The current onn client remains useful even if additional client classes emerge.
+```text
+wake word
+   ↓
+local speech/phrase recognition
+   ↓
+deterministic command registry
+   ↓
+validated plugin action
+   ↓
+local response/TTS
+```
+
+Core household commands must not require a cloud API.
+
+## I3 — Small local intent model
+
+A very small local model may map fuzzy language to constrained registered
+actions.
+
+Example:
+
+```text
+"make the living room a little darker"
+        ↓
+light.set_brightness(living_room, ...)
+```
+
+The model:
+
+- sees a bounded action vocabulary;
+- returns structured output;
+- has no shell/device/network authority;
+- fails safely;
+- requires confirmation for sensitive actions;
+- remains optional where deterministic matching is sufficient.
+
+## I4 — Optional external AI provider abstraction
+
+Allow a user to supply credentials for providers such as:
+
+- OpenAI;
+- Anthropic/Claude;
+- other commercial APIs;
+- user-hosted compatible endpoints;
+- future local high-capability inference.
+
+Potential provider capabilities:
+
+```text
+speech.transcribe()
+language.interpret()
+vision.describe()
+vision.detect()
+speech.synthesize()
+```
+
+Providers are plugins, not core dependencies.
+
+## I5 — Privacy boundary / data-minimization policy
+
+Cloud capability is **explicit opt-in** and should maximize local privacy even
+when enabled.
+
+Required principles:
+
+- no silent local-failure → cloud-upload fallback;
+- user-controlled API credentials;
+- secrets stored separately from normal config/logging;
+- per-provider and preferably per-device permissions;
+- disclose what data type crosses the boundary;
+- minimize payload before transmission;
+- prefer local feature/event extraction over raw continuous media where
+  sufficient;
+- send only the minimum temporal/spatial/audio segment needed;
+- redact/suppress unnecessary metadata;
+- do not include unrelated household context;
+- local-only modes remain available;
+- provider outage never disables core home control;
+- sensitive actions pass through the same local validation/permission layer;
+- cloud models never receive arbitrary shell/device authority;
+- AI/provider actions are auditable.
+
+Possible user policies:
+
+```text
+home control       local only
+basic voice        local only
+general assistant  cloud allowed
+camera analysis    off / event-only / explicit request
+microphone cloud   off / push-to-talk / explicit request
+```
+
+## I6 — Privacy-aware camera/microphone intelligence
+
+Preferred order:
+
+```text
+local deterministic event detection
+        ↓
+small local classifier/intent model
+        ↓
+optional external analysis of minimized selected data
+```
+
+Continuous microphone/camera feeds should not be exported merely because a cloud
+provider is configured.
+
+## I7 — Future first-party local LLM
+
+Defer larger local open-weight inference until actual usage justifies the
+hardware/cost.
+
+It should plug into the same provider interface rather than create a parallel
+control architecture.
+
+## I8 — Local adaptive resource optimizer
+
+Use machine telemetry to choose among bounded validated actions/profiles.
+
+Progression:
+
+```text
+deterministic rules
+      ↓
+rolling statistics / adaptive thresholds
+      ↓
+simple lightweight models where useful
+      ↓
+more sophisticated ML only if evidence justifies it
+```
+
+Inputs may include CPU/RAM, hardware video engine, network/FEC, decoder state,
+storage I/O, thermal state, active services, client capabilities, and concurrent
+workloads.
+
+Every adaptive decision remains diagnosable.
 
 ---
 
 # Cross-cutting architecture rules
 
-These apply to every phase.
+## Local-first, not necessarily local-only
+
+Core operation must not require:
+
+- cloud availability;
+- subscription;
+- metadata provider;
+- external AI;
+- remote authentication;
+- vendor smart-home cloud.
+
+Optional external providers are explicit additions.
+
+## User-owned content boundary
+
+PrivyHub does not supply copyrighted/proprietary game content.
+
+User ROMs/ISOs/BIOS/firmware remain runtime/user data:
+
+- outside Git;
+- outside support bundles;
+- imported through explicit tooling;
+- not silently fetched;
+- not silently replaced.
+
+## Privacy boundary is explicit
+
+A local failure must never silently send microphone audio, camera images,
+household state, filenames, or other private data to an external provider.
+
+## Models request actions; they do not control the machine
+
+Local or cloud models may request registered PrivyHub actions.
+
+The local policy/permission layer remains authoritative.
 
 ## Diagnostics first
 
-When behavior is uncertain:
+Dynamic behavior must explain why it changed.
+
+Use:
 
 ```text
 one narrow hypothesis
       ↓
-one targeted diagnostic/probe
+one targeted diagnostic
       ↓
 fresh evidence
       ↓
 inspect raw measurements
       ↓
-one coherent patch
+one coherent change
 ```
 
-Production features that become dynamic should expose why they changed state.
+## Preserve validated subsystems
 
-## Preserve validated paths
-
-Do not disturb stable video/audio/controller/storage behavior for unrelated work.
-
-## Local-first
-
-Normal functionality should not require:
-
-- cloud availability;
-- a subscription;
-- a metadata provider;
-- remote authentication;
-- proprietary control infrastructure.
-
-Optional Internet features should cache/use graceful local fallback.
-
-## Privacy
-
-Do not require network addresses in routine support workflows. Diagnostics and
-checkpoint evidence should exclude/redact addresses and secrets.
-
-## Data/source-control boundary
-
-Git contains:
-
-- source;
-- configuration;
-- durable engineering memory;
-- reusable diagnostics;
-- curated evidence;
-- sanitized checkpoint evidence snapshots.
-
-Git does not contain normal:
-
-- ROMs/ISOs;
-- saves/states;
-- media libraries;
-- runtime emulator trees;
-- logs;
-- packet captures;
-- private network-bearing state;
-- build output;
-- backups.
+Do not disturb stable video/audio/controller/storage/media paths for unrelated
+work.
 
 ## Capability-driven architecture
 
-Avoid embedding assumptions about the current Windows PC, current Wi-Fi adapter,
-current router, or onn model into the core architecture.
+Avoid hard-coding assumptions about one PC/router/client.
+
+Features and stream/emulator tiers should be enabled from measured capability.
 
 ## Fail closed
 
-If readiness, identity, save integrity, capture scope, or other safety-sensitive
-preconditions cannot be established, preserve the session/data rather than
-blindly proceeding.
+If identity, readiness, save integrity, import integrity, capture scope, or
+permission cannot be established, preserve the data/session rather than guessing.
 
 ## Checkpoint discipline
 
-At each meaningful milestone:
+At every meaningful milestone:
 
-- update `docs/memory/`;
-- preserve runtime evidence;
+- update durable memory;
+- preserve curated runtime evidence;
 - run deterministic validation;
-- create a clean checkpoint;
-- push only after the local authoritative state is proven.
-
----
-
-# Immediate development sequence
-
-The preferred next sequence is:
-
-```text
-e65e8f8 Phase A checkpoint
-        ↓
-B1 inventory existing diagnostics
-        ↓
-B1 unified diagnostic schema + health snapshot
-        ↓
-B2 GUI Diagnostics / Self-Test / sanitized bundle
-        ↓
-B3 Sunshine/Moonlight dependency inventory
-        ↓
-B4 legacy removal
-        ↓
-B5 native-only regression
-        ↓
-B6 clean-native checkpoint
-        ↓
-C1 explicit stream profiles
-        ↓
-C2 transport telemetry contract
-        ↓
-C3 adaptive bitrate
-        ↓
-C4 adaptive FEC decision
-        ↓
-C5 1080p60 characterization
-        ↓
-C6 generalized source abstraction
-        ↓
-C7 streaming checkpoint
-        ↓
-D VOD/media-library UX
-        ↓
-E Linux/resource scaling
-        ↓
-G broader smart-home/client expansion
-```
-
-Phase F/OpenBIOS may run in parallel after Phase B when it helps portability,
-distribution, or Linux preparation, but it should not block the main sequence.
+- checkpoint cleanly;
+- push only after local state is proven.
 
 ---
 
 # Near-term decision gates
 
-## Gate 1 — Diagnostics architecture
+## Gate 1 — Phase C telemetry
 
-Before coding B1, answer:
-
-- what existing telemetry should become permanent;
-- what the common diagnostic schema is;
-- what belongs in GUI vs developer detail;
-- what self-test can safely exercise;
-- what a sanitized bundle must contain.
-
-## Gate 2 — Adaptive bitrate telemetry
-
-Before coding C3, prove that the measurements selected in C2 can distinguish:
+Do not implement adaptive bitrate until the telemetry can distinguish:
 
 - healthy path;
 - capacity pressure;
 - random loss;
 - burst/jitter pathology;
-- decoder-side starvation.
+- decoder starvation.
 
-Do not tune bitrate from one noisy metric.
+## Gate 2 — Phase D Live TV data model
 
-## Gate 3 — VOD metadata scope
+Do not polish the guide UI around unreliable channel/EPG identity.
 
-Before optional Internet metadata integration, make local sidecar artwork and
-recursive library behavior work completely offline.
+First establish canonical channels, normalization, matching, refresh, and
+diagnostics.
 
-## Gate 4 — OpenBIOS
+## Gate 3 — Linux backend selection
 
-Before changing BIOS behavior, compare the current compatibility path and
-OpenBIOS using an explicit game/boot/save regression matrix. OpenBIOS remains an
-option until evidence justifies any broader default.
+Before Phase E implementation, define the Linux equivalents for capture,
+hardware encoding, source audio, input injection, service lifecycle, and
+diagnostics while preserving stable behavioral contracts.
 
-## Gate 5 — Linux target selection
+## Gate 4 — Linux acceptance
 
-Do not buy/design around a final cheap Linux host until the benchmark suite
-exists. Let workload measurements determine the hardware tier.
+Do not start hardware shrinking until the Linux system is functionally correct
+and runtime validated.
+
+## Gate 5 — Resource measurement quality
+
+Do not select Prototype 2 from superficial aggregate CPU percentages.
+
+Use whole-system measurements and hardware-acceleration evidence.
+
+## Gate 6 — User-content import
+
+Before enabling new N64/GameCube/PS2 libraries, validate the USB/removable-media
+import path, idempotence, hashing, target mapping, and failure behavior.
+
+## Gate 7 — Extended emulation
+
+Do not allow N64/GameCube/PS2 to raise the Core minimum before incremental cost
+is measured against the optimized Phase F baseline.
+
+## Gate 8 — Cloud AI
+
+Do not add an external AI provider without:
+
+- explicit opt-in;
+- credential boundary;
+- per-capability privacy model;
+- data minimization;
+- no silent fallback;
+- local action validation.
+
+## Gate 9 — Larger local AI
+
+Do not make a substantial local LLM a base hardware requirement without product
+evidence that justifies it.
+
+---
+
+# Immediate sequence
+
+```text
+A COMPLETE / PUSHED
+        ↓
+B COMPLETE / PUSHED
+        ↓
+C Adaptive Streaming
+  C1 profiles
+  C2 telemetry
+  C3 adaptive bitrate
+  C4 FEC decision
+  C5 1080p characterization
+  C6 generalized source abstraction
+  C7 checkpoint
+        ↓
+D Media / VOD / Live TV
+  local library polish
+  channel normalization
+  EPG/guide rebuild
+  checkpoint
+        ↓
+E Linux Migration
+  HP 805 G6
+  Linux-native A/V/input/server
+  PS1-and-below parity
+  UDP replay
+  checkpoint
+        ↓
+F Linux Optimization / Resource Characterization
+  freeze PS1-and-below
+  measure
+  optimize
+  measure again
+  derive capability envelope
+  select Prototype 2
+        ↓
+G User Content + Extended Emulation
+  safe USB import
+  N64
+  GameCube
+  PS2
+  capability tiers
+        ↓
+H Home / Clients / Plugins
+  handheld
+  Steam/external compute
+  Home Assistant/devices
+  cameras/microphones
+  storage
+  remote access
+        ↓
+I Local Intelligence / Voice / AI
+  deterministic local control
+  local voice
+  small local intent model
+  optional OpenAI/Claude/other providers
+  privacy-aware camera/microphone analysis
+  future local LLM
+  bounded adaptive optimizer
+```
+
+---
+
+## Guiding statement
+
+PrivyHub should be designed around the smallest reliable **Linux-native,
+local-first core** that can deliver the validated household experience with
+appropriate headroom.
+
+Optional capabilities should scale upward:
+
+```text
+CORE
+  media / Live TV / local services
+  PS1-and-below
+  normal native streaming
+  deterministic local home control
+  basic local voice
+
+EXTENDED
+  stronger stream profiles
+  N64
+  additional concurrency
+
+ENHANCED
+  selected GameCube / PS2
+  heavier local processing
+
+OPTIONAL EXTERNAL COMPUTE
+  existing gaming PC / Steam
+  user-enabled cloud AI providers
+
+FUTURE LOCAL AI
+  stronger local open-weight inference
+```
+
+The HP EliteDesk 805 G6 exists to establish and optimize the Linux reference
+with enough headroom to avoid confusing migration failures with minimum-hardware
+limits.
+
+Prototype 2 should be selected only after Phase F produces evidence for a
+cheaper, appropriately sized alpha appliance.

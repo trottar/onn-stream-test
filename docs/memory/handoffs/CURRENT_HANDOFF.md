@@ -553,3 +553,25 @@ regression and B6 repository/build audit are complete.
 
 Next: C1 explicit stream profiles. Preserve the validated 720p60 behavior while
 making the currently implicit stream constants named and inspectable.
+
+
+## Accepted roadmap after Phase B
+
+Phase C remains next; start with C1 explicit stream profiles.
+
+Future sequence is now:
+D media/VOD/Live TV cleanup -> E Linux migration -> F Linux PS1-and-below
+optimization/resource characterization -> G user-content import + N64/GameCube/
+PS2 -> H home/client/plugin expansion -> I local/optional-cloud intelligence.
+
+The HP EliteDesk 805 G6 is the Linux reference prototype, not the minimum target.
+Prototype 2 is selected only after Phase F evidence.
+
+OpenBIOS is retired from the roadmap. Required game firmware/content is
+user-supplied through the future G0 import boundary.
+
+Live TV is not considered finished: Phase D includes channel normalization,
+identity/deduplication, EPG matching/cache/timezone diagnostics, and guide UX.
+
+AI/home work stays local-first. External API providers are explicit opt-in and
+subject to data minimization, no-silent-fallback, and local action validation.

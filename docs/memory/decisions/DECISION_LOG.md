@@ -475,3 +475,47 @@ path/line/pattern/hash tuple as inert text. Any drift fails the audit.
 Remove `manifest.json` from its own `files` list. A conventional final-file
 SHA-256/byte-count self-entry is recursive. Continue exact validation of every
 other durable-memory entry.
+
+
+### D-043 — Linux migration and resource sizing are separate phases
+
+**Status:** Accepted (2026-09-11)
+
+Use the HP EliteDesk 805 G6 as the Linux reference prototype. Do not spend a
+dedicated phase formally sizing the abandoned Windows server architecture.
+First establish Linux functional parity (E), then optimize/measure Linux with
+PS1-and-below only (F), and select Prototype 2 from that evidence.
+
+### D-044 — User supplies emulator firmware/content
+
+**Status:** Accepted (2026-09-11)
+
+PrivyHub does not provide, download, redistribute, or silently substitute ROMs,
+ISOs, BIOS/firmware, keys, or equivalent game content. Retire OpenBIOS as a
+roadmap requirement. Before N64/GameCube/PS2 expansion, build an explicit,
+idempotent removable-media import path that validates/hashes/copies user content
+into the existing runtime data layout while keeping it out of Git/support
+bundles.
+
+### D-045 — Live TV requires a data-model/EPG repair phase
+
+**Status:** Accepted (2026-09-11)
+
+Phase D includes Live TV channel normalization, stable channel identity,
+duplicate handling, favorites/search/pagination, EPG matching/cache/timezone
+diagnostics, and guide UX. Do not polish the guide around unreliable identity
+or matching; basic channel playback must not depend on guide success.
+
+### D-046 — Local-first intelligence with explicit optional cloud providers
+
+**Status:** Accepted (2026-09-11)
+
+Deterministic/local home control and basic voice remain the baseline. Small local
+intent models may request bounded registered actions. Users may explicitly add
+OpenAI, Anthropic/Claude, other commercial providers, or user-hosted compatible
+endpoints for more sophisticated capabilities.
+
+External AI is never mandatory. No local failure may silently become a cloud
+upload. Credentials remain user-controlled; data is minimized; microphone/
+camera export requires an explicit policy; and all model-requested actions pass
+through local permission/validation.

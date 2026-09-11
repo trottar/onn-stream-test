@@ -713,3 +713,37 @@ Two audit-model false positives were corrected:
 Phase B is checkpointed/pushed. Phase C is next.
 
 Next step: C1 explicit stream profiles.
+
+
+## Roadmap v3 accepted — Linux-first continuation
+
+The merged roadmap is now authoritative for future sequencing.
+
+Current development step remains:
+`C1 explicit stream profiles`
+
+Post-C sequence:
+
+```text
+C Adaptive Streaming
+D Media Library / VOD / Live TV UX
+E Linux Migration / Native Linux Baseline
+F Linux Core Resource Characterization & Optimization
+G Extended Emulation & User-Content Import
+H Home Infrastructure / Client / Plugin Expansion
+I Local Intelligence / Voice / Privacy-Aware AI
+```
+
+Key changes:
+- Phase D explicitly includes Live TV channel normalization and EPG/guide repair.
+- Phase E moves the core server to the HP EliteDesk 805 G6 Linux prototype.
+- Phase F performs formal optimization/resource sizing on Linux with PS1-and-below only.
+- Phase G first establishes safe user-supplied USB/removable-media content import,
+  then evaluates N64 -> GameCube -> PS2.
+- OpenBIOS/Open Platform work is removed from the roadmap; users supply required
+  ROM/ISO/BIOS/firmware content.
+- Home intelligence remains local-first: deterministic/local control is the
+  baseline, with optional user-configured OpenAI/Anthropic/other providers behind
+  explicit privacy/data-minimization boundaries.
+
+Immediate next step remains C1 inventory/profile-schema work.

@@ -680,3 +680,30 @@ hash/byte list. All other durable-memory entries remain strictly validated.
 Legacy scan rule: the exact MainActivity path/line/pattern/hash tuple recorded by
 B6 is inert text. Any additional occurrence, or the same occurrence under a
 different source hash, is a regression.
+
+
+## Roadmap v3 durable direction
+
+The accepted roadmap after the Phase B checkpoint is:
+
+- C: adaptive streaming architecture;
+- D: media/VOD plus substantive Live TV channel/EPG cleanup;
+- E: Linux migration to the HP EliteDesk 805 G6 reference prototype;
+- F: optimize/measure the Linux core with NES/SNES/Genesis/PS1 only, then select
+  Prototype 2 from evidence;
+- G: user-content import followed by N64/GameCube/PS2 feasibility;
+- H: home infrastructure, clients and providers;
+- I: deterministic/local intelligence first, optional privacy-aware external AI.
+
+Game-content rule:
+PrivyHub does not provide, download, redistribute, or silently substitute ROMs,
+ISOs, BIOS/firmware, keys, or equivalent game content. User content is imported
+through explicit tooling and remains outside Git/support bundles.
+
+OpenBIOS is no longer a roadmap requirement.
+
+Cloud-AI rule:
+external providers such as OpenAI or Anthropic are optional user-configured
+providers, never core dependencies. Local failure must never silently become a
+cloud upload. Models may request registered PrivyHub actions but do not receive
+arbitrary machine/device authority.

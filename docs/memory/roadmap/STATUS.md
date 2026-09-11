@@ -362,3 +362,26 @@ Sunshine/Moonlight architecture and artifacts. B5 passed native-only regression.
 B6 audited repository/build state and checkpointed the clean-native baseline.
 
 Phase C is NEXT, beginning with C1 explicit stream profiles.
+
+
+## Roadmap v3 — accepted Linux-first continuation
+
+Current:
+- A COMPLETE / PUSHED
+- B COMPLETE / PUSHED
+- C NEXT
+
+Planned continuation:
+- D Media Library / VOD / Live TV UX
+- E Linux Migration / Native Linux Baseline
+- F Linux Core Resource Characterization & Optimization
+- G Extended Emulation & User-Content Import
+- H Home Infrastructure / Client / Plugin Expansion
+- I Local Intelligence / Voice / Privacy-Aware AI
+
+OpenBIOS/Open Platform is removed as a dedicated phase.
+
+Phase F core sizing is intentionally limited to PS1-and-below.
+Phase G adds safe user-content import before N64/GameCube/PS2 work.
+
+Immediate next step: C1 explicit stream profiles.

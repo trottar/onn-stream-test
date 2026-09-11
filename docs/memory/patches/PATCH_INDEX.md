@@ -247,3 +247,10 @@ This index records durable checkpoints and major patch lines; it does not invent
   probe, removes the manifest self-entry convention, updates `docs/ROADMAP.md`
   to Phase B complete / Phase C next, selectively stages the exact audited
   scope, commits, pushes, and verifies remote main.
+
+
+- `privyhub_roadmap_v3_linux_first_merge_01_2026-09-11` — roadmap-only checkpoint. Replaces the post-C roadmap with the
+  accepted Linux-first sequence; expands Live TV work; retires OpenBIOS;
+  formalizes user-supplied game-content import; and records local-first,
+  privacy-aware optional external AI providers. No production/runtime code
+  changes.
