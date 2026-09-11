@@ -36,8 +36,8 @@ checkpoint/history layer.
 | Phase | Purpose | Status |
 |---|---|---|
 | **A — Emulator Subsystem** | Finish Games/emulation as a normal-use subsystem | **COMPLETE / PUSHED** |
-| **B — Diagnostics & Clean Native Baseline** | Make PrivyHub self-diagnosing, then remove Sunshine/Moonlight legacy | **NEXT** |
-| **C — Adaptive Streaming Architecture** | Explicit profiles, dynamic bitrate/network adaptation, 1080p, generalized native streaming | **PLANNED** |
+| **B — Diagnostics & Clean Native Baseline** | Make PrivyHub self-diagnosing, then remove Sunshine/Moonlight legacy | **COMPLETE / PUSHED** |
+| **C — Adaptive Streaming Architecture** | Explicit profiles, dynamic bitrate/network adaptation, 1080p, generalized native streaming | **NEXT** |
 | **D — Media Library / VOD UX** | Poster art, metadata, recursive VOD presentation, local-first library polish | **PLANNED** |
 | **E — Resource Scaling / Linux** | Benchmark the architecture, test inexpensive Linux tiers, capability scaling | **PLANNED** |
 | **F — Open Platform / Firmware Portability** | Evaluate OpenBIOS and other open replacements without sacrificing compatibility | **OPTIONAL / PARALLEL AFTER B** |
@@ -240,7 +240,7 @@ repository. Network-bearing target values are not printed or committed.
 
 # Phase B — Diagnostics & Clean Native Baseline
 
-**Status: NEXT**
+**Status: COMPLETE / CHECKPOINTED / PUSHED**
 
 Phase B combines two related objectives:
 
@@ -255,7 +255,7 @@ and harder to troubleshoot.
 
 ## B1 — Unified diagnostics substrate
 
-**Status: NEXT**
+**Status: COMPLETE / RUNTIME VALIDATED**
 
 PrivyHub already has substantial instrumentation, but it is spread across
 subsystem-specific logs and probes. Consolidate it into a common diagnostic
@@ -388,6 +388,8 @@ No network addresses should be required in ordinary diagnostics.
 
 ## B2 — GUI Diagnostics / Self-Test
 
+**Status: COMPLETE / RUNTIME VALIDATED**
+
 Expose the diagnostics substrate through the onn GUI without making the GUI the
 only way to access it.
 
@@ -464,7 +466,7 @@ This becomes the preferred support/debug handoff.
 
 ## B3 — Sunshine / Moonlight dependency inventory
 
-**Status: PENDING AFTER B1/B2 FOUNDATION**
+**Status: COMPLETE / RUNTIME VALIDATED**
 
 Do not begin by deleting files.
 
@@ -497,6 +499,8 @@ MUST PRESERVE
 
 ## B4 — Remove legacy streaming infrastructure
 
+**Status: COMPLETE / RUNTIME VALIDATED**
+
 Make one coherent removal series based on B3 evidence.
 
 Do not disturb the stable native paths:
@@ -514,6 +518,8 @@ Remove Sunshine/Moonlight only where native PrivyHub has already superseded it.
 ---
 
 ## B5 — Native-only regression
+
+**Status: COMPLETE / RUNTIME VALIDATED**
 
 Prove Games independently after legacy removal:
 
@@ -542,6 +548,8 @@ every Phase A exploratory diagnostic.
 
 ## B6 — Clean-native checkpoint
 
+**Status: COMPLETE / CHECKPOINTED / PUSHED**
+
 Acceptance:
 
 - unified diagnostics substrate established;
@@ -560,7 +568,7 @@ At this point the architectural statement should be:
 
 # Phase C — Adaptive Streaming Architecture
 
-**Status: PLANNED**
+**Status: NEXT**
 
 Phase C turns the current proven game streamer into a reusable, measurable,
 adaptive native streaming platform.

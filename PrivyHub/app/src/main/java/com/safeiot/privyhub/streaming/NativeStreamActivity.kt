@@ -62,6 +62,13 @@ class NativeStreamActivity :
         private const val VIDEO_FPS = 60
         private const val EXPECTED_HOST_ALPHA = "0.7"
         private const val CLIENT_PROFILER_VERSION = "0.12.2"
+
+        // PRIVYHUB_B1_CLIENT_HEALTH_V1
+        private const val CLIENT_HEALTH_INTERVAL_MS =
+            2_000L
+        private const val CLIENT_HEALTH_INTERVAL_NS =
+            CLIENT_HEALTH_INTERVAL_MS *
+                1_000_000L
     }
 
     private lateinit var surfaceView: SurfaceView
@@ -159,6 +166,16 @@ class NativeStreamActivity :
 
     private var recentVideoFps =
         0.0
+
+    private var lastClientHealthPostAtNs =
+        0L
+
+    private var clientHealthSequence =
+        0L
+
+    @Volatile
+    private var clientHealthPostInFlight =
+        false
 
     @Volatile
     private var sessionStartedAtNs =
@@ -396,6 +413,12 @@ class NativeStreamActivity :
         hostMetadataError = ""
         sessionStartedAtNs =
             System.nanoTime()
+        lastClientHealthPostAtNs =
+            0L
+        clientHealthSequence =
+            0L
+        clientHealthPostInFlight =
+            false
 
         audioReceiver =
             NativeAudioReceiver(
@@ -1372,6 +1395,166 @@ class NativeStreamActivity :
         return root.toString()
     }
 
+
+    private fun maybeSendClientHealth(
+        nowNs: Long
+    ) {
+        if (
+            !sessionStarted ||
+            stopping ||
+            clientHealthPostInFlight
+        ) {
+            return
+        }
+
+        if (
+            lastClientHealthPostAtNs > 0L &&
+            nowNs - lastClientHealthPostAtNs <
+                CLIENT_HEALTH_INTERVAL_NS
+        ) {
+            return
+        }
+
+        val rtp =
+            receiver?.snapshot()
+                ?: return
+
+        val dec =
+            decoder?.snapshot()
+                ?: return
+
+        val host =
+            intent.getStringExtra(
+                EXTRA_COMPANION_HOST
+            )
+                ?.trim()
+                .orEmpty()
+
+        if (host.isBlank()) {
+            return
+        }
+
+        val elapsedMs =
+            if (sessionStartedAtNs > 0L) {
+                (
+                    nowNs -
+                        sessionStartedAtNs
+                ).coerceAtLeast(0L) /
+                    1_000_000L
+            } else {
+                0L
+            }
+
+        clientHealthSequence +=
+            1L
+
+        val payload =
+            JSONObject().apply {
+                put(
+                    "schema",
+                    "privyhub_client_health_v1"
+                )
+                put(
+                    "sequence",
+                    clientHealthSequence
+                )
+                put(
+                    "interval_ms",
+                    CLIENT_HEALTH_INTERVAL_MS
+                )
+                put(
+                    "session_elapsed_ms",
+                    elapsedMs
+                )
+                put(
+                    "video",
+                    JSONObject().apply {
+                        put("packets", rtp.packets)
+                        put("lost_packets", rtp.lostPackets)
+                        put("dropped_frames", rtp.droppedFrames)
+                        put(
+                            "fec_recovered_packets",
+                            rtp.fecRecoveredPackets
+                        )
+                        put(
+                            "fec_unrecoverable_groups",
+                            rtp.fecUnrecoverableGroups
+                        )
+                        put(
+                            "late_or_reordered_packets",
+                            rtp.lateOrReorderedPackets
+                        )
+                        put(
+                            "forward_gap_events",
+                            rtp.forwardGapEvents
+                        )
+                        put("recent_fps", recentVideoFps)
+                        put("recent_mbps", recentVideoMbps)
+                        put("waiting_for_idr", rtp.waitingForIdr)
+                    }
+                )
+                put(
+                    "decoder",
+                    JSONObject().apply {
+                        put("queued_frames", dec.queuedFrames)
+                        put("rendered_frames", dec.renderedFrames)
+                        put("dropped_frames", dec.droppedFrames)
+                        put("queue_depth", dec.queueDepth)
+                        put(
+                            "queue_overflow_drops",
+                            dec.queueOverflowDrops
+                        )
+                        put(
+                            "stale_output_drops",
+                            dec.staleOutputDrops
+                        )
+                        put(
+                            "latest_rx_to_decode_ms",
+                            dec.latestReceiveToDecodeMs
+                        )
+                        put(
+                            "latest_output_gap_ms",
+                            dec.latestOutputGapMs
+                        )
+                        put(
+                            "hardware_accelerated",
+                            dec.hardwareAccelerated
+                        )
+                        put("vendor_codec", dec.vendorCodec)
+                        put(
+                            "low_latency_enabled",
+                            dec.lowLatencyEnabled
+                        )
+                    }
+                )
+            }
+
+        lastClientHealthPostAtNs =
+            nowNs
+        clientHealthPostInFlight =
+            true
+
+        thread(
+            start = true,
+            isDaemon = true,
+            name = "PrivyHub-Client-Health"
+        ) {
+            try {
+                httpPostJson(
+                    "http://$host:$CONTROL_PORT" +
+                        "/diagnostics/client-health",
+                    payload
+                )
+            } catch (_: Exception) {
+                // Diagnostic feedback must never disturb gameplay.
+            } finally {
+                clientHealthPostInFlight =
+                    false
+            }
+        }
+    }
+
+
     private fun updateMetrics() {
         val rtp =
             receiver?.snapshot()
@@ -1426,6 +1609,10 @@ class NativeStreamActivity :
             lastRtpFrames =
                 rtp.frames
         }
+
+        maybeSendClientHealth(
+            nowNs
+        )
 
         statusView.text =
             buildString {
@@ -1914,6 +2101,64 @@ class NativeStreamActivity :
             event
         )
     }
+
+
+    private fun httpPostJson(
+        address: String,
+        payload: JSONObject
+    ) {
+        val body =
+            payload.toString()
+                .toByteArray(
+                    Charsets.UTF_8
+                )
+
+        val connection =
+            (
+                URL(address).openConnection()
+                    as HttpURLConnection
+                ).apply {
+                    requestMethod = "POST"
+                    connectTimeout = 1_500
+                    readTimeout = 1_500
+                    doInput = true
+                    doOutput = true
+                    setRequestProperty(
+                        "Content-Type",
+                        "application/json"
+                    )
+                    setFixedLengthStreamingMode(
+                        body.size
+                    )
+                }
+
+        try {
+            connection.outputStream.use {
+                it.write(body)
+            }
+
+            val code =
+                connection.responseCode
+
+            val stream =
+                if (code in 200..299) {
+                    connection.inputStream
+                } else {
+                    connection.errorStream
+                }
+
+            stream?.close()
+
+            if (code !in 200..299) {
+                throw IllegalStateException(
+                    "HTTP $code"
+                )
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
 
     private fun httpPost(
         address: String,

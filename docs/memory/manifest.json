@@ -7,11 +7,31 @@
     "snes": "runtime exercised"
   },
   "a9_status": "pending PS1 On/Off CTR validation; Android install temporarily blocked by ADB recovery tooling",
-  "as_of": "2026-09-10",
-  "baseline_commit": "e65e8f89604ce325e6e3e0537d0287070b8996c5",
-  "baseline_short": "e65e8f8",
-  "current_phase": "Phase B",
-  "current_step": "B1 unified diagnostics inventory and architecture",
+  "android_behavior_changed": false,
+  "android_manifest_post_sha256": "ab1140c3230582f9dbbbf3c179d8fa08363971d9289e08442487f3849c7ac8a2",
+  "android_moonlight_package_state": "unverified if ADB remains unavailable",
+  "as_of": "2026-09-11",
+  "b1_status": "complete / runtime validated",
+  "b2_status": "complete / runtime and manual GUI validated",
+  "b3_status": "broad inventory captured; focused active-edge trace pending runtime evidence",
+  "b4_status": "COMPLETE / runtime validated",
+  "b5_status": "COMPLETE / runtime validated",
+  "b6_status": "COMPLETE / checkpointed / pushed",
+  "baseline_commit": "6b7c74f417e2ef14e252b9ea19afc16bdefaa50a",
+  "baseline_short": "6b7c74f4",
+  "classifier_changed": false,
+  "client_health_interval_ms": 2000,
+  "client_health_schema": "privyhub_client_health_v1",
+  "client_health_storage": "latest only plus one delta baseline",
+  "companion_behavior_changed": false,
+  "current_phase": "Phase C",
+  "current_step": "C1 explicit stream profiles",
+  "decoder_classifier_runtime_validated": true,
+  "decoder_stale_policy": "informational unless decoder-local failure exists",
+  "development_infrastructure_changed": true,
+  "diagnostic_event_history_capacity": 128,
+  "diagnostics_gui": "standalone activity consuming GET /diagnostics/health",
+  "diagnostics_health_schema": "privyhub_diagnostics_health_v1",
   "durable_memory_updated": true,
   "files": [
     {
@@ -25,9 +45,9 @@
       "sha256": "2f3c393d42bf1629909e77cdecb9196befaf1b47141656f18ba4bfb2feaad930"
     },
     {
-      "bytes": 2345,
+      "bytes": 30508,
       "path": "CURRENT.md",
-      "sha256": "9f19701f55c94ae6e48470f45cd023f2959a87cae96ebef835d2cc3ca1a892b7"
+      "sha256": "1fcf22ab5b74aae139fb33ec1ad1869e525894a6a102291852c520846f85abee"
     },
     {
       "bytes": 2564,
@@ -35,9 +55,9 @@
       "sha256": "7957a58cd59456684c568bc85d8fe39c22d130b58ddaf9d9d636f7b063fa9698"
     },
     {
-      "bytes": 17381,
+      "bytes": 36739,
       "path": "MEMORY.md",
-      "sha256": "089c904559195ad4dc8f29cd689dcdc5740bf94bc7ba540eb927c5aa5b776042"
+      "sha256": "ec388a004805940df848859b403aefef02446a83b8c80317b261dab996dbd904"
     },
     {
       "bytes": 3012,
@@ -63,6 +83,11 @@
       "bytes": 9720,
       "path": "architecture/CONTROLLERS.md",
       "sha256": "1c3fc5fad67b6efe23a71864d48325966165300eab6d0e94880c4a45db39805b"
+    },
+    {
+      "bytes": 23670,
+      "path": "architecture/DIAGNOSTICS.md",
+      "sha256": "00a88d5852e069b94fd388d0292490798b4bd7b5e69dcced30619abebea81d2c"
     },
     {
       "bytes": 4328,
@@ -95,9 +120,9 @@
       "sha256": "508ae66c526882e3a598403eb3b36228e576ffa1dd22d36fd85bc4f99f83890c"
     },
     {
-      "bytes": 8308,
+      "bytes": 23451,
       "path": "decisions/DECISION_LOG.md",
-      "sha256": "6a59c0e984595e24bd9fbb0ba9c7b090d6dbf0fed9d32c016c791943d090a411"
+      "sha256": "438aa1aa92bcd96b3ddbd0eed61771f3064dc49b1a042f1afca45189f9534d65"
     },
     {
       "bytes": 1129,
@@ -133,6 +158,151 @@
       "bytes": 1011,
       "path": "evidence/ADB_WIRELESS_RECOVERY_RUNTIME_VALIDATED_2026-09-10.md",
       "sha256": "e0d8b05108dcdf8dc91f1b859d3116ac4653f1e140ef3383309e73603da84080"
+    },
+    {
+      "bytes": 897,
+      "path": "evidence/B1_B2_COMPLETION_GAPS_2026-09-10.md",
+      "sha256": "a6ca2e2fb49df387a8dec9bdd60c4ed7c7180c90a53392ef2f19170c74089601"
+    },
+    {
+      "bytes": 1310,
+      "path": "evidence/B1_B2_COMPLETION_RUNTIME_2026-09-10.md",
+      "sha256": "2b53692029b84889c41f58ea7063b028fcf2579b0025e48004ea5af83cafa65f"
+    },
+    {
+      "bytes": 1967,
+      "path": "evidence/B1_B2_COMPLETION_SOURCE_CONTEXT_2026-09-10.md",
+      "sha256": "059f199a88048b480a28df9705d4a4fcdcddc1205cb71441e50e3fd63e931eff"
+    },
+    {
+      "bytes": 1551,
+      "path": "evidence/B1_CLIENT_FEEDBACK_RUNTIME_2026-09-10.md",
+      "sha256": "99560edd22c6c93752c695998d382a1c8e3e49ea5c6f2db8a863cb1da3caa18b"
+    },
+    {
+      "bytes": 661,
+      "path": "evidence/B1_CLIENT_FEEDBACK_SOURCE_CONTEXT_2026-09-10.md",
+      "sha256": "76c8f8adb06ca99d28b58bfa56c6ea05d54d73bb388bb6a486c3575597b038d6"
+    },
+    {
+      "bytes": 1166,
+      "path": "evidence/B1_DECODER_CLASSIFIER_RUNTIME_2026-09-10.md",
+      "sha256": "2a612fbc9148be9f2af26c7019d7d91683805dfd3bcc951011bef0bdac7810e2"
+    },
+    {
+      "bytes": 1453,
+      "path": "evidence/B1_DECODER_STALE_SEMANTICS_2026-09-10.md",
+      "sha256": "5181d56876058a6c58da0691b15eaaa33dd11b5dbfe4f93b1f52f4b63974a0df"
+    },
+    {
+      "bytes": 1396,
+      "path": "evidence/B1_DIAGNOSTICS_INVENTORY_2026-09-10.md",
+      "sha256": "eaa428fea5cfdacf43b4cc31daf366a733a3f0b5feed91aec88c59eb8fb74bb6"
+    },
+    {
+      "bytes": 1259,
+      "path": "evidence/B1_GUI_RETENTION_CONTEXT_2026-09-10.md",
+      "sha256": "ea623d96309aa04bfd0b58906d676c13e8e93cf1608d661150359aad57c9ec01"
+    },
+    {
+      "bytes": 1223,
+      "path": "evidence/B1_GUI_RETENTION_RUNTIME_2026-09-10.md",
+      "sha256": "47cd4fee970bee8b3817e2a432b5e2fc9ea7815540ebcf981a962e2bd97ac8bb"
+    },
+    {
+      "bytes": 1039,
+      "path": "evidence/B1_HEALTH_ENDPOINT_RUNTIME_2026-09-10.md",
+      "sha256": "608d9269ed448a0a3bc2c04907bc90d05cde8ebe9c2434016e324dc204420001"
+    },
+    {
+      "bytes": 1469,
+      "path": "evidence/B1_HEALTH_MODEL_RUNTIME_2026-09-10.md",
+      "sha256": "87d6665de422d2d19c4f1994e057bc86049689fc40fb3a228427aeb218a3ded8"
+    },
+    {
+      "bytes": 926,
+      "path": "evidence/B1_RETENTION_APPLY_2026-09-10.md",
+      "sha256": "b6f2d1e0efa55f5cda51b6fa60c1d76ee41ec54aad58c8ab8fc1625893dd39f7"
+    },
+    {
+      "bytes": 1114,
+      "path": "evidence/B1_RETENTION_BLOCKER_2026-09-10.md",
+      "sha256": "58582c446ef604c7ee505e1977cc19904686c6eb89e27bdaf52647e11e5cdaaa"
+    },
+    {
+      "bytes": 328,
+      "path": "evidence/B2_GUI_ACTION_FEEDBACK_RUNTIME_2026-09-10.md",
+      "sha256": "2558cea177ab77944a7f33c1e0a17cc09efdb9c63599b858acbe2f043d99dbed"
+    },
+    {
+      "bytes": 1270,
+      "path": "evidence/B3_SUNSHINE_MOONLIGHT_INVENTORY_2026-09-10.md",
+      "sha256": "379ccc267d2d6b74de3e824bdc6f8c078cc3caa82c477985e80bef0b4f071f11"
+    },
+    {
+      "bytes": 1406,
+      "path": "evidence/B4_1_GAMES_SOURCE_CONTEXT_2026-09-11.md",
+      "sha256": "492c5e0483ca495ab0fc584497db196e9c2ce4c6f88c8c8573536ba4d368e3f7"
+    },
+    {
+      "bytes": 1103,
+      "path": "evidence/B4_1_SERVER_EDGE_RUNTIME_2026-09-11.md",
+      "sha256": "9ca57b15862778dfc5f4742ef14d0a27fb8a35307dbb485f21dc23dfe8feed7a"
+    },
+    {
+      "bytes": 1058,
+      "path": "evidence/B4_2_ANDROID_EDGE_RUNTIME_2026-09-11.md",
+      "sha256": "397021982b8f71988775fb302109a20f34a693c166c44c894f36f69a0a02d84a"
+    },
+    {
+      "bytes": 1397,
+      "path": "evidence/B4_2_ANDROID_SOURCE_CONTEXT_2026-09-11.md",
+      "sha256": "007231f1109a19551146bd38af3fe84350cf1404df152e67dd73f850b7940f5f"
+    },
+    {
+      "bytes": 1266,
+      "path": "evidence/B4_3_ORPHAN_REFERENCE_AUDIT_2026-09-11.md",
+      "sha256": "5990a84bcae0305561270df600e737fd18ca1b296c8550cb5a7c25105d4f3f06"
+    },
+    {
+      "bytes": 891,
+      "path": "evidence/B4_4_CODE_ORPHAN_CLEANUP_RUNTIME_2026-09-11.md",
+      "sha256": "173e75aefe3490aaa4e3badc41250688dccb3c4caf5598ca6e66fbd897aaff6f"
+    },
+    {
+      "bytes": 788,
+      "path": "evidence/B4_5_PHYSICAL_LEGACY_HASH_MANIFEST_2026-09-11.md",
+      "sha256": "f269682e76e7ca25b96e73f301c76698875abf2f7a7c1adeec325171e1e44a87"
+    },
+    {
+      "bytes": 980,
+      "path": "evidence/B4_6_PHYSICAL_LEGACY_CLEANUP_RUNTIME_2026-09-11.md",
+      "sha256": "df1ca85a575744f136bfc338754537009d041b40979b8f97d9ff6a38a9eb574c"
+    },
+    {
+      "bytes": 637,
+      "path": "evidence/B4_7_DEVICE_MOONLIGHT_PACKAGE_CHECK_2026-09-11.md",
+      "sha256": "7012bba06326779c126267c189a54fbe7d0c13c508b8a992cd61351ce84f6deb"
+    },
+    {
+      "bytes": 904,
+      "path": "evidence/B4_8_DEVICE_MOONLIGHT_FINAL_STATE_2026-09-11.md",
+      "sha256": "fd17177752dfdbd36d4f1f38e67fbd31bce20713acc3690f03e5dda92fd9b959"
+    },
+    {
+      "bytes": 1000,
+      "path": "evidence/B4_8_DEVICE_MOONLIGHT_REMOVAL_FIRST_RESULT_2026-09-11.md",
+      "sha256": "f3a680fd8dfd8ae21f6cf398ff005d7305151f55c07085a94b9af3cf5afe0066"
+    },
+    {
+      "bytes": 2088,
+      "path": "evidence/B5_NATIVE_ONLY_REGRESSION_2026-09-11.md",
+      "sha256": "02bf2c312bcfadd4f67e1ccd3abb6d5f876e580f6c59b81d3824d713254960ab"
+    },
+    {
+      "bytes": 1298,
+      "path": "evidence/B6_CLEAN_NATIVE_CHECKPOINT_2026-09-11.md",
+      "sha256": "0a3fb8ab2338e33f371caf8cffbbec600ac05467d489a30fb9a3352be8e8c13a"
     },
     {
       "bytes": 1212,
@@ -215,101 +385,6 @@
       "sha256": "bac6507c6cecae267eba68b349d863ed5a1a7a860b59f2b2bcd56eaafe9667b6"
     },
     {
-      "bytes": 908,
-      "path": "evidence/raw/a8_four_player_profiles_probe_2026-09-10.txt",
-      "sha256": "0dd223cdd2f959c3b4f2a4233c7137c8300be4d6ccd25d0baa7287c929783f31"
-    },
-    {
-      "bytes": 1287,
-      "path": "evidence/raw/adb_wireless_recovery_runtime_2026-09-10.txt",
-      "sha256": "b84f06e67657b6f39ca5f60561a1b153b179c952a82baa3d45365388bbbbcdba"
-    },
-    {
-      "bytes": 1499,
-      "path": "evidence/raw/four_player_android_assignment_after_multitap_rollback_2026-09-10.txt",
-      "sha256": "05af19256a1721089e4cc09e04e4241183032fe26158da9e664d14d07993754a"
-    },
-    {
-      "bytes": 1762,
-      "path": "evidence/raw/four_player_android_assignment_probe_2026-09-10.txt",
-      "sha256": "819e6bfa7465291bf7670f911e00326cf82be85c939894bd3d3e34bc36c71cb9"
-    },
-    {
-      "bytes": 1762,
-      "path": "evidence/raw/four_player_android_assignment_replacement_controller_2026-09-10.txt",
-      "sha256": "04547dd76521be735e3d6383dbd7c45cafc0b91f8c6f7f7566d2aec10805e49c"
-    },
-    {
-      "bytes": 716,
-      "path": "evidence/raw/four_player_controller_probe_2026-09-10.txt",
-      "sha256": "23f37facccce4e491ec3b7880fa66c929e18cfa26b92b7f882f3e50071e5c808"
-    },
-    {
-      "bytes": 1041,
-      "path": "evidence/raw/four_player_retroarch_ports_probe_2026-09-10.txt",
-      "sha256": "0ad52da5bbbb631e942feaca3efbc0a9fcc94cb1cf750f2818d26b8fa30ff42f"
-    },
-    {
-      "bytes": 11682,
-      "path": "evidence/raw/four_player_source_audit_2026-09-10.txt",
-      "sha256": "1a21797c7424804e5c376e2899f3ce0f765bab17fe5c031205776cb49c9a7ac4"
-    },
-    {
-      "bytes": 980,
-      "path": "evidence/raw/phase_a_1p_regression_probe_2026-09-10.txt",
-      "sha256": "2de9a2d700d8bb976f79f0619b0c7c6efceb8747ef6bf48b87f3d6d3b15583f7"
-    },
-    {
-      "bytes": 1300,
-      "path": "evidence/raw/phase_a_2p_regression_probe_2026-09-10.txt",
-      "sha256": "5abc58b8f2b4d4b91fc56c3e688ff8cb0868ad179a19db1f2d2124885b19c5ec"
-    },
-    {
-      "bytes": 2019,
-      "path": "evidence/raw/phase_a_4p_gameplay_final_2026-09-10.txt",
-      "sha256": "2eb2f7e7d985dce5830ba50b6e73eb98f14a276af3d49a9423de1eb3858c37bd"
-    },
-    {
-      "bytes": 2029,
-      "path": "evidence/raw/phase_a_4p_gameplay_post_multitap_failure_2026-09-10.txt",
-      "sha256": "a45f5317ec1ae7d7fa01367465c62b9dbbdd9ab5a654d0cc2e98e84d70033935"
-    },
-    {
-      "bytes": 2039,
-      "path": "evidence/raw/phase_a_4p_gameplay_probe_2026-09-10.txt",
-      "sha256": "96daf25ec60371e7ade9c8cd4f7713719bc795fe285b2a8e3a25808a101b15cd"
-    },
-    {
-      "bytes": 2173,
-      "path": "evidence/raw/phase_a_a9_checkpoint_ready_2026-09-10.txt",
-      "sha256": "65689bc01d56310a37e7ffb45eb71ad8960361e59f54b1ad65adb9e04094eac7"
-    },
-    {
-      "bytes": 3540,
-      "path": "evidence/raw/phase_a_a9_first_run_transcript_2026-09-10.txt",
-      "sha256": "5bd3b026972280cf779778248e95e13ea1d0d39a723bf33e4bce84763c4a13d5"
-    },
-    {
-      "bytes": 2552,
-      "path": "evidence/raw/ps1_multitap_core_options_audit_2026-09-10.txt",
-      "sha256": "c0a0a1546ce1e1433abdeb45d025338c035e2e29a5eec38a247c572db9741555"
-    },
-    {
-      "bytes": 25515,
-      "path": "evidence/raw/ps1_multitap_flag_source_context_2026-09-10.txt",
-      "sha256": "d84335d031939bd18b49cb3f6cfcd9fbfc44a50015916270deabc43c85098d18"
-    },
-    {
-      "bytes": 617,
-      "path": "evidence/raw/ps1_multitap_onoff_ctr_2026-09-10.txt",
-      "sha256": "3c8d09f04c188a30a176bd5458ada483e0a3fb581d88008d24b1ce94bbea11d1"
-    },
-    {
-      "bytes": 74723,
-      "path": "evidence/raw/ps1_multitap_source_context_audit_2026-09-10.txt",
-      "sha256": "4fc87dcd17e1dae3ed9b6589e873b59cd70cf90e1eba4040da3e93b42f570554"
-    },
-    {
       "bytes": 376,
       "path": "evidence/snapshots/README.md",
       "sha256": "941a2d121be0e03128d2eeea1e3790d8bebcf2924ab20b94b02dc7dde5c8f30d"
@@ -325,14 +400,19 @@
       "sha256": "7cd58c6b7e2b128e36b3a879fa151444790e9d95d9b12ec933f415bec19ef756"
     },
     {
-      "bytes": 2041,
+      "bytes": 17672,
       "path": "handoffs/CURRENT_HANDOFF.md",
-      "sha256": "ee589308de1e8e1b4ffa7a49f3ab88e30221efab9c751ff918e70cd8ca70efa0"
+      "sha256": "b095de6615b810bbb6cddcf90fa8832bc55302179f0378d74ef5d174be34c4bb"
     },
     {
-      "bytes": 5318,
+      "bytes": 20434,
       "path": "investigations/ACTIVE.md",
-      "sha256": "935c12ef28d43dd2ad226b14fe680385337082a3c88dade9f1eab04cb8c264b4"
+      "sha256": "99c4180057285f2db0c1e2ed5a99f68b2aa7b5a8934f3cc6e2142b7af328c11e"
+    },
+    {
+      "bytes": 1712,
+      "path": "investigations/B1_DIAGNOSTICS_INVENTORY.md",
+      "sha256": "f523c870dedc6a886078ba6a94b1fc54e3a2f4936264e382e9738ab9338e06f3"
     },
     {
       "bytes": 1034,
@@ -345,19 +425,19 @@
       "sha256": "6d168e126018b8cdc368ae511be3cae6a646e9b6ead2d01d54a1e3ea707bc217"
     },
     {
-      "bytes": 14798,
-      "path": "manifest.json",
-      "sha256": "bd4ecfe1aa568bfce474889c0826d399454cba9125bbbda3fa120492f90013d9"
-    },
-    {
-      "bytes": 17575,
+      "bytes": 27117,
       "path": "memory/2026-09-10.md",
-      "sha256": "d217f66eebdaaf31c1e316d91b40403c21794687680690facbab03eae2fdaddc"
+      "sha256": "df3aa331aa94cd503ba13164ea9a0461643d1e2e67f042c8499e92595f9ec044"
     },
     {
-      "bytes": 8211,
+      "bytes": 3927,
+      "path": "memory/2026-09-11.md",
+      "sha256": "1a2b04782b0583e1a23ca6de78e117dbd1a7c800f8ca4d46371b0e72ef23605e"
+    },
+    {
+      "bytes": 20461,
       "path": "patches/PATCH_INDEX.md",
-      "sha256": "f758ca1cadd0c0e9c31225af9d99ff07cce30b560149764f8590f92cd18dc61d"
+      "sha256": "0e37c8de9a5bfd7da6df423af2b6a337550ede9e6f81cbb565cadf9a7770a59f"
     },
     {
       "bytes": 1894,
@@ -380,9 +460,9 @@
       "sha256": "21b9f707d66c70990ab8b091247ac4ada1fa7a7e0a5c671f2b007b96de689a79"
     },
     {
-      "bytes": 2079,
+      "bytes": 14840,
       "path": "roadmap/STATUS.md",
-      "sha256": "618f99ec08269646730107d69b684a20cedb6faadad4f142de15cc04e81c00a3"
+      "sha256": "19b49d8e035ed8d7f44e39fbaddc3a79ef7cb71ef283a07fd207cd76e800e422"
     },
     {
       "bytes": 750,
@@ -396,16 +476,43 @@
     }
   ],
   "four_player_status": "complete / runtime validated including game-specific PS1 multitap and representative 4P gameplay",
+  "games_post_sha256": "f1271c865cdf88b971da4116d7eb887bf9855864ce1ae848baafc7a3452e0f9c",
+  "gui_collect_diagnostics": true,
+  "health_endpoint": "GET /diagnostics/health",
+  "main_activity_post_sha256": "394d2b839fdb01f2988a0054b42e139e419e02207728f914e1713287992733cc",
   "memory_backend": "repository docs/memory (ChatGPT account Memory unavailable in this project)",
   "name": "PrivyHub durable project memory",
+  "new_client_metrics_timer": false,
+  "new_resource_sampler": false,
   "phase_a_status": "complete / pushed",
-  "predecessor": "e65e8f89604ce325e6e3e0537d0287070b8996c5 Phase A checkpoint",
+  "phase_b_status": "COMPLETE / PUSHED",
+  "phase_c_status": "NEXT",
+  "physical_legacy_groups_deleted": 9,
+  "predecessor": "B6 clean-native repository audit",
   "production_behavior_changed": false,
   "ps1_multitap_status": "complete / runtime validated on Crash Bash and CTR; Port 1 only",
   "repository_evidence_policy": "raw local/ignored; sanitized checkpoint snapshots committed",
+  "resource_collection": "existing host telemetry only; no new sampler",
+  "resource_snapshot_schema": "privyhub_resource_snapshot_v1",
+  "retention_automatic": false,
+  "retention_policy": "manual dry-run-first; allowlisted runtime families only",
+  "retention_policy_applied": true,
+  "retention_policy_sha256": "03466dbefde0c3f82fcecfa496009d0fcfdb8573825f6ffb01a4bd95ef012628",
+  "retention_raw_name_overrides": [
+    "pktmon_full.txt"
+  ],
   "roadmap_authoritative_path": "docs/ROADMAP.md",
   "roadmap_version": "v2",
   "schema": 1,
+  "self_test_dedicated_checks": [
+    "storage_writability",
+    "adb_development",
+    "emulator_runtime"
+  ],
   "snapshot_manifest_sha256": "e1bd175f86fb771516cb1a93572a5aff1e9dbef53a3968ec3eb30cc9a93ae3fe",
-  "snapshot_sha256": "7cd58c6b7e2b128e36b3a879fa151444790e9d95d9b12ec933f415bec19ef756"
+  "snapshot_sha256": "7cd58c6b7e2b128e36b3a879fa151444790e9d95d9b12ec933f415bec19ef756",
+  "stream_manager_deleted": true,
+  "streaming_behavior_changed": false,
+  "streaming_data_path_changed": false,
+  "system_state_changed": false
 }

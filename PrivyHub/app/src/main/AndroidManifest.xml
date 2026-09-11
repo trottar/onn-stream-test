@@ -6,10 +6,6 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <queries>
-        <package android:name="com.limelight" />
-    </queries>
-
     <uses-feature
         android:name="android.software.leanback"
         android:required="true" />
@@ -46,6 +42,12 @@
             android:exported="true"
             android:excludeFromRecents="true"
             android:noHistory="true"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".diagnostics.DiagnosticsActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
             android:screenOrientation="landscape" />
 
         <activity

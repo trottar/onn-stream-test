@@ -10,7 +10,6 @@ from typing import Any
 from urllib.parse import parse_qs, urlencode
 
 from games.emulator_manager import EmulatorError, EmulatorManager
-from games.stream_manager import StreamHostError, StreamManager
 from games.decoder_session_log import write_decoder_session_log
 from native_stream import NativeStreamError, NativeStreamManager
 
@@ -67,9 +66,6 @@ class GamesPlugin:
         self._cached_at = 0.0
         self._cached_games: list[dict[str, Any]] = []
         self._emulator = EmulatorManager(
-            self.PROJECT_ROOT
-        )
-        self._stream = StreamManager(
             self.PROJECT_ROOT
         )
         self._native_stream = NativeStreamManager(
@@ -1666,14 +1662,6 @@ class GamesPlugin:
         nodes.extend(
             [
                 {
-                    "id": "games_stream_host",
-                    "name": "Streaming Host",
-                    "node_type": "game",
-                    "lazy_path": (
-                        f"/plugins/{self.PLUGIN_ID}/stream-status"
-                    ),
-                },
-                {
                     "id": "games_native_stream",
                     "name": "Native Streaming Alpha",
                     "node_type": "game",
@@ -2784,12 +2772,9 @@ class GamesPlugin:
 
         if action == "status":
             payload = self._emulator.status()
-            payload["stream_host"] = self._stream.status()
             payload["native_stream"] = self._native_stream.status()
             return payload
 
-        if action == "stream-status":
-            return self._stream.status()
 
         if action == "native-stream-status":
             return self._native_stream.status()
@@ -3465,7 +3450,6 @@ class GamesPlugin:
                         slot
                     )
 
-                payload["stream_host"] = self._stream.status()
                 return payload
 
             if action == "launch":
@@ -3481,14 +3465,7 @@ class GamesPlugin:
                     game_id
                 )
 
-                stream_warning = None
 
-                try:
-                    self._stream.ensure_running()
-                except StreamHostError as exc:
-                    # Streaming remains modular. A host setup problem must
-                    # never break the already-proven local emulator launch.
-                    stream_warning = str(exc)
 
                 cheat_source_index, cheat_enabled_indexes = (
                     self._parse_cheat_launch_request(query)
@@ -3508,8 +3485,6 @@ class GamesPlugin:
                     cheat_enabled_indexes=cheat_enabled_indexes,
                     mod_index=mod_index,
                 )
-                payload["stream_host"] = self._stream.status()
-                payload["stream_warning"] = stream_warning
 
                 return payload
 
@@ -3519,16 +3494,11 @@ class GamesPlugin:
                     payload["native_stream"] = self._native_stream.end_game_session()
                 except NativeStreamError as exc:
                     payload["native_stream_warning"] = str(exc)
-                payload["stream_host"] = self._stream.status()
                 return payload
 
-            if action == "stream-start":
-                return self._stream.start()
 
-            if action == "stream-stop":
-                return self._stream.stop()
 
-        except (EmulatorError, StreamHostError) as exc:
+        except EmulatorError as exc:
             raise RuntimeError(str(exc)) from exc
 
         raise ValueError(

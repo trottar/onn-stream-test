@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
 
 import com.safeiot.privyhub.streaming.NativeStreamActivity
+import com.safeiot.privyhub.diagnostics.DiagnosticsActivity
 
 import android.os.Bundle
 import android.os.Handler
@@ -897,6 +898,10 @@ class MainActivity : AppCompatActivity() {
                     "Cancel",
                     null
                 )
+                .setNeutralButton(
+                    "Diagnostics",
+                    null
+                )
                 .create()
 
 
@@ -953,6 +958,35 @@ class MainActivity : AppCompatActivity() {
                 navigationStack.clear()
 
                 loadCatalog()
+            }
+
+            // PRIVYHUB_B1_DIAGNOSTICS_NAV_V1
+            dialog.getButton(
+                AlertDialog.BUTTON_NEUTRAL
+            ).setOnClickListener {
+
+                val host =
+                    getCompanionHost()
+
+                if (host.isBlank()) {
+
+                    input.error =
+                        "Save companion host first"
+
+                } else {
+
+                    startActivity(
+                        Intent(
+                            this,
+                            DiagnosticsActivity::class.java
+                        ).apply {
+                            putExtra(
+                                DiagnosticsActivity.EXTRA_COMPANION_HOST,
+                                host
+                            )
+                        }
+                    )
+                }
             }
         }
 
@@ -5817,11 +5851,6 @@ class MainActivity : AppCompatActivity() {
                                 json
                             )
 
-                        "stream_host" ->
-                            buildStreamHostMessage(
-                                json
-                            )
-
                         "native_stream_host" ->
                             buildNativeStreamMessage(
                                 json
@@ -5883,19 +5912,6 @@ class MainActivity : AppCompatActivity() {
                                     false
                                 )
 
-                            val streamHost =
-                                json.optJSONObject(
-                                    "stream_host"
-                                )
-
-                            val streaming =
-                                streamHost
-                                    ?.optBoolean(
-                                        "active",
-                                        false
-                                    )
-                                    ?: false
-
                             statusText.text =
                                 when {
                                     active && paused ->
@@ -5920,17 +5936,6 @@ class MainActivity : AppCompatActivity() {
                                     openNativeGameStream()
                                 }
 
-                            } else if (
-                                active &&
-                                streaming
-                            ) {
-
-                                builder.setPositiveButton(
-                                    "Open Stream"
-                                ) { _, _ ->
-
-                                    openGameStreamClient()
-                                }
                             }
 
                             if (active) {
@@ -5949,71 +5954,6 @@ class MainActivity : AppCompatActivity() {
                                     activeTitle,
                                     paused
                                 )
-                            }
-                        }
-
-                        "stream_host" -> {
-
-                            val active =
-                                json.optBoolean(
-                                    "active",
-                                    false
-                                )
-
-                            val ready =
-                                json.optBoolean(
-                                    "ready",
-                                    false
-                                )
-
-                            statusText.text =
-                                when {
-                                    active ->
-                                        "Streaming host running"
-
-                                    ready ->
-                                        "Streaming host ready"
-
-                                    else ->
-                                        "Streaming host setup required"
-                                }
-
-                            if (active) {
-
-                                builder.setPositiveButton(
-                                    "Open Stream"
-                                ) { _, _ ->
-
-                                    openGameStreamClient()
-                                }
-
-                                if (
-                                    json.optBoolean(
-                                        "managed",
-                                        false
-                                    )
-                                ) {
-
-                                    builder.setNeutralButton(
-                                        "Stop Host"
-                                    ) { _, _ ->
-
-                                        setGameStreamHost(
-                                            false
-                                        )
-                                    }
-                                }
-
-                            } else if (ready) {
-
-                                builder.setPositiveButton(
-                                    "Start Host"
-                                ) { _, _ ->
-
-                                    setGameStreamHost(
-                                        true
-                                    )
-                                }
                             }
                         }
 
@@ -7636,8 +7576,7 @@ class MainActivity : AppCompatActivity() {
 
         details.append(
             "\n\nLaunch starts the game on the PrivyHub companion. " +
-                "If the Sunshine transport is configured, PrivyHub " +
-                "starts it automatically."
+                "Streaming uses PrivyHub's native transport."
         )
 
         return details.toString()
@@ -8017,91 +7956,6 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    private fun buildStreamHostMessage(
-        json: JSONObject
-    ): String {
-
-        val active =
-            json.optBoolean(
-                "active",
-                false
-            )
-
-        val ready =
-            json.optBoolean(
-                "ready",
-                false
-            )
-
-        val details =
-            StringBuilder()
-
-        details
-            .append(
-                "Status: "
-            )
-            .append(
-                when {
-                    active ->
-                        "RUNNING"
-
-                    ready ->
-                        "READY"
-
-                    else ->
-                        "SETUP REQUIRED"
-                }
-            )
-
-        if (
-            json.optBoolean(
-                "external",
-                false
-            )
-        ) {
-
-            details.append(
-                "\nOwnership: external/unmanaged"
-            )
-        } else if (
-            json.optBoolean(
-                "managed",
-                false
-            )
-        ) {
-
-            details.append(
-                "\nOwnership: PrivyHub"
-            )
-        }
-
-        details.append(
-            "\nController forwarding: DISABLED"
-        )
-
-        details.append(
-            "\nWeb UI: PC localhost only"
-        )
-
-        val message =
-            json.optString(
-                "message",
-                ""
-            )
-
-        if (message.isNotBlank()) {
-
-            details
-                .append(
-                    "\n\n"
-                )
-                .append(
-                    message
-                )
-        }
-
-        return details.toString()
-    }
 
 
     // PrivyHub Phase A5 follow-up: choose the initial game state before
@@ -11209,24 +11063,8 @@ class MainActivity : AppCompatActivity() {
                         cheatProfileLabel
                     )
                 }
-                val streamHost =
-                    json.optJSONObject(
-                        "stream_host"
-                    )
-
-                val streaming =
-                    streamHost
-                        ?.optBoolean(
-                            "active",
-                            false
-                        )
-                        ?: false
-
                 val streamWarning =
-                    json.optString(
-                        "stream_warning",
-                        ""
-                    )
+                    ""
 
                 // PrivyHub Phase A5: the launch request already waits for
                 // RetroArch command readiness, establishes the paused A3
@@ -11312,36 +11150,6 @@ class MainActivity : AppCompatActivity() {
                                 streamWarning = streamWarning
                             )
                         }
-
-                    } else if (
-                        active &&
-                        streaming
-                    ) {
-
-                        statusText.text =
-                            "Running on companion: $title"
-
-                        AlertDialog.Builder(
-                            this
-                        )
-                            .setTitle(
-                                "Game running"
-                            )
-                            .setMessage(
-                                "$title is running on the companion. " +
-                                    "Open the streaming transport?"
-                            )
-                            .setPositiveButton(
-                                "Open Stream"
-                            ) { _, _ ->
-
-                                openGameStreamClient()
-                            }
-                            .setNegativeButton(
-                                "Stay in PrivyHub",
-                                null
-                            )
-                            .show()
 
                     } else if (active) {
 
@@ -12286,137 +12094,8 @@ private fun requestGameStateAction(
     }
 
 
-    private fun setGameStreamHost(
-        start: Boolean
-    ) {
-
-        val host =
-            getCompanionHost()
-
-        if (host.isBlank()) {
-            return
-        }
-
-        statusText.text =
-            if (start) {
-                "Starting streaming host..."
-            } else {
-                "Stopping streaming host..."
-            }
-
-        networkExecutor.execute {
-
-            try {
-
-                httpPost(
-                    "http://$host:$CONTROL_PORT" +
-                        if (start) {
-                            "/plugins/games/stream-start"
-                        } else {
-                            "/plugins/games/stream-stop"
-                        }
-                )
-
-                runOnUiThread {
-
-                    statusText.text =
-                        if (start) {
-                            "Streaming host running"
-                        } else {
-                            "Streaming host stopped"
-                        }
-                }
-
-            } catch (error: Exception) {
-
-                Log.e(
-                    TAG,
-                    "Failed to change stream host",
-                    error
-                )
-
-                runOnUiThread {
-
-                    statusText.text =
-                        "Streaming host control failed"
-
-                    AlertDialog.Builder(
-                        this
-                    )
-                        .setTitle(
-                            "Streaming host"
-                        )
-                        .setMessage(
-                            error.message
-                                ?: "Unknown error"
-                        )
-                        .setPositiveButton(
-                            "OK",
-                            null
-                        )
-                        .show()
-                }
-            }
-        }
-    }
 
 
-    private fun openGameStreamClient() {
-
-        val packageName =
-            "com.limelight"
-
-        val launchIntent =
-            packageManager
-                .getLaunchIntentForPackage(
-                    packageName
-                )
-
-        val intent =
-            launchIntent
-                ?: Intent().apply {
-                    setClassName(
-                        packageName,
-                        "com.limelight.PcView"
-                    )
-                    addFlags(
-                        Intent.FLAG_ACTIVITY_NEW_TASK
-                    )
-                }
-
-        try {
-
-            startActivity(
-                intent
-            )
-
-        } catch (
-            error: Exception
-        ) {
-
-            Log.e(
-                TAG,
-                "Moonlight launch failed",
-                error
-            )
-
-            AlertDialog.Builder(
-                this
-            )
-                .setTitle(
-                    "Streaming client unavailable"
-                )
-                .setMessage(
-                    "Moonlight is installed but could not be launched. " +
-                        "Reinstall the PrivyHub-selected Moonlight APK."
-                )
-                .setPositiveButton(
-                    "OK",
-                    null
-                )
-                .show()
-        }
-    }
 
 
     private fun formatGameSize(

@@ -18,6 +18,10 @@ Directory-independent layout:
 
 Public API:
     GET  /status
+    GET  /diagnostics/health
+    POST /diagnostics/self-test
+    POST /diagnostics/bundle
+    POST /diagnostics/client-health
     GET  /sources
     POST /sources/<source_id>/start
     POST /stop
@@ -54,6 +58,23 @@ from urllib.parse import quote, unquote, urlparse, urlsplit
 from plugins import (
     PLUGINS,
     shutdown_plugins,
+)
+
+from diagnostics.runtime_health import (
+    build_live_health_snapshot,
+)
+
+from diagnostics.client_feedback import (
+    ClientHealthStore,
+)
+
+from diagnostics.self_test import (
+    run_diagnostics_self_test,
+)
+
+from diagnostics.support_bundle import (
+    SupportBundleError,
+    create_sanitized_support_bundle,
 )
 
 
@@ -1481,6 +1502,7 @@ class PrivyHubController:
 
 
 CONTROLLER = PrivyHubController()
+CLIENT_HEALTH_STORE = ClientHealthStore()
 
 
 class PrivyHubRequestHandler(
@@ -1493,6 +1515,15 @@ class PrivyHubRequestHandler(
         format: str,
         *args: Any,
     ) -> None:
+        # PRIVYHUB_B1_CLIENT_HEALTH_ENDPOINT_V1
+        # PRIVYHUB_B1_B2_COMPLETION_API_V1
+        if (
+            urlsplit(self.path).path.startswith(
+                "/diagnostics/"
+            )
+        ):
+            return
+
         print(
             f"{self.client_address[0]} - "
             f"{self.log_date_time_string()} - "
@@ -1534,6 +1565,76 @@ class PrivyHubRequestHandler(
             body
         )
 
+    def _read_json_body(
+        self,
+        *,
+        max_bytes: int,
+    ) -> tuple[
+        dict[str, Any],
+        int,
+    ]:
+        raw_length = self.headers.get(
+            "Content-Length"
+        )
+
+        if raw_length is None:
+            raise ValueError(
+                "Content-Length is required"
+            )
+
+        try:
+            length = int(raw_length)
+        except ValueError as exc:
+            raise ValueError(
+                "Invalid Content-Length"
+            ) from exc
+
+        if length <= 0 or length > max_bytes:
+            raise ValueError(
+                "Client health payload size is invalid"
+            )
+
+        body = self.rfile.read(length)
+
+        try:
+            payload = json.loads(
+                body.decode("utf-8")
+            )
+        except (
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+        ) as exc:
+            raise ValueError(
+                "Client health payload is not valid JSON"
+            ) from exc
+
+        if not isinstance(payload, dict):
+            raise ValueError(
+                "Client health payload must be an object"
+            )
+
+        return payload, length
+
+    def _current_health_snapshot(
+        self,
+    ) -> dict[str, Any]:
+        return build_live_health_snapshot(
+            project_root=(
+                PROJECT_ROOT
+            ),
+            companion_status=(
+                CONTROLLER.status()
+            ),
+            games_plugin=(
+                PLUGINS.get(
+                    "games"
+                )
+            ),
+            client_health_feedback=(
+                CLIENT_HEALTH_STORE.snapshot()
+            ),
+        )
+
     def do_GET(
         self,
     ) -> None:
@@ -1544,6 +1645,14 @@ class PrivyHubRequestHandler(
             self._send_json(
                 200,
                 CONTROLLER.status(),
+            )
+            return
+
+        # PRIVYHUB_B1_HEALTH_ENDPOINT_V1
+        if request_path == "/diagnostics/health":
+            self._send_json(
+                200,
+                self._current_health_snapshot(),
             )
             return
 
@@ -1622,6 +1731,115 @@ class PrivyHubRequestHandler(
         try:
             parsed = urlsplit(self.path)
             request_path = parsed.path
+
+            if request_path == "/diagnostics/self-test":
+                try:
+                    result = run_diagnostics_self_test(
+                        project_root=(
+                            PROJECT_ROOT
+                        ),
+                        health_snapshot=(
+                            self._current_health_snapshot()
+                        ),
+                    )
+                except Exception as exc:
+                    self._send_json(
+                        500,
+                        {
+                            "ok": False,
+                            "error": "Diagnostics self-test failed.",
+                            "error_class": type(exc).__name__,
+                        },
+                    )
+                    return
+
+                self._send_json(
+                    200,
+                    result,
+                )
+                return
+
+            if request_path == "/diagnostics/bundle":
+                companion_status = CONTROLLER.status()
+
+                try:
+                    result = create_sanitized_support_bundle(
+                        project_root=(
+                            PROJECT_ROOT
+                        ),
+                        health_snapshot=(
+                            build_live_health_snapshot(
+                                project_root=(
+                                    PROJECT_ROOT
+                                ),
+                                companion_status=(
+                                    companion_status
+                                ),
+                                games_plugin=(
+                                    PLUGINS.get(
+                                        "games"
+                                    )
+                                ),
+                                client_health_feedback=(
+                                    CLIENT_HEALTH_STORE.snapshot()
+                                ),
+                            )
+                        ),
+                        companion_status=(
+                            companion_status
+                        ),
+                    )
+                except SupportBundleError as exc:
+                    self._send_json(
+                        500,
+                        {
+                            "ok": False,
+                            "error": "Sanitized diagnostics bundle creation failed.",
+                            "error_code": exc.code,
+                        },
+                    )
+                    return
+                except Exception as exc:
+                    self._send_json(
+                        500,
+                        {
+                            "ok": False,
+                            "error": "Sanitized diagnostics bundle creation failed.",
+                            "error_class": type(exc).__name__,
+                        },
+                    )
+                    return
+
+                self._send_json(
+                    200,
+                    result,
+                )
+                return
+
+            if request_path == "/diagnostics/client-health":
+                try:
+                    payload, payload_bytes = self._read_json_body(
+                        max_bytes=8_192
+                    )
+                    accepted = CLIENT_HEALTH_STORE.accept(
+                        payload,
+                        payload_bytes=payload_bytes,
+                    )
+                except ValueError as exc:
+                    self._send_json(
+                        400,
+                        {
+                            "ok": False,
+                            "error": str(exc),
+                        },
+                    )
+                    return
+
+                self._send_json(
+                    200,
+                    accepted,
+                )
+                return
 
             parts = [
                 part
@@ -1832,6 +2050,10 @@ def main(
 
     print("Endpoints:")
     print("  GET  /status")
+    print("  GET  /diagnostics/health")
+    print("  POST /diagnostics/self-test")
+    print("  POST /diagnostics/bundle")
+    print("  POST /diagnostics/client-health")
     print("  GET  /sources")
     print("  GET  /plugins/<plugin>/<action>")
     print("  POST /sources/<id>/start")

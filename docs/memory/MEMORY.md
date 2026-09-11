@@ -233,3 +233,450 @@ inspection/customization, and future appliance portability. It is not expected
 to materially improve normal game frame rate or stream latency. Keep the
 current compatibility BIOS path and evaluate OpenBIOS through an explicit
 compatibility/save/boot matrix before any broader default.
+
+## B1 diagnostics architecture
+
+B1.1 runtime inventory confirmed that low-level instrumentation already exists.
+The architectural gap is a cross-subsystem health/event model, not missing raw
+logs.
+
+Use an adapter/aggregator approach. Preserve detailed subsystem telemetry as
+evidence and classify it separately. Stable component fields are `subsystem`,
+`component`, `health`, `severity`, `event_code`, `summary`, `measurements` and
+classifier/basis metadata. `unknown` is not synonymous with failure.
+
+Resource/optimization infrastructure begins in B1. Reuse the existing bounded
+2-second native host telemetry sampler instead of creating a second sampler.
+Expose capture/encoder CPU and memory plus WGC timing in a stable resource
+snapshot. Keep GPU/encoder-engine/system RAM/storage/network capacity explicit
+as unavailable until implemented. Do not classify hardware tiers or stream
+profile fit until Phase E representative benchmarks establish thresholds.
+
+B1.1 also measured substantial local diagnostic growth (transport history
+already hundreds of MB). Directory-level retention is therefore a required B1
+item before expanding always-on history.
+
+## B1.2 validated resource snapshot
+
+The real B1.2 idle snapshot recovered 41 last-session resource samples at a
+2-second cadence. Capture/encoder CPU and memory observations are useful
+optimization evidence, but remain descriptive rather than tier thresholds.
+`current_session` versus `last_session` provenance must remain explicit.
+
+The common health model is approved for read-only API integration.
+
+## B1.3 health endpoint runtime validation
+
+`GET /diagnostics/health` is runtime validated. After companion restart it
+correctly recovers existing host telemetry as `latest_history` /
+`last_session`, starts no new sampler, and passes the normalized privacy
+contract.
+
+Before adding client telemetry, audit exact Android metrics/cadence/network
+source. Reuse existing client measurement machinery where possible; do not add
+a duplicate hot loop.
+
+## B1.5 client-health contract
+
+Reuse Android's existing native-stream metrics tick. Initial client-health
+cadence is 2 seconds with one in-flight request maximum. The companion validates
+a strict numeric/boolean whitelist and stores latest state plus one previous
+baseline only.
+
+Do not add a duplicate decoder/resource sampler or persistent client-health
+sample log. Expose cadence/payload size so diagnostics overhead is measurable.
+This contract is the intended future input for adaptive bitrate.
+
+## B1.5 runtime feedback result / classifier caution
+
+The client-health transport is runtime validated at a measured 631-byte payload
+every 2 seconds with no duplicate sampler. A single B1.5 interval reported 9
+decoder stale-output drops while receive FPS remained ~59.7, network health was
+healthy, FEC unrecoverable delta was zero, and queue overflow was zero.
+
+Do not equate any nonzero stale-output count with product-visible degradation
+without rendered-cadence/context evidence. During classifier investigations,
+trust the raw measurements over the classifier.
+
+## B1.6 decoder classifier evidence
+
+Multi-interval runtime evidence established that stale-output shedding alone is
+not a decoder-local fault. Direct decoder-local health remains based on hardware
+decode availability, ordinary decoder drops and queue overflow. Preserve stale
+counts as measurements and do not invent a numerical stale/FPS tolerance.
+
+## B1.7 classifier runtime validation
+
+The corrected decoder classifier is runtime validated. Stale-only low-latency
+shedding remains healthy/info, including when the network component is
+independently degraded. This avoids cross-subsystem double-counting.
+
+The health substrate is ready to become a GUI consumer contract. The GUI should
+show health plus measurement context rather than hiding informational shedding.
+
+Before applying retention, inventory exact current log-family size/count and
+existing cleanup mechanisms. Never automatically delete curated
+`docs/memory/evidence/` or local raw durable-memory evidence as part of normal
+runtime log retention.
+
+## B1.8/B1.9 GUI and retention
+
+The validated health model is now suitable for a thin user-facing Diagnostics
+activity. Keep classification in the companion; the Android screen renders
+health, event codes and measurement context and performs only structural/current
+health Self-Test checks.
+
+MainActivity is already 14,437 lines, so add navigation only and keep diagnostics
+in its own activity.
+
+Runtime retention must be allowlisted and dry-run-first. Initial scope is
+forward transport, reverse transport and debug bundles. Never include
+`docs/memory/` or patch backups. Automatic deletion remains disabled until the
+real candidate plan is inspected. Phase E can later scale budgets by host
+storage/capability.
+
+
+## B1.9 runtime result / retention safety rule
+
+The standalone Diagnostics GUI is runtime validated on the onn and consumes the common health model without a parallel sampler/classifier.
+
+The first retention dry-run failed closed rather than deleting evidence: forward transport remained above its cap after all eligible files because 43/58 files were protected. Never apply a retention plan whose family reports `blocked_by_protected_evidence=True`. Audit protected bytes/reasons first and change protection semantics only from measured evidence. Reverse transport and debug bundles were already below their provisional caps.
+
+## B1.10 retention blocker semantics
+
+Do not treat file extension alone as evidence semantics. `pktmon_full.txt` is a
+raw packet capture despite its `.txt` suffix.
+
+Retention rule: explicit raw-name classification may override blanket summary
+extension protection, but newest-minimum protection remains higher priority.
+Do not globally unprotect `.txt`.
+
+Any retention-rule change must first be validated by a new dry-run plan. Do not
+apply deletion while a plan reports blocked-by-protected-evidence.
+
+## B1.12 retention apply
+
+Manual diagnostic retention has completed one real apply successfully under the
+reviewed policy. The post-apply plan is empty and unblocked for every managed
+family. Keep automatic retention disabled until a later explicit product
+decision.
+
+Do not consider B1/B2 globally complete merely because health, GUI, and
+retention are validated. Compare implementation to the roadmap requirements
+before beginning Sunshine/Moonlight removal work.
+
+## B1/B2 completion gate
+
+The roadmap gap audit is authoritative for missing B1.3/B2 features, but
+token-level absence is not sufficient to infer missing semantic coverage.
+Inspect the exact Self-Test loop before duplicating audio/controller/emulator
+checks.
+
+Before implementing event history or GUI bundle collection, inspect exact local
+service/health/client-feedback/debug-bundle integration points. GitHub may be
+behind the local authoritative tree.
+
+## B1/B2 completion implementation rules
+
+The Self-Test GUI is a consumer of the companion diagnostic contract. Keep
+audio/controller/decoder classifications in the existing health model rather
+than duplicating them.
+
+`game_session` is not a complete emulator prerequisite check. A bounded
+Self-Test may verify configured RetroArch executable, cores and config location
+without launching or changing an emulator session.
+
+ADB Self-Test is development-only readiness. It may resolve adb and run
+`adb devices`, but must never connect/recover a target, return target
+identifiers, or log network addresses.
+
+The common event history is bounded in memory at 128 records. Record component
+classification transitions and meaningful nonzero client-feedback pulses; keep
+raw measurements distinct from classification. Do not start another timer or
+sampler.
+
+The GUI bundle action must reuse the existing sanitized bundler. The bridge may
+append generated safe diagnostic context/version metadata, update manifest
+hashes and rebuild/revalidate the ZIP, but must not include raw packet captures.
+
+## Diagnostics GUI action feedback
+
+For Android TV asynchronous diagnostics actions, status text alone is not
+sufficiently visible feedback. The active button should change its own label
+immediately while the request is in flight, while all action buttons remain
+disabled against duplicate execution.
+
+This is presentation-only. Do not alter companion endpoints, classifiers,
+sampling, bundle semantics or stream/session behavior for this polish.
+
+## B3 legacy-streaming inventory rule
+
+Begin Sunshine/Moonlight removal with evidence, not deletion. Treat executable production references conservatively as active until traced. Keep documentation/history separate from runtime dependencies. Keep install/firewall/task remnants distinct from production code. A legacy reference inside a validated native-path file never makes the whole file removable; preserve the file and remove only a proven-obsolete reference in B4.
+
+## B3 inventory interpretation
+
+Broad static term counts are not removal authority. Archive backups, files
+inside a vendored runtime tree, and unrelated name collisions can inflate
+ACTIVE classifications.
+
+For B4 authority, prefer:
+1. current production call edges;
+2. current source/config references;
+3. grouped legacy runtime/setup artifacts;
+4. system-state evidence.
+
+Known non-target name collisions:
+- RetroArch `moonlight_libretro.info`;
+- RetroArch `stellabialek-moonlight-sillyness` shaders;
+- B3 diagnostic package filenames.
+
+Do not delete these merely because they contain the word `moonlight`.
+
+## Production patch source-context rule
+
+A current-file SHA plus isolated trace lines is not enough to author brittle
+multi-line text anchors. Before a production transform that removes several
+blocks from a large file, capture exact local source context for every modified
+AST/span.
+
+Prefer semantic AST selection + exact source spans over hand-authored whitespace
+anchors. Preserve the original BOM/newline convention and reject if the exact
+predecessor hash changes.
+
+If an installer fails with code 2 before modification, treat it as a preflight
+rejection, not a runtime failure; do not continue to runtime probes that were
+supposed to be installed by that package.
+
+## AST-span production transformation pattern
+
+When exact source context is available, production edits to large Python files
+should use AST semantics to identify whole removable statements/blocks, then
+apply line-span changes against the exact hashed predecessor.
+
+For B4.1 specifically, distinguish the nested Sunshine launch Try from the
+outer request Try by requiring the selected Try to have a direct
+`except StreamHostError` handler. The outer handler is a tuple
+`(EmulatorError, StreamHostError)` and is rewritten, not deleted.
+
+Generated source must preserve the original CRLF convention and compile before
+any write.
+
+## B4.1 runtime fact
+
+The current normal Games path no longer reaches Sunshine. A live representative
+game remained active with `windows_graphics_capture`, `h264_nvenc` and
+`rtp_udp_xor_fec`; no Sunshine process was running.
+
+`stream_manager.py` remains only as a physically retained orphan candidate until
+later artifact cleanup.
+
+## B4.2 boundary
+
+Android Moonlight removal is an independent edge. Capture exact current function
+bodies/callers and manifest query before editing. Do not combine Android UI
+removal with runtime/download/setup artifact deletion.
+
+## B4.2 Android cut rule
+
+Remove the exact captured Moonlight/com.limelight launcher/query and the stale
+stream_host response/UI fallback paths that became unreachable after B4.1.
+
+Do not infer deletion safety for helper definitions whose exact bodies were not
+captured. Audit them after B4.2 runtime validation.
+
+Preserve MainActivity CRLF and AndroidManifest LF.
+
+## B4.2 runtime fact
+
+The Android Moonlight/com.limelight client edge is removed and runtime
+validated. MainActivity and manifest are clean, B4.1 games.py is unchanged, and
+native streaming remained active.
+
+Before deleting legacy files, distinguish:
+- active production references;
+- orphan helper definitions;
+- maintenance/setup scripts;
+- diagnostic/historical tool references;
+- physical runtime/download payloads;
+- RetroArch Moonlight-name collisions, which remain non-targets.
+
+## Legacy cleanup staging rule
+
+B4.3 proves code orphans separately from physical artifact groups.
+
+It is safe to remove the two exact-hash Android helper functions and
+`stream_manager.py` as one code-orphan patch.
+
+Do not delete Sunshine/Moonlight runtime/download/setup groups from only a
+path/size inventory. Capture exact per-file/hash manifest first, then use it as
+the predecessor for physical deletion.
+
+## B4.4 runtime fact
+
+The product starts and streams normally after physical deletion of
+`stream_manager.py` and removal of both orphan Android stream-host helpers.
+
+Physical legacy cleanup still requires an exact content manifest. Include
+machine-level Sunshine state and already-connected Android Moonlight package
+presence so cleanup cannot strand firewall rules or the installed temporary
+client.
+
+## B4.5 physical deletion rule
+
+Use the B4.5 canonical group digest (sorted project-relative path + bytes + per-file SHA-256) as deletion authority. Back up all targeted bytes under archive/patch_backups before delete and verify rollback against the original digests. Project cleanup does not imply Android package cleanup when ADB state is unavailable.
+
+## Canonical physical-manifest implementation rule
+
+B4.5/B4.6 group hashing uses actual separator bytes:
+- NUL `b"\0"`
+- newline `b"\n"`
+
+Do not substitute literal backslash-character sequences `b"\\0"` or
+`b"\\n"`. B4.6 v1 did so and correctly failed closed before modification.
+Cross-version manifest-equivalence fixtures are required for this cleanup path.
+
+## Legacy name-collision classification rule
+
+The B4.5 non-target matcher is authoritative:
+- `^runtime/emulators/.*/moonlight_libretro\.info$`
+- `^runtime/emulators/.*/stellabialek-moonlight-sillyness\.`
+
+When these are represented as Python raw regex strings, use a single regex
+escape before the literal dot (`\.` in regex notation), not a doubled
+backslash that would require an actual backslash in the path.
+
+The installer must additionally treat the exact B4.5 non-target path list as a
+hard preservation allowlist and verify every path still exists after cleanup.
+
+## Android package verification rule
+
+Do not interpret `ADB_UNAVAILABLE` from a PATH-only probe as proof that project
+ADB tooling is unavailable.
+
+For device cleanup verification, reuse the established build/install ADB
+discovery path:
+- PATH;
+- ANDROID_SDK_ROOT / ANDROID_HOME;
+- PrivyHub/local.properties sdk.dir;
+- private cached target recovery;
+- mDNS recovery.
+
+Never log the cached target, serial, network address, or mDNS instance.
+Confirm the resolved device contains the PrivyHub package before querying
+`com.limelight`.
+
+## Device package cleanup rule
+
+When removing the obsolete Moonlight Android client:
+1. privately resolve the paired onn;
+2. verify `com.safeiot.privyhub` is present;
+3. verify `com.limelight` is present;
+4. uninstall only `com.limelight`;
+5. immediately verify PrivyHub remains present;
+6. immediately verify Moonlight is absent;
+7. never log the target identifier or network address.
+
+Do not proceed to B5 until the final package state is verified.
+
+## Android package absence verification rule
+
+Do not use `adb shell pm path <package>` as the sole absence verifier. Some
+Android builds return a nonzero shell status when the package does not exist,
+which can turn a valid absence into a false query failure.
+
+For final package-state verification use:
+1. `pm list packages <package>`; or
+2. `cmd package list packages <package>` as fallback.
+
+A successful command with no exact `package:<name>` line means the package is
+absent. B4.8 first action exposed this distinction after a successful uninstall.
+
+## B4 clean-native predecessor
+
+B4 is complete as of 2026-09-11.
+
+Authoritative clean-native facts before B5:
+- no active Sunshine/Moonlight server dependency;
+- no Android Moonlight launch edge;
+- no `stream_manager.py`;
+- no project Sunshine/Moonlight runtime/download/setup artifacts;
+- no Windows Sunshine process/service/task/firewall residue;
+- no installed `com.limelight` on the paired onn;
+- PrivyHub remains installed;
+- native Games streaming is WGC -> NVENC -> RTP-sized UDP + XOR FEC ->
+  Android hardware decode.
+
+B5 should validate this architecture as a normal-use session, not reopen B3/B4.
+
+## B5 classifier correction
+
+B5 post-removal regression is runtime validated.
+
+Do not use `post_profile_native_ok` as a required B5 pass gate. Profile/UI
+navigation may close the native stream client while leaving the managed game
+session active. Keep the post-profile host status as lifecycle evidence only.
+
+For continuity adjudication, prefer decoder/session measurements over a single
+host status bit. The validated B5 session had:
+- 148103 video packets;
+- 0 video packet loss;
+- 10551 video frames;
+- 10551 queued decoder frames;
+- 10041 rendered frames;
+- 509 stale-output drops;
+- 1 frame in flight;
+- 0 decoder drops;
+- 0 unrecoverable FEC groups;
+- 176503 ms decoder duration.
+
+This exactly supports a healthy stream through the client/profile transition.
+
+## B6 checkpoint rule
+
+Before staging a Phase B checkpoint, run a read-only repository audit and review
+the exact local status list. The local working tree remains authoritative.
+
+B6 audit acceptance requires: clean diagnostic evidence chain, no active legacy
+production references, no tracked raw evidence, no unexpected status entries,
+`git diff --check` PASS, Python syntax PASS, Android Kotlin compile PASS, and
+remote main still at the expected predecessor.
+
+Do not let a broad `git add .` decide checkpoint scope. Build the final staging
+allowlist from the reviewed B6 audit result.
+
+## Repository-audit ROADMAP rule
+
+Do not exact-hash-gate a working-tree documentation file merely because it was
+copied into an earlier package-building environment.
+
+For B6:
+- exact-hash production source and durable memory;
+- require working `docs/ROADMAP.md` to exist and remain byte-identical across the
+  audit installer;
+- hash committed `HEAD:docs/ROADMAP.md` separately against the known pushed baseline;
+- use Git diff semantics to determine whether the working roadmap has a
+  substantive uncommitted change.
+
+This avoids confusing line-ending/local-working-copy differences with invalid
+project state while still failing closed on production-state drift.
+
+## Phase B checkpoint
+
+Phase B is complete and pushed.
+
+Validated baseline:
+- unified diagnostics/health/Self-Test/support bundle/retention are established;
+- Sunshine/Moonlight active architecture and physical project artifacts are
+  removed;
+- Android `com.limelight` is absent while PrivyHub remains installed;
+- Games passed the native-only WGC/NVENC/RTP-UDP-XOR-FEC regression;
+- repository scope was audited with zero unexpected/pre-staged paths;
+- Python and Android Kotlin compilation passed;
+- `docs/ROADMAP.md` advances Phase C to NEXT.
+
+Manifest rule: `manifest.json` is excluded from its own conventional `files`
+hash/byte list. All other durable-memory entries remain strictly validated.
+
+Legacy scan rule: the exact MainActivity path/line/pattern/hash tuple recorded by
+B6 is inert text. Any additional occurrence, or the same occurrence under a
+different source hash, is a regression.

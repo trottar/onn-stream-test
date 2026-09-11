@@ -63,3 +63,187 @@ This index records durable checkpoints and major patch lines; it does not invent
 - `privyhub_phase_a_final_checkpoint_push_01_2026-09-10` — final Phase A checkpoint/push package: records A9 checkpoint-ready state, adds repository evidence policy, ignores live raw evidence, creates sanitized compressed Phase A evidence snapshot, stages only approved Phase A source/memory/probe changes, validates, commits, and pushes.
 
 - `privyhub_roadmap_v2_push_01_2026-09-10` — docs-only roadmap update after Phase A checkpoint: replaces `docs/ROADMAP.md`, curates current/handoff/roadmap memory, and defines Diagnostics, adaptive streaming, VOD artwork, Linux scaling, OpenBIOS and future expansion phases.
+
+- `privyhub_b1_diagnostics_inventory_01_2026-09-10` — diagnostic-only Phase B1.1 inventory package. Adds a local
+  diagnostics-inventory probe and durable-memory handoff; no production behavior
+  change. The probe inventories existing telemetry/probes/harness/privacy/schema
+  surfaces before B1.2 architecture design.
+
+- `privyhub_b1_health_model_foundation_01_2026-09-10` — B1.2 development foundation. Adds the pure
+  `privyhub_diagnostics_health_v1` / `privyhub_resource_snapshot_v1` model and a
+  runtime health-snapshot probe, records B1.1 evidence, and defines
+  resource-aware diagnostics architecture. No service API, Android or native
+  streaming behavior change.
+
+- `privyhub_b1_health_endpoint_01_2026-09-10` — B1.3 read-only health endpoint. Adds a small runtime adapter,
+  exposes `GET /diagnostics/health`, adds endpoint probe, records B1.2 runtime
+  validation, and preserves resource-aware/zero-new-sampler semantics. No
+  Android or native streaming pipeline changes.
+
+- `privyhub_b1_client_feedback_source_audit_01_2026-09-10` — B1.4 diagnostic-only source-context audit. Records B1.3
+  endpoint runtime validation and adds a probe that inventories exact current
+  Android native-stream metrics, scheduler/cadence primitives, HTTP/JSON request
+  infrastructure, lifecycle methods and companion health source hashes before
+  any client-feedback implementation.
+
+- `privyhub_b1_client_feedback_01_2026-09-10` — B1.5 client-feedback development patch. Reuses Android's
+  existing metrics tick for a 2-second privacy-minimized report, adds a
+  latest-only companion receiver/delta baseline, integrates fresh feedback into
+  network/decoder health, and adds runtime validation. No new timer/resource
+  sampler or persistent client-health log.
+
+- `privyhub_b1_decoder_stale_semantics_audit_01_2026-09-10` — B1.6 diagnostic-only classifier audit. Records the successful
+  B1.5 client-feedback runtime result and adds a multi-interval probe comparing
+  rendered cadence, stale-output shedding, ordinary decoder drops, queue state,
+  timing and network/FEC measurements before any decoder health rule is changed.
+
+- `privyhub_b1_decoder_classifier_01_2026-09-10` — B1.7 health-classifier correction based on the B1.6
+  multi-interval measurements. Stale-only low-latency shedding is informational
+  rather than degraded; direct decoder-local faults remain degraded. Adds
+  runtime validation and durable evidence. No Android/streaming changes.
+
+- `privyhub_b1_gui_retention_context_audit_01_2026-09-10` — B1.8 diagnostic-only GUI/Self-Test + retention context audit.
+  Records B1.7 classifier runtime validation, inventories exact Android UI and
+  diagnostic-activity anchors, confirms the live health endpoint/self-test
+  inputs, and measures log-family retention pressure without deleting evidence.
+
+- `privyhub_b1_diagnostics_gui_retention_foundation_01_2026-09-10` — B1.9 development patch. Adds the standalone Android
+  Diagnostics/Self-Test activity, a narrow PrivyHub Settings navigation entry,
+  and a manual dry-run-first retention utility for the measured
+  transport/debug-bundle pressure. Automatic deletion remains off. Records
+  B1.8 evidence and updates durable memory.
+
+- `privyhub_b1_retention_blocker_audit_01_2026-09-10` — B1.10 diagnostic-only protected-footprint audit. Records B1.9 GUI runtime validation, preserves production and retention behavior, and inventories why forward retention is blocked.
+
+- `privyhub_b1_retention_rule_refinement_01_2026-09-10` — B1.11 retention classifier refinement. Treats only
+  `pktmon_full.txt` as raw capture for extension-protection purposes, keeps
+  newest/failure/general `.txt` protections, adds a dry-run validation probe,
+  records B1.10 evidence, and performs no retention deletion.
+
+- `privyhub_b1_b2_completion_gap_audit_01_2026-09-10` — diagnostic-only B1/B2 completion-gap audit. Records the
+  successful B1.12 real retention apply and checks exact current source for the
+  roadmap's remaining bounded event-history, GUI support-bundle and Self-Test
+  requirements before B3. No production changes or deletions.
+
+- `privyhub_b1_b2_completion_source_context_01_2026-09-10` — diagnostic-only exact source-context audit for the remaining
+  B1/B2 completion requirements. Records the completion-gap result, inspects
+  local Self-Test/service/health/client-feedback/bundle hooks, and searches for
+  reusable ADB/storage/event-history candidates. No production changes.
+
+- `privyhub_b1_b2_completion_01_2026-09-10` — B1.13 development patch.
+  Completes the explicit B1/B2 diagnostics requirements with a bounded
+  128-event history, storage/ADB/emulator-runtime Self-Test checks, GUI
+  `COLLECT DIAGNOSTICS`, and a support-bundle bridge that reuses and revalidates
+  the existing sanitized bundler. Streaming/session paths intentionally
+  unchanged. Runtime validation pending.
+
+- `privyhub_b1_b2_gui_action_feedback_01_2026-09-10` — UI-only B2 polish. Adds immediate button-local busy labels
+  (`REFRESHING...`, `RUNNING...`, `COLLECTING...`) in the existing Diagnostics
+  busy gate and records the successful B1/B2 completion runtime evidence.
+  Companion/API/streaming behavior unchanged.
+
+- `privyhub_b3_sunshine_moonlight_inventory_01_2026-09-10` — B3 diagnostic-only Sunshine/Moonlight dependency inventory. Records final B2 manual GUI validation, scans current source/config/docs plus privacy-safe Windows process/service/task/firewall/software state, classifies legacy occurrences, and emits a MUST PRESERVE native-path guard. No production or system-state changes.
+
+- `privyhub_b3_active_legacy_edge_trace_01_2026-09-10` — B3.1 diagnostic-only active legacy-edge trace. Records the
+  broad B3 runtime result, then traces exact current `games.py -> StreamManager`
+  calls, Android Moonlight/com.limelight functions/call sites, manifest
+  visibility, current-tree artifact references, and grouped legacy runtime
+  footprint. No production/system-state changes.
+
+- `privyhub_b4_1_games_source_context_01_2026-09-11` — diagnostic-only recovery after the first B4.1 installer was
+  correctly rejected before modification. Captures exact `games.py` source
+  encoding/newline state, semantic AST spans, and surrounding source blocks for
+  rebuilding B4.1 without inferred whitespace anchors.
+
+- `privyhub_b4_1_server_legacy_edge_removal_02_2026-09-11` — corrected B4.1 production patch. Uses exact predecessor hash
+  plus AST-selected whole-line spans to remove the Games StreamManager edge,
+  preserving CRLF, NativeStreamManager, Android, stream_manager.py and all
+  Sunshine artifacts. Supersedes the rejected original B4.1 ZIP.
+
+- `privyhub_b4_2_android_source_context_01_2026-09-11` — diagnostic-only B4.2 exact Android source-context capture
+  after successful B4.1 runtime validation. Captures MainActivity function
+  bodies/callers, legacy terms and manifest com.limelight context before any
+  Android production edit.
+
+- `privyhub_b4_2_android_moonlight_edge_removal_01_2026-09-11` — removes the exact evidenced Android Moonlight/com.limelight
+  launcher/query and stale stream_host UI/response edge while preserving native
+  streaming. Runs Kotlin compilation and rolls back source bytes on failure.
+
+- `privyhub_b4_3_orphan_reference_audit_01_2026-09-11` — diagnostic-only orphan-reference audit after successful
+  B4.1/B4.2 runtime validation. Separates production references, scripts,
+  diagnostics/tools and physical legacy artifact groups before cleanup.
+
+- `privyhub_b4_4_code_orphan_cleanup_01_2026-09-11` — removes the two exact-hash orphan Android stream-host helper
+  functions and deletes the exact-hash orphan `stream_manager.py`. Preserves all
+  physical Sunshine/Moonlight runtime/download/setup artifacts pending a hash
+  manifest.
+
+- `privyhub_b4_5_physical_legacy_hash_manifest_01_2026-09-11` — diagnostic-only exact hash manifest for remaining physical
+  Sunshine/Moonlight artifacts after B4.4 runtime validation, including
+  process/service/task/firewall state and com.limelight presence on
+  already-connected Android targets without logging identifiers.
+
+- `privyhub_b4_6_physical_legacy_cleanup_01_2026-09-11` — deletes exactly the nine B4.5-hashed project legacy groups after canonical digest revalidation and a verified backup archive. Preserves RetroArch name collisions and leaves Android package verification separate.
+
+- `privyhub_b4_6_physical_legacy_cleanup_01_2026-09-11` — superseded. It was
+  **FAILED BEFORE MODIFICATION** because the package's canonical-manifest
+  separator bytes did not match B4.5.
+- `privyhub_b4_6_physical_legacy_cleanup_02_2026-09-11` — corrected B4.6
+  physical cleanup. Canonical group hashing exactly matches B4.5 and is covered
+  by a direct cross-version equivalence regression fixture.
+
+- `privyhub_b4_6_physical_legacy_cleanup_02_2026-09-11` — superseded. It was
+  **FAILED BEFORE MODIFICATION** after falsely classifying the nine known
+  RetroArch name-collision non-targets because its regex literal-dot escapes
+  were doubled.
+- `privyhub_b4_6_physical_legacy_cleanup_03_2026-09-11` — corrected physical
+  cleanup. It matches both B4.5 canonical hashing and B4.5 non-target discovery,
+  and hard-preserves the exact nine authoritative non-target paths.
+
+- `privyhub_b4_7_device_moonlight_package_check_01_2026-09-11` — diagnostic-only device package verification using the
+  established private ADB discovery/recovery pattern. Verifies PrivyHub on the
+  resolved target, then checks `com.limelight`; performs no package changes.
+
+- `privyhub_b4_8_device_moonlight_removal_01_2026-09-11` — installs the package-only B4.8 device cleanup action. The
+  action privately resolves the established onn, verifies PrivyHub, uninstalls
+  only `com.limelight`, and verifies the final package state.
+
+- `privyhub_b4_8_device_moonlight_final_verify_02_2026-09-11` — diagnostic-only correction for the B4.8 post-uninstall
+  verifier. Uses package-list semantics so missing Moonlight is a valid absence
+  state. Performs no Android package changes.
+
+- `privyhub_b5_native_only_regression_01_2026-09-11` — installs the focused B5 native-only regression harness.
+  Diagnostic/runtime-validation only; no production-source change. On a fully
+  confirmed PASS it writes B5 runtime evidence and advances durable memory to
+  B6 clean-native checkpoint work.
+
+- `privyhub_b5_classifier_correction_01_2026-09-11` — corrects the B5 diagnostic harness so post-profile native
+  client activity is informational rather than a required pass gate. The
+  installer adjudicates the existing failed B5 run against the fresh sanitized
+  game diagnostic bundle, records B5 as runtime validated, and advances durable
+  memory to B6. No production-source change.
+
+- `privyhub_b6_clean_native_repository_audit_01_2026-09-11` — installs the read-only B6 clean-native repository audit. It
+  captures exact source-control status, legacy production references, durable
+  memory consistency, build readiness and remote predecessor state. No staging,
+  commit or push.
+
+- `privyhub_b6_clean_native_repository_audit_01_2026-09-11` — superseded;
+  **FAILED BEFORE MODIFICATION** because it incorrectly exact-hash-gated the
+  working `docs/ROADMAP.md`.
+- `privyhub_b6_clean_native_repository_audit_02_2026-09-11` — corrected audit:
+  preserves the current working roadmap, verifies the committed roadmap baseline
+  separately, and classifies substantive working roadmap diffs in the audit.
+
+- `privyhub_b6_clean_native_repository_audit_02_2026-09-11` — superseded;
+  **FAILED BEFORE MODIFICATION** because it still looked for nonexistent
+  repository-root `ROADMAP.md`.
+- `privyhub_b6_clean_native_repository_audit_03_2026-09-11` — corrected to use
+  the actual authoritative `docs/ROADMAP.md` path throughout installer, probe,
+  Git HEAD lookup, Git diff classification, reports, and memory.
+
+- `privyhub_b6_final_checkpoint_push_01_2026-09-11` — final Phase B checkpoint.
+  Corrects the two B6 audit-model false positives, installs the corrected audit
+  probe, removes the manifest self-entry convention, updates `docs/ROADMAP.md`
+  to Phase B complete / Phase C next, selectively stages the exact audited
+  scope, commits, pushes, and verifies remote main.
