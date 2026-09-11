@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-11
-baseline_commit: fa79d4f5feba6797a6993a6fcdcdaff673812da3
+baseline_commit: 8f25763fca012257a3695ede03004fc9a368966a
 ---
 
 # Curated Project Memory
@@ -32,7 +32,8 @@ minimization and no silent fallback.
 - Phase C — Adaptive native streaming: **ACTIVE**
 - Current technical item: **C1 explicit stream profiles**
 - C1 inventory: **COMPLETE**
-- Next technical classification: `C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA`
+- C1 minimal schema design: **COMPLETE**
+- Next technical classification: `C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION`
 
 The completed C1 inventory is checkpointed. Do not rerun it unless source changes
 invalidate its evidence.
@@ -63,42 +64,34 @@ profile semantics.
 
 Current ownership:
 
-- `companion/games/native/native_stream.py` — capture/session setup, quality
+- `companion/native_stream.py` — capture/session setup, quality
   constants, encoder policy, RTP/FEC/session ports.
-- `companion/games/native/native_fec_relay.py` — relay/FEC behavior and part of
+- `companion/native_fec_relay.py` — relay/FEC behavior and part of
   the duplicated transport contract.
 - `PrivyHub/app/src/main/java/com/safeiot/privyhub/streaming/NativeStreamActivity.kt`
   — duplicated width/height/fps and endpoint constants.
 - `PrivyHub/app/src/main/java/com/safeiot/privyhub/streaming/RtpH264Receiver.kt`
   — receive/FEC buffering.
 
-Likely portable profile fields:
+Reference profile `native_game_720p60_reference` is design-fixed as:
 
-- `id`
-- `width`
-- `height`
-- `fps`
-- `bitrate_kbps`
-- `max_bitrate_kbps`
-- `gop_frames`
-- `bframes`
-- optional `fec_group_size`
+- `id`: `native_game_720p60_reference`
+- `width`: 1280
+- `height`: 720
+- `fps`: 60
+- `bitrate_kbps`: 7000
+- `max_bitrate_kbps`: 7000
+- `gop_frames`: 15
+- `bframes`: 0
+- `fec_group_size`: 8
 
-Keep outside the portable profile unless later evidence requires otherwise:
+Do not add `min_bitrate_kbps` in C1.1 because the validated baseline has no existing lower-bound behavior to preserve.
 
-- NVENC codec/preset/tune/RC/buffer policy;
-- RTP payload type and packet size;
-- ports;
-- capture backend;
-- audio implementation;
-- controller/input protocol;
-- telemetry cadence.
+`fec_group_size` is portable C1 profile data and must validate to 1-8 because the current PHF1 marker mask is one byte.
 
-First profile concept: `native_game_720p60_reference`.
+Keep NVENC codec/preset/tune/RC/buffer/pixel-format policy, RTP payload type, packet size, ports, capture backend, audio, controller protocol and telemetry cadence outside the portable C1.1 profile.
 
-The first C1 implementation is a behavior-preserving static extraction. Do not
-add a GUI selector, adaptive controller or generalized streaming framework in
-that first patch.
+C1.1 is companion-only static extraction. Preserve Android constants/startup ordering; keep existing top-level host status fields and add inspectable `profile_id` plus nested profile data. No selector, adaptation, generalized backend framework, capture/audio/input redesign or wire-format change.
 
 ## Stable runtime boundaries
 

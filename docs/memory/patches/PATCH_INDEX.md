@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-10
-baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
+baseline_commit: 8f25763fca012257a3695ede03004fc9a368966a
 ---
 
 # Patch / Checkpoint Index
@@ -327,3 +327,11 @@ This index records durable checkpoints and major patch lines; it does not invent
   evidence, marks the cleanup runtime validated, stages only the reviewed eight
   paths, commits, pushes, verifies a clean tree and `origin/main == HEAD`, and
   returns the active technical step to `C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA`.
+
+- `privyhub_c1_design_memory_patch_01_2026-09-11` — memory-only C1 design update. Corrects stale native-stream source paths, records D-058, fixes the minimal explicit profile schema/C1.1 boundary, and advances the next technical classification to `C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION`. No production/runtime source change.
+
+- `privyhub_c1_design_memory_checkpoint_finalizer_01_2026-09-11` — exact-scope checkpoint finalizer for the C1 design durable-memory
+  update. Stages only the reviewed ten memory paths, records the design memory
+  checkpoint, commits/pushes it, verifies a clean tree and `origin/main == HEAD`,
+  and leaves `C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION` as the active
+  technical step.

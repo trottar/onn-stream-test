@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-11
-baseline_commit: 65d02012409440d5559c14beb2b28268b0b225bc
+baseline_commit: 8f25763fca012257a3695ede03004fc9a368966a
 ---
 
 # Current Development State
@@ -9,7 +9,7 @@ baseline_commit: 65d02012409440d5559c14beb2b28268b0b225bc
 ## Checkpoint
 
 - Branch: `main`
-- Last synchronized checkpoint: `65d02012409440d5559c14beb2b28268b0b225bc`
+- Last synchronized checkpoint: `8f25763fca012257a3695ede03004fc9a368966a`
 - Part 1 current-state alignment: **CHECKPOINTED / PUSHED**
 - Part 2 durable-memory curation/deep history: **CHECKPOINTED / PUSHED**
 - Part 3 decision/investigation normalization: **CHECKPOINTED / PUSHED**
@@ -20,7 +20,9 @@ baseline_commit: 65d02012409440d5559c14beb2b28268b0b225bc
 - Phase B: **COMPLETE / PUSHED**
 - Phase C: **ACTIVE**
 
-Next work: technical C1 schema design.
+C1 minimal schema design: **COMPLETE / CHECKPOINTED / PUSHED**
+
+Next work: `C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION`.
 
 ## Active technical step
 
@@ -30,9 +32,13 @@ Inventory result:
 
 `C1_INVENTORY_COMPLETE`
 
+Design classification:
+
+`C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA` — **COMPLETE**
+
 Next classification:
 
-`C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA`
+`C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION`
 
 Do not rerun the inventory unless source changes invalidate it.
 
@@ -58,32 +64,33 @@ buffer and yuv420p. Those are not automatically portable profile semantics.
 
 ## C1 ownership findings
 
-- `companion/games/native/native_stream.py` — capture/session setup, reference
+- `companion/native_stream.py` — capture/session setup, reference
   quality constants, encoder/backend policy and RTP/FEC/session setup.
-- `companion/games/native/native_fec_relay.py` — relay/FEC behavior and
+- `companion/native_fec_relay.py` — relay/FEC behavior and
   duplicated transport assumptions.
 - Android `NativeStreamActivity.kt` — duplicated width/height/fps and endpoint
   constants.
 - Android `RtpH264Receiver.kt` — receive/FEC buffering.
 
-Likely portable profile fields:
+Reference profile `native_game_720p60_reference` is design-fixed as:
 
-- `id`
-- `width`
-- `height`
-- `fps`
-- `bitrate_kbps`
-- `max_bitrate_kbps`
-- `gop_frames`
-- `bframes`
-- optional `fec_group_size`
+- `id`: `native_game_720p60_reference`
+- `width`: 1280
+- `height`: 720
+- `fps`: 60
+- `bitrate_kbps`: 7000
+- `max_bitrate_kbps`: 7000
+- `gop_frames`: 15
+- `bframes`: 0
+- `fec_group_size`: 8
 
-Keep backend/session details outside the portable profile unless evidence
-requires otherwise: codec/preset/tune/RC/buffer policy, RTP payload type,
-packet size, ports, capture backend, audio, controller protocol and telemetry
-cadence.
+Do not add `min_bitrate_kbps` in C1.1 because the validated baseline has no existing lower-bound behavior to preserve.
 
-First concept: `native_game_720p60_reference`.
+`fec_group_size` is portable C1 profile data and must validate to 1-8 because the current PHF1 marker mask is one byte.
+
+Keep NVENC codec/preset/tune/RC/buffer/pixel-format policy, RTP payload type, packet size, ports, capture backend, audio, controller protocol and telemetry cadence outside the portable C1.1 profile.
+
+C1.1 is companion-only static extraction. Preserve Android constants/startup ordering; keep existing top-level host status fields and add inspectable `profile_id` plus nested profile data. No selector, adaptation, generalized backend framework, capture/audio/input redesign or wire-format change.
 
 ## First C1 acceptance boundary
 

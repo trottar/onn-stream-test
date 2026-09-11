@@ -17,20 +17,34 @@
   "b4_status": "COMPLETE / runtime validated",
   "b5_status": "COMPLETE / runtime validated",
   "b6_status": "COMPLETE / checkpointed / pushed",
-  "baseline_commit": "216c0b00bce8558e23eb977f80a32af278b70319",
-  "baseline_short": "216c0b00",
+  "baseline_commit": "8f25763fca012257a3695ede03004fc9a368966a",
+  "baseline_short": "8f25763f",
+  "c1_design_memory_checkpoint": "CHECKPOINTED / PUSHED",
+  "c1_design_status": "COMPLETE / CHECKPOINTED / PUSHED / C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA",
   "c1_inventory_status": "COMPLETE / C1_INVENTORY_COMPLETE",
-  "c1_next_step": "C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA",
+  "c1_next_step": "C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION",
+  "c1_reference_profile_id": "native_game_720p60_reference",
+  "c1_reference_profile_schema": {
+    "bframes": 0,
+    "bitrate_kbps": 7000,
+    "fec_group_size": 8,
+    "fps": 60,
+    "gop_frames": 15,
+    "height": 720,
+    "id": "native_game_720p60_reference",
+    "max_bitrate_kbps": 7000,
+    "width": 1280
+  },
   "checkpoint_parent_commit": "a6dbf627dd32af7da975bf01a679350810026ca3",
   "checkpoint_scope": "Part 1 current-state repair + completed C1 inventory memory/probe",
   "classifier_changed": false,
   "client_health_interval_ms": 2000,
   "client_health_schema": "privyhub_client_health_v1",
   "client_health_storage": "latest only plus one delta baseline",
-  "companion_behavior_changed": true,
+  "companion_behavior_changed": false,
   "current_phase": "Phase C",
-  "current_step": "C1 minimal explicit stream profile schema design",
-  "decision_id_state": "unique durable IDs through D-057",
+  "current_step": "C1 static reference profile extraction implementation",
+  "decision_id_state": "unique durable IDs through D-058",
   "decoder_classifier_runtime_validated": true,
   "decoder_stale_policy": "informational unless decoder-local failure exists",
   "deep_memory_history": "docs/memory/history/",
@@ -53,9 +67,9 @@
       "sha256": "2f3c393d42bf1629909e77cdecb9196befaf1b47141656f18ba4bfb2feaad930"
     },
     {
-      "bytes": 4686,
+      "bytes": 5393,
       "path": "CURRENT.md",
-      "sha256": "9ba5c449e2585a4e77bd0c7a1c942ed8a1e2d42e3e66a54a8f2167219b47fb82"
+      "sha256": "4c10a1c53e86b6fb212e146477d87a2210097608ef98c1b8885068323031e71b"
     },
     {
       "bytes": 2564,
@@ -63,9 +77,9 @@
       "sha256": "7957a58cd59456684c568bc85d8fe39c22d130b58ddaf9d9d636f7b063fa9698"
     },
     {
-      "bytes": 12306,
+      "bytes": 12672,
       "path": "MEMORY.md",
-      "sha256": "189546cd3c3b8d99ed47466577ddd52963760a3fbffb023916d830f15b94f2d5"
+      "sha256": "9def1ae48012e75f73c6116bfb348c3299d8b0c9aa61ff8cd32bb215bb834317"
     },
     {
       "bytes": 3012,
@@ -108,9 +122,9 @@
       "sha256": "c3d62c71eae19c7b41aa649fbf44232bf629280c9049ad580ee2f8734792c64e"
     },
     {
-      "bytes": 1130,
+      "bytes": 2151,
       "path": "architecture/STREAMING.md",
-      "sha256": "6e9d9abda87a9fcc6ad7ff174a2def604bcd1608462319be288676b40a441edc"
+      "sha256": "f77147e11f03e7722b330560c5a41ef2017cedcc1fc1f13eccef185134bfce39"
     },
     {
       "bytes": 1117,
@@ -128,9 +142,9 @@
       "sha256": "950432c56ea8454554952f5053248e2d464ba793d0d43bbd976a0b38660d52be"
     },
     {
-      "bytes": 27149,
+      "bytes": 28238,
       "path": "decisions/DECISION_LOG.md",
-      "sha256": "18ec041f1c9569f3e1170e39469a1a56fe7708c1b572fd9e6336a8575e065cd5"
+      "sha256": "cdd00d53a54387e7a4618c41e3a06e070df05deef3f63ba452bfd000906c8a7f"
     },
     {
       "bytes": 1129,
@@ -408,9 +422,9 @@
       "sha256": "7cd58c6b7e2b128e36b3a879fa151444790e9d95d9b12ec933f415bec19ef756"
     },
     {
-      "bytes": 4793,
+      "bytes": 5407,
       "path": "handoffs/CURRENT_HANDOFF.md",
-      "sha256": "22be73216b0f74fb769c9c8b4c6dddb6e38f5b72c101a497571e24b45086cb4c"
+      "sha256": "f0ba0260cf6cfb56fc1f3524c9c8e9fbc56ad3c91f91f3e3180cb27ee9ab7e3f"
     },
     {
       "bytes": 20924,
@@ -428,9 +442,9 @@
       "sha256": "17179b3916be00b216a803bef7f798eaa59c246835ea85543b23929fa5ef18dc"
     },
     {
-      "bytes": 1440,
+      "bytes": 2282,
       "path": "investigations/ACTIVE.md",
-      "sha256": "3298aaddc6676a0ea1d1d36c6f52c9539106608b30a3904e5ec74f69d41cd9c5"
+      "sha256": "88d8db7b661eba48a7589a3f49b2501f19d7172e80dda6e0a77519d4c281d99c"
     },
     {
       "bytes": 1712,
@@ -453,14 +467,14 @@
       "sha256": "df3aa331aa94cd503ba13164ea9a0461643d1e2e67f042c8499e92595f9ec044"
     },
     {
-      "bytes": 14173,
+      "bytes": 15649,
       "path": "memory/2026-09-11.md",
-      "sha256": "f59c72926c4f1f629a98cf66c513ba8f8528d99c033e0d627b12a105e90a9c38"
+      "sha256": "d3265a989b22efe8335b824d1d898acf04586f0f71afcedfd4c1b9ad6a889de8"
     },
     {
-      "bytes": 25807,
+      "bytes": 26539,
       "path": "patches/PATCH_INDEX.md",
-      "sha256": "7353cca98f22d32676c0a38ac9c6b97720add84a3b102684e68481b691d9da31"
+      "sha256": "73c6b3dd23637485c039d223dc6b70a1f90f63133da8d52e553efbab39f086bf"
     },
     {
       "bytes": 1894,
@@ -483,9 +497,9 @@
       "sha256": "9b2d03a0a18fe45ea7ee607020d922232e1d15603f9bfb0eccd4e5165088cd12"
     },
     {
-      "bytes": 3244,
+      "bytes": 4068,
       "path": "roadmap/STATUS.md",
-      "sha256": "8ae445d9ae625b2909a2da93bd0c645ba19c61e614e84b72f73c83bcc6c73c3b"
+      "sha256": "2b99240490a4bb2d6d646a741f56ac4f8bd92ae0f472ce0c2a5f1010548d4302"
     },
     {
       "bytes": 750,
@@ -512,7 +526,7 @@
   "name": "PrivyHub durable project memory",
   "new_client_metrics_timer": false,
   "new_resource_sampler": false,
-  "next_work": "C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA",
+  "next_work": "C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION",
   "part2_status": "COMPLETE / CHECKPOINTED / PUSHED",
   "part3_status": "COMPLETE / CHECKPOINTED / PUSHED",
   "part4_status": "COMPLETE / CHECKPOINTED / PUSHED",
@@ -521,7 +535,7 @@
   "phase_c_status": "ACTIVE",
   "physical_legacy_groups_deleted": 9,
   "predecessor": "C1 stream parameter inventory",
-  "production_behavior_changed": true,
+  "production_behavior_changed": false,
   "ps1_multitap_status": "complete / runtime validated on Crash Bash and CTR; Port 1 only",
   "repository_evidence_policy": "raw local/ignored; sanitized checkpoint snapshots committed",
   "repository_ledgers_status": "CODE_MAP/DEBT/CHAT_INDEX refreshed",

@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-11
-baseline_commit: db59209578fc628fc602e707f5f7cd9091949edc
+baseline_commit: 8f25763fca012257a3695ede03004fc9a368966a
 ---
 
 # Decision Log
@@ -559,3 +559,13 @@ External AI is never mandatory. No local failure may silently become a cloud
 upload. Credentials remain user-controlled; data is minimized; microphone/
 camera export requires an explicit policy; and all model-requested actions pass
 through local permission/validation.
+
+### D-058 — C1.1 uses one immutable companion reference profile
+
+**Status:** Accepted (2026-09-11)
+
+The first C1 production change is a behavior-preserving static extraction of the validated native Games stream into one immutable companion-side profile: `native_game_720p60_reference`.
+
+Portable C1.1 fields are `id`, `width`, `height`, `fps`, `bitrate_kbps`, `max_bitrate_kbps`, `gop_frames`, `bframes`, and `fec_group_size`. Do not add a minimum bitrate yet because the validated stream has no lower-bound behavior to preserve. Validate `fec_group_size` to 1-8 because the current PHF1 wire header stores its marker mask in one byte.
+
+Keep NVENC backend policy, RTP payload type/packet size, ports, capture backend, audio, controller protocol and telemetry cadence outside this profile. C1.1 changes the companion only; preserve Android startup constants/order until the static host profile is runtime validated. Preserve existing top-level host status fields and add inspectable `profile_id`/profile data. No GUI selector, adaptation or generalized source framework belongs in C1.1.

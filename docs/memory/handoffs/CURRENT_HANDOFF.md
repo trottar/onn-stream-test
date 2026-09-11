@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-11
-baseline_commit: 65d02012409440d5559c14beb2b28268b0b225bc
+baseline_commit: 8f25763fca012257a3695ede03004fc9a368966a
 ---
 
 # Current Handoff
@@ -15,9 +15,9 @@ Authoritative local root:
 Local source is authoritative between checkpoints. GitHub is reference/history
 unless a clean synchronized checkpoint is being verified.
 
-Last synchronized checkpoint before this local Part 4 install:
+Last synchronized checkpoint:
 
-`65d02012409440d5559c14beb2b28268b0b225bc`
+`8f25763fca012257a3695ede03004fc9a368966a`
 
 Part 1, Part 2 and Part 3 docs/memory cleanup are checkpointed/pushed.
 
@@ -33,9 +33,11 @@ The minor Games startup/catalog cleanup is runtime validated and checkpointed:
 - native-stream status/start/stop endpoints and `NativeStreamActivity` remain preserved;
 - normal game picture/audio/controller regression passed.
 
+C1 schema design and its durable-memory update are checkpointed/pushed.
+
 Resume technical work at:
 
-`C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA`
+`C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION`
 
 Do not rerun the completed C1 inventory unless source changes invalidate it.
 
@@ -64,27 +66,25 @@ Reference behavior:
 - RTP PT 96;
 - packet size 1200 bytes.
 
-Likely portable profile fields:
+Reference profile `native_game_720p60_reference` is design-fixed as:
 
-- `id`
-- `width`
-- `height`
-- `fps`
-- `bitrate_kbps`
-- `max_bitrate_kbps`
-- `gop_frames`
-- `bframes`
-- optional `fec_group_size`
+- `id`: `native_game_720p60_reference`
+- `width`: 1280
+- `height`: 720
+- `fps`: 60
+- `bitrate_kbps`: 7000
+- `max_bitrate_kbps`: 7000
+- `gop_frames`: 15
+- `bframes`: 0
+- `fec_group_size`: 8
 
-Keep backend/session policy outside the first portable profile unless evidence
-requires otherwise.
+Do not add `min_bitrate_kbps` in C1.1 because the validated baseline has no existing lower-bound behavior to preserve.
 
-First profile concept:
+`fec_group_size` is portable C1 profile data and must validate to 1-8 because the current PHF1 marker mask is one byte.
 
-`native_game_720p60_reference`
+Keep NVENC codec/preset/tune/RC/buffer/pixel-format policy, RTP payload type, packet size, ports, capture backend, audio, controller protocol and telemetry cadence outside the portable C1.1 profile.
 
-First implementation is static extraction only. No GUI selector, adaptation or
-generic framework in that patch.
+C1.1 is companion-only static extraction. Preserve Android constants/startup ordering; keep existing top-level host status fields and add inspectable `profile_id` plus nested profile data. No selector, adaptation, generalized backend framework, capture/audio/input redesign or wire-format change.
 
 ## Regression contract
 

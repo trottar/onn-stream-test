@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-11
-baseline_commit: a6dbf627dd32af7da975bf01a679350810026ca3
+baseline_commit: 8f25763fca012257a3695ede03004fc9a368966a
 ---
 
 # Roadmap Status
@@ -42,9 +42,13 @@ Reference stream:
 - H.264 NVENC over the native RTP-sized UDP path;
 - Android hardware AVC decode.
 
+### Design
+
+`C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA` — **COMPLETE**
+
 ### Next
 
-`C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA`
+`C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION`
 
 The first profile patch should:
 1. name the existing reference behavior explicitly;
@@ -54,19 +58,25 @@ The first profile patch should:
 5. avoid a GUI selector or adaptive controller until the static profile is
    runtime validated.
 
-Likely portable fields:
-- `id`
-- `width`
-- `height`
-- `fps`
-- `bitrate_kbps`
-- `max_bitrate_kbps`
-- `gop_frames`
-- `bframes`
-- optional `fec_group_size`
+Reference profile `native_game_720p60_reference` is design-fixed as:
 
-Backend/session details remain outside the portable schema unless later evidence
-requires otherwise.
+- `id`: `native_game_720p60_reference`
+- `width`: 1280
+- `height`: 720
+- `fps`: 60
+- `bitrate_kbps`: 7000
+- `max_bitrate_kbps`: 7000
+- `gop_frames`: 15
+- `bframes`: 0
+- `fec_group_size`: 8
+
+Do not add `min_bitrate_kbps` in C1.1 because the validated baseline has no existing lower-bound behavior to preserve.
+
+`fec_group_size` is portable C1 profile data and must validate to 1-8 because the current PHF1 marker mask is one byte.
+
+Keep NVENC codec/preset/tune/RC/buffer/pixel-format policy, RTP payload type, packet size, ports, capture backend, audio, controller protocol and telemetry cadence outside the portable C1.1 profile.
+
+C1.1 is companion-only static extraction. Preserve Android constants/startup ordering; keep existing top-level host status fields and add inspectable `profile_id` plus nested profile data. No selector, adaptation, generalized backend framework, capture/audio/input redesign or wire-format change.
 
 ## C1 acceptance gate
 
