@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-14
-baseline_commit: 0c31c100ec721d687aff6aedbd79bc0cf9343810
+baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 ---
 
 # Patch / Checkpoint Index
@@ -372,3 +372,15 @@ This index records durable checkpoints and major patch lines; it does not invent
   remote/portable-client foundation, H/I/J phase reorder, D-059, provider-neutral
   overlay boundary and explicit remote identity/auth rules. No production/runtime
   source changes.
+
+- `privyhub_c2_telemetry_contract_design_03_2026-09-14` — documentation/durable-memory-only Phase C2 design update on
+  synchronized checkpoint `45ef51f9e583b459752dd5ea83163f54171e68c7`. Records the C2.1 telemetry
+  inventory, adds the `privyhub_stream_telemetry_v1` architecture design,
+  accepts D-060, normalizes CURRENT/HANDOFF/roadmap state from C1 to C2, and
+  sets `C2_IMPLEMENT_STREAM_TELEMETRY_V1` as the next production step. No
+  production/runtime source changes.
+
+- `Checkpoint: define C2 telemetry contract` — checkpoints the documentation-only C2.1 telemetry
+  inventory and C2.2 minimal `privyhub_stream_telemetry_v1` design on predecessor
+  `45ef51f9e583b459752dd5ea83163f54171e68c7`. D-060 and the four missing measurement classes are now
+  durable. No production/runtime source changes.

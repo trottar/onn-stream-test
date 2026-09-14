@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-14
-baseline_commit: 0c31c100ec721d687aff6aedbd79bc0cf9343810
+baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 ---
 
 # Roadmap Status
@@ -23,7 +23,7 @@ baseline_commit: 0c31c100ec721d687aff6aedbd79bc0cf9343810
 
 `docs/ROADMAP.md` roadmap v4 is authoritative for phase definitions.
 
-## Active item: C1 explicit stream profiles
+## Completed item: C1 explicit stream profiles
 
 ### Inventory
 
@@ -90,6 +90,45 @@ Before C2:
 - Pause/Resume, Save/Load and End/teardown pass;
 - no regression in existing game/profile behavior.
 
+## Active item: C2 end-to-end transport telemetry
+
+### C2.1 inventory
+
+**COMPLETE**
+
+Result:
+
+`C2_INVENTORY_COMPLETE_EXISTING_FOUNDATION_WITH_GAPS`
+
+Existing production foundation already provides receiver Mbps/FPS, loss/FEC
+counters, decoder queue state, stale/overflow drops, rendered continuity and
+receive/decode/output-gap timing.
+
+### C2.2 minimal design
+
+`C2_DESIGN_MINIMAL_STREAM_TELEMETRY_V1` — **COMPLETE / CHECKPOINTED / PUSHED**
+
+Use a companion-side `privyhub_stream_telemetry_v1` measurement snapshot.
+
+Add only:
+- receiver RFC-style inter-arrival jitter;
+- control-path round trip from the existing client-health POST;
+- signed decoder queue-depth change;
+- FEC-relay send pressure/timing.
+
+No second telemetry loop and no adaptive controller.
+
+### Next implementation
+
+`C2_IMPLEMENT_STREAM_TELEMETRY_V1`
+
+Acceptance before C3:
+- contract is inspectable;
+- optional new client fields tolerate older reports;
+- measurements remain fail-open and do not disturb gameplay;
+- no transport/wire/profile behavior changes;
+- representative runtime telemetry is captured and reviewed.
+
 ## Post-C direction
 
 Accepted continuation:
@@ -145,5 +184,6 @@ Representative game runtime regression passed the C1.1 acceptance boundary.
 
 ## Immediate repository action
 
-Remote-foundation architecture/roadmap documentation is checkpointed/pushed.
-Resume deeper Phase C under D-059.
+Implement and runtime-validate `C2_IMPLEMENT_STREAM_TELEMETRY_V1`.
+
+Do not begin adaptive bitrate until the C2 telemetry contract is validated.

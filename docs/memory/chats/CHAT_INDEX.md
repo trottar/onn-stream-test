@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-14
-baseline_commit: 0c31c100ec721d687aff6aedbd79bc0cf9343810
+baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 ---
 
 # Project Chat Index
@@ -26,6 +26,7 @@ durable evidence.
 | 2026-09-11 | Durable-memory cleanup | Current-state alignment, curated MEMORY/AGENTS, deep-history snapshots, unique decision IDs and current-only investigations. |
 | 2026-09-14 | C1.1 + privacy | Static reference profile runtime validated and checkpointed; public native-stream status privacy boundary live-validated and checkpointed. |
 | 2026-09-14 | Remote architecture promotion | Home Opal established as trust domain; Phase C made future-WAN-aware; secure remote/portable-client foundation promoted to Phase G and later phases renumbered H/I/J. |
+| 2026-09-14 | Phase C2 telemetry | Existing Phase-B receiver/decoder telemetry inventoried; minimal `privyhub_stream_telemetry_v1` contract designed with four missing measurement classes and no adaptive controller. |
 
 ## Chat-derived rules
 

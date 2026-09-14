@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-14
-baseline_commit: 0c31c100ec721d687aff6aedbd79bc0cf9343810
+baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 ---
 
 # Current Development State
@@ -26,25 +26,26 @@ C1.1 static reference profile extraction: **RUNTIME VALIDATED / CHECKPOINTED / P
 
 Native-stream status privacy hotfix: **LIVE ENDPOINT VALIDATED / CHECKPOINTED / PUSHED**
 
-Next work: remote-foundation architecture/roadmap documentation update before deeper Phase C implementation.
+Next work: implement the C2 `privyhub_stream_telemetry_v1` measurement contract.
 
 ## Active technical step
 
-**C1 — explicit stream profiles**
+**C2 — end-to-end transport telemetry contract**
 
-Inventory result:
+C2.1 inventory:
 
-`C1_INVENTORY_COMPLETE`
+`C2_INVENTORY_COMPLETE_EXISTING_FOUNDATION_WITH_GAPS` — **COMPLETE**
 
-Design classification:
+C2.2 design:
 
-`C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA` — **COMPLETE**
+`C2_DESIGN_MINIMAL_STREAM_TELEMETRY_V1` — **COMPLETE / CHECKPOINTED / PUSHED**
 
-Implementation classification:
+Next production step:
 
-`C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION` — **RUNTIME VALIDATED / CHECKPOINTED / PUSHED**
+`C2_IMPLEMENT_STREAM_TELEMETRY_V1`
 
-Do not rerun the inventory unless source changes invalidate it.
+Reuse the Phase-B 2-second client-health cadence/store. Do not create a second
+Android telemetry sampler and do not add adaptive bitrate yet.
 
 ## C1 reference stream
 
@@ -268,3 +269,26 @@ The remote-foundation architecture/roadmap promotion is checkpointed/pushed.
 
 Resume deeper Phase C implementation under D-059. Do not implement WAN overlay,
 remote authentication or travel-router routing in Phase C.
+
+## C2 telemetry contract design
+
+C2.1 confirmed that receiver Mbps/FPS, loss/FEC counters, decoder queue state,
+stale/overflow drops, rendered continuity and receive/decode/output-gap timing
+already exist in the production feedback path.
+
+The remaining C2 implementation classes are:
+- RTP inter-arrival jitter;
+- control-path round trip from the existing health POST;
+- signed queue-depth change derived on the companion;
+- FEC-relay send pressure/timing.
+
+The adaptation-facing measurement contract is
+`privyhub_stream_telemetry_v1`, assembled companion-side from client health plus
+native-stream/FEC-relay status.
+
+No second sampler, pacing scheduler, explicit starvation counter, adaptive
+controller, WAN plumbing or source-address identity is part of C2.2.
+
+Decision: D-060.
+
+Design status: **COMPLETE / CHECKPOINTED / PUSHED**.

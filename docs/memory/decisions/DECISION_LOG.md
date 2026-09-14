@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-14
-baseline_commit: 0c31c100ec721d687aff6aedbd79bc0cf9343810
+baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 ---
 
 # Decision Log
@@ -609,3 +609,38 @@ before using the old Windows/current-network anomaly to shape WAN buffering.
 Roadmap order becomes:
 
 `A -> B -> C -> D -> E -> F -> G Remote -> H Extended Emulation -> I Home Infrastructure -> J Intelligence`
+
+### D-060 — C2 telemetry reuses client health and adds only four missing measurement classes
+
+**Status:** Accepted (2026-09-14)
+
+Phase C2 must not create a second Android telemetry sampler. Reuse the existing
+2-second `privyhub_client_health_v1` receiver report and assemble a new
+companion-side adaptation-facing measurement snapshot named
+`privyhub_stream_telemetry_v1`.
+
+The first implementation adds only the missing measurement classes established
+by the C2.1 inventory:
+
+1. RFC-3550-style RTP inter-arrival jitter at the Android receiver;
+2. control-path round trip from the existing client-health POST;
+3. signed decoder queue-depth change derived companion-side;
+4. FEC-relay `sendto()` pressure/timing counters.
+
+The relay has no production pacing deadline, so do not invent a
+`pacing_lateness` metric or scheduler merely to match the synthetic transport
+probe.
+
+The control round-trip metric is not pure media/UDP RTT and must be labeled as
+such.
+
+Do not add a new explicit decoder-starvation counter in the first C2 patch;
+existing rendered-frame/FPS/output-gap/queue measurements are sufficient inputs
+for later C3 classification.
+
+The C2 contract is measurement-only. It adds no bitrate adaptation, dynamic FEC,
+overlay/WAN routing, source-IP identity, packet-format change, audio/controller
+change or capture redesign.
+
+This preserves D-059: Phase C produces reusable WAN-relevant measurements
+without implementing Phase-G remote plumbing.

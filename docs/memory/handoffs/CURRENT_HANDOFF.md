@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-14
-baseline_commit: 0c31c100ec721d687aff6aedbd79bc0cf9343810
+baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 ---
 
 # Current Handoff
@@ -39,7 +39,7 @@ C1.1 static reference profile extraction is runtime validated and checkpointed/p
 
 The native-stream public-status privacy hotfix is live-endpoint validated and checkpointed/pushed.
 
-Next work: remote-foundation architecture/roadmap documentation update before deeper Phase C implementation.
+Next work: `C2_IMPLEMENT_STREAM_TELEMETRY_V1`.
 
 Do not rerun the completed C1 inventory unless source changes invalidate it.
 
@@ -257,3 +257,24 @@ Resume Phase C.
 Preserve D-059:
 - Phase C artifacts must remain reusable for future WAN paths;
 - WAN overlay/auth/travel-router implementation remains Phase G work.
+
+## C2 continuation
+
+C2.1 inventory result:
+
+`C2_INVENTORY_COMPLETE_EXISTING_FOUNDATION_WITH_GAPS`
+
+C2.2 design classification:
+
+`C2_DESIGN_MINIMAL_STREAM_TELEMETRY_V1` — **COMPLETE / CHECKPOINTED / PUSHED**
+
+Implementation target:
+- keep the existing 2-second client-health loop;
+- add receiver RFC-style jitter;
+- add previous successful health-POST control round trip;
+- derive signed queue-depth change companion-side;
+- instrument FEC-relay `sendto()` pressure/timing;
+- assemble `privyhub_stream_telemetry_v1` companion-side;
+- no adaptive bitrate/FEC controller yet.
+
+Decision: D-060.

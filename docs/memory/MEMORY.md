@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-14
-baseline_commit: 0c31c100ec721d687aff6aedbd79bc0cf9343810
+baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 ---
 
 # Curated Project Memory
@@ -40,11 +40,13 @@ minimization and no silent fallback.
 - C1.1 static reference profile extraction: **RUNTIME VALIDATED / CHECKPOINTED / PUSHED**
 - Native-stream public-status privacy hotfix: **LIVE ENDPOINT VALIDATED / CHECKPOINTED / PUSHED**
 - Remote-foundation architecture/roadmap update: **CHECKPOINTED / PUSHED**
+- C2.1 telemetry inventory: **COMPLETE**
+- C2.2 minimal telemetry contract design: **COMPLETE / CHECKPOINTED / PUSHED**
 
 The completed C1 inventory should not be rerun unless source changes invalidate
 its evidence.
 
-Resume deeper Phase C under D-059.
+Next: `C2_IMPLEMENT_STREAM_TELEMETRY_V1` under D-059/D-060.
 
 ## C1 reference stream
 
@@ -384,3 +386,24 @@ Durable rules:
 - Phase C is designed for future WAN reuse without implementing WAN plumbing;
 - representative UDP replay target is Linux + home Opal + onn;
 - remote runtime status remains planned only.
+
+## C2 telemetry contract
+
+Reuse the existing 2-second `privyhub_client_health_v1` path.
+
+The companion assembles a measurement-only
+`privyhub_stream_telemetry_v1` snapshot from receiver feedback and native host
+status.
+
+First implementation adds only:
+- RFC-3550-style receiver inter-arrival jitter;
+- control-path round-trip timing from the existing health POST;
+- signed decoder queue-depth change;
+- FEC-relay send-call/byte/error timing.
+
+No second sampler or pacing scheduler.
+
+No explicit decoder-starvation counter is required initially; existing
+render/FPS/output-gap/queue measurements are sufficient raw inputs for C3.
+
+C2 contains measurements only. C3 owns adaptation policy.

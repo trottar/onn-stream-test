@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-14
-baseline_commit: 0c31c100ec721d687aff6aedbd79bc0cf9343810
+baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 ---
 
 # Active Investigations
@@ -102,3 +102,24 @@ checkpointed/pushed.
 
 Continue Phase C with D-059 as a design constraint: future WAN reuse is
 required; WAN implementation remains deferred to Phase G.
+
+## C2 end-to-end telemetry contract
+
+**Status:** ACTIVE — C2.1 INVENTORY COMPLETE / C2.2 DESIGN CHECKPOINTED / PUSHED
+
+Inventory:
+
+`C2_INVENTORY_COMPLETE_EXISTING_FOUNDATION_WITH_GAPS`
+
+Design:
+
+`C2_DESIGN_MINIMAL_STREAM_TELEMETRY_V1`
+
+Next:
+
+`C2_IMPLEMENT_STREAM_TELEMETRY_V1`
+
+No adaptive controller yet.
+
+Implementation must preserve D-059/D-060 and the existing video/audio/controller
+wire/lifecycle behavior.

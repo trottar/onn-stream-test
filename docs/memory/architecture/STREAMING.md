@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-14
-baseline_commit: 0c31c100ec721d687aff6aedbd79bc0cf9343810
+baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 ---
 
 # Native Streaming Architecture
@@ -42,9 +42,22 @@ Keep NVENC codec/preset/tune/RC/buffer/pixel-format policy, RTP payload type, pa
 
 C1.1 is companion-only static extraction. Preserve Android constants/startup ordering; keep existing top-level host status fields and add inspectable `profile_id` plus nested profile data. No selector, adaptation, generalized backend framework, capture/audio/input redesign or wire-format change.
 
-## Future
+## Current Phase C direction
 
-After the static reference profile is runtime validated, later Phase C work may add client-side profile consumption, additional profiles, telemetry and adaptation. Generalization should follow the proven Games implementation rather than replace it prematurely.
+C1/C1.1 are complete.
+
+C2 is active.
+
+C2.1 inventory is complete and C2.2 minimal telemetry design is recorded in:
+
+`docs/memory/architecture/STREAM_TELEMETRY.md`
+
+Next production step:
+
+`C2_IMPLEMENT_STREAM_TELEMETRY_V1`
+
+Do not add adaptive bitrate until the measurement contract is implemented and
+runtime validated.
 
 ## C1.1 static reference profile extraction — development state
 
@@ -127,3 +140,21 @@ allowed to create runaway latency.
 Reference WAN planning estimate for the current 720p60 + PCM16 + 8+1 stream is
 roughly 10-11 Mbps outbound per session. This is a planning estimate, not a
 reason to alter the stable PCM audio path.
+
+## C2 telemetry architecture
+
+The adaptation-facing contract is `privyhub_stream_telemetry_v1`.
+
+Reuse the existing Phase-B client-health report as the receiver source and
+combine it companion-side with native-stream/FEC-relay sender status.
+
+Missing measurements are limited to:
+- receiver inter-arrival jitter;
+- control-path round trip;
+- signed decoder queue-depth change;
+- sender `sendto()` pressure/timing.
+
+The relay has no pacing deadline, so do not invent probe-style pacing lateness.
+Measure real send pressure without changing transport scheduling.
+
+See `architecture/STREAM_TELEMETRY.md` for exact semantics.
