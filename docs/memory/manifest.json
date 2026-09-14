@@ -7,7 +7,9 @@
     "snes": "runtime exercised"
   },
   "a9_status": "complete / checkpointed; PS1 Multitap On/Off runtime validated; NES/Genesis no local fixtures",
-  "android_behavior_changed": false,
+  "adaptive_behavior_changed": false,
+  "adb_stale_cache_recovery_status": "CLOSED / RUNTIME VALIDATED 2026-09-14",
+  "android_behavior_changed": true,
   "android_manifest_post_sha256": "ab1140c3230582f9dbbbf3c179d8fa08363971d9289e08442487f3849c7ac8a2",
   "android_moonlight_package_state": "absent / verified; PrivyHub remains present",
   "as_of": "2026-09-14",
@@ -17,8 +19,8 @@
   "b4_status": "COMPLETE / runtime validated",
   "b5_status": "COMPLETE / runtime validated",
   "b6_status": "COMPLETE / checkpointed / pushed",
-  "baseline_commit": "45ef51f9e583b459752dd5ea83163f54171e68c7",
-  "baseline_short": "45ef51f9",
+  "baseline_commit": "47d3cf54220146c1d727e2a0491111f6d7dea6c9",
+  "baseline_short": "47d3cf54",
   "c1_design_memory_checkpoint": "CHECKPOINTED / PUSHED",
   "c1_design_status": "COMPLETE / CHECKPOINTED / PUSHED / C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA",
   "c1_implementation_status": "RUNTIME VALIDATED / CHECKPOINTED / PUSHED",
@@ -39,18 +41,19 @@
   },
   "c1_reference_profile_source": "companion/native_stream_profiles.py",
   "c2_design_status": "COMPLETE / CHECKPOINTED / PUSHED",
+  "c2_implementation_status": "COMPLETE / RUNTIME VALIDATED / CHECKPOINT PENDING",
   "c2_inventory_status": "COMPLETE / CHECKPOINTED / PUSHED",
-  "c2_next_step": "C2_IMPLEMENT_STREAM_TELEMETRY_V1",
+  "c2_next_step": "C3_ADAPTIVE_BITRATE",
   "checkpoint_parent_commit": "a6dbf627dd32af7da975bf01a679350810026ca3",
   "checkpoint_scope": "Part 1 current-state repair + completed C1 inventory memory/probe",
   "classifier_changed": false,
   "client_health_interval_ms": 2000,
   "client_health_schema": "privyhub_client_health_v1",
   "client_health_storage": "latest only plus one delta baseline",
-  "companion_behavior_changed": false,
+  "companion_behavior_changed": true,
   "current_phase": "Phase C",
-  "current_step": "C2_IMPLEMENT_STREAM_TELEMETRY_V1",
-  "decision_id_state": "unique durable IDs through D-060",
+  "current_step": "C3 adaptive bitrate",
+  "decision_id_state": "unique durable IDs through D-061",
   "decoder_classifier_runtime_validated": true,
   "decoder_stale_policy": "informational unless decoder-local failure exists",
   "deep_memory_history": "docs/memory/history/",
@@ -73,9 +76,9 @@
       "sha256": "2f3c393d42bf1629909e77cdecb9196befaf1b47141656f18ba4bfb2feaad930"
     },
     {
-      "bytes": 10252,
+      "bytes": 11482,
       "path": "CURRENT.md",
-      "sha256": "c33c52cf649653534036e83f27fd3dda2c616e6910d17ed7f21536bfa940f683"
+      "sha256": "ff1da0ead1d1edabc0f9856eba705029590ea380ad23ba60900a3d93b868f061"
     },
     {
       "bytes": 2564,
@@ -83,9 +86,9 @@
       "sha256": "7957a58cd59456684c568bc85d8fe39c22d130b58ddaf9d9d636f7b063fa9698"
     },
     {
-      "bytes": 15066,
+      "bytes": 15588,
       "path": "MEMORY.md",
-      "sha256": "55dc43d93cae7522997f5922bd2a514872b27cdd05bdaffffd54c890fbd3cff5"
+      "sha256": "960a661dff6c8c3f3d583f4bec7b30035e7964f972f881c2a208d7b05124c5cb"
     },
     {
       "bytes": 3012,
@@ -138,9 +141,9 @@
       "sha256": "bc203ed62b6ac9a316127b77bc9f8666f3d7566b21298ed919d776eab65f809d"
     },
     {
-      "bytes": 5804,
+      "bytes": 6361,
       "path": "architecture/STREAM_TELEMETRY.md",
-      "sha256": "d3b698eb487bfd109c4d6bee7669d42a52531253ce361524835514fc62657a68"
+      "sha256": "4d94673009d1d17afe9e6696b7c7bce9bc2c17a6a038477f242b223d7057e32b"
     },
     {
       "bytes": 2108,
@@ -158,9 +161,9 @@
       "sha256": "d159cccf4315d615d21c7cc2cd7765bcc5be691b5f2ca7ed9f8c4a7b14d593dc"
     },
     {
-      "bytes": 31647,
+      "bytes": 32809,
       "path": "decisions/DECISION_LOG.md",
-      "sha256": "2d704145c99d8974f6a61db8b3a4f4b6689fed7c45a98c04b99a95feb1396763"
+      "sha256": "709aef6da39e47d77ac15021bf11ce476e7dc00b195bb085bbf8ee27632e356b"
     },
     {
       "bytes": 1129,
@@ -176,6 +179,11 @@
       "bytes": 931,
       "path": "evidence/A9_NES_GENESIS_NO_FIXTURE_CORRECTION_2026-09-10.md",
       "sha256": "7789a44c011a5d1e6134df15b9fb4c1a5d1f54facd2e31e50bf8c6ebd8a82483"
+    },
+    {
+      "bytes": 1631,
+      "path": "evidence/ADB_STALE_CACHE_RECOVERY_RUNTIME_VALIDATED_2026-09-14.md",
+      "sha256": "ab2db4fdb8e6b869e8b2e5813d1b23081db6aef18ffa78fb63b209b1f3acc473"
     },
     {
       "bytes": 1137,
@@ -348,6 +356,11 @@
       "sha256": "a685f6687aca31b0578eebfc258a2452ad4f64d6cf2e446a6f18430cda104552"
     },
     {
+      "bytes": 1777,
+      "path": "evidence/C2_STREAM_TELEMETRY_RUNTIME_VALIDATED_2026-09-14.md",
+      "sha256": "263d53256fabc15be2662ffcdf9e69cd659e07365fadefafd814d8bb60a56de1"
+    },
+    {
       "bytes": 1818,
       "path": "evidence/C2_TELEMETRY_CONTRACT_INVENTORY_2026-09-14.md",
       "sha256": "035d86d54e1dc50ef0c26a080ff1c3c608df3c8e271f8bea4d850142338386a9"
@@ -448,9 +461,9 @@
       "sha256": "7cd58c6b7e2b128e36b3a879fa151444790e9d95d9b12ec933f415bec19ef756"
     },
     {
-      "bytes": 9016,
+      "bytes": 9582,
       "path": "handoffs/CURRENT_HANDOFF.md",
-      "sha256": "24c83d4e886fdd688780c61dc11396be54a9185d65f980f9d12bf34f86ddcb19"
+      "sha256": "fe471d4e5a25e32935d01a2d470ce43a2b066da55561e144c033886dbf5dc85f"
     },
     {
       "bytes": 20924,
@@ -468,9 +481,14 @@
       "sha256": "17179b3916be00b216a803bef7f798eaa59c246835ea85543b23929fa5ef18dc"
     },
     {
-      "bytes": 4146,
+      "bytes": 4643,
       "path": "investigations/ACTIVE.md",
-      "sha256": "96cc7621389377877538415c36d015e9d6f6c2bf23bd5d7f199d7d17de00a936"
+      "sha256": "6a3f0a4456d7507d82c7cf1db11093e6a7751d411de0c6fad62716521e25b999"
+    },
+    {
+      "bytes": 2659,
+      "path": "investigations/ADB_STALE_CACHE_NATIVE_ERROR_2026-09-14.md",
+      "sha256": "5c878f19305ad3e3dd8c2ce307f9f6cfab9e838d16b4421520eb6fd932326c8e"
     },
     {
       "bytes": 1712,
@@ -498,14 +516,14 @@
       "sha256": "0bc6c287c87ba9c90326a6672b923c581a33493b83e38383df521c7c733cff28"
     },
     {
-      "bytes": 6227,
+      "bytes": 9055,
       "path": "memory/2026-09-14.md",
-      "sha256": "35d13bd9260c2231c1b204a06c66a031eed1b36175eed21252bf46d0898c0c2c"
+      "sha256": "962ead46bdfc7522f4058d2c5a30e74f7161165c10939321c6f7f79baead788d"
     },
     {
-      "bytes": 29838,
+      "bytes": 31232,
       "path": "patches/PATCH_INDEX.md",
-      "sha256": "0cbcd94c6ebd233312b9d10da3119c5069c2eaf9ea3d364a0a69f816a081335e"
+      "sha256": "c3a776d0f1558d269a8eb0fe8f1fdc6c97828ed6fdea078e648c31e6f69efdfd"
     },
     {
       "bytes": 1894,
@@ -528,9 +546,9 @@
       "sha256": "9b2d03a0a18fe45ea7ee607020d922232e1d15603f9bfb0eccd4e5165088cd12"
     },
     {
-      "bytes": 7174,
+      "bytes": 7481,
       "path": "roadmap/STATUS.md",
-      "sha256": "6ddba9f3da23cb72df690b96ffb782ae1bc3f0c0aeff28279c68bf05b56e4d5b"
+      "sha256": "7cb6d48c81ad15be2e9fb3613dc720a2d439e27247c327a3507de40354bd97e8"
     },
     {
       "bytes": 750,
@@ -574,7 +592,7 @@
   "phase_c_status": "ACTIVE",
   "physical_legacy_groups_deleted": 9,
   "predecessor": "C1 stream parameter inventory",
-  "production_behavior_changed": false,
+  "production_behavior_changed": true,
   "ps1_multitap_status": "complete / runtime validated on Crash Bash and CTR; Port 1 only",
   "remote_architecture_checkpoint": "CHECKPOINTED / PUSHED",
   "remote_architecture_decision": "D-059 ACCEPTED / CHECKPOINTED / PUSHED",

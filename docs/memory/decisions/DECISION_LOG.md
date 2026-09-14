@@ -644,3 +644,27 @@ change or capture redesign.
 
 This preserves D-059: Phase C produces reusable WAN-relevant measurements
 without implementing Phase-G remote plumbing.
+
+### D-061 — Validate D-053 stale-cache failure path and narrow D-054's old claim
+
+**Status:** Accepted / runtime validated (2026-09-14)
+
+D-053's bounded wireless-ADB recovery architecture remains accepted. The
+2026-09-10 D-054 result proved only the already-online branch, not stale cached
+target handling.
+
+A real 2026-09-14 stale cached `_adb-tls-connect._tcp` target caused
+`adb get-state` to emit device-not-found under script-wide
+`ErrorActionPreference=Stop`. Exploratory recovery commands now run through a
+fail-soft helper while final recovered-device validation/install/launch remain
+fail-hard.
+
+Runtime validation exercised the previously missing branch: recovery continued
+through `cached-after-server-restart`, the physical onn responded, APK install
+succeeded and PrivyHub launched. The subsequent sanitized audit measured one
+online transport and one TLS-connect service with no offline/unauthorized
+transports.
+
+The audit's old literal-source checks for direct mDNS/reconnect calls are stale
+after the helper refactor and are not authoritative. Raw runtime behavior is
+authoritative. No network-bearing target data is stored in durable memory.

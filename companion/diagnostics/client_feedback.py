@@ -98,6 +98,11 @@ def normalize_client_health(payload: Any) -> dict[str, Any]:
         video.get("waiting_for_idr"),
         name="video.waiting_for_idr",
     )
+    if "interarrival_jitter_ms" in video:
+        normalized_video["interarrival_jitter_ms"] = _float(
+            video.get("interarrival_jitter_ms"),
+            name="video.interarrival_jitter_ms",
+        )
 
     normalized_decoder = {
         key: _int(decoder.get(key), name=f"decoder.{key}")
@@ -123,7 +128,7 @@ def normalize_client_health(payload: Any) -> dict[str, Any]:
             name=f"decoder.{key}",
         )
 
-    return {
+    normalized = {
         "schema": CLIENT_HEALTH_SCHEMA,
         "sequence": sequence,
         "interval_ms": interval_ms,
@@ -131,6 +136,14 @@ def normalize_client_health(payload: Any) -> dict[str, Any]:
         "video": normalized_video,
         "decoder": normalized_decoder,
     }
+
+    if "control_round_trip_ms" in root:
+        normalized["control_round_trip_ms"] = _int(
+            root.get("control_round_trip_ms"),
+            name="control_round_trip_ms",
+        )
+
+    return normalized
 
 
 def _counter_delta(
@@ -159,17 +172,40 @@ def _deltas(
     ):
         return False, {}
 
+    current_video = _object(
+        current.get("video"),
+        name="video",
+    )
+    previous_video = _object(
+        previous.get("video"),
+        name="previous.video",
+    )
+    current_decoder = _object(
+        current.get("decoder"),
+        name="decoder",
+    )
+    previous_decoder = _object(
+        previous.get("decoder"),
+        name="previous.decoder",
+    )
+
+    decoder_delta = _counter_delta(
+        current_decoder,
+        previous_decoder,
+        _DECODER_COUNTERS,
+    )
+    decoder_delta["queue_depth_delta"] = (
+        int(current_decoder.get("queue_depth", 0))
+        - int(previous_decoder.get("queue_depth", 0))
+    )
+
     return True, {
         "video": _counter_delta(
-            _object(current.get("video"), name="video"),
-            _object(previous.get("video"), name="previous.video"),
+            current_video,
+            previous_video,
             _VIDEO_COUNTERS,
         ),
-        "decoder": _counter_delta(
-            _object(current.get("decoder"), name="decoder"),
-            _object(previous.get("decoder"), name="previous.decoder"),
-            _DECODER_COUNTERS,
-        ),
+        "decoder": decoder_delta,
     }
 
 

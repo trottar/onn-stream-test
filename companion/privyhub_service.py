@@ -19,6 +19,7 @@ Directory-independent layout:
 Public API:
     GET  /status
     GET  /diagnostics/health
+    GET  /diagnostics/stream-telemetry
     POST /diagnostics/self-test
     POST /diagnostics/bundle
     POST /diagnostics/client-health
@@ -66,6 +67,10 @@ from diagnostics.runtime_health import (
 
 from diagnostics.client_feedback import (
     ClientHealthStore,
+)
+
+from diagnostics.stream_telemetry import (
+    StreamTelemetryStore,
 )
 
 from diagnostics.self_test import (
@@ -1503,6 +1508,7 @@ class PrivyHubController:
 
 CONTROLLER = PrivyHubController()
 CLIENT_HEALTH_STORE = ClientHealthStore()
+STREAM_TELEMETRY_STORE = StreamTelemetryStore()
 
 
 class PrivyHubRequestHandler(
@@ -1635,6 +1641,29 @@ class PrivyHubRequestHandler(
             ),
         )
 
+    def _native_stream_status(
+        self,
+    ) -> dict[str, Any]:
+        games = PLUGINS.get(
+            "games"
+        )
+        if games is None:
+            return {}
+
+        try:
+            payload = games.handle(
+                "native-stream-status",
+                "",
+            )
+        except Exception:
+            return {}
+
+        return (
+            payload
+            if isinstance(payload, dict)
+            else {}
+        )
+
     def do_GET(
         self,
     ) -> None:
@@ -1653,6 +1682,13 @@ class PrivyHubRequestHandler(
             self._send_json(
                 200,
                 self._current_health_snapshot(),
+            )
+            return
+
+        if request_path == "/diagnostics/stream-telemetry":
+            self._send_json(
+                200,
+                STREAM_TELEMETRY_STORE.snapshot(),
             )
             return
 
@@ -1825,6 +1861,19 @@ class PrivyHubRequestHandler(
                         payload,
                         payload_bytes=payload_bytes,
                     )
+
+                    try:
+                        STREAM_TELEMETRY_STORE.accept(
+                            client_health_feedback=(
+                                CLIENT_HEALTH_STORE.snapshot()
+                            ),
+                            native_stream_status=(
+                                self._native_stream_status()
+                            ),
+                        )
+                    except Exception:
+                        # Telemetry must never disturb client health/gameplay.
+                        pass
                 except ValueError as exc:
                     self._send_json(
                         400,

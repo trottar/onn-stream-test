@@ -278,3 +278,19 @@ Implementation target:
 - no adaptive bitrate/FEC controller yet.
 
 Decision: D-060.
+
+## C2 implementation runtime-validated state
+
+`C2_IMPLEMENT_STREAM_TELEMETRY_V1` — **COMPLETE / RUNTIME VALIDATED /
+CHECKPOINT PENDING**
+
+Evidence:
+- `docs/memory/evidence/C2_STREAM_TELEMETRY_RUNTIME_VALIDATED_2026-09-14.md`;
+- `C2_STREAM_TELEMETRY_RUNTIME_PASS`;
+- representative gameplay regression passed.
+
+The stale cached wireless-ADB failure path encountered during C2 installation
+is also runtime validated as fixed; see
+`docs/memory/evidence/ADB_STALE_CACHE_RECOVERY_RUNTIME_VALIDATED_2026-09-14.md`.
+
+Next after checkpoint/push: **C3 adaptive bitrate**.

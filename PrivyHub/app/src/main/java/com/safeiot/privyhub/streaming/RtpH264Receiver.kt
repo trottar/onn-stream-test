@@ -43,6 +43,7 @@ data class NativeStreamMetrics(
     val idrFrames: Long,
     val maxFramesBetweenIdr: Long,
     val currentFramesSinceIdr: Long,
+    val interarrivalJitterMs: Double,
     val hasSps: Boolean,
     val hasPps: Boolean
 )
@@ -203,6 +204,18 @@ class RtpH264Receiver(
     private val currentFramesSinceIdr =
         AtomicLong(0)
 
+    private val interarrivalJitterUs =
+        AtomicLong(0)
+
+    private var jitterLastArrivalNs =
+        0L
+
+    private var jitterLastTimestamp =
+        -1L
+
+    private var jitterEstimateNs =
+        0.0
+
     @Volatile
     private var running =
         false
@@ -296,6 +309,8 @@ class RtpH264Receiver(
 
         resyncStartedNs =
             0L
+
+        resetInterarrivalJitter()
 
         worker =
             thread(
@@ -403,6 +418,10 @@ class RtpH264Receiver(
                 maxFramesBetweenIdr.get(),
             currentFramesSinceIdr =
                 currentFramesSinceIdr.get(),
+            interarrivalJitterMs =
+                interarrivalJitterUs.get()
+                    .toDouble() /
+                    1_000.0,
             hasSps =
                 sps != null,
             hasPps =
@@ -577,6 +596,11 @@ class RtpH264Receiver(
             )
         }
 
+        observeInterarrivalJitter(
+            timestamp,
+            nowNs
+        )
+
         packets
             .incrementAndGet()
 
@@ -620,6 +644,85 @@ class RtpH264Receiver(
         pruneCaches(
             nowNs
         )
+    }
+
+    private fun resetInterarrivalJitter() {
+        jitterLastArrivalNs =
+            0L
+        jitterLastTimestamp =
+            -1L
+        jitterEstimateNs =
+            0.0
+        interarrivalJitterUs
+            .set(0L)
+    }
+
+    private fun observeInterarrivalJitter(
+        timestamp: Long,
+        nowNs: Long
+    ) {
+        if (
+            jitterLastArrivalNs <= 0L ||
+            jitterLastTimestamp < 0L
+        ) {
+            jitterLastArrivalNs =
+                nowNs
+            jitterLastTimestamp =
+                timestamp
+            return
+        }
+
+        val rawTimestampDelta =
+            (
+                timestamp -
+                    jitterLastTimestamp
+            ) and
+                0xffffffffL
+
+        val signedTimestampDelta =
+            if (rawTimestampDelta >= 0x80000000L) {
+                rawTimestampDelta - 0x100000000L
+            } else {
+                rawTimestampDelta
+            }
+
+        val arrivalDeltaNs =
+            (
+                nowNs -
+                    jitterLastArrivalNs
+            ).toDouble()
+
+        val timestampDeltaNs =
+            signedTimestampDelta.toDouble() *
+                1_000_000_000.0 /
+                90_000.0
+
+        val differenceNs =
+            kotlin.math.abs(
+                arrivalDeltaNs -
+                    timestampDeltaNs
+            )
+
+        jitterEstimateNs +=
+            (
+                differenceNs -
+                    jitterEstimateNs
+            ) /
+                16.0
+
+        interarrivalJitterUs
+            .set(
+                (
+                    jitterEstimateNs /
+                        1_000.0
+                ).toLong()
+                    .coerceAtLeast(0L)
+            )
+
+        jitterLastArrivalNs =
+            nowNs
+        jitterLastTimestamp =
+            timestamp
     }
 
     private fun shouldResyncForSequenceJump(
@@ -667,6 +770,8 @@ class RtpH264Receiver(
 
         activeSsrc =
             newSsrc
+
+        resetInterarrivalJitter()
 
         orderedLastSequence =
             -1

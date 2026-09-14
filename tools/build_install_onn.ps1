@@ -142,11 +142,51 @@ $AdbPrivateRoot = Join-Path $env:LOCALAPPDATA "PrivyHub\adb"
 $AdbTargetCache = Join-Path $AdbPrivateRoot "last_wireless_target.txt"
 
 
+function Invoke-AdbRecoveryCommand {
+    param(
+        [string[]]$Arguments
+    )
+
+    $PreviousErrorActionPreference = $ErrorActionPreference
+
+    try {
+        # Recovery probes are expected to encounter stale/offline targets.
+        # Native ADB stderr/nonzero exits must become probe results rather
+        # than terminating PowerShell errors under the script-wide Stop mode.
+        $ErrorActionPreference = "Continue"
+
+        $Output = @(
+            & $Adb @Arguments 2>$null
+        )
+        $ExitCode = $LASTEXITCODE
+
+        return @{
+            ExitCode = [int]$ExitCode
+            Output = @($Output)
+        }
+    }
+    catch {
+        return @{
+            ExitCode = -1
+            Output = @()
+        }
+    }
+    finally {
+        $ErrorActionPreference = $PreviousErrorActionPreference
+    }
+}
+
+
 function Get-OnlineAdbDevices {
-    $Lines = & $Adb devices
+    $Result = Invoke-AdbRecoveryCommand `
+        -Arguments @("devices")
+
+    if ($Result.ExitCode -ne 0) {
+        return @()
+    }
 
     return @(
-        $Lines |
+        $Result.Output |
         Select-Object -Skip 1 |
         ForEach-Object {
             $Line = $_.Trim()
@@ -181,12 +221,18 @@ function Test-AdbTargetOnline {
         return $false
     }
 
+    $Result = Invoke-AdbRecoveryCommand `
+        -Arguments @("-s", $Target, "get-state")
+
     $State = (
-        & $Adb -s $Target get-state 2>$null |
+        $Result.Output |
         Out-String
     ).Trim()
 
-    return ($LASTEXITCODE -eq 0 -and $State -eq "device")
+    return (
+        $Result.ExitCode -eq 0 -and
+        $State -eq "device"
+    )
 }
 
 
@@ -197,7 +243,13 @@ function Try-AdbConnectTarget {
         return $false
     }
 
-    & $Adb connect $Target *> $null
+    $Connect = Invoke-AdbRecoveryCommand `
+        -Arguments @("connect", $Target)
+
+    if ($Connect.ExitCode -ne 0) {
+        return $false
+    }
+
     Start-Sleep -Milliseconds 750
 
     return Test-AdbTargetOnline $Target
@@ -251,14 +303,15 @@ function Save-CachedAdbTarget {
 
 
 function Get-MdnsConnectTargets {
-    $Lines = & $Adb mdns services 2>$null
+    $Result = Invoke-AdbRecoveryCommand `
+        -Arguments @("mdns", "services")
 
-    if ($LASTEXITCODE -ne 0) {
+    if ($Result.ExitCode -ne 0) {
         return @()
     }
 
     return @(
-        $Lines |
+        $Result.Output |
         ForEach-Object {
             $Line = $_.Trim()
 
@@ -339,7 +392,8 @@ function Resolve-OnnWithRecovery {
         }
     }
 
-    & $Adb reconnect offline *> $null
+    $null = Invoke-AdbRecoveryCommand `
+        -Arguments @("reconnect", "offline")
     Start-Sleep -Seconds 1
 
     $Online = Resolve-OnlineOnn
@@ -347,9 +401,11 @@ function Resolve-OnnWithRecovery {
         return @{ Target = $Online; Source = "reconnect" }
     }
 
-    & $Adb kill-server *> $null
+    $null = Invoke-AdbRecoveryCommand `
+        -Arguments @("kill-server")
     Start-Sleep -Milliseconds 750
-    & $Adb start-server *> $null
+    $null = Invoke-AdbRecoveryCommand `
+        -Arguments @("start-server")
     Start-Sleep -Seconds 2
 
     if ($Cached -and (Try-AdbConnectTarget $Cached)) {

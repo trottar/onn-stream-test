@@ -123,3 +123,21 @@ No adaptive controller yet.
 
 Implementation must preserve D-059/D-060 and the existing video/audio/controller
 wire/lifecycle behavior.
+
+## C2 telemetry v1 runtime validation
+
+**Status:** CLOSED / RUNTIME VALIDATED 2026-09-14
+
+Validated:
+- `privyhub_stream_telemetry_v1` live endpoint;
+- receiver jitter;
+- control-path round trip;
+- sender deltas/timing;
+- signed queue-depth delta;
+- absence of adaptation fields;
+- normal picture/process-audio/controller behavior;
+- Pause/Resume, Save/Load and End/teardown.
+
+See `evidence/C2_STREAM_TELEMETRY_RUNTIME_VALIDATED_2026-09-14.md`.
+
+C3 adaptive bitrate is next after checkpoint/push.

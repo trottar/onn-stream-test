@@ -3,6 +3,7 @@ from __future__ import annotations
 import socket
 import struct
 import threading
+import time
 
 from dataclasses import dataclass
 from typing import Any
@@ -66,6 +67,10 @@ class NativeVideoFecRelay:
         self._groups = 0
         self._skipped_packets = 0
         self._send_errors = 0
+        self._send_calls = 0
+        self._sent_bytes = 0
+        self._send_call_total_ns = 0
+        self._send_call_max_ns = 0
 
     @property
     def running(self) -> bool:
@@ -125,6 +130,10 @@ class NativeVideoFecRelay:
             self._groups = 0
             self._skipped_packets = 0
             self._send_errors = 0
+            self._send_calls = 0
+            self._sent_bytes = 0
+            self._send_call_total_ns = 0
+            self._send_call_max_ns = 0
 
             self._running = True
             self._thread = threading.Thread(
@@ -187,6 +196,14 @@ class NativeVideoFecRelay:
                 "groups": self._groups,
                 "skipped_packets": self._skipped_packets,
                 "send_errors": self._send_errors,
+                "send_calls": self._send_calls,
+                "sent_bytes": self._sent_bytes,
+                "send_call_total_us": (
+                    self._send_call_total_ns / 1_000.0
+                ),
+                "send_call_max_us": (
+                    self._send_call_max_ns / 1_000.0
+                ),
             }
 
     def _run(self) -> None:
@@ -356,14 +373,28 @@ class NativeVideoFecRelay:
         ):
             return
 
+        started_ns = time.perf_counter_ns()
+
         try:
-            send_socket.sendto(
+            sent = send_socket.sendto(
                 packet,
                 client,
             )
+            duration_ns = max(
+                0,
+                time.perf_counter_ns() - started_ns,
+            )
 
-            if parity:
-                with self._lock:
+            with self._lock:
+                self._send_calls += 1
+                self._sent_bytes += int(sent)
+                self._send_call_total_ns += duration_ns
+                self._send_call_max_ns = max(
+                    self._send_call_max_ns,
+                    duration_ns,
+                )
+
+                if parity:
                     self._parity_packets += 1
                     self._parity_bytes += len(
                         packet

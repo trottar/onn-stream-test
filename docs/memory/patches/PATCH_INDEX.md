@@ -384,3 +384,24 @@ This index records durable checkpoints and major patch lines; it does not invent
   inventory and C2.2 minimal `privyhub_stream_telemetry_v1` design on predecessor
   `45ef51f9e583b459752dd5ea83163f54171e68c7`. D-060 and the four missing measurement classes are now
   durable. No production/runtime source changes.
+
+- `privyhub_c2_stream_telemetry_v1_03_2026-09-14` — development implementation of
+  `C2_IMPLEMENT_STREAM_TELEMETRY_V1` on synchronized checkpoint
+  `47d3cf54220146c1d727e2a0491111f6d7dea6c9`. Adds measurement-only receiver jitter, health-POST control
+  round trip, signed queue-depth delta, relay send-pressure metrics, companion
+  telemetry assembly, read-only diagnostics endpoint and runtime validator. No
+  adaptive bitrate/FEC or packet/wire behavior change. **Runtime validated
+  2026-09-14; checkpoint pending.**
+
+- `privyhub_adb_stale_cache_recovery_fix_01_2026-09-14` — fixes the stale cached wireless-ADB failure branch in
+  `tools/build_install_onn.ps1` while preserving the exact reconciled C2
+  candidate. Exploratory step-2 ADB commands become fail-soft so a stale target
+  can fall through to the already-accepted D-053 mDNS/reconnect/server-restart
+  recovery sequence. Final device/install/launch checks remain fail-hard.
+  **Runtime validated 2026-09-14 through `cached-after-server-restart`.**
+
+- `privyhub_c2_adb_runtime_acceptance_memory_01_2026-09-14` — docs/evidence-only acceptance update for
+  runtime-validated C2 telemetry and the stale-cache wireless-ADB recovery fix.
+  Production/runtime bytes are exact-gated and unchanged. Promotes C2 to
+  COMPLETE / RUNTIME VALIDATED / CHECKPOINT PENDING and advances the next
+  development step to C3 adaptive bitrate.

@@ -10,7 +10,7 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 **C2.1 inventory: COMPLETE**
 
-**C2.2 minimal contract design: COMPLETE / IMPLEMENTATION NEXT**
+**C2.2 minimal contract design: COMPLETE / CHECKPOINTED / PUSHED**
 
 No adaptive bitrate/FEC controller is implemented by this design.
 
@@ -229,3 +229,19 @@ It must not change:
 - game lifecycle;
 - profile selection;
 - bitrate or FEC adaptation.
+
+## C2 telemetry v1 implementation
+
+**Status:** COMPLETE / RUNTIME VALIDATED / CHECKPOINT PENDING
+
+The public diagnostics surface is:
+
+`GET /diagnostics/stream-telemetry`
+
+Runtime validation confirmed the adaptation-facing measurement contract carries
+fresh receiver, FEC, sender-pressure, control-path latency and decoder
+measurements while containing no adaptation-decision fields.
+
+This closes C2 measurement infrastructure. C3 may consume these measurements,
+but C2 itself does not choose bitrate, classify congestion, apply hysteresis or
+change FEC.

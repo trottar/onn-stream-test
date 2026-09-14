@@ -187,3 +187,14 @@ Representative game runtime regression passed the C1.1 acceptance boundary.
 Implement and runtime-validate `C2_IMPLEMENT_STREAM_TELEMETRY_V1`.
 
 Do not begin adaptive bitrate until the C2 telemetry contract is validated.
+
+## C2 implementation state
+
+`C2_IMPLEMENT_STREAM_TELEMETRY_V1` — **COMPLETE / RUNTIME VALIDATED /
+CHECKPOINT PENDING**
+
+The live telemetry contract and representative gameplay regression passed on
+2026-09-14.
+
+**Next:** C3 adaptive bitrate after checkpoint/push of this validated C2 + ADB
+tooling state.

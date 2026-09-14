@@ -178,6 +178,11 @@ class NativeStreamActivity :
         false
 
     @Volatile
+    private var clientHealthControlRoundTripMs:
+        Long? =
+        null
+
+    @Volatile
     private var sessionStartedAtNs =
         0L
 
@@ -419,6 +424,8 @@ class NativeStreamActivity :
             0L
         clientHealthPostInFlight =
             false
+        clientHealthControlRoundTripMs =
+            null
 
         audioReceiver =
             NativeAudioReceiver(
@@ -1466,6 +1473,15 @@ class NativeStreamActivity :
                     "session_elapsed_ms",
                     elapsedMs
                 )
+
+                clientHealthControlRoundTripMs
+                    ?.let { roundTripMs ->
+                        put(
+                            "control_round_trip_ms",
+                            roundTripMs
+                        )
+                    }
+
                 put(
                     "video",
                     JSONObject().apply {
@@ -1490,6 +1506,10 @@ class NativeStreamActivity :
                         )
                         put("recent_fps", recentVideoFps)
                         put("recent_mbps", recentVideoMbps)
+                        put(
+                            "interarrival_jitter_ms",
+                            rtp.interarrivalJitterMs
+                        )
                         put("waiting_for_idr", rtp.waitingForIdr)
                     }
                 )
@@ -1539,12 +1559,22 @@ class NativeStreamActivity :
             isDaemon = true,
             name = "PrivyHub-Client-Health"
         ) {
+            val postStartedNs =
+                System.nanoTime()
+
             try {
                 httpPostJson(
                     "http://$host:$CONTROL_PORT" +
                         "/diagnostics/client-health",
                     payload
                 )
+
+                clientHealthControlRoundTripMs =
+                    (
+                        System.nanoTime() -
+                            postStartedNs
+                    ).coerceAtLeast(0L) /
+                        1_000_000L
             } catch (_: Exception) {
                 // Diagnostic feedback must never disturb gameplay.
             } finally {

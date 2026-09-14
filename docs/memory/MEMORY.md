@@ -42,6 +42,7 @@ minimization and no silent fallback.
 - Remote-foundation architecture/roadmap update: **CHECKPOINTED / PUSHED**
 - C2.1 telemetry inventory: **COMPLETE**
 - C2.2 minimal telemetry contract design: **COMPLETE / CHECKPOINTED / PUSHED**
+- C2 stream telemetry v1 implementation: **COMPLETE / RUNTIME VALIDATED / CHECKPOINT PENDING**
 
 The completed C1 inventory should not be rerun unless source changes invalidate
 its evidence.
@@ -407,3 +408,15 @@ No explicit decoder-starvation counter is required initially; existing
 render/FPS/output-gap/queue measurements are sufficient raw inputs for C3.
 
 C2 contains measurements only. C3 owns adaptation policy.
+
+## C2 implementation status
+
+`C2_IMPLEMENT_STREAM_TELEMETRY_V1` is **COMPLETE / RUNTIME VALIDATED /
+CHECKPOINT PENDING**.
+
+The live `privyhub_stream_telemetry_v1` contract passed all automated runtime
+gates, and representative gameplay passed picture, process audio, controller,
+Pause/Resume, Save/Load and End/teardown.
+
+C3 adaptive bitrate is the next development step after this validated state is
+checkpointed and pushed.

@@ -292,3 +292,41 @@ controller, WAN plumbing or source-address identity is part of C2.2.
 Decision: D-060.
 
 Design status: **COMPLETE / CHECKPOINTED / PUSHED**.
+
+## C2 stream telemetry v1 implementation
+
+**Status:** COMPLETE / RUNTIME VALIDATED / CHECKPOINT PENDING
+
+D-060 is now implemented and runtime validated.
+
+Validated measurement surfaces:
+- receiver RFC-style inter-arrival jitter;
+- previous successful client-health POST control round trip;
+- signed decoder queue-depth delta;
+- FEC-relay send bytes/calls/errors and send-call timing;
+- companion-side `privyhub_stream_telemetry_v1`;
+- `GET /diagnostics/stream-telemetry`;
+- bounded runtime validator.
+
+2026-09-14 live result:
+- `C2_STREAM_TELEMETRY_RUNTIME_PASS`;
+- reference profile active;
+- receiver ~7.46 Mbps and ~61.35 FPS;
+- inter-arrival jitter 2.399 ms;
+- packet loss 0;
+- unrecoverable FEC groups 0;
+- sender errors 0;
+- queue depth 0;
+- control-path round trip 42 ms.
+
+Representative gameplay regression also passed: picture, process audio,
+controller input, Pause/Resume, Save/Load and End/teardown.
+
+Intentionally unchanged:
+- reference profile and encoder settings;
+- RTP/FEC packet format/group semantics and packet scheduling;
+- audio/controller/capture/ports/game lifecycle behavior;
+- adaptive bitrate/FEC policy;
+- WAN/overlay/session routing.
+
+Next development step after checkpoint: **C3 adaptive bitrate**.
