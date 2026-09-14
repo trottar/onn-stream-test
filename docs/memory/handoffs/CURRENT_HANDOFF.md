@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-09-11
-baseline_commit: aa82ff13e01d5d16cf334d667f8f17e7537cae56
+as_of: 2026-09-14
+baseline_commit: 0c31c100ec721d687aff6aedbd79bc0cf9343810
 ---
 
 # Current Handoff
@@ -15,9 +15,9 @@ Authoritative local root:
 Local source is authoritative between checkpoints. GitHub is reference/history
 unless a clean synchronized checkpoint is being verified.
 
-Last synchronized checkpoint:
+Predecessor synchronized checkpoint for the remote-foundation promotion:
 
-`8f25763fca012257a3695ede03004fc9a368966a`
+`0c31c100ec721d687aff6aedbd79bc0cf9343810`
 
 Part 1, Part 2 and Part 3 docs/memory cleanup are checkpointed/pushed.
 
@@ -139,23 +139,34 @@ Raw measurements outrank classifiers.
 
 ## Roadmap
 
-`docs/ROADMAP.md` roadmap v3 is authoritative.
+`docs/ROADMAP.md` roadmap v4 is authoritative.
 
 After C:
 
 - D Media Library / VOD / Live TV UX
 - E Linux Migration / Native Linux Baseline
 - F Linux Core Resource Characterization & Optimization
-- G Extended Emulation & User-Content Import
-- H Home Infrastructure / Client / Plugin Expansion
-- I Local Intelligence / Voice / Privacy-Aware AI
+- G Secure Remote Access / Portable Client Foundation
+- H Extended Emulation & User-Content Import
+- I Home Infrastructure / Broader Plugin Expansion
+- J Local Intelligence / Voice / Privacy-Aware AI
 
-Phase E uses the HP EliteDesk 805 G6 as the Linux reference machine. Phase F
-characterizes/optimizes PS1-and-below before cheaper Prototype 2 hardware is
-selected.
+Phase C must remain reusable for future WAN paths while WAN implementation stays
+deferred to Phase G.
 
-OpenBIOS is retired as a dedicated phase. Users provide ROM/ISO/BIOS/firmware/
-keys through the future import boundary.
+D-059 establishes:
+
+- home Opal = PrivyHub trust/network domain;
+- ordinary household network = upstream only;
+- Tailscale = preferred first overlay candidate, not permanent contract;
+- overlay transport != PrivyHub authorization;
+- source/request IP != durable client identity;
+- no permanent travel-router model selected yet;
+- deferred UDP replay target = Linux + home Opal + onn.
+
+Remote implementation is **PLANNED ONLY**.
+
+The remote-foundation documentation update is **CHECKPOINTED / PUSHED**.
 
 ## Commands
 
@@ -238,3 +249,11 @@ Intentionally unchanged:
 - C1.1 profile values and stream behavior.
 
 The live native-stream status endpoint passed the bounded privacy validator.
+
+## Immediate continuation after remote-foundation checkpoint
+
+Resume Phase C.
+
+Preserve D-059:
+- Phase C artifacts must remain reusable for future WAN paths;
+- WAN overlay/auth/travel-router implementation remains Phase G work.

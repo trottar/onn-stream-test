@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-09-11
-baseline_commit: aa82ff13e01d5d16cf334d667f8f17e7537cae56
+as_of: 2026-09-14
+baseline_commit: 0c31c100ec721d687aff6aedbd79bc0cf9343810
 ---
 
 # Active Investigations
@@ -93,8 +93,12 @@ Intentionally unchanged:
 
 Representative game runtime regression passed the C1.1 acceptance boundary.
 
-## Checkpoint transition
+## Architecture transition
 
 C1.1 and the native-stream public-status privacy hotfix are checkpointed/pushed.
-Before deeper Phase C implementation, apply the accepted remote-foundation
-architecture/roadmap documentation update.
+
+The accepted remote-foundation architecture/roadmap documentation update is
+checkpointed/pushed.
+
+Continue Phase C with D-059 as a design constraint: future WAN reuse is
+required; WAN implementation remains deferred to Phase G.

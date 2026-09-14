@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-09-11
-baseline_commit: 65d02012409440d5559c14beb2b28268b0b225bc
+as_of: 2026-09-14
+baseline_commit: 0c31c100ec721d687aff6aedbd79bc0cf9343810
 ---
 
 # Project Chat Index
@@ -24,6 +24,8 @@ durable evidence.
 | 2026-09-11 | Roadmap v3 | Linux-first D-I roadmap, HP EliteDesk Linux reference, PS1-and-below Phase F sizing, user-content import and privacy-aware optional AI direction. |
 | 2026-09-11 | C1 inventory | Explicit stream-parameter ownership/duplication captured; `C1_INVENTORY_COMPLETE`; schema design next. |
 | 2026-09-11 | Durable-memory cleanup | Current-state alignment, curated MEMORY/AGENTS, deep-history snapshots, unique decision IDs and current-only investigations. |
+| 2026-09-14 | C1.1 + privacy | Static reference profile runtime validated and checkpointed; public native-stream status privacy boundary live-validated and checkpointed. |
+| 2026-09-14 | Remote architecture promotion | Home Opal established as trust domain; Phase C made future-WAN-aware; secure remote/portable-client foundation promoted to Phase G and later phases renumbered H/I/J. |
 
 ## Chat-derived rules
 

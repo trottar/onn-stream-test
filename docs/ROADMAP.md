@@ -1,8 +1,8 @@
-# PrivyHub / Safe IoT Roadmap — Merged Linux-First Revision
+# PrivyHub / Safe IoT Roadmap — Linux-First + Remote-Foundation Revision
 
-**Draft date:** 2026-09-11
-**Predecessor implementation checkpoint:** Phase B clean-native checkpoint `ae616352897d418360dc740ef37343ea72e88098`
-**Roadmap status:** Accepted project plan. Phase C is the active next phase.
+**Revision date:** 2026-09-14
+**Predecessor synchronized checkpoint:** C1.1 + native-status privacy checkpoint `0c31c100ec721d687aff6aedbd79bc0cf9343810`
+**Roadmap status:** Accepted project plan. Phase C is active. Future secure remote access is promoted to Phase G after Linux optimization.
 
 ---
 
@@ -12,13 +12,14 @@
 |---|---|---|
 | **A — Emulator Subsystem** | Finish Games/emulation as a normal-use subsystem | **COMPLETE / PUSHED** |
 | **B — Diagnostics & Clean Native Baseline** | Make PrivyHub self-diagnosing and remove active Sunshine/Moonlight legacy | **COMPLETE / PUSHED** |
-| **C — Adaptive Streaming Architecture** | Explicit profiles, telemetry, adaptive bitrate/FEC, 1080p characterization, generalized native streaming | **NEXT** |
+| **C — Adaptive Streaming Architecture** | Explicit profiles, telemetry, adaptive bitrate/FEC, 1080p characterization, generalized native streaming with future-WAN reuse in mind | **ACTIVE** |
 | **D — Media Library, VOD & Live TV UX** | Local media polish plus a substantial Live TV/channel/guide rebuild | **PLANNED** |
 | **E — Linux Migration / Native Linux Baseline** | Move the core server to the HP EliteDesk Linux prototype and restore normal-use parity | **PLANNED** |
 | **F — Linux Core Resource Characterization & Optimization** | Optimize and measure the Linux core with PS1-and-below only; select Prototype 2 from evidence | **PLANNED** |
-| **G — Extended Emulation & User-Content Import** | Build safe user-content ingestion, then characterize N64, GameCube, and PS2 | **FUTURE AFTER F** |
-| **H — Home Infrastructure / Client / Plugin Expansion** | Handhelds, Home Assistant/devices, cameras/microphones, storage, remote access, Steam/external compute | **FUTURE** |
-| **I — Local Intelligence / Voice / Privacy-Aware AI** | Deterministic local automation, small local models, optional user-supplied cloud AI providers, bounded adaptive optimization | **FUTURE** |
+| **G — Secure Remote Access / Portable Client Foundation** | Establish overlay/provider abstraction, portable trusted-LAN access, WAN session identity/auth, and off-site PS1-and-below validation | **FUTURE AFTER F** |
+| **H — Extended Emulation & User-Content Import** | Build safe user-content ingestion, then characterize N64, GameCube, and PS2 on the established local/remote foundation | **FUTURE AFTER G** |
+| **I — Home Infrastructure / Broader Plugin Expansion** | Home Assistant/devices, cameras/microphones, storage, broader clients and provider expansion | **FUTURE** |
+| **J — Local Intelligence / Voice / Privacy-Aware AI** | Deterministic local automation, small local models, optional user-supplied cloud AI providers, bounded adaptive optimization | **FUTURE** |
 
 ### Retired roadmap item
 
@@ -90,7 +91,7 @@ Architectural statement:
 
 # Phase C — Adaptive Streaming Architecture
 
-**Status: NEXT**
+**Status: ACTIVE**
 
 Phase C turns the current proven native game stream into a reusable, measurable,
 adaptive streaming platform.
@@ -99,6 +100,36 @@ The current Windows/GTX 970 system remains a valid development/reference host
 for this phase because Linux migration has not happened yet. Measurements here
 are intended to validate streaming architecture and client capability, **not**
 to establish the eventual Linux minimum hardware requirement.
+
+### Phase C remote-readiness constraint
+
+Phase C remains a local-streaming implementation phase, but its outputs are
+critical prerequisites for future secure remote operation.
+
+Design Phase C so that later WAN work can reuse, rather than replace:
+
+- named stream profiles and capability gates;
+- transport/FEC telemetry;
+- RTT/jitter/loss/goodput/queue measurements;
+- adaptation reason codes and bounded fallback behavior;
+- source/capture -> profile/encoder -> transport/FEC -> decoder boundaries;
+- status/session contracts that do not become more dependent on source address
+  as durable client identity.
+
+Do **not** add Tailscale, travel-router logic, WAN authentication, or remote
+session routing in Phase C. Those belong to Phase G after the Linux core is
+migrated and characterized.
+
+Future WAN adaptation should protect interactivity first: reduce quality or
+bitrate before allowing queue/buffer growth to create runaway latency. Random
+loss and capacity pressure must remain distinguishable so FEC is not increased
+blindly during congestion.
+
+The current reference session is not just a 7 Mbps video stream. PCM16 stereo
+audio is about 1.536 Mbps before packet/tunnel overhead, and 8+1 video FEC adds
+parity overhead. Use roughly 10-11 Mbps outbound per reference session as a
+planning estimate for later WAN testing without changing the stable PCM audio
+path in Phase C.
 
 ## C1 — Explicit stream profiles
 
@@ -149,6 +180,8 @@ Formalize the measurements that future adaptation consumes:
 
 Every adaptation decision must be explainable from recorded measurements.
 
+The contract should remain useful on both local and future overlay/WAN paths; later Phase G may add overlay/path-state fields without replacing the Phase C core.
+
 ## C3 — Adaptive bitrate
 
 Change bitrate first while keeping resolution and 60 fps fixed.
@@ -161,7 +194,8 @@ Required behavior:
 - congestion hold-down;
 - no rapid oscillation;
 - explicit diagnostics/reason codes;
-- safe fallback to a known profile.
+- safe fallback to a known profile;
+- protect latency before image quality: degrade quality before queue growth is allowed to run away.
 
 ## C4 — Adaptive FEC
 
@@ -211,6 +245,7 @@ Acceptance:
 - 1080p60 characterized;
 - generalized source contract established;
 - Games regression passes;
+- Phase C artifacts are explicitly reusable by future Phase G remote/WAN work without implementing remote transport here;
 - clean checkpoint/push.
 
 ---
@@ -440,12 +475,12 @@ Migrate the post-Phase-D server functions without broadening scope:
 ## E6 — Replay deferred UDP investigation
 
 Rerun the saved forward/reverse transport acceptance suite on the representative
-Linux host.
+Linux + home Opal + onn path.
 
 Classify whether the prior packet timing/duplication pathology was:
 
 - specific to the old Windows/test environment;
-- reproduced on the new representative host/network path;
+- reproduced on the representative Linux + home Opal + onn path;
 - or indicative of a broader transport issue.
 
 Do not reopen beyond evidence.
@@ -627,17 +662,266 @@ Acceptance:
 
 ---
 
-# Phase G — Extended Emulation & User-Content Import
+# Phase G — Secure Remote Access / Portable Client Foundation
 
 **Status: FUTURE AFTER F**
 
+Phase G establishes secure optional remote use on top of the validated,
+optimized Linux core before heavier emulator families are introduced.
+
+This ordering is deliberate. Remote work adds NAT/SNAT, overlay routing,
+identity/authentication, WAN latency/loss/jitter and portable-client variables.
+Those should be characterized against the simplest mature PS1-and-below
+workload instead of being mixed with new N64/GameCube/PS2 compatibility and
+resource variables.
+
+Local operation remains authoritative and must continue to function when remote
+connectivity is absent.
+
+## G0 — Correct trust topology and threat model
+
+Home topology:
+
+```text
+Internet / ordinary household upstream
+              |
+          home Opal
+   PrivyHub trust/network domain
+      |                   |
+future Linux hub      local PrivyHub clients/devices
+```
+
+The ordinary household router/Wi-Fi is upstream connectivity, not part of the
+PrivyHub trust domain.
+
+Remote topology:
+
+```text
+remote uplink
+   |
+travel GL-iNet-class router
+portable trusted client LAN
+   |
+onn / future handheld
+   |
+secure overlay
+   |
+future Linux hub on the home Opal domain
+```
+
+The travel router owns uplink changes. Portable clients should remain configured
+to the travel router's trusted LAN rather than being reconfigured for each
+hotel/friend/work network.
+
+Remote access must never flatten or expose the ordinary household LAN.
+
+## G1 — Overlay provider abstraction
+
+Use a provider boundary instead of hard-coding one overlay product into the
+PrivyHub session architecture.
+
+First prototype candidate:
+
+- Tailscale terminated on the future Linux hub.
+
+Future/provider alternatives may include:
+
+- direct WireGuard;
+- self-hosted/local-first coordination;
+- another secure overlay that satisfies the same contract.
+
+Tailscale is the preferred first implementation candidate, not the permanent
+architecture contract. The home Opal does not need replacement merely to add
+Tailscale if the Linux hub can terminate the home-side overlay.
+
+Useful provider state should include, where available:
+
+- connected/disconnected;
+- direct vs relayed path;
+- reachable overlay endpoint;
+- MTU/path constraints;
+- peer/session readiness;
+- provider-specific diagnostics kept behind the provider abstraction.
+
+## G2 — Portable trusted-LAN / travel-router baseline
+
+Select and validate a travel GL-iNet-class router only when Phase G begins.
+
+Do not choose the permanent travel-router model now.
+
+Required behavior:
+
+- onn/future handheld stays on the travel router's trusted LAN;
+- router can join Ethernet or Wi-Fi uplinks;
+- overlay survives ordinary uplink changes;
+- client configuration does not depend on the visited network;
+- loss of overlay fails closed for remote PrivyHub access;
+- local client/router management remains possible without exposing PrivyHub
+  services to the visited LAN.
+
+## G3 — WAN session identity and application authorization
+
+The current LAN prototype may derive reachable media/controller targets from the
+request source address. That mechanism is not a durable remote identity model
+because a portable client may sit behind NAT/SNAT on the travel router.
+
+Phase G must separate:
+
+```text
+client identity
+session identity
+reachable video/audio/controller endpoints
+overlay/path state
+authorization/permissions
+```
+
+Do not use source IP as durable client identity.
+
+Secure overlay membership is transport protection, not sufficient PrivyHub
+authorization. Possession of the travel router or access to the overlay must not
+grant unrestricted application authority.
+
+Add explicit application authentication/authorization with fail-closed session
+setup and auditable permissions.
+
+## G4 — PS1-and-below off-site remote baseline
+
+Use the mature Core workload first:
+
+```text
+NES
+SNES
+Genesis
+PS1
+```
+
+Minimum real off-site onn validation:
+
+- authenticated control/session setup;
+- Games discovery/launch;
+- video;
+- process audio;
+- controller input;
+- Pause/Resume;
+- Save/Load;
+- End/teardown;
+- reconnect/recovery;
+- local behavior unchanged when overlay is absent.
+
+The current 720p60 reference path should be treated as roughly 10-11 Mbps
+outbound per session for planning once video, 8+1 parity, PCM16 stereo audio and
+packet/tunnel overhead are considered. Measure the real envelope rather than
+turning this estimate into a hard requirement.
+
+## G5 — WAN-aware telemetry and adaptation
+
+Reuse Phase C telemetry/adaptation instead of creating a parallel WAN streamer.
+
+Measure and classify:
+
+- delivered goodput;
+- packet loss;
+- FEC recovery/unrecoverable groups;
+- jitter/inter-arrival behavior;
+- RTT/echo latency;
+- sender pacing;
+- queue/buffer growth;
+- decoder starvation/stale drops;
+- direct vs relayed overlay path where available;
+- MTU/fragmentation symptoms;
+- reconnect/path-change events.
+
+Remote adaptation priority:
+
+1. preserve control/session correctness;
+2. prevent runaway latency;
+3. reduce bitrate/quality when capacity tightens;
+4. use FEC only when loss characteristics justify it;
+5. recover upward slowly with hysteresis.
+
+Do not hide a bad WAN path with ever-growing buffers.
+
+## G6 — Portable handheld validation
+
+When representative hardware exists, validate an X28-class Android handheld or
+similar low-cost client:
+
+- reuse the Android client where practical;
+- hardware AVC decode;
+- 720p60 baseline;
+- built-in controls;
+- Games/VOD/TV browsing;
+- session/pause UX;
+- battery/network behavior;
+- travel-router operation;
+- optional dock/TV use.
+
+Absence of handheld hardware must not block the onn-based Phase G remote
+foundation.
+
+## G7 — Existing-PC / Steam provider over the remote foundation
+
+Use an existing gaming PC/laptop as optional external compute without making it
+part of the core server requirement.
+
+PrivyHub owns discovery, readiness, library/orchestration, permissions and
+session UX.
+
+Prefer a direct provider-to-client media path when the provider already solves
+streaming better than routing media through the Linux hub, while preserving the
+same PrivyHub authorization/session boundary.
+
+## G8 — Adverse-network characterization
+
+Exercise bounded representative conditions:
+
+- reduced bandwidth;
+- added latency;
+- jitter;
+- random loss;
+- burst loss;
+- reordering where practical;
+- overlay path changes/direct-vs-relayed conditions.
+
+Record the operating envelope and failure behavior. Avoid claiming a universal
+Internet requirement from one ISP/path.
+
+## G9 — Remote foundation checkpoint
+
+Acceptance:
+
+- corrected trust topology documented;
+- overlay provider abstraction established;
+- first provider path validated;
+- travel-router trusted-LAN baseline validated;
+- source address separated from durable client/session identity;
+- application authentication/authorization validated;
+- real off-site onn PS1-and-below session validated;
+- Phase C telemetry/adaptation reused under WAN conditions;
+- adverse-network envelope documented;
+- handheld validated if representative hardware is available, otherwise
+  explicitly pending;
+- Steam/external-compute provider integrated or explicitly deferred with a
+  preserved provider contract;
+- ordinary household LAN remains outside the PrivyHub trust domain;
+- local operation remains functional without remote connectivity;
+- clean checkpoint/push.
+
+---
+
+# Phase H — Extended Emulation & User-Content Import
+
+**Status: FUTURE AFTER G**
+
 This phase adds the user-owned content pipeline before introducing heavier
-console workloads.
+console workloads. It runs after Phase G has established the reusable secure
+remote/client contract so later emulator families can validate locally first and
+then regress over that existing remote foundation.
 
 PrivyHub will **not** provide or fetch ROMs, ISOs, BIOS/firmware, keys, or similar
 game content.
 
-## G0 — User-content import contract
+## H0 — User-content import contract
 
 Define a removable-media import layout, for example:
 
@@ -684,7 +968,7 @@ The import system should:
 The import tooling should integrate content **into the existing infrastructure**
 rather than create a second game-library path.
 
-## G1 — N64
+## H1 — N64
 
 Evaluate representative N64 emulation, controllers, saves, local rendering,
 native streaming, CPU/iGPU cost, latency, and compatibility.
@@ -693,7 +977,7 @@ Question:
 
 > Does the optimized core/alpha hardware already have enough margin for N64?
 
-## G2 — GameCube
+## H2 — GameCube
 
 Evaluate bounded representative titles:
 
@@ -705,7 +989,7 @@ Evaluate bounded representative titles:
 - thermals;
 - compatibility outliers.
 
-## G3 — PS2
+## H3 — PS2
 
 Evaluate representative easy/moderate/heavy titles:
 
@@ -719,7 +1003,7 @@ Evaluate representative easy/moderate/heavy titles:
 
 User-supplied PS2 BIOS should enter only through the G0 import boundary.
 
-## G4 — Extended-emulation tiers
+## H4 — Extended-emulation tiers
 
 Possible evidence-driven outcome:
 
@@ -736,7 +1020,7 @@ ENHANCED
 
 The actual boundaries come from runtime evidence.
 
-## G5 — Extended-emulation checkpoint
+## H5 — Extended-emulation checkpoint
 
 Acceptance:
 
@@ -746,6 +1030,7 @@ Acceptance:
 - GameCube characterized;
 - PS2 characterized;
 - incremental resource costs compared with Phase F;
+- local validation is followed by regression over the established Phase G remote contract where representative hardware is available;
 - compatibility claims limited to tested evidence;
 - base Core hardware remains independent unless evidence strongly justifies a
   change;
@@ -753,17 +1038,18 @@ Acceptance:
 
 ---
 
-# Phase H — Home Infrastructure / Client / Plugin Expansion
+# Phase I — Home Infrastructure / Broader Plugin Expansion
 
-**Status: FUTURE**
+**Status: FUTURE AFTER H**
 
 PrivyHub expands from TV/media/games into a private local home-coordination
-layer.
+layer. Phase I builds on the secure remote/client foundation from Phase G rather
+than inventing a second remote-access path.
 
-## H1 — First-class plugin/provider architecture
+## I1 — First-class plugin/provider architecture
 
-Capabilities should be exposed once and callable from GUI, remote/control API,
-automation, voice, or AI:
+Capabilities should be exposed once and callable from GUI, control API,
+automation, voice, AI, and authorized remote sessions:
 
 ```text
 games.launch()
@@ -779,31 +1065,7 @@ steam.launch()
 Interfaces should invoke registered capabilities rather than duplicate device
 logic.
 
-## H2 — Handheld client
-
-Evaluate X28-class Android handheld:
-
-- reuse Android client;
-- hardware AVC decoding;
-- 720p60 behavior;
-- built-in controls;
-- Games/VOD/TV browsing;
-- session/pause UI;
-- battery/network behavior;
-- discovery;
-- optional dock/TV use.
-
-## H3 — Existing-PC / Steam provider
-
-Use an existing gaming PC/laptop as optional external compute.
-
-PrivyHub should provide discovery, readiness, library/orchestration, permissions,
-and session UX.
-
-Prefer a direct PC→client media path when the external provider already solves it
-better than routing video through the Linux hub.
-
-## H4 — Home Assistant / device provider
+## I2 — Home Assistant / device provider
 
 Integrate mature local-first smart-home infrastructure rather than recreating
 every protocol.
@@ -818,7 +1080,7 @@ Potential capabilities:
 - Matter/Zigbee devices exposed by the home stack;
 - automation state.
 
-## H5 — Camera and microphone infrastructure
+## I3 — Camera and microphone infrastructure
 
 Treat cameras/microphones as explicit private device classes:
 
@@ -834,7 +1096,10 @@ Treat cameras/microphones as explicit private device classes:
 Microphones should support local deterministic/voice workflows without requiring
 cloud transmission.
 
-## H6 — Storage / larger media server
+Remote camera/microphone access, if enabled, must reuse Phase G authentication,
+authorization and transport boundaries.
+
+## I4 — Storage / larger media server
 
 Expand household storage:
 
@@ -842,31 +1107,57 @@ Expand household storage:
 - larger DVD/VOD libraries;
 - storage health;
 - backup/maintenance;
-- optional remote streaming.
+- authorized optional remote streaming through the established Phase G boundary.
 
 Storage capacity and compute sizing remain separate questions.
 
-## H7 — Secure optional remote access
+## I5 — Broader clients and household surfaces
 
-Possible targets:
+Expand beyond the first onn/travel-client baseline:
 
-- VOD;
-- cameras;
-- home controls;
-- game/session control.
+- additional TV clients;
+- handheld/docked use refinements;
+- phone/tablet control surfaces;
+- wall/control-panel clients;
+- accessibility/alternate-input surfaces.
 
-Local operation must remain functional when remote connectivity is absent.
+New clients reuse the established identity/session/permission model.
+
+## I6 — Provider expansion
+
+Expand providers beyond the initial Phase G Steam/external-compute work while
+preserving one capability and permission model.
+
+Potential areas:
+
+- additional PCs;
+- NAS/media services;
+- local automation services;
+- future local compute accelerators;
+- specialized household devices.
+
+## I7 — Home-infrastructure checkpoint
+
+Acceptance:
+
+- provider/plugin contracts are first-class;
+- Home Assistant/device integration works locally;
+- camera/microphone permissions are explicit;
+- storage expansion preserves local-first behavior;
+- broader clients reuse established identity/auth/session contracts;
+- remote-capable features reuse Phase G rather than creating parallel exposure;
+- clean checkpoint/push.
 
 ---
 
-# Phase I — Local Intelligence / Voice / Privacy-Aware AI
+# Phase J — Local Intelligence / Voice / Privacy-Aware AI
 
 **Status: FUTURE**
 
 PrivyHub intelligence should be layered from deterministic/local to optional
 external providers. No cloud AI provider is mandatory.
 
-## I1 — Deterministic local automation first
+## J1 — Deterministic local automation first
 
 Simple home behavior should remain explicit and inspectable:
 
@@ -887,7 +1178,7 @@ Examples:
 - camera display;
 - scheduled routines.
 
-## I2 — Local voice foundation
+## J2 — Local voice foundation
 
 Default path:
 
@@ -905,7 +1196,7 @@ local response/TTS
 
 Core household commands must not require a cloud API.
 
-## I3 — Small local intent model
+## J3 — Small local intent model
 
 A very small local model may map fuzzy language to constrained registered
 actions.
@@ -927,7 +1218,7 @@ The model:
 - requires confirmation for sensitive actions;
 - remains optional where deterministic matching is sufficient.
 
-## I4 — Optional external AI provider abstraction
+## J4 — Optional external AI provider abstraction
 
 Allow a user to supply credentials for providers such as:
 
@@ -949,7 +1240,7 @@ speech.synthesize()
 
 Providers are plugins, not core dependencies.
 
-## I5 — Privacy boundary / data-minimization policy
+## J5 — Privacy boundary / data-minimization policy
 
 Cloud capability is **explicit opt-in** and should maximize local privacy even
 when enabled.
@@ -983,7 +1274,7 @@ camera analysis    off / event-only / explicit request
 microphone cloud   off / push-to-talk / explicit request
 ```
 
-## I6 — Privacy-aware camera/microphone intelligence
+## J6 — Privacy-aware camera/microphone intelligence
 
 Preferred order:
 
@@ -998,7 +1289,7 @@ optional external analysis of minimized selected data
 Continuous microphone/camera feeds should not be exported merely because a cloud
 provider is configured.
 
-## I7 — Future first-party local LLM
+## J7 — Future first-party local LLM
 
 Defer larger local open-weight inference until actual usage justifies the
 hardware/cost.
@@ -1006,7 +1297,7 @@ hardware/cost.
 It should plug into the same provider interface rather than create a parallel
 control architecture.
 
-## I8 — Local adaptive resource optimizer
+## J8 — Local adaptive resource optimizer
 
 Use machine telemetry to choose among bounded validated actions/profiles.
 
@@ -1044,6 +1335,19 @@ Core operation must not require:
 - vendor smart-home cloud.
 
 Optional external providers are explicit additions.
+
+Remote access is optional. Core local operation must not depend on an overlay,
+travel router, WAN path, or remote authentication service being available.
+
+## Network trust and remote authorization boundary
+
+The home Opal defines the PrivyHub network/trust domain. The ordinary household
+network is upstream connectivity only.
+
+A secure overlay protects transport; it does not by itself authorize PrivyHub
+actions. Remote sessions must pass the local PrivyHub identity/permission layer.
+
+Source/request address is routing evidence, not durable client identity.
 
 ## User-owned content boundary
 
@@ -1150,17 +1454,34 @@ Do not select Prototype 2 from superficial aggregate CPU percentages.
 
 Use whole-system measurements and hardware-acceleration evidence.
 
-## Gate 6 — User-content import
+## Gate 6 — Remote foundation readiness
+
+Do not begin Phase G WAN implementation until:
+
+- Linux-native PS1-and-below core is functionally validated;
+- Phase F resource/capability work is complete enough to avoid confusing host
+  exhaustion with WAN failure;
+- the deferred UDP suite has been replayed on the representative Linux + home
+  Opal + onn path;
+- Phase C telemetry/adaptation contracts are available for reuse.
+
+Do not treat Tailscale, a specific travel-router model, or source IP as the
+permanent architecture contract.
+
+## Gate 7 — User-content import
 
 Before enabling new N64/GameCube/PS2 libraries, validate the USB/removable-media
 import path, idempotence, hashing, target mapping, and failure behavior.
 
-## Gate 7 — Extended emulation
+## Gate 8 — Extended emulation
 
 Do not allow N64/GameCube/PS2 to raise the Core minimum before incremental cost
 is measured against the optimized Phase F baseline.
 
-## Gate 8 — Cloud AI
+Run heavier-emulator local validation first, then regress over the established
+Phase G remote contract rather than redesigning remote access per emulator.
+
+## Gate 9 — Cloud AI
 
 Do not add an external AI provider without:
 
@@ -1171,7 +1492,7 @@ Do not add an external AI provider without:
 - no silent fallback;
 - local action validation.
 
-## Gate 9 — Larger local AI
+## Gate 10 — Larger local AI
 
 Do not make a substantial local LLM a base hardware requirement without product
 evidence that justifies it.
@@ -1193,6 +1514,7 @@ C Adaptive Streaming
   C5 1080p characterization
   C6 generalized source abstraction
   C7 checkpoint
+  (all designed for future Phase G WAN reuse)
         ↓
 D Media / VOD / Live TV
   local library polish
@@ -1204,7 +1526,7 @@ E Linux Migration
   HP 805 G6
   Linux-native A/V/input/server
   PS1-and-below parity
-  UDP replay
+  Linux + home Opal + onn UDP replay
   checkpoint
         ↓
 F Linux Optimization / Resource Characterization
@@ -1215,22 +1537,33 @@ F Linux Optimization / Resource Characterization
   derive capability envelope
   select Prototype 2
         ↓
-G User Content + Extended Emulation
+G Secure Remote Access / Portable Client Foundation
+  corrected trust topology
+  overlay-provider abstraction
+  travel-router trusted LAN
+  application auth/session identity
+  off-site onn PS1-and-below
+  WAN telemetry/adaptation
+  handheld when available
+  Steam/external compute
+  adverse-network characterization
+        ↓
+H User Content + Extended Emulation
   safe USB import
   N64
   GameCube
   PS2
+  local + remote regression
   capability tiers
         ↓
-H Home / Clients / Plugins
-  handheld
-  Steam/external compute
+I Home Infrastructure / Broader Plugins
   Home Assistant/devices
   cameras/microphones
   storage
-  remote access
+  broader clients
+  provider expansion
         ↓
-I Local Intelligence / Voice / AI
+J Local Intelligence / Voice / AI
   deterministic local control
   local voice
   small local intent model
@@ -1260,6 +1593,7 @@ CORE
 
 EXTENDED
   stronger stream profiles
+  secure remote/portable-client foundation
   N64
   additional concurrency
 

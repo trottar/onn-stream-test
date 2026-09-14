@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-09-11
-baseline_commit: aa82ff13e01d5d16cf334d667f8f17e7537cae56
+as_of: 2026-09-14
+baseline_commit: 0c31c100ec721d687aff6aedbd79bc0cf9343810
 ---
 
 # Current Development State
@@ -9,7 +9,7 @@ baseline_commit: aa82ff13e01d5d16cf334d667f8f17e7537cae56
 ## Checkpoint
 
 - Branch: `main`
-- Last synchronized checkpoint: `8f25763fca012257a3695ede03004fc9a368966a`
+- Predecessor synchronized checkpoint for the remote-foundation promotion: `0c31c100ec721d687aff6aedbd79bc0cf9343810`
 - Part 1 current-state alignment: **CHECKPOINTED / PUSHED**
 - Part 2 durable-memory curation/deep history: **CHECKPOINTED / PUSHED**
 - Part 3 decision/investigation normalization: **CHECKPOINTED / PUSHED**
@@ -150,20 +150,29 @@ Do not reopen without new evidence:
 
 ## Roadmap
 
-`docs/ROADMAP.md` roadmap v3 is authoritative.
+`docs/ROADMAP.md` roadmap v4 is authoritative.
 
 - D — Media Library / VOD / Live TV UX
 - E — Linux Migration / Native Linux Baseline
 - F — Linux Core Resource Characterization & Optimization
-- G — Extended Emulation & User-Content Import
-- H — Home Infrastructure / Client / Plugin Expansion
-- I — Local Intelligence / Voice / Privacy-Aware AI
+- G — Secure Remote Access / Portable Client Foundation
+- H — Extended Emulation & User-Content Import
+- I — Home Infrastructure / Broader Plugin Expansion
+- J — Local Intelligence / Voice / Privacy-Aware AI
 
-OpenBIOS is not a dedicated phase. Users supply required game content through
-the future import boundary.
+Phase C remains active. Its profiles, telemetry, adaptation/FEC behavior and
+streaming boundaries must be reusable for future WAN work without implementing
+WAN overlay/auth/travel-router behavior during Phase C.
 
-HP EliteDesk 805 G6 is the Linux reference prototype, not the minimum target.
-Cheaper Prototype 2 hardware is selected from Phase F evidence.
+Home trust boundary: home Opal.
+
+Ordinary household network: upstream only.
+
+Tailscale is the preferred first overlay candidate, not the permanent contract.
+No permanent travel-router model is selected yet.
+
+Before Phase G WAN characterization, replay the deferred UDP suite on the
+representative `Linux + home Opal + onn` path.
 
 ## Debugging and privacy rule
 
@@ -234,3 +243,28 @@ Intentionally unchanged:
 
 The live native-stream status endpoint passed the bounded privacy validator:
 no network identifiers, absolute paths or unsafe keyed values were exposed.
+
+## Remote-foundation architecture decision
+
+D-059 is accepted.
+
+Remote implementation remains **PLANNED ONLY**.
+
+Future Phase G separates client identity, session identity, reachable
+media/audio/controller endpoints, overlay/path state and PrivyHub application
+authorization. Source/request IP is not durable client identity.
+
+Future WAN adaptation protects interactivity by degrading quality before
+queue/buffer growth creates runaway latency.
+
+The current reference session planning envelope is roughly 10-11 Mbps outbound;
+this does not change the stable PCM audio path.
+
+Documentation update status: **CHECKPOINTED / PUSHED**.
+
+## Next technical work after architecture checkpoint
+
+The remote-foundation architecture/roadmap promotion is checkpointed/pushed.
+
+Resume deeper Phase C implementation under D-059. Do not implement WAN overlay,
+remote authentication or travel-router routing in Phase C.

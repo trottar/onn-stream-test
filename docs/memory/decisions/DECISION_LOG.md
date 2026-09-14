@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-09-11
-baseline_commit: 8f25763fca012257a3695ede03004fc9a368966a
+as_of: 2026-09-14
+baseline_commit: 0c31c100ec721d687aff6aedbd79bc0cf9343810
 ---
 
 # Decision Log
@@ -569,3 +569,43 @@ The first C1 production change is a behavior-preserving static extraction of the
 Portable C1.1 fields are `id`, `width`, `height`, `fps`, `bitrate_kbps`, `max_bitrate_kbps`, `gop_frames`, `bframes`, and `fec_group_size`. Do not add a minimum bitrate yet because the validated stream has no lower-bound behavior to preserve. Validate `fec_group_size` to 1-8 because the current PHF1 wire header stores its marker mask in one byte.
 
 Keep NVENC backend policy, RTP payload type/packet size, ports, capture backend, audio, controller protocol and telemetry cadence outside this profile. C1.1 changes the companion only; preserve Android startup constants/order until the static host profile is runtime validated. Preserve existing top-level host status fields and add inspectable `profile_id`/profile data. No GUI selector, adaptation or generalized source framework belongs in C1.1.
+
+### D-059 — Phase C is remote-aware; secure remote foundation is Phase G
+
+**Status:** Accepted (2026-09-14)
+
+The home Opal is the PrivyHub network/trust domain. The ordinary household
+router/Wi-Fi is upstream connectivity only. Current architecture documents must
+not place trusted PrivyHub server infrastructure on the ordinary household-LAN
+side of that boundary; older Prototype-1 split-network evidence remains
+historical evidence only.
+
+Phase C remains the active local adaptive-streaming phase, but its profiles,
+telemetry, adaptation/FEC classification and source/profile/transport/decoder
+contracts must be designed for later WAN reuse. Phase C does not implement an
+overlay, travel-router logic or remote authentication. Future remote adaptation
+must protect interactivity by degrading quality before queue/buffer growth
+creates runaway latency.
+
+Promote secure remote access and portable clients to dedicated Phase G after
+Linux migration/resource characterization and before extended emulation. Phase
+G establishes provider-neutral overlay integration, the travel-router trusted
+LAN, explicit session/client identity, application authentication/authorization,
+off-site PS1-and-below validation, WAN telemetry/adaptation and adverse-network
+characterization.
+
+Tailscale is the preferred first overlay candidate, not the permanent
+architecture contract. Direct WireGuard or a future self-hosted/local-first
+provider may satisfy the same interface.
+
+Secure overlay membership is transport protection, not PrivyHub authorization.
+Source/request IP is routing evidence, not durable client identity.
+
+Do not choose a permanent travel-router model yet.
+
+Replay the deferred UDP suite on the representative Linux + home Opal + onn path
+before using the old Windows/current-network anomaly to shape WAN buffering.
+
+Roadmap order becomes:
+
+`A -> B -> C -> D -> E -> F -> G Remote -> H Extended Emulation -> I Home Infrastructure -> J Intelligence`

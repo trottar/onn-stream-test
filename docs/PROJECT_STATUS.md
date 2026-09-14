@@ -1,14 +1,18 @@
-# Project status — 2026-09-11
+# Project status — 2026-09-14
 
 ## Goal
 
 PrivyHub is an experiment in building a local-first smart-home/media environment
-where inexpensive clients live on an isolated IoT network and trusted
-host/server infrastructure provides local services.
+inside a dedicated PrivyHub network/trust domain.
 
-The current prototype uses an onn Android TV device and a Windows companion host.
+The home Opal is that domain boundary. The ordinary household router/Wi-Fi is
+upstream connectivity only. Trusted server/client/device infrastructure belongs
+behind the Opal.
+
+The current implementation uses an onn Android TV client and Windows companion.
 The roadmap moves core server responsibilities to dedicated Linux
-infrastructure while preserving validated client/application behavior.
+infrastructure while preserving validated client/application behavior and later
+adds an optional secure remote/portable-client foundation.
 
 ## Current development position
 
@@ -20,55 +24,47 @@ infrastructure while preserving validated client/application behavior.
 | D — Media Library / VOD / Live TV UX | Planned after C |
 | E — Linux Migration / Native Linux Baseline | Planned |
 | F — Linux Core Resource Characterization & Optimization | Planned |
-| G — Extended Emulation & User-Content Import | Planned |
-| H — Home Infrastructure / Client / Plugin Expansion | Planned |
-| I — Local Intelligence / Voice / Privacy-Aware AI | Planned |
+| G — Secure Remote Access / Portable Client Foundation | Future after F |
+| H — Extended Emulation & User-Content Import | Future after G |
+| I — Home Infrastructure / Broader Plugin Expansion | Future |
+| J — Local Intelligence / Voice / Privacy-Aware AI | Future |
 
-Current technical item: **C1 explicit stream profiles**.
+Predecessor synchronized checkpoint for this documentation promotion:
 
-C1 inventory completed with:
+`0c31c100ec721d687aff6aedbd79bc0cf9343810`
 
-`C1_INVENTORY_COMPLETE`
+C1.1 static reference profile extraction and the native-stream public-status
+privacy hotfix are runtime validated, checkpointed and pushed.
 
-Next technical classification:
-
-`C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA`
-
-The first implementation is a behavior-preserving static extraction, not an
-adaptive-controller or generic-framework rewrite.
+The active technical phase remains **Phase C adaptive native streaming**. Phase C
+must now be developed with explicit future-remote reuse in mind, but it does not
+implement WAN overlay/auth/travel-router behavior.
 
 ## Current topology
 
-Conceptually:
-
 ```text
-Internet
-  |
-trusted household network
-  |
-trusted host / future Linux server
-  |
-isolated IoT gateway
-  |
-onn Android TV client and future IoT devices
+Internet / ordinary household upstream
+              |
+          home Opal
+   PrivyHub trust/network domain
+      |                   |
+companion / Linux hub    onn / PrivyHub devices
 ```
 
-The consumer networking hardware used by the first prototype is test
-infrastructure, not a permanent architectural dependency.
+Older Prototype-1 split-network evidence is historical test topology, not the
+current product trust model.
+
+Future remote clients use a travel-router trusted LAN plus a secure overlay back
+to the Linux hub. Overlay transport remains separate from PrivyHub application
+authentication/authorization.
 
 ## Working application areas
 
 ### TV / IPTV
 
 The existing TV stack is stable enough to preserve while streaming work
-continues. It already includes catalog/state/provider/EPG functionality, search,
-favorites, recents, hidden channels, ordering/grouping, backups, preview and
-playback behavior.
-
-It is not considered finished. Phase D owns the remaining product work:
-stable channel identity/deduplication, favorites/search/pagination polish, EPG
-matching/cache/timezone diagnostics, guide UX and robust unmatched-channel
-handling. Playback must not depend on guide metadata success.
+continues. Phase D owns the remaining channel normalization, EPG matching/cache,
+guide diagnostics and UX work. Basic playback must not depend on guide success.
 
 ### Local sources and VOD
 
@@ -87,29 +83,14 @@ Managed cores:
 
 Phase A is complete.
 
-Validated behavior includes:
+Runtime coverage:
 
-- PS1 1P/2P/4P controller routing;
-- four physical Android controllers to four ViGEm/XInput slots;
-- A8 P1-P4 input profiles/editor;
-- Crash Bash and CTR manual Port-1-only Multitap On/Off;
-- Save/Load with prior-save preservation;
-- pause/resume/frozen preview;
-- process-specific audio and host coexistence;
-- direct launch/readiness/fail-closed behavior;
-- metadata/art;
-- isolated cheats and mods;
-- normal End/teardown.
-
-Coverage boundary:
-
-- PS1 — extensive runtime coverage;
+- PS1 — extensive;
 - SNES — runtime exercised;
-- NES — supported/configured, but no local A9 fixture;
-- Genesis — supported/configured, but no local A9 fixture.
+- NES — supported/configured, no local A9 fixture;
+- Genesis — supported/configured, no local A9 fixture.
 
-NES and Genesis must not be promoted to runtime-validated status until
-representative fixtures are actually exercised.
+NES and Genesis are not runtime validated merely because configuration exists.
 
 ## Native game-streaming baseline
 
@@ -120,86 +101,110 @@ Validated path:
 Reference behavior:
 
 - 1280x720 at 60 fps;
-- H.264 NVENC;
-- 7000 kbps target bitrate;
-- P1 / ultra-low-latency backend policy;
+- 7000 kbps target/max;
 - GOP 15;
 - no B-frames;
-- 1200-byte RTP packet sizing;
-- 8 data + 1 XOR FEC;
-- Windows Graphics Capture of the exact PrivyHub-managed game window;
-- Android hardware AVC decode.
+- FEC group size 8;
+- process-specific PCM audio;
+- PHI1/ViGEm controller path.
 
-Process audio uses process-specific Windows loopback capture and a dedicated UDP
-audio path. Controller transport uses PHI1 UDP plus persistent ViGEm VX360
-devices.
+Reference profile:
 
-C1 will make the portable stream parameters explicit while preserving this
-runtime behavior.
+`native_game_720p60_reference`
 
-## Phase B diagnostics / clean-native baseline
+C1.1 made the reference stream parameters explicit without changing validated
+behavior.
 
-Phase B is complete and runtime/manual validated.
+Phase C continues with telemetry/adaptation/generalization. Its contracts must
+remain reusable by future Phase G WAN operation.
 
-It delivered:
+## Phase C remote-readiness rule
 
-- unified health/resource model;
-- `GET /diagnostics/health`;
-- 2-second Android client feedback using the existing metrics cadence;
-- corrected decoder/network classifier semantics;
-- bounded event history;
-- Diagnostics / Self-Test GUI;
-- sanitized support-bundle collection;
-- bounded/manual diagnostic retention;
-- Sunshine/Moonlight production-edge and physical artifact removal;
-- native-only regression after legacy removal;
-- clean-native repository checkpoint.
+Future Phase G depends on Phase C producing reusable:
 
-Raw measured evidence outranks classifier output when they disagree.
+- named profiles and capability gates;
+- goodput/loss/FEC/jitter/RTT/pacing/queue telemetry;
+- explainable adaptation decisions;
+- source/capture -> profile/encoder -> transport/FEC -> decoder boundaries.
+
+Do not implement remote overlay/auth/travel-router routing in Phase C.
+
+For future WAN adaptation, degrade quality before allowing queue/buffer growth
+to create runaway latency.
+
+The current reference session is roughly 10-11 Mbps outbound as a planning
+estimate once video, 8+1 parity, PCM16 stereo audio and packet/tunnel overhead
+are considered. This does not change the stable audio path.
 
 ## Deferred UDP infrastructure root cause
 
-The Windows/current-network prototype exhibited severe packet timing
-transformation and duplication outside normal application pacing in both
-directions. The investigation localized the issue beyond normal application
-send/receive pacing but did not identify one responsible device/firmware layer.
+The older Windows/current-network prototype exhibited severe packet timing
+transformation and duplication in both directions.
 
-Decision:
+Preserve the validated native path and diagnostics. Do not tune product
+buffering around that environment.
 
-- preserve the validated native video/audio/input baseline;
-- preserve the transport diagnostics;
-- do not tune product buffering around this specific environment;
-- establish the representative Linux baseline first;
-- replay the acceptance suite during Linux characterization;
-- resume root-cause work earlier only if it becomes a real blocker.
+Replay the saved acceptance suite on the representative:
 
-Detailed evidence:
-`investigations/2026-09-07-udp-transport.md`.
+`Linux + home Opal + onn`
 
-## Linux direction
+path after Linux migration and before WAN characterization.
 
-Phase E moves core server responsibilities to the HP EliteDesk 805 G6 Linux
-reference machine. That machine is a reference prototype, not the minimum target.
+If the representative path is clean, treat the older anomaly as environment
+specific unless new evidence contradicts that. If it reproduces, investigate
+the representative local path before layering WAN jitter/loss on top.
 
-Phase F then performs representative resource/transport characterization and
-optimization with PS1-and-below before cheaper Prototype 2 hardware is selected.
+## Linux and remote direction
 
-Future user-content import expects the user to supply ROM/ISO/BIOS/firmware/keys.
-PrivyHub validates/hashes/copies content into the runtime layout while keeping it
-out of Git and support bundles.
+Phase E establishes Linux-native functional parity on the HP EliteDesk 805 G6
+reference machine.
+
+Phase F optimizes and characterizes PS1-and-below, then selects cheaper
+Prototype 2 hardware from evidence.
+
+Phase G establishes secure optional remote access and portable clients on that
+mature Linux/Core baseline before heavier emulator families are introduced.
+
+Tailscale is the preferred first overlay candidate, not the permanent contract.
+No permanent travel-router model is selected yet.
+
+Phase H then adds user-content import and N64/GameCube/PS2 characterization.
+Users supply ROM/ISO/BIOS/firmware/keys; PrivyHub keeps that content outside Git
+and support bundles.
+
+## Security boundary
+
+Future remote operation separates:
+
+- secure network transport/overlay;
+- PrivyHub client/session identity;
+- application authentication/authorization;
+- reachable media/audio/controller endpoints;
+- overlay/path state.
+
+Source/request IP is not durable client identity.
+
+Remote access must not flatten or expose the ordinary household LAN.
 
 ## Current constraints and debt
 
 Open/deferred work that does not invalidate the current baseline includes:
 
 - Windows-specific server/capture/audio implementation before Phase E;
-- current-network UDP pathology pending representative Linux/network replay;
+- older-network UDP pathology pending representative Linux + home Opal + onn
+  replay;
 - Android cleartext/exported diagnostic surfaces and immature companion auth;
 - minimal conventional CI;
-- large orchestration files such as `MainActivity.kt`, `emulator_manager.py` and
-  `plugins/games.py`;
-- clean-machine/bootstrap representation that is less mature than the current
-  working prototype;
-- remaining Phase D media/EPG/guide UX work.
+- large orchestration files;
+- remaining Phase D media/EPG/guide UX work;
+- all Phase G remote functionality, which is planned only.
 
-See `KNOWN_ISSUES.md` and `memory/repository/DEBT.md`.
+See `KNOWN_ISSUES.md` and durable memory for detailed evidence/state.
+
+## Architecture checkpoint state
+
+The remote-foundation topology/roadmap promotion is **CHECKPOINTED / PUSHED**.
+
+Git HEAD is the authoritative synchronized checkpoint.
+
+Next technical work returns to Phase C under D-059.

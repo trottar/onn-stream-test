@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-09-10
-baseline_commit: aa82ff13e01d5d16cf334d667f8f17e7537cae56
+as_of: 2026-09-14
+baseline_commit: 0c31c100ec721d687aff6aedbd79bc0cf9343810
 ---
 
 # Native Streaming Architecture
@@ -102,3 +102,28 @@ Intentionally unchanged:
 - C1.1 profile values and stream behavior.
 
 The live native-stream status endpoint passed the bounded privacy validator.
+
+## Phase C future-remote readiness
+
+Phase C remains a local streaming implementation phase, but its artifacts are
+direct prerequisites for Phase G.
+
+Preserve reusable contracts for:
+
+- named profiles/capability gates;
+- goodput/loss/FEC/jitter/RTT/pacing/queue telemetry;
+- explainable adaptation reason codes;
+- source/capture -> profile/encoder -> transport/FEC -> decoder boundaries.
+
+Do not add overlay providers, travel-router handling or remote authentication in
+Phase C.
+
+Do not make new Phase C contracts depend on source/request address as durable
+client identity.
+
+Future WAN adaptation principle: degrade quality before queue/buffer growth is
+allowed to create runaway latency.
+
+Reference WAN planning estimate for the current 720p60 + PCM16 + 8+1 stream is
+roughly 10-11 Mbps outbound per session. This is a planning estimate, not a
+reason to alter the stable PCM audio path.

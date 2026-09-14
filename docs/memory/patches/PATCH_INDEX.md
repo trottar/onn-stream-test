@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-09-10
-baseline_commit: aa82ff13e01d5d16cf334d667f8f17e7537cae56
+as_of: 2026-09-14
+baseline_commit: 0c31c100ec721d687aff6aedbd79bc0cf9343810
 ---
 
 # Patch / Checkpoint Index
@@ -357,3 +357,18 @@ This index records durable checkpoints and major patch lines; it does not invent
   twelve-path reviewed working tree. No new production behavior is introduced
   by finalization. Next work is the remote-foundation architecture/roadmap
   documentation update.
+
+- `privyhub_remote_foundation_roadmap_memory_02_2026-09-14` — documentation/durable-memory architecture update on clean checkpoint
+  `0c31c100ec721d687aff6aedbd79bc0cf9343810`. Corrects the home Opal trust topology, makes Phase C
+  explicitly future-remote-aware without adding WAN implementation, promotes
+  Secure Remote Access / Portable Client Foundation to Phase G, renumbers later
+  phases H/I/J, records D-059, adds the planned remote-access architecture
+  record, and adds curated C1.1/privacy evidence. No production/runtime source
+  changes.
+
+- `Checkpoint: promote remote foundation roadmap` — checkpoints the documentation-only remote-foundation
+  architecture promotion on predecessor `0c31c100ec721d687aff6aedbd79bc0cf9343810`. Establishes the home
+  Opal trust boundary, Phase C future-WAN design constraint, Phase G secure
+  remote/portable-client foundation, H/I/J phase reorder, D-059, provider-neutral
+  overlay boundary and explicit remote identity/auth rules. No production/runtime
+  source changes.

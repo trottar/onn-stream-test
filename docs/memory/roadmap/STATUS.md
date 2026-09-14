@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-09-11
-baseline_commit: aa82ff13e01d5d16cf334d667f8f17e7537cae56
+as_of: 2026-09-14
+baseline_commit: 0c31c100ec721d687aff6aedbd79bc0cf9343810
 ---
 
 # Roadmap Status
@@ -11,16 +11,17 @@ baseline_commit: aa82ff13e01d5d16cf334d667f8f17e7537cae56
 | Phase | Status | Current meaning |
 | --- | --- | --- |
 | A — Games / Emulator Subsystem | **COMPLETE / PUSHED** | Runtime-validated native game, controller, Save/Load, profile and PS1 multitap baseline |
-| B — Diagnostics & Clean Native Baseline | **COMPLETE / PUSHED** | Diagnostics/Self-Test/support bundle/retention complete; Sunshine/Moonlight product dependency removed; native regression passed |
-| C — Adaptive Native Streaming | **ACTIVE** | C1 explicit stream profiles |
+| B — Diagnostics & Clean Native Baseline | **COMPLETE / PUSHED** | Diagnostics/Self-Test/support bundle/retention complete; Sunshine/Moonlight removed; native regression passed |
+| C — Adaptive Native Streaming | **ACTIVE** | Profiles/telemetry/adaptation with future-Phase-G WAN reuse in mind |
 | D — Media Library / VOD / Live TV UX | PLANNED | Media-library and substantial Live TV/EPG/guide work |
 | E — Linux Migration / Native Linux Baseline | PLANNED | Move core server path to Linux reference prototype |
 | F — Linux Core Resource Characterization & Optimization | PLANNED | Optimize and size PS1-and-below on Linux |
-| G — Extended Emulation & User-Content Import | PLANNED | Safe content import, then N64/GameCube/PS2 feasibility |
-| H — Home Infrastructure / Client / Plugin Expansion | FUTURE | Broader smart-home/storage/client/plugin work |
-| I — Local Intelligence / Voice / Privacy-Aware AI | FUTURE | Local-first intelligence with optional explicit external providers |
+| G — Secure Remote Access / Portable Client Foundation | FUTURE AFTER F | Overlay/provider abstraction, travel-router trusted LAN, WAN identity/auth and off-site Core validation |
+| H — Extended Emulation & User-Content Import | FUTURE AFTER G | Safe content import, then N64/GameCube/PS2 local + remote regression |
+| I — Home Infrastructure / Broader Plugin Expansion | FUTURE | Home Assistant/devices, cameras/microphones, storage and broader clients/providers |
+| J — Local Intelligence / Voice / Privacy-Aware AI | FUTURE | Local-first intelligence with optional explicit external providers |
 
-`docs/ROADMAP.md` roadmap v3 is authoritative for phase definitions.
+`docs/ROADMAP.md` roadmap v4 is authoritative for phase definitions.
 
 ## Active item: C1 explicit stream profiles
 
@@ -93,16 +94,26 @@ Before C2:
 
 Accepted continuation:
 
-`D -> E -> F -> G -> H -> I`
+`D -> E -> F -> G Remote -> H Extended Emulation -> I Home Infrastructure -> J Intelligence`
 
 Constraints:
-- Live TV is not considered finished; Phase D contains remaining channel/EPG UX work.
+
+- Live TV remains Phase D work.
 - HP EliteDesk 805 G6 is the Linux reference prototype, not the minimum target.
 - Choose cheaper Prototype 2 hardware from measured Phase F evidence.
-- Phase F core sizing is intentionally PS1-and-below.
-- Phase G establishes safe user-content import before later-console feasibility work.
+- Phase F Core sizing remains PS1-and-below.
+- Phase G establishes secure remote/portable-client infrastructure before
+  heavier emulator families.
+- Phase H establishes user-content import before later-console feasibility work.
+- Phase C artifacts must remain reusable by Phase G without implementing WAN
+  plumbing during C.
+- Tailscale is the preferred first overlay candidate, not the permanent
+  architecture contract.
+- Source/request IP is not durable client identity.
+- No permanent travel-router model is selected yet.
+- Replay deferred UDP evidence on Linux + home Opal + onn before WAN
+  characterization.
 - OpenBIOS is not a dedicated project phase.
-- Local deterministic control remains the baseline for later intelligence work.
 
 ## C1.1 static reference profile extraction — development state
 
@@ -134,5 +145,5 @@ Representative game runtime regression passed the C1.1 acceptance boundary.
 
 ## Immediate repository action
 
-Apply and checkpoint the remote-foundation architecture/roadmap documentation
-update. After that administrative architecture update, resume deeper Phase C.
+Remote-foundation architecture/roadmap documentation is checkpointed/pushed.
+Resume deeper Phase C under D-059.

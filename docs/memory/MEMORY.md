@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-09-11
-baseline_commit: 8f25763fca012257a3695ede03004fc9a368966a
+as_of: 2026-09-14
+baseline_commit: 0c31c100ec721d687aff6aedbd79bc0cf9343810
 ---
 
 # Curated Project Memory
@@ -14,12 +14,17 @@ source or runtime evidence, the newer evidence wins.
 ## Mission and architecture direction
 
 PrivyHub is a local-first, privacy-preserving, modular smart-home/media
-experiment. The current prototype uses a Windows companion/server and an
-inexpensive onn Android TV client on an isolated secondary network.
+experiment.
 
-The architecture is intended to evolve toward inexpensive Linux-capable server
-hardware and additional clients without mandatory cloud, subscriptions or
-proprietary infrastructure.
+The home Opal is the PrivyHub network/trust domain. The ordinary household
+router/Wi-Fi is upstream connectivity only, not the PrivyHub trust domain.
+Trusted PrivyHub server/client/device infrastructure belongs behind the Opal.
+Older split-network Prototype-1 evidence is historical test topology.
+
+The current implementation uses a Windows companion and inexpensive onn Android
+TV client. The architecture evolves toward inexpensive Linux-capable server
+hardware, portable trusted-LAN clients and additional home infrastructure
+without mandatory cloud, subscriptions or proprietary infrastructure.
 
 Local deterministic control is the baseline. Optional external AI providers may
 be added later only as explicit user-configured integrations with data
@@ -30,16 +35,16 @@ minimization and no silent fallback.
 - Phase A — Games / emulator subsystem: **COMPLETE / PUSHED**
 - Phase B — Diagnostics + clean native baseline: **COMPLETE / PUSHED**
 - Phase C — Adaptive native streaming: **ACTIVE**
-- Current technical item: **C1 explicit stream profiles**
 - C1 inventory: **COMPLETE**
-- C1 minimal schema design: **COMPLETE**
-- Next technical classification: `C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION`
+- C1 minimal schema design: **COMPLETE / CHECKPOINTED**
+- C1.1 static reference profile extraction: **RUNTIME VALIDATED / CHECKPOINTED / PUSHED**
+- Native-stream public-status privacy hotfix: **LIVE ENDPOINT VALIDATED / CHECKPOINTED / PUSHED**
+- Remote-foundation architecture/roadmap update: **CHECKPOINTED / PUSHED**
 
-The completed C1 inventory is checkpointed. Do not rerun it unless source changes
-invalidate its evidence.
+The completed C1 inventory should not be rerun unless source changes invalidate
+its evidence.
 
-Current docs/memory cleanup is an administrative preservation task before C1
-production implementation. It does not change runtime behavior.
+Resume deeper Phase C under D-059.
 
 ## C1 reference stream
 
@@ -314,16 +319,17 @@ Existing TV/media work is useful but unfinished. Future Phase D work includes:
 
 Playback must not depend on guide or external metadata success.
 
-## Linux and resource direction
+## Linux, remote and resource direction
 
-Roadmap v3 is Linux-first:
+Roadmap v4:
 
 - D — Media Library / VOD / Live TV UX
 - E — Linux Migration / Native Linux Baseline
 - F — Linux Core Resource Characterization & Optimization
-- G — Extended Emulation & User-Content Import
-- H — Home Infrastructure / Client / Plugin Expansion
-- I — Local Intelligence / Voice / Privacy-Aware AI
+- G — Secure Remote Access / Portable Client Foundation
+- H — Extended Emulation & User-Content Import
+- I — Home Infrastructure / Broader Plugin Expansion
+- J — Local Intelligence / Voice / Privacy-Aware AI
 
 The HP EliteDesk 805 G6 Mini Ryzen 5 PRO 4650G / 16 GB / 256 GB machine is the
 reference Linux prototype, not the minimum target.
@@ -331,15 +337,25 @@ reference Linux prototype, not the minimum target.
 Phase F sizing is intentionally limited to PS1-and-below before selecting
 cheaper Prototype 2 hardware.
 
-Future removable-media import validates/hashes/copies user-supplied
-ROM/ISO/BIOS/firmware/keys into the runtime layout while keeping that content
-out of Git and support bundles.
+Phase G establishes the remote/portable-client contract before heavier emulator
+families. Tailscale is the preferred first overlay candidate, not a permanent
+dependency. The future Linux hub can terminate the home-side overlay without
+requiring replacement of the home Opal.
+
+Phase H adds removable-media import and later-console characterization.
+User-supplied ROM/ISO/BIOS/firmware/keys remain outside Git/support bundles.
+
+Remote security has separate transport and application-authorization layers.
+Source/request IP is not durable client identity.
+
+Future WAN adaptation degrades quality before allowing queue/buffer growth to
+create runaway latency.
 
 ## Deferred and known debt
 
-The severe UDP burst/gap/duplication investigation from the Windows/current
-network test environment is deferred to representative Linux/network
-infrastructure unless it becomes a blocker again. Do not encode quirks of the
+The severe UDP burst/gap/duplication investigation from the older Windows/current
+network test environment is deferred to the representative Linux + home Opal + onn
+path unless it becomes a blocker again. Do not encode quirks of the
 current test environment into product architecture without representative
 evidence.
 
@@ -351,3 +367,20 @@ phase rather than mixing it into unrelated streaming or documentation work.
 Maintainability debt remains in large files such as `MainActivity.kt`,
 `emulator_manager.py` and `games.py`. Avoid broad refactors while behavior is
 stable.
+
+## Secure remote foundation
+
+Accepted architecture is documented in `architecture/REMOTE_ACCESS.md`.
+
+Durable rules:
+
+- home Opal is the PrivyHub trust/network domain;
+- ordinary household network is upstream only;
+- future travel router provides a portable trusted client LAN;
+- Tailscale is the first-provider candidate, not a permanent dependency;
+- overlay transport and PrivyHub application authorization are separate;
+- source/request IP is not durable client identity;
+- no permanent travel-router model is selected yet;
+- Phase C is designed for future WAN reuse without implementing WAN plumbing;
+- representative UDP replay target is Linux + home Opal + onn;
+- remote runtime status remains planned only.

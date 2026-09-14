@@ -17,13 +17,13 @@
   "b4_status": "COMPLETE / runtime validated",
   "b5_status": "COMPLETE / runtime validated",
   "b6_status": "COMPLETE / checkpointed / pushed",
-  "baseline_commit": "aa82ff13e01d5d16cf334d667f8f17e7537cae56",
-  "baseline_short": "aa82ff13",
+  "baseline_commit": "0c31c100ec721d687aff6aedbd79bc0cf9343810",
+  "baseline_short": "0c31c100",
   "c1_design_memory_checkpoint": "CHECKPOINTED / PUSHED",
   "c1_design_status": "COMPLETE / CHECKPOINTED / PUSHED / C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA",
   "c1_implementation_status": "RUNTIME VALIDATED / CHECKPOINTED / PUSHED",
   "c1_inventory_status": "COMPLETE / C1_INVENTORY_COMPLETE",
-  "c1_next_step": "REMOTE_FOUNDATION_ARCHITECTURE_ROADMAP_UPDATE",
+  "c1_next_step": "RESUME_PHASE_C_REMOTE_READY_STREAMING_WORK",
   "c1_reference_profile_consumer": "companion/native_stream.py",
   "c1_reference_profile_id": "native_game_720p60_reference",
   "c1_reference_profile_schema": {
@@ -44,10 +44,10 @@
   "client_health_interval_ms": 2000,
   "client_health_schema": "privyhub_client_health_v1",
   "client_health_storage": "latest only plus one delta baseline",
-  "companion_behavior_changed": true,
+  "companion_behavior_changed": false,
   "current_phase": "Phase C",
-  "current_step": "Remote-foundation architecture/roadmap documentation update before deeper Phase C",
-  "decision_id_state": "unique durable IDs through D-058",
+  "current_step": "Resume deeper Phase C under D-059",
+  "decision_id_state": "unique durable IDs through D-059",
   "decoder_classifier_runtime_validated": true,
   "decoder_stale_policy": "informational unless decoder-local failure exists",
   "deep_memory_history": "docs/memory/history/",
@@ -70,9 +70,9 @@
       "sha256": "2f3c393d42bf1629909e77cdecb9196befaf1b47141656f18ba4bfb2feaad930"
     },
     {
-      "bytes": 8075,
+      "bytes": 9372,
       "path": "CURRENT.md",
-      "sha256": "c6199e19ea060ee676125c41a12f8db58ed601fbfdf26ff655e16019d74f495f"
+      "sha256": "506ca29185195cea7a387854b9ed34bdeb2eead734cc4264152e373ee0cf6462"
     },
     {
       "bytes": 2564,
@@ -80,9 +80,9 @@
       "sha256": "7957a58cd59456684c568bc85d8fe39c22d130b58ddaf9d9d636f7b063fa9698"
     },
     {
-      "bytes": 12672,
+      "bytes": 14232,
       "path": "MEMORY.md",
-      "sha256": "9def1ae48012e75f73c6116bfb348c3299d8b0c9aa61ff8cd32bb215bb834317"
+      "sha256": "f045e653698d9b2400688b7aadb775f37810f3fccc6c2c8066adfc9bf8e9e19b"
     },
     {
       "bytes": 3012,
@@ -120,19 +120,24 @@
       "sha256": "3cd4e54950b36ce797f3c3de7d004e4622fa24659bce7df3475ce85bf8d55269"
     },
     {
-      "bytes": 1170,
+      "bytes": 3255,
       "path": "architecture/NETWORK.md",
-      "sha256": "c3d62c71eae19c7b41aa649fbf44232bf629280c9049ad580ee2f8734792c64e"
+      "sha256": "28c84a0a929f79c24b4224f01c9fa02039dc810284504983891ca0fe34633609"
     },
     {
-      "bytes": 4364,
+      "bytes": 3732,
+      "path": "architecture/REMOTE_ACCESS.md",
+      "sha256": "7ce5e23c01f22ac4ece69ddd24ca0a4ddb5c814247b17dbbef6972ad1a992611"
+    },
+    {
+      "bytes": 5253,
       "path": "architecture/STREAMING.md",
-      "sha256": "bdb6744dfc457066ab8923fda0136895ab4bb16021d81dc24c080bbf3cfa1b24"
+      "sha256": "1139b2c84393d034a5a4510536e0d3e9b67ccb7bb01dcb03c0e043b7aa071a89"
     },
     {
-      "bytes": 1117,
+      "bytes": 2108,
       "path": "architecture/SYSTEM.md",
-      "sha256": "843a446e77f9a08b5491f8502fcfba9e4850c96a18b332ab90bed610741f9f3b"
+      "sha256": "66750a741fe182fec4439f572b2e4c64452b7e89075882efdc1a1058d48beea0"
     },
     {
       "bytes": 706,
@@ -140,14 +145,14 @@
       "sha256": "c29964695e2dd3445205af42200c4813176d6e493d3e31b65a2e5d53d0042d77"
     },
     {
-      "bytes": 2916,
+      "bytes": 3304,
       "path": "chats/CHAT_INDEX.md",
-      "sha256": "950432c56ea8454554952f5053248e2d464ba793d0d43bbd976a0b38660d52be"
+      "sha256": "63f84c8e990a7df15ff1a5036ad63f6ebae0e59c284540bfe7f6b923e867d0ee"
     },
     {
-      "bytes": 28238,
+      "bytes": 30190,
       "path": "decisions/DECISION_LOG.md",
-      "sha256": "cdd00d53a54387e7a4618c41e3a06e070df05deef3f63ba452bfd000906c8a7f"
+      "sha256": "e8dd8607a7a38c482629f97dce90bded06c12bf543276010da8c28ad6b453208"
     },
     {
       "bytes": 1129,
@@ -330,6 +335,11 @@
       "sha256": "0a3fb8ab2338e33f371caf8cffbbec600ac05467d489a30fb9a3352be8e8c13a"
     },
     {
+      "bytes": 1351,
+      "path": "evidence/C1_STATIC_PROFILE_AND_STATUS_PRIVACY_VALIDATED_2026-09-14.md",
+      "sha256": "a685f6687aca31b0578eebfc258a2452ad4f64d6cf2e446a6f18430cda104552"
+    },
+    {
       "bytes": 1212,
       "path": "evidence/FOUR_PLAYER_ANDROID_ASSIGNMENT_RUNTIME_2026-09-10.md",
       "sha256": "c22b6cba5cb459f09273b9203da39c6f9a1683c7a417c95f7fd08468f60322d8"
@@ -425,9 +435,9 @@
       "sha256": "7cd58c6b7e2b128e36b3a879fa151444790e9d95d9b12ec933f415bec19ef756"
     },
     {
-      "bytes": 7839,
+      "bytes": 8484,
       "path": "handoffs/CURRENT_HANDOFF.md",
-      "sha256": "b1f3d38fd6157d17cb955d7b5104dd495900b9017c7843477e9ca5c09f6cd898"
+      "sha256": "0efb90302ec9569fc6067d9c98fff83f745e4d1d4a54d0c639f287464ff00aba"
     },
     {
       "bytes": 20924,
@@ -445,9 +455,9 @@
       "sha256": "17179b3916be00b216a803bef7f798eaa59c246835ea85543b23929fa5ef18dc"
     },
     {
-      "bytes": 3616,
+      "bytes": 3729,
       "path": "investigations/ACTIVE.md",
-      "sha256": "6a85100760db23b1daf84310fcf2941811756064ee06597a390bd528c80ae9e6"
+      "sha256": "a95c04ecb98dfb8cbc0b230b0c0bf9c86d2f07293c6ecf30b62de8ec54461bc6"
     },
     {
       "bytes": 1712,
@@ -475,14 +485,14 @@
       "sha256": "0bc6c287c87ba9c90326a6672b923c581a33493b83e38383df521c7c733cff28"
     },
     {
-      "bytes": 1742,
+      "bytes": 4470,
       "path": "memory/2026-09-14.md",
-      "sha256": "41ec74467991746de20304e65fc6372ef519197c8e2335a3b2477b6dd45909ae"
+      "sha256": "2332782836bb1535572891d8b47c9775788cd1966f449828c7b9bcff68800b3f"
     },
     {
-      "bytes": 28000,
+      "bytes": 29026,
       "path": "patches/PATCH_INDEX.md",
-      "sha256": "2ebd7ec3d99fb4b5a1afc208c4cbddf3da75e16c283adabc22db9e3175a985fa"
+      "sha256": "36661020993ebedd5f37feb16e7032a3472699450d6896ec952aa00cde8dfac5"
     },
     {
       "bytes": 1894,
@@ -505,9 +515,9 @@
       "sha256": "9b2d03a0a18fe45ea7ee607020d922232e1d15603f9bfb0eccd4e5165088cd12"
     },
     {
-      "bytes": 5420,
+      "bytes": 6045,
       "path": "roadmap/STATUS.md",
-      "sha256": "19e8b85081e6f19f8a1577371a2a101dd1d251765ff89f4c4b5cda72a614fa70"
+      "sha256": "4e9dde924659de00bf2d17ab77b1ca74455699099ae093df473bf35cc3e58a1f"
     },
     {
       "bytes": 750,
@@ -524,6 +534,7 @@
   "games_post_sha256": "f1271c865cdf88b971da4116d7eb887bf9855864ce1ae848baafc7a3452e0f9c",
   "gui_collect_diagnostics": true,
   "health_endpoint": "GET /diagnostics/health",
+  "home_trust_domain": "home Opal",
   "investigation_state": "ACTIVE current-only; predecessor ACTIVE preserved in deep memory",
   "main_activity_post_sha256": "394d2b839fdb01f2988a0054b42e139e419e02207728f914e1713287992733cc",
   "memory_backend": "repository docs/memory (ChatGPT account Memory unavailable in this project)",
@@ -538,16 +549,25 @@
   "new_client_metrics_timer": false,
   "new_resource_sampler": false,
   "next_work": "C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION",
+  "ordinary_household_network_role": "upstream-only",
+  "overlay_contract": "provider-neutral",
+  "overlay_first_candidate": "Tailscale",
   "part2_status": "COMPLETE / CHECKPOINTED / PUSHED",
   "part3_status": "COMPLETE / CHECKPOINTED / PUSHED",
   "part4_status": "COMPLETE / CHECKPOINTED / PUSHED",
   "phase_a_status": "COMPLETE / PUSHED",
   "phase_b_status": "COMPLETE / PUSHED",
+  "phase_c_remote_readiness": true,
   "phase_c_status": "ACTIVE",
   "physical_legacy_groups_deleted": 9,
   "predecessor": "C1 stream parameter inventory",
-  "production_behavior_changed": true,
+  "production_behavior_changed": false,
   "ps1_multitap_status": "complete / runtime validated on Crash Bash and CTR; Port 1 only",
+  "remote_architecture_checkpoint": "CHECKPOINTED / PUSHED",
+  "remote_architecture_decision": "D-059 ACCEPTED / CHECKPOINTED / PUSHED",
+  "remote_foundation_phase": "G \u2014 Secure Remote Access / Portable Client Foundation",
+  "remote_identity_rule": "source/request IP is not durable client identity",
+  "remote_implementation_status": "PLANNED ONLY",
   "repository_evidence_policy": "raw local/ignored; sanitized checkpoint snapshots committed",
   "repository_ledgers_status": "CODE_MAP/DEBT/CHAT_INDEX refreshed",
   "resource_collection": "existing host telemetry only; no new sampler",
@@ -560,7 +580,7 @@
     "pktmon_full.txt"
   ],
   "roadmap_authoritative_path": "docs/ROADMAP.md",
-  "roadmap_revision": "Linux-first merged roadmap v3",
+  "roadmap_revision": "v4 remote-foundation promotion / CHECKPOINTED / PUSHED",
   "roadmap_status": "v3 authoritative / unchanged by Part 4",
   "roadmap_version": "v3",
   "runtime_validation_ledger_status": "refreshed; NES/Genesis remain no-fixture gaps",
@@ -576,5 +596,6 @@
   "streaming_behavior_changed": false,
   "streaming_data_path_changed": false,
   "system_state_changed": false,
-  "top_level_docs_status": "refreshed to roadmap v3 / Phase C current state"
+  "top_level_docs_status": "refreshed to roadmap v3 / Phase C current state",
+  "travel_router_selection": "UNRESOLVED / DO NOT SELECT YET"
 }
