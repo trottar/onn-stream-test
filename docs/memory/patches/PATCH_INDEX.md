@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-10
-baseline_commit: 8f25763fca012257a3695ede03004fc9a368966a
+baseline_commit: aa82ff13e01d5d16cf334d667f8f17e7537cae56
 ---
 
 # Patch / Checkpoint Index
@@ -335,3 +335,25 @@ This index records durable checkpoints and major patch lines; it does not invent
   checkpoint, commits/pushes it, verifies a clean tree and `origin/main == HEAD`,
   and leaves `C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION` as the active
   technical step.
+
+- `privyhub_c1_static_reference_profile_01_2026-09-11` — C1.1 production development patch. Adds an immutable validated
+  `NativeStreamProfile` and the `native_game_720p60_reference` profile, makes
+  `companion/native_stream.py` derive the existing reference stream constants
+  from it, uses explicit max-bitrate/B-frame profile fields, and exposes
+  `profile_id`/profile data in native-stream status. Android, capture/audio/
+  controller paths and RTP/FEC wire mechanics remain unchanged. Runtime
+  validation pending.
+
+- `privyhub_native_status_privacy_hotfix_01_2026-09-14` — privacy hotfix on top of the runtime-validated C1.1 development
+  state. Sanitizes `NativeAudioStreamer.status()` so public native-stream status
+  no longer publishes helper network identifiers or absolute local paths. Raw
+  helper JSON remains local and unchanged. Includes a bounded validator that
+  prints counts/classification only. No audio/video/controller/Android/C1 profile
+  behavior changes. Runtime privacy validation pending.
+
+- `Checkpoint: validate C1 static profile and status privacy` — checkpoints the runtime-validated C1.1 static
+  reference-profile extraction together with the live-endpoint-validated
+  native-stream public-status privacy hotfix. Checkpoint scope is the exact
+  twelve-path reviewed working tree. No new production behavior is introduced
+  by finalization. Next work is the remote-foundation architecture/roadmap
+  documentation update.

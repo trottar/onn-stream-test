@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-11
-baseline_commit: 8f25763fca012257a3695ede03004fc9a368966a
+baseline_commit: aa82ff13e01d5d16cf334d667f8f17e7537cae56
 ---
 
 # Roadmap Status
@@ -46,9 +46,9 @@ Reference stream:
 
 `C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA` — **COMPLETE**
 
-### Next
+### C1.1 implementation
 
-`C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION`
+`C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION` — **RUNTIME VALIDATED / CHECKPOINTED / PUSHED**
 
 The first profile patch should:
 1. name the existing reference behavior explicitly;
@@ -80,6 +80,8 @@ C1.1 is companion-only static extraction. Preserve Android constants/startup ord
 
 ## C1 acceptance gate
 
+**Result: PASSED / CHECKPOINTED / PUSHED**
+
 Before C2:
 - explicit reference profile is active and visible to diagnostics/status;
 - stream remains 720p60 / 7000 kbps / GOP15 / 8+1 FEC;
@@ -101,3 +103,36 @@ Constraints:
 - Phase G establishes safe user-content import before later-console feasibility work.
 - OpenBIOS is not a dedicated project phase.
 - Local deterministic control remains the baseline for later intelligence work.
+
+## C1.1 static reference profile extraction — development state
+
+**Status:** RUNTIME VALIDATED / CHECKPOINTED / PUSHED
+
+Implementation:
+- added `companion/native_stream_profiles.py`;
+- defines immutable `NativeStreamProfile`;
+- defines `native_game_720p60_reference`;
+- `NativeStreamManager` now derives the prior width/height/fps/bitrate/GOP/
+  B-frame/FEC constants from that profile;
+- FFmpeg `-maxrate` explicitly consumes `max_bitrate_kbps`;
+- FFmpeg `-bf` explicitly consumes `bframes`;
+- the FEC relay still uses the same 8-packet group through the profile-derived
+  manager constant;
+- native-stream status preserves existing top-level fields and adds
+  `profile_id` plus nested `profile`.
+
+Intentionally unchanged:
+- Android source/startup ordering;
+- WGC capture ownership;
+- H.264 NVENC backend/preset/tune/RC/buffer/pixel format;
+- RTP payload type, packet size and ports;
+- FEC wire format;
+- audio and controller paths;
+- GUI/profile selection and adaptation.
+
+Representative game runtime regression passed the C1.1 acceptance boundary.
+
+## Immediate repository action
+
+Apply and checkpoint the remote-foundation architecture/roadmap documentation
+update. After that administrative architecture update, resume deeper Phase C.

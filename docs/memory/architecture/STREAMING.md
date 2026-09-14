@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-10
-baseline_commit: 8f25763fca012257a3695ede03004fc9a368966a
+baseline_commit: aa82ff13e01d5d16cf334d667f8f17e7537cae56
 ---
 
 # Native Streaming Architecture
@@ -45,3 +45,60 @@ C1.1 is companion-only static extraction. Preserve Android constants/startup ord
 ## Future
 
 After the static reference profile is runtime validated, later Phase C work may add client-side profile consumption, additional profiles, telemetry and adaptation. Generalization should follow the proven Games implementation rather than replace it prematurely.
+
+## C1.1 static reference profile extraction — development state
+
+**Status:** RUNTIME VALIDATED / CHECKPOINTED / PUSHED
+
+Implementation:
+- added `companion/native_stream_profiles.py`;
+- defines immutable `NativeStreamProfile`;
+- defines `native_game_720p60_reference`;
+- `NativeStreamManager` now derives the prior width/height/fps/bitrate/GOP/
+  B-frame/FEC constants from that profile;
+- FFmpeg `-maxrate` explicitly consumes `max_bitrate_kbps`;
+- FFmpeg `-bf` explicitly consumes `bframes`;
+- the FEC relay still uses the same 8-packet group through the profile-derived
+  manager constant;
+- native-stream status preserves existing top-level fields and adds
+  `profile_id` plus nested `profile`.
+
+Intentionally unchanged:
+- Android source/startup ordering;
+- WGC capture ownership;
+- H.264 NVENC backend/preset/tune/RC/buffer/pixel format;
+- RTP payload type, packet size and ports;
+- FEC wire format;
+- audio and controller paths;
+- GUI/profile selection and adaptation.
+
+Representative game runtime regression passed the C1.1 acceptance boundary.
+
+## Native-stream status privacy hotfix — 2026-09-14
+
+**Status:** LIVE ENDPOINT VALIDATED / CHECKPOINTED / PUSHED
+
+A C1.1 runtime status review found that public native-stream status inherited the
+process-audio helper's raw status object. That exposed a client network
+identifier and an absolute local diagnostics path.
+
+Root cause:
+- `NativeAudioStreamer.status()` returned `_read_status()` wholesale as
+  `helper_status`;
+- the same method exposed its timing-log `Path` as an absolute string.
+
+Hotfix boundary:
+- raw helper JSON remains unchanged in local runtime/data storage;
+- public `helper_status` is a recursively sanitized copy;
+- network-address fields and valid embedded IPv4/MAC identifiers are redacted;
+- helper path fields are redacted;
+- public top-level `timing_log` is project-relative when available;
+- public strings containing the project-root prefix use `<project-root>`.
+
+Intentionally unchanged:
+- process-audio capture/pacing/packetization and raw local diagnostics;
+- video/FEC/controller behavior;
+- Android;
+- C1.1 profile values and stream behavior.
+
+The live native-stream status endpoint passed the bounded privacy validator.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 
@@ -23,6 +24,16 @@ class NativeSessionIOError(RuntimeError):
 class NativeAudioStreamer:
     TIMING_PROBE_VERSION = "process_loopback_pair_pacer_v0.22"
     AUDIO_BUFFER_ARCHITECTURE = "windows_process_loopback_pair_pacer_v0.22"
+
+    _ADDRESS_CANDIDATE_RE = re.compile(
+        r"(?<!\d)(?:\d{1,5}\.){3}\d{1,5}(?!\d)"
+    )
+    _MAC_RE = re.compile(
+        r"(?i)(?<![0-9a-f])(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}(?![0-9a-f])"
+    )
+    _WINDOWS_ABSOLUTE_PATH_RE = re.compile(
+        r"(?i)(?<![A-Za-z0-9_])[A-Z]:[\\/][^\r\n\t\"<>|]*"
+    )
 
     def __init__(
         self,
@@ -339,6 +350,108 @@ class NativeAudioStreamer:
                 "ready within 5 seconds."
             )
 
+    @classmethod
+    def _redact_network_text(
+        cls,
+        value: str,
+    ) -> str:
+        def replace_address(
+            match: re.Match[str],
+        ) -> str:
+            candidate = match.group(0)
+
+            try:
+                ipaddress.ip_address(candidate)
+            except ValueError:
+                return candidate
+
+            return "<redacted-address>"
+
+        value = cls._ADDRESS_CANDIDATE_RE.sub(
+            replace_address,
+            value,
+        )
+
+        return cls._MAC_RE.sub(
+            "<redacted-address>",
+            value,
+        )
+
+    def _public_timing_log(
+        self,
+    ) -> str:
+        if self._timing_path is None:
+            return ""
+
+        try:
+            return (
+                self._timing_path.resolve()
+                .relative_to(self.project_root)
+                .as_posix()
+            )
+        except (OSError, ValueError):
+            return self._timing_path.name
+
+    def _sanitize_public_helper_status(
+        self,
+        value: Any,
+        *,
+        key: str = "",
+        depth: int = 0,
+    ) -> Any:
+        if depth > 12:
+            return None
+
+        normalized_key = key.strip().lower()
+
+        if (
+            normalized_key == "ip"
+            or normalized_key.endswith("_ip")
+            or normalized_key == "address"
+            or normalized_key.endswith("_address")
+        ):
+            if value in (None, ""):
+                return value
+            return "<redacted-address>"
+
+        if (
+            normalized_key == "path"
+            or normalized_key.endswith("_path")
+            or normalized_key in {"log_path", "timing_log", "status_path"}
+        ):
+            if value in (None, ""):
+                return value
+            return "<redacted-path>"
+
+        if value is None:
+            return None
+        if isinstance(value, (bool, int, float)):
+            return value
+
+        if isinstance(value, str):
+            public = self._redact_network_text(value)
+            root_text = str(self.project_root)
+            if root_text:
+                public = public.replace(root_text, "<project-root>")
+                public = public.replace(root_text.replace("\\", "/"), "<project-root>")
+            return self._WINDOWS_ABSOLUTE_PATH_RE.sub("<redacted-path>", public)
+
+        if isinstance(value, list):
+            return [
+                self._sanitize_public_helper_status(item, depth=depth + 1)
+                for item in value
+            ]
+
+        if isinstance(value, dict):
+            return {
+                str(item_key): self._sanitize_public_helper_status(
+                    item_value, key=str(item_key), depth=depth + 1
+                )
+                for item_key, item_value in value.items()
+            }
+
+        return str(type(value).__name__)
+
     def status(
         self,
     ) -> dict[str, Any]:
@@ -421,14 +534,13 @@ class NativeAudioStreamer:
                 else 0
             ),
             "timing_log": (
-                str(
-                    self._timing_path
-                )
-                if self._timing_path
-                is not None
-                else ""
+                self._public_timing_log()
             ),
-            "helper_status": helper,
+            "helper_status": (
+                self._sanitize_public_helper_status(
+                    helper
+                )
+            ),
         }
 
     def stop(

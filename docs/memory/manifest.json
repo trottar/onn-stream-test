@@ -10,19 +10,21 @@
   "android_behavior_changed": false,
   "android_manifest_post_sha256": "ab1140c3230582f9dbbbf3c179d8fa08363971d9289e08442487f3849c7ac8a2",
   "android_moonlight_package_state": "absent / verified; PrivyHub remains present",
-  "as_of": "2026-09-11",
+  "as_of": "2026-09-14",
   "b1_status": "complete / runtime validated",
   "b2_status": "complete / runtime and manual GUI validated",
   "b3_status": "COMPLETE / inventory and focused active-edge trace completed",
   "b4_status": "COMPLETE / runtime validated",
   "b5_status": "COMPLETE / runtime validated",
   "b6_status": "COMPLETE / checkpointed / pushed",
-  "baseline_commit": "8f25763fca012257a3695ede03004fc9a368966a",
-  "baseline_short": "8f25763f",
+  "baseline_commit": "aa82ff13e01d5d16cf334d667f8f17e7537cae56",
+  "baseline_short": "aa82ff13",
   "c1_design_memory_checkpoint": "CHECKPOINTED / PUSHED",
   "c1_design_status": "COMPLETE / CHECKPOINTED / PUSHED / C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA",
+  "c1_implementation_status": "RUNTIME VALIDATED / CHECKPOINTED / PUSHED",
   "c1_inventory_status": "COMPLETE / C1_INVENTORY_COMPLETE",
-  "c1_next_step": "C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION",
+  "c1_next_step": "REMOTE_FOUNDATION_ARCHITECTURE_ROADMAP_UPDATE",
+  "c1_reference_profile_consumer": "companion/native_stream.py",
   "c1_reference_profile_id": "native_game_720p60_reference",
   "c1_reference_profile_schema": {
     "bframes": 0,
@@ -35,15 +37,16 @@
     "max_bitrate_kbps": 7000,
     "width": 1280
   },
+  "c1_reference_profile_source": "companion/native_stream_profiles.py",
   "checkpoint_parent_commit": "a6dbf627dd32af7da975bf01a679350810026ca3",
   "checkpoint_scope": "Part 1 current-state repair + completed C1 inventory memory/probe",
   "classifier_changed": false,
   "client_health_interval_ms": 2000,
   "client_health_schema": "privyhub_client_health_v1",
   "client_health_storage": "latest only plus one delta baseline",
-  "companion_behavior_changed": false,
+  "companion_behavior_changed": true,
   "current_phase": "Phase C",
-  "current_step": "C1 static reference profile extraction implementation",
+  "current_step": "Remote-foundation architecture/roadmap documentation update before deeper Phase C",
   "decision_id_state": "unique durable IDs through D-058",
   "decoder_classifier_runtime_validated": true,
   "decoder_stale_policy": "informational unless decoder-local failure exists",
@@ -67,9 +70,9 @@
       "sha256": "2f3c393d42bf1629909e77cdecb9196befaf1b47141656f18ba4bfb2feaad930"
     },
     {
-      "bytes": 5393,
+      "bytes": 8075,
       "path": "CURRENT.md",
-      "sha256": "4c10a1c53e86b6fb212e146477d87a2210097608ef98c1b8885068323031e71b"
+      "sha256": "c6199e19ea060ee676125c41a12f8db58ed601fbfdf26ff655e16019d74f495f"
     },
     {
       "bytes": 2564,
@@ -122,9 +125,9 @@
       "sha256": "c3d62c71eae19c7b41aa649fbf44232bf629280c9049ad580ee2f8734792c64e"
     },
     {
-      "bytes": 2151,
+      "bytes": 4364,
       "path": "architecture/STREAMING.md",
-      "sha256": "f77147e11f03e7722b330560c5a41ef2017cedcc1fc1f13eccef185134bfce39"
+      "sha256": "bdb6744dfc457066ab8923fda0136895ab4bb16021d81dc24c080bbf3cfa1b24"
     },
     {
       "bytes": 1117,
@@ -422,9 +425,9 @@
       "sha256": "7cd58c6b7e2b128e36b3a879fa151444790e9d95d9b12ec933f415bec19ef756"
     },
     {
-      "bytes": 5407,
+      "bytes": 7839,
       "path": "handoffs/CURRENT_HANDOFF.md",
-      "sha256": "f0ba0260cf6cfb56fc1f3524c9c8e9fbc56ad3c91f91f3e3180cb27ee9ab7e3f"
+      "sha256": "b1f3d38fd6157d17cb955d7b5104dd495900b9017c7843477e9ca5c09f6cd898"
     },
     {
       "bytes": 20924,
@@ -442,9 +445,9 @@
       "sha256": "17179b3916be00b216a803bef7f798eaa59c246835ea85543b23929fa5ef18dc"
     },
     {
-      "bytes": 2282,
+      "bytes": 3616,
       "path": "investigations/ACTIVE.md",
-      "sha256": "88d8db7b661eba48a7589a3f49b2501f19d7172e80dda6e0a77519d4c281d99c"
+      "sha256": "6a85100760db23b1daf84310fcf2941811756064ee06597a390bd528c80ae9e6"
     },
     {
       "bytes": 1712,
@@ -467,14 +470,19 @@
       "sha256": "df3aa331aa94cd503ba13164ea9a0461643d1e2e67f042c8499e92595f9ec044"
     },
     {
-      "bytes": 15649,
+      "bytes": 16359,
       "path": "memory/2026-09-11.md",
-      "sha256": "d3265a989b22efe8335b824d1d898acf04586f0f71afcedfd4c1b9ad6a889de8"
+      "sha256": "0bc6c287c87ba9c90326a6672b923c581a33493b83e38383df521c7c733cff28"
     },
     {
-      "bytes": 26539,
+      "bytes": 1742,
+      "path": "memory/2026-09-14.md",
+      "sha256": "41ec74467991746de20304e65fc6372ef519197c8e2335a3b2477b6dd45909ae"
+    },
+    {
+      "bytes": 28000,
       "path": "patches/PATCH_INDEX.md",
-      "sha256": "73c6b3dd23637485c039d223dc6b70a1f90f63133da8d52e553efbab39f086bf"
+      "sha256": "2ebd7ec3d99fb4b5a1afc208c4cbddf3da75e16c283adabc22db9e3175a985fa"
     },
     {
       "bytes": 1894,
@@ -497,9 +505,9 @@
       "sha256": "9b2d03a0a18fe45ea7ee607020d922232e1d15603f9bfb0eccd4e5165088cd12"
     },
     {
-      "bytes": 4068,
+      "bytes": 5420,
       "path": "roadmap/STATUS.md",
-      "sha256": "2b99240490a4bb2d6d646a741f56ac4f8bd92ae0f472ce0c2a5f1010548d4302"
+      "sha256": "19e8b85081e6f19f8a1577371a2a101dd1d251765ff89f4c4b5cda72a614fa70"
     },
     {
       "bytes": 750,
@@ -524,6 +532,9 @@
   "minor_games_cleanup_scope": "background startup metadata/art reconciliation + remove Native Streaming Alpha catalog node only",
   "minor_games_cleanup_status": "RUNTIME VALIDATED / CHECKPOINTED / PUSHED",
   "name": "PrivyHub durable project memory",
+  "native_status_privacy_hotfix": "LIVE ENDPOINT VALIDATED / CHECKPOINTED / PUSHED",
+  "native_status_public_helper_policy": "sanitized-copy-raw-local-preserved",
+  "native_status_public_timing_log_policy": "project-relative-only",
   "new_client_metrics_timer": false,
   "new_resource_sampler": false,
   "next_work": "C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION",
@@ -535,7 +546,7 @@
   "phase_c_status": "ACTIVE",
   "physical_legacy_groups_deleted": 9,
   "predecessor": "C1 stream parameter inventory",
-  "production_behavior_changed": false,
+  "production_behavior_changed": true,
   "ps1_multitap_status": "complete / runtime validated on Crash Bash and CTR; Port 1 only",
   "repository_evidence_policy": "raw local/ignored; sanitized checkpoint snapshots committed",
   "repository_ledgers_status": "CODE_MAP/DEBT/CHAT_INDEX refreshed",

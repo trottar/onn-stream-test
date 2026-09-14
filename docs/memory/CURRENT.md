@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-11
-baseline_commit: 8f25763fca012257a3695ede03004fc9a368966a
+baseline_commit: aa82ff13e01d5d16cf334d667f8f17e7537cae56
 ---
 
 # Current Development State
@@ -22,7 +22,11 @@ baseline_commit: 8f25763fca012257a3695ede03004fc9a368966a
 
 C1 minimal schema design: **COMPLETE / CHECKPOINTED / PUSHED**
 
-Next work: `C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION`.
+C1.1 static reference profile extraction: **RUNTIME VALIDATED / CHECKPOINTED / PUSHED**
+
+Native-stream status privacy hotfix: **LIVE ENDPOINT VALIDATED / CHECKPOINTED / PUSHED**
+
+Next work: remote-foundation architecture/roadmap documentation update before deeper Phase C implementation.
 
 ## Active technical step
 
@@ -36,9 +40,9 @@ Design classification:
 
 `C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA` — **COMPLETE**
 
-Next classification:
+Implementation classification:
 
-`C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION`
+`C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION` — **RUNTIME VALIDATED / CHECKPOINTED / PUSHED**
 
 Do not rerun the inventory unless source changes invalidate it.
 
@@ -170,3 +174,63 @@ inspect raw measurements -> one coherent patch**
 
 Never ask the user to provide or paste network addresses. Shareable diagnostics
 must avoid or redact them.
+
+## C1.1 static reference profile extraction — development state
+
+**Status:** RUNTIME VALIDATED / CHECKPOINTED / PUSHED
+
+Implementation:
+- added `companion/native_stream_profiles.py`;
+- defines immutable `NativeStreamProfile`;
+- defines `native_game_720p60_reference`;
+- `NativeStreamManager` now derives the prior width/height/fps/bitrate/GOP/
+  B-frame/FEC constants from that profile;
+- FFmpeg `-maxrate` explicitly consumes `max_bitrate_kbps`;
+- FFmpeg `-bf` explicitly consumes `bframes`;
+- the FEC relay still uses the same 8-packet group through the profile-derived
+  manager constant;
+- native-stream status preserves existing top-level fields and adds
+  `profile_id` plus nested `profile`.
+
+Intentionally unchanged:
+- Android source/startup ordering;
+- WGC capture ownership;
+- H.264 NVENC backend/preset/tune/RC/buffer/pixel format;
+- RTP payload type, packet size and ports;
+- FEC wire format;
+- audio and controller paths;
+- GUI/profile selection and adaptation.
+
+Representative game runtime regression confirmed picture, process audio,
+controller input, Pause/Resume, Save/Load and End/teardown with the
+reference profile/status values preserved.
+
+## Native-stream status privacy hotfix — 2026-09-14
+
+**Status:** LIVE ENDPOINT VALIDATED / CHECKPOINTED / PUSHED
+
+A C1.1 runtime status review found that public native-stream status inherited the
+process-audio helper's raw status object. That exposed a client network
+identifier and an absolute local diagnostics path.
+
+Root cause:
+- `NativeAudioStreamer.status()` returned `_read_status()` wholesale as
+  `helper_status`;
+- the same method exposed its timing-log `Path` as an absolute string.
+
+Hotfix boundary:
+- raw helper JSON remains unchanged in local runtime/data storage;
+- public `helper_status` is a recursively sanitized copy;
+- network-address fields and valid embedded IPv4/MAC identifiers are redacted;
+- helper path fields are redacted;
+- public top-level `timing_log` is project-relative when available;
+- public strings containing the project-root prefix use `<project-root>`.
+
+Intentionally unchanged:
+- process-audio capture/pacing/packetization and raw local diagnostics;
+- video/FEC/controller behavior;
+- Android;
+- C1.1 profile values and stream behavior.
+
+The live native-stream status endpoint passed the bounded privacy validator:
+no network identifiers, absolute paths or unsafe keyed values were exposed.

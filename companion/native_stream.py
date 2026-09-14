@@ -18,6 +18,7 @@ from ctypes import wintypes
 from native_session_io import NativeSessionIO
 from native_fec_relay import NativeVideoFecRelay
 from native_host_telemetry import NativeHostTelemetryProfiler
+from native_stream_profiles import NATIVE_GAME_720P60_REFERENCE
 
 
 class NativeStreamError(RuntimeError):
@@ -37,15 +38,18 @@ class NativeStreamManager:
 
     ALPHA_VERSION = "0.7"
 
-    WIDTH = 1280
-    HEIGHT = 720
-    FPS = 60
-    GOP_FRAMES = 15
-    BITRATE_KBPS = 7000
+    PROFILE = NATIVE_GAME_720P60_REFERENCE
+    WIDTH = PROFILE.width
+    HEIGHT = PROFILE.height
+    FPS = PROFILE.fps
+    GOP_FRAMES = PROFILE.gop_frames
+    BITRATE_KBPS = PROFILE.bitrate_kbps
+    MAX_BITRATE_KBPS = PROFILE.max_bitrate_kbps
+    BFRAMES = PROFILE.bframes
     PAYLOAD_TYPE = 96
     DEFAULT_PORT = 48100
     FEC_INPUT_PORT = 48110
-    FEC_GROUP_SIZE = 8
+    FEC_GROUP_SIZE = PROFILE.fec_group_size
     AUDIO_PORT = 48101
     INPUT_PORT = 48102
 
@@ -199,8 +203,9 @@ class NativeStreamManager:
                 message = (
                     f"PrivyHub Native A/V/Input Alpha v{self.ALPHA_VERSION} "
                     "is capturing the managed RetroArch window with "
-                    "Windows Graphics Capture using a fixed 1280x720 "
-                    "frame envelope and streaming H.264 RTP/UDP."
+                    "Windows Graphics Capture using the "
+                    f"{self.PROFILE.width}x{self.PROFILE.height} "
+                    "reference profile envelope and streaming H.264 RTP/UDP."
                 )
             else:
                 ready = True
@@ -217,6 +222,8 @@ class NativeStreamManager:
                 "ok": True,
                 "kind": "native_stream_host",
                 "alpha_version": self.ALPHA_VERSION,
+                "profile_id": self.PROFILE.id,
+                "profile": self.PROFILE.to_dict(),
                 "title": "Native Streaming Alpha",
                 "ready": ready,
                 "active": active,
@@ -688,13 +695,13 @@ class NativeStreamManager:
             "-b:v",
             f"{self.BITRATE_KBPS}k",
             "-maxrate",
-            f"{self.BITRATE_KBPS}k",
+            f"{self.MAX_BITRATE_KBPS}k",
             "-bufsize",
             "1000k",
             "-g",
             str(self.GOP_FRAMES),
             "-bf",
-            "0",
+            str(self.BFRAMES),
             "-pix_fmt",
             "yuv420p",
             "-payload_type",
@@ -873,9 +880,10 @@ class NativeStreamManager:
             )
 
             self._log_handle.write(
-                f"Profile: {self.WIDTH}x{self.HEIGHT}@{self.FPS}, "
-                f"{self.BITRATE_KBPS} kbps H.264 NVENC, "
-                f"GOP={self.GOP_FRAMES}\n"
+                f"Profile: {self.PROFILE.id} "
+                f"{self.WIDTH}x{self.HEIGHT}@{self.FPS}, "
+                f"{self.BITRATE_KBPS}/{self.MAX_BITRATE_KBPS} kbps "
+                f"H.264 NVENC, GOP={self.GOP_FRAMES}, BF={self.BFRAMES}\n"
             )
 
             self._log_handle.write(
@@ -1127,11 +1135,13 @@ class NativeStreamManager:
 
             self._log_handle.write(
                 "NVENC latency: p1 / tune=ull / zerolatency=1 / "
-                "delay=0 / rc-lookahead=0 / bf=0\n"
+                "delay=0 / rc-lookahead=0 / "
+                f"bf={self.BFRAMES}\n"
             )
 
             self._log_handle.write(
-                "Video FEC: XOR 8+1; FFmpeg RTP -> loopback relay -> onn; "
+                f"Video FEC: XOR {self.FEC_GROUP_SIZE}+1; "
+                "FFmpeg RTP -> loopback relay -> onn; "
                 f"encoder={self.BITRATE_KBPS} kbps\n"
             )
 
