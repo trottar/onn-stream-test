@@ -572,3 +572,62 @@ D-065:
 - usable-floor characterization is bracketed to 5000–6000 kbps;
 - next single candidate is 5500 kbps;
 - production minimum and automatic controller remain unset.
+
+## C3 5500 midpoint characterization rule
+
+After D-065, the lower fixed-bitrate boundary is bracketed at 5000–6000 kbps.
+
+5500 kbps is the single midpoint candidate.
+
+Before this test:
+- 7000 kbps validated;
+- 6000 kbps validated;
+- 5000 kbps runtime tested / not accepted due definite increased steady-state
+  visual stuttering.
+
+Keep 1280x720@60, GOP15, B-frames0 and FEC8 fixed. Use the same shared
+backend-neutral video-only restart implementation and require focused
+steady-state smoothness observation.
+
+Acceptance priority remains:
+**interactive smoothness/continuity before subjective image clarity.**
+
+The known audio burst/gap pathology remains separately deferred to
+representative Linux + Home-Opal replay. Report its detailed counters but do not
+treat pre-existing nonzero audio metrics as a bitrate failure without new
+bitrate-specific causal evidence.
+
+No production minimum or automatic bitrate controller exists yet.
+
+## C3 fixed bitrate envelope — D-066
+
+Windows C3 fixed-bitrate characterization is complete.
+
+Validated controller ladder:
+- 7000 kbps — reference/max;
+- 6000 kbps — middle;
+- 5500 kbps — lower/current Windows floor.
+
+Not accepted:
+- 5000 kbps — technically viable but showed definitely more steady-state visual
+  stutters during focused extended play.
+
+5500 acceptance:
+- focused play had a short initial lag, recovered after a few seconds, then ran
+  very well;
+- six fresh post-cycle telemetry intervals from 5.5–15.5 seconds added 638
+  rendered frames with zero decoder-drop and zero queue-overflow deltas;
+- final whole-session decoder report still contained 57 drops/overflows. Preserve
+  this fact; do not invent a timestamp/location for those drops outside the
+  sampled interval.
+
+For the adaptive controller, use discrete levels 5500/6000/7000 rather than
+continuing to optimize the floor in the current test environment.
+
+The 5500 floor is a Windows C3 validation result, not a universal backend
+constant. Linux migration must revalidate the actuator and fixed envelope.
+
+The known audio burst/gap pathology remains separately deferred to Linux + Home
+Opal.
+
+Automatic bitrate control is still not implemented.

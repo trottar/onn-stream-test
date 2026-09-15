@@ -19,8 +19,8 @@
   "b4_status": "COMPLETE / runtime validated",
   "b5_status": "COMPLETE / runtime validated",
   "b6_status": "COMPLETE / checkpointed / pushed",
-  "baseline_commit": "6e4563f7109f6dd1b4227a264e96e2acbd7e112d",
-  "baseline_short": "6e4563f7",
+  "baseline_commit": "0f0f58ef24646a72ff1aa6b769395d8d8dd06a1b",
+  "baseline_short": "0f0f58ef",
   "c1_design_memory_checkpoint": "CHECKPOINTED / PUSHED",
   "c1_design_status": "COMPLETE / CHECKPOINTED / PUSHED / C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA",
   "c1_implementation_status": "RUNTIME VALIDATED / CHECKPOINTED / PUSHED",
@@ -49,25 +49,28 @@
   "c3_audio_transport_status": "BURST_GAP PATHOLOGY DEFERRED / REPLAY ON LINUX + HOME OPAL",
   "c3_characterization_bracket_kbps": [
     5000,
-    6000
+    5500
   ],
-  "c3_characterization_candidate_kbps": 5500,
+  "c3_characterization_candidate_kbps": null,
   "c3_characterization_probe_levels_installed_kbps": [
     6000,
-    5000
+    5000,
+    5500
   ],
-  "c3_characterization_status": "5000 KBPS NOT ACCEPTED / BRACKET 5000-6000 / NEXT 5500",
-  "c3_controller_status": "NOT IMPLEMENTED",
+  "c3_characterization_status": "COMPLETE / WINDOWS FIXED LADDER 5500-6000-7000 VALIDATED",
+  "c3_controller_status": "NEXT / NOT IMPLEMENTED",
   "c3_design_status": "C3.1 SOURCE/POLICY AUDIT COMPLETE / CHECKPOINTED / PUSHED",
   "c3_linux_actuator_status": "NOT RUNTIME VALIDATED / EQUIVALENT BACKEND REQUIRED",
-  "c3_min_bitrate_status": "UNSET / CHARACTERIZATION REQUIRED",
+  "c3_min_bitrate_kbps": 5500,
+  "c3_min_bitrate_status": "5500 WINDOWS C3 VALIDATED / LINUX REVALIDATION REQUIRED",
   "c3_reference_max_bitrate_kbps": 7000,
   "c3_rejected_bitrate_levels_kbps": [
     5000
   ],
   "c3_validated_bitrate_levels_kbps": [
     7000,
-    6000
+    6000,
+    5500
   ],
   "c3_windows_actuator_backend": "wgc_ffmpeg_nvenc",
   "checkpoint_parent_commit": "a6dbf627dd32af7da975bf01a679350810026ca3",
@@ -78,8 +81,8 @@
   "client_health_storage": "latest only plus one delta baseline",
   "companion_behavior_changed": true,
   "current_phase": "Phase C",
-  "current_step": "C3 fixed 5500 kbps characterization",
-  "decision_id_state": "unique durable IDs through D-065",
+  "current_step": "C3 adaptive bitrate controller",
+  "decision_id_state": "unique durable IDs through D-066",
   "decoder_classifier_runtime_validated": true,
   "decoder_stale_policy": "informational unless decoder-local failure exists",
   "deep_memory_history": "docs/memory/history/",
@@ -102,9 +105,9 @@
       "sha256": "2f3c393d42bf1629909e77cdecb9196befaf1b47141656f18ba4bfb2feaad930"
     },
     {
-      "bytes": 19074,
+      "bytes": 22113,
       "path": "CURRENT.md",
-      "sha256": "c2e790e4fe50acdaf2b417adc5000f580cd33621eed6419b46faba1b579c7720"
+      "sha256": "1af71ca53c9d0d61bdeabb713e941e9ec4a7233d8698e1824933f3d0cefc7c8e"
     },
     {
       "bytes": 2564,
@@ -112,9 +115,9 @@
       "sha256": "7957a58cd59456684c568bc85d8fe39c22d130b58ddaf9d9d636f7b063fa9698"
     },
     {
-      "bytes": 22009,
+      "bytes": 24182,
       "path": "MEMORY.md",
-      "sha256": "56ddc657fc191840b5e62eaf2fec6cdfab2f1c3a6d224123d2bad2289d48f155"
+      "sha256": "7a453c18bec729d2d4693fe457934af05fb2350a74568df83379cff24a647c8f"
     },
     {
       "bytes": 3012,
@@ -137,9 +140,9 @@
       "sha256": "fcf02ab01e9bb291796a58a263d488b78008188771a025459bf475de23a0237e"
     },
     {
-      "bytes": 12023,
+      "bytes": 14174,
       "path": "architecture/ADAPTIVE_BITRATE.md",
-      "sha256": "cb811a4d4f6feb591e7d41eac7c52b4b77821818771af0d7e27a24e5c5507c10"
+      "sha256": "afd3215f18f29ff82cbdf49d1cb964e49f047306bbcd77c4309c3604c29d98a2"
     },
     {
       "bytes": 9720,
@@ -192,9 +195,9 @@
       "sha256": "d159cccf4315d615d21c7cc2cd7765bcc5be691b5f2ca7ed9f8c4a7b14d593dc"
     },
     {
-      "bytes": 39639,
+      "bytes": 41647,
       "path": "decisions/DECISION_LOG.md",
-      "sha256": "f429464e3c169d89a1a0cacd8e0c7c4f601073d08214d17457212f5fe91b010f"
+      "sha256": "1dc54833d8ebebe2e25a0b55c9f6b91c63c3814f4bc34d3e61242585939a5751"
     },
     {
       "bytes": 1129,
@@ -402,6 +405,11 @@
       "sha256": "b984b7f09f628cfd3796c1d8cffa832dce337c78d356c688a2e8b4f9f6f44df6"
     },
     {
+      "bytes": 3331,
+      "path": "evidence/C3_FIXED_5500_VALIDATED_2026-09-14.md",
+      "sha256": "a57c41ca1047aeb3c7db02da69e0867a0ceab311f497abfadc9634b6ecde11f2"
+    },
+    {
       "bytes": 2830,
       "path": "evidence/C3_FIXED_6000_VALIDATED_2026-09-14.md",
       "sha256": "b688a53daaf138c352b3b7baae6d6c2b2ab635a98bd7407608a37896c3371a34"
@@ -507,9 +515,9 @@
       "sha256": "7cd58c6b7e2b128e36b3a879fa151444790e9d95d9b12ec933f415bec19ef756"
     },
     {
-      "bytes": 14440,
+      "bytes": 16281,
       "path": "handoffs/CURRENT_HANDOFF.md",
-      "sha256": "a539d4e1173a295dac782eac738ebecd8e0205fcf8a5d5706a17b2d3a69e7082"
+      "sha256": "f603f9a108a29d690702c0471500b6cae703060f9db6cc0e30c2c6dacc700989"
     },
     {
       "bytes": 20924,
@@ -527,9 +535,9 @@
       "sha256": "17179b3916be00b216a803bef7f798eaa59c246835ea85543b23929fa5ef18dc"
     },
     {
-      "bytes": 6429,
+      "bytes": 7616,
       "path": "investigations/ACTIVE.md",
-      "sha256": "3ede5751fadb7e7c0cf0e4105f7419a46d12fd886fc237f4d78fd34981014530"
+      "sha256": "b25e21f10a766230ee99f4e5e87ece3808f3b39dab37fca8e5387ef74311494a"
     },
     {
       "bytes": 2659,
@@ -547,9 +555,9 @@
       "sha256": "4b96fdd88999cae8cb4399e23caa7e96f13666624319da5203f6882655b45be8"
     },
     {
-      "bytes": 4992,
+      "bytes": 7888,
       "path": "investigations/C3_FIXED_BITRATE_CHARACTERIZATION.md",
-      "sha256": "bd0264fc4513fe9c2714db4ccde68a4358575dc47c5e19d44552e62e8a29b930"
+      "sha256": "dc81cb1788f3b9e1823432e6f7707e95555a64cc32d46b2492acaa07ce998490"
     },
     {
       "bytes": 2537,
@@ -572,14 +580,14 @@
       "sha256": "0bc6c287c87ba9c90326a6672b923c581a33493b83e38383df521c7c733cff28"
     },
     {
-      "bytes": 14719,
+      "bytes": 16432,
       "path": "memory/2026-09-14.md",
-      "sha256": "38e3001012c10bd8433c8eb9802adb91011c2ff11c9f68358293b56ecaeb3c00"
+      "sha256": "288aebf5a1167d8703ba0c72a018cd7593c739a1721df6ea36eae660318b16b0"
     },
     {
-      "bytes": 35320,
+      "bytes": 36457,
       "path": "patches/PATCH_INDEX.md",
-      "sha256": "871ff0049ba6fb6bfd0ef532dd2e43e1d8ad95c56572d53310640676921bead1"
+      "sha256": "7bfdefa622ae758ca72d153b3ac0db50c3f6ebe39c890f38c76e013475a140e9"
     },
     {
       "bytes": 1894,
@@ -602,9 +610,9 @@
       "sha256": "9b2d03a0a18fe45ea7ee607020d922232e1d15603f9bfb0eccd4e5165088cd12"
     },
     {
-      "bytes": 9943,
+      "bytes": 11196,
       "path": "roadmap/STATUS.md",
-      "sha256": "f660a49842f993674a8951a922f653e03ed0809881323b492a35efdb3268fabe"
+      "sha256": "3e091f20cdeefa510296aa30281588231b22e7cdb23d415f63bf6fc81c6c2486"
     },
     {
       "bytes": 750,

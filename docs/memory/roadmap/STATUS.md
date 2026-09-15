@@ -280,8 +280,46 @@ Current lower-bound bracket:
 **5000–6000 kbps**
 
 Next:
-`C3_FIXED_5500_CHARACTERIZATION` — **NEXT / NOT YET INSTALLED**
+`C3_FIXED_5500_CHARACTERIZATION` — **RUNTIME VALIDATED LOWER CANDIDATE / WINDOWS FLOOR**
 
 Production minimum remains unset. Automatic bitrate control remains
 unimplemented. Audio burst/gap pathology remains deferred to Linux + Home
 Opal.
+
+## C3 fixed 5500 characterization installed
+
+Current bitrate state:
+- 7000 kbps: validated;
+- 6000 kbps: validated;
+- 5000 kbps: runtime tested / not accepted;
+- 5500 kbps: **DEVELOPMENT DIAGNOSTIC INSTALLED / RUNTIME EVIDENCE PENDING**.
+
+Pre-test bracket: **5000–6000 kbps**.
+
+Production minimum remains unset. Automatic bitrate control remains
+unimplemented.
+
+Audio burst/gap pathology remains deferred to Linux + Home Opal and is reported,
+not silently treated as a 5500 failure.
+
+## C3 fixed ladder frozen for Windows controller prototype
+
+Validated fixed levels:
+- 7000 kbps — high/reference;
+- 6000 kbps — medium;
+- 5500 kbps — low/current Windows floor.
+
+Excluded:
+- 5000 kbps — runtime tested / not accepted.
+
+`C3_FIXED_BITRATE_CHARACTERIZATION` — **COMPLETE / WINDOWS RUNTIME VALIDATED**
+
+`C3_ADAPTIVE_BITRATE_CONTROLLER` — **NEXT / NOT YET IMPLEMENTED**
+
+The 5500 final report contains 57 whole-session decoder drops/overflows, while
+the stored 5.5–15.5-second post-cycle telemetry window contains zero drop/overflow
+deltas across 638 rendered frames. Preserve both facts.
+
+Audio burst/gap pathology remains deferred to Linux + Home Opal.
+
+Linux migration must revalidate the actuator/fixed envelope.

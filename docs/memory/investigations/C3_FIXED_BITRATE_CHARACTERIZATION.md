@@ -8,7 +8,7 @@ baseline_commit: 20a1112831f47b0c44104d547123395a89964b8a
 
 ## Status
 
-**ACTIVE / 5000 KBPS NOT ACCEPTED / NEXT 5500 KBPS BRACKET TEST**
+**COMPLETE / 5500 KBPS VALIDATED / WINDOWS FIXED ENVELOPE FROZEN**
 
 ## Question
 
@@ -168,3 +168,87 @@ remain a separate deferred issue.
 
 Current bracket: 5000–6000 kbps.
 Next single candidate: 5500 kbps.
+
+## 5500 kbps midpoint candidate
+
+**Runtime evidence pending.**
+
+Question: is fixed 5500 kbps acceptable at unchanged
+1280x720@60/GOP15/B-frames0/FEC8?
+
+Method:
+- begin from the 7000 reference;
+- perform one loopback-only 7000 -> 5500 video cycle;
+- preserve FEC/audio/controller/game ownership;
+- capture post-cycle C2 telemetry;
+- capture the final Android decoder-session report;
+- retain detailed audio queue/starvation counters without using the separately
+  deferred burst/gap pathology as an automatic failure;
+- require enough focused steady-state play after transition to distinguish
+  startup effects from persistent visual stutter.
+
+Decision boundary:
+- pass -> 5500 becomes a validated candidate and the lower envelope can be
+  reconsidered below/at 5500;
+- fail on steady-state smoothness -> retain 6000 as the lowest validated level
+  and bracket the floor between 5500 and 6000 or stop further descent,
+  depending on severity.
+
+## 5500 kbps runtime result
+
+Classification: **VALIDATED LOWER CANDIDATE / CURRENT WINDOWS FLOOR**
+
+Final result:
+`C3_FIXED_5500_EVIDENCE_CAPTURED_WITH_FINDINGS`
+
+Whole-session measurements:
+- duration 76,085 ms;
+- sequence resyncs 1;
+- SSRC changes 1;
+- packets dropped waiting for IDR 0;
+- resync-to-IDR 44 ms;
+- waiting for IDR at end false;
+- lost video packets 43;
+- FEC recovered packets 5;
+- unrecoverable FEC groups 12;
+- rendered frames 4,088;
+- decoder dropped frames 57;
+- queue-overflow drops 57;
+- max output gap 1,026 ms;
+- max rx-to-decode 1,036 ms;
+- audio lost packets 31;
+- audio write errors 0;
+- audio underruns 247;
+- audio stale drops 1,252;
+- audio concealed underruns 1,372;
+- audio prolonged starvation events 178;
+- controller send errors 0.
+
+Stored post-cycle telemetry samples:
+- elapsed 5,502 ms: rendered +116, dropped +0, overflow +0, queue depth 0;
+- elapsed 7,509 ms: rendered +69, dropped +0, overflow +0, queue depth 0;
+- elapsed 9,514 ms: rendered +112, dropped +0, overflow +0, queue depth 0;
+- elapsed 11,522 ms: rendered +116, dropped +0, overflow +0, queue depth 0;
+- elapsed 13,530 ms: rendered +111, dropped +0, overflow +0, queue depth 0;
+- elapsed 15,536 ms: rendered +114, dropped +0, overflow +0, queue depth 0.
+
+Post-cycle sampled totals:
+- rendered +638;
+- dropped +0;
+- overflow +0.
+
+Focused observation:
+- initial lag remained for a few seconds;
+- it recovered;
+- after recovery the stream ran very nicely / was great.
+
+Interpretation:
+the sampled post-cycle interval is clean and matches the focused steady-state
+observation. The 57 final whole-session drops are preserved but cannot be
+localized by the existing evidence outside that sampled window; do not claim
+they were all startup drops.
+
+Decision:
+accept 5500 as the current Windows C3 lower ladder level. End further
+fixed-floor binary search in this environment and proceed to the adaptive
+controller. Revalidate the fixed envelope on Linux.

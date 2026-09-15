@@ -462,3 +462,19 @@ This index records durable checkpoints and major patch lines; it does not invent
   extended focused play showed definitely more visual stutters than 6000/7000,
   brackets the lower boundary at 5000–6000 kbps, and advances the next single
   test point to 5500 kbps. Runtime characterization source is unchanged.
+
+- `privyhub_c3_fixed_5500_characterization_01_2026-09-14` — development-only C3 fixed-5500 midpoint
+  characterization patch on synchronized checkpoint `0f0f58ef24646a72ff1aa6b769395d8d8dd06a1b`. Extends
+  the existing shared fixed-bitrate actuator target set to 6000/5000/5500,
+  preserves the existing 6000 and 5000 wrappers/routes/tools, adds one
+  loopback-only 5500 wrapper/route and two-stage evidence tool, and updates
+  durable memory to 5500 runtime-evidence-pending. No Android/audio/FEC/
+  controller/automatic-adaptation change.
+
+- `privyhub_c3_fixed_5500_runtime_acceptance_01_2026-09-14` — docs/evidence-only C3 5500-kbps runtime acceptance on
+  the exact post-characterization state from checkpoint `0f0f58ef24646a72ff1aa6b769395d8d8dd06a1b`.
+  Records D-066, validates 5500 as the current Windows lower ladder level,
+  preserves both the 57 whole-session decoder drops/overflows and the six
+  clean post-cycle telemetry intervals, freezes the Windows controller ladder
+  at 5500/6000/7000, excludes 5000, and advances C3 to adaptive bitrate
+  controller implementation. Runtime characterization source is unchanged.

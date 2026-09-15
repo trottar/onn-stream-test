@@ -200,3 +200,44 @@ classified as an encoder-start failure.
 Active next question:
 **Does 5500 kbps recover the smoothness of 6000 while retaining the lower
 bandwidth target?**
+
+## C3 5500 midpoint characterization active
+
+**Active / runtime evidence pending.**
+
+Question:
+Does 5500 kbps recover the smooth steady-state presentation of validated
+6000 while reducing bandwidth below it?
+
+The 5000 run is the failed lower bracket side because focused extended play
+showed definitely more visual stutters.
+
+The known audio burst/gap pathology remains out of scope for automatic bitrate
+rejection. Detailed audio counters remain observational for comparison.
+
+## C3 fixed characterization complete / controller next
+
+Fixed-bitrate characterization is complete for the Windows C3 prototype.
+
+Ladder:
+- 5500;
+- 6000;
+- 7000 kbps.
+
+5000 is excluded.
+
+Next active work:
+**C3 adaptive bitrate controller implementation**.
+
+Policy constraints already accepted:
+- latency/continuity first;
+- fast down / slow up;
+- hysteresis and hold-down;
+- stale/unavailable/resync telemetry freezes decisions;
+- actuator failure disables adaptation until reset/restart;
+- fixed FEC8 until C4;
+- no resolution/FPS adaptation in C3;
+- use fresh interval telemetry, not cumulative whole-session totals as direct
+  decision signals.
+
+Linux later revalidates actuator/fixed-envelope behavior.

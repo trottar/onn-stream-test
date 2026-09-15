@@ -365,3 +365,55 @@ Next test point: 5500 kbps.
 
 The audio burst/gap pathology remains independently deferred and is not part of
 the 5000 rejection criterion.
+
+## 5500 midpoint bracket characterization
+
+The shared fixed-bitrate characterization actuator now exposes loopback-only
+wrappers for:
+- 6000 kbps — validated;
+- 5000 kbps — runtime tested / not accepted;
+- 5500 kbps — runtime evidence pending.
+
+All wrappers use the same internal video-only cycle. No parallel actuator
+implementation is introduced.
+
+The pre-test lower boundary is 5000–6000 kbps. 5500 is the midpoint test.
+
+All candidate cycles retain 1280x720@60, GOP15, B-frames0, FEC8, process audio,
+persistent controller and game lifecycle.
+
+A 5500 pass would make it an evidence-backed candidate; a 5500 smoothness
+failure would move the practical lower boundary upward toward 6000. Production
+minimum and controller policy remain undefined until the fixed envelope is
+resolved.
+
+## D-066 fixed ladder for adaptive controller
+
+The Windows C3 adaptive controller uses three fixed evidence-backed targets:
+
+- 5500 kbps — low;
+- 6000 kbps — medium;
+- 7000 kbps — high/reference.
+
+5000 kbps is excluded from the ladder because focused extended play showed more
+steady-state visual stuttering.
+
+5500 is accepted because focused steady-state gameplay was excellent after a
+short initial transition, and the stored six post-cycle C2 telemetry intervals
+showed zero decoder-drop/overflow deltas across 638 rendered frames.
+
+The final decoder-session report still recorded 57 whole-session
+drop/queue-overflow events. Their timing outside the sampled interval is
+unresolved and must remain visible in evidence. Controller policy must reason
+from fresh interval deltas rather than blindly reacting to cumulative
+whole-session totals.
+
+The controller should treat actuator transitions as a stabilization period:
+freeze further bitrate decisions while telemetry is stale/unavailable or the
+receiver is resynchronizing, and require fresh post-transition evidence before
+another decision. Exact timing/hysteresis remains controller implementation
+work.
+
+This fixed envelope is Windows-runtime validated. Linux backend migration must
+revalidate the actuator and fixed bitrate envelope before these thresholds are
+treated as portable constants.

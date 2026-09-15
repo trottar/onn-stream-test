@@ -822,3 +822,61 @@ Keep 7000 and 6000 as validated candidates. Treat 5000 as the lower failed side
 of the current bracket and test exactly one midpoint candidate next: 5500 kbps.
 
 Do not define the production minimum or automatic bitrate controller yet.
+
+### D-066 — Validate 5500 kbps and freeze the Windows C3 fixed ladder
+
+**Status:** Accepted / Windows runtime validated (2026-09-14)
+
+The fixed 5500-kbps characterization completed at unchanged
+1280x720@60, GOP15, B-frames0 and FEC8.
+
+Final decoder-session evidence:
+- duration 76,085 ms;
+- one expected sequence resync and SSRC change;
+- 44 ms resync-to-IDR;
+- zero packets dropped waiting for IDR;
+- receiver not waiting for IDR at session end;
+- 43 lost video packets;
+- 5 FEC-recovered packets;
+- 12 unrecoverable FEC groups;
+- 4,088 decoder-rendered frames;
+- 57 decoder dropped frames;
+- 57 decoder queue-overflow drops;
+- 1,026 ms max output gap;
+- 1,036 ms max receive-to-decode;
+- zero audio write errors;
+- zero controller send errors.
+
+Follow-up inspection of the already captured post-cycle C2 telemetry found six
+fresh samples from session elapsed 5,502 through 15,536 ms. Across those
+intervals:
+- 638 rendered-frame deltas;
+- zero decoder dropped-frame deltas;
+- zero queue-overflow-drop deltas;
+- queue depth remained zero.
+
+Focused observation: there was still initial lag for a few seconds, then it
+recovered and gameplay ran very well.
+
+The evidence does not timestamp the 57 whole-session drop/overflow events outside
+the sampled post-cycle window. Preserve those totals; do not claim that all
+occurred during startup. The clean sampled post-cycle interval and focused
+steady-state observation are sufficient to accept 5500 for the current Windows
+C3 controller prototype.
+
+Freeze the Windows fixed ladder at:
+- 5500 kbps low;
+- 6000 kbps medium;
+- 7000 kbps high/reference.
+
+Keep 5000 excluded due the previously validated steady-state visual-stutter
+regression.
+
+Stop further fixed-floor binary search in this environment. Proceed to the C3
+adaptive bitrate controller.
+
+The 5500 floor is not a universal backend constant. Linux migration must
+revalidate the actuator and fixed envelope.
+
+The known audio burst/gap pathology remains separately deferred for Linux +
+Home-Opal replay.

@@ -434,3 +434,55 @@ Validated candidates remain 7000 and 6000 kbps.
 
 Current bracket: 5000–6000 kbps.
 Next candidate: **5500 kbps**.
+
+## C3 fixed 5500 characterization runtime step
+
+5500 kbps is installed as the single midpoint bracket test.
+
+Current state:
+- 7000 validated;
+- 6000 validated;
+- 5000 runtime tested / not accepted;
+- bracket 5000–6000.
+
+Runtime:
+1. restart companion;
+2. launch a normal game/native stream at the 7000 reference;
+3. run `python .\tools\probe_c3_fixed_5500_characterization.py`;
+4. play for several focused minutes, including enough steady-state time after
+   the initial transition to judge visual stutter/smoothness;
+5. assess input responsiveness and image quality;
+6. verify audio/controller/Pause/Resume/Save/Load;
+7. End normally;
+8. run `python .\tools\probe_c3_fixed_5500_characterization.py --finalize`;
+9. return `logs/streaming/c3_fixed_5500_characterization.txt` plus focused
+   gameplay/visual observations.
+
+Detailed audio burst/gap counters are included automatically but remain a
+separate deferred issue unless new causal evidence appears.
+
+## C3 5500 accepted / fixed envelope complete
+
+D-066 validates the Windows C3 fixed ladder:
+
+- 7000 kbps validated max;
+- 6000 kbps validated middle;
+- 5500 kbps validated lower/current Windows floor;
+- 5000 kbps not accepted.
+
+5500 focused observation: initial lag for a few seconds, then gameplay ran very
+well.
+
+Important evidence nuance:
+- whole-session decoder totals: 57 drops / 57 queue-overflow drops;
+- six stored post-cycle telemetry intervals, session elapsed 5,502–15,536 ms:
+  638 rendered-frame deltas, 0 dropped-frame deltas, 0 overflow deltas, queue
+  depth 0 throughout.
+
+Do not claim all 57 drops occurred during startup; their location outside the
+sampled window is unresolved.
+
+Audio burst/gap remains deferred to Linux + Home Opal.
+
+Next: C3 adaptive bitrate controller over discrete 5500/6000/7000 levels.
+Linux later revalidates the actuator/fixed envelope.

@@ -13,7 +13,7 @@ from typing import Any, Callable
 SCHEMA = "privyhub_c3_fixed_bitrate_cycle_v1"
 MODE = "fixed_bitrate_characterization"
 REFERENCE_BITRATE_KBPS = 7000
-SUPPORTED_CHARACTERIZATION_BITRATES_KBPS = (6000, 5000)
+SUPPORTED_CHARACTERIZATION_BITRATES_KBPS = (6000, 5000, 5500)
 
 
 def _dict(value: Any) -> dict[str, Any]:
@@ -660,5 +660,16 @@ def run_c3_fixed_bitrate_5000_cycle(
     return _run_c3_fixed_bitrate_cycle(
         manager,
         target_bitrate_kbps=5000,
+        **kwargs,
+    )
+
+def run_c3_fixed_bitrate_5500_cycle(
+    manager: Any,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Run the 5500 kbps characterization actuator cycle."""
+    return _run_c3_fixed_bitrate_cycle(
+        manager,
+        target_bitrate_kbps=5500,
         **kwargs,
     )

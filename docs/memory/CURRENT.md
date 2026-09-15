@@ -401,7 +401,7 @@ controller.
 
 ## C3 fixed-bitrate characterization
 
-**Status:** 5000 KBPS NOT ACCEPTED / 5000–6000 BRACKET / NEXT 5500 KBPS CHARACTERIZATION
+**Status:** 5500 KBPS VALIDATED / FIXED LADDER 5500-6000-7000 / NEXT ADAPTIVE CONTROLLER
 
 The actuator checkpoint is `20a1112831f47b0c44104d547123395a89964b8a`.
 
@@ -533,3 +533,85 @@ The fixed-bitrate floor is now bracketed between 5000 and 6000 kbps.
 
 Next: characterize exactly one midpoint candidate, 5500 kbps. No production
 minimum or automatic controller is defined yet.
+
+## C3 fixed 5500 kbps characterization implementation
+
+**Status:** DEVELOPMENT DIAGNOSTIC INSTALLED / RUNTIME EVIDENCE PENDING
+
+Synchronized predecessor: `0f0f58ef24646a72ff1aa6b769395d8d8dd06a1b`.
+
+Current evidence:
+- 7000 kbps: validated reference/max;
+- 6000 kbps: validated lower candidate;
+- 5000 kbps: runtime tested / not accepted because extended focused play showed
+  definitely more steady-state visual stutters;
+- lower-bound bracket before this test: 5000–6000 kbps.
+
+5500 kbps is the single midpoint candidate. It is not yet a validated ladder
+level or production minimum.
+
+The existing shared fixed-bitrate video-only actuator now accepts 6000, 5000 and
+5500 wrappers. No actuator-body fork was added.
+
+5500 preserves:
+- 1280x720;
+- 60 fps;
+- GOP15;
+- B-frames0;
+- FEC8;
+- process audio;
+- persistent controller;
+- game/emulator lifecycle.
+
+The final 5500 evidence output retains the detailed audio queue/starvation
+counters, but the known burst/gap pathology remains a separate deferred Linux +
+Home-Opal issue and is not an automatic bitrate rejection criterion.
+
+Next evidence: focused 5500 gameplay/visual smoothness observation, normal End,
+and finalized 5500 characterization log.
+
+## C3 5500 kbps runtime acceptance
+
+D-066 validates 5500 kbps as the lowest accepted fixed bitrate in the current
+Windows C3 environment.
+
+Fixed C3 ladder for controller implementation:
+- 7000 kbps: validated reference/max;
+- 6000 kbps: validated middle level;
+- 5500 kbps: validated lower level / current Windows floor;
+- 5000 kbps: runtime tested / not accepted.
+
+5500 runtime evidence:
+- 76,085 ms final decoder session;
+- one expected sequence resync and SSRC change;
+- resync-to-IDR 44 ms;
+- zero packets dropped waiting for IDR;
+- receiver not waiting for IDR at end;
+- 4,088 decoder-rendered frames;
+- 57 whole-session decoder drops and 57 queue-overflow drops;
+- 1,026 ms max output gap;
+- 1,036 ms max receive-to-decode;
+- zero audio write errors;
+- zero controller send errors.
+
+The characterization tool captured six fresh post-cycle telemetry intervals from
+session elapsed 5,502 through 15,536 ms. Across those intervals:
+- 638 rendered frames;
+- zero decoder dropped-frame deltas;
+- zero queue-overflow-drop deltas;
+- decoder queue depth remained zero.
+
+The 57 whole-session decoder drops are retained as unresolved whole-session
+evidence. They are not falsely attributed to the transition or erased. The
+sampled post-cycle window itself was clean, and focused play reported the
+initial lag recovering after a few seconds followed by excellent gameplay.
+
+The known audio burst/gap pathology remains separately deferred to representative
+Linux + Home-Opal replay.
+
+Fixed-bitrate characterization is complete for the Windows C3 controller
+prototype. Do not continue binary-searching below 5500 in this environment.
+
+Next: implement the C3 adaptive bitrate controller over the discrete
+5500/6000/7000 ladder. Linux migration must revalidate the actuator/fixed
+envelope before treating these thresholds as portable constants.
