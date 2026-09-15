@@ -323,3 +323,25 @@ deltas across 638 rendered frames. Preserve both facts.
 Audio burst/gap pathology remains deferred to Linux + Home Opal.
 
 Linux migration must revalidate the actuator/fixed envelope.
+
+## C3 startup stabilization before adaptive controller
+
+`C3_FIXED_BITRATE_CHARACTERIZATION` — **COMPLETE / WINDOWS RUNTIME VALIDATED**
+
+`C3_STARTUP_STABILIZATION_UI` — **DEVELOPMENT / RUNTIME VALIDATION PENDING**
+
+`C3_ADAPTIVE_BITRATE_CONTROLLER` — **QUEUED AFTER STABILIZATION VALIDATION**
+
+Fixed ladder remains 5500/6000/7000; FEC remains fixed at 8.
+
+## C3 startup stabilization accepted
+
+`C3_FIXED_BITRATE_CHARACTERIZATION` — **COMPLETE / WINDOWS RUNTIME VALIDATED**
+
+`C3_STARTUP_STABILIZATION_UI` — **COMPLETE / RUNTIME VALIDATED**
+
+`C3_ADAPTIVE_BITRATE_CONTROLLER` — **NEXT / NOT YET IMPLEMENTED**
+
+Validated fixed ladder remains 5500/6000/7000. FEC remains fixed at 8.
+
+Operational validation rule: restart companion after Python changes.

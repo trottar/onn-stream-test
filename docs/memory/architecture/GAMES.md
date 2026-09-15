@@ -104,3 +104,28 @@ Operator runtime validation also confirmed:
 
 The five missing artwork results are provider/artwork availability gaps, not a
 startup-reconciliation failure.
+
+## Native startup stabilization release boundary
+
+`native-stream-start` now guarantees the active game is paused and starts native
+streaming without resuming gameplay.
+
+`native-stream-ready` validates active native stream + active game and resumes
+the emulator idempotently after Android readiness succeeds.
+
+`native-stream-stop` remains the existing pause-on-exit path.
+
+Back therefore continues to use the validated paused-frame -> MainActivity Game
+Session flow; Save/Load/Resume/End architecture is not replaced.
+
+## Companion restart rule and startup gate validation
+
+The explicit `native-stream-ready` release boundary is runtime validated.
+
+Important process-lifecycle rule: Games plugin Python is loaded into the running
+companion process. Replacing source files does not update the live plugin.
+Restart the companion after Python changes before testing.
+
+A mixed new-APK/old-companion run reproduced predecessor auto-resume behavior
+and a false `Release failed` UI. A companion restart resolved it with unchanged
+installed source.

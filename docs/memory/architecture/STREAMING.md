@@ -158,3 +158,23 @@ The relay has no pacing deadline, so do not invent probe-style pacing lateness.
 Measure real send pressure without changing transport scheduling.
 
 See `architecture/STREAM_TELEMETRY.md` for exact semantics.
+
+## User-facing stream readiness/status surface
+
+Native startup has a full-screen readiness overlay separate from hidden
+engineering telemetry. It shows only basic non-sensitive metadata: title,
+resolution/FPS, bitrate, FEC, video state, audio state and controller state.
+
+A pure Kotlin in-process `GameStreamStatusUi` snapshot/formatter is shared with
+MainActivity's paused Game Session banner. Metadata is not persisted to disk.
+
+No IPs/endpoints/ports/SSRC/sequence values are shown.
+
+## Startup stabilization runtime result
+
+The metadata-rich startup stabilization overlay and readiness release boundary
+are accepted for the current Windows + onn path. The user reported successful
+release and no initial gameplay lag after the companion process was restarted.
+
+This remains a readiness gate, not a playback buffer; no intentional
+steady-state latency is added.

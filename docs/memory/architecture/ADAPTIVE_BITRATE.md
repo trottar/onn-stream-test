@@ -417,3 +417,34 @@ work.
 This fixed envelope is Windows-runtime validated. Linux backend migration must
 revalidate the actuator and fixed bitrate envelope before these thresholds are
 treated as portable constants.
+
+## Startup/resume readiness boundary — D-067
+
+Adaptive bitrate policy operates only after gameplay readiness.
+
+Startup states:
+`LAUNCHING -> STABILIZING -> READY -> PLAYING`.
+
+Freeze automatic adaptation during STABILIZING or PAUSED. Static paused-scene
+telemetry is not representative gameplay evidence. Future bitrate transitions
+must also receive fresh post-transition telemetry before another decision.
+
+D-067 does not enable automatic adaptation; it establishes the lifecycle/status
+boundary first.
+
+## Startup readiness boundary runtime validated — D-068
+
+D-067's startup readiness boundary is runtime validated on the current Windows +
+onn environment.
+
+The gate successfully hid the known initial gameplay lag after a clean
+companion restart.
+
+Controller implementation may now rely on:
+`LAUNCHING -> STABILIZING -> READY -> PLAYING`
+
+Adaptation remains frozen during STABILIZING/PAUSED and is still not
+implemented.
+
+Operational prerequisite: if companion Python changes, restart the companion
+before validating policy/actuator behavior.

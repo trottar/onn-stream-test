@@ -486,3 +486,40 @@ Audio burst/gap remains deferred to Linux + Home Opal.
 
 Next: C3 adaptive bitrate controller over discrete 5500/6000/7000 levels.
 Linux later revalidates the actuator/fixed envelope.
+
+## C3 startup stabilization runtime validation
+
+D-067 development patch is the gate before adaptive bitrate control.
+
+Expected:
+1. game launches paused;
+2. fullscreen native stream shows `Stabilizing game…`;
+3. overlay includes title, 720p60, bitrate, FEC, video/audio/controller;
+4. gameplay input does not leak while stabilizing;
+5. after clean readiness, game resumes automatically and overlay disappears;
+6. Back returns to existing paused Game Session UI;
+7. paused Game Session shows the same compact stream metadata;
+8. Resume/Save/Load/End still work.
+
+Fail closed: if readiness times out/errors, game remains paused and Back returns
+to Game Session.
+
+Automatic bitrate switching remains off.
+
+## D-067 startup stabilization validated
+
+Runtime result after companion restart:
+- stabilization GUI appeared;
+- release succeeded;
+- gameplay worked well;
+- no initial lag was observed.
+
+The first failure was a stale-process artifact: new APK + old running companion.
+RetroArch logs proved PAUSED then old-code resume behavior. Restarting companion
+loaded the installed Python and fixed the issue without another patch.
+
+Operational rule: restart companion after companion Python changes before
+runtime validation.
+
+Next: checkpoint D-067/D-068 and proceed to C3 adaptive bitrate controller over
+5500/6000/7000.

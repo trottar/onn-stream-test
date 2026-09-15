@@ -3112,11 +3112,23 @@ class GamesPlugin:
                 raise RuntimeError("Launch a game before starting Native Video Alpha.")
             port = self._parse_int(self._first(query, "port"), NativeStreamManager.DEFAULT_PORT)
             try:
+                if not game_status.get("paused", False):
+                    try:
+                        game_status = self._emulator.pause()
+                    except EmulatorError as exc:
+                        raise RuntimeError(
+                            f"Unable to pause game for stream stabilization: {exc}"
+                        ) from exc
+
+                    if not game_status.get("paused", False):
+                        raise RuntimeError(
+                            "Game did not remain paused for stream stabilization."
+                        )
+
                 payload = self._native_stream.start(client_ip=client_ip, port=port)
-                if game_status.get("paused", False):
-                    resumed = self._emulator.resume()
-                    payload["game_session"] = resumed
-                    payload["paused"] = False
+                payload["game_session"] = game_status
+                payload["paused"] = True
+                payload["stabilization_required"] = True
                 return payload
             except NativeStreamError as exc:
                 raise RuntimeError(str(exc)) from exc
@@ -3126,6 +3138,40 @@ class GamesPlugin:
                 except Exception:
                     pass
                 raise RuntimeError(f"Native stream started but game resume failed: {exc}") from exc
+
+        if action == "native-stream-ready":
+            stream_status = self._native_stream.status()
+            if not stream_status.get("active", False):
+                raise RuntimeError(
+                    "Native stream is not active; gameplay remains paused."
+                )
+
+            game_status = self._emulator.status()
+            if not game_status.get("active", False):
+                raise RuntimeError(
+                    "Game session is not active."
+                )
+
+            if game_status.get("paused", False):
+                try:
+                    game_status = self._emulator.resume()
+                except EmulatorError as exc:
+                    raise RuntimeError(
+                        f"Unable to release stabilized gameplay: {exc}"
+                    ) from exc
+
+            if game_status.get("paused", False):
+                raise RuntimeError(
+                    "Game remained paused after stabilization release."
+                )
+
+            return {
+                "ready": True,
+                "released": True,
+                "paused": False,
+                "game_session": game_status,
+                "native_stream": stream_status,
+            }
 
         if action == "native-stream-stop":
             game_status = self._emulator.status()

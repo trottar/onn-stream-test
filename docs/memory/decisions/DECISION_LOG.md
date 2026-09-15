@@ -880,3 +880,69 @@ revalidate the actuator and fixed envelope.
 
 The known audio burst/gap pathology remains separately deferred for Linux +
 Home-Opal replay.
+
+### D-067 — Gate native gameplay behind evidence-driven startup stabilization
+
+**Status:** Development implementation / runtime validation pending (2026-09-14)
+
+Before automatic bitrate adaptation is enabled, use the existing paused game
+launch as the native stream startup stabilization boundary.
+
+`native-stream-start` must leave gameplay paused. Android starts the native
+video/audio/controller pipeline and displays a full-screen `Stabilizing game…`
+surface with compact, non-sensitive stream metadata. Gameplay is released only
+after consecutive clean local receiver/decoder readiness checks.
+
+Initial development criteria are six clean 500-ms checks with active host
+metadata, receiver/decoder availability, no IDR wait, advancing rendered frames,
+zero new decoder drops/queue-overflow drops, zero queue depth, recent FPS >=45,
+output gap <=120 ms, receive-to-decode <=150 ms, and active host
+audio/controller paths.
+
+A 15-second ceiling fails closed and leaves the game paused. This is a startup
+gate, not a playback buffer, and introduces no intentional steady-state video
+latency.
+
+Back keeps the validated paused-frame exit lifecycle. MainActivity reuses the
+same compact in-process stream status snapshot/formatter in the existing paused
+Game Session banner.
+
+Automatic bitrate switching remains disabled. Future adaptation is frozen while
+STABILIZING or PAUSED and must require fresh post-transition evidence.
+
+### D-068 — Accept startup stabilization and require companion restart after Python changes
+
+**Status:** Accepted / runtime validated (2026-09-14)
+
+D-067 startup stabilization is accepted for the current Windows + onn runtime.
+
+Observed result after a clean companion restart:
+- the stabilization GUI appeared;
+- the game remained behind the startup readiness gate;
+- release completed successfully;
+- gameplay then ran normally;
+- the previously observed initial startup lag was not present.
+
+A prior failed attempt is preserved as a lifecycle/validation lesson. The new
+Android APK was installed while an older companion Python process was still
+running. Existing RetroArch lifecycle evidence showed a real PAUSED state
+followed by a later PLAYING/resume transition matching the predecessor
+`native-stream-start` behavior. The new APK then attempted the new
+`native-stream-ready` action against the stale companion process and displayed
+`Release failed`.
+
+After restarting the companion, the same installed D-067 code worked correctly
+without another source change.
+
+Durable operational rule:
+**when companion Python changes, restart the companion process before judging
+runtime behavior.** Python source installation does not hot-reload the running
+service.
+
+This validation accepts the startup stabilization boundary and unblocks C3
+adaptive bitrate controller work over the already validated
+5500/6000/7000-kbps ladder.
+
+The paused Game Session metadata surface is implemented by D-067 but is not
+promoted here beyond the user's broad successful-run report as a separately
+instrumented validation point.

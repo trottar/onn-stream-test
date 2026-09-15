@@ -478,3 +478,17 @@ This index records durable checkpoints and major patch lines; it does not invent
   clean post-cycle telemetry intervals, freezes the Windows controller ladder
   at 5500/6000/7000, excludes 5000, and advances C3 to adaptive bitrate
   controller implementation. Runtime characterization source is unchanged.
+
+- `privyhub_c3_startup_stabilization_ui_01_2026-09-14` — C3 startup stabilization + shared
+  stream-status UI development patch on synchronized checkpoint
+  `b2f752223d0bd7617a7f7ef75c9618202d2372fa`. Keeps game paused during native startup, adds explicit
+  ready/release action, evidence-driven Android overlay/readiness, gameplay
+  input gating, and shared compact metadata in existing paused Game Session UI.
+  Does not enable automatic bitrate switching. Runtime validation required.
+
+- `privyhub_c3_startup_stabilization_runtime_acceptance_01_2026-09-14` — docs/evidence-only D-068 runtime
+  acceptance for D-067 on checkpoint `b2f752223d0bd7617a7f7ef75c9618202d2372fa` plus the exact installed
+  D-067 development working tree. Records successful stabilization/release with
+  no initial lag after companion restart, preserves the stale-companion
+  mixed-version diagnosis, and promotes companion restart after Python changes
+  to a durable runtime-validation rule. Production source bytes unchanged.

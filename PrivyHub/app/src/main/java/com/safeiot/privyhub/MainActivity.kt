@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
 
 import com.safeiot.privyhub.streaming.NativeStreamActivity
+import com.safeiot.privyhub.streaming.GameStreamStatusUi
 import com.safeiot.privyhub.diagnostics.DiagnosticsActivity
 
 import android.os.Bundle
@@ -13182,6 +13183,32 @@ private fun requestGameStateAction(
     }
 
 
+    private fun gameSessionStreamStatusText():
+        String {
+
+        val sessionPhase =
+            if (
+                gameSessionPaused
+            ) {
+                "PAUSED"
+            } else {
+                "RUNNING"
+            }
+
+        val snapshot =
+            GameStreamStatusUi.latestFor(
+                gameSessionTitle
+            )
+                ?: return sessionPhase
+
+        return sessionPhase +
+            "\n" +
+            GameStreamStatusUi.compactMetadata(
+                snapshot
+            )
+    }
+
+
     private fun showGameSessionBannerUi() {
 
         showNowPlaying()
@@ -13191,11 +13218,7 @@ private fun requestGameStateAction(
                 ?: "Game"
 
         nowPlayingProgress.text =
-            if (gameSessionPaused) {
-                "PAUSED"
-            } else {
-                "RUNNING"
-            }
+            gameSessionStreamStatusText()
 
         playerView.visibility =
             View.GONE

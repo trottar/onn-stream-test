@@ -241,3 +241,24 @@ Policy constraints already accepted:
   decision signals.
 
 Linux later revalidates actuator/fixed-envelope behavior.
+
+## C3 startup stabilization active
+
+**Active / development / runtime validation pending.**
+
+Validate startup gate + shared pause metadata before implementing automatic
+bitrate decisions.
+
+Audio burst/gap remains deferred to Linux + Home Opal.
+
+## C3 startup stabilization validated / adaptive controller next
+
+`C3_STARTUP_STABILIZATION_UI` is runtime validated.
+
+Next active development:
+**C3 adaptive bitrate controller** over 5500/6000/7000.
+
+Before controller runtime tests, restart the companion after any Python-side
+patch.
+
+Audio burst/gap remains deferred to Linux + Home Opal.

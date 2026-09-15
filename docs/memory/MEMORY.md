@@ -631,3 +631,47 @@ The known audio burst/gap pathology remains separately deferred to Linux + Home
 Opal.
 
 Automatic bitrate control is still not implemented.
+
+## Startup stabilization and shared game stream status — D-067
+
+Use the existing paused emulator launch as an evidence-driven native-stream
+startup gate, not as a playback buffer.
+
+Rules:
+- `native-stream-start` keeps gameplay paused;
+- Android explicitly calls `native-stream-ready` only after local readiness;
+- readiness uses consecutive clean receiver/decoder evidence, not fixed sleep;
+- timeout/error leaves game paused;
+- gameplay controller input is blocked while stabilizing except Back;
+- startup UI shows game title, resolution/FPS, bitrate, FEC and
+  video/audio/controller state;
+- no network address, endpoint, port, SSRC or packet identifier is exposed;
+- Back preserves the validated paused-frame exit;
+- MainActivity reuses the same in-process status snapshot in Game Session UI;
+- automatic adaptation is frozen while stabilizing/paused and is not enabled by
+  this patch.
+
+Initial development thresholds: six clean 500-ms checks, recent FPS >=45,
+output gap <=120 ms, rx-to-decode <=150 ms, zero queue depth, no new
+drop/overflow counters, and a 15-second fail-closed ceiling.
+
+## Companion restart requirement for Python runtime validation — D-068
+
+When companion Python source changes, the running companion service must be
+restarted before runtime validation. Installing new `.py` bytes does not
+hot-reload the existing Python process.
+
+A stale companion can create false mixed-version failures: the Android APK may
+exercise new client behavior while the old Python process still implements old
+plugin actions/lifecycle.
+
+This was proven during D-067 validation:
+- RetroArch really entered PAUSED;
+- stale predecessor `native-stream-start` later resumed it;
+- the new Android client attempted `native-stream-ready`;
+- the stale companion did not provide the new contract;
+- UI reported release failure;
+- restarting the companion fixed the same installed source.
+
+D-067 startup stabilization is runtime validated after restart, and the user
+reported no initial gameplay lag.

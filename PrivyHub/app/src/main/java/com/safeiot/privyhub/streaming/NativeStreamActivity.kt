@@ -69,10 +69,22 @@ class NativeStreamActivity :
         private const val CLIENT_HEALTH_INTERVAL_NS =
             CLIENT_HEALTH_INTERVAL_MS *
                 1_000_000L
+
+        private const val STABILIZATION_CLEAN_TICKS =
+            6
+        private const val STABILIZATION_TIMEOUT_MS =
+            15_000L
+        private const val STABILIZATION_MIN_FPS =
+            45.0
+        private const val STABILIZATION_MAX_OUTPUT_GAP_MS =
+            120L
+        private const val STABILIZATION_MAX_RX_DECODE_MS =
+            150L
     }
 
     private lateinit var surfaceView: SurfaceView
     private lateinit var statusView: TextView
+    private lateinit var stabilizationOverlay: TextView
 
     private val uiHandler =
         Handler(
@@ -212,6 +224,40 @@ class NativeStreamActivity :
     private var backExitInProgress =
         false
 
+    @Volatile
+    private var gameplayReleased =
+        false
+
+    @Volatile
+    private var stabilizationFailed =
+        false
+
+    @Volatile
+    private var releaseRequestInFlight =
+        false
+
+    @Volatile
+    private var stabilizationPhase =
+        "Launching"
+
+    private var stabilizationStartedAtNs =
+        0L
+
+    private var stabilizationBaselineSet =
+        false
+
+    private var stabilizationCleanTicks =
+        0
+
+    private var stabilizationLastRendered =
+        0L
+
+    private var stabilizationLastDropped =
+        0L
+
+    private var stabilizationLastOverflow =
+        0L
+
     private val metricsTick =
         object : Runnable {
             override fun run() {
@@ -303,6 +349,39 @@ class NativeStreamActivity :
         root.addView(
             statusView,
             statusLayout
+        )
+
+        stabilizationOverlay =
+            TextView(
+                this
+            ).apply {
+                setTextColor(
+                    Color.WHITE
+                )
+                setBackgroundColor(
+                    Color.BLACK
+                )
+                textSize = 18f
+                gravity =
+                    Gravity.CENTER
+                setPadding(
+                    48,
+                    32,
+                    48,
+                    32
+                )
+                text =
+                    "Stabilizing game…\nPreparing smooth playback"
+                visibility =
+                    View.VISIBLE
+            }
+
+        root.addView(
+            stabilizationOverlay,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
         )
 
         setContentView(
@@ -414,6 +493,28 @@ class NativeStreamActivity :
             0
         backExitInProgress =
             false
+        gameplayReleased =
+            false
+        stabilizationFailed =
+            false
+        releaseRequestInFlight =
+            false
+        stabilizationPhase =
+            "Launching"
+        stabilizationStartedAtNs =
+            System.nanoTime()
+        stabilizationBaselineSet =
+            false
+        stabilizationCleanTicks =
+            0
+        stabilizationLastRendered =
+            0L
+        stabilizationLastDropped =
+            0L
+        stabilizationLastOverflow =
+            0L
+        stabilizationOverlay.visibility =
+            View.VISIBLE
         hostMetadataComplete = false
         hostMetadataError = ""
         sessionStartedAtNs =
@@ -1585,6 +1686,419 @@ class NativeStreamActivity :
     }
 
 
+    private fun currentGameTitle():
+        String {
+
+        return intent.getStringExtra(
+            EXTRA_GAME_TITLE
+        )
+            ?.trim()
+            ?.ifBlank {
+                "Game"
+            }
+            ?: "Game"
+    }
+
+
+    private fun hostAudioReady():
+        Boolean {
+
+        return hostAudioState.startsWith(
+            "Audio host: process"
+        )
+    }
+
+
+    private fun hostControllerReady():
+        Boolean {
+
+        return hostInputState.startsWith(
+            "Controller host: UDP"
+        )
+    }
+
+
+    private fun publishStreamStatus(
+        phase: String =
+            stabilizationPhase
+    ) {
+        val rtp =
+            receiver?.snapshot()
+
+        val videoState =
+            when {
+                rtp == null ->
+                    "Connecting"
+
+                rtp.waitingForIdr ->
+                    "Synchronizing"
+
+                decoder == null ->
+                    "Starting decoder"
+
+                gameplayReleased ->
+                    "Stable"
+
+                else ->
+                    "Checking stability"
+            }
+
+        GameStreamStatusUi.publish(
+            GameStreamStatusSnapshot(
+                gameTitle =
+                    currentGameTitle(),
+                phase =
+                    phase,
+                width =
+                    VIDEO_WIDTH,
+                height =
+                    VIDEO_HEIGHT,
+                fps =
+                    VIDEO_FPS,
+                bitrateKbps =
+                    hostVideoBitrateKbps,
+                fecEnabled =
+                    hostFecEnabled,
+                fecGroupSize =
+                    hostFecGroupSize,
+                videoState =
+                    videoState,
+                audioActive =
+                    hostAudioReady(),
+                controllerActive =
+                    hostControllerReady(),
+                updatedAtMs =
+                    System.currentTimeMillis()
+            )
+        )
+    }
+
+
+    private fun updateStabilizationOverlay() {
+
+        if (
+            gameplayReleased
+        ) {
+            stabilizationOverlay.visibility =
+                View.GONE
+            return
+        }
+
+        val snapshot =
+            GameStreamStatusUi.latestFor(
+                currentGameTitle()
+            )
+
+        stabilizationOverlay.visibility =
+            View.VISIBLE
+
+        stabilizationOverlay.text =
+            buildString {
+                append(
+                    if (
+                        stabilizationFailed
+                    ) {
+                        "Game stream isn't ready"
+                    } else {
+                        "Stabilizing game…"
+                    }
+                )
+                append(
+                    "\nPreparing smooth playback"
+                )
+                append(
+                    "\n\n${currentGameTitle()}"
+                )
+
+                if (
+                    snapshot != null
+                ) {
+                    append(
+                        "\n\n" +
+                            GameStreamStatusUi.compactMetadata(
+                                snapshot
+                            )
+                    )
+                }
+
+                append(
+                    "\n\nStream: $stabilizationPhase"
+                )
+
+                if (
+                    stabilizationFailed
+                ) {
+                    append(
+                        "\n\nPress Back to return to Game Session."
+                    )
+                }
+            }
+    }
+
+
+    private fun failStabilization(
+        reason: String
+    ) {
+        stabilizationFailed =
+            true
+        releaseRequestInFlight =
+            false
+        stabilizationCleanTicks =
+            0
+        stabilizationPhase =
+            reason
+        publishStreamStatus()
+        updateStabilizationOverlay()
+    }
+
+
+    private fun requestGameplayRelease() {
+
+        if (
+            gameplayReleased ||
+            stabilizationFailed ||
+            releaseRequestInFlight
+        ) {
+            return
+        }
+
+        val host =
+            intent.getStringExtra(
+                EXTRA_COMPANION_HOST
+            )
+                ?.trim()
+                .orEmpty()
+
+        if (
+            host.isBlank()
+        ) {
+            failStabilization(
+                "Companion unavailable"
+            )
+            return
+        }
+
+        releaseRequestInFlight =
+            true
+        stabilizationPhase =
+            "Ready"
+        publishStreamStatus()
+        updateStabilizationOverlay()
+
+        thread(
+            start = true,
+            isDaemon = true,
+            name = "PrivyHub-Native-Ready"
+        ) {
+            try {
+                val response =
+                    httpPost(
+                        "http://$host:$CONTROL_PORT" +
+                            "/plugins/games/native-stream-ready",
+                        readTimeoutMs =
+                            10_000
+                    )
+
+                val json =
+                    JSONObject(
+                        response
+                    )
+
+                if (
+                    !json.optBoolean(
+                        "released",
+                        false
+                    )
+                ) {
+                    throw IllegalStateException(
+                        "Gameplay release was not confirmed"
+                    )
+                }
+
+                runOnUiThread {
+                    releaseRequestInFlight =
+                        false
+                    gameplayReleased =
+                        true
+                    stabilizationPhase =
+                        "Playing"
+                    streamState =
+                        "Playing"
+                    publishStreamStatus()
+                    updateStabilizationOverlay()
+                }
+
+            } catch (_: Exception) {
+                runOnUiThread {
+                    failStabilization(
+                        "Release failed — game remains paused"
+                    )
+                }
+            }
+        }
+    }
+
+
+    private fun updateStabilization(
+        nowNs: Long
+    ) {
+
+        if (
+            gameplayReleased ||
+            stabilizationFailed
+        ) {
+            publishStreamStatus()
+            updateStabilizationOverlay()
+            return
+        }
+
+        val elapsedMs =
+            if (
+                stabilizationStartedAtNs >
+                0L
+            ) {
+                (
+                    nowNs -
+                        stabilizationStartedAtNs
+                ).coerceAtLeast(
+                    0L
+                ) /
+                    1_000_000L
+            } else {
+                0L
+            }
+
+        if (
+            elapsedMs >=
+            STABILIZATION_TIMEOUT_MS
+        ) {
+            failStabilization(
+                "Stability timeout — game remains paused"
+            )
+            return
+        }
+
+        val rtp =
+            receiver?.snapshot()
+
+        val dec =
+            decoder?.snapshot()
+
+        val waitingPhase =
+            when {
+                !hostMetadataComplete ->
+                    "Starting encoder"
+
+                rtp == null ->
+                    "Connecting receiver"
+
+                dec == null ->
+                    "Starting decoder"
+
+                rtp.waitingForIdr ->
+                    "Synchronizing video"
+
+                !hostAudioReady() ->
+                    "Starting audio"
+
+                !hostControllerReady() ->
+                    "Connecting controller"
+
+                else ->
+                    ""
+            }
+
+        if (
+            waitingPhase.isNotEmpty()
+        ) {
+            stabilizationPhase =
+                waitingPhase
+            stabilizationCleanTicks =
+                0
+            stabilizationBaselineSet =
+                false
+            publishStreamStatus()
+            updateStabilizationOverlay()
+            return
+        }
+
+        val currentRendered =
+            dec!!.renderedFrames
+
+        val currentDropped =
+            dec.droppedFrames
+
+        val currentOverflow =
+            dec.queueOverflowDrops
+
+        if (
+            !stabilizationBaselineSet
+        ) {
+            stabilizationBaselineSet =
+                true
+            stabilizationLastRendered =
+                currentRendered
+            stabilizationLastDropped =
+                currentDropped
+            stabilizationLastOverflow =
+                currentOverflow
+            stabilizationCleanTicks =
+                0
+            stabilizationPhase =
+                "Checking stability"
+            publishStreamStatus()
+            updateStabilizationOverlay()
+            return
+        }
+
+        val clean =
+            currentRendered >
+                stabilizationLastRendered &&
+                currentDropped ==
+                    stabilizationLastDropped &&
+                currentOverflow ==
+                    stabilizationLastOverflow &&
+                dec.queueDepth ==
+                    0 &&
+                recentVideoFps >=
+                    STABILIZATION_MIN_FPS &&
+                dec.latestOutputGapMs <=
+                    STABILIZATION_MAX_OUTPUT_GAP_MS &&
+                dec.latestReceiveToDecodeMs <=
+                    STABILIZATION_MAX_RX_DECODE_MS
+
+        stabilizationLastRendered =
+            currentRendered
+        stabilizationLastDropped =
+            currentDropped
+        stabilizationLastOverflow =
+            currentOverflow
+
+        stabilizationCleanTicks =
+            if (
+                clean
+            ) {
+                stabilizationCleanTicks +
+                    1
+            } else {
+                0
+            }
+
+        stabilizationPhase =
+            "Checking stability"
+
+        publishStreamStatus()
+        updateStabilizationOverlay()
+
+        if (
+            stabilizationCleanTicks >=
+            STABILIZATION_CLEAN_TICKS
+        ) {
+            requestGameplayRelease()
+        }
+    }
+
+
     private fun updateMetrics() {
         val rtp =
             receiver?.snapshot()
@@ -1641,6 +2155,10 @@ class NativeStreamActivity :
         }
 
         maybeSendClientHealth(
+            nowNs
+        )
+
+        updateStabilization(
             nowNs
         )
 
@@ -1968,6 +2486,12 @@ class NativeStreamActivity :
 
     private fun capturePausedFrameAndFinish() {
 
+        stabilizationPhase =
+            "Paused"
+        publishStreamStatus(
+            phase = "Paused"
+        )
+
         if (backExitInProgress) {
             return
         }
@@ -2102,6 +2626,12 @@ class NativeStreamActivity :
         }
 
         if (
+            !gameplayReleased
+        ) {
+            return true
+        }
+
+        if (
             controllerSender?.handleKeyEvent(
                 event
             ) ==
@@ -2118,6 +2648,12 @@ class NativeStreamActivity :
     override fun dispatchGenericMotionEvent(
         event: MotionEvent
     ): Boolean {
+        if (
+            !gameplayReleased
+        ) {
+            return true
+        }
+
         if (
             controllerSender?.handleMotionEvent(
                 event

@@ -615,3 +615,40 @@ prototype. Do not continue binary-searching below 5500 in this environment.
 Next: implement the C3 adaptive bitrate controller over the discrete
 5500/6000/7000 ladder. Linux migration must revalidate the actuator/fixed
 envelope before treating these thresholds as portable constants.
+
+## C3 startup stabilization foundation — D-067
+
+**Status:** DEVELOPMENT PATCH / RUNTIME VALIDATION PENDING
+
+Authoritative predecessor: `b2f752223d0bd7617a7f7ef75c9618202d2372fa`.
+
+Before automatic bitrate control, native startup now uses the existing paused
+game as a readiness gate. Android shows `Stabilizing game…` plus basic stream
+metadata and releases gameplay only after six consecutive clean 500-ms local
+checks. A 15-second ceiling fails closed. Back retains the existing paused-frame
+lifecycle and MainActivity reuses the same compact status model.
+
+Windows ladder remains 5500/6000/7000; 5000 remains excluded. Automatic bitrate
+switching remains disabled.
+
+Next: runtime validate D-067 before controller implementation.
+
+## C3 startup stabilization runtime validation — D-068
+
+**Status:** RUNTIME VALIDATED / STARTUP LAG HIDDEN
+
+After a clean companion restart, D-067 worked as designed: stabilization GUI
+appeared, release succeeded, gameplay ran normally, and the previously observed
+initial lag was not present.
+
+The earlier `Release failed` result was caused by stale companion Python, not by
+the installed D-067 source. RetroArch lifecycle evidence showed real PAUSED then
+PLAYING/resume behavior matching the old running Games plugin. Restarting the
+companion loaded the new `native-stream-ready` contract and resolved the issue
+without another source change.
+
+Durable rule: after companion Python changes, restart the companion before
+runtime judgment.
+
+Next: checkpoint D-067/D-068, then continue C3 adaptive bitrate controller work
+over 5500/6000/7000.
