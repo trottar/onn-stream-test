@@ -1,28 +1,55 @@
 ---
 memory_schema: 1
-as_of: 2026-09-11
-baseline_commit: db59209578fc628fc602e707f5f7cd9091949edc
+as_of: 2026-09-15
+baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 ---
 
-# Deferred Investigations
+# Deferred / Paused Investigations
 
-## UDP transport pathology
+<!-- PRIVYHUB_MEMORY_NORMALIZATION_D083_2026_09_15 -->
 
-Severe burst/gap timing transformation and duplication was observed in both directions in the Prototype 1 environment. Application-level sender/capture evidence and Android-local loopback did not support blaming the normal production application path. Preserve the diagnostics. After Phase D establishes the representative native Linux baseline, replay the acceptance suite during Phase E Linux resource/transport characterization unless a real blocker appears earlier.
+## Linux + home Opal + onn UDP transport root cause
+
+**Status:** PAUSED AFTER D083 CLOSEOUT
+
+The old Prototype-1 pathology was successfully replayed on the representative
+Linux path and reproduced bidirectionally while idle. Therefore it is no longer
+valid to describe this as merely an old Windows/test-environment issue.
+
+Established:
+
+- severe burst/gap transformation and same-stamp duplication occur without game
+  load in both directions;
+- a Linux-only sender implementation cannot explain it;
+- standard Opal `wlan0`, `wlan1`, and `br-lan` tcpdump/AF_PACKET observation
+  points were zero-record during confirmed traffic;
+- disabling exposed OpenWrt software/hardware flow-offload flags did not repair
+  the transport or capture visibility;
+- proprietary Siflower networking components remain in the unresolved region;
+- D083/D083R1 are invalid as networking evidence;
+- D082 is the last valid router-boundary measurement.
+
+Do not continue open-ended router/vendor reverse engineering. Reopen only when:
+
+1. a single bounded measurement would change a product/roadmap decision; or
+2. the preserved synthetic suite can be run on a different representative
+   network/router path.
+
+Production bitrate/FEC/decoder thresholds must not be tuned to hide this
+unresolved environment/path behavior.
 
 ## Game Session banner latency
 
-A multi-second appearance delay was observed during prior testing. It is UI-lifecycle polish, not a current blocker. Do not perturb stable session/audio/controller lifecycle without a dedicated latency diagnostic.
+A prior multi-second appearance delay is UI-lifecycle polish, not a current
+blocker. Do not perturb stable game/audio/controller lifecycle without a
+focused diagnostic.
 
 ## BPS/UPS/XDelta mod specifics
 
-Supported through the current path but not individually promoted into new investigations unless an actual mod/runtime failure is observed.
+Supported through the existing path but not separately promoted unless a real
+mod/runtime failure is observed.
 
 ## Full clean-machine Windows bootstrap
 
-Current runtime includes ignored/local dependencies. Defer comprehensive clean-machine Windows reproducibility unless it becomes necessary sooner. Linux functional parity belongs to Phase D; representative Linux resource characterization belongs to Phase E.
-
-## Roadmap-v3 normalization note
-
-Part 3 updates phase references only. These investigations remain deferred; no
-deferred work is reactivated by this documentation change.
+Comprehensive Windows clean-machine reproducibility is deferred. Linux normal-
+use parity is Phase D and representative Linux sizing belongs to Phase E.

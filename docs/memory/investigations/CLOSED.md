@@ -1,56 +1,43 @@
 ---
 memory_schema: 1
-as_of: 2026-09-11
-baseline_commit: db59209578fc628fc602e707f5f7cd9091949edc
+as_of: 2026-09-15
+baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 ---
 
 # Closed Investigations
 
-## A4 audio/host lifecycle
+<!-- PRIVYHUB_MEMORY_NORMALIZATION_D083_2026_09_15 -->
 
-Runtime validated: TV game audio works, local duplicate audio is suppressed, controlled shutdown restores session state, and plugin shutdown reuses the normal Games stop path. Do not reopen absent regression evidence.
+## Stable closed work
 
-## A8 mapping assignment boundary
+Do not reopen absent fresh contradictory evidence:
 
-Resolved: physical controller semantics remain canonical through PHI1/ViGEm; A8 session mapping applies later in RetroArch bindings. Controller preflight ordering was corrected so XInput devices exist before RetroArch initializes.
+- A4 game-audio/host lifecycle recovery and coexistence;
+- A8 mapping assignment boundary and P1-P4 profile/editor behavior;
+- A6 transient artwork disappearance;
+- cheat/mod namespace isolation;
+- Phase A A9 regression/checkpoint and PS1 Port-1-only multitap validation;
+- NES/Genesis A9 no-fixture identity issue;
+- wireless ADB recovery/stale-cache correction;
+- Phase B health/client-feedback/classifier/Diagnostics/Self-Test/support-bundle/
+  retention work;
+- Sunshine/Moonlight active-edge, artifact, and device-package removal;
+- B5/B6 native-only regression and clean-native checkpoint;
+- C1 inventory and C1.1 static profile extraction;
+- C2 telemetry implementation/runtime validation;
+- Windows fixed-bitrate characterization;
+- Windows bidirectional restart-actuator characterization.
 
-## A6 artwork transient
+Exact older chronology is preserved in Git and `history/`.
 
-A temporary cover-art disappearance after repeated APK reinstall activity repopulated without persistent regression. Do not touch artwork unless repeatable in normal launches.
+## D083 router netdev-counter branch
 
-## Cheat/mod isolation
+**Status:** CLOSED AS INVALID DIAGNOSTIC BRANCH
 
-Resolved and runtime validated: normal save/state namespaces are protected; cheat/mod profiles use isolated namespaces; deterministic IPS derived content is verified.
+D083 and D083R1 did not produce valid networking measurements. The first run had
+insufficient samples and a false-success wrapper; the revision relied on
+`nohup`, unavailable on the router. A smoke classifier also contradicted raw
+mount evidence.
 
-## Part 3 normalization — resolved work migrated from ACTIVE
-
-The pre-Part-3 `ACTIVE.md` contained accumulated investigation chronology from
-completed Phase A and Phase B work. Its exact bytes are preserved at:
-
-`docs/memory/history/ACTIVE_INVESTIGATIONS_SUPERSEDED_THROUGH_2026-09-11.md`
-
-The following work is closed and must not be treated as active unless fresh
-contradictory evidence appears:
-
-- Phase A A9 regression/checkpoint;
-- PS1 library-wide manual Port-1-only Multitap On/Off generalization and CTR
-  validation;
-- NES/Genesis A9 identity issue, closed as invalid no-fixture test setup;
-- persistent wireless ADB recovery and post-patch validation;
-- Phase B B1.1-B1.13 diagnostics/health/client-feedback/classifier/GUI/retention
-  work;
-- B1/B2 completion-gap and source-context audits;
-- B2 Diagnostics action-feedback polish;
-- B3/B3.1 Sunshine/Moonlight dependency inventory and active-edge trace;
-- B4.1-B4.8 server/Android legacy-edge removal, orphan audit, code cleanup,
-  physical artifact cleanup, device package verification/removal and final
-  package-state verification;
-- B5 native-only regression and classifier correction;
-- B6 clean-native repository audit/checkpoint;
-- C1.1 explicit stream-parameter inventory.
-
-C1.1 completed with `C1_INVENTORY_COMPLETE`. The next technical work is schema
-design, not another inventory run.
-
-Historical intermediate states, including development-patch/runtime-pending
-labels that were true at the time, remain reference history only.
+The underlying UDP root cause is not closed; it is **paused/deferred** in
+`DEFERRED.md`. D082 remains the last valid router-boundary evidence.

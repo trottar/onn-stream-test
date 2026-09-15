@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-15
-status: active
+status: paused
 ---
 
 # Linux -> onn UDP Egress Investigation
@@ -448,3 +448,12 @@ Do not continue by default into Siflower reverse engineering. Re-entry requires
 a bounded hypothesis whose result changes a product/roadmap decision.
 
 <!-- PRIVYHUB_D083_CLOSEOUT_INVALID_DIAGNOSTICS_2026_09_15:INVESTIGATION:END -->
+
+<!-- PRIVYHUB_MEMORY_NORMALIZATION_D083_2026_09_15:INVESTIGATION -->
+## Current disposition after D083 closeout
+
+**Status: PAUSED.** The representative transport pathology is established, but
+the Opal/Siflower vendor-specific root-cause branch is not the default next task.
+D082 is the last valid router-boundary evidence. Re-entry requires either one
+bounded measurement that changes a product/roadmap decision or a different
+representative network/router environment.

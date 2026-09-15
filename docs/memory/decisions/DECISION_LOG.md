@@ -1103,3 +1103,101 @@ Do not silently skip remaining Phase C work, and do not proceed directly from D
 to E until the Phase C remainder has been explicitly dispositioned on Linux.
 
 No runtime behavior changes in this sequencing update.
+
+### D-073 — Establish the Linux host baseline while preserving validated control surfaces
+
+**Status:** Accepted / host baseline validated (2026-09-15)
+
+Use Debian/Renoir as the Linux reference prototype. Preserve `EmulatorManager`,
+PHI1/PHA1/client contracts, and normal game lifecycle while replacing only
+platform-specific capture/audio/controller/runtime seams. Project-owned
+RetroArch 1.22.2 and required Linux cores are validated; exact-window X11
+capture, VAAPI H.264, PulseAudio isolation, uinput, and real SNES lifecycle are
+proven at the host boundary.
+
+### D-074 — Use exact managed X11 window capture plus VAAPI for Linux native video
+
+**Status:** Accepted / host runtime validated (2026-09-15)
+
+Linux native video uses the manager-owned RetroArch PID to identify the exact
+mapped X11 window, captures it with FFmpeg `x11grab`, encodes H.264 through
+VAAPI, and preserves the existing RTP/FEC Android contract. Do not build a
+Linux WGC-equivalent raw-frame bridge.
+
+### D-075 — Use PulseAudio process isolation; require thread-local RT pacing under load
+
+**Status:** Accepted / D-075R1 authoritative (2026-09-15)
+
+Route the owned RetroArch sink-input to a temporary dedicated PulseAudio sink and
+capture its monitor while preserving PHA1. Under active RetroArch, the sender
+thread must verify `SCHED_RR` priority 1 before emission. Fail the Linux audio
+subpath if that policy cannot be obtained; do not grant broad `CAP_SYS_NICE` to
+Python.
+
+### D-076 — Preserve PHI1 and use Linux uinput with project-owned RetroArch autoconfig
+
+**Status:** Accepted / host managed runtime validated through D-076R2 (2026-09-15)
+
+Linux converts canonical PHI1/XUSB state to four uinput pads. All pads exist
+before RetroArch input initialization. Managed Linux session config rewrites the
+portable autoconfig directory to the validated absolute project-owned path.
+D-076R2 closes the missing-`sys` defect; raw runtime evidence validates P1-P4,
+Pause/Resume, Save/Load, graceful End, and cleanup.
+
+### D-077 — Select trusted RetroArch runtime/cores by host platform
+
+**Status:** Accepted / normal-path host validated (2026-09-15)
+
+Keep the Windows descriptor as the base mapping and apply trusted Linux runtime,
+core-directory, and core-name overrides before readiness/core resolution/launch.
+Malformed selected-platform overrides fail closed.
+
+### D-078 — Remove the PowerShell requirement from normal Linux media-server startup
+
+**Status:** Accepted / host startup validated (2026-09-15)
+
+Windows retains `scripts/start_server.ps1`; non-Windows hosts launch the existing
+Python `companion/range_server.py` under the same managed lifecycle.
+
+### D-079 — Treat integrated Linux runtime/capture success and transport failure as separate boundaries
+
+**Status:** Accepted diagnostic disposition (2026-09-15)
+
+Integrated PS1 launch, prior-save load, controller preflight, exact X11 window
+discovery, and near-60-fps VAAPI encode prove the emulator/capture path works.
+The Linux/onn stabilization failure is a transport problem. The Android
+auto-open dependency on Windows-only `host_window_policy.window_found` is a
+separate confirmed compatibility bug.
+
+### D-080 — Router-boundary classifiers must fail closed without actual packet coverage
+
+**Status:** Accepted diagnostic rule (2026-09-15)
+
+Do not describe a router boundary as clean when the capture has zero matching
+traffic. The Opal radio captures were genuine 24-byte/zero-record PCAPs during
+confirmed endpoint traffic.
+
+### D-081 — Do not use exposed OpenWrt flow-offload flags as the transport workaround
+
+**Status:** Accepted falsification (2026-09-15)
+
+Temporarily disabling software and hardware flow-offload flags did not repair the
+UDP pathology and did not restore per-radio capture visibility. Exact prior state
+was restored. Do not productize acceleration-off.
+
+### D-082 — Ordinary Opal AF_PACKET observation points are blind to the confirmed WLAN path
+
+**Status:** Accepted boundary evidence (2026-09-15)
+
+`wlan0`, `wlan1`, and `br-lan` tcpdump captures were zero-record while endpoint
+UTP1 traffic and duplication were confirmed. This establishes capture blindness,
+not the identity of the duplicating component.
+
+### D-083 — Close the invalid netdev-counter branch and stop open-ended router reverse engineering
+
+**Status:** Accepted closeout (2026-09-15)
+
+D083/D083R1 are invalid as networking evidence. D082 is the last valid router
+result. Pause the Opal/Siflower root-cause branch. Re-enter only for one bounded
+measurement that changes a product/roadmap decision or on a different
+representative network/router environment.

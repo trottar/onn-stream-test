@@ -543,3 +543,10 @@ This index records durable checkpoints and major patch lines; it does not invent
 | D-077 Linux platform-aware RetroArch runtime selection | 2026-09-15 | Normal product-path runtime selector: preserve Windows base descriptor, select validated Linux AppImage/cores through an effective config; installer requires fixture + live normal-path readiness validation; onn E2E pending. |
 
 - `D-078_LINUX_COMPANION_MEDIA_SERVER_STARTUP.md` — platform-aware companion media-server launch; Linux direct Python range server, Windows PowerShell path preserved; host startup seam validated, onn E2E pending.
+
+- `MEMORY_NORMALIZATION_2026-09-15` — durable-memory-only normalization after
+  Phase-D Linux migration and D083 closeout. Replaces stale current/handoff/
+  active/roadmap summaries, updates deferred/closed/chat ledgers, marks the
+  Linux UDP investigation paused, adds D073-D083 central decision summaries,
+  updates the 2026-09-15 dated log, and regenerates the memory manifest. Runtime
+  behavior intentionally unchanged.
