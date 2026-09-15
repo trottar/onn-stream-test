@@ -212,3 +212,28 @@ Decision: D-062.
 
 Keep bitrate unchanged at 7000 kbps and test one prospective video-only actuator
 cycle before automatic adaptation or a production minimum bitrate is defined.
+
+## C3 actuator continuity diagnostic state
+
+`C3_ACTUATOR_CONTINUITY_PROBE` — **RUNTIME VALIDATED / INITIAL ACTUATOR
+STRATEGY ACCEPTED / CHECKPOINT PENDING**
+
+The probe is companion-only and holds bitrate at 7000 kbps. Android remains
+unchanged.
+
+Next: capture runtime evidence plus manual picture/audio/controller/
+Pause/Resume/Save/Load/End behavior, then choose the actuator boundary.
+
+## C3 actuator accepted
+
+`video_only_restart` — **ACCEPTED INITIAL C3 STRATEGY / WINDOWS RUNTIME
+VALIDATED / LINUX REVALIDATION REQUIRED**
+
+No production minimum bitrate or adaptive controller exists yet.
+
+### Next
+
+`C3_FIXED_BITRATE_CHARACTERIZATION`
+
+Characterize lower fixed bitrates while preserving 1280x720@60, GOP15,
+B-frames0 and FEC8. Only evidence-backed levels may enter the production ladder.

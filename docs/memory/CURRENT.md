@@ -345,3 +345,56 @@ Keep bitrate at 7000 kbps and measure one prospective video-only actuator cycle
 before changing bitrate or implementing automatic adaptation.
 
 Do not add a guessed production minimum bitrate yet.
+
+## C3 actuator continuity diagnostic implementation
+
+**Status:** RUNTIME VALIDATED / INITIAL ACTUATOR STRATEGY ACCEPTED / CHECKPOINT PENDING
+
+The first C3 actuator probe is companion-only and keeps the reference bitrate at
+7000 kbps.
+
+It adds a loopback-only diagnostic action that restarts only the WGC capture and
+FFmpeg encoder while intentionally preserving:
+- the existing FEC relay;
+- process audio;
+- persistent controller;
+- RetroArch/game lifecycle.
+
+The probe tool captures pre/post `privyhub_stream_telemetry_v1` and consumes the
+existing Android decoder-session report after normal End. No Android change or
+new telemetry sampler is required.
+
+This is not production adaptation. No minimum bitrate, bitrate ladder,
+controller, hysteresis or adaptive FEC is implemented.
+
+Runtime result is required before choosing restart-based actuation.
+
+## C3 actuator acceptance
+
+D-063 accepts backend-neutral `video_only_restart` as the initial C3 bitrate
+actuator strategy.
+
+Windows runtime validation used the current WGC + FFmpeg/NVENC video pair while
+FEC, process audio, persistent controller and the RetroArch/game session
+remained alive.
+
+The receiver recorded one sequence resync and one SSRC change, reacquired IDR in
+17 ms, dropped zero packets while waiting for IDR, and ended with
+`waiting_for_idr=false`. Decoder rendered 2,131 frames with zero decoder drops
+and zero queue-overflow drops. Audio/controller error counters remained zero.
+
+The session recorded a 791 ms maximum output gap and 800 ms maximum
+receive-to-decode time. These measurements are retained; the transition is not
+classified as mathematically seamless.
+
+Focused play for several minutes felt normal. Possible slight stutter could not
+be distinguished from existing occasional baseline stutter. No clear freeze,
+black frame, audio interruption or controller stall was observed.
+
+Linux is not runtime validated. Phase E must implement the same backend-neutral
+video-only actuator boundary using the selected Linux capture/encoder backend
+and rerun equivalent continuity validation.
+
+**Next:** fixed-bitrate characterization. Establish validated lower bitrate
+levels before adding a production minimum, bitrate ladder or automatic
+controller.

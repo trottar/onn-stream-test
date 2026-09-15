@@ -702,3 +702,37 @@ only validated levels become the bounded production ladder.
 
 Every later automatic decision must expose an explicit state, reason code and
 supporting measurements. C4 adaptive FEC remains separate.
+
+### D-063 — Use backend-neutral video-only restart as the initial C3 bitrate actuator
+
+**Status:** Accepted / Windows runtime validated / Linux revalidation required (2026-09-14)
+
+The C3 actuator continuity probe demonstrated that the video-producing path can
+be replaced while FEC, process audio, persistent controller and the
+RetroArch/game session remain owned by their existing stable lifecycles.
+
+The Windows validation used WGC capture plus FFmpeg/NVENC at the unchanged
+7000 kbps reference rate. The receiver recorded one sequence resync and one
+SSRC change, reacquired IDR in 17 ms, dropped zero packets while waiting for
+IDR, rendered 2,131 frames with zero decoder drops/queue-overflow drops, and
+ended with no audio-write or controller-send errors.
+
+The same session measured a 791 ms maximum output gap and 800 ms maximum
+receive-to-decode time. Focused play for several minutes felt normal; possible
+slight stutter could not be distinguished from existing occasional baseline
+stutter, and no clear freeze, black frame, audio interruption or controller
+stall was observed. Do not describe the transition as provably seamless.
+
+Accept `video_only_restart` as a backend-neutral actuator **strategy** for the
+initial C3 implementation. Do not encode WGC as the portable abstraction.
+Windows maps the actuator to WGC + FFmpeg/NVENC. Linux must map the same
+controller-facing actuator boundary to its selected capture/encoder backend and
+rerun equivalent continuity validation during migration.
+
+If a future backend cannot preserve the required lifecycle/continuity boundary,
+that backend may use true live encoder reconfiguration without changing the C3
+controller policy.
+
+Proceed next to fixed-bitrate characterization. Do not define a production
+minimum bitrate or automatic bitrate controller until lower fixed levels are
+measured and accepted.

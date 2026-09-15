@@ -8,7 +8,7 @@ baseline_commit: da03bb59cee9f7e9cf8bdfcc91dc1f52454beff0
 
 ## Status
 
-**ACTIVE / DIAGNOSTIC REQUIRED**
+**CLOSED / RUNTIME VALIDATED / INITIAL ACTUATOR STRATEGY ACCEPTED**
 
 ## Question
 
@@ -39,3 +39,47 @@ live-reconfigure encoder actuator.
 ## Privacy
 
 Do not log or request network addresses.
+
+## Installed diagnostic
+
+Development probe surfaces:
+- `companion/diagnostics/c3_actuator_probe.py`;
+- `NativeStreamManager.diagnostic_c3_actuator_continuity_cycle()`;
+- loopback-only Games POST action `c3-actuator-continuity-cycle`;
+- `tools/probe_c3_actuator_continuity.py`.
+
+The cycle keeps bitrate at 7000 kbps and does not modify FEC settings.
+
+Acceptance remains evidence-based. The probe intentionally reports interruption
+and recovery measurements without hard-coding an acceptable millisecond
+threshold.
+
+## Runtime result and closure
+
+Result: `C3_ACTUATOR_CONTINUITY_EVIDENCE_CAPTURED`, problems none.
+
+Key evidence:
+- sequence resyncs: 1;
+- SSRC changes: 1;
+- packets dropped waiting for IDR: 0;
+- resync-to-IDR: 17 ms;
+- waiting for IDR at end: false;
+- decoder rendered frames: 2,131;
+- decoder drops: 0;
+- queue-overflow drops: 0;
+- max output gap: 791 ms;
+- max receive-to-decode: 800 ms;
+- audio write errors: 0;
+- controller send errors: 0.
+
+Whole-session loss/FEC totals are not attributed entirely to the actuator
+cycle.
+
+Focused UX observation: several minutes of play felt normal. Possible slight
+stutter was not distinguishable from the existing occasional baseline stutter;
+no clear freeze, black frame, audio interruption or controller stall was
+observed.
+
+Decision: close actuator-feasibility investigation. Use backend-neutral
+`video_only_restart` for initial C3. Linux equivalent requires future runtime
+revalidation.

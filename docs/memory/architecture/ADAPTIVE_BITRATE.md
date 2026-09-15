@@ -227,3 +227,57 @@ hold-down. If it is not, move to true live encoder reconfiguration.
 
 C3 does not change resolution, frame rate, GOP/B-frames, FEC group size, WAN
 routing, source identity, audio/controller architecture, or C4 adaptive FEC.
+
+## C3 actuator continuity probe implementation
+
+**Status:** RUNTIME VALIDATED / `video_only_restart` ACCEPTED FOR INITIAL C3
+
+The first actuator candidate is a same-bitrate video-only cycle:
+- stop old FFmpeg then old WGC capture;
+- leave FEC relay running;
+- leave process audio running;
+- leave persistent controller running;
+- launch replacement WGC capture against the same managed RetroArch HWND;
+- launch replacement FFmpeg at the unchanged 7000 kbps reference settings;
+- measure host time until FEC observes RTP again.
+
+The diagnostic action is loopback-only.
+
+The Android production app is unchanged. Existing decoder-session reporting
+already supplies SSRC/resync/IDR, decoder output-gap, audio and controller
+evidence after normal End.
+
+No threshold for acceptable interruption is encoded in the probe. Raw
+measurements and manual gameplay behavior decide whether restart-based actuation
+is viable.
+
+## Accepted actuator portability boundary
+
+D-063 accepts `video_only_restart` as the initial C3 actuator **strategy**, not
+WGC as a cross-platform implementation.
+
+Controller-facing contract:
+
+```text
+adaptive bitrate controller
+        |
+        v
+backend-neutral video actuator
+        |
+        +-- Windows: WGC + FFmpeg/NVENC video-only restart
+        |
+        `-- Linux: selected Linux capture + encoder video-only restart
+```
+
+The stable boundary is:
+- replace/reconfigure only video-producing processes;
+- keep FEC/transport ownership alive where the backend permits;
+- keep process audio alive;
+- keep controller alive;
+- keep emulator/game-session lifecycle alive;
+- require receiver IDR/resync recovery;
+- expose raw interruption/recovery measurements.
+
+Linux migration acceptance must rerun this continuity test. If the Linux
+backend cannot meet the same lifecycle boundary, revisit live encoder
+reconfiguration there without changing the controller policy.

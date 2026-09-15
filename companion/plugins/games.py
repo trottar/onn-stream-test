@@ -3022,6 +3022,27 @@ class GamesPlugin:
 
             return payload
 
+        if action == "c3-actuator-continuity-cycle":
+            # Development diagnostic: never expose a remotely triggerable
+            # encoder-cycle primitive. The probe tool calls only from loopback.
+            if client_ip not in {
+                "127.0.0.1",
+                "::1",
+            }:
+                raise RuntimeError(
+                    "C3 actuator continuity diagnostic is loopback-only"
+                )
+
+            try:
+                return (
+                    self._native_stream
+                    .diagnostic_c3_actuator_continuity_cycle()
+                )
+            except NativeStreamError as exc:
+                raise RuntimeError(
+                    str(exc)
+                ) from exc
+
         if action == "native-stream-start":
             game_status = self._emulator.status()
             if not game_status.get("active", False):

@@ -436,3 +436,39 @@ D-062:
 - C4 adaptive FEC remains separate.
 
 Next technical step: `C3_ACTUATOR_CONTINUITY_PROBE`.
+
+## C3 actuator diagnostic implementation state
+
+`C3_ACTUATOR_CONTINUITY_PROBE` is **RUNTIME VALIDATED** and the
+backend-neutral `video_only_restart` strategy is accepted for the initial C3
+implementation path. The installed Windows probe remains development
+infrastructure until checkpointed and incorporated into the production actuator.
+
+The diagnostic:
+- stays at 7000 kbps;
+- cycles WGC capture + FFmpeg only;
+- keeps FEC/audio/controller ownership alive;
+- is loopback-triggered only;
+- reuses C2 telemetry and the existing Android decoder-session report;
+- adds no Android sampler or adaptive controller.
+
+Do not choose `video_only_restart` versus `live_bitrate_reconfigure` until the
+runtime evidence and manual gameplay regression are reviewed.
+
+## C3 actuator acceptance rule
+
+D-063:
+- accept backend-neutral `video_only_restart` for the initial C3 actuator;
+- Windows implementation/runtime evidence is WGC + FFmpeg/NVENC;
+- preserve FEC, process audio, persistent controller and game-session ownership
+  across a video actuator cycle;
+- do not claim the Windows implementation itself is Linux-portable;
+- Linux must provide an equivalent backend-specific video actuator and rerun
+  continuity validation;
+- retain the measured 791 ms max output gap / 800 ms max receive-to-decode
+  evidence;
+- focused play showed no clear restart-specific disruption, while possible
+  slight stutter remained indistinguishable from occasional baseline stutter;
+- do not add a minimum bitrate or automatic controller yet.
+
+Next: fixed-bitrate characterization.

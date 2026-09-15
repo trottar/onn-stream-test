@@ -410,3 +410,18 @@ This index records durable checkpoints and major patch lines; it does not invent
   checkpoint `da03bb59cee9f7e9cf8bdfcc91dc1f52454beff0`. Adds D-062, adaptive-bitrate architecture, and
   the active actuator-feasibility investigation. Production/runtime behavior is
   unchanged.
+
+- `privyhub_c3_actuator_continuity_probe_01_2026-09-14` — C3 diagnostic-only development patch on synchronized
+  checkpoint `f7962f667dfcbd80425db0d0ed8bff0e3c44ec4c`. Adds a loopback-only unchanged-7000
+  capture+encoder cycle, keeps FEC/audio/controller ownership intact, and adds a
+  two-stage evidence tool using C2 telemetry plus the existing Android
+  decoder-session report. No adaptive controller, bitrate ladder, FEC change or
+  Android change. **Runtime validated 2026-09-14; `video_only_restart` accepted
+  as the initial backend-neutral C3 actuator strategy.**
+
+- `privyhub_c3_actuator_runtime_acceptance_02_2026-09-14` — docs/evidence-only runtime acceptance update on exact
+  post-probe state at checkpoint `f7962f667dfcbd80425db0d0ed8bff0e3c44ec4c`. Records D-063, closes the
+  actuator-feasibility investigation, accepts backend-neutral
+  `video_only_restart` for initial C3, records Windows-only runtime validation
+  and Linux revalidation requirement, and advances C3 to fixed-bitrate
+  characterization. Production diagnostic source bytes are unchanged.

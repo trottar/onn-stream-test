@@ -310,3 +310,37 @@ Next diagnostic: `C3_ACTUATOR_CONTINUITY_PROBE`.
 Keep 7000 kbps and determine whether a narrow video-only actuator cycle can
 preserve audio/controller/game lifecycle and recover Android IDR/render
 continuity acceptably.
+
+## C3 actuator continuity runtime step
+
+`C3_ACTUATOR_CONTINUITY_PROBE` — **RUNTIME VALIDATED / INITIAL ACTUATOR
+STRATEGY ACCEPTED / CHECKPOINT PENDING**
+
+Companion-only diagnostic. No Android rebuild is required.
+
+Runtime order:
+1. restart companion;
+2. launch a normal game/native stream;
+3. run `python .\tools\probe_c3_actuator_continuity.py`;
+4. verify process audio, controller, Pause/Resume, Save/Load;
+5. End normally so Android writes the decoder-session report;
+6. run `python .\tools\probe_c3_actuator_continuity.py --finalize`;
+7. review `logs/streaming/c3_actuator_continuity_probe.txt`.
+
+Do not checkpoint this development diagnostic as an accepted actuator until the
+evidence is reviewed.
+
+## C3 actuator accepted state
+
+D-063 accepts `video_only_restart` as the initial backend-neutral C3 actuator
+strategy.
+
+Windows runtime validation passed using WGC + FFmpeg/NVENC. The exact Windows
+implementation is not the Linux architecture; Linux must map the same actuator
+boundary to its selected capture/encoder backend and rerun the continuity test.
+
+Evidence:
+`docs/memory/evidence/C3_VIDEO_ONLY_RESTART_RUNTIME_VALIDATED_2026-09-14.md`
+
+Next development step after checkpoint:
+**C3 fixed-bitrate characterization**.

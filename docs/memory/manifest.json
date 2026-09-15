@@ -19,8 +19,8 @@
   "b4_status": "COMPLETE / runtime validated",
   "b5_status": "COMPLETE / runtime validated",
   "b6_status": "COMPLETE / checkpointed / pushed",
-  "baseline_commit": "da03bb59cee9f7e9cf8bdfcc91dc1f52454beff0",
-  "baseline_short": "da03bb59",
+  "baseline_commit": "f7962f667dfcbd80425db0d0ed8bff0e3c44ec4c",
+  "baseline_short": "f7962f66",
   "c1_design_memory_checkpoint": "CHECKPOINTED / PUSHED",
   "c1_design_status": "COMPLETE / CHECKPOINTED / PUSHED / C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA",
   "c1_implementation_status": "RUNTIME VALIDATED / CHECKPOINTED / PUSHED",
@@ -44,11 +44,15 @@
   "c2_implementation_status": "COMPLETE / RUNTIME VALIDATED / CHECKPOINTED / PUSHED",
   "c2_inventory_status": "COMPLETE / CHECKPOINTED / PUSHED",
   "c2_next_step": "C3_ACTUATOR_CONTINUITY_PROBE",
-  "c3_actuator_status": "DIAGNOSTIC REQUIRED",
+  "c3_actuator_status": "VIDEO_ONLY_RESTART ACCEPTED / WINDOWS RUNTIME VALIDATED / LINUX REVALIDATION REQUIRED",
+  "c3_actuator_strategy": "video_only_restart",
+  "c3_characterization_status": "NEXT / NOT STARTED",
   "c3_controller_status": "NOT IMPLEMENTED",
-  "c3_design_status": "C3.1 SOURCE/POLICY AUDIT COMPLETE",
+  "c3_design_status": "C3.1 SOURCE/POLICY AUDIT COMPLETE / CHECKPOINTED / PUSHED",
+  "c3_linux_actuator_status": "NOT RUNTIME VALIDATED / EQUIVALENT BACKEND REQUIRED",
   "c3_min_bitrate_status": "UNSET / CHARACTERIZATION REQUIRED",
   "c3_reference_max_bitrate_kbps": 7000,
+  "c3_windows_actuator_backend": "wgc_ffmpeg_nvenc",
   "checkpoint_parent_commit": "a6dbf627dd32af7da975bf01a679350810026ca3",
   "checkpoint_scope": "Part 1 current-state repair + completed C1 inventory memory/probe",
   "classifier_changed": false,
@@ -57,8 +61,8 @@
   "client_health_storage": "latest only plus one delta baseline",
   "companion_behavior_changed": true,
   "current_phase": "Phase C",
-  "current_step": "C3 actuator continuity diagnostic",
-  "decision_id_state": "unique durable IDs through D-062",
+  "current_step": "C3 fixed-bitrate characterization",
+  "decision_id_state": "unique durable IDs through D-063",
   "decoder_classifier_runtime_validated": true,
   "decoder_stale_policy": "informational unless decoder-local failure exists",
   "deep_memory_history": "docs/memory/history/",
@@ -81,9 +85,9 @@
       "sha256": "2f3c393d42bf1629909e77cdecb9196befaf1b47141656f18ba4bfb2feaad930"
     },
     {
-      "bytes": 11974,
+      "bytes": 14199,
       "path": "CURRENT.md",
-      "sha256": "8b091c5be8c6d84b342050d3b0b05acb2e3499f8942367cee7da16c9780cd53d"
+      "sha256": "403f3ca4337f8da6e389956fdc055c7341261f5841f2cdfb95a67b0166d62c5f"
     },
     {
       "bytes": 2564,
@@ -91,9 +95,9 @@
       "sha256": "7957a58cd59456684c568bc85d8fe39c22d130b58ddaf9d9d636f7b063fa9698"
     },
     {
-      "bytes": 16176,
+      "bytes": 17732,
       "path": "MEMORY.md",
-      "sha256": "4477a88f679f80a5a0422682e7328e702656ae743cbee196de802ffd172c7e85"
+      "sha256": "9a82694ebca49c339ee341d9979d36e03886506be2a43c73c425af830784d5df"
     },
     {
       "bytes": 3012,
@@ -116,9 +120,9 @@
       "sha256": "fcf02ab01e9bb291796a58a263d488b78008188771a025459bf475de23a0237e"
     },
     {
-      "bytes": 7162,
+      "bytes": 9045,
       "path": "architecture/ADAPTIVE_BITRATE.md",
-      "sha256": "c22ea4b8f355e1b80cb6be8769296e657b04f170d3eb6ce2a197c7d282bd41bc"
+      "sha256": "727d5c231911053f0abc3bc7c252516145f50d2c18dcd2239d04878342a6ac48"
     },
     {
       "bytes": 9720,
@@ -171,9 +175,9 @@
       "sha256": "d159cccf4315d615d21c7cc2cd7765bcc5be691b5f2ca7ed9f8c4a7b14d593dc"
     },
     {
-      "bytes": 34518,
+      "bytes": 36378,
       "path": "decisions/DECISION_LOG.md",
-      "sha256": "b5ab9ad14e0c26fd38d4abe376d1565544a04222da6398f6ff6bda4aee03406b"
+      "sha256": "6d96dfbb4a80a648c6026212c34eb950dc2dddd4064920245c9ab116d2c2a041"
     },
     {
       "bytes": 1129,
@@ -376,6 +380,11 @@
       "sha256": "035d86d54e1dc50ef0c26a080ff1c3c608df3c8e271f8bea4d850142338386a9"
     },
     {
+      "bytes": 2614,
+      "path": "evidence/C3_VIDEO_ONLY_RESTART_RUNTIME_VALIDATED_2026-09-14.md",
+      "sha256": "2279101e0dd34a8631ad1168cc347007f4b40d6f563f989354f6afad9ce93c01"
+    },
+    {
       "bytes": 1212,
       "path": "evidence/FOUR_PLAYER_ANDROID_ASSIGNMENT_RUNTIME_2026-09-10.md",
       "sha256": "c22b6cba5cb459f09273b9203da39c6f9a1683c7a417c95f7fd08468f60322d8"
@@ -471,9 +480,9 @@
       "sha256": "7cd58c6b7e2b128e36b3a879fa151444790e9d95d9b12ec933f415bec19ef756"
     },
     {
-      "bytes": 10077,
+      "bytes": 11309,
       "path": "handoffs/CURRENT_HANDOFF.md",
-      "sha256": "5842a1f49a9d3d3b82d19ad28f46d907d4cf24690b5b29aebb4d15cd035ca5f7"
+      "sha256": "22281508654cf9b18b5e770b80f331813f8f747ff433b262172696f7eb305cd6"
     },
     {
       "bytes": 20924,
@@ -506,9 +515,9 @@
       "sha256": "f523c870dedc6a886078ba6a94b1fc54e3a2f4936264e382e9738ab9338e06f3"
     },
     {
-      "bytes": 1135,
+      "bytes": 2616,
       "path": "investigations/C3_BITRATE_ACTUATOR.md",
-      "sha256": "6c8203f99a649e03a632f3ce58ceed8d8f627908a84bb3aa233c28f508102c68"
+      "sha256": "4b96fdd88999cae8cb4399e23caa7e96f13666624319da5203f6882655b45be8"
     },
     {
       "bytes": 2537,
@@ -531,14 +540,14 @@
       "sha256": "0bc6c287c87ba9c90326a6672b923c581a33493b83e38383df521c7c733cff28"
     },
     {
-      "bytes": 9659,
+      "bytes": 11259,
       "path": "memory/2026-09-14.md",
-      "sha256": "42a268a10b80ca1b342c34810a59230a803a216401d56944c8c4b22d64d0f3f1"
+      "sha256": "8f3ade168a8f9d7553c998db0ccf0125885a1b7a21206aad08e4bdb8141cf11a"
     },
     {
-      "bytes": 31555,
+      "bytes": 32633,
       "path": "patches/PATCH_INDEX.md",
-      "sha256": "21b84d2071a098d7cf3cdfc8913eddd20cb772e7f7bb43231d5e820f5956b8c1"
+      "sha256": "cf7bdde6c05eb96fcc3f5e05b8644659f28cd202427fc2e0efefba55071fd1db"
     },
     {
       "bytes": 1894,
@@ -561,9 +570,9 @@
       "sha256": "9b2d03a0a18fe45ea7ee607020d922232e1d15603f9bfb0eccd4e5165088cd12"
     },
     {
-      "bytes": 7804,
+      "bytes": 8602,
       "path": "roadmap/STATUS.md",
-      "sha256": "75dfcb9fd2b7579ad65df2f41102260bb6bf57c4d7663690da958a772041bebc"
+      "sha256": "432e4ff1a25fe7d1688e1d88c093e4df76d741429300ab9ef6e22fb04fc71a5e"
     },
     {
       "bytes": 750,
@@ -607,7 +616,7 @@
   "phase_c_status": "ACTIVE",
   "physical_legacy_groups_deleted": 9,
   "predecessor": "C1 stream parameter inventory",
-  "production_behavior_changed": false,
+  "production_behavior_changed": true,
   "ps1_multitap_status": "complete / runtime validated on Crash Bash and CTR; Port 1 only",
   "remote_architecture_checkpoint": "CHECKPOINTED / PUSHED",
   "remote_architecture_decision": "D-059 ACCEPTED / CHECKPOINTED / PUSHED",

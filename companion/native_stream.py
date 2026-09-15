@@ -1306,6 +1306,27 @@ class NativeStreamManager:
 
             return payload
 
+    def diagnostic_c3_actuator_continuity_cycle(
+        self,
+    ) -> dict[str, Any]:
+        """Run one same-bitrate video-only actuator continuity diagnostic."""
+        from diagnostics.c3_actuator_probe import (
+            run_c3_actuator_continuity_cycle,
+        )
+
+        with self._lock:
+            try:
+                return run_c3_actuator_continuity_cycle(
+                    self
+                )
+            except NativeStreamError:
+                raise
+            except Exception as exc:
+                raise NativeStreamError(
+                    "C3 actuator continuity diagnostic failed: "
+                    + type(exc).__name__
+                ) from exc
+
     def stop(self) -> dict[str, Any]:
         with self._lock:
             self._stop_locked()
