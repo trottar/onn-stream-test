@@ -544,3 +544,257 @@ existing RTP/FEC relay.
 
 Android, audio, controller, FEC format, and emulator lifecycle were unchanged.
 Full onn/Android E2E remains a later integration validation boundary.
+
+## Managed RetroArch PID to isolated PulseAudio route
+
+Baseline 32 launched real SNES content through EmulatorManager and resolved the
+managed RetroArch PID to its PulseAudio playback stream.
+
+Observed:
+- exactly one sink-input matched the managed RetroArch PID;
+- a temporary dedicated PrivyHub null sink was created at s16le stereo 48 kHz;
+- the exact managed sink-input moved successfully into that sink;
+- the dedicated monitor captured useful non-silent PCM;
+- three-second capture produced 574,396 bytes;
+- PCM peak was 8,958 and RMS was 1,154.454;
+- the original sink restoration was requested successfully;
+- RetroArch shutdown remained graceful;
+- the temporary sink unloaded successfully.
+
+Result: **MANAGED PID -> EXACT PULSEAUDIO STREAM -> ISOLATED MONITOR VALIDATED**
+
+Linux native audio can preserve process isolation by moving only the
+EmulatorManager-owned RetroArch sink-input into a dedicated PrivyHub sink.
+
+## Linux PHA1 cadence diagnostic — initial pacer rejected
+
+Baseline 33 combined the validated isolated PulseAudio route with a Python
+absolute-deadline 5 ms PHA1 sender.
+
+Capture/packet integrity passed:
+- 1,000 packet opportunities;
+- 1,000 packets sent;
+- zero sender underflows;
+- 1,000 packets received;
+- zero malformed packets;
+- zero sequence gaps;
+- useful non-silent audio observed.
+
+Timing did not pass:
+- average send interval: 5.0 ms;
+- 47 send intervals below 2 ms;
+- 46 send intervals at or above 8 ms;
+- send maximum: 12.5274 ms;
+- receiver timing showed the same burst/gap pattern.
+
+Result: **AUDIO SOURCE/PHA1 SHAPE VALID; SIMPLE PYTHON SLEEP PACER REJECTED**
+
+The symmetric late-then-catch-up pattern indicates pacing scheduler jitter, not
+PCM starvation. Do not reject the PulseAudio architecture from this result.
+
+## Linux hybrid 5 ms audio pacer
+
+Baseline 34 isolated the PHA1 sender timing from PulseAudio.
+
+Observed:
+- 1,000 packets sent and received;
+- zero malformed packets;
+- zero sequence gaps;
+- send interval average 5.0 ms;
+- send p95 5.0381 ms;
+- send max 5.0786 ms;
+- zero intervals below 2 ms;
+- zero intervals at or above 8 ms;
+- receiver timing remained similarly stable.
+
+Result: **HYBRID MONOTONIC 5 MS PHA1 PACER VALIDATED**
+
+Baseline 33's burst/gap behavior was caused by the simple sleep-based pacer,
+not by the PulseAudio capture architecture.
+
+## D-075 first production runtime — functional path passes, cadence rejected
+
+D-075 production runtime validated routing, capture, PHA1 integrity, restoration,
+and shutdown, but did not pass packet-cadence acceptance.
+
+Observed:
+- 1,140 packets sent and received;
+- zero malformed packets and zero sequence gaps;
+- zero send errors;
+- useful non-silent PCM after gameplay resume;
+- only two additional sender underflows after resume;
+- original PulseAudio route restored;
+- temporary sink removed;
+- video remained active;
+- graceful game shutdown.
+
+Cadence remained unacceptable under the full production stream:
+- send average 5.0007 ms;
+- p95 7.9436 ms;
+- 57 intervals below 2 ms;
+- 55 intervals at or above 8 ms.
+
+Result: **D-075 FUNCTIONAL AUDIO PATH VALIDATED / PRODUCTION CADENCE NOT ACCEPTED**
+
+Do not commit D-075 yet. Next isolate the production NativeAudioStreamer from
+the concurrent video/FEC workload.
+
+## Linux audio GIL switch-interval diagnostic
+
+Baseline 36 reran the installed D-075 audio backend in isolation with the
+Python thread switch interval reduced from 5 ms to 1 ms.
+
+Observed:
+- audio remained active;
+- zero send errors;
+- zero malformed packets;
+- zero sequence gaps;
+- send average remained ~5 ms;
+- 81 intervals below 2 ms;
+- 73 intervals at or above 8 ms.
+
+Result: **PYTHON THREAD SWITCH INTERVAL HYPOTHESIS REJECTED**
+
+Reducing the interpreter switch interval did not remove the burst/gap pattern.
+
+## Linux audio Event.wait versus sleep diagnostic
+
+Baseline 37 replaced only the production pacer coarse Event.wait(1 ms)
+stage with time.sleep(1 ms), matching Baseline 34 more closely.
+
+Observed:
+- 1,020 packets sent and received;
+- zero malformed packets and zero sequence gaps;
+- send average 5.0 ms;
+- p95 8.0325 ms;
+- 64 intervals below 2 ms;
+- 60 intervals at or above 8 ms.
+
+Result: **EVENT.WAIT PACER HYPOTHESIS REJECTED**
+
+The cadence regression remains inside the production audio path and is not
+explained by Event.wait versus time.sleep.
+
+## Linux production audio sender stage timing
+
+Baseline 38 instrumented the installed D-075 sender without changing project source.
+
+The PCM buffer handoff was effectively free:
+- lock-wait p95 0.0018 ms, max 0.0124 ms;
+- lock-hold p95 0.0109 ms, max 0.0657 ms.
+
+The dominant delay occurred before buffer access:
+- wake-late average 0.4735 ms;
+- wake-late p95 3.8561 ms;
+- wake-late max 7.8806 ms;
+- 96 wakeups at least 2 ms late.
+
+UDP send calls were normally short but had occasional measured scheduling-sized excursions:
+- send-call p95 0.0646 ms;
+- send-call max 5.844 ms;
+- 14 measured calls at least 2 ms.
+
+Result: **PCM BUFFER LOCK CONTENTION REJECTED**
+
+The primary cadence failure is sender-thread wake lateness before shared-buffer access.
+Next isolate whether managed RetroArch workload alone causes that wake lateness.
+
+## Pure 5 ms pacer under active RetroArch workload
+
+Baseline 39 reran the previously stable Baseline-34 hybrid pacer while only
+adding an active managed RetroArch game. PulseAudio routing, FFmpeg audio,
+PCM buffering, native video, and FEC were absent.
+
+Observed:
+- 1,000 packets sent and received;
+- zero malformed packets and zero sequence gaps;
+- send average 5.0 ms;
+- send p95 8.6571 ms;
+- 55 intervals below 2 ms;
+- 55 intervals at or above 8 ms;
+- graceful game shutdown.
+
+Result: **NORMAL-SCHEDULER 5 MS USERSPACE PACER NOT RELIABLE UNDER ACTIVE RETROARCH**
+
+Active RetroArch workload alone reproduces the D-075 burst/gap pattern.
+PulseAudio, FFmpeg capture, PCM locking, video, and FEC are not required to cause it.
+
+## Lowest-priority real-time pacer under active RetroArch
+
+Baseline 40 repeated the pure 5 ms pacer under active managed RetroArch but
+changed only the pacing thread scheduling policy to SCHED_RR priority 1.
+
+Observed sender timing:
+- 1,000 packets sent;
+- average 5.0 ms;
+- p95 5.0346 ms;
+- max 5.0756 ms;
+- zero intervals below 2 ms;
+- zero intervals at or above 8 ms;
+- zero malformed packets or sequence gaps.
+
+Result: **SCHED_RR PRIORITY 1 RESTORES RELIABLE 5 MS SENDER PACING UNDER RETROARCH**
+
+Normal Linux scheduling under active RetroArch is the established cause of
+D-075 sender wake lateness. Do not continue tuning PulseAudio, FFmpeg, PCM
+locking, Python switch intervals, or the hybrid deadline loop.
+## Baseline 41 — thread-local real-time sender scheduling
+
+Baseline 41 promoted only the dedicated pacing thread to `SCHED_RR` priority 1
+while leaving the process main thread at `SCHED_OTHER`.
+
+Observed:
+- main thread remained `SCHED_OTHER`, priority 0;
+- sender thread became `SCHED_RR`, priority 1;
+- 1,000 packets sent and 1,000 received;
+- zero malformed packets and zero sequence gaps;
+- send average 5.0 ms;
+- send p95 5.0318 ms;
+- send max 5.116 ms;
+- zero send intervals below 2 ms;
+- zero send intervals at or above 8 ms;
+- graceful game shutdown.
+
+Result: **THREAD-LOCAL SCHED_RR/1 PACER VALIDATED**
+
+This is the production scheduler boundary for the D-075R1 correction. The
+persistent privilege grant is not part of D-075R1; service-scoped
+`RLIMIT_RTPRIO=1` remains the preferred deployment mechanism.
+
+## D-075R1 Linux native-audio production runtime
+
+D-075R1 production runtime revalidation passed.
+
+Observed:
+- Linux managed-process PulseAudio isolation remained functional;
+- audio sender thread successfully entered SCHED_RR priority 1;
+- companion/main execution remained outside that RT scheduling change;
+- audio remained active across paused startup and gameplay resume;
+- 1,039 PHA1 packets were sent and received;
+- zero send errors;
+- zero malformed packets;
+- zero receiver sequence gaps;
+- 532 non-silent packets were observed after resume;
+- sender interval average 4.9999 ms;
+- sender interval p95 5.0397 ms;
+- sender interval max 8.0572 ms;
+- one interval below 2 ms;
+- one interval at or above 8 ms;
+- original PulseAudio route restored after stream stop;
+- dedicated temporary sink removed;
+- native video remained active during the test;
+- RetroArch shutdown remained graceful.
+
+Probe classification:
+**d075r1_runtime_validated=True**
+
+Result:
+**D-075R1 LINUX NATIVE AUDIO BACKEND RUNTIME VALIDATED**
+
+The established Linux native-audio design is managed RetroArch PID -> exact
+PulseAudio sink-input -> dedicated 48 kHz stereo PrivyHub sink -> monitor
+capture -> PCM16/PHA1 v1 -> sender-thread-only SCHED_RR priority 1.
+
+Normal SCHED_OTHER pacing under active RetroArch was experimentally rejected.
+Do not reopen the PulseAudio, Python GIL, buffer-lock, Event.wait, or ordinary
+pacer investigations without contradictory new runtime evidence.

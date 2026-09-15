@@ -1,0 +1,68 @@
+=== PRIVYHUB D-075 LINUX NATIVE AUDIO RUNTIME ===
+game_active= True
+managed_pid_present= True
+prestream_managed_sink_input_count= 1
+game_paused_before_stream= True
+paused_audio_active= True
+audio_capture_backend= pulseaudio_managed_sink_monitor
+audio_packet_ms= 5
+audio_sample_rate= 48000
+audio_format= pcm_s16le
+audio_packets_at_start= 20
+audio_underflows_at_start= 20
+game_paused_after_resume= False
+audio_active_after_5s= True
+audio_packets_sent= 1140
+audio_send_errors= 0
+audio_sender_underflows= 24
+post_resume_underflow_delta= 2
+audio_reader_bytes= 1078452
+receiver_audio_packets= 1140
+receiver_bad_packets= 0
+receiver_sequence_gaps= 0
+receiver_nonzero_packets= 540
+post_resume_packet_delta= 1020
+post_resume_nonzero_delta= 540
+send_interval_count= 1139
+send_interval_avg_ms= 5.0007
+send_interval_p95_ms= 7.9436
+send_interval_max_ms= 10.8794
+send_interval_under_2ms= 57
+send_interval_ge_8ms= 55
+stream_active_after_stop= False
+poststop_managed_sink_input_count= 1
+audio_route_restored= True
+dedicated_sink_present_after_stop= False
+game_stop_graceful= True
+video_packets_received= 8167
+audio_timing_log= /home/privyhub/Projects/onn-stream-test/logs/games/audio_timing/audio_pulseaudio_20260915_051836.json
+=== AUDIO TIMING LOG ===
+{
+  "schema": "privyhub_linux_pulseaudio_timing_v1",
+  "probe_version": "pulse_monitor_hybrid_pacer_v0.1",
+  "final": true,
+  "target_pid": 11630,
+  "format": {
+    "sample_rate": 48000,
+    "channels": 2,
+    "network_sample_format": "pcm_s16le",
+    "frames_per_packet": 240,
+    "packet_ms": 5,
+    "payload_bytes": 960
+  },
+  "capture_backend": "pulseaudio_managed_sink_monitor",
+  "packets_sent": 1140,
+  "send_errors": 0,
+  "sender_underflows": 24,
+  "reader_bytes": 1087672,
+  "max_buffer_bytes": 16312,
+  "send_intervals": {
+    "count": 1139,
+    "avg_ms": 5.0007,
+    "p95_ms": 7.9436,
+    "max_ms": 10.8794,
+    "under_2ms": 57,
+    "ge_8ms": 55
+  },
+  "restore_errors": 0
+}

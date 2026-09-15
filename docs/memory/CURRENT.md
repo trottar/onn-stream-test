@@ -787,7 +787,7 @@ Next technical work: establish the smallest production backend seam for native v
 
 ## D-074 Linux native-video backend development patch
 
-**Status:** DEVELOPMENT-ONLY / INSTALL VALIDATED / RUNTIME E2E PENDING
+**Status:** SUPERSEDED — SEE HOST-SIDE RUNTIME VALIDATION BELOW
 
 D-074 adds the first production Linux native-video seam while preserving the
 validated Windows path.
@@ -834,3 +834,53 @@ No Linux WGC-equivalent capture bridge is required.
 Full Android/onn E2E remains pending.
 
 Next Phase D production seam: Linux audio.
+
+## D-075 Linux native-audio backend development patch
+
+**Status:** DEVELOPMENT-ONLY / INSTALL VALIDATED / RUNTIME E2E PENDING
+
+Baselines 32-34 established the production Linux audio boundary:
+- the EmulatorManager-owned RetroArch PID resolves to exactly one PulseAudio
+  sink-input;
+- that exact stream can be moved into a dedicated 48 kHz stereo PrivyHub sink;
+- the dedicated monitor supplies useful PCM;
+- a simple sleep pacer was rejected due burst/gap scheduling jitter;
+- the hybrid monotonic 5 ms pacer produced 1,000/1,000 packets with no malformed
+  packets, sequence gaps, sub-2 ms bursts, or >=8 ms gaps.
+
+D-075 implements only the Linux audio backend inside `NativeAudioStreamer`:
+`managed PID -> exact PulseAudio sink-input -> dedicated sink -> monitor ->
+FFmpeg PCM16 -> hybrid 5 ms PHA1 sender`.
+
+Windows WASAPI process-loopback remains unchanged. Android audio, PHI1,
+video/FEC, controller output, telemetry, and EmulatorManager remain unchanged.
+
+Next runtime validation: start the real native stream through the existing
+paused stabilization flow, verify Linux audio is active while paused, resume the
+game, observe valid/non-silent PHA1 traffic and timing metrics, then verify route
+restoration and clean teardown.
+## D-075R1 Linux native-audio RT pacer correction
+
+**Status:** RUNTIME VALIDATED
+
+D-075's Linux audio route and PHA1 framing are functionally validated, but the
+first production runtime exposed sender cadence jitter under active RetroArch.
+Baselines 35-39 rejected video/FEC, PulseAudio routing, PCM lock contention,
+Python switch-interval tuning, and wait-primitive tuning as root causes.
+
+Baselines 40-41 established the correction:
+- active RetroArch makes a normal `SCHED_OTHER` 5 ms userspace pacer unreliable;
+- `SCHED_RR` priority 1 restores stable sender timing;
+- only the PHA1 sender thread needs promotion; the main companion thread remains
+  `SCHED_OTHER`;
+- Baseline 41 delivered 1,000/1,000 packets with p95 5.0318 ms, max 5.116 ms,
+  zero sub-2 ms intervals, and zero >=8 ms intervals.
+
+D-075R1 promotes only the Linux PHA1 sender thread to `SCHED_RR/1`, verifies the
+policy before sending, and exposes scheduler state in timing/status evidence.
+Production code never invokes `sudo`. Runtime permission must be scoped to the
+PrivyHub process/service with `RLIMIT_RTPRIO=1`; persistent service configuration
+remains a later Phase D task.
+
+Next: runtime-revalidate the full native stream with a temporary process-scoped
+`RLIMIT_RTPRIO=1`, then record acceptance before committing.

@@ -1,0 +1,36 @@
+=== PRIVYHUB BASELINE 41: THREAD-LOCAL RT PACER ===
+game_active= True
+managed_pid_present= True
+process_pid= 12758
+main_native_tid= 12758
+sender_native_tid= 12792
+main_scheduler_before=
+pid 12758's current scheduling policy: SCHED_OTHER
+pid 12758's current scheduling priority: 0
+pid 12758's current runtime parameter: 2800000
+sender_scheduler_before=
+pid 12792's current scheduling policy: SCHED_OTHER
+pid 12792's current scheduling priority: 0
+pid 12792's current runtime parameter: 2800000
+sender_rt_request_exit= 0
+main_scheduler_after=
+pid 12758's current scheduling policy: SCHED_OTHER
+pid 12758's current scheduling priority: 0
+pid 12758's current runtime parameter: 2800000
+sender_scheduler_after=
+pid 12792's current scheduling policy: SCHED_RR
+pid 12792's current scheduling priority: 1
+sender_error= None
+packets_sent= 1000
+receiver_packets= 1000
+receiver_bad_packets= 0
+receiver_sequence_gaps= 0
+send_interval_count= 999
+send_interval_avg_ms= 5.0
+send_interval_p95_ms= 5.0318
+send_interval_max_ms= 5.116
+send_interval_under_2ms= 0
+send_interval_ge_8ms= 0
+thread_local_rt_pacer_validated= True
+game_stop_graceful= True
+[1]+  Done                    nohup env PYTHONPATH="$PWD/companion" python3 /tmp/privyhub_baseline41.py > "$HOME/privyhub_linux_baseline_41_thread_local_rt.txt" 2>&1 < /dev/null

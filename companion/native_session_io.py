@@ -6,6 +6,7 @@ import os
 
 from collections import deque
 import re
+import shutil
 import socket
 import struct
 import subprocess
@@ -24,6 +25,19 @@ class NativeSessionIOError(RuntimeError):
 class NativeAudioStreamer:
     TIMING_PROBE_VERSION = "process_loopback_pair_pacer_v0.22"
     AUDIO_BUFFER_ARCHITECTURE = "windows_process_loopback_pair_pacer_v0.22"
+
+    # PrivyHub D-075 Linux native audio backend
+    LINUX_TIMING_PROBE_VERSION = "pulse_monitor_thread_rt_pacer_v0.2"
+    LINUX_AUDIO_BUFFER_ARCHITECTURE = "pulse_monitor_accumulator_thread_rt_pacer_v0.2"
+    LINUX_SENDER_RT_PRIORITY = 1
+    LINUX_SAMPLE_RATE = 48_000
+    LINUX_CHANNELS = 2
+    LINUX_FRAMES_PER_PACKET = 240
+    LINUX_PACKET_MS = 5
+    LINUX_PAYLOAD_BYTES = 960
+    LINUX_PACKET_NS = 5_000_000
+    LINUX_HEADER = struct.Struct("<4sBBHII")
+    LINUX_SILENCE_PAYLOAD = bytes(LINUX_PAYLOAD_BYTES)
 
     _ADDRESS_CANDIDATE_RE = re.compile(
         r"(?<!\d)(?:\d{1,5}\.){3}\d{1,5}(?!\d)"
@@ -80,6 +94,34 @@ class NativeAudioStreamer:
         self._client_port: int | None = None
         self._timing_path: Path | None = None
         self._last_status: dict[str, Any] = {}
+
+        self._linux_pactl: str | None = None
+        self._linux_sink_module: str | None = None
+        self._linux_sink_name: str | None = None
+        self._linux_sink_index: int | None = None
+        self._linux_monitor_source: str | None = None
+        self._linux_sink_input_index: int | None = None
+        self._linux_original_sink: int | str | None = None
+        self._linux_reader_thread: threading.Thread | None = None
+        self._linux_sender_thread: threading.Thread | None = None
+        self._linux_stop_event = threading.Event()
+        self._linux_buffer_condition = threading.Condition()
+        self._linux_buffer = bytearray()
+        self._linux_ready = False
+        self._linux_packets_sent = 0
+        self._linux_send_errors = 0
+        self._linux_sender_underflows = 0
+        self._linux_reader_bytes = 0
+        self._linux_max_buffer_bytes = 0
+        self._linux_restore_errors = 0
+        self._linux_send_intervals_ns: deque[int] = deque(maxlen=4096)
+        self._linux_last_send_ns = 0
+        self._linux_sender_native_id: int | None = None
+        self._linux_sender_scheduler_ready = False
+        self._linux_sender_scheduler_policy = ""
+        self._linux_sender_scheduler_priority = 0
+        self._linux_sender_scheduler_error = ""
+        self._linux_log_path = self.log_dir / "native_pulseaudio.log"
 
     @staticmethod
     def _kill_process(
@@ -159,6 +201,892 @@ class NativeAudioStreamer:
             self._last_status
         )
 
+    # PrivyHub D-075 Linux native audio backend
+    def _linux_run_pactl(
+        self,
+        *args: str,
+        check: bool = True,
+    ) -> subprocess.CompletedProcess[str]:
+        pactl = self._linux_pactl or shutil.which("pactl")
+
+        if not pactl:
+            raise NativeSessionIOError(
+                "Linux native audio requires pactl."
+            )
+
+        result = subprocess.run(
+            [pactl, *args],
+            cwd=str(self.project_root),
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=3.0,
+        )
+
+        if check and result.returncode != 0:
+            detail = result.stderr.strip()
+            raise NativeSessionIOError(
+                "PulseAudio command failed"
+                + (f": {detail[:300]}" if detail else ".")
+            )
+
+        return result
+
+    def _linux_pactl_json(
+        self,
+        *args: str,
+    ) -> list[dict[str, Any]]:
+        result = self._linux_run_pactl(
+            "-f",
+            "json",
+            *args,
+        )
+
+        try:
+            payload = json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            raise NativeSessionIOError(
+                "PulseAudio returned invalid JSON."
+            ) from exc
+
+        if not isinstance(payload, list):
+            raise NativeSessionIOError(
+                "PulseAudio JSON response had an unexpected shape."
+            )
+
+        return [
+            item
+            for item in payload
+            if isinstance(item, dict)
+        ]
+
+    @staticmethod
+    def _linux_process_id_from_sink_input(
+        item: dict[str, Any],
+    ) -> str:
+        properties = item.get("properties")
+
+        if not isinstance(properties, dict):
+            return ""
+
+        return str(
+            properties.get(
+                "application.process.id",
+                "",
+            )
+        ).strip()
+
+    def _linux_find_owned_sink_inputs(
+        self,
+        process_id: int,
+    ) -> list[dict[str, Any]]:
+        return [
+            item
+            for item in self._linux_pactl_json(
+                "list",
+                "sink-inputs",
+            )
+            if self._linux_process_id_from_sink_input(item)
+            == str(process_id)
+        ]
+
+    def _linux_wait_until(
+        self,
+        deadline_ns: int,
+    ) -> bool:
+        while not self._linux_stop_event.is_set():
+            remaining_ns = (
+                deadline_ns
+                - time.perf_counter_ns()
+            )
+
+            if remaining_ns <= 0:
+                return True
+
+            if remaining_ns > 1_500_000:
+                self._linux_stop_event.wait(0.001)
+            elif remaining_ns > 250_000:
+                time.sleep(0)
+            else:
+                # Baseline 34 validated a final <=0.25 ms spin as the
+                # smallest reliable way to avoid Linux scheduler catch-up
+                # bursts at the existing 5 ms PHA1 cadence.
+                pass
+
+        return False
+
+    def _linux_reader_loop(self) -> None:
+        process = self._process
+        stream = (
+            process.stdout
+            if process is not None
+            else None
+        )
+
+        if stream is None:
+            return
+
+        try:
+            descriptor = stream.fileno()
+
+            while not self._linux_stop_event.is_set():
+                chunk = os.read(
+                    descriptor,
+                    16 * 1024,
+                )
+
+                if not chunk:
+                    break
+
+                with self._linux_buffer_condition:
+                    self._linux_buffer.extend(chunk)
+                    self._linux_reader_bytes += len(chunk)
+                    self._linux_max_buffer_bytes = max(
+                        self._linux_max_buffer_bytes,
+                        len(self._linux_buffer),
+                    )
+                    self._linux_buffer_condition.notify_all()
+        except (OSError, ValueError):
+            pass
+
+    # PrivyHub D-075R1 sender-thread realtime scheduler
+    def _linux_prepare_sender_scheduler(self) -> bool:
+        self._linux_sender_native_id = threading.get_native_id()
+        self._linux_sender_scheduler_ready = False
+        self._linux_sender_scheduler_policy = ""
+        self._linux_sender_scheduler_priority = 0
+        self._linux_sender_scheduler_error = ""
+
+        try:
+            if not all(
+                hasattr(os, name)
+                for name in (
+                    "SCHED_RR",
+                    "sched_setscheduler",
+                    "sched_getscheduler",
+                    "sched_getparam",
+                    "sched_param",
+                )
+            ):
+                raise RuntimeError(
+                    "required Linux scheduler APIs are unavailable"
+                )
+
+            # Linux scheduling policy is per-thread. pid=0 means the calling
+            # thread, so this does not promote the companion's main thread.
+            os.sched_setscheduler(
+                0,
+                os.SCHED_RR,
+                os.sched_param(
+                    self.LINUX_SENDER_RT_PRIORITY
+                ),
+            )
+            policy = os.sched_getscheduler(0)
+            priority = int(
+                os.sched_getparam(0).sched_priority
+            )
+
+            if (
+                policy != os.SCHED_RR
+                or priority != self.LINUX_SENDER_RT_PRIORITY
+            ):
+                raise RuntimeError(
+                    "sender thread did not retain SCHED_RR priority 1"
+                )
+
+            self._linux_sender_scheduler_policy = "SCHED_RR"
+            self._linux_sender_scheduler_priority = priority
+            self._linux_sender_scheduler_ready = True
+            return True
+        except Exception as exc:
+            self._linux_sender_scheduler_error = (
+                type(exc).__name__
+                + ": "
+                + str(exc)[:240]
+            )
+            return False
+
+    def _linux_sender_loop(self) -> None:
+        client_ip = self._client_ip
+        client_port = self._client_port
+
+        if client_ip is None or client_port is None:
+            return
+
+        if not self._linux_prepare_sender_scheduler():
+            return
+
+        sock = socket.socket(
+            socket.AF_INET,
+            socket.SOCK_DGRAM,
+        )
+
+        try:
+            sock.setsockopt(
+                socket.SOL_SOCKET,
+                socket.SO_SNDBUF,
+                64 * 1024,
+            )
+            sock.setblocking(False)
+
+            sequence = 0
+            sample_timestamp = 0
+            deadline_ns = time.perf_counter_ns()
+
+            while not self._linux_stop_event.is_set():
+                deadline_ns += self.LINUX_PACKET_NS
+
+                if not self._linux_wait_until(deadline_ns):
+                    break
+
+                with self._linux_buffer_condition:
+                    if len(self._linux_buffer) >= self.LINUX_PAYLOAD_BYTES:
+                        payload = bytes(
+                            self._linux_buffer[
+                                : self.LINUX_PAYLOAD_BYTES
+                            ]
+                        )
+                        del self._linux_buffer[
+                            : self.LINUX_PAYLOAD_BYTES
+                        ]
+                    else:
+                        payload = self.LINUX_SILENCE_PAYLOAD
+                        self._linux_sender_underflows += 1
+
+                datagram = self.LINUX_HEADER.pack(
+                    b"PHA1",
+                    1,
+                    self.LINUX_CHANNELS,
+                    sequence,
+                    sample_timestamp,
+                    self.LINUX_FRAMES_PER_PACKET,
+                ) + payload
+
+                try:
+                    sock.sendto(
+                        datagram,
+                        (
+                            client_ip,
+                            int(client_port),
+                        ),
+                    )
+                    now_ns = time.perf_counter_ns()
+
+                    if self._linux_last_send_ns > 0:
+                        self._linux_send_intervals_ns.append(
+                            now_ns
+                            - self._linux_last_send_ns
+                        )
+
+                    self._linux_last_send_ns = now_ns
+                    self._linux_packets_sent += 1
+                except (BlockingIOError, OSError):
+                    self._linux_send_errors += 1
+
+                sequence = (
+                    sequence + 1
+                ) & 0xFFFF
+                sample_timestamp = (
+                    sample_timestamp
+                    + self.LINUX_FRAMES_PER_PACKET
+                ) & 0xFFFFFFFF
+        finally:
+            try:
+                sock.close()
+            except OSError:
+                pass
+
+    def _linux_interval_metrics(self) -> dict[str, Any]:
+        values = list(
+            self._linux_send_intervals_ns
+        )
+
+        if not values:
+            return {
+                "count": 0,
+                "avg_ms": 0.0,
+                "p95_ms": 0.0,
+                "max_ms": 0.0,
+                "under_2ms": 0,
+                "ge_8ms": 0,
+            }
+
+        ordered = sorted(values)
+        p95_index = min(
+            len(ordered) - 1,
+            int(
+                (len(ordered) - 1)
+                * 0.95
+            ),
+        )
+
+        return {
+            "count": len(values),
+            "avg_ms": round(
+                sum(values)
+                / len(values)
+                / 1_000_000.0,
+                4,
+            ),
+            "p95_ms": round(
+                ordered[p95_index]
+                / 1_000_000.0,
+                4,
+            ),
+            "max_ms": round(
+                max(values)
+                / 1_000_000.0,
+                4,
+            ),
+            "under_2ms": sum(
+                value < 2_000_000
+                for value in values
+            ),
+            "ge_8ms": sum(
+                value >= 8_000_000
+                for value in values
+            ),
+        }
+
+    def _linux_status_locked(self) -> dict[str, Any]:
+        process_active = (
+            self._process is not None
+            and self._process.poll() is None
+        )
+        reader_active = (
+            self._linux_reader_thread is not None
+            and self._linux_reader_thread.is_alive()
+        )
+        sender_active = (
+            self._linux_sender_thread is not None
+            and self._linux_sender_thread.is_alive()
+        )
+
+        with self._linux_buffer_condition:
+            buffered_bytes = len(
+                self._linux_buffer
+            )
+
+        active = bool(
+            self._linux_ready
+            and process_active
+            and reader_active
+            and sender_active
+            and self._linux_sender_scheduler_ready
+            and self._linux_sink_module
+            and self._linux_sink_input_index is not None
+        )
+
+        helper_status = {
+            "schema": "privyhub_linux_pulseaudio_v1",
+            "ready": active,
+            "backend": "pulseaudio_managed_sink_monitor",
+            "route": {
+                "managed_sink_input": self._linux_sink_input_index,
+                "dedicated_sink": self._linux_sink_name or "",
+                "dedicated_sink_index": self._linux_sink_index,
+            },
+            "capture": {
+                "reader_bytes": self._linux_reader_bytes,
+                "buffered_bytes": buffered_bytes,
+                "max_buffer_bytes": self._linux_max_buffer_bytes,
+            },
+            "scheduler": {
+                "native_tid": self._linux_sender_native_id,
+                "ready": self._linux_sender_scheduler_ready,
+                "policy": self._linux_sender_scheduler_policy,
+                "priority": self._linux_sender_scheduler_priority,
+                "required_policy": "SCHED_RR",
+                "required_priority": self.LINUX_SENDER_RT_PRIORITY,
+                "error": self._linux_sender_scheduler_error,
+            },
+            "send": {
+                "packets": self._linux_packets_sent,
+                "errors": self._linux_send_errors,
+                "underflows": self._linux_sender_underflows,
+                "intervals": self._linux_interval_metrics(),
+            },
+            "restore_errors": self._linux_restore_errors,
+        }
+
+        return {
+            "active": active,
+            "device": "managed_process_audio",
+            "sample_rate": self.LINUX_SAMPLE_RATE,
+            "channels": self.LINUX_CHANNELS,
+            "format": "pcm_s16le",
+            "packet_ms": self.LINUX_PACKET_MS,
+            "port": self._client_port,
+            "target_pid": self._target_pid,
+            "include_process_tree": False,
+            "capture_backend": "pulseaudio_managed_sink_monitor",
+            "helper": "FFmpeg PulseAudio monitor + thread-local SCHED_RR/1 PHA1 pacer",
+            "timing_probe": self.LINUX_TIMING_PROBE_VERSION,
+            "audio_buffer_architecture": self.LINUX_AUDIO_BUFFER_ARCHITECTURE,
+            "packets_sent": self._linux_packets_sent,
+            "send_errors": self._linux_send_errors,
+            "timing_log": self._public_timing_log(),
+            "helper_status": helper_status,
+        }
+
+    def _write_linux_timing_snapshot(self) -> None:
+        path = self._timing_path
+
+        if path is None:
+            return
+
+        payload = {
+            "schema": "privyhub_linux_pulseaudio_timing_v1",
+            "probe_version": self.LINUX_TIMING_PROBE_VERSION,
+            "final": True,
+            "target_pid": self._target_pid,
+            "format": {
+                "sample_rate": self.LINUX_SAMPLE_RATE,
+                "channels": self.LINUX_CHANNELS,
+                "network_sample_format": "pcm_s16le",
+                "frames_per_packet": self.LINUX_FRAMES_PER_PACKET,
+                "packet_ms": self.LINUX_PACKET_MS,
+                "payload_bytes": self.LINUX_PAYLOAD_BYTES,
+            },
+            "capture_backend": "pulseaudio_managed_sink_monitor",
+            "scheduler": {
+                "native_tid": self._linux_sender_native_id,
+                "ready": self._linux_sender_scheduler_ready,
+                "policy": self._linux_sender_scheduler_policy,
+                "priority": self._linux_sender_scheduler_priority,
+                "required_policy": "SCHED_RR",
+                "required_priority": self.LINUX_SENDER_RT_PRIORITY,
+                "error": self._linux_sender_scheduler_error,
+            },
+            "packets_sent": self._linux_packets_sent,
+            "send_errors": self._linux_send_errors,
+            "sender_underflows": self._linux_sender_underflows,
+            "reader_bytes": self._linux_reader_bytes,
+            "max_buffer_bytes": self._linux_max_buffer_bytes,
+            "send_intervals": self._linux_interval_metrics(),
+            "restore_errors": self._linux_restore_errors,
+        }
+
+        try:
+            path.parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+            temporary = path.with_suffix(
+                path.suffix + ".tmp"
+            )
+            temporary.write_text(
+                json.dumps(
+                    payload,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            temporary.replace(path)
+        except OSError:
+            pass
+
+    def _stop_linux_locked(self) -> None:
+        had_session = bool(
+            self._process is not None
+            or self._linux_sink_module
+            or self._linux_sink_input_index is not None
+            or self._target_pid is not None
+        )
+
+        self._linux_ready = False
+        self._linux_stop_event.set()
+
+        with self._linux_buffer_condition:
+            self._linux_buffer_condition.notify_all()
+
+        sender = self._linux_sender_thread
+        self._linux_sender_thread = None
+
+        if (
+            sender is not None
+            and sender is not threading.current_thread()
+        ):
+            sender.join(timeout=1.0)
+
+        process = self._process
+        self._process = None
+        self._kill_process(process)
+
+        if process is not None and process.stdout is not None:
+            try:
+                process.stdout.close()
+            except Exception:
+                pass
+
+        reader = self._linux_reader_thread
+        self._linux_reader_thread = None
+
+        if (
+            reader is not None
+            and reader is not threading.current_thread()
+        ):
+            reader.join(timeout=1.0)
+
+        if (
+            self._linux_sink_input_index is not None
+            and self._linux_original_sink is not None
+            and self._linux_pactl
+        ):
+            result = self._linux_run_pactl(
+                "move-sink-input",
+                str(self._linux_sink_input_index),
+                str(self._linux_original_sink),
+                check=False,
+            )
+
+            if result.returncode != 0:
+                self._linux_restore_errors += 1
+
+        if (
+            self._linux_sink_module
+            and self._linux_pactl
+        ):
+            result = self._linux_run_pactl(
+                "unload-module",
+                str(self._linux_sink_module),
+                check=False,
+            )
+
+            if result.returncode != 0:
+                self._linux_restore_errors += 1
+
+        if had_session:
+            self._write_linux_timing_snapshot()
+
+        if self._log_handle is not None:
+            try:
+                self._log_handle.close()
+            except Exception:
+                pass
+
+        self._log_handle = None
+        self._linux_pactl = None
+        self._linux_sink_module = None
+        self._linux_sink_index = None
+        self._linux_monitor_source = None
+        self._linux_sink_input_index = None
+        self._linux_original_sink = None
+        self._client_ip = None
+        self._client_port = None
+        self._target_pid = None
+        self._linux_sender_native_id = None
+        self._linux_sender_scheduler_ready = False
+        self._linux_sender_scheduler_policy = ""
+        self._linux_sender_scheduler_priority = 0
+        self._linux_sender_scheduler_error = ""
+
+        with self._linux_buffer_condition:
+            self._linux_buffer.clear()
+
+    def _start_linux_locked(
+        self,
+        ffmpeg: Path,
+        client_ip: str,
+        client_port: int,
+        process_id: int,
+    ) -> dict[str, Any]:
+        if not sys.platform.startswith("linux"):
+            raise NativeSessionIOError(
+                "Linux native audio backend requested on a non-Linux host."
+            )
+
+        pactl = shutil.which("pactl")
+
+        if not pactl:
+            raise NativeSessionIOError(
+                "Linux native audio requires pactl."
+            )
+
+        ffmpeg = Path(ffmpeg).resolve()
+
+        if not ffmpeg.is_file():
+            raise NativeSessionIOError(
+                "Linux native audio requires a valid FFmpeg executable."
+            )
+
+        process_id = int(process_id)
+
+        if (
+            process_id <= 0
+            or not Path(
+                f"/proc/{process_id}"
+            ).is_dir()
+        ):
+            raise NativeSessionIOError(
+                "Managed RetroArch process ID is invalid or inactive."
+            )
+
+        self._linux_pactl = pactl
+        self._target_pid = process_id
+        self._client_ip = client_ip
+        self._client_port = int(client_port)
+        self._linux_stop_event.clear()
+        self._linux_ready = False
+        self._linux_packets_sent = 0
+        self._linux_send_errors = 0
+        self._linux_sender_underflows = 0
+        self._linux_reader_bytes = 0
+        self._linux_max_buffer_bytes = 0
+        self._linux_restore_errors = 0
+        self._linux_send_intervals_ns.clear()
+        self._linux_last_send_ns = 0
+        self._linux_sender_native_id = None
+        self._linux_sender_scheduler_ready = False
+        self._linux_sender_scheduler_policy = ""
+        self._linux_sender_scheduler_priority = 0
+        self._linux_sender_scheduler_error = ""
+
+        with self._linux_buffer_condition:
+            self._linux_buffer.clear()
+
+        self.log_dir.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+        self.timing_log_dir.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        stamp = time.strftime(
+            "%Y%m%d_%H%M%S"
+        )
+        self._timing_path = (
+            self.timing_log_dir
+            / f"audio_pulseaudio_{stamp}.json"
+        )
+        self._linux_sink_name = (
+            "privyhub_native_audio_"
+            + str(os.getpid())
+            + "_"
+            + str(process_id)
+            + "_"
+            + format(
+                time.monotonic_ns()
+                & 0x0FFFFFFF,
+                "x",
+            )
+        )
+
+        try:
+            loaded = self._linux_run_pactl(
+                "load-module",
+                "module-null-sink",
+                f"sink_name={self._linux_sink_name}",
+                "rate=48000",
+                "channels=2",
+            )
+            module_id = loaded.stdout.strip()
+
+            if not module_id:
+                raise NativeSessionIOError(
+                    "PulseAudio did not return a module ID for the dedicated sink."
+                )
+
+            self._linux_sink_module = module_id
+
+            sinks = self._linux_pactl_json(
+                "list",
+                "sinks",
+            )
+            matches = [
+                item
+                for item in sinks
+                if item.get("name")
+                == self._linux_sink_name
+            ]
+
+            if len(matches) != 1:
+                raise NativeSessionIOError(
+                    "Dedicated PulseAudio sink was not uniquely created."
+                )
+
+            sink = matches[0]
+            self._linux_sink_index = int(
+                sink.get("index")
+            )
+            self._linux_monitor_source = str(
+                sink.get("monitor_source_name")
+                or (
+                    self._linux_sink_name
+                    + ".monitor"
+                )
+            )
+
+            deadline = time.monotonic() + 5.0
+            owned: list[dict[str, Any]] = []
+
+            while time.monotonic() < deadline:
+                owned = self._linux_find_owned_sink_inputs(
+                    process_id
+                )
+
+                if len(owned) == 1:
+                    break
+
+                if len(owned) > 1:
+                    raise NativeSessionIOError(
+                        "Managed RetroArch PID owns multiple PulseAudio sink-inputs; refusing ambiguous routing."
+                    )
+
+                time.sleep(0.05)
+
+            if len(owned) != 1:
+                raise NativeSessionIOError(
+                    "Managed RetroArch PID did not resolve to exactly one PulseAudio sink-input."
+                )
+
+            target = owned[0]
+            self._linux_sink_input_index = int(
+                target.get("index")
+            )
+            self._linux_original_sink = target.get(
+                "sink"
+            )
+
+            if self._linux_original_sink is None:
+                raise NativeSessionIOError(
+                    "Managed PulseAudio sink-input did not report its original sink."
+                )
+
+            self._linux_run_pactl(
+                "move-sink-input",
+                str(self._linux_sink_input_index),
+                self._linux_sink_name,
+            )
+
+            moved = [
+                item
+                for item in self._linux_pactl_json(
+                    "list",
+                    "sink-inputs",
+                )
+                if int(
+                    item.get(
+                        "index",
+                        -1,
+                    )
+                )
+                == self._linux_sink_input_index
+            ]
+
+            if (
+                len(moved) != 1
+                or int(
+                    moved[0].get(
+                        "sink",
+                        -1,
+                    )
+                )
+                != self._linux_sink_index
+            ):
+                raise NativeSessionIOError(
+                    "Managed PulseAudio stream did not remain on the dedicated sink."
+                )
+
+            self._log_handle = open(
+                self._linux_log_path,
+                "ab",
+                buffering=0,
+            )
+
+            command = [
+                str(ffmpeg),
+                "-hide_banner",
+                "-loglevel",
+                "warning",
+                "-nostdin",
+                "-f",
+                "pulse",
+                "-i",
+                self._linux_monitor_source,
+                "-ac",
+                str(self.LINUX_CHANNELS),
+                "-ar",
+                str(self.LINUX_SAMPLE_RATE),
+                "-c:a",
+                "pcm_s16le",
+                "-f",
+                "s16le",
+                "pipe:1",
+            ]
+
+            self._process = subprocess.Popen(
+                command,
+                cwd=str(self.project_root),
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=self._log_handle,
+                bufsize=0,
+            )
+
+            self._linux_reader_thread = threading.Thread(
+                target=self._linux_reader_loop,
+                daemon=True,
+                name="PrivyHub-Linux-Audio-Reader",
+            )
+            self._linux_sender_thread = threading.Thread(
+                target=self._linux_sender_loop,
+                daemon=True,
+                name="PrivyHub-Linux-Audio-PHA1",
+            )
+            self._linux_reader_thread.start()
+            self._linux_sender_thread.start()
+
+            startup_deadline = time.monotonic() + 1.0
+
+            while time.monotonic() < startup_deadline:
+                if (
+                    self._process is None
+                    or self._process.poll() is not None
+                ):
+                    raise NativeSessionIOError(
+                        "Linux PulseAudio FFmpeg capture exited during startup."
+                    )
+
+                if (
+                    self._linux_reader_thread is None
+                    or not self._linux_reader_thread.is_alive()
+                    or self._linux_sender_thread is None
+                    or not self._linux_sender_thread.is_alive()
+                ):
+                    if self._linux_sender_scheduler_error:
+                        raise NativeSessionIOError(
+                            "Linux native-audio sender requires thread-local "
+                            "SCHED_RR priority 1. Grant only the PrivyHub "
+                            "service/process RLIMIT_RTPRIO=1. Scheduler error: "
+                            + self._linux_sender_scheduler_error
+                        )
+                    raise NativeSessionIOError(
+                        "Linux native-audio worker exited during startup."
+                    )
+
+                if self._linux_packets_sent >= 20:
+                    self._linux_ready = True
+                    return self._linux_status_locked()
+
+                time.sleep(0.01)
+
+            raise NativeSessionIOError(
+                "Linux native-audio sender did not establish the 5 ms PHA1 cadence within one second."
+            )
+        except NativeSessionIOError:
+            self._stop_linux_locked()
+            raise
+        except Exception as exc:
+            self._stop_linux_locked()
+            raise NativeSessionIOError(
+                "Unable to start Linux native audio: "
+                + type(exc).__name__
+            ) from exc
+
     def start(
         self,
         ffmpeg: Path,
@@ -166,15 +1094,23 @@ class NativeAudioStreamer:
         client_port: int,
         process_id: int,
     ) -> dict[str, Any]:
-        del ffmpeg
-
         with self._lock:
             self.stop()
 
+            if sys.platform.startswith("linux"):
+                return self._start_linux_locked(
+                    ffmpeg=ffmpeg,
+                    client_ip=client_ip,
+                    client_port=client_port,
+                    process_id=process_id,
+                )
+
             if os.name != "nt":
                 raise NativeSessionIOError(
-                    "Windows process-loopback audio is Windows-only."
+                    "Native audio is not implemented for this host platform."
                 )
+
+            del ffmpeg
 
             if not self.helper_path.is_file():
                 raise NativeSessionIOError(
@@ -455,6 +1391,10 @@ class NativeAudioStreamer:
     def status(
         self,
     ) -> dict[str, Any]:
+        if sys.platform.startswith("linux"):
+            with self._lock:
+                return self._linux_status_locked()
+
         process_active = (
             self._process is not None
             and self._process.poll()
@@ -546,6 +1486,11 @@ class NativeAudioStreamer:
     def stop(
         self,
     ) -> None:
+        if sys.platform.startswith("linux"):
+            with self._lock:
+                self._stop_linux_locked()
+            return
+
         process = (
             self._process
         )

@@ -648,7 +648,7 @@ Changed production scope:
 - stream liveness/status are backend-aware.
 
 Still pending:
-- runtime validation of the installed D-074 path;
+- full Android/onn E2E validation of D-074;
 - Linux PulseAudio backend;
 - PHI1 -> uinput backend;
 - Linux host telemetry;
@@ -673,3 +673,44 @@ Do not add a Linux WGC/raw-frame bridge.
 Android video code remains unchanged; full onn E2E is still pending.
 
 Next: Linux audio production backend.
+
+## D-075 Linux native-audio development patch
+
+Baselines 32-34 resolved the Linux audio architecture.
+
+Validated concepts:
+- managed RetroArch PID -> exactly one PulseAudio sink-input;
+- exact stream -> dedicated 48 kHz stereo null sink;
+- monitor -> useful PCM;
+- hybrid monotonic 5 ms PHA1 pacer is stable;
+- simple sleep pacer is rejected.
+
+D-075 changes only `NativeAudioStreamer` plus durable memory. Windows WASAPI,
+Android, PHI1, video/FEC, controller output, telemetry, and EmulatorManager are
+intentionally unchanged.
+
+D-075 runtime validation established that the Linux PulseAudio route, PCM
+capture, PHA1 framing, and cleanup path are correct, but normal-scheduler
+sender cadence was rejected. D-075R1 below is authoritative for production
+Linux native-audio pacing.
+
+## D-075R1 Linux native-audio RT pacer correction
+
+D-075 functional routing/wire behavior passed, but its normal-scheduler sender
+cadence failed under active RetroArch. Baselines 35-41 localized the cause to
+Linux scheduling and validated the fix: only the PHA1 sender thread uses
+`SCHED_RR` priority 1; the main companion thread stays `SCHED_OTHER`.
+
+D-075R1 implements that correction without changing PulseAudio routing, FFmpeg
+capture, Android/PHA1, Windows audio, video/FEC, controller output,
+EmulatorManager, or telemetry. Production code does not invoke `sudo`.
+
+D-075R1 production runtime validation passed with process-scoped
+`RLIMIT_RTPRIO=1`: the sender thread verified `SCHED_RR/1`, PHA1 framing and
+delivery remained clean, 5 ms sender cadence was restored under active
+RetroArch, the original PulseAudio route was restored, the temporary sink was
+removed, native video remained active, and RetroArch stopped gracefully.
+
+Next: implement the Linux PHI1 -> uinput production controller backend and
+runtime-validate actual gameplay mapping, four-player ordering, hotkeys, and
+trigger behavior without disturbing the validated video or audio paths.

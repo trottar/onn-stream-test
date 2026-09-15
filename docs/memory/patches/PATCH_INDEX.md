@@ -524,3 +524,6 @@ This index records durable checkpoints and major patch lines; it does not invent
   No runtime source changes.
 
 | D-074 Linux native-video backend | 2026-09-15 | Development patch: managed PID -> exact X11 window -> single FFmpeg VAAPI -> existing RTP/FEC; Windows path preserved. |
+
+| D-075 Linux native-audio backend | 2026-09-15 | Development patch: managed PID -> isolated PulseAudio sink/monitor -> PCM16 -> hybrid 5 ms PHA1 sender; Windows audio preserved. |
+| D-075R1 Linux native-audio RT pacer | 2026-09-15 | Runtime validated: sender-thread-only SCHED_RR/1 restores stable 5 ms PHA1 pacing under active RetroArch; production Linux PulseAudio route/capture/send/restore path passed. |

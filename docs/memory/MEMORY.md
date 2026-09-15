@@ -844,3 +844,39 @@ Android RTP/H.264/FEC contract.
 
 The Windows WGC/NVENC path remains a separate validated backend and must not be
 changed by Linux implementation work.
+
+## Linux native-audio implementation boundary — D-075
+
+Linux process-audio isolation uses the EmulatorManager-owned RetroArch PID to
+identify exactly one PulseAudio sink-input. The stream is moved into a temporary
+dedicated PrivyHub null sink at 48 kHz stereo and captured from that sink's
+monitor.
+
+The existing Android PHA1 contract is preserved: PCM S16LE stereo at 48 kHz,
+240 frames / 5 ms per packet, 16-byte `PHA1` v1 header.
+
+A plain Python sleep-based pacer is explicitly rejected because Baseline 33
+showed paired late intervals and catch-up bursts despite zero PCM underflows.
+Baseline 34 validated the hybrid monotonic pacer: coarse 1 ms sleep, scheduler
+yield, then a final <=0.25 ms spin.
+
+Do not replace the PulseAudio route because of Baseline 33; the failure was
+isolated to pacing. Do not change Android audio for the Linux migration unless
+new E2E evidence requires it.
+## Linux native-audio scheduler boundary — D-075R1
+
+**Authoritative over the original D-075 pacing conclusion.** The D-075
+PulseAudio architecture remains valid, but Baseline 34's stable idle-host pacer
+was not representative once RetroArch was active.
+
+Baselines 39-41 establish that the Linux PHA1 sender needs thread-local
+`SCHED_RR` priority 1 under active RetroArch. Baseline 41 verified that promoting
+only the sender thread leaves the companion main thread at `SCHED_OTHER` and
+restores stable 5 ms sender cadence.
+
+Production rule: Linux native audio must verify `SCHED_RR/1` on the sender thread
+before emitting PHA1. If the policy cannot be acquired, fail the Linux audio
+subpath rather than silently running the known-jittery `SCHED_OTHER` pacer.
+Never grant `CAP_SYS_NICE` to the general Python interpreter for this purpose.
+The preferred persistent deployment boundary is service-scoped
+`LimitRTPRIO=1`/equivalent, with no production `sudo` invocation.

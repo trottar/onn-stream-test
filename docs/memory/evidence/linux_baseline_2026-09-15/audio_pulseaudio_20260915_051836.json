@@ -1,0 +1,29 @@
+{
+  "schema": "privyhub_linux_pulseaudio_timing_v1",
+  "probe_version": "pulse_monitor_hybrid_pacer_v0.1",
+  "final": true,
+  "target_pid": 11630,
+  "format": {
+    "sample_rate": 48000,
+    "channels": 2,
+    "network_sample_format": "pcm_s16le",
+    "frames_per_packet": 240,
+    "packet_ms": 5,
+    "payload_bytes": 960
+  },
+  "capture_backend": "pulseaudio_managed_sink_monitor",
+  "packets_sent": 1140,
+  "send_errors": 0,
+  "sender_underflows": 24,
+  "reader_bytes": 1087672,
+  "max_buffer_bytes": 16312,
+  "send_intervals": {
+    "count": 1139,
+    "avg_ms": 5.0007,
+    "p95_ms": 7.9436,
+    "max_ms": 10.8794,
+    "under_2ms": 57,
+    "ge_8ms": 55
+  },
+  "restore_errors": 0
+}
