@@ -732,3 +732,20 @@ known. Revalidate the Windows bitrate envelope there before treating 5500 as a
 production floor.
 
 Next technical work after checkpoint: **Phase D Linux migration baseline**.
+
+## D-072 Phase C resume point
+
+**Current next work:** Phase D Linux Migration / Native Linux Baseline.
+
+Phase C is **PAUSED / NOT COMPLETE** at the Windows boundary.
+
+After the Phase D Linux baseline checkpoint, resume the remaining Phase C work
+on Linux before Phase E:
+- C3 automatic bitrate controller;
+- C4 adaptive FEC or evidence-backed deferral;
+- C5 1080p60 characterization;
+- C6 generalized source abstraction;
+- C7 final Phase C checkpoint.
+
+Then proceed to Phase E Linux characterization/optimization, followed by Phase F
+media/VOD/Live TV UX.

@@ -211,3 +211,16 @@ The remote-foundation topology/roadmap promotion is **CHECKPOINTED / PUSHED**.
 Git HEAD is the authoritative synchronized checkpoint.
 
 Next technical work returns to Phase C under D-059.
+
+## Linux-first sequencing clarification
+
+Phase C is not complete. The Windows implementation reached a portability
+boundary and deliberately stopped before the remaining adaptive-streaming work.
+
+Next execution sequence:
+
+`Phase D Linux baseline -> remaining Phase C on Linux -> Phase E -> Phase F`
+
+The remaining Phase C items are automatic bitrate control, adaptive FEC
+disposition, 1080p60 characterization, generalized source abstraction and the
+final Phase C checkpoint.

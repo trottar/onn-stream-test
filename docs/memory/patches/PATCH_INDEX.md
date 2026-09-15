@@ -516,3 +516,9 @@ This index records durable checkpoints and major patch lines; it does not invent
   preserves working media during migration without requiring polish first,
   defers adaptation/FEC continuation to Linux, and leaves G+ unchanged. No
   runtime source changes.
+
+- `privyhub_phase_c_resume_after_linux_boundary_01_2026-09-14` — docs-only D-072 sequencing clarification
+  on synchronized checkpoint `3280644bba1d6d1fe0179311b837ced29cdb9752`. Records that Phase C is paused
+  rather than complete, keeps Phase D Linux migration as the immediate next
+  step, then resumes unfinished C3/C4/C5/C6/C7 work on Linux before Phase E.
+  No runtime source changes.

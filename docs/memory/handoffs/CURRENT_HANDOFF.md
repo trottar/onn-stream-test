@@ -594,3 +594,18 @@ On Linux:
 6. then resume automatic bitrate/FEC work if supported.
 
 Next after checkpoint: Phase D Linux baseline work.
+
+## D-072 sequencing clarification
+
+Next technical phase is still **Phase D Linux Migration / Native Linux
+Baseline**.
+
+However Phase C is paused, not finished.
+
+After D is runtime validated/checkpointed, return to:
+C3 controller -> C4 FEC -> C5 1080p60 -> C6 source abstraction -> C7 Phase C
+checkpoint, all on Linux.
+
+Only then move into Phase E Linux resource characterization/optimization.
+
+Do not resume Windows/NVENC-specific adaptation work.

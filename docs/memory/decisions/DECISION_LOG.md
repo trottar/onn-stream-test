@@ -1071,3 +1071,35 @@ backend. The Windows 5500/6000/7000 ladder remains useful evidence, not a
 universal Linux product constant.
 
 No runtime behavior changes in this roadmap patch.
+
+### D-072 — Resume unfinished Phase C work after Linux baseline
+
+**Status:** Accepted sequencing clarification (2026-09-14)
+
+The Linux-first roadmap does not mark Phase C complete.
+
+Phase C is paused at the Windows portability boundary while Phase D establishes
+a representative Linux-native baseline.
+
+After Phase D reaches its Linux baseline checkpoint, resume the unfinished
+Phase C items **on Linux** before proceeding to Phase E Linux resource
+characterization/optimization.
+
+Deferred Phase C items are:
+- C3 automatic bitrate controller over a low-interruption Linux actuator;
+- C4 adaptive FEC or evidence-backed explicit deferral;
+- C5 1080p60 capability characterization;
+- C6 generalized native source abstraction;
+- C7 final Phase C acceptance/checkpoint.
+
+The fixed Windows 5500/6000/7000 ladder and restart-actuator findings remain
+input evidence, not Linux production constants.
+
+Execution order is therefore:
+
+`D Linux baseline -> resume remaining C on Linux -> E Linux characterization -> F media/VOD/Live TV -> G remote`
+
+Do not silently skip remaining Phase C work, and do not proceed directly from D
+to E until the Phase C remainder has been explicitly dispositioned on Linux.
+
+No runtime behavior changes in this sequencing update.

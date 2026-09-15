@@ -19,8 +19,8 @@
   "b4_status": "COMPLETE / runtime validated",
   "b5_status": "COMPLETE / runtime validated",
   "b6_status": "COMPLETE / checkpointed / pushed",
-  "baseline_commit": "9d7da2ccc47cc78a19f7128161859a1c5f308174",
-  "baseline_short": "9d7da2cc",
+  "baseline_commit": "3280644bba1d6d1fe0179311b837ced29cdb9752",
+  "baseline_short": "3280644b",
   "c1_design_memory_checkpoint": "CHECKPOINTED / PUSHED",
   "c1_design_status": "COMPLETE / CHECKPOINTED / PUSHED / C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA",
   "c1_implementation_status": "RUNTIME VALIDATED / CHECKPOINTED / PUSHED",
@@ -102,10 +102,10 @@
   "client_health_interval_ms": 2000,
   "client_health_schema": "privyhub_client_health_v1",
   "client_health_storage": "latest only plus one delta baseline",
-  "companion_behavior_changed": true,
+  "companion_behavior_changed": false,
   "current_phase": "Phase D",
   "current_step": "Phase D Linux Migration / Native Linux Baseline",
-  "decision_id_state": "unique durable IDs through D-071",
+  "decision_id_state": "unique durable IDs through D-072",
   "decoder_classifier_runtime_validated": true,
   "decoder_stale_policy": "informational unless decoder-local failure exists",
   "deep_memory_history": "docs/memory/history/",
@@ -116,6 +116,13 @@
   "diagnostics_health_schema": "privyhub_diagnostics_health_v1",
   "docs_memory_cleanup_status": "Parts 1-4 complete / checkpointed / pushed",
   "durable_memory_updated": true,
+  "execution_order_after_checkpoint": [
+    "Phase D Linux baseline",
+    "remaining Phase C on Linux",
+    "Phase E Linux characterization",
+    "Phase F media/VOD/Live TV",
+    "Phase G remote"
+  ],
   "files": [
     {
       "bytes": 5229,
@@ -128,9 +135,9 @@
       "sha256": "2f3c393d42bf1629909e77cdecb9196befaf1b47141656f18ba4bfb2feaad930"
     },
     {
-      "bytes": 26733,
+      "bytes": 27290,
       "path": "CURRENT.md",
-      "sha256": "da66a034c55467fe51f24242b52c2c067810aeb16fb774801c8be422b955005e"
+      "sha256": "c8573d56f0ca44961fd494be77bda06bcc9007ab5cad5a77befee89ca4d6247b"
     },
     {
       "bytes": 2564,
@@ -138,9 +145,9 @@
       "sha256": "7957a58cd59456684c568bc85d8fe39c22d130b58ddaf9d9d636f7b063fa9698"
     },
     {
-      "bytes": 29026,
+      "bytes": 29721,
       "path": "MEMORY.md",
-      "sha256": "f6ae99216ff23f48ca623b26d470fca953c30b11a826ad798ced6565d6696c19"
+      "sha256": "fcb10ea968d2a95297bd577ccf80a75cf6ed6f3305248b8915947124f337f954"
     },
     {
       "bytes": 3012,
@@ -218,9 +225,9 @@
       "sha256": "d159cccf4315d615d21c7cc2cd7765bcc5be691b5f2ca7ed9f8c4a7b14d593dc"
     },
     {
-      "bytes": 49868,
+      "bytes": 51123,
       "path": "decisions/DECISION_LOG.md",
-      "sha256": "2cd7f0226932833b965802d7dded031a4671e0e5c868373db78b1a5fb45bb184"
+      "sha256": "0c6e5b2e3a39185ff3d718b80e21ab283ba903dc2b16e52f4215364404b43349"
     },
     {
       "bytes": 1129,
@@ -548,9 +555,9 @@
       "sha256": "7cd58c6b7e2b128e36b3a879fa151444790e9d95d9b12ec933f415bec19ef756"
     },
     {
-      "bytes": 19838,
+      "bytes": 20287,
       "path": "handoffs/CURRENT_HANDOFF.md",
-      "sha256": "0540f205432476789a20aaf1fb4889732d4c8145cff115dea64c4217bb011491"
+      "sha256": "dccd0d6d32f523b25f7fc4b684659494b8263f2731bc486b0be832305e36da35"
     },
     {
       "bytes": 20924,
@@ -623,14 +630,14 @@
       "sha256": "0bc6c287c87ba9c90326a6672b923c581a33493b83e38383df521c7c733cff28"
     },
     {
-      "bytes": 19719,
+      "bytes": 20219,
       "path": "memory/2026-09-14.md",
-      "sha256": "6a72721d043d291ab5b96c3b89740e71eff36d66899713b911d453c1535cdedc"
+      "sha256": "8a5d5264536d7a89839b504f1929eb47bed2890d753fbeba8a020426508442c6"
     },
     {
-      "bytes": 39153,
+      "bytes": 39548,
       "path": "patches/PATCH_INDEX.md",
-      "sha256": "b612790ac1b9bbfc37b3f02d8f05534ed8999e27025080e81adc75f1f2f0a77e"
+      "sha256": "b00ba380d1478c3f2eaf6e13192e1b9cef50cf3ee6634aa004718e3ceb5c4b9d"
     },
     {
       "bytes": 1894,
@@ -653,9 +660,9 @@
       "sha256": "5157fbc4db4194f2102dde6c829ce2f7c9a3c61df831ace7850b9e7b1c95d641"
     },
     {
-      "bytes": 13180,
+      "bytes": 13565,
       "path": "roadmap/STATUS.md",
-      "sha256": "3592ec4e60b1d66538711739587c027bba0b32b6fb40963e6a88b57085fa8790"
+      "sha256": "140c63908c099e5873f4ffd9dfe0a12bd15b458926553c57b1fdf7c3e86ee8d9"
     },
     {
       "bytes": 750,
@@ -695,8 +702,16 @@
   "part4_status": "COMPLETE / CHECKPOINTED / PUSHED",
   "phase_a_status": "COMPLETE / PUSHED",
   "phase_b_status": "COMPLETE / PUSHED",
+  "phase_c_remaining": [
+    "C3 automatic bitrate controller",
+    "C4 adaptive FEC disposition",
+    "C5 1080p60 capability characterization",
+    "C6 generalized native source abstraction",
+    "C7 final Phase C checkpoint"
+  ],
   "phase_c_remote_readiness": true,
-  "phase_c_status": "ACTIVE",
+  "phase_c_resume_after": "PHASE D LINUX BASELINE CHECKPOINT",
+  "phase_c_status": "PAUSED AT WINDOWS BOUNDARY / RESUME AFTER PHASE D ON LINUX",
   "physical_legacy_groups_deleted": 9,
   "predecessor": "C1 stream parameter inventory",
   "production_behavior_changed": true,

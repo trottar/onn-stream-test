@@ -376,3 +376,22 @@ No automatic bitrate decisions are enabled by the probe.
 
 Validated bitrate ladder remains 5500/6000/7000. 5000 remains excluded. FEC
 remains fixed at 8.
+
+## D-072 execution order
+
+Phase C status:
+**PAUSED AT WINDOWS BOUNDARY / REMAINING WORK RESUMES AFTER D ON LINUX**
+
+Immediate next:
+**D — Linux Migration / Native Linux Baseline**
+
+Then:
+**resume remaining C3/C4/C5/C6/C7 on Linux**
+
+Then:
+**E — Linux Core Resource Characterization & Optimization**
+
+Then:
+**F — Media Library / VOD / Live TV UX**
+
+G and later remain unchanged.

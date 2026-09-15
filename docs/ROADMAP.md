@@ -1631,3 +1631,23 @@ limits.
 
 Prototype 2 should be selected only after Phase F produces evidence for a
 cheaper, appropriately sized alpha appliance.
+
+## D-072 execution sequencing clarification
+
+Phase C is **paused at the Windows boundary, not complete**.
+
+After Phase D establishes the Linux-native baseline, return to the remaining
+Phase C work on Linux before Phase E resource characterization:
+
+- C3 automatic bitrate controller using the actual Linux actuator capability;
+- C4 adaptive FEC or explicit evidence-backed deferral;
+- C5 1080p60 capability characterization;
+- C6 generalized native source abstraction;
+- C7 final Phase C acceptance/checkpoint.
+
+Authoritative execution order:
+
+`D Linux baseline -> resume remaining C on Linux -> E Linux characterization -> F media/VOD/Live TV -> G remote`
+
+The Windows 5500/6000/7000 ladder and restart-actuator evidence are retained as
+development evidence, not universal Linux constants.

@@ -755,3 +755,23 @@ revalidate bitrate levels before production adaptation is finalized.
 
 Adaptive FEC and transport-sensitive tuning also wait for representative
 Linux + home Opal + onn evidence.
+
+## Phase C pause/resume sequencing — D-072
+
+Phase C is paused at the Windows portability boundary, not complete.
+
+Do Phase D Linux migration next. Once the Linux-native baseline is working,
+return to the unfinished Phase C items on Linux before starting Phase E.
+
+Remaining Phase C:
+- C3 automatic bitrate controller;
+- C4 adaptive FEC or explicit evidence-backed deferral;
+- C5 1080p60 capability characterization;
+- C6 generalized native source abstraction;
+- C7 final Phase C acceptance/checkpoint.
+
+Execution order:
+`D -> remaining C on Linux -> E -> F -> G`.
+
+Do not treat the Windows 5500/6000/7000 ladder as a Linux product constant.
+Revalidate actuator and bitrate envelope on Linux.
