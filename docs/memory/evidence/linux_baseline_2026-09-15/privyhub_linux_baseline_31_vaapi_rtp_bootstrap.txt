@@ -1,0 +1,32 @@
+SDP:
+v=0
+o=- 0 0 IN IP4 127.0.0.1
+s=No Name
+c=IN IP4 127.0.0.1
+t=0 0
+a=tool:libavformat 61.7.103
+m=video 48110 RTP/AVP 96
+b=AS:7000
+a=rtpmap:96 H264/90000
+a=fmtp:96 packetization-mode=1
+
+=== PRIVYHUB LINUX BASELINE 31: VAAPI RTP BOOTSTRAP ===
+managed_pid= 9668
+visible_window_count= 1
+ffmpeg_exit_code= 0
+rtp=4027
+fec=606
+single_sps=0
+single_pps=0
+single_idr=0
+stap_a=70
+stap_sps=20
+stap_pps=20
+stap_idr=2
+fu_a=3726
+fu_idr=367
+has_sps= True
+has_pps= True
+has_idr= True
+android_bootstrap_shape_compatible= True
+game_stop_graceful= True

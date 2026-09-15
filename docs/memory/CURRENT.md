@@ -784,3 +784,53 @@ Remaining Linux production surfaces:
 7. save/state/profile regression validation through the migrated project data.
 
 Next technical work: establish the smallest production backend seam for native video/audio/controller without altering the already-validated Android protocol or emulator lifecycle.
+
+## D-074 Linux native-video backend development patch
+
+**Status:** DEVELOPMENT-ONLY / INSTALL VALIDATED / RUNTIME E2E PENDING
+
+D-074 adds the first production Linux native-video seam while preserving the
+validated Windows path.
+
+Linux video shape:
+`EmulatorManager PID -> exact owned X11 window -> one FFmpeg x11grab/VAAPI
+process -> existing RTP/XOR-FEC relay -> unchanged Android receiver`.
+
+The managed RetroArch PID is supplied only by the internal Games plugin after
+`EmulatorManager.status()` reports an active game. Linux window discovery
+remains fail-closed and never falls back to desktop capture.
+
+Intentionally unchanged:
+- Android video/audio/controller code;
+- PHI1 protocol;
+- FEC wire format and relay;
+- Windows WGC/NVENC start path;
+- RetroArch lifecycle manager;
+- Linux audio, controller output and host telemetry.
+
+Next runtime validation: launch a managed game, start the Linux native stream
+against a loopback receiver, verify active/status/FEC/bootstrap behavior, then
+stop normally and inspect `logs/games/native_video_alpha.log`.
+
+## D-074 Linux native video backend
+
+**Status:** HOST-SIDE RUNTIME VALIDATED
+
+Production Linux native video now uses the trusted EmulatorManager-owned
+RetroArch PID to select an exact visible X11 window, then runs one FFmpeg
+x11grab -> Renoir VAAPI H.264 process into the existing RTP/FEC relay.
+
+Runtime validation with real SNES content passed:
+- active x11grab/VAAPI stream;
+- 4,500 RTP packets;
+- 680 PHF1 parity packets;
+- zero skipped relay packets;
+- zero relay send errors;
+- clean managed stream teardown;
+- graceful RetroArch shutdown.
+
+No Linux WGC-equivalent capture bridge is required.
+
+Full Android/onn E2E remains pending.
+
+Next Phase D production seam: Linux audio.

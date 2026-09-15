@@ -1,6 +1,6 @@
 # Linux Native Baseline — 2026-09-15
 
-Status: **D1 BASE PLATFORM CAPABILITIES VALIDATED / RETROARCH RUNTIME NOT YET INSTALLED**
+Status: **D1 LINUX BASE PLATFORM / RETROARCH / NATIVE VIDEO ARCHITECTURE VALIDATED**
 
 Baseline predecessor:
 
@@ -446,3 +446,101 @@ Observed:
 Result: **EXISTING EMULATOR MANAGER LAUNCH/CONTROL/FLUSH/STOP LIFECYCLE RUNTIME-VALIDATED ON LINUX**
 
 The emulator lifecycle layer is not a Linux migration blocker. Preserve it unless later save/state/profile regression evidence requires a change.
+
+## Managed PID to X11 window identity
+
+Baseline 29 launched real SNES content through EmulatorManager and used the
+manager-owned RetroArch PID as the X11 ownership anchor.
+
+Observed:
+- exactly one visible X11 window belonged to the managed PID;
+- `_NET_WM_PID` exactly matched the EmulatorManager PID;
+- WM_CLASS was `retroarch`;
+- the game window was `IsViewable`;
+- the game window had valid capture dimensions;
+- shutdown remained graceful.
+
+The AppImage process executable resolved through `/proc/<pid>/exe` to the
+temporary AppImage mount. Therefore executable-path equality is not an
+appropriate Linux ownership check.
+
+Result: **MANAGER-OWNED PID -> EXACT X11 RETROARCH WINDOW VALIDATED**
+
+Linux native capture should fail closed around the manager-owned PID and must
+never broaden to whole-desktop capture.
+
+## Single-process Linux video path through existing FEC relay
+
+Baseline 30 exercised:
+
+managed RetroArch -> exact X11 window -> FFmpeg x11grab -> Renoir VAAPI H.264
+-> RTP loopback -> existing NativeVideoFecRelay -> local UDP receiver.
+
+Observed:
+- 300 frames over 5 seconds at real-time speed;
+- H.264 High, 1280x720, 60 fps;
+- FFmpeg exit code 0;
+- 4,010 RTP packets accepted by the existing relay;
+- 605 PHF1 parity packets emitted across 605 groups;
+- zero skipped relay packets;
+- zero relay send errors;
+- downstream receiver observed all 4,010 RTP and 605 PHF1 packets;
+- game shutdown remained graceful.
+
+Result: **SINGLE-PROCESS X11GRAB -> VAAPI -> RTP -> EXISTING FEC RELAY VALIDATED**
+
+Linux does not require a WGC-style raw-frame bridge. The preferred native-video
+shape is one FFmpeg capture/encode process feeding the existing portable FEC
+relay.
+
+## VAAPI RTP Android bootstrap compatibility
+
+Baseline 31 inspected the actual H.264 RTP packetization produced by the
+validated Linux VAAPI path.
+
+Observed:
+- 4,027 RTP packets;
+- 606 PHF1 FEC packets;
+- SPS present through STAP-A;
+- PPS present through STAP-A;
+- IDR present through STAP-A and FU-A;
+- Android bootstrap shape compatibility: true;
+- FFmpeg exited successfully;
+- game shutdown remained graceful.
+
+Result: **LINUX VAAPI RTP BOOTSTRAP IS COMPATIBLE WITH THE EXISTING ANDROID RECEIVER**
+
+No Android video-protocol change and no Linux WGC-equivalent raw-frame bridge
+are required.
+
+## D-074 production Linux native-video runtime validation
+
+The first production Linux native-video backend was installed and exercised
+against a real managed SNES session.
+
+Observed:
+- stream ready: true;
+- stream active: true;
+- capture backend: `x11grab_window`;
+- encoder: `h264_vaapi`;
+- exact managed RetroArch window selected;
+- stream remained active after five seconds;
+- 4,500 RTP packets traversed the existing FEC relay;
+- 680 PHF1 parity packets traversed the existing FEC relay;
+- zero skipped relay packets;
+- zero relay send errors;
+- downstream diagnostic receiver observed the same RTP/FEC packet counts;
+- stream teardown returned inactive;
+- RetroArch shutdown remained graceful.
+
+FFmpeg sustained approximately 60 fps and terminated normally via SIGTERM during
+managed stream teardown.
+
+Result: **D-074 LINUX NATIVE VIDEO BACKEND HOST-SIDE RUNTIME VALIDATED**
+
+This validates the production host path:
+managed RetroArch PID -> exact X11 window -> x11grab -> VAAPI H.264 ->
+existing RTP/FEC relay.
+
+Android, audio, controller, FEC format, and emulator lifecycle were unchanged.
+Full onn/Android E2E remains a later integration validation boundary.

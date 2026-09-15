@@ -3165,7 +3165,11 @@ class GamesPlugin:
                             "Game did not remain paused for stream stabilization."
                         )
 
-                payload = self._native_stream.start(client_ip=client_ip, port=port)
+                payload = self._native_stream.start(
+                    client_ip=client_ip,
+                    port=port,
+                    managed_process_id=game_status.get("pid"),
+                )
                 payload["game_session"] = game_status
                 payload["paused"] = True
                 payload["stabilization_required"] = True

@@ -1,0 +1,38 @@
+=== PRIVYHUB LINUX BASELINE 30: SINGLE-PROCESS VIDEO + FEC ===
+manager_pid= 9502
+visible_window_count= 1
+window_id= 54525954
+ffmpeg_exit_code= 0
+relay_running= True
+relay_rtp_packets= 4010
+relay_parity_packets= 605
+relay_groups= 605
+relay_skipped_packets= 0
+relay_send_errors= 0
+receiver_rtp_packets= 4010
+receiver_fec_packets= 605
+receiver_bytes= 4960223
+=== FFMPEG TAIL ===
+Input #0, x11grab, from ':0.0':
+  Duration: N/A, start: 1789461155.643003, bitrate: 1134120 kb/s
+  Stream #0:0: Video: rawvideo (BGR[0] / 0x524742), bgr0, 879x672, 1134120 kb/s, 60 fps, 60 tbr, 1000k tbn
+Stream mapping:
+  Stream #0:0 -> #0:0 (rawvideo (native) -> h264 (h264_vaapi))
+Output #0, rtp, to 'rtp://127.0.0.1:48110?pkt_size=1200':
+  Metadata:
+    encoder         : Lavf61.7.103
+  Stream #0:0: Video: h264 (High), vaapi(tv, progressive), 1280x720, q=2-31, 7000 kb/s, 60 fps, 90k tbn
+      Metadata:
+        encoder         : Lavc61.19.101 h264_vaapi
+frame=   31 fps=0.0 q=-0.0 size=     217KiB time=00:00:00.51 bitrate=3440.5kbits/s speed=1.03x    
+frame=   61 fps= 61 q=-0.0 size=     650KiB time=00:00:01.01 bitrate=5237.8kbits/s speed=1.01x    
+frame=   92 fps= 61 q=-0.0 size=    1098KiB time=00:00:01.53 bitrate=5864.8kbits/s speed=1.02x    
+frame=  122 fps= 61 q=-0.0 size=    1542KiB time=00:00:02.03 bitrate=6211.1kbits/s speed=1.01x    
+frame=  152 fps= 61 q=-0.0 size=    1980KiB time=00:00:02.53 bitrate=6401.1kbits/s speed=1.01x    
+frame=  182 fps= 61 q=-0.0 size=    2417KiB time=00:00:03.03 bitrate=6528.7kbits/s speed=1.01x    
+frame=  212 fps= 60 q=-0.0 size=    2877KiB time=00:00:03.53 bitrate=6669.8kbits/s speed=1.01x    
+frame=  242 fps= 60 q=-0.0 size=    3283KiB time=00:00:04.03 bitrate=6667.9kbits/s speed=1.01x    
+frame=  271 fps= 60 q=-0.0 size=    3681KiB time=00:00:04.51 bitrate=6677.0kbits/s speed=   1x    
+[out#0/rtp @ 0x55d57bdf0dc0] video:4097KiB audio:0KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: 1.244793%
+frame=  300 fps= 60 q=-0.0 Lsize=    4148KiB time=00:00:05.00 bitrate=6796.1kbits/s speed=   1x    
+game_stop_graceful= True

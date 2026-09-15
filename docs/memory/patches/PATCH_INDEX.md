@@ -522,3 +522,5 @@ This index records durable checkpoints and major patch lines; it does not invent
   rather than complete, keeps Phase D Linux migration as the immediate next
   step, then resumes unfinished C3/C4/C5/C6/C7 work on Linux before Phase E.
   No runtime source changes.
+
+| D-074 Linux native-video backend | 2026-09-15 | Development patch: managed PID -> exact X11 window -> single FFmpeg VAAPI -> existing RTP/FEC; Windows path preserved. |

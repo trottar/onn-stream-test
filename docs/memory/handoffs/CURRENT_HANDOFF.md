@@ -634,3 +634,42 @@ Windows persistent RetroArch state was migrated byte-for-byte:
 Do not resume Windows/NVENC adaptation.
 
 Next: identify and implement the smallest Linux backend substitutions for native video, audio, controller output, and telemetry while preserving PHI1, FEC, Android decoding/audio/controller paths, and the validated emulator lifecycle.
+
+## D-074 Linux native-video development patch
+
+D-074 implements the validated Linux video architecture without changing the
+Windows WGC/NVENC path.
+
+Changed production scope:
+- Games plugin passes the internally trusted active RetroArch PID;
+- NativeStreamManager resolves the exact visible X11 window for that PID;
+- Linux uses one FFmpeg x11grab -> VAAPI H.264 process;
+- existing RTP/XOR-FEC relay is reused unchanged;
+- stream liveness/status are backend-aware.
+
+Still pending:
+- runtime validation of the installed D-074 path;
+- Linux PulseAudio backend;
+- PHI1 -> uinput backend;
+- Linux host telemetry;
+- service/device permissions;
+- migrated save/state/profile regressions.
+
+Do not change Android or FEC for D-074 runtime validation.
+
+## D-074 validated Linux video backend
+
+D-074 is host-side runtime validated.
+
+Validated production path:
+`EmulatorManager PID -> exact X11 window -> x11grab -> VAAPI H.264 ->
+existing NativeVideoFecRelay`.
+
+Real-session validation observed 4,500 RTP + 680 PHF1 packets, zero skipped
+packets, zero send errors, clean stream teardown, and graceful game shutdown.
+
+Do not add a Linux WGC/raw-frame bridge.
+
+Android video code remains unchanged; full onn E2E is still pending.
+
+Next: Linux audio production backend.

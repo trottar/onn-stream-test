@@ -1,0 +1,53 @@
+=== PRIVYHUB D-074 LINUX NATIVE VIDEO RUNTIME ===
+game_active= True
+managed_pid_present= True
+start_ready= True
+start_active= True
+capture_backend= x11grab_window
+encoder= h264_vaapi
+capture_target= {'type': 'window', 'process': 'retroarch', 'pid': 10297, 'title': 'RetroArch bsnes 115', 'window_class': '', 'width': 879, 'height': 672, 'backend': 'x11grab_window'}
+active_after_5s= True
+fec_rtp_packets= 4500
+fec_parity_packets= 680
+fec_skipped_packets= 0
+fec_send_errors= 0
+receiver_rtp_packets= 4500
+receiver_fec_packets= 680
+stream_active_after_stop= False
+game_stop_graceful= True
+=== NATIVE VIDEO LOG TAIL ===
+  Stream #0:0: Video: rawvideo (BGR[0] / 0x524742), bgr0, 879x672, 1134120 kb/s, 60 fps, 60 tbr, 1000k tbn
+Stream mapping:
+  Stream #0:0 -> #0:0 (rawvideo (native) -> h264 (h264_vaapi))
+Output #0, rtp, to 'rtp://127.0.0.1:48110?pkt_size=1200':
+  Metadata:
+    encoder         : Lavf61.7.103
+  Stream #0:0: Video: h264 (High), vaapi(tv, progressive), 1280x720, q=2-31, 7000 kb/s, 60 fps, 90k tbn
+      Metadata:
+        encoder         : Lavc61.19.101 h264_vaapi
+SDP:
+v=0
+o=- 0 0 IN IP4 127.0.0.1
+s=No Name
+c=IN IP4 127.0.0.1
+t=0 0
+a=tool:libavformat 61.7.103
+m=video 48110 RTP/AVP 96
+b=AS:7000
+a=rtpmap:96 H264/90000
+a=fmtp:96 packetization-mode=1
+
+frame=   32 fps=0.0 q=-0.0 size=     231KiB time=00:00:00.53 bitrate=3555.7kbits/s speed=1.06x    
+frame=   62 fps= 62 q=-0.0 size=     665KiB time=00:00:01.03 bitrate=5268.2kbits/s speed=1.03x    
+frame=   92 fps= 61 q=-0.0 size=    1098KiB time=00:00:01.53 bitrate=5864.4kbits/s speed=1.02x    
+frame=  122 fps= 61 q=-0.0 size=    1541KiB time=00:00:02.03 bitrate=6208.4kbits/s speed=1.01x    
+frame=  152 fps= 61 q=-0.0 size=    1980KiB time=00:00:02.53 bitrate=6402.1kbits/s speed=1.01x    
+frame=  182 fps= 61 q=-0.0 size=    2417KiB time=00:00:03.03 bitrate=6528.7kbits/s speed=1.01x    
+frame=  212 fps= 60 q=-0.0 size=    2871KiB time=00:00:03.53 bitrate=6657.3kbits/s speed=1.01x    
+frame=  242 fps= 60 q=-0.0 size=    3283KiB time=00:00:04.03 bitrate=6667.0kbits/s speed=1.01x    
+frame=  272 fps= 60 q=-0.0 size=    3704KiB time=00:00:04.53 bitrate=6693.5kbits/s speed=1.01x    
+frame=  302 fps= 60 q=-0.0 size=    4167KiB time=00:00:05.03 bitrate=6782.1kbits/s speed=   1x    
+frame=  332 fps= 60 q=-0.0 size=    4562KiB time=00:00:05.53 bitrate=6753.8kbits/s speed=   1x    
+[out#0/rtp @ 0x555892c32c80] video:5344KiB audio:0KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: 1.241921%
+frame=  363 fps= 60 q=-0.0 Lsize=    5410KiB time=00:00:06.05 bitrate=7325.9kbits/s speed=1.01x    
+Exiting normally, received signal 15.

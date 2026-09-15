@@ -121,14 +121,70 @@ class NativeStreamManager:
             ).is_dir()
         )
 
+
+    # PrivyHub D-074 Linux native video backend
+    @staticmethod
+    def _linux_host() -> bool:
+        return sys.platform.startswith("linux")
+
+    @staticmethod
+    def _linux_display() -> str | None:
+        value = os.environ.get("DISPLAY", "").strip()
+        return value or None
+
+    @staticmethod
+    def _linux_xdotool() -> str | None:
+        return shutil.which("xdotool")
+
+    @staticmethod
+    def _linux_vaapi_device() -> Path | None:
+        render_root = Path("/dev/dri")
+
+        try:
+            candidates = sorted(
+                render_root.glob("renderD*")
+            )
+        except OSError:
+            return None
+
+        usable = [
+            candidate
+            for candidate in candidates
+            if (
+                candidate.exists()
+                and os.access(
+                    candidate,
+                    os.R_OK | os.W_OK,
+                )
+            )
+        ]
+
+        # Fail closed when host GPU selection is ambiguous. Phase D has
+        # validated the single-render-node case; a multi-GPU selector is a
+        # later capability problem rather than something to guess here.
+        if len(usable) != 1:
+            return None
+
+        return usable[0].resolve()
+
     def _running_locked(self) -> bool:
-        return (
-            self._process is not None
-            and self._process.poll() is None
-            and self._capture_process is not None
-            and self._capture_process.poll() is None
-            and self._fec_relay.running
-        )
+        if (
+            self._process is None
+            or self._process.poll() is not None
+            or not self._fec_relay.running
+        ):
+            return False
+
+        if os.name == "nt":
+            return (
+                self._capture_process is not None
+                and self._capture_process.poll() is None
+            )
+
+        if self._linux_host():
+            return self._capture_process is None
+
+        return False
 
     def _reap_locked(self) -> None:
         ffmpeg_exited = (
@@ -181,38 +237,90 @@ class NativeStreamManager:
             wgc_ready = self._wgc_ready()
             active = self._running_locked()
 
-            if os.name != "nt":
-                ready = False
-                message = (
-                    "Native Performance Alpha v0.6 currently implements "
-                    "the Windows Graphics Capture host only."
-                )
-            elif ffmpeg is None:
-                ready = False
-                message = (
-                    "FFmpeg was not found. The project-local "
-                    "runtime/streaming/ffmpeg build is required."
-                )
-            elif not wgc_ready:
-                ready = False
-                message = (
-                    "The project-local Windows Graphics Capture runtime "
-                    "is missing. Re-run the v0.4 setup patch."
-                )
-            elif active:
-                ready = True
-                message = (
-                    f"PrivyHub Native A/V/Input Alpha v{self.ALPHA_VERSION} "
-                    "is capturing the managed RetroArch window with "
-                    "Windows Graphics Capture using the "
-                    f"{self.PROFILE.width}x{self.PROFILE.height} "
-                    "reference profile envelope and streaming H.264 RTP/UDP."
-                )
+            linux_host = self._linux_host()
+            linux_display = (
+                self._linux_display()
+                if linux_host
+                else None
+            )
+            linux_xdotool = (
+                self._linux_xdotool()
+                if linux_host
+                else None
+            )
+            linux_vaapi_device = (
+                self._linux_vaapi_device()
+                if linux_host
+                else None
+            )
+
+            if os.name == "nt":
+                if ffmpeg is None:
+                    ready = False
+                    message = (
+                        "FFmpeg was not found. The project-local "
+                        "runtime/streaming/ffmpeg build is required."
+                    )
+                elif not wgc_ready:
+                    ready = False
+                    message = (
+                        "The project-local Windows Graphics Capture runtime "
+                        "is missing. Re-run the v0.4 setup patch."
+                    )
+                elif active:
+                    ready = True
+                    message = (
+                        f"PrivyHub Native A/V/Input Alpha v{self.ALPHA_VERSION} "
+                        "is capturing the managed RetroArch window with "
+                        "Windows Graphics Capture using the "
+                        f"{self.PROFILE.width}x{self.PROFILE.height} "
+                        "reference profile envelope and streaming H.264 RTP/UDP."
+                    )
+                else:
+                    ready = True
+                    message = (
+                        "Native Performance Alpha v0.6 is ready. Launch a game first, "
+                        "then open the native receiver on the onn."
+                    )
+            elif linux_host:
+                if ffmpeg is None:
+                    ready = False
+                    message = "FFmpeg was not found on the Linux host."
+                elif linux_display is None:
+                    ready = False
+                    message = (
+                        "Linux native video requires an active X11 DISPLAY."
+                    )
+                elif linux_xdotool is None:
+                    ready = False
+                    message = (
+                        "Linux native video requires xdotool for fail-closed "
+                        "managed-window discovery."
+                    )
+                elif linux_vaapi_device is None:
+                    ready = False
+                    message = (
+                        "Linux native video requires exactly one accessible "
+                        "DRM render node."
+                    )
+                elif active:
+                    ready = True
+                    message = (
+                        f"PrivyHub Native Video Alpha v{self.ALPHA_VERSION} "
+                        "is capturing the managed RetroArch X11 window and "
+                        "streaming VAAPI H.264 through the existing RTP/FEC path."
+                    )
+                else:
+                    ready = True
+                    message = (
+                        "Linux native video is ready. Audio, controller output, "
+                        "and host telemetry remain separate Phase D migration "
+                        "surfaces."
+                    )
             else:
-                ready = True
+                ready = False
                 message = (
-                    "Native Performance Alpha v0.6 is ready. Launch a game first, "
-                    "then open the native receiver on the onn."
+                    "Native streaming is not implemented for this host platform."
                 )
 
             session_io = (
@@ -232,9 +340,21 @@ class NativeStreamManager:
                 "capture_backend": (
                     "windows_graphics_capture"
                     if os.name == "nt"
-                    else "unavailable"
+                    else (
+                        "x11grab_window"
+                        if linux_host
+                        else "unavailable"
+                    )
                 ),
-                "encoder": "h264_nvenc",
+                "encoder": (
+                    "h264_nvenc"
+                    if os.name == "nt"
+                    else (
+                        "h264_vaapi"
+                        if linux_host
+                        else "unavailable"
+                    )
+                ),
                 "transport": "rtp_udp_xor_fec",
                 "fec": self._fec_relay.status(),
                 "host_telemetry": self._host_telemetry.status(),
@@ -255,6 +375,9 @@ class NativeStreamManager:
                 "controller": session_io["controller"],
                 "ffmpeg_found": ffmpeg is not None,
                 "wgc_runtime_found": wgc_ready,
+                "x11_display_found": linux_display is not None,
+                "x11_window_tool_found": linux_xdotool is not None,
+                "vaapi_render_node_found": linux_vaapi_device is not None,
                 "capture_target": self._public_capture_target(
                     self._capture_target
                     or self._last_capture_target
@@ -374,14 +497,199 @@ class NativeStreamManager:
             os.path.abspath(str(second))
         )
 
+
+    def _find_linux_retroarch_window(
+        self,
+        managed_process_id: int | None,
+    ) -> dict[str, Any] | None:
+        if managed_process_id is None:
+            return None
+
+        try:
+            process_id = int(managed_process_id)
+        except (TypeError, ValueError):
+            return None
+
+        if process_id <= 0:
+            return None
+
+        if not Path(f"/proc/{process_id}").is_dir():
+            return None
+
+        xdotool = self._linux_xdotool()
+        display = self._linux_display()
+
+        if xdotool is None or display is None:
+            return None
+
+        environment = os.environ.copy()
+        environment["DISPLAY"] = display
+
+        try:
+            search = subprocess.run(
+                [
+                    xdotool,
+                    "search",
+                    "--onlyvisible",
+                    "--pid",
+                    str(process_id),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=1.0,
+                env=environment,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+
+        if search.returncode not in (0, 1):
+            return None
+
+        matches: list[dict[str, Any]] = []
+
+        for raw_window_id in search.stdout.splitlines():
+            raw_window_id = raw_window_id.strip()
+
+            if not raw_window_id:
+                continue
+
+            try:
+                window_id = int(raw_window_id, 10)
+            except ValueError:
+                continue
+
+            try:
+                owner = subprocess.run(
+                    [
+                        xdotool,
+                        "getwindowpid",
+                        str(window_id),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=1.0,
+                    env=environment,
+                )
+
+                if (
+                    owner.returncode != 0
+                    or int(owner.stdout.strip()) != process_id
+                ):
+                    continue
+
+                geometry_result = subprocess.run(
+                    [
+                        xdotool,
+                        "getwindowgeometry",
+                        "--shell",
+                        str(window_id),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=1.0,
+                    env=environment,
+                )
+
+                if geometry_result.returncode != 0:
+                    continue
+
+                geometry: dict[str, str] = {}
+
+                for line in geometry_result.stdout.splitlines():
+                    if "=" not in line:
+                        continue
+
+                    key, value = line.split("=", 1)
+                    geometry[key.strip()] = value.strip()
+
+                width = int(geometry.get("WIDTH", "0"))
+                height = int(geometry.get("HEIGHT", "0"))
+
+                if width < 64 or height < 64:
+                    continue
+
+                title_result = subprocess.run(
+                    [
+                        xdotool,
+                        "getwindowname",
+                        str(window_id),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=1.0,
+                    env=environment,
+                )
+
+                class_result = subprocess.run(
+                    [
+                        xdotool,
+                        "getwindowclassname",
+                        str(window_id),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=1.0,
+                    env=environment,
+                )
+
+                title = (
+                    title_result.stdout.strip()
+                    if title_result.returncode == 0
+                    else ""
+                )
+                window_class = (
+                    class_result.stdout.strip()
+                    if class_result.returncode == 0
+                    else ""
+                )
+
+                matches.append(
+                    {
+                        "type": "window",
+                        "process": "retroarch",
+                        "pid": process_id,
+                        "title": title,
+                        "window_class": window_class,
+                        "width": width,
+                        "height": height,
+                        "_window_id": window_id,
+                        "_area": int(width * height),
+                    }
+                )
+            except (
+                OSError,
+                ValueError,
+                subprocess.TimeoutExpired,
+            ):
+                continue
+
+        if not matches:
+            return None
+
+        return max(
+            matches,
+            key=lambda item: int(item["_area"]),
+        )
     def _find_retroarch_window(
         self,
+        managed_process_id: int | None = None,
     ) -> dict[str, Any] | None:
         """Return the largest visible top-level window owned by RetroArch.
 
-        The Android client never supplies a title, PID, or HWND.  PrivyHub
-        derives the target from the exact project-managed RetroArch executable.
+        Windows preserves the validated executable-path ownership check.
+        Linux uses the EmulatorManager-owned PID because an AppImage executable
+        resolves through a temporary mount rather than its project path.
         """
+
+        if self._linux_host():
+            return self._find_linux_retroarch_window(
+                managed_process_id
+            )
 
         if os.name != "nt":
             return None
@@ -608,13 +916,16 @@ class NativeStreamManager:
 
     def _select_capture_target(
         self,
+        managed_process_id: int | None = None,
     ) -> dict[str, Any]:
         # Fail closed. Native game streaming must never silently broaden from
         # the PrivyHub-owned emulator window to the user's whole desktop.
         deadline = time.monotonic() + 2.0
 
         while time.monotonic() < deadline:
-            window = self._find_retroarch_window()
+            window = self._find_retroarch_window(
+                managed_process_id
+            )
 
             if window is not None:
                 return window
@@ -623,8 +934,8 @@ class NativeStreamManager:
 
         raise NativeStreamError(
             "No visible window owned by the project-managed RetroArch "
-            "executable was found. Whole-desktop capture is intentionally "
-            "disabled in Native Performance Alpha v0.6."
+            "session was found. Whole-desktop capture is intentionally "
+            "disabled."
         )
 
     @staticmethod
@@ -734,6 +1045,109 @@ class NativeStreamManager:
             destination,
         ]
 
+
+    def _build_linux_ffmpeg_command(
+        self,
+        ffmpeg: Path,
+        capture_target: dict[str, Any],
+        bitrate_kbps: int | None = None,
+        max_bitrate_kbps: int | None = None,
+    ) -> list[str]:
+        target_bitrate_kbps = (
+            self.BITRATE_KBPS
+            if bitrate_kbps is None
+            else int(bitrate_kbps)
+        )
+        target_max_bitrate_kbps = (
+            self.MAX_BITRATE_KBPS
+            if max_bitrate_kbps is None
+            else int(max_bitrate_kbps)
+        )
+
+        if (
+            target_bitrate_kbps <= 0
+            or target_max_bitrate_kbps < target_bitrate_kbps
+        ):
+            raise NativeStreamError(
+                "Invalid native-stream encoder bitrate override"
+            )
+
+        display = self._linux_display()
+        vaapi_device = self._linux_vaapi_device()
+
+        try:
+            window_id = int(
+                capture_target["_window_id"]
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise NativeStreamError(
+                "Linux capture target has no valid X11 window ID"
+            ) from exc
+
+        if display is None:
+            raise NativeStreamError(
+                "Linux native video requires an active X11 DISPLAY."
+            )
+
+        if vaapi_device is None:
+            raise NativeStreamError(
+                "Linux native video requires exactly one accessible DRM "
+                "render node."
+            )
+
+        destination = (
+            f"rtp://127.0.0.1:{self.FEC_INPUT_PORT}"
+            "?pkt_size=1200"
+        )
+
+        video_filter = (
+            f"scale={self.WIDTH}:{self.HEIGHT}:"
+            "force_original_aspect_ratio=decrease:"
+            "flags=fast_bilinear,"
+            f"pad={self.WIDTH}:{self.HEIGHT}:"
+            "(ow-iw)/2:(oh-ih)/2:black,"
+            "format=nv12,hwupload"
+        )
+
+        return [
+            str(ffmpeg),
+            "-hide_banner",
+            "-loglevel",
+            "info",
+            "-nostdin",
+            "-vaapi_device",
+            str(vaapi_device),
+            "-f",
+            "x11grab",
+            "-framerate",
+            str(self.FPS),
+            "-window_id",
+            str(window_id),
+            "-i",
+            display,
+            "-vf",
+            video_filter,
+            "-an",
+            "-c:v",
+            "h264_vaapi",
+            "-profile:v",
+            "high",
+            "-b:v",
+            f"{target_bitrate_kbps}k",
+            "-maxrate",
+            f"{target_max_bitrate_kbps}k",
+            "-bufsize",
+            f"{target_max_bitrate_kbps}k",
+            "-g",
+            str(self.GOP_FRAMES),
+            "-bf",
+            str(self.BFRAMES),
+            "-payload_type",
+            str(self.PAYLOAD_TYPE),
+            "-f",
+            "rtp",
+            destination,
+        ]
     @staticmethod
     def _kill_managed_process(
         process: subprocess.Popen[Any] | None,
@@ -818,10 +1232,194 @@ class NativeStreamManager:
 
             self._log_handle = None
 
+
+    def _start_linux_locked(
+        self,
+        client_ip: str,
+        port: int,
+        managed_process_id: int | None,
+    ) -> dict[str, Any]:
+        if not self._linux_host():
+            raise NativeStreamError(
+                "Linux native-video backend requested on a non-Linux host."
+            )
+
+        try:
+            process_id = int(managed_process_id)
+        except (TypeError, ValueError) as exc:
+            raise NativeStreamError(
+                "Linux native video requires the managed RetroArch process ID."
+            ) from exc
+
+        if (
+            process_id <= 0
+            or not Path(f"/proc/{process_id}").is_dir()
+        ):
+            raise NativeStreamError(
+                "The managed RetroArch process is no longer active."
+            )
+
+        ffmpeg = self._find_ffmpeg()
+
+        if ffmpeg is None:
+            raise NativeStreamError(
+                "FFmpeg was not found on the Linux host."
+            )
+
+        if self._linux_display() is None:
+            raise NativeStreamError(
+                "Linux native video requires an active X11 DISPLAY."
+            )
+
+        if self._linux_xdotool() is None:
+            raise NativeStreamError(
+                "Linux native video requires xdotool for fail-closed "
+                "managed-window discovery."
+            )
+
+        if self._linux_vaapi_device() is None:
+            raise NativeStreamError(
+                "Linux native video requires exactly one accessible DRM "
+                "render node."
+            )
+
+        self._stop_locked()
+
+        capture_target = self._select_capture_target(
+            managed_process_id=process_id
+        )
+        capture_target = dict(capture_target)
+        capture_target["backend"] = "x11grab_window"
+
+        self._capture_target = capture_target
+
+        self.data_dir.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+        self.log_dir.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        self._log_handle = open(
+            self.log_path,
+            "a",
+            encoding="utf-8",
+            errors="replace",
+            buffering=1,
+        )
+
+        self._log_handle.write(
+            "\n"
+            + "=" * 72
+            + "\n"
+        )
+        self._log_handle.write(
+            "Starting PrivyHub Linux native-video backend "
+            f"v{self.ALPHA_VERSION}\n"
+        )
+        self._log_handle.write(
+            f"Profile: {self.PROFILE.id} "
+            f"{self.WIDTH}x{self.HEIGHT}@{self.FPS}, "
+            f"{self.BITRATE_KBPS}/{self.MAX_BITRATE_KBPS} kbps "
+            f"H.264 VAAPI, GOP={self.GOP_FRAMES}, BF={self.BFRAMES}\n"
+        )
+        self._log_handle.write(
+            "Capture backend: exact X11 window via x11grab\n"
+        )
+        self._log_handle.write(
+            "Capture: managed RetroArch window "
+            f"(pid={process_id}, "
+            f"window_id={capture_target['_window_id']}, "
+            f"discovered={capture_target['width']}x"
+            f"{capture_target['height']})\n"
+        )
+        self._log_handle.write(
+            f"Window title: {capture_target.get('title', '')}\n"
+        )
+        self._log_handle.write(
+            f"Video FEC: XOR {self.FEC_GROUP_SIZE}+1; "
+            "FFmpeg RTP -> loopback relay -> onn; "
+            f"encoder={self.BITRATE_KBPS} kbps\n"
+        )
+        self._log_handle.write(
+            "=" * 72
+            + "\n"
+        )
+        self._log_handle.flush()
+
+        try:
+            self._fec_relay.start(
+                client_ip=client_ip,
+                client_port=port,
+            )
+
+            self._process = subprocess.Popen(
+                self._build_linux_ffmpeg_command(
+                    ffmpeg=ffmpeg,
+                    capture_target=capture_target,
+                ),
+                cwd=str(self.project_root),
+                stdin=subprocess.DEVNULL,
+                stdout=self._log_handle,
+                stderr=subprocess.STDOUT,
+            )
+        except Exception as exc:
+            self._stop_locked()
+            raise NativeStreamError(
+                f"Unable to start Linux native video: {exc}"
+            ) from exc
+
+        self._client_port = port
+
+        deadline = time.monotonic() + 0.75
+
+        while time.monotonic() < deadline:
+            if (
+                self._process is None
+                or self._process.poll() is not None
+                or not self._fec_relay.running
+            ):
+                log_tail = self._tail_log()
+                self._stop_locked()
+
+                detail = (
+                    f"\n\nFFmpeg log:\n{log_tail}"
+                    if log_tail
+                    else ""
+                )
+
+                raise NativeStreamError(
+                    "Linux native video exited during startup."
+                    + detail
+                )
+
+            time.sleep(0.05)
+
+        self._session_io.start(
+            ffmpeg=ffmpeg,
+            client_ip=client_ip,
+            audio_port=self.AUDIO_PORT,
+            input_port=self.INPUT_PORT,
+            process_id=process_id,
+        )
+
+        payload = self.status()
+        payload["bootstrap"] = "in_band_h264_parameter_sets"
+        payload["fec_enabled"] = True
+        payload["fec_group_size"] = self.FEC_GROUP_SIZE
+        payload["source_bitrate_kbps"] = self.BITRATE_KBPS
+        payload["capture_target"] = self._public_capture_target(
+            capture_target
+        )
+
+        return payload
     def start(
         self,
         client_ip: str,
         port: int = DEFAULT_PORT,
+        managed_process_id: int | None = None,
     ) -> dict[str, Any]:
         client_ip = self._validated_ipv4(
             client_ip
@@ -832,10 +1430,16 @@ class NativeStreamManager:
         )
 
         with self._lock:
+            if self._linux_host():
+                return self._start_linux_locked(
+                    client_ip=client_ip,
+                    port=port,
+                    managed_process_id=managed_process_id,
+                )
+
             if os.name != "nt":
                 raise NativeStreamError(
-                    "Native Performance Alpha v0.6 currently supports "
-                    "the Windows host only."
+                    "Native streaming is not implemented for this host platform."
                 )
 
             ffmpeg = self._find_ffmpeg()

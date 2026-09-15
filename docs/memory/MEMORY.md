@@ -828,3 +828,19 @@ Remaining Phase D production seams:
 
 Windows bitrate values remain reference evidence only. Linux bitrate, FEC, and
 actuation behavior must be characterized independently.
+
+## Linux native-video implementation boundary — D-074
+
+The Linux production video backend uses the manager-owned RetroArch PID as the
+capture identity. AppImage `/proc/<pid>/exe` paths are temporary mount paths and
+must not be treated as durable project identity.
+
+Linux video is intentionally single-process:
+`exact X11 window -> FFmpeg x11grab -> VAAPI H.264 -> loopback RTP -> existing
+NativeVideoFecRelay`.
+
+Do not create a Linux WGC-equivalent raw-frame bridge. Preserve the existing
+Android RTP/H.264/FEC contract.
+
+The Windows WGC/NVENC path remains a separate validated backend and must not be
+changed by Linux implementation work.
