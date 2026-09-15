@@ -26,7 +26,7 @@ C1.1 static reference profile extraction: **RUNTIME VALIDATED / CHECKPOINTED / P
 
 Native-stream status privacy hotfix: **LIVE ENDPOINT VALIDATED / CHECKPOINTED / PUSHED**
 
-Next work: implement the C2 `privyhub_stream_telemetry_v1` measurement contract.
+Next work: C3 actuator continuity diagnostic under D-062.
 
 ## Active technical step
 
@@ -295,7 +295,7 @@ Design status: **COMPLETE / CHECKPOINTED / PUSHED**.
 
 ## C2 stream telemetry v1 implementation
 
-**Status:** COMPLETE / RUNTIME VALIDATED / CHECKPOINT PENDING
+**Status:** COMPLETE / RUNTIME VALIDATED / CHECKPOINTED / PUSHED
 
 D-060 is now implemented and runtime validated.
 
@@ -330,3 +330,18 @@ Intentionally unchanged:
 - WAN/overlay/session routing.
 
 Next development step after checkpoint: **C3 adaptive bitrate**.
+
+## C3 adaptive bitrate design / actuator gate
+
+**Status:** C3.1 SOURCE/POLICY AUDIT COMPLETE / ACTUATOR DIAGNOSTIC NEXT
+
+The synchronized C2 checkpoint is `da03bb59cee9f7e9cf8bdfcc91dc1f52454beff0`.
+
+Source audit found no live bitrate actuator in the current stream manager.
+
+Next: `C3_ACTUATOR_CONTINUITY_PROBE`.
+
+Keep bitrate at 7000 kbps and measure one prospective video-only actuator cycle
+before changing bitrate or implementing automatic adaptation.
+
+Do not add a guessed production minimum bitrate yet.

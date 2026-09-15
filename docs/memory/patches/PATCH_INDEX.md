@@ -405,3 +405,8 @@ This index records durable checkpoints and major patch lines; it does not invent
   Production/runtime bytes are exact-gated and unchanged. Promotes C2 to
   COMPLETE / RUNTIME VALIDATED / CHECKPOINT PENDING and advances the next
   development step to C3 adaptive bitrate.
+
+- `privyhub_c3_adaptive_bitrate_design_02_2026-09-14` — documentation/design-only C3.1 source/policy audit on synchronized
+  checkpoint `da03bb59cee9f7e9cf8bdfcc91dc1f52454beff0`. Adds D-062, adaptive-bitrate architecture, and
+  the active actuator-feasibility investigation. Production/runtime behavior is
+  unchanged.

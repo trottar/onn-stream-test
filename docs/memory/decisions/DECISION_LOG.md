@@ -668,3 +668,37 @@ transports.
 The audit's old literal-source checks for direct mDNS/reconnect calls are stale
 after the helper refactor and are not authoritative. Raw runtime behavior is
 authoritative. No network-bearing target data is stored in durable memory.
+
+### D-062 — C3 separates adaptation policy from the bitrate actuator
+
+**Status:** Accepted design / actuator runtime evidence pending (2026-09-14)
+
+C3 consumes `privyhub_stream_telemetry_v1` at the existing 2-second cadence and
+changes bitrate only. Resolution remains 1280x720, frame rate 60, GOP 15,
+B-frames 0 and FEC group size 8.
+
+The current FFmpeg/NVENC CLI process is configured with fixed startup
+`-b:v`/`-maxrate`, uses `-nostdin`, and directly consumes the WGC stdout pipe.
+PrivyHub therefore has no live bitrate setter today. Do not implement the
+adaptive controller around an assumed setter or use full stream teardown
+blindly as an adaptation primitive.
+
+Introduce a backend-neutral bitrate actuator boundary. The first diagnostic
+keeps bitrate at 7000 kbps and measures one prospective video-only actuator
+cycle, including receiver resync/IDR/render continuity and preservation of
+audio/controller/game lifecycle.
+
+If controlled video-only restart is acceptable, it may be the first actuator.
+If not, move to true live encoder reconfiguration.
+
+C3 is latency/capacity driven. Recovered FEC packets alone, stale-output shedding
+alone, or isolated random loss do not independently force bitrate reduction.
+Telemetry stale/unavailable/resync states freeze adaptation.
+
+The evidence-backed upper bound remains 7000 kbps. Do not invent a production
+minimum or bitrate ladder from the single healthy C2 reference interval.
+Characterize fixed lower bitrates after the actuator boundary is validated;
+only validated levels become the bounded production ladder.
+
+Every later automatic decision must expose an explicit state, reason code and
+supporting measurements. C4 adaptive FEC remains separate.

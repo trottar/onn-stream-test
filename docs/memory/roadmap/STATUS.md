@@ -191,10 +191,24 @@ Do not begin adaptive bitrate until the C2 telemetry contract is validated.
 ## C2 implementation state
 
 `C2_IMPLEMENT_STREAM_TELEMETRY_V1` — **COMPLETE / RUNTIME VALIDATED /
-CHECKPOINT PENDING**
+CHECKPOINTED / PUSHED**
 
 The live telemetry contract and representative gameplay regression passed on
 2026-09-14.
 
-**Next:** C3 adaptive bitrate after checkpoint/push of this validated C2 + ADB
-tooling state.
+**Next:** C3 actuator continuity diagnostic under D-062.
+
+## Active item: C3 adaptive bitrate
+
+### C3.1 source/policy audit
+
+`C3_DESIGN_CONTROLLER_ACTUATOR_BOUNDARY` — **COMPLETE**
+
+Decision: D-062.
+
+### Next diagnostic
+
+`C3_ACTUATOR_CONTINUITY_PROBE`
+
+Keep bitrate unchanged at 7000 kbps and test one prospective video-only actuator
+cycle before automatic adaptation or a production minimum bitrate is defined.

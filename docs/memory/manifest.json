@@ -19,8 +19,8 @@
   "b4_status": "COMPLETE / runtime validated",
   "b5_status": "COMPLETE / runtime validated",
   "b6_status": "COMPLETE / checkpointed / pushed",
-  "baseline_commit": "47d3cf54220146c1d727e2a0491111f6d7dea6c9",
-  "baseline_short": "47d3cf54",
+  "baseline_commit": "da03bb59cee9f7e9cf8bdfcc91dc1f52454beff0",
+  "baseline_short": "da03bb59",
   "c1_design_memory_checkpoint": "CHECKPOINTED / PUSHED",
   "c1_design_status": "COMPLETE / CHECKPOINTED / PUSHED / C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA",
   "c1_implementation_status": "RUNTIME VALIDATED / CHECKPOINTED / PUSHED",
@@ -41,9 +41,14 @@
   },
   "c1_reference_profile_source": "companion/native_stream_profiles.py",
   "c2_design_status": "COMPLETE / CHECKPOINTED / PUSHED",
-  "c2_implementation_status": "COMPLETE / RUNTIME VALIDATED / CHECKPOINT PENDING",
+  "c2_implementation_status": "COMPLETE / RUNTIME VALIDATED / CHECKPOINTED / PUSHED",
   "c2_inventory_status": "COMPLETE / CHECKPOINTED / PUSHED",
-  "c2_next_step": "C3_ADAPTIVE_BITRATE",
+  "c2_next_step": "C3_ACTUATOR_CONTINUITY_PROBE",
+  "c3_actuator_status": "DIAGNOSTIC REQUIRED",
+  "c3_controller_status": "NOT IMPLEMENTED",
+  "c3_design_status": "C3.1 SOURCE/POLICY AUDIT COMPLETE",
+  "c3_min_bitrate_status": "UNSET / CHARACTERIZATION REQUIRED",
+  "c3_reference_max_bitrate_kbps": 7000,
   "checkpoint_parent_commit": "a6dbf627dd32af7da975bf01a679350810026ca3",
   "checkpoint_scope": "Part 1 current-state repair + completed C1 inventory memory/probe",
   "classifier_changed": false,
@@ -52,8 +57,8 @@
   "client_health_storage": "latest only plus one delta baseline",
   "companion_behavior_changed": true,
   "current_phase": "Phase C",
-  "current_step": "C3 adaptive bitrate",
-  "decision_id_state": "unique durable IDs through D-061",
+  "current_step": "C3 actuator continuity diagnostic",
+  "decision_id_state": "unique durable IDs through D-062",
   "decoder_classifier_runtime_validated": true,
   "decoder_stale_policy": "informational unless decoder-local failure exists",
   "deep_memory_history": "docs/memory/history/",
@@ -76,9 +81,9 @@
       "sha256": "2f3c393d42bf1629909e77cdecb9196befaf1b47141656f18ba4bfb2feaad930"
     },
     {
-      "bytes": 11482,
+      "bytes": 11974,
       "path": "CURRENT.md",
-      "sha256": "ff1da0ead1d1edabc0f9856eba705029590ea380ad23ba60900a3d93b868f061"
+      "sha256": "8b091c5be8c6d84b342050d3b0b05acb2e3499f8942367cee7da16c9780cd53d"
     },
     {
       "bytes": 2564,
@@ -86,9 +91,9 @@
       "sha256": "7957a58cd59456684c568bc85d8fe39c22d130b58ddaf9d9d636f7b063fa9698"
     },
     {
-      "bytes": 15588,
+      "bytes": 16176,
       "path": "MEMORY.md",
-      "sha256": "960a661dff6c8c3f3d583f4bec7b30035e7964f972f881c2a208d7b05124c5cb"
+      "sha256": "4477a88f679f80a5a0422682e7328e702656ae743cbee196de802ffd172c7e85"
     },
     {
       "bytes": 3012,
@@ -109,6 +114,11 @@
       "bytes": 1288,
       "path": "USER.md",
       "sha256": "fcf02ab01e9bb291796a58a263d488b78008188771a025459bf475de23a0237e"
+    },
+    {
+      "bytes": 7162,
+      "path": "architecture/ADAPTIVE_BITRATE.md",
+      "sha256": "c22ea4b8f355e1b80cb6be8769296e657b04f170d3eb6ce2a197c7d282bd41bc"
     },
     {
       "bytes": 9720,
@@ -141,9 +151,9 @@
       "sha256": "bc203ed62b6ac9a316127b77bc9f8666f3d7566b21298ed919d776eab65f809d"
     },
     {
-      "bytes": 6361,
+      "bytes": 6811,
       "path": "architecture/STREAM_TELEMETRY.md",
-      "sha256": "4d94673009d1d17afe9e6696b7c7bce9bc2c17a6a038477f242b223d7057e32b"
+      "sha256": "e5c9a4814bdfb6990c41b12345850cceac126259ee6127e2ab98f0ff487d540a"
     },
     {
       "bytes": 2108,
@@ -161,9 +171,9 @@
       "sha256": "d159cccf4315d615d21c7cc2cd7765bcc5be691b5f2ca7ed9f8c4a7b14d593dc"
     },
     {
-      "bytes": 32809,
+      "bytes": 34518,
       "path": "decisions/DECISION_LOG.md",
-      "sha256": "709aef6da39e47d77ac15021bf11ce476e7dc00b195bb085bbf8ee27632e356b"
+      "sha256": "b5ab9ad14e0c26fd38d4abe376d1565544a04222da6398f6ff6bda4aee03406b"
     },
     {
       "bytes": 1129,
@@ -461,9 +471,9 @@
       "sha256": "7cd58c6b7e2b128e36b3a879fa151444790e9d95d9b12ec933f415bec19ef756"
     },
     {
-      "bytes": 9582,
+      "bytes": 10077,
       "path": "handoffs/CURRENT_HANDOFF.md",
-      "sha256": "fe471d4e5a25e32935d01a2d470ce43a2b066da55561e144c033886dbf5dc85f"
+      "sha256": "5842a1f49a9d3d3b82d19ad28f46d907d4cf24690b5b29aebb4d15cd035ca5f7"
     },
     {
       "bytes": 20924,
@@ -496,6 +506,11 @@
       "sha256": "f523c870dedc6a886078ba6a94b1fc54e3a2f4936264e382e9738ab9338e06f3"
     },
     {
+      "bytes": 1135,
+      "path": "investigations/C3_BITRATE_ACTUATOR.md",
+      "sha256": "6c8203f99a649e03a632f3ce58ceed8d8f627908a84bb3aa233c28f508102c68"
+    },
+    {
       "bytes": 2537,
       "path": "investigations/CLOSED.md",
       "sha256": "28e663cd873901bbe7f939e5c71125332b54ccd8b63a410986a12c6f02aba7fe"
@@ -516,14 +531,14 @@
       "sha256": "0bc6c287c87ba9c90326a6672b923c581a33493b83e38383df521c7c733cff28"
     },
     {
-      "bytes": 9055,
+      "bytes": 9659,
       "path": "memory/2026-09-14.md",
-      "sha256": "962ead46bdfc7522f4058d2c5a30e74f7161165c10939321c6f7f79baead788d"
+      "sha256": "42a268a10b80ca1b342c34810a59230a803a216401d56944c8c4b22d64d0f3f1"
     },
     {
-      "bytes": 31232,
+      "bytes": 31555,
       "path": "patches/PATCH_INDEX.md",
-      "sha256": "c3a776d0f1558d269a8eb0fe8f1fdc6c97828ed6fdea078e648c31e6f69efdfd"
+      "sha256": "21b84d2071a098d7cf3cdfc8913eddd20cb772e7f7bb43231d5e820f5956b8c1"
     },
     {
       "bytes": 1894,
@@ -546,9 +561,9 @@
       "sha256": "9b2d03a0a18fe45ea7ee607020d922232e1d15603f9bfb0eccd4e5165088cd12"
     },
     {
-      "bytes": 7481,
+      "bytes": 7804,
       "path": "roadmap/STATUS.md",
-      "sha256": "7cb6d48c81ad15be2e9fb3613dc720a2d439e27247c327a3507de40354bd97e8"
+      "sha256": "75dfcb9fd2b7579ad65df2f41102260bb6bf57c4d7663690da958a772041bebc"
     },
     {
       "bytes": 750,
@@ -592,7 +607,7 @@
   "phase_c_status": "ACTIVE",
   "physical_legacy_groups_deleted": 9,
   "predecessor": "C1 stream parameter inventory",
-  "production_behavior_changed": true,
+  "production_behavior_changed": false,
   "ps1_multitap_status": "complete / runtime validated on Crash Bash and CTR; Port 1 only",
   "remote_architecture_checkpoint": "CHECKPOINTED / PUSHED",
   "remote_architecture_decision": "D-059 ACCEPTED / CHECKPOINTED / PUSHED",

@@ -39,7 +39,7 @@ C1.1 static reference profile extraction is runtime validated and checkpointed/p
 
 The native-stream public-status privacy hotfix is live-endpoint validated and checkpointed/pushed.
 
-Next work: `C2_IMPLEMENT_STREAM_TELEMETRY_V1`.
+Next work: `C3_ACTUATOR_CONTINUITY_PROBE`.
 
 Do not rerun the completed C1 inventory unless source changes invalidate it.
 
@@ -282,7 +282,7 @@ Decision: D-060.
 ## C2 implementation runtime-validated state
 
 `C2_IMPLEMENT_STREAM_TELEMETRY_V1` — **COMPLETE / RUNTIME VALIDATED /
-CHECKPOINT PENDING**
+CHECKPOINTED / PUSHED**
 
 Evidence:
 - `docs/memory/evidence/C2_STREAM_TELEMETRY_RUNTIME_VALIDATED_2026-09-14.md`;
@@ -293,4 +293,20 @@ The stale cached wireless-ADB failure path encountered during C2 installation
 is also runtime validated as fixed; see
 `docs/memory/evidence/ADB_STALE_CACHE_RECOVERY_RUNTIME_VALIDATED_2026-09-14.md`.
 
-Next after checkpoint/push: **C3 adaptive bitrate**.
+C3 is active. Next: **C3_ACTUATOR_CONTINUITY_PROBE**.
+
+## C3 continuation
+
+C2 is checkpointed/pushed at `da03bb59cee9f7e9cf8bdfcc91dc1f52454beff0`.
+
+C3.1 source/policy audit is complete under D-062.
+
+The present FFmpeg/NVENC process has no live PrivyHub bitrate control surface.
+
+Do not implement the automatic controller yet.
+
+Next diagnostic: `C3_ACTUATOR_CONTINUITY_PROBE`.
+
+Keep 7000 kbps and determine whether a narrow video-only actuator cycle can
+preserve audio/controller/game lifecycle and recover Android IDR/render
+continuity acceptably.

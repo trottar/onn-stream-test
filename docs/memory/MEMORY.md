@@ -42,12 +42,12 @@ minimization and no silent fallback.
 - Remote-foundation architecture/roadmap update: **CHECKPOINTED / PUSHED**
 - C2.1 telemetry inventory: **COMPLETE**
 - C2.2 minimal telemetry contract design: **COMPLETE / CHECKPOINTED / PUSHED**
-- C2 stream telemetry v1 implementation: **COMPLETE / RUNTIME VALIDATED / CHECKPOINT PENDING**
+- C2 stream telemetry v1 implementation: **COMPLETE / RUNTIME VALIDATED / CHECKPOINTED / PUSHED**
 
 The completed C1 inventory should not be rerun unless source changes invalidate
 its evidence.
 
-Next: `C2_IMPLEMENT_STREAM_TELEMETRY_V1` under D-059/D-060.
+Next: `C3_ACTUATOR_CONTINUITY_PROBE` under D-059/D-060/D-062.
 
 ## C1 reference stream
 
@@ -412,7 +412,7 @@ C2 contains measurements only. C3 owns adaptation policy.
 ## C2 implementation status
 
 `C2_IMPLEMENT_STREAM_TELEMETRY_V1` is **COMPLETE / RUNTIME VALIDATED /
-CHECKPOINT PENDING**.
+CHECKPOINTED / PUSHED**.
 
 The live `privyhub_stream_telemetry_v1` contract passed all automated runtime
 gates, and representative gameplay passed picture, process audio, controller,
@@ -420,3 +420,19 @@ Pause/Resume, Save/Load and End/teardown.
 
 C3 adaptive bitrate is the next development step after this validated state is
 checkpointed and pushed.
+
+## C3 adaptive bitrate durable rules
+
+C3 is active after the runtime-validated C2 checkpoint.
+
+D-062:
+- reuse the 2-second telemetry cadence;
+- keep 1280x720/60/GOP15/B-frames0/FEC8 fixed;
+- separate controller from a backend-neutral bitrate actuator;
+- current FFmpeg CLI path has no live bitrate setter;
+- first probe one unchanged-7000 video-actuator cycle;
+- stale/unavailable/resync telemetry freezes adaptation;
+- do not invent the production minimum/ladder before characterization;
+- C4 adaptive FEC remains separate.
+
+Next technical step: `C3_ACTUATOR_CONTINUITY_PROBE`.

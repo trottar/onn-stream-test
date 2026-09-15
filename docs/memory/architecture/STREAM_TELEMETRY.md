@@ -232,7 +232,7 @@ It must not change:
 
 ## C2 telemetry v1 implementation
 
-**Status:** COMPLETE / RUNTIME VALIDATED / CHECKPOINT PENDING
+**Status:** COMPLETE / RUNTIME VALIDATED / CHECKPOINTED / PUSHED
 
 The public diagnostics surface is:
 
@@ -245,3 +245,16 @@ measurements while containing no adaptation-decision fields.
 This closes C2 measurement infrastructure. C3 may consume these measurements,
 but C2 itself does not choose bitrate, classify congestion, apply hysteresis or
 change FEC.
+
+## C3 consumer boundary
+
+C3 consumes this contract at the existing 2-second cadence.
+
+The telemetry module remains measurement-only. Adaptation state, reason codes,
+hold-down/probation and actuator results belong in the C3 controller/status
+surface, not in `privyhub_stream_telemetry_v1`.
+
+Telemetry stale/unavailable or receiver-resync state freezes adaptation rather
+than causing blind bitrate changes.
+
+See `architecture/ADAPTIVE_BITRATE.md`.
