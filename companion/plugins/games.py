@@ -3106,6 +3106,46 @@ class GamesPlugin:
                     str(exc)
                 ) from exc
 
+        if action == "c3-validated-bitrate-transition":
+            # Diagnostic-only actuator surface. Never expose bitrate actuation
+            # to non-loopback callers before the C3 controller owns policy.
+            if client_ip not in {
+                "127.0.0.1",
+                "::1",
+            }:
+                raise RuntimeError(
+                    "C3 validated bitrate transition is loopback-only"
+                )
+
+            target = self._parse_int(
+                self._first(
+                    query,
+                    "target",
+                ),
+                0,
+            )
+
+            if target not in {
+                5500,
+                6000,
+                7000,
+            }:
+                raise ValueError(
+                    "target must be one of 5500, 6000, or 7000"
+                )
+
+            try:
+                return (
+                    self._native_stream
+                    .diagnostic_c3_validated_bitrate_transition(
+                        target
+                    )
+                )
+            except NativeStreamError as exc:
+                raise RuntimeError(
+                    str(exc)
+                ) from exc
+
         if action == "native-stream-start":
             game_status = self._emulator.status()
             if not game_status.get("active", False):

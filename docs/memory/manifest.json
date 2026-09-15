@@ -9,7 +9,7 @@
   "a9_status": "complete / checkpointed; PS1 Multitap On/Off runtime validated; NES/Genesis no local fixtures",
   "adaptive_behavior_changed": false,
   "adb_stale_cache_recovery_status": "CLOSED / RUNTIME VALIDATED 2026-09-14",
-  "android_behavior_changed": true,
+  "android_behavior_changed": false,
   "android_manifest_post_sha256": "ab1140c3230582f9dbbbf3c179d8fa08363971d9289e08442487f3849c7ac8a2",
   "android_moonlight_package_state": "absent / verified; PrivyHub remains present",
   "as_of": "2026-09-14",
@@ -19,8 +19,8 @@
   "b4_status": "COMPLETE / runtime validated",
   "b5_status": "COMPLETE / runtime validated",
   "b6_status": "COMPLETE / checkpointed / pushed",
-  "baseline_commit": "b2f752223d0bd7617a7f7ef75c9618202d2372fa",
-  "baseline_short": "b2f75222",
+  "baseline_commit": "9d7da2ccc47cc78a19f7128161859a1c5f308174",
+  "baseline_short": "9d7da2cc",
   "c1_design_memory_checkpoint": "CHECKPOINTED / PUSHED",
   "c1_design_status": "COMPLETE / CHECKPOINTED / PUSHED / C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA",
   "c1_implementation_status": "RUNTIME VALIDATED / CHECKPOINTED / PUSHED",
@@ -46,7 +46,18 @@
   "c2_next_step": "C3_ACTUATOR_CONTINUITY_PROBE",
   "c3_actuator_status": "VIDEO_ONLY_RESTART ACCEPTED / WINDOWS RUNTIME VALIDATED / LINUX REVALIDATION REQUIRED",
   "c3_actuator_strategy": "video_only_restart",
+  "c3_actuator_validated_directions": "BIDIRECTIONAL",
   "c3_audio_transport_status": "BURST_GAP PATHOLOGY DEFERRED / REPLAY ON LINUX + HOME OPAL",
+  "c3_bidirectional_actuator_status": "BIDIRECTIONAL RECOVERY VALIDATED / VIDEO_ONLY_RESTART NOT ACCEPTED FOR AUTOMATIC ADAPTATION",
+  "c3_bidirectional_down_first_rtp_resume_ms": 952.789,
+  "c3_bidirectional_max_output_gap_ms": 1059,
+  "c3_bidirectional_probe_loopback_only": true,
+  "c3_bidirectional_probe_sequence_kbps": [
+    7000,
+    6000,
+    7000
+  ],
+  "c3_bidirectional_up_first_rtp_resume_ms": 837.313,
   "c3_characterization_bracket_kbps": [
     5000,
     5500
@@ -59,9 +70,10 @@
   ],
   "c3_characterization_status": "COMPLETE / WINDOWS FIXED LADDER 5500-6000-7000 VALIDATED",
   "c3_companion_restart_after_python_changes": true,
-  "c3_controller_status": "NEXT / NOT IMPLEMENTED",
+  "c3_controller_status": "DEFERRED TO LINUX BACKEND / NOT IMPLEMENTED",
   "c3_design_status": "C3.1 SOURCE/POLICY AUDIT COMPLETE / CHECKPOINTED / PUSHED",
   "c3_linux_actuator_status": "NOT RUNTIME VALIDATED / EQUIVALENT BACKEND REQUIRED",
+  "c3_live_bitrate_reconfigure_status": "INTENTIONALLY NOT PURSUED ON WINDOWS / REASSESS ON LINUX",
   "c3_min_bitrate_kbps": 5500,
   "c3_min_bitrate_status": "5500 WINDOWS C3 VALIDATED / LINUX REVALIDATION REQUIRED",
   "c3_mixed_version_runtime_warning": "RESTART COMPANION AFTER PYTHON CHANGES BEFORE VALIDATION",
@@ -80,7 +92,10 @@
     6000,
     5500
   ],
+  "c3_video_only_restart_automatic_status": "NOT ACCEPTED / USER-VISIBLE ~1 SECOND TRANSITION INTERRUPTION",
   "c3_windows_actuator_backend": "wgc_ffmpeg_nvenc",
+  "c3_windows_adaptation_status": "PORTABLE BOUNDARY REACHED / WINDOWS-SPECIFIC WORK STOPPED",
+  "c4_adaptive_fec_status": "DEFERRED TO REPRESENTATIVE LINUX + HOME OPAL + ONN",
   "checkpoint_parent_commit": "a6dbf627dd32af7da975bf01a679350810026ca3",
   "checkpoint_scope": "Part 1 current-state repair + completed C1 inventory memory/probe",
   "classifier_changed": false,
@@ -88,9 +103,9 @@
   "client_health_schema": "privyhub_client_health_v1",
   "client_health_storage": "latest only plus one delta baseline",
   "companion_behavior_changed": true,
-  "current_phase": "Phase C",
-  "current_step": "C3 adaptive bitrate controller",
-  "decision_id_state": "unique durable IDs through D-068",
+  "current_phase": "Phase D",
+  "current_step": "Phase D Linux Migration / Native Linux Baseline",
+  "decision_id_state": "unique durable IDs through D-071",
   "decoder_classifier_runtime_validated": true,
   "decoder_stale_policy": "informational unless decoder-local failure exists",
   "deep_memory_history": "docs/memory/history/",
@@ -113,9 +128,9 @@
       "sha256": "2f3c393d42bf1629909e77cdecb9196befaf1b47141656f18ba4bfb2feaad930"
     },
     {
-      "bytes": 23694,
+      "bytes": 26733,
       "path": "CURRENT.md",
-      "sha256": "e7afbd3fce33a035cdd232e4e2d3cf190eeff230a46fef1ed9e32a5c8b70406a"
+      "sha256": "da66a034c55467fe51f24242b52c2c067810aeb16fb774801c8be422b955005e"
     },
     {
       "bytes": 2564,
@@ -123,9 +138,9 @@
       "sha256": "7957a58cd59456684c568bc85d8fe39c22d130b58ddaf9d9d636f7b063fa9698"
     },
     {
-      "bytes": 26184,
+      "bytes": 29026,
       "path": "MEMORY.md",
-      "sha256": "c1580c7aa9afb140acc03de07c425693ba139493bc05ceeeb644aca63fc1f6de"
+      "sha256": "f6ae99216ff23f48ca623b26d470fca953c30b11a826ad798ced6565d6696c19"
     },
     {
       "bytes": 3012,
@@ -148,9 +163,9 @@
       "sha256": "fcf02ab01e9bb291796a58a263d488b78008188771a025459bf475de23a0237e"
     },
     {
-      "bytes": 15226,
+      "bytes": 17848,
       "path": "architecture/ADAPTIVE_BITRATE.md",
-      "sha256": "73e28b2a13fa67fa0a8c926cd46e530accb0a4c3222098d56130141a32f4ce6d"
+      "sha256": "5a3e75fad98a1404c136dd919c8ef40d812fe986add6f689b16ebb966c575d19"
     },
     {
       "bytes": 9720,
@@ -203,9 +218,9 @@
       "sha256": "d159cccf4315d615d21c7cc2cd7765bcc5be691b5f2ca7ed9f8c4a7b14d593dc"
     },
     {
-      "bytes": 44686,
+      "bytes": 49868,
       "path": "decisions/DECISION_LOG.md",
-      "sha256": "f10f5ff809a0b6a3f05c075ffc86c52f51763e229e47f422e3d4a559755324df"
+      "sha256": "2cd7f0226932833b965802d7dded031a4671e0e5c868373db78b1a5fb45bb184"
     },
     {
       "bytes": 1129,
@@ -408,6 +423,11 @@
       "sha256": "035d86d54e1dc50ef0c26a080ff1c3c608df3c8e271f8bea4d850142338386a9"
     },
     {
+      "bytes": 3094,
+      "path": "evidence/C3_BIDIRECTIONAL_ACTUATOR_DISPOSITION_2026-09-14.md",
+      "sha256": "19579f468d4569c36c7bc07e59d7828a9975726c8d16132c7febcab4863f62bc"
+    },
+    {
       "bytes": 2346,
       "path": "evidence/C3_FIXED_5000_NOT_ACCEPTED_2026-09-14.md",
       "sha256": "b984b7f09f628cfd3796c1d8cffa832dce337c78d356c688a2e8b4f9f6f44df6"
@@ -528,9 +548,9 @@
       "sha256": "7cd58c6b7e2b128e36b3a879fa151444790e9d95d9b12ec933f415bec19ef756"
     },
     {
-      "bytes": 17600,
+      "bytes": 19838,
       "path": "handoffs/CURRENT_HANDOFF.md",
-      "sha256": "6812cbcf7095cf5f71a56b71f29e2299bb1d597e8494d861f4404ce565ea1d02"
+      "sha256": "0540f205432476789a20aaf1fb4889732d4c8145cff115dea64c4217bb011491"
     },
     {
       "bytes": 20924,
@@ -548,9 +568,9 @@
       "sha256": "17179b3916be00b216a803bef7f798eaa59c246835ea85543b23929fa5ef18dc"
     },
     {
-      "bytes": 8202,
+      "bytes": 9680,
       "path": "investigations/ACTIVE.md",
-      "sha256": "d077c9f319a00d6b72a5c47dd95c1b5c018062123ffc66df4e31601a738c3026"
+      "sha256": "8fa90c4bc34c23e6906005ba41846b5c930f83d8b1cb1366cca105b56ef310de"
     },
     {
       "bytes": 2659,
@@ -561,6 +581,11 @@
       "bytes": 1712,
       "path": "investigations/B1_DIAGNOSTICS_INVENTORY.md",
       "sha256": "f523c870dedc6a886078ba6a94b1fc54e3a2f4936264e382e9738ab9338e06f3"
+    },
+    {
+      "bytes": 2769,
+      "path": "investigations/C3_BIDIRECTIONAL_ACTUATOR.md",
+      "sha256": "705bc197bb1648bfd5b765114cfbc317430cac5f56312d4fd5277d70791410c7"
     },
     {
       "bytes": 2616,
@@ -585,7 +610,7 @@
     {
       "bytes": 1520,
       "path": "investigations/DEFERRED.md",
-      "sha256": "3b8f2601d8e5fb003919cd9af4425778e46b89092f63761dc6ed083c9a92f0fd"
+      "sha256": "af70d1e3c1807d17e442dd8be34c0db59b8d6abe64cc7f99b698de580f5f7fd5"
     },
     {
       "bytes": 27117,
@@ -598,14 +623,14 @@
       "sha256": "0bc6c287c87ba9c90326a6672b923c581a33493b83e38383df521c7c733cff28"
     },
     {
-      "bytes": 17642,
+      "bytes": 19719,
       "path": "memory/2026-09-14.md",
-      "sha256": "f72d29e588665c325a4b85eb22eebfade0614020a4890477827b60353d00f0b7"
+      "sha256": "6a72721d043d291ab5b96c3b89740e71eff36d66899713b911d453c1535cdedc"
     },
     {
-      "bytes": 37468,
+      "bytes": 39153,
       "path": "patches/PATCH_INDEX.md",
-      "sha256": "8e68727c373f3e00111758ed6312a6cd4bd40e36c484fad8de685ec2a6266ac0"
+      "sha256": "b612790ac1b9bbfc37b3f02d8f05534ed8999e27025080e81adc75f1f2f0a77e"
     },
     {
       "bytes": 1894,
@@ -625,12 +650,12 @@
     {
       "bytes": 1886,
       "path": "repository/DEBT.md",
-      "sha256": "9b2d03a0a18fe45ea7ee607020d922232e1d15603f9bfb0eccd4e5165088cd12"
+      "sha256": "5157fbc4db4194f2102dde6c829ce2f7c9a3c61df831ace7850b9e7b1c95d641"
     },
     {
-      "bytes": 11955,
+      "bytes": 13180,
       "path": "roadmap/STATUS.md",
-      "sha256": "c352ff0d1ac7c7fefbdd897f9fcd437961a95774e9cfbadc814a99c4b090a9c1"
+      "sha256": "3592ec4e60b1d66538711739587c027bba0b32b6fb40963e6a88b57085fa8790"
     },
     {
       "bytes": 750,
@@ -693,6 +718,10 @@
     "pktmon_full.txt"
   ],
   "roadmap_authoritative_path": "docs/ROADMAP.md",
+  "roadmap_phase_d": "Linux Migration / Native Linux Baseline",
+  "roadmap_phase_e": "Linux Core Resource Characterization & Optimization",
+  "roadmap_phase_f": "Media Library / VOD / Live TV UX",
+  "roadmap_reorder_status": "D-071 ACCEPTED / LINUX BEFORE MEDIA POLISH",
   "roadmap_revision": "v4 remote-foundation promotion / CHECKPOINTED / PUSHED",
   "roadmap_status": "v3 authoritative / unchanged by Part 4",
   "roadmap_version": "v3",

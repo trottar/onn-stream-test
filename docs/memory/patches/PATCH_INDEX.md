@@ -492,3 +492,27 @@ This index records durable checkpoints and major patch lines; it does not invent
   no initial lag after companion restart, preserves the stale-companion
   mixed-version diagnosis, and promotes companion restart after Python changes
   to a durable runtime-validation rule. Production source bytes unchanged.
+
+- `privyhub_c3_bidirectional_actuator_probe_01_2026-09-14` — diagnostic-only C3 bidirectional
+  actuator patch on synchronized checkpoint `9d7da2ccc47cc78a19f7128161859a1c5f308174`. Generalizes the
+  already-validated shared video-only restart primitive for validated-ladder
+  diagnostic transitions, preserves existing fixed-characterization semantics,
+  adds a loopback-only 5500/6000/7000 transition route, and adds a two-stage
+  `7000 -> 6000 -> 7000` evidence tool. No Android/FEC/audio/controller or
+  automatic-adaptation change. Runtime evidence pending.
+
+- `privyhub_c3_bidirectional_actuator_runtime_disposition_01_2026-09-14` — docs/evidence-only D-070 disposition on
+  exact installed D-069 development state from checkpoint `9d7da2ccc47cc78a19f7128161859a1c5f308174`.
+  Records successful bidirectional `7000 -> 6000 -> 7000` recovery, preserves
+  transition-local telemetry and the ~1 s visible freeze, rejects
+  `video_only_restart` for seamless automatic gameplay adaptation, retains it as
+  diagnostic/startup/manual/fallback capability, and advances C3 to live bitrate
+  reconfiguration investigation. Runtime source unchanged.
+
+- `privyhub_linux_first_phase_reorder_01_2026-09-14` — docs/roadmap-only D-071 update on exact
+  installed D-070 development state from checkpoint `9d7da2ccc47cc78a19f7128161859a1c5f308174`. Stops
+  Windows/NVENC-specific adaptation work, reorders old phases E/F/D into new
+  D Linux Migration, E Linux Characterization/Optimization, F Media/VOD/Live TV,
+  preserves working media during migration without requiring polish first,
+  defers adaptation/FEC continuation to Linux, and leaves G+ unchanged. No
+  runtime source changes.

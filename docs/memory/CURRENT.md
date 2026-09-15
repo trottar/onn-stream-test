@@ -652,3 +652,83 @@ runtime judgment.
 
 Next: checkpoint D-067/D-068, then continue C3 adaptive bitrate controller work
 over 5500/6000/7000.
+
+## C3 bidirectional actuator validation — D-069
+
+**Status:** DEVELOPMENT DIAGNOSTIC / RUNTIME EVIDENCE PENDING
+
+Authoritative predecessor: `9d7da2ccc47cc78a19f7128161859a1c5f308174`.
+
+Startup stabilization is runtime validated and the Windows fixed ladder remains
+5500/6000/7000.
+
+Before automatic policy, validate the missing actuator direction:
+`7000 -> 6000 -> 7000`.
+
+The existing shared video-only restart implementation is generalized in place;
+existing 6000/5000/5500 characterization wrappers retain their reference-start
+semantics.
+
+The new transition surface is loopback-only and diagnostic. Automatic bitrate
+control remains disabled.
+
+Next evidence: run the bidirectional probe during normal gameplay, End normally,
+finalize the probe, and review raw telemetry/decoder evidence plus focused
+transition smoothness observation.
+
+Restart the companion after installing this Python-side diagnostic.
+
+## C3 bidirectional actuator disposition — D-070
+
+**Status:** BIDIRECTIONAL RECOVERY VALIDATED / VIDEO-ONLY RESTART NOT ACCEPTED FOR AUTOMATIC ADAPTATION
+
+D-069 completed `7000 -> 6000 -> 7000`.
+
+Both legs recovered, but first RTP was absent for about 953 ms on the downshift
+and 837 ms on the upshift. Focused play observed an approximately one-second
+freeze during one shift. Final decoder evidence recorded a 1,059-ms max output
+gap and 1,074-ms max receive-to-decode.
+
+The downshift sampled recovery was clean. The first fresh upshift interval
+recorded one decoder drop + one queue-overflow drop, followed by clean intervals.
+
+Conclusion: the existing `video_only_restart` actuator is bidirectionally
+functional but too disruptive for silent automatic gameplay adaptation.
+
+Retain it as diagnostic/startup/manual/fallback capability.
+
+Automatic controller remains blocked.
+
+Next: determine whether the active encoder can change bitrate without replacing
+the encoder process.
+
+## D-071 Linux-first phase reorder
+
+**Status:** ROADMAP UPDATED / WINDOWS-SPECIFIC C3 ADAPTATION PAUSED
+
+Authoritative checkpoint beneath the current development tree:
+`9d7da2ccc47cc78a19f7128161859a1c5f308174`.
+
+D-070 remains authoritative:
+- `video_only_restart` works bidirectionally;
+- ~0.84–0.95 s first-RTP interruption;
+- focused play observed ~1 s freeze;
+- restart is retained for diagnostic/startup/manual/fallback use;
+- it is not accepted for transparent automatic gameplay adaptation.
+
+Do not pursue a Windows/NVENC-specific live-bitrate workaround.
+
+Roadmap order is now:
+- **D — Linux Migration / Native Linux Baseline**
+- **E — Linux Core Resource Characterization & Optimization**
+- **F — Media Library / VOD / Live TV UX**
+- G onward unchanged.
+
+Phase D preserves the currently working media/VOD/Live TV baseline while
+migrating; it does not wait for Phase F polish.
+
+Automatic bitrate/FEC continuation resumes on Linux after the real backend is
+known. Revalidate the Windows bitrate envelope there before treating 5500 as a
+production floor.
+
+Next technical work after checkpoint: **Phase D Linux migration baseline**.

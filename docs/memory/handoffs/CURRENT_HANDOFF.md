@@ -523,3 +523,74 @@ runtime validation.
 
 Next: checkpoint D-067/D-068 and proceed to C3 adaptive bitrate controller over
 5500/6000/7000.
+
+## C3 bidirectional actuator runtime step
+
+Current clean checkpoint before development:
+`9d7da2ccc47cc78a19f7128161859a1c5f308174`.
+
+D-069 diagnostic sequence:
+`7000 -> 6000 -> 7000`.
+
+After installation:
+1. restart companion because Python changed;
+2. launch a normal game and let startup stabilization release;
+3. while actively playing, run
+   `python .\tools\probe_c3_bidirectional_actuator.py`;
+4. continue focused play briefly and note whether either transition causes
+   visible stutter/input disruption;
+5. End normally;
+6. run
+   `python .\tools\probe_c3_bidirectional_actuator.py --finalize`;
+7. return `logs/streaming/c3_bidirectional_actuator_probe.txt` plus focused
+   transition observation.
+
+Automatic bitrate adaptation is still disabled.
+
+## D-070 actuator disposition / next probe
+
+D-069 bidirectional probe completed:
+`7000 -> 6000 -> 7000`.
+
+Both legs recovered, but restart produced ~0.84-0.95 s first-RTP gaps and focused
+play observed ~1 s freeze. Final decoder max output gap was 1,059 ms.
+
+Disposition:
+- bidirectional restart works;
+- not accepted for seamless automatic adaptation;
+- retain as diagnostic/startup/manual/fallback only.
+
+Next:
+investigate **live bitrate reconfiguration without encoder replacement**.
+
+Do not implement the automatic bitrate controller until that actuator question
+is answered.
+
+Companion restart remains required after Python changes.
+
+## D-071 current roadmap / next work
+
+Current development tree contains D-069/D-070 evidence on checkpoint
+`9d7da2ccc47cc78a19f7128161859a1c5f308174`.
+
+D-071 roadmap reorder:
+- D = Linux Migration / Native Linux Baseline;
+- E = Linux Core Resource Characterization & Optimization;
+- F = Media Library / VOD / Live TV UX;
+- G+ unchanged.
+
+Windows-specific automatic adaptation is paused. Do not pursue NVENC-specific
+live reconfiguration.
+
+The Linux migration preserves today's working VOD/Live TV paths but does not
+block on media polish.
+
+On Linux:
+1. restore normal-use parity;
+2. inventory capture/encoder/audio/input backends;
+3. classify bitrate actuation;
+4. replay deferred transport evidence;
+5. revalidate bitrate envelope;
+6. then resume automatic bitrate/FEC work if supported.
+
+Next after checkpoint: Phase D Linux baseline work.

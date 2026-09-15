@@ -1420,6 +1420,31 @@ class NativeStreamManager:
                     + type(exc).__name__
                 ) from exc
 
+    def diagnostic_c3_validated_bitrate_transition(
+        self,
+        target_bitrate_kbps: int,
+    ) -> dict[str, Any]:
+        """Run one loopback-only validated-ladder actuator transition."""
+        from diagnostics.c3_fixed_bitrate_probe import (
+            run_c3_validated_bitrate_transition,
+        )
+
+        with self._lock:
+            try:
+                return run_c3_validated_bitrate_transition(
+                    self,
+                    target_bitrate_kbps=int(
+                        target_bitrate_kbps
+                    ),
+                )
+            except NativeStreamError:
+                raise
+            except Exception as exc:
+                raise NativeStreamError(
+                    "C3 validated bitrate transition failed: "
+                    + type(exc).__name__
+                ) from exc
+
     def stop(self) -> dict[str, Any]:
         with self._lock:
             self._stop_locked()

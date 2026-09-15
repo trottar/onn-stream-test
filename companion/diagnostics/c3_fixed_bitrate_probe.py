@@ -14,6 +14,9 @@ SCHEMA = "privyhub_c3_fixed_bitrate_cycle_v1"
 MODE = "fixed_bitrate_characterization"
 REFERENCE_BITRATE_KBPS = 7000
 SUPPORTED_CHARACTERIZATION_BITRATES_KBPS = (6000, 5000, 5500)
+VALIDATED_ADAPTIVE_BITRATES_KBPS = (5500, 6000, 7000)
+BIDIRECTIONAL_SCHEMA = "privyhub_c3_validated_bitrate_transition_v1"
+BIDIRECTIONAL_MODE = "validated_ladder_actuator_probe"
 
 
 def _dict(value: Any) -> dict[str, Any]:
@@ -102,6 +105,7 @@ def _run_c3_fixed_bitrate_cycle(
     manager: Any,
     *,
     target_bitrate_kbps: int,
+    validated_transition: bool = False,
     popen_factory: Callable[..., Any] = subprocess.Popen,
     perf_counter_ns: Callable[[], int] = time.perf_counter_ns,
     monotonic: Callable[[], float] = time.monotonic,
@@ -112,7 +116,40 @@ def _run_c3_fixed_bitrate_cycle(
     manager._reap_locked()
 
     target_bitrate_kbps = int(target_bitrate_kbps)
-    if (
+    current_bitrate_kbps = int(
+        getattr(
+            manager,
+            "_active_bitrate_kbps",
+            REFERENCE_BITRATE_KBPS,
+        )
+    )
+
+    if validated_transition:
+        if (
+            target_bitrate_kbps
+            not in VALIDATED_ADAPTIVE_BITRATES_KBPS
+        ):
+            raise RuntimeError(
+                "unsupported_validated_bitrate"
+            )
+
+        if (
+            current_bitrate_kbps
+            not in VALIDATED_ADAPTIVE_BITRATES_KBPS
+        ):
+            raise RuntimeError(
+                "validated_transition_requires_validated_start"
+            )
+
+        if (
+            target_bitrate_kbps
+            == current_bitrate_kbps
+        ):
+            raise RuntimeError(
+                "bitrate_transition_noop"
+            )
+
+    elif (
         target_bitrate_kbps
         not in SUPPORTED_CHARACTERIZATION_BITRATES_KBPS
         or target_bitrate_kbps >= REFERENCE_BITRATE_KBPS
@@ -136,13 +173,11 @@ def _run_c3_fixed_bitrate_cycle(
             "reference_profile_not_7000"
         )
 
-    if int(
-        getattr(
-            manager,
-            "_active_bitrate_kbps",
-            REFERENCE_BITRATE_KBPS,
-        )
-    ) != REFERENCE_BITRATE_KBPS:
+    if (
+        not validated_transition
+        and current_bitrate_kbps
+        != REFERENCE_BITRATE_KBPS
+    ):
         raise RuntimeError(
             "characterization_requires_reference_start"
         )
@@ -277,8 +312,9 @@ def _run_c3_fixed_bitrate_cycle(
 
     _safe_log(
         manager,
-        "C3 fixed-bitrate characterization: "
-        f"7000 -> {target_bitrate_kbps} kbps video-only cycle begin",
+        "C3 bitrate actuator: "
+        f"{current_bitrate_kbps} -> {target_bitrate_kbps} "
+        "kbps video-only cycle begin",
     )
 
     cycle_started_ns = perf_counter_ns()
@@ -494,11 +530,22 @@ def _run_c3_fixed_bitrate_cycle(
         )
 
         payload = {
-            "schema": SCHEMA,
+            "schema": (
+                BIDIRECTIONAL_SCHEMA
+                if validated_transition
+                else SCHEMA
+            ),
             "ok": True,
-            "mode": MODE,
+            "mode": (
+                BIDIRECTIONAL_MODE
+                if validated_transition
+                else MODE
+            ),
             "reference_bitrate_kbps": (
                 REFERENCE_BITRATE_KBPS
+            ),
+            "from_bitrate_kbps": (
+                current_bitrate_kbps
             ),
             "target_bitrate_kbps": (
                 target_bitrate_kbps
@@ -606,7 +653,7 @@ def _run_c3_fixed_bitrate_cycle(
 
         _safe_log(
             manager,
-            "C3 fixed-bitrate characterization: "
+            "C3 bitrate actuator: "
             f"{target_bitrate_kbps} kbps active; "
             f"first RTP resume={payload['video']['first_rtp_resume_ms']} ms",
         )
@@ -629,16 +676,32 @@ def _run_c3_fixed_bitrate_cycle(
         manager._process = None
         manager._capture_process = None
         manager._active_bitrate_kbps = (
-            REFERENCE_BITRATE_KBPS
+            current_bitrate_kbps
         )
 
         _safe_log(
             manager,
-            "C3 fixed-bitrate characterization: "
-            f"{target_bitrate_kbps} kbps cycle failed",
+            "C3 bitrate actuator: "
+            f"{current_bitrate_kbps} -> {target_bitrate_kbps} "
+            "kbps cycle failed",
         )
 
         raise
+
+def run_c3_validated_bitrate_transition(
+    manager: Any,
+    *,
+    target_bitrate_kbps: int,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Run one diagnostic transition between validated C3 bitrate levels."""
+    return _run_c3_fixed_bitrate_cycle(
+        manager,
+        target_bitrate_kbps=target_bitrate_kbps,
+        validated_transition=True,
+        **kwargs,
+    )
+
 
 def run_c3_fixed_bitrate_6000_cycle(
     manager: Any,

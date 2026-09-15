@@ -5,14 +5,14 @@ Status as of 2026-09-11.
 | Issue | Status | Blocks current Phase C work? | Resume / resolve when |
 | --- | --- | --- | --- |
 | Bidirectional UDP burst/gap distortion and duplication in the current test path | Deferred after deep isolation | No | Replay after representative Linux baseline; reopen earlier only if blocking |
-| Native streaming host is Windows-specific | Expected prototype limitation | No | Phase E Linux migration |
+| Native streaming host is Windows-specific | Expected prototype limitation | No | Phase D Linux migration |
 | NES runtime coverage | No local A9 fixture | No | Representative NES fixture is available |
 | Genesis runtime coverage | No local A9 fixture | No | Representative Genesis fixture is available |
 | Android cleartext/exported diagnostics and companion network exposure without mature auth | Security/privacy debt | No for isolated prototype | Dedicated threat-model/auth/encryption/privacy work |
-| WGC/FFmpeg/process-audio bootstrap is not fully portable | Portability debt | No | Phase E / clean-machine reproducibility work |
+| WGC/FFmpeg/process-audio bootstrap is not fully portable | Portability debt | No | Phase D / clean-machine reproducibility work |
 | Conventional automated CI is minimal | Engineering debt | No | Before productization / broader platform expansion |
 | Large orchestration files | Maintainability debt | No | Dedicated refactor with its own validation objective |
-| Remaining Live TV / EPG / guide polish | Planned product work | No | Phase D |
+| Remaining Live TV / EPG / guide polish | Planned product work | No | Phase F |
 | Game Session banner latency | Low-priority polish | No | Dedicated measured latency investigation if prioritized |
 
 Resolved items such as the historical `companion/games/` ignore defect,
@@ -43,8 +43,8 @@ interaction among those layers.
 Do not encode this environment’s measured jitter/duplicate rate into product
 buffering or transport architecture.
 
-Preserve the diagnostics. After Phase E establishes the representative native
-Linux baseline, replay the acceptance suite during Phase F Linux
+Preserve the diagnostics. After Phase D establishes the representative native
+Linux baseline, replay the acceptance suite during Phase E Linux
 resource/transport characterization unless the issue becomes a blocker sooner.
 
 Full record: `investigations/2026-09-07-udp-transport.md`.
@@ -83,7 +83,7 @@ into unrelated C1 streaming work.
 The current native path intentionally uses Windows-specific components,
 including WGC, NVENC/FFmpeg integration, process-loopback audio and ViGEm.
 
-Phase E owns Linux functional parity. Phase F owns representative Linux
+Phase D owns Linux functional parity. Phase E owns representative Linux
 resource/transport characterization. The current Windows implementation remains
 the validated behavior reference until those phases execute.
 

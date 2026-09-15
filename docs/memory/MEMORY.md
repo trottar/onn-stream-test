@@ -675,3 +675,83 @@ This was proven during D-067 validation:
 
 D-067 startup stabilization is runtime validated after restart, and the user
 reported no initial gameplay lag.
+
+## Bidirectional actuator validation rule — D-069
+
+Before automatic C3 bitrate policy is enabled, the backend-neutral actuator must
+be runtime validated in both directions.
+
+Existing evidence covers unchanged-7000 continuity and downward fixed-bitrate
+transitions. The missing proof is upward recovery from an already-lowered
+encoder.
+
+Use exactly one focused diagnostic sequence:
+`7000 -> 6000 -> 7000`.
+
+Reuse the same video-only restart body. Do not create a second actuator path.
+
+The diagnostic transition endpoint is loopback-only and accepts only the
+validated 5500/6000/7000 ladder. 5000 remains excluded.
+
+Do not attempt the upshift until fresh C2 receiver/decoder evidence has recovered
+after the downshift.
+
+Automatic adaptation remains disabled until this probe is accepted.
+
+## Video-only restart actuator disposition — D-070
+
+The C3 `video_only_restart` actuator is bidirectionally functional but is not
+the seamless automatic bitrate actuator.
+
+Validated D-069 sequence:
+`7000 -> 6000 -> 7000`.
+
+Measured encoder-restart gaps:
+- downshift first RTP resume: 952.789 ms;
+- upshift first RTP resume: 837.313 ms.
+
+Focused play observed a roughly one-second freeze during a transition. Final
+decoder evidence recorded a 1,059-ms max output gap.
+
+Rule:
+do not build automatic fast-down/slow-up policy on `video_only_restart` during
+active gameplay.
+
+Retain the restart actuator for diagnostic transitions, startup/manual recovery,
+fallback, and backends that cannot reconfigure live.
+
+Next investigate live bitrate reconfiguration without replacing the encoder
+process. Automatic adaptation remains disabled.
+
+## Linux-first phase order and Windows adaptation boundary — D-071
+
+Current live roadmap order after Phase C:
+**D Linux Migration -> E Linux Characterization/Optimization -> F Media/VOD/Live TV -> G Remote**.
+
+The previous D/E/F labels are superseded:
+- old D Media/VOD/Live TV = new F;
+- old E Linux Migration = new D;
+- old F Linux Characterization = new E.
+
+Reason:
+finish the platform migration before investing further in media/VOD/EPG polish.
+
+Windows C3 portable results remain valid evidence:
+- explicit stream profile;
+- end-to-end telemetry;
+- startup stabilization/readiness;
+- fixed 5500/6000/7000 test-environment evidence;
+- 5000 rejection;
+- backend-neutral actuator capability boundary;
+- restart actuation is too disruptive for seamless automatic play.
+
+Do not implement an NVENC-specific live controller merely to finish Windows C3.
+
+Phase D Linux must preserve currently working media/server behavior. Phase F
+later improves media UX on Linux.
+
+Phase E Linux characterization must inventory actual encoder actuation and
+revalidate bitrate levels before production adaptation is finalized.
+
+Adaptive FEC and transport-sensitive tuning also wait for representative
+Linux + home Opal + onn evidence.

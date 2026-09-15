@@ -262,3 +262,55 @@ Before controller runtime tests, restart the companion after any Python-side
 patch.
 
 Audio burst/gap remains deferred to Linux + Home Opal.
+
+## C3 bidirectional actuator validation active
+
+**Active / diagnostic / runtime evidence pending.**
+
+Question:
+Can the accepted video-only actuator complete `7000 -> 6000 -> 7000` while
+preserving FEC/audio/controller/game lifecycle and clean receiver recovery?
+
+This is the last actuator gate before C3 automatic policy.
+
+Automatic adaptation remains disabled.
+
+Restart companion after this Python-side diagnostic is installed.
+
+## C3 live bitrate reconfiguration investigation next
+
+D-069 is closed with D-070 disposition.
+
+`video_only_restart`:
+**BIDIRECTIONAL / NOT ACCEPTED FOR SEAMLESS AUTOMATIC ADAPTATION**
+
+Reason:
+~0.84-0.95 s first-RTP interruption and focused ~1 s gameplay freeze.
+
+Next active question:
+Can the current encoder/backend change target bitrate while the encoder process
+remains active?
+
+Automatic bitrate controller remains blocked until this is answered.
+
+Audio burst/gap remains separately deferred.
+
+## Windows C3 paused / Phase D Linux next
+
+D-069/D-070 are closed.
+
+Windows restart actuation:
+**BIDIRECTIONAL / NOT ACCEPTED FOR SEAMLESS AUTOMATIC ADAPTATION**.
+
+Do not open a Windows/NVENC live-reconfiguration investigation.
+
+Roadmap reordered:
+- D Linux migration;
+- E Linux characterization/optimization;
+- F media/VOD/Live TV polish.
+
+Next active technical work after checkpoint:
+**Phase D Linux Migration / Native Linux Baseline**.
+
+Transport/audio/adaptive-FEC questions remain deferred to the representative
+Linux + home Opal + onn path.

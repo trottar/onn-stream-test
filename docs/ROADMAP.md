@@ -12,10 +12,10 @@
 |---|---|---|
 | **A — Emulator Subsystem** | Finish Games/emulation as a normal-use subsystem | **COMPLETE / PUSHED** |
 | **B — Diagnostics & Clean Native Baseline** | Make PrivyHub self-diagnosing and remove active Sunshine/Moonlight legacy | **COMPLETE / PUSHED** |
-| **C — Adaptive Streaming Architecture** | Explicit profiles, telemetry, adaptive bitrate/FEC, 1080p characterization, generalized native streaming with future-WAN reuse in mind | **ACTIVE** |
-| **D — Media Library, VOD & Live TV UX** | Local media polish plus a substantial Live TV/channel/guide rebuild | **PLANNED** |
-| **E — Linux Migration / Native Linux Baseline** | Move the core server to the HP EliteDesk Linux prototype and restore normal-use parity | **PLANNED** |
-| **F — Linux Core Resource Characterization & Optimization** | Optimize and measure the Linux core with PS1-and-below only; select Prototype 2 from evidence | **PLANNED** |
+| **C — Adaptive Streaming Architecture** | Portable profile/telemetry/readiness foundation complete enough for Windows; automatic adaptation continues on Linux | **WINDOWS BOUNDARY REACHED** |
+| **D — Linux Migration / Native Linux Baseline** | Move the core server to the HP EliteDesk Linux prototype and restore normal-use parity | **NEXT** |
+| **E — Linux Core Resource Characterization & Optimization** | Optimize and measure the Linux core with PS1-and-below only; select Prototype 2 from evidence | **PLANNED AFTER D** |
+| **F — Media Library, VOD & Live TV UX** | Finish local media polish plus substantial Live TV/channel/guide work on Linux | **PLANNED AFTER E** |
 | **G — Secure Remote Access / Portable Client Foundation** | Establish overlay/provider abstraction, portable trusted-LAN access, WAN session identity/auth, and off-site PS1-and-below validation | **FUTURE AFTER F** |
 | **H — Extended Emulation & User-Content Import** | Build safe user-content ingestion, then characterize N64, GameCube, and PS2 on the established local/remote foundation | **FUTURE AFTER G** |
 | **I — Home Infrastructure / Broader Plugin Expansion** | Home Assistant/devices, cameras/microphones, storage, broader clients and provider expansion | **FUTURE** |
@@ -236,6 +236,22 @@ source-specific capture/audio/buffering requirements.
 
 ## C7 — Phase C checkpoint
 
+### D-071 Windows stop boundary
+
+The Windows implementation is not required to complete an NVENC-specific
+automatic bitrate/FEC controller before Linux migration.
+
+Portable Windows results retained for Linux reuse include explicit profiles,
+C2 telemetry, startup stabilization/readiness, fixed-bitrate evidence, and the
+backend-neutral actuator capability model.
+
+`video_only_restart` is bidirectionally functional but produces roughly one
+second of gameplay interruption and is not accepted for seamless automatic
+adaptation.
+
+Automatic bitrate/FEC continuation, Linux bitrate-envelope revalidation, and
+backend actuation classification move to Phase D/E.
+
 Acceptance:
 
 - explicit profiles;
@@ -250,129 +266,9 @@ Acceptance:
 
 ---
 
-# Phase D — Media Library, VOD & Live TV UX
+# Phase D — Linux Migration / Native Linux Baseline
 
-**Status: PLANNED**
-
-Phase D now covers both local media-library polish and a deliberate Live TV
-cleanup/rebuild.
-
-The existing Live TV playback path should be preserved where it is stable, but
-the current channel organization and guide behavior should **not** be treated as
-finished architecture.
-
-## D1 — Recursive VOD artwork
-
-Support local sidecar art and directory-oriented movie layouts without rewriting
-canonical media.
-
-Priority may include:
-
-1. exact video-stem artwork;
-2. `poster.*`;
-3. `folder.*`;
-4. cached provider art;
-5. generated local thumbnail;
-6. generic tile.
-
-## D2 — VOD metadata cache
-
-Potential fields:
-
-- title/year/runtime;
-- genre/description;
-- poster;
-- resolution/codecs;
-- audio/subtitle information.
-
-External lookup remains optional and cacheable. Normal browsing/playback must
-remain local-first.
-
-## D3 — Playback-state UX
-
-Potential layers:
-
-- resume position;
-- watched/unwatched;
-- recently played;
-- favorites;
-- collections/series;
-- sort/filter/search;
-- future per-user state.
-
-Canonical media files remain untouched.
-
-## D4 — Live TV channel normalization
-
-Treat the current channel catalog as data that needs normalization rather than
-as a finished list.
-
-Goals:
-
-- stable canonical channel identity;
-- duplicate detection/merging;
-- consistent display names;
-- group/category normalization;
-- source/provider provenance;
-- hidden-channel state that remains recoverable;
-- favorites;
-- search/filter;
-- deterministic sorting;
-- pagination that behaves like pagination rather than artificial channel-number
-  groups;
-- graceful handling of dead/unavailable streams.
-
-Do not bind user state to unstable provider ordering.
-
-## D5 — EPG / guide foundation
-
-Rebuild the guide around explicit identity/matching rather than best-effort UI
-assumptions.
-
-Required areas:
-
-- XMLTV/provider ingestion where used;
-- channel matching using stable IDs first and normalized-name fallback second;
-- timezone handling;
-- program start/end normalization;
-- cache/refresh policy;
-- stale-data behavior;
-- no-guide fallback;
-- diagnostics explaining unmatched channels;
-- deterministic handling of multiple candidate matches.
-
-The guide must remain optional to basic channel playback.
-
-## D6 — Live TV guide UX
-
-Once the underlying EPG data is trustworthy:
-
-- current/next program;
-- timeline/grid view where practical;
-- channel details;
-- jump to current time;
-- category/favorites filters;
-- clear "guide unavailable" behavior;
-- responsive onn-TV navigation.
-
-Do not hide data-quality failures behind empty UI.
-
-## D7 — Media/TV checkpoint
-
-Acceptance:
-
-- recursive VOD library remains stable;
-- metadata/art work offline after caching;
-- Live TV channel list is normalized and manageable;
-- guide matching/refresh behavior is diagnosable;
-- normal channel playback does not depend on guide success;
-- checkpoint/push.
-
----
-
-# Phase E — Linux Migration / Native Linux Baseline
-
-**Status: PLANNED AFTER D**
+**Status: NEXT AFTER C WINDOWS BOUNDARY**
 
 Prototype 1 Linux server:
 
@@ -389,7 +285,7 @@ optimization.
 
 Windows installed on the machine is not a project target.
 
-## E1 — Linux appliance baseline
+## D1 — Linux appliance baseline
 
 Select and install a stable Linux base with:
 
@@ -404,7 +300,7 @@ Select and install a stable Linux base with:
 Record hardware details relevant to later measurement, including RAM topology,
 storage, firmware, thermals, and network interfaces.
 
-## E2 — Migrate platform-neutral companion responsibilities
+## D2 — Migrate platform-neutral companion responsibilities
 
 Preserve established contracts:
 
@@ -421,7 +317,7 @@ Preserve established contracts:
 Linux should replace implementation details without needlessly changing these
 contracts.
 
-## E3 — Replace Windows-specific backends
+## D3 — Replace Windows-specific backends
 
 Replace behind explicit platform boundaries:
 
@@ -435,7 +331,7 @@ Windows lifecycle        → Linux service/process lifecycle
 
 Preserve behavior, not Windows APIs.
 
-## E4 — Restore PS1-and-below Games on Linux
+## D4 — Restore PS1-and-below Games on Linux
 
 Required scope:
 
@@ -459,9 +355,9 @@ Preserve:
 - metadata/art;
 - teardown/recovery.
 
-## E5 — Restore media/server functionality
+## D5 — Restore media/server functionality
 
-Migrate the post-Phase-D server functions without broadening scope:
+Restore the currently working media/server functions at the Linux migration boundary without broadening scope:
 
 - companion/control API;
 - VOD;
@@ -469,10 +365,10 @@ Migrate the post-Phase-D server functions without broadening scope:
 - browser/live source where active;
 - camera source where active;
 - diagnostics/Self-Test;
-- Phase C profile/adaptation infrastructure;
-- Phase D media state/cache.
+- Phase C profile/telemetry/stabilization infrastructure;
+- existing media state/cache and working playback paths.
 
-## E6 — Replay deferred UDP investigation
+## D6 — Replay deferred UDP investigation
 
 Rerun the saved forward/reverse transport acceptance suite on the representative
 Linux + home Opal + onn path.
@@ -485,7 +381,7 @@ Classify whether the prior packet timing/duplication pathology was:
 
 Do not reopen beyond evidence.
 
-## E7 — Native Linux regression
+## D7 — Native Linux regression
 
 Minimum normal-use regression:
 
@@ -502,7 +398,7 @@ End/teardown
 restart/recovery
 ```
 
-## E8 — Linux baseline checkpoint
+## D8 — Linux baseline checkpoint
 
 Acceptance:
 
@@ -520,11 +416,11 @@ Architectural statement:
 
 ---
 
-# Phase F — Linux Core Resource Characterization & Optimization
+# Phase E — Linux Core Resource Characterization & Optimization
 
-**Status: PLANNED AFTER E**
+**Status: PLANNED AFTER D**
 
-Phase F deliberately limits the core emulator workload to:
+Phase E deliberately limits the core emulator workload to:
 
 ```text
 NES
@@ -539,7 +435,7 @@ The goal is not merely to benchmark the EliteDesk. It is to **optimize the Linux
 implementation as far as worthwhile, measure the complete system, and derive a
 lower-cost Prototype 2 from evidence**.
 
-## F1 — Freeze the workload suite
+## E1 — Freeze the workload suite
 
 Representative workloads should include, where present:
 
@@ -556,7 +452,7 @@ Representative workloads should include, where present:
 - metadata/storage work;
 - representative concurrent core workloads.
 
-## F2 — Whole-system measurements
+## E2 — Whole-system measurements
 
 Measure:
 
@@ -576,7 +472,7 @@ Measure:
 
 Do not infer lower-tier hardware requirements from one aggregate CPU percentage.
 
-## F3 — Optimization loop
+## E3 — Optimization loop
 
 Use:
 
@@ -609,7 +505,7 @@ Potential areas:
 
 Optimize before deriving the hardware floor.
 
-## F4 — Core Linux resource envelope
+## E4 — Core Linux resource envelope
 
 Produce:
 
@@ -618,7 +514,7 @@ Produce:
 - **Recommended alpha:** floor plus reliability/update/concurrency headroom;
 - **Optional higher tier:** stronger profiles without redefining Core.
 
-## F5 — Capability detection and graceful scaling
+## E5 — Capability detection and graceful scaling
 
 PrivyHub should classify:
 
@@ -632,7 +528,7 @@ PrivyHub should classify:
 
 Features should enable only where the host/client pair is known to support them.
 
-## F6 — Select Prototype 2 / friend-alpha hardware
+## E6 — Select Prototype 2 / friend-alpha hardware
 
 Select from measured evidence, considering:
 
@@ -648,7 +544,7 @@ Select from measured evidence, considering:
 Do not select the absolute cheapest machine merely because it has a superficially
 similar benchmark score.
 
-## F7 — Resource checkpoint
+## E7 — Resource checkpoint
 
 Acceptance:
 
@@ -659,6 +555,126 @@ Acceptance:
 - capability model established;
 - Prototype 2 class selected from evidence;
 - clean checkpoint/push.
+
+---
+
+# Phase F — Media Library, VOD & Live TV UX
+
+**Status: PLANNED AFTER E**
+
+Phase F now covers both local media-library polish and a deliberate Live TV
+cleanup/rebuild.
+
+The existing Live TV playback path should be preserved where it is stable, but
+the current channel organization and guide behavior should **not** be treated as
+finished architecture.
+
+## F1 — Recursive VOD artwork
+
+Support local sidecar art and directory-oriented movie layouts without rewriting
+canonical media.
+
+Priority may include:
+
+1. exact video-stem artwork;
+2. `poster.*`;
+3. `folder.*`;
+4. cached provider art;
+5. generated local thumbnail;
+6. generic tile.
+
+## F2 — VOD metadata cache
+
+Potential fields:
+
+- title/year/runtime;
+- genre/description;
+- poster;
+- resolution/codecs;
+- audio/subtitle information.
+
+External lookup remains optional and cacheable. Normal browsing/playback must
+remain local-first.
+
+## F3 — Playback-state UX
+
+Potential layers:
+
+- resume position;
+- watched/unwatched;
+- recently played;
+- favorites;
+- collections/series;
+- sort/filter/search;
+- future per-user state.
+
+Canonical media files remain untouched.
+
+## F4 — Live TV channel normalization
+
+Treat the current channel catalog as data that needs normalization rather than
+as a finished list.
+
+Goals:
+
+- stable canonical channel identity;
+- duplicate detection/merging;
+- consistent display names;
+- group/category normalization;
+- source/provider provenance;
+- hidden-channel state that remains recoverable;
+- favorites;
+- search/filter;
+- deterministic sorting;
+- pagination that behaves like pagination rather than artificial channel-number
+  groups;
+- graceful handling of dead/unavailable streams.
+
+Do not bind user state to unstable provider ordering.
+
+## F5 — EPG / guide foundation
+
+Rebuild the guide around explicit identity/matching rather than best-effort UI
+assumptions.
+
+Required areas:
+
+- XMLTV/provider ingestion where used;
+- channel matching using stable IDs first and normalized-name fallback second;
+- timezone handling;
+- program start/end normalization;
+- cache/refresh policy;
+- stale-data behavior;
+- no-guide fallback;
+- diagnostics explaining unmatched channels;
+- deterministic handling of multiple candidate matches.
+
+The guide must remain optional to basic channel playback.
+
+## F6 — Live TV guide UX
+
+Once the underlying EPG data is trustworthy:
+
+- current/next program;
+- timeline/grid view where practical;
+- channel details;
+- jump to current time;
+- category/favorites filters;
+- clear "guide unavailable" behavior;
+- responsive onn-TV navigation.
+
+Do not hide data-quality failures behind empty UI.
+
+## F7 — Media/TV checkpoint
+
+Acceptance:
+
+- recursive VOD library remains stable;
+- metadata/art work offline after caching;
+- Live TV channel list is normalized and manageable;
+- guide matching/refresh behavior is diagnosable;
+- normal channel playback does not depend on guide success;
+- checkpoint/push.
 
 ---
 

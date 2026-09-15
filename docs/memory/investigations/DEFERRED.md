@@ -8,7 +8,7 @@ baseline_commit: db59209578fc628fc602e707f5f7cd9091949edc
 
 ## UDP transport pathology
 
-Severe burst/gap timing transformation and duplication was observed in both directions in the Prototype 1 environment. Application-level sender/capture evidence and Android-local loopback did not support blaming the normal production application path. Preserve the diagnostics. After Phase E establishes the representative native Linux baseline, replay the acceptance suite during Phase F Linux resource/transport characterization unless a real blocker appears earlier.
+Severe burst/gap timing transformation and duplication was observed in both directions in the Prototype 1 environment. Application-level sender/capture evidence and Android-local loopback did not support blaming the normal production application path. Preserve the diagnostics. After Phase D establishes the representative native Linux baseline, replay the acceptance suite during Phase E Linux resource/transport characterization unless a real blocker appears earlier.
 
 ## Game Session banner latency
 
@@ -20,7 +20,7 @@ Supported through the current path but not individually promoted into new invest
 
 ## Full clean-machine Windows bootstrap
 
-Current runtime includes ignored/local dependencies. Defer comprehensive clean-machine Windows reproducibility unless it becomes necessary sooner. Linux functional parity belongs to Phase E; representative Linux resource characterization belongs to Phase F.
+Current runtime includes ignored/local dependencies. Defer comprehensive clean-machine Windows reproducibility unless it becomes necessary sooner. Linux functional parity belongs to Phase D; representative Linux resource characterization belongs to Phase E.
 
 ## Roadmap-v3 normalization note
 

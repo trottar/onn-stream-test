@@ -20,10 +20,10 @@ adds an optional secure remote/portable-client foundation.
 | --- | --- |
 | A — Games / emulator subsystem | COMPLETE / checkpointed |
 | B — Diagnostics + clean native baseline | COMPLETE / checkpointed |
-| C — Adaptive native streaming | ACTIVE |
-| D — Media Library / VOD / Live TV UX | Planned after C |
-| E — Linux Migration / Native Linux Baseline | Planned |
-| F — Linux Core Resource Characterization & Optimization | Planned |
+| C — Adaptive native streaming | Windows portable boundary reached; adaptation continues on Linux |
+| D — Linux Migration / Native Linux Baseline | NEXT |
+| E — Linux Core Resource Characterization & Optimization | Planned after D |
+| F — Media Library / VOD / Live TV UX | Planned after E |
 | G — Secure Remote Access / Portable Client Foundation | Future after F |
 | H — Extended Emulation & User-Content Import | Future after G |
 | I — Home Infrastructure / Broader Plugin Expansion | Future |
@@ -63,14 +63,14 @@ authentication/authorization.
 ### TV / IPTV
 
 The existing TV stack is stable enough to preserve while streaming work
-continues. Phase D owns the remaining channel normalization, EPG matching/cache,
+continues. Phase F owns the remaining channel normalization, EPG matching/cache,
 guide diagnostics and UX work. Basic playback must not depend on guide success.
 
 ### Local sources and VOD
 
 The companion supports local live/browser/camera sources and dynamically scanned
 VOD media. Control and media planes remain separate. Recursive local-first
-artwork/metadata work is scheduled for Phase D.
+artwork/metadata work is scheduled for Phase F.
 
 ### Games / emulation
 
@@ -156,11 +156,14 @@ the representative local path before layering WAN jitter/loss on top.
 
 ## Linux and remote direction
 
-Phase E establishes Linux-native functional parity on the HP EliteDesk 805 G6
+Phase D establishes Linux-native functional parity on the HP EliteDesk 805 G6
 reference machine.
 
-Phase F optimizes and characterizes PS1-and-below, then selects cheaper
+Phase E optimizes and characterizes PS1-and-below, then selects cheaper
 Prototype 2 hardware from evidence.
+
+Phase F resumes Media Library / VOD / Live TV UX work on the representative
+Linux foundation.
 
 Phase G establishes secure optional remote access and portable clients on that
 mature Linux/Core baseline before heavier emulator families are introduced.
@@ -190,13 +193,13 @@ Remote access must not flatten or expose the ordinary household LAN.
 
 Open/deferred work that does not invalidate the current baseline includes:
 
-- Windows-specific server/capture/audio implementation before Phase E;
+- Windows-specific server/capture/audio implementation before Phase D;
 - older-network UDP pathology pending representative Linux + home Opal + onn
   replay;
 - Android cleartext/exported diagnostic surfaces and immature companion auth;
 - minimal conventional CI;
 - large orchestration files;
-- remaining Phase D media/EPG/guide UX work;
+- remaining Phase F media/EPG/guide UX work;
 - all Phase G remote functionality, which is planned only.
 
 See `KNOWN_ISSUES.md` and durable memory for detailed evidence/state.

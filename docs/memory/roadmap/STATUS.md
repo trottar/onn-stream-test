@@ -12,10 +12,10 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 | --- | --- | --- |
 | A — Games / Emulator Subsystem | **COMPLETE / PUSHED** | Runtime-validated native game, controller, Save/Load, profile and PS1 multitap baseline |
 | B — Diagnostics & Clean Native Baseline | **COMPLETE / PUSHED** | Diagnostics/Self-Test/support bundle/retention complete; Sunshine/Moonlight removed; native regression passed |
-| C — Adaptive Native Streaming | **ACTIVE** | Profiles/telemetry/adaptation with future-Phase-G WAN reuse in mind |
-| D — Media Library / VOD / Live TV UX | PLANNED | Media-library and substantial Live TV/EPG/guide work |
-| E — Linux Migration / Native Linux Baseline | PLANNED | Move core server path to Linux reference prototype |
-| F — Linux Core Resource Characterization & Optimization | PLANNED | Optimize and size PS1-and-below on Linux |
+| C — Adaptive Native Streaming | **WINDOWS BOUNDARY REACHED** | Profiles/telemetry/startup readiness retained; automatic adaptation resumes on Linux |
+| D — Linux Migration / Native Linux Baseline | **NEXT** | Move core server path to Linux reference prototype |
+| E — Linux Core Resource Characterization & Optimization | PLANNED AFTER D | Optimize and size PS1-and-below on Linux; revalidate transport/adaptation capability |
+| F — Media Library / VOD / Live TV UX | PLANNED AFTER E | Media-library and substantial Live TV/EPG/guide work on Linux |
 | G — Secure Remote Access / Portable Client Foundation | FUTURE AFTER F | Overlay/provider abstraction, travel-router trusted LAN, WAN identity/auth and off-site Core validation |
 | H — Extended Emulation & User-Content Import | FUTURE AFTER G | Safe content import, then N64/GameCube/PS2 local + remote regression |
 | I — Home Infrastructure / Broader Plugin Expansion | FUTURE | Home Assistant/devices, cameras/microphones, storage and broader clients/providers |
@@ -133,14 +133,14 @@ Acceptance before C3:
 
 Accepted continuation:
 
-`D -> E -> F -> G Remote -> H Extended Emulation -> I Home Infrastructure -> J Intelligence`
+`D Linux -> E Linux Optimization -> F Media -> G Remote -> H Extended Emulation -> I Home Infrastructure -> J Intelligence`
 
 Constraints:
 
-- Live TV remains Phase D work.
+- Live TV remains Phase F work.
 - HP EliteDesk 805 G6 is the Linux reference prototype, not the minimum target.
-- Choose cheaper Prototype 2 hardware from measured Phase F evidence.
-- Phase F Core sizing remains PS1-and-below.
+- Choose cheaper Prototype 2 hardware from measured Phase E evidence.
+- Phase E Core sizing remains PS1-and-below.
 - Phase G establishes secure remote/portable-client infrastructure before
   heavier emulator families.
 - Phase H establishes user-content import before later-console feasibility work.
@@ -345,3 +345,34 @@ Fixed ladder remains 5500/6000/7000; FEC remains fixed at 8.
 Validated fixed ladder remains 5500/6000/7000. FEC remains fixed at 8.
 
 Operational validation rule: restart companion after Python changes.
+
+## C3 bidirectional actuator gate
+
+`C3_FIXED_BITRATE_CHARACTERIZATION` — **COMPLETE / WINDOWS RUNTIME VALIDATED**
+
+`C3_STARTUP_STABILIZATION_UI` — **COMPLETE / RUNTIME VALIDATED**
+
+`C3_BIDIRECTIONAL_ACTUATOR_PROBE` — **DEVELOPMENT / RUNTIME VALIDATION PENDING**
+
+`C3_ADAPTIVE_BITRATE_CONTROLLER` — **BLOCKED ON BIDIRECTIONAL ACTUATOR PROBE**
+
+Validated ladder remains 5500/6000/7000; 5000 remains excluded; FEC remains 8.
+
+No automatic bitrate decisions are enabled by the probe.
+
+## C3 restart actuator disposition
+
+`C3_FIXED_BITRATE_CHARACTERIZATION` — **COMPLETE / WINDOWS RUNTIME VALIDATED**
+
+`C3_STARTUP_STABILIZATION_UI` — **COMPLETE / RUNTIME VALIDATED**
+
+`C3_BIDIRECTIONAL_ACTUATOR_PROBE` — **COMPLETE / BIDIRECTIONAL RECOVERY VALIDATED**
+
+`C3_VIDEO_ONLY_RESTART_AUTOMATIC_ACTUATOR` — **NOT ACCEPTED / ~1 S TRANSITION INTERRUPTION**
+
+`C3_LIVE_BITRATE_RECONFIGURE_CAPABILITY` — **NEXT**
+
+`C3_ADAPTIVE_BITRATE_CONTROLLER` — **BLOCKED ON LOW-INTERRUPTION ACTUATOR**
+
+Validated bitrate ladder remains 5500/6000/7000. 5000 remains excluded. FEC
+remains fixed at 8.

@@ -946,3 +946,128 @@ adaptive bitrate controller work over the already validated
 The paused Game Session metadata surface is implemented by D-067 but is not
 promoted here beyond the user's broad successful-run report as a separately
 instrumented validation point.
+
+### D-069 — Validate the C3 actuator bidirectionally before automatic control
+
+**Status:** Development diagnostic / runtime validation pending (2026-09-14)
+
+The accepted Windows C3 video-only restart actuator has runtime evidence for
+same-bitrate continuity and for 7000-to-lower fixed characterization points, but
+not yet for an upward transition from an already-lowered live encoder.
+
+Before implementing automatic bitrate policy, validate exactly one
+bidirectional sequence:
+
+`7000 -> 6000 -> 7000`
+
+Reuse the existing shared video-only restart body. Do not introduce a parallel
+actuator implementation.
+
+The diagnostic may expose a loopback-only validated-ladder transition action for
+5500/6000/7000. It must remain unavailable to non-loopback callers and must not
+enable automatic adaptation.
+
+Require fresh receiver/decoder recovery after the downshift before attempting
+the upshift. Preserve FEC, process audio, controller and emulator/game lifecycle.
+
+If the upward leg is runtime acceptable, the same internal transition primitive
+becomes the controller-facing actuator candidate. If it fails, stop before
+automatic adaptation and revisit the actuator boundary.
+
+Companion Python changes require a companion restart before runtime validation.
+
+### D-070 — Do not use video-only restart as the automatic C3 actuator
+
+**Status:** Accepted disposition / bidirectional recovery validated, seamless automatic use rejected (2026-09-14)
+
+The D-069 diagnostic completed the intended live sequence:
+
+`7000 -> 6000 -> 7000`
+
+Both legs recovered and the session remained usable.
+
+Final session evidence:
+- duration 55,443 ms;
+- 2 sequence resyncs;
+- 2 SSRC changes;
+- 0 packets dropped while waiting for IDR;
+- final receiver not waiting for IDR;
+- 3 lost video packets;
+- 1 FEC-recovered packet;
+- 1 unrecoverable FEC group;
+- 2,938 decoder-rendered frames;
+- 7 decoder dropped frames;
+- 7 decoder queue-overflow drops;
+- 1,059 ms max output gap;
+- 1,074 ms max receive-to-decode;
+- 0 audio write errors;
+- 0 controller send errors.
+
+Transition-local evidence:
+- 7000 -> 6000: first RTP resumed after 952.789 ms; host verified after
+  1,715.798 ms. Fresh sampled recovery showed 0 decoder drops/overflows.
+- 6000 -> 7000: first RTP resumed after 837.313 ms; host verified after
+  1,597.242 ms. The first fresh interval recorded 1 decoder drop and 1
+  queue-overflow drop, then subsequent intervals were clean.
+
+Focused gameplay observation:
+one of the shifts caused a visible freeze of roughly one second, after which
+gameplay recovered and otherwise played fine.
+
+Disposition:
+the backend-neutral `video_only_restart` actuator is **bidirectionally capable**
+but **not acceptable as the seamless automatic C3 actuator** because restarting
+the encoder creates a user-visible interruption on the order of one second.
+
+Retain `video_only_restart` for diagnostics, startup/manual recovery, and
+backends that lack a better capability. Do not build fast-down/slow-up automatic
+policy on top of it for active gameplay.
+
+Next C3 actuator question:
+can the active encoder bitrate be reconfigured without replacing the encoder
+process? Investigate local FFmpeg/NVENC live bitrate reconfiguration capability
+before automatic controller implementation.
+
+Automatic bitrate adaptation remains unimplemented.
+
+### D-071 — Move Linux migration ahead of media polish and defer Windows-specific adaptation
+
+**Status:** Accepted roadmap reorder / Windows streaming boundary (2026-09-14)
+
+Stop platform-specific Windows/NVENC adaptation work at the current evidence
+boundary and move Linux migration ahead of the remaining VOD/Live TV polish.
+
+Phase order changes:
+
+- old Phase E Linux Migration becomes **Phase D**;
+- old Phase F Linux Core Resource Characterization & Optimization becomes
+  **Phase E**;
+- old Phase D Media Library / VOD / Live TV UX becomes **Phase F**;
+- Phase G and later retain their existing letters/order.
+
+Rationale:
+- the Windows backend is temporary;
+- D-070 proved restart-based bitrate actuation is bidirectionally functional but
+  creates roughly one second of user-visible interruption;
+- an NVENC-specific live-reconfiguration detour would overfit the outgoing
+  platform;
+- media/VOD/EPG work should be completed on the Linux server path that will be
+  retained rather than polished further on Windows and then migrated.
+
+The new Phase D Linux migration must preserve the currently working media/VOD/
+Live TV baseline but does not depend on completing deferred media polish first.
+
+The new Phase E characterizes/optimizes the Linux core and replays deferred
+transport evidence. It also inventories the actual Linux capture/encoder
+backend, classifies bitrate actuation as live/low-interruption, restart-only, or
+unsupported, and revalidates the fixed bitrate envelope before automatic
+controller thresholds are frozen.
+
+The new Phase F then resumes Media Library / VOD / Live TV UX work on the
+representative Linux foundation.
+
+Automatic bitrate and adaptive-FEC continuation are deferred to the Linux
+backend. The Windows 5500/6000/7000 ladder remains useful evidence, not a
+universal Linux product constant.
+
+No runtime behavior changes in this roadmap patch.

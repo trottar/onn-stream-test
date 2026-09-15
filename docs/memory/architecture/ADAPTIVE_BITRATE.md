@@ -448,3 +448,71 @@ implemented.
 
 Operational prerequisite: if companion Python changes, restart the companion
 before validating policy/actuator behavior.
+
+## Bidirectional actuator gate before controller — D-069
+
+The final actuator prerequisite before automatic policy is upward-transition
+validation.
+
+Existing fixed characterization starts at the 7000 reference and moves down.
+The controller must also move upward after sustained clean conditions.
+
+D-069 therefore validates:
+`7000 -> 6000 -> 7000`.
+
+The low-level video-only restart implementation is shared with fixed
+characterization. Diagnostic mode expands allowed start/target states only to
+the validated 5500/6000/7000 ladder; existing characterization wrappers still
+require a 7000 reference start and retain 5000 only as historical diagnostic
+coverage.
+
+The probe waits for two consecutive clean existing C2 telemetry intervals after
+the downshift before attempting the upshift. This is a safety gate for the
+probe, not the final hysteresis/hold-down policy.
+
+Automatic adaptation remains unimplemented until runtime evidence accepts both
+directions.
+
+## Video-only restart rejected for automatic policy — D-070
+
+The C3 capability classification is refined:
+
+- `video_only_restart`: runtime validated in both directions, but unsuitable for
+  seamless automatic active-game adaptation because it creates ~0.84-0.95 s RTP
+  interruption and a user-visible ~1 s freeze.
+- `live_bitrate_reconfigure`: next actuator capability to investigate.
+- `unsupported`: fallback classification if a backend supports neither.
+
+Automatic policy must not use `video_only_restart` for routine fast-down/slow-up
+changes during active gameplay.
+
+A backend may still expose restart as diagnostic/startup/manual/fallback
+behavior.
+
+The controller remains blocked until a low-interruption actuator is validated.
+
+## Linux migration boundary for adaptation — D-071
+
+Windows-specific actuator development stops after D-070.
+
+Do not pursue NVENC-specific live bitrate control solely for the outgoing
+Windows prototype.
+
+Preserve the backend-neutral capability model:
+- `live_bitrate_reconfigure`;
+- `video_only_restart`;
+- `unsupported`.
+
+Current Windows classification:
+- `video_only_restart`: bidirectionally functional, ~1 s interruption, fallback
+  only for active gameplay;
+- `live_bitrate_reconfigure`: intentionally not pursued on Windows;
+- automatic controller: deferred to Linux.
+
+New Phase D establishes the Linux backend.
+New Phase E must classify Linux actuation and revalidate fixed levels.
+Only then resume controller thresholds/hysteresis/hold-down implementation.
+
+The Windows 5500/6000/7000 ladder is evidence, not a Linux product constant.
+
+Adaptive FEC remains deferred to representative Linux transport evidence.
