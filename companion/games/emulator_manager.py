@@ -7,6 +7,7 @@ import re
 import shutil
 import socket
 import subprocess
+import sys
 import threading
 import time
 
@@ -4413,6 +4414,65 @@ class EmulatorManager:
             raise EmulatorError(
                 f"Unable to read RetroArch session config inputs: {exc}"
             ) from exc
+
+        # PrivyHub D-076R1: RetroArch resolves relative autoconfig paths
+        # from the process working directory. EmulatorManager launches from
+        # executable.parent, so keep the persistent config portable and make
+        # the generated Linux session config point at the project-owned path.
+        if sys.platform.startswith("linux"):
+            autoconfig_pattern = re.compile(
+                r'(?m)^[ \t]*joypad_autoconfig_dir[ \t]*=[ \t]*"([^"\r\n]+)"[ \t]*$'
+            )
+            autoconfig_matches = autoconfig_pattern.findall(
+                base_text
+            )
+            if len(autoconfig_matches) != 1:
+                raise EmulatorError(
+                    "Persistent RetroArch config must contain exactly one "
+                    "joypad_autoconfig_dir assignment on Linux"
+                )
+
+            configured_autoconfig = (
+                autoconfig_matches[0].strip()
+            )
+            if not configured_autoconfig:
+                raise EmulatorError(
+                    "Persistent RetroArch joypad_autoconfig_dir is empty"
+                )
+
+            configured_path = Path(
+                configured_autoconfig
+            )
+            if configured_path.is_absolute():
+                autoconfig_path = configured_path.resolve()
+                try:
+                    autoconfig_path.relative_to(
+                        self.project_root
+                    )
+                except ValueError as exc:
+                    raise EmulatorError(
+                        "RetroArch joypad autoconfig directory escaped "
+                        "the project root"
+                    ) from exc
+            else:
+                autoconfig_path = self._project_path(
+                    configured_autoconfig
+                )
+
+            if not autoconfig_path.is_dir():
+                raise EmulatorError(
+                    "RetroArch joypad autoconfig directory is missing: "
+                    f"{configured_autoconfig}"
+                )
+
+            autoconfig_value = str(
+                autoconfig_path
+            ).replace("\\", "/")
+            base_text = autoconfig_pattern.sub(
+                f'joypad_autoconfig_dir = "{autoconfig_value}"',
+                base_text,
+                count=1,
+            )
 
         required_settings = (
             'network_cmd_enable = "true"',

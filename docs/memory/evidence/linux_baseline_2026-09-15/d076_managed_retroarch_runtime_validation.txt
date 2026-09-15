@@ -1,0 +1,49 @@
+PrivyHub D-076/R1/R2 managed RetroArch host-side runtime validation
+Date: 2026-09-15
+Result: HOST_SIDE_MANAGED_RUNTIME_VALIDATED
+
+Interpretation:
+- P1-P4 autoconfigured in ports 1-4.
+- Live PHI1 reached all four players with zero bad packets.
+- Pause and Resume changed RetroArch state correctly.
+- RetroArch logged saving and loading the same real 284304-byte .state.
+- Product End uses EmulatorManager.stop(); SAVE_FILES returned OK and SIGTERM shutdown was graceful with return code 0.
+- All virtual pads were removed on cleanup.
+- Probe final False is a classifier defect: .state.png matched and optional controller quit was required.
+
+Managed probe source: logs/games/d076r2_managed_retroarch_probe.txt
+controller_preflight_active= True
+controller_backend= linux_uinput
+controller_players= 4
+retroarch_p1_configured= True
+retroarch_p2_configured= True
+retroarch_p3_configured= True
+retroarch_p4_configured= True
+retroarch_configured_ports= [1, 2, 3, 4]
+session_autoconfig_absolute= True
+live_packets_received= 8
+live_bad_packets= 0
+live_updates_by_player= [2, 2, 2, 2]
+pause_hotkey_state= PAUSED
+resume_hotkey_state= PLAYING
+save_hotkey_state_file= states/bsnes/Donkey Kong Country (USA).state.png
+load_hotkey_state_file_present= True
+quit_hotkey_exited= False
+d076r1_managed_retroarch_validated= False
+fallback_manager_stop_graceful= True
+controller_active_after_cleanup= False
+virtual_pads_after_cleanup= []
+
+RetroArch session log: logs/games/20260915-065347-game_snes_84cbb2d09db83cb9.log
+[INFO] [Autoconf] PrivyHub Virtual Gamepad P1 configured in port 1.
+[INFO] [Autoconf] PrivyHub Virtual Gamepad P2 configured in port 2.
+[INFO] [Autoconf] PrivyHub Virtual Gamepad P3 configured in port 3.
+[INFO] [Autoconf] PrivyHub Virtual Gamepad P4 configured in port 4.
+[INFO] [State] Saving state "/home/privyhub/Projects/onn-stream-test/logs/games/d076r1_managed_probe_runtime/states/bsnes/Donkey Kong Country (USA).state", 284304 bytes.
+[INFO] [State] Loading state "/home/privyhub/Projects/onn-stream-test/logs/games/d076r1_managed_probe_runtime/states/bsnes/Donkey Kong Country (USA).state", 284304 bytes.
+[INFO] [State] Saving state "RAM", 284304 bytes.
+
+Lifecycle source: logs/games/save_state_probe.txt
+{"attempt": 1, "command": "SAVE_FILES", "command_event": "command_response", "event": "retroarch_command", "port": 60828, "probe": "a2_a3_game_session_trace_v0.2", "response": "OK", "time_unix": 1789469637.8307018}
+{"close_requested": true, "command_event": "frontend_close_result", "event": "retroarch_command", "forced": false, "method": "sigterm", "network_quit_fallback": false, "pid": 16112, "probe": "a2_a3_game_session_trace_v0.2", "returncode": 0, "save_flush_response": "OK", "time_unix": 1789469638.0468638}
+{"action": "stop", "close_method": "sigterm", "event": "lifecycle", "graceful": true, "network_quit_fallback": false, "pid": 16112, "probe": "a2_a3_game_session_trace_v0.2", "save_flush_response": "OK", "state_files": [{"mtime_ns": 1789056246000000000, "path": "Beetle PSX HW/CTR - Crash Team Racing (USA).state", "size": 1655980}, {"mtime_ns": 1789056246000000000, "path": "Beetle PSX HW/CTR - Crash Team Racing (USA).state.png", "size": 44849}, {"mtime_ns": 1789000002000000000, "path": "Beetle PSX HW/CTR - Crash Team Racing (USA).state1", "size": 1655980}, {"mtime_ns": 1789000002000000000, "path": "Beetle PSX HW/CTR - Crash Team Racing (USA).state1.png", "size": 44849}, {"mtime_ns": 1789005782000000000, "path": "Beetle PSX HW/CTR - Crash Team Racing (USA).state2", "size": 1820464}, {"mtime_ns": 1789005782000000000, "path": "Beetle PSX HW/CTR - Crash Team Racing (USA).state2.png", "size": 47041}, {"mtime_ns": 1788900492000000000, "path": "Beetle PSX HW/Castlevania - Symphony of the Night (USA).state", "size": 1373198}, {"mtime_ns": 1788900492000000000, "path": "Beetle PSX HW/Castlevania - Symphony of the Night (USA).state.png", "size": 12896}, {"mtime_ns": 1788880402000000000, "path": "Beetle PSX HW/Castlevania - Symphony of the Night (USA).state1", "size": 1384988}, {"mtime_ns": 1788880402000000000, "path": "Beetle PSX HW/Castlevania - Symphony of the Night (USA).state1.png", "size": 30485}, {"mtime_ns": 1788882908000000000, "path": "Beetle PSX HW/Castlevania - Symphony of the Night (USA).state2", "size": 1373198}, {"mtime_ns": 1788882908000000000, "path": "Beetle PSX HW/Castlevania - Symphony of the Night (USA).state2.png", "size": 12896}, {"mtime_ns": 1789443580000000000, "path": "Beetle PSX HW/Crash Bandicoot (USA).state", "size": 2002593}, {"mtime_ns": 1789443580000000000, "path": "Beetle PSX HW/Crash Bandicoot (USA).state.png", "size": 136163}, {"mtime_ns": 1789443580000000000, "path": "Beetle PSX HW/Crash Bandicoot (USA).state1", "size": 2002593}, {"mtime_ns": 1789443580000000000, "path": "Beetle PSX HW/Crash Bandicoot (USA).state1.png", "size": 136163}, {"mtime_ns": 1789047624000000000, "path": "Beetle PSX HW/Crash Bash (USA).state", "size": 1626207}, {"mtime_ns": 1789047624000000000, "path": "Beetle PSX HW/Crash Bash (USA).state.png", "size": 40395}, {"mtime_ns": 1789021556000000000, "path": "Beetle PSX HW/Crash Bash (USA).state1", "size": 1626207}, {"mtime_ns": 1789021556000000000, "path": "Beetle PSX HW/Crash Bash (USA).state1.png", "size": 40395}, {"mtime_ns": 1789440608000000000, "path": "Beetle PSX HW/Disney's The Emperor's New Groove (USA).state", "size": 1800199}, {"mtime_ns": 1789440608000000000, "path": "Beetle PSX HW/Disney's The Emperor's New Groove (USA).state.png", "size": 67889}, {"mtime_ns": 1789440470000000000, "path": "Beetle PSX HW/Disney's The Emperor's New Groove (USA).state1", "size": 1800199}, {"mtime_ns": 1789440470000000000, "path": "Beetle PSX HW/Disney's The Emperor's New Groove (USA).state1.png", "size": 67889}, {"mtime_ns": 1788987866000000000, "path": "Beetle PSX HW/Disney's The Emperor's New Groove (USA).state2", "size": 1593881}, {"mtime_ns": 1788987866000000000, "path": "Beetle PSX HW/Disney's The Emperor's New Groove (USA).state2.png", "size": 43014}, {"mtime_ns": 1788929030000000000, "path": "Beetle PSX HW/Disney's The Emperor's New Groove (USA).state3", "size": 1532407}, {"mtime_ns": 1788929030000000000, "path": "Beetle PSX HW/Disney's The Emperor's New Groove (USA).state3.png", "size": 30951}, {"mtime_ns": 1789051354000000000, "path": "Beetle PSX HW/King's Field II (USA).state", "size": 1517709}, {"mtime_ns": 1789051354000000000, "path": "Beetle PSX HW/King's Field II (USA).state.png", "size": 111562}, {"mtime_ns": 1789029732000000000, "path": "Beetle PSX HW/King's Field II (USA).state1", "size": 1517709}, {"mtime_ns": 1789029732000000000, "path": "Beetle PSX HW/King's Field II (USA).state1.png", "size": 111562}, {"mtime_ns": 1789014504000000000, "path": "Beetle PSX HW/Legacy of Kain - Soul Reaver (USA).state", "size": 1526778}, {"mtime_ns": 1789014504000000000, "path": "Beetle PSX HW/Legacy of Kain - Soul Reaver (USA).state.png", "size": 112780}, {"mtime_ns": 1789014504000000000, "path": "Beetle PSX HW/Legacy of Kain - Soul Reaver (USA).state1", "size": 1526778}, {"mtime_ns": 1789014504000000000, "path": "Beetle PSX HW/Legacy of Kain - Soul Reaver (USA).state1.png", "size": 112780}, {"mtime_ns": 1788937442000000000, "path": "Beetle PSX HW/Mega Man Legends (USA).state", "size": 1180794}, {"mtime_ns": 1788937442000000000, "path": "Beetle PSX HW/Mega Man Legends (USA).state.png", "size": 27975}, {"mtime_ns": 1788932532000000000, "path": "Beetle PSX HW/Mega Man Legends (USA).state1", "size": 1180794}, {"mtime_ns": 1788932532000000000, "path": "Beetle PSX HW/Mega Man Legends (USA).state1.png", "size": 27975}, {"mtime_ns": 1788929330000000000, "path": "Beetle PSX HW/Mega Man Legends (USA).state2", "size": 1160695}, {"mtime_ns": 1788929330000000000, "path": "Beetle PSX HW/Mega Man Legends (USA).state2.png", "size": 28021}, {"mtime_ns": 1788929864000000000, "path": "Beetle PSX HW/Mega Man Legends (USA).state3", "size": 1215820}, {"mtime_ns": 1788929864000000000, "path": "Beetle PSX HW/Mega Man Legends (USA).state3.png", "size": 13890}, {"mtime_ns": 1789050956000000000, "path": "bsnes/Donkey Kong Country (USA).state", "size": 108802}, {"mtime_ns": 1789050956000000000, "path": "bsnes/Donkey Kong Country (USA).state.png", "size": 42789}, {"mtime_ns": 1788971032000000000, "path": "bsnes/Donkey Kong Country (USA).state1", "size": 108802}, {"mtime_ns": 1788971032000000000, "path": "bsnes/Donkey Kong Country (USA).state1.png", "size": 42789}], "time_unix": 1789469638.0482612}

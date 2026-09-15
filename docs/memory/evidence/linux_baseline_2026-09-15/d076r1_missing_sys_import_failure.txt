@@ -1,0 +1,20 @@
+=== PRIVYHUB D-076R1 MANAGED RETROARCH INTEGRATION PROBE ===
+controller_preflight_active= True
+controller_backend= linux_uinput
+controller_players= 4
+controller_active_after_cleanup= False
+virtual_pads_after_cleanup= []
+probe_runtime_directory_removed= True
+Traceback (most recent call last):
+  File "/home/privyhub/Projects/onn-stream-test/tools/probes/d076r1_managed_retroarch_probe.py", line 192, in <module>
+    launch = manager.launch(game)
+  File "/home/privyhub/Projects/onn-stream-test/companion/games/emulator_manager.py", line 4994, in launch
+    self._prepare_retroarch_session_config(
+  File "/home/privyhub/Projects/onn-stream-test/companion/games/emulator_manager.py", line 4421, in _prepare_retroarch_session_config
+    if sys.platform.startswith("linux"):
+NameError: name 'sys' is not defined. Did you forget to import 'sys'?
+
+Classification: D-076R1 failed before RetroArch launch because the new Linux
+session-path branch referenced the standard-library `sys` module without importing
+it. Controller preflight and cleanup remained correct. No PHI1/uinput mapping,
+autoconfig profile, video, audio, or Android failure was observed in this run.

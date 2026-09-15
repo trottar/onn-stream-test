@@ -1520,6 +1520,26 @@ class NativeControllerBridge:
         "<4sBBHIQIhhhhHH"
     )
 
+    LINUX_VENDOR_ID = 0x1209
+    LINUX_PRODUCT_ID = 0x5048
+    LINUX_VERSION_ID = 1
+    LINUX_GAMEPAD_NAME = "PrivyHub Virtual Gamepad P{player}"
+
+    XUSB_DPAD_UP = 0x0001
+    XUSB_DPAD_DOWN = 0x0002
+    XUSB_DPAD_LEFT = 0x0004
+    XUSB_DPAD_RIGHT = 0x0008
+    XUSB_START = 0x0010
+    XUSB_BACK = 0x0020
+    XUSB_LEFT_THUMB = 0x0040
+    XUSB_RIGHT_THUMB = 0x0080
+    XUSB_LEFT_SHOULDER = 0x0100
+    XUSB_RIGHT_SHOULDER = 0x0200
+    XUSB_A = 0x1000
+    XUSB_B = 0x2000
+    XUSB_X = 0x4000
+    XUSB_Y = 0x8000
+
     def __init__(
         self,
         project_root: Path,
@@ -1538,6 +1558,8 @@ class NativeControllerBridge:
         self._gamepads: list[Any] = []
         self._client_ip: str | None = None
         self._port: int | None = None
+        self._controller_backend = self._selected_backend()
+        self._evdev: Any | None = None
 
         self._packets = 0
         self._lost_packets = 0
@@ -1557,7 +1579,33 @@ class NativeControllerBridge:
         self._forced_buttons = [
             0 for _ in range(self.MAX_PLAYERS)
         ]
+        self._last_reports = [
+            self._empty_report()
+            for _ in range(self.MAX_PLAYERS)
+        ]
         self._meta_lock = threading.RLock()
+
+    @staticmethod
+    def _selected_backend() -> str:
+        if os.name == "nt":
+            return "windows_vigem"
+        if sys.platform.startswith("linux"):
+            return "linux_uinput"
+        raise NativeSessionIOError(
+            f"Unsupported controller host platform: {os.name}"
+        )
+
+    @staticmethod
+    def _empty_report() -> dict[str, int]:
+        return {
+            "buttons": 0,
+            "lx": 0,
+            "ly": 0,
+            "rx": 0,
+            "ry": 0,
+            "lt": 0,
+            "rt": 0,
+        }
 
     def _load_vgamepad(
         self,
@@ -1587,6 +1635,18 @@ class NativeControllerBridge:
         return vg
 
     @staticmethod
+    def _load_evdev():
+        try:
+            import evdev
+        except Exception as exc:
+            raise NativeSessionIOError(
+                "Linux controller backend requires python3-evdev. "
+                f"Import failed: {exc}"
+            ) from exc
+
+        return evdev
+
+    @staticmethod
     def _clamp_axis(
         value: int,
     ) -> int:
@@ -1596,6 +1656,15 @@ class NativeControllerBridge:
                 32767,
                 int(value),
             ),
+        )
+
+    @classmethod
+    def _invert_axis(
+        cls,
+        value: int,
+    ) -> int:
+        return cls._clamp_axis(
+            -cls._clamp_axis(value)
         )
 
     @staticmethod
@@ -1609,6 +1678,143 @@ class NativeControllerBridge:
                 int(value),
             ),
         )
+
+    def _linux_capabilities(
+        self,
+        evdev: Any,
+    ) -> dict[int, list[Any]]:
+        ecodes = evdev.ecodes
+        stick = evdev.AbsInfo(
+            value=0,
+            min=-32768,
+            max=32767,
+            fuzz=0,
+            flat=128,
+            resolution=0,
+        )
+        trigger = evdev.AbsInfo(
+            value=0,
+            min=0,
+            max=255,
+            fuzz=0,
+            flat=0,
+            resolution=0,
+        )
+        hat = evdev.AbsInfo(
+            value=0,
+            min=-1,
+            max=1,
+            fuzz=0,
+            flat=0,
+            resolution=0,
+        )
+        return {
+            ecodes.EV_KEY: [
+                ecodes.BTN_SOUTH,
+                ecodes.BTN_EAST,
+                ecodes.BTN_NORTH,
+                ecodes.BTN_WEST,
+                ecodes.BTN_TL,
+                ecodes.BTN_TR,
+                ecodes.BTN_SELECT,
+                ecodes.BTN_START,
+                ecodes.BTN_THUMBL,
+                ecodes.BTN_THUMBR,
+            ],
+            ecodes.EV_ABS: [
+                (ecodes.ABS_X, stick),
+                (ecodes.ABS_Y, stick),
+                (ecodes.ABS_Z, trigger),
+                (ecodes.ABS_RX, stick),
+                (ecodes.ABS_RY, stick),
+                (ecodes.ABS_RZ, trigger),
+                (ecodes.ABS_HAT0X, hat),
+                (ecodes.ABS_HAT0Y, hat),
+            ],
+        }
+
+    def _create_gamepads(
+        self,
+    ) -> list[Any]:
+        if self._controller_backend == "windows_vigem":
+            vg = self._load_vgamepad()
+            gamepads: list[Any] = []
+            try:
+                for _ in range(
+                    self.MAX_PLAYERS
+                ):
+                    gamepads.append(
+                        vg.VX360Gamepad()
+                    )
+            except Exception as exc:
+                for gamepad in gamepads:
+                    try:
+                        gamepad.reset()
+                        gamepad.update()
+                    except Exception:
+                        pass
+                raise NativeSessionIOError(
+                    "Unable to create four temporary virtual X360 controllers. "
+                    "ViGEmBus must already be installed on this Windows host."
+                ) from exc
+            return gamepads
+
+        evdev = self._load_evdev()
+        self._evdev = evdev
+        capabilities = self._linux_capabilities(evdev)
+        gamepads = []
+
+        try:
+            for player in range(
+                1,
+                self.MAX_PLAYERS + 1,
+            ):
+                gamepads.append(
+                    evdev.UInput(
+                        capabilities,
+                        name=self.LINUX_GAMEPAD_NAME.format(
+                            player=player
+                        ),
+                        vendor=self.LINUX_VENDOR_ID,
+                        product=self.LINUX_PRODUCT_ID,
+                        version=self.LINUX_VERSION_ID,
+                        bustype=evdev.ecodes.BUS_USB,
+                    )
+                )
+        except Exception as exc:
+            for gamepad in reversed(gamepads):
+                try:
+                    gamepad.close()
+                except Exception:
+                    pass
+            self._evdev = None
+            raise NativeSessionIOError(
+                "Unable to create four Linux uinput controllers. "
+                "The companion user must have write access to /dev/uinput. "
+                f"uinput error: {exc}"
+            ) from exc
+
+        return gamepads
+
+    def _dispose_gamepads(
+        self,
+        gamepads: list[Any],
+    ) -> None:
+        if self._controller_backend == "windows_vigem":
+            for gamepad in gamepads:
+                try:
+                    gamepad.reset()
+                    gamepad.update()
+                except Exception:
+                    pass
+            return
+
+        for gamepad in reversed(gamepads):
+            try:
+                gamepad.close()
+            except Exception:
+                pass
+        self._evdev = None
 
     # PrivyHub Phase A3 persistent game-session controller
     def ensure_started(
@@ -1634,50 +1840,39 @@ class NativeControllerBridge:
     ) -> dict[str, Any]:
         self.stop()
 
-        vg = self._load_vgamepad()
-        gamepads: list[Any] = []
+        gamepads = self._create_gamepads()
+        sock: socket.socket | None = None
 
         try:
-            for _ in range(
-                self.MAX_PLAYERS
-            ):
-                gamepads.append(
-                    vg.VX360Gamepad()
-                )
-        except Exception as exc:
-            for gamepad in gamepads:
-                try:
-                    gamepad.reset()
-                    gamepad.update()
-                except Exception:
-                    pass
-
-            raise NativeSessionIOError(
-                "Unable to create four temporary virtual X360 controllers. "
-                "ViGEmBus must already be installed on this Windows host."
-            ) from exc
-
-        sock = socket.socket(
-            socket.AF_INET,
-            socket.SOCK_DGRAM,
-        )
-
-        sock.setsockopt(
-            socket.SOL_SOCKET,
-            socket.SO_RCVBUF,
-            256 * 1024,
-        )
-
-        sock.bind(
-            (
-                "0.0.0.0",
-                int(port),
+            sock = socket.socket(
+                socket.AF_INET,
+                socket.SOCK_DGRAM,
             )
-        )
 
-        sock.settimeout(
-            0.05
-        )
+            sock.setsockopt(
+                socket.SOL_SOCKET,
+                socket.SO_RCVBUF,
+                256 * 1024,
+            )
+
+            sock.bind(
+                (
+                    "0.0.0.0",
+                    int(port),
+                )
+            )
+
+            sock.settimeout(
+                0.05
+            )
+        except Exception:
+            if sock is not None:
+                try:
+                    sock.close()
+                except OSError:
+                    pass
+            self._dispose_gamepads(gamepads)
+            raise
 
         self._socket = sock
         self._gamepads = gamepads
@@ -1699,6 +1894,10 @@ class NativeControllerBridge:
         self._neutralized = [
             True for _ in range(self.MAX_PLAYERS)
         ]
+        self._last_reports = [
+            self._empty_report()
+            for _ in range(self.MAX_PLAYERS)
+        ]
 
         with self._meta_lock:
             self._forced_buttons = [
@@ -1715,6 +1914,102 @@ class NativeControllerBridge:
         self._thread.start()
 
         return self.status()
+
+    def _write_linux_report_locked(
+        self,
+        player: int,
+        report: dict[str, int],
+        *,
+        forced_buttons: int,
+    ) -> None:
+        if self._evdev is None:
+            raise NativeSessionIOError(
+                "Linux uinput backend is unavailable"
+            )
+
+        ecodes = self._evdev.ecodes
+        gamepad = self._gamepads[player]
+        buttons = (
+            int(report["buttons"])
+            | int(forced_buttons)
+        ) & 0xFFFF
+
+        button_map = (
+            (self.XUSB_A, ecodes.BTN_SOUTH),
+            (self.XUSB_B, ecodes.BTN_EAST),
+            (self.XUSB_X, ecodes.BTN_WEST),
+            (self.XUSB_Y, ecodes.BTN_NORTH),
+            (self.XUSB_LEFT_SHOULDER, ecodes.BTN_TL),
+            (self.XUSB_RIGHT_SHOULDER, ecodes.BTN_TR),
+            (self.XUSB_BACK, ecodes.BTN_SELECT),
+            (self.XUSB_START, ecodes.BTN_START),
+            (self.XUSB_LEFT_THUMB, ecodes.BTN_THUMBL),
+            (self.XUSB_RIGHT_THUMB, ecodes.BTN_THUMBR),
+        )
+
+        for mask, code in button_map:
+            gamepad.write(
+                ecodes.EV_KEY,
+                code,
+                1 if buttons & mask else 0,
+            )
+
+        hat_x = (
+            -1
+            if buttons & self.XUSB_DPAD_LEFT
+            else 1
+            if buttons & self.XUSB_DPAD_RIGHT
+            else 0
+        )
+        hat_y = (
+            -1
+            if buttons & self.XUSB_DPAD_UP
+            else 1
+            if buttons & self.XUSB_DPAD_DOWN
+            else 0
+        )
+
+        gamepad.write(
+            ecodes.EV_ABS,
+            ecodes.ABS_X,
+            self._clamp_axis(report["lx"]),
+        )
+        gamepad.write(
+            ecodes.EV_ABS,
+            ecodes.ABS_Y,
+            self._invert_axis(report["ly"]),
+        )
+        gamepad.write(
+            ecodes.EV_ABS,
+            ecodes.ABS_RX,
+            self._clamp_axis(report["rx"]),
+        )
+        gamepad.write(
+            ecodes.EV_ABS,
+            ecodes.ABS_RY,
+            self._invert_axis(report["ry"]),
+        )
+        gamepad.write(
+            ecodes.EV_ABS,
+            ecodes.ABS_Z,
+            self._clamp_trigger(report["lt"]),
+        )
+        gamepad.write(
+            ecodes.EV_ABS,
+            ecodes.ABS_RZ,
+            self._clamp_trigger(report["rt"]),
+        )
+        gamepad.write(
+            ecodes.EV_ABS,
+            ecodes.ABS_HAT0X,
+            hat_x,
+        )
+        gamepad.write(
+            ecodes.EV_ABS,
+            ecodes.ABS_HAT0Y,
+            hat_y,
+        )
+        gamepad.syn()
 
     def _neutralize(
         self,
@@ -1739,16 +2034,26 @@ class NativeControllerBridge:
             gamepad = self._gamepads[index]
 
             try:
-                # PrivyHub A2/A3 patch 01: timeout neutralization must not
-                # erase a companion-injected RetroArch meta hotkey mid-pulse.
+                # Timeout neutralization must not erase a companion-injected
+                # RetroArch meta hotkey mid-pulse.
                 with self._meta_lock:
                     forced_buttons = self._forced_buttons[index]
-                    gamepad.reset()
-                    gamepad.report.wButtons = (
-                        int(forced_buttons)
-                        & 0xFFFF
-                    )
-                    gamepad.update()
+                    self._last_reports[index] = self._empty_report()
+
+                    if self._controller_backend == "windows_vigem":
+                        gamepad.reset()
+                        gamepad.report.wButtons = (
+                            int(forced_buttons)
+                            & 0xFFFF
+                        )
+                        gamepad.update()
+                    else:
+                        self._write_linux_report_locked(
+                            index,
+                            self._last_reports[index],
+                            forced_buttons=forced_buttons,
+                        )
+
                     self._neutralized[index] = (
                         forced_buttons == 0
                     )
@@ -1775,55 +2080,97 @@ class NativeControllerBridge:
 
         gamepad = self._gamepads[player]
 
-        # PrivyHub A2/A3 patch 01: serialize real reports with the forced
-        # meta-button overlay so receiver traffic cannot erase a hotkey.
+        # Serialize real reports with the forced meta-button overlay so
+        # receiver traffic cannot erase a hotkey.
         with self._meta_lock:
             forced_buttons = self._forced_buttons[player]
+            report = {
+                "buttons": int(buttons) & 0xFFFF,
+                "lx": self._clamp_axis(lx),
+                "ly": self._clamp_axis(ly),
+                "rx": self._clamp_axis(rx),
+                "ry": self._clamp_axis(ry),
+                "lt": self._clamp_trigger(lt),
+                "rt": self._clamp_trigger(rt),
+            }
+            self._last_reports[player] = report
 
-            gamepad.report.wButtons = (
-                (
-                    int(buttons)
-                    & 0xFFFF
+            if self._controller_backend == "windows_vigem":
+                gamepad.report.wButtons = (
+                    report["buttons"]
+                    | forced_buttons
+                ) & 0xFFFF
+                gamepad.report.bLeftTrigger = report["lt"]
+                gamepad.report.bRightTrigger = report["rt"]
+                gamepad.report.sThumbLX = report["lx"]
+                gamepad.report.sThumbLY = report["ly"]
+                gamepad.report.sThumbRX = report["rx"]
+                gamepad.report.sThumbRY = report["ry"]
+                gamepad.update()
+            else:
+                self._write_linux_report_locked(
+                    player,
+                    report,
+                    forced_buttons=forced_buttons,
                 )
-                | forced_buttons
-            )
-            gamepad.report.bLeftTrigger = (
-                self._clamp_trigger(lt)
-            )
-            gamepad.report.bRightTrigger = (
-                self._clamp_trigger(rt)
-            )
-            gamepad.report.sThumbLX = (
-                self._clamp_axis(lx)
-            )
-            gamepad.report.sThumbLY = (
-                self._clamp_axis(ly)
-            )
-            gamepad.report.sThumbRX = (
-                self._clamp_axis(rx)
-            )
-            gamepad.report.sThumbRY = (
-                self._clamp_axis(ry)
-            )
-
-            gamepad.update()
 
             self._updates += 1
             self._updates_by_player[player] += 1
             self._neutralized[player] = False
 
-    # PrivyHub A2/A3 patch 02: stage RetroArch meta-hotkey edges.
-    # RetroArch treats input_enable_hotkey as a modifier. A human press
-    # naturally establishes Back/View before the action button; emitting both
-    # bits in one XInput report can be missed by the frontend. Keep the proven
-    # XInput mappings, but reproduce the physical chord ordering explicitly.
-    RETROARCH_HOTKEY_ENABLE = 0x0020  # Back / View
+    # RetroArch meta-hotkey edges. RetroArch treats input_enable_hotkey as a
+    # modifier, so establish Back/View before the action button and release it
+    # last. The canonical XUSB masks remain unchanged on both host backends.
+    RETROARCH_HOTKEY_ENABLE = XUSB_BACK
     RETROARCH_META_ACTION_BUTTONS = {
-        "save": 0x0200,  # right shoulder
-        "load": 0x0100,  # left shoulder
-        "pause": 0x0080,  # right thumb
-        "quit": 0x0010,  # Start
+        "save": XUSB_RIGHT_SHOULDER,
+        "load": XUSB_LEFT_SHOULDER,
+        "pause": XUSB_RIGHT_THUMB,
+        "quit": XUSB_START,
     }
+
+    def _write_forced_overlay_locked(
+        self,
+        player: int,
+    ) -> None:
+        gamepad = self._gamepads[player]
+        forced_buttons = self._forced_buttons[player]
+
+        if self._controller_backend == "windows_vigem":
+            gamepad.report.wButtons = (
+                int(gamepad.report.wButtons)
+                | int(forced_buttons)
+            ) & 0xFFFF
+            gamepad.update()
+            return
+
+        self._write_linux_report_locked(
+            player,
+            self._last_reports[player],
+            forced_buttons=forced_buttons,
+        )
+
+    def _clear_forced_bit_locked(
+        self,
+        player: int,
+        mask: int,
+    ) -> None:
+        gamepad = self._gamepads[player]
+        self._forced_buttons[player] &= ~mask
+
+        if self._controller_backend == "windows_vigem":
+            gamepad.report.wButtons = (
+                int(gamepad.report.wButtons)
+                & ~mask
+            ) & 0xFFFF
+            gamepad.update()
+            return
+
+        self._write_linux_report_locked(
+            player,
+            self._last_reports[player],
+            forced_buttons=self._forced_buttons[player],
+        )
 
     def pulse_retroarch_hotkey(
         self,
@@ -1856,7 +2203,6 @@ class NativeControllerBridge:
                 "Requested virtual controller is unavailable"
             )
 
-        gamepad = self._gamepads[player]
         modifier_mask = int(
             self.RETROARCH_HOTKEY_ENABLE
         )
@@ -1877,44 +2223,32 @@ class NativeControllerBridge:
         # 1. Establish Back/View alone.
         with self._meta_lock:
             self._forced_buttons[player] |= modifier_mask
-            gamepad.report.wButtons = (
-                int(gamepad.report.wButtons)
-                | modifier_mask
-            ) & 0xFFFF
-            gamepad.update()
+            self._write_forced_overlay_locked(player)
 
         time.sleep(settle)
 
         # 2. Press the action while the modifier is already held.
         with self._meta_lock:
             self._forced_buttons[player] |= action_mask
-            gamepad.report.wButtons = (
-                int(gamepad.report.wButtons)
-                | action_mask
-            ) & 0xFFFF
-            gamepad.update()
+            self._write_forced_overlay_locked(player)
 
         time.sleep(hold)
 
         # 3. Release the action first, preserving Back/View.
         with self._meta_lock:
-            self._forced_buttons[player] &= ~action_mask
-            gamepad.report.wButtons = (
-                int(gamepad.report.wButtons)
-                & ~action_mask
-            ) & 0xFFFF
-            gamepad.update()
+            self._clear_forced_bit_locked(
+                player,
+                action_mask,
+            )
 
         time.sleep(release_gap)
 
         # 4. Release Back/View last so RetroArch sees a complete chord.
         with self._meta_lock:
-            self._forced_buttons[player] &= ~modifier_mask
-            gamepad.report.wButtons = (
-                int(gamepad.report.wButtons)
-                & ~modifier_mask
-            ) & 0xFFFF
-            gamepad.update()
+            self._clear_forced_bit_locked(
+                player,
+                modifier_mask,
+            )
 
         return {
             "action": normalized_action,
@@ -2042,6 +2376,11 @@ class NativeControllerBridge:
     def status(
         self,
     ) -> dict[str, Any]:
+        sink = (
+            "vigem_x360_quad_poc"
+            if self._controller_backend == "windows_vigem"
+            else "uinput_quad"
+        )
         return {
             "active": (
                 self._running.is_set()
@@ -2050,7 +2389,8 @@ class NativeControllerBridge:
                     self._gamepads
                 ) == self.MAX_PLAYERS
             ),
-            "sink": "vigem_x360_quad_poc",
+            "sink": sink,
+            "backend": self._controller_backend,
             "transport": "udp_full_state",
             "poc_version": self.POC_VERSION,
             "players": self.MAX_PLAYERS,
@@ -2059,6 +2399,12 @@ class NativeControllerBridge:
             "lost_packets": self._lost_packets,
             "rejected_packets": self._rejected_packets,
             "bad_packets": self._bad_packets,
+            "updates": self._updates,
+            "updates_by_player": list(
+                self._updates_by_player
+            ),
+            # Compatibility aliases consumed by existing diagnostics. These
+            # remain populated on Linux even though the sink is not ViGEm.
             "vigem_updates": self._updates,
             "vigem_updates_by_player": list(
                 self._updates_by_player
@@ -2096,10 +2442,15 @@ class NativeControllerBridge:
             ]
 
         self._neutralize()
+        gamepads = self._gamepads
         self._gamepads = []
+        self._dispose_gamepads(gamepads)
+        self._last_reports = [
+            self._empty_report()
+            for _ in range(self.MAX_PLAYERS)
+        ]
         self._client_ip = None
         self._port = None
-
 
 class NativeSessionIO:
     def __init__(

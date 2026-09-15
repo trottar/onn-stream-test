@@ -527,3 +527,15 @@ This index records durable checkpoints and major patch lines; it does not invent
 
 | D-075 Linux native-audio backend | 2026-09-15 | Development patch: managed PID -> isolated PulseAudio sink/monitor -> PCM16 -> hybrid 5 ms PHA1 sender; Windows audio preserved. |
 | D-075R1 Linux native-audio RT pacer | 2026-09-15 | Runtime validated: sender-thread-only SCHED_RR/1 restores stable 5 ms PHA1 pacing under active RetroArch; production Linux PulseAudio route/capture/send/restore path passed. |
+| D-076 Linux uinput controller backend | 2026-09-15 | Development patch: Linux PHI1/XUSB -> four evdev.UInput pads plus project-owned RetroArch udev autoconfig; Windows ViGEm preserved; runtime validation pending. |
+
+- D-076R1 — Linux managed RetroArch autoconfig session-path correction; runtime revalidation pending.
+
+- D-076R2 — add missing `sys` import required by D-076R1 Linux session-path branch; managed runtime revalidation pending.
+
+## 2026-09-15 D-076 controller checkpoint status
+
+- D-076 Linux uinput controller backend: **HOST-SIDE MANAGED RUNTIME VALIDATED / ONN E2E PENDING**.
+- D-076R1 managed autoconfig session-path correction: **HOST-SIDE RUNTIME VALIDATED**.
+- D-076R2 missing `sys` import correction: **HOST-SIDE RUNTIME VALIDATED**.
+- The managed probe's final false classification is superseded by raw RetroArch/lifecycle evidence; see `docs/memory/evidence/linux_baseline_2026-09-15/d076_managed_retroarch_runtime_validation.txt`.

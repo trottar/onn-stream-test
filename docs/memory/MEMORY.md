@@ -821,7 +821,7 @@ Remaining Phase D production seams:
 1. platform-aware RetroArch runtime/config selection;
 2. Linux X11/VAAPI native-video backend;
 3. Linux PulseAudio native-audio backend;
-4. PHI1-to-uinput controller backend;
+4. PHI1-to-uinput controller backend — D-076/R1/R2 host-side managed runtime validated; onn E2E pending;
 5. Linux host telemetry;
 6. durable service-user/device permissions;
 7. migrated save/state/cheat/mod/profile regression validation.
@@ -880,3 +880,67 @@ subpath rather than silently running the known-jittery `SCHED_OTHER` pacer.
 Never grant `CAP_SYS_NICE` to the general Python interpreter for this purpose.
 The preferred persistent deployment boundary is service-scoped
 `LimitRTPRIO=1`/equivalent, with no production `sudo` invocation.
+
+## Linux controller implementation boundary — D-076
+
+Baselines 42-45 are authoritative for the Linux controller mapping. Canonical
+PHI1/XUSB remains the host-independent transport contract. Linux converts that
+state to four `evdev.UInput` pads; Windows continues to use ViGEm VX360 pads.
+
+Linux production mapping:
+
+- A/B/X/Y -> BTN_SOUTH/BTN_EAST/BTN_WEST/BTN_NORTH;
+- L1/R1 -> BTN_TL/BTN_TR;
+- Back/Start/L3/R3 -> BTN_SELECT/BTN_START/BTN_THUMBL/BTN_THUMBR;
+- LX/LY -> ABS_X/ABS_Y, with XInput-positive Y inverted for Linux;
+- RX/RY -> ABS_RX/ABS_RY, with the same Y inversion;
+- LT/RT -> ABS_Z/ABS_RZ, 0..255;
+- D-pad -> ABS_HAT0X/ABS_HAT0Y.
+
+RetroArch uses project-owned udev autoconfig profiles for P1-P4 under
+`data/games/retroarch/autoconfig/udev`. Baseline 45 proved project-relative
+autoconfig only for a project-root launch; D-076R1 is authoritative for managed
+launches and rewrites the generated Linux session config to the validated
+absolute project-owned directory. The four pads must exist before RetroArch
+initializes input.
+
+D-076/R1/R2 are host-side managed-runtime validated. Full Android/onn E2E and
+durable `/dev/uinput` service permission remain pending; production code must not
+invoke `sudo`.
+
+## D-076R1 managed RetroArch autoconfig-path correction
+
+D-076 isolated runtime validation passed, but the first real managed RetroArch
+probe exposed a session-path issue rather than a controller-mapping failure.
+All four Linux uinput pads existed before launch and RetroArch selected the udev
+joypad driver, but P1-P4 were reported `not configured`.
+
+Fresh evidence established the cause: the persistent config kept the portable
+relative setting `joypad_autoconfig_dir = "data/games/retroarch/autoconfig"`,
+while EmulatorManager launches RetroArch with `cwd=executable.parent`. RetroArch
+therefore resolved that relative path below the AppImage directory, where no
+autoconfig profiles exist. The project-owned autoconfig directory itself was
+present and contained all four D-076 profiles.
+
+D-076R1 keeps the persistent config portable. On Linux, only the generated
+per-launch session config rewrites the single validated project-relative
+`joypad_autoconfig_dir` to its absolute project-owned path. Windows behavior,
+PHI1, uinput mapping, Android, video/FEC, audio, and emulator process cwd remain
+unchanged.
+
+Authoritative current controller note: D-076R1 supersedes the Baseline-45 project-root relative-path assumption; the generated absolute project-owned autoconfig path passed managed runtime validation.
+
+## D-076R2 missing `sys` import correction
+
+The first D-076R1 managed RetroArch revalidation failed before RetroArch launch.
+Linux controller preflight succeeded (`linux_uinput`, four players), but the new
+D-076R1 session-config branch referenced `sys.platform` without importing the
+standard-library `sys` module. Cleanup removed all virtual pads correctly.
+
+D-076R2 adds only the missing top-level `import sys` to
+`companion/games/emulator_manager.py`. The D-076R1 autoconfig path-resolution
+logic, D-076 uinput backend/mapping, PHI1, Android, video/FEC, D-075R1 audio,
+RetroArch persistent config/profiles, process cwd, and runtime descriptor are
+unchanged.
+
+Authoritative current controller note: D-076R2 supersedes the D-076R1 missing-import defect; managed RetroArch host validation passed. The probe final classifier was false only because it accepted `.state.png` and required the non-production controller `quit` chord; raw RetroArch/lifecycle evidence proves Save, Load, and graceful production End.

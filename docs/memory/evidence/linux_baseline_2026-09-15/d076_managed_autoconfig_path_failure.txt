@@ -1,0 +1,36 @@
+=== PRIVYHUB D-076 MANAGED RETROARCH AUTOCONFIG PATH FAILURE ===
+Date: 2026-09-15
+
+Controller preflight:
+active=True
+backend=linux_uinput
+players=4
+
+Managed RetroArch:
+launch_active=True
+retroarch_state=PLAYING
+P1 configured=False
+P2 configured=False
+P3 configured=False
+P4 configured=False
+
+Fresh RetroArch input evidence:
+Pad #0 event19: PrivyHub Virtual Gamepad P1 not configured
+Pad #1 event20: PrivyHub Virtual Gamepad P2 not configured
+Pad #2 event21: PrivyHub Virtual Gamepad P3 not configured
+Pad #3 event22: PrivyHub Virtual Gamepad P4 not configured
+joypad driver=udev
+
+Path evidence:
+EmulatorManager Popen cwd=executable.parent
+persistent joypad_autoconfig_dir=data/games/retroarch/autoconfig
+project-relative directory exists=True
+relative path below managed cwd exists=False
+
+Cleanup:
+fallback manager stop graceful=True
+controller active after cleanup=False
+virtual pads after cleanup=[]
+
+Classification: MANAGED_RETROARCH_AUTOCONFIG_RELATIVE_PATH_CWD_MISMATCH
+D-076 controller creation/enumeration remains valid; D-076R1 path correction required.

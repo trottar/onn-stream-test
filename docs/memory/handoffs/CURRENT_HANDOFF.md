@@ -650,7 +650,7 @@ Changed production scope:
 Still pending:
 - full Android/onn E2E validation of D-074;
 - Linux PulseAudio backend;
-- PHI1 -> uinput backend;
+- D-076 PHI1 -> uinput runtime validation;
 - Linux host telemetry;
 - service/device permissions;
 - migrated save/state/profile regressions.
@@ -711,6 +711,77 @@ delivery remained clean, 5 ms sender cadence was restored under active
 RetroArch, the original PulseAudio route was restored, the temporary sink was
 removed, native video remained active, and RetroArch stopped gracefully.
 
-Next: implement the Linux PHI1 -> uinput production controller backend and
-runtime-validate actual gameplay mapping, four-player ordering, hotkeys, and
-trigger behavior without disturbing the validated video or audio paths.
+D-076/R1/R2 host-side managed runtime validation passed without changing the
+validated Linux video/audio implementations. Next: checkpoint this state, then
+run full Android/onn Linux E2E.
+
+## D-076 Linux uinput controller backend
+
+Baselines 42-45 passed before production modification:
+
+- exact Linux joystick mapping measured;
+- PHI1/XUSB -> uinput translation passed 20/20 controls;
+- P1-P4 autoconfigured in RetroArch ports 1-4;
+- project-relative autoconfig directory validated.
+
+D-076 adds the Linux uinput backend inside the existing controller bridge while
+preserving Windows ViGEm, Android PHI1, video/FEC, D-075R1 audio, EmulatorManager,
+and A8 gameplay-profile semantics. Existing ViGEm-named diagnostic counters are
+retained as compatibility aliases.
+
+Host-side managed RetroArch validation is complete. P1-P4 configured in ports
+1-4, PHI1 live updates were clean, Pause/Resume passed, raw RetroArch logs prove
+real Save/Load, normal EmulatorManager stop was graceful, and all pads cleaned up.
+Durable service permissions remain a later Phase D item.
+
+D-076 isolated production-backend runtime validation passed: Linux selected
+`linux_uinput`, created four pads, processed PHI1 for P1-P4 with zero
+bad/rejected packets, preserved meta-hotkey edge ordering, and removed all pads
+on stop. Managed RetroArch host integration subsequently passed; full onn E2E remains pending.
+
+## D-076R1 managed RetroArch autoconfig-path correction
+
+D-076 isolated runtime validation passed, but the first real managed RetroArch
+probe exposed a session-path issue rather than a controller-mapping failure.
+All four Linux uinput pads existed before launch and RetroArch selected the udev
+joypad driver, but P1-P4 were reported `not configured`.
+
+Fresh evidence established the cause: the persistent config kept the portable
+relative setting `joypad_autoconfig_dir = "data/games/retroarch/autoconfig"`,
+while EmulatorManager launches RetroArch with `cwd=executable.parent`. RetroArch
+therefore resolved that relative path below the AppImage directory, where no
+autoconfig profiles exist. The project-owned autoconfig directory itself was
+present and contained all four D-076 profiles.
+
+D-076R1 keeps the persistent config portable. On Linux, only the generated
+per-launch session config rewrites the single validated project-relative
+`joypad_autoconfig_dir` to its absolute project-owned path. Windows behavior,
+PHI1, uinput mapping, Android, video/FEC, audio, and emulator process cwd remain
+unchanged.
+
+Status: **HOST-SIDE MANAGED RUNTIME VALIDATED / ONN E2E PENDING**
+
+## D-076R2 missing `sys` import correction
+
+The first D-076R1 managed RetroArch revalidation failed before RetroArch launch.
+Linux controller preflight succeeded (`linux_uinput`, four players), but the new
+D-076R1 session-config branch referenced `sys.platform` without importing the
+standard-library `sys` module. Cleanup removed all virtual pads correctly.
+
+D-076R2 adds only the missing top-level `import sys` to
+`companion/games/emulator_manager.py`. The D-076R1 autoconfig path-resolution
+logic, D-076 uinput backend/mapping, PHI1, Android, video/FEC, D-075R1 audio,
+RetroArch persistent config/profiles, process cwd, and runtime descriptor are
+unchanged.
+
+Status: **HOST-SIDE MANAGED RUNTIME VALIDATED / ONN E2E PENDING**
+
+## D-076 managed-runtime acceptance
+
+Authoritative evidence: P1-P4 autoconfigured in ports 1-4; eight live PHI1
+packets produced two updates per player with zero bad packets; Pause and Resume
+changed RetroArch state correctly; RetroArch logged saving and loading the same
+284304-byte `.state`; the production `EmulatorManager.stop()` path returned a
+graceful SIGTERM shutdown with `SAVE_FILES` -> `OK`; cleanup removed all virtual
+pads. The probe's `validated=False` was a classifier defect (`.state.png` match +
+non-production `quit` requirement), not a controller failure.

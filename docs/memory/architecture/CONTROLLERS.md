@@ -98,3 +98,62 @@ After exact rollback of the PS1 multitap patch, four ViGEm/XInput slots were sti
 ## Final P1-P4 acceptance, 2026-09-10
 
 After substituting a different physical controller, the Android assignment probe again confirmed exact P1->1, P2->2, P3->3, P4->4 routing with clean release, four-slot continuity, and neutral final state during an active game session. The final 4P gameplay probe confirmed the same mapping in Crash Bash. The earlier P4/dropout episode persisted once with multitap rolled back and disappeared with the replacement controller, so it is not attributed to PHI1, ViGEm, or the multitap code. Treat as controller-specific/pairing/transient Bluetooth behavior unless reproduced across representative devices.
+
+## Linux production backend (D-076)
+
+Linux retains the same canonical Android/PHI1 state and replaces only the final
+host output stage:
+
+`Android InputDevice -> NativeControllerSender -> PHI1 UDP full-state packets -> NativeControllerBridge -> evdev.UInput P1-P4 -> RetroArch udev input`
+
+The Linux backend creates all four pads before RetroArch input initialization.
+Project-owned udev autoconfig profiles bind those pads in ports 1-4. Windows
+continues to use the existing ViGEm VX360 path. Save/Load/Pause/End remain
+companion-injected meta controls outside gameplay-profile remapping.
+
+## D-076R1 managed RetroArch autoconfig-path correction
+
+D-076 isolated runtime validation passed, but the first real managed RetroArch
+probe exposed a session-path issue rather than a controller-mapping failure.
+All four Linux uinput pads existed before launch and RetroArch selected the udev
+joypad driver, but P1-P4 were reported `not configured`.
+
+Fresh evidence established the cause: the persistent config kept the portable
+relative setting `joypad_autoconfig_dir = "data/games/retroarch/autoconfig"`,
+while EmulatorManager launches RetroArch with `cwd=executable.parent`. RetroArch
+therefore resolved that relative path below the AppImage directory, where no
+autoconfig profiles exist. The project-owned autoconfig directory itself was
+present and contained all four D-076 profiles.
+
+D-076R1 keeps the persistent config portable. On Linux, only the generated
+per-launch session config rewrites the single validated project-relative
+`joypad_autoconfig_dir` to its absolute project-owned path. Windows behavior,
+PHI1, uinput mapping, Android, video/FEC, audio, and emulator process cwd remain
+unchanged.
+
+Status: **DEVELOPMENT PATCH / MANAGED RETROARCH RUNTIME REVALIDATION PENDING**
+
+## D-076R2 missing `sys` import correction
+
+The first D-076R1 managed RetroArch revalidation failed before RetroArch launch.
+Linux controller preflight succeeded (`linux_uinput`, four players), but the new
+D-076R1 session-config branch referenced `sys.platform` without importing the
+standard-library `sys` module. Cleanup removed all virtual pads correctly.
+
+D-076R2 adds only the missing top-level `import sys` to
+`companion/games/emulator_manager.py`. The D-076R1 autoconfig path-resolution
+logic, D-076 uinput backend/mapping, PHI1, Android, video/FEC, D-075R1 audio,
+RetroArch persistent config/profiles, process cwd, and runtime descriptor are
+unchanged.
+
+Status: **DEVELOPMENT PATCH / MANAGED RETROARCH RUNTIME REVALIDATION PENDING**
+
+## D-076/R1/R2 managed Linux runtime status — 2026-09-15
+
+**Authoritative over earlier pending-runtime notes.** Host-side managed RetroArch
+validation passed: P1-P4 configured in ports 1-4, PHI1 live updates were clean,
+Pause/Resume worked, RetroArch logged a real 284304-byte `.state` save and load,
+normal `EmulatorManager.stop()` was graceful with `SAVE_FILES` -> `OK`, and all
+virtual pads were removed. The prior probe final `False` was a classifier defect
+(`.state.png` match plus a non-production `quit` requirement). Full onn E2E and
+durable `/dev/uinput` service permission remain pending.

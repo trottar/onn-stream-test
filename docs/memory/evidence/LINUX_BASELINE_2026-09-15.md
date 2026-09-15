@@ -798,3 +798,168 @@ capture -> PCM16/PHA1 v1 -> sender-thread-only SCHED_RR priority 1.
 Normal SCHED_OTHER pacing under active RetroArch was experimentally rejected.
 Do not reopen the PulseAudio, Python GIL, buffer-lock, Event.wait, or ordinary
 pacer investigations without contradictory new runtime evidence.
+
+## Baseline 42 exact Linux uinput control map
+
+A production-candidate PrivyHub uinput gamepad was measured through the Linux
+joystick API.
+
+Measured button indices:
+
+- BTN_SOUTH -> 0
+- BTN_EAST -> 1
+- BTN_NORTH -> 2
+- BTN_WEST -> 3
+- BTN_TL -> 4
+- BTN_TR -> 5
+- BTN_SELECT -> 6
+- BTN_START -> 7
+- BTN_THUMBL -> 8
+- BTN_THUMBR -> 9
+
+Measured axes:
+
+- ABS_X -> 0
+- ABS_Y -> 1
+- ABS_Z -> 2
+- ABS_RX -> 3
+- ABS_RY -> 4
+- ABS_RZ -> 5
+- ABS_HAT0X -> 6
+- ABS_HAT0Y -> 7
+
+Triggers configured as 0..255 ABS_Z/ABS_RZ are exposed through the joystick
+interface as full-range axes. D-pad hats are exposed as axes 6/7.
+
+Result: **EXACT LINUX UINPUT CONTROL LAYOUT MEASURED**
+
+## Baseline 43 PHI1 -> Linux uinput translation
+
+The existing PHI1 v1/XUSB canonical state was translated through a temporary
+production-candidate Linux uinput device and measured through the Linux joystick
+API.
+
+Results:
+
+- 20 control checks passed out of 20;
+- A/B/X/Y button placement correct;
+- shoulders, Back, Start, L3, and R3 correct;
+- left/right stick axes correct;
+- XInput-positive Y values correctly inverted for Linux ABS_Y/ABS_RY;
+- LT/RT correctly mapped to ABS_Z/ABS_RZ;
+- D-pad correctly mapped to ABS_HAT0X/ABS_HAT0Y;
+- 40 PHI1 packets processed;
+- zero bad PHI1 packets;
+- temporary device cleaned up.
+
+Result: **PHI1 -> LINUX UINPUT CONTROL TRANSLATION VALIDATED**
+
+Android PHI1 remains unchanged. Production Linux controller work may reuse this
+mapping directly.
+
+## Baseline 44 four-pad RetroArch autoconfig
+
+Four production-candidate PrivyHub uinput gamepads were created before
+RetroArch startup and supplied matching reconstructed udev autoconfig profiles.
+
+Observed:
+
+- P1 -> event19 -> RetroArch port 1
+- P2 -> event20 -> RetroArch port 2
+- P3 -> event21 -> RetroArch port 3
+- P4 -> event22 -> RetroArch port 4
+- joypad driver: udev
+- configured pads: 4
+- not-configured pads: 0
+- temporary devices removed after the probe
+
+Result: **FOUR-PLAYER UINPUT + RETROARCH AUTOCONFIG VALIDATED**
+
+This validates the production startup ordering requirement:
+
+`create P1-P4 -> launch RetroArch -> enumerate/configure all four pads`
+
+## Baseline 45 project-relative RetroArch autoconfig
+
+Four production-candidate PrivyHub uinput gamepads were created before RetroArch
+startup. The temporary RetroArch config used a project-relative autoconfig path:
+
+`data/games/retroarch/.baseline45_autoconfig`
+
+Observed:
+
+- P1-P4 created as event19-event22;
+- all four pads configured in RetroArch ports 1-4;
+- joypad driver: `udev`;
+- configured count: 4;
+- not-configured count: 0;
+- bounded RetroArch timeout exit: 124 (expected);
+- temporary profile directory removed;
+- no temporary controller remnants remained.
+
+Result: **PROJECT-RELATIVE FOUR-PAD AUTOCONFIG VALIDATED**
+
+Baseline 45 proves project-relative autoconfig only when RetroArch starts from
+the project root. Managed EmulatorManager launches use `cwd=executable.parent`;
+D-076R1 therefore keeps the persistent value portable but resolves the generated
+Linux session config to the absolute project-owned autoconfig directory.
+
+## D-076R1 managed RetroArch autoconfig-path correction
+
+D-076 isolated runtime validation passed, but the first real managed RetroArch
+probe exposed a session-path issue rather than a controller-mapping failure.
+All four Linux uinput pads existed before launch and RetroArch selected the udev
+joypad driver, but P1-P4 were reported `not configured`.
+
+Fresh evidence established the cause: the persistent config kept the portable
+relative setting `joypad_autoconfig_dir = "data/games/retroarch/autoconfig"`,
+while EmulatorManager launches RetroArch with `cwd=executable.parent`. RetroArch
+therefore resolved that relative path below the AppImage directory, where no
+autoconfig profiles exist. The project-owned autoconfig directory itself was
+present and contained all four D-076 profiles.
+
+D-076R1 keeps the persistent config portable. On Linux, only the generated
+per-launch session config rewrites the single validated project-relative
+`joypad_autoconfig_dir` to its absolute project-owned path. Windows behavior,
+PHI1, uinput mapping, Android, video/FEC, audio, and emulator process cwd remain
+unchanged.
+
+Status: **HOST-SIDE MANAGED RUNTIME VALIDATED / ONN E2E PENDING**
+
+## D-076R2 missing `sys` import correction
+
+The first D-076R1 managed RetroArch revalidation failed before RetroArch launch.
+Linux controller preflight succeeded (`linux_uinput`, four players), but the new
+D-076R1 session-config branch referenced `sys.platform` without importing the
+standard-library `sys` module. Cleanup removed all virtual pads correctly.
+
+D-076R2 adds only the missing top-level `import sys` to
+`companion/games/emulator_manager.py`. The D-076R1 autoconfig path-resolution
+logic, D-076 uinput backend/mapping, PHI1, Android, video/FEC, D-075R1 audio,
+RetroArch persistent config/profiles, process cwd, and runtime descriptor are
+unchanged.
+
+Status: **HOST-SIDE MANAGED RUNTIME VALIDATED / ONN E2E PENDING**
+
+## D-076 authoritative managed RetroArch runtime validation
+
+The D-076R2 managed run passed the host-side production controller path:
+
+- Linux controller preflight active with backend `linux_uinput`;
+- P1-P4 configured in deterministic RetroArch ports 1-4;
+- generated session autoconfig path was absolute/project-owned;
+- eight live PHI1 packets, zero bad packets, updates `[2, 2, 2, 2]`;
+- Pause -> `PAUSED`; Resume -> `PLAYING`;
+- RetroArch logged saving slot 0 to the real `.state`, 284304 bytes;
+- RetroArch logged loading that same `.state`, 284304 bytes;
+- `SAVE_FILES` returned `OK`; normal production stop requested SIGTERM, returned
+  code 0 and `graceful=true`;
+- controller cleanup removed all virtual pads.
+
+The diagnostic emitted `d076r1_managed_retroarch_validated=False`, but raw
+evidence overrides that classifier: its Save matcher selected `.state.png`, and
+it required the optional controller `quit` chord even though product End uses
+`EmulatorManager.stop()`. Those are probe defects, not runtime subsystem failures.
+
+Result: **D-076/R1/R2 HOST-SIDE MANAGED RUNTIME VALIDATED**. Full Android/onn
+Linux E2E remains pending.
