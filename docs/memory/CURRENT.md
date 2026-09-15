@@ -749,3 +749,38 @@ on Linux before Phase E:
 
 Then proceed to Phase E Linux characterization/optimization, followed by Phase F
 media/VOD/Live TV UX.
+
+## D-073 Linux baseline — emulator/runtime boundary validated
+
+**Status:** PHASE D ACTIVE / CORE LINUX EMULATOR LIFECYCLE RUNTIME-VALIDATED
+
+The Debian host now has a validated project-owned RetroArch 1.22.2 Linux runtime with all four required cores.
+
+Validated Linux foundations:
+- Renoir VAAPI H.264 encode;
+- exact X11 RetroArch window capture;
+- mapped-window lifecycle requirement;
+- PulseAudio isolated-capture architecture;
+- four simultaneous uinput gamepads;
+- RetroArch udev enumeration/autoconfig;
+- real SNES video/audio runtime;
+- real-game 720p60 VAAPI capture;
+- current native/emulator Python modules import on Linux;
+- existing `EmulatorManager` launch/control/flush/stop lifecycle works unchanged on Linux.
+
+Windows durable RetroArch state was migrated byte-for-byte:
+129 files, manifest SHA-256
+`6de3fa8b67d5a0ee21ace20af9347b5cf0f5997f3a9d410fcd23d6410b18280c`.
+
+Do not port or replace `EmulatorManager` without new evidence.
+
+Remaining Linux production surfaces:
+1. platform-aware runtime/config selection;
+2. X11/VAAPI native video backend;
+3. PulseAudio native audio backend;
+4. PHI1 -> uinput controller backend;
+5. Linux host telemetry;
+6. persistent service-user/device permissions;
+7. save/state/profile regression validation through the migrated project data.
+
+Next technical work: establish the smallest production backend seam for native video/audio/controller without altering the already-validated Android protocol or emulator lifecycle.

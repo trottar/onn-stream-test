@@ -1,0 +1,20 @@
+=== PRIVYHUB LINUX BASELINE 09v2: UINPUT MODULE PROBE ===
+Tue Sep 15 02:59:12 AM EDT 2026
+
+=== TOOLS ===
+modinfo=MISSING
+modprobe=MISSING
+
+=== BEFORE ===
+sysfs_module=absent
+lsmod=uinput_not_listed
+
+=== LOAD MODULE ===
+modprobe_exit_code=0
+
+=== AFTER ===
+sysfs_module=present
+uinput                 20480  0
+
+=== DEVICE NODE ===
+crw------- root root /dev/uinput

@@ -775,3 +775,56 @@ Execution order:
 
 Do not treat the Windows 5500/6000/7000 ladder as a Linux product constant.
 Revalidate actuator and bitrate envelope on Linux.
+
+## Linux native baseline architectural facts — D-073
+
+Phase D established the Linux host architecture on Debian 13 with the Ryzen
+Renoir iGPU.
+
+Durable Linux backend facts:
+
+- Renoir `amdgpu` exposes working H.264 VAAPI encoding through
+  `/dev/dri/renderD128`.
+- Stock Debian FFmpeg is sufficient for the current baseline.
+- Exact X11 window capture with `x11grab -window_id` works for real RetroArch
+  gameplay and feeds VAAPI H.264 successfully.
+- The target RetroArch window must remain mapped. Minimizing/unmapping it kills
+  exact-window capture. Covering/occluding a still-mapped window does not.
+- PulseAudio is the validated desktop audio stack. A dedicated sink plus monitor
+  capture can isolate application audio.
+- Linux uinput can expose four simultaneous PrivyHub virtual gamepads.
+- RetroArch enumerates all four when they exist before frontend startup.
+- Local udev autoconfig matching works for the validated PrivyHub virtual-pad
+  capability set.
+- Preserve PHI1 v1 and replace only the Windows ViGEm output backend with
+  Linux uinput.
+- The project-owned RetroArch 1.22.2 Linux AppImage and all four required Linux
+  cores load successfully.
+- Real SNES video/audio/content lifecycle is validated.
+- Existing `EmulatorManager` readiness, launch, loopback control, save flush,
+  and shutdown lifecycle work on Linux without source changes.
+- `EmulatorManager` is therefore not a Linux-porting blocker. Do not replace it
+  without new regression evidence.
+- `NativeStreamManager` constructs safely on Linux, but its current capture,
+  encoder, audio, controller, and telemetry status remains Windows-specific.
+  Preserve the manager/control surface and substitute platform backends.
+- Windows durable RetroArch state migrated byte-for-byte to Linux: 129 files,
+  manifest SHA-256
+  `6de3fa8b67d5a0ee21ace20af9347b5cf0f5997f3a9d410fcd23d6410b18280c`.
+- The migrated backup had no files under `system/`; do not assume PS1 BIOS
+  availability from the migration.
+- Never use the user's global `~/.config/retroarch` as production state.
+  PrivyHub owns `data/games/retroarch/`.
+
+Remaining Phase D production seams:
+
+1. platform-aware RetroArch runtime/config selection;
+2. Linux X11/VAAPI native-video backend;
+3. Linux PulseAudio native-audio backend;
+4. PHI1-to-uinput controller backend;
+5. Linux host telemetry;
+6. durable service-user/device permissions;
+7. migrated save/state/cheat/mod/profile regression validation.
+
+Windows bitrate values remain reference evidence only. Linux bitrate, FEC, and
+actuation behavior must be characterized independently.

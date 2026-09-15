@@ -1,0 +1,24 @@
+=== PRIVYHUB LINUX BASELINE 19: REAL GAME X11 -> VAAPI ===
+window_id=0x3400002
+Input #0, x11grab, from ':0.0':
+  Duration: N/A, start: 1789458234.549613, bitrate: 1134120 kb/s
+  Stream #0:0: Video: rawvideo (BGR[0] / 0x524742), bgr0, 879x672, 1134120 kb/s, 60 fps, 60 tbr, 1000k tbn
+Stream mapping:
+  Stream #0:0 -> #0:0 (rawvideo (native) -> h264 (h264_vaapi))
+Press [q] to stop, [?] for help
+Output #0, h264, to '/tmp/privyhub_baseline_19.h264':
+  Metadata:
+    encoder         : Lavf61.7.103
+  Stream #0:0: Video: h264 (High), vaapi(tv, progressive), 1280x720, q=2-31, 7000 kb/s, 60 fps, 60 tbn
+      Metadata:
+        encoder         : Lavc61.19.101 h264_vaapi
+frame=   32 fps=0.0 q=-0.0 size=     229KiB time=00:00:00.53 bitrate=3510.8kbits/s speed=1.07x    frame=   62 fps= 62 q=-0.0 size=     512KiB time=00:00:01.03 bitrate=4059.0kbits/s speed=1.03x    frame=   92 fps= 61 q=-0.0 size=    1024KiB time=00:00:01.53 bitrate=5470.8kbits/s speed=1.02x    frame=  122 fps= 61 q=-0.0 size=    1280KiB time=00:00:02.03 bitrate=5156.9kbits/s speed=1.02x    frame=  152 fps= 61 q=-0.0 size=    1792KiB time=00:00:02.53 bitrate=5794.8kbits/s speed=1.01x    frame=  182 fps= 61 q=-0.0 size=    2304KiB time=00:00:03.03 bitrate=6222.3kbits/s speed=1.01x    frame=  212 fps= 61 q=-0.0 size=    2560KiB time=00:00:03.53 bitrate=5935.3kbits/s speed=1.01x    frame=  242 fps= 60 q=-0.0 size=    3072KiB time=00:00:04.03 bitrate=6239.5kbits/s speed=1.01x    frame=  272 fps= 60 q=-0.0 size=    3584KiB time=00:00:04.53 bitrate=6476.5kbits/s speed=1.01x    [out#0/h264 @ 0x563806ec2d80] video:4064KiB audio:0KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: 0.000000%
+frame=  300 fps= 60 q=-0.0 Lsize=    4064KiB time=00:00:05.00 bitrate=6657.9kbits/s speed=   1x    
+ffmpeg_exit_code=0
+
+=== OUTPUT ===
+codec_name=h264
+profile=High
+width=1280
+height=720
+pix_fmt=yuv420p

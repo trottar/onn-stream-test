@@ -1,0 +1,25 @@
+retroarch_window=54525954 geometry=879x672+556+223
+=== WINDOW STATES ===
+  Map State: IsViewable
+  Map State: IsViewable
+=== TARGET VS COVER ===
+=== VAAPI CAPTURE ===
+Input #0, x11grab, from ':0.0':
+  Duration: N/A, start: 1789458793.476795, bitrate: 1134120 kb/s
+  Stream #0:0: Video: rawvideo (BGR[0] / 0x524742), bgr0, 879x672, 1134120 kb/s, 60 fps, 59 tbr, 1000k tbn
+Stream mapping:
+  Stream #0:0 -> #0:0 (rawvideo (native) -> h264 (h264_vaapi))
+Output #0, h264, to '/tmp/privyhub_baseline_21.h264':
+  Metadata:
+    encoder         : Lavf61.7.103
+  Stream #0:0: Video: h264 (High), vaapi(tv, progressive), 1280x720, q=2-31, 7000 kb/s, 59 fps, 59 tbn
+      Metadata:
+        encoder         : Lavc61.19.101 h264_vaapi
+frame=   32 fps=0.0 q=-0.0 size=     236KiB time=00:00:00.54 bitrate=3565.3kbits/s speed=1.08x    frame=   62 fps= 62 q=-0.0 size=     512KiB time=00:00:01.05 bitrate=3991.4kbits/s speed=1.05x    frame=   92 fps= 61 q=-0.0 size=    1024KiB time=00:00:01.55 bitrate=5379.7kbits/s speed=1.04x    frame=  122 fps= 61 q=-0.0 size=    1536KiB time=00:00:02.06 bitrate=6085.2kbits/s speed=1.03x    frame=  151 fps= 60 q=-0.0 size=    1792KiB time=00:00:02.55 bitrate=5735.9kbits/s dup=0 drop=1 speed=1.02x    [out#0/h264 @ 0x55a81390ac40] video:2353KiB audio:0KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: 0.000000%
+frame=  177 fps= 60 q=-0.0 Lsize=    2353KiB time=00:00:03.00 bitrate=6424.7kbits/s dup=0 drop=1 speed=1.02x    
+ffmpeg_exit_code=0
+codec_name=h264
+width=1280
+height=720
+nb_read_frames=177
+unique_decoded_frames=29

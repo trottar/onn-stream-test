@@ -609,3 +609,28 @@ checkpoint, all on Linux.
 Only then move into Phase E Linux resource characterization/optimization.
 
 Do not resume Windows/NVENC-specific adaptation work.
+
+## D-073 Linux baseline handoff
+
+Phase D is active.
+
+Linux runtime validation now includes:
+- VAAPI H.264 encode;
+- exact X11 RetroArch capture;
+- PulseAudio isolation;
+- four uinput pads;
+- all four required Linux libretro cores;
+- real SNES content/video/audio;
+- real RetroArch -> x11grab -> VAAPI capture;
+- `NativeStreamManager` construction/status boundary;
+- `EmulatorManager` readiness and complete real-game launch/flush/stop lifecycle.
+
+Windows persistent RetroArch state was migrated byte-for-byte:
+129 files, manifest SHA-256
+`6de3fa8b67d5a0ee21ace20af9347b5cf0f5997f3a9d410fcd23d6410b18280c`.
+
+`EmulatorManager` is no longer considered a Linux-porting blocker.
+
+Do not resume Windows/NVENC adaptation.
+
+Next: identify and implement the smallest Linux backend substitutions for native video, audio, controller output, and telemetry while preserving PHI1, FEC, Android decoding/audio/controller paths, and the validated emulator lifecycle.

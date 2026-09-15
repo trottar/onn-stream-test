@@ -1,0 +1,25 @@
+=== PRIVYHUB LINUX BASELINE 08: ISOLATED AUDIO ROUTING ===
+Tue Sep 15 02:57:10 AM EDT 2026
+
+=== CREATE TEMPORARY PRIVYHUB SINK ===
+module_id=24
+
+=== SINK ===
+1	privyhub_probe	module-null-sink.c	s16le 2ch 44100Hz	IDLE
+
+=== MONITOR SOURCE ===
+1	privyhub_probe.monitor	module-null-sink.c	s16le 2ch 44100Hz	IDLE
+
+=== GENERATE TEST AUDIO ===
+
+=== CAPTURE PRIVYHUB MONITOR ===
+
+=== RESULT ===
+capture_exit_code=0
+codec_name=pcm_s16le
+sample_rate=48000
+channels=2
+
+=== CAPTURE LEVEL ===
+[Parsed_volumedetect_0 @ 0x7f0b5c003b40] mean_volume: -21.1 dB
+[Parsed_volumedetect_0 @ 0x7f0b5c003b40] max_volume: -18.1 dB

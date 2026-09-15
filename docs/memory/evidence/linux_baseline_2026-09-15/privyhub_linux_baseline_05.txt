@@ -1,0 +1,28 @@
+=== PRIVYHUB LINUX BASELINE 05: VAAPI H264 ENCODE ===
+Tue Sep 15 02:53:02 AM EDT 2026
+
+Input #0, lavfi, from 'testsrc2=size=1280x720:rate=60':
+  Duration: N/A, start: 0.000000, bitrate: N/A
+  Stream #0:0: Video: wrapped_avframe, yuv420p, 1280x720 [SAR 1:1 DAR 16:9], 60 fps, 60 tbr, 60 tbn
+Stream mapping:
+  Stream #0:0 -> #0:0 (wrapped_avframe (native) -> h264 (h264_vaapi))
+Press [q] to stop, [?] for help
+Output #0, h264, to '/tmp/privyhub_vaapi_test.h264':
+  Metadata:
+    encoder         : Lavf61.7.103
+  Stream #0:0: Video: h264 (High), vaapi(tv, progressive), 1280x720 [SAR 1:1 DAR 16:9], q=2-31, 7000 kb/s, 60 fps, 60 tbn
+      Metadata:
+        encoder         : Lavc61.19.101 h264_vaapi
+[out#0/h264 @ 0x562a420de540] video:4246KiB audio:0KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: 0.000000%
+frame=  300 fps=0.0 q=-0.0 Lsize=    4246KiB time=00:00:05.00 bitrate=6957.2kbits/s speed=11.5x    
+
+=== RESULT ===
+ffmpeg_exit_code=0
+-rw-rw-r-- 1 privyhub privyhub 4.2M Sep 15 02:53 /tmp/privyhub_vaapi_test.h264
+
+codec_name=h264
+profile=High
+width=1280
+height=720
+pix_fmt=yuv420p
+r_frame_rate=120/1

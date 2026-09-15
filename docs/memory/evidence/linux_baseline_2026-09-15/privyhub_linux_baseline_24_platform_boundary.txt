@@ -1,0 +1,214 @@
+companion/native_stream.py:16:from ctypes import wintypes
+companion/native_stream.py:31:    v0.4 replaces GDI window capture with Windows Graphics Capture while
+companion/native_stream.py:83:            self.project_root / "runtime" / "streaming" / "ffmpeg" / "bin" / "ffmpeg.exe",
+companion/native_stream.py:84:            self.project_root / "runtime" / "ffmpeg" / "bin" / "ffmpeg.exe",
+companion/native_stream.py:85:            self.project_root / "runtime" / "streaming" / "ffmpeg" / "ffmpeg.exe",
+companion/native_stream.py:98:    def _wgc_runtime_dir(self) -> Path:
+companion/native_stream.py:103:            / "wgc_python"
+companion/native_stream.py:106:    def _wgc_bridge_path(self) -> Path:
+companion/native_stream.py:110:            / "native_wgc_bridge.py"
+companion/native_stream.py:113:    def _wgc_ready(self) -> bool:
+companion/native_stream.py:114:        runtime = self._wgc_runtime_dir()
+companion/native_stream.py:117:            self._wgc_bridge_path().is_file()
+companion/native_stream.py:120:                / "windows_capture"
+companion/native_stream.py:181:            wgc_ready = self._wgc_ready()
+companion/native_stream.py:184:            if os.name != "nt":
+companion/native_stream.py:188:                    "the Windows Graphics Capture host only."
+companion/native_stream.py:196:            elif not wgc_ready:
+companion/native_stream.py:199:                    "The project-local Windows Graphics Capture runtime "
+companion/native_stream.py:207:                    "Windows Graphics Capture using the "
+companion/native_stream.py:233:                    "windows_graphics_capture"
+companion/native_stream.py:234:                    if os.name == "nt"
+companion/native_stream.py:237:                "encoder": "h264_nvenc",
+companion/native_stream.py:257:                "wgc_runtime_found": wgc_ready,
+companion/native_stream.py:367:    def _same_windows_path(
+companion/native_stream.py:386:        if os.name != "nt":
+companion/native_stream.py:394:        user32 = ctypes.WinDLL(
+companion/native_stream.py:398:        kernel32 = ctypes.WinDLL(
+companion/native_stream.py:405:        user32.EnumWindows.argtypes = [
+companion/native_stream.py:407:                wintypes.BOOL,
+companion/native_stream.py:408:                wintypes.HWND,
+companion/native_stream.py:409:                wintypes.LPARAM,
+companion/native_stream.py:411:            wintypes.LPARAM,
+companion/native_stream.py:413:        user32.EnumWindows.restype = wintypes.BOOL
+companion/native_stream.py:416:            wintypes.HWND,
+companion/native_stream.py:418:        user32.IsWindowVisible.restype = wintypes.BOOL
+companion/native_stream.py:421:            wintypes.HWND,
+companion/native_stream.py:423:        user32.IsIconic.restype = wintypes.BOOL
+companion/native_stream.py:426:            wintypes.HWND,
+companion/native_stream.py:431:            wintypes.HWND,
+companion/native_stream.py:432:            wintypes.LPWSTR,
+companion/native_stream.py:438:            wintypes.HWND,
+companion/native_stream.py:439:            ctypes.POINTER(wintypes.DWORD),
+companion/native_stream.py:441:        user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+companion/native_stream.py:444:            wintypes.HWND,
+companion/native_stream.py:445:            ctypes.POINTER(wintypes.RECT),
+companion/native_stream.py:447:        user32.GetClientRect.restype = wintypes.BOOL
+companion/native_stream.py:450:            wintypes.DWORD,
+companion/native_stream.py:451:            wintypes.BOOL,
+companion/native_stream.py:452:            wintypes.DWORD,
+companion/native_stream.py:454:        kernel32.OpenProcess.restype = wintypes.HANDLE
+companion/native_stream.py:457:            wintypes.HANDLE,
+companion/native_stream.py:458:            wintypes.DWORD,
+companion/native_stream.py:459:            wintypes.LPWSTR,
+companion/native_stream.py:460:            ctypes.POINTER(wintypes.DWORD),
+companion/native_stream.py:462:        kernel32.QueryFullProcessImageNameW.restype = wintypes.BOOL
+companion/native_stream.py:465:            wintypes.HANDLE,
+companion/native_stream.py:467:        kernel32.CloseHandle.restype = wintypes.BOOL
+companion/native_stream.py:472:            wintypes.BOOL,
+companion/native_stream.py:473:            wintypes.HWND,
+companion/native_stream.py:474:            wintypes.LPARAM,
+companion/native_stream.py:508:                process_id = wintypes.DWORD()
+companion/native_stream.py:531:                    path_length = wintypes.DWORD(
+companion/native_stream.py:547:                if not self._same_windows_path(
+companion/native_stream.py:553:                client_rect = wintypes.RECT()
+companion/native_stream.py:576:                        "process": "retroarch.exe",
+companion/native_stream.py:593:        if not user32.EnumWindows(
+companion/native_stream.py:705:            "h264_nvenc",
+companion/native_stream.py:744:        if os.name == "nt":
+companion/native_stream.py:835:            if os.name != "nt":
+companion/native_stream.py:838:                    "the Windows host only."
+companion/native_stream.py:849:            if not self._wgc_ready():
+companion/native_stream.py:851:                    "Project-local Windows Graphics Capture runtime "
+companion/native_stream.py:877:                / "wgc_capture_meta.json"
+companion/native_stream.py:914:                "Capture backend: Windows Graphics Capture "
+companion/native_stream.py:938:                subprocess.CREATE_NEW_PROCESS_GROUP
+companion/native_stream.py:939:                if os.name == "nt"
+companion/native_stream.py:948:                self._wgc_runtime_dir()
+companion/native_stream.py:969:                sys.executable,
+companion/native_stream.py:971:                    self._wgc_bridge_path()
+companion/native_stream.py:1004:                    "Unable to start the Windows Graphics Capture "
+companion/native_stream.py:1040:                        "Windows Graphics Capture exited before "
+companion/native_stream.py:1100:                    "Windows Graphics Capture did not deliver "
+companion/native_stream.py:1126:                    "WGC bridge reported an invalid native frame size."
+companion/native_stream.py:1142:                "windows_graphics_capture"
+companion/native_stream.py:1150:                "WGC source frame: "
+companion/native_stream.py:1185:                    "Windows Graphics Capture raw-video "
+companion/native_stream.py:1275:                        "Windows Graphics Capture exited during "
+companion/native_session_io.py:26:    AUDIO_BUFFER_ARCHITECTURE = "windows_process_loopback_pair_pacer_v0.22"
+companion/native_session_io.py:51:            / "PrivyHubProcessAudio.exe"
+companion/native_session_io.py:94:        if os.name == "nt":
+companion/native_session_io.py:174:            if os.name != "nt":
+companion/native_session_io.py:176:                    "Windows process-loopback audio is Windows-only."
+companion/native_session_io.py:255:                subprocess.CREATE_NEW_PROCESS_GROUP
+companion/native_session_io.py:256:                if os.name == "nt"
+companion/native_session_io.py:277:                    "Unable to start native Windows process-loopback "
+companion/native_session_io.py:320:                        "Windows process-loopback audio helper exited "
+companion/native_session_io.py:349:                "Windows process-loopback audio helper did not become "
+companion/native_session_io.py:491:                "windows_wasapi_process_loopback"
+companion/native_session_io.py:494:                "NAudio.Wasapi 3.0.1"
+companion/native_session_io.py:617:    def _load_vgamepad(
+companion/native_session_io.py:622:                "Project-local vgamepad runtime is missing."
+companion/native_session_io.py:636:            import vgamepad as vg
+companion/native_session_io.py:639:                f"Unable to import project-local vgamepad: {exc}"
+companion/native_session_io.py:692:        vg = self._load_vgamepad()
+companion/native_session_io.py:712:                "ViGEmBus must already be installed on this Windows host."
+companion/native_session_io.py:1108:            "sink": "vigem_x360_quad_poc",
+companion/native_session_io.py:1117:            "vigem_updates": self._updates,
+companion/native_session_io.py:1118:            "vigem_updates_by_player": list(
+companion/native_host_telemetry.py:13:from ctypes import wintypes
+companion/native_host_telemetry.py:27:        ("cb", wintypes.DWORD),
+companion/native_host_telemetry.py:28:        ("PageFaultCount", wintypes.DWORD),
+companion/native_host_telemetry.py:69:    value: wintypes.FILETIME,
+companion/native_host_telemetry.py:76:class _WindowsProcessSampler:
+companion/native_host_telemetry.py:88:        self._kernel32 = ctypes.WinDLL(
+companion/native_host_telemetry.py:93:        self._psapi = ctypes.WinDLL(
+companion/native_host_telemetry.py:99:            wintypes.DWORD,
+companion/native_host_telemetry.py:100:            wintypes.BOOL,
+companion/native_host_telemetry.py:101:            wintypes.DWORD,
+companion/native_host_telemetry.py:104:            wintypes.HANDLE
+companion/native_host_telemetry.py:108:            wintypes.HANDLE,
+companion/native_host_telemetry.py:111:            wintypes.BOOL
+companion/native_host_telemetry.py:115:            wintypes.HANDLE,
+companion/native_host_telemetry.py:117:                wintypes.FILETIME
+companion/native_host_telemetry.py:120:                wintypes.FILETIME
+companion/native_host_telemetry.py:123:                wintypes.FILETIME
+companion/native_host_telemetry.py:126:                wintypes.FILETIME
+companion/native_host_telemetry.py:130:            wintypes.BOOL
+companion/native_host_telemetry.py:134:            wintypes.HANDLE,
+companion/native_host_telemetry.py:138:            wintypes.DWORD,
+companion/native_host_telemetry.py:141:            wintypes.BOOL
+companion/native_host_telemetry.py:184:            creation = wintypes.FILETIME()
+companion/native_host_telemetry.py:185:            exit_time = wintypes.FILETIME()
+companion/native_host_telemetry.py:186:            kernel = wintypes.FILETIME()
+companion/native_host_telemetry.py:187:            user = wintypes.FILETIME()
+companion/native_host_telemetry.py:506:                _WindowsProcessSampler()
+companion/native_host_telemetry.py:543:            _WindowsProcessSampler | None
+companion/native_host_telemetry.py:547:        if os.name != "nt":
+companion/native_host_telemetry.py:552:                _WindowsProcessSampler()
+companion/native_host_telemetry.py:605:                    "wgc"
+companion/native_host_telemetry.py:707:                    "wgc_error"
+companion/native_host_telemetry.py:851:        latest_wgc = None
+companion/native_host_telemetry.py:857:                sample.get("wgc"),
+companion/native_host_telemetry.py:860:                latest_wgc = (
+companion/native_host_telemetry.py:861:                    sample["wgc"]
+companion/native_host_telemetry.py:914:            "latest_wgc": latest_wgc,
+companion/games/emulator_manager.py:56:        # PrivyHub A4: best-effort Windows host coexistence state.
+companion/games/emulator_manager.py:57:        # RetroArch stays rendered/non-iconic for WGC, but is pushed behind
+companion/games/emulator_manager.py:2389:    # already-validated PHI1 -> ViGEm path. A8 remaps only RetroArch gameplay
+companion/games/emulator_manager.py:4545:    def _windows_foreground_window() -> int:
+companion/games/emulator_manager.py:4546:        if os.name != "nt":
+companion/games/emulator_manager.py:4551:            from ctypes import wintypes
+companion/games/emulator_manager.py:4553:            user32 = ctypes.WinDLL(
+companion/games/emulator_manager.py:4558:            user32.GetForegroundWindow.restype = wintypes.HWND
+companion/games/emulator_manager.py:4567:    def _apply_windows_host_coexistence(
+companion/games/emulator_manager.py:4575:            "supported": os.name == "nt",
+companion/games/emulator_manager.py:4585:        if os.name != "nt":
+companion/games/emulator_manager.py:4595:            from ctypes import wintypes
+companion/games/emulator_manager.py:4597:            user32 = ctypes.WinDLL(
+companion/games/emulator_manager.py:4603:                wintypes.BOOL,
+companion/games/emulator_manager.py:4604:                wintypes.HWND,
+companion/games/emulator_manager.py:4605:                wintypes.LPARAM,
+companion/games/emulator_manager.py:4608:            user32.EnumWindows.argtypes = [
+companion/games/emulator_manager.py:4610:                wintypes.LPARAM,
+companion/games/emulator_manager.py:4612:            user32.EnumWindows.restype = wintypes.BOOL
+companion/games/emulator_manager.py:4614:                wintypes.HWND,
+companion/games/emulator_manager.py:4616:            user32.IsWindow.restype = wintypes.BOOL
+companion/games/emulator_manager.py:4618:                wintypes.HWND,
+companion/games/emulator_manager.py:4620:            user32.IsWindowVisible.restype = wintypes.BOOL
+companion/games/emulator_manager.py:4622:                wintypes.HWND,
+companion/games/emulator_manager.py:4624:            user32.IsIconic.restype = wintypes.BOOL
+companion/games/emulator_manager.py:4626:                wintypes.HWND,
+companion/games/emulator_manager.py:4627:                ctypes.POINTER(wintypes.DWORD),
+companion/games/emulator_manager.py:4629:            user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+companion/games/emulator_manager.py:4631:                wintypes.HWND,
+companion/games/emulator_manager.py:4632:                ctypes.POINTER(wintypes.RECT),
+companion/games/emulator_manager.py:4634:            user32.GetClientRect.restype = wintypes.BOOL
+companion/games/emulator_manager.py:4636:                wintypes.HWND,
+companion/games/emulator_manager.py:4639:            user32.ShowWindowAsync.restype = wintypes.BOOL
+companion/games/emulator_manager.py:4641:                wintypes.HWND,
+companion/games/emulator_manager.py:4642:                wintypes.HWND,
+companion/games/emulator_manager.py:4647:                wintypes.UINT,
+companion/games/emulator_manager.py:4649:            user32.SetWindowPos.restype = wintypes.BOOL
+companion/games/emulator_manager.py:4651:                wintypes.HWND,
+companion/games/emulator_manager.py:4653:            user32.SetForegroundWindow.restype = wintypes.BOOL
+companion/games/emulator_manager.py:4655:            user32.GetForegroundWindow.restype = wintypes.HWND
+companion/games/emulator_manager.py:4689:                        pid = wintypes.DWORD()
+companion/games/emulator_manager.py:4708:                        rect = wintypes.RECT()
+companion/games/emulator_manager.py:4748:                user32.EnumWindows(
+companion/games/emulator_manager.py:4775:            # Keep the window rendered and non-iconic for WGC, but do not
+companion/games/emulator_manager.py:5021:            if os.name == "nt":
+companion/games/emulator_manager.py:5022:                creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+companion/games/emulator_manager.py:5024:                    self._windows_foreground_window()
+companion/games/emulator_manager.py:5156:                self._apply_windows_host_coexistence(
+companion/games/emulator_manager.py:6815:        if os.name != "nt":
+companion/games/emulator_manager.py:6821:            from ctypes import wintypes
+companion/games/emulator_manager.py:6823:            user32 = ctypes.WinDLL(
+companion/games/emulator_manager.py:6832:                wintypes.BOOL,
+companion/games/emulator_manager.py:6833:                wintypes.HWND,
+companion/games/emulator_manager.py:6834:                wintypes.LPARAM,
+companion/games/emulator_manager.py:6837:            user32.EnumWindows.argtypes = [
+companion/games/emulator_manager.py:6839:                wintypes.LPARAM,
+companion/games/emulator_manager.py:6841:            user32.EnumWindows.restype = wintypes.BOOL
+companion/games/emulator_manager.py:6843:                wintypes.HWND,
+companion/games/emulator_manager.py:6844:                ctypes.POINTER(wintypes.DWORD),
+companion/games/emulator_manager.py:6846:            user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+companion/games/emulator_manager.py:6848:                wintypes.HWND,
+companion/games/emulator_manager.py:6849:                wintypes.UINT,
+companion/games/emulator_manager.py:6850:                wintypes.WPARAM,
+companion/games/emulator_manager.py:6851:                wintypes.LPARAM,
+companion/games/emulator_manager.py:6853:            user32.PostMessageW.restype = wintypes.BOOL
+companion/games/emulator_manager.py:6861:                pid = wintypes.DWORD()
+companion/games/emulator_manager.py:6876:            user32.EnumWindows(
+companion/games/emulator_manager.py:6902:        if os.name == "nt":
+companion/games/config/emulators.json:6:    "executable": "runtime/emulators/retroarch-nightly-20260907/retroarch.exe",
