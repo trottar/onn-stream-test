@@ -45,6 +45,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import threading
 import time
 import urllib.error
@@ -92,11 +93,14 @@ LOG_DIR = PROJECT_ROOT / "logs"
 
 CATALOG_FILE = COMPANION_DIR / "config" / "sources.json"
 SERVER_SCRIPT = PROJECT_ROOT / "scripts" / "start_server.ps1"
+# PRIVYHUB_D078_LINUX_MEDIA_SERVER_STARTUP_V1
+RANGE_SERVER = COMPANION_DIR / "range_server.py"
 
 CONTROL_HOST = "0.0.0.0"
 CONTROL_PORT = 8765
 
 MEDIA_HOST_FOR_HEALTH = "127.0.0.1"
+MEDIA_SERVER_HOST = "0.0.0.0"
 DEFAULT_MEDIA_PORT = 8000
 
 POWERSHELL = "powershell.exe"
@@ -774,9 +778,14 @@ class PrivyHubController:
             exist_ok=True,
         )
 
-        if not SERVER_SCRIPT.exists():
+        if os.name == "nt":
+            if not SERVER_SCRIPT.exists():
+                raise FileNotFoundError(
+                    f"Required server script not found: {SERVER_SCRIPT}"
+                )
+        elif not RANGE_SERVER.exists():
             raise FileNotFoundError(
-                f"Required server script not found: {SERVER_SCRIPT}"
+                f"Required range server not found: {RANGE_SERVER}"
             )
 
         self.catalog = SourceCatalog(
@@ -876,6 +885,67 @@ class PrivyHubController:
             log_path=log_path,
         )
 
+    def _launch_python_media_server(
+        self,
+        name: str,
+    ) -> ManagedProcess:
+        range_server = RANGE_SERVER.resolve()
+
+        if not range_server.exists():
+            raise FileNotFoundError(
+                f"Range server not found: {range_server}"
+            )
+
+        log_path = (
+            LOG_DIR / f"{name}.log"
+        )
+
+        log_handle = open(
+            log_path,
+            "a",
+            encoding="utf-8",
+            buffering=1,
+        )
+
+        log_handle.write("\n")
+        log_handle.write("=" * 72 + "\n")
+        log_handle.write(
+            f"Starting PrivyHub process: {name}\n"
+        )
+        log_handle.write(
+            "Launcher: Python range_server.py\n"
+        )
+        log_handle.write("=" * 72 + "\n")
+        log_handle.flush()
+
+        try:
+            process = subprocess.Popen(
+                [
+                    sys.executable,
+                    str(range_server),
+                    "--root",
+                    str(MEDIA_ROOT),
+                    "--host",
+                    MEDIA_SERVER_HOST,
+                    "--port",
+                    str(DEFAULT_MEDIA_PORT),
+                ],
+                cwd=str(PROJECT_ROOT),
+                stdin=subprocess.DEVNULL,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+            )
+        except Exception:
+            log_handle.close()
+            raise
+
+        return ManagedProcess(
+            name=name,
+            process=process,
+            log_handle=log_handle,
+            log_path=log_path,
+        )
+
     @staticmethod
     def _kill_process_tree(
         item: ManagedProcess,
@@ -924,12 +994,19 @@ class PrivyHubController:
                 )
                 self.server = None
 
-            self.server = (
-                self._launch_powershell(
-                    "server",
-                    SERVER_SCRIPT,
+            if os.name == "nt":
+                self.server = (
+                    self._launch_powershell(
+                        "server",
+                        SERVER_SCRIPT,
+                    )
                 )
-            )
+            else:
+                self.server = (
+                    self._launch_python_media_server(
+                        "server"
+                    )
+                )
 
     def stop_server(
         self,

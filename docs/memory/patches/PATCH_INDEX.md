@@ -539,3 +539,7 @@ This index records durable checkpoints and major patch lines; it does not invent
 - D-076R1 managed autoconfig session-path correction: **HOST-SIDE RUNTIME VALIDATED**.
 - D-076R2 missing `sys` import correction: **HOST-SIDE RUNTIME VALIDATED**.
 - The managed probe's final false classification is superseded by raw RetroArch/lifecycle evidence; see `docs/memory/evidence/linux_baseline_2026-09-15/d076_managed_retroarch_runtime_validation.txt`.
+
+| D-077 Linux platform-aware RetroArch runtime selection | 2026-09-15 | Normal product-path runtime selector: preserve Windows base descriptor, select validated Linux AppImage/cores through an effective config; installer requires fixture + live normal-path readiness validation; onn E2E pending. |
+
+- `D-078_LINUX_COMPANION_MEDIA_SERVER_STARTUP.md` — platform-aware companion media-server launch; Linux direct Python range server, Windows PowerShell path preserved; host startup seam validated, onn E2E pending.

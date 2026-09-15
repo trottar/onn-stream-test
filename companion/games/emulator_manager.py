@@ -157,8 +157,116 @@ class EmulatorManager:
         if cheat_runtime_cleanup:
             self._cleanup_cheat_runtime()
 
+    # PrivyHub D-077 platform-aware RetroArch runtime selection
+    @staticmethod
+    def _runtime_platform_key() -> str:
+        if os.name == "nt":
+            return "windows"
+        if sys.platform.startswith("linux"):
+            return "linux"
+        return sys.platform.casefold() or os.name.casefold()
+
+    def _effective_runtime_config(
+        self,
+        config: dict[str, Any],
+    ) -> tuple[dict[str, Any], str, bool]:
+        """Return the trusted host-specific runtime view of emulators.json."""
+        platform_key = self._runtime_platform_key()
+        retroarch = config.get("retroarch")
+        systems = config.get("systems")
+
+        if not isinstance(retroarch, dict):
+            raise EmulatorError("Missing retroarch config")
+        if not isinstance(systems, dict):
+            raise EmulatorError("Missing systems config")
+
+        effective = dict(config)
+        effective_retroarch = dict(retroarch)
+        effective_systems: dict[str, Any] = {
+            str(system_id): (
+                dict(system_config)
+                if isinstance(system_config, dict)
+                else system_config
+            )
+            for system_id, system_config in systems.items()
+        }
+        effective["retroarch"] = effective_retroarch
+        effective["systems"] = effective_systems
+
+        platforms = config.get("platforms")
+        if platforms is None:
+            return effective, platform_key, False
+        if not isinstance(platforms, dict):
+            raise EmulatorError("Emulator platform overrides must be an object")
+
+        platform_override = platforms.get(platform_key)
+        if platform_override is None:
+            return effective, platform_key, False
+        if not isinstance(platform_override, dict):
+            raise EmulatorError(
+                f"Emulator platform override is invalid: {platform_key}"
+            )
+
+        retroarch_override = platform_override.get("retroarch")
+        core_overrides = platform_override.get("cores")
+        if not isinstance(retroarch_override, dict):
+            raise EmulatorError(
+                f"RetroArch platform override is invalid: {platform_key}"
+            )
+        if not isinstance(core_overrides, dict):
+            raise EmulatorError(
+                f"Core platform overrides are invalid: {platform_key}"
+            )
+
+        required_retroarch_overrides = (
+            "executable",
+            "cores_directory",
+        )
+        missing_retroarch_overrides = [
+            key
+            for key in required_retroarch_overrides
+            if not isinstance(retroarch_override.get(key), str)
+            or not str(retroarch_override.get(key)).strip()
+        ]
+        if missing_retroarch_overrides:
+            raise EmulatorError(
+                f"Incomplete {platform_key} RetroArch override: "
+                + ", ".join(missing_retroarch_overrides)
+            )
+
+        unknown_core_overrides = sorted(
+            set(str(key) for key in core_overrides)
+            - set(effective_systems)
+        )
+        if unknown_core_overrides:
+            raise EmulatorError(
+                "Core platform overrides reference unknown systems: "
+                + ", ".join(unknown_core_overrides)
+            )
+
+        effective_retroarch.update(retroarch_override)
+
+        for system_id, system_config in effective_systems.items():
+            if not isinstance(system_config, dict):
+                continue
+            base_core = system_config.get("core")
+            if not isinstance(base_core, str) or not base_core.strip():
+                continue
+
+            selected_core = core_overrides.get(system_id)
+            if not isinstance(selected_core, str) or not selected_core.strip():
+                raise EmulatorError(
+                    f"Missing {platform_key} core override for system: {system_id}"
+                )
+            system_config["core"] = selected_core.strip()
+
+        return effective, platform_key, True
+
     def _runtime_details(self) -> dict[str, Any]:
-        config = self._load_config()
+        raw_config = self._load_config()
+        config, runtime_platform, platform_override = (
+            self._effective_runtime_config(raw_config)
+        )
         retroarch = config.get("retroarch")
         systems = config.get("systems")
 
@@ -212,6 +320,8 @@ class EmulatorManager:
             "retroarch_config": retroarch_config,
             "cores_directory": cores_directory,
             "core_status": core_status,
+            "runtime_platform": runtime_platform,
+            "platform_override": platform_override,
         }
 
     def status(self) -> dict[str, Any]:

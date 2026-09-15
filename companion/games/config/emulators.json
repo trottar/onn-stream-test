@@ -7,6 +7,21 @@
     "cores_directory": "runtime/emulators/retroarch/cores",
     "config": "data/games/retroarch/retroarch.cfg"
   },
+  "platforms": {
+    "linux": {
+      "retroarch": {
+        "version": "1.22.2",
+        "executable": "runtime/emulators/retroarch-nightly-20260907-linux/RetroArch-Linux-x86_64/RetroArch-Linux-x86_64.AppImage",
+        "cores_directory": "runtime/emulators/retroarch/cores-linux"
+      },
+      "cores": {
+        "nes": "fceumm_libretro.so",
+        "snes": "bsnes_libretro.so",
+        "genesis": "blastem_libretro.so",
+        "ps1": "mednafen_psx_hw_libretro.so"
+      }
+    }
+  },
   "systems": {
     "nes": {
       "name": "NES",
