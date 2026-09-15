@@ -1378,6 +1378,27 @@ class NativeStreamManager:
                     + type(exc).__name__
                 ) from exc
 
+    def diagnostic_c3_fixed_bitrate_5000_cycle(
+        self,
+    ) -> dict[str, Any]:
+        """Run the 5000 kbps fixed-bitrate C3 characterization point."""
+        from diagnostics.c3_fixed_bitrate_probe import (
+            run_c3_fixed_bitrate_5000_cycle,
+        )
+
+        with self._lock:
+            try:
+                return run_c3_fixed_bitrate_5000_cycle(
+                    self
+                )
+            except NativeStreamError:
+                raise
+            except Exception as exc:
+                raise NativeStreamError(
+                    "C3 fixed 5000 kbps characterization failed: "
+                    + type(exc).__name__
+                ) from exc
+
     def stop(self) -> dict[str, Any]:
         with self._lock:
             self._stop_locked()

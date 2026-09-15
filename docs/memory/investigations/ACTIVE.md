@@ -173,3 +173,30 @@ Audio:
   replay.
 
 Next single candidate: 5000 kbps.
+
+## C3 5000 characterization active
+
+**Active / runtime evidence pending.**
+
+5000 kbps is the only current lower candidate.
+
+Validated levels remain 7000 and 6000 kbps.
+
+The known audio queue burst/gap pathology is explicitly out of scope for bitrate
+rejection unless new 5000-specific evidence establishes causation. Detailed
+audio counters are still captured for comparison.
+
+## 5000 disposition / 5500 bracket test
+
+5000 kbps is **not accepted** as a ladder candidate.
+
+Primary reason: definite increase in steady-state visual stutters during
+extended focused play compared with the validated settings.
+
+Image clarity was subjectively good/clearer and restart recovery was clean, so
+5000 remains useful as the lower side of the bitrate bracket rather than being
+classified as an encoder-start failure.
+
+Active next question:
+**Does 5500 kbps recover the smoothness of 6000 while retaining the lower
+bandwidth target?**

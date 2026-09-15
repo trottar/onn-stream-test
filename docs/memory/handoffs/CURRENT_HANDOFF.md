@@ -390,3 +390,47 @@ by whether stdout/stderr contains text.
 Specifically, `git diff --check` exit 0 with CRLF/LF warnings is PASS; warnings
 are logged but are not rollback triggers. Future packages must regression-test
 that case before delivery.
+
+## C3 fixed 5000 characterization runtime step
+
+5000 kbps is **installed as the next development-only characterization
+candidate**.
+
+Validated before this test:
+- 7000 kbps;
+- 6000 kbps.
+
+Runtime:
+1. restart the companion;
+2. launch a normal game/native stream at the 7000 reference;
+3. run `python .\tools\probe_c3_fixed_5000_characterization.py`;
+4. play for several focused minutes and assess image quality, motion/stutter and
+   responsiveness;
+5. verify audio/controller/Pause/Resume/Save/Load;
+6. End normally;
+7. run `python .\tools\probe_c3_fixed_5000_characterization.py --finalize`;
+8. return `logs/streaming/c3_fixed_5000_characterization.txt` plus the focused
+   visual/gameplay impression.
+
+Detailed audio burst/gap counters are emitted automatically but remain a
+separate deferred issue unless the 5000 evidence shows a specific regression.
+
+## C3 5000 result / 5500 next
+
+5000 kbps: **RUNTIME TESTED / NOT ACCEPTED AS A LADDER CANDIDATE**.
+
+Why:
+- image looked subjectively clearer;
+- initial lag persisted but later gameplay could feel good;
+- however, focused extended play showed definitely more visual stutters than
+  6000/7000.
+
+Technical evidence also recorded 11 decoder drops and 11 queue-overflow drops.
+
+Do not attribute the known audio burst/gap pathology to 5000; it remains
+deferred to Linux + Home-Opal replay.
+
+Validated candidates remain 7000 and 6000 kbps.
+
+Current bracket: 5000–6000 kbps.
+Next candidate: **5500 kbps**.

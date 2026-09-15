@@ -13,7 +13,7 @@ from typing import Any, Callable
 SCHEMA = "privyhub_c3_fixed_bitrate_cycle_v1"
 MODE = "fixed_bitrate_characterization"
 REFERENCE_BITRATE_KBPS = 7000
-TARGET_BITRATE_KBPS = 6000
+SUPPORTED_CHARACTERIZATION_BITRATES_KBPS = (6000, 5000)
 
 
 def _dict(value: Any) -> dict[str, Any]:
@@ -98,17 +98,28 @@ def _wait_for_capture_metadata(
     )
 
 
-def run_c3_fixed_bitrate_6000_cycle(
+def _run_c3_fixed_bitrate_cycle(
     manager: Any,
     *,
+    target_bitrate_kbps: int,
     popen_factory: Callable[..., Any] = subprocess.Popen,
     perf_counter_ns: Callable[[], int] = time.perf_counter_ns,
     monotonic: Callable[[], float] = time.monotonic,
     sleep: Callable[[float], None] = time.sleep,
 ) -> dict[str, Any]:
-    """Restart video at 6000 kbps while preserving stable session owners."""
+    """Restart video at one approved characterization bitrate."""
 
     manager._reap_locked()
+
+    target_bitrate_kbps = int(target_bitrate_kbps)
+    if (
+        target_bitrate_kbps
+        not in SUPPORTED_CHARACTERIZATION_BITRATES_KBPS
+        or target_bitrate_kbps >= REFERENCE_BITRATE_KBPS
+    ):
+        raise RuntimeError(
+            "unsupported_characterization_bitrate"
+        )
 
     if not manager._running_locked():
         raise RuntimeError(
@@ -267,7 +278,7 @@ def run_c3_fixed_bitrate_6000_cycle(
     _safe_log(
         manager,
         "C3 fixed-bitrate characterization: "
-        "7000 -> 6000 kbps video-only cycle begin",
+        f"7000 -> {target_bitrate_kbps} kbps video-only cycle begin",
     )
 
     cycle_started_ns = perf_counter_ns()
@@ -354,8 +365,8 @@ def run_c3_fixed_bitrate_6000_cycle(
                 ),
                 source_width=source_width,
                 source_height=source_height,
-                bitrate_kbps=TARGET_BITRATE_KBPS,
-                max_bitrate_kbps=TARGET_BITRATE_KBPS,
+                bitrate_kbps=target_bitrate_kbps,
+                max_bitrate_kbps=target_bitrate_kbps,
             ),
             cwd=str(
                 manager.project_root
@@ -430,7 +441,7 @@ def run_c3_fixed_bitrate_6000_cycle(
             sleep(0.05)
 
         manager._active_bitrate_kbps = (
-            TARGET_BITRATE_KBPS
+            target_bitrate_kbps
         )
 
         try:
@@ -490,7 +501,7 @@ def run_c3_fixed_bitrate_6000_cycle(
                 REFERENCE_BITRATE_KBPS
             ),
             "target_bitrate_kbps": (
-                TARGET_BITRATE_KBPS
+                target_bitrate_kbps
             ),
             "profile_id": str(
                 manager.PROFILE.id
@@ -596,7 +607,7 @@ def run_c3_fixed_bitrate_6000_cycle(
         _safe_log(
             manager,
             "C3 fixed-bitrate characterization: "
-            "6000 kbps active; "
+            f"{target_bitrate_kbps} kbps active; "
             f"first RTP resume={payload['video']['first_rtp_resume_ms']} ms",
         )
 
@@ -624,7 +635,30 @@ def run_c3_fixed_bitrate_6000_cycle(
         _safe_log(
             manager,
             "C3 fixed-bitrate characterization: "
-            "6000 kbps cycle failed",
+            f"{target_bitrate_kbps} kbps cycle failed",
         )
 
         raise
+
+def run_c3_fixed_bitrate_6000_cycle(
+    manager: Any,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Run the validated 6000 kbps characterization actuator cycle."""
+    return _run_c3_fixed_bitrate_cycle(
+        manager,
+        target_bitrate_kbps=6000,
+        **kwargs,
+    )
+
+
+def run_c3_fixed_bitrate_5000_cycle(
+    manager: Any,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Run the 5000 kbps characterization actuator cycle."""
+    return _run_c3_fixed_bitrate_cycle(
+        manager,
+        target_bitrate_kbps=5000,
+        **kwargs,
+    )

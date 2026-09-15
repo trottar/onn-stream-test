@@ -8,7 +8,7 @@ baseline_commit: 20a1112831f47b0c44104d547123395a89964b8a
 
 ## Status
 
-**ACTIVE / 6000 KBPS VALIDATED / NEXT 5000 KBPS CANDIDATE**
+**ACTIVE / 5000 KBPS NOT ACCEPTED / NEXT 5500 KBPS BRACKET TEST**
 
 ## Question
 
@@ -107,3 +107,64 @@ contained substantial audio loss/underrun totals. Do not attribute this audio
 behavior to the 6000 bitrate change.
 
 Next candidate: 5000 kbps.
+
+## 5000 kbps candidate
+
+**Runtime evidence pending.**
+
+Question: does fixed 5000 kbps remain technically and visually acceptable at
+unchanged 1280x720@60, GOP15, B-frames0 and FEC8?
+
+Method:
+- begin at the 7000 reference;
+- perform one loopback-only 7000 -> 5000 video-cycle;
+- preserve FEC/audio/controller/game ownership;
+- capture post-cycle C2 telemetry;
+- capture the final Android decoder-session report;
+- include detailed audio queue/starvation counters without using the already
+  deferred burst/gap pathology as an automatic bitrate failure;
+- require focused visual/gameplay observation.
+
+If 5000 passes, record it as the next validated candidate and choose one lower
+point. If it fails on bitrate-specific evidence, stop descending and bracket
+between 5000 and 6000.
+
+## 5000 kbps runtime disposition
+
+Classification: **RUNTIME TESTED / NOT ACCEPTED AS LADDER CANDIDATE**
+
+Final result:
+`C3_FIXED_5000_EVIDENCE_CAPTURED_WITH_FINDINGS`
+
+Runtime measurements:
+- session duration 57,498 ms;
+- sequence resyncs 1;
+- SSRC changes 1;
+- packets dropped waiting for IDR 0;
+- resync-to-IDR 17 ms;
+- waiting for IDR at end false;
+- lost video packets 100;
+- FEC recovered packets 6;
+- unrecoverable FEC groups 15;
+- rendered frames 3,080;
+- decoder dropped frames 11;
+- decoder queue-overflow drops 11;
+- max output gap 1,010 ms;
+- max receive-to-decode 1,019 ms;
+- audio write errors 0;
+- controller send errors 0.
+
+Focused observation:
+- image definitely appeared clearer;
+- initial lag was still present;
+- after it settled, gameplay could run very nicely/smoothly;
+- extended play nevertheless showed definitely more visual stutters than the
+  other validated bitrate settings;
+- possible slightly worse input lag was uncertain.
+
+Decision: the definite steady-state visual-stutter regression is sufficient to
+withhold ladder acceptance at 5000. Audio burst/gap counters are retained but
+remain a separate deferred issue.
+
+Current bracket: 5000–6000 kbps.
+Next single candidate: 5500 kbps.

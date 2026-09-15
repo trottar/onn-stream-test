@@ -529,3 +529,46 @@ Required behavior:
 This rule was added after the failed
 `privyhub_c3_fixed_6000_runtime_acceptance_01_2026-09-14` installer incorrectly
 rolled back on warning text despite successful `git diff --check`.
+
+## C3 5000 characterization rule
+
+After D-064, C3 proceeds to exactly one lower candidate: 5000 kbps.
+
+Evidence-backed levels before this test:
+- 7000 kbps validated reference/max;
+- 6000 kbps validated lower candidate.
+
+5000 remains diagnostic until technical continuity and focused visual quality
+are reviewed.
+
+Keep 1280x720@60, GOP15, B-frames0 and FEC8 fixed. Start from a normal 7000-kbps
+session and use the same backend-neutral video-only restart boundary.
+
+The fixed-bitrate diagnostic implementation is shared internally; do not fork a
+new actuator body per bitrate.
+
+The known audio burst/gap pathology remains deferred to representative Linux +
+Home-Opal replay. Report its detailed counters during characterization, but do
+not reject a bitrate merely because those pre-existing counters are nonzero.
+Only new evidence tying a regression specifically to the bitrate may change
+that attribution.
+
+No production minimum or automatic bitrate controller exists yet.
+
+## C3 5000 disposition and bitrate bracket
+
+D-065:
+- 7000 kbps remains the validated reference/max;
+- 6000 kbps remains a validated lower candidate;
+- 5000 kbps is runtime tested but **not accepted** as a ladder candidate;
+- 5000 produced a subjectively clearer image and clean restart recovery, but
+  steady-state visual stutters were definitely more frequent than at the
+  validated settings;
+- smoothness/interactive quality takes precedence over apparent image clarity
+  for bitrate acceptance;
+- possible slightly worse input lag at 5000 was uncertain and is not required
+  for the rejection decision;
+- audio burst/gap pathology remains separate and deferred to Linux + Home Opal;
+- usable-floor characterization is bracketed to 5000–6000 kbps;
+- next single candidate is 5500 kbps;
+- production minimum and automatic controller remain unset.

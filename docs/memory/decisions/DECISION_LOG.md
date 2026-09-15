@@ -777,3 +777,48 @@ production minimum.
 
 Proceed next to exactly one lower candidate: 5000 kbps. Automatic bitrate
 control remains unimplemented until the lower fixed envelope is characterized.
+
+### D-065 — Do not accept 5000 kbps; bracket the lower boundary at 5000–6000
+
+**Status:** Accepted disposition / 5000 runtime tested but not accepted (2026-09-14)
+
+The fixed 5000-kbps characterization completed at unchanged
+1280x720@60, GOP15, B-frames0 and FEC8.
+
+Technical positives:
+- one expected sequence resync and SSRC change;
+- 17 ms resync-to-IDR;
+- zero packets dropped waiting for IDR;
+- receiver not waiting for IDR at session end;
+- zero audio write errors;
+- zero controller send errors.
+
+Technical findings:
+- 100 lost video packets;
+- 6 FEC-recovered packets;
+- 15 unrecoverable FEC groups;
+- 3,080 decoder-rendered frames;
+- 11 decoder dropped frames;
+- 11 decoder queue-overflow drops;
+- 1,010 ms max output gap;
+- 1,019 ms max receive-to-decode.
+
+Focused observation:
+- image appeared definitely clearer;
+- initial lag remained present;
+- after the initial period, gameplay could feel very good and smooth;
+- extended play nevertheless showed definitely more visual stutters than the
+  validated 6000/7000 settings;
+- slightly worse input lag was possible but uncertain.
+
+The definite steady-state visual-stutter regression is sufficient to withhold
+ladder acceptance at 5000. Subjective image clarity does not override smoothness
+for the low-latency game-stream target.
+
+The known audio burst/gap pathology remains separate and deferred for
+representative Linux + Home-Opal replay; it is not the rejection criterion.
+
+Keep 7000 and 6000 as validated candidates. Treat 5000 as the lower failed side
+of the current bracket and test exactly one midpoint candidate next: 5500 kbps.
+
+Do not define the production minimum or automatic bitrate controller yet.

@@ -446,3 +446,19 @@ This index records durable checkpoints and major patch lines; it does not invent
   authoritative, logs warnings separately, regression-tests exit-0-with-warning
   vs nonzero failure, records the hardening rule in durable memory, and keeps
   the intended D-064/6000 validation scope unchanged.
+
+- `privyhub_c3_fixed_5000_characterization_01_2026-09-14` — development-only C3 fixed-5000 characterization patch on
+  synchronized checkpoint `6e4563f7109f6dd1b4227a264e96e2acbd7e112d`. Generalizes the checkpointed
+  fixed-bitrate video-cycle body for shared 6000/5000 use, preserves the
+  existing 6000 wrapper/route, adds one loopback-only 5000 wrapper/route and
+  two-stage evidence tool, and automatically reports detailed deferred-audio
+  counters. No Android/FEC/controller/automatic-adaptation change. Runtime
+  evidence pending.
+
+- `privyhub_c3_fixed_5000_runtime_disposition_01_2026-09-14` — docs/evidence-only C3 5000-kbps runtime
+  disposition update on the exact post-characterization state from checkpoint
+  `6e4563f7109f6dd1b4227a264e96e2acbd7e112d`. Records D-065, preserves the positive clarity/recovery
+  observations and all decoder findings, withholds ladder acceptance because
+  extended focused play showed definitely more visual stutters than 6000/7000,
+  brackets the lower boundary at 5000–6000 kbps, and advances the next single
+  test point to 5500 kbps. Runtime characterization source is unchanged.

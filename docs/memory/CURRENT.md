@@ -401,7 +401,7 @@ controller.
 
 ## C3 fixed-bitrate characterization
 
-**Status:** 6000 KBPS VALIDATED CANDIDATE / NEXT 5000 KBPS CHARACTERIZATION
+**Status:** 5000 KBPS NOT ACCEPTED / 5000–6000 BRACKET / NEXT 5500 KBPS CHARACTERIZATION
 
 The actuator checkpoint is `20a1112831f47b0c44104d547123395a89964b8a`.
 
@@ -463,3 +463,73 @@ Durable rule:
   - nonzero exit => FAIL.
 
 This rule applies to future patch/install/checkpoint tooling, not only C3.
+
+## C3 fixed 5000 kbps characterization implementation
+
+**Status:** DEVELOPMENT DIAGNOSTIC INSTALLED / RUNTIME EVIDENCE PENDING
+
+Synchronized predecessor: `6e4563f7109f6dd1b4227a264e96e2acbd7e112d`.
+
+Validated fixed levels remain:
+- 7000 kbps reference/max;
+- 6000 kbps validated lower candidate.
+
+5000 kbps is the next single diagnostic candidate. It is not yet a validated
+ladder level or production minimum.
+
+The checkpointed 6000 video-cycle implementation is now shared internally by
+both the 6000 and 5000 loopback-only wrappers. The existing 6000 external
+diagnostic interface remains available as a regression surface.
+
+5000 preserves:
+- 1280x720;
+- 60 fps;
+- GOP15;
+- B-frames0;
+- FEC8;
+- process audio;
+- persistent controller;
+- game/emulator lifecycle.
+
+The final 5000 evidence log includes detailed audio queue/starvation counters,
+but those known burst/gap counters do not classify the bitrate candidate unless
+new evidence establishes a bitrate-specific regression.
+
+Next evidence: focused 5000 gameplay/visual observation, normal End, finalized
+5000 characterization log.
+
+## C3 5000 kbps runtime disposition
+
+D-065 records 5000 kbps as **not accepted as a ladder candidate in the current
+test environment**.
+
+Positive evidence:
+- 17 ms resync-to-IDR;
+- zero packets dropped while waiting for IDR;
+- receiver recovered and remained active;
+- image was subjectively clearer;
+- after the initial lag period, gameplay could feel good and smooth.
+
+Disqualifying focused observation:
+- after settling, visual stutters were definitely more frequent than at the
+  validated 6000/7000 settings.
+
+Technical findings retained:
+- 3,080 rendered frames;
+- 11 decoder drops;
+- 11 decoder queue-overflow drops;
+- 1,010 ms max output gap;
+- 1,019 ms max receive-to-decode;
+- 100 lost video packets;
+- 15 unrecoverable FEC groups.
+
+Possible slightly worse input lag was observed but was not certain and is not
+used as the rejection criterion.
+
+Audio burst/gap behavior remains the separately deferred Linux + Home-Opal
+issue and is not used to reject 5000.
+
+The fixed-bitrate floor is now bracketed between 5000 and 6000 kbps.
+
+Next: characterize exactly one midpoint candidate, 5500 kbps. No production
+minimum or automatic controller is defined yet.

@@ -245,8 +245,43 @@ B-frames0 and FEC8. Only evidence-backed levels may enter the production ladder.
 6000 kbps is the first validated lower bitrate candidate. It is a validated
 candidate, not yet the production minimum.
 
-`C3_FIXED_5000_CHARACTERIZATION` — **NEXT / NOT YET INSTALLED**
+`C3_FIXED_5000_CHARACTERIZATION` — **RUNTIME TESTED / NOT ACCEPTED AS LADDER CANDIDATE**
 
 The known audio burst/gap pathology remains separate from bitrate
 characterization and stays deferred for representative Linux + Home-Opal
 replay.
+
+## C3 fixed 5000 characterization installed
+
+Validated bitrate candidates:
+- 7000 kbps;
+- 6000 kbps.
+
+5000 kbps:
+**DEVELOPMENT DIAGNOSTIC INSTALLED / RUNTIME EVIDENCE PENDING**
+
+No production minimum is set. Automatic bitrate control remains unimplemented.
+
+Audio burst/gap pathology remains deferred to Linux + Home Opal and is reported,
+not silently treated as a 5000 failure.
+
+## C3 5000 disposition / 5500 next
+
+Validated bitrate candidates:
+- 7000 kbps;
+- 6000 kbps.
+
+5000 kbps:
+**RUNTIME TESTED / NOT ACCEPTED**
+
+Primary reason: more steady-state visual stutters during focused extended play.
+
+Current lower-bound bracket:
+**5000–6000 kbps**
+
+Next:
+`C3_FIXED_5500_CHARACTERIZATION` — **NEXT / NOT YET INSTALLED**
+
+Production minimum remains unset. Automatic bitrate control remains
+unimplemented. Audio burst/gap pathology remains deferred to Linux + Home
+Opal.

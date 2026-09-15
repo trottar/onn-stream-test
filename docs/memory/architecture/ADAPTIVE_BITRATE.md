@@ -323,3 +323,45 @@ Next candidate: 5000 kbps.
 
 No minimum or automatic controller is set until lower-level characterization
 finishes.
+
+## 5000 characterization implementation
+
+The fixed-bitrate characterization actuator now has one shared internal
+video-cycle implementation with stable loopback-only wrappers for the individual
+test points.
+
+Installed wrappers:
+- 6000 kbps — previously runtime validated;
+- 5000 kbps — runtime evidence pending.
+
+This avoids parallel actuator implementations while preserving the exact
+candidate-at-a-time characterization workflow.
+
+All candidate cycles still start from the 7000 reference and preserve
+1280x720@60, GOP15, B-frames0, FEC8, process audio, controller and game
+lifecycle.
+
+The production ladder/minimum is not defined merely by installing a wrapper; a
+candidate becomes evidence-backed only after runtime and focused quality
+acceptance.
+
+## 5000 result and current bitrate bracket
+
+5000 kbps is technically viable but not accepted as a production-ladder
+candidate in the current environment.
+
+The reason is steady-state presentation quality: after the transition settled,
+focused play showed definitely more visual stutters than the validated 6000 and
+7000 settings. Subjective image clarity at 5000 does not override that
+smoothness regression.
+
+Current evidence-backed state:
+- 7000 kbps: validated reference/max;
+- 6000 kbps: validated lower candidate;
+- 5000 kbps: runtime tested / not accepted;
+- bracket for the lower usable boundary: 5000–6000 kbps.
+
+Next test point: 5500 kbps.
+
+The audio burst/gap pathology remains independently deferred and is not part of
+the 5000 rejection criterion.

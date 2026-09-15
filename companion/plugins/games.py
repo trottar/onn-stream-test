@@ -3064,6 +3064,27 @@ class GamesPlugin:
                     str(exc)
                 ) from exc
 
+        if action == "c3-fixed-bitrate-5000-cycle":
+            # Development characterization only. Never expose a remotely
+            # triggerable bitrate-change primitive.
+            if client_ip not in {
+                "127.0.0.1",
+                "::1",
+            }:
+                raise RuntimeError(
+                    "C3 fixed-bitrate characterization is loopback-only"
+                )
+
+            try:
+                return (
+                    self._native_stream
+                    .diagnostic_c3_fixed_bitrate_5000_cycle()
+                )
+            except NativeStreamError as exc:
+                raise RuntimeError(
+                    str(exc)
+                ) from exc
+
         if action == "native-stream-start":
             game_status = self._emulator.status()
             if not game_status.get("active", False):
