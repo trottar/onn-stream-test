@@ -398,3 +398,68 @@ and rerun equivalent continuity validation.
 **Next:** fixed-bitrate characterization. Establish validated lower bitrate
 levels before adding a production minimum, bitrate ladder or automatic
 controller.
+
+## C3 fixed-bitrate characterization
+
+**Status:** 6000 KBPS VALIDATED CANDIDATE / NEXT 5000 KBPS CHARACTERIZATION
+
+The actuator checkpoint is `20a1112831f47b0c44104d547123395a89964b8a`.
+
+The first lower fixed test point is 6000 kbps. This is not yet a production
+ladder entry.
+
+The diagnostic starts from the normal 7000 kbps reference, uses the accepted
+video-only restart boundary to move video to 6000, leaves all other stream
+parameters/lifecycles unchanged, then records C2 telemetry plus the existing
+Android decoder-session report.
+
+Next evidence required: focused play at 6000, normal End, finalized probe log.
+
+## C3 6000 kbps runtime acceptance
+
+D-064 accepts 6000 kbps as the first validated lower C3 bitrate candidate.
+
+Technical evidence:
+- session duration 51,477 ms;
+- one expected sequence resync and one SSRC change;
+- resync-to-IDR 52 ms;
+- zero packets dropped while waiting for IDR;
+- receiver not waiting for IDR at session end;
+- 2,823 decoder-rendered frames;
+- one decoder drop and one queue-overflow drop;
+- max output gap 1,016 ms;
+- max receive-to-decode 1,025 ms;
+- zero audio write errors;
+- zero controller send errors.
+
+Focused play: movement and gameplay were fine. Audio was audibly somewhat
+stuttery.
+
+Detailed audio evidence showed queue oscillation rather than an average-bandwidth
+failure: 868 stale drops/smooth latency trims, queue depth 8/8, 922 concealed
+underruns, 104 prolonged-starvation events, and only 11 lost audio packets.
+
+The accepted 7000 actuator session already exhibited substantial audio
+loss/underrun totals. Therefore the audio burst/gap pathology is not attributed
+to the 6000 bitrate change and remains deferred for representative Linux +
+Home-Opal replay.
+
+Next: characterize exactly one lower candidate, 5000 kbps. No production minimum
+or automatic controller is defined yet.
+
+## Patch validation hardening — command warnings vs failures
+
+A 2026-09-14 C3 acceptance installer rolled back even though `git diff --check`
+succeeded, because the installer treated non-empty command output as failure.
+The output contained only Git line-ending warnings.
+
+Durable rule:
+- subprocess success/failure is determined by the process exit code;
+- stdout/stderr text is evidence/logging, not a failure predicate by itself;
+- warnings must be retained in logs and classified separately;
+- `git diff --check` fails only when its exit code is nonzero;
+- every installer using command validation must regression-test both:
+  - exit 0 with warnings => PASS;
+  - nonzero exit => FAIL.
+
+This rule applies to future patch/install/checkpoint tooling, not only C3.

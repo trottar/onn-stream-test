@@ -736,3 +736,44 @@ controller policy.
 Proceed next to fixed-bitrate characterization. Do not define a production
 minimum bitrate or automatic bitrate controller until lower fixed levels are
 measured and accepted.
+
+### D-064 — Validate 6000 kbps as the first lower C3 bitrate candidate
+
+**Status:** Accepted / runtime validated candidate (2026-09-14)
+
+The fixed 6000-kbps characterization completed at unchanged
+1280x720@60, GOP15, B-frames0 and FEC8.
+
+Video/session evidence:
+- 51,477 ms session;
+- one expected sequence resync and SSRC change;
+- 52 ms resync-to-IDR;
+- zero packets dropped waiting for IDR;
+- receiver not waiting for IDR at session end;
+- 2,823 rendered frames;
+- one decoder dropped frame;
+- one decoder queue-overflow drop;
+- 1,016 ms max output gap;
+- 1,025 ms max receive-to-decode;
+- 25 lost video packets;
+- 6 FEC-recovered packets;
+- 5 unrecoverable FEC groups.
+
+Focused gameplay/movement was fine.
+
+Audio was somewhat stuttery. Detailed audio evidence, however, showed
+simultaneous queue overflow trimming and prolonged starvation/concealment:
+868 stale drops/smooth trims, queue depth 8/8, 922 concealed underruns and 104
+prolonged-starvation events, with only 11 actual lost audio packets and zero
+audio write errors.
+
+The accepted 7000-kbps actuator session already exhibited substantial audio
+loss/underrun totals. This evidence does not support attributing the audio
+burstiness to the 6000-kbps video bitrate. Keep that transport/audio pathology
+separate and deferred for representative Linux + Home-Opal replay.
+
+Accept 6000 kbps as a validated lower candidate. Do not yet declare it the
+production minimum.
+
+Proceed next to exactly one lower candidate: 5000 kbps. Automatic bitrate
+control remains unimplemented until the lower fixed envelope is characterized.

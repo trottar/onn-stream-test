@@ -425,3 +425,24 @@ This index records durable checkpoints and major patch lines; it does not invent
   `video_only_restart` for initial C3, records Windows-only runtime validation
   and Linux revalidation requirement, and advances C3 to fixed-bitrate
   characterization. Production diagnostic source bytes are unchanged.
+
+- `privyhub_c3_fixed_6000_characterization_01_2026-09-14` — development-only C3 fixed-bitrate characterization
+  patch on synchronized checkpoint `20a1112831f47b0c44104d547123395a89964b8a`. Adds one loopback-only
+  6000 kbps candidate using the accepted video-only restart boundary, reports
+  actual active bitrate separately from the 7000 reference, and adds two-stage
+  telemetry/decoder evidence capture. No Android change, production ladder,
+  minimum bitrate or automatic controller. Runtime evidence pending.
+
+- `privyhub_c3_fixed_6000_runtime_acceptance_01_2026-09-14` — docs/evidence-only acceptance update on the exact
+  post-characterization state from checkpoint `20a1112831f47b0c44104d547123395a89964b8a`. Records D-064,
+  validates 6000 kbps as the first lower candidate, preserves decoder/audio
+  findings, explicitly keeps the existing burst/gap audio pathology separate
+  and deferred to Linux + Home-Opal replay, and advances characterization to
+  5000 kbps. Runtime characterization source bytes are unchanged.
+
+- `privyhub_c3_fixed_6000_runtime_acceptance_02_2026-09-14` — corrected C3 6000-kbps acceptance package.
+  Supersedes `privyhub_c3_fixed_6000_runtime_acceptance_01_2026-09-14`, which rolled back because its installer treated
+  successful `git diff --check` warning output as failure. v2 makes exit code
+  authoritative, logs warnings separately, regression-tests exit-0-with-warning
+  vs nonzero failure, records the hardening rule in durable memory, and keeps
+  the intended D-064/6000 validation scope unchanged.

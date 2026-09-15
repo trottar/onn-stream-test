@@ -344,3 +344,49 @@ Evidence:
 
 Next development step after checkpoint:
 **C3 fixed-bitrate characterization**.
+
+## C3 fixed 6000 characterization runtime step
+
+First lower candidate: **6000 kbps — VALIDATED**.
+
+Next lower candidate: **5000 kbps — NOT YET INSTALLED**.
+
+No Android rebuild is required for the completed 6000 validation.
+
+Runtime:
+1. restart companion;
+2. launch a normal game/native stream at 7000;
+3. run `python .\tools\probe_c3_fixed_6000_characterization.py`;
+4. play for several focused minutes and watch image quality/stutter;
+5. verify audio/controller/Pause/Resume/Save/Load;
+6. End normally;
+7. run `python .\tools\probe_c3_fixed_6000_characterization.py --finalize`;
+8. review `logs/streaming/c3_fixed_6000_characterization.txt`.
+
+Do not accept 6000 until technical evidence and manual quality observation are
+both reviewed.
+
+## C3 6000 validated result
+
+D-064 validates 6000 kbps as the first lower C3 candidate.
+
+Focused gameplay/movement was fine. Audio stutter was heard, but receiver
+metrics showed severe queue burst/gap oscillation (868 stale trims, 922
+concealed underruns, 104 prolonged-starvation events) with only 11 lost audio
+packets. This matches the separately deferred transport/audio pathology and is
+not attributed to the bitrate reduction.
+
+Evidence:
+`docs/memory/evidence/C3_FIXED_6000_VALIDATED_2026-09-14.md`
+
+Next after checkpoint:
+**C3 fixed 5000 kbps characterization**.
+
+## Patch tooling hardening from C3 6000 acceptance
+
+Durable installer rule: command success/failure is determined by exit code, not
+by whether stdout/stderr contains text.
+
+Specifically, `git diff --check` exit 0 with CRLF/LF warnings is PASS; warnings
+are logged but are not rollback triggers. Future packages must regression-test
+that case before delivery.

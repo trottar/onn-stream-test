@@ -237,3 +237,16 @@ No production minimum bitrate or adaptive controller exists yet.
 
 Characterize lower fixed bitrates while preserving 1280x720@60, GOP15,
 B-frames0 and FEC8. Only evidence-backed levels may enter the production ladder.
+
+## C3 fixed-bitrate characterization
+
+`C3_FIXED_6000_CHARACTERIZATION` — **RUNTIME VALIDATED CANDIDATE**
+
+6000 kbps is the first validated lower bitrate candidate. It is a validated
+candidate, not yet the production minimum.
+
+`C3_FIXED_5000_CHARACTERIZATION` — **NEXT / NOT YET INSTALLED**
+
+The known audio burst/gap pathology remains separate from bitrate
+characterization and stays deferred for representative Linux + Home-Opal
+replay.

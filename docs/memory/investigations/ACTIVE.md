@@ -141,3 +141,35 @@ Validated:
 See `evidence/C2_STREAM_TELEMETRY_RUNTIME_VALIDATED_2026-09-14.md`.
 
 C3 adaptive bitrate is next after checkpoint/push.
+
+## C3 fixed-bitrate characterization
+
+**Active.**
+
+First candidate: 6000 kbps — **VALIDATED**.
+
+Next question: is fixed 5000 kbps acceptable at unchanged 720p60/GOP15/B-frames0/FEC8?
+
+Evidence must include post-cycle C2 telemetry, final decoder-session report and
+focused manual image-quality/stutter observation.
+
+See `C3_FIXED_BITRATE_CHARACTERIZATION.md`.
+
+## 6000 result / 5000 next
+
+6000 kbps: **VALIDATED CANDIDATE**.
+
+Video/gameplay acceptance:
+- movement/gameplay fine;
+- receiver recovered cleanly;
+- one decoder drop and one queue-overflow drop retained as raw evidence.
+
+Audio:
+- audible stutter observed;
+- not attributed to 6000;
+- receiver simultaneously showed queue overflow trimming and prolonged
+  starvation/concealment;
+- existing audio/transport burstiness remains deferred to Linux + Home-Opal
+  replay.
+
+Next single candidate: 5000 kbps.

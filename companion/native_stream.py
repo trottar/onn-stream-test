@@ -64,6 +64,7 @@ class NativeStreamManager:
         self._capture_process: subprocess.Popen[Any] | None = None
         self._log_handle = None
         self._client_port: int | None = None
+        self._active_bitrate_kbps = self.BITRATE_KBPS
         self._capture_target: dict[str, Any] | None = None
         self._last_capture_target: dict[str, Any] | None = None
         self._session_io = NativeSessionIO(
@@ -239,12 +240,13 @@ class NativeStreamManager:
                 "host_telemetry": self._host_telemetry.status(),
                 "fec_enabled": True,
                 "fec_group_size": self.FEC_GROUP_SIZE,
-                "source_bitrate_kbps": self.BITRATE_KBPS,
+                "source_bitrate_kbps": self._active_bitrate_kbps,
+                "reference_bitrate_kbps": self.BITRATE_KBPS,
                 "width": self.WIDTH,
                 "height": self.HEIGHT,
                 "fps": self.FPS,
                 "gop_frames": self.GOP_FRAMES,
-                "bitrate_kbps": self.BITRATE_KBPS,
+                "bitrate_kbps": self._active_bitrate_kbps,
                 "payload_type": self.PAYLOAD_TYPE,
                 "video_port": self._client_port,
                 "audio_port": self.AUDIO_PORT,
@@ -645,7 +647,28 @@ class NativeStreamManager:
         port: int,
         source_width: int,
         source_height: int,
+        bitrate_kbps: int | None = None,
+        max_bitrate_kbps: int | None = None,
     ) -> list[str]:
+        target_bitrate_kbps = (
+            self.BITRATE_KBPS
+            if bitrate_kbps is None
+            else int(bitrate_kbps)
+        )
+        target_max_bitrate_kbps = (
+            self.MAX_BITRATE_KBPS
+            if max_bitrate_kbps is None
+            else int(max_bitrate_kbps)
+        )
+
+        if (
+            target_bitrate_kbps <= 0
+            or target_max_bitrate_kbps < target_bitrate_kbps
+        ):
+            raise NativeStreamError(
+                "Invalid native-stream encoder bitrate override"
+            )
+
         destination = (
             f"rtp://127.0.0.1:{self.FEC_INPUT_PORT}"
             "?pkt_size=1200"
@@ -693,9 +716,9 @@ class NativeStreamManager:
             "-rc",
             "cbr",
             "-b:v",
-            f"{self.BITRATE_KBPS}k",
+            f"{target_bitrate_kbps}k",
             "-maxrate",
-            f"{self.MAX_BITRATE_KBPS}k",
+            f"{target_max_bitrate_kbps}k",
             "-bufsize",
             "1000k",
             "-g",
@@ -780,6 +803,7 @@ class NativeStreamManager:
         self._process = None
         self._capture_process = None
         self._client_port = None
+        self._active_bitrate_kbps = self.BITRATE_KBPS
 
         if self._capture_target is not None:
             self._last_capture_target = self._capture_target
@@ -1315,6 +1339,12 @@ class NativeStreamManager:
         )
 
         with self._lock:
+            if self._active_bitrate_kbps != self.BITRATE_KBPS:
+                raise NativeStreamError(
+                    "C3 same-bitrate continuity diagnostic requires "
+                    "the 7000 kbps reference stream"
+                )
+
             try:
                 return run_c3_actuator_continuity_cycle(
                     self
@@ -1324,6 +1354,27 @@ class NativeStreamManager:
             except Exception as exc:
                 raise NativeStreamError(
                     "C3 actuator continuity diagnostic failed: "
+                    + type(exc).__name__
+                ) from exc
+
+    def diagnostic_c3_fixed_bitrate_6000_cycle(
+        self,
+    ) -> dict[str, Any]:
+        """Run the first fixed-bitrate C3 characterization point."""
+        from diagnostics.c3_fixed_bitrate_probe import (
+            run_c3_fixed_bitrate_6000_cycle,
+        )
+
+        with self._lock:
+            try:
+                return run_c3_fixed_bitrate_6000_cycle(
+                    self
+                )
+            except NativeStreamError:
+                raise
+            except Exception as exc:
+                raise NativeStreamError(
+                    "C3 fixed 6000 kbps characterization failed: "
                     + type(exc).__name__
                 ) from exc
 

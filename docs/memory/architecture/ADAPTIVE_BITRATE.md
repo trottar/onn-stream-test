@@ -281,3 +281,45 @@ The stable boundary is:
 Linux migration acceptance must rerun this continuity test. If the Linux
 backend cannot meet the same lifecycle boundary, revisit live encoder
 reconfiguration there without changing the controller policy.
+
+## Fixed-bitrate characterization
+
+After D-063, lower bitrate levels are established one at a time.
+
+The first candidate is 6000 kbps. It keeps:
+- 1280x720;
+- 60 fps;
+- GOP15;
+- B-frames0;
+- FEC8.
+
+The reference profile remains 7000 kbps. The stream manager now distinguishes
+the immutable reference bitrate from the **active encoder bitrate** so
+diagnostics do not claim 7000 after a fixed-bitrate actuator cycle.
+
+Normal sessions still start/reset to the reference. Only the loopback-only C3
+characterization action changes the active development bitrate.
+
+A candidate becomes a production ladder level only after technical and focused
+visual-quality acceptance.
+
+## Validated bitrate candidate 6000
+
+6000 kbps is validated as a lower C3 candidate at unchanged
+1280x720@60/GOP15/B-frames0/FEC8.
+
+The characterization result must not be conflated with the independent audio
+transport pathology. At 6000, the Android audio queue repeatedly reached its
+8-packet cap and trimmed old PCM while also recording prolonged starvation and
+concealment. That simultaneous overflow/starvation pattern is evidence of
+bursty delivery/scheduling, not simple insufficient average video bitrate.
+
+The bitrate ladder remains under characterization. Current evidence-backed
+levels:
+- 7000 kbps: validated reference/max;
+- 6000 kbps: validated lower candidate.
+
+Next candidate: 5000 kbps.
+
+No minimum or automatic controller is set until lower-level characterization
+finishes.

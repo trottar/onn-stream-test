@@ -472,3 +472,60 @@ D-063:
 - do not add a minimum bitrate or automatic controller yet.
 
 Next: fixed-bitrate characterization.
+
+## C3 fixed-bitrate characterization rule
+
+C3 characterization proceeds **one candidate at a time**.
+
+First candidate: 6000 kbps.
+
+6000 is diagnostic only until runtime evidence and focused visual-quality
+observation are reviewed. Keep 1280x720@60, GOP15, B-frames0 and FEC8 fixed.
+Do not sweep multiple levels in one decision because that would obscure the
+first quality/capacity boundary.
+
+A normal session still starts at the validated 7000 kbps reference. The
+loopback-only characterization action may move the active encoder to 6000; a
+normal End/new session resets to the reference.
+
+No automatic controller or production minimum exists yet.
+
+## C3 validated bitrate candidates
+
+D-064:
+- 7000 kbps remains the validated reference/max;
+- 6000 kbps is the first validated lower candidate;
+- 6000 validation keeps 1280x720@60, GOP15, B-frames0 and FEC8 unchanged;
+- one decoder drop/queue-overflow event and ~1.0 s maximum restart-associated
+  gap are retained as evidence rather than hidden;
+- focused movement/gameplay at 6000 was fine;
+- audible audio stutter occurred, but detailed receiver evidence shows the
+  existing burst/gap queue pathology rather than evidence of insufficient
+  average 6000-kbps capacity;
+- do not attribute the deferred audio pathology to 6000 without new evidence;
+- replay the transport/audio pathology on Linux + Home Opal before product
+  architecture changes;
+- next bitrate characterization candidate is 5000 kbps;
+- production minimum and automatic controller remain unset.
+
+## Installer validation rule — exit code is authoritative
+
+For deterministic patch/install/checkpoint tooling, **command exit code is the
+authoritative success/failure signal**.
+
+Never fail a validation merely because stdout or stderr is non-empty. Tools such
+as Git can emit benign warnings (including line-ending warnings) while returning
+success.
+
+Required behavior:
+- capture stdout and stderr separately where practical;
+- preserve warnings in the result log;
+- fail only on the command's documented nonzero exit status or on a separate
+  explicit semantic invariant;
+- for `git diff --check`, return code 0 with warnings is PASS;
+- package-side regression must cover return code 0 + warning text and nonzero
+  return code + diagnostic text.
+
+This rule was added after the failed
+`privyhub_c3_fixed_6000_runtime_acceptance_01_2026-09-14` installer incorrectly
+rolled back on warning text despite successful `git diff --check`.
