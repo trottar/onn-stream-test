@@ -1,10 +1,81 @@
 ---
 memory_schema: 1
-as_of: 2026-09-14
+as_of: 2026-09-15
 baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 ---
 
 # Current Handoff
+
+
+<!-- PRIVYHUB_D079_MEMORY_CHECKPOINT_LINUX_ONN_STREAM_DIAGNOSIS_2026_09_15:HANDOFF:BEGIN -->
+## 2026-09-15 active handoff — first Linux/onn game E2E
+
+Current active work is **Phase D Linux migration / integrated onn E2E**, not the
+older Windows Phase-C position in stale checkpoints.
+
+What now works in the integrated path:
+
+- Linux runtime selection/startup;
+- RetroArch launch;
+- restored game/user data;
+- uinput controller preflight with temporary development ACL;
+- RT audio permission with temporary `RLIMIT_RTPRIO=1`;
+- prior PS1 save load;
+- exact managed X11 window discovery by the Linux native backend;
+- VAAPI 720p60 encoding.
+
+Two distinct remaining issues:
+
+1. **Android handoff compatibility bug:** `MainActivity` still requires
+   Windows-only `host_window_policy.window_found` before automatic native-stream
+   handoff. Linux can therefore show `Game ready, stream not opened` even though
+   native Linux X11 discovery subsequently succeeds. Manual banner entry reaches
+   NativeStreamActivity.
+2. **Transport blocker:** NativeStreamActivity then fails stabilization because
+   the Linux -> onn path is delivering severe video/audio gaps. Multiple short
+   runs showed thousands of UDP `SndbufErrors` and `RcvbufErrors`; video
+   `sendto()` stalled for hundreds of milliseconds; the separate nonblocking
+   SCHED_RR audio sender had thousands of failed sends.
+
+Hypotheses already tested/falsified as primary cause:
+
+- Linux exact-window capture failure — falsified.
+- VAAPI encoder starvation — not supported; encoder remained near 60 fps.
+- Android software-decoder fallback — falsified; hardware vendor decoder active.
+- Linux socket max-buffer cap — falsified as root cause; 4 MiB ceilings did not
+  improve the run.
+- USB runtime autosuspend / USB 2-speed bottleneck — falsified; adapter is
+  SuperSpeed 5000 Mb/s, `power/control=on`, never runtime-suspended.
+- rtw88 deep-LPS — falsified as root cause.
+- ordinary mac80211/NetworkManager powersave — disabling it removed rtw88 LPS
+  warnings but transport failure persisted, so it is a secondary driver issue.
+
+Important host/kernel evidence:
+
+- adapter: Realtek RTL8822BU (`0bda:b812`), driver `rtw_8822bu`;
+- repeated kernel `firmware failed to leave lps state`;
+- one rtw register read timeout;
+- interface TX drop/error counters did not increase during UDP failure;
+- ordinary Wi-Fi powersave test suppressed LPS/register warnings while
+  `SndbufErrors`/`RcvbufErrors` still rose by thousands.
+
+Next step:
+
+Run the preserved standalone **Linux -> onn idle UDP Test A** before touching
+production transport. Use 5 ms / ~1000-byte datagrams and Android kernel receive
+timestamps. Do not ask for or expose the onn IP. The first Linux wrapper attempt
+failed locally at address discovery (`ONN_ADDRESS_DISCOVERY_FAILED`) before any
+packets were sent, so fix only that wrapper/discovery seam first.
+
+Also restore the PS1 `scph5501.bin` BIOS before final PS1 acceptance; it is not
+the present transport root cause.
+
+<!-- PRIVYHUB_D079_MEMORY_CHECKPOINT_LINUX_ONN_STREAM_DIAGNOSIS_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_D078_HANDOFF -->
+## D-078 handoff
+
+D-078 is installed and host-validated when `logs/games/d078_linux_companion_startup_probe.txt` ends with `D078_LINUX_MEDIA_SERVER_STARTUP_READY`. Normal Linux companion startup now uses Python `range_server.py`; Windows remains on the existing PowerShell wrapper. Current next step is integrated onn/Linux SNES E2E through the normal Games UI. Live-source PowerShell runner portability is explicitly not part of D-078.
 
 ## Repository state
 
@@ -785,3 +856,411 @@ changed RetroArch state correctly; RetroArch logged saving and loading the same
 graceful SIGTERM shutdown with `SAVE_FILES` -> `OK`; cleanup removed all virtual
 pads. The probe's `validated=False` was a classifier defect (`.state.png` match +
 non-production `quit` requirement), not a controller failure.
+
+## D-077 Linux platform-aware RetroArch runtime selection
+
+**Status after successful installer validation:** NORMAL-PATH RUNTIME SELECTION VALIDATED / ONN E2E PENDING
+
+The normal Games product path no longer depends on the Windows-only base runtime
+selection when running on Linux. D-077 adds an optional `platforms.linux`
+override to the existing trusted emulator descriptor and has EmulatorManager
+merge it into the effective config used by both readiness and `_resolve_game()`.
+
+Windows base paths/`.dll` cores remain unchanged. Linux selects the already
+validated project AppImage plus `cores-linux`/`.so` cores. No GamesPlugin,
+Android, video/FEC, audio, controller, lifecycle, telemetry or permission
+behavior is changed.
+
+Next: run the integrated onn Linux E2E through the normal Games launch path.
+
+<!-- PRIVYHUB_D079R1_MEMORY_CHECKPOINT_LINUX_IDLE_UDP_TEST_A_2026_09_15:HANDOFF:BEGIN -->
+## Linux transport handoff update — idle Test A
+
+Standalone Linux -> onn idle UDP Test A has now **reproduced the old transport
+pathology on the representative deployment path**.
+
+Measured 20-second result:
+
+- 3993 successful Linux sends, 7 would-block;
+- host send p95 ~5.015 ms;
+- 3993 unique Android arrivals, zero unique loss;
+- **2626 same-stamp duplicate Android arrivals**;
+- Android kernel arrival p95 ~18.36 ms, max ~792.30 ms;
+- 2116 sender-clean 4-6 ms intervals became kernel intervals <2 ms;
+- 190 sender-clean 4-6 ms intervals became kernel intervals >=20 ms;
+- Linux `SndbufErrors +7`, `RcvbufErrors +0`.
+
+This isolates the base pathology from RetroArch/native-stream load. The old
+2026-09-07 investigation's resume criterion is met. Its prior Android
+`WIFI_MODE_FULL_LOW_LATENCY` test did not fix the forward behavior, so do not
+repeat that as the next hypothesis.
+
+Next: preserved **Test B — onn -> Linux, idle**. Use the existing Android
+nonblocking DatagramChannel sender and Linux Python receiver. Discover the Linux
+target address locally and never print/persist it in shareable output.
+
+<!-- PRIVYHUB_D079R1_MEMORY_CHECKPOINT_LINUX_IDLE_UDP_TEST_A_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_D079R2_MEMORY_CHECKPOINT_LINUX_REVERSE_IDLE_UDP_TEST_B_2026_09_15:HANDOFF:BEGIN -->
+## Transport handoff — Tests A and B complete
+
+The representative Linux acceptance replay has now reproduced the deferred UDP
+problem in both directions while idle.
+
+### Test A — Linux -> onn
+
+- 3993/4000 successful sends;
+- 7 would-block;
+- 3993 unique Android arrivals;
+- 0 missing unique packets;
+- **2626 same-stamp duplicates**;
+- Android kernel p95 ~18.36 ms, max ~792.30 ms;
+- 2116 clean 4-6 ms sends became kernel <2 ms;
+- 190 became kernel >=20 ms.
+
+### Test B — onn -> Linux
+
+- 4000/4000 Android sends successful;
+- 3894 unique Linux arrivals;
+- 106 missing unique packets;
+- **476 same-stamp duplicates**;
+- Linux receive p95 ~18.14 ms, max ~173.72 ms;
+- 1312 clean 4-6 ms sends became receive <2 ms;
+- 126 became receive >=20 ms;
+- Linux `SndbufErrors +0`, `RcvbufErrors +120`.
+
+Interpretation:
+
+The transport pathology is not specific to production game streaming or a
+Linux-only sender. Both directions are affected on the shared home
+Opal/network/radio path.
+
+Do not tune production bitrate/FEC/audio/decoder/relay behavior yet.
+
+Next:
+1. capability probe the locally discovered default-gateway router without
+   printing the gateway;
+2. if router-side capture is available, perform the deferred dual-boundary
+   packet capture around one synthetic direction at a time;
+3. compare unique packet identities/timing at the router boundaries with the
+   endpoint summaries.
+
+<!-- PRIVYHUB_D079R2_MEMORY_CHECKPOINT_LINUX_REVERSE_IDLE_UDP_TEST_B_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_D079R3_MEMORY_CHECKPOINT_OPAL_SSH_CAPABILITY_2026_09_15:HANDOFF:BEGIN -->
+## Router localization readiness
+
+The default gateway was discovered locally and SSH port 22 is reachable.
+`ssh` is installed on the Linux host. Batch login is unavailable, so the next
+step is an interactive `ssh root@<locally discovered gateway>` capability check.
+
+Return only sanitized capability/interface names. Do not expose addresses,
+SSID, MACs, or credentials.
+
+If `tcpdump` exists, proceed to a router-side dual-boundary UDP capture using the
+preserved synthetic transport probes.
+
+<!-- PRIVYHUB_D079R3_MEMORY_CHECKPOINT_OPAL_SSH_CAPABILITY_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_D079R4_MEMORY_CHECKPOINT_OPAL_SSH_RSA_NEGOTIATION_2026_09_15:HANDOFF:BEGIN -->
+## Opal SSH handoff update
+
+SSH/22 is reachable, but the first interactive execution probe stopped before
+authentication because the Opal offered only `ssh-rsa` as its host key.
+
+Use one-command compatibility only:
+
+`-o HostKeyAlgorithms=+ssh-rsa`
+
+Do not modify global `ssh_config`. Do not add `PubkeyAcceptedAlgorithms` unless
+authentication later fails for a separate RSA-signature reason.
+
+Next: rerun the sanitized capability command with that single option and confirm
+`router_shell=OK` plus `tcpdump` availability.
+
+<!-- PRIVYHUB_D079R4_MEMORY_CHECKPOINT_OPAL_SSH_RSA_NEGOTIATION_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_D079R5_MEMORY_CHECKPOINT_OPAL_AUTH_CAPABILITIES_2026_09_15:HANDOFF:BEGIN -->
+## Router diagnostic handoff
+
+Authenticated Opal shell works.
+
+Current sanitized capabilities:
+
+- `tcpdump=UNAVAILABLE`
+- `iw=AVAILABLE`
+- bridge: `br-lan`
+- radios: `wlan0`, `wlan1`
+
+Use `HostKeyAlgorithms=+ssh-rsa` only per router SSH command. Do not weaken
+global SSH policy.
+
+Next diagnostic-only step:
+
+- identify firmware release/package manager;
+- report writable overlay free space;
+- show bridge member interface names;
+- show wireless interface type/channel only;
+- check whether package indexes already advertise `tcpdump` or `tcpdump-mini`;
+- do not run package update/install yet.
+
+<!-- PRIVYHUB_D079R5_MEMORY_CHECKPOINT_OPAL_AUTH_CAPABILITIES_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_D079R6_MEMORY_CHECKPOINT_OPAL_CAPTURE_READINESS_2026_09_15:HANDOFF:BEGIN -->
+## Router capture readiness handoff
+
+Current sanitized Opal state:
+
+- OpenWrt/LEDE;
+- `opkg` present;
+- ~81 MiB free overlay;
+- `libpcap` installed;
+- zero cached package lists;
+- no installed `tcpdump`;
+- `br-lan` = `eth0.1` + `wlan0` + `wlan1`;
+- `wlan0` = AP channel 1;
+- `wlan1` = AP channel 40.
+
+Next:
+1. temporarily populate `opkg` indexes in RAM;
+2. determine whether `tcpdump-mini`/`tcpdump` is available and its installed
+   size;
+3. return package-list cache to the exact prior empty state;
+4. map Linux and onn to radio names without exposing IP/MAC values.
+
+Do not install a package until that probe establishes a compatible candidate.
+
+<!-- PRIVYHUB_D079R6_MEMORY_CHECKPOINT_OPAL_CAPTURE_READINESS_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_D079R7_MEMORY_CHECKPOINT_OPAL_SSH_COMMAND_TRANSPORT_2026_09_15:HANDOFF:BEGIN -->
+## Opal SSH transport handoff
+
+Use quoted remote commands only. A control probe confirmed:
+
+- router shell OK;
+- remote command execution OK;
+- `opkg` available;
+- `iw` available;
+- exit code 0.
+
+The prior heredoc/stdin form is incompatible in this environment and is not a
+router diagnostic result.
+
+Next rerun the temporary package-index/radio-membership probe using the validated
+quoted-command form.
+
+<!-- PRIVYHUB_D079R7_MEMORY_CHECKPOINT_OPAL_SSH_COMMAND_TRANSPORT_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_D080_OPAL_DUAL_BOUNDARY_PROBE_01_2026_09_15:HANDOFF:BEGIN -->
+## D080 router dual-boundary diagnostic
+
+New diagnostic files:
+
+- `tools/run_opal_dual_boundary_probe.sh`
+- `tools/analyze_opal_dual_boundary_pcap.py`
+
+The probe temporarily installs `tcpdump-mini`, captures the existing forward
+20-second UTP1 test on both Opal radios, removes the package, verifies the
+installed-package set and empty package-list cache are restored, and writes
+`opal_dual_boundary_summary.txt/json`.
+
+Raw PCAPs remain local because they contain network metadata.
+
+<!-- PRIVYHUB_D080_OPAL_DUAL_BOUNDARY_PROBE_01_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_D080R1_OPAL_DUAL_BOUNDARY_ANALYZER_FAIL_CLOSED_2026_09_15:HANDOFF:BEGIN -->
+## D080 first-run correction
+
+Do not trust the first D080 classification.
+
+Run:
+`logs/transport_probe/opal_dual_boundary_20260915_102045`
+
+Endpoint traffic was real (2971 host successes, 2971 Android unique arrivals,
+5291 Android duplicates), but both router analyses matched zero UTP1 packets.
+
+D080R1 fixes the diagnostic classifier to fail closed and adds:
+- PCAP byte size;
+- total PCAP record count;
+- linktype;
+- matched UTP1 packet count.
+
+Next action is local re-analysis of the existing session only. No router access
+or new capture is required.
+
+<!-- PRIVYHUB_D080R1_OPAL_DUAL_BOUNDARY_ANALYZER_FAIL_CLOSED_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_D080R2_MEMORY_CHECKPOINT_EMPTY_OPAL_PCAPS_2026_09_15:HANDOFF:BEGIN -->
+## D080 router-capture handoff
+
+D080R1 reanalysis proved both router radio PCAPs were header-only:
+
+- `router_linux_radio.pcap`: 24 bytes, 0 records;
+- `router_onn_radio.pcap`: 24 bytes, 0 records.
+
+Endpoint traffic was definitely present:
+- 2971 host successes;
+- 2971 Android unique arrivals;
+- 5291 Android duplicates.
+
+So the current problem is router capture visibility, not UTP1 parsing.
+
+Next diagnostic:
+read only the Opal acceleration/offload state and relevant fast-path modules /
+services. Do not change the router yet. If acceleration is enabled, a later
+controlled experiment can temporarily disable it, repeat the idle synthetic
+probe, and restore the exact prior setting.
+
+<!-- PRIVYHUB_D080R2_MEMORY_CHECKPOINT_EMPTY_OPAL_PCAPS_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_D081_OPAL_ACCELERATION_OFF_DUAL_BOUNDARY_PROBE_2026_09_15:HANDOFF:BEGIN -->
+## D081 acceleration-off probe
+
+Run `tools/run_opal_acceleration_off_dual_boundary_probe.sh`.
+
+It refuses unexpected pre-state, arms a 600-second router restore watchdog,
+temporarily sets flow offloading 1/1 -> 0/0, invokes D080, then explicitly
+restores and verifies 1/1.
+
+Interpret capture visibility and Android duplicate metrics separately: capture
+visibility improving alone does not prove acceleration caused duplication.
+
+<!-- PRIVYHUB_D081_OPAL_ACCELERATION_OFF_DUAL_BOUNDARY_PROBE_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_D081R1_MEMORY_CHECKPOINT_ACCELERATION_OFF_FALSIFIED_2026_09_15:HANDOFF:BEGIN -->
+## D081 result
+
+D081 is runtime validated and restored cleanly.
+
+Acceleration-off test:
+- UCI flow offload flags: 0/0;
+- `sfhnat`: still loaded;
+- host sends: 3131;
+- Android unique: 2944;
+- Android duplicates: 5224;
+- Android missing: 187;
+- both router radio PCAPs: 24 bytes / zero records.
+
+Restore verified:
+- flow_offloading=1;
+- flow_offloading_hw=1.
+
+Interpretation:
+The normal OpenWrt/GL.iNet offload toggles do not expose the radio path and do
+not cure the UDP failure. Next inspect Siflower `sfhnat`, switch, and wireless
+driver control surfaces read-only. Do not disable/unload vendor modules until
+their dependencies and restore mechanism are understood.
+
+<!-- PRIVYHUB_D081R1_MEMORY_CHECKPOINT_ACCELERATION_OFF_FALSIFIED_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_D081R2_MEMORY_CHECKPOINT_SIFLOWER_INVENTORY_2026_09_15:HANDOFF:BEGIN -->
+## Siflower inventory handoff
+
+Validated loaded modules:
+- sf16a18_hb_fmac
+- sf16a18_lb_fmac
+- sf16a18_rf
+- sf_eswitch
+- sfax8_factory_read
+- sfax8_netlink
+- sfhnat
+
+`sfhnat` module parameters: none.
+
+The prior `siflower_packages` output is invalid due to an awk syntax error.
+Ignore it.
+
+Next:
+read module file paths / metadata and identify installed package ownership with
+`opkg search`; do not unload modules or restart networking.
+
+<!-- PRIVYHUB_D081R2_MEMORY_CHECKPOINT_SIFLOWER_INVENTORY_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_D082_OPAL_BRIDGE_BOUNDARY_PROBE_2026_09_15:HANDOFF:BEGIN -->
+## D082 bridge-boundary diagnostic
+
+New files:
+- `tools/run_opal_bridge_boundary_probe.sh`
+- `tools/analyze_opal_bridge_boundary_pcap.py`
+
+The probe temporarily installs `tcpdump-mini`, captures only `br-lan` during
+the existing UTP1 forward test, removes the package, verifies package state
+restoration, retains raw PCAP locally, and prints a sanitized summary.
+
+No vendor module unload, wireless restart, or acceleration change occurs.
+
+<!-- PRIVYHUB_D082_OPAL_BRIDGE_BOUNDARY_PROBE_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_D083_OPAL_NETDEV_COUNTER_PROBE_2026_09_15:HANDOFF:BEGIN -->
+## D083 next diagnostic
+
+D082:
+- 3661 host successful sends;
+- 3661 Android unique;
+- 2371 Android duplicates;
+- zero Android unique loss;
+- `br-lan` PCAP = 24 bytes / 0 records.
+
+D083 files:
+- `tools/run_opal_netdev_counter_probe.sh`;
+- `tools/analyze_opal_netdev_counter_probe.py`.
+
+D083 is read-only on the router. It samples sysfs counters for `wlan0`,
+`wlan1`, and `br-lan` during the existing forward synthetic test.
+
+<!-- PRIVYHUB_D083_OPAL_NETDEV_COUNTER_PROBE_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_D083R1_NETDEV_SAMPLER_LIFETIME_FIX_2026_09_15:HANDOFF:BEGIN -->
+## D083R1
+
+Initial D083 failed diagnostically: counter CSV had fewer than two rows, while
+the runner incorrectly returned 0.
+
+D083R1 fixes only `tools/run_opal_netdev_counter_probe.sh`:
+- nohup-detached finite sampler;
+- minimum 25-line retrieval gate;
+- explicit compare/analyzer failure propagation.
+
+Analyzer hash remains unchanged. Rerun D083 after installing D083R1.
+
+<!-- PRIVYHUB_D083R1_NETDEV_SAMPLER_LIFETIME_FIX_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_D083_CLOSEOUT_INVALID_DIAGNOSTICS_2026_09_15:HANDOFF:BEGIN -->
+## End-of-chat handoff — transport investigation
+
+Resume from **D082**, not D083.
+
+Last valid result:
+`logs/transport_probe/opal_bridge_20260915_141216`
+
+- host successful sends: 3661;
+- Android unique: 3661;
+- Android duplicates: 2371;
+- Android missing: 0;
+- `br-lan` capture: 24 bytes / 0 records;
+- `wlan0` and `wlan1` had already shown the same capture blindness.
+
+D083 is invalid:
+- insufficient counter CSV;
+- analyzer failed;
+- runner falsely exited 0.
+
+D083R1 is invalid:
+- `nohup` was assumed without capability validation;
+- router has no `nohup` command or BusyBox applet;
+- setup failed before sampling with `sampler_not_running`.
+
+Smoke-test correction:
+- raw `/proc/mounts` shows `/tmp` without `noexec`;
+- ignore the contradictory `tmp_noexec=YES` classifier;
+- direct `sh` execution did write header + three sample rows.
+
+Do not treat the original D083 SSH-lifetime hypothesis as established.
+
+Next chat must first decide between:
+- one clearly bounded, product-relevant diagnostic; or
+- deferring the Opal/Siflower-specific path and moving on.
+
+No further router diagnostic is authorized by this handoff by default.
+
+<!-- PRIVYHUB_D083_CLOSEOUT_INVALID_DIAGNOSTICS_2026_09_15:HANDOFF:END -->
