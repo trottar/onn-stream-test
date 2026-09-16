@@ -11105,6 +11105,18 @@ class MainActivity : AppCompatActivity() {
                         )
                         ?: false
 
+                // PRIVYHUB_D4_LINUX_HANDOFF_FIX_01
+                // Require the legacy host-window confirmation only on hosts
+                // that explicitly support that policy. Linux reports it as
+                // unsupported and uses its native X11 capture readiness path.
+                val hostWindowPolicySupported =
+                    hostWindowPolicy
+                        ?.optBoolean(
+                            "supported",
+                            false
+                        )
+                        ?: false
+
                 val autoOpen =
                     getGameAutoOpenAfterLaunch()
 
@@ -11134,6 +11146,7 @@ class MainActivity : AppCompatActivity() {
                                         autoOpen = autoOpen,
                                         nativeReady = nativeReady,
                                         nativeMessage = nativeMessage,
+                                        hostWindowPolicySupported = hostWindowPolicySupported,
                                         hostWindowFound = hostWindowFound,
                                         streamWarning = streamWarning
                                     )
@@ -11147,6 +11160,7 @@ class MainActivity : AppCompatActivity() {
                                 autoOpen = autoOpen,
                                 nativeReady = nativeReady,
                                 nativeMessage = nativeMessage,
+                                hostWindowPolicySupported = hostWindowPolicySupported,
                                 hostWindowFound = hostWindowFound,
                                 streamWarning = streamWarning
                             )
@@ -11219,8 +11233,10 @@ class MainActivity : AppCompatActivity() {
                             "Game launch failed"
                         )
                         .setMessage(
-                            error.message
-                                ?: "Unknown error"
+                            sanitizeGameNetworkError(
+                                error,
+                                host
+                            )
                         )
                         .setPositiveButton(
                             "OK",
@@ -11410,6 +11426,7 @@ class MainActivity : AppCompatActivity() {
         autoOpen: Boolean,
         nativeReady: Boolean,
         nativeMessage: String,
+        hostWindowPolicySupported: Boolean,
         hostWindowFound: Boolean,
         streamWarning: String
     ) {
@@ -11417,7 +11434,10 @@ class MainActivity : AppCompatActivity() {
         if (
             autoOpen &&
             nativeReady &&
-            hostWindowFound
+            (
+                !hostWindowPolicySupported ||
+                hostWindowFound
+            )
         ) {
 
             statusText.text =
@@ -11441,7 +11461,10 @@ class MainActivity : AppCompatActivity() {
                 )
             }
 
-            if (!hostWindowFound) {
+            if (
+                hostWindowPolicySupported &&
+                !hostWindowFound
+            ) {
                 reasons.add(
                     "The managed RetroArch window was not " +
                         "confirmed by the host-coexistence preflight."
@@ -11819,12 +11842,54 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    private fun isIdempotentLoadTransportFailure(
+        error: Throwable
+    ): Boolean {
+
+        var current: Throwable? =
+            error
+
+        while (current != null) {
+            if (
+                current is java.net.SocketTimeoutException ||
+                current is java.net.ConnectException ||
+                current is java.net.NoRouteToHostException
+            ) {
+                return true
+            }
+            current = current.cause
+        }
+        return false
+    }
+
+
+    private fun sanitizeGameNetworkError(
+        error: Throwable,
+        host: String
+    ): String {
+
+        val message =
+            error.message
+                ?: "Unknown error"
+
+        return if (host.isBlank()) {
+            message
+        } else {
+            message.replace(
+                host,
+                "<companion-host>"
+            )
+        }
+    }
+
+
         // PRIVYHUB_A7_PATCH_10V5_CHEAT_SAVE_REPLACE_CONFIRMATION
 private fun requestGameStateAction(
         action: String,
         slot: Int,
         onSuccess: (() -> Unit)? = null,
-        replace: Boolean = false
+        replace: Boolean = false,
+        transportRetryAttempt: Int = 0
     ) {
 
         val endpoint =
@@ -11910,6 +11975,37 @@ private fun requestGameStateAction(
                 }
 
             } catch (error: Exception) {
+
+                if (
+                    loading &&
+                    transportRetryAttempt < 1 &&
+                    isIdempotentLoadTransportFailure(
+                        error
+                    )
+                ) {
+                    Log.w(
+                        TAG,
+                        "Load-state transport failed; retrying once",
+                        error
+                    )
+
+                    runOnUiThread {
+                        statusText.text =
+                            "Load response unavailable - retrying once..."
+
+                        requestGameStateAction(
+                            action = action,
+                            slot = slot,
+                            onSuccess = onSuccess,
+                            replace = replace,
+                            transportRetryAttempt =
+                                transportRetryAttempt + 1
+                        )
+                    }
+
+                    return@execute
+                }
+
                 Log.e(
                     TAG,
                     "Game state action failed",
@@ -11970,8 +12066,10 @@ private fun requestGameStateAction(
                                 "Game State"
                             )
                             .setMessage(
-                                error.message
-                                    ?: "Unknown error"
+                                sanitizeGameNetworkError(
+                                    error,
+                                    host
+                                )
                             )
                             .setPositiveButton(
                                 "OK",
@@ -12081,8 +12179,10 @@ private fun requestGameStateAction(
                             "End Game"
                         )
                         .setMessage(
-                            error.message
-                                ?: "Unknown error"
+                            sanitizeGameNetworkError(
+                                error,
+                                host
+                            )
                         )
                         .setPositiveButton(
                             "OK",
