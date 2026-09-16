@@ -1,10 +1,69 @@
 ---
 memory_schema: 1
-as_of: 2026-09-15
+as_of: 2026-09-16
 baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 ---
 
 # Current Handoff
+
+<!-- PRIVYHUB_D4_RUNTIME_RECONCILIATION_2026_09_16:HANDOFF:BEGIN -->
+## D4 resume point after Linux/network/controller reconciliation — 2026-09-16
+
+The newest runtime evidence supersedes the older handoff bullets that still list
+persistent `/dev/uinput` and realtime-priority setup as unfinished. Those
+prerequisites now persist across reboot.
+
+Normal Linux product progress has reached:
+
+- companion reachable;
+- PS1 game launch;
+- native stream visible;
+- controller buttons working;
+- PHI1/controller transport healthy;
+- Linux virtual gamepad present and detected by RetroArch;
+- live analog `ABS_X` / `ABS_Y` events present.
+
+The immediate fault boundary is now **RetroArch PS1 controller mode/session
+configuration**. Investigate digital PlayStation pad versus DualShock/analog
+behavior before changing any transport or uinput code.
+
+### Network/VPN note
+
+The temporary Windows routing bridge is characterized sufficiently for Phase D.
+Keep `expressvpn-pkf` disabled on the physical Wi-Fi/Ethernet adapters for the
+known-good PrivyHub routed path. With ExpressVPN itself connected, Windows keeps
+Internet access but downstream Linux Internet does not traverse the VPN route.
+When Linux needs Internet, disconnect ExpressVPN. This is deferred because the
+Windows bridge is temporary.
+
+Do not reopen ICS, firewall, uinput, RT-priority, or ExpressVPN bridge debugging
+without new evidence.
+
+The saved Opal/UDP burst-gap investigation remains separately paused; normal
+stream success after the ExpressVPN-filter correction does not erase its saved
+synthetic evidence.
+
+Other remembered D4 observations:
+
+- Android signing mismatch is a packaging/migration issue, not runtime behavior.
+- A fixed-bitrate Linux audio characterization attempt was blocked because
+  process audio was inactive; do not reinterpret that as proof the validated
+  PulseAudio architecture is broken.
+- A prior Linux hard freeze has no established root cause.
+
+Older ADB recovery probe notes remain preserved below for history/tooling. The
+newest normal companion/game runtime succeeded, so return to ADB only if
+installation or wireless recovery fails again.
+
+### Next
+
+1. Test/fix RetroArch PS1 analog controller mode.
+2. Run the complete Linux normal-use game regression.
+3. Only then decide whether any remaining transport characterization is needed
+   for Phase-D acceptance.
+
+<!-- PRIVYHUB_D4_RUNTIME_RECONCILIATION_2026_09_16:HANDOFF:END -->
+
 <!-- D4_LINUX_HANDOFF_FIX_01_HANDOFF -->
 ## Active D4 Linux handoff work — 2026-09-15
 

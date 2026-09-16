@@ -1,10 +1,47 @@
 ---
 memory_schema: 1
-as_of: 2026-09-15
+as_of: 2026-09-16
 baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 ---
 
 # Active Investigations and Queued Work
+
+<!-- PRIVYHUB_D4_RUNTIME_RECONCILIATION_2026_09_16:ACTIVE:BEGIN -->
+## 2026-09-16 active reconciliation
+
+This section supersedes older Phase-D queued bullets where they conflict with
+newer runtime evidence.
+
+### RetroArch PS1 analog controller mode
+
+**Status:** ACTIVE / NARROWLY ISOLATED
+
+Proven below the RetroArch/core layer:
+
+- Android controller packets arrive;
+- Linux PHI1 injection works;
+- four-pad uinput architecture remains valid;
+- RetroArch detects `PrivyHub Virtual Gamepad P1`;
+- the virtual pad exposes the expected absolute axes;
+- live `ABS_X` / `ABS_Y` values change.
+
+Next diagnostic scope is only PS1 controller mode/core/session configuration
+(digital PlayStation pad versus DualShock/analog behavior).
+
+### Linux normal-use acceptance
+
+**Status:** QUEUED AFTER ANALOG FIX
+
+Rerun launch, video, process audio, controller, Pause/Resume, Save/Load, and End.
+Persistent uinput module/ownership and realtime-priority prerequisites are
+already validated and are no longer active setup tasks.
+
+### Android auto-open handoff
+
+Keep the already-installed D4 handoff fix on its own acceptance track. Do not
+conflate a remaining auto-open runtime check with the controller-mode issue.
+
+<!-- PRIVYHUB_D4_RUNTIME_RECONCILIATION_2026_09_16:ACTIVE:END -->
 
 <!-- PRIVYHUB_MEMORY_NORMALIZATION_D083_2026_09_15 -->
 

@@ -1,10 +1,73 @@
 ---
 memory_schema: 1
-as_of: 2026-09-15
+as_of: 2026-09-16
 baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 ---
 
 # Curated Project Memory
+
+<!-- PRIVYHUB_D4_RUNTIME_RECONCILIATION_2026_09_16:MEMORY:BEGIN -->
+## D4 Linux post-migration durable facts — 2026-09-16
+
+### Persistent Linux controller prerequisites are resolved
+
+`uinput` must be loaded persistently at boot, not merely configured by a udev
+rule. The validated development host uses:
+
+`/etc/modules-load.d/99-privyhub-uinput.conf`
+
+with `uinput`, plus the project ownership rule for `/dev/uinput`. After reboot
+the device ownership is correct and the PrivyHub user retains the required
+realtime-priority allowance. Treat the older "persistent uinput / RT priority
+still required" bullets as superseded by this evidence.
+
+### Controller fault boundary
+
+If buttons work and live Linux event monitoring shows changing `EV_ABS` values
+for `ABS_X`/`ABS_Y`, do not return to Android transport, network transport,
+uinput permissions, or analog-generation code by default. The current PS1
+movement failure is isolated to RetroArch/core/session controller mode and
+mapping behavior.
+
+### rtw88 LPS is not the primary current stream cause
+
+A run with ordinary LPS successfully disabled still produced severe socket
+pressure (`SndbufErrors`, `RcvbufErrors`, and audio send errors). The repeated
+rtw88 LPS fault is genuine but did not explain the stream failure by itself.
+Do not productize LPS-off as the primary fix without new evidence.
+
+### Temporary Windows router and ExpressVPN
+
+The Windows PC is a development routing bridge, not the intended PrivyHub
+network architecture. ExpressVPN has two independently observed effects:
+
+1. its `expressvpn-pkf` binding on physical adapters can block forwarded
+   Wi-Fi-to-Ethernet traffic;
+2. even with those physical bindings disabled, an active VPN moves Windows'
+   Internet route to the ExpressVPN interface, while Linux-forwarded Internet
+   traffic does not successfully traverse that VPN path.
+
+Local Linux-to-Windows reachability remains healthy in the second case. This is
+a temporary-topology limitation, not a Linux/PrivyHub defect. Defer further
+work; disconnect ExpressVPN when the Linux development host requires upstream
+Internet.
+
+### Android signing migration is separate from runtime behavior
+
+`INSTALL_FAILED_UPDATE_INCOMPATIBLE` during Linux APK installation was traced to
+different Android signing certificates between the already-installed package
+and the Linux-built APK. Treat signing migration separately from game/runtime
+debugging.
+
+### Unresolved observations are not conclusions
+
+A Linux hard freeze observed after a paused/stale game stream does not establish
+a memory leak, GPU fault, or driver root cause without supporting kernel/runtime
+evidence. Preserve the observation and reopen only if it recurs with measurable
+evidence.
+
+<!-- PRIVYHUB_D4_RUNTIME_RECONCILIATION_2026_09_16:MEMORY:END -->
+
 <!-- D4_LINUX_HANDOFF_FIX_01_MEMORY -->
 ## D4 Linux game handoff durable facts — 2026-09-15
 

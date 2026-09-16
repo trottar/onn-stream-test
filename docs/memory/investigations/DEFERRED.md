@@ -1,10 +1,47 @@
 ---
 memory_schema: 1
-as_of: 2026-09-15
+as_of: 2026-09-16
 baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 ---
 
 # Deferred / Paused Investigations
+
+<!-- PRIVYHUB_D4_RUNTIME_RECONCILIATION_2026_09_16:DEFERRED:BEGIN -->
+## Temporary Windows bridge + ExpressVPN forwarding
+
+**Status:** DEFERRED BY DESIGN — 2026-09-16
+
+The development topology temporarily routes Linux through the Windows PC.
+ExpressVPN changes that host's routing/filtering in ways that are not required
+by the intended product architecture.
+
+Validated bounds:
+
+- `expressvpn-pkf` on the physical Windows adapters can block the routed
+  PrivyHub path;
+- with both physical bindings disabled and ExpressVPN disconnected, Windows and
+  Linux both have Internet and PrivyHub local routing works;
+- with ExpressVPN connected, Windows Internet still works and Linux still
+  reaches its Windows gateway, but Linux Internet fails;
+- Windows forwarding remains enabled in both states;
+- no active Windows `NetNat` or ICS sharing object explains the behavior;
+- the selected Windows Internet route moves to the ExpressVPN interface while
+  the VPN is active.
+
+Decision: do not redesign the temporary bridge. Disconnect ExpressVPN whenever
+Linux requires upstream Internet. Reopen only if Windows-as-router unexpectedly
+becomes a product requirement.
+
+## Linux hard-freeze observation
+
+**Status:** DEFERRED UNTIL RECURRENCE WITH EVIDENCE
+
+One hard freeze occurred while RetroArch was active and the onn game stream had
+been left paused/stale for an extended period. No kernel evidence established a
+memory leak, GPU fault, or driver cause. Do not treat any candidate cause as
+confirmed.
+
+<!-- PRIVYHUB_D4_RUNTIME_RECONCILIATION_2026_09_16:DEFERRED:END -->
 
 <!-- PRIVYHUB_MEMORY_NORMALIZATION_D083_2026_09_15 -->
 

@@ -1,10 +1,89 @@
 ---
 memory_schema: 1
-as_of: 2026-09-15
+as_of: 2026-09-16
 baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 ---
 
 # Current Development State
+
+<!-- PRIVYHUB_D4_RUNTIME_RECONCILIATION_2026_09_16:CURRENT:BEGIN -->
+## D4 runtime reconciliation — 2026-09-16
+
+**Status:** Phase D Linux migration remains active, but the newest runtime evidence
+moves the immediate blocker beyond basic Linux host/network prerequisites.
+
+Newest validated state:
+
+- Linux companion service is reachable and normal game launch/streaming works
+  after the temporary Windows-router path was corrected for ExpressVPN filter
+  interference.
+- `/dev/uinput` persistence is no longer an open deployment gap: `uinput` is
+  loaded at boot through `/etc/modules-load.d/99-privyhub-uinput.conf`, the
+  project udev ownership rule applies after reboot, and the PrivyHub account has
+  the required realtime-priority allowance.
+- Controller transport, Linux uinput injection, RetroArch pad discovery, and live
+  `ABS_X` / `ABS_Y` analog events are all proven.
+- The remaining controller issue is inside RetroArch/PS1 core controller-mode
+  behavior (digital pad versus DualShock/analog session configuration), not
+  Android transport, Linux permissions, uinput creation, or analog generation.
+- The saved Linux/home-Opal UDP timing pathology remains a separate deferred
+  transport investigation. Latest normal game streaming success does not prove
+  that the older synthetic timing pathology disappeared, but it is no longer
+  valid to treat basic Linux reachability or the Windows bridge as the current
+  game-launch blocker.
+- The repeated rtw88/LPS fault is real, but disabling ordinary LPS did not repair
+  the failed stream run; do not treat LPS as the primary stream root cause.
+- The Android/Linux auto-open compatibility fix is already represented by the
+  current D4 handoff patch. Keep its dedicated runtime-acceptance status separate
+  from the controller investigation.
+
+### Temporary Windows/ExpressVPN bridge
+
+The temporary topology uses Windows as the routed hop between the GL-iNet side
+and Linux. `expressvpn-pkf` on the physical adapters was proven capable of
+blocking that forwarded path.
+
+Current development behavior with both physical-adapter bindings disabled:
+
+- ExpressVPN disconnected: Windows Internet, Linux Internet, and PrivyHub local
+  routing work.
+- ExpressVPN connected: Windows Internet works, Linux still reaches its Windows
+  gateway, but Linux Internet fails because Windows selects the ExpressVPN
+  interface as its Internet route and the forwarded Linux traffic does not
+  successfully traverse that VPN path.
+
+This is **DEFERRED BY DESIGN**. It is a limitation of the temporary
+Windows-as-router development topology, not a PrivyHub/Linux product defect.
+Use ExpressVPN disconnected when Linux requires upstream Internet. Do not spend
+more Phase-D time redesigning this bridge.
+
+### Diagnostic precedence
+
+Older ADB recovery diagnostics remain preserved in durable memory, but the newest
+normal companion/game runtime succeeded. Do not let stale ADB probe resume notes
+displace the current RetroArch analog issue unless ADB installation/recovery
+actually fails again.
+
+### Immediate next technical work
+
+1. Narrow RetroArch PS1 controller-mode investigation only.
+2. After analog movement is corrected, run the normal Linux game regression
+   (launch -> video/audio/controller -> pause/resume -> Save/Load -> End).
+3. Keep the saved UDP/router branch paused unless fresh evidence from normal use
+   requires reopening it.
+4. Restore user-provided PS1 BIOS before final PS1 acceptance if still absent.
+
+### Do not reopen without new evidence
+
+- ICS experimentation;
+- Windows Firewall as the routed-path cause;
+- Linux `/dev/uinput` permission/module-load debugging;
+- Linux realtime-priority persistence debugging;
+- ExpressVPN forwarding on the temporary Windows bridge;
+- rtw88 ordinary-LPS tuning as the primary stream fix.
+
+<!-- PRIVYHUB_D4_RUNTIME_RECONCILIATION_2026_09_16:CURRENT:END -->
+
 <!-- D4_LINUX_HANDOFF_FIX_01_CURRENT -->
 ## D4 Linux game handoff fix — development patch installed; runtime validation pending
 
