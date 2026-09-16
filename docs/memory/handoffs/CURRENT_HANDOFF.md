@@ -6,6 +6,27 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:HANDOFF:BEGIN -->
+## D-106 handoff — EPG provider / identity split
+
+D-105 is complete:
+89 of 3,286 nonblank onn channel IDs exactly match guide metadata; 86 are
+English; none currently have a hosted guide source.
+
+Do not build a Linux EPG grabber yet.
+
+Run D-106 to measure:
+- built-in IPTV-org English playlist guide coverage;
+- synthetic `tv_stream_*` identities;
+- meaningful identities by provider;
+- guide coverage by provider.
+
+Return:
+`logs/tv/d106_epg_provider_identity_probe.txt`.
+
+Production EPG changes remain blocked until this diagnostic is reviewed.
+<!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:HANDOFF:END -->
+
 <!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:HANDOFF:BEGIN -->
 ## D-105 handoff — D5.3 EPG source availability
 

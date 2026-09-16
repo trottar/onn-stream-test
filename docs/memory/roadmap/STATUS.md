@@ -6,6 +6,20 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:ROADMAP:BEGIN -->
+## D5.3 EPG — provider/identity diagnostic
+
+**Status:** ACTIVE / D-106 runtime evidence next.
+
+D-105 measured only 2.7085% exact metadata coverage of all nonblank onn channel
+IDs. This is insufficient to commit to local EPG generation.
+
+D-106 must first distinguish meaningful IDs, synthetic `tv_stream_*` IDs, and
+provider-specific coverage.
+
+D5.4 TV-state sync remains pending behind D5.3.
+<!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:ROADMAP:END -->
+
 <!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:ROADMAP:BEGIN -->
 ## D5.3 EPG — upstream source availability
 

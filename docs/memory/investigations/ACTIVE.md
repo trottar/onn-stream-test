@@ -6,6 +6,22 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:ACTIVE:BEGIN -->
+## D5.3 active — provider / channel identity
+
+D-105 found only 89 exact guide-metadata matches among 3,286 nonblank onn
+channel IDs.
+
+The next question is whether that denominator contains many synthetic
+`tv_stream_*` fallback identities, and whether the built-in IPTV-org playlist
+itself has similarly sparse guide metadata coverage.
+
+D-106 is the active diagnostic-only probe.
+
+Do not implement local EPG generation, fuzzy guide matching, or another Android
+parser change before D-106 evidence.
+<!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:ACTIVE:END -->
+
 <!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:ACTIVE:BEGIN -->
 ## D5.3 active — EPG local-source viability
 

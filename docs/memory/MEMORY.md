@@ -6,6 +6,28 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:MEMORY:BEGIN -->
+## TV channel identity quality rule
+
+A nonblank `streams.channel_id` is not automatically a meaningful TV/EPG
+identity.
+
+`TvRepository.parsePlaylist()` uses the playlist `tvg-id` when available. If it
+is blank, the repository falls back to the generated stable stream ID. Those
+fallback IDs begin with `tv_stream_`.
+
+`TvRepository.meaningfulChannelId()` explicitly treats `tv_stream_*` IDs as
+non-meaningful channel identities.
+
+Therefore EPG diagnostics must report meaningful and synthetic identities
+separately rather than using all nonblank `channel_id` values as the denominator.
+
+Provider identity also matters: non-built-in providers attempt to resolve to a
+known built-in IPTV-org identity before their stream is stored.
+
+D-106 establishes the provider/identity breakdown before further EPG design.
+<!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:MEMORY:END -->
+
 <!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:MEMORY:BEGIN -->
 ## IPTV-org guide-row versus hosted-source rule
 

@@ -1,5 +1,28 @@
 # D-105 — D5 EPG local-source viability
 
+<!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:D105_RESULT:BEGIN -->
+## Result — 2026-09-16
+
+D-105 completed successfully.
+
+Classification:
+`D105_METADATA_MATCHES_BUT_PUBLIC_SOURCES_UNAVAILABLE`.
+
+Measured:
+- 180,681 guide rows / 11,723 unique guide IDs;
+- 3,286 unique nonblank onn TV channel IDs;
+- 89 exact metadata matches (2.7085%);
+- 86 English exact matches (2.6172%);
+- 0 source-backed matched channels;
+- 1 green public guide worker covering 2 channels.
+
+Decision:
+do not build Linux-local EPG acquisition yet. First separate meaningful channel
+IDs from generated `tv_stream_*` IDs and partition metadata coverage by provider.
+
+D-106 owns the next diagnostic.
+<!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:D105_RESULT:END -->
+
 **Status:** diagnostic-only / runtime evidence next
 
 ## Question

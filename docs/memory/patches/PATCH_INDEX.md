@@ -6,6 +6,23 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:PATCH_INDEX:BEGIN -->
+### D-106 — D5 EPG provider/identity probe — 2026-09-16
+
+Diagnostic-only patch.
+
+Records the completed D-105 result and adds a read-only provider/identity probe.
+
+The probe distinguishes meaningful channel IDs from generated `tv_stream_*`
+fallback IDs, partitions guide coverage by provider, and measures guide metadata
+coverage of the built-in IPTV-org English playlist independently.
+
+No production code changes.
+
+Runtime evidence next:
+`logs/tv/d106_epg_provider_identity_probe.txt`.
+<!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:PATCH_INDEX:BEGIN -->
 ### D-105 — D5 EPG local-source viability probe — 2026-09-16
 

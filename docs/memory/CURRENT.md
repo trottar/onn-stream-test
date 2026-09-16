@@ -6,6 +6,32 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:CURRENT:BEGIN -->
+## D-106 D5.3 EPG provider/identity diagnostic
+
+D-105 completed successfully.
+
+Measured metadata coverage of the current onn catalog:
+- 3,286 unique nonblank channel IDs;
+- 89 exact guide-metadata matches (2.7085%);
+- 86 English exact matches (2.6172%);
+- 0 matched channels with a currently hosted XML/GZIP source.
+
+This is too little coverage to justify a Linux-local grabber as a broad EPG
+solution yet.
+
+Important identity correction:
+`TvRepository` falls back to generated `tv_stream_*` IDs when `tvg-id` is
+missing, while its own `meaningfulChannelId()` logic explicitly excludes those
+IDs from logical channel identity.
+
+D-106 is diagnostic-only. It measures meaningful versus synthetic IDs by
+provider and independently measures guide coverage of the built-in IPTV-org
+English playlist.
+
+No production EPG change until that split is measured.
+<!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:CURRENT:END -->
+
 <!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:CURRENT:BEGIN -->
 ## D-105 D5.3 EPG upstream-availability correction
 

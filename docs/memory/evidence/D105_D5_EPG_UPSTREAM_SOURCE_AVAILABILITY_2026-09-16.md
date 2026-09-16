@@ -1,5 +1,22 @@
 # D-105 — D5 EPG upstream source availability evidence — 2026-09-16
 
+<!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:D105_METADATA_RESULT:BEGIN -->
+## D-105 metadata coverage follow-up
+
+The D-105 runtime probe subsequently measured:
+- 11,723 unique guide channel IDs;
+- 3,286 unique nonblank onn TV channel IDs;
+- 89 exact metadata matches;
+- 86 English exact matches;
+- 0 currently source-backed exact matches.
+
+This confirms that public source availability is not the only limitation:
+exact metadata coverage of the current nonblank onn IDs is also low.
+
+Because some nonblank onn IDs can be generated `tv_stream_*` fallbacks, D-106
+measures meaningful versus synthetic identities before any production decision.
+<!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:D105_METADATA_RESULT:END -->
+
 **Status:** runtime evidence / architectural correction
 
 ## Fresh runtime evidence

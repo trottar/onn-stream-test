@@ -6,6 +6,24 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:D5_SUBSTEPS:BEGIN -->
+## D5.3 execution checkpoint — D-106
+
+D-105 is complete and showed weak metadata coverage:
+89 exact matches among 3,286 nonblank onn channel IDs.
+
+D5.3 remains ACTIVE / not accepted.
+
+D-106 now measures:
+1. built-in English playlist `tvg-id` completeness;
+2. built-in playlist exact guide-metadata coverage;
+3. onn meaningful versus synthetic `tv_stream_*` identity counts;
+4. provider-specific meaningful identity and guide coverage.
+
+Only after D-106 should D5 choose between provider identity work, alternative
+guide sources, or a limited Linux-local EPG acquisition path.
+<!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:D5_SUBSTEPS:END -->
+
 <!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:D5_SUBSTEPS:BEGIN -->
 ## D5.3 correction — D-105 source-availability boundary
 
