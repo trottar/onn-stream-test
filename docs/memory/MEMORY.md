@@ -6,6 +6,28 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+
+<!-- PRIVYHUB_D102_D5_TV_SYNC_CHECKPOINT:MEMORY:BEGIN -->
+## D5 TV durable rules
+
+- Current onn Live TV catalog/categories/playback are runtime accepted on the
+  Linux migration baseline.
+- Current EPG is not accepted: fresh status showed 2 mappings and 0 cached
+  programmes; the Program Guide UI works but has no actual guide data on tested
+  channels.
+- Diagnose the existing EPG ingestion path stage-by-stage before changing
+  production matching/parser behavior.
+- Linux is the durable authority target for TV user intent; onn keeps a local
+  cache.
+- Reuse/version the Android TV export/import model for synchronization. Never
+  synchronize by copying `privyhub_tv.db` or `privyhub_epg.db`.
+- Provider-derived catalogs and programme listings are rebuildable cache.
+- Multi-client merge semantics for runtime health/recent-viewing observations
+  must be explicit; do not blindly overwrite counters across clients.
+- D5 restores the existing guide and establishes TV user-state sync. Full
+  channel/guide redesign remains later media/TV work.
+<!-- PRIVYHUB_D102_D5_TV_SYNC_CHECKPOINT:MEMORY:END -->
+
 <!-- PRIVYHUB_D101R1_BROWSER_CAMERA_C6_RECLASSIFICATION:MEMORY:BEGIN -->
 ## Browser/camera roadmap ownership
 

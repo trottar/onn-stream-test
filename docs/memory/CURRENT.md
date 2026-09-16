@@ -6,6 +6,76 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+
+<!-- PRIVYHUB_D102_D5_TV_SYNC_CHECKPOINT:CURRENT:BEGIN -->
+## D-102 D5 Live TV acceptance, EPG defect, and TV-state synchronization
+
+This is the authoritative D5 resume point as of 2026-09-16. Older D5/current
+blocks below remain historical evidence and must not override this state.
+
+### Runtime accepted
+
+- D5 external/removable VOD storage remains **COMPLETE / runtime validated**.
+- D5.1 Live TV catalog/categories and normal channel playback are
+  **COMPLETE / runtime validated** on the onn client.
+- The established onn TV UI survived the Linux migration.
+
+Fresh onn `Catalog / EPG Status`:
+- language: English;
+- country: All Countries;
+- streams: 3356;
+- favorites: 22;
+- reliable: 49;
+- hidden: 4;
+- enabled providers: 3;
+- catalog refreshed: 2026-09-16 15:55:38 local;
+- EPG mappings: 2;
+- cached programmes: 0.
+
+The Program Guide action exists and executes, but no tested channel currently
+shows actual schedule data. Therefore EPG data is **NOT ACCEPTED**.
+
+### Accepted architecture direction
+
+Linux becomes the durable authority for TV **user state**. The onn retains a
+local cache for responsive operation and temporary sync-outage tolerance.
+
+Do not copy Android SQLite databases between devices. Reuse/version the existing
+Android TV export/import representation as the first synchronization boundary.
+
+Durable user intent includes, where supported by the current Android model:
+providers/enabled state, favorites, favorite groups/order, manual hidden state,
+custom channel profile overrides, auto-hide protection, and selected
+language/country preferences.
+
+Downloaded channel catalogs and EPG mappings/programmes are derived/cacheable
+data. Runtime observations such as recent viewing and stream-health counters
+need explicit merge semantics before becoming generalized multi-client
+authority.
+
+### D5 substeps
+
+- D5.1 — **COMPLETE / runtime validated:** Live TV catalog/categories/playback.
+- D5.2 — **ACTIVE / next:** diagnostic-only EPG ingestion stage probe.
+- D5.3 — **PENDING:** repair first evidenced EPG divergence and validate guide.
+- D5.4 — **PENDING:** finalize TV state ownership/sync contract.
+- D5.5 — **PENDING:** companion durable TV state store/API.
+- D5.6 — **PENDING:** onn <-> Linux state synchronization.
+- D5.7 — **PENDING:** sync persistence/convergence/runtime acceptance.
+- D5.8 — **PENDING:** integrated VOD + TV + EPG + diagnostics/Self-Test regression.
+- D5.9 — **PENDING:** D5 checkpoint/closeout.
+
+Immediate next step: D5.2 must measure the existing EPG pipeline from upstream
+guide fetch through mapping acceptance, current catalog identity matching,
+XMLTV fetch and programme matching. Make no production guide change until fresh
+evidence identifies the first divergent boundary.
+
+Scope remains bounded: do not reopen validated VOD without regression evidence;
+do not port legacy browser/camera runners for D5; browser/app and camera/live
+native-source work remains C6 after D7/D8. Full TV data-model/guide UX redesign
+remains later media/TV work.
+<!-- PRIVYHUB_D102_D5_TV_SYNC_CHECKPOINT:CURRENT:END -->
+
 <!-- PRIVYHUB_D101R1_BROWSER_CAMERA_C6_RECLASSIFICATION:CURRENT:BEGIN -->
 ## D-101 browser/camera source work reclassified to C6
 

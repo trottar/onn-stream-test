@@ -1201,3 +1201,24 @@ D083/D083R1 are invalid as networking evidence. D082 is the last valid router
 result. Pause the Opal/Siflower root-cause branch. Re-enter only for one bounded
 measurement that changes a product/roadmap decision or on a different
 representative network/router environment.
+
+<!-- PRIVYHUB_D102_D5_TV_SYNC_CHECKPOINT:DECISION_LOG:BEGIN -->
+### D-102 — D5 Live TV acceptance and Linux TV-state ownership
+
+**Status:** Accepted architecture decision; sync implementation/runtime
+validation pending (2026-09-16)
+
+D5.1 accepts the existing onn Live TV catalog/categories and normal playback on
+the Linux migration baseline. EPG remains not accepted after fresh status showed
+2 mappings and 0 cached programmes and tested Program Guide dialogs contained no
+actual schedule data.
+
+Linux becomes the durable authority for TV user intent while onn keeps a local
+cache. The first synchronization boundary reuses/version the existing Android TV
+export/import representation; do not copy Android SQLite databases between
+devices. Provider catalog and EPG data remain rebuildable/cacheable. Runtime
+health/recent-viewing merge semantics require explicit later definition.
+
+D5.2 is a diagnostic-only EPG ingestion stage probe. Full TV/channel/guide
+redesign remains outside D5.
+<!-- PRIVYHUB_D102_D5_TV_SYNC_CHECKPOINT:DECISION_LOG:END -->

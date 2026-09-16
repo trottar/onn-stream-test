@@ -6,6 +6,36 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+
+<!-- PRIVYHUB_D102_D5_TV_SYNC_CHECKPOINT:ACTIVE:BEGIN -->
+## D5 current active investigation
+
+**Closed / runtime accepted**
+- external/removable VOD storage and hotplug behavior;
+- Live TV catalog/categories/navigation;
+- normal Live TV channel playback.
+
+**Active — one narrow hypothesis**
+The existing EPG ingestion/matching path is failing before usable programme
+cache creation. Fresh onn state is 2 EPG mappings and 0 cached programmes.
+
+**Next probe**
+Measure:
+upstream guide entries -> channel IDs -> source-bearing entries -> supported XML
+sources -> accepted mappings -> current-catalog ID matches -> XMLTV fetch ->
+matching programme records.
+
+Do not patch EPG production logic until the first divergent boundary is
+measured.
+
+**Queued after EPG repair**
+- Linux-authoritative TV user-state store/sync contract;
+- onn synchronization and convergence validation;
+- integrated media/diagnostics/Self-Test regression.
+
+Browser/app and camera/live generalized native sources remain C6 after D7/D8.
+<!-- PRIVYHUB_D102_D5_TV_SYNC_CHECKPOINT:ACTIVE:END -->
+
 <!-- PRIVYHUB_D101R1_BROWSER_CAMERA_C6_RECLASSIFICATION:ACTIVE:BEGIN -->
 ## D5 active scope after storage acceptance
 

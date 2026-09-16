@@ -6,6 +6,41 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+
+<!-- PRIVYHUB_D102_D5_TV_SYNC_CHECKPOINT:HANDOFF:BEGIN -->
+## D-102 handoff — D5 TV/EPG and Linux state sync
+
+D5 storage is already runtime accepted and must not be reopened without fresh
+regression evidence.
+
+Fresh onn Live TV result:
+- normal TV categories/navigation work;
+- normal Live TV playback works;
+- English / All Countries;
+- 3356 streams, 22 favorites, 49 reliable, 4 hidden, 3 enabled providers;
+- catalog refreshed 2026-09-16 15:55:38 local;
+- EPG mappings 2, cached programmes 0;
+- Program Guide opens, but tested channels have no actual guide listings.
+
+Classification:
+- D5.1 Live TV catalog/playback: **COMPLETE / runtime validated**.
+- EPG data: **NOT ACCEPTED**.
+- D5.2 next: one diagnostic-only EPG ingestion probe; no speculative production
+  guide patch.
+
+Accepted TV-state direction:
+Linux is durable authority for TV user intent; onn remains a local cache/client.
+Reuse the existing Android TV export/import representation rather than copying
+SQLite databases.
+
+D5 sequence:
+D5.2 EPG diagnostic -> D5.3 narrow EPG repair -> D5.4 sync contract ->
+D5.5 Linux state store/API -> D5.6 onn sync -> D5.7 sync runtime acceptance ->
+D5.8 integrated media/diagnostics regression -> D5.9 checkpoint.
+
+Browser/app and camera/live native streaming remain C6 after D7/D8.
+<!-- PRIVYHUB_D102_D5_TV_SYNC_CHECKPOINT:HANDOFF:END -->
+
 <!-- PRIVYHUB_D101R1_BROWSER_CAMERA_C6_RECLASSIFICATION:HANDOFF:BEGIN -->
 ## D-101 handoff — browser/camera deferred to C6
 

@@ -6,6 +6,32 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+
+<!-- PRIVYHUB_D102_D5_TV_SYNC_CHECKPOINT:ROADMAP:BEGIN -->
+## D5 authoritative substep status — 2026-09-16
+
+**D5 remains ACTIVE.**
+
+- D5 storage: **COMPLETE / runtime validated**.
+- D5.1 Live TV catalog/categories/playback: **COMPLETE / runtime validated**.
+- D5.2 EPG ingestion diagnostic: **ACTIVE / NEXT**.
+- D5.3 existing EPG path repair/acceptance: **PENDING**.
+- D5.4 TV state ownership/sync contract: **PENDING**.
+- D5.5 Linux durable TV state store/API: **PENDING**.
+- D5.6 onn <-> Linux synchronization: **PENDING**.
+- D5.7 synchronization runtime acceptance: **PENDING**.
+- D5.8 integrated VOD/TV/EPG/diagnostics/Self-Test regression: **PENDING**.
+- D5.9 D5 checkpoint: **PENDING**.
+
+Accepted architecture: Linux becomes durable authority for TV user state while
+onn keeps a local cache. Derived catalog/EPG data stays rebuildable/cacheable.
+
+After D5:
+`D7 -> D8 -> remaining Phase C (including C6) -> E`.
+
+Do not pull browser/camera runner work back into D5.
+<!-- PRIVYHUB_D102_D5_TV_SYNC_CHECKPOINT:ROADMAP:END -->
+
 <!-- PRIVYHUB_D101R1_BROWSER_CAMERA_C6_RECLASSIFICATION:ROADMAP:BEGIN -->
 ## D5 scope reclassification
 

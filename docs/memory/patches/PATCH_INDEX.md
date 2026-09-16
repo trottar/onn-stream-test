@@ -6,6 +6,17 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+
+<!-- PRIVYHUB_D102_D5_TV_SYNC_CHECKPOINT:PATCH_INDEX:BEGIN -->
+## 2026-09-16 D5 TV memory checkpoint
+
+`privyhub_d102r1_d5_tv_memory_checkpoint_01_2026-09-16` — documentation-only
+checkpoint. Records D5.1 Live TV catalog/playback runtime acceptance, classifies
+EPG as not accepted at 2 mappings / 0 programmes, defines D5.1-D5.9, and records
+Linux-authoritative TV user-state synchronization as D-102. No production code
+change. R1 supersedes the first failed-before-modification delivery wrapper and safely tolerates the pre-existing untracked `_patches/` and `_probes/` directories.
+<!-- PRIVYHUB_D102_D5_TV_SYNC_CHECKPOINT:PATCH_INDEX:END -->
+
 This index records durable checkpoints and major patch lines; it does not invent hashes for historical ZIPs that were not retained in the current audit.
 
 | Checkpoint / line | Date | Status / significance |
