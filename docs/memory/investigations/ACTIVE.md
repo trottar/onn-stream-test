@@ -6,6 +6,41 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:ACTIVE:BEGIN -->
+## PS1 multiplayer / multitap parity on Linux
+
+**Status:** ACTIVE / NEXT
+
+The prior broad Linux controller issue is closed for the tested default/A8
+single-game paths: D-085 was runtime accepted across three games and three input
+profiles.
+
+Current separate regression:
+- PS1 multitap does not work on Linux.
+
+Known-good behavioral reference from Windows Phase A:
+- manual Multitap On/Off;
+- stored mode `port1`;
+- `beetle_psx_hw_enable_multitap_port1 = "enabled"`;
+- `beetle_psx_hw_enable_multitap_port2 = "disabled"`;
+- Players 3/4 available in CTR;
+- four controllers independently normal;
+- classification `PS1_MULTITAP_ONOFF_CTR_CONFIRMED`.
+
+Do not patch yet. First Linux diagnostic must capture the same semantic
+boundaries without relying on Windows XInput APIs:
+
+1. exact active game ID;
+2. stored controller override and `ps1_multitap`;
+3. generated content-specific Beetle PSX HW `.opt` and both multitap values;
+4. P1-P4 Linux virtual-pad presence and RetroArch configuration in the same
+   launch;
+5. user-visible Players 3/4 availability and independent control.
+
+The result should classify which boundary first diverges from the Windows
+reference.
+<!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:ACTIVE:END -->
+
 <!-- PRIVYHUB_D4_RUNTIME_RECONCILIATION_2026_09_16:ACTIVE:BEGIN -->
 ## 2026-09-16 active reconciliation
 

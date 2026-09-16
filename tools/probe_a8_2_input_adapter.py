@@ -79,7 +79,11 @@ def main() -> int:
                     "player1": {
                         "a": "b",
                         "b": "a",
+                        "x": "y",
+                        "y": "x",
                         "left_x": "right_x",
+                        "l2": "up",
+                        "r2": "right_stick_right",
                     },
                     "player2": {
                         "start": "select",
@@ -105,15 +109,96 @@ def main() -> int:
             encoding="utf-8"
         )
 
-        expected = (
+        # PRIVYHUB_D084_LINUX_A8_PLATFORM_ADAPTER
+        runtime_platform = str(
+            runtime.get(
+                "runtime_platform",
+                "",
+            )
+        ).strip().casefold()
+
+        common_expected = (
             'input_player1_a_btn = "1"',
             'input_player1_a_axis = "nul"',
             'input_player1_b_btn = "0"',
             'input_player1_b_axis = "nul"',
-            'input_player1_l_x_plus_axis = "+2"',
-            'input_player1_l_x_minus_axis = "-2"',
-            'input_player2_start_btn = "7"',
-            'input_player2_start_axis = "nul"',
+        )
+
+        if runtime_platform == "windows":
+            platform_expected = (
+                'input_player1_x_btn = "3"',
+                'input_player1_y_btn = "2"',
+                'input_player1_l_x_plus_axis = "+2"',
+                'input_player1_l_x_minus_axis = "-2"',
+                'input_player1_l2_btn = "h0up"',
+                'input_player1_l2_axis = "nul"',
+                'input_player1_r2_btn = "nul"',
+                'input_player1_r2_axis = "+2"',
+                'input_player2_start_btn = "7"',
+                'input_player2_start_axis = "nul"',
+            )
+        elif runtime_platform == "linux":
+            # PRIVYHUB_D085_LINUX_UDEV_HAT_MAPPING
+            platform_expected = (
+                'input_player1_x_btn = "2"',
+                'input_player1_y_btn = "3"',
+                'input_player1_l_x_plus_axis = "+3"',
+                'input_player1_l_x_minus_axis = "-3"',
+                'input_player1_l2_btn = "h0up"',
+                'input_player1_l2_axis = "nul"',
+                'input_player1_r2_btn = "nul"',
+                'input_player1_r2_axis = "+3"',
+                'input_player2_start_btn = "6"',
+                'input_player2_start_axis = "nul"',
+            )
+
+            autoconfig_dir = (
+                root
+                / "data"
+                / "games"
+                / "retroarch"
+                / "autoconfig"
+                / "udev"
+            )
+            for player_number in range(1, 5):
+                pad_path = (
+                    autoconfig_dir
+                    / f"PrivyHub Virtual Gamepad P{player_number}.cfg"
+                )
+                pad_text = pad_path.read_text(
+                    encoding="utf-8"
+                )
+                for expected_hat in (
+                    'input_up_btn = "h0up"',
+                    'input_down_btn = "h0down"',
+                    'input_left_btn = "h0left"',
+                    'input_right_btn = "h0right"',
+                ):
+                    if expected_hat not in pad_text:
+                        raise RuntimeError(
+                            f"P{player_number} Linux udev autoconfig "
+                            f"is missing {expected_hat}"
+                        )
+                for forbidden_axis in (
+                    "input_up_axis",
+                    "input_down_axis",
+                    "input_left_axis",
+                    "input_right_axis",
+                ):
+                    if forbidden_axis in pad_text:
+                        raise RuntimeError(
+                            f"P{player_number} Linux udev autoconfig still "
+                            f"contains obsolete {forbidden_axis}"
+                        )
+        else:
+            raise RuntimeError(
+                "Unsupported runtime platform for A8 adapter probe: "
+                + (runtime_platform or "<blank>")
+            )
+
+        expected = (
+            *common_expected,
+            *platform_expected,
         )
         missing = [
             item
@@ -140,11 +225,22 @@ def main() -> int:
                 "Generated metadata did not report game_assignment"
             )
 
+        if metadata.get(
+            "input_profile_runtime_platform"
+        ) != runtime_platform:
+            raise RuntimeError(
+                "Generated metadata did not report the runtime platform"
+            )
+
         lines.append(
             "Assigned profile generated expected P1/P2 binds: PASS"
         )
         lines.append(
             "Generated profile metadata: PASS"
+        )
+        lines.append(
+            "Runtime platform adapter: "
+            + runtime_platform
         )
 
         manager.assign_input_profile(

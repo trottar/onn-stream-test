@@ -6,6 +6,29 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Closed Investigations
 
+<!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:CLOSED:BEGIN -->
+## Linux gameplay controller regression — closed for tested profiles
+
+**Status:** RUNTIME VALIDATED 2026-09-16
+
+D-085 corrected the Linux RetroArch udev D-pad mapping from joystick-axis
+`+/-6/7` assumptions to the udev hat tokens `h0up/h0down/h0left/h0right`, and
+aligned the Linux A8 adapter with the same frontend representation.
+
+After restart, the user tested three different games with three different input
+profiles and reported correct gameplay in all three.
+
+Closed preservation boundary:
+- Android -> PHI1;
+- Linux uinput generation;
+- RetroArch udev detection/autoconfig;
+- D-085 default D-pad translation;
+- D-084/D-085 named-profile translation.
+
+This closure does not include PS1 multitap/four-player topology. That remains an
+active separate investigation.
+<!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:CLOSED:END -->
+
 <!-- PRIVYHUB_MEMORY_NORMALIZATION_D083_2026_09_15 -->
 
 ## Stable closed work

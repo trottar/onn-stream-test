@@ -2537,6 +2537,46 @@ class EmulatorManager:
         "right_x": ("+2", "-2"),
         "right_y": ("-3", "+3"),
     }
+    # PRIVYHUB_D084_LINUX_A8_PLATFORM_ADAPTER
+    # A8 profile source tokens are canonical physical controls. D-076 keeps
+    # those semantics on Linux, but RetroArch's udev frontend sees Linux
+    # joystick indices rather than the original XInput indices.
+    # PRIVYHUB_D085_LINUX_UDEV_HAT_MAPPING
+    A8_LINUX_UDEV_DIGITAL_SOURCES = {
+        "a": "0",
+        "b": "1",
+        "x": "3",
+        "y": "2",
+        "l": "4",
+        "r": "5",
+        "select": "6",
+        "start": "7",
+        "l3": "8",
+        "r3": "9",
+        "up": "h0up",
+        "down": "h0down",
+        "left": "h0left",
+        "right": "h0right",
+    }
+    A8_LINUX_UDEV_AXIS_DIRECTION_SOURCES = {
+        "l2": "+2",
+        "r2": "+5",
+        "left_stick_left": "-0",
+        "left_stick_right": "+0",
+        "left_stick_up": "-1",
+        "left_stick_down": "+1",
+        "right_stick_left": "-3",
+        "right_stick_right": "+3",
+        "right_stick_up": "-4",
+        "right_stick_down": "+4",
+    }
+    A8_LINUX_UDEV_STICK_SOURCES = {
+        "left_x": ("+0", "-0"),
+        "left_y": ("+1", "-1"),
+        "right_x": ("+3", "-3"),
+        "right_y": ("+4", "-4"),
+    }
+
     A8_RETROPAD_AXIS_TARGETS = {
         "left_x": ("l_x_plus", "l_x_minus"),
         "left_y": ("l_y_plus", "l_y_minus"),
@@ -2553,6 +2593,38 @@ class EmulatorManager:
         "right_stick_up": "r_y_minus",
         "right_stick_down": "r_y_plus",
     }
+
+    @classmethod
+    def _a8_runtime_source_maps(
+        cls,
+        runtime_platform: str,
+    ) -> tuple[
+        dict[str, str],
+        dict[str, str],
+        dict[str, tuple[str, str]],
+    ]:
+        platform = str(
+            runtime_platform
+        ).strip().casefold()
+
+        if platform == "windows":
+            return (
+                cls.A8_XINPUT_DIGITAL_SOURCES,
+                cls.A8_XINPUT_AXIS_DIRECTION_SOURCES,
+                cls.A8_XINPUT_STICK_SOURCES,
+            )
+
+        if platform == "linux":
+            return (
+                cls.A8_LINUX_UDEV_DIGITAL_SOURCES,
+                cls.A8_LINUX_UDEV_AXIS_DIRECTION_SOURCES,
+                cls.A8_LINUX_UDEV_STICK_SOURCES,
+            )
+
+        raise EmulatorError(
+            "A8 gameplay input profiles have no RetroArch source map for "
+            f"host platform: {platform or '<blank>'}"
+        )
 
     @classmethod
     def _a8_validate_runtime_mapping(
@@ -2596,6 +2668,8 @@ class EmulatorManager:
     def _a8_retroarch_profile_lines(
         cls,
         effective: dict[str, Any],
+        *,
+        runtime_platform: str,
     ) -> list[str]:
         profile = effective.get(
             "profile"
@@ -2616,6 +2690,14 @@ class EmulatorManager:
         )
         cls._a8_validate_runtime_mapping(
             mapping
+        )
+
+        (
+            digital_sources,
+            axis_direction_sources,
+            stick_sources,
+        ) = cls._a8_runtime_source_maps(
+            runtime_platform
         )
 
         lines: list[str] = []
@@ -2641,7 +2723,7 @@ class EmulatorManager:
                 )
 
                 if legacy_axis_target is not None:
-                    source_axes = cls.A8_XINPUT_STICK_SOURCES[
+                    source_axes = stick_sources[
                         source
                     ]
                     plus_name, minus_name = legacy_axis_target
@@ -2661,12 +2743,12 @@ class EmulatorManager:
                     target,
                 )
 
-                if source in cls.A8_XINPUT_DIGITAL_SOURCES:
+                if source in digital_sources:
                     lines.extend(
                         [
                             (
                                 f'{prefix}{target_name}_btn = '
-                                f'"{cls.A8_XINPUT_DIGITAL_SOURCES[source]}"'
+                                f'"{digital_sources[source]}"'
                             ),
                             f'{prefix}{target_name}_axis = "nul"',
                         ]
@@ -2678,7 +2760,7 @@ class EmulatorManager:
                         f'{prefix}{target_name}_btn = "nul"',
                         (
                             f'{prefix}{target_name}_axis = '
-                            f'"{cls.A8_XINPUT_AXIS_DIRECTION_SOURCES[source]}"'
+                            f'"{axis_direction_sources[source]}"'
                         ),
                     ]
                 )
@@ -2769,6 +2851,17 @@ class EmulatorManager:
         # PrivyHub A8.2: named gameplay profiles are resolved only at session
         # preparation time. The Default profile produces no explicit binds,
         # preserving RetroArch's validated controller autoconfiguration.
+        runtime_platform = str(
+            runtime.get(
+                "runtime_platform",
+                "",
+            )
+        ).strip().casefold()
+        if not runtime_platform:
+            raise EmulatorError(
+                "Emulator runtime did not report its host platform"
+            )
+
         a8_input_profile = (
             self.input_profile_for_game(
                 game
@@ -2776,7 +2869,8 @@ class EmulatorManager:
         )
         a8_profile_lines = (
             self._a8_retroarch_profile_lines(
-                a8_input_profile
+                a8_input_profile,
+                runtime_platform=runtime_platform,
             )
         )
 
@@ -2897,6 +2991,7 @@ class EmulatorManager:
                         a8_profile_lines
                     )
                 ),
+                "input_profile_runtime_platform": runtime_platform,
                 "libretro_device": libretro_device,
                 "network_cmd_port": command_port,
             },
@@ -5222,6 +5317,13 @@ class EmulatorManager:
                 "Controller: "
                 f"{input_profile['controller_label']} "
                 f"({input_profile['controller_source']})\n"
+            )
+            log_handle.write(
+                "Input profile: "
+                f"{input_profile['input_profile_name']} "
+                f"({input_profile['input_profile_source']}; "
+                f"platform={input_profile['input_profile_runtime_platform']}; "
+                f"override_lines={input_profile['input_profile_override_count']})\n"
             )
             if bool(
                 ps1_multitap.get(

@@ -1,5 +1,27 @@
 # Project status — 2026-09-14
 
+<!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:PROJECT_STATUS:BEGIN -->
+## 2026-09-16 Linux controller checkpoint update
+
+This section supersedes older status language below where it conflicts.
+
+- Phase D is **ACTIVE**, not "NEXT".
+- The normal Linux Games path now launches and streams successfully on the HP
+  EliteDesk Linux server.
+- Linux gameplay input is runtime validated across three games and three input
+  profiles after D-084/D-085.
+- The current Games controller backend is native Linux
+  `PHI1 -> uinput -> RetroArch udev`; Windows/ViGEm remains a preserved reference
+  backend, not the active Linux implementation.
+- The next D4 issue is PS1 multiplayer/multitap parity. The feature was
+  previously runtime validated on Windows but currently does not work on Linux.
+- Remaining Phase C work stays paused until the Phase-D Linux baseline is
+  sufficiently complete.
+
+The next diagnostic should classify multitap override/core-option/frontend/game
+topology before any multiplayer production change.
+<!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:PROJECT_STATUS:END -->
+
 ## Goal
 
 PrivyHub is an experiment in building a local-first smart-home/media environment

@@ -6,6 +6,76 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:MEMORY:BEGIN -->
+## Linux controller parity accepted; multiplayer remains separate
+
+On 2026-09-16, after D-085, the user tested three different games using three
+different input profiles and reported all three ran correctly.
+
+Durable interpretation:
+
+- Linux PHI1 -> uinput -> RetroArch udev gameplay input is runtime accepted for
+  the tested single-game/profile paths.
+- The D-085 `ABS_HAT0X/Y` -> RetroArch `h0*` correction is runtime validated.
+- Default RetroArch autoconfig and named A8 profile application both have
+  integrated gameplay evidence.
+- D-084's platform-aware A8 adapter is retained, with D-085's Linux hat
+  correction authoritative over D-084's initial D-pad table.
+- Earlier D-076 host-side "configured" evidence must not be mistaken for
+  gameplay acceptance; D-085 supplies the missing gameplay acceptance.
+
+PS1 multitap/multiplayer is a separate active Linux regression. Windows Phase A
+proved the intended behavior, including CTR Port-1 multitap and four independent
+players. Linux must reproduce that behavior without changing the now-validated
+single-player/default/A8 controller path.
+<!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:MEMORY:END -->
+
+<!-- PRIVYHUB_D085_LINUX_UDEV_HAT_MAPPING:MEMORY:BEGIN -->
+## Linux RetroArch udev hat rule
+
+Do not derive RetroArch `udev` autoconfig tokens directly from Linux
+`/dev/input/js*` axis indexes.
+
+The PrivyHub uinput D-pad is correctly emitted as `ABS_HAT0X/ABS_HAT0Y`.
+For RetroArch's `udev` frontend those directions must be bound as:
+`h0up`, `h0down`, `h0left`, `h0right`.
+
+The prior `input_up_axis = "-7"` / `input_left_axis = "-6"` form came from the
+Linux joystick API measurement and was a frontend-translation error.
+
+Keep the validated non-hat Linux layout unchanged:
+- left stick axes 0/1;
+- LT/RT axes 2/5;
+- right stick axes 3/4;
+- canonical face/shoulder/select/start/thumb button mapping.
+
+Validation-boundary rule: RetroArch reporting a controller "configured" proves
+profile matching/enumeration, not that every gameplay binding in that profile is
+correct. Linux controller parity requires actual onn gameplay validation.
+<!-- PRIVYHUB_D085_LINUX_UDEV_HAT_MAPPING:MEMORY:END -->
+
+<!-- PRIVYHUB_D084_LINUX_A8_PLATFORM_ADAPTER:MEMORY:BEGIN -->
+## A8 portability rule — platform-neutral profiles, platform-specific RetroArch binds
+
+A8 profile JSON is intentionally host-agnostic: sources such as `a`, `x`,
+`right_stick_left`, and `l2` mean physical/canonical controller controls, not
+RetroArch numeric button or axis indices.
+
+The final A8 session adapter must translate those canonical tokens through the
+active host controller frontend:
+
+- Windows ViGEm/XInput uses the established A8 XInput tables.
+- Linux PrivyHub uinput/udev uses the measured Linux joystick layout represented
+  by `data/games/retroarch/autoconfig/udev/PrivyHub Virtual Gamepad P1.cfg`.
+
+Never reuse Windows numeric XInput indices as Linux udev indices merely because
+PHI1/XUSB semantics upstream are identical. D-076 preserved semantic transport,
+not frontend numbering.
+
+The immutable `Default` A8 profile still emits no explicit gameplay binds and
+continues to rely on the host-specific RetroArch autoconfig.
+<!-- PRIVYHUB_D084_LINUX_A8_PLATFORM_ADAPTER:MEMORY:END -->
+
 <!-- PRIVYHUB_D4_RUNTIME_RECONCILIATION_2026_09_16:MEMORY:BEGIN -->
 ## D4 Linux post-migration durable facts — 2026-09-16
 

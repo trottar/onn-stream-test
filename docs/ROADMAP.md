@@ -268,7 +268,7 @@ Acceptance:
 
 # Phase D — Linux Migration / Native Linux Baseline
 
-**Status: NEXT AFTER C WINDOWS BOUNDARY**
+**Status: ACTIVE — D4 controller parity checkpoint; multiplayer/multitap next**
 
 Prototype 1 Linux server:
 
@@ -354,6 +354,21 @@ Preserve:
 - input profiles;
 - metadata/art;
 - teardown/recovery.
+
+### D4 controller parity checkpoint — 2026-09-16
+
+Runtime validated on Linux:
+- integrated gameplay controls across three different games;
+- three different input profiles;
+- default/autoconfig and named-profile controller paths after D-084/D-085.
+
+Still required inside D4 before normal-use Games parity is complete:
+- PS1 multiplayer / multitap Linux parity;
+- representative multiplayer regression after the multitap boundary is fixed;
+- remaining D4 normal-use regression/acceptance.
+
+The Windows Phase-A multitap result is the behavior reference. Do not redesign
+the feature until a Linux diagnostic identifies the first divergent boundary.
 
 ## D5 — Restore media/server functionality
 

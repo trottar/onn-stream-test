@@ -157,3 +157,51 @@ normal `EmulatorManager.stop()` was graceful with `SAVE_FILES` -> `OK`, and all
 virtual pads were removed. The prior probe final `False` was a classifier defect
 (`.state.png` match plus a non-production `quit` requirement). Full onn E2E and
 durable `/dev/uinput` service permission remain pending.
+
+<!-- PRIVYHUB_D085_LINUX_UDEV_HAT_MAPPING:ARCH:BEGIN -->
+## D-085 correction — Linux udev hats are not joystick axes
+
+D-076 correctly emits the canonical D-pad as `ABS_HAT0X/ABS_HAT0Y`, and Baseline
+42 correctly observed those as Linux joystick axes 6/7. The mistake was carrying
+the `/dev/input/js*` indexes into RetroArch's `udev` autoconfig.
+
+RetroArch udev represents those directions through hat tokens:
+
+```text
+input_up_btn    = "h0up"
+input_down_btn  = "h0down"
+input_left_btn  = "h0left"
+input_right_btn = "h0right"
+```
+
+Do not encode them as `input_*_axis = +/-6/7`.
+
+The rest of the validated PrivyHub uinput frontend map remains:
+- left stick 0/1;
+- LT/RT 2/5;
+- right stick 3/4;
+- project canonical button ordering.
+
+D-076's managed result is retained as host-integration evidence, not retroactively
+promoted into gameplay-binding validation.
+<!-- PRIVYHUB_D085_LINUX_UDEV_HAT_MAPPING:ARCH:END -->
+
+<!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:ARCH:BEGIN -->
+## D-086 Linux gameplay acceptance
+
+D-085 moved the Linux controller backend from host-integration validated to
+integrated gameplay validated for the tested paths.
+
+Runtime acceptance:
+- three games;
+- three input profiles;
+- successful gameplay controls on all three.
+
+Therefore the Linux controller architecture is now accepted through
+RetroArch/core gameplay for representative tested profiles, not merely through
+uinput event generation or RetroArch autoconfig matching.
+
+PS1 multitap remains a topology/session feature above this accepted lower input
+path. Debug it without changing the validated PHI1/uinput/udev/A8 foundation
+unless fresh evidence specifically contradicts that boundary.
+<!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:ARCH:END -->

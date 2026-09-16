@@ -1,5 +1,23 @@
 # Known issues and deferred work
 
+<!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:KNOWN_ISSUES:BEGIN -->
+## 2026-09-16 current issue override
+
+Current Phase-D blocker:
+- **PS1 multiplayer / multitap parity on Linux** — active. Windows Phase A proved
+  the intended Port-1 multitap behavior; Linux currently fails to reproduce it.
+  Exact boundary is not yet classified.
+
+Resolved/superseded:
+- broad "Linux controller input is broken" — resolved for the tested paths by
+  D-084/D-085 and runtime validated across three games / three input profiles;
+- "native Games streaming host is Windows-specific" — superseded for Games by
+  the current Linux X11/VAAPI/PulseAudio/uinput runtime.
+
+Do not reopen the lower controller transport or D-pad mapping while debugging
+multitap unless a fresh diagnostic contradicts the D-085 runtime acceptance.
+<!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:KNOWN_ISSUES:END -->
+
 Status as of 2026-09-11.
 
 | Issue | Status | Blocks current Phase C work? | Resume / resolve when |

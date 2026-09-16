@@ -6,6 +6,127 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:CURRENT:BEGIN -->
+## D-086 Linux controller parity checkpoint — runtime validated
+
+D-085 is now **RUNTIME VALIDATED** on the representative Linux -> onn path.
+
+User runtime acceptance after restarting the patched companion:
+
+- three different games were launched;
+- three different input profiles were exercised;
+- all three ran with correct gameplay controls;
+- this covers the normal/default RetroArch autoconfig path and multiple named
+  gameplay-profile paths in the integrated Linux product flow.
+
+This supersedes the earlier broad Linux controller blocker and the earlier
+generic "PS1 analog controller mode" next-step language. Do not reopen PHI1,
+uinput permissions, uinput control generation, RetroArch udev discovery, or the
+D-pad frontend mapping without new contradictory evidence.
+
+The confirmed Linux gameplay-input architecture is now:
+
+`Android InputDevice -> PHI1 -> Linux uinput -> RetroArch udev -> Default/A8 gameplay profile -> core/game`
+
+D-084 remains part of the accepted architecture: A8 source semantics are
+platform-neutral and the final source-token adapter is host-specific. D-085
+corrected the Linux udev hat representation inherited by both default
+autoconfig and the D-084 Linux A8 adapter.
+
+### Immediate next Phase-D work
+
+**PS1 multiplayer / multitap parity on Linux is ACTIVE.**
+
+The historical Windows Phase-A baseline remains authoritative for intended
+behavior: manual Multitap On/Off, Port 1 enabled / Port 2 disabled, Players 3/4
+available in CTR, and four independent controllers were runtime validated.
+
+Current Linux report: multitap does not work. The exact failure boundary is not
+yet classified.
+
+Next work must use one narrow diagnostic before production changes:
+
+1. verify the selected game's stored `ps1_multitap` override;
+2. verify the generated content-specific Beetle PSX HW `.opt` contains Port 1
+   enabled and Port 2 disabled;
+3. verify P1-P4 Linux uinput pads are configured by RetroArch for that launch;
+4. determine whether Players 3/4 become available and whether four controllers
+   remain independently routed.
+
+Do not continue broader Phase-D work until this multiplayer regression is
+classified or explicitly deferred.
+<!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:CURRENT:END -->
+
+<!-- PRIVYHUB_D085_LINUX_UDEV_HAT_MAPPING:CURRENT:BEGIN -->
+## D-085 Linux RetroArch udev D-pad correction — development patch
+
+The controller investigation was reconstructed against the older Phase-A and
+D-076 evidence instead of treating the newest summary as sufficient.
+
+Authoritative distinction:
+
+- Windows PHI1 -> ViGEm/XInput reached real 1P/2P/4P gameplay validation.
+- D-076 Linux reached host-side managed RetroArch integration: P1-P4 device
+  creation/enumeration, clean PHI1 updates, meta controls, Save/Load, and
+  teardown.
+- D-076's own acceptance record still listed actual gameplay controls as pending.
+  Host integration was later being over-read as gameplay validation.
+
+The exact Linux uinput measurement remains valid: the D-pad is emitted as
+`ABS_HAT0X/ABS_HAT0Y`. The error was at the RetroArch udev binding boundary.
+The four project autoconfigs encoded those hats as ordinary axes `6/7`.
+RetroArch udev autoconfig semantics represent D-pad hats as
+`h0up/h0down/h0left/h0right`.
+
+D-085 changes only:
+- P1-P4 project udev D-pad binds from `input_*_axis = +/-6/7` to
+  `input_*_btn = h0...`;
+- the D-084 Linux A8 source translator to use the same udev hat tokens;
+- the existing A8 deterministic probe so it rejects the old Linux-axis form.
+
+Buttons, sticks, triggers, PHI1, Android input, Linux uinput event generation,
+Windows XInput behavior, PS1 Digital/DualShock selection, audio/video/networking,
+and emulator lifecycle are unchanged.
+
+Status: **DEVELOPMENT PATCH; ONN GAMEPLAY VALIDATION REQUIRED**.
+
+First runtime discriminator after install: default-profile Crash must regain
+D-pad movement. Analog behavior remains subject to the existing PS1
+Digital/DualShock per-game controller mode and must not be conflated with this
+D-pad correction.
+<!-- PRIVYHUB_D085_LINUX_UDEV_HAT_MAPPING:CURRENT:END -->
+
+<!-- PRIVYHUB_D084_LINUX_A8_PLATFORM_ADAPTER:CURRENT:BEGIN -->
+## D-084 Linux A8 gameplay-profile adapter — development patch
+
+Fresh source/memory reconciliation found a second controller issue distinct from
+PS1 Digital-vs-DualShock mode.
+
+A8 named gameplay profiles store platform-neutral physical control names, but
+the A8.2 RetroArch adapter still translated those names with the original
+Windows/XInput numeric layout. D-076 moved Linux controller output to
+uinput/udev without changing A8 profile semantics. The project-owned Linux udev
+autoconfig proves that Linux joystick numbering differs from XInput for X/Y,
+Back/Start, triggers, right stick, D-pad, and Y-axis sign.
+
+D-084 therefore keeps the A8 profile schema and Android editor unchanged while
+making only the final RetroArch source-token translation host-specific:
+
+- Windows -> existing XInput bindings, unchanged;
+- Linux -> validated PrivyHub uinput/udev bindings.
+
+The existing deterministic A8 adapter probe is made platform-aware and now
+checks Linux face buttons, D-pad axis mapping, trigger/right-stick remapping,
+legacy right-stick whole-axis mapping, and Back/Start numbering.
+
+Status: **DEVELOPMENT PATCH; RUNTIME GAMEPLAY ACCEPTANCE PENDING**.
+
+Next runtime check: restart the Linux companion, launch a game with an existing
+custom input profile, and verify the configured gameplay permutation. Do not
+change PHI1, Android controller transport, Linux uinput generation, or PS1
+Digital/DualShock selection for this issue.
+<!-- PRIVYHUB_D084_LINUX_A8_PLATFORM_ADAPTER:CURRENT:END -->
+
 <!-- PRIVYHUB_D4_RUNTIME_RECONCILIATION_2026_09_16:CURRENT:BEGIN -->
 ## D4 runtime reconciliation — 2026-09-16
 

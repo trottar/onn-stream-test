@@ -9,6 +9,49 @@
 
 ## Architecture
 
+<!-- PRIVYHUB_D085_LINUX_UDEV_HAT_MAPPING:A8:BEGIN -->
+## D-085 Linux udev D-pad source correction
+
+D-084 correctly introduced a platform-specific A8 source-token adapter, but its
+Linux D-pad entries inherited the existing project autoconfig mistake by using
+ordinary axes 6/7.
+
+For Linux/udev, canonical A8 physical D-pad sources are now:
+- `up -> h0up`
+- `down -> h0down`
+- `left -> h0left`
+- `right -> h0right`
+
+They are digital/hat sources, not entries in the Linux axis-direction table.
+
+This preserves A8's platform-neutral profile JSON and keeps the Windows/XInput
+adapter unchanged.
+<!-- PRIVYHUB_D085_LINUX_UDEV_HAT_MAPPING:A8:END -->
+
+<!-- PRIVYHUB_D084_LINUX_A8_PLATFORM_ADAPTER:DOC:BEGIN -->
+## Linux portability of A8 source tokens
+
+A8 source tokens are canonical physical-control names, not host numeric indices.
+The original A8.2 implementation translated them through RetroArch's
+Windows/XInput layout because A8 was first validated on ViGEm X360 devices.
+
+On Linux, D-076 preserves the same PHI1/XUSB semantics but emits a Linux uinput
+device consumed by RetroArch's `udev` joypad driver. Linux joystick button/axis
+numbering is therefore translated separately at the final session-adapter
+boundary.
+
+Current translation backends:
+- `windows` -> original A8 XInput source tables;
+- `linux` -> PrivyHub uinput/udev source tables matching the project-owned
+  `PrivyHub Virtual Gamepad P1-P4` autoconfig.
+
+`Default` remains unchanged: it emits no explicit A8 gameplay binds and lets the
+active host's validated RetroArch autoconfig remain authoritative.
+
+The profile JSON schema and Android editor remain platform-neutral and do not
+store numeric button/axis indices.
+<!-- PRIVYHUB_D084_LINUX_A8_PLATFORM_ADAPTER:DOC:END -->
+
 ```text
 Physical controller
     ↓
@@ -539,3 +582,18 @@ disabled until the complete 24-endpoint mapping is one-to-one again.
 
 The generalized directional backend, RetroArch generator, controller transport,
 player-sync behavior, game lifecycle, audio/video, and artwork are unchanged.
+
+<!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:A8:BEGIN -->
+## Linux runtime acceptance — D-084 + D-085
+
+The Linux A8 portability work is now integrated-runtime validated in conjunction
+with D-085.
+
+The user exercised three different games with three different input profiles and
+reported correct gameplay across all three. This provides representative
+evidence that named gameplay profiles survive the Linux platform adapter and
+RetroArch udev frontend.
+
+D-085's Linux D-pad hat mapping is authoritative over the initial D-084 Linux
+D-pad table. Windows/XInput behavior remains unchanged.
+<!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:A8:END -->

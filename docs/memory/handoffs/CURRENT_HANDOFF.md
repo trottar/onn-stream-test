@@ -6,6 +6,107 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:HANDOFF:BEGIN -->
+## D-086 checkpoint handoff
+
+### Newly closed
+
+Linux gameplay controller parity is now runtime validated after D-085:
+
+- 3 different games;
+- 3 different input profiles;
+- all reported correct in integrated onn gameplay.
+
+Preserve:
+- Android controller sender;
+- PHI1;
+- Linux uinput generation;
+- RetroArch `udev` selection and P1-P4 project autoconfig;
+- D-085 `h0*` D-pad mapping;
+- D-084 host-specific A8 translation;
+- working video/audio/save/lifecycle paths.
+
+### Active next issue
+
+PS1 multiplayer / multitap does not currently work on Linux.
+
+Do not treat this as evidence that the lower controller path regressed. Windows
+Phase-A evidence previously validated the feature end-to-end, including
+`PS1_MULTITAP_ONOFF_CTR_CONFIRMED`.
+
+Start with a diagnostic-only Linux adaptation of the old multitap runtime check.
+Measure, in order:
+
+1. game ID and stored `ps1_multitap` override;
+2. content-specific Beetle PSX HW `.opt` path and exact Port-1/Port-2 values;
+3. managed P1-P4 uinput/RetroArch configuration during the same launch;
+4. Players 3/4 availability;
+5. controller independence.
+
+One narrow hypothesis -> one probe -> fresh evidence -> one coherent patch.
+<!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:HANDOFF:END -->
+
+<!-- PRIVYHUB_D085_LINUX_UDEV_HAT_MAPPING:HANDOFF:BEGIN -->
+## D-085 controller handoff
+
+Older evidence was re-read before changing code.
+
+Windows Phase A is the gameplay reference: normal 1P/2P/4P sessions were
+runtime-confirmed through Android -> PHI1 -> ViGEm/XInput -> RetroArch.
+
+Linux D-076 did not reach equivalent gameplay acceptance. It proved host
+controller integration and session lifecycle, while its own patch record still
+listed gameplay controls as pending.
+
+The first proven Linux gameplay-binding defect is the D-pad frontend translation:
+the uinput device emits ABS_HAT0X/Y, but project RetroArch udev profiles used
+ordinary axis binds +/-6/7. D-085 uses RetroArch udev hat tokens h0* instead and
+makes the same correction in the Linux A8 explicit-binding adapter.
+
+After installation:
+1. restart the companion;
+2. launch Crash with Default input profile;
+3. verify physical D-pad movement;
+4. do not use Crash analog-stick behavior to judge this patch unless the game is
+   intentionally launched with an analog-capable PS1 controller mode;
+5. then test one existing custom A8 profile.
+
+If D-pad remains dead after D-085, collect the newest per-game RetroArch log and
+the generated `data/games/retroarch/config/privyhub-session.cfg` before another
+production change.
+<!-- PRIVYHUB_D085_LINUX_UDEV_HAT_MAPPING:HANDOFF:END -->
+
+<!-- PRIVYHUB_D084_LINUX_A8_PLATFORM_ADAPTER:HANDOFF:BEGIN -->
+## D-084 Linux A8 adapter handoff
+
+Controller transport/uinput discovery is already proven. A source audit found
+that the A8 custom-profile generator remained Windows/XInput-specific after the
+Linux uinput migration.
+
+The concrete mismatch is visible directly in current source:
+
+- legacy A8 translator: LT `+4`, right stick X/Y `2/3`, X/Y physical buttons
+  `2/3`, D-pad as XInput hat button tokens;
+- Linux project udev profile: LT `+2`, right stick X/Y `3/4`, physical
+  X/Y appear as joystick buttons `3/2`, D-pad as axes `6/7`, with Linux Y
+  directions inverted relative to XInput.
+
+D-084 changes only the final source-token -> RetroArch bind translation and the
+existing deterministic A8 adapter probe. Windows translation is preserved in
+behavior.
+
+After installation:
+1. deterministic A8 probe must pass and restore profile/config bytes;
+2. restart the companion;
+3. launch an already-assigned custom gameplay profile and verify its intended
+   controls;
+4. if gameplay still fails, return the fresh per-game RetroArch log and
+   `logs/games/a8_2_input_adapter_probe.txt`.
+
+Do not reopen Android PHI1, Linux uinput permissions, or controller enumeration
+unless new evidence contradicts the established boundary.
+<!-- PRIVYHUB_D084_LINUX_A8_PLATFORM_ADAPTER:HANDOFF:END -->
+
 <!-- PRIVYHUB_D4_RUNTIME_RECONCILIATION_2026_09_16:HANDOFF:BEGIN -->
 ## D4 resume point after Linux/network/controller reconciliation — 2026-09-16
 
