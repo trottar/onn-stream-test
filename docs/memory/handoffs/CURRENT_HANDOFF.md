@@ -5,6 +5,11 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 ---
 
 # Current Handoff
+<!-- D4_LINUX_HANDOFF_FIX_01_HANDOFF -->
+## Active D4 Linux handoff work — 2026-09-15
+
+The unchanged Android app builds successfully on Linux. The active development patch changes `MainActivity.kt` only: Linux no longer fails auto-open on the unsupported Windows host-window policy, idempotent load-state transport failure gets one bounded retry, and literal IPv4 addresses are removed from game-facing errors. Host savestate/emulator code remains intentionally unchanged. Runtime validation is pending.
+
 
 <!-- PRIVYHUB_MEMORY_NORMALIZATION_D083_2026_09_15 -->
 
@@ -138,3 +143,61 @@ For game-stream diagnosis, prefer existing logs and
 - restart the companion after Python changes before runtime judgment;
 - preserve network privacy; never request or expose addresses;
 - meaningful fixes update durable memory in the same work.
+
+<!-- PRIVYHUB_ADB_RECOVERY_PROBE_LINUX_PARITY_2026_09_15:HANDOFF:BEGIN -->
+## Immediate ADB diagnostic note
+
+A development patch aligns `tools/probe_adb_wireless_recovery.py` with the
+accepted D-053 recovery sequence on Linux. The Linux companion itself was
+healthy when the onn showed "Companion unavailable"; ADB and companion reachability
+remain separate layers. After installing the probe patch, run it once and use
+its sanitized recovery classification/log as the next evidence. Runtime
+validation is pending until that run completes.
+
+<!-- PRIVYHUB_ADB_RECOVERY_PROBE_LINUX_PARITY_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_ADB_EPHEMERAL_PORT_RECOVERY_2026_09_15:HANDOFF:BEGIN -->
+## Immediate ADB resume point
+
+Do not spend more time swapping ADB versions or assuming the Opal's radio split
+permanently blocks wireless ADB. The current development probe v4 tests the
+stale-ephemeral-port hypothesis: reuse a privately known onn host, find the
+current listening ADB TLS endpoint on that host only, authenticate with the
+existing pairing, and refresh the private cache. Production installer parity is
+intentionally deferred until this probe is runtime validated.
+
+<!-- PRIVYHUB_ADB_EPHEMERAL_PORT_RECOVERY_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_ADB_EPHEMERAL_PORT_RECOVERY_V5_2026_09_15:HANDOFF:BEGIN -->
+## Immediate ADB resume point — v5
+
+V4 automatic ephemeral-port recovery failed, but manual local `adb connect` to
+the current endpoint succeeded, so pairing/reachability are healthy. Install and
+run the v5 diagnostic while the onn is still connected so it can seed the private
+host and measured ephemeral-range cache. On a later stale endpoint it scans only
+that host/range. If that still fails, the probe prompts for repair/re-pair and
+retries once. Do not promote this into `build_install_onn.ps1` until runtime
+validated.
+
+<!-- PRIVYHUB_ADB_EPHEMERAL_PORT_RECOVERY_V5_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_ADB_ENDPOINT_DEBUG_V6_2026_09_15:HANDOFF:BEGIN -->
+## Immediate ADB resume point — endpoint debug
+
+Run `python3 ./tools/probe_adb_wireless_recovery.py --debug-endpoints` locally.
+The terminal intentionally shows literal host/port selections; the normal log
+remains redacted. Use the terminal evidence to identify whether the wrong host,
+wrong cached port, wrong scan range, missed open port, or failed ADB validation
+is responsible. Do not promote the v5 recovery into `build_install_onn.ps1` yet.
+
+<!-- PRIVYHUB_ADB_ENDPOINT_DEBUG_V6_2026_09_15:HANDOFF:END -->
+
+<!-- PRIVYHUB_ADB_ENDPOINT_WATCH_V7_2026_09_15:HANDOFF:BEGIN -->
+## Immediate ADB resume point — watch known current port
+
+Run the recovery probe with `--debug-watch-port <known-current-port>` locally.
+Inspect only the WATCH lines: in-range status, scheduled batch, and OPEN versus
+CLOSED/UNREACHABLE. Do not paste literal endpoint values into durable/shareable
+logs. Use the result before changing the scanner or pairing logic again.
+
+<!-- PRIVYHUB_ADB_ENDPOINT_WATCH_V7_2026_09_15:HANDOFF:END -->

@@ -550,3 +550,49 @@ This index records durable checkpoints and major patch lines; it does not invent
   Linux UDP investigation paused, adds D073-D083 central decision summaries,
   updates the 2026-09-15 dated log, and regenerates the memory manifest. Runtime
   behavior intentionally unchanged.
+
+<!-- PRIVYHUB_ADB_RECOVERY_PROBE_LINUX_PARITY_2026_09_15:PATCH_INDEX:BEGIN -->
+- `privyhub_adb_recovery_probe_linux_parity_01_2026-09-15` — development-only
+  diagnostic patch aligning the Linux wireless-ADB probe with D-053
+  cached-target/mDNS/reconnect/server-restart recovery. No companion, Android,
+  game, media, transport, bitrate/FEC, or router production path changes.
+  **Runtime validation pending.**
+
+<!-- PRIVYHUB_ADB_RECOVERY_PROBE_LINUX_PARITY_2026_09_15:PATCH_INDEX:END -->
+
+<!-- PRIVYHUB_ADB_EPHEMERAL_PORT_RECOVERY_2026_09_15:PATCH_INDEX:BEGIN -->
+- `privyhub_adb_ephemeral_port_recovery_probe_01_2026-09-15` — development-only
+  ADB diagnostic extending D-053 with single-private-host ephemeral TLS-port
+  refresh after stale endpoint failure. Preserves no-address/no-port shareable
+  logging and leaves the production onn installer unchanged pending runtime
+  validation.
+
+<!-- PRIVYHUB_ADB_EPHEMERAL_PORT_RECOVERY_2026_09_15:PATCH_INDEX:END -->
+
+<!-- PRIVYHUB_ADB_EPHEMERAL_PORT_RECOVERY_V5_2026_09_15:PATCH_INDEX:BEGIN -->
+- `privyhub_adb_ephemeral_port_recovery_probe_02_2026-09-15` — development-only
+  correction after v4 failed at runtime but manual `adb connect` succeeded.
+  Seeds private host/range state from an online onn, restricts stale endpoint
+  search to the measured/cached device range, and adds a final repair/re-pair
+  prompt plus one retry. Production installer remains unchanged pending runtime
+  validation.
+
+<!-- PRIVYHUB_ADB_EPHEMERAL_PORT_RECOVERY_V5_2026_09_15:PATCH_INDEX:END -->
+
+<!-- PRIVYHUB_ADB_ENDPOINT_DEBUG_V6_2026_09_15:PATCH_INDEX:BEGIN -->
+- `privyhub_adb_endpoint_debug_probe_01_2026-09-15` — development-only endpoint
+  observability after v5 recovery failed but manual `adb connect` still worked.
+  Adds opt-in terminal-only literal host/port debugging; shareable logs remain
+  redacted and production installer behavior is unchanged.
+
+<!-- PRIVYHUB_ADB_ENDPOINT_DEBUG_V6_2026_09_15:PATCH_INDEX:END -->
+
+<!-- PRIVYHUB_ADB_ENDPOINT_WATCH_V7_2026_09_15:PATCH_INDEX:BEGIN -->
+- `privyhub_adb_endpoint_debug_watch_port_01_2026-09-15` — development-only
+  targeted observability for the concurrent ADB endpoint scanner. Adds
+  `--debug-watch-port` markers without changing production recovery behavior.
+
+<!-- PRIVYHUB_ADB_ENDPOINT_WATCH_V7_2026_09_15:PATCH_INDEX:END -->
+
+<!-- D4_LINUX_HANDOFF_FIX_01_INDEX -->
+- `PRIVYHUB_D4_LINUX_HANDOFF_FIX_01` — Android-only D4 Linux handoff correction. v1/v2/v3 rolled back; v4 retains build-environment preflight and replaces the failed regex redaction helper with exact configured-host replacement. Runtime validation pending.

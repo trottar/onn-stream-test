@@ -5,6 +5,15 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 ---
 
 # Curated Project Memory
+<!-- D4_LINUX_HANDOFF_FIX_01_MEMORY -->
+## D4 Linux game handoff durable facts — 2026-09-15
+
+- Linux Android build baseline is validated with the project unchanged before the D4 handoff patch.
+- `load_state()` deliberately verifies RetroArch remains paused after loading during launch; a lost Android HTTP response can strand a correctly loaded session in the safe paused state.
+- Require `host_window_policy.window_found` only when `host_window_policy.supported` is true.
+- Retry only idempotent load-state transport failures, once; do not generalize to launch/save/end POSTs.
+- User-visible game networking errors must redact literal IPv4 addresses.
+
 
 <!-- PRIVYHUB_MEMORY_NORMALIZATION_D083_2026_09_15 -->
 
@@ -282,3 +291,63 @@ authorization are separate; source/request IP is not durable client identity.
 Maintainability debt remains in large files such as `MainActivity.kt`,
 `emulator_manager.py`, and `games.py`. Avoid broad refactors while behavior is
 stable.
+
+<!-- PRIVYHUB_ADB_RECOVERY_PROBE_LINUX_PARITY_2026_09_15:MEMORY:BEGIN -->
+## Wireless-ADB diagnostic parity rule
+
+On Linux, `probe_adb_wireless_recovery.py` must follow the accepted D-053
+bounded recovery semantics rather than only auditing mDNS/transport counts:
+private cached target -> online transport -> mDNS connect -> reconnect offline ->
+one ADB-server restart and bounded retry -> only then preserved-pairing Wireless
+debugging Off/On. The private target may contain a network endpoint and must
+never enter shareable logs, Git, or durable memory.
+
+<!-- PRIVYHUB_ADB_RECOVERY_PROBE_LINUX_PARITY_2026_09_15:MEMORY:END -->
+
+<!-- PRIVYHUB_ADB_EPHEMERAL_PORT_RECOVERY_2026_09_15:MEMORY:BEGIN -->
+## Wireless-ADB endpoint-lifetime rule
+
+Treat wireless-ADB pairing identity and `IP:port` endpoint as separate lifetimes.
+The paired key may remain valid while the TLS listener restarts on a different
+random port. A cached endpoint is therefore disposable. Recovery may reuse a
+privately known host address, discover listening ports only on that one host,
+and accept a new endpoint only after paired ADB authentication plus `get-state`
+validation. Never expose or persist host/port values in shareable logs or durable
+memory. mDNS remains useful but is not sufficient as the sole recovery path in
+the representative environment.
+
+<!-- PRIVYHUB_ADB_EPHEMERAL_PORT_RECOVERY_2026_09_15:MEMORY:END -->
+
+<!-- PRIVYHUB_ADB_EPHEMERAL_PORT_RECOVERY_V5_2026_09_15:MEMORY:BEGIN -->
+## Wireless-ADB repair fallback rule
+
+A successful manual `adb connect` after v4 failure proves that a recovery failure
+must not be equated with lost pairing. Seed private endpoint host state whenever
+ADB is online, learn the device's live `/proc/sys/net/ipv4/ip_local_port_range`,
+and limit stale-port search to that one host/range. If bounded recovery still
+fails, prompt the local operator to repair/re-pair and retry once. The probe does
+not perform pairing itself and never places host, endpoint, pairing code, serial,
+or mDNS identity into shareable logs or durable memory.
+
+<!-- PRIVYHUB_ADB_EPHEMERAL_PORT_RECOVERY_V5_2026_09_15:MEMORY:END -->
+
+<!-- PRIVYHUB_ADB_ENDPOINT_DEBUG_V6_2026_09_15:MEMORY:BEGIN -->
+## ADB endpoint-debug rule
+
+When automatic ADB recovery disagrees with a manually successful `adb connect`,
+inspect the exact selected endpoint before changing pairing, mDNS, router, or
+scan architecture again. Literal host/port output is allowed only in an explicit
+local terminal debug mode and must remain excluded from shareable logs and
+durable memory.
+
+<!-- PRIVYHUB_ADB_ENDPOINT_DEBUG_V6_2026_09_15:MEMORY:END -->
+
+<!-- PRIVYHUB_ADB_ENDPOINT_WATCH_V7_2026_09_15:MEMORY:BEGIN -->
+## ADB scanner observability rule
+
+When validating concurrent endpoint discovery, absence of a port from an
+"open-candidate" log is not evidence that it was skipped. Use the explicit
+watch-port instrumentation to distinguish not-in-range/not-completed from a
+completed CLOSED/UNREACHABLE result. Literal endpoints remain local-only.
+
+<!-- PRIVYHUB_ADB_ENDPOINT_WATCH_V7_2026_09_15:MEMORY:END -->

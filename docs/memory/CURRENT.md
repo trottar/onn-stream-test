@@ -5,6 +5,15 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 ---
 
 # Current Development State
+<!-- D4_LINUX_HANDOFF_FIX_01_CURRENT -->
+## D4 Linux game handoff fix — development patch installed; runtime validation pending
+
+- Unchanged Android baseline built successfully on Linux before this patch.
+- PS1 slot load reached RetroArch and completed while the session remained intentionally paused; the client then lost the control response and did not finish launch handoff.
+- Linux reports the legacy Windows host-window policy unsupported, so Android must not require `window_found` when that policy is unsupported.
+- Patch scope: Android handoff gating, one bounded retry for idempotent load-state transport failures, and IPv4 redaction in game-facing errors.
+- Next: install APK and runtime-test PS1 launch -> Load Save -> automatic native-stream handoff/resume.
+
 
 <!-- PRIVYHUB_MEMORY_NORMALIZATION_D083_2026_09_15 -->
 
@@ -146,3 +155,74 @@ Do not change these merely because the current integrated stream is unstable:
 - Companion Python changes require a companion restart before runtime judgment.
 - One narrow hypothesis -> one targeted probe -> fresh evidence -> one coherent
   patch.
+
+<!-- PRIVYHUB_ADB_RECOVERY_PROBE_LINUX_PARITY_2026_09_15:CURRENT:BEGIN -->
+## Active ADB diagnostic — Linux recovery parity
+
+During D4 setup the Linux companion process/listeners/local API were healthy,
+while the existing ADB audit found zero onn transports and zero TLS-connect
+services. The v2 audit did not execute D-053 cached-target recovery. A narrow
+v3 diagnostic patch now aligns the probe with the installer recovery sequence.
+Status is **development patch / runtime validation pending**. Do not classify
+the companion service as failed from ADB state alone.
+
+<!-- PRIVYHUB_ADB_RECOVERY_PROBE_LINUX_PARITY_2026_09_15:CURRENT:END -->
+
+<!-- PRIVYHUB_ADB_EPHEMERAL_PORT_RECOVERY_2026_09_15:CURRENT:BEGIN -->
+## Active ADB diagnostic — ephemeral TLS-port recovery
+
+Fresh Linux evidence shows Debian ADB 34.0.5, forced libadbmdns, and temporary
+Google Platform Tools 37.0.1/LIBADBMDNS all observe zero TLS-connect services
+while the onn remains paired. Windows previously recovered the same dual-radio
+setup, so do not classify the Opal radio split as a permanent ADB blocker.
+
+The current narrow hypothesis is a stale wireless-ADB endpoint: pairing survives
+while Android restarts its TLS server on a new random port. The v4 diagnostic
+adds single-private-host port refresh and paired-ADB verification. Status is
+**development patch / runtime validation pending**.
+
+<!-- PRIVYHUB_ADB_EPHEMERAL_PORT_RECOVERY_2026_09_15:CURRENT:END -->
+
+<!-- PRIVYHUB_ADB_EPHEMERAL_PORT_RECOVERY_V5_2026_09_15:CURRENT:BEGIN -->
+## Active ADB diagnostic — v5 endpoint/range recovery
+
+The v4 ephemeral-port diagnostic failed at runtime. A manual local `adb connect`
+to the current onn endpoint succeeded immediately, proving pairing and basic
+reachability remained healthy and locating the failure in PrivyHub endpoint
+bootstrap/discovery.
+
+The connected onn exposes no `service.adb.tls.port` value. Its kernel ephemeral
+range was measured as 32768-60999. V5 treats that as representative-device
+runtime evidence, learns/caches the live range whenever ADB is connected, scans
+only the one privately known onn host and cached/measured range after staleness,
+and prompts for repair/re-pair only after automatic recovery is exhausted.
+Status remains **development patch / runtime validation pending**.
+
+<!-- PRIVYHUB_ADB_EPHEMERAL_PORT_RECOVERY_V5_2026_09_15:CURRENT:END -->
+
+<!-- PRIVYHUB_ADB_ENDPOINT_DEBUG_V6_2026_09_15:CURRENT:BEGIN -->
+## Active ADB diagnostic — literal endpoint debug
+
+The v5 automatic endpoint recovery also failed at runtime while direct local
+`adb connect <host>:<current-port>` continued to work. The active hypothesis is
+therefore no longer pairing or TCP reachability; the exact endpoint selected by
+the recovery probe must be observed directly.
+
+The diagnostic now supports `--debug-endpoints`, which prints the literal cached
+endpoint, resolved private host, scan range, open TCP candidates, each ADB
+connect endpoint attempted, and its connect/get-state result to the local
+terminal only. The normal shareable log remains redacted. Status is development
+diagnostic / runtime validation pending.
+
+<!-- PRIVYHUB_ADB_ENDPOINT_DEBUG_V6_2026_09_15:CURRENT:END -->
+
+<!-- PRIVYHUB_ADB_ENDPOINT_WATCH_V7_2026_09_15:CURRENT:BEGIN -->
+## Active ADB diagnostic — watch one known port
+
+The literal endpoint debug proved that terminal output did not show every port
+submitted to the concurrent TCP scan. A known-current port can therefore be
+used as a narrow discriminator. `--debug-watch-port <port>` now reports whether
+that exact port is in range, when its scan batch is scheduled, and whether its
+TCP result is OPEN or CLOSED/UNREACHABLE. Runtime result remains pending.
+
+<!-- PRIVYHUB_ADB_ENDPOINT_WATCH_V7_2026_09_15:CURRENT:END -->
