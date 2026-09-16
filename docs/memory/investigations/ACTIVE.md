@@ -6,6 +6,21 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D103_D5_EPG_INGESTION_PROBE:ACTIVE:BEGIN -->
+## D5.2 active investigation — EPG ingestion
+
+**Status:** D-103 diagnostic-only probe / runtime result next.
+
+Narrow hypothesis boundary:
+the current `2 mappings / 0 programmes` result may originate before programme
+rendering, so measure upstream guide structure, parser acceptance, cache state,
+catalog identity, and XML programme identity in order.
+
+No production EPG change until the fresh D-103 log identifies the first
+divergent stage.
+<!-- PRIVYHUB_D103_D5_EPG_INGESTION_PROBE:ACTIVE:END -->
+
+
 
 <!-- PRIVYHUB_D102_D5_TV_SYNC_CHECKPOINT:ACTIVE:BEGIN -->
 ## D5 current active investigation

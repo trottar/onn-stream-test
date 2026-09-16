@@ -6,6 +6,19 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D103_D5_EPG_INGESTION_PROBE:PATCH_INDEX:BEGIN -->
+### D-103 — D5.2 EPG ingestion probe — 2026-09-16
+
+Diagnostic-only patch. Adds a read-only EPG stage probe and durable D5.2
+handoff/roadmap state. Production TV/EPG behavior is unchanged.
+
+Initial D-103 delivery rolled back before commit when `git diff --check` caught
+an extra blank line at EOF in the daily-memory append. D-103R1 fixes only the
+installer append/validation path and keeps the probe payload unchanged. Runtime
+evidence remains pending.
+<!-- PRIVYHUB_D103_D5_EPG_INGESTION_PROBE:PATCH_INDEX:END -->
+
+
 
 <!-- PRIVYHUB_D102_D5_TV_SYNC_CHECKPOINT:PATCH_INDEX:BEGIN -->
 ## 2026-09-16 D5 TV memory checkpoint

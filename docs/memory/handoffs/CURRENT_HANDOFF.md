@@ -6,6 +6,26 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D103_D5_EPG_INGESTION_PROBE:HANDOFF:BEGIN -->
+## D-103 handoff — D5.2 EPG ingestion probe
+
+D5.1 Live TV playback/catalog is runtime accepted. The unresolved symptom remains
+2 EPG mappings / 0 cached programmes and empty Program Guide content.
+
+Run the read-only D-103 probe. It compares:
+`guides.json -> Android-equivalent parser -> catalog channel IDs -> optional onn
+SQLite snapshot -> bounded XMLTV programme sample`.
+
+Do not clear EPG/cache state before the probe.
+
+Return:
+`cat logs/tv/d103_epg_ingestion_probe.txt`
+
+Do not patch production EPG behavior until the first divergent boundary is
+measured.
+<!-- PRIVYHUB_D103_D5_EPG_INGESTION_PROBE:HANDOFF:END -->
+
+
 
 <!-- PRIVYHUB_D102_D5_TV_SYNC_CHECKPOINT:HANDOFF:BEGIN -->
 ## D-102 handoff — D5 TV/EPG and Linux state sync

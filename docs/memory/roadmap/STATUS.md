@@ -6,6 +6,21 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D103_D5_EPG_INGESTION_PROBE:ROADMAP:BEGIN -->
+## D5.2 EPG ingestion diagnostic
+
+**Status:** PROBE READY / RUNTIME EVIDENCE NEXT
+
+D5.1 Live TV remains complete/runtime validated.
+
+D-103 is diagnostic-only. Acceptance requires fresh stage measurements before
+D5.3 chooses any EPG production repair.
+
+Next:
+`D5.2 probe -> inspect first divergent boundary -> D5.3 narrow repair`.
+<!-- PRIVYHUB_D103_D5_EPG_INGESTION_PROBE:ROADMAP:END -->
+
+
 
 <!-- PRIVYHUB_D102_D5_TV_SYNC_CHECKPOINT:ROADMAP:BEGIN -->
 ## D5 authoritative substep status — 2026-09-16

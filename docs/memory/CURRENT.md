@@ -6,6 +6,26 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D103_D5_EPG_INGESTION_PROBE:CURRENT:BEGIN -->
+## D-103 D5.2 EPG ingestion diagnostic
+
+D5.1 Live TV catalog/category/playback acceptance remains complete.
+
+D5.2 is now a diagnostic-only probe:
+- reproduce the current Android `guides.json` mapping parser on Linux;
+- measure every acceptance/rejection stage;
+- compare guide IDs with the same English IPTV-org playlist used by Android;
+- when ADB `run-as` is available, inspect temporary read-only snapshots of the
+  onn TV/EPG SQLite state;
+- sample bounded XMLTV sources only after mapping/catalog intersection exists.
+
+No production TV, EPG, companion, or playback behavior changes in D-103.
+
+Next evidence:
+`logs/tv/d103_epg_ingestion_probe.txt`.
+<!-- PRIVYHUB_D103_D5_EPG_INGESTION_PROBE:CURRENT:END -->
+
+
 
 <!-- PRIVYHUB_D102_D5_TV_SYNC_CHECKPOINT:CURRENT:BEGIN -->
 ## D-102 D5 Live TV acceptance, EPG defect, and TV-state synchronization
