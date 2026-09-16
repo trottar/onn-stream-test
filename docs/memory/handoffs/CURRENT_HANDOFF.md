@@ -6,6 +6,39 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:HANDOFF:BEGIN -->
+## D-104 handoff — D5.3 EPG source repair
+
+D-103 classified the first EPG failure as source-format/parser divergence:
+180,681 upstream guide entries collapsed to 2 XML-only mappings, exactly matching
+the onn cache.
+
+D-104 adds XML-preferred/GZIP-fallback mapping selection and gzip-magic
+decompression without changing XMLTV programme parsing or channel matching.
+
+After installing the new APK:
+1. open PrivyHub TV on the onn;
+2. open Program Guide for a channel to trigger the parser-version refresh;
+3. rerun `tools/probes/d103_epg_ingestion_probe.py`;
+4. return `logs/tv/d103_epg_ingestion_probe.txt`.
+
+If the new supported mappings are healthy but catalog intersection or programme
+matching becomes the next failure, diagnose that boundary separately. Do not add
+fuzzy matching preemptively.
+
+D-104 installer history: the first D-104 package rolled back before build,
+commit, push, or APK installation because its post-patch validator searched
+for a literal escaped `\\n` sequence in Kotlin. D-104R2 corrects only that
+installer validation defect; the intended Kotlin compatibility change is
+unchanged.
+
+D-104R1 installer history: R1 also rolled back before commit, push, or APK
+installation because the repository tracks `PrivyHub/gradlew` as mode `100644`,
+so direct `./gradlew` execution is not permitted on Linux. D-104R2 preserves
+that tracked mode and invokes the wrapper with `sh ./gradlew` instead.
+<!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:HANDOFF:END -->
+
+
 <!-- PRIVYHUB_D103_D5_EPG_INGESTION_PROBE:HANDOFF:BEGIN -->
 ## D-103 handoff — D5.2 EPG ingestion probe
 

@@ -6,6 +6,31 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:MEMORY:BEGIN -->
+## D5 EPG source-format compatibility rule
+
+D-103 established that the September 2026 IPTV-org guide feed is not failing at
+network fetch: it returned 180,681 entries. PrivyHub reduced that feed to only
+2 mappings because `TvEpgRepository` accepted only `sources[].format == XML`.
+
+Current upstream EPG infrastructure may expose compressed XML as `GZIP`.
+PrivyHub's D5 compatibility rule is:
+- prefer a valid XML source when one is present;
+- otherwise accept a valid GZIP source;
+- identify compressed response bytes by gzip magic before XMLTV parsing;
+- do not infer gzip solely from an HTTP header or filename;
+- leave JSON source parsing deferred unless later evidence requires it;
+- preserve exact channel/site ID matching until a separate diagnostic proves a
+  matching defect.
+
+Mapping parser/source-selection semantics have a version marker in EPG meta so
+an old nonempty cache cannot suppress the first refresh after a parser upgrade.
+
+The D-103 `2 mappings / 0 programmes` state is measured parser incompatibility,
+not merely a stale-cache theory.
+<!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:MEMORY:END -->
+
+
 
 <!-- PRIVYHUB_D102_D5_TV_SYNC_CHECKPOINT:MEMORY:BEGIN -->
 ## D5 TV durable rules

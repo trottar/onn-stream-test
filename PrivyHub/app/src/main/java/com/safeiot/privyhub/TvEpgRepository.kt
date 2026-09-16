@@ -9,6 +9,7 @@ import org.json.JSONArray
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 
+import java.io.BufferedInputStream
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
@@ -17,6 +18,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import java.util.zip.GZIPInputStream
 
 
 data class TvProgramme(
@@ -192,6 +194,8 @@ class TvEpgRepository(
             48L * 60L * 60L * 1_000L
 
         private const val MAX_PROGRAMMES_PER_CHANNEL = 120
+
+        private const val MAPPING_SOURCE_SCHEMA_VERSION = "2"
     }
 
 
@@ -312,11 +316,17 @@ class TvEpgRepository(
         val count =
             mappingCount()
 
+        val sourceSchemaVersion =
+            db.getMeta(
+                "guide_mappings_source_schema_version"
+            )
+
         val age =
             now - refreshedAt
 
         if (
             !force &&
+            sourceSchemaVersion == MAPPING_SOURCE_SCHEMA_VERSION &&
             count > 0 &&
             refreshedAt > 0L &&
             age in 0 until MAPPING_REFRESH_INTERVAL_MS
@@ -349,6 +359,11 @@ class TvEpgRepository(
         db.setMeta(
             "guide_mappings_refreshed_at",
             now.toString()
+        )
+
+        db.setMeta(
+            "guide_mappings_source_schema_version",
+            MAPPING_SOURCE_SCHEMA_VERSION
         )
     }
 
@@ -394,7 +409,10 @@ class TvEpgRepository(
                     "sources"
                 ) ?: continue
 
-            var sourceUrl: String? =
+            var xmlUrl: String? =
+                null
+
+            var gzipUrl: String? =
                 null
 
             for (
@@ -415,24 +433,40 @@ class TvEpgRepository(
                         "url"
                     ).trim()
 
+                val validUrl =
+                    url.startsWith("http://") ||
+                        url.startsWith("https://")
+
+                if (!validUrl) {
+                    continue
+                }
+
                 if (
                     format.equals(
                         "XML",
                         ignoreCase = true
-                    ) &&
-                    (
-                        url.startsWith("http://") ||
-                        url.startsWith("https://")
                     )
                 ) {
-                    sourceUrl =
+                    xmlUrl =
                         url
                     break
+                }
+
+                if (
+                    gzipUrl == null &&
+                    format.equals(
+                        "GZIP",
+                        ignoreCase = true
+                    )
+                ) {
+                    gzipUrl =
+                        url
                 }
             }
 
             val selectedUrl =
-                sourceUrl
+                xmlUrl
+                    ?: gzipUrl
                     ?: continue
 
             val candidate =
@@ -617,14 +651,51 @@ class TvEpgRepository(
                 )
             }
 
-            parseXmlTv(
-                input = connection.inputStream,
-                mapping = mapping,
-                nowMs = nowMs
-            )
+            connection.inputStream.use { rawInput ->
+                openXmlTvInput(
+                    rawInput
+                ).use { xmlInput ->
+                    parseXmlTv(
+                        input = xmlInput,
+                        mapping = mapping,
+                        nowMs = nowMs
+                    )
+                }
+            }
 
         } finally {
             connection.disconnect()
+        }
+    }
+
+
+    private fun openXmlTvInput(
+        input: InputStream
+    ): InputStream {
+        val buffered =
+            BufferedInputStream(
+                input
+            )
+
+        buffered.mark(2)
+
+        val firstByte =
+            buffered.read()
+
+        val secondByte =
+            buffered.read()
+
+        buffered.reset()
+
+        return if (
+            firstByte == 0x1f &&
+            secondByte == 0x8b
+        ) {
+            GZIPInputStream(
+                buffered
+            )
+        } else {
+            buffered
         }
     }
 

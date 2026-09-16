@@ -6,6 +6,28 @@ baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
 
 # TV, IPTV, and Media Architecture
 
+<!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:TV_MEDIA:BEGIN -->
+## EPG source-format compatibility boundary
+
+The Android TV EPG model remains XMLTV-based.
+
+Guide-source ingestion may receive:
+- plain XML;
+- GZIP-compressed XML;
+- other upstream formats such as JSON.
+
+D5's compatibility boundary is intentionally narrow:
+`guide mapping -> prefer XML / fallback GZIP -> magic-byte decompression -> existing XMLTV parser`.
+
+The mapping database does not need a new source-format column because content
+compression is determined from the fetched bytes. A parser-source version stored
+in EPG meta invalidates only the refresh gate, not the SQLite schema.
+
+JSON ingestion and non-exact channel matching remain separate future concerns
+that require their own evidence before implementation.
+<!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:TV_MEDIA:END -->
+
+
 <!-- PRIVYHUB_D101R1_BROWSER_CAMERA_C6_RECLASSIFICATION:TV_MEDIA:BEGIN -->
 ## Browser/camera native source architecture placement
 

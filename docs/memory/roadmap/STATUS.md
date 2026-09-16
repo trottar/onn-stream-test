@@ -6,6 +6,25 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:ROADMAP:BEGIN -->
+## D5.2 -> D5.3 EPG transition
+
+**D5.2:** COMPLETE — diagnostic boundary measured.
+
+D-103 proved the current XML-only source selector is the first EPG divergence.
+
+**D5.3:** ACTIVE — D-104 development patch.
+
+D-104 adds GZIP compatibility only. Runtime acceptance remains pending.
+
+Required next evidence:
+`updated onn APK -> Program Guide request -> fresh D-103 probe`.
+
+D5.4 TV-state ownership/sync implementation remains blocked until D5.3 EPG
+runtime acceptance is complete.
+<!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:ROADMAP:END -->
+
+
 <!-- PRIVYHUB_D103_D5_EPG_INGESTION_PROBE:ROADMAP:BEGIN -->
 ## D5.2 EPG ingestion diagnostic
 

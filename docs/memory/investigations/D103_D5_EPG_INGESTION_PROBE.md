@@ -1,5 +1,32 @@
 # D-103 — D5.2 EPG ingestion diagnostic
 
+<!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:D103_RESULT:BEGIN -->
+## Result — 2026-09-16
+
+D-103 completed successfully and identified the first divergence before XMLTV
+programme parsing.
+
+Measured:
+- guide fetch: success;
+- guide entries: 180,681;
+- entries accepted by the XML-only source gate: 2;
+- unique accepted mappings: 2;
+- onn cached mapping rows: 2;
+- onn cached programme rows: 0;
+- onn TV streams: 3,356;
+- onn distinct nonblank channel IDs: 3,286;
+- accepted-guide to onn-catalog intersection: 0.
+
+Classification:
+`D103_MAPPING_SOURCE_SCHEMA_OR_FORMAT_DIVERGENCE`.
+
+Source inspection then confirmed current IPTV-org EPG workers support compressed
+XML/GZIP output in addition to XML and JSON. D-104 owns the narrow compatibility
+repair. D-103 remains the runtime evidence probe and is updated to model
+XML-preferred/GZIP-fallback source selection.
+<!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:D103_RESULT:END -->
+
+
 **Status:** diagnostic-only / runtime evidence next
 **Date:** 2026-09-16
 

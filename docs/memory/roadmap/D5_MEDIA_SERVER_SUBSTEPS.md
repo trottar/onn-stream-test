@@ -6,6 +6,31 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:D5_SUBSTEPS:BEGIN -->
+## D5.2/D5.3 execution checkpoint — D-104
+
+D5.2 is complete:
+- the upstream guide endpoint is reachable;
+- the XML-only source gate reduced 180,681 records to 2;
+- the onn cache exactly reflected that 2-row result.
+
+D5.3 begins with one compatibility repair:
+- XML preferred;
+- GZIP fallback;
+- gzip-magic decompression into the existing XMLTV parser;
+- mapping-source parser version forces one refresh after upgrade.
+
+Not included:
+- JSON guide parsing;
+- fuzzy/canonical channel matching;
+- guide-grid UX;
+- broader catalog redesign.
+
+Post-fix D-103 decides whether D5.3 is accepted or whether a new measured
+identity/programme boundary remains.
+<!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:D5_SUBSTEPS:END -->
+
+
 <!-- PRIVYHUB_D103_D5_EPG_INGESTION_PROBE:D5_SUBSTEPS:BEGIN -->
 ## D5.2 execution checkpoint — D-103
 

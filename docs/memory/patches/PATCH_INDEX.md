@@ -6,6 +6,37 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:PATCH_INDEX:BEGIN -->
+### D-104 — D5.3 EPG GZIP source support — 2026-09-16
+
+Development patch based on D-103 runtime evidence.
+
+Production change:
+- Android EPG mapping source selection accepts XML first, GZIP second;
+- gzip-compressed XML is transparently decoded before the existing XMLTV parser;
+- mapping-source version meta forces refresh of the old 2-row parser cache.
+
+Diagnostic change:
+- D-103 now models the post-D-104 XML/GZIP source rule.
+
+No JSON EPG parser, fuzzy guide matching, TV catalog redesign, or unrelated
+media behavior is changed.
+
+Runtime validation pending.
+
+D-104 installer history: the first D-104 package rolled back before build,
+commit, push, or APK installation because its post-patch validator searched
+for a literal escaped `\\n` sequence in Kotlin. D-104R2 corrects only that
+installer validation defect; the intended Kotlin compatibility change is
+unchanged.
+
+D-104R1 installer history: R1 also rolled back before commit, push, or APK
+installation because the repository tracks `PrivyHub/gradlew` as mode `100644`,
+so direct `./gradlew` execution is not permitted on Linux. D-104R2 preserves
+that tracked mode and invokes the wrapper with `sh ./gradlew` instead.
+<!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:PATCH_INDEX:END -->
+
+
 <!-- PRIVYHUB_D103_D5_EPG_INGESTION_PROBE:PATCH_INDEX:BEGIN -->
 ### D-103 — D5.2 EPG ingestion probe — 2026-09-16
 

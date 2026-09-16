@@ -138,7 +138,7 @@ def fetch_bytes(url: str, *, user_agent: str, max_bytes: int) -> tuple[bytes | N
 
 def parse_guides_android_semantics(data: bytes) -> tuple[dict[str, dict[str, str]], dict[str, Any]]:
     stats: dict[str, Any] = {
-        "android_rule": "channel nonblank + sources array + first http(s) source whose format equals XML; dedupe exact channel; prefer lang=en",
+        "android_rule": "channel nonblank + sources array + prefer valid XML, otherwise valid GZIP; JSON unsupported; dedupe exact channel; prefer lang=en",
     }
     try:
         payload = json.loads(data.decode("utf-8"))
@@ -177,8 +177,8 @@ def parse_guides_android_semantics(data: bytes) -> tuple[dict[str, dict[str, str
             counts["sources_empty"] += 1
             continue
 
-        selected_url = None
-        valid_xml_sources = 0
+        xml_url = None
+        gzip_url = None
         for source in sources:
             counts["sources_seen"] += 1
             if not isinstance(source, dict):
@@ -187,28 +187,45 @@ def parse_guides_android_semantics(data: bytes) -> tuple[dict[str, dict[str, str
             fmt = str(source.get("format", "") or "").strip()
             formats[fmt or "<blank>"] += 1
             url = str(source.get("url", "") or "").strip()
-            if fmt.lower() == "xml":
+            valid_url = url.startswith("http://") or url.startswith("https://")
+            lower = fmt.lower()
+            if lower == "xml":
                 counts["format_xml"] += 1
-                if url.startswith("http://") or url.startswith("https://"):
-                    valid_xml_sources += 1
-                    if selected_url is None:
-                        selected_url = url
+                if valid_url:
+                    counts["valid_xml_sources"] += 1
+                    if xml_url is None:
+                        xml_url = url
                 else:
                     counts["xml_invalid_url"] += 1
+            elif lower == "gzip":
+                counts["format_gzip"] += 1
+                if valid_url:
+                    counts["valid_gzip_sources"] += 1
+                    if gzip_url is None:
+                        gzip_url = url
+                else:
+                    counts["gzip_invalid_url"] += 1
+            elif lower == "json":
+                counts["format_json_unsupported"] += 1
             else:
-                counts["format_not_xml"] += 1
+                counts["format_other_unsupported"] += 1
 
-        if valid_xml_sources:
-            counts["entries_with_valid_xml_source"] += 1
+        selected_url = xml_url or gzip_url
+        selected_format = "XML" if xml_url else ("GZIP" if gzip_url else "")
+        if xml_url:
+            counts["entries_selected_xml"] += 1
+        elif gzip_url:
+            counts["entries_selected_gzip"] += 1
         else:
-            counts["no_valid_xml_source"] += 1
-        if selected_url is None:
+            counts["entries_without_supported_source"] += 1
             continue
+        counts["entries_with_supported_source"] += 1
 
         candidate = {
             "channel_id": channel,
             "site_id": site_id,
             "source_url": selected_url,
+            "source_format": selected_format,
             "language": language,
         }
         existing = best.get(channel)
@@ -230,6 +247,9 @@ def parse_guides_android_semantics(data: bytes) -> tuple[dict[str, dict[str, str
             "duplicate_channel_candidates": duplicate_candidates,
             "english_preference_replacements": english_replacements,
             "accepted_unique_mappings": len(best),
+            "accepted_format_distribution": dict(
+                Counter(v.get("source_format", "") for v in best.values()).most_common()
+            ),
             "accepted_source_hosts": dict(
                 Counter((urlsplit(v["source_url"]).hostname or "") for v in best.values()).most_common(30)
             ),
@@ -606,10 +626,12 @@ def render_text(report: dict[str, Any]) -> str:
         "GUIDES INPUT",
         f"  fetch_ok: {report['upstream']['guides_fetch'].get('ok')}",
         f"  entries_total: {gp.get('counts', {}).get('entries_total')}",
-        f"  entries_with_valid_xml_source: {gp.get('counts', {}).get('entries_with_valid_xml_source')}",
+        f"  entries_with_supported_source: {gp.get('counts', {}).get('entries_with_supported_source')}",
+        f"  entries_selected_xml: {gp.get('counts', {}).get('entries_selected_xml')}",
+        f"  entries_selected_gzip: {gp.get('counts', {}).get('entries_selected_gzip')}",
         f"  accepted_unique_mappings: {gp.get('accepted_unique_mappings')}",
         f"  sources_missing_or_not_array: {gp.get('counts', {}).get('sources_missing_or_not_array')}",
-        f"  no_valid_xml_source: {gp.get('counts', {}).get('no_valid_xml_source')}",
+        f"  entries_without_supported_source: {gp.get('counts', {}).get('entries_without_supported_source')}",
         "",
         "CATALOG IDENTITY",
         f"  playlist_fetch_ok: {report['upstream']['playlist_fetch'].get('ok')}",
@@ -647,14 +669,19 @@ def self_test() -> int:
         [
             {"channel": "A.us", "site_id": "a", "lang": "fr", "sources": [{"format": "XML", "url": "https://example.test/a.xml"}]},
             {"channel": "A.us", "site_id": "a2", "lang": "en", "sources": [{"format": "XML", "url": "https://example.test/a-en.xml"}]},
-            {"channel": "B.us", "site_id": "b", "lang": "en", "sources": [{"format": "JSON", "url": "https://example.test/b.json"}]},
+            {"channel": "B.us", "site_id": "b", "lang": "en", "sources": [{"format": "GZIP", "url": "https://example.test/b.xml.gz"}]},
+            {"channel": "C.us", "site_id": "c", "lang": "en", "sources": [{"format": "JSON", "url": "https://example.test/c.json"}]},
+            {"channel": "D.us", "site_id": "d", "lang": "en", "sources": [{"format": "GZIP", "url": "https://example.test/d.xml.gz"}, {"format": "XML", "url": "https://example.test/d.xml"}]},
             {"channel": "", "site_id": "", "lang": "en", "sources": [{"format": "XML", "url": "https://example.test/x.xml"}]},
         ]
     ).encode()
     mappings, stats = parse_guides_android_semantics(sample)
-    assert list(mappings) == ["A.us"]
+    assert list(mappings) == ["A.us", "B.us", "D.us"]
     assert mappings["A.us"]["language"] == "en"
-    assert stats["accepted_unique_mappings"] == 1
+    assert mappings["B.us"]["source_format"] == "GZIP"
+    assert mappings["D.us"]["source_format"] == "XML"
+    assert mappings["D.us"]["source_url"].endswith("/d.xml")
+    assert stats["accepted_unique_mappings"] == 3
     playlist = b'#EXTM3U\n#EXTINF:-1 tvg-id="A.us" tvg-country="US",A\nhttps://x\n#EXTINF:-1,B\nhttps://y\n'
     ids, pstats = parse_playlist_channel_ids(playlist)
     assert ids == {"A.us"}

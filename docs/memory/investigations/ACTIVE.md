@@ -6,6 +6,25 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:ACTIVE:BEGIN -->
+## D5.3 active — EPG GZIP source compatibility
+
+D5.2's mapping-source diagnostic is resolved at its measured boundary.
+
+Active development patch D-104:
+- XML remains preferred;
+- GZIP is accepted as fallback;
+- compressed XML is decoded by gzip magic;
+- existing exact guide identity rules remain unchanged.
+
+Next evidence is runtime, not another speculative code change:
+updated APK -> Program Guide request -> fresh D-103 probe.
+
+If D-103 then reports a different first divergence, that becomes the next narrow
+D5.3 investigation.
+<!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:ACTIVE:END -->
+
+
 <!-- PRIVYHUB_D103_D5_EPG_INGESTION_PROBE:ACTIVE:BEGIN -->
 ## D5.2 active investigation — EPG ingestion
 
