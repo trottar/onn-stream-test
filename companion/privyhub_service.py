@@ -57,6 +57,11 @@ from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import quote, unquote, urlparse, urlsplit
 
+from storage_presence import (
+    configured_local_backing_present,
+    lexical_absolute_path,
+)
+
 from plugins import (
     PLUGINS,
     shutdown_plugins,
@@ -91,6 +96,13 @@ MEDIA_ROOT = PROJECT_ROOT / "media"
 LIVE_DIR = MEDIA_ROOT / "live"
 LOG_DIR = PROJECT_ROOT / "logs"
 
+# PRIVYHUB_D096_CONFIGURABLE_VOD_STORAGE_V1
+# Machine-specific storage selection lives under ignored data/, not in
+# tracked source/config.  The default remains the project-local media/vod.
+STORAGE_CONFIG_FILE = (
+    PROJECT_ROOT / "data" / "storage.json"
+)
+
 CATALOG_FILE = COMPANION_DIR / "config" / "sources.json"
 SERVER_SCRIPT = PROJECT_ROOT / "scripts" / "start_server.ps1"
 # PRIVYHUB_D078_LINUX_MEDIA_SERVER_STARTUP_V1
@@ -119,6 +131,92 @@ DEFAULT_MEDIA_EXTENSIONS = {
 }
 
 
+@dataclass(frozen=True)
+class StorageConfig:
+    vod_root: Path
+    configured: bool
+
+
+def _load_storage_config(
+) -> StorageConfig:
+    default_vod_root = (
+        MEDIA_ROOT / "vod"
+    ).resolve(
+        strict=False
+    )
+
+    if not STORAGE_CONFIG_FILE.exists():
+        return StorageConfig(
+            vod_root=default_vod_root,
+            configured=False,
+        )
+
+    try:
+        with STORAGE_CONFIG_FILE.open(
+            "r",
+            encoding="utf-8",
+        ) as handle:
+            raw = json.load(handle)
+    except (
+        OSError,
+        json.JSONDecodeError,
+    ) as exc:
+        raise RuntimeError(
+            "Could not read PrivyHub storage config: "
+            f"{STORAGE_CONFIG_FILE}"
+        ) from exc
+
+    if not isinstance(raw, dict):
+        raise RuntimeError(
+            "PrivyHub storage config must be a JSON object"
+        )
+
+    version = raw.get(
+        "version",
+        1,
+    )
+
+    if version != 1:
+        raise RuntimeError(
+            f"Unsupported PrivyHub storage config version: {version}"
+        )
+
+    raw_vod_root = raw.get(
+        "vod_root"
+    )
+
+    if (
+        not isinstance(
+            raw_vod_root,
+            str,
+        )
+        or not raw_vod_root.strip()
+    ):
+        raise RuntimeError(
+            "Configured vod_root must be a non-empty absolute path"
+        )
+
+    vod_root = Path(
+        raw_vod_root
+    ).expanduser()
+
+    if not vod_root.is_absolute():
+        raise RuntimeError(
+            "Configured vod_root must be absolute"
+        )
+
+    return StorageConfig(
+        vod_root=lexical_absolute_path(
+            vod_root
+        ),
+        configured=True,
+    )
+
+
+STORAGE_CONFIG = _load_storage_config()
+VOD_ROOT = STORAGE_CONFIG.vod_root
+
+
 @dataclass
 class ManagedProcess:
     name: str
@@ -140,9 +238,13 @@ class SourceCatalog:
         self,
         catalog_path: Path,
         media_root: Path,
+        vod_root: Path,
     ) -> None:
         self.catalog_path = catalog_path
         self.media_root = media_root.resolve()
+        self.vod_root = lexical_absolute_path(
+            vod_root
+        )
 
         self.lock = threading.RLock()
 
@@ -328,24 +430,103 @@ class SourceCatalog:
                         f"{extension!r}"
                     )
 
+    def _physical_media_path(
+        self,
+        relative_path: str,
+    ) -> Path:
+        logical_path = Path(
+            relative_path
+        )
+
+        if (
+            logical_path.is_absolute()
+            or ".." in logical_path.parts
+        ):
+            raise CatalogError(
+                f"Media path escapes logical root: {relative_path}"
+            )
+
+        parts = logical_path.parts
+
+        if (
+            parts
+            and parts[0].casefold() == "vod"
+        ):
+            suffix = Path(
+                *parts[1:]
+            )
+
+            return lexical_absolute_path(
+                self.vod_root / suffix
+            )
+
+        return (
+            self.media_root / logical_path
+        ).resolve(
+            strict=False
+        )
+
     def _safe_media_directory(
         self,
         relative_path: str,
     ) -> Path:
-        directory = (
-            self.media_root / relative_path
-        ).resolve()
+        return self._physical_media_path(
+            relative_path
+        )
 
-        try:
-            directory.relative_to(
-                self.media_root
-            )
-        except ValueError as exc:
-            raise CatalogError(
-                f"Dynamic media path escapes media root: {relative_path}"
-            ) from exc
+    def resolve_playback_path(
+        self,
+        playback_path: str,
+    ) -> Path:
+        logical_path = unquote(
+            urlparse(
+                playback_path
+            ).path
+        ).lstrip("/")
 
-        return directory
+        return self._physical_media_path(
+            logical_path
+        )
+
+    def vod_backing_device_present(
+        self,
+    ) -> Optional[bool]:
+        if not STORAGE_CONFIG.configured:
+            return None
+
+        return configured_local_backing_present(
+            self.vod_root
+        )
+
+    def vod_storage_status(
+        self,
+    ) -> dict[str, Any]:
+        backing_present = (
+            self.vod_backing_device_present()
+        )
+
+        if backing_present is False:
+            available = False
+        else:
+            try:
+                available = (
+                    self.vod_root.exists()
+                    and self.vod_root.is_dir()
+                )
+            except OSError:
+                available = False
+
+        return {
+            "configured": (
+                STORAGE_CONFIG.configured
+            ),
+            "mode": (
+                "configured"
+                if STORAGE_CONFIG.configured
+                else "project_default"
+            ),
+            "available": available,
+        }
 
     @staticmethod
     def _slug(
@@ -487,13 +668,28 @@ class SourceCatalog:
             relative_root.as_posix()
         )
 
-        if not disk_root.exists():
+        if (
+            relative_root.parts
+            and relative_root.parts[0].casefold() == "vod"
+            and self.vod_backing_device_present() is False
+        ):
             return []
 
-        if not disk_root.is_dir():
-            raise CatalogError(
-                f"Dynamic media path is not a directory: {disk_root}"
-            )
+        # PRIVYHUB_D098_ABSENT_VOD_CATALOG_RESILIENCE_V1
+        # Removable/bulk storage can disappear while the companion remains
+        # online. Linux automount/device states may raise ENODEV/EIO from
+        # stat() instead of making Path.exists() simply return False.
+        # Treat those filesystem errors as unavailable dynamic storage.
+        try:
+            if not disk_root.exists():
+                return []
+
+            if not disk_root.is_dir():
+                raise CatalogError(
+                    f"Dynamic media path is not a directory: {disk_root}"
+                )
+        except OSError:
+            return []
 
         extensions = self._extensions_from_config(
             dynamic
@@ -608,10 +804,17 @@ class SourceCatalog:
 
             return children
 
-        nodes = scan_directory(
-            disk_root,
-            relative_root,
-        )
+        # The removable device can also disappear after the initial root
+        # check. Any filesystem OSError during recursive enumeration,
+        # file stat, or path resolution aborts this scan cleanly. Do not
+        # publish a partial dynamic index from a torn scan.
+        try:
+            nodes = scan_directory(
+                disk_root,
+                relative_root,
+            )
+        except OSError:
+            return []
 
         self.dynamic_sources.update(
             dynamic_source_index
@@ -752,6 +955,11 @@ class SourceCatalog:
                     "version",
                     1,
                 ),
+                "storage": {
+                    "vod": (
+                        self.vod_storage_status()
+                    ),
+                },
                 "root": [
                     self._public_node(item)
                     for item in self.raw["root"]
@@ -791,6 +999,7 @@ class PrivyHubController:
         self.catalog = SourceCatalog(
             CATALOG_FILE,
             MEDIA_ROOT,
+            VOD_ROOT,
         )
 
         self.server: Optional[ManagedProcess] = None
@@ -925,6 +1134,8 @@ class PrivyHubController:
                     str(range_server),
                     "--root",
                     str(MEDIA_ROOT),
+                    "--vod-root",
+                    str(VOD_ROOT),
                     "--host",
                     MEDIA_SERVER_HOST,
                     "--port",
@@ -1066,80 +1277,55 @@ class PrivyHubController:
         self,
         source: dict[str, Any],
     ) -> bool:
+        if (
+            self.catalog.vod_backing_device_present()
+            is False
+        ):
+            return False
+
+        try:
+            media_file = (
+                self.catalog.resolve_playback_path(
+                    source["playback"]["path"]
+                )
+            )
+        except (
+            CatalogError,
+            OSError,
+        ):
+            return False
+
         explicit_path = source.get(
             "_filesystem_path"
         )
 
-        # PRIVYHUB_D092_DYNAMIC_VOD_SYMLINK_HEALTH_V1
-        #
-        # Dynamic VOD sources are created only by the media-directory
-        # scanner.  Their public playback path remains lexically beneath
-        # MEDIA_ROOT even when a directory component is a symlink to
-        # external storage.  Validate that lexical path and require it to
-        # resolve to the exact file recorded by the scanner; do not grant
-        # the same external-path allowance to static/configured sources.
-        if (
-            explicit_path
-            and source.get("_dynamic") is True
-        ):
-            playback_path = Path(
-                unquote(
-                    source["playback"]["path"]
-                ).lstrip("/")
-            )
-
-            if (
-                playback_path.is_absolute()
-                or ".." in playback_path.parts
-            ):
-                return False
-
-            media_file = (
-                MEDIA_ROOT / playback_path
-            )
-
+        # D-092 established exact scanner-recorded target validation for
+        # dynamic VOD. D-096 preserves that invariant while moving the
+        # physical /vod namespace behind the configured VOD root.
+        if explicit_path:
             try:
                 if (
-                    media_file.resolve()
-                    != Path(explicit_path).resolve()
+                    media_file.resolve(
+                        strict=False
+                    )
+                    != Path(
+                        explicit_path
+                    ).resolve(
+                        strict=False
+                    )
                 ):
                     return False
             except OSError:
                 return False
 
-        elif explicit_path:
-            media_file = Path(
-                explicit_path
-            ).resolve()
-
-            try:
-                media_file.relative_to(
-                    MEDIA_ROOT.resolve()
-                )
-            except ValueError:
-                return False
-
-        else:
-            playback_path = unquote(
-                source["playback"]["path"]
-            ).lstrip("/")
-
-            media_file = (
-                MEDIA_ROOT / playback_path
-            ).resolve()
-
-            try:
-                media_file.relative_to(
-                    MEDIA_ROOT.resolve()
-                )
-            except ValueError:
-                return False
-
-        return (
-            media_file.exists()
-            and media_file.is_file()
-            and media_file.stat().st_size > 0
-        )
+        try:
+            return (
+                media_file.exists()
+                and media_file.is_file()
+                and media_file.stat().st_size > 0
+            )
+        except OSError:
+            return False
 
     def _hls_is_healthy(
         self,
@@ -1585,6 +1771,11 @@ class PrivyHubController:
                 "media_root": str(
                     MEDIA_ROOT
                 ),
+                "storage": {
+                    "vod": (
+                        self.catalog.vod_storage_status()
+                    ),
+                },
                 "control_port": CONTROL_PORT,
                 "server": {
                     "running": self._running(
@@ -2199,6 +2390,19 @@ def main(
 
     print(
         f"Media root:   {MEDIA_ROOT}"
+    )
+
+    print(
+        f"VOD root:     {VOD_ROOT}"
+    )
+
+    print(
+        "VOD storage:  "
+        + (
+            "configured"
+            if STORAGE_CONFIG.configured
+            else "project default"
+        )
     )
 
     print(

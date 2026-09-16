@@ -6,6 +6,133 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D101R1_BROWSER_CAMERA_C6_RECLASSIFICATION:ACTIVE:BEGIN -->
+## D5 active scope after storage acceptance
+
+**Complete / runtime validated**
+- configurable/removable VOD storage;
+- zero-touch hotplug recovery;
+- Continue Watching continuity.
+
+**Active**
+- Live TV/EPG acceptance;
+- diagnostics/Self-Test/media regression.
+
+**Reclassified / not a D5 blocker**
+- browser/app native streaming -> C6 after D8;
+- camera/live native streaming -> C6 after D8;
+- broad smart-home camera integration -> Phase I.
+
+Do not build temporary Linux browser/camera runners unless new evidence makes a
+D5 compatibility requirement unavoidable.
+<!-- PRIVYHUB_D101R1_BROWSER_CAMERA_C6_RECLASSIFICATION:ACTIVE:END -->
+
+<!-- PRIVYHUB_D100_D5_EXTERNAL_VOD_HOTPLUG_RUNTIME_ACCEPTANCE:ACTIVE:BEGIN -->
+## D5 current active work
+
+External/removable VOD storage boundary:
+**COMPLETE / runtime validated**.
+
+Closed acceptance includes:
+- stable configurable physical VOD root;
+- stable logical identity;
+- clean absent-storage behavior;
+- nonblocking control/media services;
+- zero-touch reinsert recovery;
+- Continue Watching continuity across unplug/reinsert;
+- repeated hotplug refresh on onn.
+
+Current active D5 work:
+**Linux browser/camera runner restoration**.
+
+After runners:
+integrated VOD + Live TV/EPG + diagnostics acceptance.
+<!-- PRIVYHUB_D100_D5_EXTERNAL_VOD_HOTPLUG_RUNTIME_ACCEPTANCE:ACTIVE:END -->
+
+<!-- PRIVYHUB_D099_NONBLOCKING_VOD_PRESENCE_V1:ACTIVE:BEGIN -->
+## D5 nonblocking absent-storage acceptance
+
+**Status:** D-099 development patch / runtime validation next.
+
+Acceptance: absent disk keeps `/status`, `/sources`, and stale source-start under 2 seconds; `storage.vod.available=false`; port 8000 remains available; reinsertion restores VOD automatically.
+<!-- PRIVYHUB_D099_NONBLOCKING_VOD_PRESENCE_V1:ACTIVE:END -->
+
+<!-- PRIVYHUB_D098_ABSENT_VOD_CATALOG_RESILIENCE_V1:ACTIVE:BEGIN -->
+## D5 removable-storage absent-state resilience
+
+**Status:** D-098 development patch / hotplug E2E next.
+
+Acceptance:
+- no uncaught `OSError` from absent external VOD;
+- `/sources` HTTP 200 while disk is absent;
+- stale Continue Watching/source start fails cleanly;
+- Companion remains available after stale source attempt;
+- reinsertion restores dynamic VOD automatically;
+- logical IDs and Continue Watching identity remain stable.
+
+D-097 read-only/permanent-automount policy remains the intended appliance
+operating model when installed.
+<!-- PRIVYHUB_D098_ABSENT_VOD_CATALOG_RESILIENCE_V1:ACTIVE:END -->
+
+<!-- PRIVYHUB_D097_VOD_APPLIANCE_MODE:ACTIVE:BEGIN -->
+## D5 removable VOD hotplug acceptance
+
+**Status:** D-097 development patch / final removable-storage E2E next.
+
+Acceptance:
+- normal VOD mount is read-only;
+- UUID automount remains active while disk is absent;
+- no Linux command required for normal unplug/reinsert;
+- unplug after playback stops removes/unavailable library cleanly;
+- reinsertion plus client VOD access remounts/repopulates automatically;
+- source identity/Continue Watching remain stable;
+- no desktop/file-manager activation.
+
+After acceptance, checkpoint storage work and continue D5 Linux browser/camera
+runner restoration.
+<!-- PRIVYHUB_D097_VOD_APPLIANCE_MODE:ACTIVE:END -->
+
+<!-- PRIVYHUB_D096_CONFIGURABLE_VOD_STORAGE:ACTIVE:BEGIN -->
+## D5 stable VOD storage runtime acceptance
+
+**Status:** DEVELOPMENT PATCH D-096 / RUNTIME VALIDATION NEXT
+
+Acceptance gates:
+- configured storage status is explicit and available;
+- old representative VOD source ID remains stable;
+- source-start and HTTP Range pass from the configured physical root;
+- normal onn playback and Continue Watching remain intact;
+- storage absence does not prevent companion/live server startup;
+- after drive return, deterministic system automount restores the configured
+  path without a desktop/file-manager click;
+- catalog repopulates automatically with stable logical IDs.
+
+Browser/camera Linux runner work remains queued after this storage boundary.
+<!-- PRIVYHUB_D096_CONFIGURABLE_VOD_STORAGE:ACTIVE:END -->
+
+<!-- PRIVYHUB_D094_EXTERNAL_STORAGE_REMOUNT:ACTIVE:BEGIN -->
+## D5 stable bulk-media root and storage availability
+
+**Status:** ACTIVE / NEXT
+
+Validated:
+- external VOD normal playback;
+- Continue Watching;
+- dynamic source-start health;
+- automatic library repopulation once the external filesystem path becomes
+  available again.
+
+Still missing:
+1. deterministic OS-level mount at a stable path;
+2. explicit PrivyHub bulk-media-root configuration;
+3. unavailable-root state distinct from empty library.
+
+Do not depend on desktop file-manager activation or user-label automount paths.
+
+The next implementation/probe should preserve the existing default local media
+root while introducing a stable configurable storage boundary.
+<!-- PRIVYHUB_D094_EXTERNAL_STORAGE_REMOUNT:ACTIVE:END -->
+
 <!-- PRIVYHUB_D093R2_D5_EXTERNAL_VOD_RUNTIME_VALIDATION:ACTIVE:BEGIN -->
 ## D5 configurable bulk-media root
 

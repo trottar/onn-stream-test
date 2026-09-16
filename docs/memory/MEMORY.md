@@ -6,6 +6,219 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D101R1_BROWSER_CAMERA_C6_RECLASSIFICATION:MEMORY:BEGIN -->
+## Browser/camera roadmap ownership
+
+Do not rebuild legacy browser/camera runners as temporary D5 Linux-specific
+paths.
+
+Roadmap ownership:
+- D5: VOD + Live TV/EPG + diagnostics restored on Linux;
+- after D8: return to remaining Phase C on Linux;
+- C6: browser/app and camera/live streaming through generalized native source
+  abstraction and shared profile/telemetry/transport/decoder infrastructure;
+- optional browser keyboard/mouse forwarding from onn/client HID belongs with
+  that C6 source/session work;
+- Phase I: broader smart-home camera/device integration.
+
+The current Linux host lacking a camera is not a D5 blocker.
+<!-- PRIVYHUB_D101R1_BROWSER_CAMERA_C6_RECLASSIFICATION:MEMORY:END -->
+
+### D-101R1 local-roadmap correction
+
+The earlier D-101 attempt failed before modification because its
+installer incorrectly required `ROADMAP.md` at the Linux repository
+root. The roadmap file reviewed in chat was uploaded reference material;
+the repo's durable roadmap state is maintained in
+`docs/memory/roadmap/STATUS.md`.
+
+D-101R1 records the same accepted reclassification entirely through the
+actual durable-memory/decision files and does not create or require a
+new root-level roadmap file.
+
+<!-- PRIVYHUB_D100_D5_EXTERNAL_VOD_HOTPLUG_RUNTIME_ACCEPTANCE:MEMORY:BEGIN -->
+## External VOD removable-storage contract — runtime validated
+
+Validated Linux/onn product behavior:
+
+- bulk VOD physical storage is configurable and independent of logical `/vod`;
+- logical source IDs remain stable across physical storage migration/remount;
+- the server may run indefinitely with removable VOD absent;
+- absence must not crash or block the control API;
+- VOD absence appears as an unavailable/empty dynamic library, not deletion;
+- stale saved/Continue Watching source attempts fail cleanly;
+- reinsertion requires no desktop/file-manager activation;
+- normal client refresh/access automatically repopulates the library;
+- Continue Watching identity survives unplug/reinsert;
+- repeated unplug/reinsert transitions are supported.
+
+Runtime acceptance sequence on 2026-09-16:
+`connected -> unplug -> empty VOD -> reinsert -> Continue Watching/playback ->
+unplug again -> empty VOD`, with successful onn refresh at every transition.
+
+This storage seam is closed unless new evidence shows a regression.
+<!-- PRIVYHUB_D100_D5_EXTERNAL_VOD_HOTPLUG_RUNTIME_ACCEPTANCE:MEMORY:END -->
+
+<!-- PRIVYHUB_D099_NONBLOCKING_VOD_PRESENCE_V1:MEMORY:BEGIN -->
+## Do not dereference a missing systemd automount to test presence
+
+For UUID/label/device-backed removable VOD, check backing-device presence first using the fstab mapping plus `/dev/disk/...`. If absent, return unavailable without `resolve()`, `exists()`, `stat()`, `open()`, or other access under the automount. If present, normal path access may activate the automount. Keep media-server startup independent of removable VOD. Never log raw device identifiers.
+<!-- PRIVYHUB_D099_NONBLOCKING_VOD_PRESENCE_V1:MEMORY:END -->
+
+### Layered predecessor receipts must merge by actual installation chronology
+
+When uncommitted development patches overlap files, merge expected post-state
+using actual successful-receipt chronology, not arbitrary required/optional
+grouping. The newest installed receipt is authoritative for an overlapping path.
+
+<!-- PRIVYHUB_D098_ABSENT_VOD_CATALOG_RESILIENCE_V1:MEMORY:BEGIN -->
+## Removable storage OSError is library unavailability, never control-API failure
+
+Linux automount/device states can make `Path.exists()`, `Path.is_dir()`,
+`iterdir()`, stat calls, or path resolution raise `OSError` such as `ENODEV`
+when removable storage is absent or disappears mid-scan.
+
+Dynamic-media rule:
+- catch filesystem `OSError` at the dynamic scanner boundary;
+- return no dynamic children for that request;
+- do not publish a partially built dynamic source index;
+- keep `/sources` and the rest of the companion alive;
+- stale saved source IDs may return controlled not-found/unavailable responses;
+- when storage returns, a fresh scan restores the same logical IDs.
+
+Do not interpret a missing removable library as authoritative library deletion.
+<!-- PRIVYHUB_D098_ABSENT_VOD_CATALOG_RESILIENCE_V1:MEMORY:END -->
+
+<!-- PRIVYHUB_D097_VOD_APPLIANCE_MODE:MEMORY:BEGIN -->
+## External VOD appliance mode: read-only normal operation, automount always active
+
+For removable bulk VOD media on the Linux appliance:
+
+- keep the UUID-based systemd automount active continuously, including while
+  the disk is physically absent;
+- mount the normal VOD library read-only;
+- do not stop the automount as part of normal unplugging;
+- do not depend on desktop `/media/<user>/<label>` mounts or file-manager
+  activation;
+- after reinsertion, normal VOD access triggers the mount and dynamic rescan.
+
+User-facing normal workflow:
+`stop playback -> unplug -> plug back later -> open/refresh VOD`.
+
+Write/ingest operations are a distinct maintenance mode. If PrivyHub later
+writes/rips directly to this storage, provide an explicit writable maintenance
+workflow plus a client-accessible safe-disconnect action.
+<!-- PRIVYHUB_D097_VOD_APPLIANCE_MODE:MEMORY:END -->
+
+<!-- PRIVYHUB_D096R3_PROBE_LISTENER_LIFECYCLE:MEMORY:BEGIN -->
+## Lifecycle acceptance should test listeners/process ownership, not raw bind reuse
+
+For PrivyHub managed-process teardown, the meaningful acceptance boundary is:
+- managed process exited;
+- no matching PrivyHub process remains;
+- no LISTEN socket remains on owned service ports.
+
+A raw `bind()` test can remain false briefly after process exit because of TCP
+socket state and therefore must not be used as the primary lifecycle classifier.
+
+Also, classification return codes must compare the exact success token. Never
+use a suffix test when the failure token contains that same suffix, as with
+`NOT_CONFIRMED`.
+<!-- PRIVYHUB_D096R3_PROBE_LISTENER_LIFECYCLE:MEMORY:END -->
+
+<!-- PRIVYHUB_D096R2R1_PROBE_INSTALLER_PRESTATE:MEMORY:BEGIN -->
+## Layered patch pre-state must validate the full uncommitted patch stack
+
+When development patches are installed but intentionally not committed yet,
+a follow-up patch cannot validate only its immediate predecessor receipt if
+older installed patches still own legitimate tracked changes.
+
+For a layered stack:
+- union all still-active predecessor post-state paths;
+- if multiple receipts contain the same path, the newest receipt is
+  authoritative for that path;
+- verify exact hashes against that merged expected state;
+- allow no other tracked/staged modifications.
+
+D-096R2R1 applies this to D-096 + D-096R1.
+<!-- PRIVYHUB_D096R2R1_PROBE_INSTALLER_PRESTATE:MEMORY:END -->
+
+<!-- PRIVYHUB_D096R1_STORAGE_DEVICE_DISCOVERY:MEMORY:BEGIN -->
+## Do not infer backing block devices from automount pseudo-sources
+
+On the Linux prototype, `findmnt -T <mounted-media-path>` can report a synthetic
+systemd automount source such as `systemd-1`. That value is not a block device
+and must not be passed to `blkid`.
+
+For stable removable-storage identity:
+1. access/stat a real file or directory on the mounted filesystem;
+2. read its filesystem device number (`st_dev`);
+3. convert to major:minor;
+4. map major:minor to a real block device with `lsblk`;
+5. use that `/dev/...` device for UUID lookup.
+
+D-096R1 makes this the authoritative storage-device discovery rule.
+<!-- PRIVYHUB_D096R1_STORAGE_DEVICE_DISCOVERY:MEMORY:END -->
+
+<!-- PRIVYHUB_D096_CONFIGURABLE_VOD_STORAGE:MEMORY:BEGIN -->
+## Bulk VOD physical storage is separate from the logical `/vod` namespace
+
+D-096 establishes the storage abstraction needed by the Linux appliance.
+
+Logical media identity:
+- catalog paths remain `/vod/...`;
+- generated dynamic VOD IDs remain based on logical relative paths;
+- moving physical storage must not change source identity or Continue Watching
+  ownership merely because the mount path changed.
+
+Physical storage:
+- default: project `media/vod`;
+- optional local override: ignored `data/storage.json` with absolute `vod_root`;
+- Linux appliance setup may mount a filesystem by stable UUID at
+  `/mnt/privyhub-media` and point `vod_root` into that filesystem.
+
+Serving:
+- internal `media/live` remains under the project media root;
+- Linux range server maps only `/vod/...` to the configured VOD physical root.
+
+Availability:
+- configured VOD root may be temporarily absent;
+- companion startup must still succeed;
+- API reports configured/mode/available explicitly;
+- absent storage is an availability condition, not authoritative library
+  deletion;
+- dynamic rescanning repopulates the same logical IDs when storage returns.
+
+Mount ownership:
+- do not depend on `/media/<user>/<label>` or a file-manager click;
+- use stable filesystem identity for appliance mounting;
+- keep raw UUID machine-local; do not place it in tracked project files.
+<!-- PRIVYHUB_D096_CONFIGURABLE_VOD_STORAGE:MEMORY:END -->
+
+<!-- PRIVYHUB_D094_EXTERNAL_STORAGE_REMOUNT:MEMORY:BEGIN -->
+## External storage: stable mount ownership is separate from PrivyHub rescanning
+
+D5 runtime testing established that an external drive may be physically present
+after reinsertion while still unmounted until the Linux desktop/file manager
+activates it.
+
+Once mounted, the existing VOD symlink becomes valid and PrivyHub dynamically
+repopulates the library without a companion restart.
+
+Durable rule:
+- do not depend on `/media/<user>/<label>` desktop automount behavior;
+- do not require opening the drive in a GUI;
+- establish deterministic OS-level mount ownership for appliance operation;
+- configure PrivyHub against a stable media-root path;
+- represent configured-root unavailable separately from a genuinely empty media
+  library;
+- reuse the existing dynamic rescan path for automatic recovery after storage
+  returns.
+
+This narrows the D5 storage problem: scanner recovery is validated; stable mount
+and explicit availability semantics remain.
+<!-- PRIVYHUB_D094_EXTERNAL_STORAGE_REMOUNT:MEMORY:END -->
+
 <!-- PRIVYHUB_D093R2_D5_EXTERNAL_VOD_RUNTIME_VALIDATION:MEMORY:BEGIN -->
 ## D5 external VOD runtime validated through normal onn UX
 

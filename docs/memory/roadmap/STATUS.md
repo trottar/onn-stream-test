@@ -6,6 +6,107 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D101R1_BROWSER_CAMERA_C6_RECLASSIFICATION:ROADMAP:BEGIN -->
+## D5 scope reclassification
+
+External VOD storage: **COMPLETE / runtime validated**.
+
+D5 next:
+**Live TV/EPG + diagnostics/Self-Test acceptance.**
+
+Browser/app and camera/live Linux-native streaming are moved out of D5 and into
+the remaining C6 work after D8, where they will use the generalized native
+source/decoder/transport infrastructure.
+
+Expected sequence:
+`D5 -> D7 -> D8 -> remaining C (including C6) -> E`.
+<!-- PRIVYHUB_D101R1_BROWSER_CAMERA_C6_RECLASSIFICATION:ROADMAP:END -->
+
+### D-101R1 local-roadmap correction
+
+The earlier D-101 attempt failed before modification because its
+installer incorrectly required `ROADMAP.md` at the Linux repository
+root. The roadmap file reviewed in chat was uploaded reference material;
+the repo's durable roadmap state is maintained in
+`docs/memory/roadmap/STATUS.md`.
+
+D-101R1 records the same accepted reclassification entirely through the
+actual durable-memory/decision files and does not create or require a
+new root-level roadmap file.
+
+<!-- PRIVYHUB_D100_D5_EXTERNAL_VOD_HOTPLUG_RUNTIME_ACCEPTANCE:ROADMAP:BEGIN -->
+## D5 storage substep
+
+**COMPLETE / runtime validated — 2026-09-16**
+
+Validated:
+- external configurable bulk VOD;
+- stable logical identity;
+- hotplug absence without Companion failure;
+- zero-touch reinsert recovery;
+- Continue Watching continuity;
+- repeated client refresh across transitions.
+
+D5 remains ACTIVE.
+
+**Next:** Linux browser/camera runners, followed by integrated
+VOD + Live TV/EPG + diagnostics acceptance.
+<!-- PRIVYHUB_D100_D5_EXTERNAL_VOD_HOTPLUG_RUNTIME_ACCEPTANCE:ROADMAP:END -->
+
+<!-- PRIVYHUB_D099_NONBLOCKING_VOD_PRESENCE_V1:ROADMAP:BEGIN -->
+## D5 absent-VOD timeout closure
+
+D-099 addresses the remaining Android Companion-unavailable timeout after D-098 fixed the crash. Pending runtime validation: fast absent-state control responses, stale Continue Watching failure without service loss, port 8000 availability, and automatic reinsert recovery.
+<!-- PRIVYHUB_D099_NONBLOCKING_VOD_PRESENCE_V1:ROADMAP:END -->
+
+<!-- PRIVYHUB_D098_ABSENT_VOD_CATALOG_RESILIENCE_V1:ROADMAP:BEGIN -->
+## D5 external-VOD resilience
+
+D-098 closes the control-API crash discovered during physical removable-storage
+testing.
+
+Pending runtime validation:
+absent disk `/sources`, stale Continue Watching, companion survival, and
+reinsert/recovery.
+
+After acceptance, checkpoint the D5 storage seam and continue Linux
+browser/camera runner restoration.
+<!-- PRIVYHUB_D098_ABSENT_VOD_CATALOG_RESILIENCE_V1:ROADMAP:END -->
+
+<!-- PRIVYHUB_D097_VOD_APPLIANCE_MODE:ROADMAP:BEGIN -->
+## D5 removable-storage appliance mode
+
+D-097 is the final storage-operability step before external-VOD checkpoint:
+read-only normal VOD serving with permanently active UUID automount and zero
+Linux interaction for routine unplug/reinsert.
+
+Pending: physical E2E unplug/reinsert validation from the onn client.
+
+After acceptance: checkpoint D5 storage seam, then proceed to Linux
+browser/camera runners and integrated TV/EPG/media/diagnostics validation.
+<!-- PRIVYHUB_D097_VOD_APPLIANCE_MODE:ROADMAP:END -->
+
+<!-- PRIVYHUB_D096_CONFIGURABLE_VOD_STORAGE:ROADMAP:BEGIN -->
+## D5 configurable storage boundary
+
+**Status:** D-096 development implementation / runtime validation next.
+
+Implemented:
+- separate physical VOD root;
+- stable logical VOD identity;
+- Linux range-server `/vod` mapping;
+- explicit storage availability state;
+- deterministic UUID-based Linux mount helper.
+
+Pending validation:
+- host boundary probe;
+- onn playback / Continue Watching;
+- unplug/replug recovery without desktop activation.
+
+After acceptance:
+continue D5 with Linux browser/camera runners and integrated media/TV diagnostics.
+<!-- PRIVYHUB_D096_CONFIGURABLE_VOD_STORAGE:ROADMAP:END -->
+
 <!-- PRIVYHUB_D093R2_D5_EXTERNAL_VOD_RUNTIME_VALIDATION:ROADMAP_STATUS:BEGIN -->
 ## 2026-09-16 D5 external-VOD checkpoint
 

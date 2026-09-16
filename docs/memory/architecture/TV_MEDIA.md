@@ -6,6 +6,142 @@ baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
 
 # TV, IPTV, and Media Architecture
 
+<!-- PRIVYHUB_D101R1_BROWSER_CAMERA_C6_RECLASSIFICATION:TV_MEDIA:BEGIN -->
+## Browser/camera native source architecture placement
+
+The accepted future architecture for browser/app and camera/live streaming is
+the C6 generalized native source pipeline:
+
+`source/capture -> profile/encoder -> transport/FEC -> client decoder`
+
+This allows reuse of:
+- lifecycle/readiness;
+- stream profiles/capability gates;
+- telemetry/adaptation;
+- transport/FEC;
+- client decoder;
+- diagnostics.
+
+Browser input may later extend the client/session input contract to forward
+keyboard/mouse events from client-attached HID devices.
+
+Camera streaming-source infrastructure is C6; smart-home camera/device
+orchestration remains Phase I.
+<!-- PRIVYHUB_D101R1_BROWSER_CAMERA_C6_RECLASSIFICATION:TV_MEDIA:END -->
+
+<!-- PRIVYHUB_D100_D5_EXTERNAL_VOD_HOTPLUG_RUNTIME_ACCEPTANCE:TV_MEDIA:BEGIN -->
+## External VOD removable-storage architecture — accepted
+
+Runtime-validated architecture:
+
+```text
+logical /vod namespace + stable IDs
+        |
+configurable VOD root
+        |
+nonblocking backing-device presence boundary
+        |
+UUID/system-managed removable storage
+```
+
+Accepted behavior:
+- disk absent: control/media services stay available; dynamic VOD is empty;
+- stale saved source: controlled failure;
+- disk inserted: normal access activates/reuses the system mount;
+- next catalog refresh repopulates the same logical IDs;
+- Continue Watching survives the physical storage transition.
+
+Final physical E2E passed repeated unplug/reinsert cycles without Linux desktop
+or file-manager interaction.
+<!-- PRIVYHUB_D100_D5_EXTERNAL_VOD_HOTPLUG_RUNTIME_ACCEPTANCE:TV_MEDIA:END -->
+
+<!-- PRIVYHUB_D099_NONBLOCKING_VOD_PRESENCE_V1:TV_MEDIA:BEGIN -->
+## Nonblocking removable-VOD presence boundary
+
+Configured local removable storage separates device presence from filesystem access. Device absent -> fast `/dev/disk/...` check -> unavailable, no mount-path touch. Device present -> normal access may activate systemd automount. Range server remains online without VOD so internal media is independent of removable storage.
+<!-- PRIVYHUB_D099_NONBLOCKING_VOD_PRESENCE_V1:TV_MEDIA:END -->
+
+<!-- PRIVYHUB_D098_ABSENT_VOD_CATALOG_RESILIENCE_V1:TV_MEDIA:BEGIN -->
+## Removable VOD absent-state contract
+
+The logical `/vod` namespace may point at removable physical storage.
+
+When that storage is absent or disappears during a scan:
+- filesystem `OSError` is treated as storage unavailability;
+- dynamic VOD children are omitted for that request;
+- no partial scan is published;
+- the control API remains online;
+- saved/stale source IDs fail through a controlled response;
+- reinsertion plus a subsequent rescan restores the same logical IDs.
+
+This keeps removable storage failure isolated from unrelated PrivyHub
+subsystems.
+<!-- PRIVYHUB_D098_ABSENT_VOD_CATALOG_RESILIENCE_V1:TV_MEDIA:END -->
+
+<!-- PRIVYHUB_D097_VOD_APPLIANCE_MODE:TV_MEDIA:BEGIN -->
+## Removable VOD appliance operating model
+
+Prototype-1 bulk VOD storage is treated as removable appliance media.
+
+Normal mode:
+- UUID-backed `/mnt/privyhub-media`;
+- systemd `x-systemd.automount`;
+- `nofail`;
+- read-only filesystem;
+- logical `/vod/...` namespace independent of physical storage;
+- automount remains active even when disk is absent.
+
+This allows a headless/server workflow:
+`stop playback -> unplug -> later reinsert -> client access triggers recovery`.
+
+Writable media ingestion is intentionally not part of normal serving mode.
+Future direct rip/copy workflows should temporarily enter controlled writable
+maintenance mode and expose safe-disconnect through PrivyHub rather than SSH.
+<!-- PRIVYHUB_D097_VOD_APPLIANCE_MODE:TV_MEDIA:END -->
+
+<!-- PRIVYHUB_D096_CONFIGURABLE_VOD_STORAGE:TV_MEDIA:BEGIN -->
+## Configurable physical VOD root
+
+D-096 separates internal runtime media from bulk VOD storage.
+
+Logical namespace:
+- `/live/...` -> internal project `media/live`;
+- `/vod/...` -> configured physical VOD root, defaulting to project `media/vod`.
+
+Machine-local configuration:
+`data/storage.json` is ignored by Git and may contain an absolute `vod_root`.
+No external-disk path or UUID is tracked in the repository.
+
+Linux Prototype-1 mount:
+- stable mountpoint: `/mnt/privyhub-media`;
+- filesystem selected by UUID discovered locally by the setup helper;
+- systemd automount + `nofail`;
+- no dependence on user-session `/media/...` mounts.
+
+This shape is intentionally portable to later dedicated server/storage: the
+logical VOD namespace and media identity do not depend on the physical storage
+path.
+<!-- PRIVYHUB_D096_CONFIGURABLE_VOD_STORAGE:TV_MEDIA:END -->
+
+<!-- PRIVYHUB_D094_EXTERNAL_STORAGE_REMOUNT:TV_MEDIA:BEGIN -->
+## External media mount ownership
+
+The external-drive test demonstrated that Linux desktop automount may be lazy:
+physical reconnection alone did not recreate the mounted filesystem path, while
+opening the drive in the file manager did.
+
+PrivyHub itself recovered correctly after the mount appeared.
+
+Architecture:
+- OS/service layer: deterministic mount ownership at a stable path;
+- PrivyHub: configured bulk-media root + availability reporting;
+- scanner/range server: consume that root consistently;
+- client semantics: unavailable storage is not the same as an empty library.
+
+The final design should remain portable to later dedicated local/server storage
+and must not encode a removable-drive label or desktop-session mount path.
+<!-- PRIVYHUB_D094_EXTERNAL_STORAGE_REMOUNT:TV_MEDIA:END -->
+
 <!-- PRIVYHUB_D093R2_D5_EXTERNAL_VOD_RUNTIME_VALIDATION:TV_MEDIA:BEGIN -->
 ## External VOD runtime validation and next storage boundary
 

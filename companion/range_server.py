@@ -5,8 +5,17 @@ Small HTTP media server with single-range byte request support.
 PrivyHub uses this instead of Python's basic SimpleHTTPServer because
 Android Media3/ExoPlayer expects reliable HTTP Range behavior for VOD.
 
+The default HTTP namespace is served from --root.  When --vod-root is
+provided, the logical /vod/... namespace is served from that separate
+physical directory.  This keeps generated live/HLS content on the
+internal media root while allowing bulk VOD storage to live elsewhere.
+
 Example:
-    python range_server.py --root ../media --host 0.0.0.0 --port 8000
+    python range_server.py \
+        --root ../media \
+        --vod-root /mnt/privyhub-media/library/vod \
+        --host 0.0.0.0 \
+        --port 8000
 """
 
 from __future__ import annotations
@@ -18,8 +27,14 @@ import re
 from functools import partial
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import BinaryIO, Optional
+from urllib.parse import unquote, urlsplit
+
+from storage_presence import (
+    configured_local_backing_present,
+    lexical_absolute_path,
+)
 
 
 RANGE_RE = re.compile(
@@ -28,15 +43,81 @@ RANGE_RE = re.compile(
 
 
 class RangeRequestHandler(SimpleHTTPRequestHandler):
-    server_version = "PrivyHubMedia/0.2"
+    server_version = "PrivyHubMedia/0.3"
 
-    def __init__(self, *args, directory: str, **kwargs) -> None:
+    def __init__(
+        self,
+        *args,
+        directory: str,
+        vod_directory: Optional[str] = None,
+        **kwargs,
+    ) -> None:
         self._range: Optional[tuple[int, int]] = None
+        self._vod_directory = (
+            lexical_absolute_path(
+                vod_directory
+            )
+            if vod_directory
+            else None
+        )
 
         super().__init__(
             *args,
             directory=directory,
             **kwargs,
+        )
+
+    @staticmethod
+    def _vod_relative_parts(
+        request_path: str,
+    ) -> Optional[tuple[str, ...]]:
+        decoded = unquote(
+            urlsplit(request_path).path
+        ).replace("\\", "/")
+
+        parts = tuple(
+            part
+            for part in PurePosixPath(decoded).parts
+            if part not in {"/", "", "."}
+        )
+
+        if not parts or parts[0] != "vod":
+            return None
+
+        relative_parts = parts[1:]
+
+        if ".." in relative_parts:
+            raise ValueError(
+                "Unsafe VOD request path"
+            )
+
+        return relative_parts
+
+    def translate_path(
+        self,
+        path: str,
+    ) -> str:
+        if self._vod_directory is None:
+            return super().translate_path(path)
+
+        try:
+            relative_parts = (
+                self._vod_relative_parts(path)
+            )
+        except ValueError:
+            return str(
+                self._vod_directory
+                / ".privyhub-invalid-request"
+                / "__rejected__"
+            )
+
+        if relative_parts is None:
+            return super().translate_path(path)
+
+        return str(
+            self._vod_directory.joinpath(
+                *relative_parts
+            )
         )
 
     def end_headers(self) -> None:
@@ -48,6 +129,32 @@ class RangeRequestHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def send_head(self) -> Optional[BinaryIO]:
+        try:
+            vod_relative = (
+                self._vod_relative_parts(
+                    self.path
+                )
+            )
+        except ValueError:
+            self.send_error(
+                HTTPStatus.NOT_FOUND,
+                "File not found",
+            )
+            return None
+
+        if (
+            vod_relative is not None
+            and self._vod_directory is not None
+            and configured_local_backing_present(
+                self._vod_directory
+            ) is False
+        ):
+            self.send_error(
+                HTTPStatus.NOT_FOUND,
+                "File not found",
+            )
+            return None
+
         path = self.translate_path(self.path)
 
         if os.path.isdir(path):
@@ -249,7 +356,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--root",
         required=True,
-        help="Directory to expose over HTTP.",
+        help="Internal media directory to expose over HTTP.",
+    )
+
+    parser.add_argument(
+        "--vod-root",
+        default=None,
+        help=(
+            "Optional physical directory for the logical /vod namespace. "
+            "The directory may be temporarily unavailable."
+        ),
     )
 
     parser.add_argument(
@@ -285,9 +401,38 @@ def main() -> None:
             f"Media root is not a directory: {media_root}"
         )
 
+    vod_root = (
+        lexical_absolute_path(
+            args.vod_root
+        )
+        if args.vod_root
+        else lexical_absolute_path(
+            media_root / "vod"
+        )
+    )
+
+    backing_present = (
+        configured_local_backing_present(
+            vod_root
+        )
+    )
+
+    if backing_present is not False:
+        try:
+            if (
+                vod_root.exists()
+                and not vod_root.is_dir()
+            ):
+                raise NotADirectoryError(
+                    f"VOD root is not a directory: {vod_root}"
+                )
+        except OSError:
+            pass
+
     handler = partial(
         RangeRequestHandler,
         directory=str(media_root),
+        vod_directory=str(vod_root),
     )
 
     server = ThreadingHTTPServer(
@@ -300,6 +445,24 @@ def main() -> None:
 
     print("PrivyHub media server")
     print(f"Root: {media_root}")
+    print(f"VOD root: {vod_root}")
+    if backing_present is False:
+        vod_available = False
+    else:
+        try:
+            vod_available = (
+                vod_root.exists()
+                and vod_root.is_dir()
+            )
+        except OSError:
+            vod_available = False
+
+    print(
+        "VOD available: "
+        + str(
+            vod_available
+        )
+    )
     print(
         f"Listening on {args.host}:{args.port}"
     )

@@ -6,6 +6,321 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D101R1_BROWSER_CAMERA_C6_RECLASSIFICATION:CURRENT:BEGIN -->
+## D-101 browser/camera source work reclassified to C6
+
+The D5 external/removable VOD storage seam is runtime validated.
+
+Browser/camera work is reclassified:
+- do not port the old Windows browser/camera runners merely to satisfy D5;
+- finish D5 with VOD + Live TV/EPG + diagnostics/Self-Test;
+- finish D7/D8 Linux baseline acceptance;
+- then return to remaining Phase C work on Linux;
+- C6 builds browser/app and camera/live sources on the generalized native
+  capture -> profile/encoder -> transport/FEC -> client-decoder contract.
+
+Rationale:
+- browser streaming is strategically useful for the eventual stationary/headless
+  server role;
+- reusing the native decoder/telemetry/profile/transport infrastructure is a
+  substantial improvement over the original runner path;
+- the current Linux Prototype 1 has no representative camera hardware, so
+  local-camera parity should not block D5;
+- future onn-attached Bluetooth keyboard/mouse input is a useful C6 browser
+  control target, not a D5 restoration requirement;
+- broader smart-home camera/device integration remains Phase I.
+
+Current next step:
+D5 Live TV/EPG + diagnostics acceptance.
+<!-- PRIVYHUB_D101R1_BROWSER_CAMERA_C6_RECLASSIFICATION:CURRENT:END -->
+
+### D-101R1 local-roadmap correction
+
+The earlier D-101 attempt failed before modification because its
+installer incorrectly required `ROADMAP.md` at the Linux repository
+root. The roadmap file reviewed in chat was uploaded reference material;
+the repo's durable roadmap state is maintained in
+`docs/memory/roadmap/STATUS.md`.
+
+D-101R1 records the same accepted reclassification entirely through the
+actual durable-memory/decision files and does not create or require a
+new root-level roadmap file.
+
+<!-- PRIVYHUB_D100_D5_EXTERNAL_VOD_HOTPLUG_RUNTIME_ACCEPTANCE:CURRENT:BEGIN -->
+## D-100 external VOD hotplug runtime acceptance
+
+The configurable/removable external-VOD storage seam is runtime validated on
+the Linux Prototype-1 host and onn client.
+
+Validated end-to-end sequence:
+- external VOD connected: normal library and playback work;
+- physical unplug with no Linux/file-manager interaction: Companion remains
+  available and the VOD library cleanly shows no movies;
+- client refresh during absence succeeds;
+- reinsertion with no Linux/file-manager interaction: VOD automatically
+  repopulates;
+- Continue Watching reappears and resumes successfully;
+- second physical unplug again produces the same clean empty-VOD state;
+- client refresh succeeds at each transition.
+
+Earlier acceptance already established:
+- stable logical source identity for Aviator;
+- source-start HTTP 200 while storage is present;
+- logical `/vod` HTTP byte-range serving;
+- managed companion lifecycle cleanup;
+- absent-storage ENODEV no longer crashes catalog requests;
+- absent-storage probing no longer blocks long enough to make Android report
+  Companion unavailable;
+- stale Continue Watching fails cleanly while storage is absent;
+- media/control services remain available independently of removable VOD.
+
+D5 storage substep status: **COMPLETE / runtime validated**.
+
+D5 overall remains **ACTIVE**. Next:
+Linux browser/camera runner restoration, then integrated
+VOD + Live TV/EPG + diagnostics acceptance.
+<!-- PRIVYHUB_D100_D5_EXTERNAL_VOD_HOTPLUG_RUNTIME_ACCEPTANCE:CURRENT:END -->
+
+<!-- PRIVYHUB_D099_NONBLOCKING_VOD_PRESENCE_V1:CURRENT:BEGIN -->
+## D-099 nonblocking removable-VOD presence
+
+D-098 eliminated the ENODEV traceback, but absent-drive timing proved path-based checks were still activating the missing systemd automount: `/status` took ~3s, `/sources` and stale source-start exceeded 12s, Android reported Companion unavailable, and port 8000 was not listening.
+
+D-099 checks the configured local fstab backing device under `/dev/disk/...` before touching the VOD mount path. Absent local media now reports unavailable immediately. Configured VOD path normalization is lexical rather than filesystem-dereferencing, and the Range server starts independently of removable VOD presence. Raw storage identifiers are never logged.
+<!-- PRIVYHUB_D099_NONBLOCKING_VOD_PRESENCE_V1:CURRENT:END -->
+
+### D-099R1 installer pre-state correction
+
+The first D-099 installer attempt failed before modification because predecessor
+post-state was merged by hard-coded required/optional groups. Optional D-097 was
+applied after newer D-098 and incorrectly replaced newer hashes for overlapping
+durable-memory files.
+
+D-099R1 changes installer validation only:
+- collect the latest successful receipt for each installed predecessor;
+- sort those receipts by actual receipt modification time;
+- merge post-state in that chronological order;
+- newest installed receipt wins for overlapping files.
+
+The D-099 production payload is unchanged.
+
+<!-- PRIVYHUB_D098_ABSENT_VOD_CATALOG_RESILIENCE_V1:CURRENT:BEGIN -->
+## D-098 absent removable-VOD resilience
+
+Physical hotplug exposed a production defect after the configurable external
+VOD boundary:
+
+`GET /sources` could raise:
+`OSError: [Errno 19] No such device`
+
+The exception originated in `_scan_media_directory()` when `Path.exists()` was
+called on the configured external VOD root while the systemd automount existed
+but the physical filesystem was absent.
+
+Additional runtime evidence:
+- Companion/catalog behavior returns when the external disk is reinserted,
+  confirming the UUID mount and logical `/vod` mapping are functioning.
+- A saved Continue Watching item can also reach dynamic-source resolution while
+  storage is absent; that path must fail cleanly without making Companion
+  unavailable.
+
+D-098 changes only the dynamic media scanner:
+- filesystem `OSError` during initial dynamic-root availability checks returns
+  no dynamic children;
+- filesystem `OSError` anywhere in recursive enumeration/stat/resolve aborts
+  that scan and publishes no partial dynamic index;
+- `/sources` remains a valid control-API response while external VOD is absent;
+- a stale dynamic source id resolves to the existing controlled CatalogError
+  path rather than an uncaught filesystem exception;
+- the next successful rescan after reinsertion repopulates the same logical
+  source IDs.
+
+The systemd mount architecture, Android client, Games, live media, and controller
+paths are unchanged.
+<!-- PRIVYHUB_D098_ABSENT_VOD_CATALOG_RESILIENCE_V1:CURRENT:END -->
+
+<!-- PRIVYHUB_D097_VOD_APPLIANCE_MODE:CURRENT:BEGIN -->
+## D-097 removable VOD appliance mode
+
+D-096/R3 established the first-class external VOD root and validated host
+playback/lifecycle.
+
+A real unplug/reinsert exercise then showed:
+- when the automount unit was manually stopped for "eject", reinsertion could
+  not recover until the automount was started again;
+- once the automount was restarted, the library immediately returned in the onn
+  GUI and playback worked without desktop/file-manager activation.
+
+D-097 changes the operating model:
+- the systemd automount remains permanently active;
+- normal external VOD media mode is read-only;
+- user-session/file-manager mounting is not part of the workflow;
+- normal hotplug requires no Linux login or mount command;
+- with storage absent, PrivyHub remains operational and VOD is unavailable;
+- reinsertion is recovered by normal access to `/sources`/VOD, which activates
+  the system automount.
+
+Normal physical procedure after D-097:
+1. stop VOD playback;
+2. unplug the external VOD disk;
+3. later plug it back in;
+4. refresh/open VOD on the client.
+
+No server-side command is part of that normal procedure.
+
+Future maintenance/write mode is separate: adding/ripping media should use a
+deliberate writable workflow and eventually expose a PrivyHub/onn "Safely
+disconnect storage" action rather than relying on Linux shell access.
+<!-- PRIVYHUB_D097_VOD_APPLIANCE_MODE:CURRENT:END -->
+
+<!-- PRIVYHUB_D096R3_PROBE_LISTENER_LIFECYCLE:CURRENT:BEGIN -->
+## D-096R3 listener-based lifecycle acceptance
+
+Follow-up diagnostics after the D-096R2R1 probe established:
+- no PrivyHub companion/range-server processes remained;
+- port 8765 had no LISTEN socket;
+- port 8000 had no LISTEN socket;
+- neither port had an owning PID.
+
+Therefore the D-096 storage/runtime lifecycle is not leaking processes or
+listeners. The probe's raw bindability test was measuring a stricter socket
+reuse condition than the lifecycle question.
+
+D-096R3 changes only the probe:
+- lifecycle success requires the managed companion process to exit;
+- no PrivyHub companion/range-server process may remain;
+- neither 8765 nor 8000 may have a LISTEN socket;
+- a bounded wait remains for listener/process teardown;
+- TIME_WAIT or other closed-connection state is not treated as a lifecycle
+  failure;
+- exit code is now based on exact classification equality, fixing the bug where
+  `D096_STORAGE_BOUNDARY_NOT_CONFIRMED` incorrectly returned zero because its
+  name also ended in `_CONFIRMED`.
+
+Production media/storage code and stable mount configuration are unchanged.
+<!-- PRIVYHUB_D096R3_PROBE_LISTENER_LIFECYCLE:CURRENT:END -->
+
+<!-- PRIVYHUB_D096R2R1_PROBE_INSTALLER_PRESTATE:CURRENT:BEGIN -->
+## D-096R2R1 installer pre-state correction
+
+D-096R2 failed **before modification**.
+
+Observed precheck rejection listed legitimate D-096 tracked changes:
+- `companion/privyhub_service.py`
+- `companion/range_server.py`
+- `docs/memory/architecture/TV_MEDIA.md`
+- `docs/memory/investigations/ACTIVE.md`
+- `docs/memory/roadmap/STATUS.md`
+
+Cause:
+the R2 installer validated only the D-096R1 receipt when deciding which
+uncommitted tracked files were expected. D-096R1 intentionally changed only the
+storage helper and a subset of memory files, so the still-valid D-096 production
+and memory changes were omitted from the allowed pre-state.
+
+D-096R2R1 corrects installer validation only:
+- load both successful D-096 and D-096R1 receipts;
+- treat their post-state paths as one expected installed stack;
+- for overlapping files, use the newer D-096R1 hash;
+- for D-096-only files, require the exact D-096 post-state hash;
+- reject any tracked/staged modification outside that combined stack.
+
+The R2 lifecycle-aware probe itself is unchanged.
+<!-- PRIVYHUB_D096R2R1_PROBE_INSTALLER_PRESTATE:CURRENT:END -->
+
+<!-- PRIVYHUB_D096R1_STORAGE_DEVICE_DISCOVERY:CURRENT:BEGIN -->
+## D-096R1 storage-device discovery correction
+
+The D-096 application boundary installed successfully, but the first root-level
+storage configuration attempt rolled back before persistent modification.
+
+Failure:
+`blkid -s UUID -o value systemd-1`
+
+Cause:
+the helper used `findmnt -T <path>` and treated its SOURCE as the underlying
+block device. With the current systemd/desktop automount stack, findmnt reported
+the synthetic automount source `systemd-1` instead of the real partition.
+
+D-096R1 changes only storage-device discovery:
+- `stat()` the resolved VOD target to obtain its actual filesystem device number;
+- map that major:minor identifier to the real block partition through `lsblk`;
+- derive the current mountpoint from that block device's mountpoints;
+- use only the real `/dev/...` partition for UUID lookup.
+
+D-096 production media-root/range-server changes are preserved unchanged.
+
+Runtime storage configuration must be retried before D-096 acceptance.
+<!-- PRIVYHUB_D096R1_STORAGE_DEVICE_DISCOVERY:CURRENT:END -->
+
+<!-- PRIVYHUB_D096_CONFIGURABLE_VOD_STORAGE:CURRENT:BEGIN -->
+## D-096 configurable VOD storage boundary
+
+D5 external-storage evidence now supports a first-class storage boundary.
+
+D-095 established:
+- the current external VOD filesystem is exFAT;
+- it has a stable filesystem UUID;
+- it is hotplug-capable;
+- it is currently mounted by the desktop/user automount layer;
+- systemd/systemd-mount tooling is available;
+- `/etc/fstab` does not already own that filesystem.
+
+D-096 changes the architecture so bulk VOD no longer depends on the repo-local
+`media/vod/movies` symlink:
+- `data/storage.json` selects an optional physical VOD root;
+- default behavior remains project `media/vod`;
+- logical `/vod/...` paths and generated source IDs remain unchanged;
+- `media/live` remains on the internal project media root;
+- the Linux Range server maps `/vod/...` to the configured VOD root;
+- `/status` and `/sources` explicitly report VOD storage configured/mode/available;
+- the storage setup helper discovers the current filesystem UUID locally and
+  creates a stable systemd/fstab automount at `/mnt/privyhub-media`;
+- raw filesystem UUID is not written to PrivyHub logs/receipts;
+- the temporary desktop-path VOD symlink is removed only after stable mount and
+  local storage config validate successfully.
+
+The deterministic mount configuration uses the filesystem UUID rather than a
+desktop label/path. It is `nofail` + systemd automount, so boot remains possible
+when the drive is absent and later access can activate the mount when it returns.
+
+Runtime acceptance next:
+install D-096, configure the stable mount, run the D-096 managed lifecycle
+probe, then test onn playback and physical eject/reinsert recovery.
+<!-- PRIVYHUB_D096_CONFIGURABLE_VOD_STORAGE:CURRENT:END -->
+
+<!-- PRIVYHUB_D094_EXTERNAL_STORAGE_REMOUNT:CURRENT:BEGIN -->
+## D-094 external-storage remount behavior
+
+Fresh D5 runtime evidence clarified the remaining external-VOD storage boundary.
+
+Observed sequence:
+1. external drive ejected;
+2. VOD symlink target became unavailable;
+3. `/sources` correctly returned zero VOD sources;
+4. drive was physically reconnected but remained unmounted;
+5. opening the drive in the Linux file manager caused the OS desktop storage
+   layer to mount it;
+6. the existing VOD symlink immediately became valid again;
+7. PrivyHub dynamic rescanning repopulated the movie library without a companion
+   restart;
+8. onn movie playback worked normally again.
+
+Interpretation:
+- PrivyHub dynamic catalog recovery is already working when the configured
+  filesystem path becomes available again;
+- the missing behavior is deterministic OS-level storage mounting, not catalog
+  rescanning;
+- the appliance must not depend on a desktop file-manager click to activate
+  removable storage.
+
+Next D5 storage implementation should separate responsibilities:
+- OS/service layer owns deterministic mounting at a stable path;
+- PrivyHub owns explicit bulk-media-root configuration and availability state;
+- unavailable configured storage must be distinguishable from an empty library;
+- when the root returns, normal rescanning should repopulate automatically.
+<!-- PRIVYHUB_D094_EXTERNAL_STORAGE_REMOUNT:CURRENT:END -->
+
 <!-- PRIVYHUB_D093R2_D5_EXTERNAL_VOD_RUNTIME_VALIDATION:CURRENT:BEGIN -->
 ## D-093R2 D5 external-VOD runtime validation
 
