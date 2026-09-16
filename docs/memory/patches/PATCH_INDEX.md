@@ -6,6 +6,24 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:PATCH_INDEX:BEGIN -->
+### D-110 — D5 Linux EPG service/cache seam — 2026-09-16
+
+Production-seam development patch.
+
+Adds:
+- `companion/plugins/epg.py`;
+- EPG plugin registration;
+- D-110 runtime probe;
+- D-109 success evidence;
+- D-110 architecture/decision/investigation memory.
+
+No Android change.
+
+Runtime evidence next:
+`logs/tv/d110_epg_plugin_runtime_probe.txt`.
+<!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:PATCH_INDEX:BEGIN -->
 ### D-109 — D5 EPG portable-Node grabber probe — 2026-09-16
 

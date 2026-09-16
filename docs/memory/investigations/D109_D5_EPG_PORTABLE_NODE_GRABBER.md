@@ -1,5 +1,35 @@
 # D-109 — D5 EPG portable-Node grabber diagnostic
 
+<!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:D109_RESULT:BEGIN -->
+## Result — 2026-09-16
+
+D-109 passed.
+
+Classification:
+`D109_PORTABLE_NODE_LOCAL_GRABBER_VIABLE_MULTI_SITE`.
+
+Portable runtime:
+- Node 24.21.0;
+- npm 11.19.0;
+- official checksum verified;
+- runtime removed after probe.
+
+Refreshed D-108 measured:
+- 91 configured candidate sites;
+- 77.42 second upstream setup;
+- 445,831,397 byte disposable toolchain tree.
+
+Successful programme grabs:
+- i.mjh.nz: 33;
+- pluto.tv: 32;
+- plex.tv: 1.
+
+Decision:
+local acquisition is viable. Move to a persistent rebuildable Linux
+acquisition/cache service seam; do not repeat npm setup per guide request and do
+not install Node system-wide.
+<!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:D109_RESULT:END -->
+
 **Status:** diagnostic-only / runtime evidence next
 
 ## Narrow question

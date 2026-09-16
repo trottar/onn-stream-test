@@ -6,6 +6,25 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:ACTIVE:BEGIN -->
+## D5.3 active — Linux EPG production seam
+
+D-109 closed the technical-viability question with real multi-site programme
+output.
+
+The active boundary is now the companion service/cache implementation.
+
+D-110 runtime-validates:
+- side-effect-free companion startup;
+- persistent rebuildable EPG bootstrap;
+- exact feed-aware acquisition;
+- positive programme cache;
+- stable plugin API behavior.
+
+Do not modify Android EPG networking in the same patch. D-111 owns that boundary
+after Linux validation.
+<!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:ACTIVE:END -->
+
 <!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:ACTIVE:BEGIN -->
 ## D5.3 active — temporary EPG toolchain environment
 

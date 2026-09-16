@@ -6,6 +6,35 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:MEMORY:BEGIN -->
+## Linux EPG acquisition/cache ownership rule
+
+D-109 proved multi-site local EPG acquisition.
+
+For D5, Linux now owns EPG acquisition/cache through the companion plugin API.
+Android continues to own its local SQLite/UI cache until the Linux seam is
+runtime validated.
+
+Reference-grabber resource facts:
+- initial setup: 77.42 seconds;
+- disposable upstream tree: 445,831,397 bytes;
+- representative uncached channel grabs: about 7-8 seconds.
+
+Therefore:
+- never reinstall/clone the upstream grabber for every guide request;
+- keep toolchain state persistent but rebuildable under ignored `data/epg`;
+- do not make Node/npm a system package dependency merely because the reference
+  implementation uses Node;
+- do not block normal companion startup on EPG bootstrap;
+- cache positive programme results for normal guide navigation;
+- preserve stale cached guide data when refresh fails;
+- preserve exact `channel[@feed]` identity and keep fuzzy matching deferred.
+
+A passing D-110 does not settle the final cheap-Linux dependency footprint.
+Toolchain slimming/native acquisition remains an optimization question after
+functional D5 acceptance.
+<!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:MEMORY:END -->
+
 <!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:MEMORY:BEGIN -->
 ## Diagnostic toolchain must not become appliance dependency by accident
 

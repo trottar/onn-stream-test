@@ -6,6 +6,44 @@ baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
 
 # TV, IPTV, and Media Architecture
 
+<!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:TV_MEDIA:BEGIN -->
+## Linux EPG acquisition/cache service boundary
+
+D-109 established that the current upstream grabber can generate real programme
+data from multiple guide sites.
+
+D-110's development architecture is:
+
+```text
+upstream guide metadata + site definitions
+        |
+persistent rebuildable Linux EPG toolchain
+        |
+Linux programme cache
+        |
+existing companion /plugins API
+        |
+future Android EPG adapter
+        |
+onn local SQLite/UI cache
+```
+
+Properties:
+- companion startup does not bootstrap EPG;
+- EPG runtime lives under ignored `data/epg`;
+- Node/npm is not installed system-wide;
+- official portable runtime checksum and upstream commit are pinned;
+- exact `channel[@feed]` identity is preserved;
+- programme acquisition is serialized and bounded;
+- positive results are cached;
+- stale cache may survive refresh failure;
+- no Android dependency on the upstream grabber implementation.
+
+The ~446 MB reference toolchain footprint is acceptable only as a Prototype-1
+development seam. Resource slimming or a smaller native acquisition adapter
+remains open for cheap future Linux targets.
+<!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:TV_MEDIA:END -->
+
 <!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:TV_MEDIA:BEGIN -->
 ## EPG reference grabber dependency boundary
 

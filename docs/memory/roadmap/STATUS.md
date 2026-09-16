@@ -6,6 +6,21 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:ROADMAP:BEGIN -->
+## D5.3 EPG — Linux service/cache seam
+
+**Status:** ACTIVE / D-110 Linux runtime validation next.
+
+D-109 proved local EPG acquisition across three independent sites.
+
+D-110 moves that capability behind the existing companion plugin API with
+persistent rebuildable toolchain/cache state.
+
+Android remains unchanged until the Linux boundary passes.
+
+D5.4 TV-state sync remains pending behind D5.3.
+<!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:ROADMAP:END -->
+
 <!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:ROADMAP:BEGIN -->
 ## D5.3 EPG — portable diagnostic environment
 

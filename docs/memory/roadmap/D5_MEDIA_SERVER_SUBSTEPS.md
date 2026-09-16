@@ -6,6 +6,27 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:D5_SUBSTEPS:BEGIN -->
+## D5.3 execution checkpoint — D-110
+
+D-109 local programme acquisition is runtime validated across multiple guide
+sites.
+
+D5.3 remains ACTIVE / not accepted because the result is still a diagnostic
+toolchain path rather than a PrivyHub service boundary.
+
+D-110 adds and validates the Linux companion EPG plugin/cache seam.
+
+Acceptance for this substep:
+1. status endpoint responds with the expected schema;
+2. persistent toolchain bootstrap succeeds;
+3. two representative canonical channels return programmes;
+4. repeated first-channel read is served from cache;
+5. companion startup remains independent of EPG bootstrap.
+
+Android integration remains D-111 and is not part of D-110.
+<!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:D5_SUBSTEPS:END -->
+
 <!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:D5_SUBSTEPS:BEGIN -->
 ## D5.3 execution checkpoint — D-109
 

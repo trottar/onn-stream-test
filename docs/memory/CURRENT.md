@@ -6,6 +6,39 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:CURRENT:BEGIN -->
+## D-110 D5.3 Linux EPG service/cache seam
+
+D-109 is runtime validated.
+
+Measured local acquisition success:
+- official portable Node 24.21.0 verified and removed after diagnostic use;
+- upstream EPG checkout/setup passed;
+- three independent sites produced real programme data;
+- setup cost: 77.42 seconds;
+- disposable upstream tree: 445,831,397 bytes;
+- representative uncached grabs: approximately 7-8 seconds each.
+
+Therefore local EPG acquisition is technically viable, but rebuilding the
+toolchain per request is not a viable production pattern.
+
+D-110 adds the smallest Linux production seam:
+- companion `epg` plugin behind the existing `/plugins/<plugin>/<action>` API;
+- persistent rebuildable toolchain under ignored `data/epg`;
+- no system Node/npm installation;
+- lazy/explicit bootstrap so companion startup remains fast;
+- exact feed-aware channel identity only;
+- 24-hour guide-metadata cache;
+- 6-hour positive / 30-minute negative programme cache;
+- stale-cache fallback on refresh failure.
+
+Android remains unchanged in D-110.
+
+D5.3 remains ACTIVE until the D-110 endpoint/bootstrap/cache runtime probe
+passes. If it passes, D-111 may connect the existing Android EPG repository to
+the Linux endpoint while retaining onn local cache/offline behavior.
+<!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:CURRENT:END -->
+
 <!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:CURRENT:BEGIN -->
 ## D-109 D5.3 portable-Node acquisition diagnostic
 

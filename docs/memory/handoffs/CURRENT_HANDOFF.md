@@ -6,6 +6,29 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:HANDOFF:BEGIN -->
+## D-110 handoff — Linux EPG plugin/cache seam
+
+D-109 passed multi-site local acquisition.
+
+D-110 adds Linux-side EPG service/cache only. Android is intentionally untouched.
+
+After installing/pushing D-110:
+1. restart `python .\companion\privyhub_service.py` equivalent on the current
+   Linux repo (`python3 ./companion/privyhub_service.py`);
+2. run `tools/probes/d110_epg_plugin_runtime_probe.py`;
+3. return `logs/tv/d110_epg_plugin_runtime_probe.txt`.
+
+Runtime acceptance requires:
+- EPG status endpoint;
+- verified persistent toolchain bootstrap;
+- nonempty programme results for two representative channels;
+- cached second read for the first channel.
+
+If D-110 passes, next is D-111 Android integration using the companion EPG
+endpoint with onn SQLite/cache fallback.
+<!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:HANDOFF:END -->
+
 <!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:HANDOFF:BEGIN -->
 ## D-109 handoff — portable Node for D-108
 

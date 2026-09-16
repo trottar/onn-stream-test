@@ -1,9 +1,11 @@
 from .iptv_org import IPTVOrgPlugin
+from .epg import EpgPlugin
 from .games import GamesPlugin
 
 
 PLUGINS = {
     "iptv_org": IPTVOrgPlugin(),
+    "epg": EpgPlugin(),
     "games": GamesPlugin(),
 }
 # PRIVYHUB_A4_PLUGIN_LIFECYCLE_SHUTDOWN_V1
