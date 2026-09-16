@@ -6,6 +6,31 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:HANDOFF:BEGIN -->
+## D-107 handoff — feed-aware EPG identity
+
+D-106 raw provider/identity measurements are valid, but its zero built-in guide
+overlap was produced by an incomplete comparison:
+
+playlist:
+`channel@feed`
+
+guide API:
+`channel` + `feed`
+
+D-107 canonicalizes the guide pair back to `channel@feed` and measures exact
+coverage, base-channel coverage, and controlled fallback candidates.
+
+Run:
+`python3 tools/probes/d107_epg_feed_identity_probe.py --repo /home/privyhub/Projects/onn-stream-test`
+
+Return:
+`logs/tv/d107_epg_feed_identity_probe.txt`.
+
+Public hosted guide-source availability remains two channels. Production EPG
+changes remain blocked until D-107 is reviewed.
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:HANDOFF:END -->
+
 <!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:HANDOFF:BEGIN -->
 ## D-106 handoff — EPG provider / identity split
 

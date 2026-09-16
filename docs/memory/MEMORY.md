@@ -6,6 +6,31 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:MEMORY:BEGIN -->
+## IPTV-org channel/feed canonical identity rule
+
+For current IPTV-org stream/guide data, identity can include a feed dimension.
+
+Playlist stream IDs may be:
+- `<channel_id>`;
+- `<channel_id>@<feed_id>`.
+
+API stream and guide records expose the same components separately as
+`channel` and optional `feed`.
+
+Canonical comparison rule:
+- feed blank -> `channel`;
+- feed nonblank -> `channel@feed`.
+
+Never compare a composite playlist ID only against the guide's bare `channel`
+field and interpret non-overlap as missing metadata.
+
+D-106's provider/synthetic counts remain valid, but its
+`D106_BUILTIN_GUIDE_METADATA_COVERAGE_SPARSE` classification is superseded.
+
+Public guide-source availability is a separate dimension and remains minimal.
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:MEMORY:END -->
+
 <!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:MEMORY:BEGIN -->
 ## TV channel identity quality rule
 

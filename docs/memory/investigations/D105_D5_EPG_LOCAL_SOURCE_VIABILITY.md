@@ -1,5 +1,20 @@
 # D-105 — D5 EPG local-source viability
 
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:D105_CORRECTION:BEGIN -->
+## Feed-identity correction after D-106
+
+D-105's public-source result remains valid: current hosted guide-source
+availability is effectively absent for the onn catalog.
+
+Its 89/3,286 metadata-overlap figure is representation-incomplete for built-in
+IPTV-org streams because current playlist IDs may include `@feed` while the
+probe compared them only to guide `channel`.
+
+Do not use the D-105 exact-overlap percentage as final metadata coverage.
+
+D-107 supersedes that coverage calculation with feed-aware canonical identity.
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:D105_CORRECTION:END -->
+
 <!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:D105_RESULT:BEGIN -->
 ## Result — 2026-09-16
 

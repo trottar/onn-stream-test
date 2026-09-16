@@ -6,6 +6,32 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:CURRENT:BEGIN -->
+## D-107 D5.3 EPG feed-aware identity correction
+
+D-106 completed, but its built-in sparse-coverage classification is superseded.
+
+Valid D-106 raw measurements:
+- 3,169 meaningful onn channel IDs;
+- 117 synthetic `tv_stream_*` IDs;
+- built-in `iptv_org` has 3,017 meaningful IDs and 2,973 overlaps with the
+  current English playlist.
+
+Invalid D-106 inference:
+the probe compared composite playlist IDs directly with only guide `channel`.
+
+Current IPTV-org contracts define stream identity as `<channel_id>` or
+`<channel_id>@<feed_id>`, while API guide records expose `channel` and `feed`
+separately.
+
+D-107 is diagnostic-only and recomputes metadata coverage using canonical
+`channel@feed` identity. Public hosted-source availability remains only two
+channels and is unchanged by this correction.
+
+Do not make another Android or Linux EPG production change until D-107 is
+reviewed.
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:CURRENT:END -->
+
 <!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:CURRENT:BEGIN -->
 ## D-106 D5.3 EPG provider/identity diagnostic
 

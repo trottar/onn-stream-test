@@ -1,5 +1,20 @@
 # D-105 — D5 EPG metadata coverage result — 2026-09-16
 
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:D105_EVIDENCE_CORRECTION:BEGIN -->
+## Superseding identity note
+
+The raw D-105 counts remain evidence, but the reported exact guide-metadata
+coverage is not a final built-in IPTV-org coverage metric.
+
+Reason:
+current playlist IDs may encode `<channel>@<feed>`, while the D-105 guide
+comparison used only the bare `channel` field and ignored guide `feed`.
+
+The public hosted-source finding remains valid.
+
+D-107 provides the authoritative feed-aware coverage measurement.
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:D105_EVIDENCE_CORRECTION:END -->
+
 **Status:** runtime validated diagnostic result
 
 D-105 completed successfully against the onn TV database and current IPTV-org

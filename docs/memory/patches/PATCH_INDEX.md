@@ -6,6 +6,23 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:PATCH_INDEX:BEGIN -->
+### D-107 — D5 EPG feed-aware identity probe — 2026-09-16
+
+Diagnostic-only patch.
+
+Supersedes D-106's sparse built-in guide-coverage classification after source
+review established that playlist IDs can encode `channel@feed` while guide API
+records carry `channel` and `feed` separately.
+
+Adds a read-only canonical identity probe and durable-memory correction.
+
+No production code changes.
+
+Runtime evidence next:
+`logs/tv/d107_epg_feed_identity_probe.txt`.
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:PATCH_INDEX:BEGIN -->
 ### D-106 — D5 EPG provider/identity probe — 2026-09-16
 

@@ -6,6 +6,23 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:ACTIVE:BEGIN -->
+## D5.3 active — feed-aware guide identity
+
+D-106 established that synthetic IDs are only a small part of the catalog, but
+its built-in zero-overlap result used the wrong identity representation.
+
+Upstream stream IDs can contain `@feed`; guide records carry that feed in a
+separate field.
+
+Active narrow diagnostic:
+recompute built-in and onn metadata coverage with canonical `channel@feed`
+identity.
+
+D-107 is read-only. No fuzzy matching, local guide generation, or Android EPG
+mapping change before its result.
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:ACTIVE:END -->
+
 <!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:ACTIVE:BEGIN -->
 ## D5.3 active — provider / channel identity
 

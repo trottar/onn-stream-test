@@ -6,6 +6,25 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:D5_SUBSTEPS:BEGIN -->
+## D5.3 execution checkpoint — D-107
+
+D-106 completed but exposed a representation error in the guide-coverage
+diagnostics.
+
+D5.3 remains ACTIVE / not accepted.
+
+D-107:
+1. rebuild guide identity as `channel@feed` when feed is present;
+2. recompute built-in English playlist exact coverage;
+3. measure base-channel and blank-feed fallback candidates separately;
+4. recompute provider-specific onn coverage;
+5. preserve public hosted-source availability as an independent measurement.
+
+Only after D-107 should D5 choose between Linux-local guide acquisition,
+feed-aware production mapping, or alternative guide sources.
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:D5_SUBSTEPS:END -->
+
 <!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:D5_SUBSTEPS:BEGIN -->
 ## D5.3 execution checkpoint — D-106
 

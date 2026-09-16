@@ -1,5 +1,29 @@
 # D-106 — D5 EPG provider / identity diagnostic
 
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:D106_RESULT:BEGIN -->
+## Result and correction — 2026-09-16
+
+D-106 completed successfully.
+
+Raw provider/identity measurements are valid:
+- 3,169 meaningful IDs;
+- 117 synthetic IDs;
+- `iptv_org`: 3,017 meaningful IDs;
+- `free_tv`: 153 meaningful IDs;
+- `freecasthub`: 1 meaningful ID / 107 synthetic IDs.
+
+The classification
+`D106_BUILTIN_GUIDE_METADATA_COVERAGE_SPARSE`
+is superseded.
+
+Cause:
+D-106 compared playlist `tvg-id` values such as `channel@feed` with only the
+guide API `channel`, ignoring its separate `feed` field.
+
+D-107 recomputes the intersection with feed-aware canonical identity before any
+architecture decision.
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:D106_RESULT:END -->
+
 **Status:** diagnostic-only / runtime evidence next
 
 ## Question

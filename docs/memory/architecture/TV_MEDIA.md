@@ -6,6 +6,25 @@ baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
 
 # TV, IPTV, and Media Architecture
 
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:TV_MEDIA:BEGIN -->
+## Feed-aware TV / EPG identity
+
+Current IPTV-org stream identity is feed-aware.
+
+Canonical identity is:
+- `channel` when no feed is present;
+- `channel@feed` when a feed is present.
+
+The playlist may carry this as one `tvg-id` string, while API stream and guide
+records expose `channel` and `feed` separately.
+
+PrivyHub diagnostics and future EPG mapping must preserve this distinction.
+
+This is an exact structural identity rule, not fuzzy matching.
+
+D-107 measures the impact before any production schema or mapping change.
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:TV_MEDIA:END -->
+
 <!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:TV_MEDIA:BEGIN -->
 ## EPG source-format compatibility boundary
 

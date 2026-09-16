@@ -6,6 +6,20 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:ROADMAP:BEGIN -->
+## D5.3 EPG — feed-aware identity diagnostic
+
+**Status:** ACTIVE / D-107 runtime evidence next.
+
+D-106's raw identity-quality data is accepted, but its sparse built-in guide
+coverage classification is superseded by the discovered channel/feed
+representation mismatch.
+
+D-107 recomputes coverage using the upstream canonical stream identity model.
+
+D5.4 TV-state sync remains pending behind D5.3.
+<!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:ROADMAP:END -->
+
 <!-- PRIVYHUB_D106_D5_EPG_PROVIDER_IDENTITY:ROADMAP:BEGIN -->
 ## D5.3 EPG — provider/identity diagnostic
 
