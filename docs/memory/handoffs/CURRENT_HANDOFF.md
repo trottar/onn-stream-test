@@ -6,6 +6,27 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:HANDOFF:BEGIN -->
+## D-105 handoff — D5.3 EPG source availability
+
+D-104R2 was installed/pushed and a fresh D-103 run still produced 2 supported
+mappings, 0 programmes, and 0 catalog intersection.
+
+The current official IPTV-org public guide-worker list explains the count: only
+one green worker is presently publishing guide data, for 2 channels.
+
+Do not add another Android parser compatibility change.
+
+Run:
+`python3 tools/probes/d105_epg_local_source_viability_probe.py --repo /home/privyhub/Projects/onn-stream-test`
+
+Return:
+`logs/tv/d105_epg_local_source_viability_probe.txt`
+
+The result decides whether D5 should pivot to Linux-local EPG acquisition/cache
+or first investigate guide metadata/catalog identity coverage.
+<!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:HANDOFF:END -->
+
 <!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:HANDOFF:BEGIN -->
 ## D-104 handoff — D5.3 EPG source repair
 

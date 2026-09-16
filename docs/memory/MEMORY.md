@@ -6,6 +6,29 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:MEMORY:BEGIN -->
+## IPTV-org guide-row versus hosted-source rule
+
+As of 2026-09-16, IPTV-org `guides.json` contains 180,681 guide metadata rows,
+but current public hosted guide availability is drastically smaller. Official
+`epg/GUIDES.md` lists one green worker covering 2 channels; the other listed
+workers report 0.
+
+Do not equate top-level `guides.json` row count with downloadable EPG coverage.
+
+PrivyHub must distinguish:
+- guide metadata identity: channel, feed, site, site ID, language;
+- currently available hosted guide sources: `sources[]`;
+- actual programme coverage after XMLTV acquisition.
+
+D-104R2's XML/GZIP compatibility is safe to retain, but runtime evidence showed
+it does not solve the present 2-mapping/0-programme condition.
+
+Before choosing a production EPG architecture, measure metadata-to-catalog
+coverage without the public-source filter. If coverage is useful, Linux-local
+EPG acquisition/caching is the next architectural candidate.
+<!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:MEMORY:END -->
+
 <!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:MEMORY:BEGIN -->
 ## D5 EPG source-format compatibility rule
 

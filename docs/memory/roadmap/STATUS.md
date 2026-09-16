@@ -6,6 +6,22 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:ROADMAP:BEGIN -->
+## D5.3 EPG — upstream source availability
+
+**Status:** ACTIVE / diagnostic correction.
+
+D-104R2 is installed and pushed but did not change the runtime EPG result:
+2 mappings / 0 programmes.
+
+The current official IPTV-org public worker inventory also exposes only 2
+channels, so D5.3 cannot be accepted as a parser-format repair.
+
+Next checkpoint: D-105 guide-metadata/catalog coverage probe.
+
+D5.4 TV-state sync remains pending behind D5.3.
+<!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:ROADMAP:END -->
+
 <!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:ROADMAP:BEGIN -->
 ## D5.2 -> D5.3 EPG transition
 

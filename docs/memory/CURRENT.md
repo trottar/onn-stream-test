@@ -6,6 +6,31 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:CURRENT:BEGIN -->
+## D-105 D5.3 EPG upstream-availability correction
+
+Fresh post-D-104R2 runtime evidence did **not** increase guide coverage:
+- 180,681 `guides.json` rows still reduced to 2 supported XML/GZIP mappings;
+- onn still held 2 EPG mappings and 0 programmes;
+- those 2 mappings intersected none of the 3,286 onn TV channel IDs.
+
+Current official IPTV-org guide-worker status corroborates the result: one
+green public worker currently covers 2 channels; the other listed workers are
+down with 0 channels.
+
+Therefore the earlier D-103 `schema/format divergence` classification was too
+broad. The authoritative first boundary is now upstream hosted-source
+availability, not Android GZIP support.
+
+D-104R2 remains a compatible development change but is **not D5.3 runtime
+acceptance**.
+
+Next: run D-105, which measures guide metadata/catalog identity coverage before
+the `sources[]` availability filter and ranks the guide sites covering the onn
+catalog. Do not make another Android EPG parser change until that evidence is
+reviewed.
+<!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:CURRENT:END -->
+
 <!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:CURRENT:BEGIN -->
 ## D-104 D5.3 EPG source-format compatibility repair
 

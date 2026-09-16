@@ -6,6 +6,28 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:ACTIVE:BEGIN -->
+## D5.3 active — EPG local-source viability
+
+D-104R2 runtime evidence invalidated the assumption that source compression was
+the main remaining blocker.
+
+Measured state:
+- guide metadata rows: 180,681;
+- source-backed mappings accepted: 2;
+- onn mappings: 2;
+- programmes: 0;
+- exact/case-insensitive intersection with onn channel IDs: 0;
+- official public guide workers currently cover 2 channels total.
+
+Active narrow question:
+does guide metadata itself cover the onn catalog before source availability is
+applied?
+
+D-105 is diagnostic-only and answers that question. Production EPG architecture
+must wait for the result.
+<!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:ACTIVE:END -->
+
 <!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:ACTIVE:BEGIN -->
 ## D5.3 active — EPG GZIP source compatibility
 

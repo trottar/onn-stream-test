@@ -6,6 +6,24 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:PATCH_INDEX:BEGIN -->
+### D-105 — D5 EPG local-source viability probe — 2026-09-16
+
+Diagnostic-only patch.
+
+Adds a read-only probe that measures IPTV-org guide metadata coverage against
+the effective onn catalog before current hosted-source availability is applied.
+
+Also records the corrected D5.3 diagnosis:
+D-104R2 did not increase the 2-mapping/0-programme state, and official upstream
+public guide-worker availability currently covers only 2 channels.
+
+Production Android/companion/media/game code is unchanged.
+
+Runtime evidence next:
+`logs/tv/d105_epg_local_source_viability_probe.txt`.
+<!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:PATCH_INDEX:BEGIN -->
 ### D-104 — D5.3 EPG GZIP source support — 2026-09-16
 

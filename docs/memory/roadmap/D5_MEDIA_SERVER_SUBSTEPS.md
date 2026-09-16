@@ -6,6 +6,24 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:D5_SUBSTEPS:BEGIN -->
+## D5.3 correction — D-105 source-availability boundary
+
+D-104R2 did not increase runtime EPG mappings or programmes.
+
+D5.3 remains ACTIVE, not accepted.
+
+The next substep is D-105:
+1. measure all guide metadata IDs against the onn catalog before `sources[]`;
+2. measure English guide metadata coverage;
+3. measure currently source-backed matched channels;
+4. identify the guide sites with the largest matched channel coverage;
+5. decide between Linux-local EPG acquisition/cache and an identity/provider
+   investigation.
+
+TV-state ownership/sync remains D5.4 after the EPG direction is resolved.
+<!-- PRIVYHUB_D105_D5_EPG_LOCAL_SOURCE_VIABILITY:D5_SUBSTEPS:END -->
+
 <!-- PRIVYHUB_D104R2_D5_EPG_GZIP_SOURCE_SUPPORT:D5_SUBSTEPS:BEGIN -->
 ## D5.2/D5.3 execution checkpoint — D-104
 
