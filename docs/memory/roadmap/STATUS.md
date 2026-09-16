@@ -6,6 +6,24 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D088_MULTITAP_RUNTIME_VALIDATION:ROADMAP:BEGIN -->
+## 2026-09-16 D4 multiplayer checkpoint
+
+**Phase D remains ACTIVE.**
+
+Runtime validated inside D4:
+- integrated Linux gameplay controller parity across three games / three input
+  profiles;
+- PS1 Port-1 multitap/four-player parity in Crash Bash with four independent
+  remotes/controllers.
+
+Remaining D4 scope before normal-use Games parity is complete:
+- representative final Games regression/acceptance across required lifecycle and
+  feature paths.
+
+After D4 acceptance, proceed to D5 media/server restoration.
+<!-- PRIVYHUB_D088_MULTITAP_RUNTIME_VALIDATION:ROADMAP:END -->
+
 <!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:ROADMAP:BEGIN -->
 ## 2026-09-16 D4 controller checkpoint
 

@@ -205,3 +205,18 @@ PS1 multitap remains a topology/session feature above this accepted lower input
 path. Debug it without changing the validated PHI1/uinput/udev/A8 foundation
 unless fresh evidence specifically contradicts that boundary.
 <!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:ARCH:END -->
+
+<!-- PRIVYHUB_D087_LINUX_PS1_MULTITAP_CONFIG_PATH:ARCH:BEGIN -->
+## PS1 multitap core-options Config root
+
+The multitap adapter materializes a content-specific Beetle PSX HW `.opt`.
+
+Config-root selection is host-specific:
+- Windows portable: executable-adjacent `config`;
+- Linux AppImage: XDG RetroArch Config tree
+  (`$XDG_CONFIG_HOME/retroarch/config`, else `~/.config/retroarch/config`).
+
+The selected core directory remains `<Config root>/Beetle PSX HW`.
+Do not encode a specific Linux home path in product configuration; derive XDG/home
+at runtime.
+<!-- PRIVYHUB_D087_LINUX_PS1_MULTITAP_CONFIG_PATH:ARCH:END -->

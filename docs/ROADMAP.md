@@ -370,6 +370,23 @@ Still required inside D4 before normal-use Games parity is complete:
 The Windows Phase-A multitap result is the behavior reference. Do not redesign
 the feature until a Linux diagnostic identifies the first divergent boundary.
 
+### D4 multiplayer checkpoint — 2026-09-16
+
+Runtime validated on Linux:
+- PS1 Port-1 multitap in Crash Bash;
+- Players 3/4 available;
+- four independent remotes/controllers;
+- D-087 XDG/user Config-root portability fix;
+- D-087R1 external Config-path metadata fix.
+
+The dedicated multiplayer blocker is closed.
+
+Still required inside D4 before normal-use Games parity is complete:
+- representative final normal-use regression/acceptance across the required
+  Games lifecycle and feature paths.
+
+After D4 acceptance, continue to D5 media/server restoration.
+
 ## D5 — Restore media/server functionality
 
 Restore the currently working media/server functions at the Linux migration boundary without broadening scope:

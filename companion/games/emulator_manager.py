@@ -2240,6 +2240,117 @@ class EmulatorManager:
                 game
             )
 
+    # PRIVYHUB_D087_LINUX_PS1_MULTITAP_CONFIG_PATH
+    def _retroarch_config_directory(
+        self,
+        runtime: dict[str, Any],
+    ) -> Path:
+        platform = str(
+            runtime.get(
+                "runtime_platform",
+                "",
+            )
+        ).strip().casefold()
+
+        executable = Path(
+            runtime[
+                "executable"
+            ]
+        ).resolve()
+
+        if platform == "windows":
+            config_directory = (
+                executable.parent
+                / "config"
+            ).resolve()
+            try:
+                config_directory.relative_to(
+                    self.project_root
+                )
+            except ValueError as exc:
+                raise EmulatorError(
+                    "Windows RetroArch Config directory escaped the project root"
+                ) from exc
+            return config_directory
+
+        if platform == "linux":
+            raw_xdg = str(
+                os.environ.get(
+                    "XDG_CONFIG_HOME",
+                    "",
+                )
+            ).strip()
+            if raw_xdg:
+                config_home = Path(
+                    os.path.expanduser(
+                        raw_xdg
+                    )
+                )
+                if not config_home.is_absolute():
+                    raise EmulatorError(
+                        "XDG_CONFIG_HOME must be an absolute path"
+                    )
+                config_home = config_home.resolve()
+            else:
+                config_home = (
+                    Path.home()
+                    / ".config"
+                ).resolve()
+
+            retroarch_root = (
+                config_home
+                / "retroarch"
+            ).resolve()
+            config_directory = (
+                retroarch_root
+                / "config"
+            ).resolve()
+            try:
+                config_directory.relative_to(
+                    retroarch_root
+                )
+            except ValueError as exc:
+                raise EmulatorError(
+                    "Linux RetroArch Config directory escaped its trusted root"
+                ) from exc
+            return config_directory
+
+        raise EmulatorError(
+            "PS1 multitap has no RetroArch Config-directory adapter for "
+            f"host platform: {platform or '<blank>'}"
+        )
+
+    # PRIVYHUB_D087R1_LINUX_PS1_MULTITAP_METADATA_PATH
+    def _retroarch_options_metadata_path(
+        self,
+        target_options: Path,
+        config_directory: Path,
+        runtime_platform: str,
+    ) -> str:
+        platform = str(runtime_platform).strip().casefold()
+        target = target_options.resolve()
+        if platform == "windows":
+            try:
+                relative = target.relative_to(self.project_root)
+            except ValueError as exc:
+                raise EmulatorError(
+                    "Windows multitap options metadata escaped the project root"
+                ) from exc
+            return str(relative).replace("\\", "/")
+        if platform == "linux":
+            trusted_config = config_directory.resolve()
+            try:
+                relative = target.relative_to(trusted_config)
+            except ValueError as exc:
+                raise EmulatorError(
+                    "Linux multitap options metadata escaped the RetroArch Config directory"
+                ) from exc
+            return "retroarch-config/" + str(relative).replace("\\", "/")
+        raise EmulatorError(
+            "PS1 multitap has no metadata-path adapter for host platform: "
+            + (platform or "<blank>")
+        )
+
     def _prepare_ps1_multitap_options(
         self,
         game: dict[str, Any],
@@ -2295,24 +2406,22 @@ class EmulatorManager:
                 f"{mode or '<blank>'}"
             )
 
-        executable = Path(
-            runtime[
-                "executable"
-            ]
-        ).resolve()
-        runtime_root = executable.parent.resolve()
+        config_directory = (
+            self._retroarch_config_directory(
+                runtime
+            )
+        )
         options_directory = (
-            runtime_root
-            / "config"
+            config_directory
             / self.PS1_MULTITAP_CORE_LIBRARY
         ).resolve()
         try:
             options_directory.relative_to(
-                self.project_root
+                config_directory
             )
         except ValueError as exc:
             raise EmulatorError(
-                "PS1 core-options directory escaped the project root"
+                "PS1 core-options directory escaped the RetroArch Config directory"
             ) from exc
 
         base_options = (
@@ -2482,11 +2591,11 @@ class EmulatorManager:
             "mode": mode,
             "port1": port1,
             "port2": port2,
-            "options_file": str(
-                target_options.relative_to(
-                    self.project_root
-                )
-            ).replace("\\", "/"),
+            "options_file": self._retroarch_options_metadata_path(
+                target_options,
+                config_directory,
+                str(runtime.get("runtime_platform", "")),
+            ),
             "options_source": (
                 "existing_game_options"
                 if source_options == target_options

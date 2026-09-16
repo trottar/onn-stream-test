@@ -6,6 +6,26 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Closed Investigations
 
+<!-- PRIVYHUB_D088_MULTITAP_RUNTIME_VALIDATION:CLOSED:BEGIN -->
+## Linux PS1 multiplayer / multitap regression — closed
+
+**Status:** RUNTIME VALIDATED 2026-09-16
+
+Root portability fixes:
+- D-087: Linux RetroArch Config tree uses the active XDG/user Config directory
+  rather than the Windows executable-adjacent portable path;
+- D-087R1: external Linux Config paths are represented safely in metadata rather
+  than forced through `relative_to(project_root)`.
+
+Runtime acceptance:
+- Crash Bash launched with Multitap On;
+- Players 3/4 were available;
+- four remotes/controllers were independently routed.
+
+Classification:
+`LINUX_PS1_MULTITAP_FOUR_PLAYER_PARITY_CONFIRMED`
+<!-- PRIVYHUB_D088_MULTITAP_RUNTIME_VALIDATION:CLOSED:END -->
+
 <!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:CLOSED:BEGIN -->
 ## Linux gameplay controller regression — closed for tested profiles
 

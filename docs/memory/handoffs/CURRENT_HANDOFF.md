@@ -6,6 +6,71 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D088_MULTITAP_RUNTIME_VALIDATION:HANDOFF:BEGIN -->
+## D-088 checkpoint handoff
+
+### Newly closed
+
+Linux PS1 multitap / four-player parity is runtime validated:
+- Crash Bash launches with Multitap On;
+- Players 3 and 4 are available;
+- four remotes operate independently.
+
+The validated chain now includes:
+`stored per-game multitap -> Linux RetroArch Config tree -> content-specific Beetle PSX HW .opt -> Port-1 topology -> P1-P4 uinput/udev -> four-player gameplay`
+
+Preserve D-087/D-087R1 and the D-085 controller foundation.
+
+### Next
+
+Return to the Phase-D outline at D4 final normal-use Games regression/acceptance.
+Cover the required Games behaviors without reopening validated subsystems unless
+fresh evidence contradicts them. Once D4 is accepted, move to D5 media/server
+restoration.
+<!-- PRIVYHUB_D088_MULTITAP_RUNTIME_VALIDATION:HANDOFF:END -->
+
+<!-- PRIVYHUB_D087R1_LINUX_PS1_MULTITAP_METADATA_PATH:HANDOFF:BEGIN -->
+## D-087R1 multitap resume point
+
+D-087 found and wrote the correct Linux RetroArch Config path. Launch then
+failed only while formatting that external path as project-relative metadata.
+
+D-087R1 fixes the metadata representation only.
+
+After install/restart:
+1. Multitap On for the same four-player PS1 title;
+2. launch;
+3. confirm launch proceeds past options preparation;
+4. reach player selection;
+5. report whether Players 3/4 are available and whether all four controllers
+   operate independently.
+
+If launch reaches the game but topology is wrong, use the read-only Linux
+multitap runtime probe against that active session.
+<!-- PRIVYHUB_D087R1_LINUX_PS1_MULTITAP_METADATA_PATH:HANDOFF:END -->
+
+<!-- PRIVYHUB_D087_LINUX_PS1_MULTITAP_CONFIG_PATH:HANDOFF:BEGIN -->
+## D-087 multitap resume point
+
+First Linux multitap divergence is classified.
+
+The launch failed before RetroArch because the old Phase-A adapter searched the
+Windows executable-adjacent Config tree. The Linux seed file is actually:
+`~/.config/retroarch/config/Beetle PSX HW/Beetle PSX HW.opt`
+
+D-087 changes only this host filesystem adapter. Preserve D-085 lower controller
+parity and the generic per-game multitap materializer.
+
+After installation/restart:
+1. Multitap On for a known four-player PS1 title;
+2. launch must pass core-options preparation;
+3. confirm Players 3/4 are available;
+4. confirm all four controllers remain independent.
+
+If launch succeeds but topology still fails, run the read-only active-session
+multitap probe before any further production change.
+<!-- PRIVYHUB_D087_LINUX_PS1_MULTITAP_CONFIG_PATH:HANDOFF:END -->
+
 <!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:HANDOFF:BEGIN -->
 ## D-086 checkpoint handoff
 

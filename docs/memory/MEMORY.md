@@ -6,6 +6,56 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D088_MULTITAP_RUNTIME_VALIDATION:MEMORY:BEGIN -->
+## Linux PS1 multitap parity is runtime validated
+
+On 2026-09-16 the user confirmed Crash Bash with Multitap On launches correctly,
+Players 3/4 are available, and all four remotes independently control the four
+players.
+
+Durable interpretation:
+- Linux reproduces the previously validated Windows Port-1 multitap behavior;
+- D-087's XDG/user RetroArch Config-root adapter is correct;
+- D-087R1's external-path metadata fix is correct;
+- PS1 multitap is no longer an active Linux regression;
+- lower PHI1/uinput/udev/A8 controller paths remain preserved and accepted.
+
+Next Games work is broad normal-use D4 regression/acceptance, not another
+multitap-specific patch.
+<!-- PRIVYHUB_D088_MULTITAP_RUNTIME_VALIDATION:MEMORY:END -->
+
+<!-- PRIVYHUB_D087R1_LINUX_PS1_MULTITAP_METADATA_PATH:MEMORY:BEGIN -->
+## External RetroArch paths must not be forced repo-relative
+
+Linux RetroArch's XDG/user Config tree is intentionally outside the PrivyHub
+repository. Once an external path is selected and validated against its trusted
+Config root, metadata/logging must not subsequently call
+`relative_to(project_root)` on it.
+
+PS1 multitap `options_file` metadata:
+- Windows portable runtime: retain existing project-relative form;
+- Linux: `retroarch-config/...`, relative to the trusted RetroArch Config root.
+
+Do not encode a specific Linux home directory into product metadata.
+<!-- PRIVYHUB_D087R1_LINUX_PS1_MULTITAP_METADATA_PATH:MEMORY:END -->
+
+<!-- PRIVYHUB_D087_LINUX_PS1_MULTITAP_CONFIG_PATH:MEMORY:BEGIN -->
+## RetroArch Config-directory portability rule
+
+Do not assume RetroArch's `config/<core>/*.opt` tree is adjacent to the emulator
+executable on every host.
+
+- Windows portable runtime: `<retroarch executable dir>/config`
+- Linux AppImage: `$XDG_CONFIG_HOME/retroarch/config` when set, otherwise
+  `~/.config/retroarch/config`
+
+PS1 multitap's content-specific `.opt` adapter must resolve this host Config
+root before locating/copying `Beetle PSX HW.opt`.
+
+A failure in this pre-launch materialization layer does not invalidate the
+runtime-validated PHI1/uinput/udev/A8 controller path.
+<!-- PRIVYHUB_D087_LINUX_PS1_MULTITAP_CONFIG_PATH:MEMORY:END -->
+
 <!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:MEMORY:BEGIN -->
 ## Linux controller parity accepted; multiplayer remains separate
 

@@ -6,6 +6,54 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D088_MULTITAP_RUNTIME_VALIDATION:ACTIVE:BEGIN -->
+## Phase D / D4 normal-use Games acceptance
+
+**Status:** ACTIVE / NEXT
+
+The dedicated PS1 multiplayer/multitap investigation is closed by D-088 runtime
+evidence.
+
+Remaining D4 work is the representative normal-use Games regression/acceptance
+required by the roadmap, including the already-established paths for launch,
+video/audio/input, saves/states, pause/resume, profiles/cheats/mods, metadata/art,
+and teardown/recovery.
+
+Do not create new multiplayer architecture work unless regression evidence
+requires it.
+<!-- PRIVYHUB_D088_MULTITAP_RUNTIME_VALIDATION:ACTIVE:END -->
+
+<!-- PRIVYHUB_D087R1_LINUX_PS1_MULTITAP_METADATA_PATH:ACTIVE:BEGIN -->
+## PS1 multiplayer / multitap Linux — D-087R1 follow-up
+
+**Status:** ACTIVE / DEVELOPMENT PATCH
+
+D-087 resolved the Config-root lookup and exposed a second prelaunch portability
+error in metadata only. D-087R1 removes that remaining project-root assumption.
+
+Next discriminator: does the game reach multiplayer selection? If yes, continue
+with Players 3/4 and four-controller independence checks.
+<!-- PRIVYHUB_D087R1_LINUX_PS1_MULTITAP_METADATA_PATH:ACTIVE:END -->
+
+<!-- PRIVYHUB_D087_LINUX_PS1_MULTITAP_CONFIG_PATH:ACTIVE:BEGIN -->
+## PS1 multiplayer / multitap Linux — first boundary classified
+
+**Status:** ACTIVE / DEVELOPMENT PATCH D-087
+
+First divergence from the Windows Phase-A reference:
+`stored multitap state -> core-options materialization`.
+
+Linux failed before RetroArch because the adapter searched the Windows portable
+Config directory. The Linux Beetle seed exists in the user/XDG RetroArch Config
+tree. D-087 corrects only that path seam.
+
+Acceptance after D-087:
+- game launches with Multitap On;
+- Port 1 enabled / Port 2 disabled in content-specific `.opt`;
+- Players 3/4 available;
+- four independent controllers.
+<!-- PRIVYHUB_D087_LINUX_PS1_MULTITAP_CONFIG_PATH:ACTIVE:END -->
+
 <!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:ACTIVE:BEGIN -->
 ## PS1 multiplayer / multitap parity on Linux
 

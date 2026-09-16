@@ -6,6 +6,90 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D088_MULTITAP_RUNTIME_VALIDATION:CURRENT:BEGIN -->
+## D-088 PS1 multitap Linux runtime validation
+
+D-087 + D-087R1 are now **RUNTIME VALIDATED**.
+
+Integrated Linux -> onn acceptance:
+- Crash Bash launches with PrivyHub Multitap On;
+- Players 3 and 4 are available in-game;
+- four physical remotes/controllers each control independently;
+- the historical Windows Port-1-only multitap behavior is reproduced on Linux.
+
+This closes the active Linux PS1 multiplayer/multitap regression. Preserve:
+- host-aware RetroArch Config-root resolution from D-087;
+- external Config-path metadata handling from D-087R1;
+- D-085 lower controller path;
+- Port-1 enabled / Port-2 disabled product semantics.
+
+### Immediate next Phase-D work
+
+D4 remains active only for final normal-use Games regression/acceptance across
+the required PS1-and-below behavior set. After D4 is accepted, proceed to D5
+media/server restoration according to `docs/ROADMAP.md`.
+
+Do not reopen multitap or the lower controller stack without contradictory new
+evidence.
+<!-- PRIVYHUB_D088_MULTITAP_RUNTIME_VALIDATION:CURRENT:END -->
+
+<!-- PRIVYHUB_D087R1_LINUX_PS1_MULTITAP_METADATA_PATH:CURRENT:BEGIN -->
+## D-087R1 Linux multitap metadata-path correction — development patch
+
+D-087 correctly moved Linux Beetle PSX HW core-option reads/writes to the active
+XDG/user RetroArch Config directory. Runtime then exposed a second project-root
+assumption later in the same function.
+
+Observed after D-087:
+- the Linux game-specific `.opt` target was correctly selected under RetroArch's
+  user Config tree;
+- launch then failed while serializing `options_file` because the code still
+  called `target_options.relative_to(self.project_root)`.
+
+That field is returned/logged metadata; it is not used for the file write.
+D-087R1 preserves Windows project-relative metadata and represents Linux as
+`retroarch-config/<core>/<game>.opt`, relative to the already-validated Config
+root.
+
+No core-option contents, multitap topology, controller, A/V, network, or
+lifecycle behavior changes.
+
+Status: **DEVELOPMENT PATCH; MULTITAP RUNTIME VALIDATION PENDING**.
+<!-- PRIVYHUB_D087R1_LINUX_PS1_MULTITAP_METADATA_PATH:CURRENT:END -->
+
+<!-- PRIVYHUB_D087_LINUX_PS1_MULTITAP_CONFIG_PATH:CURRENT:BEGIN -->
+## D-087 Linux PS1 multitap core-options path — development patch
+
+The Linux multitap failure is now classified before RetroArch startup.
+
+Observed launch error:
+`Beetle PSX HW core-options file is unavailable for multitap launch`
+
+Targeted filesystem/config evidence:
+- project-managed RetroArch config contains no explicit `rgui_config_directory`;
+- Linux RetroArch's active Beetle options are under the normal user Config tree:
+  `~/.config/retroarch/config/Beetle PSX HW/Beetle PSX HW.opt`;
+- both multitap keys exist there and are disabled.
+
+Root cause: `_prepare_ps1_multitap_options()` still used the Windows portable
+layout `runtime executable parent / config` and required that directory to live
+under the project root. That is correct for the old Windows runtime and wrong for
+the Linux AppImage.
+
+D-087 changes only host Config-root selection:
+- Windows keeps executable-adjacent `config` exactly as before;
+- Linux uses `$XDG_CONFIG_HOME/retroarch/config` when XDG_CONFIG_HOME is set,
+  otherwise `~/.config/retroarch/config`;
+- per-game `.opt` output remains constrained beneath that selected Config root;
+- existing Port-1-only materialization and all controller/A-V/lifecycle behavior
+  remain unchanged.
+
+Status: **DEVELOPMENT PATCH; MULTITAP RUNTIME VALIDATION PENDING**.
+
+Next: restart companion, enable Multitap for a known four-player PS1 game,
+launch, verify Players 3/4, then verify four independent controllers.
+<!-- PRIVYHUB_D087_LINUX_PS1_MULTITAP_CONFIG_PATH:CURRENT:END -->
+
 <!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:CURRENT:BEGIN -->
 ## D-086 Linux controller parity checkpoint — runtime validated
 
