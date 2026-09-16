@@ -6,6 +6,27 @@ baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
 
 # TV, IPTV, and Media Architecture
 
+<!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:TV_MEDIA:BEGIN -->
+## EPG acquisition boundary after D-107
+
+The TV catalog and guide metadata identity layers must remain separate from
+programme acquisition.
+
+Current measured built-in IPTV-org state:
+- exact feed-aware metadata coverage: 40.3712%;
+- public hosted guide-source coverage: effectively 2 canonical IDs.
+
+A Linux-local acquisition/cache path is now a plausible architecture candidate,
+but it is not yet accepted.
+
+D-108 tests the upstream EPG grabber only as a disposable reference
+implementation. Passing D-108 does not require PrivyHub production to retain
+Node/npm or the upstream repository as a permanent dependency.
+
+Production architecture should be chosen only after measuring real programme
+yield and resource/toolchain cost.
+<!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:TV_MEDIA:END -->
+
 <!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:TV_MEDIA:BEGIN -->
 ## Feed-aware TV / EPG identity
 

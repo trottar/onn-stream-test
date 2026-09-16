@@ -6,6 +6,19 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:ROADMAP:BEGIN -->
+## D5.3 EPG — local acquisition viability
+
+**Status:** ACTIVE / D-108 runtime evidence next.
+
+D-107 established useful feed-aware metadata coverage for the built-in provider
+but confirmed that public hosted guide output is not presently broad enough.
+
+D-108 is a diagnostic-only Linux-local grabber test.
+
+D5.4 TV-state ownership/sync remains pending behind D5.3 acceptance.
+<!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:ROADMAP:END -->
+
 <!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:ROADMAP:BEGIN -->
 ## D5.3 EPG — feed-aware identity diagnostic
 

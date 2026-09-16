@@ -6,6 +6,30 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:MEMORY:BEGIN -->
+## D5 EPG metadata-versus-acquisition boundary
+
+D-107 established that feed-aware guide metadata is materially useful for the
+built-in IPTV-org provider:
+
+- 3,017 meaningful built-in IDs;
+- 1,218 exact canonical guide matches (40.3712%);
+- 1,475 IDs with some base-channel guide metadata.
+
+This supersedes the earlier idea that guide metadata itself was broadly sparse.
+
+A separate upstream limitation remains:
+only 2 canonical IDs currently expose public hosted XML/GZIP guide sources.
+
+Treat these as separate dimensions:
+1. channel/feed metadata identity;
+2. programme acquisition mechanism;
+3. actual current/upcoming programme yield.
+
+The next architectural decision must be based on measured local acquisition,
+not on `guides.json` row count alone.
+<!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:MEMORY:END -->
+
 <!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:MEMORY:BEGIN -->
 ## IPTV-org channel/feed canonical identity rule
 

@@ -6,6 +6,21 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:PATCH_INDEX:BEGIN -->
+### D-108 — D5 EPG local-grabber viability probe — 2026-09-16
+
+Diagnostic-only patch.
+
+Records the D-107 feed-aware runtime result and adds a disposable Linux-local
+programme-acquisition probe pinned to upstream `iptv-org/epg` commit
+`78e94adb76841a63d94a53e80dbd0d52bb7c2c5c`.
+
+No production code changes and no host toolchain installation.
+
+Runtime evidence next:
+`logs/tv/d108_epg_local_grabber_viability_probe.txt`.
+<!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:PATCH_INDEX:BEGIN -->
 ### D-107 — D5 EPG feed-aware identity probe — 2026-09-16
 

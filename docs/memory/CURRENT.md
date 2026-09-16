@@ -6,6 +6,29 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:CURRENT:BEGIN -->
+## D-108 D5.3 EPG local-grabber viability
+
+D-107 completed successfully.
+
+Authoritative feed-aware measurements:
+- built-in `iptv_org`: 3,017 meaningful IDs;
+- 1,218 exact canonical guide matches (40.3712%);
+- 1,475 built-in IDs have guide metadata at the base-channel level;
+- current public hosted guide sources still cover only 2 canonical IDs.
+
+Therefore D5.3 is no longer blocked by a general catalog-identity failure.
+The active boundary is programme acquisition.
+
+D-108 is diagnostic-only:
+use the current upstream IPTV-org EPG grabber in disposable temporary state on a
+small exact-matched sample, measure real XMLTV programme output, and remove all
+temporary toolchain/cache/output state afterward.
+
+Do not make a companion or Android production EPG architecture change until
+D-108 runtime evidence is reviewed.
+<!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:CURRENT:END -->
+
 <!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:CURRENT:BEGIN -->
 ## D-107 D5.3 EPG feed-aware identity correction
 

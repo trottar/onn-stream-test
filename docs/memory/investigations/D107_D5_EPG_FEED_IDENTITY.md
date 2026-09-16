@@ -1,5 +1,31 @@
 # D-107 — D5 EPG feed-aware identity diagnostic
 
+<!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:D107_RESULT:BEGIN -->
+## Result — 2026-09-16
+
+D-107 completed successfully.
+
+Built-in IPTV-org:
+- 3,017 meaningful IDs;
+- 1,218 feed-aware exact canonical guide matches;
+- 40.3712% exact canonical coverage;
+- 1,475 IDs with some base-channel guide metadata.
+
+Whole onn catalog:
+- 3,169 meaningful IDs;
+- 1,220 exact canonical guide matches;
+- 38.4979% exact canonical coverage;
+- 1,564 IDs with base-channel guide metadata.
+
+The earlier bare-channel zero-overlap result is conclusively superseded.
+
+Public source-backed guide availability remains only 2 canonical IDs.
+
+Decision:
+move to a bounded local-acquisition viability probe rather than another Android
+matching/parser patch.
+<!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:D107_RESULT:END -->
+
 **Status:** diagnostic-only / runtime evidence next
 
 ## Narrow question

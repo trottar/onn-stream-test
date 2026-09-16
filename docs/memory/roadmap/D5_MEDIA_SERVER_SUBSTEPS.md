@@ -6,6 +6,28 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:D5_SUBSTEPS:BEGIN -->
+## D5.3 execution checkpoint — D-108
+
+D-107 feed-aware identity measurement is complete.
+
+Accepted diagnostic facts:
+- built-in exact canonical metadata coverage is 40.3712%;
+- base-channel metadata presence is higher;
+- public hosted guide-source availability remains only 2 canonical IDs.
+
+D5.3 remains ACTIVE / not accepted.
+
+D-108 tests one narrow question:
+whether Linux-local acquisition can produce actual programme data from the
+current upstream EPG site definitions for a small exact-matched multi-site
+sample.
+
+If viable, the following production patch should design the smallest companion
+EPG cache/acquisition seam. If not, diagnose the measured acquisition/toolchain
+failure before changing architecture.
+<!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:D5_SUBSTEPS:END -->
+
 <!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:D5_SUBSTEPS:BEGIN -->
 ## D5.3 execution checkpoint — D-107
 

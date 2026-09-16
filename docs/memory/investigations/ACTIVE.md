@@ -6,6 +6,23 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:ACTIVE:BEGIN -->
+## D5.3 active — local programme acquisition
+
+D-107 closed the feed-aware identity question sufficiently for D5:
+the built-in provider has 1,218 exact canonical matches out of 3,017 meaningful
+IDs (40.3712%).
+
+Public hosted source coverage remains effectively unavailable.
+
+Active narrow diagnostic:
+test the pinned upstream IPTV-org grabber against a bounded multi-site sample of
+exact-matched channels using disposable Linux state.
+
+No production cache/service implementation before D-108 establishes actual
+programme yield and environment/toolchain viability.
+<!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:ACTIVE:END -->
+
 <!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:ACTIVE:BEGIN -->
 ## D5.3 active — feed-aware guide identity
 

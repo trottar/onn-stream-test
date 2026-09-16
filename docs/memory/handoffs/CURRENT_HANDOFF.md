@@ -6,6 +6,29 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:HANDOFF:BEGIN -->
+## D-108 handoff — local EPG acquisition viability
+
+D-107 is complete:
+built-in IPTV-org feed-aware guide metadata coverage is about 40.4% exact, while
+public hosted guide-source coverage remains only 2 canonical IDs.
+
+Next narrow question:
+can the Linux host generate useful XMLTV locally from the upstream EPG site
+definitions for representative exact matches?
+
+Run:
+`python3 tools/probes/d108_epg_local_grabber_viability_probe.py --repo /home/privyhub/Projects/onn-stream-test`
+
+Return:
+`logs/tv/d108_epg_local_grabber_viability_probe.txt`.
+
+The probe must not install/upgrade host Node/npm/git. Unsupported local tooling
+is a classified diagnostic result.
+
+No production EPG change until D-108 is reviewed.
+<!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:HANDOFF:END -->
+
 <!-- PRIVYHUB_D107_D5_EPG_FEED_IDENTITY:HANDOFF:BEGIN -->
 ## D-107 handoff — feed-aware EPG identity
 
