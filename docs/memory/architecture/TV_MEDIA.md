@@ -6,6 +6,58 @@ baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
 
 # TV, IPTV, and Media Architecture
 
+<!-- PRIVYHUB_D093R2_D5_EXTERNAL_VOD_RUNTIME_VALIDATION:TV_MEDIA:BEGIN -->
+## External VOD runtime validation and next storage boundary
+
+The temporary external-drive-backed VOD path is runtime validated through the
+normal onn client, including Continue Watching.
+
+The compatibility chain currently works through a VOD directory symlink, with
+D-092 allowing scanner-generated dynamic source health to match scanner
+discovery.
+
+Product architecture must not depend on that symlink. The next storage boundary
+should select a media root explicitly and make that same root authoritative for
+both catalog scanning and HTTP serving.
+
+The selection mechanism must preserve the repo-local `media/` default and fail
+cleanly when an explicitly selected external root is unavailable.
+<!-- PRIVYHUB_D093R2_D5_EXTERNAL_VOD_RUNTIME_VALIDATION:TV_MEDIA:END -->
+
+<!-- PRIVYHUB_D092_DYNAMIC_VOD_SYMLINK_HEALTH:TV_MEDIA:BEGIN -->
+## Dynamic VOD health and external-storage symlinks
+
+During D5, a temporary directory symlink beneath `media/vod` exposed a mismatch
+between catalog discovery and source-start health validation.
+
+The scanner owns dynamic source creation. D-092 therefore permits only those
+scanner-generated sources to traverse a symlink outside the project tree, and
+only when the lexical playback path is safe and resolves to the exact scanner
+recorded file.
+
+Static catalog sources do not gain general external-path access.
+
+This preserves a narrow fail-closed boundary while Prototype-1 uses temporary
+external storage. A first-class configurable bulk-media root is still the
+long-term D5 architecture.
+<!-- PRIVYHUB_D092_DYNAMIC_VOD_SYMLINK_HEALTH:TV_MEDIA:END -->
+
+<!-- PRIVYHUB_D091_D5_MEDIA_BASELINE:TV_MEDIA:BEGIN -->
+## D5 Prototype-1 external VOD measurement
+
+A directory symlink under the project VOD tree can currently expose the
+Prototype-1 external movie disk to the existing scanner and range server. A
+representative movie was discovered and served successfully with HTTP Range 206.
+
+This proves host compatibility only. The symlink is not the desired permanent
+storage abstraction because the companion still defines `MEDIA_ROOT` as the
+project `media/` directory.
+
+D5 should make the bulk-media root explicit/configurable while keeping small
+PrivyHub state local and preserving stable library identity across storage
+migration.
+<!-- PRIVYHUB_D091_D5_MEDIA_BASELINE:TV_MEDIA:END -->
+
 The TV/IPTV subsystem is mature and should remain stable during Games/controller work. It includes persistent catalog state, paging, hidden channels, favorites, recents, search, EPG, fullscreen/channel-surfing behavior, grouping/order/overrides, provider handling, backup behavior, and preview UX.
 
 The companion also supports local live/browser/camera sources and dynamically scanned VOD/media content. Control and media planes are separate.

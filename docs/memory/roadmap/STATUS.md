@@ -6,6 +6,33 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D093R2_D5_EXTERNAL_VOD_RUNTIME_VALIDATION:ROADMAP_STATUS:BEGIN -->
+## 2026-09-16 D5 external-VOD checkpoint
+
+**D5 remains ACTIVE.**
+
+Completed/runtime validated within D5:
+- Linux companion/control baseline;
+- dynamic VOD catalog;
+- HTTP byte-range serving;
+- external-storage-backed VOD through the normal onn path;
+- dynamic source-start health for scanner-mediated external-storage symlinks;
+- Continue Watching on the validated external VOD path;
+- diagnostics/telemetry/Self-Test endpoint reachability;
+- IPTV category endpoint reachability.
+
+D-093 and D-093R1 checkpoint attempts both rolled back cleanly for installer-only
+documentation validation defects. D-093R2 is the corrected checkpoint.
+
+Next D5 implementation:
+**first-class configurable bulk-media root**.
+
+Still pending after that:
+- Linux browser/live source runner;
+- Linux camera source runner;
+- integrated VOD/TV/EPG/diagnostics acceptance.
+<!-- PRIVYHUB_D093R2_D5_EXTERNAL_VOD_RUNTIME_VALIDATION:ROADMAP_STATUS:END -->
+
 <!-- PRIVYHUB_D090_D4_LINUX_GAMES_ACCEPTANCE:ROADMAP:BEGIN -->
 ## 2026-09-16 D4 Linux Games acceptance
 

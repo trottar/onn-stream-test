@@ -6,6 +6,73 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D093R2_D5_EXTERNAL_VOD_RUNTIME_VALIDATION:ACTIVE:BEGIN -->
+## D5 configurable bulk-media root
+
+**Status:** ACTIVE / NEXT
+
+D-092 external-VOD compatibility is runtime validated, including normal playback
+and Continue Watching.
+
+Next narrow implementation goal:
+make the bulk media root configurable without depending on a repo-local symlink.
+
+Required behavior:
+- default remains project `media/` when no override exists;
+- external root is explicit/configurable;
+- dynamic scanning and media serving use the same selected root;
+- lightweight PrivyHub state remains internal where practical;
+- stable content/source identity survives storage relocation where possible;
+- unavailable external storage is reported as unavailable, not interpreted as
+  authoritative library deletion;
+- no mandatory cloud or proprietary dependency.
+
+Do not mix browser/camera runner migration into the storage-root patch.
+<!-- PRIVYHUB_D093R2_D5_EXTERNAL_VOD_RUNTIME_VALIDATION:ACTIVE:END -->
+
+<!-- PRIVYHUB_D092_DYNAMIC_VOD_SYMLINK_HEALTH:ACTIVE:BEGIN -->
+## D5 dynamic external-VOD source-start
+
+**Status:** DEVELOPMENT PATCH D-092 / RUNTIME VALIDATION NEXT
+
+First failing boundary:
+`cataloged dynamic VOD -> POST source start -> _vod_is_healthy()`.
+
+Pre-patch result:
+HTTP 503 before any port-8000 media request.
+
+D-092 fixes only the scanner-generated dynamic-symlink health mismatch.
+
+Acceptance:
+- source-start probe returns HTTP 200 / ready true for Aviator;
+- onn then reaches and plays the movie normally, or fresh evidence identifies
+  the next boundary.
+
+Do not alter Android playback or range serving unless source-start first passes.
+<!-- PRIVYHUB_D092_DYNAMIC_VOD_SYMLINK_HEALTH:ACTIVE:END -->
+
+<!-- PRIVYHUB_D091_D5_MEDIA_BASELINE:ACTIVE:BEGIN -->
+## D5 VOD onn playback boundary
+
+**Status:** ACTIVE / NEXT DIAGNOSTIC
+
+Host-side external-VOD path is healthy through HTTP Range.
+
+One narrow unresolved question:
+when the onn attempts the exact failing symlinked movie, does a matching GET/HEAD
+reach the media server and receive HTTP 200/206?
+
+Use the D-091 request-boundary probe before any production change.
+
+Interpretation:
+- matching successful request -> inspect Android Media3/container/codec error;
+- no request -> inspect client URL/network construction;
+- matching HTTP error -> inspect media-server path response.
+
+Do not modify external storage or introduce codec work before this boundary is
+measured.
+<!-- PRIVYHUB_D091_D5_MEDIA_BASELINE:ACTIVE:END -->
+
 <!-- PRIVYHUB_D090_D4_LINUX_GAMES_ACCEPTANCE:ACTIVE:BEGIN -->
 ## Phase D / D5 media-server restoration
 

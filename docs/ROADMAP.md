@@ -414,6 +414,28 @@ Proceed to D5 media/server restoration.
 
 ## D5 — Restore media/server functionality
 
+<!-- PRIVYHUB_D093R2_D5_EXTERNAL_VOD_RUNTIME_VALIDATION:ROADMAP:BEGIN -->
+### D5 external-VOD runtime checkpoint — 2026-09-16
+
+D-092 is runtime validated through the normal onn path.
+
+Confirmed:
+- scanner-generated external-storage-backed VOD source-start;
+- normal movie playback;
+- Continue Watching.
+
+Checkpoint-installer history:
+- D-093 rolled back because its transformer expected the wrong D5 heading level;
+- D-093R1 rolled back because its post-write validation expected a roadmap
+  marker that its inserted roadmap block did not contain;
+- D-093R2 corrects that installer-only consistency defect.
+
+The temporary symlink is not the final storage architecture.
+
+**Next D5 task:** first-class configurable bulk-media root, preserving the
+repo-local default and clean unavailable-storage behavior.
+<!-- PRIVYHUB_D093R2_D5_EXTERNAL_VOD_RUNTIME_VALIDATION:ROADMAP:END -->
+
 Restore the currently working media/server functions at the Linux migration boundary without broadening scope:
 
 - companion/control API;

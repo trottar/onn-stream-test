@@ -6,6 +6,112 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D093R2_D5_EXTERNAL_VOD_RUNTIME_VALIDATION:CURRENT:BEGIN -->
+## D-093R2 D5 external-VOD runtime validation
+
+D-092 is **RUNTIME VALIDATED** on the normal onn client path.
+
+Validated sequence:
+external movie storage -> temporary VOD symlink -> dynamic catalog ->
+source-start health -> port-8000 playback -> onn Media3 -> normal playback UX.
+
+Fresh runtime result:
+- D-092 source-start probe returned HTTP 200 and `ready: true`;
+- the representative external movie that previously failed at source-start now
+  plays normally on the onn;
+- video/audio playback is working;
+- Continue Watching was explicitly tested and works.
+
+The previous HTTP 503 `VOD source is unavailable` failure is closed.
+
+Checkpoint-installer history:
+- D-093 rolled back cleanly because it expected the wrong D5 roadmap heading;
+- D-093R1 rolled back cleanly because it validated a marker that its roadmap
+  insert did not contain;
+- D-093R2 supersedes both failed checkpoint attempts.
+
+Architectural status:
+- the current symlink is acceptable as a temporary Prototype-1 compatibility
+  path;
+- it is not the permanent storage abstraction;
+- the next D5 storage task is a first-class configurable external/bulk media
+  root that preserves stable library identity and clean unavailable-storage
+  behavior.
+
+Other D5 work remains:
+- Linux-native browser/live runner;
+- Linux-native camera runner;
+- integrated TV/EPG/media/diagnostics acceptance.
+<!-- PRIVYHUB_D093R2_D5_EXTERNAL_VOD_RUNTIME_VALIDATION:CURRENT:END -->
+
+<!-- PRIVYHUB_D092_DYNAMIC_VOD_SYMLINK_HEALTH:CURRENT:BEGIN -->
+## D-092 dynamic VOD symlink health boundary
+
+Fresh Android evidence classified the current VOD failure before ExoPlayer/media
+fetch:
+
+- onn POSTed the dynamic VOD source start request;
+- companion returned HTTP 503;
+- response error was `VOD source is unavailable`;
+- no port-8000 media request followed.
+
+Root cause is in companion `_vod_is_healthy()`:
+dynamic scanning records the resolved target in `_filesystem_path`, then health
+validation requires that resolved path to remain beneath project `MEDIA_ROOT`.
+A directory symlink to external storage therefore passes discovery and HTTP Range
+serving but is rejected during source-start health validation.
+
+D-092 changes only this dynamic-source health rule:
+- scanner-generated dynamic VOD validates through its lexical catalog path under
+  `MEDIA_ROOT`;
+- that path must resolve to the exact `_filesystem_path` recorded by the scanner;
+- static/configured VOD retains the existing resolved `MEDIA_ROOT` containment
+  rule.
+
+Next runtime gate:
+restart companion, run the D-092 source-start probe, then retry Aviator on the
+onn if source-start is confirmed.
+<!-- PRIVYHUB_D092_DYNAMIC_VOD_SYMLINK_HEALTH:CURRENT:END -->
+
+<!-- PRIVYHUB_D091_D5_MEDIA_BASELINE:CURRENT:BEGIN -->
+## D-091 D5 Linux media baseline and external-VOD boundary
+
+D5 is ACTIVE.
+
+Fresh read-only Linux baseline evidence:
+- control API and `/sources` respond normally;
+- 91 dynamic VOD sources were visible;
+- an ordinary VOD byte-range request returned HTTP 206;
+- diagnostics health, stream telemetry, Self-Test, and IPTV categories endpoints
+  were reachable;
+- Linux media-server startup remains the D-078 direct-Python path;
+- browser and camera source runners remain PowerShell and are still Linux
+  portability seams.
+
+External-VOD symlink boundary evidence:
+- the current `media/vod/movies` symlink resolves to mounted external storage;
+- a representative movie is readable both through the symlink and resolved
+  target;
+- the exact movie appears in `/sources`;
+- the existing port-8000 media server returns a correct one-byte HTTP 206 Range
+  response for that exact movie.
+
+Classification:
+`D5_VOD_SYMLINK_HOST_RANGE_PATH_HEALTHY`.
+
+Interpretation:
+the external disk, filesystem permissions, symlink traversal, catalog generation,
+and host-side Range serving are not the current playback failure boundary.
+
+The symlink remains a temporary development arrangement, not the intended D5
+storage architecture. D5 still needs an explicit configurable bulk-media root.
+
+Immediate next diagnostic:
+reproduce one failing symlinked movie on the onn and inspect only new sanitized
+port-8000 access records. This distinguishes client URL/network failure from
+Media3/container/codec failure.
+<!-- PRIVYHUB_D091_D5_MEDIA_BASELINE:CURRENT:END -->
+
 <!-- PRIVYHUB_D090_D4_LINUX_GAMES_ACCEPTANCE:CURRENT:BEGIN -->
 ## D-090 D4 Linux Games acceptance — runtime validated
 

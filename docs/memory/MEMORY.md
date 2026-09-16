@@ -6,6 +6,81 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D093R2_D5_EXTERNAL_VOD_RUNTIME_VALIDATION:MEMORY:BEGIN -->
+## D5 external VOD runtime validated through normal onn UX
+
+D-092 fixed the mismatch between dynamic VOD discovery and source-start health
+for scanner-mediated symlinks to external storage.
+
+Runtime validation on 2026-09-16 established:
+- source-start HTTP 200 / ready true for the representative external movie;
+- the movie plays normally on the onn;
+- Continue Watching works.
+
+Therefore the temporary external-drive VOD path is viable for Prototype 1.
+
+Do not reinterpret this as the final storage architecture. The symlink remains
+temporary. D5 still requires a configurable bulk-media root independent of the
+repo/system disk, with stable content identity and clean handling of an
+unavailable external root.
+
+Checkpoint history:
+- D-093 and D-093R1 both rolled back cleanly for installer-only documentation
+  validation defects;
+- D-093R2 is the authoritative runtime-validation checkpoint.
+
+Do not reopen the D-092 source-start defect without contradictory runtime
+evidence.
+<!-- PRIVYHUB_D093R2_D5_EXTERNAL_VOD_RUNTIME_VALIDATION:MEMORY:END -->
+
+<!-- PRIVYHUB_D092_DYNAMIC_VOD_SYMLINK_HEALTH:MEMORY:BEGIN -->
+## Dynamic VOD discovery and source-start health must agree on scanner-mediated symlinks
+
+D5 diagnosed a specific inconsistency:
+the media-directory scanner can enumerate files beneath a symlinked directory and
+the range server can serve the resulting lexical URL path, but pre-D-092
+`_vod_is_healthy()` rejected the same source because `_filesystem_path` had
+already been resolved outside project `MEDIA_ROOT`.
+
+D-092 permits external resolution only for `_dynamic == True` sources generated
+by the trusted scanner, and only when:
+- the public playback path is lexically relative/safe beneath `MEDIA_ROOT`;
+- no `..` component is present;
+- the lexical path resolves to the exact scanner-recorded `_filesystem_path`.
+
+Static/configured VOD continues to require resolved containment beneath
+`MEDIA_ROOT`.
+
+This is a narrow compatibility fix for the current temporary external-storage
+arrangement, not the final configurable-media-root architecture.
+<!-- PRIVYHUB_D092_DYNAMIC_VOD_SYMLINK_HEALTH:MEMORY:END -->
+
+<!-- PRIVYHUB_D091_D5_MEDIA_BASELINE:MEMORY:BEGIN -->
+## D5 external-VOD host path is healthy; symlink is diagnostic, not architecture
+
+The Prototype-1 external movie disk is currently exposed under the project VOD
+tree through a directory symlink.
+
+Runtime measurement proved the full host path for a representative movie:
+external filesystem -> symlink -> dynamic catalog -> direct Linux read ->
+port-8000 HTTP Range, including a valid HTTP 206 response.
+
+Therefore do not diagnose the current onn playback error as an external-drive
+permission, exFAT-readability, symlink-resolution, catalog, or host Range-server
+failure without contradictory evidence.
+
+Architectural rule remains:
+- do not make a symlink the product storage abstraction;
+- D5 should provide a configurable bulk-media root independent of the project
+  tree;
+- preserve media/library identity across later migration to dedicated storage;
+- temporary external-root absence must not mean authoritative library deletion.
+
+Separate D5 portability seam:
+browser and camera sources still use PowerShell runners and require Linux-native
+runner work later in D5.
+<!-- PRIVYHUB_D091_D5_MEDIA_BASELINE:MEMORY:END -->
+
 <!-- PRIVYHUB_D090_D4_LINUX_GAMES_ACCEPTANCE:MEMORY:BEGIN -->
 ## D4 Linux Games parity accepted with explicit no-fixture gaps
 

@@ -1070,10 +1070,55 @@ class PrivyHubController:
             "_filesystem_path"
         )
 
-        if explicit_path:
+        # PRIVYHUB_D092_DYNAMIC_VOD_SYMLINK_HEALTH_V1
+        #
+        # Dynamic VOD sources are created only by the media-directory
+        # scanner.  Their public playback path remains lexically beneath
+        # MEDIA_ROOT even when a directory component is a symlink to
+        # external storage.  Validate that lexical path and require it to
+        # resolve to the exact file recorded by the scanner; do not grant
+        # the same external-path allowance to static/configured sources.
+        if (
+            explicit_path
+            and source.get("_dynamic") is True
+        ):
+            playback_path = Path(
+                unquote(
+                    source["playback"]["path"]
+                ).lstrip("/")
+            )
+
+            if (
+                playback_path.is_absolute()
+                or ".." in playback_path.parts
+            ):
+                return False
+
+            media_file = (
+                MEDIA_ROOT / playback_path
+            )
+
+            try:
+                if (
+                    media_file.resolve()
+                    != Path(explicit_path).resolve()
+                ):
+                    return False
+            except OSError:
+                return False
+
+        elif explicit_path:
             media_file = Path(
                 explicit_path
             ).resolve()
+
+            try:
+                media_file.relative_to(
+                    MEDIA_ROOT.resolve()
+                )
+            except ValueError:
+                return False
+
         else:
             playback_path = unquote(
                 source["playback"]["path"]
@@ -1083,12 +1128,12 @@ class PrivyHubController:
                 MEDIA_ROOT / playback_path
             ).resolve()
 
-        try:
-            media_file.relative_to(
-                MEDIA_ROOT.resolve()
-            )
-        except ValueError:
-            return False
+            try:
+                media_file.relative_to(
+                    MEDIA_ROOT.resolve()
+                )
+            except ValueError:
+                return False
 
         return (
             media_file.exists()
