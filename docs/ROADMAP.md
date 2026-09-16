@@ -268,7 +268,7 @@ Acceptance:
 
 # Phase D — Linux Migration / Native Linux Baseline
 
-**Status: ACTIVE — D4 final normal-use Games regression next; D5 media/server follows**
+**Status: ACTIVE — D4 complete/runtime accepted; D5 media/server restoration next**
 
 Prototype 1 Linux server:
 
@@ -386,6 +386,31 @@ Still required inside D4 before normal-use Games parity is complete:
   Games lifecycle and feature paths.
 
 After D4 acceptance, continue to D5 media/server restoration.
+
+### D4 final Linux acceptance — 2026-09-16
+
+**D4 status: COMPLETE / RUNTIME ACCEPTED WITH EXPLICIT NO-FIXTURE SKIPS.**
+
+Final representative regression passed:
+- Games library/search/art;
+- SNES normal launch, video/audio/input, analog-to-D-pad convenience, End and
+  uinput cleanup;
+- PS1 normal launch, video/audio/input, pause/frozen preview, Save/Load, resume,
+  End and uinput cleanup;
+- cheat profile;
+- IPS mod profile;
+- named A8 input profile;
+- fresh launch/recovery after repeated teardown;
+- previously validated PS1 four-player Port-1 multitap.
+
+Coverage-aware exclusions:
+- NES had zero local fixtures and is not claimed as Linux runtime validated;
+- Genesis had zero local fixtures and is not claimed as Linux runtime validated.
+
+Final classification:
+`D4_FINAL_GAMES_REGRESSION_CONFIRMED_WITH_NO_FIXTURE_SKIPS`
+
+Proceed to D5 media/server restoration.
 
 ## D5 — Restore media/server functionality
 

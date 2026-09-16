@@ -6,6 +6,31 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D090_D4_LINUX_GAMES_ACCEPTANCE:ROADMAP:BEGIN -->
+## 2026-09-16 D4 Linux Games acceptance
+
+**D4 is COMPLETE / RUNTIME ACCEPTED WITH EXPLICIT NO-FIXTURE SKIPS.**
+
+Accepted Linux Games coverage:
+- library/search/art;
+- SNES normal-use launch/gameplay/End;
+- PS1 normal-use A/V/input, pause/resume, Save/Load, End;
+- cheats;
+- IPS mods;
+- named A8 input profiles;
+- teardown/recovery;
+- PS1 four-player Port-1 multitap from D-088.
+
+Explicitly not claimed:
+- NES runtime validation — no local fixture;
+- Genesis runtime validation — no local fixture.
+
+Phase D remains ACTIVE and advances to **D5 media/server restoration**.
+
+Execution remains:
+`D5 -> D6 reconciliation of already-replayed UDP branch -> D7 -> D8 -> remaining C on Linux -> E`
+<!-- PRIVYHUB_D090_D4_LINUX_GAMES_ACCEPTANCE:ROADMAP:END -->
+
 <!-- PRIVYHUB_D089_D5_EXTERNAL_VOD_STORAGE_CONSTRAINT:ROADMAP:BEGIN -->
 ## 2026-09-16 D5 storage constraint
 

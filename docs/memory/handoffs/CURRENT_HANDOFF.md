@@ -6,6 +6,42 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D090_D4_LINUX_GAMES_ACCEPTANCE:HANDOFF:BEGIN -->
+## D-090 handoff — D4 complete, D5 next
+
+D4 Linux Games normal-use parity is accepted.
+
+Fresh final regression passed:
+- library/search/art;
+- SNES launch/video/audio/input/End;
+- PS1 launch/video/audio/input/pause/Save/Load/resume/End;
+- cheat profile;
+- IPS mod profile;
+- named A8 profile;
+- post-teardown relaunch/recovery.
+
+D-088 four-player/multitap acceptance remains part of the D4 result.
+
+Explicit coverage gaps:
+- NES: no local fixture;
+- Genesis: no local fixture.
+
+Do not claim those two systems were runtime exercised on Linux.
+
+### Resume point
+
+Start D5 media/server restoration.
+
+D5 must verify existing companion/control API, VOD, Live TV/EPG, browser/live,
+camera, diagnostics/Self-Test, Phase-C profile/telemetry/stabilization
+infrastructure, and media state/cache behavior without broadening scope.
+
+Prototype-1 storage constraint:
+bulk VOD may use an external hard drive. Keep media-root handling configurable,
+do not copy the library onto the internal NVMe merely for D5, and treat an
+unavailable external root as storage unavailable rather than library deletion.
+<!-- PRIVYHUB_D090_D4_LINUX_GAMES_ACCEPTANCE:HANDOFF:END -->
+
 <!-- PRIVYHUB_D089_D5_EXTERNAL_VOD_STORAGE_CONSTRAINT:HANDOFF:BEGIN -->
 ## D5 storage handoff constraint
 

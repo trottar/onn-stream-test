@@ -6,6 +6,36 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D090_D4_LINUX_GAMES_ACCEPTANCE:MEMORY:BEGIN -->
+## D4 Linux Games parity accepted with explicit no-fixture gaps
+
+On 2026-09-16 the final Linux Games normal-use regression passed for every
+available representative path:
+
+- SNES normal launch/gameplay/End;
+- PS1 video/audio/controller, pause/frozen preview, Save/Load, resume, End;
+- cheat profile;
+- IPS mod profile;
+- named A8 input profile;
+- restart/recovery after repeated teardown;
+- previously validated PS1 four-player/multitap behavior.
+
+Classification:
+`D4_FINAL_GAMES_REGRESSION_CONFIRMED_WITH_NO_FIXTURE_SKIPS`
+
+Coverage rule remains authoritative:
+zero installed fixtures means **skipped**, not runtime validated.
+
+At D4 acceptance:
+- NES: 0 local fixtures -> not Linux runtime validated;
+- Genesis: 0 local fixtures -> not Linux runtime validated;
+- SNES: runtime exercised and accepted;
+- PS1: extensively runtime exercised and accepted.
+
+Do not reopen validated D4 controller/multitap/lifecycle paths without new
+contradictory evidence. Phase-D execution moves to D5 media/server restoration.
+<!-- PRIVYHUB_D090_D4_LINUX_GAMES_ACCEPTANCE:MEMORY:END -->
+
 <!-- PRIVYHUB_D089_D5_EXTERNAL_VOD_STORAGE_CONSTRAINT:MEMORY:BEGIN -->
 ## D5 bulk-media storage rule
 

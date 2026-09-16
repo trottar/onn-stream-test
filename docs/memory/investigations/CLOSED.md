@@ -6,6 +6,33 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Closed Investigations
 
+<!-- PRIVYHUB_D090_D4_LINUX_GAMES_ACCEPTANCE:CLOSED:BEGIN -->
+## Phase D / D4 Linux Games normal-use parity — closed
+
+**Status:** RUNTIME ACCEPTED 2026-09-16
+
+Final classification:
+`D4_FINAL_GAMES_REGRESSION_CONFIRMED_WITH_NO_FIXTURE_SKIPS`
+
+Accepted representative paths:
+- library/search/art;
+- SNES normal launch, A/V/input, End/uinput cleanup;
+- PS1 normal launch, A/V/input, pause/frozen preview, Save/Load, resume,
+  End/uinput cleanup;
+- cheat profile;
+- IPS mod;
+- named A8 input profile;
+- restart/recovery;
+- D-088 PS1 four-player/multitap behavior.
+
+Coverage exclusions are explicit:
+- NES had zero local fixtures;
+- Genesis had zero local fixtures;
+- neither is claimed as runtime exercised by this acceptance.
+
+Preserve D4 unless fresh contradictory evidence appears.
+<!-- PRIVYHUB_D090_D4_LINUX_GAMES_ACCEPTANCE:CLOSED:END -->
+
 <!-- PRIVYHUB_D088_MULTITAP_RUNTIME_VALIDATION:CLOSED:BEGIN -->
 ## Linux PS1 multiplayer / multitap regression — closed
 

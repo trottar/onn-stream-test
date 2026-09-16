@@ -6,6 +6,31 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D090_D4_LINUX_GAMES_ACCEPTANCE:ACTIVE:BEGIN -->
+## Phase D / D5 media-server restoration
+
+**Status:** ACTIVE / NEXT
+
+D4 normal-use Games acceptance is closed by D-090.
+
+Next scope is D5 only:
+- companion/control API;
+- VOD;
+- Live TV/EPG;
+- browser/live source where active;
+- camera source where active;
+- diagnostics/Self-Test;
+- Phase-C profile/telemetry/stabilization infrastructure;
+- existing media state/cache and working playback paths.
+
+Prototype-1 storage rule:
+bulk VOD may live on external storage. Do not make the internal NVMe the media
+capacity requirement. Treat unavailable external storage as unavailable storage,
+not authoritative deletion.
+
+Do not reopen D4 Games internals unless new regression evidence appears.
+<!-- PRIVYHUB_D090_D4_LINUX_GAMES_ACCEPTANCE:ACTIVE:END -->
+
 <!-- PRIVYHUB_D088_MULTITAP_RUNTIME_VALIDATION:ACTIVE:BEGIN -->
 ## Phase D / D4 normal-use Games acceptance
 

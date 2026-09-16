@@ -6,6 +6,43 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D090_D4_LINUX_GAMES_ACCEPTANCE:CURRENT:BEGIN -->
+## D-090 D4 Linux Games acceptance — runtime validated
+
+D4 normal-use Games acceptance is complete on the representative Linux -> onn
+path.
+
+Fresh final regression evidence:
+- Games library/search/art remained normal;
+- SNES launched normally with video, audio, input, analog-to-D-pad convenience,
+  and clean End/uinput teardown;
+- PS1 launched normally with video/audio/input, paused frozen-preview controls,
+  Save/Load, resume, and clean End/uinput teardown;
+- a validated cheat-profile session passed;
+- the validated IPS mod path passed;
+- a non-default named A8 input profile passed;
+- a fresh game launch after repeated End/cleanup cycles passed;
+- D-088 four-player PS1 Port-1 multitap evidence remains accepted.
+
+Coverage limitation:
+- NES library count was 0;
+- Genesis library count was 0;
+- therefore neither family is claimed as Linux runtime validated by this D4 run.
+  They remain configured/supported with explicit no-fixture skips.
+
+Final classification:
+`D4_FINAL_GAMES_REGRESSION_CONFIRMED_WITH_NO_FIXTURE_SKIPS`
+
+### Immediate next Phase-D work
+
+**D5 media/server restoration is ACTIVE / NEXT.**
+
+Preserve the D5 Prototype-1 storage constraint: bulk VOD may live on external
+storage, small PrivyHub state should remain internal where practical, and
+temporary external-root unavailability must not be interpreted as library
+deletion.
+<!-- PRIVYHUB_D090_D4_LINUX_GAMES_ACCEPTANCE:CURRENT:END -->
+
 <!-- PRIVYHUB_D089_D5_EXTERNAL_VOD_STORAGE_CONSTRAINT:CURRENT:BEGIN -->
 ## D5 storage constraint recorded before media restoration
 
