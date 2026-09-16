@@ -6,6 +6,27 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D089_D5_EXTERNAL_VOD_STORAGE_CONSTRAINT:CURRENT:BEGIN -->
+## D5 storage constraint recorded before media restoration
+
+Phase D remains at **D4 final normal-use Games regression/acceptance**.
+
+Before D5 begins, preserve this deployment constraint:
+
+- the current Linux Prototype 1 has a comparatively small internal system disk;
+- bulk VOD/movie content will temporarily live on a simple external hard drive;
+- PrivyHub must not require large media libraries to be copied into the project
+  tree or internal system disk;
+- catalog/metadata/cache/runtime state should remain small and internal where
+  practical;
+- an unavailable/unmounted external media root must be treated as storage
+  unavailable, not as authoritative deletion of the library;
+- D5 should keep media-root selection portable so the same library can later
+  move to dedicated server/storage infrastructure without redesigning VOD.
+
+No production behavior changes in this checkpoint.
+<!-- PRIVYHUB_D089_D5_EXTERNAL_VOD_STORAGE_CONSTRAINT:CURRENT:END -->
+
 <!-- PRIVYHUB_D088_MULTITAP_RUNTIME_VALIDATION:CURRENT:BEGIN -->
 ## D-088 PS1 multitap Linux runtime validation
 

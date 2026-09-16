@@ -6,6 +6,23 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D089_D5_EXTERNAL_VOD_STORAGE_CONSTRAINT:ROADMAP:BEGIN -->
+## 2026-09-16 D5 storage constraint
+
+**Phase D remains ACTIVE at D4 final Games regression.**
+
+D5 media/server restoration follows D4 acceptance.
+
+Prototype-1 D5 storage constraint:
+- bulk VOD/movie data may reside on an external hard drive;
+- internal disk space must not be treated as the required media-library capacity;
+- media-root handling should remain portable toward later dedicated storage;
+- temporary media-root unavailability must be handled separately from library
+  deletion.
+
+This is a planning constraint only; D5 implementation/validation has not begun.
+<!-- PRIVYHUB_D089_D5_EXTERNAL_VOD_STORAGE_CONSTRAINT:ROADMAP:END -->
+
 <!-- PRIVYHUB_D088_MULTITAP_RUNTIME_VALIDATION:ROADMAP:BEGIN -->
 ## 2026-09-16 D4 multiplayer checkpoint
 

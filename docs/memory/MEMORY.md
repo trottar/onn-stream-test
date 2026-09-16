@@ -6,6 +6,32 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D089_D5_EXTERNAL_VOD_STORAGE_CONSTRAINT:MEMORY:BEGIN -->
+## D5 bulk-media storage rule
+
+For the current Linux Prototype 1, bulk VOD/movie files are expected to live
+temporarily on an external hard drive because the internal system disk is small
+relative to the media library.
+
+Durable architecture rule:
+
+- bulk media storage is a configurable storage root, not an intrinsic project
+  directory;
+- do not copy large VOD assets into PrivyHub runtime/project storage merely to
+  make them available;
+- keep small catalog, metadata, cache, configuration, and runtime state internal
+  where practical;
+- temporary external-storage absence must fail cleanly and must not by itself be
+  interpreted as library deletion;
+- preserve stable media/library identity across storage-path changes where
+  practical;
+- the external-drive deployment is temporary infrastructure, so D5 must not
+  encode USB/removable-disk quirks into the long-term architecture.
+
+The intended future transition is external disk -> dedicated server/storage
+infrastructure without replacing the VOD/media model.
+<!-- PRIVYHUB_D089_D5_EXTERNAL_VOD_STORAGE_CONSTRAINT:MEMORY:END -->
+
 <!-- PRIVYHUB_D088_MULTITAP_RUNTIME_VALIDATION:MEMORY:BEGIN -->
 ## Linux PS1 multitap parity is runtime validated
 

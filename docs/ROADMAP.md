@@ -268,7 +268,7 @@ Acceptance:
 
 # Phase D — Linux Migration / Native Linux Baseline
 
-**Status: ACTIVE — D4 controller parity checkpoint; multiplayer/multitap next**
+**Status: ACTIVE — D4 final normal-use Games regression next; D5 media/server follows**
 
 Prototype 1 Linux server:
 
@@ -399,6 +399,26 @@ Restore the currently working media/server functions at the Linux migration boun
 - diagnostics/Self-Test;
 - Phase C profile/telemetry/stabilization infrastructure;
 - existing media state/cache and working playback paths.
+
+### D5 Prototype-1 bulk-media storage constraint
+
+The current Linux Prototype 1 has limited internal disk capacity relative to the
+VOD/movie library. During this phase, bulk VOD content may live on an external
+hard drive.
+
+D5 must preserve a configurable media-storage boundary:
+
+- do not require bulk VOD assets to be copied into the PrivyHub project or
+  internal system disk;
+- keep small catalog/metadata/cache/configuration state internal where practical;
+- treat an unavailable/unmounted external media root as storage unavailable,
+  not as authoritative deletion of the user's library;
+- do not hard-code a specific external mount path or removable-storage quirk;
+- preserve a migration path from the temporary external disk to later dedicated
+  server/storage infrastructure without redesigning VOD/library identity.
+
+This is a deployment/architecture constraint, not a requirement that future
+PrivyHub systems use removable storage.
 
 ## D6 — Replay deferred UDP investigation
 

@@ -6,6 +6,26 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D089_D5_EXTERNAL_VOD_STORAGE_CONSTRAINT:HANDOFF:BEGIN -->
+## D5 storage handoff constraint
+
+Immediate next work remains D4 final Games regression.
+
+When D5 media/server restoration begins, do not assume VOD content is stored
+under the Linux project or internal system disk. The current deployment will use
+an external hard drive for bulk movie files.
+
+D5 should first audit the existing media-root contract and mount/unavailable
+behavior before changing media code. Preserve:
+- configurable media root;
+- small internal metadata/catalog/cache where practical;
+- no bulk-media copying into project storage;
+- unavailable external root != deleted library;
+- portability toward later dedicated server/storage infrastructure.
+
+No external-drive mount path has been standardized yet; do not hard-code one.
+<!-- PRIVYHUB_D089_D5_EXTERNAL_VOD_STORAGE_CONSTRAINT:HANDOFF:END -->
+
 <!-- PRIVYHUB_D088_MULTITAP_RUNTIME_VALIDATION:HANDOFF:BEGIN -->
 ## D-088 checkpoint handoff
 
