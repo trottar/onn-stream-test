@@ -6,6 +6,29 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:CURRENT:BEGIN -->
+## D-109 D5.3 portable-Node acquisition diagnostic
+
+D-108 completed cleanly with:
+`D108_ENVIRONMENT_NODE_UNSUPPORTED`.
+
+Measured host environment:
+- Git 2.47.3;
+- Node unavailable;
+- npm unavailable.
+
+D-108 stopped before upstream checkout, npm setup, onn snapshot, or programme
+acquisition. This is an environment boundary, not an EPG acquisition failure.
+
+Do not install Node system-wide merely to continue the diagnostic.
+
+D-109 supplies an official checksum-verified Node 24.21.0 Linux runtime inside
+temporary probe state, invokes the exact installed D-108 probe under that
+temporary PATH, captures the D-108 result, then removes the portable runtime.
+
+No production EPG architecture change until D-109 runtime evidence is reviewed.
+<!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:CURRENT:END -->
+
 <!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:CURRENT:BEGIN -->
 ## D-108 D5.3 EPG local-grabber viability
 

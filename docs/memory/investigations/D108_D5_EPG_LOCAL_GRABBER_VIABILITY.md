@@ -1,5 +1,26 @@
 # D-108 — D5 EPG local-grabber viability
 
+<!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:D108_RESULT:BEGIN -->
+## Result — 2026-09-16
+
+D-108 completed with:
+`D108_ENVIRONMENT_NODE_UNSUPPORTED`.
+
+Host:
+- Git 2.47.3;
+- Node unavailable;
+- npm unavailable.
+
+The probe intentionally stopped before reading the onn TV DB, fetching guide
+metadata, checking out the upstream EPG repository, installing dependencies, or
+attempting a grab.
+
+Therefore local EPG acquisition remains untested.
+
+D-109 continues the same diagnostic using a temporary checksum-verified official
+Node runtime. Do not install Node globally for this probe.
+<!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:D108_RESULT:END -->
+
 **Status:** diagnostic-only / runtime evidence next
 
 ## Narrow question

@@ -6,6 +6,24 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:D5_SUBSTEPS:BEGIN -->
+## D5.3 execution checkpoint — D-109
+
+D-108 is complete as an environment diagnostic:
+the Linux host has no Node/npm, so acquisition was not attempted.
+
+D5.3 remains ACTIVE / not accepted.
+
+D-109 reruns the exact D-108 acquisition path under a temporary verified Node
+runtime without altering the appliance toolchain.
+
+Next branch depends only on D-109/D-108 runtime evidence:
+- multi-site programme output -> design smallest production EPG acquisition/cache
+  seam;
+- setup failure -> diagnose upstream toolchain;
+- acquisition failure -> diagnose first failing site boundary.
+<!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:D5_SUBSTEPS:END -->
+
 <!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:D5_SUBSTEPS:BEGIN -->
 ## D5.3 execution checkpoint — D-108
 

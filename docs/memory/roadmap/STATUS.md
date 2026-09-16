@@ -6,6 +6,19 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:ROADMAP:BEGIN -->
+## D5.3 EPG — portable diagnostic environment
+
+**Status:** ACTIVE / D-109 runtime evidence next.
+
+D-108 was blocked only by absent host Node/npm and made no acquisition attempt.
+
+D-109 supplies Node/npm temporarily without changing the appliance installation
+and reuses D-108 to test actual local programme acquisition.
+
+D5.4 TV-state sync remains pending behind D5.3.
+<!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:ROADMAP:END -->
+
 <!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:ROADMAP:BEGIN -->
 ## D5.3 EPG — local acquisition viability
 

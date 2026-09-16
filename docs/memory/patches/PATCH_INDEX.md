@@ -6,6 +6,23 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:PATCH_INDEX:BEGIN -->
+### D-109 — D5 EPG portable-Node grabber probe — 2026-09-16
+
+Diagnostic-only patch.
+
+Records D-108 as environment-blocked before acquisition and adds a portable-Node
+wrapper that reuses the exact D-108 probe.
+
+The runtime is official Node 24.21.0, downloaded into temporary state and
+verified against pinned SHA-256 before use.
+
+No host package installation and no production code changes.
+
+Runtime evidence next:
+`logs/tv/d109_epg_portable_node_grabber_probe.txt`.
+<!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:PATCH_INDEX:BEGIN -->
 ### D-108 — D5 EPG local-grabber viability probe — 2026-09-16
 

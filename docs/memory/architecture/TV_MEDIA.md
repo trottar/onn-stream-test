@@ -6,6 +6,26 @@ baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
 
 # TV, IPTV, and Media Architecture
 
+<!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:TV_MEDIA:BEGIN -->
+## EPG reference grabber dependency boundary
+
+The current IPTV-org reference EPG grabber requires Node/npm, but the Prototype-1
+Linux appliance does not currently have Node/npm installed.
+
+Do not infer from a successful reference-grabber experiment that Node must become
+a permanent PrivyHub production dependency.
+
+D-109 uses a verified portable runtime only to answer acquisition viability.
+
+If local acquisition is viable, production design must separately evaluate:
+- resource footprint;
+- scheduling/caching model;
+- dependency isolation;
+- update strategy;
+- whether to retain the upstream Node tooling or implement a smaller native
+  acquisition adapter.
+<!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:TV_MEDIA:END -->
+
 <!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:TV_MEDIA:BEGIN -->
 ## EPG acquisition boundary after D-107
 

@@ -6,6 +6,23 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:ACTIVE:BEGIN -->
+## D5.3 active — temporary EPG toolchain environment
+
+D-108 did not reach local programme acquisition because Node/npm is absent from
+the Linux host.
+
+The active question is still D-108's question:
+can representative exact-matched channels produce real XMLTV locally?
+
+D-109 removes only the environment blocker using a verified portable Node
+runtime in temporary state. It reuses D-108 rather than creating parallel
+acquisition logic.
+
+No system Node installation and no production EPG implementation before this
+evidence.
+<!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:ACTIVE:END -->
+
 <!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:ACTIVE:BEGIN -->
 ## D5.3 active — local programme acquisition
 

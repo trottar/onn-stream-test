@@ -6,6 +6,26 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:MEMORY:BEGIN -->
+## Diagnostic toolchain must not become appliance dependency by accident
+
+A missing diagnostic dependency is not by itself a reason to install that
+dependency permanently on the PrivyHub appliance.
+
+D-108 found no host Node/npm, so it stopped before testing local EPG
+acquisition.
+
+For D-109, Node/npm is supplied as a checksum-verified portable official runtime
+in a temporary directory. It exists only for the D-108 subprocess and is
+deleted afterward.
+
+This preserves the architectural distinction between:
+- a reference/tooling implementation used to prove viability;
+- the eventual PrivyHub production dependency model.
+
+Passing a Node-based diagnostic does not commit PrivyHub production to Node.
+<!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:MEMORY:END -->
+
 <!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:MEMORY:BEGIN -->
 ## D5 EPG metadata-versus-acquisition boundary
 

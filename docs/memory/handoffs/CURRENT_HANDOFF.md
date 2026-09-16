@@ -6,6 +6,27 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:HANDOFF:BEGIN -->
+## D-109 handoff — portable Node for D-108
+
+D-108 result:
+`D108_ENVIRONMENT_NODE_UNSUPPORTED`.
+
+This did not test programme acquisition; the host simply lacks Node/npm.
+
+Do not install Node system-wide.
+
+Run D-109. It downloads and SHA-256 verifies an official portable Node 24.21.0
+runtime in temporary state, runs the exact D-108 probe under that PATH, and
+removes the runtime afterward.
+
+Return:
+`logs/tv/d109_epg_portable_node_grabber_probe.txt`.
+
+If D-108 then reaches acquisition, raw site/programme measurements determine the
+next D5.3 step.
+<!-- PRIVYHUB_D109_D5_EPG_PORTABLE_NODE:HANDOFF:END -->
+
 <!-- PRIVYHUB_D108_D5_EPG_LOCAL_GRABBER:HANDOFF:BEGIN -->
 ## D-108 handoff — local EPG acquisition viability
 
