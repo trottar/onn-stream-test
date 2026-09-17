@@ -916,6 +916,26 @@ def verify_and_restore(
     }
 
 
+def final_classification(
+    *,
+    restored: bool,
+    marker_pull_observed: bool,
+) -> str:
+    if not restored:
+        return (
+            "D117_FINAL_RESTORE_PARITY_FAILED"
+        )
+
+    if marker_pull_observed:
+        return (
+            "D117_LINUX_AUTHORITY_PULL_AND_RESTORE_RUNTIME_VALIDATED"
+        )
+
+    return (
+        "D117_LINUX_AUTHORITY_RESTORE_PULL_RUNTIME_VALIDATED"
+    )
+
+
 def final_verify(
     repo: Path,
     plugin_class,
@@ -1054,16 +1074,13 @@ def final_verify(
     return {
         "phase": "final",
         "classification":
-            (
-                "D117_LINUX_AUTHORITY_PULL_AND_RESTORE_RUNTIME_VALIDATED"
-                if (
-                    restored
-                    and session.get(
+            final_classification(
+                restored =
+                    restored,
+                marker_pull_observed =
+                    session.get(
                         "pull_observed"
-                    ) is True
-                )
-                else
-                "D117_FINAL_RESTORE_PARITY_FAILED"
+                    ) is True,
             ),
         "initial_revision":
             session.get(
@@ -1173,6 +1190,27 @@ def self_test(
     ) != canonical_sha(
         plugin_class,
         changed,
+    )
+
+    assert final_classification(
+        restored = True,
+        marker_pull_observed = True,
+    ) == (
+        "D117_LINUX_AUTHORITY_PULL_AND_RESTORE_RUNTIME_VALIDATED"
+    )
+
+    assert final_classification(
+        restored = True,
+        marker_pull_observed = False,
+    ) == (
+        "D117_LINUX_AUTHORITY_RESTORE_PULL_RUNTIME_VALIDATED"
+    )
+
+    assert final_classification(
+        restored = False,
+        marker_pull_observed = True,
+    ) == (
+        "D117_FINAL_RESTORE_PARITY_FAILED"
     )
 
     print(

@@ -6,6 +6,21 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D118_PULL_ACCEPTANCE:ACTIVE:BEGIN -->
+## D5.4 ACTIVE — core synchronization validated
+
+Core TV durable-state synchronization is now bidirectionally runtime validated.
+
+Do not reopen seed/push/pull mechanics without new contradictory evidence.
+
+Remaining bounded D5.4 questions:
+1. make the user-visible synchronization trigger unambiguous/reliable;
+2. surface revision conflicts/last-sync diagnostics adequately;
+3. run focused TV/media regression before D5.4 closure.
+
+D-117 marker testing is closed.
+<!-- PRIVYHUB_D118_PULL_ACCEPTANCE:ACTIVE:END -->
+
 <!-- PRIVYHUB_D117_PULL_VALIDATION:ACTIVE:BEGIN -->
 ## D5.4 ACTIVE — D-117 Linux-to-onn pull validation
 

@@ -1,5 +1,30 @@
 # D-117 — D5.4 Linux-authority pull validation
 
+<!-- PRIVYHUB_D118_PULL_ACCEPTANCE:D117_RESULT:BEGIN -->
+## Runtime disposition — accepted via restored-authority pull
+
+The temporary revision-3 marker was not observed before Linux was restored.
+
+After restoration to revision 4, explicit TV Refresh caused the onn to adopt
+revision 4 with exact canonical durable-state parity.
+
+Final raw measurements:
+- onn country name `All Countries`;
+- onn stored revision 4;
+- local/remote parity true;
+- Linux original content restored true;
+- onn original content restored true;
+- session inactive.
+
+This proves the existing Linux-authoritative pull mechanism.
+
+The original final classifier incorrectly labeled this as failure because it
+required `pull_observed == true` for the earlier marker even though the restored
+revision pull was independently demonstrated.
+
+D-118 fixes the classifier and closes D-117 at its synchronization scope.
+<!-- PRIVYHUB_D118_PULL_ACCEPTANCE:D117_RESULT:END -->
+
 **Status:** diagnostic-only / runtime interaction required
 
 ## Narrow question

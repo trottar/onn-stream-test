@@ -6,6 +6,27 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D118_PULL_ACCEPTANCE:D5_SUBSTEPS:BEGIN -->
+## D5.4 — core synchronization accepted
+
+Runtime accepted:
+- Linux TV-state authority;
+- onn -> Linux initial seed;
+- onn -> Linux durable mutation push;
+- revision conflict protection;
+- Linux -> onn restored-authority pull;
+- exact durable-state parity.
+
+D-118 corrects the D-117 classifier only.
+
+Before D5.4 closure:
+- resolve/define TV sync trigger UX;
+- ensure conflict/last-sync diagnostics are sufficient;
+- run focused TV/media regression.
+
+No further core state-contract redesign is indicated.
+<!-- PRIVYHUB_D118_PULL_ACCEPTANCE:D5_SUBSTEPS:END -->
+
 <!-- PRIVYHUB_D117_PULL_VALIDATION:D5_SUBSTEPS:BEGIN -->
 ## D5.4 — seed/push accepted; pull validation active
 

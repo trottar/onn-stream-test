@@ -6,6 +6,30 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # TV State Synchronization Architecture
 
+<!-- PRIVYHUB_D118_PULL_ACCEPTANCE:ARCH:BEGIN -->
+## Bidirectional runtime acceptance
+
+D5.4 architecture has now been exercised in both directions:
+
+```text
+onn durable intent -> Linux revisioned authority
+Linux revisioned authority -> onn durable projection
+```
+
+Validated properties:
+- seed only when Linux is uninitialized;
+- local durable mutation push;
+- Linux monotonic revision;
+- stale-write conflict rejection;
+- initialized Linux pull;
+- exact canonical local/remote parity after pull;
+- runtime observations excluded.
+
+The remaining issue is not data-contract correctness. It is when/how the TV UI
+invokes the synchronization path and how sync/conflict status is surfaced to the
+user.
+<!-- PRIVYHUB_D118_PULL_ACCEPTANCE:ARCH:END -->
+
 <!-- PRIVYHUB_D117_PULL_VALIDATION:ARCH:BEGIN -->
 ## Runtime status through D-116
 

@@ -6,6 +6,20 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D118_PULL_ACCEPTANCE:PATCH_INDEX:BEGIN -->
+### D-118 — D5 pull classifier / acceptance checkpoint — 2026-09-17
+
+Diagnostic correction only.
+
+Corrects D-117 final classification so restored-authority pull parity is not
+reported as failure merely because the temporary marker revision was not
+observed.
+
+Records D5.4 Linux-to-onn pull as runtime accepted from revision/hash parity.
+
+No Android or companion production change.
+<!-- PRIVYHUB_D118_PULL_ACCEPTANCE:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D117_PULL_VALIDATION:PATCH_INDEX:BEGIN -->
 ### D-117 — D5 Linux-authority pull probe — 2026-09-17
 

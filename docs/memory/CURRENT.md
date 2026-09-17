@@ -6,6 +6,39 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D118_PULL_ACCEPTANCE:CURRENT:BEGIN -->
+## D-118 D5.4 pull acceptance / classifier correction
+
+D-117 raw runtime evidence validates the Linux -> onn pull path.
+
+After Linux restored the original durable state at revision 4, an explicit TV
+Refresh caused the onn to adopt revision 4 with the exact same canonical state
+hash.
+
+Measured post-refresh:
+- Linux revision 4;
+- onn stored revision 4;
+- canonical hash parity true;
+- 25 durable channel rows;
+- 22 favorites;
+- 3 manual-hidden rows;
+- 10 Bold manual-hidden on both sides.
+
+D-117 final raw measurements also confirmed:
+- original Linux content restored;
+- original onn content restored;
+- local/remote parity true;
+- D-117 session removed.
+
+The reported `D117_FINAL_RESTORE_PARITY_FAILED` label was therefore a diagnostic
+classifier defect, not a synchronization failure.
+
+D-118 corrects that classifier only.
+
+D5.4 core seed, push, revision protection, and pull are runtime validated.
+Remaining work before closure: sync trigger/UX and conflict/diagnostic polish.
+<!-- PRIVYHUB_D118_PULL_ACCEPTANCE:CURRENT:END -->
+
 <!-- PRIVYHUB_D117_PULL_VALIDATION:CURRENT:BEGIN -->
 ## D-117 D5.4 Linux-authority pull validation
 

@@ -6,6 +6,27 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D118_PULL_ACCEPTANCE:MEMORY:BEGIN -->
+## D5.4 bidirectional TV-state sync runtime status
+
+Validated:
+- Linux revisioned JSON authority;
+- initial onn -> Linux seed;
+- onn durable-mutation push;
+- stale-revision rejection;
+- Linux -> onn pull;
+- exact canonical state parity after pull;
+- manual-hidden persistence;
+- runtime health/recency excluded from authority.
+
+Important D-117 lesson:
+trust raw measurements over a classifier that contradicts them.
+
+D-117 final had revision/hash/restoration parity but still returned failure
+because it required observation of an earlier temporary marker. D-118 fixes the
+classifier; production sync code was not at fault.
+<!-- PRIVYHUB_D118_PULL_ACCEPTANCE:MEMORY:END -->
+
 <!-- PRIVYHUB_D117_PULL_VALIDATION:MEMORY:BEGIN -->
 ## D5.4 seed/push acceptance
 

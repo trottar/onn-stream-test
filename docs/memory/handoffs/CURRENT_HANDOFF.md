@@ -6,6 +6,30 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D118_PULL_ACCEPTANCE:HANDOFF:BEGIN -->
+## D-118 handoff — D5.4 core sync bidirectionally validated
+
+D-115: Linux authority accepted.
+
+D-116: onn seed/push accepted.
+
+D-117/D-118: Linux-to-onn pull accepted from raw revision/hash parity; D-118
+corrects the D-117 classifier that mislabeled restored-authority parity as a
+failure when the earlier marker was not observed.
+
+Current authority:
+- Linux revision 4;
+- onn remembered revision 4;
+- exact canonical durable-state parity;
+- original user-state content restored;
+- no active D-117 session.
+
+No further D-117 prepare/final cycle is needed.
+
+Next D5.4 work should be limited to synchronization trigger/UX and
+conflict/diagnostic polish, then media regression/closure.
+<!-- PRIVYHUB_D118_PULL_ACCEPTANCE:HANDOFF:END -->
+
 <!-- PRIVYHUB_D117_PULL_VALIDATION:HANDOFF:BEGIN -->
 ## D-117 handoff — Linux-authority pull validation
 

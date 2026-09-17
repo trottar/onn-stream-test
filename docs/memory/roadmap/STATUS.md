@@ -6,6 +6,20 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D118_PULL_ACCEPTANCE:ROADMAP:BEGIN -->
+## D5.4 TV-state sync — core bidirectional path runtime validated
+
+D-115 authority: accepted.
+
+D-116 seed/push: accepted.
+
+D-117/D-118 Linux-to-onn pull: accepted; D-118 corrects a diagnostic classifier
+that contradicted restored revision/hash parity.
+
+D5.4 remains ACTIVE only for trigger/UX, conflict diagnostics, and focused media
+regression before closure.
+<!-- PRIVYHUB_D118_PULL_ACCEPTANCE:ROADMAP:END -->
+
 <!-- PRIVYHUB_D117_PULL_VALIDATION:ROADMAP:BEGIN -->
 ## D5.4 TV-state sync — pull validation active
 
