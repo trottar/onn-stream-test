@@ -2941,9 +2941,17 @@ class MainActivity : AppCompatActivity() {
                     )
 
                 tvEpgRepository.prefetchCompanionGuides(
-                    favoriteChannels.map {
-                        it.channelId
-                    }
+                    favoriteChannels
+                        .filterNot {
+                            it.guideIncorrect
+                        }
+                        .map {
+                            it.channelId
+                        }
+                )
+
+                tvEpgRepository.prefetchRejectedGuides(
+                    favoriteChannels
                 )
 
             } catch (error: Exception) {
@@ -3686,9 +3694,17 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 tvEpgRepository.prefetchCompanionGuides(
-                    channels.map {
-                        it.channelId
-                    }
+                    channels
+                        .filterNot {
+                            it.guideIncorrect
+                        }
+                        .map {
+                            it.channelId
+                        }
+                )
+
+                tvEpgRepository.prefetchRejectedGuides(
+                    channels
                 )
 
             } catch (error: Exception) {
@@ -3715,23 +3731,31 @@ class MainActivity : AppCompatActivity() {
     ): SourceNode {
 
         val status =
-            when {
+            buildList {
+                if (channel.guideIncorrect) {
+                    add(
+                        "Guide marked incorrect"
+                    )
+                }
 
-                channel.manualHidden ->
-                    "Hidden"
+                when {
+                    channel.manualHidden ->
+                        add("Hidden")
 
-                channel.autoHidden ->
-                    "Unavailable - ${channel.consecutiveFailures} failures"
+                    channel.autoHidden ->
+                        add(
+                            "Unavailable - ${channel.consecutiveFailures} failures"
+                        )
 
-                channel.consecutiveFailures > 0 ->
-                    "Recent failures: ${channel.consecutiveFailures}"
+                    channel.consecutiveFailures > 0 ->
+                        add(
+                            "Recent failures: ${channel.consecutiveFailures}"
+                        )
 
-                channel.successCount > 0 ->
-                    "Working"
-
-                else ->
-                    ""
-            }
+                    channel.successCount > 0 ->
+                        add("Working")
+                }
+            }.joinToString("\n")
 
         val prefix =
             if (channel.favorite) {
@@ -3741,12 +3765,17 @@ class MainActivity : AppCompatActivity() {
             }
 
         val guide =
-            tvEpgRepository.getCachedGuide(
-                channel.channelId
-            )
+            if (channel.guideIncorrect) {
+                null
+            } else {
+                tvEpgRepository.getCachedGuide(
+                    channel.channelId
+                )
+            }
 
         val nowPlaying =
-            guide.current
+            guide
+                ?.current
                 ?.title
                 ?.takeIf {
                     it.isNotBlank()
@@ -5432,6 +5461,11 @@ class MainActivity : AppCompatActivity() {
                 },
                 "Favorite Options",
                 "Channel Profile",
+                if (channel.guideIncorrect) {
+                    "Retry Guide"
+                } else {
+                    "Mark Guide Incorrect"
+                },
                 if (hidden) {
                     "Unhide Channel"
                 } else {
@@ -5460,18 +5494,29 @@ class MainActivity : AppCompatActivity() {
                     2 -> showTvFavoriteOptions(channel.streamId)
                     3 -> showTvChannelProfile(channel.streamId)
                     4 -> {
+                        if (channel.guideIncorrect) {
+                            retryTvProgramGuide(
+                                channel.streamId
+                            )
+                        } else {
+                            markTvGuideIncorrect(
+                                channel.streamId
+                            )
+                        }
+                    }
+                    5 -> {
                         val hiddenNow =
                             tvRepository.toggleHidden(channel.streamId)
                         statusText.text =
                             if (hiddenNow) "Channel hidden" else "Channel restored"
                         refreshCurrentTvResultPage()
                     }
-                    5 -> {
+                    6 -> {
                         tvRepository.resetHealth(channel.streamId)
                         statusText.text = "Health history reset"
                         refreshCurrentTvResultPage()
                     }
-                    6 -> showTvChannelDetails(channel.streamId)
+                    7 -> showTvChannelDetails(channel.streamId)
                 }
             }
             .setNegativeButton("Cancel", null)
@@ -5502,6 +5547,42 @@ class MainActivity : AppCompatActivity() {
             tvRepository.getChannel(
                 streamId
             ) ?: return
+
+        if (channel.guideIncorrect) {
+            AlertDialog.Builder(
+                this
+            )
+                .setTitle(
+                    "${channel.name} - Program Guide"
+                )
+                .setMessage(
+                    "This guide is marked incorrect. The channel remains playable, " +
+                        "but its programme data is not being presented as trusted."
+                )
+                .setPositiveButton(
+                    "Retry"
+                ) { _, _ ->
+                    retryTvProgramGuide(
+                        streamId
+                    )
+                }
+                .setNeutralButton(
+                    "Clear Mark"
+                ) { _, _ ->
+                    clearTvGuideIncorrect(
+                        streamId
+                    )
+                }
+                .setNegativeButton(
+                    "Close",
+                    null
+                )
+                .show()
+
+            statusText.text =
+                "Guide marked incorrect: ${channel.name}"
+            return
+        }
 
         statusText.text =
             "Loading guide for ${channel.name}..."
@@ -5611,6 +5692,13 @@ class MainActivity : AppCompatActivity() {
                             streamId
                         )
                     }
+                    .setNegativeButton(
+                        "Mark Incorrect"
+                    ) { _, _ ->
+                        markTvGuideIncorrect(
+                            streamId
+                        )
+                    }
                     .show()
 
                 statusText.text =
@@ -5621,6 +5709,151 @@ class MainActivity : AppCompatActivity() {
                     }
 
                 refreshCurrentTvResultPage()
+            }
+        }
+    }
+
+
+    private fun markTvGuideIncorrect(
+        streamId: String
+    ) {
+        val channel =
+            tvRepository.getChannel(
+                streamId
+            ) ?: return
+
+        val sourceKey =
+            tvEpgRepository.currentGuideSourceKey(
+                channel.channelId
+            )
+
+        if (
+            tvRepository.markGuideIncorrect(
+                streamId = streamId,
+                rejectedSourceKey = sourceKey
+            )
+        ) {
+            statusText.text =
+                "Guide marked incorrect: ${channel.name}"
+            refreshCurrentTvResultPage()
+        }
+    }
+
+
+    private fun clearTvGuideIncorrect(
+        streamId: String
+    ) {
+        val channel =
+            tvRepository.getChannel(
+                streamId
+            ) ?: return
+
+        if (
+            tvRepository.clearGuideIncorrect(
+                streamId
+            )
+        ) {
+            statusText.text =
+                "Guide mark cleared: ${channel.name}"
+            refreshCurrentTvResultPage()
+        }
+    }
+
+
+    private fun retryTvProgramGuide(
+        streamId: String
+    ) {
+        val channel =
+            tvRepository.getChannel(
+                streamId
+            ) ?: return
+
+        if (!channel.guideIncorrect) {
+            refreshTvProgramGuide(
+                streamId
+            )
+            return
+        }
+
+        val rejectedSource =
+            channel.rejectedGuideSourceKey
+
+        statusText.text =
+            "Rechecking guide for ${channel.name}..."
+
+        networkExecutor.execute {
+            val guide =
+                tvEpgRepository.getGuide(
+                    channelId = channel.channelId,
+                    force = true
+                )
+
+            val hasProgrammes =
+                guide.current != null ||
+                    guide.upcoming.isNotEmpty()
+
+            val refreshedSource =
+                guide.sourceKey.orEmpty()
+
+            runOnUiThread {
+                if (!hasProgrammes) {
+                    statusText.text =
+                        "No replacement guide found: ${channel.name}"
+                    showTvProgramGuide(
+                        streamId
+                    )
+                    return@runOnUiThread
+                }
+
+                val recheckMessage =
+                    if (
+                        refreshedSource.isNotBlank() &&
+                        refreshedSource != rejectedSource
+                    ) {
+                        "A different guide source is available. " +
+                            "Accept the refreshed guide or keep the existing rejection."
+                    } else {
+                        "The refreshed guide still resolves to the source you marked incorrect. " +
+                            "Keep it rejected, or explicitly accept the refreshed guide."
+                    }
+
+                AlertDialog.Builder(
+                    this
+                )
+                    .setTitle(
+                        "${channel.name} - Guide Recheck"
+                    )
+                    .setMessage(
+                        recheckMessage
+                    )
+                    .setPositiveButton(
+                        "Accept Refreshed"
+                    ) { _, _ ->
+                        tvRepository.clearGuideIncorrect(
+                            streamId
+                        )
+                        statusText.text =
+                            "Refreshed guide accepted: ${channel.name}"
+                        refreshCurrentTvResultPage()
+                        showTvProgramGuide(
+                            streamId
+                        )
+                    }
+                    .setNegativeButton(
+                        "Keep Marked",
+                        null
+                    )
+                    .show()
+
+                statusText.text =
+                    if (
+                        refreshedSource.isNotBlank() &&
+                        refreshedSource != rejectedSource
+                    ) {
+                        "Replacement guide awaiting acceptance: ${channel.name}"
+                    } else {
+                        "Rejected guide source unchanged: ${channel.name}"
+                    }
             }
         }
     }
@@ -5745,6 +5978,8 @@ class MainActivity : AppCompatActivity() {
                 append(channel.favoriteGroup.ifBlank { "Ungrouped" })
                 append("\nAuto-hide protected: ")
                 append(if (channel.protectAutoHide) "Yes" else "No")
+                append("\nGuide marked incorrect: ")
+                append(if (channel.guideIncorrect) "Yes" else "No")
 
                 if (!channel.label.isNullOrBlank()) {
                     append("\nUpstream note: ")

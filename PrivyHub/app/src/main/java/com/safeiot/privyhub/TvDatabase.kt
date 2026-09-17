@@ -17,7 +17,7 @@ class TvDatabase(
 
     companion object {
         private const val DATABASE_NAME = "privyhub_tv.db"
-        private const val DATABASE_VERSION = 2
+        private const val DATABASE_VERSION = 3
         const val BUILTIN_PROVIDER_ID = "iptv_org"
     }
 
@@ -62,6 +62,12 @@ class TvDatabase(
             createIndexes(db)
             ensureBuiltinProvider(db)
         }
+
+        if (oldVersion < 3) {
+            addColumn(db, "streams", "guide_incorrect INTEGER NOT NULL DEFAULT 0")
+            addColumn(db, "streams", "rejected_guide_source_key TEXT NOT NULL DEFAULT ''")
+            addColumn(db, "streams", "guide_incorrect_at_ms INTEGER NOT NULL DEFAULT 0")
+        }
     }
 
 
@@ -99,7 +105,10 @@ class TvDatabase(
                 custom_user_agent TEXT,
                 favorite_group TEXT NOT NULL DEFAULT '',
                 favorite_order INTEGER NOT NULL DEFAULT 0,
-                protect_auto_hide INTEGER NOT NULL DEFAULT 0
+                protect_auto_hide INTEGER NOT NULL DEFAULT 0,
+                guide_incorrect INTEGER NOT NULL DEFAULT 0,
+                rejected_guide_source_key TEXT NOT NULL DEFAULT '',
+                guide_incorrect_at_ms INTEGER NOT NULL DEFAULT 0
             )
             """.trimIndent()
         )

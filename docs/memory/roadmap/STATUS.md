@@ -1,7 +1,7 @@
 ---
 memory_schema: 2
 as_of: 2026-09-17
-baseline_commit: 0206017cfd8f0fc57decb7a5e9e8632e6a4f6cdd
+baseline_commit: c01bb79ddbf6763a48ce9487ee31cdb8aef9aef6
 ---
 
 # Roadmap Status
@@ -22,15 +22,17 @@ D5 media/TV work is at its final bounded usability/closeout sequence.
 
 ### Active
 
-**D-127 — durable incorrect-guide mark/recheck.**
+**D-127 — durable incorrect-guide mark/recheck: DEVELOPMENT PATCH / RUNTIME
+VALIDATION NEXT.**
 
 ### Next
 
-1. guide-style paged Favorites/category UI;
-2. correct/expand EPG coverage/status presentation;
-3. focused TV/media regression;
-4. checkpoint/close D5 bounded TV work;
-5. continue the broader Linux roadmap without reopening the deferred UDP branch
+1. finish D-127 runtime acceptance;
+2. guide-style paged Favorites/category UI;
+3. correct/expand EPG coverage/status presentation;
+4. focused TV/media regression;
+5. checkpoint/close D5 bounded TV work;
+6. continue the broader Linux roadmap without reopening the deferred UDP branch
    by default.
 
 Browser/app and camera/live generalized native-source work remains outside this

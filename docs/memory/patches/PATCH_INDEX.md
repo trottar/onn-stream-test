@@ -6,6 +6,23 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D127_INCORRECT_GUIDE:PATCH_INDEX:BEGIN -->
+### D-127 — durable incorrect-guide intent / recheck — 2026-09-17
+
+Android + Linux TV-state production change.
+
+Adds TV user-state v2, rejected guide-source fingerprints, marked-guide
+presentation suppression, delayed recheck reuse of the existing background EPG
+warmer, and explicit Retry/Accept/Clear behavior. Channel visibility/playback are
+unchanged by guide rejection.
+
+Runtime probe:
+`tools/probes/d127_incorrect_guide_probe.py`.
+
+**Status:** development patch / runtime validation pending.
+<!-- PRIVYHUB_D127_INCORRECT_GUIDE:PATCH_INDEX:END -->
+
+
 <!-- PRIVYHUB_D126_ANDROID_PREFETCH:PATCH_INDEX:BEGIN -->
 ### D-126 — Android EPG prefetch integration — 2026-09-17
 

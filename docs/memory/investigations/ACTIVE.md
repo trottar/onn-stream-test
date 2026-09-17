@@ -5,23 +5,22 @@ as_of: 2026-09-17
 
 # Active Investigations and Queued Work
 
-## Active — D-127 incorrect-guide intent
+## Active — D-127 incorrect-guide runtime validation
 
-Question:
+Development implementation is installed when this file is present.
 
-How should a user explicitly distrust an incorrect guide while keeping the
-channel visible/playable and allowing a later controlled recheck?
+Validate:
 
-Required boundaries:
+- `Mark Guide Incorrect` does not hide or disable the channel;
+- current-program and Program Guide presentation are suppressed while marked;
+- rejected guide-source fingerprint is durable through Linux TV-state sync;
+- app/companion restart preserves the mark;
+- delayed rejected-guide prefetch does not silently clear intent;
+- Retry does not silently trust the same rejected source;
+- explicit Accept/Clear restores trust deliberately.
 
-- separate from Hide;
-- durable across restart and TV-state synchronization;
-- rejected guide not presented as trusted;
-- later retry/recheck possible;
-- no speculative remapping heuristic;
-- no guide-grid redesign in the same change.
-
-See `../CURRENT.md`.
+Canonical design record:
+`D127_INCORRECT_GUIDE_INTENT.md`.
 
 ## Queued after D-127
 

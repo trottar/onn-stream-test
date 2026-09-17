@@ -19,7 +19,8 @@ class TvStatePlugin:
     STATUS_SCHEMA = "privyhub_tv_state_status_v1"
     ENVELOPE_SCHEMA = "privyhub_tv_state_envelope_v1"
     UPDATE_SCHEMA = "privyhub_tv_state_update_v1"
-    USER_STATE_SCHEMA = "privyhub_tv_user_state_v1"
+    LEGACY_USER_STATE_SCHEMA = "privyhub_tv_user_state_v1"
+    USER_STATE_SCHEMA = "privyhub_tv_user_state_v2"
     STORAGE_SCHEMA = 1
 
     MAX_MANAGED_PROVIDERS = 64
@@ -39,6 +40,7 @@ class TvStatePlugin:
     MAX_CATEGORY_CHARS = 128
     MAX_HEADER_CHARS = 1_024
     MAX_FAVORITE_GROUP_CHARS = 160
+    MAX_GUIDE_SOURCE_KEY_CHARS = 256
     MAX_CLIENT_ID_CHARS = 96
 
     def __init__(
@@ -389,7 +391,31 @@ class TvStatePlugin:
                     item.get("protect_auto_hide", False),
                     f"channels[{index}].protect_auto_hide",
                 ),
+                "guide_incorrect": cls._bool(
+                    item.get("guide_incorrect", False),
+                    f"channels[{index}].guide_incorrect",
+                ),
+                "rejected_guide_source_key": cls._optional_string(
+                    item,
+                    "rejected_guide_source_key",
+                    max_chars=cls.MAX_GUIDE_SOURCE_KEY_CHARS,
+                ),
+                "guide_incorrect_at_ms": cls._int(
+                    item.get("guide_incorrect_at_ms", 0),
+                    f"channels[{index}].guide_incorrect_at_ms",
+                    minimum=0,
+                    maximum=9_223_372_036_854_775_807,
+                ),
             }
+
+            if not bool(normalized["guide_incorrect"]):
+                normalized["rejected_guide_source_key"] = ""
+                normalized["guide_incorrect_at_ms"] = 0
+            elif not str(normalized["rejected_guide_source_key"]):
+                raise ValueError(
+                    f"channels[{index}].rejected_guide_source_key must not be blank "
+                    "when guide_incorrect is true"
+                )
 
             custom_url = str(normalized["custom_url"])
             if custom_url:
@@ -409,6 +435,7 @@ class TvStatePlugin:
                 or bool(normalized["favorite_group"])
                 or int(normalized["favorite_order"]) > 0
                 or bool(normalized["protect_auto_hide"])
+                or bool(normalized["guide_incorrect"])
             )
             if has_intent:
                 result.append(normalized)
@@ -420,11 +447,19 @@ class TvStatePlugin:
     def normalize_user_state(
         cls,
         raw: Any,
+        *,
+        allow_legacy: bool = False,
     ) -> dict[str, Any]:
         state = cls._obj(raw, "state")
 
         schema = state.get("schema")
-        if schema != cls.USER_STATE_SCHEMA:
+        if (
+            schema != cls.USER_STATE_SCHEMA
+            and not (
+                allow_legacy
+                and schema == cls.LEGACY_USER_STATE_SCHEMA
+            )
+        ):
             raise ValueError(
                 f"state.schema must be {cls.USER_STATE_SCHEMA}"
             )
@@ -486,15 +521,32 @@ class TvStatePlugin:
                 "TV state store revision is invalid"
             )
 
+        raw_state = self._obj(
+            payload.get("state"),
+            "state",
+        )
+        stored_hash = self._state_sha256(
+            raw_state
+        )
+        if payload.get("state_sha256") != stored_hash:
+            raise RuntimeError(
+                "TV state store hash mismatch"
+            )
+
         state = self.normalize_user_state(
-            payload.get("state")
+            raw_state,
+            allow_legacy=True,
         )
         expected_hash = self._state_sha256(
             state
         )
-        if payload.get("state_sha256") != expected_hash:
-            raise RuntimeError(
-                "TV state store hash mismatch"
+
+        if state != raw_state:
+            migrated = dict(payload)
+            migrated["state"] = state
+            migrated["state_sha256"] = expected_hash
+            self._write_envelope_unlocked(
+                migrated
             )
 
         return {

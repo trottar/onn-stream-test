@@ -16,6 +16,7 @@ import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -36,7 +37,8 @@ data class TvGuideSummary(
     val channelId: String,
     val current: TvProgramme?,
     val upcoming: List<TvProgramme>,
-    val cached: Boolean
+    val cached: Boolean,
+    val sourceKey: String?
 )
 
 
@@ -58,7 +60,8 @@ private data class TvGuideMapping(
 private data class CompanionGuideResult(
     val programmes: List<TvProgramme>,
     val cached: Boolean,
-    val stale: Boolean
+    val stale: Boolean,
+    val sourceKey: String?
 )
 
 
@@ -227,6 +230,9 @@ class TvEpgRepository(
         private const val COMPANION_PREFETCH_TIMEOUT_MS = 2_000
 
         private const val MAX_PREFETCH_CHANNELS = 80
+
+        private const val REJECTED_GUIDE_RECHECK_INTERVAL_MS =
+            24L * 60L * 60L * 1_000L
     }
 
 
@@ -347,6 +353,13 @@ class TvEpgRepository(
                 companionGuide.stale.toString()
             )
 
+            companionGuide.sourceKey?.let { sourceKey ->
+                db.setMeta(
+                    guideSourceMetaKey(channelId),
+                    sourceKey
+                )
+            }
+
             return buildSummary(
                 channelId = channelId,
                 programmes = companionGuide.programmes,
@@ -403,6 +416,11 @@ class TvEpgRepository(
                 now.toString()
             )
 
+            db.setMeta(
+                guideSourceMetaKey(channelId),
+                mappingSourceKey(mapping)
+            )
+
             buildSummary(
                 channelId = channelId,
                 programmes = programmes,
@@ -419,7 +437,8 @@ class TvEpgRepository(
 
 
     fun prefetchCompanionGuides(
-        channelIds: List<String>
+        channelIds: List<String>,
+        forceRefresh: Boolean = false
     ): Int {
         val baseUrl =
             companionBaseUrl()
@@ -442,10 +461,11 @@ class TvEpgRepository(
                 }
                 .distinct()
                 .filter {
-                    needsCompanionPrefetch(
-                        channelId = it,
-                        nowMs = now
-                    )
+                    forceRefresh ||
+                        needsCompanionPrefetch(
+                            channelId = it,
+                            nowMs = now
+                        )
                 }
                 .take(
                     MAX_PREFETCH_CHANNELS
@@ -545,6 +565,27 @@ class TvEpgRepository(
             val queued =
                 accepted.length() +
                     alreadyPending.length()
+
+            if (forceRefresh) {
+                val rechecked =
+                    buildList {
+                        for (index in 0 until accepted.length()) {
+                            add(accepted.optString(index))
+                        }
+                        for (index in 0 until alreadyPending.length()) {
+                            add(alreadyPending.optString(index))
+                        }
+                    }
+
+                for (channelId in rechecked) {
+                    if (channelId.isNotBlank()) {
+                        db.setMeta(
+                            rejectedGuideRecheckKey(channelId),
+                            now.toString()
+                        )
+                    }
+                }
+            }
 
             db.setMeta(
                 "companion_epg_last_prefetch_at_ms",
@@ -844,6 +885,17 @@ class TvEpgRepository(
                 }
             }
 
+            val sourceKey =
+                payload.optJSONObject(
+                    "source"
+                )?.let { source ->
+                    companionSourceKey(
+                        site = source.optString("site"),
+                        siteId = source.optString("site_id"),
+                        language = source.optString("language")
+                    )
+                }
+
             CompanionGuideResult(
                 programmes =
                     programmes
@@ -866,12 +918,178 @@ class TvEpgRepository(
                     payload.optBoolean(
                         "stale",
                         false
-                    )
+                    ),
+                sourceKey =
+                    sourceKey
             )
 
         } finally {
             connection.disconnect()
         }
+    }
+
+
+    fun currentGuideSourceKey(
+        channelId: String
+    ): String {
+        val stored =
+            db.getMeta(
+                guideSourceMetaKey(channelId)
+            )?.trim().orEmpty()
+
+        if (stored.isNotBlank()) {
+            return stored
+        }
+
+        val mapping =
+            getMapping(
+                channelId
+            )
+
+        if (mapping != null) {
+            return mappingSourceKey(
+                mapping
+            )
+        }
+
+        return "channel:" +
+            sha256(
+                channelId
+            ).take(24)
+    }
+
+
+    fun prefetchRejectedGuides(
+        channels: List<TvChannel>
+    ): Int {
+        val now =
+            System.currentTimeMillis()
+
+        val due =
+            channels
+                .asSequence()
+                .filter {
+                    it.guideIncorrect &&
+                        it.channelId.isNotBlank() &&
+                        !it.channelId.startsWith(
+                            "tv_stream_"
+                        )
+                }
+                .filter { channel ->
+                    val lastRecheck =
+                        db.getMeta(
+                            rejectedGuideRecheckKey(
+                                channel.channelId
+                            )
+                        )?.toLongOrNull() ?: 0L
+
+                    val anchor =
+                        maxOf(
+                            channel.guideIncorrectAtMs,
+                            lastRecheck
+                        )
+
+                    anchor > 0L &&
+                        now - anchor >=
+                            REJECTED_GUIDE_RECHECK_INTERVAL_MS
+                }
+                .map {
+                    it.channelId
+                }
+                .distinct()
+                .toList()
+
+        if (due.isEmpty()) {
+            return 0
+        }
+
+        return prefetchCompanionGuides(
+            channelIds = due,
+            forceRefresh = true
+        )
+    }
+
+
+    private fun companionSourceKey(
+        site: String,
+        siteId: String,
+        language: String
+    ): String? {
+        val cleanSite =
+            site.trim()
+
+        val cleanSiteId =
+            siteId.trim()
+
+        if (
+            cleanSite.isBlank() ||
+            cleanSiteId.isBlank()
+        ) {
+            return null
+        }
+
+        return "companion:" +
+            sha256(
+                listOf(
+                    cleanSite,
+                    cleanSiteId,
+                    language.trim()
+                ).joinToString("|")
+            ).take(24)
+    }
+
+
+    private fun mappingSourceKey(
+        mapping: TvGuideMapping
+    ): String {
+        return "legacy:" +
+            sha256(
+                listOf(
+                    mapping.siteId,
+                    mapping.sourceUrl,
+                    mapping.language
+                ).joinToString("|")
+            ).take(24)
+    }
+
+
+    private fun guideSourceMetaKey(
+        channelId: String
+    ): String {
+        return "guide_source:" +
+            sha256(
+                channelId
+            ).take(24)
+    }
+
+
+    private fun rejectedGuideRecheckKey(
+        channelId: String
+    ): String {
+        return "rejected_guide_recheck:" +
+            sha256(
+                channelId
+            ).take(24)
+    }
+
+
+    private fun sha256(
+        value: String
+    ): String {
+        return MessageDigest
+            .getInstance("SHA-256")
+            .digest(
+                value.toByteArray(
+                    Charsets.UTF_8
+                )
+            )
+            .joinToString(
+                separator = ""
+            ) { byte ->
+                "%02x".format(
+                    byte.toInt() and 0xff
+                )
+            }
     }
 
 
@@ -1606,7 +1824,15 @@ class TvEpgRepository(
             channelId = channelId,
             current = current,
             upcoming = upcoming,
-            cached = cached
+            cached = cached,
+            sourceKey =
+                db.getMeta(
+                    guideSourceMetaKey(
+                        channelId
+                    )
+                )?.takeIf {
+                    it.isNotBlank()
+                }
         )
     }
 

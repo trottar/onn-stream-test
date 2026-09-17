@@ -6,6 +6,23 @@ baseline_commit: 0206017cfd8f0fc57decb7a5e9e8632e6a4f6cdd
 
 # Curated Project Memory
 
+## Incorrect-guide durable-intent rule (D-127 development)
+
+A bad EPG mapping is not a playback-health failure and must not hide an otherwise
+playable channel. D-127 carries incorrect-guide state as Linux-authoritative
+durable user intent, separate from `manual_hidden`/`auto_hidden`. The rejected
+guide source is stored as a stable fingerprint rather than a raw upstream URL.
+
+Marked guide programme data may remain cached for comparison/recheck but is not
+presented as trusted. Background recheck may warm replacement data after a
+bounded delay; it never clears the user's mark. Trust is restored only by an
+explicit Retry/Accept or Clear action. TV user-state v2 is fail-closed at the
+Android sync boundary; Linux alone migrates persisted v1 authority to v2 without
+advancing the household revision.
+
+**Status:** development contract; runtime validation pending.
+
+
 This file contains durable rules and repeatedly useful validated facts. It is not
 a patch log or current-task tracker. Current work belongs in `CURRENT.md`.
 

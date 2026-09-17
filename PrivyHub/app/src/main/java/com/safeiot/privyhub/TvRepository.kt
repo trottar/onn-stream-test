@@ -40,7 +40,10 @@ data class TvChannel(
     val sourceCategory: String,
     val favoriteGroup: String,
     val favoriteOrder: Int,
-    val protectAutoHide: Boolean
+    val protectAutoHide: Boolean,
+    val guideIncorrect: Boolean,
+    val rejectedGuideSourceKey: String,
+    val guideIncorrectAtMs: Long
 )
 
 
@@ -177,7 +180,10 @@ class TvRepository(
             "s.category",
             "s.favorite_group",
             "s.favorite_order",
-            "s.protect_auto_hide"
+            "s.protect_auto_hide",
+            "s.guide_incorrect",
+            "s.rejected_guide_source_key",
+            "s.guide_incorrect_at_ms"
         ).joinToString(", ")
     }
 
@@ -746,6 +752,62 @@ class TvRepository(
     }
 
 
+    fun markGuideIncorrect(
+        streamId: String,
+        rejectedSourceKey: String
+    ): Boolean {
+        if (getChannel(streamId) == null) return false
+
+        val sourceKey =
+            rejectedSourceKey
+                .trim()
+                .take(256)
+
+        if (sourceKey.isBlank()) return false
+
+        val values =
+            ContentValues().apply {
+                put("guide_incorrect", 1)
+                put("rejected_guide_source_key", sourceKey)
+                put("guide_incorrect_at_ms", System.currentTimeMillis())
+            }
+
+        db.writableDatabase.update(
+            "streams",
+            values,
+            "stream_id = ?",
+            arrayOf(streamId)
+        )
+        invalidateDedupeCache()
+        notifyDurableStateChanged()
+        return true
+    }
+
+
+    fun clearGuideIncorrect(
+        streamId: String
+    ): Boolean {
+        if (getChannel(streamId) == null) return false
+
+        val values =
+            ContentValues().apply {
+                put("guide_incorrect", 0)
+                put("rejected_guide_source_key", "")
+                put("guide_incorrect_at_ms", 0L)
+            }
+
+        db.writableDatabase.update(
+            "streams",
+            values,
+            "stream_id = ?",
+            arrayOf(streamId)
+        )
+        invalidateDedupeCache()
+        notifyDurableStateChanged()
+        return true
+    }
+
+
     fun resetHealth(
         streamId: String
     ) {
@@ -1043,7 +1105,7 @@ class TvRepository(
             JSONObject()
                 .put(
                     "schema",
-                    "privyhub_tv_user_state_v1"
+                    "privyhub_tv_user_state_v2"
                 )
                 .put(
                     "preferences",
@@ -1138,13 +1200,15 @@ class TvRepository(
             SELECT stream_id, favorite, manual_hidden,
                    custom_name, custom_category, custom_url,
                    custom_referrer, custom_user_agent,
-                   favorite_group, favorite_order, protect_auto_hide
+                   favorite_group, favorite_order, protect_auto_hide,
+                   guide_incorrect, rejected_guide_source_key, guide_incorrect_at_ms
             FROM streams
             WHERE favorite = 1 OR manual_hidden = 1 OR
                   custom_name IS NOT NULL OR custom_category IS NOT NULL OR
                   custom_url IS NOT NULL OR custom_referrer IS NOT NULL OR
                   custom_user_agent IS NOT NULL OR favorite_group <> '' OR
-                  favorite_order > 0 OR protect_auto_hide = 1
+                  favorite_order > 0 OR protect_auto_hide = 1 OR
+                  guide_incorrect = 1
             ORDER BY stream_id
             """.trimIndent(),
             null
@@ -1198,6 +1262,18 @@ class TvRepository(
                             "protect_auto_hide",
                             cursor.getInt(10) != 0
                         )
+                        .put(
+                            "guide_incorrect",
+                            cursor.getInt(11) != 0
+                        )
+                        .put(
+                            "rejected_guide_source_key",
+                            cursor.getStringOrEmpty(12)
+                        )
+                        .put(
+                            "guide_incorrect_at_ms",
+                            cursor.getLong(13)
+                        )
                 )
             }
         }
@@ -1220,11 +1296,16 @@ class TvRepository(
                 jsonText
             )
 
-        require(
+        val schema =
             root.optString(
                 "schema"
-            ) ==
-                "privyhub_tv_user_state_v1"
+            )
+
+        require(
+            schema ==
+                "privyhub_tv_user_state_v1" ||
+            schema ==
+                "privyhub_tv_user_state_v2"
         ) {
             "Unsupported TV state schema"
         }
@@ -1388,6 +1469,18 @@ class TvRepository(
                             "protect_auto_hide",
                             0
                         )
+                        put(
+                            "guide_incorrect",
+                            0
+                        )
+                        put(
+                            "rejected_guide_source_key",
+                            ""
+                        )
+                        put(
+                            "guide_incorrect_at_ms",
+                            0L
+                        )
                     }
 
             val database =
@@ -1513,6 +1606,30 @@ class TvRepository(
                                         0
                                     }
                                 )
+                                put(
+                                    "guide_incorrect",
+                                    if (
+                                        item.optBoolean(
+                                            "guide_incorrect"
+                                        )
+                                    ) {
+                                        1
+                                    } else {
+                                        0
+                                    }
+                                )
+                                put(
+                                    "rejected_guide_source_key",
+                                    item.optString(
+                                        "rejected_guide_source_key"
+                                    )
+                                )
+                                put(
+                                    "guide_incorrect_at_ms",
+                                    item.optLong(
+                                        "guide_incorrect_at_ms"
+                                    )
+                                )
                             }
 
                     database.update(
@@ -1541,7 +1658,7 @@ class TvRepository(
 
     fun exportSettingsJson(): String {
         val root = JSONObject()
-        root.put("version", 2)
+        root.put("version", 3)
 
         val managedProviders = JSONArray()
         for (provider in listProviders().filter {
@@ -1573,14 +1690,15 @@ class TvRepository(
             SELECT stream_id, favorite, manual_hidden, success_count, failure_count,
                    consecutive_failures, last_success, last_failure, last_watched,
                    custom_name, custom_category, custom_url, custom_referrer,
-                   custom_user_agent, favorite_group, favorite_order, protect_auto_hide
+                   custom_user_agent, favorite_group, favorite_order, protect_auto_hide,
+                   guide_incorrect, rejected_guide_source_key, guide_incorrect_at_ms
             FROM streams
             WHERE favorite = 1 OR manual_hidden = 1 OR auto_hidden = 1 OR
                   success_count > 0 OR failure_count > 0 OR last_watched > 0 OR
                   custom_name IS NOT NULL OR custom_category IS NOT NULL OR
                   custom_url IS NOT NULL OR custom_referrer IS NOT NULL OR
                   custom_user_agent IS NOT NULL OR favorite_group <> '' OR
-                  protect_auto_hide = 1
+                  protect_auto_hide = 1 OR guide_incorrect = 1
             """.trimIndent(),
             null
         ).use { cursor ->
@@ -1604,6 +1722,9 @@ class TvRepository(
                         .put("favorite_group", cursor.getStringOrEmpty(14))
                         .put("favorite_order", cursor.getInt(15))
                         .put("protect_auto_hide", cursor.getInt(16) != 0)
+                        .put("guide_incorrect", cursor.getInt(17) != 0)
+                        .put("rejected_guide_source_key", cursor.getStringOrEmpty(18))
+                        .put("guide_incorrect_at_ms", cursor.getLong(19))
                 )
             }
         }
@@ -1665,6 +1786,9 @@ class TvRepository(
                     put("favorite_group", item.optString("favorite_group"))
                     put("favorite_order", item.optInt("favorite_order"))
                     put("protect_auto_hide", if (item.optBoolean("protect_auto_hide")) 1 else 0)
+                    put("guide_incorrect", if (item.optBoolean("guide_incorrect")) 1 else 0)
+                    put("rejected_guide_source_key", item.optString("rejected_guide_source_key"))
+                    put("guide_incorrect_at_ms", item.optLong("guide_incorrect_at_ms"))
                     put("auto_hidden", 0)
                 }
                 database.update("streams", values, "stream_id = ?", arrayOf(streamId))
@@ -2017,7 +2141,10 @@ class TvRepository(
             sourceCategory = cursor.getString(i++),
             favoriteGroup = cursor.getString(i++) ?: "",
             favoriteOrder = cursor.getInt(i++),
-            protectAutoHide = cursor.getInt(i) != 0
+            protectAutoHide = cursor.getInt(i++) != 0,
+            guideIncorrect = cursor.getInt(i++) != 0,
+            rejectedGuideSourceKey = cursor.getString(i++) ?: "",
+            guideIncorrectAtMs = cursor.getLong(i)
         )
     }
 

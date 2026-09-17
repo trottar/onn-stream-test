@@ -94,7 +94,7 @@ class TvStateSyncClient(
             "privyhub_tv_state_update_v1"
 
         private const val USER_STATE_SCHEMA =
-            "privyhub_tv_user_state_v1"
+            "privyhub_tv_user_state_v2"
     }
 
 

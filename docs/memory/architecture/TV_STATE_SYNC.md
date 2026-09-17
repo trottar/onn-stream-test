@@ -6,6 +6,32 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # TV State Synchronization Architecture
 
+<!-- PRIVYHUB_D127_INCORRECT_GUIDE:ARCH:BEGIN -->
+## D-127 incorrect-guide durable-intent seam
+
+D-127 development contract adds three per-stream durable fields to TV user-state
+schema v2:
+
+- `guide_incorrect`;
+- `rejected_guide_source_key`;
+- `guide_incorrect_at_ms`.
+
+These fields are user-intent/provenance metadata, not EPG programme cache data.
+They remain independent of manual/automatic Hide and playback-health state.
+
+Android keeps programme rows/cache local. Linux continues to own the durable TV
+user-state projection. Existing v1 state is accepted and canonicalized to v2;
+Linux verifies the predecessor hash and migrates the stored state without
+incrementing `server_revision`.
+
+Marked guide presentation is suppressed until explicit Retry/Accept or Clear.
+Delayed background recheck may refresh Linux guide cache, but must never clear
+this durable intent by itself.
+
+**Status:** development implementation; runtime validation pending.
+<!-- PRIVYHUB_D127_INCORRECT_GUIDE:ARCH:END -->
+
+
 <!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:ARCH:BEGIN -->
 ## Conflict observability acceptance test
 
