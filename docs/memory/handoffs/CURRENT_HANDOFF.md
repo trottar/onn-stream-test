@@ -6,6 +6,28 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D119_TV_ENTRY_TRIGGER:HANDOFF:BEGIN -->
+## D-119 handoff — measure top-level TV-entry trigger
+
+Current accepted authority:
+- Linux and onn revision 4 at the D-118 checkpoint;
+- exact canonical durable-state parity;
+- no active D-117 session.
+
+D-119 test sequence:
+1. run `--phase prepare`;
+2. on onn, Back out until the top-level PrivyHub source list is visible;
+3. select TV exactly once and do not press Refresh;
+4. run `--phase verify`;
+5. while inside TV, press Refresh once for cleanup;
+6. run `--phase final`.
+
+Return:
+`logs/tv/d119_tv_entry_sync_trigger_probe.txt`.
+
+Do not make a production trigger change until D-119 evidence is reviewed.
+<!-- PRIVYHUB_D119_TV_ENTRY_TRIGGER:HANDOFF:END -->
+
 <!-- PRIVYHUB_D118_PULL_ACCEPTANCE:HANDOFF:BEGIN -->
 ## D-118 handoff — D5.4 core sync bidirectionally validated
 

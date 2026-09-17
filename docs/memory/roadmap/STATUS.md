@@ -6,6 +6,20 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D119_TV_ENTRY_TRIGGER:ROADMAP:BEGIN -->
+## D5.4 TV-state sync — top-level entry trigger diagnostic active
+
+Core Linux/onn synchronization: bidirectionally runtime validated.
+
+D-119: diagnostic-only measurement of true top-level TV entry versus the already
+validated Refresh-triggered pull.
+
+D5.4 remains ACTIVE for:
+1. trigger/UX resolution;
+2. conflict/last-sync diagnostics;
+3. focused TV/media regression.
+<!-- PRIVYHUB_D119_TV_ENTRY_TRIGGER:ROADMAP:END -->
+
 <!-- PRIVYHUB_D118_PULL_ACCEPTANCE:ROADMAP:BEGIN -->
 ## D5.4 TV-state sync — core bidirectional path runtime validated
 

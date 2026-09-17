@@ -6,6 +6,20 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D119_TV_ENTRY_TRIGGER:D5_SUBSTEPS:BEGIN -->
+## D5.4 — D-119 trigger validation active
+
+Core synchronization remains accepted.
+
+D-119 measures whether the normal top-level TV-entry path reliably executes the
+existing pull before deciding whether any production trigger change is needed.
+
+After D-119:
+- if validated, move directly to conflict/last-sync diagnostics;
+- if not observed with healthy ADB, make one narrow trigger/lifecycle fix;
+- then run focused TV/media regression before D5.4 closure.
+<!-- PRIVYHUB_D119_TV_ENTRY_TRIGGER:D5_SUBSTEPS:END -->
+
 <!-- PRIVYHUB_D118_PULL_ACCEPTANCE:D5_SUBSTEPS:BEGIN -->
 ## D5.4 — core synchronization accepted
 

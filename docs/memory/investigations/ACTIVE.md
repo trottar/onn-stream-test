@@ -6,6 +6,23 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D119_TV_ENTRY_TRIGGER:ACTIVE:BEGIN -->
+## D5.4 ACTIVE — D-119 top-level TV-entry trigger
+
+Core state contract is accepted and must not be reopened without contradictory
+evidence.
+
+Active hypothesis:
+the earlier apparent pull miss may have been caused by navigation that did not
+actually execute `openTvHome()`.
+
+D-119 distinguishes:
+- true top-level TV entry reliably invokes sync; or
+- top-level TV entry misses sync with healthy ADB and a newer Linux revision.
+
+Only the second outcome justifies a production lifecycle/trigger patch.
+<!-- PRIVYHUB_D119_TV_ENTRY_TRIGGER:ACTIVE:END -->
+
 <!-- PRIVYHUB_D118_PULL_ACCEPTANCE:ACTIVE:BEGIN -->
 ## D5.4 ACTIVE — core synchronization validated
 

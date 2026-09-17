@@ -6,6 +6,29 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D119_TV_ENTRY_TRIGGER:CURRENT:BEGIN -->
+## D-119 D5.4 top-level TV-entry sync trigger
+
+Core D5.4 synchronization is bidirectionally runtime validated.
+
+One UX/lifecycle question remains:
+does selecting TV from the true top-level PrivyHub source list reliably execute
+the pull path without requiring Refresh?
+
+D-119 is diagnostic-only.
+
+It prepares one harmless newer Linux revision by changing only
+`preferences.country_name`, then requires a true top-level TV entry with no
+Refresh. The verify phase measures whether the onn adopted that revision and
+immediately restores Linux user-state content.
+
+The final phase uses the already-validated TV Refresh path only for cleanup
+parity.
+
+No production code change is justified unless D-119 measures a healthy-ADB
+top-level-entry miss.
+<!-- PRIVYHUB_D119_TV_ENTRY_TRIGGER:CURRENT:END -->
+
 <!-- PRIVYHUB_D118_PULL_ACCEPTANCE:CURRENT:BEGIN -->
 ## D-118 D5.4 pull acceptance / classifier correction
 

@@ -6,6 +6,20 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D119_TV_ENTRY_TRIGGER:PATCH_INDEX:BEGIN -->
+### D-119 — D5 TV-entry sync-trigger probe — 2026-09-17
+
+Diagnostic-only.
+
+Measures whether selecting TV from the true top-level PrivyHub source list
+pulls a newer Linux revision without Refresh.
+
+The temporary runtime marker changes only the country display name and is
+restored before final cleanup.
+
+No Android or companion production change.
+<!-- PRIVYHUB_D119_TV_ENTRY_TRIGGER:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D118_PULL_ACCEPTANCE:PATCH_INDEX:BEGIN -->
 ### D-118 — D5 pull classifier / acceptance checkpoint — 2026-09-17
 
