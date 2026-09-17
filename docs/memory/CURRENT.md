@@ -6,6 +6,34 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:CURRENT:BEGIN -->
+## D-114 stream-identity policy checkpoint
+
+D-113 completed successfully.
+
+Runtime result:
+- 3,071 built-in IPTV-org stream rows;
+- 3,070 feed-bearing rows;
+- 3,013 exact current official-API URL matches;
+- 9 feed-name contradiction heuristic hits (~0.29%);
+- confirmed `10 Bold Adelaide` defect:
+  `10Bold.au@Sydney`, title says Adelaide, and observed video is not 10 Bold.
+
+The other heuristic hits include ambiguous regional/name tokens, so D-113 does
+not justify a generic automatic identity-suspect/hide rule.
+
+Policy:
+- EPG acquisition/cache/UI remains accepted;
+- playback transport health and semantic stream identity remain separate;
+- do not hardcode the current 10 Bold URL into production;
+- use existing manual Hide for user-confirmed bad sources when desired;
+- `manual_hidden` remains durable user intent.
+
+D-113 is closed at this scope.
+
+**Active next development step: D5.4 Linux-authoritative TV-state sync.**
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:CURRENT:END -->
+
 <!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:CURRENT:BEGIN -->
 ## D-113 D5 stream-identity integrity audit
 

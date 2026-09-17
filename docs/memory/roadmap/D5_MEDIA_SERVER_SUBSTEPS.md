@@ -6,6 +6,29 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:D5_SUBSTEPS:BEGIN -->
+## D5.3 closeout and D5.4 activation
+
+D5.3 EPG data path remains runtime validated:
+Linux acquisition/cache -> companion API -> Android repository -> onn SQLite ->
+Program Guide.
+
+D-113 established a separate third-party stream-identity quality issue, not an
+EPG transport regression.
+
+D-113 policy closeout:
+- confirmed 10 Bold upstream/source defect;
+- only 9/3,071 feed-name heuristic hits;
+- several hits are ambiguous;
+- no generic automatic identity-suspect production rule.
+
+D5.4 is now ACTIVE.
+
+First D5.4 contract must synchronize durable TV user intent, including
+`manual_hidden`, while keeping catalogs/EPG derived and runtime health outside
+the initial authoritative merge.
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:D5_SUBSTEPS:END -->
+
 <!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:D5_SUBSTEPS:BEGIN -->
 ## D5.3 post-acceptance integrity checkpoint — D-113
 

@@ -6,6 +6,32 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:MEMORY:BEGIN -->
+## Semantic stream-identity policy
+
+D-113 measured 9 feed-name contradictions among 3,071 built-in IPTV-org streams,
+but several were ambiguous naming/token cases.
+
+Do not turn that heuristic into automatic hiding, transport failure, or EPG
+suppression.
+
+The confirmed 10 Bold case proves a narrower rule:
+a technically healthy stream and a valid guide identity do not prove that the
+video is semantically the advertised channel.
+
+Keep separate:
+- transport/playback health;
+- feed/catalog metadata consistency;
+- semantic content identity;
+- EPG acquisition/cache correctness.
+
+For user-confirmed bad sources, existing manual Hide is the safe current action.
+Do not hardcode ephemeral third-party stream URLs as architectural product rules.
+
+`manual_hidden` is durable user intent and must survive D5.4 Linux-authoritative
+TV-state synchronization.
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:MEMORY:END -->
+
 <!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:MEMORY:BEGIN -->
 ## Stream transport health is not stream identity health
 

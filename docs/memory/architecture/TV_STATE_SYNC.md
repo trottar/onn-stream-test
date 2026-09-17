@@ -6,6 +6,33 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # TV State Synchronization Architecture
 
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:TV_STATE_SYNC:BEGIN -->
+## D5.4 activation after D-113
+
+D5.4 is now active.
+
+D-113 reinforces why `manual_hidden` belongs in durable user intent:
+users need a persistent way to suppress a third-party source they have confirmed
+is semantically wrong even when transport health remains good.
+
+The initial Linux-authoritative sync contract should therefore preserve:
+- provider configuration/enabled state;
+- favorites;
+- favorite groups/order;
+- manual hidden state;
+- custom channel profile overrides;
+- auto-hide protection;
+- language/country.
+
+Do not synchronize semantic-identity heuristics as if they were user intent.
+
+Do not synchronize raw SQLite files.
+
+Initial conflict model remains one-client-oriented with a Linux-assigned
+monotonic server revision. More complex multi-client runtime-health merging is
+deferred.
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:TV_STATE_SYNC:END -->
+
 ## Current split
 
 The mature TV catalog/user-state implementation is currently onn-local. Android

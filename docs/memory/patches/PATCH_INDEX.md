@@ -6,6 +6,23 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:PATCH_INDEX:BEGIN -->
+### D-114 — D5 stream identity policy checkpoint — 2026-09-16
+
+Memory/decision-only checkpoint.
+
+Records D-113 runtime result and closes the stream-identity audit without adding
+a noisy generic production heuristic.
+
+Policy:
+- manual Hide for user-confirmed semantically bad streams;
+- no playback-failure conflation;
+- no current-source URL hardcoding;
+- `manual_hidden` included in D5.4 durable TV-state sync.
+
+Next: D5.4 Linux-authoritative TV-state synchronization.
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:PATCH_INDEX:BEGIN -->
 ### D-113 — D5 stream identity audit — 2026-09-16
 

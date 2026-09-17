@@ -6,6 +6,30 @@ baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
 
 # TV, IPTV, and Media Architecture
 
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:TV_MEDIA:BEGIN -->
+## Stream identity quality policy after D-113
+
+D-113 confirms that semantic stream identity is a quality dimension distinct
+from both playback and EPG mechanics.
+
+The current feed-name heuristic is diagnostic only.
+
+Do not:
+- auto-hide a stream from display-name/feed-token disagreement alone;
+- translate semantic mismatch into transport failure;
+- hardcode the current 10 Bold URL into core architecture.
+
+For a source a user confirms is wrong, manual Hide is the current supported
+control.
+
+Future automated identity confidence requires stronger evidence, for example
+multiple independent metadata/content signals with a low demonstrated false
+positive rate.
+
+D5.4 must synchronize that manual user intent without synchronizing derived EPG
+or stream-health data as if they were preferences.
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:TV_MEDIA:END -->
+
 <!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:TV_MEDIA:BEGIN -->
 ## TV semantic identity boundary
 

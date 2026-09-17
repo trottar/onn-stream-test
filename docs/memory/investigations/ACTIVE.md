@@ -6,6 +6,26 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:ACTIVE:BEGIN -->
+## D5.4 ACTIVE — Linux-authoritative TV-state synchronization
+
+D-113 stream-identity audit is closed at current scope.
+
+No generic semantic-identity classifier is justified by the current heuristic.
+
+D5.4 now becomes active.
+
+Narrow implementation boundary:
+1. inventory the exact existing Android TV export/import JSON contract;
+2. establish Linux persistent versioned TV-state storage/API;
+3. preserve onn-local operation when Linux is unavailable;
+4. synchronize durable user intent without copying SQLite DBs;
+5. include `manual_hidden` so user-confirmed bad-source decisions persist.
+
+Runtime observations/health counters remain outside the first generalized sync
+contract until explicit merge semantics exist.
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:ACTIVE:END -->
+
 <!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:ACTIVE:BEGIN -->
 ## D5 active — stream semantic identity integrity
 

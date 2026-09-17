@@ -6,6 +6,29 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D-102 — D5 Live TV acceptance and Linux TV-state ownership
 
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:D102_RUNTIME_UPDATE:BEGIN -->
+## Runtime update through D-114
+
+The older EPG-not-accepted status in this decision is superseded by later D5.3
+runtime evidence.
+
+Current authoritative state:
+- Linux local EPG acquisition/cache runtime validated;
+- Android companion-backed EPG consumption runtime validated;
+- Program Guide renders real schedule data;
+- D5.3 EPG data flow accepted;
+- third-party stream semantic identity remains a separate quality dimension.
+
+D-113 found one confirmed upstream/source identity defect and a small/noisy set
+of feed-name heuristic hits. D-114 explicitly declines a generic automatic
+identity-suppression rule.
+
+The original Linux-authoritative TV-state ownership decision remains unchanged.
+
+D5.4 implementation is now active, including `manual_hidden` as durable user
+intent.
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:D102_RUNTIME_UPDATE:END -->
+
 **Status:** Accepted architecture decision; implementation/runtime sync
 validation pending (2026-09-16)
 

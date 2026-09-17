@@ -6,6 +6,24 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:ROADMAP:BEGIN -->
+## D5.4 TV-state sync — ACTIVE
+
+D5.3 EPG data flow is runtime validated.
+
+D-113 stream-identity integrity audit is closed without a generic production
+heuristic.
+
+Current policy for known semantically bad sources is user/manual Hide, not
+playback failure.
+
+D5.4 is now the active implementation substep:
+Linux-authoritative durable TV user-state synchronization with onn-local
+fail-soft operation.
+
+`manual_hidden` is explicitly part of the durable contract.
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:ROADMAP:END -->
+
 <!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:ROADMAP:BEGIN -->
 ## D5 EPG — data path accepted; stream-identity integrity audit active
 

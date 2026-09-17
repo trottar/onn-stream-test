@@ -1,5 +1,38 @@
 # D-113 — D5 stream identity integrity audit
 
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:D113_RESULT:BEGIN -->
+## Runtime result / disposition — 2026-09-16
+
+D-113 passed with:
+
+`D113_CONFIRMED_UPSTREAM_STREAM_IDENTITY_CONTRADICTION`
+
+Measured:
+- 3,071 built-in IPTV-org rows;
+- 3,070 feed-bearing rows;
+- 3,013 exact official API URL matches;
+- 9 feed-name contradiction heuristic hits.
+
+The 10 Bold trigger is confirmed:
+- `10 Bold Adelaide (1080p)`;
+- `10Bold.au@Sydney`;
+- official API preserves the same contradiction;
+- known bad URL hash matches;
+- user-observed video does not contain 10 Bold content.
+
+The remaining hits include ambiguous name/feed cases, so the classifier is not
+precise enough for generic automatic suppression.
+
+Disposition:
+- close D-113 at current scope;
+- no production identity-suspect heuristic;
+- no hardcoded URL deny list;
+- manual Hide is the current safe user action;
+- preserve manual-hidden state in D5.4 synchronization.
+
+See `decisions/D114_STREAM_IDENTITY_POLICY.md`.
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:D113_RESULT:END -->
+
 **Status:** diagnostic-only / runtime evidence next
 
 ## Trigger

@@ -6,6 +6,37 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:HANDOFF:BEGIN -->
+## D-114 handoff — begin D5.4 TV-state sync
+
+D-113 is closed.
+
+Result:
+- 9/3,071 feed-name heuristic hits;
+- confirmed 10 Bold source identity defect;
+- heuristic too noisy for generic production suppression.
+
+No production identity-suspect feature was added.
+
+Operationally, a user-confirmed bad source may be hidden with the existing Hide
+action. Do not mark it as a playback failure.
+
+Next active work is D5.4:
+make Linux the durable authority for TV user intent using a versioned JSON/state
+API derived from the existing Android export/import contract.
+
+D5.4 durable scope includes:
+- providers/enabled state;
+- favorites;
+- favorite groups/order;
+- manual hidden state;
+- custom channel overrides;
+- protect-auto-hide;
+- language/country.
+
+Keep onn local operation fail-soft and never copy SQLite databases.
+<!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:HANDOFF:END -->
+
 <!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:HANDOFF:BEGIN -->
 ## D-113 handoff — stream identity integrity
 
