@@ -6,6 +6,22 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D116_TV_STATE_SYNC:ACTIVE:BEGIN -->
+## D5.4 ACTIVE — D-116 Android sync runtime validation
+
+Linux TV-state authority is runtime validated.
+
+Active boundary:
+prove the onn can seed, pull, and push the durable projection without syncing
+runtime health/recency data.
+
+Use a real user mutation (`manual_hidden` on the known-bad 10 Bold source) to
+prove a post-seed revisioned push.
+
+Do not expand to multi-client merge semantics until this one-client contract is
+runtime validated.
+<!-- PRIVYHUB_D116_TV_STATE_SYNC:ACTIVE:END -->
+
 <!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:ACTIVE:BEGIN -->
 ## D5.4 active — Linux state authority runtime validation
 

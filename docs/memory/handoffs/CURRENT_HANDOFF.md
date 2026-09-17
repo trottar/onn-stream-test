@@ -6,6 +6,32 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D116_TV_STATE_SYNC:HANDOFF:BEGIN -->
+## D-116 handoff — Android/Linux TV-state sync
+
+D-115 authority is accepted.
+
+D-116 adds Android durable-state projection/import plus the revision-aware
+`TvStateSyncClient`.
+
+Runtime procedure:
+1. keep companion running;
+2. install D-116 APK;
+3. open TV once and allow the uninitialized Linux authority to seed;
+4. long-press `10 Bold Adelaide` and Hide it;
+5. run `tools/probes/d116_android_tv_state_sync_probe.py`;
+6. return `logs/tv/d116_android_tv_state_sync_probe.txt`.
+
+Acceptance:
+`D116_ANDROID_TV_STATE_SYNC_RUNTIME_VALIDATED`.
+
+The probe requires local/remote durable-state parity and evidence of a post-seed
+revisioned push.
+
+No companion restart is required because D-116 changes only Android production
+code.
+<!-- PRIVYHUB_D116_TV_STATE_SYNC:HANDOFF:END -->
+
 <!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:HANDOFF:BEGIN -->
 ## D-115 handoff — Linux TV-state authority
 

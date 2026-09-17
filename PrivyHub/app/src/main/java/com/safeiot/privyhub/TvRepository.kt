@@ -219,6 +219,33 @@ class TvRepository(
         linkedMapOf<DedupeCacheKey, DedupeCacheEntry>()
 
 
+    private var durableStateChangedListener:
+        (() -> Unit)? =
+        null
+
+
+    private var suppressDurableStateChanged =
+        false
+
+
+    fun setDurableStateChangedListener(
+        listener: (() -> Unit)?
+    ) {
+        durableStateChangedListener =
+            listener
+    }
+
+
+    private fun notifyDurableStateChanged() {
+        if (
+            !suppressDurableStateChanged
+        ) {
+            durableStateChangedListener
+                ?.invoke()
+        }
+    }
+
+
     private data class ParsedStream(
         val streamId: String,
         val channelId: String,
@@ -689,6 +716,7 @@ class TvRepository(
             arrayOf(streamId)
         )
         invalidateDedupeCache()
+        notifyDurableStateChanged()
         return favorite
     }
 
@@ -713,6 +741,7 @@ class TvRepository(
             arrayOf(streamId)
         )
         invalidateDedupeCache()
+        notifyDurableStateChanged()
         return !currentlyHidden
     }
 
@@ -768,6 +797,7 @@ class TvRepository(
             "stream_id = ?",
             arrayOf(streamId)
         )
+        notifyDurableStateChanged()
     }
 
 
@@ -814,6 +844,7 @@ class TvRepository(
         } finally {
             database.endTransaction()
         }
+        notifyDurableStateChanged()
         return true
     }
 
@@ -842,6 +873,7 @@ class TvRepository(
             "stream_id = ?",
             arrayOf(streamId)
         )
+        notifyDurableStateChanged()
     }
 
 
@@ -862,6 +894,7 @@ class TvRepository(
             "stream_id = ?",
             arrayOf(streamId)
         )
+        notifyDurableStateChanged()
     }
 
 
@@ -922,6 +955,7 @@ class TvRepository(
             SQLiteDatabase.CONFLICT_REPLACE
         )
         invalidateCatalogCache()
+        notifyDurableStateChanged()
         return listProviders().first { it.providerId == id }
     }
 
@@ -941,6 +975,7 @@ class TvRepository(
             arrayOf(providerId)
         )
         invalidateCatalogCache()
+        notifyDurableStateChanged()
     }
 
 
@@ -963,6 +998,7 @@ class TvRepository(
             database.endTransaction()
         }
         invalidateCatalogCache()
+        notifyDurableStateChanged()
     }
 
 
@@ -994,6 +1030,512 @@ class TvRepository(
             providers = scalarInt("SELECT COUNT(*) FROM providers WHERE enabled = 1"),
             refreshedAtMs = db.getMeta(refreshKey(languageCode))?.toLongOrNull() ?: 0L
         )
+    }
+
+
+    fun exportDurableStateJson(
+        languageCode: String,
+        languageName: String,
+        countryCode: String,
+        countryName: String
+    ): String {
+        val root =
+            JSONObject()
+                .put(
+                    "schema",
+                    "privyhub_tv_user_state_v1"
+                )
+                .put(
+                    "preferences",
+                    JSONObject()
+                        .put(
+                            "language_code",
+                            languageCode
+                        )
+                        .put(
+                            "language_name",
+                            languageName
+                        )
+                        .put(
+                            "country_code",
+                            countryCode
+                        )
+                        .put(
+                            "country_name",
+                            countryName
+                        )
+                )
+
+        val managedProviders =
+            JSONArray()
+
+        for (
+            provider in
+            listProviders().filter {
+                it.builtin &&
+                    it.providerId !=
+                    BUILTIN_PROVIDER_ID
+            }
+        ) {
+            managedProviders.put(
+                JSONObject()
+                    .put(
+                        "provider_id",
+                        provider.providerId
+                    )
+                    .put(
+                        "enabled",
+                        provider.enabled
+                    )
+            )
+        }
+
+        root.put(
+            "managed_providers",
+            managedProviders
+        )
+
+        val providers =
+            JSONArray()
+
+        for (
+            provider in
+            listProviders().filter {
+                !it.builtin
+            }
+        ) {
+            providers.put(
+                JSONObject()
+                    .put(
+                        "name",
+                        provider.name
+                    )
+                    .put(
+                        "url",
+                        provider.url
+                    )
+                    .put(
+                        "language_code",
+                        provider.languageCode
+                    )
+                    .put(
+                        "enabled",
+                        provider.enabled
+                    )
+            )
+        }
+
+        root.put(
+            "providers",
+            providers
+        )
+
+        val channels =
+            JSONArray()
+
+        db.readableDatabase.rawQuery(
+            """
+            SELECT stream_id, favorite, manual_hidden,
+                   custom_name, custom_category, custom_url,
+                   custom_referrer, custom_user_agent,
+                   favorite_group, favorite_order, protect_auto_hide
+            FROM streams
+            WHERE favorite = 1 OR manual_hidden = 1 OR
+                  custom_name IS NOT NULL OR custom_category IS NOT NULL OR
+                  custom_url IS NOT NULL OR custom_referrer IS NOT NULL OR
+                  custom_user_agent IS NOT NULL OR favorite_group <> '' OR
+                  favorite_order > 0 OR protect_auto_hide = 1
+            ORDER BY stream_id
+            """.trimIndent(),
+            null
+        ).use { cursor ->
+            while (
+                cursor.moveToNext()
+            ) {
+                channels.put(
+                    JSONObject()
+                        .put(
+                            "stream_id",
+                            cursor.getString(0)
+                        )
+                        .put(
+                            "favorite",
+                            cursor.getInt(1) != 0
+                        )
+                        .put(
+                            "manual_hidden",
+                            cursor.getInt(2) != 0
+                        )
+                        .put(
+                            "custom_name",
+                            cursor.getStringOrEmpty(3)
+                        )
+                        .put(
+                            "custom_category",
+                            cursor.getStringOrEmpty(4)
+                        )
+                        .put(
+                            "custom_url",
+                            cursor.getStringOrEmpty(5)
+                        )
+                        .put(
+                            "custom_referrer",
+                            cursor.getStringOrEmpty(6)
+                        )
+                        .put(
+                            "custom_user_agent",
+                            cursor.getStringOrEmpty(7)
+                        )
+                        .put(
+                            "favorite_group",
+                            cursor.getStringOrEmpty(8)
+                        )
+                        .put(
+                            "favorite_order",
+                            cursor.getInt(9)
+                        )
+                        .put(
+                            "protect_auto_hide",
+                            cursor.getInt(10) != 0
+                        )
+                )
+            }
+        }
+
+        root.put(
+            "channels",
+            channels
+        )
+
+        return root.toString()
+    }
+
+
+    fun importDurableStateJson(
+        jsonText: String,
+        catalogLanguageCode: String
+    ) {
+        val root =
+            JSONObject(
+                jsonText
+            )
+
+        require(
+            root.optString(
+                "schema"
+            ) ==
+                "privyhub_tv_user_state_v1"
+        ) {
+            "Unsupported TV state schema"
+        }
+
+        val previousSuppress =
+            suppressDurableStateChanged
+
+        suppressDurableStateChanged =
+            true
+
+        try {
+            setProviderEnabled(
+                FREE_TV_PROVIDER_ID,
+                false
+            )
+
+            setProviderEnabled(
+                FREECASTHUB_PROVIDER_ID,
+                false
+            )
+
+            val managedProviders =
+                root.optJSONArray(
+                    "managed_providers"
+                ) ?: JSONArray()
+
+            for (
+                index in
+                0 until
+                    managedProviders.length()
+            ) {
+                val item =
+                    managedProviders
+                        .getJSONObject(
+                            index
+                        )
+
+                val providerId =
+                    item.optString(
+                        "provider_id"
+                    )
+
+                if (
+                    providerId ==
+                    FREE_TV_PROVIDER_ID ||
+                    providerId ==
+                    FREECASTHUB_PROVIDER_ID
+                ) {
+                    setProviderEnabled(
+                        providerId,
+                        item.optBoolean(
+                            "enabled",
+                            false
+                        )
+                    )
+                }
+            }
+
+            val currentCustom =
+                listProviders()
+                    .filter {
+                        !it.builtin
+                    }
+                    .map {
+                        it.providerId
+                    }
+
+            for (
+                providerId in
+                currentCustom
+            ) {
+                removeProvider(
+                    providerId
+                )
+            }
+
+            val providers =
+                root.optJSONArray(
+                    "providers"
+                ) ?: JSONArray()
+
+            for (
+                index in
+                0 until
+                    providers.length()
+            ) {
+                val item =
+                    providers.getJSONObject(
+                        index
+                    )
+
+                val provider =
+                    addCustomProvider(
+                        item.optString(
+                            "name",
+                            "Custom M3U"
+                        ),
+                        item.optString(
+                            "url"
+                        ),
+                        item.optString(
+                            "language_code",
+                            ENGLISH
+                        )
+                    )
+
+                setProviderEnabled(
+                    provider.providerId,
+                    item.optBoolean(
+                        "enabled",
+                        true
+                    )
+                )
+            }
+
+            ensureCatalog(
+                languageCode =
+                    catalogLanguageCode
+                        .ifBlank {
+                            ENGLISH
+                        },
+                force =
+                    false
+            )
+
+            val reset =
+                ContentValues()
+                    .apply {
+                        put(
+                            "favorite",
+                            0
+                        )
+                        put(
+                            "manual_hidden",
+                            0
+                        )
+                        putNull(
+                            "custom_name"
+                        )
+                        putNull(
+                            "custom_category"
+                        )
+                        putNull(
+                            "custom_url"
+                        )
+                        putNull(
+                            "custom_referrer"
+                        )
+                        putNull(
+                            "custom_user_agent"
+                        )
+                        put(
+                            "favorite_group",
+                            ""
+                        )
+                        put(
+                            "favorite_order",
+                            0
+                        )
+                        put(
+                            "protect_auto_hide",
+                            0
+                        )
+                    }
+
+            val database =
+                db.writableDatabase
+
+            database.beginTransaction()
+
+            try {
+                database.update(
+                    "streams",
+                    reset,
+                    null,
+                    null
+                )
+
+                val channels =
+                    root.optJSONArray(
+                        "channels"
+                    ) ?: JSONArray()
+
+                for (
+                    index in
+                    0 until
+                        channels.length()
+                ) {
+                    val item =
+                        channels.getJSONObject(
+                            index
+                        )
+
+                    val streamId =
+                        item.optString(
+                            "stream_id"
+                        )
+
+                    if (
+                        streamId.isBlank() ||
+                        !isTvStreamId(
+                            streamId
+                        )
+                    ) {
+                        continue
+                    }
+
+                    val values =
+                        ContentValues()
+                            .apply {
+                                put(
+                                    "favorite",
+                                    if (
+                                        item.optBoolean(
+                                            "favorite"
+                                        )
+                                    ) {
+                                        1
+                                    } else {
+                                        0
+                                    }
+                                )
+                                put(
+                                    "manual_hidden",
+                                    if (
+                                        item.optBoolean(
+                                            "manual_hidden"
+                                        )
+                                    ) {
+                                        1
+                                    } else {
+                                        0
+                                    }
+                                )
+                                put(
+                                    "custom_name",
+                                    item.optString(
+                                        "custom_name"
+                                    )
+                                )
+                                put(
+                                    "custom_category",
+                                    item.optString(
+                                        "custom_category"
+                                    )
+                                )
+                                put(
+                                    "custom_url",
+                                    item.optString(
+                                        "custom_url"
+                                    )
+                                )
+                                put(
+                                    "custom_referrer",
+                                    item.optString(
+                                        "custom_referrer"
+                                    )
+                                )
+                                put(
+                                    "custom_user_agent",
+                                    item.optString(
+                                        "custom_user_agent"
+                                    )
+                                )
+                                put(
+                                    "favorite_group",
+                                    item.optString(
+                                        "favorite_group"
+                                    )
+                                )
+                                put(
+                                    "favorite_order",
+                                    item.optInt(
+                                        "favorite_order"
+                                    )
+                                )
+                                put(
+                                    "protect_auto_hide",
+                                    if (
+                                        item.optBoolean(
+                                            "protect_auto_hide"
+                                        )
+                                    ) {
+                                        1
+                                    } else {
+                                        0
+                                    }
+                                )
+                            }
+
+                    database.update(
+                        "streams",
+                        values,
+                        "stream_id = ?",
+                        arrayOf(
+                            streamId
+                        )
+                    )
+                }
+
+                database.setTransactionSuccessful()
+            } finally {
+                database.endTransaction()
+            }
+
+            invalidateDedupeCache()
+
+        } finally {
+            suppressDurableStateChanged =
+                previousSuppress
+        }
     }
 
 
@@ -1132,6 +1674,7 @@ class TvRepository(
             database.endTransaction()
         }
         invalidateCatalogCache()
+        notifyDurableStateChanged()
     }
 
 

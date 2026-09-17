@@ -6,6 +6,36 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D116_TV_STATE_SYNC:CURRENT:BEGIN -->
+## D-116 D5.4 Android TV-state synchronization
+
+D-115 is runtime validated and accepted.
+
+Linux authority guarantees:
+- persistent JSON user state;
+- monotonic server revision;
+- idempotent identical writes;
+- stale-revision rejection;
+- runtime-only fields excluded.
+
+D-116 connects the onn to that seam.
+
+Initial one-client policy:
+- empty Linux authority -> seed from current onn durable intent;
+- initialized Linux authority -> pull/apply on TV entry;
+- local durable user mutations -> revisioned push;
+- conflict -> fail closed, never overwrite newer Linux state;
+- companion unavailable -> local TV remains usable.
+
+Durable fields include favorites/groups/order, manual hidden, custom channel
+overrides, protect-auto-hide, provider state, and TV language/country.
+
+Health counters, recency, auto-hidden runtime state, catalog, and EPG remain
+outside this sync contract.
+
+Runtime validation is next.
+<!-- PRIVYHUB_D116_TV_STATE_SYNC:CURRENT:END -->
+
 <!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:CURRENT:BEGIN -->
 ## D-115 D5.4 Linux TV-state authority
 

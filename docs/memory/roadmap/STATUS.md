@@ -6,6 +6,22 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D116_TV_STATE_SYNC:ROADMAP:BEGIN -->
+## D5.4 TV-state sync — D-116 runtime validation pending
+
+D-115 Linux authority: runtime validated.
+
+D-116 Android seed/pull/push integration: development patch.
+
+Acceptance requires:
+- Linux authority seeded from existing onn durable state;
+- local/remote durable-state parity;
+- post-seed revisioned push of a real user change;
+- runtime-only TV health/recency excluded from Linux state.
+
+D5.4 remains ACTIVE.
+<!-- PRIVYHUB_D116_TV_STATE_SYNC:ROADMAP:END -->
+
 <!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:ROADMAP:BEGIN -->
 ## D5.4 TV-state sync — D-115 Linux authority development
 

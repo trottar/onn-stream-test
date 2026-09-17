@@ -6,6 +6,44 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # TV State Synchronization Architecture
 
+<!-- PRIVYHUB_D116_TV_STATE_SYNC:ARCH:BEGIN -->
+## D-116 Android client seam
+
+```text
+onn local durable intent
+        |
+durable projection JSON
+        |
+TvStateSyncClient
+        |
+/plugins/tv_state/state
+        |
+Linux revisioned authority
+```
+
+TV entry:
+- ensure local catalog;
+- GET authority;
+- seed if revision 0/uninitialized;
+- otherwise apply Linux state locally.
+
+Durable mutation:
+- export current durable projection;
+- POST using locally remembered `base_revision`;
+- update remembered revision on success;
+- reject conflict without overwriting Linux.
+
+Import preserves runtime observations:
+channel health counters, last-watched data, and auto-hidden state are not reset
+as part of durable synchronization.
+
+Provider changes may refresh catalog data before channel-level durable overrides
+are applied.
+
+Initial model assumes one actively mutating client. Multi-client merge is
+deferred.
+<!-- PRIVYHUB_D116_TV_STATE_SYNC:ARCH:END -->
+
 <!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:TV_STATE_SYNC:BEGIN -->
 ## D-115 concrete authority contract
 

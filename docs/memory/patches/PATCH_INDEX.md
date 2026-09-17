@@ -6,6 +6,20 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D116_TV_STATE_SYNC:PATCH_INDEX:BEGIN -->
+### D-116 — D5 Android TV-state synchronization — 2026-09-17
+
+Android production integration.
+
+Adds durable projection/import to `TvRepository`, revision-aware
+`TvStateSyncClient`, and fail-soft seed/pull/push wiring in `MainActivity`.
+
+Real Android build is an installer gate.
+
+Runtime evidence next:
+`logs/tv/d116_android_tv_state_sync_probe.txt`.
+<!-- PRIVYHUB_D116_TV_STATE_SYNC:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:PATCH_INDEX:BEGIN -->
 ### D-115 — D5 Linux TV-state authority — 2026-09-16
 

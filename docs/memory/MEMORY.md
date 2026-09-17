@@ -6,6 +6,32 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D116_TV_STATE_SYNC:MEMORY:BEGIN -->
+## TV durable-state synchronization boundary
+
+D-115 validated Linux revisioned JSON authority.
+
+D-116 client rules:
+- seed Linux only when it is uninitialized;
+- once initialized, Linux is authoritative on TV entry;
+- push only durable user intent;
+- use `server_revision` optimistic concurrency;
+- stale writes must not overwrite Linux;
+- local TV remains fail-soft/offline-capable.
+
+Durable projection:
+- language/country;
+- managed/custom provider configuration;
+- favorites;
+- favorite groups/order;
+- manual hidden;
+- custom name/category/URL/referrer/user-agent;
+- protect-auto-hide.
+
+Never synchronize raw SQLite, EPG/cache data, playback-health counters,
+last-watched timestamps, or auto-hidden runtime state as user preferences.
+<!-- PRIVYHUB_D116_TV_STATE_SYNC:MEMORY:END -->
+
 <!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:MEMORY:BEGIN -->
 ## D5.4 TV-state authority rules
 

@@ -6,6 +6,24 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D116_TV_STATE_SYNC:D5_SUBSTEPS:BEGIN -->
+## D5.4 — D-116 Android synchronization
+
+D-115 Linux authority is runtime accepted.
+
+D-116 implements the first end-to-end TV durable-state synchronization:
+- seed empty Linux authority from onn;
+- pull initialized authority on TV entry;
+- push durable mutations with optimistic revision checking;
+- remain fail-soft when companion is unavailable.
+
+Runtime acceptance requires local/remote durable parity and a real post-seed
+manual-hidden push.
+
+After D-116 passes, D5.4 can assess remaining sync UX/conflict diagnostics before
+closure.
+<!-- PRIVYHUB_D116_TV_STATE_SYNC:D5_SUBSTEPS:END -->
+
 <!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:D5_SUBSTEPS:BEGIN -->
 ## D5.4 substep 1 — Linux durable TV-state authority
 

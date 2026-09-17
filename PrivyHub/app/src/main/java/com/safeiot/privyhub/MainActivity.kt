@@ -167,6 +167,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvEpgRepository:
         TvEpgRepository
 
+    private lateinit var tvStateSyncClient:
+        TvStateSyncClient
+
     /*
      * Optional NFL Game Finder add-on. This remains outside the base
      * PrivyHub TV feature set.
@@ -372,6 +375,16 @@ class MainActivity : AppCompatActivity() {
             TvEpgRepository(
                 this
             )
+
+        tvStateSyncClient =
+            TvStateSyncClient(
+                context = this,
+                repository = tvRepository
+            )
+
+        tvRepository.setDurableStateChangedListener {
+            scheduleTvStatePush()
+        }
 
         nflRepository =
             NflRepository(
@@ -2544,6 +2557,8 @@ class MainActivity : AppCompatActivity() {
                 name
             )
             .apply()
+
+        scheduleTvStatePush()
     }
 
 
@@ -2566,6 +2581,102 @@ class MainActivity : AppCompatActivity() {
                 name
             )
             .apply()
+
+        scheduleTvStatePush()
+    }
+
+
+    private fun scheduleTvStatePush() {
+        if (
+            !::tvStateSyncClient
+                .isInitialized
+        ) {
+            return
+        }
+
+        val host =
+            getCompanionHost()
+                .trim()
+
+        if (
+            host.isBlank()
+        ) {
+            return
+        }
+
+        networkExecutor.execute {
+            try {
+                val result =
+                    tvStateSyncClient.push(
+                        host
+                    )
+
+                if (
+                    result.conflict
+                ) {
+                    Log.w(
+                        TAG,
+                        "TV state push rejected by revision conflict"
+                    )
+                }
+
+            } catch (
+                error: Exception
+            ) {
+                /*
+                 * TV state synchronization is fail-soft. Local TV use must
+                 * continue even when Linux is temporarily unreachable.
+                 */
+                Log.d(
+                    TAG,
+                    "TV state push deferred",
+                    error
+                )
+            }
+        }
+    }
+
+
+    private fun synchronizeTvStateNow():
+        TvStateSyncResult? {
+
+        if (
+            !::tvStateSyncClient
+                .isInitialized
+        ) {
+            return null
+        }
+
+        val host =
+            getCompanionHost()
+                .trim()
+
+        if (
+            host.isBlank()
+        ) {
+            return null
+        }
+
+        return try {
+            tvStateSyncClient.synchronize(
+                host
+            )
+
+        } catch (
+            error: Exception
+        ) {
+            /*
+             * Linux authority is durable when reachable, but the onn remains
+             * usable from its local cache when the companion is unavailable.
+             */
+            Log.d(
+                TAG,
+                "TV state synchronization unavailable",
+                error
+            )
+
+            null
+        }
     }
 
 
@@ -2760,11 +2871,28 @@ class MainActivity : AppCompatActivity() {
 
             try {
 
-                val result =
+                var result =
                     tvRepository.ensureCatalog(
                         languageCode = languageCode,
                         force = force
                     )
+
+                val syncResult =
+                    synchronizeTvStateNow()
+
+                if (
+                    syncResult
+                        ?.localStateChanged ==
+                    true
+                ) {
+                    result =
+                        tvRepository.ensureCatalog(
+                            languageCode =
+                                getTvLanguageCode(),
+                            force =
+                                false
+                        )
+                }
 
 
                 runOnUiThread {
@@ -2773,11 +2901,26 @@ class MainActivity : AppCompatActivity() {
                         buildTvHomeNode()
                     )
 
+                    val syncSuffix =
+                        when (
+                            syncResult
+                                ?.action
+                        ) {
+                            "seeded" ->
+                                " - state seeded"
+
+                            "pulled" ->
+                                " - state synced"
+
+                            else ->
+                                ""
+                        }
+
                     statusText.text =
                         if (result.usedCachedData) {
-                            "TV: ${getTvLanguageName()} - cached catalog"
+                            "TV: ${getTvLanguageName()} - cached catalog$syncSuffix"
                         } else {
-                            "TV: ${getTvLanguageName()} - ${result.channelCount} streams"
+                            "TV: ${getTvLanguageName()} - ${result.channelCount} streams$syncSuffix"
                         }
 
                     renderCurrentPage()

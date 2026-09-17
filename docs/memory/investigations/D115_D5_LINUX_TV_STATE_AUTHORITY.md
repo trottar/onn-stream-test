@@ -1,5 +1,26 @@
 # D-115 — D5.4 Linux TV-state authority
 
+<!-- PRIVYHUB_D116_TV_STATE_SYNC:D115_RESULT:BEGIN -->
+## Runtime result — 2026-09-17
+
+D-115 passed:
+
+`D115_TV_STATE_AUTHORITY_RUNTIME_VALIDATED`
+
+Validated through the real companion HTTP API:
+- first write revision 1;
+- persisted GET parity;
+- runtime-field exclusion;
+- identical-write idempotence;
+- stale-write conflict rejection;
+- authoritative state preserved after conflict;
+- exact predecessor runtime state/directory restored by the probe.
+
+D-115 is accepted.
+
+D-116 now owns Android seed/pull/push integration.
+<!-- PRIVYHUB_D116_TV_STATE_SYNC:D115_RESULT:END -->
+
 **Status:** development patch / runtime validation next
 
 ## Narrow goal
