@@ -3694,6 +3694,15 @@ class MainActivity : AppCompatActivity() {
         request: TvPageRequest
     ) {
 
+        val d134PageStartedMs =
+            android.os.SystemClock.elapsedRealtime()
+
+        Log.i(
+            TAG,
+            "D134_TV_PAGE session=$d134PageStartedMs stage=page_begin " +
+                "mode=${request.mode} total_ms=0"
+        )
+
         val languageCode =
             getTvLanguageCode()
 
@@ -3708,6 +3717,9 @@ class MainActivity : AppCompatActivity() {
 
             try {
 
+                val d134CountStartedMs =
+                    android.os.SystemClock.elapsedRealtime()
+
                 val count =
                     tvRepository.countChannels(
                         languageCode = languageCode,
@@ -3716,6 +3728,17 @@ class MainActivity : AppCompatActivity() {
                         value = request.value,
                         includeHidden = request.includeHidden
                     )
+
+                val d134CountFinishedMs =
+                    android.os.SystemClock.elapsedRealtime()
+
+                Log.i(
+                    TAG,
+                    "D134_TV_PAGE session=$d134PageStartedMs stage=count " +
+                        "elapsed_ms=${d134CountFinishedMs - d134CountStartedMs} " +
+                        "total_ms=${d134CountFinishedMs - d134PageStartedMs} " +
+                        "count=$count"
+                )
 
                 val pageCount =
                     if (
@@ -3773,6 +3796,9 @@ class MainActivity : AppCompatActivity() {
                             }
                     )
 
+                val d134QueryStartedMs =
+                    android.os.SystemClock.elapsedRealtime()
+
                 val channels =
                     tvRepository.queryChannels(
                         languageCode = languageCode,
@@ -3784,6 +3810,17 @@ class MainActivity : AppCompatActivity() {
                         offset = normalizedRequest.offset
                     )
 
+                val d134QueryFinishedMs =
+                    android.os.SystemClock.elapsedRealtime()
+
+                Log.i(
+                    TAG,
+                    "D134_TV_PAGE session=$d134PageStartedMs stage=query " +
+                        "elapsed_ms=${d134QueryFinishedMs - d134QueryStartedMs} " +
+                        "total_ms=${d134QueryFinishedMs - d134PageStartedMs} " +
+                        "channels=${channels.size}"
+                )
+
                 val guideChannelIds =
                     channels
                         .filterNot {
@@ -3793,20 +3830,68 @@ class MainActivity : AppCompatActivity() {
                             it.channelId
                         }
 
-                tvEpgRepository.prefetchCompanionGuides(
-                    guideChannelIds
+                val d134PrefetchStartedMs =
+                    android.os.SystemClock.elapsedRealtime()
+
+                val d134PrefetchQueued =
+                    tvEpgRepository.prefetchCompanionGuides(
+                        guideChannelIds
+                    )
+
+                val d134PrefetchFinishedMs =
+                    android.os.SystemClock.elapsedRealtime()
+
+                Log.i(
+                    TAG,
+                    "D134_TV_PAGE session=$d134PageStartedMs stage=prefetch " +
+                        "elapsed_ms=${d134PrefetchFinishedMs - d134PrefetchStartedMs} " +
+                        "total_ms=${d134PrefetchFinishedMs - d134PageStartedMs} " +
+                        "queued=$d134PrefetchQueued"
                 )
 
-                tvEpgRepository.prefetchRejectedGuides(
-                    channels
+                val d134RejectedStartedMs =
+                    android.os.SystemClock.elapsedRealtime()
+
+                val d134RejectedQueued =
+                    tvEpgRepository.prefetchRejectedGuides(
+                        channels
+                    )
+
+                val d134RejectedFinishedMs =
+                    android.os.SystemClock.elapsedRealtime()
+
+                Log.i(
+                    TAG,
+                    "D134_TV_PAGE session=$d134PageStartedMs stage=rejected_prefetch " +
+                        "elapsed_ms=${d134RejectedFinishedMs - d134RejectedStartedMs} " +
+                        "total_ms=${d134RejectedFinishedMs - d134PageStartedMs} " +
+                        "queued=$d134RejectedQueued"
                 )
 
-                tvEpgRepository.hydrateCompanionGuides(
-                    guideChannelIds
+                val d134HydrateStartedMs =
+                    android.os.SystemClock.elapsedRealtime()
+
+                val d134Hydrated =
+                    tvEpgRepository.hydrateCompanionGuides(
+                        guideChannelIds
+                    )
+
+                val d134HydrateFinishedMs =
+                    android.os.SystemClock.elapsedRealtime()
+
+                Log.i(
+                    TAG,
+                    "D134_TV_PAGE session=$d134PageStartedMs stage=hydrate " +
+                        "elapsed_ms=${d134HydrateFinishedMs - d134HydrateStartedMs} " +
+                        "total_ms=${d134HydrateFinishedMs - d134PageStartedMs} " +
+                        "hydrated=$d134Hydrated"
                 )
 
 
                 runOnUiThread {
+
+                    val d134UiStartedMs =
+                        android.os.SystemClock.elapsedRealtime()
 
                     val currentNode =
                         navigationStack
@@ -3906,6 +3991,16 @@ class MainActivity : AppCompatActivity() {
                         }
 
                     renderCurrentPage()
+
+                    val d134UiFinishedMs =
+                        android.os.SystemClock.elapsedRealtime()
+
+                    Log.i(
+                        TAG,
+                        "D134_TV_PAGE session=$d134PageStartedMs stage=ui_ready " +
+                            "elapsed_ms=${d134UiFinishedMs - d134UiStartedMs} " +
+                            "total_ms=${d134UiFinishedMs - d134PageStartedMs}"
+                    )
                 }
 
 

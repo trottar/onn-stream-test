@@ -1,94 +1,85 @@
 ---
 memory_schema: 2
 state_updated: 2026-09-17
-active_work_item: D-133
+active_work_item: D-134
 maintenance_status: healthy
-baseline_commit: 85cfc89e6327c156df4d9d6fa3bbf7f6b3ac577b
+baseline_commit: 6866ee1a2b9e6dab7e0490796a7d6de74860788a
 ---
 
 # Current Project State
 
 ## Active Objective
 
-Finish the bounded D5 TV/EPG usability work without reopening validated media,
-TV-state, Games, or transport subsystems.
+Finish the bounded D5 TV/EPG work without reopening validated media, TV-state,
+Games, or transport subsystems.
 
 ## Current Work Item
 
-**D-133 — accurate schedule-gap versus unavailable guide status.**
+**D-134 — Favorites load latency stage probe.**
 
-D-132 classified all 21 visible Favorites: 11 have a current programme, 5 have
-future/companion schedule data but no programme covering the current moment, and
-5 have no known guide coverage.
-
-The current renderer labels every no-current-programme case as
-`Guide data unavailable`, even when `Next:` data exists. D-133 corrects only that
-presentation distinction.
+D-133 is runtime accepted with `D133_EPG_STATUS_ACCURACY_RUNTIME_VALIDATED`.
+The guide presentation is correct. The user reports opening Favorites can still
+take more than 15 seconds. D-134 instruments the existing page-load path only.
 
 ## Verified State
 
-- D5 external/removable VOD: **COMPLETE / runtime validated**.
-- D5 Live TV catalog/categories/playback: **runtime validated**.
-- Linux EPG acquisition plus Android EPG consumption/cache: **runtime validated**.
-- D5.4 Linux-authoritative durable TV-state sync: **COMPLETE / runtime validated**.
+- D5 external/removable VOD: **runtime validated**.
+- Live TV catalog/categories/playback: **runtime validated**.
+- Linux EPG plus Android guide cache: **runtime validated**.
+- D5.4 Linux-authoritative TV state: **runtime validated**.
 - D-125 non-blocking EPG miss handling: **runtime validated**.
-- D-126 Favorites/visible-page prefetch: **runtime validated**.
+- D-126 Favorites prefetch: **runtime validated**.
 - D-127 incorrect-guide durable intent: **runtime validated**.
-- D-128 compact tile treatment: **superseded after runtime failure**.
-- D-129 single-column full-width TV guide: **runtime validated**.
-- D-130 latency diagnostic: **runtime measured / closed**.
-- D-131 non-blocking TV-entry state sync: **runtime validated**.
-- D-132 Favorites EPG coverage diagnostic: **runtime measured / closed** with
-  `D132_FAVORITES_GUIDE_GAPS_CLASSIFIED`.
+- D-129 single-column guide: **runtime validated**.
+- D-131 non-blocking TV entry: **runtime validated**.
+- D-132 coverage classification: **runtime measured / closed**.
+- D-133 EPG status accuracy: **runtime validated**.
 
 ## Current Repository / Patch State
 
-Expected D-133 predecessor checkpoint:
+Expected D-134 predecessor:
 
-`85cfc89e6327c156df4d9d6fa3bbf7f6b3ac577b`
+`6866ee1a2b9e6dab7e0490796a7d6de74860788a`
 
-D-133 production scope is one rendering branch in `MainActivity.kt`:
-current -> existing `Now:`; upcoming but no current -> `No current listing`
-plus existing `Next:`; no current/upcoming -> `Guide data unavailable`.
+D-134 adds monotonic timing around the existing `openTvPage()` count, query,
+prefetch, rejected-guide prefetch, synchronous companion hydration, and UI-render
+stages. It does not reorder or alter those calls.
 
-**Status: DEVELOPMENT PATCH / RUNTIME VALIDATION NEXT.**
+**Status: DIAGNOSTIC INSTRUMENTATION / RUNTIME MEASUREMENT NEXT.**
 
 ## Next Action
 
-1. install/build/push/APK-install D-133;
-2. open TV -> Favorites at the top of the list;
-3. verify a schedule-gap row shows `No current listing` plus `Next:`;
-4. run `tools/probes/d133_epg_status_accuracy_probe.py --verify`.
-
-Target: `D133_EPG_STATUS_ACCURACY_RUNTIME_VALIDATED`
+1. install/build/push/APK-install D-134;
+2. prepare the probe;
+3. open TV -> Favorites once;
+4. verify the probe;
+5. target only the measured dominant stage.
 
 ## Success Criteria
 
-- schedule-gap rows are not mislabeled as unavailable guide coverage;
-- schedule-gap rows retain their existing `Next:` programme/time;
-- true no-coverage rows continue to say `Guide data unavailable`;
-- D-129 one-column/full-width layout remains intact;
-- acquisition, mappings, TV-state, playback, Favorites and Hide semantics do not change;
-- no network address or device identifier is written to the probe report.
+- all existing Favorites stages have raw elapsed measurements;
+- the dominant stage is classified;
+- page behavior and guide semantics remain unchanged;
+- no network address or device identifier is written to the report.
 
 ## Do Not Reopen Without New Evidence
 
-- D5.4 TV-state seed/push/pull/conflict correctness.
-- D-125 non-blocking Linux EPG request boundary.
-- D-126 Favorites/visible-page prefetch seam.
-- D-127 incorrect-guide durable-state contract.
-- D-129 one-column guide presentation.
-- D-131 non-blocking TV-entry scheduling.
-- D-132 measured coverage classes unless contradicted by new evidence.
-- External VOD hotplug/storage architecture.
-- Linux Games controller/multitap/video/audio lifecycle.
-- Deferred Opal/Siflower UDP reverse-engineering branch.
+- D5.4 TV-state authority semantics.
+- D-125 Linux EPG non-blocking boundary.
+- D-126 prefetch semantics.
+- D-127 incorrect-guide state.
+- D-129 guide geometry.
+- D-131 top-level TV-entry scheduling.
+- D-132 coverage classes.
+- D-133 status distinction.
+- External VOD architecture.
+- Linux Games lifecycle.
+- Deferred UDP work.
 
 ## Relevant References
 
-- `evidence/D132_FAVORITES_EPG_COVERAGE_RUNTIME_EVIDENCE_2026-09-17.md`
-- `investigations/D132_FAVORITES_EPG_COVERAGE.md`
-- `investigations/D133_EPG_STATUS_ACCURACY.md`
-- `patches/D-133_EPG_STATUS_ACCURACY.md`
+- `evidence/D133_EPG_STATUS_ACCURACY_RUNTIME_ACCEPTANCE_2026-09-17.md`
+- `investigations/D134_FAVORITES_LOAD_LATENCY.md`
+- `patches/D-134_FAVORITES_LOAD_LATENCY_PROBE.md`
 - `roadmap/STATUS.md`
 - `2026-09-17.md`

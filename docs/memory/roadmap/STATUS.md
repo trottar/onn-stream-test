@@ -1,44 +1,40 @@
 ---
 memory_schema: 2
 as_of: 2026-09-17
-baseline_commit: 85cfc89e6327c156df4d9d6fa3bbf7f6b3ac577b
+baseline_commit: 6866ee1a2b9e6dab7e0490796a7d6de74860788a
 ---
 
 # Roadmap Status
 
 ## Current position
 
-D5 media/TV work is at the final bounded EPG presentation and regression step.
+D5 TV/EPG work is at final performance/regression closeout.
 
 ### Complete / runtime validated
 
-- External/removable VOD storage and hotplug behavior.
+- External/removable VOD.
 - Live TV catalog/categories/playback.
-- Linux EPG acquisition and Android guide consumption/cache.
-- D5.4 Linux-authoritative TV durable-state synchronization.
-- D-125 non-blocking EPG cache-miss handling.
-- D-126 Android Favorites/visible-page EPG prefetch.
-- D-127 durable incorrect-guide intent/recheck.
-- D-129 single-column full-width TV guide.
-- D-131 non-blocking TV-entry state synchronization.
+- Linux EPG and Android guide cache.
+- D5.4 Linux-authoritative TV state.
+- D-125 non-blocking EPG misses.
+- D-126 Android prefetch.
+- D-127 incorrect-guide intent.
+- D-129 single-column guide.
+- D-131 non-blocking top-level TV entry.
+- D-133 EPG status accuracy.
 
-### Superseded
+### Diagnostics closed
 
-- D-128 compact Now/Next treatment on generic tiles.
-
-### Runtime diagnostics closed
-
-- D-130: old TV-entry delay was synchronous TV-state sync.
-- D-132: 21 Favorites = 11 current, 5 schedule-gap with future guide, 5 no coverage.
+- D-130 top-level TV-entry bottleneck.
+- D-132 guide coverage classification.
 
 ### Active
 
-**D-133 — accurate schedule-gap versus unavailable-guide presentation:
-DEVELOPMENT PATCH / RUNTIME VALIDATION NEXT.**
+**D-134 — Favorites load latency stage probe.**
 
 ### Next
 
-1. runtime-validate D-133;
-2. focused TV/media regression;
-3. checkpoint/close D5 bounded TV work;
-4. continue broader Linux roadmap.
+1. measure Favorites dominant stage;
+2. one bounded performance fix if needed;
+3. focused TV/media regression;
+4. close D5 bounded TV work.

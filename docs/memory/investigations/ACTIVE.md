@@ -5,20 +5,17 @@ as_of: 2026-09-17
 
 # Active Investigations and Queued Work
 
-## Active — D-133 EPG status accuracy
+## Active — D-134 Favorites load latency
 
-D-132 runtime classification: `D132_FAVORITES_GUIDE_GAPS_CLASSIFIED`.
+D-133 is runtime accepted. Remaining observed issue: Favorites entry can exceed
+15 seconds.
 
-Measured 21 visible Favorites:
-- 11 `android_current_programme`;
-- 5 `companion_programmes_no_current` with Android future programmes;
-- 5 `no_known_guide_coverage`.
+Current source runs count/query, prefetch, rejected-guide prefetch and
+`hydrateCompanionGuides()` before posting the Favorites UI. D-134 measures those
+exact stages before any scheduling change.
 
-D-133 changes only the presentation mismatch: future schedule with no current
-programme becomes `No current listing`; true empty coverage remains
-`Guide data unavailable`.
+## Queued after D-134
 
-## Queued after D-133
-
-1. focused TV/media regression;
-2. D5 checkpoint/closeout.
+1. one narrow fix to the measured dominant stage;
+2. focused TV/media regression;
+3. D5 checkpoint/closeout.

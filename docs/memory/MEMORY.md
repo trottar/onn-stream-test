@@ -6,6 +6,16 @@ baseline_commit: 0206017cfd8f0fc57decb7a5e9e8632e6a4f6cdd
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D133_EPG_STATUS_ACCEPTED:BEGIN -->
+## EPG schedule-gap presentation acceptance
+
+D-133 runtime validated the status distinction: a schedule-gap row showed
+`No current listing` plus `Next:`, no unavailable+next contradiction remained,
+one genuine unavailable row remained, and the full-width one-column guide stayed
+intact.
+<!-- PRIVYHUB_D133_EPG_STATUS_ACCEPTED:END -->
+
+
 <!-- PRIVYHUB_D132_EPG_COVERAGE_CLASSIFICATION:BEGIN -->
 ## EPG coverage/status presentation rule
 

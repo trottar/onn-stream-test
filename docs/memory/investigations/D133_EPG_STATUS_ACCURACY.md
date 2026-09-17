@@ -16,3 +16,15 @@ D-133 changes only that display branch:
 4. marked incorrect -> unchanged D-127 behavior.
 
 Runtime target: `D133_EPG_STATUS_ACCURACY_RUNTIME_VALIDATED`.
+
+<!-- PRIVYHUB_D133_RUNTIME_RESULT:BEGIN -->
+## Runtime result — accepted 2026-09-17
+
+`D133_EPG_STATUS_ACCURACY_RUNTIME_VALIDATED`
+
+4/4 visible guide rows remained full-width; 2 had current programmes; 1 had
+`No current listing` plus `Next:`; 0 had the old unavailable+next contradiction;
+1 genuine unavailable row remained.
+
+**Status: runtime accepted.**
+<!-- PRIVYHUB_D133_RUNTIME_RESULT:END -->

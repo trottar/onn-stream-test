@@ -6,6 +6,15 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D134_FAVORITES_LATENCY:PATCH_INDEX:BEGIN -->
+### D-134 — Favorites load latency probe — 2026-09-17
+
+Diagnostic timing around the existing Favorites/page load stages.
+
+**Status:** diagnostic / runtime measurement pending.
+<!-- PRIVYHUB_D134_FAVORITES_LATENCY:PATCH_INDEX:END -->
+
+
 <!-- PRIVYHUB_D133_EPG_STATUS_ACCURACY:PATCH_INDEX:BEGIN -->
 ### D-133 — EPG status accuracy — 2026-09-17
 
