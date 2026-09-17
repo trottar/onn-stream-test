@@ -202,13 +202,16 @@ def local_projection(serial: str, plugin_class) -> tuple[dict[str, Any] | None, 
                        custom_name, custom_category, custom_url,
                        custom_referrer, custom_user_agent,
                        favorite_group, favorite_order, protect_auto_hide,
+                       guide_incorrect, rejected_guide_source_key,
+                       guide_incorrect_at_ms,
                        name, channel_id
                 FROM streams
                 WHERE favorite = 1 OR manual_hidden = 1 OR
                       custom_name IS NOT NULL OR custom_category IS NOT NULL OR
                       custom_url IS NOT NULL OR custom_referrer IS NOT NULL OR
                       custom_user_agent IS NOT NULL OR favorite_group <> '' OR
-                      favorite_order > 0 OR protect_auto_hide = 1
+                      favorite_order > 0 OR protect_auto_hide = 1 OR
+                      guide_incorrect = 1
                 ORDER BY stream_id
                 """
             ).fetchall()
@@ -262,6 +265,13 @@ def local_projection(serial: str, plugin_class) -> tuple[dict[str, Any] | None, 
                 "favorite_group": str(row["favorite_group"] or ""),
                 "favorite_order": int(row["favorite_order"] or 0),
                 "protect_auto_hide": int(row["protect_auto_hide"] or 0) != 0,
+                "guide_incorrect": int(row["guide_incorrect"] or 0) != 0,
+                "rejected_guide_source_key": str(
+                    row["rejected_guide_source_key"] or ""
+                ),
+                "guide_incorrect_at_ms": int(
+                    row["guide_incorrect_at_ms"] or 0
+                ),
             }
         )
 
@@ -334,6 +344,43 @@ def self_test(repo: Path) -> int:
     normalized = plugin_class.normalize_user_state(state)
     assert "success_count" not in normalized["channels"][0]
     assert canonical_sha(plugin_class, normalized) == canonical_sha(plugin_class, state)
+
+    guide_state = {
+        "schema": plugin_class.USER_STATE_SCHEMA,
+        "preferences": {
+            "language_code": "eng",
+            "language_name": "English",
+            "country_code": "",
+            "country_name": "All Countries",
+        },
+        "managed_providers": [],
+        "providers": [],
+        "channels": [
+            {
+                "stream_id": "tv_stream_guide_fixture",
+                "favorite": False,
+                "manual_hidden": False,
+                "custom_name": "",
+                "custom_category": "",
+                "custom_url": "",
+                "custom_referrer": "",
+                "custom_user_agent": "",
+                "favorite_group": "",
+                "favorite_order": 0,
+                "protect_auto_hide": False,
+                "guide_incorrect": True,
+                "rejected_guide_source_key": "fixture-guide-source",
+                "guide_incorrect_at_ms": 123456789,
+            }
+        ],
+    }
+    normalized_guide = plugin_class.normalize_user_state(guide_state)
+    assert normalized_guide["channels"][0]["guide_incorrect"] is True
+    assert (
+        normalized_guide["channels"][0]["rejected_guide_source_key"]
+        == "fixture-guide-source"
+    )
+    assert normalized_guide["channels"][0]["guide_incorrect_at_ms"] == 123456789
     print("D116_PROBE_SELF_TEST_OK")
     return 0
 

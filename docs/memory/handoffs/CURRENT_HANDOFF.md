@@ -1,24 +1,18 @@
 ---
 memory_schema: 2
 as_of: 2026-09-17
-baseline_commit: 7d2d5a17d3b568161fccb00cdaeefd22798dca5c
+baseline_commit: 93047ce05399744d461a2ad451fa5604c5f268a9
 ---
 
 # Current Handoff
 
 The authoritative resumable state is `../CURRENT.md`.
 
-- D-135 runtime accepted:
-  `D135_FAVORITES_QUEUE_CONTENTION_REMOVED`.
-- Favorites total 1,599 ms, queue wait 2 ms, residual 4 ms.
-- Linux state sync still completed/reconciled after Favorites became ready.
-- D-136 is the final focused TV/media regression gate.
-- Reuse D-122 automated baseline; do not invent a parallel media regression
-  architecture.
-- Manual closeout smoke remains Live TV playback, guide/navigation, and VOD.
+- D-136 automated regression failed only with `D122_TV_STATE_PARITY_FAILED`.
+- D-133 and D-135 gates remained clean.
+- D-122 reuses D-116's local TV-state projection.
+- D-116 still omits D-127 schema-v2 durable guide-intent fields while the Linux
+  canonical normalizer includes them.
+- D-137 repairs only that diagnostic projection.
 
-## Resume
-
-Install/run D-136. If automated classification is
-`D136_FOCUSED_TV_MEDIA_AUTOMATED_REGRESSION_VALIDATED`, perform the short manual
-onn smoke and then record D5 closeout if clean.
+Resume by rerunning D-136 after D-137 installs.

@@ -1,41 +1,35 @@
 ---
 memory_schema: 2
 as_of: 2026-09-17
-baseline_commit: 7d2d5a17d3b568161fccb00cdaeefd22798dca5c
+baseline_commit: 93047ce05399744d461a2ad451fa5604c5f268a9
 ---
 
 # Roadmap Status
 
 ## Current position
 
-D5 TV/media work is at the final regression gate.
+D5 TV/media work remains at the final regression gate.
 
-### Complete / runtime validated
+### Runtime validated
 
-- External/removable VOD.
-- Live TV catalog/categories/playback.
-- Linux EPG and Android guide cache.
+- Live TV / VOD baseline.
+- Linux EPG + Android guide.
 - D5.4 Linux-authoritative TV state.
-- D-125/D-126 EPG background behavior.
-- D-127 incorrect-guide intent.
-- D-129 single-column guide.
-- D-131 non-blocking first TV render.
-- D-133 EPG status accuracy.
-- D-135 TV-state executor isolation / fast Favorites.
+- D-129/D-133 guide presentation.
+- D-131/D-135 navigation/state executor performance.
 
-### Diagnostics closed
+### Current regression finding
 
-- D-130 top-level TV-entry bottleneck.
-- D-132 guide coverage.
-- D-134 Favorites queue contention.
+D-136 failed only because the inherited D-116 projection used by D-122 is stale
+for TV user-state schema v2. This is a diagnostic false negative, not yet a
+production-state regression.
 
 ### Active
 
-**D-136 — focused TV/media regression gate.**
+**D-137 — update D-116 canonical local projection for schema-v2 guide intent.**
 
 ### Next
 
-1. automated regression baseline;
-2. short manual Live TV / guide / VOD smoke;
-3. record D5 closeout if clean;
-4. continue broader Linux roadmap.
+1. rerun D-136 fresh;
+2. if clean, manual Live TV / guide / VOD smoke;
+3. close D5 bounded TV/media work.

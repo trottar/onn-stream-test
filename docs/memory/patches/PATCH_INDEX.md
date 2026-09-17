@@ -6,6 +6,17 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D137_PROBE_V2:PATCH_INDEX:BEGIN -->
+### D-137 — TV-state probe schema-v2 projection — 2026-09-17
+
+Diagnostic-only repair. Updates D-116 local canonical projection for D-127
+schema-v2 guide-intent fields after D-136 produced a stale-projection parity false
+negative.
+
+**Status:** diagnostic repair / D-136 rerun next.
+<!-- PRIVYHUB_D137_PROBE_V2:PATCH_INDEX:END -->
+
+
 <!-- PRIVYHUB_D136_FOCUSED_REGRESSION:PATCH_INDEX:BEGIN -->
 ### D-136 — focused TV/media regression — 2026-09-17
 

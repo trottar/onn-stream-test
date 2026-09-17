@@ -6,6 +6,19 @@ baseline_commit: 0206017cfd8f0fc57decb7a5e9e8632e6a4f6cdd
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D137_PROBE_SCHEMA_V2_RULE:BEGIN -->
+## TV-state regression probes must project the current durable schema
+
+D-136 exposed a diagnostic false negative: D-122 canonical parity reused the old
+D-116 local projection, which omitted D-127's schema-v2 `guide_incorrect`,
+`rejected_guide_source_key`, and `guide_incorrect_at_ms` fields.
+
+Canonical parity tools must evolve with the durable TV-state schema. Otherwise a
+correct synchronized state can be reported as divergent solely because the probe
+silently defaults newer durable fields away.
+<!-- PRIVYHUB_D137_PROBE_SCHEMA_V2_RULE:END -->
+
+
 <!-- PRIVYHUB_D135_ACCEPTANCE:BEGIN -->
 ## TV-state executor isolation accepted
 

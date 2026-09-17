@@ -5,21 +5,17 @@ as_of: 2026-09-17
 
 # Active Investigations and Queued Work
 
-## Active — D-136 focused TV/media regression
+## Active — D-137 TV-state probe schema-v2 projection repair
 
-D-135 is runtime accepted. Favorites queue contention is removed without
-weakening state synchronization.
+D-136 failed only at D-122 TV-state parity. Source inspection proves D-122's
+D-116 projection is stale relative to TV user-state schema v2: it omits
+`guide_incorrect`, `rejected_guide_source_key`, and `guide_incorrect_at_ms`.
 
-D-136 reuses the existing D-122 regression seam and layers the accepted D-133
-guide-status and D-135 executor-isolation results onto it.
+D-137 updates diagnostic projection only. Production TV-state code remains
+unchanged.
 
-Required closeout:
-1. automated D-136 pass;
-2. manual Live TV playback;
-3. manual guide/navigation smoke;
-4. manual VOD playback.
+## Queued after D-137
 
-## Queued after D-136
-
-If clean, record D5 bounded TV/media closeout and move to the broader Linux
-roadmap.
+1. rerun D-136;
+2. if automated pass, short manual Live TV / guide / VOD smoke;
+3. D5 closeout.
