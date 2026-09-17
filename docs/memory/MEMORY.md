@@ -6,6 +6,21 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D126_ANDROID_PREFETCH:MEMORY:BEGIN -->
+## EPG warm-ahead navigation rule
+
+D-125 proves normal guide cache misses can return immediately while Linux warms
+the cache in the background.
+
+Android should submit likely-near-term channel identities proactively instead of
+waiting for a Program Guide click.
+
+D-126 uses Favorites on TV entry and the currently visible TV result page as the
+first bounded warm-ahead sets.
+
+Fresh Android guide rows are filtered before submission.
+<!-- PRIVYHUB_D126_ANDROID_PREFETCH:MEMORY:END -->
+
 <!-- PRIVYHUB_D125_NONBLOCKING_EPG:MEMORY:BEGIN -->
 ## EPG interactive latency rule
 

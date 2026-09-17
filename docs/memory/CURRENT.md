@@ -6,6 +6,26 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D126_ANDROID_PREFETCH:CURRENT:BEGIN -->
+## D-126 — Android EPG prefetch integration
+
+D-125 is runtime validated:
+
+`D125_NONBLOCKING_GUIDE_MISS_AND_BACKGROUND_WARMER_VALIDATED`
+
+Measured uncached interactive latency fell from the D-124 19.08-second example
+to 14.199 ms, while background acquisition completed separately in ~10 seconds
+and produced seven programmes.
+
+D-126 connects normal Android navigation to the accepted Linux prefetch seam:
+- TV entry submits stale/missing Favorites;
+- TV result pages submit stale/missing visible channels;
+- successful calls record bounded prefetch diagnostics in the Android EPG DB.
+
+Runtime validation requires a real TV/Favorites navigation event after APK
+installation.
+<!-- PRIVYHUB_D126_ANDROID_PREFETCH:CURRENT:END -->
+
 <!-- PRIVYHUB_D125_NONBLOCKING_EPG:CURRENT:BEGIN -->
 ## D-125 — non-blocking EPG background warmer
 

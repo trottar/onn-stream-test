@@ -1,5 +1,24 @@
 # D-125 — EPG non-blocking background warmer
 
+<!-- PRIVYHUB_D126_ANDROID_PREFETCH:D125_RESULT:BEGIN -->
+## Runtime result — accepted
+
+Classification:
+
+`D125_NONBLOCKING_GUIDE_MISS_AND_BACKGROUND_WARMER_VALIDATED`
+
+Uncached interactive guide response: 14.199 ms.
+
+Background refresh:
+- observed;
+- completed in 10,039.458 ms;
+- cached seven programmes;
+- zero worker failures.
+
+D-125 is accepted. D-126 connects normal Android TV navigation to the prefetch
+seam.
+<!-- PRIVYHUB_D126_ANDROID_PREFETCH:D125_RESULT:END -->
+
 **Status:** production patch / runtime validation required
 
 ## Evidence

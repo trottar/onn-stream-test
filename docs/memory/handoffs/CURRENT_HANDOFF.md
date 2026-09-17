@@ -6,6 +6,24 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D126_ANDROID_PREFETCH:HANDOFF:BEGIN -->
+## D-126 handoff — Android EPG warm-ahead
+
+D-125 is runtime accepted.
+
+After D-126 APK install:
+1. run the D-126 probe with `--prepare`;
+2. open TV and then Favorites on the onn;
+3. run the probe with `--verify`.
+
+Target:
+
+`D126_ANDROID_TV_ENTRY_AND_PAGE_PREFETCH_VALIDATED`
+
+If accepted, proceed directly to durable `incorrect guide` intent/recheck, then
+the guide-style category UI and focused D5 checkpoint.
+<!-- PRIVYHUB_D126_ANDROID_PREFETCH:HANDOFF:END -->
+
 <!-- PRIVYHUB_D125_NONBLOCKING_EPG:HANDOFF:BEGIN -->
 ## D-125 handoff — non-blocking EPG
 

@@ -217,9 +217,16 @@ class TvEpgRepository(
         private const val COMPANION_GUIDE_SCHEMA =
             "privyhub_epg_guide_v1"
 
+        private const val COMPANION_PREFETCH_SCHEMA =
+            "privyhub_epg_prefetch_v1"
+
         private const val COMPANION_CONNECT_TIMEOUT_MS = 3_000
 
         private const val COMPANION_READ_TIMEOUT_MS = 30_000
+
+        private const val COMPANION_PREFETCH_TIMEOUT_MS = 2_000
+
+        private const val MAX_PREFETCH_CHANNELS = 80
     }
 
 
@@ -408,6 +415,198 @@ class TvEpgRepository(
         }
     }
 
+
+
+
+    fun prefetchCompanionGuides(
+        channelIds: List<String>
+    ): Int {
+        val baseUrl =
+            companionBaseUrl()
+                ?: return 0
+
+        val now =
+            System.currentTimeMillis()
+
+        val candidates =
+            channelIds
+                .asSequence()
+                .map {
+                    it.trim()
+                }
+                .filter {
+                    it.isNotBlank() &&
+                        !it.startsWith(
+                            "tv_stream_"
+                        )
+                }
+                .distinct()
+                .filter {
+                    needsCompanionPrefetch(
+                        channelId = it,
+                        nowMs = now
+                    )
+                }
+                .take(
+                    MAX_PREFETCH_CHANNELS
+                )
+                .toList()
+
+        if (candidates.isEmpty()) {
+            return 0
+        }
+
+        val query =
+            candidates.joinToString(
+                separator = "&"
+            ) {
+                "channel_id=" +
+                    URLEncoder.encode(
+                        it,
+                        "UTF-8"
+                    )
+            }
+
+        val connection =
+            try {
+                URL(
+                    "$baseUrl/plugins/epg/prefetch?$query"
+                ).openConnection()
+                    as HttpURLConnection
+            } catch (_: Exception) {
+                return 0
+            }
+
+        return try {
+            connection.requestMethod =
+                "POST"
+
+            connection.connectTimeout =
+                COMPANION_PREFETCH_TIMEOUT_MS
+
+            connection.readTimeout =
+                COMPANION_PREFETCH_TIMEOUT_MS
+
+            connection.instanceFollowRedirects =
+                true
+
+            connection.useCaches =
+                false
+
+            connection.setRequestProperty(
+                "User-Agent",
+                "PrivyHub/1.0"
+            )
+
+            val response =
+                connection.responseCode
+
+            if (
+                response < 200 ||
+                response >= 300
+            ) {
+                return 0
+            }
+
+            val text =
+                connection.inputStream
+                    .bufferedReader()
+                    .use {
+                        it.readText()
+                    }
+
+            val payload =
+                JSONObject(
+                    text
+                )
+
+            if (
+                payload.optString(
+                    "schema"
+                ) != COMPANION_PREFETCH_SCHEMA ||
+                !payload.optBoolean(
+                    "ok",
+                    false
+                )
+            ) {
+                return 0
+            }
+
+            val accepted =
+                payload.optJSONArray(
+                    "accepted"
+                ) ?: JSONArray()
+
+            val alreadyPending =
+                payload.optJSONArray(
+                    "already_pending"
+                ) ?: JSONArray()
+
+            val queued =
+                accepted.length() +
+                    alreadyPending.length()
+
+            db.setMeta(
+                "companion_epg_last_prefetch_at_ms",
+                now.toString()
+            )
+
+            db.setMeta(
+                "companion_epg_last_prefetch_requested",
+                candidates.size.toString()
+            )
+
+            db.setMeta(
+                "companion_epg_last_prefetch_queued",
+                queued.toString()
+            )
+
+            queued
+
+        } catch (_: Exception) {
+            0
+
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+
+    private fun needsCompanionPrefetch(
+        channelId: String,
+        nowMs: Long
+    ): Boolean {
+        val cached =
+            getCachedGuide(
+                channelId = channelId,
+                nowMs = nowMs
+            )
+
+        if (
+            cached.current == null &&
+            cached.upcoming.isEmpty()
+        ) {
+            return true
+        }
+
+        val refreshedAt =
+            db.getMeta(
+                channelRefreshKey(
+                    channelId
+                )
+            )?.toLongOrNull() ?: 0L
+
+        if (refreshedAt <= 0L) {
+            return true
+        }
+
+        val age =
+            nowMs - refreshedAt
+
+        return age !in
+            0 until
+                PROGRAMME_REFRESH_INTERVAL_MS
+    }
 
     private fun companionBaseUrl(): String? {
         val host =

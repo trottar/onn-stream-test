@@ -2926,6 +2926,26 @@ class MainActivity : AppCompatActivity() {
                     renderCurrentPage()
                 }
 
+                val favoriteChannels =
+                    tvRepository.queryChannels(
+                        languageCode =
+                            getTvLanguageCode(),
+                        countryCode =
+                            getTvCountryCode(),
+                        mode =
+                            TvRepository.MODE_FAVORITES,
+                        limit =
+                            TV_PAGE_SIZE,
+                        offset =
+                            0
+                    )
+
+                tvEpgRepository.prefetchCompanionGuides(
+                    favoriteChannels.map {
+                        it.channelId
+                    }
+                )
+
             } catch (error: Exception) {
 
                 Log.e(
@@ -3664,6 +3684,12 @@ class MainActivity : AppCompatActivity() {
 
                     renderCurrentPage()
                 }
+
+                tvEpgRepository.prefetchCompanionGuides(
+                    channels.map {
+                        it.channelId
+                    }
+                )
 
             } catch (error: Exception) {
 

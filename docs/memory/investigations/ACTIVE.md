@@ -6,6 +6,20 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D126_ANDROID_PREFETCH:ACTIVE:BEGIN -->
+## ACTIVE — D-126 Android EPG warm-ahead
+
+D-125 non-blocking Linux guide acquisition is runtime validated.
+
+D-126 is the Android integration check:
+normal TV/Favorites/page navigation must submit stale/missing channel identities
+to the Linux prefetch queue.
+
+After acceptance:
+durable incorrect-guide intent/recheck -> guide-style category UI -> focused D5
+regression/checkpoint.
+<!-- PRIVYHUB_D126_ANDROID_PREFETCH:ACTIVE:END -->
+
 <!-- PRIVYHUB_D125_NONBLOCKING_EPG:ACTIVE:BEGIN -->
 ## ACTIVE — D-125 EPG non-blocking cache miss
 

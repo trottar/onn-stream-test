@@ -6,6 +6,19 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D126_ANDROID_PREFETCH:ROADMAP:BEGIN -->
+## Post-D5 bounded TV follow-up — D-126 active
+
+D-125 non-blocking EPG cache-miss handling is runtime validated.
+
+D-126 adds Android Favorites/visible-page guide warm-ahead.
+
+Remaining bounded TV work before the next clean D5 checkpoint:
+1. durable incorrect-guide mark/recheck;
+2. guide-style category presentation;
+3. focused TV/media regression and roadmap advance.
+<!-- PRIVYHUB_D126_ANDROID_PREFETCH:ROADMAP:END -->
+
 <!-- PRIVYHUB_D125_NONBLOCKING_EPG:ROADMAP:BEGIN -->
 ## Post-D5 bounded TV follow-up — D-125 active
 

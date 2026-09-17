@@ -6,6 +6,20 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D126_ANDROID_PREFETCH:PATCH_INDEX:BEGIN -->
+### D-126 — Android EPG prefetch integration — 2026-09-17
+
+Android production performance integration.
+
+TV entry queues stale/missing Favorites; result pages queue stale/missing
+visible channels through the D-125 Linux background prefetch seam.
+
+Installer runs a real Android debug APK build.
+
+Runtime evidence:
+`logs/tv/d126_android_epg_prefetch_probe.txt`.
+<!-- PRIVYHUB_D126_ANDROID_PREFETCH:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D125_NONBLOCKING_EPG:PATCH_INDEX:BEGIN -->
 ### D-125 — EPG non-blocking background warmer — 2026-09-17
 
