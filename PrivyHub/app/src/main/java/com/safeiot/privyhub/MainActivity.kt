@@ -5334,7 +5334,7 @@ class MainActivity : AppCompatActivity() {
                                     )
                                 }
 
-                                append("\\n")
+                                append("\n")
                             }
                         }.trim()
                     }

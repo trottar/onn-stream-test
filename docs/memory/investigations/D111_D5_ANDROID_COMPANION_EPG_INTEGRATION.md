@@ -1,5 +1,33 @@
 # D-111 — D5 Android companion-EPG integration
 
+<!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:D111_RESULT:BEGIN -->
+## Runtime result — 2026-09-16
+
+D-111 passed.
+
+Classification:
+
+`D111_ANDROID_COMPANION_EPG_RUNTIME_VALIDATED`
+
+Measured onn state:
+- 65 total EPG programmes;
+- last companion-success channel `10Bold.au@Sydney`;
+- declared programme count 65;
+- 65 SQLite rows for that channel;
+- companion response cached: true;
+- stale: false.
+
+The Program Guide also displayed real time/title schedule data.
+
+D5.3 EPG data flow is therefore accepted.
+
+Observed follow-up defect:
+literal `\n` separators appear between programme rows because the renderer uses
+`append("\\n")`.
+
+D-112 fixes only that presentation issue.
+<!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:D111_RESULT:END -->
+
 **Status:** development patch / Android runtime validation next
 
 ## Purpose

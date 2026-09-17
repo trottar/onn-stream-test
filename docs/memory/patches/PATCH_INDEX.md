@@ -6,6 +6,22 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:PATCH_INDEX:BEGIN -->
+### D-112 — D5 Program Guide newline polish — 2026-09-16
+
+Android presentation-only patch after D-111 runtime acceptance.
+
+Changes one Program Guide separator:
+literal `\n` -> actual newline.
+
+Records D-111/D5.3 runtime acceptance in durable memory.
+
+No EPG acquisition/cache/identity logic changes.
+
+Runtime validation:
+visually confirm `10 Bold` Program Guide rows no longer display literal `\n`.
+<!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:PATCH_INDEX:BEGIN -->
 ### D-111 — D5 Android companion EPG integration — 2026-09-16
 

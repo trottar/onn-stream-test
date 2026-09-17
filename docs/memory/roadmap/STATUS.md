@@ -6,6 +6,19 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:ROADMAP:BEGIN -->
+## D5.3 EPG — runtime validated / accepted
+
+D-111 passed end-to-end Android companion EPG validation.
+
+D5.3 EPG data flow is accepted.
+
+D-112 is a small Program Guide newline/readability polish and does not reopen
+D5.3 architecture.
+
+**Next after D-112 visual confirmation:** D5.4 TV-state ownership/sync.
+<!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:ROADMAP:END -->
+
 <!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:ROADMAP:BEGIN -->
 ## D5.3 EPG — Android companion integration
 

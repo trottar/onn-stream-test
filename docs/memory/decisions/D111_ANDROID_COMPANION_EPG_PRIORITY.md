@@ -1,5 +1,17 @@
 # D-111 decision — Android companion-first EPG lookup
 
+<!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:D111_DECISION_STATUS:BEGIN -->
+## Runtime status
+
+**Runtime validated / accepted on 2026-09-16.**
+
+The companion-first policy produced 65 programmes for
+`10Bold.au@Sydney`, persisted them into the onn EPG SQLite database, and the
+existing Program Guide rendered the schedule.
+
+The D-112 literal-newline UI polish does not alter this decision.
+<!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:D111_DECISION_STATUS:END -->
+
 **Date:** 2026-09-16
 
 **Status:** development accepted / runtime validation pending

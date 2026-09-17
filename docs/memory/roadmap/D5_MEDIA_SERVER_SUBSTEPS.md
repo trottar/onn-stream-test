@@ -6,6 +6,25 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:D5_SUBSTEPS:BEGIN -->
+## D5.3 accepted — D-112 visual polish
+
+D-111 completed the D5.3 EPG data path.
+
+Runtime acceptance:
+- Linux acquisition/cache accepted;
+- Android companion consumption accepted;
+- onn SQLite persistence confirmed;
+- Program Guide schedule rendering confirmed.
+
+D5.3 is **runtime validated / accepted**.
+
+D-112 is a non-architectural polish:
+replace literal `\n` separators in the Program Guide with real line breaks.
+
+After D-112 visual confirmation, begin D5.4 TV durable-state ownership/sync.
+<!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:D5_SUBSTEPS:END -->
+
 <!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:D5_SUBSTEPS:BEGIN -->
 ## D5.3 execution checkpoint — D-111
 

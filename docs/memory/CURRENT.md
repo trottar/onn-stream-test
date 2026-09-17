@@ -6,6 +6,32 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:CURRENT:BEGIN -->
+## D-112 Program Guide newline polish
+
+D-111 is runtime validated and accepted.
+
+Authoritative Android evidence:
+- `D111_ANDROID_COMPANION_EPG_RUNTIME_VALIDATED`;
+- 65 programmes stored on the onn for `10Bold.au@Sydney`;
+- companion response was cached and non-stale;
+- the Program Guide displayed real time/title schedule data.
+
+Therefore D5.3 EPG data flow is accepted.
+
+A minor presentation defect remains:
+`showTvProgramGuide()` appends the literal string `\n` between programme rows,
+so visible backslash-n artifacts appear in the dialog.
+
+D-112 changes only that separator to a real newline.
+
+No EPG acquisition, cache, identity, Linux service, catalog, or playback logic
+is changed.
+
+After visual confirmation of D-112, D5.4 TV-state ownership/sync is the next
+development substep.
+<!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:CURRENT:END -->
+
 <!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:CURRENT:BEGIN -->
 ## D-111 D5.3 Android companion-EPG integration
 

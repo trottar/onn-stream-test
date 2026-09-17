@@ -6,6 +6,20 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:ACTIVE:BEGIN -->
+## D5.3 accepted; D-112 presentation polish active
+
+D-111 established end-to-end companion-backed Android EPG and D5.3 is runtime
+accepted.
+
+Active narrow polish:
+replace the literal `\n` Program Guide row separator with an actual newline.
+
+This does not reopen EPG acquisition or matching investigations.
+
+Next development boundary after the visual check is D5.4 TV durable-state sync.
+<!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:ACTIVE:END -->
+
 <!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:ACTIVE:BEGIN -->
 ## D5.3 active — Android companion EPG consumption
 

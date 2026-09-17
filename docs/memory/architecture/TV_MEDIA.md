@@ -6,6 +6,29 @@ baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
 
 # TV, IPTV, and Media Architecture
 
+<!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:TV_MEDIA:BEGIN -->
+## EPG end-to-end acceptance
+
+D-111 runtime evidence validates the intended EPG architecture:
+
+```text
+Linux acquisition/cache
+        |
+companion /plugins/epg/guide
+        |
+Android TvEpgRepository
+        |
+onn local SQLite cache
+        |
+Program Guide UI
+```
+
+The onn remains a local/offline cache; Linux remains acquisition authority.
+
+D-112 changes only Program Guide text rendering from a literal `\n` separator
+to an actual newline. It does not change this architecture.
+<!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:TV_MEDIA:END -->
+
 <!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:TV_MEDIA:BEGIN -->
 ## Android EPG consumption after D-110
 

@@ -6,6 +6,27 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:HANDOFF:BEGIN -->
+## D-112 handoff — Program Guide newline polish
+
+D-111 is runtime accepted.
+
+The onn showed real programme times/titles and the read-only DB probe confirmed
+65 companion-backed rows for `10Bold.au@Sydney`.
+
+Remaining issue before D5.4:
+the Program Guide renderer displays literal `\n` between schedule rows.
+
+D-112 changes only that separator to an actual newline and rebuilds the APK.
+
+Runtime check:
+open `10 Bold` -> Program Guide and confirm the visible `\n` artifacts are gone.
+
+No companion restart is required.
+
+After that visual check, proceed to D5.4 Linux-authoritative TV-state sync.
+<!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:HANDOFF:END -->
+
 <!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:HANDOFF:BEGIN -->
 ## D-111 handoff — Android consumes Linux EPG
 

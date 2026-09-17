@@ -6,6 +6,28 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:MEMORY:BEGIN -->
+## D5.3 EPG runtime acceptance
+
+D-111 completed the end-to-end EPG path and is accepted:
+
+- Linux companion EPG acquisition/cache works;
+- Android consumes `/plugins/epg/guide`;
+- onn SQLite stores returned programmes;
+- Program Guide renders schedule times and titles;
+- playback remains independent of guide success.
+
+Accepted runtime sample:
+`10Bold.au@Sydney` with 65 cached programmes and a non-stale companion response.
+
+The visible `\n` separators observed after acceptance are a
+`MainActivity.showTvProgramGuide()` presentation bug, not an EPG data defect.
+
+D-112 fixes that literal-newline rendering bug only.
+
+Next architectural work after the polish is D5.4 TV durable-state ownership/sync.
+<!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:MEMORY:END -->
+
 <!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:MEMORY:BEGIN -->
 ## Android EPG cache / companion priority rule
 
