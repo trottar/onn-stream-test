@@ -6,6 +6,19 @@ baseline_commit: 0206017cfd8f0fc57decb7a5e9e8632e6a4f6cdd
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D134_QUEUE_CONTENTION_RULE:BEGIN -->
+## Trust raw stage accounting over incomplete latency classifiers
+
+D-134 emitted `D134_FAVORITES_UI_RENDER_DOMINANT`, but raw stage accounting showed
+24,382 ms total versus only 1,530 ms across all named stages. The unexplained
+22,852 ms interval was the actual dominant delay.
+
+When a classifier omits a large residual interval, trust the raw measurements.
+For Android TV navigation, long authority/network maintenance work must not occupy
+the same single-thread executor needed for responsive page navigation.
+<!-- PRIVYHUB_D134_QUEUE_CONTENTION_RULE:END -->
+
+
 <!-- PRIVYHUB_D133_EPG_STATUS_ACCEPTED:BEGIN -->
 ## EPG schedule-gap presentation acceptance
 

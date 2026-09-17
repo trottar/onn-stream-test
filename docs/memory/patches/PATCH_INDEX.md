@@ -6,6 +6,19 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D135_EXECUTOR_ISOLATION:PATCH_INDEX:BEGIN -->
+### D-135 — TV-state executor isolation — 2026-09-17
+
+Separates serialized Linux TV-state push/pull work from the general Android
+navigation executor after D-134 exposed a 22.85-second queue residual.
+
+Runtime probe:
+`logs/tv/d135_tv_state_executor_isolation_probe.txt`.
+
+**Status:** development patch / runtime validation pending.
+<!-- PRIVYHUB_D135_EXECUTOR_ISOLATION:PATCH_INDEX:END -->
+
+
 <!-- PRIVYHUB_D134_FAVORITES_LATENCY:PATCH_INDEX:BEGIN -->
 ### D-134 — Favorites load latency probe — 2026-09-17
 

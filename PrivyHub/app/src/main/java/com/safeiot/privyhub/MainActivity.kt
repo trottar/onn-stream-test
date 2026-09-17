@@ -107,6 +107,14 @@ class MainActivity : AppCompatActivity() {
     private val networkExecutor: ExecutorService =
         Executors.newSingleThreadExecutor()
 
+    /*
+     * TV-state push/pull operations can wait on the Linux companion for
+     * many seconds. Keep them serialized with each other without occupying
+     * the general navigation/catalog executor.
+     */
+    private val tvStateSyncExecutor: ExecutorService =
+        Executors.newSingleThreadExecutor()
+
     // PrivyHub Phase A6 box art: artwork loading is isolated from
     // companion control requests so a slow/missing cover can never
     // delay launch, Save/Load, or library navigation.
@@ -2662,7 +2670,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        networkExecutor.execute {
+        tvStateSyncExecutor.execute {
             try {
                 val result =
                     tvStateSyncClient.push(
@@ -2910,6 +2918,161 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    private fun scheduleTvEntryStateSync(
+        d131EntryStartedMs: Long,
+        initialResult: TvRefreshResult
+    ) {
+
+        tvStateSyncExecutor.execute {
+
+            try {
+
+                val d135SyncExecutorStartedMs =
+                    android.os.SystemClock.elapsedRealtime()
+
+                Log.i(
+                    TAG,
+                    "D135_TV_STATE session=$d131EntryStartedMs stage=executor_start " +
+                        "total_ms=${d135SyncExecutorStartedMs - d131EntryStartedMs}"
+                )
+
+                val d131SyncStartedMs =
+                    android.os.SystemClock.elapsedRealtime()
+
+                val syncResult =
+                    synchronizeTvStateNow()
+
+                val d131SyncFinishedMs =
+                    android.os.SystemClock.elapsedRealtime()
+
+                Log.i(
+                    TAG,
+                    "D131_TV_ENTRY session=$d131EntryStartedMs stage=state_sync_complete " +
+                        "elapsed_ms=${d131SyncFinishedMs - d131SyncStartedMs} " +
+                        "total_ms=${d131SyncFinishedMs - d131EntryStartedMs} " +
+                        "action=${syncResult?.action ?: "none"} " +
+                        "local_changed=${syncResult?.localStateChanged ?: false}"
+                )
+
+                var reconciledResult =
+                    initialResult
+
+                if (
+                    syncResult
+                        ?.localStateChanged ==
+                    true
+                ) {
+                    val d131PostSyncCatalogStartedMs =
+                        android.os.SystemClock.elapsedRealtime()
+
+                    reconciledResult =
+                        tvRepository.ensureCatalog(
+                            languageCode =
+                                getTvLanguageCode(),
+                            force =
+                                false
+                        )
+
+                    val d131PostSyncCatalogFinishedMs =
+                        android.os.SystemClock.elapsedRealtime()
+
+                    Log.i(
+                        TAG,
+                        "D131_TV_ENTRY session=$d131EntryStartedMs stage=post_sync_catalog " +
+                            "elapsed_ms=${d131PostSyncCatalogFinishedMs - d131PostSyncCatalogStartedMs} " +
+                            "total_ms=${d131PostSyncCatalogFinishedMs - d131EntryStartedMs} " +
+                            "cached=${reconciledResult.usedCachedData}"
+                    )
+                }
+
+                val finalResult =
+                    reconciledResult
+
+                runOnUiThread {
+
+                    val syncSuffix =
+                        when (
+                            syncResult
+                                ?.action
+                        ) {
+                            "seeded" ->
+                                " - state seeded"
+
+                            "pulled" ->
+                                " - state synced"
+
+                            else ->
+                                ""
+                        }
+
+                    when {
+                        navigationStack
+                            .lastOrNull()
+                            ?.id ==
+                            "__tv_home" -> {
+
+                            navigationStack[
+                                navigationStack.lastIndex
+                            ] =
+                                buildTvHomeNode()
+
+                            statusText.text =
+                                if (finalResult.usedCachedData) {
+                                    "TV: ${getTvLanguageName()} - cached catalog$syncSuffix"
+                                } else {
+                                    "TV: ${getTvLanguageName()} - ${finalResult.channelCount} streams$syncSuffix"
+                                }
+
+                            renderCurrentPage()
+                        }
+
+                        syncResult
+                            ?.localStateChanged ==
+                            true &&
+                            isCurrentTvResultPage() -> {
+
+                            refreshCurrentTvResultPage()
+                        }
+
+                        isInTv() &&
+                            syncResult != null -> {
+
+                            statusText.text =
+                                when (syncResult.action) {
+                                    "seeded" ->
+                                        "TV state seeded"
+                                    "pulled" ->
+                                        "TV state synced"
+                                    else ->
+                                        statusText.text
+                                }
+                        }
+                    }
+
+                    val d131ReconciledMs =
+                        android.os.SystemClock.elapsedRealtime()
+
+                    Log.i(
+                        TAG,
+                        "D131_TV_ENTRY session=$d131EntryStartedMs stage=sync_reconciled " +
+                            "total_ms=${d131ReconciledMs - d131EntryStartedMs} " +
+                            "action=${syncResult?.action ?: "none"} " +
+                            "local_changed=${syncResult?.localStateChanged ?: false}"
+                    )
+                }
+
+            } catch (error: Exception) {
+
+                Log.e(
+                    TAG,
+                    "TV state background reconciliation failed",
+                    error
+                )
+            }
+        }
+    }
+
+
     private fun openTvHome(
         force: Boolean = false
     ) {
@@ -3027,127 +3190,10 @@ class MainActivity : AppCompatActivity() {
                     favoriteChannels
                 )
 
-                val d131SyncStartedMs =
-                    android.os.SystemClock.elapsedRealtime()
-
-                val syncResult =
-                    synchronizeTvStateNow()
-
-                val d131SyncFinishedMs =
-                    android.os.SystemClock.elapsedRealtime()
-
-                Log.i(
-                    TAG,
-                    "D131_TV_ENTRY session=$d131EntryStartedMs stage=state_sync_complete " +
-                        "elapsed_ms=${d131SyncFinishedMs - d131SyncStartedMs} " +
-                        "total_ms=${d131SyncFinishedMs - d131EntryStartedMs} " +
-                        "action=${syncResult?.action ?: "none"} " +
-                        "local_changed=${syncResult?.localStateChanged ?: false}"
+                scheduleTvEntryStateSync(
+                    d131EntryStartedMs = d131EntryStartedMs,
+                    initialResult = result
                 )
-
-                if (
-                    syncResult
-                        ?.localStateChanged ==
-                    true
-                ) {
-                    val d131PostSyncCatalogStartedMs =
-                        android.os.SystemClock.elapsedRealtime()
-
-                    result =
-                        tvRepository.ensureCatalog(
-                            languageCode =
-                                getTvLanguageCode(),
-                            force =
-                                false
-                        )
-
-                    val d131PostSyncCatalogFinishedMs =
-                        android.os.SystemClock.elapsedRealtime()
-
-                    Log.i(
-                        TAG,
-                        "D131_TV_ENTRY session=$d131EntryStartedMs stage=post_sync_catalog " +
-                            "elapsed_ms=${d131PostSyncCatalogFinishedMs - d131PostSyncCatalogStartedMs} " +
-                            "total_ms=${d131PostSyncCatalogFinishedMs - d131EntryStartedMs} " +
-                            "cached=${result.usedCachedData}"
-                    )
-                }
-
-                val reconciledResult =
-                    result
-
-                runOnUiThread {
-
-                    val syncSuffix =
-                        when (
-                            syncResult
-                                ?.action
-                        ) {
-                            "seeded" ->
-                                " - state seeded"
-
-                            "pulled" ->
-                                " - state synced"
-
-                            else ->
-                                ""
-                        }
-
-                    when {
-                        navigationStack
-                            .lastOrNull()
-                            ?.id ==
-                            "__tv_home" -> {
-
-                            navigationStack[
-                                navigationStack.lastIndex
-                            ] =
-                                buildTvHomeNode()
-
-                            statusText.text =
-                                if (reconciledResult.usedCachedData) {
-                                    "TV: ${getTvLanguageName()} - cached catalog$syncSuffix"
-                                } else {
-                                    "TV: ${getTvLanguageName()} - ${reconciledResult.channelCount} streams$syncSuffix"
-                                }
-
-                            renderCurrentPage()
-                        }
-
-                        syncResult
-                            ?.localStateChanged ==
-                            true &&
-                            isCurrentTvResultPage() -> {
-
-                            refreshCurrentTvResultPage()
-                        }
-
-                        isInTv() &&
-                            syncResult != null -> {
-
-                            statusText.text =
-                                when (syncResult.action) {
-                                    "seeded" ->
-                                        "TV state seeded"
-                                    "pulled" ->
-                                        "TV state synced"
-                                    else ->
-                                        statusText.text
-                                }
-                        }
-                    }
-
-                    val d131ReconciledMs =
-                        android.os.SystemClock.elapsedRealtime()
-
-                    Log.i(
-                        TAG,
-                        "D131_TV_ENTRY session=$d131EntryStartedMs stage=sync_reconciled " +
-                            "total_ms=${d131ReconciledMs - d131EntryStartedMs} " +
-                            "action=${syncResult?.action ?: "none"} " +
-                            "local_changed=${syncResult?.localStateChanged ?: false}"
-                    )
-                }
 
             } catch (error: Exception) {
 
@@ -3714,6 +3760,15 @@ class MainActivity : AppCompatActivity() {
 
 
         networkExecutor.execute {
+
+            val d135ExecutorStartedMs =
+                android.os.SystemClock.elapsedRealtime()
+
+            Log.i(
+                TAG,
+                "D135_TV_PAGE session=$d134PageStartedMs stage=executor_start " +
+                    "queue_wait_ms=${d135ExecutorStartedMs - d134PageStartedMs}"
+            )
 
             try {
 

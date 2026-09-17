@@ -291,3 +291,15 @@ TV UI when it changes local durable state.
 
 This does not introduce merge semantics or weaken stale-write rejection.
 <!-- PRIVYHUB_D131_TV_ENTRY_SYNC_SCHEDULING:END -->
+
+<!-- PRIVYHUB_D135_TV_STATE_EXECUTOR_ISOLATION:BEGIN -->
+## TV-state executor isolation
+
+TV-state network operations use a dedicated single-thread executor. This preserves
+serialization of pushes, pulls, revision checks and reconciliation while keeping
+long companion state round trips out of the general navigation/catalog executor.
+
+D-134 showed why this boundary matters: Favorites total latency was 24,382 ms
+despite only 1,530 ms of named page work, because the page task queued behind the
+D-131 background state pull on the shared executor.
+<!-- PRIVYHUB_D135_TV_STATE_EXECUTOR_ISOLATION:END -->

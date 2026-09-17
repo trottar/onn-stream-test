@@ -1,7 +1,7 @@
 ---
 memory_schema: 2
 as_of: 2026-09-17
-baseline_commit: 6866ee1a2b9e6dab7e0490796a7d6de74860788a
+baseline_commit: 634bc0affc17f9f4317df896a0068c61f8f2afc3
 ---
 
 # Roadmap Status
@@ -16,25 +16,26 @@ D5 TV/EPG work is at final performance/regression closeout.
 - Live TV catalog/categories/playback.
 - Linux EPG and Android guide cache.
 - D5.4 Linux-authoritative TV state.
-- D-125 non-blocking EPG misses.
-- D-126 Android prefetch.
+- D-125/D-126 EPG non-blocking/prefetch behavior.
 - D-127 incorrect-guide intent.
 - D-129 single-column guide.
-- D-131 non-blocking top-level TV entry.
+- D-131 non-blocking first TV render.
 - D-133 EPG status accuracy.
 
 ### Diagnostics closed
 
-- D-130 top-level TV-entry bottleneck.
-- D-132 guide coverage classification.
+- D-130: top-level entry blocked on state sync.
+- D-132: guide coverage classification.
+- D-134: Favorites raw timings exposed ~22.85 s executor queue contention;
+  classifier's UI-dominant label was incomplete.
 
 ### Active
 
-**D-134 — Favorites load latency stage probe.**
+**D-135 — isolate serialized TV-state synchronization from navigation executor.**
 
 ### Next
 
-1. measure Favorites dominant stage;
-2. one bounded performance fix if needed;
-3. focused TV/media regression;
-4. close D5 bounded TV work.
+1. runtime-validate D-135;
+2. focused TV/media regression;
+3. close D5 bounded TV work;
+4. continue broader Linux roadmap.
