@@ -6,6 +6,21 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:PATCH_INDEX:BEGIN -->
+### D-121 — D5 TV-state conflict diagnostics probe — 2026-09-17
+
+Diagnostic-only.
+
+Exercises one real stale Android Favorite mutation while Linux is one revision
+newer, verifies Linux reject/preservation plus D-120 conflict metadata, then
+restores exact parity.
+
+No production code change.
+
+Runtime evidence:
+`logs/tv/d121_tv_state_conflict_diagnostics_probe.txt`.
+<!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:PATCH_INDEX:BEGIN -->
 ### D-120 — D5 TV-state sync diagnostics — 2026-09-17
 

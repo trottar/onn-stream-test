@@ -6,6 +6,21 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:ACTIVE:BEGIN -->
+## D5.4 ACTIVE — D-121 conflict diagnostics
+
+Core bidirectional sync, normal top-level trigger, and last-success diagnostics
+are runtime validated.
+
+One synchronization acceptance question remains:
+controlled stale Android durable write -> Linux rejection -> visible conflict
+metadata -> authoritative recovery.
+
+D-121 is diagnostic-only and must be reviewed before any conflict-policy change.
+
+After D-121 passes, move to focused TV/media regression and D5.4 closure.
+<!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:ACTIVE:END -->
+
 <!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:ACTIVE:BEGIN -->
 ## D5.4 ACTIVE — D-120 sync diagnostics
 

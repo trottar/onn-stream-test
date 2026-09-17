@@ -6,6 +6,24 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:D5_SUBSTEPS:BEGIN -->
+## D5.4 — conflict diagnostic active
+
+Accepted:
+- Linux TV-state authority;
+- onn seed/push;
+- Linux pull;
+- normal top-level sync trigger;
+- last-success diagnostics/status UI.
+
+D-121 is the final sync-specific runtime acceptance check:
+stale write rejection + conflict diagnostics + authoritative recovery.
+
+If D-121 passes:
+1. focused TV/media regression;
+2. record D5.4 closure if clean.
+<!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:D5_SUBSTEPS:END -->
+
 <!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:D5_SUBSTEPS:BEGIN -->
 ## D5.4 — trigger accepted; diagnostics active
 

@@ -6,6 +6,23 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:MEMORY:BEGIN -->
+## D5.4 conflict validation boundary
+
+D-120 runtime validates last-success sync diagnostics and their status-dialog
+presentation.
+
+Before D5.4 closure, prove one real stale Android durable write:
+- Linux must reject the stale base revision;
+- Linux state must remain authoritative and unchanged;
+- Android must persist last-conflict base/server revision;
+- a later authoritative pull must restore exact parity.
+
+D-121 performs this test without changing production code or conflict policy.
+
+Do not add automatic conflict merging in D5.4.
+<!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:MEMORY:END -->
+
 <!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:MEMORY:BEGIN -->
 ## D5.4 TV sync trigger and observability
 

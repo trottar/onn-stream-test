@@ -6,6 +6,31 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:HANDOFF:BEGIN -->
+## D-121 handoff — stale-write conflict diagnostics
+
+D-120 diagnostics are runtime accepted.
+
+D-121 sequence:
+1. keep the onn inside TV before prepare;
+2. run D-121 `--phase prepare`;
+3. do not return to top-level TV and do not Refresh;
+4. long-press one visible channel and toggle Favorite exactly once;
+5. run `--phase verify`;
+6. confirm the probe reports stale-write rejection / conflict diagnostics;
+7. press TV Refresh once;
+8. optionally inspect Catalog / EPG Status for the conflict line;
+9. run `--phase final`.
+
+Target:
+
+`D121_CONFLICT_PROTECTION_AND_DIAGNOSTICS_RUNTIME_VALIDATED`
+
+Return:
+
+`logs/tv/d121_tv_state_conflict_diagnostics_probe.txt`
+<!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:HANDOFF:END -->
+
 <!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:HANDOFF:BEGIN -->
 ## D-120 handoff — sync observability
 

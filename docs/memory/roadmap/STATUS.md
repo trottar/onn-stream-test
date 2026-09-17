@@ -6,6 +6,20 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:ROADMAP:BEGIN -->
+## D5.4 TV-state sync — conflict acceptance active
+
+Runtime validated:
+- bidirectional durable-state sync;
+- normal top-level TV-entry trigger;
+- last-success diagnostics.
+
+D-121 stale-write rejection / conflict diagnostics: active.
+
+After D-121:
+focused TV/media regression, then D5.4 closure if clean.
+<!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:ROADMAP:END -->
+
 <!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:ROADMAP:BEGIN -->
 ## D5.4 TV-state sync — diagnostics active
 

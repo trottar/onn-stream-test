@@ -6,6 +6,23 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # TV State Synchronization Architecture
 
+<!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:ARCH:BEGIN -->
+## Conflict observability acceptance test
+
+D-121 validates the existing one-client optimistic-concurrency rule through the
+actual Android mutation path.
+
+Expected stale-write behavior:
+- local mutation remains locally usable;
+- push uses remembered stale `base_revision`;
+- Linux returns `revision_conflict`;
+- Linux state is not overwritten;
+- Android records conflict timestamp/base/server revision;
+- later normal pull can restore authoritative durable-state parity.
+
+This remains fail-closed. D-121 does not introduce merge behavior.
+<!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:ARCH:END -->
+
 <!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:ARCH:BEGIN -->
 ## Local sync diagnostics
 

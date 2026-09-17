@@ -6,6 +6,34 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:CURRENT:BEGIN -->
+## D-121 D5.4 stale-write conflict diagnostics
+
+D-120 is runtime validated and accepted.
+
+Accepted D-120 state:
+- Linux revision 6;
+- onn remembered revision 6;
+- exact canonical durable-state parity;
+- last successful sync `pulled`, revision 6;
+- no conflict recorded yet;
+- TV Settings -> Catalog / EPG Status displays the new diagnostics correctly.
+
+D-121 is diagnostic-only.
+
+It advances Linux by one harmless display-name revision, leaves the onn stale,
+then uses one real local Favorite toggle to exercise the production stale-write
+path.
+
+Acceptance requires:
+- Linux authoritative state unchanged by the stale push;
+- Android conflict metadata records old base/new server revisions;
+- Linux restoration succeeds;
+- normal Refresh restores the onn to exact original durable-state parity.
+
+No production patch is justified unless this measured path fails.
+<!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:CURRENT:END -->
+
 <!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:CURRENT:BEGIN -->
 ## D-120 D5.4 synchronization diagnostics
 
