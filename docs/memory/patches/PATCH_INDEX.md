@@ -6,6 +6,17 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D136_FOCUSED_REGRESSION:PATCH_INDEX:BEGIN -->
+### D-136 — focused TV/media regression — 2026-09-17
+
+No production change. Reuses D-122 automated regression and gates current D-133
+guide plus D-135 executor acceptance before the final manual Live TV/guide/VOD
+smoke.
+
+**Status:** regression gate active.
+<!-- PRIVYHUB_D136_FOCUSED_REGRESSION:PATCH_INDEX:END -->
+
+
 <!-- PRIVYHUB_D135_EXECUTOR_ISOLATION:PATCH_INDEX:BEGIN -->
 ### D-135 — TV-state executor isolation — 2026-09-17
 

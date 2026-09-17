@@ -6,6 +6,17 @@ baseline_commit: 0206017cfd8f0fc57decb7a5e9e8632e6a4f6cdd
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D135_ACCEPTANCE:BEGIN -->
+## TV-state executor isolation accepted
+
+D-135 runtime validated dedicated serialized TV-state execution: Favorites loaded
+in 1,599 ms with only 2 ms executor queue wait while the Linux-authoritative state
+pull continued for 24,697 ms and still completed/reconciled successfully.
+
+Keep long TV-state authority operations off the general navigation executor.
+<!-- PRIVYHUB_D135_ACCEPTANCE:END -->
+
+
 <!-- PRIVYHUB_D134_QUEUE_CONTENTION_RULE:BEGIN -->
 ## Trust raw stage accounting over incomplete latency classifiers
 

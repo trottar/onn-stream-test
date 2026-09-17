@@ -1,97 +1,92 @@
 ---
 memory_schema: 2
 state_updated: 2026-09-17
-active_work_item: D-135
+active_work_item: D-136
 maintenance_status: healthy
-baseline_commit: 634bc0affc17f9f4317df896a0068c61f8f2afc3
+baseline_commit: 7d2d5a17d3b568161fccb00cdaeefd22798dca5c
 ---
 
 # Current Project State
 
 ## Active Objective
 
-Finish bounded D5 TV/EPG performance and regression closeout without reopening
-validated media, TV-state authority, Games, or transport behavior.
+Finish bounded D5 TV/media regression and closeout without reopening validated
+subsystems absent new evidence.
 
 ## Current Work Item
 
-**D-135 — isolate serialized TV-state synchronization from navigation work.**
+**D-136 — focused TV/media regression gate.**
 
-D-134's classifier printed `D134_FAVORITES_UI_RENDER_DOMINANT`, but the raw
-measurements contradict that conclusion. Total Favorites latency was 24,382 ms,
-while the named measured stages sum to only 1,530 ms. The 22,852 ms residual is
-outside those stages.
+D-135 is runtime accepted with
+`D135_FAVORITES_QUEUE_CONTENTION_REMOVED`.
 
-Source inspection explains the residual: the D-134 `page_begin` marker is emitted
-before submitting to the single-thread `networkExecutor`, while D-131 leaves the
-~24-second Linux TV-state pull running on that same executor after TV home becomes
-visible. Favorites therefore waits in the executor queue before its measured
-count/query stages begin.
+Measured D-135 result:
+- Favorites total: 1,599 ms;
+- executor queue wait: 2 ms;
+- named stage sum: 1,595 ms;
+- residual: 4 ms;
+- Linux TV-state sync still completed and reconciled;
+- Favorites became ready before the ~24.7-second state pull completed.
+
+The >15-second Favorites regression is therefore resolved without weakening the
+Linux-authority contract.
 
 ## Verified State
 
-- Live TV guide presentation through D-133: **runtime validated**.
-- D-131 fast top-level TV render with eventual Linux-authority reconciliation:
-  **runtime validated**.
-- D-134 raw evidence: total 24,382 ms; count 26; query 0; prefetch 181;
-  rejected-prefetch 2; hydrate 477; UI render 844; named sum 1,530; residual
-  22,852 ms.
-- D-134 classifier label is **not authoritative** because it ignored the dominant
-  unmeasured pre-executor queue interval.
+- Live TV guide UX through D-133: **runtime validated**.
+- D-131 first TV render: **runtime validated**.
+- D-135 executor isolation/Favorites performance: **runtime validated**.
+- D-134 classifier error is superseded by raw timing evidence.
 
 ## Current Repository / Patch State
 
-Expected D-135 predecessor:
+Expected D-136 predecessor:
 
-`634bc0affc17f9f4317df896a0068c61f8f2afc3`
+`7d2d5a17d3b568161fccb00cdaeefd22798dca5c`
 
-D-135 adds a dedicated single-thread `tvStateSyncExecutor`, routes all TV-state
-push/pull operations through it, and releases the general `networkExecutor`
-immediately after TV-home catalog/prefetch work. Linux authority operations remain
-serialized; navigation/page work no longer queues behind the long state pull.
+D-136 changes no production code. It reuses the established D-122 automated
+TV/media regression baseline and additionally requires the accepted D-133 guide
+status result and D-135 executor-isolation result.
 
-**Status: DEVELOPMENT PATCH / RUNTIME VALIDATION NEXT.**
+**Status: REGRESSION GATE / AUTOMATED + SHORT MANUAL SMOKE NEXT.**
 
 ## Next Action
 
-1. install/build/push/APK-install D-135;
-2. prepare the D-135 probe;
-3. from the top-level app, open TV and then Favorites promptly;
-4. verify that Favorites queue wait and total load collapse while the Linux
-   state pull still completes and reconciles.
-
-Target:
-
-`D135_FAVORITES_QUEUE_CONTENTION_REMOVED`
+1. install/commit/push D-136;
+2. run the D-136 automated probe;
+3. if automated baseline passes, manually smoke:
+   - one Live TV channel playback;
+   - TV guide/Favorites navigation;
+   - one VOD playback;
+4. if all are clean, record D5 bounded TV/media closeout.
 
 ## Success Criteria
 
-- Favorites executor queue wait <= 1,500 ms;
-- Favorites total load <= 5,000 ms in the representative cached case;
-- Linux TV-state sync still completes and reconciles;
-- TV-state pushes and pulls remain serialized on one dedicated executor;
-- D-129/D-133 guide layout/status behavior remains unchanged;
-- no network address or device identifier is written to the probe report.
+- D-122 automated media baseline still passes;
+- D-133 one-column/status acceptance remains valid;
+- D-135 Favorites queue wait/latency and state reconciliation remain valid;
+- manual Live TV playback is normal;
+- guide/navigation is normal;
+- manual VOD playback is normal;
+- no production changes are required.
 
 ## Do Not Reopen Without New Evidence
 
-- D5.4 Linux-authoritative TV-state semantics.
+- D5.4 TV-state authority semantics.
 - D-125/D-126 EPG background behavior.
 - D-127 incorrect-guide state.
-- D-129 guide geometry.
-- D-131 first-render scheduling.
-- D-132 coverage classes.
-- D-133 status distinction.
+- D-129/D-133 guide geometry/status.
+- D-131/D-135 executor scheduling.
 - External VOD architecture.
 - Linux Games lifecycle.
 - Deferred UDP work.
 
 ## Relevant References
 
-- `evidence/D134_FAVORITES_LOAD_RUNTIME_EVIDENCE_2026-09-17.md`
-- `investigations/D134_FAVORITES_LOAD_LATENCY.md`
-- `investigations/D135_TV_STATE_EXECUTOR_ISOLATION.md`
-- `architecture/TV_STATE_SYNC.md`
-- `patches/D-135_TV_STATE_EXECUTOR_ISOLATION.md`
+- `evidence/D135_TV_STATE_EXECUTOR_ISOLATION_RUNTIME_ACCEPTANCE_2026-09-17.md`
+- `investigations/D136_FOCUSED_TV_MEDIA_REGRESSION.md`
+- `patches/D-136_FOCUSED_TV_MEDIA_REGRESSION.md`
+- `tools/probes/d122_d5_tv_media_regression_probe.py`
+- `roadmap/D5_MEDIA_SERVER_SUBSTEPS.md`
 - `roadmap/STATUS.md`
 - `2026-09-17.md`

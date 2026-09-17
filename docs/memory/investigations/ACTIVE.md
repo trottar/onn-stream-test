@@ -5,24 +5,21 @@ as_of: 2026-09-17
 
 # Active Investigations and Queued Work
 
-## Active — D-135 TV-state executor isolation
+## Active — D-136 focused TV/media regression
 
-D-134 raw evidence:
+D-135 is runtime accepted. Favorites queue contention is removed without
+weakening state synchronization.
 
-- total Favorites load: 24,382 ms;
-- named stage sum: 1,530 ms;
-- residual/unmeasured interval: 22,852 ms.
+D-136 reuses the existing D-122 regression seam and layers the accepted D-133
+guide-status and D-135 executor-isolation results onto it.
 
-The D-134 classifier called UI render dominant only because 844 ms was the
-largest named stage. That classifier omitted pre-executor queue wait.
+Required closeout:
+1. automated D-136 pass;
+2. manual Live TV playback;
+3. manual guide/navigation smoke;
+4. manual VOD playback.
 
-Source inspection confirms the queue hypothesis: D-131's long Linux state pull
-remains inside the same single-thread `networkExecutor` used by `openTvPage()`.
+## Queued after D-136
 
-D-135 moves TV-state push/pull work onto its own single-thread executor so state
-authority remains serialized while navigation is no longer blocked.
-
-## Queued after D-135
-
-1. focused TV/media regression;
-2. D5 checkpoint/closeout.
+If clean, record D5 bounded TV/media closeout and move to the broader Linux
+roadmap.

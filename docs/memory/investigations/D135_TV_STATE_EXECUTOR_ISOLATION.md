@@ -28,3 +28,15 @@ than becoming concurrent.
 ## Runtime target
 
 `D135_FAVORITES_QUEUE_CONTENTION_REMOVED`
+
+<!-- PRIVYHUB_D135_RUNTIME_RESULT:BEGIN -->
+## Runtime result — accepted 2026-09-17
+
+`D135_FAVORITES_QUEUE_CONTENTION_REMOVED`
+
+Favorites total 1,599 ms; queue wait 2 ms; named-stage sum 1,595 ms; residual
+4 ms. Linux TV-state synchronization still completed (`pulled`) and reconciled,
+with Favorites ready before state-sync completion.
+
+**Status: runtime accepted.**
+<!-- PRIVYHUB_D135_RUNTIME_RESULT:END -->

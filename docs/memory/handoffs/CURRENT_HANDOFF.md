@@ -1,20 +1,24 @@
 ---
 memory_schema: 2
 as_of: 2026-09-17
-baseline_commit: 634bc0affc17f9f4317df896a0068c61f8f2afc3
+baseline_commit: 7d2d5a17d3b568161fccb00cdaeefd22798dca5c
 ---
 
 # Current Handoff
 
 The authoritative resumable state is `../CURRENT.md`.
 
-- D-133 guide presentation is runtime accepted.
-- D-134 measured Favorites total at 24,382 ms, but named stages total only
-  1,530 ms. Residual: 22,852 ms.
-- Raw evidence overrides D-134's `UI_RENDER_DOMINANT` classifier output.
-- Source confirms both D-131 background TV-state sync and Favorites page work use
-  the same single-thread `networkExecutor`.
-- D-135 isolates TV-state push/pull/reconciliation on a dedicated serialized
-  executor and adds direct Favorites queue-wait measurement.
+- D-135 runtime accepted:
+  `D135_FAVORITES_QUEUE_CONTENTION_REMOVED`.
+- Favorites total 1,599 ms, queue wait 2 ms, residual 4 ms.
+- Linux state sync still completed/reconciled after Favorites became ready.
+- D-136 is the final focused TV/media regression gate.
+- Reuse D-122 automated baseline; do not invent a parallel media regression
+  architecture.
+- Manual closeout smoke remains Live TV playback, guide/navigation, and VOD.
 
-Resume by runtime-validating D-135.
+## Resume
+
+Install/run D-136. If automated classification is
+`D136_FOCUSED_TV_MEDIA_AUTOMATED_REGRESSION_VALIDATED`, perform the short manual
+onn smoke and then record D5 closeout if clean.
