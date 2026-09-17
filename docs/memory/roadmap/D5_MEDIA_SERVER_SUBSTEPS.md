@@ -6,6 +6,28 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D123_D54_CLOSURE:D5_SUBSTEPS:BEGIN -->
+## D5.4 — COMPLETE / RUNTIME VALIDATED
+
+D-122 closure gate passed automated and manual regression.
+
+Accepted:
+- Linux TV durable-state authority;
+- onn seed/push;
+- authoritative pull;
+- optimistic revision protection;
+- normal TV-entry synchronization;
+- last-sync diagnostics;
+- stale-write conflict diagnostics;
+- authoritative recovery;
+- Live TV/EPG/VOD regression.
+
+D5.4 is closed.
+
+Post-acceptance TV performance and guide UX work is tracked separately and does
+not reopen the D5.4 synchronization contract.
+<!-- PRIVYHUB_D123_D54_CLOSURE:D5_SUBSTEPS:END -->
+
 <!-- PRIVYHUB_D122_MEDIA_REGRESSION:D5_SUBSTEPS:BEGIN -->
 ## D5.4 — sync accepted; final regression active
 

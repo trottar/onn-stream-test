@@ -6,6 +6,23 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D123_D54_CLOSURE:ROADMAP:BEGIN -->
+## D5.4 — COMPLETE / RUNTIME VALIDATED
+
+D-122 final TV/media regression passed.
+
+TV durable-state synchronization is accepted end-to-end and should not remain
+the active roadmap item.
+
+Immediate bounded follow-up:
+TV/EPG performance timing and guide-navigation usability, prompted by runtime
+observations after D5.4 acceptance.
+
+This follow-up is not a state-sync redesign.
+
+Broader roadmap sequencing after the bounded TV usability work remains unchanged.
+<!-- PRIVYHUB_D123_D54_CLOSURE:ROADMAP:END -->
+
 <!-- PRIVYHUB_D122_MEDIA_REGRESSION:ROADMAP:BEGIN -->
 ## D5.4 TV-state sync — final regression gate
 

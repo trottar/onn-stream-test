@@ -6,6 +6,25 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D123_D54_CLOSURE:MEMORY:BEGIN -->
+## D5.4 final accepted state
+
+D5.4 Linux-authoritative TV durable-state synchronization is complete/runtime
+validated through D-122.
+
+Do not reopen its seed/push/pull/conflict contract without new contradictory
+evidence.
+
+Post-D5.4 TV observations are separate usability/performance work:
+- guide/loading latency;
+- misleading `EPG mappings` status semantics;
+- guide-style paged category browsing.
+
+Important metric rule:
+Android `guide_mappings` row count is a fallback-mapping count, not total EPG
+coverage from the Linux companion.
+<!-- PRIVYHUB_D123_D54_CLOSURE:MEMORY:END -->
+
 <!-- PRIVYHUB_D122_MEDIA_REGRESSION:MEMORY:BEGIN -->
 ## D5.4 synchronization acceptance
 

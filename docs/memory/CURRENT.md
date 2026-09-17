@@ -6,6 +6,31 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D123_D54_CLOSURE:CURRENT:BEGIN -->
+## D-123 — D5.4 complete / TV EPG usability follow-up active
+
+D-122 automated baseline passed:
+
+`D122_D5_TV_MEDIA_AUTOMATED_REGRESSION_BASELINE_VALIDATED`
+
+Manual onn regression was also reported clean for Live TV, Program Guide, VOD,
+navigation, and TV-state status diagnostics.
+
+**D5.4 is COMPLETE / RUNTIME VALIDATED.**
+
+Final TV-state authority is at revision 8 with exact Linux/onn canonical parity.
+
+Post-acceptance observations now become separate TV usability work:
+1. Live TV and guide loading is often very slow;
+2. `EPG mappings: 2` is misleading because it counts only the old Android
+   fallback mapping table, not companion-backed guide coverage;
+3. category pages such as Favorites should evolve toward paged TV-guide rows
+   showing channels plus current/next programme information.
+
+Next step: one timing/instrumentation diagnostic before changing guide loading
+or UI architecture.
+<!-- PRIVYHUB_D123_D54_CLOSURE:CURRENT:END -->
+
 <!-- PRIVYHUB_D122_MEDIA_REGRESSION:CURRENT:BEGIN -->
 ## D-122 D5.4 focused TV/media regression gate
 

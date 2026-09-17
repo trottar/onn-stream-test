@@ -1,5 +1,26 @@
 # D-122 — D5.4 focused TV/media regression gate
 
+<!-- PRIVYHUB_D123_D54_CLOSURE:D122_RESULT:BEGIN -->
+## Runtime result — accepted / gate closed
+
+Automated classification:
+
+`D122_D5_TV_MEDIA_AUTOMATED_REGRESSION_BASELINE_VALIDATED`
+
+Automated result:
+- companion status/source endpoints healthy;
+- EPG ready;
+- Linux and onn revision 8;
+- exact canonical durable-state parity;
+- current pull diagnostics valid;
+- D-121 conflict diagnostics retained.
+
+Manual onn smoke test was reported clean for Live TV, Program Guide, VOD,
+navigation, and TV-state status display.
+
+D-122 is accepted and D5.4 may close.
+<!-- PRIVYHUB_D123_D54_CLOSURE:D122_RESULT:END -->
+
 **Status:** diagnostic/manual regression active
 
 ## Purpose

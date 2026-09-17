@@ -6,6 +6,24 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D123_D54_CLOSURE:ACTIVE:BEGIN -->
+## ACTIVE — post-D5.4 TV EPG performance / guide UX
+
+D5.4 is closed/runtime validated.
+
+Active question:
+where is the observed Live TV / guide loading latency actually spent?
+
+First action must be diagnostic-only timing instrumentation.
+
+Do not combine the timing probe with the guide UI redesign.
+
+Queued after evidence:
+1. fix/expand EPG coverage diagnostics;
+2. paged guide-style channel/category UI;
+3. performance/runtime validation.
+<!-- PRIVYHUB_D123_D54_CLOSURE:ACTIVE:END -->
+
 <!-- PRIVYHUB_D122_MEDIA_REGRESSION:ACTIVE:BEGIN -->
 ## D5.4 ACTIVE — D-122 final regression gate
 

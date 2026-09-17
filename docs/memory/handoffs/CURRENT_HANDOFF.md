@@ -6,6 +6,32 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D123_D54_CLOSURE:HANDOFF:BEGIN -->
+## D-123 handoff — D5.4 closed; TV guide performance/UX next
+
+D5.4 is COMPLETE / RUNTIME VALIDATED.
+
+D-122:
+- automated baseline validated;
+- manual Live TV/EPG/VOD regression reported clean;
+- Linux/onn TV state at revision 8 with exact canonical parity.
+
+Do not continue synchronization feature work.
+
+Next narrow hypothesis:
+slow TV/guide UX may be dominated by per-channel guide fetch/cache behavior.
+
+Build a diagnostic-only timing probe before production changes.
+
+Measure raw stages for catalog/category construction, local EPG cache lookup,
+companion guide fetch, persistence, and render/request counts.
+
+Also preserve:
+- `EPG mappings` currently means fallback-table rows, not guide coverage;
+- desired future UX is paged guide-style category rows with channel +
+  current/next programme/time information.
+<!-- PRIVYHUB_D123_D54_CLOSURE:HANDOFF:END -->
+
 <!-- PRIVYHUB_D122_MEDIA_REGRESSION:HANDOFF:BEGIN -->
 ## D-122 handoff — final D5.4 TV/media regression
 

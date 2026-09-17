@@ -6,6 +6,20 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D123_D54_CLOSURE:PATCH_INDEX:BEGIN -->
+### D-123 — D5.4 closure / TV EPG usability follow-up — 2026-09-17
+
+Docs/memory checkpoint only.
+
+Records D-122 automated/manual regression acceptance and closes D5.4 as
+runtime validated.
+
+Preserves post-acceptance TV observations and opens a separate EPG
+performance/guide-UX investigation.
+
+No production code change.
+<!-- PRIVYHUB_D123_D54_CLOSURE:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D122_MEDIA_REGRESSION:PATCH_INDEX:BEGIN -->
 ### D-122 — D5.4 focused TV/media regression gate — 2026-09-17
 
