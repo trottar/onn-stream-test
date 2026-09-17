@@ -6,6 +6,19 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:ROADMAP:BEGIN -->
+## D5.4 TV-state sync — D-115 Linux authority development
+
+**Status:** ACTIVE / Linux authority runtime validation next.
+
+D-115 implements the persistent revisioned Linux TV-state API.
+
+Android synchronization is not yet enabled.
+
+Next after D-115 runtime acceptance:
+D-116 Android bootstrap/pull/push around the validated Linux state contract.
+<!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:ROADMAP:END -->
+
 <!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:ROADMAP:BEGIN -->
 ## D5.4 TV-state sync — ACTIVE
 

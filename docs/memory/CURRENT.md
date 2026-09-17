@@ -6,6 +6,41 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:CURRENT:BEGIN -->
+## D-115 D5.4 Linux TV-state authority
+
+D5.4 is active.
+
+Source inventory established that Android backup version 2 currently mixes
+durable user intent with runtime health/recency fields. Language/country are
+stored separately in `privyhub_settings`.
+
+D-115 therefore establishes Linux authority around a new durable-only schema:
+`privyhub_tv_user_state_v1`.
+
+Linux state includes:
+- language/country;
+- managed/custom provider state;
+- favorites;
+- manual hidden;
+- custom channel profile overrides;
+- favorite group/order;
+- protect-auto-hide.
+
+It explicitly excludes stream health counters, last watched, auto-hidden
+runtime result, catalog rows, and EPG data.
+
+Linux assigns a monotonic `server_revision`. Writes require the current
+`base_revision`; stale writes fail closed with `revision_conflict`.
+
+Production seam:
+- `GET /plugins/tv_state/status`
+- `GET /plugins/tv_state/state`
+- `POST /plugins/tv_state/state`
+
+D-115 runtime validation is required before Android synchronization begins.
+<!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:CURRENT:END -->
+
 <!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:CURRENT:BEGIN -->
 ## D-114 stream-identity policy checkpoint
 

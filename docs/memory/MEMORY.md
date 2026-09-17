@@ -6,6 +6,36 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:MEMORY:BEGIN -->
+## D5.4 TV-state authority rules
+
+Do not mirror the Android version-2 TV backup directly onto Linux.
+
+That backup mixes durable intent with runtime observations.
+
+Linux-authoritative D5.4 state contains only:
+- preferences;
+- provider definitions/enabled state;
+- favorite/manual-hidden state;
+- channel profile overrides;
+- favorite group/order;
+- protect-auto-hide.
+
+Runtime health/recency stays client/runtime data until explicit merge semantics
+exist.
+
+Linux owns a monotonic `server_revision`.
+A write must carry the current `base_revision`.
+Stale revisions never overwrite current state.
+Identical state is idempotent and does not consume a revision.
+
+State is versioned JSON under ignored `data/tv_state/`, never a copied SQLite
+database.
+
+An uninitialized Linux authority must be seeded from current onn durable state
+before a later Android pull can become authoritative.
+<!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:MEMORY:END -->
+
 <!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:MEMORY:BEGIN -->
 ## Semantic stream-identity policy
 

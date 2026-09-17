@@ -6,6 +6,23 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:ACTIVE:BEGIN -->
+## D5.4 active — Linux state authority runtime validation
+
+D-115 is the active implementation boundary.
+
+Validate before Android changes:
+- bounded JSON-body plugin POST path;
+- durable-only normalization;
+- atomic state persistence;
+- monotonic revision assignment;
+- idempotent identical writes;
+- stale-revision conflict protection;
+- exact probe cleanup/restoration.
+
+Do not enable Android automatic sync until this boundary passes.
+<!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:ACTIVE:END -->
+
 <!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:ACTIVE:BEGIN -->
 ## D5.4 ACTIVE — Linux-authoritative TV-state synchronization
 

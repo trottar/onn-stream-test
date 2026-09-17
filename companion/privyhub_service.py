@@ -2227,6 +2227,12 @@ class PrivyHubRequestHandler(
                     )
                     return
 
+                json_request_handler = getattr(
+                    plugin,
+                    "handle_post_json_request",
+                    None,
+                )
+
                 request_handler = getattr(
                     plugin,
                     "handle_post_request",
@@ -2234,7 +2240,8 @@ class PrivyHubRequestHandler(
                 )
 
                 handler = (
-                    request_handler
+                    json_request_handler
+                    or request_handler
                     or getattr(
                         plugin,
                         "handle_post",
@@ -2253,7 +2260,17 @@ class PrivyHubRequestHandler(
                     return
 
                 try:
-                    if request_handler is not None:
+                    if json_request_handler is not None:
+                        request_payload, _ = self._read_json_body(
+                            max_bytes=4_194_304
+                        )
+                        payload = json_request_handler(
+                            action,
+                            parsed.query,
+                            request_payload,
+                            self.client_address[0],
+                        )
+                    elif request_handler is not None:
                         payload = request_handler(
                             action,
                             parsed.query,

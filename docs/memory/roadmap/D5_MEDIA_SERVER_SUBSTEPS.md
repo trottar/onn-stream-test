@@ -6,6 +6,23 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:D5_SUBSTEPS:BEGIN -->
+## D5.4 substep 1 — Linux durable TV-state authority
+
+D-115 establishes the server side before client synchronization.
+
+State contract:
+- versioned JSON;
+- durable user intent only;
+- Linux `server_revision`;
+- compare-and-swap style `base_revision`;
+- local ignored persistence under `data/tv_state`.
+
+Android remains local/offline-capable and unchanged in this substep.
+
+After D-115 runtime validation, D-116 may implement one-client bootstrap/sync.
+<!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:D5_SUBSTEPS:END -->
+
 <!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:D5_SUBSTEPS:BEGIN -->
 ## D5.3 closeout and D5.4 activation
 

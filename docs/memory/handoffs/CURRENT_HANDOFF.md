@@ -6,6 +6,32 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:HANDOFF:BEGIN -->
+## D-115 handoff — Linux TV-state authority
+
+D-115 adds the Linux persistence/revision seam only.
+
+After install:
+1. restart the companion so `tv_state` is registered;
+2. run `tools/probes/d115_tv_state_authority_probe.py`;
+3. return `logs/tv/d115_tv_state_authority_probe.txt`.
+
+Acceptance:
+`D115_TV_STATE_AUTHORITY_RUNTIME_VALIDATED`.
+
+The probe tests persistence, runtime-field exclusion, idempotence, stale-revision
+conflict protection, and exact restoration of any predecessor state file.
+
+Android is intentionally unchanged.
+
+If D-115 passes, D-116 should:
+- project onn state into the durable v1 schema;
+- seed Linux when uninitialized;
+- otherwise pull/apply Linux;
+- push local user changes with revision protection;
+- fail soft when companion is unavailable.
+<!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:HANDOFF:END -->
+
 <!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:HANDOFF:BEGIN -->
 ## D-114 handoff — begin D5.4 TV-state sync
 

@@ -6,6 +6,20 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:PATCH_INDEX:BEGIN -->
+### D-115 — D5 Linux TV-state authority — 2026-09-16
+
+Companion production-seam patch.
+
+Adds revisioned durable TV-state JSON persistence and opt-in JSON-body plugin
+POST routing.
+
+Android is unchanged.
+
+Runtime evidence next:
+`logs/tv/d115_tv_state_authority_probe.txt`.
+<!-- PRIVYHUB_D115_TV_STATE_AUTHORITY:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D114_STREAM_IDENTITY_POLICY:PATCH_INDEX:BEGIN -->
 ### D-114 — D5 stream identity policy checkpoint — 2026-09-16
 
