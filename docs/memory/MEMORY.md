@@ -6,6 +6,20 @@ baseline_commit: 0206017cfd8f0fc57decb7a5e9e8632e6a4f6cdd
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D131_ACCEPTED_NONBLOCKING_ENTRY:BEGIN -->
+## Non-blocking TV-entry authority rule
+
+D-131 runtime validated the scheduling boundary: cached TV home first-render took
+330 ms while the unchanged Linux-authoritative state pull took 24,050 ms and
+completed later. Reconciliation finished at 25,073 ms with action `pulled` and
+local state changed.
+
+Durable authority and first-render responsiveness are separate concerns. When a
+valid Android TV cache exists, the UI should not block on Linux reachability or
+latency; the versioned authority pull/import still runs and reconciles afterward.
+<!-- PRIVYHUB_D131_ACCEPTED_NONBLOCKING_ENTRY:END -->
+
+
 <!-- PRIVYHUB_D131_NONBLOCKING_TV_ENTRY:MEMORY:BEGIN -->
 ## TV-entry synchronization scheduling rule
 

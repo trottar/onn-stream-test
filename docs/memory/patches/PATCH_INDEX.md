@@ -6,6 +6,17 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D132_FAVORITES_EPG_COVERAGE:PATCH_INDEX:BEGIN -->
+### D-132 — Favorites EPG coverage probe — 2026-09-17
+
+Diagnostic-only probe to classify visible Favorites guide coverage from Android
+TV/EPG database state plus bounded local companion checks. Also records D-131
+runtime acceptance.
+
+**Status:** diagnostic / runtime measurement next.
+<!-- PRIVYHUB_D132_FAVORITES_EPG_COVERAGE:PATCH_INDEX:END -->
+
+
 <!-- PRIVYHUB_D131_NONBLOCKING_TV_ENTRY:PATCH_INDEX:BEGIN -->
 ### D-131 — non-blocking TV-entry state sync — 2026-09-17
 

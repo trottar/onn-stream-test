@@ -34,3 +34,23 @@ Prepare the probe, open TV once from top-level PrivyHub, then verify.
 Target:
 
 `D131_TV_ENTRY_NONBLOCKING_SYNC_VALIDATED`
+
+<!-- PRIVYHUB_D131_RUNTIME_RESULT:BEGIN -->
+## Runtime result — accepted 2026-09-17
+
+`D131_TV_ENTRY_NONBLOCKING_SYNC_VALIDATED`
+
+- first TV-home render: 330 ms;
+- catalog: 19 ms;
+- Linux TV-state sync: 24,050 ms;
+- sync complete: 24,754 ms;
+- reconciliation complete: 25,073 ms;
+- action: `pulled`;
+- local state changed: true;
+- UI ready before state sync completed: true.
+
+User reports the visible load is now roughly one or two seconds and other Live TV
+behavior appears normal.
+
+**Status: runtime accepted.**
+<!-- PRIVYHUB_D131_RUNTIME_RESULT:END -->

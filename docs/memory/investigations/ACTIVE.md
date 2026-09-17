@@ -5,27 +5,25 @@ as_of: 2026-09-17
 
 # Active Investigations and Queued Work
 
-## Active — D-131 non-blocking TV-entry state sync
+## Active — D-132 Favorites EPG coverage/status classification
 
-D-130 measured:
+D-131 is runtime accepted:
 
-- total TV entry: 24,525 ms;
-- initial cached catalog: 7 ms;
-- Linux TV-state sync: 24,214 ms;
-- post-sync catalog: 3 ms;
-- UI render: 291 ms.
+`D131_TV_ENTRY_NONBLOCKING_SYNC_VALIDATED`
 
-Classification: `D130_TV_ENTRY_STATE_SYNC_DOMINANT`.
+Measured first render 330 ms with Linux state sync continuing for 24,050 ms and
+reconciling afterward. The user reports the TV home now loads in roughly one or
+two seconds and other Live TV behavior appears normal.
 
-D-131 preserves the Linux-authoritative state operation but removes it from the
-first TV-home render critical path. The cached/local TV home renders first; the
-same pull/import continues on the existing network executor and reconciles the
-TV UI after completion.
+D-132 does not change production behavior. It classifies visible Favorites guide
+coverage from Android cache state and the existing Linux companion guide endpoint
+so the final coverage/status UI work is evidence-driven.
 
 Canonical investigation:
-`D131_NONBLOCKING_TV_ENTRY_STATE_SYNC.md`.
+`D132_FAVORITES_EPG_COVERAGE.md`.
 
-## Queued after D-131
+## Queued after D-132
 
-1. corrected/expanded EPG coverage/status presentation;
-2. focused TV/media regression and D5 checkpoint.
+1. one bounded EPG coverage/status production change, if evidence requires it;
+2. focused TV/media regression;
+3. D5 checkpoint/closeout.

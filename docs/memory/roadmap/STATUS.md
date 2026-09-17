@@ -1,14 +1,14 @@
 ---
 memory_schema: 2
 as_of: 2026-09-17
-baseline_commit: 6da5c4506128b2518370de0f46e7b719bd967850
+baseline_commit: 0c9d1aee1f4d9d65c2ee15729a52fbbb32861dd8
 ---
 
 # Roadmap Status
 
 ## Current position
 
-D5 media/TV work is at its final bounded usability/closeout sequence.
+D5 media/TV work is in final bounded EPG usability/closeout work.
 
 ### Complete / runtime validated
 
@@ -21,27 +21,25 @@ D5 media/TV work is at its final bounded usability/closeout sequence.
 - D-126 Android Favorites/visible-page EPG prefetch.
 - D-127 durable incorrect-guide intent/recheck.
 - D-129 single-column full-width TV guide.
+- D-131 non-blocking TV-entry state synchronization.
 
-### Development-only / superseded
+### Superseded
 
-- D-128 compact Now/Next text on generic tiles: superseded after runtime UI
-  target failure.
+- D-128 compact Now/Next treatment on generic tiles.
 
-### Runtime evidence
+### Runtime diagnostics closed
 
-- D-130: `D130_TV_ENTRY_STATE_SYNC_DOMINANT`; 24,214 ms of a 24,525 ms cached
-  TV-entry path was synchronous TV-state sync.
+- D-130 measured the old TV-entry bottleneck as synchronous TV-state sync.
 
 ### Active
 
-**D-131 — non-blocking top-level TV-state synchronization: DEVELOPMENT PATCH /
-RUNTIME VALIDATION NEXT.**
+**D-132 — Favorites EPG coverage/status classification: DIAGNOSTIC / RUNTIME
+MEASUREMENT NEXT.**
 
 ### Next
 
-1. finish D-131 runtime acceptance;
-2. correct/expand EPG coverage/status presentation;
+1. classify remaining guide-coverage gaps;
+2. make at most one bounded evidence-driven coverage/status change;
 3. focused TV/media regression;
 4. checkpoint/close D5 bounded TV work;
-5. continue the broader Linux roadmap without reopening the deferred UDP branch
-   by default.
+5. continue broader Linux roadmap.

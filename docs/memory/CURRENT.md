@@ -1,9 +1,9 @@
 ---
 memory_schema: 2
 state_updated: 2026-09-17
-active_work_item: D-131
+active_work_item: D-132
 maintenance_status: healthy
-baseline_commit: 6da5c4506128b2518370de0f46e7b719bd967850
+baseline_commit: 0c9d1aee1f4d9d65c2ee15729a52fbbb32861dd8
 ---
 
 # Current Project State
@@ -15,15 +15,17 @@ TV-state, Games, or transport subsystems.
 
 ## Current Work Item
 
-**D-131 — non-blocking top-level TV-state synchronization.**
+**D-132 — Favorites EPG coverage/status classification.**
 
-D-130 measured top-level TV entry at 24,525 ms. The cached catalog check took
-7 ms and UI render took 291 ms; synchronous Linux TV-state synchronization alone
-took 24,214 ms and dominated the entry path.
+D-131 is runtime accepted with
+`D131_TV_ENTRY_NONBLOCKING_SYNC_VALIDATED`. First TV-home render measured 330 ms
+while the unchanged Linux-authoritative pull continued for 24,050 ms and
+reconciled at 25,073 ms.
 
-D-131 preserves the same Linux-authoritative pull/import contract but renders the
-cached TV home before the state round trip. Reconciliation happens after the
-background pull completes.
+The remaining bounded TV/EPG question is guide coverage/status presentation.
+D-132 is diagnostic-only: classify why visible Favorites do or do not currently
+have trusted programme data before changing UI status labels or acquisition
+behavior.
 
 ## Verified State
 
@@ -36,48 +38,38 @@ background pull completes.
 - D-127 incorrect-guide durable intent: **runtime validated**.
 - D-128 compact tile treatment: **superseded after runtime failure**.
 - D-129 single-column full-width TV guide: **runtime validated**.
-- D-130 latency measurement: **runtime measured** with
-  `D130_TV_ENTRY_STATE_SYNC_DOMINANT`.
+- D-130 latency diagnostic: **runtime measured / closed**.
+- D-131 non-blocking TV-entry state sync: **runtime validated**.
 
 ## Current Repository / Patch State
 
-Expected D-131 predecessor checkpoint:
+Expected D-132 predecessor checkpoint:
 
-`6da5c4506128b2518370de0f46e7b719bd967850`
+`0c9d1aee1f4d9d65c2ee15729a52fbbb32861dd8`
 
-D-131 production scope is only `MainActivity.kt`:
+D-132 changes no Android or companion production code. It adds a diagnostic probe
+that snapshots the onn TV/EPG databases and, only for visible Favorites lacking a
+current Android programme, checks the existing local companion guide endpoint.
 
-- local/cached `ensureCatalog()` still runs first;
-- the TV home renders immediately after that local catalog gate;
-- D-126 Favorites prefetch begins without waiting for TV-state sync;
-- the existing `synchronizeTvStateNow()` still performs the same Linux pull/import;
-- when the pull changes durable state, the post-sync catalog pass and TV UI
-  reconciliation still occur;
-- Linux authority, revisions, conflicts, schemas and push behavior are unchanged.
-
-**Status: DEVELOPMENT PATCH / RUNTIME VALIDATION NEXT.**
+**Status: DIAGNOSTIC PATCH / RUNTIME MEASUREMENT NEXT.**
 
 ## Next Action
 
-1. install/build/push/APK-install D-131;
-2. run the D-131 probe with `--prepare`;
-3. open TV once from the top-level PrivyHub screen;
-4. the TV home should appear quickly; run `--verify` and let the probe observe the
-   eventual background state-sync completion;
-5. inspect `logs/tv/d131_tv_entry_nonblocking_probe.txt`.
-
-Target:
-
-`D131_TV_ENTRY_NONBLOCKING_SYNC_VALIDATED`
+1. install/commit/push D-132;
+2. run `tools/probes/d132_favorites_epg_coverage_probe.py --repo .`;
+3. inspect `logs/tv/d132_favorites_epg_coverage_probe.txt`;
+4. choose the next production change only from the measured gap classes.
 
 ## Success Criteria
 
-- first TV-home render completes within 2,000 ms in the measured cached-catalog case;
-- Linux TV-state synchronization still completes and reports its normal action;
-- synchronization reconciliation completes after the first render;
-- local-state changes are still imported under the existing D5.4 authority contract;
-- D-129 guide UI, D-126 prefetch, playback, Favorites and Hide remain unchanged;
-- no network address or device identifier is written to the probe report.
+- every visible Favorite is classified into a concrete guide state;
+- Android current/future/stale cache state is measured directly;
+- missing Android current data is compared against the existing Linux companion
+  guide endpoint where the channel identity is EPG-matchable;
+- marked-incorrect and synthetic/unmatchable channels are separated from ordinary
+  missing guide coverage;
+- no production behavior changes;
+- no network address or device identifier is written to the report.
 
 ## Do Not Reopen Without New Evidence
 
@@ -86,16 +78,16 @@ Target:
 - D-126 Favorites/visible-page prefetch seam.
 - D-127 incorrect-guide durable-state contract.
 - D-129 one-column guide presentation.
+- D-131 non-blocking TV-entry scheduling.
 - External VOD hotplug/storage architecture.
 - Linux Games controller/multitap/video/audio lifecycle.
 - Deferred Opal/Siflower UDP reverse-engineering branch.
 
 ## Relevant References
 
-- `evidence/D130_TV_ENTRY_LATENCY_RUNTIME_EVIDENCE_2026-09-17.md`
-- `investigations/D130_TV_ENTRY_LATENCY.md`
-- `investigations/D131_NONBLOCKING_TV_ENTRY_STATE_SYNC.md`
-- `patches/D-131_NONBLOCKING_TV_ENTRY_STATE_SYNC.md`
+- `evidence/D131_NONBLOCKING_TV_ENTRY_RUNTIME_ACCEPTANCE_2026-09-17.md`
+- `investigations/D132_FAVORITES_EPG_COVERAGE.md`
+- `patches/D-132_FAVORITES_EPG_COVERAGE_PROBE.md`
 - `architecture/TV_STATE_SYNC.md`
 - `roadmap/STATUS.md`
 - `2026-09-17.md`
