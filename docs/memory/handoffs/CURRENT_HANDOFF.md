@@ -6,6 +6,30 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D125_NONBLOCKING_EPG:HANDOFF:BEGIN -->
+## D-125 handoff — non-blocking EPG
+
+After install, restart the companion.
+
+Run:
+
+`python3 tools/probes/d125_epg_background_warmer_probe.py --repo /home/privyhub/Projects/onn-stream-test`
+
+Target:
+
+`D125_NONBLOCKING_GUIDE_MISS_AND_BACKGROUND_WARMER_VALIDATED`
+
+Return:
+
+`logs/tv/d125_epg_background_warmer_probe.txt`
+
+If validated, next:
+1. Android Favorites/visible-page prefetch;
+2. durable `incorrect guide` user intent/recheck;
+3. paged guide-style category UI;
+4. focused runtime regression/checkpoint.
+<!-- PRIVYHUB_D125_NONBLOCKING_EPG:HANDOFF:END -->
+
 <!-- PRIVYHUB_D124A_SPLIT_DB_FIX:HANDOFF:BEGIN -->
 ## D-124A handoff — rerun corrected latency probe
 

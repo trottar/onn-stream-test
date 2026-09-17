@@ -6,6 +6,20 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D125_NONBLOCKING_EPG:PATCH_INDEX:BEGIN -->
+### D-125 — EPG non-blocking background warmer — 2026-09-17
+
+Linux companion production performance fix.
+
+Normal guide cache misses/stale reads enqueue background refresh and return
+immediately instead of synchronously running upstream acquisition.
+
+Adds bounded prefetch seam and queue diagnostics.
+
+Runtime probe:
+`logs/tv/d125_epg_background_warmer_probe.txt`.
+<!-- PRIVYHUB_D125_NONBLOCKING_EPG:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D124A_SPLIT_DB_FIX:PATCH_INDEX:BEGIN -->
 ### D-124A — TV/EPG latency probe split-DB fix — 2026-09-17
 

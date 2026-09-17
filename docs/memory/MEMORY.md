@@ -6,6 +6,22 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D125_NONBLOCKING_EPG:MEMORY:BEGIN -->
+## EPG interactive latency rule
+
+D-124 establishes that synchronous companion acquisition, not SQLite, is the
+measured Live TV/guide latency bottleneck.
+
+Normal interactive guide reads must be cache-first and non-blocking.
+
+Missing/stale acquisition belongs behind a bounded Linux background queue.
+
+Explicit user/manual force-refresh may remain synchronous.
+
+Do not regress this boundary when adding Favorites/page prefetch or guide-grid
+UX.
+<!-- PRIVYHUB_D125_NONBLOCKING_EPG:MEMORY:END -->
+
 <!-- PRIVYHUB_D124A_SPLIT_DB_FIX:MEMORY:BEGIN -->
 ## D-124 split-database diagnostic rule
 

@@ -6,6 +6,7 @@ import html
 import json
 import os
 import platform
+import queue
 import re
 import shutil
 import subprocess
@@ -22,6 +23,177 @@ from typing import Any
 from urllib.parse import parse_qs
 
 
+
+class BackgroundGuideWarmer:
+    """Single-worker, deduplicated background guide refresh queue."""
+
+    def __init__(
+        self,
+        callback,
+        *,
+        max_pending: int = 512,
+    ) -> None:
+        self._callback = callback
+        self._max_pending = max_pending
+        self._queue: queue.PriorityQueue[
+            tuple[int, int, str]
+        ] = queue.PriorityQueue(
+            maxsize=max_pending
+        )
+        self._lock = threading.RLock()
+        self._pending: set[str] = set()
+        self._sequence = 0
+        self._thread: threading.Thread | None = None
+        self._shutdown = threading.Event()
+        self._completed = 0
+        self._failed = 0
+        self._last_channel = ""
+        self._last_error_class = ""
+
+    def enqueue(
+        self,
+        channel_id: str,
+        *,
+        priority: int = 50,
+    ) -> bool:
+        channel_id = (channel_id or "").strip()
+        if not channel_id:
+            return False
+
+        with self._lock:
+            if (
+                self._shutdown.is_set()
+                or channel_id in self._pending
+                or len(self._pending) >= self._max_pending
+            ):
+                return False
+
+            self._sequence += 1
+            item = (
+                int(priority),
+                self._sequence,
+                channel_id,
+            )
+
+            try:
+                self._queue.put_nowait(
+                    item
+                )
+            except queue.Full:
+                return False
+
+            self._pending.add(
+                channel_id
+            )
+
+            if (
+                self._thread is None
+                or not self._thread.is_alive()
+            ):
+                thread = threading.Thread(
+                    target=self._run,
+                    name="PrivyHubEpgWarmer",
+                    daemon=True,
+                )
+                self._thread = thread
+                thread.start()
+
+            return True
+
+    def is_pending(
+        self,
+        channel_id: str,
+    ) -> bool:
+        with self._lock:
+            return channel_id in self._pending
+
+    def status(
+        self,
+    ) -> dict[str, Any]:
+        with self._lock:
+            thread = self._thread
+            return {
+                "worker_alive": bool(
+                    thread
+                    and thread.is_alive()
+                ),
+                "pending_count": len(
+                    self._pending
+                ),
+                "completed_count":
+                    self._completed,
+                "failed_count":
+                    self._failed,
+                "last_channel":
+                    self._last_channel,
+                "last_error_class":
+                    self._last_error_class,
+                "max_pending":
+                    self._max_pending,
+            }
+
+    def _run(
+        self,
+    ) -> None:
+        while not self._shutdown.is_set():
+            try:
+                _, _, channel_id = (
+                    self._queue.get(
+                        timeout=0.25
+                    )
+                )
+            except queue.Empty:
+                continue
+
+            failed = False
+            error_class = ""
+
+            try:
+                self._callback(
+                    channel_id
+                )
+            except Exception as exc:
+                failed = True
+                error_class = (
+                    type(exc).__name__
+                )
+            finally:
+                with self._lock:
+                    self._pending.discard(
+                        channel_id
+                    )
+                    self._last_channel = (
+                        channel_id
+                    )
+                    self._last_error_class = (
+                        error_class
+                    )
+                    if failed:
+                        self._failed += 1
+                    else:
+                        self._completed += 1
+
+                self._queue.task_done()
+
+    def shutdown(
+        self,
+    ) -> None:
+        self._shutdown.set()
+
+        with self._lock:
+            thread = self._thread
+
+        if (
+            thread is not None
+            and thread.is_alive()
+            and thread
+                is not threading.current_thread()
+        ):
+            thread.join(
+                timeout=0.75
+            )
+
+
 class EpgPlugin:
     """Linux-owned EPG acquisition/cache adapter.
 
@@ -34,6 +206,7 @@ class EpgPlugin:
 
     STATUS_SCHEMA = "privyhub_epg_status_v1"
     GUIDE_SCHEMA = "privyhub_epg_guide_v1"
+    PREFETCH_SCHEMA = "privyhub_epg_prefetch_v1"
     TOOLCHAIN_SCHEMA = 1
     CACHE_SCHEMA = 1
 
@@ -131,6 +304,9 @@ class EpgPlugin:
         self._state_lock = threading.RLock()
         self._bootstrap_thread: threading.Thread | None = None
         self._last_error: dict[str, Any] | None = None
+        self._warmer = BackgroundGuideWarmer(
+            self._background_refresh,
+        )
 
     @staticmethod
     def _now_ms() -> int:
@@ -293,6 +469,7 @@ class EpgPlugin:
             "minimum_bootstrap_free_bytes": self.MIN_BOOTSTRAP_FREE_BYTES,
             "metadata_age_seconds": self._metadata_age_seconds(),
             "guide_cache_files": self._cache_file_count(),
+            "background_refresh": self._warmer.status(),
             "last_error": last_error,
         }
 
@@ -1012,6 +1189,19 @@ class EpgPlugin:
                 "programme_count": len(programmes),
             }
 
+
+    def _background_refresh(
+        self,
+        channel_id: str,
+    ) -> None:
+        if not self._toolchain_ready():
+            self.bootstrap()
+
+        self.guide(
+            channel_id,
+            force=True,
+        )
+
     def guide(
         self,
         channel_id: str,
@@ -1032,6 +1222,41 @@ class EpgPlugin:
             channel_id,
             allow_stale=True,
         )
+
+        if not force:
+            queued = self._warmer.enqueue(
+                channel_id,
+                priority=10,
+            )
+            pending = (
+                queued
+                or self._warmer.is_pending(
+                    channel_id
+                )
+            )
+
+            if stale is not None:
+                stale["refresh_queued"] = (
+                    pending
+                )
+                return stale
+
+            return {
+                "schema": self.GUIDE_SCHEMA,
+                "ok": True,
+                "ready": self._toolchain_ready(),
+                "channel_id": channel_id,
+                "cached": False,
+                "stale": False,
+                "refresh_queued": pending,
+                "empty_reason": (
+                    "background_refresh_pending"
+                    if pending
+                    else "background_queue_full"
+                ),
+                "programmes": [],
+                "programme_count": 0,
+            }
 
         if not self._toolchain_ready():
             started = self._start_bootstrap_async()
@@ -1200,9 +1425,59 @@ class EpgPlugin:
                 self._record_error("guide_refresh_failed", exc)
                 raise RuntimeError("EPG guide refresh failed") from exc
 
+        if action == "prefetch":
+            raw_channel_ids = query.get(
+                "channel_id",
+                [],
+            )
+            accepted: list[str] = []
+            already_pending: list[str] = []
+            rejected: list[str] = []
+
+            for raw_channel_id in raw_channel_ids[:80]:
+                try:
+                    channel_id = self._validate_channel_id(
+                        raw_channel_id
+                    )
+                except ValueError:
+                    rejected.append(
+                        (raw_channel_id or "")[:180]
+                    )
+                    continue
+
+                queued = self._warmer.enqueue(
+                    channel_id,
+                    priority=20,
+                )
+
+                if queued:
+                    accepted.append(
+                        channel_id
+                    )
+                elif self._warmer.is_pending(
+                    channel_id
+                ):
+                    already_pending.append(
+                        channel_id
+                    )
+                else:
+                    rejected.append(
+                        channel_id
+                    )
+
+            return {
+                "schema": self.PREFETCH_SCHEMA,
+                "ok": True,
+                "accepted": accepted,
+                "already_pending":
+                    already_pending,
+                "rejected": rejected,
+                "background_refresh":
+                    self._warmer.status(),
+            }
+
         raise ValueError(f"Unknown EPG POST action: {action}")
 
     def shutdown(self) -> None:
-        # The plugin owns no persistent child process. Individual grab
-        # subprocesses are synchronous and bounded by timeout.
+        self._warmer.shutdown()
         return None

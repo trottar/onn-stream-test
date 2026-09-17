@@ -1,5 +1,25 @@
 # D-124 — TV/EPG latency probe
 
+<!-- PRIVYHUB_D125_NONBLOCKING_EPG:D124_RESULT:BEGIN -->
+## Runtime result — bottleneck identified
+
+Classification:
+
+`D124_COMPANION_GUIDE_FETCH_LATENCY_OBSERVED`
+
+Cached guide reads were ~1–2 ms.
+
+One uncached favorite required 19.08 seconds.
+
+Representative SQLite work was <= 0.352 ms.
+
+Favorites current/future programme cache coverage was 8/21 (38.1%).
+
+Conclusion:
+fix synchronous companion cache-miss acquisition first. Android render
+instrumentation is not the next step.
+<!-- PRIVYHUB_D125_NONBLOCKING_EPG:D124_RESULT:END -->
+
 <!-- PRIVYHUB_D124A_SPLIT_DB_FIX:INVESTIGATION:BEGIN -->
 ## First runtime attempt — diagnostic defect
 

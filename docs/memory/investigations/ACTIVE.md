@@ -6,6 +6,21 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D125_NONBLOCKING_EPG:ACTIVE:BEGIN -->
+## ACTIVE — D-125 EPG non-blocking cache miss
+
+Measured cause:
+uncached synchronous companion acquisition can take ~19 seconds.
+
+D-125 production seam is runtime-validation pending.
+
+Do not start the guide UI redesign until normal guide reads are proven
+non-blocking.
+
+Next after D-125 acceptance:
+Android page/Favorites prefetch and durable incorrect-guide state.
+<!-- PRIVYHUB_D125_NONBLOCKING_EPG:ACTIVE:END -->
+
 <!-- PRIVYHUB_D124A_SPLIT_DB_FIX:ACTIVE:BEGIN -->
 ## ACTIVE — D-124A correction pending rerun
 

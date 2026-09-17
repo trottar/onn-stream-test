@@ -6,6 +6,28 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D125_NONBLOCKING_EPG:CURRENT:BEGIN -->
+## D-125 — non-blocking EPG background warmer
+
+D-124 runtime result:
+
+`D124_COMPANION_GUIDE_FETCH_LATENCY_OBSERVED`
+
+Key measurements:
+- cached companion guide: ~1–2 ms;
+- uncached companion guide: 19.08 s;
+- representative SQLite: <= 0.352 ms;
+- Favorites Android guide-cache coverage: 8/21 (38.1%).
+
+D-125 changes only the Linux companion EPG interaction boundary.
+
+Normal cache miss/stale guide reads enqueue deduplicated background acquisition
+and return immediately. Explicit forced refresh remains synchronous.
+
+Android page-level prefetch, incorrect-guide durable intent, and guide-style
+category UI remain next after this seam is runtime validated.
+<!-- PRIVYHUB_D125_NONBLOCKING_EPG:CURRENT:END -->
+
 <!-- PRIVYHUB_D124A_SPLIT_DB_FIX:CURRENT:BEGIN -->
 ## D-124A — latency probe split-database correction
 

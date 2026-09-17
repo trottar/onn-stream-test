@@ -6,6 +6,22 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D125_NONBLOCKING_EPG:ROADMAP:BEGIN -->
+## Post-D5 bounded TV follow-up — D-125 active
+
+D5.4 remains complete/runtime validated.
+
+D-124 identified synchronous EPG cache-miss acquisition as the latency
+bottleneck.
+
+D-125 makes normal companion guide reads non-blocking and moves acquisition to a
+bounded background worker.
+
+After runtime acceptance:
+Favorites/page prefetch -> incorrect-guide durable intent -> guide-style
+category UI -> focused regression/checkpoint.
+<!-- PRIVYHUB_D125_NONBLOCKING_EPG:ROADMAP:END -->
+
 <!-- PRIVYHUB_D124_EPG_LATENCY:ROADMAP:BEGIN -->
 ## Post-D5.4 bounded TV follow-up — D-124 active
 
