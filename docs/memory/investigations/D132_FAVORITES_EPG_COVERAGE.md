@@ -40,3 +40,19 @@ Linux companion endpoint, bounded to 16 checks.
 No production behavior changes. Do not alter D-125/D-126 acquisition, D-127 trust
 state, D-129 layout, D-131 entry scheduling, playback, Favorites, Hide, VOD or
 Games from this diagnostic.
+
+<!-- PRIVYHUB_D132_RUNTIME_RESULT:BEGIN -->
+## Runtime result — 2026-09-17
+
+`D132_FAVORITES_GUIDE_GAPS_CLASSIFIED`
+
+- visible Favorites: 21
+- Android current programme: 11
+- companion programmes but no current programme: 5
+- no known guide coverage: 5
+
+The five schedule-gap rows also had Android future programmes. D-133 owns the
+bounded presentation correction.
+
+**Status: runtime measured / closed.**
+<!-- PRIVYHUB_D132_RUNTIME_RESULT:END -->

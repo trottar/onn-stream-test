@@ -6,6 +6,19 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D133_EPG_STATUS_ACCURACY:PATCH_INDEX:BEGIN -->
+### D-133 — EPG status accuracy — 2026-09-17
+
+Presentation-only correction based on D-132 runtime evidence. Upcoming guide
+data without a current programme says `No current listing`; only empty coverage
+says `Guide data unavailable`.
+
+Runtime probe: `logs/tv/d133_epg_status_accuracy_probe.txt`.
+
+**Status:** development patch / runtime validation pending.
+<!-- PRIVYHUB_D133_EPG_STATUS_ACCURACY:PATCH_INDEX:END -->
+
+
 <!-- PRIVYHUB_D132_FAVORITES_EPG_COVERAGE:PATCH_INDEX:BEGIN -->
 ### D-132 — Favorites EPG coverage probe — 2026-09-17
 

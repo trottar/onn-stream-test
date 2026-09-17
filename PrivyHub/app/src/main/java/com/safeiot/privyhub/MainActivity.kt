@@ -4014,6 +4014,8 @@ class MainActivity : AppCompatActivity() {
                             currentProgramme
                         )
                     )
+                } else if (nextProgramme != null) {
+                    append("\nNo current listing")
                 } else if (!channel.guideIncorrect) {
                     append("\nGuide data unavailable")
                 }

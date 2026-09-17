@@ -1,18 +1,17 @@
 ---
 memory_schema: 2
 as_of: 2026-09-17
-baseline_commit: 0c9d1aee1f4d9d65c2ee15729a52fbbb32861dd8
+baseline_commit: 85cfc89e6327c156df4d9d6fa3bbf7f6b3ac577b
 ---
 
 # Roadmap Status
 
 ## Current position
 
-D5 media/TV work is in final bounded EPG usability/closeout work.
+D5 media/TV work is at the final bounded EPG presentation and regression step.
 
 ### Complete / runtime validated
 
-- Linux Games representative baseline.
 - External/removable VOD storage and hotplug behavior.
 - Live TV catalog/categories/playback.
 - Linux EPG acquisition and Android guide consumption/cache.
@@ -29,17 +28,17 @@ D5 media/TV work is in final bounded EPG usability/closeout work.
 
 ### Runtime diagnostics closed
 
-- D-130 measured the old TV-entry bottleneck as synchronous TV-state sync.
+- D-130: old TV-entry delay was synchronous TV-state sync.
+- D-132: 21 Favorites = 11 current, 5 schedule-gap with future guide, 5 no coverage.
 
 ### Active
 
-**D-132 — Favorites EPG coverage/status classification: DIAGNOSTIC / RUNTIME
-MEASUREMENT NEXT.**
+**D-133 — accurate schedule-gap versus unavailable-guide presentation:
+DEVELOPMENT PATCH / RUNTIME VALIDATION NEXT.**
 
 ### Next
 
-1. classify remaining guide-coverage gaps;
-2. make at most one bounded evidence-driven coverage/status change;
-3. focused TV/media regression;
-4. checkpoint/close D5 bounded TV work;
-5. continue broader Linux roadmap.
+1. runtime-validate D-133;
+2. focused TV/media regression;
+3. checkpoint/close D5 bounded TV work;
+4. continue broader Linux roadmap.

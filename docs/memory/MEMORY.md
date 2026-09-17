@@ -6,6 +6,19 @@ baseline_commit: 0206017cfd8f0fc57decb7a5e9e8632e6a4f6cdd
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D132_EPG_COVERAGE_CLASSIFICATION:BEGIN -->
+## EPG coverage/status presentation rule
+
+D-132 measured 21 visible Favorites: 11 current, 5 valid future/companion
+programme schedules with no current programme, and 5 no known guide coverage.
+
+A schedule gap is not unavailable guide data. UI presentation must distinguish
+`No current listing` when upcoming trusted programme data exists from
+`Guide data unavailable` when neither current nor upcoming trusted data exists.
+This distinction does not itself justify changing EPG acquisition or mappings.
+<!-- PRIVYHUB_D132_EPG_COVERAGE_CLASSIFICATION:END -->
+
+
 <!-- PRIVYHUB_D131_ACCEPTED_NONBLOCKING_ENTRY:BEGIN -->
 ## Non-blocking TV-entry authority rule
 

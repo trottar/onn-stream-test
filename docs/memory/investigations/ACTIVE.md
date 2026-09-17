@@ -5,25 +5,20 @@ as_of: 2026-09-17
 
 # Active Investigations and Queued Work
 
-## Active — D-132 Favorites EPG coverage/status classification
+## Active — D-133 EPG status accuracy
 
-D-131 is runtime accepted:
+D-132 runtime classification: `D132_FAVORITES_GUIDE_GAPS_CLASSIFIED`.
 
-`D131_TV_ENTRY_NONBLOCKING_SYNC_VALIDATED`
+Measured 21 visible Favorites:
+- 11 `android_current_programme`;
+- 5 `companion_programmes_no_current` with Android future programmes;
+- 5 `no_known_guide_coverage`.
 
-Measured first render 330 ms with Linux state sync continuing for 24,050 ms and
-reconciling afterward. The user reports the TV home now loads in roughly one or
-two seconds and other Live TV behavior appears normal.
+D-133 changes only the presentation mismatch: future schedule with no current
+programme becomes `No current listing`; true empty coverage remains
+`Guide data unavailable`.
 
-D-132 does not change production behavior. It classifies visible Favorites guide
-coverage from Android cache state and the existing Linux companion guide endpoint
-so the final coverage/status UI work is evidence-driven.
+## Queued after D-133
 
-Canonical investigation:
-`D132_FAVORITES_EPG_COVERAGE.md`.
-
-## Queued after D-132
-
-1. one bounded EPG coverage/status production change, if evidence requires it;
-2. focused TV/media regression;
-3. D5 checkpoint/closeout.
+1. focused TV/media regression;
+2. D5 checkpoint/closeout.

@@ -1,9 +1,9 @@
 ---
 memory_schema: 2
 state_updated: 2026-09-17
-active_work_item: D-132
+active_work_item: D-133
 maintenance_status: healthy
-baseline_commit: 0c9d1aee1f4d9d65c2ee15729a52fbbb32861dd8
+baseline_commit: 85cfc89e6327c156df4d9d6fa3bbf7f6b3ac577b
 ---
 
 # Current Project State
@@ -15,17 +15,15 @@ TV-state, Games, or transport subsystems.
 
 ## Current Work Item
 
-**D-132 — Favorites EPG coverage/status classification.**
+**D-133 — accurate schedule-gap versus unavailable guide status.**
 
-D-131 is runtime accepted with
-`D131_TV_ENTRY_NONBLOCKING_SYNC_VALIDATED`. First TV-home render measured 330 ms
-while the unchanged Linux-authoritative pull continued for 24,050 ms and
-reconciled at 25,073 ms.
+D-132 classified all 21 visible Favorites: 11 have a current programme, 5 have
+future/companion schedule data but no programme covering the current moment, and
+5 have no known guide coverage.
 
-The remaining bounded TV/EPG question is guide coverage/status presentation.
-D-132 is diagnostic-only: classify why visible Favorites do or do not currently
-have trusted programme data before changing UI status labels or acquisition
-behavior.
+The current renderer labels every no-current-programme case as
+`Guide data unavailable`, even when `Next:` data exists. D-133 corrects only that
+presentation distinction.
 
 ## Verified State
 
@@ -40,36 +38,38 @@ behavior.
 - D-129 single-column full-width TV guide: **runtime validated**.
 - D-130 latency diagnostic: **runtime measured / closed**.
 - D-131 non-blocking TV-entry state sync: **runtime validated**.
+- D-132 Favorites EPG coverage diagnostic: **runtime measured / closed** with
+  `D132_FAVORITES_GUIDE_GAPS_CLASSIFIED`.
 
 ## Current Repository / Patch State
 
-Expected D-132 predecessor checkpoint:
+Expected D-133 predecessor checkpoint:
 
-`0c9d1aee1f4d9d65c2ee15729a52fbbb32861dd8`
+`85cfc89e6327c156df4d9d6fa3bbf7f6b3ac577b`
 
-D-132 changes no Android or companion production code. It adds a diagnostic probe
-that snapshots the onn TV/EPG databases and, only for visible Favorites lacking a
-current Android programme, checks the existing local companion guide endpoint.
+D-133 production scope is one rendering branch in `MainActivity.kt`:
+current -> existing `Now:`; upcoming but no current -> `No current listing`
+plus existing `Next:`; no current/upcoming -> `Guide data unavailable`.
 
-**Status: DIAGNOSTIC PATCH / RUNTIME MEASUREMENT NEXT.**
+**Status: DEVELOPMENT PATCH / RUNTIME VALIDATION NEXT.**
 
 ## Next Action
 
-1. install/commit/push D-132;
-2. run `tools/probes/d132_favorites_epg_coverage_probe.py --repo .`;
-3. inspect `logs/tv/d132_favorites_epg_coverage_probe.txt`;
-4. choose the next production change only from the measured gap classes.
+1. install/build/push/APK-install D-133;
+2. open TV -> Favorites at the top of the list;
+3. verify a schedule-gap row shows `No current listing` plus `Next:`;
+4. run `tools/probes/d133_epg_status_accuracy_probe.py --verify`.
+
+Target: `D133_EPG_STATUS_ACCURACY_RUNTIME_VALIDATED`
 
 ## Success Criteria
 
-- every visible Favorite is classified into a concrete guide state;
-- Android current/future/stale cache state is measured directly;
-- missing Android current data is compared against the existing Linux companion
-  guide endpoint where the channel identity is EPG-matchable;
-- marked-incorrect and synthetic/unmatchable channels are separated from ordinary
-  missing guide coverage;
-- no production behavior changes;
-- no network address or device identifier is written to the report.
+- schedule-gap rows are not mislabeled as unavailable guide coverage;
+- schedule-gap rows retain their existing `Next:` programme/time;
+- true no-coverage rows continue to say `Guide data unavailable`;
+- D-129 one-column/full-width layout remains intact;
+- acquisition, mappings, TV-state, playback, Favorites and Hide semantics do not change;
+- no network address or device identifier is written to the probe report.
 
 ## Do Not Reopen Without New Evidence
 
@@ -79,15 +79,16 @@ current Android programme, checks the existing local companion guide endpoint.
 - D-127 incorrect-guide durable-state contract.
 - D-129 one-column guide presentation.
 - D-131 non-blocking TV-entry scheduling.
+- D-132 measured coverage classes unless contradicted by new evidence.
 - External VOD hotplug/storage architecture.
 - Linux Games controller/multitap/video/audio lifecycle.
 - Deferred Opal/Siflower UDP reverse-engineering branch.
 
 ## Relevant References
 
-- `evidence/D131_NONBLOCKING_TV_ENTRY_RUNTIME_ACCEPTANCE_2026-09-17.md`
+- `evidence/D132_FAVORITES_EPG_COVERAGE_RUNTIME_EVIDENCE_2026-09-17.md`
 - `investigations/D132_FAVORITES_EPG_COVERAGE.md`
-- `patches/D-132_FAVORITES_EPG_COVERAGE_PROBE.md`
-- `architecture/TV_STATE_SYNC.md`
+- `investigations/D133_EPG_STATUS_ACCURACY.md`
+- `patches/D-133_EPG_STATUS_ACCURACY.md`
 - `roadmap/STATUS.md`
 - `2026-09-17.md`
