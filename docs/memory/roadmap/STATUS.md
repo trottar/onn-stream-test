@@ -6,6 +6,18 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D117_PULL_VALIDATION:ROADMAP:BEGIN -->
+## D5.4 TV-state sync — pull validation active
+
+D-115 Linux authority: runtime validated.
+
+D-116 seed + onn-to-Linux push: runtime validated.
+
+D-117 Linux-to-onn pull/restore: active diagnostic.
+
+D5.4 remains ACTIVE until D-117 is measured.
+<!-- PRIVYHUB_D117_PULL_VALIDATION:ROADMAP:END -->
+
 <!-- PRIVYHUB_D116_TV_STATE_SYNC:ROADMAP:BEGIN -->
 ## D5.4 TV-state sync — D-116 runtime validation pending
 

@@ -1,5 +1,27 @@
 # D-116 — D5.4 Android TV-state synchronization
 
+<!-- PRIVYHUB_D117_PULL_VALIDATION:D116_RESULT:BEGIN -->
+## Runtime result — 2026-09-17
+
+D-116 passed:
+
+`D116_ANDROID_TV_STATE_SYNC_RUNTIME_VALIDATED`
+
+Measured:
+- Linux initialized at revision 2;
+- onn remembered revision 2;
+- canonical local/remote state SHA-256 matched exactly;
+- 25 durable channel rows;
+- 22 favorites;
+- 3 manual-hidden rows;
+- post-seed push observed;
+- `10 Bold Adelaide` manual-hidden on both sides.
+
+D-116 seed and onn-to-Linux push are accepted.
+
+D-117 validates the remaining Linux-to-onn pull direction before D5.4 closure.
+<!-- PRIVYHUB_D117_PULL_VALIDATION:D116_RESULT:END -->
+
 **Status:** development patch / runtime validation next
 
 ## Purpose

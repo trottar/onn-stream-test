@@ -6,6 +6,28 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D117_PULL_VALIDATION:HANDOFF:BEGIN -->
+## D-117 handoff — Linux-authority pull validation
+
+D-116 seed/push is runtime accepted.
+
+Run D-117 in three explicit phases:
+
+1. prepare the temporary Linux display-name marker;
+2. open TV once and verify the pull while restoring Linux;
+3. open TV once more and verify the restored state.
+
+Final acceptance:
+
+`D117_LINUX_AUTHORITY_PULL_AND_RESTORE_RUNTIME_VALIDATED`
+
+The probe stores the original full Linux user state only in a local ignored
+mode-0600 session file and never prints it.
+
+A successful test restores original user-state content and removes the session.
+The monotonic server revision remains two revisions higher by design.
+<!-- PRIVYHUB_D117_PULL_VALIDATION:HANDOFF:END -->
+
 <!-- PRIVYHUB_D116_TV_STATE_SYNC:HANDOFF:BEGIN -->
 ## D-116 handoff — Android/Linux TV-state sync
 

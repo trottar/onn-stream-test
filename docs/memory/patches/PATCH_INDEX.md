@@ -6,6 +6,21 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D117_PULL_VALIDATION:PATCH_INDEX:BEGIN -->
+### D-117 — D5 Linux-authority pull probe — 2026-09-17
+
+Diagnostic-only checkpoint after D-116 runtime acceptance.
+
+Temporarily changes only Linux `country_name`, verifies Android pulls the newer
+authority, restores original Linux user-state content, and verifies Android
+pulls the restoration.
+
+No production code changes.
+
+Final evidence:
+`logs/tv/d117_linux_authority_pull_probe.txt`.
+<!-- PRIVYHUB_D117_PULL_VALIDATION:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D116_TV_STATE_SYNC:PATCH_INDEX:BEGIN -->
 ### D-116 — D5 Android TV-state synchronization — 2026-09-17
 

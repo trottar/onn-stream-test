@@ -6,6 +6,21 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D117_PULL_VALIDATION:ACTIVE:BEGIN -->
+## D5.4 ACTIVE — D-117 Linux-to-onn pull validation
+
+D-116 seed + push is runtime validated.
+
+One narrow acceptance gap remains:
+initialized/newer Linux state -> onn.
+
+D-117 changes only a harmless display-name preference, verifies the pull, then
+restores and verifies again.
+
+Do not add further synchronization features until this existing pull path is
+measured.
+<!-- PRIVYHUB_D117_PULL_VALIDATION:ACTIVE:END -->
+
 <!-- PRIVYHUB_D116_TV_STATE_SYNC:ACTIVE:BEGIN -->
 ## D5.4 ACTIVE — D-116 Android sync runtime validation
 

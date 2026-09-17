@@ -6,6 +6,24 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D117_PULL_VALIDATION:MEMORY:BEGIN -->
+## D5.4 seed/push acceptance
+
+D-116 runtime validated Linux/onn durable-state parity after:
+- initial Linux seed from onn;
+- a real manual-hidden user mutation;
+- revision advancement to 2.
+
+Canonical state hashes matched exactly.
+
+Before closing D5.4, separately prove the pull direction with Linux intentionally
+newer than the onn.
+
+D-117 performs that test using only the country display name. Never change the
+country code merely to create a sync test, because that would alter catalog
+filter semantics.
+<!-- PRIVYHUB_D117_PULL_VALIDATION:MEMORY:END -->
+
 <!-- PRIVYHUB_D116_TV_STATE_SYNC:MEMORY:BEGIN -->
 ## TV durable-state synchronization boundary
 

@@ -1,5 +1,16 @@
 # D-116 — Android TV-state synchronization policy
 
+<!-- PRIVYHUB_D117_PULL_VALIDATION:D116_POLICY_STATUS:BEGIN -->
+## Runtime status
+
+D-116 seed and onn-to-Linux push behavior is runtime validated and accepted.
+
+The policy still requires one directional acceptance check before D5.4 closure:
+Linux deliberately newer than the onn must be pulled and applied correctly.
+
+D-117 validates that existing policy without changing production code.
+<!-- PRIVYHUB_D117_PULL_VALIDATION:D116_POLICY_STATUS:END -->
+
 **Date:** 2026-09-17
 
 **Status:** development implementation / runtime validation pending

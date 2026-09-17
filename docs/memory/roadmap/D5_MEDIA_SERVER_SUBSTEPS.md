@@ -6,6 +6,22 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D117_PULL_VALIDATION:D5_SUBSTEPS:BEGIN -->
+## D5.4 — seed/push accepted; pull validation active
+
+D-116 accepts:
+- initial Linux seed;
+- onn-to-Linux durable mutation push;
+- manual-hidden persistence;
+- canonical local/remote parity.
+
+D-117 is the final directional synchronization check:
+Linux newer -> onn -> Linux restored -> onn restored.
+
+If D-117 passes, assess only conflict/diagnostic UX and media regression needs
+before declaring D5.4 complete.
+<!-- PRIVYHUB_D117_PULL_VALIDATION:D5_SUBSTEPS:END -->
+
 <!-- PRIVYHUB_D116_TV_STATE_SYNC:D5_SUBSTEPS:BEGIN -->
 ## D5.4 — D-116 Android synchronization
 

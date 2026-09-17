@@ -6,6 +6,33 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D117_PULL_VALIDATION:CURRENT:BEGIN -->
+## D-117 D5.4 Linux-authority pull validation
+
+D-116 is runtime validated.
+
+Accepted D-116 evidence:
+- Linux revision 2;
+- onn remembered revision 2;
+- exact canonical durable-state hash parity;
+- 22 favorites;
+- 3 manual-hidden rows;
+- post-seed push observed;
+- `10 Bold Adelaide` manual-hidden on both onn and Linux.
+
+This accepts D5.4 seed and onn-to-Linux push behavior.
+
+Remaining acceptance question:
+prove initialized/newer Linux state is pulled back to the onn.
+
+D-117 is diagnostic-only. It temporarily changes only the Linux
+`country_name` display value while keeping `country_code` unchanged, verifies
+the onn pull, restores the original Linux user-state content, then verifies the
+onn pulls the restoration.
+
+No production code changes are required for D-117.
+<!-- PRIVYHUB_D117_PULL_VALIDATION:CURRENT:END -->
+
 <!-- PRIVYHUB_D116_TV_STATE_SYNC:CURRENT:BEGIN -->
 ## D-116 D5.4 Android TV-state synchronization
 

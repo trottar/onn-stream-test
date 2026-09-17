@@ -6,6 +6,26 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # TV State Synchronization Architecture
 
+<!-- PRIVYHUB_D117_PULL_VALIDATION:ARCH:BEGIN -->
+## Runtime status through D-116
+
+Validated:
+- Linux revisioned authority;
+- seed from onn when authority is empty;
+- durable onn mutation push;
+- optimistic server revision;
+- exact local/remote durable-state parity.
+
+Still to validate:
+- initialized/newer Linux authority pulled into onn.
+
+D-117 tests this without changing any channel-selection preference:
+only `country_name` changes, while `country_code` remains identical.
+
+This preserves the distinction between testing synchronization mechanics and
+changing TV product behavior.
+<!-- PRIVYHUB_D117_PULL_VALIDATION:ARCH:END -->
+
 <!-- PRIVYHUB_D116_TV_STATE_SYNC:ARCH:BEGIN -->
 ## D-116 Android client seam
 
