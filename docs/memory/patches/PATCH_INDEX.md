@@ -6,6 +6,20 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D124_EPG_LATENCY:PATCH_INDEX:BEGIN -->
+### D-124 — TV/EPG latency probe — 2026-09-17
+
+Diagnostic-only.
+
+Measures read-only Android TV/EPG cache/query state and bounded normal companion
+guide-request latency.
+
+No production code change.
+
+Runtime evidence:
+`logs/tv/d124_tv_epg_latency_probe.txt`.
+<!-- PRIVYHUB_D124_EPG_LATENCY:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D123_D54_CLOSURE:PATCH_INDEX:BEGIN -->
 ### D-123 — D5.4 closure / TV EPG usability follow-up — 2026-09-17
 

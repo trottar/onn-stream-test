@@ -6,6 +6,22 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D124_EPG_LATENCY:ROADMAP:BEGIN -->
+## Post-D5.4 bounded TV follow-up — D-124 active
+
+D5.4 remains COMPLETE / RUNTIME VALIDATED.
+
+D-124 TV/EPG latency diagnostic is active.
+
+Next is evidence-dependent:
+- measured cache/companion/query optimization; or
+- Android-side timing instrumentation.
+
+After performance understanding:
+correct EPG coverage diagnostics and implement paged guide-style channel
+categories.
+<!-- PRIVYHUB_D124_EPG_LATENCY:ROADMAP:END -->
+
 <!-- PRIVYHUB_D123_D54_CLOSURE:ROADMAP:BEGIN -->
 ## D5.4 — COMPLETE / RUNTIME VALIDATED
 

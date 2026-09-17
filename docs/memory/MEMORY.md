@@ -6,6 +6,22 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D124_EPG_LATENCY:MEMORY:BEGIN -->
+## TV/EPG performance diagnostic rule
+
+Post-D5.4 guide slowness must be measured before optimization.
+
+D-124 first separates:
+- cache coverage;
+- representative SQLite query shape;
+- companion guide-request latency.
+
+Host-side snapshot SQLite timing is not equivalent to onn UI/render timing.
+
+If D-124 external stages are fast, use Android-side instrumentation next rather
+than guessing at a cache/network fix.
+<!-- PRIVYHUB_D124_EPG_LATENCY:MEMORY:END -->
+
 <!-- PRIVYHUB_D123_D54_CLOSURE:MEMORY:BEGIN -->
 ## D5.4 final accepted state
 

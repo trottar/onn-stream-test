@@ -6,6 +6,28 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D124_EPG_LATENCY:HANDOFF:BEGIN -->
+## D-124 handoff — TV/EPG latency
+
+D5.4 is complete/runtime validated.
+
+Run:
+
+`python3 tools/probes/d124_tv_epg_latency_probe.py --repo /home/privyhub/Projects/onn-stream-test`
+
+Return:
+
+`logs/tv/d124_tv_epg_latency_probe.txt`
+
+Inspect raw timings before choosing a production fix.
+
+If classification is
+`D124_EXTERNAL_TIMING_DOES_NOT_EXPLAIN_UI_LATENCY`, build the next narrow
+Android-side instrumentation probe.
+
+Do not combine that instrumentation with the guide UI redesign.
+<!-- PRIVYHUB_D124_EPG_LATENCY:HANDOFF:END -->
+
 <!-- PRIVYHUB_D123_D54_CLOSURE:HANDOFF:BEGIN -->
 ## D-123 handoff — D5.4 closed; TV guide performance/UX next
 

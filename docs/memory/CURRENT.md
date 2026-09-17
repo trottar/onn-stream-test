@@ -6,6 +6,26 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D124_EPG_LATENCY:CURRENT:BEGIN -->
+## D-124 — TV/EPG latency diagnostic active
+
+D5.4 remains complete/runtime validated.
+
+Current post-D5.4 work is the slow Live TV/guide observation.
+
+D-124 is diagnostic-only and measures:
+- Android TV/EPG SQLite snapshot/cache coverage;
+- representative Favorites/page query shapes;
+- companion status/EPG latency;
+- a bounded set of normal companion guide requests.
+
+No APK or production code change.
+
+If external DB/API timing explains the delay, optimize that measured stage.
+If it does not, proceed to targeted Android-side timing instrumentation before
+changing the guide UI.
+<!-- PRIVYHUB_D124_EPG_LATENCY:CURRENT:END -->
+
 <!-- PRIVYHUB_D123_D54_CLOSURE:CURRENT:BEGIN -->
 ## D-123 — D5.4 complete / TV EPG usability follow-up active
 

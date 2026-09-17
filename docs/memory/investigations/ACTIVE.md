@@ -6,6 +6,24 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D124_EPG_LATENCY:ACTIVE:BEGIN -->
+## ACTIVE — D-124 TV/EPG latency
+
+Narrow hypothesis:
+EPG acquisition/cache misses materially contribute to slow TV/guide loading.
+
+D-124 measures external/database stages only.
+
+Possible outcomes:
+- slow companion guide fetch -> inspect/acquire/cache path;
+- poor Android programme-cache coverage -> inspect prefetch/cache strategy;
+- expensive representative SQLite shape -> inspect query/index plan;
+- external stages fast -> instrument Android category/guide/render path.
+
+Guide-style paged Favorites/category UX remains queued until the timing evidence
+is known.
+<!-- PRIVYHUB_D124_EPG_LATENCY:ACTIVE:END -->
+
 <!-- PRIVYHUB_D123_D54_CLOSURE:ACTIVE:BEGIN -->
 ## ACTIVE — post-D5.4 TV EPG performance / guide UX
 

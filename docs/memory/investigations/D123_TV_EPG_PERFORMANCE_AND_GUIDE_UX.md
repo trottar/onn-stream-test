@@ -1,5 +1,20 @@
 # D-123 — post-D5.4 TV EPG performance and guide UX follow-up
 
+<!-- PRIVYHUB_D124_EPG_LATENCY:D123_NEXT:BEGIN -->
+## D-124 selected as first follow-up diagnostic
+
+The first performance diagnostic is read-only.
+
+It measures existing TV/EPG SQLite cache coverage and representative query
+shapes plus bounded companion guide GET latency.
+
+Android UI/render timing is intentionally deferred unless these external stages
+fail to explain the observed delay.
+
+This preserves the agreed order:
+measure -> identify bottleneck -> optimize -> implement guide-style category UI.
+<!-- PRIVYHUB_D124_EPG_LATENCY:D123_NEXT:END -->
+
 **Status:** active follow-up; performance diagnostic should precede production redesign
 
 D5.4 is closed/runtime validated.
