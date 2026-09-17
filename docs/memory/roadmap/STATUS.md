@@ -6,6 +6,21 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:ROADMAP:BEGIN -->
+## D5.4 TV-state sync — diagnostics active
+
+Core bidirectional sync: runtime validated.
+
+Normal top-level TV-entry trigger: runtime validated by D-119.
+
+D-120: Android last-sync / last-conflict observability, runtime validation
+pending.
+
+Remaining before D5.4 closure:
+- conflict-observability validation;
+- focused TV/media regression.
+<!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:ROADMAP:END -->
+
 <!-- PRIVYHUB_D119_TV_ENTRY_TRIGGER:ROADMAP:BEGIN -->
 ## D5.4 TV-state sync — top-level entry trigger diagnostic active
 

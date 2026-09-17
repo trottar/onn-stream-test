@@ -6,6 +6,29 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:HANDOFF:BEGIN -->
+## D-120 handoff — sync observability
+
+D-119 top-level entry trigger is accepted. No lifecycle fix is needed.
+
+D-120 changes only Android observability.
+
+After installing the D-120 APK:
+1. Back to the top-level PrivyHub source list.
+2. Select TV once.
+3. Open TV Settings -> Catalog / EPG Status.
+4. Confirm TV-state revision / Last state sync / Last sync revision /
+   Last state conflict are visible.
+5. Run `tools/probes/d120_tv_state_sync_diagnostics_probe.py`.
+6. Return `logs/tv/d120_tv_state_sync_diagnostics_probe.txt`.
+
+Target:
+`D120_TV_STATE_SYNC_DIAGNOSTICS_RUNTIME_VALIDATED`.
+
+After D-120, validate conflict observability separately without adding automatic
+conflict resolution.
+<!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:HANDOFF:END -->
+
 <!-- PRIVYHUB_D119_TV_ENTRY_TRIGGER:HANDOFF:BEGIN -->
 ## D-119 handoff — measure top-level TV-entry trigger
 

@@ -6,6 +6,24 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:MEMORY:BEGIN -->
+## D5.4 TV sync trigger and observability
+
+D-119 proved that true top-level TV selection reliably invokes the existing
+Linux-authoritative pull path. Do not patch the lifecycle trigger absent new
+contradictory evidence.
+
+D-120 adds local diagnostics only:
+- last successful sync timestamp/action/revision;
+- last revision-conflict timestamp/base/server revision.
+
+These diagnostics are not durable household TV state and must never be pushed
+to Linux as user intent.
+
+Conflict resolution remains fail-closed and explicit; D-120 only makes the
+existing result visible.
+<!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:MEMORY:END -->
+
 <!-- PRIVYHUB_D118_PULL_ACCEPTANCE:MEMORY:BEGIN -->
 ## D5.4 bidirectional TV-state sync runtime status
 

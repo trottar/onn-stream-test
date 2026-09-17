@@ -6,6 +6,20 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:PATCH_INDEX:BEGIN -->
+### D-120 — D5 TV-state sync diagnostics — 2026-09-17
+
+Android production observability patch.
+
+Persists last successful state-sync and last conflict metadata locally on the
+onn and displays it in TV Settings -> Catalog / EPG Status.
+
+No Linux authority or synchronization-policy change.
+
+Runtime evidence:
+`logs/tv/d120_tv_state_sync_diagnostics_probe.txt`.
+<!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D119_TV_ENTRY_TRIGGER:PATCH_INDEX:BEGIN -->
 ### D-119 — D5 TV-entry sync-trigger probe — 2026-09-17
 

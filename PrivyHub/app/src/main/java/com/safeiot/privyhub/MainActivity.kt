@@ -5191,13 +5191,81 @@ class MainActivity : AppCompatActivity() {
             )
         val epg =
             tvEpgRepository.stats()
+        val sync =
+            tvStateSyncClient.diagnostics()
 
-        val refreshed =
-            if (catalog.refreshedAtMs <= 0L) {
+        fun formattedTime(
+            timestampMs: Long
+        ): String {
+
+            return if (
+                timestampMs <= 0L
+            ) {
                 "Never"
             } else {
-                java.text.DateFormat.getDateTimeInstance()
-                    .format(java.util.Date(catalog.refreshedAtMs))
+                java.text.DateFormat
+                    .getDateTimeInstance()
+                    .format(
+                        java.util.Date(
+                            timestampMs
+                        )
+                    )
+            }
+        }
+
+        val refreshed =
+            formattedTime(
+                catalog.refreshedAtMs
+            )
+
+        val syncAction =
+            when (
+                sync.lastSuccessAction
+            ) {
+                "seeded" ->
+                    "Seeded"
+
+                "pulled" ->
+                    "Pulled"
+
+                "pushed" ->
+                    "Pushed"
+
+                "unchanged" ->
+                    "Unchanged"
+
+                else ->
+                    sync.lastSuccessAction
+                        .ifBlank {
+                            "Unknown"
+                        }
+            }
+
+        val lastSync =
+            if (
+                sync.lastSuccessAtMs <= 0L
+            ) {
+                "Never"
+            } else {
+                "$syncAction - " +
+                    formattedTime(
+                        sync.lastSuccessAtMs
+                    )
+            }
+
+        val lastConflict =
+            if (
+                sync.lastConflictAtMs <= 0L
+            ) {
+                "Never"
+            } else {
+                formattedTime(
+                    sync.lastConflictAtMs
+                ) +
+                    " (base " +
+                    "${sync.lastConflictBaseRevision}, " +
+                    "server " +
+                    "${sync.lastConflictServerRevision})"
             }
 
         val message =
@@ -5211,7 +5279,20 @@ class MainActivity : AppCompatActivity() {
                 append("Enabled providers: ${catalog.providers}\n")
                 append("Catalog refreshed: $refreshed\n")
                 append("EPG mappings: ${epg.mappings}\n")
-                append("Cached programmes: ${epg.programmes}")
+                append("Cached programmes: ${epg.programmes}\n")
+                append("\nTV state revision: ${sync.serverRevision}\n")
+                append("Last state sync: $lastSync\n")
+                append(
+                    "Last sync revision: " +
+                        if (
+                            sync.lastSuccessRevision > 0L
+                        ) {
+                            sync.lastSuccessRevision
+                        } else {
+                            "Never"
+                        }
+                )
+                append("\nLast state conflict: $lastConflict")
             }
 
         AlertDialog.Builder(this)

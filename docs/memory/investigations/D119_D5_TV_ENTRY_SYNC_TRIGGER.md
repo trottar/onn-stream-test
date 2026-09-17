@@ -1,5 +1,28 @@
 # D-119 — D5.4 TV-entry synchronization trigger
 
+<!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:D119_RESULT:BEGIN -->
+## Runtime result — accepted
+
+D-119 passed:
+
+`D119_TOP_LEVEL_TV_ENTRY_SYNC_TRIGGER_AND_RESTORE_VALIDATED`
+
+A true top-level TV entry adopted prepared Linux revision 5 without Refresh.
+
+Cleanup:
+- Linux restore revision 6;
+- onn revision 6;
+- exact local/remote canonical-state parity;
+- original Linux/onn content restored;
+- session removed.
+
+Conclusion:
+normal top-level TV entry reliably invokes synchronization. No production
+trigger/lifecycle patch is required.
+
+D-119 is closed.
+<!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:D119_RESULT:END -->
+
 **Status:** diagnostic-only / runtime interaction required
 
 ## Narrow question

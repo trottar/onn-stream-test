@@ -6,6 +6,20 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:D5_SUBSTEPS:BEGIN -->
+## D5.4 — trigger accepted; diagnostics active
+
+D-119 validates normal top-level TV-entry synchronization.
+
+D-120 adds user-visible last-sync and last-conflict diagnostics without changing
+sync semantics.
+
+After D-120:
+1. controlled conflict-observability validation;
+2. focused TV/media regression;
+3. D5.4 closure if clean.
+<!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:D5_SUBSTEPS:END -->
+
 <!-- PRIVYHUB_D119_TV_ENTRY_TRIGGER:D5_SUBSTEPS:BEGIN -->
 ## D5.4 — D-119 trigger validation active
 

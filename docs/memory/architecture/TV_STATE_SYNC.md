@@ -6,6 +6,27 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # TV State Synchronization Architecture
 
+<!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:ARCH:BEGIN -->
+## Local sync diagnostics
+
+D-120 adds onn-local observability metadata alongside the existing remembered
+server revision.
+
+These fields are operational diagnostics, not household durable user intent:
+- last success timestamp/action/revision;
+- last conflict timestamp/base/server revision.
+
+They are never included in `privyhub_tv_user_state_v1`.
+
+The normal top-level TV-entry trigger is runtime validated by D-119.
+
+Conflict semantics remain:
+- stale write is rejected by Linux;
+- local TV remains usable;
+- no silent overwrite;
+- no automatic merge in D5.4.
+<!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:ARCH:END -->
+
 <!-- PRIVYHUB_D118_PULL_ACCEPTANCE:ARCH:BEGIN -->
 ## Bidirectional runtime acceptance
 

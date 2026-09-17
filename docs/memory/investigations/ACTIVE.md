@@ -6,6 +6,22 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:ACTIVE:BEGIN -->
+## D5.4 ACTIVE — D-120 sync diagnostics
+
+D-119 closed the trigger question successfully.
+
+Current narrow boundary:
+make the already-validated state synchronization observable without changing its
+semantics.
+
+D-120 adds last-success and last-conflict metadata plus status-dialog display.
+
+Next only after D-120 runtime acceptance:
+exercise one controlled stale-revision conflict and confirm the conflict is
+visible while Linux remains protected.
+<!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:ACTIVE:END -->
+
 <!-- PRIVYHUB_D119_TV_ENTRY_TRIGGER:ACTIVE:BEGIN -->
 ## D5.4 ACTIVE — D-119 top-level TV-entry trigger
 

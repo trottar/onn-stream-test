@@ -19,6 +19,17 @@ data class TvStateSyncResult(
 )
 
 
+data class TvStateSyncDiagnostics(
+    val serverRevision: Long,
+    val lastSuccessAtMs: Long,
+    val lastSuccessAction: String,
+    val lastSuccessRevision: Long,
+    val lastConflictAtMs: Long,
+    val lastConflictBaseRevision: Long,
+    val lastConflictServerRevision: Long
+)
+
+
 class TvStateSyncClient(
     context: Context,
     private val repository: TvRepository
@@ -45,6 +56,24 @@ class TvStateSyncClient(
 
         private const val PREF_TV_STATE_SERVER_REVISION =
             "tv_state_server_revision"
+
+        private const val PREF_TV_STATE_LAST_SUCCESS_AT_MS =
+            "tv_state_last_success_at_ms"
+
+        private const val PREF_TV_STATE_LAST_SUCCESS_ACTION =
+            "tv_state_last_success_action"
+
+        private const val PREF_TV_STATE_LAST_SUCCESS_REVISION =
+            "tv_state_last_success_revision"
+
+        private const val PREF_TV_STATE_LAST_CONFLICT_AT_MS =
+            "tv_state_last_conflict_at_ms"
+
+        private const val PREF_TV_STATE_LAST_CONFLICT_BASE_REVISION =
+            "tv_state_last_conflict_base_revision"
+
+        private const val PREF_TV_STATE_LAST_CONFLICT_SERVER_REVISION =
+            "tv_state_last_conflict_server_revision"
 
         private const val CONTROL_PORT =
             8765
@@ -370,6 +399,91 @@ class TvStateSyncClient(
     }
 
 
+    private fun recordSuccess(
+        action: String,
+        revision: Long
+    ) {
+        prefs.edit()
+            .putLong(
+                PREF_TV_STATE_LAST_SUCCESS_AT_MS,
+                System.currentTimeMillis()
+            )
+            .putString(
+                PREF_TV_STATE_LAST_SUCCESS_ACTION,
+                action
+            )
+            .putLong(
+                PREF_TV_STATE_LAST_SUCCESS_REVISION,
+                revision
+            )
+            .apply()
+    }
+
+
+    private fun recordConflict(
+        baseRevision: Long,
+        serverRevision: Long
+    ) {
+        prefs.edit()
+            .putLong(
+                PREF_TV_STATE_LAST_CONFLICT_AT_MS,
+                System.currentTimeMillis()
+            )
+            .putLong(
+                PREF_TV_STATE_LAST_CONFLICT_BASE_REVISION,
+                baseRevision
+            )
+            .putLong(
+                PREF_TV_STATE_LAST_CONFLICT_SERVER_REVISION,
+                serverRevision
+            )
+            .apply()
+    }
+
+
+    fun diagnostics():
+        TvStateSyncDiagnostics {
+
+        return TvStateSyncDiagnostics(
+            serverRevision =
+                prefs.getLong(
+                    PREF_TV_STATE_SERVER_REVISION,
+                    0L
+                ),
+            lastSuccessAtMs =
+                prefs.getLong(
+                    PREF_TV_STATE_LAST_SUCCESS_AT_MS,
+                    0L
+                ),
+            lastSuccessAction =
+                prefs.getString(
+                    PREF_TV_STATE_LAST_SUCCESS_ACTION,
+                    ""
+                ) ?: "",
+            lastSuccessRevision =
+                prefs.getLong(
+                    PREF_TV_STATE_LAST_SUCCESS_REVISION,
+                    0L
+                ),
+            lastConflictAtMs =
+                prefs.getLong(
+                    PREF_TV_STATE_LAST_CONFLICT_AT_MS,
+                    0L
+                ),
+            lastConflictBaseRevision =
+                prefs.getLong(
+                    PREF_TV_STATE_LAST_CONFLICT_BASE_REVISION,
+                    0L
+                ),
+            lastConflictServerRevision =
+                prefs.getLong(
+                    PREF_TV_STATE_LAST_CONFLICT_SERVER_REVISION,
+                    0L
+                )
+        )
+    }
+
+
     private fun applyEnvelope(
         envelope: JSONObject
     ): TvStateSyncResult {
@@ -474,6 +588,11 @@ class TvStateSyncClient(
                 revision
             )
             .apply()
+
+        recordSuccess(
+            action = "pulled",
+            revision = revision
+        )
 
         return TvStateSyncResult(
             ok = true,
@@ -580,6 +699,11 @@ class TvStateSyncClient(
                 revision
             )
 
+            recordSuccess(
+                action = "seeded",
+                revision = revision
+            )
+
             return TvStateSyncResult(
                 ok = true,
                 action = "seeded",
@@ -637,14 +761,22 @@ class TvStateSyncClient(
                 false
             )
         ) {
+            val serverRevision =
+                result.optLong(
+                    "server_revision",
+                    baseRevision
+                )
+
+            recordConflict(
+                baseRevision = baseRevision,
+                serverRevision = serverRevision
+            )
+
             return TvStateSyncResult(
                 ok = false,
                 action = "conflict",
                 serverRevision =
-                    result.optLong(
-                        "server_revision",
-                        baseRevision
-                    ),
+                    serverRevision,
                 localStateChanged = false,
                 conflict = true
             )
@@ -677,19 +809,26 @@ class TvStateSyncClient(
             revision
         )
 
+        val action =
+            if (
+                result.optBoolean(
+                    "changed",
+                    false
+                )
+            ) {
+                "pushed"
+            } else {
+                "unchanged"
+            }
+
+        recordSuccess(
+            action = action,
+            revision = revision
+        )
+
         return TvStateSyncResult(
             ok = true,
-            action =
-                if (
-                    result.optBoolean(
-                        "changed",
-                        false
-                    )
-                ) {
-                    "pushed"
-                } else {
-                    "unchanged"
-                },
+            action = action,
             serverRevision = revision,
             localStateChanged = false
         )

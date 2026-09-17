@@ -6,6 +6,28 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:CURRENT:BEGIN -->
+## D-120 D5.4 synchronization diagnostics
+
+D-119 passed:
+
+`D119_TOP_LEVEL_TV_ENTRY_SYNC_TRIGGER_AND_RESTORE_VALIDATED`
+
+A true top-level TV selection pulled prepared Linux revision 5 without Refresh.
+Cleanup reached revision 6 on both Linux and onn with exact canonical parity.
+
+Therefore there is no production TV-entry trigger defect.
+
+D-120 addresses the remaining observability gap:
+- persist last successful sync time/action/revision;
+- persist last conflict time/base/server revision;
+- expose those fields in TV Settings -> Catalog / EPG Status.
+
+No synchronization policy or Linux authority behavior changes.
+
+Runtime validation is next after APK installation.
+<!-- PRIVYHUB_D120_SYNC_DIAGNOSTICS:CURRENT:END -->
+
 <!-- PRIVYHUB_D119_TV_ENTRY_TRIGGER:CURRENT:BEGIN -->
 ## D-119 D5.4 top-level TV-entry sync trigger
 
