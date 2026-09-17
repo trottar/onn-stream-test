@@ -1,9 +1,9 @@
 ---
 memory_schema: 2
 state_updated: 2026-09-17
-active_work_item: D-127
+active_work_item: D-128
 maintenance_status: healthy
-baseline_commit: c01bb79ddbf6763a48ce9487ee31cdb8aef9aef6
+baseline_commit: 020d86a0c0792653e2ce4d976244098981419648
 ---
 
 # Current Project State
@@ -15,15 +15,11 @@ TV-state, Games, or transport subsystems.
 
 ## Current Work Item
 
-**D-127 — durable `Mark Guide Incorrect` intent and deferred recheck policy.**
+**D-128 — guide-style paged Favorites/category presentation.**
 
-D-127 development patch is installed when this file is present. Runtime
-validation is still required before D-127 is accepted.
-
-The user can mark a guide incorrect without hiding or disabling its channel. The
-mark is Linux-authoritative durable intent, the rejected guide source is
-fingerprinted, marked guide data is not presented as trusted, and background
-recheck remains separate from user acceptance.
+D-127 is runtime accepted. D-128 is an Android presentation-only development
+patch that turns existing paged TV rows into compact guide rows using already
+cached guide data.
 
 ## Verified State
 
@@ -33,65 +29,53 @@ recheck remains separate from user acceptance.
 - D5.4 Linux-authoritative durable TV-state sync: **COMPLETE / runtime validated**.
 - D-125 non-blocking EPG miss handling: **runtime validated**.
 - D-126 Favorites/visible-page prefetch: **runtime validated**.
-- D-127 source/design pre-state was audited against synchronized checkpoint
-  `c01bb79ddbf6763a48ce9487ee31cdb8aef9aef6`.
-- D-127 intentionally does not change playback health, Hide, Favorites, stream
-  transport, Linux EPG acquisition algorithms, or guide-grid/category layout.
+- D-127 incorrect-guide durable intent: **runtime validated** with
+  `D127_INCORRECT_GUIDE_DURABILITY_CONFIRMED`.
 
 ## Current Repository / Patch State
 
-Predecessor synchronized checkpoint:
+Expected D-128 predecessor checkpoint:
 
-`c01bb79ddbf6763a48ce9487ee31cdb8aef9aef6`
+`020d86a0c0792653e2ce4d976244098981419648`
 
-D-127 development implementation changes:
+D-128 rev1 failed the Kotlin compile gate because it duplicated the existing `formatTvGuideTime(Long)` member and was fully rolled back. Rev2 corrected that transform, but its delivery wrapper used persistent `set -euo pipefail` plus `exit 1`; on failure it terminated the interactive Bash session before installation completed, so the D-128 probe was never installed. Rev3 passed the Android build but its generated `CURRENT.md` omitted two headings required by `tools/check_memory_health.py`; the memory-health gate therefore failed and the installer rolled back. Rev4 keeps the corrected Android transform, shell-safe delivery pattern, and exact memory-health heading contract.
 
-- Android TV DB schema 3 with `guide_incorrect`, rejected-source fingerprint and
-  mark timestamp;
-- durable TV user-state schema v2 with v1 migration support;
-- Linux authority v1 -> v2 migration preserving server revision;
-- Android guide-source fingerprints plus delayed rejected-guide prefetch;
-- explicit Mark / Retry / Accept / Clear UI behavior;
-- diagnostic probe `tools/probes/d127_incorrect_guide_probe.py`.
+D-128 production scope is only `MainActivity.kt`. It reads the existing cached
+`TvGuideSummary` already populated/warmed by D-125/D-126 and displays current and
+next programme time ranges in shared TV rows. D-127 marked-incorrect channels
+continue to suppress trusted guide presentation.
 
 **Status: DEVELOPMENT PATCH / RUNTIME VALIDATION NEXT.**
 
-## Blockers
-
-None known before runtime validation.
-
 ## Next Action
 
-Runtime-validate D-127 through the normal onn path using a visible/playable
-channel with a known incorrect guide:
+After APK installation:
 
-1. mark the guide incorrect;
-2. confirm the channel remains visible and playable while current-program/guide
-   presentation is suppressed;
-3. reopen TV after app/companion restart and confirm the mark survives Linux
-   authority synchronization;
-4. run `python3 tools/probes/d127_incorrect_guide_probe.py` and inspect
-   `logs/tv/d127_incorrect_guide_probe.txt`;
-5. exercise Retry and confirm an unchanged rejected source is not silently
-   trusted; then explicitly Accept or Clear and confirm normal guide display can
-   be restored deliberately.
+1. run the D-128 probe with `--prepare`;
+2. open TV and then Favorites on the onn;
+3. confirm visible guide-backed rows show current and next programme time ranges;
+4. run the probe with `--verify` and inspect
+   `logs/tv/d128_guide_style_ui_probe.txt`.
+
+Target:
+
+`D128_GUIDE_STYLE_FAVORITES_RUNTIME_VALIDATED`
 
 ## Success Criteria
 
-- Channel remains visible and playable after `Mark Guide Incorrect`.
-- Known rejected guide is not presented as trusted/current.
-- Mark survives restart and Linux-authoritative TV-state synchronization.
-- Rejected source fingerprint is nonblank and synchronized.
-- Later background recheck does not silently clear user intent.
-- Explicit Retry/Accept or Clear can restore guide trust deliberately.
-- Existing Favorites, Hide, playback, EPG background warming, and TV-state sync
-  regressions remain clean.
+- Favorites/category pages remain paged and navigable.
+- Cached guide-backed rows show `Now:` with start/end time and title.
+- Cached guide-backed rows show `Next:` with start/end time and title when known.
+- D-127 marked-incorrect channels do not show trusted Now/Next programme data.
+- Rendering performs no guide acquisition or channel-state mutation.
+- D-125/D-126 prefetch, playback, Favorites, Hide and TV-state sync remain unchanged.
 
 ## Do Not Reopen Without New Evidence
 
 - D5.4 TV-state seed/push/pull/conflict contract.
 - D-125 non-blocking Linux EPG request boundary.
 - D-126 Favorites/visible-page prefetch seam.
+- D-127 incorrect-guide durable-state contract.
 - External VOD hotplug/storage architecture.
 - Linux Games controller/multitap/video/audio lifecycle.
 - Deferred Opal/Siflower UDP reverse-engineering branch.
@@ -99,11 +83,14 @@ channel with a known incorrect guide:
 
 ## Relevant References
 
-- `investigations/D127_INCORRECT_GUIDE_INTENT.md`
+- `investigations/D128_GUIDE_STYLE_CATEGORY_PRESENTATION.md`
+- `evidence/D127_INCORRECT_GUIDE_RUNTIME_ACCEPTANCE_2026-09-17.md`
 - `architecture/TV_STATE_SYNC.md`
-- `architecture/TV_MEDIA.md`
-- `evidence/D125_EPG_BACKGROUND_WARMER_RUNTIME_ACCEPTANCE_2026-09-17.md`
-- `evidence/D126_ANDROID_EPG_PREFETCH_RUNTIME_ACCEPTANCE_2026-09-17.md`
 - `roadmap/STATUS.md`
 - `2026-09-17.md`
-- `MAINTENANCE.md`
+
+## After D-128
+
+1. correct/expand EPG coverage/status presentation;
+2. focused TV/media regression;
+3. checkpoint/close bounded D5 TV work.

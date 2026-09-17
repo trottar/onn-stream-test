@@ -6,6 +6,19 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D128_GUIDE_STYLE:PATCH_INDEX:BEGIN -->
+### D-128 — guide-style category presentation — 2026-09-17
+
+Android presentation-only development patch, rev3. Rev1 was rolled back after the Kotlin compiler found a duplicate `formatTvGuideTime(Long)` overload. Rev2 corrected the code transform but its delivery wrapper could terminate the interactive shell. Rev3 preserves the corrected code and restores the safe function-local return procedure.
+
+Shared paged TV rows display cached Now/Next programme time ranges while
+preserving D-127 incorrect-guide suppression. No EPG acquisition, TV-state,
+playback, Hide, Favorites, VOD or Games behavior changes.
+
+Runtime probe:
+`logs/tv/d128_guide_style_ui_probe.txt`.
+<!-- PRIVYHUB_D128_GUIDE_STYLE:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D127_INCORRECT_GUIDE:PATCH_INDEX:BEGIN -->
 ### D-127 — durable incorrect-guide intent / recheck — 2026-09-17
 

@@ -6,6 +6,18 @@ baseline_commit: 0206017cfd8f0fc57decb7a5e9e8632e6a4f6cdd
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D128_GUIDE_STYLE:UI_RULE:BEGIN -->
+## TV guide-row presentation rule
+
+TV category/Favorites rendering consumes Android cached guide state only.
+Rendering must not synchronously acquire EPG data or mutate channel state.
+D-125/D-126 remain responsible for non-blocking acquisition/warm-ahead.
+
+Guide-backed rows may present compact current/next time ranges. A D-127
+`guide_incorrect` mark overrides those cached rows: rejected guide data may remain
+cached for recheck but is not presented as trusted Now/Next content.
+<!-- PRIVYHUB_D128_GUIDE_STYLE:UI_RULE:END -->
+
 ## Incorrect-guide durable-intent rule (D-127 development)
 
 A bad EPG mapping is not a playback-health failure and must not hide an otherwise

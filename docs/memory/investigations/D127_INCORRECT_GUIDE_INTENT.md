@@ -1,5 +1,20 @@
 # D-127 — Durable incorrect-guide intent and deferred recheck
 
+<!-- PRIVYHUB_D128:D127_ACCEPTANCE:BEGIN -->
+## Runtime result — accepted
+
+Classification:
+
+`D127_INCORRECT_GUIDE_DURABILITY_CONFIRMED`
+
+Observed one marked Android channel with exact Linux durable-state match,
+`manual_hidden = 0`, `auto_hidden = 0`, rejected source key present, mark
+timestamp present and no problems.
+
+D-127 is closed/runtime validated. D-128 proceeds as a separate Android
+presentation-only change.
+<!-- PRIVYHUB_D128:D127_ACCEPTANCE:END -->
+
 **Date:** 2026-09-17
 
 **Status:** development patch / runtime validation pending

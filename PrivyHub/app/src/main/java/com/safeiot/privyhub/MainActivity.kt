@@ -3726,6 +3726,20 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    private fun tvGuideProgrammeSpan(
+        programme: TvProgramme
+    ): String =
+        formatTvGuideTime(
+            programme.startMs
+        ) +
+            " - " +
+            formatTvGuideTime(
+                programme.stopMs
+            ) +
+            "  " +
+            programme.title
+
+
     private fun tvChannelToNode(
         channel: TvChannel
     ): SourceNode {
@@ -3773,12 +3787,19 @@ class MainActivity : AppCompatActivity() {
                 )
             }
 
-        val nowPlaying =
+        val currentProgramme =
             guide
                 ?.current
-                ?.title
                 ?.takeIf {
-                    it.isNotBlank()
+                    it.title.isNotBlank()
+                }
+
+        val nextProgramme =
+            guide
+                ?.upcoming
+                ?.firstOrNull()
+                ?.takeIf {
+                    it.title.isNotBlank()
                 }
 
         val displayName =
@@ -3787,9 +3808,22 @@ class MainActivity : AppCompatActivity() {
                     "$prefix${channel.name}"
                 )
 
-                if (nowPlaying != null) {
+                currentProgramme?.let { programme ->
                     append("\nNow: ")
-                    append(nowPlaying)
+                    append(
+                        tvGuideProgrammeSpan(
+                            programme
+                        )
+                    )
+                }
+
+                nextProgramme?.let { programme ->
+                    append("\nNext: ")
+                    append(
+                        tvGuideProgrammeSpan(
+                            programme
+                        )
+                    )
                 }
 
                 if (status.isNotBlank()) {
@@ -5526,17 +5560,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun formatTvGuideTime(
         timestampMs: Long
-    ): String {
-
-        return java.text.SimpleDateFormat(
-            "h:mm a",
-            java.util.Locale.getDefault()
-        ).format(
-            java.util.Date(
-                timestampMs
+    ): String =
+        android.text.format.DateFormat
+            .getTimeFormat(this)
+            .format(
+                java.util.Date(timestampMs)
             )
-        )
-    }
 
 
     private fun showTvProgramGuide(

@@ -5,6 +5,17 @@ as_of: 2026-09-17
 
 # Chat and Memory Communication Protocol
 
+<!-- PRIVYHUB_D128_DELIVERY_SAFETY:BEGIN -->
+## Interactive-shell delivery invariant
+
+User-facing Linux patch blocks must not call `exit`, must not enable persistent
+shell options such as `set -euo pipefail` in the interactive user shell, and
+must not rely on shell termination for error handling. Wrap the complete
+operation in a function and use function-local `return` codes, then print the
+result after the function is unset. A command block that closes the terminal is
+a delivery failure even when repository rollback succeeds.
+<!-- PRIVYHUB_D128_DELIVERY_SAFETY:END -->
+
 ## Platform-command invariant
 
 Before sending an executable command block, match it to the active host, shell,
