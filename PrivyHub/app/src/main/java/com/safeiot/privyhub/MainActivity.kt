@@ -2914,12 +2914,12 @@ class MainActivity : AppCompatActivity() {
         force: Boolean = false
     ) {
 
-        val d130EntryStartedMs =
+        val d131EntryStartedMs =
             android.os.SystemClock.elapsedRealtime()
 
         Log.i(
             TAG,
-            "D130_TV_ENTRY session=$d130EntryStartedMs stage=entry_begin total_ms=0"
+            "D131_TV_ENTRY session=$d131EntryStartedMs stage=entry_begin total_ms=0"
         )
 
         val languageCode =
@@ -2937,7 +2937,7 @@ class MainActivity : AppCompatActivity() {
 
             try {
 
-                val d130CatalogStartedMs =
+                val d131CatalogStartedMs =
                     android.os.SystemClock.elapsedRealtime()
 
                 var result =
@@ -2946,63 +2946,25 @@ class MainActivity : AppCompatActivity() {
                         force = force
                     )
 
-                val d130CatalogFinishedMs =
+                val d131CatalogFinishedMs =
                     android.os.SystemClock.elapsedRealtime()
 
                 Log.i(
                     TAG,
-                    "D130_TV_ENTRY session=$d130EntryStartedMs stage=ensure_catalog " +
-                        "elapsed_ms=${d130CatalogFinishedMs - d130CatalogStartedMs} " +
-                        "total_ms=${d130CatalogFinishedMs - d130EntryStartedMs} " +
+                    "D131_TV_ENTRY session=$d131EntryStartedMs stage=ensure_catalog " +
+                        "elapsed_ms=${d131CatalogFinishedMs - d131CatalogStartedMs} " +
+                        "total_ms=${d131CatalogFinishedMs - d131EntryStartedMs} " +
                         "cached=${result.usedCachedData}"
                 )
 
-                val d130SyncStartedMs =
-                    android.os.SystemClock.elapsedRealtime()
-
-                val syncResult =
-                    synchronizeTvStateNow()
-
-                val d130SyncFinishedMs =
-                    android.os.SystemClock.elapsedRealtime()
-
-                Log.i(
-                    TAG,
-                    "D130_TV_ENTRY session=$d130EntryStartedMs stage=state_sync " +
-                        "elapsed_ms=${d130SyncFinishedMs - d130SyncStartedMs} " +
-                        "total_ms=${d130SyncFinishedMs - d130EntryStartedMs} " +
-                        "action=${syncResult?.action ?: "none"} " +
-                        "local_changed=${syncResult?.localStateChanged ?: false}"
-                )
-
-                if (
-                    syncResult
-                        ?.localStateChanged ==
-                    true
-                ) {
-                    val d130PostSyncCatalogStartedMs =
-                        android.os.SystemClock.elapsedRealtime()
-
-                    result =
-                        tvRepository.ensureCatalog(
-                            languageCode =
-                                getTvLanguageCode(),
-                            force =
-                                false
-                        )
-
-                    val d130PostSyncCatalogFinishedMs =
-                        android.os.SystemClock.elapsedRealtime()
-
-                    Log.i(
-                        TAG,
-                        "D130_TV_ENTRY session=$d130EntryStartedMs stage=post_sync_catalog " +
-                            "elapsed_ms=${d130PostSyncCatalogFinishedMs - d130PostSyncCatalogStartedMs} " +
-                            "total_ms=${d130PostSyncCatalogFinishedMs - d130EntryStartedMs} " +
-                            "cached=${result.usedCachedData}"
-                    )
-                }
-
+                /*
+                 * D-130 measured Linux TV-state synchronization at 24.214 s while
+                 * the cached catalog check took 7 ms. Render the local TV home
+                 * immediately, then preserve the same Linux-authority pull/import
+                 * off the first-render critical path.
+                 */
+                val initialResult =
+                    result
 
                 runOnUiThread {
 
@@ -3010,44 +2972,33 @@ class MainActivity : AppCompatActivity() {
                         buildTvHomeNode()
                     )
 
-                    val syncSuffix =
-                        when (
-                            syncResult
-                                ?.action
-                        ) {
-                            "seeded" ->
-                                " - state seeded"
-
-                            "pulled" ->
-                                " - state synced"
-
-                            else ->
-                                ""
-                        }
-
                     statusText.text =
-                        if (result.usedCachedData) {
-                            "TV: ${getTvLanguageName()} - cached catalog$syncSuffix"
+                        if (initialResult.usedCachedData) {
+                            "TV: ${getTvLanguageName()} - cached catalog - syncing state..."
                         } else {
-                            "TV: ${getTvLanguageName()} - ${result.channelCount} streams$syncSuffix"
+                            "TV: ${getTvLanguageName()} - ${initialResult.channelCount} streams - syncing state..."
                         }
 
-                    val d130UiStartedMs =
+                    val d131UiStartedMs =
                         android.os.SystemClock.elapsedRealtime()
 
                     renderCurrentPage()
 
-                    val d130UiFinishedMs =
+                    val d131UiFinishedMs =
                         android.os.SystemClock.elapsedRealtime()
 
                     Log.i(
                         TAG,
-                        "D130_TV_ENTRY session=$d130EntryStartedMs stage=ui_ready " +
-                            "elapsed_ms=${d130UiFinishedMs - d130UiStartedMs} " +
-                            "total_ms=${d130UiFinishedMs - d130EntryStartedMs}"
+                        "D131_TV_ENTRY session=$d131EntryStartedMs stage=ui_ready " +
+                            "elapsed_ms=${d131UiFinishedMs - d131UiStartedMs} " +
+                            "total_ms=${d131UiFinishedMs - d131EntryStartedMs}"
                     )
                 }
 
+                /*
+                 * Preserve D-126 warm-ahead at TV entry. This work no longer waits
+                 * for the Linux state round trip before it can begin.
+                 */
                 val favoriteChannels =
                     tvRepository.queryChannels(
                         languageCode =
@@ -3076,6 +3027,128 @@ class MainActivity : AppCompatActivity() {
                     favoriteChannels
                 )
 
+                val d131SyncStartedMs =
+                    android.os.SystemClock.elapsedRealtime()
+
+                val syncResult =
+                    synchronizeTvStateNow()
+
+                val d131SyncFinishedMs =
+                    android.os.SystemClock.elapsedRealtime()
+
+                Log.i(
+                    TAG,
+                    "D131_TV_ENTRY session=$d131EntryStartedMs stage=state_sync_complete " +
+                        "elapsed_ms=${d131SyncFinishedMs - d131SyncStartedMs} " +
+                        "total_ms=${d131SyncFinishedMs - d131EntryStartedMs} " +
+                        "action=${syncResult?.action ?: "none"} " +
+                        "local_changed=${syncResult?.localStateChanged ?: false}"
+                )
+
+                if (
+                    syncResult
+                        ?.localStateChanged ==
+                    true
+                ) {
+                    val d131PostSyncCatalogStartedMs =
+                        android.os.SystemClock.elapsedRealtime()
+
+                    result =
+                        tvRepository.ensureCatalog(
+                            languageCode =
+                                getTvLanguageCode(),
+                            force =
+                                false
+                        )
+
+                    val d131PostSyncCatalogFinishedMs =
+                        android.os.SystemClock.elapsedRealtime()
+
+                    Log.i(
+                        TAG,
+                        "D131_TV_ENTRY session=$d131EntryStartedMs stage=post_sync_catalog " +
+                            "elapsed_ms=${d131PostSyncCatalogFinishedMs - d131PostSyncCatalogStartedMs} " +
+                            "total_ms=${d131PostSyncCatalogFinishedMs - d131EntryStartedMs} " +
+                            "cached=${result.usedCachedData}"
+                    )
+                }
+
+                val reconciledResult =
+                    result
+
+                runOnUiThread {
+
+                    val syncSuffix =
+                        when (
+                            syncResult
+                                ?.action
+                        ) {
+                            "seeded" ->
+                                " - state seeded"
+
+                            "pulled" ->
+                                " - state synced"
+
+                            else ->
+                                ""
+                        }
+
+                    when {
+                        navigationStack
+                            .lastOrNull()
+                            ?.id ==
+                            "__tv_home" -> {
+
+                            navigationStack[
+                                navigationStack.lastIndex
+                            ] =
+                                buildTvHomeNode()
+
+                            statusText.text =
+                                if (reconciledResult.usedCachedData) {
+                                    "TV: ${getTvLanguageName()} - cached catalog$syncSuffix"
+                                } else {
+                                    "TV: ${getTvLanguageName()} - ${reconciledResult.channelCount} streams$syncSuffix"
+                                }
+
+                            renderCurrentPage()
+                        }
+
+                        syncResult
+                            ?.localStateChanged ==
+                            true &&
+                            isCurrentTvResultPage() -> {
+
+                            refreshCurrentTvResultPage()
+                        }
+
+                        isInTv() &&
+                            syncResult != null -> {
+
+                            statusText.text =
+                                when (syncResult.action) {
+                                    "seeded" ->
+                                        "TV state seeded"
+                                    "pulled" ->
+                                        "TV state synced"
+                                    else ->
+                                        statusText.text
+                                }
+                        }
+                    }
+
+                    val d131ReconciledMs =
+                        android.os.SystemClock.elapsedRealtime()
+
+                    Log.i(
+                        TAG,
+                        "D131_TV_ENTRY session=$d131EntryStartedMs stage=sync_reconciled " +
+                            "total_ms=${d131ReconciledMs - d131EntryStartedMs} " +
+                            "action=${syncResult?.action ?: "none"} " +
+                            "local_changed=${syncResult?.localStateChanged ?: false}"
+                    )
+                }
+
             } catch (error: Exception) {
 
                 Log.e(
@@ -3083,7 +3156,6 @@ class MainActivity : AppCompatActivity() {
                     "Failed to load local TV catalog",
                     error
                 )
-
 
                 if (
                     languageCode !=

@@ -6,6 +6,21 @@ baseline_commit: 0206017cfd8f0fc57decb7a5e9e8632e6a4f6cdd
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D131_NONBLOCKING_TV_ENTRY:MEMORY:BEGIN -->
+## TV-entry synchronization scheduling rule
+
+D-130 measured a cached top-level TV entry at 24,525 ms: catalog 7 ms, Linux
+TV-state sync 24,214 ms, post-sync catalog 3 ms, UI render 291 ms. The authority
+operation was valid but dominated the first-render path.
+
+D-131 therefore preserves Linux durable authority while decoupling responsiveness
+from reachability/latency: render the valid local TV cache first, then perform the
+same Linux pull/import on the network executor and reconcile afterward. Do not
+make first TV-home render depend on a remote state round trip when a valid local
+cache exists.
+<!-- PRIVYHUB_D131_NONBLOCKING_TV_ENTRY:MEMORY:END -->
+
+
 <!-- PRIVYHUB_D129_SINGLE_COLUMN_GUIDE:MEMORY:BEGIN -->
 ## TV guide presentation rule
 

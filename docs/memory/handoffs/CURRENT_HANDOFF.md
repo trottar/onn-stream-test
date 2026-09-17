@@ -1,7 +1,7 @@
 ---
 memory_schema: 2
 as_of: 2026-09-17
-baseline_commit: bfc62a6c5b815ecbd9427af0117d5c22906e2998
+baseline_commit: 6da5c4506128b2518370de0f46e7b719bd967850
 ---
 
 # Current Handoff
@@ -12,16 +12,15 @@ The authoritative resumable state is `../CURRENT.md`. Read it first.
 
 - Authoritative Linux worktree: `/home/privyhub/Projects/onn-stream-test`.
 - D-125, D-126, D-127 and D-129 are runtime accepted.
-- D-128 is superseded after `D128_GUIDE_STYLE_ROWS_NOT_OBSERVED`.
-- D-129 runtime acceptance: four visible guide rows, all full-width/one-column;
-  three rows had current-programme data and one explicitly reported unavailable
-  guide data.
-- Remaining Live TV usability observation: top-level `Loading TV catalog...`
-  still takes a few seconds while result-page navigation is otherwise responsive.
-- D-130 is diagnostic-only timing instrumentation for the existing TV-entry
-  stages; do not change sync/catalog policy until its measurements are inspected.
+- D-128 is superseded after runtime UI failure.
+- D-130 measured TV entry at 24,525 ms: catalog 7 ms, state sync 24,214 ms,
+  post-sync catalog 3 ms, UI render 291 ms.
+- D-131 moves the unchanged Linux TV-state pull/import off the first-render
+  critical path and reconciles afterward.
+- D-131 does not change TV-state schemas, revision authority, conflict semantics,
+  playback, guide acquisition or the D-129 layout.
 
 ## Resume
 
-Run the D-130 prepare/open-TV/verify sequence in `CURRENT.md`, inspect the raw
-stage timings, then make one production change against the measured bottleneck.
+Runtime-validate D-131 with `tools/probes/d131_tv_entry_nonblocking_probe.py`.
+Target: `D131_TV_ENTRY_NONBLOCKING_SYNC_VALIDATED`.

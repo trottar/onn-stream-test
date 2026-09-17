@@ -6,6 +6,20 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D131_NONBLOCKING_TV_ENTRY:PATCH_INDEX:BEGIN -->
+### D-131 — non-blocking TV-entry state sync — 2026-09-17
+
+Production scheduling fix driven by D-130 runtime evidence. The cached TV home
+renders before Linux TV-state synchronization; the unchanged authority pull/import
+continues in background and reconciles afterward.
+
+Runtime probe:
+`logs/tv/d131_tv_entry_nonblocking_probe.txt`.
+
+**Status:** development patch / runtime validation pending.
+<!-- PRIVYHUB_D131_NONBLOCKING_TV_ENTRY:PATCH_INDEX:END -->
+
+
 <!-- PRIVYHUB_D130_TV_ENTRY_LATENCY:PATCH_INDEX:BEGIN -->
 ### D-130 — TV-entry latency stage probe — 2026-09-17
 

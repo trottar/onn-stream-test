@@ -5,32 +5,27 @@ as_of: 2026-09-17
 
 # Active Investigations and Queued Work
 
-## Active — D-130 top-level TV-entry latency
+## Active — D-131 non-blocking TV-entry state sync
 
-D-129 is runtime accepted. The one-column guide renderer is not the remaining
-latency source: Favorites/category result pages load within a few seconds and the
-specific persistent delay is top-level `Loading TV catalog...`.
+D-130 measured:
 
-D-130 measures one existing `openTvHome()` execution:
+- total TV entry: 24,525 ms;
+- initial cached catalog: 7 ms;
+- Linux TV-state sync: 24,214 ms;
+- post-sync catalog: 3 ms;
+- UI render: 291 ms.
 
-- initial `ensureCatalog()`;
-- Linux TV-state synchronize/import;
-- optional second `ensureCatalog()` after sync reports local state changed;
-- UI render / total entry time.
+Classification: `D130_TV_ENTRY_STATE_SYNC_DOMINANT`.
 
-Source inspection shows the initialized TV-state sync path currently imports the
-Linux envelope and reports `localStateChanged = true`; `openTvHome()` then reruns
-`ensureCatalog()`. This is a hypothesis only until D-130 measures the stages.
+D-131 preserves the Linux-authoritative state operation but removes it from the
+first TV-home render critical path. The cached/local TV home renders first; the
+same pull/import continues on the existing network executor and reconciles the
+TV UI after completion.
 
-Canonical investigation: `D130_TV_ENTRY_LATENCY.md`.
+Canonical investigation:
+`D131_NONBLOCKING_TV_ENTRY_STATE_SYNC.md`.
 
-## Queued after D-130
+## Queued after D-131
 
-1. one production fix for the measured TV-entry bottleneck;
-2. corrected/expanded EPG coverage/status presentation;
-3. focused TV/media regression and D5 checkpoint.
-
-## Observed but not active
-
-No separate ADB, playback, Games, VOD, or transport regression is indicated by
-the current evidence.
+1. corrected/expanded EPG coverage/status presentation;
+2. focused TV/media regression and D5 checkpoint.

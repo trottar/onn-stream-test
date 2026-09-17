@@ -276,3 +276,18 @@ user actions or make cached TV browsing unusable.
 Moving catalog/EPG acquisition fully to Linux may reduce client refresh latency
 and centralize provider work, but that broader consolidation is not required to
 establish D5 user-state durability.
+
+<!-- PRIVYHUB_D131_TV_ENTRY_SYNC_SCHEDULING:BEGIN -->
+## TV-entry synchronization scheduling
+
+Linux remains the durable TV-state authority. Android local TV state remains the
+responsive/offline cache.
+
+D-130 established that a reachable Linux pull can still be slow enough to block
+TV entry (~24.2 s measured). D-131 therefore separates authority from first-render
+scheduling: local cached TV UI may render before the pull completes; the same
+versioned pull/import/revision contract runs afterward and reconciles the current
+TV UI when it changes local durable state.
+
+This does not introduce merge semantics or weaken stale-write rejection.
+<!-- PRIVYHUB_D131_TV_ENTRY_SYNC_SCHEDULING:END -->

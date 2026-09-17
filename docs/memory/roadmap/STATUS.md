@@ -1,7 +1,7 @@
 ---
 memory_schema: 2
 as_of: 2026-09-17
-baseline_commit: bfc62a6c5b815ecbd9427af0117d5c22906e2998
+baseline_commit: 6da5c4506128b2518370de0f46e7b719bd967850
 ---
 
 # Roadmap Status
@@ -20,21 +20,26 @@ D5 media/TV work is at its final bounded usability/closeout sequence.
 - D-125 non-blocking EPG cache-miss handling.
 - D-126 Android Favorites/visible-page EPG prefetch.
 - D-127 durable incorrect-guide intent/recheck.
-- D-129 single-column full-width TV guide presentation.
+- D-129 single-column full-width TV guide.
 
 ### Development-only / superseded
 
-- D-128 compact Now/Next text on generic channel tiles: superseded after runtime
-  returned `D128_GUIDE_STYLE_ROWS_NOT_OBSERVED`.
+- D-128 compact Now/Next text on generic tiles: superseded after runtime UI
+  target failure.
+
+### Runtime evidence
+
+- D-130: `D130_TV_ENTRY_STATE_SYNC_DOMINANT`; 24,214 ms of a 24,525 ms cached
+  TV-entry path was synchronous TV-state sync.
 
 ### Active
 
-**D-130 — top-level TV-entry latency stage probe: DIAGNOSTIC / RUNTIME
-MEASUREMENT NEXT.**
+**D-131 — non-blocking top-level TV-state synchronization: DEVELOPMENT PATCH /
+RUNTIME VALIDATION NEXT.**
 
 ### Next
 
-1. measure D-130 and patch only the dominant TV-entry stage;
+1. finish D-131 runtime acceptance;
 2. correct/expand EPG coverage/status presentation;
 3. focused TV/media regression;
 4. checkpoint/close D5 bounded TV work;
