@@ -6,6 +6,15 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D130_TV_ENTRY_LATENCY:PATCH_INDEX:BEGIN -->
+### D-130 — TV-entry latency stage probe — 2026-09-17
+
+Diagnostic-only Android observability patch. Adds monotonic stage markers around
+initial catalog check, Linux TV-state sync, optional post-sync catalog pass and
+UI-ready time. Probe parses raw milliseconds without logging addresses or device
+identifiers. No TV behavior or policy changes.
+<!-- PRIVYHUB_D130_TV_ENTRY_LATENCY:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D129_SINGLE_COLUMN_GUIDE:PATCH_INDEX:BEGIN -->
 ### D-129 — single-column TV guide result presentation — 2026-09-17
 

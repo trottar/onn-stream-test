@@ -15,6 +15,10 @@ category results, search/result pages) must use a dedicated one-column,
 full-width row presentation. Non-TV catalog/VOD/Games pages retain their normal
 tile layout.
 
+D-129 runtime validated this contract: four visible Favorites guide rows were
+full-width and one-column; three carried current-programme data and one showed an
+explicit unavailable-guide state.
+
 Guide presentation and guide acquisition remain separate. Android may perform a
 bounded companion-only hydration pass to copy already-warmed guide data into its
 local cache, but normal UI rendering must not restore synchronous upstream EPG
@@ -33,7 +37,7 @@ Guide-backed rows may present compact current/next time ranges. A D-127
 cached for recheck but is not presented as trusted Now/Next content.
 <!-- PRIVYHUB_D128_GUIDE_STYLE:UI_RULE:END -->
 
-## Incorrect-guide durable-intent rule (D-127 development)
+## Incorrect-guide durable-intent rule (D-127 accepted)
 
 A bad EPG mapping is not a playback-health failure and must not hide an otherwise
 playable channel. D-127 carries incorrect-guide state as Linux-authoritative
@@ -47,7 +51,7 @@ explicit Retry/Accept or Clear action. TV user-state v2 is fail-closed at the
 Android sync boundary; Linux alone migrates persisted v1 authority to v2 without
 advancing the household revision.
 
-**Status:** development contract; runtime validation pending.
+**Status:** runtime validated by D-127 durable Android/Linux parity evidence.
 
 
 This file contains durable rules and repeatedly useful validated facts. It is not

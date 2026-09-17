@@ -5,28 +5,32 @@ as_of: 2026-09-17
 
 # Active Investigations and Queued Work
 
-## Active — D-129 single-column TV guide
+## Active — D-130 top-level TV-entry latency
 
-D-128 runtime failed with `D128_GUIDE_STYLE_ROWS_NOT_OBSERVED`. Inspection showed
-that D-128 changed only channel text; the actual renderer remained the generic
-`GridLayout` with three columns and fixed-width source buttons.
+D-129 is runtime accepted. The one-column guide renderer is not the remaining
+latency source: Favorites/category result pages load within a few seconds and the
+specific persistent delay is top-level `Loading TV catalog...`.
 
-D-129 therefore changes the rendering seam:
+D-130 measures one existing `openTvHome()` execution:
 
-- TV result pages: one column, full-width focusable guide rows;
-- non-TV pages: unchanged three-column tile layout;
-- row content: channel + current/next programme when available, explicit
-  unavailable/incorrect-guide state otherwise;
-- Android guide cache: bounded companion-only hydration before result render.
+- initial `ensureCatalog()`;
+- Linux TV-state synchronize/import;
+- optional second `ensureCatalog()` after sync reports local state changed;
+- UI render / total entry time.
 
-Canonical investigation: `D129_SINGLE_COLUMN_TV_GUIDE.md`.
+Source inspection shows the initialized TV-state sync path currently imports the
+Linux envelope and reports `localStateChanged = true`; `openTvHome()` then reruns
+`ensureCatalog()`. This is a hypothesis only until D-130 measures the stages.
 
-## Queued after D-129
+Canonical investigation: `D130_TV_ENTRY_LATENCY.md`.
 
-1. corrected/expanded EPG coverage/status presentation;
-2. focused TV/media regression and D5 checkpoint.
+## Queued after D-130
+
+1. one production fix for the measured TV-entry bottleneck;
+2. corrected/expanded EPG coverage/status presentation;
+3. focused TV/media regression and D5 checkpoint.
 
 ## Observed but not active
 
-Top-level TV entry still spends a few seconds on `Loading TV catalog...`.
-Do not reopen that path without new evidence during this bounded guide UI change.
+No separate ADB, playback, Games, VOD, or transport regression is indicated by
+the current evidence.

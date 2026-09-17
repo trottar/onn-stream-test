@@ -2914,6 +2914,14 @@ class MainActivity : AppCompatActivity() {
         force: Boolean = false
     ) {
 
+        val d130EntryStartedMs =
+            android.os.SystemClock.elapsedRealtime()
+
+        Log.i(
+            TAG,
+            "D130_TV_ENTRY session=$d130EntryStartedMs stage=entry_begin total_ms=0"
+        )
+
         val languageCode =
             getTvLanguageCode()
 
@@ -2929,20 +2937,52 @@ class MainActivity : AppCompatActivity() {
 
             try {
 
+                val d130CatalogStartedMs =
+                    android.os.SystemClock.elapsedRealtime()
+
                 var result =
                     tvRepository.ensureCatalog(
                         languageCode = languageCode,
                         force = force
                     )
 
+                val d130CatalogFinishedMs =
+                    android.os.SystemClock.elapsedRealtime()
+
+                Log.i(
+                    TAG,
+                    "D130_TV_ENTRY session=$d130EntryStartedMs stage=ensure_catalog " +
+                        "elapsed_ms=${d130CatalogFinishedMs - d130CatalogStartedMs} " +
+                        "total_ms=${d130CatalogFinishedMs - d130EntryStartedMs} " +
+                        "cached=${result.usedCachedData}"
+                )
+
+                val d130SyncStartedMs =
+                    android.os.SystemClock.elapsedRealtime()
+
                 val syncResult =
                     synchronizeTvStateNow()
+
+                val d130SyncFinishedMs =
+                    android.os.SystemClock.elapsedRealtime()
+
+                Log.i(
+                    TAG,
+                    "D130_TV_ENTRY session=$d130EntryStartedMs stage=state_sync " +
+                        "elapsed_ms=${d130SyncFinishedMs - d130SyncStartedMs} " +
+                        "total_ms=${d130SyncFinishedMs - d130EntryStartedMs} " +
+                        "action=${syncResult?.action ?: "none"} " +
+                        "local_changed=${syncResult?.localStateChanged ?: false}"
+                )
 
                 if (
                     syncResult
                         ?.localStateChanged ==
                     true
                 ) {
+                    val d130PostSyncCatalogStartedMs =
+                        android.os.SystemClock.elapsedRealtime()
+
                     result =
                         tvRepository.ensureCatalog(
                             languageCode =
@@ -2950,6 +2990,17 @@ class MainActivity : AppCompatActivity() {
                             force =
                                 false
                         )
+
+                    val d130PostSyncCatalogFinishedMs =
+                        android.os.SystemClock.elapsedRealtime()
+
+                    Log.i(
+                        TAG,
+                        "D130_TV_ENTRY session=$d130EntryStartedMs stage=post_sync_catalog " +
+                            "elapsed_ms=${d130PostSyncCatalogFinishedMs - d130PostSyncCatalogStartedMs} " +
+                            "total_ms=${d130PostSyncCatalogFinishedMs - d130EntryStartedMs} " +
+                            "cached=${result.usedCachedData}"
+                    )
                 }
 
 
@@ -2981,7 +3032,20 @@ class MainActivity : AppCompatActivity() {
                             "TV: ${getTvLanguageName()} - ${result.channelCount} streams$syncSuffix"
                         }
 
+                    val d130UiStartedMs =
+                        android.os.SystemClock.elapsedRealtime()
+
                     renderCurrentPage()
+
+                    val d130UiFinishedMs =
+                        android.os.SystemClock.elapsedRealtime()
+
+                    Log.i(
+                        TAG,
+                        "D130_TV_ENTRY session=$d130EntryStartedMs stage=ui_ready " +
+                            "elapsed_ms=${d130UiFinishedMs - d130UiStartedMs} " +
+                            "total_ms=${d130UiFinishedMs - d130EntryStartedMs}"
+                    )
                 }
 
                 val favoriteChannels =

@@ -2,6 +2,8 @@
 
 **Date:** 2026-09-17
 
+**Status:** runtime accepted
+
 ## Purpose
 
 Replace the failed D-128 text-only tile treatment with the requested actual TV
@@ -15,17 +17,17 @@ column.
 
 ## Safety / validation
 
-Installer verifies exact D-128 predecessor blobs, backs up every changed file,
-compiles the diagnostic probe, runs probe/installer self-tests, runs the real
-Android debug build, runs `git diff --check` and memory-health validation, and
-restores exact predecessor bytes if a post-write gate fails.
+Installer verified exact D-128 predecessor blobs, backed up every changed file,
+compiled the diagnostic probe, ran probe/installer self-tests, ran the real
+Android debug build, ran `git diff --check` and memory-health validation.
 
 ## Runtime acceptance
 
-Open TV -> Favorites and verify with:
-
-`python3 tools/probes/d129_single_column_tv_guide_probe.py --repo . --verify`
-
-Target:
-
 `D129_SINGLE_COLUMN_TV_GUIDE_RUNTIME_VALIDATED`
+
+The runtime probe measured four visible TV guide rows, all full-width and in one
+column. Three rows contained current-programme data and one explicitly reported
+unavailable guide data.
+
+Evidence:
+`docs/memory/evidence/D129_SINGLE_COLUMN_TV_GUIDE_RUNTIME_ACCEPTANCE_2026-09-17.md`.
