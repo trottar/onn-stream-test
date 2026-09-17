@@ -6,6 +6,21 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D124A_SPLIT_DB_FIX:ACTIVE:BEGIN -->
+## ACTIVE — D-124A correction pending rerun
+
+D-124's first runtime attempt did not test the latency hypothesis.
+
+It failed in diagnostic code because a TV-database query referenced the
+EPG-only `programmes` table.
+
+D-124A fixes only that measurement and adds direct split-database self-test
+coverage.
+
+The original D-124 latency hypothesis remains active and unclassified until the
+corrected report is produced.
+<!-- PRIVYHUB_D124A_SPLIT_DB_FIX:ACTIVE:END -->
+
 <!-- PRIVYHUB_D124_EPG_LATENCY:ACTIVE:BEGIN -->
 ## ACTIVE — D-124 TV/EPG latency
 

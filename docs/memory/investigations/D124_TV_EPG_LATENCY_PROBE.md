@@ -1,5 +1,26 @@
 # D-124 — TV/EPG latency probe
 
+<!-- PRIVYHUB_D124A_SPLIT_DB_FIX:INVESTIGATION:BEGIN -->
+## First runtime attempt — diagnostic defect
+
+The first runtime execution stopped before report generation:
+
+`sqlite3.OperationalError: no such table: programmes`
+
+The favorite cache-coverage SQL was executed through the TV database connection
+but referenced `programmes`, which exists only in the EPG database snapshot.
+
+Therefore this run does not classify the latency hypothesis.
+
+D-124A corrects the metric by querying favorite IDs from TV and programme IDs
+from EPG separately, then intersecting the sets in Python.
+
+A split-database self-test now exercises this exact boundary.
+
+Status after D-124A:
+runtime latency evidence pending corrected rerun.
+<!-- PRIVYHUB_D124A_SPLIT_DB_FIX:INVESTIGATION:END -->
+
 **Status:** diagnostic-only / runtime evidence pending
 
 ## Hypothesis

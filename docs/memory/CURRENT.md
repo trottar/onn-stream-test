@@ -6,6 +6,29 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D124A_SPLIT_DB_FIX:CURRENT:BEGIN -->
+## D-124A — latency probe split-database correction
+
+The first D-124 runtime attempt failed inside the probe before a report was
+written:
+
+`sqlite3.OperationalError: no such table: programmes`
+
+Cause:
+the favorite EPG-cache coverage query ran on the TV DB connection while
+referencing the EPG-only `programmes` table.
+
+This is a diagnostic implementation defect, not production TV/EPG evidence.
+
+D-124A keeps production unchanged and corrects only that measurement by
+intersecting channel-ID sets read independently from the TV and EPG snapshots.
+
+A split-database self-test now covers the exact runtime failure mode.
+
+Next step:
+rerun D-124 and inspect its actual latency report before any production change.
+<!-- PRIVYHUB_D124A_SPLIT_DB_FIX:CURRENT:END -->
+
 <!-- PRIVYHUB_D124_EPG_LATENCY:CURRENT:BEGIN -->
 ## D-124 — TV/EPG latency diagnostic active
 

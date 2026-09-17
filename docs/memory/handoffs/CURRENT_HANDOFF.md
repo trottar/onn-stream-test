@@ -6,6 +6,26 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D124A_SPLIT_DB_FIX:HANDOFF:BEGIN -->
+## D-124A handoff — rerun corrected latency probe
+
+The first D-124 attempt produced no report because the probe incorrectly crossed
+the TV/EPG SQLite boundary.
+
+D-124A corrects that diagnostic bug only.
+
+After installing D-124A, run:
+
+`python3 tools/probes/d124_tv_epg_latency_probe.py --repo /home/privyhub/Projects/onn-stream-test`
+
+Return:
+
+`logs/tv/d124_tv_epg_latency_probe.txt`
+
+Do not make a production optimization until that corrected runtime evidence is
+inspected.
+<!-- PRIVYHUB_D124A_SPLIT_DB_FIX:HANDOFF:END -->
+
 <!-- PRIVYHUB_D124_EPG_LATENCY:HANDOFF:BEGIN -->
 ## D-124 handoff — TV/EPG latency
 

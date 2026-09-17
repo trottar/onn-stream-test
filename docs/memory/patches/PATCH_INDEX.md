@@ -6,6 +6,22 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D124A_SPLIT_DB_FIX:PATCH_INDEX:BEGIN -->
+### D-124A — TV/EPG latency probe split-DB fix — 2026-09-17
+
+Diagnostic-only correction.
+
+Fixes the first D-124 runtime failure where a TV SQLite connection referenced
+the EPG-only `programmes` table.
+
+Favorite programme-cache coverage is now computed from independent TV and EPG
+channel-ID queries plus a Python set intersection.
+
+Adds a split-database regression self-test.
+
+No production code change.
+<!-- PRIVYHUB_D124A_SPLIT_DB_FIX:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D124_EPG_LATENCY:PATCH_INDEX:BEGIN -->
 ### D-124 — TV/EPG latency probe — 2026-09-17
 

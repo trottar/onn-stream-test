@@ -211,6 +211,66 @@ def one_int(
     )
 
 
+
+def favorite_programme_cache_coverage(
+    tv: sqlite3.Connection,
+    epg: sqlite3.Connection,
+    now_ms: int,
+) -> tuple[int, int]:
+    favorite_ids = {
+        str(
+            row[0]
+            or ""
+        ).strip()
+        for row in tv.execute(
+            """
+            SELECT DISTINCT channel_id
+            FROM streams
+            WHERE
+                favorite = 1
+                AND manual_hidden = 0
+                AND auto_hidden = 0
+                AND TRIM(channel_id) <> ''
+            """
+        ).fetchall()
+    }
+
+    favorite_ids.discard(
+        ""
+    )
+
+    programme_ids = {
+        str(
+            row[0]
+            or ""
+        ).strip()
+        for row in epg.execute(
+            """
+            SELECT DISTINCT channel_id
+            FROM programmes
+            WHERE stop_ms > ?
+            """,
+            (
+                now_ms,
+            ),
+        ).fetchall()
+    }
+
+    programme_ids.discard(
+        ""
+    )
+
+    return (
+        len(
+            favorite_ids
+        ),
+        len(
+            favorite_ids
+            & programme_ids
+        ),
+    )
+
+
 def timed_query(
     connection: sqlite3.Connection,
     sql: str,
@@ -468,6 +528,64 @@ def main() -> int:
             3,
         ) == 2.0
 
+        tv_test = sqlite3.connect(
+            ":memory:"
+        )
+
+        epg_test = sqlite3.connect(
+            ":memory:"
+        )
+
+        try:
+            tv_test.executescript(
+                """
+                CREATE TABLE streams (
+                    channel_id TEXT NOT NULL,
+                    favorite INTEGER NOT NULL,
+                    manual_hidden INTEGER NOT NULL,
+                    auto_hidden INTEGER NOT NULL
+                );
+
+                INSERT INTO streams
+                VALUES
+                    ('channel.a', 1, 0, 0),
+                    ('channel.b', 1, 0, 0),
+                    ('channel.hidden', 1, 1, 0),
+                    ('channel.nonfavorite', 0, 0, 0);
+                """
+            )
+
+            epg_test.executescript(
+                """
+                CREATE TABLE programmes (
+                    channel_id TEXT NOT NULL,
+                    stop_ms INTEGER NOT NULL
+                );
+
+                INSERT INTO programmes
+                VALUES
+                    ('channel.a', 2000),
+                    ('channel.nonfavorite', 2000),
+                    ('channel.old', 500);
+                """
+            )
+
+            (
+                favorite_count,
+                cached_count,
+            ) = favorite_programme_cache_coverage(
+                tv_test,
+                epg_test,
+                1000,
+            )
+
+            assert favorite_count == 2
+            assert cached_count == 1
+
+        finally:
+            tv_test.close()
+            epg_test.close()
+
         print(
             "D124_PROBE_SELF_TEST_OK"
         )
@@ -711,47 +829,13 @@ def main() -> int:
                 ),
             )
 
-            favorite_channel_count = one_int(
+            (
+                favorite_channel_count,
+                favorite_cached_channels,
+            ) = favorite_programme_cache_coverage(
                 tv,
-                """
-                SELECT COUNT(
-                    DISTINCT channel_id
-                )
-                FROM streams
-                WHERE
-                    favorite = 1
-                    AND manual_hidden = 0
-                    AND auto_hidden = 0
-                    AND TRIM(channel_id) <> ''
-                """,
-            )
-
-            favorite_cached_channels = one_int(
-                tv,
-                """
-                SELECT COUNT(
-                    DISTINCT s.channel_id
-                )
-                FROM streams AS s
-                WHERE
-                    s.favorite = 1
-                    AND s.manual_hidden = 0
-                    AND s.auto_hidden = 0
-                    AND TRIM(
-                        s.channel_id
-                    ) <> ''
-                    AND EXISTS (
-                        SELECT 1
-                        FROM programmes AS p
-                        WHERE
-                            p.channel_id =
-                                s.channel_id
-                            AND p.stop_ms > ?
-                    )
-                """,
-                (
-                    now_ms,
-                ),
+                epg,
+                now_ms,
             )
 
             favorite_cache_ratio = (

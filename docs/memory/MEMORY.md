@@ -6,6 +6,20 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D124A_SPLIT_DB_FIX:MEMORY:BEGIN -->
+## D-124 split-database diagnostic rule
+
+`privyhub_tv.db` and `privyhub_epg.db` are separate read-only probe snapshots.
+
+Do not issue SQL on one snapshot that references tables owned by the other.
+
+Cross-database diagnostic metrics should be computed from independently queried
+identities unless the probe deliberately and safely attaches databases.
+
+The first D-124 runtime failure was caused by violating this rule; it does not
+indicate a production EPG database failure.
+<!-- PRIVYHUB_D124A_SPLIT_DB_FIX:MEMORY:END -->
+
 <!-- PRIVYHUB_D124_EPG_LATENCY:MEMORY:BEGIN -->
 ## TV/EPG performance diagnostic rule
 
