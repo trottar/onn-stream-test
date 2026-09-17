@@ -6,6 +6,18 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D122_MEDIA_REGRESSION:ROADMAP:BEGIN -->
+## D5.4 TV-state sync — final regression gate
+
+Sync contract, normal trigger, diagnostics, conflict protection, and recovery:
+runtime validated through D-121.
+
+D-122 focused TV/media regression: active.
+
+If D-122 automated + manual smoke tests pass, D5.4 may be marked complete /
+runtime validated and development can advance to the next roadmap item.
+<!-- PRIVYHUB_D122_MEDIA_REGRESSION:ROADMAP:END -->
+
 <!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:ROADMAP:BEGIN -->
 ## D5.4 TV-state sync — conflict acceptance active
 

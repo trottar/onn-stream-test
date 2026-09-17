@@ -6,6 +6,21 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D122_MEDIA_REGRESSION:MEMORY:BEGIN -->
+## D5.4 synchronization acceptance
+
+D-121 closes the conflict-specific acceptance boundary:
+a real stale Android durable mutation is rejected by Linux, conflict metadata is
+recorded, Linux remains authoritative, and a later pull restores exact parity.
+
+Do not add merge behavior merely because conflict diagnostics now exist.
+
+Before D5.4 closure, run only a focused regression of already-accepted media
+paths:
+Live TV, Program Guide, VOD, companion source/status endpoints, and final
+TV-state parity.
+<!-- PRIVYHUB_D122_MEDIA_REGRESSION:MEMORY:END -->
+
 <!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:MEMORY:BEGIN -->
 ## D5.4 conflict validation boundary
 

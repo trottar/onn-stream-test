@@ -6,6 +6,28 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D122_MEDIA_REGRESSION:HANDOFF:BEGIN -->
+## D-122 handoff — final D5.4 TV/media regression
+
+D-121 is accepted.
+
+Run:
+`tools/probes/d122_d5_tv_media_regression_probe.py`
+
+Target:
+`D122_D5_TV_MEDIA_AUTOMATED_REGRESSION_BASELINE_VALIDATED`
+
+Then manually confirm on the onn:
+- normal TV categories/navigation;
+- one known-good Live TV channel video + audio;
+- Program Guide real schedule rows on a mapped channel;
+- one existing VOD item plays;
+- back/return navigation works;
+- Catalog / EPG Status still shows TV-state diagnostics.
+
+If all pass, D5.4 is ready for a closure checkpoint.
+<!-- PRIVYHUB_D122_MEDIA_REGRESSION:HANDOFF:END -->
+
 <!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:HANDOFF:BEGIN -->
 ## D-121 handoff — stale-write conflict diagnostics
 

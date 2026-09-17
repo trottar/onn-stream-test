@@ -6,6 +6,20 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D122_MEDIA_REGRESSION:PATCH_INDEX:BEGIN -->
+### D-122 — D5.4 focused TV/media regression gate — 2026-09-17
+
+Diagnostic/manual gate after D-121 conflict acceptance.
+
+Adds a read-only companion/EPG/TV-state regression probe and records D-121
+runtime acceptance.
+
+No production code change.
+
+Runtime evidence:
+`logs/tv/d122_d5_tv_media_regression_probe.txt`.
+<!-- PRIVYHUB_D122_MEDIA_REGRESSION:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:PATCH_INDEX:BEGIN -->
 ### D-121 — D5 TV-state conflict diagnostics probe — 2026-09-17
 

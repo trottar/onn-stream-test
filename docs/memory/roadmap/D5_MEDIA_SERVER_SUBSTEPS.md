@@ -6,6 +6,22 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D122_MEDIA_REGRESSION:D5_SUBSTEPS:BEGIN -->
+## D5.4 — sync accepted; final regression active
+
+D-121 completes the final sync-specific acceptance check.
+
+D-122 is the closure gate:
+- companion/status/source baseline;
+- EPG service ready;
+- exact Linux/onn TV-state parity;
+- Live TV playback smoke;
+- Program Guide smoke;
+- VOD playback smoke.
+
+If clean, record D5.4 complete/runtime validated.
+<!-- PRIVYHUB_D122_MEDIA_REGRESSION:D5_SUBSTEPS:END -->
+
 <!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:D5_SUBSTEPS:BEGIN -->
 ## D5.4 — conflict diagnostic active
 

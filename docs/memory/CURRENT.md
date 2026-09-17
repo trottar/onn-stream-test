@@ -6,6 +6,30 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D122_MEDIA_REGRESSION:CURRENT:BEGIN -->
+## D-122 D5.4 focused TV/media regression gate
+
+D-121 passed all target checks and is runtime accepted.
+
+D5.4 sync-specific acceptance is now complete:
+- Linux durable authority;
+- onn seed/push;
+- Linux pull;
+- true top-level TV-entry trigger;
+- last-sync diagnostics;
+- stale-write rejection;
+- visible conflict diagnostics;
+- authoritative recovery.
+
+No additional sync production patch is indicated.
+
+D-122 is the final closure gate:
+- read-only companion/EPG/TV-state baseline;
+- short onn Live TV / Program Guide / VOD smoke test.
+
+Camera/browser and other deferred subsystems remain outside this gate.
+<!-- PRIVYHUB_D122_MEDIA_REGRESSION:CURRENT:END -->
+
 <!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:CURRENT:BEGIN -->
 ## D-121 D5.4 stale-write conflict diagnostics
 

@@ -6,6 +6,19 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D122_MEDIA_REGRESSION:ACTIVE:BEGIN -->
+## D5.4 ACTIVE — D-122 final regression gate
+
+Synchronization-specific runtime acceptance is complete through D-121.
+
+Active work is limited to regression confirmation of mature media paths.
+
+No new D5.4 feature or architectural change should begin before this gate is
+classified.
+
+If clean, close D5.4 and advance the roadmap.
+<!-- PRIVYHUB_D122_MEDIA_REGRESSION:ACTIVE:END -->
+
 <!-- PRIVYHUB_D121_CONFLICT_DIAGNOSTICS:ACTIVE:BEGIN -->
 ## D5.4 ACTIVE — D-121 conflict diagnostics
 
