@@ -6,6 +6,26 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:D5_SUBSTEPS:BEGIN -->
+## D5.3 post-acceptance integrity checkpoint — D-113
+
+The D-111 EPG data path remains runtime validated.
+
+D-112 readability polish is accepted.
+
+A mislabeled upstream stream demonstrated that a technically correct guide can
+still disagree with video when stream identity metadata is wrong.
+
+D-113 does not reopen acquisition/cache architecture. It audits semantic stream
+identity metadata before D5.4 begins.
+
+Required result:
+catalog-wide count/details of explicit feed-ID/display-name contradictions, with
+10 Bold examined as the known trigger case.
+
+D5.4 state sync remains next after this bounded integrity decision.
+<!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:D5_SUBSTEPS:END -->
+
 <!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:D5_SUBSTEPS:BEGIN -->
 ## D5.3 accepted — D-112 visual polish
 

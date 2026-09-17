@@ -6,6 +6,20 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:PATCH_INDEX:BEGIN -->
+### D-113 — D5 stream identity audit — 2026-09-16
+
+Diagnostic-only patch.
+
+Audits current onn built-in IPTV-org rows against official feed/stream metadata
+after a known 10 Bold stream mismatch.
+
+No production code, TV DB, EPG DB, or cache mutation.
+
+Runtime evidence next:
+`logs/tv/d113_stream_identity_audit.txt`.
+<!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:PATCH_INDEX:BEGIN -->
 ### D-112 — D5 Program Guide newline polish — 2026-09-16
 

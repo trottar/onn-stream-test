@@ -6,6 +6,37 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:CURRENT:BEGIN -->
+## D-113 D5 stream-identity integrity audit
+
+D-111 companion-backed Android EPG remains runtime validated.
+
+D-112 Program Guide newline polish is visually accepted.
+
+A new semantic-integrity issue was then observed:
+the search entry `10 Bold Adelaide` plays children's programming while its
+companion-backed guide shows 10 Bold programming.
+
+Current upstream evidence identifies a catalog/source contradiction:
+- official stream canonical ID: `10Bold.au@Sydney`;
+- official stream title: `10 Bold Adelaide`;
+- an existing IPTV-org issue reports that the same URL actually carries Rocky
+  Mountain PBS Kids.
+
+Therefore:
+- EPG acquisition/cache/transport remains accepted;
+- guide-to-video semantic correctness is **not globally assumed** for every
+  third-party stream;
+- playback health is not equivalent to stream identity health.
+
+D-113 is diagnostic-only and audits the current built-in catalog for explicit
+feed-ID/display-name contradictions using official IPTV-org `feeds.json` and
+`streams.json`.
+
+Do not add automatic hiding/suppression until D-113 establishes whether this is
+isolated or systemic.
+<!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:CURRENT:END -->
+
 <!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:CURRENT:BEGIN -->
 ## D-112 Program Guide newline polish
 

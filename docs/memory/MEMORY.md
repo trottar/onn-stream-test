@@ -6,6 +6,35 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:MEMORY:BEGIN -->
+## Stream transport health is not stream identity health
+
+A stream can:
+- return valid media;
+- accumulate playback successes;
+- have a syntactically valid canonical channel/feed ID;
+- have a functioning EPG;
+
+and still broadcast the wrong channel.
+
+Observed example:
+the upstream row titled `10 Bold Adelaide` currently carries canonical ID
+`10Bold.au@Sydney`, and an upstream issue reports its URL actually carries Rocky
+Mountain PBS Kids.
+
+Therefore never use successful playback alone as proof that EPG semantic
+identity is trustworthy.
+
+Keep separate:
+1. transport/playback health;
+2. channel/feed metadata consistency;
+3. actual content identity;
+4. EPG acquisition/cache correctness.
+
+D-113 measures metadata consistency before a generic identity-suspect policy is
+designed.
+<!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:MEMORY:END -->
+
 <!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:MEMORY:BEGIN -->
 ## D5.3 EPG runtime acceptance
 

@@ -6,6 +6,33 @@ baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
 
 # TV, IPTV, and Media Architecture
 
+<!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:TV_MEDIA:BEGIN -->
+## TV semantic identity boundary
+
+The EPG architecture can faithfully return a guide for a canonical channel ID
+even when a third-party stream assigned that ID broadcasts the wrong content.
+
+Therefore TV architecture must distinguish:
+
+```text
+stream URL transport health
+        !=
+catalog channel/feed identity confidence
+        !=
+EPG acquisition correctness
+```
+
+Known example:
+`10 Bold Adelaide` is currently tagged `10Bold.au@Sydney`, and upstream issue
+evidence reports the stream itself carries Rocky Mountain PBS Kids.
+
+D-113 measures feed metadata contradictions before adding an identity-confidence
+state.
+
+A future `identity_suspect` state, if justified, should affect guide confidence
+without falsely recording a transport failure.
+<!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:TV_MEDIA:END -->
+
 <!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:TV_MEDIA:BEGIN -->
 ## EPG end-to-end acceptance
 

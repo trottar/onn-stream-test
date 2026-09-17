@@ -6,6 +6,25 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:ACTIVE:BEGIN -->
+## D5 active — stream semantic identity integrity
+
+EPG transport/acquisition/cache is accepted.
+
+Active narrow question:
+how broad are feed-ID/display-name contradictions in the current built-in IPTV
+catalog?
+
+D-113 audits official feed metadata against the current onn catalog.
+
+If contradictions are systemic, design a generic `identity_suspect` state that
+can suppress misleading EPG without conflating it with playback failure.
+
+If isolated, prefer targeted quarantine/override rather than a broad heuristic.
+
+D5.4 TV-state sync remains queued behind this integrity checkpoint.
+<!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:ACTIVE:END -->
+
 <!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:ACTIVE:BEGIN -->
 ## D5.3 accepted; D-112 presentation polish active
 

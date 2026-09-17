@@ -6,6 +6,22 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:ROADMAP:BEGIN -->
+## D5 EPG — data path accepted; stream-identity integrity audit active
+
+D-111/D-112 establish a functioning readable Program Guide.
+
+D-113 is a bounded post-acceptance integrity audit because a current upstream
+stream is mislabeled and its video content does not match its advertised guide
+identity.
+
+This is not an EPG transport regression.
+
+**Active:** D-113 stream identity audit.
+
+**Next:** D5.4 TV-state ownership/sync after the D-113 policy decision.
+<!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:ROADMAP:END -->
+
 <!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:ROADMAP:BEGIN -->
 ## D5.3 EPG — runtime validated / accepted
 

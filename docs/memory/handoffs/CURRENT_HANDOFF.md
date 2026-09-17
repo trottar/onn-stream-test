@@ -6,6 +6,28 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:HANDOFF:BEGIN -->
+## D-113 handoff — stream identity integrity
+
+D-111 EPG transport/data path is accepted and D-112 newline polish is visually
+accepted.
+
+The next issue is semantic stream identity, exposed by `10 Bold Adelaide`.
+
+Known current upstream facts:
+- stream title says Adelaide;
+- canonical ID says Sydney;
+- upstream issue reports the exact URL plays Rocky Mountain PBS Kids.
+
+Run D-113 and return:
+`logs/tv/d113_stream_identity_audit.txt`.
+
+The probe is read-only and audits the whole built-in onn catalog for explicit
+feed-name contradictions.
+
+Do not change EPG matching, playback, or auto-hide logic before this result.
+<!-- PRIVYHUB_D113_D5_STREAM_IDENTITY:HANDOFF:END -->
+
 <!-- PRIVYHUB_D112_D5_GUIDE_NEWLINE:HANDOFF:BEGIN -->
 ## D-112 handoff — Program Guide newline polish
 
