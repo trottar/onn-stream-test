@@ -6,6 +6,22 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:PATCH_INDEX:BEGIN -->
+### D-111 — D5 Android companion EPG integration — 2026-09-16
+
+Android production integration patch.
+
+Changes only `TvEpgRepository.kt` in Android production source:
+fresh local cache -> companion refresh -> existing fallback.
+
+Adds a read-only D-111 onn EPG DB probe and records D-110 runtime acceptance.
+
+Real Android `assembleDebug` is an installer success gate.
+
+Runtime evidence next:
+`logs/tv/d111_android_companion_epg_probe.txt`.
+<!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:PATCH_INDEX:BEGIN -->
 ### D-110 — D5 Linux EPG service/cache seam — 2026-09-16
 

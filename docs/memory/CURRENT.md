@@ -6,6 +6,36 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Development State
 
+<!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:CURRENT:BEGIN -->
+## D-111 D5.3 Android companion-EPG integration
+
+D-110 is runtime validated.
+
+Measured accepted Linux service state:
+- bootstrap 140.079 seconds;
+- ready after bootstrap;
+- persistent toolchain 626,714,586 bytes;
+- 10Bold refresh: 65 programmes / 19.538 seconds;
+- 5Cops refresh: 13 programmes / 9.105 seconds;
+- cached 10Bold read: 65 programmes / 0.001 seconds.
+
+Classification:
+`D110_EPG_PLUGIN_RUNTIME_VALIDATED`.
+
+D-111 changes only Android `TvEpgRepository.kt`:
+- fresh onn SQLite guide remains first;
+- companion `/plugins/epg/guide` is preferred for refresh;
+- exact `channel[@feed]` identity is passed unchanged;
+- companion programmes are written into the existing onn SQLite cache;
+- companion success markers are written into existing `meta`;
+- stale/nonempty onn cache is preserved when Linux is unavailable;
+- previous hosted-source path remains fallback;
+- playback remains independent from guide success.
+
+D5.3 remains ACTIVE until the new APK shows a real companion-backed guide and
+the D-111 read-only probe confirms the companion marker plus programme rows.
+<!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:CURRENT:END -->
+
 <!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:CURRENT:BEGIN -->
 ## D-110 D5.3 Linux EPG service/cache seam
 

@@ -6,6 +6,23 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Active Investigations and Queued Work
 
+<!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:ACTIVE:BEGIN -->
+## D5.3 active — Android companion EPG consumption
+
+Linux acquisition/cache is accepted from D-110.
+
+The active boundary is Android consumption.
+
+D-111 must prove:
+- existing companion host configuration reaches port 8765 EPG plugin;
+- exact feed-aware channel ID survives the Android request;
+- Linux programmes populate the existing onn EPG SQLite database;
+- Program Guide renders the resulting schedule;
+- local cache continues to work independently after population.
+
+No TV catalog/provider rewrite and no TV-state sync change in D-111.
+<!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:ACTIVE:END -->
+
 <!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:ACTIVE:BEGIN -->
 ## D5.3 active — Linux EPG production seam
 

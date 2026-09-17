@@ -6,6 +6,29 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Current Handoff
 
+<!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:HANDOFF:BEGIN -->
+## D-111 handoff — Android consumes Linux EPG
+
+D-110 Linux EPG service/cache is runtime validated.
+
+D-111 changes only `TvEpgRepository.kt` to prefer the companion guide endpoint
+when the onn local guide needs refresh.
+
+After installing the D-111 APK:
+1. keep the Linux companion running;
+2. on the onn, open a known matched channel such as `10 Bold`;
+3. open Program Guide;
+4. confirm schedule data appears;
+5. run `tools/probes/d111_android_companion_epg_probe.py`;
+6. return `logs/tv/d111_android_companion_epg_probe.txt`.
+
+Acceptance requires:
+`D111_ANDROID_COMPANION_EPG_RUNTIME_VALIDATED`.
+
+If that passes, D5.3 EPG data flow is functionally accepted and durable memory
+should record the runtime acceptance before moving into D5.4 TV-state sync.
+<!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:HANDOFF:END -->
+
 <!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:HANDOFF:BEGIN -->
 ## D-110 handoff — Linux EPG plugin/cache seam
 

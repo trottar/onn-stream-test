@@ -6,6 +6,30 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:MEMORY:BEGIN -->
+## Android EPG cache / companion priority rule
+
+After D-110 runtime acceptance, Android EPG refresh policy is:
+
+1. use fresh nonempty onn SQLite guide data immediately;
+2. otherwise prefer the Linux companion EPG endpoint;
+3. persist successful companion programmes back into the same onn SQLite cache;
+4. if Linux is unavailable, preserve stale/nonempty local data for normal
+   navigation;
+5. retain the older public hosted-guide acquisition path only as fallback.
+
+Do not copy SQLite databases between Linux and Android.
+
+Linux owns acquisition/cache generation; onn owns its local UI/offline cache.
+
+Canonical identity remains exact `channel[@feed]`.
+
+Playback must not depend on EPG success.
+
+D-110's persistent reference-toolchain footprint is 626,714,586 bytes and
+remains a future resource-optimization concern.
+<!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:MEMORY:END -->
+
 <!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:MEMORY:BEGIN -->
 ## Linux EPG acquisition/cache ownership rule
 

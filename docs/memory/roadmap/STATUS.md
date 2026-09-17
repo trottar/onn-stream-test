@@ -6,6 +6,21 @@ baseline_commit: 88c797ea3a7659035ef4a45380789cfe8c5cbc53
 
 # Roadmap Status
 
+<!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:ROADMAP:BEGIN -->
+## D5.3 EPG — Android companion integration
+
+**Status:** ACTIVE / D-111 APK runtime validation next.
+
+D-110 Linux EPG service/cache is runtime validated.
+
+D-111 connects the existing Android EPG repository to that service while
+retaining the onn local SQLite cache and previous fallback path.
+
+If D-111 passes UI + DB evidence, D5.3 EPG data flow can be accepted.
+
+D5.4 TV-state sync follows.
+<!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:ROADMAP:END -->
+
 <!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:ROADMAP:BEGIN -->
 ## D5.3 EPG — Linux service/cache seam
 

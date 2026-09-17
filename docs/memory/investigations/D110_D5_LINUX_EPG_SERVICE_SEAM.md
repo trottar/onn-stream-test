@@ -1,5 +1,29 @@
 # D-110 — D5 Linux EPG acquisition/cache service seam
 
+<!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:D110_RESULT:BEGIN -->
+## Result — 2026-09-16
+
+D-110 passed runtime validation.
+
+Classification:
+`D110_EPG_PLUGIN_RUNTIME_VALIDATED`.
+
+Measured:
+- bootstrap 140.079 seconds;
+- Node 24.21.0;
+- pinned upstream EPG commit matched;
+- persistent toolchain 626,714,586 bytes;
+- 10Bold: 65 programmes, 19.538 second uncached refresh;
+- 5Cops: 13 programmes, 9.105 second uncached refresh;
+- second 10Bold request: cached, 65 programmes, 0.001 seconds.
+
+Decision:
+Linux service/cache seam is accepted for D5 development.
+
+Next boundary is Android consumption through the existing companion host setting
+and local SQLite cache. D-111 owns that change.
+<!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:D110_RESULT:END -->
+
 **Status:** development patch / runtime validation next
 
 ## Purpose

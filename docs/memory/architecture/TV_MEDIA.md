@@ -6,6 +6,38 @@ baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
 
 # TV, IPTV, and Media Architecture
 
+<!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:TV_MEDIA:BEGIN -->
+## Android EPG consumption after D-110
+
+D-111 completes the next seam in the EPG path:
+
+```text
+Linux exact feed-aware acquisition/cache
+        |
+companion port 8765 /plugins/epg/guide
+        |
+Android TvEpgRepository
+        |
+onn privyhub_epg.db
+        |
+existing Program Guide UI
+```
+
+Android does not know how the Linux grabber is implemented.
+
+The onn SQLite database remains a local/offline cache, not a synchronized copy
+of a Linux database.
+
+Normal read policy:
+- fresh onn cache -> immediate;
+- refresh needed -> Linux companion;
+- Linux unavailable -> retain nonempty local data;
+- no local data + Linux unavailable -> older hosted-guide fallback may run.
+
+This keeps acquisition authority on Linux while preserving a responsive/fail-soft
+client.
+<!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:TV_MEDIA:END -->
+
 <!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:TV_MEDIA:BEGIN -->
 ## Linux EPG acquisition/cache service boundary
 

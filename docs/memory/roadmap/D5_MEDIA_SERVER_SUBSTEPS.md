@@ -6,6 +6,26 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:D5_SUBSTEPS:BEGIN -->
+## D5.3 execution checkpoint — D-111
+
+D-110 Linux EPG service/cache seam is runtime validated.
+
+D-111 is the Android integration substep.
+
+Scope:
+1. retain fresh onn SQLite guide as first read;
+2. use companion EPG for refresh;
+3. persist companion programmes into onn SQLite;
+4. fail soft to local data;
+5. preserve old hosted-source path as fallback;
+6. runtime-validate both UI schedule and DB companion-success marker.
+
+D5.3 may be marked functionally accepted only after D-111 runtime validation.
+
+D5.4 TV-state ownership/sync remains next after that acceptance.
+<!-- PRIVYHUB_D111_D5_ANDROID_COMPANION_EPG:D5_SUBSTEPS:END -->
+
 <!-- PRIVYHUB_D110_D5_LINUX_EPG_SERVICE:D5_SUBSTEPS:BEGIN -->
 ## D5.3 execution checkpoint — D-110
 

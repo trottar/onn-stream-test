@@ -6,6 +6,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
 import org.json.JSONArray
+import org.json.JSONObject
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 
@@ -14,6 +15,7 @@ import java.io.InputStream
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -50,6 +52,13 @@ private data class TvGuideMapping(
     val siteId: String,
     val sourceUrl: String,
     val language: String
+)
+
+
+private data class CompanionGuideResult(
+    val programmes: List<TvProgramme>,
+    val cached: Boolean,
+    val stale: Boolean
 )
 
 
@@ -196,12 +205,31 @@ class TvEpgRepository(
         private const val MAX_PROGRAMMES_PER_CHANNEL = 120
 
         private const val MAPPING_SOURCE_SCHEMA_VERSION = "2"
+
+        private const val COMPANION_PREFS_NAME =
+            "privyhub_settings"
+
+        private const val COMPANION_HOST_PREF =
+            "companion_host"
+
+        private const val COMPANION_CONTROL_PORT = 8765
+
+        private const val COMPANION_GUIDE_SCHEMA =
+            "privyhub_epg_guide_v1"
+
+        private const val COMPANION_CONNECT_TIMEOUT_MS = 3_000
+
+        private const val COMPANION_READ_TIMEOUT_MS = 30_000
     }
+
+
+    private val appContext =
+        context.applicationContext
 
 
     private val db =
         TvEpgDatabase(
-            context.applicationContext
+            appContext
         )
 
 
@@ -259,6 +287,85 @@ class TvEpgRepository(
             return cached
         }
 
+        val companionGuide =
+            try {
+                fetchCompanionGuide(
+                    channelId = channelId,
+                    force = force,
+                    nowMs = now
+                )
+            } catch (_: Exception) {
+                null
+            }
+
+        if (
+            companionGuide != null &&
+            companionGuide.programmes.isNotEmpty()
+        ) {
+            replaceProgrammes(
+                channelId = channelId,
+                programmes = companionGuide.programmes,
+                nowMs = now
+            )
+
+            db.setMeta(
+                channelRefreshKey(
+                    channelId
+                ),
+                now.toString()
+            )
+
+            db.setMeta(
+                "companion_epg_last_success_channel",
+                channelId
+            )
+
+            db.setMeta(
+                "companion_epg_last_success_at_ms",
+                now.toString()
+            )
+
+            db.setMeta(
+                "companion_epg_last_programme_count",
+                companionGuide.programmes.size.toString()
+            )
+
+            db.setMeta(
+                "companion_epg_last_response_cached",
+                companionGuide.cached.toString()
+            )
+
+            db.setMeta(
+                "companion_epg_last_response_stale",
+                companionGuide.stale.toString()
+            )
+
+            return buildSummary(
+                channelId = channelId,
+                programmes = companionGuide.programmes,
+                nowMs = now,
+                cached = false
+            )
+        }
+
+        if (
+            companionGuide != null &&
+            !force
+        ) {
+            return cached
+        }
+
+        if (
+            companionGuide == null &&
+            !force &&
+            (
+                cached.current != null ||
+                cached.upcoming.isNotEmpty()
+            )
+        ) {
+            return cached
+        }
+
         return try {
             ensureMappings(
                 force = force
@@ -298,6 +405,273 @@ class TvEpgRepository(
 
         } catch (error: Exception) {
             cached
+        }
+    }
+
+
+    private fun companionBaseUrl(): String? {
+        val host =
+            appContext.getSharedPreferences(
+                COMPANION_PREFS_NAME,
+                Context.MODE_PRIVATE
+            ).getString(
+                COMPANION_HOST_PREF,
+                ""
+            )?.trim().orEmpty()
+
+        if (host.isBlank()) {
+            return null
+        }
+
+        val normalized =
+            host.trimEnd('/')
+
+        if (
+            normalized.startsWith("http://") ||
+            normalized.startsWith("https://")
+        ) {
+            return try {
+                val parsed =
+                    URL(
+                        normalized
+                    )
+
+                if (parsed.port >= 0) {
+                    normalized
+                } else {
+                    "${parsed.protocol}://${parsed.host}:$COMPANION_CONTROL_PORT"
+                }
+            } catch (_: Exception) {
+                null
+            }
+        }
+
+        return try {
+            val parsed =
+                URL(
+                    "http://$normalized"
+                )
+
+            if (parsed.port >= 0) {
+                "http://$normalized"
+            } else {
+                "http://$normalized:$COMPANION_CONTROL_PORT"
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+
+    private fun fetchCompanionGuide(
+        channelId: String,
+        force: Boolean,
+        nowMs: Long
+    ): CompanionGuideResult? {
+        val baseUrl =
+            companionBaseUrl()
+                ?: return null
+
+        val encodedChannelId =
+            URLEncoder.encode(
+                channelId,
+                "UTF-8"
+            )
+
+        val forceQuery =
+            if (force) {
+                "&force=1"
+            } else {
+                ""
+            }
+
+        val connection =
+            URL(
+                "$baseUrl/plugins/epg/guide" +
+                    "?channel_id=$encodedChannelId" +
+                    forceQuery
+            ).openConnection()
+                as HttpURLConnection
+
+        return try {
+            connection.requestMethod =
+                "GET"
+
+            connection.connectTimeout =
+                COMPANION_CONNECT_TIMEOUT_MS
+
+            connection.readTimeout =
+                COMPANION_READ_TIMEOUT_MS
+
+            connection.instanceFollowRedirects =
+                true
+
+            connection.useCaches =
+                false
+
+            connection.setRequestProperty(
+                "User-Agent",
+                "PrivyHub/1.0"
+            )
+
+            val response =
+                connection.responseCode
+
+            if (
+                response < 200 ||
+                response >= 300
+            ) {
+                return null
+            }
+
+            val text =
+                connection.inputStream
+                    .bufferedReader()
+                    .use {
+                        it.readText()
+                    }
+
+            val payload =
+                JSONObject(
+                    text
+                )
+
+            if (
+                payload.optString(
+                    "schema"
+                ) != COMPANION_GUIDE_SCHEMA ||
+                !payload.optBoolean(
+                    "ok",
+                    false
+                ) ||
+                payload.optString(
+                    "channel_id"
+                ) != channelId
+            ) {
+                return null
+            }
+
+            val earliest =
+                nowMs -
+                    GUIDE_PAST_WINDOW_MS
+
+            val latest =
+                nowMs +
+                    GUIDE_FUTURE_WINDOW_MS
+
+            val jsonProgrammes =
+                payload.optJSONArray(
+                    "programmes"
+                ) ?: JSONArray()
+
+            val programmes =
+                mutableListOf<TvProgramme>()
+
+            for (
+                index in 0 until jsonProgrammes.length()
+            ) {
+                val item =
+                    jsonProgrammes.optJSONObject(
+                        index
+                    ) ?: continue
+
+                val programmeChannelId =
+                    item.optString(
+                        "channel_id"
+                    ).trim()
+
+                val startMs =
+                    item.optLong(
+                        "start_ms",
+                        0L
+                    )
+
+                val stopMs =
+                    item.optLong(
+                        "stop_ms",
+                        0L
+                    )
+
+                val title =
+                    item.optString(
+                        "title"
+                    ).trim()
+
+                val rawDescription =
+                    item.opt(
+                        "description"
+                    )
+
+                val description =
+                    if (
+                        rawDescription == null ||
+                        rawDescription == JSONObject.NULL
+                    ) {
+                        null
+                    } else {
+                        rawDescription
+                            .toString()
+                            .trim()
+                            .takeIf {
+                                it.isNotBlank()
+                            }
+                    }
+
+                if (
+                    programmeChannelId != channelId ||
+                    startMs <= 0L ||
+                    stopMs <= earliest ||
+                    startMs >= latest ||
+                    title.isBlank()
+                ) {
+                    continue
+                }
+
+                programmes.add(
+                    TvProgramme(
+                        channelId = channelId,
+                        startMs = startMs,
+                        stopMs = stopMs,
+                        title = title,
+                        description = description
+                    )
+                )
+
+                if (
+                    programmes.size >=
+                    MAX_PROGRAMMES_PER_CHANNEL
+                ) {
+                    break
+                }
+            }
+
+            CompanionGuideResult(
+                programmes =
+                    programmes
+                        .distinctBy {
+                            Triple(
+                                it.channelId,
+                                it.startMs,
+                                it.title
+                            )
+                        }
+                        .sortedBy {
+                            it.startMs
+                        },
+                cached =
+                    payload.optBoolean(
+                        "cached",
+                        false
+                    ),
+                stale =
+                    payload.optBoolean(
+                        "stale",
+                        false
+                    )
+            )
+
+        } finally {
+            connection.disconnect()
         }
     }
 
