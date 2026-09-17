@@ -1002,3 +1002,20 @@ This index records durable checkpoints and major patch lines; it does not invent
 
 <!-- D4_LINUX_HANDOFF_FIX_01_INDEX -->
 - `PRIVYHUB_D4_LINUX_HANDOFF_FIX_01` — Android-only D4 Linux handoff correction. v1/v2/v3 rolled back; v4 retains build-environment preflight and replaces the failed regex redaction helper with exact configured-host replacement. Runtime validation pending.
+
+<!-- PRIVYHUB_MEMORY_MAINTENANCE_2026_09_17:PATCH_INDEX:BEGIN -->
+### Repository memory maintenance — 2026-09-17
+
+Documentation/tooling-only maintenance checkpoint.
+
+- adds `MAINTENANCE.md`;
+- adds `tools/check_memory_health.py`;
+- rewrites oversized active bootstrap files;
+- records D-126 runtime acceptance;
+- keeps exact pre-maintenance state recoverable at commit
+  `0206017cfd8f0fc57decb7a5e9e8632e6a4f6cdd`;
+- makes no application/runtime behavior change.
+
+Patch record:
+`patches/MEMORY_MAINTENANCE_2026-09-17.md`.
+<!-- PRIVYHUB_MEMORY_MAINTENANCE_2026_09_17:PATCH_INDEX:END -->

@@ -1,27 +1,41 @@
 ---
-memory_schema: 1
-as_of: 2026-09-10
-baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
+memory_schema: 2
+as_of: 2026-09-17
 ---
 
 # Chat and Memory Communication Protocol
 
-## Purpose
+## Start of substantial work
 
-A chat should be able to start by reading a small, stable set of repository files rather than reconstructing months of discussion. Conversely, meaningful chat conclusions should be committed back into repository memory rather than living only in conversation history.
+Read:
 
-## Start-of-chat load order
+1. `AGENTS.md`;
+2. `CURRENT.md`;
+3. only CURRENT-linked records relevant to the task.
 
-Read `MEMORY.md`, `CURRENT.md`, `USER.md`, and `AGENTS.md` first. Then open the subsystem/decision/evidence files relevant to the task. Use `handoffs/CURRENT_HANDOFF.md` when a compact transfer summary is needed.
+Consult `MEMORY.md` selectively. Read handoffs/history only when needed.
 
 ## During work
 
-Record durable discoveries in the dated `memory/YYYY-MM-DD.md` file. Do not promote a hypothesis into `MEMORY.md` until evidence supports it. When a decision changes, update its status in `decisions/DECISION_LOG.md` rather than leaving two apparently-current statements.
+Put detailed chronology in the dated memory log. Put proof in `evidence/` or the
+relevant investigation. Put durable conclusions in `MEMORY.md` only when they
+are expected to matter beyond the current task.
+
+Do not append completed patch narratives to active-state files.
 
 ## End of meaningful work
 
-Update the dated log, `CURRENT.md`, roadmap/evidence/decision files as applicable, and `handoffs/CURRENT_HANDOFF.md`. Curate `MEMORY.md` only when a fact is likely to matter across future phases.
+Update:
 
-## ZIP behavior
+- dated history;
+- `CURRENT.md` if objective/state/next action changed;
+- relevant evidence/investigation/roadmap/decision records;
+- `MEMORY.md` only for durable knowledge;
+- `CURRENT_HANDOFF.md` only as a compact transfer note.
 
-The memory changes belonging to a patch travel in the same ZIP. This makes the patch itself a communication checkpoint: code/data changes, validation state, and the explanation of why the change exists remain together.
+Follow `MAINTENANCE.md` when thresholds or semantic triggers fire.
+
+## Patch behavior
+
+Memory changes travel with the same patch that establishes the code or evidence
+change. Package manifests set `durable_memory_updated: true`.

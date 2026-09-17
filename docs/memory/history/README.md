@@ -1,44 +1,38 @@
 ---
-memory_schema: 1
-as_of: 2026-09-11
-baseline_commit: fa79d4f5feba6797a6993a6fcdcdaff673812da3
+memory_schema: 2
+as_of: 2026-09-17
 ---
 
 # Deep Memory / Superseded History
 
-This directory preserves superseded durable-memory snapshots that remain useful
-for historical reconstruction but are no longer authoritative for current
-development state.
+This directory preserves superseded snapshots/reference that remain useful for
+historical reconstruction but are not authoritative current state.
 
-## Trust rule
+## Trust order
 
-Files in `history/` are reference only.
-
-When a history snapshot conflicts with newer information, prefer:
+When history conflicts with current material, prefer:
 
 1. current local source and fresh runtime evidence;
-2. current specific evidence/decision/architecture records;
-3. `CURRENT.md`, `CURRENT_HANDOFF.md` and current `MEMORY.md`;
-4. dated history and patch records;
-5. this directory.
+2. newest specific evidence/decision/architecture records;
+3. `CURRENT.md`;
+4. durable rules in `MEMORY.md`;
+5. dated/patch history;
+6. this directory.
 
-Do not copy an old guardrail, roadmap phase, baseline commit, classifier result
-or investigation status back into current memory without checking newer evidence.
+Do not copy an old guardrail, roadmap phase, baseline commit, classifier result,
+or investigation status back into current memory without checking newer
+evidence.
 
-## What belongs here
+## 2026-09-17 bootstrap maintenance
 
-Use `history/` for a coherent superseded snapshot whose full historical context
-is worth retaining but would make live `MEMORY.md` misleading or append-only.
+Immediately before the memory-maintenance rewrite, the exact active-memory state
+is preserved naturally in Git commit:
 
-Do not move detailed runtime evidence, dated session logs, decisions, patch
-history or investigation records here merely to shorten current memory. Those
-already have dedicated durable homes.
+`0206017cfd8f0fc57decb7a5e9e8632e6a4f6cdd`
 
-## Initial snapshot
+That checkpoint contains the pre-maintenance `CURRENT.md`, `MEMORY.md`,
+`CURRENT_HANDOFF.md`, active investigation index, and roadmap status. Do not copy
+those large files into a second archive merely to shorten the live bootstrap.
 
-`MEMORY_SUPERSEDED_THROUGH_2026-09-11.md` is an exact byte-for-byte copy of the
-pre-Part-2 `MEMORY.md`.
-
-It preserves the accumulated Phase A/Phase B/C1 chronology, including
-intermediate findings and superseded roadmap/guardrail state, while the live
-`MEMORY.md` is curated to current durable facts and rules.
+Specific technical detail remains additionally preserved in dated memory,
+evidence, investigations, patch records, architecture, and decisions.

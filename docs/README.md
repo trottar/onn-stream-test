@@ -1,59 +1,54 @@
 # PrivyHub documentation
 
-This directory contains the project’s architectural, operational, diagnostic and
-roadmap documentation.
+This directory contains project architecture, operations, diagnostics, roadmap,
+and durable development memory.
 
 ## Current authority
 
-For current development state, use this order:
+Use this order:
 
 1. current local source and fresh runtime evidence;
-2. `memory/evidence/`, `memory/decisions/`, `memory/architecture/` and other
-   specific durable records;
-3. `memory/CURRENT.md`, `memory/handoffs/CURRENT_HANDOFF.md`, and
-   `memory/MEMORY.md`;
-4. dated memory / patch history;
-5. `memory/history/` superseded snapshots.
+2. newest specific evidence/decision/architecture records;
+3. `memory/CURRENT.md`;
+4. durable rules in `memory/MEMORY.md`;
+5. dated/patch history;
+6. superseded `memory/history/` reference.
 
-Older top-level documents are reference only when they conflict with newer
-validated state.
+## Startup
 
-## Main documents
+Substantial work starts with:
 
-- **ROADMAP.md** — authoritative Linux-first roadmap v3.
-- **PROJECT_STATUS.md** — current architecture, completed phases and active work.
-- **KNOWN_ISSUES.md** — unresolved/deferred issues and technical debt.
-- **DIAGNOSTICS.md** — diagnostic inventory and repeatable transport tests.
-- **A4_AUDIO_RECOVERY.md** — validated game-audio recovery/lifecycle details.
-- **A8_INPUT_PROFILES.md** — controller-profile architecture and behavior.
-- **investigations/2026-09-07-udp-transport.md** — detailed deferred UDP
-  transport investigation.
+- `memory/AGENTS.md`;
+- `memory/CURRENT.md`;
+- only the records CURRENT links for the active task.
 
-Durable development memory lives under **memory/**. It is the cross-chat
-continuation layer and includes current state, curated facts, decisions,
-investigations, evidence, patch history, repository maps, roadmap status and
-superseded history snapshots.
+Do not eagerly load all historical memory.
 
-## Current development position
+## Memory architecture
 
-- Phase A Games/emulator subsystem: complete.
-- Phase B diagnostics + clean native baseline: complete.
-- Phase C adaptive native streaming: active.
-- C1 stream-parameter inventory: complete.
-- Next technical step after the docs cleanup checkpoint:
-  `C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA`.
+- `memory/CURRENT.md` — one active objective and one next action.
+- `memory/MEMORY.md` — long-lived rules and validated facts.
+- `memory/MAINTENANCE.md` — memory health/cleanup policy.
+- `memory/handoffs/` — compact handoff notes.
+- `memory/evidence/` — runtime proof.
+- `memory/investigations/` — investigation detail.
+- `memory/decisions/` — decision records.
+- `memory/architecture/` — subsystem architecture.
+- `memory/patches/` — patch/checkpoint history.
+- `memory/roadmap/` — current roadmap state.
+- dated files / `memory/history/` — chronology and superseded reference.
 
-## Documentation rule
+## Main project documents
 
-When an experiment is deliberately deferred, record:
+- `ROADMAP.md`
+- `PROJECT_STATUS.md`
+- `KNOWN_ISSUES.md`
+- `DIAGNOSTICS.md`
+- `A4_AUDIO_RECOVERY.md`
+- `A8_INPUT_PROFILES.md`
 
-1. the symptom;
-2. what was actually measured;
-3. what was ruled out;
-4. what remains unresolved;
-5. the condition that should cause the investigation to resume;
-6. the diagnostic tools needed to resume without repeating old work.
+When any older top-level document conflicts with newer validated state, prefer
+the newer source/evidence and current repository memory.
 
-Do not record private network addresses, MAC addresses, device GUIDs,
-credentials, ROM filenames, or other environment-specific secrets in shareable
-project documentation.
+Do not place private network addresses, credentials, device identifiers, or
+user media/content identifiers in shareable documentation.

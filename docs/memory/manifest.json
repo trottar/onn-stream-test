@@ -1,1119 +1,1581 @@
 {
-  "a8_status": "complete / runtime validated including P1-P4 profiles/editor",
-  "a9_coverage": {
-    "genesis": "no local fixture; not runtime validated",
-    "nes": "no local fixture; not runtime validated",
-    "ps1": "runtime exercised extensively",
-    "snes": "runtime exercised"
-  },
-  "a9_status": "complete / checkpointed; PS1 Multitap On/Off runtime validated; NES/Genesis no local fixtures",
-  "adaptive_behavior_changed": false,
-  "adb_stale_cache_recovery_status": "CLOSED / RUNTIME VALIDATED 2026-09-14",
-  "android_behavior_changed": false,
-  "android_manifest_post_sha256": "ab1140c3230582f9dbbbf3c179d8fa08363971d9289e08442487f3849c7ac8a2",
-  "android_moonlight_package_state": "absent / verified; PrivyHub remains present",
-  "as_of": "2026-09-15",
-  "b1_status": "complete / runtime validated",
-  "b2_status": "complete / runtime and manual GUI validated",
-  "b3_status": "COMPLETE / inventory and focused active-edge trace completed",
-  "b4_status": "COMPLETE / runtime validated",
-  "b5_status": "COMPLETE / runtime validated",
-  "b6_status": "COMPLETE / checkpointed / pushed",
-  "baseline_commit": "88c797ea3a7659035ef4a45380789cfe8c5cbc53",
-  "baseline_short": "88c797ea",
-  "c1_design_memory_checkpoint": "CHECKPOINTED / PUSHED",
-  "c1_design_status": "COMPLETE / CHECKPOINTED / PUSHED / C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA",
-  "c1_implementation_status": "RUNTIME VALIDATED / CHECKPOINTED / PUSHED",
-  "c1_inventory_status": "COMPLETE / C1_INVENTORY_COMPLETE",
-  "c1_reference_profile_consumer": "companion/native_stream.py",
-  "c1_reference_profile_id": "native_game_720p60_reference",
-  "c1_reference_profile_schema": {
-    "bframes": 0,
-    "bitrate_kbps": 7000,
-    "fec_group_size": 8,
-    "fps": 60,
-    "gop_frames": 15,
-    "height": 720,
-    "id": "native_game_720p60_reference",
-    "max_bitrate_kbps": 7000,
-    "width": 1280
-  },
-  "c1_reference_profile_source": "companion/native_stream_profiles.py",
-  "c2_design_status": "COMPLETE / CHECKPOINTED / PUSHED",
-  "c2_implementation_status": "COMPLETE / RUNTIME VALIDATED / CHECKPOINTED / PUSHED",
-  "c2_inventory_status": "COMPLETE / CHECKPOINTED / PUSHED",
-  "c3_actuator_status": "VIDEO_ONLY_RESTART ACCEPTED / WINDOWS RUNTIME VALIDATED / LINUX REVALIDATION REQUIRED",
-  "c3_actuator_strategy": "video_only_restart",
-  "c3_actuator_validated_directions": "BIDIRECTIONAL",
-  "c3_audio_transport_status": "BURST_GAP PATHOLOGY DEFERRED / REPLAY ON LINUX + HOME OPAL",
-  "c3_bidirectional_actuator_status": "BIDIRECTIONAL RECOVERY VALIDATED / VIDEO_ONLY_RESTART NOT ACCEPTED FOR AUTOMATIC ADAPTATION",
-  "c3_bidirectional_down_first_rtp_resume_ms": 952.789,
-  "c3_bidirectional_max_output_gap_ms": 1059,
-  "c3_bidirectional_probe_loopback_only": true,
-  "c3_bidirectional_probe_sequence_kbps": [
-    7000,
-    6000,
-    7000
-  ],
-  "c3_bidirectional_up_first_rtp_resume_ms": 837.313,
-  "c3_characterization_bracket_kbps": [
-    5000,
-    5500
-  ],
-  "c3_characterization_candidate_kbps": null,
-  "c3_characterization_probe_levels_installed_kbps": [
-    6000,
-    5000,
-    5500
-  ],
-  "c3_characterization_status": "COMPLETE / WINDOWS FIXED LADDER 5500-6000-7000 VALIDATED",
-  "c3_companion_restart_after_python_changes": true,
-  "c3_controller_status": "DEFERRED TO LINUX BACKEND / NOT IMPLEMENTED",
-  "c3_design_status": "C3.1 SOURCE/POLICY AUDIT COMPLETE / CHECKPOINTED / PUSHED",
-  "c3_linux_actuator_status": "NOT RUNTIME VALIDATED / EQUIVALENT BACKEND REQUIRED",
-  "c3_live_bitrate_reconfigure_status": "INTENTIONALLY NOT PURSUED ON WINDOWS / REASSESS ON LINUX",
-  "c3_min_bitrate_kbps": 5500,
-  "c3_min_bitrate_status": "5500 WINDOWS C3 VALIDATED / LINUX REVALIDATION REQUIRED",
-  "c3_mixed_version_runtime_warning": "RESTART COMPANION AFTER PYTHON CHANGES BEFORE VALIDATION",
-  "c3_pause_metadata_status": "IMPLEMENTED / NOT SEPARATELY INSTRUMENTED IN D-068",
-  "c3_reference_max_bitrate_kbps": 7000,
-  "c3_rejected_bitrate_levels_kbps": [
-    5000
-  ],
-  "c3_startup_stabilization_clean_ticks": 6,
-  "c3_startup_stabilization_fail_closed": true,
-  "c3_startup_stabilization_status": "RUNTIME VALIDATED / STARTUP LAG HIDDEN",
-  "c3_startup_stabilization_tick_ms": 500,
-  "c3_startup_stabilization_timeout_ms": 15000,
-  "c3_validated_bitrate_levels_kbps": [
-    7000,
-    6000,
-    5500
-  ],
-  "c3_video_only_restart_automatic_status": "NOT ACCEPTED / USER-VISIBLE ~1 SECOND TRANSITION INTERRUPTION",
-  "c3_windows_actuator_backend": "wgc_ffmpeg_nvenc",
-  "c3_windows_adaptation_status": "PORTABLE BOUNDARY REACHED / WINDOWS-SPECIFIC WORK STOPPED",
-  "c4_adaptive_fec_status": "DEFERRED TO REPRESENTATIVE LINUX + HOME OPAL + ONN",
-  "checkpoint_parent_commit": "88c797ea3a7659035ef4a45380789cfe8c5cbc53",
-  "checkpoint_scope": "Durable-memory normalization through D083 closeout",
-  "classifier_changed": false,
-  "client_health_interval_ms": 2000,
-  "client_health_schema": "privyhub_client_health_v1",
-  "client_health_storage": "latest only plus one delta baseline",
-  "companion_behavior_changed": false,
-  "current_phase": "Phase D",
-  "current_step": "ANDROID_LINUX_AUTO_OPEN_HANDOFF_FIX_AFTER_MEMORY_NORMALIZATION",
-  "decision_id_state": "central durable decisions normalized through D-083",
-  "decoder_classifier_runtime_validated": true,
-  "decoder_stale_policy": "informational unless decoder-local failure exists",
-  "deep_memory_history": "docs/memory/history/",
-  "deep_memory_trust": "superseded reference only",
-  "development_infrastructure_changed": true,
-  "diagnostic_event_history_capacity": 128,
-  "diagnostics_gui": "standalone activity consuming GET /diagnostics/health",
-  "diagnostics_health_schema": "privyhub_diagnostics_health_v1",
-  "docs_memory_cleanup_status": "NORMALIZED THROUGH D083 / LOCAL INSTALL VALIDATED / CHECKPOINT PENDING",
+  "memory_schema": 2,
+  "as_of": "2026-09-17",
+  "baseline_commit": "0206017cfd8f0fc57decb7a5e9e8632e6a4f6cdd",
+  "current_step": "D-127 incorrect-guide durable intent/recheck",
+  "maintenance_policy": "docs/memory/MAINTENANCE.md",
+  "maintenance_status": "healthy",
   "durable_memory_updated": true,
-  "execution_order_after_checkpoint": [
-    "Phase D Linux baseline",
-    "remaining Phase C on Linux",
-    "Phase E Linux characterization",
-    "Phase F media/VOD/Live TV",
-    "Phase G remote"
-  ],
   "files": [
     {
-      "bytes": 7335,
       "path": "2026-09-15.md",
+      "bytes": 7335,
       "sha256": "c5b367e16baba3f96bd1e0702f523cc5f4b5b968dce0339bca548a3ec0f02d4b"
     },
     {
-      "bytes": 5229,
+      "path": "2026-09-16.md",
+      "bytes": 41849,
+      "sha256": "c76d1c8fbb629b4d897db39d160fd43e2ab6325c44fa98fb2a778b8792f8ee0a"
+    },
+    {
+      "path": "2026-09-17.md",
+      "bytes": 8580,
+      "sha256": "010d1e663d8229288a114e03ec2a64a917128322ce040949bc167330bbd9e6f1"
+    },
+    {
       "path": "AGENTS.md",
-      "sha256": "254d5facda27a7895e08e628a6dc25f7e875c66ec06b09ed19fc6828324bcc16"
+      "bytes": 3301,
+      "sha256": "eecdb58502cc7c9ee015c6919ab1a83b1c82d8ea8432dc6176155c9fae558329"
     },
     {
-      "bytes": 17848,
-      "path": "architecture/ADAPTIVE_BITRATE.md",
-      "sha256": "5a3e75fad98a1404c136dd919c8ef40d812fe986add6f689b16ebb966c575d19"
-    },
-    {
-      "bytes": 12844,
-      "path": "architecture/CONTROLLERS.md",
-      "sha256": "6808d2d7dcd52fa52054039e4a0db48ff1627ead2fdfc45687d22a98885c4afe"
-    },
-    {
-      "bytes": 23670,
-      "path": "architecture/DIAGNOSTICS.md",
-      "sha256": "00a88d5852e069b94fd388d0292490798b4bd7b5e69dcced30619abebea81d2c"
-    },
-    {
-      "bytes": 7877,
-      "path": "architecture/GAMES.md",
-      "sha256": "e060df4a1a4f95d7157fa99322cd495f7ef6e14921b95311289b7cf040363b6b"
-    },
-    {
-      "bytes": 3255,
-      "path": "architecture/NETWORK.md",
-      "sha256": "28c84a0a929f79c24b4224f01c9fa02039dc810284504983891ca0fe34633609"
-    },
-    {
-      "bytes": 3732,
-      "path": "architecture/REMOTE_ACCESS.md",
-      "sha256": "7ce5e23c01f22ac4ece69ddd24ca0a4ddb5c814247b17dbbef6972ad1a992611"
-    },
-    {
-      "bytes": 6811,
-      "path": "architecture/STREAM_TELEMETRY.md",
-      "sha256": "e5c9a4814bdfb6990c41b12345850cceac126259ee6127e2ab98f0ff487d540a"
-    },
-    {
-      "bytes": 6820,
-      "path": "architecture/STREAMING.md",
-      "sha256": "b76cfadcc3e5e81385f5c630b6a0c8f95c955f030729ef042660ec4e8aeae891"
-    },
-    {
-      "bytes": 2108,
-      "path": "architecture/SYSTEM.md",
-      "sha256": "66750a741fe182fec4439f572b2e4c64452b7e89075882efdc1a1058d48beea0"
-    },
-    {
-      "bytes": 706,
-      "path": "architecture/TV_MEDIA.md",
-      "sha256": "c29964695e2dd3445205af42200c4813176d6e493d3e31b65a2e5d53d0042d77"
-    },
-    {
-      "bytes": 3215,
-      "path": "chats/CHAT_INDEX.md",
-      "sha256": "7231c9d31cc33a7bcec65e8e795d716b3b7a0a4ce2dc795aa671fcffe7439994"
-    },
-    {
-      "bytes": 1416,
       "path": "COMMUNICATION.md",
-      "sha256": "2f3c393d42bf1629909e77cdecb9196befaf1b47141656f18ba4bfb2feaad930"
+      "bytes": 1069,
+      "sha256": "5bd31468ff36a9ae7ee81cc5ca85123b27fb4408aa95feb5f66999a93083d890"
     },
     {
-      "bytes": 6904,
       "path": "CURRENT.md",
-      "sha256": "622cf7cee62136ab3c222f8494e8cd2c86c7253028ea65c7ea40917dba382537"
+      "bytes": 3772,
+      "sha256": "acc0a44c37c891a6ef3ffb2d6b04d1d82f59cf942a56670df3907f0ebc642c46"
     },
     {
-      "bytes": 1136,
-      "path": "decisions/D083_NETDEV_DIAGNOSTIC_CLOSEOUT_2026-09-15.md",
-      "sha256": "86d2d33b54cbf37cea4e7724f8b0309fd7600b0841e38eb13667fe8ecbf665ad"
-    },
-    {
-      "bytes": 55737,
-      "path": "decisions/DECISION_LOG.md",
-      "sha256": "84f97986ae66ecbfaf57b8e67e78801efac37cfc05138933e6c8ff890a8a9e26"
-    },
-    {
-      "bytes": 1129,
-      "path": "evidence/A8_FOUR_PLAYER_PROFILE_RUNTIME_2026-09-10.md",
-      "sha256": "4947ccde6cdf82b85c8cc62a8c17a7d6e4047c622d98da9b9678387167481741"
-    },
-    {
-      "bytes": 1444,
-      "path": "evidence/A9_FIRST_RUN_2026-09-10.md",
-      "sha256": "96c406680ff38f92e484bebfd58ea4906eb90af58b15178d1dde60b2804b62f5"
-    },
-    {
-      "bytes": 931,
-      "path": "evidence/A9_NES_GENESIS_NO_FIXTURE_CORRECTION_2026-09-10.md",
-      "sha256": "7789a44c011a5d1e6134df15b9fb4c1a5d1f54facd2e31e50bf8c6ebd8a82483"
-    },
-    {
-      "bytes": 1631,
-      "path": "evidence/ADB_STALE_CACHE_RECOVERY_RUNTIME_VALIDATED_2026-09-14.md",
-      "sha256": "ab2db4fdb8e6b869e8b2e5813d1b23081db6aef18ffa78fb63b209b1f3acc473"
-    },
-    {
-      "bytes": 1137,
-      "path": "evidence/ADB_WIRELESS_RECOVERY_AUDIT_PLAN_2026-09-10.md",
-      "sha256": "ef181fedc80a18550c2afb495880603327d1edac3559f38577aac940d7d05c4a"
-    },
-    {
-      "bytes": 907,
-      "path": "evidence/ADB_WIRELESS_RECOVERY_AUDIT_V1_PROBE_DEFECT_2026-09-10.md",
-      "sha256": "3612bdec4e3782dc3bb4937002d5a6d3e6278b76d824828189871575496af515"
-    },
-    {
-      "bytes": 1220,
-      "path": "evidence/ADB_WIRELESS_RECOVERY_FAILURE_2026-09-10.md",
-      "sha256": "c882d61dec3c4fa7272c7467514082af2f78ffa82f68b210aad0b21b49aa6dd1"
-    },
-    {
-      "bytes": 1011,
-      "path": "evidence/ADB_WIRELESS_RECOVERY_RUNTIME_VALIDATED_2026-09-10.md",
-      "sha256": "e0d8b05108dcdf8dc91f1b859d3116ac4653f1e140ef3383309e73603da84080"
-    },
-    {
-      "bytes": 897,
-      "path": "evidence/B1_B2_COMPLETION_GAPS_2026-09-10.md",
-      "sha256": "a6ca2e2fb49df387a8dec9bdd60c4ed7c7180c90a53392ef2f19170c74089601"
-    },
-    {
-      "bytes": 1310,
-      "path": "evidence/B1_B2_COMPLETION_RUNTIME_2026-09-10.md",
-      "sha256": "2b53692029b84889c41f58ea7063b028fcf2579b0025e48004ea5af83cafa65f"
-    },
-    {
-      "bytes": 1967,
-      "path": "evidence/B1_B2_COMPLETION_SOURCE_CONTEXT_2026-09-10.md",
-      "sha256": "059f199a88048b480a28df9705d4a4fcdcddc1205cb71441e50e3fd63e931eff"
-    },
-    {
-      "bytes": 1551,
-      "path": "evidence/B1_CLIENT_FEEDBACK_RUNTIME_2026-09-10.md",
-      "sha256": "99560edd22c6c93752c695998d382a1c8e3e49ea5c6f2db8a863cb1da3caa18b"
-    },
-    {
-      "bytes": 661,
-      "path": "evidence/B1_CLIENT_FEEDBACK_SOURCE_CONTEXT_2026-09-10.md",
-      "sha256": "76c8f8adb06ca99d28b58bfa56c6ea05d54d73bb388bb6a486c3575597b038d6"
-    },
-    {
-      "bytes": 1166,
-      "path": "evidence/B1_DECODER_CLASSIFIER_RUNTIME_2026-09-10.md",
-      "sha256": "2a612fbc9148be9f2af26c7019d7d91683805dfd3bcc951011bef0bdac7810e2"
-    },
-    {
-      "bytes": 1453,
-      "path": "evidence/B1_DECODER_STALE_SEMANTICS_2026-09-10.md",
-      "sha256": "5181d56876058a6c58da0691b15eaaa33dd11b5dbfe4f93b1f52f4b63974a0df"
-    },
-    {
-      "bytes": 1396,
-      "path": "evidence/B1_DIAGNOSTICS_INVENTORY_2026-09-10.md",
-      "sha256": "eaa428fea5cfdacf43b4cc31daf366a733a3f0b5feed91aec88c59eb8fb74bb6"
-    },
-    {
-      "bytes": 1259,
-      "path": "evidence/B1_GUI_RETENTION_CONTEXT_2026-09-10.md",
-      "sha256": "ea623d96309aa04bfd0b58906d676c13e8e93cf1608d661150359aad57c9ec01"
-    },
-    {
-      "bytes": 1223,
-      "path": "evidence/B1_GUI_RETENTION_RUNTIME_2026-09-10.md",
-      "sha256": "47cd4fee970bee8b3817e2a432b5e2fc9ea7815540ebcf981a962e2bd97ac8bb"
-    },
-    {
-      "bytes": 1039,
-      "path": "evidence/B1_HEALTH_ENDPOINT_RUNTIME_2026-09-10.md",
-      "sha256": "608d9269ed448a0a3bc2c04907bc90d05cde8ebe9c2434016e324dc204420001"
-    },
-    {
-      "bytes": 1469,
-      "path": "evidence/B1_HEALTH_MODEL_RUNTIME_2026-09-10.md",
-      "sha256": "87d6665de422d2d19c4f1994e057bc86049689fc40fb3a228427aeb218a3ded8"
-    },
-    {
-      "bytes": 926,
-      "path": "evidence/B1_RETENTION_APPLY_2026-09-10.md",
-      "sha256": "b6f2d1e0efa55f5cda51b6fa60c1d76ee41ec54aad58c8ab8fc1625893dd39f7"
-    },
-    {
-      "bytes": 1114,
-      "path": "evidence/B1_RETENTION_BLOCKER_2026-09-10.md",
-      "sha256": "58582c446ef604c7ee505e1977cc19904686c6eb89e27bdaf52647e11e5cdaaa"
-    },
-    {
-      "bytes": 328,
-      "path": "evidence/B2_GUI_ACTION_FEEDBACK_RUNTIME_2026-09-10.md",
-      "sha256": "2558cea177ab77944a7f33c1e0a17cc09efdb9c63599b858acbe2f043d99dbed"
-    },
-    {
-      "bytes": 1270,
-      "path": "evidence/B3_SUNSHINE_MOONLIGHT_INVENTORY_2026-09-10.md",
-      "sha256": "379ccc267d2d6b74de3e824bdc6f8c078cc3caa82c477985e80bef0b4f071f11"
-    },
-    {
-      "bytes": 1406,
-      "path": "evidence/B4_1_GAMES_SOURCE_CONTEXT_2026-09-11.md",
-      "sha256": "492c5e0483ca495ab0fc584497db196e9c2ce4c6f88c8c8573536ba4d368e3f7"
-    },
-    {
-      "bytes": 1103,
-      "path": "evidence/B4_1_SERVER_EDGE_RUNTIME_2026-09-11.md",
-      "sha256": "9ca57b15862778dfc5f4742ef14d0a27fb8a35307dbb485f21dc23dfe8feed7a"
-    },
-    {
-      "bytes": 1058,
-      "path": "evidence/B4_2_ANDROID_EDGE_RUNTIME_2026-09-11.md",
-      "sha256": "397021982b8f71988775fb302109a20f34a693c166c44c894f36f69a0a02d84a"
-    },
-    {
-      "bytes": 1397,
-      "path": "evidence/B4_2_ANDROID_SOURCE_CONTEXT_2026-09-11.md",
-      "sha256": "007231f1109a19551146bd38af3fe84350cf1404df152e67dd73f850b7940f5f"
-    },
-    {
-      "bytes": 1266,
-      "path": "evidence/B4_3_ORPHAN_REFERENCE_AUDIT_2026-09-11.md",
-      "sha256": "5990a84bcae0305561270df600e737fd18ca1b296c8550cb5a7c25105d4f3f06"
-    },
-    {
-      "bytes": 891,
-      "path": "evidence/B4_4_CODE_ORPHAN_CLEANUP_RUNTIME_2026-09-11.md",
-      "sha256": "173e75aefe3490aaa4e3badc41250688dccb3c4caf5598ca6e66fbd897aaff6f"
-    },
-    {
-      "bytes": 788,
-      "path": "evidence/B4_5_PHYSICAL_LEGACY_HASH_MANIFEST_2026-09-11.md",
-      "sha256": "f269682e76e7ca25b96e73f301c76698875abf2f7a7c1adeec325171e1e44a87"
-    },
-    {
-      "bytes": 980,
-      "path": "evidence/B4_6_PHYSICAL_LEGACY_CLEANUP_RUNTIME_2026-09-11.md",
-      "sha256": "df1ca85a575744f136bfc338754537009d041b40979b8f97d9ff6a38a9eb574c"
-    },
-    {
-      "bytes": 637,
-      "path": "evidence/B4_7_DEVICE_MOONLIGHT_PACKAGE_CHECK_2026-09-11.md",
-      "sha256": "7012bba06326779c126267c189a54fbe7d0c13c508b8a992cd61351ce84f6deb"
-    },
-    {
-      "bytes": 904,
-      "path": "evidence/B4_8_DEVICE_MOONLIGHT_FINAL_STATE_2026-09-11.md",
-      "sha256": "fd17177752dfdbd36d4f1f38e67fbd31bce20713acc3690f03e5dda92fd9b959"
-    },
-    {
-      "bytes": 1000,
-      "path": "evidence/B4_8_DEVICE_MOONLIGHT_REMOVAL_FIRST_RESULT_2026-09-11.md",
-      "sha256": "f3a680fd8dfd8ae21f6cf398ff005d7305151f55c07085a94b9af3cf5afe0066"
-    },
-    {
-      "bytes": 2088,
-      "path": "evidence/B5_NATIVE_ONLY_REGRESSION_2026-09-11.md",
-      "sha256": "02bf2c312bcfadd4f67e1ccd3abb6d5f876e580f6c59b81d3824d713254960ab"
-    },
-    {
-      "bytes": 1298,
-      "path": "evidence/B6_CLEAN_NATIVE_CHECKPOINT_2026-09-11.md",
-      "sha256": "0a3fb8ab2338e33f371caf8cffbbec600ac05467d489a30fb9a3352be8e8c13a"
-    },
-    {
-      "bytes": 1351,
-      "path": "evidence/C1_STATIC_PROFILE_AND_STATUS_PRIVACY_VALIDATED_2026-09-14.md",
-      "sha256": "a685f6687aca31b0578eebfc258a2452ad4f64d6cf2e446a6f18430cda104552"
-    },
-    {
-      "bytes": 1777,
-      "path": "evidence/C2_STREAM_TELEMETRY_RUNTIME_VALIDATED_2026-09-14.md",
-      "sha256": "263d53256fabc15be2662ffcdf9e69cd659e07365fadefafd814d8bb60a56de1"
-    },
-    {
-      "bytes": 1818,
-      "path": "evidence/C2_TELEMETRY_CONTRACT_INVENTORY_2026-09-14.md",
-      "sha256": "035d86d54e1dc50ef0c26a080ff1c3c608df3c8e271f8bea4d850142338386a9"
-    },
-    {
-      "bytes": 3094,
-      "path": "evidence/C3_BIDIRECTIONAL_ACTUATOR_DISPOSITION_2026-09-14.md",
-      "sha256": "19579f468d4569c36c7bc07e59d7828a9975726c8d16132c7febcab4863f62bc"
-    },
-    {
-      "bytes": 2346,
-      "path": "evidence/C3_FIXED_5000_NOT_ACCEPTED_2026-09-14.md",
-      "sha256": "b984b7f09f628cfd3796c1d8cffa832dce337c78d356c688a2e8b4f9f6f44df6"
-    },
-    {
-      "bytes": 3331,
-      "path": "evidence/C3_FIXED_5500_VALIDATED_2026-09-14.md",
-      "sha256": "a57c41ca1047aeb3c7db02da69e0867a0ceab311f497abfadc9634b6ecde11f2"
-    },
-    {
-      "bytes": 2830,
-      "path": "evidence/C3_FIXED_6000_VALIDATED_2026-09-14.md",
-      "sha256": "b688a53daaf138c352b3b7baae6d6c2b2ab635a98bd7407608a37896c3371a34"
-    },
-    {
-      "bytes": 2354,
-      "path": "evidence/C3_STARTUP_STABILIZATION_VALIDATED_2026-09-14.md",
-      "sha256": "dccbd29d2cbe2a97bb8e42d183aab430b33eb52d638ea819b2b89943dae23ed2"
-    },
-    {
-      "bytes": 2614,
-      "path": "evidence/C3_VIDEO_ONLY_RESTART_RUNTIME_VALIDATED_2026-09-14.md",
-      "sha256": "2279101e0dd34a8631ad1168cc347007f4b40d6f563f989354f6afad9ce93c01"
-    },
-    {
-      "bytes": 1193,
-      "path": "evidence/D083_DIAGNOSTIC_INVALIDATION_2026-09-15.md",
-      "sha256": "dfe9def8612ef43db74e429ae2a379bee1aecf5d6601662d7546f57c5c1fda5e"
-    },
-    {
-      "bytes": 16032,
-      "path": "evidence/D_LINUX_ONN_STREAM_DIAGNOSIS_2026-09-15.md",
-      "sha256": "b28177f3bf222a909763ec300a5b118e09ac40ca54b901843e55dc97463cba08"
-    },
-    {
-      "bytes": 1212,
-      "path": "evidence/FOUR_PLAYER_ANDROID_ASSIGNMENT_RUNTIME_2026-09-10.md",
-      "sha256": "c22b6cba5cb459f09273b9203da39c6f9a1683c7a417c95f7fd08468f60322d8"
-    },
-    {
-      "bytes": 1560,
-      "path": "evidence/FOUR_PLAYER_BASE_SLOT_RUNTIME_2026-09-10.md",
-      "sha256": "6029e532b1ffff3ec62d066eb650fd8159d7e36c7fadd40daf486f23e95d3d85"
-    },
-    {
-      "bytes": 1190,
-      "path": "evidence/FOUR_PLAYER_FINAL_RUNTIME_2026-09-10.md",
-      "sha256": "ac683ad46f692b38babe626d0a40dedf489156709cb0b2dfca5e232ce12d8da7"
-    },
-    {
-      "bytes": 1177,
-      "path": "evidence/FOUR_PLAYER_RETROARCH_PORTS_RUNTIME_2026-09-10.md",
-      "sha256": "30165bcc5f34b6f1f5047a1a72699cf6903271bec1bd16d1988c50b11a0709d3"
-    },
-    {
-      "bytes": 2220,
-      "path": "evidence/FOUR_PLAYER_SOURCE_AUDIT_2026-09-10.md",
-      "sha256": "47b99517f46d7f6e3c4bef3bb6338396ba98bdd98c47200524712aaa648c749d"
-    },
-    {
-      "bytes": 32137,
-      "path": "evidence/LINUX_BASELINE_2026-09-15.md",
-      "sha256": "739b59b7b870c72a4d6ba07633f22a992f9faf9c8f1a17671408fdfd0748bb77"
-    },
-    {
-      "bytes": 686,
-      "path": "evidence/linux_baseline_2026-09-15/audio_pulseaudio_20260915_051836.json",
-      "sha256": "e99dca925a000c1ca0ef0d9170d9c6d9a277a2d4a8f78aeaeeb9c445a56f76d1"
-    },
-    {
-      "bytes": 1254,
-      "path": "evidence/linux_baseline_2026-09-15/d075r1_linux_native_audio_rt_probe.txt",
-      "sha256": "ec3214c5d608a774d07aaa78f2ff43e08acd859400cbac667c2fc68e2ab4baaa"
-    },
-    {
-      "bytes": 619,
-      "path": "evidence/linux_baseline_2026-09-15/d076_linux_controller_runtime_probe.txt",
-      "sha256": "643f273c0c6a48c39f0f742af9c4e23bb958efe5a71b96877e03be8e6f8a8121"
-    },
-    {
-      "bytes": 1062,
-      "path": "evidence/linux_baseline_2026-09-15/d076_managed_autoconfig_path_failure.txt",
-      "sha256": "d6ac735020a2d90d97b352e583838e481bc96dfbd66e88c4c89c7a88d1e5e5be"
-    },
-    {
-      "bytes": 8439,
-      "path": "evidence/linux_baseline_2026-09-15/d076_managed_retroarch_runtime_validation.txt",
-      "sha256": "e67b9114e6f860c714856d8790ad11ce87c7e15b96a95b47e2a438e876e4af43"
-    },
-    {
-      "bytes": 1161,
-      "path": "evidence/linux_baseline_2026-09-15/d076r1_missing_sys_import_failure.txt",
-      "sha256": "80a11dc1dc16b977b8e3953e720e034f9f77357cd8e8f5db896ecdafa971af9c"
-    },
-    {
-      "bytes": 1923,
-      "path": "evidence/linux_baseline_2026-09-15/linux_native_audio_d075_probe.txt",
-      "sha256": "65f8366bc7ee3aa0b41a6d69ea72ae025b9dc1742ea783c015b9f840f78960c9"
-    },
-    {
-      "bytes": 2626,
-      "path": "evidence/linux_baseline_2026-09-15/linux_native_video_d074_probe.txt",
-      "sha256": "9142a20f93ee2d613cbe73d7b47ff46373356c8cfea51248c8287b8bf17a7dca"
-    },
-    {
-      "bytes": 1918,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_01.txt",
-      "sha256": "7e43f441b4373761d7bab941a11af65bd37be69b0c4753a181a6fe97a686367c"
-    },
-    {
-      "bytes": 1976,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_02.txt",
-      "sha256": "b387868b0f2849b99d4f1e73d7725e11a7d0502b6ccb4074e2a5c46f9ee3f44a"
-    },
-    {
-      "bytes": 1865,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_03.txt",
-      "sha256": "4fb49d133f3f127a6c13adad737305590bbd083d5f1548ee4226376f73da981e"
-    },
-    {
-      "bytes": 2239,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_04.txt",
-      "sha256": "c56f0e5146a1aec0a190d053cebd3b2db23250db0370711701db2cac762c89fc"
-    },
-    {
-      "bytes": 1133,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_05.txt",
-      "sha256": "a189237d1c864fd5a737d78533aefcb2260d18f2d19eb8ee5bbd85fb64e665b4"
-    },
-    {
-      "bytes": 738,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_06.txt",
-      "sha256": "eee7b64c63144f612552e61e532df2bfd32df93653180f45ba531bc3e0c1f3d3"
-    },
-    {
-      "bytes": 2124,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_06v2.txt",
-      "sha256": "43a435f100c09ef883a74e950bb893a0ebb2e8b94422c5c0e9ff31545f7abcd0"
-    },
-    {
-      "bytes": 577,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_07.txt",
-      "sha256": "6d554c1a8d108a70cffaa75693fce6840e447d32161260a9f1d6ce67101a4f03"
-    },
-    {
-      "bytes": 605,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_08.txt",
-      "sha256": "d2f3b27317491786bbc181c52ff5ca138f1758f714da4f3ff0567472fd6d5536"
-    },
-    {
-      "bytes": 1606,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_09.txt",
-      "sha256": "69665bdd114eaac80775c00826142795db8d844a07f875d2babd8360d456b876"
-    },
-    {
-      "bytes": 362,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_09v2.txt",
-      "sha256": "8fd38e39aee42415037f5d2c9ae98e25cf320af6acdd57fbd593e7184c966216"
-    },
-    {
-      "bytes": 435,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_10.txt",
-      "sha256": "361ec7d5f0d067982cd5e33db74347e8e0a46458cb09699cd955a9cf1fcb9b8a"
-    },
-    {
-      "bytes": 1285,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_10v2.txt",
-      "sha256": "094cf2c28cc0f066dbf0d2b61994078d81cb6ad7293cd817c47609f5dd0a7e3b"
-    },
-    {
-      "bytes": 1675,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_11.txt",
-      "sha256": "1a4e121621440da233bd15749dbbbc93cf9ac755c63748ad956eea52fb74eb81"
-    },
-    {
-      "bytes": 4668,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_12_core_load.txt",
-      "sha256": "349afdfb495997803ed8cb4b9394e1a702f35517dd75e2e85f701e9d7ad8c5bb"
-    },
-    {
-      "bytes": 1593,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_13_core_batch.txt",
-      "sha256": "e4d42e98b44373d75f2cd6db07230dd47c8d91ad8e2d7601939da1ad199f11fc"
-    },
-    {
-      "bytes": 5735,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_14_retroarch_four_gamepads.txt",
-      "sha256": "eea360d9a5ac83af034aa8b367a9ed45c07e297e81a53f74b9a9b841ca1a7125"
-    },
-    {
-      "bytes": 119,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_15_autoconfig_inventory.txt",
-      "sha256": "a2851a4f1828883f8171bcc314dc8f449c416ece1e790173ef6071840be746ee"
-    },
-    {
-      "bytes": 1436,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_16_autoconfig_path.txt",
-      "sha256": "84a165b4e883aadc3e0d03c6671d96693b82b2fb9f8a69e5b7a899c0bf2b0ad0"
-    },
-    {
-      "bytes": 4091,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_17v2_autoconfig_match.txt",
-      "sha256": "915cfb8faa22a0c8df13b090cb83dd908971df8537cf85c417311bb074857980"
-    },
-    {
-      "bytes": 5438,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_18_real_snes_launch.txt",
-      "sha256": "f1738fe109da9131d92d0b1b63b24ff1be861c87404086eaae924ceac67dd816"
-    },
-    {
-      "bytes": 1893,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_19_real_game_capture.txt",
-      "sha256": "2434a7796a17ba66b162739455b4cbb97b7d41c08f9db59bcb1f573b06e40a45"
-    },
-    {
-      "bytes": 1742,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_20v2_minimize_capture.txt",
-      "sha256": "e1b02bddda6bdb5b284d8f3216e57e996eec23ec1cc8c692ddd623a679dd69c8"
-    },
-    {
-      "bytes": 1578,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_21_occlusion_capture.txt",
-      "sha256": "e3c138de14ea9c52b5f39af73b166ec8feb0b8d309100c8d1c61cb1cbc6fa925"
-    },
-    {
-      "bytes": 727,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_22_python_import_boundary.txt",
-      "sha256": "2432f8147e4582a094c92e5d7ff9dc45e834c042bb328e61fa138ffa44ca76ca"
-    },
-    {
-      "bytes": 1264,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_23_manager_status.txt",
-      "sha256": "e07ebe5df8538a0936ffc8bfde7c980296811dea5fa1d8cd5bd227b6022a0c6d"
-    },
-    {
-      "bytes": 16777,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_24_platform_boundary.txt",
-      "sha256": "ebe057a04984a01ff743e54f3e7292464d188dcd6baae9f3a40cf4f0b83a6c80"
-    },
-    {
-      "bytes": 468,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_25_linux_runtime_config.txt",
-      "sha256": "65e0716d5429d86031523cb3231c640b3160444e094a60184f40f9ad2908822d"
-    },
-    {
-      "bytes": 156,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_27_manager_ready.txt",
-      "sha256": "8b7640c4db5b15aee1843a1621e006c4395abd38cebfac6a4e4f9f4072d8fa6f"
-    },
-    {
-      "bytes": 709,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_28_manager_launch.txt",
-      "sha256": "e6c8b4419e40aaa33162195ee6e28f88891d4b1e368f55524fe72930573ce761"
-    },
-    {
-      "bytes": 899,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_29_pid_window_identity.txt",
-      "sha256": "a7de7ac60ae2b991a1deffb01f7946a06ae153e958e4ac208fbc8dbb2a2717c5"
-    },
-    {
-      "bytes": 2085,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_30_single_process_fec.txt",
-      "sha256": "c93c57d16763ddebf6cc78a7ca03ed7404ca6a9ca35740361f21dbeaacef9cf5"
-    },
-    {
-      "bytes": 545,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_31_vaapi_rtp_bootstrap.txt",
-      "sha256": "ab145e79abb15f9eeae54017718c89315a7430e724aa19e3636f312a9b0f5bea"
-    },
-    {
-      "bytes": 628,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_32_managed_pulse_route.txt",
-      "sha256": "8338a28fab59dc4a3da00134225a8f22a7a5ce3ebdaea5183421178cd109627d"
-    },
-    {
-      "bytes": 774,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_33_audio_packet_cadence.txt",
-      "sha256": "9e53b1ebc383dc5f890f659733161d5a359e3b4253e30e39baecd61707854059"
-    },
-    {
-      "bytes": 515,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_34_hybrid_audio_pacer.txt",
-      "sha256": "33ea91134090972df2515e49090dda9f881748117693e219c39d80d2a9c1aed6"
-    },
-    {
-      "bytes": 535,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_35_production_audio_isolated.txt",
-      "sha256": "63701cf977925ce8aa2b64e52b9a07e378627b14aef754b1696ad21a236a38e3"
-    },
-    {
-      "bytes": 612,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_36_audio_gil_probe.txt",
-      "sha256": "928f1be8dbe6e0f2c2dbf9a5c7ff955a886cee35d0eadad18dee591c1dd0ba06"
-    },
-    {
-      "bytes": 535,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_37_event_wait_pacer.txt",
-      "sha256": "66fe5142246005e0da1cb1f633f759d840ccea0af1e154ee4fc999a4cf4f8a7a"
-    },
-    {
-      "bytes": 1087,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_38_sender_stage_timing.txt",
-      "sha256": "3cdbc62968a571105c311e900c3fcf57192dfd0a4afdfcec45a8bafd49fc2859"
-    },
-    {
-      "bytes": 596,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_39_retroarch_pacer.txt",
-      "sha256": "93e9ffe667785578cccbcee4da55d2d0c890bb434d9656f2dd5236a1bf632ff8"
-    },
-    {
-      "bytes": 713,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_40_low_rt_pacer.txt",
-      "sha256": "a044906916e537e88fc2e8ba5fb68005170df22426b9f79de0ade92088095c42"
-    },
-    {
-      "bytes": 1308,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_41_thread_local_rt.txt",
-      "sha256": "2607c1d34661576959bbd77c6dbf001013b5129c68f54ef36ae4955bd3807a1d"
-    },
-    {
-      "bytes": 1273,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_42_uinput_control_map.txt",
-      "sha256": "9a5b7e85e492c5f95a006d7f601dfb43d97502685d619903ea8190707b5f60d9"
-    },
-    {
-      "bytes": 1171,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_43_phi1_uinput_translation.txt",
-      "sha256": "cc070e3db9ccf5fd33d191b8afdbddef0b4edb0ff4807e5ac76ba596c5931064"
-    },
-    {
-      "bytes": 4357,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_44_retroarch_autoconfig.txt",
-      "sha256": "d2b981c46a3deb394ae7b44d73950bb6914d0652b3869ed2b06b204f90a9f50e"
-    },
-    {
-      "bytes": 587,
-      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_45_relative_autoconfig_summary.txt",
-      "sha256": "aa37d946c215ce0a50d45aa1be1bd7f9e91c135d0f7d746185d56dfce009fd4b"
-    },
-    {
-      "bytes": 937,
-      "path": "evidence/PHASE_A_1P_REGRESSION_RUNTIME_2026-09-10.md",
-      "sha256": "101f74c12973da89f99d173b818ce6b10fa076ddeeaa2122d61cf521c235aeb4"
-    },
-    {
-      "bytes": 955,
-      "path": "evidence/PHASE_A_2P_REGRESSION_RUNTIME_2026-09-10.md",
-      "sha256": "7441db1f22977e85120c5c9c6f1127b2dea7bfd1f605adea85240305e5469a9e"
-    },
-    {
-      "bytes": 1111,
-      "path": "evidence/PHASE_A_4P_HOST_ROUTING_RUNTIME_2026-09-10.md",
-      "sha256": "161ddbdeabe28afd3f6c89fa578e1a915026865450d7b93f62488ae7e46aca08"
-    },
-    {
-      "bytes": 839,
-      "path": "evidence/PHASE_A_A9_CHECKPOINT_READY_2026-09-10.md",
-      "sha256": "da20a702d333ae30da19917b8f248cdb87cf3c18a8b14d7f7b64671d0b709632"
-    },
-    {
-      "bytes": 1329,
-      "path": "evidence/PS1_MULTITAP_CORE_OPTIONS_AUDIT_2026-09-10.md",
-      "sha256": "9aee19d7eb23f1af39176475ebc3fb13b0976cf61c1db6142e7843b69eb72e0b"
-    },
-    {
-      "bytes": 1260,
-      "path": "evidence/PS1_MULTITAP_FLAG_AUDIT_2026-09-10.md",
-      "sha256": "a392b9c29f6db92abbb0dff7c864470ad7c3f05a69a3aa13d93b8fd5f3c1f175"
-    },
-    {
-      "bytes": 831,
-      "path": "evidence/PS1_MULTITAP_ONOFF_CTR_VALIDATED_2026-09-10.md",
-      "sha256": "d11a2b7e31638dc089712147f882490dda48ab8ab0d21645c966a25f5e0fa0b7"
-    },
-    {
-      "bytes": 1197,
-      "path": "evidence/PS1_MULTITAP_POSTPATCH_CONNECTIVITY_REGRESSION_2026-09-10.md",
-      "sha256": "b7b1870fa070f3ac0162db9bcb88fda0de4510c60a834d4f8f143e8f938e12d5"
-    },
-    {
-      "bytes": 1042,
-      "path": "evidence/PS1_MULTITAP_ROLLBACK_COMPARISON_2026-09-10.md",
-      "sha256": "b04c9f35ac7b9bad0284c6a8ea7d24b80b5d08a9d8cc778a3df6e5293132172f"
-    },
-    {
-      "bytes": 1732,
-      "path": "evidence/PS1_MULTITAP_SOURCE_CONTEXT_AUDIT_2026-09-10.md",
-      "sha256": "8f1c1845bb244275c1a54998eed3bd04ae32a47a8b8f8d6428f1d9351dc39757"
-    },
-    {
-      "bytes": 5151,
-      "path": "evidence/RUNTIME_VALIDATION.md",
-      "sha256": "62c06b0a0c4b7f4344c5431146f228efd672cea2fcd9e47eedae5eb33f675e38"
-    },
-    {
-      "bytes": 3708,
-      "path": "evidence/snapshots/phase_a_runtime_evidence_2026-09-10.manifest.json",
-      "sha256": "e1bd175f86fb771516cb1a93572a5aff1e9dbef53a3968ec3eb30cc9a93ae3fe"
-    },
-    {
-      "bytes": 41061,
-      "path": "evidence/snapshots/phase_a_runtime_evidence_2026-09-10.zip",
-      "sha256": "7cd58c6b7e2b128e36b3a879fa151444790e9d95d9b12ec933f415bec19ef756"
-    },
-    {
-      "bytes": 376,
-      "path": "evidence/snapshots/README.md",
-      "sha256": "941a2d121be0e03128d2eeea1e3790d8bebcf2924ab20b94b02dc7dde5c8f30d"
-    },
-    {
-      "bytes": 5094,
-      "path": "handoffs/CURRENT_HANDOFF.md",
-      "sha256": "f7f11bad9aa63592c6afe85d8349893a47bce22a3b82eae80c76af277abbbf80"
-    },
-    {
-      "bytes": 20924,
-      "path": "history/ACTIVE_INVESTIGATIONS_SUPERSEDED_THROUGH_2026-09-11.md",
-      "sha256": "279f6c391fb27c79e58719dc62a42889f63d6b7a61e93d6e697c472af61b0245"
-    },
-    {
-      "bytes": 38295,
-      "path": "history/MEMORY_SUPERSEDED_THROUGH_2026-09-11.md",
-      "sha256": "37cb35190c7d158e15b0873a7b6780a94e630a226a454f8cd40d5e1d68470825"
-    },
-    {
-      "bytes": 1535,
-      "path": "history/README.md",
-      "sha256": "17179b3916be00b216a803bef7f798eaa59c246835ea85543b23929fa5ef18dc"
-    },
-    {
-      "bytes": 2158,
-      "path": "investigations/ACTIVE.md",
-      "sha256": "781cc741538bea48979e5c1d86514ed7ad49cd392be7bb4fcb5df0cc27adc6d1"
-    },
-    {
-      "bytes": 2659,
-      "path": "investigations/ADB_STALE_CACHE_NATIVE_ERROR_2026-09-14.md",
-      "sha256": "5c878f19305ad3e3dd8c2ce307f9f6cfab9e838d16b4421520eb6fd932326c8e"
-    },
-    {
-      "bytes": 1712,
-      "path": "investigations/B1_DIAGNOSTICS_INVENTORY.md",
-      "sha256": "f523c870dedc6a886078ba6a94b1fc54e3a2f4936264e382e9738ab9338e06f3"
-    },
-    {
-      "bytes": 2769,
-      "path": "investigations/C3_BIDIRECTIONAL_ACTUATOR.md",
-      "sha256": "705bc197bb1648bfd5b765114cfbc317430cac5f56312d4fd5277d70791410c7"
-    },
-    {
-      "bytes": 2616,
-      "path": "investigations/C3_BITRATE_ACTUATOR.md",
-      "sha256": "4b96fdd88999cae8cb4399e23caa7e96f13666624319da5203f6882655b45be8"
-    },
-    {
-      "bytes": 7888,
-      "path": "investigations/C3_FIXED_BITRATE_CHARACTERIZATION.md",
-      "sha256": "dc81cb1788f3b9e1823432e6f7707e95555a64cc32d46b2492acaa07ce998490"
-    },
-    {
-      "bytes": 2832,
-      "path": "investigations/C3_STARTUP_STABILIZATION.md",
-      "sha256": "f5f89217d55809ee1e403ed8a3d25def4995737c4f41e6be3ed9218042049097"
-    },
-    {
-      "bytes": 1595,
-      "path": "investigations/CLOSED.md",
-      "sha256": "c2853610c1898a5ee4ff97e336682d295aea3fdd431b6fb886f319a3aa1c4648"
-    },
-    {
-      "bytes": 17215,
-      "path": "investigations/D_LINUX_UDP_EGRESS_2026-09-15.md",
-      "sha256": "e2246e5dfb6d7e573678bfd3d77e042814196d529a9ef6e5cbaca648ff333504"
-    },
-    {
-      "bytes": 2035,
-      "path": "investigations/DEFERRED.md",
-      "sha256": "f56878acb6e749ce9ff5a7922109a1b2b9d61fc9170a4616b5160ad6e5659131"
-    },
-    {
-      "bytes": 2564,
       "path": "LEARNINGS.md",
+      "bytes": 2564,
       "sha256": "7957a58cd59456684c568bc85d8fe39c22d130b58ddaf9d9d636f7b063fa9698"
     },
     {
-      "bytes": 12574,
+      "path": "MAINTENANCE.md",
+      "bytes": 5985,
+      "sha256": "d5e6755714a0476aa7adc541df4ceb131a5664f799173f3d3b7e7b578acaa867"
+    },
+    {
       "path": "MEMORY.md",
-      "sha256": "56dcc429eb9a27365fb4a15c50cf8582fe0440e50ef9722e91752c6f24cc5eac"
+      "bytes": 7785,
+      "sha256": "7bd5294b91827af839037af4cd77daf30fe1f172603294fb08c3a49338368460"
     },
     {
-      "bytes": 27117,
-      "path": "memory/2026-09-10.md",
-      "sha256": "df3aa331aa94cd503ba13164ea9a0461643d1e2e67f042c8499e92595f9ec044"
-    },
-    {
-      "bytes": 16359,
-      "path": "memory/2026-09-11.md",
-      "sha256": "0bc6c287c87ba9c90326a6672b923c581a33493b83e38383df521c7c733cff28"
-    },
-    {
-      "bytes": 20219,
-      "path": "memory/2026-09-14.md",
-      "sha256": "8a5d5264536d7a89839b504f1929eb47bed2890d753fbeba8a020426508442c6"
-    },
-    {
-      "bytes": 16308,
-      "path": "memory/2026-09-15.md",
-      "sha256": "3ea7c7f201191d2765b91e1bf2a0cee3f4aa90a17216892c2473695bd5f5056f"
-    },
-    {
-      "bytes": 1342,
-      "path": "patches/D-074_LINUX_NATIVE_VIDEO_BACKEND.md",
-      "sha256": "a5e50b3542185c1f602a2362dae3c9105977804b4af9a21fed13a260bf087fe8"
-    },
-    {
-      "bytes": 1971,
-      "path": "patches/D-075_LINUX_NATIVE_AUDIO_BACKEND.md",
-      "sha256": "7eb2429ca1f6239446964b412140b43114b6bfc27d1214cf4a823b02d0dcfe3b"
-    },
-    {
-      "bytes": 2143,
-      "path": "patches/D-075R1_LINUX_NATIVE_AUDIO_RT_PACER.md",
-      "sha256": "8c9fee57fed478455d37de7c84ef38949e28b7d7830d4e906f0cec5b71c610e7"
-    },
-    {
-      "bytes": 4553,
-      "path": "patches/D-076_LINUX_UINPUT_CONTROLLER_BACKEND.md",
-      "sha256": "358a97b530a5bc3102c268d9afcc29d0df9c44a5166dabb5be50f3e74aacff94"
-    },
-    {
-      "bytes": 2462,
-      "path": "patches/D-076R1_LINUX_AUTOCONFIG_SESSION_PATH.md",
-      "sha256": "ced99e5ae4e6659d010f2a1bd279efe6c786602292fe27bde48bbd423dd2e7b4"
-    },
-    {
-      "bytes": 1681,
-      "path": "patches/D-076R2_LINUX_AUTOCONFIG_SYS_IMPORT.md",
-      "sha256": "ba414a59cde80ee667d4c01efc7b7978ca45bbb4c64e097da99bfc1140265145"
-    },
-    {
-      "bytes": 2844,
-      "path": "patches/D-077_LINUX_PLATFORM_RUNTIME_SELECTION.md",
-      "sha256": "c6d1d6ea043446cefd9a90c83e6507d6c29cbdaff927d98ff56b7186d766f99b"
-    },
-    {
-      "bytes": 2354,
-      "path": "patches/D-078_LINUX_COMPANION_MEDIA_SERVER_STARTUP.md",
-      "sha256": "8bcce16bda21b271c170411c05b42d4b0d8d1cda41234aa13aedc82a731a4c8f"
-    },
-    {
-      "bytes": 1719,
-      "path": "patches/MEMORY_NORMALIZATION_2026-09-15.md",
-      "sha256": "93e45793ba7059a3714aaecdd80759876b2d82b789c8174c695e0d1f686fb90c"
-    },
-    {
-      "bytes": 42035,
-      "path": "patches/PATCH_INDEX.md",
-      "sha256": "9166385b867b09883960565b35659f57d15a6f8713e928d9dfc2770af27cec24"
-    },
-    {
-      "bytes": 1894,
-      "path": "patches/PATCH_PROTOCOL.md",
-      "sha256": "003dd9017a7ef514793dbec5875223f10d41f3c6ef1033258a9201fea33e2606"
-    },
-    {
-      "bytes": 3012,
       "path": "README.md",
-      "sha256": "604ed606c8169d87f669160f8cb5c48baf5a89069ea5fe681002733e0e118ba3"
+      "bytes": 1816,
+      "sha256": "e7583aa417dcd62a5f93b44ba2ec7df6f09b53078b1c6379d79c125521a7addb"
     },
     {
-      "bytes": 7536,
-      "path": "repository/AUDIT_2026-09-10.md",
-      "sha256": "07e3defdb7dc7d0ad6e87aca49171c8831be662471c7203dd9ad06ecec3ad95b"
-    },
-    {
-      "bytes": 3008,
-      "path": "repository/CODE_MAP.md",
-      "sha256": "f855171adb9cc88a72fe1422c837e68824b250c1b08426b6468237042abcc3ae"
-    },
-    {
-      "bytes": 1886,
-      "path": "repository/DEBT.md",
-      "sha256": "5157fbc4db4194f2102dde6c829ce2f7c9a3c61df831ace7850b9e7b1c95d641"
-    },
-    {
-      "bytes": 1472,
       "path": "REPOSITORY_POLICY.md",
+      "bytes": 1472,
       "sha256": "fb6755f8f4774a5a3fe50b5cc76ba1739372e6176ae2d41e10710cfc2f64bd4d"
     },
     {
-      "bytes": 3872,
-      "path": "roadmap/STATUS.md",
-      "sha256": "2d75ef59d7fd4f7d2e62511e200717cf80c8ede771217628e6aad9a7d933d17c"
-    },
-    {
-      "bytes": 750,
-      "path": "templates/MEMORY_UPDATE.md",
-      "sha256": "4879fd7bcb0245e637e373fcfcce5f60ba8da38e2b8fa1aef20527a75a67176f"
-    },
-    {
-      "bytes": 669,
-      "path": "templates/SESSION_LOG.md",
-      "sha256": "c990aa997c923f79a0ab6c138f1dbd1a1e30574a72163c1b199914206a721e26"
-    },
-    {
-      "bytes": 1445,
       "path": "TOOLS.md",
+      "bytes": 1445,
       "sha256": "dd2ac2f8393cc8c96a348cf8dbe3c7bb2c917d9d59ec30e8210b614c65927708"
     },
     {
-      "bytes": 1288,
       "path": "USER.md",
+      "bytes": 1288,
       "sha256": "fcf02ab01e9bb291796a58a263d488b78008188771a025459bf475de23a0237e"
+    },
+    {
+      "path": "architecture/ADAPTIVE_BITRATE.md",
+      "bytes": 17848,
+      "sha256": "5a3e75fad98a1404c136dd919c8ef40d812fe986add6f689b16ebb966c575d19"
+    },
+    {
+      "path": "architecture/CONTROLLERS.md",
+      "bytes": 15198,
+      "sha256": "20425585baa6800b7a5afd7d9f7495f087e5687311ade476bebfe28c91acdec2"
+    },
+    {
+      "path": "architecture/DIAGNOSTICS.md",
+      "bytes": 23670,
+      "sha256": "00a88d5852e069b94fd388d0292490798b4bd7b5e69dcced30619abebea81d2c"
+    },
+    {
+      "path": "architecture/GAMES.md",
+      "bytes": 7877,
+      "sha256": "e060df4a1a4f95d7157fa99322cd495f7ef6e14921b95311289b7cf040363b6b"
+    },
+    {
+      "path": "architecture/NETWORK.md",
+      "bytes": 3255,
+      "sha256": "28c84a0a929f79c24b4224f01c9fa02039dc810284504983891ca0fe34633609"
+    },
+    {
+      "path": "architecture/REMOTE_ACCESS.md",
+      "bytes": 3732,
+      "sha256": "7ce5e23c01f22ac4ece69ddd24ca0a4ddb5c814247b17dbbef6972ad1a992611"
+    },
+    {
+      "path": "architecture/STREAMING.md",
+      "bytes": 6820,
+      "sha256": "b76cfadcc3e5e81385f5c630b6a0c8f95c955f030729ef042660ec4e8aeae891"
+    },
+    {
+      "path": "architecture/STREAM_TELEMETRY.md",
+      "bytes": 6811,
+      "sha256": "e5c9a4814bdfb6990c41b12345850cceac126259ee6127e2ab98f0ff487d540a"
+    },
+    {
+      "path": "architecture/SYSTEM.md",
+      "bytes": 2108,
+      "sha256": "66750a741fe182fec4439f572b2e4c64452b7e89075882efdc1a1058d48beea0"
+    },
+    {
+      "path": "architecture/TV_MEDIA.md",
+      "bytes": 17239,
+      "sha256": "a45f51643464e1c26607815d4dac28de8b09a58b94ba2e35cee126addf2bf539"
+    },
+    {
+      "path": "architecture/TV_STATE_SYNC.md",
+      "bytes": 7588,
+      "sha256": "1e8108e48e117219e65ba450e516cdc68f15f7be6d719c662057d6bce2379b3c"
+    },
+    {
+      "path": "chats/CHAT_INDEX.md",
+      "bytes": 3215,
+      "sha256": "7231c9d31cc33a7bcec65e8e795d716b3b7a0a4ce2dc795aa671fcffe7439994"
+    },
+    {
+      "path": "decisions/D-101_BROWSER_CAMERA_C6_RECLASSIFICATION.md",
+      "bytes": 1245,
+      "sha256": "49a33ea01fdf7f9a8603212cab8bc6f914151eff92b6550ca1f02e886c54cd83"
+    },
+    {
+      "path": "decisions/D-102_D5_TV_ACCEPTANCE_SYNC_OWNERSHIP.md",
+      "bytes": 3457,
+      "sha256": "c1d840940df35a9fe42ba401b9473f06004a249939a6b7598060456749fec2ff"
+    },
+    {
+      "path": "decisions/D083_NETDEV_DIAGNOSTIC_CLOSEOUT_2026-09-15.md",
+      "bytes": 1136,
+      "sha256": "86d2d33b54cbf37cea4e7724f8b0309fd7600b0841e38eb13667fe8ecbf665ad"
+    },
+    {
+      "path": "decisions/D110_EPG_LINUX_ACQUISITION_SEAM.md",
+      "bytes": 1625,
+      "sha256": "cc333ee5ee8031fc836a1cf2f448d7505b4cbd28623fec605c8e436295603f54"
+    },
+    {
+      "path": "decisions/D111_ANDROID_COMPANION_EPG_PRIORITY.md",
+      "bytes": 1634,
+      "sha256": "2379e7d4d7b3330edf10f9c2ea26957acb89158fe3011362c65cc6c44755db87"
+    },
+    {
+      "path": "decisions/D114_STREAM_IDENTITY_POLICY.md",
+      "bytes": 1920,
+      "sha256": "0e4f632e2122e62b18982edb6c73ea1b3a02489f65bfb09397a919ceb60eb3fb"
+    },
+    {
+      "path": "decisions/D115_TV_STATE_AUTHORITY_CONTRACT.md",
+      "bytes": 2294,
+      "sha256": "5f99776b2886fd9a377f5b535ce94d598f0d7d6fba4a39db808a28e95c4edd0d"
+    },
+    {
+      "path": "decisions/D116_ANDROID_TV_STATE_SYNC_POLICY.md",
+      "bytes": 1929,
+      "sha256": "cf77c4cee475852764075008aa1c3bdcc5be19d47ca5d8e1239bc85cd3be2deb"
+    },
+    {
+      "path": "decisions/DECISION_LOG.md",
+      "bytes": 56790,
+      "sha256": "ebb86deccd3af5ba66622562aee01c081f14dd56ba222373c9ebc809620c0ff2"
+    },
+    {
+      "path": "evidence/A8_FOUR_PLAYER_PROFILE_RUNTIME_2026-09-10.md",
+      "bytes": 1129,
+      "sha256": "4947ccde6cdf82b85c8cc62a8c17a7d6e4047c622d98da9b9678387167481741"
+    },
+    {
+      "path": "evidence/A9_FIRST_RUN_2026-09-10.md",
+      "bytes": 1444,
+      "sha256": "96c406680ff38f92e484bebfd58ea4906eb90af58b15178d1dde60b2804b62f5"
+    },
+    {
+      "path": "evidence/A9_NES_GENESIS_NO_FIXTURE_CORRECTION_2026-09-10.md",
+      "bytes": 931,
+      "sha256": "7789a44c011a5d1e6134df15b9fb4c1a5d1f54facd2e31e50bf8c6ebd8a82483"
+    },
+    {
+      "path": "evidence/ADB_ENDPOINT_DEBUG_RUNTIME_REQUEST_2026-09-15.md",
+      "bytes": 1146,
+      "sha256": "3f0581db51c8de70af73b803d8914dbf9ed988905e2ea50f47a27819fd41516f"
+    },
+    {
+      "path": "evidence/ADB_ENDPOINT_DEBUG_WATCH_PORT_2026-09-15.md",
+      "bytes": 995,
+      "sha256": "2010de3d7f123686b8f75875605520623a1c5f7f94f9de5717fbf0836517e988"
+    },
+    {
+      "path": "evidence/ADB_EPHEMERAL_PORT_RECOVERY_DEVELOPMENT_2026-09-15.md",
+      "bytes": 2677,
+      "sha256": "3247e5d0bfd24c260249e1e5babf9cebd7ac2325271ec6083d37a828729e1859"
+    },
+    {
+      "path": "evidence/ADB_EPHEMERAL_PORT_RECOVERY_RUNTIME_FAILURE_2026-09-15.md",
+      "bytes": 2239,
+      "sha256": "474afab292829e98d7a068ea482cdb079a406644dcb75e60059a11f0db6f3a7e"
+    },
+    {
+      "path": "evidence/ADB_RECOVERY_PROBE_LINUX_PARITY_DEVELOPMENT_2026-09-15.md",
+      "bytes": 2530,
+      "sha256": "7d7828c53edadb0ccae18a5aecdc54de7529650b09d431e3f12ffadcf593bcbd"
+    },
+    {
+      "path": "evidence/ADB_STALE_CACHE_RECOVERY_RUNTIME_VALIDATED_2026-09-14.md",
+      "bytes": 1631,
+      "sha256": "ab2db4fdb8e6b869e8b2e5813d1b23081db6aef18ffa78fb63b209b1f3acc473"
+    },
+    {
+      "path": "evidence/ADB_WIRELESS_RECOVERY_AUDIT_PLAN_2026-09-10.md",
+      "bytes": 1137,
+      "sha256": "ef181fedc80a18550c2afb495880603327d1edac3559f38577aac940d7d05c4a"
+    },
+    {
+      "path": "evidence/ADB_WIRELESS_RECOVERY_AUDIT_V1_PROBE_DEFECT_2026-09-10.md",
+      "bytes": 907,
+      "sha256": "3612bdec4e3782dc3bb4937002d5a6d3e6278b76d824828189871575496af515"
+    },
+    {
+      "path": "evidence/ADB_WIRELESS_RECOVERY_FAILURE_2026-09-10.md",
+      "bytes": 1220,
+      "sha256": "c882d61dec3c4fa7272c7467514082af2f78ffa82f68b210aad0b21b49aa6dd1"
+    },
+    {
+      "path": "evidence/ADB_WIRELESS_RECOVERY_RUNTIME_VALIDATED_2026-09-10.md",
+      "bytes": 1011,
+      "sha256": "e0d8b05108dcdf8dc91f1b859d3116ac4653f1e140ef3383309e73603da84080"
+    },
+    {
+      "path": "evidence/B1_B2_COMPLETION_GAPS_2026-09-10.md",
+      "bytes": 897,
+      "sha256": "a6ca2e2fb49df387a8dec9bdd60c4ed7c7180c90a53392ef2f19170c74089601"
+    },
+    {
+      "path": "evidence/B1_B2_COMPLETION_RUNTIME_2026-09-10.md",
+      "bytes": 1310,
+      "sha256": "2b53692029b84889c41f58ea7063b028fcf2579b0025e48004ea5af83cafa65f"
+    },
+    {
+      "path": "evidence/B1_B2_COMPLETION_SOURCE_CONTEXT_2026-09-10.md",
+      "bytes": 1967,
+      "sha256": "059f199a88048b480a28df9705d4a4fcdcddc1205cb71441e50e3fd63e931eff"
+    },
+    {
+      "path": "evidence/B1_CLIENT_FEEDBACK_RUNTIME_2026-09-10.md",
+      "bytes": 1551,
+      "sha256": "99560edd22c6c93752c695998d382a1c8e3e49ea5c6f2db8a863cb1da3caa18b"
+    },
+    {
+      "path": "evidence/B1_CLIENT_FEEDBACK_SOURCE_CONTEXT_2026-09-10.md",
+      "bytes": 661,
+      "sha256": "76c8f8adb06ca99d28b58bfa56c6ea05d54d73bb388bb6a486c3575597b038d6"
+    },
+    {
+      "path": "evidence/B1_DECODER_CLASSIFIER_RUNTIME_2026-09-10.md",
+      "bytes": 1166,
+      "sha256": "2a612fbc9148be9f2af26c7019d7d91683805dfd3bcc951011bef0bdac7810e2"
+    },
+    {
+      "path": "evidence/B1_DECODER_STALE_SEMANTICS_2026-09-10.md",
+      "bytes": 1453,
+      "sha256": "5181d56876058a6c58da0691b15eaaa33dd11b5dbfe4f93b1f52f4b63974a0df"
+    },
+    {
+      "path": "evidence/B1_DIAGNOSTICS_INVENTORY_2026-09-10.md",
+      "bytes": 1396,
+      "sha256": "eaa428fea5cfdacf43b4cc31daf366a733a3f0b5feed91aec88c59eb8fb74bb6"
+    },
+    {
+      "path": "evidence/B1_GUI_RETENTION_CONTEXT_2026-09-10.md",
+      "bytes": 1259,
+      "sha256": "ea623d96309aa04bfd0b58906d676c13e8e93cf1608d661150359aad57c9ec01"
+    },
+    {
+      "path": "evidence/B1_GUI_RETENTION_RUNTIME_2026-09-10.md",
+      "bytes": 1223,
+      "sha256": "47cd4fee970bee8b3817e2a432b5e2fc9ea7815540ebcf981a962e2bd97ac8bb"
+    },
+    {
+      "path": "evidence/B1_HEALTH_ENDPOINT_RUNTIME_2026-09-10.md",
+      "bytes": 1039,
+      "sha256": "608d9269ed448a0a3bc2c04907bc90d05cde8ebe9c2434016e324dc204420001"
+    },
+    {
+      "path": "evidence/B1_HEALTH_MODEL_RUNTIME_2026-09-10.md",
+      "bytes": 1469,
+      "sha256": "87d6665de422d2d19c4f1994e057bc86049689fc40fb3a228427aeb218a3ded8"
+    },
+    {
+      "path": "evidence/B1_RETENTION_APPLY_2026-09-10.md",
+      "bytes": 926,
+      "sha256": "b6f2d1e0efa55f5cda51b6fa60c1d76ee41ec54aad58c8ab8fc1625893dd39f7"
+    },
+    {
+      "path": "evidence/B1_RETENTION_BLOCKER_2026-09-10.md",
+      "bytes": 1114,
+      "sha256": "58582c446ef604c7ee505e1977cc19904686c6eb89e27bdaf52647e11e5cdaaa"
+    },
+    {
+      "path": "evidence/B2_GUI_ACTION_FEEDBACK_RUNTIME_2026-09-10.md",
+      "bytes": 328,
+      "sha256": "2558cea177ab77944a7f33c1e0a17cc09efdb9c63599b858acbe2f043d99dbed"
+    },
+    {
+      "path": "evidence/B3_SUNSHINE_MOONLIGHT_INVENTORY_2026-09-10.md",
+      "bytes": 1270,
+      "sha256": "379ccc267d2d6b74de3e824bdc6f8c078cc3caa82c477985e80bef0b4f071f11"
+    },
+    {
+      "path": "evidence/B4_1_GAMES_SOURCE_CONTEXT_2026-09-11.md",
+      "bytes": 1406,
+      "sha256": "492c5e0483ca495ab0fc584497db196e9c2ce4c6f88c8c8573536ba4d368e3f7"
+    },
+    {
+      "path": "evidence/B4_1_SERVER_EDGE_RUNTIME_2026-09-11.md",
+      "bytes": 1103,
+      "sha256": "9ca57b15862778dfc5f4742ef14d0a27fb8a35307dbb485f21dc23dfe8feed7a"
+    },
+    {
+      "path": "evidence/B4_2_ANDROID_EDGE_RUNTIME_2026-09-11.md",
+      "bytes": 1058,
+      "sha256": "397021982b8f71988775fb302109a20f34a693c166c44c894f36f69a0a02d84a"
+    },
+    {
+      "path": "evidence/B4_2_ANDROID_SOURCE_CONTEXT_2026-09-11.md",
+      "bytes": 1397,
+      "sha256": "007231f1109a19551146bd38af3fe84350cf1404df152e67dd73f850b7940f5f"
+    },
+    {
+      "path": "evidence/B4_3_ORPHAN_REFERENCE_AUDIT_2026-09-11.md",
+      "bytes": 1266,
+      "sha256": "5990a84bcae0305561270df600e737fd18ca1b296c8550cb5a7c25105d4f3f06"
+    },
+    {
+      "path": "evidence/B4_4_CODE_ORPHAN_CLEANUP_RUNTIME_2026-09-11.md",
+      "bytes": 891,
+      "sha256": "173e75aefe3490aaa4e3badc41250688dccb3c4caf5598ca6e66fbd897aaff6f"
+    },
+    {
+      "path": "evidence/B4_5_PHYSICAL_LEGACY_HASH_MANIFEST_2026-09-11.md",
+      "bytes": 788,
+      "sha256": "f269682e76e7ca25b96e73f301c76698875abf2f7a7c1adeec325171e1e44a87"
+    },
+    {
+      "path": "evidence/B4_6_PHYSICAL_LEGACY_CLEANUP_RUNTIME_2026-09-11.md",
+      "bytes": 980,
+      "sha256": "df1ca85a575744f136bfc338754537009d041b40979b8f97d9ff6a38a9eb574c"
+    },
+    {
+      "path": "evidence/B4_7_DEVICE_MOONLIGHT_PACKAGE_CHECK_2026-09-11.md",
+      "bytes": 637,
+      "sha256": "7012bba06326779c126267c189a54fbe7d0c13c508b8a992cd61351ce84f6deb"
+    },
+    {
+      "path": "evidence/B4_8_DEVICE_MOONLIGHT_FINAL_STATE_2026-09-11.md",
+      "bytes": 904,
+      "sha256": "fd17177752dfdbd36d4f1f38e67fbd31bce20713acc3690f03e5dda92fd9b959"
+    },
+    {
+      "path": "evidence/B4_8_DEVICE_MOONLIGHT_REMOVAL_FIRST_RESULT_2026-09-11.md",
+      "bytes": 1000,
+      "sha256": "f3a680fd8dfd8ae21f6cf398ff005d7305151f55c07085a94b9af3cf5afe0066"
+    },
+    {
+      "path": "evidence/B5_NATIVE_ONLY_REGRESSION_2026-09-11.md",
+      "bytes": 2088,
+      "sha256": "02bf2c312bcfadd4f67e1ccd3abb6d5f876e580f6c59b81d3824d713254960ab"
+    },
+    {
+      "path": "evidence/B6_CLEAN_NATIVE_CHECKPOINT_2026-09-11.md",
+      "bytes": 1298,
+      "sha256": "0a3fb8ab2338e33f371caf8cffbbec600ac05467d489a30fb9a3352be8e8c13a"
+    },
+    {
+      "path": "evidence/C1_STATIC_PROFILE_AND_STATUS_PRIVACY_VALIDATED_2026-09-14.md",
+      "bytes": 1351,
+      "sha256": "a685f6687aca31b0578eebfc258a2452ad4f64d6cf2e446a6f18430cda104552"
+    },
+    {
+      "path": "evidence/C2_STREAM_TELEMETRY_RUNTIME_VALIDATED_2026-09-14.md",
+      "bytes": 1777,
+      "sha256": "263d53256fabc15be2662ffcdf9e69cd659e07365fadefafd814d8bb60a56de1"
+    },
+    {
+      "path": "evidence/C2_TELEMETRY_CONTRACT_INVENTORY_2026-09-14.md",
+      "bytes": 1818,
+      "sha256": "035d86d54e1dc50ef0c26a080ff1c3c608df3c8e271f8bea4d850142338386a9"
+    },
+    {
+      "path": "evidence/C3_BIDIRECTIONAL_ACTUATOR_DISPOSITION_2026-09-14.md",
+      "bytes": 3094,
+      "sha256": "19579f468d4569c36c7bc07e59d7828a9975726c8d16132c7febcab4863f62bc"
+    },
+    {
+      "path": "evidence/C3_FIXED_5000_NOT_ACCEPTED_2026-09-14.md",
+      "bytes": 2346,
+      "sha256": "b984b7f09f628cfd3796c1d8cffa832dce337c78d356c688a2e8b4f9f6f44df6"
+    },
+    {
+      "path": "evidence/C3_FIXED_5500_VALIDATED_2026-09-14.md",
+      "bytes": 3331,
+      "sha256": "a57c41ca1047aeb3c7db02da69e0867a0ceab311f497abfadc9634b6ecde11f2"
+    },
+    {
+      "path": "evidence/C3_FIXED_6000_VALIDATED_2026-09-14.md",
+      "bytes": 2830,
+      "sha256": "b688a53daaf138c352b3b7baae6d6c2b2ab635a98bd7407608a37896c3371a34"
+    },
+    {
+      "path": "evidence/C3_STARTUP_STABILIZATION_VALIDATED_2026-09-14.md",
+      "bytes": 2354,
+      "sha256": "dccbd29d2cbe2a97bb8e42d183aab430b33eb52d638ea819b2b89943dae23ed2"
+    },
+    {
+      "path": "evidence/C3_VIDEO_ONLY_RESTART_RUNTIME_VALIDATED_2026-09-14.md",
+      "bytes": 2614,
+      "sha256": "2279101e0dd34a8631ad1168cc347007f4b40d6f563f989354f6afad9ce93c01"
+    },
+    {
+      "path": "evidence/D-100_D5_EXTERNAL_VOD_HOTPLUG_RUNTIME_ACCEPTANCE.md",
+      "bytes": 1162,
+      "sha256": "6845cf4c817c9905929de95e2b452cdc3b5bcd349c5f719717cdbe527bddb246"
+    },
+    {
+      "path": "evidence/D083_DIAGNOSTIC_INVALIDATION_2026-09-15.md",
+      "bytes": 1193,
+      "sha256": "dfe9def8612ef43db74e429ae2a379bee1aecf5d6601662d7546f57c5c1fda5e"
+    },
+    {
+      "path": "evidence/D085_LINUX_CONTROLLER_RUNTIME_VALIDATION_2026-09-16.md",
+      "bytes": 1308,
+      "sha256": "71765fa0de17981d47a43b7d59c653eb8b3ddc85d6d1a5aa220364e495afe2eb"
+    },
+    {
+      "path": "evidence/D085_LINUX_UDEV_HAT_MAPPING_2026-09-16.md",
+      "bytes": 1593,
+      "sha256": "08b9893ed3ba2973ac37c21edfa4550ae937cdd6ab7215b18632a715621949f8"
+    },
+    {
+      "path": "evidence/D087R1_LINUX_PS1_MULTITAP_METADATA_PATH_2026-09-16.md",
+      "bytes": 744,
+      "sha256": "1f61dac6095f6a6bee5e69d4776d41273e709752a9eac1d63290face2aa7e6ed"
+    },
+    {
+      "path": "evidence/D087_LINUX_PS1_MULTITAP_CONFIG_PATH_2026-09-16.md",
+      "bytes": 1074,
+      "sha256": "1d3b091dbb698d30aa664c977cd5d7bf1c4f48326bf2ebaf04a8d601fa850884"
+    },
+    {
+      "path": "evidence/D088_LINUX_PS1_MULTITAP_RUNTIME_VALIDATION_2026-09-16.md",
+      "bytes": 1106,
+      "sha256": "c4b693ebfe28dbc8d97a6b6051b3f07252e4015c1b3fa99765f50482c3de2cdf"
+    },
+    {
+      "path": "evidence/D090_D4_LINUX_GAMES_ACCEPTANCE_2026-09-16.md",
+      "bytes": 2460,
+      "sha256": "3aef808338a21b6b2225170fcd4425aa9aef2681682f9412a481a3e022e415d9"
+    },
+    {
+      "path": "evidence/D091_D5_LINUX_MEDIA_BASELINE_2026-09-16.md",
+      "bytes": 1723,
+      "sha256": "5120c801a613213a37bc2d6b6ce324bcf30816bd7a4f77c38749f6f0352894d5"
+    },
+    {
+      "path": "evidence/D092_D5_DYNAMIC_VOD_SOURCE_START_HEALTH_2026-09-16.md",
+      "bytes": 1085,
+      "sha256": "87e26266da864e54ab043094b3fef336c6854d6bf1ca658bafdcfcc4f1abf7ec"
+    },
+    {
+      "path": "evidence/D093R2_D5_EXTERNAL_VOD_RUNTIME_VALIDATION_2026-09-16.md",
+      "bytes": 1644,
+      "sha256": "34062e4c181653a3cfeed0e0f22b82c8c558df3dfb8b82144d68c0a103304f05"
+    },
+    {
+      "path": "evidence/D094_D5_EXTERNAL_STORAGE_REMOUNT_2026-09-16.md",
+      "bytes": 1377,
+      "sha256": "a1554f20003f1db134ad5642c5114f45b434d053fdcd5a40907c64f5d7c74bf8"
+    },
+    {
+      "path": "evidence/D095_D5_EXTERNAL_STORAGE_IDENTITY_2026-09-16.md",
+      "bytes": 860,
+      "sha256": "f35cfb5ae4e95c3523504443d5e39898ccd21f22260454b0b1b730228791cf2e"
+    },
+    {
+      "path": "evidence/D102_D5_LIVE_TV_ACCEPTANCE_2026-09-16.md",
+      "bytes": 1351,
+      "sha256": "0ff1de477d2413db84515abc0cbd4563f653f8d841c7619effbc7310396c034f"
+    },
+    {
+      "path": "evidence/D103_D5_EPG_MAPPING_SOURCE_DIVERGENCE_2026-09-16.md",
+      "bytes": 1301,
+      "sha256": "832f4c3615f2eb6af367eb88f58484684817f436f19418ec3c60a553c9271476"
+    },
+    {
+      "path": "evidence/D105_D5_EPG_METADATA_COVERAGE_RESULT_2026-09-16.md",
+      "bytes": 1800,
+      "sha256": "faadfa4e3520a19eac2b522aa7c13436c1f7c6e1fcf14df8b15b0737b25a91f2"
+    },
+    {
+      "path": "evidence/D105_D5_EPG_UPSTREAM_SOURCE_AVAILABILITY_2026-09-16.md",
+      "bytes": 2484,
+      "sha256": "751c89e7802163baf15d70008d57ca8183b5ab05cf51475bea80de780673806a"
+    },
+    {
+      "path": "evidence/D106_D5_EPG_FEED_IDENTITY_CORRECTION_2026-09-16.md",
+      "bytes": 1622,
+      "sha256": "6611fa52ceb179db469f9144712344978bb0b1f15521e660cb0d37d05bd62272"
+    },
+    {
+      "path": "evidence/D107_D5_EPG_FEED_IDENTITY_RESULT_2026-09-16.md",
+      "bytes": 1938,
+      "sha256": "7e24118c30ad2d84846452eb796ae86421a11315f3496e5e0fa554b4faaac9a5"
+    },
+    {
+      "path": "evidence/D108_D5_EPG_ENVIRONMENT_RESULT_2026-09-16.md",
+      "bytes": 1018,
+      "sha256": "679d4c895a6944cd767abeb54a14bca27f0784e0326efe6421d41750a71b6e74"
+    },
+    {
+      "path": "evidence/D109_D5_EPG_LOCAL_GRABBER_RUNTIME_SUCCESS_2026-09-16.md",
+      "bytes": 2090,
+      "sha256": "6858448c78e8fc663487278f666d6a6727e66ae6a47b334ecd910d8918579186"
+    },
+    {
+      "path": "evidence/D110_D5_LINUX_EPG_SERVICE_RUNTIME_ACCEPTANCE_2026-09-16.md",
+      "bytes": 1344,
+      "sha256": "f96d69bdb369094daf6e327eaff34ec7fbf6d7b11d28d79ade7fe7f322524550"
+    },
+    {
+      "path": "evidence/D111_D5_ANDROID_COMPANION_EPG_RUNTIME_ACCEPTANCE_2026-09-16.md",
+      "bytes": 1344,
+      "sha256": "a51d495d8dd1115bf77499594d20584e58f46177ec6d0078503ed0f2eecf87ad"
+    },
+    {
+      "path": "evidence/D113_10BOLD_UPSTREAM_STREAM_IDENTITY_EVIDENCE_2026-09-16.md",
+      "bytes": 1638,
+      "sha256": "c15eba0363f2e0f0ad6a6a906b29f41b1d81dece48dca41a19d3f551e6c1a34f"
+    },
+    {
+      "path": "evidence/D113_D5_STREAM_IDENTITY_AUDIT_RESULT_2026-09-16.md",
+      "bytes": 2338,
+      "sha256": "f50d180f9a8edc98699e1bc0f5312abad627a8b2c220557eb6a3dc2083e5004b"
+    },
+    {
+      "path": "evidence/D115_D5_TV_STATE_AUTHORITY_RUNTIME_ACCEPTANCE_2026-09-17.md",
+      "bytes": 944,
+      "sha256": "c6209793010cf2726fc15a5321a06f54bc8177318296d300b7aadf406b37065a"
+    },
+    {
+      "path": "evidence/D115_D5_TV_STATE_CONTRACT_INVENTORY_2026-09-16.md",
+      "bytes": 2377,
+      "sha256": "4a0f8c619cc0d132e9657f247251f57e5cbad1a3e1d7801ce8fa2cd602534743"
+    },
+    {
+      "path": "evidence/D116_D5_ANDROID_TV_STATE_SYNC_RUNTIME_ACCEPTANCE_2026-09-17.md",
+      "bytes": 1317,
+      "sha256": "a42ee6646b3cdc62430504a73ad04ca37f78ba35de4e760216e8f2a98fee36e4"
+    },
+    {
+      "path": "evidence/D117_D5_LINUX_AUTHORITY_PULL_RUNTIME_ACCEPTANCE_2026-09-17.md",
+      "bytes": 2387,
+      "sha256": "3db4c6893b255cb868d24988003bdef17eada072a30045ecb438d2f7085948f3"
+    },
+    {
+      "path": "evidence/D119_D5_TV_ENTRY_SYNC_TRIGGER_RUNTIME_ACCEPTANCE_2026-09-17.md",
+      "bytes": 1006,
+      "sha256": "2e094a56e31a6fe5b47eb6cbc50f347c7e862cedc8d861e3dc14bdaa3524ecaf"
+    },
+    {
+      "path": "evidence/D120_D5_TV_STATE_SYNC_DIAGNOSTICS_RUNTIME_ACCEPTANCE_2026-09-17.md",
+      "bytes": 942,
+      "sha256": "de58d9769614ef7655d00b5176d35d8035cf90d553c968aa13fcdb64af2f03b2"
+    },
+    {
+      "path": "evidence/D121_D5_TV_STATE_CONFLICT_DIAGNOSTICS_RUNTIME_ACCEPTANCE_2026-09-17.md",
+      "bytes": 1068,
+      "sha256": "e352a586bb23e347783efcdb8a8ead72def0fa2865f26e370bf62f1c1de26988"
+    },
+    {
+      "path": "evidence/D122_D54_TV_MEDIA_REGRESSION_RUNTIME_ACCEPTANCE_2026-09-17.md",
+      "bytes": 1665,
+      "sha256": "ba9b0de6226c67c0c7672b5e441925a3b8cbefc38063e720581814e6450df56c"
+    },
+    {
+      "path": "evidence/D124_TV_EPG_LATENCY_RUNTIME_RESULT_2026-09-17.md",
+      "bytes": 939,
+      "sha256": "65347a9c19af02064c9b20ed71e691465c88d7ff8360a56133b284743ecc42cd"
+    },
+    {
+      "path": "evidence/D125_EPG_BACKGROUND_WARMER_RUNTIME_ACCEPTANCE_2026-09-17.md",
+      "bytes": 922,
+      "sha256": "2cc7a5f15cc52f7d8d1bd6f4cdf56fbd535a8543847a3c1ceb4de51af144c5fa"
+    },
+    {
+      "path": "evidence/D126_ANDROID_EPG_PREFETCH_RUNTIME_ACCEPTANCE_2026-09-17.md",
+      "bytes": 934,
+      "sha256": "3fa38983303303d0437082ad097f6038c7278c98784dc1f5eb2e2c8f70bdc3a0"
+    },
+    {
+      "path": "evidence/D4_LINUX_A8_PLATFORM_ADAPTER_2026-09-16.md",
+      "bytes": 1825,
+      "sha256": "ad46a56afaa1940473b87a38abbc190547eea67aba1be54115b27fd2ed208d20"
+    },
+    {
+      "path": "evidence/D4_LINUX_GAME_HANDOFF_RESPONSE_LOSS_2026-09-15.md",
+      "bytes": 782,
+      "sha256": "6325901f33b1ccc6205c463e9d4cd78422c35f1d95487e71de94a72bbed36ef6"
+    },
+    {
+      "path": "evidence/D4_LINUX_RUNTIME_RECONCILIATION_2026-09-16.md",
+      "bytes": 2908,
+      "sha256": "21ee4e6180c05348a73119460aaec8000556a4b027de3998ecdb4c742b2c2e1f"
+    },
+    {
+      "path": "evidence/D_LINUX_ONN_STREAM_DIAGNOSIS_2026-09-15.md",
+      "bytes": 16032,
+      "sha256": "b28177f3bf222a909763ec300a5b118e09ac40ca54b901843e55dc97463cba08"
+    },
+    {
+      "path": "evidence/FOUR_PLAYER_ANDROID_ASSIGNMENT_RUNTIME_2026-09-10.md",
+      "bytes": 1212,
+      "sha256": "c22b6cba5cb459f09273b9203da39c6f9a1683c7a417c95f7fd08468f60322d8"
+    },
+    {
+      "path": "evidence/FOUR_PLAYER_BASE_SLOT_RUNTIME_2026-09-10.md",
+      "bytes": 1560,
+      "sha256": "6029e532b1ffff3ec62d066eb650fd8159d7e36c7fadd40daf486f23e95d3d85"
+    },
+    {
+      "path": "evidence/FOUR_PLAYER_FINAL_RUNTIME_2026-09-10.md",
+      "bytes": 1190,
+      "sha256": "ac683ad46f692b38babe626d0a40dedf489156709cb0b2dfca5e232ce12d8da7"
+    },
+    {
+      "path": "evidence/FOUR_PLAYER_RETROARCH_PORTS_RUNTIME_2026-09-10.md",
+      "bytes": 1177,
+      "sha256": "30165bcc5f34b6f1f5047a1a72699cf6903271bec1bd16d1988c50b11a0709d3"
+    },
+    {
+      "path": "evidence/FOUR_PLAYER_SOURCE_AUDIT_2026-09-10.md",
+      "bytes": 2220,
+      "sha256": "47b99517f46d7f6e3c4bef3bb6338396ba98bdd98c47200524712aaa648c749d"
+    },
+    {
+      "path": "evidence/LINUX_BASELINE_2026-09-15.md",
+      "bytes": 32137,
+      "sha256": "739b59b7b870c72a4d6ba07633f22a992f9faf9c8f1a17671408fdfd0748bb77"
+    },
+    {
+      "path": "evidence/MEMORY_MAINTENANCE_REPORT_2026-09-17.md",
+      "bytes": 922,
+      "sha256": "359da21e347322fdb66359c3e5ac7a9c1f9e023e0ece6ad1ff64127984d8a1b1"
+    },
+    {
+      "path": "evidence/PHASE_A_1P_REGRESSION_RUNTIME_2026-09-10.md",
+      "bytes": 937,
+      "sha256": "101f74c12973da89f99d173b818ce6b10fa076ddeeaa2122d61cf521c235aeb4"
+    },
+    {
+      "path": "evidence/PHASE_A_2P_REGRESSION_RUNTIME_2026-09-10.md",
+      "bytes": 955,
+      "sha256": "7441db1f22977e85120c5c9c6f1127b2dea7bfd1f605adea85240305e5469a9e"
+    },
+    {
+      "path": "evidence/PHASE_A_4P_HOST_ROUTING_RUNTIME_2026-09-10.md",
+      "bytes": 1111,
+      "sha256": "161ddbdeabe28afd3f6c89fa578e1a915026865450d7b93f62488ae7e46aca08"
+    },
+    {
+      "path": "evidence/PHASE_A_A9_CHECKPOINT_READY_2026-09-10.md",
+      "bytes": 839,
+      "sha256": "da20a702d333ae30da19917b8f248cdb87cf3c18a8b14d7f7b64671d0b709632"
+    },
+    {
+      "path": "evidence/PS1_MULTITAP_CORE_OPTIONS_AUDIT_2026-09-10.md",
+      "bytes": 1329,
+      "sha256": "9aee19d7eb23f1af39176475ebc3fb13b0976cf61c1db6142e7843b69eb72e0b"
+    },
+    {
+      "path": "evidence/PS1_MULTITAP_FLAG_AUDIT_2026-09-10.md",
+      "bytes": 1260,
+      "sha256": "a392b9c29f6db92abbb0dff7c864470ad7c3f05a69a3aa13d93b8fd5f3c1f175"
+    },
+    {
+      "path": "evidence/PS1_MULTITAP_ONOFF_CTR_VALIDATED_2026-09-10.md",
+      "bytes": 831,
+      "sha256": "d11a2b7e31638dc089712147f882490dda48ab8ab0d21645c966a25f5e0fa0b7"
+    },
+    {
+      "path": "evidence/PS1_MULTITAP_POSTPATCH_CONNECTIVITY_REGRESSION_2026-09-10.md",
+      "bytes": 1197,
+      "sha256": "b7b1870fa070f3ac0162db9bcb88fda0de4510c60a834d4f8f143e8f938e12d5"
+    },
+    {
+      "path": "evidence/PS1_MULTITAP_ROLLBACK_COMPARISON_2026-09-10.md",
+      "bytes": 1042,
+      "sha256": "b04c9f35ac7b9bad0284c6a8ea7d24b80b5d08a9d8cc778a3df6e5293132172f"
+    },
+    {
+      "path": "evidence/PS1_MULTITAP_SOURCE_CONTEXT_AUDIT_2026-09-10.md",
+      "bytes": 1732,
+      "sha256": "8f1c1845bb244275c1a54998eed3bd04ae32a47a8b8f8d6428f1d9351dc39757"
+    },
+    {
+      "path": "evidence/RUNTIME_VALIDATION.md",
+      "bytes": 5151,
+      "sha256": "62c06b0a0c4b7f4344c5431146f228efd672cea2fcd9e47eedae5eb33f675e38"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/audio_pulseaudio_20260915_051836.json",
+      "bytes": 686,
+      "sha256": "e99dca925a000c1ca0ef0d9170d9c6d9a277a2d4a8f78aeaeeb9c445a56f76d1"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/d075r1_linux_native_audio_rt_probe.txt",
+      "bytes": 1254,
+      "sha256": "ec3214c5d608a774d07aaa78f2ff43e08acd859400cbac667c2fc68e2ab4baaa"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/d076_linux_controller_runtime_probe.txt",
+      "bytes": 619,
+      "sha256": "643f273c0c6a48c39f0f742af9c4e23bb958efe5a71b96877e03be8e6f8a8121"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/d076_managed_autoconfig_path_failure.txt",
+      "bytes": 1062,
+      "sha256": "d6ac735020a2d90d97b352e583838e481bc96dfbd66e88c4c89c7a88d1e5e5be"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/d076_managed_retroarch_runtime_validation.txt",
+      "bytes": 8439,
+      "sha256": "e67b9114e6f860c714856d8790ad11ce87c7e15b96a95b47e2a438e876e4af43"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/d076r1_missing_sys_import_failure.txt",
+      "bytes": 1161,
+      "sha256": "80a11dc1dc16b977b8e3953e720e034f9f77357cd8e8f5db896ecdafa971af9c"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/linux_native_audio_d075_probe.txt",
+      "bytes": 1923,
+      "sha256": "65f8366bc7ee3aa0b41a6d69ea72ae025b9dc1742ea783c015b9f840f78960c9"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/linux_native_video_d074_probe.txt",
+      "bytes": 2626,
+      "sha256": "9142a20f93ee2d613cbe73d7b47ff46373356c8cfea51248c8287b8bf17a7dca"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_01.txt",
+      "bytes": 1918,
+      "sha256": "7e43f441b4373761d7bab941a11af65bd37be69b0c4753a181a6fe97a686367c"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_02.txt",
+      "bytes": 1976,
+      "sha256": "b387868b0f2849b99d4f1e73d7725e11a7d0502b6ccb4074e2a5c46f9ee3f44a"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_03.txt",
+      "bytes": 1865,
+      "sha256": "4fb49d133f3f127a6c13adad737305590bbd083d5f1548ee4226376f73da981e"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_04.txt",
+      "bytes": 2239,
+      "sha256": "c56f0e5146a1aec0a190d053cebd3b2db23250db0370711701db2cac762c89fc"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_05.txt",
+      "bytes": 1133,
+      "sha256": "a189237d1c864fd5a737d78533aefcb2260d18f2d19eb8ee5bbd85fb64e665b4"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_06.txt",
+      "bytes": 738,
+      "sha256": "eee7b64c63144f612552e61e532df2bfd32df93653180f45ba531bc3e0c1f3d3"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_06v2.txt",
+      "bytes": 2124,
+      "sha256": "43a435f100c09ef883a74e950bb893a0ebb2e8b94422c5c0e9ff31545f7abcd0"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_07.txt",
+      "bytes": 577,
+      "sha256": "6d554c1a8d108a70cffaa75693fce6840e447d32161260a9f1d6ce67101a4f03"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_08.txt",
+      "bytes": 605,
+      "sha256": "d2f3b27317491786bbc181c52ff5ca138f1758f714da4f3ff0567472fd6d5536"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_09.txt",
+      "bytes": 1606,
+      "sha256": "69665bdd114eaac80775c00826142795db8d844a07f875d2babd8360d456b876"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_09v2.txt",
+      "bytes": 362,
+      "sha256": "8fd38e39aee42415037f5d2c9ae98e25cf320af6acdd57fbd593e7184c966216"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_10.txt",
+      "bytes": 435,
+      "sha256": "361ec7d5f0d067982cd5e33db74347e8e0a46458cb09699cd955a9cf1fcb9b8a"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_10v2.txt",
+      "bytes": 1285,
+      "sha256": "094cf2c28cc0f066dbf0d2b61994078d81cb6ad7293cd817c47609f5dd0a7e3b"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_11.txt",
+      "bytes": 1675,
+      "sha256": "1a4e121621440da233bd15749dbbbc93cf9ac755c63748ad956eea52fb74eb81"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_12_core_load.txt",
+      "bytes": 4668,
+      "sha256": "349afdfb495997803ed8cb4b9394e1a702f35517dd75e2e85f701e9d7ad8c5bb"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_13_core_batch.txt",
+      "bytes": 1593,
+      "sha256": "e4d42e98b44373d75f2cd6db07230dd47c8d91ad8e2d7601939da1ad199f11fc"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_14_retroarch_four_gamepads.txt",
+      "bytes": 5735,
+      "sha256": "eea360d9a5ac83af034aa8b367a9ed45c07e297e81a53f74b9a9b841ca1a7125"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_15_autoconfig_inventory.txt",
+      "bytes": 119,
+      "sha256": "a2851a4f1828883f8171bcc314dc8f449c416ece1e790173ef6071840be746ee"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_16_autoconfig_path.txt",
+      "bytes": 1436,
+      "sha256": "84a165b4e883aadc3e0d03c6671d96693b82b2fb9f8a69e5b7a899c0bf2b0ad0"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_17v2_autoconfig_match.txt",
+      "bytes": 4091,
+      "sha256": "915cfb8faa22a0c8df13b090cb83dd908971df8537cf85c417311bb074857980"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_18_real_snes_launch.txt",
+      "bytes": 5438,
+      "sha256": "f1738fe109da9131d92d0b1b63b24ff1be861c87404086eaae924ceac67dd816"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_19_real_game_capture.txt",
+      "bytes": 1893,
+      "sha256": "2434a7796a17ba66b162739455b4cbb97b7d41c08f9db59bcb1f573b06e40a45"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_20v2_minimize_capture.txt",
+      "bytes": 1742,
+      "sha256": "e1b02bddda6bdb5b284d8f3216e57e996eec23ec1cc8c692ddd623a679dd69c8"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_21_occlusion_capture.txt",
+      "bytes": 1578,
+      "sha256": "e3c138de14ea9c52b5f39af73b166ec8feb0b8d309100c8d1c61cb1cbc6fa925"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_22_python_import_boundary.txt",
+      "bytes": 727,
+      "sha256": "2432f8147e4582a094c92e5d7ff9dc45e834c042bb328e61fa138ffa44ca76ca"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_23_manager_status.txt",
+      "bytes": 1264,
+      "sha256": "e07ebe5df8538a0936ffc8bfde7c980296811dea5fa1d8cd5bd227b6022a0c6d"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_24_platform_boundary.txt",
+      "bytes": 16777,
+      "sha256": "ebe057a04984a01ff743e54f3e7292464d188dcd6baae9f3a40cf4f0b83a6c80"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_25_linux_runtime_config.txt",
+      "bytes": 468,
+      "sha256": "65e0716d5429d86031523cb3231c640b3160444e094a60184f40f9ad2908822d"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_27_manager_ready.txt",
+      "bytes": 156,
+      "sha256": "8b7640c4db5b15aee1843a1621e006c4395abd38cebfac6a4e4f9f4072d8fa6f"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_28_manager_launch.txt",
+      "bytes": 709,
+      "sha256": "e6c8b4419e40aaa33162195ee6e28f88891d4b1e368f55524fe72930573ce761"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_29_pid_window_identity.txt",
+      "bytes": 899,
+      "sha256": "a7de7ac60ae2b991a1deffb01f7946a06ae153e958e4ac208fbc8dbb2a2717c5"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_30_single_process_fec.txt",
+      "bytes": 2085,
+      "sha256": "c93c57d16763ddebf6cc78a7ca03ed7404ca6a9ca35740361f21dbeaacef9cf5"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_31_vaapi_rtp_bootstrap.txt",
+      "bytes": 545,
+      "sha256": "ab145e79abb15f9eeae54017718c89315a7430e724aa19e3636f312a9b0f5bea"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_32_managed_pulse_route.txt",
+      "bytes": 628,
+      "sha256": "8338a28fab59dc4a3da00134225a8f22a7a5ce3ebdaea5183421178cd109627d"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_33_audio_packet_cadence.txt",
+      "bytes": 774,
+      "sha256": "9e53b1ebc383dc5f890f659733161d5a359e3b4253e30e39baecd61707854059"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_34_hybrid_audio_pacer.txt",
+      "bytes": 515,
+      "sha256": "33ea91134090972df2515e49090dda9f881748117693e219c39d80d2a9c1aed6"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_35_production_audio_isolated.txt",
+      "bytes": 535,
+      "sha256": "63701cf977925ce8aa2b64e52b9a07e378627b14aef754b1696ad21a236a38e3"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_36_audio_gil_probe.txt",
+      "bytes": 612,
+      "sha256": "928f1be8dbe6e0f2c2dbf9a5c7ff955a886cee35d0eadad18dee591c1dd0ba06"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_37_event_wait_pacer.txt",
+      "bytes": 535,
+      "sha256": "66fe5142246005e0da1cb1f633f759d840ccea0af1e154ee4fc999a4cf4f8a7a"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_38_sender_stage_timing.txt",
+      "bytes": 1087,
+      "sha256": "3cdbc62968a571105c311e900c3fcf57192dfd0a4afdfcec45a8bafd49fc2859"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_39_retroarch_pacer.txt",
+      "bytes": 596,
+      "sha256": "93e9ffe667785578cccbcee4da55d2d0c890bb434d9656f2dd5236a1bf632ff8"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_40_low_rt_pacer.txt",
+      "bytes": 713,
+      "sha256": "a044906916e537e88fc2e8ba5fb68005170df22426b9f79de0ade92088095c42"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_41_thread_local_rt.txt",
+      "bytes": 1308,
+      "sha256": "2607c1d34661576959bbd77c6dbf001013b5129c68f54ef36ae4955bd3807a1d"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_42_uinput_control_map.txt",
+      "bytes": 1273,
+      "sha256": "9a5b7e85e492c5f95a006d7f601dfb43d97502685d619903ea8190707b5f60d9"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_43_phi1_uinput_translation.txt",
+      "bytes": 1171,
+      "sha256": "cc070e3db9ccf5fd33d191b8afdbddef0b4edb0ff4807e5ac76ba596c5931064"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_44_retroarch_autoconfig.txt",
+      "bytes": 4357,
+      "sha256": "d2b981c46a3deb394ae7b44d73950bb6914d0652b3869ed2b06b204f90a9f50e"
+    },
+    {
+      "path": "evidence/linux_baseline_2026-09-15/privyhub_linux_baseline_45_relative_autoconfig_summary.txt",
+      "bytes": 587,
+      "sha256": "aa37d946c215ce0a50d45aa1be1bd7f9e91c135d0f7d746185d56dfce009fd4b"
+    },
+    {
+      "path": "evidence/snapshots/README.md",
+      "bytes": 376,
+      "sha256": "941a2d121be0e03128d2eeea1e3790d8bebcf2924ab20b94b02dc7dde5c8f30d"
+    },
+    {
+      "path": "evidence/snapshots/phase_a_runtime_evidence_2026-09-10.manifest.json",
+      "bytes": 3708,
+      "sha256": "e1bd175f86fb771516cb1a93572a5aff1e9dbef53a3968ec3eb30cc9a93ae3fe"
+    },
+    {
+      "path": "evidence/snapshots/phase_a_runtime_evidence_2026-09-10.zip",
+      "bytes": 41061,
+      "sha256": "7cd58c6b7e2b128e36b3a879fa151444790e9d95d9b12ec933f415bec19ef756"
+    },
+    {
+      "path": "handoffs/CURRENT_HANDOFF.md",
+      "bytes": 976,
+      "sha256": "3d3843738490097e4497a41d78d414244373849e205b941a87536e85d57d5fd1"
+    },
+    {
+      "path": "history/ACTIVE_INVESTIGATIONS_SUPERSEDED_THROUGH_2026-09-11.md",
+      "bytes": 20924,
+      "sha256": "279f6c391fb27c79e58719dc62a42889f63d6b7a61e93d6e697c472af61b0245"
+    },
+    {
+      "path": "history/MEMORY_SUPERSEDED_THROUGH_2026-09-11.md",
+      "bytes": 38295,
+      "sha256": "37cb35190c7d158e15b0873a7b6780a94e630a226a454f8cd40d5e1d68470825"
+    },
+    {
+      "path": "history/README.md",
+      "bytes": 1245,
+      "sha256": "8731e03b54c8da7be9907ca5f3ed6023fe7f0713a520dfe70dc980eaf1f94d7e"
+    },
+    {
+      "path": "investigations/ACTIVE.md",
+      "bytes": 1029,
+      "sha256": "3d5a202f0d017d966901eedaec4a3f64e60d4a3f4dc702aead2cdece99257e95"
+    },
+    {
+      "path": "investigations/ADB_STALE_CACHE_NATIVE_ERROR_2026-09-14.md",
+      "bytes": 2659,
+      "sha256": "5c878f19305ad3e3dd8c2ce307f9f6cfab9e838d16b4421520eb6fd932326c8e"
+    },
+    {
+      "path": "investigations/B1_DIAGNOSTICS_INVENTORY.md",
+      "bytes": 1712,
+      "sha256": "f523c870dedc6a886078ba6a94b1fc54e3a2f4936264e382e9738ab9338e06f3"
+    },
+    {
+      "path": "investigations/C3_BIDIRECTIONAL_ACTUATOR.md",
+      "bytes": 2769,
+      "sha256": "705bc197bb1648bfd5b765114cfbc317430cac5f56312d4fd5277d70791410c7"
+    },
+    {
+      "path": "investigations/C3_BITRATE_ACTUATOR.md",
+      "bytes": 2616,
+      "sha256": "4b96fdd88999cae8cb4399e23caa7e96f13666624319da5203f6882655b45be8"
+    },
+    {
+      "path": "investigations/C3_FIXED_BITRATE_CHARACTERIZATION.md",
+      "bytes": 7888,
+      "sha256": "dc81cb1788f3b9e1823432e6f7707e95555a64cc32d46b2492acaa07ce998490"
+    },
+    {
+      "path": "investigations/C3_STARTUP_STABILIZATION.md",
+      "bytes": 2832,
+      "sha256": "f5f89217d55809ee1e403ed8a3d25def4995737c4f41e6be3ed9218042049097"
+    },
+    {
+      "path": "investigations/CLOSED.md",
+      "bytes": 4077,
+      "sha256": "8d486b70233a9b649701885a52a143ee88e9932fed2921534fac7dde38cd237e"
+    },
+    {
+      "path": "investigations/D103_D5_EPG_INGESTION_PROBE.md",
+      "bytes": 2434,
+      "sha256": "b2104e3d37e94e3fa6fdfa74743d2d6962c9ed30f14af05774d43b63206ab587"
+    },
+    {
+      "path": "investigations/D105_D5_EPG_LOCAL_SOURCE_VIABILITY.md",
+      "bytes": 2778,
+      "sha256": "c3d00e5853c00af2435613751fd0963d7d51a244f6120cb45168c16353aa1604"
+    },
+    {
+      "path": "investigations/D106_D5_EPG_PROVIDER_IDENTITY.md",
+      "bytes": 2428,
+      "sha256": "c14aa16f1e3ffb0ca521765705591f78a96936b1db3e7fc3d011b8a08e941137"
+    },
+    {
+      "path": "investigations/D107_D5_EPG_FEED_IDENTITY.md",
+      "bytes": 2387,
+      "sha256": "56c20f07b5c731994468a9ff5d32ddb9c842eb5f5efa5b6709724768ded7abe9"
+    },
+    {
+      "path": "investigations/D108_D5_EPG_LOCAL_GRABBER_VIABILITY.md",
+      "bytes": 3046,
+      "sha256": "265554144ab9ce21d960898d42652462a7e1b9cdb76c647d7c1ac5ad07d2bd47"
+    },
+    {
+      "path": "investigations/D109_D5_EPG_PORTABLE_NODE_GRABBER.md",
+      "bytes": 2774,
+      "sha256": "93dedecd04b35b380480dcaf6eba2f8274e5d64e7203c156c95d8d79e4834d95"
+    },
+    {
+      "path": "investigations/D110_D5_LINUX_EPG_SERVICE_SEAM.md",
+      "bytes": 3620,
+      "sha256": "52b549c4b8fd8d091eb07c82aa508a5d0617bebe38e26acdb1a06729f68ccfe3"
+    },
+    {
+      "path": "investigations/D111_D5_ANDROID_COMPANION_EPG_INTEGRATION.md",
+      "bytes": 3082,
+      "sha256": "e8a1bd7bcb4b561f6d901804c393162611892cc4e53d5aa007212193e54363b2"
+    },
+    {
+      "path": "investigations/D113_D5_STREAM_IDENTITY_INTEGRITY.md",
+      "bytes": 3228,
+      "sha256": "b88dac5366fc307974f672a007572f41930b6bad42477f6b25ee8ecdbcd18628"
+    },
+    {
+      "path": "investigations/D115_D5_LINUX_TV_STATE_AUTHORITY.md",
+      "bytes": 1923,
+      "sha256": "e00ba1d615f68b875996a402132ebc7d915f2e400ba1ad74e38338d4aef9bc10"
+    },
+    {
+      "path": "investigations/D116_D5_ANDROID_TV_STATE_SYNC.md",
+      "bytes": 2253,
+      "sha256": "dd7310112828999563b2289df5e255dcfd003396394852c1011c5d640044b186"
+    },
+    {
+      "path": "investigations/D117_D5_LINUX_AUTHORITY_PULL_VALIDATION.md",
+      "bytes": 2477,
+      "sha256": "30e843899466a6be5cc6a48a3d02d9dc45165ea5682686bb0778ec567ab7cb03"
+    },
+    {
+      "path": "investigations/D119_D5_TV_ENTRY_SYNC_TRIGGER.md",
+      "bytes": 2914,
+      "sha256": "2e1b07efe287be7abac32a5defe76285940b574bd4df9140713540cb847e524a"
+    },
+    {
+      "path": "investigations/D120_D5_TV_STATE_SYNC_DIAGNOSTICS.md",
+      "bytes": 1506,
+      "sha256": "f7f670b27e0b0f24daf489bfa1e6cecc6ddd43872f6ea3e67b37217b84e83a34"
+    },
+    {
+      "path": "investigations/D121_D5_TV_STATE_CONFLICT_DIAGNOSTICS.md",
+      "bytes": 1852,
+      "sha256": "9e115d2598652afb2b556fcdcbca0649222ea58706b3da82cd97ba8059f7fe7e"
+    },
+    {
+      "path": "investigations/D122_D5_TV_MEDIA_REGRESSION_GATE.md",
+      "bytes": 1886,
+      "sha256": "afafeccfade19512513c329570819f1205fec4a65740c63bf96e7b0ed8c1f8f6"
+    },
+    {
+      "path": "investigations/D123_TV_EPG_PERFORMANCE_AND_GUIDE_UX.md",
+      "bytes": 3346,
+      "sha256": "e59915743d8cedd9a41c457feb464939133065cf431dc4b6f2d13f8a599a8c5d"
+    },
+    {
+      "path": "investigations/D124_TV_EPG_LATENCY_PROBE.md",
+      "bytes": 3326,
+      "sha256": "fc95e7f1821bdff83a0d2bd8244a4b7947fed697bb5b37bf383efab64f9423e4"
+    },
+    {
+      "path": "investigations/D125_EPG_NONBLOCKING_BACKGROUND_WARMER.md",
+      "bytes": 1727,
+      "sha256": "c095edf9b1a32cea29ed7eb4cd3449b657005affe4975627ec3410f9a2c86d82"
+    },
+    {
+      "path": "investigations/D126_ANDROID_EPG_PREFETCH_INTEGRATION.md",
+      "bytes": 1299,
+      "sha256": "58c2beb294960107ed165ac61ed15dce169169f7d7dbc82a518a16318f69a7cd"
+    },
+    {
+      "path": "investigations/D4_PS1_MULTITAP_LINUX_2026-09-16.md",
+      "bytes": 1994,
+      "sha256": "0667762ea00ab6360744958f2e2d495beb893282de7323a60656db720e8c3904"
+    },
+    {
+      "path": "investigations/DEFERRED.md",
+      "bytes": 3601,
+      "sha256": "d11b85d8e39fa475be68cfd752bc5817144e40289cf5b2adfd1e4123cd12ed31"
+    },
+    {
+      "path": "investigations/D_LINUX_UDP_EGRESS_2026-09-15.md",
+      "bytes": 17215,
+      "sha256": "e2246e5dfb6d7e573678bfd3d77e042814196d529a9ef6e5cbaca648ff333504"
+    },
+    {
+      "path": "investigations/EXPRESSVPN_WINDOWS_BRIDGE_2026-09-16.md",
+      "bytes": 1974,
+      "sha256": "7e710315d5dbdf946804dd226c157ea85b7841eeeff667a0c485c6527e1fdd99"
+    },
+    {
+      "path": "memory/2026-09-10.md",
+      "bytes": 27117,
+      "sha256": "df3aa331aa94cd503ba13164ea9a0461643d1e2e67f042c8499e92595f9ec044"
+    },
+    {
+      "path": "memory/2026-09-11.md",
+      "bytes": 16359,
+      "sha256": "0bc6c287c87ba9c90326a6672b923c581a33493b83e38383df521c7c733cff28"
+    },
+    {
+      "path": "memory/2026-09-14.md",
+      "bytes": 20219,
+      "sha256": "8a5d5264536d7a89839b504f1929eb47bed2890d753fbeba8a020426508442c6"
+    },
+    {
+      "path": "memory/2026-09-15.md",
+      "bytes": 21146,
+      "sha256": "e0d5a9ee90a8bc89d9893984fcdc0943787949b7260aaf6864c170388ef61c2d"
+    },
+    {
+      "path": "patches/ADB_ENDPOINT_DEBUG_PROBE_V1_2026-09-15.md",
+      "bytes": 732,
+      "sha256": "a1597f4be78ce0e04bf766e64a4dfd02cc2f3879205d1b05a29de1b9f45d1e8c"
+    },
+    {
+      "path": "patches/ADB_ENDPOINT_DEBUG_WATCH_PORT_V1_2026-09-15.md",
+      "bytes": 653,
+      "sha256": "f5680bf441f961e7dd2a6e6a215597dbee38b6bfd05589bbb7eb6124608ab3e6"
+    },
+    {
+      "path": "patches/ADB_EPHEMERAL_PORT_RECOVERY_PROBE_2026-09-15.md",
+      "bytes": 1292,
+      "sha256": "80d8f1db3344142c79fa40ea62ea0cd00279439d1ac06866fe8f1bfc323ee094"
+    },
+    {
+      "path": "patches/ADB_EPHEMERAL_PORT_RECOVERY_PROBE_V2_2026-09-15.md",
+      "bytes": 1111,
+      "sha256": "52bf65b2bd6f16b05f9cf8ad86cf912f1cb262d407f41b8982d3c571b263838e"
+    },
+    {
+      "path": "patches/ADB_RECOVERY_PROBE_LINUX_PARITY_2026-09-15.md",
+      "bytes": 1380,
+      "sha256": "c665817b1ecb5e5ebf21bc3ac9d57a4f0267e74b783e4d10a7190ef3d555e5c5"
+    },
+    {
+      "path": "patches/D-074_LINUX_NATIVE_VIDEO_BACKEND.md",
+      "bytes": 1342,
+      "sha256": "a5e50b3542185c1f602a2362dae3c9105977804b4af9a21fed13a260bf087fe8"
+    },
+    {
+      "path": "patches/D-075R1_LINUX_NATIVE_AUDIO_RT_PACER.md",
+      "bytes": 2143,
+      "sha256": "8c9fee57fed478455d37de7c84ef38949e28b7d7830d4e906f0cec5b71c610e7"
+    },
+    {
+      "path": "patches/D-075_LINUX_NATIVE_AUDIO_BACKEND.md",
+      "bytes": 1971,
+      "sha256": "7eb2429ca1f6239446964b412140b43114b6bfc27d1214cf4a823b02d0dcfe3b"
+    },
+    {
+      "path": "patches/D-076R1_LINUX_AUTOCONFIG_SESSION_PATH.md",
+      "bytes": 2462,
+      "sha256": "ced99e5ae4e6659d010f2a1bd279efe6c786602292fe27bde48bbd423dd2e7b4"
+    },
+    {
+      "path": "patches/D-076R2_LINUX_AUTOCONFIG_SYS_IMPORT.md",
+      "bytes": 1681,
+      "sha256": "ba414a59cde80ee667d4c01efc7b7978ca45bbb4c64e097da99bfc1140265145"
+    },
+    {
+      "path": "patches/D-076_LINUX_UINPUT_CONTROLLER_BACKEND.md",
+      "bytes": 4553,
+      "sha256": "358a97b530a5bc3102c268d9afcc29d0df9c44a5166dabb5be50f3e74aacff94"
+    },
+    {
+      "path": "patches/D-077_LINUX_PLATFORM_RUNTIME_SELECTION.md",
+      "bytes": 2844,
+      "sha256": "c6d1d6ea043446cefd9a90c83e6507d6c29cbdaff927d98ff56b7186d766f99b"
+    },
+    {
+      "path": "patches/D-078_LINUX_COMPANION_MEDIA_SERVER_STARTUP.md",
+      "bytes": 2354,
+      "sha256": "8bcce16bda21b271c170411c05b42d4b0d8d1cda41234aa13aedc82a731a4c8f"
+    },
+    {
+      "path": "patches/D-084_LINUX_A8_PLATFORM_ADAPTER.md",
+      "bytes": 1736,
+      "sha256": "b467d412d9d21fb6194e0224ca6c57d7f15071e9a3d01b990acddb9d3e655069"
+    },
+    {
+      "path": "patches/D-085_LINUX_UDEV_HAT_MAPPING.md",
+      "bytes": 938,
+      "sha256": "4063191c3b30c89532a185fff7061900fbadde318ce8b5fd0128a50689dc5ace"
+    },
+    {
+      "path": "patches/D-086_CONTROLLER_PARITY_CHECKPOINT.md",
+      "bytes": 1051,
+      "sha256": "6f0cfb53019de46494a3bd3149ded818c61da8a84d7271ca130cd6c1d7b0fd9a"
+    },
+    {
+      "path": "patches/D-087R1_LINUX_PS1_MULTITAP_METADATA_PATH.md",
+      "bytes": 610,
+      "sha256": "301bfc1bf7213b61bd39265134d19eb511b0dedabdf88222f438b9571aae1ec8"
+    },
+    {
+      "path": "patches/D-087_LINUX_PS1_MULTITAP_CONFIG_PATH.md",
+      "bytes": 695,
+      "sha256": "2051dbca4095d0593cd7001425dd45b53314dcd5b13772f73cae1a0970381a25"
+    },
+    {
+      "path": "patches/D-088R1_MULTITAP_RUNTIME_VALIDATION.md",
+      "bytes": 1089,
+      "sha256": "81a51067715aed64fb7a6b066210e17507c0ea374e73b19bdafb704eb7740e49"
+    },
+    {
+      "path": "patches/D-089_D5_EXTERNAL_VOD_STORAGE_CONSTRAINT.md",
+      "bytes": 932,
+      "sha256": "c4073e6ca8f0e0611fa8b1bc2a652215c1d30adaa6ff77032d7e59b2975863c3"
+    },
+    {
+      "path": "patches/D-090_D4_LINUX_GAMES_ACCEPTANCE.md",
+      "bytes": 733,
+      "sha256": "e6161a8fbccfb66a55cf1844c88418824416cc46a25bc18648270cc66563325c"
+    },
+    {
+      "path": "patches/D-091_D5_MEDIA_BASELINE_AND_CLIENT_BOUNDARY_PROBE.md",
+      "bytes": 889,
+      "sha256": "8ef6f9c8cfbdbd2cd9d6cf5e19459c9378a3cc1156712cc617a9889e22bc166e"
+    },
+    {
+      "path": "patches/D-092_DYNAMIC_VOD_SYMLINK_HEALTH.md",
+      "bytes": 836,
+      "sha256": "278c81a62cf7f25bed447625a504f4bd753b41ab1460ca2a0f381cf0a5d6c69f"
+    },
+    {
+      "path": "patches/D-093R2_D5_EXTERNAL_VOD_RUNTIME_VALIDATION.md",
+      "bytes": 759,
+      "sha256": "2af876c242c67ef116f1c201b15c78ca1e25408cca6fdc185a2068192f5e2e7d"
+    },
+    {
+      "path": "patches/D-094_D5_EXTERNAL_STORAGE_REMOUNT_EVIDENCE.md",
+      "bytes": 647,
+      "sha256": "51903f26cc02d9a9e9e822bf8e8a599d5a64857f7a4b3ccecd938330963953e3"
+    },
+    {
+      "path": "patches/D-096R1_STORAGE_DEVICE_DISCOVERY.md",
+      "bytes": 693,
+      "sha256": "1fe4fe63536fecf339ffcf3a88cf43469cc1185da3c58211e084cb32fac0f38e"
+    },
+    {
+      "path": "patches/D-096R2R1_PROBE_INSTALLER_PRESTATE.md",
+      "bytes": 786,
+      "sha256": "432f1f499cde9e5c895e069f9ad01db5aebf715abb9af5683d853315f7bd2f94"
+    },
+    {
+      "path": "patches/D-096R3_PROBE_LISTENER_LIFECYCLE.md",
+      "bytes": 696,
+      "sha256": "3082686147ddd25b3929d6ed69646b6e5f852a1042da38d237ce068e5311ac5d"
+    },
+    {
+      "path": "patches/D-096_CONFIGURABLE_VOD_STORAGE_BOUNDARY.md",
+      "bytes": 1031,
+      "sha256": "0e8a659094da0ebcf6455157b3ffd0b7f122f9f5c9516afd9612897bc037616f"
+    },
+    {
+      "path": "patches/D-097_VOD_APPLIANCE_MODE.md",
+      "bytes": 889,
+      "sha256": "44e47afe4c4508d633af4ce0e924517fcdd6d59eda89407532b96d6c62c3008e"
+    },
+    {
+      "path": "patches/D-098_ABSENT_VOD_CATALOG_RESILIENCE.md",
+      "bytes": 785,
+      "sha256": "846943ba81160cb81af5bf43fa4162de45a1e4c09bf1f1372747237fa2af1656"
+    },
+    {
+      "path": "patches/D-099R1_PRESTATE_RECEIPT_ORDER.md",
+      "bytes": 661,
+      "sha256": "90b56ec3e7ad9b5ebb4bc09fd0487208eecd6e8e6cf5780274f769020feb4d48"
+    },
+    {
+      "path": "patches/D-099_NONBLOCKING_VOD_PRESENCE.md",
+      "bytes": 513,
+      "sha256": "bd98e90dfaf0f29796e431ab9217bad5a7d6be446f53ea55bc50e41d1c787fec"
+    },
+    {
+      "path": "patches/D-100_D5_EXTERNAL_VOD_HOTPLUG_RUNTIME_ACCEPTANCE.md",
+      "bytes": 402,
+      "sha256": "eb728918634e71cfb5baffeca10882ed60c8770cd61af835535d6e4b49c669f0"
+    },
+    {
+      "path": "patches/D-101R1_BROWSER_CAMERA_C6_RECLASSIFICATION.md",
+      "bytes": 546,
+      "sha256": "93d0e931b3160eada7d2448f334d50834e67b755b8519d520057ebc7b01967d5"
+    },
+    {
+      "path": "patches/D-103_D5_EPG_INGESTION_PROBE.md",
+      "bytes": 1278,
+      "sha256": "a6db3ccd70ec91c1c1629eeb42be6a706fa81ccf21914809d6d41fe49f362f69"
+    },
+    {
+      "path": "patches/D-104R2_D5_EPG_GZIP_SOURCE_SUPPORT.md",
+      "bytes": 2773,
+      "sha256": "1c2215f2208f99e5e4d32ce9031cbc07e8df7b65d6b8ef3ceb720a6973539fb9"
+    },
+    {
+      "path": "patches/D-105_D5_EPG_LOCAL_SOURCE_VIABILITY_PROBE.md",
+      "bytes": 906,
+      "sha256": "d48d285ec262052c984ab439a3fc068ed10f52ce85a818433023350e1dc6f684"
+    },
+    {
+      "path": "patches/D-106_D5_EPG_PROVIDER_IDENTITY_PROBE.md",
+      "bytes": 830,
+      "sha256": "4920b2b8f72243fcece604d77b4f72f981ba1548541a970cc9389966da279c3a"
+    },
+    {
+      "path": "patches/D-107_D5_EPG_FEED_IDENTITY_PROBE.md",
+      "bytes": 856,
+      "sha256": "f3d60e276abbe05be59c9abb9b7f7b5200d2d47f9f8086f595c98f24cb764a34"
+    },
+    {
+      "path": "patches/D-108_D5_EPG_LOCAL_GRABBER_VIABILITY_PROBE.md",
+      "bytes": 998,
+      "sha256": "ee6e684163f28ccd573b6523bd8839f3e45fc9aa3cff3173f52a91256c866359"
+    },
+    {
+      "path": "patches/D-109_D5_EPG_PORTABLE_NODE_GRABBER_PROBE.md",
+      "bytes": 1100,
+      "sha256": "108d761067a01bc57ee117e2f3c08419f2704e28272f3833b378134a13dfa92c"
+    },
+    {
+      "path": "patches/D-110_D5_LINUX_EPG_SERVICE_SEAM.md",
+      "bytes": 1075,
+      "sha256": "d625cc7ee7f8b11702e61ab50163e1c499ec83ab779ea9c733e433091c23a9a4"
+    },
+    {
+      "path": "patches/D-111_D5_ANDROID_COMPANION_EPG_INTEGRATION.md",
+      "bytes": 966,
+      "sha256": "8fcfb47a931cc0f872eda7553bca8a240f8e17d5fdbfe4290d7957ef38bcc2a4"
+    },
+    {
+      "path": "patches/D-112_D5_PROGRAM_GUIDE_NEWLINE_POLISH.md",
+      "bytes": 1276,
+      "sha256": "ddb01b770f1749943abd6d0f44aa0003f5a02a490439d93a5f8af2b9fa2a9d29"
+    },
+    {
+      "path": "patches/D-113_D5_STREAM_IDENTITY_AUDIT.md",
+      "bytes": 781,
+      "sha256": "205bef19d3df8f37f408fdd4c93c9907671e16d29aa669e06df068f3f8a0cf2f"
+    },
+    {
+      "path": "patches/D-114_D5_STREAM_IDENTITY_POLICY_CHECKPOINT.md",
+      "bytes": 994,
+      "sha256": "0ea66815d946c15009f4ad1961bf8c9e13b45352a483f367accd63fa05fc3652"
+    },
+    {
+      "path": "patches/D-115_D5_LINUX_TV_STATE_AUTHORITY.md",
+      "bytes": 1242,
+      "sha256": "cd4ad151b9d7e34cce9e980841946d3e5097d01afe455770dec773da61b8e44d"
+    },
+    {
+      "path": "patches/D-116_D5_ANDROID_TV_STATE_SYNC.md",
+      "bytes": 1041,
+      "sha256": "b95292bad80ee56e4a44834ae243fa1c08ac564cb98ca600e31ebd5afb2e6a9c"
+    },
+    {
+      "path": "patches/D-117_D5_LINUX_AUTHORITY_PULL_PROBE.md",
+      "bytes": 914,
+      "sha256": "2732a8fab8810132312ebb0c57f7eccaa157dbe5afb6ddbd047125caecd199b3"
+    },
+    {
+      "path": "patches/D-118_D5_PULL_CLASSIFIER_ACCEPTANCE_CHECKPOINT.md",
+      "bytes": 1176,
+      "sha256": "27bf667e028d1837def9ad74c9d40db13e7444202db1f57b12b96c7ef1d806d8"
+    },
+    {
+      "path": "patches/D-119_D5_TV_ENTRY_SYNC_TRIGGER_PROBE.md",
+      "bytes": 845,
+      "sha256": "5e9845e67d02b68cd365b6b1259cd90be907f3299c70f3d5324cea4bed8a9362"
+    },
+    {
+      "path": "patches/D-120_D5_TV_STATE_SYNC_DIAGNOSTICS.md",
+      "bytes": 923,
+      "sha256": "76a3f5dd5808f78ac2ce3e374c9d876a376939532ceae65b4e1c3dae92fc3f86"
+    },
+    {
+      "path": "patches/D-121_D5_TV_STATE_CONFLICT_DIAGNOSTICS_PROBE.md",
+      "bytes": 844,
+      "sha256": "129cb575d2edd2c0cbd9c2825af2b0f98a0378346e1c9597153dc36e42a94080"
+    },
+    {
+      "path": "patches/D-122_D5_TV_MEDIA_REGRESSION_GATE.md",
+      "bytes": 658,
+      "sha256": "49fd487600c3a090932c267a7e3ba520c25899c1c589293326e36b64182d63e6"
+    },
+    {
+      "path": "patches/D-123_D54_CLOSURE_TV_UX_FOLLOWUP.md",
+      "bytes": 671,
+      "sha256": "e0433f0c8afb8a07f849de8ae15ec2d5a767cf507c4256d09042db354c9b6e81"
+    },
+    {
+      "path": "patches/D-124A_TV_EPG_LATENCY_PROBE_SPLIT_DB_FIX.md",
+      "bytes": 1237,
+      "sha256": "be086eb6bf30f91503e3f78cd15605c5a0fa755f96fc442d49c26f807336ad33"
+    },
+    {
+      "path": "patches/D-124_TV_EPG_LATENCY_PROBE.md",
+      "bytes": 691,
+      "sha256": "211f3ed433935980160e0864d726f299c9f0861e09d29369a9e97d7b4c2fc874"
+    },
+    {
+      "path": "patches/D-125_EPG_NONBLOCKING_BACKGROUND_WARMER.md",
+      "bytes": 731,
+      "sha256": "2f48b8f3127b2f840f4ed35b761cf637ffc26fdfb1da1fe9bdf3cfba9285380f"
+    },
+    {
+      "path": "patches/D-126_ANDROID_EPG_PREFETCH_INTEGRATION.md",
+      "bytes": 858,
+      "sha256": "3518ecf362d6a846f67a5aae25f175433892d234428a5c2dcf90eee9d9290482"
+    },
+    {
+      "path": "patches/D4_LINUX_GAME_HANDOFF_FIX_01_2026-09-15.md",
+      "bytes": 829,
+      "sha256": "66a8570be07b961dc7828b065e279ce3895ad3126e3913a72c958e588b68ada0"
+    },
+    {
+      "path": "patches/D4_MEMORY_RECONCILIATION_2026-09-16.md",
+      "bytes": 1570,
+      "sha256": "fc640d3defca0f1d2cbd3f427fe55854812dbb3c338b6b02430514cfb834fc3d"
+    },
+    {
+      "path": "patches/MEMORY_MAINTENANCE_2026-09-17.md",
+      "bytes": 1306,
+      "sha256": "d20f8f7a3be9b483374f28b3247459489d1054f11a08bc97d56fcba89d86da03"
+    },
+    {
+      "path": "patches/MEMORY_NORMALIZATION_2026-09-15.md",
+      "bytes": 1719,
+      "sha256": "93e45793ba7059a3714aaecdd80759876b2d82b789c8174c695e0d1f686fb90c"
+    },
+    {
+      "path": "patches/PATCH_INDEX.md",
+      "bytes": 59484,
+      "sha256": "d2e3c4b9cd348a03f9af48292730e206295d12fe205c5ebd63c75ae4b5b891ae"
+    },
+    {
+      "path": "patches/PATCH_PROTOCOL.md",
+      "bytes": 1894,
+      "sha256": "003dd9017a7ef514793dbec5875223f10d41f3c6ef1033258a9201fea33e2606"
+    },
+    {
+      "path": "repository/AUDIT_2026-09-10.md",
+      "bytes": 7536,
+      "sha256": "07e3defdb7dc7d0ad6e87aca49171c8831be662471c7203dd9ad06ecec3ad95b"
+    },
+    {
+      "path": "repository/CODE_MAP.md",
+      "bytes": 1838,
+      "sha256": "95a7bc8ec2288270a2e523f7d30ba5cdc060f06ab72e3ae18b760f584a258cee"
+    },
+    {
+      "path": "repository/DEBT.md",
+      "bytes": 1886,
+      "sha256": "5157fbc4db4194f2102dde6c829ce2f7c9a3c61df831ace7850b9e7b1c95d641"
+    },
+    {
+      "path": "roadmap/D5_MEDIA_SERVER_SUBSTEPS.md",
+      "bytes": 16730,
+      "sha256": "485d28872255ec2b1be84110123c066d5a11ca2cd8c1603a0a4c37b0108f61f6"
+    },
+    {
+      "path": "roadmap/STATUS.md",
+      "bytes": 1041,
+      "sha256": "32b4624b72f950e84eb4357c5a16710838e360f4482cf0cab95a45dda470b254"
+    },
+    {
+      "path": "templates/MEMORY_UPDATE.md",
+      "bytes": 910,
+      "sha256": "76ae1d2c933b5fb54c6c097482c53dfe6fc557100fe4ef86ef1ec8217b4c3021"
+    },
+    {
+      "path": "templates/SESSION_LOG.md",
+      "bytes": 669,
+      "sha256": "c990aa997c923f79a0ab6c138f1dbd1a1e30574a72163c1b199914206a721e26"
     }
-  ],
-  "four_player_status": "complete / runtime validated including game-specific PS1 multitap and representative 4P gameplay",
-  "games_post_sha256": "f1271c865cdf88b971da4116d7eb887bf9855864ce1ae848baafc7a3452e0f9c",
-  "gui_collect_diagnostics": true,
-  "health_endpoint": "GET /diagnostics/health",
-  "home_trust_domain": "home Opal",
-  "investigation_state": "ACTIVE current-only; predecessor ACTIVE preserved in deep memory",
-  "main_activity_post_sha256": "394d2b839fdb01f2988a0054b42e139e419e02207728f914e1713287992733cc",
-  "memory_backend": "repository docs/memory (ChatGPT account Memory unavailable in this project)",
-  "memory_mode": "curated current facts/rules",
-  "minor_games_cleanup_runtime": "RECONCILED 124/124 after library_changed; subsequent SKIPPED_CURRENT 124/124; Alpha node absent; game regression PASS",
-  "minor_games_cleanup_scope": "background startup metadata/art reconciliation + remove Native Streaming Alpha catalog node only",
-  "minor_games_cleanup_status": "RUNTIME VALIDATED / CHECKPOINTED / PUSHED",
-  "name": "PrivyHub durable project memory",
-  "native_status_privacy_hotfix": "LIVE ENDPOINT VALIDATED / CHECKPOINTED / PUSHED",
-  "native_status_public_helper_policy": "sanitized-copy-raw-local-preserved",
-  "native_status_public_timing_log_policy": "project-relative-only",
-  "new_client_metrics_timer": false,
-  "new_resource_sampler": false,
-  "next_work": "C1_IMPLEMENT_STATIC_REFERENCE_PROFILE_EXTRACTION",
-  "ordinary_household_network_role": "upstream-only",
-  "overlay_contract": "provider-neutral",
-  "overlay_first_candidate": "Tailscale",
-  "part2_status": "COMPLETE / CHECKPOINTED / PUSHED",
-  "part3_status": "COMPLETE / CHECKPOINTED / PUSHED",
-  "part4_status": "COMPLETE / CHECKPOINTED / PUSHED",
-  "phase_a_status": "COMPLETE / PUSHED",
-  "phase_b_status": "COMPLETE / PUSHED",
-  "phase_c_remaining": [
-    "C3 automatic bitrate controller",
-    "C4 adaptive FEC disposition",
-    "C5 1080p60 capability characterization",
-    "C6 generalized native source abstraction",
-    "C7 final Phase C checkpoint"
-  ],
-  "phase_c_remote_readiness": true,
-  "phase_c_resume_after": "PHASE D LINUX BASELINE CHECKPOINT",
-  "phase_c_status": "PAUSED AT WINDOWS BOUNDARY / RESUME AFTER PHASE D ON LINUX",
-  "physical_legacy_groups_deleted": 9,
-  "predecessor": "C1 stream parameter inventory",
-  "production_behavior_changed": true,
-  "ps1_multitap_status": "complete / runtime validated on Crash Bash and CTR; Port 1 only",
-  "remote_architecture_checkpoint": "CHECKPOINTED / PUSHED",
-  "remote_architecture_decision": "D-059 ACCEPTED / CHECKPOINTED / PUSHED",
-  "remote_foundation_phase": "G — Secure Remote Access / Portable Client Foundation",
-  "remote_identity_rule": "source/request IP is not durable client identity",
-  "remote_implementation_status": "PLANNED ONLY",
-  "repository_evidence_policy": "raw local/ignored; sanitized checkpoint snapshots committed",
-  "repository_ledgers_status": "CODE_MAP/DEBT/CHAT_INDEX refreshed",
-  "resource_collection": "existing host telemetry only; no new sampler",
-  "resource_snapshot_schema": "privyhub_resource_snapshot_v1",
-  "retention_automatic": false,
-  "retention_policy": "manual dry-run-first; allowlisted runtime families only",
-  "retention_policy_applied": true,
-  "retention_policy_sha256": "03466dbefde0c3f82fcecfa496009d0fcfdb8573825f6ffb01a4bd95ef012628",
-  "retention_raw_name_overrides": [
-    "pktmon_full.txt"
-  ],
-  "roadmap_authoritative_path": "docs/ROADMAP.md",
-  "roadmap_phase_d": "Linux Migration / Native Linux Baseline",
-  "roadmap_phase_e": "Linux Core Resource Characterization & Optimization",
-  "roadmap_phase_f": "Media Library / VOD / Live TV UX",
-  "roadmap_reorder_status": "D-071 ACCEPTED / LINUX BEFORE MEDIA POLISH",
-  "roadmap_revision": "v4 remote-foundation promotion / CHECKPOINTED / PUSHED",
-  "roadmap_status": "v3 authoritative / unchanged by Part 4",
-  "roadmap_version": "v3",
-  "runtime_validation_ledger_status": "refreshed; NES/Genesis remain no-fixture gaps",
-  "schema": 1,
-  "self_test_dedicated_checks": [
-    "storage_writability",
-    "adb_development",
-    "emulator_runtime"
-  ],
-  "snapshot_manifest_sha256": "e1bd175f86fb771516cb1a93572a5aff1e9dbef53a3968ec3eb30cc9a93ae3fe",
-  "snapshot_sha256": "7cd58c6b7e2b128e36b3a879fa151444790e9d95d9b12ec933f415bec19ef756",
-  "stream_manager_deleted": true,
-  "stream_telemetry_schema": "privyhub_stream_telemetry_v1",
-  "streaming_behavior_changed": false,
-  "streaming_data_path_changed": false,
-  "system_state_changed": false,
-  "top_level_docs_status": "refreshed to roadmap v3 / Phase C current state",
-  "travel_router_selection": "UNRESOLVED / DO NOT SELECT YET",
-  "phase_d_linux_status": "ACTIVE / HOST RUNTIME-VIDEO-AUDIO-CONTROLLER-SELECTION-STARTUP SEAMS VALIDATED",
-  "linux_integrated_e2e_status": "RUNTIME_AND_CAPTURE_WORK / REPRESENTATIVE_TRANSPORT BLOCKER",
-  "linux_transport_status": "BIDIRECTIONAL_IDLE_PATHOLOGY_REPRODUCED / OPAL_VENDOR_BRANCH PAUSED",
-  "linux_transport_last_valid_router_probe": "D082",
-  "linux_transport_reentry_rule": "BOUNDED_PRODUCT_DECISION_MEASUREMENT_OR_DIFFERENT_REPRESENTATIVE_NETWORK",
-  "android_linux_auto_open_status": "CONFIRMED_COMPATIBILITY_BUG / NEXT NARROW PRODUCTION PATCH",
-  "ps1_linux_bios_status": "USER-PROVIDED scph5501.bin MISSING / RESTORE BEFORE FINAL PS1 ACCEPTANCE"
+  ]
 }
