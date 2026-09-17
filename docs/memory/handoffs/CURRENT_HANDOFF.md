@@ -1,7 +1,7 @@
 ---
 memory_schema: 2
 as_of: 2026-09-17
-baseline_commit: 020d86a0c0792653e2ce4d976244098981419648
+baseline_commit: 821796701d534e5cee127f43edf85342e1f7998c
 ---
 
 # Current Handoff
@@ -12,14 +12,16 @@ The authoritative resumable state is `../CURRENT.md`. Read it first.
 
 - Authoritative Linux worktree: `/home/privyhub/Projects/onn-stream-test`.
 - D-125, D-126 and D-127 are runtime accepted.
-- D-128 rev1 failed compile on a duplicate `formatTvGuideTime(Long)` overload and rolled back exactly.
-- D-128 rev2 corrected the transform but the supplied Bash wrapper could terminate the interactive session before installation. Rev3 passed the Android build but failed the repository memory-health gate because its generated `CURRENT.md` omitted two required headings; rollback restored the predecessor. Rev4 corrects that memory contract.
-- D-128 is Android presentation-only and requires runtime validation after APK
-  installation.
-- D-128 consumes cached guide data only; acquisition/prefetch remains owned by
-  the validated D-125/D-126 paths.
+- D-128 built/installed but runtime probe returned
+  `D128_GUIDE_STYLE_ROWS_NOT_OBSERVED`; the UI still looked like the old
+  three-column button grid.
+- D-129 corrects the rendering seam itself: one-column full-width TV guide rows,
+  while non-TV pages remain three-column.
+- D-129 adds bounded companion-only Android guide-cache hydration; it does not
+  change Linux acquisition policy or TV-state authority.
 
 ## Resume
 
-Run the D-128 Favorites UI validation in `CURRENT.md`. On acceptance, proceed to
-EPG coverage/status semantics, then the focused D5 regression/checkpoint.
+Install and runtime-validate D-129 using the probe in `CURRENT.md`. If layout
+passes without programme data, continue into the already-planned EPG
+coverage/status investigation rather than reverting the list presentation.

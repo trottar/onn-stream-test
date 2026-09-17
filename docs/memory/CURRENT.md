@@ -1,9 +1,9 @@
 ---
 memory_schema: 2
 state_updated: 2026-09-17
-active_work_item: D-128
+active_work_item: D-129
 maintenance_status: healthy
-baseline_commit: 020d86a0c0792653e2ce4d976244098981419648
+baseline_commit: 821796701d534e5cee127f43edf85342e1f7998c
 ---
 
 # Current Project State
@@ -15,11 +15,16 @@ TV-state, Games, or transport subsystems.
 
 ## Current Work Item
 
-**D-128 — guide-style paged Favorites/category presentation.**
+**D-129 — true single-column TV guide result presentation.**
 
-D-127 is runtime accepted. D-128 is an Android presentation-only development
-patch that turns existing paged TV rows into compact guide rows using already
-cached guide data.
+D-128 installed and built, but runtime validation failed with
+`D128_GUIDE_STYLE_ROWS_NOT_OBSERVED`. The Favorites screen still used the generic
+three-column fixed-width source-button grid, so adding Now/Next text did not
+produce the requested TV-guide experience.
+
+D-129 moves the correction to the actual rendering seam: TV result pages use a
+dedicated one-column full-width row layout while non-TV pages keep the existing
+three-column tile UI.
 
 ## Verified State
 
@@ -29,46 +34,58 @@ cached guide data.
 - D5.4 Linux-authoritative durable TV-state sync: **COMPLETE / runtime validated**.
 - D-125 non-blocking EPG miss handling: **runtime validated**.
 - D-126 Favorites/visible-page prefetch: **runtime validated**.
-- D-127 incorrect-guide durable intent: **runtime validated** with
-  `D127_INCORRECT_GUIDE_DURABILITY_CONFIRMED`.
+- D-127 incorrect-guide durable intent: **runtime validated**.
+- D-128 Android build/install: **development-only; runtime UI target failed**.
 
 ## Current Repository / Patch State
 
-Expected D-128 predecessor checkpoint:
+Expected D-129 predecessor checkpoint:
 
-`020d86a0c0792653e2ce4d976244098981419648`
+`821796701d534e5cee127f43edf85342e1f7998c`
 
-D-128 rev1 failed the Kotlin compile gate because it duplicated the existing `formatTvGuideTime(Long)` member and was fully rolled back. Rev2 corrected that transform, but its delivery wrapper used persistent `set -euo pipefail` plus `exit 1`; on failure it terminated the interactive Bash session before installation completed, so the D-128 probe was never installed. Rev3 passed the Android build but its generated `CURRENT.md` omitted two headings required by `tools/check_memory_health.py`; the memory-health gate therefore failed and the installer rolled back. Rev4 keeps the corrected Android transform, shell-safe delivery pattern, and exact memory-health heading contract.
+D-129 production scope:
 
-D-128 production scope is only `MainActivity.kt`. It reads the existing cached
-`TvGuideSummary` already populated/warmed by D-125/D-126 and displays current and
-next programme time ranges in shared TV rows. D-127 marked-incorrect channels
-continue to suppress trusted guide presentation.
+- `MainActivity.kt`: TV result pages switch the shared `GridLayout` to one column,
+  TV channel controls expand to full-width guide rows, non-TV pages restore three
+  columns, and rows explicitly show current/next guide data or an unavailable /
+  incorrect-guide state;
+- `TvEpgRepository.kt`: adds a bounded companion-only hydration pass so Android
+  can copy already-warmed companion guide data into its local EPG cache before
+  the result page is rendered. It does not invoke the legacy upstream fallback.
 
 **Status: DEVELOPMENT PATCH / RUNTIME VALIDATION NEXT.**
 
 ## Next Action
 
-After APK installation:
-
-1. run the D-128 probe with `--prepare`;
-2. open TV and then Favorites on the onn;
-3. confirm visible guide-backed rows show current and next programme time ranges;
-4. run the probe with `--verify` and inspect
-   `logs/tv/d128_guide_style_ui_probe.txt`.
+1. install/build/push/APK-install D-129;
+2. open TV -> Favorites;
+3. confirm channel/program entries are one full-width vertical list, not a
+   three-column tile grid;
+4. run `tools/probes/d129_single_column_tv_guide_probe.py --verify` and inspect
+   `logs/tv/d129_single_column_tv_guide_probe.txt`.
 
 Target:
 
-`D128_GUIDE_STYLE_FAVORITES_RUNTIME_VALIDATED`
+`D129_SINGLE_COLUMN_TV_GUIDE_RUNTIME_VALIDATED`
+
+If the layout validates but no programme data is available, the probe reports
+`D129_SINGLE_COLUMN_TV_GUIDE_LAYOUT_VALIDATED_NO_PROGRAMMES`; that is evidence for
+the separate EPG coverage/status follow-up, not a reason to return to tiles.
 
 ## Success Criteria
 
-- Favorites/category pages remain paged and navigable.
-- Cached guide-backed rows show `Now:` with start/end time and title.
-- Cached guide-backed rows show `Next:` with start/end time and title when known.
-- D-127 marked-incorrect channels do not show trusted Now/Next programme data.
-- Rendering performs no guide acquisition or channel-state mutation.
-- D-125/D-126 prefetch, playback, Favorites, Hide and TV-state sync remain unchanged.
+- TV Favorites/category result pages render one full-width row per channel in a
+  single vertical column.
+- Guide-backed rows show current programme time/title and next programme when
+  available.
+- Missing guide data is represented explicitly rather than silently leaving a
+  generic channel tile.
+- D-127 marked-incorrect channels remain visibly marked and do not present guide
+  data as trusted.
+- Non-TV catalog/VOD/Games pages retain the existing three-column presentation.
+- Hydration is companion-only, bounded, off the UI thread, and does not restore
+  synchronous upstream EPG acquisition.
+- Playback, Favorites, Hide and TV-state synchronization remain unchanged.
 
 ## Do Not Reopen Without New Evidence
 
@@ -83,13 +100,14 @@ Target:
 
 ## Relevant References
 
+- `evidence/D128_GUIDE_STYLE_RUNTIME_FAILURE_2026-09-17.md`
 - `investigations/D128_GUIDE_STYLE_CATEGORY_PRESENTATION.md`
-- `evidence/D127_INCORRECT_GUIDE_RUNTIME_ACCEPTANCE_2026-09-17.md`
-- `architecture/TV_STATE_SYNC.md`
+- `investigations/D129_SINGLE_COLUMN_TV_GUIDE.md`
+- `patches/D-129_SINGLE_COLUMN_TV_GUIDE.md`
 - `roadmap/STATUS.md`
 - `2026-09-17.md`
 
-## After D-128
+## After D-129
 
 1. correct/expand EPG coverage/status presentation;
 2. focused TV/media regression;

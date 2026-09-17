@@ -6,8 +6,26 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D129_SINGLE_COLUMN_GUIDE:PATCH_INDEX:BEGIN -->
+### D-129 — single-column TV guide result presentation — 2026-09-17
+
+Android presentation/cache-integration development patch.
+
+Supersedes the failed D-128 runtime UI target. TV result pages become a
+single-column full-width guide list; non-TV pages keep the three-column tile
+layout. Adds bounded companion-only cache hydration so already-warmed guide data
+is available to the row renderer without synchronous upstream acquisition.
+
+Runtime probe:
+`tools/probes/d129_single_column_tv_guide_probe.py`.
+
+**Status:** development patch / runtime validation pending.
+<!-- PRIVYHUB_D129_SINGLE_COLUMN_GUIDE:PATCH_INDEX:END -->
+
 <!-- PRIVYHUB_D128_GUIDE_STYLE:PATCH_INDEX:BEGIN -->
 ### D-128 — guide-style category presentation — 2026-09-17
+
+**D-128 runtime status: FAILED / superseded by D-129.**
 
 Android presentation-only development patch, rev3. Rev1 was rolled back after the Kotlin compiler found a duplicate `formatTvGuideTime(Long)` overload. Rev2 corrected the code transform but its delivery wrapper could terminate the interactive shell. Rev3 preserves the corrected code and restores the safe function-local return procedure.
 

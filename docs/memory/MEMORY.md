@@ -6,6 +6,21 @@ baseline_commit: 0206017cfd8f0fc57decb7a5e9e8632e6a4f6cdd
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D129_SINGLE_COLUMN_GUIDE:MEMORY:BEGIN -->
+## TV guide presentation rule
+
+D-128 runtime established that adding Now/Next text to the generic three-column
+source-button grid is not equivalent to a TV guide. TV result pages (Favorites,
+category results, search/result pages) must use a dedicated one-column,
+full-width row presentation. Non-TV catalog/VOD/Games pages retain their normal
+tile layout.
+
+Guide presentation and guide acquisition remain separate. Android may perform a
+bounded companion-only hydration pass to copy already-warmed guide data into its
+local cache, but normal UI rendering must not restore synchronous upstream EPG
+acquisition. Missing data is represented explicitly in the guide row.
+<!-- PRIVYHUB_D129_SINGLE_COLUMN_GUIDE:MEMORY:END -->
+
 <!-- PRIVYHUB_D128_GUIDE_STYLE:UI_RULE:BEGIN -->
 ## TV guide-row presentation rule
 

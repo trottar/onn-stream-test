@@ -231,6 +231,8 @@ class TvEpgRepository(
 
         private const val MAX_PREFETCH_CHANNELS = 80
 
+        private const val MAX_COMPANION_HYDRATE_CHANNELS = 24
+
         private const val REJECTED_GUIDE_RECHECK_INTERVAL_MS =
             24L * 60L * 60L * 1_000L
     }
@@ -610,6 +612,106 @@ class TvEpgRepository(
         } finally {
             connection.disconnect()
         }
+    }
+
+
+    fun hydrateCompanionGuides(
+        channelIds: List<String>
+    ): Int {
+        val candidates =
+            channelIds
+                .asSequence()
+                .map {
+                    it.trim()
+                }
+                .filter {
+                    it.isNotBlank() &&
+                        !it.startsWith(
+                            "tv_stream_"
+                        )
+                }
+                .distinct()
+                .take(
+                    MAX_COMPANION_HYDRATE_CHANNELS
+                )
+                .toList()
+
+        var hydrated =
+            0
+
+        for (channelId in candidates) {
+            val now =
+                System.currentTimeMillis()
+
+            val cached =
+                getCachedGuide(
+                    channelId = channelId,
+                    nowMs = now
+                )
+
+            if (
+                cached.current != null ||
+                cached.upcoming.isNotEmpty()
+            ) {
+                continue
+            }
+
+            val companionGuide =
+                try {
+                    fetchCompanionGuide(
+                        channelId = channelId,
+                        force = false,
+                        nowMs = now
+                    )
+                } catch (_: Exception) {
+                    null
+                }
+                    ?: continue
+
+            if (companionGuide.programmes.isEmpty()) {
+                continue
+            }
+
+            replaceProgrammes(
+                channelId = channelId,
+                programmes = companionGuide.programmes,
+                nowMs = now
+            )
+
+            db.setMeta(
+                channelRefreshKey(
+                    channelId
+                ),
+                now.toString()
+            )
+
+            db.setMeta(
+                "companion_epg_last_success_channel",
+                channelId
+            )
+
+            db.setMeta(
+                "companion_epg_last_success_at_ms",
+                now.toString()
+            )
+
+            db.setMeta(
+                "companion_epg_last_programme_count",
+                companionGuide.programmes.size.toString()
+            )
+
+            companionGuide.sourceKey?.let { sourceKey ->
+                db.setMeta(
+                    guideSourceMetaKey(channelId),
+                    sourceKey
+                )
+            }
+
+            hydrated +=
+                1
+        }
+
+        return hydrated
     }
 
 

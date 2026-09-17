@@ -1,7 +1,7 @@
 ---
 memory_schema: 2
 as_of: 2026-09-17
-baseline_commit: 020d86a0c0792653e2ce4d976244098981419648
+baseline_commit: 821796701d534e5cee127f43edf85342e1f7998c
 ---
 
 # Roadmap Status
@@ -21,14 +21,20 @@ D5 media/TV work is at its final bounded usability/closeout sequence.
 - D-126 Android Favorites/visible-page EPG prefetch.
 - D-127 durable incorrect-guide intent/recheck.
 
+### Development-only / superseded
+
+- D-128 compact Now/Next text on generic channel tiles: Android build/install
+  succeeded, but runtime probe returned `D128_GUIDE_STYLE_ROWS_NOT_OBSERVED` and
+  the requested guide layout was not achieved.
+
 ### Active
 
-**D-128 — guide-style paged Favorites/category presentation rev3: DEVELOPMENT PATCH /
-RUNTIME VALIDATION NEXT.**
+**D-129 — single-column full-width TV guide result presentation: DEVELOPMENT
+PATCH / RUNTIME VALIDATION NEXT.**
 
 ### Next
 
-1. finish D-128 runtime acceptance;
+1. finish D-129 runtime acceptance;
 2. correct/expand EPG coverage/status presentation;
 3. focused TV/media regression;
 4. checkpoint/close D5 bounded TV work;

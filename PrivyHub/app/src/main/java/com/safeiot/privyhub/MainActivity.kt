@@ -1359,6 +1359,20 @@ class MainActivity : AppCompatActivity() {
      */
 
 
+    private fun isCurrentTvResultPage(): Boolean {
+
+        val currentId =
+            navigationStack
+                .lastOrNull()
+                ?.id
+                ?: return false
+
+        return tvResultPages.containsKey(
+            currentId
+        )
+    }
+
+
     private fun renderCurrentPage() {
 
         /*
@@ -1371,6 +1385,16 @@ class MainActivity : AppCompatActivity() {
                 as? String
 
         sourceGrid.removeAllViews()
+
+        val tvGuideListPage =
+            isCurrentTvResultPage()
+
+        sourceGrid.columnCount =
+            if (tvGuideListPage) {
+                1
+            } else {
+                3
+            }
 
 
         val currentNodes =
@@ -1835,6 +1859,16 @@ class MainActivity : AppCompatActivity() {
                     node.id
                 )
 
+        val isTvGuideListPage =
+            isCurrentTvResultPage()
+
+        val isTvGuideRow =
+            isTvGuideListPage &&
+                node.nodeType == "source" &&
+                tvRepository.isTvStreamId(
+                    node.id
+                )
+
 
         button.text =
             when {
@@ -1879,16 +1913,16 @@ class MainActivity : AppCompatActivity() {
 
 
         button.textSize =
-            if (
+            when {
+                isTvGuideRow ->
+                    16f
+
                 isContinueWatchingSource ||
-                isRecentlyFailedIptv
-            ) {
+                    isRecentlyFailedIptv ->
+                    16f
 
-                16f
-
-            } else {
-
-                18f
+                else ->
+                    18f
             }
 
 
@@ -1902,13 +1936,15 @@ class MainActivity : AppCompatActivity() {
 
 
         button.maxLines =
-            if (isContinueWatchingSource) {
+            when {
+                isTvGuideRow ->
+                    4
 
-                2
+                isContinueWatchingSource ->
+                    2
 
-            } else {
-
-                3
+                else ->
+                    3
             }
 
         button.isFocusable =
@@ -1916,6 +1952,11 @@ class MainActivity : AppCompatActivity() {
 
         button.tag =
             node.id
+
+        if (isTvGuideRow) {
+            button.contentDescription =
+                "TV guide row"
+        }
 
         /*
          * Categories remain centered navigation tiles. Media/channel titles
@@ -1937,9 +1978,9 @@ class MainActivity : AppCompatActivity() {
 
         button.setPadding(
             dp(18),
-            dp(4),
+            if (isTvGuideRow) dp(8) else dp(4),
             dp(18),
-            dp(4)
+            if (isTvGuideRow) dp(8) else dp(4)
         )
 
 
@@ -1965,12 +2006,29 @@ class MainActivity : AppCompatActivity() {
             GridLayout.LayoutParams()
 
 
-        layoutParams.width =
-            dp(300)
+        if (isTvGuideListPage) {
+            layoutParams.width =
+                0
+            layoutParams.columnSpec =
+                GridLayout.spec(
+                    0,
+                    1,
+                    1f
+                )
+        } else {
+            layoutParams.width =
+                dp(300)
+        }
 
         layoutParams.height =
             dp(
                 when {
+                    isTvGuideRow ->
+                        106
+
+                    isTvGuideListPage &&
+                        node.nodeType == "category" ->
+                        58
 
                     node.nodeType == "game" &&
                         node.artworkPath != null ->
@@ -3590,6 +3648,27 @@ class MainActivity : AppCompatActivity() {
                         offset = normalizedRequest.offset
                     )
 
+                val guideChannelIds =
+                    channels
+                        .filterNot {
+                            it.guideIncorrect
+                        }
+                        .map {
+                            it.channelId
+                        }
+
+                tvEpgRepository.prefetchCompanionGuides(
+                    guideChannelIds
+                )
+
+                tvEpgRepository.prefetchRejectedGuides(
+                    channels
+                )
+
+                tvEpgRepository.hydrateCompanionGuides(
+                    guideChannelIds
+                )
+
 
                 runOnUiThread {
 
@@ -3693,19 +3772,6 @@ class MainActivity : AppCompatActivity() {
                     renderCurrentPage()
                 }
 
-                tvEpgRepository.prefetchCompanionGuides(
-                    channels
-                        .filterNot {
-                            it.guideIncorrect
-                        }
-                        .map {
-                            it.channelId
-                        }
-                )
-
-                tvEpgRepository.prefetchRejectedGuides(
-                    channels
-                )
 
             } catch (error: Exception) {
 
@@ -3765,11 +3831,8 @@ class MainActivity : AppCompatActivity() {
                         add(
                             "Recent failures: ${channel.consecutiveFailures}"
                         )
-
-                    channel.successCount > 0 ->
-                        add("Working")
                 }
-            }.joinToString("\n")
+            }.joinToString("  •  ")
 
         val prefix =
             if (channel.favorite) {
@@ -3808,13 +3871,15 @@ class MainActivity : AppCompatActivity() {
                     "$prefix${channel.name}"
                 )
 
-                currentProgramme?.let { programme ->
+                if (currentProgramme != null) {
                     append("\nNow: ")
                     append(
                         tvGuideProgrammeSpan(
-                            programme
+                            currentProgramme
                         )
                     )
+                } else if (!channel.guideIncorrect) {
+                    append("\nGuide data unavailable")
                 }
 
                 nextProgramme?.let { programme ->
