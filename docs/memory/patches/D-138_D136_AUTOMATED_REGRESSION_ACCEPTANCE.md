@@ -11,3 +11,11 @@ Purpose:
 
 No Android build, APK installation, companion restart, database change, or runtime
 behavior change is part of D-138.
+
+<!-- PRIVYHUB_D138_MANUAL_GATE_RESULT:BEGIN -->
+## Manual gate result
+
+The final manual Live TV / guide / VOD smoke passed.
+
+D-138 is complete and D5 may close.
+<!-- PRIVYHUB_D138_MANUAL_GATE_RESULT:END -->

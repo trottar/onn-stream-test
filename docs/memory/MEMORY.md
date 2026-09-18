@@ -6,6 +6,23 @@ baseline_commit: 0206017cfd8f0fc57decb7a5e9e8632e6a4f6cdd
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D5_TV_MEDIA_CLOSEOUT:BEGIN -->
+## D5 media/server restoration closed
+
+D5 is complete/runtime validated as of 2026-09-17.
+
+Closure combines the clean D-136 automated regression with the final manual onn
+smoke: Live TV playback, Favorites/guide navigation, and VOD playback all passed.
+
+The accepted D5 baseline includes external/removable VOD, Live TV, Linux EPG and
+Android guide caching/presentation, Linux-authoritative TV durable state,
+incorrect-guide durable intent, and the D-131/D-135 responsiveness boundaries.
+
+D6 UDP replay remains deferred. The active roadmap proceeds to D7 native Linux
+regression and then D8 Linux baseline checkpoint.
+<!-- PRIVYHUB_D5_TV_MEDIA_CLOSEOUT:END -->
+
+
 <!-- PRIVYHUB_D136_AUTOMATED_REGRESSION_ACCEPTED:BEGIN -->
 ## Focused TV/media automated regression accepted
 

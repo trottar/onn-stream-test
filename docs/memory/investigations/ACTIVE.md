@@ -5,19 +5,29 @@ as_of: 2026-09-17
 
 # Active Investigations and Queued Work
 
-## Active — D-138 manual D5 smoke / closeout gate
+## Active — D7 native Linux regression
 
-Fresh D-136 automated regression is fully validated after D-137 corrected the
-stale D-116 schema-v2 projection.
+D5 is closed after clean automated and manual TV/media regression.
 
-No automated failures remain.
+D7 minimum normal-use scope:
+- server boot/start;
+- client discovery/control;
+- media;
+- Games launch;
+- video/audio/controller;
+- pause/resume;
+- Save/Load;
+- profiles/cheats/mod state;
+- End/teardown;
+- restart/recovery.
 
-Manual gate:
-1. Live TV playback;
-2. Favorites/guide navigation;
-3. VOD playback.
+Reuse existing probes/evidence first. Open a new narrow investigation only where
+current regression evidence is missing or contradictory.
 
-## Queued after manual smoke
+## Deferred
 
-If all three are clean, record D5 bounded TV/media closeout and move to the
-broader Linux roadmap.
+D6 UDP replay remains deferred unless new evidence requires reopening it.
+
+## Queued after D7
+
+D8 Linux baseline checkpoint.

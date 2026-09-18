@@ -1,35 +1,38 @@
 ---
 memory_schema: 2
 as_of: 2026-09-17
-baseline_commit: 707d2442095c12bcf86301c6593997cb733ca9aa
+baseline_commit: 663d2e4484afb7d88980aefb691f0b45a0ae6358
 ---
 
 # Roadmap Status
 
 ## Current position
 
-D5 TV/media work is at the final manual smoke gate.
+**D5 media/server restoration: COMPLETE / RUNTIME VALIDATED.**
 
-### Complete / runtime validated
+Final D5 closure includes:
+- external/removable VOD;
+- Live TV catalog/categories/playback;
+- Linux EPG + Android guide cache/presentation;
+- Linux-authoritative durable TV state;
+- incorrect-guide durable intent;
+- responsive TV/Favorites navigation with serialized state authority;
+- clean focused automated regression;
+- clean manual Live TV / guide / VOD smoke.
 
-- External/removable VOD.
-- Live TV catalog/categories/playback baseline.
-- Linux EPG and Android guide cache.
-- D5.4 Linux-authoritative TV state.
-- D-125/D-126 EPG background behavior.
-- D-127 incorrect-guide intent.
-- D-129/D-133 guide presentation.
-- D-131/D-135 navigation/state executor performance.
-- D-136 focused automated TV/media regression after D-137 probe repair.
+## Active
 
-### Active
+**D7 — Native Linux regression.**
 
-**D-138 — short manual Live TV / guide / VOD smoke.**
+Use the roadmap minimum normal-use regression and reuse existing D4/D5 evidence.
 
-### Next
+## Deferred
 
-1. manual Live TV playback;
-2. manual guide/Favorites navigation;
-3. manual VOD playback;
-4. record D5 closeout if clean;
-5. continue broader Linux roadmap.
+**D6 — UDP replay** remains deferred unless new evidence changes the current
+decision.
+
+## Next
+
+1. D7 native Linux normal-use regression;
+2. D8 Linux baseline checkpoint;
+3. Phase E resource characterization/optimization after D8.

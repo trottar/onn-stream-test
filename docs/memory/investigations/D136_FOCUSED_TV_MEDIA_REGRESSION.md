@@ -59,3 +59,14 @@ D-122, D-133 and D-135 all pass. Problems: none.
 
 **Status: automated regression accepted; manual playback/navigation smoke pending.**
 <!-- PRIVYHUB_D136_ACCEPTED_AFTER_D137:END -->
+
+<!-- PRIVYHUB_D136_MANUAL_CLOSEOUT:BEGIN -->
+## Manual closure smoke — passed
+
+Final onn smoke after automated acceptance:
+- Live TV playback: passed;
+- Favorites/guide navigation: passed;
+- VOD playback: passed.
+
+**Status: D-136 complete; D5 closeout criteria satisfied.**
+<!-- PRIVYHUB_D136_MANUAL_CLOSEOUT:END -->

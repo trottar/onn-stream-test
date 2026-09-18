@@ -268,7 +268,7 @@ Acceptance:
 
 # Phase D — Linux Migration / Native Linux Baseline
 
-**Status: ACTIVE — D4 complete/runtime accepted; D5 media/server restoration next**
+**Status: ACTIVE — D5 complete/runtime accepted; D7 native Linux regression next; D6 remains deferred unless new evidence reopens it**
 
 Prototype 1 Linux server:
 
@@ -466,6 +466,21 @@ D5 must preserve a configurable media-storage boundary:
 
 This is a deployment/architecture constraint, not a requirement that future
 PrivyHub systems use removable storage.
+
+### D5 final closeout — 2026-09-17
+
+**D5 status: COMPLETE / RUNTIME VALIDATED.**
+
+Final focused automated regression passed after the schema-v2 diagnostic
+projection repair, followed by a clean manual onn smoke for Live TV playback,
+Favorites/guide navigation, and VOD playback.
+
+D5's validated Linux media/server baseline now includes external VOD, Live TV,
+EPG, durable Linux TV state, guide UX/status, and responsive TV/Favorites
+navigation.
+
+D6 remains deferred. Proceed to D7 native Linux regression, then D8 Linux
+baseline checkpoint.
 
 ## D6 — Replay deferred UDP investigation
 

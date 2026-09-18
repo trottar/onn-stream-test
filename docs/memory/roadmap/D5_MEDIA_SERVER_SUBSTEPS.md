@@ -6,6 +6,29 @@ baseline_commit: 53fd9b176647bad324a9fdae4d4f04b2f62e43a4
 
 # D5 Media / Server Restoration Substeps
 
+<!-- PRIVYHUB_D139_D5_FINAL_CLOSEOUT:D5_SUBSTEPS:BEGIN -->
+## D5 FINAL CLOSEOUT — COMPLETE / RUNTIME VALIDATED
+
+**Authoritative status as of 2026-09-17.**
+
+Final regression:
+- D-136 focused automated TV/media regression validated;
+- Live TV playback manual smoke passed;
+- Favorites/guide navigation manual smoke passed;
+- VOD playback manual smoke passed.
+
+Accepted D5 scope includes external VOD, Live TV, Linux EPG/Android guide,
+Linux-authoritative TV durable state, incorrect-guide intent, guide presentation,
+and the final TV/Favorites responsiveness fixes.
+
+The older static ACTIVE/PENDING entries retained later in this file are historical
+planning text and are superseded by this closeout status.
+
+D6 UDP replay remains deferred. Proceed to D7 native Linux regression, then D8
+Linux baseline checkpoint.
+<!-- PRIVYHUB_D139_D5_FINAL_CLOSEOUT:D5_SUBSTEPS:END -->
+
+
 <!-- PRIVYHUB_D123_D54_CLOSURE:D5_SUBSTEPS:BEGIN -->
 ## D5.4 — COMPLETE / RUNTIME VALIDATED
 

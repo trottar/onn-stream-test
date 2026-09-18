@@ -6,6 +6,16 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D139_D5_CLOSEOUT:PATCH_INDEX:BEGIN -->
+### D-139 — D5 TV/media closeout — 2026-09-17
+
+Memory/roadmap-only checkpoint recording clean automated + manual D5 regression
+and advancing the active roadmap to D7.
+
+**Status:** D5 COMPLETE / RUNTIME VALIDATED.
+<!-- PRIVYHUB_D139_D5_CLOSEOUT:PATCH_INDEX:END -->
+
+
 <!-- PRIVYHUB_D138_D136_ACCEPTANCE:PATCH_INDEX:BEGIN -->
 ### D-138 — D-136 automated regression acceptance — 2026-09-17
 

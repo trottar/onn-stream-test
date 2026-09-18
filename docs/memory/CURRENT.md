@@ -1,87 +1,99 @@
 ---
 memory_schema: 2
 state_updated: 2026-09-17
-active_work_item: D-138
+active_work_item: D7
 maintenance_status: healthy
-baseline_commit: 707d2442095c12bcf86301c6593997cb733ca9aa
+baseline_commit: 663d2e4484afb7d88980aefb691f0b45a0ae6358
 ---
 
 # Current Project State
 
 ## Active Objective
 
-Finish bounded D5 TV/media regression and closeout without reopening validated
-production subsystems absent new evidence.
+Begin D7 native Linux regression from the closed D5 media/server baseline,
+without reopening validated D5 subsystems absent new evidence.
 
 ## Current Work Item
 
-**D-138 — record automated regression acceptance and finish manual smoke.**
+**D7 — Native Linux regression.**
 
-D-137 repaired the stale D-116 schema-v2 projection. The fresh D-136 rerun now
-passes:
+D5 media/server restoration is **COMPLETE / RUNTIME VALIDATED**.
 
-`D136_FOCUSED_TV_MEDIA_AUTOMATED_REGRESSION_VALIDATED`
+Final closure evidence:
+- D-136 focused automated TV/media regression validated after D-137 repaired the
+  stale schema-v2 diagnostic projection;
+- D-122 automated TV/media baseline validated;
+- D-133 guide layout/status validated;
+- D-135 Favorites executor isolation/state reconciliation validated;
+- final manual onn smoke passed for Live TV playback, Favorites/guide navigation,
+  and VOD playback.
 
-Sub-gates:
-- D-122 automated TV/media baseline: validated;
-- D-133 guide layout/status: validated;
-- D-135 Favorites executor isolation/state reconciliation: validated;
-- problems: none.
+D6 UDP replay remains deferred unless new evidence requires reopening it.
 
 ## Verified State
 
-- D-133 guide layout/status: **runtime validated**.
-- D-135 Favorites executor isolation: **runtime validated**.
-- D-137 diagnostic schema-v2 projection repair: **validated**.
-- D-136 focused automated TV/media regression: **validated**.
-- No current automated regression failure remains.
+- External/removable VOD: **runtime validated**.
+- Live TV catalog/categories/playback: **runtime validated**.
+- Linux EPG + Android guide cache/UI: **runtime validated**.
+- Linux-authoritative TV durable state: **runtime validated**.
+- Incorrect-guide durable intent: **runtime validated**.
+- One-column guide/status presentation: **runtime validated**.
+- TV/Favorites responsiveness with serialized state authority: **runtime validated**.
+- Focused automated TV/media regression: **validated**.
+- Final manual Live TV / guide / VOD smoke: **passed**.
+- D5 media/server restoration: **CLOSED / COMPLETE**.
 
 ## Current Repository / Patch State
 
-Expected D-138 predecessor:
+D-139 is the D5 closeout/checkpoint memory update.
 
-`707d2442095c12bcf86301c6593997cb733ca9aa`
+No production source, APK, companion runtime, database, playback, network, or
+state-sync behavior changes are part of D-139.
 
-D-138 changes durable memory only. No Android, companion, probe behavior, database,
-network, playback, or state-sync production code changes.
-
-**Status: AUTOMATED REGRESSION ACCEPTED / MANUAL SMOKE PENDING.**
+**Status: D5 CLOSED / D7 NEXT.**
 
 ## Next Action
 
-Perform the established short onn smoke:
+Start D7 with the minimum native Linux normal-use regression from
+`docs/ROADMAP.md`:
 
-1. play one Live TV channel and confirm normal video/audio;
-2. open Favorites/guide, navigate, and confirm layout/status/navigation remain normal;
-3. play one VOD item and confirm normal video/audio.
+1. server boot/start;
+2. client discovery/control;
+3. media;
+4. Games launch;
+5. video/audio/controller;
+6. pause/resume;
+7. Save/Load;
+8. profiles/cheats/mod state;
+9. End/teardown;
+10. restart/recovery.
 
-If all three pass, record D5 bounded TV/media closeout.
+Reuse existing accepted evidence and probes wherever possible.
 
 ## Success Criteria
 
-- Live TV playback normal;
-- guide/Favorites navigation normal;
-- VOD playback normal;
-- automated D-136 acceptance remains recorded;
-- no new production change required.
+- D7 covers the minimum normal-use Linux regression set;
+- validated D5 TV/media behavior remains stable;
+- validated D4 Games behavior remains stable;
+- any regression is isolated with the normal one-hypothesis/one-probe workflow;
+- D8 can then record the Linux baseline checkpoint.
 
 ## Do Not Reopen Without New Evidence
 
-- D5.4 TV-state production semantics.
-- D-125/D-126 EPG background behavior.
-- D-127 incorrect-guide production behavior.
-- D-129/D-133 guide presentation.
+- D5 external VOD storage architecture.
+- D5 Live TV/EPG acquisition/cache/presentation.
+- D5.4 Linux-authoritative TV-state contract.
+- D-127 incorrect-guide state.
 - D-131/D-135 executor scheduling.
 - D-137 diagnostic projection repair.
-- External VOD architecture.
-- Linux Games lifecycle.
-- Deferred UDP work.
+- D6 UDP replay remains deferred.
+- Resolved Linux Games controller/multitap/video/audio lifecycle work.
 
 ## Relevant References
 
+- `evidence/D5_TV_MEDIA_CLOSEOUT_2026-09-17.md`
 - `evidence/D136_FOCUSED_TV_MEDIA_AUTOMATED_ACCEPTANCE_2026-09-17.md`
-- `investigations/D136_FOCUSED_TV_MEDIA_REGRESSION.md`
-- `investigations/D137_TV_STATE_PROBE_V2_PROJECTION.md`
-- `patches/D-138_D136_AUTOMATED_REGRESSION_ACCEPTANCE.md`
+- `roadmap/D5_MEDIA_SERVER_SUBSTEPS.md`
 - `roadmap/STATUS.md`
+- `../../ROADMAP.md`
 - `2026-09-17.md`
