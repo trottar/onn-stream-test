@@ -47,3 +47,15 @@ guide-intent fields, so this result does not establish production state divergen
 
 **Status: rerun required after D-137 diagnostic repair.**
 <!-- PRIVYHUB_D136_FIRST_RUNTIME_RESULT:END -->
+
+<!-- PRIVYHUB_D136_ACCEPTED_AFTER_D137:BEGIN -->
+## Automated acceptance after D-137
+
+Fresh rerun:
+
+`D136_FOCUSED_TV_MEDIA_AUTOMATED_REGRESSION_VALIDATED`
+
+D-122, D-133 and D-135 all pass. Problems: none.
+
+**Status: automated regression accepted; manual playback/navigation smoke pending.**
+<!-- PRIVYHUB_D136_ACCEPTED_AFTER_D137:END -->

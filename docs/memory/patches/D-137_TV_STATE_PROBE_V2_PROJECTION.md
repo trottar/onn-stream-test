@@ -20,3 +20,12 @@ Validation:
 
 Runtime target remains the D-136 automated regression classification after a
 fresh rerun.
+
+<!-- PRIVYHUB_D137_RUNTIME_RESULT:BEGIN -->
+## Runtime result — accepted 2026-09-17
+
+D-137 corrected the D-116 schema-v2 projection. A fresh D-136 rerun then passed
+D-122 canonical parity and the full focused automated regression.
+
+**Status: diagnostic repair accepted.**
+<!-- PRIVYHUB_D137_RUNTIME_RESULT:END -->

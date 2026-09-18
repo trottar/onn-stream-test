@@ -6,6 +6,18 @@ baseline_commit: 0206017cfd8f0fc57decb7a5e9e8632e6a4f6cdd
 
 # Curated Project Memory
 
+<!-- PRIVYHUB_D136_AUTOMATED_REGRESSION_ACCEPTED:BEGIN -->
+## Focused TV/media automated regression accepted
+
+After D-137 corrected the stale schema-v2 diagnostic projection, D-136 reran
+cleanly with `D136_FOCUSED_TV_MEDIA_AUTOMATED_REGRESSION_VALIDATED`.
+
+D-122 baseline, D-133 guide presentation, and D-135 Favorites/state-executor gates
+all passed with no reported problems. Only the established manual Live TV,
+guide/Favorites, and VOD smoke remains before D5 bounded TV/media closeout.
+<!-- PRIVYHUB_D136_AUTOMATED_REGRESSION_ACCEPTED:END -->
+
+
 <!-- PRIVYHUB_D137_PROBE_SCHEMA_V2_RULE:BEGIN -->
 ## TV-state regression probes must project the current durable schema
 

@@ -35,3 +35,12 @@ Update D-116 diagnostic projection to match v2. Do not change production sync,
 database schema, plugin state, or D-127 behavior.
 
 Then rerun D-136 fresh.
+
+<!-- PRIVYHUB_D137_RUNTIME_RESULT:BEGIN -->
+## Runtime result — accepted 2026-09-17
+
+D-137 corrected the D-116 schema-v2 projection. A fresh D-136 rerun then passed
+D-122 canonical parity and the full focused automated regression.
+
+**Status: diagnostic repair accepted.**
+<!-- PRIVYHUB_D137_RUNTIME_RESULT:END -->

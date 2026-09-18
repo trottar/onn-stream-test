@@ -5,17 +5,19 @@ as_of: 2026-09-17
 
 # Active Investigations and Queued Work
 
-## Active — D-137 TV-state probe schema-v2 projection repair
+## Active — D-138 manual D5 smoke / closeout gate
 
-D-136 failed only at D-122 TV-state parity. Source inspection proves D-122's
-D-116 projection is stale relative to TV user-state schema v2: it omits
-`guide_incorrect`, `rejected_guide_source_key`, and `guide_incorrect_at_ms`.
+Fresh D-136 automated regression is fully validated after D-137 corrected the
+stale D-116 schema-v2 projection.
 
-D-137 updates diagnostic projection only. Production TV-state code remains
-unchanged.
+No automated failures remain.
 
-## Queued after D-137
+Manual gate:
+1. Live TV playback;
+2. Favorites/guide navigation;
+3. VOD playback.
 
-1. rerun D-136;
-2. if automated pass, short manual Live TV / guide / VOD smoke;
-3. D5 closeout.
+## Queued after manual smoke
+
+If all three are clean, record D5 bounded TV/media closeout and move to the
+broader Linux roadmap.

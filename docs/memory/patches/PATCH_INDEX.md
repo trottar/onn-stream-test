@@ -6,6 +6,16 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Patch / Checkpoint Index
 
+<!-- PRIVYHUB_D138_D136_ACCEPTANCE:PATCH_INDEX:BEGIN -->
+### D-138 — D-136 automated regression acceptance — 2026-09-17
+
+Memory-only checkpoint recording clean D-136 automated regression after D-137.
+No production changes.
+
+**Status:** manual Live TV / guide / VOD smoke pending.
+<!-- PRIVYHUB_D138_D136_ACCEPTANCE:PATCH_INDEX:END -->
+
+
 <!-- PRIVYHUB_D137_PROBE_V2:PATCH_INDEX:BEGIN -->
 ### D-137 — TV-state probe schema-v2 projection — 2026-09-17
 
