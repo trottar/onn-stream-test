@@ -41,3 +41,52 @@ When a classifier contradicts raw measurements, investigate the raw measurements
 ## Scope control
 
 Working subsystems should not be “improved” during unrelated fixes. This project has benefited most from contained probes, reversible patches, and stopping feature polish after runtime success.
+
+## Negative results are results
+
+Durable memory records what failed as well as what worked. A record that keeps
+only successes teaches nothing and invites repeated attempts down paths already
+known to be dead. Rejected candidates, rolled-back installers, wrong-state
+rejections and probes that could not run are all results and are written down in
+the same work that produced them.
+
+State explicitly when a run was clean. An absent failure section must mean "none
+occurred", never "none were recorded". The 2026-09-18 C1/C2 checkpoint recorded
+a bare `PASS` with no measurements and no failure section, leaving the Linux
+baseline outside the repository entirely; `C3.L0` had to reconstruct it.
+
+## Compression must not destroy measurements
+
+Memory maintenance that shortens active files must first verify the canonical
+evidence record holds the detail. The 2026-09-18 checkpoint reduced `CURRENT.md`,
+`roadmap/STATUS.md`, `investigations/ACTIVE.md`, the dated file and
+`patches/PATCH_INDEX.md` to single-line assertions. `PATCH_INDEX.md` lost its
+index of roughly seventy patch records that still existed on disk.
+
+Prefer a generated index over a hand-transcribed one where the source of truth is
+a directory. Transcription is the failure mode; generation plus validation is
+not.
+
+## Cross-platform evidence does not transfer by default
+
+Windows-era C3 measured a 0.84-0.95 s RTP interruption for a video-only encoder
+restart and rejected it for automatic adaptation. That figure is a property of
+the Windows two-process topology (WGC bridge feeding FFmpeg over an inherited
+pipe), not of the actuator strategy. Linux runs a single FFmpeg process with
+x11grab as an input format.
+
+Carry the *strategy* and the *capability model* across platforms. Re-measure the
+*numbers*. A validated ladder from one backend is a hypothesis on another.
+
+## Audit the client when auditing a stream parameter
+
+Stream parameters can be owned jointly by host and client without any
+negotiation between them. Resolution and FPS are FFmpeg arguments on the
+companion *and* independent compile-time constants in the Android activity, with
+the decoder ignoring `INFO_OUTPUT_FORMAT_CHANGED`. A host-only audit would have
+classified them as restart-mutable; they are actually APK-mutable, and the two
+sides can silently diverge.
+
+Conversely, check whether a wire format is self-describing before assuming a
+parameter is pinned. FEC group size looked like a fixed constant on both ends
+but is carried per-group in the header and validated by the receiver.

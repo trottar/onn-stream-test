@@ -154,3 +154,43 @@ Memory maintenance must:
 - preserve uncertain information in history rather than silently deleting it.
 
 Automatic destructive rewriting is not part of this policy.
+
+## Negative-result policy
+
+Durable memory records failures alongside successes. This is a maintenance
+requirement, not a stylistic preference: a repository that preserves only
+successful outcomes cannot prevent a future session from retrying a path that
+was already measured and rejected.
+
+Every meaningful patch, probe, diagnostic, discussion outcome or roadmap change
+records, in the same work:
+
+1. what was attempted, and the narrow hypothesis behind it;
+2. what succeeded, with the measurements that establish it;
+3. what failed, was rejected, was rolled back, or was rejected before
+   modification, with the measurement or reason that decided it;
+4. what remains unknown;
+5. the durable lesson, promoted to `LEARNINGS.md` when it generalizes beyond the
+   immediate work item.
+
+Rules:
+
+- a rejected candidate, a rolled-back installer and a wrong-state rejection are
+  all results and are written down;
+- state explicitly when a run was clean, so that an absent failure section means
+  "none occurred" rather than "none were recorded";
+- preserve superseded records; mark newer state authoritative rather than
+  deleting the old one;
+- raw measurements outrank later generalized summaries when they conflict;
+- before shortening an active file, verify the canonical evidence record holds
+  the measurements being removed.
+
+Patch result classes remain `INSTALLED SUCCESSFULLY`,
+`FAILED BEFORE MODIFICATION` and `ROLLED BACK`. Whichever occurred is recorded.
+
+## Generated indexes
+
+Where the source of truth for a memory file is a directory, prefer generating
+that file and validating the generated output over hand-transcribing it.
+`patches/PATCH_INDEX.md` is generated from `docs/memory/patches/*.md`.
+Hand transcription of a large directory listing is a known failure mode.

@@ -516,3 +516,74 @@ Only then resume controller thresholds/hysteresis/hold-down implementation.
 The Windows 5500/6000/7000 ladder is evidence, not a Linux product constant.
 
 Adaptive FEC remains deferred to representative Linux transport evidence.
+
+## Linux actuator boundary audit — C3.L0
+
+Audited at `310596dd0cc3ff22f3fe46e2eb025d052da90ec0`. Source only; no runtime
+execution and no production change.
+
+The backend-neutral capability model from D-071 is retained unchanged:
+`live_bitrate_reconfigure`, `video_only_restart`, `unsupported`.
+
+Current Linux classification:
+
+- `live_bitrate_reconfigure`: **foreclosed by the current architecture.** The
+  encoder is an external FFmpeg CLI launched with `-nostdin` and
+  `stdin=DEVNULL`, with `-b:v`/`-maxrate`/`-bufsize` baked into argv at `Popen`
+  time. There is no control socket, no ZMQ filter and no in-process libavcodec
+  handle. Reaching this capability requires an in-process encoder or a
+  controllable encoder host. That is an architecture change, not a patch. This
+  is a statement about the current architecture, not about h264_vaapi hardware.
+- `video_only_restart`: **not implemented on Linux.** `_start_linux_locked`
+  calls `_stop_locked()`, which also stops the FEC relay, session I/O and host
+  telemetry, violating the lifecycle-preservation boundary. A narrow
+  encoder-only seam must be added before the continuity test can run.
+- interruption cost: **unmeasured on Linux.**
+
+### Topology difference that motivates measuring rather than assuming
+
+Windows runs two managed video processes: the WGC bridge writes raw frames into
+FFmpeg's stdin over an inherited pipe, so a video-only restart must replace both
+and re-handshake the pipe.
+
+Linux runs one process; `_running_locked()` asserts `_capture_process is None`
+because x11grab is an FFmpeg input format. A Linux encoder-only restart is one
+`Popen` with no pipe handoff and no capture-metadata first-frame wait.
+
+The Windows 0.84-0.95 s RTP gap therefore does not transfer in either
+direction, and D-070's rejection cannot be assumed to hold on Linux until
+measured.
+
+### Parameters other than bitrate
+
+Resolution and FPS are **client-pinned, not negotiated**. `NativeStreamActivity`
+holds them as compile-time constants and passes them to
+`AvcLowLatencyDecoder`, which configures MediaCodec once, does not derive
+dimensions from the in-band SPS, and ignores `INFO_OUTPUT_FORMAT_CHANGED`.
+Changing either requires an APK change, not merely a restart. GOP is expressed
+in frames, so an FPS change silently rescales the keyframe interval in seconds.
+These remain C3 non-goals.
+
+FEC group size is the only in-place seam in the system. The FEC header carries
+the real group length and the receiver validates 1 to 8, so mutation would need
+no encoder restart, SSRC change, resync or IDR wait. No setter exists and no
+runtime evidence exists. **C4 continues to own adaptive FEC.**
+
+Pacing has no owner and no actuator, consistent with the
+`architecture/STREAM_TELEMETRY.md` rule against importing probe-style pacing
+semantics into the live stream.
+
+### Existing C3 probes do not run on Linux
+
+`companion/diagnostics/c3_actuator_probe.py` and
+`companion/diagnostics/c3_fixed_bitrate_probe.py` require `_wgc_ready()`, an
+HWND capture target and `_build_ffmpeg_command`. On Linux they fail closed with
+`wgc_runtime_unavailable` before modifying anything. They are correct as
+written; they are simply not reusable without a Linux cycle implementation
+behind the same probe structure.
+
+### Next
+
+`C3.L1` — Linux encoder-only restart continuity probe, same bitrate 7000 to
+7000, loopback only, no acceptance threshold encoded. Full plan in
+`investigations/C3_LINUX_ACTUATOR_BOUNDARY.md`.

@@ -18,6 +18,37 @@ Do not reopen the lower controller transport or D-pad mapping while debugging
 multitap unless a fresh diagnostic contradicts the D-085 runtime acceptance.
 <!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:KNOWN_ISSUES:END -->
 
+<!-- PRIVYHUB_C3_L0_AUDIT:KNOWN_ISSUES:BEGIN -->
+## 2026-09-18 C3.L0 audit findings
+
+Added by the `C3.L0` Linux actuator boundary audit. Neither item is fixed by
+that work.
+
+- **Linux host resource telemetry never starts.**
+  `NativeStreamManager._host_telemetry.start()` is called only inside the
+  Windows start path, gated on `_capture_process is not None`.
+  `_start_linux_locked` never calls it, while `status()` still publishes a
+  `host_telemetry` section, so the field reports an inactive profiler on every
+  Linux session. The C2 telemetry contract is unaffected because its sender
+  metrics come from the FEC relay `sendto()` boundary, which does run on Linux.
+  Status: open, Phase E prerequisite. Does not block C3.
+
+- **`_patches/` and `_probes/` are not covered by `.gitignore`.** The existing
+  patterns are `privyhub_*/` and `privyhub_*_v*.zip`. The local probe
+  directories are named `PrivyHub_*`, which does not match on a case-sensitive
+  filesystem. These directories are development-only and must not be pushed.
+  Status: open. Confirm with `git status --short` before any commit. Do not fix
+  this inside unrelated streaming work.
+
+- **Existing C3 probes cannot run on Linux.**
+  `companion/diagnostics/c3_actuator_probe.py` and
+  `companion/diagnostics/c3_fixed_bitrate_probe.py` require `_wgc_ready()`, an
+  HWND capture target and `_build_ffmpeg_command`, and fail closed with
+  `wgc_runtime_unavailable` before modifying anything. They are correct as
+  written. Status: expected prototype limitation; resolved by the `C3.L1` Linux
+  cycle implementation.
+<!-- PRIVYHUB_C3_L0_AUDIT:KNOWN_ISSUES:END -->
+
 Status as of 2026-09-11.
 
 | Issue | Status | Blocks current Phase C work? | Resume / resolve when |

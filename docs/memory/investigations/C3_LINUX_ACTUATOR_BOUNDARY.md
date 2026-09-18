@@ -1,0 +1,267 @@
+---
+memory_schema: 1
+as_of: 2026-09-18
+baseline_commit: 310596dd0cc3ff22f3fe46e2eb025d052da90ec0
+status: source_audit_complete_runtime_evidence_pending
+---
+
+# C3 Linux actuator boundary
+
+## Status
+
+**SOURCE AUDIT COMPLETE / LINUX RUNTIME EVIDENCE PENDING**
+
+## Narrow question
+
+Can the existing Linux streaming architecture expose safe backend-neutral
+quality controls without disturbing validated playback?
+
+This audit answers ownership, runtime mutability and lifecycle cost from source.
+It does not implement an actuator, a controller or any production change.
+
+## Relationship to the Windows-era C3 record
+
+C3 was substantially executed on the outgoing Windows prototype and then
+deliberately handed to Linux by D-071. This investigation resumes that work; it
+does not restart it.
+
+Closed Windows-era results that remain authoritative as history:
+
+- D-063 accepted `video_only_restart` as the initial backend-neutral actuator
+  strategy;
+- fixed-bitrate characterization produced 7000 reference, 6000 validated, 5500
+  validated floor, 5000 runtime tested and not accepted;
+- D-070 validated bidirectional transitions but **rejected**
+  `video_only_restart` for seamless automatic in-game adaptation because the
+  host produced no new RTP for roughly 0.84-0.95 s and gameplay visibly froze
+  for roughly 1 s;
+- D-067/D-068 runtime validated the
+  `LAUNCHING -> STABILIZING -> READY -> PLAYING` readiness boundary and froze
+  adaptation during STABILIZING/PAUSED;
+- D-071 stopped Windows actuator development and required Linux to reclassify
+  actuation and revalidate the fixed envelope.
+
+The Windows 5500/6000/7000 ladder is evidence, not a Linux product constant.
+
+## Audited source
+
+Audited at `310596dd0cc3ff22f3fe46e2eb025d052da90ec0`:
+
+- `companion/native_stream.py`
+  - `_build_linux_ffmpeg_command` (encoder argv construction);
+  - `_start_linux_locked` (Linux start path);
+  - `_stop_locked` (teardown ownership);
+  - `_running_locked` (Linux liveness definition);
+  - `status()` (published backend/profile/bitrate surface);
+- `companion/native_stream_profiles.py`;
+- `companion/native_fec_relay.py` (`_handle_rtp`, `_emit_group_locked`, `_send`);
+- `companion/diagnostics/c3_actuator_probe.py`;
+- `companion/diagnostics/c3_fixed_bitrate_probe.py`;
+- `companion/plugins/games.py` loopback-only C3 action registration;
+- `PrivyHub/app/src/main/java/com/safeiot/privyhub/streaming/RtpH264Receiver.kt`;
+- `PrivyHub/app/src/main/java/com/safeiot/privyhub/streaming/AvcLowLatencyDecoder.kt`;
+- `PrivyHub/app/src/main/java/com/safeiot/privyhub/streaming/NativeStreamActivity.kt`.
+
+## Actuator boundary map
+
+| Parameter | Owner | Runtime mutable? | Restart required? | Safe? |
+| --- | --- | --- | --- | --- |
+| bitrate | Companion FFmpeg `-b:v`/`-maxrate`/`-bufsize`, fixed at process creation | No | Encoder-process restart | Unknown on Linux; Windows functional but rejected for automatic use |
+| resolution | Split: host `-vf scale/pad` from profile; Android compile-time constants | No | Encoder restart plus decoder re-creation plus APK rebuild | No; not negotiated; C3 non-goal |
+| FPS | Split: host x11grab `-framerate`; Android compile-time constant | No | Same as resolution; also rescales GOP seconds | No; C3 non-goal |
+| FEC | Companion `NativeVideoFecRelay.group_size` | Structurally yes; wire format is self-describing | No | Unvalidated; no setter exists; C4 owns adaptive FEC |
+| pacing | No owner; no pacing actuator exists | Not applicable | Not applicable | Introducing one is a new transport scheduler; out of C3 scope |
+
+### Bitrate
+
+The Linux encoder is launched with `-nostdin` and `stdin=subprocess.DEVNULL`,
+and the bitrate arguments are baked into argv at `Popen` time. There is no
+control socket, no ZMQ filter and no in-process libavcodec handle.
+
+Therefore `live_bitrate_reconfigure` is not merely unimplemented on Linux. It is
+foreclosed by the current external FFmpeg CLI architecture, independently of
+what h264_vaapi hardware supports. Reaching it requires an in-process encoder or
+a controllable encoder host, which is an architecture change rather than a
+patch.
+
+`_build_linux_ffmpeg_command` already accepts and validates `bitrate_kbps` and
+`max_bitrate_kbps` overrides, but no Linux caller passes them. The override seam
+exists and is unexercised.
+
+### Linux and Windows actuator topology differ in one favourable way
+
+On Windows the video path is two managed processes: the WGC bridge writes raw
+frames into FFmpeg's stdin over an inherited pipe. A video-only restart must
+replace both and re-handshake the pipe.
+
+On Linux there is one process. `_running_locked()` asserts
+`self._capture_process is None` on Linux because x11grab is an input format
+inside FFmpeg itself.
+
+A Linux encoder-only restart is therefore structurally simpler: one `Popen`, no
+pipe handoff, no capture-metadata first-frame wait. This is a concrete reason
+the Linux interruption cost may not match the Windows 0.84-0.95 s, and it is the
+strongest argument for measuring rather than assuming D-070 transfers.
+
+### No Linux video-only restart path exists
+
+`_start_linux_locked` calls `self._stop_locked()` first. `_stop_locked` stops
+host telemetry, stops session I/O, kills the encoder **and stops the FEC relay**.
+
+That is exactly the lifecycle violation the backend-neutral actuator contract
+forbids. A Linux continuity probe therefore requires one narrow internal
+encoder-only replacement seam that does not call `_stop_locked()`.
+
+### Existing C3 probes are Windows-only
+
+`c3_actuator_probe.py` and `c3_fixed_bitrate_probe.py` both require
+`manager._wgc_ready()`, the WGC bridge path, an HWND capture target and
+`_build_ffmpeg_command`. On Linux they fail closed with
+`wgc_runtime_unavailable` before modifying anything.
+
+They are correct as written. They are not reusable on Linux without a Linux
+cycle implementation behind the same probe structure.
+
+### Resolution and FPS are client-pinned, not negotiated
+
+`NativeStreamActivity` holds `VIDEO_WIDTH = 1280`, `VIDEO_HEIGHT = 720` and
+`VIDEO_FPS = 60` as compile-time constants and passes them to
+`AvcLowLatencyDecoder` at construction. The decoder configures MediaCodec from
+those constructor values, does not derive dimensions from the in-band SPS, and
+ignores `INFO_OUTPUT_FORMAT_CHANGED` with a bare `continue`. It is never
+reconfigured, and the Activity does not poll host status during playback.
+
+Consequences:
+
+- host profile and client constants can silently diverge with no negotiation and
+  no runtime detection;
+- any resolution or FPS change requires an APK change, not only a restart;
+- GOP is expressed in frames, so an FPS change silently rescales the keyframe
+  interval in seconds.
+
+C1 deliberately preserved these Android constants. C3 must not change them.
+Record the divergence risk; do not act on it inside C3.
+
+### FEC is the only parameter with a real in-place seam
+
+`_emit_group_locked` packs the actual `len(group)` into the FEC header.
+`RtpH264Receiver.kt` reads the count from header byte 5 and validates a range of
+1 to 8. No client constant participates.
+
+Short groups are already an exercised production path, because the relay flushes
+early on RTP marker or timestamp change.
+
+So changing `group_size` between groups would take effect with no encoder
+restart, no SSRC change, no sequence resync and no IDR wait. It is by a wide
+margin the cheapest actuator in the system.
+
+Constraints:
+
+- the one-byte marker mask caps group size at 8;
+- `group_size` is assigned only in `__init__` and has no thread-safe mutator;
+- there is no runtime evidence for mid-stream mutation.
+
+Adaptive FEC belongs to C4. C3 maps this seam and stops.
+
+### Pacing has no owner
+
+`_send()` calls `sendto()` immediately and only instruments monotonic duration
+around it. There is no deadline, no sleep and no scheduler anywhere in the
+production transport path.
+
+`architecture/STREAM_TELEMETRY.md` states this as a deliberate rule: the relay
+has no pacing deadline, so probe-style pacing-lateness semantics must not be
+copied into the live stream.
+
+There is nothing to actuate. Introducing pacing would be a new transport
+scheduler adjacent to the deferred UDP burst/gap pathology, which is a Windows
+measurement that has never been re-measured on Linux.
+
+## Defects and gaps surfaced by this audit
+
+1. **Host telemetry never starts on Linux.** `_host_telemetry.start()` is called
+   only inside the Windows start path, gated on `_capture_process is not None`.
+   `_start_linux_locked` never calls it, while `status()` still publishes a
+   `host_telemetry` section. The C2 contract is unaffected because its sender
+   metrics come from the FEC relay, which does run. Sender-side host resource
+   telemetry is nevertheless absent on Linux and is a Phase E prerequisite.
+
+2. **`_patches/` and `_probes/` are not ignored.** `.gitignore` covers
+   `privyhub_*/` and `privyhub_*_v*.zip` but not `_patches/` or `_probes/`, and
+   the local probe directories are named `PrivyHub_*`, which does not match on a
+   case-sensitive filesystem. Confirm with `git status --short` before any
+   commit.
+
+Both are recorded in `docs/KNOWN_ISSUES.md`. Neither is fixed by this work.
+
+## Unknowns, in priority order
+
+1. Linux encoder-only restart interruption cost. Unmeasured. The Windows figure
+   is not portable and the single-process topology gives real reason to expect a
+   different number.
+2. Whether any low-interruption Linux bitrate actuator is reachable without
+   replacing the external FFmpeg CLI. Source says no for bitrate under the
+   current architecture.
+3. Whether mid-stream FEC group-size mutation is safe. Wire format permits it;
+   no runtime evidence exists. C4 territory.
+4. Linux UDP burst/gap behaviour. Deferred and never re-measured on
+   representative Linux infrastructure.
+
+## Next diagnostic
+
+`C3.L1` — Linux encoder-only restart continuity probe.
+
+Narrow question: can the Linux backend perform one same-bitrate 7000 to 7000
+encoder-only cycle while preserving the FEC relay, process audio, the persistent
+controller and emulator lifecycle, and how large is the RTP interruption?
+
+This is the test that
+`evidence/C3_VIDEO_ONLY_RESTART_RUNTIME_VALIDATED_2026-09-14.md` already
+requires before Linux actuator acceptance. It is a gate memory has already set,
+not new scope.
+
+It reuses the existing probe structure, the existing loopback-only
+`c3-actuator-continuity-cycle` Games action, and existing C2 telemetry and
+decoder-session reporting for evidence. It encodes no acceptance threshold and
+changes no bitrate.
+
+It requires one narrow new internal seam: a Linux encoder-only replacement that
+does not call `_stop_locked()`. That seam does not exist today and is the
+minimum honest cost of answering the question.
+
+Decision boundary:
+
+- interruption materially below the Windows 0.84-0.95 s — D-070's rejection does
+  not transfer; reopen Linux actuator classification and proceed to Linux fixed
+  envelope revalidation;
+- interruption comparable to Windows — `video_only_restart` is fallback-only on
+  Linux as well, the automatic controller stays blocked, and the next real item
+  is the encoder-host architecture question rather than further probing.
+
+## C3 Linux sequence
+
+1. `C3.L0` — this audit recorded in durable memory. **This item.**
+2. `C3.L1` — Linux encoder-only restart continuity probe.
+3. `C3.L2` — Linux actuator capability classification recorded as a decision:
+   `live_bitrate_reconfigure`, `video_only_restart` or `unsupported`.
+4. `C3.L3` — Linux fixed-bitrate envelope revalidation, only if `C3.L2` accepts
+   an actuator. The Windows ladder enters as hypothesis, not constant.
+5. `C3.L4` — explainable fast-down/slow-up controller. Still blocked.
+
+## Preservation boundary for all C3 Linux work
+
+Do not change:
+
+- encoded resolution, frame rate, GOP or B-frames;
+- FEC algorithm or wire format;
+- RTP payload type, packet size or ports;
+- process audio;
+- controller transport;
+- emulator/game lifecycle;
+- Android streaming constants or startup ordering;
+- any non-loopback control surface.
+
+## Privacy
+
+No network addresses appear in this record. Any C3 diagnostic output must
+continue to exclude source/request address identity.
