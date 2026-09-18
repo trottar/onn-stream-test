@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-18
-baseline_commit: 555cc4f
+baseline_commit: 6abe47d2f7adf1eae847d3b23b12b760586f6d41
 ---
 
 # Current State
@@ -16,65 +16,75 @@ boundary for the validated Linux native game stream.
 
 ## Current Work Item
 
-`C3.L2` — Linux actuator classification.
+`C3.L2a` — first-IDR acceptance investigation.
 
 Start from `PHASE_C_CONTEXT.md`. It is the compact, self-sufficient Phase C
 continuation brief and should not require reading the wider memory hierarchy.
 
 ## Verified State
 
-- C1 Linux profile/backend: COMPLETE / RUNTIME VALIDATED
-  (`native_game_720p60_reference`, `x11grab_window`, `h264_vaapi`,
-  `rtp_udp_xor_fec`, fail-closed render-node behavior).
-- C2 stream telemetry: COMPLETE / RUNTIME VALIDATED. Linux baseline
-  measurements are recorded in
+- C1 Linux profile/backend and C2 stream telemetry: COMPLETE / RUNTIME
+  VALIDATED. Baseline measurements in
   `evidence/C1_C2_LINUX_REVALIDATION_2026-09-18.md`.
-- `C3.L0` actuator boundary audit: COMPLETE. Full map in
+- `C3.L0` actuator boundary audit: COMPLETE. Map in
   `investigations/C3_LINUX_ACTUATOR_BOUNDARY.md`.
 - `C3.L1` / `C3.L1R1` Linux encoder-only actuator: COMPLETE / RUNTIME
-  VALIDATED across two clean cycles.
-  Lifecycle preservation confirmed: FEC, process audio, controller and
-  emulator all survived the cycle with zero errors and exactly one SSRC
-  change.
-- Linux decoder max output gap **318 ms** against Windows 791 ms on the
-  directly comparable D-062 same-bitrate run: materially better, so the
-  `C3.L0` boundary is met and Linux actuator classification is reopened.
-  Evidence: `evidence/C3_L1_LINUX_ACTUATOR_RUNTIME_2026-09-18.md`.
+  VALIDATED across two clean cycles. Lifecycle preserved both times: FEC,
+  process audio, controller and emulator survived with zero errors and exactly
+  one SSRC change per cycle.
+- Interruption cost: **287-318 ms decoder output gap**, against Windows 791 ms
+  on the directly comparable D-062 same-bitrate run. The `C3.L0` boundary is
+  met.
+- `C3.L2` Linux actuator classification: COMPLETE. Linux is
+  `video_only_restart`; `live_bitrate_reconfigure` is not available under the
+  current architecture. Authorized for start-time profile selection, manual and
+  loopback-only diagnostic changes, fallback and recovery, and `C3.L3`
+  characterization. Not authorized for automatic adaptation during play.
+  Record: `decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`.
 - D4 Games and D5 media/server restoration: COMPLETE / RUNTIME VALIDATED.
 
 Blocked or incomplete:
 
-- automatic bitrate controller is **blocked**; D-070 rejected
-  `video_only_restart` for seamless automatic in-game adaptation on Windows, and
-  Linux has no measured actuator interruption cost yet;
-- whether a ~287 ms automatic mid-game interruption is acceptable is **not
-  decided**; that is the `C3.L2` question;
-- whether an immediate-IDR request on the replacement encoder would shrink the
-  gap is an **unauthorized open lead**, not an approved action;
+- the automatic fast-down/slow-up controller (`C3.L4`) is **blocked**; its gate
+  is the `C3.L2a` result;
+- `C3.L3` Linux fixed-bitrate envelope revalidation is unblocked for manual
+  characterization but is sequenced after `C3.L2a`;
+- the recorded "request an immediate IDR" lead is **premise-corrected**: a fresh
+  FFmpeg RTP stream already begins with in-band parameter sets and an IDR, so
+  the late first IDR needs a cause before any remedy;
+- the Android receiver's resync and IDR-acceptance policy has not been
+  re-audited since `C3.L0`; that is the first task of `C3.L2a`;
 - Linux host resource telemetry never starts; see `docs/KNOWN_ISSUES.md`.
 
 ## Next Action
 
-Classify the Linux actuator in `C3.L2` and record it as a decision:
-`live_bitrate_reconfigure`, `video_only_restart` or `unsupported`, plus whether
-`video_only_restart` is acceptable for automatic mid-game adaptation.
+Answer, from existing instrumentation before any code change, why the receiver
+discards 118-123 packets and takes time to accept an IDR after an encoder-only
+cycle whose replacement stream starts with a keyframe.
 
-Evidence needed for that decision already exists; no new probe is required to
-make the classification itself. See section 5 of `PHASE_C_CONTEXT.md`.
+Read `logs/games/decoder_sessions/*.json`, `logs/games/native_video_alpha.log`,
+the stored `C3.L1` / `C3.L1R1` payloads, and
+`PrivyHub/app/src/main/java/com/safeiot/privyhub/streaming/RtpH264Receiver.kt`.
+Only then decide whether a probe is needed, and keep it loopback-only with no
+acceptance threshold encoded.
 
 ## Success Criteria
 
-Raw interruption and recovery measurements are captured with FEC, audio,
-controller and game lifecycle demonstrably preserved. No acceptance threshold is
-encoded in the probe.
+The cause of the late first-IDR acceptance is identified from evidence, or the
+candidate causes are narrowed to one that a single loopback-only probe can
+discriminate. Raw measurements stay visible and the classification's whole-session
+qualifications are preserved.
 
-Decision boundary:
+Decision boundary, pre-registered in
+`decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`:
 
-- interruption materially below the Windows 0.84-0.95 s — reopen Linux actuator
-  classification and proceed to `C3.L3` fixed-envelope revalidation;
-- interruption comparable to Windows — `video_only_restart` is fallback-only on
-  Linux too, the controller stays blocked, and the next item is the encoder-host
-  architecture question.
+- decoder output gap reproducibly at or below ~120 ms with lifecycle preserved —
+  reopen the automatic-adaptation question, with a focused gameplay observation
+  required before acceptance;
+- ~120-250 ms — the remaining cost is not first-IDR acceptance; the actuator
+  stays non-automatic and the next question is pipeline re-establishment;
+- unchanged, or lifecycle regressed — the lead is falsified and closed, and the
+  next real item is the encoder-host architecture question.
 
 Do not change during C3: resolution, frame rate, GOP, B-frames, FEC wire format,
 RTP payload type, packet size, ports, process audio, controller transport,
@@ -87,14 +97,18 @@ surface.
 - The Windows-era C3 record (D-063, D-067, D-068, D-069, D-070, D-071).
 - The deferred UDP burst/gap pathology, which is a Windows measurement awaiting
   representative Linux replay.
+- The `C3.L2` classification itself, including the decision not to authorize
+  automatic in-game adaptation at the currently measured cost.
 
 ## Relevant References
 
 - `PHASE_C_CONTEXT.md` — **start here**; compact Phase C continuation brief.
+- `decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md` — classification and the
+  pre-registered `C3.L2a` boundary.
 - `investigations/C3_LINUX_ACTUATOR_BOUNDARY.md` — actuator boundary map.
 - `architecture/ADAPTIVE_BITRATE.md` — adaptation architecture and history.
 - `architecture/STREAM_TELEMETRY.md` — C2 measurement contract.
-- `evidence/C1_C2_LINUX_REVALIDATION_2026-09-18.md` — Linux baseline.
+- `evidence/C3_L1R1_LINUX_ACTUATOR_RUNTIME_2026-09-18.md` — corrected run.
 - `roadmap/STATUS.md` — roadmap position.
 - `MAINTENANCE.md` — memory maintenance policy and required validation gate.
 - `docs/KNOWN_ISSUES.md` — open gaps and deferred work.

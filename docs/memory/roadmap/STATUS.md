@@ -1,12 +1,12 @@
 # Roadmap Status
 
-As of 2026-09-18, baseline `310596dd0cc3ff22f3fe46e2eb025d052da90ec0`.
+As of 2026-09-18, baseline `6abe47d2f7adf1eae847d3b23b12b760586f6d41`.
 
 ## Active
 
 Phase C Linux continuation.
 
-Active work item: `C3.L1` — Linux encoder-only restart continuity probe.
+Active work item: `C3.L2a` — first-IDR acceptance investigation.
 
 ## Completed
 
@@ -18,16 +18,22 @@ Active work item: `C3.L1` — Linux encoder-only restart continuity probe.
 - C1 Linux profile/backend: COMPLETE / RUNTIME VALIDATED.
 - C2 stream telemetry: COMPLETE / RUNTIME VALIDATED.
 - `C3.L0` Linux actuator boundary audit: COMPLETE (source audit only).
+- `C3.L1` / `C3.L1R1` Linux encoder-only actuator: COMPLETE / RUNTIME
+  VALIDATED. Interruption 287-318 ms decoder output gap.
+- `C3.L2` Linux actuator classification: COMPLETE. Linux is
+  `video_only_restart`, authorized for start-time, manual, fallback and
+  characterization use; not authorized for automatic in-game adaptation.
 
 ## Phase C Linux sequence
 
 | Item | State |
 | --- | --- |
 | `C3.L0` actuator boundary audit | COMPLETE |
-| `C3.L1` encoder-only restart continuity probe | **NEXT** |
-| `C3.L2` Linux actuator capability classification | PENDING |
-| `C3.L3` Linux fixed-bitrate envelope revalidation | PENDING, conditional on `C3.L2` |
-| `C3.L4` explainable fast-down/slow-up controller | BLOCKED |
+| `C3.L1` encoder-only restart continuity probe | COMPLETE / RUNTIME VALIDATED |
+| `C3.L2` Linux actuator capability classification | COMPLETE |
+| `C3.L2a` first-IDR acceptance investigation | **NEXT** |
+| `C3.L3` Linux fixed-bitrate envelope revalidation | UNBLOCKED for manual characterization; sequenced after `C3.L2a` |
+| `C3.L4` explainable fast-down/slow-up controller | BLOCKED; gate is `C3.L2a` |
 | C4 adaptive FEC | DEFERRED |
 
 ## Historical / reassigned

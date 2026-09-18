@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-18
-baseline_commit: 094b638a575d0f1acd141193d52a136af39248a2
+baseline_commit: 6abe47d2f7adf1eae847d3b23b12b760586f6d41
 phase: C
 scope: phase_c_linux_streaming_continuation
 ---
@@ -38,9 +38,10 @@ Phase C is active. Sub-phase state:
 | `C3.L0` actuator boundary audit | COMPLETE |
 | `C3.L1` Linux encoder-only seam and probe | COMPLETE / RUNTIME VALIDATED |
 | `C3.L1R1` RTP baseline correction | COMPLETE / RUNTIME VALIDATED |
-| `C3.L2` Linux actuator classification | **NEXT** |
-| `C3.L3` Linux fixed-bitrate envelope revalidation | PENDING, conditional on `C3.L2` |
-| `C3.L4` fast-down/slow-up controller | BLOCKED |
+| `C3.L2` Linux actuator classification | COMPLETE |
+| `C3.L2a` first-IDR acceptance investigation | **NEXT** |
+| `C3.L3` Linux fixed-bitrate envelope revalidation | UNBLOCKED for manual characterization; sequenced after `C3.L2a` |
+| `C3.L4` fast-down/slow-up controller | BLOCKED; gate is `C3.L2a` |
 | C4 adaptive FEC | DEFERRED |
 
 Phase E does not begin until the streaming architecture is stable. It measures a
@@ -134,11 +135,19 @@ Linux is ~2.5-2.75x better than the directly comparable Windows run. The
 `C3.L0` pre-registered boundary ("materially below 0.84-0.95 s reopens
 classification") is **met**.
 
-**Where the gap comes from:** `max_resync_to_idr_ms` 191-241 ms with 118-123
-packets dropped waiting for IDR, against 0 on both Windows runs. GOP 15 at
-60 fps is a 250 ms keyframe interval, so the wait is roughly one full GOP. The
-interruption is dominated by waiting for the replacement encoder's first usable
-IDR, not by process spawn (115-215 ms).
+**Reading the interruption, with `C3.L2`'s qualifications:**
+
+- `max_resync_to_idr_ms` and `packets_dropped_waiting_for_idr` are **whole-session
+  values**. Each session recorded two sequence resyncs and one SSRC change, so
+  attributing the session maximum to the cycle is an inference, not a
+  measurement.
+- The terms do not sum. Spawn 115 ms, RTP silence ~152 ms and decoder gap 287 ms
+  overlap in time; 152 + 191 exceeds 287.
+- `decoder_max_output_gap_ms` is the figure to cite. It is measured on the
+  receiver, which has no stake in the host probe's result.
+
+Process spawn (115-215 ms) is not the dominant term. Waiting for a usable IDR
+still is, on the evidence available.
 
 **Focused gameplay observation (2026-09-18, user):** "pretty good... occasional
 stutter that happens, but definitely playable... still obvious that it is a
@@ -149,32 +158,65 @@ the actuator cycle.
 
 ---
 
-## 5. The open question — `C3.L2`
+## 5. The classification — settled by `C3.L2`
 
-Classify the Linux actuator: `live_bitrate_reconfigure`, `video_only_restart`,
-or `unsupported`, and decide whether `video_only_restart` is acceptable for
-**automatic mid-game adaptation** on Linux.
+Linux is classified **`video_only_restart`**. Full record:
+`decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`.
 
-What is settled: the mechanism works, preserves lifecycle, and costs ~287-318 ms
-of decoder output gap. Windows rejected its ~1 s equivalent (D-070).
+- `live_bitrate_reconfigure`: not available under the current architecture.
+- `video_only_restart`: runtime validated, lifecycle preserved twice, 287-318 ms
+  decoder output gap.
+- `unsupported`: does not apply.
 
-What is not settled: whether ~290 ms — roughly 17 frame intervals at 60 fps — is
-acceptable to trigger automatically during play. The user's standing preference
-is to **minimize** perceptible streaming artifacts, which argues for caution.
+**Authorized:** session start and start-time profile selection before `READY`;
+manual and loopback-only diagnostic changes; fallback and recovery, including
+replacing a dead encoder; `C3.L3` characterization cycles.
 
-The strongest identified lead, **not yet authorized or investigated**: the gap is
-mostly IDR wait, so requesting an immediate IDR on the replacement encoder could
-shrink it materially. Nothing in current evidence authorizes implementing that;
-it would be its own narrow hypothesis and its own probe.
+**Not authorized:** automatic adaptation during `PLAYING`. `C3.L4` stays
+BLOCKED.
 
-A defensible `C3.L2` outcome may be to accept `video_only_restart` for
-**startup, manual and fallback** use while keeping automatic in-game adaptation
-blocked pending the IDR question. That mirrors the Windows disposition without
-copying its numbers.
+The reasoning, in one line each: the gap is ~17 frame intervals against a
+settled stream whose post-cycle gap was 5 ms; an automatic controller fires
+under pressure, when a deliberate discontinuity hurts most; one accepted manual
+cycle is not evidence for repeated automatic ones; and the standing preference
+is to minimize perceptible artifacts while an untested lead to reduce the cost
+exists.
 
 ---
 
-## 6. Rules that bind Phase C work
+## 6. The open question — `C3.L2a`
+
+Why is the receiver's first accepted IDR late after an encoder-only cycle, when
+the replacement stream's first frame is a keyframe?
+
+`C3.L1R1` recorded the lead as "request an immediate IDR on the replacement
+encoder". `C3.L2` corrected its premise: `_build_linux_ffmpeg_command` starts a
+fresh FFmpeg with `-f rtp`, `-g 15`, `-bf 0` and no periodic-keyframe override,
+and the start path publishes `bootstrap: in_band_h264_parameter_sets`. A new
+H.264 RTP stream begins with parameter sets and an IDR. There is nothing to
+request; the wait needs a cause, not a remedy.
+
+Start from existing evidence, not from a code change:
+`logs/games/decoder_sessions/*.json`, `logs/games/native_video_alpha.log`, the
+stored `C3.L1` / `C3.L1R1` payloads, and
+`PrivyHub/app/src/main/java/com/safeiot/privyhub/streaming/RtpH264Receiver.kt`,
+whose resync and IDR-acceptance policy `C3.L2` did **not** re-audit.
+
+Candidates to discriminate: a first IDR that arrives damaged across FEC groups
+at the discontinuity (33 lost packets, 2 unrecoverable groups in session); FEC
+group damage caused by the swap itself; a receiver resync policy that discards
+until parameter sets plus a clean sequence baseline; encoder ramp, largely
+excluded because the silence window is measured before resume.
+
+Pre-registered boundary: reproducibly **≈120 ms or below** reopens the automatic
+question, with a focused gameplay observation required before acceptance;
+**~120-250 ms** means the remaining cost is not first-IDR acceptance and the
+actuator stays non-automatic; **unchanged** falsifies the lead and moves the next
+real item to the encoder-host architecture question.
+
+---
+
+## 7. Rules that bind Phase C work
 
 Do not change: resolution, frame rate, GOP, B-frames, FEC wire format, RTP
 payload type, packet size, ports, process audio, controller transport, emulator
@@ -193,7 +235,7 @@ Never ask the user for IP addresses; redact network identity in diagnostics.
 
 ---
 
-## 7. Operational facts
+## 8. Operational facts
 
 - Companion: `python3 ./companion/privyhub_service.py`. **Restart it whenever
   companion Python changes** — D-068 durable rule; stale-process behavior is not
@@ -217,7 +259,7 @@ Never ask the user for IP addresses; redact network identity in diagnostics.
 - Record failures alongside successes in the same work. See the negative-result
   policy in `MEMORY.md`.
 
-## 8. Open debt, recorded and not blocking
+## 9. Open debt, recorded and not blocking
 
 - `_host_telemetry.start()` is never called on the Linux path; sender-side host
   resource telemetry is inactive on Linux. Phase E prerequisite.
@@ -229,10 +271,12 @@ Never ask the user for IP addresses; redact network identity in diagnostics.
   Treat Windows "first RTP resume" figures as pipeline re-establishment time.
   Not fixed; Windows is outgoing.
 
-## 9. Pointers, for detail only
+## 10. Pointers, for detail only
 
+- `decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md` — the classification, its
+  reasoning, and the pre-registered `C3.L2a` boundary.
 - `investigations/C3_LINUX_ACTUATOR_BOUNDARY.md` — full boundary map and
-  `C3.L1` history.
+  `C3.L0`-`C3.L2` history.
 - `evidence/C3_L1_LINUX_ACTUATOR_RUNTIME_2026-09-18.md` and
   `evidence/C3_L1R1_LINUX_ACTUATOR_RUNTIME_2026-09-18.md` — raw runs.
 - `evidence/C1_C2_LINUX_REVALIDATION_2026-09-18.md` — Linux baseline.

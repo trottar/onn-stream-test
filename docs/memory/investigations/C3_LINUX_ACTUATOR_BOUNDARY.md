@@ -1,15 +1,23 @@
 ---
 memory_schema: 1
 as_of: 2026-09-18
-baseline_commit: 310596dd0cc3ff22f3fe46e2eb025d052da90ec0
-status: source_audit_complete_runtime_evidence_pending
+baseline_commit: 6abe47d2f7adf1eae847d3b23b12b760586f6d41
+status: actuator_classified_video_only_restart_non_automatic
 ---
 
 # C3 Linux actuator boundary
 
 ## Status
 
-**SOURCE AUDIT COMPLETE / LINUX RUNTIME EVIDENCE PENDING**
+**SOURCE AUDIT COMPLETE / ACTUATOR RUNTIME VALIDATED / CLASSIFIED BY C3.L2**
+
+Linux is classified `video_only_restart`, authorized for start-time, manual,
+fallback and characterization use and not authorized for automatic in-game
+adaptation. Decision record:
+`../decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`.
+
+The sections below are preserved in the order they were written. Later sections
+are authoritative where they disagree with earlier ones.
 
 ## Narrow question
 
@@ -430,3 +438,88 @@ open lead and is **not authorized** by this evidence.
 
 Active work moves to `C3.L2` classification. Compact continuation brief:
 `../PHASE_C_CONTEXT.md`.
+
+## C3.L2 — classification recorded
+
+Full record: `../decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`. No new
+measurement was taken; the classification is made from the `C3.L0` source audit
+and the two `C3.L1` / `C3.L1R1` runs.
+
+**Linux is `video_only_restart`.** `live_bitrate_reconfigure` is not available
+under the current external-FFmpeg-CLI architecture. `unsupported` does not
+apply.
+
+Authorized: start-time profile selection before `READY`, manual and
+loopback-only diagnostic changes, fallback and recovery, and `C3.L3`
+characterization cycles.
+
+Not authorized: automatic adaptation during `PLAYING`. `C3.L4` stays blocked.
+
+The reasons, short form: 287-318 ms is ~17 frame intervals against a settled
+stream whose post-cycle output gap was 5 ms; an automatic controller fires under
+pressure, when a deliberate discontinuity costs most; a single accepted manual
+cycle is not evidence for repeated automatic ones; and the standing user
+preference is to minimize perceptible artifacts while an untested lead to reduce
+the cost exists.
+
+### Two corrections to how the `C3.L1` figures are read
+
+`max_resync_to_idr_ms` and `packets_dropped_waiting_for_idr` are **whole-session
+values**. Both sessions recorded two sequence resyncs against one SSRC change,
+so attributing the session maximum to the actuator cycle is an inference rather
+than a measurement. The 287-318 ms `decoder_max_output_gap_ms` is unaffected and
+remains the figure to cite.
+
+The terms also do not sum: spawn 115 ms, RTP silence ~152 ms and decoder gap
+287 ms overlap in time, and 152 + 191 exceeds 287.
+
+### The recorded "immediate IDR" lead had a false premise
+
+`C3.L1R1` recorded the strongest lead as requesting an immediate IDR on the
+replacement encoder. `_build_linux_ffmpeg_command` launches a fresh FFmpeg with
+`-f rtp`, `-g 15`, `-bf 0` and no periodic-keyframe override, and
+`_start_linux_locked` publishes `bootstrap: in_band_h264_parameter_sets`. A new
+H.264 RTP stream begins with parameter sets and an IDR access unit, so the
+replacement encoder's first frame is already a keyframe and there is nothing to
+request.
+
+The lead is re-registered with its premise corrected rather than discarded: the
+IDR wait remains the best available explanation for most of the gap, but the
+question is why a keyframe-first stream is not accepted promptly.
+
+## C3.L2a — next diagnostic
+
+Narrow question: why is the receiver's first accepted IDR late after an
+encoder-only cycle, when the replacement stream's first frame is a keyframe?
+
+Existing instrumentation first, no code change first:
+`logs/games/decoder_sessions/*.json`, `logs/games/native_video_alpha.log`, the
+stored `C3.L1` / `C3.L1R1` payloads, and
+`PrivyHub/app/src/main/java/com/safeiot/privyhub/streaming/RtpH264Receiver.kt`,
+whose resync and IDR-acceptance policy `C3.L2` did not re-audit. That omission is
+recorded here rather than left silent.
+
+Candidates to discriminate:
+
+1. the first IDR arrives damaged — its fragments span FEC groups at the
+   discontinuity, and each session recorded 33 lost packets and 2 unrecoverable
+   groups; a damaged first keyframe forces a wait of one GOP, 250 ms at GOP 15 /
+   60 fps, which matches the observed magnitude with no encoder change;
+2. the swap itself damages the first FEC groups, since the encoder-down window
+   leaves a partially filled group and the relay flushes on marker or timestamp
+   change;
+3. receiver resync policy discards the first IDR while establishing parameter
+   sets and a clean sequence baseline;
+4. encoder ramp — largely excluded, because the ~152 ms silence window is
+   measured before RTP resumes while the resync figure is measured after.
+
+Pre-registered boundary, declared before the run: at or below ~120 ms reopens
+the automatic-adaptation question, with a focused gameplay observation required
+before acceptance; ~120-250 ms keeps the actuator non-automatic and moves the
+question to pipeline re-establishment; unchanged falsifies the lead and makes
+the encoder-host architecture question the next real item.
+
+Constraints unchanged: loopback-only, no change to resolution, frame rate, GOP,
+B-frames, FEC wire format, RTP payload type, packet size, ports, process audio,
+controller transport, emulator lifecycle, Android streaming constants, or any
+non-loopback control surface.

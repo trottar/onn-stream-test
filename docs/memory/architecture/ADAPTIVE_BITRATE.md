@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-09-14
-baseline_commit: da03bb59cee9f7e9cf8bdfcc91dc1f52454beff0
+as_of: 2026-09-18
+baseline_commit: 6abe47d2f7adf1eae847d3b23b12b760586f6d41
 ---
 
 # Adaptive Bitrate Architecture
@@ -12,7 +12,16 @@ baseline_commit: da03bb59cee9f7e9cf8bdfcc91dc1f52454beff0
 
 **Production adaptive bitrate: NOT IMPLEMENTED**
 
-**Next diagnostic:** `C3_ACTUATOR_CONTINUITY_PROBE`
+**Linux actuator capability:** `video_only_restart`, classified by `C3.L2`.
+Authorized for start-time, manual, fallback and characterization use; not
+authorized for automatic in-game adaptation.
+
+**Next diagnostic:** `C3.L2a` — first-IDR acceptance after an encoder-only
+cycle.
+
+Sections appear in the order they were written. Later sections are
+authoritative where they disagree with earlier ones; the Linux sections at the
+end supersede Windows-era numbers for the Linux backend.
 
 C3 changes bitrate first while holding the validated reference stream at
 1280x720, 60 fps, GOP 15, B-frames 0 and FEC group size 8.
@@ -587,3 +596,85 @@ behind the same probe structure.
 `C3.L1` — Linux encoder-only restart continuity probe, same bitrate 7000 to
 7000, loopback only, no acceptance threshold encoded. Full plan in
 `investigations/C3_LINUX_ACTUATOR_BOUNDARY.md`.
+
+## Linux encoder-only actuator runtime result — C3.L1 / C3.L1R1
+
+The Linux actuator exists and was measured. Evidence:
+`../evidence/C3_L1_LINUX_ACTUATOR_RUNTIME_2026-09-18.md` and
+`../evidence/C3_L1R1_LINUX_ACTUATOR_RUNTIME_2026-09-18.md`.
+
+Implementation: `companion/diagnostics/c3_linux_actuator_probe.py`, selected by
+platform inside `NativeStreamManager.diagnostic_c3_actuator_continuity_cycle()`.
+It replaces only the encoder and never calls `_stop_locked()`, so the FEC relay,
+process audio, persistent controller and emulator all stay up.
+
+Lifecycle preservation passed on both runs: zero FEC send errors, zero audio
+write errors, zero controller send errors, exactly one SSRC change per cycle,
+receiver not waiting for IDR at session end.
+
+Interruption, on `decoder_max_output_gap_ms` measured at the receiver:
+
+| Run | Backend | Gap |
+| --- | --- | ---: |
+| Windows D-062 same-bitrate | WGC + NVENC | 791 ms |
+| Windows D-070 bidirectional | WGC + NVENC | 1,059 ms |
+| Linux `C3.L1` same-bitrate | x11grab + VAAPI | 318 ms |
+| Linux `C3.L1R1` same-bitrate | x11grab + VAAPI | 287 ms |
+
+Linux is ~2.5-2.75x better than the directly comparable Windows run, as the
+single-process topology predicted. D-070's interruption figures are not portable
+to Linux and are not used to classify it.
+
+Read the supporting figures with care: `max_resync_to_idr_ms` and
+`packets_dropped_waiting_for_idr` are whole-session values against two sequence
+resyncs per session, and spawn, RTP silence and decoder gap overlap in time
+rather than summing.
+
+## Linux actuator classification — C3.L2
+
+Decision record: `../decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`.
+
+The backend-neutral capability model is unchanged. Current Linux classification:
+
+- `live_bitrate_reconfigure`: **not available.** The encoder is an external
+  FFmpeg CLI with bitrate baked into argv at `Popen` time and no control
+  channel. This is an architecture statement, not a VAAPI capability statement.
+- `video_only_restart`: **runtime validated**, 287-318 ms decoder output gap,
+  lifecycle preserved twice.
+- `unsupported`: does not apply.
+
+Controller-facing consequence, which is the part that matters to this
+architecture:
+
+```text
+adaptive bitrate controller            <- still BLOCKED on Linux
+        |
+        v
+backend-neutral video actuator
+        |
+        +-- Windows: WGC + FFmpeg/NVENC video-only restart   (~1 s, fallback only)
+        |
+        `-- Linux: x11grab + VAAPI encoder-only restart      (~290 ms, non-automatic)
+```
+
+The actuator is authorized for session start and start-time profile selection
+before `READY`, for manual and loopback-only diagnostic changes, for fallback
+and recovery including replacing a dead encoder, and for `C3.L3`
+characterization cycles. It is not authorized for automatic adaptation during
+`PLAYING`.
+
+Rationale in short: the gap is ~17 frame intervals against a settled stream
+whose post-cycle output gap was 5 ms; an automatic controller fires under
+pressure, when a deliberate discontinuity costs most; one accepted manual cycle
+is not evidence for repeated automatic ones; and a lead to reduce the cost
+exists but is untested.
+
+Unchanged by this classification: the fast-down/slow-up asymmetry, the 2-second
+telemetry cadence, the safety states, the freshness and fail-safe rules, the
+signal-interpretation rules, and the requirement that every automatic decision
+be explainable. Those remain the policy the controller will implement once an
+actuator is authorized for automatic use.
+
+Still not established on Linux: bidirectional and upward transitions, any
+bitrate ladder or minimum, and whether a ~290 ms automatic interruption is
+acceptable. `C3.L3` owns the envelope; `C3.L2a` owns the interruption cost.

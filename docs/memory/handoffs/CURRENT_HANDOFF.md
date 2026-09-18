@@ -1,6 +1,7 @@
 # Current Handoff
 
 The authoritative resumable state is `../CURRENT.md`.
+The compact Phase C brief is `../PHASE_C_CONTEXT.md`; start there.
 
 D5 media/server restoration remains COMPLETE / RUNTIME VALIDATED.
 D4 Games remains COMPLETE / RUNTIME VALIDATED.
@@ -8,8 +9,13 @@ D4 Games remains COMPLETE / RUNTIME VALIDATED.
 Current direction:
 - Phase C Linux continuation is active;
 - C1 profile/backend and C2 telemetry are complete on Linux;
-- `C3.L0` actuator boundary audit is complete;
-- the next work item is `C3.L1`, the Linux encoder-only restart continuity probe;
+- `C3.L0` boundary audit and `C3.L1` / `C3.L1R1` encoder-only actuator runs are
+  complete, the actuator is runtime validated at 287-318 ms decoder output gap;
+- `C3.L2` classified Linux as `video_only_restart`, authorized for start-time,
+  manual, fallback and characterization use and not for automatic in-game
+  adaptation;
+- the next work item is `C3.L2a`, the first-IDR acceptance investigation, which
+  starts from existing decoder-session evidence rather than a code change;
 - do not begin D7 as the next major development item;
 - do not begin Phase E; it measures a finalized architecture.
 
@@ -18,14 +24,16 @@ validation.
 
 ## C3 entry conditions
 
-Read `investigations/C3_LINUX_ACTUATOR_BOUNDARY.md` before proposing any
-actuator work. It records what has already been audited and what is foreclosed.
+Read `../decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md` and
+`investigations/C3_LINUX_ACTUATOR_BOUNDARY.md` before proposing any actuator
+work. They record what is classified, what is authorized, what is foreclosed and
+what is merely assumed.
 
 Do not rebuild the Windows-era C3 record. D-063, D-067, D-068, D-069, D-070 and
 D-071 are closed and remain authoritative as history.
 
-The automatic bitrate controller is blocked until a Linux actuator interruption
-cost is measured.
+The automatic bitrate controller is blocked; its gate is the `C3.L2a` result,
+not a further re-measurement of the actuator itself.
 
 ## Patch Procedure
 

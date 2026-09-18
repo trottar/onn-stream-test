@@ -159,3 +159,35 @@ meaning: a cycle where the replacement produces no video at all. A stale
 baseline reports success for a dead stream; a correct baseline raises. Every
 regression test is run against the unfixed code and shown to fail before it is
 trusted.
+
+## Check the premise of the strongest lead before authorizing work on it
+
+`C3.L1R1` recorded "request an immediate IDR on the replacement encoder" as the
+strongest lead for shrinking the 287-318 ms actuator gap, reasoning from
+`max_resync_to_idr_ms` of 191-241 ms being approximately one GOP. The reasoning
+was sound; the premise was not checked. A freshly launched FFmpeg RTP stream
+already emits in-band parameter sets and an IDR access unit as its first output,
+so there was nothing to request. The lead named a remedy for a cause nobody had
+established.
+
+A magnitude that matches a plausible mechanism is not evidence that the
+mechanism is present. Before authorizing work on a lead, state the mechanism it
+assumes and confirm that assumption against source or measurement. Otherwise the
+first patch of the next work item changes something that was already doing what
+the patch would ask of it.
+
+## A whole-session maximum is not a per-event measurement
+
+`max_resync_to_idr_ms` and `packets_dropped_waiting_for_idr` are cumulative
+session figures. Both `C3.L1` sessions recorded two sequence resyncs against a
+single SSRC change, so the session maximum may belong to the other resync
+entirely. Attributing it to the actuator cycle is an inference, and it was
+carried forward through three records as though it were a measurement.
+
+Related: measurements taken from different origins do not sum. Spawn 115 ms, RTP
+silence ~152 ms and decoder output gap 287 ms overlap in time; adding the resync
+term to the silence term exceeds the gap they are supposed to explain, which is
+the tell.
+
+Check whether a reported figure is per-event or per-session before building an
+explanation on it, and say which it is wherever it is cited.

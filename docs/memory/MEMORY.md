@@ -59,6 +59,45 @@ Per D-071, Linux must reclassify actuation and revalidate the fixed envelope
 before any level is treated as portable.
 <!-- PRIVYHUB_C3_L0_LINUX_ACTUATOR_BOUNDARY:END -->
 
+<!-- PRIVYHUB_C3_L2_LINUX_ACTUATOR_CLASSIFICATION:BEGIN -->
+## C3 Linux actuator classification — durable facts
+
+Recorded by `C3.L2` on 2026-09-18. Full record:
+`decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`.
+
+**Linux is `video_only_restart`.** The capability is runtime validated across
+two clean cycles with full lifecycle preservation, at a cost of **287-318 ms of
+decoder output gap** against Windows D-062's 791 ms on the directly comparable
+cycle. `live_bitrate_reconfigure` is not available under the current external
+FFmpeg CLI architecture. `unsupported` does not apply.
+
+**Authorized use:** session start and start-time profile selection before
+`READY`; manual and loopback-only diagnostic changes; fallback and recovery,
+including replacing a dead encoder; `C3.L3` characterization cycles.
+
+**Not authorized:** automatic adaptation during `PLAYING`. The automatic
+fast-down/slow-up controller stays blocked. An automatic controller fires under
+pressure, so it would insert a deliberate ~290 ms discontinuity exactly when
+delivery is already degraded, repeatedly rather than once, against a standing
+preference to minimize perceptible streaming artifacts.
+
+This mirrors the Windows D-070 disposition but is reached from Linux
+measurements. Windows numbers are not carried across in either direction.
+
+**A fresh encoder process already starts with a keyframe.** A newly launched
+FFmpeg RTP stream emits in-band parameter sets and an IDR access unit, and the
+Linux start path publishes `bootstrap: in_band_h264_parameter_sets`. "Request an
+immediate IDR on the replacement encoder" therefore names a remedy without an
+established cause. The open question is why the receiver does not accept that
+first keyframe promptly.
+
+**`max_resync_to_idr_ms` and `packets_dropped_waiting_for_idr` are whole-session
+values.** Sessions carrying more than one sequence resync cannot attribute the
+session maximum to a single actuator cycle. `decoder_max_output_gap_ms` is the
+figure to cite, because the receiver measures it independently of the host
+probe.
+<!-- PRIVYHUB_C3_L2_LINUX_ACTUATOR_CLASSIFICATION:END -->
+
 <!-- PRIVYHUB_NEGATIVE_RESULT_POLICY:BEGIN -->
 ## Record failures, not only successes
 
