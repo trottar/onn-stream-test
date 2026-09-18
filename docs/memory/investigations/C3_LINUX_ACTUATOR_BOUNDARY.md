@@ -407,3 +407,26 @@ observation.
 The trigger phase takes no flag. `--finalize` is the only option the runner
 defines. A `--trigger` flag does not exist and was an error in delivery
 instructions, not in the code.
+
+## C3.L1R1 re-run — C3.L1 closed
+
+Corrected measurement: spawn 115.145 ms, first RTP resume 267.069 ms (152 ms of
+real video silence), decoder max output gap 287 ms, max resync to IDR 191 ms,
+123 packets dropped waiting for IDR.
+
+Two Linux runs bracket the interruption at 287-318 ms decoder output gap against
+Windows D-062's 791 ms on the directly comparable cycle.
+
+Lifecycle preservation reproduced cleanly twice. `C3.L1` is
+**COMPLETE / RUNTIME VALIDATED**.
+
+Gameplay observation supplied: playable, no freeze reported from the cycle, the
+occasional stutter is pre-existing baseline, and the user wants perceptible
+streaming artifacts minimized. That preference is a constraint on `C3.L2`.
+
+The dominant term is IDR wait, roughly one GOP at GOP 15 / 60 fps, not process
+spawn. An immediate-IDR request on the replacement encoder is the strongest
+open lead and is **not authorized** by this evidence.
+
+Active work moves to `C3.L2` classification. Compact continuation brief:
+`../PHASE_C_CONTEXT.md`.

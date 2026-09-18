@@ -16,7 +16,10 @@ boundary for the validated Linux native game stream.
 
 ## Current Work Item
 
-`C3.L1R1` — corrected RTP measurement, then re-run the continuity probe.
+`C3.L2` — Linux actuator classification.
+
+Start from `PHASE_C_CONTEXT.md`. It is the compact, self-sufficient Phase C
+continuation brief and should not require reading the wider memory hierarchy.
 
 ## Verified State
 
@@ -28,7 +31,8 @@ boundary for the validated Linux native game stream.
   `evidence/C1_C2_LINUX_REVALIDATION_2026-09-18.md`.
 - `C3.L0` actuator boundary audit: COMPLETE. Full map in
   `investigations/C3_LINUX_ACTUATOR_BOUNDARY.md`.
-- `C3.L1` Linux encoder-only actuator seam and probe: RUNTIME EXERCISED.
+- `C3.L1` / `C3.L1R1` Linux encoder-only actuator: COMPLETE / RUNTIME
+  VALIDATED across two clean cycles.
   Lifecycle preservation confirmed: FEC, process audio, controller and
   emulator all survived the cycle with zero errors and exactly one SSRC
   change.
@@ -43,27 +47,20 @@ Blocked or incomplete:
 - automatic bitrate controller is **blocked**; D-070 rejected
   `video_only_restart` for seamless automatic in-game adaptation on Windows, and
   Linux has no measured actuator interruption cost yet;
-- `host_first_rtp_resume_ms` from the first run is **defective** and must not
-  be cited; it reported encoder spawn time, not video resume time. Fixed in
-  `C3.L1R1`; a re-run is required for the true figure;
-- the focused gameplay observation is **missing**; `C3.L2` must not be
-  classified without it;
+- whether a ~287 ms automatic mid-game interruption is acceptable is **not
+  decided**; that is the `C3.L2` question;
+- whether an immediate-IDR request on the replacement encoder would shrink the
+  gap is an **unauthorized open lead**, not an approved action;
 - Linux host resource telemetry never starts; see `docs/KNOWN_ISSUES.md`.
 
 ## Next Action
 
-Install `C3.L1R1`, restart the companion, and re-run the probe to obtain a
-trustworthy video-resume measurement.
+Classify the Linux actuator in `C3.L2` and record it as a decision:
+`live_bitrate_reconfigure`, `video_only_restart` or `unsupported`, plus whether
+`video_only_restart` is acceptable for automatic mid-game adaptation.
 
-The runner's trigger phase takes **no flag**; `--finalize` is the only option:
-
-```
-python3 tools/probe_c3_actuator_continuity.py
-python3 tools/probe_c3_actuator_continuity.py --finalize
-```
-
-Return the probe log and the focused gameplay observation: whether a freeze was
-perceptible and roughly how long.
+Evidence needed for that decision already exists; no new probe is required to
+make the classification itself. See section 5 of `PHASE_C_CONTEXT.md`.
 
 ## Success Criteria
 
@@ -93,6 +90,7 @@ surface.
 
 ## Relevant References
 
+- `PHASE_C_CONTEXT.md` — **start here**; compact Phase C continuation brief.
 - `investigations/C3_LINUX_ACTUATOR_BOUNDARY.md` — actuator boundary map.
 - `architecture/ADAPTIVE_BITRATE.md` — adaptation architecture and history.
 - `architecture/STREAM_TELEMETRY.md` — C2 measurement contract.
