@@ -342,3 +342,68 @@ is unchanged:
   classification and proceed to `C3.L3`;
 - interruption comparable to Windows — `video_only_restart` is fallback-only on
   Linux too and the controller stays blocked.
+
+## C3.L1 runtime result and C3.L1R1 measurement correction
+
+Full evidence: `evidence/C3_L1_LINUX_ACTUATOR_RUNTIME_2026-09-18.md`.
+
+### Lifecycle preservation: PASSED
+
+The cycle ran against a live session. FEC relay, process audio, persistent
+controller and emulator all continued, with zero FEC send errors, zero audio
+write errors, zero controller send errors, and exactly one SSRC change. The
+receiver was not waiting for an IDR at session end.
+
+### Measurement defect found in the C3.L1 probe
+
+`host_first_rtp_resume_ms` of 215.017 ms sat 0.010 ms after
+`host_ffmpeg_spawn_ms` of 215.007 ms, while the RTP poll sleeps 10 ms between
+checks. The first poll succeeded immediately because the baseline came from the
+pre-kill FEC snapshot and was already exceeded by old-encoder packets.
+
+The figure is encoder spawn time mislabelled as video resume time and must not
+be cited. `C3.L1R1` takes the baseline after the kill returns, reports
+`rtp_baseline_residual_packets`, and adds `rtp_silence_after_spawn_ms` and
+`encoder_down_ms`.
+
+The Windows probe shares the same baseline pattern. Its evidence did not record
+`ffmpeg_spawn_ms`, so its 837-953 ms figures cannot be checked retrospectively;
+treat them as pipeline re-establishment time rather than verified video-resume
+time. Windows is outgoing and its probe is not modified.
+
+### Authoritative comparison
+
+`decoder_max_output_gap_ms` is measured on the receiver, independently of the
+host probe, and is unaffected by the defect:
+
+- Windows D-062 same-bitrate cycle: 791 ms;
+- Windows D-070 bidirectional cycle: 1,059 ms;
+- **Linux C3.L1 same-bitrate cycle: 318 ms.**
+
+Against the directly comparable D-062 run, Linux is 2.5x better. This matches
+the single-process topology prediction recorded above.
+
+### The gap is dominated by IDR wait, not spawn
+
+`max_resync_to_idr_ms` 241 ms and `packets_dropped_waiting_for_idr` 118, against
+0 dropped-waiting-for-IDR on both Windows runs. GOP 15 at 60 fps is a 250 ms
+keyframe interval, so the 241 ms maximum is approximately one full GOP and
+accounts for most of the 318 ms gap.
+
+Whether an explicit immediate-IDR request on the replacement encoder would
+shorten this is an open `C3.L2` question. It is not authorized by this
+evidence.
+
+### Disposition
+
+The pre-registered boundary is met on the authoritative measure. D-070's
+rejection does not automatically transfer to Linux, Linux actuator
+classification is reopened as `C3.L2`, and the automatic controller stays
+blocked pending that classification and the missing focused gameplay
+observation.
+
+### Runner invocation, for the record
+
+The trigger phase takes no flag. `--finalize` is the only option the runner
+defines. A `--trigger` flag does not exist and was an error in delivery
+instructions, not in the code.

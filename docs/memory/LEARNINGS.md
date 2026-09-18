@@ -117,3 +117,45 @@ nothing enforced it and the installer's own validation did not include it.
 Where a repository ships a checker for state a patch modifies, the installer
 runs it and treats a reported problem as a post-write validation failure with
 rollback. Documented intent does not survive; executed gates do.
+
+## A counter baseline must be taken after the thing it measures has stopped
+
+The `C3.L1` probe measured "time until video resumed" by watching the FEC relay
+packet counter rise above a baseline. It took that baseline from a status
+snapshot read during precondition checks, several milliseconds before the old
+encoder was killed. At roughly 770 packets per second, those milliseconds were
+enough for the old encoder to push the counter past the baseline on its own, so
+the first poll after spawning the replacement succeeded instantly and reported
+process spawn time as video resume time.
+
+When measuring the resumption of a stream, take the baseline after the old
+producer is dead and reaped, and report the residue so a reader can judge
+whether the baseline was clean. Do not delay the restart to drain the queue:
+that lengthens the very interruption being measured.
+
+The tell was in the data. Spawn and resume were 0.010 ms apart while the poll
+loop slept 10 ms between checks. Two timings that cannot legitimately be that
+close are a defect signature, not a fast result.
+
+## Prefer the measurement the component under test cannot influence
+
+The `C3.L1` conclusion survived a defective host-side measurement only because
+`decoder_max_output_gap_ms` is measured on the Android receiver, independently
+of the host probe. The independent measurement was the one worth trusting, and
+it was already being collected.
+
+When a probe measures its own effect, look for a second measurement taken by
+something that has no stake in the result, and prefer it for the conclusion.
+
+## A regression test must be shown to fail against the defect
+
+The first attempt at a regression guard for the baseline defect asserted that
+the corrected probe slept at least once before reporting resume. It passed
+against the defective probe too, because the sleep counter also counted the
+post-resume stability window.
+
+The test that actually discriminated was constructed from the failure's
+meaning: a cycle where the replacement produces no video at all. A stale
+baseline reports success for a dead stream; a correct baseline raises. Every
+regression test is run against the unfixed code and shown to fail before it is
+trusted.

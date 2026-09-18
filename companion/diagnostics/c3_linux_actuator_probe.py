@@ -178,7 +178,7 @@ def run_c3_linux_actuator_continuity_cycle(
     # docs/KNOWN_ISSUES.md by C3.L0), so there is nothing to stop or restart
     # here. Do not add it inside a diagnostic.
 
-    before_rtp_packets = _counter(fec_before, "rtp_packets")
+    pre_kill_rtp_packets = _counter(fec_before, "rtp_packets")
 
     _safe_log(
         manager,
@@ -203,6 +203,27 @@ def run_c3_linux_actuator_continuity_cycle(
 
         session_mid = manager._session_io.status()
         fec_mid = manager._fec_relay.status()
+
+        # C3.L1R1: take the RTP baseline AFTER the old encoder is dead and
+        # reaped, not from the pre-kill snapshot. Packets the old encoder sent
+        # between the precondition read and the kill are already counted; using
+        # the stale figure made the first poll succeed immediately and reported
+        # encoder spawn time as if it were video resume time.
+        #
+        # A few packets may still be queued in the relay socket when the
+        # baseline is taken. That residue is reported rather than papered over,
+        # so a reader can challenge this measurement with raw numbers. The
+        # spawn is deliberately NOT delayed to drain the queue: that would
+        # lengthen the very interruption this probe measures.
+        before_rtp_packets = _counter(fec_mid, "rtp_packets")
+        rtp_baseline_residual_packets = max(
+            0,
+            before_rtp_packets - pre_kill_rtp_packets,
+        )
+
+        encoder_down_ms = (
+            perf_counter_ns() - cycle_started_ns
+        ) / 1_000_000.0
 
         replacement_ffmpeg = popen_factory(
             manager._build_linux_ffmpeg_command(
@@ -292,9 +313,25 @@ def run_c3_linux_actuator_continuity_cycle(
                     float(ffmpeg_spawn_ms or 0.0),
                     3,
                 ),
+                "encoder_down_ms": round(
+                    float(encoder_down_ms),
+                    3,
+                ),
                 "first_rtp_resume_ms": round(
                     float(first_rtp_resume_ms),
                     3,
+                ),
+                # first_rtp_resume_ms minus ffmpeg_spawn_ms. A value at or
+                # near zero means the baseline was satisfied by residue rather
+                # than by new video; treat the measurement as untrustworthy and
+                # read rtp_baseline_residual_packets.
+                "rtp_silence_after_spawn_ms": round(
+                    float(first_rtp_resume_ms)
+                    - float(ffmpeg_spawn_ms or 0.0),
+                    3,
+                ),
+                "rtp_baseline_residual_packets": int(
+                    rtp_baseline_residual_packets
                 ),
                 "host_verified_ms": round(
                     total_verified_ms,

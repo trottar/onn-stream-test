@@ -16,10 +16,7 @@ boundary for the validated Linux native game stream.
 
 ## Current Work Item
 
-`C3.L1` — Linux encoder-only restart continuity probe.
-
-The probe is **installed and development validated**. Runtime evidence is
-pending: it must be run against a live Linux game session.
+`C3.L1R1` — corrected RTP measurement, then re-run the continuity probe.
 
 ## Verified State
 
@@ -31,8 +28,14 @@ pending: it must be run against a live Linux game session.
   `evidence/C1_C2_LINUX_REVALIDATION_2026-09-18.md`.
 - `C3.L0` actuator boundary audit: COMPLETE. Full map in
   `investigations/C3_LINUX_ACTUATOR_BOUNDARY.md`.
-- `C3.L1` Linux encoder-only actuator seam and probe: INSTALLED /
-  DEVELOPMENT VALIDATED / RUNTIME EVIDENCE PENDING.
+- `C3.L1` Linux encoder-only actuator seam and probe: RUNTIME EXERCISED.
+  Lifecycle preservation confirmed: FEC, process audio, controller and
+  emulator all survived the cycle with zero errors and exactly one SSRC
+  change.
+- Linux decoder max output gap **318 ms** against Windows 791 ms on the
+  directly comparable D-062 same-bitrate run: materially better, so the
+  `C3.L0` boundary is met and Linux actuator classification is reopened.
+  Evidence: `evidence/C3_L1_LINUX_ACTUATOR_RUNTIME_2026-09-18.md`.
 - D4 Games and D5 media/server restoration: COMPLETE / RUNTIME VALIDATED.
 
 Blocked or incomplete:
@@ -40,18 +43,27 @@ Blocked or incomplete:
 - automatic bitrate controller is **blocked**; D-070 rejected
   `video_only_restart` for seamless automatic in-game adaptation on Windows, and
   Linux has no measured actuator interruption cost yet;
-- the Linux encoder-only restart interruption cost is **unmeasured**; the
-  `C3.L1` probe exists but has not been run against a live session;
+- `host_first_rtp_resume_ms` from the first run is **defective** and must not
+  be cited; it reported encoder spawn time, not video resume time. Fixed in
+  `C3.L1R1`; a re-run is required for the true figure;
+- the focused gameplay observation is **missing**; `C3.L2` must not be
+  classified without it;
 - Linux host resource telemetry never starts; see `docs/KNOWN_ISSUES.md`.
 
 ## Next Action
 
-Run the installed `C3.L1` probe against a live Linux game session and record
-the measured RTP interruption.
+Install `C3.L1R1`, restart the companion, and re-run the probe to obtain a
+trustworthy video-resume measurement.
 
-Launch a game, open the native receiver on the onn, then run
-`tools/probe_c3_actuator_continuity.py --trigger`, play briefly, and run
-`--finalize`. Return the probe log and the focused gameplay observation.
+The runner's trigger phase takes **no flag**; `--finalize` is the only option:
+
+```
+python3 tools/probe_c3_actuator_continuity.py
+python3 tools/probe_c3_actuator_continuity.py --finalize
+```
+
+Return the probe log and the focused gameplay observation: whether a freeze was
+perceptible and roughly how long.
 
 ## Success Criteria
 
