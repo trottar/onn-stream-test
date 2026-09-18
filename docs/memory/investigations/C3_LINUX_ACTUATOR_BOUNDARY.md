@@ -265,3 +265,80 @@ Do not change:
 
 No network addresses appear in this record. Any C3 diagnostic output must
 continue to exclude source/request address identity.
+
+## C3.L1 implementation — installed, runtime evidence pending
+
+Status: **INSTALLED / DEVELOPMENT VALIDATED / RUNTIME EVIDENCE PENDING**
+
+### Seam
+
+`companion/diagnostics/c3_linux_actuator_probe.py` implements the Linux
+encoder-only cycle. `NativeStreamManager.diagnostic_c3_actuator_continuity_cycle()`
+now selects it by platform: Linux uses the new module, Windows keeps
+`c3_actuator_probe`, and any other host is refused.
+
+`_stop_locked()` is never called. The FEC relay, process audio, the persistent
+controller and the managed RetroArch process stay running.
+
+### Why no new action and no new tool
+
+The Linux cycle emits the same `privyhub_c3_actuator_cycle_probe_v1` schema and
+the same `video.ffmpeg_spawn_ms`, `video.first_rtp_resume_ms` and
+`video.host_verified_ms` fields the existing runner consumes. The existing
+loopback-only `c3-actuator-continuity-cycle` action and
+`tools/probe_c3_actuator_continuity.py` therefore work unchanged.
+
+`companion/plugins/games.py` and the tools runner are intentionally untouched.
+This avoids the parallel-implementation failure mode and keeps one evidence
+format across both backends.
+
+### Reaper hazard and how it is handled
+
+`status()` calls `_reap_locked()`, which calls `_stop_locked()` when it observes
+an exited encoder. During the swap the encoder is deliberately dead, so the
+probe clears `manager._process` **before** killing the old process. With
+`_process` set to `None`, `_reap_locked` sees no exited process, no absent
+capture process and no relay-without-encoder condition, and does not tear down
+FEC or session I/O.
+
+The manager lock is held for the whole cycle; clearing the handle first is
+defence against the reaper specifically rather than against concurrency.
+
+### Honest Linux payload differences
+
+`capture_restarted` is `false` and `capture_process_present` is `false`, because
+x11grab is an FFmpeg input format rather than a separate process. The payload
+also carries `platform`, `capture_backend` and `encoder_backend` so the two
+backends' evidence is not silently conflated.
+
+### What the probe measures
+
+Host time from cycle start until the FEC relay observes new RTP
+(`first_rtp_resume_ms`), encoder spawn time, and a 0.75 s post-resume stability
+window, plus FEC, audio and controller continuity deltas across the cycle.
+
+No acceptance threshold is encoded. Bitrate is held at the 7000 reference and
+the probe refuses to run if the active bitrate is anything else.
+
+### Development validation
+
+48 deterministic behavioural checks against a fake manager, with no real
+process, network or X11 access: happy-path payload shape and schema, FEC/audio/
+controller continuity, `_process` cleared before the kill, no bitrate override
+passed to the command builder, `_stop_locked` never called, replacement-exit and
+RTP-never-resumed failure paths each clearing `_process` while leaving FEC and
+session I/O intact, and twelve precondition rejections each asserted to modify
+nothing.
+
+Development validation is not runtime validation. The measured interruption
+cost is still unknown.
+
+### Next
+
+Run the probe against a live Linux game session. The `C3.L0` decision boundary
+is unchanged:
+
+- interruption materially below the Windows 0.84-0.95 s — reopen Linux actuator
+  classification and proceed to `C3.L3`;
+- interruption comparable to Windows — `video_only_restart` is fallback-only on
+  Linux too and the controller stays blocked.

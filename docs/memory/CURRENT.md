@@ -18,6 +18,9 @@ boundary for the validated Linux native game stream.
 
 `C3.L1` — Linux encoder-only restart continuity probe.
 
+The probe is **installed and development validated**. Runtime evidence is
+pending: it must be run against a live Linux game session.
+
 ## Verified State
 
 - C1 Linux profile/backend: COMPLETE / RUNTIME VALIDATED
@@ -28,6 +31,8 @@ boundary for the validated Linux native game stream.
   `evidence/C1_C2_LINUX_REVALIDATION_2026-09-18.md`.
 - `C3.L0` actuator boundary audit: COMPLETE. Full map in
   `investigations/C3_LINUX_ACTUATOR_BOUNDARY.md`.
+- `C3.L1` Linux encoder-only actuator seam and probe: INSTALLED /
+  DEVELOPMENT VALIDATED / RUNTIME EVIDENCE PENDING.
 - D4 Games and D5 media/server restoration: COMPLETE / RUNTIME VALIDATED.
 
 Blocked or incomplete:
@@ -35,22 +40,18 @@ Blocked or incomplete:
 - automatic bitrate controller is **blocked**; D-070 rejected
   `video_only_restart` for seamless automatic in-game adaptation on Windows, and
   Linux has no measured actuator interruption cost yet;
-- the Linux encoder-only restart seam **does not exist**;
-  `_start_linux_locked` calls `_stop_locked()`, which also stops the FEC relay
-  and session I/O;
-- existing C3 probes are Windows-only and fail closed on Linux with
-  `wgc_runtime_unavailable`;
+- the Linux encoder-only restart interruption cost is **unmeasured**; the
+  `C3.L1` probe exists but has not been run against a live session;
 - Linux host resource telemetry never starts; see `docs/KNOWN_ISSUES.md`.
 
 ## Next Action
 
-Implement and run `C3.L1`: one loopback-only same-bitrate 7000 to 7000
-encoder-only cycle on Linux that preserves the FEC relay, process audio, the
-persistent controller and emulator lifecycle, and measures the RTP interruption.
+Run the installed `C3.L1` probe against a live Linux game session and record
+the measured RTP interruption.
 
-Requires one narrow internal Linux encoder-only replacement seam that does not
-call `_stop_locked()`. Reuse the existing probe structure and the existing
-loopback-only `c3-actuator-continuity-cycle` action.
+Launch a game, open the native receiver on the onn, then run
+`tools/probe_c3_actuator_continuity.py --trigger`, play briefly, and run
+`--finalize`. Return the probe log and the focused gameplay observation.
 
 ## Success Criteria
 

@@ -1937,11 +1937,19 @@ class NativeStreamManager:
     def diagnostic_c3_actuator_continuity_cycle(
         self,
     ) -> dict[str, Any]:
-        """Run one same-bitrate video-only actuator continuity diagnostic."""
-        from diagnostics.c3_actuator_probe import (
-            run_c3_actuator_continuity_cycle,
-        )
+        """Run one same-bitrate video-only actuator continuity diagnostic.
 
+        The actuator strategy is backend-neutral; the implementation is not.
+        Windows replaces the WGC capture bridge and the FFmpeg/NVENC encoder
+        together because raw frames cross an inherited pipe. Linux replaces
+        only the FFmpeg/VAAPI encoder because x11grab is an input format inside
+        that same process.
+
+        Both implementations preserve FEC, process audio, the persistent
+        controller and the emulator lifecycle, and both emit the same probe
+        schema so the existing loopback-only action and probe runner are
+        unchanged.
+        """
         with self._lock:
             if self._active_bitrate_kbps != self.BITRATE_KBPS:
                 raise NativeStreamError(
@@ -1949,8 +1957,22 @@ class NativeStreamManager:
                     "the 7000 kbps reference stream"
                 )
 
+            if self._linux_host():
+                from diagnostics.c3_linux_actuator_probe import (
+                    run_c3_linux_actuator_continuity_cycle as _cycle,
+                )
+            elif os.name == "nt":
+                from diagnostics.c3_actuator_probe import (
+                    run_c3_actuator_continuity_cycle as _cycle,
+                )
+            else:
+                raise NativeStreamError(
+                    "C3 actuator continuity diagnostic is not implemented "
+                    "for this host platform"
+                )
+
             try:
-                return run_c3_actuator_continuity_cycle(
+                return _cycle(
                     self
                 )
             except NativeStreamError:
