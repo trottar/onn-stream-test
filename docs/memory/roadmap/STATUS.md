@@ -1,7 +1,7 @@
 ---
 memory_schema: 2
-as_of: 2026-09-17
-baseline_commit: 663d2e4484afb7d88980aefb691f0b45a0ae6358
+as_of: 2026-09-18
+baseline_commit: 10566d6
 ---
 
 # Roadmap Status
@@ -10,29 +10,35 @@ baseline_commit: 663d2e4484afb7d88980aefb691f0b45a0ae6358
 
 **D5 media/server restoration: COMPLETE / RUNTIME VALIDATED.**
 
-Final D5 closure includes:
+Final D5 closure remains:
 - external/removable VOD;
 - Live TV catalog/categories/playback;
 - Linux EPG + Android guide cache/presentation;
 - Linux-authoritative durable TV state;
 - incorrect-guide durable intent;
-- responsive TV/Favorites navigation with serialized state authority;
-- clean focused automated regression;
-- clean manual Live TV / guide / VOD smoke.
+- responsive TV/Favorites navigation;
+- focused automated regression;
+- manual Live TV / guide / VOD smoke.
 
 ## Active
 
-**D7 — Native Linux regression.**
+**Phase C — Linux continuation.**
 
-Use the roadmap minimum normal-use regression and reuse existing D4/D5 evidence.
+Scope:
+- profile/backend revalidation;
+- telemetry consolidation;
+- former D6 transport validation;
+- adaptive bitrate;
+- FEC decision;
+- capability profiles;
+- generalized source abstraction.
 
 ## Deferred
 
-**D6 — UDP replay** remains deferred unless new evidence changes the current
-decision.
+D7 and D8 remain later baseline checkpoints.
 
 ## Next
 
-1. D7 native Linux normal-use regression;
-2. D8 Linux baseline checkpoint;
-3. Phase E resource characterization/optimization after D8.
+1. Complete Phase C Linux continuation.
+2. Perform remaining D checkpoint work.
+3. Begin Phase E resource characterization only after architecture freeze.
