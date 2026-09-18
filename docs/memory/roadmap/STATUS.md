@@ -1,7 +1,7 @@
 ---
 memory_schema: 2
 as_of: 2026-09-18
-baseline_commit: 10566d6
+baseline_commit: 4dc13bf000359c8c2832a35692d94a793b6a4685
 ---
 
 # Roadmap Status
@@ -10,7 +10,7 @@ baseline_commit: 10566d6
 
 **D5 media/server restoration: COMPLETE / RUNTIME VALIDATED.**
 
-Final D5 closure remains:
+Final D5 closure includes:
 - external/removable VOD;
 - Live TV catalog/categories/playback;
 - Linux EPG + Android guide cache/presentation;
@@ -33,7 +33,7 @@ Scope:
 - capability profiles;
 - generalized source abstraction.
 
-## Deferred
+## Deferred checkpoints
 
 D7 and D8 remain later baseline checkpoints.
 
