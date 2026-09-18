@@ -194,3 +194,34 @@ Where the source of truth for a memory file is a directory, prefer generating
 that file and validating the generated output over hand-transcribing it.
 `patches/PATCH_INDEX.md` is generated from `docs/memory/patches/*.md`.
 Hand transcription of a large directory listing is a known failure mode.
+
+## Required validation gate
+
+`tools/check_memory_health.py` is a gate, not a suggestion. Any patch that
+modifies `docs/memory/` runs it as part of installer post-write validation and
+treats a `maintenance_required` result as a validation failure with exact-byte
+rollback.
+
+A documented manual step is not a gate. This rule exists because `C3.L0`
+listed the check in its delivery block, did not execute it during validation,
+and shipped a `CURRENT.md` that the checker rejected.
+
+`docs/memory/CURRENT.md` must contain each of these headings exactly once, with
+this exact spelling and casing:
+
+```
+## Active Objective
+## Current Work Item
+## Verified State
+## Next Action
+## Success Criteria
+## Do Not Reopen Without New Evidence
+## Relevant References
+```
+
+The checker counts substrings, so these headings must not appear anywhere else
+in the file, including inside quoted examples.
+
+When the checker's expectations and a rewrite disagree, the checker is the
+specification. Change the file, or change the checker deliberately in its own
+patch with its own justification.

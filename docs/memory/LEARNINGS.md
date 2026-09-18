@@ -90,3 +90,30 @@ sides can silently diverge.
 Conversely, check whether a wire format is self-describing before assuming a
 parameter is pinned. FEC group size looked like a fixed constant on both ends
 but is carried per-group in the header and validated by the receiver.
+
+## Inspect the repository's own validators before rewriting what they validate
+
+`C3.L0` rewrote `docs/memory/CURRENT.md` wholesale without first reading
+`tools/check_memory_health.py`, which requires seven exact section headings, each
+present exactly once. The rewrite used different names and casing, so the
+checker still reported `maintenance_required` after a patch whose stated purpose
+included memory reconciliation.
+
+The pre-existing 182-byte `CURRENT.md` had no headings at all and was already
+failing the same check, so `C3.L0` did not introduce the regression. It
+inherited it and failed to fix it, which is worse in one specific way: the patch
+looked like it had addressed memory health.
+
+The project instruction to inspect existing tools and probes before creating
+anything new applies to validators too, not only to diagnostics. A validator in
+the repository is a specification of the file it checks.
+
+## A validation step that is only documented is not a gate
+
+`MAINTENANCE.md` already listed running `tools/check_memory_health.py` as step 9
+of the maintenance procedure. It was documented and still skipped, because
+nothing enforced it and the installer's own validation did not include it.
+
+Where a repository ships a checker for state a patch modifies, the installer
+runs it and treats a reported problem as a post-write validation failure with
+rollback. Documented intent does not survive; executed gates do.
