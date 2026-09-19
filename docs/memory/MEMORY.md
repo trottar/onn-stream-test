@@ -98,6 +98,37 @@ figure to cite, because the receiver measures it independently of the host
 probe.
 <!-- PRIVYHUB_C3_L2_LINUX_ACTUATOR_CLASSIFICATION:END -->
 
+<!-- PRIVYHUB_C3_L2A_E1_DECODER_EVIDENCE:BEGIN -->
+## Decoder-report retention limits — durable facts
+
+Established by the `C3.L2a` E1 evidence pass. Record:
+`evidence/C3_L2A_E1_DECODER_EVIDENCE_PASS_2026-09-18.md`.
+
+**The Android decoder session report's slow-event list is a fixed-capacity
+ring.** It reports `slow_event_retained` and `slow_event_capacity`; when they are
+equal the buffer overflowed and only the most recent events survive. In the
+`C3.L1R1` session it held 128 of 128 and covered only the last 29.4 s of a 64.8 s
+session. A cumulative field such as `max_output_gap_ms` can therefore name an
+event whose row is gone. Read those two fields before concluding anything from
+an absence.
+
+**The game diagnostic bundle's native video section is the last 500 lines of the
+host log.** A missing encoder restart banner is not evidence that no restart
+happened.
+
+**Decoder time, not transport, dominates the large output gaps on this client.**
+In ordinary play, `output_gap_ms` tracks `codec_ms` one-to-one with
+`feed_delay_ms` near zero and an empty app queue, reaching 238 ms and 200 ms with
+no actuator involved. Session-wide: 2,696 spikes at or above 20 ms against 3,847
+queued frames, `max_codec_ms` 297, `low_latency_enabled` false on
+`c2.realtek.video.avc.decoder`.
+
+**Therefore the actuator's 287-318 ms is not established as actuator cost.**
+Against a baseline that reaches 238 ms unaided, the attributable part may be
+~50 ms or may not be separately visible. Do not restate it as "the cost of the
+actuator" without this qualification.
+<!-- PRIVYHUB_C3_L2A_E1_DECODER_EVIDENCE:END -->
+
 <!-- PRIVYHUB_NEGATIVE_RESULT_POLICY:BEGIN -->
 ## Record failures, not only successes
 

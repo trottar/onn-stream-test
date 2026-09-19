@@ -49,6 +49,36 @@ that work.
   cycle implementation.
 <!-- PRIVYHUB_C3_L0_AUDIT:KNOWN_ISSUES:END -->
 
+<!-- PRIVYHUB_C3_L2A_E1:KNOWN_ISSUES:BEGIN -->
+## 2026-09-18 C3.L2a E1 diagnostic retention findings
+
+Found by the `C3.L2a` E1 evidence pass. Record:
+`docs/memory/evidence/C3_L2A_E1_DECODER_EVIDENCE_PASS_2026-09-18.md`.
+
+- **The decoder session report's slow-event list is a 128-entry ring that
+  discards the actuator cycle.** In the `C3.L1R1` session it held 128 of 128 and
+  covered only the last 29.4 s of a 64.8 s session, so the row explaining
+  `max_output_gap_ms` 287 was already gone. Any session with more than 128 slow
+  events after a cycle loses the cycle's evidence. Status: open; blocks `C3.L2a`
+  until the report retains a marked window and anchors the SSRC change in
+  `elapsed_ms`. Diagnostic-only client work.
+
+- **The encoder swap is not visible in the native video host log tail.** The
+  bundle carries the last 500 lines, which for the `C3.L1R1` session showed a
+  single continuous frame counter with no restart banner while the receiver
+  recorded one SSRC change. Status: open question for the probe source; either
+  the replacement encoder does not write to that log or the swap fell outside
+  the tail.
+
+- **Decoder time dominates the large output gaps on the onn client.**
+  `output_gap_ms` tracks `codec_ms` one-to-one in ordinary play, reaching 238 ms
+  with no actuator involved; 2,696 spikes at or above 20 ms against 3,847 queued
+  frames; `low_latency_enabled` is false on `c2.realtek.video.avc.decoder`.
+  Status: open, unattributed. Enabling low-latency decode is a separate
+  production-behavior candidate and is not authorized as part of diagnostics
+  work.
+<!-- PRIVYHUB_C3_L2A_E1:KNOWN_ISSUES:END -->
+
 Status as of 2026-09-11.
 
 | Issue | Status | Blocks current Phase C work? | Resume / resolve when |

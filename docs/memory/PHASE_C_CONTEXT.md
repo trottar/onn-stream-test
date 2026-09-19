@@ -196,25 +196,44 @@ and the start path publishes `bootstrap: in_band_h264_parameter_sets`. A new
 H.264 RTP stream begins with parameter sets and an IDR. There is nothing to
 request; the wait needs a cause, not a remedy.
 
-Start from existing evidence, not from a code change:
-`logs/games/decoder_sessions/*.json`, `logs/games/native_video_alpha.log`, the
-stored `C3.L1` / `C3.L1R1` payloads, and
-`PrivyHub/app/src/main/java/com/safeiot/privyhub/streaming/RtpH264Receiver.kt`,
-whose resync and IDR-acceptance policy `C3.L2` did **not** re-audit.
+**E1 evidence pass: the question cannot be answered from what was collected.**
+Record: `evidence/C3_L2A_E1_DECODER_EVIDENCE_PASS_2026-09-18.md`. The decoder
+report's slow-event list is a 128-entry ring; in the `C3.L1R1` session it was
+full and retained only elapsed 35,421-64,813 ms, so the 287 ms event's row was
+evicted before the report was written. Re-running the existing probe unchanged
+would lose it again.
 
-Candidates to discriminate: a first IDR that arrives damaged across FEC groups
-at the discontinuity (33 lost packets, 2 unrecoverable groups in session); FEC
-group damage caused by the swap itself; a receiver resync policy that discards
-until parameter sets plus a clean sequence baseline; encoder ramp, largely
-excluded because the silence window is measured before resume.
+**What E1 did establish, and it matters more than the original question.** In
+ordinary play with no actuator activity, `output_gap_ms` tracks `codec_ms`
+one-to-one — 238/247, 200/211, 133/142 — with feed delay near zero and an empty
+app queue. The large gaps on this client are decoder time on a single frame.
+Session-wide: 2,696 spikes at or above 20 ms against 3,847 queued frames,
+`max_codec_ms` 297, `low_latency_enabled` false on
+`c2.realtek.video.avc.decoder`.
 
-Pre-registered boundary: reproducibly **≈120 ms or below** reopens the automatic
-question, with a focused gameplay observation required before acceptance;
-**~120-250 ms** means the remaining cost is not first-IDR acceptance and the
-actuator stays non-automatic; **unchanged** falsifies the lead and moves the next
-real item to the encoder-host architecture question.
+So the cycle's 287 ms sits against a baseline that reaches 238 ms unaided. The
+attributable actuator cost may be ~50 ms, or may not be separately visible. Do
+not restate 287-318 ms as "the cost of the actuator" without that qualification.
 
----
+Also from E1: `max_frames_between_idr` 27 against GOP 15, so the worst-case
+keyframe wait is ~450 ms, not 250 ms; the damaged-first-IDR mechanism is real
+in-session (`fec_recovered_idr_packets` 1, `fec_unrecoverable_groups` 2,
+`sequence_gap_au_drops` 4, `incomplete_au_drops` 3) but cannot be tied to the
+cycle; and the encoder swap is not visible in the host log's retained 500-line
+tail, which is a question for the probe source.
+
+**Next, before any re-run:** make the decoder session report retain the cycle —
+marked-window retention or a segmented ring, `elapsed_ms` anchors for the SSRC
+change and sequence resyncs, and per-event IDR context for the first accepted
+IDR after an SSRC change. Diagnostic-only client work; needs a real Gradle build
+and its own patch. `low_latency_enabled` false is a separate candidate with its
+own hypothesis and is not authorized.
+
+The pre-registered boundary from `C3.L2` stands once the instrumentation can
+support it: reproducibly **≈120 ms or below** reopens the automatic question,
+with a focused gameplay observation required before acceptance; **~120-250 ms**
+keeps the actuator non-automatic; **unchanged** falsifies the lead. Judge those
+figures against the client's own baseline distribution, not against zero.
 
 ## 7. Rules that bind Phase C work
 

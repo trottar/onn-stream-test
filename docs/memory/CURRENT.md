@@ -41,6 +41,12 @@ continuation brief and should not require reading the wider memory hierarchy.
   loopback-only diagnostic changes, fallback and recovery, and `C3.L3`
   characterization. Not authorized for automatic adaptation during play.
   Record: `decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`.
+- `C3.L2a` E1 evidence pass: COMPLETE, question **not** answered. The decoder
+  report's slow-event list is a 128-entry ring that had already evicted the
+  cycle's row. In ordinary play with no actuator, output gap tracks codec time
+  one-to-one and reaches 238 ms, so the cycle's 287 ms is not established as
+  actuator cost. Record:
+  `evidence/C3_L2A_E1_DECODER_EVIDENCE_PASS_2026-09-18.md`.
 - D4 Games and D5 media/server restoration: COMPLETE / RUNTIME VALIDATED.
 
 Blocked or incomplete:
@@ -52,21 +58,29 @@ Blocked or incomplete:
 - the recorded "request an immediate IDR" lead is **premise-corrected**: a fresh
   FFmpeg RTP stream already begins with in-band parameter sets and an IDR, so
   the late first IDR needs a cause before any remedy;
+- the cycle's interruption cost is **not separable** from the client's own
+  decoder-spike baseline with the current instrumentation;
 - the Android receiver's resync and IDR-acceptance policy has not been
-  re-audited since `C3.L0`; that is the first task of `C3.L2a`;
+  re-audited since `C3.L0`;
+- `low_latency_enabled` is false on `c2.realtek.video.avc.decoder`; a separate
+  candidate with its own hypothesis, **not authorized** and not to be folded
+  into diagnostics work;
 - Linux host resource telemetry never starts; see `docs/KNOWN_ISSUES.md`.
 
 ## Next Action
 
-Answer, from existing instrumentation before any code change, why the receiver
-discards 118-123 packets and takes time to accept an IDR after an encoder-only
-cycle whose replacement stream starts with a keyframe.
+Patch the Android decoder session report so an actuator cycle survives into the
+evidence, then re-run the continuity probe.
 
-Read `logs/games/decoder_sessions/*.json`, `logs/games/native_video_alpha.log`,
-the stored `C3.L1` / `C3.L1R1` payloads, and
-`PrivyHub/app/src/main/java/com/safeiot/privyhub/streaming/RtpH264Receiver.kt`.
-Only then decide whether a probe is needed, and keep it loopback-only with no
-acceptance threshold encoded.
+The report must gain marked-window retention or a segmented slow-event buffer,
+`elapsed_ms` anchors for the SSRC change and sequence resyncs, and per-event IDR
+context for the first accepted IDR after an SSRC change. Diagnostic-only client
+work: it changes the report, not decoder configuration or any streaming
+constant. It needs a real Gradle build and its own patch.
+
+Do not re-run `tools/probe_c3_actuator_continuity.py` first. The E1 pass
+established that the existing report discards the cycle's row, so an unchanged
+re-run cannot answer the question.
 
 ## Success Criteria
 
@@ -109,6 +123,8 @@ surface.
 - `architecture/ADAPTIVE_BITRATE.md` — adaptation architecture and history.
 - `architecture/STREAM_TELEMETRY.md` — C2 measurement contract.
 - `evidence/C3_L1R1_LINUX_ACTUATOR_RUNTIME_2026-09-18.md` — corrected run.
+- `evidence/C3_L2A_E1_DECODER_EVIDENCE_PASS_2026-09-18.md` — E1 evidence pass
+  and the retention defect that blocks `C3.L2a`.
 - `roadmap/STATUS.md` — roadmap position.
 - `MAINTENANCE.md` — memory maintenance policy and required validation gate.
 - `docs/KNOWN_ISSUES.md` — open gaps and deferred work.

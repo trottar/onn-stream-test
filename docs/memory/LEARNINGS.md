@@ -191,3 +191,37 @@ the tell.
 
 Check whether a reported figure is per-event or per-session before building an
 explanation on it, and say which it is wherever it is cited.
+
+## A bounded diagnostic buffer discards exactly the event you went looking for
+
+The Android decoder session report keeps its slow-event rows in a 128-entry
+ring. The `C3.L1R1` session produced more than 128 slow events after the
+actuator cycle, so by the time the report was written the cycle's row was gone
+and only the last 29 s of a 65 s session survived. The cumulative
+`max_output_gap_ms` still named the event; nothing remained to explain it.
+
+The probe was well designed, the run was clean, the evidence was collected, and
+the answer was still unavailable. No amount of re-running the same probe would
+have changed that.
+
+Before running a diagnostic, check the retention of every buffer the answer will
+come from, and confirm that the event of interest survives until the report is
+written. A report that states its own retention — this one exposes
+`slow_event_retained` and `slow_event_capacity` — is telling you whether to
+trust an absence; read those fields first.
+
+The same caution applies to log tails. The game diagnostic bundle carries the
+last 500 lines of the native video host log, so a missing encoder restart banner
+is not evidence that no restart occurred.
+
+## Measure the baseline before attributing a cost to the change
+
+`C3.L1` and `C3.L1R1` reported a 287-318 ms decoder output gap for the actuator
+cycle and compared it against Windows. Nobody compared it against the same
+session's ordinary gameplay, where output gaps of 238 ms and 200 ms occurred
+with no actuator involved, caused by decoder time on a single frame.
+
+An interruption figure means little without the distribution it sits in. Before
+attributing a cost to an intervention, take the same measurement while the
+intervention is not happening. The comparison that matters is usually against
+the system's own baseline, not against another platform.

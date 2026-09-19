@@ -523,3 +523,51 @@ Constraints unchanged: loopback-only, no change to resolution, frame rate, GOP,
 B-frames, FEC wire format, RTP payload type, packet size, ports, process audio,
 controller transport, emulator lifecycle, Android streaming constants, or any
 non-loopback control surface.
+
+## C3.L2a E1 — first evidence pass, question not answered
+
+Full record:
+`../evidence/C3_L2A_E1_DECODER_EVIDENCE_PASS_2026-09-18.md`. No new runtime run;
+this is an analysis of the `C3.L1R1` session bundle produced by
+`tools/collect_game_session_diagnostics.py`.
+
+**The evidence needed was collected and then discarded.** The decoder report's
+slow-event list is a fixed-capacity ring: `slow_event_retained` 128,
+`slow_event_capacity` 128, retaining only elapsed 35,421-64,813 ms of a 64,842 ms
+session. `max_output_gap_ms` 287 is a cumulative maximum whose per-event row no
+longer exists. Any session with more than 128 slow events after a cycle loses
+the cycle's evidence, so re-running the existing probe unchanged would not
+answer the question either.
+
+**What the retained window shows instead.** In ordinary play with no actuator
+activity, output gap tracks codec time one-to-one — 238/247, 200/211, 133/142,
+123/131 — with `feed_delay_ms` at or near zero, one or two frames in flight and
+an empty app queue. Those gaps are decoder time on a single frame, not transport
+or IDR wait. Session-wide: 2,696 spikes at or above 20 ms against 3,847 queued
+frames, `max_codec_ms` 297, `low_latency_enabled` false on
+`c2.realtek.video.avc.decoder`.
+
+**Consequence for the classification.** Steady-state play in the same session
+reached 238 ms and 200 ms output gaps without any actuator. Against that, the
+cycle's 287 ms is either ~50 ms of attributable actuator cost or not separately
+visible at all; this evidence cannot separate the two. `C3.L2` stands as
+written, but 287-318 ms must not be restated as "the cost of the actuator"
+without this qualification.
+
+**Also found.** `max_frames_between_idr` is 27 against GOP 15, so the worst-case
+keyframe wait is ~450 ms rather than the assumed 250 ms. The damaged-first-IDR
+mechanism is real in-session — `fec_recovered_idr_packets` 1,
+`fec_unrecoverable_groups` 2, `sequence_gap_au_drops` 4, `incomplete_au_drops`
+3 — but cannot be tied to the cycle. The encoder swap is not visible in the
+host log's retained 500-line tail, which is an instrumentation question for the
+probe source rather than a claim that no swap occurred.
+
+**Next, before any re-run:** the decoder session report must retain the cycle —
+marked-window retention or a segmented ring, `elapsed_ms` anchors for the SSRC
+change and sequence resyncs, and per-event IDR context for the first accepted
+IDR after an SSRC change. Diagnostic-only client work requiring a real Gradle
+build and its own patch.
+
+`low_latency_enabled` false is a separate candidate with its own hypothesis. It
+changes decoder configuration, which is production client behavior, and is not
+authorized here.
