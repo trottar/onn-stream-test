@@ -66,7 +66,7 @@ Audited at `310596dd0cc3ff22f3fe46e2eb025d052da90ec0`:
 - `companion/diagnostics/c3_actuator_probe.py`;
 - `companion/diagnostics/c3_fixed_bitrate_probe.py`;
 - `companion/plugins/games.py` loopback-only C3 action registration;
-- `PrivyHub/app/src/main/java/com/safeiot/privyhub/streaming/RtpH264Receiver.kt`;
+- `PrivyHub/app/src/main/java/streaming/RtpH264Receiver.kt`;
 - `PrivyHub/app/src/main/java/com/safeiot/privyhub/streaming/AvcLowLatencyDecoder.kt`;
 - `PrivyHub/app/src/main/java/com/safeiot/privyhub/streaming/NativeStreamActivity.kt`.
 
@@ -495,7 +495,7 @@ encoder-only cycle, when the replacement stream's first frame is a keyframe?
 Existing instrumentation first, no code change first:
 `logs/games/decoder_sessions/*.json`, `logs/games/native_video_alpha.log`, the
 stored `C3.L1` / `C3.L1R1` payloads, and
-`PrivyHub/app/src/main/java/com/safeiot/privyhub/streaming/RtpH264Receiver.kt`,
+`PrivyHub/app/src/main/java/streaming/RtpH264Receiver.kt`,
 whose resync and IDR-acceptance policy `C3.L2` did not re-audit. That omission is
 recorded here rather than left silent.
 

@@ -129,6 +129,27 @@ Against a baseline that reaches 238 ms unaided, the attributable part may be
 actuator" without this qualification.
 <!-- PRIVYHUB_C3_L2A_E1_DECODER_EVIDENCE:END -->
 
+<!-- PRIVYHUB_ANDROID_FLAT_SOURCE_LAYOUT:BEGIN -->
+## Android source layout is flat by design
+
+Kotlin sources live directly in the Gradle source roots
+(`PrivyHub/app/src/main/java/`, with `diagnostics/` and `streaming/`
+subdirectories) rather than under `com/safeiot/privyhub/`.
+
+Package declarations were **not** edited and still read
+`package com.safeiot.privyhub...`. Kotlin does not require directory/package
+agreement; Java does, and this app has no Java sources. `namespace`,
+`applicationId` and `AndroidManifest.xml` are all independent of directory
+layout.
+
+Do not re-nest. Android Studio's "package directive does not match file
+location" inspection offers a quick-fix that would undo this; decline it. If a
+Java source is ever introduced, it must use package-matching directories.
+
+The reversed-domain chain was inherited Java convention that cost three
+directory levels and bought this project nothing.
+<!-- PRIVYHUB_ANDROID_FLAT_SOURCE_LAYOUT:END -->
+
 <!-- PRIVYHUB_NEGATIVE_RESULT_POLICY:BEGIN -->
 ## Record failures, not only successes
 

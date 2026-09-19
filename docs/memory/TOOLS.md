@@ -33,6 +33,35 @@ adb shell am force-stop com.safeiot.privyhub
 Patch installers that change Android source run the real Gradle build
 themselves and roll back exact tracked bytes if it fails.
 
+## Android source layout
+
+Kotlin sources are **flat**: they sit directly in the Gradle source roots, not
+in reversed-domain package directories.
+
+```text
+PrivyHub/app/src/main/java/MainActivity.kt
+PrivyHub/app/src/main/java/diagnostics/DiagnosticsActivity.kt
+PrivyHub/app/src/main/java/streaming/RtpH264Receiver.kt
+```
+
+Package declarations are unchanged and still read
+`package com.safeiot.privyhub[.diagnostics|.streaming]`. Kotlin does not require
+a file's directory to match its package; only Java does, and this app has no
+Java sources. `namespace` and `applicationId` in `app/build.gradle.kts` are
+independent of directory layout, and `AndroidManifest.xml` names classes by
+fully-qualified name.
+
+Two consequences worth knowing:
+
+- Android Studio shows a "package directive does not match file location"
+  inspection on these files and offers to move them back. **Decline it.** That
+  quick-fix would undo the layout.
+- If a Java source is ever added, it must live in package-matching directories.
+  Do not flatten Java.
+
+Patch `git add` allowlists and probe paths use the flat paths. Records written
+before 2026-09-18 name the old `com/safeiot/privyhub/` paths and are history.
+
 ## Memory and repository health
 
 `tools/check_memory_health.py --repo <repo>`
