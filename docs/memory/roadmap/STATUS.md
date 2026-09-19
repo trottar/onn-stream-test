@@ -1,12 +1,12 @@
 # Roadmap Status
 
-As of 2026-09-18, baseline `6abe47d2f7adf1eae847d3b23b12b760586f6d41`.
+As of 2026-09-18, baseline `62b8b6014c23a7cd895d89d38b6f83e822aa6f31`.
 
 ## Active
 
 Phase C Linux continuation.
 
-Active work item: `C3.L2a` — first-IDR acceptance investigation.
+Active work item: `C3.L2b` — decoder-report cycle retention.
 
 ## Completed
 
@@ -19,10 +19,13 @@ Active work item: `C3.L2a` — first-IDR acceptance investigation.
 - C2 stream telemetry: COMPLETE / RUNTIME VALIDATED.
 - `C3.L0` Linux actuator boundary audit: COMPLETE (source audit only).
 - `C3.L1` / `C3.L1R1` Linux encoder-only actuator: COMPLETE / RUNTIME
-  VALIDATED. Interruption 287-318 ms decoder output gap.
+  VALIDATED. Interruption 287-318 ms decoder output gap, not established as
+  actuator cost — see `C3.L2a` E1.
 - `C3.L2` Linux actuator classification: COMPLETE. Linux is
   `video_only_restart`, authorized for start-time, manual, fallback and
   characterization use; not authorized for automatic in-game adaptation.
+- `C3.L2a` E1 evidence pass: COMPLETE. The question is not answered and the
+  reason is a diagnostic retention defect.
 
 ## Phase C Linux sequence
 
@@ -31,8 +34,10 @@ Active work item: `C3.L2a` — first-IDR acceptance investigation.
 | `C3.L0` actuator boundary audit | COMPLETE |
 | `C3.L1` encoder-only restart continuity probe | COMPLETE / RUNTIME VALIDATED |
 | `C3.L2` Linux actuator capability classification | COMPLETE |
-| `C3.L2a` first-IDR acceptance investigation | **NEXT** |
-| `C3.L3` Linux fixed-bitrate envelope revalidation | UNBLOCKED for manual characterization; sequenced after `C3.L2a` |
+| `C3.L2a` first-IDR acceptance investigation | OPEN; blocked on `C3.L2b` |
+| `C3.L2b` decoder-report cycle retention | **NEXT** |
+| `C3.L2c` low-latency decode candidate | REGISTERED, NOT SCHEDULED, NOT AUTHORIZED |
+| `C3.L3` Linux fixed-bitrate envelope revalidation | UNBLOCKED for manual characterization; sequenced after `C3.L2a` closes |
 | `C3.L4` explainable fast-down/slow-up controller | BLOCKED; gate is `C3.L2a` |
 | C4 adaptive FEC | DEFERRED |
 

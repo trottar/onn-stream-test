@@ -16,7 +16,10 @@ boundary for the validated Linux native game stream.
 
 ## Current Work Item
 
-`C3.L2a` — first-IDR acceptance investigation.
+`C3.L2b` — decoder-report cycle retention.
+
+`C3.L2a` stays open behind it: its question cannot be answered until the report
+retains the cycle.
 
 Start from `PHASE_C_CONTEXT.md`. It is the compact, self-sufficient Phase C
 continuation brief and should not require reading the wider memory hierarchy.
@@ -81,6 +84,10 @@ constant. It needs a real Gradle build and its own patch.
 Do not re-run `tools/probe_c3_actuator_continuity.py` first. The E1 pass
 established that the existing report discards the cycle's row, so an unchanged
 re-run cannot answer the question.
+
+`C3.L2c`, the low-latency decode candidate, is registered and **not
+authorized**. It changes production client behavior and needs its own hypothesis
+and its own focused gameplay acceptance. It must not be folded into `C3.L2b`.
 
 ## Success Criteria
 

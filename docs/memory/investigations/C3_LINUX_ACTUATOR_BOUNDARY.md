@@ -571,3 +571,25 @@ build and its own patch.
 `low_latency_enabled` false is a separate candidate with its own hypothesis. It
 changes decoder configuration, which is production client behavior, and is not
 authorized here.
+
+## C3.L2b and C3.L2c registered
+
+`C3.L2b` — decoder-report cycle retention. **NEXT.** Make the decoder session
+report retain the actuator cycle: marked-window retention or a segmented
+slow-event buffer, `elapsed_ms` anchors for the SSRC change and the sequence
+resyncs, and per-event IDR context for the first accepted IDR after an SSRC
+change. Diagnostic-only client work — the report, not decoder configuration or
+any streaming constant. Real Gradle build, `adb install -r`, then one clean
+cycle. Do not re-run `tools/probe_c3_actuator_continuity.py` before it lands.
+
+`C3.L2c` — low-latency decode candidate. **REGISTERED, NOT SCHEDULED, NOT
+AUTHORIZED.** `low_latency_enabled` is false on `c2.realtek.video.avc.decoder`
+while 2,696 of 3,847 frames took 20 ms or more to decode and `max_codec_ms` was
+297. Enabling MediaCodec low-latency mode is a production client behavior change
+requiring its own narrow hypothesis, its own probe and its own focused gameplay
+acceptance. It must not be folded into `C3.L2b`, and it is not a C3 adaptation
+item — it changes the baseline C3 measures against.
+
+`C3.L2a` stays open behind `C3.L2b`. `C3.L3` remains unblocked for manual
+characterization but is sequenced after `C3.L2a` closes. `C3.L4` remains
+blocked.

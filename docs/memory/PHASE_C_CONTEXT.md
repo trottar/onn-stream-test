@@ -39,8 +39,10 @@ Phase C is active. Sub-phase state:
 | `C3.L1` Linux encoder-only seam and probe | COMPLETE / RUNTIME VALIDATED |
 | `C3.L1R1` RTP baseline correction | COMPLETE / RUNTIME VALIDATED |
 | `C3.L2` Linux actuator classification | COMPLETE |
-| `C3.L2a` first-IDR acceptance investigation | **NEXT** |
-| `C3.L3` Linux fixed-bitrate envelope revalidation | UNBLOCKED for manual characterization; sequenced after `C3.L2a` |
+| `C3.L2a` first-IDR acceptance investigation | EVIDENCE PASS COMPLETE; question open, blocked on instrumentation |
+| `C3.L2b` decoder-report cycle retention | **NEXT** |
+| `C3.L2c` low-latency decode candidate | REGISTERED, NOT SCHEDULED, NOT AUTHORIZED |
+| `C3.L3` Linux fixed-bitrate envelope revalidation | UNBLOCKED for manual characterization; sequenced after `C3.L2a` closes |
 | `C3.L4` fast-down/slow-up controller | BLOCKED; gate is `C3.L2a` |
 | C4 adaptive FEC | DEFERRED |
 
@@ -222,12 +224,24 @@ in-session (`fec_recovered_idr_packets` 1, `fec_unrecoverable_groups` 2,
 cycle; and the encoder swap is not visible in the host log's retained 500-line
 tail, which is a question for the probe source.
 
-**Next, before any re-run:** make the decoder session report retain the cycle —
-marked-window retention or a segmented ring, `elapsed_ms` anchors for the SSRC
-change and sequence resyncs, and per-event IDR context for the first accepted
-IDR after an SSRC change. Diagnostic-only client work; needs a real Gradle build
-and its own patch. `low_latency_enabled` false is a separate candidate with its
-own hypothesis and is not authorized.
+**`C3.L2b` is the next item, and it is the only way forward on `C3.L2a`.** Make
+the decoder session report retain the cycle: marked-window retention or a
+segmented slow-event buffer, `elapsed_ms` anchors for the SSRC change and
+sequence resyncs, and per-event IDR context for the first accepted IDR after an
+SSRC change. Diagnostic-only client work — it changes the report, not decoder
+configuration, resolution, frame rate or any streaming constant. It carries a
+real `./gradlew :app:assembleDebug`, an `adb install -r`, and one clean cycle
+run afterwards. Do not re-run `tools/probe_c3_actuator_continuity.py` before it
+lands; the existing report would evict the same row again.
+
+**`C3.L2c` is registered and not authorized.** `low_latency_enabled` is false on
+`c2.realtek.video.avc.decoder` while 2,696 of 3,847 frames took 20 ms or more to
+decode. Enabling MediaCodec low-latency mode is a production client behavior
+change with its own hypothesis and its own focused gameplay acceptance. On the
+E1 evidence it is plausibly a larger lever on perceived smoothness than the
+actuator question, but it must not ride along inside a diagnostics patch. The
+user chooses whether `C3.L2b` or `C3.L2c` runs first; `C3.L2b` is the one that
+unblocks `C3.L2a`.
 
 The pre-registered boundary from `C3.L2` stands once the instrumentation can
 support it: reproducibly **≈120 ms or below** reopens the automatic question,
@@ -298,6 +312,9 @@ Never ask the user for IP addresses; redact network identity in diagnostics.
   `C3.L0`-`C3.L2` history.
 - `evidence/C3_L1_LINUX_ACTUATOR_RUNTIME_2026-09-18.md` and
   `evidence/C3_L1R1_LINUX_ACTUATOR_RUNTIME_2026-09-18.md` — raw runs.
+- `evidence/C3_L2A_E1_DECODER_EVIDENCE_PASS_2026-09-18.md` — E1 pass, the
+  retention defect, and the decoder-spike baseline the actuator is measured
+  against.
 - `evidence/C1_C2_LINUX_REVALIDATION_2026-09-18.md` — Linux baseline.
 - `architecture/ADAPTIVE_BITRATE.md` — adaptation architecture and Windows-era
   history.
