@@ -45,7 +45,8 @@ evidence. Raw measurements outrank classifiers when they disagree.
 
 - `CURRENT.md` — single active objective, current state, exact next action.
 - `MEMORY.md` — long-lived rules and validated facts, not chronology.
-- `YYYY-MM-DD.md` / `memory/` — detailed dated history.
+- `YYYY-MM-DD.md` — detailed dated history, one file per date at the
+  memory root.
 - `handoffs/CURRENT_HANDOFF.md` — small transfer note only.
 - `architecture/` — subsystem architecture.
 - `decisions/` — decisions and status.

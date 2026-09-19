@@ -62,6 +62,14 @@ Two consequences worth knowing:
 Patch `git add` allowlists and probe paths use the flat paths. Records written
 before 2026-09-18 name the old `com/safeiot/privyhub/` paths and are history.
 
+## Where dated history lives
+
+One file per date at the memory root: `docs/memory/YYYY-MM-DD.md`.
+
+Until 2026-09-18 there were two locations — the root and `docs/memory/memory/` —
+with two different `2026-09-15.md` files. The directory is gone and that date is
+merged. Do not recreate `docs/memory/memory/`.
+
 ## Memory and repository health
 
 `tools/check_memory_health.py --repo <repo>`
@@ -184,23 +192,39 @@ Games probes for Phase A input, multitap and four-player routing remain at the
 top level as `tools/probe_a8_*.py`, `tools/probe_four_player_*.py`,
 `tools/probe_ps1_multitap_*.py` and `tools/probe_phase_a_*.py`.
 
-## Windows-era, retained as history
+## Windows-era, archived
 
-Do not run these on the Linux host:
+The Windows-only scripts were moved out of `tools/` on 2026-09-18 and now live
+under `archive/windows_tools/`:
 
-- `tools/build_install_onn.ps1`, `tools/audit_repo_checkpoint.ps1`,
-  `tools/run_privyhub_debug.ps1`;
-- `tools/run_udp_transport_probe.ps1`,
-  `tools/run_udp_reverse_transport_probe.ps1`,
-  `tools/run_udp_loopback_probe.ps1`;
-- `tools/probe_a4_minimize_wgc.py`,
-  `tools/probe_a4_occluded_background_wgc.py`, and the C# probes under
-  `tools/a4_audio_mute_probe/` and `tools/a4_audio_float_attenuation_probe/`.
+```text
+archive/windows_tools/
+    build_install_onn.ps1
+    audit_repo_checkpoint.ps1
+    run_privyhub_debug.ps1
+    run_udp_transport_probe.ps1
+    run_udp_reverse_transport_probe.ps1
+    run_udp_loopback_probe.ps1
+    probe_a4_minimize_wgc.py
+    probe_a4_occluded_background_wgc.py
+    a4_audio_mute_probe/
+    a4_audio_float_attenuation_probe/
+```
+
+`archive/` is gitignored, so these are untracked on disk and out of the working
+tree, while git history still holds every version. Do not consult them unless a
+Windows question is explicitly raised; none of them run on this host.
 
 The Opal router-boundary scripts — `tools/run_opal_*.sh` and
-`tools/analyze_opal_*.py` — belong to a branch closed by D-083. Re-enter only
-for one bounded measurement that changes a product or roadmap decision, or on a
-different representative network environment.
+`tools/analyze_opal_*.py` — stay in `tools/`. They are POSIX shell and Python,
+they run on this host, and D-083 allows re-entry for one bounded measurement
+that would change a product or roadmap decision.
+
+Windows-only code that is still imported by production dispatch stays where it
+is: `companion/native_wgc_bridge.py`, `companion/process_audio/`,
+`companion/diagnostics/c3_actuator_probe.py` and
+`companion/diagnostics/c3_fixed_bitrate_probe.py` are selected by platform at
+runtime and fail closed on Linux. Do not archive or delete them.
 
 ## Privacy
 

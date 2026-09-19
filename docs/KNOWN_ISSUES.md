@@ -33,12 +33,11 @@ that work.
   metrics come from the FEC relay `sendto()` boundary, which does run on Linux.
   Status: open, Phase E prerequisite. Does not block C3.
 
-- **`_patches/` and `_probes/` are not covered by `.gitignore`.** The existing
-  patterns are `privyhub_*/` and `privyhub_*_v*.zip`. The local probe
-  directories are named `PrivyHub_*`, which does not match on a case-sensitive
-  filesystem. These directories are development-only and must not be pushed.
-  Status: open. Confirm with `git status --short` before any commit. Do not fix
-  this inside unrelated streaming work.
+- **`_patches/` and `_probes/` are not covered by `.gitignore`.**
+  Status: **RESOLVED 2026-09-18** by the STREAMLINE patch. `.gitignore` was
+  deduplicated and now covers `_patches/`, `_probes/` and `Claude outputs/`
+  explicitly, alongside the existing `privyhub_*` patterns. The directories
+  themselves are left on disk; delete them when you want the space back.
 
 - **Existing C3 probes cannot run on Linux.**
   `companion/diagnostics/c3_actuator_probe.py` and

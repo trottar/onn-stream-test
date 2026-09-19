@@ -1,30 +1,41 @@
+# Generated runtime, media and logs
 logs/
-build/
-.gradle/
-.idea/
-__pycache__/
-*.pyc
-*.apk
 media/
 cache/
-
-# PrivyHub local game runtime
-/games/
-/runtime/
-/data/games/
-/logs/games/
-
-# Local Android SDK configuration
-**/local.properties
-
-# PrivyHub generated/runtime content
 runtime/
 data/
 /games/
+
+# Android / Gradle / Kotlin build output
+build/
+.gradle/
+.kotlin/
+.idea/
+*.apk
+**/local.properties
+
+# Python generated files
+__pycache__/
+*.pyc
+
+# .NET generated build artifacts
+**/bin/
+**/obj/
+
+# Local rollback/checkpoint archives
 archive/
 
-# Temporary patch bundles
+# Patch packages, extracted packages and delivered ZIPs
 privyhub_*/
+privyhub_*_v*/
+privyhub_*.zip
+_patches/
+_probes/
+Claude outputs/
+
+# Local patch/build state
+.state.json
+.build/
 
 # Local secrets / signing material
 .env
@@ -36,39 +47,6 @@ privyhub_*/
 *.jks
 *.keystore
 keystore.properties
-
-# Kotlin/Android local caches
-.kotlin/
-
-# PrivyHub generated diagnostics
-logs/
-
-# Local rollback/checkpoint archives
-archive/
-
-# Generated runtime binaries/state
-runtime/
-
-# Extracted local patch packages
-privyhub_*_v*/
-
-# Local patch/build state
-.state.json
-.build/
-
-# Python generated files
-__pycache__/
-*.pyc
-
-# PrivyHub patch ZIP packages
-privyhub_*_v*.zip
-
-# .NET generated build artifacts
-**/bin/
-**/obj/
-
-# All local PrivyHub patch ZIPs
-privyhub_*.zip
 
 # PrivyHub durable-memory raw evidence
 /docs/memory/evidence/raw/
