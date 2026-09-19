@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-18
-baseline_commit: e220d3e39c896bac89bc8d286279b480cba50669
+baseline_commit: 41bbc6acd3534f79283e328596115a02c3acc296
 phase: C
 scope: phase_c_linux_streaming_continuation
 ---
@@ -41,9 +41,9 @@ Phase C is active. Sub-phase state:
 | `C3.L2` Linux actuator classification | COMPLETE |
 | `C3.L2a` first-IDR acceptance investigation | **ANSWERED**; IDR wait falsified |
 | `C3.L2b` decoder-report cycle retention | COMPLETE / RUNTIME VALIDATED |
-| `C3.L2c` low-latency decode candidate | **NEXT**; needs authorization first |
-| `C3.L3` Linux fixed-bitrate envelope revalidation | UNBLOCKED for manual characterization |
-| `C3.L4` fast-down/slow-up controller | BLOCKED; gate is a focused gameplay acceptance, not the IDR question |
+| `C3.L2c` low-latency decode candidate | **FALSIFIED / ROLLED BACK**; see section 6 |
+| `C3.L3` Linux fixed-bitrate envelope characterization | **COMPLETE / RUNTIME VALIDATED**; see section 6a |
+| `C3.L4` fast-down/slow-up controller | BLOCKED; gate is a focused gameplay acceptance, which nothing in `C3.L2a`/`C3.L2c`/`C3.L3` performed |
 | C4 adaptive FEC | DEFERRED |
 
 Phase E does not begin until the streaming architecture is stable. It measures a
@@ -227,11 +227,60 @@ while `slow_event_retained_marked` reports 30 of 64. The marked rows are counted
 and dropped. `stream_discontinuities` and `first_idr_after_discontinuity` carried
 this result without them.
 
-**Next: `C3.L2c`**, enabling MediaCodec low-latency decode. Decoder time is now
-the largest measured contributor to perceptible interruption, larger than
-anything the actuator does. It changes production client behavior, so it needs
-its own hypothesis and its own focused gameplay acceptance, and it is **not yet
-authorized**.
+**`C3.L2c`**, enabling MediaCodec low-latency decode, was authorized
+2026-09-18, installed, and runtime tested 2026-09-19. The capability gate
+removal worked as designed: `low_latency_enabled` flipped to true and
+`max_codec_ms` fell to 107 ms — the best of the eight sessions recorded on
+this device that day, whose ordinary range was 140-433 ms — with
+`spike_50_ms` at 19 against 91-314 in those sessions and `spike_250_ms` at
+zero, the only session of the eight with none. But `max_output_gap_ms` —
+the worst perceptible stall — was **385 ms, second worst of the eight**,
+and the user's own report ("gameplay was trash") matched it. **FALSIFIED.**
+
+The durable lesson is larger than the candidate: in every ordinary session
+`max_output_gap_ms` tracks `max_codec_ms` to within ~10 ms; here it exceeded
+it by 278 ms. **`max_codec_ms` is not a valid proxy for
+`max_output_gap_ms`.** Any future candidate justified by "it lowers decode
+time" must measure the gap directly before acceptance.
+
+Reverted to the capability-gated behavior; source restored to its exact
+predecessor bytes (SHA-256
+`22038e355f85bb8330d900bae64c37db54c902d4affdef12be4810bb03271c07`). Do not
+retry the unconditional `KEY_LOW_LATENCY` request without new evidence.
+Records: `evidence/C3_L2C_LOW_LATENCY_DECODE_FALSIFIED_2026-09-19.md`,
+`patches/C3-L2C_LOW_LATENCY_DECODE_ENABLE.md`.
+
+## 6a. `C3.L3` — Linux fixed-bitrate characterization, closed
+
+The characterization cycle was Windows-only (WGC replacement capture) and
+failed immediately on Linux. It was ported by reusing the validated
+`C3.L1`/`C3.L1R1` encoder-only restart primitive —
+`run_c3_linux_fixed_bitrate_cycle()` in
+`companion/diagnostics/c3_linux_actuator_probe.py`, driving
+`_build_linux_ffmpeg_command`'s pre-existing, previously unused
+`bitrate_kbps`/`max_bitrate_kbps` overrides. The Windows implementation was
+not touched.
+
+Ten trigger/finalize cycles across three runs at 5000/5500/6000 kbps, zero
+cycle-level FEC/audio/controller errors in every one.
+
+`decoder_max_output_gap_ms`, three valid samples per bitrate:
+
+| bitrate | samples | band |
+| --- | --- | --- |
+| 5000 kbps | 367 / 292 / 242 | 125 ms |
+| 5500 kbps | 219 / 584 / 335 | 365 ms |
+| 6000 kbps | 331 / 291 / 307 | **40 ms** |
+
+**6000 kbps is the most consistent of the three** and never exceeded 331 ms.
+5500 kbps produced both the best and the worst single result in the set; its
+584 ms session traces to one 417 ms resync-to-IDR event.
+
+Every figure is transport and decoder timing. **No perceptual quality was
+measured, so no bitrate is accepted as a fallback level on this data.** The
+focused gameplay observation is still owed and it is the `C3.L4` gate.
+
+Record: `evidence/C3_L3_LINUX_FIXED_BITRATE_CHARACTERIZATION_2026-09-19.md`.
 
 ## 7. Rules that bind Phase C work
 
@@ -291,6 +340,12 @@ Never ask the user for IP addresses; redact network identity in diagnostics.
   never recorded `ffmpeg_spawn_ms`, so it cannot be checked retrospectively.
   Treat Windows "first RTP resume" figures as pipeline re-establishment time.
   Not fixed; Windows is outgoing.
+- `tools/probe_c3_fixed_*_characterization.py --finalize` has matched the
+  wrong decoder-session file once, when run back to back after another
+  bitrate's finalize. Intermittent, not root-caused. Always check
+  `payload.decoder_session_log` and `session_duration_ms` in the written JSON
+  against the intended session before using a finalize result. Companion-side
+  code is not implicated. See `docs/KNOWN_ISSUES.md`.
 - `C3.L2b`'s 2000 ms cycle-window default and its choice not to correlate
   `trimFecGroups`'s rare capacity-eviction path into `auFecUnrecoverableGroup`
   are judgment calls, not runtime-validated figures. See "Negative results and
@@ -309,6 +364,15 @@ Never ask the user for IP addresses; redact network identity in diagnostics.
   against.
 - `patches/C3-L2B_DECODER_REPORT_CYCLE_RETENTION.md` — the retention patch
   installed this session; what changed and what is still not runtime-verified.
+- `patches/C3-L2C_LOW_LATENCY_DECODE_ENABLE.md` — the `C3.L2c` install: the
+  `KEY_LOW_LATENCY` capability-gate removal and why.
+- `evidence/C3_L2C_LOW_LATENCY_DECODE_FALSIFIED_2026-09-19.md` — the
+  falsification, measured against seven same-day baseline sessions.
+- `evidence/C3_L3_LINUX_FIXED_BITRATE_CHARACTERIZATION_2026-09-19.md` — all
+  three `C3.L3` runs and the corrected three-run reading.
+- `patches/C3-L3_LINUX_FIXED_BITRATE_PORT.md` — the Linux port of the cycle.
+- `patches/C3-L3R1_CHARACTERIZATION_CORRECTION.md` — the memory correction
+  that added the omitted 6000 kbps rerun.
 - `evidence/C1_C2_LINUX_REVALIDATION_2026-09-18.md` — Linux baseline.
 - `architecture/ADAPTIVE_BITRATE.md` — adaptation architecture and Windows-era
   history.

@@ -1,6 +1,6 @@
 ---
 memory_schema: 2
-as_of: 2026-09-17
+as_of: 2026-09-18
 baseline_commit: 0206017cfd8f0fc57decb7a5e9e8632e6a4f6cdd
 ---
 
@@ -45,6 +45,18 @@ evidence. Raw measurements outrank classifiers when they disagree.
 
 State the plan in three lines before starting. Stop and ask if the work needs
 more than **10 file reads, 15 commands, or one deliverable**.
+
+Minimizing cost and maximizing usable work per unit of budget is a project
+value, not just a ceiling to avoid hitting — the same preference the project
+principles already state for local-first, reuse-over-rebuild work. Pause
+proactively, well before the hard cap, rather than running until a limit is
+already exceeded: when a sub-phase is large enough that it might approach the
+budget, say so in the three-line plan and split it into explicit smaller
+parts up front (e.g. investigate, then patch, then package/deliver), pausing
+between parts for a go-ahead instead of continuing straight to a finished
+deliverable. A session that notices it is approaching the cap mid-task stops
+there, reports exactly what is done and what remains, and waits, rather than
+finishing the remaining work to avoid leaving it half-done.
 
 Do **not** build installer self-tests, synthetic fixtures, stub compilers or
 mock Android frameworks to pre-validate a patch. The gates that decide
@@ -100,7 +112,14 @@ Current Linux companion launch:
 
 `python3 ./companion/privyhub_service.py`
 
-Keep commands narrow and copy/paste friendly.
+Keep commands narrow and copy/paste friendly. Every response that asks the
+user to run something includes the exact command(s), inline, every time —
+not a description of what to run. Fixes and installer payloads are written
+directly onto the repo through the session's file bridge; there is no
+ZIP-and-send-and-unzip step to describe — the response just gives the run
+command against the files already in place.
+
+Diagnostic and probe output that a script already persists to a file (e.g. `logs/`, `docs/memory/evidence/`) is read directly from the repository through the session's file bridge, not requested as a paste. Ask for a paste only when no such file exists.
 
 ## Patch discipline
 

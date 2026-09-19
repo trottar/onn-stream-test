@@ -194,9 +194,59 @@ Refactor only with a dedicated objective and explicit regression boundary.
   `stream_discontinuities` and `first_idr_after_discontinuity`, but the marked
   window cannot yet be inspected row by row. Status: open, diagnostic-only.
 
-- **Decoder time dominates perceptible interruption on the onn client.**
-  `low_latency_enabled` is false on `c2.realtek.video.avc.decoder`;
-  `max_codec_ms` 367; the two largest output gaps in the last session, 359 ms and
-  352 ms, tracked `codec_ms` to within 8 ms with feed delay at zero. Status:
-  open; owned by `C3.L2c`, which is not yet authorized.
+- **Decoder time correlates with perceptible interruption on the onn client,
+  but is not its mechanism.** `low_latency_enabled` is false on
+  `c2.realtek.video.avc.decoder`; `max_codec_ms` 367; the two largest output
+  gaps in the `C3.L2a` E2 session, 359 ms and 352 ms, tracked `codec_ms` to
+  within 8 ms with feed delay at zero. `C3.L2c` then cut `max_codec_ms` to
+  107 ms and `max_output_gap_ms` got **worse** (385 ms), which falsifies
+  `max_codec_ms` as a proxy for the gap. Status: open, owner unassigned —
+  `C3.L2c` is closed as falsified and is not the owner. Any future candidate
+  justified by "it lowers decode time" must measure `max_output_gap_ms`
+  directly before acceptance. Record:
+  `docs/memory/evidence/C3_L2C_LOW_LATENCY_DECODE_FALSIFIED_2026-09-19.md`.
 <!-- PRIVYHUB_C3_L2A_E2:KNOWN_ISSUES:END -->
+
+<!-- PRIVYHUB_C3_L3_FINALIZE_MATCH_BUG:KNOWN_ISSUES:BEGIN -->
+## 2026-09-19 C3.L3 characterization probe finalize bug
+
+Found during `C3.L3` Linux fixed-bitrate characterization (third run).
+Corrected 2026-09-19 by `C3-L3R1`: the original entry misidentified the
+decoder-session file involved and implied the 6000 kbps result was
+unrecoverable. Neither was right. The defect itself is real and stays open.
+
+- **`--finalize` can match the wrong decoder-session file.**
+  `tools/probe_c3_fixed_6000_characterization.py --finalize`, run
+  immediately after `tools/probe_c3_fixed_5500_characterization.py
+  --finalize` in the same sequence, returned measurements byte-identical to
+  the 5500 kbps result (`session_duration_ms` 66,638, every
+  decoder/controller count, `sequence_resyncs`, `ssrc_changes`) apart from
+  `target_bitrate_kbps` itself, and was missing several audio fields the
+  5500 result had. It had matched the 5500 kbps run's own decoder-session
+  file, `logs/games/decoder_sessions/native_decoder_20260919_055703_163.json`.
+  That attempt was discarded.
+
+  **The defect is intermittent.** The 6000 kbps rerun taken the same
+  session matched correctly:
+  `logs/streaming/c3_fixed_6000_characterization.json` records
+  `payload.decoder_session_log =
+  logs/games/decoder_sessions/native_decoder_20260919_060325_369.json`, a
+  distinct 64,840 ms session written 9.4 s before that finalize, whose
+  figures differ from the 5500 kbps session in every field. So back-to-back
+  finalizes do not fail deterministically, and the data that was thought
+  lost was never lost.
+
+  Not root-caused. Status: **open**. Affects
+  `tools/probe_c3_fixed_*_characterization.py`'s decoder-session matching
+  only — the `C3.L3` companion-side Linux cycle
+  (`companion/diagnostics/c3_linux_actuator_probe.py`) is not implicated.
+
+  **Workaround until fixed:** after any `--finalize`, check
+  `payload.decoder_session_log` and `session_duration_ms` in the written
+  JSON against the session you intended to measure, before using the
+  result. A finalize that reports the previous bitrate's duration has
+  matched the wrong file.
+
+  Records: `docs/memory/evidence/C3_L3_LINUX_FIXED_BITRATE_CHARACTERIZATION_2026-09-19.md`,
+  `docs/memory/patches/C3-L3R1_CHARACTERIZATION_CORRECTION.md`.
+<!-- PRIVYHUB_C3_L3_FINALIZE_MATCH_BUG:KNOWN_ISSUES:END -->

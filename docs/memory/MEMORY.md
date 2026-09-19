@@ -238,6 +238,88 @@ does not authorize automatic in-game adaptation, which still needs repetition
 and a focused gameplay observation.
 <!-- PRIVYHUB_C3_L2A_ANSWERED:END -->
 
+<!-- PRIVYHUB_C3_L2C_FALSIFIED:BEGIN -->
+## Decode time is not the stall — durable fact
+
+Measured 2026-09-19 by `C3.L2c`. Record:
+`evidence/C3_L2C_LOW_LATENCY_DECODE_FALSIFIED_2026-09-19.md`.
+
+Requesting `MediaFormat.KEY_LOW_LATENCY` unconditionally on
+`c2.realtek.video.avc.decoder` — overriding its own `FEATURE_LowLatency`
+self-report of unsupported — works: `low_latency_enabled` flips true.
+
+It does not help. In the one session with the flag set, against the seven
+ordinary sessions on the same device the same day:
+
+- `max_codec_ms` 107, better than all seven (range 140-433);
+- `spike_20_ms` 147, against 775-3,260;
+- `spike_50_ms` 19, against 91-314;
+- `spike_250_ms` 0, the only session of the eight with none;
+- **`max_output_gap_ms` 385, second worst of the eight.**
+
+In every ordinary session `max_output_gap_ms` tracks `max_codec_ms` to within
+about 10 ms. In the low-latency session it exceeded it by 278 ms.
+
+**`max_codec_ms` is therefore not a valid proxy for `max_output_gap_ms`.** Any
+future candidate justified by "it lowers decode time" must measure the output
+gap directly before acceptance. The `C3.L2a` E2 statement that decoder time is
+the largest measured contributor to perceptible interruption holds as a
+correlation and not as a mechanism.
+
+Rolled back to exact predecessor bytes. **Do not retry the unconditional
+`KEY_LOW_LATENCY` request without new evidence.**
+
+What produced a 385 ms gap in a session with zero 250 ms codec spikes is
+unexplained and no work item owns it.
+<!-- PRIVYHUB_C3_L2C_FALSIFIED:END -->
+
+<!-- PRIVYHUB_C3_L3_FIXED_BITRATE:BEGIN -->
+## Linux fixed-bitrate characterization — durable facts
+
+Established 2026-09-19 by `C3.L3`. Records:
+`patches/C3-L3_LINUX_FIXED_BITRATE_PORT.md`,
+`evidence/C3_L3_LINUX_FIXED_BITRATE_CHARACTERIZATION_2026-09-19.md`.
+
+The fixed-bitrate characterization cycle is Linux-capable. It was ported by
+reusing the validated `C3.L1`/`C3.L1R1` encoder-only restart primitive rather
+than porting the Windows WGC replacement-capture implementation, which stays
+untouched and Windows-only. `_build_linux_ffmpeg_command`'s
+`bitrate_kbps`/`max_bitrate_kbps` overrides existed and were unused; the port
+called them.
+
+Ten trigger/finalize cycles across three runs at 5000/5500/6000 kbps, zero
+`cycle_fec_send_errors_delta`, `cycle_audio_send_errors_delta` and
+`cycle_controller_bad_packets_delta` in every one. Lifecycle preserved
+throughout.
+
+`decoder_max_output_gap_ms`, three valid samples per bitrate:
+
+| bitrate | samples | band |
+| --- | --- | --- |
+| 5000 kbps | 367 / 292 / 242 | 125 ms |
+| 5500 kbps | 219 / 584 / 335 | 365 ms |
+| 6000 kbps | 331 / 291 / 307 | **40 ms** |
+
+**6000 kbps is the most consistent of the three**, across sessions of 21.1s,
+77.2s and 64.8s, and never exceeded 331 ms. 5500 kbps produced both the best
+and the worst single result in the data set; its 584 ms session traces to one
+417 ms resync-to-IDR event.
+
+Two standing qualifications:
+
+- every figure here is transport and decoder timing. **No perceptual quality
+  was measured**, so no bitrate is accepted as a fallback level on this data.
+  A focused gameplay observation is still required, and it is the `C3.L4`
+  gate;
+- the Windows 5500/6000/7000 ladder remains evidence, not a Linux constant.
+
+Operational rule from this work: `tools/probe_c3_fixed_*_characterization.py
+--finalize` has matched the wrong decoder-session file when run back to back
+after another bitrate's finalize. Always check `payload.decoder_session_log`
+and `session_duration_ms` in the written JSON against the intended session
+before using a finalize result. See `docs/KNOWN_ISSUES.md`.
+<!-- PRIVYHUB_C3_L3_FIXED_BITRATE:END -->
+
 <!-- PRIVYHUB_NEGATIVE_RESULT_POLICY:BEGIN -->
 ## Record failures, not only successes
 
