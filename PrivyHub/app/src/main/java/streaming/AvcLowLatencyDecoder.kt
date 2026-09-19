@@ -66,7 +66,24 @@ class AvcLowLatencyDecoder(
     companion object {
         private const val INPUT_QUEUE_CAPACITY = 4
         private const val SLOW_EVENT_THRESHOLD_MS = 50L
-        private const val MAX_SLOW_EVENTS = 128
+
+        // C3.L2b: the 128-entry ring was flat FIFO, so an ordinary session
+        // long enough to log >128 slow events evicted an actuator cycle's
+        // rows before the report was ever written (C3.L2a E1). The capacity
+        // is now segmented: MARKED holds events recorded while a cycle
+        // window is open (see markCycleWindow) and is not touched by
+        // ordinary-play evictions; RECENT is the unmarked rolling tail,
+        // unchanged in behavior from the old ring except for its smaller
+        // size. Total capacity (128) is unchanged from the predecessor.
+        const val MAX_MARKED_SLOW_EVENTS = 64
+        const val MAX_RECENT_SLOW_EVENTS = 64
+
+        // How long after a marked discontinuity (SSRC change or sequence
+        // resync) slow events keep landing in the protected segment.
+        // Generous relative to the measured cycle terms it must cover:
+        // encoder spawn 115-215 ms, RTP silence ~152 ms, decoder output gap
+        // 287-318 ms, resync-to-IDR 191-241 ms (evidence/C3_L1R1_*).
+        const val DEFAULT_CYCLE_WINDOW_MS = 2_000L
     }
 
     private data class EncodedFrame(
@@ -109,10 +126,25 @@ class AvcLowLatencyDecoder(
 
     private val slowEventsLock = Any()
 
+    // Recent segment: unmarked ordinary-play events, rolling FIFO exactly
+    // like the predecessor ring, just at half its old capacity.
     private val slowEvents =
         ArrayDeque<DecoderSlowEvent>(
-            MAX_SLOW_EVENTS
+            MAX_RECENT_SLOW_EVENTS
         )
+
+    // Marked segment: events recorded while a cycle window (see
+    // markCycleWindow) is open. Evicted only by its own overflow, never by
+    // unrelated later ordinary-play spikes.
+    private val markedSlowEvents =
+        ArrayDeque<DecoderSlowEvent>(
+            MAX_MARKED_SLOW_EVENTS
+        )
+
+    // nanoTime() deadline; recordSlowEvent() routes to the marked segment
+    // while System.nanoTime() is at or before this value. 0 means no window
+    // is open. Only ever moved forward (see markCycleWindow).
+    private val cycleWindowUntilNs = AtomicLong(0L)
 
     @Volatile
     private var lastOutputAtUs = 0L
@@ -339,6 +371,30 @@ class AvcLowLatencyDecoder(
         synchronized(slowEventsLock) {
             return slowEvents.toList()
         }
+    }
+
+    fun markedSlowEventsSnapshot():
+        List<DecoderSlowEvent> {
+        synchronized(slowEventsLock) {
+            return markedSlowEvents.toList()
+        }
+    }
+
+    // C3.L2b: called from the RTP receiver's stream-discontinuity hook (an
+    // SSRC change or a sequence resync) so slow events around an actuator
+    // cycle land in the protected segment instead of the ordinary rolling
+    // ring. Safe to call from another thread; only ever extends the window
+    // forward, so a second discontinuity shortly after the first (the
+    // C3.L1R1 sessions each saw one SSRC change and two sequence resyncs)
+    // does not shrink or reset it.
+    fun markCycleWindow(
+        nowNs: Long,
+        windowMs: Long = DEFAULT_CYCLE_WINDOW_MS
+    ) {
+        updateMax(
+            cycleWindowUntilNs,
+            nowNs + windowMs * 1_000_000L
+        )
     }
 
     fun close() {
@@ -658,14 +714,28 @@ class AvcLowLatencyDecoder(
     private fun recordSlowEvent(
         event: DecoderSlowEvent
     ) {
+        val insideCycleWindow =
+            event.eventAtNs <=
+                cycleWindowUntilNs.get()
+
         synchronized(slowEventsLock) {
-            while (
-                slowEvents.size >=
-                MAX_SLOW_EVENTS
-            ) {
-                slowEvents.removeFirst()
+            if (insideCycleWindow) {
+                while (
+                    markedSlowEvents.size >=
+                    MAX_MARKED_SLOW_EVENTS
+                ) {
+                    markedSlowEvents.removeFirst()
+                }
+                markedSlowEvents.addLast(event)
+            } else {
+                while (
+                    slowEvents.size >=
+                    MAX_RECENT_SLOW_EVENTS
+                ) {
+                    slowEvents.removeFirst()
+                }
+                slowEvents.addLast(event)
             }
-            slowEvents.addLast(event)
         }
     }
 

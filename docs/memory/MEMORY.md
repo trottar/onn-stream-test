@@ -104,30 +104,92 @@ probe.
 Established by the `C3.L2a` E1 evidence pass. Record:
 `evidence/C3_L2A_E1_DECODER_EVIDENCE_PASS_2026-09-18.md`.
 
-**The Android decoder session report's slow-event list is a fixed-capacity
-ring.** It reports `slow_event_retained` and `slow_event_capacity`; when they are
-equal the buffer overflowed and only the most recent events survive. In the
+**Superseded by `C3.L2b` (below): the specific "128-entry flat ring" retention
+description is historical, describing the report as it existed through
+`C3.L1R1`.** The facts about the client's own decoder baseline and the
+287-318 ms qualification remain current and are restated, not superseded.
+
+**The Android decoder session report's slow-event list *was* a fixed-capacity
+ring.** It reports `slow_event_retained` and `slow_event_capacity`; when they were
+equal the buffer had overflowed and only the most recent events survived. In the
 `C3.L1R1` session it held 128 of 128 and covered only the last 29.4 s of a 64.8 s
-session. A cumulative field such as `max_output_gap_ms` can therefore name an
-event whose row is gone. Read those two fields before concluding anything from
-an absence.
+session. A cumulative field such as `max_output_gap_ms` could therefore name an
+event whose row was gone. `C3.L2b` replaced this with the segmented design
+recorded below; read the two `_marked`/`_recent` field pairs there before
+concluding anything from an absence in reports generated after this patch.
 
 **The game diagnostic bundle's native video section is the last 500 lines of the
 host log.** A missing encoder restart banner is not evidence that no restart
-happened.
+happened. Unaffected by `C3.L2b`.
 
 **Decoder time, not transport, dominates the large output gaps on this client.**
 In ordinary play, `output_gap_ms` tracks `codec_ms` one-to-one with
 `feed_delay_ms` near zero and an empty app queue, reaching 238 ms and 200 ms with
 no actuator involved. Session-wide: 2,696 spikes at or above 20 ms against 3,847
 queued frames, `max_codec_ms` 297, `low_latency_enabled` false on
-`c2.realtek.video.avc.decoder`.
+`c2.realtek.video.avc.decoder`. This is a fact about the client's decoder, not
+about report retention, and does not change with `C3.L2b`.
 
 **Therefore the actuator's 287-318 ms is not established as actuator cost.**
 Against a baseline that reaches 238 ms unaided, the attributable part may be
 ~50 ms or may not be separately visible. Do not restate it as "the cost of the
-actuator" without this qualification.
+actuator" without this qualification. `C3.L2b` makes it possible to measure
+this on a future cycle; it did not itself perform that measurement.
 <!-- PRIVYHUB_C3_L2A_E1_DECODER_EVIDENCE:END -->
+
+<!-- PRIVYHUB_C3_L2B_DECODER_REPORT_CYCLE_RETENTION:BEGIN -->
+## Decoder-report cycle retention — durable facts
+
+Established by `C3.L2b`. Full record:
+`patches/C3-L2B_DECODER_REPORT_CYCLE_RETENTION.md`.
+
+**The decoder session report now retains two slow-event segments, not one
+ring.** `slow_event_retained_marked` / `slow_event_capacity_marked` (64) cover
+events recorded while a cycle window was open; `slow_event_retained_recent` /
+`slow_event_capacity_recent` (64) cover ordinary play. `slow_event_retained`
+and `slow_event_capacity` keep their old whole-report meaning.
+`slow_events_ge_50_ms` keeps its old 7-column shape, now the two segments
+merged and sorted by `elapsed_ms`.
+
+**A cycle window opens on every SSRC change and sequence resync, for
+2000 ms, protecting the marked segment from ordinary-play eviction during
+that time.** `RtpH264Receiver.onStreamDiscontinuity` fires into
+`AvcLowLatencyDecoder.markCycleWindow`. 2000 ms is a judgment call against
+the measured cycle terms (max observed component 318 ms), not itself
+runtime-validated — if a future cycle's discontinuity-adjacent slow events
+land outside it, that is a finding for the next evidence pass, not a defect
+in the design.
+
+**`stream_discontinuities` gives `elapsed_ms`, `type`
+(`ssrc_change`/`sequence_resync`, set explicitly at each call site) and
+`jump_packets` for every discontinuity, bounded to 64 entries.**
+**`first_idr_after_discontinuity` gives `elapsed_ms`, `resync_to_idr_ms`,
+`au_complete`, `au_fec_recovered` and `au_fec_unrecoverable_group` for the
+first accepted IDR following each discontinuity, bounded to 64 entries** —
+only for discontinuities, not the session-start IDR.
+
+**`au_fec_unrecoverable_group` does not cover `trimFecGroups`'s capacity
+eviction (>96 concurrently buffered groups).** A known, accepted gap: that
+path needs loss well past anything C3 evidence has shown, and omitting it can
+only under-report the flag, never falsely claim recovery.
+
+**Held packets now carry their FEC-recovery provenance.** `heldPackets`
+changed from `HashMap<Int, ByteArray>` to `HashMap<Int, HeldPacket>` so a
+packet recovered by FEC but then held for reordering does not silently lose
+that fact before its access unit completes.
+
+**This patch changed report retention and observation only.** It did not
+change decoder configuration, resolution, frame rate, GOP, B-frames, FEC wire
+format, RTP payload type, packet size, ports, process audio, controller
+transport or emulator lifecycle, and it did not enable MediaCodec low-latency
+mode (`C3.L2c`, separately registered, not authorized).
+
+**As of 2026-09-18 this is code, not yet runtime evidence.** No APK built
+with the real Android/Gradle toolchain has been installed on the onn device,
+and no actuator cycle has been run against it. Do not treat
+`stream_discontinuities` or `first_idr_after_discontinuity` field names or
+behavior as confirmed against real hardware until that cycle runs.
+<!-- PRIVYHUB_C3_L2B_DECODER_REPORT_CYCLE_RETENTION:END -->
 
 <!-- PRIVYHUB_ANDROID_FLAT_SOURCE_LAYOUT:BEGIN -->
 ## Android source layout is flat by design

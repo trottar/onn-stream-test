@@ -582,6 +582,18 @@ class NativeStreamActivity :
                         data = accessUnit,
                         presentationTimeUs = presentationTimeUs
                     )
+                },
+                onStreamDiscontinuity = { discontinuityAtNs ->
+                    // C3.L2b: an SSRC change or a sequence resync opens a
+                    // marked window on the decoder's slow-event buffer, so
+                    // the actuator cycle's rows survive alongside ordinary
+                    // play instead of being evicted by it. decoder may still
+                    // be null this early (it is created lazily from the
+                    // first in-band SPS/PPS), which is fine: there is
+                    // nothing to mark yet because nothing has decoded.
+                    decoder?.markCycleWindow(
+                        discontinuityAtNs
+                    )
                 }
             ).also {
                 it.start()
@@ -1199,6 +1211,70 @@ class NativeStreamActivity :
                     )
                 }
             )
+
+            // C3.L2b: elapsed_ms-anchored discontinuities and per-event
+            // first-IDR-after-discontinuity context, so a reader can locate
+            // an actuator cycle in the timeline without relying on the
+            // whole-session cumulative counters above (ssrc_changes,
+            // sequence_resyncs, max_resync_to_idr_ms) to attribute a moment.
+            val discontinuities =
+                receiver
+                    ?.discontinuityEventsSnapshot()
+                    .orEmpty()
+
+            val discontinuityArray =
+                JSONArray()
+
+            for (event in discontinuities) {
+                discontinuityArray.put(
+                    JSONObject().apply {
+                        put("elapsed_ms", event.elapsedMs)
+                        put("type", event.type)
+                        put("jump_packets", event.jumpPackets)
+                    }
+                )
+            }
+
+            root.put(
+                "stream_discontinuities",
+                discontinuityArray
+            )
+            root.put(
+                "stream_discontinuity_capacity",
+                64
+            )
+
+            val idrContexts =
+                receiver
+                    ?.firstIdrAfterDiscontinuityEventsSnapshot()
+                    .orEmpty()
+
+            val idrContextArray =
+                JSONArray()
+
+            for (event in idrContexts) {
+                idrContextArray.put(
+                    JSONObject().apply {
+                        put("elapsed_ms", event.elapsedMs)
+                        put("resync_to_idr_ms", event.resyncToIdrMs)
+                        put("au_complete", event.auComplete)
+                        put("au_fec_recovered", event.auFecRecovered)
+                        put(
+                            "au_fec_unrecoverable_group",
+                            event.auFecUnrecoverableGroup
+                        )
+                    }
+                )
+            }
+
+            root.put(
+                "first_idr_after_discontinuity",
+                idrContextArray
+            )
+            root.put(
+                "first_idr_after_discontinuity_capacity",
+                64
+            )
         }
 
         if (dec != null) {
@@ -1320,10 +1396,27 @@ class NativeStreamActivity :
                 }
             )
 
-            val decoderEvents =
+            // C3.L2b: the predecessor's single 128-entry ring evicted the
+            // oldest row regardless of cause, so an actuator cycle's rows
+            // were indistinguishable from ordinary play and were discarded
+            // by it (C3.L2a E1). The decoder now keeps two segments; this
+            // report merges them back into one chronological array so the
+            // shape and columns stay exactly what earlier tooling expects,
+            // while the marked segment's presence is what keeps a cycle's
+            // rows from being silently evicted by later ordinary spikes.
+            val markedDecoderEvents =
+                decoder
+                    ?.markedSlowEventsSnapshot()
+                    .orEmpty()
+
+            val recentDecoderEvents =
                 decoder
                     ?.slowEventsSnapshot()
                     .orEmpty()
+
+            val decoderEvents =
+                (markedDecoderEvents + recentDecoderEvents)
+                    .sortedBy { it.eventAtNs }
 
             val events =
                 JSONArray()
@@ -1388,6 +1481,22 @@ class NativeStreamActivity :
             root.put(
                 "slow_event_capacity",
                 128
+            )
+            root.put(
+                "slow_event_retained_marked",
+                markedDecoderEvents.size
+            )
+            root.put(
+                "slow_event_capacity_marked",
+                AvcLowLatencyDecoder.MAX_MARKED_SLOW_EVENTS
+            )
+            root.put(
+                "slow_event_retained_recent",
+                recentDecoderEvents.size
+            )
+            root.put(
+                "slow_event_capacity_recent",
+                AvcLowLatencyDecoder.MAX_RECENT_SLOW_EVENTS
             )
         }
 

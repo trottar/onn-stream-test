@@ -1,12 +1,14 @@
 # Roadmap Status
 
-As of 2026-09-18, baseline `62b8b6014c23a7cd895d89d38b6f83e822aa6f31`.
+As of 2026-09-18, baseline `e220d3e39c896bac89bc8d286279b480cba50669`.
 
 ## Active
 
 Phase C Linux continuation.
 
-Active work item: `C3.L2b` — decoder-report cycle retention.
+Active work item: collect `C3.L2b` runtime evidence and close `C3.L2a`. The
+`C3.L2b` code is installed; the actuator cycle against the rebuilt client has
+not yet been run.
 
 ## Completed
 
@@ -26,6 +28,8 @@ Active work item: `C3.L2b` — decoder-report cycle retention.
   characterization use; not authorized for automatic in-game adaptation.
 - `C3.L2a` E1 evidence pass: COMPLETE. The question is not answered and the
   reason is a diagnostic retention defect.
+- `C3.L2b` decoder-report cycle retention: **CODE INSTALLED**, not yet
+  runtime validated. See `patches/C3-L2B_DECODER_REPORT_CYCLE_RETENTION.md`.
 
 ## Phase C Linux sequence
 
@@ -34,8 +38,8 @@ Active work item: `C3.L2b` — decoder-report cycle retention.
 | `C3.L0` actuator boundary audit | COMPLETE |
 | `C3.L1` encoder-only restart continuity probe | COMPLETE / RUNTIME VALIDATED |
 | `C3.L2` Linux actuator capability classification | COMPLETE |
-| `C3.L2a` first-IDR acceptance investigation | OPEN; blocked on `C3.L2b` |
-| `C3.L2b` decoder-report cycle retention | **NEXT** |
+| `C3.L2a` first-IDR acceptance investigation | OPEN; instrumentation defect fixed by `C3.L2b`, runtime cycle not yet run |
+| `C3.L2b` decoder-report cycle retention | CODE INSTALLED; RUNTIME EVIDENCE NOT YET COLLECTED |
 | `C3.L2c` low-latency decode candidate | REGISTERED, NOT SCHEDULED, NOT AUTHORIZED |
 | `C3.L3` Linux fixed-bitrate envelope revalidation | UNBLOCKED for manual characterization; sequenced after `C3.L2a` closes |
 | `C3.L4` explainable fast-down/slow-up controller | BLOCKED; gate is `C3.L2a` |

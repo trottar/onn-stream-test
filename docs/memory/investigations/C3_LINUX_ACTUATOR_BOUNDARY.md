@@ -593,3 +593,60 @@ item — it changes the baseline C3 measures against.
 `C3.L2a` stays open behind `C3.L2b`. `C3.L3` remains unblocked for manual
 characterization but is sequenced after `C3.L2a` closes. `C3.L4` remains
 blocked.
+
+## C3.L2b installed as code; runtime evidence still pending
+
+Full record: `../patches/C3-L2B_DECODER_REPORT_CYCLE_RETENTION.md`. Installed
+2026-09-18. No production change: decoder configuration, resolution, frame
+rate, GOP, B-frames, FEC wire format, RTP payload type, packet size, ports,
+process audio, controller transport and emulator lifecycle are all untouched.
+`C3.L2c` was not folded in.
+
+**What changed.** `AvcLowLatencyDecoder`'s single 128-entry flat slow-event
+ring split into a 64-entry `recent` segment (ordinary-play eviction,
+unchanged behavior at half capacity) and a 64-entry `marked` segment written
+only while a cycle window is open. `RtpH264Receiver.onStreamDiscontinuity`
+fires on every SSRC change and sequence resync; `NativeStreamActivity` wires
+it to `decoder?.markCycleWindow(nowNs)`, opening a 2000 ms protected window.
+The receiver also gained a bounded `stream_discontinuities` list
+(`elapsed_ms`, explicit `type`, `jump_packets`) and a bounded
+`first_idr_after_discontinuity` list (`elapsed_ms`, `resync_to_idr_ms`,
+`au_complete`, `au_fec_recovered`, `au_fec_unrecoverable_group`) for the
+first accepted IDR after each discontinuity. FEC-recovery provenance now
+survives the packet-hold path (`heldPackets` changed from
+`HashMap<Int, ByteArray>` to a `HeldPacket(data, fecRecovered)` carrier), so
+`au_fec_recovered` is correct even for a recovered packet that had to wait
+for reordering. The old `slow_event_retained`/`slow_event_capacity` fields
+and the `slow_events_ge_50_ms` array keep their old whole-session meaning and
+shape; nothing that read the pre-`C3.L2b` report breaks.
+
+**Deliberately not done.** `trimFecGroups`'s rare capacity-eviction path
+(>96 concurrently buffered FEC groups) is not correlated into
+`au_fec_unrecoverable_group` — that path needs loss well past anything C3
+evidence has shown, and omitting it can only under-report the flag. The
+2000 ms cycle window is a judgment call against the measured cycle terms (max
+observed component 318 ms), not itself runtime-validated.
+
+**Validation performed and its limit.** This session had no shell access to
+the linked device (two ToolSearch queries confirmed no `device_bash`-class
+tool exists for this link), so the real `sh ./gradlew :app:assembleDebug`
+gate — the first compile against the actual Android/Activity framework —
+could not run here; it is the installer's own post-write gate, run on the
+machine with the Android SDK. What was validated here: `RtpH264Receiver.kt`
+(no Android dependency) compiled standalone with a real Kotlin 2.0.21
+compiler; `AvcLowLatencyDecoder.kt` compiled against hand-written stubs of
+the exact Android API surface it uses; the `NativeStreamActivity.kt`
+report-building addition was re-implemented in an isolated harness against
+the real compiled data classes and a minimal `org.json` stub, run, and
+confirmed to produce a correctly merged, chronologically sorted report
+fragment.
+
+**Not claimed.** `adb install -r`, a rebuilt-client actuator cycle, or a
+`C3.L2a` re-attempt. Those are the immediate next steps, not part of this
+installation. `C3.L2a` stays open until a clean cycle runs against the
+rebuilt APK and its report is read — see `CURRENT.md` → Next Action for the
+exact commands.
+
+Do not reopen the `C3.L2b` code design itself (the marked/recent
+segmentation, the 2000 ms window, the discontinuity/IDR-context list
+capacities) without a runtime finding that it is insufficient.

@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-09-18
-baseline_commit: 6abe47d2f7adf1eae847d3b23b12b760586f6d41
+baseline_commit: e220d3e39c896bac89bc8d286279b480cba50669
 phase: C
 scope: phase_c_linux_streaming_continuation
 ---
@@ -39,8 +39,8 @@ Phase C is active. Sub-phase state:
 | `C3.L1` Linux encoder-only seam and probe | COMPLETE / RUNTIME VALIDATED |
 | `C3.L1R1` RTP baseline correction | COMPLETE / RUNTIME VALIDATED |
 | `C3.L2` Linux actuator classification | COMPLETE |
-| `C3.L2a` first-IDR acceptance investigation | EVIDENCE PASS COMPLETE; question open, blocked on instrumentation |
-| `C3.L2b` decoder-report cycle retention | **NEXT** |
+| `C3.L2a` first-IDR acceptance investigation | EVIDENCE PASS COMPLETE; question open, blocked on instrumentation until `C3.L2b` runtime evidence lands |
+| `C3.L2b` decoder-report cycle retention | **CODE INSTALLED; RUNTIME EVIDENCE NOT YET COLLECTED** |
 | `C3.L2c` low-latency decode candidate | REGISTERED, NOT SCHEDULED, NOT AUTHORIZED |
 | `C3.L3` Linux fixed-bitrate envelope revalidation | UNBLOCKED for manual characterization; sequenced after `C3.L2a` closes |
 | `C3.L4` fast-down/slow-up controller | BLOCKED; gate is `C3.L2a` |
@@ -142,7 +142,9 @@ classification") is **met**.
 - `max_resync_to_idr_ms` and `packets_dropped_waiting_for_idr` are **whole-session
   values**. Each session recorded two sequence resyncs and one SSRC change, so
   attributing the session maximum to the cycle is an inference, not a
-  measurement.
+  measurement. `C3.L2b` gives future sessions per-event values instead of a
+  session maximum; the whole-session figures above stand as the historical
+  `C3.L1R1` record.
 - The terms do not sum. Spawn 115 ms, RTP silence ~152 ms and decoder gap 287 ms
   overlap in time; 152 + 191 exceeds 287.
 - `decoder_max_output_gap_ms` is the figure to cite. It is measured on the
@@ -198,12 +200,13 @@ and the start path publishes `bootstrap: in_band_h264_parameter_sets`. A new
 H.264 RTP stream begins with parameter sets and an IDR. There is nothing to
 request; the wait needs a cause, not a remedy.
 
-**E1 evidence pass: the question cannot be answered from what was collected.**
-Record: `evidence/C3_L2A_E1_DECODER_EVIDENCE_PASS_2026-09-18.md`. The decoder
-report's slow-event list is a 128-entry ring; in the `C3.L1R1` session it was
-full and retained only elapsed 35,421-64,813 ms, so the 287 ms event's row was
-evicted before the report was written. Re-running the existing probe unchanged
-would lose it again.
+**E1 evidence pass: the question could not be answered from what was
+collected.** Record: `evidence/C3_L2A_E1_DECODER_EVIDENCE_PASS_2026-09-18.md`.
+The decoder report's slow-event list was a 128-entry flat ring; in the
+`C3.L1R1` session it was full and retained only elapsed 35,421-64,813 ms, so
+the 287 ms event's row was evicted before the report was written. Re-running
+the existing probe unchanged would have lost it again — that instrumentation
+defect is what `C3.L2b` (below) fixes.
 
 **What E1 did establish, and it matters more than the original question.** In
 ordinary play with no actuator activity, `output_gap_ms` tracks `codec_ms`
@@ -215,37 +218,46 @@ Session-wide: 2,696 spikes at or above 20 ms against 3,847 queued frames,
 
 So the cycle's 287 ms sits against a baseline that reaches 238 ms unaided. The
 attributable actuator cost may be ~50 ms, or may not be separately visible. Do
-not restate 287-318 ms as "the cost of the actuator" without that qualification.
+not restate 287-318 ms as "the cost of the actuator" without that
+qualification — that qualification does not change with `C3.L2b`; it is a fact
+about the client's decoder, not about the report's retention.
 
 Also from E1: `max_frames_between_idr` 27 against GOP 15, so the worst-case
 keyframe wait is ~450 ms, not 250 ms; the damaged-first-IDR mechanism is real
 in-session (`fec_recovered_idr_packets` 1, `fec_unrecoverable_groups` 2,
-`sequence_gap_au_drops` 4, `incomplete_au_drops` 3) but cannot be tied to the
-cycle; and the encoder swap is not visible in the host log's retained 500-line
-tail, which is a question for the probe source.
+`sequence_gap_au_drops` 4, `incomplete_au_drops` 3) but could not be tied to
+the cycle with the old report; and the encoder swap is not visible in the host
+log's retained 500-line tail, which is a question for the probe source.
 
-**`C3.L2b` is the next item, and it is the only way forward on `C3.L2a`.** Make
-the decoder session report retain the cycle: marked-window retention or a
-segmented slow-event buffer, `elapsed_ms` anchors for the SSRC change and
-sequence resyncs, and per-event IDR context for the first accepted IDR after an
-SSRC change. Diagnostic-only client work — it changes the report, not decoder
-configuration, resolution, frame rate or any streaming constant. It carries a
-real `./gradlew :app:assembleDebug`, an `adb install -r`, and one clean cycle
-run afterwards. Do not re-run `tools/probe_c3_actuator_continuity.py` before it
-lands; the existing report would evict the same row again.
+**`C3.L2b` is installed, this session, as code. It is not yet runtime
+evidence.** `docs/memory/patches/C3-L2B_DECODER_REPORT_CYCLE_RETENTION.md`
+replaced the decoder session report's retention: a 64-entry marked segment
+(protected while a cycle window is open, opened by every SSRC change and
+sequence resync) alongside a 64-entry recent segment instead of one flat
+128-entry ring; `elapsed_ms`-anchored `stream_discontinuities` for every SSRC
+change and sequence resync, each typed explicitly rather than inferred; and a
+bounded `first_idr_after_discontinuity` list giving `resync_to_idr_ms` and
+FEC-recovery/completeness context for the specific access unit that ended each
+wait. The three changed Kotlin files were compiled for real with the Kotlin
+compiler (two of them independent of the Android SDK; the third re-verified in
+an isolated harness against the real compiled types), but no APK has been
+built with the actual Android/Gradle toolchain or installed on the onn device
+yet, and no actuator cycle has been run against it. `C3.L2a` stays open until
+that happens. See `CURRENT.md` → Next Action for the exact commands.
 
 **`C3.L2c` is registered and not authorized.** `low_latency_enabled` is false on
 `c2.realtek.video.avc.decoder` while 2,696 of 3,847 frames took 20 ms or more to
 decode. Enabling MediaCodec low-latency mode is a production client behavior
 change with its own hypothesis and its own focused gameplay acceptance. On the
 E1 evidence it is plausibly a larger lever on perceived smoothness than the
-actuator question, but it must not ride along inside a diagnostics patch. The
-user chooses whether `C3.L2b` or `C3.L2c` runs first; `C3.L2b` is the one that
-unblocks `C3.L2a`.
+actuator question, but it must not ride along inside a diagnostics patch — and
+it did not: `C3.L2b` touched only report retention. The user chooses whether
+`C3.L2c` runs next; it is not a prerequisite for closing `C3.L2a`.
 
 The pre-registered boundary from `C3.L2` stands once the instrumentation can
-support it: reproducibly **≈120 ms or below** reopens the automatic question,
-with a focused gameplay observation required before acceptance; **~120-250 ms**
+support it, which is now a runtime question rather than a blocked one:
+reproducibly **≈120 ms or below** reopens the automatic question, with a
+focused gameplay observation required before acceptance; **~120-250 ms**
 keeps the actuator non-automatic; **unchanged** falsifies the lead. Judge those
 figures against the client's own baseline distribution, not against zero.
 
@@ -256,7 +268,9 @@ payload type, packet size, ports, process audio, controller transport, emulator
 lifecycle, Android streaming constants, or any non-loopback control surface.
 
 Do not reopen: D4 Games, D5 media/server, the Windows-era C3 record (D-063,
-D-067, D-068, D-069, D-070, D-071), or the deferred UDP burst/gap pathology.
+D-067, D-068, D-069, D-070, D-071), the deferred UDP burst/gap pathology, or
+the `C3.L2b` code design itself (marked/recent segmentation, discontinuity and
+IDR-context bounded lists) without a runtime finding that it is insufficient.
 
 The Windows 5500/6000/7000 bitrate ladder is **evidence, not a Linux constant**.
 `C3.L3` must revalidate it on Linux before any level is treated as portable.
@@ -276,7 +290,9 @@ Never ask the user for IP addresses; redact network identity in diagnostics.
 - Continuity probe, trigger phase takes **no flag**:
   `python3 tools/probe_c3_actuator_continuity.py`
   then after normal Back: `... --finalize`.
-  A `--trigger` flag does not exist.
+  A `--trigger` flag does not exist. Do not run it against the pre-`C3.L2b`
+  APK; it must be the rebuilt client, or the retention defect the patch fixed
+  is simply re-measured against old code.
 - The runner extracts only `ffmpeg_spawn_ms`, `first_rtp_resume_ms` and
   `host_verified_ms` from the host payload. `C3.L1R1`'s new fields
   (`encoder_down_ms`, `rtp_silence_after_spawn_ms`,
@@ -303,6 +319,10 @@ Never ask the user for IP addresses; redact network identity in diagnostics.
   never recorded `ffmpeg_spawn_ms`, so it cannot be checked retrospectively.
   Treat Windows "first RTP resume" figures as pipeline re-establishment time.
   Not fixed; Windows is outgoing.
+- `C3.L2b`'s 2000 ms cycle-window default and its choice not to correlate
+  `trimFecGroups`'s rare capacity-eviction path into `auFecUnrecoverableGroup`
+  are judgment calls, not runtime-validated figures. See "Negative results and
+  scope decisions" in `patches/C3-L2B_DECODER_REPORT_CYCLE_RETENTION.md`.
 
 ## 10. Pointers, for detail only
 
@@ -315,6 +335,8 @@ Never ask the user for IP addresses; redact network identity in diagnostics.
 - `evidence/C3_L2A_E1_DECODER_EVIDENCE_PASS_2026-09-18.md` — E1 pass, the
   retention defect, and the decoder-spike baseline the actuator is measured
   against.
+- `patches/C3-L2B_DECODER_REPORT_CYCLE_RETENTION.md` — the retention patch
+  installed this session; what changed and what is still not runtime-verified.
 - `evidence/C1_C2_LINUX_REVALIDATION_2026-09-18.md` — Linux baseline.
 - `architecture/ADAPTIVE_BITRATE.md` — adaptation architecture and Windows-era
   history.

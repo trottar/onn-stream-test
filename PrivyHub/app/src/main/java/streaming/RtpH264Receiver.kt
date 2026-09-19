@@ -8,6 +8,28 @@ import java.util.LinkedHashMap
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.concurrent.thread
 
+// C3.L2b: elapsed_ms-anchored record of an SSRC change or a sequence
+// resync, so a reader of the decoder session report can locate an actuator
+// cycle in the timeline even when the cumulative counters (ssrcChanges,
+// sequenceResyncs) are all a reader has otherwise.
+data class StreamDiscontinuityEvent(
+    val elapsedMs: Long,
+    val type: String,
+    val jumpPackets: Long
+)
+
+// C3.L2b: per-event context for the first access unit accepted as clean
+// after a discontinuity (waitingForIdr transitioning back to false). Answers
+// the C3.L2a question's prerequisite: was the accepted IDR itself intact,
+// and had this receiver seen FEC involvement for it.
+data class FirstIdrAfterDiscontinuity(
+    val elapsedMs: Long,
+    val resyncToIdrMs: Long,
+    val auComplete: Boolean,
+    val auFecRecovered: Boolean,
+    val auFecUnrecoverableGroup: Boolean
+)
+
 data class NativeStreamMetrics(
     val packets: Long,
     val bytes: Long,
@@ -52,7 +74,14 @@ class RtpH264Receiver(
     private val port: Int,
     private val payloadType: Int = 96,
     private val onParameterSets: (ByteArray, ByteArray) -> Unit,
-    private val onAccessUnit: (ByteArray, Long) -> Unit
+    private val onAccessUnit: (ByteArray, Long) -> Unit,
+    // C3.L2b: fired on every SSRC change and sequence resync, nowNs
+    // (System.nanoTime()) of the discontinuity. Lets the decoder open its
+    // marked slow-event window without RtpH264Receiver knowing anything
+    // about AvcLowLatencyDecoder. Default no-op keeps every other
+    // construction site (there are none today, but this keeps the
+    // constructor safe to call positionally-short) source-compatible.
+    private val onStreamDiscontinuity: (Long) -> Unit = {}
 ) {
     companion object {
         private const val FEC_HEADER_SIZE =
@@ -78,6 +107,17 @@ class RtpH264Receiver(
         private const val RESYNC_FORWARD_GAP_PACKETS =
             128
 
+        // C3.L2b: discontinuities and first-IDR-after-discontinuity events
+        // are rare (the C3.L1/C3.L1R1 evidence shows one SSRC change and two
+        // sequence resyncs per cycle), so a small bounded list is generous
+        // headroom for many cycles in one session, not a tight ring like the
+        // decoder's slow-event buffer.
+        private const val MAX_DISCONTINUITY_EVENTS =
+            64
+
+        private const val MAX_IDR_CONTEXT_EVENTS =
+            64
+
         private val FEC_MAGIC =
             byteArrayOf(
                 'P'.code.toByte(),
@@ -90,6 +130,16 @@ class RtpH264Receiver(
     private data class PacketKey(
         val timestamp: Long,
         val sequence: Int
+    )
+
+    // C3.L2b: held packets used to be a bare ByteArray, which lost whether a
+    // held packet was a live arrival or a FEC-reconstructed one once it sat
+    // in the hold map. That provenance is needed to attribute
+    // auFecRecovered correctly for an access unit whose recovered packet
+    // arrived out of order relative to the ordered frontier.
+    private data class HeldPacket(
+        val data: ByteArray,
+        val fecRecovered: Boolean
     )
 
     private data class FecGroup(
@@ -251,7 +301,24 @@ class RtpH264Receiver(
         0L
 
     private val heldPackets =
-        HashMap<Int, ByteArray>()
+        HashMap<Int, HeldPacket>()
+
+    // C3.L2b: bounded, locked lists behind the same style as the decoder's
+    // slowEventsLock/slowEvents pair. Rare events, so plain synchronized
+    // ArrayDeques are enough; no atomic/lock-free machinery needed.
+    private val discontinuityLock = Any()
+
+    private val discontinuityEvents =
+        ArrayDeque<StreamDiscontinuityEvent>(
+            MAX_DISCONTINUITY_EVENTS
+        )
+
+    private val idrContextLock = Any()
+
+    private val idrContextEvents =
+        ArrayDeque<FirstIdrAfterDiscontinuity>(
+            MAX_IDR_CONTEXT_EVENTS
+        )
 
     private val recentPackets =
         LinkedHashMap<PacketKey, ByteArray>()
@@ -277,6 +344,17 @@ class RtpH264Receiver(
 
     private var currentAccessUnitPacketCount =
         0L
+
+    // C3.L2b: per-access-unit FEC provenance, valid only while the AU
+    // identified by currentTimestamp is being assembled. Reset at every AU
+    // boundary alongside currentAccessUnitPacketCount. Single-threaded by
+    // construction (receiveLoop is the only writer), same as
+    // currentCorrupt/currentSequenceGap above.
+    private var currentAccessUnitFecRecovered =
+        false
+
+    private var currentAccessUnitFecUnrecoverable =
+        false
 
     private var accessUnit =
         ByteArrayOutputStream(
@@ -429,6 +507,22 @@ class RtpH264Receiver(
         )
     }
 
+    // C3.L2b: bounded snapshots for the decoder session report. Mirrors the
+    // decoder's slowEventsSnapshot()/markedSlowEventsSnapshot() pattern.
+    fun discontinuityEventsSnapshot():
+        List<StreamDiscontinuityEvent> {
+        synchronized(discontinuityLock) {
+            return discontinuityEvents.toList()
+        }
+    }
+
+    fun firstIdrAfterDiscontinuityEventsSnapshot():
+        List<FirstIdrAfterDiscontinuity> {
+        synchronized(idrContextLock) {
+            return idrContextEvents.toList()
+        }
+    }
+
     private fun receiveLoop() {
         val localSocket =
             DatagramSocket(
@@ -565,7 +659,9 @@ class RtpH264Receiver(
                 jumpPackets =
                     0L,
                 nowNs =
-                    nowNs
+                    nowNs,
+                type =
+                    "ssrc_change"
             )
         } else if (
             shouldResyncForSequenceJump(
@@ -592,7 +688,9 @@ class RtpH264Receiver(
                 jumpPackets =
                     jump.toLong(),
                 nowNs =
-                    nowNs
+                    nowNs,
+                type =
+                    "sequence_resync"
             )
         }
 
@@ -758,7 +856,8 @@ class RtpH264Receiver(
     private fun beginStreamResync(
         newSsrc: Long,
         jumpPackets: Long,
-        nowNs: Long
+        nowNs: Long,
+        type: String
     ) {
         sequenceResyncs
             .incrementAndGet()
@@ -766,6 +865,19 @@ class RtpH264Receiver(
         updateMax(
             largestResyncJumpPackets,
             jumpPackets
+        )
+
+        recordDiscontinuity(
+            nowNs =
+                nowNs,
+            type =
+                type,
+            jumpPackets =
+                jumpPackets
+        )
+
+        onStreamDiscontinuity(
+            nowNs
         )
 
         activeSsrc =
@@ -806,6 +918,12 @@ class RtpH264Receiver(
         currentAccessUnitPacketCount =
             0L
 
+        currentAccessUnitFecRecovered =
+            false
+
+        currentAccessUnitFecUnrecoverable =
+            false
+
         accessUnit
             .reset()
 
@@ -816,9 +934,47 @@ class RtpH264Receiver(
             nowNs
     }
 
+    private fun recordDiscontinuity(
+        nowNs: Long,
+        type: String,
+        jumpPackets: Long
+    ) {
+        val elapsedMs =
+            if (receiverStartedNs > 0L) {
+                (
+                    nowNs -
+                        receiverStartedNs
+                ).coerceAtLeast(0L) /
+                    1_000_000L
+            } else {
+                0L
+            }
+
+        val event =
+            StreamDiscontinuityEvent(
+                elapsedMs =
+                    elapsedMs,
+                type =
+                    type,
+                jumpPackets =
+                    jumpPackets
+            )
+
+        synchronized(discontinuityLock) {
+            while (
+                discontinuityEvents.size >=
+                MAX_DISCONTINUITY_EVENTS
+            ) {
+                discontinuityEvents.removeFirst()
+            }
+            discontinuityEvents.addLast(event)
+        }
+    }
+
     private fun acceptOrderedPacket(
         packet: ByteArray,
-        nowNs: Long
+        nowNs: Long,
+        fecRecovered: Boolean = false
     ) {
         val info =
             basicRtpInfo(
@@ -836,7 +992,8 @@ class RtpH264Receiver(
         ) {
             parseRtpPacket(
                 packet,
-                packet.size
+                packet.size,
+                fecRecovered
             )
 
             orderedLastSequence =
@@ -858,7 +1015,8 @@ class RtpH264Receiver(
         ) {
             parseRtpPacket(
                 packet,
-                packet.size
+                packet.size,
+                fecRecovered
             )
 
             orderedLastSequence =
@@ -885,7 +1043,12 @@ class RtpH264Receiver(
             heldPackets[
                 sequence
             ] =
-                packet
+                HeldPacket(
+                    data =
+                        packet,
+                    fecRecovered =
+                        fecRecovered
+                )
 
             if (
                 gapHoldStartedNs ==
@@ -923,15 +1086,16 @@ class RtpH264Receiver(
                 ) and
                     0xffff
 
-            val packet =
+            val held =
                 heldPackets.remove(
                     expected
                 ) ?:
                     break
 
             parseRtpPacket(
-                packet,
-                packet.size
+                held.data,
+                held.data.size,
+                held.fecRecovered
             )
 
             orderedLastSequence =
@@ -1012,8 +1176,8 @@ class RtpH264Receiver(
                 .sortedBy {
                     val info =
                         basicRtpInfo(
-                            it,
-                            it.size
+                            it.data,
+                            it.data.size
                         )
 
                     if (
@@ -1037,19 +1201,20 @@ class RtpH264Receiver(
             0L
 
         for (
-            packet in
+            held in
             ordered
         ) {
             val info =
                 basicRtpInfo(
-                    packet,
-                    packet.size
+                    held.data,
+                    held.data.size
                 ) ?:
                     continue
 
             parseRtpPacket(
-                packet,
-                packet.size
+                held.data,
+                held.data.size,
+                held.fecRecovered
             )
 
             orderedLastSequence =
@@ -1395,6 +1560,14 @@ class RtpH264Receiver(
             fecUnrecoverableGroups
                 .incrementAndGet()
 
+            if (
+                group.timestamp ==
+                currentTimestamp
+            ) {
+                currentAccessUnitFecUnrecoverable =
+                    true
+            }
+
             return
         }
 
@@ -1497,7 +1670,8 @@ class RtpH264Receiver(
 
         acceptOrderedPacket(
             reconstructed,
-            nowNs
+            nowNs,
+            fecRecovered = true
         )
     }
 
@@ -1525,6 +1699,14 @@ class RtpH264Receiver(
 
                 fecUnrecoverableGroups
                     .incrementAndGet()
+
+                if (
+                    entry.value.timestamp ==
+                    currentTimestamp
+                ) {
+                    currentAccessUnitFecUnrecoverable =
+                        true
+                }
             }
         }
     }
@@ -1549,6 +1731,13 @@ class RtpH264Receiver(
     }
 
     private fun trimFecGroups() {
+        // C3.L2b note: capacity eviction here is not correlated into
+        // currentAccessUnitFecUnrecoverable, unlike the two failure paths in
+        // attemptRecoverGroup() and pruneCaches(). Reaching MAX_FEC_GROUPS
+        // (96) concurrently buffered groups needs a degree of loss or
+        // reordering well past anything observed in C3 evidence; leaving it
+        // uncorrelated can only under-report the flag, never claim recovery
+        // that did not happen.
         while (
             fecGroups
                 .size >
@@ -1746,7 +1935,8 @@ class RtpH264Receiver(
 
     private fun parseRtpPacket(
         data: ByteArray,
-        length: Int
+        length: Int,
+        fecRecovered: Boolean = false
     ) {
         if (length < 12) {
             return
@@ -1849,6 +2039,8 @@ class RtpH264Receiver(
             currentCorrupt = sequenceGap
             currentSequenceGap = sequenceGap
             currentAccessUnitPacketCount = 0L
+            currentAccessUnitFecRecovered = false
+            currentAccessUnitFecUnrecoverable = false
             accessUnit.reset()
         } else if (sequenceGap) {
             currentCorrupt = true
@@ -1857,6 +2049,10 @@ class RtpH264Receiver(
 
         currentAccessUnitPacketCount +=
             1L
+
+        if (fecRecovered) {
+            currentAccessUnitFecRecovered = true
+        }
 
         val offset = headerLength
         val nalType = data[offset].toInt() and 0x1f
@@ -1920,7 +2116,14 @@ class RtpH264Receiver(
                         isIdr
                     ) {
                         completeStreamResync(
-                            System.nanoTime()
+                            nowNs =
+                                System.nanoTime(),
+                            auComplete =
+                                !currentCorrupt,
+                            auFecRecovered =
+                                currentAccessUnitFecRecovered,
+                            auFecUnrecoverableGroup =
+                                currentAccessUnitFecUnrecoverable
                         )
                     }
 
@@ -1955,6 +2158,8 @@ class RtpH264Receiver(
             currentCorrupt = false
             currentSequenceGap = false
             currentAccessUnitPacketCount = 0L
+            currentAccessUnitFecRecovered = false
+            currentAccessUnitFecUnrecoverable = false
         }
     }
 
@@ -2014,7 +2219,10 @@ class RtpH264Receiver(
     }
 
     private fun completeStreamResync(
-        nowNs: Long
+        nowNs: Long,
+        auComplete: Boolean,
+        auFecRecovered: Boolean,
+        auFecUnrecoverableGroup: Boolean
     ) {
         waitingForIdr =
             false
@@ -2061,6 +2269,44 @@ class RtpH264Receiver(
                 maxResyncToIdrMs,
                 elapsedMs
             )
+
+            // C3.L2b: only when this completion follows an actual
+            // discontinuity (startNs > 0L), not the very first IDR at
+            // session start, which is not "after an SSRC change".
+            val sessionElapsedMs =
+                if (receiverStartedNs > 0L) {
+                    (
+                        nowNs -
+                            receiverStartedNs
+                    ).coerceAtLeast(0L) /
+                        1_000_000L
+                } else {
+                    0L
+                }
+
+            val idrEvent =
+                FirstIdrAfterDiscontinuity(
+                    elapsedMs =
+                        sessionElapsedMs,
+                    resyncToIdrMs =
+                        elapsedMs,
+                    auComplete =
+                        auComplete,
+                    auFecRecovered =
+                        auFecRecovered,
+                    auFecUnrecoverableGroup =
+                        auFecUnrecoverableGroup
+                )
+
+            synchronized(idrContextLock) {
+                while (
+                    idrContextEvents.size >=
+                    MAX_IDR_CONTEXT_EVENTS
+                ) {
+                    idrContextEvents.removeFirst()
+                }
+                idrContextEvents.addLast(idrEvent)
+            }
         }
 
         resyncStartedNs =
