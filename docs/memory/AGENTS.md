@@ -41,6 +41,27 @@ avoid unrelated cleanup.
 Do not reopen resolved or explicitly deferred investigations without new
 evidence. Raw measurements outrank classifiers when they disagree.
 
+## Execution budget
+
+State the plan in three lines before starting. Stop and ask if the work needs
+more than **10 file reads, 15 commands, or one deliverable**.
+
+Do **not** build installer self-tests, synthetic fixtures, stub compilers or
+mock Android frameworks to pre-validate a patch. The gates that decide
+correctness run on the user's machine — predecessor SHA-256, the real
+`./gradlew :app:assembleDebug`, `tools/check_memory_health.py` — and the
+installer restores exact predecessor bytes if any of them fails. Re-proving them
+in a sandbox costs the user real money and proves nothing the install will not
+prove.
+
+Earlier patch records in `patches/` list fixtures, stub compilation and
+multi-check self-tests under "Validation performed". **Do not use them as a
+model.** They are over-built, they are the reason sessions have run 20+ minutes
+on single work items, and this rule supersedes that precedent.
+
+"Memory" in this project means `docs/memory/`. It does not mean assistant
+memory. Read the repository.
+
 ## Durable memory
 
 - `CURRENT.md` — single active objective, current state, exact next action.
