@@ -61,7 +61,7 @@ Two distinct unanswered questions:
    picture at 5000 or 5500 kbps. A fast-down controller whose destination is
    visually poor fails even with invisible transitions.
 
-## C3.L3a — gameplay acceptance probe. PART 1 INSTALLED / PART 2 NEXT.
+## C3.L3a — gameplay acceptance probe. PART 1 RUNTIME VALIDATED / PART 2 NEXT.
 
 The `C3.L4` gate, made performable. Diagnostic-only. **It authorizes nothing**
 and adds no controller logic. Full design in
@@ -82,10 +82,18 @@ earlier "reuses `run_c3_linux_fixed_bitrate_cycle` as-is" description and the
 later `ladder_transition`/new-route design; see the correction in
 `../architecture/ADAPTIVE_BITRATE.md`.
 
-**Gate before Part 2 is built:** one manual round trip,
-`7000 -> 6000 -> 5500 -> 5000 -> 5500 -> 6000 -> 7000`. Six chained
-transitions, both directions, ending at reference. Chaining has never run on
-Linux and must not debut inside a blinded gameplay session.
+**Gate PASSED 2026-09-19.** The round trip
+`7000 -> 6000 -> 5500 -> 5000 -> 5500 -> 6000 -> 7000` ran clean on both
+sides. Host: every transition `ok`, `from_bitrate_kbps` chaining exactly,
+zero FEC/audio/controller deltas, spawn spread 0.45 ms across five restarts,
+ending at reference. Client: `ssrc_changes` 6, all six discontinuities typed
+`ssrc_change` with `jump_packets` 0, first IDRs at 18/24/24/29/30/65 ms, all
+complete and unrepaired. A redundant same-target request was correctly
+rejected with `bitrate_transition_noop`. Record:
+`../evidence/C3_L3A_P1_LADDER_TRANSITION_RUNTIME_2026-09-19.md`.
+
+Part 1 needs no further work, and **it advances the `C3.L4` gate not at
+all** — nothing perceptual was measured.
 
 Requirements, from `../decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`,
 section "The `C3.L4` gate, stated so it can be satisfied":

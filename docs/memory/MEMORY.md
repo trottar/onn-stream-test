@@ -251,6 +251,41 @@ does not authorize automatic in-game adaptation, which still needs repetition
 and a focused gameplay observation.
 <!-- PRIVYHUB_C3_L2A_ANSWERED:END -->
 
+<!-- PRIVYHUB_C3_L3A_LADDER:BEGIN -->
+## Chained ladder transitions work on Linux — durable facts
+
+Established 2026-09-19 by `C3.L3a` Part 1. Record:
+`evidence/C3_L3A_P1_LADDER_TRANSITION_RUNTIME_2026-09-19.md`.
+
+The Linux encoder-only actuator supports **several transitions in one
+session, in either direction**, between `(5000, 5500, 6000, 7000)` kbps. Six
+chained transitions ran clean, ending back at the 7000 reference. Upward
+transitions and 7000-as-target had never run on Linux before and were
+impossible under the C3.L3 precondition, which required a 7000 start.
+
+Use `run_c3_linux_validated_bitrate_transition` for this. The `C3.L3`
+characterization path (`run_c3_linux_fixed_bitrate_cycle`) still requires a
+7000 start by design and still cannot target 7000.
+
+**The actuator's first IDR is accepted fast, now on seven observations.**
+18-65 ms across the six ladder transitions, plus 27 ms from `C3.L2a` E2 —
+every one access-unit complete, none FEC-repaired, none hitting an
+unrecoverable group. Ordinary sequence resyncs on record cost 195-332 ms. The
+discontinuities are typed `ssrc_change` with `jump_packets` 0: an encoder
+restart does not disturb the RTP sequence.
+
+Cost figures worth carrying: spawn ~265.5-266.0 ms (0.45 ms spread across
+five restarts), first RTP resume 417.7-428.2 ms, host-verified ~1.17-1.18 s
+per transition.
+
+**Chained transitions resume faster than from-reference cycles** —
+417.7-428.2 ms here against `C3.L3`'s 519.4/667.1/517.5 ms. One sequence;
+an observation, not a finding.
+
+**None of this is perceptual.** It advances the `C3.L4` gate not at all. The
+gate is `C3.L3a` Part 2.
+<!-- PRIVYHUB_C3_L3A_LADDER:END -->
+
 <!-- PRIVYHUB_C3_L2C_FALSIFIED:BEGIN -->
 ## Decode time is not the stall — durable fact
 

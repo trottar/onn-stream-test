@@ -45,7 +45,7 @@ definition in `decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`.
 | `C3.L2b` decoder-report cycle retention | COMPLETE / RUNTIME VALIDATED |
 | `C3.L2c` low-latency decode candidate | **FALSIFIED / ROLLED BACK** |
 | `C3.L3` Linux fixed-bitrate envelope characterization | COMPLETE / RUNTIME VALIDATED |
-| `C3.L3a` gameplay acceptance probe | Part 1 **INSTALLED / DEVELOPMENT ONLY**; Part 2 next. This is the `C3.L4` gate |
+| `C3.L3a` gameplay acceptance probe | Part 1 **COMPLETE / RUNTIME VALIDATED**; Part 2 next. This is the `C3.L4` gate |
 | `C3.L4` explainable fast-down/slow-up controller | **BLOCKED**; gate is `C3.L3a` |
 | C4 adaptive FEC | DEFERRED |
 
@@ -109,6 +109,21 @@ is accepted as a fallback level on this data**. Record:
 observation; nothing in `C3.L2a`, `C3.L2c` or `C3.L3` performed one, and none
 of them could have — all three measure transport and decoder timing, and
 `C3.L2c` is the standing proof that timing and perception come apart.
+
+## C3.L3a Part 1 result — 2026-09-19
+
+Chained ladder transitions work on Linux. Six in one session,
+`7000 -> 6000 -> 5500 -> 5000 -> 5500 -> 6000 -> 7000`, every one clean on
+both host and client, ending at reference. Upward transitions and
+7000-as-target had never run on Linux and were impossible before the port.
+
+Client first-IDR acceptance across the six: **18-65 ms**, all complete, none
+FEC-repaired. With `C3.L2a` E2's 27 ms that is seven observations against
+195-332 ms for ordinary sequence resyncs. Record:
+`evidence/C3_L3A_P1_LADDER_TRANSITION_RUNTIME_2026-09-19.md`.
+
+Part 2 — the gameplay acceptance probe — is the `C3.L4` gate and is next.
+Part 1 advances that gate not at all; nothing perceptual was measured.
 
 ## Decision-record correction — 2026-09-19
 
