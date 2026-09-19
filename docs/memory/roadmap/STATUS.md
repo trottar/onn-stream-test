@@ -45,7 +45,7 @@ definition in `decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`.
 | `C3.L2b` decoder-report cycle retention | COMPLETE / RUNTIME VALIDATED |
 | `C3.L2c` low-latency decode candidate | **FALSIFIED / ROLLED BACK** |
 | `C3.L3` Linux fixed-bitrate envelope characterization | COMPLETE / RUNTIME VALIDATED |
-| `C3.L3a` gameplay acceptance probe | Part 1 **COMPLETE / RUNTIME VALIDATED**; Part 2 next. This is the `C3.L4` gate |
+| `C3.L3a` gameplay acceptance probe | Part 1 **RUNTIME VALIDATED**; Part 2 **INSTALLED**, needs one session. This is the `C3.L4` gate |
 | `C3.L4` explainable fast-down/slow-up controller | **BLOCKED**; gate is `C3.L3a` |
 | C4 adaptive FEC | DEFERRED |
 

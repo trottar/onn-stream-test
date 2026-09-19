@@ -61,7 +61,7 @@ Two distinct unanswered questions:
    picture at 5000 or 5500 kbps. A fast-down controller whose destination is
    visually poor fails even with invisible transitions.
 
-## C3.L3a — gameplay acceptance probe. PART 1 RUNTIME VALIDATED / PART 2 NEXT.
+## C3.L3a — gameplay acceptance probe. PART 1 RUNTIME VALIDATED / PART 2 INSTALLED.
 
 The `C3.L4` gate, made performable. Diagnostic-only. **It authorizes nothing**
 and adds no controller logic. Full design in
@@ -82,7 +82,24 @@ earlier "reuses `run_c3_linux_fixed_bitrate_cycle` as-is" description and the
 later `ladder_transition`/new-route design; see the correction in
 `../architecture/ADAPTIVE_BITRATE.md`.
 
-**Gate PASSED 2026-09-19.** The round trip
+**Part 2 INSTALLED 2026-09-19, development only — not yet run.**
+`tools/probe_c3_l3a_gameplay_acceptance.py` plus the shared
+`tools/manual_checkout.py`. Tools only; no companion source changed and no
+existing probe touched. Record:
+`../patches/C3-L3A-P2_GAMEPLAY_ACCEPTANCE_PROBE.md`.
+
+To run it:
+
+    python3 tools/probe_c3_l3a_gameplay_acceptance.py --plan
+    python3 tools/probe_c3_l3a_gameplay_acceptance.py --traversals 8
+    python3 tools/probe_c3_l3a_gameplay_acceptance.py --finalize
+    python3 tools/probe_c3_l3a_gameplay_acceptance.py --aggregate
+
+The probe requires the stream active and at 7000 and fails preflight
+otherwise. It always returns the stream to 7000 — on success, on error and on
+Ctrl-C.
+
+**Part 1 gate PASSED 2026-09-19.** The round trip
 `7000 -> 6000 -> 5500 -> 5000 -> 5500 -> 6000 -> 7000` ran clean on both
 sides. Host: every transition `ok`, `from_bitrate_kbps` chaining exactly,
 zero FEC/audio/controller deltas, spawn spread 0.45 ms across five restarts,

@@ -138,18 +138,34 @@ recorded more than one resync.
   `NativeStreamManager.diagnostic_c3_actuator_continuity_cycle()`, so on Linux
   it drives `companion/diagnostics/c3_linux_actuator_probe.py`.
 
-**These C3 probes are Windows-only and fail closed on Linux** with
-`wgc_runtime_unavailable` before modifying anything. They require `_wgc_ready()`,
-an HWND capture target and `_build_ffmpeg_command`:
+The fixed-characterization probes **work on Linux as of `C3.L3`**
+(2026-09-19). They were Windows-only and failed closed with
+`wgc_runtime_unavailable`; the companion now dispatches by platform, so the
+probe scripts themselves were never changed:
 
-- `tools/probe_c3_bidirectional_actuator.py`;
 - `tools/probe_c3_fixed_5000_characterization.py`;
 - `tools/probe_c3_fixed_5500_characterization.py`;
 - `tools/probe_c3_fixed_6000_characterization.py`.
 
-They are correct as written. Linux fixed-envelope work (`C3.L3`) needs a Linux
-cycle implementation behind the same probe structure, not a new parallel
-actuator.
+Trigger takes no flag; `--finalize` is run after play. **Check
+`payload.decoder_session_log` and `session_duration_ms` in the written JSON
+before using a finalize result** — the matching has picked up the previous
+bitrate's session once. See `docs/KNOWN_ISSUES.md`.
+
+`tools/probe_c3_bidirectional_actuator.py` remains Windows-only.
+
+### C3.L3a gameplay acceptance
+
+- `tools/probe_c3_l3a_gameplay_acceptance.py` — the `C3.L4` gate. Fires
+  unannounced jump and ramp sequences during play, captures operator marks
+  non-blocking, scores them against decoys, then parks at each rung for a
+  picture judgement. `--plan` shows shape counts without running,
+  `--finalize` analyses, `--aggregate` pools runs. Always returns the stream
+  to 7000, including on error and Ctrl-C. Encodes no acceptance threshold.
+- `tools/manual_checkout.py` — shared `yes()`, report writer in the existing
+  `Classification:` convention, and non-blocking mark capture. **Existing
+  checkout probes are deliberately not migrated to it**; other probes grep
+  their reports for exact substrings, so that is its own work item.
 
 ## Linux subsystem probes
 
