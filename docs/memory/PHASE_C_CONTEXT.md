@@ -39,11 +39,11 @@ Phase C is active. Sub-phase state:
 | `C3.L1` Linux encoder-only seam and probe | COMPLETE / RUNTIME VALIDATED |
 | `C3.L1R1` RTP baseline correction | COMPLETE / RUNTIME VALIDATED |
 | `C3.L2` Linux actuator classification | COMPLETE |
-| `C3.L2a` first-IDR acceptance investigation | EVIDENCE PASS COMPLETE; question open, blocked on instrumentation until `C3.L2b` runtime evidence lands |
-| `C3.L2b` decoder-report cycle retention | **CODE INSTALLED; RUNTIME EVIDENCE NOT YET COLLECTED** |
-| `C3.L2c` low-latency decode candidate | REGISTERED, NOT SCHEDULED, NOT AUTHORIZED |
-| `C3.L3` Linux fixed-bitrate envelope revalidation | UNBLOCKED for manual characterization; sequenced after `C3.L2a` closes |
-| `C3.L4` fast-down/slow-up controller | BLOCKED; gate is `C3.L2a` |
+| `C3.L2a` first-IDR acceptance investigation | **ANSWERED**; IDR wait falsified |
+| `C3.L2b` decoder-report cycle retention | COMPLETE / RUNTIME VALIDATED |
+| `C3.L2c` low-latency decode candidate | **NEXT**; needs authorization first |
+| `C3.L3` Linux fixed-bitrate envelope revalidation | UNBLOCKED for manual characterization |
+| `C3.L4` fast-down/slow-up controller | BLOCKED; gate is a focused gameplay acceptance, not the IDR question |
 | C4 adaptive FEC | DEFERRED |
 
 Phase E does not begin until the streaming architecture is stable. It measures a
@@ -188,78 +188,50 @@ exists.
 
 ---
 
-## 6. The open question — `C3.L2a`
+## 6. `C3.L2a` — answered
 
-Why is the receiver's first accepted IDR late after an encoder-only cycle, when
-the replacement stream's first frame is a keyframe?
+**The actuator's first IDR is accepted in 27 ms.** Record:
+`evidence/C3_L2A_E2_ACTUATOR_IDR_RESOLVED_2026-09-18.md`.
 
-`C3.L1R1` recorded the lead as "request an immediate IDR on the replacement
-encoder". `C3.L2` corrected its premise: `_build_linux_ffmpeg_command` starts a
-fresh FFmpeg with `-f rtp`, `-g 15`, `-bf 0` and no periodic-keyframe override,
-and the start path publishes `bootstrap: in_band_h264_parameter_sets`. A new
-H.264 RTP stream begins with parameter sets and an IDR. There is nothing to
-request; the wait needs a cause, not a remedy.
+One encoder-only cycle against the `C3.L2b` client, session 63,719 ms:
 
-**E1 evidence pass: the question could not be answered from what was
-collected.** Record: `evidence/C3_L2A_E1_DECODER_EVIDENCE_PASS_2026-09-18.md`.
-The decoder report's slow-event list was a 128-entry flat ring; in the
-`C3.L1R1` session it was full and retained only elapsed 35,421-64,813 ms, so
-the 287 ms event's row was evicted before the report was written. Re-running
-the existing probe unchanged would have lost it again — that instrumentation
-defect is what `C3.L2b` (below) fixes.
+| `elapsed_ms` | discontinuity | first IDR at | `resync_to_idr_ms` | AU complete | FEC repaired |
+| ---: | --- | ---: | ---: | --- | --- |
+| 22,852 | sequence resync | 23,047 | 195 | true | false |
+| **43,443** | **ssrc change — the cycle** | **43,471** | **27** | **true** | **false** |
+| 48,545 | sequence resync | 48,756 | 210 | true | false |
 
-**What E1 did establish, and it matters more than the original question.** In
-ordinary play with no actuator activity, `output_gap_ms` tracks `codec_ms`
-one-to-one — 238/247, 200/211, 133/142 — with feed delay near zero and an empty
-app queue. The large gaps on this client are decoder time on a single frame.
-Session-wide: 2,696 spikes at or above 20 ms against 3,847 queued frames,
-`max_codec_ms` 297, `low_latency_enabled` false on
+The replacement encoder's keyframe is the fastest of the three by a factor of
+seven, and it arrived intact. Two explanations are now dead by measurement: the
+IDR wait, and the damaged-first-keyframe candidate.
+
+**The session's real gaps are decoder time, and they follow the resyncs, not the
+cycle.** 359 ms at 23,103 against `codec_ms` 367; 352 ms at 48,808 against
+`codec_ms` 361 — both with `feed_delay_ms` 0. Nothing registered at or near
+43,443. `max_codec_ms` 367, `low_latency_enabled` **false** on
 `c2.realtek.video.avc.decoder`.
 
-So the cycle's 287 ms sits against a baseline that reaches 238 ms unaided. The
-attributable actuator cost may be ~50 ms, or may not be separately visible. Do
-not restate 287-318 ms as "the cost of the actuator" without that
-qualification — that qualification does not change with `C3.L2b`; it is a fact
-about the client's decoder, not about the report's retention.
+So the 287-318 ms from `C3.L1` / `C3.L1R1` was never actuator cost. Do not cite
+it as such.
 
-Also from E1: `max_frames_between_idr` 27 against GOP 15, so the worst-case
-keyframe wait is ~450 ms, not 250 ms; the damaged-first-IDR mechanism is real
-in-session (`fec_recovered_idr_packets` 1, `fec_unrecoverable_groups` 2,
-`sequence_gap_au_drops` 4, `incomplete_au_drops` 3) but could not be tied to
-the cycle with the old report; and the encoder swap is not visible in the host
-log's retained 500-line tail, which is a question for the probe source.
+**What this does not settle.** `C3.L2`'s refusal to authorize automatic in-game
+adaptation stands. This is one cycle in one session. It removes the mechanism
+that was assumed to make the actuator expensive; acceptance still needs
+repetition and a focused gameplay observation. Note also that this session saw
+530 lost packets and 38 sequence-gap AU drops against zero unrecoverable FEC
+groups — transport conditions differed from `C3.L1R1`, so the two sessions are
+not like-for-like.
 
-**`C3.L2b` is installed, this session, as code. It is not yet runtime
-evidence.** `docs/memory/patches/C3-L2B_DECODER_REPORT_CYCLE_RETENTION.md`
-replaced the decoder session report's retention: a 64-entry marked segment
-(protected while a cycle window is open, opened by every SSRC change and
-sequence resync) alongside a 64-entry recent segment instead of one flat
-128-entry ring; `elapsed_ms`-anchored `stream_discontinuities` for every SSRC
-change and sequence resync, each typed explicitly rather than inferred; and a
-bounded `first_idr_after_discontinuity` list giving `resync_to_idr_ms` and
-FEC-recovery/completeness context for the specific access unit that ended each
-wait. The three changed Kotlin files were compiled for real with the Kotlin
-compiler (two of them independent of the Android SDK; the third re-verified in
-an isolated harness against the real compiled types), but no APK has been
-built with the actual Android/Gradle toolchain or installed on the onn device
-yet, and no actuator cycle has been run against it. `C3.L2a` stays open until
-that happens. See `CURRENT.md` → Next Action for the exact commands.
+**Open defect, not blocking:** `slow_events_marked` is emitted as an empty array
+while `slow_event_retained_marked` reports 30 of 64. The marked rows are counted
+and dropped. `stream_discontinuities` and `first_idr_after_discontinuity` carried
+this result without them.
 
-**`C3.L2c` is registered and not authorized.** `low_latency_enabled` is false on
-`c2.realtek.video.avc.decoder` while 2,696 of 3,847 frames took 20 ms or more to
-decode. Enabling MediaCodec low-latency mode is a production client behavior
-change with its own hypothesis and its own focused gameplay acceptance. On the
-E1 evidence it is plausibly a larger lever on perceived smoothness than the
-actuator question, but it must not ride along inside a diagnostics patch — and
-it did not: `C3.L2b` touched only report retention. The user chooses whether
-`C3.L2c` runs next; it is not a prerequisite for closing `C3.L2a`.
-
-The pre-registered boundary from `C3.L2` stands once the instrumentation can
-support it, which is now a runtime question rather than a blocked one:
-reproducibly **≈120 ms or below** reopens the automatic question, with a
-focused gameplay observation required before acceptance; **~120-250 ms**
-keeps the actuator non-automatic; **unchanged** falsifies the lead. Judge those
-figures against the client's own baseline distribution, not against zero.
+**Next: `C3.L2c`**, enabling MediaCodec low-latency decode. Decoder time is now
+the largest measured contributor to perceptible interruption, larger than
+anything the actuator does. It changes production client behavior, so it needs
+its own hypothesis and its own focused gameplay acceptance, and it is **not yet
+authorized**.
 
 ## 7. Rules that bind Phase C work
 

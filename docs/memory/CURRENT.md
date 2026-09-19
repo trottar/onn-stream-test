@@ -16,16 +16,14 @@ boundary for the validated Linux native game stream.
 
 ## Current Work Item
 
-`C3.L2b` — decoder-report cycle retention. **CODE INSTALLED; RUNTIME EVIDENCE
-NOT YET COLLECTED.**
+`C3.L2c` — low-latency decode candidate.
 
-`docs/memory/patches/C3-L2B_DECODER_REPORT_CYCLE_RETENTION.md` installed the
-segmented slow-event buffer, `elapsed_ms`-anchored discontinuity events and
-per-event first-IDR-after-discontinuity context described there. The installer
-ran a real `sh ./gradlew :app:assembleDebug --no-daemon`, but no APK has been
-installed on the onn device and no actuator cycle has been run against the
-rebuilt client yet. `C3.L2a` stays open until that cycle is run and its report
-is read.
+`C3.L2b` is COMPLETE / RUNTIME VALIDATED and `C3.L2a` is ANSWERED. The actuator's
+first IDR after the SSRC change was accepted in **27 ms**, complete, with no FEC
+repair — against 195 ms and 210 ms for the two ordinary sequence resyncs in the
+same session. The IDR-wait explanation is falsified.
+
+Record: `evidence/C3_L2A_E2_ACTUATOR_IDR_RESOLVED_2026-09-18.md`.
 
 Start from `PHASE_C_CONTEXT.md`. It is the compact, self-sufficient Phase C
 continuation brief and should not require reading the wider memory hierarchy.
@@ -70,6 +68,15 @@ continuation brief and should not require reading the wider memory hierarchy.
   new code is not obviously broken, **not** a substitute for the installer's
   own `sh ./gradlew :app:assembleDebug --no-daemon` gate, which is the first
   real compile against the actual Android/Activity framework.
+- `C3.L2b` decoder-report cycle retention: **COMPLETE / RUNTIME VALIDATED**.
+  The recent buffer did not overflow (94 of 128) and the new
+  `stream_discontinuities` and `first_idr_after_discontinuity` arrays were
+  populated on first use.
+- `C3.L2a` first-IDR acceptance: **ANSWERED**. SSRC change at 43,443 ms, first
+  IDR accepted at 43,471 ms — 27 ms, AU complete, no FEC repair, no
+  unrecoverable group. The two ordinary resyncs took 195 ms and 210 ms. The
+  session's worst gaps, 359 ms and 352 ms, followed those resyncs and tracked
+  `codec_ms`; nothing registered at the cycle. Record: `evidence/C3_L2A_E2_ACTUATOR_IDR_RESOLVED_2026-09-18.md`.
 - D4 Games and D5 media/server restoration: COMPLETE / RUNTIME VALIDATED.
 
 Blocked or incomplete:
@@ -93,32 +100,22 @@ Blocked or incomplete:
 
 ## Next Action
 
-Install the rebuilt APK and produce the evidence `C3.L2b` was installed to
-collect:
+Decide whether to authorize `C3.L2c`, then run it.
 
-```bash
-sh ./gradlew :app:assembleDebug --no-daemon
-adb install -r PrivyHub/app/build/outputs/apk/debug/app-debug.apk
-adb shell am force-stop com.safeiot.privyhub
-```
+`low_latency_enabled` is **false** on `c2.realtek.video.avc.decoder` while
+`max_codec_ms` was 367 in the last session and the two largest output gaps —
+359 ms and 352 ms — tracked `codec_ms` to within 8 ms with feed delay at zero.
+Decoder time on a single frame is now the largest measured contributor to
+perceptible interruption, and it is larger than anything the actuator does.
 
-Then run one clean `C3.L1`-style encoder-only actuator cycle (trigger phase,
-no flag; `--finalize` after a normal Back), and re-attempt the `C3.L2a`
-evidence pass by reading the new decoder session report: check
-`stream_discontinuities` for the SSRC change and resync `elapsed_ms`, check
-`first_idr_after_discontinuity` for `resync_to_idr_ms` and whether the
-accepted IDR's access unit was FEC-recovered or sat behind an unrecoverable
-group, and confirm `slow_event_retained_marked` is nonzero and covers the
-cycle's `elapsed_ms` window this time.
+`C3.L2c` enables MediaCodec low-latency mode. It changes production client
+behavior, so it needs its own narrow hypothesis, its own focused gameplay
+acceptance, and it must not be folded into unrelated work. It is **not yet
+authorized**; authorizing it is the decision this item waits on.
 
-Do not re-run `tools/probe_c3_actuator_continuity.py` against the *old* APK;
-it must be the rebuilt one, or the same eviction the `C3.L2a` E1 pass found
-will recur.
-
-`C3.L2c`, the low-latency decode candidate, is registered and **not
-authorized**. It changes production client behavior and needs its own
-hypothesis and its own focused gameplay acceptance. It was not folded into
-`C3.L2b`.
+Open and not blocking: `slow_events_marked` is emitted as an empty array while
+`slow_event_retained_marked` reports 30 of 64. The marked window's rows are
+counted and dropped. Recorded in `docs/KNOWN_ISSUES.md`.
 
 ## Success Criteria
 

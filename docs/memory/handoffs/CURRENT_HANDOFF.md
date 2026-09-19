@@ -130,3 +130,22 @@ Local testing directories such as `_patches/` and `_probes/` are development-onl
 and are not part of pushed changes unless explicitly intended. They are not
 currently covered by `.gitignore`; confirm with `git status --short` before
 committing.
+
+## 2026-09-18 — C3.L2a answered, next item is C3.L2c
+
+`C3.L2b` is COMPLETE / RUNTIME VALIDATED. `C3.L2a` is ANSWERED: the actuator's
+first IDR is accepted 27 ms after the SSRC change, complete and unrepaired,
+against 195 ms and 210 ms for ordinary sequence resyncs in the same session.
+
+**The one thing not to get wrong:** 287-318 ms is not the cost of the actuator
+and never was. The session's worst gaps — 359 ms and 352 ms — followed sequence
+resyncs and tracked `codec_ms` with feed delay at zero. Nothing registered at the
+cycle.
+
+Next: `C3.L2c`, MediaCodec low-latency decode. `low_latency_enabled` is false,
+`max_codec_ms` was 367, and decoder time is now the largest measured contributor
+to perceptible interruption. It changes production client behavior and is **not
+yet authorized** — authorizing it is the pending decision.
+
+Open, not blocking: `slow_events_marked` emitted empty while the marked count
+reports 30 of 64.

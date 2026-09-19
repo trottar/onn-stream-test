@@ -183,3 +183,20 @@ evidence are strong, but they are not a substitute for future automated
 multi-platform coverage.
 
 Refactor only with a dedicated objective and explicit regression boundary.
+
+<!-- PRIVYHUB_C3_L2A_E2:KNOWN_ISSUES:BEGIN -->
+## 2026-09-18 C3.L2b reporting defect
+
+- **`slow_events_marked` is emitted as an empty array.**
+  `slow_event_retained_marked` reports 30 of 64, so the marked window's rows are
+  counted and then dropped rather than serialized. Found on the first runtime use
+  of `C3.L2b`. It did not block `C3.L2a`, which was answered from
+  `stream_discontinuities` and `first_idr_after_discontinuity`, but the marked
+  window cannot yet be inspected row by row. Status: open, diagnostic-only.
+
+- **Decoder time dominates perceptible interruption on the onn client.**
+  `low_latency_enabled` is false on `c2.realtek.video.avc.decoder`;
+  `max_codec_ms` 367; the two largest output gaps in the last session, 359 ms and
+  352 ms, tracked `codec_ms` to within 8 ms with feed delay at zero. Status:
+  open; owned by `C3.L2c`, which is not yet authorized.
+<!-- PRIVYHUB_C3_L2A_E2:KNOWN_ISSUES:END -->

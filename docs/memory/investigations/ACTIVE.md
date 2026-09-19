@@ -58,3 +58,21 @@ characterization and is sequenced after `C3.L2a` closes.
 - Adaptive FEC — C4.
 - Linux host resource telemetry gap — recorded in `docs/KNOWN_ISSUES.md`; not an
   active investigation.
+
+## C3.L2a — CLOSED 2026-09-18
+
+Answered by one encoder-only cycle against the `C3.L2b` client. The replacement
+encoder's first IDR was accepted 27 ms after the SSRC change, access unit
+complete, no FEC repair; the two ordinary sequence resyncs in the same session
+took 195 ms and 210 ms. The IDR-wait and damaged-first-keyframe explanations are
+both falsified, and the session's worst gaps (359 ms, 352 ms) followed the
+resyncs and tracked `codec_ms`, not the cycle.
+
+Record: `../evidence/C3_L2A_E2_ACTUATOR_IDR_RESOLVED_2026-09-18.md`.
+
+Next diagnostic: `C3.L2c` — MediaCodec low-latency decode. `low_latency_enabled`
+is false on `c2.realtek.video.avc.decoder` and `max_codec_ms` was 367. It changes
+production client behavior; not yet authorized.
+
+Open, not blocking: `slow_events_marked` emitted empty while
+`slow_event_retained_marked` reports 30 of 64. See `docs/KNOWN_ISSUES.md`.

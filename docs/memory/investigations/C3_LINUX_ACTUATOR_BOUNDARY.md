@@ -650,3 +650,34 @@ exact commands.
 Do not reopen the `C3.L2b` code design itself (the marked/recent
 segmentation, the 2000 ms window, the discontinuity/IDR-context list
 capacities) without a runtime finding that it is insufficient.
+
+## C3.L2a answered — the IDR wait is falsified
+
+Record: `../evidence/C3_L2A_E2_ACTUATOR_IDR_RESOLVED_2026-09-18.md`.
+
+One encoder-only cycle against the `C3.L2b` client. Discontinuities and first
+accepted IDR after each:
+
+| `elapsed_ms` | discontinuity | first IDR | `resync_to_idr_ms` | AU complete | FEC repaired |
+| ---: | --- | ---: | ---: | --- | --- |
+| 22,852 | sequence resync | 23,047 | 195 | true | false |
+| **43,443** | **ssrc change — the cycle** | **43,471** | **27** | **true** | **false** |
+| 48,545 | sequence resync | 48,756 | 210 | true | false |
+
+The replacement encoder's keyframe is accepted seven times faster than an
+ordinary resync's, and intact. Both candidate explanations carried since
+`C3.L1` — a one-GOP IDR wait, and a first keyframe damaged across FEC groups —
+are dead by measurement.
+
+The session's worst output gaps followed the resyncs, not the cycle: 359 ms at
+23,103 against `codec_ms` 367, and 352 ms at 48,808 against `codec_ms` 361, both
+with `feed_delay_ms` 0. Nothing registered at 43,443.
+
+Consequence for the record: the 287-318 ms from `C3.L1` / `C3.L1R1` is not
+actuator cost and must not be cited as such. `C3.L2`'s refusal to authorize
+automatic in-game adaptation still stands — one cycle in one session removes a
+mechanism, it does not establish acceptance.
+
+Transport conditions differed from `C3.L1R1`: 530 lost packets and 38
+sequence-gap AU drops here against zero unrecoverable FEC groups. The two
+sessions are not like-for-like.

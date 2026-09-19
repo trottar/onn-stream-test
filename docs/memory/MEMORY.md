@@ -212,6 +212,32 @@ The reversed-domain chain was inherited Java convention that cost three
 directory levels and bought this project nothing.
 <!-- PRIVYHUB_ANDROID_FLAT_SOURCE_LAYOUT:END -->
 
+<!-- PRIVYHUB_C3_L2A_ANSWERED:BEGIN -->
+## The Linux actuator does not impose an IDR wait — durable fact
+
+Measured 2026-09-18 by `C3.L2a` E2. Record:
+`evidence/C3_L2A_E2_ACTUATOR_IDR_RESOLVED_2026-09-18.md`.
+
+After an encoder-only cycle, the receiver accepted the replacement encoder's
+first IDR **27 ms** after the SSRC change, access unit complete, no FEC repair,
+no unrecoverable group. The two ordinary sequence resyncs in the same session
+took 195 ms and 210 ms.
+
+Two explanations are dead by measurement: the IDR wait, and the
+damaged-first-keyframe candidate. **The 287-318 ms figure from `C3.L1` /
+`C3.L1R1` was never actuator cost and must not be cited as such.**
+
+**Decoder time is the largest measured contributor to perceptible
+interruption.** The session's worst output gaps — 359 ms and 352 ms — followed
+sequence resyncs, not the cycle, and tracked `codec_ms` to within 8 ms with feed
+delay at zero. `max_codec_ms` 367 with `low_latency_enabled` false on
+`c2.realtek.video.avc.decoder`. Nothing registered at the actuator cycle at all.
+
+This does not reopen `C3.L2`. One cycle in one session removes a mechanism; it
+does not authorize automatic in-game adaptation, which still needs repetition
+and a focused gameplay observation.
+<!-- PRIVYHUB_C3_L2A_ANSWERED:END -->
+
 <!-- PRIVYHUB_NEGATIVE_RESULT_POLICY:BEGIN -->
 ## Record failures, not only successes
 
