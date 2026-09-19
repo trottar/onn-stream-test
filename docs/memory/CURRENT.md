@@ -16,15 +16,25 @@ boundary for the validated Linux native game stream.
 
 ## Current Work Item
 
-None authorized. `C3.L3` closed 2026-09-19; the next item is not yet chosen.
+`C3.L3a` — gameplay acceptance probe. **REGISTERED / NEXT**, design not yet
+authorized.
 
 Start from `PHASE_C_CONTEXT.md`. It is the compact, self-sufficient Phase C
 continuation brief and should not require reading the wider memory hierarchy.
 
-`C3.L4` (automatic fast-down/slow-up controller) is **still blocked**. Its gate
-is a focused gameplay acceptance observation, which neither `C3.L2a`, `C3.L2c`
-nor `C3.L3` performed. Re-read the gate in
-`decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md` before assuming otherwise.
+`C3.L3a` is the `C3.L4` gate made performable. Diagnostic-only; it authorizes
+nothing and adds no controller logic, reusing the validated
+`run_c3_linux_fixed_bitrate_cycle` as-is. Required shape: several transitions
+in one session, fired at intervals the player does not know in advance, at
+least one no-op interval as a control, the player's marks compared against
+`stream_discontinuities` `elapsed_ms` **after** the session, and part of the
+session parked at 5000 and 5500 kbps so the picture itself can be judged.
+
+`C3.L4` stays **BLOCKED**, gate `C3.L3a`. A manual cycle with a subjective read
+does not satisfy it — that was done on 2026-09-18 and ruled insufficient — and
+neither does transport/decoder timing at any sample size. Full gate definition:
+`decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`, section "The `C3.L4` gate,
+stated so it can be satisfied".
 
 ## Verified State
 
@@ -85,9 +95,10 @@ nor `C3.L3` performed. Re-read the gate in
 
 Blocked or incomplete:
 
-- `C3.L4` automatic fast-down/slow-up controller: **BLOCKED**. Gate is a
-  focused gameplay acceptance observation, not the IDR question and not the
-  `C3.L3` data;
+- `C3.L4` automatic fast-down/slow-up controller: **BLOCKED**. Gate is
+  `C3.L3a`, not the IDR question and not the `C3.L3` data;
+- **no perceptual quantity has been measured anywhere in Phase C.** Every
+  figure on record is transport or decoder timing;
 - the recorded "request an immediate IDR" lead is **premise-corrected**: a
   fresh FFmpeg RTP stream already begins with in-band parameter sets and an
   IDR, so a late first IDR needs a cause before any remedy;
@@ -102,7 +113,8 @@ Blocked or incomplete:
 
 ## Next Action
 
-Choose the next Phase C item. `C3.L3` needs no further runs.
+Authorize the `C3.L3a` probe design. Ask for the design as a short plan first —
+no code, no patch — then Tier 1 when built. `C3.L3` needs no further runs.
 
 Two open defects are recorded and neither blocks: `slow_events_marked` is
 emitted as an empty array while `slow_event_retained_marked` reports 30 of 64,
@@ -158,6 +170,9 @@ surface.
   revert.
 - `patches/C3-L3R1_CHARACTERIZATION_CORRECTION.md` — the memory correction that
   added the omitted 6000 kbps rerun.
+- `patches/C3-L3R2_GATE_DEFINITION_AND_DECISION_SYNC.md` — the gate definition,
+  the falsified-premise correction, and `C3.L3a`'s registration.
+- `investigations/ACTIVE.md` — current sub-item states and `C3.L3a`'s scope.
 - `decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md` — classification and the
   pre-registered boundary.
 - `investigations/C3_LINUX_ACTUATOR_BOUNDARY.md` — actuator boundary map.

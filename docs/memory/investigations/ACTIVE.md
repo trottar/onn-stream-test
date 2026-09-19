@@ -4,52 +4,87 @@
 
 Record: `C3_LINUX_ACTUATOR_BOUNDARY.md`
 Decision: `../decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`
-Evidence: `../evidence/C3_L2A_E1_DECODER_EVIDENCE_PASS_2026-09-18.md`
-Patch: `../patches/C3-L2B_DECODER_REPORT_CYCLE_RETENTION.md`
+Evidence: `../evidence/C3_L2A_E2_ACTUATOR_IDR_RESOLVED_2026-09-18.md`,
+`../evidence/C3_L2C_LOW_LATENCY_DECODE_FALSIFIED_2026-09-19.md`,
+`../evidence/C3_L3_LINUX_FIXED_BITRATE_CHARACTERIZATION_2026-09-19.md`
 
 Question: can the existing Linux streaming architecture expose safe
 backend-neutral quality controls without disturbing validated playback?
 
-State: source audit COMPLETE; Linux encoder-only actuator COMPLETE / RUNTIME
-VALIDATED; `C3.L2` classification COMPLETE; `C3.L2a` E1 evidence pass COMPLETE
-with its question still open; `C3.L2b` decoder-report retention CODE
-INSTALLED, runtime evidence not yet collected.
+**State as of 2026-09-19.** The measurement side of this investigation is
+finished. What remains is a judgment nobody has made.
+
+| Sub-item | State |
+| --- | --- |
+| `C3.L0` source audit | COMPLETE |
+| `C3.L1` / `C3.L1R1` encoder-only actuator | COMPLETE / RUNTIME VALIDATED |
+| `C3.L2` classification | COMPLETE; reason 1's premise falsified, decision unchanged |
+| `C3.L2a` first-IDR acceptance | **ANSWERED**; IDR wait falsified |
+| `C3.L2b` decoder-report cycle retention | COMPLETE / RUNTIME VALIDATED |
+| `C3.L2c` low-latency decode | **FALSIFIED / ROLLED BACK** |
+| `C3.L3` fixed-bitrate port and characterization | COMPLETE / RUNTIME VALIDATED |
+| `C3.L3a` gameplay acceptance probe | **REGISTERED / NEXT** |
+| `C3.L4` automatic controller | **BLOCKED**; gate is `C3.L3a` |
 
 Linux is `video_only_restart`: authorized for start-time profile selection,
 manual and loopback-only diagnostic changes, fallback and recovery, and `C3.L3`
 characterization; not authorized for automatic adaptation during play.
 `live_bitrate_reconfigure` is not available under the current architecture.
 
-E1 changed what the open question is about. The decoder report's slow-event list
-was a 128-entry ring that had already evicted the cycle's row, and in the
-retained window — ordinary play, no actuator — output gap tracks codec time
-one-to-one and reaches 238 ms. So 287-318 ms is not established as actuator
-cost, and the existing probe could not be re-run to settle it.
+### What the measurements settled
 
-`C3.L2b` fixed the retention defect: a 64-entry marked segment (protected by a
-2000 ms window opened on every SSRC change and sequence resync) alongside a
-64-entry recent segment, `elapsed_ms`-anchored `stream_discontinuities`, and a
-bounded `first_idr_after_discontinuity` list with per-event `resync_to_idr_ms`
-and FEC-recovery/completeness context. It is installed as code — three Kotlin
-files compiled for real with the Kotlin compiler — but no APK built with the
-real Android/Gradle toolchain has been installed on the onn device, and no
-actuator cycle has run against it. `C3.L2a` stays open until that happens.
+- **The actuator is not expensive.** `C3.L2a` E2: the cycle's first IDR was
+  accepted 27 ms after the SSRC change, complete and unrepaired, and nothing
+  registered at the cycle. The same session's ordinary resyncs cost 195 and
+  210 ms. **287-318 ms was never actuator cost** and must not be cited as such.
+- **Decode time is not the stall.** `C3.L2c` cut `max_codec_ms` to 107 ms —
+  best of eight same-day sessions, zero 250 ms spikes — and `max_output_gap_ms`
+  came out 385 ms, second worst of the eight. `max_codec_ms` is falsified as a
+  proxy for the gap.
+- **6000 kbps is the steadiest characterized level.** `C3.L3`, three valid
+  samples per bitrate: 5000 kbps 242-367 ms (125 ms band), 5500 kbps 219-584 ms
+  (365 ms), 6000 kbps 291-331 ms (**40 ms**).
 
-Next diagnostic: build (`sh ./gradlew :app:assembleDebug --no-daemon`),
-install (`adb install -r`), run one clean `C3.L1`-style encoder-only actuator
-cycle against the rebuilt client, and re-read the decoder session report's new
-fields. Do not run `tools/probe_c3_actuator_continuity.py` against the old
-APK; the same eviction the E1 pass found will recur against unchanged code.
+### What is not settled, and why the controller stays blocked
 
-Registered, not scheduled, not authorized: `C3.L2c`, enabling MediaCodec
-low-latency decode. `low_latency_enabled` is false on
-`c2.realtek.video.avc.decoder` while 2,696 of 3,847 frames took 20 ms or more to
-decode. Production client behavior change; own hypothesis, own acceptance; was
-not folded into `C3.L2b`.
+Every figure above is transport and decoder timing. **No perceptual quantity
+has been measured at any point in this investigation.** `C3.L2c` is the
+standing proof that the two come apart: the instrumentation said the build was
+clearly better and the user's verdict was "trash".
 
-Blocked downstream: the automatic bitrate controller (`C3.L4`), gated on
-`C3.L2a`. `C3.L3` fixed-bitrate envelope revalidation is unblocked for manual
-characterization and is sequenced after `C3.L2a` closes.
+Two distinct unanswered questions:
+
+1. **Are repeated, unannounced, under-pressure transitions perceptible?** The
+   2026-09-18 manual observation covered a single announced transition, which
+   `C3.L2` reason 3 already ruled insufficient.
+2. **Do the candidate destinations look acceptable?** Nothing has judged the
+   picture at 5000 or 5500 kbps. A fast-down controller whose destination is
+   visually poor fails even with invisible transitions.
+
+## C3.L3a — gameplay acceptance probe. REGISTERED / NEXT.
+
+The `C3.L4` gate, made performable. Diagnostic-only. **It authorizes nothing**
+and adds no controller logic; it reuses the validated
+`run_c3_linux_fixed_bitrate_cycle` as-is.
+
+Requirements, from `../decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`,
+section "The `C3.L4` gate, stated so it can be satisfied":
+
+1. several transitions within one play session, not one;
+2. fired at intervals the player does not know in advance;
+3. at least one interval in which nothing fires, as a control;
+4. the player's marks compared against `stream_discontinuities` `elapsed_ms`
+   after the session, not during it;
+5. part of the session parked at 5000 and 5500 kbps so the picture itself can
+   be judged.
+
+Writes a fresh per-run result file with cycle times. Changes no production
+path. No acceptance threshold is encoded in the probe — the probe records, the
+user judges.
+
+Outcome disposition: marks not aligned with cycle times and the picture judged
+acceptable → the gate is met and `C3.L4` may be proposed. Marks aligned →
+`C3.L4` is answered in the negative and closed cheaply. Either is a result.
 
 ## Deferred, not active
 
@@ -59,20 +94,24 @@ characterization and is sequenced after `C3.L2a` closes.
 - Linux host resource telemetry gap — recorded in `docs/KNOWN_ISSUES.md`; not an
   active investigation.
 
-## C3.L2a — CLOSED 2026-09-18
+## Open, not blocking
 
-Answered by one encoder-only cycle against the `C3.L2b` client. The replacement
-encoder's first IDR was accepted 27 ms after the SSRC change, access unit
-complete, no FEC repair; the two ordinary sequence resyncs in the same session
-took 195 ms and 210 ms. The IDR-wait and damaged-first-keyframe explanations are
-both falsified, and the session's worst gaps (359 ms, 352 ms) followed the
-resyncs and tracked `codec_ms`, not the cycle.
+- `slow_events_marked` emitted empty while `slow_event_retained_marked` reports
+  30 of 64.
+- `tools/probe_c3_fixed_*_characterization.py --finalize` matched the wrong
+  decoder-session file once, when run back to back after another bitrate's
+  finalize. Intermittent. Check `payload.decoder_session_log` and
+  `session_duration_ms` before using any finalize result.
+- The cause of a 385 ms output gap in a session with zero 250 ms codec spikes.
+  No work item owns it.
 
-Record: `../evidence/C3_L2A_E2_ACTUATOR_IDR_RESOLVED_2026-09-18.md`.
+Both defects are in `docs/KNOWN_ISSUES.md`.
 
-Next diagnostic: `C3.L2c` — MediaCodec low-latency decode. `low_latency_enabled`
-is false on `c2.realtek.video.avc.decoder` and `max_codec_ms` was 367. It changes
-production client behavior; not yet authorized.
+## Superseded — the 2026-09-18 open state (history)
 
-Open, not blocking: `slow_events_marked` emitted empty while
-`slow_event_retained_marked` reports 30 of 64. See `docs/KNOWN_ISSUES.md`.
+Before `C3.L2a` E2, this file recorded `C3.L2a` as open with the question
+unanswered, `C3.L2b` as code-installed with no runtime evidence, `C3.L2c` as
+registered but unauthorized, and `C3.L4`'s gate as `C3.L2a`. All four have
+since resolved. The `C3.L2b` "next diagnostic" instructions — build, install,
+run one cycle, re-read the report — were carried out and produced the E2
+evidence. Kept as chronology; act on the current state above.

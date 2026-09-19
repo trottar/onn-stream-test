@@ -6,8 +6,10 @@ As of 2026-09-19, baseline `41bbc6acd3534f79283e328596115a02c3acc296`.
 
 Phase C Linux continuation.
 
-Active work item: **none authorized**. `C3.L2c` and `C3.L3` both closed
-2026-09-19; the next Phase C item has not been chosen.
+Active work item: **`C3.L3a`** — gameplay acceptance probe. REGISTERED / NEXT,
+design not yet authorized. It is the `C3.L4` gate made performable:
+diagnostic-only, authorizes nothing. Scope in `investigations/ACTIVE.md`; gate
+definition in `decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`.
 
 ## Completed
 
@@ -42,7 +44,8 @@ Active work item: **none authorized**. `C3.L2c` and `C3.L3` both closed
 | `C3.L2b` decoder-report cycle retention | COMPLETE / RUNTIME VALIDATED |
 | `C3.L2c` low-latency decode candidate | **FALSIFIED / ROLLED BACK** |
 | `C3.L3` Linux fixed-bitrate envelope characterization | COMPLETE / RUNTIME VALIDATED |
-| `C3.L4` explainable fast-down/slow-up controller | **BLOCKED**; gate is a focused gameplay acceptance |
+| `C3.L3a` gameplay acceptance probe | **REGISTERED / NEXT**; this is the `C3.L4` gate |
+| `C3.L4` explainable fast-down/slow-up controller | **BLOCKED**; gate is `C3.L3a` |
 | C4 adaptive FEC | DEFERRED |
 
 ## Historical / reassigned
@@ -101,5 +104,17 @@ and decoder timing only — no perceptual quality was measured, and **no bitrate
 is accepted as a fallback level on this data**. Record:
 `evidence/C3_L3_LINUX_FIXED_BITRATE_CHARACTERIZATION_2026-09-19.md`.
 
-`C3.L4` remains blocked. Its gate is a focused gameplay acceptance observation;
-nothing in `C3.L2a`, `C3.L2c` or `C3.L3` performed one.
+`C3.L4` remains blocked. Its gate is `C3.L3a`, a gameplay acceptance
+observation; nothing in `C3.L2a`, `C3.L2c` or `C3.L3` performed one, and none
+of them could have — all three measure transport and decoder timing, and
+`C3.L2c` is the standing proof that timing and perception come apart.
+
+## Decision-record correction — 2026-09-19
+
+`decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md` had not been updated since
+it was written and was reasoning from the falsified 287-318 ms figure. Reason 1
+is struck, reason 2 restated without a magnitude, the consequences table
+refreshed, and the `C3.L4` gate given a definition that can actually be
+satisfied. The classification itself is unchanged: `video_only_restart`,
+manual use authorized, automatic use not. Record:
+`patches/C3-L3R2_GATE_DEFINITION_AND_DECISION_SYNC.md`.

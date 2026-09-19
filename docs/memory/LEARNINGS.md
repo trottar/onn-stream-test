@@ -225,3 +225,43 @@ An interruption figure means little without the distribution it sits in. Before
 attributing a cost to an intervention, take the same measurement while the
 intervention is not happening. The comparison that matters is usually against
 the system's own baseline, not against another platform.
+
+## A decision record is a source, not a summary
+
+The project rule "prefer current local source and fresh measured evidence over
+stale summaries" was applied rigorously to numbers and not at all to prose.
+
+On 2026-09-19 a correction patch re-derived every figure it wrote from raw
+decoder JSON — and wrote the phrase "`C3.L4` is BLOCKED; gate is a focused
+gameplay acceptance" into six files without once opening
+`decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`, the record that defines
+that gate. Had it been opened, reason 3 was sitting there in plain text: the
+gameplay observation had already been performed on 2026-09-18 and already
+ruled insufficient. Instead the undefined phrase propagated, and the next
+session proposed exactly the observation that had been rejected — costing a
+round trip to discover something the repository already knew.
+
+A summary is a pointer, not a citation. Before restating what a decision,
+gate, classification or constraint says, open the record that defines it.
+Copying a phrase from `CURRENT.md` into five more files does not make it
+true five more times; it makes it harder to correct.
+
+## When a result falsifies a premise, the decisions that rest on it are in scope
+
+`C3.L2a` E2 falsified the 287-318 ms actuator cost. Its patch updated
+`CURRENT.md`, `MEMORY.md`, `PHASE_C_CONTEXT.md`, the roadmap, the handoff, two
+investigation files, the dated record and `KNOWN_ISSUES.md` — nine files — and
+did not touch `decisions/`. The decision that had reasoned from the falsified
+figure kept asserting it for a day, while every other file said it was wrong.
+
+Evidence files record what was measured; decision files record what was
+*concluded from* it. A result that invalidates an input invalidates the
+conclusions built on that input, and those live in `decisions/`. When a patch
+falsifies something, grep the memory tree for the figure or claim it kills and
+put every file that cites it in the changed scope — including, especially, the
+ones that are hard to change because they are load-bearing.
+
+Strike the falsified reasoning in place rather than deleting it, mark the
+current state authoritative, and say explicitly which of the remaining reasons
+still carry the decision. A decision with one reason struck and three intact
+is a different object from a decision that was never examined.

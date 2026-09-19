@@ -43,7 +43,8 @@ Phase C is active. Sub-phase state:
 | `C3.L2b` decoder-report cycle retention | COMPLETE / RUNTIME VALIDATED |
 | `C3.L2c` low-latency decode candidate | **FALSIFIED / ROLLED BACK**; see section 6 |
 | `C3.L3` Linux fixed-bitrate envelope characterization | **COMPLETE / RUNTIME VALIDATED**; see section 6a |
-| `C3.L4` fast-down/slow-up controller | BLOCKED; gate is a focused gameplay acceptance, which nothing in `C3.L2a`/`C3.L2c`/`C3.L3` performed |
+| `C3.L3a` gameplay acceptance probe | **REGISTERED / NEXT**; the `C3.L4` gate, see section 6b |
+| `C3.L4` fast-down/slow-up controller | BLOCKED; gate is `C3.L3a` |
 | C4 adaptive FEC | DEFERRED |
 
 Phase E does not begin until the streaming architecture is stable. It measures a
@@ -281,6 +282,46 @@ measured, so no bitrate is accepted as a fallback level on this data.** The
 focused gameplay observation is still owed and it is the `C3.L4` gate.
 
 Record: `evidence/C3_L3_LINUX_FIXED_BITRATE_CHARACTERIZATION_2026-09-19.md`.
+
+## 6b. The `C3.L4` gate, and `C3.L3a`
+
+`C3.L4` is blocked on a gameplay acceptance observation. Until 2026-09-19 that
+gate was named but never defined, and sessions repeatedly proposed the wrong
+thing in good faith. It now has a definition; the authoritative statement is in
+`decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`, section "The `C3.L4` gate,
+stated so it can be satisfied".
+
+**Two things do not satisfy it.**
+
+- *A manual cycle or two with a subjective read.* Performed 2026-09-18,
+  reported playable, and `C3.L2` reason 3 already ruled it insufficient: it is
+  acceptance of a single **operator-initiated** transition, not of an
+  unannounced policy-initiated one.
+- *Transport or decoder timing, at any sample size.* `C3.L3` produced three
+  valid samples per bitrate and measured no perceptual quantity at all.
+  `C3.L2c` is the standing proof the two come apart — best `max_codec_ms` of
+  eight same-day sessions, and the verdict on the build was "trash".
+
+**What satisfies it:** a session with several transitions, fired at intervals
+the player does not know in advance, including at least one interval where
+nothing fires as a control, with the player's marks compared against
+`stream_discontinuities` `elapsed_ms` **after** the session rather than during
+it. `C3.L2b` exists to provide that anchoring.
+
+**Separately unmeasured:** whether 5000 or 5500 kbps *looks* acceptable. A
+fast-down controller whose destination is visually poor fails even if every
+transition is invisible. The observation should park at the candidate bitrates
+long enough to judge the picture.
+
+`C3.L3a` owns this. Diagnostic-only, authorizes nothing, reuses
+`run_c3_linux_fixed_bitrate_cycle` unchanged. Scope in
+`investigations/ACTIVE.md`.
+
+One standing consequence of the `C3.L2a` E2 result, easy to miss: the
+classification's reason 1 — the actuator inserting a ~290 ms discontinuity —
+is **falsified**. Reasons 2, 3 and 4 carry the block. Do not argue for or
+against `C3.L4` from the size of a transition; argue from frequency, timing,
+and the unmeasured perceptual question.
 
 ## 7. Rules that bind Phase C work
 

@@ -15,6 +15,14 @@ has been validated.
 Prefer current local source and the newest specific runtime evidence over
 summaries. Never let stale documentation override newer validated state.
 
+This applies to prose as much as to numbers. **Before restating what a
+decision, gate, classification or constraint says, open the record that
+defines it** — not `CURRENT.md`'s summary of it, and not a previous session's
+paraphrase. Restating a summary propagates it; on 2026-09-19 a single
+undefined gate phrase was copied into six files without the decision record
+being opened once. See `LEARNINGS.md`, "A decision record is a source, not a
+summary".
+
 ## Startup
 
 For substantial work:
@@ -114,10 +122,14 @@ Current Linux companion launch:
 
 Keep commands narrow and copy/paste friendly. Every response that asks the
 user to run something includes the exact command(s), inline, every time —
-not a description of what to run. Fixes and installer payloads are written
-directly onto the repo through the session's file bridge; there is no
-ZIP-and-send-and-unzip step to describe — the response just gives the run
-command against the files already in place.
+not a description of what to run.
+
+**Patches are delivered as ZIP installers the user runs.** The ZIP is written
+into the repository root and the response carries one complete copy/paste
+block: SHA-256 verification, extraction, install, gates, commit, push, return
+to the repo root. This is a deliberate control boundary the user has stated
+twice — the user runs the zip, the install and the push. Do not replace it
+with direct file-bridge writes and do not describe the step away.
 
 Diagnostic and probe output that a script already persists to a file (e.g. `logs/`, `docs/memory/evidence/`) is read directly from the repository through the session's file bridge, not requested as a paste. Ask for a paste only when no such file exists.
 
@@ -144,3 +156,10 @@ Result classes remain explicit:
 
 Checkpoint with an exact reviewed staging allowlist. Never use broad
 `git add .` to choose checkpoint scope.
+
+**Derive the allowlist from `git status --short`, and account for every path
+it prints** — stage it, or state why it is excluded. An allowlist written from
+what the current patch happens to touch will silently leave earlier
+uncommitted work behind: on 2026-09-19 a memory-scoped allowlist left the
+runtime-validated `C3.L3` source changes uncommitted, and the user found them.
+End a checkpoint block with `git status --short`; it should print nothing.

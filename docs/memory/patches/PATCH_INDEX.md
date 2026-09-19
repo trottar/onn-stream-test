@@ -5,7 +5,7 @@ record; the record file is authoritative, not this index.
 
 `PATCH_PROTOCOL.md` describes the workflow and is not a patch record.
 
-Records: 94
+Records: 95
 
 - `ADB_ENDPOINT_DEBUG_PROBE_V1_2026-09-15.md`
 - `ADB_ENDPOINT_DEBUG_WATCH_PORT_V1_2026-09-15.md`
@@ -26,6 +26,7 @@ Records: 94
 - `C3-L2C_LOW_LATENCY_DECODE_ENABLE.md`
 - `C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`
 - `C3-L3R1_CHARACTERIZATION_CORRECTION.md`
+- `C3-L3R2_GATE_DEFINITION_AND_DECISION_SYNC.md`
 - `C3-L3_LINUX_FIXED_BITRATE_PORT.md`
 - `D-074_LINUX_NATIVE_VIDEO_BACKEND.md`
 - `D-075R1_LINUX_NATIVE_AUDIO_RT_PACER.md`

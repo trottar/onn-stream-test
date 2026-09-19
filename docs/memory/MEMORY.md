@@ -66,9 +66,10 @@ Recorded by `C3.L2` on 2026-09-18. Full record:
 `decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`.
 
 **Linux is `video_only_restart`.** The capability is runtime validated across
-two clean cycles with full lifecycle preservation, at a cost of **287-318 ms of
-decoder output gap** against Windows D-062's 791 ms on the directly comparable
-cycle. `live_bitrate_reconfigure` is not available under the current external
+two clean cycles with full lifecycle preservation. Those runs recorded a
+287-318 ms decoder output gap, **which `C3.L2a` E2 later showed was not the
+actuator's** — see "The Linux actuator does not impose an IDR wait" below. The
+comparison against Windows D-062's 791 ms is history, not a live cost figure. `live_bitrate_reconfigure` is not available under the current external
 FFmpeg CLI architecture. `unsupported` does not apply.
 
 **Authorized use:** session start and start-time profile selection before
@@ -77,9 +78,21 @@ including replacing a dead encoder; `C3.L3` characterization cycles.
 
 **Not authorized:** automatic adaptation during `PLAYING`. The automatic
 fast-down/slow-up controller stays blocked. An automatic controller fires under
-pressure, so it would insert a deliberate ~290 ms discontinuity exactly when
-delivery is already degraded, repeatedly rather than once, against a standing
-preference to minimize perceptible streaming artifacts.
+pressure — it transitions precisely when delivery is already degraded, and
+repeatedly rather than once — against a standing preference to minimize
+perceptible streaming artifacts. *(This reason originally cited "a deliberate
+~290 ms discontinuity"; that magnitude is falsified. The argument is about
+frequency and timing, not size, and stands without it.)*
+
+**The gate for `C3.L4` is `C3.L3a`, not `C3.L2a`.** It is a gameplay
+acceptance observation and it has a definition: repeated, unannounced,
+under-pressure transitions with a no-op control interval, the player's marks
+compared against `stream_discontinuities` **after** the session, plus a
+judgment of how the picture looks at the destination bitrates. A manual cycle
+with a subjective read does **not** satisfy it — that was performed on
+2026-09-18 and `C3.L2` reason 3 already ruled it insufficient. Transport and
+decoder timing does not satisfy it at any sample size. Full statement:
+`decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`.
 
 This mirrors the Windows D-070 disposition but is reached from Linux
 measurements. Windows numbers are not carried across in either direction.

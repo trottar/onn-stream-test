@@ -108,31 +108,37 @@ conditions" sections has been superseded by the two items closed on
 
 ## Next work item
 
-Not yet decided. Read `../PHASE_C_CONTEXT.md` and `../roadmap/STATUS.md`.
-**`C3.L4` (automatic adaptation) is not unblocked.** Its gate is a focused
-gameplay acceptance observation; `C3.L2a`, `C3.L2c` and `C3.L3` are all
-transport/decoder timing and none of them performed it. Re-read the gate in
-`../decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md` before proposing it.
+**`C3.L3a` — gameplay acceptance probe.** REGISTERED / NEXT, design not yet
+authorized. Ask for the design as a short plan first, no code; Tier 1 when
+built. Scope: `../investigations/ACTIVE.md`.
+
+`C3.L3a` is the `C3.L4` gate made performable — diagnostic-only, authorizes
+nothing, reuses the validated `run_c3_linux_fixed_bitrate_cycle` as-is.
+Required shape: several transitions in one session, at intervals the player
+does not know in advance, at least one no-op control interval, marks compared
+against `stream_discontinuities` `elapsed_ms` **after** the session, and time
+parked at 5000/5500 kbps to judge the picture.
+
+**`C3.L4` is not unblocked and cannot be unblocked by data.** Two things that
+do *not* satisfy the gate, both proposed in good faith before: a manual cycle
+with a subjective read (performed 2026-09-18, ruled insufficient by `C3.L2`
+reason 3), and transport/decoder timing at any sample size (`C3.L2c` is the
+proof — best `max_codec_ms` of eight sessions, verdict "trash"). Full
+definition: `../decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`, section
+"The `C3.L4` gate, stated so it can be satisfied".
 
 ---
 
-# Superseded — 2026-09-18 handoff (kept for history; do not act on this
-# section without first checking `CURRENT.md`, it predates `C3.L2c` and
-# `C3.L3` above)
+# Superseded — 2026-09-18 handoff
 
-## Where Phase C stood then
+Compressed 2026-09-19 to keep this file inside its size budget; `AGENTS.md`
+defines the handoff as a small transfer note. Nothing is lost — that day's
+state is recorded in full in `../2026-09-18.md` and in
+`../evidence/C3_L2A_E2_ACTUATOR_IDR_RESOLVED_2026-09-18.md`.
 
-- C1 profile/backend and C2 telemetry complete on Linux.
-- `C3.L0` boundary audit, `C3.L1` and `C3.L1R1` encoder-only actuator runs
-  complete.
-- `C3.L2` classified Linux as `video_only_restart`.
-- `C3.L2a` was ANSWERED same day: actuator first IDR accepted 27 ms after
-  SSRC change, against 195/210 ms for ordinary resyncs. 287-318 ms was
-  **not** established as actuator cost.
-- `C3.L2b` decoder-report cycle retention installed and runtime validated.
-
-## 2026-09-18 note
-
-Next was `C3.L2c` (low-latency decode), registered but not yet authorized.
-It has since been authorized, installed, runtime tested, falsified and
-rolled back — see "2026-09-19 work" above.
+Summary: C1/C2 complete on Linux; `C3.L0`, `C3.L1`, `C3.L1R1` complete;
+`C3.L2` classified Linux `video_only_restart`; `C3.L2a` ANSWERED the same day
+(27 ms actuator IDR against 195/210 ms for ordinary resyncs, so 287-318 ms was
+not actuator cost); `C3.L2b` installed and runtime validated. `C3.L2c` was
+registered but unauthorized then, and has since been authorized, installed,
+falsified and rolled back — see above.

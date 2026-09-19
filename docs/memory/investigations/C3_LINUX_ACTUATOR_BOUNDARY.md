@@ -67,8 +67,11 @@ Audited at `310596dd0cc3ff22f3fe46e2eb025d052da90ec0`:
 - `companion/diagnostics/c3_fixed_bitrate_probe.py`;
 - `companion/plugins/games.py` loopback-only C3 action registration;
 - `PrivyHub/app/src/main/java/streaming/RtpH264Receiver.kt`;
-- `PrivyHub/app/src/main/java/com/safeiot/privyhub/streaming/AvcLowLatencyDecoder.kt`;
-- `PrivyHub/app/src/main/java/com/safeiot/privyhub/streaming/NativeStreamActivity.kt`.
+- `PrivyHub/app/src/main/java/streaming/AvcLowLatencyDecoder.kt`;
+- `PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt`.
+
+(Paths as of the 2026-09-18 `ANDROID-FLAT` flattening. Text written before that
+date names the pre-flatten `com/safeiot/privyhub/` paths and is history.)
 
 ## Actuator boundary map
 
