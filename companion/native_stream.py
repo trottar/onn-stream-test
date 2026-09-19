@@ -1987,63 +1987,99 @@ class NativeStreamManager:
         self,
     ) -> dict[str, Any]:
         """Run the first fixed-bitrate C3 characterization point."""
-        from diagnostics.c3_fixed_bitrate_probe import (
-            run_c3_fixed_bitrate_6000_cycle,
-        )
-
         with self._lock:
-            try:
-                return run_c3_fixed_bitrate_6000_cycle(
-                    self
+            if self._linux_host():
+                from diagnostics.c3_linux_actuator_probe import (
+                    run_c3_linux_fixed_bitrate_cycle as _cycle,
                 )
+
+                kwargs: dict[str, Any] = {"target_bitrate_kbps": 6000}
+            elif os.name == "nt":
+                from diagnostics.c3_fixed_bitrate_probe import (
+                    run_c3_fixed_bitrate_6000_cycle as _cycle,
+                )
+
+                kwargs = {}
+            else:
+                raise NativeStreamError(
+                    "C3 fixed 6000 kbps characterization is not "
+                    "implemented for this host platform"
+                )
+
+            try:
+                return _cycle(self, **kwargs)
             except NativeStreamError:
                 raise
             except Exception as exc:
                 raise NativeStreamError(
                     "C3 fixed 6000 kbps characterization failed: "
-                    + type(exc).__name__
+                    + type(exc).__name__ + ": " + str(exc)
                 ) from exc
 
     def diagnostic_c3_fixed_bitrate_5000_cycle(
         self,
     ) -> dict[str, Any]:
         """Run the 5000 kbps fixed-bitrate C3 characterization point."""
-        from diagnostics.c3_fixed_bitrate_probe import (
-            run_c3_fixed_bitrate_5000_cycle,
-        )
-
         with self._lock:
-            try:
-                return run_c3_fixed_bitrate_5000_cycle(
-                    self
+            if self._linux_host():
+                from diagnostics.c3_linux_actuator_probe import (
+                    run_c3_linux_fixed_bitrate_cycle as _cycle,
                 )
+
+                kwargs: dict[str, Any] = {"target_bitrate_kbps": 5000}
+            elif os.name == "nt":
+                from diagnostics.c3_fixed_bitrate_probe import (
+                    run_c3_fixed_bitrate_5000_cycle as _cycle,
+                )
+
+                kwargs = {}
+            else:
+                raise NativeStreamError(
+                    "C3 fixed 5000 kbps characterization is not "
+                    "implemented for this host platform"
+                )
+
+            try:
+                return _cycle(self, **kwargs)
             except NativeStreamError:
                 raise
             except Exception as exc:
                 raise NativeStreamError(
                     "C3 fixed 5000 kbps characterization failed: "
-                    + type(exc).__name__
+                    + type(exc).__name__ + ": " + str(exc)
                 ) from exc
 
     def diagnostic_c3_fixed_bitrate_5500_cycle(
         self,
     ) -> dict[str, Any]:
         """Run the 5500 kbps fixed-bitrate C3 characterization point."""
-        from diagnostics.c3_fixed_bitrate_probe import (
-            run_c3_fixed_bitrate_5500_cycle,
-        )
-
         with self._lock:
-            try:
-                return run_c3_fixed_bitrate_5500_cycle(
-                    self
+            if self._linux_host():
+                from diagnostics.c3_linux_actuator_probe import (
+                    run_c3_linux_fixed_bitrate_cycle as _cycle,
                 )
+
+                kwargs: dict[str, Any] = {"target_bitrate_kbps": 5500}
+            elif os.name == "nt":
+                from diagnostics.c3_fixed_bitrate_probe import (
+                    run_c3_fixed_bitrate_5500_cycle as _cycle,
+                )
+
+                kwargs = {}
+            else:
+                raise NativeStreamError(
+                    "C3 fixed 5500 kbps characterization is not "
+                    "implemented for this host platform"
+                )
+
+            try:
+                return _cycle(self, **kwargs)
             except NativeStreamError:
                 raise
             except Exception as exc:
                 raise NativeStreamError(
                     "C3 fixed 5500 kbps characterization failed: "
-                    + type(exc).__name__
+                    + type(exc).__name__ + ": " + str(exc)
                 ) from exc
 
     def diagnostic_c3_validated_bitrate_transition(

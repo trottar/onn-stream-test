@@ -19,6 +19,13 @@ REFERENCE_BITRATE_KBPS = 7000
 CAPTURE_BACKEND = "x11grab_window"
 ENCODER_BACKEND = "h264_vaapi"
 
+# C3.L3: fixed-bitrate characterization. Same schema/mode strings as the
+# Windows WGC implementation (companion/diagnostics/c3_fixed_bitrate_probe.py)
+# so tools/probe_c3_fixed_*_characterization.py works unchanged on either host.
+FIXED_BITRATE_SCHEMA = "privyhub_c3_fixed_bitrate_cycle_v1"
+FIXED_BITRATE_MODE = "fixed_bitrate_characterization"
+SUPPORTED_FIXED_BITRATES_KBPS = (5000, 5500, 6000)
+
 
 def _dict(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
@@ -413,6 +420,334 @@ def run_c3_linux_actuator_continuity_cycle(
             manager,
             "C3.L1 Linux actuator continuity probe: "
             "encoder-only cycle failed",
+        )
+
+        raise
+
+
+def run_c3_linux_fixed_bitrate_cycle(
+    manager: Any,
+    target_bitrate_kbps: int,
+    *,
+    popen_factory: Callable[..., Any] = subprocess.Popen,
+    perf_counter_ns: Callable[[], int] = time.perf_counter_ns,
+    monotonic: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = time.sleep,
+) -> dict[str, Any]:
+    """Restart the Linux encoder process at a fixed characterization bitrate.
+
+    Same encoder-only restart mechanism as
+    `run_c3_linux_actuator_continuity_cycle` (C3.L1/C3.L1R1), parameterized
+    to move off the reference bitrate for C3.L3 characterization instead of
+    restarting at the same bitrate. Capture, the FEC relay, process audio,
+    the persistent controller and the managed RetroArch process are left
+    running exactly as in the continuity cycle; only the encoder
+    invocation's requested bitrate differs.
+
+    Emits the same response schema as the Windows WGC-based
+    `_run_c3_fixed_bitrate_cycle` (`privyhub_c3_fixed_bitrate_cycle_v1`) so
+    `tools/probe_c3_fixed_*_characterization.py` works unchanged on either
+    platform. Only the caller-selected encoder bitrate changes; resolution,
+    FPS, GOP, B-frames, FEC group size, RTP payload type and packet size are
+    untouched (they are not parameters of `_build_linux_ffmpeg_command`).
+    """
+
+    target = _int(target_bitrate_kbps)
+
+    if target not in SUPPORTED_FIXED_BITRATES_KBPS:
+        raise RuntimeError("unsupported_characterization_bitrate")
+
+    manager._reap_locked()
+
+    if not manager._linux_host():
+        raise RuntimeError("not_linux_host")
+
+    if not manager._running_locked():
+        raise RuntimeError("native_video_stream_not_active")
+
+    if (
+        int(manager.BITRATE_KBPS) != REFERENCE_BITRATE_KBPS
+        or int(manager.MAX_BITRATE_KBPS) != REFERENCE_BITRATE_KBPS
+    ):
+        raise RuntimeError("reference_profile_not_7000")
+
+    current_bitrate_kbps = int(
+        getattr(
+            manager,
+            "_active_bitrate_kbps",
+            REFERENCE_BITRATE_KBPS,
+        )
+    )
+
+    if current_bitrate_kbps != REFERENCE_BITRATE_KBPS:
+        raise RuntimeError("characterization_requires_reference_start")
+
+    if not manager._fec_relay.running:
+        raise RuntimeError("fec_relay_not_running")
+
+    ffmpeg = manager._find_ffmpeg()
+
+    if ffmpeg is None:
+        raise RuntimeError("ffmpeg_unavailable")
+
+    if manager._linux_display() is None:
+        raise RuntimeError("x11_display_unavailable")
+
+    if manager._linux_xdotool() is None:
+        raise RuntimeError("x11_window_tool_unavailable")
+
+    if manager._linux_vaapi_device() is None:
+        raise RuntimeError("vaapi_render_node_unavailable")
+
+    if manager._log_handle is None:
+        raise RuntimeError("native_video_log_not_open")
+
+    if manager._client_port is None:
+        raise RuntimeError("native_client_port_unavailable")
+
+    capture_target = _dict(
+        getattr(
+            manager,
+            "_capture_target",
+            None,
+        )
+    )
+
+    window_id = _int(
+        capture_target.get(
+            "_window_id",
+            0,
+        )
+    )
+
+    if window_id <= 0:
+        raise RuntimeError("capture_target_window_id_unavailable")
+
+    managed_pid = _int(
+        capture_target.get(
+            "pid",
+            0,
+        )
+    )
+
+    if managed_pid <= 0 or not Path(f"/proc/{managed_pid}").is_dir():
+        raise RuntimeError("managed_game_process_not_active")
+
+    session_before = manager._session_io.status()
+    fec_before = manager._fec_relay.status()
+
+    if not _active(session_before.get("audio")):
+        raise RuntimeError("process_audio_not_active")
+
+    if not _active(session_before.get("controller")):
+        raise RuntimeError("controller_not_active")
+
+    if not bool(fec_before.get("running", False)):
+        raise RuntimeError("fec_relay_not_running")
+
+    old_ffmpeg = manager._process
+
+    if old_ffmpeg is None or old_ffmpeg.poll() is not None:
+        raise RuntimeError("managed_encoder_process_not_active")
+
+    if manager._capture_process is not None:
+        raise RuntimeError("unexpected_linux_capture_process")
+
+    pre_kill_rtp_packets = _counter(fec_before, "rtp_packets")
+
+    _safe_log(
+        manager,
+        "C3.L3 Linux fixed-bitrate characterization probe: "
+        f"{current_bitrate_kbps} -> {target} kbps encoder-only cycle begin",
+    )
+
+    cycle_started_ns = perf_counter_ns()
+    replacement_ffmpeg = None
+    first_rtp_resume_ms: float | None = None
+    ffmpeg_spawn_ms: float | None = None
+
+    try:
+        manager._process = None
+
+        manager._kill_managed_process(old_ffmpeg)
+
+        session_mid = manager._session_io.status()
+        fec_mid = manager._fec_relay.status()
+
+        before_rtp_packets = _counter(fec_mid, "rtp_packets")
+        rtp_baseline_residual_packets = max(
+            0,
+            before_rtp_packets - pre_kill_rtp_packets,
+        )
+
+        replacement_ffmpeg = popen_factory(
+            manager._build_linux_ffmpeg_command(
+                ffmpeg=ffmpeg,
+                capture_target=capture_target,
+                bitrate_kbps=target,
+                max_bitrate_kbps=target,
+            ),
+            cwd=str(manager.project_root),
+            stdin=subprocess.DEVNULL,
+            stdout=manager._log_handle,
+            stderr=subprocess.STDOUT,
+        )
+
+        manager._process = replacement_ffmpeg
+
+        ffmpeg_spawn_ms = (
+            perf_counter_ns() - cycle_started_ns
+        ) / 1_000_000.0
+
+        rtp_deadline = monotonic() + 2.0
+
+        while monotonic() < rtp_deadline:
+            if replacement_ffmpeg.poll() is not None:
+                raise RuntimeError("replacement_ffmpeg_exited")
+
+            if (
+                _counter(
+                    manager._fec_relay.status(),
+                    "rtp_packets",
+                )
+                > before_rtp_packets
+            ):
+                first_rtp_resume_ms = (
+                    perf_counter_ns() - cycle_started_ns
+                ) / 1_000_000.0
+                break
+
+            sleep(0.01)
+
+        if first_rtp_resume_ms is None:
+            raise RuntimeError("replacement_rtp_did_not_resume")
+
+        stable_deadline = monotonic() + 0.75
+
+        while monotonic() < stable_deadline:
+            if replacement_ffmpeg.poll() is not None:
+                raise RuntimeError("replacement_ffmpeg_unstable")
+
+            sleep(0.05)
+
+        manager._active_bitrate_kbps = target
+
+        session_after = manager._session_io.status()
+        fec_after = manager._fec_relay.status()
+
+        total_verified_ms = (
+            perf_counter_ns() - cycle_started_ns
+        ) / 1_000_000.0
+
+        audio_before = _dict(session_before.get("audio"))
+        audio_mid = _dict(session_mid.get("audio"))
+        audio_after = _dict(session_after.get("audio"))
+
+        controller_before = _dict(session_before.get("controller"))
+        controller_mid = _dict(session_mid.get("controller"))
+        controller_after = _dict(session_after.get("controller"))
+
+        payload = {
+            "schema": FIXED_BITRATE_SCHEMA,
+            "ok": True,
+            "mode": FIXED_BITRATE_MODE,
+            "platform": "linux",
+            "capture_backend": CAPTURE_BACKEND,
+            "encoder_backend": ENCODER_BACKEND,
+            "reference_bitrate_kbps": REFERENCE_BITRATE_KBPS,
+            "from_bitrate_kbps": current_bitrate_kbps,
+            "target_bitrate_kbps": target,
+            "profile_id": str(manager.PROFILE.id),
+            "video": {
+                "capture_restarted": False,
+                "capture_process_present": False,
+                "encoder_restarted": True,
+                "source_width": _int(
+                    capture_target.get("width", 0)
+                ),
+                "source_height": _int(
+                    capture_target.get("height", 0)
+                ),
+                "ffmpeg_spawn_ms": round(
+                    float(ffmpeg_spawn_ms or 0.0),
+                    3,
+                ),
+                "first_rtp_resume_ms": round(
+                    float(first_rtp_resume_ms),
+                    3,
+                ),
+                "rtp_silence_after_spawn_ms": round(
+                    float(first_rtp_resume_ms)
+                    - float(ffmpeg_spawn_ms or 0.0),
+                    3,
+                ),
+                "rtp_baseline_residual_packets": int(
+                    rtp_baseline_residual_packets
+                ),
+                "host_verified_ms": round(
+                    total_verified_ms,
+                    3,
+                ),
+            },
+            "fec": {
+                "restarted": False,
+                "running_before": bool(
+                    fec_before.get("running", False)
+                ),
+                "running_mid_cycle": bool(
+                    fec_mid.get("running", False)
+                ),
+                "running_after": bool(
+                    fec_after.get("running", False)
+                ),
+                "send_errors_delta": max(
+                    0,
+                    _counter(fec_after, "send_errors")
+                    - _counter(fec_before, "send_errors"),
+                ),
+            },
+            "audio": {
+                "restarted": False,
+                "active_before": _active(audio_before),
+                "active_mid_cycle": _active(audio_mid),
+                "active_after": _active(audio_after),
+                "send_errors_delta": max(
+                    0,
+                    _counter(audio_after, "send_errors")
+                    - _counter(audio_before, "send_errors"),
+                ),
+            },
+            "controller": {
+                "restarted": False,
+                "active_before": _active(controller_before),
+                "active_mid_cycle": _active(controller_mid),
+                "active_after": _active(controller_after),
+                "bad_packets_delta": max(
+                    0,
+                    _counter(controller_after, "bad_packets")
+                    - _counter(controller_before, "bad_packets"),
+                ),
+            },
+        }
+
+        _safe_log(
+            manager,
+            "C3.L3 Linux fixed-bitrate characterization probe: "
+            f"{target} kbps active; "
+            f"first RTP resume={payload['video']['first_rtp_resume_ms']} ms",
+        )
+
+        return payload
+
+    except Exception:
+        manager._kill_managed_process(replacement_ffmpeg)
+        manager._process = None
+        manager._active_bitrate_kbps = current_bitrate_kbps
+
+        _safe_log(
+            manager,
+            "C3.L3 Linux fixed-bitrate characterization probe: "
+            f"{current_bitrate_kbps} -> {target} kbps cycle failed",
         )
 
         raise
