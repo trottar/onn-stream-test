@@ -678,3 +678,156 @@ actuator is authorized for automatic use.
 Still not established on Linux: bidirectional and upward transitions, any
 bitrate ladder or minimum, and whether a ~290 ms automatic interruption is
 acceptable. `C3.L3` owns the envelope; `C3.L2a` owns the interruption cost.
+
+## C3.L3a design — Linux ladder transition and gameplay acceptance probe
+
+**Status: DESIGNED, 2026-09-19. Not yet built or run.** This section records
+the design produced before authorization, per `CURRENT.md`'s own gate:
+present the plan first, build only after it is authorized.
+
+### The ladder
+
+`LINUX_LADDER_BITRATES_KBPS = (5000, 5500, 6000, 7000)`. All four are already
+timing-characterized on Linux: 7000 is the reference/baseline; 5000, 5500 and
+6000 were measured by `C3.L3` (`decoder_max_output_gap_ms` bands 125/365/40 ms
+respectively). None has been quality-accepted — that is exactly what `C3.L3a`
+gathers evidence for. Adding a fifth rung (for example 6500, to fill a gap
+between two existing levels) is not a decision this probe makes for itself: a
+new rung needs its own `C3.L3`-style timing characterization pass before it
+joins the ladder, mirroring how 5500 itself was added as a midpoint bracket
+test between 5000 and 6000. `C3.L3a`'s job with the current four-point ladder
+is to find out whether that ladder is already fine/coarse enough, or whether a
+gap needs filling — not to guess at arbitrary intermediate bitrates.
+
+### Why the existing precondition blocks C3.L3a, and the fix
+
+`run_c3_linux_fixed_bitrate_cycle` (`C3.L3`) requires `current_bitrate_kbps ==
+7000` and `target in (5000, 5500, 6000)`. As written it supports exactly one
+transition per session, which cannot rehearse "several transitions... not
+one" (the `C3.L4` gate's first requirement).
+
+The fix reuses a precedent already set on Windows rather than inventing a new
+shape: D-069's `_run_c3_fixed_bitrate_cycle(..., validated_transition: bool =
+False)` on Windows already distinguishes a one-shot characterization
+precondition from a bidirectional-ladder precondition restricted to a named,
+validated set (`VALIDATED_ADAPTIVE_BITRATES_KBPS`). **Correction, `C3-L3A-P1` (installed 2026-09-19).** The text that stood here
+said the Windows code "stays untouched and historical; only its precondition
+*shape* is reused", and proposed a new `ladder_transition` flag plus a new
+companion method and route. A source audit before building found more of the
+seam already present than that assumed:
+
+- `run_c3_validated_bitrate_transition()` and
+  `VALIDATED_ADAPTIVE_BITRATES_KBPS` exist in
+  `companion/diagnostics/c3_fixed_bitrate_probe.py`;
+- `NativeStreamManager.diagnostic_c3_validated_bitrate_transition()` already
+  exists in `companion/native_stream.py`;
+- the loopback-only route already exists in `companion/plugins/games.py`,
+  allowlisting `{5500, 6000, 7000}`;
+- `BIDIRECTIONAL_SCHEMA` and `BIDIRECTIONAL_MODE` already exist.
+
+The dispatch called the Windows implementation unconditionally, so on Linux
+it failed exactly the way the fixed-bitrate cycles did before `C3.L3`. The
+seam was built for D-069 and simply never ported. Building a parallel
+`ladder_transition` flag beside it would have been a second implementation of
+an existing path, which this project's principles forbid. **What shipped is
+the port, under the existing names.**
+
+- `_run_c3_linux_bitrate_cycle(..., validated_transition: bool = False)`
+  holds one body with two preconditions, mirroring the Windows
+  `_run_c3_fixed_bitrate_cycle` split;
+- `run_c3_linux_fixed_bitrate_cycle(manager, target, **kw)` — unchanged call
+  shape, `validated_transition=False`, the `C3.L3` path, behaving as it did
+  when `C3.L3`'s runtime evidence was produced;
+- `run_c3_linux_validated_bitrate_transition(manager, *, target_bitrate_kbps,
+  **kw)` — `validated_transition=True`, keyword-only target matching the
+  Windows signature so one dispatch call shape serves both;
+- guards under `validated_transition=True` reuse the Windows error strings
+  verbatim: `unsupported_validated_bitrate`,
+  `validated_transition_requires_validated_start`, `bitrate_transition_noop`.
+
+Restart mechanics are identical in both modes — kill, RTP baseline after the
+kill, spawn, poll for resume, 0.75 s stability window.
+
+One guard deliberately does **not** relax: `manager.BITRATE_KBPS` and
+`MAX_BITRATE_KBPS` must still be 7000. That asserts the configured reference
+profile is untampered, a different claim from where the stream currently sits.
+
+**Ladder divergence, deliberate.** Linux is `(5000, 5500, 6000, 7000)`;
+Windows `VALIDATED_ADAPTIVE_BITRATES_KBPS` is `(5500, 6000, 7000)`. 5000 kbps
+has three valid Linux characterization samples from `C3.L3` and none on
+Windows. The shared route allowlists the union and each platform's
+implementation rejects what it has not characterized, so a 5000 kbps request
+on Windows fails closed with `unsupported_validated_bitrate`.
+
+This is a real precondition change, not a no-op; the default path's byte-
+identical behavior is what keeps `C3.L3`'s existing runtime evidence valid
+without rerunning it.
+
+### Jump vs. ramp, and why both matter
+
+This architecture's own fast-down/slow-up rule (above, "Fast-down / slow-up
+rule") already states that one automatic decision changes at most one
+validated bitrate level and no sample may trigger multiple steps. That means
+the eventual `C3.L4` controller will only ever move one ladder rung at a
+time — a **ramp** (7000 -> 6000 -> 5500 -> 5000, one rung per cycle) is the
+routine pattern it would actually execute. A **jump** (7000 -> 5000 directly)
+is not routine-adaptation behavior; it exercises the separately-authorized
+fallback/recovery use case (`C3.L2`'s "fallback and recovery, including
+replacing a dead encoder"). Both are worth rehearsing, but they answer
+different questions and must be labeled and reported separately, never
+pooled — the ramp's multiple smaller discontinuities and the jump's one
+larger discontinuity are not directly comparable without knowing which
+produced which mark.
+
+### Companion primitive — no new one was needed
+
+The design originally called for a new
+`diagnostic_c3_l3a_ladder_transition()` method and a new
+`POST /plugins/games/c3-l3a-ladder-transition` route. **Neither was built,
+because both already existed** under the D-069 name. `C3.L3a` uses the
+existing `diagnostic_c3_validated_bitrate_transition(target_bitrate_kbps)`
+and its existing loopback-only route; the only route change was adding 5000
+to the allowlist.
+
+The properties the design asked for hold unchanged: the manager lock is held
+for the single restart call only, never across dwell time, so all timing,
+randomization and the control interval live in the probe script — matching
+how every other multi-stage checkout probe in `tools/` orchestrates
+client-side against a single companion primitive. **`C3.L3a` introduces no
+new companion-side mechanism at all.** It authorizes nothing and adds no
+controller logic.
+
+The line that must not be crossed: the probe follows a **pre-generated
+random script**. It never reads telemetry and decides a target. A sequencer
+that observes conditions and picks a bitrate *is* `C3.L4`, and would have
+skipped its own gate.
+
+### The gameplay acceptance probe
+
+`tools/probe_c3_l3a_gameplay_acceptance.py` orchestrates one play session
+against the primitive above: a background thread fires a randomized,
+unannounced sequence of ladder transitions (at least one full ramp, at least
+one direct jump, at least one control interval where nothing fires) while the
+main thread runs a non-blocking mark-capture loop — the player presses Enter
+on the companion terminal the instant they notice something, timestamped
+against the same clock the cycle log and the decoder's
+`stream_discontinuities` use, without pausing gameplay or asking a question
+mid-session (a blocking yes/no prompt would itself telegraph that a
+transition just fired). The session dwells long enough at 5000/5500/6000 kbps
+for the picture itself to be judged, not just measured. After the session
+ends, a post-session debrief reuses the existing terminal yes/no idiom
+already used by every other `tools/` checkout probe (see next section) to ask
+whether each destination bitrate looked acceptable. No pass/fail threshold is
+encoded in the probe anywhere — it records, the user judges, per
+`investigations/ACTIVE.md`'s existing disposition rule.
+
+### Shared checkout module
+
+Every existing manual checkout probe (`probe_ps1_multitap_onoff_runtime.py`,
+`probe_phase_a_a9_emulator_checkpoint.py`, and others in the same family)
+duplicates its own copy of a `yes(prompt)` input helper and its own
+`lines`-list-plus-`Classification:`-header report writer. `C3.L3a` factors
+this into one shared `tools/manual_checkout.py` module — `yes()`, a report
+writer matching the existing convention, and the new non-blocking mark-
+capture loop — so this probe and future ones stop duplicating it. Existing
+probes are not touched; this is additive only.

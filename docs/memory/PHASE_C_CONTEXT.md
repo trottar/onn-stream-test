@@ -313,9 +313,16 @@ fast-down controller whose destination is visually poor fails even if every
 transition is invisible. The observation should park at the candidate bitrates
 long enough to judge the picture.
 
-`C3.L3a` owns this. Diagnostic-only, authorizes nothing, reuses
-`run_c3_linux_fixed_bitrate_cycle` unchanged. Scope in
-`investigations/ACTIVE.md`.
+`C3.L3a` owns this. Diagnostic-only, authorizes nothing.
+
+Part 1 (`C3-L3A-P1`, installed 2026-09-19) ported the D-069 validated-ladder
+seam to Linux so several transitions can run in one session, via
+`run_c3_linux_validated_bitrate_transition` dispatched from the
+already-existing `diagnostic_c3_validated_bitrate_transition` and its
+already-existing loopback route. The `C3.L3` characterization path is
+unchanged. Linux ladder `(5000, 5500, 6000, 7000)`. Part 2 is the probe.
+Scope in `investigations/ACTIVE.md`; mechanism in
+`architecture/ADAPTIVE_BITRATE.md`.
 
 One standing consequence of the `C3.L2a` E2 result, easy to miss: the
 classification's reason 1 — the actuator inserting a ~290 ms discontinuity —

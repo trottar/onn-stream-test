@@ -26,6 +26,21 @@ FIXED_BITRATE_SCHEMA = "privyhub_c3_fixed_bitrate_cycle_v1"
 FIXED_BITRATE_MODE = "fixed_bitrate_characterization"
 SUPPORTED_FIXED_BITRATES_KBPS = (5000, 5500, 6000)
 
+# C3.L3a: validated-ladder transitions. Same schema/mode strings and the same
+# error strings as the Windows implementation's `validated_transition=True`
+# path, so the shared route, the shared dispatch method and any probe reading
+# the response behave identically on either host.
+#
+# The Linux ladder includes 5000 kbps; the Windows ladder
+# (VALIDATED_ADAPTIVE_BITRATES_KBPS) does not. 5000 kbps carries three valid
+# Linux characterization samples from C3.L3 and none on Windows, so this is a
+# deliberate, evidence-backed divergence rather than an oversight. The shared
+# route allowlists the union and each platform's implementation rejects what
+# it has not characterized.
+BIDIRECTIONAL_SCHEMA = "privyhub_c3_validated_bitrate_transition_v1"
+BIDIRECTIONAL_MODE = "validated_ladder_actuator_probe"
+LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS = (5000, 5500, 6000, 7000)
+
 
 def _dict(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
@@ -425,16 +440,40 @@ def run_c3_linux_actuator_continuity_cycle(
         raise
 
 
-def run_c3_linux_fixed_bitrate_cycle(
+def _run_c3_linux_bitrate_cycle(
     manager: Any,
     target_bitrate_kbps: int,
     *,
+    validated_transition: bool = False,
     popen_factory: Callable[..., Any] = subprocess.Popen,
     perf_counter_ns: Callable[[], int] = time.perf_counter_ns,
     monotonic: Callable[[], float] = time.monotonic,
     sleep: Callable[[float], None] = time.sleep,
 ) -> dict[str, Any]:
     """Restart the Linux encoder process at a fixed characterization bitrate.
+
+    Two preconditions share one body, mirroring the Windows
+    `_run_c3_fixed_bitrate_cycle(..., validated_transition=...)` split:
+
+    - `validated_transition=False` (default) is the C3.L3 characterization
+      path and is unchanged. Target must be in
+      `SUPPORTED_FIXED_BITRATES_KBPS`; the stream must currently be at the
+      7000 kbps reference. C3.L3's runtime evidence stays valid because this
+      path behaves exactly as it did when that evidence was produced.
+    - `validated_transition=True` is the C3.L3a ladder path. Target and
+      current must both be in `LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS` and
+      must differ, so chained transitions in either direction between the
+      four characterized levels are legal and a session no longer has to be
+      restarted to move again.
+
+    Restart mechanics are identical in both modes: kill, RTP baseline after
+    the kill, spawn, poll for resume, 0.75 s stability window. Only the
+    precondition, the emitted schema/mode strings and the log label differ.
+
+    The guard on `manager.BITRATE_KBPS` / `manager.MAX_BITRATE_KBPS` applies
+    in both modes: the configured reference profile must still be 7000. That
+    is a different assertion from where the stream currently sits, and
+    relaxing the second must not relax the first.
 
     Same encoder-only restart mechanism as
     `run_c3_linux_actuator_continuity_cycle` (C3.L1/C3.L1R1), parameterized
@@ -454,7 +493,10 @@ def run_c3_linux_fixed_bitrate_cycle(
 
     target = _int(target_bitrate_kbps)
 
-    if target not in SUPPORTED_FIXED_BITRATES_KBPS:
+    if validated_transition:
+        if target not in LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS:
+            raise RuntimeError("unsupported_validated_bitrate")
+    elif target not in SUPPORTED_FIXED_BITRATES_KBPS:
         raise RuntimeError("unsupported_characterization_bitrate")
 
     manager._reap_locked()
@@ -479,8 +521,25 @@ def run_c3_linux_fixed_bitrate_cycle(
         )
     )
 
-    if current_bitrate_kbps != REFERENCE_BITRATE_KBPS:
+    if validated_transition:
+        if (
+            current_bitrate_kbps
+            not in LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS
+        ):
+            raise RuntimeError(
+                "validated_transition_requires_validated_start"
+            )
+
+        if target == current_bitrate_kbps:
+            raise RuntimeError("bitrate_transition_noop")
+    elif current_bitrate_kbps != REFERENCE_BITRATE_KBPS:
         raise RuntimeError("characterization_requires_reference_start")
+
+    label = (
+        "C3.L3a Linux validated-ladder transition probe"
+        if validated_transition
+        else "C3.L3 Linux fixed-bitrate characterization probe"
+    )
 
     if not manager._fec_relay.running:
         raise RuntimeError("fec_relay_not_running")
@@ -557,7 +616,7 @@ def run_c3_linux_fixed_bitrate_cycle(
 
     _safe_log(
         manager,
-        "C3.L3 Linux fixed-bitrate characterization probe: "
+        f"{label}: "
         f"{current_bitrate_kbps} -> {target} kbps encoder-only cycle begin",
     )
 
@@ -648,9 +707,17 @@ def run_c3_linux_fixed_bitrate_cycle(
         controller_after = _dict(session_after.get("controller"))
 
         payload = {
-            "schema": FIXED_BITRATE_SCHEMA,
+            "schema": (
+                BIDIRECTIONAL_SCHEMA
+                if validated_transition
+                else FIXED_BITRATE_SCHEMA
+            ),
             "ok": True,
-            "mode": FIXED_BITRATE_MODE,
+            "mode": (
+                BIDIRECTIONAL_MODE
+                if validated_transition
+                else FIXED_BITRATE_MODE
+            ),
             "platform": "linux",
             "capture_backend": CAPTURE_BACKEND,
             "encoder_backend": ENCODER_BACKEND,
@@ -732,7 +799,7 @@ def run_c3_linux_fixed_bitrate_cycle(
 
         _safe_log(
             manager,
-            "C3.L3 Linux fixed-bitrate characterization probe: "
+            f"{label}: "
             f"{target} kbps active; "
             f"first RTP resume={payload['video']['first_rtp_resume_ms']} ms",
         )
@@ -746,8 +813,43 @@ def run_c3_linux_fixed_bitrate_cycle(
 
         _safe_log(
             manager,
-            "C3.L3 Linux fixed-bitrate characterization probe: "
+            f"{label}: "
             f"{current_bitrate_kbps} -> {target} kbps cycle failed",
         )
 
         raise
+
+
+def run_c3_linux_fixed_bitrate_cycle(
+    manager: Any,
+    target_bitrate_kbps: int,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Run one C3.L3 fixed-bitrate characterization cycle from reference."""
+    return _run_c3_linux_bitrate_cycle(
+        manager,
+        target_bitrate_kbps,
+        validated_transition=False,
+        **kwargs,
+    )
+
+
+def run_c3_linux_validated_bitrate_transition(
+    manager: Any,
+    *,
+    target_bitrate_kbps: int,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Run one C3.L3a transition between validated Linux ladder levels.
+
+    Keyword-only `target_bitrate_kbps`, matching the Windows
+    `run_c3_validated_bitrate_transition` signature so
+    `NativeStreamManager.diagnostic_c3_validated_bitrate_transition` can
+    dispatch to either implementation with one call shape.
+    """
+    return _run_c3_linux_bitrate_cycle(
+        manager,
+        target_bitrate_kbps,
+        validated_transition=True,
+        **kwargs,
+    )

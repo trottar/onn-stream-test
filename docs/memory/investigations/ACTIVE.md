@@ -61,11 +61,31 @@ Two distinct unanswered questions:
    picture at 5000 or 5500 kbps. A fast-down controller whose destination is
    visually poor fails even with invisible transitions.
 
-## C3.L3a — gameplay acceptance probe. REGISTERED / NEXT.
+## C3.L3a — gameplay acceptance probe. PART 1 INSTALLED / PART 2 NEXT.
 
 The `C3.L4` gate, made performable. Diagnostic-only. **It authorizes nothing**
-and adds no controller logic; it reuses the validated
-`run_c3_linux_fixed_bitrate_cycle` as-is.
+and adds no controller logic. Full design in
+`../architecture/ADAPTIVE_BITRATE.md`, section "C3.L3a design".
+
+**Part 1 — `C3-L3A-P1`, installed 2026-09-19, DEVELOPMENT ONLY.** Ported the
+D-069 validated-ladder seam to Linux. `_run_c3_linux_bitrate_cycle` now holds
+one body with two preconditions, mirroring the Windows split;
+`run_c3_linux_fixed_bitrate_cycle` keeps the `C3.L3` behaviour unchanged, and
+`run_c3_linux_validated_bitrate_transition` allows chained transitions in
+either direction between `(5000, 5500, 6000, 7000)`.
+
+No new companion method and no new route were built —
+`diagnostic_c3_validated_bitrate_transition` and its loopback route already
+existed and dispatched to the Windows implementation unconditionally. The
+only route change was adding 5000 to the allowlist. This supersedes both the
+earlier "reuses `run_c3_linux_fixed_bitrate_cycle` as-is" description and the
+later `ladder_transition`/new-route design; see the correction in
+`../architecture/ADAPTIVE_BITRATE.md`.
+
+**Gate before Part 2 is built:** one manual round trip,
+`7000 -> 6000 -> 5500 -> 5000 -> 5500 -> 6000 -> 7000`. Six chained
+transitions, both directions, ending at reference. Chaining has never run on
+Linux and must not debut inside a blinded gameplay session.
 
 Requirements, from `../decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`,
 section "The `C3.L4` gate, stated so it can be satisfied":
@@ -75,12 +95,46 @@ section "The `C3.L4` gate, stated so it can be satisfied":
 3. at least one interval in which nothing fires, as a control;
 4. the player's marks compared against `stream_discontinuities` `elapsed_ms`
    after the session, not during it;
-5. part of the session parked at 5000 and 5500 kbps so the picture itself can
-   be judged.
+5. part of the session parked at 5000/5500/6000 kbps so the picture itself
+   can be judged.
 
-Writes a fresh per-run result file with cycle times. Changes no production
-path. No acceptance threshold is encoded in the probe — the probe records, the
-user judges.
+**Part 2 session design, settled with the user 2026-09-19.** Ladder state
+machine alternating top (7000) and bottom (5000); each traversal randomly
+assigned **jump** (one cycle, 2000 kbps delta) or **ramp** (three cycles, one
+rung each, 4 s apart). Jump and ramp data are recorded separately and never
+pooled — a ramp's three smaller discontinuities and a jump's one larger one
+answer different questions, and per the architecture's fast-down/slow-up rule
+the ramp is what routine `C3.L4` adaptation would actually do while the jump
+exercises the separately-authorized fallback/recovery case.
+
+Decoys cost no session time: each dwell carries one decoy timestamp at a
+random offset where nothing fires, giving a 1:1 decoy ratio and a
+false-alarm baseline without it, a mark rate on ramps means nothing.
+
+Marks are captured non-blocking — the player presses Enter on the companion
+terminal the instant they notice something, timestamped against the same
+clock as the cycle log and `stream_discontinuities`. A blocking prompt would
+itself telegraph that a transition fired. The association window is
+**asymmetric**, `[event, event + 2.5 s]`, because a mark always lags the
+event by reaction time; decoys are scored through the identical window.
+Primary metric is binary per sequence — was this sequence marked at all;
+mark count is secondary, since a three-rung ramp in 8 s may reasonably draw
+one press.
+
+Runs pool: per-run files aggregate across sessions of the same configuration,
+so several shorter sessions beat one long one. Attention drifts over a long
+marking session, and drift correlated with shape order would fake a result —
+shape order is randomized within each run.
+
+Expectation, stated plainly: ~20 of each shape estimates a detection rate to
+roughly +/-11%. That resolves a large difference and will not resolve a
+subtle one. Pooling is what moves it.
+
+Writes a fresh per-run result file with cycle times, and always returns the
+stream to 7000 on completion, on error and on interrupt — nothing today does
+that, so a session currently stays parked wherever the last cycle left it.
+Changes no production path. No acceptance threshold is encoded in the probe —
+the probe records, the user judges.
 
 Outcome disposition: marks not aligned with cycle times and the picture judged
 acceptable → the gate is met and `C3.L4` may be proposed. Marks aligned →

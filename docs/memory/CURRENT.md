@@ -16,19 +16,34 @@ boundary for the validated Linux native game stream.
 
 ## Current Work Item
 
-`C3.L3a` — gameplay acceptance probe. **REGISTERED / NEXT**, design not yet
-authorized.
+`C3.L3a` — gameplay acceptance probe. **Part 1 INSTALLED, development only.
+Part 2 not yet built.**
 
 Start from `PHASE_C_CONTEXT.md`. It is the compact, self-sufficient Phase C
 continuation brief and should not require reading the wider memory hierarchy.
 
+**Part 1 (`C3-L3A-P1`) is installed and needs a runtime gate before Part 2.**
+It ported the D-069 validated-ladder seam to Linux so several transitions can
+run in one session. No new companion method and no new route were needed —
+both already existed and simply dispatched to the Windows implementation
+unconditionally. Mechanism:
+`architecture/ADAPTIVE_BITRATE.md`, section "C3.L3a design".
+
+Required gate before Part 2 is built — one manual round trip, chaining and
+both directions, ending at reference:
+
+    7000 -> 6000 -> 5500 -> 5000 -> 5500 -> 6000 -> 7000
+
+Six chained transitions. Chaining has never run on Linux and must not debut
+inside a blinded gameplay session.
+
 `C3.L3a` is the `C3.L4` gate made performable. Diagnostic-only; it authorizes
-nothing and adds no controller logic, reusing the validated
-`run_c3_linux_fixed_bitrate_cycle` as-is. Required shape: several transitions
-in one session, fired at intervals the player does not know in advance, at
-least one no-op interval as a control, the player's marks compared against
-`stream_discontinuities` `elapsed_ms` **after** the session, and part of the
-session parked at 5000 and 5500 kbps so the picture itself can be judged.
+nothing and adds no controller logic. Required shape of the Part 2 session:
+several transitions, fired at intervals the player does not know in advance,
+a control interval that fires nothing, the player's marks compared against
+`stream_discontinuities` `elapsed_ms` **after** the session, and time parked
+at 5000/5500/6000 kbps so the picture itself can be judged. Jump and ramp
+sequences are recorded separately and never pooled.
 
 `C3.L4` stays **BLOCKED**, gate `C3.L3a`. A manual cycle with a subjective read
 does not satisfy it — that was done on 2026-09-18 and ruled insufficient — and
@@ -43,24 +58,21 @@ stated so it can be satisfied".
 - `C3.L0` actuator boundary audit: COMPLETE. Map in
   `investigations/C3_LINUX_ACTUATOR_BOUNDARY.md`.
 - `C3.L1` / `C3.L1R1` Linux encoder-only actuator: COMPLETE / RUNTIME
-  VALIDATED across two clean cycles. Lifecycle preserved both times: FEC,
-  process audio, controller and emulator survived with zero errors and exactly
-  one SSRC change per cycle.
+  VALIDATED across two clean cycles, lifecycle preserved both times with zero
+  FEC/audio/controller errors and one SSRC change per cycle.
 - `C3.L2` Linux actuator classification: COMPLETE. Linux is
-  `video_only_restart`; `live_bitrate_reconfigure` is not available under the
-  current architecture. Authorized for start-time profile selection, manual and
-  loopback-only diagnostic changes, fallback and recovery, and `C3.L3`
-  characterization. **Not** authorized for automatic adaptation during play.
-  Record: `decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`.
-- `C3.L2a` E1 evidence pass: COMPLETE, question not answered by it. The old
-  decoder report's slow-event list was a 128-entry flat ring that had already
-  evicted the cycle's row. Record:
+  `video_only_restart`; `live_bitrate_reconfigure` is unavailable under the
+  current architecture. Authorized for start-time selection, manual and
+  loopback-only changes, fallback/recovery and characterization. **Not**
+  authorized for automatic adaptation during play. Reason 1 of that record is
+  falsified; the decision stands on reasons 2-4. Record:
+  `decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`.
+- `C3.L2a` E1 evidence pass: COMPLETE, question not answered by it — the old
+  128-entry flat ring had evicted the cycle's row. Record:
   `evidence/C3_L2A_E1_DECODER_EVIDENCE_PASS_2026-09-18.md`.
-- `C3.L2b` decoder-report cycle retention: COMPLETE / RUNTIME VALIDATED. The
-  recent buffer did not overflow (94 of 128) and the new
-  `stream_discontinuities` and `first_idr_after_discontinuity` arrays were
-  populated on first use. Record:
-  `patches/C3-L2B_DECODER_REPORT_CYCLE_RETENTION.md`.
+- `C3.L2b` decoder-report cycle retention: COMPLETE / RUNTIME VALIDATED.
+  `stream_discontinuities` and `first_idr_after_discontinuity` populated on
+  first use. Record: `patches/C3-L2B_DECODER_REPORT_CYCLE_RETENTION.md`.
 - `C3.L2a` first-IDR acceptance: **ANSWERED**. SSRC change at 43,443 ms, first
   IDR accepted at 43,471 ms — 27 ms, AU complete, no FEC repair, no
   unrecoverable group. The two ordinary resyncs took 195 ms and 210 ms. The
@@ -69,28 +81,24 @@ stated so it can be satisfied".
   `C3.L1` / `C3.L1R1` was never actuator cost and must not be cited as such.**
   Record: `evidence/C3_L2A_E2_ACTUATOR_IDR_RESOLVED_2026-09-18.md`.
 - `C3.L2c` low-latency decode: **FALSIFIED / ROLLED BACK**, 2026-09-19.
-  `low_latency_enabled` did flip true and per-frame decode improved sharply
-  (`max_codec_ms` 107, best of eight same-day sessions; `spike_250_ms` zero,
-  the only session with none), but `max_output_gap_ms` was 385 ms — second
-  worst of the eight — and the user's gameplay report matched. Source restored
-  to exact predecessor bytes. Do not retry the unconditional `KEY_LOW_LATENCY`
-  request without new evidence. Records:
+  `max_codec_ms` 107 (best of eight same-day sessions, `spike_250_ms` zero)
+  but `max_output_gap_ms` 385 ms, second worst, and the gameplay report
+  matched. Source restored to exact predecessor bytes. Do not retry the
+  unconditional `KEY_LOW_LATENCY` request without new evidence. Records:
   `evidence/C3_L2C_LOW_LATENCY_DECODE_FALSIFIED_2026-09-19.md`,
   `patches/C3-L2C_LOW_LATENCY_DECODE_ENABLE.md`.
-- `C3.L3` Linux fixed-bitrate cycle: **COMPLETE / RUNTIME VALIDATED**. The
-  Windows-only WGC implementation was ported to Linux by reusing the validated
-  `C3.L1`/`C3.L1R1` encoder-only restart primitive. Ten trigger/finalize cycles
-  across three runs at 5000/5500/6000 kbps, zero cycle-level
-  FEC/audio/controller errors in every one. Record:
+- `C3.L3` Linux fixed-bitrate cycle: **COMPLETE / RUNTIME VALIDATED**. Ported
+  from the Windows-only WGC implementation by reusing the `C3.L1`/`C3.L1R1`
+  encoder-only restart primitive. Ten trigger/finalize cycles across three
+  runs, zero cycle-level errors in every one. Record:
   `patches/C3-L3_LINUX_FIXED_BITRATE_PORT.md`.
-- `C3.L3` fixed-bitrate characterization: **COMPLETE**, three valid samples per
-  bitrate. `decoder_max_output_gap_ms` by run — 5000 kbps 367/292/242 (band
-  125 ms); 5500 kbps 219/584/335 (band 365 ms, includes the only session over
-  400 ms recorded at any bitrate); **6000 kbps 331/291/307 (band 40 ms)**.
-  6000 kbps is the most consistent of the three and never exceeded 331 ms.
-  This is transport and decoder timing only — no perceptual quality was
-  measured, and no bitrate is accepted as a fallback level on this data.
-  Record: `evidence/C3_L3_LINUX_FIXED_BITRATE_CHARACTERIZATION_2026-09-19.md`.
+- `C3.L3` fixed-bitrate characterization: **COMPLETE**, three valid samples
+  per bitrate. `decoder_max_output_gap_ms` bands — 5000 kbps 242-367 (125 ms);
+  5500 kbps 219-584 (365 ms, the only session over 400 ms at any bitrate);
+  **6000 kbps 291-331 (40 ms)**, the most consistent, never over 331 ms.
+  Transport and decoder timing only — no perceptual quality was measured and
+  no bitrate is accepted as a fallback level on this data. Record:
+  `evidence/C3_L3_LINUX_FIXED_BITRATE_CHARACTERIZATION_2026-09-19.md`.
 - D4 Games and D5 media/server restoration: COMPLETE / RUNTIME VALIDATED.
 
 Blocked or incomplete:
@@ -113,8 +121,14 @@ Blocked or incomplete:
 
 ## Next Action
 
-Authorize the `C3.L3a` probe design. Ask for the design as a short plan first —
-no code, no patch — then Tier 1 when built. `C3.L3` needs no further runs.
+The `C3.L3a` design is complete and presented; see
+`architecture/ADAPTIVE_BITRATE.md`. Awaiting authorization to build it as a
+Tier 1 patch touching `companion/diagnostics/c3_linux_actuator_probe.py`
+(`ladder_transition` flag on the existing, unchanged-by-default cycle
+function), `companion/native_stream.py` (one new Linux-only dispatch method),
+`companion/plugins/games.py` (one new loopback-only route), a new shared
+`tools/manual_checkout.py`, and the new
+`tools/probe_c3_l3a_gameplay_acceptance.py`. `C3.L3` needs no further runs.
 
 Two open defects are recorded and neither blocks: `slow_events_marked` is
 emitted as an empty array while `slow_event_retained_marked` reports 30 of 64,
@@ -127,22 +141,22 @@ without new evidence.
 
 ## Success Criteria
 
-The next item is chosen against the pre-registered decision boundary in
-`decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`, with raw measurements kept
-visible and whole-session qualifications preserved:
+`C3.L3a` Part 1 is accepted when the six-chained-transition round trip above
+runs clean — every transition returning `ok`, lifecycle preserved, and the
+stream back at 7000 — and the `C3.L3` characterization path is confirmed
+unchanged.
 
-- decoder output gap reproducibly at or below ~120 ms with lifecycle preserved
-  — reopen the automatic-adaptation question, with a focused gameplay
-  observation required before acceptance;
-- ~120-250 ms — the remaining cost is not first-IDR acceptance; the actuator
-  stays non-automatic and the next question is pipeline re-establishment;
-- unchanged, or lifecycle regressed — the lead is falsified and closed, and the
-  next real item is the encoder-host architecture question.
+The `C3.L2a` pre-registered gap boundary (<=120 ms / 120-250 ms / unchanged)
+is **spent**: the run landed outside all three branches because the gap was
+never the actuator's. Do not reason from it. The live criterion is the
+`C3.L4` gate in `decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`, section
+"The `C3.L4` gate, stated so it can be satisfied", which `C3.L3a` Part 2
+performs.
 
-Do not change during C3: resolution, frame rate, GOP, B-frames, FEC wire format,
-RTP payload type, packet size, ports, process audio, controller transport,
-emulator lifecycle, Android streaming constants, or any non-loopback control
-surface.
+Do not change during C3: resolution, frame rate, GOP, B-frames, FEC wire
+format, RTP payload type, packet size, ports, process audio, controller
+transport, emulator lifecycle, Android streaming constants, or any
+non-loopback control surface.
 
 ## Do Not Reopen Without New Evidence
 
@@ -160,24 +174,18 @@ surface.
 ## Relevant References
 
 - `PHASE_C_CONTEXT.md` — **start here**; compact Phase C continuation brief.
+- `decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md` — classification, the
+  falsified-premise correction, and the `C3.L4` gate definition.
+- `investigations/ACTIVE.md` — current sub-item states and `C3.L3a` scope.
+- `architecture/ADAPTIVE_BITRATE.md` — adaptation architecture, the
+  fast-down/slow-up rule, and the `C3.L3a` design.
 - `evidence/C3_L3_LINUX_FIXED_BITRATE_CHARACTERIZATION_2026-09-19.md` — all
-  three characterization runs and the corrected three-run reading.
+  three characterization runs.
 - `evidence/C3_L2C_LOW_LATENCY_DECODE_FALSIFIED_2026-09-19.md` — the
-  falsification, measured against seven same-day baseline sessions.
-- `patches/C3-L3_LINUX_FIXED_BITRATE_PORT.md` — the Linux port of the
-  fixed-bitrate cycle.
-- `patches/C3-L2C_LOW_LATENCY_DECODE_ENABLE.md` — the `C3.L2c` install and
-  revert.
-- `patches/C3-L3R1_CHARACTERIZATION_CORRECTION.md` — the memory correction that
-  added the omitted 6000 kbps rerun.
-- `patches/C3-L3R2_GATE_DEFINITION_AND_DECISION_SYNC.md` — the gate definition,
-  the falsified-premise correction, and `C3.L3a`'s registration.
-- `investigations/ACTIVE.md` — current sub-item states and `C3.L3a`'s scope.
-- `decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md` — classification and the
-  pre-registered boundary.
+  falsification against seven same-day baseline sessions.
+- `evidence/C3_L2A_E2_ACTUATOR_IDR_RESOLVED_2026-09-18.md` — the 27 ms
+  actuator IDR.
 - `investigations/C3_LINUX_ACTUATOR_BOUNDARY.md` — actuator boundary map.
-- `architecture/ADAPTIVE_BITRATE.md` — adaptation architecture and history.
-- `architecture/STREAM_TELEMETRY.md` — C2 measurement contract.
+- `patches/PATCH_INDEX.md` — every patch record, including `C3-L3A-P1`.
 - `roadmap/STATUS.md` — roadmap position.
-- `MAINTENANCE.md` — memory maintenance policy and required validation gate.
 - `docs/KNOWN_ISSUES.md` — open gaps and deferred work.

@@ -3126,12 +3126,13 @@ class GamesPlugin:
             )
 
             if target not in {
+                5000,
                 5500,
                 6000,
                 7000,
             }:
                 raise ValueError(
-                    "target must be one of 5500, 6000, or 7000"
+                    "target must be one of 5000, 5500, 6000, or 7000"
                 )
 
             try:

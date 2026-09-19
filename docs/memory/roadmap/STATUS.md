@@ -7,8 +7,9 @@ As of 2026-09-19, baseline `41bbc6acd3534f79283e328596115a02c3acc296`.
 Phase C Linux continuation.
 
 Active work item: **`C3.L3a`** — gameplay acceptance probe. REGISTERED / NEXT,
-design not yet authorized. It is the `C3.L4` gate made performable:
-diagnostic-only, authorizes nothing. Scope in `investigations/ACTIVE.md`; gate
+design complete 2026-09-19, build not yet authorized. It is the `C3.L4` gate
+made performable: diagnostic-only, authorizes nothing. Scope in
+`investigations/ACTIVE.md`; design in `architecture/ADAPTIVE_BITRATE.md`; gate
 definition in `decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`.
 
 ## Completed
@@ -44,7 +45,7 @@ definition in `decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`.
 | `C3.L2b` decoder-report cycle retention | COMPLETE / RUNTIME VALIDATED |
 | `C3.L2c` low-latency decode candidate | **FALSIFIED / ROLLED BACK** |
 | `C3.L3` Linux fixed-bitrate envelope characterization | COMPLETE / RUNTIME VALIDATED |
-| `C3.L3a` gameplay acceptance probe | **REGISTERED / NEXT**; this is the `C3.L4` gate |
+| `C3.L3a` gameplay acceptance probe | Part 1 **INSTALLED / DEVELOPMENT ONLY**; Part 2 next. This is the `C3.L4` gate |
 | `C3.L4` explainable fast-down/slow-up controller | **BLOCKED**; gate is `C3.L3a` |
 | C4 adaptive FEC | DEFERRED |
 

@@ -2086,14 +2086,36 @@ class NativeStreamManager:
         self,
         target_bitrate_kbps: int,
     ) -> dict[str, Any]:
-        """Run one loopback-only validated-ladder actuator transition."""
-        from diagnostics.c3_fixed_bitrate_probe import (
-            run_c3_validated_bitrate_transition,
-        )
+        """Run one loopback-only validated-ladder actuator transition.
 
+        Backend-neutral strategy, platform-specific implementation, the same
+        split as `diagnostic_c3_actuator_continuity_cycle` and the fixed
+        bitrate cycles. Windows replaces the WGC capture bridge and the
+        FFmpeg/NVENC encoder together; Linux replaces only the FFmpeg/VAAPI
+        encoder because x11grab is an input format inside that process.
+
+        Both emit `privyhub_c3_validated_bitrate_transition_v1`, so the
+        existing loopback-only route is unchanged. The validated ladders
+        differ by platform and each implementation enforces its own: Linux
+        includes 5000 kbps on C3.L3 evidence, Windows does not.
+        """
         with self._lock:
+            if self._linux_host():
+                from diagnostics.c3_linux_actuator_probe import (
+                    run_c3_linux_validated_bitrate_transition as _cycle,
+                )
+            elif os.name == "nt":
+                from diagnostics.c3_fixed_bitrate_probe import (
+                    run_c3_validated_bitrate_transition as _cycle,
+                )
+            else:
+                raise NativeStreamError(
+                    "C3 validated bitrate transition is not implemented "
+                    "for this host platform"
+                )
+
             try:
-                return run_c3_validated_bitrate_transition(
+                return _cycle(
                     self,
                     target_bitrate_kbps=int(
                         target_bitrate_kbps
@@ -2104,7 +2126,7 @@ class NativeStreamManager:
             except Exception as exc:
                 raise NativeStreamError(
                     "C3 validated bitrate transition failed: "
-                    + type(exc).__name__
+                    + type(exc).__name__ + ": " + str(exc)
                 ) from exc
 
     def stop(self) -> dict[str, Any]:
