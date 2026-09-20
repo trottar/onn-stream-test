@@ -1,6 +1,21 @@
 # Active investigations
 
-## C3 Linux actuator boundary
+## BASELINE STREAM HEALTH — ACTIVE
+
+`BASELINE_STREAM_HEALTH.md`. The active line of work as of 2026-09-20.
+Decision: `../decisions/D-BASE_BASELINE_BEFORE_ADAPTATION.md`. Evidence:
+`../evidence/BASELINE_STREAM_HEALTH_2026-09-20.md`.
+
+The reference stream is not healthy and never has been: ~70% of every frame
+misses the 16.7 ms budget in every session on record, the stream never reaches
+60 fps, and stalls reach 7.3 s. None of the three identified faults is a
+bandwidth fault.
+
+**Everything under "C3 Linux actuator boundary" below is SUSPENDED**, not
+failed. The Linux actuator is real, measured and correct; it is a mechanism
+awaiting a reason. Phase C resumes when the baseline target is met.
+
+## C3 Linux actuator boundary — SUSPENDED 2026-09-20
 
 Record: `C3_LINUX_ACTUATOR_BOUNDARY.md`
 Decision: `../decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`

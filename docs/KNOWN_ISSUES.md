@@ -1,5 +1,44 @@
 # Known issues and deferred work
 
+<!-- PRIVYHUB_BASELINE_STREAM_HEALTH:KNOWN_ISSUES:BEGIN -->
+## 2026-09-20 baseline stream health — three open faults
+
+The reference stream fails its own baseline. Full evidence:
+`docs/memory/evidence/BASELINE_STREAM_HEALTH_2026-09-20.md`. These supersede
+Phase C as the active blockers.
+
+- **Decoder path: ~70% of frames miss the 16.7 ms budget.** Median 2,506
+  decode spikes >20 ms per minute against 3,600 frames, in every code epoch
+  since 2026-09-16. The decoder holds 11-13 frames in flight while the client
+  feeds promptly and is never starved. Status: **open, owner Step 2 of
+  `investigations/BASELINE_STREAM_HEALTH.md`.** `C3.L2c` is reopened as the
+  leading candidate fix.
+- **Stall-tail regression, 2026-09-19 01:37-02:38 UTC.** Worst stall 338 ms
+  across 21 sessions before; 7,341 ms after. Candidates: `C3.L2b` hot-path
+  instrumentation (stronger on mechanism) and `ANDROID-FLAT`'s rebuild (layout
+  only, not excluded). Not separated. Status: **open, owner Step 1** — a
+  one-variable revert test.
+- **Audio underruns.** 69/min before that boundary, 139/min after, peaking at
+  2,555/min. No investigation exists. Status: **open, owner Step 4.**
+- **Physical link type is unrecorded.** Lost packets run 199/min median on
+  what should be a local link, reaching 2,094. Nothing on record states
+  whether the client link is wired or wireless. Status: **open** — record it
+  before any transport code work. No addresses are needed to answer it.
+
+Also open, from the `C3.L3a` Part 2 probe's first run — fix before any rerun:
+
+- the mark-association window anchors on sequence start, so a ramp closes its
+  window before it finishes and marks are lost;
+- telemetry field paths were taken from a probe's output artifact rather than
+  the endpoint, so settling was never measured;
+- the picture rating used an unanchored 1-5 scale and silently rescaled 1-10
+  answers.
+
+The 2026-09-20 session's raw marks and per-cycle timings are retained in
+`logs/streaming/c3_l3a_gameplay_acceptance_state.json` and can be re-scored
+without replaying.
+<!-- PRIVYHUB_BASELINE_STREAM_HEALTH:KNOWN_ISSUES:END -->
+
 <!-- PRIVYHUB_D086_CONTROLLER_PARITY_CHECKPOINT:KNOWN_ISSUES:BEGIN -->
 ## 2026-09-16 current issue override
 

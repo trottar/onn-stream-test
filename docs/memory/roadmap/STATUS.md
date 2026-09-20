@@ -1,16 +1,31 @@
 # Roadmap Status
 
-As of 2026-09-19, baseline `41bbc6acd3534f79283e328596115a02c3acc296`.
+As of 2026-09-20, baseline `e2fd7b566534f4bbd9a74d6456916bace7abfc29`.
 
 ## Active
 
-Phase C Linux continuation.
+**Baseline stream health.** Reach seamless local play before any adaptation
+work. Decision: `decisions/D-BASE_BASELINE_BEFORE_ADAPTATION.md`.
+Investigation: `investigations/BASELINE_STREAM_HEALTH.md`. Evidence:
+`evidence/BASELINE_STREAM_HEALTH_2026-09-20.md`.
 
-Active work item: **`C3.L3a`** — gameplay acceptance probe. REGISTERED / NEXT,
-design complete 2026-09-19, build not yet authorized. It is the `C3.L4` gate
-made performable: diagnostic-only, authorizes nothing. Scope in
-`investigations/ACTIVE.md`; design in `architecture/ADAPTIVE_BITRATE.md`; gate
-definition in `decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`.
+Active work item: **Step 1 — the stall-tail regression.** Revert only the
+`C3.L2b` hot-path instrumentation, keep the flat layout, five sessions, compare
+the tail.
+
+**Phase C adaptive-bitrate work is SUSPENDED**, not failed. `C3.L4` and
+`C3.L3a` Part 2 do not proceed until the baseline target is met.
+
+## Why Phase C was suspended
+
+47 decoder sessions at the 7000 kbps reference, most with no actuator
+activity: ~70% of every frame misses the 16.7 ms budget, in every epoch since
+2026-09-16; the stream never reaches 60 fps; the worst stall is 7,341 ms;
+audio underruns run at ~2.5/s.
+
+None of the three identified faults is a bandwidth fault, so adaptive bitrate
+control adjusts the one variable that is not the problem. Remote play is
+unreachable while a local link stalls for seconds.
 
 ## Completed
 

@@ -286,6 +286,50 @@ an observation, not a finding.
 gate is `C3.L3a` Part 2.
 <!-- PRIVYHUB_C3_L3A_LADDER:END -->
 
+<!-- PRIVYHUB_BASELINE_STREAM_HEALTH:BEGIN -->
+## The reference stream is not healthy — durable fact
+
+Established 2026-09-20 from 47 decoder sessions spanning 2026-09-16 to
+2026-09-20, all at the 7000 kbps reference, most with no actuator activity.
+Record: `evidence/BASELINE_STREAM_HEALTH_2026-09-20.md`.
+
+At 60 fps the frame budget is 16.7 ms. The median session records **2,506
+decode spikes over 20 ms per minute** against 3,600 frames — roughly **70% of
+every frame misses budget**, in every code epoch on record. The stream has
+never reached 60 fps in any session (median ~56, minimum 34). Worst stall
+7,341 ms. Audio underruns median 155/min. Lost packets median 199/min on a
+local link.
+
+**Three faults, none of them bandwidth:**
+
+1. **Decoder path.** The decoder holds 11-13 frames in flight, 180-220 ms of
+   pipeline depth, while `latest_feed_delay_ms` is 0 and the client is never
+   starved — it is buffering for throughput, which is correct for playback and
+   wrong for interactive streaming. `stale_output_drops` reached 2,461 of
+   50,515 frames in one session.
+2. **A stall-tail regression** in 2026-09-19 01:37-02:38 UTC. Worst stall
+   338 ms across 21 sessions before, 7,341 ms after. `C3.L2b` (hot-path
+   instrumentation) is the stronger suspect; `ANDROID-FLAT` (rebuild, layout
+   only) is not excluded. Not separated.
+3. **Audio underruns**, 69/min before that boundary and 139/min after.
+
+**Therefore adaptive bitrate control cannot fix this stream**, and Phase C is
+suspended. Lowering bitrate does not make a decoder drain faster, remove
+hot-path overhead, or stop audio underruns. Decision:
+`decisions/D-BASE_BASELINE_BEFORE_ADAPTATION.md`.
+
+**A worst-case statistic must not overrule a distribution.** `C3.L2c` was
+rolled back because `max_output_gap_ms` moved 359 -> 385 — one sample per
+session — while the same data showed 159 spikes/min against 1,828-2,723 for
+every other session, the best fps and the lowest drop rate on record. Judge a
+client change on `spike_20_ms/min`, `stale_output_drops` and fps. `C3.L2c` is
+reopened on this evidence.
+
+**Aggregate the corpus before optimizing anything.** Every one of those 47
+session reports existed the whole time. Phase C ran its full length on the
+unexamined assumption that the stream underneath it was healthy.
+<!-- PRIVYHUB_BASELINE_STREAM_HEALTH:END -->
+
 <!-- PRIVYHUB_C3_L2C_FALSIFIED:BEGIN -->
 ## Decode time is not the stall — durable fact
 

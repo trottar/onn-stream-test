@@ -5,7 +5,7 @@ record; the record file is authoritative, not this index.
 
 `PATCH_PROTOCOL.md` describes the workflow and is not a patch record.
 
-Records: 98
+Records: 99
 
 - `ADB_ENDPOINT_DEBUG_PROBE_V1_2026-09-15.md`
 - `ADB_ENDPOINT_DEBUG_WATCH_PORT_V1_2026-09-15.md`
@@ -99,6 +99,7 @@ Records: 98
 - `D-137_TV_STATE_PROBE_V2_PROJECTION.md`
 - `D-138_D136_AUTOMATED_REGRESSION_ACCEPTANCE.md`
 - `D-139_D5_TV_MEDIA_CLOSEOUT.md`
+- `D-BASE_BASELINE_STREAM_HEALTH.md`
 - `D4_LINUX_GAME_HANDOFF_FIX_01_2026-09-15.md`
 - `D4_MEMORY_RECONCILIATION_2026-09-16.md`
 - `MEM-TOOLS_LINUX_TOOL_INVENTORY_REFRESH.md`
