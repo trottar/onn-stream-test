@@ -1,0 +1,25 @@
+---
+memory_schema: 1
+as_of: 2026-09-21
+status: TASK HANDOFF — D-BASE-P4, air telemetry beside the loss series; host-side sampling through adb only, no client or companion code change; authorized by the user 2026-09-21 for an unattended run
+---
+
+# D-BASE-P4 task handoff — is it the air?
+
+**The question, from `D-BASE-P3`'s control arm:** with nothing changed, on one link, inside one hour, loss swung from 1.8 to 35.2 per minute — a 20x range — and `B2` saw the same day-to-day. Every transport number so far is a symptom count at the decoder; nothing measures the radio. **The user states the onn is associated on the Opal's 5 GHz SSID**; confirm it from the device rather than assume it, and if it is on 2.4 GHz, stop and report that before anything else — it would be the cheapest fix available and would invalidate the rest of this run.
+
+Read first: docs/memory/evidence/D_BASE_P3_SENDER_PACING_2026-09-21.md (the control-arm swing), B2_HOST_ON_OPAL_2026-09-21.md, GROUP_A_DIAGNOSTIC_AUDIT_2026-09-20.md §A2.2 and §A4, docs/memory/TOOLS.md (adb driving rules), D_LINUX_ONN_STREAM_DIAGNOSIS_2026-09-15.md (D080-D083: what the Opal's own capture points could and could not see).
+
+**No code change anywhere.** The sampler is a host-side script under evidence/d_base_p4_<date>/ that runs beside each session, not a companion feature; if it later earns a place in `tools/`, that is a separate decision.
+
+**What to sample, every 10 s, from the onn over adb**, as JSON lines with host UTC time: from `adb shell dumpsys wifi` — the associated frequency (MHz) and band, channel width if shown, RSSI, TX and RX link speed, the supplicant/link state, and the cumulative counters the device exposes (typically `txgood`/`txbad`/`txretries`/`rxgood` or `LinkLayerStats` fields, whatever this build prints — record the raw names); from `adb shell cat /proc/net/wireless` if readable — link quality, level, noise, and the discarded/missed-beacon counters; from `adb shell dumpsys wifi | grep -i scan` whether a background scan is in progress (a client-side scan stalls the radio for tens of ms and is a classic burst-loss cause); and `dumpsys wifiscanner` / `dumpsys connectivity` only if they are cheap. Measure the cost of one sampling round first (`time adb shell dumpsys wifi >/dev/null`) and say what it is; if a round costs more than ~300 ms of onn CPU, thin it to every 20 s. Do not record MACs, BSSIDs, SSIDs or addresses — replace them with `<redacted>` in the stored lines; band, channel and counters are what matter.
+
+**Also from the host, every 10 s:** the encoder's `rtp_packets` and the relay's `sent_bytes` from `relay.status()` (via the companion's status endpoint), so the host's send rate is on the same clock as the onn's receive counters.
+
+**Sessions.** Six attract-mode sessions of the PS1 reference title, 120 s each, zero input, per TOOLS.md, BACK to end, teardown between, sampler running through each and for 30 s before and after. Then **one 20-minute session** with the same sampling, to catch the minute-scale swing inside a single session rather than between sessions. Reject nothing; a session that dies is a finding.
+
+**Analysis, per session and pooled:** the per-minute loss series (from the heartbeat's `rx_packets` and the report's forward-gap timing where retained; from `lost_packets` deltas if the report exposes them per tick, else per session), beside the per-minute RSSI, link speed, retry and failure deltas, and scan-in-progress flags. Spearman of per-minute loss against each radio series; list every minute whose loss is in the top quartile with its radio readings, and every scan event with the loss in the minute around it. Report the association's frequency and width, and whether the link speed is stable or renegotiating.
+
+**Pre-registered reading.** The air is implicated if per-minute loss tracks retry/failure deltas or RSSI dips (|rho| ≥ 0.5 pooled, and the top-quartile loss minutes carry visibly worse radio readings), or if scan events sit inside the loss bursts; the air is not the explanation if radio readings are flat and scan-free while loss swings 10x; mixed, say so. If the onn is not on 5 GHz, that alone is the finding. State plainly what the levers would be for each outcome (band, channel, width, placement, disabling background scanning on the onn, the Opal's channel — none of them code) and that choosing one is the user's decision.
+
+Record raw numbers first in docs/memory/evidence/D_BASE_P4_AIR_TELEMETRY_<date>.md with the sampling files, reports and heartbeat excerpts under evidence/d_base_p4_<date>/ and SHA-256s; classify CHARACTERIZED / INDETERMINATE. Update CURRENT.md (fixed headings, `python3 tools/check_memory_health.py` healthy — trim), MEMORY.md (what the onn exposes about its radio), handoffs/CURRENT_HANDOFF.md, investigations/ACTIVE.md, the dated memory file, BASELINE_STREAM_HEALTH.md Step 3, KNOWN_ISSUES.md (the UDP burst pathology entry gains the air reading), TOOLS.md (how to read the onn's radio state). Teardown per TOOLS.md. Never retry a failing action more than twice. No addresses, MACs, BSSIDs, SSIDs or device identifiers in any memory or evidence file.

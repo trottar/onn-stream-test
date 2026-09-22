@@ -17,6 +17,21 @@ from ctypes import wintypes
 
 from native_session_io import NativeSessionIO
 from native_fec_relay import NativeVideoFecRelay
+
+# Encoder knobs read from the environment at command build time.
+#
+#   PRIVYHUB_ENC_MAX_FRAME_SIZE  bytes, `h264_vaapi -max_frame_size`.
+#     **D-BASE-P6a: no longer a diagnostic default-off knob.** The cap is
+#     now a PROFILE field (`max_frame_size_bytes`, 90,000 on the reference
+#     profile) and this variable OVERRIDES it. Setting it to **0 runs
+#     uncapped** -- the argv omits the flag -- which is how the D-BASE-P6
+#     baseline arm is re-run for comparison. Unset means "use the profile".
+#   PRIVYHUB_ENC_BUFSIZE_K       kbit, overrides `-bufsize` (VBV depth).
+#     Still diagnostic and still default off (D-BASE-P6 measured it and it
+#     was NOT adopted: 3x the loss of the cap).
+ENC_MAX_FRAME_SIZE_ENV = "PRIVYHUB_ENC_MAX_FRAME_SIZE"
+ENC_BUFSIZE_K_ENV = "PRIVYHUB_ENC_BUFSIZE_K"
+from games import host_resource_sampling
 from native_host_telemetry import NativeHostTelemetryProfiler
 from native_stream_profiles import NATIVE_GAME_720P60_REFERENCE
 
@@ -66,6 +81,7 @@ class NativeStreamManager:
         self._client_port: int | None = None
         self._active_bitrate_kbps = self.BITRATE_KBPS
         self._capture_target: dict[str, Any] | None = None
+        self._encoder_command: list[str] | None = None
         self._last_capture_target: dict[str, Any] | None = None
         self._session_io = NativeSessionIO(
             self.project_root
@@ -73,10 +89,131 @@ class NativeStreamManager:
         self._fec_relay = NativeVideoFecRelay(
             local_port=self.FEC_INPUT_PORT,
             group_size=self.FEC_GROUP_SIZE,
+            # D-BASE-P5: one JSON line per second of streaming, rotated
+            # into the same `stream_log_archive/` the heartbeat log uses,
+            # so the existing retention family bounds it.
+            frame_size_log=(
+                self.log_dir / "native_frame_sizes.jsonl"
+            ),
         )
         self._host_telemetry = NativeHostTelemetryProfiler(
             self.project_root
         )
+
+    @staticmethod
+    def _env_int(name: str) -> int:
+        """A positive integer from the environment, or 0 for 'not set'.
+
+        Anything unparseable reads as not set rather than raising: a
+        malformed diagnostic knob must not stop a stream from starting.
+        """
+
+        try:
+            value = int(str(os.environ.get(name, "")).strip() or 0)
+        except (TypeError, ValueError):
+            return 0
+
+        return value if value > 0 else 0
+
+    def _log_line(self, message: str) -> None:
+        """One line into the native video host log, if it is open.
+
+        Used for the few notices that belong with the encoder's own output
+        rather than in a status field. Never raises: a log that cannot be
+        written must not stop a stream starting.
+        """
+
+        handle = self._log_handle
+
+        if handle is None:
+            return
+
+        try:
+            handle.write(message.rstrip("\n") + "\n")
+            handle.flush()
+        except Exception:
+            pass
+
+    @staticmethod
+    def _env_int_or_none(name: str) -> int | None:
+        """The same, but **0 is a value, not an absence**.
+
+        `_env_int` cannot express "explicitly zero", and D-BASE-P6a needs
+        it to: with the cap in the profile, `PRIVYHUB_ENC_MAX_FRAME_SIZE=0`
+        is the documented way to run uncapped for comparison. None means
+        the variable is unset or unparseable, i.e. use the profile.
+        """
+
+        raw = str(os.environ.get(name, "")).strip()
+
+        if not raw:
+            return None
+
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            return None
+
+        return value if value >= 0 else None
+
+    def _effective_max_frame_size(self) -> tuple[int, str]:
+        """The cap actually applied, and which source decided it.
+
+        Returns (bytes, source) where 0 bytes means uncapped and source is
+        one of "profile", the environment variable's name, or
+        "profile (uncapped)".
+        """
+
+        override = self._env_int_or_none(ENC_MAX_FRAME_SIZE_ENV)
+
+        if override is not None:
+            return override, ENC_MAX_FRAME_SIZE_ENV
+
+        return int(self.PROFILE.max_frame_size_bytes), "profile"
+
+    def encoder_overrides(self) -> dict[str, Any]:
+        """Which encoder settings are in force and where each came from.
+
+        **D-BASE-P6a changed what `any_override` means.** The frame cap is
+        now a profile default, so the profile being in force is NOT an
+        override: `any_override` is false when nothing but the profile and
+        the reference bitrate decide the argv. It is true only when an
+        environment variable is actually set -- including
+        `PRIVYHUB_ENC_MAX_FRAME_SIZE=0`, which overrides the profile to run
+        uncapped.
+        """
+
+        max_frame_size, mfs_source = self._effective_max_frame_size()
+        mfs_override = self._env_int_or_none(ENC_MAX_FRAME_SIZE_ENV)
+        bufsize_k = self._env_int(ENC_BUFSIZE_K_ENV)
+
+        return {
+            "max_frame_size_bytes": max_frame_size or None,
+            "max_frame_size_source": mfs_source,
+            "max_frame_size_env": ENC_MAX_FRAME_SIZE_ENV,
+            "default_max_frame_size_bytes": int(
+                self.PROFILE.max_frame_size_bytes
+            ),
+            "uncapped": max_frame_size <= 0,
+            "bufsize_kbits": bufsize_k or None,
+            "bufsize_source": ENC_BUFSIZE_K_ENV,
+            "default_bufsize_kbits": self.MAX_BITRATE_KBPS,
+            "any_override": bool(
+                mfs_override is not None or bufsize_k
+            ),
+        }
+
+    def fec_frame_size_status(self) -> dict[str, Any]:
+        """D-BASE-P5: the relay's frame-size block, including its bounded
+        per-second ring. Counting only."""
+
+        return self._fec_relay.frame_size_status()
+
+    def fec_pacing_status(self) -> dict[str, Any]:
+        """D-BASE-P3: the relay's pacing block, for the decoder session
+        log's host metadata. Diagnostic only; default off."""
+
+        return self._fec_relay.pacing_status()
 
     def _find_ffmpeg(self) -> Path | None:
         names = (
@@ -229,6 +366,28 @@ class NativeStreamManager:
             self._session_io.stop()
             return self.status()
 
+    def _host_thermal_c(self) -> float | None:
+        """Hottest hwmon reading in °C, or None if none is readable.
+
+        Read directly rather than from the sampler's log so `status` is
+        answerable whether or not a session — and therefore a sampler — is
+        running. Any failure reads as None; this must never raise.
+        """
+
+        try:
+            sys.path.insert(
+                0,
+                str(self.project_root / "tools"),
+            )
+            from host_resource_sampler import (  # noqa: PLC0415
+                hottest_c,
+                read_hwmon,
+            )
+
+            return hottest_c(read_hwmon())
+        except Exception:
+            return None
+
     def status(self) -> dict[str, Any]:
         with self._lock:
             self._reap_locked()
@@ -356,7 +515,19 @@ class NativeStreamManager:
                     )
                 ),
                 "transport": "rtp_udp_xor_fec",
+                # D-BASE-P6: the argv actually used for the running
+                # encoder, so an arm can be confirmed before the stream
+                # opens rather than inferred. None when nothing is running.
+                "encoder_command": list(self._encoder_command or ()) or None,
+                "encoder_overrides": self.encoder_overrides(),
                 "fec": self._fec_relay.status(),
+                # D-BASE-T1: the hottest host sensor, so one `status` call
+                # carries both ends' temperatures once the client's arrive
+                # in the heartbeat. None when no sensor is readable.
+                "host_thermal_c": self._host_thermal_c(),
+                "host_resource_sampler": (
+                    host_resource_sampling.status()
+                ),
                 "host_telemetry": self._host_telemetry.status(),
                 "fec_enabled": True,
                 "fec_group_size": self.FEC_GROUP_SIZE,
@@ -961,6 +1132,18 @@ class NativeStreamManager:
         bitrate_kbps: int | None = None,
         max_bitrate_kbps: int | None = None,
     ) -> list[str]:
+        # D-BASE-P6a: the profile's `max_frame_size_bytes` is honoured by
+        # the `h264_vaapi` builder only. NVENC has its own rate-control
+        # vocabulary and no measurement behind a translation, so this path
+        # **ignores the field and says so once** rather than inventing an
+        # equivalent. See `decisions/D-BASE-P6A_FRAME_CAP_ADOPTED.md`.
+        if int(self.PROFILE.max_frame_size_bytes) > 0:
+            self._log_line(
+                "h264_nvenc: ignoring profile max_frame_size_bytes="
+                f"{int(self.PROFILE.max_frame_size_bytes)} "
+                "(honoured by the h264_vaapi path only, D-BASE-P6a)"
+            )
+
         target_bitrate_kbps = (
             self.BITRATE_KBPS
             if bitrate_kbps is None
@@ -1109,7 +1292,18 @@ class NativeStreamManager:
             "format=nv12,hwupload"
         )
 
-        return [
+        # D-BASE-P6a: the frame cap comes from the PROFILE by default and
+        # the environment variable overrides it, including with 0 to run
+        # uncapped. `-bufsize` stays a default-off diagnostic knob.
+        max_frame_size_bytes, _cap_source = self._effective_max_frame_size()
+        bufsize_override_kbits = self._env_int(ENC_BUFSIZE_K_ENV)
+        bufsize_kbits = (
+            bufsize_override_kbits
+            if bufsize_override_kbits > 0
+            else target_max_bitrate_kbps
+        )
+
+        command = [
             str(ffmpeg),
             "-hide_banner",
             "-loglevel",
@@ -1137,7 +1331,22 @@ class NativeStreamManager:
             "-maxrate",
             f"{target_max_bitrate_kbps}k",
             "-bufsize",
-            f"{target_max_bitrate_kbps}k",
+            f"{bufsize_kbits}k",
+        ]
+
+        # `h264_vaapi -max_frame_size` caps a single encoded frame in
+        # BYTES -- the one knob that acts directly on the tail `D-BASE-P5`
+        # found drives the loss and `D-BASE-P6` proved controls it.
+        # **Adopted as the profile default by D-BASE-P6a (90,000).** At 0,
+        # from the profile or from the override, the argument is absent and
+        # the command is byte for byte the pre-P6 one.
+        if max_frame_size_bytes > 0:
+            command += [
+                "-max_frame_size",
+                str(max_frame_size_bytes),
+            ]
+
+        command += [
             "-g",
             str(self.GOP_FRAMES),
             "-bf",
@@ -1148,6 +1357,8 @@ class NativeStreamManager:
             "rtp",
             destination,
         ]
+
+        return command
     @staticmethod
     def _kill_managed_process(
         process: subprocess.Popen[Any] | None,
@@ -1216,6 +1427,7 @@ class NativeStreamManager:
 
         self._process = None
         self._capture_process = None
+        self._encoder_command = None
         self._client_port = None
         self._active_bitrate_kbps = self.BITRATE_KBPS
 
@@ -1355,11 +1567,21 @@ class NativeStreamManager:
                 client_port=port,
             )
 
+            linux_command = self._build_linux_ffmpeg_command(
+                ffmpeg=ffmpeg,
+                capture_target=capture_target,
+            )
+            self._encoder_command = list(linux_command)
+
+            self._log_handle.write(
+                "encoder argv: "
+                + " ".join(linux_command)
+                + "\n"
+            )
+            self._log_handle.flush()
+
             self._process = subprocess.Popen(
-                self._build_linux_ffmpeg_command(
-                    ffmpeg=ffmpeg,
-                    capture_target=capture_target,
-                ),
+                linux_command,
                 cwd=str(self.project_root),
                 stdin=subprocess.DEVNULL,
                 stdout=self._log_handle,
@@ -1428,6 +1650,17 @@ class NativeStreamManager:
         port = self._validated_port(
             int(port)
         )
+
+        # D-BASE-T1 piece 2: the host resource sampler runs for the life of
+        # the stream. Idempotent, `nice 10`, its own process, and every
+        # failure swallowed — a session must never fail to start because a
+        # diagnostic sampler would not.
+        try:
+            host_resource_sampling.start(
+                self.project_root
+            )
+        except Exception:
+            pass
 
         with self._lock:
             if self._linux_host():
@@ -2130,6 +2363,11 @@ class NativeStreamManager:
                 ) from exc
 
     def stop(self) -> dict[str, Any]:
+        try:
+            host_resource_sampling.stop()
+        except Exception:
+            pass
+
         with self._lock:
             self._stop_locked()
             return self.status()

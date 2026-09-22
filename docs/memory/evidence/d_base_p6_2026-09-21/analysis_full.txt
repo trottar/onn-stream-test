@@ -1,0 +1,130 @@
+==========================================================================
+
+### ARM A0
+  encoder: max_frame_size=None bufsize_kbits=None (default 7000)
+  frames 72500  bytes/pkt 1069.34
+  packets  p50 11   p90 29   p99 77   max 205    >=40 2923   >=80 718
+  bytes    p50 12288  p90 32768  p99 90112  max 242418   over cap(40000) 4248
+  loss 2696 (0.2732%, 134.0/min)  fgap 306  maxgap 61 pkt  resyncs 1
+  audio loss 838 (0.3488%)  fps 59.58  spike20/min 61.6  max_output_gap 366 ms  max_rx_to_decode 153 ms
+  encoder 6928.9 kbps (per-0.5s (64.0, 15792.0))   relay rtp_bytes 1068848694  send_errors 0
+  loss conditional on the window's largest frame (10 s windows):
+    bucket    windows    frames     loss   loss/win
+    < 40           12      7199       40       3.33
+    40-59          33     19801       81       2.45
+    60-79          15      8999       19       1.27
+    >= 80          60     36001     2550       42.5
+  onn socket drops over the arm: 0
+
+### ARM A1
+  encoder: max_frame_size=90000 bufsize_kbits=None (default 7000)
+  frames 72650  bytes/pkt 1066.09
+  packets  p50 12   p90 29   p99 66   max 77     >=40 2598   >=80 0
+  bytes    p50 13312  p90 33792  p99 76800  max 89996    over cap(90000) 0
+  loss 311 (0.0313%, 15.4/min)  fgap 105  maxgap 13 pkt  resyncs 0
+  audio loss 481 (0.1999%)  fps 59.88  spike20/min 34.9  max_output_gap 167 ms  max_rx_to_decode 112 ms
+  encoder 6929.7 kbps (per-0.5s (2272.0, 14544.0))   relay rtp_bytes 1073764263  send_errors 0
+  loss conditional on the window's largest frame (10 s windows):
+    bucket    windows    frames     loss   loss/win
+    < 40           19     11400       31       1.63
+    40-59          36     21600      102       2.83
+    60-79          65     39000      175       2.69
+    >= 80           0         0     None          0
+  onn socket drops over the arm: 0
+
+### ARM A2
+  encoder: max_frame_size=60000 bufsize_kbits=None (default 7000)
+  frames 72470  bytes/pkt 1063.91
+  packets  p50 13   p90 29   p99 49   max 52     >=40 1867   >=80 0
+  bytes    p50 14336  p90 32768  p99 56320  max 60092    over cap(60000) 3
+  loss 299 (0.0301%, 14.9/min)  fgap 88  maxgap 25 pkt  resyncs 0
+  audio loss 419 (0.1742%)  fps 59.89  spike20/min 25.5  max_output_gap 489 ms  max_rx_to_decode 120 ms
+  encoder 6929.2 kbps (per-0.5s (2752.0, 13344.0))   relay rtp_bytes 1071031971  send_errors 0
+  loss conditional on the window's largest frame (10 s windows):
+    bucket    windows    frames     loss   loss/win
+    < 40           28     16799       76       2.71
+    40-59          92     55200      223       2.42
+    60-79           0         0     None          0
+    >= 80           0         0     None          0
+  onn socket drops over the arm: 0
+
+### ARM B1
+  encoder: max_frame_size=None bufsize_kbits=117 (default 7000)
+  frames 72560  bytes/pkt 1026.41
+  packets  p50 14   p90 15   p99 15   max 16     >=40 0      >=80 0
+  bytes    p50 15360  p90 15360  p99 15360  max 17144    over cap(90000) 0
+  loss 938 (0.0911%, 46.6/min)  fgap 238  maxgap 28 pkt  resyncs 0
+  audio loss 568 (0.2363%)  fps 59.76  spike20/min 15.0  max_output_gap 387 ms  max_rx_to_decode 117 ms
+  encoder 6931.3 kbps (per-0.5s (6661.5, 7168.0))   relay rtp_bytes 1072903856  send_errors 0
+  loss conditional on the window's largest frame (10 s windows):
+    bucket    windows    frames     loss   loss/win
+    < 40          120     72000      935       7.79
+    40-59           0         0     None          0
+    60-79           0         0     None          0
+    >= 80           0         0     None          0
+  onn socket drops over the arm: 0
+
+### ARM A0prime
+  encoder: max_frame_size=None bufsize_kbits=None (default 7000)
+  frames 72560  bytes/pkt 1069.4
+  packets  p50 11   p90 29   p99 77   max 207    >=40 2885   >=80 717
+  bytes    p50 12288  p90 32768  p99 90112  max 244794   over cap(None) 0
+  loss 2189 (0.2218%, 108.8/min)  fgap 249  maxgap 66 pkt  resyncs 0
+  audio loss 587 (0.2442%)  fps 59.68  spike20/min 54.9  max_output_gap 507 ms  max_rx_to_decode 172 ms
+  encoder 6930.0 kbps (per-0.5s (192.0, 15952.0))   relay rtp_bytes 1070357965  send_errors 0
+  loss conditional on the window's largest frame (10 s windows):
+    bucket    windows    frames     loss   loss/win
+    < 40           13      7799       38       2.92
+    40-59          33     19801      100       3.03
+    60-79          18     10798       23       1.28
+    >= 80          56     33601     2028      36.21
+  onn socket drops over the arm: 0
+
+### ARM A1r2
+  encoder: max_frame_size=90000 bufsize_kbits=None (default 7000)
+  frames 72530  bytes/pkt 1066.18
+  packets  p50 12   p90 29   p99 66   max 77     >=40 2551   >=80 0
+  bytes    p50 13312  p90 33792  p99 76800  max 89937    over cap(90000) 0
+  loss 408 (0.0411%, 20.3/min)  fgap 119  maxgap 27 pkt  resyncs 0
+  audio loss 836 (0.3478%)  fps 59.88  spike20/min 33.3  max_output_gap 561 ms  max_rx_to_decode 93 ms
+  encoder 6929.7 kbps (per-0.5s (2160.0, 15120.0))   relay rtp_bytes 1071991752  send_errors 0
+  loss conditional on the window's largest frame (10 s windows):
+    bucket    windows    frames     loss   loss/win
+    < 40           16      9599       46       2.88
+    40-59          35     21000      172       4.91
+    60-79          69     41400      190       2.75
+    >= 80           0         0     None          0
+  onn socket drops over the arm: 0
+
+### ARM A0r2
+  encoder: max_frame_size=None bufsize_kbits=None (default 7000)
+  frames 72590  bytes/pkt 1069.55
+  packets  p50 11   p90 29   p99 80   max 209    >=40 2902   >=80 734
+  bytes    p50 12288  p90 32768  p99 94208  max 247170   over cap(None) 0
+  loss 2896 (0.2937%, 144.0/min)  fgap 341  maxgap 100 pkt  resyncs 0
+  audio loss 1065 (0.4439%)  fps 59.56  spike20/min 60.8  max_output_gap 447 ms  max_rx_to_decode 191 ms
+  encoder 6929.9 kbps (per-0.5s (496.0, 16064.0))   relay rtp_bytes 1070572988  send_errors 0
+  loss conditional on the window's largest frame (10 s windows):
+    bucket    windows    frames     loss   loss/win
+    < 40           16      9600       74       4.62
+    40-59          31     18600       84       2.71
+    60-79          14      8399       53       3.79
+    >= 80          59     35401     2685      45.51
+  onn socket drops over the arm: 0
+
+==========================================================================
+CROSS-ARM, per minute (the content-lock makes these comparable)
+  arm      loss   vs A0     fgap   max_pkt  max_byte     >=80
+  A0       2690   1.00x      304       205    242418      717
+  A1        308   0.11x      104        77     89996        0
+  A2        299   0.11x       88        52     60092        0
+  B1        935   0.35x      236        16     16833        0
+  A0prime    2189   0.81x      249       207    244794      710
+  A1r2      408   0.15x      119        77     89937        0
+  A0r2     2896   1.08x      341       209    247170      725
+  A0 vs A1 per-minute loss: pearson 0.337  spearman 0.193  n=20
+  A0 vs A2 per-minute loss: pearson 0.172  spearman -0.029  n=20
+  A0 vs B1 per-minute loss: pearson 0.052  spearman -0.233  n=20
+  A0 vs A0prime per-minute loss: pearson 0.854  spearman 0.776  n=20
+  A0 vs A1r2 per-minute loss: pearson 0.038  spearman -0.011  n=20
+  A0 vs A0r2 per-minute loss: pearson 0.779  spearman 0.801  n=20

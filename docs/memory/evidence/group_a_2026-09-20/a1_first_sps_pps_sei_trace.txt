@@ -1,0 +1,100 @@
+Sequence Parameter Set
+0           forbidden_zero_bit                                          0 = 0
+1           nal_ref_idc                                                11 = 3
+3           nal_unit_type                                           00111 = 7
+8           profile_idc                                          01100100 = 100
+16          constraint_set0_flag                                        0 = 0
+17          constraint_set1_flag                                        0 = 0
+18          constraint_set2_flag                                        0 = 0
+19          constraint_set3_flag                                        0 = 0
+20          constraint_set4_flag                                        1 = 1
+21          constraint_set5_flag                                        1 = 1
+22          reserved_zero_2bits                                        00 = 0
+24          level_idc                                            00100000 = 32
+32          seq_parameter_set_id                                        1 = 0
+33          chroma_format_idc                                         010 = 1
+36          bit_depth_luma_minus8                                       1 = 0
+37          bit_depth_chroma_minus8                                     1 = 0
+38          qpprime_y_zero_transform_bypass_flag                        0 = 0
+39          seq_scaling_matrix_present_flag                             0 = 0
+40          log2_max_frame_num_minus4                               00101 = 4
+45          pic_order_cnt_type                                        011 = 2
+48          max_num_ref_frames                                        010 = 1
+51          gaps_in_frame_num_allowed_flag                              0 = 0
+52          pic_width_in_mbs_minus1                         0000001010000 = 79
+65          pic_height_in_map_units_minus1                    00000101101 = 44
+76          frame_mbs_only_flag                                         1 = 1
+77          direct_8x8_inference_flag                                   1 = 1
+78          frame_cropping_flag                                         0 = 0
+79          vui_parameters_present_flag                                 1 = 1
+80          aspect_ratio_info_present_flag                              0 = 0
+81          overscan_info_present_flag                                  0 = 0
+82          video_signal_type_present_flag                              1 = 1
+83          video_format                                              101 = 5
+86          video_full_range_flag                                       0 = 0
+87          colour_description_present_flag                             0 = 0
+88          chroma_loc_info_present_flag                                0 = 0
+89          timing_info_present_flag                                    1 = 1
+90          num_units_in_tick            00000000000000000000000000000001 = 1
+122         time_scale                   00000000000000000000000001111000 = 120
+154         fixed_frame_rate_flag                                       1 = 1
+155         nal_hrd_parameters_present_flag                             1 = 1
+156         cpb_cnt_minus1                                              1 = 0
+157         bit_rate_scale                                           0001 = 1
+161         cpb_size_scale                                           0011 = 3
+165         bit_rate_value_minus1[0]      0000000000000001101010110011111 = 54686
+196         cpb_size_value_minus1[0]      0000000000000001101010110011111 = 54686
+227         cbr_flag[0]                                                 0 = 0
+228         initial_cpb_removal_delay_length_minus1                 10111 = 23
+233         cpb_removal_delay_length_minus1                         10111 = 23
+238         dpb_output_delay_length_minus1                          00111 = 7
+243         time_offset_length                                      00000 = 0
+248         vcl_hrd_parameters_present_flag                             0 = 0
+249         low_delay_hrd_flag                                          0 = 0
+250         pic_struct_present_flag                                     0 = 0
+251         bitstream_restriction_flag                                  1 = 1
+252         motion_vectors_over_pic_boundaries_flag                     1 = 1
+253         max_bytes_per_pic_denom                                     1 = 0
+254         max_bits_per_mb_denom                                       1 = 0
+255         log2_max_mv_length_horizontal                       000010001 = 16
+264         log2_max_mv_length_vertical                         000010001 = 16
+273         max_num_reorder_frames                                      1 = 0
+274         max_dec_frame_buffering                                   010 = 1
+277         rbsp_stop_one_bit                                           1 = 1
+278         rbsp_alignment_zero_bit                                     0 = 0
+279         rbsp_alignment_zero_bit                                     0 = 0
+Picture Parameter Set
+0           forbidden_zero_bit                                          0 = 0
+1           nal_ref_idc                                                11 = 3
+3           nal_unit_type                                           01000 = 8
+8           pic_parameter_set_id                                        1 = 0
+9           seq_parameter_set_id                                        1 = 0
+10          entropy_coding_mode_flag                                    1 = 1
+11          bottom_field_pic_order_in_frame_present_flag                0 = 0
+12          num_slice_groups_minus1                                     1 = 0
+13          num_ref_idx_l0_default_active_minus1                        1 = 0
+14          num_ref_idx_l1_default_active_minus1                        1 = 0
+15          weighted_pred_flag                                          0 = 0
+16          weighted_bipred_idc                                        00 = 0
+18          pic_init_qp_minus26                                         1 = 0
+19          pic_init_qs_minus26                                         1 = 0
+20          chroma_qp_index_offset                                      1 = 0
+21          deblocking_filter_control_present_flag                      0 = 0
+22          constrained_intra_pred_flag                                 0 = 0
+23          redundant_pic_cnt_present_flag                              0 = 0
+24          transform_8x8_mode_flag                                     0 = 0
+25          pic_scaling_matrix_present_flag                             0 = 0
+26          second_chroma_qp_index_offset                               1 = 0
+27          rbsp_stop_one_bit                                           1 = 1
+28          rbsp_alignment_zero_bit                                     0 = 0
+29          rbsp_alignment_zero_bit                                     0 = 0
+30          rbsp_alignment_zero_bit                                     0 = 0
+31          rbsp_alignment_zero_bit                                     0 = 0
+Stream mapping:
+  Stream #0:0 -> #0:0 (copy)
+Output #0, null, to 'pipe:':
+  Metadata:
+    encoder         : Lavf61.7.103
+  Stream #0:0: Video: h264 (High), yuv420p(tv, progressive), 1280x720, q=2-31, 25 fps, 120 tbr, 1200k tbn
+Press [q] to stop, [?] for help
+Packet: 61416 bytes, key frame, no pts, dts 0, duration 20000.

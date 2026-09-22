@@ -1,0 +1,32 @@
+session A: 120 ten-second windows
+session B: 121 ten-second windows
+
+pooled 241 windows; loss/window min 0 median 0 max 174 total 3887
+windows with zero loss: 141 (59%)
+
+Spearman against per-window loss (n = number of paired windows):
+  d_tx_retries          0.296   241  225..3817
+  retry_rate            0.296   241  0.01914..0.3402
+  d_rx_drop_misc            -   241  const 0
+  d_tx_packets         -0.210   241  9455..11895
+  utilization_pct      -0.008   241  3.3..13.3
+  signal_dbm            0.013   241  -75..-66
+  tx_bitrate_mbps      -0.074   241  54..390
+  tx_mcs               -0.082   241  0..9
+  noise_dbm            -0.161   241  -91..-84
+  cli_rx               -0.043   241  3329..8588
+
+Spearman against per-window forward_gap_events:
+  d_tx_retries          0.332   241
+  retry_rate            0.331   241
+  utilization_pct       0.005   241
+  signal_dbm            0.016   241
+
+worst 24 windows vs the 141 zero-loss windows:
+  d_tx_retries       worst   1300.542   zero-loss   1087.624
+  retry_rate         worst      0.113   zero-loss      0.094
+  utilization_pct    worst      6.775   zero-loss      6.936
+  signal_dbm         worst    -70.333   zero-loss    -70.723
+  tx_bitrate_mbps    worst    137.533   zero-loss    154.144
+  d_tx_packets       worst  11478.000   zero-loss  11568.844
+  loss               worst     98.167   zero-loss      0.000

@@ -1,24 +1,27 @@
 # PrivyHub
 
 PrivyHub is an experimental local-first media, gaming, and smart-home platform
-built around an isolated IoT network. The current prototype uses an onn Android
-TV device as the first client and a Windows companion host as the temporary
-server/streaming platform. The roadmap moves the core server toward dedicated
-Linux infrastructure after the current native-streaming architecture work.
+built around an isolated IoT network. The prototype is an onn Android TV client
+and a **Linux companion host** (HP EliteDesk) wired directly into the network
+boundary router. The Windows companion is a preserved reference implementation,
+not the running server.
 
 ## Current development state
 
 - Phase A — Games / emulator subsystem: **complete and checkpointed**
 - Phase B — Diagnostics + clean native baseline: **complete and checkpointed**
-- Phase C — Adaptive native streaming: **active**
-- Current technical item: **C1 explicit stream profiles**
-- C1 inventory: **complete**
-- Next technical classification: `C1_DESIGN_MINIMAL_EXPLICIT_PROFILE_SCHEMA`
+- Phase D — Linux migration / native Linux baseline: **active**
+- Phase C — Adaptive native streaming: **suspended** behind baseline stream
+  health
+- Current technical item: **`D-BASE` baseline stream health** —
+  [`docs/memory/investigations/BASELINE_STREAM_HEALTH.md`](docs/memory/investigations/BASELINE_STREAM_HEALTH.md)
 
-The first C1 implementation is intentionally narrow: extract the validated
-static native stream parameters into an explicit profile without changing
-runtime behavior. A GUI selector, bitrate adaptation, adaptive FEC, or a broad
-streaming-framework rewrite comes later.
+**C1 explicit stream profiles are done.** The reference parameters live in
+`companion/native_stream_profiles.py` as `native_game_720p60_reference`, and
+`native-stream-status` reports the profile in force plus any environment
+override. What replaced C1 as the active item is measuring and fixing the
+stream baseline, not adaptation: adaptation is not built on a baseline that is
+not healthy.
 
 ## Current prototype
 
@@ -44,28 +47,46 @@ not claimed as runtime validated.
 
 ## Native game-streaming baseline
 
-Validated path:
+Validated path, Linux (the production one):
 
-`Windows Graphics Capture -> H.264 NVENC -> RTP-sized UDP -> 8+1 XOR FEC -> Android hardware AVC`
+`x11grab of the managed RetroArch window -> H.264 VAAPI -> RTP-sized UDP -> 8+1 XOR FEC -> Android hardware AVC`
 
-Reference profile behavior:
+Windows Graphics Capture -> NVENC remains as a preserved reference path.
+
+Reference profile behavior (`native_game_720p60_reference`):
 
 - 1280x720;
 - 60 fps;
 - 7000 kbps target bitrate;
 - GOP 15;
 - no B-frames;
+- **maximum frame size 90,000 bytes** (Linux `h264_vaapi` only);
 - 8 data + 1 XOR FEC;
 - RTP payload type 96;
 - 1200-byte packet size.
 
-Process-specific Windows audio and the PHI1/ViGEm P1-P4 controller path are
-separate from the video transport and are preserved during C1.
+Process-specific audio and the P1-P4 controller path (PHI1 -> uinput ->
+RetroArch udev on Linux) are separate from the video transport.
 
-The current Windows/network prototype has a deeply measured UDP burst/gap/
-duplication pathology outside normal application pacing. It is **deferred**, not
-treated as a product buffering requirement. Replay the saved acceptance suite on
-representative Linux/network infrastructure after the Linux baseline exists.
+**The frame cap is a transport parameter, not a quality knob.** The packet
+loss on the wireless hop was traced to a per-frame micro-burst meeting the
+access point's per-station queue — one frame in a hundred is 80-plus packets
+emitted back to back. Capping the frame bounds the burst: it removed 100 % of
+the >= 80-packet frames and 7-9x of the loss, with achieved bitrate, frame rate
+and encoder CPU unchanged, and held over a three-hour soak. The encoder is
+CBR, so it spends the same bits; the cap only changes when it may spend them.
+`PRIVYHUB_ENC_MAX_FRAME_SIZE=0` reproduces the uncapped behavior for
+comparison. Records:
+[`D_BASE_P6_FRAME_TAIL_CONTROL_2026-09-21.md`](docs/memory/evidence/D_BASE_P6_FRAME_TAIL_CONTROL_2026-09-21.md),
+[`D_BASE_P6A_CAP_ADOPTED_2026-09-22.md`](docs/memory/evidence/D_BASE_P6A_CAP_ADOPTED_2026-09-22.md),
+[`D_BASE_S3_CAP_SOAK_2026-09-22.md`](docs/memory/evidence/D_BASE_S3_CAP_SOAK_2026-09-22.md).
+
+A separate and still **paused** issue is the synthetic UDP
+burst/gap/duplication pathology seen without game load. It is not a
+Windows-only artifact — it reproduced from a Linux sender too — but it has
+never been replayed on the current topology, and it is not treated as a
+product buffering requirement. See
+[`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md).
 
 ## Documentation
 

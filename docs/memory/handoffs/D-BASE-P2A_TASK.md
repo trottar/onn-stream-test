@@ -1,0 +1,17 @@
+---
+memory_schema: 1
+as_of: 2026-09-20
+status: TASK HANDOFF — D-BASE-P2a, the audio startup prefill fix from D-BASE-P2; sending this task to the host session is the user's authorization; superseded once its evidence record exists
+---
+
+# D-BASE-P2a task handoff — hold audio playback until real PCM arrives
+
+Implement the candidate fix from docs/memory/evidence/D_BASE_P2_AUDIO_UNDERRUN_BURST_2026-09-20.md in /home/privyhub/Projects/onn-stream-test. Run unattended, ask nothing. Read first: that record (the hypothesis, the fix, and the accepting evidence, verbatim), docs/memory/CURRENT.md, docs/memory/TOOLS.md, PrivyHub/app/src/main/java/streaming/NativeAudioReceiver.kt (`playbackLoop`, `TARGET_QUEUE_PACKETS`, `STARTUP_PREFILL_TIMEOUT_MS`, `firstWriteAtNs`).
+
+**The change, client only, startup path only.** `playbackLoop` does not begin writing to the `AudioTrack` (and does not call `play()`, if it is called from there) until the first **real** PCM packet has been queued — the same event `firstWriteAtNs` marks — with a bound `STARTUP_REAL_PCM_TIMEOUT_MS` = **3,000** after which the existing prefill behaviour resumes unchanged, so an absent or silent audio stream cannot wedge the loop. Once real PCM has arrived, the existing 100 ms `TARGET_QUEUE_PACKETS` prefill applies as today. Nothing else changes: not the queue target or capacity, not concealment, trim, crossfade, or any steady-state logic. Record in the report `audio.startup_wait_ms` (how long the loop held) and `audio.startup_wait_timed_out` (bool).
+
+Build with the real toolchain, install per TOOLS.md, companion restarted with 8765 checked free, `git diff --check` clean.
+
+**Validation.** Five attract-mode sessions of the PS1 reference title, 120 s each, zero input, per TOOLS.md, BACK to end, teardown between. Reject and re-run any with a discontinuity in the first 30 s. Accepting evidence, per the P2 record: median `audio.underruns` per session falls from ~207 to **≤ 10**; `audio.first_write_elapsed_ms` **unchanged** against P2's 1,679-2,762 ms (the fix must not delay audio, only the track's start — if it has moved by more than 200 ms at the median, the fix is wrong); `concealed_underruns` in the first 3 s falls with the underruns; `prolonged_starvation_events` per session **unchanged** against P2's 134-146; `audio.startup_wait_timed_out` false in all five; the tick series shows no burst. Also confirm video is unaffected: rendered fps ≥ 59.4 and `max_output_gap_ms` in P1's range. Classify RUNTIME VALIDATED only if every check passes, else DEVELOPMENT naming the failing check, and if the fix is wrong, revert it and say so (ROLLED BACK).
+
+Record raw numbers first in docs/memory/evidence/D_BASE_P2A_AUDIO_STARTUP_HOLD_<date>.md with reports under evidence/d_base_p2a_<date>/ and SHA-256s; patch record in docs/memory/patches/ and PATCH_INDEX.md; update CURRENT.md (fixed headings, `python3 tools/check_memory_health.py` healthy), MEMORY.md, handoffs/CURRENT_HANDOFF.md, investigations/ACTIVE.md, the dated memory file, KNOWN_ISSUES.md (audio underrun item), evidence/RUNTIME_VALIDATION.md, and the target table in investigations/BASELINE_STREAM_HEALTH.md (audio row: state the new measured value and that the burst was a startup artifact). Teardown per TOOLS.md. Never retry a failing action more than twice; INDETERMINATE with the exact command otherwise. No IP addresses, ADB endpoints or device identifiers in any memory or evidence file.

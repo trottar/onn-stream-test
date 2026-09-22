@@ -1,0 +1,56 @@
+==========================================================================
+D-BASE-S3 -- 180 one-minute windows, 1080 ten-second windows
+
+--- the cap held? ---
+  minutes with >=80-packet frames : 0 
+  minutes with a frame > 90,000 B : 2 [(120, 90011), (163, 90009)]
+  max frame bytes over the session: 90011
+  max packets per frame           : 77
+
+--- loss ---
+  total 973 over 180 min = 5.4/min (bar for SOAK VALIDATED: <= 30)
+  per-minute min 0 median 4.0 max 37
+  hourly totals: [380, 340, 253]
+  worst/best hour ratio: 1.50x (drift flagged above 2.0)
+  forward-gap events 366 (max forward gap: see the report)
+  per-minute series:
+   15 5 17 11 10 11 17 7 8 10 1 5 12 11 2 3 4 5 4 5 8 11 8 10 4 6 0 7 0 0 15 12 5 0 0 10 2 3 8 4 1 2 5 7 0 6 8 6 4 13 6 2 5 3 0 11 13 10 0 2 6 6 2 4 12 2 11 6 0 6 8 2 13 2 8 2 5 2 0 4 11 3 2 8 2 13 2 6 4 20 3 2 8 0 2 3 0 0 35 5 0 2 3 4 8 4 9 0 3 12 0 6 12 0 23 5 2 11 4 2 3 8 37 0 6 2 3 8 8 5 0 0 4 1 7 0 9 2 4 2 9 15 0 0 0 10 7 4 0 3 3 12 1 6 2 7 0 8 2 3 2 14 4 0 5 0 5 5 0 0 0 0 2 2 0 0 0 9 0 4
+
+--- what the RESIDUAL tracks (pre-registered) ---
+  10 s windows, n=1080
+    max_packets    rho -0.025  n=1080
+    max_bytes      rho -0.027  n=1080
+    frames_ge_40   rho -0.014  n=1080
+    mean_packets   rho +0.024  n=1080
+    frames         rho +0.037  n=1080
+    rx_packets     rho +0.013  n=1080
+  per minute windows, n=180
+    max_packets    rho +0.041  n=180
+    max_bytes      rho +0.045  n=180
+    frames_ge_40   rho -0.011  n=180
+    mean_packets   rho +0.028  n=180
+    frames         rho +0.031  n=180
+    rx_packets     rho +0.026  n=180
+
+  bucketed loss (windows assigned by their largest frame):
+    bucket    windows    frames     loss   loss/win
+    < 40          152     91200      121        0.8
+    40-59         306    183604      321       1.05
+    60-79         622    373196      531       0.85
+    >= 80           0         0     None          0
+
+--- session report (180.1 min) ---
+  video 8888555 pkts, loss 977 (0.0110%, 5.4/min), fgap 369, max gap 27 pkt, resyncs 0, ssrc 0
+  audio 2152427 pkts, loss 8543 (0.3969%), underruns 129, starvation 5759 (32.0/min)
+  fps 59.96, spike20 26.7/min, max output gap 162 ms, max rx->decode 117 ms
+  encoder 6928.7 kbps (per-0.5 s (2128.0, 14896.0))
+
+--- rotation ---
+  frame sizes  live    949864 B, 2 archived [('native_frame_sizes.jsonl.1', 4194673), ('native_frame_sizes.jsonl.2', 4194460)]
+  heartbeat    live   1904014 B, 2 archived [('native_stream_heartbeat.log.1', 4194497), ('native_stream_heartbeat.log.2', 4194628)]
+  frame-size series: 10801 seconds, 0 discontinuities []
+  heartbeat: 5382 lines, interval min 2001 max 2031 ms
+
+  onn socket drops over three hours: 0
+  opal: 543 rounds, channel utilization mean 6.82% (0.0-56.6)
+  opal utilization vs loss, per minute: rho +0.073  n=180

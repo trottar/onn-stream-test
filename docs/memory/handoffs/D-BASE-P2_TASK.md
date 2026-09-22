@@ -1,0 +1,23 @@
+---
+memory_schema: 1
+as_of: 2026-09-20
+status: TASK HANDOFF — D-BASE-P2, audio underrun burst characterization; diagnostic instrumentation only; authorized 2026-09-20 for an unattended run
+---
+
+# D-BASE-P2 task handoff — where the audio underruns are
+
+Run only after C5 is recorded in docs/memory/CURRENT.md (check first; stop and say so if it is not). The user is away; run unattended, ask nothing.
+
+The fact, from Group A (`evidence/GROUP_A_DIAGNOSTIC_AUDIT_2026-09-20.md`): `audio.underruns` is **113 / min median** across the corpus against a target of < 5, and the count is dominated by a **~180-320 burst per session** with a steady state near 17 / min in sessions ≥ 300 s. The report gives one total per session, so nobody knows *when* the burst happens — at stream start before the first video frame, during the startup stabilization gate, at the first resync, or spread. Also unread: `prolonged_starvation_events` (108 in one 99 s session), `concealed_underruns` (947), `stale_drops` (768) and `smooth_latency_trims` (768, equal to stale drops) sit next to it and nobody has related them to the raw count.
+
+Read first: docs/memory/CURRENT.md, docs/memory/TOOLS.md, the Group A record's audio section, PrivyHub/app/src/main/java/streaming/NativeAudioReceiver.kt (the whole file: queue target 3 packets, capacity 8, startup prefill 100 ms, the concealment, trim and crossfade logic, and where `AudioTrack.underrunCount` is read), NativeStreamActivity.kt (report assembly, the 500 ms tick), companion/native_session_io.py (the audio sender: packet size, cadence, and whether audio starts before, with, or after video).
+
+**Step 1 — corpus, no runtime.** From every decoder report since 2026-09-16: `audio.underruns` per session against `duration_ms`; fit `underruns = burst + rate × minutes` and report the burst and the rate with their spread; relate `underruns` to `prolonged_starvation_events`, `concealed_underruns`, `stale_drops`, `smooth_latency_trims` and `audio.lost_packets` (Spearman, and say which pairs move together). Script under evidence/d_base_p2_<date>/, raw table as CSV with LF line endings.
+
+**Step 2 — one probe build.** Add to the client, diagnostic only, product behaviour unchanged: a per-500-ms-tick sample of `AudioTrack.underrunCount` deltas, `queue_depth`, and `prolonged_starvation_events` deltas, kept as a per-session series in the report (`audio.tick_series`, capped at 400 ticks = 200 s, columns named in `audio.tick_series_columns`), plus two timestamps: `audio.first_write_elapsed_ms` and `audio.first_video_output_elapsed_ms` (the latter from the decoder) so the burst can be placed relative to the first rendered frame. Build with the real toolchain, install per TOOLS.md, companion restarted with 8765 checked free.
+
+**Step 3 — sessions.** Five attract-mode sessions of the PS1 reference title, 120 s each, zero input, per TOOLS.md, BACK to end. Reject and re-run any with a sequence resync jump ≥ 128 packets in the first 30 s. Per session: the tick series, the two timestamps, and the totals.
+
+**Answer:** (1) when the burst happens — elapsed-ms window that holds ≥ 80 % of the session's underruns, and where that sits relative to the first video output and the stabilization gate's release (`native-stream-ready`, from the companion log); (2) whether it is one event or many; (3) whether the steady-state underruns coincide with video slow events (compare the tick series against `slow_events_ge_50_ms` elapsed times) or run independently; (4) whether `prolonged_starvation_events` is the same thing counted differently or a second phenomenon. Then **one narrow hypothesis and one candidate fix**, not implemented: e.g. "audio starts N ms before the first video frame and the 100 ms prefill drains before the stream is steady — start the track on first video output, or raise prefill during the gate". Say what evidence would accept it.
+
+Record raw numbers first in docs/memory/evidence/D_BASE_P2_AUDIO_UNDERRUN_BURST_<date>.md; classify CHARACTERIZED / INDETERMINATE. The probe's report fields stay in the tree as diagnostics (patch record in docs/memory/patches/ and PATCH_INDEX.md). Update CURRENT.md (fixed headings, `python3 tools/check_memory_health.py` healthy), MEMORY.md, handoffs/CURRENT_HANDOFF.md, investigations/ACTIVE.md, the dated memory file, KNOWN_ISSUES.md (audio underrun item points at the record). Teardown per TOOLS.md: no stopped process, no listener on 8765 / 48100-48102 / 48110, no banner on the onn. Never retry a failing action more than twice; INDETERMINATE with the exact command otherwise. No IP addresses, ADB endpoints or device identifiers in any memory or evidence file.

@@ -1,0 +1,19 @@
+---
+memory_schema: 1
+as_of: 2026-09-22
+status: TASK HANDOFF — H1-VERIFY, confirm the SSH console and the autologin the user set up by hand; read-only except TOOLS.md/memory; run only after the user says H1 and autologin are done
+---
+
+# H1-VERIFY task handoff — the console works before the screen goes
+
+**Gate.** The user has run the three `H1` blocks in `handoffs/PLAN_WEEK_2026-09-21.md` (openssh-server, the PC's key, key-only auth) and written the LightDM autologin drop-in from `D-BASE-H2_TASK.md` pre-flight item 2, and has rebooted once with the monitor attached. This task checks their work; it makes **no root write** and changes nothing under `/etc`. If any check fails, name the failing command and the exact fix from `PLAN_WEEK`/`H2` and stop.
+
+**Checks, each recorded with its command and trimmed output (no addresses):**
+
+1. `systemctl is-active ssh`; `ss -ltn | grep ':22 '` (port only); `sudo -n sshd -T 2>/dev/null | grep -E '^(passwordauthentication|permitrootlogin|kbdinteractiveauthentication|pubkeyauthentication)'` — if `sudo -n` is refused, read `/etc/ssh/sshd_config` and `/etc/ssh/sshd_config.d/*` instead and say so. Required: password auth **no**, root login **no**, pubkey **yes**. Confirm `~/.ssh/authorized_keys` exists with mode 600 and one key (its type only, never the key).
+2. `loginctl list-sessions` and `loginctl show-session <the seat0 session> -p Type -p State -p Remote`: an **X11 session on seat0 that is active**, owned by the project user, present without anyone having typed a password since the reboot. Confirm `/etc/lightdm/lightdm.conf.d/10-autologin.conf` exists with `autologin-user` and `autologin-session` set (quote it) and that `light-locker` did not lock the session (`light-locker-command -q` if present, or the absence of a locker window in `xdotool search --name`).
+3. **The capture path from a bare shell.** In a fresh non-login shell with only `DISPLAY=:0` exported (emulate the SSH environment: `env -i HOME=$HOME PATH=$PATH DISPLAY=:0 bash -c 'xrandr --current | head -3; xdotool getactivewindow getwindowname'`), X must answer. If it refuses with "cannot open display", find whether `XAUTHORITY` is needed (`echo $XAUTHORITY` in the desktop session; LightDM commonly uses `~/.Xauthority`) and record the exact export the SSH console will need. This is the check that decides whether the companion can be started from SSH at all.
+4. **tmux survives and the companion starts from it.** From the desktop, `tmux new -d -s privyhub 'cd ~/Projects/onn-stream-test && DISPLAY=:0 python3 ./companion/privyhub_service.py'`; wait 10 s; `curl -s localhost:8765/plugins/games/native-stream-status | python3 -c "import sys,json; s=json.load(sys.stdin); print(s['ready'], s['encoder_overrides']['any_override'])"` must print `True False`. Then stop it (`tmux kill-session -t privyhub`) and restart the companion the usual way per TOOLS.md, unless the user's companion was already running — in which case skip the start, read the status, and say so. Note `Linger=no` still means the tmux server dies at logout; with autologin there is no logout, but record it.
+5. **adb after the reboot**: `adb devices` — if the onn is not listed, record the exact reconnect sequence that worked (TOOLS.md documents none; `H2` check 2 depends on it).
+
+**Record** in docs/memory/evidence/H1_VERIFY_SSH_CONSOLE_<date>.md (redacted, port numbers only). Update TOOLS.md: the console is SSH from the PC on the Opal wifi, started with `tmux` + `claude --remote-control`; the `DISPLAY`/`XAUTHORITY` export the companion needs from SSH; autologin in force and the file that sets it; the adb reconnect sequence. One line each in CURRENT.md's Next Action (H1 done → H2 gated on the plug), MEMORY.md (durable: SSH console, key-only; autologin), the dated memory file. Never retry a failing action more than twice. No addresses, MACs, SSIDs, keys, serials or device identifiers in any memory or evidence file.

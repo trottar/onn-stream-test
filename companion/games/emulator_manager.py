@@ -11,6 +11,7 @@ import sys
 import threading
 import time
 
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -6572,6 +6573,676 @@ class EmulatorManager:
             )
             return payload
 
+    # ------------------------------------------------------------------
+    # D-BASE-R3: the recovery save. Its own file, never one of the three
+    # player slots. `_normalize_save_state_slot` still rejects anything but
+    # 1-3, so no existing path can reach this file by accident, and it is
+    # never listed as a slot.
+    # ------------------------------------------------------------------
+
+    RECOVERY_STATE_SUFFIX = ".recovery"
+    RECOVERY_INDEX_PATH = (
+        "data/games/retroarch/privyhub_recovery_save.json"
+    )
+
+    def _recovery_index_path(self) -> Path:
+        path = self._project_path(
+            self.RECOVERY_INDEX_PATH
+        )
+        path.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+        return path
+
+    def _read_recovery_index(self) -> dict[str, Any]:
+        try:
+            raw = self._recovery_index_path().read_text(
+                encoding="utf-8"
+            )
+        except (OSError, ValueError):
+            return {}
+
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
+
+        return payload if isinstance(payload, dict) else {}
+
+    def _write_recovery_index(
+        self,
+        payload: dict[str, Any] | None,
+    ) -> None:
+        path = self._recovery_index_path()
+
+        if not payload:
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError:
+                pass
+            return
+
+        path.write_text(
+            json.dumps(payload, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+    def recovery_state_detail(self) -> dict[str, Any]:
+        """What the launcher needs to offer the recovery prompt."""
+        payload = self._read_recovery_index()
+        relative = str(
+            payload.get("state_file", "")
+        ).strip()
+
+        detail: dict[str, Any] = {
+            "exists": False,
+            "state_file": relative or None,
+            "saved_at": payload.get("saved_at"),
+            "game_id": payload.get("game_id"),
+            "game_title": payload.get("game_title"),
+            "game_key": payload.get("game_key"),
+            "size_bytes": 0,
+        }
+
+        if not relative:
+            return detail
+
+        try:
+            path = self._project_path(relative)
+        except Exception:
+            return detail
+
+        if not path.is_file():
+            return detail
+
+        try:
+            size = int(path.stat().st_size)
+        except OSError:
+            return detail
+
+        detail["exists"] = size > 0
+        detail["size_bytes"] = size
+        return detail
+
+    def _recovery_state_path_for_active(
+        self,
+        *,
+        must_exist: bool = True,
+    ) -> Path:
+        """Where this game's recovery save actually is.
+
+        RetroArch's sort_savestates puts states under a per-core directory,
+        so the file is not directly under the state root; save_state learns
+        the real path from the probe diff and this must not re-guess it.
+        The index written at save time is authoritative; the recursive
+        search is the fallback for an index that is missing or stale.
+        """
+        stem = self._active_state_stem()
+        filename = f"{stem}.state{self.RECOVERY_STATE_SUFFIX}"
+
+        payload = self._read_recovery_index()
+        relative = str(
+            payload.get("state_file", "")
+        ).strip()
+
+        if relative:
+            try:
+                indexed = self._project_path(relative)
+            except Exception:
+                indexed = None
+
+            if (
+                indexed is not None
+                and indexed.name.casefold() == filename.casefold()
+                and indexed.is_file()
+            ):
+                return indexed
+
+        matches = self._find_state_files(filename)
+
+        if len(matches) == 1:
+            return matches[0]
+
+        if len(matches) > 1:
+            raise EmulatorError(
+                "Multiple recovery savestates match this game; "
+                "refusing an ambiguous load"
+            )
+
+        if must_exist:
+            raise EmulatorError(
+                "No recovery save exists for this game"
+            )
+
+        return (
+            self._state_root()
+            / filename
+        )
+
+    def save_recovery_state(self) -> dict[str, Any]:
+        """Same SAVE_STATE_SLOT 0 + copy mechanism, recovery destination."""
+        with self.lock:
+            self._refresh_process()
+            if (
+                self.process is None
+                or self.process.poll() is not None
+            ):
+                raise EmulatorError(
+                    "No PrivyHub game session is running"
+                )
+
+            captured = self._capture_slot0_state(
+                probe_action="save_state_link_drop_recovery",
+                probe_slot=0,
+            )
+
+            source = captured["source"]
+            source_diag = captured["source_diag"]
+
+            destination = source.with_name(
+                source.name + self.RECOVERY_STATE_SUFFIX
+            )
+
+            self._copy_state_file(
+                source,
+                destination,
+            )
+
+            source_png = Path(str(source) + ".png")
+            destination_png = Path(str(destination) + ".png")
+
+            if source_png.is_file():
+                self._copy_state_file(
+                    source_png,
+                    destination_png,
+                )
+
+            destination_diag = (
+                self._state_file_diagnostic(
+                    destination
+                )
+            )
+
+            if (
+                int(
+                    destination_diag.get("size_bytes", 0) or 0
+                )
+                <= 0
+                or destination_diag.get("sha256")
+                != source_diag.get("sha256")
+            ):
+                self.record_save_state_probe_event(
+                    "save_state_failure",
+                    slot=0,
+                    reason="recovery_copy_verification_failed",
+                    source=source_diag,
+                    destination=destination_diag,
+                )
+                raise EmulatorError(
+                    "PrivyHub could not verify the recovery savestate"
+                )
+
+            identity = self._active_game_state_identity()
+            game = (
+                self.active_game
+                if isinstance(self.active_game, dict)
+                else {}
+            )
+            relative = str(
+                destination.relative_to(self.project_root)
+            ).replace("\\", "/")
+
+            saved_at = (
+                datetime.now(timezone.utc)
+                .isoformat(timespec="seconds")
+                .replace("+00:00", "Z")
+            )
+
+            self._write_recovery_index(
+                {
+                    "schema": "privyhub_recovery_save_v1",
+                    "state_file": relative,
+                    "saved_at": saved_at,
+                    "game_id": game.get("id"),
+                    "game_title": identity.get("game_title"),
+                    "game_key": identity.get("game_key"),
+                }
+            )
+
+            self.record_save_state_probe_event(
+                "save_state_observation",
+                slot=0,
+                control="link_drop_recovery_save",
+                source=source_diag,
+                destination=destination_diag,
+            )
+
+            return {
+                "ok": True,
+                "action": "save_recovery_state",
+                "state_file": relative,
+                "saved_at": saved_at,
+                "size_bytes": int(
+                    destination_diag.get("size_bytes", 0) or 0
+                ),
+            }
+
+    def load_recovery_state(self) -> dict[str, Any]:
+        """Stage <stem>.state.recovery as slot 0 and LOAD_STATE_SLOT 0."""
+        with self.lock:
+            self._refresh_process()
+            if (
+                self.process is None
+                or self.process.poll() is not None
+                or self.active_game is None
+            ):
+                raise EmulatorError(
+                    "No active game session is available to load"
+                )
+
+            if not self._paused:
+                raise EmulatorError(
+                    "Load State requires the game to be paused"
+                )
+
+            source = self._recovery_state_path_for_active()
+            source_diag = self._state_file_diagnostic(source)
+
+            if int(
+                source_diag.get("size_bytes", 0) or 0
+            ) <= 0:
+                raise EmulatorError(
+                    "The recovery save is an invalid 0-byte file"
+                )
+
+            stem = self._active_state_stem()
+            scratch = source.with_name(f"{stem}.state")
+
+            self._copy_state_file(
+                source,
+                scratch,
+            )
+
+            scratch_diag = self._state_file_diagnostic(scratch)
+
+            if (
+                scratch_diag.get("sha256")
+                != source_diag.get("sha256")
+                or int(
+                    scratch_diag.get("size_bytes", 0) or 0
+                )
+                <= 0
+            ):
+                raise EmulatorError(
+                    "PrivyHub could not verify the staged "
+                    "recovery savestate"
+                )
+
+            source_png = Path(str(source) + ".png")
+            scratch_png = Path(str(scratch) + ".png")
+
+            if source_png.is_file():
+                self._copy_state_file(
+                    source_png,
+                    scratch_png,
+                )
+
+            log_offset = (
+                self._retroarch_session_log_position()
+            )
+
+            self.record_save_state_probe_event(
+                "manager_action",
+                action="load_state_link_drop_recovery",
+                slot=0,
+                source=source_diag,
+                scratch=scratch_diag,
+            )
+
+            response = (
+                self._retroarch_network_request(
+                    "LOAD_STATE_SLOT 0",
+                    expect_response=True,
+                    timeout=2.0,
+                    retries=1,
+                )
+            )
+
+            if (
+                not response
+                or not response.upper().startswith(
+                    "LOAD_STATE_SLOT 0"
+                )
+            ):
+                raise EmulatorError(
+                    "RetroArch nightly did not acknowledge "
+                    "LOAD_STATE_SLOT 0"
+                )
+
+            time.sleep(0.30)
+
+            failed_lines = [
+                line
+                for line in self._retroarch_session_log_since(
+                    log_offset
+                )
+                if "failed to load state" in line.casefold()
+            ]
+
+            if failed_lines:
+                raise EmulatorError(
+                    "RetroArch reported Failed to load state"
+                )
+
+            payload = self.status()
+            payload["action"] = "load_recovery_state"
+            payload["accepted"] = True
+            payload["retroarch_response"] = response
+            return payload
+
+    def copy_recovery_state_to_slot(
+        self,
+        slot: int,
+        *,
+        replace: bool = False,
+    ) -> dict[str, Any]:
+        """Put the recovery file into a player slot.
+
+        Same destination naming, same copy verification and same slot index
+        write as a manual save, and the same occupied-slot confirmation.
+        The live emulator state is not re-saved: the recovery file is what
+        the user is choosing to keep.
+        """
+        with self.lock:
+            normalized = self._normalize_save_state_slot(slot)
+
+            replacing_existing = False
+            if isinstance(self._active_cheat_session, dict):
+                existing_detail = self._save_state_slot_detail(
+                    normalized
+                )
+                replacing_existing = bool(
+                    existing_detail.get("exists")
+                    or existing_detail.get("invalid")
+                    or existing_detail.get("ambiguous")
+                )
+                if replacing_existing and not bool(replace):
+                    raise EmulatorError(
+                        f"Profile save Slot {normalized} is already "
+                        "occupied; explicit replacement confirmation "
+                        "is required"
+                    )
+
+            source = self._recovery_state_path_for_active()
+            source_diag = self._state_file_diagnostic(source)
+
+            if int(
+                source_diag.get("size_bytes", 0) or 0
+            ) <= 0:
+                raise EmulatorError(
+                    "The recovery save is an invalid 0-byte file"
+                )
+
+            stem = self._active_state_stem()
+            destination = source.with_name(
+                f"{stem}.state{normalized}"
+            )
+
+            self._copy_state_file(
+                source,
+                destination,
+            )
+
+            source_png = Path(str(source) + ".png")
+            destination_png = Path(str(destination) + ".png")
+
+            if source_png.is_file():
+                self._copy_state_file(
+                    source_png,
+                    destination_png,
+                )
+
+            destination_diag = self._state_file_diagnostic(
+                destination
+            )
+
+            if (
+                int(
+                    destination_diag.get("size_bytes", 0) or 0
+                )
+                <= 0
+                or destination_diag.get("sha256")
+                != source_diag.get("sha256")
+            ):
+                raise EmulatorError(
+                    "PrivyHub could not verify the copied savestate"
+                )
+
+            self._record_state_slot_index(
+                normalized,
+                destination,
+            )
+
+            payload = self.status()
+            payload["action"] = "copy_recovery_state"
+            payload["slot"] = normalized
+            payload["accepted"] = True
+            payload["confirmed"] = True
+            payload["replaced_existing"] = bool(replacing_existing)
+            payload["slot_detail"] = self._save_state_slot_detail(
+                normalized
+            )
+            payload["state_file"] = str(
+                destination.relative_to(self.project_root)
+            ).replace("\\", "/")
+            return payload
+
+    def discard_recovery_state(self) -> dict[str, Any]:
+        with self.lock:
+            detail = self.recovery_state_detail()
+            relative = detail.get("state_file")
+
+            removed = False
+
+            if relative:
+                try:
+                    path = self._project_path(str(relative))
+                except Exception:
+                    path = None
+
+                if path is not None:
+                    for candidate in (
+                        path,
+                        Path(str(path) + ".png"),
+                    ):
+                        try:
+                            candidate.unlink()
+                            removed = True
+                        except FileNotFoundError:
+                            pass
+                        except OSError as exc:
+                            raise EmulatorError(
+                                "Unable to remove the recovery save: "
+                                f"{exc}"
+                            ) from exc
+
+            self._write_recovery_index(None)
+
+            return {
+                "ok": True,
+                "action": "discard_recovery_state",
+                "removed": removed,
+            }
+
+    # D-BASE-R3: the slot-0 capture half of save_state, extracted so the
+    # recovery save uses the identical RetroArch command, the identical
+    # artifact observation and the identical stability wait. Only the
+    # destination differs, and the recovery destination is never a slot.
+    def _capture_slot0_state(
+        self,
+        *,
+        probe_action: str,
+        probe_slot: int,
+    ) -> dict[str, Any]:
+        stem = self._active_state_stem()
+        before = self._save_state_probe_snapshot()
+        log_offset = (
+            self._retroarch_session_log_position()
+        )
+
+        self.record_save_state_probe_event(
+            "manager_action",
+            action=probe_action,
+            slot=probe_slot,
+            state_files_before=before,
+            game=(
+                dict(self.active_game)
+                if isinstance(
+                    self.active_game,
+                    dict,
+                )
+                else None
+            ),
+        )
+
+        command_response = (
+            self._retroarch_network_request(
+                "SAVE_STATE_SLOT 0",
+                expect_response=True,
+                timeout=2.0,
+                retries=1,
+            )
+        )
+
+        if (
+            not command_response
+            or not command_response.upper().startswith(
+                "SAVE_STATE_SLOT 0"
+            )
+        ):
+            self.record_save_state_probe_event(
+                "save_state_failure",
+                slot=probe_slot,
+                reason="direct_command_not_acknowledged",
+                retroarch_response=command_response,
+                retroarch_log=(
+                    self._retroarch_session_log_since(
+                        log_offset
+                    )
+                ),
+            )
+            raise EmulatorError(
+                "RetroArch nightly did not acknowledge "
+                "SAVE_STATE_SLOT 0"
+            )
+
+        # The direct action may queue an asynchronous save task. Observe the
+        # slot-0 artifact, then wait until it is non-zero and stable before
+        # copying it anywhere.
+        deadline = time.monotonic() + 5.0
+        matching: list[dict[str, Any]] = []
+        changes: dict[str, list[dict[str, Any]]] = {
+            "created": [],
+            "modified": [],
+            "removed": [],
+        }
+        wanted_name = (
+            stem + ".state"
+        ).casefold()
+
+        while time.monotonic() < deadline:
+            time.sleep(0.05)
+            after = self._save_state_probe_snapshot()
+            changes = self._save_state_probe_diff(
+                before,
+                after,
+            )
+            matching = [
+                item
+                for item in (
+                    changes["created"]
+                    + changes["modified"]
+                )
+                if Path(
+                    str(item.get("path", ""))
+                ).name.casefold() == wanted_name
+            ]
+            if matching:
+                break
+
+        if len(matching) != 1:
+            self.record_save_state_probe_event(
+                "save_state_failure",
+                slot=probe_slot,
+                reason="slot0_not_created_or_modified",
+                changes=changes,
+                matching_slot0_changes=matching,
+                retroarch_response=command_response,
+                retroarch_log=(
+                    self._retroarch_session_log_since(
+                        log_offset
+                    )
+                ),
+            )
+            raise EmulatorError(
+                "RetroArch did not create or update the slot-0 "
+                "savestate after SAVE_STATE_SLOT 0"
+            )
+
+        relative = Path(
+            str(matching[0]["path"])
+        )
+        source = (
+            self._state_root()
+            / relative
+        )
+
+        source_diag = (
+            self._wait_for_nonzero_stable_state(
+                source,
+                timeout=5.0,
+            )
+        )
+        source_size = int(
+            source_diag.get(
+                "size_bytes",
+                0,
+            )
+            or 0
+        )
+
+        if source_size <= 0:
+            self.record_save_state_probe_event(
+                "save_state_failure",
+                slot=probe_slot,
+                reason="zero_byte_slot0",
+                changes=changes,
+                source=source_diag,
+                retroarch_response=command_response,
+                retroarch_log=(
+                    self._retroarch_session_log_since(
+                        log_offset
+                    )
+                ),
+            )
+            raise EmulatorError(
+                "RetroArch produced an empty 0-byte savestate; "
+                "the save was rejected and was not indexed"
+            )
+
+        return {
+            "stem": stem,
+            "source": source,
+            "source_diag": source_diag,
+            "changes": changes,
+            "matching": matching,
+            "command_response": command_response,
+            "log_offset": log_offset,
+        }
+
     def save_state(
         self,
         slot: int,
@@ -6595,151 +7266,18 @@ class EmulatorManager:
                         f"Profile save Slot {normalized} is already occupied; "
                         "explicit replacement confirmation is required"
                     )
-            stem = self._active_state_stem()
-            before = self._save_state_probe_snapshot()
-            log_offset = (
-                self._retroarch_session_log_position()
+            captured = self._capture_slot0_state(
+                probe_action="save_state_nightly_direct",
+                probe_slot=normalized,
             )
 
-            self.record_save_state_probe_event(
-                "manager_action",
-                action="save_state_nightly_direct",
-                slot=normalized,
-                state_files_before=before,
-                game=(
-                    dict(self.active_game)
-                    if isinstance(
-                        self.active_game,
-                        dict,
-                    )
-                    else None
-                ),
-            )
-
-            command_response = (
-                self._retroarch_network_request(
-                    "SAVE_STATE_SLOT 0",
-                    expect_response=True,
-                    timeout=2.0,
-                    retries=1,
-                )
-            )
-
-            if (
-                not command_response
-                or not command_response.upper().startswith(
-                    "SAVE_STATE_SLOT 0"
-                )
-            ):
-                self.record_save_state_probe_event(
-                    "save_state_failure",
-                    slot=normalized,
-                    reason="direct_command_not_acknowledged",
-                    retroarch_response=command_response,
-                    retroarch_log=(
-                        self._retroarch_session_log_since(
-                            log_offset
-                        )
-                    ),
-                )
-                raise EmulatorError(
-                    "RetroArch nightly did not acknowledge "
-                    "SAVE_STATE_SLOT 0"
-                )
-
-            # The direct action may queue an asynchronous save task. Observe the
-            # slot-0 artifact, then wait until it is non-zero and stable before
-            # copying it into a PrivyHub slot.
-            deadline = time.monotonic() + 5.0
-            matching: list[dict[str, Any]] = []
-            changes: dict[str, list[dict[str, Any]]] = {
-                "created": [],
-                "modified": [],
-                "removed": [],
-            }
-            wanted_name = (
-                stem + ".state"
-            ).casefold()
-
-            while time.monotonic() < deadline:
-                time.sleep(0.05)
-                after = self._save_state_probe_snapshot()
-                changes = self._save_state_probe_diff(
-                    before,
-                    after,
-                )
-                matching = [
-                    item
-                    for item in (
-                        changes["created"]
-                        + changes["modified"]
-                    )
-                    if Path(
-                        str(item.get("path", ""))
-                    ).name.casefold() == wanted_name
-                ]
-                if matching:
-                    break
-
-            if len(matching) != 1:
-                self.record_save_state_probe_event(
-                    "save_state_failure",
-                    slot=normalized,
-                    reason="slot0_not_created_or_modified",
-                    changes=changes,
-                    matching_slot0_changes=matching,
-                    retroarch_response=command_response,
-                    retroarch_log=(
-                        self._retroarch_session_log_since(
-                            log_offset
-                        )
-                    ),
-                )
-                raise EmulatorError(
-                    "RetroArch did not create or update the slot-0 "
-                    "savestate after SAVE_STATE_SLOT 0"
-                )
-
-            relative = Path(
-                str(matching[0]["path"])
-            )
-            source = (
-                self._state_root()
-                / relative
-            )
-
-            source_diag = (
-                self._wait_for_nonzero_stable_state(
-                    source,
-                    timeout=5.0,
-                )
-            )
-            source_size = int(
-                source_diag.get(
-                    "size_bytes",
-                    0,
-                )
-                or 0
-            )
-
-            if source_size <= 0:
-                self.record_save_state_probe_event(
-                    "save_state_failure",
-                    slot=normalized,
-                    reason="zero_byte_slot0",
-                    changes=changes,
-                    source=source_diag,
-                    retroarch_response=command_response,
-                    retroarch_log=(
-                        self._retroarch_session_log_since(
-                            log_offset
-                        )
-                    ),
-                )
-                raise EmulatorError(
-                    "RetroArch produced an empty 0-byte savestate; "
-                    "the save was rejected and was not indexed"
-                )
+            stem = captured["stem"]
+            source = captured["source"]
+            source_diag = captured["source_diag"]
+            changes = captured["changes"]
+            matching = captured["matching"]
+            command_response = captured["command_response"]
+            log_offset = captured["log_offset"]
 
             destination = source.with_name(
                 source.name + str(normalized)

@@ -1,0 +1,191 @@
+===== L1 (native_decoder_20260921_085115_213.json) =====
+  duration_ms                  10814688
+  rendered_fps                 58.622
+  received_au_fps              58.904
+  max_output_gap_ms            77592
+  output_age_at_end_ms         23
+  terminal_slow_event          None
+  spike_20_ms_per_min          119.7
+  stale_drops_per_min          5.1
+  lost_packets                 70202
+  lost_per_min                 389.5
+  lost_packets_in_resyncs      46806
+  forward_gap_events           1703
+  max_forward_gap_packets      112
+  late_or_reordered_packets    0
+  sequence_resyncs             94
+  ssrc_changes                 1
+  fec_recovered_packets        925
+  fec_unrecoverable_groups     326
+  idr_aus_rejected             10
+  non_idr_aus_dropped          1059
+  underruns                    11958
+  prolonged_starvation_events  13682
+  concealed_underruns          127062
+  avg_queue_residence_ms       27.86
+  startup_wait_ms              2144
+  tick_series_rows             400
+  duration_hours 3.00
+
+--- host samples: 360 over 179.7 minutes ---
+  MemTotal 15667476 kB (14.94 GiB)
+    ra_rss_kb      first=151780 last=271656 min=151780 max=271656  Spearman 0.984
+    ra_anon_kb     first=66448 last=72672 min=66448 max=72672  Spearman 0.960
+    ra_file_kb     first=83208 last=196772 min=83208 max=196772  Spearman 0.985
+    ra_shmem_kb    first=2124 last=2212 min=2100 max=2212  Spearman 0.069
+    ra_swap_kb     first=0 last=0 min=0 max=0  Spearman nan
+    comp_rss_kb    first=40960 last=47724 min=40960 max=47724  Spearman 0.999
+    comp_anon_kb   first=28560 last=35324 min=28560 max=35324  Spearman 0.999
+    comp_threads   first=5 last=6 min=5 max=7  Spearman 0.097
+    enc_rss_kb     first=120060 last=120524 min=120004 max=120596  Spearman 0.122
+    cpu_temp_c     first=40.625 last=55.75 min=40.625 max=57.625  Spearman -0.534
+    gpu_temp_c     first=36.0 last=45.0 min=36.0 max=48.0  Spearman -0.549
+    gpu_power_w    first=20.0 last=24.0 min=19.0 max=27.0  Spearman 0.034
+    load1          first=0.779296875 last=2.2529296875 min=0.779296875 max=3.3623046875  Spearman 0.091
+    mem_avail_kb   first=7832556 last=7954440 min=7806296 max=7969300  Spearman 0.192
+    enc_cpu_pct    first=26.1 last=26.8 min=25.5 max=27.3  Spearman -0.012
+    ra_cpu_pct     first=16.0 last=31.6 min=2.2 max=42.6  Spearman -0.052
+    comp_cpu_pct   first=23.8 last=23.4 min=20.5 max=24.5  Spearman -0.307
+
+  ra_rss_kb per 30-min block (start_kb -> end_kb, slope kB/30min):
+      0- 30 min:    151780 ->    261976   111949.9
+     30- 60 min:    262048 ->    263268     1239.4
+     60- 90 min:    263236 ->    270116     6989.5
+     90-120 min:    270116 ->    270628      520.1
+    120-150 min:    270628 ->    271652     1040.3
+    150-179 min:    271652 ->    271656        4.1
+
+  ra_anon_kb per 30-min block (start_kb -> end_kb, slope kB/30min):
+      0- 30 min:     66448 ->     68824     2413.8
+     30- 60 min:     68824 ->     68824        0.0
+     60- 90 min:     68824 ->     71960     3185.9
+     90-120 min:     71960 ->     71960        0.0
+    120-150 min:     71960 ->     72668      719.3
+    150-179 min:     72668 ->     72672        4.1
+
+  ra_file_kb per 30-min block (start_kb -> end_kb, slope kB/30min):
+      0- 30 min:     83208 ->    191012   109519.8
+     30- 60 min:    191012 ->    192232     1239.4
+     60- 90 min:    192232 ->    195944     3771.1
+     90-120 min:    195944 ->    196456      520.1
+    120-150 min:    196456 ->    196772      321.0
+    150-179 min:    196772 ->    196772        0.0
+
+  comp_rss_kb per 30-min block (start_kb -> end_kb, slope kB/30min):
+      0- 30 min:     40960 ->     46896     6030.5
+     30- 60 min:     46896 ->     47040      146.3
+     60- 90 min:     47040 ->     47156      117.8
+     90-120 min:     47160 ->     47368      211.3
+    120-150 min:     47372 ->     47548      178.8
+    150-179 min:     47548 ->     47724      178.9
+
+  enc_rss_kb per 30-min block (start_kb -> end_kb, slope kB/30min):
+      0- 30 min:    120060 ->    120576      524.2
+     30- 60 min:    120576 ->    120576        0.0
+     60- 90 min:    120596 ->    120596        0.0
+     90-120 min:    120596 ->    120596        0.0
+    120-150 min:    120596 ->    120596        0.0
+    150-179 min:    120596 ->    120524      -73.2
+
+  logs: heartbeat=2961714 recovery=19002 archive_files=0
+  fec groups=1430759 send_errors=0
+  recovery states seen: ['ENDED', 'PAUSED_RECOVERING', 'PLAYING']; restarts end=0
+
+--- heartbeat: 180 minutes ---
+    fps                first=59.851 last=59.756 min=36.397 max=61.02  Spearman vs minute -0.251
+    max_age_ms         first=52 last=39 min=23 max=75661  Spearman vs minute 0.152
+    stalls_gt_120ms    first=0 last=0 min=0 max=3  Spearman vs minute 0.130
+    stalls_gt_1000ms   first=0 last=0 min=0 max=2  Spearman vs minute 0.122
+
+  fps by 30-min block:
+      0- 30 min: mean 59.528  min 57.301  max 59.965
+     30- 60 min: mean 59.714  min 59.216  max 60.017
+     60- 90 min: mean 59.619  min 57.423  max 60.004
+     90-120 min: mean 59.710  min 59.056  max 60.025
+    120-150 min: mean 58.779  min 48.710  max 59.992
+    150-180 min: mean 56.828  min 36.397  max 61.020
+    180-210 min: mean 59.756  min 59.756  max 59.756
+
+  recovery events beyond start/end: 15
+     2026-09-21T07:13:04.586Z desync_pause {'state': 'PAUSED_RECOVERING', 'trigger': 'controller_silence', 'age_ms': 1002.8}
+     2026-09-21T07:13:13.770Z resumed {'state': 'PLAYING', 'from_state': 'PAUSED_RECOVERING', 'recovering_ms': 9274, 'restarts': 0}
+     2026-09-21T07:55:28.492Z desync_pause {'state': 'PAUSED_RECOVERING', 'trigger': 'client_output_silence', 'age_ms': 1364.0}
+     2026-09-21T07:55:42.052Z resumed {'state': 'PLAYING', 'from_state': 'PAUSED_RECOVERING', 'recovering_ms': 13652, 'restarts': 0}
+     2026-09-21T08:18:50.153Z desync_pause {'state': 'PAUSED_RECOVERING', 'trigger': 'controller_silence', 'age_ms': 1002.9}
+     2026-09-21T08:19:01.513Z resumed {'state': 'PLAYING', 'from_state': 'PAUSED_RECOVERING', 'recovering_ms': 11454, 'restarts': 0}
+     2026-09-21T08:21:42.899Z desync_pause {'state': 'PAUSED_RECOVERING', 'trigger': 'controller_silence', 'age_ms': 1004.0}
+     2026-09-21T08:21:51.199Z resumed {'state': 'PLAYING', 'from_state': 'PAUSED_RECOVERING', 'recovering_ms': 8391, 'restarts': 0}
+     2026-09-21T08:22:52.548Z desync_pause {'state': 'PAUSED_RECOVERING', 'trigger': 'controller_silence', 'age_ms': 1002.9}
+     2026-09-21T08:24:09.813Z encoder_restart {'state': 'PAUSED_RECOVERING', 'attempt': 1, 'method': 'restart', 'backoff_ms': 5000, 'last_output_age_ms': 75661, 'age_pair_ms': [72118, 75661], 'cycle': {'capture_restarted': False, 'capture_process_present': False, 'encoder_restarted': True, 'source_width': 879, 'source_height': 720, 'ffmpeg_spawn_ms': 215.473, 'encoder_down_ms': 215.07, 'first_rtp_resume_ms': 367.353, 'rtp_silence_after_spawn_ms': 151.88, 'rtp_baseline_residual_packets': 168, 'host_verified_ms': 1120.226}}
+     2026-09-21T08:24:10.814Z resumed {'state': 'PLAYING', 'from_state': 'PAUSED_RECOVERING', 'recovering_ms': 78355, 'restarts': 1}
+     2026-09-21T08:26:47.225Z desync_pause {'state': 'PAUSED_RECOVERING', 'trigger': 'client_output_silence', 'age_ms': 1050.0}
+     2026-09-21T08:26:51.839Z resumed {'state': 'PLAYING', 'from_state': 'PAUSED_RECOVERING', 'recovering_ms': 4713, 'restarts': 1}
+     2026-09-21T08:39:59.163Z desync_pause {'state': 'PAUSED_RECOVERING', 'trigger': 'client_output_silence', 'age_ms': 1080.0}
+     2026-09-21T08:40:08.095Z resumed {'state': 'PLAYING', 'from_state': 'PAUSED_RECOVERING', 'recovering_ms': 9032, 'restarts': 1}
+
+--- discontinuities ---
+elapsed_ms,type,jump_packets,resync_to_idr_ms,rejected_idr_aus,dropped_non_idr_aus,au_complete,au_fec_recovered,au_fec_unrecoverable_group
+8964249,sequence_resync,498,131,0,14,True,False,False
+8964343,sequence_resync,490,89,0,3,True,False,False
+8964467,sequence_resync,279,200,0,23,True,False,False
+8964524,sequence_resync,525,63,0,13,True,False,False
+8964622,sequence_resync,611,42,0,8,True,False,False
+9024512,sequence_resync,169,23,0,2,True,False,False
+9047461,sequence_resync,4365,19,0,1,True,False,False
+9189353,ssrc_change,0,29,0,3,True,True,False
+9348681,sequence_resync,223,46,0,4,True,False,False
+9348878,sequence_resync,532,40,0,10,True,False,False
+9348909,sequence_resync,167,275,0,12,True,False,False
+9349145,sequence_resync,284,253,0,15,True,False,False
+9908125,sequence_resync,134,225,0,15,True,False,False
+9908136,sequence_resync,146,91,0,13,True,False,False
+9908145,sequence_resync,163,38,0,13,True,False,False
+9908161,sequence_resync,130,34,0,9,True,False,False
+9908461,sequence_resync,364,112,0,7,True,False,False
+10019155,sequence_resync,128,240,1,19,True,False,False
+10131600,sequence_resync,157,158,0,10,True,False,False
+10143165,sequence_resync,128,801,0,40,True,False,False
+10406120,sequence_resync,484,3,0,0,True,False,False
+10408670,sequence_resync,134,15,0,2,True,False,False
+10408688,sequence_resync,228,122,0,19,True,False,False
+10425140,sequence_resync,130,83,0,15,True,False,False
+10425325,sequence_resync,386,207,0,11,True,False,False
+10425329,sequence_resync,381,136,0,3,True,False,False
+10425334,sequence_resync,161,248,0,11,True,False,False
+10425460,sequence_resync,503,239,0,7,True,False,False
+10425654,sequence_resync,590,136,0,15,True,False,False
+10425826,sequence_resync,422,450,0,10,True,False,False
+10426001,sequence_resync,304,36,0,4,True,True,False
+10426420,sequence_resync,446,31,0,6,True,False,False
+10426586,sequence_resync,844,57,0,11,True,False,False
+10426984,sequence_resync,276,112,0,13,True,False,False
+10427035,sequence_resync,384,71,0,12,True,False,False
+10427261,sequence_resync,274,53,0,10,True,True,False
+10427744,sequence_resync,229,58,0,8,True,False,False
+10427868,sequence_resync,5123,133,0,16,True,False,False
+10428039,sequence_resync,128,57,0,8,True,False,False
+10498745,sequence_resync,146,51,0,14,True,False,False
+10498968,sequence_resync,175,38,0,5,True,False,False
+10499183,sequence_resync,511,70,0,11,True,False,False
+10499401,sequence_resync,507,161,0,16,True,False,False
+10499561,sequence_resync,160,29,0,6,True,False,False
+10499778,sequence_resync,564,34,0,1,True,False,False
+10499930,sequence_resync,933,74,0,13,True,False,False
+10500076,sequence_resync,981,22,0,1,True,False,False
+10500235,sequence_resync,128,47,0,7,True,False,False
+10522576,sequence_resync,245,29,0,6,True,False,False
+10522592,sequence_resync,340,41,0,6,True,False,False
+10530985,sequence_resync,394,31,0,3,True,False,False
+10531209,sequence_resync,673,326,0,14,True,False,False
+10531343,sequence_resync,404,89,0,11,True,False,False
+10531484,sequence_resync,264,69,0,14,True,False,False
+10531666,sequence_resync,554,45,0,7,True,False,False
+10531866,sequence_resync,355,73,0,12,True,False,False
+10541480,sequence_resync,808,62,0,13,True,False,False
+10542590,sequence_resync,331,33,0,1,True,False,False
+10550474,sequence_resync,337,52,0,2,True,False,False
+10550548,sequence_resync,154,493,2,67,True,False,False
+10552466,sequence_resync,157,104,0,3,True,False,False
+10561978,sequence_resync,403,1340,0,54,True,False,False
+10725710,sequence_resync,149,143,0,7,True,False,False
+10790769,sequence_resync,147,91,0,7,True,False,False

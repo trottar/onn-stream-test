@@ -1,0 +1,1028 @@
+{
+  "schema": "privyhub_native_decoder_session_log_v1",
+  "received_at_utc": "2026-09-20T23:05:40.902Z",
+  "report": {
+    "schema": "privyhub_native_decoder_session_v1",
+    "client_profiler_version": "0.12.2",
+    "duration_ms": 75009,
+    "host_alpha": "0.7",
+    "encoder_gop_frames": 15,
+    "encoder_bitrate_kbps": 7000,
+    "fec_enabled": true,
+    "fec_group_size": 8,
+    "host_metadata_complete": true,
+    "host_metadata_error": "",
+    "capture_backend": "x11grab_window",
+    "capture_description": "Capture: RetroArch window  879x720\nRetroArch Beetle PSX HW 0.9.44.1 82d8e05",
+    "paused_frame_capture_status": "saved",
+    "paused_frame_bytes": 17797,
+    "paused_frame_width": 480,
+    "paused_frame_height": 270,
+    "video": {
+      "packets": 61453,
+      "bytes": 66893894,
+      "lost_packets": 166,
+      "lost_packets_in_resyncs": 0,
+      "frames": 4457,
+      "dropped_frames": 27,
+      "robust_missing_packets": 166,
+      "forward_gap_events": 14,
+      "late_or_reordered_packets": 0,
+      "duplicate_highest_packets": 0,
+      "max_forward_gap_packets": 31,
+      "sequence_gap_au_drops": 14,
+      "incomplete_au_drops": 13,
+      "fec_parity_packets": 10119,
+      "fec_parity_bytes": 11213250,
+      "fec_groups_received": 10119,
+      "fec_recovered_packets": 7,
+      "fec_recovered_marker_packets": 0,
+      "fec_recovered_idr_packets": 4,
+      "fec_gap_holds": 20,
+      "fec_hold_timeouts": 14,
+      "fec_max_hold_ms": 13,
+      "fec_max_held_packets": 27,
+      "fec_unrecoverable_groups": 0,
+      "ssrc_changes": 0,
+      "sequence_resyncs": 0,
+      "largest_resync_jump_packets": 0,
+      "packets_dropped_waiting_for_idr": 0,
+      "resync_to_idr_ms": 0,
+      "max_resync_to_idr_ms": 0,
+      "first_clean_idr_ms": 765,
+      "waiting_for_idr": false,
+      "idr_frames": 285,
+      "max_frames_between_idr": 53,
+      "current_frames_since_idr": 13,
+      "recent_fps": 59.704982278675644,
+      "recent_mbps": 7.8899736048054665
+    },
+    "stream_discontinuities": [],
+    "stream_discontinuity_capacity": 64,
+    "first_idr_after_discontinuity": [],
+    "first_idr_after_discontinuity_capacity": 64,
+    "decoder": {
+      "queued_frames": 4457,
+      "rendered_frames": 4402,
+      "dropped_frames": 46,
+      "queue_depth": 0,
+      "max_queue_depth": 4,
+      "input_waits": 0,
+      "queue_overflow_drops": 46,
+      "stale_output_drops": 8,
+      "latest_feed_delay_ms": 0,
+      "max_feed_delay_ms": 47,
+      "latest_codec_ms": 16,
+      "max_codec_ms": 105,
+      "latest_rx_to_decode_ms": 18,
+      "max_rx_to_decode_ms": 118,
+      "timestamp_anomalies": 0,
+      "spike_20_ms": 330,
+      "spike_50_ms": 14,
+      "spike_80_ms": 8,
+      "spike_250_ms": 0,
+      "spike_500_ms": 0,
+      "codec_in_flight": 1,
+      "max_codec_in_flight": 7,
+      "latest_output_gap_ms": 10,
+      "max_output_gap_ms": 233,
+      "codec_name": "c2.realtek.video.avc.decoder",
+      "hardware_accelerated": true,
+      "vendor_codec": true,
+      "stale_output_ms": 60,
+      "rx_to_output_histogram_ms": [
+        4080,
+        298,
+        24,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "rx_to_output_histogram_bucket_ms": 20,
+      "low_latency_enabled": true
+    },
+    "slow_event_columns": [
+      "elapsed_ms",
+      "rx_to_decode_ms",
+      "feed_delay_ms",
+      "codec_ms",
+      "codec_in_flight",
+      "app_queue_depth",
+      "output_gap_ms"
+    ],
+    "slow_events_ge_50_ms": [
+      [
+        45290,
+        8,
+        0,
+        8,
+        2,
+        0,
+        73
+      ],
+      [
+        47243,
+        10,
+        0,
+        10,
+        2,
+        0,
+        69
+      ],
+      [
+        47542,
+        10,
+        1,
+        9,
+        2,
+        0,
+        74
+      ],
+      [
+        47694,
+        10,
+        0,
+        10,
+        2,
+        0,
+        56
+      ],
+      [
+        47812,
+        11,
+        1,
+        9,
+        0,
+        0,
+        54
+      ],
+      [
+        48168,
+        11,
+        0,
+        10,
+        2,
+        0,
+        82
+      ],
+      [
+        48569,
+        9,
+        0,
+        8,
+        1,
+        0,
+        51
+      ],
+      [
+        48778,
+        17,
+        1,
+        16,
+        3,
+        1,
+        93
+      ],
+      [
+        50162,
+        12,
+        0,
+        11,
+        2,
+        0,
+        69
+      ],
+      [
+        50497,
+        8,
+        0,
+        7,
+        2,
+        1,
+        79
+      ],
+      [
+        50861,
+        7,
+        0,
+        6,
+        2,
+        0,
+        60
+      ],
+      [
+        51239,
+        8,
+        0,
+        8,
+        2,
+        0,
+        64
+      ],
+      [
+        51611,
+        9,
+        0,
+        9,
+        2,
+        0,
+        67
+      ],
+      [
+        51807,
+        11,
+        0,
+        11,
+        2,
+        0,
+        71
+      ],
+      [
+        53264,
+        10,
+        0,
+        9,
+        2,
+        0,
+        74
+      ],
+      [
+        53485,
+        10,
+        0,
+        9,
+        1,
+        0,
+        210
+      ],
+      [
+        54523,
+        9,
+        0,
+        9,
+        2,
+        0,
+        57
+      ],
+      [
+        55133,
+        11,
+        0,
+        10,
+        2,
+        0,
+        51
+      ],
+      [
+        55346,
+        12,
+        0,
+        12,
+        3,
+        0,
+        81
+      ],
+      [
+        55862,
+        13,
+        0,
+        12,
+        3,
+        1,
+        61
+      ],
+      [
+        55955,
+        8,
+        0,
+        8,
+        2,
+        0,
+        70
+      ],
+      [
+        56509,
+        9,
+        0,
+        9,
+        2,
+        0,
+        56
+      ],
+      [
+        57075,
+        10,
+        0,
+        9,
+        2,
+        1,
+        52
+      ],
+      [
+        57429,
+        9,
+        0,
+        9,
+        1,
+        1,
+        69
+      ],
+      [
+        57505,
+        8,
+        0,
+        8,
+        0,
+        0,
+        54
+      ],
+      [
+        57928,
+        7,
+        0,
+        6,
+        1,
+        0,
+        75
+      ],
+      [
+        58493,
+        9,
+        1,
+        8,
+        1,
+        0,
+        82
+      ],
+      [
+        58616,
+        8,
+        0,
+        7,
+        1,
+        0,
+        55
+      ],
+      [
+        58842,
+        11,
+        0,
+        10,
+        1,
+        1,
+        61
+      ],
+      [
+        59032,
+        9,
+        0,
+        9,
+        2,
+        0,
+        55
+      ],
+      [
+        59649,
+        10,
+        0,
+        10,
+        2,
+        0,
+        64
+      ],
+      [
+        60036,
+        9,
+        0,
+        9,
+        0,
+        0,
+        58
+      ],
+      [
+        60759,
+        7,
+        0,
+        7,
+        2,
+        0,
+        71
+      ],
+      [
+        62108,
+        9,
+        0,
+        9,
+        2,
+        0,
+        53
+      ],
+      [
+        62235,
+        12,
+        1,
+        10,
+        4,
+        1,
+        102
+      ],
+      [
+        62859,
+        9,
+        0,
+        8,
+        2,
+        0,
+        53
+      ],
+      [
+        63477,
+        14,
+        0,
+        13,
+        3,
+        2,
+        79
+      ],
+      [
+        64271,
+        10,
+        0,
+        9,
+        3,
+        0,
+        89
+      ],
+      [
+        64534,
+        10,
+        0,
+        9,
+        1,
+        0,
+        72
+      ],
+      [
+        64759,
+        10,
+        0,
+        9,
+        2,
+        0,
+        76
+      ],
+      [
+        65579,
+        12,
+        0,
+        11,
+        1,
+        1,
+        59
+      ],
+      [
+        65740,
+        9,
+        0,
+        8,
+        2,
+        0,
+        52
+      ],
+      [
+        67035,
+        12,
+        1,
+        11,
+        2,
+        0,
+        81
+      ],
+      [
+        68246,
+        12,
+        0,
+        12,
+        1,
+        2,
+        58
+      ],
+      [
+        68688,
+        8,
+        0,
+        8,
+        3,
+        1,
+        86
+      ],
+      [
+        68957,
+        7,
+        0,
+        6,
+        2,
+        0,
+        56
+      ],
+      [
+        69101,
+        9,
+        0,
+        9,
+        0,
+        0,
+        98
+      ],
+      [
+        69211,
+        12,
+        0,
+        11,
+        2,
+        0,
+        72
+      ],
+      [
+        69527,
+        11,
+        1,
+        9,
+        2,
+        0,
+        77
+      ],
+      [
+        70063,
+        8,
+        0,
+        7,
+        1,
+        0,
+        79
+      ],
+      [
+        70274,
+        11,
+        1,
+        10,
+        2,
+        0,
+        73
+      ],
+      [
+        70805,
+        9,
+        0,
+        8,
+        0,
+        0,
+        50
+      ],
+      [
+        71093,
+        10,
+        0,
+        10,
+        2,
+        2,
+        66
+      ],
+      [
+        71374,
+        10,
+        0,
+        9,
+        2,
+        1,
+        103
+      ],
+      [
+        71647,
+        9,
+        0,
+        9,
+        1,
+        0,
+        70
+      ],
+      [
+        71798,
+        13,
+        3,
+        9,
+        1,
+        0,
+        68
+      ],
+      [
+        72868,
+        6,
+        0,
+        6,
+        1,
+        0,
+        59
+      ],
+      [
+        73041,
+        8,
+        0,
+        8,
+        1,
+        0,
+        50
+      ],
+      [
+        73292,
+        13,
+        3,
+        9,
+        1,
+        0,
+        58
+      ],
+      [
+        73377,
+        8,
+        0,
+        7,
+        2,
+        0,
+        53
+      ],
+      [
+        73556,
+        10,
+        1,
+        8,
+        0,
+        0,
+        54
+      ],
+      [
+        73770,
+        12,
+        4,
+        8,
+        1,
+        0,
+        52
+      ],
+      [
+        74615,
+        43,
+        2,
+        40,
+        2,
+        1,
+        72
+      ],
+      [
+        74899,
+        13,
+        0,
+        13,
+        2,
+        0,
+        60
+      ]
+    ],
+    "slow_event_retained": 64,
+    "slow_event_capacity": 128,
+    "slow_event_retained_marked": 0,
+    "slow_event_capacity_marked": 64,
+    "slow_event_retained_recent": 64,
+    "slow_event_capacity_recent": 64,
+    "output_age_at_end_ms": 10,
+    "terminal_slow_event": null,
+    "slow_events_top_gap": [
+      [
+        1557,
+        13,
+        1,
+        12,
+        0,
+        0,
+        233
+      ],
+      [
+        27872,
+        11,
+        1,
+        9,
+        0,
+        0,
+        225
+      ],
+      [
+        53485,
+        10,
+        0,
+        9,
+        1,
+        0,
+        210
+      ],
+      [
+        1980,
+        8,
+        1,
+        7,
+        2,
+        4,
+        162
+      ],
+      [
+        1017,
+        11,
+        0,
+        10,
+        1,
+        1,
+        142
+      ],
+      [
+        6161,
+        12,
+        0,
+        11,
+        5,
+        3,
+        141
+      ],
+      [
+        2352,
+        10,
+        1,
+        8,
+        3,
+        1,
+        139
+      ],
+      [
+        5182,
+        8,
+        0,
+        8,
+        3,
+        2,
+        138
+      ],
+      [
+        6659,
+        7,
+        0,
+        6,
+        3,
+        1,
+        138
+      ],
+      [
+        8402,
+        9,
+        0,
+        8,
+        4,
+        0,
+        136
+      ],
+      [
+        3652,
+        9,
+        0,
+        8,
+        4,
+        0,
+        135
+      ],
+      [
+        7899,
+        14,
+        1,
+        12,
+        3,
+        4,
+        133
+      ],
+      [
+        13897,
+        8,
+        0,
+        8,
+        4,
+        0,
+        130
+      ],
+      [
+        2158,
+        8,
+        0,
+        8,
+        2,
+        4,
+        118
+      ],
+      [
+        3443,
+        11,
+        0,
+        11,
+        3,
+        2,
+        117
+      ],
+      [
+        3882,
+        12,
+        0,
+        11,
+        5,
+        1,
+        115
+      ]
+    ],
+    "slow_event_retained_top_gap": 16,
+    "slow_event_capacity_top_gap": 16,
+    "slow_events_top_latency": [
+      [
+        1152,
+        118,
+        15,
+        102,
+        4,
+        0,
+        4
+      ],
+      [
+        1148,
+        116,
+        11,
+        105,
+        5,
+        0,
+        17
+      ],
+      [
+        1154,
+        116,
+        17,
+        98,
+        3,
+        0,
+        1
+      ],
+      [
+        1155,
+        112,
+        17,
+        95,
+        2,
+        0,
+        1
+      ],
+      [
+        1156,
+        109,
+        18,
+        91,
+        1,
+        0,
+        0
+      ],
+      [
+        1129,
+        105,
+        7,
+        98,
+        6,
+        0,
+        103
+      ],
+      [
+        1130,
+        105,
+        10,
+        94,
+        5,
+        0,
+        1
+      ],
+      [
+        875,
+        92,
+        11,
+        80,
+        0,
+        0,
+        0
+      ],
+      [
+        2742,
+        59,
+        47,
+        12,
+        0,
+        3,
+        16
+      ],
+      [
+        4208,
+        56,
+        39,
+        16,
+        3,
+        0,
+        10
+      ],
+      [
+        4214,
+        54,
+        34,
+        20,
+        2,
+        1,
+        5
+      ],
+      [
+        2755,
+        53,
+        42,
+        10,
+        2,
+        0,
+        13
+      ],
+      [
+        2760,
+        51,
+        38,
+        12,
+        1,
+        0,
+        4
+      ],
+      [
+        2039,
+        50,
+        40,
+        9,
+        0,
+        0,
+        8
+      ],
+      [
+        74615,
+        43,
+        2,
+        40,
+        2,
+        1,
+        72
+      ],
+      [
+        11389,
+        23,
+        0,
+        23,
+        2,
+        1,
+        109
+      ]
+    ],
+    "slow_event_retained_top_latency": 16,
+    "slow_event_capacity_top_latency": 16,
+    "audio": {
+      "packets": 14742,
+      "lost_packets": 0,
+      "pcm_bytes": 14299200,
+      "write_errors": 0,
+      "stale_drops": 573,
+      "queue_depth": 6,
+      "max_queue_depth": 8,
+      "track_buffer_frames": 960,
+      "buffered_ms": 12,
+      "underruns": 241,
+      "low_latency_mode": true,
+      "concealed_loss_packets": 0,
+      "concealed_underruns": 733,
+      "prolonged_starvation_events": 77,
+      "smooth_latency_trims": 573,
+      "crossfaded_packets": 466,
+      "max_queue_residence_ms": 50,
+      "avg_queue_residence_ms": 27.74666705020123,
+      "queue_target_packets": 3,
+      "queue_capacity_packets": 8,
+      "startup_prefill_ms": 100
+    },
+    "controller": {
+      "packets_sent": 31113,
+      "send_errors": 3,
+      "motion_events": 0
+    }
+  }
+}

@@ -1,0 +1,367 @@
+{
+  "schema": "privyhub_native_decoder_session_log_v1",
+  "received_at_utc": "2026-09-20T15:28:14.643Z",
+  "report": {
+    "schema": "privyhub_native_decoder_session_v1",
+    "client_profiler_version": "0.12.2",
+    "duration_ms": 131772,
+    "host_alpha": "0.7",
+    "encoder_gop_frames": 15,
+    "encoder_bitrate_kbps": 7000,
+    "fec_enabled": true,
+    "fec_group_size": 8,
+    "host_metadata_complete": true,
+    "host_metadata_error": "",
+    "capture_backend": "x11grab_window",
+    "capture_description": "Capture: RetroArch window  879x720\nRetroArch Beetle PSX HW 0.9.44.1 82d8e05",
+    "paused_frame_capture_status": "saved",
+    "paused_frame_bytes": 29934,
+    "paused_frame_width": 480,
+    "paused_frame_height": 270,
+    "video": {
+      "packets": 111268,
+      "bytes": 119894449,
+      "lost_packets": 676,
+      "lost_packets_in_resyncs": 386,
+      "frames": 7784,
+      "dropped_frames": 82,
+      "robust_missing_packets": 290,
+      "forward_gap_events": 23,
+      "late_or_reordered_packets": 0,
+      "duplicate_highest_packets": 0,
+      "max_forward_gap_packets": 46,
+      "sequence_gap_au_drops": 22,
+      "incomplete_au_drops": 20,
+      "fec_parity_packets": 17667,
+      "fec_parity_bytes": 20241419,
+      "fec_groups_received": 17667,
+      "fec_recovered_packets": 5,
+      "fec_recovered_marker_packets": 0,
+      "fec_recovered_idr_packets": 2,
+      "fec_gap_holds": 29,
+      "fec_hold_timeouts": 22,
+      "fec_max_hold_ms": 14,
+      "fec_max_held_packets": 17,
+      "fec_unrecoverable_groups": 3,
+      "ssrc_changes": 0,
+      "sequence_resyncs": 3,
+      "largest_resync_jump_packets": 130,
+      "packets_dropped_waiting_for_idr": 510,
+      "resync_to_idr_ms": 242,
+      "max_resync_to_idr_ms": 242,
+      "first_clean_idr_ms": 472,
+      "waiting_for_idr": false,
+      "idr_frames": 501,
+      "max_frames_between_idr": 54,
+      "current_frames_since_idr": 41,
+      "recent_fps": 53.52683073824487,
+      "recent_mbps": 9.128124728363725
+    },
+    "stream_discontinuities": [
+      {
+        "elapsed_ms": 66572,
+        "type": "sequence_resync",
+        "jump_packets": 130
+      },
+      {
+        "elapsed_ms": 67987,
+        "type": "sequence_resync",
+        "jump_packets": 128
+      },
+      {
+        "elapsed_ms": 70488,
+        "type": "sequence_resync",
+        "jump_packets": 128
+      }
+    ],
+    "stream_discontinuity_capacity": 64,
+    "first_idr_after_discontinuity": [
+      {
+        "elapsed_ms": 66735,
+        "resync_to_idr_ms": 162,
+        "au_complete": true,
+        "au_fec_recovered": false,
+        "au_fec_unrecoverable_group": false
+      },
+      {
+        "elapsed_ms": 68226,
+        "resync_to_idr_ms": 239,
+        "au_complete": true,
+        "au_fec_recovered": false,
+        "au_fec_unrecoverable_group": false
+      },
+      {
+        "elapsed_ms": 70731,
+        "resync_to_idr_ms": 242,
+        "au_complete": true,
+        "au_fec_recovered": false,
+        "au_fec_unrecoverable_group": false
+      }
+    ],
+    "first_idr_after_discontinuity_capacity": 64,
+    "decoder": {
+      "queued_frames": 7784,
+      "rendered_frames": 7728,
+      "dropped_frames": 37,
+      "queue_depth": 0,
+      "max_queue_depth": 4,
+      "input_waits": 12,
+      "queue_overflow_drops": 37,
+      "stale_output_drops": 19,
+      "latest_feed_delay_ms": 0,
+      "max_feed_delay_ms": 41,
+      "latest_codec_ms": 9,
+      "max_codec_ms": 250,
+      "latest_rx_to_decode_ms": 10,
+      "max_rx_to_decode_ms": 250,
+      "timestamp_anomalies": 0,
+      "spike_20_ms": 234,
+      "spike_50_ms": 21,
+      "spike_80_ms": 17,
+      "spike_250_ms": 1,
+      "spike_500_ms": 0,
+      "codec_in_flight": 0,
+      "max_codec_in_flight": 11,
+      "latest_output_gap_ms": 16,
+      "max_output_gap_ms": 388,
+      "codec_name": "c2.realtek.video.avc.decoder",
+      "hardware_accelerated": true,
+      "vendor_codec": true,
+      "low_latency_enabled": true
+    },
+    "slow_event_columns": [
+      "elapsed_ms",
+      "rx_to_decode_ms",
+      "feed_delay_ms",
+      "codec_ms",
+      "codec_in_flight",
+      "app_queue_depth",
+      "output_gap_ms"
+    ],
+    "slow_events_ge_50_ms": [
+      [
+        580,
+        105,
+        0,
+        105,
+        10,
+        0,
+        0
+      ],
+      [
+        584,
+        104,
+        4,
+        99,
+        9,
+        0,
+        4
+      ],
+      [
+        587,
+        98,
+        3,
+        95,
+        8,
+        0,
+        2
+      ],
+      [
+        590,
+        94,
+        6,
+        88,
+        7,
+        0,
+        2
+      ],
+      [
+        596,
+        97,
+        13,
+        84,
+        6,
+        0,
+        5
+      ],
+      [
+        600,
+        100,
+        14,
+        85,
+        5,
+        0,
+        4
+      ],
+      [
+        603,
+        102,
+        15,
+        87,
+        5,
+        3,
+        2
+      ],
+      [
+        608,
+        74,
+        0,
+        73,
+        6,
+        2,
+        5
+      ],
+      [
+        612,
+        76,
+        2,
+        73,
+        7,
+        0,
+        3
+      ],
+      [
+        622,
+        83,
+        3,
+        80,
+        6,
+        0,
+        9
+      ],
+      [
+        623,
+        84,
+        37,
+        47,
+        5,
+        0,
+        1
+      ],
+      [
+        120654,
+        189,
+        6,
+        182,
+        5,
+        3,
+        155
+      ],
+      [
+        120824,
+        86,
+        6,
+        80,
+        3,
+        0,
+        41
+      ],
+      [
+        120830,
+        91,
+        7,
+        84,
+        2,
+        0,
+        5
+      ],
+      [
+        120841,
+        102,
+        10,
+        91,
+        3,
+        0,
+        11
+      ],
+      [
+        121311,
+        114,
+        10,
+        104,
+        1,
+        0,
+        75
+      ],
+      [
+        121553,
+        250,
+        0,
+        250,
+        1,
+        0,
+        241
+      ],
+      [
+        121798,
+        50,
+        41,
+        8,
+        0,
+        0,
+        9
+      ],
+      [
+        121961,
+        52,
+        9,
+        43,
+        3,
+        0,
+        8
+      ],
+      [
+        122079,
+        136,
+        0,
+        136,
+        6,
+        2,
+        115
+      ],
+      [
+        122083,
+        125,
+        0,
+        124,
+        7,
+        0,
+        4
+      ]
+    ],
+    "slow_event_retained": 21,
+    "slow_event_capacity": 128,
+    "slow_event_retained_marked": 0,
+    "slow_event_capacity_marked": 64,
+    "slow_event_retained_recent": 21,
+    "slow_event_capacity_recent": 64,
+    "audio": {
+      "packets": 26593,
+      "lost_packets": 112,
+      "pcm_bytes": 25254720,
+      "write_errors": 0,
+      "stale_drops": 1705,
+      "queue_depth": 1,
+      "max_queue_depth": 8,
+      "track_buffer_frames": 960,
+      "buffered_ms": 0,
+      "underruns": 106,
+      "low_latency_mode": true,
+      "concealed_loss_packets": 38,
+      "concealed_underruns": 1376,
+      "prolonged_starvation_events": 192,
+      "smooth_latency_trims": 1705,
+      "crossfaded_packets": 1217,
+      "max_queue_residence_ms": 52,
+      "avg_queue_residence_ms": 27.520117087237285,
+      "queue_target_packets": 3,
+      "queue_capacity_packets": 8,
+      "startup_prefill_ms": 100
+    },
+    "controller": {
+      "packets_sent": 57500,
+      "send_errors": 0,
+      "motion_events": 0
+    }
+  }
+}

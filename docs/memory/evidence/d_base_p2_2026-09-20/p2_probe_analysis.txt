@@ -1,0 +1,42 @@
+PER SESSION
+run     dur_s  underr  starv  conceal  firstWr firstVid    gate  80% by  last dU  burst%
+P2A     127.1     315    138     1213     2180     1091    5209    1992     6615   99.4%
+P2B     125.9     205    146     1210     1712      727    4200    1512     6642   96.6%
+P2C     130.9     207    138     1181     1679      787    9260    1476   124447   94.2%
+P2D     134.0     201    145     1211     1800      766   12378    1478    21874   99.0%
+P2E     127.1     399    134     1304     2762     1757    5757    2499    81202   98.7%
+
+MEDIANS
+  underruns 207 | starvation 138 | concealed 1211
+  first_write_elapsed_ms 1800 | first_video_output_elapsed_ms 787 | audio-after-video 1013 ms
+  gate release (native-stream-ready) 5757 ms | 80% of underruns by 1512 ms | last underrun tick 21874 ms
+  share of underruns within the first 3 s: 98.7%
+
+UNDERRUNS AFTER THE BURST (ticks with dU>0 beyond 5 s)
+  P2A: 1 ticks, 2 underruns  [(6615, 2)]
+  P2B: 1 ticks, 7 underruns  [(6642, 7)]
+  P2C: 2 ticks, 12 underruns  [(15775, 2), (124447, 10)]
+  P2D: 1 ticks, 2 underruns  [(21874, 2)]
+  P2E: 3 ticks, 5 underruns  [(57051, 2), (61584, 2), (81202, 1)]
+
+STEADY-STATE COINCIDENCE: do late underrun ticks sit near video slow events?
+  P2A: 0/1 late underrun ticks within 750 ms of a slow event (64 slow events)
+  P2B: 0/1 late underrun ticks within 750 ms of a slow event (64 slow events)
+  P2C: 1/2 late underrun ticks within 750 ms of a slow event (64 slow events)
+  P2D: 0/1 late underrun ticks within 750 ms of a slow event (64 slow events)
+  P2E: 0/3 late underrun ticks within 750 ms of a slow event (64 slow events)
+
+STARVATION vs UNDERRUNS over time (P2A, every 20th tick)
+   elapsed     19  dU    0  dStarv    0  dConceal     0  qdepth 0  buf_ms 0
+   elapsed   9139  dU    0  dStarv    1  dConceal     4  qdepth 6  buf_ms 17
+   elapsed  19233  dU    0  dStarv    0  dConceal     0  qdepth 6  buf_ms 16
+   elapsed  29319  dU    0  dStarv    0  dConceal     0  qdepth 7  buf_ms 16
+   elapsed  39395  dU    0  dStarv    1  dConceal     5  qdepth 7  buf_ms 16
+   elapsed  49466  dU    0  dStarv    2  dConceal     7  qdepth 6  buf_ms 16
+   elapsed  59530  dU    0  dStarv    0  dConceal     2  qdepth 6  buf_ms 17
+   elapsed  69594  dU    0  dStarv    2  dConceal     6  qdepth 3  buf_ms 18
+   elapsed  79643  dU    0  dStarv    1  dConceal     5  qdepth 8  buf_ms 15
+   elapsed  89693  dU    0  dStarv    0  dConceal     0  qdepth 7  buf_ms 17
+   elapsed  99749  dU    0  dStarv    2  dConceal     7  qdepth 0  buf_ms 14
+   elapsed 109797  dU    0  dStarv    1  dConceal     4  qdepth 7  buf_ms 16
+   elapsed 119845  dU    0  dStarv    1  dConceal     3  qdepth 7  buf_ms 18

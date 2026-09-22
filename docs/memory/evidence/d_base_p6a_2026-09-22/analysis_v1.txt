@@ -1,0 +1,39 @@
+==========================================================================
+
+### ARM V1
+  encoder: max_frame_size=90000 bufsize_kbits=None (default 7000)
+  frames 72470  bytes/pkt 1066.13
+  packets  p50 12   p90 29   p99 65   max 77     >=40 2565   >=80 0
+  bytes    p50 13312  p90 33792  p99 76800  max 89874    over cap(None) 0
+  loss 249 (0.0251%, 12.4/min)  fgap 91  maxgap 15 pkt  resyncs 0
+  audio loss 1106 (0.4612%)  fps 59.90  spike20/min 25.9  max_output_gap 141 ms  max_rx_to_decode 96 ms
+  encoder 6929.6 kbps (per-0.5s (2336.0, 15056.0))   relay rtp_bytes 1071090387  send_errors 0
+  loss conditional on the window's largest frame (10 s windows):
+    bucket    windows    frames     loss   loss/win
+    < 40           16      9600       50       3.12
+    40-59          35     21000       78       2.23
+    60-79          69     41399      121       1.75
+    >= 80           0         0     None          0
+  onn socket drops over the arm: 0
+
+### ARM U0
+  encoder: max_frame_size=None bufsize_kbits=None (default 7000)
+  frames 4052  bytes/pkt 1067.13
+  packets  p50 14   p90 30   p99 43   max 78     >=40 95     >=80 0
+  bytes    p50 15360  p90 33792  p99 50176  max 90438    over cap(None) 0
+  loss 4 (0.0073%, 3.6/min)  fgap 1  maxgap 4 pkt  resyncs 0
+  audio loss 59 (0.4573%)  fps 59.54  spike20/min 55.6  max_output_gap 124 ms  max_rx_to_decode 117 ms
+  encoder 6947.3 kbps (per-0.5s (3184.0, 10384.0))   relay rtp_bytes 59819335  send_errors 0
+  loss conditional on the window's largest frame (10 s windows):
+    bucket    windows    frames     loss   loss/win
+    < 40            1       600        0        0.0
+    40-59           4      2400        4        1.0
+    60-79           1       600        0        0.0
+    >= 80           0         0     None          0
+  onn socket drops over the arm: 0
+
+==========================================================================
+CROSS-ARM, per minute (the content-lock makes these comparable)
+  arm      loss   vs A0     fgap   max_pkt  max_byte     >=80
+  V1        249   1.00x       91        77     89874        0
+  U0          4   0.18x        1        78     90438        0

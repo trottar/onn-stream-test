@@ -1,0 +1,32 @@
+== accepted sessions, in run order ==
+label,arm,starvation,underruns,concealed,avg_queue_res_ms,max_queue_res_ms,startup_wait_ms,first_write_ms,video_lost_pm,fps,discontinuities
+slot1,off,125,363,1499,27.7,47,0,2083,12.6,59.68,0
+slot2,on,143,19,1036,27.62,53,2157,2210,1.9,59.77,0
+slot3,off,153,276,1390,27.8,49,0,2024,8.2,57.48,0
+slot4,on,154,105,1224,27.59,49,2066,2125,6.3,61.88,0
+slot5,off,151,241,1445,27.29,52,0,2334,18.9,51.76,0
+slot6,on,138,98,1127,27.43,49,2199,2254,8.7,71.58,0
+slot7,off,157,299,1365,27.37,85,0,2085,23.7,58.31,0
+slot8,on,139,7,850,28.21,93,2050,2131,2.9,43.81,0
+slot9,off,139,245,1195,28.08,49,0,2106,7.8,59.68,0
+slot10,on,140,7,981,27.69,49,2161,2226,10.2,59.78,0
+
+Spearman(starvation, run index), pooled: -0.036
+  off arm: n=5 starvation [125, 153, 151, 157, 139] median 151.0; Spearman vs index 0.300
+  on arm: n=5 starvation [143, 154, 138, 139, 140] median 140.0; Spearman vs index -0.500
+
+== pairs (off, on) in order ==
+  pair 1: off=125 on=143  on-off=+18  queue_res off=27.70 on=27.62
+  pair 2: off=153 on=154  on-off=+1  queue_res off=27.80 on=27.59
+  pair 3: off=151 on=138  on-off=-13  queue_res off=27.29 on=27.43
+  pair 4: off=157 on=139  on-off=-18  queue_res off=27.37 on=28.21
+  pair 5: off=139 on=140  on-off=+1  queue_res off=28.08 on=27.69
+  sign test: hold-on above hold-off in 3 of 5 pairs
+  median starvation: off=151.00 on=140.00
+  median underruns: off=276.00 on=19.00
+  median concealed: off=1390.00 on=1036.00
+  median avg_queue_res_ms: off=27.70 on=27.62
+  median max_queue_res_ms: off=49.00 on=49.00
+  median first_write_ms: off=2085.00 on=2210.00
+  median fps: off=58.31 on=59.78
+  median video_lost_pm: off=12.60 on=6.30

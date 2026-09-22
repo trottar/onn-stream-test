@@ -1,0 +1,82 @@
+
+=== session A: {"heartbeats": 598, "air_rounds": 135, "t0": "2026-09-21T23:03:33.362Z", "t1": "2026-09-21T23:23:33.025Z"}
+  full minutes: 20
+
+=== session B: {"heartbeats": 598, "air_rounds": 134, "t0": "2026-09-21T23:26:31.758Z", "t1": "2026-09-21T23:46:31.370Z"}
+  full minutes: 20
+
+=== pooled: 40 minutes over 2 sessions
+loss/min: min 0  median 98.5  max 331  total 4270
+
+Spearman of per-minute client loss against each Opal reading:
+  reading                           rho      n  spread
+  utilization_pct                -0.434     40  6.05..8.2833
+  busy_fraction                  -0.435     40  0.0611..0.0833
+  d_tx_retries                    0.219     40  2931..9858
+  d_tx_failed                     0.221     40  2931..9860
+  d_rx_drop_misc                      -     40  const 0
+  d_tx_packets                   -0.259     40  57433..58206
+  signal_dbm                      0.058     40  -71.5..-70.167
+  signal_avg_dbm                  0.110     40  -72.167..-71
+  tx_bitrate_mbps                -0.278     40  93.567..200.45
+  rx_bitrate_mbps                -0.306     40  217.667..265.433
+  tx_mcs                          0.034     40  1.5..3.333
+  expected_tput_mbps             -0.155     40  1188.61..2100.35
+  noise_dbm                      -0.102     40  -90.1667..-88.8333
+  opal_load                       0.104     40  1.05..1.81
+  d_br-lan_rx_dropped                 -     40  const 0
+  d_br-lan_rx_errors                  -     40  const 0
+  d_br-lan_tx_dropped                 -     40  const 0
+  d_br-lan_tx_errors                  -     40  const 0
+  d_eth0.1_rx_dropped                 -     40  const 0
+  d_eth0.1_rx_errors                  -     40  const 0
+  d_eth0.1_tx_dropped                 -     40  const 0
+  d_eth0.1_tx_errors                  -     40  const 0
+  d_eth0.2_rx_dropped            -0.337     40  144..149
+  d_eth0.2_rx_errors                  -     40  const 0
+  d_eth0.2_tx_dropped                 -     40  const 0
+  d_eth0.2_tx_errors                  -     40  const 0
+  d_eth0_rx_dropped                   -     40  const 0
+  d_eth0_rx_errors                    -     40  const 0
+  d_eth0_tx_dropped                   -     40  const 0
+  d_eth0_tx_errors                    -     40  const 0
+  d_wlan1_rx_dropped                  -     40  const 0
+  d_wlan1_rx_errors                   -     40  const 0
+  d_wlan1_tx_dropped                  -     40  const 0
+  d_wlan1_tx_errors                   -     40  const 0
+
+Spearman of per-minute forward_gap_events against each:
+  utilization_pct                -0.491     40
+  busy_fraction                  -0.492     40
+  d_tx_packets                   -0.306     40
+  rx_bitrate_mbps                -0.389     40
+
+Top-quartile loss minutes (10 of 40), with their Opal readings:
+     sess     min    loss    fgap   util% d_retry  d_fail  d_drop     sig  txMbps     mcs d_txpkt
+        A      17     331      16  7.2333    9858    9860       0 -70.333 143.333   2.167   57645
+        A      12     272      13  7.1667    2931    2931       0 -70.667 118.033   2.833   57774
+        B      17     251      12     6.6    6756    6756       0   -70.5  161.05     2.5   57792
+        A      16     242      13  6.6667    5135    5135       0   -71.0 116.533   1.833   57669
+        A       2     214      14     6.6    4324    4324       0 -70.167 128.367     2.0   57803
+        B       2     212      18     6.6    5783    5791       0   -71.0 166.833   3.333   57909
+        B      12     204      12     7.2    6375    6375       0 -70.833   132.2   1.667   57948
+        A      10     188      12  6.0833    6254    6254       0 -70.667 146.933   2.167   57865
+        B      18     185      18     6.6    7583    7587       0 -70.667 148.283   2.333   57979
+        B      16     183      11     6.6    7840    7840       0 -71.333 166.833   2.333   57814
+
+Bottom-quartile loss minutes, same columns:
+        A       3       8       4    7.75    4103    4105       0 -70.833  200.45   2.333   57955
+        A       0       4       2  7.1667    5021    5021       0 -70.333 118.033   2.167   58046
+        B       7       4       2  7.7833    5939    5939       0 -70.667   108.5     2.0   57832
+        B       3       3       1  8.2833    4181    4181       0 -70.667   184.7   2.333   58132
+        A       1       2       1  6.6333    4247    4247       0   -70.5 133.383   2.333   57641
+        A      19       2       1     7.2    6392    6392       0 -71.167 195.017   2.667   57718
+        B      15       2       1  7.7333    3941    3941       0   -71.5   177.6   2.667   58110
+        A       7       0       0  6.6333    5990    5990       0 -70.167 147.367   1.667   57732
+        A      15       0       0  6.6667    4947    4949       0 -70.833 122.267     2.0   58122
+        B      13       0       0  7.7333    8167    8167       0 -70.833   185.3   2.333   57932
+
+Opal log events during the sessions: 0
+
+Retry and failure rate over the pooled minutes:
+  tx packets 2315482  retries 239133 (10.33%)  failed 239191 (10.33%)

@@ -1,0 +1,40 @@
+=== packet stream equivalence ===
+off packets: 128  on packets: 128
+identical bytes and order: True
+
+=== counters ===
+  rtp_packets        off=     112  on=     112  OK
+  parity_packets     off=      16  on=      16  OK
+  groups             off=      16  on=      16  OK
+  skipped_packets    off=       0  on=       0  OK
+  send_calls         off=     128  on=     128  OK
+  send_errors        off=       0  on=       0  OK
+  sent_bytes         off=  142512  on=  142512  OK
+
+=== pacing status (on) ===
+  enabled                      True
+  configured_us                150
+  source                       PRIVYHUB_FEC_PACING_US
+  frame_budget_us              8000
+  paced_frames                 8
+  paced_packets                128
+  clamped_frames               0
+  late_frames                  0
+  last_spacing_us              150.0
+  achieved_spacing_samples     120
+  achieved_spacing_p50_us      147.5
+  achieved_spacing_p99_us      152.5
+  max_start_delay_us           1462.852
+  queue_depth                  0
+  max_queue_depth              1
+
+=== pacing status (off) ===
+  enabled: False  paced_frames: 0  p50: None
+
+=== achieved intra-frame spacing, measured in the test ===
+  n=120 p50=150.0us p99=164.2us max=178.8us
+
+=== clamp check: 40-packet frames at PACING_US=400 ===
+  budget/packets = 177.77777777777777 us
+  clamped_frames = 3  last_spacing_us = 110.818
+  late_frames    = 0

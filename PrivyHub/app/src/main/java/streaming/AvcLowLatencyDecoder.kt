@@ -1,7 +1,6 @@
 package com.safeiot.privyhub.streaming
 
 import android.media.MediaCodec
-import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.os.Build
 import android.view.Surface
@@ -61,7 +60,12 @@ class AvcLowLatencyDecoder(
     height: Int,
     fps: Int,
     sps: ByteArray,
-    pps: ByteArray
+    pps: ByteArray,
+    // D-BASE-P1: the v0.7 stale-presentation threshold, read once here so a
+    // probe can characterize it. The product default is 60 and nothing in
+    // the product path supplies anything else.
+    private val staleOutputMs: Long =
+        DEFAULT_STALE_OUTPUT_MS
 ) {
     companion object {
         private const val INPUT_QUEUE_CAPACITY = 4
@@ -77,6 +81,21 @@ class AvcLowLatencyDecoder(
         // size. Total capacity (128) is unchanged from the predecessor.
         const val MAX_MARKED_SLOW_EVENTS = 64
         const val MAX_RECENT_SLOW_EVENTS = 64
+
+        // D-BASE-R4 item 2: the two rolling segments are both FIFO, so a
+        // long session evicts its own worst events — the 7,341 ms event of
+        // 2026-09-20T00:27 is not in its own report. These two lists are
+        // ordered by magnitude instead of by time and are never evicted by
+        // later ordinary traffic.
+        const val MAX_TOP_SLOW_EVENTS = 16
+
+        // D-BASE-P1. The product default; the literal this replaced.
+        const val DEFAULT_STALE_OUTPUT_MS = 60L
+
+        // Receive-to-output latency histogram over rendered frames:
+        // 0-20, 20-40, ... 160-180, >180 ms.
+        const val RX_TO_OUTPUT_BUCKETS = 10
+        const val RX_TO_OUTPUT_BUCKET_MS = 20L
 
         // How long after a marked discontinuity (SSRC change or sequence
         // resync) slow events keep landing in the protected segment.
@@ -141,6 +160,34 @@ class AvcLowLatencyDecoder(
             MAX_MARKED_SLOW_EVENTS
         )
 
+    // D-BASE-R4 item 2: worst-of-session, by each of the two things a slow
+    // event can be bad at. Kept sorted descending, bounded to
+    // MAX_TOP_SLOW_EVENTS. The existing segments are untouched.
+    private val topGapSlowEvents =
+        ArrayList<DecoderSlowEvent>(
+            MAX_TOP_SLOW_EVENTS
+        )
+
+    private val topLatencySlowEvents =
+        ArrayList<DecoderSlowEvent>(
+            MAX_TOP_SLOW_EVENTS
+        )
+
+    // D-BASE-R4 item 1: a gap that never ended. No frame closes it, so no
+    // ordinary slow event is ever recorded for it and max_output_gap_ms
+    // stays at whatever the last completed gap was — a 46 s terminal stall
+    // reported 135 ms. This slot holds the largest such gap seen, refreshed
+    // as it grows rather than appended, so one stall produces one row.
+    private var terminalSlowEvent: DecoderSlowEvent? = null
+
+    // D-BASE-P1: what the threshold is actually deciding on. Counted for
+    // rendered frames only, so a higher threshold shows up as weight moving
+    // into the buckets above 60 ms rather than as a changed total.
+    private val rxToOutputHistogram =
+        Array(RX_TO_OUTPUT_BUCKETS) {
+            AtomicLong(0L)
+        }
+
     // nanoTime() deadline; recordSlowEvent() routes to the marked segment
     // while System.nanoTime() is at or before this value. 0 means no window
     // is open. Only ever moved forward (see markCycleWindow).
@@ -148,6 +195,11 @@ class AvcLowLatencyDecoder(
 
     @Volatile
     private var lastOutputAtUs = 0L
+
+    // D-BASE-P2: when the first frame left the decoder, so the audio
+    // underrun burst can be placed relative to it. Diagnostic only.
+    @Volatile
+    private var firstOutputAtNs = 0L
 
     @Volatile
     private var running = true
@@ -237,26 +289,11 @@ class AvcLowLatencyDecoder(
             Build.VERSION_CODES.R
         ) {
             try {
-                val capabilities =
-                    codec.codecInfo
-                        .getCapabilitiesForType(
-                            MediaFormat.MIMETYPE_VIDEO_AVC
-                        )
-
-                if (
-                    capabilities
-                        .isFeatureSupported(
-                            MediaCodecInfo
-                                .CodecCapabilities
-                                .FEATURE_LowLatency
-                        )
-                ) {
-                    format.setInteger(
-                        MediaFormat.KEY_LOW_LATENCY,
-                        1
-                    )
-                    lowLatencyEnabled = true
-                }
+                format.setInteger(
+                    MediaFormat.KEY_LOW_LATENCY,
+                    1
+                )
+                lowLatencyEnabled = true
             } catch (_: Exception) {
                 lowLatencyEnabled = false
             }
@@ -313,6 +350,22 @@ class AvcLowLatencyDecoder(
             maxQueueDepth,
             queue.size
         )
+    }
+
+    // D-BASE-R2: age of the newest decoder output, for the host-side
+    // heartbeat. -1 while nothing has been output yet.
+    fun lastOutputAgeMs(): Long {
+        val lastUs = lastOutputAtUs
+
+        if (lastUs <= 0L) {
+            return -1L
+        }
+
+        return (
+            System.nanoTime() / 1000L -
+                lastUs
+        ).coerceAtLeast(0L) /
+            1000L
     }
 
     fun snapshot(): DecoderMetrics {
@@ -378,6 +431,107 @@ class AvcLowLatencyDecoder(
         synchronized(slowEventsLock) {
             return markedSlowEvents.toList()
         }
+    }
+
+    // D-BASE-P2. 0 until the first frame has been output.
+    fun firstOutputAtNs(): Long {
+        return firstOutputAtNs
+    }
+
+    fun staleOutputThresholdMs(): Long {
+        return staleOutputMs
+    }
+
+    fun rxToOutputHistogramSnapshot():
+        List<Long> {
+        return rxToOutputHistogram.map {
+            it.get()
+        }
+    }
+
+    private fun recordRxToOutput(
+        latencyMs: Long
+    ) {
+        val index =
+            (
+                latencyMs / RX_TO_OUTPUT_BUCKET_MS
+            ).toInt()
+                .coerceIn(
+                    0,
+                    RX_TO_OUTPUT_BUCKETS - 1
+                )
+
+        rxToOutputHistogram[index]
+            .incrementAndGet()
+    }
+
+    fun topGapSlowEventsSnapshot():
+        List<DecoderSlowEvent> {
+        synchronized(slowEventsLock) {
+            return topGapSlowEvents.toList()
+        }
+    }
+
+    fun topLatencySlowEventsSnapshot():
+        List<DecoderSlowEvent> {
+        synchronized(slowEventsLock) {
+            return topLatencySlowEvents.toList()
+        }
+    }
+
+    fun terminalSlowEventSnapshot():
+        DecoderSlowEvent? {
+        synchronized(slowEventsLock) {
+            return terminalSlowEvent
+        }
+    }
+
+    // D-BASE-R4 item 1. Called from the client's 500 ms tick and once more
+    // at report assembly. While output is flowing this is a no-op; once the
+    // age since the last output exceeds every completed gap, it raises
+    // max_output_gap_ms and refreshes the terminal row. Returns the age it
+    // observed so the caller can report output_age_at_end_ms.
+    fun noteOutputStall(
+        nowNs: Long
+    ): Long {
+        val ageMs = lastOutputAgeMs()
+
+        if (ageMs < 0L) {
+            return ageMs
+        }
+
+        if (ageMs <= maxOutputGapMs.get()) {
+            return ageMs
+        }
+
+        updateMax(
+            maxOutputGapMs,
+            ageMs
+        )
+
+        // The frame that would have closed this gap never arrived, so
+        // receive-to-output, feed delay and codec time do not exist for it.
+        // -1 says that, rather than implying a measurement.
+        val event =
+            DecoderSlowEvent(
+                eventAtNs = nowNs,
+                receiveToDecodeMs = -1L,
+                feedDelayMs = -1L,
+                codecMs = -1L,
+                codecInFlight =
+                    (
+                        codecInputs.get() -
+                            codecOutputs.get()
+                    ).coerceAtLeast(0L),
+                appQueueDepth = queue.size,
+                outputGapMs = ageMs
+            )
+
+        synchronized(slowEventsLock) {
+            terminalSlowEvent = event
+        }
+
+        return ageMs
     }
 
     // C3.L2b: called from the RTP receiver's stream-discontinuity hook (an
@@ -654,10 +808,42 @@ class AvcLowLatencyDecoder(
 
                 lastOutputAtUs = nowUs
 
-                if (
+                if (firstOutputAtNs == 0L) {
+                    firstOutputAtNs =
+                        System.nanoTime()
+                }
+
+                // D-BASE-R4 item 1: a frame came out, so whatever gap the
+                // terminal slot was holding has ended and is now an
+                // ordinary completed gap (recorded as one below, and still
+                // counted in max_output_gap_ms). The slot must mean only
+                // "a gap that had not ended when the session ended",
+                // otherwise `terminal: true` would label gaps that closed.
+                if (terminalSlowEvent != null) {
+                    synchronized(slowEventsLock) {
+                        terminalSlowEvent = null
+                    }
+                }
+
+                // D-BASE-R2: a row for the gap as well as for the
+                // latency. On the low-latency build an arrival gap ends
+                // with a frame that arrived and decoded fast, so the
+                // session's worst output gap never qualified under the
+                // latency trigger alone and left no per-event row. Such a
+                // row carries a small codecMs and feedDelayMs on purpose:
+                // that is what says the decoder was not holding anything.
+                val latencySlowEvent =
                     plausibleTimestamp &&
                     latencyMs >=
                     SLOW_EVENT_THRESHOLD_MS
+
+                val outputGapSlowEvent =
+                    frameOutputGapMs >=
+                    SLOW_EVENT_THRESHOLD_MS
+
+                if (
+                    latencySlowEvent ||
+                    outputGapSlowEvent
                 ) {
                     recordSlowEvent(
                         DecoderSlowEvent(
@@ -679,8 +865,9 @@ class AvcLowLatencyDecoder(
                     )
                 }
 
-                if (latencyMs > 60L) {
-                    // Same v0.7 stale-presentation policy.
+                if (latencyMs > staleOutputMs) {
+                    // Same v0.7 stale-presentation policy; the threshold is
+                    // a constant now so D-BASE-P1 can characterize it.
                     codec.releaseOutputBuffer(
                         outputIndex,
                         false
@@ -692,6 +879,11 @@ class AvcLowLatencyDecoder(
                         outputIndex,
                         System.nanoTime()
                     )
+
+                    if (plausibleTimestamp) {
+                        recordRxToOutput(latencyMs)
+                    }
+
                     renderedFrames
                         .incrementAndGet()
                 }
@@ -736,6 +928,49 @@ class AvcLowLatencyDecoder(
                 }
                 slowEvents.addLast(event)
             }
+
+            insertTopLocked(
+                topGapSlowEvents,
+                event
+            ) { it.outputGapMs }
+
+            insertTopLocked(
+                topLatencySlowEvents,
+                event
+            ) { it.receiveToDecodeMs }
+        }
+    }
+
+    // Insertion sort into a descending, bounded list. MAX_TOP_SLOW_EVENTS
+    // is 16, so this is cheaper than keeping a heap and keeps the list
+    // ready to serialize without a second sort.
+    private inline fun insertTopLocked(
+        target: ArrayList<DecoderSlowEvent>,
+        event: DecoderSlowEvent,
+        key: (DecoderSlowEvent) -> Long
+    ) {
+        val value = key(event)
+
+        if (
+            target.size >= MAX_TOP_SLOW_EVENTS &&
+            value <= key(target[target.size - 1])
+        ) {
+            return
+        }
+
+        var index = 0
+
+        while (
+            index < target.size &&
+            key(target[index]) >= value
+        ) {
+            index += 1
+        }
+
+        target.add(index, event)
+
+        while (target.size > MAX_TOP_SLOW_EVENTS) {
+            target.removeAt(target.size - 1)
         }
     }
 

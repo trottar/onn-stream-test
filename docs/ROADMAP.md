@@ -1,8 +1,32 @@
 # PrivyHub / Safe IoT Roadmap — Linux-First + Remote-Foundation Revision
 
-**Revision date:** 2026-09-14
+**Revision date:** 2026-09-14 (position marker updated 2026-09-22)
 **Predecessor synchronized checkpoint:** C1.1 + native-status privacy checkpoint `0c31c100ec721d687aff6aedbd79bc0cf9343810`
-**Roadmap status:** Accepted project plan. Phase C is active. Future secure remote access is promoted to Phase G after Linux optimization.
+**Roadmap status:** Accepted project plan, **still authoritative and unchanged in structure**. Future secure remote access remains promoted to Phase G after Linux optimization.
+
+---
+
+## 0. Where the work actually is — 2026-09-22
+
+**The roadmap below is not restructured; only this marker moves.**
+Authority for the current position is `docs/memory/CURRENT.md`.
+
+- **Phase D is ACTIVE.** The Linux host runs the companion and the games
+  path; D4 PS1 multitap parity is the open functional item.
+- **Phase C is SUSPENDED**, not active, behind an inserted investigation:
+  **`D-BASE` baseline stream health**
+  (`docs/memory/investigations/BASELINE_STREAM_HEALTH.md`; decision
+  `docs/memory/decisions/D-BASE_BASELINE_BEFORE_ADAPTATION.md`).
+  Adaptation is not built on a baseline that is not healthy.
+- **`D-BASE`'s loss column is closed.** The wireless-hop packet loss was
+  traced to the encoder's per-frame burst and fixed by a 90,000-byte frame
+  cap, now a declared field of `native_game_720p60_reference`
+  (`D-BASE-P6`, `P6a`, `S3`). The residual correlates with nothing
+  measured.
+- **Next in sequence:** the SSH console on the host (`H1`, the user's
+  step), then the **headless cutover** (`H2`) once the DisplayPort dummy
+  plug is installed — after which the roadmap's own order resumes:
+  remaining Phase C on Linux, then Phase E.
 
 ---
 
@@ -12,8 +36,8 @@
 |---|---|---|
 | **A — Emulator Subsystem** | Finish Games/emulation as a normal-use subsystem | **COMPLETE / PUSHED** |
 | **B — Diagnostics & Clean Native Baseline** | Make PrivyHub self-diagnosing and remove active Sunshine/Moonlight legacy | **COMPLETE / PUSHED** |
-| **C — Adaptive Streaming Architecture** | Portable profile/telemetry/readiness foundation complete enough for Windows; automatic adaptation continues on Linux | **WINDOWS BOUNDARY REACHED** |
-| **D — Linux Migration / Native Linux Baseline** | Move the core server to the HP EliteDesk Linux prototype and restore normal-use parity | **NEXT** |
+| **C — Adaptive Streaming Architecture** | Portable profile/telemetry/readiness foundation complete enough for Windows; automatic adaptation continues on Linux | **SUSPENDED** pending `D-BASE` baseline stream health |
+| **D — Linux Migration / Native Linux Baseline** | Move the core server to the HP EliteDesk Linux prototype and restore normal-use parity | **ACTIVE** |
 | **E — Linux Core Resource Characterization & Optimization** | Optimize and measure the Linux core with PS1-and-below only; select Prototype 2 from evidence | **PLANNED AFTER D** |
 | **F — Media Library, VOD & Live TV UX** | Finish local media polish plus substantial Live TV/channel/guide work on Linux | **PLANNED AFTER E** |
 | **G — Secure Remote Access / Portable Client Foundation** | Establish overlay/provider abstraction, portable trusted-LAN access, WAN session identity/auth, and off-site PS1-and-below validation | **FUTURE AFTER F** |
@@ -91,15 +115,19 @@ Architectural statement:
 
 # Phase C — Adaptive Streaming Architecture
 
-**Status: ACTIVE**
+**Status: SUSPENDED (2026-09-22) — see §0. Phase C resumes only when the
+baseline-stream-health target table is met or the attempt is formally
+abandoned.**
 
 Phase C turns the current proven native game stream into a reusable, measurable,
 adaptive streaming platform.
 
-The current Windows/GTX 970 system remains a valid development/reference host
-for this phase because Linux migration has not happened yet. Measurements here
-are intended to validate streaming architecture and client capability, **not**
-to establish the eventual Linux minimum hardware requirement.
+**The Windows/GTX 970 reference host language below is historical.** Linux
+migration has happened: the companion runs on the HP EliteDesk host with
+`h264_vaapi`, wired directly into the Opal since `D-BASE-B2`. Measurements
+are still intended to validate streaming architecture and client
+capability, **not** to establish the eventual Linux minimum hardware
+requirement.
 
 ### Phase C remote-readiness constraint
 
@@ -142,14 +170,22 @@ Reference profile:
 Native Game 720p60
 1280x720 @ 60
 H.264
-NVENC
+NVENC (Windows) / VAAPI (Linux, current)
 ~7 Mbps target
 P1 / ultra-low-latency
 GOP 15
 no B-frames
-RTP-sized UDP
+max frame size 90,000 bytes   (Linux h264_vaapi, adopted 2026-09-22)
+RTP-sized UDP, 1200-byte packets
 8 data + 1 XOR parity
+payload type 96
 ```
+
+The frame-size cap is a **transport** parameter: it bounds the per-frame
+burst that meets the wireless queue, and adopting it cut packet loss 7-9x
+at no measurable cost in bitrate, frame rate or encoder time
+(`docs/memory/decisions/D-BASE-P6A_FRAME_CAP_ADOPTED.md`). It is honoured
+by the Linux `h264_vaapi` path only; the NVENC path ignores it.
 
 Profiles should separate:
 

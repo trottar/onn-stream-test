@@ -1,0 +1,28 @@
+run    windows    sum  report     per-window loss, interpolated
+                         lost
+S1          11      5      14   [-14, -43, -30, 128, -35, -111, 109, -54]...
+                                noise sd=68 packets/window, signal=1.3 packets/window, ratio=54x
+S2          11    173      52   [23, 18, -39, -18, 66, -52, 51, 36]...
+                                noise sd=76 packets/window, signal=4.7 packets/window, ratio=16x
+S3          11    -37       3   [57, 20, -107, -5, -46, 18, -57, 48]...
+                                noise sd=125 packets/window, signal=0.3 packets/window, ratio=459x
+S4          12    220      50   [30, -104, 29, -84, 49, 42, -68, 69]...
+                                noise sd=116 packets/window, signal=4.2 packets/window, ratio=28x
+S5          12     38      13   [-50, -4, 82, -143, 85, -1, -88, 128]...
+                                noise sd=123 packets/window, signal=1.1 packets/window, ratio=114x
+S6          11     25      33   [-33, 11, -47, 89, -23, -33, 82, -68]...
+                                noise sd=86 packets/window, signal=3.0 packets/window, ratio=29x
+L20        119   -255    2114   [-72, 1, -43, -1, -55, -7, 110, -87]...
+                                noise sd=86 packets/window, signal=17.8 packets/window, ratio=5x
+
+Reading: the totals reconcile (the sums land within a few hundred of the
+report's own count), but every window's value is dominated by the
+interpolation error of a 2 s heartbeat against an ~830 packet/s stream —
+about +/-100 packets, against a real per-window loss of a few. Negative
+windows are the giveaway: the stream cannot un-lose packets.
+
+Pooled: median noise sd 86 packets/window against a
+median signal of 3.0. A per-minute loss series is NOT
+available from these counters, and none is presented. Loss stays per
+session, from the report. Getting finer would need a per-tick loss
+counter in the client, which this task forbade changing.

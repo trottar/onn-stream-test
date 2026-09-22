@@ -1,0 +1,61 @@
+===== V20: 597 heartbeats over 1207 s =====
+
+-- CHECK 1: every heartbeat carries the new fields --
+   schema(s) seen: {'privyhub_native_stream_heartbeat_v2'}
+   heartbeats missing any new field: 0 of 597   PASS
+
+-- CHECK 2: last heartbeat's cumulative values vs the report --
+   field                      heartbeat   report  delta
+   lost_packets                    2218     2218      0
+   lost_packets_in_resyncs            0        0      0
+   forward_gap_events               175      175      0
+   max_forward_gap_packets           48       48      0
+   stream_resyncs                     0        0      0
+   fec_recovered_packets             94       94      0
+   fec_unrecoverable_groups          38       38      0
+   rx_packets                    985748   987058   1310
+   last heartbeat at elapsed 1205252 ms; report duration 1206893 ms -> 1641 ms of stream after it
+   exact matches: 7 of 8
+
+-- CHECK 3: per-minute loss series from heartbeat deltas --
+   series sum 2212  + first-heartbeat head 6  + post-last-heartbeat tail 0  = 2218
+   report lost_packets = 2218   PASS (accounts exactly)
+
+-- CHECK 4: the 20-minute loss series, radio alongside --
+    min   lost  loss/min  gaps      rx   rssi  txLink
+      0      4         4     2   44979    -66     260
+      1      9         9     4   49131    -66     260
+      2    159       159    11   47592    -66     228
+      3      5         5     2   50307    -66     260
+      4    230       230    11   48969    -67     260
+      5    161       161    10   49086    -66     260
+      6    303       303    34   49663    -66     260
+      7      0         0     0   47392    -67     260
+      8     78        78    10   49152    -65     260
+      9     72        72     4   49827    -66     260
+     10    128       128    10   49163    -66     260
+     11    152       152     9   49221    -65     260
+     12    203       203    12   49193    -66     260
+     13      2         2     1   49162    -65     260
+     14    146       146    11   47260    -66     260
+     15      0         0     0   50009    -66     260
+     16     87        87     7   49255    -65     260
+     17    228       228    17   49263    -65     260
+     18    236       236    15   49206    -65     260
+     19      7         7     2   49090    -65     260
+     20      2         2     1    3276      -       -
+
+   per-minute loss: [4, 9, 159, 5, 230, 161, 303, 0, 78, 72, 128, 152, 203, 2, 146, 0, 87, 228, 236, 7, 2]
+   median 87/min, min 0, max 303, 303x spread within ONE session
+   burst minutes (>= 2x median): [4, 6, 12, 17, 18]
+     minute 4: 230 lost, 11 gap events, rssi -67, txLink 260
+     minute 6: 303 lost, 34 gap events, rssi -66, txLink 260
+     minute 12: 203 lost, 12 gap events, rssi -66, txLink 260
+     minute 17: 228 lost, 17 gap events, rssi -65, txLink 260
+     minute 18: 236 lost, 15 gap events, rssi -65, txLink 260
+
+-- CHECK 5: did the heartbeat get more expensive? --
+   heartbeat line bytes now: min 449 median 465 max 468
+   spike_20_ms/min 51.5  (P4's seven sessions: 40.6-62.4)
+   rendered fps 59.70
+   max_output_gap_ms 343, discontinuities 0

@@ -1,0 +1,38 @@
+O1 -- Opal-side context around each session (from air_A/air_B.jsonl).
+"util" is `iw dev wlan1 info` channel utilization, a 30 ms busy/active
+window read once per round; "retry %" is the station's cumulative
+tx-retries delta over the block divided by its tx-packets delta.
+
+session A
+   pre-60s  rounds   9  util mean 3.30% (0.0..6.6)  tx    40 pkt/s  retry 20.24%  load 1.12..1.29
+   stream   rounds 120  util mean 6.86% (3.3..13.3) tx 1,156 pkt/s  retry 10.15%  load 1.02..2.06
+   post-60s rounds   6  util mean 2.75% (0.0..3.3)  tx     1 pkt/s  retry  0.00%  load 1.42..1.60
+session B
+   pre-60s  rounds   8  util mean 2.89% (0.0..6.6)  tx    47 pkt/s  retry  7.84%  load 1.35..1.80
+   stream   rounds 120  util mean 6.90% (3.3..13.3) tx 1,158 pkt/s  retry 11.32%  load 1.05..2.02
+   post-60s rounds   6  util mean 2.75% (0.0..3.3)  tx     1 pkt/s  retry  0.00%  load 1.07..1.14
+
+The pre/post retry percentages rest on 300-500 packets and are noise; the
+stream figures rest on ~1.16 million each.
+
+Sampler cost: 1,661-1,727 ms per round, median 1,692 (one ssh per 10 s).
+Opal load: 1.08-1.18 idle before any sampling; 1.05-1.81 as a per-minute
+mean through the sessions, median 1.13. A two-minute sampling-only smoke
+run with no stream open saw load FALL 1.33 -> 1.08, so the sampler itself
+does not raise it and the task's "thin to 20 s above +0.3" rule never
+triggered.
+
+Session decoder reports
+   A  1,210.1 s  video 989,789 pkts  loss 2,230 (0.225%)  fgap 149  max gap 85 pkts
+                 audio 241,399 pkts  loss   185 (0.077%)
+                 fps 59.76 (rendered/duration)  spike_20_ms 845 (41.9/min)  stale 8
+                 max output gap 155 ms
+                 sequence_resyncs 0  ssrc_changes 0  fec unrecoverable groups 29
+   B  1,209.9 s  video 989,783 pkts  loss 2,040 (0.206%)  fgap 163  max gap 75 pkts
+                 audio 241,509 pkts  loss    67 (0.028%)
+                 fps 59.71 (rendered/duration)  spike_20_ms 1,011 (50.1/min)  stale 23
+                 max output gap 463 ms  [`video.recent_fps` read 49.80 -- a SPOT
+                 reading at BACK, the D-BASE-P2b trap; use rendered/duration]
+                 sequence_resyncs 0  ssrc_changes 0  fec unrecoverable groups 41
+   Both: FEC pacing off (`PRIVYHUB_FEC_PACING_US` enabled=false), 7000 kbps,
+   GOP 15, fec_group_size 8.

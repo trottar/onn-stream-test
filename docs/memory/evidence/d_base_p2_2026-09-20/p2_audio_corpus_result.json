@@ -1,0 +1,89 @@
+{
+ "selection": {
+  "since": "2026-09-16",
+  "sessions": 177,
+  "with_underruns": 177,
+  "sessions_ge_300s": 8,
+  "sessions_lt_40s": 43
+ },
+ "underruns": {
+  "total_p50": 129.0,
+  "total_p90": 255.2,
+  "total_max": 12020,
+  "per_min_p50": 121.6,
+  "per_min_p90": 335.8
+ },
+ "fit_underruns_eq_burst_plus_rate_x_minutes": {
+  "burst_intercept": 323.2,
+  "rate_per_min": 27.66,
+  "r2": 0.003,
+  "n": 177,
+  "residual_p50": -223.9,
+  "residual_max": 11648.2,
+  "residual_min": -644.2
+ },
+ "sessions_ge_300s": {
+  "n": 8,
+  "underruns_total_p50": 182.0,
+  "underruns_pm_p50": 17.5
+ },
+ "sessions_lt_40s": {
+  "n": 43,
+  "underruns_total_p50": 116.0,
+  "underruns_pm_p50": 262.8
+ },
+ "spearman": {
+  "underruns_vs_prolonged_starvation_events": {
+   "rho": 0.195,
+   "n": 177
+  },
+  "underruns_vs_concealed_underruns": {
+   "rho": 0.502,
+   "n": 177
+  },
+  "underruns_vs_concealed_loss_packets": {
+   "rho": 0.093,
+   "n": 177
+  },
+  "underruns_vs_stale_drops": {
+   "rho": 0.186,
+   "n": 177
+  },
+  "underruns_vs_smooth_latency_trims": {
+   "rho": 0.186,
+   "n": 177
+  },
+  "underruns_vs_crossfaded_packets": {
+   "rho": 0.171,
+   "n": 177
+  },
+  "underruns_vs_lost_packets": {
+   "rho": 0.113,
+   "n": 177
+  },
+  "underruns_vs_packets": {
+   "rho": 0.145,
+   "n": 177
+  },
+  "underruns_vs_max_queue_residence_ms": {
+   "rho": 0.069,
+   "n": 177
+  },
+  "underruns_vs_avg_queue_residence_ms": {
+   "rho": -0.414,
+   "n": 177
+  },
+  "underruns_vs_max_queue_depth": {
+   "rho": -0.181,
+   "n": 177
+  },
+  "underruns_pm_vs_duration": {
+   "rho": -0.725,
+   "n": 177
+  },
+  "starvation_vs_underruns": {
+   "rho": 0.195,
+   "n": 177
+  }
+ }
+}

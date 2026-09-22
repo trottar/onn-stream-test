@@ -37,7 +37,14 @@ data class NativeAudioMetrics(
     val avgQueueResidenceMs: Double,
     val queueTargetPackets: Int,
     val queueCapacityPackets: Int,
-    val startupPrefillMs: Long
+    val startupPrefillMs: Long,
+    // D-BASE-P7, diagnostic: the largest gap between two consecutive
+    // audio datagrams ARRIVING, in ms, over the WHOLE session. One max()
+    // in the receive loop; no new thread and no new sampling. The
+    // per-heartbeat window figure is `takeWindowMaxArrivalGapMs()`, which
+    // is separate precisely so a heartbeat read cannot steal from the
+    // end-of-session report -- both read `snapshot()`.
+    val maxArrivalGapMs: Long
 )
 
 class NativeAudioReceiver(
@@ -69,6 +76,16 @@ class NativeAudioReceiver(
 
         private const val STARTUP_PREFILL_TIMEOUT_MS = 100L
 
+        // D-BASE-P2a: hold the AudioTrack until the audio stream is
+        // actually flowing. D-BASE-P2 measured the first real PCM packet
+        // arriving a median 1,800 ms into the session — the host spawns the
+        // encoder first and the audio sender after — so the 100 ms prefill
+        // above expired long before there was anything to play, and the
+        // track spent ~1.7 s underrunning on concealment. The bound exists
+        // so an absent or silent audio stream cannot wedge the loop: after
+        // it, the original behaviour resumes unchanged.
+        private const val STARTUP_REAL_PCM_TIMEOUT_MS = 3_000L
+
         // Wait at most one PCM packet interval before synthesizing continuity.
         private const val STARVATION_POLL_MS = PACKET_MS.toLong()
 
@@ -83,6 +100,26 @@ class NativeAudioReceiver(
         // upward to a device-supported value.
         private const val TARGET_TRACK_FRAMES = 960
     }
+
+    // D-BASE-P2: when the first real PCM reached AudioTrack, so the underrun
+    // burst can be placed relative to the first video output. Diagnostic
+    // only; nothing reads it on the playback path.
+    @Volatile
+    private var firstWriteAtNs = 0L
+
+    // D-BASE-P2a: set by the receive loop when the first real PCM packet is
+    // queued. This is what the playback loop waits for, and it is the same
+    // event firstWriteAtNs marks, one step earlier.
+    @Volatile
+    private var firstRealPacketQueuedNs = 0L
+
+    // How long the playback loop held before starting the track, and
+    // whether it gave up on the bound rather than seeing real PCM.
+    @Volatile
+    private var startupWaitMs = 0L
+
+    @Volatile
+    private var startupWaitTimedOut = false
 
     private data class PcmPacket(
         val payload: ByteArray?,
@@ -138,6 +175,28 @@ class NativeAudioReceiver(
         AtomicLong(0)
 
     private val maxQueueResidenceNs =
+        AtomicLong(0)
+
+    /**
+     * D-BASE-P7: the largest audio inter-arrival gap since this was last
+     * called, in ms, and reset. Called by the heartbeat only.
+     */
+    fun takeWindowMaxArrivalGapMs(): Long =
+        windowMaxArrivalGapNs.getAndSet(0) /
+            1_000_000L
+
+    // D-BASE-P7. `lastArrivalNs` is touched only by the receive thread.
+    // `maxArrivalGapNs` is the session maximum and is never reset, so the
+    // end-of-session report reads a whole-session figure.
+    // `windowMaxArrivalGapNs` is read-and-reset by the heartbeat, giving
+    // a per-tick window without disturbing the session figure.
+    private var lastArrivalNs =
+        0L
+
+    private val maxArrivalGapNs =
+        AtomicLong(0)
+
+    private val windowMaxArrivalGapNs =
         AtomicLong(0)
 
     @Volatile
@@ -258,6 +317,20 @@ class NativeAudioReceiver(
         queue.clear()
     }
 
+    // D-BASE-P2. 0 until the first real PCM packet has been written.
+    fun firstWriteAtNs(): Long {
+        return firstWriteAtNs
+    }
+
+    // D-BASE-P2a.
+    fun startupWaitMs(): Long {
+        return startupWaitMs
+    }
+
+    fun startupWaitTimedOut(): Boolean {
+        return startupWaitTimedOut
+    }
+
     fun snapshot():
         NativeAudioMetrics {
         val currentTrack =
@@ -351,6 +424,9 @@ class NativeAudioReceiver(
                 concealedUnderruns.get(),
             prolongedStarvationEvents =
                 prolongedStarvationEvents.get(),
+            maxArrivalGapMs =
+                maxArrivalGapNs.get() /
+                    1_000_000L,
             smoothLatencyTrims =
                 smoothLatencyTrims.get(),
             crossfadedPackets =
@@ -471,6 +547,27 @@ class NativeAudioReceiver(
             }
 
         return created
+    }
+
+    /** D-BASE-P7: lock-free `max` on an AtomicLong. */
+    private fun updateMax(
+        target: AtomicLong,
+        value: Long
+    ) {
+        while (true) {
+            val seen =
+                target.get()
+
+            if (
+                value <= seen ||
+                target.compareAndSet(
+                    seen,
+                    value
+                )
+            ) {
+                return
+            }
+        }
     }
 
     private fun receiveLoop() {
@@ -594,6 +691,32 @@ class NativeAudioReceiver(
                     continue
                 }
 
+                // D-BASE-P7: the gap since the previous VALID audio
+                // datagram arrived. Measured here, after the header
+                // checks, so a malformed datagram does not reset it. One
+                // comparison and one atomic max on the receive thread.
+                val arrivalNs =
+                    System.nanoTime()
+
+                if (lastArrivalNs != 0L) {
+                    val gapNs =
+                        arrivalNs -
+                            lastArrivalNs
+
+                    updateMax(
+                        maxArrivalGapNs,
+                        gapNs
+                    )
+
+                    updateMax(
+                        windowMaxArrivalGapNs,
+                        gapNs
+                    )
+                }
+
+                lastArrivalNs =
+                    arrivalNs
+
                 if (
                     expectedSequence >= 0 &&
                     sequence != expectedSequence
@@ -664,6 +787,11 @@ class NativeAudioReceiver(
     private fun enqueueLatest(
         payload: ByteArray
     ) {
+        if (firstRealPacketQueuedNs == 0L) {
+            firstRealPacketQueuedNs =
+                System.nanoTime()
+        }
+
         enqueuePacket(
             PcmPacket(
                 payload =
@@ -764,6 +892,44 @@ class NativeAudioReceiver(
             false
 
         try {
+            // D-BASE-P2a: wait for the stream, then prefill. Until a real
+            // PCM packet has been queued there is nothing to play, and
+            // starting the track early only buys underruns.
+            val startupWaitStartedNs =
+                System.nanoTime()
+
+            while (
+                running &&
+                firstRealPacketQueuedNs == 0L &&
+                (
+                    System.nanoTime() -
+                        startupWaitStartedNs
+                ) <
+                STARTUP_REAL_PCM_TIMEOUT_MS *
+                    1_000_000L
+            ) {
+                try {
+                    Thread.sleep(
+                        1
+                    )
+                } catch (_: InterruptedException) {
+                    if (!running) {
+                        break
+                    }
+                }
+            }
+
+            startupWaitMs =
+                (
+                    System.nanoTime() -
+                        startupWaitStartedNs
+                ).coerceAtLeast(0L) /
+                    1_000_000L
+
+            startupWaitTimedOut =
+                firstRealPacketQueuedNs == 0L
+
+            // From here the original startup path is unchanged.
             val prefillStartedNs =
                 System.nanoTime()
 
@@ -918,6 +1084,14 @@ class NativeAudioReceiver(
 
                     trimCrossfadePending =
                         false
+                }
+
+                if (
+                    firstWriteAtNs == 0L &&
+                    isRealPacket
+                ) {
+                    firstWriteAtNs =
+                        System.nanoTime()
                 }
 
                 val written =

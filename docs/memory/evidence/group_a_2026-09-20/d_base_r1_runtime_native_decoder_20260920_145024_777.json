@@ -1,0 +1,925 @@
+{
+  "schema": "privyhub_native_decoder_session_log_v1",
+  "received_at_utc": "2026-09-20T14:50:24.777Z",
+  "report": {
+    "schema": "privyhub_native_decoder_session_v1",
+    "client_profiler_version": "0.12.2",
+    "duration_ms": 127497,
+    "host_alpha": "0.7",
+    "encoder_gop_frames": 15,
+    "encoder_bitrate_kbps": 7000,
+    "fec_enabled": true,
+    "fec_group_size": 8,
+    "host_metadata_complete": true,
+    "host_metadata_error": "",
+    "capture_backend": "x11grab_window",
+    "capture_description": "Capture: RetroArch window  879x720\nRetroArch Beetle PSX HW 0.9.44.1 82d8e05",
+    "paused_frame_capture_status": "saved",
+    "paused_frame_bytes": 18564,
+    "paused_frame_width": 480,
+    "paused_frame_height": 270,
+    "video": {
+      "packets": 106477,
+      "bytes": 115264162,
+      "lost_packets": 695,
+      "lost_packets_in_resyncs": 493,
+      "frames": 7547,
+      "dropped_frames": 45,
+      "robust_missing_packets": 202,
+      "forward_gap_events": 12,
+      "late_or_reordered_packets": 0,
+      "duplicate_highest_packets": 0,
+      "max_forward_gap_packets": 98,
+      "sequence_gap_au_drops": 11,
+      "incomplete_au_drops": 2,
+      "fec_parity_packets": 16986,
+      "fec_parity_bytes": 19700105,
+      "fec_groups_received": 16986,
+      "fec_recovered_packets": 20,
+      "fec_recovered_marker_packets": 1,
+      "fec_recovered_idr_packets": 4,
+      "fec_gap_holds": 29,
+      "fec_hold_timeouts": 12,
+      "fec_max_hold_ms": 15,
+      "fec_max_held_packets": 25,
+      "fec_unrecoverable_groups": 8,
+      "ssrc_changes": 0,
+      "sequence_resyncs": 3,
+      "largest_resync_jump_packets": 182,
+      "packets_dropped_waiting_for_idr": 377,
+      "resync_to_idr_ms": 492,
+      "max_resync_to_idr_ms": 492,
+      "first_clean_idr_ms": 1008,
+      "waiting_for_idr": false,
+      "idr_frames": 504,
+      "max_frames_between_idr": 28,
+      "current_frames_since_idr": 14,
+      "recent_fps": 60.17039495986503,
+      "recent_mbps": 6.831629741261438
+    },
+    "stream_discontinuities": [
+      {
+        "elapsed_ms": 60552,
+        "type": "sequence_resync",
+        "jump_packets": 129
+      },
+      {
+        "elapsed_ms": 123886,
+        "type": "sequence_resync",
+        "jump_packets": 182
+      },
+      {
+        "elapsed_ms": 124572,
+        "type": "sequence_resync",
+        "jump_packets": 182
+      }
+    ],
+    "stream_discontinuity_capacity": 64,
+    "first_idr_after_discontinuity": [
+      {
+        "elapsed_ms": 60775,
+        "resync_to_idr_ms": 222,
+        "au_complete": true,
+        "au_fec_recovered": false,
+        "au_fec_unrecoverable_group": false
+      },
+      {
+        "elapsed_ms": 124026,
+        "resync_to_idr_ms": 139,
+        "au_complete": true,
+        "au_fec_recovered": false,
+        "au_fec_unrecoverable_group": false
+      },
+      {
+        "elapsed_ms": 125064,
+        "resync_to_idr_ms": 492,
+        "au_complete": true,
+        "au_fec_recovered": false,
+        "au_fec_unrecoverable_group": false
+      }
+    ],
+    "first_idr_after_discontinuity_capacity": 64,
+    "decoder": {
+      "queued_frames": 7547,
+      "rendered_frames": 7174,
+      "dropped_frames": 9,
+      "queue_depth": 1,
+      "max_queue_depth": 4,
+      "input_waits": 0,
+      "queue_overflow_drops": 9,
+      "stale_output_drops": 361,
+      "latest_feed_delay_ms": 1,
+      "max_feed_delay_ms": 32,
+      "latest_codec_ms": 34,
+      "max_codec_ms": 647,
+      "latest_rx_to_decode_ms": 34,
+      "max_rx_to_decode_ms": 649,
+      "timestamp_anomalies": 0,
+      "spike_20_ms": 4799,
+      "spike_50_ms": 596,
+      "spike_80_ms": 147,
+      "spike_250_ms": 4,
+      "spike_500_ms": 2,
+      "codec_in_flight": 1,
+      "max_codec_in_flight": 10,
+      "latest_output_gap_ms": 25,
+      "max_output_gap_ms": 639,
+      "codec_name": "c2.realtek.video.avc.decoder",
+      "hardware_accelerated": true,
+      "vendor_codec": true,
+      "low_latency_enabled": false
+    },
+    "slow_event_columns": [
+      "elapsed_ms",
+      "rx_to_decode_ms",
+      "feed_delay_ms",
+      "codec_ms",
+      "codec_in_flight",
+      "app_queue_depth",
+      "output_gap_ms"
+    ],
+    "slow_events_ge_50_ms": [
+      [
+        60800,
+        290,
+        0,
+        289,
+        2,
+        1,
+        280
+      ],
+      [
+        60984,
+        83,
+        0,
+        82,
+        3,
+        0,
+        73
+      ],
+      [
+        61221,
+        69,
+        0,
+        68,
+        3,
+        0,
+        60
+      ],
+      [
+        61542,
+        55,
+        0,
+        54,
+        1,
+        0,
+        45
+      ],
+      [
+        61838,
+        51,
+        0,
+        51,
+        3,
+        0,
+        39
+      ],
+      [
+        62358,
+        57,
+        2,
+        54,
+        3,
+        0,
+        45
+      ],
+      [
+        62460,
+        58,
+        0,
+        58,
+        3,
+        0,
+        49
+      ],
+      [
+        62505,
+        52,
+        1,
+        50,
+        2,
+        0,
+        37
+      ],
+      [
+        110994,
+        92,
+        0,
+        92,
+        4,
+        1,
+        81
+      ],
+      [
+        111247,
+        95,
+        0,
+        94,
+        5,
+        0,
+        84
+      ],
+      [
+        111559,
+        52,
+        2,
+        49,
+        2,
+        1,
+        39
+      ],
+      [
+        111736,
+        75,
+        0,
+        75,
+        3,
+        1,
+        65
+      ],
+      [
+        111839,
+        74,
+        0,
+        73,
+        4,
+        1,
+        65
+      ],
+      [
+        112248,
+        212,
+        0,
+        211,
+        2,
+        0,
+        203
+      ],
+      [
+        112388,
+        70,
+        1,
+        68,
+        4,
+        0,
+        49
+      ],
+      [
+        112641,
+        88,
+        0,
+        87,
+        3,
+        0,
+        79
+      ],
+      [
+        112693,
+        59,
+        0,
+        58,
+        4,
+        0,
+        45
+      ],
+      [
+        113139,
+        52,
+        0,
+        51,
+        2,
+        0,
+        42
+      ],
+      [
+        113207,
+        53,
+        0,
+        52,
+        2,
+        0,
+        41
+      ],
+      [
+        113291,
+        55,
+        0,
+        54,
+        2,
+        0,
+        45
+      ],
+      [
+        113490,
+        70,
+        0,
+        70,
+        3,
+        0,
+        61
+      ],
+      [
+        113820,
+        58,
+        0,
+        58,
+        2,
+        0,
+        49
+      ],
+      [
+        114121,
+        81,
+        0,
+        80,
+        3,
+        0,
+        71
+      ],
+      [
+        114413,
+        63,
+        0,
+        62,
+        2,
+        1,
+        54
+      ],
+      [
+        114574,
+        55,
+        0,
+        54,
+        2,
+        0,
+        46
+      ],
+      [
+        114980,
+        69,
+        0,
+        69,
+        4,
+        0,
+        60
+      ],
+      [
+        115074,
+        80,
+        0,
+        80,
+        3,
+        0,
+        70
+      ],
+      [
+        115297,
+        74,
+        0,
+        74,
+        2,
+        2,
+        64
+      ],
+      [
+        115399,
+        62,
+        1,
+        61,
+        3,
+        0,
+        52
+      ],
+      [
+        115494,
+        58,
+        0,
+        57,
+        3,
+        0,
+        48
+      ],
+      [
+        115720,
+        81,
+        0,
+        80,
+        3,
+        0,
+        71
+      ],
+      [
+        115825,
+        57,
+        0,
+        57,
+        3,
+        1,
+        48
+      ],
+      [
+        115947,
+        87,
+        0,
+        87,
+        2,
+        0,
+        77
+      ],
+      [
+        116020,
+        55,
+        2,
+        52,
+        3,
+        1,
+        44
+      ],
+      [
+        116162,
+        93,
+        0,
+        92,
+        2,
+        1,
+        84
+      ],
+      [
+        116220,
+        50,
+        3,
+        46,
+        1,
+        0,
+        36
+      ],
+      [
+        116373,
+        72,
+        0,
+        72,
+        3,
+        0,
+        63
+      ],
+      [
+        116520,
+        82,
+        0,
+        82,
+        3,
+        0,
+        72
+      ],
+      [
+        116659,
+        70,
+        0,
+        70,
+        1,
+        0,
+        62
+      ],
+      [
+        116757,
+        79,
+        1,
+        77,
+        2,
+        0,
+        64
+      ],
+      [
+        116853,
+        66,
+        0,
+        66,
+        3,
+        0,
+        58
+      ],
+      [
+        117074,
+        86,
+        0,
+        86,
+        3,
+        0,
+        78
+      ],
+      [
+        117335,
+        98,
+        0,
+        97,
+        3,
+        0,
+        83
+      ],
+      [
+        117573,
+        77,
+        1,
+        76,
+        3,
+        1,
+        66
+      ],
+      [
+        117776,
+        71,
+        0,
+        71,
+        2,
+        0,
+        63
+      ],
+      [
+        118072,
+        61,
+        0,
+        60,
+        2,
+        0,
+        50
+      ],
+      [
+        118120,
+        56,
+        1,
+        55,
+        3,
+        1,
+        45
+      ],
+      [
+        118386,
+        82,
+        0,
+        81,
+        4,
+        1,
+        71
+      ],
+      [
+        118595,
+        65,
+        0,
+        64,
+        3,
+        1,
+        56
+      ],
+      [
+        119407,
+        117,
+        0,
+        117,
+        2,
+        0,
+        108
+      ],
+      [
+        119473,
+        59,
+        5,
+        54,
+        3,
+        0,
+        40
+      ],
+      [
+        119753,
+        59,
+        0,
+        58,
+        2,
+        0,
+        47
+      ],
+      [
+        119975,
+        84,
+        0,
+        83,
+        3,
+        0,
+        74
+      ],
+      [
+        120225,
+        67,
+        0,
+        66,
+        3,
+        0,
+        57
+      ],
+      [
+        121254,
+        85,
+        0,
+        85,
+        2,
+        0,
+        77
+      ],
+      [
+        121578,
+        81,
+        0,
+        80,
+        5,
+        0,
+        71
+      ],
+      [
+        121800,
+        56,
+        0,
+        55,
+        3,
+        0,
+        46
+      ],
+      [
+        121946,
+        56,
+        0,
+        55,
+        3,
+        0,
+        47
+      ],
+      [
+        122083,
+        95,
+        0,
+        95,
+        2,
+        0,
+        84
+      ],
+      [
+        122133,
+        56,
+        0,
+        55,
+        4,
+        2,
+        42
+      ],
+      [
+        122308,
+        71,
+        0,
+        70,
+        4,
+        0,
+        62
+      ],
+      [
+        122559,
+        73,
+        0,
+        72,
+        4,
+        0,
+        62
+      ],
+      [
+        122811,
+        66,
+        0,
+        66,
+        4,
+        0,
+        57
+      ],
+      [
+        123087,
+        100,
+        0,
+        99,
+        2,
+        1,
+        91
+      ],
+      [
+        123266,
+        72,
+        0,
+        72,
+        3,
+        0,
+        63
+      ],
+      [
+        123312,
+        50,
+        2,
+        48,
+        4,
+        0,
+        36
+      ],
+      [
+        123523,
+        52,
+        0,
+        51,
+        2,
+        0,
+        43
+      ],
+      [
+        124052,
+        315,
+        0,
+        314,
+        3,
+        0,
+        306
+      ],
+      [
+        124333,
+        92,
+        0,
+        92,
+        4,
+        1,
+        83
+      ],
+      [
+        125088,
+        649,
+        1,
+        647,
+        5,
+        0,
+        639
+      ],
+      [
+        125220,
+        50,
+        1,
+        48,
+        2,
+        0,
+        39
+      ],
+      [
+        125309,
+        73,
+        1,
+        72,
+        4,
+        0,
+        64
+      ],
+      [
+        125562,
+        74,
+        0,
+        73,
+        4,
+        0,
+        64
+      ],
+      [
+        125812,
+        75,
+        0,
+        75,
+        3,
+        0,
+        66
+      ],
+      [
+        126098,
+        111,
+        1,
+        109,
+        6,
+        0,
+        101
+      ],
+      [
+        126210,
+        55,
+        0,
+        54,
+        3,
+        0,
+        45
+      ],
+      [
+        126322,
+        82,
+        0,
+        81,
+        4,
+        0,
+        73
+      ],
+      [
+        126575,
+        78,
+        0,
+        77,
+        2,
+        0,
+        68
+      ],
+      [
+        126671,
+        53,
+        0,
+        53,
+        3,
+        0,
+        43
+      ],
+      [
+        126843,
+        52,
+        12,
+        39,
+        2,
+        1,
+        22
+      ],
+      [
+        126947,
+        59,
+        1,
+        58,
+        3,
+        0,
+        45
+      ],
+      [
+        126954,
+        50,
+        0,
+        49,
+        2,
+        0,
+        7
+      ],
+      [
+        127174,
+        53,
+        5,
+        47,
+        3,
+        0,
+        36
+      ]
+    ],
+    "slow_event_retained": 83,
+    "slow_event_capacity": 128,
+    "slow_event_retained_marked": 19,
+    "slow_event_capacity_marked": 64,
+    "slow_event_retained_recent": 64,
+    "slow_event_capacity_recent": 64,
+    "audio": {
+      "packets": 25304,
+      "lost_packets": 197,
+      "pcm_bytes": 24361920,
+      "write_errors": 0,
+      "stale_drops": 1761,
+      "queue_depth": 6,
+      "max_queue_depth": 8,
+      "track_buffer_frames": 960,
+      "buffered_ms": 11,
+      "underruns": 257,
+      "low_latency_mode": true,
+      "concealed_loss_packets": 52,
+      "concealed_underruns": 1780,
+      "prolonged_starvation_events": 181,
+      "smooth_latency_trims": 1761,
+      "crossfaded_packets": 1232,
+      "max_queue_residence_ms": 52,
+      "avg_queue_residence_ms": 26.83977334223239,
+      "queue_target_packets": 3,
+      "queue_capacity_packets": 8,
+      "startup_prefill_ms": 101
+    },
+    "controller": {
+      "packets_sent": 54674,
+      "send_errors": 2,
+      "motion_events": 0
+    }
+  }
+}

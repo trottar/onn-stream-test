@@ -1,0 +1,16 @@
+per-minute loss, session A: [4, 2, 214, 8, 123, 180, 121, 0, 84, 89, 188, 115, 272, 17, 90, 0, 242, 331, 148, 2]
+per-minute loss, session B: [12, 30, 212, 3, 94, 173, 135, 4, 103, 80, 162, 121, 204, 0, 72, 2, 183, 251, 185, 14]
+A vs B: pearson 0.964  spearman 0.913  n=20
+forward gaps A vs B: pearson 0.783  spearman 0.807
+
+session A: mean encoded rate 6903..6957 kbps over 20 minutes
+  mean rate vs loss:  pearson -0.192
+
+session B: mean encoded rate 6901..6954 kbps over 20 minutes
+  mean rate vs loss:  pearson -0.313
+
+pooled n=40
+  loss vs peak 0.5 s rate : pearson 0.331  spearman 0.384
+  loss vs 0.5 s rate sd   : pearson 0.396  spearman 0.351
+  forward gaps vs sd      : pearson 0.519  spearman 0.451
+  burstiness is itself reproducible: sd A vs B pearson 0.911

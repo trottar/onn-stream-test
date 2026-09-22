@@ -15,7 +15,7 @@ import threading
 import time
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 class NativeSessionIOError(RuntimeError):
@@ -1585,6 +1585,15 @@ class NativeControllerBridge:
         ]
         self._meta_lock = threading.RLock()
 
+        # D-BASE-R3: the host's own evidence that the client is gone. The
+        # receive loop already wakes every 50 ms and already measures
+        # per-player silence in order to neutralize inputs; this rides on
+        # that and reports the first crossing of the recovery threshold.
+        self._last_any_packet_at = 0.0
+        self._silence_callback: Callable[[float], None] | None = None
+        self._silence_threshold_s = 1.0
+        self._silence_reported = False
+
     @staticmethod
     def _selected_backend() -> str:
         if os.name == "nt":
@@ -1817,6 +1826,30 @@ class NativeControllerBridge:
         self._evdev = None
 
     # PrivyHub Phase A3 persistent game-session controller
+    # D-BASE-R3 accessors. The callback fires once per silence episode, from
+    # the receive loop, and is re-armed by the next packet.
+    def set_client_silence_callback(
+        self,
+        callback: "Callable[[float], None] | None",
+        threshold_ms: float,
+    ) -> None:
+        self._silence_callback = callback
+        self._silence_threshold_s = max(
+            0.05,
+            float(threshold_ms) / 1000.0,
+        )
+
+    def last_client_packet_age_ms(self) -> float | None:
+        last = self._last_any_packet_at
+
+        if last <= 0.0:
+            return None
+
+        return max(
+            0.0,
+            (time.monotonic() - last) * 1000.0,
+        )
+
     def ensure_started(
         self,
         client_ip: str,
@@ -1898,6 +1931,8 @@ class NativeControllerBridge:
             self._empty_report()
             for _ in range(self.MAX_PLAYERS)
         ]
+        self._last_any_packet_at = 0.0
+        self._silence_reported = False
 
         with self._meta_lock:
             self._forced_buttons = [
@@ -2295,6 +2330,31 @@ class NativeControllerBridge:
                             player
                         )
 
+                # D-BASE-R3: the client sends ~430 packets/s even with no
+                # input, so this silence means the client or the link is
+                # gone. Reported once per episode; the callback must not
+                # block this loop for long.
+                callback = self._silence_callback
+
+                if (
+                    callback is not None
+                    and not self._silence_reported
+                    and self._last_any_packet_at > 0.0
+                    and now - self._last_any_packet_at
+                    > self._silence_threshold_s
+                ):
+                    self._silence_reported = True
+
+                    try:
+                        callback(
+                            (
+                                now - self._last_any_packet_at
+                            )
+                            * 1000.0
+                        )
+                    except Exception:
+                        pass
+
                 continue
             except OSError:
                 break
@@ -2356,6 +2416,10 @@ class NativeControllerBridge:
             self._last_packet_at[player] = (
                 time.monotonic()
             )
+            self._last_any_packet_at = (
+                self._last_packet_at[player]
+            )
+            self._silence_reported = False
 
             try:
                 self._apply_report(

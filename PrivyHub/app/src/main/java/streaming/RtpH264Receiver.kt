@@ -27,13 +27,21 @@ data class FirstIdrAfterDiscontinuity(
     val resyncToIdrMs: Long,
     val auComplete: Boolean,
     val auFecRecovered: Boolean,
-    val auFecUnrecoverableGroup: Boolean
+    val auFecUnrecoverableGroup: Boolean,
+    // C5a: how many access units this particular wait threw away before it
+    // found an IDR it would accept. An IDR that lost a packet fails the
+    // completeness gate and costs a whole further GOP, which is the C5
+    // hypothesis for why an ordinary resync takes 195-332 ms where an
+    // actuator IDR takes 27.
+    val rejectedIdrAus: Long,
+    val droppedNonIdrAus: Long
 )
 
 data class NativeStreamMetrics(
     val packets: Long,
     val bytes: Long,
     val lostPackets: Long,
+    val lostPacketsInResyncs: Long,
     val frames: Long,
     val droppedFrames: Long,
     val robustMissingPackets: Long,
@@ -58,6 +66,12 @@ data class NativeStreamMetrics(
     val sequenceResyncs: Long,
     val largestResyncJumpPackets: Long,
     val packetsDroppedWaitingForIdr: Long,
+    // C5a: access units thrown away during an IDR wait, split by whether
+    // they were an IDR the completeness gate rejected or an ordinary
+    // non-IDR frame. `packetsDroppedWaitingForIdr` counts packets and
+    // cannot tell the two apart.
+    val idrAusRejectedWaitingForIdr: Long,
+    val nonIdrAusDroppedWaitingForIdr: Long,
     val resyncToIdrMs: Long,
     val maxResyncToIdrMs: Long,
     val firstCleanIdrMs: Long,
@@ -164,6 +178,9 @@ class RtpH264Receiver(
     private val lostPackets =
         AtomicLong(0)
 
+    private val lostPacketsInResyncs =
+        AtomicLong(0)
+
     private val frames =
         AtomicLong(0)
 
@@ -232,6 +249,19 @@ class RtpH264Receiver(
 
     private val largestResyncJumpPackets =
         AtomicLong(0)
+
+    // C5a session totals.
+    private val idrAusRejectedWaitingForIdr =
+        AtomicLong(0)
+
+    private val nonIdrAusDroppedWaitingForIdr =
+        AtomicLong(0)
+
+    // C5a per-episode, reset at each discontinuity and read when the wait
+    // ends. Touched only from the receive loop, so no atomics are needed.
+    private var episodeRejectedIdrAus = 0L
+
+    private var episodeDroppedNonIdrAus = 0L
 
     private val packetsDroppedWaitingForIdr =
         AtomicLong(0)
@@ -434,6 +464,8 @@ class RtpH264Receiver(
                 bytes.get(),
             lostPackets =
                 lostPackets.get(),
+            lostPacketsInResyncs =
+                lostPacketsInResyncs.get(),
             frames =
                 frames.get(),
             droppedFrames =
@@ -480,6 +512,10 @@ class RtpH264Receiver(
                 sequenceResyncs.get(),
             largestResyncJumpPackets =
                 largestResyncJumpPackets.get(),
+            idrAusRejectedWaitingForIdr =
+                idrAusRejectedWaitingForIdr.get(),
+            nonIdrAusDroppedWaitingForIdr =
+                nonIdrAusDroppedWaitingForIdr.get(),
             packetsDroppedWaitingForIdr =
                 packetsDroppedWaitingForIdr.get(),
             resyncToIdrMs =
@@ -867,6 +903,24 @@ class RtpH264Receiver(
             jumpPackets
         )
 
+        // A2.2 (2026-09-20): a forward jump large enough to resync is
+        // packets that never arrived. Count it as loss, and keep the
+        // resync share separately so pre-fix reports stay comparable.
+        if (
+            jumpPackets >
+            0L
+        ) {
+            lostPackets
+                .addAndGet(
+                    jumpPackets
+                )
+
+            lostPacketsInResyncs
+                .addAndGet(
+                    jumpPackets
+                )
+        }
+
         recordDiscontinuity(
             nowNs =
                 nowNs,
@@ -929,6 +983,12 @@ class RtpH264Receiver(
 
         waitingForIdr =
             true
+
+        episodeRejectedIdrAus =
+            0L
+
+        episodeDroppedNonIdrAus =
+            0L
 
         resyncStartedNs =
             nowNs
@@ -2110,6 +2170,13 @@ class RtpH264Receiver(
                         .addAndGet(
                             currentAccessUnitPacketCount
                         )
+
+                    // C5a
+                    nonIdrAusDroppedWaitingForIdr
+                        .incrementAndGet()
+
+                    episodeDroppedNonIdrAus +=
+                        1L
                 } else {
                     if (
                         waitingForIdr &&
@@ -2146,6 +2213,36 @@ class RtpH264Receiver(
                         .addAndGet(
                             currentAccessUnitPacketCount
                         )
+
+                    // C5a. The completeness gate above runs before the IDR
+                    // check, so this AU was discarded without anyone asking
+                    // what it was. Ask now, for counting only: an IDR
+                    // rejected here costs the wait a whole further GOP, and
+                    // that is the cost C5 could not see. Nothing about
+                    // which AUs are delivered changes — this branch already
+                    // drops every one of them, corrupt IDR or not. Only
+                    // done while waiting, so the steady-state path is
+                    // untouched.
+                    if (accessUnit.size() > 0) {
+                        if (
+                            containsNalType(
+                                accessUnit.toByteArray(),
+                                5
+                            )
+                        ) {
+                            idrAusRejectedWaitingForIdr
+                                .incrementAndGet()
+
+                            episodeRejectedIdrAus +=
+                                1L
+                        } else {
+                            nonIdrAusDroppedWaitingForIdr
+                                .incrementAndGet()
+
+                            episodeDroppedNonIdrAus +=
+                                1L
+                        }
+                    }
                 }
 
                 if (currentSequenceGap) {
@@ -2295,7 +2392,11 @@ class RtpH264Receiver(
                     auFecRecovered =
                         auFecRecovered,
                     auFecUnrecoverableGroup =
-                        auFecUnrecoverableGroup
+                        auFecUnrecoverableGroup,
+                    rejectedIdrAus =
+                        episodeRejectedIdrAus,
+                    droppedNonIdrAus =
+                        episodeDroppedNonIdrAus
                 )
 
             synchronized(idrContextLock) {

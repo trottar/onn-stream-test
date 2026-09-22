@@ -1,0 +1,346 @@
+===IWDEV===
+phy#1
+	Interface sta1
+		ifindex 16
+		wdev 0x100000003
+		addr sta-A
+		type managed
+		txpower 0.00 dBm
+		bitrate 0.0 MBit/s
+	Interface wlan1
+		ifindex 15
+		wdev 0x100000002
+		addr sta-B
+		ssid <redacted-ssid>
+		type AP
+		channel 36 (5180 MHz), width: 80 MHz, center1: 5210 MHz
+		txpower 23.00 dBm
+		bitrate 0.0 MBit/s
+		noise -90 dbm
+		channel utilization 6.6%
+phy#0
+	Interface sta0
+		ifindex 17
+		wdev 0x3
+		addr sta-C
+		type managed
+		txpower 0.00 dBm
+		bitrate 0.0 MBit/s
+	Interface wlan0
+		ifindex 14
+		wdev 0x2
+		addr sta-D
+		ssid <redacted-ssid>
+		type AP
+		channel 1 (2412 MHz), width: 40 MHz, center1: 2422 MHz
+		txpower 20.00 dBm
+		bitrate 0.0 MBit/s
+		noise -85 dbm
+		channel utilization 26.6%
+===IWINFO===
+Interface wlan1
+	ifindex 15
+	wdev 0x100000002
+	addr sta-B
+	ssid <redacted-ssid>
+	type AP
+	wiphy 1
+	channel 36 (5180 MHz), width: 80 MHz, center1: 5210 MHz
+	txpower 23.00 dBm
+	bitrate 0.0 MBit/s
+	noise -90 dbm
+	channel utilization 6.6%
+===STA0LINK===
+Not connected.
+===STA1LINK===
+Not connected.
+===IWLIST===
+Wiphy phy1
+	max # scan SSIDs: 2
+	max scan IEs length: 2304 bytes
+	max # sched scan SSIDs: 0
+	max # match sets: 0
+	max # scan plans: 1
+	max scan plan interval: -1
+	max scan plan iterations: 0
+	Retry short limit: 7
+	Retry long limit: 4
+	Coverage class: 0 (up to 0m)
+	Available Antennas: TX 0 RX 0
+	Supported interface modes:
+		 * managed
+		 * AP
+		 * AP/VLAN
+		 * monitor
+		 * P2P-client
+		 * P2P-GO
+	Band 2:
+		Capabilities: 0x9ff
+			RX LDPC
+			HT20/HT40
+			SM Power Save disabled
+			RX Greenfield
+			RX HT20 SGI
+			RX HT40 SGI
+			TX STBC
+			RX STBC 1-stream
+			Max AMSDU length: 7935 bytes
+			No DSSS/CCK HT40
+		Maximum RX AMPDU length 65535 bytes (exponent: 0x003)
+		Minimum RX AMPDU time spacing: 16 usec (0x07)
+		HT Max RX data rate: 300 Mbps
+		HT TX/RX MCS rate indexes supported: 0-15, 32
+		VHT Capabilities (0x038001b1):
+			Max MPDU length: 7991
+			Supported Channel Width: neither 160 nor 80+80
+			RX LDPC
+			short GI (80 MHz)
+			TX STBC
+		VHT RX MCS set:
+			1 streams: MCS 0-9
+			2 streams: MCS 0-9
+			3 streams: not supported
+			4 streams: not supported
+			5 streams: not supported
+			6 streams: not supported
+			7 streams: not supported
+			8 streams: not supported
+		VHT RX highest supported: 780 Mbps
+		VHT TX MCS set:
+			1 streams: MCS 0-9
+			2 streams: MCS 0-9
+			3 streams: not supported
+			4 streams: not supported
+			5 streams: not supported
+			6 streams: not supported
+			7 streams: not supported
+			8 streams: not supported
+		VHT TX highest supported: 780 Mbps
+		Frequencies:
+			* 5180 MHz [36] (23.0 dBm)
+			* 5200 MHz [40] (23.0 dBm)
+			* 5220 MHz [44] (23.0 dBm)
+			* 5240 MHz [48] (23.0 dBm)
+			* 5260 MHz [52] (23.0 dBm) (radar detection)
+			* 5280 MHz [56] (23.0 dBm) (radar detection)
+			* 5300 MHz [60] (23.0 dBm) (radar detection)
+			* 5320 MHz [64] (23.0 dBm) (radar detection)
+			* 5500 MHz [100] (23.0 dBm) (radar detection)
+			* 5520 MHz [104] (23.0 dBm) (radar detection)
+			* 5540 MHz [108] (23.0 dBm) (radar detection)
+			* 5560 MHz [112] (23.0 dBm) (radar detection)
+			* 5580 MHz [116] (23.0 dBm) (radar detection)
+			* 5600 MHz [120] (23.0 dBm) (radar detection)
+			* 5620 MHz [124] (23.0 dBm) (radar detection)
+			* 5640 MHz [128] (23.0 dBm) (radar detection)
+			* 5660 MHz [132] (23.0 dBm) (radar detection)
+			* 5680 MHz [136] (23.0 dBm) (radar detection)
+			* 5700 MHz [140] (23.0 dBm) (radar detection)
+			* 5720 MHz [144] (23.0 dBm) (radar detection)
+			* 5745 MHz [149] (25.0 dBm)
+			* 5765 MHz [153] (25.0 dBm)
+			* 5785 MHz [157] (25.0 dBm)
+			* 5805 MHz [161] (25.0 dBm)
+			* 5825 MHz [165] (25.0 dBm)
+	valid interface combinations:
+		 * #{ managed, AP } <= 4,
+		   total <= 4, #channels <= 3
+		 * #{ AP } <= 4,
+		   total <= 4, #channels <= 1, radar detect widths: { 20 MHz (no HT), 20 MHz, 40 MHz, 80 MHz }
+
+===UCI===
+wireless.radio0=wifi-device
+wireless.radio0.type='mac80211'
+wireless.radio0.txpower='20'
+wireless.radio0.txpower_max='20'
+wireless.radio0.channel='auto'
+wireless.radio0.band='2g'
+wireless.radio0.hwmode='11g'
+wireless.radio0.noscan='0'
+wireless.radio0.netisolate='0'
+wireless.radio0.max_all_num_sta='64'
+wireless.radio0.path='platform/11000000.wifi-lb'
+wireless.radio0.htmode='HT40'
+wireless.radio0.disabled='0'
+wireless.radio0.country='US'
+wireless.radio0.legacy_rates='0'
+wireless.radio0.random_bssid='<redacted-ssid>'
+wireless.default_radio0=wifi-iface
+wireless.default_radio0.device='radio0'
+wireless.default_radio0.network='lan'
+wireless.default_radio0.mode='ap'
+wireless.default_radio0.hidden='0'
+wireless.default_radio0.ifname='wlan0'
+wireless.default_radio0.wpa_group_rekey='<redacted-secret>'
+wireless.default_radio0.isolate='0'
+wireless.default_radio0.group='1'
+wireless.default_radio0.disable_input='0'
+wireless.default_radio0.wps_pushbutton='1'
+wireless.default_radio0.wps_label='0'
+wireless.default_radio0.encryption='psk2'
+wireless.default_radio0.wds='1'
+wireless.default_radio0.ssid='<redacted-ssid>'
+wireless.default_radio0.key='<redacted-secret>'
+wireless.default_radio0.macaddr='sta-D'
+wireless.radio1=wifi-device
+wireless.radio1.type='mac80211'
+wireless.radio1.txpower='25'
+wireless.radio1.txpower_max='25'
+wireless.radio1.channel='auto'
+wireless.radio1.band='5g'
+wireless.radio1.hwmode='11a'
+wireless.radio1.noscan='0'
+wireless.radio1.netisolate='0'
+wireless.radio1.max_all_num_sta='64'
+wireless.radio1.path='platform/17800000.wifi-hb'
+wireless.radio1.htmode='VHT80'
+wireless.radio1.disabled='0'
+wireless.radio1.acs_noradar='1'
+wireless.radio1.country='US'
+wireless.radio1.legacy_rates='0'
+wireless.radio1.channels='36,40,44,48,149,153,157,161'
+wireless.radio1.random_bssid='<redacted-ssid>'
+wireless.default_radio1=wifi-iface
+wireless.default_radio1.device='radio1'
+wireless.default_radio1.network='lan'
+wireless.default_radio1.mode='ap'
+wireless.default_radio1.hidden='0'
+wireless.default_radio1.ifname='wlan1'
+wireless.default_radio1.wpa_group_rekey='<redacted-secret>'
+wireless.default_radio1.isolate='0'
+wireless.default_radio1.group='1'
+wireless.default_radio1.disable_input='0'
+wireless.default_radio1.wps_pushbutton='1'
+wireless.default_radio1.wps_label='0'
+wireless.default_radio1.encryption='psk2'
+wireless.default_radio1.wds='1'
+wireless.default_radio1.ssid='<redacted-ssid>'
+wireless.default_radio1.key='<redacted-secret>'
+wireless.default_radio1.macaddr='sta-B'
+wireless.guest2g=wifi-iface
+wireless.guest2g.device='radio0'
+wireless.guest2g.network='guest'
+wireless.guest2g.mode='ap'
+wireless.guest2g.ifname='wlan2'
+wireless.guest2g.encryption='psk2'
+wireless.guest2g.key='<redacted-secret>'
+wireless.guest2g.ssid='<redacted-ssid>'
+wireless.guest2g.guest='1'
+wireless.guest2g.disabled='1'
+wireless.guest2g.wds='1'
+wireless.guest2g.isolate='1'
+wireless.guest2g.macaddr='sta-E'
+wireless.guest5g=wifi-iface
+wireless.guest5g.device='radio1'
+wireless.guest5g.network='guest'
+wireless.guest5g.mode='ap'
+wireless.guest5g.ifname='wlan3'
+wireless.guest5g.encryption='psk2'
+wireless.guest5g.key='<redacted-secret>'
+wireless.guest5g.ssid='<redacted-ssid>'
+wireless.guest5g.guest='1'
+wireless.guest5g.disabled='1'
+wireless.guest5g.wds='1'
+wireless.guest5g.isolate='1'
+wireless.guest5g.macaddr='sta-F'
+===SURVEY===
+Survey data from wlan1
+	frequency:			5180 MHz [in use]
+	noise:				-90 dBm
+	channel active time:		30 ms
+	channel busy time:		2 ms
+Survey data from wlan1
+	frequency:			5200 MHz
+Survey data from wlan1
+	frequency:			5220 MHz
+Survey data from wlan1
+	frequency:			5240 MHz
+Survey data from wlan1
+	frequency:			5260 MHz
+Survey data from wlan1
+	frequency:			5280 MHz
+Survey data from wlan1
+	frequency:			5300 MHz
+Survey data from wlan1
+	frequency:			5320 MHz
+Survey data from wlan1
+	frequency:			5500 MHz
+Survey data from wlan1
+	frequency:			5520 MHz
+Survey data from wlan1
+	frequency:			5540 MHz
+Survey data from wlan1
+	frequency:			5560 MHz
+Survey data from wlan1
+	frequency:			5580 MHz
+Survey data from wlan1
+	frequency:			5600 MHz
+Survey data from wlan1
+	frequency:			5620 MHz
+Survey data from wlan1
+	frequency:			5640 MHz
+Survey data from wlan1
+	frequency:			5660 MHz
+Survey data from wlan1
+	frequency:			5680 MHz
+Survey data from wlan1
+	frequency:			5700 MHz
+Survey data from wlan1
+	frequency:			5720 MHz
+Survey data from wlan1
+	frequency:			5745 MHz
+Survey data from wlan1
+	frequency:			5765 MHz
+Survey data from wlan1
+	frequency:			5785 MHz
+Survey data from wlan1
+	frequency:			5805 MHz
+Survey data from wlan1
+	frequency:			5825 MHz
+===STATION===
+Station sta-G (on wlan1)
+	inactive time:	0 ms
+	rx bytes:	1569210387
+	rx packets:	22834259
+	tx bytes:	64622744538
+	tx packets:	59237075
+	tx retries:	6900664
+	tx failed:	6910906
+	rx drop misc:	0
+	signal:  	-73 [-56, -86] dBm
+	signal avg:	-76 dBm
+	tx bitrate:	65.1 MBit/s VHT-MCS 0 80MHz short GI VHT-NSS 2
+	rx bitrate:	234.0 MBit/s VHT-MCS 5 80MHz VHT-NSS 1
+	expected throughput:	77.636Mbps
+	authorized:	yes
+	authenticated:	yes
+	associated:	yes
+	preamble:	short
+	WMM/WME:	yes
+	MFP:		no
+	TDLS peer:	no
+	DTIM period:	2
+	beacon interval:100
+	connected time:	149098 seconds
+===IWINFOBIN===
+wlan1     ESSID: "<redacted-ssid>"
+          Access Point: sta-B
+          Mode: Master  Channel: 36 (5.180 GHz) HT Mode: VHT80
+          Tx-Power: 23 dBm  Link Quality: 36/70
+          Signal: -74 dBm  Noise: -89 dBm
+          Bit Rate: 65.1 MBit/s
+          Encryption: WPA2 PSK (CCMP)
+          Type: nl80211  HW Mode(s): 802.11nac
+          Hardware: unknown [Generic MAC80211]
+          TX power offset: unknown
+          Frequency offset: unknown
+          Supports VAPs: yes  PHY name: phy1
+sta-G  -75 dBm / -89 dBm (SNR 14)  0 ms ago
+	RX: 175.5 MBit/s, VHT-MCS 4, 80MHz, VHT-NSS 1  22834288 Pkts.
+	TX: 65.1 MBit/s, VHT-MCS 0, 80MHz, VHT-NSS 2  59237099 Pkts.
+	expected throughput: 11.4 MBit/s
+
+===LOAD===
+1.21 1.12 1.10 1/101 9720
+ 02:37:32 up 2 days,  6:28,  load average: 1.20, 1.12, 1.10
+Tue Sep 22 06:37:32 UTC 2026

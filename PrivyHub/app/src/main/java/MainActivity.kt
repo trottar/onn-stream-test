@@ -91,6 +91,12 @@ class MainActivity : AppCompatActivity() {
     // PrivyHub A2/A3 patch 01: persistent paused game-session banner.
     // PrivyHub A3 patch 11v2: frozen gameplay banner frame.
     private var gameSessionActive = false
+
+    // D-BASE-R3: the recovery-save prompt is shown once per
+    // saved_at value, so a poll every few seconds does not reopen it.
+    private var recoveryPromptShownFor: String? = null
+
+    private var recoveryPromptVisible = false
     private var gameSessionPaused = false
     private var gameSessionTitle: String? = null
 
@@ -243,6 +249,19 @@ class MainActivity : AppCompatActivity() {
 
         private const val CONTROL_PORT =
             8765
+
+        // D-BASE-R2: consecutive companion-unreachable poll failures
+        // tolerated before the game-session banner is cleared. Two retries
+        // 350 ms apart absorb an ordinary blip; beyond that the banner is
+        // asserting a session nothing can confirm.
+        private const val UNREACHABLE_RETRIES =
+            2
+
+        private const val UNREACHABLE_RETRY_DELAY_MS =
+            350L
+
+        private const val UNREACHABLE_STATUS_TEXT =
+            "Companion unreachable"
 
         private const val DEFAULT_MEDIA_PORT =
             8000
@@ -8774,6 +8793,25 @@ class MainActivity : AppCompatActivity() {
                     gameSessionTitle
                         ?: "Game"
                 )
+
+                // D-BASE-P1: forward the diagnostic stale-output threshold
+                // when the launcher was itself started with one. Absent —
+                // every product launch — nothing is put and the decoder
+                // uses its 60 ms default.
+                val requestedStaleMs =
+                    intent.getIntExtra(
+                        NativeStreamActivity
+                            .EXTRA_STALE_OUTPUT_MS,
+                        0
+                    )
+
+                if (requestedStaleMs > 0) {
+                    putExtra(
+                        NativeStreamActivity
+                            .EXTRA_STALE_OUTPUT_MS,
+                        requestedStaleMs
+                    )
+                }
             }
         )
     }
@@ -12160,6 +12198,337 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    // ------------------------------------------------------------------
+    // D-BASE-R3: the recovery-save prompt.
+    //
+    // The stream was lost, the host gave up waiting and saved the game to
+    // its own file — never one of the three player slots. The user is asked
+    // on return, not during the outage, and the copy option writes a slot
+    // through the same path a manual save uses, occupied-slot confirmation
+    // included.
+    // ------------------------------------------------------------------
+
+    private fun maybeShowRecoveryPrompt(
+        recovery: JSONObject?
+    ) {
+
+        if (recovery == null) {
+            return
+        }
+
+        if (
+            !recovery.optBoolean(
+                "save_available",
+                false
+            )
+        ) {
+            recoveryPromptShownFor = null
+            return
+        }
+
+        val savedAt =
+            recovery.optString(
+                "saved_at",
+                ""
+            )
+
+        val key =
+            savedAt.ifBlank {
+                recovery.optString(
+                    "save_game_title",
+                    "recovery"
+                )
+            }
+
+        if (
+            recoveryPromptVisible ||
+            recoveryPromptShownFor == key
+        ) {
+            return
+        }
+
+        recoveryPromptShownFor = key
+        recoveryPromptVisible = true
+
+        showRecoveryPrompt(
+            savedAt = savedAt,
+            title =
+                recovery.optString(
+                    "save_game_title",
+                    "your game"
+                )
+        )
+    }
+
+
+    private fun formatRecoveryTime(
+        savedAt: String
+    ): String {
+
+        // The companion sends UTC ISO-8601. Show local wall-clock time; if
+        // it cannot be parsed, say nothing rather than something wrong.
+        if (savedAt.isBlank()) {
+            return ""
+        }
+
+        return try {
+            val parsed =
+                java.text.SimpleDateFormat(
+                    "yyyy-MM-dd'T'HH:mm:ss",
+                    java.util.Locale.US
+                ).apply {
+                    timeZone =
+                        java.util.TimeZone.getTimeZone("UTC")
+                }.parse(
+                    savedAt.take(19)
+                )
+
+            if (parsed == null) {
+                ""
+            } else {
+                java.text.SimpleDateFormat(
+                    "HH:mm",
+                    java.util.Locale.US
+                ).format(parsed)
+            }
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+
+    private fun showRecoveryPrompt(
+        savedAt: String,
+        title: String
+    ) {
+
+        val whenText =
+            formatRecoveryTime(savedAt)
+
+        val message =
+            if (whenText.isBlank()) {
+                "The stream was lost and $title was saved automatically."
+            } else {
+                "The stream was lost at $whenText and $title was saved " +
+                    "automatically."
+            }
+
+        val options =
+            arrayOf(
+                "Resume from recovery save",
+                "Copy to slot 1",
+                "Copy to slot 2",
+                "Copy to slot 3",
+                "Discard"
+            )
+
+        // setMessage and setItems cannot both render in an AlertDialog —
+        // the message wins and the list disappears. The sentence therefore
+        // goes into a custom title view above the five options.
+        val header =
+            androidx.appcompat.widget.LinearLayoutCompat(this).apply {
+                orientation =
+                    androidx.appcompat.widget.LinearLayoutCompat.VERTICAL
+                setPadding(
+                    48,
+                    40,
+                    48,
+                    8
+                )
+
+                addView(
+                    TextView(context).apply {
+                        text =
+                            "Recovery Save"
+                        textSize =
+                            20f
+                    }
+                )
+
+                addView(
+                    TextView(context).apply {
+                        text =
+                            message
+                        textSize =
+                            15f
+                        setPadding(
+                            0,
+                            12,
+                            0,
+                            0
+                        )
+                    }
+                )
+            }
+
+        AlertDialog.Builder(this)
+            .setCustomTitle(
+                header
+            )
+            .setItems(
+                options
+            ) { _, which ->
+
+                recoveryPromptVisible = false
+
+                when (which) {
+                    0 -> requestRecoveryAction(
+                        action = "recovery-resume"
+                    )
+
+                    1, 2, 3 -> requestRecoveryAction(
+                        action = "recovery-copy",
+                        slot = which
+                    )
+
+                    else -> requestRecoveryAction(
+                        action = "recovery-discard"
+                    )
+                }
+            }
+            .setNegativeButton(
+                "Not now"
+            ) { _, _ ->
+                recoveryPromptVisible = false
+            }
+            .setOnCancelListener {
+                recoveryPromptVisible = false
+            }
+            .show()
+    }
+
+
+    private fun requestRecoveryAction(
+        action: String,
+        slot: Int = 0,
+        replace: Boolean = false
+    ) {
+
+        val host =
+            getCompanionHost()
+
+        if (host.isBlank()) {
+            showCompanionSettings()
+            return
+        }
+
+        statusText.text =
+            when (action) {
+                "recovery-resume" ->
+                    "Loading recovery save..."
+
+                "recovery-copy" ->
+                    "Copying recovery save to slot $slot..."
+
+                else ->
+                    "Discarding recovery save..."
+            }
+
+        val query =
+            when (action) {
+                "recovery-copy" ->
+                    "?slot=$slot" +
+                        if (replace) "&replace=true" else ""
+
+                else ->
+                    ""
+            }
+
+        networkExecutor.execute {
+
+            try {
+
+                httpPost(
+                    "http://$host:$CONTROL_PORT" +
+                        "/plugins/games/$action$query"
+                )
+
+                runOnUiThread {
+                    statusText.text =
+                        when (action) {
+                            "recovery-resume" ->
+                                "Recovery save loaded"
+
+                            "recovery-copy" ->
+                                "Recovery save copied to slot $slot"
+
+                            else ->
+                                "Recovery save discarded"
+                        }
+
+                    if (action != "recovery-resume") {
+                        recoveryPromptShownFor = null
+                    }
+
+                    refreshCurrentGameLibraryView()
+                }
+
+            } catch (error: Exception) {
+
+                val replacementRequired =
+                    action == "recovery-copy" &&
+                        !replace &&
+                        error.message
+                            ?.contains(
+                                "explicit replacement confirmation is required",
+                                ignoreCase = true
+                            ) == true
+
+                runOnUiThread {
+
+                    if (replacementRequired) {
+
+                        statusText.text =
+                            "Profile save slot $slot is occupied"
+
+                        AlertDialog.Builder(this)
+                            .setTitle("Replace Profile Save?")
+                            .setMessage(
+                                "Slot $slot already contains a save.\n\n" +
+                                    "Replace this slot completely?"
+                            )
+                            .setPositiveButton(
+                                "Replace Completely"
+                            ) { _, _ ->
+                                requestRecoveryAction(
+                                    action = action,
+                                    slot = slot,
+                                    replace = true
+                                )
+                            }
+                            .setNegativeButton(
+                                "Cancel",
+                                null
+                            )
+                            .show()
+
+                        return@runOnUiThread
+                    }
+
+                    statusText.text =
+                        "Recovery save action failed"
+
+                    AlertDialog.Builder(this)
+                        .setTitle(
+                            "Recovery Save"
+                        )
+                        .setMessage(
+                            sanitizeGameNetworkError(
+                                error,
+                                host
+                            )
+                        )
+                        .setPositiveButton(
+                            "OK",
+                            null
+                        )
+                        .show()
+                }
+            }
+        }
+    }
+
+
     private fun showGameSessionBanner(
         title: String,
         paused: Boolean
@@ -12199,8 +12568,17 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    // D-BASE-R2 piece 3. `retry` paces the success-side re-poll while a
+    // session is unpausing; `unreachableRetry` is separate and counts
+    // consecutive failures to reach the companion. A failed poll used to be
+    // swallowed, which left "NOW PLAYING" on screen indefinitely once the
+    // companion was gone — the state the first autonomous teardown left the
+    // onn in. After UNREACHABLE_RETRIES attempts the banner is cleared and
+    // the status line says so, rather than showing a session that cannot be
+    // confirmed.
     private fun refreshGameSessionBanner(
-        retry: Int = 0
+        retry: Int = 0,
+        unreachableRetry: Int = 0
     ) {
 
         val host =
@@ -12244,7 +12622,28 @@ class MainActivity : AppCompatActivity() {
                         )
                         ?: "Game"
 
+                val recovery =
+                    json.optJSONObject(
+                        "recovery"
+                    )
+
                 runOnUiThread {
+
+                    maybeShowRecoveryPrompt(
+                        recovery
+                    )
+
+                    // A reachable companion retires the unreachable
+                    // notice; nothing else rewrites this line, so without
+                    // this it would stand for the rest of the session and
+                    // be its own stale assertion.
+                    if (
+                        statusText.text.toString() ==
+                        UNREACHABLE_STATUS_TEXT
+                    ) {
+                        statusText.text =
+                            "Connected: $host"
+                    }
 
                     if (active) {
 
@@ -12261,7 +12660,8 @@ class MainActivity : AppCompatActivity() {
                             playbackUiHandler.postDelayed(
                                 {
                                     refreshGameSessionBanner(
-                                        retry + 1
+                                        retry + 1,
+                                        0
                                     )
                                 },
                                 350L
@@ -12276,12 +12676,38 @@ class MainActivity : AppCompatActivity() {
 
             } catch (error: Exception) {
 
-                if (retry == 0) {
+                if (retry == 0 && unreachableRetry == 0) {
                     Log.d(
                         TAG,
                         "Game-session refresh unavailable",
                         error
                     )
+                }
+
+                runOnUiThread {
+
+                    if (
+                        unreachableRetry <
+                        UNREACHABLE_RETRIES
+                    ) {
+
+                        playbackUiHandler.postDelayed(
+                            {
+                                refreshGameSessionBanner(
+                                    retry,
+                                    unreachableRetry + 1
+                                )
+                            },
+                            UNREACHABLE_RETRY_DELAY_MS
+                        )
+
+                    } else {
+
+                        clearGameSessionBanner()
+
+                        statusText.text =
+                            UNREACHABLE_STATUS_TEXT
+                    }
                 }
             }
         }

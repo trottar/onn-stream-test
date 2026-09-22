@@ -1,0 +1,276 @@
+{
+  "ok": true,
+  "kind": "game_session",
+  "title": "Game Session",
+  "active": true,
+  "paused": true,
+  "host_window_policy": {
+    "mode": "background_nonintrusive",
+    "supported": false,
+    "applied": false,
+    "window_found": false,
+    "sent_to_bottom": false,
+    "foreground_restore_attempted": false,
+    "foreground_restored": false,
+    "retroarch_iconic": false,
+    "error": "not_windows"
+  },
+  "ready": true,
+  "retroarch_installed": true,
+  "retroarch_configured": true,
+  "missing_cores": [],
+  "cores": {
+    "nes": {
+      "name": "NES",
+      "core": "fceumm_libretro.so",
+      "installed": true
+    },
+    "snes": {
+      "name": "SNES",
+      "core": "bsnes_libretro.so",
+      "installed": true
+    },
+    "genesis": {
+      "name": "Genesis",
+      "core": "blastem_libretro.so",
+      "installed": true
+    },
+    "ps1": {
+      "name": "PlayStation",
+      "core": "mednafen_psx_hw_libretro.so",
+      "installed": true
+    }
+  },
+  "runtime_error": null,
+  "game": {
+    "id": "game_ps1_b0a5986638f61a11",
+    "title": "Tekken 3 (USA)",
+    "system": "ps1",
+    "system_name": "PlayStation"
+  },
+  "pid": 456784,
+  "elapsed_seconds": 10838,
+  "save_state_slots": [
+    1,
+    2,
+    3
+  ],
+  "save_state_slot_details": [
+    {
+      "slot": 1,
+      "game_key": "ps1::games/ps1/tekken 3 (usa).cue",
+      "game_title": "Tekken 3 (USA)",
+      "game_system": "ps1",
+      "game_relative_path": "games/ps1/Tekken 3 (USA).cue",
+      "exists": false,
+      "ambiguous": false,
+      "source": "legacy_discovery"
+    },
+    {
+      "slot": 2,
+      "game_key": "ps1::games/ps1/tekken 3 (usa).cue",
+      "game_title": "Tekken 3 (USA)",
+      "game_system": "ps1",
+      "game_relative_path": "games/ps1/Tekken 3 (USA).cue",
+      "exists": false,
+      "ambiguous": false,
+      "source": "legacy_discovery"
+    },
+    {
+      "slot": 3,
+      "game_key": "ps1::games/ps1/tekken 3 (usa).cue",
+      "game_title": "Tekken 3 (USA)",
+      "game_system": "ps1",
+      "game_relative_path": "games/ps1/Tekken 3 (USA).cue",
+      "exists": false,
+      "ambiguous": false,
+      "source": "legacy_discovery"
+    }
+  ],
+  "cheat_session": null,
+  "mod_session": null,
+  "message": "A PrivyHub-managed game is running on the companion.",
+  "native_stream": {
+    "ok": true,
+    "kind": "native_stream_host",
+    "alpha_version": "0.7",
+    "profile_id": "native_game_720p60_reference",
+    "profile": {
+      "id": "native_game_720p60_reference",
+      "width": 1280,
+      "height": 720,
+      "fps": 60,
+      "bitrate_kbps": 7000,
+      "max_bitrate_kbps": 7000,
+      "gop_frames": 15,
+      "bframes": 0,
+      "fec_group_size": 8
+    },
+    "title": "Native Streaming Alpha",
+    "ready": true,
+    "active": false,
+    "managed": false,
+    "capture_backend": "x11grab_window",
+    "encoder": "h264_vaapi",
+    "transport": "rtp_udp_xor_fec",
+    "fec": {
+      "enabled": true,
+      "running": false,
+      "version": "xor8_1",
+      "group_size": 8,
+      "local_port": 48110,
+      "rtp_packets": 8847659,
+      "rtp_bytes": 9569134803,
+      "parity_packets": 1435002,
+      "parity_bytes": 1630204815,
+      "groups": 1435002,
+      "skipped_packets": 323,
+      "send_errors": 0,
+      "send_calls": 10282661,
+      "sent_bytes": 11199339618,
+      "send_call_total_us": 126411962.456,
+      "send_call_max_us": 2581.992
+    },
+    "host_telemetry": {
+      "version": "0.15",
+      "active": false,
+      "sample_interval_seconds": 2.0,
+      "samples": 0,
+      "path": "",
+      "error": ""
+    },
+    "fec_enabled": true,
+    "fec_group_size": 8,
+    "source_bitrate_kbps": 7000,
+    "reference_bitrate_kbps": 7000,
+    "width": 1280,
+    "height": 720,
+    "fps": 60,
+    "gop_frames": 15,
+    "bitrate_kbps": 7000,
+    "payload_type": 96,
+    "video_port": null,
+    "audio_port": 48101,
+    "input_port": 48102,
+    "audio": {
+      "active": false,
+      "device": "managed_process_audio",
+      "sample_rate": 48000,
+      "channels": 2,
+      "format": "pcm_s16le",
+      "packet_ms": 5,
+      "port": null,
+      "target_pid": null,
+      "include_process_tree": false,
+      "capture_backend": "pulseaudio_managed_sink_monitor",
+      "helper": "FFmpeg PulseAudio monitor + thread-local SCHED_RR/1 PHA1 pacer",
+      "timing_probe": "pulse_monitor_thread_rt_pacer_v0.2",
+      "audio_buffer_architecture": "pulse_monitor_accumulator_thread_rt_pacer_v0.2",
+      "packets_sent": 2162715,
+      "send_errors": 0,
+      "timing_log": "logs/games/audio_timing/audio_pulseaudio_20260921_015101.json",
+      "helper_status": {
+        "schema": "privyhub_linux_pulseaudio_v1",
+        "ready": false,
+        "backend": "pulseaudio_managed_sink_monitor",
+        "route": {
+          "managed_sink_input": null,
+          "dedicated_sink": "privyhub_native_audio_456650_456784_4c5b03c",
+          "dedicated_sink_index": null
+        },
+        "capture": {
+          "reader_bytes": 2076332356,
+          "buffered_bytes": 0,
+          "max_buffer_bytes": 155604
+        },
+        "scheduler": {
+          "native_tid": null,
+          "ready": false,
+          "policy": "",
+          "priority": 0,
+          "required_policy": "SCHED_RR",
+          "required_priority": 1,
+          "error": ""
+        },
+        "send": {
+          "packets": 2162715,
+          "errors": 0,
+          "underflows": 26,
+          "intervals": {
+            "count": 4096,
+            "avg_ms": 5.0,
+            "p95_ms": 5.053,
+            "max_ms": 8.0629,
+            "under_2ms": 1,
+            "ge_8ms": 1
+          }
+        },
+        "restore_errors": 1
+      }
+    },
+    "controller": {
+      "active": true,
+      "sink": "uinput_quad",
+      "backend": "linux_uinput",
+      "transport": "udp_full_state",
+      "poc_version": "four_player_poc_v0.1",
+      "players": 4,
+      "port": 48102,
+      "packets_received": 4670583,
+      "lost_packets": 48323,
+      "rejected_packets": 0,
+      "bad_packets": 0,
+      "updates": 4670583,
+      "updates_by_player": [
+        1168459,
+        1167769,
+        1167308,
+        1167047
+      ],
+      "vigem_updates": 4670583,
+      "vigem_updates_by_player": [
+        1168459,
+        1167769,
+        1167308,
+        1167047
+      ]
+    },
+    "ffmpeg_found": true,
+    "wgc_runtime_found": false,
+    "x11_display_found": true,
+    "x11_window_tool_found": true,
+    "vaapi_render_node_found": true,
+    "capture_target": {
+      "type": "window",
+      "process": "retroarch",
+      "pid": 456784,
+      "title": "RetroArch Beetle PSX HW 0.9.44.1 82d8e05",
+      "window_class": "",
+      "width": 879,
+      "height": 720,
+      "backend": "x11grab_window"
+    },
+    "message": "Linux native video is ready. Audio, controller output, and host telemetry remain separate Phase D migration surfaces."
+  },
+  "recovery": {
+    "state": "ENDED",
+    "since_ms": 1024,
+    "restarts": 0,
+    "last_client_seen_ms": 1805,
+    "save_available": false,
+    "saved_at": null,
+    "save_game_id": null,
+    "save_game_title": null,
+    "desync_reason": null,
+    "last_error": null,
+    "constants": {
+      "desync_ms": 1000,
+      "recovery_clean_ticks": 3,
+      "give_up_ms": 120000,
+      "end_ms": 1800000,
+      "restart_after_ms": 2000,
+      "restart_backoff_ms": 5000,
+      "restart_backoff_cap_ms": 30000
+    }
+  }
+}

@@ -11,9 +11,38 @@ MAX_REPORT_CHARS = 32_000
 SCHEMA = "privyhub_native_decoder_session_log_v1"
 
 
+def _host_thermal_c(
+    project_root: Path,
+) -> float | None:
+    """D-BASE-T1: the hottest host sensor at the moment the report lands.
+
+    Recorded beside the report rather than inside it, so a reader can see
+    both ends' temperatures — the onn's in `report.thermal`, the host's
+    here — without correlating two files. Any failure reads as None.
+    """
+
+    try:
+        import sys
+
+        sys.path.insert(
+            0,
+            str(Path(project_root) / "tools"),
+        )
+
+        from host_resource_sampler import (  # noqa: PLC0415
+            hottest_c,
+            read_hwmon,
+        )
+
+        return hottest_c(read_hwmon())
+    except Exception:
+        return None
+
+
 def write_decoder_session_log(
     project_root: Path,
     report_text: str,
+    host_extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if not report_text:
         raise ValueError(
@@ -80,6 +109,14 @@ def write_decoder_session_log(
             )
         ),
         "report": report,
+        "host": {
+            "host_thermal_c": _host_thermal_c(
+                project_root
+            ),
+            # D-BASE-P3: whichever arm this session ran in, recorded beside
+            # the report so a reader never has to infer it.
+            **(host_extra or {}),
+        },
     }
 
     temporary = path.with_suffix(

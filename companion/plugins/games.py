@@ -11,6 +11,15 @@ from urllib.parse import parse_qs, urlencode
 
 from games.emulator_manager import EmulatorError, EmulatorManager
 from games.decoder_session_log import write_decoder_session_log
+from games.native_stream_heartbeat import (
+    append_native_stream_heartbeat,
+    latest_native_stream_heartbeat,
+    loss_per_min_recent,
+)
+from games.link_drop_recovery import (
+    DESYNC_MS,
+    LinkDropRecovery,
+)
 from games.startup_reconcile import run_startup_metadata_reconcile
 from native_stream import NativeStreamError, NativeStreamManager
 
@@ -76,6 +85,42 @@ class GamesPlugin:
             self._native_stream.retroarch_hotkey
         )
 
+        # D-BASE-R3 link-drop self-recovery. Every callback goes through an
+        # existing validated path: EmulatorManager.pause()/resume() (never a
+        # raw PAUSE_TOGGLE), the C3.L1 encoder-only restart primitive, and
+        # the SAVE_STATE_SLOT 0 + copy mechanism with a non-slot destination.
+        self._recovery = LinkDropRecovery(
+            self.PROJECT_ROOT,
+            pause_game=self._emulator.pause,
+            resume_game=self._emulator.resume,
+            save_recovery_state=self._emulator.save_recovery_state,
+            restart_encoder=(
+                self._native_stream
+                .diagnostic_c3_actuator_continuity_cycle
+            ),
+            full_start_encoder=self._recovery_full_start_encoder,
+            stream_active=self._recovery_stream_active,
+            end_session=self._recovery_end_session,
+            client_packet_age_ms=(
+                self._native_stream
+                ._session_io
+                .controller
+                .last_client_packet_age_ms
+            ),
+            recovery_save_detail=(
+                self._emulator.recovery_state_detail
+            ),
+        )
+
+        self._native_stream._session_io.controller.set_client_silence_callback(
+            self._recovery.note_client_silence,
+            DESYNC_MS,
+        )
+
+        # The client target of the live native-stream session, remembered so
+        # a recovery can bring the encoder up again without the client.
+        self._recovery_start_args: dict[str, Any] = {}
+
         self._metadata_reconcile_thread = threading.Thread(
             target=run_startup_metadata_reconcile,
             kwargs={
@@ -86,6 +131,68 @@ class GamesPlugin:
             daemon=True,
         )
         self._metadata_reconcile_thread.start()
+
+    def _recovery_stream_active(self) -> bool:
+        """Does the session still have a live encoder?"""
+        try:
+            return bool(
+                self._native_stream.status().get(
+                    "active",
+                    False,
+                )
+            )
+        except Exception:
+            return False
+
+    def _recovery_full_start_encoder(self) -> dict[str, Any]:
+        """Bring the encoder up the way `native-stream-start` does.
+
+        D-BASE-R3a fix 1. The C3.L1 cycle can only replace a *running*
+        encoder; once it has failed, the session has none and every further
+        cycle raises. This is the same `NativeStreamManager.start()` the
+        `native-stream-start` action calls, with the client target and port
+        remembered from that action and the managed RetroArch process as it
+        stands now. It deliberately does **not** go through the action
+        itself: the action pauses the game, and during a recovery the game
+        is already paused and must stay exactly as it is.
+        """
+        args = self._recovery_start_args
+
+        if not isinstance(args, dict) or not args.get("client_ip"):
+            raise RuntimeError(
+                "no remembered native-stream client for a full start"
+            )
+
+        game_status = self._emulator.status()
+
+        if not game_status.get("active", False):
+            raise RuntimeError(
+                "game session is not active"
+            )
+
+        return self._native_stream.start(
+            client_ip=str(args["client_ip"]),
+            port=int(
+                args.get(
+                    "port",
+                    NativeStreamManager.DEFAULT_PORT,
+                )
+            ),
+            managed_process_id=game_status.get("pid"),
+        )
+
+    def _recovery_end_session(self) -> dict[str, Any]:
+        """Graceful end at END_MS. The recovery save is already on disk."""
+        payload = self._emulator.stop()
+
+        try:
+            payload["native_stream"] = (
+                self._native_stream.end_game_session()
+            )
+        except Exception as exc:
+            payload["native_stream_warning"] = str(exc)
+
+        return payload
 
     def _invalidate_scan_cache(self) -> None:
         with self._lock:
@@ -2775,11 +2882,55 @@ class GamesPlugin:
         if action == "status":
             payload = self._emulator.status()
             payload["native_stream"] = self._native_stream.status()
+            # D-BASE-R3: what the launcher needs to say "the stream was
+            # lost and the game was saved", and what a reader needs to tell
+            # a recovering session from a playing one.
+            payload["recovery"] = self._recovery.status()
             return payload
 
 
         if action == "native-stream-status":
-            return self._native_stream.status()
+            payload = self._native_stream.status()
+            payload["recovery"] = self._recovery.status()
+            # D-BASE-R2: newest client heartbeat, or None if none has
+            # arrived. Read from the log, so it survives a companion
+            # restart and says nothing about liveness by itself — compare
+            # its received_at_utc against now.
+            payload["last_heartbeat"] = (
+                latest_native_stream_heartbeat(
+                    self.PROJECT_ROOT
+                )
+            )
+            # D-BASE-R5: loss over the last 60 s of the current session,
+            # so a live session can be watched without waiting for its
+            # report. None when no client has sent the counters, when
+            # there is no session, or when the window holds fewer than two
+            # heartbeats — never a substituted 0.
+            payload["loss_per_min_recent"] = (
+                loss_per_min_recent(
+                    self.PROJECT_ROOT
+                )
+            )
+            # D-BASE-P5: the relay keeps a bounded per-second frame-size
+            # ring (1,800 s) and `relay.status()` carries it in full. That
+            # is ~1,800 rows, so this endpoint — which several probes poll
+            # every couple of seconds through a whole session — drops the
+            # rows unless `frame_series=1` is asked for. The summary,
+            # including the percentiles and the session maximum, is always
+            # here, and `logs/games/native_frame_sizes.jsonl` holds every
+            # row regardless.
+            if self._first(query, "frame_series") != "1":
+                frame_sizes = (
+                    payload.get("fec", {})
+                    .get("frame_sizes")
+                )
+
+                if isinstance(frame_sizes, dict):
+                    frame_sizes["buckets_omitted"] = len(
+                        frame_sizes.pop("buckets", ())
+                    )
+
+            return payload
 
         raise ValueError(
             f"Unknown Games plugin action: {action}"
@@ -3147,11 +3298,187 @@ class GamesPlugin:
                     str(exc)
                 ) from exc
 
+        # D-BASE-R2 piece 2: trace only. The client posts this every two
+        # seconds while a session is open; a stall that never ends simply
+        # stops posting, and the gap in the log is the evidence. Nothing
+        # acts on it here — automatic recovery is a separate item and is not
+        # authorized. Unknown query keys are ignored, not recorded.
+        if action == "native-stream-heartbeat":
+            values = {}
+
+            for field in (
+                "sequence",
+                "interval_ms",
+                "last_output_age_ms",
+                "rendered_frames",
+                "queued_frames",
+                "rx_packets",
+                "elapsed_ms",
+                # D-BASE-R5: the receiver's cumulative loss counters,
+                # passed straight through. Each is optional so an older
+                # client simply records nothing for it.
+                "lost_packets",
+                "lost_packets_in_resyncs",
+                "forward_gap_events",
+                "max_forward_gap_packets",
+                "stream_resyncs",
+                "fec_recovered_packets",
+                "fec_unrecoverable_groups",
+                # D-BASE-P7: the audio counters, same rule — optional, so
+                # an older client records nothing for them. This list is
+                # the whitelist: a key the client sends but that is not
+                # named here is silently dropped, which is exactly how the
+                # first P7 build came back with no audio fields at all.
+                "audio_prolonged_starvation_events",
+                "audio_lost_packets",
+                "audio_rx_packets",
+                "audio_concealed_underruns",
+                "audio_concealed_loss_packets",
+                "audio_underruns",
+                "audio_queue_depth",
+                "audio_queue_ms",
+                "audio_max_arrival_gap_ms",
+                "audio_session_max_arrival_gap_ms",
+            ):
+                if field not in query:
+                    continue
+
+                values[field] = self._parse_int(
+                    self._first(query, field),
+                    -1,
+                )
+
+            # D-BASE-T1: the onn's thermal fields, each optional and each
+            # kept in its own type. A device that does not report one sends
+            # nothing for it, and nothing is recorded for it.
+            thermal_status = self._first(
+                query,
+                "thermal_status",
+            ).strip()
+
+            if thermal_status:
+                values["thermal_status"] = self._parse_int(
+                    thermal_status,
+                    -1,
+                )
+
+            thermal_headroom = self._first(
+                query,
+                "thermal_headroom",
+            ).strip()
+
+            if thermal_headroom:
+                try:
+                    values["thermal_headroom"] = float(
+                        thermal_headroom
+                    )
+                except (TypeError, ValueError):
+                    pass
+
+            thermal_zones = self._first(
+                query,
+                "thermal_zones_c",
+            ).strip()
+
+            if thermal_zones:
+                values["thermal_zones_c"] = thermal_zones[:512]
+
+            if not values:
+                raise ValueError(
+                    "Missing native stream heartbeat fields"
+                )
+
+            result = append_native_stream_heartbeat(
+                self.PROJECT_ROOT,
+                values,
+            )
+
+            # D-BASE-R3 reads it; D-BASE-R2 only recorded it.
+            heartbeat = result.get("heartbeat")
+
+            if isinstance(heartbeat, dict):
+                self._recovery.note_heartbeat(heartbeat)
+
+            return {
+                "plugin": self.PLUGIN_ID,
+                **result,
+            }
+
+        # D-BASE-R3: the client's own desync detector. Best-effort and
+        # one-shot per episode by design; the host treats it exactly like
+        # controller silence.
+        if action == "native-stream-desync":
+            reason = self._first(
+                query,
+                "reason",
+            ).strip() or "output_silence"
+
+            age_ms = self._parse_int(
+                self._first(query, "age_ms"),
+                -1,
+            )
+
+            self._recovery.note_client_desync(
+                reason,
+                float(age_ms),
+            )
+
+            return {
+                "ok": True,
+                "plugin": self.PLUGIN_ID,
+                "accepted": True,
+                "recovery": self._recovery.status(),
+            }
+
+        if action == "recovery-resume":
+            payload = self._emulator.load_recovery_state()
+            return {
+                "ok": True,
+                "plugin": self.PLUGIN_ID,
+                **payload,
+            }
+
+        if action == "recovery-copy":
+            slot = self._parse_int(
+                self._first(query, "slot"),
+                0,
+            )
+            replace = self._first(
+                query,
+                "replace",
+            ).strip().casefold() in (
+                "1",
+                "true",
+                "yes",
+            )
+            payload = self._emulator.copy_recovery_state_to_slot(
+                slot,
+                replace=replace,
+            )
+            return {
+                "ok": True,
+                "plugin": self.PLUGIN_ID,
+                **payload,
+            }
+
+        if action == "recovery-discard":
+            payload = self._emulator.discard_recovery_state()
+            return {
+                "ok": True,
+                "plugin": self.PLUGIN_ID,
+                **payload,
+            }
+
         if action == "native-stream-start":
             game_status = self._emulator.status()
             if not game_status.get("active", False):
                 raise RuntimeError("Launch a game before starting Native Video Alpha.")
             port = self._parse_int(self._first(query, "port"), NativeStreamManager.DEFAULT_PORT)
+            # D-BASE-R3: a client re-entering the stream during a recovery is
+            # expected, not an error. The game is already paused in that
+            # state, so the pause below is skipped and the gate below still
+            # owns the resume.
+            self._recovery.note_stream_start()
             try:
                 if not game_status.get("paused", False):
                     try:
@@ -3171,6 +3498,10 @@ class GamesPlugin:
                     port=port,
                     managed_process_id=game_status.get("pid"),
                 )
+                self._recovery_start_args = {
+                    "client_ip": client_ip,
+                    "port": port,
+                }
                 payload["game_session"] = game_status
                 payload["paused"] = True
                 payload["stabilization_required"] = True
@@ -3210,15 +3541,22 @@ class GamesPlugin:
                     "Game remained paused after stabilization release."
                 )
 
+            # D-BASE-R3: the same gate serves startup and recovery; this is
+            # where the host learns which one just happened.
+            released = self._recovery.note_gameplay_released()
+
             return {
                 "ready": True,
                 "released": True,
                 "paused": False,
                 "game_session": game_status,
                 "native_stream": stream_status,
+                "recovered": bool(released.get("recovered", False)),
+                "recovery": self._recovery.status(),
             }
 
         if action == "native-stream-stop":
+            self._recovery.session_ended()
             game_status = self._emulator.status()
             if game_status.get("active", False) and not game_status.get("paused", False):
                 try:
@@ -3441,6 +3779,11 @@ class GamesPlugin:
                 return write_decoder_session_log(
                     self.PROJECT_ROOT,
                     report,
+                    host_extra={
+                        "fec_pacing": (
+                            self._native_stream.fec_pacing_status()
+                        ),
+                    },
                 )
 
             # PrivyHub Phase A6: persistent favorite state.
@@ -3666,6 +4009,7 @@ class GamesPlugin:
                 return payload
 
             if action == "stop":
+                self._recovery.session_ended()
                 payload = self._emulator.stop()
                 try:
                     payload["native_stream"] = self._native_stream.end_game_session()

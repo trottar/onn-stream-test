@@ -39,6 +39,12 @@ class NativeStreamActivity :
         const val EXTRA_GAME_TITLE =
             "privyhub_game_title"
 
+        // D-BASE-P1: diagnostic knob for the stale-presentation threshold.
+        // Absent — which is every product launch — the decoder keeps its
+        // 60 ms default and behaves exactly as before.
+        const val EXTRA_STALE_OUTPUT_MS =
+            "privyhub.stale_output_ms"
+
         fun pausedFrameFileName(
             gameTitle: String
         ): String {
@@ -69,6 +75,26 @@ class NativeStreamActivity :
         private const val CLIENT_HEALTH_INTERVAL_NS =
             CLIENT_HEALTH_INTERVAL_MS *
                 1_000_000L
+
+        // PRIVYHUB_D_BASE_R2_STALL_VISIBILITY
+        private const val HEARTBEAT_INTERVAL_MS =
+            2_000L
+        private const val HEARTBEAT_INTERVAL_NS =
+            HEARTBEAT_INTERVAL_MS *
+                1_000_000L
+
+        // PRIVYHUB_D_BASE_P2_AUDIO_TICK_SERIES
+        // 400 ticks at the existing 500 ms cadence = 200 s, which covers
+        // the probe's 120 s sessions with headroom. Diagnostic only.
+        private const val AUDIO_TICK_SERIES_CAPACITY =
+            400
+
+        // PRIVYHUB_D_BASE_R3_LINK_DROP_RECOVERY
+        // The design note's constants; do not tune them here.
+        private const val DESYNC_MS =
+            1_000L
+        private const val RECOVERY_CLEAN_TICKS =
+            3
 
         private const val STABILIZATION_CLEAN_TICKS =
             6
@@ -185,6 +211,45 @@ class NativeStreamActivity :
     private var clientHealthSequence =
         0L
 
+    // D-BASE-P2: one row per 500 ms tick, so the audio underrun burst can be
+    // located in time instead of inferred from a session total.
+    private val audioTickSeries =
+        ArrayList<LongArray>(
+            AUDIO_TICK_SERIES_CAPACITY
+        )
+
+    private var audioTickLastUnderruns = 0L
+
+    private var audioTickLastStarvation = 0L
+
+    private var audioTickLastConcealed = 0L
+
+    // D-BASE-R3: the client's own desync detector and its recovery pass
+    // through the same stabilization gate.
+    @Volatile
+    private var recoveryActive =
+        false
+
+    private var desyncPostedForEpisode =
+        false
+
+    private var lastRtpPacketsSeen =
+        0L
+
+    private var lastRtpAdvanceAtNs =
+        0L
+
+    // D-BASE-R2: host-side trace of a terminal stall.
+    private var lastHeartbeatPostAtNs =
+        0L
+
+    private var heartbeatSequence =
+        0L
+
+    @Volatile
+    private var heartbeatPostInFlight =
+        false
+
     @Volatile
     private var clientHealthPostInFlight =
         false
@@ -195,6 +260,11 @@ class NativeStreamActivity :
         null
 
     @Volatile
+    // D-BASE-T1 piece 1. Created per session; every read is best-effort
+    // and none of it is on the decode, audio or transport path.
+    private var thermalSampler: ThermalSampler? =
+        null
+
     private var sessionStartedAtNs =
         0L
 
@@ -519,12 +589,37 @@ class NativeStreamActivity :
         hostMetadataError = ""
         sessionStartedAtNs =
             System.nanoTime()
+        thermalSampler =
+            ThermalSampler(this).also {
+                it.start(sessionStartedAtNs)
+            }
         lastClientHealthPostAtNs =
             0L
         clientHealthSequence =
             0L
         clientHealthPostInFlight =
             false
+        lastHeartbeatPostAtNs =
+            0L
+        heartbeatSequence =
+            0L
+        heartbeatPostInFlight =
+            false
+        audioTickSeries.clear()
+        audioTickLastUnderruns =
+            0L
+        audioTickLastStarvation =
+            0L
+        audioTickLastConcealed =
+            0L
+        recoveryActive =
+            false
+        desyncPostedForEpisode =
+            false
+        lastRtpPacketsSeen =
+            0L
+        lastRtpAdvanceAtNs =
+            0L
         clientHealthControlRoundTripMs =
             null
 
@@ -556,7 +651,9 @@ class NativeStreamActivity :
                                     height = VIDEO_HEIGHT,
                                     fps = VIDEO_FPS,
                                     sps = sps,
-                                    pps = pps
+                                    pps = pps,
+                                    staleOutputMs =
+                                        requestedStaleOutputMs()
                                 )
 
                             runOnUiThread {
@@ -843,6 +940,9 @@ class NativeStreamActivity :
         val report =
             cacheSessionReport()
 
+        // After the report, which reads the sampler's totals.
+        thermalSampler?.stop()
+
         sessionStarted = false
 
         stopLocalPipeline()
@@ -912,8 +1012,146 @@ class NativeStreamActivity :
         return report
     }
 
+    // D-BASE-P2. One row per 500 ms tick: elapsed, then the deltas since the
+    // previous tick for the three counters that a burst would move, plus the
+    // instantaneous queue depth. Deltas rather than totals because the
+    // question is *when*, and a total answers only *how many*.
+    private fun sampleAudioTick(
+        nowNs: Long
+    ) {
+        if (
+            !sessionStarted ||
+            stopping ||
+            audioTickSeries.size >=
+            AUDIO_TICK_SERIES_CAPACITY
+        ) {
+            return
+        }
+
+        val audio =
+            audioReceiver?.snapshot()
+                ?: return
+
+        val elapsedMs =
+            if (sessionStartedAtNs > 0L) {
+                (
+                    nowNs -
+                        sessionStartedAtNs
+                ).coerceAtLeast(0L) /
+                    1_000_000L
+            } else {
+                0L
+            }
+
+        val underruns =
+            audio.underruns.toLong()
+
+        val starvation =
+            audio.prolongedStarvationEvents
+
+        val concealed =
+            audio.concealedUnderruns
+
+        audioTickSeries.add(
+            longArrayOf(
+                elapsedMs,
+                (
+                    underruns -
+                        audioTickLastUnderruns
+                ).coerceAtLeast(0L),
+                (
+                    starvation -
+                        audioTickLastStarvation
+                ).coerceAtLeast(0L),
+                (
+                    concealed -
+                        audioTickLastConcealed
+                ).coerceAtLeast(0L),
+                audio.queueDepth.toLong(),
+                audio.bufferedMs
+            )
+        )
+
+        audioTickLastUnderruns =
+            underruns
+        audioTickLastStarvation =
+            starvation
+        audioTickLastConcealed =
+            concealed
+    }
+
+
+    // D-BASE-R4: session-relative time for a slow-event row, and the row
+    // itself in the seven-column shape every existing reader expects.
+    // D-BASE-P2. -1 when the event has not happened yet.
+    private fun elapsedMsSinceSessionStart(
+        atNs: Long
+    ): Long {
+        if (
+            atNs <= 0L ||
+            sessionStartedAtNs <= 0L
+        ) {
+            return -1L
+        }
+
+        return (
+            atNs -
+                sessionStartedAtNs
+        ).coerceAtLeast(0L) /
+            1_000_000L
+    }
+
+
+    private fun elapsedMsOf(
+        event: DecoderSlowEvent
+    ): Long {
+        return if (sessionStartedAtNs > 0L) {
+            (
+                event.eventAtNs -
+                    sessionStartedAtNs
+            ).coerceAtLeast(0L) /
+                1_000_000L
+        } else {
+            0L
+        }
+    }
+
+
+    private fun slowEventRows(
+        events: List<DecoderSlowEvent>
+    ): JSONArray {
+        val rows = JSONArray()
+
+        for (event in events) {
+            rows.put(
+                JSONArray().apply {
+                    put(elapsedMsOf(event))
+                    put(event.receiveToDecodeMs)
+                    put(event.feedDelayMs)
+                    put(event.codecMs)
+                    put(event.codecInFlight)
+                    put(event.appQueueDepth)
+                    put(event.outputGapMs)
+                }
+            )
+        }
+
+        return rows
+    }
+
+
     private fun buildSessionReport():
         String {
+        // D-BASE-R4 item 1: last chance to see a gap that is still open as
+        // the report is written — BACK during a terminal stall lands here
+        // with output stopped. Must run before snapshot(), so the
+        // max_output_gap_ms the report carries already includes it.
+        val outputAgeAtEndMs =
+            decoder?.noteOutputStall(
+                System.nanoTime()
+            )
+                ?: -1L
+
         val rtp =
             receiver?.snapshot()
 
@@ -1080,6 +1318,10 @@ class NativeStreamActivity :
                         "lost_packets",
                         rtp.lostPackets
                     )
+                    put(
+                        "lost_packets_in_resyncs",
+                        rtp.lostPacketsInResyncs
+                    )
                     put("frames", rtp.frames)
                     put(
                         "dropped_frames",
@@ -1168,6 +1410,15 @@ class NativeStreamActivity :
                     put(
                         "largest_resync_jump_packets",
                         rtp.largestResyncJumpPackets
+                    )
+                    // C5a session totals.
+                    put(
+                        "idr_aus_rejected_waiting_for_idr",
+                        rtp.idrAusRejectedWaitingForIdr
+                    )
+                    put(
+                        "non_idr_aus_dropped_waiting_for_idr",
+                        rtp.nonIdrAusDroppedWaitingForIdr
                     )
                     put(
                         "packets_dropped_waiting_for_idr",
@@ -1262,6 +1513,15 @@ class NativeStreamActivity :
                         put(
                             "au_fec_unrecoverable_group",
                             event.auFecUnrecoverableGroup
+                        )
+                        // C5a
+                        put(
+                            "rejected_idr_aus",
+                            event.rejectedIdrAus
+                        )
+                        put(
+                            "dropped_non_idr_aus",
+                            event.droppedNonIdrAus
                         )
                     }
                 )
@@ -1390,6 +1650,26 @@ class NativeStreamActivity :
                         dec.vendorCodec
                     )
                     put(
+                        "stale_output_ms",
+                        decoder
+                            ?.staleOutputThresholdMs()
+                            ?: AvcLowLatencyDecoder
+                                .DEFAULT_STALE_OUTPUT_MS
+                    )
+                    put(
+                        "rx_to_output_histogram_ms",
+                        JSONArray(
+                            decoder
+                                ?.rxToOutputHistogramSnapshot()
+                                .orEmpty()
+                        )
+                    )
+                    put(
+                        "rx_to_output_histogram_bucket_ms",
+                        AvcLowLatencyDecoder
+                            .RX_TO_OUTPUT_BUCKET_MS
+                    )
+                    put(
                         "low_latency_enabled",
                         dec.lowLatencyEnabled
                     )
@@ -1498,6 +1778,116 @@ class NativeStreamActivity :
                 "slow_event_capacity_recent",
                 AvcLowLatencyDecoder.MAX_RECENT_SLOW_EVENTS
             )
+
+            // D-BASE-R4 item 1. A gap that never ended has no closing
+            // frame, so it is not in the arrays above and its columns for
+            // receive-to-output, feed delay and codec time read -1. It is
+            // emitted on its own key, explicitly flagged, so a reader can
+            // tell it from a gap that ended.
+            val terminalEvent =
+                decoder
+                    ?.terminalSlowEventSnapshot()
+
+            root.put(
+                "output_age_at_end_ms",
+                outputAgeAtEndMs
+            )
+
+            root.put(
+                "terminal_slow_event",
+                if (terminalEvent == null) {
+                    JSONObject.NULL
+                } else {
+                    JSONObject().apply {
+                        put("terminal", true)
+                        put(
+                            "elapsed_ms",
+                            elapsedMsOf(terminalEvent)
+                        )
+                        put(
+                            "rx_to_decode_ms",
+                            terminalEvent.receiveToDecodeMs
+                        )
+                        put(
+                            "feed_delay_ms",
+                            terminalEvent.feedDelayMs
+                        )
+                        put(
+                            "codec_ms",
+                            terminalEvent.codecMs
+                        )
+                        put(
+                            "codec_in_flight",
+                            terminalEvent.codecInFlight
+                        )
+                        put(
+                            "app_queue_depth",
+                            terminalEvent.appQueueDepth
+                        )
+                        put(
+                            "output_gap_ms",
+                            terminalEvent.outputGapMs
+                        )
+                    }
+                }
+            )
+
+            // D-BASE-R4 item 2. Worst-of-session, so the events that matter
+            // most survive the two rolling segments. Same seven columns.
+            // The terminal gap joins the by-gap list, which is what keeps
+            // its maximum equal to max_output_gap_ms.
+            val topGapEvents =
+                (
+                    decoder
+                        ?.topGapSlowEventsSnapshot()
+                        .orEmpty() +
+                        listOfNotNull(terminalEvent)
+                )
+                    .sortedByDescending {
+                        it.outputGapMs
+                    }
+                    .take(
+                        AvcLowLatencyDecoder.MAX_TOP_SLOW_EVENTS
+                    )
+
+            val topLatencyEvents =
+                decoder
+                    ?.topLatencySlowEventsSnapshot()
+                    .orEmpty()
+
+            root.put(
+                "slow_events_top_gap",
+                slowEventRows(topGapEvents)
+            )
+            root.put(
+                "slow_event_retained_top_gap",
+                topGapEvents.size
+            )
+            root.put(
+                "slow_event_capacity_top_gap",
+                AvcLowLatencyDecoder.MAX_TOP_SLOW_EVENTS
+            )
+            root.put(
+                "slow_events_top_latency",
+                slowEventRows(topLatencyEvents)
+            )
+            root.put(
+                "slow_event_retained_top_latency",
+                topLatencyEvents.size
+            )
+            root.put(
+                "slow_event_capacity_top_latency",
+                AvcLowLatencyDecoder.MAX_TOP_SLOW_EVENTS
+            )
+        }
+
+        // D-BASE-T1 piece 1: both ends' temperatures in one report. The
+        // host half arrives through host metadata; this is the onn's.
+        thermalSampler?.let { sampler ->
+            root.put(
+                "thermal",
+                sampler.reportJson()
+            )
         }
 
         if (audio != null) {
@@ -1561,6 +1951,67 @@ class NativeStreamActivity :
                         "smooth_latency_trims",
                         audio.smoothLatencyTrims
                     )
+
+                    // D-BASE-P2 / P2a diagnostics.
+                    put(
+                        "startup_wait_ms",
+                        audioReceiver
+                            ?.startupWaitMs()
+                            ?: -1L
+                    )
+                    put(
+                        "startup_wait_timed_out",
+                        audioReceiver
+                            ?.startupWaitTimedOut()
+                            ?: false
+                    )
+                    put(
+                        "first_write_elapsed_ms",
+                        elapsedMsSinceSessionStart(
+                            audioReceiver
+                                ?.firstWriteAtNs()
+                                ?: 0L
+                        )
+                    )
+                    put(
+                        "first_video_output_elapsed_ms",
+                        elapsedMsSinceSessionStart(
+                            decoder
+                                ?.firstOutputAtNs()
+                                ?: 0L
+                        )
+                    )
+                    put(
+                        "tick_series_columns",
+                        JSONArray(
+                            listOf(
+                                "elapsed_ms",
+                                "underruns_delta",
+                                "starvation_delta",
+                                "concealed_delta",
+                                "queue_depth",
+                                "buffered_ms"
+                            )
+                        )
+                    )
+                    put(
+                        "tick_series_capacity",
+                        AUDIO_TICK_SERIES_CAPACITY
+                    )
+                    put(
+                        "tick_series",
+                        JSONArray().apply {
+                            for (row in audioTickSeries) {
+                                put(
+                                    JSONArray().apply {
+                                        for (v in row) {
+                                            put(v)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    )
                     put(
                         "crossfaded_packets",
                         audio.crossfadedPackets
@@ -1610,6 +2061,235 @@ class NativeStreamActivity :
         }
 
         return root.toString()
+    }
+
+
+    // D-BASE-R2, piece 2. A terminal stall leaves nothing behind today:
+    // the client stops posting and the report is never written, so the host
+    // cannot tell a stall from a clean exit. This posts a small fixed
+    // payload every HEARTBEAT_INTERVAL_MS while a session is open. Purely a
+    // trace: the companion appends it to a log and exposes the newest one.
+    // Nothing acts on it — automatic recovery is a separate, unauthorized
+    // item. Failures are swallowed, like every other diagnostic post here.
+    // D-BASE-T1. Three fields, URL-encoded, omitted individually when the
+    // device does not report them — an absent field is the finding, and a
+    // substitute number would not be.
+    private fun thermalQuery(): String {
+        val sampler =
+            thermalSampler
+                ?: return ""
+
+        val parts =
+            StringBuilder()
+
+        val status =
+            sampler.statusNow()
+
+        if (status >= 0) {
+            parts.append(
+                "&thermal_status=$status"
+            )
+        }
+
+        val headroom =
+            sampler.headroomNow()
+
+        if (!headroom.isNaN()) {
+            parts.append(
+                "&thermal_headroom=$headroom"
+            )
+        }
+
+        val zones =
+            sampler.zonesNowCompact()
+
+        if (zones.isNotEmpty()) {
+            parts.append(
+                "&thermal_zones_c=" +
+                    URLEncoder.encode(
+                        zones,
+                        "UTF-8"
+                    )
+            )
+        }
+
+        return parts.toString()
+    }
+
+    /**
+     * D-BASE-P7: the audio block of the heartbeat query.
+     *
+     * Every field is **omitted** when the audio receiver is absent, rather
+     * than sent as 0 — the `D-BASE-P4` rule, so a missing value reads as
+     * missing and never as "measured zero".
+     */
+    private fun audioQuery(
+        aud: NativeAudioMetrics?,
+        windowGapMs: Long?
+    ): String {
+        if (aud == null) {
+            return ""
+        }
+
+        return "&audio_prolonged_starvation_events=" +
+            "${aud.prolongedStarvationEvents}" +
+            "&audio_lost_packets=${aud.lostPackets}" +
+            "&audio_rx_packets=${aud.packets}" +
+            "&audio_concealed_underruns=${aud.concealedUnderruns}" +
+            "&audio_concealed_loss_packets=" +
+            "${aud.concealedLossPackets}" +
+            "&audio_underruns=${aud.underruns}" +
+            "&audio_queue_depth=${aud.queueDepth}" +
+            "&audio_queue_ms=${aud.bufferedMs}" +
+            "&audio_session_max_arrival_gap_ms=" +
+            "${aud.maxArrivalGapMs}" +
+            (
+                if (windowGapMs != null) {
+                    "&audio_max_arrival_gap_ms=$windowGapMs"
+                } else {
+                    ""
+                }
+            )
+    }
+
+    private fun maybeSendStallHeartbeat(
+        nowNs: Long
+    ) {
+        if (
+            !sessionStarted ||
+            stopping ||
+            heartbeatPostInFlight
+        ) {
+            return
+        }
+
+        if (
+            lastHeartbeatPostAtNs > 0L &&
+            nowNs - lastHeartbeatPostAtNs <
+                HEARTBEAT_INTERVAL_NS
+        ) {
+            return
+        }
+
+        val activeDecoder =
+            decoder
+                ?: return
+
+        val dec =
+            activeDecoder.snapshot()
+
+        val rtp =
+            receiver?.snapshot()
+                ?: return
+
+        // D-BASE-P7: the audio side of the same tick, read from the same
+        // snapshot the end-of-session report reads. The window arrival gap
+        // is taken separately because it resets on read.
+        val aud =
+            audioReceiver?.snapshot()
+
+        val audWindowGapMs =
+            audioReceiver?.takeWindowMaxArrivalGapMs()
+
+        val host =
+            intent.getStringExtra(
+                EXTRA_COMPANION_HOST
+            )
+                ?.trim()
+                .orEmpty()
+
+        if (host.isBlank()) {
+            return
+        }
+
+        val elapsedMs =
+            if (sessionStartedAtNs > 0L) {
+                (
+                    nowNs -
+                        sessionStartedAtNs
+                ).coerceAtLeast(0L) /
+                    1_000_000L
+            } else {
+                0L
+            }
+
+        val lastOutputAgeMs =
+            activeDecoder.lastOutputAgeMs()
+
+        heartbeatSequence +=
+            1L
+
+        val sequence =
+            heartbeatSequence
+
+        val address =
+            "http://$host:$CONTROL_PORT" +
+                "/plugins/games/native-stream-heartbeat" +
+                "?sequence=$sequence" +
+                "&interval_ms=$HEARTBEAT_INTERVAL_MS" +
+                "&last_output_age_ms=$lastOutputAgeMs" +
+                "&rendered_frames=${dec.renderedFrames}" +
+                "&queued_frames=${dec.queuedFrames}" +
+                "&rx_packets=${rtp.packets}" +
+                "&elapsed_ms=$elapsedMs" +
+                // D-BASE-R5: the receiver's own cumulative loss counters,
+                // the same ones the end-of-session report reads. Nothing
+                // new is sampled or counted — these are already maintained
+                // on the receive path — so a per-tick delta is exact and a
+                // per-minute loss series becomes readable from the
+                // heartbeat log alone. `D-BASE-P4` showed the alternative,
+                // deriving loss from host-sent minus client-received, is
+                // 29x noise.
+                "&lost_packets=${rtp.lostPackets}" +
+                "&lost_packets_in_resyncs=" +
+                "${rtp.lostPacketsInResyncs}" +
+                "&forward_gap_events=${rtp.forwardGapEvents}" +
+                "&max_forward_gap_packets=" +
+                "${rtp.maxForwardGapPackets}" +
+                // sequence resyncs and SSRC changes are both stream
+                // discontinuities; the report keeps them apart and this
+                // carries their sum, which is what a per-minute series
+                // needs.
+                "&stream_resyncs=" +
+                "${rtp.sequenceResyncs + rtp.ssrcChanges}" +
+                "&fec_recovered_packets=${rtp.fecRecoveredPackets}" +
+                "&fec_unrecoverable_groups=" +
+                "${rtp.fecUnrecoverableGroups}" +
+                // D-BASE-P7: the audio counters, cumulative and from the
+                // same snapshot the report reads, so a per-tick delta is
+                // exact. `audio_max_arrival_gap_ms` is the window figure
+                // (reset each heartbeat); `audio_session_max_arrival_gap_ms`
+                // is the whole-session one. Nothing new is sampled — the
+                // gap is one max() already taken on the receive path.
+                audioQuery(aud, audWindowGapMs) +
+                // D-BASE-T1: the onn's own thermal state travels with the
+                // heartbeat, so a session that never posts a report still
+                // leaves a temperature trace on the host.
+                thermalQuery()
+
+        lastHeartbeatPostAtNs =
+            nowNs
+        heartbeatPostInFlight =
+            true
+
+        thread(
+            start = true,
+            isDaemon = true,
+            name = "PrivyHub-Stall-Heartbeat"
+        ) {
+            try {
+                httpPost(
+                    address,
+                    readTimeoutMs = 1_500
+                )
+            } catch (_: Exception) {
+                // A heartbeat that cannot be delivered is itself the
+                // symptom; it must never disturb gameplay.
+            } finally {
+                heartbeatPostInFlight =
+                    false
+            }
+        }
     }
 
 
@@ -1697,6 +2377,10 @@ class NativeStreamActivity :
                     JSONObject().apply {
                         put("packets", rtp.packets)
                         put("lost_packets", rtp.lostPackets)
+                        put(
+                            "lost_packets_in_resyncs",
+                            rtp.lostPacketsInResyncs
+                        )
                         put("dropped_frames", rtp.droppedFrames)
                         put(
                             "fec_recovered_packets",
@@ -1904,16 +2588,23 @@ class NativeStreamActivity :
         stabilizationOverlay.text =
             buildString {
                 append(
-                    if (
-                        stabilizationFailed
-                    ) {
-                        "Game stream isn't ready"
-                    } else {
-                        "Stabilizing game…"
+                    when {
+                        stabilizationFailed ->
+                            "Game stream isn't ready"
+
+                        recoveryActive ->
+                            "Reconnecting…"
+
+                        else ->
+                            "Stabilizing game…"
                     }
                 )
                 append(
-                    "\nPreparing smooth playback"
+                    if (recoveryActive) {
+                        "\nThe game is paused until the stream returns"
+                    } else {
+                        "\nPreparing smooth playback"
+                    }
                 )
                 append(
                     "\n\n${currentGameTitle()}"
@@ -2029,6 +2720,12 @@ class NativeStreamActivity :
                         false
                     gameplayReleased =
                         true
+                    recoveryActive =
+                        false
+                    desyncPostedForEpisode =
+                        false
+                    lastRtpAdvanceAtNs =
+                        System.nanoTime()
                     stabilizationPhase =
                         "Playing"
                     streamState =
@@ -2044,6 +2741,195 @@ class NativeStreamActivity :
                     )
                 }
             }
+        }
+    }
+
+
+    // D-BASE-R3 piece: the client's own desync detector. Secondary to the
+    // host's controller-silence trigger — the host pauses on its own
+    // evidence — but it is the only one that fires when the link drops in
+    // one direction only, which is exactly the injected fault case.
+    //
+    // The last decoded frame stays on screen (nothing is released), the
+    // controller sender keeps running because it is the host's liveness
+    // signal, and the desync notice is posted once per episode: it must
+    // never become a second periodic post.
+    private fun maybeEnterLinkRecovery(
+        nowNs: Long
+    ) {
+        if (
+            !sessionStarted ||
+            stopping
+        ) {
+            return
+        }
+
+        val rtp =
+            receiver?.snapshot()
+                ?: return
+
+        if (
+            rtp.packets != lastRtpPacketsSeen
+        ) {
+            lastRtpPacketsSeen =
+                rtp.packets
+            lastRtpAdvanceAtNs =
+                nowNs
+        }
+
+        if (
+            !gameplayReleased ||
+            recoveryActive
+        ) {
+            return
+        }
+
+        val outputAgeMs =
+            decoder?.lastOutputAgeMs()
+                ?: -1L
+
+        val rxSilenceMs =
+            if (lastRtpAdvanceAtNs > 0L) {
+                (
+                    nowNs - lastRtpAdvanceAtNs
+                ).coerceAtLeast(0L) /
+                    1_000_000L
+            } else {
+                0L
+            }
+
+        val reason =
+            when {
+                outputAgeMs >= DESYNC_MS ->
+                    "output_silence"
+
+                rxSilenceMs >= DESYNC_MS ->
+                    "rx_silence"
+
+                else ->
+                    ""
+            }
+
+        if (reason.isEmpty()) {
+            return
+        }
+
+        val ageMs =
+            if (reason == "output_silence") {
+                outputAgeMs
+            } else {
+                rxSilenceMs
+            }
+
+        enterLinkRecovery(
+            reason,
+            ageMs
+        )
+    }
+
+
+    private fun enterLinkRecovery(
+        reason: String,
+        ageMs: Long
+    ) {
+        recoveryActive =
+            true
+
+        // Re-enter the same gate the session passed at startup. Nothing is
+        // torn down: the decoder, receiver, audio and controller all keep
+        // running, and the surface keeps the last frame.
+        gameplayReleased =
+            false
+        stabilizationFailed =
+            false
+        releaseRequestInFlight =
+            false
+        stabilizationBaselineSet =
+            false
+        stabilizationCleanTicks =
+            0
+        stabilizationStartedAtNs =
+            System.nanoTime()
+        stabilizationPhase =
+            "Reconnecting"
+        streamState =
+            "Reconnecting"
+
+        publishStreamStatus()
+        updateStabilizationOverlay()
+
+        if (desyncPostedForEpisode) {
+            return
+        }
+
+        desyncPostedForEpisode =
+            true
+
+        val host =
+            intent.getStringExtra(
+                EXTRA_COMPANION_HOST
+            )
+                ?.trim()
+                .orEmpty()
+
+        if (host.isBlank()) {
+            return
+        }
+
+        val address =
+            "http://$host:$CONTROL_PORT" +
+                "/plugins/games/native-stream-desync" +
+                "?reason=$reason" +
+                "&age_ms=$ageMs"
+
+        thread(
+            start = true,
+            isDaemon = true,
+            name = "PrivyHub-Native-Desync"
+        ) {
+            try {
+                httpPost(
+                    address,
+                    readTimeoutMs = 1_500
+                )
+            } catch (_: Exception) {
+                // Best-effort. When the link is down in both directions
+                // the host pauses on controller silence instead.
+            }
+        }
+    }
+
+
+    // D-BASE-P1. Read once per session from the launch intent; anything
+    // outside a sane band is ignored in favour of the product default, so a
+    // typo cannot silently disable the stale policy.
+    private fun requestedStaleOutputMs(): Long {
+        val requested =
+            intent.getIntExtra(
+                EXTRA_STALE_OUTPUT_MS,
+                AvcLowLatencyDecoder
+                    .DEFAULT_STALE_OUTPUT_MS
+                    .toInt()
+            )
+                .toLong()
+
+        if (
+            requested < 16L ||
+            requested > 1_000L
+        ) {
+            return AvcLowLatencyDecoder
+                .DEFAULT_STALE_OUTPUT_MS
+        }
+
+        return requested
+    }
+
+
+    private fun requiredCleanTicks(): Int {
+        return if (recoveryActive) {
+            RECOVERY_CLEAN_TICKS
+        } else {
+            STABILIZATION_CLEAN_TICKS
         }
     }
 
@@ -2081,6 +2967,23 @@ class NativeStreamActivity :
             elapsedMs >=
             STABILIZATION_TIMEOUT_MS
         ) {
+            if (recoveryActive) {
+                // D-BASE-R3: a recovery does not give up on a timeout. The
+                // link may be down for minutes; the host owns the encoder
+                // restarts and the give-up decision.
+                stabilizationStartedAtNs =
+                    System.nanoTime()
+                stabilizationBaselineSet =
+                    false
+                stabilizationCleanTicks =
+                    0
+                stabilizationPhase =
+                    "Reconnecting"
+                publishStreamStatus()
+                updateStabilizationOverlay()
+                return
+            }
+
             failStabilization(
                 "Stability timeout — game remains paused"
             )
@@ -2201,7 +3104,7 @@ class NativeStreamActivity :
 
         if (
             stabilizationCleanTicks >=
-            STABILIZATION_CLEAN_TICKS
+            requiredCleanTicks()
         ) {
             requestGameplayRelease()
         }
@@ -2264,6 +3167,31 @@ class NativeStreamActivity :
         }
 
         maybeSendClientHealth(
+            nowNs
+        )
+
+        maybeSendStallHeartbeat(
+            nowNs
+        )
+
+        sampleAudioTick(
+            nowNs
+        )
+
+        // D-BASE-T1: at most one read per 10 s, whatever the tick rate.
+        thermalSampler?.sample(
+            nowNs
+        )
+
+        // D-BASE-R4 item 1: a gap that never ends is invisible to
+        // drainOutputs, which only records a slow event when a frame comes
+        // out. This is the only place that can see one while it is
+        // happening.
+        decoder?.noteOutputStall(
+            nowNs
+        )
+
+        maybeEnterLinkRecovery(
             nowNs
         )
 

@@ -1,0 +1,79 @@
+
+===== PC path (reference)  (n=11) =====
+run         dur_s       lostlost_in_res   loss/min   fwd_gaps    pkt/gap  maxgap_pk late/reord       disc  maxout_ms  spk20/min  stale/min        fps   aud_lost  aud_under
+A60          96.8          0          0        0.0          0          -          0          0          0        268       67.5        3.7      59.73          1        222
+B60          96.9          6          0        3.7          2       3.00          3          0          0        174       62.5       10.5      59.59          3        225
+C60          97.0          2          0        1.2          1       2.00          2          0          0        147       69.9        9.3      59.65         10        254
+Q1          129.0         19          0        8.8          5       3.80          6          0          0        296       94.0        8.4      59.66         29          0
+Q2          125.9        134          0       63.9         11      12.18         31          0          0        191       99.6        6.7      59.49          5          6
+Q3          130.9        451          0      206.7         28      16.11         58          0          0        259      251.1        7.3      59.13          4         21
+Q4          133.0        397          0      179.1         22      18.05         49          0          0        175      140.3        2.7      59.26         15          3
+Q5          131.0        241          0      110.4         18      13.39         38          0          0        292      154.8        5.0      59.38         13         20
+R1          158.1        122          0       46.3         12      10.17         27          0          0        331       84.2        6.8      59.62          9         12
+R2          158.2         51          0       19.3          7       7.29         26          0          0        321       87.2        5.7      59.61         12         13
+R3          158.5        228          0       86.3         14      16.29         47          0          0        357       87.1        6.8      59.59         15          5
+MED         130.9        122          0       46.3         11      11.17         27          0          0        268       87.2        6.8      59.59         10         13
+  C5a counters:
+  run           resyncs       ssrc_chg    max_jump_pk   idr_rejected nonidr_dropped  pkts_wait_idr  resync_idr_ms max_res_idr_ms   first_idr_ms   gap_au_drops      fec_unrec
+  A60                 0              0              0              -              -              0              0              0            634              0              0
+  B60                 0              0              0              -              -              0              0              0            597              2              1
+  C60                 0              0              0              -              -              0              0              0            576              1              1
+  Q1                  0              0              0              -              -              0              0              0            735              5              5
+  Q2                  0              0              0              -              -              0              0              0            620             11              3
+  Q3                  0              0              0              -              -              0              0              0            665             28              1
+  Q4                  0              0              0              -              -              0              0              0            705             22              4
+  Q5                  0              0              0              -              -              0              0              0            637             18              5
+  R1                  0              0              0              0              0              0              0              0            577             12              2
+  R2                  0              0              0              0              0              0              0              0            577              7              1
+  R3                  0              0              0              0              0              0              0              0            607             14              3
+
+===== Opal path (B2)  (n=6) =====
+run         dur_s       lostlost_in_res   loss/min   fwd_gaps    pkt/gap  maxgap_pk late/reord       disc  maxout_ms  spk20/min  stale/min        fps   aud_lost  aud_under
+O1          126.8         40          0       18.9          7       5.71         22          0          0        143       48.2        5.7      59.71         27          2
+O2          127.8         15          0        7.0          3       5.00          8          0          0        153       46.5        7.0      59.68         14          2
+O3          126.9         15          0        7.1          7       2.14          3          0          0        193       54.4        5.2      59.66         14          2
+O4          126.9         51          0       24.1         13       3.92         11          0          0        139       47.8        7.1      59.63         12          1
+O5          126.8         49          0       23.2          6       8.17         32          0          0        231       46.4        8.0      59.66          9          3
+O6          126.9         30          0       14.2         10       3.00          8          0          0        153       50.1        7.1      59.68          5          1
+MED         126.9         35          0       16.6          7       4.46         10          0          0        153       48.0        7.1      59.67         13          2
+  C5a counters:
+  run           resyncs       ssrc_chg    max_jump_pk   idr_rejected nonidr_dropped  pkts_wait_idr  resync_idr_ms max_res_idr_ms   first_idr_ms   gap_au_drops      fec_unrec
+  O1                  0              0              0              0              0              0              0              0            595              7              6
+  O2                  0              0              0              0              0              0              0              0            579              3              3
+  O3                  0              0              0              0              0              0              0              0            573              7              5
+  O4                  0              0              0              0              0              0              0              0            613             13              8
+  O5                  0              0              0              0              0              0              0              0            586              6              5
+  O6                  0              0              0              0              0              0              0              0            588              9              8
+
+===== Opal PULSE  (single 3 s SIGSTOP/SIGCONT at 60 s)  (n=1) =====
+run         dur_s       lostlost_in_res   loss/min   fwd_gaps    pkt/gap  maxgap_pk late/reord       disc  maxout_ms  spk20/min  stale/min        fps   aud_lost  aud_under
+PULSE       126.9        740        690      349.9         10       5.00         15          0          1       3048      116.3       12.8      58.78          4          1
+  C5a counters:
+  run           resyncs       ssrc_chg    max_jump_pk   idr_rejected nonidr_dropped  pkts_wait_idr  resync_idr_ms max_res_idr_ms   first_idr_ms   gap_au_drops      fec_unrec
+  PULSE               1              0            690              0             13            109             60             60            555             10              7
+
+===== per-discontinuity rows (all sessions, both arms) =====
+arm                   run    elapsed_ms              type  jump_pk res_idr_ms  rej_idr drop_nonidr au_complete
+Opal PULSE            PULSE       69968   sequence_resync      690         60        0          13        True   idr_at=70029 fec_unrec_grp=False
+
+===== medians side by side =====
+lost         PC        122   Opal         35   ratio    3.49x
+lost_in_res  PC          0   Opal          0
+loss/min     PC       46.3   Opal       16.6   ratio    2.80x
+fwd_gaps     PC         11   Opal          7   ratio    1.57x
+pkt/gap      PC      11.17   Opal       4.46   ratio    2.50x
+maxgap_pk    PC         27   Opal         10   ratio    2.84x
+late/reord   PC          0   Opal          0
+disc         PC          0   Opal          0
+maxout_ms    PC        268   Opal        153   ratio    1.75x
+spk20/min    PC       87.2   Opal       48.0   ratio    1.82x
+stale/min    PC        6.8   Opal        7.1   ratio    0.96x
+fps          PC      59.59   Opal      59.67   ratio    1.00x
+aud_lost     PC         10   Opal         13   ratio    0.77x
+aud_under    PC         13   Opal          2   ratio    6.50x
+
+full per-session lists (the day-to-day swing is larger than most effects):
+  loss per minute        PC path (reference)    0.0, 1.2, 3.7, 8.8, 19.3, 46.3, 63.9, 86.3, 110.4, 179.1, 206.7
+  loss per minute        Opal path (B2)         7.0, 7.1, 14.2, 18.9, 23.2, 24.1
+  packets per gap event  PC path (reference)    2.00, 3.00, 3.80, 7.29, 10.17, 12.18, 13.39, 16.11, 16.29, 18.05
+  packets per gap event  Opal path (B2)         2.14, 3.00, 3.92, 5.00, 5.71, 8.17

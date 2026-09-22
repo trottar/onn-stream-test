@@ -265,3 +265,122 @@ Strike the falsified reasoning in place rather than deleting it, mark the
 current state authoritative, and say explicitly which of the remaining reasons
 still carry the decision. A decision with one reason struck and three intact
 is a different object from a decision that was never examined.
+
+## Teardown is part of the test, and the client is part of the teardown
+
+The first fully autonomous session on 2026-09-20 did everything the
+instruction listed — BACK to post the report, `stop` the game, kill the
+companion, verify no host process remained — and still left the onn showing
+"NOW PLAYING … PAUSED". The host was clean; the client was not. The launcher
+clears that banner only when its own END control runs or when an `onResume`
+poll gets `active: false`, and the companion was already dead when the
+launcher next asked.
+
+"Leave the host as you found it" is half the rule. The client keeps its own
+view of the session, and that view is updated by the companion answering,
+not by the companion existing. End the game through the client, or make the
+client re-poll while the companion is still up, and verify what the client
+shows before the last process is stopped. A teardown checklist that only
+lists host processes will pass while the user's screen is wrong.
+
+## An instrumentation threshold is tuned to the fault it was built for
+
+`AvcLowLatencyDecoder` records a slow event only when a frame's
+receive-to-output latency reaches 50 ms. That was the right trigger for the
+fault the corpus showed — a codec that held frames — because a long output
+gap and a long latency were the same event.
+
+`C3.L2c` removed the hold, and the trigger went blind precisely where it was
+needed. On the low-latency build the worst output gap of a session ends with
+a frame that arrived late but decoded fast, so it never qualifies: in two of
+three sessions the buffer had spare capacity and the worst gap still had no
+row, and `slow_event_retained_marked` was 0 in all three despite five
+sequence resyncs — the `C3.L2b` cycle window protected nothing because
+nothing qualified to protect.
+
+The absence was readable only because the retention counters were in the
+report: `recent 21/64` says "not overflowed", which turns "the event is
+missing" from a retention question into a threshold one, and that is what
+made the attribution possible at all.
+
+When a change is expected to move where time is spent, check whether the
+instrumentation's trigger still fires on the new shape before reading its
+silence as good news. Record a counter alongside every bounded list so a
+later reader can tell eviction from non-qualification.
+
+## A rollback is a result that can itself be wrong
+
+`C3.L2c` was rolled back on 2026-09-19 on one number — `max_output_gap_ms`
+385 against a 359 ms baseline — while the same session showed a 20x
+improvement in receive-to-output spikes. The rollback was recorded honestly,
+with its measurement, as the negative-result policy requires. It was still
+the wrong call: the 385 ms was an arrival gap and the 359 ms was a codec
+hold, so the two numbers were never the same quantity, and re-running it
+three times showed the improvement holds across the distribution.
+
+The negative-result policy keeps failures from being lost. It does not make
+them correct. A recorded rollback deserves the same scepticism as a recorded
+success — especially a rollback decided by a single sample of a metric whose
+meaning the change itself altered. Before citing "we tried that and it
+failed", check what the deciding number measured on each side of the change.
+
+## A background start hides the failure that matters most
+
+`nohup python3 ./companion/privyhub_service.py &` looked identical whether it
+started or not. On 2026-09-20 it did not start — an older companion still
+held port 8765 — and the bind error went into a redirected log nobody read.
+The old process answered every request, so the shell, the game launch, the
+stream and the session report all behaved normally, and a validation session
+ran to completion against code that predated the patch it was validating.
+
+What caught it was the check itself: the new endpoint answered "Unknown
+Games plugin POST action". A check that only confirmed the expected outcome
+would have passed on the strength of the *old* code's behaviour.
+
+The project already had the rule — D-068, restart the companion whenever
+companion Python changes, stale-process behavior is not evidence. The rule
+was followed and the restart still did not happen. So the rule needs its
+verification attached: after starting a service in the background, confirm
+the pid you started is the one serving, not merely that something answers.
+"Started" and "running" are different claims, and `&` reports neither.
+
+## Fix the stale assertion in both directions
+
+`D-BASE-R2` piece 3 existed because the launcher kept saying "NOW PLAYING"
+when it could no longer confirm a session. The first implementation replaced
+that with a status line reading "Companion unreachable" — and nothing ever
+cleared it. The companion came back, the poll succeeded, and the line went
+on asserting the opposite of the truth for the rest of the session.
+
+A notice about a lost dependency is itself a claim about the present. It
+needs the same treatment as the claim it replaced: whatever sets it must
+also retire it when the condition ends. Writing only the failure branch
+swaps one stale assertion for another and feels like progress because the
+original bug is gone.
+
+## A substitute fault must reproduce the mechanism, not the symptom
+
+`C5a` needed a sequence resync — 128+ consecutive RTP packets missing — and
+the authorized substitute for the unavailable nftables injection was a
+0.3 s SIGSTOP of the encoder. Three sessions produced zero resyncs, and the
+reason is that the substitute cannot produce one *in principle*: a stopped
+encoder emits nothing, so it burns no sequence numbers, and on SIGCONT the
+sequence resumes contiguous. It makes a gap in **time**; the test needed a
+gap in **sequence**.
+
+The premise had propagated. `D-BASE-R3a` recorded 720/984/480-packet jumps
+during SIGSTOP runs, and the next task cited them as evidence that the
+pulses cause jumps. They did not: those jumps came from encoder *restarts*
+the recovery fired during longer holds, which mint a new SSRC and a fresh
+sequence base. A correlation inside one record became a causal claim in the
+next, and a session's worth of runs was spent before the data contradicted
+it — `max_forward_gap_packets` 47 against a 128 threshold.
+
+Two habits would have caught it earlier. State the causal chain from the
+injection to the metric before running, in one sentence, and check each
+link: "SIGSTOP stops the encoder → the encoder sends no packets → ... → the
+receiver sees a sequence jump" fails at the third arrow on inspection
+alone. And run the positive control first: exercise the new counter through
+*any* path that must trip it, so a zero result is known to mean "nothing
+happened" rather than "nothing was measured". The C5a control session did
+exactly that, and it was what separated a sound probe from a broken one.

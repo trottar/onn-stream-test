@@ -1,0 +1,100 @@
+===== per session, in run order =====
+run       cfg      dur_s   loss/min   fwd_gaps    pkt/gap  maxgap_pk       disc  maxout_ms  spk20/min max_rx2dec        fps  space_p50  space_p99 sendmax_us
+P1off     0         127.0       22.2          6       7.83         16          0        136       46.8        137      59.67          -          -      929.6
+P1on      150       126.8        3.8          5       1.60          2          0        137       67.6        101      59.71      147.5      202.5     1206.8
+P2off     0         127.9       35.2         11       6.82         22          0        255       42.7        106      59.63          -          -      990.1
+P2on      150       126.9        9.0          6       3.17          8          0        156       60.1        109      59.65      147.5      172.5     1627.7
+P3off     0         126.8        4.7          2       5.00          5          0         98       42.1        170      59.69          -          -      714.5
+P3on      150       129.0       13.0          9       3.11          8          0        152       57.2        112      59.68      147.5      217.5     2601.4
+P4off     0         126.8       20.3          8       5.38         22          0        128       35.5        123      59.66          -          -    67989.4
+P4on      150       126.9       11.8          7       3.57         12          0        109       52.9        136      59.67      147.5      252.5     1257.7
+P5off     0         130.0        1.8          1       4.00          4          0         97       43.8        188      59.72          -          -     1015.3
+P5on      150       126.9       22.7          6       8.00         31          0        120       61.0        143      59.67      147.5      182.5    60096.1
+S1off     0         126.8        3.8          3       2.67          4          0        101       41.2         95      59.75          -          -     1014.2
+S1on400   400       126.9        6.6          6       2.33          4          0        123       59.6         93      59.70      187.5      417.5     1033.2
+S2off     0         126.9        6.1          4       3.25          5          0        136       39.7        103      59.68          -          -     1012.2
+S2on400   400       126.9       27.9         14       4.21         19          0        161       67.6        128      59.64      187.5      457.5     1277.3
+S3off     0         126.9        5.2          4       2.75          4          0        109       46.3        122      59.71          -          -     1431.2
+
+Rejected (discontinuity in first 30 s): 0 of 15. None re-run was needed.
+Last session in run order: S3off, pacing enabled=False, configured_us=0
+
+===== BLOCK A - PACING_US = 150, five pairs, strictly alternating from off =====
+pair    loss/min off       on    fall     pkt/gap off      on    fall     spk20 off      on     rx2dec off     on
+P1              22.2      3.8   5.87x            7.83    1.60   4.90x          46.8    67.6            137    101
+P2              35.2      9.0   3.91x            6.82    3.17   2.15x          42.7    60.1            106    109
+P3               4.7     13.0   0.36x            5.00    3.11   1.61x          42.1    57.2            170    112
+P4              20.3     11.8   1.72x            5.38    3.57   1.50x          35.5    52.9            123    136
+P5               1.8     22.7   0.08x            4.00    8.00   0.50x          43.8    61.0            188    143
+  loss/min fell in    3 of 5 pairs
+  pkt/gap  fell in    4 of 5 pairs
+  spike20/min ROSE in 5 of 5 pairs
+  max_rx2dec ROSE in  2 of 5 pairs
+  medians (P, off n=5 / on n=5 at 150 us):
+    dur_s        off      127.0   on      126.9   ratio    1.00x
+    loss/min     off       20.3   on       11.8   ratio    1.72x
+    fwd_gaps     off          6   on          6   ratio    1.00x
+    pkt/gap      off       5.38   on       3.17   ratio    1.70x
+    maxgap_pk    off         16   on          8   ratio    2.00x
+    disc         off          0   on          0
+    maxout_ms    off        128   on        137   ratio    0.93x
+    spk20/min    off       42.7   on       60.1   ratio    0.71x
+    max_rx2dec   off        137   on        112   ratio    1.22x
+    fps          off      59.67   on      59.67   ratio    1.00x
+    space_p50    off          -   on      147.5
+    space_p99    off          -   on      202.5
+    sendmax_us   off      990.1   on     1627.7   ratio    0.61x
+    loss per minute   off  1.8, 4.7, 20.3, 22.2, 35.2
+    loss per minute   on   3.8, 9.0, 11.8, 13.0, 22.7
+    packets per gap   off  4.00, 5.00, 5.38, 6.82, 7.83
+    packets per gap   on   1.60, 3.11, 3.17, 3.57, 8.00
+    spikes>=20ms/min  off  35.5, 42.1, 42.7, 43.8, 46.8
+    spikes>=20ms/min  on   52.9, 57.2, 60.1, 61.0, 67.6
+    max_rx_to_decode  off  106, 123, 137, 170, 188
+    max_rx_to_decode  on   101, 109, 112, 136, 143
+
+===== BLOCK B - PACING_US = 400, scaling probe, two pairs =====
+pair    loss/min off       on    fall     pkt/gap off      on    fall     spk20 off      on     rx2dec off     on
+S1               3.8      6.6   0.57x            2.67    2.33   1.14x          41.2    59.6             95     93
+S2               6.1     27.9   0.22x            3.25    4.21   0.77x          39.7    67.6            103    128
+  loss/min fell in    0 of 2 pairs
+  pkt/gap  fell in    1 of 2 pairs
+  spike20/min ROSE in 2 of 2 pairs
+  max_rx2dec ROSE in  1 of 2 pairs
+  medians (S, off n=3 / on n=2 at 400 us):
+    dur_s        off      126.9   on      126.9   ratio    1.00x
+    loss/min     off        5.2   on       17.3   ratio    0.30x
+    fwd_gaps     off          4   on         10   ratio    0.40x
+    pkt/gap      off       2.75   on       3.27   ratio    0.84x
+    maxgap_pk    off          4   on         12   ratio    0.35x
+    disc         off          0   on          0
+    maxout_ms    off        109   on        142   ratio    0.77x
+    spk20/min    off       41.2   on       63.6   ratio    0.65x
+    max_rx2dec   off        103   on        110   ratio    0.93x
+    fps          off      59.71   on      59.67   ratio    1.00x
+    space_p50    off          -   on      187.5
+    space_p99    off          -   on      437.5
+    sendmax_us   off     1014.2   on     1155.2   ratio    0.88x
+    loss per minute   off  3.8, 5.2, 6.1
+    loss per minute   on   6.6, 27.9
+    packets per gap   off  2.67, 2.75, 3.25
+    packets per gap   on   2.33, 4.21
+    spikes>=20ms/min  off  39.7, 41.2, 46.3
+    spikes>=20ms/min  on   59.6, 67.6
+    max_rx_to_decode  off  95, 103, 122
+    max_rx_to_decode  on   93, 128
+
+===== does the effect scale with PACING_US? =====
+arm         n  achieved p50  achieved p99   clamped/frames   late  loss/min med  pkt/gap med  spk20 med
+off         8             -             -                -      0           5.7         4.50       42.4
+150 us      5         147.5         202.5         833/7629     46          11.8         3.17       60.1
+400 us      2         187.5         437.5        2253/7630     99          17.3         3.27       63.6
+
+===== pacing fidelity and cost, on-arm sessions =====
+  P1on       cfg=150  p50=147.5   p99=202.5   paced_frames=7628   clamped=892    late=55    max_start_delay_us=14481.952
+  P2on       cfg=150  p50=147.5   p99=172.5   paced_frames=7629   clamped=827    late=39    max_start_delay_us=15871.357
+  P3on       cfg=150  p50=147.5   p99=217.5   paced_frames=7759   clamped=824    late=44    max_start_delay_us=17195.711
+  P4on       cfg=150  p50=147.5   p99=252.5   paced_frames=7636   clamped=833    late=54    max_start_delay_us=64988.086
+  P5on       cfg=150  p50=147.5   p99=182.5   paced_frames=7629   clamped=834    late=46    max_start_delay_us=17120.339
+  S1on400    cfg=400  p50=187.5   p99=417.5   paced_frames=7629   clamped=2251   late=88    max_start_delay_us=16240.797
+  S2on400    cfg=400  p50=187.5   p99=457.5   paced_frames=7630   clamped=2255   late=110   max_start_delay_us=17645.691

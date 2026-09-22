@@ -1,0 +1,10 @@
+session,arm,status,elapsed_ms,type,jump_packets,resync_to_idr_ms,rejected_idr_aus,dropped_non_idr_aus,au_complete,au_fec_recovered,au_fec_unrecoverable_group
+P1off,off,rejected,4446,sequence_resync,302,98,0,11,True,False,False
+P1off,off,rejected,29291,sequence_resync,151,263,0,14,True,False,False
+
+discontinuities total: 2 (sequence_resync 2, ssrc_change 0)
+sequence resyncs > 250 ms: 1
+   P1off sequence_resync: 263 ms, jump 151, rejected_idr_aus 0, dropped_non_idr 14, complete True
+sequence resyncs <= 250 ms: 1, of which with rejected_idr_aus > 0: 0
+
+C5a pre-registered verdict: INDETERMINATE (2 discontinuities, 1 over 250 ms)

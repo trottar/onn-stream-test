@@ -1,0 +1,20 @@
+PrivyHub diagnostic retention plan
+Schema: privyhub_diagnostic_retention_v1
+Mode: DRY_RUN
+Files deleted: 0
+Automatic retention enabled: False
+Durable memory in scope: False
+Patch backups in scope: False
+Policy SHA-256: b13fbc32dbf7f46a4ca9321985ea2d410804c15b9faaf82c3f87dce8356971b5
+
+=== FAMILIES ===
+transport_forward: files=56 total_mib=6.062 limit_mib=256.000 protected=36 would_delete=0 would_free_mib=0.000 projected_mib=6.062 blocked=False
+transport_reverse: files=9 total_mib=0.702 limit_mib=128.000 protected=9 would_delete=0 would_free_mib=0.000 projected_mib=0.702 blocked=False
+debug_bundles: files=0 total_mib=0.000 limit_mib=64.000 protected=0 would_delete=0 would_free_mib=0.000 projected_mib=0.000 blocked=False
+stream_log_archive: files=0 total_mib=0.000 limit_mib=32.000 protected=0 would_delete=0 would_free_mib=0.000 projected_mib=0.000 blocked=False
+
+Total would delete: 0 file(s)
+Total would free: 0.000 MiB
+
+No files were deleted.
+To apply later, re-run with --apply and the exact policy SHA-256.

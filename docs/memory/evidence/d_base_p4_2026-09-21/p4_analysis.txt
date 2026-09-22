@@ -1,0 +1,53 @@
+===== per session: loss (report, authoritative) beside radio =====
+run     dur  loss loss/min  fge pk/gap maxgap disc spk20/m    fps  | rssi med  min  max tx med tx min tx max rx med beacon scans
+S1      127    14      6.6    2   7.00     12    0    42.6  59.71  |      -66  -67  -64    195    175    260    117      0     0
+S2      127    52     24.6   14   3.71      8    0    50.1  59.67  |      -66  -67  -64    260    234    292    117      0     0
+S3      127     3      1.4    1   3.00      3    0    47.3  59.72  |      -66  -67  -65    260    195    292    117      0     0
+S4      130    50     23.1   10   5.00     21    0    62.4  59.56  |      -66  -67  -65    260    195    260    117      0     0
+S5      130    13      6.0    2   6.50      8    0    40.6  59.74  |      -66  -68  -65    260    117    260    117      0     0
+S6      127    33     15.6    6   5.50      8    0    48.7  59.70  |      -67  -69  -65    234    117    263    117      0     0
+L20    1208  2114    105.0  142  14.89     53    0    45.9  59.76  |      -66  -67  -65    260    130    390    117      0     0
+
+===== association, every session =====
+  S1    band=5GHz ch=36 80MHz 802.11 std=5 max=866Mbps state=COMPLETED score=60
+  S2    band=5GHz ch=36 80MHz 802.11 std=5 max=866Mbps state=COMPLETED score=60
+  S3    band=5GHz ch=36 80MHz 802.11 std=5 max=866Mbps state=COMPLETED score=60
+  S4    band=5GHz ch=36 80MHz 802.11 std=5 max=866Mbps state=COMPLETED score=60
+  S5    band=5GHz ch=36 80MHz 802.11 std=5 max=866Mbps state=COMPLETED score=60
+  S6    band=5GHz ch=36 80MHz 802.11 std=5 max=866Mbps state=COMPLETED score=60
+  L20   band=5GHz ch=36 80MHz 802.11 std=5 max=866Mbps state=COMPLETED score=60
+
+===== Spearman across sessions: loss/min vs radio =====
+  (n = 7 sessions; loss from the report, radio from the 3 s ring)
+  median rssi                  rho=+0.000 n=7
+  worst rssi                   rho=+0.267 n=7
+  median level (/proc)         rho=+0.000 n=7
+  median link_quality (/proc)  rho=+0.786 n=7   <-- |rho| >= 0.5
+  median txLinkSpeed           rho=+0.178 n=7
+  worst txLinkSpeed            rho=+0.182 n=7
+  median rxLinkSpeed           rho=None n=7
+
+===== counters the driver does NOT populate (absences, not zeros) =====
+  WifiScoreReport tx_retry, tx_bad, bcnCnt ....... identically 0, all rows
+  /proc/net/wireless disc_* and missed_beacon .... identically 0, all samples
+  /proc/net/wireless noise ....................... -256 (driver reports none)
+  WifiUsabilityStatsEntry total_tx_retries/bad ... identically 0
+  => the retry/failure half of the pre-registered test is UNAVAILABLE here.
+    S1    disc_retry max=0 disc_misc max=0 missed_beacon max=0
+    S2    disc_retry max=0 disc_misc max=0 missed_beacon max=0
+    S3    disc_retry max=0 disc_misc max=0 missed_beacon max=0
+    S4    disc_retry max=0 disc_misc max=0 missed_beacon max=0
+    S5    disc_retry max=0 disc_misc max=0 missed_beacon max=0
+    S6    disc_retry max=0 disc_misc max=0 missed_beacon max=0
+    L20   disc_retry max=0 disc_misc max=0 missed_beacon max=0
+
+===== scan events inside session windows =====
+  NONE - not one scan of any kind was logged inside any session window.
+
+===== radio stability across the whole run =====
+  3 s ring rows pooled: 639
+  rssi        min=-69 med=-66 max=-64 spread=5 dB
+  txLinkSpeed min=117 med=260 max=390 distinct=9
+  rxLinkSpeed min=29 med=117 max=351 distinct=7
+  loss/min across sessions: 1.4 .. 105.0 (74x swing)
+  sampler cost ms, median per session: [209, 200, 198, 200, 205, 195, 193]

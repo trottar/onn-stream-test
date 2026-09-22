@@ -1,144 +1,179 @@
 # Current Handoff
 
-The authoritative resumable state is `../CURRENT.md`.
-The compact Phase C brief is `../PHASE_C_CONTEXT.md`; **start there**. It is
-self-sufficient and does not require reading the wider hierarchy.
+Authoritative state: `../CURRENT.md`. **Start there.**
 
-D5 media/server restoration remains COMPLETE / RUNTIME VALIDATED.
-D4 Games remains COMPLETE / RUNTIME VALIDATED.
+## READ FIRST
 
-This handoff replaces the 2026-09-18 version below (kept for history further
-down this file). Everything in the old "Next work item" / "C3 entry
-conditions" sections has been superseded by the two items closed on
-2026-09-19, `C3.L2c` and `C3.L3`.
+**The 90 KB frame cap is ADOPTED and in force.**
+`max_frame_size_bytes = 90,000` is a declared field of
+`native_game_720p60_reference` (Linux `h264_vaapi`), running with
+**nothing set in the environment**. The user checked the picture first —
+"could barely tell it was over the LAN", **their words, not instrument
+evidence**. **Loss runs 5.4-12.4/min against an uncapped 110-145**, zero
+≥80-packet frames, bitrate/fps/CPU unchanged, holding over three hours.
 
-## 2026-09-19 work, in order
+**Three things before touching the encoder.** **`any_override: false`
+means "only the profile decided"**, not "no cap" — an uncapped run is
+`any_override: true` with `uncapped: true`.
+**`PRIVYHUB_ENC_MAX_FRAME_SIZE=0` runs uncapped**, flag absent, which
+re-runs the `P6` baseline without editing source. And **60 KB and VBV are
+measured alternatives, not rejected ones** — reopen on a picture
+complaint, not on more loss measurement.
 
-1. **`C3.L2c` — MediaCodec low-latency decode. Installed, runtime tested,
-   FALSIFIED, rolled back.**
-   `AvcLowLatencyDecoder.kt` was changed to request `KEY_LOW_LATENCY`
-   unconditionally instead of gating on the decoder's own
-   `FEATURE_LowLatency` self-report (which reports unsupported on
-   `c2.realtek.video.avc.decoder`). Real gradle build passed, installed on
-   device. Runtime result: the flag flipped true and per-frame decode
-   improved sharply — `max_codec_ms` 107 ms, the best of eight same-day
-   sessions, with `spike_250_ms` at zero, the only session of the eight
-   with none. But `max_output_gap_ms` was **385 ms, second worst of the
-   eight**, and the user's own gameplay assessment ("trash") matched it.
-   Reverted to the exact predecessor bytes (SHA-256
-   `22038e355f85bb8330d900bae64c37db54c902d4affdef12be4810bb03271c07`,
-   verified byte-exact); the first post-revert session reports
-   `low_latency_enabled: false` and a 221 ms gap. **Do not retry the
-   unconditional request without new evidence.** Records:
-   `../evidence/C3_L2C_LOW_LATENCY_DECODE_FALSIFIED_2026-09-19.md`,
-   `../patches/C3-L2C_LOW_LATENCY_DECODE_ENABLE.md`.
+The path is **host wired -> Opal -> onn wireless, one hop** (`B2`).
 
-2. **`C3.L3` — Linux fixed-bitrate characterization. Ported, installed,
-   runtime validated, CLOSED.**
-   The existing probe scripts (`tools/probe_c3_fixed_{5000,5500,6000}_characterization.py`)
-   called a Windows-only implementation (`companion/diagnostics/c3_fixed_bitrate_probe.py`,
-   built around WGC replacement capture — `hwnd`, `_wgc_bridge_path()`) that
-   fails immediately on Linux. Ported by reusing the validated `C3.L1`/
-   `C3.L1R1` Linux encoder-only restart primitive instead of building
-   something new: `run_c3_linux_fixed_bitrate_cycle()`, added to
-   `companion/diagnostics/c3_linux_actuator_probe.py`, restarts the single
-   x11grab/VAAPI ffmpeg process at a caller-chosen bitrate via
-   `_build_linux_ffmpeg_command`'s pre-existing (but previously unused)
-   `bitrate_kbps`/`max_bitrate_kbps` override parameters. `native_stream.py`'s
-   three `diagnostic_c3_fixed_bitrate_*_cycle` methods now dispatch
-   Linux/Windows the same way `diagnostic_c3_actuator_continuity_cycle`
-   already did. The Windows implementation was not touched. Record:
-   `../patches/C3-L3_LINUX_FIXED_BITRATE_PORT.md`.
+**`D-BASE-R3b` RAN 2026-09-22, by hand** — the classifier still refuses
+every `nft` write, so the user drove
+`../evidence/d_base_r3b_2026-09-21/r3b_run.sh`. **N3, N15 and N150 all
+PASS**; N15 caught an encoder restart **succeeding while the fault was still
+dropping every packet**, and N150's give-up landed at **120.42 s** with the
+`.state.recovery` file written. **N05, N15b and E30 did not run, so `R3` +
+`R3a` are still NOT runtime validated** and `END_MS` is still unexercised.
+Record: `../evidence/D_BASE_R3B_NFTABLES_LINK_DROP_2026-09-22.md`.
 
-   Runtime result after three full characterization runs (ten clean
-   trigger/finalize cycles, zero cycle-level FEC/audio/controller errors
-   throughout): `decoder_max_output_gap_ms` ranged **291-331 ms at 6000 kbps
-   (tightest, 40 ms band)**, 242-367 ms at 5000 kbps, and 219-584 ms at
-   5500 kbps (widest, one severe unexplained outlier). Full data:
-   `../evidence/C3_L3_LINUX_FIXED_BITRATE_CHARACTERIZATION_2026-09-19.md`.
-   **This does not authorize automatic in-session adaptation** — that is
-   `C3.L4`, gated on a focused gameplay acceptance that nothing on
-   2026-09-19 performed.
+**Read the loss numbers with the restart caveat.** A 3 s outage with no
+restart counted **2 348** lost packets; 15 s and 150 s outages that restarted
+counted **22** and **40** — a new SSRC makes the return an `ssrc_change`, not
+loss. **`max_output_gap_ms` is the honest column for outages.**
 
-3. **`C3-L3R1` — memory correction.** The `C3.L3` evidence file, `CURRENT.md`
-   and `docs/KNOWN_ISSUES.md` were written before the 6000 kbps rerun was
-   read back, and declared that result invalid and still owing. It was not:
-   the rerun was already on disk and valid. Corrected, with the three-run
-   reading re-derived. `C3.L2c`'s result was also promoted from its install
-   record into an evidence record. Record:
-   `../patches/C3-L3R1_CHARACTERIZATION_CORRECTION.md`.
+**Two post-run defects are open**
+(`../evidence/R3B_POST_RUN_SESSION_REUSE_2026-09-22.md`): a stream-stop leaves
+the game session live, so the launcher resolves to `recovery-resume` and
+reports "Loaded" with no window; and after a recovery-state load the source
+picture cycles through about four frames. The Tekken 3 `.state.recovery` is
+**kept on purpose** as their evidence.
 
-## Issues found, not yet resolved
+## 2026-09-22 — `H2-PREP` and `M1`, the two non-stream tasks
 
-- **Probe-script finalize matched the wrong decoder-session file once.**
-  On the run-3 first attempt, `tools/probe_c3_fixed_6000_characterization.py
-  --finalize` — run immediately after `..._5500_... --finalize` — returned a
-  result byte-identical to the 5500 kbps run and matched that run's
-  decoder-session file. That attempt was discarded. The 6000 kbps **rerun
-  matched correctly**: `c3_fixed_6000_characterization.json` records
-  `payload.decoder_session_log = .../native_decoder_20260919_060325_369.json`,
-  a distinct 64,840 ms session. So the defect is intermittent, not a
-  guaranteed failure of back-to-back finalizes. Root cause not found.
-  Affects `tools/probe_c3_fixed_*_characterization.py` only, not the `C3.L3`
-  companion code. Logged in `../../KNOWN_ISSUES.md`
-  (`PRIVYHUB_C3_L3_FINALIZE_MATCH_BUG`). **Check
-  `payload.decoder_session_log` and `session_duration_ms` against the
-  intended session before trusting any finalize result.**
+`../evidence/H2_PREP_HOST_DISPLAY_INVENTORY_2026-09-22.md`;
+`../CHECKPOINT_PROPOSAL_2026-09-22.md`. Neither touched source.
 
-- **File-bridge writes to `docs/memory/*.md` lagged behind their own commits
-  on 2026-09-19.** Several times, a file that was just written and confirmed
-  "written" read back as an older version. Retrying after a delay, and
-  writing files in isolated single-file commits rather than rapid
-  back-to-back batches, got the correct content to stick every time. Never
-  affected code files or single-write new files. **If a new session sees
-  `docs/memory/` content that looks stale relative to this handoff,
-  re-stage the file rather than assuming the repo regressed** — check the
-  raw file directly before trusting a summary of it, per standing practice.
+**Three things block `H2`, none about the plug.** **No
+`openssh-server`** — absent, not disabled, so `H1` has not started and
+there is no console once the monitor is gone. **No autologin** — a
+reboot stops at the LightDM greeter: no X session, no window, no capture.
+**Nothing starts the companion at boot**, `Linger=no`. All three are
+user-side root writes; `D-BASE-H2_TASK.md` is rewritten round them.
 
-## Standing workflow rules added 2026-09-19 (now in `../AGENTS.md`)
+**Names you will need:** X **`DisplayPort-0`** = DRM **`card0-DP-1`**,
+**off by one**; today's monitor maxes at **1440x900** through a DP→VGA
+adapter. **The capture is a `-window_id`, not the screen**, and
+`xdotool --onlyvisible` means X-mapped, so it should survive headless —
+*"Whole-desktop capture is intentionally disabled"* means **no window**,
+not a capture fault.
 
-- Every response that asks the user to run something includes the exact
-  command(s), inline, always — not a description of what to run.
-- Diagnostic/probe output a script already persists to a file (`logs/`,
-  `docs/memory/evidence/`) is read directly from the repository through
-  the file bridge, not requested as a paste.
-- Patch tiering and the execution budget: see `../AGENTS.md` and
-  `../patches/PATCH_PROTOCOL.md`. Tier 1 is the default; the 2026-09-18
-  patch records are **not** the model for validation effort.
+**`M1` corrected one thing the handoffs had wrong.** The synthetic UDP
+burst/gap/**duplication** pathology is **not Windows-only**:
+`investigations/DEFERRED.md` records it reproducing from a Linux sender,
+bidirectionally, while idle. It has never been replayed on the post-`B2`
+topology. **PAUSED**, and **a different fault** from the in-session loss
+the cap fixed. `KNOWN_ISSUES.md` carries two entries.
 
-## Next work item
+**Nothing is committed.** `.claude/` and `_prel2b/` are untracked and
+**unignored** — the user's call first.
 
-**`C3.L3a` — gameplay acceptance probe.** REGISTERED / NEXT, design not yet
-authorized. Ask for the design as a short plan first, no code; Tier 1 when
-built. Scope: `../investigations/ACTIVE.md`.
+## 2026-09-22 — `D-BASE-P7`, the starvation counter named. CHARACTERIZED.
 
-`C3.L3a` is the `C3.L4` gate made performable — diagnostic-only, authorizes
-nothing, reuses the validated `run_c3_linux_fixed_bitrate_cycle` as-is.
-Required shape: several transitions in one session, at intervals the player
-does not know in advance, at least one no-op control interval, marks compared
-against `stream_discontinuities` `elapsed_ms` **after** the session, and time
-parked at 5000/5500 kbps to judge the picture.
+`../evidence/D_BASE_P7_STARVATION_COUNTER_2026-09-22.md`; patch of the
+same name.
 
-**`C3.L4` is not unblocked and cannot be unblocked by data.** Two things that
-do *not* satisfy the gate, both proposed in good faith before: a manual cycle
-with a subjective read (performed 2026-09-18, ruled insufficient by `C3.L2`
-reason 3), and transport/decoder timing at any sample size (`C3.L2c` is the
-proof — best `max_codec_ms` of eight sessions, verdict "trash"). Full
-definition: `../decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`, section
-"The `C3.L4` gate, stated so it can be satisfied".
+**`prolonged_starvation_events` counts holes in the audio arrival
+stream** — latched, so **one per hole longer than ~15 ms**, episodes not
+polls. Rho **+0.684** against the per-tick max arrival gap, **+0.020**
+against audio loss, and the packet deficit averages **+0.54 of ~400** —
+**nothing is missing, it is late**.
 
----
+**The hole is periodic and not the sender's**: 93 % of ticks peak at
+**50-69 ms** while the host paces to **5.0 ms, max 5.08**. A path
+property — 75.9/min PC, 32/min capped Opal. **Read it as a jitter rate,
+not a fault**: 32/min came with **4 actual underruns in 20 minutes**. The
+only client lever is a deeper cushion (**3 packets / 15 ms** against a p90
+hole of 60 ms = **+45 ms audio latency**); sender pacing is closed by
+measurement. **Nothing changed, no rename.**
 
-# Superseded — 2026-09-18 handoff
+**The heartbeat is schema v3** with ten audio fields. **Adding a field
+takes TWO edits**: the client, *and* `plugins/games.py`'s key whitelist —
+`P7`'s first session recorded no audio fields because of the second, and
+had to be re-run.
 
-Compressed 2026-09-19 to keep this file inside its size budget; `AGENTS.md`
-defines the handoff as a small transfer note. Nothing is lost — that day's
-state is recorded in full in `../2026-09-18.md` and in
-`../evidence/C3_L2A_E2_ACTUATOR_IDR_RESOLVED_2026-09-18.md`.
+**Still open:** what causes the 55-60 ms hole. One maximum per 2 s tick
+aligns with nothing — not the video burst, the AP, or a client stall.
 
-Summary: C1/C2 complete on Linux; `C3.L0`, `C3.L1`, `C3.L1R1` complete;
-`C3.L2` classified Linux `video_only_restart`; `C3.L2a` ANSWERED the same day
-(27 ms actuator IDR against 195/210 ms for ordinary resyncs, so 287-318 ms was
-not actuator cost); `C3.L2b` installed and runtime validated. `C3.L2c` was
-registered but unauthorized then, and has since been authorized, installed,
-falsified and rolled back — see above.
+## 2026-09-22 — `D-BASE-S3`, three hours on the cap. SOAK VALIDATED.
+
+`../evidence/D_BASE_S3_CAP_SOAK_2026-09-22.md`. No code change.
+
+**5.4 losses/min over 180 minutes**, ~25x below uncapped. **0 resyncs, 0
+SSRC changes, 0 onn socket drops**, fps **59.96**, hourly 380/340/253.
+**The residual is a floor**: every Spearman **under 0.08** across 1,080
+ten-second and 180 per-minute windows, bucketed table **flat** where
+uncapped it rose 14-fold. **A tighter cap is not a lever.**
+
+**How to test the cap:** `max_frame_size` is a **target, not a hard
+ceiling**. Two frames came **9-11 bytes over** 90,000 — harmless, but
+**check with a tolerance, never `<= 90000` exactly**.
+
+**Rotation proven over hours**: both bounded logs rotated **twice**, **0
+discontinuities across 10,801 rows**. **Thermals plateau**, but **`S2`'s
+memory result does not reproduce**: RetroArch **+34.3 MB anonymous**
+against `S2`'s +6.2 MB, still rising at the end. **The Opal**: mean
+utilization **6.82 %**, and a **56.6 % excursion moved the loss not at
+all** (rho +0.073).
+
+## 2026-09-22 — `D-BASE-P6a`, the cap adopted. RUNTIME VALIDATED.
+
+`../evidence/D_BASE_P6A_CAP_ADOPTED_2026-09-22.md`; patch and decision of
+the same name. **All ten gates** on one session with
+`env | grep PRIVYHUB_ENC` empty, and the uncapped path **proven**: a 60 s
+`=0` check gave a 90,438-byte frame, flag absent.
+
+**The arithmetic that confuses people:** 90,000 B is **~76-79 packets**,
+because a large frame's packets run near the 1,188-byte payload maximum,
+not the 1,066-byte mean — which is why every capped session reports
+`max_packets` **77** against an ≥80 threshold.
+
+## 2026-09-21 — `P6`, `P5`, `O1` and the instruments
+
+Each has its own record; conclusions in `../MEMORY.md`. Carry these:
+
+**`P6` is the intervention behind the adoption** (arm numbers in
+`../MEMORY.md`). **The causal pattern:** the ≥80-packet bucket carries
+**93-95 % of baseline loss at ~14x the loss/window** of any bucket below,
+capping deletes it, **`< 40` is not raised**. **Knee: a step at 100 KB.**
+The benefit **saturates** at 60 KB; **VBV is not the same lever** (3x the
+loss). **Baselines drift ±15 % — bookend every arm.** No achieved QP,
+`slices` or intra-refresh on this encoder.
+
+**Instrument traps, the expensive ones.**
+
+- **`P5`**: the client's Java socket binds the **IPv6** wildcard — read
+  **`/proc/net/udp6`**; a row there has **thirteen** fields, not the
+  fourteen the header names, so `drops` is the **last**. **`wlan0
+  rx_dropped` is broadcast filtering** — 16.6x the loss, rho 0.040,
+  never stream loss. The socket discarded **0 of 4,349**.
+- **`O1`**: **`tx failed` copies `tx retries`** on this AP, so retry
+  exhaustion is unreadable. Every interface `dropped`/`errors` was
+  **constant 0**, channel **~93 % idle**: not the air, not the Opal.
+- **`R5`**: the heartbeat log **rotates mid-session, breaking
+  offset-based slicing** — read archive + live and filter on time. **The
+  Gradle wrapper is in `PrivyHub/`.**
+- **`P4`**: **no retry, failure, airtime or channel-occupancy counter on
+  this onn.** **`video.recent_fps` is a spot reading** — use
+  `rendered_frames/duration_s`.
+
+**`P3`** — the sender pacer (**default 0**) was **insufficient at its
+8 ms budget, not ineffective**: it clamps above 53 packets a frame,
+exactly the tail `P6` capped. **`B2`** — the Windows PC is **neither
+implicated nor exonerated**; **`C5a`**/**`C5`** are falsified.
+**`S2`/`S1`/`T1`** — recovery works on real link failure; **still owed
+`GIVE_UP_MS`, `END_MS`, the recovery save**. **`P2a` is VALIDATED.**
+
+## 2026-09-20 and before
+
+`../2026-09-20.md` is the chronology; conclusions in `../MEMORY.md`. Two
+facts hard to find again: **`R4`**'s `diagnostic_retention.py` policy
+SHA-256 `b13fbc32…71b5`, which an `--apply` run must quote, and
+**`R3`+`R3a`**'s recovery save, which goes to `<stem>.state.recovery`,
+**never a slot**. **`P2`**: 98.7 % of underruns fall in the first 3 s —
+read the per-session total, never a rate. **`P1`**: the stale default is
+60. **`B2` has run; `B1`/`B3` have not.**

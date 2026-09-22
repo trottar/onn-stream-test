@@ -28,6 +28,17 @@ POLICY: dict[str, Any] = {
             "max_bytes": 64 * MIB,
             "min_keep_files": 8,
         },
+        # D-BASE-R4: the rotated native-stream heartbeat and recovery logs,
+        # joined by D-BASE-T1's rotated host_resource_samples.jsonl. They
+        # live in their own directory precisely so this family can bound
+        # them without reaching the decoder session JSONs or the native
+        # video host log, which share logs/games. (Comments are outside
+        # POLICY, so the policy SHA-256 is unchanged by this note.)
+        "stream_log_archive": {
+            "relative_path": "logs/games/stream_log_archive",
+            "max_bytes": 32 * MIB,
+            "min_keep_files": 3,
+        },
     },
     "protected_extensions": [".json", ".md", ".txt"],
     "raw_name_overrides": [
