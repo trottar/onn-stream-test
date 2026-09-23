@@ -1,8 +1,19 @@
 # Active investigations
 
-## BASELINE STREAM HEALTH — ACTIVE
+## PHASE C — `C3.L3a` Part 2 — ACTIVE (2026-09-23)
 
-`BASELINE_STREAM_HEALTH.md`. The active line of work as of 2026-09-20.
+Phase C resumed when `D-BASE` closed (baseline met,
+`../evidence/D_BASE_CLOSEOUT_2026-09-23.md`). The active item is `C3.L3a`
+Part 2 (below): fix the probe's three recorded defects, re-score the
+retained 2026-09-20 marks, then decide on a rerun; then `C3.L4`. Every
+change is measured against the close-out table. Open beside it, not
+blocking: the warm-state loss's cause between the ends (`host_link`),
+thermal threshold proposals (none enforced), max output gap.
+
+## BASELINE STREAM HEALTH — CLOSED 2026-09-23 (MET)
+
+`BASELINE_STREAM_HEALTH.md`. The active line of work from 2026-09-20 to
+2026-09-23; history below.
 Decision: `../decisions/D-BASE_BASELINE_BEFORE_ADAPTATION.md`. Evidence:
 `../evidence/BASELINE_STREAM_HEALTH_2026-09-20.md`.
 
@@ -18,9 +29,9 @@ resumes into a fresh core loaded while running (the user's option A)
 are **RUNTIME VALIDATED for real loss** (`R3d`: N05, N15b, E30 PASS;
 `END_MS` validated).
 
-**Everything under "C3 Linux actuator boundary" below is SUSPENDED**, not
-failed. The Linux actuator is real, measured and correct; it is a mechanism
-awaiting a reason. Phase C resumes when the baseline target is met.
+**Everything under "C3 Linux actuator boundary" below was SUSPENDED**, not
+failed, and **resumes now** (2026-09-23). The Linux actuator is real,
+measured and correct.
 
 ## C3 Linux actuator boundary — SUSPENDED 2026-09-20
 

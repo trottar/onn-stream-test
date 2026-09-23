@@ -4,7 +4,13 @@ as_of: 2026-09-20
 baseline_commit: e2fd7b566534f4bbd9a74d6456916bace7abfc29
 ---
 
-# Baseline stream health — ACTIVE
+# Baseline stream health — CLOSED 2026-09-23: MET
+
+**Status: MET (2026-09-23)**, pre-registered close-out on the adopted build,
+cold and warm: `../evidence/D_BASE_CLOSEOUT_2026-09-23.md`. Every
+numeric-target row passes in both sessions; max output gap (163 / 110 ms)
+is the transport's open row, inside the close-out's 250 ms bound. The
+Step 5 client decision is **not triggered**. Phase C resumed.
 
 Decision: `../decisions/D-BASE_BASELINE_BEFORE_ADAPTATION.md`
 Evidence: `../evidence/BASELINE_STREAM_HEALTH_2026-09-20.md`
@@ -15,6 +21,11 @@ seamless local play, and if not, what is the ceiling and where is it?
 Phase C adaptive-bitrate work is suspended until this closes.
 
 ## Target (entry criteria for resuming Phase C)
+
+**Now (close-out 2026-09-23, cold / warm):** spikes 32.8 / 26.0 per min;
+rendered fps 59.90 / 59.91; max output gap 163 / 110 ms; stale drops
+1.1 / 0.8 per min; video loss 8.7 / 8.4 per min (post-FEC; audio after
+de-duplication 0.25 / 1.44); audio underruns 17 / 14 per session.
 
 | metric | target | median, 127 sessions (Group A) | median, 47-session record |
 | --- | --- | ---: | ---: |

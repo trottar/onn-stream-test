@@ -130,8 +130,8 @@ the default is the companion's. **Cost: +1.60 Mbps** on the wire (audio
 encoder CPU unchanged (25.6-28.9 %), audio latency unchanged (residence
 within ±6 ms — the copy only fills a slot already in the queue).
 
-The user's listen with redundancy on — their words, never a gate: not yet
-given.
+The user's listen with redundancy on — verbatim, user-stated, never a
+gate: *"sound good"* (recorded 2026-09-23).
 
 ## State at the end
 

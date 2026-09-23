@@ -27,11 +27,11 @@ No addresses, MACs, BSSIDs, SSIDs, ADB endpoints, serials, credentials anywhere 
 - **Profile** `native_game_720p60_reference` now declares: `max_frame_size_bytes` 90000, `audio_queue_target/capacity_packets` 12/17, `audio_redundancy_copies/offset_packets` 2/4 — all `source: profile`, `any_override: false`.
 - **Uncommitted since the 2026-09-23 checkpoint**: P9, P9a, T2, T3, P10 (companion + client changes, APK `f31b1c18…8ae7`, five records, `.gitignore` savestate rules already committed). Commit before anything else.
 
-## Queue
+## Queue (updated 2026-09-23 evening)
 
-1. **User**: listen with redundancy on (their words → the `P10` record); commit and push (block in the chat of 2026-09-23).
-2. `Run docs/memory/handoffs/D-BASE-CLOSE_TASK.md` — score the target table cold + warm on the finished build, verdict MET / NOT MET, hand the roadmap back to Phase C (C1's explicit schema is effectively done). Needs ≥ 40 min idle first. Verify from `evidence/d_base_closeout_<date>/`.
-3. Then the roadmap: Phase C from where `docs/ROADMAP.md` puts it after C1; `host_link` with `T3`'s fact; `B1`/`B3`; Group C; C6.
+1. ~~User listen + commit~~ done ("sound good" is in the `P10` record; checkpoint pushed).
+2. ~~`D-BASE-CLOSE_TASK.md`~~ done and **verified**: **BASELINE MET**, `D-BASE` CLOSED, Phase C RESUMED (`evidence/D_BASE_CLOSEOUT_2026-09-23.md`; cold/warm spikes 32.8/26.0, fps 59.90/59.91, video loss 8.7/8.4 post-FEC, max gap 163/110 — the one open row). `CURRENT.md` was trimmed hard; `MEMORY.md` carries the D-BASE conclusions.
+3. **Next chat's first job**: commit the close-out (uncommitted after step 2), then **`C3.L3a` Part 2** — fix the probe's three recorded defects (mark-association window, telemetry field paths, the rating scale), re-score the retained 2026-09-20 marks without replaying, then decide on a rerun; then `C3.L4` under `C3.L2`'s `video_only_restart` constraint. Every Phase C change is measured against the close-out table. `host_link` (`T3`'s fact), `B1`/`B3`, Group C, C6 remain on the list.
 
 ## Reading order for the new chat
 

@@ -2,136 +2,65 @@
 
 Authoritative state: `../CURRENT.md`. **Start there.**
 
-## READ FIRST
+## READ FIRST — Phase C has resumed (2026-09-23)
 
-**The 90 KB frame cap is ADOPTED and in force.**
-`max_frame_size_bytes = 90,000` is a declared field of
-`native_game_720p60_reference` (Linux `h264_vaapi`), running with
-**nothing set in the environment**. The user checked the picture first —
-"could barely tell it was over the LAN", **their words, not instrument
-evidence**. **Loss runs 5.4-12.4/min against an uncapped 110-145**, zero
-≥80-packet frames, bitrate/fps/CPU unchanged, holding over three hours.
+**`D-BASE` is CLOSED: BASELINE MET** (`../evidence/D_BASE_CLOSEOUT_2026-09-23.md`).
+Cold / warm on the adopted build: spikes 32.8 / 26.0 per min, fps 59.90 /
+59.91, stale drops 1.1 / 0.8, video loss 8.7 / 8.4 (post-FEC), audio
+underruns 17 / 14 per session; max output gap 163 / 110 ms — the
+transport's one open row. The onn is not the ceiling.
 
-**Three things before touching the encoder.** **`any_override: false`
-means "only the profile decided"**, not "no cap" — an uncapped run is
-`any_override: true` with `uncapped: true`.
-**`PRIVYHUB_ENC_MAX_FRAME_SIZE=0` runs uncapped**, flag absent, which
-re-runs the `P6` baseline without editing source. And **60 KB and VBV are
-measured alternatives, not rejected ones** — reopen on a picture
-complaint, not on more loss measurement.
+**The active item is `C3.L3a` Part 2** (gameplay acceptance of the Linux
+actuator). **Fix the probe's three recorded defects before any rerun**
+(`../investigations/BASELINE_STREAM_HEALTH.md`, "Suspended, not failed"),
+re-score the retained 2026-09-20 marks
+(`logs/streaming/c3_l3a_gameplay_acceptance_state.json`) without
+replaying, then decide. Then `C3.L4`. **`C3.L2`'s classification stands**:
+Linux is `video_only_restart`, not authorized for automatic adaptation
+during play — `C3.L4` has to answer it.
 
-The path is **host wired -> Opal -> onn wireless, one hop** (`B2`).
+**Every Phase C change is measured against the close-out table** — the
+baseline must stay met.
 
-**`D-BASE-R3b` RAN 2026-09-22, by hand** — the classifier still refuses
-every `nft` write, so the user drove
-`../evidence/d_base_r3b_2026-09-21/r3b_run.sh`. **N3, N15 and N150 all
-PASS**; N15 caught an encoder restart **succeeding while the fault was still
-dropping every packet**, and N150's give-up landed at **120.42 s** with the
-`.state.recovery` file written. **`R3d` (hand runs, 2026-09-22): N15b
-PASS, E30 PASS → `END_MS` RUNTIME VALIDATED; N05 PASS on 2026-09-23 →
-`R3` + `R3a` RUNTIME VALIDATED for real loss**
-(`../evidence/D_BASE_R3D_HAND_RUNS_2026-09-22.md`).
-Record: `../evidence/D_BASE_R3B_NFTABLES_LINK_DROP_2026-09-22.md`.
+## The reference profile — three adopted fields, read before changing any
 
-**Read the loss numbers with the restart caveat.** A 3 s outage with no
-restart counted **2 348** lost packets; 15 s and 150 s outages that restarted
-counted **22** and **40** — a new SSRC makes the return an `ssrc_change`, not
-loss. **`max_output_gap_ms` is the honest column for outages.**
+`native_game_720p60_reference` (`companion/native_stream_profiles.py`),
+all `source: profile`, nothing in the environment, `any_override: false`:
 
-**Two post-run defects are open**
-(`../evidence/R3B_POST_RUN_SESSION_REUSE_2026-09-22.md`): a stream-stop leaves
-the game session live, so the launcher resolves to `recovery-resume` and
-reports "Loaded" with no window; and after a recovery-state load the source
-picture cycles through about four frames. The Tekken 3 `.state.recovery` is
-**kept on purpose** as their evidence.
+- **`max_frame_size_bytes` 90,000** (`P6a`): the encoder's per-frame burst
+  was the video loss. **`any_override: false` means "only the profile
+  decided", not "no cap"**; `PRIVYHUB_ENC_MAX_FRAME_SIZE=0` runs uncapped.
+  60 KB and VBV are measured alternatives, not rejected.
+- **`audio_queue_target/capacity_packets` 12 / 17** (`P9`/`P9a`): **the
+  capacity sets the running audio latency** (+34-38 ms over 3/8); the
+  target is only the startup prefill.
+- **`audio_redundancy_copies/offset_packets` 2 / 4** (`P10`): each audio
+  datagram sent twice, 20 ms apart; the client de-duplicates by sequence
+  first and a late copy fills its concealment slot in place.
+  `lost_packets` = sequences never received.
 
-## 2026-09-23 — `D-BASE-T2`/`T3`/`P10`: the warm-state audio loss, mitigated
+Per-session overrides for comparison runs: `TOOLS.md`
+(`systemctl --user set-environment …`, restart, `unset-environment`).
 
-From cold, audio loss steps to 30-90/min after ~7 min (idle resets it);
-it is single packets lost **between** the host's NIC and the onn's IP
-stack (`T3`: host sent all, onn dropped none). **`P10` sends every audio
-datagram twice, 20 ms apart — adopted 2/4**: loss −96-98 %, +1.6 Mbps,
-no latency (`../evidence/D_BASE_P10_AUDIO_REDUNDANCY_2026-09-23.md`).
-**Read before touching audio receive**: the client de-duplicates by
-sequence first and a late copy fills its concealment slot in place;
-`lost_packets` = sequences never received. APK `f31b1c18…8ae7`. Samplers:
-`t2_sample.py` (host+onn+Opal, 10 s), `t3_host_sample.py`.
+## Operating the host
 
-## 2026-09-23 — `D-BASE-P9` / `P9a`: the audio cushion
+- **The companion is the systemd user unit `privyhub-companion`** (`H3`):
+  `systemctl --user restart privyhub-companion`, never `kill` + `nohup`;
+  confirm the MainPID owns 8765. Its log is the journal.
+- **Headless** (`H2`): the dummy plug is X `DisplayPort-1` = DRM
+  `card0-DP-2`. adb after a host reboot: `adb connect <onn-address>:5555`.
+- Sessions from a host shell: `MainActivity`, wake, tap RESUME PLAYING;
+  BACK ends the stream and posts the report (`TOOLS.md`).
+- **The warm state**: from cold, the path drops single packets from ~7
+  min (onn cpu-thermal ≈ 67 °C) until ~30 min idle — compare arms
+  **interleaved**, never in one block. `t2_sample.py` (host+onn+Opal,
+  10 s) and `t3_host_sample.py` are the samplers.
+- **The session harness**: `../evidence/d_base_p9_2026-09-23/p9_run.sh`.
 
-`../evidence/D_BASE_P9_AUDIO_CUSHION_2026-09-23.md`,
-`../evidence/D_BASE_P9A_CUSHION_INTERLEAVED_2026-09-23.md`. **The
-CAPACITY sets the running audio latency; the target is only the startup
-prefill** (and the host's value arrives after the first PCM). 12/17:
-+33.5-37.9 ms, starvation -98-99.5 %, underruns inside the 3/8 band
-(4-20) — adopted in `T2`. Setting: `audio_queue_{target,capacity}_packets`,
-override `PRIVYHUB_AUDIO_QUEUE_*`. **`H3` is installed**: restart with
-`systemctl --user restart privyhub-companion`, never `kill` + `nohup`.
+## Still open, not blocking
 
-## 2026-09-23 — `H3`: companion autostart DESIGNED (installed by the user later that day)
-
-`../evidence/H3_COMPANION_AUTOSTART_DESIGN_2026-09-23.md`: a systemd user
-unit on `default.target`, `DISPLAY=:0`, wait for X, `KillSignal=SIGINT`,
-`Restart=on-failure`; paste-ready install/undo steps and `h3_verify.sh`.
-**The companion's clean shutdown runs only on SIGINT** — stop it with
-`kill -INT`, not `kill`. Also tonight: **N05 PASS → `R3`+`R3a` RUNTIME
-VALIDATED for real loss** (`../evidence/D_BASE_R3D_HAND_RUNS_2026-09-22.md`).
-
-## 2026-09-23 — `D-BASE-R3c2`: recovery flow RUNTIME VALIDATED
-
-`../evidence/D_BASE_R3C2_RECOVERY_FLOW_2026-09-23.md`. Tile = **Resume** for
-a live session (same pid, no load); the recovery prompt only with no live
-session; resume-from-recovery = launch fresh → unpause → load into the
-**running** core → pause → delete the recovery files. The N150 mid-FMV
-save now plays; a gameplay save plays at 60 fps. Both R3b post-run defects
-closed. APK `21e3d089…9dcb`.
-
-## 2026-09-22 — `H2`: the host is headless — RUNTIME VALIDATED
-
-`../evidence/H2_HEADLESS_CUTOVER_2026-09-22.md` (built on `H2-PREP`'s
-inventory; `H1` gave SSH + autologin). **No write made.**
-
-**The plug is not where the task said.** X **`DisplayPort-1`** = DRM
-**`card0-DP-2`**; the monitor's `DisplayPort-0` now reads disconnected.
-The plug prefers **1920x1080 @ 60.00 Hz** by EDID (4K@17 is listed, not
-chosen). Any future `xorg.conf.d` / `video=` fix must name the plug's
-port — `DisplayPort-1` / `DP-2`.
-
-**Capture is unchanged headless**: `capture_target` the 879x720 window;
-fps 59.68 and spikes 50.0/min inside `B2`; max gap 93 ms (below `B2`);
-x11grab PTS delta 1 on all 1,799, 0 repeats in motion. adb after a host
-reboot: **`adb connect <onn-address>:5555`** (the pin held).
-
-**Check 5 PASS** (user-run after a second plug-only reboot): autologin
-desktop, 1080p60, adb back on the pinned port, companion started by the
-script with `DISPLAY=:0`, `S2` in bounds (fps 59.69, spikes 46.34/min,
-max gap 184 ms). **Nothing starts the companion at boot** — start it by
-hand. Run Claude Code **inside tmux**. **The R3b recovery prompt covers
-RESUME PLAYING** until `R3c`; `h2_session.sh` dismisses it with BACK only
-when it is up (no action, file untouched).
-
-**`M1` corrected one thing the handoffs had wrong.** The synthetic UDP
-burst/gap/**duplication** pathology is **not Windows-only**:
-`investigations/DEFERRED.md` records it reproducing from a Linux sender,
-bidirectionally, while idle. It has never been replayed on the post-`B2`
-topology. **PAUSED**, and **a different fault** from the in-session loss
-the cap fixed. `KNOWN_ISSUES.md` carries two entries.
-
-**Nothing is committed.** `.claude/` and `_prel2b/` are untracked and
-**unignored** — the user's call first.
-
-## Earlier handoff sections
-
-`P7`, `S3`, `P6a` (09-22) and `P6`/`P5`/`O1` (09-21) moved verbatim to
-`../history/HANDOFF_SECTIONS_THROUGH_2026-09-22.md`; their evidence
-records are authoritative.
-
-## 2026-09-20 and before
-
-`../2026-09-20.md` is the chronology; conclusions in `../MEMORY.md`. Two
-facts hard to find again: **`R4`**'s `diagnostic_retention.py` policy
-SHA-256 `b13fbc32…71b5`, which an `--apply` run must quote, and
-**`R3`+`R3a`**'s recovery save, which goes to `<stem>.state.recovery`,
-**never a slot**. **`P2`**: 98.7 % of underruns fall in the first 3 s —
-read the per-session total, never a rate. **`P1`**: the stale default is
-60. **`B2` has run; `B1`/`B3` have not.**
+Max output gap (transport); the warm-state loss's cause between the ends
+(`host_link`); the synthetic UDP pathology (PAUSED, `M1`); thermal
+threshold proposals (the user's). `D-BASE`'s full history:
+`../MEMORY.md` (curated) and one evidence record per item
+(`../evidence/RUNTIME_VALIDATION.md`).

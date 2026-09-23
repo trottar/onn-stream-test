@@ -849,6 +849,25 @@ resource/transport characterization unless the issue becomes a blocker sooner.
 
 Full record: `investigations/2026-09-07-udp-transport.md`.
 
+## 2026-09-23 — open after the `D-BASE` close-out (baseline MET)
+
+`D-BASE` is closed (`docs/memory/evidence/D_BASE_CLOSEOUT_2026-09-23.md`).
+What stays open, recorded as open rows, not failures:
+
+- **Max output gap** — 163 / 110 ms at close-out against the ≤ 100 ms
+  target; ~100-330 ms across the capped build. The transport's: single
+  loss bursts or a late IDR, not the decode path. **Open.**
+- **Warm-state loss between the ends** — from ~7 min into a cold stream
+  the path drops single packets between the host's NIC and the onn's IP
+  stack (`T2`, `T3`); audio redundancy covers audio, FEC covers most
+  video. Cause not located. **Open → `host_link`.**
+- **The synthetic UDP pathology** — PAUSED (`M1`), never seen on the
+  post-`B2` topology. **Paused.**
+- **`host_link`** — the per-session link-type field; its first fact is
+  `T3`'s. **Open, roadmap.**
+- **Thermal thresholds** — proposed from `T2`/`T3` (onn cpu-thermal
+  ≥ ~67.5 °C marks the warm state), none enforced; the user's call.
+
 ## 2026-09-22 open items after the baseline-stream-health chain
 
 One line each; the record named is authoritative.

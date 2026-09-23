@@ -6,34 +6,35 @@ Moved verbatim to `history/MEMORY_SECTIONS_MOVED_2026-09-23.md` (Phase C is SUSP
 <!-- PRIVYHUB_C3_LINUX_ACTUATOR:END -->
 
 <!-- PRIVYHUB_BASELINE_STREAM_HEALTH:BEGIN -->
-## The reference stream was not healthy — durable fact, with its corrections
+## D-BASE — CLOSED 2026-09-23: the baseline is met — curated conclusions
 
-The live investigation is `investigations/BASELINE_STREAM_HEALTH.md`;
-this keeps only what outlives it. Established 2026-09-20 from 47 sessions,
-re-scored on all 128. Pre-`C3.L2c` medians: spikes **2,535/min**, fps
-**55.5**, max output gap **287 ms**, stale drops **193/min** — **the
-stream had never reached 60 fps.**
+`evidence/D_BASE_CLOSEOUT_2026-09-23.md`; decision
+`decisions/D-BASE_BASELINE_BEFORE_ADAPTATION.md` (closed). One line each:
 
-**Three faults were named; all three are corrected or accounted for.**
-Client receive-to-output latency, by `C3.L2c` and `P1`; audio underruns,
-by `P2`/`P2a`/`P2b`; and **transport outages, which `P5` and `P6` have
-since located at the frame-size tail** (see the loss block) — every stall
-over 1,000 ms is an outage-class sequence jump plus an IDR wait, with
-`lost_packets` undercounting 2-3x until `R1`. **Adaptive bitrate control
-was never the fix for this stream**, and Phase C stays suspended
-(`decisions/D-BASE_BASELINE_BEFORE_ADAPTATION.md`).
-
-**Host side closed 2026-09-20 (Group A live half):** the on-wire SPS/SEI
-are explicit and correct, x11grab is 60 fps clean, the host is wired.
-**The "one wireless hop by role" inference was wrong** — the cable ran to
-the Windows PC until 2026-09-21. `P5` adds the send path: relay
-`send_errors` **0**, host UDP `SndbufErrors` **0**.
-
-**A worst-case statistic must not overrule a distribution:** `C3.L2c` was
-rolled back on one `max_output_gap_ms` sample while the same data showed
-159 spikes/min against 1,828-2,723 elsewhere. **A window is not a
-corpus.** **Hot-path instrumentation was not the stall**, and the user
-**kept** the build on the re-run.
+- **Start (2026-09-20, 128 sessions):** spikes 2,535/min, fps 55.5, max gap
+  287 ms, stale 193/min — the stream had never reached 60 fps.
+- **Close (cold + warm, adopted build):** spikes 32.8 / 26.0, fps 59.90 /
+  59.91, stale 1.1 / 0.8, video loss 8.7 / 8.4 (post-FEC), audio
+  underruns 17 / 14 per session, max gap 163 / 110 ms. **The onn is not
+  the ceiling** (Step 5 not triggered).
+- **Client latency** fixed by `C3.L2c` + `P1` (98-99 % of frames < 20 ms).
+- **Audio startup burst** fixed by the `P2a` hold (`P2b` validated).
+- **Video loss** is the encoder's frame-size tail: the **90 KB cap**
+  (`P6a`) cut it 7-9x.
+- **Audio holes** are the path's (`P7`/`P8`): the **12/17 cushion**
+  (`P9`/`P9a`) removes 98-99 % of starvation for +34-38 ms.
+- **Warm-state loss** (`T2`/`T3`): single packets lost between the ends
+  after ~7 min; **audio redundancy 2/4** (`P10`) recovers them, +1.6 Mbps.
+- **Link-drop recovery** validated on real loss (`R3`-`R3d`); the recovery
+  flow never loads into a live core (`R3c2`).
+- **Host**: headless (`H2`), companion a systemd user unit (`H3`).
+- **Open, not failures:** max output gap (transport, ~100-330 ms); the
+  cause of the warm-state loss (`host_link`); the synthetic UDP
+  pathology (PAUSED, `M1`).
+- **Method:** a worst-case statistic must not overrule a distribution
+  (`C3.L2c` was rolled back on one sample; the user kept it). A window is
+  not a corpus. Pre-register the reading; ask when a clause fails on the
+  favourable side (`P9a`, `P10`).
 <!-- PRIVYHUB_BASELINE_STREAM_HEALTH:END -->
 
 <!-- PRIVYHUB_C3_L2C_FALSIFIED:BEGIN -->
@@ -191,6 +192,10 @@ buckets over **rendered frames only**.
 
 <!-- PRIVYHUB_D_BASE_P2_AUDIO_UNDERRUN_BURST:BEGIN -->
 ## The audio underrun count is a startup artifact — durable fact
+
+*(Partly superseded, `P9`/`P9a`: with the `P2a` hold in force the startup
+burst is gone and a 20-min total of 4-20 is mostly mid-session events of
+1-3 — read events, not totals.)*
 
 `D-BASE-P2` characterized it (2026-09-20), `P2a` fixed it and `P2b`
 validated the fix (2026-09-21). Records of those names.
@@ -601,14 +606,11 @@ the ~453 KB/h measured here became ~819 once R5 grew the line.
 the eventual **PS2 / GameCube** work needs headroom. Nothing acts on a
 temperature; a thermal pause on recovery is deferred (`DEFERRED.md`).
 
-**The onn reports thermal STATUS ONLY.** On SDK 34
-`getCurrentThermalStatus()` works, `getThermalHeadroom(10)` returns **NaN**
-and `/sys/class/thermal` is **permission-denied even to the adb shell** —
-recorded as absent, not filled in. **Status read 0 (NONE) throughout.**
-**Status alone cannot distinguish "the onn is cool" from "the onn is not
-telling us"**; that needs a device exposing a zone, not more sessions. The
-radio has the same shape (`D-BASE-P4`): the counters that would answer the
-question are absent.
+**The onn: status via `getCurrentThermalStatus()` (0 throughout) and — found
+by `T2` — a live `cpu-thermal` temperature via `dumpsys thermalservice`**
+(62-70 °C streaming, HAL thresholds 95 / 125 °C). `/sys/class/thermal` and
+`getThermalHeadroom` stay unavailable. *(Superseded: "the onn reports
+thermal status only", `T1`.)*
 
 **Host thermals ramp to a plateau and stay:** 54 → 60 °C over ten minutes,
 42-44 → 57-59 °C over thirty. **The host warms while the onn reports

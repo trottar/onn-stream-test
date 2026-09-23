@@ -13,20 +13,21 @@ Authority for the current position is `docs/memory/CURRENT.md`.
 
 - **Phase D is ACTIVE.** The Linux host runs the companion and the games
   path; D4 PS1 multitap parity is the open functional item.
-- **Phase C is SUSPENDED**, not active, behind an inserted investigation:
-  **`D-BASE` baseline stream health**
-  (`docs/memory/investigations/BASELINE_STREAM_HEALTH.md`; decision
-  `docs/memory/decisions/D-BASE_BASELINE_BEFORE_ADAPTATION.md`).
-  Adaptation is not built on a baseline that is not healthy.
+- **Phase C RESUMED 2026-09-23.** The inserted investigation, **`D-BASE`
+  baseline stream health, is CLOSED — BASELINE MET**
+  (`docs/memory/evidence/D_BASE_CLOSEOUT_2026-09-23.md`; decision
+  `docs/memory/decisions/D-BASE_BASELINE_BEFORE_ADAPTATION.md`, closed).
+  Next: `C3.L3a` Part 2 (fix its probe's three defects first), then
+  `C3.L4`; C1 is done.
 - **`D-BASE`'s loss column is closed.** The wireless-hop packet loss was
   traced to the encoder's per-frame burst and fixed by a 90,000-byte frame
   cap, now a declared field of `native_game_720p60_reference`
   (`D-BASE-P6`, `P6a`, `S3`). The residual correlates with nothing
   measured.
-- **Next in sequence:** the SSH console on the host (`H1`, the user's
-  step), then the **headless cutover** (`H2`) once the DisplayPort dummy
-  plug is installed — after which the roadmap's own order resumes:
-  remaining Phase C on Linux, then Phase E.
+- **Done since:** the headless host (`H2`), the companion as a systemd
+  unit (`H3`), link-drop recovery validated on real loss (`R3`-`R3d`),
+  the audio cushion (12/17) and audio redundancy (2/4) adopted. **The
+  roadmap's own order resumes: remaining Phase C on Linux, then Phase E.**
 
 ---
 
@@ -36,7 +37,7 @@ Authority for the current position is `docs/memory/CURRENT.md`.
 |---|---|---|
 | **A — Emulator Subsystem** | Finish Games/emulation as a normal-use subsystem | **COMPLETE / PUSHED** |
 | **B — Diagnostics & Clean Native Baseline** | Make PrivyHub self-diagnosing and remove active Sunshine/Moonlight legacy | **COMPLETE / PUSHED** |
-| **C — Adaptive Streaming Architecture** | Portable profile/telemetry/readiness foundation complete enough for Windows; automatic adaptation continues on Linux | **SUSPENDED** pending `D-BASE` baseline stream health |
+| **C — Adaptive Streaming Architecture** | Portable profile/telemetry/readiness foundation complete enough for Windows; automatic adaptation continues on Linux | **RESUMED 2026-09-23** at C3 (`D-BASE` closed, baseline met) |
 | **D — Linux Migration / Native Linux Baseline** | Move the core server to the HP EliteDesk Linux prototype and restore normal-use parity | **ACTIVE** |
 | **E — Linux Core Resource Characterization & Optimization** | Optimize and measure the Linux core with PS1-and-below only; select Prototype 2 from evidence | **PLANNED AFTER D** |
 | **F — Media Library, VOD & Live TV UX** | Finish local media polish plus substantial Live TV/channel/guide work on Linux | **PLANNED AFTER E** |
@@ -115,9 +116,8 @@ Architectural statement:
 
 # Phase C — Adaptive Streaming Architecture
 
-**Status: SUSPENDED (2026-09-22) — see §0. Phase C resumes only when the
-baseline-stream-health target table is met or the attempt is formally
-abandoned.**
+**Status: RESUMED 2026-09-23 — see §0.** The baseline-stream-health target
+table was met (`D-BASE` close-out); Phase C continues on Linux at C3.
 
 Phase C turns the current proven native game stream into a reusable, measurable,
 adaptive streaming platform.
@@ -176,6 +176,8 @@ P1 / ultra-low-latency
 GOP 15
 no B-frames
 max frame size 90,000 bytes   (Linux h264_vaapi, adopted 2026-09-22)
+audio queue 12 / 17 packets   (5 ms each; adopted 2026-09-23)
+audio redundancy 2 copies, 4-packet offset (adopted 2026-09-23)
 RTP-sized UDP, 1200-byte packets
 8 data + 1 XOR parity
 payload type 96

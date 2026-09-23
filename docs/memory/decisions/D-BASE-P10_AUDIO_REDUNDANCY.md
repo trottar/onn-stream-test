@@ -45,6 +45,11 @@ outside the A range — **because it came in lower** (3.2, 3.6/min against
 10.8). The clause guards against redundancy hurting video; it did not.
 Whether it helps video is not settled by two pairs. The user adopted.
 
+## The user's listen
+
+Verbatim, user-stated, not a gate: *"sound good"* (2026-09-23, with 2 / 4
+in force).
+
 ## Reversal
 
 `audio_redundancy_copies=1` in the profile (or

@@ -1,0 +1,43 @@
+[close 21:52:13Z] last session_ended 2026-09-23T21:49:25.096Z; C not before 22:30:25Z
+[C] sampler=off heartbeat_ms=default cushion=profile/profile
+[C] env: MAX_FRAME_SIZE=unset BUFSIZE_K=unset BYTE_CAP=unset
+[C] env | grep PRIVYHUB_ENC ->
+    (nothing, as the validating run requires)
+[C] companion MainPID 244474 serving 8765
+[C] cushion env in companion environ: 
+[C] audio_cushion {'queue_target_packets': 12, 'queue_capacity_packets': 17, 'packet_ms': 5, 'target_ms': 60, 'capacity_ms': 85, 'source': 'profile', 'env_ignored': False, 'default_queue_target_packets': 12, 'default_queue_capacity_packets': 17}
+[C] encoder argv: ... 7000k -bufsize 7000k -max_frame_size 90000 -g 15 -bf 0 -payload_type 96 -f rtp rtp://127.0.0.1:48110?pkt_size=1200
+[C] overrides: max_frame_size=90000 bufsize_kbits=None
+[C] relay byte cap under test: None
+[C] audio_cushion at PLAYING: {'queue_target_packets': 12, 'queue_capacity_packets': 17, 'packet_ms': 5, 'target_ms': 60, 'capacity_ms': 85, 'source': 'profile', 'env_ignored': False, 'default_queue_target_packets': 12, 'default_queue_capacity_packets': 17}
+[C] any_override False max_frame_size 90000 profile
+[C] PLAYING at 2026-09-23T22:31:20Z; holding 1200s, zero input
+[C] adb client processes seen during hold: 42 (# polls 2317)
+[C] report: native_decoder_20260923_225121_726.json
+[frames] 1201 seconds in the session window
+[heartbeat] 598 lines
+[C] game active after stop: False
+[C] done
+[W] sampler=off heartbeat_ms=default cushion=profile/profile
+[W] env: MAX_FRAME_SIZE=unset BUFSIZE_K=unset BYTE_CAP=unset
+[W] env | grep PRIVYHUB_ENC ->
+    (nothing, as the validating run requires)
+[W] companion MainPID 258852 serving 8765
+[W] cushion env in companion environ: 
+[W] audio_cushion {'queue_target_packets': 12, 'queue_capacity_packets': 17, 'packet_ms': 5, 'target_ms': 60, 'capacity_ms': 85, 'source': 'profile', 'env_ignored': False, 'default_queue_target_packets': 12, 'default_queue_capacity_packets': 17}
+[W] encoder argv: ... 7000k -bufsize 7000k -max_frame_size 90000 -g 15 -bf 0 -payload_type 96 -f rtp rtp://127.0.0.1:48110?pkt_size=1200
+[W] overrides: max_frame_size=90000 bufsize_kbits=None
+[W] relay byte cap under test: None
+[W] audio_cushion at PLAYING: {'queue_target_packets': 12, 'queue_capacity_packets': 17, 'packet_ms': 5, 'target_ms': 60, 'capacity_ms': 85, 'source': 'profile', 'env_ignored': False, 'default_queue_target_packets': 12, 'default_queue_capacity_packets': 17}
+[W] any_override False max_frame_size 90000 profile
+[W] PLAYING at 2026-09-23T22:52:31Z; holding 1200s, zero input
+[W] adb client processes seen during hold: 37 (# polls 2316)
+[W] report: native_decoder_20260923_231233_191.json
+[frames] 1201 seconds in the session window
+[heartbeat] 597 lines
+[W] game active after stop: False
+[W] done
+[close 23:13:43Z] sampler rows 488; MainPID 258852; 8765 258852; PRIVYHUB_* environ 0 manager 0
+[close] cap 90000 profile cushion 12 17 profile redundancy 2 4 profile any_override False
+[close] game active False
+[close 23:13:43Z] done

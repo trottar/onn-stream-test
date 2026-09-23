@@ -1,0 +1,33 @@
+row                                              C               W            pair
+duration_s                                 1211.30         1207.30                
+spikes_20_per_min                            32.84           26.04           29.45
+rendered_fps                                 59.90           59.91           59.91
+received_au_fps                              59.92           59.92           59.92
+max_output_gap_ms                              163             110             163
+stale_output_drops_per_min                    1.14            0.80            0.97
+video_lost_per_min_post_fec                   8.67            8.40            8.53
+video_fec_recovered_per_min                  14.71           16.15                
+audio_lost_per_min_after_dedup                0.25            1.44            0.84
+audio_recovered_by_duplicate                   590            1081                
+audio_underruns_total                           17              14              31
+audio_underruns_per_min                       0.84            0.70            0.77
+prolonged_starvation_per_min                  0.35            0.05                
+frames_under_20ms_pct                        99.12           99.30           99.21
+client_fps_deficit                            0.02            0.01            0.02
+avg_queue_residence_ms                       67.93           62.41                
+redundancy                                2/4 host        2/4 host                
+cushion                                 12/17 host      12/17 host                
+onn_cpu_mean_c                               67.60           68.01                
+onn_cpu_max_c                                69.52           69.15                
+onn_thermal_status_values                      [0]             [0]                
+
+== rows with a numeric target, per session
+  spikes_20_per_min              < 200                                            C 32.84 PASS  W 26.04 PASS
+  rendered_fps                   >= 59.5                                          C 59.90 PASS  W 59.91 PASS
+  stale_output_drops_per_min     < 20                                             C 1.14 PASS  W 0.80 PASS
+  video_lost_per_min_post_fec    < 10                                             C 8.67 PASS  W 8.40 PASS
+  audio_underruns_per_min        < 5 / min (table's wording; total also reported) C 0.84 PASS  W 0.70 PASS
+  max_output_gap_ms (transport row; <= 100 target, verdict bound <= 250): C 163 <=250  W 110 <=250
+
+== VERDICT: BASELINE MET
+== client decision (Step 5): NOT TRIGGERED (spikes 32.8 / 26.0 per min; fps 59.90 / 59.91)

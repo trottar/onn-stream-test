@@ -1,4 +1,37 @@
-# Project status — 2026-09-22
+# Project status — 2026-09-23
+
+<!-- PRIVYHUB_D_BASE_CLOSED:PROJECT_STATUS:BEGIN -->
+## 2026-09-23 — D-BASE closed: baseline met; Phase C resumed
+
+This section supersedes every older statement below where it conflicts.
+
+**`D-BASE` is CLOSED — BASELINE MET** (pre-registered close-out,
+`docs/memory/evidence/D_BASE_CLOSEOUT_2026-09-23.md`). Scored cold and
+warm on the adopted build (target / cold / warm): spikes ≥ 20 ms/min
+< 200 / 32.8 / 26.0; rendered fps ≥ 59.5 / 59.90 / 59.91; stale drops/min
+< 20 / 1.1 / 0.8; video loss/min (post-FEC) < 10 / 8.7 / 8.4; audio
+underruns 17 / 14 per session. **Max output gap 163 / 110 ms** is the
+transport's one open row (target ≤ 100). The pre-registered client
+decision is **not triggered** — the onn is not the ceiling.
+
+**Phase C RESUMES on Linux** at `C3` (`C3.L3a` Part 2 first — fix its
+probe's three recorded defects — then `C3.L4`), per the roadmap's Linux
+order C3 → C4 → C5 → C6 → C7. **C1 is done.**
+
+**The reference profile** `native_game_720p60_reference` now declares,
+beside the C1.1 parameters, three fields adopted from `D-BASE` evidence,
+all in force from the profile with nothing in the environment:
+`max_frame_size_bytes` **90,000**, `audio_queue_target/capacity_packets`
+**12 / 17**, `audio_redundancy_copies/offset_packets` **2 / 4**.
+
+**The host is headless** behind a DisplayPort dummy plug (`H2`), with the
+**companion running as a systemd user unit** (`H3`); **link-drop recovery
+is RUNTIME VALIDATED on real loss** (`R3`-`R3d`), and recovery never loads
+into a live core (`R3c2`). Open, recorded not failed: max output gap; the
+warm-state loss's cause between the ends (covered by redundancy;
+`host_link`); the synthetic UDP pathology (PAUSED); thermal thresholds
+proposed, none enforced.
+<!-- PRIVYHUB_D_BASE_CLOSED:PROJECT_STATUS:END -->
 
 <!-- PRIVYHUB_D_BASE_STATUS:PROJECT_STATUS:BEGIN -->
 ## 2026-09-22 baseline stream health update
@@ -33,7 +66,7 @@ The loss mechanism's records are `D_BASE_P5_WHICH_QUEUE_2026-09-21.md`
 (which queue) and `D_BASE_P6_FRAME_TAIL_CONTROL_2026-09-21.md` (the
 control).
 
-**Phase C is SUSPENDED** until the baseline-stream-health target table in
+**Phase C was SUSPENDED** (resumed 2026-09-23 — see the block at the top) until the baseline-stream-health target table in
 `docs/memory/investigations/BASELINE_STREAM_HEALTH.md` is met or the
 attempt is formally abandoned. Decision:
 `docs/memory/decisions/D-BASE_BASELINE_BEFORE_ADAPTATION.md`.
@@ -51,7 +84,7 @@ attempt is formally abandoned. Decision:
 | heartbeat loss counters (schema v2, now v3) | RUNTIME VALIDATED | `D_BASE_R5_HEARTBEAT_LOSS_COUNTERS_2026-09-21.md` |
 | heartbeat audio counters, schema **v3** | RUNTIME VALIDATED | `D_BASE_P7_STARVATION_COUNTER_2026-09-22.md` |
 | terminal-stall report fields | RUNTIME VALIDATED | `D_BASE_R4_REPORT_VISIBILITY_2026-09-20.md` |
-| host thermal telemetry; the onn reports **status only** | RUNTIME VALIDATED / absence recorded | `D_BASE_T1_*_2026-09-21.md` |
+| host thermal telemetry; the onn: status, and (`T2`) a live CPU temperature via `dumpsys thermalservice` | RUNTIME VALIDATED | `D_BASE_T1_*_2026-09-21.md`, `D_BASE_T2_*_2026-09-23.md` |
 | per-frame packet and byte counters | RUNTIME VALIDATED | `D_BASE_P5_*`, `D_BASE_P6_*` |
 | audio startup hold | **DEVELOPMENT-ONLY**, not reverted | `D_BASE_P2A_*`, `D_BASE_P2B_*` |
 | `prolonged_starvation_events` | CHARACTERIZED — a jitter rate, not a fault | `D_BASE_P7_*_2026-09-22.md` |
@@ -113,7 +146,7 @@ foundation.
 | --- | --- |
 | A — Games / emulator subsystem | COMPLETE / checkpointed |
 | B — Diagnostics + clean native baseline | COMPLETE / checkpointed |
-| C — Adaptive native streaming | **SUSPENDED** pending baseline stream health (`D-BASE`) |
+| C — Adaptive native streaming | **RESUMED 2026-09-23** on Linux at C3 (`D-BASE` closed, baseline met) |
 | D — Linux Migration / Native Linux Baseline | **ACTIVE** — Linux games path launches and streams; D4 multitap parity open |
 | E — Linux Core Resource Characterization & Optimization | Planned after D |
 | F — Media Library / VOD / Live TV UX | Planned after E |
@@ -135,8 +168,8 @@ reference profile lives in `companion/native_stream_profiles.py` as
 What replaced C1 as the active item is **baseline stream health**
 (`D-BASE`), not adaptation.
 
-**The active technical work is `D-BASE` baseline stream health**, with
-Phase C suspended behind it. Phase C must still be developed with explicit
+**`D-BASE` closed on 2026-09-23 (baseline met) and Phase C resumed** —
+see the 2026-09-23 block above. Phase C must still be developed with explicit
 future-remote reuse in mind, and it does not implement WAN
 overlay/auth/travel-router behavior.
 
@@ -255,7 +288,7 @@ C1.1 made the reference stream parameters explicit without changing
 validated behavior, and `D-BASE-P6a` added the first parameter adopted from
 transport evidence rather than inherited from the Windows build.
 
-Phase C is **suspended**; when it resumes it continues with
+Phase C **resumed 2026-09-23**; it continues with
 telemetry/adaptation/generalization, and its contracts must remain reusable
 by future Phase G WAN operation.
 
