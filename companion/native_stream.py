@@ -31,9 +31,19 @@ from native_fec_relay import NativeVideoFecRelay
 #     was NOT adopted: 3x the loss of the cap).
 ENC_MAX_FRAME_SIZE_ENV = "PRIVYHUB_ENC_MAX_FRAME_SIZE"
 ENC_BUFSIZE_K_ENV = "PRIVYHUB_ENC_BUFSIZE_K"
+# D-BASE-P9: per-session override of the profile's audio cushion (5 ms
+# packets). Both must be set, and 1 <= target <= capacity <= 32, or both
+# are ignored and the profile decides. Read at every stream start.
+AUDIO_QUEUE_TARGET_ENV = "PRIVYHUB_AUDIO_QUEUE_TARGET_PACKETS"
+AUDIO_QUEUE_CAPACITY_ENV = "PRIVYHUB_AUDIO_QUEUE_CAPACITY_PACKETS"
+# D-BASE-P10: per-session override of the profile's audio redundancy; each
+# variable independently, ignored when invalid (copies 1|2, offset 1-16).
+AUDIO_REDUNDANCY_COPIES_ENV = "PRIVYHUB_AUDIO_REDUNDANCY_COPIES"
+AUDIO_REDUNDANCY_OFFSET_ENV = "PRIVYHUB_AUDIO_REDUNDANCY_OFFSET_PACKETS"
 from games import host_resource_sampling
 from native_host_telemetry import NativeHostTelemetryProfiler
 from native_stream_profiles import NATIVE_GAME_720P60_REFERENCE
+from native_stream_profiles import AUDIO_PACKET_MS, AUDIO_QUEUE_MAX_PACKETS, AUDIO_REDUNDANCY_MAX_OFFSET
 
 
 class NativeStreamError(RuntimeError):
@@ -200,6 +210,83 @@ class NativeStreamManager:
             "default_bufsize_kbits": self.MAX_BITRATE_KBPS,
             "any_override": bool(
                 mfs_override is not None or bufsize_k
+            ),
+        }
+
+    def audio_cushion(self) -> dict[str, Any]:
+        """D-BASE-P9: the client audio cushion in force, and its source.
+
+        Sent to the client in the stream-start response (which is this
+        status) and applied by `NativeAudioReceiver.configureCushion`. Kept
+        out of `encoder_overrides`: `any_override` stays about the encoder.
+        """
+
+        target = int(self.PROFILE.audio_queue_target_packets)
+        capacity = int(self.PROFILE.audio_queue_capacity_packets)
+        source = "profile"
+        env_target = self._env_int_or_none(AUDIO_QUEUE_TARGET_ENV)
+        env_capacity = self._env_int_or_none(AUDIO_QUEUE_CAPACITY_ENV)
+        env_set = env_target is not None or env_capacity is not None
+
+        if (
+            env_target is not None
+            and env_capacity is not None
+            and 1 <= env_target <= env_capacity <= AUDIO_QUEUE_MAX_PACKETS
+        ):
+            target, capacity, source = env_target, env_capacity, "environment"
+
+        return {
+            "queue_target_packets": target,
+            "queue_capacity_packets": capacity,
+            "packet_ms": AUDIO_PACKET_MS,
+            "target_ms": target * AUDIO_PACKET_MS,
+            "capacity_ms": capacity * AUDIO_PACKET_MS,
+            "source": source,
+            "env_ignored": env_set and source != "environment",
+            "default_queue_target_packets": int(
+                self.PROFILE.audio_queue_target_packets
+            ),
+            "default_queue_capacity_packets": int(
+                self.PROFILE.audio_queue_capacity_packets
+            ),
+        }
+
+    def audio_redundancy(self) -> dict[str, Any]:
+        """D-BASE-P10: the audio redundancy in force, and its source.
+
+        Sent to the client in the stream-start response (this status) and
+        handed to the Linux audio sender at stream start. Kept out of
+        `encoder_overrides` like `audio_cushion`.
+        """
+
+        copies = int(self.PROFILE.audio_redundancy_copies)
+        offset = int(self.PROFILE.audio_redundancy_offset_packets)
+        source = "profile"
+        env_copies = self._env_int_or_none(AUDIO_REDUNDANCY_COPIES_ENV)
+        env_offset = self._env_int_or_none(AUDIO_REDUNDANCY_OFFSET_ENV)
+        ignored = False
+
+        if env_copies is not None:
+            if env_copies in (1, 2):
+                copies, source = env_copies, "environment"
+            else:
+                ignored = True
+
+        if env_offset is not None:
+            if 1 <= env_offset <= AUDIO_REDUNDANCY_MAX_OFFSET:
+                offset, source = env_offset, "environment"
+            else:
+                ignored = True
+
+        return {
+            "copies": copies,
+            "offset_packets": offset,
+            "offset_ms": offset * AUDIO_PACKET_MS,
+            "source": source,
+            "env_ignored": ignored,
+            "default_copies": int(self.PROFILE.audio_redundancy_copies),
+            "default_offset_packets": int(
+                self.PROFILE.audio_redundancy_offset_packets
             ),
         }
 
@@ -520,6 +607,8 @@ class NativeStreamManager:
                 # opens rather than inferred. None when nothing is running.
                 "encoder_command": list(self._encoder_command or ()) or None,
                 "encoder_overrides": self.encoder_overrides(),
+                "audio_cushion": self.audio_cushion(),
+                "audio_redundancy": self.audio_redundancy(),
                 "fec": self._fec_relay.status(),
                 # D-BASE-T1: the hottest host sensor, so one `status` call
                 # carries both ends' temperatures once the client's arrive
@@ -1618,6 +1707,13 @@ class NativeStreamManager:
                 )
 
             time.sleep(0.05)
+
+        # D-BASE-P10: the audio sender reads this once when it starts.
+        redundancy = self.audio_redundancy()
+        self._session_io.audio.set_redundancy(
+            copies=redundancy["copies"],
+            offset_packets=redundancy["offset_packets"],
+        )
 
         self._session_io.start(
             ffmpeg=ffmpeg,

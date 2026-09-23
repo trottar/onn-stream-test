@@ -14,6 +14,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicLongArray
 import kotlin.concurrent.thread
 import kotlin.math.max
 import org.json.JSONArray
@@ -40,6 +41,18 @@ data class NativeAudioMetrics(
     val avgQueueResidenceMs: Double,
     val queueTargetPackets: Int,
     val queueCapacityPackets: Int,
+    // D-BASE-P9: "host" (the companion's audio_cushion) or "client_default".
+    val queueCushionSource: String,
+    val cushionAppliedBeforeFirstPcm: Boolean,
+    // D-BASE-P10: audio redundancy in force, and what de-duplication did.
+    val redundancyCopies: Int,
+    val redundancyOffsetPackets: Int,
+    val redundancySource: String,
+    val duplicatesDropped: Long,
+    val recoveredByDuplicate: Long,
+    val lateUnplaced: Long,
+    val sequenceGapPackets: Long,
+    val sequenceGapHistogram: LongArray,
     val startupPrefillMs: Long,
     // D-BASE-P7, diagnostic: the largest gap between two consecutive
     // audio datagrams ARRIVING, in ms, over the WHOLE session. One max()
@@ -104,11 +117,34 @@ class NativeAudioReceiver(
 
         // Hard application reservoir: 8 x 5 ms = 40 ms. This remains bounded
         // and is only 10 ms larger than the prior queue.
-        private const val QUEUE_PACKETS = 8
+        //
+        // D-BASE-P9: this and the target below are now the CLIENT DEFAULTS,
+        // used only when the companion's stream-start response carries no
+        // `audio_cushion` block (an older companion). The companion's
+        // profile declares the pair (`audio_queue_target_packets` /
+        // `audio_queue_capacity_packets`) and `configureCushion` applies
+        // it. Note what each one governs: the TARGET is only the startup
+        // prefill; the running depth sits near the CAPACITY, because every
+        // arrival hole is concealed and the late burst that follows refills
+        // the queue until the capacity trims it (P8 arm A: residence 30.9 ms
+        // against a 40 ms ceiling, trims 4,622 = concealed underruns 4,637).
+        private const val DEFAULT_QUEUE_PACKETS = 8
 
         // Start playback with about 15 ms of application PCM available. The
         // AudioTrack itself remains the same low-latency ~20 ms target.
-        private const val TARGET_QUEUE_PACKETS = 3
+        private const val DEFAULT_TARGET_QUEUE_PACKETS = 3
+
+        // D-BASE-P9: the queue is allocated at this bound once; the
+        // capacity in force is enforced in enqueuePacket. 32 x 5 = 160 ms.
+        private const val MAX_QUEUE_PACKETS = 32
+
+        // D-BASE-P10: the de-duplication window, in sequences (a power of
+        // two; 64 x 5 ms = 320 ms, far beyond any copy offset in use), and
+        // the sequence-gap histogram's bins: 1, 2, 3, 4-7, 8+.
+        private const val SEEN_WINDOW = 64
+        private const val SEEN_WINDOW_MASK = SEEN_WINDOW - 1
+        private const val GAP_BINS = 5
+        private const val MAX_REDUNDANCY_OFFSET = 16
 
         private const val STARTUP_PREFILL_TIMEOUT_MS = 100L
 
@@ -157,16 +193,153 @@ class NativeAudioReceiver(
     @Volatile
     private var startupWaitTimedOut = false
 
-    private data class PcmPacket(
-        val payload: ByteArray?,
+    // D-BASE-P10: a concealment slot carries the sequence it stands for,
+    // so a late redundant copy can fill it in place. `state`: 0 pending,
+    // 1 filled by a late copy (receive thread), 2 consumed (played or
+    // trimmed). Whichever side moves it off 0 first wins.
+    private class PcmPacket(
+        @Volatile var payload: ByteArray?,
         val concealLoss: Boolean,
-        val enqueuedNs: Long
-    )
+        val enqueuedNs: Long,
+        val sequence: Int = -1
+    ) {
+        val state =
+            AtomicInteger(0)
+    }
+
+    // D-BASE-P10: redundancy in force (configureRedundancy) and its counters.
+    @Volatile
+    private var redundancyCopies =
+        1
+
+    @Volatile
+    private var redundancyOffsetPackets =
+        0
+
+    @Volatile
+    private var redundancySource =
+        "client_default"
+
+    // Concealment slots per sequence gap: 2 as before; 2 + offset with
+    // redundancy on, so the copies of a burst up to that long have a slot.
+    @Volatile
+    private var placeholderCap =
+        2
+
+    // Touched by the receive thread only.
+    private val seenSequences =
+        IntArray(SEEN_WINDOW) { -1 }
+
+    private val duplicatesDropped =
+        AtomicLong(0)
+
+    private val recoveredByDuplicate =
+        AtomicLong(0)
+
+    private val lateUnplaced =
+        AtomicLong(0)
+
+    private val sequenceGapPackets =
+        AtomicLong(0)
+
+    private val sequenceGapHistogram =
+        AtomicLongArray(GAP_BINS)
+
+    /**
+     * D-BASE-P10: apply the companion's audio redundancy. copies <= 0
+     * (field absent) leaves it off.
+     */
+    fun configureRedundancy(
+        copies: Int,
+        offsetPackets: Int
+    ) {
+        if (copies <= 0) {
+            return
+        }
+
+        val on =
+            copies >= 2
+
+        redundancyCopies =
+            if (on) 2 else 1
+
+        redundancyOffsetPackets =
+            offsetPackets.coerceIn(
+                1,
+                MAX_REDUNDANCY_OFFSET
+            )
+
+        placeholderCap =
+            if (on) 2 + redundancyOffsetPackets else 2
+
+        redundancySource =
+            "host"
+    }
+
+    // D-BASE-P9: the cushion in force. Written once by configureCushion
+    // (the activity's session thread, from the stream-start response), read
+    // by the receive and playback threads.
+    @Volatile
+    private var queueTargetPackets =
+        DEFAULT_TARGET_QUEUE_PACKETS
+
+    @Volatile
+    private var queueCapacityPackets =
+        DEFAULT_QUEUE_PACKETS
+
+    // "host" once the companion's values are applied, else "client_default".
+    @Volatile
+    private var cushionSource =
+        "client_default"
+
+    // Whether the host's values were applied before the first real PCM
+    // packet was queued, i.e. whether the whole session ran on them.
+    @Volatile
+    private var cushionAppliedBeforeFirstPcm =
+        false
 
     private val queue =
         ArrayBlockingQueue<PcmPacket>(
-            QUEUE_PACKETS
+            MAX_QUEUE_PACKETS
         )
+
+    /**
+     * D-BASE-P9: apply the companion's declared audio cushion. Values <= 0
+     * (field absent) leave the client defaults in force. The capacity is
+     * bounded by MAX_QUEUE_PACKETS and the target by the capacity.
+     */
+    fun configureCushion(
+        targetPackets: Int,
+        capacityPackets: Int
+    ) {
+        if (
+            targetPackets <= 0 ||
+            capacityPackets <= 0
+        ) {
+            return
+        }
+
+        val capacity =
+            capacityPackets.coerceIn(
+                1,
+                MAX_QUEUE_PACKETS
+            )
+
+        queueCapacityPackets =
+            capacity
+
+        queueTargetPackets =
+            targetPackets.coerceIn(
+                1,
+                capacity
+            )
+
+        cushionSource =
+            "host"
+
+        cushionAppliedBeforeFirstPcm =
+            firstRealPacketQueuedNs == 0L
+    }
 
     private val packets =
         AtomicLong(0)
@@ -668,9 +841,31 @@ class NativeAudioReceiver(
             avgQueueResidenceMs =
                 averageResidenceMs,
             queueTargetPackets =
-                TARGET_QUEUE_PACKETS,
+                queueTargetPackets,
             queueCapacityPackets =
-                QUEUE_PACKETS,
+                queueCapacityPackets,
+            queueCushionSource =
+                cushionSource,
+            cushionAppliedBeforeFirstPcm =
+                cushionAppliedBeforeFirstPcm,
+            redundancyCopies =
+                redundancyCopies,
+            redundancyOffsetPackets =
+                redundancyOffsetPackets,
+            redundancySource =
+                redundancySource,
+            duplicatesDropped =
+                duplicatesDropped.get(),
+            recoveredByDuplicate =
+                recoveredByDuplicate.get(),
+            lateUnplaced =
+                lateUnplaced.get(),
+            sequenceGapPackets =
+                sequenceGapPackets.get(),
+            sequenceGapHistogram =
+                LongArray(GAP_BINS) {
+                    sequenceGapHistogram.get(it)
+                },
             startupPrefillMs =
                 startupPrefillMs
         )
@@ -922,6 +1117,23 @@ class NativeAudioReceiver(
                     continue
                 }
 
+                // D-BASE-P10: de-duplicate by sequence before anything else.
+                // With redundancy on every sequence is sent twice; the first
+                // to arrive is the packet and the second is dropped here, so
+                // everything below -- arrival gaps, loss, the queue -- sees
+                // each sequence once, as with redundancy off.
+                val seenSlot =
+                    sequence and
+                        SEEN_WINDOW_MASK
+
+                if (seenSequences[seenSlot] == sequence) {
+                    duplicatesDropped.incrementAndGet()
+                    continue
+                }
+
+                seenSequences[seenSlot] =
+                    sequence
+
                 // D-BASE-P7: the gap since the previous VALID audio
                 // datagram arrived. Measured here, after the header
                 // checks, so a malformed datagram does not reset it. One
@@ -955,46 +1167,93 @@ class NativeAudioReceiver(
                 lastArrivalNs =
                     arrivalNs
 
-                if (
-                    expectedSequence >= 0 &&
-                    sequence != expectedSequence
-                ) {
-                    val missing =
+                val gap =
+                    if (expectedSequence >= 0) {
                         (
                             sequence -
                                 expectedSequence
                         ) and
                             0xffff
+                    } else {
+                        0
+                    }
+
+                // D-BASE-P10: a sequence BEHIND the expected one is late -- a
+                // redundant copy whose original was lost (or, never seen on
+                // this path, a reordered original). It fills its concealment
+                // slot if that is still queued, and is dropped otherwise. It
+                // never moves expectedSequence: before P10 a late packet reset
+                // it backwards and was queued at the tail, out of order, and
+                // the next in-order packet then read as a false gap.
+                if (gap > 32767) {
+                    packets.incrementAndGet()
 
                     if (
-                        missing in
-                        1..32767
+                        fillPlaceholder(
+                            sequence,
+                            buffer.copyOfRange(
+                                HEADER_BYTES,
+                                HEADER_BYTES +
+                                    EXPECTED_PAYLOAD
+                            )
+                        )
                     ) {
-                        lostPackets.addAndGet(
-                            missing.toLong()
+                        recoveredByDuplicate.incrementAndGet()
+                        lostPackets.decrementAndGet()
+                    } else {
+                        lateUnplaced.incrementAndGet()
+                    }
+
+                    continue
+                }
+
+                if (gap > 0) {
+                    lostPackets.addAndGet(
+                        gap.toLong()
+                    )
+
+                    sequenceGapPackets.addAndGet(
+                        gap.toLong()
+                    )
+
+                    sequenceGapHistogram.incrementAndGet(
+                        when {
+                            gap <= 3 -> gap - 1
+                            gap <= 7 -> 3
+                            else -> 4
+                        }
+                    )
+
+                    // Preserve at most 10 ms of explicit packet loss. This
+                    // keeps A/V time continuous without manufacturing a
+                    // large delayed backlog after a bigger network outage.
+                    // D-BASE-P10: with redundancy on, up to 2 + offset slots;
+                    // each stands for one missing sequence -- the most recent
+                    // ones, whose copies are still to come.
+                    val slots =
+                        minOf(
+                            gap,
+                            placeholderCap
                         )
 
-                        // Preserve at most 10 ms of explicit packet loss. This
-                        // keeps A/V time continuous without manufacturing a
-                        // large delayed backlog after a bigger network outage.
-                        repeat(
-                            minOf(
-                                missing,
-                                2
-                            )
-                        ) {
-                            enqueueConcealment()
-                        }
+                    for (back in slots downTo 1) {
+                        enqueueConcealment(
+                            (
+                                sequence -
+                                    back
+                            ) and
+                                0xffff
+                        )
+                    }
 
-                        if (
-                            missing >
-                            2
-                        ) {
-                            // The first real packet after an intentionally
-                            // skipped larger hole will be ramped in smoothly.
-                            trimCrossfadePending =
-                                true
-                        }
+                    if (
+                        gap >
+                        slots
+                    ) {
+                        // The first real packet after an intentionally
+                        // skipped larger hole will be ramped in smoothly.
+                        trimCrossfadePending =
+                            true
                     }
                 }
 
@@ -1042,7 +1301,9 @@ class NativeAudioReceiver(
         )
     }
 
-    private fun enqueueConcealment() {
+    private fun enqueueConcealment(
+        sequence: Int
+    ) {
         enqueuePacket(
             PcmPacket(
                 payload =
@@ -1050,22 +1311,68 @@ class NativeAudioReceiver(
                 concealLoss =
                     true,
                 enqueuedNs =
-                    System.nanoTime()
+                    System.nanoTime(),
+                sequence =
+                    sequence
             )
         )
+    }
+
+    /**
+     * D-BASE-P10: give a late packet's payload to its concealment slot, if
+     * that slot is still queued and not yet played. Receive thread only;
+     * the playback thread claims items with the same state CAS.
+     */
+    private fun fillPlaceholder(
+        sequence: Int,
+        payload: ByteArray
+    ): Boolean {
+        for (item in queue) {
+            if (
+                item.concealLoss &&
+                item.sequence ==
+                sequence
+            ) {
+                item.payload =
+                    payload
+
+                return item.state.compareAndSet(
+                    0,
+                    1
+                )
+            }
+        }
+
+        return false
     }
 
     private fun enqueuePacket(
         item: PcmPacket
     ) {
-        if (!queue.offer(item)) {
+        // D-BASE-P9: the capacity in force is checked here; the backing
+        // queue is MAX_QUEUE_PACKETS deep. One producer (the receive
+        // thread), so at the old 8 this is exactly the old offer-fails test.
+        if (
+            queue.size >=
+            queueCapacityPackets ||
+            !queue.offer(item)
+        ) {
             // Preserve the latest audio and the latency ceiling, but explicitly
             // flag the resulting timeline trim so playback can smooth the next
             // real waveform boundary instead of making a raw PCM cut.
+            val trimmed =
+                queue.poll()
+
             if (
-                queue.poll() !=
+                trimmed !=
                 null
             ) {
+                // D-BASE-P10: a trimmed slot can no longer be filled.
+                trimmed.state.compareAndSet(
+                    0,
+                    2
+                )
+
                 staleDrops.incrementAndGet()
                 smoothLatencyTrims.incrementAndGet()
                 trimCrossfadePending =
@@ -1174,7 +1481,7 @@ class NativeAudioReceiver(
             while (
                 running &&
                 queue.size <
-                TARGET_QUEUE_PACKETS &&
+                queueTargetPackets &&
                 (
                     System.nanoTime() -
                         prefillStartedNs
@@ -1234,9 +1541,23 @@ class NativeAudioReceiver(
                             item.enqueuedNs
                     )
 
+                    // D-BASE-P10: claim the item. A concealment slot that a
+                    // late redundant copy filled first (state 1) is real audio.
+                    val filledLate =
+                        !item.state.compareAndSet(
+                            0,
+                            2
+                        )
+
+                    val itemPayload =
+                        item.payload
+
                     if (
-                        item.concealLoss ||
-                        item.payload ==
+                        (
+                            item.concealLoss &&
+                                !filledLate
+                        ) ||
+                        itemPayload ==
                         null
                     ) {
                         concealedLossPackets.incrementAndGet()
@@ -1252,7 +1573,7 @@ class NativeAudioReceiver(
                             true
                     } else {
                         payload =
-                            item.payload
+                            itemPayload
 
                         isRealPacket =
                             true

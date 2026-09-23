@@ -45,7 +45,30 @@ reports "Loaded" with no window; and after a recovery-state load the source
 picture cycles through about four frames. The Tekken 3 `.state.recovery` is
 **kept on purpose** as their evidence.
 
-## 2026-09-23 — `H3`: companion autostart DESIGNED, not installed
+## 2026-09-23 — `D-BASE-T2`/`T3`/`P10`: the warm-state audio loss, mitigated
+
+From cold, audio loss steps to 30-90/min after ~7 min (idle resets it);
+it is single packets lost **between** the host's NIC and the onn's IP
+stack (`T3`: host sent all, onn dropped none). **`P10` sends every audio
+datagram twice, 20 ms apart — adopted 2/4**: loss −96-98 %, +1.6 Mbps,
+no latency (`../evidence/D_BASE_P10_AUDIO_REDUNDANCY_2026-09-23.md`).
+**Read before touching audio receive**: the client de-duplicates by
+sequence first and a late copy fills its concealment slot in place;
+`lost_packets` = sequences never received. APK `f31b1c18…8ae7`. Samplers:
+`t2_sample.py` (host+onn+Opal, 10 s), `t3_host_sample.py`.
+
+## 2026-09-23 — `D-BASE-P9` / `P9a`: the audio cushion
+
+`../evidence/D_BASE_P9_AUDIO_CUSHION_2026-09-23.md`,
+`../evidence/D_BASE_P9A_CUSHION_INTERLEAVED_2026-09-23.md`. **The
+CAPACITY sets the running audio latency; the target is only the startup
+prefill** (and the host's value arrives after the first PCM). 12/17:
++33.5-37.9 ms, starvation -98-99.5 %, underruns inside the 3/8 band
+(4-20) — adopted in `T2`. Setting: `audio_queue_{target,capacity}_packets`,
+override `PRIVYHUB_AUDIO_QUEUE_*`. **`H3` is installed**: restart with
+`systemctl --user restart privyhub-companion`, never `kill` + `nohup`.
+
+## 2026-09-23 — `H3`: companion autostart DESIGNED (installed by the user later that day)
 
 `../evidence/H3_COMPANION_AUTOSTART_DESIGN_2026-09-23.md`: a systemd user
 unit on `default.target`, `DISPLAY=:0`, wait for X, `KillSignal=SIGINT`,

@@ -553,21 +553,34 @@ onn's.**
 35.8-40.7 Opal uncapped (`O1`), **32.0-32.5 Opal capped** (`S3`, `P7`).
 The frame cap barely moves it — audio is low-rate, evenly paced and small,
 never the bursty stream. **Read it as a path-jitter rate, not a fault**:
-32/min came with **4 actual underruns in 20 minutes**. The only client
-lever is a deeper cushion — **3 packets (15 ms)** against a p90 hole of
-**60 ms**, about **+45 ms of audio latency**; sender pacing is closed by
-measurement.
+32/min came with **4 actual underruns in 20 minutes**. Sender pacing is
+closed by measurement.
 
-**The hole's origin is the path, not the client's 2 s senders** (`P8`,
-2026-09-22, replacing "`P7` could not locate it"): per-hole timestamps
-over three 20-min sessions — **~158 holes > 15 ms and ~100 ≥ 40 ms per
-minute**, half of them 50-60 ms; only **5.7-6.6 %** start within 100 ms
-of a heartbeat send (uniform 5 %); removing the adb socket sampler moved
-the rate **-1 %**, a 10 s heartbeat **-11 %**. "Once every 2 s" was the
-latched counter's episode rate, not the hole rate. A send costs ~1 % of
-holes within 50 ms — nothing more. **The AP's per-station scheduling is
-the remaining candidate, unmeasured.** The socket sampler is safe during
-audio measurements.
+**The audio cushion is a profile setting; the CAPACITY sets the latency**
+(`P9`, 2026-09-23). `audio_queue_{target,capacity}_packets` (5 ms each),
+override `PRIVYHUB_AUDIO_QUEUE_*`. The target is only the startup prefill
+(and the host's value lands after the first PCM); every hole's late burst
+refills the queue to the capacity, so residence ≈ capacity − ~2 packets.
+**12 / 17 is the profile default — adopted by the user 2026-09-23.**
+Measured three times: **+33.5-37.9 ms residence, starvation -98-99.5 %**
+(`P9`, `P9a`); 12 / 24 = +71.7 ms. The user's listen: "No issues from
+playing for a minute or two" (user-stated).
+
+**A 20-minute `audio.underruns` total is noise: 4-20 across six 3/8
+sessions** (median 9.5), arriving as events of 1-3 spread through the
+session (`P9a`, heartbeat deltas). Read events, not totals; one 8-event
+(`P9`-B) is the only large one on record.
+
+**The hole's origin is the path, not the client's 2 s senders** (`P8`):
+~158 holes > 15 ms/min, half 50-60 ms; 5.7-6.6 % start within 100 ms of
+a heartbeat send (uniform 5 %); the adb socket sampler moved the rate
+-1 % — safe during audio measurements.
+
+**Warm-state audio loss** (`T2`/`T3`): from cold, ~7 min at 1-6/min, then
+30-90/min, single packets, lost **between** the ends (host `send_errors`
+0, onn socket drops 0); idle resets it. **Mitigated by audio redundancy
+2/4** (`P10`, adopted): each datagram sent twice 20 ms apart, loss
+−96-98 %, +1.6 Mbps, no latency. onn CPU temp: `dumpsys thermalservice`.
 
 **Nothing reorders, ever.** `late_or_reordered_packets` is **0** across
 11 M packets on the PC path including a half-hour losing 389/min, and 0 on

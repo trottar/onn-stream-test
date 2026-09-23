@@ -1,0 +1,63 @@
+== raw, the four arms in run order
+field                                   A3          B2          A4          B3
+cushion                                3/8       12/17         3/8       12/17
+cushion_source                        host        host        host        host
+duration_s                         1207.00     1207.10     1207.20     1207.90
+underruns                               10          12          16          19
+prolonged_starvation_events            833          15         931           4
+starvation_per_min                   41.41        0.75       46.27        0.20
+concealed_underruns                   5201         158        6087          49
+smooth_latency_trims                  5203         127        6090          28
+lost_packets                           442        1151        1417        1676
+concealed_loss_packets                 424        1117        1381        1651
+avg_queue_residence_ms               30.85       68.45       30.34       64.14
+max_queue_residence_ms                  51         127          52         100
+max_queue_depth                          8          17           8          17
+first_write_elapsed_ms                2306        2222        2121        2244
+startup_wait_ms                       2211        2139        2037        2175
+holes                                 3479        3749        4451        3450
+holes_ge_40                           2227        2328        2781        2175
+rendered_fps                         59.91       59.87       59.91       59.90
+spike_20_per_min                     31.87       34.75       33.10       29.70
+max_output_gap_ms                      157         203         214         329
+video_lost_per_min                    9.49       21.92        9.44       17.04
+heartbeat_rows                         597         597         597         598
+
+== hole length (ms: count)
+  A3: {'15-20': 331, '20-30': 416, '30-40': 505, '40-50': 251, '50-60': 1775, '60-70': 193, '70-100': 6, '100-200': 2, '200-max': 0}
+  B2: {'15-20': 459, '20-30': 420, '30-40': 542, '40-50': 304, '50-60': 1851, '60-70': 164, '70-100': 5, '100-200': 4, '200-max': 0}
+  A4: {'15-20': 512, '20-30': 500, '30-40': 658, '40-50': 396, '50-60': 2203, '60-70': 178, '70-100': 4, '100-200': 0, '200-max': 0}
+  B3: {'15-20': 413, '20-30': 385, '30-40': 477, '40-50': 272, '50-60': 1747, '60-70': 152, '70-100': 4, '100-200': 0, '200-max': 0}
+
+== underruns: tick_series rows (first ~200 s) and whole-session events from the heartbeat
+  A3 (3/8): total 10; tick_series [(2731, 3), (62609, 1)]
+      events (6): 3@7s*, 1@64s, 2@415s, 1@494s, 2@803s, 1@1187s
+  B2 (12/17): total 12; tick_series [(5591, 2)]
+      events (7): 2@7s*, 2@285s, 1@554s, 2@588s, 1@887s, 2@1026s, 2@1165s
+  A4 (3/8): total 16; tick_series [(2467, 1), (87251, 2)]
+      events (9): 1@7s*, 2@88s, 1@470s, 2@506s, 2@685s, 2@795s, 2@970s, 2@996s, 2@1163s
+  B3 (12/17): total 19; tick_series [(45544, 1), (62666, 1), (114968, 2)]
+      events (11): 1@46s, 1@64s, 2@116s, 1@237s, 2@566s, 2@717s, 2@803s, 2@954s, 3@966s, 2@974s, 1@1197s
+      (* = before the first heartbeat / after the last)
+
+== the 3/8 noise band (2 s heartbeat sessions)
+  P7     total   4; largest event 2; events 3
+  P8-A   total   9; largest event 2; events 6
+  P8-B   total   6; largest event 2; events 4
+  P9-A2  total  20; largest event 3; events 12
+  A3     total  10; largest event 3; events 6
+  A4     total  16; largest event 2; events 9
+  band: min 4, median 9.5, max 20; largest single 3/8 event 3; B allowance = max + largest = 23
+  context P9-B (12/17): total 25; events 2@7s, 8@78s, 2@486s, 2@516s, 1@618s, 2@934s, 1@1024s, 2@1070s, 2@1177s, 3@1205s
+
+== pre-registered reading (A mean: starvation 43.84/min, residence 30.60 ms, holes 3965)
+  B2: starvation drop 98.3%; residence +37.9 ms; holes -5.4% (vs A3 +7.8%, A4 -15.8%); underruns 12 (band max 20, allowance 23) -> starvation_drop_ge_80 PASS, residence_30_55 PASS, holes_within_20pct PASS, underruns_within_allowance PASS
+  B3: starvation drop 99.5%; residence +33.5 ms; holes -13.0% (vs A3 -0.8%, A4 -22.5%); underruns 19 (band max 20, allowance 23) -> starvation_drop_ge_80 PASS, residence_30_55 PASS, holes_within_20pct FAIL, underruns_within_allowance PASS
+  READING: KEEP 3/8
+
+== audio loss, run order (total; per-minute series)
+  A3 (3/8): 442; [3, 3, 3, 1, 5, 3, 9, 2, 9, 8, 4, 21, 21, 40, 34, 47, 66, 49, 59, 53]
+  B2 (12/17): 1151; [33, 55, 52, 39, 60, 67, 87, 29, 76, 86, 70, 50, 46, 59, 45, 62, 58, 63, 24, 74]
+  A4 (3/8): 1417; [111, 35, 55, 95, 60, 94, 64, 118, 24, 84, 57, 77, 46, 75, 96, 26, 79, 83, 105, 25]
+  B3 (12/17): 1676; [80, 96, 42, 71, 90, 83, 58, 47, 80, 77, 60, 91, 78, 81, 81, 121, 132, 65, 117, 117]
+  A4>=A3 True; B3>=B2 True; B systematically above neighbouring A False; both B >= 1.5x both A False -> TIME-DRIVEN

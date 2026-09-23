@@ -111,6 +111,12 @@ class NativeAudioStreamer:
         self._linux_packets_sent = 0
         self._linux_send_errors = 0
         self._linux_sender_underflows = 0
+        # D-BASE-P10: audio redundancy (set_redundancy) and its counters.
+        # packets_sent keeps counting originals only.
+        self._redundancy_copies = 1
+        self._redundancy_offset_packets = 4
+        self._linux_duplicates_sent = 0
+        self._linux_duplicate_send_errors = 0
         self._linux_reader_bytes = 0
         self._linux_max_buffer_bytes = 0
         self._linux_restore_errors = 0
@@ -315,6 +321,13 @@ class NativeAudioStreamer:
 
         return False
 
+    def set_redundancy(self, copies: int, offset_packets: int) -> None:
+        """D-BASE-P10: send each audio datagram `copies` times, the copy
+        `offset_packets` ticks after the original. Read by the Linux sender
+        when it starts; 1 = off (the historical behaviour)."""
+        self._redundancy_copies = 2 if int(copies) >= 2 else 1
+        self._redundancy_offset_packets = max(1, min(16, int(offset_packets)))
+
     def _linux_reader_loop(self) -> None:
         process = self._process
         stream = (
@@ -431,6 +444,12 @@ class NativeAudioStreamer:
 
             sequence = 0
             sample_timestamp = 0
+            # D-BASE-P10: the last `offset` + 1 datagrams, so tick n can send
+            # the copy of packet n - offset right after packet n. The pacer's
+            # deadline is untouched; a copy is a second sendto in the tick.
+            copies = self._redundancy_copies
+            offset = self._redundancy_offset_packets
+            history: deque[bytes] = deque(maxlen=offset + 1)
             deadline_ns = time.perf_counter_ns()
 
             while not self._linux_stop_event.is_set():
@@ -482,6 +501,22 @@ class NativeAudioStreamer:
                     self._linux_packets_sent += 1
                 except (BlockingIOError, OSError):
                     self._linux_send_errors += 1
+
+                # D-BASE-P10: original first, then the copy of n - offset.
+                if copies >= 2:
+                    history.append(datagram)
+                    if len(history) > offset:
+                        try:
+                            sock.sendto(
+                                history[0],
+                                (
+                                    client_ip,
+                                    int(client_port),
+                                ),
+                            )
+                            self._linux_duplicates_sent += 1
+                        except (BlockingIOError, OSError):
+                            self._linux_duplicate_send_errors += 1
 
                 sequence = (
                     sequence + 1
@@ -606,6 +641,12 @@ class NativeAudioStreamer:
                 "underflows": self._linux_sender_underflows,
                 "intervals": self._linux_interval_metrics(),
             },
+            "redundancy": {
+                "copies": self._redundancy_copies,
+                "offset_packets": self._redundancy_offset_packets,
+                "duplicates_sent": self._linux_duplicates_sent,
+                "duplicate_send_errors": self._linux_duplicate_send_errors,
+            },
             "restore_errors": self._linux_restore_errors,
         }
 
@@ -625,6 +666,11 @@ class NativeAudioStreamer:
             "audio_buffer_architecture": self.LINUX_AUDIO_BUFFER_ARCHITECTURE,
             "packets_sent": self._linux_packets_sent,
             "send_errors": self._linux_send_errors,
+            # D-BASE-P10
+            "copies": self._redundancy_copies,
+            "offset_packets": self._redundancy_offset_packets,
+            "duplicates_sent": self._linux_duplicates_sent,
+            "duplicate_send_errors": self._linux_duplicate_send_errors,
             "timing_log": self._public_timing_log(),
             "helper_status": helper_status,
         }
@@ -832,6 +878,8 @@ class NativeAudioStreamer:
         self._linux_packets_sent = 0
         self._linux_send_errors = 0
         self._linux_sender_underflows = 0
+        self._linux_duplicates_sent = 0
+        self._linux_duplicate_send_errors = 0
         self._linux_reader_bytes = 0
         self._linux_max_buffer_bytes = 0
         self._linux_restore_errors = 0

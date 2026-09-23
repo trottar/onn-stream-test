@@ -1,0 +1,24 @@
+[t3 18:44:52Z] last session_ended 2026-09-23T17:39:40.705Z, 65 min ago
+[T3] sampler=on heartbeat_ms=default cushion=profile/profile
+[T3] env: MAX_FRAME_SIZE=unset BUFSIZE_K=unset BYTE_CAP=unset
+[T3] env | grep PRIVYHUB_ENC ->
+    (nothing, as the validating run requires)
+[T3] companion MainPID 167526 serving 8765
+[T3] cushion env in companion environ: 
+[T3] audio_cushion {'queue_target_packets': 12, 'queue_capacity_packets': 17, 'packet_ms': 5, 'target_ms': 60, 'capacity_ms': 85, 'source': 'profile', 'env_ignored': False, 'default_queue_target_packets': 12, 'default_queue_capacity_packets': 17}
+[T3] encoder argv: ... 7000k -bufsize 7000k -max_frame_size 90000 -g 15 -bf 0 -payload_type 96 -f rtp rtp://127.0.0.1:48110?pkt_size=1200
+[T3] overrides: max_frame_size=90000 bufsize_kbits=None
+[T3] relay byte cap under test: None
+[T3] audio_cushion at PLAYING: {'queue_target_packets': 12, 'queue_capacity_packets': 17, 'packet_ms': 5, 'target_ms': 60, 'capacity_ms': 85, 'source': 'profile', 'env_ignored': False, 'default_queue_target_packets': 12, 'default_queue_capacity_packets': 17}
+[T3] any_override False max_frame_size 90000 profile
+[T3] PLAYING at 2026-09-23T18:46:15Z; holding 1500s, zero input
+[T3] adb client processes seen during hold: 276 (# polls 2893)
+[T3] report: native_decoder_20260923_191117_838.json
+[frames] 1501 seconds in the session window
+[heartbeat] 747 lines
+[T3] game active after stop: False
+[T3] done
+[t3 19:12:37Z] rows: thermal 166, host 827, onn socket 787
+[t3 19:12:37Z] MainPID 167526; 8765 167526; PRIVYHUB_* environ 0 manager 0
+[t3] cushion 12 17 profile any_override False
+[t3 19:12:37Z] done

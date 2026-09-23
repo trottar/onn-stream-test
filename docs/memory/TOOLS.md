@@ -22,6 +22,24 @@ Companion launch:
 Restart the companion whenever companion Python changes. D-068 durable rule:
 stale-process behavior is not evidence.
 
+**Since `H3` (installed 2026-09-23) the companion is the systemd user unit
+`privyhub-companion`.** Restart it through systemd — never `kill` +
+`nohup`, which the unit would fight — and confirm the unit's MainPID owns
+8765 before any session:
+
+```bash
+systemctl --user restart privyhub-companion
+MP=$(systemctl --user show -p MainPID --value privyhub-companion)
+ss -lntp | grep ':8765 ' | grep -q "pid=$MP," && echo "8765 owned by $MP"
+journalctl --user -u privyhub-companion --since "10 min ago"   # its log
+```
+
+A per-session companion variable goes in the user manager's environment,
+not the unit file, and comes out after:
+`systemctl --user set-environment VAR=value`, restart, … then
+`systemctl --user unset-environment VAR` and restart again; check
+`/proc/$MP/environ`. The by-hand notes below predate `H3`.
+
 **Check for an existing listener first, and check the log after.** Started
 as `nohup … &`, a second companion dies on
 `OSError: [Errno 98] Address already in use` into its redirected log and the
@@ -676,6 +694,59 @@ encoded.
 
 **The adb socket sampler (`p5_socket_sample.py`) is safe during audio
 measurements** — removing it moved the hole rate by 1 % (`P8`).
+
+**The audio cushion (`D-BASE-P9`)** is a profile pair,
+`audio_queue_target_packets` / `audio_queue_capacity_packets` (5 ms
+packets; reference **12 / 17** since 2026-09-23, 3 / 8 before), sent to the client in the stream-start
+response and shown in `native-stream-status.audio_cushion` (with
+`source`). **The capacity sets the running latency** (residence ≈
+capacity − 2 packets); the target is only the startup prefill and in
+practice arrives after the first PCM. Per session, both or neither:
+
+```bash
+# e.g. back to the old 3 / 8 for one comparison session
+systemctl --user set-environment PRIVYHUB_AUDIO_QUEUE_TARGET_PACKETS=3 PRIVYHUB_AUDIO_QUEUE_CAPACITY_PACKETS=8
+systemctl --user restart privyhub-companion
+# undo
+systemctl --user unset-environment PRIVYHUB_AUDIO_QUEUE_TARGET_PACKETS PRIVYHUB_AUDIO_QUEUE_CAPACITY_PACKETS
+systemctl --user restart privyhub-companion
+```
+
+The report's `audio.queue_cushion_source` says whether the host's values
+were applied. **A 20-minute `audio.underruns` total is noisy** (4-20 at
+3/8 across six sessions): read **events** — runs of non-zero 2 s deltas of
+the heartbeat's cumulative `audio_underruns` — not totals
+(`evidence/d_base_p9a_2026-09-23/p9a_analyze.py` does it). And **audio
+loss builds over back-to-back sessions**: compare arms interleaved, never
+in one block. `encoder_overrides.any_override` does not include them.
+`evidence/d_base_p9_2026-09-23/p9_run.sh` is the systemd-era session
+harness (derived from `P8`'s).
+
+**Audio redundancy (`D-BASE-P10`)**: profile `audio_redundancy_copies` /
+`_offset_packets`, reference **2 / 4** (each audio datagram sent again 4
+ticks = 20 ms later; the client keeps the first). Shown in
+`native-stream-status.audio_redundancy` (`source`) and, sender side,
+`audio.duplicates_sent` / `duplicate_send_errors`; the report carries
+`audio.recovered_by_duplicate`, `duplicates_dropped`, `late_unplaced`,
+`sequence_gap_histogram`. Off for one comparison session:
+`systemctl --user set-environment PRIVYHUB_AUDIO_REDUNDANCY_COPIES=1`,
+restart, then `unset-environment` and restart. **The host sender advances
+the sequence on a failed send too, so `audio.send_errors` is the host's
+whole share of any client loss** (`T3`).
+
+**Host + onn + Opal together, every 10 s (`D-BASE-T2`):**
+`evidence/d_base_t2_2026-09-23/t2_sample.py <out.jsonl> 10` (stop:
+`touch <out.jsonl>.stop`). Host hwmon temperatures by label, per-core
+cpufreq, encoder / RetroArch CPU %, `eno1` counters; the onn in one
+`adb shell` — **`dumpsys thermalservice` gives a live `cpu-thermal`
+temperature** (the HAL; `/sys/class/thermal` stays denied), `cmd wifi
+status` gives RSSI and link speeds (**`cmd wifi status` prints its own
+`====` headers — never split its output on `===`**); the Opal in one
+read-only `ssh opal` — the onn's `wlan1` station row (matched by the onn's
+address held in memory only, never written), `iwinfo`, load, SoC
+`thermal_zone0`. ~0.9 s per round; its adb calls are the only foreign
+adb in a hold (safe, `P8`). `t2_analyze.py` / `t2_separation.py` read it
+against the heartbeat's per-minute audio loss.
 
 **`save_state_probe.txt` is reset at every game launch**; read the
 RetroArch session logs' `[State]` lines to follow loads across launches

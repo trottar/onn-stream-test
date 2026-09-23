@@ -260,8 +260,25 @@ acceptable → the gate is met and `C3.L4` may be proposed. Marks aligned →
 - **The cause of the 55-60 ms audio arrival hole** (`D-BASE-P7`,
   2026-09-22) — **narrowed by `P8`** the same night: not the heartbeat, not
   the adb socket sampler; the path's (the AP's per-station scheduling is
-  the remaining candidate, unmeasured). Lever unchanged: the +45 ms audio
-  cushion, the user's call.
+  the remaining candidate, unmeasured). **The lever was measured by `P9`
+  (2026-09-23)**: 12 / 17 took starvation 42.4 → 0.8/min at +36.0 ms
+  residence; underruns 20 → 25 tripped the pre-registered revert, default
+  3 / 8, re-adoption the user's call
+  (`../evidence/D_BASE_P9_AUDIO_CUSHION_2026-09-23.md`). Open from it:
+  audio `lost_packets` rose 282 → 990 → 1,380 across the hour with video
+  flat. **`P9a` separated it** (interleaved A3/B2/A4/B3): **time-driven** —
+  it builds over back-to-back streaming (A3 3/min after a 40-min idle gap,
+  later arms open at 35-111/min) and is not the cushion's. **12/17 adopted
+  (`T2` Part 0).** **`T2` (2026-09-23)**: reproduced; a **step** ~7 min
+  into a cold stream (1-6 → 30-90/min), reset by 30 min idle; every
+  temperature moves with it, the radio and video loss do not → reading
+  MIXED. **`T3` located it between the ends**: at the step the host sent
+  every packet (0 send errors, 0 `SndbufErrors`) and the onn's socket and
+  UDP stack dropped none — wired hop, Opal, air or onn Wi-Fi firmware
+  (`../evidence/D_BASE_T3_AUDIO_LOSS_LOCATION_2026-09-23.md`). **Mitigated
+  by `P10`** (audio sent twice 20 ms apart, adopted 2/4): loss −96-98 %.
+  The cause between the ends stays open for `host_link` (next instrument,
+  Opal per-second counters, absent).
 - `slow_events_marked` emitted empty while `slow_event_retained_marked` reports
   30 of 64.
 - `tools/probe_c3_fixed_*_characterization.py --finalize` matched the wrong

@@ -1,0 +1,12 @@
+underrun timing (tick_series, ms elapsed; startup = before first_write + 3000 ms)
+ A2: underruns total 20; in series 7 (series covers to 199842 ms); <= first_write+3 s: 1; later: 6; later rows [(5584, 1), (24800, 1), (34380, 2), (70628, 1), (166162, 1)]
+ B: underruns total 25; in series 10 (series covers to 199880 ms); <= first_write+3 s: 2; later: 8; later rows [(76177, 8)]
+ Bp: underruns total 16; in series 5 (series covers to 199825 ms); <= first_write+3 s: 1; later: 4; later rows [(8130, 2), (24795, 2)]
+
+audio lost packets per 2 s heartbeat tick (delta), distribution
+ A2: ticks 596, ticks with loss 178, top ticks [10, 6, 5, 5, 5, 5, 4, 4], sum 281; video loss sum 244
+      per-minute audio loss [6, 3, 3, 2, 5, 6, 15, 5, 4, 8, 14, 19, 16, 8, 12, 55, 13, 37, 31, 19]
+ B: ticks 596, ticks with loss 399, top ticks [15, 15, 14, 14, 12, 11, 11, 9], sum 986; video loss sum 265
+      per-minute audio loss [43, 39, 38, 36, 24, 35, 33, 34, 20, 34, 52, 60, 83, 88, 32, 81, 107, 73, 42, 32]
+ Bp: ticks 596, ticks with loss 461, top ticks [17, 14, 13, 13, 12, 12, 11, 11], sum 1376; video loss sum 219
+      per-minute audio loss [66, 65, 31, 60, 49, 92, 33, 40, 24, 75, 63, 125, 114, 45, 65, 113, 129, 48, 61, 78]

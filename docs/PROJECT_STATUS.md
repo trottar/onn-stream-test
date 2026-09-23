@@ -44,6 +44,8 @@ attempt is formally abandoned. Decision:
 | --- | --- | --- |
 | Linux host on the production path | measured | `B2_HOST_ON_OPAL_2026-09-21.md` |
 | 90 KB frame cap as profile default | RUNTIME VALIDATED | `D_BASE_P6A_CAP_ADOPTED_2026-09-22.md` |
+| Audio redundancy 2 / 4 as profile default (`P10`) | ADOPTED by the user 2026-09-23 — warm audio loss −96-98 %, +1.6 Mbps | `D_BASE_P10_AUDIO_REDUNDANCY_2026-09-23.md` |
+| Audio cushion 12 / 17 as profile default (`P9`, `P9a`, `T2` Part 0) | ADOPTED by the user 2026-09-23 — +33.5-37.9 ms, starvation -98-99.5 % | `D_BASE_P9A_CUSHION_INTERLEAVED_2026-09-23.md` |
 | the cap over three hours | SOAK VALIDATED | `D_BASE_S3_CAP_SOAK_2026-09-22.md` |
 | recovery state machine (`GIVE_UP_MS` path, backoff, `.state.recovery`) | RUNTIME VALIDATED on real link failure | `D_BASE_R3_*`, `D_BASE_R3A_*`, `D_BASE_S2_*` |
 | heartbeat loss counters (schema v2, now v3) | RUNTIME VALIDATED | `D_BASE_R5_HEARTBEAT_LOSS_COUNTERS_2026-09-21.md` |
@@ -219,7 +221,20 @@ Reference behavior:
 - **maximum frame size 90,000 bytes** (adopted 2026-09-22 on `D-BASE-P6`
   evidence; Linux `h264_vaapi` path only — see below);
 - FEC group size 8;
-- process-specific PCM audio;
+- process-specific PCM audio; **client audio cushion 12 / 17 packets**
+  (`audio_queue_target_packets` / `audio_queue_capacity_packets`, 5 ms
+  each; adopted by the user 2026-09-23 after `D-BASE-P9`/`P9a`). The
+  capacity sets the audio latency: **+33.5-37.9 ms of queue residence**
+  over the old 3 / 8 (≈ 30.6 → ≈ 66 ms), for **98-99.5 % fewer
+  starvation episodes**; underruns inside the 3/8 noise band.
+  `PRIVYHUB_AUDIO_QUEUE_{TARGET,CAPACITY}_PACKETS` overrides per session.
+  Decision: `docs/memory/decisions/D-BASE-P9_AUDIO_CUSHION.md`;
+- **audio redundancy 2 copies, offset 4 packets** (adopted 2026-09-23,
+  `D-BASE-P10`): each audio datagram sent twice 20 ms apart, the client
+  keeps the first. Warm-state audio loss −96-98 % for +1.6 Mbps, no added
+  latency. `PRIVYHUB_AUDIO_REDUNDANCY_{COPIES,OFFSET_PACKETS}` overrides
+  per session. Decision:
+  `docs/memory/decisions/D-BASE-P10_AUDIO_REDUNDANCY.md`;
 - PHI1 -> uinput -> RetroArch udev controller path on Linux (PHI1/ViGEm is
   the preserved Windows reference).
 

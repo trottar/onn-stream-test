@@ -756,6 +756,45 @@ class NativeStreamActivity :
                         10_000L
                     )
 
+                // D-BASE-P9: the companion's declared audio cushion (its
+                // profile, or an environment override). Absent means the
+                // receiver's client defaults (3 / 8) stay in force.
+                json.optJSONObject(
+                    "audio_cushion"
+                )?.let { cushion ->
+                    audioReceiver?.configureCushion(
+                        targetPackets =
+                            cushion.optInt(
+                                "queue_target_packets",
+                                0
+                            ),
+                        capacityPackets =
+                            cushion.optInt(
+                                "queue_capacity_packets",
+                                0
+                            )
+                    )
+                }
+
+                // D-BASE-P10: the companion's audio redundancy. Absent means
+                // off (one copy), as before.
+                json.optJSONObject(
+                    "audio_redundancy"
+                )?.let { redundancy ->
+                    audioReceiver?.configureRedundancy(
+                        copies =
+                            redundancy.optInt(
+                                "copies",
+                                0
+                            ),
+                        offsetPackets =
+                            redundancy.optInt(
+                                "offset_packets",
+                                0
+                            )
+                    )
+                }
+
                 if (
                     hostAlphaVersion !=
                     EXPECTED_HOST_ALPHA
@@ -2064,6 +2103,57 @@ class NativeStreamActivity :
                     put(
                         "queue_capacity_packets",
                         audio.queueCapacityPackets
+                    )
+                    put(
+                        "queue_cushion_source",
+                        audio.queueCushionSource
+                    )
+                    put(
+                        "cushion_applied_before_first_pcm",
+                        audio.cushionAppliedBeforeFirstPcm
+                    )
+                    // D-BASE-P10
+                    put(
+                        "redundancy_copies",
+                        audio.redundancyCopies
+                    )
+                    put(
+                        "redundancy_offset_packets",
+                        audio.redundancyOffsetPackets
+                    )
+                    put(
+                        "redundancy_source",
+                        audio.redundancySource
+                    )
+                    put(
+                        "duplicates_dropped",
+                        audio.duplicatesDropped
+                    )
+                    put(
+                        "recovered_by_duplicate",
+                        audio.recoveredByDuplicate
+                    )
+                    put(
+                        "late_unplaced",
+                        audio.lateUnplaced
+                    )
+                    put(
+                        "sequence_gap_packets",
+                        audio.sequenceGapPackets
+                    )
+                    put(
+                        "sequence_gap_histogram",
+                        JSONObject().apply {
+                            val labels =
+                                arrayOf("1", "2", "3", "4-7", "8+")
+
+                            for (i in labels.indices) {
+                                put(
+                                    labels[i],
+                                    audio.sequenceGapHistogram[i]
+                                )
+                            }
+                        }
                     )
                     put(
                         "startup_prefill_ms",

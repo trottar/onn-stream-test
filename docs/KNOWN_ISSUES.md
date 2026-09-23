@@ -152,6 +152,37 @@ first with the second.
   in a 125-157 band and not following video loss (1.9-23.7 per minute
   across the same ten sessions). Nobody has related it to anything
   audible.
+
+  **Since explained and priced (2026-09-22/23).** `P7`/`P8`: it counts
+  audio arrival holes > 15 ms, and the holes are the path's. `P9`: a
+  deeper cushion (profile `audio_queue_capacity_packets` 8 → 17) takes it
+  from 42.4 to **0.8/min** for **+36.0 ms** of measured audio latency, but
+  underruns went 20 → 25 and the pre-registered rule reverted the default
+  to 3 / 8 — **open as the user's decision**
+  (`docs/memory/decisions/D-BASE-P9_AUDIO_CUSHION.md`). Note also: with
+  the `P2a` hold in force, most of a session's `audio.underruns` is now
+  mid-session, not the startup burst (`P9`, all three arms).
+  **`P9a` (interleaved)**: 12/17 again -98-99.5 % at +33.5-37.9 ms, its
+  underruns inside the 3/8 band of 4-20 — still the user's decision.
+- **Audio packet loss builds over back-to-back streaming** (`P9`, `P9a`,
+  2026-09-23). Within a run of consecutive 20-minute sessions the audio
+  `lost_packets` rate climbs from ~3/min to 50-130/min and resets after
+  idle time (~40 min); interleaving shows it is **time-driven, not the
+  audio cushion's** (counted before the queue). **`D-BASE-T2`
+  (2026-09-23)**: it is a **step at a warm state** — 1-6/min for ~7 min
+  from cold, then 30-90/min; 30 min idle resets it. Every temperature
+  (host, onn CPU, Opal SoC) moves with it; RSSI, MCS, retries and video
+  loss do not. **Narrowed by `D-BASE-T3`**: the host sends every packet
+  (0 send errors, 0 kernel `SndbufErrors`) and the onn's audio socket and
+  UDP stack drop none — the packets are **lost between the ends** (wired
+  hop, Opal, air, or the onn's Wi-Fi firmware). **Mitigated by
+  `D-BASE-P10`** (adopted 2026-09-23): every audio datagram is sent twice,
+  20 ms apart; warm loss 78 → 1.4-2.8/min, +1.6 Mbps
+  (`docs/memory/evidence/D_BASE_P10_AUDIO_REDUNDANCY_2026-09-23.md`).
+  Status: **mitigated; the cause between the ends is still open**
+  (`host_link`). Thresholds proposed, not enforced.
+  `docs/memory/evidence/D_BASE_T3_AUDIO_LOSS_LOCATION_2026-09-23.md`;
+  `docs/memory/evidence/D_BASE_T2_STREAMING_ACCUMULATION_2026-09-23.md`.
 - **Link type.** Host measured wired (`eno1`, `r8169`, no radio present) on
   2026-09-20; on 2026-09-15 it was a USB RTL8822BU radio. The onn's
   association is still unread. One wireless hop by role. Nothing per

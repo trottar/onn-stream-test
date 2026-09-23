@@ -1,0 +1,47 @@
+== raw, per hold (run order)
+field                                   A1          B1          A2          B2
+copies                                   1           2           1           2
+offset                                   4           4           4           4
+source                                host        host        host        host
+duration_s                          606.90      606.20      607.00      607.50
+onn_cpu_prestart_c                   63.70       64.20       64.70       65.50
+onn_cpu_mean_c                       67.30       67.82       67.76       68.09
+lost_packets                           794          28         784          14
+lost_per_min                         78.49        2.77       77.49        1.38
+recovered_by_duplicate                   0         820           0         772
+duplicates_dropped                       0      119215           0      119501
+late_unplaced                            0          14           0           6
+sequence_gap_packets                   794         848         784         786
+raw_gap_per_min                      78.49       83.93       77.49       77.62
+crossfaded_packets                     773          38         783          21
+crossfaded_per_min                   76.42        3.76       77.39        2.07
+concealed_loss_packets                 771          28         784          14
+underruns                                3           0          12          13
+prolonged_starvation_events              3           3           2           1
+avg_queue_residence_ms               58.74       56.85       66.50       62.16
+max_queue_residence_ms                  83          93          91          89
+holes                                 1627        1924        1717        1895
+sender_packets_sent                 121131      121013      121125      121253
+sender_duplicates_sent                   0      121009           0      121249
+sender_send_errors                       0           0           0           0
+sender_duplicate_send_errors             0           0           0           0
+audio_wire_kbps                    1603.02     3206.82     1602.67     3205.97
+encoder_cpu_pct                      28.90       26.30       25.90       25.60
+rendered_fps                         59.88       59.94       59.91       59.93
+spike_20_per_min                     32.33       31.28       33.61       35.75
+max_output_gap_ms                      168         128         105         141
+video_lost_per_min                   16.11        4.75       10.77        2.96
+fec_recovered_per_min                11.47        3.17        5.04        3.56
+
+== sequence-gap histogram (gap events, first arrivals, before recovery)
+  A1: {'1': 755, '2': 7, '3': 0, '4-7': 0, '8+': 1}
+  B1: {'1': 822, '2': 13, '3': 0, '4-7': 0, '8+': 0}
+  A2: {'1': 754, '2': 15, '3': 0, '4-7': 0, '8+': 0}
+  B2: {'1': 770, '2': 8, '3': 0, '4-7': 0, '8+': 0}
+
+== reading against A mean: lost/min 77.99, crossfaded/min 76.90, residence 62.62 ms, holes 1672
+  B1: loss drop 96.4%; crossfades_in_step PASS, raw_loss_like_A PASS, underruns_le_20 PASS, residence_within_10ms PASS, holes_within_20pct PASS, fps_in_A_range PASS, spikes_in_A_range PASS, fec_recovered_in_A_range FAIL
+  B2: loss drop 98.2%; crossfades_in_step PASS, raw_loss_like_A PASS, underruns_le_20 PASS, residence_within_10ms PASS, holes_within_20pct PASS, fps_in_A_range PASS, spikes_in_A_range PASS, fec_recovered_in_A_range FAIL
+  READING: DOES NOT WORK (a clause failed)
+  B1: gap events 835, p90 gap bin 1; residual lost 28, late_unplaced 14
+  B2: gap events 778, p90 gap bin 1; residual lost 14, late_unplaced 6

@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-09-22
-baseline_commit: cbfd2d03321e1be936aa5b94a512695a1d2b03af
+as_of: 2026-09-23
+baseline_commit: 3e6cde5
 ---
 
 # Current State
@@ -16,40 +16,36 @@ closes. Decision: `decisions/D-BASE_BASELINE_BEFORE_ADAPTATION.md`.
 
 ## Current Work Item
 
-**Overnight queue `OVERNIGHT_2026-09-23B_QUEUE.md` — complete:**
+**`D-BASE-P10` — audio redundancy ADOPTED** (the user;
+`evidence/D_BASE_P10_AUDIO_REDUNDANCY_2026-09-23.md`,
+`decisions/D-BASE-P10_AUDIO_REDUNDANCY.md`). Every audio datagram is sent
+twice, the copy 20 ms later; the client keeps the first. Warm,
+interleaved: audio loss **78 → 1.4-2.8/min (−96-98 %)**, crossfades in
+step, **+1.6 Mbps**, no added latency. The warm-state loss is single
+packets (98-99 % of gaps). The pre-registered rule failed one clause on
+the favourable side (video FEC recoveries lower with it on). APK
+`f31b1c18…8ae7` (also fixes a latent late-packet bug).
 
-- **N05 close — PASS → `R3`+`R3a` RUNTIME VALIDATED for real loss**
-  (N05, N3, N15, N15b, N150; `END_MS` validated by E30),
-  `evidence/D_BASE_R3D_HAND_RUNS_2026-09-22.md`.
-- **`D-BASE-R3c2` — RUNTIME VALIDATED**, checks 0-6,
-  `evidence/D_BASE_R3C2_RECOVERY_FLOW_2026-09-23.md`: Resume tile for a
-  live session (same pid, no load); prompt only with none; recovery
-  resumes into a fresh core loaded **while running** (option A) and plays;
-  both `R3b` post-run defects closed.
-- **`H3` — DESIGN RECORDED, not installed**,
-  `evidence/H3_COMPANION_AUTOSTART_DESIGN_2026-09-23.md`: systemd user
-  unit on `default.target`, `KillSignal=SIGINT`; install is the user's.
+Before it: `T3` — the warm-state loss is lost **between** the ends (host
+sends all, onn drops none); `T2` — it steps up ~7 min from cold, idle
+resets it; 12/17 adopted; `P9a`, `P9`.
 
-Before that: `R3c` (the loop is the paused load), `P8` (audio holes are
-the path's, not the heartbeat or sampler).
+**`H3` installed by the user** 2026-09-23 (user-stated, verified across
+a reboot): the companion runs as the systemd user unit
+`privyhub-companion` — restart it with `systemctl --user restart`.
+Before that: `R3c2` RUNTIME VALIDATED, N05 → `R3`+`R3a` RUNTIME
+VALIDATED for real loss, `P8` (audio holes are the path's).
 
 **`H2` — the host is headless: RUNTIME VALIDATED** (2026-09-22,
-`evidence/H2_HEADLESS_CUTOVER_2026-09-22.md`), checks 1-5 across **two
-plug-only boots**. Plug in X **`DisplayPort-1`** = DRM `card0-DP-2`,
-**1920x1080 @ 60.00 Hz by EDID — nothing written**; autologin desktop on
-`:0`; capture the 879x720 window; sessions S1/S2 fps 59.68/59.69, max gap
-93/184 ms; `framemd5` PTS delta 1 on all 1,799, 0 repeats in motion. adb
-after a host reboot: **`adb connect <onn-address>:5555`**. **The
-companion is still started by hand** after every boot.
+`evidence/H2_HEADLESS_CUTOVER_2026-09-22.md`): the dummy plug on X
+**`DisplayPort-1`** = DRM `card0-DP-2`, 1920x1080 @ 60 by EDID; capture
+unchanged. adb after a host reboot: **`adb connect <onn-address>:5555`**.
 
 **The 90 KB frame cap is adopted and in force** (`P6a`, profile field,
 nothing in the environment; `=0` runs uncapped; `any_override` false when
 only the profile decides). `S3`: **5.4 losses/min over three hours**, the
 residual tracks nothing — **the loss column is closed at this level**; the
 cap is a target, check with a tolerance (two frames 9-11 B over).
-Also done 09-22: `S3`, `P7`, `H2-PREP`, `M1`.
-
-`P7` named `prolonged_starvation_events` (audio arrival holes, latched);
 `M1`: the synthetic UDP pathology is PAUSED, not Windows-only.
 
 Earlier, **in full in `handoffs/CURRENT_HANDOFF.md`** — read it before
@@ -87,9 +83,10 @@ loss fell **7-9x** with bitrate unchanged. **Thermals (`T1`):** host
 hottest sensor 54 → 60 °C over 10 min; **the onn reports status only**.
 
 - **`R1`**: `lost_packets` includes resync jumps; **`C3.L2c`** kept.
-- **Installed now**: the `R3c2` build (tile states; P8's passive hole
-  ring and schema `_v2` kept), APK `21e3d089…9dcb`; `NativeStreamActivity`
-  `b640e2be…dfe60`. `PRIVYHUB_HEARTBEAT_MS` unset (default 2 s).
+- **Installed now**: the `P10` build (the `R3c2` tiles, P8's ring, schema
+  `_v2`, the cushion setting, audio de-duplication), APK `f31b1c18…8ae7`.
+  Profile: cushion **12 / 17**, redundancy **2 / 4**.
+  `PRIVYHUB_HEARTBEAT_MS` and `PRIVYHUB_AUDIO_QUEUE_*` unset.
 - **Host-shell operation**: open `MainActivity`, wake, tap RESUME PLAYING
   (`TOOLS.md`); `am start` cannot open `NativeStreamActivity`.
 - **`logs/games/native_frame_sizes.jsonl`** (`P5`/`P6`): packets and
@@ -99,13 +96,16 @@ hottest sensor 54 → 60 °C over 10 min; **the onn reports status only**.
 
 ## Next Action
 
-**The user's H3 install decision** (paste-ready steps in the H3 record),
-**then thermal thresholds, then the +45 ms audio-cushion decision**
-(`P8`: the holes are the path's), then the roadmap list below.
+**The roadmap list**: `host_link` (first fact: `T3` — the warm-state loss
+is lost between the host's NIC and the onn's IP stack, cause not
+located), `B1`/`B3`, Group C, C6. The C1 profile now carries the frame
+cap (90 KB), the audio cushion (12/17) and audio redundancy (2/4).
+Open for the user: their listen with redundancy on; the `T2`/`T3`
+threshold proposals (none enforced).
 
 Also open: `host_link`; `B1`/`B3`; Group C; C6. Done 09-20/22:
 Group A; `R1`-`R5`; `P1`-`P7` incl. `P6a`; `C3.L2c`; `C5`; `C5a`;
-`S1`-`S3`; `T1`; `B2`; `O1`; `H2-PREP`; `M1`; `H1`; `H2`; `R3`/`R3a`/`R3b`/`R3d`; `R3c`; `R3c2`; `P8`.
+`S1`-`S3`; `T1`; `B2`; `O1`; `H2-PREP`; `M1`; `H1`; `H2`; `R3`/`R3a`/`R3b`/`R3d`; `R3c`; `R3c2`; `P8`; `H3`; `P9`; `P9a`; `T2`; `T3`; `P10`.
 
 ## Success Criteria
 
@@ -162,9 +162,15 @@ would bind and it does not. **Not resolving.*** No perceptual gate.
 ## Relevant References
 
 One evidence record per item, one patch record where code changed;
-`patches/PATCH_INDEX.md` lists all 116. A classification per record is
+`patches/PATCH_INDEX.md` lists all 119. A classification per record is
 in `evidence/RUNTIME_VALIDATION.md`.
 
+- **2026-09-23** — `D_BASE_P10_AUDIO_REDUNDANCY` (decision of the same name),
+  `D_BASE_T3_AUDIO_LOSS_LOCATION`,
+  `D_BASE_T2_STREAMING_ACCUMULATION`,
+  `D_BASE_P9A_CUSHION_INTERLEAVED`,
+  `D_BASE_P9_AUDIO_CUSHION` (decision of the same name),
+  `D_BASE_R3C2_RECOVERY_FLOW`, `H3_COMPANION_AUTOSTART_DESIGN`.
 - **2026-09-22** — `D_BASE_P6A_CAP_ADOPTED` (decision of the same name),
   `D_BASE_S3_CAP_SOAK`, `D_BASE_P7_STARVATION_COUNTER`,
   `H2_PREP_HOST_DISPLAY_INVENTORY`, `H1_VERIFY_SSH_CONSOLE`,
