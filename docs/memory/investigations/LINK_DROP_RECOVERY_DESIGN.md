@@ -273,3 +273,31 @@ Two pass criteria in the plan above are not reachable as written, and
   (`SIGTERM`, 5 s wait) against an encoder the *substitute* injector holds
   stopped. Not a property of the recovery; it should disappear under the
   nftables rule.
+
+## 2026-09-22 — R3c: the launcher rule and the paused-load loop
+
+**The prompt's precondition and the live-session rule** (the user's
+decision, `../decisions/D-BASE-R3C_RECOVERY_NEVER_INTO_LIVE_CORE.md`): a
+recovery state never loads into a live core; a live session makes the tile
+**Resume** (no load); the recovery prompt appears **only when no live
+session exists**, and resume-from-recovery launches a fresh core, loads,
+then deletes the recovery file. **Not implemented yet.**
+
+**Why not yet** (`../evidence/D_BASE_R3C_RECOVERY_SEMANTICS_2026-09-22.md`):
+a recovery save taken mid-FMV **loops when loaded into a paused core, fresh
+or not**, and plays when loaded into a running one; a gameplay state loaded
+paused plays. `load_recovery_state` requires a paused core and the launch
+path leaves the core paused, so the decided flow would still loop for a
+cutscene give-up. The load ordering is the user's next decision.
+
+## 2026-09-23 — R3c2: the resume sequence, implemented
+
+Recovery prompt: offered by the game tile **before a launch**, only when no
+session is live and a `.state.recovery` exists for that title; a live
+session's tile is **Resume** (no load). **Resume from recovery:** end any
+live session → the normal launch (paused handoff) → `resume()` → 1 s →
+`LOAD_STATE_SLOT 0` into the **running** core, RetroArch's `[State]
+Loading` line required → `pause()` → delete the file, `.png` and index;
+failure keeps them. Copy-to-slot runs in a plain session of the title,
+then deletes the recovery save; discard deletes it and the client launches
+plain. RUNTIME VALIDATED (`../evidence/D_BASE_R3C2_RECOVERY_FLOW_2026-09-23.md`).

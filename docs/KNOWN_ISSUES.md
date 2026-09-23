@@ -798,10 +798,13 @@ hole of **60 ms**, so absorbing it costs about **+45 ms of audio
 latency** — and sender-side pacing is closed by measurement. Nothing was
 changed and the counter was not renamed; the name is accurate.
 
-**What is still open** is the cause of the 55-60 ms hole itself. `P7`'s
-instrument records one maximum per 2 s tick, so it cannot locate the hole
-within the tick or align it with the video burst, the AP's scheduling or a
-client-side stall. Record:
+**Narrowed by `D-BASE-P8` (2026-09-22):** the holes are ~100/min at
+≥ 40 ms (half 50-60 ms), **not aligned with the client's heartbeat or
+client-health posts** (5.7-6.6 % within 100 ms of a send, uniform 5 %),
+and unchanged by removing the adb socket sampler (-1 %) or slowing the
+heartbeat to 10 s (-11 %). The hole is the path's; the AP's per-station
+scheduling is the remaining, unmeasured candidate. Records:
+`docs/memory/evidence/D_BASE_P8_AUDIO_HOLE_ORIGIN_2026-09-22.md`,
 `docs/memory/evidence/D_BASE_P7_STARVATION_COUNTER_2026-09-22.md`.
 
 ### Product decision
@@ -824,11 +827,15 @@ One line each; the record named is authoritative.
   `nft` write). **N3, N15 and N150 all PASS**, so `GIVE_UP_MS` and the
   `.state.recovery` save are now exercised under controlled loss, and N15
   reached the case no substitute fault could — an encoder restart that
-  **succeeded while the fault was still dropping every packet**. **N05, N15b
-  and E30 were not run**, so `R3` + `R3a` do **not** reach RUNTIME VALIDATED
-  and `END_MS` stays unexercised. Record:
-  `docs/memory/evidence/D_BASE_R3B_NFTABLES_LINK_DROP_2026-09-22.md`.
-  **Status: open — three of five required runs done.**
+  **succeeded while the fault was still dropping every packet**. **Narrowed
+  by `R3d` (2026-09-22, hand runs): N15b PASS, E30 PASS (`END_MS`
+  validated); N05 NOT RUN** — its directory is empty, the companion was not
+  running. Records:
+  `docs/memory/evidence/D_BASE_R3B_NFTABLES_LINK_DROP_2026-09-22.md`,
+  `docs/memory/evidence/D_BASE_R3D_HAND_RUNS_2026-09-22.md`.
+  **Closed 2026-09-23**: N05 PASS (0.556 s hole, no pause, max gap
+  625 ms) — `R3` + `R3a` RUNTIME VALIDATED for real loss. **Status:
+  closed.**
 
 - **A recovery restart hides the outage from `lost_packets`.** `D-BASE-R3b`
   measured it: a 3 s outage with **no** restart counted **2 348** lost
@@ -847,7 +854,10 @@ One line each; the record named is authoritative.
   which loaded the state into the running process and reported **"Loaded"**
   while **no window opened**; no `POST /plugins/games/launch` was ever issued.
   Record: `docs/memory/evidence/R3B_POST_RUN_SESSION_REUSE_2026-09-22.md`.
-  **Status: open.**
+  **Closed 2026-09-23 by `D-BASE-R3c2`** (`docs/memory/evidence/D_BASE_R3C2_RECOVERY_FLOW_2026-09-23.md`): a live session's tile is
+  **Resume** (same pid, no load); the recovery prompt appears only with no
+  live session, and resume-from-recovery launches fresh. **Status:
+  closed.**
 
 - **`R3b-D2` — after a recovery-state load the picture cycles through about
   four frames.** The stream itself was clean (`lost_packets 0`,
@@ -856,17 +866,31 @@ One line each; the record named is authoritative.
   and **0 B** for a frozen window — so neither a freeze nor gameplay. Starts
   within one second of the core being unpaused. Cause not resolved: either the
   load-while-paused ordering or Beetle PSX HW's state restore under GL
-  hardware rendering. Needs a run to separate. **Status: open.**
+  hardware rendering. Needs a run to separate. **Narrowed 2026-09-22
+  (`D-BASE-R3c` Part 1, `evidence/D_BASE_R3C_RECOVERY_SEMANTICS_2026-09-22.md`):**
+  the ordering, not the renderer. The N150 save (taken **mid-FMV**) loops
+  whenever it is loaded into a **paused** core — a fresh core too, 3 s or
+  20 s after boot (2 distinct frames per second over 30 s); loaded into a
+  **running** core it plays; a **gameplay** state loaded paused plays at
+  60 fps. **Closed 2026-09-23 by `D-BASE-R3c2`** (the user's option A —
+  load into a fresh, running core): the N150 save now plays (607 distinct
+  frames in 30 s; 61/61 distinct IDR sizes over 60 s through the client),
+  and a gameplay save plays at 60 fps (1,630 distinct). `docs/memory/evidence/D_BASE_R3C2_RECOVERY_FLOW_2026-09-23.md`.
+  **Status: closed.**
 
 - **The `.state.recovery` file survives being consumed.**
   `load_recovery_state` stages it as slot 0 and does not remove it, so the
   recovery prompt reappears on the next launch of that title. The Tekken 3
   pair is being kept deliberately as the evidence for `R3b-D1`/`R3b-D2`.
-  **Status: open.**
+  **Closed 2026-09-23 by `D-BASE-R3c2`**: a successful resume, a copy
+  to a slot and a discard each delete the file, its `.png` and the index
+  (checks 2-4). The N150 copy stays under
+  `docs/memory/evidence/d_base_r3c_2026-09-22/recovery_copy/`. **Status:
+  closed.**
 
-- **`END_MS` (30 minutes) has never been exercised.** Recorded under
-  "link-drop resilience — stated requirement, not yet owned" below.
-  **Status: open.**
+- **`END_MS` (30 minutes) has never been exercised.** **Closed
+  2026-09-22** by `R3d` E30: `PAUSED_SAVED` → `ENDED` in 1,801.4 s, clean
+  RetroArch shutdown. **Status: closed.**
 
 - **`audio.prolonged_starvation_events` is characterized, not a fault.**
   `D-BASE-P7` (2026-09-22) established it counts **one hole in the audio
@@ -874,9 +898,9 @@ One line each; the record named is authoritative.
   **jitter, not loss** (rho +0.684 against the arrival gap, +0.020 against
   audio loss; the packet deficit averages +0.54 of ~400, so nothing is
   missing, it is late). 32/min accompanied **4 actual underruns in 20
-  minutes**. **Status: not a defect. What is open** is the cause of the
-  55-60 ms hole itself, which `P7`'s one-maximum-per-2 s instrument cannot
-  locate within a tick. The only client lever is a deeper cushion at about
+  minutes**. **Status: not a defect.** `P8` (2026-09-22) cleared the
+  heartbeat and the adb socket sampler as causes; the hole is the path's
+  (AP scheduling the remaining candidate, unmeasured). The only client lever is a deeper cushion at about
   **+45 ms of audio latency**, which has not been spent. Record:
   `D_BASE_P7_STARVATION_COUNTER_2026-09-22.md`.
 
@@ -1187,3 +1211,22 @@ unrecoverable. Neither was right. The defect itself is real and stays open.
   Records: `docs/memory/evidence/C3_L3_LINUX_FIXED_BITRATE_CHARACTERIZATION_2026-09-19.md`,
   `docs/memory/patches/C3-L3R1_CHARACTERIZATION_CORRECTION.md`.
 <!-- PRIVYHUB_C3_L3_FINALIZE_MATCH_BUG:KNOWN_ISSUES:END -->
+
+- **The decoder report travels as a URL query, capped at 64 KiB** (2026-09-22,
+  `D-BASE-P8`). `POST /plugins/games/decoder-session-log?report=…` is refused
+  with **414** once the encoded report passes 65,536 bytes, and the
+  companion's `http.server` then raises `AttributeError: … no attribute
+  'path'` in `send_error`. P8's first build lost two 20-minute reports this
+  way; build v2 keeps the report ~40 KB. **Any new report field must stay
+  bounded.** **Status: open** (moving the report to the request body is the
+  fix; not done).
+
+- **The companion was not running for the N05 hand run** (2026-09-22,
+  `R3d`): the overnight queue's teardown stopped it deliberately at ≈ 21:21
+  local, per `TOOLS.md`'s "stop the companion last", and nothing starts it
+  again; N05 and the first N15b attempt ran against no listener. Not a
+  crash. Until companion autostart (`H3`) exists, **check `ss -lnt | grep
+  8765` before a hand run**, and a session that tears down should say
+  plainly that the companion is left stopped. **Narrowed 2026-09-23**:
+  `H3` designed the autostart unit (`docs/memory/evidence/H3_COMPANION_AUTOSTART_DESIGN_2026-09-23.md`).
+  **Status: open — designed, awaiting the user's install.**

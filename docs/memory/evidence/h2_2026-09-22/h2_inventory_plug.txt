@@ -1,0 +1,501 @@
+
+===== 1a session type =====
+XDG_SESSION_TYPE=tty
+DISPLAY=:0
+WAYLAND_DISPLAY=<unset>
+SESSION  UID USER     SEAT  LEADER CLASS   TTY IDLE SINCE
+      1 1000 privyhub seat0 1215   user    -   no   -
+      2 1000 privyhub -     1260   manager -   no   -
+      3 1000 privyhub -     4310   user    -   no   -
+
+3 sessions listed.
+--- session 1 ---
+Display=:0
+Service=lightdm-autologin
+Desktop=xfce
+Type=x11
+Class=user
+Active=yes
+State=active
+--- session 2 ---
+Display=
+Service=systemd-user
+Desktop=
+Type=unspecified
+Class=manager
+Active=yes
+State=active
+--- session 3 ---
+Display=
+Service=sshd
+Desktop=
+Type=tty
+Class=user
+Active=yes
+State=active
+
+===== 1b display manager =====
+● lightdm.service - Light Display Manager
+     Loaded: loaded (/usr/lib/systemd/system/lightdm.service; enabled; preset: enabled)
+     Active: active (running) since Tue 2026-09-22 17:42:49 EDT; 12min ago
+ Invocation: 1e89fb25fc26400f91dbfb939fb124ff
+       Docs: man:lightdm(1)
+   Main PID: 1009 (lightdm)
+      Tasks: 17 (limit: 18066)
+     Memory: 134.1M (peak: 140M)
+        CPU: 29.307s
+     CGroup: /system.slice/lightdm.service
+             ├─1009 /usr/sbin/lightdm
+             └─1029 /usr/lib/xorg/Xorg :0 -seat seat0 -auth /var/run/lightdm/root/:0 -nolisten tcp vt7 -novtswitch
+root        1009 lightdm         /usr/sbin/lightdm
+root        1029 Xorg            /usr/lib/xorg/Xorg :0 -seat seat0 -auth /var/run/lightdm/root/:0 -nolisten tcp vt7 -novtswitch
+
+===== 1c autologin =====
+total 24
+-rw-r--r-- 1 root root   40 Apr 11  2025 keys.conf
+-rw-r--r-- 1 root root 6634 Apr 11  2025 lightdm.conf
+drwxr-xr-x 2 root root 4096 Sep 22 10:42 lightdm.conf.d
+-rw-r--r-- 1 root root 3557 Apr 21  2024 lightdm-gtk-greeter.conf
+-rw-r--r-- 1 root root  466 Apr 11  2025 users.conf
+/etc/lightdm/lightdm.conf.d/10-autologin.conf:2:autologin-user=privyhub
+/etc/lightdm/lightdm.conf.d/10-autologin.conf:3:autologin-session=xfce
+
+===== 2 outputs and modes =====
+Monitors: 1
+ 0: +DisplayPort-1 1920/480x1080/270+0+0  DisplayPort-1
+Screen 0: minimum 320 x 200, current 1920 x 1080, maximum 16384 x 16384
+DisplayPort-0 disconnected (normal left inverted right x axis y axis)
+DisplayPort-1 connected 1920x1080+0+0 (normal left inverted right x axis y axis) 480mm x 270mm
+   1920x1080     60.00*+  59.94  
+   3840x2160     17.00  
+   2560x1600     29.99  
+   2560x1440     30.00  
+   1920x1200     59.95  
+   1680x1050     59.88  
+   1600x900      60.00  
+   1280x1024     75.02    60.02  
+   1440x900      59.90  
+   1280x800      59.91  
+   1152x864      75.00  
+   1280x720      60.00    59.94  
+   1024x768      75.03    70.07    60.00  
+   800x600       72.19    75.00    60.32    56.25  
+   640x480       75.00    72.81    60.00    59.94  
+DisplayPort-2 disconnected (normal left inverted right x axis y axis)
+/sys/class/drm/card0-DP-1/               status=disconnected enabled=disabled
+/sys/class/drm/card0-DP-2/               status=connected enabled=enabled
+/sys/class/drm/card0-DP-3/               status=disconnected enabled=disabled
+## /sys/class/drm/card0-DP-1/ modes
+
+## /sys/class/drm/card0-DP-2/ modes
+1920x1080 3840x2160 2560x1600 2560x1440 1920x1200 1920x1080 1680x1050 1600x900 1280x1024 1280x1024 1440x900 1280x800 1152x864 1280x720 1280x720 1024x768 1024x768 1024x768 800x600 800x600 800x600 800x600 640x480 640x480 640x480 640x480 
+## /sys/class/drm/card0-DP-3/ modes
+
+Screen 0: minimum 320 x 200, current 1920 x 1080, maximum 16384 x 16384
+DisplayPort-0 disconnected (normal left inverted right x axis y axis)
+	Identifier: 0x52
+	Timestamp:  19948
+	Subpixel:   unknown
+	Clones:    
+	CRTCs:      0 1 2 3
+	Transform:  1.000000 0.000000 0.000000
+	            0.000000 1.000000 0.000000
+	            0.000000 0.000000 1.000000
+	           filter: 
+	GAMMA_LUT_SIZE: 4096 
+		range: (0, -1)
+	DEGAMMA_LUT_SIZE: 4096 
+		range: (0, -1)
+	GAMMA_LUT: 0 
+		range: (0, 65535)
+	CTM: 0 
+	DEGAMMA_LUT: 0 
+		range: (0, 65535)
+	TearFree: auto 
+		supported: off, on, auto
+	subconnector: Unknown 
+		supported: Unknown, VGA, DVI-D, HDMI, DP, Wireless, Native
+	HDCP Content Type: HDCP Type0 
+		supported: HDCP Type0, HDCP Type1
+	Content Protection: Undesired 
+		supported: Undesired, Desired, Enabled
+	vrr_capable: 0 
+		range: (0, 1)
+	Colorspace: Default 
+		supported: Default, BT709_YCC, opRGB, BT2020_RGB, BT2020_YCC
+	max bpc: 16 
+		range: (8, 16)
+	underscan vborder: 0 
+		range: (0, 128)
+	underscan hborder: 0 
+		range: (0, 128)
+	underscan: off 
+		supported: off, on, auto
+	scaling mode: None 
+		supported: None, Full, Center, Full aspect
+	link-status: Good 
+		supported: Good, Bad
+	CONNECTOR_ID: 87 
+		supported: 87
+	non-desktop: 0 
+		range: (0, 1)
+DisplayPort-1 connected 1920x1080+0+0 (0x3ce) normal (normal left inverted right x axis y axis) 480mm x 270mm
+	Identifier: 0x53
+	Timestamp:  19948
+	Subpixel:   unknown
+	Gamma:      1.0:1.0:1.0
+	Brightness: 1.0
+	Clones:    
+	CRTC:       0
+	CRTCs:      0 1 2 3
+	Transform:  1.000000 0.000000 0.000000
+	            0.000000 1.000000 0.000000
+	            0.000000 0.000000 1.000000
+	           filter: 
+	EDID: 
+		<EDID hex block: 16 lines removed; it carries the panel serial. Vendor/model recorded by hand.>
+	GAMMA_LUT_SIZE: 4096 
+		range: (0, -1)
+
+===== 3a gpu and cmdline =====
+05:00.0 VGA compatible controller: Advanced Micro Devices, Inc. [AMD/ATI] Renoir [Radeon Vega Series / Radeon Vega Mobile Series] (rev d9)
+	DeviceName: Onboard IGD
+	Subsystem: Hewlett-Packard Company Device 872c
+	Kernel driver in use: amdgpu
+vermagic:       6.12.107+deb13-amd64 SMP preempt mod_unload modversions 
+BOOT_IMAGE=/boot/vmlinuz-6.12.107+deb13-amd64 root=UUID=<root-uuid> ro quiet
+6.12.107+deb13-amd64
+
+===== 3b xorg configuration =====
+ls: cannot access '/etc/X11/xorg.conf': No such file or directory
+/etc/X11/xorg.conf.d/:
+total 0
+
+/usr/share/X11/xorg.conf.d/:
+total 20
+-rw-r--r-- 1 root root  126 Feb 26  2023 10-amdgpu.conf
+-rw-r--r-- 1 root root 1968 Sep  5 01:52 10-quirks.conf
+-rw-r--r-- 1 root root   92 Nov  8  2023 10-radeon.conf
+-rw-r--r-- 1 root root 1429 Feb  5  2025 40-libinput.conf
+-rw-r--r-- 1 root root 2482 Jan 29  2025 70-wacom.conf
+(no Monitor/Screen/Device section anywhere)
+Section "OutputClass"
+	Identifier "AMDgpu"
+	MatchDriver "amdgpu"
+	Driver "amdgpu"
+	Option "HotplugDriver" "amdgpu"
+EndSection
+[    11.000] (==) Using system config directory "/usr/share/X11/xorg.conf.d"
+[    11.014] 	loading driver: amdgpu
+[    11.189] (II) AMDGPU(0): Output DisplayPort-0 has no monitor section
+[    11.189] (II) AMDGPU(0): Output DisplayPort-1 has no monitor section
+[    11.189] (II) AMDGPU(0): Output DisplayPort-2 has no monitor section
+
+===== 3c desktop display persistence =====
+ls: cannot access '/home/privyhub/.config/monitors.xml': No such file or directory
+<?xml version="1.1" encoding="UTF-8"?>
+
+<channel name="displays" version="1.0">
+  <property name="ActiveProfile" type="string" value="Default"/>
+  <property name="Notify" type="int" value="1"/>
+  <property name="AutoEnableProfiles" type="int" value="3"/>
+</channel>
+DPMS (Display Power Management Signaling):
+  Standby: 0    Suspend: 0    Off: 0
+  DPMS is Disabled
+Screen Saver:
+  prefer blanking:  yes    allow exposures:  yes
+  timeout:  0    cycle:  600
+<?xml version="1.1" encoding="UTF-8"?>
+
+<channel name="xfce4-power-manager" version="1.0">
+  <property name="xfce4-power-manager" type="empty">
+    <property name="power-button-action" type="empty"/>
+    <property name="show-tray-icon" type="bool" value="false"/>
+    <property name="dpms-on-ac-sleep" type="uint" value="0"/>
+    <property name="dpms-on-ac-off" type="uint" value="0"/>
+    <property name="sleep-button-action" type="uint" value="0"/>
+  </property>
+</channel>
+
+===== 4 boot and login =====
+getty@.service                     enabled enabled
+lightdm.service                    enabled enabled
+networking.service                 enabled enabled
+NetworkManager-dispatcher.service  enabled enabled
+NetworkManager-wait-online.service enabled enabled
+NetworkManager.service             enabled enabled
+ssh.service                        enabled enabled
+sshd-keygen.service                enabled enabled
+UNIT FILE                                    STATE   PRESET
+gcr-ssh-agent.service                        enabled enabled
+gnome-keyring-daemon.service                 enabled enabled
+mpris-proxy.service                          enabled enabled
+org.freedesktop.IBus.session.GNOME.service   enabled enabled
+pulseaudio.service                           enabled enabled
+xdg-desktop-portal-rewrite-launchers.service enabled enabled
+dirmngr.socket                               enabled enabled
+gcr-ssh-agent.socket                         enabled enabled
+gnome-keyring-daemon.socket                  enabled enabled
+gpg-agent-browser.socket                     enabled enabled
+gpg-agent-extra.socket                       enabled enabled
+gpg-agent-ssh.socket                         enabled enabled
+gpg-agent.socket                             enabled enabled
+keyboxd.socket                               enabled enabled
+pulseaudio.socket                            enabled enabled
+speech-dispatcher.socket                     enabled enabled
+ssh-agent.socket                             enabled enabled
+
+17 unit files listed.
+total 20
+-rw------- 1 privyhub privyhub  132 Sep 18 14:06 claude-desktop.desktop
+-rw-rw-r-- 1 privyhub privyhub  346 Sep 22 10:48 expressvpn-client.desktop
+-rw-rw-r-- 1 privyhub privyhub   70 Sep 22 17:42 xfce4-clipman-plugin-autostart.desktop
+-rw-rw-r-- 1 privyhub privyhub 4256 Sep 22 17:42 xfce4-notes-autostart.desktop
+at-spi-dbus-bus.desktop
+geoclue-demo-agent.desktop
+gnome-keyring-pkcs11.desktop
+gnome-keyring-secrets.desktop
+gnome-keyring-ssh.desktop
+im-launch.desktop
+light-locker.desktop
+nm-applet.desktop
+orca-autostart.desktop
+polkit-mate-authentication-agent-1.desktop
+polkit-ukui-authentication-agent-1.desktop
+print-applet.desktop
+pulseaudio.desktop
+spice-vdagent.desktop
+xdg-user-dirs.desktop
+xdg-user-dirs-kde.desktop
+xfce4-clipman-plugin-autostart.desktop
+xfce4-notes-autostart.desktop
+xfce4-notifyd.desktop
+xfce4-power-manager.desktop
+xfsettingsd.desktop
+xiccd.desktop
+no crontab for privyhub
+Linger=no
+
+===== 5 ssh console =====
+ssh.service                                                               enabled         enabled
+sshd-keygen.service                                                       enabled         enabled
+sshd-unix-local@.service                                                  alias           -
+sshd.service                                                              alias           -
+sshd@.service                                                             indirect        enabled
+ssh.socket                                                                disabled        enabled
+sshd-unix-local.socket                                                    generated       -
+ssh-access.target                                                         static          -
+ssh          enabled
+sshd         alias
+ssh.socket   disabled
+-rwxr-xr-x 1 root root 568224 May  6 08:33 /usr/sbin/sshd
+22 25 631 5037 8000 8765 
+/usr/bin/ssh
+OpenSSH_10.0p2 Debian-7+deb13u4, OpenSSL 3.5.7 9 Jun 2026
+
+===== 6 capture geometry =====
+{
+  "ok": true,
+  "kind": "native_stream_host",
+  "alpha_version": "0.7",
+  "profile_id": "native_game_720p60_reference",
+  "profile": {
+    "id": "native_game_720p60_reference",
+    "width": 1280,
+    "height": 720,
+    "fps": 60,
+    "bitrate_kbps": 7000,
+    "max_bitrate_kbps": 7000,
+    "gop_frames": 15,
+    "bframes": 0,
+    "fec_group_size": 8,
+    "max_frame_size_bytes": 90000
+  },
+  "title": "Native Streaming Alpha",
+  "ready": true,
+  "active": false,
+  "managed": false,
+  "capture_backend": "x11grab_window",
+  "encoder": "h264_vaapi",
+  "transport": "rtp_udp_xor_fec",
+  "encoder_command": null,
+  "encoder_overrides": {
+    "max_frame_size_bytes": 90000,
+    "max_frame_size_source": "profile",
+    "max_frame_size_env": "PRIVYHUB_ENC_MAX_FRAME_SIZE",
+    "default_max_frame_size_bytes": 90000,
+    "uncapped": false,
+    "bufsize_kbits": null,
+    "bufsize_source": "PRIVYHUB_ENC_BUFSIZE_K",
+    "default_bufsize_kbits": 7000,
+    "any_override": false
+  },
+  "fec": {
+    "enabled": true,
+    "running": false,
+    "version": "xor8_1",
+    "group_size": 8,
+    "local_port": 48110,
+    "rtp_packets": 105107,
+    "rtp_bytes": 113561141,
+    "parity_packets": 16753,
+    "parity_bytes": 19395229,
+    "groups": 16753,
+    "skipped_packets": 0,
+    "send_errors": 0,
+    "send_calls": 121860,
+    "sent_bytes": 132956370,
+    "send_call_total_us": 1463208.377,
+    "send_call_max_us": 2946.8,
+    "pacing": {
+      "enabled": false,
+      "configured_us": 0,
+      "source": "PRIVYHUB_FEC_PACING_US",
+      "frame_budget_us": 8000,
+      "paced_frames": 0,
+      "paced_packets": 0,
+      "clamped_frames": 0,
+      "late_frames": 0,
+      "last_spacing_us": 0.0,
+      "achieved_spacing_samples": 0,
+      "achieved_spacing_p50_us": null,
+      "achieved_spacing_p99_us": null,
+      "max_start_delay_us": 0.0,
+      "queue_depth": 0,
+      "max_queue_depth": 0
+    },
+    "frame_sizes": {
+      "schema": "privyhub_native_frame_sizes_v1",
+      "frames": 7684,
+      "packets": 105107,
+      "mean_packets": 13.679,
+      "p50_packets": 11,
+      "p90_packets": 34,
+      "p99_packets": 49,
+      "max_packets": 76,
+      "max_at_utc": "2026-09-22T21:48:58.829Z",
+      "payload_bytes": 112299857,
+      "mean_bytes": 14614,
+      "p50_bytes": 11264,
+      "p90_bytes": 38912,
+      "p99_bytes": 57344,
+      "max_bytes": 88384,
+      "max_bytes_at_utc": "2026-09-22T21:48:58.829Z",
+      "bytes_per_packet": 1068.43,
+      "byte_cap": null,
+      "byte_cap_source": "PRIVYHUB_FRAME_BYTE_CAP",
+      "frames_over_cap": 0,
+      "byte_bucket": 1024,
+      "frames_ge_40": 290,
+      "frames_ge_80": 0,
+      "unmarked_frames": 0,
+      "large_threshold": 40,
+      "huge_threshold": 80,
+      "log_path": "/home/privyhub/Projects/onn-stream-test/logs/games/native_frame_sizes.jsonl",
+      "log_lines": 129,
+      "log_rotations": 0,
+      "log_errors": 0,
+      "bucket_seconds": 1800,
+      "packet_histogram": [
+        0,
+        1098,
+        8,
+        657,
+        777,
+        544,
+        282,
+        187,
+        122,
+        71,
+        67,
+        65,
+        59,
+        270,
+        1092,
+        147,
+        54,
+        52,
+        68,
+        75,
+        61,
+        77,
+        82,
+        95,
+        93,
+        64,
+        82,
+        93,
+        95,
+        83,
+        94,
+        100,
+        95,
+        90,
+        102,
+        104,
+        76,
+        75,
+        77,
+        61,
+        49,
+        36,
+        33,
+        16,
+        24,
+        16,
+        9,
+        14,
+        12,
+        6,
+        6,
+        11,
+        3,
+        6,
+        4,
+        0,
+        1,
+        1,
+        4,
+        4,
+        0,
+        1,
+        1,
+        1,
+        0,
+        0,
+        2,
+        1,
+        0,
+        1,
+        1,
+        1,
+        4,
+        13,
+        5,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+   
+/usr/bin/xdotool
+xdotool version 3.20160805.1
+
+===== 7 adb =====
+List of devices attached
+<onn>	device
+
+-rw------- 1 privyhub privyhub 1704 Sep 15 08:32 /home/privyhub/.android/adbkey
+-rw-rw-r-- 1 privyhub privyhub  718 Sep 15 08:32 /home/privyhub/.android/adbkey.pub

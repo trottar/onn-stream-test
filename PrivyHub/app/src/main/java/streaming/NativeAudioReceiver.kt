@@ -11,10 +11,13 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.concurrent.thread
 import kotlin.math.max
+import org.json.JSONArray
+import org.json.JSONObject
 
 data class NativeAudioMetrics(
     val packets: Long,
@@ -47,11 +50,44 @@ data class NativeAudioMetrics(
     val maxArrivalGapMs: Long
 )
 
+/**
+ * D-BASE-P8, diagnostic: what the two 2 s senders were doing when an audio
+ * arrival hole opened. NativeStreamActivity sets these around its
+ * heartbeat and client-health posts; the audio receive thread reads them
+ * only when a gap exceeds the hole threshold. No lock on either side.
+ */
+object AudioHoleTrace {
+    val heartbeatInFlight =
+        AtomicBoolean(false)
+
+    val heartbeatLastStartNs =
+        AtomicLong(0L)
+
+    val healthLastStartNs =
+        AtomicLong(0L)
+}
+
 class NativeAudioReceiver(
     private val port: Int
 ) {
     companion object {
         private const val HEADER_BYTES = 16
+
+        // D-BASE-P8: an inter-arrival gap longer than this is a hole
+        // (the P7 prolonged-starvation threshold). The last
+        // HOLE_RING_CAPACITY rows are kept raw; every hole also lands in
+        // whole-session histograms. The report travels as a URL query
+        // (64 KiB request-line limit on the companion), so the raw ring is
+        // capped at 300: 4,000 rows lost the report of any session longer
+        // than ~5 minutes (D-BASE-P8 first run, HTTP 414).
+        private const val HOLE_THRESHOLD_NS = 15_000_000L
+        private const val HOLE_RING_CAPACITY = 300
+        private const val HOLE_LONG_MS = 40L
+        private const val HOLE_BIN_MS = 50L
+        private const val HOLE_HEARTBEAT_BINS = 200 // 0-10,000 ms
+        private const val HOLE_HEALTH_BINS = 40 // 0-2,000 ms
+        private val HOLE_LENGTH_EDGES_MS =
+            longArrayOf(15, 20, 30, 40, 50, 60, 70, 100, 200)
         private const val SAMPLE_RATE = 48_000
         private const val CHANNELS = 2
         private const val BYTES_PER_SAMPLE = 2
@@ -198,6 +234,201 @@ class NativeAudioReceiver(
 
     private val windowMaxArrivalGapNs =
         AtomicLong(0)
+
+    // D-BASE-P8: the last HOLE_RING_CAPACITY holes, written by the receive
+    // thread, read once at session end. `Long.MIN_VALUE` = no send yet.
+    private val holeLock =
+        Any()
+
+    private val holeStartMs =
+        LongArray(HOLE_RING_CAPACITY)
+
+    private val holeLengthMs =
+        LongArray(HOLE_RING_CAPACITY)
+
+    private val holeSinceHeartbeatMs =
+        LongArray(HOLE_RING_CAPACITY)
+
+    private val holeSinceHealthMs =
+        LongArray(HOLE_RING_CAPACITY)
+
+    private val holeHeartbeatInFlight =
+        BooleanArray(HOLE_RING_CAPACITY)
+
+    private var holeTotal =
+        0L
+
+    // Whole-session histograms, index 0 = all holes, 1 = holes >= 40 ms.
+    private val holeLengthHist =
+        IntArray(HOLE_LENGTH_EDGES_MS.size)
+
+    private val holeHeartbeatHist =
+        Array(2) { IntArray(HOLE_HEARTBEAT_BINS) }
+
+    private val holeHealthHist =
+        Array(2) { IntArray(HOLE_HEALTH_BINS) }
+
+    private val holeHeartbeatOutside =
+        IntArray(2)
+
+    private val holeHealthOutside =
+        IntArray(2)
+
+    private val holeInFlight =
+        IntArray(2)
+
+    private val holeCount =
+        LongArray(2)
+
+    private fun binHole(
+        hist: IntArray,
+        outside: IntArray,
+        which: Int,
+        sinceMs: Long
+    ) {
+        val bin =
+            if (sinceMs == Long.MIN_VALUE || sinceMs < 0L) -1L
+            else sinceMs / HOLE_BIN_MS
+
+        if (bin in 0 until hist.size) {
+            hist[bin.toInt()] += 1
+        } else {
+            outside[which] += 1
+        }
+    }
+
+    private fun recordArrivalHole(
+        startNs: Long,
+        gapNs: Long
+    ) {
+        val heartbeatNs =
+            AudioHoleTrace.heartbeatLastStartNs.get()
+
+        val healthNs =
+            AudioHoleTrace.healthLastStartNs.get()
+
+        val inFlight =
+            AudioHoleTrace.heartbeatInFlight.get()
+
+        synchronized(holeLock) {
+            val index =
+                (holeTotal % HOLE_RING_CAPACITY).toInt()
+
+            holeStartMs[index] =
+                startNs / 1_000_000L
+            holeLengthMs[index] =
+                gapNs / 1_000_000L
+            // Signed: negative means the send started inside the hole.
+            holeSinceHeartbeatMs[index] =
+                if (heartbeatNs == 0L) Long.MIN_VALUE
+                else (startNs - heartbeatNs) / 1_000_000L
+            holeSinceHealthMs[index] =
+                if (healthNs == 0L) Long.MIN_VALUE
+                else (startNs - healthNs) / 1_000_000L
+            holeHeartbeatInFlight[index] =
+                inFlight
+            holeTotal +=
+                1L
+
+            val lengthMs =
+                gapNs / 1_000_000L
+
+            var edge =
+                HOLE_LENGTH_EDGES_MS.size - 1
+            while (edge > 0 && lengthMs < HOLE_LENGTH_EDGES_MS[edge]) {
+                edge -= 1
+            }
+            holeLengthHist[edge] += 1
+
+            for (which in 0..1) {
+                if (which == 1 && lengthMs < HOLE_LONG_MS) {
+                    continue
+                }
+                holeCount[which] += 1L
+                if (inFlight) {
+                    holeInFlight[which] += 1
+                }
+                binHole(
+                    holeHeartbeatHist[which],
+                    holeHeartbeatOutside,
+                    which,
+                    holeSinceHeartbeatMs[index]
+                )
+                binHole(
+                    holeHealthHist[which],
+                    holeHealthOutside,
+                    which,
+                    holeSinceHealthMs[index]
+                )
+            }
+        }
+    }
+
+    /** D-BASE-P8: the hole ring for the end-of-session report. */
+    fun arrivalHolesJson(): JSONObject {
+        synchronized(holeLock) {
+            val retained =
+                minOf(holeTotal, HOLE_RING_CAPACITY.toLong()).toInt()
+
+            val first =
+                holeTotal - retained
+
+            val rows =
+                JSONArray()
+
+            for (n in 0 until retained) {
+                val index =
+                    ((first + n) % HOLE_RING_CAPACITY).toInt()
+
+                rows.put(
+                    JSONArray()
+                        .put(holeStartMs[index])
+                        .put(holeLengthMs[index])
+                        .put(
+                            if (holeSinceHeartbeatMs[index] == Long.MIN_VALUE) JSONObject.NULL
+                            else holeSinceHeartbeatMs[index]
+                        )
+                        .put(holeHeartbeatInFlight[index])
+                        .put(
+                            if (holeSinceHealthMs[index] == Long.MIN_VALUE) JSONObject.NULL
+                            else holeSinceHealthMs[index]
+                        )
+                )
+            }
+
+            return JSONObject()
+                .put("threshold_ms", HOLE_THRESHOLD_NS / 1_000_000L)
+                .put("capacity", HOLE_RING_CAPACITY)
+                .put("total", holeTotal)
+                .put("retained", retained)
+                .put(
+                    "columns",
+                    JSONArray()
+                        .put("start_monotonic_ms")
+                        .put("length_ms")
+                        .put("ms_since_heartbeat_start")
+                        .put("heartbeat_in_flight")
+                        .put("ms_since_health_start")
+                )
+                .put("rows", rows)
+                .put(
+                    "histograms",
+                    JSONObject()
+                        .put("bin_ms", HOLE_BIN_MS)
+                        .put("long_hole_ms", HOLE_LONG_MS)
+                        .put("length_edges_ms", JSONArray(HOLE_LENGTH_EDGES_MS.toList()))
+                        .put("length", JSONArray(holeLengthHist.toList()))
+                        .put("count", JSONArray(holeCount.toList()))
+                        .put("heartbeat_in_flight", JSONArray(holeInFlight.toList()))
+                        .put("since_heartbeat_all", JSONArray(holeHeartbeatHist[0].toList()))
+                        .put("since_heartbeat_long", JSONArray(holeHeartbeatHist[1].toList()))
+                        .put("since_heartbeat_outside", JSONArray(holeHeartbeatOutside.toList()))
+                        .put("since_health_all", JSONArray(holeHealthHist[0].toList()))
+                        .put("since_health_long", JSONArray(holeHealthHist[1].toList()))
+                        .put("since_health_outside", JSONArray(holeHealthOutside.toList()))
+                )
+        }
+    }
 
     @Volatile
     private var running =
@@ -712,6 +943,13 @@ class NativeAudioReceiver(
                         windowMaxArrivalGapNs,
                         gapNs
                     )
+
+                    if (gapNs > HOLE_THRESHOLD_NS) {
+                        recordArrivalHole(
+                            lastArrivalNs,
+                            gapNs
+                        )
+                    }
                 }
 
                 lastArrivalNs =

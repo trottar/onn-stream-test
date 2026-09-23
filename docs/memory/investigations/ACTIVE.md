@@ -11,6 +11,13 @@ misses the 16.7 ms budget in every session on record, the stream never reaches
 60 fps, and stalls reach 7.3 s. None of the three identified faults is a
 bandwidth fault.
 
+**Link-drop recovery, launcher semantics — RUNTIME VALIDATED
+(`D-BASE-R3c2`, 2026-09-23):** recovery never loads into a live core; it
+resumes into a fresh core loaded while running (the user's option A)
+(`../evidence/D_BASE_R3C2_RECOVERY_FLOW_2026-09-23.md`). `R3`+`R3a`
+are **RUNTIME VALIDATED for real loss** (`R3d`: N05, N15b, E30 PASS;
+`END_MS` validated).
+
 **Everything under "C3 Linux actuator boundary" below is SUSPENDED**, not
 failed. The Linux actuator is real, measured and correct; it is a mechanism
 awaiting a reason. Phase C resumes when the baseline target is met.
@@ -214,9 +221,9 @@ acceptable → the gate is met and `C3.L4` may be proposed. Marks aligned →
   could reach — an encoder restart that **succeeded 9.45 s before the rule
   was deleted**, while the fault was still dropping every packet.
   `GIVE_UP_MS` and the `.state.recovery` save are now exercised; give-up
-  landed at **120.42 s** against 120,000 ms. **N05, N15b and E30 did not
-  run**, so `R3` + `R3a` do **not** reach RUNTIME VALIDATED and `END_MS`
-  stays unexercised. Two post-run defects opened. Evidence:
+  landed at **120.42 s** against 120,000 ms. **`R3d` later: N15b PASS,
+  E30 PASS (`END_MS` validated), N05 PASS (2026-09-23)** — `R3` +
+  `R3a` RUNTIME VALIDATED for real loss. Two post-run defects opened. Evidence:
   `../evidence/D_BASE_R3B_NFTABLES_LINK_DROP_2026-09-22.md`,
   `../evidence/R3B_POST_RUN_SESSION_REUSE_2026-09-22.md`.
 - **A recovery restart hides the outage from `lost_packets`
@@ -251,10 +258,10 @@ acceptable → the gate is met and `C3.L4` may be proposed. Marks aligned →
   session, no capture) and **nothing starting the companion at boot**.
   Both are user-side root writes and both block `H2`'s check 5.
 - **The cause of the 55-60 ms audio arrival hole** (`D-BASE-P7`,
-  2026-09-22). The counter is characterized; the hole is not located. One
-  maximum per 2 s tick cannot be aligned with the video burst, the AP or a
-  client stall — it needs per-packet arrival timestamps, a separate
-  instrument and a separate authorization.
+  2026-09-22) — **narrowed by `P8`** the same night: not the heartbeat, not
+  the adb socket sampler; the path's (the AP's per-station scheduling is
+  the remaining candidate, unmeasured). Lever unchanged: the +45 ms audio
+  cushion, the user's call.
 - `slow_events_marked` emitted empty while `slow_event_retained_marked` reports
   30 of 64.
 - `tools/probe_c3_fixed_*_characterization.py --finalize` matched the wrong

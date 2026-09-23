@@ -6943,6 +6943,156 @@ class EmulatorManager:
             payload["retroarch_response"] = response
             return payload
 
+    def load_recovery_state_running(self) -> dict[str, Any]:
+        """D-BASE-R3c2: load the recovery save into a RUNNING core.
+
+        The user's option A (2026-09-22). A recovery save captured mid-FMV
+        loops when loaded into a paused core, fresh or not, and plays when
+        loaded into a running one (D-BASE-R3c arms P/Q vs R). This is the
+        recovery path only: `load_recovery_state` (paused) and the
+        player Save/Load path are unchanged. Same staging, same
+        verification, same LOAD_STATE_SLOT 0; the precondition is inverted
+        and RetroArch's own `[State] Loading` line is required.
+        """
+        with self.lock:
+            self._refresh_process()
+            if (
+                self.process is None
+                or self.process.poll() is not None
+                or self.active_game is None
+            ):
+                raise EmulatorError(
+                    "No active game session is available to load"
+                )
+
+            if self._paused:
+                raise EmulatorError(
+                    "The running-core recovery load requires the game "
+                    "to be running"
+                )
+
+            observed = self._retroarch_network_status()
+            if observed != "PLAYING":
+                raise EmulatorError(
+                    "RetroArch is not PLAYING "
+                    f"({observed or 'no status'}); not loading"
+                )
+
+            source = self._recovery_state_path_for_active()
+            source_diag = self._state_file_diagnostic(source)
+
+            if int(
+                source_diag.get("size_bytes", 0) or 0
+            ) <= 0:
+                raise EmulatorError(
+                    "The recovery save is an invalid 0-byte file"
+                )
+
+            stem = self._active_state_stem()
+            scratch = source.with_name(f"{stem}.state")
+
+            self._copy_state_file(
+                source,
+                scratch,
+            )
+
+            scratch_diag = self._state_file_diagnostic(scratch)
+
+            if (
+                scratch_diag.get("sha256")
+                != source_diag.get("sha256")
+                or int(
+                    scratch_diag.get("size_bytes", 0) or 0
+                )
+                <= 0
+            ):
+                raise EmulatorError(
+                    "PrivyHub could not verify the staged "
+                    "recovery savestate"
+                )
+
+            source_png = Path(str(source) + ".png")
+            scratch_png = Path(str(scratch) + ".png")
+
+            if source_png.is_file():
+                self._copy_state_file(
+                    source_png,
+                    scratch_png,
+                )
+
+            log_offset = (
+                self._retroarch_session_log_position()
+            )
+
+            self.record_save_state_probe_event(
+                "manager_action",
+                action="load_state_link_drop_recovery_running",
+                slot=0,
+                source=source_diag,
+                scratch=scratch_diag,
+            )
+
+            response = (
+                self._retroarch_network_request(
+                    "LOAD_STATE_SLOT 0",
+                    expect_response=True,
+                    timeout=2.0,
+                    retries=1,
+                )
+            )
+
+            if (
+                not response
+                or not response.upper().startswith(
+                    "LOAD_STATE_SLOT 0"
+                )
+            ):
+                raise EmulatorError(
+                    "RetroArch nightly did not acknowledge "
+                    "LOAD_STATE_SLOT 0"
+                )
+
+            loading_lines: list[str] = []
+            deadline = time.monotonic() + 2.0
+
+            while time.monotonic() < deadline:
+                lines = self._retroarch_session_log_since(
+                    log_offset
+                )
+
+                if any(
+                    "failed to load state" in line.casefold()
+                    for line in lines
+                ):
+                    raise EmulatorError(
+                        "RetroArch reported Failed to load state"
+                    )
+
+                loading_lines = [
+                    line
+                    for line in lines
+                    if "[state] loading state" in line.casefold()
+                ]
+
+                if loading_lines:
+                    break
+
+                time.sleep(0.10)
+
+            if not loading_lines:
+                raise EmulatorError(
+                    "RetroArch acknowledged LOAD_STATE_SLOT 0 but logged "
+                    "no [State] Loading line"
+                )
+
+            payload = self.status()
+            payload["action"] = "load_recovery_state_running"
+            payload["accepted"] = True
+            payload["retroarch_response"] = response
+            payload["retroarch_loading_line"] = loading_lines[-1][:300]
+            payload["source_sha256"] = source_diag.get("sha256")
+            return payload
+
     def copy_recovery_state_to_slot(
         self,
         slot: int,

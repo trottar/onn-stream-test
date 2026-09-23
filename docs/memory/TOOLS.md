@@ -147,10 +147,31 @@ the banner state is in memory only.
 
 ## The host console — SSH from the PC (H1, verified 2026-09-22)
 
-The host has **no monitor** once the DisplayPort dummy plug is in. The
-console is **SSH from the user's PC, with the PC joined to the Opal's
-wifi** — no port-forward through the Opal, no VNC. Addresses live in the
-PC's `~/.ssh` config, never here.
+**The host is headless as of 2026-09-22 (`H2`)**: no monitor, a
+DisplayPort dummy plug (EDID `DP1080P60`) in X **`DisplayPort-1`** = DRM
+**`card0-DP-2`** — the port next to the old monitor's `DisplayPort-0`.
+It prefers **1920x1080 at 60.00 Hz** by its own EDID, so no X config is
+written; it also advertises 3840x2160@17, which must never become the
+mode. Capture is unchanged: the 879x720 RetroArch window, 60 fps
+(`evidence/H2_HEADLESS_CUTOVER_2026-09-22.md`). The console is **SSH
+from the user's PC, with the PC joined to the Opal's wifi** — no
+port-forward through the Opal, no VNC. Addresses live in the PC's
+`~/.ssh` config, never here.
+
+Check the display from SSH with
+`DISPLAY=:0 xrandr | grep -E "connected|\*"` — expect
+`DisplayPort-1 connected 1920x1080` and `60.00*+`. If the mode is wrong:
+`DISPLAY=:0 xrandr --output DisplayPort-1 --mode 1920x1080 --rate 60`.
+**If the plug is removed or swapped** (untested): put the plug — or a
+monitor — back in a DisplayPort socket, then
+`DISPLAY=:0 xrandr --output <the connected output> --auto` (the output
+name follows the socket: `DisplayPort-0/1/2`); if X or the session is
+gone, `sudo systemctl restart lightdm` brings the autologin desktop back
+without a reboot. A persistent mode, if ever needed, is
+`/etc/X11/xorg.conf.d/10-monitor.conf` with `Identifier` = **the X name
+of the plug's output** and `Option "PreferredMode" "1920x1080"`.
+**Do not open the XFCE Display dialog**: saving a profile there starts
+overriding the mode at login.
 
 `sshd` is **key-only**: `PasswordAuthentication no`,
 `KbdInteractiveAuthentication no`, `PermitRootLogin no` in
@@ -200,20 +221,47 @@ locks it switches to the greeter VT and takes the X session out from under
 **`Linger=no`** — the tmux server is killed at logout. Autologin means a
 reboot is not a logout, but a reboot still kills tmux and everything in
 it, and **nothing starts the companion at boot**: no unit, no crontab, no
-linger. Start it by hand after every reboot.
+linger. Start it by hand after every reboot. **A systemd user unit is
+designed and awaiting the user's install** (`H3`, 2026-09-23): the unit,
+the paste-ready install/undo steps and `h3_verify.sh` are in
+`evidence/H3_COMPANION_AUTOSTART_DESIGN_2026-09-23.md`. Once installed,
+restart the companion with `systemctl --user restart privyhub-companion`,
+never `kill` + `nohup`. **Stop the companion with SIGINT, not SIGTERM**
+(`kill -INT <pid>`): only SIGINT runs its clean shutdown; SIGTERM
+orphans a live game.
 
-**adb does not survive a host or TV restart, and cannot be recovered from
-the host alone.** adb here is wireless only — there is no USB path. The
-host key pair `~/.android/adbkey{,.pub}` persists and the onn does not
-re-prompt, but the TV's wireless-debugging listener returns on a **new
-ephemeral port** each time, so every stored endpoint answers
-`Connection refused` and `adb mdns services` finds nothing. The current
-port is readable only on the TV, under *Developer options → Wireless
-debugging*. Once the device is connected, `adb reconnect offline` then
+**adb after a host reboot: `adb connect <onn-address>:5555`** — verified
+by `H2` (2026-09-22): `adb devices` is empty after the reboot and that
+one command brings the onn back as `device`, from the host, no trip to
+the TV. It works because the user pinned the listener with
+`adb tcpip 5555` while connected. adb here is wireless only — there is no
+USB path. The host key pair `~/.android/adbkey{,.pub}` persists and the
+onn does not re-prompt. **A TV power cycle can undo the pin** (untested):
+the TV's wireless-debugging listener then returns on a **new ephemeral
+port**, stored endpoints answer `Connection refused`, `adb mdns services`
+finds nothing, and the port is readable only on the TV, under
+*Developer options → Wireless debugging* — connect to it, then
+`adb tcpip 5555` to pin it again. `adb reconnect offline` then
 `adb connect <endpoint>` recovers a merely-offline device (2026-09-20).
-**A fixed port has not been set up**; `adb tcpip 5555` while connected is
-the open proposal to stop a reboot costing a trip to the TV. See
-`evidence/H1_VERIFY_SSH_CONSOLE_2026-09-22.md` section 5.
+See `evidence/H1_VERIFY_SSH_CONSOLE_2026-09-22.md` section 5.
+
+**Tile states and the recovery prompt (`D-BASE-R3c2`, 2026-09-23;
+installed APK `21e3d089…9dcb`).** A game's tile dialog (GAMES → a list →
+the title's tile, e.g. CONTINUE PLAYING → "Tekken 3 (USA) - PlayStation")
+has one of three primary buttons: **Resume** when that title has a live
+session (opens the stream on the same RetroArch process, no load);
+**Launch on Companion** that first raises the **Recovery Save prompt**
+when no session is live and a `.state.recovery` exists for the title;
+otherwise the normal Start Fresh / Load Save dialog. The prompt is **no
+longer raised by the launcher's status poll**, so it no longer covers
+the RESUME PLAYING preview; **RESUME PLAYING** (the NOW PLAYING bar)
+still opens the live session's stream exactly as before. "Resume from
+recovery save" launches a fresh core, loads while it runs, pauses for
+the handoff and deletes the recovery files. A title launched while
+another is live ends the other through the normal stop. Scripted
+navigation: find nodes by text in a `uiautomator dump`; **match the
+tile's full text** — the NOW PLAYING bar also shows the bare title
+(`evidence/d_base_r3c2_2026-09-23/r3c2_checks.py`).
 
 ## Reading the Opal, read-only over SSH (O1)
 
@@ -605,6 +653,33 @@ One file per date at the memory root: `docs/memory/YYYY-MM-DD.md`.
 Until 2026-09-18 there were two locations — the root and `docs/memory/memory/` —
 with two different `2026-09-15.md` files. The directory is gone and that date is
 merged. Do not recreate `docs/memory/memory/`.
+
+## Audio arrival holes and the heartbeat knob (D-BASE-P8)
+
+Since the `P8` build (schema `privyhub_native_decoder_session_v2`) the
+decoder report carries **`audio.arrival_holes`**: every inter-arrival gap
+> 15 ms lands in whole-session histograms (length; ms since the last
+heartbeat send and since the last client-health send, 50 ms bins, all
+holes and holes ≥ 40 ms), plus the last 300 raw rows.
+`evidence/d_base_p8_2026-09-22/p8_analyze.py` reads it.
+
+**`PRIVYHUB_HEARTBEAT_MS`** (companion environment, read at each
+`native-stream-start`, clamped 1,000-10,000, default 2,000) slows the
+client's heartbeat for a diagnostic session. Never leave it set: link-drop
+recovery reads the heartbeat. `P8`'s harness restores the companion
+without it.
+
+**The report is a URL query, capped at 64 KiB encoded** — over that the
+companion answers 414 and the report is lost (`P8`'s first build lost two
+that way). Keep any new report field bounded; a normal report is ~25-40 KB
+encoded.
+
+**The adb socket sampler (`p5_socket_sample.py`) is safe during audio
+measurements** — removing it moved the hole rate by 1 % (`P8`).
+
+**`save_state_probe.txt` is reset at every game launch**; read the
+RetroArch session logs' `[State]` lines to follow loads across launches
+(`R3c`).
 
 ## Memory and repository health
 

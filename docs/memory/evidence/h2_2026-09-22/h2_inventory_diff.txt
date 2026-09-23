@@ -1,0 +1,526 @@
+--- h2_prep_2026-09-22/h2_prep_raw.txt	2026-09-22 06:39:51.893486881 -0400
++++ h2_2026-09-22/h2_inventory_plug.txt	2026-09-22 17:55:11.191208371 -0400
+@@ -1,22 +1,23 @@
+ 
+ ===== 1a session type =====
+-XDG_SESSION_TYPE=x11
+-DISPLAY=:0.0
++XDG_SESSION_TYPE=tty
++DISPLAY=:0
+ WAYLAND_DISPLAY=<unset>
+ SESSION  UID USER     SEAT  LEADER CLASS   TTY IDLE SINCE
+-      2 1000 privyhub seat0 3027   user    -   no   -
+-      3 1000 privyhub -     3042   manager -   no   -
++      1 1000 privyhub seat0 1215   user    -   no   -
++      2 1000 privyhub -     1260   manager -   no   -
++      3 1000 privyhub -     4310   user    -   no   -
+ 
+-2 sessions listed.
+---- session 2 ---
++3 sessions listed.
++--- session 1 ---
+ Display=:0
+-Service=lightdm
+-Desktop=lightdm-xsession
++Service=lightdm-autologin
++Desktop=xfce
+ Type=x11
+ Class=user
+ Active=yes
+ State=active
+---- session 3 ---
++--- session 2 ---
+ Display=
+ Service=systemd-user
+ Desktop=
+@@ -24,87 +25,95 @@
+ Class=manager
+ Active=yes
+ State=active
++--- session 3 ---
++Display=
++Service=sshd
++Desktop=
++Type=tty
++Class=user
++Active=yes
++State=active
+ 
+ ===== 1b display manager =====
+ ● lightdm.service - Light Display Manager
+      Loaded: loaded (/usr/lib/systemd/system/lightdm.service; enabled; preset: enabled)
+-     Active: active (running) since Mon 2026-09-21 10:40:13 EDT; 19h ago
+- Invocation: 81489c6bc9ea4ebdbd025b1f5c979e4a
++     Active: active (running) since Tue 2026-09-22 17:42:49 EDT; 12min ago
++ Invocation: 1e89fb25fc26400f91dbfb939fb124ff
+        Docs: man:lightdm(1)
+-   Main PID: 1023 (lightdm)
+-      Tasks: 18 (limit: 18105)
+-     Memory: 139.3M (peak: 184.8M)
+-        CPU: 51min 33.441s
++   Main PID: 1009 (lightdm)
++      Tasks: 17 (limit: 18066)
++     Memory: 134.1M (peak: 140M)
++        CPU: 29.307s
+      CGroup: /system.slice/lightdm.service
+-             ├─1023 /usr/sbin/lightdm
+-             └─1034 /usr/lib/xorg/Xorg :0 -seat seat0 -auth /var/run/lightdm/root/:0 -nolisten tcp vt7 -novtswitch
+-root        1023 lightdm         /usr/sbin/lightdm
+-root        1034 Xorg            /usr/lib/xorg/Xorg :0 -seat seat0 -auth /var/run/lightdm/root/:0 -nolisten tcp vt7 -novtswitch
++             ├─1009 /usr/sbin/lightdm
++             └─1029 /usr/lib/xorg/Xorg :0 -seat seat0 -auth /var/run/lightdm/root/:0 -nolisten tcp vt7 -novtswitch
++root        1009 lightdm         /usr/sbin/lightdm
++root        1029 Xorg            /usr/lib/xorg/Xorg :0 -seat seat0 -auth /var/run/lightdm/root/:0 -nolisten tcp vt7 -novtswitch
+ 
+ ===== 1c autologin =====
+-total 20
++total 24
+ -rw-r--r-- 1 root root   40 Apr 11  2025 keys.conf
+ -rw-r--r-- 1 root root 6634 Apr 11  2025 lightdm.conf
++drwxr-xr-x 2 root root 4096 Sep 22 10:42 lightdm.conf.d
+ -rw-r--r-- 1 root root 3557 Apr 21  2024 lightdm-gtk-greeter.conf
+ -rw-r--r-- 1 root root  466 Apr 11  2025 users.conf
+-(no uncommented autologin directive)
++/etc/lightdm/lightdm.conf.d/10-autologin.conf:2:autologin-user=privyhub
++/etc/lightdm/lightdm.conf.d/10-autologin.conf:3:autologin-session=xfce
+ 
+ ===== 2 outputs and modes =====
+ Monitors: 1
+- 0: +DisplayPort-0 1440/408x900/255+0+0  DisplayPort-0
+-Screen 0: minimum 320 x 200, current 1440 x 900, maximum 16384 x 16384
+-DisplayPort-0 connected 1440x900+0+0 (normal left inverted right x axis y axis) 408mm x 255mm
+-   1440x900      59.89*+  74.98  
++ 0: +DisplayPort-1 1920/480x1080/270+0+0  DisplayPort-1
++Screen 0: minimum 320 x 200, current 1920 x 1080, maximum 16384 x 16384
++DisplayPort-0 disconnected (normal left inverted right x axis y axis)
++DisplayPort-1 connected 1920x1080+0+0 (normal left inverted right x axis y axis) 480mm x 270mm
++   1920x1080     60.00*+  59.94  
++   3840x2160     17.00  
++   2560x1600     29.99  
++   2560x1440     30.00  
++   1920x1200     59.95  
++   1680x1050     59.88  
++   1600x900      60.00  
+    1280x1024     75.02    60.02  
+-   1280x800      59.81  
++   1440x900      59.90  
++   1280x800      59.91  
+    1152x864      75.00  
+-   1280x720      59.89  
++   1280x720      60.00    59.94  
+    1024x768      75.03    70.07    60.00  
+-   832x624       74.55  
+    800x600       72.19    75.00    60.32    56.25  
+-   640x480       75.00    72.81    66.67    59.94  
+-   720x400       70.08  
+-DisplayPort-1 disconnected (normal left inverted right x axis y axis)
++   640x480       75.00    72.81    60.00    59.94  
+ DisplayPort-2 disconnected (normal left inverted right x axis y axis)
+-/sys/class/drm/card0-DP-1/               status=connected enabled=enabled
+-/sys/class/drm/card0-DP-2/               status=disconnected enabled=disabled
++/sys/class/drm/card0-DP-1/               status=disconnected enabled=disabled
++/sys/class/drm/card0-DP-2/               status=connected enabled=enabled
+ /sys/class/drm/card0-DP-3/               status=disconnected enabled=disabled
+ ## /sys/class/drm/card0-DP-1/ modes
+-1440x900 1280x1024 1280x1024 1440x900 1280x800 1152x864 1280x720 1024x768 1024x768 1024x768 832x624 800x600 800x600 800x600 800x600 640x480 640x480 640x480 640x480 720x400 
+-## /sys/class/drm/card0-DP-2/ modes
+ 
++## /sys/class/drm/card0-DP-2/ modes
++1920x1080 3840x2160 2560x1600 2560x1440 1920x1200 1920x1080 1680x1050 1600x900 1280x1024 1280x1024 1440x900 1280x800 1152x864 1280x720 1280x720 1024x768 1024x768 1024x768 800x600 800x600 800x600 800x600 640x480 640x480 640x480 640x480 
+ ## /sys/class/drm/card0-DP-3/ modes
+ 
+-Screen 0: minimum 320 x 200, current 1440 x 900, maximum 16384 x 16384
+-DisplayPort-0 connected 1440x900+0+0 (0x56) normal (normal left inverted right x axis y axis) 408mm x 255mm
++Screen 0: minimum 320 x 200, current 1920 x 1080, maximum 16384 x 16384
++DisplayPort-0 disconnected (normal left inverted right x axis y axis)
+ 	Identifier: 0x52
+-	Timestamp:  11457
++	Timestamp:  19948
+ 	Subpixel:   unknown
+-	Gamma:      1.0:1.0:1.0
+-	Brightness: 1.0
+ 	Clones:    
+-	CRTC:       0
+ 	CRTCs:      0 1 2 3
+ 	Transform:  1.000000 0.000000 0.000000
+ 	            0.000000 1.000000 0.000000
+ 	            0.000000 0.000000 1.000000
+ 	           filter: 
+-	EDID: 
+-		<EDID hex block: 8 lines removed; it carries the panel serial. Vendor/model recorded by hand.>
+ 	GAMMA_LUT_SIZE: 4096 
+ 		range: (0, -1)
+ 	DEGAMMA_LUT_SIZE: 4096 
+ 		range: (0, -1)
+ 	GAMMA_LUT: 0 
+ 		range: (0, 65535)
+-	CTM: 	1.000000 0.000000 0.000000
+-		0.000000 1.000000 0.000000
+-		0.000000 0.000000 1.000000
++	CTM: 0 
+ 	DEGAMMA_LUT: 0 
+ 		range: (0, 65535)
+ 	TearFree: auto 
+ 		supported: off, on, auto
+-	subconnector: VGA 
++	subconnector: Unknown 
+ 		supported: Unknown, VGA, DVI-D, HDMI, DP, Wireless, Native
+ 	HDCP Content Type: HDCP Type0 
+ 		supported: HDCP Type0, HDCP Type1
+@@ -130,24 +139,23 @@
+ 		supported: 87
+ 	non-desktop: 0 
+ 		range: (0, 1)
+-  1440x900 (0x56) 106.500MHz -HSync +VSync *current +preferred
+-        h: width  1440 start 1520 end 1672 total 1904 skew    0 clock  55.93KHz
+-        v: height  900 start  903 end  909 total  934           clock  59.89Hz
+-  1280x1024 (0x57) 135.000MHz +HSync +VSync
+-        h: width  1280 start 1296 end 1440 total 1688 skew    0 clock  79.98KHz
+-        v: height 1024 start 1025 end 1028 total 1066           clock  75.02Hz
+-  1280x1024 (0x58) 108.000MHz +HSync +VSync
+-        h: width  1280 start 1328 end 1440 total 1688 skew    0 clock  63.98KHz
+-        v: height 1024 start 1025 end 1028 total 1066           clock  60.02Hz
+-  1440x900 (0x59) 136.750MHz -HSync +VSync
+-        h: width  1440 start 1536 end 1688 total 1936 skew    0 clock  70.64KHz
+-        v: height  900 start  903 end  909 total  942           clock  74.98Hz
+-  1280x800 (0x5a) 83.500MHz -HSync +VSync
+-        h: width  1280 start 1352 end 1480 total 1680 skew    0 clock  49.70KHz
+-        v: height  800 start  803 end  809 total  831           clock  59.81Hz
+-  1152x864 (0x5b) 108.000MHz +HSync +VSync
+-        h: width  1152 start 1216 end 1344 total 1600 skew    0 clock  67.50KHz
+-        v: height  864 start  865 end  868 total  900           clock  75.00Hz
++DisplayPort-1 connected 1920x1080+0+0 (0x3ce) normal (normal left inverted right x axis y axis) 480mm x 270mm
++	Identifier: 0x53
++	Timestamp:  19948
++	Subpixel:   unknown
++	Gamma:      1.0:1.0:1.0
++	Brightness: 1.0
++	Clones:    
++	CRTC:       0
++	CRTCs:      0 1 2 3
++	Transform:  1.000000 0.000000 0.000000
++	            0.000000 1.000000 0.000000
++	            0.000000 0.000000 1.000000
++	           filter: 
++	EDID: 
++		<EDID hex block: 16 lines removed; it carries the panel serial. Vendor/model recorded by hand.>
++	GAMMA_LUT_SIZE: 4096 
++		range: (0, -1)
+ 
+ ===== 3a gpu and cmdline =====
+ 05:00.0 VGA compatible controller: Advanced Micro Devices, Inc. [AMD/ATI] Renoir [Radeon Vega Series / Radeon Vega Mobile Series] (rev d9)
+@@ -177,13 +185,11 @@
+ 	Driver "amdgpu"
+ 	Option "HotplugDriver" "amdgpu"
+ EndSection
+-[    11.459] (==) Using system config directory "/usr/share/X11/xorg.conf.d"
+-[    11.489] 	loading driver: amdgpu
+-[    11.680] (II) AMDGPU(0): Output DisplayPort-0 has no monitor section
+-[    11.680] (II) AMDGPU(0): Output DisplayPort-1 has no monitor section
+-[    11.680] (II) AMDGPU(0): Output DisplayPort-2 has no monitor section
+-[    11.697] (II) AMDGPU(0): Using exact sizes for initial modes
+-[    11.697] (II) AMDGPU(0): Output DisplayPort-0 using initial mode 1440x900 +0+0
++[    11.000] (==) Using system config directory "/usr/share/X11/xorg.conf.d"
++[    11.014] 	loading driver: amdgpu
++[    11.189] (II) AMDGPU(0): Output DisplayPort-0 has no monitor section
++[    11.189] (II) AMDGPU(0): Output DisplayPort-1 has no monitor section
++[    11.189] (II) AMDGPU(0): Output DisplayPort-2 has no monitor section
+ 
+ ===== 3c desktop display persistence =====
+ ls: cannot access '/home/privyhub/.config/monitors.xml': No such file or directory
+@@ -219,6 +225,8 @@
+ NetworkManager-dispatcher.service  enabled enabled
+ NetworkManager-wait-online.service enabled enabled
+ NetworkManager.service             enabled enabled
++ssh.service                        enabled enabled
++sshd-keygen.service                enabled enabled
+ UNIT FILE                                    STATE   PRESET
+ gcr-ssh-agent.service                        enabled enabled
+ gnome-keyring-daemon.service                 enabled enabled
+@@ -239,10 +247,11 @@
+ ssh-agent.socket                             enabled enabled
+ 
+ 17 unit files listed.
+-total 16
++total 20
+ -rw------- 1 privyhub privyhub  132 Sep 18 14:06 claude-desktop.desktop
+--rw-r--r-- 1 privyhub privyhub  333 Sep 17 15:01 expressvpn-client.desktop
+--rw-rw-r-- 1 privyhub privyhub 4256 Sep 21 11:25 xfce4-notes-autostart.desktop
++-rw-rw-r-- 1 privyhub privyhub  346 Sep 22 10:48 expressvpn-client.desktop
++-rw-rw-r-- 1 privyhub privyhub   70 Sep 22 17:42 xfce4-clipman-plugin-autostart.desktop
++-rw-rw-r-- 1 privyhub privyhub 4256 Sep 22 17:42 xfce4-notes-autostart.desktop
+ at-spi-dbus-bus.desktop
+ geoclue-demo-agent.desktop
+ gnome-keyring-pkcs11.desktop
+@@ -269,12 +278,19 @@
+ Linger=no
+ 
+ ===== 5 ssh console =====
++ssh.service                                                               enabled         enabled
++sshd-keygen.service                                                       enabled         enabled
++sshd-unix-local@.service                                                  alias           -
++sshd.service                                                              alias           -
++sshd@.service                                                             indirect        enabled
++ssh.socket                                                                disabled        enabled
++sshd-unix-local.socket                                                    generated       -
+ ssh-access.target                                                         static          -
+-ssh          not-found
+-sshd         not-found
+-ssh.socket   not-found
+-ls: cannot access '/usr/sbin/sshd': No such file or directory
+-631 5037 8000 8765 
++ssh          enabled
++sshd         alias
++ssh.socket   disabled
++-rwxr-xr-x 1 root root 568224 May  6 08:33 /usr/sbin/sshd
++22 25 631 5037 8000 8765 
+ /usr/bin/ssh
+ OpenSSH_10.0p2 Debian-7+deb13u4, OpenSSL 3.5.7 9 Jun 2026
+ 
+@@ -321,17 +337,17 @@
+     "version": "xor8_1",
+     "group_size": 8,
+     "local_port": 48110,
+-    "rtp_packets": 995262,
+-    "rtp_bytes": 1072894283,
+-    "parity_packets": 158771,
+-    "parity_bytes": 182596827,
+-    "groups": 158771,
++    "rtp_packets": 105107,
++    "rtp_bytes": 113561141,
++    "parity_packets": 16753,
++    "parity_bytes": 19395229,
++    "groups": 16753,
+     "skipped_packets": 0,
+     "send_errors": 0,
+-    "send_calls": 1154033,
+-    "sent_bytes": 1255491110,
+-    "send_call_total_us": 14596878.525,
+-    "send_call_max_us": 2935.452,
++    "send_calls": 121860,
++    "sent_bytes": 132956370,
++    "send_call_total_us": 1463208.377,
++    "send_call_max_us": 2946.8,
+     "pacing": {
+       "enabled": false,
+       "configured_us": 0,
+@@ -351,122 +367,129 @@
+     },
+     "frame_sizes": {
+       "schema": "privyhub_native_frame_sizes_v1",
+-      "frames": 72591,
+-      "packets": 995262,
+-      "mean_packets": 13.711,
+-      "p50_packets": 12,
+-      "p90_packets": 29,
+-      "p99_packets": 65,
+-      "max_packets": 77,
+-      "max_at_utc": "2026-09-22T10:01:23.576Z",
+-      "payload_bytes": 1060951139,
+-      "mean_bytes": 14615,
+-      "p50_bytes": 13312,
+-      "p90_bytes": 33792,
+-      "p99_bytes": 75776,
+-      "max_bytes": 89489,
+-      "max_bytes_at_utc": "2026-09-22T10:13:27.956Z",
+-      "bytes_per_packet": 1066.0,
++      "frames": 7684,
++      "packets": 105107,
++      "mean_packets": 13.679,
++      "p50_packets": 11,
++      "p90_packets": 34,
++      "p99_packets": 49,
++      "max_packets": 76,
++      "max_at_utc": "2026-09-22T21:48:58.829Z",
++      "payload_bytes": 112299857,
++      "mean_bytes": 14614,
++      "p50_bytes": 11264,
++      "p90_bytes": 38912,
++      "p99_bytes": 57344,
++      "max_bytes": 88384,
++      "max_bytes_at_utc": "2026-09-22T21:48:58.829Z",
++      "bytes_per_packet": 1068.43,
+       "byte_cap": null,
+       "byte_cap_source": "PRIVYHUB_FRAME_BYTE_CAP",
+       "frames_over_cap": 0,
+       "byte_bucket": 1024,
+-      "frames_ge_40": 2574,
++      "frames_ge_40": 290,
+       "frames_ge_80": 0,
+       "unmarked_frames": 0,
+       "large_threshold": 40,
+       "huge_threshold": 80,
+       "log_path": "/home/privyhub/Projects/onn-stream-test/logs/games/native_frame_sizes.jsonl",
+-      "log_lines": 1211,
++      "log_lines": 129,
+       "log_rotations": 0,
+       "log_errors": 0,
+       "bucket_seconds": 1800,
+       "packet_histogram": [
+         0,
+-        8131,
+-        53,
+-        3414,
+-        3393,
+-        2736,
+-        2160,
+-        2042,
+-        2433,
+-        2901,
+-        3303,
+-        3645,
+-        3425,
+-        3830,
+-        8131,
+-        3512,
+-        2822,
+-        1840,
+-        1101,
+-        830,
+-        754,
+-        623,
+-        606,
+-        532,
+-        510,
+-        566,
+-        543,
+-        499,
+-        512,
+-        532,
+-        510,
+-        513,
+-        558,
+-        530,
+-        560,
+-        445,
+-        479,
+-        405,
+-        369,
+-        269,
+-        256,
+-        215,
+-        166,
+-        130,
+-        128,
+-        110,
+-        108,
++        1098,
++        8,
++        657,
++        777,
++        544,
++        282,
++        187,
++        122,
++        71,
++        67,
++        65,
++        59,
++        270,
++        1092,
++        147,
++        54,
++        52,
++        68,
++        75,
++        61,
++        77,
++        82,
++        95,
+         93,
++        64,
+         82,
+-        102,
++        93,
++        95,
++        83,
++        94,
++        100,
++        95,
+         90,
+-        52,
+-        54,
+-        40,
+-        55,
+-        25,
+-        22,
+-        25,
+-        18,
+-        22,
+-        15,
+-        10,
+-        12,
+-        10,
+-        7,
+-        7,
+-        5,
++        102,
++        104,
++        76,
++        75,
++        77,
++        61,
++        49,
++        36,
++        33,
++        16,
++        24,
++        16,
+         9,
++        14,
++        12,
+         6,
+         6,
+-        7,
+-        18,
+-        50,
+-        55,
+-        396,
+-        123,
+-        42,
++        11,
+         3,
++        6,
++        4,
++        0,
++        1,
++        1,
++        4,
++        4,
++        0,
++        1,
++        1,
++        1,
++        0,
++        0,
++        2,
++        1,
++        0,
++        1,
++        1,
++        1,
++        4,
++        13,
++        5,
++        3,
++        1,
++        0,
++        0,
++        0,
++        0,
++        0,
++        0,
++        0,
++        0,
++        0,
+         0,
+         0,
+         0,
+         0,
+         0,
+-        
+--f x11grab -framerate 60 -window_id 62914562 -i :0.0 -vf scale=1280:720:force_original_aspect_ratio=decrease:flags=fast_bilinear,pad=1280:720:(ow-iw)/2:(oh-ih)/2:black,format=nv12,hwupload -an -c:v h264_vaapi -profile:v high -b:v 7000k -maxrate 7000k -bufsize 7000k -max_frame_size 90000 -g 15 -bf 0 -payload_type 96 -f rtp rtp://<ipv4>:48110?pkt_size=1200
++   
+ /usr/bin/xdotool
+ xdotool version 3.20160805.1
+ 

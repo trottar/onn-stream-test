@@ -67,7 +67,7 @@ class NativeStreamActivity :
         private const val VIDEO_HEIGHT = 720
         private const val VIDEO_FPS = 60
         private const val EXPECTED_HOST_ALPHA = "0.7"
-        private const val CLIENT_PROFILER_VERSION = "0.12.2"
+        private const val CLIENT_PROFILER_VERSION = "0.12.3"
 
         // PRIVYHUB_B1_CLIENT_HEALTH_V1
         private const val CLIENT_HEALTH_INTERVAL_MS =
@@ -245,6 +245,12 @@ class NativeStreamActivity :
 
     private var heartbeatSequence =
         0L
+
+    // D-BASE-P8, diagnostic: the companion may slow the heartbeat for one
+    // session (PRIVYHUB_HEARTBEAT_MS, 1,000-10,000 ms); default unchanged.
+    @Volatile
+    private var heartbeatIntervalMs =
+        HEARTBEAT_INTERVAL_MS
 
     @Volatile
     private var heartbeatPostInFlight =
@@ -739,6 +745,15 @@ class NativeStreamActivity :
                     json.optString(
                         "alpha_version",
                         "unknown"
+                    )
+
+                heartbeatIntervalMs =
+                    json.optLong(
+                        "heartbeat_interval_ms",
+                        HEARTBEAT_INTERVAL_MS
+                    ).coerceIn(
+                        1_000L,
+                        10_000L
                     )
 
                 if (
@@ -1245,7 +1260,9 @@ class NativeStreamActivity :
 
         root.put(
             "schema",
-            "privyhub_native_decoder_session_v1"
+            // D-BASE-P8: v2 adds audio.arrival_holes and
+            // audio.heartbeat_interval_ms; every v1 field is unchanged.
+            "privyhub_native_decoder_session_v2"
         )
         root.put(
             "client_profiler_version",
@@ -1947,6 +1964,22 @@ class NativeStreamActivity :
                         "prolonged_starvation_events",
                         audio.prolongedStarvationEvents
                     )
+
+                    // D-BASE-P8: every arrival gap over 15 ms (last
+                    // 4,000), with where the heartbeat and client-health
+                    // senders were when it opened.
+                    audioReceiver
+                        ?.arrivalHolesJson()
+                        ?.let {
+                            put(
+                                "arrival_holes",
+                                it
+                            )
+                        }
+                    put(
+                        "heartbeat_interval_ms",
+                        heartbeatIntervalMs
+                    )
                     put(
                         "smooth_latency_trims",
                         audio.smoothLatencyTrims
@@ -2166,7 +2199,7 @@ class NativeStreamActivity :
         if (
             lastHeartbeatPostAtNs > 0L &&
             nowNs - lastHeartbeatPostAtNs <
-                HEARTBEAT_INTERVAL_NS
+                heartbeatIntervalMs * 1_000_000L
         ) {
             return
         }
@@ -2226,7 +2259,7 @@ class NativeStreamActivity :
             "http://$host:$CONTROL_PORT" +
                 "/plugins/games/native-stream-heartbeat" +
                 "?sequence=$sequence" +
-                "&interval_ms=$HEARTBEAT_INTERVAL_MS" +
+                "&interval_ms=$heartbeatIntervalMs" +
                 "&last_output_age_ms=$lastOutputAgeMs" +
                 "&rendered_frames=${dec.renderedFrames}" +
                 "&queued_frames=${dec.queuedFrames}" +
@@ -2277,6 +2310,14 @@ class NativeStreamActivity :
             isDaemon = true,
             name = "PrivyHub-Stall-Heartbeat"
         ) {
+            // D-BASE-P8: mark the send for the audio hole ring.
+            AudioHoleTrace.heartbeatLastStartNs.set(
+                System.nanoTime()
+            )
+            AudioHoleTrace.heartbeatInFlight.set(
+                true
+            )
+
             try {
                 httpPost(
                     address,
@@ -2286,6 +2327,9 @@ class NativeStreamActivity :
                 // A heartbeat that cannot be delivered is itself the
                 // symptom; it must never disturb gameplay.
             } finally {
+                AudioHoleTrace.heartbeatInFlight.set(
+                    false
+                )
                 heartbeatPostInFlight =
                     false
             }
@@ -2455,6 +2499,11 @@ class NativeStreamActivity :
         ) {
             val postStartedNs =
                 System.nanoTime()
+
+            // D-BASE-P8: the other 2 s sender, marked for the hole ring.
+            AudioHoleTrace.healthLastStartNs.set(
+                postStartedNs
+            )
 
             try {
                 httpPostJson(

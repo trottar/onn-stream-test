@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import threading
 import time
 
@@ -193,6 +194,149 @@ class GamesPlugin:
             payload["native_stream_warning"] = str(exc)
 
         return payload
+
+    # ------------------------------------------------------------------
+    # D-BASE-R3c2: the recovery flow under the user's decisions of
+    # 2026-09-22 — a recovery state never loads into a live core, and
+    # (option A) it loads into a fresh core while it is RUNNING, because a
+    # mid-FMV save loaded paused loops (D-BASE-R3c). The paused handoff a
+    # normal launch leaves is restored before the stream starts.
+    # ------------------------------------------------------------------
+    RECOVERY_LOAD_SETTLE_S = 1.0
+
+    def _live_session(self) -> dict[str, Any] | None:
+        status = self._emulator.status()
+        if not status.get("active", False):
+            return None
+        game = status.get("game") or {}
+        return {
+            "game_id": game.get("id"),
+            "title": game.get("title") or status.get("title"),
+            "paused": bool(status.get("paused", False)),
+        }
+
+    def _tile_session_fields(self, game_id: str) -> dict[str, Any]:
+        detail = self._emulator.recovery_state_detail()
+        return {
+            "live_session": self._live_session(),
+            "recovery_available": bool(
+                game_id
+                and detail.get("exists")
+                and detail.get("game_id") == game_id
+            ),
+            "recovery_saved_at": detail.get("saved_at"),
+        }
+
+    def _end_live_session(self) -> None:
+        """The normal stop path: recovery ended, SAVE_FILES, encoder down."""
+        if self._emulator.status().get("active", False):
+            self.handle_post("stop", "")
+
+    def _recovery_game_id(self) -> str:
+        detail = self._emulator.recovery_state_detail()
+        if not detail.get("exists"):
+            raise RuntimeError("No recovery save exists")
+        game_id = str(detail.get("game_id") or "").strip()
+        if not game_id:
+            raise RuntimeError("The recovery save names no game")
+        return game_id
+
+    def _launch_for_recovery(
+        self,
+        game_id: str,
+        client_ip: str,
+    ) -> dict[str, Any]:
+        launched = self.handle_post_request(
+            "launch",
+            urlencode({"id": game_id}),
+            client_ip,
+        )
+        if not launched.get("active", False):
+            raise RuntimeError(
+                "The recovery launch did not start a game session"
+            )
+        return launched
+
+    def _recovery_resume_fresh(self, client_ip: str) -> dict[str, Any]:
+        game_id = self._recovery_game_id()
+
+        # Never into a live core: whatever is running ends first.
+        self._end_live_session()
+
+        self._launch_for_recovery(game_id, client_ip)
+
+        try:
+            self._emulator.resume()
+            time.sleep(self.RECOVERY_LOAD_SETTLE_S)
+            loaded = self._emulator.load_recovery_state_running()
+            paused = self._emulator.pause()
+        except Exception as exc:
+            # Keep the recovery save; leave no half-loaded session behind,
+            # so the launcher offers the prompt again.
+            try:
+                self._end_live_session()
+            except Exception:
+                pass
+            raise RuntimeError(
+                f"Recovery resume failed; the recovery save is kept: {exc}"
+            ) from exc
+
+        discarded = self._emulator.discard_recovery_state()
+
+        return {
+            "ok": True,
+            "plugin": self.PLUGIN_ID,
+            **paused,
+            "action": "recovery_resume_fresh",
+            "recovery_load": {
+                key: loaded.get(key)
+                for key in (
+                    "retroarch_response",
+                    "retroarch_loading_line",
+                    "source_sha256",
+                )
+            },
+            "recovery_discarded": bool(discarded.get("removed")),
+            "native_stream": self._native_stream.status(),
+        }
+
+    def _recovery_copy_and_launch(
+        self,
+        slot: int,
+        replace: bool,
+        client_ip: str,
+    ) -> dict[str, Any]:
+        game_id = self._recovery_game_id()
+        live = self._live_session()
+
+        # The slot bookkeeping is keyed on the live session's identity, so
+        # the copy runs inside a plain session of the recovery's title.
+        if not live or live.get("game_id") != game_id:
+            self._end_live_session()
+            self._launch_for_recovery(game_id, client_ip)
+
+        payload = self._emulator.copy_recovery_state_to_slot(
+            slot,
+            replace=replace,
+        )
+        discarded = self._emulator.discard_recovery_state()
+        payload["recovery_discarded"] = bool(discarded.get("removed"))
+        payload["native_stream"] = self._native_stream.status()
+        return {
+            "ok": True,
+            "plugin": self.PLUGIN_ID,
+            **payload,
+        }
+
+    @staticmethod
+    def _diagnostic_heartbeat_interval_ms() -> int:
+        """D-BASE-P8: PRIVYHUB_HEARTBEAT_MS, clamped to 1,000-10,000."""
+        raw = os.environ.get("PRIVYHUB_HEARTBEAT_MS", "").strip()
+        try:
+            value = int(raw) if raw else 2000
+        except ValueError:
+            value = 2000
+        return max(1000, min(10000, value))
 
     def _invalidate_scan_cache(self) -> None:
         with self._lock:
@@ -2849,7 +2993,14 @@ class GamesPlugin:
             return self.games(query)
 
         if action == "details":
-            return self.details(query)
+            payload = self.details(query)
+            # D-BASE-R3c2: what the launcher tile decides on.
+            payload.update(
+                self._tile_session_fields(
+                    str(payload.get("id", ""))
+                )
+            )
+            return payload
 
         # PRIVYHUB_A8_PATCH_01_INPUT_PROFILE_BACKEND
         if action == "input-profiles":
@@ -3098,6 +3249,13 @@ class GamesPlugin:
 
 
         if action == "launch":
+            # D-BASE-R3c2: a live session of a DIFFERENT title is ended
+            # cleanly first. The same title stays: its tile is Resume.
+            live = self._live_session()
+            requested_id = self._first(query, "id").strip()
+            if live and requested_id and live.get("game_id") != requested_id:
+                self._end_live_session()
+
             # PRIVYHUB_A8_PATCH_02B_CONTROLLER_PREFLIGHT_ORDER_V1
             try:
                 self._native_stream.ensure_game_controller(client_ip)
@@ -3431,12 +3589,7 @@ class GamesPlugin:
             }
 
         if action == "recovery-resume":
-            payload = self._emulator.load_recovery_state()
-            return {
-                "ok": True,
-                "plugin": self.PLUGIN_ID,
-                **payload,
-            }
+            return self._recovery_resume_fresh(client_ip)
 
         if action == "recovery-copy":
             slot = self._parse_int(
@@ -3451,15 +3604,11 @@ class GamesPlugin:
                 "true",
                 "yes",
             )
-            payload = self._emulator.copy_recovery_state_to_slot(
+            return self._recovery_copy_and_launch(
                 slot,
-                replace=replace,
+                replace,
+                client_ip,
             )
-            return {
-                "ok": True,
-                "plugin": self.PLUGIN_ID,
-                **payload,
-            }
 
         if action == "recovery-discard":
             payload = self._emulator.discard_recovery_state()
@@ -3505,6 +3654,13 @@ class GamesPlugin:
                 payload["game_session"] = game_status
                 payload["paused"] = True
                 payload["stabilization_required"] = True
+                # D-BASE-P8, diagnostic only: the client's heartbeat
+                # interval, read once per stream start. Unset means the
+                # 2,000 ms default; the heartbeat can be slowed, never
+                # disabled (link-drop recovery reads it).
+                payload["heartbeat_interval_ms"] = (
+                    self._diagnostic_heartbeat_interval_ms()
+                )
                 return payload
             except NativeStreamError as exc:
                 raise RuntimeError(str(exc)) from exc

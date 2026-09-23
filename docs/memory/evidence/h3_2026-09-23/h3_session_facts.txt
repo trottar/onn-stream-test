@@ -1,0 +1,85 @@
+===== 1 user-manager environment
+DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+DISPLAY=:0
+XAUTHORITY=/home/privyhub/.Xauthority
+XDG_SESSION_CLASS=user
+XDG_SESSION_DESKTOP=xfce
+XDG_SESSION_ID=1
+XDG_SESSION_PATH=/org/freedesktop/DisplayManager/Session0
+XDG_SESSION_TYPE=x11
+(exit 0)
+===== 2 targets
+  basic.target                  loaded    active   active Basic System
+  default.target                loaded    active   active Main User Target
+  graphical-session-pre.target  loaded    inactive dead   Session services which should run early before the graphical session is brought up
+  graphical-session.target      loaded    inactive dead   Current graphical user session
+graphical-session.target: inactive
+default.target: active
+default.target
+===== 3 linger / user manager
+State=active
+Linger=no
+● PrivyHub
+    State: running
+    Units: 143 loaded (incl. loaded aliases)
+     Jobs: 0 queued
+ls: cannot access '/home/privyhub/.config/systemd/user/': No such file or directory
+===== 5 autostart
+total 28
+drwxr-xr-x  2 privyhub privyhub 4096 Sep 22 18:06 .
+drwx------ 17 privyhub privyhub 4096 Sep 22 18:06 ..
+-rw-------  1 privyhub privyhub  132 Sep 18 14:06 claude-desktop.desktop
+-rw-rw-r--  1 privyhub privyhub  346 Sep 22 10:48 expressvpn-client.desktop
+-rw-rw-r--  1 privyhub privyhub   70 Sep 22 18:06 xfce4-clipman-plugin-autostart.desktop
+-rw-rw-r--  1 privyhub privyhub 4256 Sep 22 18:06 xfce4-notes-autostart.desktop
+--- /home/privyhub/.config/autostart/claude-desktop.desktop
+Name=Claude
+Exec="/usr/lib/claude-desktop/claude-desktop" --startup
+X-GNOME-Autostart-enabled=true
+--- /home/privyhub/.config/autostart/expressvpn-client.desktop
+Name=ExpressVPN
+Exec=env XDG_SESSION_TYPE=X11 /opt/expressvpn/bin/expressvpn-client %u
+Hidden=true
+--- /home/privyhub/.config/autostart/xfce4-clipman-plugin-autostart.desktop
+Hidden=false
+Exec=xfce4-clipman
+--- /home/privyhub/.config/autostart/xfce4-notes-autostart.desktop
+Name=Notes
+Exec=xfce4-notes
+OnlyShowIn=XFCE;GNOME;
+Hidden=false
+===== xfce session environment (for route B)
+XDG_SESSION_TYPE=x11
+HOME=/home/privyhub
+DBUS_SESSION_BUS_ADDRESS=<set>
+PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games
+DISPLAY=:0
+XDG_CURRENT_DESKTOP=XFCE
+XAUTHORITY=/home/privyhub/.Xauthority
+===== boot-time starters
+no crontab for privyhub
+UNIT FILE                                    STATE   PRESET
+gcr-ssh-agent.service                        enabled enabled
+gnome-keyring-daemon.service                 enabled enabled
+mpris-proxy.service                          enabled enabled
+org.freedesktop.IBus.session.GNOME.service   enabled enabled
+pulseaudio.service                           enabled enabled
+xdg-desktop-portal-rewrite-launchers.service enabled enabled
+dirmngr.socket                               enabled enabled
+gcr-ssh-agent.socket                         enabled enabled
+gnome-keyring-daemon.socket                  enabled enabled
+gpg-agent-browser.socket                     enabled enabled
+gpg-agent-extra.socket                       enabled enabled
+gpg-agent-ssh.socket                         enabled enabled
+gpg-agent.socket                             enabled enabled
+keyboxd.socket                               enabled enabled
+===== 4 the companion's own needs (from companion/privyhub_service.py, read 2026-09-23)
+paths: COMPANION_DIR = Path(__file__).resolve().parent; PROJECT_ROOT = its parent; logs under PROJECT_ROOT/logs; subprocesses given cwd=PROJECT_ROOT -> independent of the working directory
+foreground: main() prints a banner, CONTROLLER.start_server(), ThreadingHTTPServer((CONTROL_HOST, 8765)).serve_forever(); does not daemonise
+bind: CONTROL_HOST = "<ipv4>" (all addresses; not a specific address) -> tolerates the wired link coming up after it
+stop: only KeyboardInterrupt (SIGINT) is caught; the finally block runs server_close(), shutdown_plugins() (Games reuses its POST stop lifecycle: SAVE_FILES, RetroArch closed), CONTROLLER.shutdown(). No SIGTERM handler: Python's default SIGTERM ends the process at once, the finally block does not run (exit by signal 15, shell status 143) -> an active game is orphaned (TOOLS.md: "Stopping the companion with a game active orphans RetroArch"). With SIGINT it exits 0 after the clean shutdown.
+stdout: block-buffered when not a terminal -- the companions stopped by SIGTERM on 2026-09-22 left 0-byte logs (companion_p8_restored, companion_teardown)
+===== 6 capture target vs start order (companion/native_stream.py _select_capture_target)
+the managed RetroArch window is searched per stream start (xdotool search --onlyvisible --pid <managed pid>, 2.0 s deadline), never at companion start -> a companion started before any RetroArch finds the window later
+===== current companion (started by hand, R3c2)
+pid Wed Sep 23 00:15:59 2026 python3 ./companion/privyhub_service.py

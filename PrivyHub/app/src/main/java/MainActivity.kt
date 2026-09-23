@@ -92,10 +92,6 @@ class MainActivity : AppCompatActivity() {
     // PrivyHub A3 patch 11v2: frozen gameplay banner frame.
     private var gameSessionActive = false
 
-    // D-BASE-R3: the recovery-save prompt is shown once per
-    // saved_at value, so a poll every few seconds does not reopen it.
-    private var recoveryPromptShownFor: String? = null
-
     private var recoveryPromptVisible = false
     private var gameSessionPaused = false
     private var gameSessionTitle: String? = null
@@ -6902,14 +6898,77 @@ class MainActivity : AppCompatActivity() {
                             statusText.text =
                                 "Games: $systemName"
 
-                            builder.setPositiveButton(
-                                "Launch on Companion"
-                            ) { _, _ ->
-
-                                showGameLaunchModeDialog(
-                                    node.id,
-                                    title
+                            // D-BASE-R3c2 tile states: a live session of
+                            // this title -> Resume (no prompt, no load); no
+                            // live session and a recovery save for it ->
+                            // the recovery prompt before any launch;
+                            // otherwise the normal launch. A live session
+                            // of another title is ended by the companion.
+                            val liveSession =
+                                json.optJSONObject(
+                                    "live_session"
                                 )
+
+                            val liveHere =
+                                liveSession != null &&
+                                    liveSession.optString(
+                                        "game_id",
+                                        ""
+                                    ) == node.id
+
+                            val recoveryHere =
+                                !liveHere &&
+                                    liveSession == null &&
+                                    json.optBoolean(
+                                        "recovery_available",
+                                        false
+                                    )
+
+                            if (liveHere) {
+
+                                builder.setPositiveButton(
+                                    "Resume"
+                                ) { _, _ ->
+
+                                    gameSessionTitle =
+                                        liveSession
+                                            ?.optString(
+                                                "title",
+                                                title
+                                            )
+                                            ?: title
+                                    openNativeGameStream()
+                                }
+
+                            } else {
+
+                                builder.setPositiveButton(
+                                    "Launch on Companion"
+                                ) { _, _ ->
+
+                                    if (recoveryHere) {
+
+                                        recoveryPromptVisible =
+                                            true
+
+                                        showRecoveryPrompt(
+                                            gameId = node.id,
+                                            savedAt =
+                                                json.optString(
+                                                    "recovery_saved_at",
+                                                    ""
+                                                ),
+                                            title = title
+                                        )
+
+                                    } else {
+
+                                        showGameLaunchModeDialog(
+                                            node.id,
+                                            title
+                                        )
+                                    }
+                                }
                             }
 
                             // PrivyHub Phase A6: library-state actions live
@@ -12208,59 +12267,6 @@ class MainActivity : AppCompatActivity() {
     // included.
     // ------------------------------------------------------------------
 
-    private fun maybeShowRecoveryPrompt(
-        recovery: JSONObject?
-    ) {
-
-        if (recovery == null) {
-            return
-        }
-
-        if (
-            !recovery.optBoolean(
-                "save_available",
-                false
-            )
-        ) {
-            recoveryPromptShownFor = null
-            return
-        }
-
-        val savedAt =
-            recovery.optString(
-                "saved_at",
-                ""
-            )
-
-        val key =
-            savedAt.ifBlank {
-                recovery.optString(
-                    "save_game_title",
-                    "recovery"
-                )
-            }
-
-        if (
-            recoveryPromptVisible ||
-            recoveryPromptShownFor == key
-        ) {
-            return
-        }
-
-        recoveryPromptShownFor = key
-        recoveryPromptVisible = true
-
-        showRecoveryPrompt(
-            savedAt = savedAt,
-            title =
-                recovery.optString(
-                    "save_game_title",
-                    "your game"
-                )
-        )
-    }
-
-
     private fun formatRecoveryTime(
         savedAt: String
     ): String {
@@ -12298,6 +12304,7 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun showRecoveryPrompt(
+        gameId: String,
         savedAt: String,
         title: String
     ) {
@@ -12371,18 +12378,37 @@ class MainActivity : AppCompatActivity() {
 
                 recoveryPromptVisible = false
 
+                // D-BASE-R3c2: every choice ends in a launch. Resume and
+                // copy launch on the companion (a fresh core; the resume
+                // loads into it while it runs); discard then launches
+                // plain from here.
+                val openStream = {
+                    gameSessionTitle =
+                        title
+                    openNativeGameStream()
+                }
+
                 when (which) {
                     0 -> requestRecoveryAction(
-                        action = "recovery-resume"
+                        action = "recovery-resume",
+                        onSuccess = openStream
                     )
 
                     1, 2, 3 -> requestRecoveryAction(
                         action = "recovery-copy",
-                        slot = which
+                        slot = which,
+                        onSuccess = openStream
                     )
 
                     else -> requestRecoveryAction(
-                        action = "recovery-discard"
+                        action = "recovery-discard",
+                        onSuccess = {
+                            launchGameOnCompanion(
+                                gameId = gameId,
+                                title = title,
+                                loadSaveAfterLaunch = false
+                            )
+                        }
                     )
                 }
             }
@@ -12401,7 +12427,8 @@ class MainActivity : AppCompatActivity() {
     private fun requestRecoveryAction(
         action: String,
         slot: Int = 0,
-        replace: Boolean = false
+        replace: Boolean = false,
+        onSuccess: (() -> Unit)? = null
     ) {
 
         val host =
@@ -12456,11 +12483,9 @@ class MainActivity : AppCompatActivity() {
                                 "Recovery save discarded"
                         }
 
-                    if (action != "recovery-resume") {
-                        recoveryPromptShownFor = null
-                    }
-
                     refreshCurrentGameLibraryView()
+
+                    onSuccess?.invoke()
                 }
 
             } catch (error: Exception) {
@@ -12493,7 +12518,8 @@ class MainActivity : AppCompatActivity() {
                                 requestRecoveryAction(
                                     action = action,
                                     slot = slot,
-                                    replace = true
+                                    replace = true,
+                                    onSuccess = onSuccess
                                 )
                             }
                             .setNegativeButton(
@@ -12622,16 +12648,11 @@ class MainActivity : AppCompatActivity() {
                         )
                         ?: "Game"
 
-                val recovery =
-                    json.optJSONObject(
-                        "recovery"
-                    )
-
                 runOnUiThread {
 
-                    maybeShowRecoveryPrompt(
-                        recovery
-                    )
+                    // D-BASE-R3c2: the recovery prompt is no longer raised
+                    // by this poll; it is offered by the game tile, before
+                    // a launch, and only when no session is live.
 
                     // A reachable companion retires the unreachable
                     // notice; nothing else rewrites this line, so without

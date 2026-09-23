@@ -1,0 +1,54 @@
+== per session ==
+[B2] O1  dur_s=126.85  lost=40  loss_min=18.92  fge=7  max_fwd_gap=22  max_gap_ms=143  spike20_min=48.25  stale_min=5.68  fps=59.71  a_lost=27  a_under=2
+[B2] O2  dur_s=127.81  lost=15  loss_min=7.04  fge=3  max_fwd_gap=8  max_gap_ms=153  spike20_min=46.48  stale_min=7.04  fps=59.68  a_lost=14  a_under=2
+[B2] O3  dur_s=126.87  lost=15  loss_min=7.09  fge=7  max_fwd_gap=3  max_gap_ms=193  spike20_min=54.39  stale_min=5.20  fps=59.66  a_lost=14  a_under=2
+[B2] O4  dur_s=126.86  lost=51  loss_min=24.12  fge=13  max_fwd_gap=11  max_gap_ms=139  spike20_min=47.77  stale_min=7.09  fps=59.63  a_lost=12  a_under=1
+[B2] O5  dur_s=126.84  lost=49  loss_min=23.18  fge=6  max_fwd_gap=32  max_gap_ms=231  spike20_min=46.36  stale_min=8.04  fps=59.66  a_lost=9  a_under=3
+[B2] O6  dur_s=126.85  lost=30  loss_min=14.19  fge=10  max_fwd_gap=8  max_gap_ms=153  spike20_min=50.14  stale_min=7.09  fps=59.68  a_lost=5  a_under=1
+[CAPPED] P6a-V1  dur_s=1206.84  lost=249  loss_min=12.38  fge=91  max_fwd_gap=15  max_gap_ms=141  spike20_min=25.90  stale_min=0.35  fps=59.90  a_lost=1106  a_under=10
+[CAPPED] S3  dur_s=10806.77  lost=977  loss_min=5.42  fge=369  max_fwd_gap=27  max_gap_ms=162  spike20_min=26.72  stale_min=0.08  fps=59.96  a_lost=8543  a_under=129
+[H2] S1  dur_s=127.17  lost=4  loss_min=1.89  fge=1  max_fwd_gap=4  max_gap_ms=93  spike20_min=50.01  stale_min=7.55  fps=59.68  a_lost=10  a_under=3
+[H2] S2  dur_s=126.89  lost=46  loss_min=21.75  fge=15  max_fwd_gap=8  max_gap_ms=184  spike20_min=46.34  stale_min=2.84  fps=59.69  a_lost=70  a_under=3
+
+== B2 range vs H2 ==
+fps: B2 59.63..59.71  H2 59.68  within
+fps: B2 59.63..59.71  H2 59.69  within
+spike20_min: B2 46.36..54.39  H2 50.01  within
+spike20_min: B2 46.36..54.39  H2 46.34  below
+max_gap_ms: B2 139.00..231.00  H2 93.00  below
+max_gap_ms: B2 139.00..231.00  H2 184.00  within
+loss_min: B2 7.04..24.12  H2 1.89  below
+loss_min: B2 7.04..24.12  H2 21.75  within
+stale_min: B2 5.20..8.04  H2 7.55  within
+stale_min: B2 5.20..8.04  H2 2.84  below
+
+== identity fields ==
+O6 | capture: 'Capture: RetroArch window  879x720\nRetroArch Beetle PSX HW 0.9.44.1 82d8e05' | backend: x11grab_window | gop: 15 | kbps: 7000 | thermal.status_samples: 13 | host_thermal_c: 58.25
+P6a-V1 | capture: 'Capture: RetroArch window  879x720\nRetroArch Beetle PSX HW 0.9.44.1 82d8e05' | backend: x11grab_window | gop: 15 | kbps: 7000 | thermal.status_samples: 121 | host_thermal_c: 52.62
+S3 | capture: 'Capture: RetroArch window  879x720\nRetroArch Beetle PSX HW 0.9.44.1 82d8e05' | backend: x11grab_window | gop: 15 | kbps: 7000 | thermal.status_samples: 1078 | host_thermal_c: 55.5
+S1 | capture: 'Capture: RetroArch window  879x720\nRetroArch Beetle PSX HW 0.9.44.1 82d8e05' | backend: x11grab_window | gop: 15 | kbps: 7000 | thermal.status_samples: 13 | host_thermal_c: 47.88
+S2 | capture: 'Capture: RetroArch window  879x720\nRetroArch Beetle PSX HW 0.9.44.1 82d8e05' | backend: x11grab_window | gop: 15 | kbps: 7000 | thermal.status_samples: 13 | host_thermal_c: 48.38
+
+S1 mid-session native-stream-status:
+  capture_target: {"type": "window", "process": "retroarch", "pid": 5087, "title": "RetroArch Beetle PSX HW 0.9.44.1 82d8e05", "window_class": "", "width": 879, "height": 720, "backend": "x11grab_window"}
+  capture_backend: x11grab_window
+  max_frame_size_bytes: 90000 | source: profile | any_override: False
+  host_resource_sampler: {"running": true, "pid": 5145, "interval_s": 30, "error": null}
+  encoder argv: framerate 60 | window_id present: True | max_frame_size 90000
+  ffmpeg: Stream #0:0: Video: rawvideo (BGR[0] / 0x524742), bgr0, 879x720, 1215129 kb/s, 60 fps, 1000k tbr, 1000k tbn
+  ffmpeg: Stream #0:0: Video: h264 (High), vaapi(tv, progressive), 1280x720, q=2-31, 7000 kb/s, 60 fps, 90k tbn
+  ffmpeg: 879x720, 1215129 kb/s, 60 fps
+  ffmpeg: 1280x720, q=2-31, 7000 kb/s, 60 fps
+  host_resource_samples: 5
+
+S2 mid-session native-stream-status:
+  capture_target: {"type": "window", "process": "retroarch", "pid": 4176, "title": "RetroArch Beetle PSX HW 0.9.44.1 82d8e05", "window_class": "", "width": 879, "height": 720, "backend": "x11grab_window"}
+  capture_backend: x11grab_window
+  max_frame_size_bytes: 90000 | source: profile | any_override: False
+  host_resource_sampler: {"running": true, "pid": 4233, "interval_s": 30, "error": null}
+  encoder argv: framerate 60 | window_id present: True | max_frame_size 90000
+  ffmpeg: Stream #0:0: Video: rawvideo (BGR[0] / 0x524742), bgr0, 879x720, 1215129 kb/s, 60 fps, 1000k tbr, 1000k tbn
+  ffmpeg: Stream #0:0: Video: h264 (High), vaapi(tv, progressive), 1280x720, q=2-31, 7000 kb/s, 60 fps, 90k tbn
+  ffmpeg: 879x720, 1215129 kb/s, 60 fps
+  ffmpeg: 1280x720, q=2-31, 7000 kb/s, 60 fps
+  host_resource_samples: 5

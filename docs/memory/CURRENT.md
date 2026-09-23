@@ -16,39 +16,41 @@ closes. Decision: `decisions/D-BASE_BASELINE_BEFORE_ADAPTATION.md`.
 
 ## Current Work Item
 
-**Overnight queue** (`handoffs/OVERNIGHT_2026-09-22_QUEUE.md`) — complete:
+**Overnight queue `OVERNIGHT_2026-09-23B_QUEUE.md` — complete:**
 
-- **`D-BASE-P6a` — RUNTIME VALIDATED**, `evidence/D_BASE_P6A_CAP_ADOPTED_2026-09-22.md`.
-- **`D-BASE-S3` — SOAK VALIDATED**, `evidence/D_BASE_S3_CAP_SOAK_2026-09-22.md`.
-- **`D-BASE-P7` — CHARACTERIZED**, `evidence/D_BASE_P7_STARVATION_COUNTER_2026-09-22.md`.
-- **`H2-PREP` — INVENTORY RECORDED**, `evidence/H2_PREP_HOST_DISPLAY_INVENTORY_2026-09-22.md`.
-- **`M1` — DOCS RECONCILED**, `CHECKPOINT_PROPOSAL_2026-09-22.md`.
+- **N05 close — PASS → `R3`+`R3a` RUNTIME VALIDATED for real loss**
+  (N05, N3, N15, N15b, N150; `END_MS` validated by E30),
+  `evidence/D_BASE_R3D_HAND_RUNS_2026-09-22.md`.
+- **`D-BASE-R3c2` — RUNTIME VALIDATED**, checks 0-6,
+  `evidence/D_BASE_R3C2_RECOVERY_FLOW_2026-09-23.md`: Resume tile for a
+  live session (same pid, no load); prompt only with none; recovery
+  resumes into a fresh core loaded **while running** (option A) and plays;
+  both `R3b` post-run defects closed.
+- **`H3` — DESIGN RECORDED, not installed**,
+  `evidence/H3_COMPANION_AUTOSTART_DESIGN_2026-09-23.md`: systemd user
+  unit on `default.target`, `KillSignal=SIGINT`; install is the user's.
 
-**The 90 KB frame cap is adopted and in force.**
-`max_frame_size_bytes = 90,000` is a declared field of
-`native_game_720p60_reference` (Linux `h264_vaapi`), **nothing set in the
-environment**. The user checked the picture first — "could barely tell it
-was over the LAN", **their words, not instruments.** All ten `P6a` gates
-passed; **`PRIVYHUB_ENC_MAX_FRAME_SIZE=0` still runs uncapped** and
-`any_override` is **false when only the profile decides**. Over three
-hours (`S3`): **5.4 losses/min**, ~25x below uncapped, 0 resyncs, 0 socket
-drops, fps 59.96, both logs rotated twice with zero lost rows. **The
-residual tracks nothing** (every Spearman under 0.08) — **the loss column
-is closed at this level**. Two frames came **9-11 bytes over**: the cap
-is a target, **check with a tolerance**.
+Before that: `R3c` (the loop is the paused load), `P8` (audio holes are
+the path's, not the heartbeat or sampler).
 
-**`prolonged_starvation_events` is named** (`P7`): **one event per hole in
-the audio arrival stream longer than ~15 ms**, latched, episodes not
-polls. Rho **+0.684** against the max arrival gap, **+0.020** against
-audio loss: **jitter, not loss**. The host paces to 5.0 ms; the client
-sees a **55-60 ms hole about once every 2 s** — a path property (75.9/min
-PC → 32/min capped Opal). The only client lever is a deeper cushion at
-**+45 ms audio latency**.
+**`H2` — the host is headless: RUNTIME VALIDATED** (2026-09-22,
+`evidence/H2_HEADLESS_CUTOVER_2026-09-22.md`), checks 1-5 across **two
+plug-only boots**. Plug in X **`DisplayPort-1`** = DRM `card0-DP-2`,
+**1920x1080 @ 60.00 Hz by EDID — nothing written**; autologin desktop on
+`:0`; capture the 879x720 window; sessions S1/S2 fps 59.68/59.69, max gap
+93/184 ms; `framemd5` PTS delta 1 on all 1,799, 0 repeats in motion. adb
+after a host reboot: **`adb connect <onn-address>:5555`**. **The
+companion is still started by hand** after every boot.
 
-**`M1` reconciled the top-level docs** and found one disagreement: the
-synthetic UDP pathology **was** replayed from a Linux sender and
-reproduced — **not Windows-only** — but never on the post-`B2` topology.
-**PAUSED, and separate from the in-session loss.**
+**The 90 KB frame cap is adopted and in force** (`P6a`, profile field,
+nothing in the environment; `=0` runs uncapped; `any_override` false when
+only the profile decides). `S3`: **5.4 losses/min over three hours**, the
+residual tracks nothing — **the loss column is closed at this level**; the
+cap is a target, check with a tolerance (two frames 9-11 B over).
+Also done 09-22: `S3`, `P7`, `H2-PREP`, `M1`.
+
+`P7` named `prolonged_starvation_events` (audio arrival holes, latched);
+`M1`: the synthetic UDP pathology is PAUSED, not Windows-only.
 
 Earlier, **in full in `handoffs/CURRENT_HANDOFF.md`** — read it before
 touching the encoder or any log slicing: `P6` (the transfer function),
@@ -85,8 +87,9 @@ loss fell **7-9x** with bitrate unchanged. **Thermals (`T1`):** host
 hottest sensor 54 → 60 °C over 10 min; **the onn reports status only**.
 
 - **`R1`**: `lost_packets` includes resync jumps; **`C3.L2c`** kept.
-- **Installed now**: the `P7` build (heartbeat v3, ten audio fields), APK
-  `6d25dee0…400c`; `NativeStreamActivity` `96582702…b319c1d6`.
+- **Installed now**: the `R3c2` build (tile states; P8's passive hole
+  ring and schema `_v2` kept), APK `21e3d089…9dcb`; `NativeStreamActivity`
+  `b640e2be…dfe60`. `PRIVYHUB_HEARTBEAT_MS` unset (default 2 s).
 - **Host-shell operation**: open `MainActivity`, wake, tap RESUME PLAYING
   (`TOOLS.md`); `am start` cannot open `NativeStreamActivity`.
 - **`logs/games/native_frame_sizes.jsonl`** (`P5`/`P6`): packets and
@@ -96,34 +99,13 @@ hottest sensor 54 → 60 °C over 10 min; **the onn reports status only**.
 
 ## Next Action
 
-**`H1` is DONE** — the SSH console is up and key-only, autologin is in
-force, and X answers a bare SSH shell on `DISPLAY=:0` alone
-(`evidence/H1_VERIFY_SSH_CONSOLE_2026-09-22.md`; `TOOLS.md` has the
-console section). **`H2` — the headless cutover** is now gated on **two**
-things: the plug going in, and **the user reconnecting adb from the TV** —
-the onn is not listed, its wireless-debugging port rotated, and no
-reconnect is possible from the host, which blocks `H2` check 2.
-`D-BASE-H2_TASK.md` is rewritten from the inventory (X `DisplayPort-0` =
-DRM `card0-DP-1`, the mode line, the one write). Still true: `Linger=no`
-with nothing starting the companion at boot leaves a power cycle running
-nothing — start it by hand.
+**The user's H3 install decision** (paste-ready steps in the H3 record),
+**then thermal thresholds, then the +45 ms audio-cushion decision**
+(`P8`: the holes are the path's), then the roadmap list below.
 
-**`D-BASE-R3b` PARTLY DONE (2026-09-22)** — run by hand;
-**N3, N15, N150 all PASS** (`evidence/D_BASE_R3B_NFTABLES_LINK_DROP_2026-09-22.md`).
-`GIVE_UP_MS` and the recovery save are exercised. **N05, N15b and E30 still
-owed**, so `R3`+`R3a` are not runtime validated and `END_MS` is untouched.
-**Two post-run defects open** — the launcher cannot launch while a stopped
-stream leaves the game session live, and a recovery-state load leaves the
-picture cycling through ~4 frames
-(`evidence/R3B_POST_RUN_SESSION_REUSE_2026-09-22.md`).
-
-**Then whatever `S3` and `P7` left open**: the **~55-60 ms audio arrival
-hole** `P7` could not locate (one maximum per 2 s tick aligns with
-nothing), and **thermal thresholds**.
-
-Also open: `END_MS`; `host_link`; `B1`/`B3`; Group C; C6. Done 09-20/22:
+Also open: `host_link`; `B1`/`B3`; Group C; C6. Done 09-20/22:
 Group A; `R1`-`R5`; `P1`-`P7` incl. `P6a`; `C3.L2c`; `C5`; `C5a`;
-`S1`-`S3`; `T1`; `B2`; `O1`; `H2-PREP`; `M1`.
+`S1`-`S3`; `T1`; `B2`; `O1`; `H2-PREP`; `M1`; `H1`; `H2`; `R3`/`R3a`/`R3b`/`R3d`; `R3c`; `R3c2`; `P8`.
 
 ## Success Criteria
 
@@ -146,9 +128,10 @@ would bind and it does not. **Not resolving.*** No perceptual gate.
   IDR wait. **A1** and **A3** (x11grab not 60 fps clean): falsified on the
   wire; reopen A1 only with a production SPS/SEI differing from
   `evidence/group_a_2026-09-20/`.
-- **The host display path** (`H2-PREP`): X11/LightDM/XFCE, monitor on X
-  `DisplayPort-0` = DRM `card0-DP-1`, no `xorg.conf`, no autologin, no SSH
-  server. Re-run the inventory after the plug; do not re-derive.
+- **The host display path** (`H2-PREP`, `H2`): X11/LightDM/XFCE,
+  autologin, no `xorg.conf`; the dummy plug on X `DisplayPort-1` = DRM
+  `card0-DP-2` at 1920x1080@60 by EDID. Re-run the inventory; do not
+  re-derive. Headless does not change the capture (`H2` checks 3-4).
 - **The synthetic UDP pathology is PAUSED, not Windows-only** (`M1`, from
   `DEFERRED.md`): it reproduced from a Linux sender, but never on the
   post-`B2` topology. Separate from the in-session loss.
@@ -184,7 +167,8 @@ in `evidence/RUNTIME_VALIDATION.md`.
 
 - **2026-09-22** — `D_BASE_P6A_CAP_ADOPTED` (decision of the same name),
   `D_BASE_S3_CAP_SOAK`, `D_BASE_P7_STARVATION_COUNTER`,
-  `H2_PREP_HOST_DISPLAY_INVENTORY`; `../CHECKPOINT_PROPOSAL_2026-09-22.md`.
+  `H2_PREP_HOST_DISPLAY_INVENTORY`, `H1_VERIFY_SSH_CONSOLE`,
+  `H2_HEADLESS_CUTOVER`; `../CHECKPOINT_PROPOSAL_2026-09-22.md`.
 - **2026-09-21** — `D_BASE_P6_FRAME_TAIL_CONTROL` (the arms, the knee,
   the quality caveat), `D_BASE_P5_WHICH_QUEUE`, `O1_OPAL_AIR_VIEW` (this
   AP's three counter traps), `D_BASE_R5_HEARTBEAT_LOSS_COUNTERS`,

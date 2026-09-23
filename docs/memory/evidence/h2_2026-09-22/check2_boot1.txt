@@ -1,0 +1,51 @@
+===== when =====
+2026-09-22T21:55:52Z
+ 17:55:52 up 13 min,  2 users,  load average: 0.53, 0.85, 0.55
+-2 Tue 2026-09-22 10:51:19 EDT
+-1 Tue 2026-09-22 10:55:21 EDT
+0 Tue 2026-09-22 17:42:50 EDT
+===== session (must be x11 / lightdm-autologin / active, not the greeter) =====
+--- session 1
+Display=:0
+Service=lightdm-autologin
+Desktop=xfce
+Type=x11
+State=active
+--- session 2
+Display=
+Service=systemd-user
+Desktop=
+Type=unspecified
+State=active
+--- session 3
+Display=
+Service=sshd
+Desktop=
+Type=tty
+State=active
+      1 light-locker
+      1 xfce4-session
+===== display (must be DisplayPort-1 1920x1080 60.00*+) =====
+DisplayPort-0 disconnected (normal left inverted right x axis y axis)
+DisplayPort-1 connected 1920x1080+0+0 (normal left inverted right x axis y axis) 480mm x 270mm
+   1920x1080     60.00*+  59.94  
+DisplayPort-2 disconnected (normal left inverted right x axis y axis)
+card0-DP-1 disconnected
+card0-DP-2 connected
+card0-DP-3 disconnected
+  timeout:  0    cycle:  600
+  DPMS is Disabled
+===== adb =====
+cmd: adb connect <onn-address>:5555
+already connected to <redacted>
+List of devices attached
+<redacted>	device
+
+===== companion =====
+companion pid 4678 (pre-existing: 4678)
+DISPLAY=:0
+LISTEN <redacted> users:(("python3",pid=4678,fd=4))
+capture_backend x11grab_window
+max_frame_size_bytes 90000 source profile any_override False
+===== tmux =====
+error connecting to /tmp/tmux-1000/default (No such file or directory)

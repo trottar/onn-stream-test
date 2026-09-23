@@ -1,81 +1,8 @@
 <!-- PRIVYHUB_C3_LINUX_ACTUATOR:BEGIN -->
 ## C3 Linux actuator boundary and classification — durable facts
 
-`C3.L0`/`C3.L2`/`C3.L2b`/`C3.L3`/`C3.L3a`, 2026-09-18/19. **Phase C is
-SUSPENDED**; this is where it was left. Full map:
-`investigations/C3_LINUX_ACTUATOR_BOUNDARY.md`; authoritative decision:
-`decisions/C3-L2_LINUX_ACTUATOR_CLASSIFICATION.md`.
+Moved verbatim to `history/MEMORY_SECTIONS_MOVED_2026-09-23.md` (Phase C is SUSPENDED; `CURRENT.md` "Do Not Reopen" keeps the classification: Linux is `video_only_restart`, not authorized for automatic adaptation during play).
 
-**No live bitrate actuator exists on Linux, and the architecture
-forecloses one.** The encoder is an external FFmpeg CLI (`-nostdin`,
-`stdin=DEVNULL`), bitrate baked into argv at `Popen`; no control socket,
-no in-process handle. `live_bitrate_reconfigure` needs an architecture
-change, not a patch. **Linux video topology is single-process** (x11grab
-is an input format where Windows uses a WGC bridge), so Windows actuator
-interruption figures are **not** portable, and **`_start_linux_locked` is
-not an actuator**: it calls `_stop_locked()`, stopping the FEC relay,
-session I/O and host telemetry too.
-
-**Resolution and FPS are client-pinned, not negotiated.**
-`NativeStreamActivity` holds `VIDEO_WIDTH`/`HEIGHT`/`FPS` as compile-time
-constants; `AvcLowLatencyDecoder` configures MediaCodec once, never
-derives dimensions from the in-band SPS, and ignores
-`INFO_OUTPUT_FORMAT_CHANGED`, so host and client can silently diverge.
-GOP is in frames, so an FPS change rescales the keyframe interval.
-
-**Linux is `video_only_restart`.** **Authorized:** session start and
-start-time profile selection before `READY`; manual and loopback-only
-diagnostic changes; fallback and recovery; `C3.L3` characterization.
-**Not authorized:** automatic adaptation during `PLAYING` — a controller
-fires under pressure, when delivery is already degraded, and repeatedly,
-against a standing preference to minimize perceptible artifacts. *(Its
-original "~290 ms discontinuity" figure is falsified; the
-frequency-and-timing argument stands.)* **The gate for `C3.L4` is
-`C3.L3a`, not `C3.L2a`**: repeated, unannounced, under-pressure
-transitions with a no-op control interval, the player's marks compared
-against `stream_discontinuities` **after** the session, plus a judgement
-of the picture.
-
-**Chained ladder transitions work.** Several in one session, either
-direction, between `(5000, 5500, 6000, 7000)` kbps; six ran clean. Use
-`run_c3_linux_validated_bitrate_transition`; the `C3.L3` path still
-requires a 7000 start and cannot target 7000. **The actuator's first IDR
-is accepted fast, on seven observations**: 18-65 ms plus 27 ms from
-`C3.L2a` E2, all AU-complete, none FEC-repaired; discontinuities typed
-`ssrc_change` with `jump_packets` 0 — an encoder restart does not disturb
-the RTP sequence; ~1.17 s per transition. **A fresh encoder process
-already starts with a keyframe**, and **the 287-318 ms figure from
-`C3.L1` was never actuator cost**. **`max_resync_to_idr_ms` and
-`packets_dropped_waiting_for_idr` are whole-session values.**
-
-**6000 kbps is the most consistent characterized level** —
-`decoder_max_output_gap_ms` 331/291/307, a 40 ms band, against 125 and
-365 ms at 5000 and 5500. Every figure is transport and decoder timing:
-**no perceptual quality was measured**, so no bitrate is a fallback level
-on this data, and **the Windows 5500/6000/7000 ladder is evidence, not a
-Linux constant** (D-071).
-
-**FEC group size is the only in-place seam** (the header carries the real
-group length, the receiver validates 1 to 8; mutation needs no restart,
-SSRC change, resync or IDR wait). **C4 owns adaptive FEC; C3 does not
-actuate it.** Diagnostic actuators exist and are unowned:
-`PRIVYHUB_FEC_PACING_US` (`P3`) and `PRIVYHUB_ENC_BUFSIZE_K` (`P6`), both
-default off; `PRIVYHUB_ENC_MAX_FRAME_SIZE` now **overrides an adopted
-profile default** rather than enabling anything.
-
-**Decoder-report retention** (`C3.L2b`). The report retains **two
-slow-event segments, not one ring**: `_marked` (64) for events recorded
-while a cycle window was open, `_recent` (64) for ordinary play, merged by
-`elapsed_ms`. **A cycle window opens on every SSRC change and sequence
-resync for 2000 ms** — a judgment call, not runtime-validated.
-**`stream_discontinuities`** gives `elapsed_ms`, `type` and
-`jump_packets`; **`first_idr_after_discontinuity`** is a **parallel array
-joined by index**. **Both bounded to 64** (`S2` had 95), and neither
-covers the session-start IDR. **`au_fec_unrecoverable_group` does not
-cover `trimFecGroups`'s capacity eviction** (>96 groups) — an accepted gap
-that can only under-report. One thing from the superseded design holds:
-**the diagnostic bundle's native video section is the last 500 lines**, so
-a missing restart banner is not evidence that none happened.
 <!-- PRIVYHUB_C3_LINUX_ACTUATOR:END -->
 
 <!-- PRIVYHUB_BASELINE_STREAM_HEALTH:BEGIN -->
@@ -159,7 +86,8 @@ a toggle and a raw send can invert the confirmed state. Constants:
 `recovering_ms` 4,713-78,355, `PAUSED_SAVED` never reached, one
 `method: "restart"` succeeding while the fault was live. **A bad enough
 link starves the client->host controller channel too.** **Still
-unexercised: `GIVE_UP_MS`, `END_MS`, the recovery save**; `R3b` is owed.
+unexercised: `GIVE_UP_MS`, `END_MS`, the recovery save** — all three
+exercised since (`R3b`, `R3d`); the five-run set is complete.
 
 **The recovery save is its own file, not a slot** —
 `<stem>.state.recovery`; **RetroArch's `sort_savestates` puts states under
@@ -173,6 +101,17 @@ two fresh rising heartbeats, logging `age_pair_ms`. **The gate's resume
 floor is 2.0 s from when video returns**, and `_kill_managed_process` waits
 5 s on `SIGTERM` — ~12 s per restart attempt against a SIGSTOPped encoder,
 distorting any "time to resume" measured that way.
+
+**Rule (user, 2026-09-22): a recovery state never loads into a live core**
+— Resume a live session with no load; prompt only when none is live
+(`decisions/D-BASE-R3C_RECOVERY_NEVER_INTO_LIVE_CORE.md`). **A mid-FMV
+recovery save loops when loaded into a paused core — fresh or not — and
+plays loaded into a running one (`R3c`)**, so **resume-from-recovery =
+launch fresh → unpause → `LOAD_STATE_SLOT 0` into the running core →
+pause for the handoff → delete the recovery files** (the user's option A,
+`R3c2`, RUNTIME VALIDATED 2026-09-23). The paused `load_recovery_state`
+and the player Save/Load path are unchanged.
+**`save_state_probe.txt` is reset at every launch.**
 
 <!-- PRIVYHUB_D_BASE_R3_LINK_DROP_RECOVERY:END -->
 
@@ -293,29 +232,8 @@ series.
 <!-- PRIVYHUB_C5A_STALLED_ENCODER_NO_SEQUENCE_GAP:BEGIN -->
 ## A stalled encoder makes no sequence gap — FALSIFIED as written
 
-`C5a`, **amended the same day by `D-BASE-B2`**, 2026-09-21. Records:
-`evidence/C5A_IDR_REJECTION_COUNT_2026-09-21.md`,
-`B2_HOST_ON_OPAL_2026-09-21.md`.
+Moved verbatim to `history/MEMORY_SECTIONS_MOVED_2026-09-23.md` (`B2` falsified the universal claim; the per-run record is `evidence/B2_HOST_ON_OPAL_2026-09-21.md`).
 
-**The rule said** a SIGSTOP of the encoder cannot produce a sequence resync
-at any pulse short of a restart. **A 3 s stall gave a 690-packet
-`sequence_resync` with `restarts` 0 and `ssrc_changes` 0**, off a resume
-burst of 2,587 packets against a steady ~1,650. **The packets were minted
-and dropped on that burst**: the boundary is the burst's size, and **a long
-enough stall produces real loss, not only silence.**
-
-**What survives:** a *stopped* encoder burns no sequence numbers, which
-is what `C5a` measured with **0.3 s** pulses — too small a resume burst to
-overflow anything, so the gap is in **time**, not **sequence**. **A short
-pulse is a silence injection, not a loss injection.** Consequently
-**`R3a`'s 720/984/480-packet jumps are unattributed**, and **the nftables
-plan remains the only injection that drops packets on the wire by
-construction.**
-
-**The `C5a` counters** (`idr_aus_rejected_waiting_for_idr`,
-`non_idr_aus_dropped_waiting_for_idr`, and the per-discontinuity
-`rejected_idr_aus`/`dropped_non_idr_aus`) cannot fire at session start —
-the encoder starts *with* the client — only after a resync.
 <!-- PRIVYHUB_C5A_STALLED_ENCODER_NO_SEQUENCE_GAP:END -->
 
 <!-- PRIVYHUB_C5_COMPLETENESS_GATE_FALSIFIED:BEGIN -->
@@ -483,31 +401,8 @@ relay's frame counting **0.36 us per packet**.
 <!-- PRIVYHUB_P3_SENDER_PACING:BEGIN -->
 ## Sender pacing is not the loss lever at 150-400 us — durable fact
 
-`D-BASE-P3`, 2026-09-21. Records:
-`evidence/D_BASE_P3_SENDER_PACING_2026-09-21.md`,
-`patches/D-BASE-P3_FEC_RELAY_SENDER_PACING.md`.
+Moved verbatim to `history/MEMORY_SECTIONS_MOVED_2026-09-23.md`; the fact stands (`P3`: pacing is closed by measurement; the loss is the frame-size tail, `P6`).
 
-**The relay can pace and does not by default** (`PRIVYHUB_FEC_PACING_US`,
-environment, read at relay `start()`; off is byte-for-byte the old path).
-**`time.sleep` cannot pace this stack** — a ~55 us overshoot floor, so
-`sleep(150 us)` returns after 205; a busy-wait on `perf_counter_ns` lands
-at 150.1 us p50.
-
-**Fifteen 120 s sessions, strictly alternating, 0 rejected: mixed, not
-adopted.** Loss/min fell in **3 of 5** pairs, medians **1.72x** where the
-bar was 4 of 5 and 2x, while **`spike_20_ms`/min rose in 5 of 5, +41 %**.
-Packets per gap fell in 4 of 5 and max forward gap halved, 16 -> 8. At
-400 us spacing reaches only **187.5 us**: **it does not scale.**
-
-**Two things bound that null.** The 8 ms budget clamps spacing above **53
-packets/frame** at 150 us against a mean frame of 15.85 — **the large
-frames a queue-overflow account blames are exactly the ones it refuses to
-spread**, which is why `P6` succeeded where this did not. And the off arm
-swung **1.8-35.2 loss/min inside one hour**: episodic loss, badly sampled.
-
-**The onn asks for a 2 MiB receive buffer and never reads back what it
-got** (`RtpH264Receiver.kt:573`); `rmem_max` is 8 MiB, so nothing clamps
-it.
 <!-- PRIVYHUB_P3_SENDER_PACING:END -->
 
 <!-- PRIVYHUB_B2_TOPOLOGY:BEGIN -->
@@ -544,10 +439,27 @@ authorises the project user through `SI:localuser:privyhub`, so no
 `XAUTHORITY` is required. Still true: **`Linger=no`, nothing at boot** —
 a reboot kills tmux and starts no companion.
 
-**adb cannot be recovered from the host.** Wireless only, no USB path; the
-onn's wireless-debugging port is ephemeral and rotates on every restart,
-so stored endpoints give `Connection refused` and mDNS discovery is empty.
-The port is readable only on the TV. This gates `H2` check 2.
+**The host is headless behind a DisplayPort dummy plug** (`H2`,
+2026-09-22; `evidence/H2_HEADLESS_CUTOVER_2026-09-22.md`): X
+**`DisplayPort-1`** = DRM **`card0-DP-2`** (not the monitor's port), at
+**1920x1080 @ 60.00 Hz by the plug's own EDID** — no X config written.
+**Capture verified without a monitor**: the same 879x720 RetroArch window
+(`-window_id`, never the screen), 60 fps, x11grab PTS delta 1 on every
+interval, 0 repeated frames in motion, session numbers inside the
+monitor-attached `B2` range. Headless changes the desktop, not the
+capture. **RUNTIME VALIDATED across two plug-only boots**: an unattended
+power cycle comes back to the autologin desktop at 1080p60 with adb
+recoverable from the host — but **nothing starts the companion at boot**
+yet: `H3` (2026-09-23) designed a systemd **user** unit on
+`default.target` (XFCE never activates `graphical-session.target`),
+`DISPLAY=:0`, a bounded wait for X, **`KillSignal=SIGINT`** (the companion
+shuts down cleanly only on SIGINT; SIGTERM orphans a game) — **not
+installed**, the user's call.
+
+**adb after a host reboot is recovered from the host**:
+`adb connect <onn-address>:5555`, because the user pinned the listener
+with `adb tcpip 5555`. Wireless only, no USB path. A **TV** power cycle
+can undo the pin, and then the port is readable only on the TV (`H1` §5).
 <!-- PRIVYHUB_B2_TOPOLOGY:END -->
 
 <!-- PRIVYHUB_R3B_REAL_LOSS:BEGIN -->
@@ -571,8 +483,11 @@ Pause at 1.27-1.44 s after the drop; give-up at **120.42 s** against
 120,000 ms; backoff 5/10/20/30/30 s; `.state.recovery` written, never a
 slot. N15 reached the case no substitute fault could: an encoder restart
 that **succeeded 9.45 s before the rule was deleted**, while every packet
-was still being dropped. **But N05, N15b and E30 did not run, so `R3`+`R3a`
-are NOT runtime validated and `END_MS` has still never fired.**
+was still being dropped. **`R3d` (hand runs, 2026-09-22): N15b PASS
+(repeat of N15, resume 3.60 s after the clear); E30 PASS — `END_MS`
+RUNTIME VALIDATED (`PAUSED_SAVED` → `ENDED` 1,801.4 s, clean shutdown);
+N05 PASS on 2026-09-23 (0.556 s hole, no pause, one 423-packet
+resync, max gap 625 ms) — **`R3`+`R3a` RUNTIME VALIDATED for real loss.****
 
 **`C5` cannot be tested by a clean link drop.** All three resyncs returned
 to an IDR in **40-75 ms**, nowhere near the 250 ms threshold, and
@@ -642,6 +557,17 @@ never the bursty stream. **Read it as a path-jitter rate, not a fault**:
 lever is a deeper cushion — **3 packets (15 ms)** against a p90 hole of
 **60 ms**, about **+45 ms of audio latency**; sender pacing is closed by
 measurement.
+
+**The hole's origin is the path, not the client's 2 s senders** (`P8`,
+2026-09-22, replacing "`P7` could not locate it"): per-hole timestamps
+over three 20-min sessions — **~158 holes > 15 ms and ~100 ≥ 40 ms per
+minute**, half of them 50-60 ms; only **5.7-6.6 %** start within 100 ms
+of a heartbeat send (uniform 5 %); removing the adb socket sampler moved
+the rate **-1 %**, a 10 s heartbeat **-11 %**. "Once every 2 s" was the
+latched counter's episode rate, not the hole rate. A send costs ~1 % of
+holes within 50 ms — nothing more. **The AP's per-station scheduling is
+the remaining candidate, unmeasured.** The socket sampler is safe during
+audio measurements.
 
 **Nothing reorders, ever.** `late_or_reordered_packets` is **0** across
 11 M packets on the PC path including a half-hour losing 389/min, and 0 on

@@ -85,6 +85,11 @@ longer sections below expand the three that changed the product.
 | item | classification | record (`evidence/`) |
 | --- | --- | --- |
 | `H2-PREP` host display/session/boot inventory | INVENTORY RECORDED — read-only, nothing changed | `H2_PREP_HOST_DISPLAY_INVENTORY_2026-09-22.md` |
+| `H2` headless cutover behind the DisplayPort dummy plug | RUNTIME VALIDATED — checks 1-5 PASS across two plug-only boots; capture unchanged (879x720 window, 60 fps); companion started by hand | `H2_HEADLESS_CUTOVER_2026-09-22.md` |
+| `D-BASE-R3c` recovery load in a fresh core (Part 1 probe) | CHARACTERIZED — mid-FMV save loops loaded paused, fresh core or not; plays loaded running; gameplay state loaded paused plays. Fix INDETERMINATE, not implemented (user decision) | `D_BASE_R3C_RECOVERY_SEMANTICS_2026-09-22.md` |
+| `D-BASE-R3c2` recovery flow (never into a live core; option A running-core load) | **RUNTIME VALIDATED** — checks 0-6 PASS (fresh running load plays 607 distinct; Resume tile same pid; prompt only without a live session; discard, copy-to-slot, cross-title; gameplay save 1,630 distinct) | `D_BASE_R3C2_RECOVERY_FLOW_2026-09-23.md` |
+| `H3` companion autostart | DESIGN RECORDED — not installed (systemd user unit on `default.target`, `KillSignal=SIGINT`; user install pending) | `H3_COMPANION_AUTOSTART_DESIGN_2026-09-23.md` |
+| `D-BASE-P8` audio arrival-hole origin | CHARACTERIZED — not the heartbeat, not the adb sampler; the path's. Diagnostic build v2 installed | `D_BASE_P8_AUDIO_HOLE_ORIGIN_2026-09-22.md` |
 | `P7` audio heartbeat counters | RUNTIME VALIDATED (instrument) / **CHARACTERIZED** (the counter) | `D_BASE_P7_STARVATION_COUNTER_2026-09-22.md` |
 | `S3` three hours on the adopted cap | **SOAK VALIDATED** | `D_BASE_S3_CAP_SOAK_2026-09-22.md` |
 | `P6a` the 90 KB cap as profile default | **RUNTIME VALIDATED** | `D_BASE_P6A_CAP_ADOPTED_2026-09-22.md` |
@@ -104,9 +109,10 @@ longer sections below expand the three that changed the product.
 | `P2` audio underrun burst | CHARACTERIZED — 98.7 % in the first 3 s; read the total, not a rate | `D_BASE_P2_AUDIO_UNDERRUN_BURST_2026-09-20.md` |
 | `P1` stale-output threshold at 60/90/120/200 ms | MEASURED — **nothing changed**, the default stays 60 | `D_BASE_P1_STALE_THRESHOLD_2026-09-20.md` |
 | `R4` terminal-stall report fields | RUNTIME VALIDATED | `D_BASE_R4_REPORT_VISIBILITY_2026-09-20.md` |
-| `R3a` restart fallback + trigger freshness | RUNTIME VALIDATED | `D_BASE_R3A_RESTART_FALLBACK_2026-09-20.md` |
-| `R3b` nftables link drop, real loss | **N3 / N15 / N150 PASS**; N05, N15b, E30 **NOT RUN**, so the set is incomplete | `D_BASE_R3B_NFTABLES_LINK_DROP_2026-09-22.md` |
-| `R3` link-drop self-recovery | RUNTIME VALIDATED **for the substitute fault**; `R3b` ran 3 of 5 required runs, so **still NOT validated for real loss** | `D_BASE_R3_LINK_DROP_RECOVERY_2026-09-20.md` |
+| `R3a` restart fallback + trigger freshness | RUNTIME VALIDATED — for real loss too since `R3d` (the five nftables runs) | `D_BASE_R3A_RESTART_FALLBACK_2026-09-20.md` |
+| `R3b` nftables link drop, real loss | **N05 / N3 / N15 / N15b / N150 all PASS** (N15b and N05 by hand, `R3d`); **E30 PASS** — the set is complete | `D_BASE_R3B_NFTABLES_LINK_DROP_2026-09-22.md`, `D_BASE_R3D_HAND_RUNS_2026-09-22.md` |
+| `END_MS` graceful end after link loss | **RUNTIME VALIDATED** (`R3d` E30: `PAUSED_SAVED` → `ENDED` 1,801.4 s against 1,800 ± 5; clean RetroArch shutdown; prompt then Discard before the next launch; the recovery file's SHA-256 not captured — recording gap) | `D_BASE_R3D_HAND_RUNS_2026-09-22.md` |
+| `R3` link-drop self-recovery | RUNTIME VALIDATED **for the substitute fault**; **RUNTIME VALIDATED for real loss** since `R3d` (2026-09-23: N05, N3, N15, N15b, N150 all PASS) | `D_BASE_R3_LINK_DROP_RECOVERY_2026-09-20.md` |
 | `R2` terminal-stall visibility | RUNTIME VALIDATED | `D_BASE_R2_STALL_VISIBILITY_2026-09-20.md` |
 | `R1` resync jumps counted in `lost_packets` | RUNTIME VALIDATED | `D_BASE_R1_RESYNC_LOSS_COUNTER_RUNTIME_2026-09-20.md` |
 | Group A host-side diagnostic audit | **A1 and A3 FALSIFIED on the wire** | `GROUP_A_DIAGNOSTIC_AUDIT_2026-09-20.md` |
@@ -119,6 +125,11 @@ drove `r3b_run.sh`): **N3, N15 and N150 all PASS**, and `GIVE_UP_MS` with its
 recovery save is now exercised. **N05, N15b and E30 were not run**, so `R3` +
 `R3a` do not reach RUNTIME VALIDATED. Two post-run defects are open
 (`R3B_POST_RUN_SESSION_REUSE_2026-09-22.md`).
+**Superseded again 2026-09-23 (Cowork verification note):** N15b and E30 ran
+by hand on 2026-09-22 and N05 on 2026-09-23 (`D_BASE_R3D_HAND_RUNS_2026-09-22.md`);
+all PASS, so `R3` + `R3a` are RUNTIME VALIDATED for real loss and `END_MS`
+is RUNTIME VALIDATED — the table rows above are authoritative, this
+paragraph is history. Both post-run defects are closed by `R3c2`.
 
 ## 2026-09-21 — `D-BASE-P2a` audio startup hold: DEVELOPMENT, not reverted
 

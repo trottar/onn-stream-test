@@ -1,0 +1,51 @@
+[A] sampler=on heartbeat_ms=default
+[A] env: MAX_FRAME_SIZE=unset BUFSIZE_K=unset BYTE_CAP=unset
+[A] env | grep PRIVYHUB_ENC ->
+    (nothing, as the validating run requires)
+[A] companion 60728 serving
+[A] encoder argv: ... 7000k -bufsize 7000k -max_frame_size 90000 -g 15 -bf 0 -payload_type 96 -f rtp rtp://127.0.0.1:48110?pkt_size=1200
+[A] overrides: max_frame_size=90000 bufsize_kbits=None
+[A] relay byte cap under test: None
+[A] any_override False max_frame_size 90000 profile
+[A] PLAYING at 2026-09-23T00:14:14Z; holding 1200s, zero input
+[A] adb client processes seen during hold: 138 (# polls 2315)
+[A] report: native_decoder_20260923_003415_654.json
+[frames] 1201 seconds in the session window
+[heartbeat] 598 lines
+[A] socket rounds: 632
+[A] done
+[B] sampler=off heartbeat_ms=default
+[B] env: MAX_FRAME_SIZE=unset BUFSIZE_K=unset BYTE_CAP=unset
+[B] env | grep PRIVYHUB_ENC ->
+    (nothing, as the validating run requires)
+[B] companion 77249 serving
+[B] encoder argv: ... 7000k -bufsize 7000k -max_frame_size 90000 -g 15 -bf 0 -payload_type 96 -f rtp rtp://127.0.0.1:48110?pkt_size=1200
+[B] overrides: max_frame_size=90000 bufsize_kbits=None
+[B] relay byte cap under test: None
+[B] any_override False max_frame_size 90000 profile
+[B] PLAYING at 2026-09-23T00:35:24Z; holding 1200s, zero input
+[B] adb client processes seen during hold: 0 (# polls 2316)
+[B] report: native_decoder_20260923_005525_894.json
+[frames] 1201 seconds in the session window
+[heartbeat] 597 lines
+[B] socket rounds: 0
+[B] done
+[C] sampler=off heartbeat_ms=10000
+[C] env: MAX_FRAME_SIZE=unset BUFSIZE_K=unset BYTE_CAP=unset
+[C] env | grep PRIVYHUB_ENC ->
+    (nothing, as the validating run requires)
+[C] companion 90794 serving
+[C] encoder argv: ... 7000k -bufsize 7000k -max_frame_size 90000 -g 15 -bf 0 -payload_type 96 -f rtp rtp://127.0.0.1:48110?pkt_size=1200
+[C] overrides: max_frame_size=90000 bufsize_kbits=None
+[C] relay byte cap under test: None
+[C] any_override False max_frame_size 90000 profile
+[C] PLAYING at 2026-09-23T00:56:35Z; holding 1200s, zero input
+[C] adb client processes seen during hold: 0 (# polls 2315)
+[C] report: native_decoder_20260923_011637_296.json
+[frames] 1201 seconds in the session window
+[heartbeat] 120 lines
+[C] socket rounds: 0
+[C] done
+[restore] companion 103827; PRIVYHUB_HEARTBEAT_MS in environ: 0
+[restore] status active False
+[all] done
