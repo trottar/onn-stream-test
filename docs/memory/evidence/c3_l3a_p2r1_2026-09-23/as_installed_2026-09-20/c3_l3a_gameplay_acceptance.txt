@@ -1,0 +1,75 @@
+PrivyHub C3.L3a gameplay acceptance probe
+Generated: 2026-09-20T01:11:48-0400
+Classification: C3_L3A_GAMEPLAY_ACCEPTANCE_RECORDED
+Production files modified by probe: NONE
+Network addresses collected/logged: NONE
+=== RUN ===
+Run id: 20260920_010023
+Seed: 857553307
+Aborted: no
+Window (s): 2.5
+Ramp rung gap (s): 4.0
+
+=== DETECTION - the gate question ===
+Binary per sequence: was this event marked at all.
+Decoys fire nothing; their rate is the false-alarm baseline.
+
+  shape  events  marked  rate       total marks
+  -----  ------  ------  ---------  -----------
+  jump        4       0  0/4 (0%)             0
+  ramp        4       0  0/4 (0%)             0
+  decoy       8       1  1/8 (12%)            1
+
+Marks attributed to nothing: 14
+Marks total: 15
+
+NO THRESHOLD IS ENCODED. Read the table; the judgement is yours.
+
+=== PICTURE QUALITY - announced, separate question ===
+  kbps  acceptable  rating 1-5
+  ----  ----------  ----------
+  6000  False                5
+  5500  False                3
+  5000  False                2
+
+=== C3.L4 READINESS ===
+What an automatic controller would need, and whether it is known.
+
+jump cycles measured: 4
+  jump spawn_ms: {'n': 4, 'min': 166.416, 'median': 365.533, 'max': 516.739, 'p95': 516.739}
+  jump first_rtp_resume_ms: {'n': 4, 'min': 318.667, 'median': 522.691, 'max': 679.324, 'p95': 679.324}
+  jump host_verified_ms: {'n': 4, 'min': 1071.179, 'median': 1275.543, 'max': 1431.654, 'p95': 1431.654}
+ramp cycles measured: 12
+  ramp spawn_ms: {'n': 12, 'min': 66.269, 'median': 265.799, 'max': 416.32, 'p95': 416.32}
+  ramp first_rtp_resume_ms: {'n': 12, 'min': 227.761, 'median': 418.616, 'max': 567.921, 'p95': 567.921}
+  ramp host_verified_ms: {'n': 12, 'min': 981.238, 'median': 1171.736, 'max': 1320.516, 'p95': 1320.516}
+
+Telemetry settling after a sequence (s): {'n': 0}
+Sequences that never settled in budget: 8
+  -> a controller MUST NOT sample telemetry inside the settling window;
+     inside it, it is measuring the restart, not the network.
+
+Cumulative lifecycle over the whole session: {'fec_send_errors_delta': 0, 'audio_send_errors_delta': 0, 'controller_bad_packets_delta': 0}
+  -> all three must be 0. Non-zero means repeated transitions
+     degrade a subsystem that a single transition does not.
+
+Minimum rung spacing exercised (s): 4.0
+Transitions in one session: 16
+
+=== CLIENT DECODER SESSION ===
+No new decoder session found.
+Run --finalize again once the client has posted one.
+
+=== CONDITIONS ===
+before: {'audio_send_errors': 0, 'controller_bad_packets': 0, 'controller_lost_packets': 287, 'fec_rtp_packets': 24521, 'fec_send_errors': 0, 'fec_skipped_packets': 0}
+after: {'audio_send_errors': 0, 'controller_bad_packets': 0, 'controller_lost_packets': 498, 'fec_rtp_packets': 408942, 'fec_send_errors': 0, 'fec_skipped_packets': 8}
+
+Transport conditions are not constant between sessions.
+Do not compare gap figures across runs without comparing these.
+
+=== WHAT THIS DOES NOT ESTABLISH ===
+- Whether C3.L4 is authorized. That is a human judgement on
+  the detection table and the picture ratings above.
+- Any controller policy: thresholds, hysteresis, sample cadence.
+- Behaviour under real network pressure. Every transition here
+  fired from a schedule, not from a degraded condition.

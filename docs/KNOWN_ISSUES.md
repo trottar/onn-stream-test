@@ -849,6 +849,25 @@ resource/transport characterization unless the issue becomes a blocker sooner.
 
 Full record: `investigations/2026-09-07-udp-transport.md`.
 
+<!-- PRIVYHUB_CONTROLLER_LOST_PACKETS_UNDER_PLAY:KNOWN_ISSUES:BEGIN -->
+## 2026-09-24 controller transport `lost_packets` under real play — observed, not investigated
+
+- **The controller transport's `lost_packets` rose 76 → 3,177 in ~9 min of
+  real play** (the `C3.L3a` smoke session, run `20260924_000330`, preflight
+  to state write): **~345 / min**, against ~23 / min on the 2026-09-20
+  `C3.L3a` session (287 → 498 over a similar span). `bad_packets` stayed 0,
+  and the user reported nothing wrong with input. The counter is a
+  sequence-gap count on the client's input datagrams
+  (`companion/native_session_io.py`: each jump in the 32-bit sequence adds
+  the missing count). **It has never been read under play in the `D-BASE`
+  era**: every `D-BASE` session was an attract-mode hold with zero input,
+  so there is no baseline for it on the adopted build. Cause not
+  investigated; whether this is loss, or the client skipping sequence
+  numbers by design, is not known. Status: **open, observed not
+  investigated.** Record:
+  `docs/memory/evidence/C3_L3A_P2R2_SMOKE_SESSION_2026-09-24.md`.
+<!-- PRIVYHUB_CONTROLLER_LOST_PACKETS_UNDER_PLAY:KNOWN_ISSUES:END -->
+
 ## 2026-09-23 — open after the `D-BASE` close-out (baseline MET)
 
 `D-BASE` is closed (`docs/memory/evidence/D_BASE_CLOSEOUT_2026-09-23.md`).

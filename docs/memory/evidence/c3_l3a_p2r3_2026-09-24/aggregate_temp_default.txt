@@ -1,0 +1,29 @@
+PrivyHub C3.L3a gameplay acceptance probe - pooled
+Generated: 2026-09-24T01:27:33-0400
+Classification: C3_L3A_GAMEPLAY_ACCEPTANCE_RECORDED
+Production files modified by probe: NONE
+Network addresses collected/logged: NONE
+=== POOL ===
+Pooled only if state schema is privyhub_c3_l3a_gameplay_acceptance_v2 and config is the pre-registration:
+  traversals 10, dwell_min_s 55, dwell_max_s 90, window_s 5, ramp_gap_s 4, park_seconds 45
+Run files found: 2
+Pooled: 0
+Skipped: 2
+
+POOLED:
+  (none)
+
+SKIPPED:
+  20260920_010023.json: state schema 'privyhub_c3_l3a_gameplay_acceptance_v1', not privyhub_c3_l3a_gameplay_acceptance_v2; traversals 8 (pre-registered 10); dwell_min_s 30.0 (pre-registered 55); dwell_max_s 75.0 (pre-registered 90); window_s 2.5 (pre-registered 5)
+  20260924_000330.json: traversals 2 (pre-registered 10); dwell_min_s 40.0 (pre-registered 55); dwell_max_s 50.0 (pre-registered 90)
+
+Nothing pooled: no pre-registered run has been finalized.
+
+=== WHAT THIS DOES NOT ESTABLISH ===
+- Whether C3.L4 is authorized. That is a human judgement on
+  the detection table and the picture ratings above.
+- Anything at n = one run. Compare marked classes against the
+  chance-expected marks and against each other; pool runs.
+- Any controller policy: thresholds, hysteresis, sample cadence.
+- Behaviour under real network pressure. Every transition here
+  fired from a schedule, not from a degraded condition.

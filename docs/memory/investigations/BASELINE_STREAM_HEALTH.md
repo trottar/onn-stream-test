@@ -405,17 +405,21 @@ rather than by attrition.
 
 ## Suspended, not failed
 
-- `C3.L4` automatic controller — suspended. Its gate (`C3.L3a` Part 2) is not
-  the blocker; the premise is.
-- `C3.L3a` Part 2 — suspended. The probe is installed and carries three known
-  defects from its first run: the mark-association window anchors on sequence
-  start so ramps close their window before finishing; the telemetry field
-  paths were taken from a probe's output artifact rather than the endpoint, so
-  settling was never measured; and the picture rating used an unanchored 1-5
-  scale that silently rescaled 1-10 answers. Fix these before any rerun. The
-  2026-09-20 session's raw marks and per-cycle timings are retained in
-  `logs/streaming/c3_l3a_gameplay_acceptance_state.json` and can be re-scored
-  without replaying.
+- `C3.L4` automatic controller — suspended 2026-09-20; resumed with Phase C
+  2026-09-23 and **BLOCKED on its gate** (`C3.L3a` Part 2), which is not yet
+  answered.
+- `C3.L3a` Part 2 — suspended 2026-09-20 with three known probe defects.
+  **Probe fixed 2026-09-23 (`C3-L3A-P2R1`)** — those three (window anchored
+  on sequence start; telemetry paths from a probe artifact, so settling was
+  never measured; unanchored 1-5 rating) plus two found on re-reading it
+  (SSRC cross-check ignored parks and restores and took the newest decoder
+  file; the gate's requirement 4, marks on the decoder's clock, was never
+  performed). The retained 2026-09-20 session was **re-scored without
+  replaying**: it cannot separate any shape from the decoys at any window —
+  the re-score corrects the record and does not answer the gate. **Rerun
+  pre-registered, not run** (primary W 5.0 s, 10 traversals, 55-90 s dwell,
+  ≥ 4 sessions to ≥ 20 per shape, anchored 1-10 rating, on the adopted build).
+  Record: `../evidence/C3_L3A_P2R1_PROBE_DEFECTS_AND_RESCORE_2026-09-23.md`.
 - Phase C's completed items stand. The Linux actuator is real and correct.
 
 ## Privacy

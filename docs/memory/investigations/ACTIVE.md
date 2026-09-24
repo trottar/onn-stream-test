@@ -4,9 +4,13 @@
 
 Phase C resumed when `D-BASE` closed (baseline met,
 `../evidence/D_BASE_CLOSEOUT_2026-09-23.md`). The active item is `C3.L3a`
-Part 2 (below): fix the probe's three recorded defects, re-score the
-retained 2026-09-20 marks, then decide on a rerun; then `C3.L4`. Every
-change is measured against the close-out table. Open beside it, not
+Part 2 (below). **Probe fixed and the 2026-09-20 session re-scored
+(`C3-L3A-P2R1`, 2026-09-23)**: the re-score corrects the record and does not
+answer the gate. **Smoke session 2026-09-24 (`C3-L3A-P2R2`)**: settling and
+transition cost now measured on the adopted build; the ladder stands. **Next:
+the pre-registered rerun — the user's play session, awaiting the user.**
+Then `C3.L4`. Every change is measured
+against the close-out table. Open beside it, not
 blocking: the warm-state loss's cause between the ends (`host_link`),
 thermal threshold proposals (none enforced), max output gap.
 
@@ -56,7 +60,7 @@ finished. What remains is a judgment nobody has made.
 | `C3.L2b` decoder-report cycle retention | COMPLETE / RUNTIME VALIDATED |
 | `C3.L2c` low-latency decode | **FALSIFIED / ROLLED BACK** |
 | `C3.L3` fixed-bitrate port and characterization | COMPLETE / RUNTIME VALIDATED |
-| `C3.L3a` gameplay acceptance probe | **REGISTERED / NEXT** |
+| `C3.L3a` gameplay acceptance probe | Part 2 ran 2026-09-20; **probe fixed, re-scored, RERUN PRE-REGISTERED** (2026-09-23) |
 | `C3.L4` automatic controller | **BLOCKED**; gate is `C3.L3a` |
 
 Linux is `video_only_restart`: authorized for start-time profile selection,
@@ -94,7 +98,7 @@ Two distinct unanswered questions:
    picture at 5000 or 5500 kbps. A fast-down controller whose destination is
    visually poor fails even with invisible transitions.
 
-## C3.L3a — gameplay acceptance probe. PART 1 RUNTIME VALIDATED / PART 2 INSTALLED.
+## C3.L3a — gameplay acceptance probe. PART 1 RUNTIME VALIDATED / PART 2 PROBE FIXED, RERUN PRE-REGISTERED.
 
 The `C3.L4` gate, made performable. Diagnostic-only. **It authorizes nothing**
 and adds no controller logic. Full design in
@@ -115,7 +119,62 @@ earlier "reuses `run_c3_linux_fixed_bitrate_cycle` as-is" description and the
 later `ladder_transition`/new-route design; see the correction in
 `../architecture/ADAPTIVE_BITRATE.md`.
 
-**Part 2 INSTALLED 2026-09-19, development only — not yet run.**
+**Part 2 R1 — probe fixed, 2026-09-20 session re-scored (2026-09-23).**
+Record: `../evidence/C3_L3A_P2R1_PROBE_DEFECTS_AND_RESCORE_2026-09-23.md`;
+patch `../patches/C3-L3A-P2R1_PROBE_DEFECTS_AND_RESCORE.md`. Part 2 ran
+once, 2026-09-20 (run `20260920_010023`: 8 traversals, 16 transitions, 15
+marks). Five defects fixed: the window anchored on sequence start; telemetry
+paths taken from a probe artifact (every settling sample `None` — **"8/8
+never settled" is withdrawn: 0 of 8 measured**); the unanchored 1-5 rating
+(the user answered out of 10: 6000 → 5/10, 5500 → 3/10, 5000 → 2/10, all
+"acceptable: no"); the SSRC cross-check ignoring parks and restores (16 + 3 +
+1 = 20 expected, 20 seen) and taking the newest decoder file; requirement 4
+never performed (now: clock alignment, offset 35.017 s, spread 0.457 s, and
+every mark's nearest preceding discontinuity). **Re-score, W 2.5 / 5.0:**
+jump 2/4, ramp 3/4, decoy jump-matched 1/8 → 5/8, ramp-matched 5/8 → 6/8, at
+a chance rate of 0.036 marks/s; six marks lag a fire by 2.7-4.3 s, four more
+lag a *decoy* by 2.7-4.9 s. **It cannot separate any shape from the decoys
+at any window; it corrects the record and does not answer the gate.**
+Lifecycle stands: 0 FEC / 0 audio / 0 controller deltas over 16 transitions,
+20 clean SSRC changes, first IDR 17-34 ms.
+
+**Part 2 R2 — smoke session recorded (2026-09-24).** Record:
+`../evidence/C3_L3A_P2R2_SMOKE_SESSION_2026-09-24.md`. The fixed probe's
+first run, on the adopted build, 2 traversals at 40-50 s dwell (not the
+pre-registered design; kept out of `c3_l3a_runs/`). **Settling MEASURED**:
+2 of 2 sequences, telemetry clean at the first report after the transition
+— settled within one to two client reports (≤ ~4 s; 2.006 / 1.504 s, cadence
+2,007 ms). **Transition cost MEASURED**: 8 of 8 SSRC changes aligned
+(spread 0.152 s), `jump_packets` 0, first IDR 1-35 ms, largest gap in the
+second after each 125-211 ms with `codec_ms` 7-11 — the restart's own ~152 ms
+RTP silence, the floor of `video_only_restart`. **Picture: 6000 / 5500 / 5000
+all acceptable, 9 / 9 / 9** on the anchored scale (2026-09-20, pre-cap: no ×3,
+5 / 3 / 2) — **the 5000-7000 ladder stands.** 0 marks at n = 1 per shape: not
+a rate. Close-out rows inside every target with 8 restarts. Fixed: every
+per-transition window now anchors on its matched `ssrc_change` (the 6000
+park read 72 ms for a true 211).
+
+**Part 2 R3 — pool rule (2026-09-24, `C3-L3A-P2R3`)**: `--aggregate` pools
+only v2-state runs with the pre-registered config, lists every skipped file
+with its reason (`--pool-all` overrides, flagged); the 2026-09-20 files moved
+to evidence, `c3_l3a_runs/` empty
+(`../evidence/C3_L3A_P2R3_POOLING_RULE_2026-09-24.md`).
+
+**Rerun — REQUIRED, pre-registered 2026-09-23, not run.** Grounds, either
+sufficient: (a) the session predates the adopted build (cap, cushion,
+redundancy, headless host) and ran on a baseline failing every row — its own
+decoder session 2,562 spikes/min, 56.1 fps, 202.8 lost/min; (b) n = 4 per
+shape against ~20 pooled. Design, fixed before the data: `--traversals 10
+--dwell-min 55 --dwell-max 90 --window 5.0` (now the defaults); **primary
+W = 5.0 s** (from the measured 2.7-4.3 s lags), 2.5 and 8.0 beside it; decoys
+through both matched windows, placement enforced in `build_schedule`
+(ramp-matched window at W 8.0 ends ≥ 3 s before the next fire); **≥ 4
+sessions pooled to ≥ 20 per shape**; shape order randomized per run; Phase B
+at 6000/5500/5000 on the anchored 1-10 scale; each session's decoder
+close-out rows reported beside `D_BASE_CLOSEOUT_2026-09-23.md` as context, not
+a gate. The rerun is the user's play session; Cowork hands them the steps.
+
+**Part 2 INSTALLED 2026-09-19** (development; first run 2026-09-20, above).
 `tools/probe_c3_l3a_gameplay_acceptance.py` plus the shared
 `tools/manual_checkout.py`. Tools only; no companion source changed and no
 existing probe touched. Record:
@@ -124,9 +183,12 @@ existing probe touched. Record:
 To run it:
 
     python3 tools/probe_c3_l3a_gameplay_acceptance.py --plan
-    python3 tools/probe_c3_l3a_gameplay_acceptance.py --traversals 8
+    python3 tools/probe_c3_l3a_gameplay_acceptance.py
     python3 tools/probe_c3_l3a_gameplay_acceptance.py --finalize
     python3 tools/probe_c3_l3a_gameplay_acceptance.py --aggregate
+
+(`--finalize --state <file> --decoder <file>` re-scores a named run; the
+state file is never written.)
 
 The probe requires the stream active and at 7000 and fails preflight
 otherwise. It always returns the stream to 7000 — on success, on error and on
@@ -173,8 +235,13 @@ Marks are captured non-blocking — the player presses Enter on the companion
 terminal the instant they notice something, timestamped against the same
 clock as the cycle log and `stream_discontinuities`. A blocking prompt would
 itself telegraph that a transition fired. The association window is
-**asymmetric**, `[event, event + 2.5 s]`, because a mark always lags the
-event by reaction time; decoys are scored through the identical window.
+**asymmetric** because a mark always lags the event by reaction time.
+~~`[event, event + 2.5 s]`, decoys through the identical window~~ —
+**superseded 2026-09-23 (`C3-L3A-P2R1`)**: a sequence's window is `[first
+fire, last return + W]`; decoys are scored through jump-matched `[d, d + W]`
+and ramp-matched `[d, d + ramp_span + W]` windows; exposure and the chance
+rate are reported per class; primary W 5.0 s for new runs, with 2.5 and 8.0
+beside it.
 Primary metric is binary per sequence — was this sequence marked at all;
 mark count is secondary, since a three-rung ramp in 8 s may reasonably draw
 one press.

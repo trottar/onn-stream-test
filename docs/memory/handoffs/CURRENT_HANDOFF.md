@@ -11,11 +11,13 @@ underruns 17 / 14 per session; max output gap 163 / 110 ms — the
 transport's one open row. The onn is not the ceiling.
 
 **The active item is `C3.L3a` Part 2** (gameplay acceptance of the Linux
-actuator). **Fix the probe's three recorded defects before any rerun**
-(`../investigations/BASELINE_STREAM_HEALTH.md`, "Suspended, not failed"),
-re-score the retained 2026-09-20 marks
-(`logs/streaming/c3_l3a_gameplay_acceptance_state.json`) without
-replaying, then decide. Then `C3.L4`. **`C3.L2`'s classification stands**:
+actuator). **Probe fixed and 2026-09-20 re-scored (`C3-L3A-P2R1`,
+2026-09-23); the gate is not answered — the pre-registered rerun awaits the
+user** (`../evidence/C3_L3A_P2R1_PROBE_DEFECTS_AND_RESCORE_2026-09-23.md`).
+Then `C3.L4`, BLOCKED until then. **Smoke 2026-09-24 (`C3-L3A-P2R2`):**
+settling and transition cost measured on the adopted build, picture 9/9/9 —
+the ladder stands; not a gate observation
+(`../evidence/C3_L3A_P2R2_SMOKE_SESSION_2026-09-24.md`). **`C3.L2`'s classification stands**:
 Linux is `video_only_restart`, not authorized for automatic adaptation
 during play — `C3.L4` has to answer it.
 

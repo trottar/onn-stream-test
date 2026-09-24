@@ -1,6 +1,6 @@
 ---
 memory_schema: 1
-as_of: 2026-09-23
+as_of: 2026-09-24
 baseline_commit: 824c9d9
 ---
 
@@ -18,16 +18,18 @@ explicitly, including the cap, cushion and redundancy.
 
 ## Current Work Item
 
-**`C3.L3a` Part 2 — gameplay acceptance of the Linux actuator**, where
-Phase C was suspended on 2026-09-20. **Fix the probe's three recorded
-defects before any rerun** (`investigations/BASELINE_STREAM_HEALTH.md`,
-"Suspended, not failed"): the mark-association window anchors on
-sequence start, so ramps close their window before finishing; telemetry
-field paths were taken from a probe artifact, not the endpoint, so
-settling was never measured; the picture rating used an unanchored 1-5
-scale that rescaled 1-10 answers. The 2026-09-20 raw marks and per-cycle
-timings are in `logs/streaming/c3_l3a_gameplay_acceptance_state.json` —
-re-score them without replaying first.
+**`C3.L3a` Part 2 — the pre-registered rerun, AWAITING THE USER** (their
+play session; Cowork hands them the steps). `C3-L3A-P2R1` (2026-09-23) fixed
+the probe's five defects and re-scored the retained 2026-09-20 session
+without replaying (`evidence/C3_L3A_P2R1_PROBE_DEFECTS_AND_RESCORE_2026-09-23.md`):
+it cannot separate any shape from the decoys at any window — the record is
+corrected, **the gate is not answered**. Rerun required: that session
+predates the adopted build and ran on a baseline failing every row, and
+n = 4 per shape. Pre-registered: 10 traversals, dwell 55-90 s, primary
+W 5.0 s (2.5, 8.0 beside), ≥ 4 sessions to ≥ 20 per shape, anchored 1-10
+rating — the probe's defaults now (`investigations/ACTIVE.md` §C3.L3a).
+The 2026-09-24 smoke (`evidence/C3_L3A_P2R2_SMOKE_SESSION_2026-09-24.md`)
+does not change it: 1 jump, 1 ramp is not a gate observation.
 
 ## Verified State
 
@@ -37,6 +39,12 @@ re-score them without replaying first.
 < 20 / 1.1 / 0.8; video loss/min (post-FEC) < 10 / **8.7** / **8.4**;
 audio underruns 17 / 14 per session; max output gap ≤ 100 / **163** /
 **110** ms — the transport's open row. Frames < 20 ms rx→output 99.1-99.3 %.
+**Transitions on it** (`C3.L3a` smoke, 2026-09-24): telemetry settled within
+one to two client reports (≤ ~4 s); each costs one 125-211 ms gap
+(`codec_ms` 7-11) — the restart's ~152 ms RTP silence.
+**`C3.L3a` pool rule** (`C3-L3A-P2R3`): `--aggregate` pools only v2-state
+runs with the pre-registered config and lists every skipped file with its
+reason; `c3_l3a_runs/` is empty (2026-09-20 files moved to evidence).
 
 - **Profile** `native_game_720p60_reference`
   (`companion/native_stream_profiles.py`), all `source: profile`,
@@ -56,13 +64,15 @@ audio underruns 17 / 14 per session; max output gap ≤ 100 / **163** /
 
 ## Next Action
 
-Fix the three `C3.L3a` Part 2 probe defects, re-score the retained
-2026-09-20 marks, and only then decide on a rerun; then `C3.L4` (the
-automatic controller). **Constraint to honour**: `C3.L2` classified Linux
-as `video_only_restart`, not authorized for automatic adaptation during
-play — `C3.L4` must answer it, not ignore it. Also open for the user: the
-`T2`/`T3` warm-state threshold proposals (none enforced); `host_link`
-(first fact: `T3`).
+The user plays the `C3.L3a` rerun sessions
+(`python3 tools/probe_c3_l3a_gameplay_acceptance.py`, then `--finalize`,
+then `--aggregate` once ≥ 4 are in); nothing runs without them.
+**`C3.L4` (the automatic controller)
+stays BLOCKED on that gate.** **Constraint to honour**: `C3.L2` classified
+Linux as `video_only_restart`, not authorized for automatic adaptation
+during play — `C3.L4` must answer it, not ignore it. Also open for the
+user: the `T2`/`T3` warm-state threshold proposals (none enforced);
+`host_link` (first fact: `T3`).
 
 ## Success Criteria
 
@@ -102,4 +112,4 @@ perceptual gate unless the user sets one.
 - `handoffs/CURRENT_HANDOFF.md` (Phase C); `investigations/ACTIVE.md`;
   `docs/ROADMAP.md` (Phase C, D-072 order); `docs/KNOWN_ISSUES.md`.
 - `evidence/RUNTIME_VALIDATION.md` — a classification per record;
-  `patches/PATCH_INDEX.md` lists all 119.
+  `patches/PATCH_INDEX.md` lists all 124.

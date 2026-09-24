@@ -1,0 +1,776 @@
+{
+  "aborted": null,
+  "as_installed": null,
+  "by_shape": {
+    "jump": {
+      "cycles": 1,
+      "first_rtp_resume_ms": {
+        "max": 468.513,
+        "median": 468.513,
+        "min": 468.513,
+        "n": 1,
+        "p95": 468.513
+      },
+      "host_verified_ms": {
+        "max": 1220.644,
+        "median": 1220.644,
+        "min": 1220.644,
+        "n": 1,
+        "p95": 1220.644
+      },
+      "spawn_ms": {
+        "max": 316.261,
+        "median": 316.261,
+        "min": 316.261,
+        "n": 1,
+        "p95": 316.261
+      }
+    },
+    "ramp": {
+      "cycles": 3,
+      "first_rtp_resume_ms": {
+        "max": 569.389,
+        "median": 419.813,
+        "min": 418.992,
+        "n": 3,
+        "p95": 569.389
+      },
+      "host_verified_ms": {
+        "max": 1322.542,
+        "median": 1171.964,
+        "min": 1171.868,
+        "n": 3,
+        "p95": 1322.542
+      },
+      "spawn_ms": {
+        "max": 416.437,
+        "median": 266.842,
+        "min": 266.323,
+        "n": 3,
+        "p95": 416.437
+      }
+    }
+  },
+  "chance_rate_per_s": 0.0,
+  "conditions_after": {
+    "audio_send_errors": 0,
+    "controller_bad_packets": 0,
+    "controller_lost_packets": 3177,
+    "fec_rtp_packets": 337115,
+    "fec_send_errors": 0,
+    "fec_skipped_packets": 0
+  },
+  "conditions_before": {
+    "audio_send_errors": 0,
+    "controller_bad_packets": 0,
+    "controller_lost_packets": 76,
+    "fec_rtp_packets": 11142,
+    "fec_send_errors": 0,
+    "fec_skipped_packets": 0
+  },
+  "config": {
+    "dwell_max_s": 50.0,
+    "dwell_min_s": 40.0,
+    "park_seconds": 45,
+    "ramp_gap_s": 4.0,
+    "report_windows_s": [
+      2.5,
+      5.0,
+      8.0
+    ],
+    "traversals": 2,
+    "window_s": 5.0
+  },
+  "decoder": {
+    "client_profiler_version": "0.12.3",
+    "closeout_rows": {
+      "duration_min": 7.98,
+      "max_output_gap_ms": 211,
+      "rendered_fps": 59.77,
+      "spikes_20_per_min": 40.46,
+      "stale_output_drops_per_min": 2.38,
+      "video_lost_per_min_post_fec": 1.38
+    },
+    "discontinuity_count": 8,
+    "dropped_frames": 7,
+    "duration_ms": 479000,
+    "expected_breakdown": {
+      "park": 3,
+      "phase_a": 4,
+      "restore": 1
+    },
+    "expected_ssrc_changes": 8,
+    "fec_unrecoverable_groups": 2,
+    "lost_packets": 11,
+    "max_codec_ms": 130,
+    "max_output_gap_ms": 211,
+    "path": "logs/games/decoder_sessions/native_decoder_20260924_041256_754.json",
+    "received_at_utc": "2026-09-24T04:12:56.754Z",
+    "rendered_frames": 28629,
+    "resync_to_idr_ms": [
+      18,
+      16,
+      35,
+      26,
+      22,
+      2,
+      23,
+      1
+    ],
+    "selection": "--decoder given",
+    "sequence_resyncs": 8,
+    "ssrc_changes": 8,
+    "ssrc_discontinuity_count": 8,
+    "view": {
+      "alignment": {
+        "max_abs_residual_s": 0.122,
+        "offset_s": 13.842,
+        "ok": true,
+        "pairs": 4,
+        "rule": "Phase-A fires matched in order to the first N ssrc_change entries; spread over 1 s means the pairing is wrong",
+        "spread_s": 0.152
+      },
+      "discontinuity_count": 8,
+      "labels_match_expected": true,
+      "per_mark": [],
+      "per_transition": [
+        {
+          "covered_from_s_into_window": null,
+          "fired_at_s": 0.0,
+          "first_idr_ms": 18,
+          "jump_packets": 0,
+          "label": "jump seq 0 step 0",
+          "max_gap_after_ssrc_ms": 35,
+          "max_gap_codec_ms": 9,
+          "max_output_gap_ms_in_1s": 125,
+          "residual_s": 0.023,
+          "slow_events_covered": "full",
+          "ssrc_elapsed_ms": 13865.0,
+          "to_kbps": 5000,
+          "window_from": "ssrc_change"
+        },
+        {
+          "covered_from_s_into_window": null,
+          "fired_at_s": 42.594,
+          "first_idr_ms": 16,
+          "jump_packets": 0,
+          "label": "ramp seq 1 step 0",
+          "max_gap_after_ssrc_ms": 33,
+          "max_gap_codec_ms": 10,
+          "max_output_gap_ms_in_1s": 198,
+          "residual_s": 0.122,
+          "slow_events_covered": "full",
+          "ssrc_elapsed_ms": 56558.0,
+          "to_kbps": 5500,
+          "window_from": "ssrc_change"
+        },
+        {
+          "covered_from_s_into_window": null,
+          "fired_at_s": 47.92,
+          "first_idr_ms": 35,
+          "jump_packets": 0,
+          "label": "ramp seq 1 step 1",
+          "max_gap_after_ssrc_ms": 51,
+          "max_gap_codec_ms": 9,
+          "max_output_gap_ms_in_1s": 154,
+          "residual_s": -0.023,
+          "slow_events_covered": "full",
+          "ssrc_elapsed_ms": 61739.0,
+          "to_kbps": 6000,
+          "window_from": "ssrc_change"
+        },
+        {
+          "covered_from_s_into_window": null,
+          "fired_at_s": 53.094,
+          "first_idr_ms": 26,
+          "jump_packets": 0,
+          "label": "ramp seq 1 step 2",
+          "max_gap_after_ssrc_ms": 41,
+          "max_gap_codec_ms": 8,
+          "max_output_gap_ms_in_1s": 187,
+          "residual_s": -0.03,
+          "slow_events_covered": "full",
+          "ssrc_elapsed_ms": 66906.0,
+          "to_kbps": 7000,
+          "window_from": "ssrc_change"
+        },
+        {
+          "at_probe_s_est": 103.255,
+          "covered_from_s_into_window": null,
+          "fired_at_s": 103.482,
+          "first_idr_ms": 22,
+          "jump_packets": 0,
+          "label": "park 6000",
+          "max_gap_after_ssrc_ms": 41,
+          "max_gap_codec_ms": 11,
+          "max_output_gap_ms_in_1s": 211,
+          "residual_s": -0.227,
+          "slow_events_covered": "full",
+          "ssrc_elapsed_ms": 117097.0,
+          "to_kbps": 6000,
+          "window_from": "ssrc_change"
+        },
+        {
+          "at_probe_s_est": 149.424,
+          "covered_from_s_into_window": null,
+          "fired_at_s": 149.455,
+          "first_idr_ms": 2,
+          "jump_packets": 0,
+          "label": "park 5500",
+          "max_gap_after_ssrc_ms": 19,
+          "max_gap_codec_ms": 9,
+          "max_output_gap_ms_in_1s": 166,
+          "residual_s": -0.031,
+          "slow_events_covered": "full",
+          "ssrc_elapsed_ms": 163266.0,
+          "to_kbps": 5500,
+          "window_from": "ssrc_change"
+        },
+        {
+          "at_probe_s_est": 195.609,
+          "covered_from_s_into_window": null,
+          "fired_at_s": 195.629,
+          "first_idr_ms": 23,
+          "jump_packets": 0,
+          "label": "park 5000",
+          "max_gap_after_ssrc_ms": 38,
+          "max_gap_codec_ms": 8,
+          "max_output_gap_ms_in_1s": 203,
+          "residual_s": -0.02,
+          "slow_events_covered": "full",
+          "ssrc_elapsed_ms": 209451.0,
+          "to_kbps": 5000,
+          "window_from": "ssrc_change"
+        },
+        {
+          "at_probe_s_est": 241.8,
+          "covered_from_s_into_window": null,
+          "fired_at_s": 241.812,
+          "first_idr_ms": 1,
+          "jump_packets": 0,
+          "label": "after phase B",
+          "max_gap_after_ssrc_ms": 16,
+          "max_gap_codec_ms": 7,
+          "max_output_gap_ms_in_1s": 189,
+          "residual_s": -0.012,
+          "slow_events_covered": "full",
+          "ssrc_elapsed_ms": 255642.0,
+          "to_kbps": 7000,
+          "window_from": "ssrc_change"
+        }
+      ],
+      "slow_event_coverage": {
+        "capacity": 128,
+        "capacity_marked": 64,
+        "capacity_recent": 64,
+        "covered_from_decoder_ms": 0.0,
+        "covered_from_probe_s": -13.842,
+        "retained": 96,
+        "retained_marked": 32,
+        "retained_recent": 64,
+        "saturated": false
+      },
+      "ssrc_change_count": 8
+    }
+  },
+  "decoy_placement": [
+    {
+      "decoy_s": 16.719,
+      "index": 0,
+      "late_s": 0.0,
+      "next_fire_s": 42.594,
+      "slack_at_2.5": 11.701,
+      "slack_at_5": 9.201,
+      "slack_at_8": 6.201
+    },
+    {
+      "decoy_s": 78.367,
+      "index": 1,
+      "late_s": 0.0,
+      "next_fire_s": null,
+      "slack_at_2.5": null,
+      "slack_at_5": null,
+      "slack_at_8": null
+    }
+  ],
+  "expected_transitions": [
+    {
+      "fired_at_s": 0.0,
+      "label": "jump seq 0 step 0",
+      "phase": "A",
+      "to_kbps": 5000
+    },
+    {
+      "fired_at_s": 42.594,
+      "label": "ramp seq 1 step 0",
+      "phase": "A",
+      "to_kbps": 5500
+    },
+    {
+      "fired_at_s": 47.92,
+      "label": "ramp seq 1 step 1",
+      "phase": "A",
+      "to_kbps": 6000
+    },
+    {
+      "fired_at_s": 53.094,
+      "label": "ramp seq 1 step 2",
+      "phase": "A",
+      "to_kbps": 7000
+    },
+    {
+      "fired_at_s": 103.482,
+      "label": "park 6000",
+      "phase": "B",
+      "to_kbps": 6000
+    },
+    {
+      "fired_at_s": 149.455,
+      "label": "park 5500",
+      "phase": "B",
+      "to_kbps": 5500
+    },
+    {
+      "fired_at_s": 195.629,
+      "label": "park 5000",
+      "phase": "B",
+      "to_kbps": 5000
+    },
+    {
+      "fired_at_s": 241.812,
+      "label": "after phase B",
+      "phase": "restore",
+      "to_kbps": 7000
+    }
+  ],
+  "lag_histogram_from_decoy": [
+    {
+      "bin_s": "0-1",
+      "count": 0
+    },
+    {
+      "bin_s": "1-2",
+      "count": 0
+    },
+    {
+      "bin_s": "2-3",
+      "count": 0
+    },
+    {
+      "bin_s": "3-4",
+      "count": 0
+    },
+    {
+      "bin_s": "4-5",
+      "count": 0
+    },
+    {
+      "bin_s": "5-8",
+      "count": 0
+    },
+    {
+      "bin_s": "8-15",
+      "count": 0
+    },
+    {
+      "bin_s": "15-30",
+      "count": 0
+    },
+    {
+      "bin_s": "30-60",
+      "count": 0
+    },
+    {
+      "bin_s": "60+",
+      "count": 0
+    },
+    {
+      "bin_s": "none before",
+      "count": 0
+    }
+  ],
+  "lag_histogram_from_fire": [
+    {
+      "bin_s": "0-1",
+      "count": 0
+    },
+    {
+      "bin_s": "1-2",
+      "count": 0
+    },
+    {
+      "bin_s": "2-3",
+      "count": 0
+    },
+    {
+      "bin_s": "3-4",
+      "count": 0
+    },
+    {
+      "bin_s": "4-5",
+      "count": 0
+    },
+    {
+      "bin_s": "5-8",
+      "count": 0
+    },
+    {
+      "bin_s": "8-15",
+      "count": 0
+    },
+    {
+      "bin_s": "15-30",
+      "count": 0
+    },
+    {
+      "bin_s": "30-60",
+      "count": 0
+    },
+    {
+      "bin_s": "60+",
+      "count": 0
+    },
+    {
+      "bin_s": "none before",
+      "count": 0
+    }
+  ],
+  "lifecycle_totals": {
+    "audio_send_errors_delta": 0,
+    "controller_bad_packets_delta": 0,
+    "fec_send_errors_delta": 0
+  },
+  "mark_lags": [],
+  "park": [
+    {
+      "acceptable": true,
+      "fired_at_s": 103.482,
+      "kbps": 6000,
+      "parked_s": 45,
+      "rating": 9,
+      "rating_scale": "1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)"
+    },
+    {
+      "acceptable": true,
+      "fired_at_s": 149.455,
+      "kbps": 5500,
+      "parked_s": 45,
+      "rating": 9,
+      "rating_scale": "1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)"
+    },
+    {
+      "acceptable": true,
+      "fired_at_s": 195.629,
+      "kbps": 5000,
+      "parked_s": 45,
+      "rating": 9,
+      "rating_scale": "1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)"
+    }
+  ],
+  "phase_a_s": 103.472,
+  "primary_window_s": 5.0,
+  "ramp_span_s": 11.674,
+  "rating_scale": {
+    "anchors": {
+      "1": "unplayable",
+      "10": "looks the same as 7000",
+      "5": "clearly softer, still playable"
+    },
+    "high": 10,
+    "low": 1,
+    "note": "1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)"
+  },
+  "run_id": "20260924_000330",
+  "schema": "privyhub_c3_l3a_analysis_v2",
+  "scoring": {
+    "2.5": {
+      "classes": {
+        "decoy_jump_matched": {
+          "chance_expected_marks": 0.0,
+          "events": 2,
+          "exposure_s": 5.0,
+          "marked": 0,
+          "marks": 0,
+          "marks_per_s": 0.0,
+          "windows": [
+            {
+              "end_s": 19.219,
+              "index": 0,
+              "marks_s": [],
+              "start_s": 16.719
+            },
+            {
+              "end_s": 80.867,
+              "index": 1,
+              "marks_s": [],
+              "start_s": 78.367
+            }
+          ]
+        },
+        "decoy_ramp_matched": {
+          "chance_expected_marks": 0.0,
+          "events": 2,
+          "exposure_s": 28.348,
+          "marked": 0,
+          "marks": 0,
+          "marks_per_s": 0.0,
+          "windows": [
+            {
+              "end_s": 30.893,
+              "index": 0,
+              "marks_s": [],
+              "start_s": 16.719
+            },
+            {
+              "end_s": 92.541,
+              "index": 1,
+              "marks_s": [],
+              "start_s": 78.367
+            }
+          ]
+        },
+        "jump": {
+          "chance_expected_marks": 0.0,
+          "events": 1,
+          "exposure_s": 3.728,
+          "marked": 0,
+          "marks": 0,
+          "marks_per_s": 0.0,
+          "windows": [
+            {
+              "end_s": 3.728,
+              "index": 0,
+              "marks_s": [],
+              "start_s": 0.0
+            }
+          ]
+        },
+        "ramp": {
+          "chance_expected_marks": 0.0,
+          "events": 1,
+          "exposure_s": 14.174,
+          "marked": 0,
+          "marks": 0,
+          "marks_per_s": 0.0,
+          "windows": [
+            {
+              "end_s": 56.768,
+              "index": 1,
+              "marks_s": [],
+              "start_s": 42.594
+            }
+          ]
+        }
+      },
+      "not_in_any_sequence_window": 0,
+      "window_s": 2.5
+    },
+    "5": {
+      "classes": {
+        "decoy_jump_matched": {
+          "chance_expected_marks": 0.0,
+          "events": 2,
+          "exposure_s": 10.0,
+          "marked": 0,
+          "marks": 0,
+          "marks_per_s": 0.0,
+          "windows": [
+            {
+              "end_s": 21.719,
+              "index": 0,
+              "marks_s": [],
+              "start_s": 16.719
+            },
+            {
+              "end_s": 83.367,
+              "index": 1,
+              "marks_s": [],
+              "start_s": 78.367
+            }
+          ]
+        },
+        "decoy_ramp_matched": {
+          "chance_expected_marks": 0.0,
+          "events": 2,
+          "exposure_s": 33.348,
+          "marked": 0,
+          "marks": 0,
+          "marks_per_s": 0.0,
+          "windows": [
+            {
+              "end_s": 33.393,
+              "index": 0,
+              "marks_s": [],
+              "start_s": 16.719
+            },
+            {
+              "end_s": 95.041,
+              "index": 1,
+              "marks_s": [],
+              "start_s": 78.367
+            }
+          ]
+        },
+        "jump": {
+          "chance_expected_marks": 0.0,
+          "events": 1,
+          "exposure_s": 6.228,
+          "marked": 0,
+          "marks": 0,
+          "marks_per_s": 0.0,
+          "windows": [
+            {
+              "end_s": 6.228,
+              "index": 0,
+              "marks_s": [],
+              "start_s": 0.0
+            }
+          ]
+        },
+        "ramp": {
+          "chance_expected_marks": 0.0,
+          "events": 1,
+          "exposure_s": 16.674,
+          "marked": 0,
+          "marks": 0,
+          "marks_per_s": 0.0,
+          "windows": [
+            {
+              "end_s": 59.268,
+              "index": 1,
+              "marks_s": [],
+              "start_s": 42.594
+            }
+          ]
+        }
+      },
+      "not_in_any_sequence_window": 0,
+      "window_s": 5.0
+    },
+    "8": {
+      "classes": {
+        "decoy_jump_matched": {
+          "chance_expected_marks": 0.0,
+          "events": 2,
+          "exposure_s": 16.0,
+          "marked": 0,
+          "marks": 0,
+          "marks_per_s": 0.0,
+          "windows": [
+            {
+              "end_s": 24.719,
+              "index": 0,
+              "marks_s": [],
+              "start_s": 16.719
+            },
+            {
+              "end_s": 86.367,
+              "index": 1,
+              "marks_s": [],
+              "start_s": 78.367
+            }
+          ]
+        },
+        "decoy_ramp_matched": {
+          "chance_expected_marks": 0.0,
+          "events": 2,
+          "exposure_s": 39.348,
+          "marked": 0,
+          "marks": 0,
+          "marks_per_s": 0.0,
+          "windows": [
+            {
+              "end_s": 36.393,
+              "index": 0,
+              "marks_s": [],
+              "start_s": 16.719
+            },
+            {
+              "end_s": 98.041,
+              "index": 1,
+              "marks_s": [],
+              "start_s": 78.367
+            }
+          ]
+        },
+        "jump": {
+          "chance_expected_marks": 0.0,
+          "events": 1,
+          "exposure_s": 9.228,
+          "marked": 0,
+          "marks": 0,
+          "marks_per_s": 0.0,
+          "windows": [
+            {
+              "end_s": 9.228,
+              "index": 0,
+              "marks_s": [],
+              "start_s": 0.0
+            }
+          ]
+        },
+        "ramp": {
+          "chance_expected_marks": 0.0,
+          "events": 1,
+          "exposure_s": 19.674,
+          "marked": 0,
+          "marks": 0,
+          "marks_per_s": 0.0,
+          "windows": [
+            {
+              "end_s": 62.268,
+              "index": 1,
+              "marks_s": [],
+              "start_s": 42.594
+            }
+          ]
+        }
+      },
+      "not_in_any_sequence_window": 0,
+      "window_s": 8.0
+    }
+  },
+  "seed": 1502366457,
+  "settling": {
+    "measured": 2,
+    "never_settled_of_measured": 0,
+    "sequences": [
+      {
+        "budget_ok": true,
+        "distinct_snapshots": 2,
+        "index": 0,
+        "measured": true,
+        "sample_interval_ms": 2000.0,
+        "settled_s": 2.006,
+        "shape": "jump",
+        "snapshot_cadence_ms": 2007.0
+      },
+      {
+        "budget_ok": true,
+        "distinct_snapshots": 2,
+        "index": 1,
+        "measured": true,
+        "sample_interval_ms": 2000.0,
+        "settled_s": 1.504,
+        "shape": "ramp",
+        "snapshot_cadence_ms": 2007.0
+      }
+    ],
+    "settled_s": {
+      "max": 2.006,
+      "median": 1.755,
+      "min": 1.504,
+      "n": 2,
+      "p95": 2.006
+    },
+    "unmeasured": 0
+  },
+  "state_path": "logs/streaming/c3_l3a_gameplay_acceptance_state.json",
+  "state_schema": "privyhub_c3_l3a_gameplay_acceptance_v2",
+  "total_marks": 0,
+  "windows_s": [
+    2.5,
+    5.0,
+    8.0
+  ]
+}

@@ -848,10 +848,29 @@ bitrate's session once. See `docs/KNOWN_ISSUES.md`.
 - `tools/probe_c3_l3a_gameplay_acceptance.py` — the `C3.L4` gate. Fires
   unannounced jump and ramp sequences during play, captures operator marks
   non-blocking, scores them against decoys, then parks at each rung for a
-  picture judgement. `--plan` shows shape counts without running,
-  `--finalize` analyses, `--aggregate` pools runs. Always returns the stream
-  to 7000, including on error and Ctrl-C. Encodes no acceptance threshold.
-- `tools/manual_checkout.py` — shared `yes()`, report writer in the existing
+  picture judgement (anchored 1-10). `--plan` shows shape counts and the
+  per-dwell decoy placement without running (and refuses a dwell too short
+  for it), `--finalize` analyses, `--aggregate` pools runs. Always returns
+  the stream to 7000, including on error and Ctrl-C. Encodes no acceptance
+  threshold. Defaults since `C3-L3A-P2R1` (2026-09-23): `--traversals 10
+  --dwell-min 55 --dwell-max 90 --window 5.0` (the pre-registered rerun);
+  every finalize reports W 2.5, 5.0 and 8.0 whatever the primary.
+  **`--finalize --state <state.json>`** scores a named run (read only; never
+  written) and **`--decoder <native_decoder_*.json>`** names the decoder
+  session; without `--decoder` it takes the *earliest* session posted after
+  the run with enough SSRC changes (Phase A + parks + restores), never the
+  newest. Writes `logs/streaming/c3_l3a_runs/<run_id>.{json,txt}` and the
+  latest-run `c3_l3a_gameplay_acceptance.{json,txt}` (`logs/` is gitignored:
+  copy what a record cites). Preflight refuses a run if telemetry is not
+  fresh or the 12 s settling budget is under three client intervals.
+  **`--aggregate` pools only pre-registered runs** (`C3-L3A-P2R3`): v2 state
+  and config = `PREREGISTERED_CONFIG` (10 traversals, dwell 55-90 s, W 5.0,
+  ramp gap 4.0, park 45 s); every other file in `c3_l3a_runs/` is listed as
+  SKIPPED with the field that differs. **`--pool-all`** pools v2 runs
+  outside it anyway (default off); the report title and first line say so —
+  never cite a `--pool-all` table as the pre-registered result.
+- `tools/manual_checkout.py` — shared `yes()`, `ask_int(..., anchors=)`
+  (scale anchors printed above the prompt), report writer in the existing
   `Classification:` convention, and non-blocking mark capture. **Existing
   checkout probes are deliberately not migrated to it**; other probes grep
   their reports for exact substrings, so that is its own work item.

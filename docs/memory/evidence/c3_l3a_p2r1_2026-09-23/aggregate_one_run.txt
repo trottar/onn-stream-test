@@ -1,0 +1,73 @@
+PrivyHub C3.L3a gameplay acceptance probe - pooled
+Generated: 2026-09-23T20:03:32-0400
+Classification: C3_L3A_GAMEPLAY_ACCEPTANCE_RECORDED
+Production files modified by probe: NONE
+Network addresses collected/logged: NONE
+=== RUN ===
+Runs pooled: 1
+Run ids: 20260920_010023
+Primary W per run (s): {'20260920_010023': 2.5}
+Ramp span per run (s): {'20260920_010023': 11.573}
+
+=== DETECTION - the gate question ===
+Sequence window: first fire .. last transition returned + W.
+Decoys fire nothing; each is scored through a jump-matched
+[d, d + W] and a ramp-matched [d, d + ramp_span + W] window.
+Classes are scored independently: one mark can count in two.
+Primary W (s): per-run
+Ramp span (s, median ramp end - first fire): {'20260920_010023': 11.573}
+Phase A (s): 415.247
+Marks total: 15
+Chance rate (marks / phase-A s): 0.0361
+
+W = 2.5 s
+  class                events  marked  marks  exposure s  marks/s  chance-expected marks
+  -------------------  ------  ------  -----  ----------  -------  ---------------------
+  jump                      4       2      2        15.1    0.133                   0.54
+  ramp                      4       3      4        56.1    0.071                   2.03
+  decoy, jump-matched       8       1      1        20.0    0.050                   0.72
+  decoy, ramp-matched       8       5      5       112.6    0.044                   4.07
+  marks in no sequence window: 9
+
+W = 5.0 s
+  class                events  marked  marks  exposure s  marks/s  chance-expected marks
+  -------------------  ------  ------  -----  ----------  -------  ---------------------
+  jump                      4       2      2        25.1    0.080                   0.91
+  ramp                      4       3      4        66.1    0.060                   2.39
+  decoy, jump-matched       8       5      5        40.0    0.125                   1.44
+  decoy, ramp-matched       8       6      7       132.6    0.053                   4.79
+  marks in no sequence window: 9
+
+W = 8.0 s
+  class                events  marked  marks  exposure s  marks/s  chance-expected marks
+  -------------------  ------  ------  -----  ----------  -------  ---------------------
+  jump                      4       2      2        37.1    0.054                   1.34
+  ramp                      4       3      4        78.1    0.051                   2.82
+  decoy, jump-matched       8       5      5        64.0    0.078                   2.31
+  decoy, ramp-matched       8       6      9       156.6    0.058                   5.66
+  marks in no sequence window: 9
+
+NO THRESHOLD IS ENCODED. Read the table; the judgement is yours.
+
+=== PICTURE QUALITY - announced, separate question ===
+  kbps  acceptable  rating  scale
+  ----  ----------  ------  ---------------------------------------------
+  6000  False            5  1-10 (prompt showed 1-5; user's stated scale)
+  5500  False            3  1-10 (prompt showed 1-5; user's stated scale)
+  5000  False            2  1-10 (prompt showed 1-5; user's stated scale)
+Ratings are printed as answered; they are never rescaled.
+
+=== C3.L4 READINESS ===
+Cycles pooled: {'jump': 4, 'ramp': 12}
+Settling measured on sequences: 0
+Telemetry settling after a sequence (s): {'n': 0}
+Cumulative lifecycle: {'fec_send_errors_delta': 0, 'audio_send_errors_delta': 0, 'controller_bad_packets_delta': 0}
+
+=== WHAT THIS DOES NOT ESTABLISH ===
+- Whether C3.L4 is authorized. That is a human judgement on
+  the detection table and the picture ratings above.
+- Anything at n = one run. Compare marked classes against the
+  chance-expected marks and against each other; pool runs.
+- Any controller policy: thresholds, hysteresis, sample cadence.
+- Behaviour under real network pressure. Every transition here
+  fired from a schedule, not from a degraded condition.

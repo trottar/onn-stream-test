@@ -1,0 +1,29 @@
+checked 2026-09-23T20:03:54-0400 - stream idle (native-stream-status active false)
+  probe reads fresh -> present
+  probe reads age_ms -> present
+  probe reads available -> present
+  probe reads session_elapsed_ms -> present
+  probe reads sample_interval_ms -> present
+  probe reads receiver.recent_fps -> present
+  probe reads receiver.recent_mbps -> present
+  probe reads receiver.waiting_for_idr -> present
+  probe reads latency.output_gap_ms -> present
+  probe reads decoder.queue_depth -> present
+  pre-P2R1 path measurements.receiver_recent_fps -> absent
+  pre-P2R1 path checks.fresh -> absent
+  available True fresh False sample_interval_ms 2000
+sample_settling() against the idle endpoint:
+{
+ "baseline_session_elapsed_ms": 1207110.0,
+ "budget_intervals": 6.0,
+ "budget_ok": true,
+ "budget_s": 12.0,
+ "distinct_snapshots": 0,
+ "poll_s": 0.5,
+ "request_errors": 0,
+ "rule": "two consecutive distinct snapshots (session_elapsed_ms advanced), both fresh, waiting_for_idr not true, recent_fps >= 54",
+ "sample_interval_ms": 2000.0,
+ "settled_s": null,
+ "snapshot_cadence_ms": null
+}
+  samples 24 first {"age_ms": 3081844, "at_s": 0.001, "fps": 49.62, "fresh": false, "good": false, "mbps": 6.324, "new_snapshot": false, "output_gap_ms": 23, "queue_depth": 0, "session_elapsed_ms": 1207110.0, "waiting_for_idr": false}

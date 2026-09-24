@@ -1,0 +1,250 @@
+{
+  "aborted": null,
+  "anchors": [
+    {
+      "at_s": 0.0,
+      "index": 0,
+      "kind": "sequence",
+      "marks": [],
+      "shape": "jump"
+    },
+    {
+      "at_s": 40.907,
+      "index": 0,
+      "kind": "decoy",
+      "marks": [],
+      "shape": "decoy"
+    },
+    {
+      "at_s": 70.295,
+      "index": 1,
+      "kind": "sequence",
+      "marks": [],
+      "shape": "ramp"
+    },
+    {
+      "at_s": 101.057,
+      "index": 1,
+      "kind": "decoy",
+      "marks": [],
+      "shape": "decoy"
+    },
+    {
+      "at_s": 132.07,
+      "index": 2,
+      "kind": "sequence",
+      "marks": [],
+      "shape": "jump"
+    },
+    {
+      "at_s": 159.723,
+      "index": 2,
+      "kind": "decoy",
+      "marks": [],
+      "shape": "decoy"
+    },
+    {
+      "at_s": 171.337,
+      "index": 3,
+      "kind": "sequence",
+      "marks": [],
+      "shape": "ramp"
+    },
+    {
+      "at_s": 200.866,
+      "index": 3,
+      "kind": "decoy",
+      "marks": [],
+      "shape": "decoy"
+    },
+    {
+      "at_s": 216.644,
+      "index": 4,
+      "kind": "sequence",
+      "marks": [],
+      "shape": "jump"
+    },
+    {
+      "at_s": 253.715,
+      "index": 4,
+      "kind": "decoy",
+      "marks": [],
+      "shape": "decoy"
+    },
+    {
+      "at_s": 270.956,
+      "index": 5,
+      "kind": "sequence",
+      "marks": [],
+      "shape": "ramp"
+    },
+    {
+      "at_s": 306.846,
+      "index": 5,
+      "kind": "decoy",
+      "marks": [
+        {
+          "elapsed_s": 307.822,
+          "severity": 4
+        }
+      ],
+      "shape": "decoy"
+    },
+    {
+      "at_s": 320.094,
+      "index": 6,
+      "kind": "sequence",
+      "marks": [],
+      "shape": "ramp"
+    },
+    {
+      "at_s": 351.905,
+      "index": 6,
+      "kind": "decoy",
+      "marks": [],
+      "shape": "decoy"
+    },
+    {
+      "at_s": 368.076,
+      "index": 7,
+      "kind": "sequence",
+      "marks": [],
+      "shape": "jump"
+    },
+    {
+      "at_s": 387.965,
+      "index": 7,
+      "kind": "decoy",
+      "marks": [],
+      "shape": "decoy"
+    }
+  ],
+  "buckets": {
+    "decoy": {
+      "marked": 1,
+      "marks": 1,
+      "total": 8
+    },
+    "jump": {
+      "marked": 0,
+      "marks": 0,
+      "total": 4
+    },
+    "ramp": {
+      "marked": 0,
+      "marks": 0,
+      "total": 4
+    }
+  },
+  "by_shape": {
+    "jump": {
+      "cycles": 4,
+      "first_rtp_resume_ms": {
+        "max": 679.324,
+        "median": 522.691,
+        "min": 318.667,
+        "n": 4,
+        "p95": 679.324
+      },
+      "host_verified_ms": {
+        "max": 1431.654,
+        "median": 1275.543,
+        "min": 1071.179,
+        "n": 4,
+        "p95": 1431.654
+      },
+      "spawn_ms": {
+        "max": 516.739,
+        "median": 365.533,
+        "min": 166.416,
+        "n": 4,
+        "p95": 516.739
+      }
+    },
+    "ramp": {
+      "cycles": 12,
+      "first_rtp_resume_ms": {
+        "max": 567.921,
+        "median": 418.616,
+        "min": 227.761,
+        "n": 12,
+        "p95": 567.921
+      },
+      "host_verified_ms": {
+        "max": 1320.516,
+        "median": 1171.736,
+        "min": 981.238,
+        "n": 12,
+        "p95": 1320.516
+      },
+      "spawn_ms": {
+        "max": 416.32,
+        "median": 265.799,
+        "min": 66.269,
+        "n": 12,
+        "p95": 416.32
+      }
+    }
+  },
+  "conditions_after": {
+    "audio_send_errors": 0,
+    "controller_bad_packets": 0,
+    "controller_lost_packets": 498,
+    "fec_rtp_packets": 408942,
+    "fec_send_errors": 0,
+    "fec_skipped_packets": 8
+  },
+  "conditions_before": {
+    "audio_send_errors": 0,
+    "controller_bad_packets": 0,
+    "controller_lost_packets": 287,
+    "fec_rtp_packets": 24521,
+    "fec_send_errors": 0,
+    "fec_skipped_packets": 0
+  },
+  "config": {
+    "dwell_max_s": 75.0,
+    "dwell_min_s": 30.0,
+    "park_seconds": 45,
+    "ramp_gap_s": 4.0,
+    "traversals": 8,
+    "window_s": 2.5
+  },
+  "decoder": {
+    "path": null
+  },
+  "lifecycle_totals": {
+    "audio_send_errors_delta": 0,
+    "controller_bad_packets_delta": 0,
+    "fec_send_errors_delta": 0
+  },
+  "never_settled": 8,
+  "park": [
+    {
+      "acceptable": false,
+      "kbps": 6000,
+      "parked_s": 45,
+      "rating": 5
+    },
+    {
+      "acceptable": false,
+      "kbps": 5500,
+      "parked_s": 45,
+      "rating": 3
+    },
+    {
+      "acceptable": false,
+      "kbps": 5000,
+      "parked_s": 45,
+      "rating": 2
+    }
+  ],
+  "run_id": "20260920_010023",
+  "schema": "privyhub_c3_l3a_analysis_v1",
+  "seed": 857553307,
+  "settling_s": {
+    "n": 0
+  },
+  "total_marks": 15,
+  "unattributed_marks": 14
+}

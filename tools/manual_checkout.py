@@ -60,12 +60,21 @@ def ask_int(
     low: int,
     high: int,
     default: int | None = None,
+    anchors: dict[int, str] | None = None,
 ) -> int | None:
     """Ask for an integer in [low, high]. Empty input returns `default`.
 
     Re-asks on invalid input rather than raising: a tester answering a
     debrief should not lose a session's worth of answers to a typo.
+
+    `anchors` maps scale points to their meaning and is printed above the
+    prompt, highest first. A bare range is not a scale: on 2026-09-20 a
+    tester shown `[1-5]` with nothing else answered out of 10.
     """
+    if anchors:
+        for point in sorted(anchors, reverse=True):
+            print(f"    {point:>{len(str(high))}} = {anchors[point]}")
+
     suffix = f" [{low}-{high}]"
 
     if default is not None:

@@ -264,6 +264,13 @@ was abandoned and re-run after the fix.
 Record: `D_BASE_P7_STARVATION_COUNTER_2026-09-22.md`; patch
 `patches/D-BASE-P7_AUDIO_HEARTBEAT_COUNTERS.md`.
 
+## Phase C — `C3.L3a` gameplay acceptance probe (2026-09-24)
+
+| Item | Status | Key runtime evidence |
+| --- | --- | --- |
+| `C3-L3A-P2R1` probe: telemetry settling path and decoder clock alignment | **RUNTIME VALIDATED on one session** (smoke `20260924_000330`, adopted build) — settling measured 2 of 2 (two distinct fresh snapshots, cadence 2,007 ms, pre-transition snapshot excluded as designed); alignment 4 pairs, spread 0.152 s, 8 of 8 SSRC changes = expected (Phase A + parks + restore); preflight refused a run on a stale stream | `C3_L3A_P2R2_SMOKE_SESSION_2026-09-24.md` |
+| `C3.L3a` gate (perceptibility of repeated transitions) | **NOT ANSWERED** — smoke is 1 jump + 1 ramp, 0 marks; pre-registered rerun (≥ 4 sessions, ≥ 20 per shape) awaits the user; `C3.L4` BLOCKED | `C3_L3A_P2R1_PROBE_DEFECTS_AND_RESCORE_2026-09-23.md` |
+
 ## Evidence integrity rule
 
 Raw measurements outrank classifiers when they disagree.
