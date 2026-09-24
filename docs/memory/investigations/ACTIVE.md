@@ -160,6 +160,22 @@ with its reason (`--pool-all` overrides, flagged); the 2026-09-20 files moved
 to evidence, `c3_l3a_runs/` empty
 (`../evidence/C3_L3A_P2R3_POOLING_RULE_2026-09-24.md`).
 
+**S1 — transition soak, overnight 2026-09-24** (unattended, attract mode,
+adopted profile; `../evidence/C3_L3A_S1_TRANSITION_SOAK_2026-09-24.md`). Three
+10-traversal no-park probe sessions interleaved with three plain holds of the
+same length, T1 cold. **A PARTIAL (52 of 60 covered — T1/T2 saturated the
+slow-event buffer)**: every restart's gap median 186.5 ms (128-225, codec
+7-13), `jump_packets` 0, RTP silence ~153 ms on all 60 — the actuator's floor;
+2 of 60 (both up) waited one GOP for a usable IDR, 405 / 423 ms. **B**: 30 of
+30 settled, 21 at the floor, 9 needed a third report (first report
+39.8-53.8 fps), one a fourth (6.0 s). **C CLEAN** (0 deltas, 20 = 20 SSRC ×
+3). **D**: rendered fps ELEVATED BY TRANSITIONS (−0.24 fps, arithmetic of
+20 × ~190 ms), every other close-out row within the night's noise; baseline
+in T **NO** on video loss (T1 37.5, T2 18.55 /min) — dominated by resyncs not
+at transitions (a 378-packet start-up resync before T1's first fire; a
+133-packet burst 4.3 s after a T2 transition), and the no-transition H2 read
+10.77. **F**: zero-input controller loss 213-438 /min. Authorizes nothing.
+
 **Rerun — REQUIRED, pre-registered 2026-09-23, not run.** Grounds, either
 sufficient: (a) the session predates the adopted build (cap, cushion,
 redundancy, headless host) and ran on a baseline failing every row — its own

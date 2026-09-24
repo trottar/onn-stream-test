@@ -45,6 +45,13 @@ one to two client reports (≤ ~4 s); each costs one 125-211 ms gap
 **`C3.L3a` pool rule** (`C3-L3A-P2R3`): `--aggregate` pools only v2-state
 runs with the pre-registered config and lists every skipped file with its
 reason; `c3_l3a_runs/` is empty (2026-09-20 files moved to evidence).
+**`C3.L3a-S1` transition soak** (2026-09-24, n = 60 / 30, attract mode):
+each restart costs one gap of median 186.5 ms (128-225; codec ≤ 13 ms;
+2 of 60 an extra GOP, ~410-420 ms); telemetry settles within one to three
+client reports (≤ ~4 s; once 6 s); lifecycle CLEAN
+(`evidence/C3_L3A_S1_TRANSITION_SOAK_2026-09-24.md`: A PARTIAL 52/60, B,
+C CLEAN, D fps ELEVATED −0.24 else within noise, baseline in T NO on video
+loss — the losses are not at transitions; no-transition H2 missed too).
 
 - **Profile** `native_game_720p60_reference`
   (`companion/native_stream_profiles.py`), all `source: profile`,
@@ -59,20 +66,18 @@ reason; `c3_l3a_runs/` is empty (2026-09-20 files moved to evidence).
   recovery never loads into a live core (`R3c2`).
 - **Host-shell operation**: open `MainActivity`, wake, tap RESUME PLAYING
   (`TOOLS.md`); adb after a host reboot: `adb connect <onn-address>:5555`.
-- **`.claude/` and `_prel2b/` are untracked and unignored** — the user's
-  call before any commit.
 
 ## Next Action
 
-The user plays the `C3.L3a` rerun sessions
-(`python3 tools/probe_c3_l3a_gameplay_acceptance.py`, then `--finalize`,
-then `--aggregate` once ≥ 4 are in); nothing runs without them.
-**`C3.L4` (the automatic controller)
-stays BLOCKED on that gate.** **Constraint to honour**: `C3.L2` classified
-Linux as `video_only_restart`, not authorized for automatic adaptation
-during play — `C3.L4` must answer it, not ignore it. Also open for the
-user: the `T2`/`T3` warm-state threshold proposals (none enforced);
-`host_link` (first fact: `T3`).
+The user's four `C3.L3a` rerun sessions — their play; nothing runs
+without them (`python3 tools/probe_c3_l3a_gameplay_acceptance.py`, then
+`--finalize`, then `--aggregate` once ≥ 4 are in). Then `C3.L4` (the
+automatic controller), BLOCKED until that gate, under `C3.L2`'s
+`video_only_restart` constraint — Linux is not authorized for automatic
+adaptation during play; `C3.L4` must answer it, not ignore it. Still open,
+not blocking: max output gap; `host_link` (first fact: `T3`); the thermal
+flag proposal (`T2`/`T3`, none enforced); the controller `lost_packets`
+item (`docs/KNOWN_ISSUES.md`).
 
 ## Success Criteria
 

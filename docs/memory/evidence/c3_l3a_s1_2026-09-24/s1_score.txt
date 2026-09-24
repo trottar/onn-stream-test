@@ -1,0 +1,206 @@
+== A. Transition cost (T1-T3 Phase A)
+  T1: alignment {'ok': True, 'pairs': 20, 'offset_s': 9.905, 'spread_s': 0.401, 'max_abs_residual_s': 0.247}; slow events retained 128/128 (marked 64/64, recent 64/64), saturated True, covered from decoder 111604 ms
+    not fully covered: ['ramp#0', 'ramp#1', 'ramp#2', 'jump#3']
+  T2: alignment {'ok': True, 'pairs': 20, 'offset_s': 7.031, 'spread_s': 0.489, 'max_abs_residual_s': 0.251}; slow events retained 128/128 (marked 64/64, recent 64/64), saturated True, covered from decoder 89751 ms
+    not fully covered: ['jump#0', 'ramp#1', 'ramp#2', 'ramp#3']
+  T3: alignment {'ok': True, 'pairs': 20, 'offset_s': 7.751, 'spread_s': 0.508, 'max_abs_residual_s': 0.302}; slow events retained 124/128 (marked 60/64, recent 64/64), saturated False, covered from decoder 0.0 ms
+  transitions 60; aligned and covered 52 -> PARTIAL (52 of 60)
+  [all]
+    max output gap in 1 s (ms)       n 52  min 128  median 186.5  p95 224  max 423
+    its codec_ms                     n 52  min 7  median 9.0  p95 11  max 13
+    first IDR (ms)                   n 60  min 0  median 18.0  p95 28  max 242
+    jump_packets                     n 60  min 0  median 0.0  p95 0  max 0
+    spawn (ms)                       n 60  min 33.1  median 266.3  p95 516.12  max 566.088
+    first RTP resume (ms)            n 60  min 186.774  median 420.2  p95 669.612  max 719.262
+    RTP silence after spawn (ms)     n 60  min 151.77  median 153.1  p95 163.588  max 164.322
+    host verified (ms)               n 60  min 939.618  median 1173.2  p95 1423.573  max 1472.0
+  [jump]
+    max output gap in 1 s (ms)       n 13  min 145  median 202  p95 224  max 423
+    its codec_ms                     n 13  min 8  median 9  p95 11  max 11
+    first IDR (ms)                   n 15  min 1  median 19  p95 28  max 241
+    jump_packets                     n 15  min 0  median 0  p95 0  max 0
+    spawn (ms)                       n 15  min 33.1  median 316.3  p95 515.445  max 515.878
+    first RTP resume (ms)            n 15  min 186.774  median 478.4  p95 668.572  max 679.596
+    RTP silence after spawn (ms)     n 15  min 151.986  median 153.1  p95 163.718  max 163.953
+    host verified (ms)               n 15  min 939.618  median 1230.9  p95 1421.149  max 1431.878
+  [ramp rung]
+    max output gap in 1 s (ms)       n 39  min 128  median 185  p95 222  max 405
+    its codec_ms                     n 39  min 7  median 9  p95 12  max 13
+    first IDR (ms)                   n 45  min 0  median 18  p95 27  max 242
+    jump_packets                     n 45  min 0  median 0  p95 0  max 0
+    spawn (ms)                       n 45  min 116.37  median 266.2  p95 516.205  max 566.088
+    first RTP resume (ms)            n 45  min 269.318  median 420.0  p95 669.612  max 719.262
+    RTP silence after spawn (ms)     n 45  min 151.77  median 153.0  p95 163.268  max 164.322
+    host verified (ms)               n 45  min 1021.638  median 1173.0  p95 1423.573  max 1472.0
+  [down]
+    max output gap in 1 s (ms)       n 25  min 135  median 178  p95 207  max 225
+    its codec_ms                     n 25  min 7  median 9  p95 11  max 12
+    first IDR (ms)                   n 29  min 0  median 18  p95 23  max 26
+    jump_packets                     n 29  min 0  median 0  p95 0  max 0
+    spawn (ms)                       n 29  min 33.1  median 266.1  p95 515.445  max 566.088
+    first RTP resume (ms)            n 29  min 186.774  median 419.1  p95 668.572  max 719.262
+    RTP silence after spawn (ms)     n 29  min 151.77  median 153.1  p95 163.953  max 164.322
+    host verified (ms)               n 29  min 939.618  median 1171.6  p95 1421.149  max 1472.0
+  [up]
+    max output gap in 1 s (ms)       n 27  min 128  median 193  p95 405  max 423
+    its codec_ms                     n 27  min 8  median 9  p95 12  max 13
+    first IDR (ms)                   n 31  min 3  median 20  p95 29  max 242
+    jump_packets                     n 31  min 0  median 0  p95 0  max 0
+    spawn (ms)                       n 31  min 65.593  median 266.4  p95 516.12  max 516.512
+    first RTP resume (ms)            n 31  min 219.287  median 428.0  p95 669.612  max 679.596
+    RTP silence after spawn (ms)     n 31  min 152.191  median 153.2  p95 163.268  max 163.718
+    host verified (ms)               n 31  min 972.825  median 1180.5  p95 1423.573  max 1431.878
+  [cold]
+    max output gap in 1 s (ms)       n  5  min 166  median 171  p95 224  max 224
+    its codec_ms                     n  5  min 9  median 9  p95 10  max 10
+    first IDR (ms)                   n  9  min 0  median 6  p95 23  max 23
+    jump_packets                     n  9  min 0  median 0  p95 0  max 0
+    spawn (ms)                       n  9  min 115.601  median 266.6  p95 465.707  max 465.707
+    first RTP resume (ms)            n  9  min 267.903  median 419.5  p95 618.289  max 618.289
+    RTP silence after spawn (ms)     n  9  min 151.77  median 152.4  p95 163.179  max 163.179
+    host verified (ms)               n  9  min 1021.742  median 1172.5  p95 1370.835  max 1370.835
+  [warm]
+    max output gap in 1 s (ms)       n 47  min 128  median 190  p95 225  max 423
+    its codec_ms                     n 47  min 7  median 9  p95 12  max 13
+    first IDR (ms)                   n 51  min 0  median 19  p95 29  max 242
+    jump_packets                     n 51  min 0  median 0  p95 0  max 0
+    spawn (ms)                       n 51  min 33.1  median 266.3  p95 516.205  max 566.088
+    first RTP resume (ms)            n 51  min 186.774  median 420.3  p95 678.672  max 719.262
+    RTP silence after spawn (ms)     n 51  min 151.986  median 153.2  p95 163.718  max 164.322
+    host verified (ms)               n 51  min 939.618  median 1173.2  p95 1431.292  max 1472.0
+  [T1]
+    max output gap in 1 s (ms)       n 16  min 128  median 185.5  p95 222  max 224
+    its codec_ms                     n 16  min 7  median 9.0  p95 12  max 12
+    first IDR (ms)                   n 20  min 0  median 13.5  p95 24  max 26
+    jump_packets                     n 20  min 0  median 0.0  p95 0  max 0
+    spawn (ms)                       n 20  min 115.601  median 266.7  p95 515.445  max 516.12
+    first RTP resume (ms)            n 20  min 267.903  median 429.1  p95 668.572  max 669.612
+    RTP silence after spawn (ms)     n 20  min 151.77  median 153.2  p95 163.179  max 163.588
+    host verified (ms)               n 20  min 1021.742  median 1181.9  p95 1421.149  max 1423.573
+  [T2]
+    max output gap in 1 s (ms)       n 16  min 143  median 186.5  p95 200  max 210
+    its codec_ms                     n 16  min 8  median 8.5  p95 11  max 13
+    first IDR (ms)                   n 20  min 3  median 19.5  p95 28  max 29
+    jump_packets                     n 20  min 0  median 0.0  p95 0  max 0
+    spawn (ms)                       n 20  min 33.1  median 265.6  p95 467.121  max 516.512
+    first RTP resume (ms)            n 20  min 186.774  median 418.9  p95 620.448  max 678.672
+    RTP silence after spawn (ms)     n 20  min 151.986  median 153.1  p95 163.268  max 163.953
+    host verified (ms)               n 20  min 939.618  median 1172.2  p95 1372.836  max 1431.292
+  [T3]
+    max output gap in 1 s (ms)       n 20  min 146  median 194.5  p95 405  max 423
+    its codec_ms                     n 20  min 7  median 9.0  p95 11  max 11
+    first IDR (ms)                   n 20  min 0  median 18.0  p95 241  max 242
+    jump_packets                     n 20  min 0  median 0.0  p95 0  max 0
+    spawn (ms)                       n 20  min 65.593  median 266.7  p95 516.205  max 566.088
+    first RTP resume (ms)            n 20  min 219.287  median 429.0  p95 679.596  max 719.262
+    RTP silence after spawn (ms)     n 20  min 152.142  median 153.1  p95 163.718  max 164.322
+    host verified (ms)               n 20  min 972.825  median 1181.6  p95 1431.878  max 1472.0
+
+== B. Settling (T1-T3, 10 sequences each)
+  sequences 30; measured 30; never settled 0
+  settled_s n 30  min 1.004  median 3.0  p95 4.013  max 6.016
+  distinct snapshots [2, 3, 4]; sample_interval_ms [2000.0]; cadence_ms n 30  min 2007.5  median 2010.0  p95 2021.5  max 2027.0; budget_ok ['True']
+  needed a third report or more: 9
+    T1 seq 2 jump: settled 4.01 distinct 3
+      {'age_ms': 492, 'at_s': 0.502, 'fps': 43.81, 'fresh': True, 'good': False, 'mbps': 1.497, 'new_snapshot': True, 'output_gap_ms': 17, 'queue_depth': 0, 'session_elapsed_ms': 186956.0, 'waiting_for_idr': False}
+      {'age_ms': 993, 'at_s': 1.003, 'fps': 43.81, 'fresh': True, 'good': False, 'mbps': 1.497, 'new_snapshot': False, 'output_gap_ms': 17, 'queue_depth': 0, 'session_elapsed_ms': 186956.0, 'waiting_for_idr': False}
+      {'age_ms': 1494, 'at_s': 1.504, 'fps': 43.81, 'fresh': True, 'good': False, 'mbps': 1.497, 'new_snapshot': False, 'output_gap_ms': 17, 'queue_depth': 0, 'session_elapsed_ms': 186956.0, 'waiting_for_idr': False}
+      {'age_ms': 463, 'at_s': 2.005, 'fps': 59.77, 'fresh': True, 'good': True, 'mbps': 5.456, 'new_snapshot': True, 'output_gap_ms': 18, 'queue_depth': 0, 'session_elapsed_ms': 188966.0, 'waiting_for_idr': False}
+      {'age_ms': 455, 'at_s': 4.01, 'fps': 59.69, 'fresh': True, 'good': True, 'mbps': 4.952, 'new_snapshot': True, 'output_gap_ms': 16, 'queue_depth': 0, 'session_elapsed_ms': 190975.0, 'waiting_for_idr': False}
+    T1 seq 3 jump: settled 4.012 distinct 3
+      {'age_ms': 494, 'at_s': 0.503, 'fps': 53.77, 'fresh': True, 'good': False, 'mbps': 5.775, 'new_snapshot': True, 'output_gap_ms': 15, 'queue_depth': 0, 'session_elapsed_ms': 263351.0, 'waiting_for_idr': False}
+      {'age_ms': 995, 'at_s': 1.004, 'fps': 53.77, 'fresh': True, 'good': False, 'mbps': 5.775, 'new_snapshot': False, 'output_gap_ms': 15, 'queue_depth': 0, 'session_elapsed_ms': 263351.0, 'waiting_for_idr': False}
+      {'age_ms': 1497, 'at_s': 1.505, 'fps': 53.77, 'fresh': True, 'good': False, 'mbps': 5.775, 'new_snapshot': False, 'output_gap_ms': 15, 'queue_depth': 0, 'session_elapsed_ms': 263351.0, 'waiting_for_idr': False}
+      {'age_ms': 294, 'at_s': 2.006, 'fps': 55.82, 'fresh': True, 'good': True, 'mbps': 6.65, 'new_snapshot': True, 'output_gap_ms': 16, 'queue_depth': 0, 'session_elapsed_ms': 265360.0, 'waiting_for_idr': False}
+      {'age_ms': 266, 'at_s': 4.012, 'fps': 59.78, 'fresh': True, 'good': True, 'mbps': 7.442, 'new_snapshot': True, 'output_gap_ms': 15, 'queue_depth': 0, 'session_elapsed_ms': 267369.0, 'waiting_for_idr': False}
+    T1 seq 4 ramp: settled 4.013 distinct 3
+      {'age_ms': 494, 'at_s': 0.504, 'fps': 45.8, 'fresh': True, 'good': False, 'mbps': 2.729, 'new_snapshot': True, 'output_gap_ms': 14, 'queue_depth': 0, 'session_elapsed_ms': 363852.0, 'waiting_for_idr': False}
+      {'age_ms': 995, 'at_s': 1.005, 'fps': 45.8, 'fresh': True, 'good': False, 'mbps': 2.729, 'new_snapshot': False, 'output_gap_ms': 14, 'queue_depth': 0, 'session_elapsed_ms': 363852.0, 'waiting_for_idr': False}
+      {'age_ms': 1497, 'at_s': 1.506, 'fps': 45.8, 'fresh': True, 'good': False, 'mbps': 2.729, 'new_snapshot': False, 'output_gap_ms': 14, 'queue_depth': 0, 'session_elapsed_ms': 363852.0, 'waiting_for_idr': False}
+      {'age_ms': 347, 'at_s': 2.008, 'fps': 55.81, 'fresh': True, 'good': True, 'mbps': 7.821, 'new_snapshot': True, 'output_gap_ms': 23, 'queue_depth': 0, 'session_elapsed_ms': 365861.0, 'waiting_for_idr': False}
+      {'age_ms': 355, 'at_s': 4.013, 'fps': 59.74, 'fresh': True, 'good': True, 'mbps': 5.053, 'new_snapshot': True, 'output_gap_ms': 19, 'queue_depth': 0, 'session_elapsed_ms': 367870.0, 'waiting_for_idr': False}
+    T1 seq 6 jump: settled 6.016 distinct 4
+      {'age_ms': 493, 'at_s': 0.502, 'fps': 51.85, 'fresh': True, 'good': False, 'mbps': 6.017, 'new_snapshot': True, 'output_gap_ms': 18, 'queue_depth': 0, 'session_elapsed_ms': 536650.0, 'waiting_for_idr': False}
+      {'age_ms': 994, 'at_s': 1.003, 'fps': 51.85, 'fresh': True, 'good': False, 'mbps': 6.017, 'new_snapshot': False, 'output_gap_ms': 18, 'queue_depth': 0, 'session_elapsed_ms': 536650.0, 'waiting_for_idr': False}
+      {'age_ms': 1496, 'at_s': 1.505, 'fps': 51.85, 'fresh': True, 'good': False, 'mbps': 6.017, 'new_snapshot': False, 'output_gap_ms': 18, 'queue_depth': 0, 'session_elapsed_ms': 536650.0, 'waiting_for_idr': False}
+      {'age_ms': 272, 'at_s': 2.006, 'fps': 53.84, 'fresh': True, 'good': False, 'mbps': 3.999, 'new_snapshot': True, 'output_gap_ms': 15, 'queue_depth': 0, 'session_elapsed_ms': 538659.0, 'waiting_for_idr': False}
+      {'age_ms': 774, 'at_s': 2.507, 'fps': 53.84, 'fresh': True, 'good': False, 'mbps': 3.999, 'new_snapshot': False, 'output_gap_ms': 15, 'queue_depth': 0, 'session_elapsed_ms': 538659.0, 'waiting_for_idr': False}
+      {'age_ms': 1275, 'at_s': 3.009, 'fps': 53.84, 'fresh': True, 'good': False, 'mbps': 3.999, 'new_snapshot': False, 'output_gap_ms': 15, 'queue_depth': 0, 'session_elapsed_ms': 538659.0, 'waiting_for_idr': False}
+      {'age_ms': 1776, 'at_s': 3.51, 'fps': 53.84, 'fresh': True, 'good': False, 'mbps': 3.999, 'new_snapshot': False, 'output_gap_ms': 15, 'queue_depth': 0, 'session_elapsed_ms': 538659.0, 'waiting_for_idr': False}
+      {'age_ms': 308, 'at_s': 4.011, 'fps': 59.81, 'fresh': True, 'good': True, 'mbps': 4.913, 'new_snapshot': True, 'output_gap_ms': 15, 'queue_depth': 0, 'session_elapsed_ms': 540669.0, 'waiting_for_idr': False}
+      {'age_ms': 306, 'at_s': 6.016, 'fps': 59.81, 'fresh': True, 'good': True, 'mbps': 4.529, 'new_snapshot': True, 'output_gap_ms': 15, 'queue_depth': 0, 'session_elapsed_ms': 542679.0, 'waiting_for_idr': False}
+    T2 seq 0 jump: settled 3.51 distinct 3
+      {'age_ms': 494, 'at_s': 0.502, 'fps': 41.54, 'fresh': True, 'good': False, 'mbps': 3.584, 'new_snapshot': True, 'output_gap_ms': 12, 'queue_depth': 0, 'session_elapsed_ms': 7124.0, 'waiting_for_idr': False}
+      {'age_ms': 995, 'at_s': 1.003, 'fps': 41.54, 'fresh': True, 'good': False, 'mbps': 3.584, 'new_snapshot': False, 'output_gap_ms': 12, 'queue_depth': 0, 'session_elapsed_ms': 7124.0, 'waiting_for_idr': False}
+      {'age_ms': 23, 'at_s': 1.505, 'fps': 61.34, 'fresh': True, 'good': True, 'mbps': 5.078, 'new_snapshot': True, 'output_gap_ms': 15, 'queue_depth': 0, 'session_elapsed_ms': 9149.0, 'waiting_for_idr': False}
+      {'age_ms': 1, 'at_s': 3.51, 'fps': 59.37, 'fresh': True, 'good': True, 'mbps': 5.075, 'new_snapshot': True, 'output_gap_ms': 13, 'queue_depth': 0, 'session_elapsed_ms': 11176.0, 'waiting_for_idr': False}
+    T3 seq 2 jump: settled 3.51 distinct 3
+      {'age_ms': 495, 'at_s': 0.503, 'fps': 39.84, 'fresh': True, 'good': False, 'mbps': 6.137, 'new_snapshot': True, 'output_gap_ms': 18, 'queue_depth': 0, 'session_elapsed_ms': 174314.0, 'waiting_for_idr': False}
+      {'age_ms': 996, 'at_s': 1.004, 'fps': 39.84, 'fresh': True, 'good': False, 'mbps': 6.137, 'new_snapshot': False, 'output_gap_ms': 18, 'queue_depth': 0, 'session_elapsed_ms': 174314.0, 'waiting_for_idr': False}
+      {'age_ms': 1497, 'at_s': 1.505, 'fps': 39.84, 'fresh': True, 'good': False, 'mbps': 6.137, 'new_snapshot': False, 'output_gap_ms': 18, 'queue_depth': 0, 'session_elapsed_ms': 174314.0, 'waiting_for_idr': False}
+      {'age_ms': 406, 'at_s': 2.007, 'fps': 57.77, 'fresh': True, 'good': True, 'mbps': 5.377, 'new_snapshot': True, 'output_gap_ms': 16, 'queue_depth': 0, 'session_elapsed_ms': 176325.0, 'waiting_for_idr': False}
+      {'age_ms': 111, 'at_s': 3.51, 'fps': 59.74, 'fresh': True, 'good': True, 'mbps': 5.007, 'new_snapshot': True, 'output_gap_ms': 16, 'queue_depth': 0, 'session_elapsed_ms': 178335.0, 'waiting_for_idr': False}
+    T3 seq 4 ramp: settled 4.011 distinct 3
+      {'age_ms': 493, 'at_s': 0.502, 'fps': 53.82, 'fresh': True, 'good': False, 'mbps': 5.868, 'new_snapshot': True, 'output_gap_ms': 14, 'queue_depth': 0, 'session_elapsed_ms': 353249.0, 'waiting_for_idr': False}
+      {'age_ms': 994, 'at_s': 1.004, 'fps': 53.82, 'fresh': True, 'good': False, 'mbps': 5.868, 'new_snapshot': False, 'output_gap_ms': 14, 'queue_depth': 0, 'session_elapsed_ms': 353249.0, 'waiting_for_idr': False}
+      {'age_ms': 1495, 'at_s': 1.505, 'fps': 53.82, 'fresh': True, 'good': False, 'mbps': 5.868, 'new_snapshot': False, 'output_gap_ms': 14, 'queue_depth': 0, 'session_elapsed_ms': 353249.0, 'waiting_for_idr': False}
+      {'age_ms': 304, 'at_s': 2.006, 'fps': 59.76, 'fresh': True, 'good': True, 'mbps': 5.017, 'new_snapshot': True, 'output_gap_ms': 22, 'queue_depth': 0, 'session_elapsed_ms': 355258.0, 'waiting_for_idr': False}
+      {'age_ms': 78, 'at_s': 4.011, 'fps': 62.64, 'fresh': True, 'good': True, 'mbps': 3.706, 'new_snapshot': True, 'output_gap_ms': 23, 'queue_depth': 0, 'session_elapsed_ms': 357281.0, 'waiting_for_idr': False}
+    T3 seq 5 ramp: settled 4.011 distinct 3
+      {'age_ms': 494, 'at_s': 0.503, 'fps': 45.86, 'fresh': True, 'good': False, 'mbps': 5.149, 'new_snapshot': True, 'output_gap_ms': 18, 'queue_depth': 0, 'session_elapsed_ms': 423626.0, 'waiting_for_idr': False}
+      {'age_ms': 995, 'at_s': 1.004, 'fps': 45.86, 'fresh': True, 'good': False, 'mbps': 5.149, 'new_snapshot': False, 'output_gap_ms': 18, 'queue_depth': 0, 'session_elapsed_ms': 423626.0, 'waiting_for_idr': False}
+      {'age_ms': 1496, 'at_s': 1.505, 'fps': 45.86, 'fresh': True, 'good': False, 'mbps': 5.149, 'new_snapshot': False, 'output_gap_ms': 18, 'queue_depth': 0, 'session_elapsed_ms': 423626.0, 'waiting_for_idr': False}
+      {'age_ms': 466, 'at_s': 2.006, 'fps': 59.76, 'fresh': True, 'good': True, 'mbps': 6.66, 'new_snapshot': True, 'output_gap_ms': 20, 'queue_depth': 0, 'session_elapsed_ms': 425635.0, 'waiting_for_idr': False}
+      {'age_ms': 469, 'at_s': 4.011, 'fps': 59.82, 'fresh': True, 'good': True, 'mbps': 6.657, 'new_snapshot': True, 'output_gap_ms': 13, 'queue_depth': 0, 'session_elapsed_ms': 427645.0, 'waiting_for_idr': False}
+    T3 seq 7 jump: settled 3.51 distinct 3
+      {'age_ms': 495, 'at_s': 0.503, 'fps': 43.87, 'fresh': True, 'good': False, 'mbps': 6.952, 'new_snapshot': True, 'output_gap_ms': 7, 'queue_depth': 0, 'session_elapsed_ms': 584377.0, 'waiting_for_idr': False}
+      {'age_ms': 996, 'at_s': 1.004, 'fps': 43.87, 'fresh': True, 'good': False, 'mbps': 6.952, 'new_snapshot': False, 'output_gap_ms': 7, 'queue_depth': 0, 'session_elapsed_ms': 584377.0, 'waiting_for_idr': False}
+      {'age_ms': 142, 'at_s': 1.505, 'fps': 59.79, 'fresh': True, 'good': True, 'mbps': 7.21, 'new_snapshot': True, 'output_gap_ms': 16, 'queue_depth': 0, 'session_elapsed_ms': 586384.0, 'waiting_for_idr': False}
+      {'age_ms': 127, 'at_s': 3.51, 'fps': 59.77, 'fresh': True, 'good': True, 'mbps': 6.901, 'new_snapshot': True, 'output_gap_ms': 11, 'queue_depth': 0, 'session_elapsed_ms': 588393.0, 'waiting_for_idr': False}
+
+== C. Lifecycle
+  transitions 60; totals fec_send_errors 0, audio_send_errors 0, controller_bad_packets 0; transitions with a nonzero delta 0
+  T1: decoder ssrc_changes 20 vs expected 20
+  T2: decoder ssrc_changes 20 vs expected 20
+  T3: decoder ssrc_changes 20 vs expected 20
+  -> CLEAN
+
+== D. Close-out rows: six sessions against the night's band (H1 H2 H3 + close-out C W)
+  row                                  T1       T2       T3       H1       H2       H3        C        W
+  spikes >= 20 ms / min             38.87    33.51    33.57    36.97    33.20    24.23    32.84    26.04
+  rendered fps                      59.68    59.66    59.65    59.91    59.91    59.92    59.90    59.91
+  stale drops / min                  1.16     1.17     1.48     1.17     1.39     0.96     1.14     0.80
+  video loss / min post-FEC         37.50    18.55     6.21     6.60    10.77     5.39     8.67     8.40
+  audio underruns / session         16.00    15.00    10.00    19.00    20.00     9.00    17.00    14.00
+  prolonged starvation / min         0.21     0.51     0.07     0.76     0.51     0.07     0.35     0.05
+  fec_recovered / min                3.63    12.83    12.42    10.86     3.81    12.86    14.71    16.15
+  (audio underruns / min)            1.09     1.10     0.74     1.31     1.47     0.66     0.84     0.70
+  max output gap (ms) [not ruled]   224.00   369.00   423.00   122.00   172.00   107.00   163.00   110.00
+  (duration min)                    14.61    13.64    13.52    14.55    13.64    13.54        -        -
+  spikes >= 20 ms / min          WITHIN THE NIGHT'S NOISE: T [38.87, 33.51, 33.57] median 33.57; band worst 36.97, width 12.74; T median beyond worst by -3.40; all three worse False
+  rendered fps                   ELEVATED BY TRANSITIONS: T [59.68, 59.66, 59.65] median 59.66; band worst 59.90, width 0.02; T median beyond worst by +0.24; all three worse True
+  stale drops / min              WITHIN THE NIGHT'S NOISE: T [1.16, 1.17, 1.48] median 1.17; band worst 1.39, width 0.60; T median beyond worst by -0.22; all three worse False
+  video loss / min post-FEC      WITHIN THE NIGHT'S NOISE: T [37.5, 18.55, 6.21] median 18.55; band worst 10.77, width 5.38; T median beyond worst by +7.77; all three worse False
+  audio underruns / session      WITHIN THE NIGHT'S NOISE: T [16, 15, 10] median 15.00; band worst 20.00, width 11.00; T median beyond worst by -5.00; all three worse False
+  prolonged starvation / min     WITHIN THE NIGHT'S NOISE: T [0.21, 0.51, 0.07] median 0.21; band worst 0.76, width 0.71; T median beyond worst by -0.55; all three worse False
+  fec_recovered / min            WITHIN THE NIGHT'S NOISE: T [3.63, 12.83, 12.42] median 12.42; band worst 16.15, width 12.34; T median beyond worst by -3.73; all three worse False
+  Baseline stays met in the T sessions: NO -- failing [('T1', 'video_lost_per_min_post_fec', 37.5, '< 10'), ('T2', 'video_lost_per_min_post_fec', 18.55, '< 10')]
+
+== E. Warm-state context
+  T0 (T) 05:40:45-05:42:25Z onn cpu 58.073 -> 56.864002 C, status 0/0; audio lost per minute (heartbeat) [0]
+  T1 (T) 06:24:17-06:38:43Z onn cpu 63.132004 -> 68.758 C, status 0/0; audio lost per minute (heartbeat) [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0]
+  H1 (H) 06:39:54-06:54:20Z onn cpu 67.626 -> 69.747 C, status 0/0; audio lost per minute (heartbeat) [0, 0, 1, 1, 0, 3, 2, 1, 1, 0, 1, 0, 0, 0]
+  T2 (T) 06:55:29-07:09:00Z onn cpu 68.04301 -> 69.079 C, status 0/0; audio lost per minute (heartbeat) [21, 1, 2, 0, 1, 3, 1, 0, 0, 2, 1, 0, 1]
+  H2 (H) 07:10:08-07:23:39Z onn cpu 67.996 -> 70.28001 C, status 0/0; audio lost per minute (heartbeat) [1, 0, 0, 3, 28, 1, 0, 0, 1, 1, 0, 1, 0]
+  T3 (T) 07:24:48-07:38:11Z onn cpu 67.600006 -> 68.219 C, status 0/0; audio lost per minute (heartbeat) [0, 1, 3, 1, 2, 2, 0, 3, 0, 1, 1, 0, 0]
+  H3 (H) 07:39:24-07:52:47Z onn cpu 66.625 -> 64.793 C, status 0/0; audio lost per minute (heartbeat) [2, 3, 3, 2, 0, 0, 3, 0, 1, 0, 1, 1, 1]
+  audio loss / min after de-dup, band rule: WITHIN THE NIGHT'S NOISE: T [0.14, 2.64, 1.18], band [0.69, 2.79, 1.77, 0.25, 1.44], T median beyond worst by -1.60 vs width 2.54
+
+== F. Controller transport, zero input
+  T0: {'minutes': 1.67, 'lost': 734, 'received': 41610, 'lost_per_min': 438.4, 'received_per_min': 24855.1, 'bad_packets_end': 0, 'probe_conditions': [29, 760]}
+  T1: {'minutes': 14.43, 'lost': 5297, 'received': 369519, 'lost_per_min': 367.0, 'received_per_min': 25602.5, 'bad_packets_end': 0, 'probe_conditions': [24, 5321]}
+  H1: {'minutes': 14.44, 'lost': 4986, 'received': 369984, 'lost_per_min': 345.4, 'received_per_min': 25629.5, 'bad_packets_end': 0}
+  T2: {'minutes': 13.52, 'lost': 2875, 'received': 347697, 'lost_per_min': 212.7, 'received_per_min': 25717.8, 'bad_packets_end': 0, 'probe_conditions': [18, 2893]}
+  H2: {'minutes': 13.52, 'lost': 3427, 'received': 348261, 'lost_per_min': 253.4, 'received_per_min': 25755.7, 'bad_packets_end': 0}
+  T3: {'minutes': 13.39, 'lost': 3406, 'received': 343798, 'lost_per_min': 254.4, 'received_per_min': 25679.6, 'bad_packets_end': 0, 'probe_conditions': [13, 3416]}
+  H3: {'minutes': 13.39, 'lost': 3130, 'received': 345433, 'lost_per_min': 233.8, 'received_per_min': 25805.0, 'bad_packets_end': 0}

@@ -17,7 +17,10 @@ user** (`../evidence/C3_L3A_P2R1_PROBE_DEFECTS_AND_RESCORE_2026-09-23.md`).
 Then `C3.L4`, BLOCKED until then. **Smoke 2026-09-24 (`C3-L3A-P2R2`):**
 settling and transition cost measured on the adopted build, picture 9/9/9 —
 the ladder stands; not a gate observation
-(`../evidence/C3_L3A_P2R2_SMOKE_SESSION_2026-09-24.md`). **`C3.L2`'s classification stands**:
+(`../evidence/C3_L3A_P2R2_SMOKE_SESSION_2026-09-24.md`). **Overnight soak
+`C3.L3a-S1`** (n = 60 transitions, attract mode): restart gap median 186.5 ms,
+lifecycle CLEAN, settling ≤ ~4 s; no-transition H2 also missed the video-loss
+target (`../evidence/C3_L3A_S1_TRANSITION_SOAK_2026-09-24.md`). **`C3.L2`'s classification stands**:
 Linux is `video_only_restart`, not authorized for automatic adaptation
 during play — `C3.L4` has to answer it.
 

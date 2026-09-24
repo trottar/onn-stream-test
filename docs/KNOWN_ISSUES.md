@@ -866,6 +866,14 @@ Full record: `investigations/2026-09-07-udp-transport.md`.
   numbers by design, is not known. Status: **open, observed not
   investigated.** Record:
   `docs/memory/evidence/C3_L3A_P2R2_SMOKE_SESSION_2026-09-24.md`.
+- **Zero-input baseline, 2026-09-24 overnight (`C3.L3a-S1`)**: with no
+  input the client sends ~25,700 controller datagrams a minute, and the
+  counter reads **213-438 lost / min** (0.8-1.8 %) across seven attract-mode
+  sessions, `bad_packets` 0; the close-out's own C / W status files give
+  ~630 / ~680 / min, also zero input. **The ~345 / min under play is inside
+  the zero-input range; play does not raise it.** The 2026-09-20 ~23 / min
+  is the outlier. Still open, still not investigated. Record:
+  `docs/memory/evidence/C3_L3A_S1_TRANSITION_SOAK_2026-09-24.md` (item F).
 <!-- PRIVYHUB_CONTROLLER_LOST_PACKETS_UNDER_PLAY:KNOWN_ISSUES:END -->
 
 ## 2026-09-23 — open after the `D-BASE` close-out (baseline MET)

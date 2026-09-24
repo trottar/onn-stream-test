@@ -1,0 +1,1199 @@
+{
+ "sessions": {
+  "T0": {
+   "mode": "T",
+   "report": "native_decoder_20260924_054227_412.json",
+   "t0": "2026-09-24T05:40:45Z",
+   "t1": "2026-09-24T05:42:25Z"
+  },
+  "T1": {
+   "mode": "T",
+   "report": "native_decoder_20260924_063845_903.json",
+   "t0": "2026-09-24T06:24:17Z",
+   "t1": "2026-09-24T06:38:43Z"
+  },
+  "H1": {
+   "mode": "H",
+   "report": "native_decoder_20260924_065422_311.json",
+   "t0": "2026-09-24T06:39:54Z",
+   "t1": "2026-09-24T06:54:20Z"
+  },
+  "T2": {
+   "mode": "T",
+   "report": "native_decoder_20260924_070901_991.json",
+   "t0": "2026-09-24T06:55:29Z",
+   "t1": "2026-09-24T07:09:00Z"
+  },
+  "H2": {
+   "mode": "H",
+   "report": "native_decoder_20260924_072341_344.json",
+   "t0": "2026-09-24T07:10:08Z",
+   "t1": "2026-09-24T07:23:39Z"
+  },
+  "T3": {
+   "mode": "T",
+   "report": "native_decoder_20260924_073814_029.json",
+   "t0": "2026-09-24T07:24:48Z",
+   "t1": "2026-09-24T07:38:11Z"
+  },
+  "H3": {
+   "mode": "H",
+   "report": "native_decoder_20260924_075248_964.json",
+   "t0": "2026-09-24T07:39:24Z",
+   "t1": "2026-09-24T07:52:47Z"
+  }
+ },
+ "alignment": {
+  "T1": {
+   "ok": true,
+   "pairs": 20,
+   "offset_s": 9.905,
+   "spread_s": 0.401,
+   "max_abs_residual_s": 0.247
+  },
+  "T2": {
+   "ok": true,
+   "pairs": 20,
+   "offset_s": 7.031,
+   "spread_s": 0.489,
+   "max_abs_residual_s": 0.251
+  },
+  "T3": {
+   "ok": true,
+   "pairs": 20,
+   "offset_s": 7.751,
+   "spread_s": 0.508,
+   "max_abs_residual_s": 0.302
+  }
+ },
+ "coverage": {
+  "T1": {
+   "capacity": 128,
+   "capacity_marked": 64,
+   "capacity_recent": 64,
+   "covered_from_decoder_ms": 111604,
+   "covered_from_probe_s": 101.699,
+   "retained": 128,
+   "retained_marked": 64,
+   "retained_recent": 64,
+   "saturated": true
+  },
+  "T2": {
+   "capacity": 128,
+   "capacity_marked": 64,
+   "capacity_recent": 64,
+   "covered_from_decoder_ms": 89751,
+   "covered_from_probe_s": 82.72,
+   "retained": 128,
+   "retained_marked": 64,
+   "retained_recent": 64,
+   "saturated": true
+  },
+  "T3": {
+   "capacity": 128,
+   "capacity_marked": 64,
+   "capacity_recent": 64,
+   "covered_from_decoder_ms": 0.0,
+   "covered_from_probe_s": -7.751,
+   "retained": 124,
+   "retained_marked": 60,
+   "retained_recent": 64,
+   "saturated": false
+  }
+ },
+ "A": {
+  "transitions": 60,
+  "aligned_covered": 52,
+  "classification": "PARTIAL (52 of 60)",
+  "groups": {
+   "all": {
+    "gap": {
+     "n": 52,
+     "min": 128,
+     "median": 186.5,
+     "p95": 224,
+     "max": 423
+    },
+    "codec": {
+     "n": 52,
+     "min": 7,
+     "median": 9.0,
+     "p95": 11,
+     "max": 13
+    },
+    "idr": {
+     "n": 60,
+     "min": 0,
+     "median": 18.0,
+     "p95": 28,
+     "max": 242
+    },
+    "jump": {
+     "n": 60,
+     "min": 0,
+     "median": 0.0,
+     "p95": 0,
+     "max": 0
+    },
+    "spawn": {
+     "n": 60,
+     "min": 33.1,
+     "median": 266.3,
+     "p95": 516.12,
+     "max": 566.088
+    },
+    "rtp": {
+     "n": 60,
+     "min": 186.774,
+     "median": 420.2,
+     "p95": 669.612,
+     "max": 719.262
+    },
+    "silence": {
+     "n": 60,
+     "min": 151.77,
+     "median": 153.1,
+     "p95": 163.588,
+     "max": 164.322
+    },
+    "verified": {
+     "n": 60,
+     "min": 939.618,
+     "median": 1173.2,
+     "p95": 1423.573,
+     "max": 1472.0
+    }
+   },
+   "jump": {
+    "gap": {
+     "n": 13,
+     "min": 145,
+     "median": 202,
+     "p95": 224,
+     "max": 423
+    },
+    "codec": {
+     "n": 13,
+     "min": 8,
+     "median": 9,
+     "p95": 11,
+     "max": 11
+    },
+    "idr": {
+     "n": 15,
+     "min": 1,
+     "median": 19,
+     "p95": 28,
+     "max": 241
+    },
+    "jump": {
+     "n": 15,
+     "min": 0,
+     "median": 0,
+     "p95": 0,
+     "max": 0
+    },
+    "spawn": {
+     "n": 15,
+     "min": 33.1,
+     "median": 316.3,
+     "p95": 515.445,
+     "max": 515.878
+    },
+    "rtp": {
+     "n": 15,
+     "min": 186.774,
+     "median": 478.4,
+     "p95": 668.572,
+     "max": 679.596
+    },
+    "silence": {
+     "n": 15,
+     "min": 151.986,
+     "median": 153.1,
+     "p95": 163.718,
+     "max": 163.953
+    },
+    "verified": {
+     "n": 15,
+     "min": 939.618,
+     "median": 1230.9,
+     "p95": 1421.149,
+     "max": 1431.878
+    }
+   },
+   "ramp rung": {
+    "gap": {
+     "n": 39,
+     "min": 128,
+     "median": 185,
+     "p95": 222,
+     "max": 405
+    },
+    "codec": {
+     "n": 39,
+     "min": 7,
+     "median": 9,
+     "p95": 12,
+     "max": 13
+    },
+    "idr": {
+     "n": 45,
+     "min": 0,
+     "median": 18,
+     "p95": 27,
+     "max": 242
+    },
+    "jump": {
+     "n": 45,
+     "min": 0,
+     "median": 0,
+     "p95": 0,
+     "max": 0
+    },
+    "spawn": {
+     "n": 45,
+     "min": 116.37,
+     "median": 266.2,
+     "p95": 516.205,
+     "max": 566.088
+    },
+    "rtp": {
+     "n": 45,
+     "min": 269.318,
+     "median": 420.0,
+     "p95": 669.612,
+     "max": 719.262
+    },
+    "silence": {
+     "n": 45,
+     "min": 151.77,
+     "median": 153.0,
+     "p95": 163.268,
+     "max": 164.322
+    },
+    "verified": {
+     "n": 45,
+     "min": 1021.638,
+     "median": 1173.0,
+     "p95": 1423.573,
+     "max": 1472.0
+    }
+   },
+   "down": {
+    "gap": {
+     "n": 25,
+     "min": 135,
+     "median": 178,
+     "p95": 207,
+     "max": 225
+    },
+    "codec": {
+     "n": 25,
+     "min": 7,
+     "median": 9,
+     "p95": 11,
+     "max": 12
+    },
+    "idr": {
+     "n": 29,
+     "min": 0,
+     "median": 18,
+     "p95": 23,
+     "max": 26
+    },
+    "jump": {
+     "n": 29,
+     "min": 0,
+     "median": 0,
+     "p95": 0,
+     "max": 0
+    },
+    "spawn": {
+     "n": 29,
+     "min": 33.1,
+     "median": 266.1,
+     "p95": 515.445,
+     "max": 566.088
+    },
+    "rtp": {
+     "n": 29,
+     "min": 186.774,
+     "median": 419.1,
+     "p95": 668.572,
+     "max": 719.262
+    },
+    "silence": {
+     "n": 29,
+     "min": 151.77,
+     "median": 153.1,
+     "p95": 163.953,
+     "max": 164.322
+    },
+    "verified": {
+     "n": 29,
+     "min": 939.618,
+     "median": 1171.6,
+     "p95": 1421.149,
+     "max": 1472.0
+    }
+   },
+   "up": {
+    "gap": {
+     "n": 27,
+     "min": 128,
+     "median": 193,
+     "p95": 405,
+     "max": 423
+    },
+    "codec": {
+     "n": 27,
+     "min": 8,
+     "median": 9,
+     "p95": 12,
+     "max": 13
+    },
+    "idr": {
+     "n": 31,
+     "min": 3,
+     "median": 20,
+     "p95": 29,
+     "max": 242
+    },
+    "jump": {
+     "n": 31,
+     "min": 0,
+     "median": 0,
+     "p95": 0,
+     "max": 0
+    },
+    "spawn": {
+     "n": 31,
+     "min": 65.593,
+     "median": 266.4,
+     "p95": 516.12,
+     "max": 516.512
+    },
+    "rtp": {
+     "n": 31,
+     "min": 219.287,
+     "median": 428.0,
+     "p95": 669.612,
+     "max": 679.596
+    },
+    "silence": {
+     "n": 31,
+     "min": 152.191,
+     "median": 153.2,
+     "p95": 163.268,
+     "max": 163.718
+    },
+    "verified": {
+     "n": 31,
+     "min": 972.825,
+     "median": 1180.5,
+     "p95": 1423.573,
+     "max": 1431.878
+    }
+   },
+   "cold": {
+    "gap": {
+     "n": 5,
+     "min": 166,
+     "median": 171,
+     "p95": 224,
+     "max": 224
+    },
+    "codec": {
+     "n": 5,
+     "min": 9,
+     "median": 9,
+     "p95": 10,
+     "max": 10
+    },
+    "idr": {
+     "n": 9,
+     "min": 0,
+     "median": 6,
+     "p95": 23,
+     "max": 23
+    },
+    "jump": {
+     "n": 9,
+     "min": 0,
+     "median": 0,
+     "p95": 0,
+     "max": 0
+    },
+    "spawn": {
+     "n": 9,
+     "min": 115.601,
+     "median": 266.6,
+     "p95": 465.707,
+     "max": 465.707
+    },
+    "rtp": {
+     "n": 9,
+     "min": 267.903,
+     "median": 419.5,
+     "p95": 618.289,
+     "max": 618.289
+    },
+    "silence": {
+     "n": 9,
+     "min": 151.77,
+     "median": 152.4,
+     "p95": 163.179,
+     "max": 163.179
+    },
+    "verified": {
+     "n": 9,
+     "min": 1021.742,
+     "median": 1172.5,
+     "p95": 1370.835,
+     "max": 1370.835
+    }
+   },
+   "warm": {
+    "gap": {
+     "n": 47,
+     "min": 128,
+     "median": 190,
+     "p95": 225,
+     "max": 423
+    },
+    "codec": {
+     "n": 47,
+     "min": 7,
+     "median": 9,
+     "p95": 12,
+     "max": 13
+    },
+    "idr": {
+     "n": 51,
+     "min": 0,
+     "median": 19,
+     "p95": 29,
+     "max": 242
+    },
+    "jump": {
+     "n": 51,
+     "min": 0,
+     "median": 0,
+     "p95": 0,
+     "max": 0
+    },
+    "spawn": {
+     "n": 51,
+     "min": 33.1,
+     "median": 266.3,
+     "p95": 516.205,
+     "max": 566.088
+    },
+    "rtp": {
+     "n": 51,
+     "min": 186.774,
+     "median": 420.3,
+     "p95": 678.672,
+     "max": 719.262
+    },
+    "silence": {
+     "n": 51,
+     "min": 151.986,
+     "median": 153.2,
+     "p95": 163.718,
+     "max": 164.322
+    },
+    "verified": {
+     "n": 51,
+     "min": 939.618,
+     "median": 1173.2,
+     "p95": 1431.292,
+     "max": 1472.0
+    }
+   },
+   "T1": {
+    "gap": {
+     "n": 16,
+     "min": 128,
+     "median": 185.5,
+     "p95": 222,
+     "max": 224
+    },
+    "codec": {
+     "n": 16,
+     "min": 7,
+     "median": 9.0,
+     "p95": 12,
+     "max": 12
+    },
+    "idr": {
+     "n": 20,
+     "min": 0,
+     "median": 13.5,
+     "p95": 24,
+     "max": 26
+    },
+    "jump": {
+     "n": 20,
+     "min": 0,
+     "median": 0.0,
+     "p95": 0,
+     "max": 0
+    },
+    "spawn": {
+     "n": 20,
+     "min": 115.601,
+     "median": 266.7,
+     "p95": 515.445,
+     "max": 516.12
+    },
+    "rtp": {
+     "n": 20,
+     "min": 267.903,
+     "median": 429.1,
+     "p95": 668.572,
+     "max": 669.612
+    },
+    "silence": {
+     "n": 20,
+     "min": 151.77,
+     "median": 153.2,
+     "p95": 163.179,
+     "max": 163.588
+    },
+    "verified": {
+     "n": 20,
+     "min": 1021.742,
+     "median": 1181.9,
+     "p95": 1421.149,
+     "max": 1423.573
+    }
+   },
+   "T2": {
+    "gap": {
+     "n": 16,
+     "min": 143,
+     "median": 186.5,
+     "p95": 200,
+     "max": 210
+    },
+    "codec": {
+     "n": 16,
+     "min": 8,
+     "median": 8.5,
+     "p95": 11,
+     "max": 13
+    },
+    "idr": {
+     "n": 20,
+     "min": 3,
+     "median": 19.5,
+     "p95": 28,
+     "max": 29
+    },
+    "jump": {
+     "n": 20,
+     "min": 0,
+     "median": 0.0,
+     "p95": 0,
+     "max": 0
+    },
+    "spawn": {
+     "n": 20,
+     "min": 33.1,
+     "median": 265.6,
+     "p95": 467.121,
+     "max": 516.512
+    },
+    "rtp": {
+     "n": 20,
+     "min": 186.774,
+     "median": 418.9,
+     "p95": 620.448,
+     "max": 678.672
+    },
+    "silence": {
+     "n": 20,
+     "min": 151.986,
+     "median": 153.1,
+     "p95": 163.268,
+     "max": 163.953
+    },
+    "verified": {
+     "n": 20,
+     "min": 939.618,
+     "median": 1172.2,
+     "p95": 1372.836,
+     "max": 1431.292
+    }
+   },
+   "T3": {
+    "gap": {
+     "n": 20,
+     "min": 146,
+     "median": 194.5,
+     "p95": 405,
+     "max": 423
+    },
+    "codec": {
+     "n": 20,
+     "min": 7,
+     "median": 9.0,
+     "p95": 11,
+     "max": 11
+    },
+    "idr": {
+     "n": 20,
+     "min": 0,
+     "median": 18.0,
+     "p95": 241,
+     "max": 242
+    },
+    "jump": {
+     "n": 20,
+     "min": 0,
+     "median": 0.0,
+     "p95": 0,
+     "max": 0
+    },
+    "spawn": {
+     "n": 20,
+     "min": 65.593,
+     "median": 266.7,
+     "p95": 516.205,
+     "max": 566.088
+    },
+    "rtp": {
+     "n": 20,
+     "min": 219.287,
+     "median": 429.0,
+     "p95": 679.596,
+     "max": 719.262
+    },
+    "silence": {
+     "n": 20,
+     "min": 152.142,
+     "median": 153.1,
+     "p95": 163.718,
+     "max": 164.322
+    },
+    "verified": {
+     "n": 20,
+     "min": 972.825,
+     "median": 1181.6,
+     "p95": 1431.878,
+     "max": 1472.0
+    }
+   }
+  }
+ },
+ "B": {
+  "n": 30,
+  "settled_s": {
+   "n": 30,
+   "min": 1.004,
+   "median": 3.0,
+   "p95": 4.013,
+   "max": 6.016
+  },
+  "never": 0,
+  "third_or_more": 9
+ },
+ "C": {
+  "totals": [
+   0,
+   0,
+   0
+  ],
+  "nonzero": 0,
+  "ssrc": {
+   "T1": [
+    20,
+    20
+   ],
+   "T2": [
+    20,
+    20
+   ],
+   "T3": [
+    20,
+    20
+   ]
+  },
+  "classification": "CLEAN"
+ },
+ "rows": {
+  "T1": {
+   "duration_min": 14.61,
+   "spikes_20_per_min": 38.865155700108794,
+   "rendered_fps": 59.6810502715315,
+   "stale_output_drops_per_min": 1.1632176882074816,
+   "video_lost_per_min_post_fec": 37.49666430221764,
+   "audio_underruns_total": 16,
+   "audio_underruns_per_min": 1.0947931183129238,
+   "prolonged_starvation_per_min": 0.2052737096836732,
+   "video_fec_recovered_per_min": 3.62650220441156,
+   "audio_lost_per_min_after_dedup": 0.13684913978911548,
+   "max_output_gap_ms": 224
+  },
+  "T2": {
+   "duration_min": 13.64,
+   "spikes_20_per_min": 33.50521762506415,
+   "rendered_fps": 59.66421466800264,
+   "stale_output_drops_per_min": 1.1730491947506048,
+   "video_lost_per_min_post_fec": 18.548840391993938,
+   "audio_underruns_total": 15,
+   "audio_underruns_per_min": 1.099733620078692,
+   "prolonged_starvation_per_min": 0.5132090227033896,
+   "video_fec_recovered_per_min": 12.83022556758474,
+   "audio_lost_per_min_after_dedup": 2.639360688188861,
+   "max_output_gap_ms": 369
+  },
+  "T3": {
+   "duration_min": 13.52,
+   "spikes_20_per_min": 33.57284592725883,
+   "rendered_fps": 59.648495754094924,
+   "stale_output_drops_per_min": 1.4789799967955435,
+   "video_lost_per_min_post_fec": 6.211715986541282,
+   "audio_underruns_total": 10,
+   "audio_underruns_per_min": 0.7394899983977717,
+   "prolonged_starvation_per_min": 0.07394899983977717,
+   "video_fec_recovered_per_min": 12.423431973082565,
+   "audio_lost_per_min_after_dedup": 1.1831839974364347,
+   "max_output_gap_ms": 423
+  },
+  "H1": {
+   "duration_min": 14.55,
+   "spikes_20_per_min": 36.97331919153508,
+   "rendered_fps": 59.913270764275616,
+   "stale_output_drops_per_min": 1.1683019075392127,
+   "video_lost_per_min_post_fec": 6.597469595515554,
+   "audio_underruns_total": 19,
+   "audio_underruns_per_min": 1.3057491907791199,
+   "prolonged_starvation_per_min": 0.7559600578194905,
+   "video_fec_recovered_per_min": 10.858335375952683,
+   "audio_lost_per_min_after_dedup": 0.6872364161995368,
+   "max_output_gap_ms": 122
+  },
+  "H2": {
+   "duration_min": 13.64,
+   "spikes_20_per_min": 33.20221836749652,
+   "rendered_fps": 59.90935965405194,
+   "stale_output_drops_per_min": 1.3925875253475362,
+   "video_lost_per_min_post_fec": 10.774229801373043,
+   "audio_underruns_total": 20,
+   "audio_underruns_per_min": 1.4658816056289854,
+   "prolonged_starvation_per_min": 0.5130585619701449,
+   "video_fec_recovered_per_min": 3.811292174635362,
+   "audio_lost_per_min_after_dedup": 2.7851750506950723,
+   "max_output_gap_ms": 172
+  },
+  "H3": {
+   "duration_min": 13.54,
+   "spikes_20_per_min": 24.23334942322658,
+   "rendered_fps": 59.91843409218524,
+   "stale_output_drops_per_min": 0.9604681173839803,
+   "video_lost_per_min_post_fec": 5.393397889925428,
+   "audio_underruns_total": 9,
+   "audio_underruns_per_min": 0.6649394658812171,
+   "prolonged_starvation_per_min": 0.0738821628756908,
+   "video_fec_recovered_per_min": 12.855496340370198,
+   "audio_lost_per_min_after_dedup": 1.7731719090165792,
+   "max_output_gap_ms": 107
+  },
+  "C": {
+   "duration_s": 1211.3,
+   "spikes_20_per_min": 32.8394482840604,
+   "rendered_fps": 59.901035870781975,
+   "received_au_fps": 59.92497614228116,
+   "max_output_gap_ms": 163,
+   "stale_output_drops_per_min": 1.1392267127200442,
+   "video_lost_per_min_post_fec": 8.66802933591338,
+   "video_fec_recovered_per_min": 14.710884072950135,
+   "audio_lost_per_min_after_dedup": 0.24765798102609654,
+   "audio_recovered_by_duplicate": 590,
+   "audio_underruns_total": 17,
+   "audio_underruns_per_min": 0.8420371354887283,
+   "prolonged_starvation_per_min": 0.34672117343653513,
+   "frames_under_20ms_pct": 99.11798348975344,
+   "client_fps_deficit": 0.023940271499185428,
+   "avg_queue_residence_ms": 67.92625663216702,
+   "redundancy": "2/4 host",
+   "cushion": "12/17 host",
+   "onn_cpu_mean_c": 67.6,
+   "onn_cpu_max_c": 69.52,
+   "onn_thermal_status_values": [
+    0
+   ]
+  },
+  "W": {
+   "duration_s": 1207.3,
+   "spikes_20_per_min": 26.042335361333258,
+   "rendered_fps": 59.90979610938774,
+   "received_au_fps": 59.92387752481849,
+   "max_output_gap_ms": 110,
+   "stale_output_drops_per_min": 0.7951858125597941,
+   "video_lost_per_min_post_fec": 8.399150145162826,
+   "video_fec_recovered_per_min": 16.15221181762082,
+   "audio_lost_per_min_after_dedup": 1.441274285264627,
+   "audio_recovered_by_duplicate": 1081,
+   "audio_underruns_total": 14,
+   "audio_underruns_per_min": 0.6957875859898199,
+   "prolonged_starvation_per_min": 0.049699113284987134,
+   "frames_under_20ms_pct": 99.29763435508178,
+   "client_fps_deficit": 0.014081415430744926,
+   "avg_queue_residence_ms": 62.412720547606696,
+   "redundancy": "2/4 host",
+   "cushion": "12/17 host",
+   "onn_cpu_mean_c": 68.01,
+   "onn_cpu_max_c": 69.15,
+   "onn_thermal_status_values": [
+    0
+   ]
+  }
+ },
+ "D": {
+  "spikes_20_per_min": {
+   "verdict": "WITHIN THE NIGHT'S NOISE",
+   "band_worst": 36.97331919153508,
+   "band_width": 12.739969768308502,
+   "t_median": 33.57284592725883,
+   "t_median_beyond_worst": -3.4004732642762505,
+   "all_three_worse": false
+  },
+  "rendered_fps": {
+   "verdict": "ELEVATED BY TRANSITIONS",
+   "band_worst": 59.901035870781975,
+   "band_width": 0.01739822140326197,
+   "t_median": 59.66421466800264,
+   "t_median_beyond_worst": 0.23682120277933194,
+   "all_three_worse": true
+  },
+  "stale_output_drops_per_min": {
+   "verdict": "WITHIN THE NIGHT'S NOISE",
+   "band_worst": 1.3925875253475362,
+   "band_width": 0.597401712787742,
+   "t_median": 1.1730491947506048,
+   "t_median_beyond_worst": -0.2195383305969314,
+   "all_three_worse": false
+  },
+  "video_lost_per_min_post_fec": {
+   "verdict": "WITHIN THE NIGHT'S NOISE",
+   "band_worst": 10.774229801373043,
+   "band_width": 5.380831911447615,
+   "t_median": 18.548840391993938,
+   "t_median_beyond_worst": 7.774610590620895,
+   "all_three_worse": false
+  },
+  "audio_underruns_total": {
+   "verdict": "WITHIN THE NIGHT'S NOISE",
+   "band_worst": 20,
+   "band_width": 11,
+   "t_median": 15,
+   "t_median_beyond_worst": -5,
+   "all_three_worse": false
+  },
+  "prolonged_starvation_per_min": {
+   "verdict": "WITHIN THE NIGHT'S NOISE",
+   "band_worst": 0.7559600578194905,
+   "band_width": 0.7062609445345034,
+   "t_median": 0.2052737096836732,
+   "t_median_beyond_worst": -0.5506863481358173,
+   "all_three_worse": false
+  },
+  "video_fec_recovered_per_min": {
+   "verdict": "WITHIN THE NIGHT'S NOISE",
+   "band_worst": 16.15221181762082,
+   "band_width": 12.340919642985458,
+   "t_median": 12.423431973082565,
+   "t_median_beyond_worst": -3.7287798445382556,
+   "all_three_worse": false
+  },
+  "baseline_met_in_T": {
+   "answer": "NO",
+   "failing": [
+    [
+     "T1",
+     "video_lost_per_min_post_fec",
+     37.5,
+     "< 10"
+    ],
+    [
+     "T2",
+     "video_lost_per_min_post_fec",
+     18.55,
+     "< 10"
+    ]
+   ],
+   "missing": []
+  }
+ },
+ "E": {
+  "thermal": {
+   "T0": {
+    "start": {
+     "at": "05:40:49",
+     "cpu_c": 58.073,
+     "status": 0
+    },
+    "end": {
+     "at": "05:42:29",
+     "cpu_c": 56.864002,
+     "status": 0
+    }
+   },
+   "T1": {
+    "start": {
+     "at": "06:24:19",
+     "cpu_c": 63.132004,
+     "status": 0
+    },
+    "end": {
+     "at": "06:38:39",
+     "cpu_c": 68.758,
+     "status": 0
+    }
+   },
+   "H1": {
+    "start": {
+     "at": "06:39:49",
+     "cpu_c": 67.626,
+     "status": 0
+    },
+    "end": {
+     "at": "06:54:19",
+     "cpu_c": 69.747,
+     "status": 0
+    }
+   },
+   "T2": {
+    "start": {
+     "at": "06:55:29",
+     "cpu_c": 68.04301,
+     "status": 0
+    },
+    "end": {
+     "at": "07:08:59",
+     "cpu_c": 69.079,
+     "status": 0
+    }
+   },
+   "H2": {
+    "start": {
+     "at": "07:10:09",
+     "cpu_c": 67.996,
+     "status": 0
+    },
+    "end": {
+     "at": "07:23:39",
+     "cpu_c": 70.28001,
+     "status": 0
+    }
+   },
+   "T3": {
+    "start": {
+     "at": "07:24:49",
+     "cpu_c": 67.600006,
+     "status": 0
+    },
+    "end": {
+     "at": "07:38:09",
+     "cpu_c": 68.219,
+     "status": 0
+    }
+   },
+   "H3": {
+    "start": {
+     "at": "07:39:19",
+     "cpu_c": 66.625,
+     "status": 0
+    },
+    "end": {
+     "at": "07:52:49",
+     "cpu_c": 64.793,
+     "status": 0
+    }
+   }
+  },
+  "audio_loss_series": {
+   "T0": [
+    0
+   ],
+   "T1": [
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0
+   ],
+   "H1": [
+    0,
+    0,
+    1,
+    1,
+    0,
+    3,
+    2,
+    1,
+    1,
+    0,
+    1,
+    0,
+    0,
+    0
+   ],
+   "T2": [
+    21,
+    1,
+    2,
+    0,
+    1,
+    3,
+    1,
+    0,
+    0,
+    2,
+    1,
+    0,
+    1
+   ],
+   "H2": [
+    1,
+    0,
+    0,
+    3,
+    28,
+    1,
+    0,
+    0,
+    1,
+    1,
+    0,
+    1,
+    0
+   ],
+   "T3": [
+    0,
+    1,
+    3,
+    1,
+    2,
+    2,
+    0,
+    3,
+    0,
+    1,
+    1,
+    0,
+    0
+   ],
+   "H3": [
+    2,
+    3,
+    3,
+    2,
+    0,
+    0,
+    3,
+    0,
+    1,
+    0,
+    1,
+    1,
+    1
+   ]
+  },
+  "audio_loss_rule": {
+   "verdict": "WITHIN THE NIGHT'S NOISE",
+   "band_worst": 2.7851750506950723,
+   "band_width": 2.5375170696689757,
+   "t_median": 1.1831839974364347,
+   "t_median_beyond_worst": -1.6019910532586377,
+   "all_three_worse": false
+  }
+ },
+ "F": {
+  "T0": {
+   "minutes": 1.67,
+   "lost": 734,
+   "received": 41610,
+   "lost_per_min": 438.4,
+   "received_per_min": 24855.1,
+   "bad_packets_end": 0,
+   "probe_conditions": [
+    29,
+    760
+   ]
+  },
+  "T1": {
+   "minutes": 14.43,
+   "lost": 5297,
+   "received": 369519,
+   "lost_per_min": 367.0,
+   "received_per_min": 25602.5,
+   "bad_packets_end": 0,
+   "probe_conditions": [
+    24,
+    5321
+   ]
+  },
+  "H1": {
+   "minutes": 14.44,
+   "lost": 4986,
+   "received": 369984,
+   "lost_per_min": 345.4,
+   "received_per_min": 25629.5,
+   "bad_packets_end": 0
+  },
+  "T2": {
+   "minutes": 13.52,
+   "lost": 2875,
+   "received": 347697,
+   "lost_per_min": 212.7,
+   "received_per_min": 25717.8,
+   "bad_packets_end": 0,
+   "probe_conditions": [
+    18,
+    2893
+   ]
+  },
+  "H2": {
+   "minutes": 13.52,
+   "lost": 3427,
+   "received": 348261,
+   "lost_per_min": 253.4,
+   "received_per_min": 25755.7,
+   "bad_packets_end": 0
+  },
+  "T3": {
+   "minutes": 13.39,
+   "lost": 3406,
+   "received": 343798,
+   "lost_per_min": 254.4,
+   "received_per_min": 25679.6,
+   "bad_packets_end": 0,
+   "probe_conditions": [
+    13,
+    3416
+   ]
+  },
+  "H3": {
+   "minutes": 13.39,
+   "lost": 3130,
+   "received": 345433,
+   "lost_per_min": 233.8,
+   "received_per_min": 25805.0,
+   "bad_packets_end": 0
+  }
+ }
+}
