@@ -1,0 +1,57 @@
+--- a/companion/privyhub_service.py
++++ b/companion/privyhub_service.py
+@@ -75,6 +75,7 @@
+     ClientHealthStore,
+ )
+ 
++from adaptive_bitrate import get_shadow as adaptive_bitrate_shadow
+ from diagnostics.stream_telemetry import (
+     StreamTelemetryStore,
+ )
+@@ -2176,12 +2177,20 @@
+                     )
+ 
+                     try:
+-                        STREAM_TELEMETRY_STORE.accept(
++                        native_status = self._native_stream_status()
++                        telemetry = STREAM_TELEMETRY_STORE.accept(
+                             client_health_feedback=(
+                                 CLIENT_HEALTH_STORE.snapshot()
+                             ),
+-                            native_stream_status=(
+-                                self._native_stream_status()
++                            native_stream_status=native_status,
++                        )
++                        # C3-L4-S1: the shadow controller reads the snapshot
++                        # just built and writes down what it would do. It
++                        # never acts; with the flag off it returns at once.
++                        adaptive_bitrate_shadow(PROJECT_ROOT).observe(
++                            telemetry,
++                            stream_bitrate_kbps=native_status.get(
++                                "bitrate_kbps"
+                             ),
+                         )
+                     except Exception:
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -23,6 +23,7 @@
+ )
+ from games.startup_reconcile import run_startup_metadata_reconcile
+ from native_stream import NativeStreamError, NativeStreamManager
++from adaptive_bitrate import get_shadow as adaptive_bitrate_shadow
+ 
+ 
+ class GamesPlugin:
+@@ -3043,6 +3044,12 @@
+         if action == "native-stream-status":
+             payload = self._native_stream.status()
+             payload["recovery"] = self._recovery.status()
++            # C3-L4-S1: the shadow controller's state (schema
++            # privyhub_adaptive_bitrate_v1). Reads `mode: off` unless
++            # PRIVYHUB_ADAPTIVE_BITRATE_MODE=shadow; `acted` is false always.
++            payload["adaptive_bitrate"] = adaptive_bitrate_shadow(
++                self.PROJECT_ROOT
++            ).status()
+             # D-BASE-R2: newest client heartbeat, or None if none has
+             # arrived. Read from the log, so it survives a companion
+             # restart and says nothing about liveness by itself — compare

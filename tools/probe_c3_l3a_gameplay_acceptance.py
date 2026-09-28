@@ -41,11 +41,16 @@ Usage:
     python3 tools/probe_c3_l3a_gameplay_acceptance.py
     python3 tools/probe_c3_l3a_gameplay_acceptance.py --finalize
     python3 tools/probe_c3_l3a_gameplay_acceptance.py --finalize \\
-        --state <state.json> --decoder <native_decoder_*.json>
+        --state <state.json> --decoder <native_decoder_*.json> [...]
     python3 tools/probe_c3_l3a_gameplay_acceptance.py --aggregate
 
 Run, play, then finalize once the client has posted a decoder session.
 `--finalize` never writes the state file; re-scoring a retained run is safe.
+Every run also keeps its own state copy under `c3_l3a_runs/states/`. If the
+client stream restarted mid-run (an accidental BACK), no one decoder session
+holds every SSRC change; `--finalize` then takes the sessions posted after
+the run's start whose counts sum to the expected one, aligns each on its own
+and reports the client restart.
 Runs pool: several shorter sessions beat one long one, because attention
 drifts and drift correlated with shape order would fake a result.
 
@@ -65,7 +70,7 @@ import time
 import urllib.error
 import urllib.request
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -90,6 +95,8 @@ PARK_LEVELS = (6000, 5500, 5000)
 STREAM_ROOT = Path("logs/streaming")
 RUNS_ROOT = STREAM_ROOT / "c3_l3a_runs"
 STATE_PATH = STREAM_ROOT / "c3_l3a_gameplay_acceptance_state.json"
+# One copy per run, beside the run files but out of `--aggregate`'s glob.
+STATES_ROOT = RUNS_ROOT / "states"
 TEXT_LOG = STREAM_ROOT / "c3_l3a_gameplay_acceptance.txt"
 JSON_LOG = STREAM_ROOT / "c3_l3a_gameplay_acceptance.json"
 AGG_TEXT = STREAM_ROOT / "c3_l3a_aggregate.txt"
@@ -922,14 +929,16 @@ def run_session(args: argparse.Namespace) -> int:
         "decoder_sessions_before": decoder_before,
     }
 
+    text = json.dumps(state, indent=2, sort_keys=True) + "\n"
     STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    STATE_PATH.write_text(
-        json.dumps(state, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    STATE_PATH.write_text(text, encoding="utf-8")
+    # The shared file is overwritten by the next run; this copy is not.
+    STATES_ROOT.mkdir(parents=True, exist_ok=True)
+    (STATES_ROOT / f"{run_id}_state.json").write_text(text, encoding="utf-8")
 
     print("")
     print(f"  State written: {STATE_PATH}")
+    print(f"  Run's own copy: {STATES_ROOT / f'{run_id}_state.json'}")
     print("")
     print("  Next: let the client post a decoder session, then run")
     print("    python3 tools/probe_c3_l3a_gameplay_acceptance.py --finalize")
@@ -1301,6 +1310,85 @@ def select_decoder_session(
     )
 
 
+def run_started(state: dict[str, Any]) -> datetime | None:
+    """When the run began: the run id is its local start time, and
+    `generated` (written at the end) carries the zone. Falls back to
+    `generated` minus the last recorded probe time."""
+    generated = _parse_time(state.get("generated"))
+
+    if generated is None:
+        return None
+
+    try:
+        return datetime.strptime(
+            str(state.get("run_id")), "%Y%m%d_%H%M%S"
+        ).replace(tzinfo=generated.tzinfo)
+    except ValueError:
+        pass
+
+    times = [_num(r.get("at_s")) for r in state.get("restores") or []]
+    times += [_num(p.get("fired_at_s")) for p in state.get("park") or []]
+    times += [_num(state.get("phase_a_end_s"))]
+    known = [t for t in times if t is not None]
+    return generated - timedelta(seconds=max(known)) if known else None
+
+
+def select_split_sessions(
+    state: dict[str, Any],
+    expected: int,
+) -> tuple[list[Path], str]:
+    """The client stream restarted mid-run: no one session holds every SSRC
+    change. Every session posted after the run's start and before now, in
+    order of arrival, taken until their `ssrc_changes` reach the expected
+    count; used only if they sum to it exactly."""
+    known = set(state.get("decoder_sessions_before", []))
+    started = run_started(state)
+    now = datetime.now().astimezone()
+    posted: list[tuple[datetime, Path, int]] = []
+
+    if started is None:
+        return [], "split: run start unknown"
+
+    for path in DECODER_ROOT.glob("*.json"):
+        if path.name in known:
+            continue
+
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+
+        received = _parse_time(payload.get("received_at_utc"))
+        changes = _num(_dict(_dict(payload.get("report")).get("video")).get("ssrc_changes"))
+
+        if received is None or changes is None or not started < received <= now:
+            continue
+
+        posted.append((received, path, int(changes)))
+
+    posted.sort()
+    taken: list[Path] = []
+    total = 0
+
+    for _, path, changes in posted:
+        if total >= expected:
+            break
+
+        taken.append(path)
+        total += changes
+
+    if len(taken) < 2 or total != expected:
+        return [], (
+            f"split: {len(taken)} session(s) posted after the run's start sum "
+            f"to {total} ssrc_changes, expected {expected}"
+        )
+
+    return taken, (
+        f"auto split: {len(taken)} sessions posted after the run's start, in "
+        f"order, whose ssrc_changes sum to {expected}"
+    )
+
+
 def closeout_rows(report: dict[str, Any]) -> dict[str, Any]:
     """The close-out table's rows for this session
     (`evidence/D_BASE_CLOSEOUT_2026-09-23.md`, same source counters).
@@ -1336,8 +1424,16 @@ def decoder_view(
     marks: list[float],
     windows: list[float],
     primary: float,
+    *,
+    split: bool = False,
 ) -> dict[str, Any]:
-    """Requirement 4: the marks and the decoder's clock on one axis."""
+    """Requirement 4: the marks and the decoder's clock on one axis.
+
+    `split`: this report is one of several client sessions that together
+    cover the run (`expected` is its own slice). Only the marks inside the
+    session's span are placed, and a slice without Phase-A fires aligns on
+    its parks' and restores' recorded fire times (v2 state).
+    """
     discontinuities = [_dict(d) for d in report.get("stream_discontinuities") or []]
     first_idr = [_dict(d) for d in report.get("first_idr_after_discontinuity") or []]
     columns = list(report.get("slow_event_columns") or [])
@@ -1384,6 +1480,14 @@ def decoder_view(
         if str(d.get("type")) == "ssrc_change"
     ]
     phase_a = [e for e in expected if e["phase"] == "A"]
+    anchor_rule = "Phase-A fires"
+
+    if split and not phase_a and expected and all(
+        e.get("fired_at_s") is not None for e in expected
+    ):
+        phase_a = list(expected)
+        anchor_rule = "park and restore fires (no Phase-A fire in this session)"
+
     n = len(phase_a)
     view: dict[str, Any] = {
         "slow_event_coverage": coverage,
@@ -1394,7 +1498,7 @@ def decoder_view(
     if n == 0 or len(ssrc) < n:
         view["alignment"] = {
             "ok": False,
-            "reason": f"{len(ssrc)} ssrc_change discontinuities for {n} Phase-A fires",
+            "reason": f"{len(ssrc)} ssrc_change discontinuities for {n} {anchor_rule}",
         }
         return view
 
@@ -1411,12 +1515,14 @@ def decoder_view(
         "spread_s": round(spread, 3),
         "max_abs_residual_s": round(max(abs(o - offset) for o in offsets), 3),
         "rule": (
-            "Phase-A fires matched in order to the first N ssrc_change "
+            f"{anchor_rule} matched in order to the first N ssrc_change "
             f"entries; spread over {ALIGN_MAX_SPREAD_S:g} s means the pairing is wrong"
         ),
     }
     view["alignment"] = alignment
     coverage["covered_from_probe_s"] = round(coverage_start_ms / 1000.0 - offset, 3)
+    duration_s = (_num(report.get("duration_ms")) or 0.0) / 1000.0
+    view["session_probe_span_s"] = [round(-offset, 3), round(duration_s - offset, 3)]
 
     if not alignment["ok"]:
         alignment["reason"] = (
@@ -1526,6 +1632,10 @@ def decoder_view(
 
     for at in marks:
         at_dec = at + offset
+
+        if split and not 0.0 <= at_dec <= duration_s:
+            continue
+
         before = [d for d in disc_times if d[0] <= at_dec]
         nearest = max(before, key=lambda d: d[0]) if before else None
         lag = None if nearest is None else at_dec - nearest[0]
@@ -1605,8 +1715,188 @@ def settling_summary(sequences: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def decoder_summary(
+    path: Path,
+    payload: dict[str, Any],
+    expected: list[dict[str, Any]],
+) -> dict[str, Any]:
+    report = _dict(payload.get("report"))
+    video = _dict(report.get("video"))
+    dec = _dict(report.get("decoder"))
+    discontinuities = report.get("stream_discontinuities") or []
+    first_idr = report.get("first_idr_after_discontinuity") or []
+    return {
+        "path": str(path),
+        "received_at_utc": payload.get("received_at_utc"),
+        "client_profiler_version": report.get("client_profiler_version"),
+        "duration_ms": report.get("duration_ms"),
+        "ssrc_changes": video.get("ssrc_changes"),
+        "sequence_resyncs": video.get("sequence_resyncs"),
+        "lost_packets": video.get("lost_packets"),
+        "fec_unrecoverable_groups": video.get("fec_unrecoverable_groups"),
+        "max_output_gap_ms": dec.get("max_output_gap_ms"),
+        "max_codec_ms": dec.get("max_codec_ms"),
+        "rendered_frames": dec.get("rendered_frames"),
+        "dropped_frames": dec.get("dropped_frames"),
+        "discontinuity_count": len(discontinuities),
+        "ssrc_discontinuity_count": sum(
+            1
+            for d in discontinuities
+            if str(_dict(d).get("type")) == "ssrc_change"
+        ),
+        "resync_to_idr_ms": [
+            _dict(entry).get("resync_to_idr_ms") for entry in first_idr
+        ],
+        "expected_ssrc_changes": len(expected),
+        "expected_breakdown": {
+            "phase_a": sum(1 for e in expected if e["phase"] == "A"),
+            "park": sum(1 for e in expected if e["phase"] == "B"),
+            "restore": sum(1 for e in expected if e["phase"] == "restore"),
+        },
+        "closeout_rows": closeout_rows(report),
+    }
+
+
+def split_decoder(
+    loaded: list[tuple[Path, dict[str, Any]]],
+    expected: list[dict[str, Any]],
+    marks: list[float],
+    windows: list[float],
+    primary: float,
+) -> dict[str, Any]:
+    """Several client sessions covering one run, in order. Each takes the
+    next `ssrc_changes` expected transitions and is aligned on its own; each
+    mark is checked in the session whose span holds it. Between two sessions
+    the client stream was down: that is reported as a client restart."""
+    sessions = []
+    cursor = 0
+
+    for number, (path, payload) in enumerate(loaded, start=1):
+        report = _dict(payload.get("report"))
+        count = int(_num(_dict(report.get("video")).get("ssrc_changes")) or 0)
+        part = expected[cursor : cursor + count]
+        cursor += count
+        summary = decoder_summary(path, payload, part)
+        summary["session"] = number
+        summary["view"] = decoder_view(report, part, marks, windows, primary, split=True)
+        sessions.append(summary)
+
+    views = [s["view"] for s in sessions]
+    aligned = all(_dict(v.get("alignment")).get("ok") for v in views)
+    per_transition = []
+    per_mark = []
+
+    for summary in sessions:
+        for row in summary["view"].get("per_transition") or []:
+            per_transition.append({"session": summary["session"], **row})
+
+        for row in summary["view"].get("per_mark") or []:
+            per_mark.append({"session": summary["session"], **row})
+
+    per_mark.sort(key=lambda m: m["mark_s"])
+    placed = {m["mark_s"] for m in per_mark}
+    restarts = []
+
+    for before, after in zip(sessions, sessions[1:]):
+        end = _dict(before["view"]).get("session_probe_span_s")
+        start = _dict(after["view"]).get("session_probe_span_s")
+
+        if not end or not start:
+            restarts.append(
+                {"after_session": before["session"], "note": "a session is unaligned; span unknown"}
+            )
+            continue
+
+        restarts.append(
+            {
+                "after_session": before["session"],
+                "first_ends_probe_s": end[1],
+                "next_starts_probe_s": start[0],
+                "between_sessions_s": round(start[0] - end[1], 3),
+                "first_received_at_utc": before["received_at_utc"],
+                "next_received_at_utc": after["received_at_utc"],
+                "marks_in_gap": [
+                    round(m, 3) for m in marks if end[1] < m < start[0]
+                ],
+                f"marks_within_{primary:g}s_after_next_start": [
+                    round(m, 3) for m in marks if start[0] <= m <= start[0] + primary
+                ],
+            }
+        )
+
+    total = sum(int(_num(s.get("ssrc_changes")) or 0) for s in sessions)
+    combined = {
+        "slow_event_coverage": None,
+        "discontinuity_count": sum(v.get("discontinuity_count", 0) for v in views),
+        "ssrc_change_count": sum(v.get("ssrc_change_count", 0) for v in views),
+        "alignment": {
+            "ok": aligned,
+            "split": True,
+            "per_session": [
+                {"session": s["session"], **_dict(s["view"].get("alignment"))}
+                for s in sessions
+            ],
+            "rule": "each session aligned separately on its own fires",
+        },
+    }
+
+    if aligned:
+        combined["per_transition"] = per_transition
+        combined["labels_match_expected"] = all(
+            v.get("labels_match_expected") for v in views
+        )
+        combined["per_mark"] = per_mark
+        combined["marks_in_no_session"] = [
+            round(m, 3) for m in marks if round(m, 3) not in placed
+        ]
+    else:
+        combined["alignment"]["reason"] = (
+            "a session's alignment failed; the per-mark decoder view is NOT computed"
+        )
+
+    return {
+        "path": "; ".join(s["path"] for s in sessions),
+        "split": True,
+        "sessions": sessions,
+        "client_restarts": restarts,
+        "ssrc_changes": total,
+        "expected_ssrc_changes": len(expected),
+        "expected_breakdown": {
+            "phase_a": sum(1 for e in expected if e["phase"] == "A"),
+            "park": sum(1 for e in expected if e["phase"] == "B"),
+            "restore": sum(1 for e in expected if e["phase"] == "restore"),
+        },
+        "view": combined,
+    }
+
+
+def default_state_path() -> Path:
+    """The last run's state. Every run since C3-L3A-R1 also keeps its own
+    copy under `STATES_ROOT`; when the shared file holds a different run
+    than the newest copy (overwritten by something older, or by hand), the
+    copy wins. A shared file newer than every copy predates the copies."""
+    copies = sorted(STATES_ROOT.glob("*_state.json"))
+
+    if not copies:
+        return STATE_PATH
+
+    newest = copies[-1]
+    newest_id = newest.name[: -len("_state.json")]
+
+    try:
+        shared_id = str(json.loads(STATE_PATH.read_text(encoding="utf-8")).get("run_id"))
+    except (OSError, ValueError):
+        return newest
+
+    if shared_id == newest_id or shared_id > newest_id:
+        return STATE_PATH
+
+    print(f"  Shared state holds run {shared_id}; using run {newest_id}'s own copy.")
+    return newest
+
+
 def finalize(args: argparse.Namespace) -> int:
-    state_path = Path(args.state) if args.state else STATE_PATH
+    state_path = Path(args.state) if args.state else default_state_path()
 
     if not state_path.is_file():
         print(f"No state file at {state_path}. Run a session first.")
@@ -1711,56 +2001,48 @@ def finalize(args: argparse.Namespace) -> int:
     expected = expected_transitions(state)
 
     if args.decoder:
-        decoder_path: Path | None = Path(args.decoder)
+        decoder_paths = [Path(p) for p in args.decoder]
         selection = "--decoder given"
 
-        if not decoder_path.is_file():
-            print(f"No decoder session at {decoder_path}.")
-            return 2
+        for path in decoder_paths:
+            if not path.is_file():
+                print(f"No decoder session at {path}.")
+                return 2
     else:
-        decoder_path, selection = select_decoder_session(state, len(expected))
+        single, selection = select_decoder_session(state, len(expected))
+        decoder_paths = [single] if single is not None else []
+
+        if not decoder_paths:
+            decoder_paths, split_note = select_split_sessions(state, len(expected))
+            selection = f"{selection}; {split_note}"
 
     decoder: dict[str, Any] = {"path": None, "selection": selection}
+    loaded = [
+        (path, json.loads(path.read_text(encoding="utf-8")))
+        for path in decoder_paths
+    ]
+    loaded.sort(key=lambda item: str(item[1].get("received_at_utc")))
 
-    if decoder_path is not None:
-        payload = json.loads(decoder_path.read_text(encoding="utf-8"))
+    if len(loaded) == 1:
+        path, payload = loaded[0]
         report = _dict(payload.get("report"))
-        video = _dict(report.get("video"))
-        dec = _dict(report.get("decoder"))
-        discontinuities = report.get("stream_discontinuities") or []
-        first_idr = report.get("first_idr_after_discontinuity") or []
-        decoder = {
-            "path": str(decoder_path),
-            "selection": selection,
-            "received_at_utc": payload.get("received_at_utc"),
-            "client_profiler_version": report.get("client_profiler_version"),
-            "duration_ms": report.get("duration_ms"),
-            "ssrc_changes": video.get("ssrc_changes"),
-            "sequence_resyncs": video.get("sequence_resyncs"),
-            "lost_packets": video.get("lost_packets"),
-            "fec_unrecoverable_groups": video.get("fec_unrecoverable_groups"),
-            "max_output_gap_ms": dec.get("max_output_gap_ms"),
-            "max_codec_ms": dec.get("max_codec_ms"),
-            "rendered_frames": dec.get("rendered_frames"),
-            "dropped_frames": dec.get("dropped_frames"),
-            "discontinuity_count": len(discontinuities),
-            "ssrc_discontinuity_count": sum(
-                1
-                for d in discontinuities
-                if str(_dict(d).get("type")) == "ssrc_change"
-            ),
-            "resync_to_idr_ms": [
-                _dict(entry).get("resync_to_idr_ms") for entry in first_idr
-            ],
-            "expected_ssrc_changes": len(expected),
-            "expected_breakdown": {
-                "phase_a": sum(1 for e in expected if e["phase"] == "A"),
-                "park": sum(1 for e in expected if e["phase"] == "B"),
-                "restore": sum(1 for e in expected if e["phase"] == "restore"),
-            },
-            "closeout_rows": closeout_rows(report),
-            "view": decoder_view(report, expected, marks, windows, primary),
-        }
+        decoder = decoder_summary(path, payload, expected)
+        decoder["selection"] = selection
+        decoder["view"] = decoder_view(report, expected, marks, windows, primary)
+    elif loaded:
+        total = sum(
+            int(_num(_dict(_dict(payload.get("report")).get("video")).get("ssrc_changes")) or 0)
+            for _, payload in loaded
+        )
+
+        if total == len(expected):
+            decoder = split_decoder(loaded, expected, marks, windows, primary)
+            decoder["selection"] = selection
+        else:
+            decoder["selection"] = (
+                f"{selection}: {len(loaded)} sessions sum to {total} "
+                f"ssrc_changes, expected {len(expected)}"
+            )
 
     scale = rating_scale_of(state)
     park = []
@@ -1901,6 +2183,26 @@ def _park_section(report: Report, park: list[dict[str, Any]]) -> None:
         report.line("Phase B not run.")
 
 
+def _coverage_lines(report: Report, prefix: str, coverage: dict[str, Any]) -> None:
+    report.line(
+        f"{prefix}Slow events (>= 50 ms) retained {coverage['retained']} of "
+        f"{coverage['capacity']} ({coverage['retained_marked']} marked + "
+        f"{coverage['retained_recent']} recent); "
+        + (
+            f"saturated, covering decoder {coverage['covered_from_decoder_ms'] / 1000.0:.1f} s "
+            f"onward = probe {coverage.get('covered_from_probe_s')} s onward."
+            if coverage["saturated"]
+            else "not saturated: the whole session is covered."
+        )
+    )
+
+    if coverage["saturated"]:
+        report.line(
+            "Before that point only discontinuities exist: 'not covered' "
+            "is not 'no gap'; 'partial' is the covered part only."
+        )
+
+
 def _run_report(analysis: dict[str, Any]) -> Report:
     report = Report("PrivyHub C3.L3a gameplay acceptance probe")
     primary = analysis["primary_window_s"]
@@ -1991,6 +2293,28 @@ def _run_report(analysis: dict[str, Any]) -> Report:
 
     if not decoder.get("path"):
         report.line("No decoder session; alignment not possible.")
+    elif decoder.get("split"):
+        report.line(
+            f"The client stream restarted mid-run: {len(decoder['sessions'])} "
+            "decoder sessions, each aligned on its own fires."
+        )
+
+        for part in alignment.get("per_session", []):
+            report.line("")
+            report.field("Session", part["session"])
+            report.field("  Rule", part.get("rule", "-"))
+            report.field("  Pairs", part.get("pairs"))
+            report.field("  Median offset (s)", part.get("offset_s"))
+            report.field("  Spread (s)", part.get("spread_s"))
+            report.field("  Max |residual| (s)", part.get("max_abs_residual_s"))
+            report.field("  Alignment", "OK" if part.get("ok") else "FAILED")
+
+            if not part.get("ok"):
+                report.line(f"    {part.get('reason')}")
+
+        report.line("")
+        report.field("Alignment", "OK" if alignment.get("ok") else "FAILED")
+        report.line("Probe clock = decoder elapsed - that session's offset.")
     else:
         report.field("Rule", alignment.get("rule", "-"))
         report.field("Pairs", alignment.get("pairs"))
@@ -2002,32 +2326,37 @@ def _run_report(analysis: dict[str, Any]) -> Report:
         if not alignment.get("ok"):
             report.line(f"  {alignment.get('reason')}")
 
+    if decoder.get("split") and decoder.get("client_restarts"):
+        report.section("CLIENT RESTARTS - the client stream ended and began again")
+        report.line("Probe clock, from each session's own alignment. Not a transition:")
+        report.line("no SSRC change is expected or counted for it.")
+        report.line("")
+
+        for restart in decoder["client_restarts"]:
+            for key, value in restart.items():
+                report.field(key, value)
+
+            report.line("")
+
+    split = bool(decoder.get("split"))
+
     if view.get("per_transition"):
-        coverage = view["slow_event_coverage"]
         report.section("PER-TRANSITION DECODER VIEW")
-        report.line(
-            f"Slow events (>= 50 ms) retained {coverage['retained']} of "
-            f"{coverage['capacity']} ({coverage['retained_marked']} marked + "
-            f"{coverage['retained_recent']} recent); "
-            + (
-                f"saturated, covering decoder {coverage['covered_from_decoder_ms'] / 1000.0:.1f} s "
-                f"onward = probe {coverage.get('covered_from_probe_s')} s onward."
-                if coverage["saturated"]
-                else "not saturated: the whole session is covered."
-            )
-        )
-        if coverage["saturated"]:
-            report.line(
-                "Before that point only discontinuities exist: 'not covered' "
-                "is not 'no gap'; 'partial' is the covered part only."
-            )
+
+        if split:
+            for part in decoder["sessions"]:
+                _coverage_lines(report, f"Session {part['session']}: ", part["view"]["slow_event_coverage"])
+        else:
+            _coverage_lines(report, "", view["slow_event_coverage"])
 
         report.line("'-' in the gap column means covered and no event >= 50 ms.")
         report.line("")
         report.table(
-            ["transition", "to", "fire s", "ssrc ms", "resid s", "jump pk", "1st IDR ms", f"max gap ms in {SLOW_EVENT_WINDOW_S:g}s", "at +ms", "codec ms"],
+            (["sess"] if split else [])
+            + ["transition", "to", "fire s", "ssrc ms", "resid s", "jump pk", "1st IDR ms", f"max gap ms in {SLOW_EVENT_WINDOW_S:g}s", "at +ms", "codec ms"],
             [
-                [
+                ([row["session"]] if split else [])
+                + [
                     row["label"],
                     _fmt(row.get("to_kbps")),
                     _fmt(row.get("fired_at_s"), ".3f") if row.get("fired_at_s") is not None else f"~{row.get('at_probe_s_est')}",
@@ -2050,8 +2379,11 @@ def _run_report(analysis: dict[str, Any]) -> Report:
                 ]
                 for row in view["per_transition"]
             ],
-            align_right={1, 2, 3, 4, 5, 6, 7, 8, 9},
+            align_right=set(range(1 + split, 10 + split)) | ({0} if split else set()),
         )
+        if split:
+            report.line("'ssrc ms' is on its own session's decoder clock.")
+
         report.line(
             f"Every row's {SLOW_EVENT_WINDOW_S:g} s window starts at its own matched "
             "ssrc_change (Phase A, parks"
@@ -2068,11 +2400,19 @@ def _run_report(analysis: dict[str, Any]) -> Report:
 
     if view.get("per_mark"):
         report.section("MARKS ON THE DECODER AXIS - requirement 4")
+
+        if split:
+            report.line("Each mark in the session whose span holds it; 'decoder s' is")
+            report.line("on that session's clock.")
+            report.line("")
+
         report.table(
-            ["mark s", "decoder s", "nearest preceding", "jump pk", "lag s"]
+            (["sess"] if split else [])
+            + ["mark s", "decoder s", "nearest preceding", "jump pk", "lag s"]
             + [f"<=W{w}" for w in view["per_mark"][0]["within"]],
             [
-                [
+                ([m["session"]] if split else [])
+                + [
                     f"{m['mark_s']:.3f}",
                     f"{m['mark_decoder_s']:.3f}",
                     _fmt(m["nearest_preceding_type"]),
@@ -2082,8 +2422,11 @@ def _run_report(analysis: dict[str, Any]) -> Report:
                 + ["y" if v else "." for v in m["within"].values()]
                 for m in view["per_mark"]
             ],
-            align_right={0, 1, 3, 4},
+            align_right={0, 1, 2, 4, 5} if split else {0, 1, 3, 4},
         )
+
+        if split:
+            report.field("Marks in no session's span", view.get("marks_in_no_session") or "none")
 
     _park_section(report, analysis.get("park", []))
 
@@ -2138,27 +2481,47 @@ def _run_report(analysis: dict[str, Any]) -> Report:
     )
 
     report.section("CLIENT DECODER SESSION")
+    closeout_keys = (
+        "duration_min",
+        "spikes_20_per_min",
+        "rendered_fps",
+        "stale_output_drops_per_min",
+        "video_lost_per_min_post_fec",
+        "max_output_gap_ms",
+    )
 
-    if decoder.get("path"):
-        for key in (
-            "path",
-            "selection",
-            "received_at_utc",
-            "client_profiler_version",
-            "duration_ms",
-            "ssrc_changes",
-            "expected_ssrc_changes",
-            "expected_breakdown",
-            "ssrc_discontinuity_count",
-            "discontinuity_count",
-            "sequence_resyncs",
-            "lost_packets",
-            "fec_unrecoverable_groups",
-            "max_output_gap_ms",
-            "max_codec_ms",
-            "rendered_frames",
-            "dropped_frames",
-        ):
+    if decoder.get("split"):
+        report.field("selection", decoder.get("selection"))
+        report.field("ssrc_changes (sum)", decoder.get("ssrc_changes"))
+        report.field("expected_ssrc_changes", decoder.get("expected_ssrc_changes"))
+        report.field("expected_breakdown", decoder.get("expected_breakdown"))
+
+        for part in decoder["sessions"]:
+            report.line("")
+            report.field("Session", part["session"])
+
+            for key in DECODER_FIELDS:
+                report.field(f"  {key}", part.get(key))
+
+            report.field("  resync_to_idr_ms per discontinuity", part.get("resync_to_idr_ms"))
+
+        report.section("DECODER SESSIONS BESIDE THE CLOSE-OUT TABLE - context, not a gate")
+        report.line("Rows as evidence/D_BASE_CLOSEOUT_2026-09-23.md defines them, per session.")
+        report.line("These sessions carry deliberate restarts; they are not baseline sessions.")
+        report.line("")
+        report.table(
+            ["row"] + [f"session {part['session']}" for part in decoder["sessions"]],
+            [
+                [key] + [_fmt((part.get("closeout_rows") or {}).get(key)) for part in decoder["sessions"]]
+                for key in closeout_keys
+            ],
+            align_right=set(range(1, 1 + len(decoder["sessions"]))),
+        )
+    elif decoder.get("path"):
+        report.field("path", decoder.get("path"))
+        report.field("selection", decoder.get("selection"))
+
+        for key in DECODER_FIELDS:
             report.field(key, decoder.get(key))
 
         report.field("resync_to_idr_ms per discontinuity", decoder.get("resync_to_idr_ms"))
@@ -2179,14 +2542,7 @@ def _run_report(analysis: dict[str, Any]) -> Report:
         report.line("Rows as evidence/D_BASE_CLOSEOUT_2026-09-23.md defines them.")
         report.line("This session carries deliberate restarts; it is not a baseline session.")
 
-        for key in (
-            "duration_min",
-            "spikes_20_per_min",
-            "rendered_fps",
-            "stale_output_drops_per_min",
-            "video_lost_per_min_post_fec",
-            "max_output_gap_ms",
-        ):
+        for key in closeout_keys:
             report.field(key, rows.get(key))
     else:
         report.field("selection", decoder.get("selection"))
@@ -2203,6 +2559,25 @@ def _run_report(analysis: dict[str, Any]) -> Report:
 
     _limits_section(report)
     return report
+
+
+DECODER_FIELDS = (
+    "received_at_utc",
+    "client_profiler_version",
+    "duration_ms",
+    "ssrc_changes",
+    "expected_ssrc_changes",
+    "expected_breakdown",
+    "ssrc_discontinuity_count",
+    "discontinuity_count",
+    "sequence_resyncs",
+    "lost_packets",
+    "fec_unrecoverable_groups",
+    "max_output_gap_ms",
+    "max_codec_ms",
+    "rendered_frames",
+    "dropped_frames",
+)
 
 
 def _limits_section(report: Report) -> None:
@@ -2532,8 +2907,11 @@ def main() -> int:
     parser.add_argument(
         "--decoder",
         default=None,
-        help="--finalize: decoder session to align against (default: the "
-        "earliest posted after the run that has enough SSRC changes)",
+        nargs="+",
+        help="--finalize: decoder session(s) to align against (default: the "
+        "earliest posted after the run that has enough SSRC changes; else, "
+        "if the client stream restarted mid-run, the sessions posted after "
+        "the run's start whose SSRC changes sum to the expected count)",
     )
     args = parser.parse_args()
 

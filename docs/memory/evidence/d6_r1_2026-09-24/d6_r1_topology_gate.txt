@@ -1,0 +1,17 @@
+default route interface: eno1
+default routes: 1
+interfaces UP (non-loopback): eno1 
+wireless interfaces on host: 0
+tunnel interfaces: 0
+default route on wired ethernet: yes
+gateway OUI equals an OUI of the Opal's own interfaces (read over ssh opal): yes
+the ssh alias opal is the default gateway: yes
+gateway ssh banner: dropbeartZ{
+gateway http server header: Server: nginx/1.26.1
+gateway answers DNS on 53: yes (61-byte reply)
+host prefix /24; onn prefix /24; onn address inside the host's network: True
+onn address on its wireless interface (wlan0): yes
+adb shell answers: ok
+internet route: dev eno1, via the default gateway: yes
+internet reachable: 200
+stream active: False; game active: False

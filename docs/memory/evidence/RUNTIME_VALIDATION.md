@@ -1,6 +1,6 @@
 ---
 memory_schema: 1
-as_of: 2026-09-22
+as_of: 2026-09-24
 baseline_commit: 65d02012409440d5559c14beb2b28268b0b225bc
 ---
 
@@ -270,7 +270,12 @@ Record: `D_BASE_P7_STARVATION_COUNTER_2026-09-22.md`; patch
 | --- | --- | --- |
 | `C3-L3A-P2R1` probe: telemetry settling path and decoder clock alignment | **RUNTIME VALIDATED on one session** (smoke `20260924_000330`, adopted build) — settling measured 2 of 2 (two distinct fresh snapshots, cadence 2,007 ms, pre-transition snapshot excluded as designed); alignment 4 pairs, spread 0.152 s, 8 of 8 SSRC changes = expected (Phase A + parks + restore); preflight refused a run on a stale stream | `C3_L3A_P2R2_SMOKE_SESSION_2026-09-24.md` |
 | `C3.L3a-S1` transition soak (60 scheduled transitions, attract mode, adopted build) | **CHARACTERIZED, cost PARTIAL (52 of 60 covered)** — gap median 186.5 ms (128-225; 2 of 60 one extra GOP, 405 / 423), codec ≤ 13 ms, `jump_packets` 0 ×60; settling 30 of 30 ≤ 6.0 s; lifecycle CLEAN; rendered fps −0.24 (ELEVATED by the band rule, above target); baseline in T NO on video loss (not at transitions; no-transition H2 also missed); headless probe path RUNTIME VALIDATED | `C3_L3A_S1_TRANSITION_SOAK_2026-09-24.md` |
-| `C3.L3a` gate (perceptibility of repeated transitions) | **NOT ANSWERED** — smoke is 1 jump + 1 ramp, 0 marks; pre-registered rerun (≥ 4 sessions, ≥ 20 per shape) awaits the user; `C3.L4` BLOCKED | `C3_L3A_P2R1_PROBE_DEFECTS_AND_RESCORE_2026-09-23.md` |
+| `C3-L3A-R2B` companion decoder-report cap 32,000 → 48,000 + rejection WARNING line | **RUNTIME VALIDATED** (`C3-L3A-R3`, 2026-09-24) — rerun session 3's 24-change report stored (32,435 compact chars, 15,565 under 48,000; would have been refused at 32,000 by 435), POST 200, no WARNING, posted text == stored; off-session validation as before (`C3_L3A_R2B_REPORT_CAP_2026-09-24.md`). Transport ceiling ~41.5K decoded chars stands (client body-POST follow-up) | `C3_L3A_R3_SESSION3_2026-09-24.md` |
+| `C3-L4-S1` shadow adaptive-bitrate controller (flag default off) | **RUNTIME VALIDATED — SHADOW SILENT** — 21/21 unit tests; flag off leaves `native-stream-status` unchanged but `adaptive_bitrate: mode off`; four healthy holds (cold 20, warm 20/60/20 min) in shadow: 0 FALLBACK / 0 ROUTINE / 0 up over 3,598 reports, 0 stale, `acted` false; flag unset and confirmed absent. Live use NOT authorized (gate + fault-injection night) | `C3_L4_S1_SHADOW_CONTROLLER_2026-09-24.md` |
+| `C4-M1` FEC comparison arm `xor8_2` (8+2, override only) | **RUNTIME VALIDATED as an arm; gain NOT SHOWN** — golden (unset relay byte-identical), codec 9/9 + 6/6, arm APK installed for the night; smokes PASS; 3 B/A pairs: recovered 2-4×, unrecoverable groups halved, post-FEC lower in 1 of 3, A median 69 % of B (rule ≤ 60 %); cost rows within noise; adopted APK reinstalled and confirmed; nothing adopted | `C4_M1_FEC_ARM_2026-09-25.md` |
+| `C3-F1` recovery restart at any ladder level | **RUNTIME VALIDATED — WORKING** — 8/8 unit tests; 4 sessions: 7000 (continuity cycle, unchanged) and 6000/5500/5000 (level-preserving restart): HTTP 200, level kept, 1 ssrc_change each, no full start, gap 132-197 ms; the loss-triggered state machine not re-run (needs nft) | `C3_F1_RECOVERY_RESTART_LADDER_2026-09-25.md` |
+| `CL-B1` decoder report as a POST body (companion both forms; client body) | **RUNTIME VALIDATED on the arm APK; not adopted** — companion 4/4 tests (both forms identical, cap 128,000, 414 path sends 414); Kotlin 4/4; body form stored on arm APK `71d8c3d7…` (29,834 chars, 0 WARNING), target form stored on the adopted APK (0 WARNING); key sets identical to R3's; adopted APK reinstalled | `CL_B1_DECODER_REPORT_BODY_2026-09-25.md` |
+| `C3.L3a` gate (perceptibility of repeated transitions) | **NOT ANSWERED** — smoke is 1 jump + 1 ramp, 0 marks; pre-registered rerun (≥ 4 sessions, ≥ 20 per shape): sessions 1-3 recorded and pooled (`C3_L3A_R1_SESSION1_2026-09-24.md`, `C3_L3A_R2_SESSION2_2026-09-24.md`, `C3_L3A_R3_SESSION3_2026-09-24.md`, all on the decoder axis; interim pooled at W 5.0: jump 5/15, ramp 11/15, decoys 4/30 and 9/30, no verdict), session 4 awaits the user; `C3.L4` BLOCKED | `C3_L3A_P2R1_PROBE_DEFECTS_AND_RESCORE_2026-09-23.md` |
 
 ## Evidence integrity rule
 

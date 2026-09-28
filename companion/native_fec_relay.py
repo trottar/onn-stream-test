@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from games.log_rotation import append_line
+import native_fec_rs
 
 
 FEC_MAGIC = b"PHF1"
@@ -29,6 +30,16 @@ DEFAULT_LOCAL_PORT = 48110
 # magic[4], version[1], count[1], base_seq[2], timestamp[4], ssrc[4],
 # marker_mask[1], rtp_byte0[1], payload_type[1], length_xor[2], parity_len[2]
 FEC_HEADER = struct.Struct("!4sBBHIIBBBHH")
+
+# C4-M1, comparison arm, DEFAULT OFF. Read from the environment at start().
+# Unset / `xor8_1`: today's behaviour byte for byte (one XOR parity, v1).
+# `xor8_2`: the same v1 XOR parity, then a second, Reed-Solomon "Q" parity
+# datagram (version 2, `native_fec_rs`), so the client can recover any two
+# missing packets of a group. A client that does not know version 2 drops it.
+# Any other value is ignored (reads xor8_1) and says so in status.
+FEC_SCHEME_ENV = "PRIVYHUB_FEC_SCHEME"
+FEC_SCHEMES = ("xor8_1", "xor8_2")
+FEC_VERSION_Q = 2
 
 # D-BASE-P3, diagnostic, DEFAULT OFF. Read from the environment at start().
 # 0 (or unset) is today's behaviour byte for byte: forward on arrival.
@@ -157,6 +168,12 @@ class NativeVideoFecRelay:
         # only thing needed to change arms.
         self._pacing_override = pacing_us
         self.pacing_us = self._configured_pacing_us()
+        # C4-M1: re-read on every start() as well.
+        self.fec_scheme = "xor8_1"
+        self.fec_scheme_source = "profile"
+        self._configure_scheme()
+        self._q_packets = 0
+        self._q_bytes = 0
 
         self._lock = threading.RLock()
         self._running = False
@@ -277,6 +294,7 @@ class NativeVideoFecRelay:
             # D-BASE-P3: re-read the knob, so the arm is whatever the
             # companion process was started with.
             self.pacing_us = self._configured_pacing_us()
+            self._configure_scheme()
             self._pace_queue.clear()
             self._pending = []
             self._pending_first_ns = 0
@@ -434,7 +452,10 @@ class NativeVideoFecRelay:
             return {
                 "enabled": True,
                 "running": self._running,
-                "version": "xor8_1",
+                "version": self.fec_scheme,
+                "scheme_source": self.fec_scheme_source,
+                "q_parity_packets": self._q_packets,
+                "q_parity_bytes": self._q_bytes,
                 "group_size": self.group_size,
                 "local_port": self.local_port,
                 "rtp_packets": self._rtp_packets,
@@ -1004,6 +1025,30 @@ class NativeVideoFecRelay:
             parity=True,
         )
 
+        if self.fec_scheme == "xor8_2":
+            # C4-M1: the second parity, after the unchanged first.
+            payloads = [item.payload for item in group]
+            q_header = FEC_HEADER.pack(
+                FEC_MAGIC,
+                FEC_VERSION_Q,
+                len(group),
+                base.sequence,
+                base.timestamp,
+                base.ssrc,
+                marker_mask,
+                base.byte0,
+                base.payload_type,
+                native_fec_rs.length_q([len(p) for p in payloads]),
+                parity_length,
+            )
+            q_packet = q_header + native_fec_rs.q_parity(payloads, parity_length)
+            self._q_packets += 1
+            self._q_bytes += len(q_packet)
+            self._emit_locked(
+                q_packet,
+                parity=True,
+            )
+
     def _handle_rtp_paced(
         self,
         packet: bytes,
@@ -1299,6 +1344,17 @@ class NativeVideoFecRelay:
             return 0
 
         return value if value > 0 else 0
+
+    def _configure_scheme(self) -> None:
+        raw = os.environ.get(FEC_SCHEME_ENV)
+        if raw is None or raw.strip() == "":
+            self.fec_scheme, self.fec_scheme_source = "xor8_1", "profile"
+            return
+        value = raw.strip().lower()
+        if value in FEC_SCHEMES:
+            self.fec_scheme, self.fec_scheme_source = value, "env"
+        else:
+            self.fec_scheme, self.fec_scheme_source = "xor8_1", "env_ignored"
 
     def _configured_pacing_us(self) -> int:
         if self._pacing_override is not None:

@@ -1,0 +1,23 @@
+test_continuity_diagnostic_unchanged (tools.test_c3_f1_recovery_restart.RecoveryRestartTests.test_continuity_diagnostic_unchanged)
+Rule: the continuity diagnostic still refuses off 7000 and still runs its ... ok
+test_manager_dispatch (tools.test_c3_f1_recovery_restart.RecoveryRestartTests.test_manager_dispatch)
+Rule: recovery_restart_encoder calls the validated continuity cycle at ... <frozen codecs>:189: ResourceWarning: unclosed file <_io.FileIO name='/dev/null' mode='wb' closefd=True>
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_recovery_is_wired_to_the_new_primitive (tools.test_c3_f1_recovery_restart.RecoveryRestartTests.test_recovery_is_wired_to_the_new_primitive)
+Rule: link-drop recovery's restart_encoder is recovery_restart_encoder. ... ok
+test_restart_at_each_level_keeps_the_level (tools.test_c3_f1_recovery_restart.RecoveryRestartTests.test_restart_at_each_level_keeps_the_level)
+Rule: at 5000/5500/6000/7000 the recovery primitive rebuilds the argv at ... ok
+test_restart_refuses_an_unvalidated_level (tools.test_c3_f1_recovery_restart.RecoveryRestartTests.test_restart_refuses_an_unvalidated_level)
+Rule: the recovery path only runs at a validated ladder level. ... ok
+test_restart_touches_only_the_encoder (tools.test_c3_f1_recovery_restart.RecoveryRestartTests.test_restart_touches_only_the_encoder)
+Rule: only the FFmpeg process is replaced -- the relay and session I/O ... ok
+test_shadow_controller_unaffected (tools.test_c3_f1_recovery_restart.RecoveryRestartTests.test_shadow_controller_unaffected)
+Rule: the shadow controller neither references nor imports the restart. ... ok
+test_transition_and_characterization_paths_unchanged (tools.test_c3_f1_recovery_restart.RecoveryRestartTests.test_transition_and_characterization_paths_unchanged)
+Rule: a ladder transition to the same level is still a no-op error, and the ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.006s
+
+OK

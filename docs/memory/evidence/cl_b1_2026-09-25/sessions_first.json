@@ -1,0 +1,91 @@
+{
+  "boot": {
+    "verdict": "PASS",
+    "evidence": {
+      "mainpid_owns_8765": true,
+      "seconds": 1.1,
+      "status_http": 200,
+      "service": "PrivyHub",
+      "native_stream_ready": true,
+      "profile_adopted": true,
+      "fec": "xor8_1",
+      "privyhub_env_in_companion": 0
+    }
+  },
+  "install_arm": {
+    "ok": true,
+    "attempt": 1,
+    "result": "Success",
+    "device_sha": "0220a29421499ae8159cabbd88dcedb481b95f93a09988e5c6be30c31a652dd4"
+  },
+  "arm_session": {
+    "label": "arm_body",
+    "launch": {
+      "verdict": "PASS",
+      "evidence": {
+        "launch_http": 200,
+        "active": true,
+        "game": "Tekken 3 (USA)",
+        "resume_playing": {
+          "ok": true,
+          "attempt": 1,
+          "seconds_to_playing": 3.0
+        },
+        "recovery_state": "PLAYING",
+        "any_override_at_playing": false
+      }
+    },
+    "any_override_at_playing": false,
+    "bitrate": 7000,
+    "report": "native_decoder_20260925_070729_440.json",
+    "journal": {
+      "received_as_body": [
+        "decoder-session-log received as body: report_chars=29508"
+      ],
+      "stored": 1,
+      "warnings": 0,
+      "target_form_posts": 0,
+      "body_form_posts": 1,
+      "tracebacks": 0
+    },
+    "game_active_after": false
+  },
+  "reinstall_adopted": {
+    "ok": true,
+    "attempt": 1,
+    "result": "Success",
+    "device_sha": "f31b1c180c5d0849230860d2f5b7ab1b4a8637f7be56a7dcf1f71aba77668ae7"
+  },
+  "adopted_session": {
+    "label": "adopted_target",
+    "launch": {
+      "verdict": "PASS",
+      "evidence": {
+        "launch_http": 200,
+        "active": true,
+        "game": "Tekken 3 (USA)",
+        "resume_playing": {
+          "ok": true,
+          "attempt": 1,
+          "seconds_to_playing": 3.0
+        },
+        "recovery_state": "PLAYING",
+        "any_override_at_playing": false
+      }
+    },
+    "any_override_at_playing": false,
+    "bitrate": 7000,
+    "report": "native_decoder_20260925_071127_016.json",
+    "journal": {
+      "received_as_body": [],
+      "stored": 1,
+      "warnings": 0,
+      "target_form_posts": 1,
+      "body_form_posts": 0,
+      "tracebacks": 0
+    },
+    "game_active_after": false
+  },
+  "banner_after": false,
+  "device_sha_end": "f31b1c180c5d0849230860d2f5b7ab1b4a8637f7be56a7dcf1f71aba77668ae7"
+}

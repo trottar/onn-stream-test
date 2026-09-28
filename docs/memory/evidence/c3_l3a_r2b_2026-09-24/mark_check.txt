@@ -1,0 +1,36 @@
+offset +21.041 s (decoder = probe + offset)
+rows 128: in a cycle window 64 (report: marked 64), outside 64 (report: recent 64)
+marked ring from decoder 283.766 s = probe 262.725 s
+recent ring from decoder 962.312 s = probe 941.271 s (off-transition events before this were evicted)
+top-gap list: 16 rows, smallest 183 ms; every gap not listed is <= 183 ms
+top-gap rows inside a cycle window (i.e. at a transition): 16 of 16
+
+  mark s    dec s  source    gap ms codec s before  lag fire lag decoy
+  12.364   33.405  unknown <= 183     12.36         -
+  34.861   55.902  unknown <= 183     34.86         -
+  49.363   70.404  unknown <= 183     49.36      0.26
+  91.531  112.572  top-gap      239    11     2.35      2.25     42.42
+ 122.003  143.044  unknown <= 183     32.72     72.90
+ 135.770  156.811  unknown <= 183     46.49      7.35
+ 166.734  187.775  unknown <= 183     77.46     38.31
+ 232.585  253.626  unknown <= 183     53.75      9.24
+ 259.489  280.530  unknown <= 183 (cycle window before marked ring)      2.03     36.14
+ 264.537  285.578  top-gap      187    12     1.81      1.85     41.19
+ 281.137  302.178  unknown <= 183     13.28     57.79
+ 341.313  362.354  top-gap      222     9     1.68      1.97     36.38
+ 347.393  368.434  marked       176    10     2.59      2.63     42.46
+ 410.911  431.952  top-gap      185     9     1.76      1.60     40.26
+ 416.639  437.680  top-gap      184     8     2.31      2.36     45.99
+ 421.833  442.874  top-gap      189     7     2.34      2.38     51.18
+ 439.191  460.232  unknown <= 183     19.73     68.54
+ 513.710  534.751  unknown <= 183     38.04     63.68
+ 534.398  555.439  unknown <= 183     58.73     20.19
+ 557.733  578.774  top-gap      184     7     2.14      2.18     43.52
+ 582.950  603.991  unknown <= 183     22.21     68.74
+ 607.775  628.816  unknown <= 183     47.04      4.68
+ 637.912  658.953  marked       180    10     1.95      1.99     34.82
+ 648.676  669.717  top-gap      184     8     2.36      2.38     45.58
+ 688.724  709.765  unknown <= 183     42.43     21.13
+ 781.420  802.461  unknown <= 183     74.57     49.09
+
+recent ring (64 off-transition events, decoder 962.3-1000.7 s): output_gap_ms >= 50: 56, max 79; the rest are latency events

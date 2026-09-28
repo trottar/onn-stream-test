@@ -39,6 +39,10 @@ SUPPORTED_FIXED_BITRATES_KBPS = (5000, 5500, 6000)
 # it has not characterized.
 BIDIRECTIONAL_SCHEMA = "privyhub_c3_validated_bitrate_transition_v1"
 BIDIRECTIONAL_MODE = "validated_ladder_actuator_probe"
+
+# C3-F1: recovery's encoder restart at whatever validated level is active.
+RECOVERY_SCHEMA = "privyhub_c3_recovery_restart_v1"
+RECOVERY_MODE = "encoder_only_restart_at_active_level"
 LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS = (5000, 5500, 6000, 7000)
 
 
@@ -445,6 +449,7 @@ def _run_c3_linux_bitrate_cycle(
     target_bitrate_kbps: int,
     *,
     validated_transition: bool = False,
+    same_level_restart: bool = False,
     popen_factory: Callable[..., Any] = subprocess.Popen,
     perf_counter_ns: Callable[[], int] = time.perf_counter_ns,
     monotonic: Callable[[], float] = time.monotonic,
@@ -493,7 +498,13 @@ def _run_c3_linux_bitrate_cycle(
 
     target = _int(target_bitrate_kbps)
 
-    if validated_transition:
+    # C3-F1: `same_level_restart` is recovery's restart at the active level
+    # (target == current, any validated level). Same mechanics; only the
+    # precondition, the label and the schema/mode strings differ.
+    if same_level_restart:
+        if target not in LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS:
+            raise RuntimeError("unsupported_validated_bitrate")
+    elif validated_transition:
         if target not in LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS:
             raise RuntimeError("unsupported_validated_bitrate")
     elif target not in SUPPORTED_FIXED_BITRATES_KBPS:
@@ -521,7 +532,10 @@ def _run_c3_linux_bitrate_cycle(
         )
     )
 
-    if validated_transition:
+    if same_level_restart:
+        if target != current_bitrate_kbps:
+            raise RuntimeError("recovery_restart_level_mismatch")
+    elif validated_transition:
         if (
             current_bitrate_kbps
             not in LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS
@@ -536,7 +550,9 @@ def _run_c3_linux_bitrate_cycle(
         raise RuntimeError("characterization_requires_reference_start")
 
     label = (
-        "C3.L3a Linux validated-ladder transition probe"
+        "C3-F1 Linux recovery restart at the active level"
+        if same_level_restart
+        else "C3.L3a Linux validated-ladder transition probe"
         if validated_transition
         else "C3.L3 Linux fixed-bitrate characterization probe"
     )
@@ -708,13 +724,17 @@ def _run_c3_linux_bitrate_cycle(
 
         payload = {
             "schema": (
-                BIDIRECTIONAL_SCHEMA
+                RECOVERY_SCHEMA
+                if same_level_restart
+                else BIDIRECTIONAL_SCHEMA
                 if validated_transition
                 else FIXED_BITRATE_SCHEMA
             ),
             "ok": True,
             "mode": (
-                BIDIRECTIONAL_MODE
+                RECOVERY_MODE
+                if same_level_restart
+                else BIDIRECTIONAL_MODE
                 if validated_transition
                 else FIXED_BITRATE_MODE
             ),
@@ -830,6 +850,32 @@ def run_c3_linux_fixed_bitrate_cycle(
         manager,
         target_bitrate_kbps,
         validated_transition=False,
+        **kwargs,
+    )
+
+
+def run_c3_linux_recovery_restart(
+    manager: Any,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """C3-F1: restart the encoder at the currently active validated level.
+
+    Recovery's restart for a stream that is not at the 7000 reference. The
+    level is `manager._active_bitrate_kbps`, the single source of truth, and
+    stays as it was; FEC relay, process audio, the controller transport and
+    the client session survive, only the FFmpeg process is replaced.
+    """
+    current = int(
+        getattr(
+            manager,
+            "_active_bitrate_kbps",
+            REFERENCE_BITRATE_KBPS,
+        )
+    )
+    return _run_c3_linux_bitrate_cycle(
+        manager,
+        current,
+        same_level_restart=True,
         **kwargs,
     )
 

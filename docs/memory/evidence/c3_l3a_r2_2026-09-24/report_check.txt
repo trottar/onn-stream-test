@@ -1,0 +1,90 @@
+journal line 1 chars            : 49200
+journal line 2 chars            : 1727
+HTTP status logged              : 400
+request-target chars            : 50759
+url-encoded report value chars  : 50717
+decoded, redacted lines (chars) : 32055
+byte-exact file (chars)         : 32057
+redact(file) == redacted decode : True
+MAX_REPORT_CHARS                : 32000
+
+write_decoder_session_log refusals, in order:
+  empty                         : False
+  len > MAX_REPORT_CHARS        : True  (over by 57)
+  invalid JSON                  : False
+  not a JSON object             : False
+
+schema                          : privyhub_native_decoder_session_v2
+duration_ms                     : 1000770
+video.ssrc_changes              : 24
+stream_discontinuities          : {'ssrc_change': 24}
+slow_event_retained (m / r)     : 128 (64 / 64)
+re-serialized compact == posted : True
+largest top-level members (compact chars):
+  audio                         : 19211
+  first_idr_after_discontinuity : 4030
+  slow_events_ge_50_ms          : 2962
+  stream_discontinuities        : 1440
+  audio.arrival_holes           : 9925
+  audio.tick_series             : 8150
+
+earlier accepted reports, compact re-serialization of `report` (the posted text; exact for the one above):
+  file                                     duration_s  ssrc  chars  headroom
+  native_decoder_20260923_001245_548.json       307.0     0  24825      7175
+  native_decoder_20260923_003415_654.json      1208.0     0  25097      6903
+  native_decoder_20260923_005525_894.json      1207.1     0  25125      6875
+  native_decoder_20260923_011637_296.json      1207.9     0  25447      6553
+  native_decoder_20260923_022942_402.json       115.1     1  19664     12336
+  native_decoder_20260923_031009_782.json      2350.3     0  17972     14028
+  native_decoder_20260923_031119_088.json        34.4     0  12309     19691
+  native_decoder_20260923_031133_755.json        13.5     0  10031     21969
+  native_decoder_20260923_040837_140.json        56.9     0  14569     17431
+  native_decoder_20260923_042019_648.json        37.9     0  13118     18882
+  native_decoder_20260923_042135_953.json        53.7     0  13421     18579
+  native_decoder_20260923_042245_786.json        36.5     0  11836     20164
+  native_decoder_20260923_042331_026.json        14.4     0   8637     23363
+  native_decoder_20260923_042526_710.json        67.2     0  15333     16667
+  native_decoder_20260923_042656_403.json        13.2     0   8487     23513
+  native_decoder_20260923_042751_552.json        14.4     0   8691     23309
+  native_decoder_20260923_042841_487.json         6.4     0   7953     24047
+  native_decoder_20260923_043232_436.json        40.6     0  12818     19182
+  native_decoder_20260923_052405_587.json        67.6     0  16916     15084
+  native_decoder_20260923_052736_464.json        58.5     0  14231     17769
+  native_decoder_20260923_052916_064.json        67.3     0  14395     17605
+  native_decoder_20260923_055504_090.json        54.7     0  16390     15610
+  native_decoder_20260923_061045_638.json        67.6     0  17220     14780
+  native_decoder_20260923_063219_093.json      1207.0     0  25202      6798
+  native_decoder_20260923_065330_640.json      1207.1     0  25648      6352
+  native_decoder_20260923_071442_315.json      1207.0     0  25614      6386
+  native_decoder_20260923_081345_177.json      1207.0     0  25307      6693
+  native_decoder_20260923_083456_497.json      1207.1     0  25590      6410
+  native_decoder_20260923_085608_138.json      1207.2     0  25294      6706
+  native_decoder_20260923_091720_187.json      1207.9     0  25877      6123
+  native_decoder_20260923_150354_838.json        81.3     0  17189     14811
+  native_decoder_20260923_160602_887.json      1209.0     0  25532      6468
+  native_decoder_20260923_162713_901.json      1206.9     0  25618      6382
+  native_decoder_20260923_171828_821.json      1208.2     0  25613      6387
+  native_decoder_20260923_173940_684.json      1207.2     0  25614      6386
+  native_decoder_20260923_191117_838.json      1508.7     0  25684      6316
+  native_decoder_20260923_194234_515.json        67.6     0  16642     15358
+  native_decoder_20260923_195637_825.json       727.0     0  25653      6347
+  native_decoder_20260923_200248_311.json       307.0     0  25484      6516
+  native_decoder_20260923_200904_976.json       311.3     0  25499      6501
+  native_decoder_20260923_202015_609.json       606.9     0  25581      6419
+  native_decoder_20260923_203126_086.json       606.2     0  25565      6435
+  native_decoder_20260923_204237_021.json       607.0     0  25538      6462
+  native_decoder_20260923_205349_174.json       607.5     0  25591      6409
+  native_decoder_20260923_214925_044.json        81.5     0  17893     14107
+  native_decoder_20260923_225121_726.json      1211.3     0  25859      6141
+  native_decoder_20260923_231233_191.json      1207.3     0  25812      6188
+  native_decoder_20260924_040354_111.json        36.9     0  12071     19929
+  native_decoder_20260924_041256_754.json       479.0     8  28102      3898
+  native_decoder_20260924_054227_412.json       108.8     4  21573     10427
+  native_decoder_20260924_063845_903.json       876.9    20  31961        39
+  native_decoder_20260924_065422_311.json       873.1     0  25649      6351
+  native_decoder_20260924_070901_991.json       818.4    20  31884       116
+  native_decoder_20260924_072341_344.json       818.6     0  25661      6339
+  native_decoder_20260924_073814_029.json       811.4    20  31574       426
+  native_decoder_20260924_075248_964.json       812.1     0  25634      6366
+  native_decoder_20260924_160232_200.json       270.7     9  28350      3650
+  native_decoder_20260924_161558_087.json       804.5    15  30235      1765

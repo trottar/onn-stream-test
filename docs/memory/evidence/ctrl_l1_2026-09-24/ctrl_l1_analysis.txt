@@ -1,0 +1,173 @@
+CTRL-L1 analysis -- read-only
+host samples 386, t2 samples 386, holds ['C', 'W1', 'W2']
+
+=== hold C: 2026-09-24T20:20:41Z, 120 host rows, 40 status rows ===
+  span 19.5 min (first to last status in the hold): lost_packets +171 (8.8/min), packets_received +507851 (26043/min), rejected +0, bad +0
+  socket drops             +0
+  Udp RcvbufErrors         +0
+  Udp InErrors             +0
+  Udp InCsumErrors         +0
+  Udp MemErrors            +0
+  softnet dropped          +0
+  softnet time_squeeze     +0
+  NIC rx_dropped           +0
+  NIC rx_missed_errors     +0
+  NIC rx_fifo_errors       +0
+  NIC rx_errors            +0
+  Opal wlan1 rx_drop       +0
+  Opal wlan1 rx_errs       +0
+  Opal wlan1 tx_drop       +0
+  Opal wlan1 tx_errs       +0
+  Opal br-lan rx_drop      +0
+  Opal br-lan rx_errs      +0
+  Opal br-lan tx_drop      +0
+  Opal br-lan tx_errs      +0
+  Opal eth0 rx_drop        +0
+  Opal eth0 rx_errs        +0
+  Opal eth0 tx_drop        +0
+  Opal eth0 tx_errs        +0
+  socket rx_queue bytes: max 5120, samples 120
+  socket drops / lost = 0.00; stack/NIC (beyond the socket's own) / lost = 0.00
+  min  lost rcv/min sockdrop rcvbuf softnet nicdrop  onn C
+    0   3.0   25098        0      0       0       0   59.5
+    1   0.0   25745        0      0       0       0   61.1
+    2   2.0   26023        0      0       0       0   62.3
+    3   0.0   26114        0      0       0       0   63.1
+    4   0.0   26127        0      0       0       0   64.2
+    5   3.0   26085        0      0       0       0   64.9
+    6   0.0   26059        0      0       0       0   65.5
+    7  55.0   26079        0      0       0       0   66.0
+    8   2.0   26187        0      0       0       0   66.6
+    9   3.0   26154        0      0       0       0   66.9
+   10   6.0   26119        0      0       0       0   67.4
+   11  58.0   26014        0      0       0       0   67.5
+   12   3.0   26144        0      0       0       0   67.9
+   13   6.0   26157        0      0       0       0   68.1
+   14   6.0   26122        0      0       0       0   68.1
+   15   4.0   26145        0      0       0       0   68.3
+   16   7.0   26117        0      0       0       0   68.5
+   17   6.0   26144        0      0       0       0   68.7
+   18   5.0   26131        0      0       0       0   68.6
+  per-minute lost vs packets_received rate: rho +0.14; vs onn cpu-thermal: rho +0.70 (n 19); warm minutes (>= 67.5 C) 8 of 19, lost/min warm 11.9 cool 6.7
+  whole session (status after BACK): received 522666, lost_packets 171, per player [130695, 130674, 130659, 130638], true-loss lower bound 114 = 67 % of the counter
+    per-player deficit vs the best player: [0, 21, 36, 57]
+  client report: packets_sent 523128 (at the report snapshot), send_errors 4, motion_events 0
+  Opal counters that moved: none
+
+=== hold W1: 2026-09-24T20:41:55Z, 120 host rows, 40 status rows ===
+  span 19.5 min (first to last status in the hold): lost_packets +266 (13.6/min), packets_received +508991 (26102/min), rejected +0, bad +0
+  socket drops             +0
+  Udp RcvbufErrors         +0
+  Udp InErrors             +0
+  Udp InCsumErrors         +0
+  Udp MemErrors            +0
+  softnet dropped          +0
+  softnet time_squeeze     +0
+  NIC rx_dropped           +0
+  NIC rx_missed_errors     +0
+  NIC rx_fifo_errors       +0
+  NIC rx_errors            +0
+  Opal wlan1 rx_drop       +0
+  Opal wlan1 rx_errs       +0
+  Opal wlan1 tx_drop       +0
+  Opal wlan1 tx_errs       +0
+  Opal br-lan rx_drop      +0
+  Opal br-lan rx_errs      +0
+  Opal br-lan tx_drop      +0
+  Opal br-lan tx_errs      +0
+  Opal eth0 rx_drop        +0
+  Opal eth0 rx_errs        +0
+  Opal eth0 tx_drop        +0
+  Opal eth0 tx_errs        +0
+  socket rx_queue bytes: max 3840, samples 120
+  socket drops / lost = 0.00; stack/NIC (beyond the socket's own) / lost = 0.00
+  min  lost rcv/min sockdrop rcvbuf softnet nicdrop  onn C
+    0   8.0   25475        0      0       0       0   67.3
+    1   8.0   26005        0      0       0       0   67.5
+    2  12.0   26062        0      0       0       0   67.8
+    3   8.0   26133        0      0       0       0   67.9
+    4  12.0   26159        0      0       0       0   68.2
+    5   8.0   26113        0      0       0       0   68.4
+    6  10.0   26164        0      0       0       0   68.7
+    7  12.0   26190        0      0       0       0   68.7
+    8   9.0   26178        0      0       0       0   68.6
+    9   9.0   26051        0      0       0       0   68.9
+   10   9.0   26170        0      0       0       0   68.8
+   11   9.0   26180        0      0       0       0   68.9
+   12   2.0   26187        0      0       0       0   68.8
+   13   8.0   26221        0      0       0       0   68.9
+   14   8.0   26160        0      0       0       0   69.0
+   15  62.0   26085        0      0       0       0   69.0
+   16   7.0   26109        0      0       0       0   69.0
+   17  57.0   26091        0      0       0       0   68.8
+   18   7.0   26171        0      0       0       0   68.9
+  per-minute lost vs packets_received rate: rho -0.08; vs onn cpu-thermal: rho -0.09 (n 19); warm minutes (>= 67.5 C) 17 of 19, lost/min warm 14.6 cool 8.0
+  whole session (status after BACK): received 523926, lost_packets 268, per player [131008, 130981, 130967, 130970], true-loss lower bound 106 = 40 % of the counter
+    per-player deficit vs the best player: [0, 27, 41, 38]
+  client report: packets_sent 524552 (at the report snapshot), send_errors 4, motion_events 0
+  Opal counters that moved: none
+
+=== hold W2: 2026-09-24T21:03:06Z, 120 host rows, 40 status rows ===
+  span 19.5 min (first to last status in the hold): lost_packets +301 (15.4/min), packets_received +508393 (26071/min), rejected +0, bad +0
+  socket drops             +0
+  Udp RcvbufErrors         +0
+  Udp InErrors             +0
+  Udp InCsumErrors         +0
+  Udp MemErrors            +0
+  softnet dropped          +0
+  softnet time_squeeze     +0
+  NIC rx_dropped           +0
+  NIC rx_missed_errors     +0
+  NIC rx_fifo_errors       +0
+  NIC rx_errors            +0
+  Opal wlan1 rx_drop       +0
+  Opal wlan1 rx_errs       +0
+  Opal wlan1 tx_drop       +0
+  Opal wlan1 tx_errs       +0
+  Opal br-lan rx_drop      +0
+  Opal br-lan rx_errs      +0
+  Opal br-lan tx_drop      +0
+  Opal br-lan tx_errs      +0
+  Opal eth0 rx_drop        +0
+  Opal eth0 rx_errs        +0
+  Opal eth0 tx_drop        +0
+  Opal eth0 tx_errs        +0
+  socket rx_queue bytes: max 1280, samples 120
+  socket drops / lost = 0.00; stack/NIC (beyond the socket's own) / lost = 0.00
+  min  lost rcv/min sockdrop rcvbuf softnet nicdrop  onn C
+    0   2.0   25263        0      0       0       0   67.5
+    1   3.0   25931        0      0       0       0   67.8
+    2   7.0   26062        0      0       0       0   68.0
+    3   3.0   26083        0      0       0       0   68.4
+    4   7.0   26140        0      0       0       0   68.7
+    5   3.0   26134        0      0       0       0   68.5
+    6   2.0   26102        0      0       0       0   68.8
+    7   5.0   26175        0      0       0       0   68.6
+    8   2.0   26168        0      0       0       0   68.8
+    9   5.0   26147        0      0       0       0   68.7
+   10   6.0   26165        0      0       0       0   68.9
+   11   2.0   26095        0      0       0       0   68.9
+   12  61.0   26110        0      0       0       0   69.2
+   13   5.0   26114        0      0       0       0   68.9
+   14   4.0   26163        0      0       0       0   69.1
+   15   1.0   26093        0      0       0       0   69.0
+   16   6.0   26178        0      0       0       0   69.1
+   17   5.0   26149        0      0       0       0   69.1
+   18   3.0   26181        0      0       0       0   69.2
+  per-minute lost vs packets_received rate: rho +0.28; vs onn cpu-thermal: rho +0.19 (n 19); warm minutes (>= 67.5 C) 18 of 19, lost/min warm 7.2 cool 2.0
+  whole session (status after BACK): received 523098, lost_packets 305, per player [130810, 130769, 130771, 130748], true-loss lower bound 142 = 47 % of the counter
+    per-player deficit vs the best player: [0, 41, 39, 62]
+  client report: packets_sent 523684 (at the report snapshot), send_errors 4, motion_events 0
+  Opal counters that moved: none
+
+=== the onn's Udp counters, read between holds ===
+  C: InDatagrams +1633921, NoPorts +3040, InErrors +0, OutDatagrams +523464, RcvbufErrors +0, SndbufErrors +0, InCsumErrors +0, IgnoredMulti +136, MemErrors +0
+  W1: InDatagrams +1632601, NoPorts +1782, InErrors +0, OutDatagrams +524844, RcvbufErrors +0, SndbufErrors +0, InCsumErrors +0, IgnoredMulti +122, MemErrors +0
+  W2: InDatagrams +1631721, NoPorts +1179, InErrors +0, OutDatagrams +523925, RcvbufErrors +0, SndbufErrors +0, InCsumErrors +0, IgnoredMulti +127, MemErrors +0
+
+=== READING (pre-registered) ===
+holds 3; socket drops >= 80 % of lost: 0; stack/NIC >= 80 %: 0; every host counter +0 while lost accumulated: 3
+  C: lost +171, socket drops +0, all host counters +0: True
+  W1: lost +266, socket drops +0, all host counters +0: True
+  W2: lost +301, socket drops +0, all host counters +0: True
+-> PATH (every host-side counter +0 while lost_packets accumulated, in every hold)

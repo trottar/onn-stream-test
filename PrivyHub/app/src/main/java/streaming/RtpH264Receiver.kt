@@ -104,6 +104,10 @@ class RtpH264Receiver(
         private const val FEC_VERSION =
             1
 
+        // C4-M1: the xor8_2 arm's second (Reed-Solomon Q) parity, FecRs82.
+        private const val FEC_VERSION_Q =
+            2
+
         private const val FEC_HOLD_TIMEOUT_NS =
             12_000_000L
 
@@ -166,7 +170,12 @@ class RtpH264Receiver(
         val payloadType: Int,
         val lengthXor: Int,
         val parity: ByteArray,
-        val receivedAtNs: Long
+        val receivedAtNs: Long,
+        // C4-M1: the group's Q parity (xor8_2 arm) if it has arrived, and
+        // whether the XOR parity P has. A v1-only stream never sets these.
+        val qParity: ByteArray? = null,
+        val lengthQ: Int = 0,
+        val hasP: Boolean = true
     )
 
     private val packets =
@@ -1301,7 +1310,9 @@ class RtpH264Receiver(
 
         if (
             version !=
-            FEC_VERSION
+            FEC_VERSION &&
+            version !=
+            FEC_VERSION_Q
         ) {
             return
         }
@@ -1375,16 +1386,18 @@ class RtpH264Receiver(
             return
         }
 
-        fecParityPackets
-            .incrementAndGet()
+        if (version == FEC_VERSION) {
+            fecParityPackets
+                .incrementAndGet()
 
-        fecParityBytes
-            .addAndGet(
-                length.toLong()
-            )
+            fecParityBytes
+                .addAndGet(
+                    length.toLong()
+                )
 
-        fecGroupsReceived
-            .incrementAndGet()
+            fecGroupsReceived
+                .incrementAndGet()
+        }
 
         val group =
             FecGroup(
@@ -1428,16 +1441,46 @@ class RtpH264Receiver(
                 group
             )
 
+        // C4-M1: P (v1) and Q (v2) of one group share its key; whichever
+        // arrives second is merged into the first. A v1-only stream takes
+        // the first branch every time, exactly as before.
+        val existing =
+            fecGroups[key]
+
+        val merged =
+            if (version == FEC_VERSION) {
+                if (existing != null && existing.qParity != null) {
+                    group.copy(
+                        qParity = existing.qParity,
+                        lengthQ = existing.lengthQ
+                    )
+                } else {
+                    group
+                }
+            } else if (existing != null && existing.hasP) {
+                existing.copy(
+                    qParity = group.parity,
+                    lengthQ = group.lengthXor
+                )
+            } else {
+                group.copy(
+                    parity = ByteArray(0),
+                    qParity = group.parity,
+                    lengthQ = group.lengthXor,
+                    hasP = false
+                )
+            }
+
         fecGroups[
             key
         ] =
-            group
+            merged
 
         trimFecGroups()
 
         attemptRecoverGroup(
             key,
-            group,
+            merged,
             nowNs
         )
     }
@@ -1519,10 +1562,28 @@ class RtpH264Receiver(
             return
         }
 
+        // C4-M1: with a Q parity (xor8_2 arm) recover one packet whose P
+        // was lost, or two packets with P and Q. Without Q nothing here runs.
+        val q =
+            group.qParity
+
+        if (q != null) {
+            if (missingIndexes.size == 1 && !group.hasP) {
+                recoverWithQ(key, group, q, missingIndexes, nowNs)
+                return
+            }
+
+            if (missingIndexes.size == 2 && group.hasP) {
+                recoverWithQ(key, group, q, missingIndexes, nowNs)
+                return
+            }
+        }
+
         if (
             missingIndexes
                 .size >
-            1
+            1 ||
+            !group.hasP
         ) {
             return
         }
@@ -1733,6 +1794,124 @@ class RtpH264Receiver(
             nowNs,
             fecRecovered = true
         )
+    }
+
+    // C4-M1: the two-parity recovery (FecRs82). Same reconstruction and
+    // counters as the XOR path: each recovered packet is one
+    // fec_recovered_packets; an impossible length is one unrecoverable group.
+    private fun recoverWithQ(
+        key: String,
+        group: FecGroup,
+        q: ByteArray,
+        missingIndexes: List<Int>,
+        nowNs: Long
+    ) {
+        val known =
+            ArrayList<FecRs82.Known>()
+
+        for (index in 0 until group.count) {
+            if (index in missingIndexes) {
+                continue
+            }
+
+            val sequence =
+                (group.baseSequence + index) and 0xffff
+
+            val packet =
+                recentPackets[PacketKey(group.timestamp, sequence)] ?: return
+
+            if (packet.size < 13) {
+                return
+            }
+
+            known.add(FecRs82.Known(index, packet, 12, packet.size - 12))
+        }
+
+        val recovered =
+            ArrayList<Pair<Int, ByteArray>>()
+
+        if (missingIndexes.size == 1) {
+            val (payload, length) =
+                FecRs82.recoverOneFromQ(q, group.lengthQ, known, missingIndexes[0])
+
+            if (length <= 0 || length > payload.size) {
+                failGroup(key, group)
+                return
+            }
+
+            recovered.add(Pair(missingIndexes[0], payload.copyOf(length)))
+        } else {
+            val x = missingIndexes[0]
+            val y = missingIndexes[1]
+            val pair =
+                FecRs82.recoverTwo(group.parity, group.lengthXor, q, group.lengthQ, known, x, y)
+
+            if (
+                pair.xLength <= 0 || pair.xLength > pair.x.size ||
+                pair.yLength <= 0 || pair.yLength > pair.y.size
+            ) {
+                failGroup(key, group)
+                return
+            }
+
+            recovered.add(Pair(x, pair.x.copyOf(pair.xLength)))
+            recovered.add(Pair(y, pair.y.copyOf(pair.yLength)))
+        }
+
+        fecGroups.remove(key)
+
+        val packets =
+            ArrayList<ByteArray>()
+
+        for ((index, payload) in recovered) {
+            val sequence =
+                (group.baseSequence + index) and 0xffff
+
+            val marker =
+                (group.markerMask and (1 shl index)) != 0
+
+            val reconstructed =
+                ByteArray(12 + payload.size)
+
+            reconstructed[0] = group.rtpByte0.toByte()
+            reconstructed[1] =
+                (group.payloadType or (if (marker) 0x80 else 0)).toByte()
+            writeU16(reconstructed, 2, sequence)
+            writeU32(reconstructed, 4, group.timestamp)
+            writeU32(reconstructed, 8, group.ssrc)
+            System.arraycopy(payload, 0, reconstructed, 12, payload.size)
+
+            recentPackets[PacketKey(group.timestamp, sequence)] = reconstructed
+            fecRecoveredPackets.incrementAndGet()
+
+            if (marker) {
+                fecRecoveredMarkerPackets.incrementAndGet()
+            }
+
+            if (rtpPayloadLooksLikeIdr(reconstructed)) {
+                fecRecoveredIdrPackets.incrementAndGet()
+            }
+
+            packets.add(reconstructed)
+        }
+
+        trimRecentPackets()
+
+        for (reconstructed in packets) {
+            acceptOrderedPacket(reconstructed, nowNs, fecRecovered = true)
+        }
+    }
+
+    private fun failGroup(
+        key: String,
+        group: FecGroup
+    ) {
+        fecGroups.remove(key)
+        fecUnrecoverableGroups.incrementAndGet()
+
+        if (group.timestamp == currentTimestamp) {
+            currentAccessUnitFecUnrecoverable = true
+        }
     }
 
     private fun pruneCaches(

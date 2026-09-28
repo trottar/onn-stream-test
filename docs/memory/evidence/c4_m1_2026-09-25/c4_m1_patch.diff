@@ -1,0 +1,411 @@
+diff --git a/PrivyHub/app/src/main/java/streaming/RtpH264Receiver.kt b/PrivyHub/app/src/main/java/streaming/RtpH264Receiver.kt
+index cc408a2..02617ca 100644
+--- a/PrivyHub/app/src/main/java/streaming/RtpH264Receiver.kt
++++ b/PrivyHub/app/src/main/java/streaming/RtpH264Receiver.kt
+@@ -104,6 +104,10 @@ class RtpH264Receiver(
+         private const val FEC_VERSION =
+             1
+ 
++        // C4-M1: the xor8_2 arm's second (Reed-Solomon Q) parity, FecRs82.
++        private const val FEC_VERSION_Q =
++            2
++
+         private const val FEC_HOLD_TIMEOUT_NS =
+             12_000_000L
+ 
+@@ -166,7 +170,12 @@ class RtpH264Receiver(
+         val payloadType: Int,
+         val lengthXor: Int,
+         val parity: ByteArray,
+-        val receivedAtNs: Long
++        val receivedAtNs: Long,
++        // C4-M1: the group's Q parity (xor8_2 arm) if it has arrived, and
++        // whether the XOR parity P has. A v1-only stream never sets these.
++        val qParity: ByteArray? = null,
++        val lengthQ: Int = 0,
++        val hasP: Boolean = true
+     )
+ 
+     private val packets =
+@@ -1301,7 +1310,9 @@ class RtpH264Receiver(
+ 
+         if (
+             version !=
+-            FEC_VERSION
++            FEC_VERSION &&
++            version !=
++            FEC_VERSION_Q
+         ) {
+             return
+         }
+@@ -1375,16 +1386,18 @@ class RtpH264Receiver(
+             return
+         }
+ 
+-        fecParityPackets
+-            .incrementAndGet()
++        if (version == FEC_VERSION) {
++            fecParityPackets
++                .incrementAndGet()
+ 
+-        fecParityBytes
+-            .addAndGet(
+-                length.toLong()
+-            )
++            fecParityBytes
++                .addAndGet(
++                    length.toLong()
++                )
+ 
+-        fecGroupsReceived
+-            .incrementAndGet()
++            fecGroupsReceived
++                .incrementAndGet()
++        }
+ 
+         val group =
+             FecGroup(
+@@ -1428,16 +1441,46 @@ class RtpH264Receiver(
+                 group
+             )
+ 
++        // C4-M1: P (v1) and Q (v2) of one group share its key; whichever
++        // arrives second is merged into the first. A v1-only stream takes
++        // the first branch every time, exactly as before.
++        val existing =
++            fecGroups[key]
++
++        val merged =
++            if (version == FEC_VERSION) {
++                if (existing != null && existing.qParity != null) {
++                    group.copy(
++                        qParity = existing.qParity,
++                        lengthQ = existing.lengthQ
++                    )
++                } else {
++                    group
++                }
++            } else if (existing != null && existing.hasP) {
++                existing.copy(
++                    qParity = group.parity,
++                    lengthQ = group.lengthXor
++                )
++            } else {
++                group.copy(
++                    parity = ByteArray(0),
++                    qParity = group.parity,
++                    lengthQ = group.lengthXor,
++                    hasP = false
++                )
++            }
++
+         fecGroups[
+             key
+         ] =
+-            group
++            merged
+ 
+         trimFecGroups()
+ 
+         attemptRecoverGroup(
+             key,
+-            group,
++            merged,
+             nowNs
+         )
+     }
+@@ -1519,10 +1562,28 @@ class RtpH264Receiver(
+             return
+         }
+ 
++        // C4-M1: with a Q parity (xor8_2 arm) recover one packet whose P
++        // was lost, or two packets with P and Q. Without Q nothing here runs.
++        val q =
++            group.qParity
++
++        if (q != null) {
++            if (missingIndexes.size == 1 && !group.hasP) {
++                recoverWithQ(key, group, q, missingIndexes, nowNs)
++                return
++            }
++
++            if (missingIndexes.size == 2 && group.hasP) {
++                recoverWithQ(key, group, q, missingIndexes, nowNs)
++                return
++            }
++        }
++
+         if (
+             missingIndexes
+                 .size >
+-            1
++            1 ||
++            !group.hasP
+         ) {
+             return
+         }
+@@ -1735,6 +1796,124 @@ class RtpH264Receiver(
+         )
+     }
+ 
++    // C4-M1: the two-parity recovery (FecRs82). Same reconstruction and
++    // counters as the XOR path: each recovered packet is one
++    // fec_recovered_packets; an impossible length is one unrecoverable group.
++    private fun recoverWithQ(
++        key: String,
++        group: FecGroup,
++        q: ByteArray,
++        missingIndexes: List<Int>,
++        nowNs: Long
++    ) {
++        val known =
++            ArrayList<FecRs82.Known>()
++
++        for (index in 0 until group.count) {
++            if (index in missingIndexes) {
++                continue
++            }
++
++            val sequence =
++                (group.baseSequence + index) and 0xffff
++
++            val packet =
++                recentPackets[PacketKey(group.timestamp, sequence)] ?: return
++
++            if (packet.size < 13) {
++                return
++            }
++
++            known.add(FecRs82.Known(index, packet, 12, packet.size - 12))
++        }
++
++        val recovered =
++            ArrayList<Pair<Int, ByteArray>>()
++
++        if (missingIndexes.size == 1) {
++            val (payload, length) =
++                FecRs82.recoverOneFromQ(q, group.lengthQ, known, missingIndexes[0])
++
++            if (length <= 0 || length > payload.size) {
++                failGroup(key, group)
++                return
++            }
++
++            recovered.add(Pair(missingIndexes[0], payload.copyOf(length)))
++        } else {
++            val x = missingIndexes[0]
++            val y = missingIndexes[1]
++            val pair =
++                FecRs82.recoverTwo(group.parity, group.lengthXor, q, group.lengthQ, known, x, y)
++
++            if (
++                pair.xLength <= 0 || pair.xLength > pair.x.size ||
++                pair.yLength <= 0 || pair.yLength > pair.y.size
++            ) {
++                failGroup(key, group)
++                return
++            }
++
++            recovered.add(Pair(x, pair.x.copyOf(pair.xLength)))
++            recovered.add(Pair(y, pair.y.copyOf(pair.yLength)))
++        }
++
++        fecGroups.remove(key)
++
++        val packets =
++            ArrayList<ByteArray>()
++
++        for ((index, payload) in recovered) {
++            val sequence =
++                (group.baseSequence + index) and 0xffff
++
++            val marker =
++                (group.markerMask and (1 shl index)) != 0
++
++            val reconstructed =
++                ByteArray(12 + payload.size)
++
++            reconstructed[0] = group.rtpByte0.toByte()
++            reconstructed[1] =
++                (group.payloadType or (if (marker) 0x80 else 0)).toByte()
++            writeU16(reconstructed, 2, sequence)
++            writeU32(reconstructed, 4, group.timestamp)
++            writeU32(reconstructed, 8, group.ssrc)
++            System.arraycopy(payload, 0, reconstructed, 12, payload.size)
++
++            recentPackets[PacketKey(group.timestamp, sequence)] = reconstructed
++            fecRecoveredPackets.incrementAndGet()
++
++            if (marker) {
++                fecRecoveredMarkerPackets.incrementAndGet()
++            }
++
++            if (rtpPayloadLooksLikeIdr(reconstructed)) {
++                fecRecoveredIdrPackets.incrementAndGet()
++            }
++
++            packets.add(reconstructed)
++        }
++
++        trimRecentPackets()
++
++        for (reconstructed in packets) {
++            acceptOrderedPacket(reconstructed, nowNs, fecRecovered = true)
++        }
++    }
++
++    private fun failGroup(
++        key: String,
++        group: FecGroup
++    ) {
++        fecGroups.remove(key)
++        fecUnrecoverableGroups.incrementAndGet()
++
++        if (group.timestamp == currentTimestamp) {
++            currentAccessUnitFecUnrecoverable = true
++        }
++    }
++
+     private fun pruneCaches(
+         nowNs: Long
+     ) {
+diff --git a/companion/native_fec_relay.py b/companion/native_fec_relay.py
+index f90072e..ed88703 100644
+--- a/companion/native_fec_relay.py
++++ b/companion/native_fec_relay.py
+@@ -14,6 +14,7 @@ from pathlib import Path
+ from typing import Any
+ 
+ from games.log_rotation import append_line
++import native_fec_rs
+ 
+ 
+ FEC_MAGIC = b"PHF1"
+@@ -30,6 +31,16 @@ DEFAULT_LOCAL_PORT = 48110
+ # marker_mask[1], rtp_byte0[1], payload_type[1], length_xor[2], parity_len[2]
+ FEC_HEADER = struct.Struct("!4sBBHIIBBBHH")
+ 
++# C4-M1, comparison arm, DEFAULT OFF. Read from the environment at start().
++# Unset / `xor8_1`: today's behaviour byte for byte (one XOR parity, v1).
++# `xor8_2`: the same v1 XOR parity, then a second, Reed-Solomon "Q" parity
++# datagram (version 2, `native_fec_rs`), so the client can recover any two
++# missing packets of a group. A client that does not know version 2 drops it.
++# Any other value is ignored (reads xor8_1) and says so in status.
++FEC_SCHEME_ENV = "PRIVYHUB_FEC_SCHEME"
++FEC_SCHEMES = ("xor8_1", "xor8_2")
++FEC_VERSION_Q = 2
++
+ # D-BASE-P3, diagnostic, DEFAULT OFF. Read from the environment at start().
+ # 0 (or unset) is today's behaviour byte for byte: forward on arrival.
+ PACING_ENV = "PRIVYHUB_FEC_PACING_US"
+@@ -157,6 +168,12 @@ class NativeVideoFecRelay:
+         # only thing needed to change arms.
+         self._pacing_override = pacing_us
+         self.pacing_us = self._configured_pacing_us()
++        # C4-M1: re-read on every start() as well.
++        self.fec_scheme = "xor8_1"
++        self.fec_scheme_source = "profile"
++        self._configure_scheme()
++        self._q_packets = 0
++        self._q_bytes = 0
+ 
+         self._lock = threading.RLock()
+         self._running = False
+@@ -277,6 +294,7 @@ class NativeVideoFecRelay:
+             # D-BASE-P3: re-read the knob, so the arm is whatever the
+             # companion process was started with.
+             self.pacing_us = self._configured_pacing_us()
++            self._configure_scheme()
+             self._pace_queue.clear()
+             self._pending = []
+             self._pending_first_ns = 0
+@@ -434,7 +452,10 @@ class NativeVideoFecRelay:
+             return {
+                 "enabled": True,
+                 "running": self._running,
+-                "version": "xor8_1",
++                "version": self.fec_scheme,
++                "scheme_source": self.fec_scheme_source,
++                "q_parity_packets": self._q_packets,
++                "q_parity_bytes": self._q_bytes,
+                 "group_size": self.group_size,
+                 "local_port": self.local_port,
+                 "rtp_packets": self._rtp_packets,
+@@ -1004,6 +1025,30 @@ class NativeVideoFecRelay:
+             parity=True,
+         )
+ 
++        if self.fec_scheme == "xor8_2":
++            # C4-M1: the second parity, after the unchanged first.
++            payloads = [item.payload for item in group]
++            q_header = FEC_HEADER.pack(
++                FEC_MAGIC,
++                FEC_VERSION_Q,
++                len(group),
++                base.sequence,
++                base.timestamp,
++                base.ssrc,
++                marker_mask,
++                base.byte0,
++                base.payload_type,
++                native_fec_rs.length_q([len(p) for p in payloads]),
++                parity_length,
++            )
++            q_packet = q_header + native_fec_rs.q_parity(payloads, parity_length)
++            self._q_packets += 1
++            self._q_bytes += len(q_packet)
++            self._emit_locked(
++                q_packet,
++                parity=True,
++            )
++
+     def _handle_rtp_paced(
+         self,
+         packet: bytes,
+@@ -1300,6 +1345,17 @@ class NativeVideoFecRelay:
+ 
+         return value if value > 0 else 0
+ 
++    def _configure_scheme(self) -> None:
++        raw = os.environ.get(FEC_SCHEME_ENV)
++        if raw is None or raw.strip() == "":
++            self.fec_scheme, self.fec_scheme_source = "xor8_1", "profile"
++            return
++        value = raw.strip().lower()
++        if value in FEC_SCHEMES:
++            self.fec_scheme, self.fec_scheme_source = value, "env"
++        else:
++            self.fec_scheme, self.fec_scheme_source = "xor8_1", "env_ignored"
++
+     def _configured_pacing_us(self) -> int:
+         if self._pacing_override is not None:
+             value = int(self._pacing_override)
+diff --git a/companion/native_stream.py b/companion/native_stream.py
+index 74d98cf..1d5745a 100644
+--- a/companion/native_stream.py
++++ b/companion/native_stream.py
+@@ -16,7 +16,7 @@ from typing import Any
+ from ctypes import wintypes
+ 
+ from native_session_io import NativeSessionIO
+-from native_fec_relay import NativeVideoFecRelay
++from native_fec_relay import FEC_SCHEME_ENV, NativeVideoFecRelay
+ 
+ # Encoder knobs read from the environment at command build time.
+ #
+@@ -208,8 +208,14 @@ class NativeStreamManager:
+             "bufsize_kbits": bufsize_k or None,
+             "bufsize_source": ENC_BUFSIZE_K_ENV,
+             "default_bufsize_kbits": self.MAX_BITRATE_KBPS,
++            # C4-M1: the FEC comparison arm counts as an override while its
++            # variable is set (the relay reads it; see native_fec_relay).
++            "fec_scheme_env": FEC_SCHEME_ENV,
++            "fec_scheme_override": (os.environ.get(FEC_SCHEME_ENV) or "").strip() or None,
+             "any_override": bool(
+-                mfs_override is not None or bufsize_k
++                mfs_override is not None
++                or bufsize_k
++                or (os.environ.get(FEC_SCHEME_ENV) or "").strip()
+             ),
+         }
+ 

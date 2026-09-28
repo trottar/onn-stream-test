@@ -1,0 +1,21 @@
+C4-M1 night -- scoring (pre-registered)
+hold     min vloss/min  rec/min unrec/min spikes/min    fps stale/min maxgap aund/min hold_ms ssrc resync  Q sent  gap sizes b=1/2/3/>=4
+B1     20.12      2.88     3.68      0.84       25.8  59.96      0.80    110     1.24      22    0      0       0  (1, 5, 2, 4)
+A1     20.16      3.08    13.44      0.50       23.6  59.95      0.40    298     1.09      14    0      1  158741  (5, 1, 2, 5)
+B2     20.12      4.87     6.51      0.60       21.4  59.96      0.80    149     0.20      15    0      0       0  (1, 5, 1, 3)
+A2     20.12      2.58    21.27      0.30       22.3  59.97      0.45    155     0.80      14    0      0  158277  (3, 0, 3, 2)
+B3     20.12      4.47     6.71      1.49       22.2  59.95      0.45    148     0.30      14    0      0       0  (1, 11, 6, 6)
+A3     20.13      5.96    25.08      0.25       21.3  59.96      0.75    158     0.99      14    0      0  158364  (0, 1, 4, 2)
+
+primary (video loss/min post-FEC): A lower in 1 of 3 pairs ['A2']; pooled median A 3.08 vs B 4.47 = 69 % (rule <= 60 %) -> NOT SHOWN
+
+cost rows (WITHIN NOISE unless all three A worse than the worst B AND the A median beyond it by > the B spread):
+  spikes/min             B [25.79, 21.37, 22.17]  A [23.56, 22.26, 21.26]  worst B 25.79, B spread 4.42, A median 22.26 -> WITHIN NOISE
+  rendered fps           B [59.96, 59.96, 59.95]  A [59.95, 59.97, 59.96]  worst B 59.95, B spread 0.01, A median 59.96 -> WITHIN NOISE
+  stale drops/min        B [0.8, 0.8, 0.45]  A [0.4, 0.45, 0.75]  worst B 0.80, B spread 0.35, A median 0.45 -> WITHIN NOISE
+  max output gap ms      B [110, 149, 148]  A [298, 155, 158]  worst B 149.00, B spread 39.00, A median 158.00 -> WITHIN NOISE
+  audio underruns/min    B [1.24, 0.2, 0.3]  A [1.09, 0.8, 0.99]  worst B 1.24, B spread 1.04, A median 0.99 -> WITHIN NOISE
+
+recovery latency (client fec_max_hold_ms per hold): B [22, 15, 14], A [14, 14, 14]; Q is emitted right after P (same group completion)
+
+OUTCOME: NOT SHOWN

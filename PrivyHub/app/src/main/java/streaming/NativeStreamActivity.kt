@@ -1018,16 +1018,13 @@ class NativeStreamActivity :
                     !report.isNullOrBlank()
                 ) {
                     try {
-                        val encoded =
-                            URLEncoder.encode(
-                                report,
-                                "UTF-8"
-                            )
-
-                        httpPost(
+                        // CL-B1: the report as a POST body, not in the
+                        // request target (the request line capped it).
+                        httpPostBody(
                             "http://$host:$CONTROL_PORT" +
-                                "/plugins/games/decoder-session-log" +
-                                "?report=$encoded"
+                                DecoderReportUpload.PATH,
+                            DecoderReportUpload.encode(report),
+                            DecoderReportUpload.CONTENT_TYPE
                         )
                     } catch (_: Exception) {
                         // Logging must never prevent the existing stop path.
@@ -1814,9 +1811,12 @@ class NativeStreamActivity :
                 "slow_event_retained",
                 decoderEvents.size
             )
+            // CL-B1: the total of the two segments (was a literal 128,
+            // which the rings' growth would have made wrong).
             root.put(
                 "slow_event_capacity",
-                128
+                AvcLowLatencyDecoder.MAX_MARKED_SLOW_EVENTS +
+                    AvcLowLatencyDecoder.MAX_RECENT_SLOW_EVENTS
             )
             root.put(
                 "slow_event_retained_marked",
@@ -3901,6 +3901,49 @@ class NativeStreamActivity :
         }
     }
 
+
+    // CL-B1: a POST with a body; the same timeouts and error handling as
+    // httpPost.
+    private fun httpPostBody(
+        address: String,
+        body: ByteArray,
+        contentType: String,
+        readTimeoutMs: Int = 10_000
+    ): String {
+        val connection =
+            (URL(address).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = 5_000
+                readTimeout = readTimeoutMs
+                doInput = true
+                doOutput = true
+                setRequestProperty("Content-Type", contentType)
+                setFixedLengthStreamingMode(body.size)
+            }
+
+        try {
+            connection.outputStream.use { it.write(body) }
+
+            val code = connection.responseCode
+            val stream =
+                if (code in 200..299) connection.inputStream else connection.errorStream
+            val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+
+            if (code !in 200..299) {
+                val message =
+                    try {
+                        JSONObject(text).optString("error", text)
+                    } catch (_: Exception) {
+                        text
+                    }
+                throw IllegalStateException(message.ifBlank { "HTTP $code" })
+            }
+
+            return text
+        } finally {
+            connection.disconnect()
+        }
+    }
 
     private fun httpPost(
         address: String,

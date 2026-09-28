@@ -60,8 +60,8 @@ finished. What remains is a judgment nobody has made.
 | `C3.L2b` decoder-report cycle retention | COMPLETE / RUNTIME VALIDATED |
 | `C3.L2c` low-latency decode | **FALSIFIED / ROLLED BACK** |
 | `C3.L3` fixed-bitrate port and characterization | COMPLETE / RUNTIME VALIDATED |
-| `C3.L3a` gameplay acceptance probe | Part 2 ran 2026-09-20; **probe fixed, re-scored, RERUN PRE-REGISTERED** (2026-09-23) |
-| `C3.L4` automatic controller | **BLOCKED**; gate is `C3.L3a` |
+| `C3.L3a` gameplay acceptance probe | Part 2 ran 2026-09-20; probe fixed, re-scored, rerun pre-registered (2026-09-23); **rerun sessions 1-3 of ≥ 4 recorded** (2026-09-24; session 2 on the decoder axis from its journal-rebuilt report, R2B; session 3 stored under the raised cap, R3) |
+| `C3.L4` automatic controller | **BLOCKED for live use**; gate is `C3.L3a`. **Shadow built and SILENT** (`C3-L4-S1`, 2026-09-24: flag default off, 21/21 tests, 4 healthy holds, 0 would-acts) |
 
 Linux is `video_only_restart`: authorized for start-time profile selection,
 manual and loopback-only diagnostic changes, fallback and recovery, and `C3.L3`
@@ -176,7 +176,65 @@ at transitions (a 378-packet start-up resync before T1's first fire; a
 133-packet burst 4.3 s after a T2 transition), and the no-transition H2 read
 10.77. **F**: zero-input controller loss 213-438 /min. Authorizes nothing.
 
-**Rerun — REQUIRED, pre-registered 2026-09-23, not run.** Grounds, either
+**Rerun session 1 of ≥ 4 — recorded (2026-09-24, `C3-L3A-R1`).** Run
+`20260924_115810`, *Crash Bandicoot*, pooled
+(`../evidence/C3_L3A_R1_SESSION1_2026-09-24.md`). At W 5.0: jump 3/5, ramp
+4/5, decoy jump-matched 1/10, ramp-matched 2/10; 11 marks in transition
+windows against ~2.7 expected by chance, each 1.4-3.0 s after a measured
+144-217 ms restart gap; 8 marks after nothing the video path recorded (not
+attributed). An accidental BACK at probe ~202 s split the client session
+(9 + 15 SSRC changes): `--finalize` now aligns split sessions and every run
+keeps its state under `c3_l3a_runs/states/`. Phase B answers defaulted by
+accidental Enter (state False/None, False/None, False/7); the user's stated
+rating 6-7, level not distinguished, roughest in the middle — read the
+pooled Phase B table with that. Lifecycle 0/0/0, settling 10/10 ≤ 4.5 s.
+No verdict; sessions 2-4 await the user.
+
+**Rerun session 2 of ≥ 4 — recorded (2026-09-24, `C3-L3A-R2`).** Run
+`20260924_130016`, title and picture judgement not stated by the user,
+pooled (`../evidence/C3_L3A_R2_SESSION2_2026-09-24.md`). At W 5.0: jump
+1/5 (≈ chance 1.02), ramp 5/5 (10 marks, 1.60-2.63 s after a fire, 2.74
+by chance), decoys 2/10 jump-matched and 4/10 ramp-matched (at chance);
+15 marks in no sequence window. **Decoder axis not done**: the client
+posted its report at BACK, but the companion rejected it with HTTP 400
+(32,057 characters against `MAX_REPORT_CHARS` 32,000), and the client
+swallowed the error. The report is rebuilt byte-exact from the journal but
+unused, so this session carries marks-only weight for now. **A
+one-client-session rerun (24 SSRC changes) is expected to exceed the cap
+every time** (`docs/KNOWN_ISSUES.md`), so sessions 3-4 need that resolved
+first or they lose requirement 4 too. Phase B defaulted; lifecycle 0/0/0;
+settling 10/10 1.0-5.0 s; controller loss ~3.8/min (session 1 ~225). No
+verdict; pooled 2 runs: jump 4/10, ramp 9/10, decoys 3/20 and 6/20.
+**R2B (2026-09-24):** the companion cap was raised to 48,000 and session 2
+finalized against the rebuilt report
+(`../evidence/C3_L3A_R2B_REPORT_CAP_2026-09-24.md`). The result: 24 = 24,
+spread 0.441 s; 10 of 11 transition-window marks sit 1.7-2.6 s behind a
+measured 176-239 ms restart gap; the 15 unattributed marks had no gap
+> 183 ms before them, but smaller events were evicted (saturated buffer),
+so those marks stay marks-only. Sessions 3-4 now store their reports
+(the transport ceiling is ~41.4K).
+
+**Rerun session 3 of ≥ 4 — recorded (2026-09-24, `C3-L3A-R3`).** Run
+`20260924_151953`, title not stated, pooled
+(`../evidence/C3_L3A_R3_SESSION3_2026-09-24.md`). **The client's
+24-change report was stored** (32,435 chars, 15,565 under 48,000): the
+R2B cap is RUNTIME VALIDATED. At W 5.0: jump 1/5, ramp 2/5, decoys 1/10
+jump-matched and 3/10 ramp-matched; 9 marks, 6 in no sequence window. The
+two ramp marks sit 1.54 / 1.87 s behind a measured 189 / 180 ms restart
+gap; the jump mark (0.51 s after its fire, 0.37 s after its gap) and a
+decoy mark (0.20 s after the decoy) are shorter than any reaction lag seen
+(≥ 1.44 s in sessions 1-2) and are not attributed. Alignment 20 pairs,
+spread 0.404 s; covered Phase A restarts 135-194 ms, codec 8-12, first IDR
+14-63 ms. **Session max output gap 564 ms = the after-Phase-B restore**
+(one IDR AU rejected, first accepted IDR at 389 ms), not in Phase A.
+Phase B as typed: 6000 n/8, 5500 y/8, 5000 y/8. Settling 10/10 1.0-4.0 s,
+lifecycle 0/0/0, controller loss ~5.6/min. **Interim pooled, 3 sessions,
+W 5.0: jump 5/15 (2.12 by chance), ramp 11/15 (20 marks; 5.64), decoys
+4/30 (3.39) and 9/30 (11.24)** — the pre-registered bar (4 sessions, ≥ 20
+per shape) is not reached; no verdict; the reading is the user's. Session
+4 awaits the user.
+
+**Rerun — REQUIRED, pre-registered 2026-09-23; sessions 1-2 run 2026-09-24.** Grounds, either
 sufficient: (a) the session predates the adopted build (cap, cushion,
 redundancy, headless host) and ran on a baseline failing every row — its own
 decoder session 2,562 spikes/min, 56.1 fps, 202.8 lost/min; (b) n = 4 per
@@ -280,6 +338,128 @@ the probe records, the user judges.
 Outcome disposition: marks not aligned with cycle times and the picture judged
 acceptable → the gate is met and `C3.L4` may be proposed. Marks aligned →
 `C3.L4` is answered in the negative and closed cheaply. Either is a result.
+
+## CL-B1 — the decoder report as a POST body (2026-09-25)
+
+Record `../evidence/CL_B1_DECODER_REPORT_BODY_2026-09-25.md`.
+- The companion accepts a body (new) and the target form (unchanged). The
+  cap is 128,000, and the 414-path logger crash is fixed.
+- The client posts the body; rings are 256 marked + 1,024 recent.
+- Tested (4 + 4). The arm APK `71d8c3d7…` stored a body report; the
+  adopted APK stored through the target form. Adopted APK reinstalled.
+- Observation: the recent ring filled at ~1.46 events/s in attract mode,
+  so 1,024 covers ~12 min. Raising it is a follow-up.
+
+## C3-F1 — recovery's restart at any ladder level: WORKING (2026-09-25)
+
+Record `../evidence/C3_F1_RECOVERY_RESTART_LADDER_2026-09-25.md`.
+`recovery_restart_encoder()` keeps the continuity cycle at 7000 and adds a
+level-preserving encoder-only restart off 7000.
+- 8/8 unit tests.
+- 4 sessions: level kept, one `ssrc_change`, no full start, gap 132-197 ms
+  → **WORKING**.
+- This meets the `C3.L4` precondition from `C6-D1` finding 7.
+
+## D7 — the native Linux regression, scripted (D7-R1, 2026-09-25)
+
+Record `../evidence/D7_R1_LINUX_REGRESSION_2026-09-25.md`; script
+`tools/d7_regression.py`.
+- Two passes, 10 min apart. 8 rows PASS both times; restart/recovery cited.
+- profiles/cheats/mod state FAIL as scripted (the count is per source;
+  fixed; recheck read 12).
+- **NEEDS USER**: controller feel, picture, and a save/load through the TV
+  (ten-minute list in the record). User slots hash-identical; scratch
+  removed.
+
+## C4 — the FEC arm measured: NOT SHOWN (C4-M1, 2026-09-25)
+
+Record `../evidence/C4_M1_FEC_ARM_2026-09-25.md`.
+- Step 0 chose 8+2; `xor8_2` was built behind `PRIVYHUB_FEC_SCHEME`. The
+  golden holds (unset relay byte-identical), and the codec tests pass
+  (9 + 6).
+- Night B/A ×3: recovered 2-4×, unrecoverable groups halved; post-FEC
+  lower in 1 of 3 pairs, A median 69 % of B → **NOT SHOWN**. Cost rows
+  within noise; pre-FEC loss 2-3× higher under the arm.
+- Override unset, adopted APK reinstalled and confirmed. Nothing adopted.
+
+## C6 — the generalized source contract established (C6-D1, 2026-09-25)
+
+Record `../evidence/C6_D1_SOURCE_CONTRACT_2026-09-25.md`; architecture
+`../architecture/NATIVE_SOURCE_CONTRACT.md`.
+- Four stages, a shared lifecycle, and a capability record (actuator
+  class per `C3-L2`, audio model, FEC schemes by wire version,
+  identity-free diagnostics). Phase G plugs in as another `Transport`.
+- Interface module `companion/native_source_contract.py`, imported by
+  nothing; 7/7 tests.
+- 14 cross-boundary findings and a 9-move migration list (nothing moved).
+  **Recovery's `restart_encoder` is the continuity diagnostic, which
+  refuses unless the stream is at 7000.** Fix it before any live `C3.L4`.
+- The C7 status table is in `docs/ROADMAP.md` §C7.
+
+## D6 — the deferred UDP suite replayed: NOT REPRODUCED (D6-R1, 2026-09-24)
+
+Record `../evidence/D6_R1_UDP_SUITE_REPLAY_2026-09-24.md`. Topology gate PASS.
+- Forward and reverse, 3 valid runs each, idle: same-stamp duplication 0-4
+  per run (pre-B2: 2,371-2,626 forward, 476 reverse); transformation
+  ~14-20× lower; host UDP errors +0.
+- Classified as specific to the old environment (the host's USB Wi-Fi,
+  2026-09-15). The `DEFERRED.md` entry is closed for the old signature.
+- Three first-pass runs were ended by the onn's 10-min screensaver and
+  retried once (woken first). One spacing was 4 min 57 s.
+
+## C3.L4 — the shadow controller built; live gated on the gate (C3-L4-S1, 2026-09-24)
+
+Record `../evidence/C3_L4_S1_SHADOW_CONTROLLER_2026-09-24.md`; patch
+`../patches/C3-L4-S1_SHADOW_CONTROLLER.md`; design
+`../architecture/ADAPTIVE_BITRATE.md` §"C3.L4 shadow controller — S1".
+- `companion/adaptive_bitrate.py`: FALLBACK is the only class that could
+  ever act. ROUTINE is logged on its own track, not authorized and not
+  built.
+- The flag `PRIVYHUB_ADAPTIVE_BITRATE_MODE` is off by default, `shadow`
+  only; the module holds no actuator. 21/21 unit tests pass.
+- Night (H1 cold 20 min, H2 20, H3 60, H4 20, all healthy by the close-out
+  rows): **SILENT**, 0 FALLBACK / 0 ROUTINE / 0 up over 3,598 reports, 0
+  stale.
+- The flag was unset and confirmed absent.
+- Findings: the decision log writes reason flips too (~29 % of reports);
+  a session's first report reads 0 fps.
+- Live still needs the user's `C3.L3a` reading and a fault-injection night
+  (the user's `nft`). **`C3.L4` stays BLOCKED for live use.**
+
+## Controller transport loss — CTRL-L1 located: PATH (2026-09-24)
+
+Record `../evidence/CTRL_L1_CONTROLLER_LOSS_LOCATION_2026-09-24.md`. Three
+20-min holds lost +171 / +266 / +301 controller datagrams (9-15/min, the
+low regime). Every host-side counter and every Opal interface counter
+read +0, and the onn's UDP SndbufErrors read +0. So the loss is between the
+onn's stack and the host NIC, as with `T3`.
+- The counter counts gaps on one global sequence (a reordered pair = 2).
+  The per-player lower bound puts 85-95 % (high regime) and ≥ 40-67 % (these
+  holds) as true non-arrival.
+- The capture was NOT RUN (no tcpdump, no root).
+- The regime swing (≤ 15 vs 200-650/min) is unexplained. The client send
+  rate is the same in both.
+- Side fact: all three holds missed the close-out's video-loss row
+  (14-24/min post-FEC; max gap 332-384 ms).
+
+## C4 — adaptive FEC: C4-D1 decided on stored evidence (2026-09-24)
+
+Record `../evidence/C4_D1_FEC_EVIDENCE_2026-09-24.md`; decision
+`../decisions/C4_ADAPTIVE_FEC_2026-09-24.md`. The corpus is 38 adopted-build
+sessions ≥ 5 min (31 holds, 7 transition).
+- 8+1 recovers 8.7/min and leaves 9.1/min at the median.
+- The residual is mostly two-packet gaps in one group: 55 % of the exact
+  single-gap windows, 36.6 % of those windows' packets.
+- Extra recoverable at the median: k+2 upper bound 7.72/min, point
+  estimate 3.12; 4+1 5.57 / 0.64. Parity would go 16 % → 32 %.
+- Pressure by the rule's letter is neither ABSENT (fps rho −0.73, a
+  consequence of the loss) nor PRESENT. Offered load is at rho ≈ 0.
+- Warm minutes: 8+1 absorbs the extra single-packet loss (recovered 10.3
+  vs 6.1/min, post-FEC median equal).
+
+**Rule outcome: BUILD (static k+2 first)**, a design task queued behind C3.
+Its first step is a measured arm, because k+2 enlarges the very frame
+bursts `P5`/`P6` located the loss in. Adaptive FEC is not supported.
 
 ## Deferred, not active
 

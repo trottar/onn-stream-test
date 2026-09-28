@@ -1,0 +1,54 @@
+diff --git a/companion/games/decoder_session_log.py b/companion/games/decoder_session_log.py
+index 5c22e42..e30f35e 100644
+--- a/companion/games/decoder_session_log.py
++++ b/companion/games/decoder_session_log.py
+@@ -7,7 +7,14 @@ from pathlib import Path
+ from typing import Any
+ 
+ 
+-MAX_REPORT_CHARS = 32_000
++# C3-L3A-R2B: was 32_000, which refused a 24-transition session's report
++# (32,057 chars; each SSRC change adds ~270-310). The client sends the report
++# URL-encoded in the request target (~1.58 encoded chars per decoded char),
++# and http.server answers 414 to a request line over 65,536 bytes before any
++# handler runs, so the transport itself stops at ~41K decoded chars. 48_000
++# sits above that ceiling: this check never refuses what the transport can
++# carry. Lifting the ceiling is the client's change (report in the body).
++MAX_REPORT_CHARS = 48_000
+ SCHEMA = "privyhub_native_decoder_session_log_v1"
+ 
+ 
+diff --git a/companion/privyhub_service.py b/companion/privyhub_service.py
+index 724f053..758ad04 100644
+--- a/companion/privyhub_service.py
++++ b/companion/privyhub_service.py
+@@ -55,7 +55,7 @@ from dataclasses import dataclass
+ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+ from pathlib import Path
+ from typing import Any, Optional
+-from urllib.parse import quote, unquote, urlparse, urlsplit
++from urllib.parse import parse_qs, quote, unquote, urlparse, urlsplit
+ 
+ from storage_presence import (
+     configured_local_backing_present,
+@@ -2282,6 +2282,20 @@ class PrivyHubRequestHandler(
+                             parsed.query,
+                         )
+                 except ValueError as exc:
++                    # C3-L3A-R2B: a refused decoder report was invisible in
++                    # the journal (the reason went only to the client, which
++                    # discards it). One line, reason and length, no content.
++                    if action == "decoder-session-log":
++                        report_chars = len(
++                            parse_qs(parsed.query)
++                            .get("report", [""])[0]
++                            .strip()
++                        )
++                        print(
++                            "WARNING decoder-session-log rejected (400): "
++                            f"{exc}; report_chars={report_chars}"
++                        )
++
+                     self._send_json(
+                         400,
+                         {

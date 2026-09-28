@@ -1,0 +1,28 @@
+C3-F1 -- the four restarts
+{"level": 7000, "http": 200, "ok": true, "schema": "privyhub_c3_actuator_cycle_probe_v1", "mode": "encoder_only_restart_same_bitrate", "before": 7000, "after": 7000, "recent_mbps": 7.036691745902812, "ssrc_total": 1, "ssrc_near_restart": 1, "idr": 2, "gap_ms": 197, "first_rtp_resume_ms": 618.964, "native_stream_start_posts": 1, "full_start": false, "session_started": 1, "session_ended": 1, "any_override": false, "bitrate_at_end": 7000, "game_active_after": false, "restart_ok": true}
+   log: C3.L1 Linux actuator continuity probe: same-bitrate encoder-only cycle begin
+   log: C3.L1 Linux actuator continuity probe: same-bitrate encoder-only cycle complete; first RTP resume=618.964 ms
+{"level": 6000, "http": 200, "ok": true, "schema": "privyhub_c3_recovery_restart_v1", "mode": "encoder_only_restart_at_active_level", "before": 6000, "after": 6000, "recent_mbps": 6.037304262885851, "ssrc_total": 3, "ssrc_near_restart": 1, "idr": 0, "gap_ms": 178, "first_rtp_resume_ms": 417.538, "native_stream_start_posts": 1, "full_start": false, "session_started": 1, "session_ended": 1, "any_override": false, "bitrate_at_end": 7000, "game_active_after": false, "restart_ok": true}
+   log: C3.L3a Linux validated-ladder transition probe: 7000 -> 6000 kbps encoder-only cycle begin
+   log: C3.L3a Linux validated-ladder transition probe: 6000 kbps active; first RTP resume=317.482 ms
+   log: C3-F1 Linux recovery restart at the active level: 6000 -> 6000 kbps encoder-only cycle begin
+   log: C3-F1 Linux recovery restart at the active level: 6000 kbps active; first RTP resume=417.538 ms
+   log: C3.L3a Linux validated-ladder transition probe: 6000 -> 7000 kbps encoder-only cycle begin
+   log: C3.L3a Linux validated-ladder transition probe: 7000 kbps active; first RTP resume=418.087 ms
+{"level": 5500, "http": 200, "ok": true, "schema": "privyhub_c3_recovery_restart_v1", "mode": "encoder_only_restart_at_active_level", "before": 5500, "after": 5500, "recent_mbps": 5.594929950997423, "ssrc_total": 3, "ssrc_near_restart": 1, "idr": 1, "gap_ms": 189, "first_rtp_resume_ms": 427.875, "native_stream_start_posts": 1, "full_start": false, "session_started": 1, "session_ended": 1, "any_override": false, "bitrate_at_end": 7000, "game_active_after": false, "restart_ok": true}
+   log: C3.L3a Linux validated-ladder transition probe: 7000 -> 5500 kbps encoder-only cycle begin
+   log: C3.L3a Linux validated-ladder transition probe: 5500 kbps active; first RTP resume=268.045 ms
+   log: C3-F1 Linux recovery restart at the active level: 5500 -> 5500 kbps encoder-only cycle begin
+   log: C3-F1 Linux recovery restart at the active level: 5500 kbps active; first RTP resume=427.875 ms
+   log: C3.L3a Linux validated-ladder transition probe: 5500 -> 7000 kbps encoder-only cycle begin
+   log: C3.L3a Linux validated-ladder transition probe: 7000 kbps active; first RTP resume=419.002 ms
+{"level": 5000, "http": 200, "ok": true, "schema": "privyhub_c3_recovery_restart_v1", "mode": "encoder_only_restart_at_active_level", "before": 5000, "after": 5000, "recent_mbps": 5.04918776403462, "ssrc_total": 3, "ssrc_near_restart": 1, "idr": 1, "gap_ms": 132, "first_rtp_resume_ms": 417.677, "native_stream_start_posts": 1, "full_start": false, "session_started": 1, "session_ended": 1, "any_override": false, "bitrate_at_end": 7000, "game_active_after": false, "restart_ok": true}
+   log: C3.L3a Linux validated-ladder transition probe: 7000 -> 5000 kbps encoder-only cycle begin
+   log: C3.L3a Linux validated-ladder transition probe: 5000 kbps active; first RTP resume=318.46 ms
+   log: C3-F1 Linux recovery restart at the active level: 5000 -> 5000 kbps encoder-only cycle begin
+   log: C3-F1 Linux recovery restart at the active level: 5000 kbps active; first RTP resume=417.677 ms
+   log: C3.L3a Linux validated-ladder transition probe: 5000 -> 7000 kbps encoder-only cycle begin
+   log: C3.L3a Linux validated-ladder transition probe: 7000 kbps active; first RTP resume=418.307 ms
+
+restart output gaps ms: [(7000, 197), (6000, 178), (5500, 189), (5000, 132)] vs S1 median 186.5 (not a gate); more than double: []
+OUTCOME: WORKING

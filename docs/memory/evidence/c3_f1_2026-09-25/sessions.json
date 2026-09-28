@@ -1,0 +1,502 @@
+[
+  {
+    "boot": {
+      "verdict": "PASS",
+      "evidence": {
+        "mainpid_owns_8765": true,
+        "seconds": 1.1,
+        "status_http": 200,
+        "service": "PrivyHub",
+        "native_stream_ready": true,
+        "profile_adopted": true,
+        "fec": "xor8_1",
+        "privyhub_env_in_companion": 0
+      }
+    }
+  },
+  {
+    "level": 7000,
+    "launch": {
+      "verdict": "PASS",
+      "evidence": {
+        "launch_http": 200,
+        "active": true,
+        "game": "Tekken 3 (USA)",
+        "resume_playing": {
+          "ok": true,
+          "attempt": 1,
+          "seconds_to_playing": 5.1
+        },
+        "recovery_state": "PLAYING",
+        "any_override_at_playing": false
+      }
+    },
+    "any_override_at_playing": false,
+    "settle_initial": [
+      [
+        7190,
+        7.163509400859135
+      ],
+      [
+        9231,
+        7.460649613412184
+      ],
+      [
+        11255,
+        7.039242081410778
+      ]
+    ],
+    "bitrate_before_restart": 7000,
+    "restart": {
+      "http": 200,
+      "ok": true,
+      "schema": "privyhub_c3_actuator_cycle_probe_v1",
+      "mode": "encoder_only_restart_same_bitrate",
+      "from": null,
+      "target": 7000,
+      "video": {
+        "capture_restarted": false,
+        "capture_process_present": false,
+        "encoder_restarted": true,
+        "source_width": 879,
+        "source_height": 720,
+        "ffmpeg_spawn_ms": 466.27,
+        "encoder_down_ms": 465.612,
+        "first_rtp_resume_ms": 618.964,
+        "rtp_silence_after_spawn_ms": 152.693,
+        "rtp_baseline_residual_packets": 352,
+        "host_verified_ms": 1371.333
+      },
+      "error": null,
+      "at_utc": "2026-09-25T06:47:35.570Z"
+    },
+    "bitrate_after_restart": 7000,
+    "settle_after_restart": [
+      [
+        11255,
+        7.039242081410778
+      ],
+      [
+        13276,
+        7.10133338772992
+      ],
+      [
+        15297,
+        7.03515919151825
+      ],
+      [
+        17317,
+        7.036691745902812
+      ]
+    ],
+    "recent_mbps_after_restart": 7.036691745902812,
+    "report": "native_decoder_20260925_064751_501.json",
+    "game_active_after": false,
+    "bitrate_at_end": 7000,
+    "recovery_events": [
+      {
+        "event": "session_started",
+        "at_utc": "2026-09-25T06:47:32.045Z",
+        "method": null
+      },
+      {
+        "event": "session_ended",
+        "at_utc": "2026-09-25T06:47:51.533Z",
+        "method": null
+      }
+    ],
+    "alpha_log": [
+      "C3.L1 Linux actuator continuity probe: same-bitrate encoder-only cycle begin",
+      "C3.L1 Linux actuator continuity probe: same-bitrate encoder-only cycle complete; first RTP resume=618.964 ms"
+    ],
+    "journal": {
+      "native_stream_start_posts": 1,
+      "recovery_restart_posts": 1
+    },
+    "restart_epoch": 1790318855.5702577
+  },
+  {
+    "level": 6000,
+    "launch": {
+      "verdict": "PASS",
+      "evidence": {
+        "launch_http": 200,
+        "active": true,
+        "game": "Tekken 3 (USA)",
+        "resume_playing": {
+          "ok": true,
+          "attempt": 1,
+          "seconds_to_playing": 3.0
+        },
+        "recovery_state": "PLAYING",
+        "any_override_at_playing": false
+      }
+    },
+    "any_override_at_playing": false,
+    "settle_initial": [
+      [
+        5082,
+        7.142615511807249
+      ],
+      [
+        7118,
+        5.770128668662939
+      ],
+      [
+        9143,
+        7.192699784078969
+      ]
+    ],
+    "transition_to_level": {
+      "http": 200,
+      "ok": true,
+      "from": 7000,
+      "to": 6000
+    },
+    "settle_after_transition": [
+      [
+        9143,
+        7.192699784078969
+      ],
+      [
+        11168,
+        6.02664644702363
+      ],
+      [
+        13190,
+        5.949328705889561
+      ]
+    ],
+    "bitrate_before_restart": 6000,
+    "restart": {
+      "http": 200,
+      "ok": true,
+      "schema": "privyhub_c3_recovery_restart_v1",
+      "mode": "encoder_only_restart_at_active_level",
+      "from": 6000,
+      "target": 6000,
+      "video": {
+        "capture_restarted": false,
+        "capture_process_present": false,
+        "encoder_restarted": true,
+        "source_width": 879,
+        "source_height": 720,
+        "ffmpeg_spawn_ms": 265.115,
+        "first_rtp_resume_ms": 417.538,
+        "rtp_silence_after_spawn_ms": 152.423,
+        "rtp_baseline_residual_packets": 168,
+        "host_verified_ms": 1170.393
+      },
+      "error": null,
+      "at_utc": "2026-09-25T06:48:42.580Z"
+    },
+    "bitrate_after_restart": 6000,
+    "settle_after_restart": [
+      [
+        13190,
+        5.949328705889561
+      ],
+      [
+        15213,
+        6.04342303610572
+      ],
+      [
+        17231,
+        6.136025301656149
+      ],
+      [
+        19247,
+        6.037304262885851
+      ]
+    ],
+    "recent_mbps_after_restart": 6.037304262885851,
+    "return_to_7000": {
+      "http": 200,
+      "ok": true
+    },
+    "report": "native_decoder_20260925_064901_988.json",
+    "game_active_after": false,
+    "bitrate_at_end": 7000,
+    "recovery_events": [
+      {
+        "event": "session_started",
+        "at_utc": "2026-09-25T06:48:34.111Z",
+        "method": null
+      },
+      {
+        "event": "session_ended",
+        "at_utc": "2026-09-25T06:49:02.067Z",
+        "method": null
+      }
+    ],
+    "alpha_log": [
+      "C3.L3a Linux validated-ladder transition probe: 7000 -> 6000 kbps encoder-only cycle begin",
+      "C3.L3a Linux validated-ladder transition probe: 6000 kbps active; first RTP resume=317.482 ms",
+      "C3-F1 Linux recovery restart at the active level: 6000 -> 6000 kbps encoder-only cycle begin",
+      "C3-F1 Linux recovery restart at the active level: 6000 kbps active; first RTP resume=417.538 ms",
+      "C3.L3a Linux validated-ladder transition probe: 6000 -> 7000 kbps encoder-only cycle begin",
+      "C3.L3a Linux validated-ladder transition probe: 7000 kbps active; first RTP resume=418.087 ms"
+    ],
+    "journal": {
+      "native_stream_start_posts": 1,
+      "recovery_restart_posts": 1
+    },
+    "restart_epoch": 1790318922.5802386
+  },
+  {
+    "level": 5500,
+    "launch": {
+      "verdict": "PASS",
+      "evidence": {
+        "launch_http": 200,
+        "active": true,
+        "game": "Tekken 3 (USA)",
+        "resume_playing": {
+          "ok": true,
+          "attempt": 1,
+          "seconds_to_playing": 3.1
+        },
+        "recovery_state": "PLAYING",
+        "any_override_at_playing": false
+      }
+    },
+    "any_override_at_playing": false,
+    "settle_initial": [
+      [
+        5073,
+        7.165371392151519
+      ],
+      [
+        7117,
+        7.0997252747986614
+      ],
+      [
+        9140,
+        6.931815984985606
+      ]
+    ],
+    "transition_to_level": {
+      "http": 200,
+      "ok": true,
+      "from": 7000,
+      "to": 5500
+    },
+    "settle_after_transition": [
+      [
+        9140,
+        6.931815984985606
+      ],
+      [
+        11166,
+        5.668349693164198
+      ],
+      [
+        13192,
+        6.018753207800511
+      ]
+    ],
+    "bitrate_before_restart": 5500,
+    "restart": {
+      "http": 200,
+      "ok": true,
+      "schema": "privyhub_c3_recovery_restart_v1",
+      "mode": "encoder_only_restart_at_active_level",
+      "from": 5500,
+      "target": 5500,
+      "video": {
+        "capture_restarted": false,
+        "capture_process_present": false,
+        "encoder_restarted": true,
+        "source_width": 879,
+        "source_height": 720,
+        "ffmpeg_spawn_ms": 265.5,
+        "first_rtp_resume_ms": 427.875,
+        "rtp_silence_after_spawn_ms": 162.374,
+        "rtp_baseline_residual_packets": 154,
+        "host_verified_ms": 1180.606
+      },
+      "error": null,
+      "at_utc": "2026-09-25T06:49:52.584Z"
+    },
+    "bitrate_after_restart": 5500,
+    "settle_after_restart": [
+      [
+        13192,
+        6.018753207800511
+      ],
+      [
+        15214,
+        5.689064870899428
+      ],
+      [
+        17235,
+        5.531410316868114
+      ],
+      [
+        19255,
+        5.594929950997423
+      ]
+    ],
+    "recent_mbps_after_restart": 5.594929950997423,
+    "return_to_7000": {
+      "http": 200,
+      "ok": true
+    },
+    "report": "native_decoder_20260925_065012_011.json",
+    "game_active_after": false,
+    "bitrate_at_end": 7000,
+    "recovery_events": [
+      {
+        "event": "session_started",
+        "at_utc": "2026-09-25T06:49:44.661Z",
+        "method": null
+      },
+      {
+        "event": "session_ended",
+        "at_utc": "2026-09-25T06:50:12.038Z",
+        "method": null
+      }
+    ],
+    "alpha_log": [
+      "C3.L3a Linux validated-ladder transition probe: 7000 -> 5500 kbps encoder-only cycle begin",
+      "C3.L3a Linux validated-ladder transition probe: 5500 kbps active; first RTP resume=268.045 ms",
+      "C3-F1 Linux recovery restart at the active level: 5500 -> 5500 kbps encoder-only cycle begin",
+      "C3-F1 Linux recovery restart at the active level: 5500 kbps active; first RTP resume=427.875 ms",
+      "C3.L3a Linux validated-ladder transition probe: 5500 -> 7000 kbps encoder-only cycle begin",
+      "C3.L3a Linux validated-ladder transition probe: 7000 kbps active; first RTP resume=419.002 ms"
+    ],
+    "journal": {
+      "native_stream_start_posts": 1,
+      "recovery_restart_posts": 1
+    },
+    "restart_epoch": 1790318992.5848548
+  },
+  {
+    "level": 5000,
+    "launch": {
+      "verdict": "PASS",
+      "evidence": {
+        "launch_http": 200,
+        "active": true,
+        "game": "Tekken 3 (USA)",
+        "resume_playing": {
+          "ok": true,
+          "attempt": 1,
+          "seconds_to_playing": 3.0
+        },
+        "recovery_state": "PLAYING",
+        "any_override_at_playing": false
+      }
+    },
+    "any_override_at_playing": false,
+    "settle_initial": [
+      [
+        5079,
+        7.1663156428019
+      ],
+      [
+        7116,
+        5.899916270920108
+      ],
+      [
+        9139,
+        7.241387276541367
+      ]
+    ],
+    "transition_to_level": {
+      "http": 200,
+      "ok": true,
+      "from": 7000,
+      "to": 5000
+    },
+    "settle_after_transition": [
+      [
+        9139,
+        7.241387276541367
+      ],
+      [
+        11163,
+        4.991052674247202
+      ],
+      [
+        13184,
+        5.069307295068619
+      ]
+    ],
+    "bitrate_before_restart": 5000,
+    "restart": {
+      "http": 200,
+      "ok": true,
+      "schema": "privyhub_c3_recovery_restart_v1",
+      "mode": "encoder_only_restart_at_active_level",
+      "from": 5000,
+      "target": 5000,
+      "video": {
+        "capture_restarted": false,
+        "capture_process_present": false,
+        "encoder_restarted": true,
+        "source_width": 879,
+        "source_height": 720,
+        "ffmpeg_spawn_ms": 265.435,
+        "first_rtp_resume_ms": 417.677,
+        "rtp_silence_after_spawn_ms": 152.242,
+        "rtp_baseline_residual_packets": 140,
+        "host_verified_ms": 1170.281
+      },
+      "error": null,
+      "at_utc": "2026-09-25T06:51:03.095Z"
+    },
+    "bitrate_after_restart": 5000,
+    "settle_after_restart": [
+      [
+        13184,
+        5.069307295068619
+      ],
+      [
+        15204,
+        5.4004108847933505
+      ],
+      [
+        17224,
+        4.7223702854316185
+      ],
+      [
+        19242,
+        5.04918776403462
+      ]
+    ],
+    "recent_mbps_after_restart": 5.04918776403462,
+    "return_to_7000": {
+      "http": 200,
+      "ok": true
+    },
+    "report": "native_decoder_20260925_065122_519.json",
+    "game_active_after": false,
+    "bitrate_at_end": 7000,
+    "recovery_events": [
+      {
+        "event": "session_started",
+        "at_utc": "2026-09-25T06:50:54.613Z",
+        "method": null
+      },
+      {
+        "event": "session_ended",
+        "at_utc": "2026-09-25T06:51:22.548Z",
+        "method": null
+      }
+    ],
+    "alpha_log": [
+      "C3.L3a Linux validated-ladder transition probe: 7000 -> 5000 kbps encoder-only cycle begin",
+      "C3.L3a Linux validated-ladder transition probe: 5000 kbps active; first RTP resume=318.46 ms",
+      "C3-F1 Linux recovery restart at the active level: 5000 -> 5000 kbps encoder-only cycle begin",
+      "C3-F1 Linux recovery restart at the active level: 5000 kbps active; first RTP resume=417.677 ms",
+      "C3.L3a Linux validated-ladder transition probe: 5000 -> 7000 kbps encoder-only cycle begin",
+      "C3.L3a Linux validated-ladder transition probe: 7000 kbps active; first RTP resume=418.307 ms"
+    ],
+    "journal": {
+      "native_stream_start_posts": 1,
+      "recovery_restart_posts": 1
+    },
+    "restart_epoch": 1790319063.0955503
+  }
+]

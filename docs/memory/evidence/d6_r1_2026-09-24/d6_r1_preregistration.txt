@@ -1,0 +1,29 @@
+D6-R1 pre-registration -- written 2026-09-24T21:28:03Z, before any D6-R1 run.
+
+The preserved probes classify nothing (no verdicts, no thresholds, no control
+arm, no with-load arm; docs/DIAGNOSTICS.md "Acceptance guidance" is
+qualitative and asks not to turn rates into hard thresholds). The only
+thresholds in the preserved suite are its router analyzers'
+(tools/analyze_opal_bridge_boundary_pcap.py, analyze_opal_dual_boundary_pcap.py):
+DUPLICATION = >= 20 same-stamp duplicates. The handoff's rule is applied with
+that as the pathology's signature floor:
+
+  per run, SIGNATURE PRESENT  = same-stamp duplicates >= 20 (the suite's own
+                                analyzer threshold);
+  per direction, REPRODUCED   = signature in >= 2 of 3 runs;
+                 NOT REPRODUCED = signature in 0 of 3;
+                 INDETERMINATE  = 1 of 3, or the direction could not run.
+  Burst/gap transformation (4-6 ms sender intervals arriving < 2 ms / >= 20 ms),
+  reorder and loss are reported beside the pre-B2 values (D082 / Test A forward,
+  Test B reverse) with NO threshold: the suite defines none, and none is
+  invented here.
+
+Deviations from "as preserved", decided before running:
+  * forward: the D082 runner's probe steps only; its Opal steps (password ssh,
+    opkg install tcpdump-mini, capture on br-lan) are not run -- the Opal is
+    read-only. So no router-boundary verdict exists for these runs.
+  * reverse: port 48122 on both ends instead of 48102 (owned by the companion's
+    controller socket; nothing is stopped for this). Test B parameters
+    otherwise (Android 20 s urgent_audio, receiver 25 s, expected 4000).
+  * the pre-B2 baseline ran host Wi-Fi (USB adapter) -> Opal -> onn Wi-Fi
+    (2026-09-15 router setup files), not through the Windows PC.

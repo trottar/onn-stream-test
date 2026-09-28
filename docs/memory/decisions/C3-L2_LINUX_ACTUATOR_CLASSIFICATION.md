@@ -296,3 +296,17 @@ encoded in any probe.
 ## Privacy
 
 No network addresses appear in this record.
+
+## Appended 2026-09-25 — recovery's restart is level-preserving (`C3-F1`)
+
+The `video_only_restart` actuator's recovery use no longer refuses off the
+7000 reference.
+- `recovery_restart_encoder()` restarts the encoder at the active validated
+  level; at 7000 it is the unchanged continuity cycle.
+- Measured WORKING at 5000 / 5500 / 6000 / 7000: level kept, one
+  `ssrc_change`, no full start, restart gap 132-197 ms.
+- The classification is unchanged: automatic adaptation during play is
+  still not authorized. `C3.L4` live remains gated on the user's
+  `C3.L3a` reading.
+
+(`../evidence/C3_F1_RECOVERY_RESTART_LADDER_2026-09-25.md`)

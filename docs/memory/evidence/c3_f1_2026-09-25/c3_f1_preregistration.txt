@@ -1,0 +1,26 @@
+C3-F1 pre-registration -- written 2026-09-25T06:44:40Z, before any session (rules copied from
+handoffs/PHASE_C_PRECONDITIONS_2026-09-25_TASK.md §1 step 5; not tightened or loosened after data).
+
+Sessions: four short attract-mode sessions, one per level 7000, 6000, 5500, 5000 (in that order); the
+companion restarted through its unit before the first. Per session: PLAYING; settle (two distinct
+telemetry snapshots); transition to the level through the loopback c3-validated-bitrate-transition route
+(7000 needs none); settle; recovery's restart through the loopback c3-recovery-restart route, which calls
+the exact callable link-drop recovery uses (NativeStreamManager.recovery_restart_encoder); settle; return
+to 7000 through the route; BACK (report); stop; game inactive between sessions.
+
+Per restart, recorded: HTTP status + journal line; bitrate_kbps before/after (native-stream-status) and
+the client's recent_mbps after; the number of ssrc_change entries within 3 s of the restart (host time
+mapped to the client clock by the heartbeats); first_idr_after_discontinuity for it; the output gap
+(largest output_gap_ms within 1 s after that ssrc_change -- S1's transition-cost measure); no full start
+(recovery log: no encoder_restart method=full_start; journal: one native-stream-start per session);
+lifecycle (recovery log: one session_started, one session_ended).
+
+Rules:
+  WORKING  all four restarts succeed and come back at their level with exactly one ssrc_change and no
+           full start;
+  PARTIAL  7000 works and any other level fails (named, with why);
+  BROKEN   7000 itself regresses -> the change is reverted from the working tree before task 2.
+  The restart's output gap is reported against S1's 186.5 ms median (n = 60) and is NOT a gate; more than
+  double is said as an observation.
+What is not exercised: the loss-triggered recovery state machine (it needs real link loss, i.e. nft,
+never used unattended); the primitive it calls is.

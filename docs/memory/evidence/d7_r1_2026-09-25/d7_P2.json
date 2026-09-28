@@ -1,0 +1,216 @@
+{
+  "schema": "privyhub_d7_regression_v1",
+  "pass": "P2",
+  "generated_utc": "2026-09-25T06:20:10.341Z",
+  "rows": [
+    {
+      "verdict": "PASS",
+      "evidence": {
+        "mainpid_owns_8765": true,
+        "seconds": 1.1,
+        "status_http": 200,
+        "service": "PrivyHub",
+        "native_stream_ready": true,
+        "profile_adopted": true,
+        "fec": "xor8_1",
+        "privyhub_env_in_companion": 0
+      },
+      "row": "server boot/start",
+      "started_utc": "2026-09-25T06:14:44.954Z",
+      "ended_utc": "2026-09-25T06:14:46.123Z"
+    },
+    {
+      "verdict": "PASS",
+      "evidence": {
+        "client_get_sources_lines": 1,
+        "client_get_games_status_lines": 1,
+        "launcher_shows_library": true,
+        "note": "controller transport checked in the video/audio/controller row",
+        "controller_transport_active_in_stream": true
+      },
+      "row": "client discovery/control",
+      "started_utc": "2026-09-25T06:14:46.123Z",
+      "ended_utc": "2026-09-25T06:14:59.480Z"
+    },
+    {
+      "verdict": "PASS",
+      "evidence": {
+        "classification": "D136_FOCUSED_TV_MEDIA_AUTOMATED_REGRESSION_VALIDATED",
+        "problems": [],
+        "generated": null,
+        "note": "D136 re-runs D122 fresh; D133/D135 are read from their 2026-09-17 files"
+      },
+      "row": "media",
+      "started_utc": "2026-09-25T06:14:59.480Z",
+      "ended_utc": "2026-09-25T06:15:00.455Z"
+    },
+    {
+      "verdict": "PASS",
+      "evidence": {
+        "launch_http": 200,
+        "active": true,
+        "game": "Tekken 3 (USA)",
+        "resume_playing": {
+          "ok": true,
+          "attempt": 1,
+          "seconds_to_playing": 3.0
+        },
+        "recovery_state": "PLAYING",
+        "any_override_at_playing": false
+      },
+      "row": "Games launch",
+      "started_utc": "2026-09-25T06:15:00.455Z",
+      "ended_utc": "2026-09-25T06:15:18.947Z"
+    },
+    {
+      "verdict": "PASS",
+      "needs_user": "controller feel and the picture on the TV",
+      "evidence": {
+        "hold_s": 180,
+        "heartbeats": 89,
+        "rendered_fps": 60.0,
+        "audio_packets_sent_delta": 36001,
+        "client_audio_rx_delta": 35431,
+        "controller_active": true,
+        "controller_packets_received_delta": 77866,
+        "video_lost_delta": 0
+      },
+      "row": "video/audio/controller",
+      "started_utc": "2026-09-25T06:15:18.947Z",
+      "ended_utc": "2026-09-25T06:18:18.993Z"
+    },
+    {
+      "verdict": "PASS",
+      "evidence": {
+        "after_back": {
+          "active": true,
+          "paused": true,
+          "report": "native_decoder_20260925_061820_479.json"
+        },
+        "resume_playing": {
+          "ok": true,
+          "attempt": 1,
+          "seconds_to_playing": 4.1
+        },
+        "after_resume": {
+          "paused": false,
+          "recovery_state": "PLAYING",
+          "heartbeats_last_25_s": 12
+        }
+      },
+      "row": "pause/resume",
+      "started_utc": "2026-09-25T06:18:18.993Z",
+      "ended_utc": "2026-09-25T06:19:12.154Z"
+    },
+    {
+      "verdict": "PASS",
+      "evidence": {
+        "scratch_slot": 3,
+        "save_http": 200,
+        "saved_file_exists": true,
+        "saved_size_bytes": 2061325,
+        "saved_sha256_16": "11d3578e879a2dfe",
+        "load_http": 200,
+        "after_load": {
+          "active": true,
+          "paused": true
+        },
+        "hashes_restored": true,
+        "scratch_removed": true,
+        "other_state_files_hashed": 54
+      },
+      "row": "Save/Load",
+      "started_utc": "2026-09-25T06:19:12.154Z",
+      "ended_utc": "2026-09-25T06:19:17.970Z"
+    },
+    {
+      "verdict": "FAIL",
+      "evidence": {
+        "cheat-catalog": {
+          "http": 200,
+          "status": "cached",
+          "reason": null,
+          "cheat_count": null,
+          "profiles": null
+        },
+        "cheat-profiles": {
+          "http": 200,
+          "status": "cached",
+          "reason": null,
+          "cheat_count": null,
+          "profiles": 0
+        },
+        "mod-catalog": {
+          "http": 200,
+          "status": "unsupported",
+          "reason": "core_softpatching_unsupported",
+          "cheat_count": null,
+          "profiles": null
+        },
+        "mod-profiles": {
+          "http": 200,
+          "status": "unsupported",
+          "reason": "core_softpatching_unsupported",
+          "cheat_count": null,
+          "profiles": 0
+        },
+        "active-cheats": {
+          "http": 200,
+          "active": false
+        },
+        "input-profiles": {
+          "http": 200,
+          "keys": [
+            "capabilities",
+            "effective",
+            "ok",
+            "plugin",
+            "profiles",
+            "schema"
+          ]
+        },
+        "session": {
+          "cheat_session": false,
+          "mod_session": false
+        },
+        "no_residue": true
+      },
+      "row": "profiles/cheats/mod state",
+      "started_utc": "2026-09-25T06:19:17.970Z",
+      "ended_utc": "2026-09-25T06:19:18.043Z"
+    },
+    {
+      "verdict": "PASS",
+      "evidence": {
+        "resume_playing": {
+          "ok": true,
+          "attempt": 1,
+          "seconds_to_playing": 4.1
+        },
+        "report": "native_decoder_20260925_061952_425.json",
+        "journal_report_stored": 1,
+        "journal_report_warnings": 0,
+        "stop_http": 200,
+        "active_after_stop": false,
+        "now_playing_banner": false,
+        "companion_serving": true
+      },
+      "row": "End/teardown",
+      "started_utc": "2026-09-25T06:19:18.043Z",
+      "ended_utc": "2026-09-25T06:20:10.341Z"
+    },
+    {
+      "verdict": "VALIDATED (cited)",
+      "evidence": {
+        "records": [
+          "D_BASE_R3D_HAND_RUNS_2026-09-22.md (N05, N15b, E30 PASS on real loss)",
+          "D_BASE_R3C2_RECOVERY_FLOW_2026-09-23.md (resume, copy, discard; seven checks)"
+        ],
+        "note": "not re-run: real link loss needs the user's nft, never used unattended"
+      },
+      "row": "restart/recovery",
+      "started_utc": "2026-09-25T06:20:10.341Z",
+      "ended_utc": "2026-09-25T06:20:10.341Z"
+    }
+  ]
+}

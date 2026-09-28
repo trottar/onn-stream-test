@@ -831,3 +831,105 @@ this into one shared `tools/manual_checkout.py` module — `yes()`, a report
 writer matching the existing convention, and the new non-blocking mark-
 capture loop — so this probe and future ones stop duplicating it. Existing
 probes are not touched; this is additive only.
+
+## C3.L4 shadow controller — S1
+
+Task: `../handoffs/C3-L4-S1_SHADOW_CONTROLLER_TASK.md` (weekend queue item 4,
+2026-09-24). Module: `companion/adaptive_bitrate.py`. Status field:
+`adaptive_bitrate` on `native-stream-status`, schema
+`privyhub_adaptive_bitrate_v1`. Flag: `PRIVYHUB_ADAPTIVE_BITRATE_MODE`.
+**This section implements the design above; it adds no new design.**
+
+### The answer to `C3-L2`
+
+`video_only_restart` is authorized for fallback and recovery. It is not
+authorized for automatic adaptation during play. So the controller has
+**two trigger classes**, and only the first can ever be an acting path:
+
+1. **FALLBACK.** The stream is already failing by the close-out's own
+   rows. A ~190 ms restart is cheaper than what the player is already
+   getting.
+2. **ROUTINE.** Capacity or latency pressure short of failure. `C3-L2`
+   does not authorize it, and the gate data so far says it is noticed.
+   **ROUTINE acting is gated on the user's `C3.L3a` reading and is not
+   built here.**
+
+- **Modes.** `off` is the default, and any unrecognised value reads off,
+  flagged `mode_env_ignored`. `shadow` evaluates and logs. The module
+  holds no actuator and no accepted mode calls one. `acted` is `false` on
+  every line and in the status.
+- **The two tracks.** Shadow keeps a *virtual* level. It is what the
+  acting path (FALLBACK down, RECOVERY up) would have done, with its
+  blackout, hold-down and oscillation guard.
+- **ROUTINE is counted on its own track.** It is logged once per 30
+  reports while its evidence persists. It **never moves the virtual level
+  or the acting track's timers**, because a later acting mode would not
+  act on it.
+- **A consequence of the pre-registered numbers.** On any queue-driven
+  onset, ROUTINE's 4-of-5 is met one report before FALLBACK's 5-of-5. So
+  a real failure logs one ROUTINE line, then the FALLBACK. This is
+  recorded, not retuned.
+
+### Jump, not ramp
+
+The rerun evidence: ramps were marked 11/15 and jumps 5/15.
+
+- **A decrease is one transition.** FALLBACK goes straight to the floor
+  (5000). ROUTINE's would-target is one rung down.
+- **An increase is one rung per decision** (slow-up). So each step up is
+  a single restart, at a long interval.
+
+### The constants (pre-registered in the task; sources)
+
+| constant | value | source |
+| --- | --- | --- |
+| ladder, reference | 5000 / 5500 / 6000 / 7000, 7000 | `D-066`, `C3.L3` |
+| cadence | the 2 s client report; only fresh, distinct snapshots (`session_elapsed_ms` advanced) | §C3 control cadence; the probe's rule |
+| blackout after any action | 3 reports (≥ 6 s) | `C3.L3a-S1`: settling in 1-3 reports, once 4 |
+| hold-down, same direction | 30 reports (60 s) | task |
+| hold-down, reversal | 60 reports (120 s) | task |
+| FALLBACK | over 5 fresh reports: fps < 50 on 5/5 **and** (queue ≥ 2 on ≥ 3/5 **or** output gap > 250 ms on ≥ 2/5) | close-out band: fps 59.9, queue 0, gap ≤ 163; transport gaps 100-200 ms must not trigger |
+| ROUTINE | fps < 57 on ≥ 4/5 **and** queue ≥ 1 on ≥ 3/5 | task |
+| never evidence | recovered FEC, stale drops, `lost_packets_delta` alone, `waiting_for_idr` in a known resync | D-019, §Signal interpretation |
+| increase | below 7000, 90 consecutive clean reports (fps ≥ 59, queue 0, gap ≤ 150), counted after the blackout → one rung up | slow-up |
+| oscillation | the third direction change within 10 min → `HOLD`, reason `oscillation`, for the rest of the session | task |
+| stale | not fresh, not available, or no distinct snapshot for 3 reports → `TELEMETRY_STALE`, no decision | §Telemetry freshness |
+
+**States** are `REFERENCE`, `PRESSURE`, `HOLD_DOWN` (blackout included),
+`RECOVERY_PROBATION`, `TELEMETRY_STALE`, `ACTUATOR_FAILED` (never reached
+in shadow) and `HOLD` (oscillation).
+
+**The status field** carries:
+
+- mode, state and reason, with the reason's measurements;
+- `current_kbps` (the stream's) and `shadow_level_kbps` (the virtual
+  level);
+- the validated ladder and the telemetry age;
+- the decision sequence, the blackout and hold-down remaining, the clean
+  count;
+- would-act counters by class (FALLBACK, ROUTINE, INCREASE), suppression
+  counters, and `acted: false`.
+
+**The decision log** is `logs/games/adaptive_bitrate_shadow.jsonl`: one
+line per decision or state change, never per report. It rotates at 4 MiB,
+keeping three, into `stream_log_archive/`.
+
+**Where it hooks.** The companion's `/diagnostics/client-health` POST
+already builds the `privyhub_stream_telemetry_v1` snapshot each 2 s. The
+shadow reads that payload after it is built, inside the same "must never
+disturb" guard. It writes nothing back.
+
+## Recovery's restart primitive — C3-F1 (2026-09-25)
+
+Beside the actuator (`c3-validated-bitrate-transition`) there is recovery's
+restart, `NativeStreamManager.recovery_restart_encoder()`. It is
+encoder-only and **level-preserving**:
+
+- at the 7000 reference it is the unchanged `C3.L1` continuity cycle;
+- off 7000 it restarts the encoder at `_active_bitrate_kbps` through the
+  transition cycle's mechanics (`privyhub_c3_recovery_restart_v1`).
+
+It was measured WORKING at 5000, 5500, 6000 and 7000
+(`../evidence/C3_F1_RECOVERY_RESTART_LADDER_2026-09-25.md`). There is a
+loopback-only diagnostic route, `c3-recovery-restart`. A live controller
+that moves the ladder no longer disables link-drop recovery.

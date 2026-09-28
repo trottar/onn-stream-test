@@ -1,0 +1,48 @@
+C3.L3a gameplay acceptance probe
+  run id           : 20260924_130016
+  traversals       : 10
+  transitions      : 20
+  ramp rung gap    : 4.0s
+  phase A estimate : ~13.5 min
+
+  The schedule is NOT shown. That is the point.
+  Play normally. Press Enter the moment you notice ANYTHING
+  wrong with the video - a hitch, a blur, a freeze, a jump.
+  Optionally type a digit 1-9 before Enter for severity.
+  Do not try to guess when something is due.
+
+  Press Enter when you are playing and ready to start... 
+  Phase A complete. Marks recorded: 26
+
+  Phase B: picture quality. Each level is announced.
+  Keep playing; judge how the picture LOOKS, not timing.
+
+  -> parking at 6000 kbps for 45s
+
+  -> parking at 5500 kbps for 45s
+
+  -> parking at 5000 kbps for 45s
+
+  Back at 7000 kbps. Debrief:
+
+  Did 6000 kbps look acceptable to play on? [y/N]: 
+    10 = looks the same as 7000
+     5 = clearly softer, still playable
+     1 = unplayable
+  Rate 6000 kbps picture quality [1-10]: 
+  Did 5500 kbps look acceptable to play on? [y/N]: 
+    10 = looks the same as 7000
+     5 = clearly softer, still playable
+     1 = unplayable
+  Rate 5500 kbps picture quality [1-10]: 
+  Did 5000 kbps look acceptable to play on? [y/N]: 
+    10 = looks the same as 7000
+     5 = clearly softer, still playable
+     1 = unplayable
+  Rate 5000 kbps picture quality [1-10]: 
+
+  State written: logs/streaming/c3_l3a_gameplay_acceptance_state.json
+  Run's own copy: logs/streaming/c3_l3a_runs/states/20260924_130016_state.json
+
+  Next: let the client post a decoder session, then run
+    python3 tools/probe_c3_l3a_gameplay_acceptance.py --finalize

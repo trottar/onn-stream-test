@@ -1,0 +1,193 @@
+PrivyHub C3.L3a gameplay acceptance probe
+Generated: 2026-09-24T12:43:51-0400
+Classification: C3_L3A_GAMEPLAY_ACCEPTANCE_RECORDED
+Production files modified by probe: NONE
+Network addresses collected/logged: NONE
+=== RUN ===
+Run id: 20260924_000330
+Seed: 1502366457
+State file (read, not written): /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/c3_l3a_p2r2_2026-09-24/c3_l3a_gameplay_acceptance_state.json
+State schema: privyhub_c3_l3a_gameplay_acceptance_v2
+Aborted: no
+Primary window (s): 5.0
+Windows reported (s): 2.5, 5, 8
+Ramp rung gap (s): 4.0
+Rating scale: 1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)
+
+=== DETECTION - the gate question ===
+Sequence window: first fire .. last transition returned + W.
+Decoys fire nothing; each is scored through a jump-matched
+[d, d + W] and a ramp-matched [d, d + ramp_span + W] window.
+Classes are scored independently: one mark can count in two.
+Primary W (s): 5.0
+Ramp span (s, median ramp end - first fire): 11.674
+Phase A (s): 103.472
+Marks total: 0
+Chance rate (marks / phase-A s): 0.0000
+
+W = 2.5 s
+  class                events  marked  marks  exposure s  marks/s  chance-expected marks
+  -------------------  ------  ------  -----  ----------  -------  ---------------------
+  jump                      1       0      0         3.7    0.000                   0.00
+  ramp                      1       0      0        14.2    0.000                   0.00
+  decoy, jump-matched       2       0      0         5.0    0.000                   0.00
+  decoy, ramp-matched       2       0      0        28.3    0.000                   0.00
+  marks in no sequence window: 0
+
+W = 5.0 s (primary)
+  class                events  marked  marks  exposure s  marks/s  chance-expected marks
+  -------------------  ------  ------  -----  ----------  -------  ---------------------
+  jump                      1       0      0         6.2    0.000                   0.00
+  ramp                      1       0      0        16.7    0.000                   0.00
+  decoy, jump-matched       2       0      0        10.0    0.000                   0.00
+  decoy, ramp-matched       2       0      0        33.3    0.000                   0.00
+  marks in no sequence window: 0
+
+W = 8.0 s
+  class                events  marked  marks  exposure s  marks/s  chance-expected marks
+  -------------------  ------  ------  -----  ----------  -------  ---------------------
+  jump                      1       0      0         9.2    0.000                   0.00
+  ramp                      1       0      0        19.7    0.000                   0.00
+  decoy, jump-matched       2       0      0        16.0    0.000                   0.00
+  decoy, ramp-matched       2       0      0        39.3    0.000                   0.00
+  marks in no sequence window: 0
+
+NO THRESHOLD IS ENCODED. Read the table; the judgement is yours.
+
+=== MARK LAGS - probe clock ===
+  mark s  sev  lag from fire  lag from decoy  jump  ramp  decoy, jump-matched  decoy, ramp-matched
+  ------  ---  -------------  --------------  ----  ----  -------------------  -------------------
+(x = inside that class's window at the primary W 5 s)
+
+Lag histogram, every mark:
+  bin s        from nearest preceding fire  from nearest preceding decoy
+  -----------  ---------------------------  ----------------------------
+  0-1                                    0                             0
+  1-2                                    0                             0
+  2-3                                    0                             0
+  3-4                                    0                             0
+  4-5                                    0                             0
+  5-8                                    0                             0
+  8-15                                   0                             0
+  15-30                                  0                             0
+  30-60                                  0                             0
+  60+                                    0                             0
+  none before                            0                             0
+
+=== DECOY PLACEMENT - ramp-matched window vs the next fire ===
+  decoy    at s  next fire s  late s  slack @W2.5  slack @W5  slack @W8
+  -----  ------  -----------  ------  -----------  ---------  ---------
+  0      16.719       42.594     0.0        11.70       9.20       6.20
+  1      78.367            -     0.0            -          -          -
+Rule for new runs: slack >= 3 s at the widest W.
+Negative slack: the decoy window overlaps the next sequence's.
+
+=== CLOCK ALIGNMENT - probe clock to decoder elapsed_ms ===
+Rule: Phase-A fires matched in order to the first N ssrc_change entries; spread over 1 s means the pairing is wrong
+Pairs: 4
+Median offset (s): 13.842
+Spread (s): 0.152
+Max |residual| (s): 0.122
+Alignment: OK
+
+=== PER-TRANSITION DECODER VIEW ===
+Slow events (>= 50 ms) retained 96 of 128 (32 marked + 64 recent); not saturated: the whole session is covered.
+'-' in the gap column means covered and no event >= 50 ms.
+
+  transition           to   fire s  ssrc ms  resid s  jump pk  1st IDR ms  max gap ms in 1s  at +ms  codec ms
+  -----------------  ----  -------  -------  -------  -------  ----------  ----------------  ------  --------
+  jump seq 0 step 0  5000    0.000    13865   +0.023        0          18               125      35         9
+  ramp seq 1 step 0  5500   42.594    56558   +0.122        0          16               198      33        10
+  ramp seq 1 step 1  6000   47.920    61739   -0.023        0          35               154      51         9
+  ramp seq 1 step 2  7000   53.094    66906   -0.030        0          26               187      41         8
+  park 6000          6000  103.482   117097   -0.227        0          22               211      41        11
+  park 5500          5500  149.455   163266   -0.031        0           2               166      19         9
+  park 5000          5000  195.629   209451   -0.020        0          23               203      38         8
+  after phase B      7000  241.812   255642   -0.012        0           1               189      16         7
+Every row's 1 s window starts at its own matched ssrc_change (Phase A, parks
+and restores alike); the fire time and its residual are beside it. 'at +ms' and
+'codec ms' belong to the largest gap in the window.
+Pre-v2 state has no probe fire time for parks and restores ('~' = ssrc - offset).
+
+=== PICTURE QUALITY - announced, separate question ===
+  kbps  acceptable  rating  scale
+  ----  ----------  ------  ------------------------------------------------------------------------------------------------
+  6000  True             9  1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)
+  5500  True             9  1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)
+  5000  True             9  1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)
+Ratings are printed as answered; they are never rescaled.
+
+=== C3.L4 READINESS ===
+What an automatic controller would need, and whether it is known.
+
+jump cycles measured: 1
+  jump spawn_ms: {'n': 1, 'min': 316.261, 'median': 316.261, 'max': 316.261, 'p95': 316.261}
+  jump first_rtp_resume_ms: {'n': 1, 'min': 468.513, 'median': 468.513, 'max': 468.513, 'p95': 468.513}
+  jump host_verified_ms: {'n': 1, 'min': 1220.644, 'median': 1220.644, 'max': 1220.644, 'p95': 1220.644}
+ramp cycles measured: 3
+  ramp spawn_ms: {'n': 3, 'min': 266.323, 'median': 266.842, 'max': 416.437, 'p95': 416.437}
+  ramp first_rtp_resume_ms: {'n': 3, 'min': 418.992, 'median': 419.813, 'max': 569.389, 'p95': 569.389}
+  ramp host_verified_ms: {'n': 3, 'min': 1171.868, 'median': 1171.964, 'max': 1322.542, 'p95': 1322.542}
+
+Settling measured on sequences: 2 of 2
+Telemetry settling after a sequence (s): {'n': 2, 'min': 1.504, 'median': 1.755, 'max': 2.006, 'p95': 2.006}
+Measured sequences that never settled in budget: 0
+  seq  shape  settled s  distinct  interval ms  cadence ms  budget >= 3 intervals
+  ---  -----  ---------  --------  -----------  ----------  ---------------------
+    0  jump       2.006         2       2000.0      2007.0  True
+    1  ramp       1.504         2       2000.0      2007.0  True
+  -> a controller MUST NOT sample telemetry inside the settling window;
+     inside it, it is measuring the restart, not the network.
+
+Cumulative lifecycle over the whole session: {'fec_send_errors_delta': 0, 'audio_send_errors_delta': 0, 'controller_bad_packets_delta': 0}
+  -> all three must be 0. Non-zero means repeated transitions
+     degrade a subsystem that a single transition does not.
+
+Minimum rung spacing exercised (s): 4.0
+Transitions in one session (Phase A): 4
+
+=== CLIENT DECODER SESSION ===
+path: /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/c3_l3a_p2r2_2026-09-24/native_decoder_20260924_041256_754.json
+selection: --decoder given
+received_at_utc: 2026-09-24T04:12:56.754Z
+client_profiler_version: 0.12.3
+duration_ms: 479000
+ssrc_changes: 8
+expected_ssrc_changes: 8
+expected_breakdown: {'phase_a': 4, 'park': 3, 'restore': 1}
+ssrc_discontinuity_count: 8
+discontinuity_count: 8
+sequence_resyncs: 8
+lost_packets: 11
+fec_unrecoverable_groups: 2
+max_output_gap_ms: 211
+max_codec_ms: 130
+rendered_frames: 28629
+dropped_frames: 7
+resync_to_idr_ms per discontinuity: [18, 16, 35, 26, 22, 2, 23, 1]
+
+=== DECODER SESSION BESIDE THE CLOSE-OUT TABLE - context, not a gate ===
+Rows as evidence/D_BASE_CLOSEOUT_2026-09-23.md defines them.
+This session carries deliberate restarts; it is not a baseline session.
+duration_min: 7.98
+spikes_20_per_min: 40.46
+rendered_fps: 59.77
+stale_output_drops_per_min: 2.38
+video_lost_per_min_post_fec: 1.38
+max_output_gap_ms: 211
+
+=== CONDITIONS ===
+before: {'audio_send_errors': 0, 'controller_bad_packets': 0, 'controller_lost_packets': 76, 'fec_rtp_packets': 11142, 'fec_send_errors': 0, 'fec_skipped_packets': 0}
+after: {'audio_send_errors': 0, 'controller_bad_packets': 0, 'controller_lost_packets': 3177, 'fec_rtp_packets': 337115, 'fec_send_errors': 0, 'fec_skipped_packets': 0}
+
+Transport conditions are not constant between sessions.
+Do not compare gap figures across runs without comparing these.
+
+=== WHAT THIS DOES NOT ESTABLISH ===
+- Whether C3.L4 is authorized. That is a human judgement on
+  the detection table and the picture ratings above.
+- Anything at n = one run. Compare marked classes against the
+  chance-expected marks and against each other; pool runs.
+- Any controller policy: thresholds, hysteresis, sample cadence.
+- Behaviour under real network pressure. Every transition here
+  fired from a schedule, not from a degraded condition.

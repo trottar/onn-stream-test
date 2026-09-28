@@ -1,0 +1,13 @@
+MAX_REPORT_CHARS = 48000
+Native decoder session log: logs/games/decoder_sessions/native_decoder_20260924_180039_002.json
+a rebuilt session-2 report    32057 chars  ACCEPTED  saved under scratch, report round-trips: True
+Native decoder session log: logs/games/decoder_sessions/native_decoder_20260924_180039_014.json
+b synthetic                   47000 chars  ACCEPTED  saved under scratch, report round-trips: True
+c synthetic                   49000 chars  REFUSED   Decoder session report is too large
+Native decoder session log: logs/games/decoder_sessions/native_decoder_20260924_180039_036.json
+d at the cap                  48000 chars  ACCEPTED  saved under scratch, report round-trips: True
+d cap + 1                     48001 chars  REFUSED   Decoder session report is too large
+files written (scratch only): 3
+rebuilt report: 32057 chars -> 50719 encoded (ratio 1.5822)
+request line = 58 fixed bytes + encoded report; http.server limit 65,536
+transport ceiling at this ratio: ~41385 decoded chars

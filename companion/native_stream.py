@@ -16,7 +16,7 @@ from typing import Any
 from ctypes import wintypes
 
 from native_session_io import NativeSessionIO
-from native_fec_relay import NativeVideoFecRelay
+from native_fec_relay import FEC_SCHEME_ENV, NativeVideoFecRelay
 
 # Encoder knobs read from the environment at command build time.
 #
@@ -208,8 +208,14 @@ class NativeStreamManager:
             "bufsize_kbits": bufsize_k or None,
             "bufsize_source": ENC_BUFSIZE_K_ENV,
             "default_bufsize_kbits": self.MAX_BITRATE_KBPS,
+            # C4-M1: the FEC comparison arm counts as an override while its
+            # variable is set (the relay reads it; see native_fec_relay).
+            "fec_scheme_env": FEC_SCHEME_ENV,
+            "fec_scheme_override": (os.environ.get(FEC_SCHEME_ENV) or "").strip() or None,
             "any_override": bool(
-                mfs_override is not None or bufsize_k
+                mfs_override is not None
+                or bufsize_k
+                or (os.environ.get(FEC_SCHEME_ENV) or "").strip()
             ),
         }
 
@@ -2262,6 +2268,46 @@ class NativeStreamManager:
             )
 
             return payload
+
+    def recovery_restart_encoder(
+        self,
+    ) -> dict[str, Any]:
+        """C3-F1: link-drop recovery's encoder restart, at the active level.
+
+        At the 7000 reference this is the validated C3.L1 continuity cycle,
+        unchanged (the path `R3`-`R3d` validated on real loss). Off the
+        reference -- after a ladder transition -- the Linux encoder is
+        restarted at `_active_bitrate_kbps` through the same encoder-only
+        mechanics, so the level is kept instead of refused. The continuity
+        diagnostic keeps its own 7000 guard: it proves same-bitrate
+        continuity at the reference and rebuilds the argv at the reference.
+        A full start still resets to 7000 (C1: the explicit profile).
+        """
+        with self._lock:
+            off_reference = (
+                self._active_bitrate_kbps != self.BITRATE_KBPS
+            )
+            linux = self._linux_host()
+
+        if not off_reference or not linux:
+            return self.diagnostic_c3_actuator_continuity_cycle()
+
+        with self._lock:
+            from diagnostics.c3_linux_actuator_probe import (
+                run_c3_linux_recovery_restart as _restart,
+            )
+
+            try:
+                return _restart(
+                    self
+                )
+            except NativeStreamError:
+                raise
+            except Exception as exc:
+                raise NativeStreamError(
+                    "C3-F1 recovery restart failed: "
+                    + type(exc).__name__ + ": " + str(exc)
+                ) from exc
 
     def diagnostic_c3_actuator_continuity_cycle(
         self,

@@ -23,6 +23,7 @@ from games.link_drop_recovery import (
 )
 from games.startup_reconcile import run_startup_metadata_reconcile
 from native_stream import NativeStreamError, NativeStreamManager
+from adaptive_bitrate import get_shadow as adaptive_bitrate_shadow
 
 
 class GamesPlugin:
@@ -95,9 +96,11 @@ class GamesPlugin:
             pause_game=self._emulator.pause,
             resume_game=self._emulator.resume,
             save_recovery_state=self._emulator.save_recovery_state,
+            # C3-F1: level-preserving at any ladder level (the continuity
+            # diagnostic itself refuses off 7000; this calls it at 7000).
             restart_encoder=(
                 self._native_stream
-                .diagnostic_c3_actuator_continuity_cycle
+                .recovery_restart_encoder
             ),
             full_start_encoder=self._recovery_full_start_encoder,
             stream_active=self._recovery_stream_active,
@@ -3043,6 +3046,12 @@ class GamesPlugin:
         if action == "native-stream-status":
             payload = self._native_stream.status()
             payload["recovery"] = self._recovery.status()
+            # C3-L4-S1: the shadow controller's state (schema
+            # privyhub_adaptive_bitrate_v1). Reads `mode: off` unless
+            # PRIVYHUB_ADAPTIVE_BITRATE_MODE=shadow; `acted` is false always.
+            payload["adaptive_bitrate"] = adaptive_bitrate_shadow(
+                self.PROJECT_ROOT
+            ).status()
             # D-BASE-R2: newest client heartbeat, or None if none has
             # arrived. Read from the log, so it survives a companion
             # restart and says nothing about liveness by itself — compare
@@ -3415,6 +3424,27 @@ class GamesPlugin:
                     str(exc)
                 ) from exc
 
+        if action == "c3-recovery-restart":
+            # C3-F1 diagnostic: the exact callable link-drop recovery uses,
+            # without the loss that normally triggers it. Loopback-only.
+            if client_ip not in {
+                "127.0.0.1",
+                "::1",
+            }:
+                raise RuntimeError(
+                    "C3 recovery restart diagnostic is loopback-only"
+                )
+
+            try:
+                return (
+                    self._native_stream
+                    .recovery_restart_encoder()
+                )
+            except NativeStreamError as exc:
+                raise RuntimeError(
+                    str(exc)
+                ) from exc
+
         if action == "c3-validated-bitrate-transition":
             # Diagnostic-only actuator surface. Never expose bitrate actuation
             # to non-loopback callers before the C3 controller owns policy.
@@ -3740,6 +3770,22 @@ class GamesPlugin:
 
         return self.handle_post(action, raw_query)
 
+    def handle_decoder_session_log(
+        self,
+        report: str,
+    ) -> dict[str, Any]:
+        """CL-B1: the decoder session report from a POST body. The same write
+        as the target form, so both forms store identical files."""
+        return write_decoder_session_log(
+            self.PROJECT_ROOT,
+            report,
+            host_extra={
+                "fec_pacing": (
+                    self._native_stream.fec_pacing_status()
+                ),
+            },
+        )
+
     def handle_post(
         self,
         action: str,
@@ -3927,6 +3973,8 @@ class GamesPlugin:
 
 
             if action == "decoder-session-log":
+                # The target form (`?report=`), unchanged; the body form is
+                # handle_decoder_session_log (CL-B1).
                 report = self._first(
                     query,
                     "report",

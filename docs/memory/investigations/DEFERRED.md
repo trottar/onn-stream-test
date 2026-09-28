@@ -47,7 +47,24 @@ confirmed.
 
 ## Linux + home Opal + onn UDP transport root cause
 
-**Status:** PAUSED AFTER D083 CLOSEOUT
+**Status:** ~~PAUSED AFTER D083 CLOSEOUT~~ **REOPENED FOR `D6-R1`, THEN CLOSED
+FOR THE OLD SIGNATURE (2026-09-24): NOT REPRODUCED in either direction on
+the production path** (`../evidence/D6_R1_UDP_SUITE_REPLAY_2026-09-24.md`).
+
+Reopen condition 2 was met: the suite can now run on a different path.
+- The preserved suite ran 3 + 3 valid runs, idle, with the host wired to
+  the Opal and the onn on its 5 GHz.
+- Same-stamp duplication was 0-4 per run, against 2,371-2,626 forward and
+  476 reverse on 2026-09-15.
+- The burst/gap transformation was ~14-20× lower.
+- Host UDP buffer errors +0.
+
+Roadmap D6 classification: **specific to the old environment**. That
+environment was the 2026-09-15 runs, with the host on its USB Wi-Fi adapter
+(RTL8822BU, `rtw_8822bu`), not the Windows PC. **Do not reopen without a
+new observation of same-stamp duplication or bidirectional transformation
+on the production path.** The text below is kept as history.
+
 
 The old Prototype-1 pathology was successfully replayed on the representative
 Linux path and reproduced bidirectionally while idle. Therefore it is no longer

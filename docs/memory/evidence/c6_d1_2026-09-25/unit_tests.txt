@@ -1,0 +1,19 @@
+test_description_reads_constants_not_copies (tools.test_native_source_contract.ContractTests.test_description_reads_constants_not_copies)
+Rule: the description follows the profile module (no duplicated constants). ... ok
+test_does_not_drag_production_in (tools.test_native_source_contract.ContractTests.test_does_not_drag_production_in)
+Rule: importing the contract never loads native_stream (the games source). ... ok
+test_games_description_validates (tools.test_native_source_contract.ContractTests.test_games_description_validates)
+Rule: the games source, described from its own constants, conforms. ... ok
+test_lifecycle_states (tools.test_native_source_contract.ContractTests.test_lifecycle_states)
+Rule: the shared lifecycle carries the states every source needs. ... ok
+test_nothing_in_production_imports_the_contract (tools.test_native_source_contract.ContractTests.test_nothing_in_production_imports_the_contract)
+Rule: no companion module imports native_source_contract (C6-D1 scope). ... ok
+test_profile_satisfies_protocol (tools.test_native_source_contract.ContractTests.test_profile_satisfies_protocol)
+Rule: today's profile object satisfies the SourceProfile protocol. ... ok
+test_validation_catches_violations (tools.test_native_source_contract.ContractTests.test_validation_catches_violations)
+Rule: duplicate wire versions, an address-bearing diagnostics surface, and an ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.003s
+
+OK

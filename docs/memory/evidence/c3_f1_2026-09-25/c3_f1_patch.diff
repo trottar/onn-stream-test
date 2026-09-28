@@ -1,0 +1,204 @@
+--- a/companion/diagnostics/c3_linux_actuator_probe.py
++++ b/companion/diagnostics/c3_linux_actuator_probe.py
+@@ -39,6 +39,10 @@
+ # it has not characterized.
+ BIDIRECTIONAL_SCHEMA = "privyhub_c3_validated_bitrate_transition_v1"
+ BIDIRECTIONAL_MODE = "validated_ladder_actuator_probe"
++
++# C3-F1: recovery's encoder restart at whatever validated level is active.
++RECOVERY_SCHEMA = "privyhub_c3_recovery_restart_v1"
++RECOVERY_MODE = "encoder_only_restart_at_active_level"
+ LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS = (5000, 5500, 6000, 7000)
+ 
+ 
+@@ -445,6 +449,7 @@
+     target_bitrate_kbps: int,
+     *,
+     validated_transition: bool = False,
++    same_level_restart: bool = False,
+     popen_factory: Callable[..., Any] = subprocess.Popen,
+     perf_counter_ns: Callable[[], int] = time.perf_counter_ns,
+     monotonic: Callable[[], float] = time.monotonic,
+@@ -493,7 +498,13 @@
+ 
+     target = _int(target_bitrate_kbps)
+ 
+-    if validated_transition:
++    # C3-F1: `same_level_restart` is recovery's restart at the active level
++    # (target == current, any validated level). Same mechanics; only the
++    # precondition, the label and the schema/mode strings differ.
++    if same_level_restart:
++        if target not in LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS:
++            raise RuntimeError("unsupported_validated_bitrate")
++    elif validated_transition:
+         if target not in LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS:
+             raise RuntimeError("unsupported_validated_bitrate")
+     elif target not in SUPPORTED_FIXED_BITRATES_KBPS:
+@@ -521,7 +532,10 @@
+         )
+     )
+ 
+-    if validated_transition:
++    if same_level_restart:
++        if target != current_bitrate_kbps:
++            raise RuntimeError("recovery_restart_level_mismatch")
++    elif validated_transition:
+         if (
+             current_bitrate_kbps
+             not in LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS
+@@ -536,7 +550,9 @@
+         raise RuntimeError("characterization_requires_reference_start")
+ 
+     label = (
+-        "C3.L3a Linux validated-ladder transition probe"
++        "C3-F1 Linux recovery restart at the active level"
++        if same_level_restart
++        else "C3.L3a Linux validated-ladder transition probe"
+         if validated_transition
+         else "C3.L3 Linux fixed-bitrate characterization probe"
+     )
+@@ -708,13 +724,17 @@
+ 
+         payload = {
+             "schema": (
+-                BIDIRECTIONAL_SCHEMA
++                RECOVERY_SCHEMA
++                if same_level_restart
++                else BIDIRECTIONAL_SCHEMA
+                 if validated_transition
+                 else FIXED_BITRATE_SCHEMA
+             ),
+             "ok": True,
+             "mode": (
+-                BIDIRECTIONAL_MODE
++                RECOVERY_MODE
++                if same_level_restart
++                else BIDIRECTIONAL_MODE
+                 if validated_transition
+                 else FIXED_BITRATE_MODE
+             ),
+@@ -833,6 +853,32 @@
+         **kwargs,
+     )
+ 
++
++def run_c3_linux_recovery_restart(
++    manager: Any,
++    **kwargs: Any,
++) -> dict[str, Any]:
++    """C3-F1: restart the encoder at the currently active validated level.
++
++    Recovery's restart for a stream that is not at the 7000 reference. The
++    level is `manager._active_bitrate_kbps`, the single source of truth, and
++    stays as it was; FEC relay, process audio, the controller transport and
++    the client session survive, only the FFmpeg process is replaced.
++    """
++    current = int(
++        getattr(
++            manager,
++            "_active_bitrate_kbps",
++            REFERENCE_BITRATE_KBPS,
++        )
++    )
++    return _run_c3_linux_bitrate_cycle(
++        manager,
++        current,
++        same_level_restart=True,
++        **kwargs,
++    )
++
+ 
+ def run_c3_linux_validated_bitrate_transition(
+     manager: Any,
+--- a/companion/native_stream.py
++++ b/companion/native_stream.py
+@@ -2269,6 +2269,46 @@
+ 
+             return payload
+ 
++    def recovery_restart_encoder(
++        self,
++    ) -> dict[str, Any]:
++        """C3-F1: link-drop recovery's encoder restart, at the active level.
++
++        At the 7000 reference this is the validated C3.L1 continuity cycle,
++        unchanged (the path `R3`-`R3d` validated on real loss). Off the
++        reference -- after a ladder transition -- the Linux encoder is
++        restarted at `_active_bitrate_kbps` through the same encoder-only
++        mechanics, so the level is kept instead of refused. The continuity
++        diagnostic keeps its own 7000 guard: it proves same-bitrate
++        continuity at the reference and rebuilds the argv at the reference.
++        A full start still resets to 7000 (C1: the explicit profile).
++        """
++        with self._lock:
++            off_reference = (
++                self._active_bitrate_kbps != self.BITRATE_KBPS
++            )
++            linux = self._linux_host()
++
++        if not off_reference or not linux:
++            return self.diagnostic_c3_actuator_continuity_cycle()
++
++        with self._lock:
++            from diagnostics.c3_linux_actuator_probe import (
++                run_c3_linux_recovery_restart as _restart,
++            )
++
++            try:
++                return _restart(
++                    self
++                )
++            except NativeStreamError:
++                raise
++            except Exception as exc:
++                raise NativeStreamError(
++                    "C3-F1 recovery restart failed: "
++                    + type(exc).__name__ + ": " + str(exc)
++                ) from exc
++
+     def diagnostic_c3_actuator_continuity_cycle(
+         self,
+     ) -> dict[str, Any]:
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -96,9 +96,11 @@
+             pause_game=self._emulator.pause,
+             resume_game=self._emulator.resume,
+             save_recovery_state=self._emulator.save_recovery_state,
++            # C3-F1: level-preserving at any ladder level (the continuity
++            # diagnostic itself refuses off 7000; this calls it at 7000).
+             restart_encoder=(
+                 self._native_stream
+-                .diagnostic_c3_actuator_continuity_cycle
++                .recovery_restart_encoder
+             ),
+             full_start_encoder=self._recovery_full_start_encoder,
+             stream_active=self._recovery_stream_active,
+@@ -3419,6 +3421,27 @@
+                 )
+             except NativeStreamError as exc:
+                 raise RuntimeError(
++                    str(exc)
++                ) from exc
++
++        if action == "c3-recovery-restart":
++            # C3-F1 diagnostic: the exact callable link-drop recovery uses,
++            # without the loss that normally triggers it. Loopback-only.
++            if client_ip not in {
++                "<ipv4>",
++                "::1",
++            }:
++                raise RuntimeError(
++                    "C3 recovery restart diagnostic is loopback-only"
++                )
++
++            try:
++                return (
++                    self._native_stream
++                    .recovery_restart_encoder()
++                )
++            except NativeStreamError as exc:
++                raise RuntimeError(
+                     str(exc)
+                 ) from exc
+ 

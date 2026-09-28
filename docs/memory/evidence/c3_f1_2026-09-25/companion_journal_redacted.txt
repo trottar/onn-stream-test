@@ -1,0 +1,97 @@
+2026-09-25T02:47:10-04:00 PrivyHub systemd[1310]: Stopping privyhub-companion.service - PrivyHub companion (control API :8765, native game stream)...
+2026-09-25T02:47:10-04:00 PrivyHub python3[567078]: Stopping PrivyHub companion service...
+2026-09-25T02:47:10-04:00 PrivyHub python3[567078]: PrivyHub companion service stopped.
+2026-09-25T02:47:10-04:00 PrivyHub systemd[1310]: Stopped privyhub-companion.service - PrivyHub companion (control API :8765, native game stream).
+2026-09-25T02:47:10-04:00 PrivyHub systemd[1310]: privyhub-companion.service: Consumed 3min 26.893s CPU time, 256.4M memory peak.
+2026-09-25T02:47:10-04:00 PrivyHub systemd[1310]: Starting privyhub-companion.service - PrivyHub companion (control API :8765, native game stream)...
+2026-09-25T02:47:10-04:00 PrivyHub systemd[1310]: Started privyhub-companion.service - PrivyHub companion (control API :8765, native game stream).
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]: PrivyHub companion service
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]: Project root: /home/privyhub/Projects/onn-stream-test
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]: Media root:   /home/privyhub/Projects/onn-stream-test/media
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]: VOD root:     /mnt/privyhub-media/onn-stream-test/media/vod
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]: VOD storage:  configured
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]: Catalog:      /home/privyhub/Projects/onn-stream-test/companion/config/sources.json
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]: Control API:  http://<ipv4>:8765
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]: Dynamic media directories are rescanned on GET /sources.
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]: Endpoints:
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]:   GET  /status
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]:   GET  /diagnostics/health
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]:   POST /diagnostics/self-test
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]:   POST /diagnostics/bundle
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]:   GET  /sources
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]:   GET  /plugins/<plugin>/<action>
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]:   POST /sources/<id>/start
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]:   POST /stop
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]: Logs: /home/privyhub/Projects/onn-stream-test/logs
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]: Starting the PrivyHub media server...
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]: Listening on <ipv4>:8765
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]: Stop with Ctrl+C.
+2026-09-25T02:47:10-04:00 PrivyHub python3[568810]: PrivyHub game metadata startup reconciliation: SKIPPED_CURRENT
+2026-09-25T02:47:11-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:47:11 - "GET /status HTTP/1.1" 200 -
+2026-09-25T02:47:11-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:47:11 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-25T02:47:11-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:47:11 - "POST /plugins/games/stop HTTP/1.1" 200 -
+2026-09-25T02:47:13-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:47:13 - "POST /plugins/games/launch?id=game_ps1_b0a5986638f61a11 HTTP/1.1" 200 -
+2026-09-25T02:47:16-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:47:16 - "GET /sources HTTP/1.1" 200 -
+2026-09-25T02:47:26-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:47:26 - "POST /plugins/games/native-stream-start?port=48100 HTTP/1.1" 200 -
+2026-09-25T02:47:32-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:47:32 - "POST /plugins/games/native-stream-ready HTTP/1.1" 200 -
+2026-09-25T02:47:32-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:47:32 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-25T02:47:32-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:47:32 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-25T02:47:35-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:47:35 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-25T02:47:36-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:47:36 - "POST /plugins/games/c3-recovery-restart HTTP/1.1" 200 -
+2026-09-25T02:47:36-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:47:36 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-25T02:47:51-04:00 PrivyHub python3[568810]: Native decoder session log: logs/games/decoder_sessions/native_decoder_20260925_064751_501.json
+2026-09-25T02:47:51-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:47:51 - "POST /plugins/games/decoder-session-log?report=%7B%22schema%22%3A%22privyhub_native_decoder_session_v2%22%2C%22client_profiler_version%22%3A%220.12.3%22%2C%22duration_ms%22%3A26546%2C%22host_alpha%22%3A%220.7
+2026-09-25T02:47:52-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:47:52 - "POST /plugins/games/native-stream-stop HTTP/1.1" 200 -
+2026-09-25T02:47:55-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:47:55 - "POST /plugins/games/stop HTTP/1.1" 200 -
+2026-09-25T02:47:55-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:47:55 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-25T02:48:15-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:48:15 - "POST /plugins/games/stop HTTP/1.1" 200 -
+2026-09-25T02:48:17-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:48:17 - "POST /plugins/games/launch?id=game_ps1_b0a5986638f61a11 HTTP/1.1" 200 -
+2026-09-25T02:48:20-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:48:20 - "GET /sources HTTP/1.1" 200 -
+2026-09-25T02:48:31-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:48:31 - "POST /plugins/games/native-stream-start?port=48100 HTTP/1.1" 200 -
+2026-09-25T02:48:34-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:48:34 - "POST /plugins/games/native-stream-ready HTTP/1.1" 200 -
+2026-09-25T02:48:34-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:48:34 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-25T02:48:34-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:48:34 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-25T02:48:39-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:48:39 - "POST /plugins/games/c3-validated-bitrate-transition?target=6000 HTTP/1.1" 200 -
+2026-09-25T02:48:42-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:48:42 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-25T02:48:43-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:48:43 - "POST /plugins/games/c3-recovery-restart HTTP/1.1" 200 -
+2026-09-25T02:48:43-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:48:43 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-25T02:48:57-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:48:57 - "POST /plugins/games/c3-validated-bitrate-transition?target=7000 HTTP/1.1" 200 -
+2026-09-25T02:49:01-04:00 PrivyHub python3[568810]: Native decoder session log: logs/games/decoder_sessions/native_decoder_20260925_064901_988.json
+2026-09-25T02:49:01-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:49:01 - "POST /plugins/games/decoder-session-log?report=%7B%22schema%22%3A%22privyhub_native_decoder_session_v2%22%2C%22client_profiler_version%22%3A%220.12.3%22%2C%22duration_ms%22%3A32390%2C%22host_alpha%22%3A%220.7
+2026-09-25T02:49:03-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:49:03 - "POST /plugins/games/native-stream-stop HTTP/1.1" 200 -
+2026-09-25T02:49:06-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:49:06 - "POST /plugins/games/stop HTTP/1.1" 200 -
+2026-09-25T02:49:06-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:49:06 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-25T02:49:26-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:49:26 - "POST /plugins/games/stop HTTP/1.1" 200 -
+2026-09-25T02:49:27-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:49:27 - "POST /plugins/games/launch?id=game_ps1_b0a5986638f61a11 HTTP/1.1" 200 -
+2026-09-25T02:49:30-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:49:30 - "GET /sources HTTP/1.1" 200 -
+2026-09-25T02:49:41-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:49:41 - "POST /plugins/games/native-stream-start?port=48100 HTTP/1.1" 200 -
+2026-09-25T02:49:44-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:49:44 - "POST /plugins/games/native-stream-ready HTTP/1.1" 200 -
+2026-09-25T02:49:45-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:49:45 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-25T02:49:45-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:49:45 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-25T02:49:49-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:49:49 - "POST /plugins/games/c3-validated-bitrate-transition?target=5500 HTTP/1.1" 200 -
+2026-09-25T02:49:52-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:49:52 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-25T02:49:53-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:49:53 - "POST /plugins/games/c3-recovery-restart HTTP/1.1" 200 -
+2026-09-25T02:49:53-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:49:53 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-25T02:50:07-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:50:07 - "POST /plugins/games/c3-validated-bitrate-transition?target=7000 HTTP/1.1" 200 -
+2026-09-25T02:50:12-04:00 PrivyHub python3[568810]: Native decoder session log: logs/games/decoder_sessions/native_decoder_20260925_065012_011.json
+2026-09-25T02:50:12-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:50:12 - "POST /plugins/games/decoder-session-log?report=%7B%22schema%22%3A%22privyhub_native_decoder_session_v2%22%2C%22client_profiler_version%22%3A%220.12.3%22%2C%22duration_ms%22%3A32346%2C%22host_alpha%22%3A%220.7
+2026-09-25T02:50:14-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:50:14 - "POST /plugins/games/native-stream-stop HTTP/1.1" 200 -
+2026-09-25T02:50:16-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:50:16 - "POST /plugins/games/stop HTTP/1.1" 200 -
+2026-09-25T02:50:16-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:50:16 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-25T02:50:36-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:50:36 - "POST /plugins/games/stop HTTP/1.1" 200 -
+2026-09-25T02:50:38-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:50:38 - "POST /plugins/games/launch?id=game_ps1_b0a5986638f61a11 HTTP/1.1" 200 -
+2026-09-25T02:50:41-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:50:41 - "GET /sources HTTP/1.1" 200 -
+2026-09-25T02:50:51-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:50:51 - "POST /plugins/games/native-stream-start?port=48100 HTTP/1.1" 200 -
+2026-09-25T02:50:54-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:50:54 - "POST /plugins/games/native-stream-ready HTTP/1.1" 200 -
+2026-09-25T02:50:55-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:50:55 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-25T02:50:55-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:50:55 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-25T02:51:00-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:51:00 - "POST /plugins/games/c3-validated-bitrate-transition?target=5000 HTTP/1.1" 200 -
+2026-09-25T02:51:03-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:51:03 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-25T02:51:04-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:51:04 - "POST /plugins/games/c3-recovery-restart HTTP/1.1" 200 -
+2026-09-25T02:51:04-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:51:04 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-25T02:51:17-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:51:17 - "POST /plugins/games/c3-validated-bitrate-transition?target=7000 HTTP/1.1" 200 -
+2026-09-25T02:51:22-04:00 PrivyHub python3[568810]: Native decoder session log: logs/games/decoder_sessions/native_decoder_20260925_065122_519.json
+2026-09-25T02:51:22-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:51:22 - "POST /plugins/games/decoder-session-log?report=%7B%22schema%22%3A%22privyhub_native_decoder_session_v2%22%2C%22client_profiler_version%22%3A%220.12.3%22%2C%22duration_ms%22%3A32361%2C%22host_alpha%22%3A%220.7
+2026-09-25T02:51:25-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:51:25 - "POST /plugins/games/native-stream-stop HTTP/1.1" 200 -
+2026-09-25T02:51:26-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:51:26 - "POST /plugins/games/stop HTTP/1.1" 200 -
+2026-09-25T02:51:26-04:00 PrivyHub python3[568810]: <ipv4> - 25/Sep/2026 02:51:26 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -

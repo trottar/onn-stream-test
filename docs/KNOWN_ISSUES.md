@@ -874,7 +874,129 @@ Full record: `investigations/2026-09-07-udp-transport.md`.
   the zero-input range; play does not raise it.** The 2026-09-20 ~23 / min
   is the outlier. Still open, still not investigated. Record:
   `docs/memory/evidence/C3_L3A_S1_TRANSITION_SOAK_2026-09-24.md` (item F).
+- **The `C3.L3a` rerun sessions, 2026-09-24, under play**: session 1 (run
+  `20260924_115810`) 15 → 3,868 over ~17.2 min, **~225 / min**, inside
+  the zero-input band; session 2 (run `20260924_130016`) **1 → 60** over
+  ~15.5 min (run start to state write), **~3.8 / min**: ~60× lower than
+  session 1 and below every zero-input session, on the same build, host
+  and day, about an hour apart. `bad_packets` 0 in both. Recorded as a
+  fact; no cause proposed. Record:
+  `docs/memory/evidence/C3_L3A_R2_SESSION2_2026-09-24.md`.
+- **Session 3** (run `20260924_151953`, under play): **0 → 95** over
+  ~16.9 min (run start to state write; the counter started at 0 after the
+  companion's 18:00:52Z restart), **~5.6 / min**, `bad_packets` 0 — near
+  session 2, below every zero-input session. Record:
+  `docs/memory/evidence/C3_L3A_R3_SESSION3_2026-09-24.md`.
+
+  | session | run | lost / min | `bad_packets` |
+  | --- | --- | ---: | ---: |
+  | rerun 1 | `20260924_115810` | ~225 | 0 |
+  | rerun 2 | `20260924_130016` | ~3.8 | 0 |
+  | rerun 3 | `20260924_151953` | ~5.6 | 0 |
+- **LOCATED 2026-09-24 (`CTRL-L1`): PATH.** Three plain 20-min holds
+  (cold, warm, warm) read +171 / +266 / +301 lost (9-15/min). Over the
+  same holds every host-side counter read +0: the controller socket's
+  `drops`, Udp RcvbufErrors / InErrors, softnet dropped, NIC rx_dropped /
+  missed / fifo / errors. So did every Opal interface counter. The onn's
+  UDP stack sent everything (SndbufErrors +0).
+  - **Where the datagrams go missing**: between the onn's UDP stack and
+    the host's NIC, the stretch `T3` located the reverse audio loss in.
+  - **What the counter counts**: sequence gaps on one global sequence
+    over the four player datagrams of each tick. A reordered pair counts
+    2, and a client send error counts 1.
+  - **Most of it is true non-arrival.** The per-player lower bound puts
+    85-95 % of it there in the high-loss sessions, and ≥ 40-67 % in
+    these holds.
+  - **The capture was not run** (no tcpdump, no root).
+  - **The swing between low (≤ 15/min) and high (200-650/min) regimes is
+    not explained.** The client's send rate is the same in both
+    (~25,960/min).
+  - Status: **located, not fixed**; nothing to fix on the host. Record:
+    `docs/memory/evidence/CTRL_L1_CONTROLLER_LOSS_LOCATION_2026-09-24.md`.
 <!-- PRIVYHUB_CONTROLLER_LOST_PACKETS_UNDER_PLAY:KNOWN_ISSUES:END -->
+
+<!-- PRIVYHUB_DECODER_REPORT_OVER_SIZE_CAP:KNOWN_ISSUES:BEGIN -->
+## 2026-09-24 end-of-session decoder report not received after BACK (session 2): rejected as too large — MITIGATED 2026-09-24 (cap 48,000), RUNTIME VALIDATED 2026-09-24 (session 3)
+
+- **What happened.** `C3.L3a` rerun session 2 (run `20260924_130016`)
+  ended with BACK at ~17:16:42Z. The client **did** post its decoder
+  session report: `POST /plugins/games/decoder-session-log?report=…` at
+  17:16:42.799Z. The companion answered **HTTP 400**, stored nothing, and
+  logged nothing beyond the access line. Then the client's
+  `native-stream-stop` (17:16:45.8Z) and `/plugins/games/stop`
+  (17:16:47.9Z) went through normally.
+- **Why.** `companion/games/decoder_session_log.py` refuses a report whose
+  decoded text is longer than **`MAX_REPORT_CHARS = 32_000`**, and this one
+  was **32,057 characters** (57 over). It was otherwise valid: a JSON
+  object, schema `privyhub_native_decoder_session_v2`, 1,000.8 s, 24
+  `ssrc_change` discontinuities (the run's expected 24). The other three
+  refusals (empty, invalid JSON, not an object) are all false for it. The
+  route turns the `ValueError` into a 400 whose `error` text is sent only in
+  the response body, so the journal shows the status and not the reason.
+  The reason comes from checking the rebuilt report against the source.
+- **Nothing reports the loss.** The client's stop thread
+  (`NativeStreamActivity.kt`, `PrivyHub-Native-Stop`) catches the exception
+  that `httpPost` throws on a non-2xx and swallows it ("Logging must never
+  prevent the existing stop path"). It does not retry, and nothing on the
+  TV or the host shows the loss. The probe's `--finalize` later found "no
+  candidate (0 rejected)".
+- **The report is not lost.** The request line is in the journal (journald
+  split it in two at its line limit). The report is rebuilt byte-exact at
+  `docs/memory/evidence/c3_l3a_r2_2026-09-24/rejected_report_20260924_171642_from_journal.json`.
+  The rebuild is checked by `report_check.py` beside it. It has not been
+  fed to `--finalize`.
+- **It will recur.** Reports without transitions sit at ~25.6K characters.
+  `audio.arrival_holes` (~10K) and `audio.tick_series` (~8K) take most of
+  that. Each SSRC change adds ~270-310 characters
+  (`first_idr_after_discontinuity`, `stream_discontinuities`, the slow
+  events). The S1 soak's 20-transition sessions came within **39, 116 and
+  426 characters** of the cap. Session 1's two halves fit only because an
+  accidental BACK split them (9 + 15). **A pre-registered rerun session
+  (24 transitions in one client session) is expected to exceed the cap
+  every time.** That would take sessions 3 and 4's decoder-axis check
+  (`C3-L2` requirement 4) with it.
+- ~~**Status: open, not fixed.**~~ **MITIGATED 2026-09-24 (`C3-L3A-R2B`).**
+  `MAX_REPORT_CHARS` is now **48,000**. A refused report now leaves one
+  journal line: `WARNING decoder-session-log rejected (400): <reason>;
+  report_chars=<n>`. The companion was restarted through systemd and the
+  adopted profile confirmed. Session 2's report, rebuilt from the journal,
+  was then finalized: 24 = 24, and the decoder axis is done. Record:
+  `docs/memory/evidence/C3_L3A_R2B_REPORT_CAP_2026-09-24.md`. **Runtime
+  validation is PENDING** until a real 24-change session's report is
+  stored (session 3).
+- **RUNTIME VALIDATED 2026-09-24 (`C3-L3A-R3`).** Rerun session 3's
+  24-change report was stored (`native_decoder_20260924_193658_993.json`,
+  POST 200, no WARNING line): 32,435 compact characters, **15,565 under
+  48,000** (it would have been refused at 32,000 by 435). Its URL-encoded
+  value was 51,105 characters (ratio 1.576, request line 51,163 of 65,536
+  bytes), ~9.1K under the transport ceiling. Record:
+  `docs/memory/evidence/C3_L3A_R3_SESSION3_2026-09-24.md`. **Mitigated and
+  validated; the body-POST follow-up below stays open.**
+- **The transport's own ceiling remains: ~41.4K decoded characters.** The
+  report travels URL-encoded in the request target (~1.58 encoded
+  characters per decoded one), and `http.server` refuses a request line
+  over 65,536 bytes before any handler runs. So 48,000 never refuses what
+  the transport can carry, but a report over ~41.4K would still be lost.
+  Past that ceiling nothing is logged cleanly: the 414 path calls the
+  companion's `log_message` override before `self.path` exists. That
+  raises an `AttributeError` traceback in the journal, no 414 is sent, and
+  the client sees an empty response and swallows it. This was checked on a
+  throwaway server of the same shape, not on the companion. A 24-change
+  session is ~32K, so there is ~9K (~30 more SSRC changes) of room.
+- **Follow-up, open: the client posts the report as a request body**
+  (`NativeStreamActivity.kt`, stop thread, instead of `?report=`). The
+  companion route would then read the body. This lifts the transport
+  ceiling, and it is a client change (new APK). Also open, low cost: the
+  client could log or surface a non-2xx on the report post instead of
+  swallowing it.
+- **Body-POST follow-up DONE on a comparison path, 2026-09-25 (`CL-B1`).**
+  - The companion accepts the report as a POST body; the target form is
+    unchanged. The cap is 128,000.
+  - The 414-path `log_message` crash is fixed: a 414 is now sent.
+  - The arm client posts the body. **It is not adopted**: the installed
+    APK still uses the target form.
+  - Record: `docs/memory/evidence/CL_B1_DECODER_REPORT_BODY_2026-09-25.md`.
+<!-- PRIVYHUB_DECODER_REPORT_OVER_SIZE_CAP:KNOWN_ISSUES:END -->
 
 ## 2026-09-23 — open after the `D-BASE` close-out (baseline MET)
 

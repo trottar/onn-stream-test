@@ -1,0 +1,27 @@
+[SB 02:59:33Z] mode=H hold/timeout=180s probe_args=none heartbeat_ms=default
+[SB 02:59:33Z] FEC_ARM B; PRIVYHUB_* in the user manager: ''
+[SB 02:59:38Z] companion MainPID 484924 serving 8765; PRIVYHUB_* in its environ: ''
+[SB] before launch: FEC_ARM B fec.version xor8_1 q_parity_packets 0 any_override False cap 90000 profile cushion 12 17 profile redundancy 2 4 profile -> AS EXPECTED FOR THE ARM
+[SB] at PLAYING: FEC_ARM B fec.version xor8_1 q_parity_packets 0 any_override False cap 90000 profile cushion 12 17 profile redundancy 2 4 profile -> AS EXPECTED FOR THE ARM
+[SB 03:00:20Z] PLAYING at 2026-09-25T03:00:20Z; holding 180s, zero input
+[SB 03:03:20Z] adb client processes seen during hold: 0 (# polls 349)
+[SB 03:03:23Z] report: native_decoder_20260925_030322_537.json
+[frames] 181 seconds in the session window
+[heartbeat] 90 lines
+[SB 03:03:45Z] game active after stop: False
+[SB 03:03:45Z] done
+SB exit 0
+[SA 03:03:45Z] mode=H hold/timeout=180s probe_args=none heartbeat_ms=default
+[SA 03:03:46Z] FEC_ARM A; PRIVYHUB_* in the user manager: 'PRIVYHUB_FEC_SCHEME=xor8_2'
+[SA 03:03:50Z] companion MainPID 487079 serving 8765; PRIVYHUB_* in its environ: 'PRIVYHUB_FEC_SCHEME=xor8_2'
+[SA] before launch: FEC_ARM A fec.version xor8_2 q_parity_packets 0 any_override True cap 90000 profile cushion 12 17 profile redundancy 2 4 profile -> AS EXPECTED FOR THE ARM
+[SA] at PLAYING: FEC_ARM A fec.version xor8_2 q_parity_packets 704 any_override True cap 90000 profile cushion 12 17 profile redundancy 2 4 profile -> AS EXPECTED FOR THE ARM
+[SA 03:04:29Z] PLAYING at 2026-09-25T03:04:29Z; holding 180s, zero input
+[SA 03:07:29Z] adb client processes seen during hold: 0 (# polls 348)
+[SA 03:07:31Z] report: native_decoder_20260925_030731_311.json
+[frames] 181 seconds in the session window
+[heartbeat] 90 lines
+[SA 03:07:54Z] game active after stop: False
+[SA 03:07:54Z] done
+SA exit 0
+smoke done

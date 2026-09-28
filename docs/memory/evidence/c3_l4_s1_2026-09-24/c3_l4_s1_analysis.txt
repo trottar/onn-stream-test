@@ -1,0 +1,66 @@
+C3-L4-S1 shadow night -- read-only scoring
+shadow log lines 1048, t2 rows 974
+
+== H1: 2026-09-24T22:05:13Z .. 2026-09-24T22:25:13Z (hold 1200 s), report native_decoder_20260924_222515_876.json
+   spikes_20_per_min                  31.53  target < 200    PASS
+   rendered_fps                       59.93  target >= 59.5  PASS
+   stale_output_drops_per_min          0.94  target < 20     PASS
+   video_lost_per_min_post_fec         9.17  target < 10     PASS
+   audio_underruns_per_min             0.40  target < 5      PASS
+   max_output_gap_ms                    175  (transport row; bound <= 250)
+   duration 20.17 min; audio underruns total 8; ssrc_changes 0
+   -> HEALTHY by the close-out target rows
+   onn cpu-thermal 61.6-69.9 C, warm (>= 67.5) share 58 %
+   shadow lines in hold 163: would-acts 0 (FALLBACK 0, ROUTINE 0, up 0), oscillation holds 0, TELEMETRY_STALE entries 0
+   state changes: {'REFERENCE/no_evidence': 59, 'REFERENCE/clean': 78, 'PRESSURE/pressure_sample': 26}
+   acted true anywhere: False
+   status at end of hold: mode shadow, state REFERENCE, reason clean, reports_evaluated 602, would_act {'FALLBACK': 0, 'ROUTINE': 0, 'INCREASE': 0}, suppressed {'blackout': 0, 'hold_down': 0, 'floor': 0, 'oscillation': 0, 'routine_hold_down': 0}, stale events 0, telemetry_age_ms 524, acted False
+
+== H2: 2026-09-24T22:26:23Z .. 2026-09-24T22:46:23Z (hold 1200 s), report native_decoder_20260924_224625_587.json
+   spikes_20_per_min                  24.41  target < 200    PASS
+   rendered_fps                       59.91  target >= 59.5  PASS
+   stale_output_drops_per_min          0.84  target < 20     PASS
+   video_lost_per_min_post_fec         8.80  target < 10     PASS
+   audio_underruns_per_min             0.75  target < 5      PASS
+   max_output_gap_ms                    123  (transport row; bound <= 250)
+   duration 20.12 min; audio underruns total 15; ssrc_changes 0
+   -> HEALTHY by the close-out target rows
+   onn cpu-thermal 67.4-70.0 C, warm (>= 67.5) share 99 %
+   shadow lines in hold 163: would-acts 0 (FALLBACK 0, ROUTINE 0, up 0), oscillation holds 0, TELEMETRY_STALE entries 0
+   state changes: {'REFERENCE/no_evidence': 58, 'REFERENCE/clean': 77, 'PRESSURE/pressure_sample': 28}
+   acted true anywhere: False
+   status at end of hold: mode shadow, state REFERENCE, reason clean, reports_evaluated 600, would_act {'FALLBACK': 0, 'ROUTINE': 0, 'INCREASE': 0}, suppressed {'blackout': 0, 'hold_down': 0, 'floor': 0, 'oscillation': 0, 'routine_hold_down': 0}, stale events 0, telemetry_age_ms 1478, acted False
+
+== H3: 2026-09-24T22:47:31Z .. 2026-09-24T23:47:31Z (hold 3600 s), report native_decoder_20260924_234733_439.json
+   spikes_20_per_min                  27.38  target < 200    PASS
+   rendered_fps                       59.94  target >= 59.5  PASS
+   stale_output_drops_per_min          0.32  target < 20     PASS
+   video_lost_per_min_post_fec         7.70  target < 10     PASS
+   audio_underruns_per_min             0.65  target < 5      PASS
+   max_output_gap_ms                    199  (transport row; bound <= 250)
+   duration 60.12 min; audio underruns total 39; ssrc_changes 0
+   -> HEALTHY by the close-out target rows
+   onn cpu-thermal 67.5-70.1 C, warm (>= 67.5) share 100 %
+   shadow lines in hold 523: would-acts 0 (FALLBACK 0, ROUTINE 0, up 0), oscillation holds 0, TELEMETRY_STALE entries 0
+   state changes: {'REFERENCE/no_evidence': 185, 'REFERENCE/clean': 250, 'PRESSURE/pressure_sample': 88}
+   acted true anywhere: False
+   status at end of hold: mode shadow, state REFERENCE, reason clean, reports_evaluated 1796, would_act {'FALLBACK': 0, 'ROUTINE': 0, 'INCREASE': 0}, suppressed {'blackout': 0, 'hold_down': 0, 'floor': 0, 'oscillation': 0, 'routine_hold_down': 0}, stale events 0, telemetry_age_ms 331, acted False
+
+== H4: 2026-09-24T23:48:39Z .. 2026-09-25T00:08:39Z (hold 1200 s), report native_decoder_20260925_000841_466.json
+   spikes_20_per_min                  29.22  target < 200    PASS
+   rendered_fps                       59.91  target >= 59.5  PASS
+   stale_output_drops_per_min          0.70  target < 20     PASS
+   video_lost_per_min_post_fec         8.99  target < 10     PASS
+   audio_underruns_per_min             0.60  target < 5      PASS
+   max_output_gap_ms                    153  (transport row; bound <= 250)
+   duration 20.12 min; audio underruns total 12; ssrc_changes 0
+   -> HEALTHY by the close-out target rows
+   onn cpu-thermal 68.0-70.1 C, warm (>= 67.5) share 100 %
+   shadow lines in hold 187: would-acts 0 (FALLBACK 0, ROUTINE 0, up 0), oscillation holds 0, TELEMETRY_STALE entries 0
+   state changes: {'REFERENCE/no_evidence': 61, 'REFERENCE/clean': 90, 'PRESSURE/pressure_sample': 36}
+   acted true anywhere: False
+   status at end of hold: mode shadow, state REFERENCE, reason clean, reports_evaluated 600, would_act {'FALLBACK': 0, 'ROUTINE': 0, 'INCREASE': 0}, suppressed {'blackout': 0, 'hold_down': 0, 'floor': 0, 'oscillation': 0, 'routine_hold_down': 0}, stale events 0, telemetry_age_ms 1728, acted False
+
+== READING (pre-registered)
+holds scored 4; healthy 4 (H1, H2, H3, H4); FALLBACK/ROUTINE would-acts on healthy holds 0, on the others 0
+-> SILENT on the 4 healthy hold(s)

@@ -1,0 +1,65 @@
+PrivyHub UDP transport laboratory - kernel timestamp comparison
+
+Host successful sends: 4000
+Android current-run unique arrivals: 3972
+Host successes missing on Android: 28
+Android duplicates: 0 (same stamp 0, conflicting stamp 0)
+Android foreign/stale arrivals: 0
+
+Matched consecutive sequence intervals: 3944
+Kernel-timestamp matched intervals: 3944
+Host send avg/max ms: 4.9999965618661255 / 5.250068
+Android app arrival avg/max ms: 4.987643619168357 / 27.118482
+Android kernel arrival avg/max ms: 4.989719600659229 / 27.720741
+
+Host 4-6 ms -> app <2 ms: 152
+Host 4-6 ms -> app >=20 ms: 10
+Host 4-6 ms -> kernel <2 ms: 152
+Host 4-6 ms -> kernel >=20 ms: 9
+
+App-minus-kernel interval delta p50/p95/p99/max-abs ms: -0.012203999999999882 / 0.2859019500000001 / 0.7448560100000005 / 17.470185999999998
+
+Host send histogram:
+{
+  "10_to_15_ms": 0,
+  "15_to_20_ms": 0,
+  "1_to_2_ms": 0,
+  "20_to_30_ms": 0,
+  "2_to_4_ms": 0,
+  "4_to_6_ms": 3944,
+  "6_to_10_ms": 0,
+  "ge_30_ms": 0,
+  "lt_1_ms": 0,
+  "lt_2_ms_total": 0
+}
+
+Android app-arrival histogram:
+{
+  "10_to_15_ms": 4,
+  "15_to_20_ms": 5,
+  "1_to_2_ms": 93,
+  "20_to_30_ms": 10,
+  "2_to_4_ms": 1410,
+  "4_to_6_ms": 1324,
+  "6_to_10_ms": 1039,
+  "ge_30_ms": 0,
+  "lt_1_ms": 59,
+  "lt_2_ms_total": 152
+}
+
+Android kernel-arrival histogram:
+{
+  "10_to_15_ms": 4,
+  "15_to_20_ms": 5,
+  "1_to_2_ms": 97,
+  "20_to_30_ms": 9,
+  "2_to_4_ms": 1254,
+  "4_to_6_ms": 1472,
+  "6_to_10_ms": 1048,
+  "ge_30_ms": 0,
+  "lt_1_ms": 55,
+  "lt_2_ms_total": 152
+}
+
+Host perf_counter_ns, Android elapsedRealtimeNanos, and kernel SO_TIMESTAMPNS have unrelated epochs. All cross-layer comparisons therefore use sequence-correlated interval deltas. app_minus_kernel_interval_ms shows how much additional interval distortion appears between kernel timestamping and post-recv userspace observation.
+

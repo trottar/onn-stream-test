@@ -1,0 +1,60 @@
+PrivyHub reverse UDP transport laboratory - Android sender / Windows receiver
+
+Android successful sends: 4000
+Windows unique arrivals: 4000
+Sender successes missing on Windows: 0
+Windows duplicates: 1 (same stamp 1, conflicting stamp 0)
+Windows foreign/stale arrivals: 0
+
+Matched consecutive intervals: 3999
+Android send-completion avg/max ms: 4.998174207301825 / 34.158666
+Android call-start avg/max ms: 4.999998885721431 / 34.360074
+Windows receive avg/max ms: 4.998059382345587 / 35.388549
+Android 4-6 ms -> Windows <2 ms: 52
+Android 4-6 ms -> Windows >=20 ms: 1
+
+Receive-minus-send abs p95/p99/max ms: 1.707059099999999 / 4.855664260000001 / 28.335586
+
+Android send-completion histogram:
+{
+  "10_to_15_ms": 4,
+  "15_to_20_ms": 5,
+  "1_to_2_ms": 103,
+  "20_to_30_ms": 7,
+  "2_to_4_ms": 64,
+  "4_to_6_ms": 3678,
+  "6_to_10_ms": 89,
+  "ge_30_ms": 2,
+  "lt_1_ms": 47,
+  "lt_2_ms_total": 150
+}
+
+Android call-start histogram:
+{
+  "10_to_15_ms": 4,
+  "15_to_20_ms": 5,
+  "1_to_2_ms": 102,
+  "20_to_30_ms": 7,
+  "2_to_4_ms": 38,
+  "4_to_6_ms": 3719,
+  "6_to_10_ms": 75,
+  "ge_30_ms": 2,
+  "lt_1_ms": 47,
+  "lt_2_ms_total": 149
+}
+
+Windows receive histogram:
+{
+  "10_to_15_ms": 14,
+  "15_to_20_ms": 7,
+  "1_to_2_ms": 100,
+  "20_to_30_ms": 8,
+  "2_to_4_ms": 211,
+  "4_to_6_ms": 3326,
+  "6_to_10_ms": 232,
+  "ge_30_ms": 5,
+  "lt_1_ms": 96,
+  "lt_2_ms_total": 196
+}
+
+Android elapsedRealtimeNanos and Windows perf_counter_ns have unrelated epochs. Cross-device comparisons therefore use sequence-correlated interval deltas. Primary transport distortion uses Android nonblocking DatagramChannel send completion (send_done_ns). Call-start timing is retained separately for sender scheduler and blocking-call analysis.

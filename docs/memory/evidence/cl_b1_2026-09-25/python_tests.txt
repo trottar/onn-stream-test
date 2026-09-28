@@ -1,0 +1,16 @@
+test_body_and_target_forms_store_identical_reports (tools.test_cl_b1_decoder_report_body.BodyFormTests.test_body_and_target_forms_store_identical_reports)
+Rule: a body POST and a target POST of the same report write the same report. ... ok
+test_request_line_over_the_limit_does_not_crash_the_logger (tools.test_cl_b1_decoder_report_body.BodyFormTests.test_request_line_over_the_limit_does_not_crash_the_logger)
+Rule: a request line over 65,536 bytes gets its 414 -- the access log no longer ... ok
+test_service_logs_the_warning_on_a_refused_body (tools.test_cl_b1_decoder_report_body.BodyFormTests.test_service_logs_the_warning_on_a_refused_body)
+Rule: the body branch keeps R2B's WARNING line and says it arrived as a body. ... ok
+test_the_cap_is_the_only_limit (tools.test_cl_b1_decoder_report_body.BodyFormTests.test_the_cap_is_the_only_limit)
+Rule: MAX_REPORT_CHARS (128,000) is the limit; the body bound never refuses ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 1.033s
+
+OK
+Native decoder session log: logs/games/decoder_sessions/native_decoder_20260925_071747_041.json
+Native decoder session log: logs/games/decoder_sessions/native_decoder_20260925_071747_052.json
+Native decoder session log: logs/games/decoder_sessions/native_decoder_20260925_071748_066.json

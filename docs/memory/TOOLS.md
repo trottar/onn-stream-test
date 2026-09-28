@@ -101,6 +101,10 @@ adb shell input keyevent KEYCODE_BACK
 The tap coordinates are the preview's centre on the 1920x1080 launcher
 layout; confirm with `uiautomator dump` if the layout changes. BACK posts
 the decoder session report and stops the stream; never force-stop to exit.
+The companion stores a report of up to 48,000 decoded characters (`C3-L3A-R2B`; the URL-encoded
+request line caps it at ~41.4K in practice). A refused one leaves
+`WARNING decoder-session-log rejected (400): <reason>; report_chars=<n>` in the journal; the client
+shows nothing, so after a session check the journal for that line or for `Native decoder session log:`.
 
 **Wake the device and open the launcher immediately before the tap.** The
 TV's screensaver (`com.google.android.apps.tv.dreamx`) takes over an idle
@@ -859,9 +863,21 @@ bitrate's session once. See `docs/KNOWN_ISSUES.md`.
   written) and **`--decoder <native_decoder_*.json>`** names the decoder
   session; without `--decoder` it takes the *earliest* session posted after
   the run with enough SSRC changes (Phase A + parks + restores), never the
-  newest. Writes `logs/streaming/c3_l3a_runs/<run_id>.{json,txt}` and the
+  newest. **Split sessions** (`C3-L3A-R1`): if no one session has enough,
+  it takes the sessions posted after the run's start, in order, whose
+  `ssrc_changes` *sum* to the expected count (or several named with
+  `--decoder a.json b.json`), aligns each on its own fires, checks each mark
+  in the session that covers it, and prints a CLIENT RESTARTS section and
+  the sessions' close-out rows side by side; a sum that does not match is
+  stated and the decoder axis skipped. **An accidental BACK mid-run splits
+  the client session; the run stays valid and `--finalize` now scores it.**
+  Writes `logs/streaming/c3_l3a_runs/<run_id>.{json,txt}` and the
   latest-run `c3_l3a_gameplay_acceptance.{json,txt}` (`logs/` is gitignored:
-  copy what a record cites). Preflight refuses a run if telemetry is not
+  copy what a record cites). **Every run also keeps its state** at
+  `c3_l3a_runs/states/<run_id>_state.json` (outside `--aggregate`'s glob);
+  the shared `c3_l3a_gameplay_acceptance_state.json` is overwritten by the
+  next run. `--finalize` without `--state` uses the newest copy when the
+  shared file holds a different, older run. Preflight refuses a run if telemetry is not
   fresh or the 12 s settling budget is under three client intervals.
   **`--aggregate` pools only pre-registered runs** (`C3-L3A-P2R3`): v2 state
   and config = `PREREGISTERED_CONFIG` (10 traversals, dwell 55-90 s, W 5.0,
@@ -874,6 +890,122 @@ bitrate's session once. See `docs/KNOWN_ISSUES.md`.
   `Classification:` convention, and non-blocking mark capture. **Existing
   checkout probes are deliberately not migrated to it**; other probes grep
   their reports for exact substrings, so that is its own work item.
+
+## The FEC comparison arm `xor8_2` (C4-M1) — never leave it set
+
+`PRIVYHUB_FEC_SCHEME=xor8_2`, read by the relay at stream start. The relay
+keeps sending the v1 XOR parity byte for byte and adds a v2 Reed-Solomon Q
+parity datagram per group (`companion/native_fec_rs.py`). The client decodes
+it only in an APK that has `FecRs82.kt`.
+
+- **Unset** (or `xor8_1`) is the adopted scheme. Any other value reads
+  `xor8_1`, flagged `env_ignored`.
+- **While it is set**, `encoder_overrides.any_override` reads true and
+  `fec.version` reads `xor8_2`.
+
+```bash
+systemctl --user set-environment PRIVYHUB_FEC_SCHEME=xor8_2 && systemctl --user restart privyhub-companion
+systemctl --user unset-environment PRIVYHUB_FEC_SCHEME && systemctl --user restart privyhub-companion
+```
+
+- **Tests**: `python3 -m unittest tools/test_fec_xor8_2.py -v` (the codec,
+  plus the golden check that the unset relay's bytes are unchanged), and
+  `cd PrivyHub && sh ./gradlew :app:testDebugUnitTest --tests
+  'com.safeiot.privyhub.streaming.FecRs82Test'`.
+- **The adopted APK** `f31b1c18…8ae7` is kept at
+  `runtime/c4_m1/adopted_app-debug.apk`, and the arm APK at
+  `runtime/c4_m1/arm_app-debug.apk`.
+
+## The decoder report route's two forms (CL-B1)
+
+`POST /plugins/games/decoder-session-log` takes two forms:
+
+- **body**: JSON, or a form's `report`. The journal shows
+  `decoder-session-log received as body: report_chars=<n>`. This is what
+  the arm client sends.
+- **`?report=`**: the target form, which the adopted APK sends. It is
+  capped at ~41K by the request line.
+
+`MAX_REPORT_CHARS` is 128,000. A refused report logs `WARNING
+decoder-session-log rejected (400)`.
+
+Tests: `python3 -m unittest tools/test_cl_b1_decoder_report_body.py -v`.
+The arm APK is kept at `runtime/cl_b1/arm2_app-debug.apk`.
+
+## Recovery's restart at any ladder level (C3-F1)
+
+`NativeStreamManager.recovery_restart_encoder()` is what link-drop recovery
+calls.
+
+- At 7000 it is the `C3.L1` continuity cycle, unchanged.
+- Off 7000 it restarts the encoder at the active level.
+- To exercise it without link loss, use the loopback-only route (stream
+  active):
+  `curl -s -X POST localhost:8765/plugins/games/c3-recovery-restart`.
+- The continuity route `c3-actuator-continuity-cycle` still refuses off
+  7000, by design.
+- Tests: `python3 -m unittest tools/test_c3_f1_recovery_restart.py -v`.
+
+## The D7 regression script (D7-R1)
+
+`python3 tools/d7_regression.py --out <dir> --pass-label P1` runs one pass,
+one row per D7 item: PASS / FAIL / NEEDS USER / VALIDATED (cited).
+
+- It restarts the companion through the unit, cold-starts the app and runs
+  the D136 media probe.
+- It launches Tekken 3 and reaches PLAYING through RESUME PLAYING, then
+  holds 3 minutes.
+- Pause/resume is BACK then RESUME PLAYING; there is no pause route.
+- Save/Load uses **scratch slot 3**, which must be empty. The slot index and
+  the slot-0 `.state` are backed up and restored, and the other state files
+  are hashed before and after.
+- It reads the cheat and mod state (the routes are POST-only), then runs
+  End: BACK, the report, `POST stop`, and a banner check. The cheat count
+  is summed over `sources[i].cheat_count` (fixed in D7-R2), and
+  `active-cheats` needs a game active, as it is within a pass.
+- Recovery is cited, not re-run.
+- Wake the onn first; the harness does.
+
+## The onn's screensaver ends diagnostic activities (D6-R1)
+
+The onn dreams (`mWakefulness=Dreaming`) 600 s after the last input, and
+the dream takes the foreground. Any diagnostic activity still running is
+ended: the UDP probe activities, and a stream too. **Wake it first**:
+
+```bash
+adb shell input keyevent KEYCODE_WAKEUP
+adb shell dumpsys power | grep -m1 mWakefulness=    # Awake
+```
+
+`p9_run.sh`-derived harnesses already do this before each launch. The
+D6-R1 runner does too (`evidence/d6_r1_2026-09-24/d6_r1_run.sh`).
+
+## The shadow adaptive-bitrate controller (C3-L4-S1) — never leave the flag set
+
+`companion/adaptive_bitrate.py`. **It never acts in any mode.** Its state
+is at `native-stream-status` → `adaptive_bitrate`
+(`privyhub_adaptive_bitrate_v1`).
+
+- **Modes.** Unset, `off` or any unknown value → `mode: off`: nothing is
+  evaluated or logged. `shadow` evaluates every fresh client report and
+  logs decisions and state changes to
+  `logs/games/adaptive_bitrate_shadow.jsonl` (4 MiB × 3 into
+  `stream_log_archive/`). There is no other mode.
+- **Commands, for a shadow run only:**
+
+```bash
+systemctl --user set-environment PRIVYHUB_ADAPTIVE_BITRATE_MODE=shadow
+systemctl --user restart privyhub-companion        # the mode is read at startup
+# ... holds ...
+systemctl --user unset-environment PRIVYHUB_ADAPTIVE_BITRATE_MODE
+systemctl --user restart privyhub-companion
+tr '\0' '\n' < /proc/$(systemctl --user show -p MainPID --value privyhub-companion)/environ | grep -c PRIVYHUB_   # must be 0
+```
+
+- **Tests**: `python3 -m unittest tools/test_adaptive_bitrate_shadow.py -v`
+  (21 tests).
+- **Harness**: `evidence/c3_l4_s1_2026-09-24/c3_l4_s1_night.sh`. It unsets
+  the flag on every exit path.
 
 ## Linux subsystem probes
 

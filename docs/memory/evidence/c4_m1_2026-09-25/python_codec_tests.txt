@@ -1,0 +1,23 @@
+test_every_single_loss_recovers_from_q_when_p_is_lost (tools.test_fec_xor8_2.CodecTests.test_every_single_loss_recovers_from_q_when_p_is_lost)
+Rule: one data packet and its P lost -> Q alone recovers it (all groups, all positions). ... ok
+test_every_two_loss_pattern_recovers (tools.test_fec_xor8_2.CodecTests.test_every_two_loss_pattern_recovers)
+Rule: any two data packets of a group lost (consecutive or not) -> P + Q recover both. ... ok
+test_gf_field (tools.test_fec_xor8_2.CodecTests.test_gf_field)
+Rule: GF(256) with 0x11d: every non-zero element has an inverse; g generates. ... ok
+test_golden_unset_bytes_unchanged (tools.test_fec_xor8_2.CodecTests.test_golden_unset_bytes_unchanged)
+Rule: scheme unset -> the relay's datagrams equal the unmodified relay's (golden). ... ok
+test_p_parity_is_the_relays (tools.test_fec_xor8_2.CodecTests.test_p_parity_is_the_relays)
+Rule: the reference P equals the relay's v1 parity (so the decoder's inputs are right). ... ok
+test_status_reports_scheme (tools.test_fec_xor8_2.CodecTests.test_status_reports_scheme)
+Rule: the relay's status names the scheme and its source. ... ok
+test_three_losses_are_not_recoverable (tools.test_fec_xor8_2.CodecTests.test_three_losses_are_not_recoverable)
+Rule: three missing packets exceed two parities -- the two-erasure solve over any ... ok
+test_unknown_scheme_is_ignored (tools.test_fec_xor8_2.CodecTests.test_unknown_scheme_is_ignored)
+Rule: an unknown value reads xor8_1, source env_ignored. ... ok
+test_xor8_2_keeps_rtp_and_p_identical (tools.test_fec_xor8_2.CodecTests.test_xor8_2_keeps_rtp_and_p_identical)
+Rule: under xor8_2 the RTP and the v1 parity datagrams are the same bytes, in order; ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.251s
+
+OK

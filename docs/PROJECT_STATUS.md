@@ -415,3 +415,40 @@ is not built on a baseline that is not healthy.
 The remaining Phase C items are automatic bitrate control, adaptive FEC
 disposition, 1080p60 characterization, generalized source abstraction and the
 final Phase C checkpoint.
+
+**C7 status, 2026-09-25 (`C6-D1`)** — each acceptance item and the record it rests on:
+
+| item | status | record |
+| --- | --- | --- |
+| explicit profiles | ✓ | C1 (`native_stream_profiles.py`; cap, cushion, redundancy adopted) |
+| transport telemetry contract | ✓ | C2 (`privyhub_stream_telemetry_v1`, heartbeat v3, decoder report v2) |
+| adaptive bitrate runtime validated | shadow built and SILENT; live gated on the user's `C3.L3a` reading | `C3-L4-S1`; `C3.L3a` sessions 1-3 |
+| adaptive FEC validated or explicitly deferred | decision record (BUILD static k+2 first; adaptive not supported); measured arm `C4-M1`: NOT SHOWN, nothing adopted | `decisions/C4_ADAPTIVE_FEC_2026-09-24.md`, `C4_M1_FEC_ARM_2026-09-25.md` |
+| 1080p60 characterized | open; needs a profile (the user's yes) | — |
+| generalized source contract established | ✓ on paper and as an unused interface | `architecture/NATIVE_SOURCE_CONTRACT.md` (`C6-D1`) |
+| Games regression passes | all 9 scripted rows PASS (D7-R2, fixed script); NEEDS USER rows pending | `D7_R1_LINUX_REGRESSION_2026-09-25.md` |
+| reusable by Phase G remote/WAN | stated in the contract (a remote transport is another `Transport`; nothing implemented) | `architecture/NATIVE_SOURCE_CONTRACT.md` |
+| clean checkpoint/push | pending | — |
+
+**D7 (D7-R1, 2026-09-25).** The native Linux regression was scripted and
+run twice on the adopted build.
+- 8 of 10 rows PASS both times; recovery cited.
+- The profiles row failed only on a script defect. **D7-R2**: the fixed
+  script scored all 9 scripted rows PASS.
+- Controller feel and picture are the user's (NEEDS USER list in
+  `docs/memory/evidence/D7_R1_LINUX_REGRESSION_2026-09-25.md`).
+
+**D6 (D6-R1, 2026-09-24).** The deferred synthetic UDP suite was replayed
+on the production path (host wired → Opal → onn). Duplication and
+burst/gap transformation were NOT REPRODUCED in either direction, so the
+pathology is specific to the old environment (the host's USB Wi-Fi of
+2026-09-15). The D8 row "deferred UDP suite replayed/reclassified" is met
+(`docs/memory/evidence/D6_R1_UDP_SUITE_REPLAY_2026-09-24.md`).
+
+**C4 disposition (C4-D1, 2026-09-24, offline).** The pre-registered rule
+gives **BUILD (static k+2 first)**: a parity-count profile field, not
+adaptive FEC. The rule read the upper bound (+7.7/min recoverable at the
+median against 9.1/min post-FEC loss); the point estimate is ~3.1/min. No
+capacity-pressure column moves with the loss. It is a design task queued
+behind C3, and its first step is a measured arm
+(`docs/memory/decisions/C4_ADAPTIVE_FEC_2026-09-24.md`).

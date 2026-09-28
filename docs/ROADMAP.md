@@ -235,6 +235,11 @@ Required behavior:
 - safe fallback to a known profile;
 - protect latency before image quality: degrade quality before queue growth is allowed to run away.
 
+**C3-F1 (2026-09-25):** recovery's encoder restart is level-preserving at
+every ladder level, measured WORKING at 5000 / 5500 / 6000 / 7000. This is
+the `C3.L4` precondition from `C6-D1` finding 7
+(`docs/memory/evidence/C3_F1_RECOVERY_RESTART_LADDER_2026-09-25.md`).
+
 ## C4 — Adaptive FEC
 
 Only after bitrate adaptation is stable.
@@ -244,6 +249,21 @@ parity during congestion.
 
 If fixed 8+1 remains the better engineering choice, explicitly defer dynamic FEC
 with evidence rather than adding complexity for its own sake.
+
+**C4-D1 (2026-09-24), the pre-registered rule applied to the stored
+adopted-build corpus: BUILD (static k+2 first). Adaptive FEC is not
+supported.** 8+1 leaves ~9.1 lost/min at the median, mostly two-packet gaps
+inside one group. k+2 would restore at most 7.7/min (upper bound), point
+estimate ~3.1, at 32 % parity against 16 %. No load column moves with the
+loss. C4 moves to a design task, queued behind C3; its first step is a
+measured k+2 / 8+1 arm, not an adoption
+(`docs/memory/decisions/C4_ADAPTIVE_FEC_2026-09-24.md`).
+
+**C4-M1 (2026-09-25): the measured arm (8+2, `xor8_2`, behind an override)
+did NOT SHOW a post-FEC gain.** It won 1 of 3 pairs, with the A median at
+69 % of B's. It did recover more, but raised pre-FEC loss 2-3×. The cost
+rows were within noise. Nothing was adopted; the profile stays 8+1
+(`docs/memory/evidence/C4_M1_FEC_ARM_2026-09-25.md`).
 
 ## C5 — 1080p60 capability characterization
 
@@ -301,6 +321,27 @@ Acceptance:
 - Games regression passes;
 - Phase C artifacts are explicitly reusable by future Phase G remote/WAN work without implementing remote transport here;
 - clean checkpoint/push.
+
+**C7 status, 2026-09-25 (`C6-D1`)** — each acceptance item and the record it rests on:
+
+| item | status | record |
+| --- | --- | --- |
+| explicit profiles | ✓ | C1 (`native_stream_profiles.py`; cap, cushion, redundancy adopted) |
+| transport telemetry contract | ✓ | C2 (`privyhub_stream_telemetry_v1`, heartbeat v3, decoder report v2) |
+| adaptive bitrate runtime validated | shadow built and SILENT; live gated on the user's `C3.L3a` reading | `C3-L4-S1`; `C3.L3a` sessions 1-3 |
+| adaptive FEC validated or explicitly deferred | decision record (BUILD static k+2 first; adaptive not supported); measured arm `C4-M1`: NOT SHOWN, nothing adopted | `decisions/C4_ADAPTIVE_FEC_2026-09-24.md`, `C4_M1_FEC_ARM_2026-09-25.md` |
+| 1080p60 characterized | open; needs a profile (the user's yes) | — |
+| generalized source contract established | ✓ on paper and as an unused interface | `architecture/NATIVE_SOURCE_CONTRACT.md` (`C6-D1`) |
+| Games regression passes | all 9 scripted rows PASS (D7-R2, fixed script); NEEDS USER rows pending | `D7_R1_LINUX_REGRESSION_2026-09-25.md` |
+| reusable by Phase G remote/WAN | stated in the contract (a remote transport is another `Transport`; nothing implemented) | `architecture/NATIVE_SOURCE_CONTRACT.md` |
+| clean checkpoint/push | pending | — |
+
+**CL-B1 (2026-09-25):** the client's decoder report can travel as a POST
+body, so the request line is no longer its ceiling. The companion accepts
+both forms and raises the cap to 128,000, and the slow-event rings grew to
+256 + 1,024. Built and tested; the adopted APK is reinstalled; adoption
+waits for the user
+(`docs/memory/evidence/CL_B1_DECODER_REPORT_BODY_2026-09-25.md`).
 
 ---
 
@@ -533,6 +574,15 @@ Classify whether the prior packet timing/duplication pathology was:
 
 Do not reopen beyond evidence.
 
+**D6-R1 (2026-09-24): REPLAYED; NOT REPRODUCED in either direction →
+specific to the old environment.** Three valid runs each way, idle, on the
+host-wired → Opal → onn path:
+- same-stamp duplication 0-4 per run, against 476-2,626 on 2026-09-15;
+- transformation ~14-20× lower; host UDP errors +0.
+
+The 2026-09-15 runs had the host on its USB Wi-Fi adapter.
+(`docs/memory/evidence/D6_R1_UDP_SUITE_REPLAY_2026-09-24.md`)
+
 ## D7 — Native Linux regression
 
 Minimum normal-use regression:
@@ -550,15 +600,28 @@ End/teardown
 restart/recovery
 ```
 
+**D7-R1 (2026-09-25): scripted and run twice** (`tools/d7_regression.py`).
+- 8 of 10 rows PASS in both passes: boot, discovery, media, launch,
+  video/audio/controller (automated part), pause/resume, Save/Load, End.
+- restart/recovery VALIDATED (cited: `R3`-`R3d`, `R3c2`).
+- profiles/cheats/mod state FAIL as scripted, from a script defect; every
+  field read as expected. A next pass scores it directly.
+- **NEEDS USER**: controller feel and picture, a ten-minute list
+  (`docs/memory/evidence/D7_R1_LINUX_REGRESSION_2026-09-25.md`).
+
+**D7-R2 (2026-09-25)**: the fixed script, in one full pass with a game
+active, scored **all 9 scripted rows PASS**, the profiles row included.
+restart/recovery is cited.
+
 ## D8 — Linux baseline checkpoint
 
 Acceptance:
 
 - Linux is sufficient for normal core server operation;
 - PS1-and-below works through Linux-native A/V/input paths;
-- onn client remains functional;
+- onn client remains functional; **met on D7-R1's scripted rows (2026-09-25)**;
 - media/Live TV remain functional;
-- deferred UDP suite replayed/reclassified;
+- deferred UDP suite replayed/reclassified; **met 2026-09-24 (`D6-R1`: not reproduced, specific to the old environment)**;
 - no minimum-hardware claim yet;
 - clean checkpoint/push.
 

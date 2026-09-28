@@ -1,0 +1,226 @@
+{
+  "chance_rate_per_s": 0.028,
+  "cycles": {
+    "jump": 10,
+    "ramp": 30
+  },
+  "files": [
+    {
+      "file": "20260924_115810.json",
+      "pooled": true,
+      "reasons": []
+    },
+    {
+      "file": "20260924_130016.json",
+      "pooled": true,
+      "reasons": []
+    }
+  ],
+  "lifecycle_totals": {
+    "audio_send_errors_delta": 0,
+    "controller_bad_packets_delta": 0,
+    "fec_send_errors_delta": 0
+  },
+  "park": [
+    {
+      "acceptable": false,
+      "fired_at_s": 815.984,
+      "kbps": 6000,
+      "parked_s": 45,
+      "rating": null,
+      "rating_scale": "1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)"
+    },
+    {
+      "acceptable": false,
+      "fired_at_s": 862.41,
+      "kbps": 5500,
+      "parked_s": 45,
+      "rating": null,
+      "rating_scale": "1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)"
+    },
+    {
+      "acceptable": false,
+      "fired_at_s": 908.585,
+      "kbps": 5000,
+      "parked_s": 45,
+      "rating": 7,
+      "rating_scale": "1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)"
+    },
+    {
+      "acceptable": false,
+      "fired_at_s": 788.376,
+      "kbps": 6000,
+      "parked_s": 45,
+      "rating": null,
+      "rating_scale": "1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)"
+    },
+    {
+      "acceptable": false,
+      "fired_at_s": 834.35,
+      "kbps": 5500,
+      "parked_s": 45,
+      "rating": null,
+      "rating_scale": "1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)"
+    },
+    {
+      "acceptable": false,
+      "fired_at_s": 880.525,
+      "kbps": 5000,
+      "parked_s": 45,
+      "rating": null,
+      "rating_scale": "1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)"
+    }
+  ],
+  "phase_a_s": 1604.34,
+  "pool_rule": {
+    "config": {
+      "dwell_max_s": 90.0,
+      "dwell_min_s": 55.0,
+      "park_seconds": 45,
+      "ramp_gap_s": 4.0,
+      "traversals": 10,
+      "window_s": 5.0
+    },
+    "pool_all_override": false,
+    "state_schema": "privyhub_c3_l3a_gameplay_acceptance_v2"
+  },
+  "primary_windows_s": {
+    "20260924_115810": 5.0,
+    "20260924_130016": 5.0
+  },
+  "ramp_span_s": {
+    "20260924_115810": 11.574,
+    "20260924_130016": 11.575
+  },
+  "run_count": 2,
+  "run_ids": [
+    "20260924_115810",
+    "20260924_130016"
+  ],
+  "schema": "privyhub_c3_l3a_aggregate_v2",
+  "scoring": {
+    "2.5": {
+      "classes": {
+        "decoy_jump_matched": {
+          "chance_expected_marks": 1.4,
+          "events": 20,
+          "exposure_s": 50.0,
+          "marked": 1,
+          "marks": 1,
+          "marks_per_s": 0.02
+        },
+        "decoy_ramp_matched": {
+          "chance_expected_marks": 7.92,
+          "events": 20,
+          "exposure_s": 281.49,
+          "marked": 6,
+          "marks": 6,
+          "marks_per_s": 0.0213
+        },
+        "jump": {
+          "chance_expected_marks": 1.04,
+          "events": 10,
+          "exposure_s": 37.282,
+          "marked": 4,
+          "marks": 4,
+          "marks_per_s": 0.1073
+        },
+        "ramp": {
+          "chance_expected_marks": 3.96,
+          "events": 10,
+          "exposure_s": 141.107,
+          "marked": 9,
+          "marks": 18,
+          "marks_per_s": 0.1276
+        }
+      },
+      "not_in_any_sequence_window": 23,
+      "window_s": 2.5
+    },
+    "5": {
+      "classes": {
+        "decoy_jump_matched": {
+          "chance_expected_marks": 2.81,
+          "events": 20,
+          "exposure_s": 100.0,
+          "marked": 3,
+          "marks": 3,
+          "marks_per_s": 0.03
+        },
+        "decoy_ramp_matched": {
+          "chance_expected_marks": 9.33,
+          "events": 20,
+          "exposure_s": 331.49,
+          "marked": 6,
+          "marks": 6,
+          "marks_per_s": 0.0181
+        },
+        "jump": {
+          "chance_expected_marks": 1.75,
+          "events": 10,
+          "exposure_s": 62.282,
+          "marked": 4,
+          "marks": 4,
+          "marks_per_s": 0.0642
+        },
+        "ramp": {
+          "chance_expected_marks": 4.68,
+          "events": 10,
+          "exposure_s": 166.107,
+          "marked": 9,
+          "marks": 18,
+          "marks_per_s": 0.1084
+        }
+      },
+      "not_in_any_sequence_window": 23,
+      "window_s": 5.0
+    },
+    "8": {
+      "classes": {
+        "decoy_jump_matched": {
+          "chance_expected_marks": 4.5,
+          "events": 20,
+          "exposure_s": 160.0,
+          "marked": 4,
+          "marks": 4,
+          "marks_per_s": 0.025
+        },
+        "decoy_ramp_matched": {
+          "chance_expected_marks": 11.02,
+          "events": 20,
+          "exposure_s": 391.49,
+          "marked": 6,
+          "marks": 6,
+          "marks_per_s": 0.0153
+        },
+        "jump": {
+          "chance_expected_marks": 2.59,
+          "events": 10,
+          "exposure_s": 92.282,
+          "marked": 4,
+          "marks": 4,
+          "marks_per_s": 0.0433
+        },
+        "ramp": {
+          "chance_expected_marks": 5.51,
+          "events": 10,
+          "exposure_s": 196.107,
+          "marked": 9,
+          "marks": 18,
+          "marks_per_s": 0.0918
+        }
+      },
+      "not_in_any_sequence_window": 23,
+      "window_s": 8.0
+    }
+  },
+  "settling_measured": 20,
+  "settling_s": {
+    "max": 5.013,
+    "median": 3.008,
+    "min": 1.004,
+    "n": 20,
+    "p95": 5.013
+  },
+  "total_marks": 45
+}

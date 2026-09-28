@@ -1,0 +1,47 @@
+test_mode_default_off (tools.test_adaptive_bitrate_shadow.ModeAndWrapperTests.test_mode_default_off)
+Rule: the flag defaults to off. ... ok
+test_no_actuator_reference (tools.test_adaptive_bitrate_shadow.ModeAndWrapperTests.test_no_actuator_reference)
+Rule: the module holds no actuator: it imports nothing from the stream path. ... ok
+test_off_writes_nothing_and_status_says_off (tools.test_adaptive_bitrate_shadow.ModeAndWrapperTests.test_off_writes_nothing_and_status_says_off)
+Rule: mode off evaluates nothing, logs nothing, and the field reads mode: off. ... ok
+test_only_off_and_shadow_are_accepted (tools.test_adaptive_bitrate_shadow.ModeAndWrapperTests.test_only_off_and_shadow_are_accepted)
+Rule: `shadow` is the only non-off mode; anything else reads off, flagged. ... ok
+test_shadow_logs_decisions_never_acts (tools.test_adaptive_bitrate_shadow.ModeAndWrapperTests.test_shadow_logs_decisions_never_acts)
+Rule: shadow logs one line per decision or state change, never per report, ... ok
+test_alternating_pattern_oscillation_hold_on_third_reversal (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_alternating_pattern_oscillation_hold_on_third_reversal)
+Rule: a third direction change within 10 minutes -> HOLD, reason ... ok
+test_clean_stream_1000_reports_no_decision (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_clean_stream_1000_reports_no_decision)
+Rule: a healthy stream (fps 59.9, queue 0, gap <= 150) never draws a decision. ... ok
+test_fallback_by_output_gap (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_fallback_by_output_gap)
+Rule: FALLBACK also on fps < 50 on 5/5 with output_gap > 250 ms on >= 2/5 ... ok
+test_fallback_one_decrease_then_blackout_then_hold_down (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_fallback_one_decrease_then_blackout_then_hold_down)
+Rules: FALLBACK (fps < 50 on 5/5 and queue >= 2 on >= 3/5) -> exactly one ... ok
+test_loss_alone_never_evidence (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_loss_alone_never_evidence)
+Rule: lost packets / recovered FEC alone never force a decrease. ... ok
+test_new_session_resets (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_new_session_resets)
+Rule: session_elapsed_ms going backwards is a new session: back to REFERENCE at 7000. ... ok
+test_no_distinct_snapshot_for_3_reports_is_stale (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_no_distinct_snapshot_for_3_reports_is_stale)
+Rule: the same snapshot (session_elapsed_ms not advancing) 3 times -> TELEMETRY_STALE. ... ok
+test_one_unclean_report_restarts_the_clean_count (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_one_unclean_report_restarts_the_clean_count)
+Rule: the 90 clean reports must be consecutive. ... ok
+test_recovery_increase_after_exactly_90_clean (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_recovery_increase_after_exactly_90_clean)
+Rule: below 7000, one would-increase (one rung) after exactly 90 ... ok
+test_restart_settling_signature_no_decision (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_restart_settling_signature_no_decision)
+Rule: a restart's own settling signature (one report at 45 fps, then clean) ... ok
+test_resync_waiting_for_idr_never_evidence (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_resync_waiting_for_idr_never_evidence)
+Rule (D-019): reports during a known resync (waiting_for_idr) never count. ... ok
+test_reversal_hold_down_60_reports (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_reversal_hold_down_60_reports)
+Rule: after an action, no action in the other direction for 60 reports. ... ok
+test_routine_logged_once_per_30_reports_never_moves_level (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_routine_logged_once_per_30_reports_never_moves_level)
+Rule: ROUTINE (not authorized) is counted on its own 30-report hold-down ... ok
+test_routine_one_decrease_logged_as_routine (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_routine_one_decrease_logged_as_routine)
+Rule: ROUTINE (fps < 57 on >= 4/5 with queue >= 1 on >= 3/5) -> one ... ok
+test_stale_telemetry_no_decision (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_stale_telemetry_no_decision)
+Rule: telemetry not fresh / unavailable -> TELEMETRY_STALE, no decision, ... ok
+test_transport_gaps_100_200_ms_do_not_trigger (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_transport_gaps_100_200_ms_do_not_trigger)
+Rule: output gaps of 100-200 ms (the transport's own) are not FALLBACK evidence. ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 0.031s
+
+OK

@@ -1,0 +1,26 @@
+=== FORWARD host -> onn ===
+  run                                           sent arrived missing dup same dup conf 4-6->lt2 4-6->ge20  p95 ms  max ms reord
+  pre-B2 Test A (linux_idle, 2026-09-15 09:40)  3993    3993       0     2626        0     2116       190    18.4   792.3     0
+  pre-B2 D082 (opal_bridge, 2026-09-15 14:12)   3661    3661       0     2371        0     2064       159    12.0   551.1     0
+  fwd1 [valid]                                  4000    3988      12        0        0      153         2     8.0    25.0     0
+  fwd2 [valid]                                  4000    3972      28        0        0      152         9     8.0    27.7     0
+  fwd3 [INVALID: the onn's screensaver ended the receiver after 0.7 s]  4000      10    3990        0        0        2         0    10.5    12.2     0
+  fwd3b [valid (retry of fwd3)]                 4000    3997       3        0        0      100         4     8.0    30.0     0
+  valid runs 3; signature (>= 20 same-stamp duplicates) in 0: []
+  -> NOT REPRODUCED
+
+=== REVERSE onn -> host ===
+  run                                           sent arrived missing dup same dup conf 4-6->lt2 4-6->ge20  p95 ms  max ms reord
+  pre-B2 Test B (linux_reverse_idle, 2026-09-15 09:45)  4000    3894     106      476        0     1312       126    18.1   173.7     0
+  rev1 [valid]                                  4000    3998       2        3        0      100         6     6.2    93.4     0
+  rev2 [INVALID: the onn's screensaver ended the sender at 2,088 packets]     0       0       0        0        0        0         0       -       -     0
+  rev3 [INVALID: the onn's screensaver ended the sender at 2,095 packets]     0       0       0        0        0        0         0       -       -     0
+  rev2b [valid (retry of rev2)]                 4000    4000       0        4        0       77         4     6.2    81.5     0
+  rev3b [valid (retry of rev3)]                 4000    4000       0        1        0       52         1     6.2    35.4     0
+  valid runs 3; signature (>= 20 same-stamp duplicates) in 0: []
+  -> NOT REPRODUCED
+
+=== CLASSIFICATION (pre-registered) ===
+  FORWARD host -> onn: NOT REPRODUCED
+  REVERSE onn -> host: NOT REPRODUCED
+  -> roadmap D6: the pathology is SPECIFIC TO THE OLD ENVIRONMENT (not reproduced on the representative path)

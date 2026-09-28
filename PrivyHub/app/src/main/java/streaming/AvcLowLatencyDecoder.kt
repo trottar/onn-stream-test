@@ -79,8 +79,16 @@ class AvcLowLatencyDecoder(
         // ordinary-play evictions; RECENT is the unmarked rolling tail,
         // unchanged in behavior from the old ring except for its smaller
         // size. Total capacity (128) is unchanged from the predecessor.
-        const val MAX_MARKED_SLOW_EVENTS = 64
-        const val MAX_RECENT_SLOW_EVENTS = 64
+        //
+        // CL-B1: with the report in a POST body the transport no longer
+        // caps its size, so both segments grow. MARKED: a transition's 2 s
+        // cycle window logs ~5 slow events (rerun session 3 filled 64 in 12
+        // of its 24 transitions), so 256 holds a 24-transition session twice
+        // over. RECENT: ordinary play logs ~0.63 events/s (the same
+        // session), so 1,024 covers ~27 min, longer than a 20-min hold.
+        // The split and the eviction rules are unchanged.
+        const val MAX_MARKED_SLOW_EVENTS = 256
+        const val MAX_RECENT_SLOW_EVENTS = 1024
 
         // D-BASE-R4 item 2: the two rolling segments are both FIFO, so a
         // long session evicts its own worst events — the 7,341 ms event of

@@ -55,7 +55,7 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Optional
-from urllib.parse import quote, unquote, urlparse, urlsplit
+from urllib.parse import parse_qs, quote, unquote, urlparse, urlsplit
 
 from storage_presence import (
     configured_local_backing_present,
@@ -75,6 +75,12 @@ from diagnostics.client_feedback import (
     ClientHealthStore,
 )
 
+from adaptive_bitrate import get_shadow as adaptive_bitrate_shadow
+from games.decoder_report_http import (
+    access_log_path,
+    body_length as decoder_report_body_length,
+    report_from_body as decoder_report_from_body,
+)
 from diagnostics.stream_telemetry import (
     StreamTelemetryStore,
 )
@@ -1836,8 +1842,9 @@ class PrivyHubRequestHandler(
     ) -> None:
         # PRIVYHUB_B1_CLIENT_HEALTH_ENDPOINT_V1
         # PRIVYHUB_B1_B2_COMPLETION_API_V1
+        # CL-B1: `self.path` does not exist yet on http.server's 414 path.
         if (
-            urlsplit(self.path).path.startswith(
+            access_log_path(self).startswith(
                 "/diagnostics/"
             )
         ):
@@ -2176,12 +2183,20 @@ class PrivyHubRequestHandler(
                     )
 
                     try:
-                        STREAM_TELEMETRY_STORE.accept(
+                        native_status = self._native_stream_status()
+                        telemetry = STREAM_TELEMETRY_STORE.accept(
                             client_health_feedback=(
                                 CLIENT_HEALTH_STORE.snapshot()
                             ),
-                            native_stream_status=(
-                                self._native_stream_status()
+                            native_stream_status=native_status,
+                        )
+                        # C3-L4-S1: the shadow controller reads the snapshot
+                        # just built and writes down what it would do. It
+                        # never acts; with the flag off it returns at once.
+                        adaptive_bitrate_shadow(PROJECT_ROOT).observe(
+                            telemetry,
+                            stream_bitrate_kbps=native_status.get(
+                                "bitrate_kbps"
                             ),
                         )
                     except Exception:
@@ -2224,6 +2239,52 @@ class PrivyHubRequestHandler(
                             "ok": False,
                             "error": f"Unknown plugin: {plugin_id}",
                         },
+                    )
+                    return
+
+                # CL-B1: the decoder report as a POST body. The target form
+                # (`?report=`, no body) falls through to the plugin as before.
+                if (
+                    plugin_id == "games"
+                    and action == "decoder-session-log"
+                    and hasattr(plugin, "handle_decoder_session_log")
+                    and self.headers.get("Content-Length") not in (None, "", "0")
+                ):
+                    report = None
+                    try:
+                        length = decoder_report_body_length(self.headers)
+                        report = decoder_report_from_body(
+                            self.rfile.read(length),
+                            self.headers.get("Content-Type"),
+                        )
+                        print(
+                            "decoder-session-log received as body: "
+                            f"report_chars={len(report)}"
+                        )
+                        payload = plugin.handle_decoder_session_log(report)
+                    except (ValueError, UnicodeDecodeError) as exc:
+                        self.close_connection = True
+                        print(
+                            "WARNING decoder-session-log rejected (400): "
+                            f"{exc}; report_chars="
+                            + (
+                                str(len(report))
+                                if report is not None
+                                else f"body_bytes={self.headers.get('Content-Length')}"
+                            )
+                        )
+                        self._send_json(
+                            400,
+                            {
+                                "ok": False,
+                                "error": str(exc),
+                            },
+                        )
+                        return
+
+                    self._send_json(
+                        200,
+                        payload,
                     )
                     return
 
@@ -2282,6 +2343,20 @@ class PrivyHubRequestHandler(
                             parsed.query,
                         )
                 except ValueError as exc:
+                    # C3-L3A-R2B: a refused decoder report was invisible in
+                    # the journal (the reason went only to the client, which
+                    # discards it). One line, reason and length, no content.
+                    if action == "decoder-session-log":
+                        report_chars = len(
+                            parse_qs(parsed.query)
+                            .get("report", [""])[0]
+                            .strip()
+                        )
+                        print(
+                            "WARNING decoder-session-log rejected (400): "
+                            f"{exc}; report_chars={report_chars}"
+                        )
+
                     self._send_json(
                         400,
                         {

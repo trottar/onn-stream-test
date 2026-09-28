@@ -1,0 +1,35 @@
+2026-09-24T18:00:44.647751+00:00 <host> python3[330296]: <ipv4> - 24/Sep/2026 14:00:44 - "GET /plugins/games/status HTTP/1.1" 200 -
+2026-09-24T18:00:44.672055+00:00 <host> python3[330296]: <ipv4> - 24/Sep/2026 14:00:44 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-24T18:00:52.090796+00:00 <host> systemd[1310]: Stopping privyhub-companion.service - PrivyHub companion (control API :8765, native game stream)...
+2026-09-24T18:00:52.091255+00:00 <host> python3[330296]: Stopping PrivyHub companion service...
+2026-09-24T18:00:52.101514+00:00 <host> python3[330296]: PrivyHub companion service stopped.
+2026-09-24T18:00:52.129368+00:00 <host> systemd[1310]: Stopped privyhub-companion.service - PrivyHub companion (control API :8765, native game stream).
+2026-09-24T18:00:52.129392+00:00 <host> systemd[1310]: privyhub-companion.service: Consumed 42min 2.790s CPU time, 260.7M memory peak.
+2026-09-24T18:00:52.130714+00:00 <host> systemd[1310]: Starting privyhub-companion.service - PrivyHub companion (control API :8765, native game stream)...
+2026-09-24T18:00:52.188035+00:00 <host> systemd[1310]: Started privyhub-companion.service - PrivyHub companion (control API :8765, native game stream).
+2026-09-24T18:00:52.384513+00:00 <host> python3[352575]: PrivyHub companion service
+2026-09-24T18:00:52.384513+00:00 <host> python3[352575]: Project root: /home/privyhub/Projects/onn-stream-test
+2026-09-24T18:00:52.384513+00:00 <host> python3[352575]: Media root:   /home/privyhub/Projects/onn-stream-test/media
+2026-09-24T18:00:52.384513+00:00 <host> python3[352575]: VOD root:     /mnt/privyhub-media/onn-stream-test/media/vod
+2026-09-24T18:00:52.384513+00:00 <host> python3[352575]: VOD storage:  configured
+2026-09-24T18:00:52.384513+00:00 <host> python3[352575]: Catalog:      /home/privyhub/Projects/onn-stream-test/companion/config/sources.json
+2026-09-24T18:00:52.384513+00:00 <host> python3[352575]: Control API:  http://<ipv4>:8765
+2026-09-24T18:00:52.385004+00:00 <host> python3[352575]: Dynamic media directories are rescanned on GET /sources.
+2026-09-24T18:00:52.385004+00:00 <host> python3[352575]: Endpoints:
+2026-09-24T18:00:52.385004+00:00 <host> python3[352575]:   GET  /status
+2026-09-24T18:00:52.385004+00:00 <host> python3[352575]:   GET  /diagnostics/health
+2026-09-24T18:00:52.385004+00:00 <host> python3[352575]:   POST /diagnostics/self-test
+2026-09-24T18:00:52.385004+00:00 <host> python3[352575]:   POST /diagnostics/bundle
+2026-09-24T18:00:52.385004+00:00 <host> python3[352575]:   POST /diagnostics/client-health
+2026-09-24T18:00:52.385004+00:00 <host> python3[352575]:   GET  /sources
+2026-09-24T18:00:52.385004+00:00 <host> python3[352575]:   GET  /plugins/<plugin>/<action>
+2026-09-24T18:00:52.385004+00:00 <host> python3[352575]:   POST /sources/<id>/start
+2026-09-24T18:00:52.385004+00:00 <host> python3[352575]:   POST /stop
+2026-09-24T18:00:52.385004+00:00 <host> python3[352575]: Logs: /home/privyhub/Projects/onn-stream-test/logs
+2026-09-24T18:00:52.385004+00:00 <host> python3[352575]: Starting the PrivyHub media server...
+2026-09-24T18:00:52.390673+00:00 <host> python3[352575]: Listening on <ipv4>:8765
+2026-09-24T18:00:52.390673+00:00 <host> python3[352575]: Stop with Ctrl+C.
+2026-09-24T18:00:52.405967+00:00 <host> python3[352575]: PrivyHub game metadata startup reconciliation: SKIPPED_CURRENT
+2026-09-24T18:01:02.793022+00:00 <host> python3[352575]: <ipv4> - 24/Sep/2026 14:01:02 - "GET /plugins/games/native-stream-status HTTP/1.1" 200 -
+2026-09-24T18:01:13.471272+00:00 <host> python3[352575]: WARNING decoder-session-log rejected (400): Decoder session report is too large; report_chars=49000
+2026-09-24T18:01:13.471782+00:00 <host> python3[352575]: <ipv4> - 24/Sep/2026 14:01:13 - "POST /plugins/games/decoder-session-log?report=<49000 x, elided> HTTP/1.1" 400 -

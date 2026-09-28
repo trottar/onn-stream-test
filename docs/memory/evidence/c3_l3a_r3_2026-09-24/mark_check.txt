@@ -1,0 +1,25 @@
+offset +12.620 s (decoder = probe + offset)
+rows 128: in a cycle window 63 (report: marked 64), outside 65 (report: recent 64)
+marked ring from decoder 364.665 s = probe 352.045 s
+recent ring from decoder 929.156 s = probe 916.536 s (off-transition events before this were evicted)
+top-gap list: 16 rows, smallest 189 ms; every gap not listed is <= 189 ms
+top-gap rows inside a cycle window (i.e. at a transition): 15 of 16
+  off-transition top-gap row: decoder 108.352 s = probe 95.732 s, gap 261 ms, codec 8, 29.78 s after the previous ssrc_change
+
+  mark s    dec s  source    gap ms codec s before  lag fire lag decoy
+ 100.991  113.611  unknown <= 189     35.24      7.24
+ 120.609  133.229  unknown <= 189     54.86     26.85
+ 190.135  202.755  unknown <= 189     62.36     43.09
+ 238.326  250.946  unknown <= 189     45.74     16.02
+ 352.885  365.505  top-gap      189     8     1.54      1.58     56.16
+ 429.571  442.191  marked       180     8     1.87      2.11     44.19
+ 619.641  632.261  marked       183     9     0.37      0.51     34.60
+ 658.206  670.826  unknown <= 189     39.07      0.20
+ 723.576  736.196  unknown <= 189     10.80     65.57
+
+marks behind a measured restart gap (>= 100 ms, in a cycle window, <= 5 s before): 3
+recent ring (65 off-transition events, decoder 929.2-1033.6 s): output_gap_ms >= 50: 65, max 82; the rest are latency events
+
+session max output gap 564 ms at decoder 927.560 s = probe 914.940 s, codec_ms 8; 405 ms after ssrc_change #24 of 24 (decoder 927.155 s)
+  first_idr_after_discontinuity row for that change: {'elapsed_ms': 927545, 'resync_to_idr_ms': 389, 'au_complete': True, 'au_fec_recovered': False, 'au_fec_unrecoverable_group': False, 'rejected_idr_aus': 1, 'dropped_non_idr_aus': 14}
+  video.max_output_gap_ms None, decoder block max_output_gap_ms 564
