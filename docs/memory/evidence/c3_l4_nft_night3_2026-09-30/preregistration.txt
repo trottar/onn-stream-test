@@ -1,0 +1,55 @@
+C3-L4-N2 -- pre-registration for the user's nft night 3 (`--only F1`)
+Written 2026-09-29 by Code, before the night, from night 2's pre-registration (sha256 3cdcfa2e...) with the
+rule the user approved on 2026-09-29 ("Go"). The user may amend this file before starting;
+tools/c3_l4_nft_night.py prints it at start and records its sha256 in the run directory. Rules are not
+tightened or loosened after data.
+
+Controller as built for the night: PRIVYHUB_ADAPTIVE_BITRATE_MODE=live (never INJECT). FALLBACK -> 5000 on
+(i) the shadow's fps/queue/gap evidence or (ii) capacity: fps < 50 on all 5 of the last 5 evaluated reports
+and lost_packets_delta >= 50 on >= 3 of 5; (iii) the recovery-escalation backstop (two recovery encoder
+restarts at one level within 180 s -> one FALLBACK decision after PLAYING and the blackout). NEW
+capacity_mild: ROUTINE ONE RUNG DOWN (6000 -> 5500, 5500 -> 5000, 7000 -> 6000; at 5000 at_floor) when fps
+< 57 on >= 4 of 5 and lost_packets_delta >= 50 on >= 3 of 5; the strict capacity FALLBACK keeps precedence,
+and while the newest report is under 50 fps a ROUTINE waits up to 4 reports for FALLBACK (L1). The queue
+ROUTINE (-> 6000) unchanged. INCREASE one rung when >= 85 of the last 90 reports since the last SSRC change
+(and its 3-report blackout) are clean (fps >= 57, queue <= 1, gap <= 150). Hold-downs in reports after a
+down / after an up: FALLBACK 30 / 60, ROUTINE 60 / 60, INCREASE 60 / 30. Oscillation guard: the third
+direction change within 10 min -> HOLD for the session. Rate limit 4 transitions per 10 min. Guards incl.
+recovery PLAYING and session age >= 60 s. Recovery unchanged (C3-F1, level-preserving). Fault: host output
+hook, video port 48100, the capacity cap (CAP = the midpoint of the calibrated 5500 and 6000 wire rates),
+12 min on, 5 min off. Session: F1 only.
+
+Classification: WORKS UNDER LOSS (F1) if every row below holds; otherwise each row is recorded as met / not
+met / not applicable, with the per-report sample rows saying why.
+
+F1a the strict capacity FALLBACK 7000 -> 5000 (reason capacity) within 60 s of the cap going in, as ONE
+    transition (nights 1-2: 13.6-19.7 s; capacity_mild's bar is met ~10 s in but waits for FALLBACK).
+F1b the climb and the mild step follow the rules, whichever way the cap falls. Expected (night 2's rungs:
+    5000 and 5500 clean under the cap; 6000 degraded -- fps median 55.8, ~60 lost per report):
+    INCREASE 5000 -> 5500 >= 93 reports after the capacity FALLBACK's SSRC change; INCREASE 5500 -> 6000
+    >= 93 reports after that; then capacity_mild 6000 -> 5500 as ONE transition, NO SOONER than the
+    60-report reversal hold-down after the increase and within 150 s of arriving at 6000 (night 2's
+    samples replayed: the bar met 46 s in, refused hold_down, acted 119 s in). NOTE: the handoff asked for
+    "within 90 s of arriving at 6000"; with the ROUTINE reversal hold-down the same handoff requires (60
+    reports = 120 s) that is not reachable as built, so the bound here is the hold-down's; the user may
+    amend it. Then the next increase attempt (>= 93 reports after the mild step's SSRC change) is the
+    third direction change: inside 10 min of the first (the 5000 -> 5500 increase) it becomes HOLD
+    (reason oscillation) and the stream stays at 5500 for the rest of the session. Predicted from night 2:
+    the first change at ~+213 s, the mild step at ~+600 s, the next attempt at ~+790 s (after the cap is
+    removed at +720 s) -> ~577 s after the first change -> HOLD at 5500, with ~23 s to spare. If the third
+    change falls more than 10 min after the first it is an INCREASE (as built), then one rung per >= 93
+    reports on the clean link; recorded, not a failure. Or: "climbed to <rung> and stayed" if the
+    calibrated cap lets that rung through (the cap and the samples recorded; not a failure).
+    MET if every transition in F1 is one the rules above name, at the spacing they allow.
+F1c rate_limited never true (the prediction puts 4 transitions inside one 10-min window -- +14, +213, +482,
+    ~+600 s -- which the limit allows; a 5th inside it would be refused and recorded); no two transitions
+    closer than the hold-down table; never a ramp (no two transitions < 93 reports apart in the same
+    direction; the mild step and the capacity FALLBACK are downs 60+ reports apart).
+F1d after removal: nothing if HOLD; otherwise one rung per >= 93 reports; BACK resets to 7000.
+F1e the backstop: expected NOT to fire (capacity and capacity_mild act first). Recorded either way.
+F1f recovery cycles under the cap, reported: expected <= 1 (night 2: 0).
+F1g reported, not ruled: the time at 6000 under the cap (night 2: 3 min 56 s with nothing firing; expected
+    ~2 min) and its per-report figures.
+All sessions: any_override false at PLAYING; decoder report stored; lifecycle clean (session_started /
+session_ended, plus F1f's reported cycles); at the end no privyhub_fault table, the flag unset and absent
+from the manager and the environ, stream 7000, no game active.

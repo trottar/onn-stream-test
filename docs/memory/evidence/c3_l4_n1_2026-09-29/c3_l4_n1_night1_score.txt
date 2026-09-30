@@ -1,0 +1,141 @@
+C3-L4-N1 section 1 -- the user's first nft night, scored read-only against its pre-registration
+run: c3_l4_nft_night_20260929_151942Z; preregistration.txt sha256 fb5ca63fe559e5b2... MATCHES the recorded fb5ca63f...
+rows: decision log 1911 (1602 sample rows), recovery log 60, events 53
+calibration: 7000 wire rate 1065 kB/s (counter); cap 854 kbytes/s (nft kbytes = 1024 B) = 874 kB/s = 0.821 x the 7000 rate (5500/7000 = 0.786, 5750/7000 = 0.821, 6000/7000 = 0.857: between the 5500 and 6000 wire rates, assuming the wire rate scales with the rung)
+
+== Per-report figures by phase (controller sample rows; 'evaluated' = fresh, distinct, outside a blackout)
+   phase | reports (evaluated) | fps median [p10-p90] min | lost/report median [max] | queue max (reports >= 1) | gap median [max] ms | clean share
+   F1 baseline (PLAYING -> first fault) [15:20:41-15:23:41Z]: 90 (90) | 59.8 [57.7-61.8] 41.8 | 0 [73] | 1 (1) | 14 [48] | 83/90
+      dispositions {'evaluated': 90}
+   F1 F1 cap ON [15:23:41-15:35:41Z]: 357 (330) | 39.9 [2.0-53.8] 0.0 | 259 [464] | 1 (2) | 17 [3850] | 16/330
+      dispositions {'evaluated': 330, 'blackout': 27}
+   F1 after removal (-> BACK) [15:35:41-15:40:46Z]: 150 (150) | 59.8 [57.8-63.7] 53.7 | 0 [217] | 1 (3) | 16 [41] | 139/150
+      dispositions {'evaluated': 150}
+   F2 baseline (PLAYING -> first fault) [15:41:25-15:43:25Z]: 60 (60) | 59.7 [55.8-61.8] 53.6 | 0 [6] | 1 (1) | 14 [77] | 52/60
+      dispositions {'evaluated': 60}
+   F2 F2 2% loss ON [15:43:25-15:53:25Z]: 298 (298) | 59.7 [55.8-61.7] 51.8 | 4 [13] | 1 (6) | 15 [69] | 236/298
+      dispositions {'evaluated': 298}
+   F2 after removal (-> BACK) [15:53:25-15:58:30Z]: 150 (150) | 59.8 [57.8-61.8] 53.9 | 0 [34] | 1 (4) | 15 [70] | 142/150
+      dispositions {'evaluated': 150}
+   F3 baseline (PLAYING -> first fault) [15:59:09-16:01:09Z]: 59 (59) | 59.7 [59.3-61.8] 53.7 | 0 [3] | 1 (3) | 15 [49] | 57/59
+      dispositions {'evaluated': 59}
+   F3 F3 cap ON [16:01:09-16:05:09Z]: 119 (107) | 31.9 [0.0-53.7] 0.0 | 247 [605] | 0 (0) | 17 [4299] | 6/107
+      dispositions {'evaluated': 107, 'blackout': 12}
+   F3 F3 full drop ON [16:05:09-16:05:24Z]: 8 (5) | 0.0 [0.0-0.0] 0.0 | 0 [0] | 0 (0) | 113 [113] | 0/5
+      dispositions {'blackout': 3, 'evaluated': 5}
+   F3 after removal (-> BACK) [16:05:24-16:08:28Z]: 90 (90) | 59.8 [57.8-61.8] 53.8 | 0 [12554] | 0 (0) | 12 [51] | 85/90
+      dispositions {'evaluated': 90}
+   K baseline (PLAYING -> first fault) [16:09:08-16:11:08Z]: 60 (60) | 59.7 [57.7-61.5] 53.8 | 0 [3] | 1 (2) | 16 [44] | 56/60
+      dispositions {'evaluated': 60}
+   K K cap ON [16:11:08-16:15:09Z]: 119 (110) | 38.6 [23.9-53.8] 0.0 | 256 [505] | 0 (0) | 16 [95] | 8/110
+      dispositions {'evaluated': 110, 'blackout': 9}
+   K after removal (-> BACK) [16:15:09-16:16:13Z]: 30 (30) | 59.8 [59.6-61.8] 55.8 | 0 [124] | 0 (0) | 16 [25] | 29/30
+      dispositions {'evaluated': 30}
+
+== Onset under the cap (the first reports after the rule went in; every row, any disposition)
+   F1 F1 cap ON from 15:23:41.571Z:
+      +  1.5 s fps 61.7 queue 0 gap 16 lost 0 [evaluated; state REFERENCE]
+      +  3.5 s fps 55.8 queue 0 gap 17 lost 0 [evaluated; state PRESSURE]
+      +  5.6 s fps 35.9 queue 0 gap 4 lost 103 [evaluated; state PRESSURE]
+      +  7.6 s fps 25.9 queue 0 gap 16 lost 252 [evaluated; state PRESSURE]
+      +  9.6 s fps 15.9 queue 0 gap 19 lost 222 [evaluated; state PRESSURE]
+      + 11.6 s fps 17.9 queue 0 gap 9 lost 255 [evaluated; state PRESSURE]
+      + 13.6 s fps 37.8 queue 0 gap 15 lost 245 [evaluated; state PRESSURE]
+      + 15.8 s fps 8.0 queue 0 gap 48 lost 248 [evaluated; state PRESSURE]
+      + 17.6 s fps 16.0 queue 0 gap 14 lost 244 [evaluated; state PRESSURE]
+      + 19.6 s fps 33.9 queue 0 gap 16 lost 260 [evaluated; state PRESSURE]
+      first report under 50 fps: +5.6 s
+      queue depth over the whole phase, every row: max 1; rows with queue >= 1: 3 of 357
+   F3 F3 cap ON from 16:01:09.382Z:
+      +  0.6 s fps 61.7 queue 0 gap 17 lost 0 [evaluated; state REFERENCE]
+      +  2.6 s fps 59.9 queue 0 gap 13 lost 0 [evaluated; state REFERENCE]
+      +  4.7 s fps 53.8 queue 0 gap 22 lost 30 [evaluated; state PRESSURE]
+      +  6.7 s fps 51.7 queue 0 gap 12 lost 287 [evaluated; state PRESSURE]
+      +  8.7 s fps 43.8 queue 0 gap 16 lost 298 [evaluated; state PRESSURE]
+      + 10.7 s fps 47.8 queue 0 gap 16 lost 235 [evaluated; state PRESSURE]
+      + 12.7 s fps 21.9 queue 0 gap 16 lost 267 [evaluated; state PRESSURE]
+      + 14.7 s fps 27.9 queue 0 gap 17 lost 252 [evaluated; state PRESSURE]
+      + 16.7 s fps 35.8 queue 0 gap 21 lost 271 [evaluated; state PRESSURE]
+      + 18.7 s fps 31.8 queue 0 gap 21 lost 279 [evaluated; state PRESSURE]
+      first report under 50 fps: +8.7 s
+      queue depth over the whole phase, every row: max 0; rows with queue >= 1: 0 of 119
+   K K cap ON from 16:11:08.936Z:
+      +  1.6 s fps 59.7 queue 0 gap 15 lost 0 [evaluated; state REFERENCE]
+      +  3.6 s fps 59.7 queue 0 gap 23 lost 0 [evaluated; state REFERENCE]
+      +  5.7 s fps 49.8 queue 0 gap 22 lost 173 [evaluated; state PRESSURE]
+      +  7.7 s fps 49.8 queue 0 gap 15 lost 251 [evaluated; state PRESSURE]
+      +  9.7 s fps 51.8 queue 0 gap 18 lost 292 [evaluated; state PRESSURE]
+      + 11.7 s fps 43.9 queue 0 gap 60 lost 266 [evaluated; state PRESSURE]
+      + 13.7 s fps 27.9 queue 0 gap 16 lost 271 [evaluated; state PRESSURE]
+      + 15.7 s fps 27.9 queue 0 gap 95 lost 277 [evaluated; state PRESSURE]
+      + 17.7 s fps 35.9 queue 0 gap 66 lost 252 [evaluated; state PRESSURE]
+      + 19.7 s fps 29.9 queue 0 gap 15 lost 264 [evaluated; state PRESSURE]
+      first report under 50 fps: +5.7 s
+      queue depth over the whole phase, every row: max 0; rows with queue >= 1: 0 of 119
+
+== Controller rows (every non-sample, non-state row)
+   transitions / would_act / holds: 0
+   refused rows: 5
+      15:30:25.843Z F1 FALLBACK -> 5000 refused guard guards failing ['game_not_paused', 'recovery_playing']; window fps [49.8, 2.0, 0.0, 0.0, 0.0] queue [0.0, 0.0, 0.0, 0.0, 0.0] gap [20.0, 102.0, 102.0, 3850.0, 3850.0]
+      15:32:44.957Z F1 FALLBACK -> 5000 refused guard guards failing ['game_not_paused', 'recovery_playing']; window fps [4.0, 2.0, 0.0, 0.0, 2.0] queue [0.0, 0.0, 0.0, 0.0, 0.0] gap [52.0, 1914.0, 1914.0, 3583.0, 398.0]
+      15:34:33.349Z F1 FALLBACK -> 5000 refused guard guards failing ['game_not_paused', 'recovery_playing']; window fps [47.8, 45.8, 0.0, 0.0, 0.0] queue [0.0, 0.0, 0.0, 0.0, 0.0] gap [5.0, 15.0, 15.0, 3550.0, 296.0]
+      16:04:21.276Z F3 FALLBACK -> 5000 refused guard guards failing ['game_not_paused', 'recovery_playing']; window fps [43.9, 0.0, 0.0, 0.0, 0.0] queue [0.0, 0.0, 0.0, 0.0, 0.0] gap [16.0, 19.0, 19.0, 2701.0, 1002.0]
+      16:04:51.841Z F3 FALLBACK -> 5000 refused guard guards failing ['game_not_paused', 'recovery_playing']; window fps [0.0, 3.9, 2.0, 2.0, 0.0] queue [0.0, 0.0, 0.0, 0.0, 0.0] gap [4299.0, 128.0, 599.0, 1002.0, 799.0]
+   ssrc_change rows: 17, sources {'recovery_restart': 17}
+   level_sync rows: 0; rate_limited in any sample/status: False
+   stream_kbps over every sample row: {7000: 1602}
+   controller state over every sample row: {'REFERENCE': 918, 'PRESSURE': 633, 'HOLD_DOWN': 51}
+
+== Recovery log per session (trigger; encoder restarts with the gap to the previous restart)
+   F1: desync_pause 10 (triggers {'client_output_silence': 10}), encoder_restart 9, resumed 10
+      15:25:40.987Z restart #1 restart backoff 5000 age pair [1175, 1278] first RTP 318 ms -- first
+      15:25:51.172Z restart #2 restart backoff 5000 age pair [2007, 4040] first RTP 418 ms --   10.2 s after the previous
+      15:27:39.904Z restart #3 restart backoff 5000 age pair [2491, 4529] first RTP 418 ms --  108.7 s after the previous
+      15:27:46.099Z restart #4 restart backoff 5000 age pair [1293, 3334] first RTP 429 ms --    6.2 s after the previous
+      15:30:41.309Z restart #5 restart backoff 5000 age pair [1345, 3382] first RTP 618 ms --  175.2 s after the previous
+      15:30:49.495Z restart #6 restart backoff 5000 age pair [2849, 4888] first RTP 669 ms --    8.2 s after the previous
+      15:32:54.230Z restart #7 restart backoff 5000 age pair [2332, 4371] first RTP 418 ms --  124.7 s after the previous
+      15:34:54.961Z restart #8 restart backoff 5000 age pair [1109, 1453] first RTP 418 ms --  120.7 s after the previous
+      15:35:01.146Z restart #9 restart backoff 5000 age pair [1191, 3227] first RTP 669 ms --    6.2 s after the previous
+      recovering_ms per resume: [4157, 8785, 2148, 5240, 4171, 22013, 6222, 17900, 27513, 4679]
+      9 restarts over 9.3 min; consecutive pairs within 180 s: 8
+   F2: desync_pause 0 (triggers {}), encoder_restart 0, resumed 0
+   F3: desync_pause 5 (triggers {'client_output_silence': 4, 'controller_silence': 1}), encoder_restart 5, resumed 4
+      16:02:07.741Z restart #1 restart backoff 5000 age pair [1025, 3072] first RTP 358 ms -- first
+      16:02:15.923Z restart #2 restart backoff 5000 age pair [1887, 3933] first RTP 418 ms --    8.2 s after the previous
+      16:04:37.160Z restart #3 restart backoff 5000 age pair [1580, 3615] first RTP 669 ms --  141.2 s after the previous
+      16:04:55.350Z restart #4 restart backoff 5000 age pair [1316, 3354] first RTP 669 ms --   18.2 s after the previous
+      16:05:09.537Z restart #5 restart backoff 10000 age pair [2190, 4228] first RTP 419 ms --   14.2 s after the previous
+      recovering_ms per resume: [4708, 5232, 22523, 47905]
+      5 restarts over 3.0 min; consecutive pairs within 180 s: 4
+   K: desync_pause 3 (triggers {'client_output_silence': 3}), encoder_restart 3, resumed 3
+      16:12:08.280Z restart #1 restart backoff 5000 age pair [1795, 3832] first RTP 369 ms -- first
+      16:14:15.016Z restart #2 restart backoff 5000 age pair [2554, 4594] first RTP 419 ms --  126.7 s after the previous
+      16:14:23.202Z restart #3 restart backoff 5000 age pair [3327, 5366] first RTP 420 ms --    8.2 s after the previous
+      recovering_ms per resume: [4717, 5735, 6703]
+      3 restarts over 2.2 min; consecutive pairs within 180 s: 2
+   around F3's BACK: [('16:08:26.463', 'session_ended', 'PAUSED_RECOVERING', None), ('16:08:26.533', 'desync_pause', 'ENDED', 'controller_silence'), ('16:09:08.818', 'session_started', 'PLAYING', None)]
+
+== Close-out rows per session (decoder report; reported, as the pre-registration says)
+   F1 (20.1 min): spikes_20_per_min 19.72; rendered_fps 45.42; stale_output_drops_per_min 0.70; video_lost_per_min_post_fec 4464.96; audio_underruns_per_min 0.60; max gap 5626 ms; ssrc_changes 9; sequence_resyncs 16; lost in resyncs 994 -> misses ['rendered_fps', 'video_lost_per_min_post_fec']
+   F2 (17.1 min): spikes_20_per_min 24.36; rendered_fps 59.11; stale_output_drops_per_min 0.93; video_lost_per_min_post_fec 86.97; audio_underruns_per_min 0.53; max gap 220 ms; ssrc_changes 0; sequence_resyncs 0; lost in resyncs 0 -> misses ['rendered_fps', 'video_lost_per_min_post_fec']
+   F3 (9.4 min): spikes_20_per_min 24.37; rendered_fps 45.01; stale_output_drops_per_min 1.82; video_lost_per_min_post_fec 4277.26; audio_underruns_per_min 117.69; max gap 14953 ms; ssrc_changes 5; sequence_resyncs 7; lost in resyncs 12696 -> misses ['rendered_fps', 'video_lost_per_min_post_fec', 'audio_underruns_per_min']
+   K (7.1 min): spikes_20_per_min 27.39; rendered_fps 46.89; stale_output_drops_per_min 1.12; video_lost_per_min_post_fec 4137.12; audio_underruns_per_min 0.28; max gap 6009 ms; ssrc_changes 3; sequence_resyncs 4; lost in resyncs 162 -> misses ['rendered_fps', 'video_lost_per_min_post_fec']
+
+== Rows
+   F1a            NOT MET         no decrease in 12 min under the cap (transitions 0); the controller stayed at 7000 in PRESSURE; its only FALLBACK decisions ({'guard': 3}) came during freezes, when recovery was already PAUSED_RECOVERING, and were refused by the recovery guard
+   F1b            NOT APPLICABLE  no decrease, so no climb under the cap to score
+   F1c            MET             rate_limited never true (cap on False, off False); no transitions, so no spacing or ramp to break
+   F1d            NOT APPLICABLE  the stream never left 7000, so there was nothing to climb back; BACK reset the controller at 7000 (session_ended_reset, level 7000, transitions 0)
+   F2a            MET             0 decreases in the 10 min of 2 % loss and after (transitions 0); loss alone did not move the controller; no recovery event in F2
+   F3a            MET             no controller transition in F3; its 2 FALLBACK decisions were refused guard (recovery_playing false) while recovery was PAUSED_RECOVERING
+   F3b            NOT TESTED      the precondition (the stream at 5000 before the drop) was never met: the cap did not bring the stream down (F1a), so the drop hit a stream at 7000. What happened instead: recovery restarted at 7000 (C3-F1 level-preserving at 7000), each restart logged ssrc_change source recovery_restart with a 3-report blackout, and no level_sync occurred (the level never changed)
+   Ka             MET             #1 already_disabled False, #2 True; status mode shadow, configured_mode live, acts False
+   Kb             MET             after the disable: no acted transition (0); no would_act row either (no trigger fired: the same shortfall as F1); level stayed 7000
+   Kc             MET             mode after BACK live
+   ALL-override   MET             any_override at PLAYING {'F1': False, 'F2': False, 'F3': False, 'K': False}
+   ALL-report     MET             decoder report stored {'F1': True, 'F2': True, 'F3': True, 'K': True}
+   ALL-lifecycle  NOT MET         recovery cycles outside F3's intended drop: encoder restarts F1 9, F2 0, K 3, and F3 4 under the cap before the drop -- the cap's freezes, which the controller did not prevent (F1a)
+   ALL-end        MET             no privyhub_fault table True; flags after []; teardown clean True (stream 7000, no game, flag absent from manager and environ, harness.log TEARDOWN); banners 0
+
+CLASSIFICATION: NOT WORKS UNDER LOSS -- rows not held: F1a, ALL-lifecycle; not applicable: F1b, F1d; not tested: F3b

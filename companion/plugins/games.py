@@ -23,7 +23,8 @@ from games.link_drop_recovery import (
 )
 from games.startup_reconcile import run_startup_metadata_reconcile
 from native_stream import NativeStreamError, NativeStreamManager
-from adaptive_bitrate import get_shadow as adaptive_bitrate_shadow
+import adaptive_bitrate_live
+from adaptive_bitrate_live import get_controller as adaptive_bitrate_controller
 
 
 class GamesPlugin:
@@ -98,10 +99,7 @@ class GamesPlugin:
             save_recovery_state=self._emulator.save_recovery_state,
             # C3-F1: level-preserving at any ladder level (the continuity
             # diagnostic itself refuses off 7000; this calls it at 7000).
-            restart_encoder=(
-                self._native_stream
-                .recovery_restart_encoder
-            ),
+            restart_encoder=self._recovery_restart_encoder,
             full_start_encoder=self._recovery_full_start_encoder,
             stream_active=self._recovery_stream_active,
             end_session=self._recovery_end_session,
@@ -125,6 +123,25 @@ class GamesPlugin:
         # a recovery can bring the encoder up again without the client.
         self._recovery_start_args: dict[str, Any] = {}
 
+        # C3-L4-L1: with PRIVYHUB_ADAPTIVE_BITRATE_MODE=live the controller
+        # acts through the same actuator the loopback
+        # c3-validated-bitrate-transition route calls, under the stream
+        # manager's lock -- the lock recovery's restart and full start take --
+        # and only while recovery reads PLAYING. Any other mode: nothing bound.
+        self._adaptive_bitrate = adaptive_bitrate_controller(
+            self.PROJECT_ROOT
+        )
+        if adaptive_bitrate_live.is_live(self._adaptive_bitrate):
+            self._adaptive_bitrate.bind(
+                actuator=(
+                    self._native_stream
+                    .diagnostic_c3_validated_bitrate_transition
+                ),
+                context=self._adaptive_bitrate_context,
+                serial_lock=self._native_stream._lock,
+                recovery_state=self._recovery.current_state,
+            )
+
         self._metadata_reconcile_thread = threading.Thread(
             target=run_startup_metadata_reconcile,
             kwargs={
@@ -135,6 +152,27 @@ class GamesPlugin:
             daemon=True,
         )
         self._metadata_reconcile_thread.start()
+
+    def _adaptive_bitrate_context(self) -> dict[str, Any]:
+        """C3-L4-L1: the guard inputs the stream status does not carry."""
+        game = self._emulator.status()
+        return {
+            "game_active": bool(game.get("active", False)),
+            "game_paused": bool(game.get("paused", False)),
+            "recovery_state": self._recovery.current_state(),
+        }
+
+    def _adaptive_bitrate_session_ended(self) -> None:
+        if adaptive_bitrate_live.is_live(self._adaptive_bitrate):
+            self._adaptive_bitrate.session_ended()
+
+    def _recovery_restart_encoder(self) -> dict[str, Any]:
+        """C3-F1's level-preserving restart; the live controller blacks out after it."""
+        try:
+            return self._native_stream.recovery_restart_encoder()
+        finally:
+            if adaptive_bitrate_live.is_live(self._adaptive_bitrate):
+                self._adaptive_bitrate.note_recovery_restart("recovery_restart")
 
     def _recovery_stream_active(self) -> bool:
         """Does the session still have a live encoder?"""
@@ -174,19 +212,25 @@ class GamesPlugin:
                 "game session is not active"
             )
 
-        return self._native_stream.start(
-            client_ip=str(args["client_ip"]),
-            port=int(
-                args.get(
-                    "port",
-                    NativeStreamManager.DEFAULT_PORT,
-                )
-            ),
-            managed_process_id=game_status.get("pid"),
-        )
+        try:
+            return self._native_stream.start(
+                client_ip=str(args["client_ip"]),
+                port=int(
+                    args.get(
+                        "port",
+                        NativeStreamManager.DEFAULT_PORT,
+                    )
+                ),
+                managed_process_id=game_status.get("pid"),
+            )
+        finally:
+            # C3-L4-L1: a full start is a new SSRC at 7000 (C1).
+            if adaptive_bitrate_live.is_live(self._adaptive_bitrate):
+                self._adaptive_bitrate.note_recovery_restart("recovery_full_start")
 
     def _recovery_end_session(self) -> dict[str, Any]:
         """Graceful end at END_MS. The recovery save is already on disk."""
+        self._adaptive_bitrate_session_ended()
         payload = self._emulator.stop()
 
         try:
@@ -3046,12 +3090,12 @@ class GamesPlugin:
         if action == "native-stream-status":
             payload = self._native_stream.status()
             payload["recovery"] = self._recovery.status()
-            # C3-L4-S1: the shadow controller's state (schema
+            # C3-L4-S1 / C3-L4-L1: the controller's state (schema
             # privyhub_adaptive_bitrate_v1). Reads `mode: off` unless
-            # PRIVYHUB_ADAPTIVE_BITRATE_MODE=shadow; `acted` is false always.
-            payload["adaptive_bitrate"] = adaptive_bitrate_shadow(
-                self.PROJECT_ROOT
-            ).status()
+            # PRIVYHUB_ADAPTIVE_BITRATE_MODE is shadow or live; in shadow
+            # `acted` is false always; live adds level, last_action,
+            # transitions_this_session and rate_limited.
+            payload["adaptive_bitrate"] = self._adaptive_bitrate.status()
             # D-BASE-R2: newest client heartbeat, or None if none has
             # arrived. Read from the log, so it survives a companion
             # restart and says nothing about liveness by itself — compare
@@ -3730,6 +3774,9 @@ class GamesPlugin:
             # D-BASE-R3: the same gate serves startup and recovery; this is
             # where the host learns which one just happened.
             released = self._recovery.note_gameplay_released()
+            # C3-L4-L1: a session that starts starts at 7000 with no history.
+            if not released.get("recovered", False):
+                self._adaptive_bitrate_session_ended()
 
             return {
                 "ready": True,
@@ -3743,6 +3790,7 @@ class GamesPlugin:
 
         if action == "native-stream-stop":
             self._recovery.session_ended()
+            self._adaptive_bitrate_session_ended()
             game_status = self._emulator.status()
             if game_status.get("active", False) and not game_status.get("paused", False):
                 try:
@@ -4214,6 +4262,7 @@ class GamesPlugin:
 
             if action == "stop":
                 self._recovery.session_ended()
+                self._adaptive_bitrate_session_ended()
                 payload = self._emulator.stop()
                 try:
                     payload["native_stream"] = self._native_stream.end_game_session()

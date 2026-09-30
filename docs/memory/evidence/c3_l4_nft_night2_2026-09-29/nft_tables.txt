@@ -1,0 +1,78 @@
+# 2026-09-29T17:42:08.724Z setup nft list tables -> rc 0
+table ip filter
+table ip6 filter
+table ip nat
+table ip6 nat
+table ip mangle
+table ip6 mangle
+table ip raw
+table ip6 raw
+# 2026-09-29T17:44:57.770Z F1 nft list table inet privyhub_fault -> rc 0
+table inet privyhub_fault {
+	chain flt {
+		type filter hook output priority filter; policy accept;
+		udp dport 48100 counter packets 0 bytes 0
+	}
+}
+# 2026-09-29T17:44:57.784Z F1 nft list table inet privyhub_fault -> rc 0
+table inet privyhub_fault {
+	chain flt {
+		type filter hook output priority filter; policy accept;
+		udp dport 48100 counter packets 13 bytes 14684
+	}
+}
+# 2026-09-29T17:45:57.797Z F1 nft list table inet privyhub_fault -> rc 0
+table inet privyhub_fault {
+	chain flt {
+		type filter hook output priority filter; policy accept;
+		udp dport 48100 counter packets 57565 bytes 63960891
+	}
+}
+# 2026-09-29T17:45:57.864Z F1 nft list table inet privyhub_fault -> rc 0
+table inet privyhub_fault {
+	chain flt {
+		type filter hook output priority filter; policy accept;
+		udp dport 48100 limit rate over 855 kbytes/second burst 64 kbytes counter packets 0 bytes 0 drop
+	}
+}
+# 2026-09-29T17:57:57.981Z F1 nft list tables -> rc 0
+table ip filter
+table ip6 filter
+table ip nat
+table ip6 nat
+table ip mangle
+table ip6 mangle
+table ip raw
+table ip6 raw
+# 2026-09-29T18:05:41.497Z F3 nft list table inet privyhub_fault -> rc 0
+table inet privyhub_fault {
+	chain flt {
+		type filter hook output priority filter; policy accept;
+		udp dport 48100 limit rate over 855 kbytes/second burst 64 kbytes counter packets 0 bytes 0 drop
+	}
+}
+# 2026-09-29T18:05:59.605Z F3 nft list table inet privyhub_fault -> rc 0
+table inet privyhub_fault {
+	chain flt {
+		type filter hook output priority filter; policy accept;
+		udp dport { 48100, 48101 } counter packets 6 bytes 6024 drop
+	}
+}
+# 2026-09-29T18:06:14.643Z F3 nft list tables -> rc 0
+table ip filter
+table ip6 filter
+table ip nat
+table ip6 nat
+table ip mangle
+table ip6 mangle
+table ip raw
+table ip6 raw
+# 2026-09-29T18:09:39.874Z F3 nft list tables -> rc 0
+table ip filter
+table ip6 filter
+table ip nat
+table ip6 nat
+table ip mangle
+table ip6 mangle
+table ip raw
+table ip6 raw

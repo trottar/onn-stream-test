@@ -1,0 +1,79 @@
+C3-L4-N2 section 1 -- the user's nft night 2 (--only F1,F3), scored read-only against its pre-registration
+run: c3_l4_nft_night_20260929_174201Z; preregistration.txt sha256 3cdcfa2e5eb6a021... MATCHES night 2's 3cdcfa2e...
+rows: decision log 838 (782 sample rows), recovery log 7, events 33, status poller 328, host frame seconds 1553
+calibration: 7000 wire rate 1066 kB/s (counter); cap 855 kbytes/s = 876 kB/s (night 1: 854 kbytes/s)
+
+== Per-report figures by phase and rung (evaluated reports; the host payload from the frame series)
+   phase | secs | reports (evaluated) | fps median [p10-p90] | fps<50 / fps<57 share | lost/report median [max] | queue>=1 | gap median [max] | clean | host payload kB/s
+   F1 baseline [17:42:57-17:45:57Z] | 180 | 90 (90) | 59.8 [57.5-61.7] | 1 % / 7 % | 0 [94] | 3 | 16 [63] | 84/90 | 877
+   F1 F1 cap ON at 7000 [17:45:57-17:46:13Z] | 15 | 7 (7) | 33.9 [27.9-59.7] | 71 % / 71 % | 220 [251] | 0 | 15 [18] | 2/7 | 875
+   F1 F1 cap ON at 5000 [17:46:13-17:49:31Z] | 199 | 99 (96) | 59.8 [57.8-61.8] | 0 % / 6 % | 0 [5] | 1 | 15 [38] | 90/96 | 626
+   F1 F1 cap ON at 5500 [17:49:31-17:54:01Z] | 269 | 134 (131) | 59.8 [57.8-61.8] | 0 % / 6 % | 0 [8] | 4 | 15 [32] | 123/131 | 689
+   F1 F1 cap ON at 6000 [17:54:01-17:57:57Z] | 237 | 118 (115) | 55.8 [47.9-59.8] | 17 % / 60 % | 60 [218] | 1 | 16 [83] | 46/115 | 752
+   F1 after removal at 6000 [17:57:57-18:00:54Z] | 177 | 88 (88) | 59.8 [57.8-61.8] | 0 % / 6 % | 0 [4] | 1 | 15 [38] | 83/88 | 752
+   F1 after removal at 7000 [18:00:54-18:03:02Z] | 127 | 62 (59) | 59.8 [57.8-61.8] | 0 % / 5 % | 0 [3] | 2 | 15 [62] | 56/59 | 877
+   F3 baseline [18:03:41-18:05:41Z] | 120 | 59 (59) | 59.7 [57.5-61.7] | 0 % / 10 % | 0 [3] | 0 | 13 [29] | 53/59 | 877
+   F3 F3 cap ON at 7000 [18:05:41-18:05:59Z] | 18 | 9 (9) | 43.9 [31.8-59.8] | 56 % / 78 % | 241 [305] | 0 | 16 [22] | 2/9 | 877
+   F3 F3 full drop ON at 5000 [18:05:59-18:06:14Z] | 15 | 8 (2) | 0.0 [0.0-0.0] | 100 % / 100 % | 0 [0] | 0 | 14 [14] | 0/2 | 625
+   F3 after removal at 5000 [18:06:14-18:09:19Z] | 184 | 90 (90) | 59.8 [57.8-61.8] | 0 % / 8 % | 0 [5] | 1 | 16 [36] | 83/90 | 626
+
+== Transitions (the controller's rows; reports between SSRC changes counted from the sample rows)
+   17:46:11.774Z F1 FALLBACK 7000->5000 reason capacity window None/None reports since the previous change None -> transition_done 1337.0 ms [F1 cap ON at 7000]
+      13.9 s after 'F1 cap ON' went in
+   17:49:30.871Z F1 INCREASE 5000->5500 reason increase_increase window 90/85 reports since the previous change 99 -> transition_done 941.7 ms [F1 cap ON at 5000]
+   17:53:59.967Z F1 INCREASE 5500->6000 reason increase_increase window 90/85 reports since the previous change 134 -> transition_done 1124.0 ms [F1 cap ON at 5500]
+   18:00:53.767Z F1 INCREASE 6000->7000 reason increase_increase window 90/85 reports since the previous change 206 -> transition_done 1123.3 ms [after removal at 6000]
+   18:05:58.169Z F3 FALLBACK 7000->5000 reason capacity window None/None reports since the previous change 133 -> transition_done 1173.9 ms [F3 cap ON at 7000]
+      16.7 s after 'F3 cap ON' went in
+   non-sample rows: {'controller_start': 1, 'session_reset': 1, 'session_ended_reset': 8, 'transition': 5, 'transition_done': 5, 'ssrc_change': 1}
+   refused 0; hold 0; escalation_armed 0; level_sync 0; rate_limited ever False
+
+== The 6000 rung under the cap (why nothing fired)
+   115 evaluated reports at 6000 under the cap: fps median 55.8, p10 47.9; under 50 on 17 %; lost median 60; the strict capacity bar (5/5 under 50 with 3/5 lost >= 50): most under 50 in a qualifying window 3/5; ROUTINE needs queue >= 1 (0 reports)
+   the handoff's mild bar (>= 4/5 under 57 and >= 3/5 lost >= 50) at its best in any window: fps 5/5, loss 5/5 (scored by the rule itself in the replays)
+
+== Recovery log per session
+   F1: [('18:02:59.571', 'session_ended', None, None)]
+   F3: [('18:06:00.773', 'desync_pause', 'client_output_silence', None), ('18:06:05.563', 'encoder_restart', None, None), ('18:06:18.126', 'resumed', None, 17444), ('18:09:16.425', 'session_ended', None, None)]
+   ssrc_change 18:06:05.563Z source recovery_restart: controller level 5000, stream 5000; host status bitrate_kbps over the next 60 s [5000]; host payload median over the next 30 s 625 kB/s (5000 kbit/s = 625; before the capacity drop at 7000 876)
+
+== Check (i): the level after F3's BACK
+   harness 'back' event F1: level_after 7000 mode live
+   harness 'back' event F3: level_after 5000 mode live
+   session_ended_reset 17:42:57.644Z: before {'transitions_this_session': 0, 'level_kbps': 7000, 'disabled': False} -> level 7000
+   session_ended_reset 18:02:59.571Z: before {'transitions_this_session': 4, 'level_kbps': 7000, 'disabled': False} -> level 7000
+   session_ended_reset 18:03:02.176Z: before {'transitions_this_session': 0, 'level_kbps': 7000, 'disabled': False} -> level 7000
+   session_ended_reset 18:03:41.409Z: before {'transitions_this_session': 0, 'level_kbps': 7000, 'disabled': False} -> level 7000
+   session_ended_reset 18:09:16.425Z: before {'transitions_this_session': 1, 'level_kbps': 5000, 'disabled': False} -> level 7000
+   session_ended_reset 18:09:19.117Z: before {'transitions_this_session': 0, 'level_kbps': 7000, 'disabled': False} -> level 7000
+   session_ended_reset 18:09:49.194Z: before {'transitions_this_session': 0, 'level_kbps': 7000, 'disabled': False} -> level 7000
+   session_ended_reset 18:09:49.227Z: before {'transitions_this_session': 0, 'level_kbps': 7000, 'disabled': False} -> level 7000
+   status 18:09:14.7Z: stream bitrate_kbps 5000 active True; adaptive_bitrate level 5000 state RECOVERY_PROBATION transitions 1
+   status 18:09:19.8Z: stream bitrate_kbps 7000 active False; adaptive_bitrate level 5000 state REFERENCE transitions 0
+   status 18:09:24.8Z: stream bitrate_kbps 7000 active False; adaptive_bitrate level 5000 state REFERENCE transitions 0
+   status 18:09:29.8Z: stream bitrate_kbps 7000 active False; adaptive_bitrate level 5000 state REFERENCE transitions 0
+   status 18:09:34.8Z: stream bitrate_kbps 7000 active False; adaptive_bitrate level 5000 state REFERENCE transitions 0
+   status 18:09:39.8Z: stream bitrate_kbps 7000 active False; adaptive_bitrate level 5000 state REFERENCE transitions 0
+   -> the policy reset to 7000 at BACK and the stream read 7000; the status field `level` is the wrapper's cached last stream bitrate (`_stream_kbps`), not cleared by session_ended(), so it read 5000 until the next report. A stale status field, not a reset defect (F1 read 7000 only because its stream ended at 7000).
+
+== Check (ii): the session_ended_reset rows
+   8 rows; duplicates (before: 0 transitions at 7000) 6 -- the games plugin resets on native-stream-stop (BACK), on games/stop, and at the next session's gameplay release; each call is idempotent (end_session), so the duplicates are harmless.
+
+== Close-out rows per session (decoder report; reported)
+   F1 (20.1 min): spikes_20_per_min 30.06; rendered_fps 58.79; stale_output_drops_per_min 0.50; video_lost_per_min_post_fec 403.69; audio_underruns_per_min 0.84; max gap 303 ms; ssrc_changes 4 at [200953, 399656, 668933, 1082732]; sequence_resyncs 4 -> misses ['rendered_fps', 'video_lost_per_min_post_fec']
+   F3 (5.7 min): spikes_20_per_min 28.64; rendered_fps 56.55; stale_output_drops_per_min 1.06; video_lost_per_min_post_fec 302.67; audio_underruns_per_min 202.07; max gap 15221 ms; ssrc_changes 2 at [142450, 158487]; sequence_resyncs 2 -> misses ['rendered_fps', 'video_lost_per_min_post_fec', 'audio_underruns_per_min']
+   F1a            MET                                      capacity FALLBACK 7000->5000 13.9 s after the cap, one transition (transition_done); one decoder ssrc_change for it
+   F1b            MET on every transition that occurred    branch: the climb 5000->5500->6000 under the cap ([99, 134] reports after the previous change, >= 93 each: True); the expected capacity FALLBACK from 6000 never came, so the HOLD step was never reached -- the stream sat at 6000 under the cap until the cap was removed (the finding)
+   F1c            MET                                      rate_limited never true; F1's transitions [199, 269, 414] s apart (hold-down minimum 60 s / 120 s; every up >= 93 reports: [99, 134, 206]); no ramp
+   F1d            MET                                      after removal: [(6000, 7000, 206)] (one rung, >= 93 reports); BACK reset to 7000
+   F1e            MET                                      the backstop did not fire in F1 (0 escalation_armed; 0 recovery restarts)
+   F1f            MET                                      recovery cycles under the cap: 0 (expected <= 1)
+   F3pre          MET                                      capacity FALLBACK 7000->5000 16.7 s after F3's cap
+   F3a            MET                                      no controller transition during the drop or recovery (the only F3 transition preceded the drop); no refused row (no report met a bar while recovery was not PLAYING)
+   F3b            MET                                      desync_pause 18:06:00.8, encoder_restart 18:06:05.6 at 5000 (host status 5000; host payload ~620 kB/s after it), resumed 18:06:18.1 (17.4 s); ssrc_change source recovery_restart with a 3-report blackout; no level_sync; one restart, so the backstop had nothing to arm; no INCREASE after the drop inside the 180 s
+   ALL-override   MET                                      {'F1': False, 'F3': False}
+   ALL-report     MET                                      both stored
+   ALL-lifecycle  MET                                      F1: session_started / session_ended only; F3: only the intended drop's pause, restart, resume
+   ALL-end        MET                                      no fault table; flag unset and absent; stream 7000; no game; 0 banners
+
+CLASSIFICATION: WORKS UNDER LOSS (F1, F3) -- with the finding that the pre-registered F1b shape (capacity back from 6000, then HOLD) did not occur: 6000 under the cap was degraded but never met a bar

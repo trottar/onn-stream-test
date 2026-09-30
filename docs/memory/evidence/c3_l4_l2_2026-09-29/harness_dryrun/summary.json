@@ -1,0 +1,178 @@
+{
+ "dry_run": true,
+ "started_utc": "2026-09-29T03:58:44.418Z",
+ "sessions": {
+  "F1": {
+   "any_override_at_playing": false,
+   "cap_on": {
+    "label": "F1 cap on",
+    "since": "2026-09-29T04:00:38.475Z",
+    "transitions": [],
+    "holds": 0,
+    "refused": {},
+    "rate_limited_ever": false,
+    "level": 7000,
+    "state": "REFERENCE",
+    "mode": "live",
+    "recovery_events": []
+   },
+   "cap_off": {
+    "label": "F1 cap off",
+    "since": "2026-09-29T04:01:08.488Z",
+    "transitions": [],
+    "holds": 0,
+    "refused": {},
+    "rate_limited_ever": false,
+    "level": 7000,
+    "state": "REFERENCE",
+    "mode": "live",
+    "recovery_events": []
+   }
+  },
+  "F2": {
+   "any_override_at_playing": false,
+   "loss_on": {
+    "label": "F2 loss on",
+    "since": "2026-09-29T04:03:52.766Z",
+    "transitions": [],
+    "holds": 0,
+    "refused": {},
+    "rate_limited_ever": false,
+    "level": 7000,
+    "state": "REFERENCE",
+    "mode": "live",
+    "recovery_events": []
+   },
+   "loss_off": {
+    "label": "F2 loss off",
+    "since": "2026-09-29T04:04:22.778Z",
+    "transitions": [],
+    "holds": 0,
+    "refused": {},
+    "rate_limited_ever": false,
+    "level": 7000,
+    "state": "REFERENCE",
+    "mode": "live",
+    "recovery_events": []
+   }
+  },
+  "F3": {
+   "any_override_at_playing": false,
+   "cap_to_5000": {
+    "label": "F3 cap",
+    "since": "2026-09-29T04:07:05.330Z",
+    "transitions": [],
+    "holds": 0,
+    "refused": {},
+    "rate_limited_ever": false,
+    "level": 7000,
+    "state": "REFERENCE",
+    "mode": "live",
+    "recovery_events": []
+   },
+   "drop": {
+    "label": "F3 drop and recovery",
+    "since": "2026-09-29T04:07:35.345Z",
+    "transitions": [],
+    "holds": 0,
+    "refused": {},
+    "rate_limited_ever": false,
+    "level": 7000,
+    "state": "REFERENCE",
+    "mode": "live",
+    "recovery_events": []
+   }
+  },
+  "K": {
+   "any_override_at_playing": false,
+   "disable": {
+    "first": [
+     200,
+     {
+      "ok": true,
+      "already_disabled": false,
+      "effective_mode": "shadow",
+      "disabled_at_utc": "2026-09-29T04:11:05.582Z",
+      "note": "live resumes only with a new session; unset the flag and restart the unit for off"
+     }
+    ],
+    "second": [
+     200,
+     {
+      "ok": true,
+      "already_disabled": true,
+      "effective_mode": "shadow",
+      "disabled_at_utc": "2026-09-29T04:11:05.582Z",
+      "note": "live resumes only with a new session; unset the flag and restart the unit for off"
+     }
+    ],
+    "status": {
+     "mode": "shadow",
+     "configured_mode": "live",
+     "acts": false,
+     "level": 7000
+    }
+   },
+   "disabled_cap_on": {
+    "label": "K cap, then disabled",
+    "since": "2026-09-29T04:10:35.579Z",
+    "transitions": [],
+    "holds": 0,
+    "refused": {},
+    "rate_limited_ever": false,
+    "level": 7000,
+    "state": "REFERENCE",
+    "mode": "shadow",
+    "recovery_events": []
+   },
+   "mode_after_back": "live"
+  }
+ },
+ "preregistration_sha256": "fb5ca63fe559e5b2f99eb670d38fb21532f55f2fdd98883ca3f3f0678f57c531",
+ "calibration": {
+  "rate_7000_bytes_per_s": null,
+  "used": 1083000,
+  "source": "estimate",
+  "cap_kbytes_per_s": 869
+ },
+ "banner_count_at_end": 0,
+ "teardown_clean": true,
+ "flags_after": [],
+ "ended_utc": "2026-09-29T04:13:22.730Z",
+ "files": {
+  "harness.log": true,
+  "events.jsonl": true,
+  "abr_series.jsonl": true,
+  "t2_samples.jsonl": true,
+  "decision_log.jsonl": true,
+  "heartbeat.jsonl": true,
+  "frames.jsonl": true,
+  "recovery_log.jsonl": true,
+  "companion_journal_redacted.log": true,
+  "preregistration.txt": true,
+  "preregistration.sha256": true,
+  "armcheck_F1.json": true,
+  "status_end_F1.json": true,
+  "report_F1.json": true,
+  "armcheck_F2.json": true,
+  "status_end_F2.json": true,
+  "report_F2.json": true,
+  "armcheck_F3.json": true,
+  "status_end_F3.json": true,
+  "report_F3.json": true,
+  "armcheck_K.json": true,
+  "status_end_K.json": true,
+  "report_K.json": true
+ },
+ "rows": {
+  "events.jsonl": 43,
+  "abr_series.jsonl": 169,
+  "t2_samples.jsonl": 86,
+  "decision_log.jsonl": 397,
+  "heartbeat.jsonl": 339,
+  "frames.jsonl": 694,
+  "recovery_log.jsonl": 8
+ },
+ "decision_log_sample_rows": 339,
+ "complete": true
+}

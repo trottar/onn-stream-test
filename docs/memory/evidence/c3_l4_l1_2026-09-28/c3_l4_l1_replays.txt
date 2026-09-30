@@ -1,0 +1,36 @@
+C3-L4-L1 offline replays through the live decision path
+live constants: targets {'FALLBACK': 5000, 'ROUTINE': 6000}; hold-downs {'FALLBACK/down': 30, 'FALLBACK/up': 60, 'ROUTINE/down': 60, 'ROUTINE/up': 60, 'INCREASE/up': 30, 'INCREASE/down': 60}; blackout 3; increase after 90 clean; rate limit 4/10 min; session age 60 s; routine defer 4
+
+== 1. PARITY: the C3-L4-S1 shadow night through the live path
+source docs/memory/evidence/c3_l4_s1_2026-09-24/shadow_log.jsonl: 1048 logged lines, 4 sessions
+rebuilt reports: 3594 (the night's status counters: 602 + 600 + 1,796 + 600 = 3,598)
+  session 1: reports 598; control (shadow on the rebuild reproduces the logged sequence) MATCH (167 logged / 167 replayed changes); shadow would-acts 0; live transitions 0; live refusals 0; live reports evaluated 598; live level at end 7000
+  session 2: reports 601; control (shadow on the rebuild reproduces the logged sequence) MATCH (167 logged / 167 replayed changes); shadow would-acts 0; live transitions 0; live refusals 0; live reports evaluated 601; live level at end 7000
+  session 3: reports 1796; control (shadow on the rebuild reproduces the logged sequence) MATCH (525 logged / 525 replayed changes); shadow would-acts 0; live transitions 0; live refusals 0; live reports evaluated 1796; live level at end 7000
+  session 4: reports 599; control (shadow on the rebuild reproduces the logged sequence) MATCH (189 logged / 189 replayed changes); shadow would-acts 0; live transitions 0; live refusals 0; live reports evaluated 599; live level at end 7000
+PARITY: reports 3594; shadow would-acts 0; live transitions 0; live refusals 0 -> SAME DECISIONS (zero actions)
+
+== 2. RECORDED LOSS: C4-D1 (82 heartbeat files) + CTRL-L1 (3 holds) through the live path
+sessions 88 (rows deduplicated across files; companion logs cut at 2026-09-24T16:13:00Z); with >= 5 intervals: 88
+-- variant proxy: series 88, reports 44634, transitions 8, oscillation holds 0, max transitions in any 10-min window 1, RATE_LIMITED 0 (shadow would-acts on the same series, ROUTINE included: 17)
+   would-fire list (source, file#session, elapsed, event, class, from -> to):
+    C4-D1 2026-09-21T03:43:39Z d_base_s1_2026-09-21/S2/heartbeat_lines.jsonl t=   340.9s transition ROUTINE  7000 -> 6000
+    C4-D1 2026-09-21T04:16:46Z d_base_s1_2026-09-21/S3/heartbeat_lines.jsonl t=   738.6s transition ROUTINE  7000 -> 6000
+    C4-D1 2026-09-21T05:51:00Z d_base_s2_2026-09-21/L1/heartbeat_lines.jsonl t=   134.0s transition ROUTINE  7000 -> 6000
+    C4-D1 2026-09-21T08:24:06Z d_base_s2_2026-09-21/L1/heartbeat_lines.jsonl t=  9587.7s transition ROUTINE  7000 -> 6000
+    C4-D1 2026-09-21T23:26:31Z o1_2026-09-21/heartbeat_B.jsonl t=   136.0s transition ROUTINE  7000 -> 6000
+    C4-D1 2026-09-22T15:21:00Z d_base_r3b_2026-09-21/N150/heartbeat_lines.jsonl t=    60.0s transition FALLBACK 7000 -> 5000  [link drop (R3b, or P8 v1 B hit by R3b E30): live, recovery / pause guards block this]
+    C4-D1 2026-09-22T23:37:40Z d_base_p8_2026-09-22/runs_v1/heartbeat_B.jsonl t=    61.9s transition FALLBACK 7000 -> 5000  [link drop (R3b, or P8 v1 B hit by R3b E30): live, recovery / pause guards block this]
+    C4-D1 2026-09-23T02:30:59Z d_base_r3b_2026-09-21/E30/heartbeat_lines.jsonl t=    62.0s transition FALLBACK 7000 -> 5000  [link drop (R3b, or P8 v1 B hit by R3b E30): live, recovery / pause guards block this]
+-- variant bound: series 88, reports 44634, transitions 9, oscillation holds 0, max transitions in any 10-min window 1, RATE_LIMITED 0 (shadow would-acts on the same series, ROUTINE included: 23)
+   would-fire list (source, file#session, elapsed, event, class, from -> to):
+    C4-D1 2026-09-21T03:10:33Z d_base_s1_2026-09-21/S1/heartbeat_lines.jsonl t=  1623.9s transition ROUTINE  7000 -> 6000
+    C4-D1 2026-09-21T03:43:39Z d_base_s1_2026-09-21/S2/heartbeat_lines.jsonl t=   338.9s transition ROUTINE  7000 -> 6000
+    C4-D1 2026-09-21T04:16:46Z d_base_s1_2026-09-21/S3/heartbeat_lines.jsonl t=   738.6s transition ROUTINE  7000 -> 6000
+    C4-D1 2026-09-21T05:51:00Z d_base_s2_2026-09-21/L1/heartbeat_lines.jsonl t=   134.0s transition ROUTINE  7000 -> 6000
+    C4-D1 2026-09-21T08:24:06Z d_base_s2_2026-09-21/L1/heartbeat_lines.jsonl t=  9587.7s transition ROUTINE  7000 -> 6000
+    C4-D1 2026-09-21T23:26:31Z o1_2026-09-21/heartbeat_B.jsonl t=   136.0s transition ROUTINE  7000 -> 6000
+    C4-D1 2026-09-22T15:21:00Z d_base_r3b_2026-09-21/N150/heartbeat_lines.jsonl t=    60.0s transition FALLBACK 7000 -> 5000  [link drop (R3b, or P8 v1 B hit by R3b E30): live, recovery / pause guards block this]
+    C4-D1 2026-09-22T23:37:40Z d_base_p8_2026-09-22/runs_v1/heartbeat_B.jsonl t=    61.9s transition FALLBACK 7000 -> 5000  [link drop (R3b, or P8 v1 B hit by R3b E30): live, recovery / pause guards block this]
+    C4-D1 2026-09-23T02:30:59Z d_base_r3b_2026-09-21/E30/heartbeat_lines.jsonl t=    62.0s transition FALLBACK 7000 -> 5000  [link drop (R3b, or P8 v1 B hit by R3b E30): live, recovery / pause guards block this]
+   outside the link-drop sessions, longest run of consecutive reports under 50 fps: 3; under 57 fps: 7 (FALLBACK needs 5 under 50; ROUTINE 4 of 5 under 57)

@@ -1,0 +1,43 @@
+[night 21:57:46Z] flag set in the manager: PRIVYHUB_ADAPTIVE_BITRATE_MODE=live 
+[night 21:57:46Z] sampler started (10 s)
+[night 21:57:46Z] last session_ended 2026-09-28T20:14:16.821Z
+[night 21:57:46Z] A begins (1800 s)
+[A 21:57:46Z] mode=H hold/timeout=1800s probe_args=none heartbeat_ms=default
+[A 21:57:50Z] companion MainPID 716536 serving 8765; PRIVYHUB_* other than the allowed flags in its environ: 0; flags: PRIVYHUB_ADAPTIVE_BITRATE_MODE=live 
+[A 21:57:50Z] adaptive_bitrate mode/configured/inject_enabled: live live False
+[A] before launch: any_override False cap 90000 profile cushion 12 17 profile redundancy 2 4 profile -> ADOPTED
+[A] at PLAYING: any_override False cap 90000 profile cushion 12 17 profile redundancy 2 4 profile -> ADOPTED
+[A 21:58:33Z] PLAYING at 2026-09-28T21:58:33Z; holding 1800s, zero input
+[A 22:28:36Z] adb client processes seen during hold: 62 (# polls 3476)
+[A 22:28:38Z] report: native_decoder_20260928_222838_340.json
+[frames] 1801 seconds in the session window
+[heartbeat] 897 lines
+[A 22:28:58Z] decision log lines in the session: 98
+[A 22:29:00Z] game active after stop: False
+[A 22:29:00Z] done
+[night 22:29:00Z] A harness exit 0
+[night 22:29:00Z] inject flag set: PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_MODE=live 
+[night 22:29:30Z] B begins (up to 900 s after the first injection)
+[B 22:29:30Z] mode=B hold/timeout=900s probe_args=none heartbeat_ms=default
+[B 22:29:35Z] companion MainPID 737069 serving 8765; PRIVYHUB_* other than the allowed flags in its environ: 0; flags: PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_MODE=live 
+[B 22:29:35Z] adaptive_bitrate mode/configured/inject_enabled: live live True
+[B] before launch: any_override False cap 90000 profile cushion 12 17 profile redundancy 2 4 profile -> ADOPTED
+[B] at PLAYING: any_override False cap 90000 profile cushion 12 17 profile redundancy 2 4 profile -> ADOPTED
+[B 22:30:14Z] PLAYING at 2026-09-28T22:30:14Z; first injection 120 s after PLAYING, zero input
+[B 22:32:14Z] injection 1 at 22:32:14Z: HTTP 200; [('transition', 'decrease_fallback', 7000, 5000)]
+[B 22:32:44Z] injection 2 at 22:32:44Z: HTTP 200; [('refused', 'hold_down', 5000, 5000)]
+[B 22:47:18Z] level/transitions: 5000 1; holding 60 s more
+[B 22:48:18Z] bitrate before BACK: 5000
+[B 22:48:19Z] adb client processes seen during hold: 37 (# polls 2095)
+[B 22:48:21Z] report: native_decoder_20260928_224821_285.json
+[frames] 1085 seconds in the session window
+[heartbeat] 540 lines
+[B 22:48:44Z] decision log lines in the session: 14
+[B 22:48:46Z] game active after stop: False
+[B 22:48:46Z] done
+[night 22:48:46Z] B harness exit 0
+[night 22:49:20Z] flags unset: manager PRIVYHUB_* 0; MainPID 751040; 8765 751040; PRIVYHUB_* in its environ 0; ADAPTIVE_BITRATE_* in its environ 0
+[night] adaptive_bitrate {'schema': 'privyhub_adaptive_bitrate_v1', 'mode': 'off', 'acted': False} | bitrate 7000 profile native_game_720p60_reference cap 90000 profile cushion 12 17 profile redundancy 2 4 profile any_override False active False
+[night 22:49:20Z] inject route after teardown: HTTP 403
+[night 22:49:30Z] teardown: game active False; NOW PLAYING on the launcher: 0
+[night 22:49:30Z] night done

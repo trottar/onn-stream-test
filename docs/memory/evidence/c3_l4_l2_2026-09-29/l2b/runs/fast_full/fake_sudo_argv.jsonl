@@ -1,0 +1,42 @@
+{"t": 1790691892.577756, "argv": ["-v"]}
+{"t": 1790691892.8552184, "argv": ["-n", "nft", "list", "tables"]}
+{"t": 1790691997.7294734, "argv": ["-n", "nft", "add", "table", "inet", "privyhub_fault"]}
+{"t": 1790691997.7501297, "argv": ["-n", "nft", "add", "chain", "inet", "privyhub_fault", "flt", "{ type filter hook output priority 0; }"]}
+{"t": 1790691997.7714005, "argv": ["-n", "nft", "add", "rule", "inet", "privyhub_fault", "flt", "udp", "dport", "48100", "counter"]}
+{"t": 1790691997.793265, "argv": ["-n", "nft", "list", "table", "inet", "privyhub_fault"]}
+{"t": 1790691997.816879, "argv": ["-n", "nft", "list", "table", "inet", "privyhub_fault"]}
+{"t": 1790692007.8390548, "argv": ["-n", "nft", "list", "table", "inet", "privyhub_fault"]}
+{"t": 1790692007.8628793, "argv": ["-n", "nft", "flush", "chain", "inet", "privyhub_fault", "flt"]}
+{"t": 1790692007.8841777, "argv": ["-n", "nft", "add", "rule", "inet", "privyhub_fault", "flt", "udp", "dport", "48100", "limit", "rate", "over", "869", "kbytes/second", "burst", "64", "kbytes", "counter", "drop"]}
+{"t": 1790692007.9050844, "argv": ["-n", "nft", "list", "table", "inet", "privyhub_fault"]}
+{"t": 1790692067.944907, "argv": ["-n", "nft", "delete", "table", "inet", "privyhub_fault"]}
+{"t": 1790692067.9675965, "argv": ["-n", "nft", "list", "tables"]}
+{"t": 1790692132.6115594, "argv": ["-n", "-v"]}
+{"t": 1790692231.7948935, "argv": ["-n", "nft", "add", "table", "inet", "privyhub_fault"]}
+{"t": 1790692231.8174236, "argv": ["-n", "nft", "add", "chain", "inet", "privyhub_fault", "flt", "{ type filter hook output priority 0; }"]}
+{"t": 1790692231.8403854, "argv": ["-n", "nft", "add", "rule", "inet", "privyhub_fault", "flt", "udp", "dport", "48100", "numgen", "random", "mod", "1000", "<", "20", "counter", "drop"]}
+{"t": 1790692231.8638854, "argv": ["-n", "nft", "list", "table", "inet", "privyhub_fault"]}
+{"t": 1790692291.8994155, "argv": ["-n", "nft", "delete", "table", "inet", "privyhub_fault"]}
+{"t": 1790692291.920303, "argv": ["-n", "nft", "list", "tables"]}
+{"t": 1790692372.6327229, "argv": ["-n", "-v"]}
+{"t": 1790692455.6770258, "argv": ["-n", "nft", "add", "table", "inet", "privyhub_fault"]}
+{"t": 1790692455.6992652, "argv": ["-n", "nft", "add", "chain", "inet", "privyhub_fault", "flt", "{ type filter hook output priority 0; }"]}
+{"t": 1790692455.7213848, "argv": ["-n", "nft", "add", "rule", "inet", "privyhub_fault", "flt", "udp", "dport", "48100", "limit", "rate", "over", "869", "kbytes/second", "burst", "64", "kbytes", "counter", "drop"]}
+{"t": 1790692455.7441242, "argv": ["-n", "nft", "list", "table", "inet", "privyhub_fault"]}
+{"t": 1790692515.7845962, "argv": ["-n", "nft", "flush", "chain", "inet", "privyhub_fault", "flt"]}
+{"t": 1790692515.8069818, "argv": ["-n", "nft", "add", "rule", "inet", "privyhub_fault", "flt", "udp", "dport", "{ 48100, 48101 }", "counter", "drop"]}
+{"t": 1790692515.8294919, "argv": ["-n", "nft", "list", "table", "inet", "privyhub_fault"]}
+{"t": 1790692530.8303595, "argv": ["-n", "nft", "delete", "table", "inet", "privyhub_fault"]}
+{"t": 1790692530.853921, "argv": ["-n", "nft", "list", "tables"]}
+{"t": 1790692612.6535165, "argv": ["-n", "-v"]}
+{"t": 1790692694.6680415, "argv": ["-n", "nft", "add", "table", "inet", "privyhub_fault"]}
+{"t": 1790692694.6904993, "argv": ["-n", "nft", "add", "chain", "inet", "privyhub_fault", "flt", "{ type filter hook output priority 0; }"]}
+{"t": 1790692694.7119296, "argv": ["-n", "nft", "add", "rule", "inet", "privyhub_fault", "flt", "udp", "dport", "48100", "limit", "rate", "over", "869", "kbytes/second", "burst", "64", "kbytes", "counter", "drop"]}
+{"t": 1790692694.733865, "argv": ["-n", "nft", "list", "table", "inet", "privyhub_fault"]}
+{"t": 1790692814.7854564, "argv": ["-n", "nft", "delete", "table", "inet", "privyhub_fault"]}
+{"t": 1790692814.808019, "argv": ["-n", "nft", "list", "tables"]}
+{"t": 1790692852.6749415, "argv": ["-n", "-v"]}
+{"t": 1790692899.643515, "argv": ["-n", "nft", "delete", "table", "inet", "privyhub_fault"]}
+{"t": 1790692899.6640255, "argv": ["-n", "nft", "list", "tables"]}
+{"t": 1790692899.6849356, "argv": ["-n", "nft", "delete", "table", "inet", "privyhub_fault"]}
+{"t": 1790692899.705272, "argv": ["-n", "nft", "list", "tables"]}

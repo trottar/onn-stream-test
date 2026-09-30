@@ -1,0 +1,188 @@
+[17:42:01Z] C3-L4-L2B/N1 nft night harness ; run dir /home/privyhub/Projects/onn-stream-test/logs/streaming/c3_l4_nft_night_20260929_174201Z
+[17:42:01Z] sessions ['F1', 'F3']; timings {'baseline_s': 120, 'f1_on_s': 720, 'f1_off_s': 300, 'f2_on_s': 600, 'f2_off_s': 300, 'f3_reach_s': 240, 'f3_drop_s': 15, 'f3_after_s': 180, 'k_first_s': 120, 'k_on_s': 120, 'k_off_s': 60, 'calib_gap_s': 60}
+[17:42:01Z] ========================================================================
+[17:42:01Z] PREFLIGHT
+[17:42:01Z]   To stop: press Ctrl-C -- the fault is removed automatically.
+[17:42:01Z] ========================================================================
+[17:42:01Z]   sudo needs your password (once, at the start) -- type it below.
+[17:42:08Z]   sudo -v -> OK
+[17:42:08Z]   sudo is cached; a keepalive (`sudo -n -v`) runs every 240 s
+[17:42:08Z]   companion MainPID serves 8765; no game; no PRIVYHUB_*; adopted profile at 7000; any_override false; APK f31b1c18...8ae7 (adopted); onn in adb
+[17:42:08Z]   pre-registration c3_l4_nft_night2_preregistration.txt sha256 3cdcfa2e5eb6a021... (copied into the run dir):
+[17:42:08Z]   | C3-L4-N1 -- pre-registration for the user's nft night 2 (`--only F1,F3`)
+[17:42:08Z]   | Written 2026-09-29 by Code, before the night, from night 1's pre-registration (c3_l4_l2_nft_preregistration.txt,
+[17:42:08Z]   | sha256 fb5ca63f...) with the two rules the user approved on 2026-09-29. The user may amend this file before
+[17:42:08Z]   | starting; tools/c3_l4_nft_night.py prints it at start and records its sha256 in the run directory. Rules are
+[17:42:08Z]   | not tightened or loosened after data.
+[17:42:08Z]   | 
+[17:42:08Z]   | Controller as built for the night: PRIVYHUB_ADAPTIVE_BITRATE_MODE=live (never INJECT); FALLBACK -> 5000,
+[17:42:08Z]   | ROUTINE -> 6000, one transition per event; the FALLBACK triggers are (i) the shadow's fps/queue/gap evidence,
+[17:42:08Z]   | (ii) NEW capacity: over the last 5 evaluated reports fps < 50 on all 5 and lost_packets_delta >= 50 on >= 3
+[17:42:08Z]   | of 5, (iii) NEW recovery_escalation: two recovery encoder restarts at one level within 180 s -> after recovery
+[17:42:08Z]   | is PLAYING and the 3-report blackout, one FALLBACK decision (at_floor at 5000); INCREASE one rung when >= 85
+[17:42:08Z]   | of the last 90 reports since the last SSRC change (and its 3-report blackout) are clean (fps >= 57, queue
+[17:42:08Z]   | <= 1, gap <= 150); hold-downs FALLBACK 30/60, ROUTINE 60, INCREASE 60/30 reports (after a down / after an
+[17:42:08Z]   | up); oscillation guard (third direction change in 10 min -> HOLD for the session); rate limit 4 per 10 min;
+[17:42:08Z]   | guards incl. recovery PLAYING and session age >= 60 s. Recovery unchanged (C3-F1, level-preserving). Faults:
+[17:42:08Z]   | host output hook, video port 48100 only (F3's drop adds audio 48101). Sessions: F1 then F3 (no F2, no K).
+[17:42:08Z]   | 
+[17:42:08Z]   | Classification: WORKS UNDER LOSS (F1, F3) if every F1 and F3 row and the all-sessions rows hold as below;
+[17:42:08Z]   | otherwise each row is recorded as met / not met / not applicable, with the per-report sample rows saying why.
+[17:42:08Z]   | 
+[17:42:08Z]   | F1 -- capacity cap (CAP = the midpoint of the calibrated 5500 and 6000 wire rates), 12 min on, 5 min off:
+[17:42:08Z]   |   F1a the capacity FALLBACK 7000 -> 5000 (reason capacity) within 60 s of the cap going in, as ONE transition
+[17:42:08Z]   |       (one ssrc_change from it); night 1's samples replayed put it at ~14 s.
+[17:42:08Z]   |   F1b the blend's climb under the cap follows the rules, whichever way the cap falls:
+[17:42:08Z]   |       expected (L1's rung loads: 5000 ~775, 5500 ~850, 6000 ~930 kB/s against a cap of ~874 kB/s):
+[17:42:08Z]   |       INCREASE 5000 -> 5500 >= 93 reports after the capacity FALLBACK's SSRC change (5500 fits); INCREASE
+[17:42:08Z]   |       5500 -> 6000 >= 93 reports after that (6000 does not fit); a capacity FALLBACK 6000 -> 5000 no sooner
+[17:42:08Z]   |       than the 60-report reversal hold-down; then the next increase -- the third direction change inside
+[17:42:08Z]   |       10 min -- becomes HOLD (reason oscillation) and the stream stays at 5000 for the rest of the session.
+[17:42:08Z]   |       Or: "climbed to <rung> and stayed" if the cap lets that rung through (the cap and the per-report
+[17:42:08Z]   |       samples recorded; not a failure of the controller). If the 3rd direction change would fall more than
+[17:42:08Z]   |       10 min after the 1st, it is an INCREASE, not a HOLD (the oscillation window, as built), recorded.
+[17:42:08Z]   |       MET if every transition in F1 is one the rules above name, at the spacing they allow.
+[17:42:08Z]   |   F1c rate_limited never true; no two transitions closer than the hold-down table; never a ramp (no two
+[17:42:08Z]   |       transitions < 93 reports apart in the same direction).
+[17:42:08Z]   |   F1d after removal: nothing if HOLD; otherwise one rung per >= 93 reports; BACK resets to 7000.
+[17:42:08Z]   |   F1e the backstop: expected NOT to fire in F1, because the capacity trigger acts first. Recorded either
+[17:42:08Z]   |       way: every escalation_armed row, and its one decision (transition / refused and why).
+[17:42:08Z]   |   F1f recovery cycles under the cap (desync_pause / encoder_restart / resumed), reported: expected <= 1
+[17:42:08Z]   |       (night 1, with no decrease: 10 pauses, 9 restarts at 7000 in 12 min).
+[17:42:08Z]   | F3 -- the cap until the stream is at 5000 (now reachable through capacity), then a 15 s full drop of 48100
+[17:42:08Z]   |       and 48101, then removed:
+[17:42:08Z]   |   F3pre the cap brings the stream to 5000 by one capacity FALLBACK within the 240 s the harness waits.
+[17:42:08Z]   |       NOT MET here makes F3b NOT TESTED (as night 1), not a failure of recovery.
+[17:42:08Z]   |   F3a no controller transition while recovery is not PLAYING (refused/guard recovery_playing, or no report
+[17:42:08Z]   |       at all).
+[17:42:08Z]   |   F3b recovery's restart is at the held level (5000; C3-F1), then resumed; ssrc_change source
+[17:42:08Z]   |       recovery_restart; 3-report blackout; no level_sync to 7000. If recovery restarts twice at 5000 within
+[17:42:08Z]   |       180 s, the backstop's one decision is refused at_floor (logged) -- reported, and it must not move the
+[17:42:08Z]   |       level. An INCREASE after the drop, if any, is the blend's (>= 93 reports after the last SSRC change).
+[17:42:08Z]   | All sessions: any_override false at PLAYING; decoder report stored; lifecycle clean except F3's intended
+[17:42:08Z]   | recovery and F1f's reported cycles; at the end no privyhub_fault table, the flag unset and absent from the
+[17:42:08Z]   | manager and the environ, stream 7000, no game active.
+[17:42:08Z]   No fault table may exist before the night:
+[17:42:08Z]     VERIFY (before the night): privyhub_fault absent -> OK
+[17:42:08Z]   To stop: press Ctrl-C -- the fault is removed automatically.
+[17:42:15Z] ========================================================================
+[17:42:15Z] SETUP: live mode on, recorders on
+[17:42:15Z]   To stop: press Ctrl-C -- the fault is removed automatically.
+[17:42:15Z] ========================================================================
+[17:42:19Z]   flag set: ['PRIVYHUB_ADAPTIVE_BITRATE_MODE=live']; MainPID 838011 serves 8765 True; adaptive_bitrate mode live level 7000 transitions 0
+[17:42:19Z] recorders: T2 sampler (10 s) pid 838030; status poller (5 s)
+[17:42:39Z] ========================================================================
+[17:42:39Z] F1 -- capacity cap (the controller's main case)
+[17:42:39Z]   To stop: press Ctrl-C -- the fault is removed automatically.
+[17:42:39Z] ========================================================================
+[17:42:57Z]   F1: PLAYING (PLAYING); any_override False; adaptive_bitrate live level 7000
+[17:42:57Z]   baseline 120 s at 7000 ...
+[17:43:27Z]     F1 baseline: 30/120 s -- level 7000 state REFERENCE transitions 0 window 13/13 recovery PLAYING
+[17:43:57Z]     F1 baseline: 60/120 s -- level 7000 state REFERENCE transitions 0 window 28/27 recovery PLAYING
+[17:44:27Z]     F1 baseline: 90/120 s -- level 7000 state REFERENCE transitions 0 window 43/41 recovery PLAYING
+[17:44:57Z]     F1 baseline: 120/120 s -- level 7000 state PRESSURE transitions 0 window 58/55 recovery PLAYING
+[17:44:57Z]   CALIBRATE the cap: a counter-only rule on the video port (no drop).
+[17:44:57Z]   APPLY (calibration counter):
+[17:44:57Z]     sudo -n nft add table inet privyhub_fault   -> rc 0
+[17:44:57Z]     sudo -n nft add chain inet privyhub_fault flt { type filter hook output priority 0; }   -> rc 0
+[17:44:57Z]     sudo -n nft add rule inet privyhub_fault flt udp dport 48100 counter   -> rc 0
+[17:44:57Z]     VERIFY (calibration counter): table inet privyhub_fault present, rules ['udp dport 48100 counter packets 0 bytes 0'] -> OK
+[17:44:57Z]     counter reading 1: 14684 bytes
+[17:44:57Z]   waiting 60 s between the two readings ...
+[17:45:57Z]     counter reading 2: 63960891 bytes
+[17:45:57Z]   7000 wire rate 1066 kB/s (counter); CAP = 0.822 x that = 855 kbytes/second (nft kbytes = 1024 B)
+[17:45:57Z]   EXPECT: within ~60 s (night 1's samples: ~14 s) ONE decrease: FALLBACK (capacity) 7000->5000; ~186 s later INCREASE 5000->5500 (fits the cap); ~186 s later INCREASE 5500->6000 (over the cap); a capacity FALLBACK back to 5000 no sooner than 120 s after that; then, instead of a third direction change inside 10 min, HOLD (oscillation) at 5000. Or, if the cap lets 6000 through, 'climbed to 6000 and stayed'. rate_limited never true; never two transitions closer than the hold-downs; no ramp; at most one recovery cycle under the cap.
+[17:45:57Z]   APPLY (F1 cap):
+[17:45:57Z]     sudo -n nft flush chain inet privyhub_fault flt   -> rc 0
+[17:45:57Z]     sudo -n nft add rule inet privyhub_fault flt udp dport 48100 limit rate over 855 kbytes/second burst 64 kbytes counter drop   -> rc 0
+[17:45:57Z]     VERIFY (F1 cap): table inet privyhub_fault present, rules ['udp dport 48100 limit rate over 855 kbytes/second burst 64 kbytes counter packets 0 bytes 0 drop'] -> OK
+[17:46:27Z]     F1 cap on: 30/720 s -- level 5000 state RECOVERY_PROBATION transitions 1 window 3/3 recovery PLAYING
+[17:46:57Z]     F1 cap on: 60/720 s -- level 5000 state RECOVERY_PROBATION transitions 1 window 18/16 recovery PLAYING
+[17:47:27Z]     F1 cap on: 90/720 s -- level 5000 state RECOVERY_PROBATION transitions 1 window 33/31 recovery PLAYING
+[17:47:57Z]     F1 cap on: 120/720 s -- level 5000 state RECOVERY_PROBATION transitions 1 window 48/45 recovery PLAYING
+[17:48:27Z]     F1 cap on: 150/720 s -- level 5000 state RECOVERY_PROBATION transitions 1 window 63/57 recovery PLAYING
+[17:48:57Z]     F1 cap on: 180/720 s -- level 5000 state RECOVERY_PROBATION transitions 1 window 78/72 recovery PLAYING
+[17:49:27Z]     F1 cap on: 210/720 s -- level 5000 state RECOVERY_PROBATION transitions 1 window 90/84 recovery PLAYING
+[17:49:57Z]     F1 cap on: 240/720 s -- level 5500 state RECOVERY_PROBATION transitions 2 window 8/8 recovery PLAYING
+[17:50:27Z]     F1 cap on: 270/720 s -- level 5500 state RECOVERY_PROBATION transitions 2 window 24/24 recovery PLAYING
+[17:50:57Z]     F1 cap on: 300/720 s -- level 5500 state RECOVERY_PROBATION transitions 2 window 39/37 recovery PLAYING
+[17:51:27Z]     F1 cap on: 330/720 s -- level 5500 state RECOVERY_PROBATION transitions 2 window 53/50 recovery PLAYING
+[17:51:57Z]     F1 cap on: 360/720 s -- level 5500 state RECOVERY_PROBATION transitions 2 window 68/63 recovery PLAYING
+[17:52:27Z]     F1 cap on: 390/720 s -- level 5500 state RECOVERY_PROBATION transitions 2 window 83/77 recovery PLAYING
+[17:52:57Z]     F1 cap on: 420/720 s -- level 5500 state RECOVERY_PROBATION transitions 2 window 90/84 recovery PLAYING
+[17:53:27Z]     F1 cap on: 450/720 s -- level 5500 state RECOVERY_PROBATION transitions 2 window 90/83 recovery PLAYING
+[17:53:57Z]     F1 cap on: 480/720 s -- level 5500 state RECOVERY_PROBATION transitions 2 window 90/84 recovery PLAYING
+[17:54:27Z]     F1 cap on: 510/720 s -- level 6000 state RECOVERY_PROBATION transitions 3 window 10/8 recovery PLAYING
+[17:54:57Z]     F1 cap on: 540/720 s -- level 6000 state RECOVERY_PROBATION transitions 3 window 25/13 recovery PLAYING
+[17:55:27Z]     F1 cap on: 570/720 s -- level 6000 state RECOVERY_PROBATION transitions 3 window 39/18 recovery PLAYING
+[17:55:57Z]     F1 cap on: 600/720 s -- level 6000 state RECOVERY_PROBATION transitions 3 window 54/23 recovery PLAYING
+[17:56:27Z]     F1 cap on: 630/720 s -- level 6000 state RECOVERY_PROBATION transitions 3 window 69/27 recovery PLAYING
+[17:56:57Z]     F1 cap on: 660/720 s -- level 6000 state RECOVERY_PROBATION transitions 3 window 84/35 recovery PLAYING
+[17:57:27Z]     F1 cap on: 690/720 s -- level 6000 state RECOVERY_PROBATION transitions 3 window 90/34 recovery PLAYING
+[17:57:57Z]     F1 cap on: 720/720 s -- level 6000 state RECOVERY_PROBATION transitions 3 window 90/32 recovery PLAYING
+[17:57:57Z]   DID (F1 cap on): 17:46:11Z transition FALLBACK 7000->5000 (capacity), 17:49:30Z transition INCREASE 5000->5500 (increase_increase), 17:53:59Z transition INCREASE 5500->6000 (increase_increase); rate_limited ever False; now level 6000 state RECOVERY_PROBATION mode live recovery PLAYING
+[17:57:57Z]   EXPECT: after the cap is removed: at 5000 for the rest of the session if HOLD was reached; otherwise one rung per ~186 s back towards 7000.
+[17:57:57Z]   REMOVE (F1 cap):
+[17:57:57Z]     sudo -n nft delete table inet privyhub_fault   -> rc 0
+[17:57:57Z]     VERIFY (F1 cap): privyhub_fault absent -> OK
+[17:58:27Z]     F1 cap off: 30/300 s -- level 6000 state RECOVERY_PROBATION transitions 3 window 90/42 recovery PLAYING
+[17:58:57Z]     F1 cap off: 60/300 s -- level 6000 state RECOVERY_PROBATION transitions 3 window 90/51 recovery PLAYING
+[17:59:27Z]     F1 cap off: 90/300 s -- level 6000 state RECOVERY_PROBATION transitions 3 window 90/60 recovery PLAYING
+[17:59:57Z]     F1 cap off: 120/300 s -- level 6000 state RECOVERY_PROBATION transitions 3 window 90/67 recovery PLAYING
+[18:00:27Z]     F1 cap off: 150/300 s -- level 6000 state RECOVERY_PROBATION transitions 3 window 90/74 recovery PLAYING
+[18:00:57Z]     F1 cap off: 180/300 s -- level 7000 state HOLD_DOWN transitions 4 window 0/0 recovery PLAYING
+[18:01:28Z]     F1 cap off: 210/300 s -- level 7000 state REFERENCE transitions 4 window 13/13 recovery PLAYING
+[18:01:58Z]     F1 cap off: 240/300 s -- level 7000 state REFERENCE transitions 4 window 28/27 recovery PLAYING
+[18:02:28Z]     F1 cap off: 270/300 s -- level 7000 state REFERENCE transitions 4 window 43/41 recovery PLAYING
+[18:02:57Z]     F1 cap off: 300/300 s -- level 7000 state REFERENCE transitions 4 window 58/56 recovery PLAYING
+[18:02:58Z]   DID (F1 cap off): 18:00:53Z transition INCREASE 6000->7000 (increase_increase); rate_limited ever False; now level 7000 state REFERENCE mode live recovery PLAYING
+[18:02:58Z]   EXPECT: BACK -> session_ended_reset: the controller back at 7000, transitions 0.
+[18:03:02Z]   F1: BACK; decoder report stored; controller after BACK: mode live level 7000 transitions 0
+[18:03:22Z] ========================================================================
+[18:03:22Z] F3 -- a link drop while off the reference (recovery and the controller)
+[18:03:22Z]   To stop: press Ctrl-C -- the fault is removed automatically.
+[18:03:22Z] ========================================================================
+[18:03:41Z]   F3: PLAYING (PLAYING); any_override False; adaptive_bitrate live level 7000
+[18:04:11Z]     F3 baseline: 30/120 s -- level 7000 state REFERENCE transitions 0 window 13/13 recovery PLAYING
+[18:04:41Z]     F3 baseline: 60/120 s -- level 7000 state REFERENCE transitions 0 window 28/26 recovery PLAYING
+[18:05:11Z]     F3 baseline: 90/120 s -- level 7000 state REFERENCE transitions 0 window 43/40 recovery PLAYING
+[18:05:41Z]     F3 baseline: 120/120 s -- level 7000 state REFERENCE transitions 0 window 58/52 recovery PLAYING
+[18:05:41Z]   EXPECT: the cap brings the stream to 5000: one capacity FALLBACK 7000->5000 (night 1's samples: ~17 s).
+[18:05:41Z]   APPLY (F3 cap):
+[18:05:41Z]     sudo -n nft add table inet privyhub_fault   -> rc 0
+[18:05:41Z]     sudo -n nft add chain inet privyhub_fault flt { type filter hook output priority 0; }   -> rc 0
+[18:05:41Z]     sudo -n nft add rule inet privyhub_fault flt udp dport 48100 limit rate over 855 kbytes/second burst 64 kbytes counter drop   -> rc 0
+[18:05:41Z]     VERIFY (F3 cap): table inet privyhub_fault present, rules ['udp dport 48100 limit rate over 855 kbytes/second burst 64 kbytes counter packets 0 bytes 0 drop'] -> OK
+[18:05:59Z]   at 5000: True
+[18:05:59Z]   DID (F3 cap): 18:05:58Z transition FALLBACK 7000->5000 (capacity); rate_limited ever False; now level 5000 state HOLD_DOWN mode live recovery PLAYING
+[18:05:59Z]   EXPECT: recovery owns the drop: desync_pause, encoder_restart AT 5000 (C3-F1, level-preserving), resumed. The controller does NOTHING while recovery is not PLAYING (a refused/guard recovery_playing row, or no rows because reports stop); then ssrc_change (recovery_restart) and a 3-report blackout; the level still 5000 (no level_sync). If recovery restarted twice within 180 s, the backstop's one decision is refused at_floor.
+[18:05:59Z]   the DROP: the harness applies it, counts 15 s, and removes it.
+[18:05:59Z]   APPLY (F3 full drop):
+[18:05:59Z]     sudo -n nft flush chain inet privyhub_fault flt   -> rc 0
+[18:05:59Z]     sudo -n nft add rule inet privyhub_fault flt udp dport { 48100, 48101 } counter drop   -> rc 0
+[18:05:59Z]     VERIFY (F3 full drop): table inet privyhub_fault present, rules ['udp dport { 48100, 48101 } counter packets 6 bytes 6024 drop'] -> OK
+[18:06:14Z]   REMOVE (F3 full drop):
+[18:06:14Z]     sudo -n nft delete table inet privyhub_fault   -> rc 0
+[18:06:14Z]     VERIFY (F3 full drop): privyhub_fault absent -> OK
+[18:06:14Z]   the drop was on for 15.0 s (from its apply to its delete)
+[18:06:14Z]   observing 180 s (recovery should resume) ...
+[18:06:44Z]     F3 after the drop: 30/180 s -- level 5000 state RECOVERY_PROBATION transitions 1 window 16/13 recovery PLAYING
+[18:07:14Z]     F3 after the drop: 60/180 s -- level 5000 state RECOVERY_PROBATION transitions 1 window 31/27 recovery PLAYING
+[18:07:44Z]     F3 after the drop: 90/180 s -- level 5000 state RECOVERY_PROBATION transitions 1 window 46/40 recovery PLAYING
+[18:08:14Z]     F3 after the drop: 120/180 s -- level 5000 state RECOVERY_PROBATION transitions 1 window 61/55 recovery PLAYING
+[18:08:44Z]     F3 after the drop: 150/180 s -- level 5000 state RECOVERY_PROBATION transitions 1 window 74/68 recovery PLAYING
+[18:09:14Z]     F3 after the drop: 180/180 s -- level 5000 state RECOVERY_PROBATION transitions 1 window 89/80 recovery PLAYING
+[18:09:14Z]   DID (F3 drop and recovery): no transition; rate_limited ever False; now level 5000 state RECOVERY_PROBATION mode live recovery PLAYING; recovery log ['desync_pause', 'encoder_restart', 'resumed']
+[18:09:19Z]   F3: BACK; decoder report stored; controller after BACK: mode live level 5000 transitions 0
+[18:09:39Z]   CLEAR THE FAULT (normal end): sudo -n nft delete table inet privyhub_fault, then list tables
+[18:09:39Z]     delete table -> rc 1 (Error: Could not process rule: No such file or directory)
+[18:09:39Z]     VERIFY (at the end): privyhub_fault absent -> OK
+[18:09:39Z] ========================================================================
+[18:09:39Z] TEARDOWN
+[18:09:39Z]   To stop: press Ctrl-C -- the fault is removed automatically.
+[18:09:39Z] ========================================================================
+[18:09:52Z]   flag unset: PRIVYHUB_* manager 0, companion environ 0; MainPID serves 8765 True; adaptive_bitrate mode off; stream 7000; game active False -> CLEAN
+[18:10:01Z]   launcher NOW PLAYING banners: 0
+[18:10:02Z]   files: 17/17 present
+[18:10:02Z]   rows: {'events.jsonl': 33, 'abr_series.jsonl': 328, 't2_samples.jsonl': 165, 'decision_log.jsonl': 838, 'heartbeat.jsonl': 789, 'frames.jsonl': 1553, 'recovery_log.jsonl': 7}; sample rows in the decision log 782
+[18:10:02Z] RUN DIRECTORY: /home/privyhub/Projects/onn-stream-test/logs/streaming/c3_l4_nft_night_20260929_174201Z

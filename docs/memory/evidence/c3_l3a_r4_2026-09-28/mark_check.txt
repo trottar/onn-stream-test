@@ -1,0 +1,42 @@
+offset +12.866 s (decoder = probe + offset)
+rows 128: in a cycle window 64 (report: marked 64), outside 64 (report: recent 64)
+marked ring from decoder 270.593 s = probe 257.727 s
+recent ring from decoder 933.672 s = probe 920.806 s (off-transition events before this were evicted)
+top-gap list: 16 rows, smallest 188 ms; every gap not listed is <= 188 ms
+top-gap rows inside a cycle window (i.e. at a transition): 16 of 16
+
+  mark s    dec s  source    gap ms codec s before  lag fire lag decoy
+  45.559   58.425  unknown <= 188     45.56      8.90
+  68.968   81.834  unknown <= 188     68.97     32.31
+  82.639   95.505  top-gap      199    10     2.42      2.49     45.98
+ 207.718  220.584  unknown <= 188     40.07     76.68
+ 274.043  286.909  unknown <= 188     17.15     63.55
+ 311.547  324.413  unknown <= 188     54.65     26.28
+ 375.300  388.166  unknown <= 188     43.13     13.14
+ 386.094  398.960  unknown <= 188     53.93     23.94
+ 390.371  403.237  unknown <= 188     58.21     28.21
+ 413.867  426.733  marked       175     8     0.01     81.70     51.71
+ 417.108  429.974  marked       175     8     3.25      3.15     54.95
+ 420.891  433.757  top-gap      200    10     1.84      1.91     58.73
+ 425.947  438.813  top-gap      194     8     1.72      1.78     63.79
+ 430.027  442.893  marked        75     8     4.99      5.86     67.87
+ 477.692  490.558  unknown <= 188     53.53     25.83
+ 481.040  493.906  unknown <= 188     56.87     29.18
+ 537.202  550.068  unknown <= 188     51.94      6.71
+ 541.268  554.134  unknown <= 188     56.01     10.77
+ 554.762  567.628  unknown <= 188     69.50     24.27
+ 572.467  585.333  marked       184     9     2.32      2.39     41.97
+ 579.648  592.514  marked       184     8     4.33      4.38     49.15
+ 626.272  639.138  unknown <= 188     45.83     16.43
+ 640.737  653.603  unknown <= 188     60.30     30.89
+ 645.792  658.658  top-gap      221    11     0.07      0.08     35.95
+ 657.904  670.770  top-gap      196    11     1.83      1.89     48.06
+ 718.912  731.778  top-gap      206     9     2.12      2.25     29.16
+ 763.095  775.961  unknown <= 188     46.43     16.74
+
+marks behind a measured restart gap (>= 100 ms, in a cycle window, <= 5 s before): 10
+recent ring (64 off-transition events, decoder 933.7-993.7 s): output_gap_ms >= 50: 61, max 90; the rest are latency events
+
+session max output gap 426 ms at decoder 882.432 s = probe 869.566 s, codec_ms 11; 282 ms after ssrc_change #23 of 24 (decoder 882.150 s)
+  first_idr_after_discontinuity row for that change: {'elapsed_ms': 882391, 'resync_to_idr_ms': 240, 'au_complete': True, 'au_fec_recovered': False, 'au_fec_unrecoverable_group': False, 'rejected_idr_aus': 1, 'dropped_non_idr_aus': 14}
+  video.max_output_gap_ms None, decoder block max_output_gap_ms 426

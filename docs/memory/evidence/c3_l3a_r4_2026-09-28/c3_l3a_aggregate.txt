@@ -1,0 +1,98 @@
+PrivyHub C3.L3a gameplay acceptance probe - pooled
+Generated: 2026-09-28T12:38:10-0400
+Classification: C3_L3A_GAMEPLAY_ACCEPTANCE_RECORDED
+Production files modified by probe: NONE
+Network addresses collected/logged: NONE
+=== POOL ===
+Pooled only if state schema is privyhub_c3_l3a_gameplay_acceptance_v2 and config is the pre-registration:
+  traversals 10, dwell_min_s 55, dwell_max_s 90, window_s 5, ramp_gap_s 4, park_seconds 45
+Run files found: 4
+Pooled: 4
+Skipped: 0
+
+POOLED:
+  20260924_115810.json: pre-registered
+  20260924_130016.json: pre-registered
+  20260924_151953.json: pre-registered
+  20260928_122028.json: pre-registered
+
+SKIPPED:
+  (none)
+
+=== RUN ===
+Runs pooled: 4
+Run ids: 20260924_115810, 20260924_130016, 20260924_151953, 20260928_122028
+Primary W per run (s): {'20260924_115810': 5.0, '20260924_130016': 5.0, '20260924_151953': 5.0, '20260928_122028': 5.0}
+Ramp span per run (s): {'20260924_115810': 11.574, '20260924_130016': 11.575, '20260924_151953': 11.476, '20260928_122028': 11.537}
+
+=== DETECTION - the gate question ===
+Sequence window: first fire .. last transition returned + W.
+Decoys fire nothing; each is scored through a jump-matched
+[d, d + W] and a ramp-matched [d, d + ramp_span + W] window.
+Classes are scored independently: one mark can count in two.
+Primary W (s): per-run
+Ramp span (s, median ramp end - first fire): {'20260924_115810': 11.574, '20260924_130016': 11.575, '20260924_151953': 11.476, '20260928_122028': 11.537}
+Phase A (s): 3157.083
+Marks total: 81
+Chance rate (marks / phase-A s): 0.0257
+
+W = 2.5 s
+  class                events  marked  marks  exposure s  marks/s  chance-expected marks
+  -------------------  ------  ------  -----  ----------  -------  ---------------------
+  jump                     20       6      6        75.1    0.080                   1.91
+  ramp                     20      15     28       281.6    0.099                   7.22
+  decoy, jump-matched      40       2      2       100.0    0.020                   2.56
+  decoy, ramp-matched      40      11     12       561.6    0.021                  14.42
+  marks in no sequence window: 47
+
+W = 5.0 s
+  class                events  marked  marks  exposure s  marks/s  chance-expected marks
+  -------------------  ------  ------  -----  ----------  -------  ---------------------
+  jump                     20       6      6       125.1    0.048                   3.21
+  ramp                     20      15     29       331.6    0.087                   8.52
+  decoy, jump-matched      40       4      4       200.0    0.020                   5.13
+  decoy, ramp-matched      40      13     14       661.6    0.021                  16.99
+  marks in no sequence window: 46
+
+W = 8.0 s
+  class                events  marked  marks  exposure s  marks/s  chance-expected marks
+  -------------------  ------  ------  -----  ----------  -------  ---------------------
+  jump                     20       6      6       185.1    0.032                   4.74
+  ramp                     20      15     29       391.6    0.074                  10.04
+  decoy, jump-matched      40       7      7       320.0    0.022                   8.21
+  decoy, ramp-matched      40      14     15       781.6    0.019                  20.07
+  marks in no sequence window: 46
+
+NO THRESHOLD IS ENCODED. Read the table; the judgement is yours.
+
+=== PICTURE QUALITY - announced, separate question ===
+  kbps  acceptable  rating  scale
+  ----  ----------  ------  ------------------------------------------------------------------------------------------------
+  6000  False         None  1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)
+  5500  False         None  1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)
+  5000  False            7  1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)
+  6000  False         None  1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)
+  5500  False         None  1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)
+  5000  False         None  1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)
+  6000  False            8  1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)
+  5500  True             8  1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)
+  5000  True             8  1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)
+  6000  False         None  1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)
+  5500  True             7  1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)
+  5000  True             7  1-10 (anchored: 10 = looks the same as 7000, 5 = clearly softer, still playable, 1 = unplayable)
+Ratings are printed as answered; they are never rescaled.
+
+=== C3.L4 READINESS ===
+Cycles pooled: {'jump': 20, 'ramp': 60}
+Settling measured on sequences: 40
+Telemetry settling after a sequence (s): {'n': 40, 'min': 1.003, 'median': 2.508, 'max': 5.013, 'p95': 4.513}
+Cumulative lifecycle: {'fec_send_errors_delta': 0, 'audio_send_errors_delta': 0, 'controller_bad_packets_delta': 0}
+
+=== WHAT THIS DOES NOT ESTABLISH ===
+- Whether C3.L4 is authorized. That is a human judgement on
+  the detection table and the picture ratings above.
+- Anything at n = one run. Compare marked classes against the
+  chance-expected marks and against each other; pool runs.
+- Any controller policy: thresholds, hysteresis, sample cadence.
+- Behaviour under real network pressure. Every transition here
+  fired from a schedule, not from a degraded condition.

@@ -154,3 +154,13 @@ sized for.** The rebuilt-arm session retained 288 recent events in 197 s
 `h2_prep_redact.py --check` reports 0 residual matches on every file
 except the decoder-report byte copies, which carry the known core-version
 false positive. The journal's client address is written `<ipv4>`.
+
+## Adoption call — the user's, 2026-09-28: bundle
+
+Recorded by `C3-L3A-R4`. The body-POST client change **ships in whichever
+APK is next adopted**: the C5 arm APK if C5 needs a client change,
+otherwise the `C3.L4` live build. **Until then the onn carries the adopted
+`f31b1c18…8ae7`**, which posts the target (query) form; the companion
+accepts both. Session 4 of `C3.L3a` (2026-09-28) stored a 32,689-character
+report through that form, 0 WARNING
+(`C3_L3A_R4_SESSION4_2026-09-28.md`).

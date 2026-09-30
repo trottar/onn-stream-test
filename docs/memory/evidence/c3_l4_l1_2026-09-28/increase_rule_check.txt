@@ -1,0 +1,23 @@
+C3-L4-L1 finding: how long do "clean" runs last on a clean link (attract mode, adopted build)?
+The live (and shadow) increase rule needs 90 CONSECUTIVE clean reports (fps >= 59, queue 0,
+gap <= 150). Direct measure: the controller's own clean counter, polled every 5 s from
+native-stream-status (abr_series_*.jsonl). Proxy: the heartbeats (fps from the rendered-frame
+counter per 2 s interval; queue proxy = frames queued but not rendered in the interval, C4-D1's
+substitution, noisier than the client's queue_depth; gap proxy = last_output_age_ms).
+The client's per-report recent_fps / queue_depth / output_gap_ms are not logged per report.
+
+controller's own clean counter, Session A (359 polls at 5 s): max 21; polls >= 30: 0; >= 60: 0; >= 90: 0
+controller's own clean counter, Session B (190 polls at 5 s, after the injected transition's blackout): max 32; polls >= 30: 2; >= 60: 0; >= 90: 0
+
+Session A heartbeats: 896 intervals (at 7000)
+   fps>=59 & q==0 & gap<=150  (the rule, proxied)          share  66.2 %  longest run    8  (90 needed)
+   fps>=59 alone                                           share  94.9 %  longest run   51  (90 needed)
+   fps>=57 & q<=1 & gap<=150  (no ROUTINE-level sample)    share  96.9 %  longest run  116  (90 needed)
+   fps>=50 & gap<=250  (no FALLBACK-level sample)          share 100.0 %  longest run  896  (90 needed)
+Session B heartbeats: 477 intervals (after the blackout, at 5000)
+   fps>=59 & q==0 & gap<=150  (the rule, proxied)          share  65.6 %  longest run    8  (90 needed)
+   fps>=59 alone                                           share  94.1 %  longest run   62  (90 needed)
+   fps>=57 & q<=1 & gap<=150  (no ROUTINE-level sample)    share  96.2 %  longest run  110  (90 needed)
+   fps>=50 & gap<=250  (no FALLBACK-level sample)          share  99.8 %  longest run  337  (90 needed)
+
+the C3-L4-S1 night's 1,048 logged samples (the client's own values; logged only at state/reason changes, so biased towards changes): {'clean': 500, 'fps<59': 470, 'queue>0': 60, 'fps<59 & queue>0': 15}

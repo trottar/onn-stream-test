@@ -1,0 +1,53 @@
+C3-L4-N1 -- pre-registration for the user's nft night 2 (`--only F1,F3`)
+Written 2026-09-29 by Code, before the night, from night 1's pre-registration (c3_l4_l2_nft_preregistration.txt,
+sha256 fb5ca63f...) with the two rules the user approved on 2026-09-29. The user may amend this file before
+starting; tools/c3_l4_nft_night.py prints it at start and records its sha256 in the run directory. Rules are
+not tightened or loosened after data.
+
+Controller as built for the night: PRIVYHUB_ADAPTIVE_BITRATE_MODE=live (never INJECT); FALLBACK -> 5000,
+ROUTINE -> 6000, one transition per event; the FALLBACK triggers are (i) the shadow's fps/queue/gap evidence,
+(ii) NEW capacity: over the last 5 evaluated reports fps < 50 on all 5 and lost_packets_delta >= 50 on >= 3
+of 5, (iii) NEW recovery_escalation: two recovery encoder restarts at one level within 180 s -> after recovery
+is PLAYING and the 3-report blackout, one FALLBACK decision (at_floor at 5000); INCREASE one rung when >= 85
+of the last 90 reports since the last SSRC change (and its 3-report blackout) are clean (fps >= 57, queue
+<= 1, gap <= 150); hold-downs FALLBACK 30/60, ROUTINE 60, INCREASE 60/30 reports (after a down / after an
+up); oscillation guard (third direction change in 10 min -> HOLD for the session); rate limit 4 per 10 min;
+guards incl. recovery PLAYING and session age >= 60 s. Recovery unchanged (C3-F1, level-preserving). Faults:
+host output hook, video port 48100 only (F3's drop adds audio 48101). Sessions: F1 then F3 (no F2, no K).
+
+Classification: WORKS UNDER LOSS (F1, F3) if every F1 and F3 row and the all-sessions rows hold as below;
+otherwise each row is recorded as met / not met / not applicable, with the per-report sample rows saying why.
+
+F1 -- capacity cap (CAP = the midpoint of the calibrated 5500 and 6000 wire rates), 12 min on, 5 min off:
+  F1a the capacity FALLBACK 7000 -> 5000 (reason capacity) within 60 s of the cap going in, as ONE transition
+      (one ssrc_change from it); night 1's samples replayed put it at ~14 s.
+  F1b the blend's climb under the cap follows the rules, whichever way the cap falls:
+      expected (L1's rung loads: 5000 ~775, 5500 ~850, 6000 ~930 kB/s against a cap of ~874 kB/s):
+      INCREASE 5000 -> 5500 >= 93 reports after the capacity FALLBACK's SSRC change (5500 fits); INCREASE
+      5500 -> 6000 >= 93 reports after that (6000 does not fit); a capacity FALLBACK 6000 -> 5000 no sooner
+      than the 60-report reversal hold-down; then the next increase -- the third direction change inside
+      10 min -- becomes HOLD (reason oscillation) and the stream stays at 5000 for the rest of the session.
+      Or: "climbed to <rung> and stayed" if the cap lets that rung through (the cap and the per-report
+      samples recorded; not a failure of the controller). If the 3rd direction change would fall more than
+      10 min after the 1st, it is an INCREASE, not a HOLD (the oscillation window, as built), recorded.
+      MET if every transition in F1 is one the rules above name, at the spacing they allow.
+  F1c rate_limited never true; no two transitions closer than the hold-down table; never a ramp (no two
+      transitions < 93 reports apart in the same direction).
+  F1d after removal: nothing if HOLD; otherwise one rung per >= 93 reports; BACK resets to 7000.
+  F1e the backstop: expected NOT to fire in F1, because the capacity trigger acts first. Recorded either
+      way: every escalation_armed row, and its one decision (transition / refused and why).
+  F1f recovery cycles under the cap (desync_pause / encoder_restart / resumed), reported: expected <= 1
+      (night 1, with no decrease: 10 pauses, 9 restarts at 7000 in 12 min).
+F3 -- the cap until the stream is at 5000 (now reachable through capacity), then a 15 s full drop of 48100
+      and 48101, then removed:
+  F3pre the cap brings the stream to 5000 by one capacity FALLBACK within the 240 s the harness waits.
+      NOT MET here makes F3b NOT TESTED (as night 1), not a failure of recovery.
+  F3a no controller transition while recovery is not PLAYING (refused/guard recovery_playing, or no report
+      at all).
+  F3b recovery's restart is at the held level (5000; C3-F1), then resumed; ssrc_change source
+      recovery_restart; 3-report blackout; no level_sync to 7000. If recovery restarts twice at 5000 within
+      180 s, the backstop's one decision is refused at_floor (logged) -- reported, and it must not move the
+      level. An INCREASE after the drop, if any, is the blend's (>= 93 reports after the last SSRC change).
+All sessions: any_override false at PLAYING; decoder report stored; lifecycle clean except F3's intended
+recovery and F1f's reported cycles; at the end no privyhub_fault table, the flag unset and absent from the
+manager and the environ, stream 7000, no game active.

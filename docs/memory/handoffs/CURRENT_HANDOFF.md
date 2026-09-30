@@ -2,6 +2,35 @@
 
 Authoritative state: `../CURRENT.md`. **Start there.**
 
+Baseline commit `f01c3b2` (2026-09-28); nothing committed since.
+
+## 2026-09-28 — `C3.L3a` closed; `C3.L4` authorized, single transition
+
+Four pre-registered sessions pooled; the user's reading: **`C3.L4`
+AUTHORIZED, one restart per adaptation event, straight to the target, the
+existing hold-downs as spacing; ramps excluded; live build pending; no
+live run before a fault-injection night with the user's `nft`**
+(`../decisions/C3-L4_LIVE_AUTHORIZATION_2026-09-28.md`,
+`../evidence/C3_L3A_R4_SESSION4_2026-09-28.md`). C4 closed (8+1 stays).
+D7 complete (the user's rows reported fine). `CL-B1` ships in the next
+adopted APK. **C5-M1: 1080p60 NOT CAPABLE (stream) at parity**; the
+candidate stays behind `PRIVYHUB_NATIVE_PROFILE_ID`, never the default
+(`../evidence/C5_M1_1080P60_PROFILE_2026-09-28.md`).
+
+**`C3-L4-L1` (queue 2, same day): the `C3.L4` live mode is BUILT**, behind
+`PRIVYHUB_ADAPTIVE_BITRATE_MODE=live`, off by default.
+
+- **Session A**, 30 min on a clean link: SILENT.
+- **Session B**, an injected FALLBACK: the decrease path is proven (one
+  transition 7000 → 5000, the blackout, the hold-down refusal). The
+  increase path never fired: the 90-consecutive-clean rule is not
+  reachable in attract mode, and that is the user's call.
+- **Next**: the user's `nft` night, with the hand-step list in
+  `../evidence/C3_L4_L1_LIVE_CONTROLLER_2026-09-28.md` §7.
+- **`C5-M2`** was not started; the user queues it after the `nft` night.
+
+The section below is the 2026-09-23 state, kept as written.
+
 ## READ FIRST — Phase C has resumed (2026-09-23)
 
 **`D-BASE` is CLOSED: BASELINE MET** (`../evidence/D_BASE_CLOSEOUT_2026-09-23.md`).

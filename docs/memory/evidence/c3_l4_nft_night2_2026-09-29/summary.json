@@ -1,0 +1,179 @@
+{
+ "dry_run": false,
+ "fast": false,
+ "sudo_cmd": "sudo",
+ "started_utc": "2026-09-29T17:42:01.803Z",
+ "sessions": {
+  "F1": {
+   "any_override_at_playing": false,
+   "cap_on": {
+    "label": "F1 cap on",
+    "since": "2026-09-29T17:45:57.798Z",
+    "transitions": [
+     {
+      "at_utc": "2026-09-29T17:46:11.774Z",
+      "event": "transition",
+      "class": "FALLBACK",
+      "from_kbps": 7000,
+      "to_kbps": 5000,
+      "injected": false,
+      "acted": true,
+      "reason": "capacity",
+      "trigger": "capacity"
+     },
+     {
+      "at_utc": "2026-09-29T17:49:30.871Z",
+      "event": "transition",
+      "class": "INCREASE",
+      "from_kbps": 5000,
+      "to_kbps": 5500,
+      "injected": false,
+      "acted": true,
+      "reason": "increase_increase",
+      "trigger": null
+     },
+     {
+      "at_utc": "2026-09-29T17:53:59.967Z",
+      "event": "transition",
+      "class": "INCREASE",
+      "from_kbps": 5500,
+      "to_kbps": 6000,
+      "injected": false,
+      "acted": true,
+      "reason": "increase_increase",
+      "trigger": null
+     }
+    ],
+    "holds": 0,
+    "refused": {},
+    "decisions_by_trigger": {
+     "transition:capacity": 1
+    },
+    "escalation_armed": 0,
+    "rate_limited_ever": false,
+    "level": 6000,
+    "state": "RECOVERY_PROBATION",
+    "mode": "live",
+    "recovery_events": []
+   },
+   "cap_off": {
+    "label": "F1 cap off",
+    "since": "2026-09-29T17:57:57.906Z",
+    "transitions": [
+     {
+      "at_utc": "2026-09-29T18:00:53.767Z",
+      "event": "transition",
+      "class": "INCREASE",
+      "from_kbps": 6000,
+      "to_kbps": 7000,
+      "injected": false,
+      "acted": true,
+      "reason": "increase_increase",
+      "trigger": null
+     }
+    ],
+    "holds": 0,
+    "refused": {},
+    "decisions_by_trigger": {},
+    "escalation_armed": 0,
+    "rate_limited_ever": false,
+    "level": 7000,
+    "state": "REFERENCE",
+    "mode": "live",
+    "recovery_events": []
+   }
+  },
+  "F3": {
+   "any_override_at_playing": false,
+   "cap_to_5000": {
+    "label": "F3 cap",
+    "since": "2026-09-29T18:05:41.442Z",
+    "transitions": [
+     {
+      "at_utc": "2026-09-29T18:05:58.169Z",
+      "event": "transition",
+      "class": "FALLBACK",
+      "from_kbps": 7000,
+      "to_kbps": 5000,
+      "injected": false,
+      "acted": true,
+      "reason": "capacity",
+      "trigger": "capacity"
+     }
+    ],
+    "holds": 0,
+    "refused": {},
+    "decisions_by_trigger": {
+     "transition:capacity": 1
+    },
+    "escalation_armed": 0,
+    "rate_limited_ever": false,
+    "level": 5000,
+    "state": "HOLD_DOWN",
+    "mode": "live",
+    "recovery_events": []
+   },
+   "drop_s_measured": 15.04,
+   "drop": {
+    "label": "F3 drop and recovery",
+    "since": "2026-09-29T18:05:59.540Z",
+    "transitions": [],
+    "holds": 0,
+    "refused": {},
+    "decisions_by_trigger": {},
+    "escalation_armed": 0,
+    "rate_limited_ever": false,
+    "level": 5000,
+    "state": "RECOVERY_PROBATION",
+    "mode": "live",
+    "recovery_events": [
+     "desync_pause",
+     "encoder_restart",
+     "resumed"
+    ]
+   }
+  }
+ },
+ "preregistration_sha256": "3cdcfa2e5eb6a021eff258214fefd5ac54541bd0c7c10c56ff3697a382dfb25d",
+ "calibration": {
+  "rate_7000_bytes_per_s": 1065538.0474112406,
+  "used": 1065538.0474112406,
+  "source": "counter",
+  "cap_kbytes_per_s": 855
+ },
+ "no_fault_table_at_end": true,
+ "banner_count_at_end": 0,
+ "teardown_clean": true,
+ "flags_after": [],
+ "ended_utc": "2026-09-29T18:10:01.883Z",
+ "files": {
+  "harness.log": true,
+  "events.jsonl": true,
+  "abr_series.jsonl": true,
+  "t2_samples.jsonl": true,
+  "decision_log.jsonl": true,
+  "heartbeat.jsonl": true,
+  "frames.jsonl": true,
+  "recovery_log.jsonl": true,
+  "companion_journal_redacted.log": true,
+  "preregistration.txt": true,
+  "preregistration.sha256": true,
+  "armcheck_F1.json": true,
+  "status_end_F1.json": true,
+  "report_F1.json": true,
+  "armcheck_F3.json": true,
+  "status_end_F3.json": true,
+  "report_F3.json": true
+ },
+ "rows": {
+  "events.jsonl": 33,
+  "abr_series.jsonl": 328,
+  "t2_samples.jsonl": 165,
+  "decision_log.jsonl": 838,
+  "heartbeat.jsonl": 789,
+  "frames.jsonl": 1553,
+  "recovery_log.jsonl": 7
+ },
+ "decision_log_sample_rows": 782,
+ "complete": true
+}

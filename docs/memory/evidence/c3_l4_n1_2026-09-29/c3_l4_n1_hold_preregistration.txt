@@ -1,0 +1,20 @@
+C3-L4-N1 -- pre-registration for the silent live hold (handoff section 4)
+Written 2026-09-29 by Code, BEFORE the hold, after the replays passed the stop rule
+(c3_l4_n1_replays.txt: PASS). Rules are not tightened or loosened after data.
+
+Controller as built for the hold: C3-L4-L2's live policy plus the two rules the user approved on
+2026-09-29 -- capacity (FALLBACK -> 5000 when fps < 50 on all 5 of the last 5 evaluated reports and
+lost_packets_delta >= 50 on >= 3 of them) and recovery_escalation (two recovery encoder restarts at one
+level within 180 s -> after PLAYING and the blackout, one FALLBACK decision). Everything else unchanged.
+
+Session H -- silent live hold. 30-minute attract-mode hold, PRIVYHUB_ADAPTIVE_BITRATE_MODE=live (never
+INJECT), clean link, T2 sampler on, adopted profile, adopted APK, zero input. any_override false at PLAYING.
+  SILENT if zero transitions (decision log: no `transition` or `would_act` row; status
+  transitions_this_session 0; no `escalation_armed` row) AND the close-out rows meet their targets
+  (spikes_20/min < 200, rendered fps >= 59.5, stale drops/min < 20, video lost/min post-FEC < 10, audio
+  underruns/min < 5; max output gap reported, bound <= 250).
+  Anything else: recorded as what fired and why (from the per-report `sample` rows and the decision log)
+  and the row that missed. Reported alongside, not ruled: the capacity bar's near misses (the most reports
+  under 50 fps in any 5, and the most with lost >= 50), every recovery event, every refused row.
+Teardown: both adaptive flags unset and absent from the manager and the new MainPID's environ,
+adaptive_bitrate mode off, stream 7000, no game, banner cleared.

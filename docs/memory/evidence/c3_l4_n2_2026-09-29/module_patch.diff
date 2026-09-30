@@ -1,0 +1,93 @@
+--- a/companion/adaptive_bitrate_live.py	2026-09-29 14:27:17.865747778 -0400
++++ companion/adaptive_bitrate_live.py	2026-09-29 14:29:21.132584713 -0400
+@@ -44,6 +44,17 @@
+                          `note_recovery_restart` (the games plugin's
+                          `_recovery_restart_encoder` / full start).
+ 
++C3-L4-N2 (the user's decision of 2026-09-29, "Go", after nft night 2 sat at
++6000 under a cap, degraded but below every bar): one more trigger, LIVE only:
++
++  capacity_mild       -- class ROUTINE, ONE RUNG DOWN (7000 -> 6000,
++                         6000 -> 5500, 5500 -> 5000; at 5000 at_floor): over
++                         the last 5 evaluated reports fps < 57 on >= 4 of 5
++                         and `lost_packets_delta` >= 50 on >= 3 of 5. The
++                         strict capacity FALLBACK keeps precedence; ROUTINE's
++                         hold-downs, the blackout, the rate limit, the
++                         oscillation guard and the guards all apply.
++
+ Serialization with link-drop recovery: the actuator runs on one worker
+ thread while holding `NativeStreamManager._lock` -- the lock recovery's own
+ restart (`recovery_restart_encoder`, C3-F1) and full start take -- and the
+@@ -134,9 +145,15 @@
+ # `recovery_escalation`): recovery's encoder restarts, not its pauses.
+ ESCALATION_RESTARTS = 2
+ ESCALATION_WINDOW_MS = 180_000
++# C3-L4-N2 -- THE MILD CAPACITY TRIGGER (ROUTINE, reason `capacity_mild`, one
++# rung down). Night 2: at 6000 under the cap fps sat at a median 55.8 (under
++# 50 on 17 %) with ~60 lost per report and no queue -- under every other bar.
++CAPACITY_MILD_FPS_BELOW, CAPACITY_MILD_FPS_OF = 57.0, 4    # < 57 on >= 4 of 5
++CAPACITY_MILD_LOSS_AT_LEAST, CAPACITY_MILD_LOSS_OF = 50, 3  # >= 50 lost on >= 3 of 5
+ TRIGGER_QUEUE_GAP = "fps_queue_gap"         # the shadow's FALLBACK / ROUTINE evidence
+ TRIGGER_CAPACITY = "capacity"
+ TRIGGER_ESCALATION = "recovery_escalation"
++TRIGGER_CAPACITY_MILD = "capacity_mild"
+ 
+ ACTUATING = "ACTUATING"
+ DISABLED = "DISABLED"
+@@ -243,6 +260,14 @@
+                 and sum(1 for v in lost if v is not None and v >= CAPACITY_LOSS_AT_LEAST) >= CAPACITY_LOSS_OF):
+             m["trigger"] = TRIGGER_CAPACITY
+             return "FALLBACK", m
++        # C3-L4-N2: the mild bar. Checked before the queue ROUTINE: from 7000
++        # both name 6000; below it only the mild rule's one-rung step can act
++        # (the queue ROUTINE's fixed 6000 target is at_or_below_target there).
++        if (sum(1 for v in fps if v is not None and v < CAPACITY_MILD_FPS_BELOW) >= CAPACITY_MILD_FPS_OF
++                and sum(1 for v in lost if v is not None and v >= CAPACITY_MILD_LOSS_AT_LEAST)
++                >= CAPACITY_MILD_LOSS_OF):
++            m["trigger"] = TRIGGER_CAPACITY_MILD
++            return "ROUTINE", m
+         if cls == "ROUTINE":
+             m["trigger"] = TRIGGER_QUEUE_GAP
+         return cls, m
+@@ -300,6 +325,10 @@
+             target = next((k for k in LADDER_KBPS if k > self.level_kbps), None)
+             if target is None:
+                 return self._refuse(kind, "at_reference", None, m, injected=injected, state=ab.REFERENCE)
++        elif kind == "ROUTINE" and m.get("trigger") == TRIGGER_CAPACITY_MILD:
++            # C3-L4-N2: one rung down from where the stream is; at the floor the
++            # "target" is the floor itself, so the check below says at_floor.
++            target = next((k for k in reversed(LADDER_KBPS) if k < self.level_kbps), self.level_kbps)
+         else:
+             target = TARGET_KBPS[kind]
+ 
+@@ -362,7 +391,7 @@
+         self.state = ab.HOLD_DOWN
+         trigger = m.get("trigger")
+         # C3-L4-N1: the two new FALLBACK triggers carry their own reason.
+-        self.reason = (trigger if trigger in (TRIGGER_CAPACITY, TRIGGER_ESCALATION)
++        self.reason = (trigger if trigger in (TRIGGER_CAPACITY, TRIGGER_ESCALATION, TRIGGER_CAPACITY_MILD)
+                        else f"{'increase' if direction == 'up' else 'decrease'}_{kind.lower()}")
+         self.measurements = m
+         row = {"event": "transition" if self.acting else "would_act", "class": kind, "direction": direction,
+@@ -600,6 +629,10 @@
+                                          f"lost_packets_delta >= {CAPACITY_LOSS_AT_LEAST} on >= "
+                                          f"{CAPACITY_LOSS_OF} of {ab.WINDOW_REPORTS}",
+                                  "target_kbps": TARGET_KBPS["FALLBACK"]},
++            "capacity_mild": {"rule": f"fps < {CAPACITY_MILD_FPS_BELOW:g} on >= {CAPACITY_MILD_FPS_OF} of "
++                                      f"{ab.WINDOW_REPORTS} and lost_packets_delta >= {CAPACITY_MILD_LOSS_AT_LEAST} on "
++                                      f">= {CAPACITY_MILD_LOSS_OF} of {ab.WINDOW_REPORTS}",
++                              "class": "ROUTINE", "target": "one rung down"},
+             "recovery_escalation": {"rule": f"{ESCALATION_RESTARTS} recovery encoder restarts at one level "
+                                             f"within {ESCALATION_WINDOW_MS // 1000} s",
+                                     "restarts_in_window": [{"level_kbps": lv} for _, lv in self.recovery_restarts],
+@@ -811,6 +844,10 @@
+                 was = {"transitions_this_session": self._policy.transitions,
+                        "level_kbps": self._policy.level_kbps, "disabled": self.disabled}
+                 self._policy.end_session()
++                # C3-L4-N2: the cached stream bitrate belonged to the ended
++                # session (night 2 read `level 5000` after BACK until the next
++                # report); the status falls back to the policy's 7000.
++                self._stream_kbps = None
+                 self.disabled = False
+                 self.disabled_at_utc = None
+                 self._write({"event": "session_ended_reset", "before": was,

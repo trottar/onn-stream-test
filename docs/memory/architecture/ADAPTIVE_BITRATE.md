@@ -19,6 +19,27 @@ authorized for automatic in-game adaptation.
 **Next diagnostic:** `C3.L2a` — first-IDR acceptance after an encoder-only
 cycle.
 
+**2026-09-28 (decision, `../decisions/C3-L4_LIVE_AUTHORIZATION_2026-09-28.md`):**
+`C3.L4` is **AUTHORIZED for live adaptation at one transition per event**;
+ramps are excluded; live build pending. See "C3.L4 live mode — the
+constraint" at the end; it supersedes the "not authorized for automatic
+in-game adaptation" line above for single transitions only.
+
+**2026-09-28 (`C3-L4-L1`):** the live mode is **BUILT** behind
+`PRIVYHUB_ADAPTIVE_BITRATE_MODE=live`, which is off by default. See "C3.L4
+live mode — as built" at the end.
+
+- On a clean link it was **SILENT** for 30 minutes.
+- The decrease path is proven on injection: one transition, a 171 ms gap,
+  the blackout, and the hold-down refusal.
+- **The increase path never fired.** The 90-consecutive-clean rule is
+  not reachable in attract mode. The user's call is pending.
+- No live run has met real loss yet; that is the user's `nft` night.
+
+**2026-09-29 (`C3-L4-L2`):** the live increase rule is now **the user's
+blend** (§"C3.L4 live increase rule — the blend" at the end). Session B2
+**climbed 5000 → 7000**, one rung per event.
+
 Sections appear in the order they were written. Later sections are
 authoritative where they disagree with earlier ones; the Linux sections at the
 end supersede Windows-era numbers for the Linux backend.
@@ -933,3 +954,402 @@ It was measured WORKING at 5000, 5500, 6000 and 7000
 (`../evidence/C3_F1_RECOVERY_RESTART_LADDER_2026-09-25.md`). There is a
 loopback-only diagnostic route, `c3-recovery-restart`. A live controller
 that moves the ladder no longer disables link-drop recovery.
+
+## C3.L4 live mode — the constraint (DECISION, 2026-09-28)
+
+**This is a decision, not an implementation.** No code changed with it.
+Source: `../decisions/C3-L4_LIVE_AUTHORIZATION_2026-09-28.md` (the user's
+reading of the pooled `C3.L3a` table: W 5.0 jump 6/20 at 1.9× chance, ramp
+15/20 at 3.4×, decoys at or below chance;
+`../evidence/C3_L3A_R4_SESSION4_2026-09-28.md`).
+
+A live (acting) mode, when built, must hold to:
+
+1. **One transition per adaptation event.** The controller picks its
+   target on the validated ladder and reaches it in a single
+   `video_only_restart`. The ladder chooses the target; it is **not
+   stepped through**.
+2. **Minimum spacing between transitions = the existing hold-downs**
+   (§"The constants": blackout ≥ 3 reports / 6 s after any action; 60 s
+   same direction; 120 s on reversal; the oscillation guard → `HOLD`).
+   Each transition is its own event under those timers.
+3. **No ramps.** Three restarts four seconds apart are noticed; that shape
+   is excluded from live adaptation.
+4. **No sampling inside the settling window** (the blackout stays).
+5. **Cost per event** stays one output gap of ~190 ms (`C3.L3a-S1`).
+6. **No live run before a fault-injection night with the user's `nft`.**
+   That night is the next `C3.L4` task.
+
+The shadow's shapes already fit (1)-(3): FALLBACK is one transition to the
+floor; an increase is one rung per decision behind the hold-downs. Whether
+ROUTINE acts, and to what target, is the live build's design question, to
+be answered inside this constraint.
+
+## C3.L4 live mode — as built (C3-L4-L1, 2026-09-28)
+
+Task: `../handoffs/C3-L4-L1_LIVE_CONTROLLER_TASK.md`. Module:
+`companion/adaptive_bitrate_live.py`. Design note, with the reasoning for
+every choice below: `../evidence/c3_l4_l1_2026-09-28/c3_l4_l1_design.txt`.
+Record: `../evidence/C3_L4_L1_LIVE_CONTROLLER_2026-09-28.md`.
+**This section implements the constraint above; the shadow sections stay
+true of `shadow` mode.**
+
+**Mode.** `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live`. Off (the default) and
+`shadow` are unchanged, and `companion/adaptive_bitrate.py` is
+byte-identical. Its suite still asserts that it accepts only off and
+shadow and holds no actuator. The live module owns the third value, and
+`get_controller()` builds it only for `live`.
+
+**The mapping table** (the only source of targets):
+
+| trigger | evidence (the shadow's, unchanged) | target | transitions |
+| --- | --- | --- | --- |
+| FALLBACK | fps < 50 on 5/5 and (queue ≥ 2 on ≥ 3/5 or gap > 250 ms on ≥ 2/5) | 5000 | 1 |
+| ROUTINE | fps < 57 on ≥ 4/5 and queue ≥ 1 on ≥ 3/5 | 6000 | 1 |
+| INCREASE | below 7000, 90 consecutive clean reports after the blackout | one rung up | 1 per event |
+
+**Refusals.**
+
+- A decrease whose target is not below the current level is refused:
+  `at_floor`, or `at_or_below_target`. So ROUTINE acts at most once (7000
+  → 6000), and deeper trouble must meet FALLBACK.
+- **ROUTINE waits for FALLBACK.** While the newest report is itself
+  under 50 fps, ROUTINE waits up to 4 reports. On a queue-driven onset
+  ROUTINE's 4-of-5 is met one report before FALLBACK's 5-of-5, so without
+  the wait one failure would be two restarts.
+
+**Hold-downs** (reports since the last transition, by its direction; at
+2 s a report):
+
+- FALLBACK: 30 after a down, 60 after an up;
+- ROUTINE: 60 after either;
+- INCREASE: 60 after a down, 30 after an up, plus the 90 clean reports
+  (≥ 93 reports, 186 s).
+
+Hold-downs are checked before the floor, so an early repeat is refused as
+`hold_down`.
+
+**The other timers and guards.**
+
+- **Blackout**: 3 reports after any SSRC change. That covers the
+  controller's own (re-armed when the actuator returns) and recovery's
+  restart or full start. The games plugin wraps both and tells the
+  controller. Reports that arrive while the actuator runs are dropped.
+- **Guards**, all required:
+  - the stream is active;
+  - the game is active and not paused;
+  - recovery reads PLAYING;
+  - the reference profile is in force at 7000;
+  - `any_override` is false;
+  - the actuator is bound;
+  - the client session is ≥ 60 s old.
+
+  A failing guard is one `refused/guard` row that names it.
+- **Rate limit**: 4 transitions in any 10 min, then `RATE_LIMITED` and
+  the level is held. With the hold-downs, the fastest legal sequence is 4
+  transitions in 558 s, so the limit is a backstop.
+- **Oscillation** and **ACTUATOR_FAILED**: as the shadow, frozen for the
+  session.
+
+**Return to reference.** `session_ended` resets the controller to 7000,
+with no history and the disable lifted. It runs on:
+
+- stop;
+- `native-stream-stop`;
+- recovery's `END_MS` end;
+- a fresh (non-recovery) gameplay release.
+
+The stream is the truth: a mismatch is logged `level_sync` and the
+stream's `bitrate_kbps` wins. A full start resets to 7000 (C1).
+
+**Actuator and serialization.**
+
+- The controller calls
+  `NativeStreamManager.diagnostic_c3_validated_bitrate_transition(target)`,
+  the loopback route's method (C3.L3a's ladder path, with the
+  reference-7000 guard inside). It runs on one worker thread, never on the
+  client-health request thread.
+- The worker holds `NativeStreamManager._lock`, re-reads recovery's state
+  under it, and restarts only if the state is PLAYING. Otherwise the event
+  is `transition_aborted`: not counted, and not a failure.
+- Recovery's restart (`recovery_restart_encoder`, C3-F1) and its full
+  start take the same lock, **so a transition and a recovery restart
+  never overlap**. A recovery that enters during a transition restarts
+  ≥ 2 s later, at the new level (level-preserving).
+
+**Kill switches and test hook.**
+
+- **The flag**: unset it and restart the unit.
+- **The disable route**, `POST /plugins/games/adaptive-bitrate/disable`,
+  gives shadow behaviour for the rest of the session. It is idempotent
+  and open to any caller. There is no enable route.
+- **The injection hook** (test-only),
+  `POST /plugins/games/adaptive-bitrate/inject?class=FALLBACK|ROUTINE`,
+  needs `PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1`, live mode and a loopback
+  caller, else 403. It feeds one synthetic degraded report through every
+  gate.
+
+**Log and status.**
+
+- **Log**: `logs/games/adaptive_bitrate_shadow.jsonl`, rows `mode: live`.
+  A `transition` row (acted true) carries its inputs, the guards and the
+  hold-downs in force. It is followed by `transition_done`,
+  `transition_aborted` or `actuator_failed`, with the cycle's timings.
+  - Other rows: `refused`, `ssrc_change`, `level_sync`,
+    `session_ended_reset`, `disabled` and `inject`.
+  - State rows are written only when the state changes (`S1` finding 1).
+- **Status**: `native-stream-status.adaptive_bitrate` carries `mode`,
+  `configured_mode`, `state` (`ACTUATING` during a restart), `level`,
+  `last_action`, `transitions_this_session`, `rate_limited`, and `policy`.
+
+**Where this stands against the constraint's item 6** ("no live run
+before a fault-injection night"):
+
+- The task, authorized by the user 2026-09-28, ran live twice on a clean
+  link: a silent 30-minute hold, and one session in which the trigger was
+  injected.
+- **No live run has yet met real loss.** That is the `nft` night, the
+  user's, with the hand-step list in the record.
+
+**Results (2026-09-28).**
+
+- **Session A** (30 min, clean link): **SILENT**. There were 0
+  transitions over 898 reports, and every close-out row was met.
+- **Session B** (injected FALLBACK): **PARTIAL (B6)**.
+  - The decrease half behaved as pre-registered: one transition 7000 →
+    5000 (actuation 1,225 ms, 152.9 ms RTP silence, a 171 ms output gap),
+    the 3-report blackout, and the second injection refused by the
+    hold-down.
+  - **The increase path never fired** in 15.9 min at 5000.
+- **Finding.** The increase rule, 90 *consecutive* clean reports (fps ≥
+  59, queue 0, gap ≤ 150), is not reachable in attract mode on the
+  adopted build. The controller's clean counter peaked at 21 (A) and 32
+  (B), because the client's 2 s fps wanders 57-62.
+  - Proxy runs under "no ROUTINE-level sample" reach 110-116.
+  - Options (a) to (c) are in the record. The choice is the user's; the
+    constant is unchanged.
+- **As built, a stepped-down session stays down until the session ends**,
+  which resets it to 7000.
+
+## C3.L4 live increase rule — the blend (C3-L4-L2, 2026-09-29; the user's choice)
+
+Decision: `../decisions/C3-L4_LIVE_AUTHORIZATION_2026-09-28.md`, appended
+2026-09-29. Record: `../evidence/C3_L4_L2_INCREASE_RULE_2026-09-29.md`.
+**This supersedes the INCREASE row of "as built" above, for live only.**
+The shadow keeps its rule.
+
+**The rule.**
+
+- **clean** = fps ≥ 57, queue ≤ 1 and output gap ≤ 150, on fresh
+  telemetry: no ROUTINE-level sample.
+- **The window** holds the last 90 evaluated reports since the last SSRC
+  change and its 3-report blackout. It starts empty after every change:
+  the controller's own, recovery's restart or full start, or a session
+  start.
+  - Stale and non-distinct reports are skipped.
+  - A resync report enters the window as not clean.
+- **INCREASE**: one rung, when the window is full and ≥ 85 are clean, and
+  the hold-downs, guards, rate limit and oscillation guard allow it.
+- **Spacing**: the minimum between increases is 3 + 90 = 93 reports, 186
+  s. With a few unclean reports the window keeps rolling until 85 of the
+  last 90 are clean.
+- **Constants**: `INCREASE_CLEAN_FPS_AT_LEAST 57`,
+  `INCREASE_CLEAN_QUEUE_AT_MOST 1`, `INCREASE_CLEAN_GAP_AT_MOST_MS 150`,
+  `INCREASE_WINDOW_REPORTS 90`, `INCREASE_CLEAN_NEEDED 85`.
+- **Status**: `policy.increase_window`. The transition row carries
+  `window_reports` and `clean_reports`.
+
+**Per-report samples.** In live, every client report writes one `sample`
+row to the controller's log, about 0.5 kB each (527 B measured) and ~0.95 MB an hour,
+rotated at 4 MiB × 3. The row carries:
+
+- fps, queue, gap, fresh;
+- clean, and the disposition;
+- the window count and its clean count;
+- state, reason and level;
+- the blackout and the hold-downs.
+
+Any night can be re-scored offline under another rule from these rows.
+
+**Measured (Session B2, attract mode).**
+
+- **Clean share by rung**, the client's own values: 5000 91.2 %, 5500
+  94.0 %, 6000 95.6 %, 7000 95.0 %.
+- **Unclean**: 44 of the 45 unclean reports were fps < 57, and one was
+  queue > 1.
+- **The climb**: the steps came 117, 120 and 93 reports after the
+  previous change, so ~4 min per rung at 5000 and 5500.
+- **The pre-registered risk**: with 91 % clean at 5000, 85 of 90 is met
+  but not with much room. A link that is merely noisy (≤ 90 % clean) will
+  hold the stream at its rung, which is the safe side.
+
+
+## C3.L4 live triggers — capacity and the recovery-escalation backstop (C3-L4-N1, 2026-09-29; the user's decision)
+
+Decision: `../decisions/C3-L4_LIVE_AUTHORIZATION_2026-09-28.md`, appended
+2026-09-29 ("Yes, add both"). Records:
+`../evidence/C3_L4_NFT_NIGHT1_2026-09-29.md` (why) and
+`../evidence/C3_L4_N1_CAPACITY_TRIGGER_2026-09-29.md` (as built).
+**Live only; the shadow is byte-identical.** This extends the mapping
+table of "as built" above.
+
+**Why.** A capacity shortfall on this client does not queue frames. The
+decoder drops them: under night 1's cap, queue was ≥ 1 on 3 of 357
+reports, fps 8-40, and ~250 post-FEC lost packets per report. The
+shadow's FALLBACK (queue ≥ 2 or gap > 250) met its bar only inside
+freezes. Those belong to recovery (`client_output_silence` after
+`DESYNC_MS` 1000), and there the recovery guard refuses the controller.
+
+**The live FALLBACK triggers, in order** (all target 5000, one transition,
+every existing gate):
+
+| trigger (`trigger` / reason) | evidence, over the last 5 evaluated reports |
+| --- | --- |
+| `fps_queue_gap` / `decrease_fallback` | fps < 50 on 5/5 and (queue ≥ 2 on ≥ 3/5 or gap > 250 on ≥ 2/5) — the shadow's, unchanged |
+| `capacity` / `capacity` | fps < 50 on 5/5 and `lost_packets_delta` ≥ 50 on ≥ 3/5 |
+| `recovery_escalation` / `recovery_escalation` | not a window. Two recovery encoder restarts at one level within 180 s → one decision at the first evaluated report with recovery PLAYING (after the blackout) |
+
+ROUTINE (→ 6000) and INCREASE are unchanged.
+
+**The loss counter.** `lost_packets_delta` is
+`receiver.lost_packets_delta` in `privyhub_stream_telemetry_v1`. It is
+the companion's per-report delta of the client's video `lost_packets`
+(`RtpH264Receiver.lostPackets`).
+
+- **What it counts**: RTP sequence gaps in the ordered path *after* FEC
+  reconstruction, so it is post-FEC. Since A2.2 it also counts the jump
+  of a sequence resync.
+- **An SSRC change adds 0**: `beginStreamResync(jumpPackets = 0)` resets
+  the sequence state.
+- **A sequence resync adds its whole jump to one report**, as B2's
+  160-packet resync did.
+  - The 3-report blackout covers only the controller's own and
+    recovery's SSRC changes. A client-side resync gets no blackout.
+  - So one resync can make one report count toward the ≥ 3.
+  - It cannot fire the rule alone: fps < 50 must still hold on all 5,
+    and two more reports must carry ≥ 50.
+  - The blackout covers the loss the old stream carried into the first
+    reports after a restart.
+  - **The judgement: enough.** Every recorded clean-link series replays
+    with zero raw capacity windows.
+
+**Where the backstop reads recovery from, and serialization.**
+
+- The games plugin's `_recovery_restart_encoder` calls
+  `LiveController.note_recovery_restart("recovery_restart")` once per
+  recovery `encoder_restart`; `_recovery_full_start_encoder` calls it
+  with `"recovery_full_start"`. Each call is on recovery's monitor
+  thread, after the restart returned and released the stream lock, and
+  carries the monotonic clock.
+- A desync pause alone never calls it.
+- The level is the held level for a restart (C3-F1 is level-preserving)
+  and 7000 for a full start (C1).
+- The controller reads recovery only: these calls, and
+  `current_state()` for the guard.
+- Its own restart still re-checks PLAYING under `NativeStreamManager._lock`,
+  the lock recovery's restart takes. So the two never overlap, and a
+  recovery restart after a controller transition runs at the new level.
+- The escalation waits, unspent, while recovery is not PLAYING. It is
+  consumed by its one decision, whatever the outcome.
+
+**Expected under a cap** (night 1's samples, open-loop): capacity acts
+~14-20 s after the cap. After that recovery has no freeze to own at 5000,
+so the backstop stays quiet; it is the net for a shortfall the capacity
+bar misses. The blend's climb under a cap between the 5500 and 6000 wire
+rates is predicted (not measured):
+
+- 5500 fits;
+- 6000 does not, and a capacity FALLBACK comes back to 5000 after the
+  120 s reversal hold-down;
+- the next increase is the third direction change inside 10 min →
+  HOLD (oscillation).
+
+Night 2's pre-registration holds exactly this.
+
+**Status and log.**
+
+- `policy.capacity_trigger` and `policy.recovery_escalation`: the rules,
+  the restarts in the window, and the armed escalation.
+- `escalation_armed` rows.
+- `trigger` on every FALLBACK / ROUTINE decision row.
+- `escalation_armed` on every `sample` row.
+
+## C3.L4 live trigger — capacity_mild (C3-L4-N2, 2026-09-29; the user's decision)
+
+Decision: `../decisions/C3-L4_LIVE_AUTHORIZATION_2026-09-28.md`, appended
+2026-09-29 ("Go"). Records: `../evidence/C3_L4_NFT_NIGHT2_2026-09-29.md`
+(why) and `../evidence/C3_L4_N2_MILD_CAPACITY_2026-09-29.md` (as built).
+**Live only; the shadow is byte-identical.**
+
+**Why.** Under night 2's cap, 5000 and 5500 ran clean and 6000 did not
+fit. The stream there was degraded but under every existing bar: fps
+median 55.8, under 50 on 17 %, ~60 lost per report, queue ≥ 1 on 1 of 115.
+It stayed at 6000 until the cap was removed.
+
+**The live decrease triggers, in order** (all over the last 5 evaluated
+reports):
+
+| trigger | class → target | bar |
+| --- | --- | --- |
+| `fps_queue_gap` | FALLBACK → 5000 | the shadow's (fps < 50 on 5/5 and queue ≥ 2 on ≥ 3/5 or gap > 250 on ≥ 2/5) |
+| `capacity` | FALLBACK → 5000 | fps < 50 on 5/5 and lost ≥ 50 on ≥ 3/5 |
+| **`capacity_mild`** | **ROUTINE → one rung down** | **fps < 57 on ≥ 4/5 and lost ≥ 50 on ≥ 3/5** |
+| `fps_queue_gap` | ROUTINE → 6000 | fps < 57 on ≥ 4/5 and queue ≥ 1 on ≥ 3/5 |
+| `recovery_escalation` | FALLBACK → 5000 | two recovery restarts at one level within 180 s (not a window) |
+
+**Timing as built.**
+
+- **At a hard cap's onset** the mild bar is met first, at ~10 s. But the
+  newest report is under 50 fps, so L1's 4-report ROUTINE deferral waits,
+  and the strict FALLBACK acts at 14-20 s. In night 1's K cap the strict
+  bar arrived exactly at the 4th deferred report.
+- **On a mild shortfall after a climb**, the mild step is a reversal. The
+  60-report ROUTINE hold-down after an up applies: the bar is met at
+  ~46 s, and the step comes at ~120 s.
+- The next increase is then the third direction change. Inside 10 min it
+  becomes HOLD `oscillation` at the lower rung.
+
+## C3.L4 — the controller as closed (2026-09-30)
+
+Decision: `../decisions/C3-L4_LIVE_AUTHORIZATION_2026-09-28.md`, the close
+appended 2026-09-30. **Live only**, behind
+`PRIVYHUB_ADAPTIVE_BITRATE_MODE=live`, off by default. **No new behaviour
+in this section**; it tables the rules the earlier sections built.
+
+| class | trigger (`trigger` / reason) | bar, over the last 5 evaluated reports | target | precedence | hold-downs (reports after a down / an up) |
+| --- | --- | --- | --- | --- | --- |
+| FALLBACK | `fps_queue_gap` / `decrease_fallback` | fps < 50 on 5/5 and (queue ≥ 2 on ≥ 3/5 or gap > 250 ms on ≥ 2/5) | 5000 | 1 | 30 / 60 |
+| FALLBACK | `capacity` / `capacity` | fps < 50 on 5/5 and lost ≥ 50 on ≥ 3/5 | 5000 | 2 | 30 / 60 |
+| ROUTINE | `capacity_mild` / `capacity_mild` | fps < 57 on ≥ 4/5 and lost ≥ 50 on ≥ 3/5 | one rung down (at 5000: `at_floor`) | 3 | 60 / 60 |
+| ROUTINE | `fps_queue_gap` / `decrease_routine` | fps < 57 on ≥ 4/5 and queue ≥ 1 on ≥ 3/5 | 6000 | 4 | 60 / 60 |
+| FALLBACK | `recovery_escalation` / `recovery_escalation` | two recovery encoder restarts at one level within 180 s → one decision once recovery is PLAYING and the blackout has passed | 5000 | its own path (not a window) | 30 / 60 |
+| INCREASE | the blend | ≥ 85 of the last 90 evaluated reports since the last SSRC change clean (fps ≥ 57, queue ≤ 1, gap ≤ 150) | one rung up | when no decrease bar holds | 60 / 30 |
+
+**Common to every row:**
+
+- one transition per event;
+- a 3-report blackout after any SSRC change;
+- L1's ROUTINE deferral: while the newest report is under 50 fps, a
+  ROUTINE waits up to 4 reports for FALLBACK;
+- the oscillation guard: a third direction change within 10 min → HOLD
+  for the session;
+- the rate limit: 4 transitions per 10 min;
+- the guards: stream active, game active and not paused, recovery
+  PLAYING, reference profile, no override, session age ≥ 60 s;
+- the disable route (shadow for the session).
+
+**Recovery is unchanged** (`C3-F1`, level-preserving), and the shadow is
+byte-identical.
+
+**The three nights.**
+
+- **Night 1** (2026-09-29, the shadow's triggers only): the stream never
+  stepped down under a capacity cap. The client drops frames rather than
+  queueing them, and recovery restarted at 7000 nine times. Hence
+  capacity and the backstop.
+- **Night 2**: capacity acted at +14 s, and recovery held 5000 through a
+  15 s drop. But 6000 under the cap sat degraded for 4 min below every
+  bar. Hence `capacity_mild`.
+- **Night 3**: capacity at +15.5 s, the climb to 6000, `capacity_mild`
+  back to 5500 at 121 s (the reversal hold-down), then HOLD `oscillation`
+  at 5500 for the session. It was **the pre-registered shape**.

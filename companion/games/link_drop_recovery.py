@@ -208,6 +208,11 @@ class LinkDropRecovery:
     def _stop_monitor(self) -> None:
         self._running.clear()
 
+    def current_state(self) -> str:
+        """C3-L4-L1: the state alone, cheaply (the live controller's interlock)."""
+        with self._lock:
+            return self._state
+
     # --- inputs ------------------------------------------------------------
 
     def note_client_silence(

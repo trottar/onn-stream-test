@@ -1,0 +1,31 @@
+C3-L4-L2 Session B2 -- read-only scoring (rules: c3_l4_l2_b2_preregistration.txt)
+   2026-09-29T03:29:21Z .. 2026-09-29T03:56:23Z, report native_decoder_20260929_035626_616.json
+   at PLAYING: any_override False; adaptive_bitrate live; bitrate 7000; profile native_game_720p60_reference
+   spikes_20_per_min                  24.67  target < 200    PASS
+   rendered_fps                       59.90  target >= 59.5  PASS
+   stale_output_drops_per_min          0.55  target < 20     PASS
+   video_lost_per_min_post_fec        14.60  target < 10     FAIL
+   audio_underruns_per_min             0.37  target < 5      PASS
+   max_output_gap_ms                    385  (reported; bound <= 250)
+   duration 27.20 min; ssrc_changes 4
+   decision log: 876 rows, 812 sample rows; transitions 4; done [('transition_done', 1375.8), ('transition_done', 1222.9), ('transition_done', 1373.4), ('transition_done', 1273.9)]; refusals [('FALLBACK', 'hold_down', True)]; holds 0
+   injection 1: HTTP 200 [('transition', 'FALLBACK', 7000, 5000)]
+   injection 2: HTTP 200 [('refused', 'hold_down', 15)]
+   decoder ssrc_change elapsed_ms: [128443, 361704, 602920, 789662]
+   transitions (time, class, from->to, window reports/clean, reports since the previous SSRC change, result, actuation, ssrc, gap in [ssrc, +1 s] vs 186.5):
+     2026-09-29T03:31:21.941Z FALLBACK 7000->5000 window None/None since None transition_done 1375.8 ms ssrc@128443 gap 175 ms (-11.5)
+     2026-09-29T03:35:15.359Z INCREASE 5000->5500 window 90/85 since 117 transition_done 1222.9 ms ssrc@361704 gap 221 ms (+34.5)
+     2026-09-29T03:39:16.429Z INCREASE 5500->6000 window 90/85 since 120 transition_done 1373.4 ms ssrc@602920 gap 178 ms (-8.5)
+     2026-09-29T03:42:23.269Z INCREASE 6000->7000 window 90/86 since 93 transition_done 1273.9 ms ssrc@789662 gap 211 ms (+24.5)
+   status before BACK: mode live, state REFERENCE, level 7000, transitions 4, rate_limited False, suppressed {'blackout': 12, 'hold_down': 0, 'floor': 0, 'oscillation': 0, 'routine_hold_down': 0}, window 90/86
+   sample dispositions {'evaluated': 800, 'blackout': 12}; clean share by level {5000: '103/113 (91.2 %)', 5500: '110/117 (94.0 %)', 6000: '86/90 (95.6 %)', 7000: '456/480 (95.0 %)'}
+   why a report was not clean: {'fps<57': 44, 'queue>1': 1}
+   W1 one ssrc_change to 5000 (1), gap 175 ms, blackout 12 for 4 changes, 2nd injection refused hold_down: MET
+   W2 climb [(5000, 5500), (5500, 6000), (6000, 7000)]: MET
+      2026-09-29T03:35:15.359Z 5000->5500: window 90/85 clean, 117 reports since the previous change, gap 221 ms
+      2026-09-29T03:39:16.429Z 5500->6000: window 90/85 clean, 120 reports since the previous change, gap 178 ms
+      2026-09-29T03:42:23.269Z 6000->7000: window 90/86 clean, 93 reports since the previous change, gap 211 ms
+   W3 at 7000 from 2026-09-29T03:42:23.269Z for 840 s to the end of the hold, transitions after it 0: MET
+   W4 ssrc_changes 4 (4), report stored, recovery events ['session_started', 'session_ended'], close-out fails ['video_lost_per_min_post_fec']: NOT MET; controller after BACK [('2026-09-29T03:56:26.640Z', 7000, 7000)]
+   close-out rows (reported): fails ['video_lost_per_min_post_fec']
+   -> Session B2: PARTIAL (W4)

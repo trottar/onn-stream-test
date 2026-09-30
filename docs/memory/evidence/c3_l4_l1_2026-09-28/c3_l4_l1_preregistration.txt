@@ -1,0 +1,33 @@
+C3-L4-L1 -- pre-registration, written 2026-09-28 before either session ran
+(rules copied from handoffs/C3-L4-L1_LIVE_CONTROLLER_TASK.md; not tightened or loosened after data)
+
+Gate before any session: py_compile; the live suite and the unchanged shadow suite pass; parity
+(shadow night -> live path: zero actions); the loss replays written. MET 21:52Z (unit_tests.txt,
+c3_l4_l1_replays.txt). Flag-off smoke after the companion restart: smoke_flag_off.txt.
+
+Session A -- silent live hold. 30-minute attract-mode hold, PRIVYHUB_ADAPTIVE_BITRATE_MODE=live, clean
+link, T2 sampler on, adopted profile, zero input. any_override false at PLAYING.
+  SILENT if zero transitions (decision log: no `transition` row; status transitions_this_session 0)
+  AND the close-out rows meet their targets (spikes_20/min < 200, rendered fps >= 59.5, stale drops/min
+  < 20, video lost/min post-FEC < 10, audio underruns/min < 5; max output gap reported, bound <= 250).
+  Anything else: recorded as what fired and why (decision log) and the row that missed.
+
+Session B -- injected trigger. live + PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1; after 120 s of PLAYING one
+injected FALLBACK; 30 s later a second injected FALLBACK.
+  WIRED if all of:
+   B1 exactly ONE ssrc_change from the first injection (the decoder report's stream_discontinuities
+      over the session, before the increase path; the increase path's own restarts counted separately
+      as one per rung);
+   B2 the level after = 5000 (the mapping table: FALLBACK -> 5000);
+   B3 its output gap reported against 186.5 ms (C3.L3a-S1 median) -- reported, not ruled;
+   B4 blackout observed: no decision for 3 reports after the change (decision log: no transition /
+      refused row inside the blackout; the status blackout counter);
+   B5 then the hold-down: the second injection, 30 s after the first, is REFUSED with reason hold_down
+      (logged, no transition, no ssrc_change);
+   B6 with the link clean, the increase path returns to 7000 one rung per event (5000 -> 5500 -> 6000
+      -> 7000), each >= the increase cadence apart (>= 93 reports: 3 blackout + 90 clean), recorded as
+      times;
+   B7 BACK -> the decoder report is stored; lifecycle clean (session_started / session_ended in the
+      recovery log, no desync_pause / encoder_restart, controller back at 7000).
+  PARTIAL naming what did not hold.
+  (ssrc_changes expected over the whole of B if WIRED: 4 -- one down, three up.)

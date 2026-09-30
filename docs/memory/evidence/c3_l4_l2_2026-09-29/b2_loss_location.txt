@@ -1,0 +1,8 @@
+C3-L4-L2 Session B2 -- where the post-FEC video loss happened (read-only; report_B2.json + heartbeat_B2.jsonl)
+stream_discontinuities: [{"elapsed_ms": 128443, "type": "ssrc_change", "jump_packets": 0}, {"elapsed_ms": 361704, "type": "ssrc_change", "jump_packets": 0}, {"elapsed_ms": 602920, "type": "ssrc_change", "jump_packets": 0}, {"elapsed_ms": 789662, "type": "ssrc_change", "jump_packets": 0}, {"elapsed_ms": 878155, "type": "sequence_resync", "jump_packets": 160}]
+video: {'lost_packets': 397, 'lost_packets_in_resyncs': 160, 'ssrc_changes': 4, 'sequence_resyncs': 5, 'largest_resync_jump_packets': 160}
+heartbeat lost over the session 390; within [-2 s, +6 s] of the 4 controller SSRC changes: 0
+non-transition discontinuity at 878155 ms (14.6 min; 88 s from the nearest controller change): type sequence_resync, jump 160, lost around it [-2 s,+6 s] 160
+2 s intervals with >= 20 lost (elapsed_ms, lost, of which in resyncs): [(879523, 160, 160), (1590501, 94, 0)]
+without those intervals: 136 lost over 27.2 min = 5.00/min (the row is < 10)
+largest output gaps (elapsed_ms, ms): [(878433, 385), (361748, 221), (789701, 211), (602968, 178), (128472, 175)]

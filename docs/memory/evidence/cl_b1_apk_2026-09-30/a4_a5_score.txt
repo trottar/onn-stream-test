@@ -1,0 +1,15 @@
+CL-B1 APK -- A4 (the new APK's hold) and A5 (the paired adopted hold)
+reference: the adopted APK's eight C5-M3 B holds: FEC recovered/min 6.17-14.80, unrecoverable groups/min 0.84-3.12, fec_max_hold_ms 14-19; loss/min 3.16-32.68 (spread 29.52)
+hold APK         min spikes/m    fps stale/m aund/m | FEC rec/m unrec/m hold ms |  loss/m max gap | slow cap recent
+N1   de072762  20.21     27.9  59.92    0.69   0.40 |      6.43    1.58      15 |   10.29     246 |     1280   1024
+O1   f31b1c18  20.24     28.3  59.92    1.09   0.64 |      5.98    1.63      14 |   11.81     205 |      128     64
+A4 rows:
+  PASS  spikes < 200/min
+  PASS  rendered fps >= 59.5
+  PASS  stale drops < 20/min
+  PASS  audio underruns < 5/min
+  inside the reference range: fec_rec 6.43
+  inside the reference range: fec_unrec 1.58
+  inside the reference range: fec_hold 15.00
+  => A4 HOLDS
+A5 (reported; gates only if worse by more than the spread 29.52): loss/min new 10.29 vs adopted 11.81 (difference -1.51); max gap new 246 vs adopted 205 -> does not gate

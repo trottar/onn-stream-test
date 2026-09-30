@@ -1,0 +1,130 @@
+C3-L4-L1 -- design note: the live adaptive-bitrate mode
+(written 2026-09-28 before the build; the build follows it. Code: companion/adaptive_bitrate_live.py.)
+
+0. What the decision authorizes (decisions/C3-L4_LIVE_AUTHORIZATION_2026-09-28.md) and what this
+   task adds: one video_only_restart per adaptation event, straight to the target; the ladder
+   chooses the target and is never stepped through; the existing hold-downs are the minimum
+   spacing; the blackout stays; no ramp. The task makes ROUTINE an acting class (the decision left
+   "whether ROUTINE acts, and to what target" to this build) and adds a rate limit, guards, a
+   runtime disable route and a test-only inject hook.
+
+1. The policy as the shadow has it (companion/adaptive_bitrate.py, unchanged).
+   - FALLBACK names a TARGET: the ladder's floor, 5000, in one would-act.
+   - ROUTINE names a STEP: one rung below the virtual level; it never moved the virtual level
+     (C3-L2 did not authorize it), logged once per 30 reports on its own track.
+   - An increase is a STEP: one rung up after 90 consecutive clean reports counted after the
+     3-report blackout.
+   - Hold-downs: 30 reports same direction, 60 on reversal; oscillation: the third direction
+     change inside 10 minutes -> HOLD for the session.
+   Since ROUTINE steps, the live policy names its target instead: the lowest rung ROUTINE's
+   severity maps to, from one table.
+
+2. THE MAPPING TABLE (live; `TARGET_KBPS` + the increase rule; nowhere else)
+
+   | trigger  | evidence (the shadow's, unchanged)                          | target            | transitions |
+   | FALLBACK | 5 fresh reports: fps < 50 on 5/5 AND (queue >= 2 on >= 3/5   | 5000              | 1           |
+   |          | OR output gap > 250 ms on >= 2/5)                           |                   |             |
+   | ROUTINE  | fps < 57 on >= 4/5 AND queue >= 1 on >= 3/5                  | 6000              | 1           |
+   | INCREASE | below 7000: 90 consecutive clean reports after the blackout  | one rung up       | 1 per event |
+   |          | (fps >= 59, queue 0, gap <= 150)                            | (5000->5500->6000->7000)       |
+
+   A decrease is refused when the target is not below the current level (FALLBACK at 5000:
+   `at_floor`; ROUTINE at 6000 or below: `at_or_below_target`). So ROUTINE moves at most once
+   (7000 -> 6000); deeper degradation must meet FALLBACK. From 5000 the return to 7000 is three
+   events, each its own restart, >= 93 reports (186 s) apart -- the slow-up the design wants, not a
+   ramp (a ramp is three restarts ~4 s apart, C3.L3a).
+
+   ROUTINE escalation deferral (new, this build): on a queue-driven failure onset ROUTINE's 4-of-5
+   is met one report before FALLBACK's 5-of-5 (S1). Acting on it would be 7000 -> 6000 and, 60 s
+   later, 6000 -> 5000: two restarts for one failure. So while the NEWEST report is itself below
+   FALLBACK's fps line (50), ROUTINE waits up to 4 reports (8 s) for FALLBACK to decide; after 4 it
+   acts (a stream slow at 45 fps with queue 1 never meets FALLBACK and must not be left alone).
+
+3. Hold-downs (reports since the last transition, by its direction; 2 s cadence):
+   | next transition | after a down | after an up |
+   | FALLBACK        | 30 (60 s)    | 60 (120 s)  |
+   | ROUTINE         | 60 (120 s)   | 60 (120 s)  |
+   | INCREASE        | 60 (120 s)   | 30 (60 s)   |  plus 90 clean after the blackout (>= 186 s)
+   The task's "30 FALLBACK-hold, 60 ROUTINE, 90 clean before an increase" and the shadow's
+   same-direction 30 / reversal 60 are both satisfied by this one table. Checked FIRST, before the
+   floor, so an injection inside the hold-down is refused as `hold_down` (Session B's second
+   injection), not as `at_floor`.
+
+4. Blackout: 3 reports after ANY SSRC change -- the controller's own (re-armed when the actuator
+   returns, i.e. at the change, not at the decision) and recovery's (restart or full start: the
+   games plugin wraps both and calls note_recovery_restart). No decision, no telemetry scored,
+   the evidence window and the clean count cleared. S1: settling 1-3 reports, pooled max 5.0 s;
+   3 x 2 s = 6 s covers it. While the actuator runs, reports are dropped (counted
+   `reports_dropped_while_actuating`), so the blackout starts on the first report after it.
+   An injection inside the blackout is refused (`blackout`); it does not consume a blackout report.
+
+5. Guards (never acts unless all hold; a failing guard is a `refused/guard` row naming it, once
+   per run): stream active; game active and not paused; recovery state PLAYING; the reference
+   profile in force (profile_id = the 720p60 reference and its bitrate 7000); any_override false;
+   the actuator bound; the client session >= 60 s old (S1 finding 2: the first reports of a session
+   read 0 fps). The adaptive-bitrate flags themselves are not encoder overrides.
+
+6. Rate limit: at most 4 transitions in any 10-minute window (a monotonic clock in the companion,
+   the client's elapsed in the replays). A fifth is refused `RATE_LIMITED`, the level held, the
+   status `rate_limited: true`. With the hold-downs above the fastest legal sequence (down + three
+   ups) is 4 in 558 s, so the limit is a backstop, never the normal governor.
+
+7. Oscillation and failure: the shadow's guard unchanged (third direction change in 10 min ->
+   HOLD, rest of the session). An actuator exception -> ACTUATOR_FAILED, frozen for the session
+   (the architecture's rule); the level is read back from the stream.
+
+8. Return to reference: `session_ended` (the games plugin's stop / native-stream-stop / recovery's
+   END_MS end, and a fresh gameplay release that is not a recovery) resets the controller: level
+   7000, transitions 0, timers and the rate history cleared, disable lifted. The stream itself
+   resets to 7000 on any full start (C1, `_stop_locked`). A client-side reset (elapsed falling)
+   resets the policy's evidence but keeps the companion-session counters, and takes the stream's
+   real level; any mismatch between the policy level and the stream's `bitrate_kbps` is logged
+   `level_sync` and the stream wins.
+
+9. How the actuator is invoked -- the same code path, not a new one: the controller calls
+   `NativeStreamManager.diagnostic_c3_validated_bitrate_transition(target)`, the method the
+   loopback route `c3-validated-bitrate-transition` calls, which runs
+   `run_c3_linux_validated_bitrate_transition` (C3.L3a's ladder path; encoder-only restart; the
+   reference-profile-7000 guard inside it). It runs on one worker thread
+   ("PrivyHub-AdaptiveBitrate-Live"), never on the client-health request thread; one in flight.
+
+10. Where recovery and the controller are serialized:
+   - `NativeStreamManager._lock` (an RLock). The worker takes it, re-reads the recovery state
+     UNDER it, and calls the actuator only if the state is PLAYING (else the transition is
+     `transition_aborted`, not counted, not a failure). The actuator takes the same lock inside.
+     Recovery's restart (`recovery_restart_encoder`, C3-F1) and its full start
+     (`NativeStreamManager.start`) take that lock too. So a controller transition and a recovery
+     restart can never overlap.
+   - Recovery can ENTER PAUSED_RECOVERING while a transition runs (entering only pauses the
+     game; it does not take the stream lock). Its first restart is >= 2 s later
+     (RESTART_AFTER_MS) and waits for the lock; it then restarts at the new level, because C3-F1
+     is level-preserving. The controller then sees recovery_playing false and does nothing until
+     PLAYING returns, and the recovery restart re-arms its blackout.
+
+11. Kill switch: the flag (unset + unit restart = off). Runtime: POST
+    /plugins/games/adaptive-bitrate/disable -> shadow behaviour for the rest of the session
+    (decisions still evaluated and logged as would_act, acted false; nothing actuates; the status
+    reads mode shadow, configured_mode live). Idempotent. Any caller (it can only reduce what the
+    controller does). No enable route; the next session is live again.
+
+12. Test-only injection: PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 with live enables POST
+    /plugins/games/adaptive-bitrate/inject?class=FALLBACK|ROUTINE -- one synthetic degraded
+    report of that class, decided through the same gates as the evidence window's verdict
+    (actuating, blackout, hold-down, target, guards, rate limit, oscillation). 403 unless the
+    caller is loopback, the inject flag is set, the mode is live and not disabled; the status
+    carries `inject_enabled` only when the flag is set.
+
+13. Log and status. The decision log is the controller's existing log,
+    logs/games/adaptive_bitrate_shadow.jsonl (schema privyhub_adaptive_bitrate_v1, rows carry
+    mode live). Rows: transition (acted true: class, from, to, the inputs = the window's
+    measurements and the latest sample, the guards, the hold-downs in force before it),
+    transition_done / transition_aborted / actuator_failed (the cycle's timings), refused (class,
+    reason, target, hold-downs in force), ssrc_change, level_sync, session_reset,
+    session_ended_reset, disabled, inject, and state rows only when the STATE changes (S1 finding
+    1: reason-only changes are no longer logged in live). native-stream-status.adaptive_bitrate
+    carries mode, configured_mode, state (ACTUATING while the worker runs), level,
+    last_action, transitions_this_session, rate_limited, and the policy's full status.
+
+14. What is not changed: adaptive_bitrate.py and its suite (byte-identical); the profile, encoder
+    flags, cap, cushion, redundancy, FEC; the client. Off and shadow construct exactly the
+    shadow module's own instance.

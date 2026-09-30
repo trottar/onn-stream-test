@@ -1,0 +1,53 @@
+C3-L4-L1 live sessions -- read-only scoring (rules: c3_l4_l1_preregistration.txt)
+t2 rows 310
+
+== Session A -- silent live hold
+   2026-09-28T21:58:33Z .. 2026-09-28T22:28:33Z (hold 1800 s), report native_decoder_20260928_222838_340.json
+   at PLAYING: any_override False; adaptive_bitrate mode live; bitrate 7000; profile native_game_720p60_reference
+   spikes_20_per_min                  32.70  target < 200    PASS
+   rendered_fps                       59.91  target >= 59.5  PASS
+   stale_output_drops_per_min          0.56  target < 20     PASS
+   video_lost_per_min_post_fec         5.22  target < 10     PASS
+   audio_underruns_per_min             0.83  target < 5      PASS
+   max_output_gap_ms                    130  (reported; bound <= 250)
+   duration 30.25 min; ssrc_changes 0; audio underruns 25
+   onn cpu-thermal 58.0-72.7 C over 180 samples
+   decision log lines 98: {'controller_start': 1, 'state': 95, 'session_ended_reset': 2}
+   transitions 0; refusals 0 []
+   status before BACK: mode live, state REFERENCE, level 7000, transitions_this_session 0, rate_limited False, reports_evaluated 898, would_act {'FALLBACK': 0, 'ROUTINE': 0, 'INCREASE': 0}, suppressed {'blackout': 0, 'hold_down': 0, 'floor': 0, 'oscillation': 0, 'routine_hold_down': 0}, refused {}, stale 0
+   status series 359 polls; (bitrate, level) seen [(7000, 7000)]
+   recovery log events in the hold: []
+   -> Session A: SILENT
+
+== Session B -- injected trigger
+   2026-09-28T22:30:14Z .. 2026-09-28T22:48:18Z, report native_decoder_20260928_224821_285.json
+   at PLAYING: any_override False; adaptive_bitrate mode live; bitrate 7000; profile native_game_720p60_reference
+   spikes_20_per_min                  41.57  target < 200    PASS
+   rendered_fps                       59.93  target >= 59.5  PASS
+   stale_output_drops_per_min          0.77  target < 20     PASS
+   video_lost_per_min_post_fec         9.33  target < 10     PASS
+   audio_underruns_per_min             2.25  target < 5      PASS
+   max_output_gap_ms                    235  (reported; bound <= 250)
+   duration 18.21 min; ssrc_changes 1; audio underruns 41
+   onn cpu-thermal 69.3-72.3 C over 109 samples
+   injection 1: HTTP 200; events [('transition', 'FALLBACK', 'decrease_fallback', 7000, 5000)]
+   injection 2: HTTP 200; events [('refused', 'FALLBACK', 'hold_down', 15)]
+   decision log: inject rows 2, transitions 1, done/aborted/failed [('transition_done', 1225.0)], refusals [('FALLBACK', 'hold_down', True)]
+   decoder ssrc_change elapsed_ms: [126934]
+   transitions (time, elapsed, class, from->to, reports since the previous, clean, result, actuation ms, ssrc, output gap in [ssrc, +1 s] vs 186.5 ms):
+     2026-09-28T22:32:14.364Z e=126073 FALLBACK 7000->5000 since=None clean=7 transition_done 1225.0 ms ssrc@126934 gap=171 ms (-15.5 vs 186.5)
+   slow events retained (>= 50 ms table): 66 (the table is bounded; a window it no longer covers reads None)
+   status before BACK: mode live, state RECOVERY_PROBATION, level 5000, transitions_this_session 1, rate_limited False, suppressed {'blackout': 3, 'hold_down': 0, 'floor': 0, 'oscillation': 0, 'routine_hold_down': 0}, refused {'hold_down': 1}, dropped while actuating 0
+   recovery log events in the session: []
+   B1 one ssrc_change from injection 1 before the increase path: 1 -> MET
+   B2 level after = 5000 (mapping FALLBACK -> 5000): MET ((7000, 5000, 'transition_done'))
+   B3 output gap of that change: 171 ms vs 186.5 ms (reported)
+   B4 blackout: suppressed.blackout 3 for 1 transitions; decision rows inside a blackout [] -> MET
+   B5 second injection refused by the hold-down: MET ([('refused', 'hold_down', 15)])
+   B6 increase path one rung per event, >= 93 reports apart: [] -> NOT MET
+   B7 BACK -> report stored, lifecycle clean, controller back at 7000: MET (report yes; recovery events around the session ['session_started', 'session_ended']; session_ended_reset after BACK [('2026-09-28T22:48:21.305Z', 5000, 7000)]; level before BACK 5000)
+   ssrc_changes over B: 1 (4 expected if WIRED)
+   close-out rows over B (reported; B is not ruled on them): fails []
+   -> Session B: PARTIAL (B6)
+
+summary -> c3_l4_l1_summary.json

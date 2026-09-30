@@ -1,0 +1,43 @@
+{"at_utc": "2026-09-29T03:58:45.741Z", "session": "setup", "event": "enter", "prompt": "listed the nft tables"}
+{"at_utc": "2026-09-29T03:58:46.741Z", "session": "setup", "event": "enter", "prompt": "the pre-registration above is the one for tonight"}
+{"at_utc": "2026-09-29T03:58:46.741Z", "session": "setup", "event": "preflight_ok", "apk": "f31b1c18...8ae7"}
+{"at_utc": "2026-09-29T03:58:49.967Z", "session": "setup", "event": "live_on", "flags": ["PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"]}
+{"at_utc": "2026-09-29T03:59:30.472Z", "session": "F1", "event": "playing", "any_override": false}
+{"at_utc": "2026-09-29T04:00:31.473Z", "session": "F1", "event": "enter", "prompt": "counter table made"}
+{"at_utc": "2026-09-29T04:00:31.474Z", "session": "F1", "event": "counter_on", "lines": ["sudo nft add table inet privyhub_fault", "sudo nft add chain inet privyhub_fault flt '{ type filter hook output priority 0; }'", "sudo nft add rule inet privyhub_fault flt udp dport 48100 counter"]}
+{"at_utc": "2026-09-29T04:00:32.474Z", "session": "F1", "event": "enter", "prompt": "counter reading 1 listed"}
+{"at_utc": "2026-09-29T04:00:38.475Z", "session": "F1", "event": "enter", "prompt": "counter reading 2 listed"}
+{"at_utc": "2026-09-29T04:00:38.475Z", "session": "F1", "event": "calibrated", "rate_7000_bytes_per_s": null, "used": 1083000, "source": "estimate", "cap_kbytes_per_s": 869}
+{"at_utc": "2026-09-29T04:00:38.475Z", "session": "F1", "event": "expect", "text": "within ~10-20 s ONE decrease: FALLBACK 7000->5000 (or ROUTINE 7000->6000, then FALLBACK ->5000 >= 60 s later); ~186 s later INCREASE 5000->5500 (fits the cap); ~186 s later INCREASE 5500->6000 (over the cap); a FALLBACK back to 5000 >= 120 s after that; then, instead of a third direction change inside 10 min, HOLD (oscillation) at 5000. rate_limited never true; never two transitions closer than the hold-downs; no ramp."}
+{"at_utc": "2026-09-29T04:00:38.476Z", "session": "F1", "event": "fault_on", "what": "F1 cap", "dry": true}
+{"at_utc": "2026-09-29T04:01:08.488Z", "session": "F1", "event": "did", "label": "F1 cap on", "since": "2026-09-29T04:00:38.475Z", "transitions": [], "holds": 0, "refused": {}, "rate_limited_ever": false, "level": 7000, "state": "REFERENCE", "mode": "live", "recovery_events": []}
+{"at_utc": "2026-09-29T04:01:08.488Z", "session": "F1", "event": "expect", "text": "after the cap is removed: at 5000 for the rest of the session if HOLD was reached; otherwise one rung per ~186 s back towards 7000."}
+{"at_utc": "2026-09-29T04:01:08.488Z", "session": "F1", "event": "fault_off", "what": "F1 cap", "dry": true}
+{"at_utc": "2026-09-29T04:02:08.499Z", "session": "F1", "event": "did", "label": "F1 cap off", "since": "2026-09-29T04:01:08.488Z", "transitions": [], "holds": 0, "refused": {}, "rate_limited_ever": false, "level": 7000, "state": "REFERENCE", "mode": "live", "recovery_events": []}
+{"at_utc": "2026-09-29T04:02:08.499Z", "session": "F1", "event": "expect", "text": "BACK -> session_ended_reset: the controller back at 7000, transitions 0."}
+{"at_utc": "2026-09-29T04:02:12.873Z", "session": "F1", "event": "back", "report": true, "level_after": 7000, "mode_after": "live"}
+{"at_utc": "2026-09-29T04:02:52.766Z", "session": "F2", "event": "playing", "any_override": false}
+{"at_utc": "2026-09-29T04:03:52.766Z", "session": "F2", "event": "expect", "text": "FEC recovers part of it; loss alone is never evidence. Either no transition, or AT MOST ONE decrease (ROUTINE ->6000 or FALLBACK ->5000) and then only at_or_below_target / at_floor / hold_down refusals. No second decrease, never a ramp."}
+{"at_utc": "2026-09-29T04:03:52.766Z", "session": "F2", "event": "fault_on", "what": "F2 2% loss", "dry": true}
+{"at_utc": "2026-09-29T04:04:22.778Z", "session": "F2", "event": "did", "label": "F2 loss on", "since": "2026-09-29T04:03:52.766Z", "transitions": [], "holds": 0, "refused": {}, "rate_limited_ever": false, "level": 7000, "state": "REFERENCE", "mode": "live", "recovery_events": []}
+{"at_utc": "2026-09-29T04:04:22.778Z", "session": "F2", "event": "expect", "text": "after removal: a stream that stepped down climbs one rung per ~186 s; otherwise nothing."}
+{"at_utc": "2026-09-29T04:04:22.778Z", "session": "F2", "event": "fault_off", "what": "F2 2% loss", "dry": true}
+{"at_utc": "2026-09-29T04:05:22.790Z", "session": "F2", "event": "did", "label": "F2 loss off", "since": "2026-09-29T04:04:22.778Z", "transitions": [], "holds": 0, "refused": {}, "rate_limited_ever": false, "level": 7000, "state": "REFERENCE", "mode": "live", "recovery_events": []}
+{"at_utc": "2026-09-29T04:05:26.918Z", "session": "F2", "event": "back", "report": true, "level_after": 7000, "mode_after": "live"}
+{"at_utc": "2026-09-29T04:06:05.329Z", "session": "F3", "event": "playing", "any_override": false}
+{"at_utc": "2026-09-29T04:07:05.330Z", "session": "F3", "event": "expect", "text": "the cap brings the stream to 5000 (one decrease)."}
+{"at_utc": "2026-09-29T04:07:05.330Z", "session": "F3", "event": "fault_on", "what": "F3 cap", "dry": true}
+{"at_utc": "2026-09-29T04:07:35.345Z", "session": "F3", "event": "did", "label": "F3 cap", "since": "2026-09-29T04:07:05.330Z", "transitions": [], "holds": 0, "refused": {}, "rate_limited_ever": false, "level": 7000, "state": "REFERENCE", "mode": "live", "recovery_events": []}
+{"at_utc": "2026-09-29T04:07:35.345Z", "session": "F3", "event": "expect", "text": "recovery owns the drop: desync_pause, encoder_restart AT 5000 (C3-F1, level-preserving), resumed. The controller does NOTHING while recovery is not PLAYING (a refused/guard recovery_playing row, or no rows because reports stop); then ssrc_change (recovery_restart) and a 3-report blackout; the level still 5000 (no level_sync)."}
+{"at_utc": "2026-09-29T04:07:35.345Z", "session": "F3", "event": "fault_on", "what": "F3 full drop", "dry": true}
+{"at_utc": "2026-09-29T04:08:50.360Z", "session": "F3", "event": "did", "label": "F3 drop and recovery", "since": "2026-09-29T04:07:35.345Z", "transitions": [], "holds": 0, "refused": {}, "rate_limited_ever": false, "level": 7000, "state": "REFERENCE", "mode": "live", "recovery_events": []}
+{"at_utc": "2026-09-29T04:08:54.499Z", "session": "F3", "event": "back", "report": true, "level_after": 7000, "mode_after": "live"}
+{"at_utc": "2026-09-29T04:09:35.579Z", "session": "K", "event": "playing", "any_override": false}
+{"at_utc": "2026-09-29T04:10:35.580Z", "session": "K", "event": "fault_on", "what": "K cap", "dry": true}
+{"at_utc": "2026-09-29T04:11:05.581Z", "session": "K", "event": "expect", "text": "disable #1 -> already_disabled false; disable #2 -> already_disabled true; status mode shadow, configured_mode live, acts false; further decisions logged as would_act (acted false); the stream stays where it is."}
+{"at_utc": "2026-09-29T04:11:05.593Z", "session": "K", "event": "disable", "first": [200, {"ok": true, "already_disabled": false, "effective_mode": "shadow", "disabled_at_utc": "2026-09-29T04:11:05.582Z", "note": "live resumes only with a new session; unset the flag and restart the unit for off"}], "second": [200, {"ok": true, "already_disabled": true, "effective_mode": "shadow", "disabled_at_utc": "2026-09-29T04:11:05.582Z", "note": "live resumes only with a new session; unset the flag and restart the unit for off"}]}
+{"at_utc": "2026-09-29T04:11:35.606Z", "session": "K", "event": "did", "label": "K cap, then disabled", "since": "2026-09-29T04:10:35.579Z", "transitions": [], "holds": 0, "refused": {}, "rate_limited_ever": false, "level": 7000, "state": "REFERENCE", "mode": "shadow", "recovery_events": []}
+{"at_utc": "2026-09-29T04:11:35.606Z", "session": "K", "event": "fault_off", "what": "K cap", "dry": true}
+{"at_utc": "2026-09-29T04:12:35.607Z", "session": "K", "event": "expect", "text": "BACK -> the next session is live again (the disable is for the session only)."}
+{"at_utc": "2026-09-29T04:12:39.756Z", "session": "K", "event": "back", "report": true, "level_after": 7000, "mode_after": "live"}
+{"at_utc": "2026-09-29T04:13:22.730Z", "session": "teardown", "event": "teardown", "clean": true}

@@ -1,0 +1,64 @@
+A1: SIGINT to 792793 at 14:44:58Z
+== A1_sigint_f1_cap: harness exit 0
+run A1_sigint_f1_cap: aborted_by None stopped None error None
+  nft/sudo calls 16; kinds after the last delete ['list_tables']
+  PASS  every fake-sudo call is -v, -n -v or -n nft
+  PASS  the delete-table call is logged
+  PASS  list tables after the last delete, rc 0, no privyhub_fault
+  PASS  no rule added after the last delete
+  PASS  summary no_fault_table_at_end
+  PASS  teardown clean (flag absent, stream 7000, game inactive, mode off)
+  PASS  flags after
+  PASS  fake table absent at the end
+  => PASS
+A2: SIGHUP to 794105 at 14:49:24Z
+== A2_sighup_f2: harness exit 129
+run A2_sighup_f2: aborted_by SIGHUP stopped None error None
+  nft/sudo calls 8; kinds after the last delete ['list_tables']
+  PASS  every fake-sudo call is -v, -n -v or -n nft
+  PASS  the delete-table call is logged
+  PASS  list tables after the last delete, rc 0, no privyhub_fault
+  PASS  no rule added after the last delete
+  PASS  summary no_fault_table_at_end
+  PASS  teardown clean (flag absent, stream 7000, game inactive, mode off)
+  PASS  flags after
+  PASS  fake table absent at the end
+  => PASS
+== A3_exception_f3_drop: harness exit 4
+run A3_exception_f3_drop: aborted_by None stopped None error RuntimeError: test exception at F3_drop
+  nft/sudo calls 11; kinds after the last delete ['list_tables']
+  PASS  every fake-sudo call is -v, -n -v or -n nft
+  PASS  the delete-table call is logged
+  PASS  list tables after the last delete, rc 0, no privyhub_fault
+  PASS  no rule added after the last delete
+  PASS  summary no_fault_table_at_end
+  PASS  teardown clean (flag absent, stream 7000, game inactive, mode off)
+  PASS  flags after
+  PASS  fake table absent at the end
+  => PASS
+A4: deny (sudo -n refused) from 14:54:22Z
+== A4_keepalive_refused_f2: harness exit 0
+run A4_keepalive_refused_f2: aborted_by None stopped None error None
+  nft/sudo calls 26; kinds after the last delete ['list_tables']
+  PASS  every fake-sudo call is -v, -n -v or -n nft
+  PASS  the delete-table call is logged
+  PASS  list tables after the last delete, rc 0, no privyhub_fault
+  PASS  no rule added after the last delete
+  PASS  summary no_fault_table_at_end
+  PASS  teardown clean (flag absent, stream 7000, game inactive, mode off)
+  PASS  flags after
+  PASS  fake table absent at the end
+  => PASS
+== A5_mismatch_f2: harness exit 3
+run A5_mismatch_f2: aborted_by None stopped F2 2% loss: expected rules ['loss_rule'], listing shows [] error None
+  nft/sudo calls 8; kinds after the last delete ['list_tables']
+  PASS  every fake-sudo call is -v, -n -v or -n nft
+  PASS  the delete-table call is logged
+  PASS  list tables after the last delete, rc 0, no privyhub_fault
+  PASS  no rule added after the last delete
+  PASS  summary no_fault_table_at_end
+  PASS  teardown clean (flag absent, stream 7000, game inactive, mode off)
+  PASS  flags after
+  PASS  fake table absent at the end
+  => PASS
+ALL DONE 0

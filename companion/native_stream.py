@@ -43,6 +43,7 @@ AUDIO_REDUNDANCY_OFFSET_ENV = "PRIVYHUB_AUDIO_REDUNDANCY_OFFSET_PACKETS"
 from games import host_resource_sampling
 from native_host_telemetry import NativeHostTelemetryProfiler
 from native_stream_profiles import NATIVE_GAME_720P60_REFERENCE
+from native_stream_profiles import PROFILE_ID_ENV, select_native_profile
 from native_stream_profiles import AUDIO_PACKET_MS, AUDIO_QUEUE_MAX_PACKETS, AUDIO_REDUNDANCY_MAX_OFFSET
 
 
@@ -79,6 +80,7 @@ class NativeStreamManager:
     INPUT_PORT = 48102
 
     def __init__(self, project_root: Path) -> None:
+        self._apply_profile_selection()
         self.project_root = project_root.resolve()
         self.data_dir = self.project_root / "data" / "games" / "native_stream"
         self.log_dir = self.project_root / "logs" / "games"
@@ -109,6 +111,27 @@ class NativeStreamManager:
         self._host_telemetry = NativeHostTelemetryProfiler(
             self.project_root
         )
+
+    def _apply_profile_selection(self) -> None:
+        """C5-M1: choose the stream profile once, at companion start.
+
+        `PRIVYHUB_NATIVE_PROFILE_ID` unset -> the class's adopted profile and
+        the same values the class constants already hold, so the argv is
+        byte-for-byte what it was. Set to a known id -> that profile's
+        values shadow the class constants on this instance.
+        """
+
+        profile, selection = select_native_profile(os.environ)
+        self._profile_selection = selection
+        self.PROFILE = profile
+        self.WIDTH = profile.width
+        self.HEIGHT = profile.height
+        self.FPS = profile.fps
+        self.GOP_FRAMES = profile.gop_frames
+        self.BITRATE_KBPS = profile.bitrate_kbps
+        self.MAX_BITRATE_KBPS = profile.max_bitrate_kbps
+        self.BFRAMES = profile.bframes
+        self.FEC_GROUP_SIZE = profile.fec_group_size
 
     @staticmethod
     def _env_int(name: str) -> int:
@@ -212,10 +235,15 @@ class NativeStreamManager:
             # variable is set (the relay reads it; see native_fec_relay).
             "fec_scheme_env": FEC_SCHEME_ENV,
             "fec_scheme_override": (os.environ.get(FEC_SCHEME_ENV) or "").strip() or None,
+            # C5-M1: the profile selector is an override while it is set,
+            # even to an id it ignores.
+            "profile_id_env": PROFILE_ID_ENV,
+            "profile_id_override": (os.environ.get(PROFILE_ID_ENV) or "").strip() or None,
             "any_override": bool(
                 mfs_override is not None
                 or bufsize_k
                 or (os.environ.get(FEC_SCHEME_ENV) or "").strip()
+                or (os.environ.get(PROFILE_ID_ENV) or "").strip()
             ),
         }
 
@@ -585,6 +613,9 @@ class NativeStreamManager:
                 "alpha_version": self.ALPHA_VERSION,
                 "profile_id": self.PROFILE.id,
                 "profile": self.PROFILE.to_dict(),
+                "profile_selection": dict(
+                    getattr(self, "_profile_selection", None) or {}
+                ),
                 "title": "Native Streaming Alpha",
                 "ready": ready,
                 "active": active,

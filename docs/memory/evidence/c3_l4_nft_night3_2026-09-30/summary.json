@@ -1,0 +1,129 @@
+{
+ "dry_run": false,
+ "fast": false,
+ "sudo_cmd": "sudo",
+ "started_utc": "2026-09-30T13:14:04.638Z",
+ "sessions": {
+  "F1": {
+   "any_override_at_playing": false,
+   "cap_on": {
+    "label": "F1 cap on",
+    "since": "2026-09-30T13:18:30.857Z",
+    "transitions": [
+     {
+      "at_utc": "2026-09-30T13:18:46.428Z",
+      "event": "transition",
+      "class": "FALLBACK",
+      "from_kbps": 7000,
+      "to_kbps": 5000,
+      "injected": false,
+      "acted": true,
+      "reason": "capacity",
+      "trigger": "capacity"
+     },
+     {
+      "at_utc": "2026-09-30T13:22:29.058Z",
+      "event": "transition",
+      "class": "INCREASE",
+      "from_kbps": 5000,
+      "to_kbps": 5500,
+      "injected": false,
+      "acted": true,
+      "reason": "increase_increase",
+      "trigger": null
+     },
+     {
+      "at_utc": "2026-09-30T13:25:35.925Z",
+      "event": "transition",
+      "class": "INCREASE",
+      "from_kbps": 5500,
+      "to_kbps": 6000,
+      "injected": false,
+      "acted": true,
+      "reason": "increase_increase",
+      "trigger": null
+     },
+     {
+      "at_utc": "2026-09-30T13:27:38.470Z",
+      "event": "transition",
+      "class": "ROUTINE",
+      "from_kbps": 6000,
+      "to_kbps": 5500,
+      "injected": false,
+      "acted": true,
+      "reason": "capacity_mild",
+      "trigger": "capacity_mild"
+     }
+    ],
+    "holds": 0,
+    "refused": {
+     "hold_down": 2
+    },
+    "decisions_by_trigger": {
+     "transition:capacity": 1,
+     "refused:capacity_mild": 2,
+     "transition:capacity_mild": 1
+    },
+    "escalation_armed": 0,
+    "rate_limited_ever": false,
+    "level": 5500,
+    "state": "RECOVERY_PROBATION",
+    "mode": "live",
+    "recovery_events": []
+   },
+   "cap_off": {
+    "label": "F1 cap off",
+    "since": "2026-09-30T13:30:30.976Z",
+    "transitions": [],
+    "holds": 1,
+    "refused": {},
+    "decisions_by_trigger": {},
+    "escalation_armed": 0,
+    "rate_limited_ever": false,
+    "level": 5500,
+    "state": "HOLD",
+    "mode": "live",
+    "recovery_events": []
+   }
+  }
+ },
+ "preregistration_sha256": "cf0ce814bf686d8f082abccea1102d2f54c65cfad146b05e3215d7db4f3d8b69",
+ "calibration": {
+  "rate_7000_bytes_per_s": 1066317.8429124698,
+  "used": 1066317.8429124698,
+  "source": "counter",
+  "cap_kbytes_per_s": 856
+ },
+ "no_fault_table_at_end": true,
+ "banner_count_at_end": 0,
+ "teardown_clean": true,
+ "flags_after": [],
+ "ended_utc": "2026-09-30T13:36:13.024Z",
+ "files": {
+  "harness.log": true,
+  "events.jsonl": true,
+  "abr_series.jsonl": true,
+  "t2_samples.jsonl": true,
+  "decision_log.jsonl": true,
+  "heartbeat.jsonl": true,
+  "frames.jsonl": true,
+  "recovery_log.jsonl": true,
+  "companion_journal_redacted.log": true,
+  "preregistration.txt": true,
+  "preregistration.sha256": true,
+  "armcheck_F1.json": true,
+  "status_end_F1.json": true,
+  "report_F1.json": true
+ },
+ "rows": {
+  "events.jsonl": 21,
+  "abr_series.jsonl": 255,
+  "t2_samples.jsonl": 128,
+  "decision_log.jsonl": 640,
+  "heartbeat.jsonl": 601,
+  "frames.jsonl": 1211,
+  "recovery_log.jsonl": 2
+ },
+ "decision_log_sample_rows": 601,
+ "complete": true
+}

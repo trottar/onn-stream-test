@@ -1,0 +1,19 @@
+C3-L4-N1 Session H -- the silent live hold, read-only scoring (rules: c3_l4_n1_hold_preregistration.txt)
+   2026-09-29T16:46:37Z .. 2026-09-29T17:16:37Z, report native_decoder_20260929_171642_771.json
+   at PLAYING: any_override False; adaptive_bitrate mode live configured live inject False; bitrate 7000; profile native_game_720p60_reference
+   the new rules in force (status): capacity fps < 50 on all 5 and lost_packets_delta >= 50 on >= 3 of 5; backstop 2 recovery encoder restarts at one level within 180 s
+   spikes_20_per_min                  26.61  target < 200    PASS
+   rendered_fps                       59.94  target >= 59.5  PASS
+   stale_output_drops_per_min          0.46  target < 20     PASS
+   video_lost_per_min_post_fec         7.78  target < 10     PASS
+   audio_underruns_per_min             0.40  target < 5      PASS
+   max_output_gap_ms                    182  (reported; bound <= 250)
+   duration 30.21 min; ssrc_changes 0; sequence_resyncs 0; lost 235 (in resyncs 0)
+   decision log: 1021 rows, 902 sample rows; events {'controller_start': 1, 'sample': 902, 'session_ended_reset': 2, 'state': 116}
+   transitions / would_act / holds 0; escalation_armed 0; refused 0 []; ssrc_change 0
+   sample dispositions {'resync': 1, 'evaluated': 901}; clean (the blend) 834/901
+   capacity bar near misses (any 5 evaluated): most under 50 fps 1/5; most with lost >= 50 0/5 (the bar: 5/5 AND 3/5); reports under 50 fps 2, with lost >= 50 0; max lost per report 25; min fps 45.74155345323929
+   recovery log in the hold: ['session_started']
+   status before BACK: mode live, state REFERENCE, level 7000, transitions 0, rate_limited False, escalation armed None
+   status poller: 359 rows; levels {7000: 359}; transitions max 0
+   -> Session H: SILENT

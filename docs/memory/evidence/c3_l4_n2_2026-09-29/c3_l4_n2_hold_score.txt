@@ -1,0 +1,20 @@
+C3-L4-N2 Session H -- the silent live hold, read-only scoring (rules: c3_l4_n2_hold_preregistration.txt)
+   2026-09-29T18:33:41Z .. 2026-09-29T19:03:41Z, report native_decoder_20260929_190345_437.json
+   at PLAYING: any_override False; adaptive_bitrate mode live configured live inject False; bitrate 7000; profile native_game_720p60_reference
+   the new rules in force (status): capacity fps < 50 on all 5 and lost_packets_delta >= 50 on >= 3 of 5; backstop 2 recovery encoder restarts at one level within 180 s
+   spikes_20_per_min                  35.95  target < 200    PASS
+   rendered_fps                       59.85  target >= 59.5  PASS
+   stale_output_drops_per_min          1.42  target < 20     PASS
+   video_lost_per_min_post_fec        33.99  target < 10     FAIL
+   audio_underruns_per_min             0.50  target < 5      PASS
+   max_output_gap_ms                    452  (reported; bound <= 250)
+   duration 30.18 min; ssrc_changes 0; sequence_resyncs 0; lost 1026 (in resyncs 0)
+   decision log: 1022 rows, 901 sample rows; events {'controller_start': 1, 'sample': 901, 'session_ended_reset': 3, 'state': 117}
+   transitions / would_act / holds 0; escalation_armed 0; refused 0 []; ssrc_change 0
+   sample dispositions {'resync': 1, 'evaluated': 900}; clean (the blend) 833/900
+   capacity_mild near misses over 896 windows of 5: windows with >= 4 under 57 fps 0; with >= 3 at lost >= 50 0; both (the bar) 0
+   capacity bar near misses (any 5 evaluated): most under 50 fps 2/5; most with lost >= 50 1/5 (the bar: 5/5 AND 3/5); reports under 50 fps 9, with lost >= 50 7; max lost per report 143; min fps 15.926071209298577
+   recovery log in the hold: []
+   status before BACK: mode live, state PRESSURE, level 7000, transitions 0, rate_limited False, escalation armed None
+   status poller: 359 rows; levels {7000: 359}; transitions max 0
+   -> Session H: NOT SILENT (close-out rows video_lost_per_min_post_fec)

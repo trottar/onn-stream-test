@@ -1,0 +1,57 @@
+{
+ "dry_run": false,
+ "fast": true,
+ "sudo_cmd": "tools/c3_l4_fake_sudo.py",
+ "started_utc": "2026-09-29T14:49:40.105Z",
+ "sessions": {
+  "F3": {
+   "any_override_at_playing": false,
+   "cap_to_5000": {
+    "label": "F3 cap",
+    "since": "2026-09-29T14:51:21.829Z",
+    "transitions": [],
+    "holds": 0,
+    "refused": {},
+    "rate_limited_ever": false,
+    "level": 7000,
+    "state": "REFERENCE",
+    "mode": "live",
+    "recovery_events": []
+   }
+  }
+ },
+ "preregistration_sha256": "fb5ca63fe559e5b2f99eb670d38fb21532f55f2fdd98883ca3f3f0678f57c531",
+ "error": "RuntimeError: test exception at F3_drop",
+ "no_fault_table_at_end": true,
+ "banner_count_at_end": 0,
+ "teardown_clean": true,
+ "flags_after": [],
+ "ended_utc": "2026-09-29T14:52:38.032Z",
+ "files": {
+  "harness.log": true,
+  "events.jsonl": true,
+  "abr_series.jsonl": true,
+  "t2_samples.jsonl": true,
+  "decision_log.jsonl": true,
+  "heartbeat.jsonl": true,
+  "frames.jsonl": true,
+  "recovery_log.jsonl": true,
+  "companion_journal_redacted.log": true,
+  "preregistration.txt": true,
+  "preregistration.sha256": true,
+  "armcheck_F3.json": true,
+  "status_end_F3.json": false,
+  "report_F3.json": false
+ },
+ "rows": {
+  "events.jsonl": 15,
+  "abr_series.jsonl": 32,
+  "t2_samples.jsonl": 16,
+  "decision_log.jsonl": 94,
+  "heartbeat.jsonl": 83,
+  "frames.jsonl": 129,
+  "recovery_log.jsonl": 2
+ },
+ "decision_log_sample_rows": 76,
+ "complete": false
+}

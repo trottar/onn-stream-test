@@ -1,0 +1,24 @@
+CL-B1 APK -- A1: the client source diff, file by file.
+
+1. The working tree against the f01c3b2 baseline (git diff --stat f01c3b2 -- PrivyHub/, and untracked files):
+   EMPTY. No client change since the baseline commit; the CL-B1 and C4-M1 client files were committed in f01c3b2.
+
+2. What the new APK carries beyond the adopted f31b1c18...8ae7, whose source is commit 824c9d9 (the D-BASE-P10
+   build of 2026-09-23; git log -- PrivyHub/): git diff --stat 824c9d9 f01c3b2 -- PrivyHub/
+ .../main/java/streaming/AvcLowLatencyDecoder.kt    |  12 +-
+ .../src/main/java/streaming/DecoderReportUpload.kt |  17 ++
+ PrivyHub/app/src/main/java/streaming/FecRs82.kt    | 126 +++++++++++++
+ .../main/java/streaming/NativeStreamActivity.kt    |  63 ++++++-
+ .../app/src/main/java/streaming/RtpH264Receiver.kt | 205 +++++++++++++++++++--
+ .../test/java/streaming/DecoderReportUploadTest.kt |  47 +++++
+ .../app/src/test/java/streaming/FecRs82Test.kt     | 100 ++++++++++
+ 7 files changed, 545 insertions(+), 25 deletions(-)
+
+   Attribution (patches/CL-B1_DECODER_REPORT_BODY.md, patches/C4-M1_FEC_XOR8_2_ARM.md, and the diff's own comments):
+   CL-B1: AvcLowLatencyDecoder.kt (slow-event rings 64+64 -> 256 marked + 1,024 recent)
+          DecoderReportUpload.kt, DecoderReportUploadTest.kt (the report as a POST body)
+          NativeStreamActivity.kt (httpPostBody, slow_event_capacity = the sum of the two segments)
+   C4-M1: FecRs82.kt, FecRs82Test.kt (the RS(8+2) decoder)
+          RtpH264Receiver.kt (the v2 parity path; a v1 stream takes the first branch every time, as before --
+          inert while PRIVYHUB_FEC_SCHEME is unset)
+   Nothing else. -> A1's diff condition HOLDS.

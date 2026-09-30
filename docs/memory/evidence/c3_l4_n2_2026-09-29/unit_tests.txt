@@ -1,0 +1,208 @@
+C3-L4-N2 unit tests, 2026-09-29T19:11:01Z; module sha256 7e03ee1b7f2f86ee...
+== tools/test_adaptive_bitrate_live.py
+test_blackout_covers_s1_settling_p95 (tools.test_adaptive_bitrate_live.Blackout.test_blackout_covers_s1_settling_p95)
+S1: settling one to three reports (<= ~4 s, pooled max 5.0 s): 3 x 2 s = 6 s. ... ok
+test_injection_inside_blackout_is_refused (tools.test_adaptive_bitrate_live.Blackout.test_injection_inside_blackout_is_refused) ... ok
+test_recovery_restart_blacks_out_and_clears_evidence (tools.test_adaptive_bitrate_live.Blackout.test_recovery_restart_blacks_out_and_clears_evidence) ... ok
+test_three_reports_after_own_transition_are_not_evaluated (tools.test_adaptive_bitrate_live.Blackout.test_three_reports_after_own_transition_are_not_evaluated) ... ok
+test_84_of_90_does_not_fire_until_the_window_rolls (tools.test_adaptive_bitrate_live.BlendIncreaseRule.test_84_of_90_does_not_fire_until_the_window_rolls) ... ok
+test_a_hold_down_in_force_blocks_a_full_window (tools.test_adaptive_bitrate_live.BlendIncreaseRule.test_a_hold_down_in_force_blocks_a_full_window) ... ok
+test_clean_boundary (tools.test_adaptive_bitrate_live.BlendIncreaseRule.test_clean_boundary) ... ok
+test_fires_at_exactly_85_of_90 (tools.test_adaptive_bitrate_live.BlendIncreaseRule.test_fires_at_exactly_85_of_90) ... ok
+test_one_rung_per_event_never_two (tools.test_adaptive_bitrate_live.BlendIncreaseRule.test_one_rung_per_event_never_two) ... ok
+test_parity_holds_at_reference (tools.test_adaptive_bitrate_live.BlendIncreaseRule.test_parity_holds_at_reference)
+An increase needs a prior decrease: a clean or wandering stream at 7000 never acts. ... ok
+test_resync_reports_enter_the_window_as_not_clean (tools.test_adaptive_bitrate_live.BlendIncreaseRule.test_resync_reports_enter_the_window_as_not_clean) ... ok
+test_stale_reports_are_skipped (tools.test_adaptive_bitrate_live.BlendIncreaseRule.test_stale_reports_are_skipped) ... ok
+test_the_blend_accepts_the_wander_l1_rejected (tools.test_adaptive_bitrate_live.BlendIncreaseRule.test_the_blend_accepts_the_wander_l1_rejected)
+fps 57-59 with queue 1 (L1 section 5: why the old rule never fired). ... ok
+test_window_empties_after_every_ssrc_change (tools.test_adaptive_bitrate_live.BlendIncreaseRule.test_window_empties_after_every_ssrc_change) ... ok
+test_a_missing_loss_delta_does_not_count (tools.test_adaptive_bitrate_live.CapacityTrigger.test_a_missing_loss_delta_does_not_count) ... ok
+test_at_5000_it_is_at_floor (tools.test_adaptive_bitrate_live.CapacityTrigger.test_at_5000_it_is_at_floor) ... ok
+test_boundaries_are_strict_and_inclusive_as_written (tools.test_adaptive_bitrate_live.CapacityTrigger.test_boundaries_are_strict_and_inclusive_as_written) ... ok
+test_fires_at_exactly_5_of_5_fps_and_3_of_5_loss (tools.test_adaptive_bitrate_live.CapacityTrigger.test_fires_at_exactly_5_of_5_fps_and_3_of_5_loss) ... ok
+test_not_at_2_of_5_loss (tools.test_adaptive_bitrate_live.CapacityTrigger.test_not_at_2_of_5_loss) ... ok
+test_not_at_4_of_5_fps (tools.test_adaptive_bitrate_live.CapacityTrigger.test_not_at_4_of_5_fps) ... ok
+test_not_during_a_hold_down (tools.test_adaptive_bitrate_live.CapacityTrigger.test_not_during_a_hold_down) ... ok
+test_not_during_the_blackout (tools.test_adaptive_bitrate_live.CapacityTrigger.test_not_during_the_blackout) ... ok
+test_not_on_loss_alone (tools.test_adaptive_bitrate_live.CapacityTrigger.test_not_on_loss_alone)
+F2's shape and worse: fps >= 50 with any loss is never capacity. ... ok
+test_not_while_recovery_is_not_playing (tools.test_adaptive_bitrate_live.CapacityTrigger.test_not_while_recovery_is_not_playing) ... ok
+test_queue_gap_fallback_keeps_its_own_trigger (tools.test_adaptive_bitrate_live.CapacityTrigger.test_queue_gap_fallback_keeps_its_own_trigger) ... ok
+test_resync_reports_are_not_evidence (tools.test_adaptive_bitrate_live.CapacityTrigger.test_resync_reports_are_not_evidence) ... ok
+test_stale_reports_never_count (tools.test_adaptive_bitrate_live.CapacityTrigger.test_stale_reports_never_count) ... ok
+test_the_rate_limit_still_binds (tools.test_adaptive_bitrate_live.CapacityTrigger.test_the_rate_limit_still_binds) ... ok
+test_the_shadow_is_unchanged (tools.test_adaptive_bitrate_live.CapacityTrigger.test_the_shadow_is_unchanged) ... ok
+test_any_override_blocks (tools.test_adaptive_bitrate_live.Guards.test_any_override_blocks) ... ok
+test_game_inactive_or_paused_blocks (tools.test_adaptive_bitrate_live.Guards.test_game_inactive_or_paused_blocks) ... ok
+test_guard_recovers_then_acts (tools.test_adaptive_bitrate_live.Guards.test_guard_recovers_then_acts) ... ok
+test_non_reference_profile_blocks (tools.test_adaptive_bitrate_live.Guards.test_non_reference_profile_blocks) ... ok
+test_recovery_not_idle_blocks (tools.test_adaptive_bitrate_live.Guards.test_recovery_not_idle_blocks) ... ok
+test_session_younger_than_60s_blocks (tools.test_adaptive_bitrate_live.Guards.test_session_younger_than_60s_blocks) ... ok
+test_stream_inactive_blocks (tools.test_adaptive_bitrate_live.Guards.test_stream_inactive_blocks) ... ok
+test_down_after_an_up_waits_60_reports (tools.test_adaptive_bitrate_live.HoldDowns.test_down_after_an_up_waits_60_reports) ... ok
+test_fallback_after_a_down_waits_30_reports (tools.test_adaptive_bitrate_live.HoldDowns.test_fallback_after_a_down_waits_30_reports) ... ok
+test_hold_down_seconds_at_the_2s_cadence (tools.test_adaptive_bitrate_live.HoldDowns.test_hold_down_seconds_at_the_2s_cadence) ... ok
+test_routine_waits_60_reports_after_any_transition (tools.test_adaptive_bitrate_live.HoldDowns.test_routine_waits_60_reports_after_any_transition) ... ok
+test_a_few_unclean_reports_do_not_restart_the_count (tools.test_adaptive_bitrate_live.IncreaseCadence.test_a_few_unclean_reports_do_not_restart_the_count)
+C3-L4-L2 (replaces L1's consecutive rule): the window is 85 of 90, ... ok
+test_back_to_7000_one_rung_per_event (tools.test_adaptive_bitrate_live.IncreaseCadence.test_back_to_7000_one_rung_per_event) ... ok
+test_session_b_offline (tools.test_adaptive_bitrate_live.InjectedSessionShape.test_session_b_offline) ... ok
+test_at_5000_it_is_at_floor_logged (tools.test_adaptive_bitrate_live.MildCapacityTrigger.test_at_5000_it_is_at_floor_logged) ... ok
+test_boundaries (tools.test_adaptive_bitrate_live.MildCapacityTrigger.test_boundaries) ... ok
+test_fires_at_4_of_5_fps_and_3_of_5_loss_one_rung (tools.test_adaptive_bitrate_live.MildCapacityTrigger.test_fires_at_4_of_5_fps_and_3_of_5_loss_one_rung) ... ok
+test_missing_or_stale_reports_do_not_count (tools.test_adaptive_bitrate_live.MildCapacityTrigger.test_missing_or_stale_reports_do_not_count) ... ok
+test_not_at_2_of_5_loss (tools.test_adaptive_bitrate_live.MildCapacityTrigger.test_not_at_2_of_5_loss) ... ok
+test_not_at_3_of_5_fps (tools.test_adaptive_bitrate_live.MildCapacityTrigger.test_not_at_3_of_5_fps) ... ok
+test_not_during_the_blackout (tools.test_adaptive_bitrate_live.MildCapacityTrigger.test_not_during_the_blackout) ... ok
+test_not_on_fps_alone_and_the_queue_routine_is_unchanged (tools.test_adaptive_bitrate_live.MildCapacityTrigger.test_not_on_fps_alone_and_the_queue_routine_is_unchanged) ... ok
+test_not_on_loss_alone (tools.test_adaptive_bitrate_live.MildCapacityTrigger.test_not_on_loss_alone) ... ok
+test_one_rung_never_two_and_the_routine_hold_down (tools.test_adaptive_bitrate_live.MildCapacityTrigger.test_one_rung_never_two_and_the_routine_hold_down) ... ok
+test_oscillation_guard_holds_the_third_change (tools.test_adaptive_bitrate_live.MildCapacityTrigger.test_oscillation_guard_holds_the_third_change)
+Night 3's pre-registered shape: 6000 -> 5500 (mild), up to 6000, mild back, ... ok
+test_strict_wins_when_both_hold (tools.test_adaptive_bitrate_live.MildCapacityTrigger.test_strict_wins_when_both_hold) ... ok
+test_the_rate_limit_binds (tools.test_adaptive_bitrate_live.MildCapacityTrigger.test_the_rate_limit_binds) ... ok
+test_the_recovery_guard_binds (tools.test_adaptive_bitrate_live.MildCapacityTrigger.test_the_recovery_guard_binds) ... ok
+test_the_shadow_is_unchanged (tools.test_adaptive_bitrate_live.MildCapacityTrigger.test_the_shadow_is_unchanged) ... ok
+test_cap_at_7000_is_one_capacity_fallback (tools.test_adaptive_bitrate_live.NightOneShape.test_cap_at_7000_is_one_capacity_fallback) ... ok
+test_6000_under_the_cap_steps_to_5500_once (tools.test_adaptive_bitrate_live.NightTwoShape.test_6000_under_the_cap_steps_to_5500_once) ... ok
+test_fallback_is_one_transition_straight_to_5000 (tools.test_adaptive_bitrate_live.OneTransitionPerEvent.test_fallback_is_one_transition_straight_to_5000) ... ok
+test_mapping_table_is_the_only_target_source (tools.test_adaptive_bitrate_live.OneTransitionPerEvent.test_mapping_table_is_the_only_target_source) ... ok
+test_queue_driven_failure_onset_is_one_transition_to_5000 (tools.test_adaptive_bitrate_live.OneTransitionPerEvent.test_queue_driven_failure_onset_is_one_transition_to_5000)
+Design rule: ROUTINE defers while the newest report is below 50 fps, ... ok
+test_routine_deferral_is_bounded (tools.test_adaptive_bitrate_live.OneTransitionPerEvent.test_routine_deferral_is_bounded)
+Design rule: slow (45 fps) with queue 1 meets ROUTINE but never FALLBACK; ... ok
+test_routine_is_one_transition_to_6000_then_nothing_while_routine (tools.test_adaptive_bitrate_live.OneTransitionPerEvent.test_routine_is_one_transition_to_6000_then_nothing_while_routine) ... ok
+test_actuator_failure_freezes_the_session (tools.test_adaptive_bitrate_live.OscillationAndFailure.test_actuator_failure_freezes_the_session) ... ok
+test_stale_telemetry_never_decides (tools.test_adaptive_bitrate_live.OscillationAndFailure.test_stale_telemetry_never_decides) ... ok
+test_third_direction_change_in_10_min_holds_for_the_session (tools.test_adaptive_bitrate_live.OscillationAndFailure.test_third_direction_change_in_10_min_holds_for_the_session) ... ok
+test_fifth_in_window_is_rate_limited_and_logged (tools.test_adaptive_bitrate_live.RateLimit.test_fifth_in_window_is_rate_limited_and_logged) ... ok
+test_hold_downs_alone_cannot_reach_the_limit_on_the_increase_path (tools.test_adaptive_bitrate_live.RateLimit.test_hold_downs_alone_cannot_reach_the_limit_on_the_increase_path)
+Down + three ups (the fastest legal return) is 4 in 558 s: never limited. ... ok
+test_180s_exactly_is_within (tools.test_adaptive_bitrate_live.RecoveryEscalation.test_180s_exactly_is_within) ... ok
+test_a_full_start_counts_at_7000 (tools.test_adaptive_bitrate_live.RecoveryEscalation.test_a_full_start_counts_at_7000) ... ok
+test_a_note_without_a_clock_is_not_a_restart (tools.test_adaptive_bitrate_live.RecoveryEscalation.test_a_note_without_a_clock_is_not_a_restart)
+Only the recovery restart path (with its clock) counts; a desync ... ok
+test_at_5000_it_is_at_floor_and_logged (tools.test_adaptive_bitrate_live.RecoveryEscalation.test_at_5000_it_is_at_floor_and_logged) ... ok
+test_disabled_it_would_act_only (tools.test_adaptive_bitrate_live.RecoveryEscalation.test_disabled_it_would_act_only) ... ok
+test_end_session_clears_it (tools.test_adaptive_bitrate_live.RecoveryEscalation.test_end_session_clears_it) ... ok
+test_fires_once_after_the_second_restart_within_180s (tools.test_adaptive_bitrate_live.RecoveryEscalation.test_fires_once_after_the_second_restart_within_180s) ... ok
+test_its_at_floor_is_logged_after_a_capacity_at_floor (tools.test_adaptive_bitrate_live.RecoveryEscalation.test_its_at_floor_is_logged_after_a_capacity_at_floor)
+Night 1's replay: the capacity bar kept refusing at_floor at 5000; the ... ok
+test_not_after_two_restarts_181s_apart (tools.test_adaptive_bitrate_live.RecoveryEscalation.test_not_after_two_restarts_181s_apart) ... ok
+test_not_at_different_levels (tools.test_adaptive_bitrate_live.RecoveryEscalation.test_not_at_different_levels) ... ok
+test_not_during_a_hold_down_and_consumed (tools.test_adaptive_bitrate_live.RecoveryEscalation.test_not_during_a_hold_down_and_consumed) ... ok
+test_the_rate_limit_still_binds (tools.test_adaptive_bitrate_live.RecoveryEscalation.test_the_rate_limit_still_binds) ... ok
+test_waits_while_recovery_is_not_playing (tools.test_adaptive_bitrate_live.RecoveryEscalation.test_waits_while_recovery_is_not_playing) ... ok
+test_client_elapsed_reset_takes_the_stream_level (tools.test_adaptive_bitrate_live.SessionReset.test_client_elapsed_reset_takes_the_stream_level) ... ok
+test_end_session_resets_to_reference_and_clears_history (tools.test_adaptive_bitrate_live.SessionReset.test_end_session_resets_to_reference_and_clears_history) ... ok
+test_level_follows_the_stream (tools.test_adaptive_bitrate_live.SessionReset.test_level_follows_the_stream)
+A recovery full start resets the encoder to 7000 (C1): the controller follows. ... ok
+test_actuator_exception_is_actuator_failed (tools.test_adaptive_bitrate_live.WrapperTests.test_actuator_exception_is_actuator_failed) ... ok
+test_any_override_from_native_status_blocks (tools.test_adaptive_bitrate_live.WrapperTests.test_any_override_from_native_status_blocks) ... ok
+test_backstop_through_the_wrapper (tools.test_adaptive_bitrate_live.WrapperTests.test_backstop_through_the_wrapper)
+The games plugin calls note_recovery_restart once per recovery ... ok
+test_capacity_through_the_wrapper_acts_once (tools.test_adaptive_bitrate_live.WrapperTests.test_capacity_through_the_wrapper_acts_once) ... ok
+test_disable_is_idempotent_and_switches_to_shadow (tools.test_adaptive_bitrate_live.WrapperTests.test_disable_is_idempotent_and_switches_to_shadow)
+Constraint 6: disable -> shadow for the rest of the session; no enable route. ... ok
+test_inject_requires_flag_live_and_loopback (tools.test_adaptive_bitrate_live.WrapperTests.test_inject_requires_flag_live_and_loopback)
+Step 3: 403 unless both flags; loopback only; absent from status otherwise. ... ok
+test_mode_parsing (tools.test_adaptive_bitrate_live.WrapperTests.test_mode_parsing)
+Constraint 6 / the flag: live is a value of the same flag; off stays the default. ... ok
+test_off_and_shadow_do_not_construct_the_live_controller (tools.test_adaptive_bitrate_live.WrapperTests.test_off_and_shadow_do_not_construct_the_live_controller)
+Constraint 6: off (default) and shadow are the shadow module's own instance. ... ok
+test_one_sample_row_per_report (tools.test_adaptive_bitrate_live.WrapperTests.test_one_sample_row_per_report)
+C3-L4-L2: live writes a sample row per client report. ... ok
+test_recovery_interlock_under_the_lock_aborts (tools.test_adaptive_bitrate_live.WrapperTests.test_recovery_interlock_under_the_lock_aborts)
+Constraint 3: recovery entering between decision and restart aborts it. ... ok
+test_recovery_restart_notification_blacks_out (tools.test_adaptive_bitrate_live.WrapperTests.test_recovery_restart_notification_blacks_out) ... ok
+test_reports_during_actuation_are_dropped (tools.test_adaptive_bitrate_live.WrapperTests.test_reports_during_actuation_are_dropped) ... ok
+test_routes (tools.test_adaptive_bitrate_live.WrapperTests.test_routes) ... ok
+test_session_ended_resets (tools.test_adaptive_bitrate_live.WrapperTests.test_session_ended_resets) ... ok
+test_status_level_after_session_end_is_the_reference (tools.test_adaptive_bitrate_live.WrapperTests.test_status_level_after_session_end_is_the_reference)
+C3-L4-N2: night 2 read `level 5000` after BACK (the cached stream bitrate). ... ok
+test_transition_goes_through_the_actuator_under_the_stream_lock (tools.test_adaptive_bitrate_live.WrapperTests.test_transition_goes_through_the_actuator_under_the_stream_lock) ... ok
+
+----------------------------------------------------------------------
+Ran 102 tests in 0.610s
+
+OK
+== tools/test_adaptive_bitrate_shadow.py
+test_mode_default_off (tools.test_adaptive_bitrate_shadow.ModeAndWrapperTests.test_mode_default_off)
+Rule: the flag defaults to off. ... ok
+test_no_actuator_reference (tools.test_adaptive_bitrate_shadow.ModeAndWrapperTests.test_no_actuator_reference)
+Rule: the module holds no actuator: it imports nothing from the stream path. ... ok
+test_off_writes_nothing_and_status_says_off (tools.test_adaptive_bitrate_shadow.ModeAndWrapperTests.test_off_writes_nothing_and_status_says_off)
+Rule: mode off evaluates nothing, logs nothing, and the field reads mode: off. ... ok
+test_only_off_and_shadow_are_accepted (tools.test_adaptive_bitrate_shadow.ModeAndWrapperTests.test_only_off_and_shadow_are_accepted)
+Rule: `shadow` is the only non-off mode; anything else reads off, flagged. ... ok
+test_shadow_logs_decisions_never_acts (tools.test_adaptive_bitrate_shadow.ModeAndWrapperTests.test_shadow_logs_decisions_never_acts)
+Rule: shadow logs one line per decision or state change, never per report, ... ok
+test_alternating_pattern_oscillation_hold_on_third_reversal (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_alternating_pattern_oscillation_hold_on_third_reversal)
+Rule: a third direction change within 10 minutes -> HOLD, reason ... ok
+test_clean_stream_1000_reports_no_decision (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_clean_stream_1000_reports_no_decision)
+Rule: a healthy stream (fps 59.9, queue 0, gap <= 150) never draws a decision. ... ok
+test_fallback_by_output_gap (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_fallback_by_output_gap)
+Rule: FALLBACK also on fps < 50 on 5/5 with output_gap > 250 ms on >= 2/5 ... ok
+test_fallback_one_decrease_then_blackout_then_hold_down (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_fallback_one_decrease_then_blackout_then_hold_down)
+Rules: FALLBACK (fps < 50 on 5/5 and queue >= 2 on >= 3/5) -> exactly one ... ok
+test_loss_alone_never_evidence (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_loss_alone_never_evidence)
+Rule: lost packets / recovered FEC alone never force a decrease. ... ok
+test_new_session_resets (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_new_session_resets)
+Rule: session_elapsed_ms going backwards is a new session: back to REFERENCE at 7000. ... ok
+test_no_distinct_snapshot_for_3_reports_is_stale (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_no_distinct_snapshot_for_3_reports_is_stale)
+Rule: the same snapshot (session_elapsed_ms not advancing) 3 times -> TELEMETRY_STALE. ... ok
+test_one_unclean_report_restarts_the_clean_count (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_one_unclean_report_restarts_the_clean_count)
+Rule: the 90 clean reports must be consecutive. ... ok
+test_recovery_increase_after_exactly_90_clean (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_recovery_increase_after_exactly_90_clean)
+Rule: below 7000, one would-increase (one rung) after exactly 90 ... ok
+test_restart_settling_signature_no_decision (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_restart_settling_signature_no_decision)
+Rule: a restart's own settling signature (one report at 45 fps, then clean) ... ok
+test_resync_waiting_for_idr_never_evidence (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_resync_waiting_for_idr_never_evidence)
+Rule (D-019): reports during a known resync (waiting_for_idr) never count. ... ok
+test_reversal_hold_down_60_reports (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_reversal_hold_down_60_reports)
+Rule: after an action, no action in the other direction for 60 reports. ... ok
+test_routine_logged_once_per_30_reports_never_moves_level (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_routine_logged_once_per_30_reports_never_moves_level)
+Rule: ROUTINE (not authorized) is counted on its own 30-report hold-down ... ok
+test_routine_one_decrease_logged_as_routine (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_routine_one_decrease_logged_as_routine)
+Rule: ROUTINE (fps < 57 on >= 4/5 with queue >= 1 on >= 3/5) -> one ... ok
+test_stale_telemetry_no_decision (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_stale_telemetry_no_decision)
+Rule: telemetry not fresh / unavailable -> TELEMETRY_STALE, no decision, ... ok
+test_transport_gaps_100_200_ms_do_not_trigger (tools.test_adaptive_bitrate_shadow.ShadowPolicyTests.test_transport_gaps_100_200_ms_do_not_trigger)
+Rule: output gaps of 100-200 ms (the transport's own) are not FALLBACK evidence. ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 0.032s
+
+OK
+== tools/test_c3_l4_nft_night.py
+test_cap_bounds (tools.test_c3_l4_nft_night.AllowListBuilds.test_cap_bounds) ... ok
+test_every_section7_command_builds_and_checks (tools.test_c3_l4_nft_night.AllowListBuilds.test_every_section7_command_builds_and_checks) ... ok
+test_no_shell_metacharacters_reach_argv_as_one_string (tools.test_c3_l4_nft_night.AllowListBuilds.test_no_shell_metacharacters_reach_argv_as_one_string) ... ok
+test_another_binary (tools.test_c3_l4_nft_night.AllowListRefuses.test_another_binary) ... ok
+test_another_port (tools.test_c3_l4_nft_night.AllowListRefuses.test_another_port) ... ok
+test_another_table (tools.test_c3_l4_nft_night.AllowListRefuses.test_another_table) ... ok
+test_cap_token_shapes (tools.test_c3_l4_nft_night.AllowListRefuses.test_cap_token_shapes) ... ok
+test_other_nft_verbs_and_shapes (tools.test_c3_l4_nft_night.AllowListRefuses.test_other_nft_verbs_and_shapes) ... ok
+test_unknown_names (tools.test_c3_l4_nft_night.AllowListRefuses.test_unknown_names) ... ok
+test_delete_absent_is_an_nft_error_not_a_sudo_refusal (tools.test_c3_l4_nft_night.FakeSudo.test_delete_absent_is_an_nft_error_not_a_sudo_refusal) ... ok
+test_deny_and_password (tools.test_c3_l4_nft_night.FakeSudo.test_deny_and_password) ... ok
+test_every_recipe_verifies (tools.test_c3_l4_nft_night.FakeSudo.test_every_recipe_verifies) ... ok
+test_flush_then_new_rule (tools.test_c3_l4_nft_night.FakeSudo.test_flush_then_new_rule) ... ok
+test_shim_refuses_non_nft (tools.test_c3_l4_nft_night.FakeSudo.test_shim_refuses_non_nft) ... ok
+test_absent_and_empty (tools.test_c3_l4_nft_night.ListingParser.test_absent_and_empty) ... ok
+test_rules_and_patterns (tools.test_c3_l4_nft_night.ListingParser.test_rules_and_patterns) ... ok
+test_set_rule_and_mbytes (tools.test_c3_l4_nft_night.ListingParser.test_set_rule_and_mbytes) ... ok
+test_sudo_refused (tools.test_c3_l4_nft_night.ListingParser.test_sudo_refused) ... ok
+test_cli_refuses_a_bad_subset_before_anything_runs (tools.test_c3_l4_nft_night.OnlySubset.test_cli_refuses_a_bad_subset_before_anything_runs) ... ok
+test_defaults_and_the_old_name (tools.test_c3_l4_nft_night.OnlySubset.test_defaults_and_the_old_name) ... ok
+test_subsets_keep_the_fixed_order (tools.test_c3_l4_nft_night.OnlySubset.test_subsets_keep_the_fixed_order) ... ok
+test_the_default_preregistration_is_night_3s (tools.test_c3_l4_nft_night.OnlySubset.test_the_default_preregistration_is_night_3s)
+C3-L4-N2: night 3's by default; nights 1 and 2 still selectable. ... ok
+test_unknown_empty_or_repeated_are_refused (tools.test_c3_l4_nft_night.OnlySubset.test_unknown_empty_or_repeated_are_refused) ... ok
+
+----------------------------------------------------------------------
+Ran 23 tests in 0.947s
+
+OK
+== mutations (each restored after): fps-of 4->3 FAILED (failures=2); loss 50->40 OK at first, FAILED (failures=1) after test_boundaries was added; fixed 6000 target FAILED (failures=6, errors=2); mild before strict FAILED (failures=11, errors=2); no status clear FAILED (failures=1)

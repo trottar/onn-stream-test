@@ -1,0 +1,14 @@
+{"at_utc": "2026-09-29T14:59:30.677Z", "session": "setup", "event": "verify", "what": "before the night", "expect": "absent", "ok": true, "rc": 0}
+{"at_utc": "2026-09-29T14:59:30.678Z", "session": "setup", "event": "enter", "prompt": "the pre-registration above is the one for tonight"}
+{"at_utc": "2026-09-29T14:59:30.678Z", "session": "setup", "event": "preflight_ok", "apk": "f31b1c18...8ae7"}
+{"at_utc": "2026-09-29T14:59:33.871Z", "session": "setup", "event": "live_on", "flags": ["PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"]}
+{"at_utc": "2026-09-29T15:00:14.086Z", "session": "F1", "event": "playing", "any_override": false}
+{"at_utc": "2026-09-29T15:01:14.183Z", "session": "F1", "event": "verify", "what": "calibration counter", "expect": ["counter_rule"], "got": ["udp dport 48100 counter packets 21 bytes 25446"], "ok": true}
+{"at_utc": "2026-09-29T15:01:14.183Z", "session": "F1", "event": "fault_on", "what": "calibration counter", "steps": [["nft", "add", "table", "inet", "privyhub_fault"], ["nft", "add", "chain", "inet", "privyhub_fault", "flt", "{ type filter hook output priority 0; }"], ["nft", "add", "rule", "inet", "privyhub_fault", "flt", "udp", "dport", "48100", "counter"]]}
+{"at_utc": "2026-09-29T15:01:24.229Z", "session": "F1", "event": "calibrated", "rate_7000_bytes_per_s": 1083008.3266384124, "used": 1083008.3266384124, "source": "counter", "cap_kbytes_per_s": 869}
+{"at_utc": "2026-09-29T15:01:24.229Z", "session": "F1", "event": "expect", "text": "within ~10-20 s ONE decrease: FALLBACK 7000->5000 (or ROUTINE 7000->6000, then FALLBACK ->5000 >= 60 s later); ~186 s later INCREASE 5000->5500 (fits the cap); ~186 s later INCREASE 5500->6000 (over the cap); a FALLBACK back to 5000 >= 120 s after that; then, instead of a third direction change inside 10 min, HOLD (oscillation) at 5000. rate_limited never true; never two transitions closer than the hold-downs; no ramp."}
+{"at_utc": "2026-09-29T15:01:24.295Z", "session": "F1", "event": "verify", "what": "F1 cap", "expect": ["cap_rule"], "got": ["udp dport 48100 limit rate over 869 kbytes/second burst 64 kbytes counter packets 0 bytes 442 drop"], "ok": true}
+{"at_utc": "2026-09-29T15:01:24.295Z", "session": "F1", "event": "fault_on", "what": "F1 cap", "steps": [["nft", "flush", "chain", "inet", "privyhub_fault", "flt"], ["nft", "add", "rule", "inet", "privyhub_fault", "flt", "udp", "dport", "48100", "limit", "rate", "over", "869", "kbytes/second", "burst", "64", "kbytes", "counter", "drop"]]}
+{"at_utc": "2026-09-29T15:01:34.752Z", "session": "F1", "event": "verify", "what": "at the end", "expect": "absent", "ok": true, "rc": 0}
+{"at_utc": "2026-09-29T15:01:34.752Z", "session": "F1", "event": "fault_cleared_final", "ok": true, "why": "Ctrl-C"}
+{"at_utc": "2026-09-29T15:01:58.381Z", "session": "teardown", "event": "teardown", "clean": true}

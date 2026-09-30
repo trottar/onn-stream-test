@@ -1,0 +1,11 @@
+{"at_utc": "2026-09-29T14:47:32.095Z", "session": "setup", "event": "verify", "what": "before the night", "expect": "absent", "ok": true, "rc": 0}
+{"at_utc": "2026-09-29T14:47:32.095Z", "session": "setup", "event": "enter", "prompt": "the pre-registration above is the one for tonight"}
+{"at_utc": "2026-09-29T14:47:32.095Z", "session": "setup", "event": "preflight_ok", "apk": "f31b1c18...8ae7"}
+{"at_utc": "2026-09-29T14:47:35.307Z", "session": "setup", "event": "live_on", "flags": ["PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"]}
+{"at_utc": "2026-09-29T14:48:13.851Z", "session": "F2", "event": "playing", "any_override": false}
+{"at_utc": "2026-09-29T14:49:13.851Z", "session": "F2", "event": "expect", "text": "FEC recovers part of it; loss alone is never evidence. Either no transition, or AT MOST ONE decrease (ROUTINE ->6000 or FALLBACK ->5000) and then only at_or_below_target / at_floor / hold_down refusals. No second decrease, never a ramp."}
+{"at_utc": "2026-09-29T14:49:13.946Z", "session": "F2", "event": "verify", "what": "F2 2% loss", "expect": ["loss_rule"], "got": ["udp dport 48100 numgen random mod 1000 < 20 counter packets 0 bytes 453 drop"], "ok": true}
+{"at_utc": "2026-09-29T14:49:13.946Z", "session": "F2", "event": "fault_on", "what": "F2 2% loss", "steps": [["nft", "add", "table", "inet", "privyhub_fault"], ["nft", "add", "chain", "inet", "privyhub_fault", "flt", "{ type filter hook output priority 0; }"], ["nft", "add", "rule", "inet", "privyhub_fault", "flt", "udp", "dport", "48100", "numgen", "random", "mod", "1000", "<", "20", "counter", "drop"]]}
+{"at_utc": "2026-09-29T14:49:24.131Z", "session": "F2", "event": "verify", "what": "at the end", "expect": "absent", "ok": true, "rc": 0}
+{"at_utc": "2026-09-29T14:49:24.131Z", "session": "F2", "event": "fault_cleared_final", "ok": true, "why": "SIGHUP"}
+{"at_utc": "2026-09-29T14:49:39.690Z", "session": "teardown", "event": "teardown", "clean": true}

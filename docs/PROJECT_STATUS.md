@@ -1,4 +1,65 @@
-# Project status — 2026-09-23
+# Project status — 2026-09-28
+
+<!-- PRIVYHUB_C3_L4_AUTHORIZED:PROJECT_STATUS:BEGIN -->
+## 2026-09-28 — C3.L3a closed; C3.L4 authorized and live mode built; C4 closed; D7 complete; C5 characterized
+
+This section supersedes every older statement below where it conflicts.
+
+- **`C3.L3a` CLOSED.** Four pre-registered sessions pooled (the bar
+  reached). At W 5.0: ramps marked 15/20 (29 marks vs 8.52 chance), jumps
+  6/20 (6 vs 3.21), both decoy classes at or below chance
+  (`docs/memory/evidence/C3_L3A_R4_SESSION4_2026-09-28.md`).
+- **`C3.L4` AUTHORIZED, single transition per event; live build
+  pending** — the user's reading: one restart per adaptation event,
+  straight to the target, the existing hold-downs as spacing; ramps
+  excluded; no live run before a fault-injection night with the user's
+  `nft` (`docs/memory/decisions/C3-L4_LIVE_AUTHORIZATION_2026-09-28.md`).
+- **`C3.L4` live mode BUILT** (`C3-L4-L1`), behind
+  `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live`, off by default; the shadow is
+  unchanged.
+  - **Rules**: one transition per event, straight to the mapped target
+    (FALLBACK → 5000, ROUTINE → 6000); an increase is one rung. The
+    blackout, the hold-downs, the guards and a 4-per-10-min rate limit
+    apply. It is serialized with recovery on the stream lock. There is a
+    disable route, and a test-only inject hook.
+  - **Offline**: 43 + 21 tests pass. Parity with the shadow night is zero
+    actions. The recorded loss nights never hit the rate limit.
+  - **Session A**, 30 minutes live on a clean link: **SILENT**.
+  - **Session B**, an injected FALLBACK: **PARTIAL (B6)**. One transition
+    7000 → 5000 with a 171 ms gap, the blackout, the hold-down refusing
+    the second trigger, and a clean lifecycle. **The increase path never
+    fired**: the pre-registered 90-consecutive-clean rule is not reachable
+    in attract mode. That is the user's call.
+  - **2026-09-29 (`C3-L4-L2`)**: the increase rule is the user's blend.
+    Session B2 climbed 5000 → 7000, one rung per event. It scored
+    PARTIAL (W4) on the close-out loss row only, from bursts away from the
+    transitions. The `nft` harness `tools/c3_l4_nft_night.py` passed its
+    dry run.
+  - **Next**: the user's `nft` night, with the hand steps in
+    `docs/memory/evidence/C3_L4_L2_INCREASE_RULE_2026-09-29.md` §7.
+- **C4 closed for Phase C** (the user's call): 8+1 `xor8_1` stays; the 8+2
+  arm is dormant behind `PRIVYHUB_FEC_SCHEME`.
+- **D7 complete on the adopted build**: 9 scripted rows PASS, recovery
+  cited, the user's hands-on rows reported fine (Tekken 3).
+- **`CL-B1`**: **the next adopted APK, ADOPTED 2026-09-30** by its
+  pre-registered rule (`de072762…835e`, replacing `f31b1c18…8ae7`;
+  `docs/memory/evidence/CL_B1_APK_ADOPTION_2026-09-30.md`).
+- **C5 characterized** (`C5-M1`): 1080p60 **NOT CAPABLE (stream)** at
+  bits-per-pixel parity (15,750 kbps, cap 200,000 B). All three candidate
+  holds missed spikes (~520/min) and post-FEC loss (123-181/min); the
+  per-frame burst doubles on the wireless hop. The onn's decoder and the
+  host encoder are capable. The candidate stays behind
+  `PRIVYHUB_NATIVE_PROFILE_ID`; nothing is adopted
+  (`docs/memory/evidence/C5_M1_1080P60_PROFILE_2026-09-28.md`).
+- **2026-09-29/30, C5 follow-ups:**
+  - **`C5-M2`** (three 1080p arms) is **INCONCLUSIVE (link)** twice. The
+    adopted 720p B holds missed their own loss row, and no arm met the
+    targets.
+  - **`C5-M3`** screened the low rungs for Phase G: **720p/4000 passes
+    transport**; 3000 and 540p/3500 do not; nothing on the live ladder.
+  - Records: `docs/memory/evidence/C5_M2_1080P60_FOLLOWUP_2026-09-29.md`
+    and `C5_M3_LOW_RUNG_SCREENING_2026-09-29.md`.
+<!-- PRIVYHUB_C3_L4_AUTHORIZED:PROJECT_STATUS:END -->
 
 <!-- PRIVYHUB_D_BASE_CLOSED:PROJECT_STATUS:BEGIN -->
 ## 2026-09-23 — D-BASE closed: baseline met; Phase C resumed
@@ -422,7 +483,7 @@ final Phase C checkpoint.
 | --- | --- | --- |
 | explicit profiles | ✓ | C1 (`native_stream_profiles.py`; cap, cushion, redundancy adopted) |
 | transport telemetry contract | ✓ | C2 (`privyhub_stream_telemetry_v1`, heartbeat v3, decoder report v2) |
-| adaptive bitrate runtime validated | shadow built and SILENT; live gated on the user's `C3.L3a` reading | `C3-L4-S1`; `C3.L3a` sessions 1-3 |
+| adaptive bitrate runtime validated | shadow built and SILENT; live AUTHORIZED and BUILT (`C3-L4-L1` 2026-09-28: SILENT on a clean link, decrease proven on injection, increase rule unreachable — the user's call); `nft` night pending | `C3-L4-S1`; `C3.L3a` sessions 1-4; `C3_L4_L1_LIVE_CONTROLLER_2026-09-28.md` |
 | adaptive FEC validated or explicitly deferred | decision record (BUILD static k+2 first; adaptive not supported); measured arm `C4-M1`: NOT SHOWN, nothing adopted | `decisions/C4_ADAPTIVE_FEC_2026-09-24.md`, `C4_M1_FEC_ARM_2026-09-25.md` |
 | 1080p60 characterized | open; needs a profile (the user's yes) | — |
 | generalized source contract established | ✓ on paper and as an unused interface | `architecture/NATIVE_SOURCE_CONTRACT.md` (`C6-D1`) |

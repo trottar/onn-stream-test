@@ -1,0 +1,208 @@
+C3-L4-N1 replays: the live policy with the capacity trigger and the recovery-escalation backstop
+capacity: fps < 50 on all 5 and lost >= 50 on >= 3; backstop: 2 restarts at one level within 180 s; everything else as C3-L4-L2
+
+== 1. PARITY (tools/c3_l4_l1_replay.py's parity, the new policy)
+== 1. PARITY: the C3-L4-S1 shadow night through the live path
+source docs/memory/evidence/c3_l4_s1_2026-09-24/shadow_log.jsonl: 1048 logged lines, 4 sessions
+rebuilt reports: 3594 (the night's status counters: 602 + 600 + 1,796 + 600 = 3,598)
+  session 1: reports 598; control (shadow on the rebuild reproduces the logged sequence) MATCH (167 logged / 167 replayed changes); shadow would-acts 0; live transitions 0; live refusals 0; live reports evaluated 598; live level at end 7000
+  session 2: reports 601; control (shadow on the rebuild reproduces the logged sequence) MATCH (167 logged / 167 replayed changes); shadow would-acts 0; live transitions 0; live refusals 0; live reports evaluated 601; live level at end 7000
+  session 3: reports 1796; control (shadow on the rebuild reproduces the logged sequence) MATCH (525 logged / 525 replayed changes); shadow would-acts 0; live transitions 0; live refusals 0; live reports evaluated 1796; live level at end 7000
+  session 4: reports 599; control (shadow on the rebuild reproduces the logged sequence) MATCH (189 logged / 189 replayed changes); shadow would-acts 0; live transitions 0; live refusals 0; live reports evaluated 599; live level at end 7000
+PARITY: reports 3594; shadow would-acts 0; live transitions 0; live refusals 0 -> SAME DECISIONS (zero actions)
+   with the logged loss: 3594 rebuilt reports, 3590 carrying a loss delta; decisions 0; new-rule decisions 0
+
+== 2. EXACT: every live sample row, open-loop
+sources: the companion's live log (+ archive): 4833 live rows, 4043 sample rows, 47 sessions with samples
+  session 1: 2026-09-29T03:29:16Z, 4 sample rows -- C3-L4-L2 session B2 (clean link, injected + blend climb)
+  session 2: 2026-09-29T03:29:23Z, 808 sample rows -- C3-L4-L2 session B2 (clean link, injected + blend climb)
+  session 3: 2026-09-29T03:59:24Z, 4 sample rows -- C3-L4-L2 harness dry run (no fault)
+  session 4: 2026-09-29T03:59:31Z, 79 sample rows -- C3-L4-L2 harness dry run (no fault)
+  session 5: 2026-09-29T04:02:48Z, 3 sample rows -- C3-L4-L2 harness dry run (no fault)
+  session 6: 2026-09-29T04:02:53Z, 75 sample rows -- C3-L4-L2 harness dry run (no fault)
+  session 7: 2026-09-29T04:06:02Z, 3 sample rows -- C3-L4-L2 harness dry run (no fault)
+  session 8: 2026-09-29T04:06:07Z, 82 sample rows -- C3-L4-L2 harness dry run (no fault)
+  session 9: 2026-09-29T04:09:30Z, 3 sample rows -- C3-L4-L2 harness dry run (no fault)
+  session 10: 2026-09-29T04:09:35Z, 90 sample rows -- C3-L4-L2 harness dry run (no fault)
+  session 11: 2026-09-29T14:25:31Z, 4 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 12: 2026-09-29T14:25:38Z, 95 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 13: 2026-09-29T14:29:27Z, 3 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 14: 2026-09-29T14:29:32Z, 90 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 15: 2026-09-29T14:33:11Z, 3 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 16: 2026-09-29T14:33:16Z, 97 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 17: 2026-09-29T14:37:10Z, 3 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 18: 2026-09-29T14:37:15Z, 120 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 19: 2026-09-29T14:43:32Z, 4 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 20: 2026-09-29T14:43:39Z, 95 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 21: 2026-09-29T14:48:09Z, 3 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 22: 2026-09-29T14:48:14Z, 35 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 23: 2026-09-29T14:49:25Z, 1 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 24: 2026-09-29T14:49:41Z, 15 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 25: 2026-09-29T14:50:22Z, 61 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 26: 2026-09-29T14:52:39Z, 15 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 27: 2026-09-29T14:53:21Z, 90 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 28: 2026-09-29T14:57:43Z, 3 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 29: 2026-09-29T14:57:48Z, 31 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 30: 2026-09-29T14:59:31Z, 16 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 31: 2026-09-29T15:00:15Z, 45 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 32: 2026-09-29T15:02:00Z, 15 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 33: 2026-09-29T15:02:41Z, 90 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 34: 2026-09-29T15:07:15Z, 3 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 35: 2026-09-29T15:07:20Z, 75 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 36: 2026-09-29T15:10:29Z, 3 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 37: 2026-09-29T15:10:34Z, 82 sample rows -- C3-L4-L2B fake-sudo runs (no fault)
+  session 38: 2026-09-29T15:20:37Z, 3 sample rows -- night 1 None, no fault on
+  session 39: 2026-09-29T15:20:41Z, 597 sample rows -- night 1 F1, no fault on
+      15:23:55.179Z transition       FALLBACK trigger capacity             7000 -> 5000 capacity  [night 1 F1, F1 cap +13.6 s]
+      15:24:11.306Z refused          FALLBACK trigger capacity             5000 -> 5000 hold_down [counterfactual: after the first firing]  [night 1 F1, F1 cap +29.7 s]
+      15:25:03.547Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +82.0 s]
+      15:25:51.172Z escalation_armed None     trigger None                 5000 -> None [counterfactual: after the first firing]  [night 1 F1, F1 cap +129.6 s]
+      15:25:58.039Z refused          FALLBACK trigger recovery_escalation  5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +136.5 s]
+      15:26:34.258Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +172.7 s]
+      15:26:54.371Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +192.8 s]
+      15:27:12.448Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +210.9 s]
+      15:27:38.649Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +237.1 s]
+      15:27:46.099Z escalation_armed None     trigger None                 5000 -> None [counterfactual: after the first firing]  [night 1 F1, F1 cap +244.5 s]
+      15:27:52.840Z refused          FALLBACK trigger recovery_escalation  5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +251.3 s]
+      15:28:08.943Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +267.4 s]
+      15:28:53.126Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +311.6 s]
+      15:29:15.224Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +333.7 s]
+      15:29:41.353Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +359.8 s]
+      15:30:23.602Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +402.0 s]
+      15:30:49.494Z escalation_armed None     trigger None                 5000 -> None [counterfactual: after the first firing]  [night 1 F1, F1 cap +427.9 s]
+      15:30:56.119Z refused          FALLBACK trigger recovery_escalation  5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +434.5 s]
+      15:31:04.151Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +442.6 s]
+      15:32:18.479Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +516.9 s]
+      15:32:44.956Z refused          FALLBACK trigger fps_queue_gap        5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +543.4 s]
+      15:33:39.248Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +597.7 s]
+      15:34:09.168Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +627.6 s]
+      15:34:29.271Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +647.7 s]
+      15:34:54.961Z escalation_armed None     trigger None                 5000 -> None [counterfactual: after the first firing]  [night 1 F1, F1 cap +673.4 s]
+      15:35:07.787Z refused          FALLBACK trigger recovery_escalation  5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +686.2 s]
+      15:35:19.834Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F1, F1 cap +698.3 s]
+  session 40: 2026-09-29T15:41:21Z, 3 sample rows -- night 1 F1, no fault on
+  session 41: 2026-09-29T15:41:26Z, 508 sample rows -- night 1 F2, no fault on
+  session 42: 2026-09-29T15:59:06Z, 3 sample rows -- night 1 F2, no fault on
+  session 43: 2026-09-29T15:59:11Z, 276 sample rows -- night 1 F3, no fault on
+      16:01:26.101Z transition       FALLBACK trigger capacity             7000 -> 5000 capacity  [night 1 F3, F3 cap +16.7 s]
+      16:01:42.181Z refused          FALLBACK trigger capacity             5000 -> 5000 hold_down [counterfactual: after the first firing]  [night 1 F3, F3 cap +32.8 s]
+      16:02:15.923Z escalation_armed None     trigger None                 5000 -> None [counterfactual: after the first firing]  [night 1 F3, F3 cap +66.5 s]
+      16:02:22.581Z refused          FALLBACK trigger recovery_escalation  5000 -> 5000 hold_down [counterfactual: after the first firing]  [night 1 F3, F3 cap +73.2 s]
+      16:02:30.621Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F3, F3 cap +81.2 s]
+      16:03:42.997Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F3, F3 cap +153.6 s]
+      16:04:17.215Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F3, F3 cap +187.8 s]
+      16:04:51.841Z refused          FALLBACK trigger fps_queue_gap        5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F3, F3 cap +222.5 s]
+      16:04:55.349Z escalation_armed None     trigger None                 5000 -> None [counterfactual: after the first firing]  [night 1 F3, F3 cap +226.0 s]
+      16:05:28.455Z refused          FALLBACK trigger recovery_escalation  5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 F3, no fault on]
+      16:08:25.278Z transition       INCREASE trigger None                 5000 -> 5500 increase_increase [counterfactual: after the first firing]  [night 1 F3, no fault on]
+  session 44: 2026-09-29T16:09:04Z, 3 sample rows -- night 1 F3, no fault on
+  session 45: 2026-09-29T16:09:09Z, 209 sample rows -- night 1 K, no fault on
+      16:11:28.662Z transition       FALLBACK trigger capacity             7000 -> 5000 capacity  [night 1 K, K cap +19.7 s]
+      16:11:44.748Z refused          FALLBACK trigger capacity             5000 -> 5000 hold_down [counterfactual: after the first firing]  [night 1 K, K cap +35.8 s]
+      16:12:23.031Z refused          FALLBACK trigger capacity             5000 -> 5000 hold_down [counterfactual: after the first firing]  [night 1 K, K cap +74.1 s]
+      16:12:29.075Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 K, K cap +80.1 s]
+      16:13:33.402Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 K, K cap +144.5 s]
+      16:14:15.015Z escalation_armed None     trigger None                 5000 -> None [counterfactual: after the first firing]  [night 1 K, K cap +186.1 s]
+      16:14:29.963Z refused          FALLBACK trigger recovery_escalation  5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 K, K cap +201.0 s]
+      16:14:38.195Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 K, K cap +209.3 s]
+      16:15:08.127Z refused          FALLBACK trigger capacity             5000 -> 5000 at_floor [counterfactual: after the first firing]  [night 1 K, K cap +239.2 s]
+  session 46: 2026-09-29T16:46:31Z, 4 sample rows -- other
+  session 47: 2026-09-29T16:46:38Z, 189 sample rows -- other
+
+== 3. HEARTBEATS: every heartbeat series, C4-D1 proxies + the loss proxy
+sessions 149 (>= 5 intervals), reports 62788; reports with a loss delta 51756 (82.4 %), in 132 sessions (older heartbeat schemas carry no lost_packets)
+   would-fire list, every trigger (label, elapsed, event, class, trigger, from -> to, reason, cause):
+      2026-09-21T03:43:39Z d_base_s1_2026-09-21/S2/heartbeat_lines.jsonl t=   340.9s transition ROUTINE  fps_queue_gap        7000 -> 6000 decrease_routine  [clean-link / no recorded fault]
+      2026-09-21T04:16:46Z d_base_s1_2026-09-21/S3/heartbeat_lines.jsonl t=   738.6s transition ROUTINE  fps_queue_gap        7000 -> 6000 decrease_routine  [clean-link / no recorded fault]
+      2026-09-21T05:51:00Z d_base_s2_2026-09-21/L1/heartbeat_lines.jsonl t=   134.0s transition ROUTINE  fps_queue_gap        7000 -> 6000 decrease_routine  [clean-link / no recorded fault]
+      2026-09-21T05:51:00Z d_base_s2_2026-09-21/L1/heartbeat_lines.jsonl t=  1198.3s transition INCREASE None                 6000 -> 7000 increase_increase  [clean-link / no recorded fault]
+      2026-09-21T05:51:00Z d_base_s2_2026-09-21/L1/heartbeat_lines.jsonl t=  8969.6s transition ROUTINE  fps_queue_gap        7000 -> 6000 decrease_routine  [clean-link / no recorded fault]
+      2026-09-21T08:24:06Z d_base_s2_2026-09-21/L1/heartbeat_lines.jsonl t=  9587.7s transition ROUTINE  fps_queue_gap        7000 -> 6000 decrease_routine  [clean-link / no recorded fault]
+      2026-09-21T23:26:31Z o1_2026-09-21/heartbeat_B.jsonl t=   136.0s transition ROUTINE  fps_queue_gap        7000 -> 6000 decrease_routine  [clean-link / no recorded fault]
+      2026-09-21T23:26:31Z o1_2026-09-21/heartbeat_B.jsonl t=   322.9s transition INCREASE None                 6000 -> 7000 increase_increase  [clean-link / no recorded fault]
+      2026-09-23T02:30:59Z d_base_r3b_2026-09-21/E30/heartbeat_lines.jsonl t=  1954.8s transition FALLBACK fps_queue_gap        7000 -> 5000 decrease_fallback  [D-BASE-R3b E30 nft link drop]
+      2026-09-29T14:48:08Z logs/games/native_stream_heartbeat.log (C3-L4-L2B fake-sudo runs (no fault)) t=    87.9s transition FALLBACK fps_queue_gap        7000 -> 5000 decrease_fallback  [clean-link / no recorded fault]
+      2026-09-29T14:50:16Z logs/games/native_stream_heartbeat.log (C3-L4-L2B fake-sudo runs (no fault)) t=   138.3s transition FALLBACK fps_queue_gap        7000 -> 5000 decrease_fallback  [clean-link / no recorded fault]
+      2026-09-29T14:57:41Z logs/games/native_stream_heartbeat.log (C3-L4-L2B fake-sudo runs (no fault)) t=    77.9s transition FALLBACK fps_queue_gap        7000 -> 5000 decrease_fallback  [clean-link / no recorded fault]
+      2026-09-29T15:00:06Z logs/games/native_stream_heartbeat.log (C3-L4-L2B fake-sudo runs (no fault)) t=   110.1s transition FALLBACK fps_queue_gap        7000 -> 5000 decrease_fallback  [clean-link / no recorded fault]
+      2026-09-29T15:20:35Z logs/games/native_stream_heartbeat.log t=   200.4s transition FALLBACK capacity             7000 -> 5000 capacity  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T15:20:35Z logs/games/native_stream_heartbeat.log t=   216.5s refused    FALLBACK capacity             5000 -> 5000 hold_down  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T15:20:35Z logs/games/native_stream_heartbeat.log t=   258.7s refused    FALLBACK capacity             5000 -> 5000 hold_down  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T15:20:35Z logs/games/native_stream_heartbeat.log t=   260.7s refused    FALLBACK capacity             5000 -> 5000 at_floor  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T15:20:35Z logs/games/native_stream_heartbeat.log t=   351.4s refused    FALLBACK capacity             5000 -> 5000 at_floor  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T15:20:35Z logs/games/native_stream_heartbeat.log t=   363.5s refused    FALLBACK capacity             5000 -> 5000 at_floor  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T15:20:35Z logs/games/native_stream_heartbeat.log t=   397.7s refused    FALLBACK capacity             5000 -> 5000 at_floor  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T15:20:35Z logs/games/native_stream_heartbeat.log t=   550.6s refused    FALLBACK capacity             5000 -> 5000 at_floor  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T15:20:35Z logs/games/native_stream_heartbeat.log t=   584.7s refused    FALLBACK capacity             5000 -> 5000 at_floor  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T15:20:35Z logs/games/native_stream_heartbeat.log t=   703.7s refused    FALLBACK capacity             5000 -> 5000 at_floor  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T15:20:35Z logs/games/native_stream_heartbeat.log t=   760.1s refused    FALLBACK capacity             5000 -> 5000 at_floor  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T15:20:35Z logs/games/native_stream_heartbeat.log t=   784.2s refused    FALLBACK capacity             5000 -> 5000 at_floor  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T15:20:35Z logs/games/native_stream_heartbeat.log t=   814.4s refused    FALLBACK capacity             5000 -> 5000 at_floor  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T15:20:35Z logs/games/native_stream_heartbeat.log t=  1079.8s transition INCREASE None                 5000 -> 5500 increase_increase  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T15:59:04Z logs/games/native_stream_heartbeat.log t=   142.0s transition FALLBACK capacity             7000 -> 5000 capacity  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T15:59:04Z logs/games/native_stream_heartbeat.log t=   158.1s refused    FALLBACK capacity             5000 -> 5000 hold_down  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T15:59:04Z logs/games/native_stream_heartbeat.log t=   202.5s refused    FALLBACK capacity             5000 -> 5000 at_floor  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T15:59:04Z logs/games/native_stream_heartbeat.log t=   278.9s refused    FALLBACK capacity             5000 -> 5000 at_floor  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T16:09:03Z logs/games/native_stream_heartbeat.log t=   146.1s transition FALLBACK capacity             7000 -> 5000 capacity  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T16:09:03Z logs/games/native_stream_heartbeat.log t=   162.1s refused    FALLBACK capacity             5000 -> 5000 hold_down  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T16:09:03Z logs/games/native_stream_heartbeat.log t=   206.5s refused    FALLBACK capacity             5000 -> 5000 at_floor  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T16:09:03Z logs/games/native_stream_heartbeat.log t=   270.8s refused    FALLBACK capacity             5000 -> 5000 at_floor  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T16:09:03Z logs/games/native_stream_heartbeat.log t=   365.5s refused    FALLBACK capacity             5000 -> 5000 at_floor  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+   raw capacity windows (5 consecutive reports at fps < 50 with >= 3 at lost >= 50), whatever the controller state: 394
+      2026-09-29T15:20:35Z logs/games/native_stream_heartbeat.log: 228 windows, first at t=200.4s (15:23:55Z) fps [49.68, 34.35, 20.4, 26.37, 24.85] lost [103, 252, 222, 255, 245] resyncs [0, 0, 0, 0, 0]  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T15:59:04Z logs/games/native_stream_heartbeat.log: 96 windows, first at t=142.0s (16:01:26Z) fps [47.78, 46.79, 37.35, 32.84, 36.74] lost [298, 235, 267, 252, 271] resyncs [0, 0, 0, 0, 0]  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      2026-09-29T16:09:03Z logs/games/native_stream_heartbeat.log: 70 windows, first at t=146.1s (16:11:28Z) fps [44.78, 31.36, 32.77, 35.84, 34.79] lost [266, 271, 277, 252, 264] resyncs [0, 0, 0, 0, 0]  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+
+== 4. BACKSTOP: every recovery encoder_restart on disk
+recovery rows on disk 684 (2026-09-20T19:43:58Z .. 2026-09-29T16:46:37Z); encoder_restart 63 in 20 sessions; consecutive pairs within 180 s: 43
+   (the level of each restart: recovery restarted at 7000 in every one of these sessions -- before C3-F1 always, and after it no controller had moved the level -- so every pair is 'at one level')
+      restart 2026-09-20T19:49:16Z then 19:49:26Z (10.0 s)  [D-BASE-R3 / R3a / R4 substitute faults (SIGSTOP, K70)]
+      restart 2026-09-20T19:51:45Z then 19:51:55Z (10.0 s)  [D-BASE-R3 / R3a / R4 substitute faults (SIGSTOP, K70)]
+      restart 2026-09-20T19:51:55Z then 19:52:15Z (20.0 s)  [D-BASE-R3 / R3a / R4 substitute faults (SIGSTOP, K70)]
+      restart 2026-09-20T19:52:15Z then 19:52:45Z (30.0 s)  [D-BASE-R3 / R3a / R4 substitute faults (SIGSTOP, K70)]
+      restart 2026-09-20T19:52:45Z then 19:53:15Z (30.0 s)  [D-BASE-R3 / R3a / R4 substitute faults (SIGSTOP, K70)]
+      restart 2026-09-20T20:05:53Z then 20:06:03Z (10.0 s)  [D-BASE-R3 / R3a / R4 substitute faults (SIGSTOP, K70)]
+      restart 2026-09-20T20:06:03Z then 20:06:23Z (20.0 s)  [D-BASE-R3 / R3a / R4 substitute faults (SIGSTOP, K70)]
+      restart 2026-09-20T20:07:32Z then 20:07:42Z (10.0 s)  [D-BASE-R3 / R3a / R4 substitute faults (SIGSTOP, K70)]
+      restart 2026-09-20T20:07:42Z then 20:08:02Z (20.0 s)  [D-BASE-R3 / R3a / R4 substitute faults (SIGSTOP, K70)]
+      restart 2026-09-20T20:08:02Z then 20:08:32Z (30.0 s)  [D-BASE-R3 / R3a / R4 substitute faults (SIGSTOP, K70)]
+      restart 2026-09-20T20:08:32Z then 20:09:02Z (30.0 s)  [D-BASE-R3 / R3a / R4 substitute faults (SIGSTOP, K70)]
+      restart 2026-09-20T20:55:04Z then 20:55:16Z (11.7 s)  [D-BASE-R3 / R3a / R4 substitute faults (SIGSTOP, K70)]
+      restart 2026-09-20T20:58:55Z then 20:59:07Z (12.0 s)  [D-BASE-R3 / R3a / R4 substitute faults (SIGSTOP, K70)]
+      restart 2026-09-20T21:00:33Z then 21:00:55Z (22.3 s)  [D-BASE-R3 / R3a / R4 substitute faults (SIGSTOP, K70)]
+      restart 2026-09-20T21:00:55Z then 21:01:19Z (23.2 s)  [D-BASE-R3 / R3a / R4 substitute faults (SIGSTOP, K70)]
+      restart 2026-09-20T21:01:19Z then 21:02:02Z (43.5 s)  [D-BASE-R3 / R3a / R4 substitute faults (SIGSTOP, K70)]
+      restart 2026-09-20T21:44:37Z then 21:45:00Z (22.3 s)  [D-BASE-R3 / R3a / R4 substitute faults (SIGSTOP, K70)]
+      restart 2026-09-20T21:45:00Z then 21:45:21Z (21.2 s)  [D-BASE-R3 / R3a / R4 substitute faults (SIGSTOP, K70)]
+      restart 2026-09-22T15:21:36Z then 15:21:49Z (12.7 s)  [D-BASE-R3b N150 nft link drop]
+      restart 2026-09-22T15:21:49Z then 15:22:11Z (22.2 s)  [D-BASE-R3b N150 nft link drop]
+      restart 2026-09-22T15:22:11Z then 15:22:44Z (32.7 s)  [D-BASE-R3b N150 nft link drop]
+      restart 2026-09-22T15:22:44Z then 15:23:17Z (32.7 s)  [D-BASE-R3b N150 nft link drop]
+      restart 2026-09-22T23:38:16Z then 23:38:29Z (12.7 s)  [D-BASE-P8 v1 arm B, hit by R3b E30]
+      restart 2026-09-22T23:38:29Z then 23:38:51Z (22.2 s)  [D-BASE-P8 v1 arm B, hit by R3b E30]
+      restart 2026-09-22T23:38:51Z then 23:39:24Z (32.7 s)  [D-BASE-P8 v1 arm B, hit by R3b E30]
+      restart 2026-09-23T02:31:35Z then 02:31:48Z (12.7 s)  [D-BASE-R3b E30 nft link drop]
+      restart 2026-09-23T02:31:48Z then 02:32:10Z (22.2 s)  [D-BASE-R3b E30 nft link drop]
+      restart 2026-09-23T02:32:10Z then 02:32:43Z (32.7 s)  [D-BASE-R3b E30 nft link drop]
+      restart 2026-09-23T02:32:43Z then 02:33:15Z (32.7 s)  [D-BASE-R3b E30 nft link drop]
+      restart 2026-09-29T15:25:40Z then 15:25:51Z (10.2 s)  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      restart 2026-09-29T15:25:51Z then 15:27:39Z (108.7 s)  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      restart 2026-09-29T15:27:39Z then 15:27:46Z (6.2 s)  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      restart 2026-09-29T15:27:46Z then 15:30:41Z (175.2 s)  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      restart 2026-09-29T15:30:41Z then 15:30:49Z (8.2 s)  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      restart 2026-09-29T15:30:49Z then 15:32:54Z (124.7 s)  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      restart 2026-09-29T15:32:54Z then 15:34:54Z (120.7 s)  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      restart 2026-09-29T15:34:54Z then 15:35:01Z (6.2 s)  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      restart 2026-09-29T16:02:07Z then 16:02:15Z (8.2 s)  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      restart 2026-09-29T16:02:15Z then 16:04:37Z (141.2 s)  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      restart 2026-09-29T16:04:37Z then 16:04:55Z (18.2 s)  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      restart 2026-09-29T16:04:55Z then 16:05:09Z (14.2 s)  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      restart 2026-09-29T16:12:08Z then 16:14:15Z (126.7 s)  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+      restart 2026-09-29T16:14:15Z then 16:14:23Z (8.2 s)  [C3-L4 nft night 1 (F1 / F3 / K caps, F2 loss, F3 drop)]
+
+== STOP RULE (a new rule firing on a clean-link session outside a deliberate fault or a recorded link drop)
+   parity (zero actions): MET; S1 with loss, new-rule decisions: 0
+   exact sessions outside night 1, new-rule decisions: 0
+   heartbeat sessions without a recorded fault, new-rule decisions: 0; raw capacity windows: 0
+   recovery restart pairs outside a recorded fault: 0
+   -> PASS: neither rule fires on a clean link

@@ -1,0 +1,10 @@
+# 2026-09-29T14:57:05.496Z setup nft list tables -> rc 0
+table inet filter
+# 2026-09-29T14:58:47.317Z F2 nft list table inet privyhub_fault -> rc 0
+table inet privyhub_fault {
+	chain flt {
+		type filter hook output priority filter; policy accept;
+	}
+}
+# 2026-09-29T14:58:47.363Z F2 nft list tables -> rc 0
+table inet filter

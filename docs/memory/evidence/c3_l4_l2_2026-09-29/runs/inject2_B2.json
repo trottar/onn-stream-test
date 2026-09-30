@@ -1,0 +1,36 @@
+{
+  "ok": true,
+  "class": "FALLBACK",
+  "events": [
+    {
+      "event": "refused",
+      "class": "FALLBACK",
+      "reason": "hold_down",
+      "from_kbps": 5000,
+      "to_kbps": 5000,
+      "injected": true,
+      "state_before": "RECOVERY_PROBATION",
+      "holds_in_force": {
+        "blackout_reports": 0,
+        "fallback_reports": 15,
+        "routine_reports": 45,
+        "increase_reports": 45,
+        "window_reports": 12,
+        "clean_reports": 9,
+        "window_needed": 90,
+        "clean_needed": 85,
+        "last_direction": "down",
+        "reports_since_transition": 15
+      },
+      "measurements": {
+        "injected": true,
+        "class": "FALLBACK"
+      },
+      "acted": false,
+      "hold_down_left_reports": 15
+    }
+  ],
+  "level_kbps": 5000,
+  "state": "HOLD_DOWN"
+}
+HTTP 200

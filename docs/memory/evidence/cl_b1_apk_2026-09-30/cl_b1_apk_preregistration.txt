@@ -1,0 +1,32 @@
+CL-B1 APK -- pre-registration (handoffs/CL-B1_APK_ADOPTION_TASK.md section 0), written 2026-09-30 by Code
+BEFORE the build. Authorized by the user 2026-09-30 ("we can queue it now"). Rules are not tightened or
+loosened after data. Two-retry limit on the build and the install; a session that fails for a harness reason
+is re-run once.
+
+ADOPTED if every row holds; otherwise NOT ADOPTED, the rows recorded, the adopted f31b1c18...8ae7 reinstalled
+and its hash confirmed.
+
+A1 build. `sh ./gradlew :app:assembleDebug` in PrivyHub/ from the tree as it stands (no source change in this
+   task); the Kotlin unit tests pass (DecoderReportUploadTest 4/4, FecRs82Test 6/6, and the rest of the suite:
+   `:app:testDebugUnitTest`); the APK's sha256 recorded; the client source tree's diff against the f01c3b2
+   baseline listed file by file -- it must be only CL-B1's and C4-M1's client files; anything else stops the task.
+A2 install. Installed on the onn with `adb install -r`; the device hash (sha256 of `pm path`) equals the build's
+   on the first read; the app opens (MainActivity), wakes and resumes as TOOLS.md says.
+A3 the report path. One attract-mode session on the new APK, >= 190 s, then BACK: the companion journal shows the
+   body form ("received as body"), the report is stored, 0 WARNING, 0 traceback in the session's journal;
+   slow_event_capacity 1,280; the report's key set identical to cl_b1_2026-09-25/report_arm2_body.json's; the
+   companion unchanged (no code change; its sha256 before = after).
+A4 a 20-min hold on the new APK: attract mode, the adopted profile at 7000, any_override false, adaptive off,
+   PRIVYHUB_FEC_SCHEME unset, T2 on; meets spikes >= 20 ms < 200/min, rendered fps >= 59.5, stale drops < 20/min,
+   audio underruns < 5/min; the client's FEC counters (fec_recovered_packets/min, fec_unrecoverable_groups/min,
+   fec_max_hold_ms) inside the range of the adopted APK's eight B holds of 2026-09-30 (c5_m3_2026-09-29 runs/
+   and runs_rerun/), or, if outside, no worse than the paired adopted hold (A5).
+A5 the link rows, paired. A 20-min hold on the adopted f31b1c18...8ae7 the same session block, run AFTER the new
+   APK's A4 hold (install the adopted APK, hash confirmed; then, if ADOPTED, reinstall the new build, hash
+   confirmed). Post-FEC video loss/min and max output gap are REPORTED for both. They do not gate adoption unless
+   the new APK's loss/min is worse than the paired adopted hold's by more than the evening's own spread -- the
+   spread of the adopted APK's eight C5-M3 B holds (max - min loss/min) -- in which case NOT ADOPTED, with the
+   two tables.
+A6 at the end. The onn carries the new APK (or the old one if NOT ADOPTED), hash confirmed; profile adopted,
+   any_override false, adaptive off, PRIVYHUB_FEC_SCHEME unset and absent, no game, 0 banners; the build output on
+   disk is the installed APK.

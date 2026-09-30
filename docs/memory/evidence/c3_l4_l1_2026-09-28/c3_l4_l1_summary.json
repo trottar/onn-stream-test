@@ -1,0 +1,43 @@
+{
+ "A": {
+  "classification": "SILENT",
+  "transitions": 0,
+  "refusals": 0,
+  "fails": [],
+  "any_override_at_playing": false
+ },
+ "B": {
+  "classification": "PARTIAL (B6)",
+  "transitions": [
+   {
+    "at_utc": "2026-09-28T22:32:14.364Z",
+    "elapsed_ms": 126073,
+    "class": "FALLBACK",
+    "from": 7000,
+    "to": 5000,
+    "injected": true,
+    "reports_since_prev": null,
+    "clean_reports": 7,
+    "result": "transition_done",
+    "actuation_ms": 1225.0,
+    "cycle": {
+     "first_rtp_resume_ms": 468.766,
+     "ffmpeg_spawn_ms": 315.869,
+     "rtp_silence_after_spawn_ms": 152.897,
+     "host_verified_ms": 1221.934
+    },
+    "ssrc_elapsed_ms": 126934,
+    "output_gap_ms": 171
+   }
+  ],
+  "missed": [
+   "B6"
+  ],
+  "ssrc_changes": [
+   126934
+  ],
+  "b3_gap_ms": 171,
+  "any_override_at_playing": false,
+  "closeout_fails": []
+ }
+}

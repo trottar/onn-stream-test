@@ -1,0 +1,49 @@
+--- a/tools/c3_l4_nft_night.py	2026-09-29 14:33:49.982755104 -0400
++++ tools/c3_l4_nft_night.py	2026-09-29 14:33:49.990755289 -0400
+@@ -3,6 +3,7 @@
+ 
+     python3 tools/c3_l4_nft_night.py              # the night (~75-90 min)
+     python3 tools/c3_l4_nft_night.py --only F1,F3 # night 2: just F1 and F3 (~45 min)
++    python3 tools/c3_l4_nft_night.py --only F1    # night 3: just F1 (~25 min)
+     python3 tools/c3_l4_nft_night.py --dry-run    # the whole flow, no fault, no sudo (~20 min)
+ 
+ One window: start it in tmux on the host, type your sudo password once when
+@@ -50,6 +51,9 @@
+ c3_l4_nft_night2_preregistration.txt`); night 1's is still selectable with
+ `--prereg`. The live controller now also carries the capacity trigger and the
+ recovery-escalation backstop (the user's decision of 2026-09-29).
++C3-L4-N2: the default pre-registration is night 3's (`c3_l4_n2_2026-09-29/
++c3_l4_nft_night3_preregistration.txt`; night 2's is `PREREG_NIGHT2`); the
++controller also carries capacity_mild (ROUTINE one rung down).
+ 
+ Everything is written to `logs/streaming/c3_l4_nft_night_<stamp>/` (or
+ `--out`); the directory is printed at the end. Scoring is a later Code task.
+@@ -94,7 +98,8 @@
+ KEEPALIVE_S = 240
+ EVID = REPO / "docs" / "memory" / "evidence" / "c3_l4_l2_2026-09-29"
+ PREREG_NIGHT1 = EVID / "c3_l4_l2_nft_preregistration.txt"
+-PREREG = REPO / "docs" / "memory" / "evidence" / "c3_l4_n1_2026-09-29" / "c3_l4_nft_night2_preregistration.txt"
++PREREG_NIGHT2 = REPO / "docs" / "memory" / "evidence" / "c3_l4_n1_2026-09-29" / "c3_l4_nft_night2_preregistration.txt"
++PREREG = REPO / "docs" / "memory" / "evidence" / "c3_l4_n2_2026-09-29" / "c3_l4_nft_night3_preregistration.txt"
+ SESSIONS = ("F1", "F2", "F3", "K")          # the parts, in the order they always run
+ T2 = EVID / "t2_sample.py"
+ GAMES_LOGS = REPO / "logs" / "games"
+@@ -963,12 +968,12 @@
+         self.calibrate()
+         # after the calibration the table exists: flush it and add the cap (the dry run builds it whole)
+         steps = [("flush_chain", None), ("cap_rule", self.cap_kbytes)] if not self.dry else self.cap_steps()
+-        self.expect("within ~60 s (night 1's samples: ~14 s) ONE decrease: FALLBACK (capacity) 7000->5000; "
+-                    "~186 s later INCREASE 5000->5500 (fits the cap); ~186 s later INCREASE 5500->6000 (over the "
+-                    "cap); a capacity FALLBACK back to 5000 no sooner than 120 s after that; then, instead of a "
+-                    "third direction change inside 10 min, HOLD (oscillation) at 5000. Or, if the cap lets 6000 "
+-                    "through, 'climbed to 6000 and stayed'. rate_limited never true; never two transitions closer "
+-                    "than the hold-downs; no ramp; at most one recovery cycle under the cap.")
++        self.expect("within ~60 s (nights 1-2: ~14 s) ONE decrease: FALLBACK (capacity) 7000->5000; >= 93 "
++                    "reports later INCREASE 5000->5500 (fits the cap); >= 93 later INCREASE 5500->6000 (over the "
++                    "cap); then capacity_mild 6000->5500 once the 120 s reversal hold-down has passed; then, "
++                    "instead of a third direction change inside 10 min, HOLD (oscillation) at 5500. Or 'climbed to "
++                    "<rung> and stayed'. rate_limited never true; never two transitions closer than the "
++                    "hold-downs; no ramp; at most one recovery cycle under the cap.")
+         since = utc()
+         self.fault_or_wait(steps, self.cap_steps(), "F1 cap", ["cap_rule"])
+         self.test_point("F1_cap_on")

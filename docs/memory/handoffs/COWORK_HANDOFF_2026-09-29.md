@@ -1,0 +1,35 @@
+---
+memory_schema: 1
+as_of: 2026-09-29
+status: COWORK HANDOFF — written by the Cowork chat that ran 2026-09-23 → 2026-09-29 (Phase C: D-BASE close-out through C3.L4 live under real loss); the next Cowork chat reads this first, then CURRENT.md
+---
+
+# Cowork handoff, 2026-09-29
+
+## How we work (the user's rules; keep every one)
+
+- The user is **remote**: a Windows PC, PowerShell, SSH into the Linux host. They cannot paste into Claude Code from the PC. Cowork writes task handoffs into `docs/memory/handoffs/<NAME>_TASK.md` through the file bridge and the one-line prompt into `_cowork_prompt.txt` at the repo root (git-tracked). **Commit the prompt under a new local file name each time, then re-stage and `cmp` it back from the host before telling the user it's ready** — the bridge has delivered stale copies when the same output path was rewritten. The user types `Read _cowork_prompt.txt in the repo root and follow it as my prompt.` into Claude Code; later says "Code is done". Cowork then **verifies from the raw artifacts** (evidence dir, `sha256sum -c` the manifest on the staged subset, recompute the headline numbers from the jsonl/json, compare the tool copy against the evidence copy) before telling the user anything is true; corrections are appended when a session over- or under-claimed.
+- Hand steps: numbered, one paste-ready block each, where they are (**PowerShell SSH window on the PC** — never "the Linux pane"), what they should see. Nothing pasted from the user to Cowork; outputs go to files under `logs/` that Cowork reads. **Never ask for anything findable in `docs/memory/`.** Keep explanations plain. The user has said "Stop wasting my tokens" — no repeated command requests; hand investigation to Code instead.
+- **Never write down or ask for an IP, MAC, SSID, ADB endpoint, serial or credential** — placeholders only. The Opal router is read-only over `ssh opal`. ROMs/BIOS/keys/logs/savestates stay out of git. The three adopted profile values (frame cap 90 KB, audio cushion 12/17, audio redundancy 2/4) stay; encoder flags unchanged. The companion is a systemd user unit: `systemctl --user restart privyhub-companion`, never kill + nohup. **Nothing perceptual is an acceptance gate** — the user's own look or listen is recorded as their words. **Claude Code cannot run `nft` or real `sudo`**; the user runs `tools/c3_l4_nft_night.py` themselves (it runs `sudo -n nft` from a fixed allow-list after one password; Code tests it only with a fake sudo). Pre-registered rules are written against the measured noise band on the direction that matters, before data, never tightened or loosened after. **Never hand the user a run to start while a Claude Code queue is running.** Every Phase C change is measured against `evidence/D_BASE_CLOSEOUT_2026-09-23.md`; the baseline must stay met. Nothing is adopted or committed by Code; commits are the user's (Cowork gives the one-line command after reading `git status --short` from a file).
+
+## Where things stand (2026-09-29, before the running queue)
+
+- **Baseline commit `f01c3b2`** (2026-09-28). Everything since is uncommitted in the working tree.
+- **C3.L3a** complete (4 pooled sessions; the user's gate reading is `decisions/C3-L4_LIVE_AUTHORIZATION_2026-09-28.md`: one transition per event, ramps excluded).
+- **C3.L4 live** built (`companion/adaptive_bitrate_live.py`, `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live`, off by default; shadow unchanged). Increase rule = the user's blend (clean = fps ≥ 57, queue ≤ 1, gap ≤ 150; one rung up at ≥ 85 of the last 90 reports since the last SSRC change). Added after the user's `nft` nights: the **capacity trigger** (fps < 50 on 5/5 and lost ≥ 50 on ≥ 3/5 → FALLBACK 5000) and the **recovery-escalation backstop** (two recovery encoder restarts at one level within 180 s → one FALLBACK after resume); the running task adds the **mild capacity rule** (fps < 57 on ≥ 4/5 and lost ≥ 50 on ≥ 3/5 → ROUTINE one rung down). `C3-F1` made recovery's restart level-preserving.
+- **`nft` night 1** (`C3_L4_NFT_NIGHT1_2026-09-29.md`): no step-down under the cap — the shadow-derived triggers need queue depth, a capacity shortfall shows none; recovery restarted at 7000 nine times. **Night 2** (run `c3_l4_nft_night_20260929_174201Z`, scored by the running task): capacity FALLBACK at +14 s, climb 5000 → 5500 → 6000, then 4 minutes degraded at 6000 with nothing firing (the mild rule's reason); F3's drop at 5000 recovered with one restart at 5000.
+- **C4** closed: adaptive FEC not supported; 8+2 arm NOT SHOWN; 8+1 stays (the user agreed). **C5-M1**: 1080p60 at parity NOT CAPABLE (stream) — burst loss on the wireless hop; client and host capable. **C6** contract established. **D7** 9/10 scripted PASS + cited; hands-on reported fine by the user. **CL-B1** (decoder report as POST body) built, companion side in; client change bundled into the next adopted APK (the user's call). Adopted APK `f31b1c18…8ae7` on the onn.
+
+## The queue running now (started 2026-09-29, ~3 nights)
+
+`handoffs/C3-L4-N2_NFT_NIGHT2_SCORE_AND_MILD_CAPACITY_TASK.md` under `QUEUE_2026-09-29B.md`: score night 2; the mild-capacity rule + tests + replays (stop rule: never fires on a clean link); a 30-min silent live hold; night 3's pre-registration and hand steps (`--only F1`, ~25 min); then `C5-M2_1080P60_FOLLOWUP_ARMS_TASK.md` (three 1080p arms, screening night + confirmation night) and `C5-M3_LOW_RUNG_SCREENING_TASK.md` (720p/4000, 720p/3000, 540p/3500: offline SSIM/IDR-pulse table + one night). Records land in `evidence/`; `CURRENT.md` is rewritten at the end.
+
+## When the user says "Code is done"
+
+1. Verify from the raw files: `C3_L4_NFT_NIGHT2_2026-09-29.md`, `C3_L4_N2_MILD_CAPACITY_2026-09-29.md` (manifest, tests, the replay stop rule PASS, the silent hold SILENT, the tool copy = the evidence copy), then the C5-M2 and C5-M3 records (rule outcomes recomputed from their score tables; golden argv unchanged when the selector is unset; adopted APK hash confirmed; selector and flags absent).
+2. Give the user **night 3**: one PowerShell SSH window — `tmux new -s nft`, then `cd ~/Projects/onn-stream-test && python3 tools/c3_l4_nft_night.py --only F1`, password once, Enter to accept the pre-registration, wait ~25 min, "nft done". Expected: capacity FALLBACK → 5000, climb to 5500, to 6000, mild-capacity back to 5500, a second attempt, then HOLD (oscillation) at 5500 for the session.
+3. Then: a Code task to score night 3 and, if WORKS UNDER LOSS, the C3.L4 close (decision record: live authorized as built; `docs/ROADMAP.md`); the user's picture check on any CAPABLE 1080p or low-rung arm (hand steps, TV only); the next adopted APK with `CL-B1`; the C7/D8 checkpoint record; a commit (the user's).
+
+## Open, not blocking
+
+Max output gap ≤ 100 (transport's open row); warm-state controller loss (`host_link`, CTRL-L1 PATH); T2/T3 thermal thresholds; B1/B3; Group C; the slow-event ring size on the client (CL-B1 grew it, still rolls in ~12 min at 7000); the controller log's chatty state lines (L1 finding); a larger GOP and a larger source window as later 1080p levers.

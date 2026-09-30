@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-09-25
-baseline_commit: 824c9d9
+as_of: 2026-09-30
+baseline_commit: f01c3b2
 ---
 
 # Current State
@@ -9,73 +9,55 @@ baseline_commit: 824c9d9
 Headings are fixed by `tools/check_memory_health.py`; do not rename.
 ## Active Objective
 
-**Phase C — adaptive streaming on Linux — RESUMED 2026-09-23.** `D-BASE`
-is **CLOSED: BASELINE MET** (`evidence/D_BASE_CLOSEOUT_2026-09-23.md`;
-decision `decisions/D-BASE_BASELINE_BEFORE_ADAPTATION.md`, closed). The
-roadmap's Linux order: **C3** (adaptive bitrate) → C4 → C5 → C6 → C7.
-**C1 is done**: the reference profile declares every stream parameter
-explicitly, including the cap, cushion and redundancy.
+**Phase C — adaptive streaming on Linux — `C3.L4` CLOSED 2026-09-30:
+live adaptive bitrate VALIDATED UNDER REAL LOSS on the user's three `nft`
+nights.**
+
+- Night 1 NOT; nights 2 and 3 WORKS UNDER LOSS; night 3 showed the
+  pre-registered HOLD shape.
+- The controller as built is authorized. **Live stays behind
+  `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live`, off by default**; turning it on
+  by default is the user's call.
+- **C7 / D8 are met or explicitly deferred**, except the commit. The
+  checkpoint record is `evidence/C7_D8_CHECKPOINT_2026-09-30.md`.
+- **The `CL-B1` APK `de072762…835e` is adopted** (2026-09-30).
+- Earlier: `D-BASE` CLOSED (baseline met, 2026-09-23); C1 done; C4
+  closed (8+1); C5 characterized (1080p60 NOT CAPABLE at parity; the
+  follow-ups INCONCLUSIVE (link); the low rungs screened for Phase G); C6
+  contract on paper; D7 complete.
 
 ## Current Work Item
 
-**`C3.L3a` Part 2 — the pre-registered rerun: sessions 1-3 of ≥ 4
-RECORDED (2026-09-24, runs `20260924_115810`, `20260924_130016`,
-`20260924_151953`, pooled); session 4 AWAITING THE USER** (their play).
-**Session 3** (`C3-L3A-R3`, `evidence/C3_L3A_R3_SESSION3_2026-09-24.md`):
-its 24-change report was stored — **the cap is RUNTIME VALIDATED**; W 5.0
-jump 1/5, ramp 2/5, decoys 1/10 and 3/10; max gap 564 ms = the
-after-Phase-B restore. **Interim pooled (3 sessions, W 5.0): jump 5/15,
-ramp 11/15 (20 marks), decoys 4/30 and 9/30 — bar not reached, no
-verdict.**
-**Sessions 1-2**: no verdict.
-- Session 1: `evidence/C3_L3A_R1_SESSION1_2026-09-24.md`. An accidental
-  BACK split its client session.
-- Session 2: `evidence/C3_L3A_R2_SESSION2_2026-09-24.md`. It is on the
-  decoder axis from its journal-rebuilt report.
-- The cap was raised to 48,000 by `C3-L3A-R2B`, and the URL transport
-  ceiling is ~41.4K.
+**The N3 prompt (under `handoffs/QUEUE_2026-09-29B.md`'s rules): Code
+ran `C3-L4-N3`, then `CL-B1` APK, and stopped.**
 
-**The pre-registration** is 10 traversals, dwell 55-90 s, primary W 5.0 s,
-≥ 4 sessions to ≥ 20 per shape, anchored 1-10 rating
-(`investigations/ACTIVE.md` §C3.L3a). The 2026-09-20 session was
-re-scored without answering the gate (`C3-L3A-P2R1`).
-
-**Weekend queue 1 (2026-09-24/25, `handoffs/WEEKEND_2026-09-24_QUEUE.md`):**
-- `C3-L3A-R3`: session 3 recorded, cap RUNTIME VALIDATED.
-- `C4-D1`: BUILD static k+2 first; adaptive FEC not supported.
-- `CTRL-L1`: the controller loss is on the PATH.
-- `C3-L4-S1`: shadow SILENT; live BLOCKED.
-- `D6-R1`: NOT REPRODUCED.
-
-The records are under `evidence/` and in the daily file `2026-09-24.md`.
-
-**Weekend queue 2 (`handoffs/WEEKEND_2026-09-25_QUEUE.md`):**
-
-1. **`C6-D1`: source contract ESTABLISHED.** It exists on paper and as an
-   interface module that production does not import (7/7 tests), with 14
-   cross-boundary findings. The one correctness defect: recovery's restart
-   refuses after any ladder transition
-   (`evidence/C6_D1_SOURCE_CONTRACT_2026-09-25.md`).
-2. **`C4-M1`: FEC arm (8+2 `xor8_2`, override only) NOT SHOWN.** It won
-   1 of 3 pairs, with the A median at 69 % of B's. The arm recovered more
-   but raised pre-FEC loss 2-3×. Cost within noise; nothing adopted; the
-   adopted APK is reinstalled (`evidence/C4_M1_FEC_ARM_2026-09-25.md`).
-3. **`D7-R1`: 8 of 10 rows PASS twice**; recovery cited; the profiles row
-   FAIL is a script defect (every field as expected). NEEDS USER:
-   controller feel and picture
-   (`evidence/D7_R1_LINUX_REGRESSION_2026-09-25.md`).
-
-**Phase C preconditions (`handoffs/PHASE_C_PRECONDITIONS_2026-09-25_TASK.md`):**
-
-1. **`C3-F1`: WORKING.** Recovery's restart is level-preserving at
-   5000-7000 (`evidence/C3_F1_RECOVERY_RESTART_LADDER_2026-09-25.md`).
-2. **`D7-R2`: the profiles row PASS.** All 9 scripted rows PASS in one
-   pass of the fixed script (`evidence/D7_R1_LINUX_REGRESSION_2026-09-25.md`
-   §R2).
-3. **`CL-B1`: the decoder report as a POST body, built and tested; not
-   adopted.** Companion both forms, cap 128,000; the arm APK `71d8c3d7…`
-   stored a body report; the adopted APK is reinstalled
-   (`evidence/CL_B1_DECODER_REPORT_BODY_2026-09-25.md`).
+- **`C3-L4-N3`: DONE.**
+  - The user's night 3 is **WORKS UNDER LOSS (F1)**: capacity at +15.5 s;
+    INCREASE ×2 (111 / 93 reports); `capacity_mild` 6000 → 5500 at 121 s
+    after two `hold_down` refusals; HOLD `oscillation` at 5500.
+  - 0 escalations and 0 recovery cycles. BACK reset to 7000 and the
+    status read 7000.
+  - **`C3.L4` is closed** in the decision (with the exact drop-in that
+    would make live the default, not made), `docs/ROADMAP.md` (C3 criteria
+    mapped to records; the C7 row), the architecture ("the controller as
+    closed" table) and `ACTIVE.md`.
+  - **The C7 / D8 checkpoint record** is written (it corrects the "PS1-
+    and-below" claim: NES / Genesis are not claimed), with
+    `logs/c7_d8_git_status_2026-09-30.txt`.
+  - Records: `evidence/C3_L4_NFT_NIGHT3_2026-09-30.md`,
+    `evidence/C7_D8_CHECKPOINT_2026-09-30.md`.
+- **`CL-B1` APK: ADOPTED** by the pre-registered rule.
+  - A clean, reproducible build `de072762…835e`; Kotlin 11/11.
+  - A3: the body form, key set identical, `slow_event_capacity` 1,280.
+  - A4: every client row met. A5: loss 10.29 against 11.81/min for the
+    paired old APK.
+  - `tools/c3_l4_nft_night.py` now expects the new hash (24/24 tests).
+  - Records: `evidence/CL_B1_APK_ADOPTION_2026-09-30.md`,
+    `decisions/CL-B1_APK_ADOPTION_2026-09-30.md`.
+- **Earlier:** 2026-09-29/30 `C3-L4-N2` (`capacity_mild`), `C5-M2`
+  (INCONCLUSIVE (link)), `C5-M3` (720p/4000 passes transport), `C3-L4-N1`,
+  `C3-L4-L2(B)`; 2026-09-28 `C3-L4-L1`, `C3-L3A-R4`, `C5-M1`; 2026-09-24/25
+  as before. Records under `evidence/` and in the daily files.
 
 ## Verified State
 
@@ -90,7 +72,7 @@ one to two client reports (≤ ~4 s); each costs one 125-211 ms gap
 (`codec_ms` 7-11) — the restart's ~152 ms RTP silence.
 **`C3.L3a` pool rule** (`C3-L3A-P2R3`): `--aggregate` pools only v2-state
 runs with the pre-registered config and lists every skipped file with its
-reason; `c3_l3a_runs/` is empty (2026-09-20 files moved to evidence).
+reason; `c3_l3a_runs/` holds the four pooled runs (2026-09-24 ×3, 2026-09-28).
 **`C3.L3a-S1` transition soak** (2026-09-24, n = 60 / 30, attract mode):
 each restart costs one gap of median 186.5 ms (128-225; codec ≤ 13 ms;
 2 of 60 an extra GOP, ~410-420 ms); telemetry settles within one to three
@@ -104,11 +86,19 @@ loss — the losses are not at transitions; no-transition H2 missed too).
   `any_override: false`: 1280x720@60, 7 Mbps, GOP 15, no B, 8+1 FEC,
   **cap 90,000 B** (`P6a`), **cushion 12/17** (`P9`), **audio redundancy
   2/4** (`P10`). Env overrides exist for comparison sessions only
-  (`TOOLS.md`); none set.
-- **Installed**: APK `f31b1c18…8ae7`; companion = systemd user unit
-  `privyhub-companion` (`H3`) — restart with `systemctl --user restart`;
-  last restarted 2026-09-25 07:03:55Z by `CL-B1` (no override; `fec` `xor8_1`); installed APK the adopted `f31b1c18…8ae7` (reinstalled 07:17Z, hash confirmed; the source tree also carries `C4-M1`'s and `CL-B1`'s client changes).
-  Host headless (`H2`); host wired to the Opal, onn on its 5 GHz (`B2`).
+  (`TOOLS.md`, including `C5-M1`'s `PRIVYHUB_NATIVE_PROFILE_ID`); none set.
+- **Installed**: **APK `de072762…835e`** (the `CL-B1` APK, adopted
+  2026-09-30; hash confirmed on the onn 15:06Z; the previous
+  `f31b1c18…8ae7` is kept at `runtime/c4_m1/adopted_app-debug.apk` for
+  rollback).
+  - The companion is the systemd user unit `privyhub-companion` (`H3`);
+    restart it with `systemctl --user restart`.
+  - Last restarted 2026-09-30 15:05Z by the `CL-B1` paired hold's
+    teardown: no flag, no selector, `PRIVYHUB_FEC_SCHEME` absent, profile
+    adopted, `adaptive_bitrate` off.
+  - The companion tree carries the live controller through `C3-L4-N2`
+    (off unless its flag is set) and the C5 selector profiles (dormant).
+  - The C5 night scripts in evidence still name the old APK (`TOOLS.md`).
 - **Link-drop recovery** RUNTIME VALIDATED on real loss (`R3`-`R3d`);
   recovery never loads into a live core (`R3c2`).
 - **Host-shell operation**: open `MainActivity`, wake, tap RESUME PLAYING
@@ -116,22 +106,17 @@ loss — the losses are not at transitions; no-transition H2 missed too).
 
 ## Next Action
 
-1. **The user's `C3.L3a` session 4 and their reading of the pooled table.**
-   Nothing runs without them. After it, run `--finalize`, then
-   `--aggregate`.
-2. **The user's FEC call.** Recommended: no adoption; 8+1 stays (`C4-M1`
-   NOT SHOWN).
-3. **The `C3.L4` live decision.** Its precondition, `C3-F1`, is met:
-   recovery's restart is level-preserving. Live still needs the gate
-   reading, a fault-injection night (the user's `nft`), and the shadow
-   log trimmed.
-4. **C5, which needs a profile.** 1080p60 waits on the user's yes.
-5. **D7's NEEDS USER rows**: controller feel, picture, and save/load
-   through the TV (the list in the D7-R1 record).
-6. **The user's APK adoption call for `CL-B1`.** The arm APK is
-   `71d8c3d7…`; the source also carries `C4-M1`'s inert v2 FEC decoder.
-7. **A commit of everything since `7a2e103`** (the user's).
-8. **Then the C7 / D8 checkpoint.**
+1. **The user's commit** (C7 / D8 "clean checkpoint/push"). Cowork gives
+   the line from `logs/c7_d8_git_status_2026-09-30.txt`. What must not be
+   committed is listed in `evidence/C7_D8_CHECKPOINT_2026-09-30.md`; all
+   of it is already ignored.
+2. **The user's call: turn live adaptive bitrate on by default, or not.**
+   The one drop-in that would do it is in the decision's 2026-09-30 close.
+   Also open for the user: the adopted 720p's loss row on these evenings
+   (`investigations/ACTIVE.md`).
+3. **What the ROADMAP says follows C7 / D8** on the Linux order: **Phase
+   E — Linux core resource characterization and optimization**, starting
+   at E1, freezing the workload suite. It is not started.
 
 **Open, not blocking:**
 
@@ -139,7 +124,8 @@ loss — the losses are not at transitions; no-transition H2 missed too).
 - `host_link`;
 - the thermal flag proposal;
 - the controller item (`CTRL-L1`: PATH);
-- the recent slow-event ring (fills in ~12 min in attract mode, `CL-B1`);
+- the recent slow-event ring (fills in ~12 min in attract mode, `CL-B1`;
+  session 4's Phase A off-transition events were all evicted);
 - the `C6-D1` migration list.
 
 ## Success Criteria
@@ -170,6 +156,9 @@ perceptual gate unless the user sets one.
   status is 0 always; its CPU temperature is `dumpsys thermalservice`.
 - D4/D5 restoration; the Windows-era C3 record; `C3.L3a` Part 1 (chained
   ladder transitions are clean).
+- **`C3.L3a` is closed** (four sessions, the user's reading): single
+  transitions are not reliably noticed, ramps are. Do not re-run the gate;
+  build to the decision. **C4 is closed** for Phase C (8+1 stays).
 
 ## Relevant References
 
@@ -180,4 +169,4 @@ perceptual gate unless the user sets one.
 - `handoffs/CURRENT_HANDOFF.md` (Phase C); `investigations/ACTIVE.md`;
   `docs/ROADMAP.md` (Phase C, D-072 order); `docs/KNOWN_ISSUES.md`.
 - `evidence/RUNTIME_VALIDATION.md` — a classification per record;
-  `patches/PATCH_INDEX.md` lists all 131.
+  `patches/PATCH_INDEX.md` lists all 137.

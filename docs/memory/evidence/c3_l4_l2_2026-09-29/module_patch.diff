@@ -1,0 +1,247 @@
+--- a/companion/adaptive_bitrate_live.py
++++ b/companion/adaptive_bitrate_live.py
+@@ -24,6 +24,11 @@
+ route). Test-only: `PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1` with live enables
+ `POST /plugins/games/adaptive-bitrate/inject?class=FALLBACK|ROUTINE`.
+ 
++C3-L4-L2: the increase rule is the user's blend (constants INCREASE_*), and
++live writes one `sample` row per client report to the same log (the inputs,
++the disposition, the increase window, the state), so a night can be
++re-scored offline under any rule.
++
+ Serialization with link-drop recovery: the actuator runs on one worker
+ thread while holding `NativeStreamManager._lock` -- the lock recovery's own
+ restart (`recovery_restart_encoder`, C3-F1) and full start take -- and the
+@@ -36,6 +41,7 @@
+ from __future__ import annotations
+ 
+ import contextlib
++from collections import deque
+ import os
+ import threading
+ import time
+@@ -69,15 +75,29 @@
+ 
+ # Hold-downs: reports since the last transition before the next one of this
+ # kind may fire, by the direction of that last transition. At the 2 s cadence:
+-# 30 = 60 s, 60 = 120 s. An increase needs, in addition, 90 consecutive clean
+-# reports counted after the blackout (>= 93 reports = 186 s since the last).
++# 30 = 60 s, 60 = 120 s. An increase needs, in addition, a full 90-report
++# window after the blackout (>= 93 reports = 186 s since the last SSRC change).
+ HOLDDOWN_REPORTS = {
+     ("FALLBACK", "down"): 30, ("FALLBACK", "up"): 60,
+     ("ROUTINE", "down"): 60, ("ROUTINE", "up"): 60,
+     ("INCREASE", "up"): 30, ("INCREASE", "down"): 60,
+ }
+ BLACKOUT_REPORTS = ab.BLACKOUT_REPORTS                    # 3 reports, after ANY SSRC change
+-CLEAN_REPORTS_FOR_INCREASE = ab.CLEAN_REPORTS_FOR_INCREASE  # 90
++# C3-L4-L2 -- THE INCREASE RULE, the user's blend (2026-09-28; recorded in
++# decisions/C3-L4_LIVE_AUTHORIZATION_2026-09-28.md). L1 used the shadow's
++# 90 CONSECUTIVE reports at fps >= 59 / queue 0 / gap <= 150, which a clean
++# link never reaches (L1 record section 5). Now:
++#   clean = no ROUTINE-level sample: fps >= 57, queue <= 1, gap <= 150;
++#   window = the last 90 evaluated reports since the last SSRC change and
++#            its blackout (empty again after every change; stale reports
++#            are skipped and do not advance it);
++#   one rung up when the window is full and >= 85 of its 90 are clean.
++# The shadow keeps its own rule (adaptive_bitrate.py is unchanged).
++INCREASE_CLEAN_FPS_AT_LEAST = 57.0
++INCREASE_CLEAN_QUEUE_AT_MOST = 1
++INCREASE_CLEAN_GAP_AT_MOST_MS = 150
++INCREASE_WINDOW_REPORTS = 90
++INCREASE_CLEAN_NEEDED = 85
+ MIN_SESSION_AGE_MS = 60_000
+ RATE_LIMIT_TRANSITIONS = 4
+ RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000
+@@ -138,6 +158,10 @@
+         if level_kbps in LADDER_KBPS:
+             self.level_kbps = int(level_kbps)
+         self.pending: dict[str, Any] | None = None
++        # The increase window (C3-L4-L2): one bool per evaluated report.
++        self.inc_window: deque[bool] = deque(maxlen=INCREASE_WINDOW_REPORTS)
++        self.last_disposition: str | None = None
++        self.last_clean: bool | None = None
+         self.routine_defer = 0
+         self.refused: dict[str, int] = {}
+         self.last_refusal_key: tuple[str, str] | None = None
+@@ -154,6 +178,18 @@
+         self.reset(None)
+ 
+     # -- helpers -----------------------------------------------------------
++    def increase_clean(self, s: dict[str, Any]) -> bool:
++        """The blend's "clean": no ROUTINE-level sample."""
++        fps, q, gap = self._num(s.get("fps")), self._num(s.get("queue_depth")), self._num(s.get("output_gap_ms"))
++        return (fps is not None and fps >= INCREASE_CLEAN_FPS_AT_LEAST
++                and q is not None and q <= INCREASE_CLEAN_QUEUE_AT_MOST
++                and gap is not None and gap <= INCREASE_CLEAN_GAP_AT_MOST_MS)
++
++    def _window_restart(self) -> None:
++        """After every SSRC change (and at a session start) the window starts empty."""
++        self.inc_window.clear()
++        self.clean_count = 0
++
+     def hold_left(self, kind: str) -> int:
+         if self.reports_since_action is None or self.last_direction is None:
+             return 0
+@@ -165,8 +201,10 @@
+                 "fallback_reports": self.hold_left("FALLBACK"),
+                 "routine_reports": self.hold_left("ROUTINE"),
+                 "increase_reports": self.hold_left("INCREASE"),
++                "window_reports": len(self.inc_window),
+                 "clean_reports": self.clean_count,
+-                "clean_needed": CLEAN_REPORTS_FOR_INCREASE,
++                "window_needed": INCREASE_WINDOW_REPORTS,
++                "clean_needed": INCREASE_CLEAN_NEEDED,
+                 "last_direction": self.last_direction,
+                 "reports_since_transition": self.reports_since_action}
+ 
+@@ -230,7 +268,7 @@
+                 self.oscillation_hold = True
+                 self.suppressed["oscillation"] += 1
+                 self.window.clear()
+-                self.clean_count = 0
++                self._window_restart()
+                 self.state, self.reason, self.measurements = ab.HOLD, "oscillation", m
+                 self.decision_seq += 1
+                 return [{"event": "hold", "class": kind, "direction": direction, "reason": "oscillation",
+@@ -250,7 +288,7 @@
+         self.reports_since_action = 0
+         self.blackout_remaining = BLACKOUT_REPORTS
+         self.window.clear()
+-        self.clean_count = 0
++        self._window_restart()
+         self.routine_defer = 0
+         self.last_refusal_key = None
+         self.state = ab.HOLD_DOWN
+@@ -288,12 +326,15 @@
+             events.append({"event": "level_sync", "from_kbps": self.level_kbps, "to_kbps": int(stream_kbps)})
+             self.level_kbps = int(stream_kbps)
+ 
++        self.last_clean = None
+         if not s.get("available") or not s.get("fresh") or not isinstance(elapsed, (int, float)):
++            self.last_disposition = "stale"          # skipped: does not advance the window
+             self.stale_events += 1
+             e = self._set_state(ab.TELEMETRY_STALE, "telemetry_unavailable" if not s.get("available")
+                                 else "telemetry_not_fresh")
+             return events + ([e] if e else [])
+         if self.last_elapsed_ms is not None and elapsed == self.last_elapsed_ms:
++            self.last_disposition = "non_distinct"   # skipped
+             self.non_distinct += 1
+             if self.non_distinct >= ab.STALE_NON_DISTINCT_REPORTS:
+                 self.stale_events += 1
+@@ -306,25 +347,36 @@
+         if self.reports_since_action is not None:
+             self.reports_since_action += 1
+ 
++        self.last_clean = self.increase_clean(s)
+         if self.actuator_failed:
++            self.last_disposition = "actuator_failed"
+             e = self._set_state(ab.ACTUATOR_FAILED, "actuator_failed")
+             return events + ([e] if e else [])
+         if self.oscillation_hold:
++            self.last_disposition = "oscillation_hold"
+             e = self._set_state(ab.HOLD, "oscillation")
+             return events + ([e] if e else [])
+         if self.blackout_remaining > 0:
++            self.last_disposition = "blackout"        # not in the window
+             self.blackout_remaining -= 1
+             self.suppressed["blackout"] += 1
+             e = self._set_state(ab.HOLD_DOWN, "blackout")
+             return events + ([e] if e else [])
+         if s.get("waiting_for_idr"):
+-            self.clean_count = 0
++            # A known resync is never evidence, and it is not clean either:
++            # it enters the increase window as not clean.
++            self.last_disposition = "resync"
++            self.last_clean = False
++            self.inc_window.append(False)
++            self.clean_count = sum(self.inc_window)
+             e = self._set_state(self.state if self.state != ab.TELEMETRY_STALE else ab.REFERENCE,
+                                 "resync_ignored")
+             return events + ([e] if e else [])
+ 
++        self.last_disposition = "evaluated"
+         self.window.append(s)
+-        self.clean_count = self.clean_count + 1 if self._is_clean(s) else 0
++        self.inc_window.append(bool(self.last_clean))
++        self.clean_count = sum(self.inc_window)
+         cls, m = self._evidence()
+ 
+         if cls == "ROUTINE":
+@@ -342,8 +394,10 @@
+         self.last_refusal_key = None
+ 
+         if self.level_kbps < REFERENCE_KBPS:
+-            if self.clean_count >= CLEAN_REPORTS_FOR_INCREASE:
+-                return events + self._decide("INCREASE", {"clean_reports": self.clean_count}, int(elapsed), ctx)
++            if len(self.inc_window) >= INCREASE_WINDOW_REPORTS and self.clean_count >= INCREASE_CLEAN_NEEDED:
++                return events + self._decide("INCREASE", {"window_reports": len(self.inc_window),
++                                                          "clean_reports": self.clean_count},
++                                             int(elapsed), ctx)
+             e = self._set_state(ab.RECOVERY_PROBATION, "counting_clean_reports")
+             return events + ([e] if e else [])
+ 
+@@ -380,7 +434,7 @@
+             # The SSRC changed now: the blackout counts from here.
+             self.blackout_remaining = BLACKOUT_REPORTS
+             self.window.clear()
+-            self.clean_count = 0
++            self._window_restart()
+             if self.last_action is not None:
+                 self.last_action["result"] = "applied"
+             return []
+@@ -403,7 +457,7 @@
+         """Recovery restarted the encoder (or a full start ran): blackout."""
+         self.blackout_remaining = BLACKOUT_REPORTS
+         self.window.clear()
+-        self.clean_count = 0
++        self._window_restart()
+         self.routine_defer = 0
+         return [{"event": "ssrc_change", "source": source, "blackout_reports": BLACKOUT_REPORTS}]
+ 
+@@ -422,6 +476,12 @@
+                 "increase": self.hold_left("INCREASE"),
+             },
+             "refused": dict(self.refused),
++            "increase_window": {"reports": len(self.inc_window), "clean": self.clean_count,
++                                "window_needed": INCREASE_WINDOW_REPORTS,
++                                "clean_needed": INCREASE_CLEAN_NEEDED,
++                                "clean_rule": f"fps >= {INCREASE_CLEAN_FPS_AT_LEAST:g}, queue <= "
++                                              f"{INCREASE_CLEAN_QUEUE_AT_MOST}, gap <= "
++                                              f"{INCREASE_CLEAN_GAP_AT_MOST_MS}"},
+             "actuator_failed": self.actuator_failed,
+             "pending": dict(self.pending) if self.pending else None,
+         })
+@@ -504,15 +564,32 @@
+                 if self._inflight is not None:
+                     # The restart is being measured, not the network.
+                     self._dropped_while_actuating += 1
++                    self._write_sample(s, "dropped_actuating", None)
+                     return
+                 self._last_sample = s
+                 ctx = self._ctx(native_status)
+                 events = self._policy.feed(s, ctx)
++                self._write_sample(s, self._policy.last_disposition, self._policy.last_clean)
+                 self._emit(events, s, ctx)
+                 self._maybe_actuate()
+         except Exception:
+             pass
+ 
++    def _write_sample(self, s: dict[str, Any], disposition: str | None, clean: bool | None) -> None:
++        """C3-L4-L2: one row per client report (~0.5 kB; ~1 MB an hour, measured 527 B in B2)."""
++        p = self._policy
++        self._write({"event": "sample", "session_elapsed_ms": s.get("elapsed_ms"),
++                     "fps": s.get("fps"), "queue_depth": s.get("queue_depth"),
++                     "output_gap_ms": s.get("output_gap_ms"), "fresh": bool(s.get("available") and s.get("fresh")),
++                     "waiting_for_idr": s.get("waiting_for_idr"), "lost_packets_delta": s.get("lost_packets_delta"),
++                     "clean": clean, "disposition": disposition,
++                     "window_reports": len(p.inc_window), "window_clean": p.clean_count,
++                     "state": p.state, "reason": p.reason, "level_kbps": p.level_kbps,
++                     "stream_kbps": self._stream_kbps, "blackout_remaining": p.blackout_remaining,
++                     "holds": {"fallback": p.hold_left("FALLBACK"), "routine": p.hold_left("ROUTINE"),
++                               "increase": p.hold_left("INCREASE")},
++                     "effective_mode": self.effective_mode})
++
+     def _emit(self, events: list[dict[str, Any]], s: dict[str, Any] | None,
+               ctx: dict[str, Any] | None = None) -> None:
+         for e in events:

@@ -1,0 +1,18 @@
+# 2026-09-29T14:49:40.441Z setup nft list tables -> rc 0
+table inet filter
+# 2026-09-29T14:51:21.915Z F3 nft list table inet privyhub_fault -> rc 0
+table inet privyhub_fault {
+	chain flt {
+		type filter hook output priority filter; policy accept;
+		udp dport 48100 limit rate over 869 kbytes/second burst 64 kbytes counter packets 0 bytes 415 drop
+	}
+}
+# 2026-09-29T14:52:22.005Z F3 nft list table inet privyhub_fault -> rc 0
+table inet privyhub_fault {
+	chain flt {
+		type filter hook output priority filter; policy accept;
+		udp dport { 48100, 48101 } counter packets 0 bytes 433 drop
+	}
+}
+# 2026-09-29T14:52:23.051Z F3 nft list tables -> rc 0
+table inet filter

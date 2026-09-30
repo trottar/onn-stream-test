@@ -1,18 +1,127 @@
 # Active investigations
 
-## PHASE C — `C3.L3a` Part 2 — ACTIVE (2026-09-23)
+## PHASE C — `C3.L4` live — CLOSED 2026-09-30 (validated under real loss; live behind its flag)
 
-Phase C resumed when `D-BASE` closed (baseline met,
-`../evidence/D_BASE_CLOSEOUT_2026-09-23.md`). The active item is `C3.L3a`
-Part 2 (below). **Probe fixed and the 2026-09-20 session re-scored
-(`C3-L3A-P2R1`, 2026-09-23)**: the re-score corrects the record and does not
-answer the gate. **Smoke session 2026-09-24 (`C3-L3A-P2R2`)**: settling and
-transition cost now measured on the adopted build; the ladder stands. **Next:
-the pre-registered rerun — the user's play session, awaiting the user.**
-Then `C3.L4`. Every change is measured
-against the close-out table. Open beside it, not
-blocking: the warm-state loss's cause between the ends (`host_link`),
-thermal threshold proposals (none enforced), max output gap.
+**2026-09-30: `C3.L4` is CLOSED.**
+
+- The user's `nft` night 3 was **WORKS UNDER LOSS (F1)**, with the
+  pre-registered shape: capacity at +15.5 s, the climb to 6000,
+  `capacity_mild` back at 121 s, HOLD `oscillation` at 5500
+  (`../evidence/C3_L4_NFT_NIGHT3_2026-09-30.md`).
+- Live is **validated under real loss on three nights**. The controller
+  as built is authorized (the decision's close).
+- **Live stays behind its flag, off by default**; turning it on by
+  default is the user's call.
+
+**Open, not blocking** (carried; none gates anything):
+
+- the max output gap;
+- `host_link`;
+- thermal threshold proposals (none enforced);
+- `CTRL-L1` (PATH);
+- the client's recent slow-event ring (fills in ~12 min in attract mode;
+  `CL-B1` grows it);
+- the controller log's chatty `state` lines (~117 per 30-min hold beside
+  the sample rows);
+- **the ROUTINE reversal hold-down length** (~120 s bounds the mild step
+  after an increase), a rule change only if the user asks;
+- the adopted 720p's loss row on the evenings of 2026-09-29/30 (below).
+
+The history of the item follows.
+
+**`C3.L3a` is CLOSED (2026-09-28).** Four pre-registered sessions pooled
+(the bar reached); the user's gate reading: **`C3.L4` AUTHORIZED, single
+transition per event; live build pending**
+(`../decisions/C3-L4_LIVE_AUTHORIZATION_2026-09-28.md`; session 4 and the
+pooled table: `../evidence/C3_L3A_R4_SESSION4_2026-09-28.md`). Ramps are
+excluded from live adaptation.
+
+**The live build is DONE** (`C3-L4-L1`,
+`../evidence/C3_L4_L1_LIVE_CONTROLLER_2026-09-28.md`):
+
+- On a clean link it was **SILENT** for 30 minutes.
+- On an injected FALLBACK the decrease is **proven**: one transition
+  7000 → 5000, a 171 ms gap, the blackout, and the hold-down refusing a
+  second trigger.
+- **The increase path never fired.** The pre-registered 90
+  *consecutive* clean reports are not reachable in attract mode (the
+  clean counter peaked at 21 and 32; the client's 2 s fps wanders
+  57-62). Options (a) to (c) are in the record, and **the choice is the
+  user's**.
+
+**2026-09-29 (`C3-L4-L2`):** the user chose the blend. "Clean" means no
+ROUTINE-level sample, and the stream steps up when ≥ 85 of the last 90
+are clean (`../evidence/C3_L4_L2_INCREASE_RULE_2026-09-29.md`).
+
+- **Session B2** climbed 5000 → 7000, one rung per event, and held 7000.
+- It scored **PARTIAL (W4)** only on the close-out loss row: two bursts at
+  7000, not at the transitions.
+- The `nft` harness `tools/c3_l4_nft_night.py` is ready and dry-run
+  tested.
+
+**2026-09-29 (`C3-L4-N1`): the user's first `nft` night.** Under a
+capacity cap the controller never stepped down.
+
+- The client drops frames rather than queueing them (queue ≥ 1 on 3 of
+  357 reports), so the queue/gap triggers met their bar only inside
+  freezes, which recovery owned.
+- Recovery restarted at 7000 nine times in F1.
+- F2, the interlock and the kill switch held.
+- Record: `../evidence/C3_L4_NFT_NIGHT1_2026-09-29.md`.
+
+**The user approved two live rules**: the capacity trigger, and the
+recovery-escalation backstop.
+
+- **Built** (`../evidence/C3_L4_N1_CAPACITY_TRIGGER_2026-09-29.md`).
+- **Replayed**: night 1's caps fire capacity 14-20 s in, and no
+  clean-link series fires either rule.
+- **A 30-min live hold was SILENT.**
+
+**2026-09-29 (`C3-L4-N2`): the user's night 2 is WORKS UNDER LOSS
+(F1, F3)** (`../evidence/C3_L4_NFT_NIGHT2_2026-09-29.md`).
+
+- Capacity acted at +14 s.
+- Recovery's restart held 5000 on real loss.
+- 6000 under the cap sat degraded for 4 min, under every bar.
+
+**The user's `capacity_mild`** (ROUTINE one rung down on fps < 57 on ≥
+4/5 and lost ≥ 50 on ≥ 3/5) is **built**
+(`../evidence/C3_L4_N2_MILD_CAPACITY_2026-09-29.md`).
+
+- The stop rule PASS.
+- A 30-min live hold: 0 transitions; the close-out loss row missed on
+  link bursts.
+
+**The open item (closed 2026-09-30)**: the user's `nft` night 3, WORKS UNDER LOSS.
+
+**C5 follow-ups (2026-09-29/30).**
+
+- **`C5-M2`** (three 1080p arms): INCONCLUSIVE (link) twice; the
+  confirmation night NOT RUN.
+- **`C5-M3`** (low rungs for Phase G): 720p/4000 passes transport; 3000
+  and 540p/3500 do not.
+- **Open, for the user.** The adopted 720p missed its own post-FEC loss
+  row on three consecutive evenings:
+  - N2's live hold: 34.0/min;
+  - C5-M2's B holds: 12.7-47.2/min;
+  - C5-M3's first night: 15.5-25.6/min.
+
+  It met the row in 5 of 16 B holds (B4 of C5-M2 night 1, B1 of C5-M3
+  night 1, and 3 of 4 in C5-M3's re-run). The radio figures (signal,
+  MCS) are unchanged, and the Opal's retries do not predict the loss
+  across nights. **Whether the baseline has shifted is worth the user's
+  look before any further arm is judged on this link.**
+
+**C5 (2026-09-28, `C5-M1`): 1080p60 NOT CAPABLE (stream) at parity** —
+client and host capable; the wireless hop's per-frame burst loss at 2.25×
+the frame size misses spikes and post-FEC loss on all three candidate holds
+(`../decisions/C5_1080P60_CAPABILITY_2026-09-28.md`). Not an open
+investigation: any further 1080p arm is the user's call.
+
+Earlier (2026-09-23): Phase C resumed when `D-BASE` closed (baseline met,
+`../evidence/D_BASE_CLOSEOUT_2026-09-23.md`); `C3.L3a` Part 2's probe was
+fixed and the 2026-09-20 session re-scored (`C3-L3A-P2R1`); the smoke
+session (`C3-L3A-P2R2`, 2026-09-24) measured settling and transition cost.
 
 ## BASELINE STREAM HEALTH — CLOSED 2026-09-23 (MET)
 
@@ -60,8 +169,8 @@ finished. What remains is a judgment nobody has made.
 | `C3.L2b` decoder-report cycle retention | COMPLETE / RUNTIME VALIDATED |
 | `C3.L2c` low-latency decode | **FALSIFIED / ROLLED BACK** |
 | `C3.L3` fixed-bitrate port and characterization | COMPLETE / RUNTIME VALIDATED |
-| `C3.L3a` gameplay acceptance probe | Part 2 ran 2026-09-20; probe fixed, re-scored, rerun pre-registered (2026-09-23); **rerun sessions 1-3 of ≥ 4 recorded** (2026-09-24; session 2 on the decoder axis from its journal-rebuilt report, R2B; session 3 stored under the raised cap, R3) |
-| `C3.L4` automatic controller | **BLOCKED for live use**; gate is `C3.L3a`. **Shadow built and SILENT** (`C3-L4-S1`, 2026-09-24: flag default off, 21/21 tests, 4 healthy holds, 0 would-acts) |
+| `C3.L3a` gameplay acceptance probe | **CLOSED 2026-09-28**: four pre-registered sessions pooled (2026-09-24 ×3, 2026-09-28), the bar reached; W 5.0 jump 6/20 (6 vs 3.21), ramp 15/20 (29 vs 8.52), decoys 4/40 and 13/40 at or below chance; the user's reading recorded (`C3-L3A-R4`) |
+| `C3.L4` automatic controller | **CLOSED 2026-09-30: VALIDATED UNDER REAL LOSS on three `nft` nights; live behind its flag, off by default; adoption the user's call** (`C3_L4_NFT_NIGHT3_2026-09-30.md`). History: **AUTHORIZED, single transition per event** (2026-09-28, `decisions/C3-L4_LIVE_AUTHORIZATION_2026-09-28.md`; ramps excluded). **Live BUILT** (`C3-L4-L1`, 2026-09-28: flag `live`, default off; 43+21 tests; parity 0 actions; Session A SILENT; Session B PARTIAL (B6) — decrease proven on injection, increase rule unreachable in attract mode; **`C3-L4-L2` 2026-09-29: the user's blend built, B2 climbed 5000→7000 (PARTIAL (W4): close-out loss row, bursts not at transitions); `nft` harness ready**; **`C3-L4-N1` 2026-09-29: `nft` night 1 NOT "WORKS UNDER LOSS" (no decrease under a cap: F1a) → the user's capacity trigger + recovery-escalation backstop built, replays PASS the stop rule, 30-min live hold SILENT**; **`C3-L4-N2` 2026-09-29: night 2 WORKS UNDER LOSS; the user's `capacity_mild` built, replays PASS, 30-min hold 0 transitions (loss row missed on link bursts)**; the user's `nft` night 3 next). **Shadow built and SILENT** (`C3-L4-S1`, 2026-09-24: flag default off, 21/21 tests, 4 healthy holds, 0 would-acts) |
 
 Linux is `video_only_restart`: authorized for start-time profile selection,
 manual and loopback-only diagnostic changes, fallback and recovery, and `C3.L3`
@@ -98,7 +207,11 @@ Two distinct unanswered questions:
    picture at 5000 or 5500 kbps. A fast-down controller whose destination is
    visually poor fails even with invisible transitions.
 
-## C3.L3a — gameplay acceptance probe. PART 1 RUNTIME VALIDATED / PART 2 PROBE FIXED, RERUN PRE-REGISTERED.
+## C3.L3a — gameplay acceptance probe. PART 1 RUNTIME VALIDATED / PART 2 CLOSED 2026-09-28 (the user's reading: C3.L4 AUTHORIZED, single transition per event).
+
+**Closed 2026-09-28** by `C3-L3A-R4` (`../evidence/C3_L3A_R4_SESSION4_2026-09-28.md`)
+and the decision `../decisions/C3-L4_LIVE_AUTHORIZATION_2026-09-28.md`. The
+history below is kept as written.
 
 The `C3.L4` gate, made performable. Diagnostic-only. **It authorizes nothing**
 and adds no controller logic. Full design in
@@ -339,7 +452,12 @@ Outcome disposition: marks not aligned with cycle times and the picture judged
 acceptable → the gate is met and `C3.L4` may be proposed. Marks aligned →
 `C3.L4` is answered in the negative and closed cheaply. Either is a result.
 
-## CL-B1 — the decoder report as a POST body (2026-09-25)
+## CL-B1 — the decoder report as a POST body (2026-09-25) — ADOPTED in the APK 2026-09-30
+
+**2026-09-30: the next adopted APK `de072762…835e` carries it**, adopted
+by its pre-registered rule (`../evidence/CL_B1_APK_ADOPTION_2026-09-30.md`).
+Open, optional: the recent slow-event ring fills in ~12 min (full at the
+end of a 20-min hold).
 
 Record `../evidence/CL_B1_DECODER_REPORT_BODY_2026-09-25.md`.
 - The companion accepts a body (new) and the target form (unchanged). The
@@ -425,6 +543,10 @@ Record `../evidence/C3_L4_S1_SHADOW_CONTROLLER_2026-09-24.md`; patch
   a session's first report reads 0 fps.
 - Live still needs the user's `C3.L3a` reading and a fault-injection night
   (the user's `nft`). **`C3.L4` stays BLOCKED for live use.**
+- **2026-09-28: the reading is given** — `C3.L4` AUTHORIZED, single
+  transition per event, ramps excluded; live build pending; the
+  fault-injection night still precedes any live run
+  (`../decisions/C3-L4_LIVE_AUTHORIZATION_2026-09-28.md`).
 
 ## Controller transport loss — CTRL-L1 located: PATH (2026-09-24)
 

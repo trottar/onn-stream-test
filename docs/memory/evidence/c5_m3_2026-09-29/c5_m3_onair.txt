@@ -1,0 +1,15 @@
+C5-M3 -- measured on-air video rate per hold (client-received RTP video bytes + FEC parity bytes, over the report's duration; UDP/IP headers of ~40 B per packet added as a separate column)
+runs       B1: video 7.09 + parity 1.21 = 8.30 Mbit/s; + headers 0.31 -> 8.60 Mbit/s on the wire; 953 packets/s
+runs       L4: video 4.06 + parity 0.77 = 4.83 Mbit/s; + headers 0.19 -> 5.02 Mbit/s on the wire; 590 packets/s
+runs       B2: video 7.09 + parity 1.21 = 8.30 Mbit/s; + headers 0.30 -> 8.60 Mbit/s on the wire; 953 packets/s
+runs       L3: video 3.04 + parity 0.65 = 3.69 Mbit/s; + headers 0.15 -> 3.84 Mbit/s on the wire; 473 packets/s
+runs       B3: video 7.09 + parity 1.21 = 8.30 Mbit/s; + headers 0.30 -> 8.60 Mbit/s on the wire; 953 packets/s
+runs       S5: video 3.55 + parity 0.70 = 4.25 Mbit/s; + headers 0.17 -> 4.42 Mbit/s on the wire; 532 packets/s
+runs       B4: video 7.09 + parity 1.21 = 8.29 Mbit/s; + headers 0.31 -> 8.60 Mbit/s on the wire; 953 packets/s
+runs_rerun B1: video 7.09 + parity 1.21 = 8.30 Mbit/s; + headers 0.31 -> 8.60 Mbit/s on the wire; 954 packets/s
+runs_rerun L4: video 4.06 + parity 0.77 = 4.83 Mbit/s; + headers 0.19 -> 5.02 Mbit/s on the wire; 590 packets/s
+runs_rerun B2: video 7.09 + parity 1.21 = 8.30 Mbit/s; + headers 0.31 -> 8.60 Mbit/s on the wire; 954 packets/s
+runs_rerun L3: video 3.05 + parity 0.65 = 3.69 Mbit/s; + headers 0.15 -> 3.85 Mbit/s on the wire; 473 packets/s
+runs_rerun B3: video 7.09 + parity 1.21 = 8.29 Mbit/s; + headers 0.30 -> 8.60 Mbit/s on the wire; 953 packets/s
+runs_rerun S5: video 3.55 + parity 0.70 = 4.25 Mbit/s; + headers 0.17 -> 4.42 Mbit/s on the wire; 531 packets/s
+runs_rerun B4: video 7.09 + parity 1.21 = 8.30 Mbit/s; + headers 0.31 -> 8.60 Mbit/s on the wire; 954 packets/s

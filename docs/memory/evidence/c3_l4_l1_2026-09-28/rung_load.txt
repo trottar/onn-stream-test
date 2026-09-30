@@ -1,0 +1,5 @@
+C3-L4-L1: host-side video load per rung, Session B's frame series (privyhub_native_frame_sizes_v1, 1 row/s)
+payload = encoder output bytes/s; packets = RTP data packets/s. Wire adds per packet IP+UDP+RTP headers (40 B)
+and the 8+1 FEC parity packets (C4-D1: parity ~16 % of packets on the adopted build).
+7000 kbps: 114 s; payload mean 877 kB/s (p95 954), packets 820/s; estimated wire 1083 kB/s = 8.66 Mbit/s
+5000 kbps: 951 s; payload mean 627 kB/s (p95 735), packets 609/s; estimated wire 775 kB/s = 6.20 Mbit/s

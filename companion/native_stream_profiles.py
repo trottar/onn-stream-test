@@ -161,3 +161,138 @@ NATIVE_GAME_720P60_REFERENCE = NativeStreamProfile(
     audio_redundancy_copies=2,
     audio_redundancy_offset_packets=4,
 )
+
+
+# C5-M1 (2026-09-28): 1080p60 as a CAPABILITY CANDIDATE, never the default.
+# Selectable only through PRIVYHUB_NATIVE_PROFILE_ID for comparison holds;
+# nothing is adopted. Bitrate at bits-per-pixel parity with the adopted
+# profile (7000 kbps at 1280x720x60 -> 15,750 at 1920x1080x60); the frame cap
+# is the adopted 90,000 scaled by the bitrate ratio, rounded to 10 KB (above
+# the IDR sizes measured offline at this bitrate). The audio cushion and
+# redundancy are the adopted values, unchanged. Design, numbers and the
+# pre-registered holds: evidence/C5_M1_1080P60_PROFILE_2026-09-28.md.
+NATIVE_GAME_1080P60_CANDIDATE = NativeStreamProfile(
+    id="native_game_1080p60_candidate",
+    width=1920,
+    height=1080,
+    fps=60,
+    bitrate_kbps=15750,
+    max_bitrate_kbps=15750,
+    gop_frames=15,
+    bframes=0,
+    fec_group_size=8,
+    max_frame_size_bytes=200_000,
+    audio_queue_target_packets=12,
+    audio_queue_capacity_packets=17,
+    audio_redundancy_copies=2,
+    audio_redundancy_offset_packets=4,
+)
+
+# C5-M2 (2026-09-29): the three 1080p60 follow-up arms C5-M1 named, as
+# CAPABILITY CANDIDATES, never the default; selectable only through
+# PRIVYHUB_NATIVE_PROFILE_ID for comparison holds. Each is 1920x1080 @ 60,
+# GOP 15 (the recovery contract: an IDR every 250 ms), no B-frames, FEC 8, the
+# adopted audio cushion and redundancy; only the bitrate and the frame cap
+# differ. c1 bounds the per-frame burst exactly as on 720p (the adopted 90 KB,
+# <= ~75 packets) at parity bitrate; c2 is the bitrate lever alone (80 %, the
+# cap scaled by C5-M1's ratio); c3 is both levers.
+# Record: evidence/C5_M2_1080P60_FOLLOWUP_2026-09-29.md.
+def _c5_1080p60(profile_id: str, bitrate_kbps: int, cap_bytes: int) -> NativeStreamProfile:
+    return NativeStreamProfile(
+        id=profile_id,
+        width=1920,
+        height=1080,
+        fps=60,
+        bitrate_kbps=bitrate_kbps,
+        max_bitrate_kbps=bitrate_kbps,
+        gop_frames=15,
+        bframes=0,
+        fec_group_size=8,
+        max_frame_size_bytes=cap_bytes,
+        audio_queue_target_packets=12,
+        audio_queue_capacity_packets=17,
+        audio_redundancy_copies=2,
+        audio_redundancy_offset_packets=4,
+    )
+
+
+NATIVE_GAME_1080P60_C1_PARITY_CAP90 = _c5_1080p60("native_game_1080p60_c1_parity_cap90", 15750, 90_000)
+NATIVE_GAME_1080P60_C2_80PCT_CAP160 = _c5_1080p60("native_game_1080p60_c2_80pct_cap160", 12600, 160_000)
+NATIVE_GAME_1080P60_C3_80PCT_CAP90 = _c5_1080p60("native_game_1080p60_c3_80pct_cap90", 12600, 90_000)
+
+# C5-M3 (2026-09-29): three LOW rungs screened for Phase G's remote transport,
+# never the default and never on the live ladder (5000-7000); selectable only
+# through PRIVYHUB_NATIVE_PROFILE_ID. GOP 15, bframes 0, FEC 8, the adopted
+# cushion and redundancy, and the adopted 90,000-byte cap in every arm, so the
+# bitrate or the size is the only lever. The client needs no change: its
+# decoder is configured with 1280x720 as a hint and the stream's own SPS sets
+# the decoded size; the full-screen SurfaceView is scaled by the compositor.
+# Record: evidence/C5_M3_LOW_RUNG_SCREENING_2026-09-29.md.
+def _c5_low_rung(profile_id: str, width: int, height: int, bitrate_kbps: int) -> NativeStreamProfile:
+    return NativeStreamProfile(
+        id=profile_id,
+        width=width,
+        height=height,
+        fps=60,
+        bitrate_kbps=bitrate_kbps,
+        max_bitrate_kbps=bitrate_kbps,
+        gop_frames=15,
+        bframes=0,
+        fec_group_size=8,
+        max_frame_size_bytes=90_000,
+        audio_queue_target_packets=12,
+        audio_queue_capacity_packets=17,
+        audio_redundancy_copies=2,
+        audio_redundancy_offset_packets=4,
+    )
+
+
+NATIVE_GAME_720P60_4000 = _c5_low_rung("native_game_720p60_4000", 1280, 720, 4000)
+NATIVE_GAME_720P60_3000 = _c5_low_rung("native_game_720p60_3000", 1280, 720, 3000)
+NATIVE_GAME_540P60_3500 = _c5_low_rung("native_game_540p60_3500", 960, 540, 3500)
+
+# C5-M1: the profile selector. Unset or empty -> the adopted reference
+# profile, exactly as before the selector existed. A known id -> that
+# profile, and the companion reports it as an override. An unknown id ->
+# the adopted profile, flagged `profile_id_ignored` (never a guess).
+PROFILE_ID_ENV = "PRIVYHUB_NATIVE_PROFILE_ID"
+NATIVE_STREAM_PROFILES: dict[str, NativeStreamProfile] = {
+    profile.id: profile
+    for profile in (
+        NATIVE_GAME_720P60_REFERENCE,
+        NATIVE_GAME_1080P60_CANDIDATE,
+        NATIVE_GAME_1080P60_C1_PARITY_CAP90,
+        NATIVE_GAME_1080P60_C2_80PCT_CAP160,
+        NATIVE_GAME_1080P60_C3_80PCT_CAP90,
+        NATIVE_GAME_720P60_4000,
+        NATIVE_GAME_720P60_3000,
+        NATIVE_GAME_540P60_3500,
+    )
+}
+
+
+def select_native_profile(
+    environ: Any,
+) -> tuple[NativeStreamProfile, dict[str, Any]]:
+    """The profile a stream uses, and how it was chosen."""
+
+    requested = str(environ.get(PROFILE_ID_ENV, "") or "").strip()
+
+    if not requested:
+        return NATIVE_GAME_720P60_REFERENCE, {
+            "env": PROFILE_ID_ENV,
+            "requested": None,
+            "source": "default",
+            "profile_id": NATIVE_GAME_720P60_REFERENCE.id,
+            "profile_id_ignored": False,
+        }
+
+    profile = NATIVE_STREAM_PROFILES.get(requested)
+
+    return (profile or NATIVE_GAME_720P60_REFERENCE), {
+        "env": PROFILE_ID_ENV,
+        "requested": requested,
+        "source": PROFILE_ID_ENV if profile is not None else "default",
+        "profile_id": (profile or NATIVE_GAME_720P60_REFERENCE).id,
+        "profile_id_ignored": profile is None,
+    }

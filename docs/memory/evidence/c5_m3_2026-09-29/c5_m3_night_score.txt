@@ -1,0 +1,21 @@
+C5 scoring (screen) -- runs
+hold profile                                  min  spk/m    fps stale vloss/m maxgap aund/m |   Mbps qmax codec    cap    frmax p50/p90/max caphit/m ge80/m   CPU   GPU   enc  onnC hostC
+B1   native_game_720p60_reference           20.21   23.9  59.93  0.64    7.32    148   0.59 |   7.09    4   122  90000  47505/ 86311/ 89498     9.55   0.00   9.9  10.1  26.7  60.0  52.5
+L4   native_game_720p60_4000                20.13   37.1  59.94  0.70    7.00    165   0.20 |   4.06    4   123  90000  32543/ 85114/ 89536     5.41   0.00  10.7  10.7  30.5  60.0  54.1
+B2   native_game_720p60_reference           20.21   24.3  59.90  0.69   15.49    180   0.74 |   7.09    4   120  90000  48574/ 86311/ 89942     9.80   0.00   9.7  10.5  26.5  60.3  54.7
+L3   native_game_720p60_3000                20.12   36.8  59.92  0.89   11.08    167   0.10 |   3.04    4    91  90000  25180/ 83244/ 88884     3.28   0.00   9.2  10.0  26.2  59.2  53.7
+B3   native_game_720p60_reference           20.26   26.5  59.93  0.39   25.61    306   1.33 |   7.09    4    80  90000  47710/ 86311/ 89498     9.62   0.00   9.5   8.6  25.6  60.0  54.0
+S5   native_game_540p60_3500                20.21    9.0  59.92  0.94    5.44     98   0.64 |   3.55    4    99  90000  27919/ 85324/ 89001     5.94   0.00  10.5  10.3  26.6  59.8  53.6
+B4   native_game_720p60_reference           20.13   29.2  59.89  0.94   17.63    471   0.70 |   7.09    4   175  90000  48413/ 86311/ 90027     9.83   0.00  10.5   9.9  26.4  61.7  54.3
+
+  B1: MEETS EVERY TARGET (any_override False, 1280 wide, bitrate 7000)
+  L4: MEETS EVERY TARGET (any_override True, 1280 wide, bitrate 4000)
+  B2: MISSES video loss / min post-FEC 15.49 vs < 10 (any_override False, 1280 wide, bitrate 7000)
+  L3: MISSES video loss / min post-FEC 11.08 vs < 10 (any_override True, 1280 wide, bitrate 3000)
+  B3: MISSES video loss / min post-FEC 25.61 vs < 10; max output gap ms 306 vs <= 250 (any_override False, 1280 wide, bitrate 7000)
+  S5: MEETS EVERY TARGET (any_override True, 960 wide, bitrate 3500)
+  B4: MISSES video loss / min post-FEC 17.63 vs < 10; max output gap ms 471 vs <= 250 (any_override False, 1280 wide, bitrate 7000)
+
+baseline holds ['B1', 'B2', 'B3', 'B4']: missed ['B2', 'B3', 'B4']; arms ['L4', 'L3', 'S5']; not run / no report none
+
+SCREENING OUTCOME: INCONCLUSIVE (link): B2 video loss / min post-FEC 15.49 vs < 10, B3 video loss / min post-FEC 25.61 vs < 10; max output gap ms 306 vs <= 250, B4 video loss / min post-FEC 17.63 vs < 10; max output gap ms 471 vs <= 250

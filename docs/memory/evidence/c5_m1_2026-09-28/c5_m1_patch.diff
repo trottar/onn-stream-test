@@ -1,0 +1,148 @@
+diff --git a/companion/native_stream.py b/companion/native_stream.py
+index c25a787..12373a8 100644
+--- a/companion/native_stream.py
++++ b/companion/native_stream.py
+@@ -43,6 +43,7 @@ AUDIO_REDUNDANCY_OFFSET_ENV = "PRIVYHUB_AUDIO_REDUNDANCY_OFFSET_PACKETS"
+ from games import host_resource_sampling
+ from native_host_telemetry import NativeHostTelemetryProfiler
+ from native_stream_profiles import NATIVE_GAME_720P60_REFERENCE
++from native_stream_profiles import PROFILE_ID_ENV, select_native_profile
+ from native_stream_profiles import AUDIO_PACKET_MS, AUDIO_QUEUE_MAX_PACKETS, AUDIO_REDUNDANCY_MAX_OFFSET
+ 
+ 
+@@ -79,6 +80,7 @@ class NativeStreamManager:
+     INPUT_PORT = 48102
+ 
+     def __init__(self, project_root: Path) -> None:
++        self._apply_profile_selection()
+         self.project_root = project_root.resolve()
+         self.data_dir = self.project_root / "data" / "games" / "native_stream"
+         self.log_dir = self.project_root / "logs" / "games"
+@@ -110,6 +112,27 @@ class NativeStreamManager:
+             self.project_root
+         )
+ 
++    def _apply_profile_selection(self) -> None:
++        """C5-M1: choose the stream profile once, at companion start.
++
++        `PRIVYHUB_NATIVE_PROFILE_ID` unset -> the class's adopted profile and
++        the same values the class constants already hold, so the argv is
++        byte-for-byte what it was. Set to a known id -> that profile's
++        values shadow the class constants on this instance.
++        """
++
++        profile, selection = select_native_profile(os.environ)
++        self._profile_selection = selection
++        self.PROFILE = profile
++        self.WIDTH = profile.width
++        self.HEIGHT = profile.height
++        self.FPS = profile.fps
++        self.GOP_FRAMES = profile.gop_frames
++        self.BITRATE_KBPS = profile.bitrate_kbps
++        self.MAX_BITRATE_KBPS = profile.max_bitrate_kbps
++        self.BFRAMES = profile.bframes
++        self.FEC_GROUP_SIZE = profile.fec_group_size
++
+     @staticmethod
+     def _env_int(name: str) -> int:
+         """A positive integer from the environment, or 0 for 'not set'.
+@@ -212,10 +235,15 @@ class NativeStreamManager:
+             # variable is set (the relay reads it; see native_fec_relay).
+             "fec_scheme_env": FEC_SCHEME_ENV,
+             "fec_scheme_override": (os.environ.get(FEC_SCHEME_ENV) or "").strip() or None,
++            # C5-M1: the profile selector is an override while it is set,
++            # even to an id it ignores.
++            "profile_id_env": PROFILE_ID_ENV,
++            "profile_id_override": (os.environ.get(PROFILE_ID_ENV) or "").strip() or None,
+             "any_override": bool(
+                 mfs_override is not None
+                 or bufsize_k
+                 or (os.environ.get(FEC_SCHEME_ENV) or "").strip()
++                or (os.environ.get(PROFILE_ID_ENV) or "").strip()
+             ),
+         }
+ 
+@@ -585,6 +613,9 @@ class NativeStreamManager:
+                 "alpha_version": self.ALPHA_VERSION,
+                 "profile_id": self.PROFILE.id,
+                 "profile": self.PROFILE.to_dict(),
++                "profile_selection": dict(
++                    getattr(self, "_profile_selection", None) or {}
++                ),
+                 "title": "Native Streaming Alpha",
+                 "ready": ready,
+                 "active": active,
+diff --git a/companion/native_stream_profiles.py b/companion/native_stream_profiles.py
+index 34d7403..11540ef 100644
+--- a/companion/native_stream_profiles.py
++++ b/companion/native_stream_profiles.py
+@@ -161,3 +161,69 @@ NATIVE_GAME_720P60_REFERENCE = NativeStreamProfile(
+     audio_redundancy_copies=2,
+     audio_redundancy_offset_packets=4,
+ )
++
++
++# C5-M1 (2026-09-28): 1080p60 as a CAPABILITY CANDIDATE, never the default.
++# Selectable only through PRIVYHUB_NATIVE_PROFILE_ID for comparison holds;
++# nothing is adopted. Bitrate at bits-per-pixel parity with the adopted
++# profile (7000 kbps at 1280x720x60 -> 15,750 at 1920x1080x60); the frame cap
++# is the adopted 90,000 scaled by the bitrate ratio, rounded to 10 KB (above
++# the IDR sizes measured offline at this bitrate). The audio cushion and
++# redundancy are the adopted values, unchanged. Design, numbers and the
++# pre-registered holds: evidence/C5_M1_1080P60_PROFILE_2026-09-28.md.
++NATIVE_GAME_1080P60_CANDIDATE = NativeStreamProfile(
++    id="native_game_1080p60_candidate",
++    width=1920,
++    height=1080,
++    fps=60,
++    bitrate_kbps=15750,
++    max_bitrate_kbps=15750,
++    gop_frames=15,
++    bframes=0,
++    fec_group_size=8,
++    max_frame_size_bytes=200_000,
++    audio_queue_target_packets=12,
++    audio_queue_capacity_packets=17,
++    audio_redundancy_copies=2,
++    audio_redundancy_offset_packets=4,
++)
++
++# C5-M1: the profile selector. Unset or empty -> the adopted reference
++# profile, exactly as before the selector existed. A known id -> that
++# profile, and the companion reports it as an override. An unknown id ->
++# the adopted profile, flagged `profile_id_ignored` (never a guess).
++PROFILE_ID_ENV = "PRIVYHUB_NATIVE_PROFILE_ID"
++NATIVE_STREAM_PROFILES: dict[str, NativeStreamProfile] = {
++    profile.id: profile
++    for profile in (
++        NATIVE_GAME_720P60_REFERENCE,
++        NATIVE_GAME_1080P60_CANDIDATE,
++    )
++}
++
++
++def select_native_profile(
++    environ: Any,
++) -> tuple[NativeStreamProfile, dict[str, Any]]:
++    """The profile a stream uses, and how it was chosen."""
++
++    requested = str(environ.get(PROFILE_ID_ENV, "") or "").strip()
++
++    if not requested:
++        return NATIVE_GAME_720P60_REFERENCE, {
++            "env": PROFILE_ID_ENV,
++            "requested": None,
++            "source": "default",
++            "profile_id": NATIVE_GAME_720P60_REFERENCE.id,
++            "profile_id_ignored": False,
++        }
++
++    profile = NATIVE_STREAM_PROFILES.get(requested)
++
++    return (profile or NATIVE_GAME_720P60_REFERENCE), {
++        "env": PROFILE_ID_ENV,
++        "requested": requested,
++        "source": PROFILE_ID_ENV if profile is not None else "default",
++        "profile_id": (profile or NATIVE_GAME_720P60_REFERENCE).id,
++        "profile_id_ignored": profile is None,
++    }

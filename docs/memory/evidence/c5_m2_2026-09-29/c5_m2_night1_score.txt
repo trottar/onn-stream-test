@@ -1,0 +1,21 @@
+C5 scoring (screen) -- runs_n1
+hold profile                                  min  spk/m    fps stale vloss/m maxgap aund/m |   Mbps qmax codec    cap    frmax p50/p90/max caphit/m ge80/m   CPU   GPU   enc  onnC hostC
+B1   native_game_720p60_reference           20.26   35.0  59.87  0.99   21.57    314   0.79 |   7.09    4   268  90000  47892/ 86311/ 89499     9.62   0.00  10.8  10.0  26.5  69.2  54.9
+C1   native_game_1080p60_c1_parity_cap90    20.19  677.3  59.58  0.89  220.87   1752   2.58 |  15.92    4    96  90000  85794/ 89304/ 90010    48.98   0.00   9.0   9.3  36.7  72.1  56.9
+B2   native_game_720p60_reference           20.20   36.3  59.88  0.79   15.99    154   1.14 |   7.09    4   125  90000  47831/ 86311/ 89498    10.05   0.00   9.5  10.1  26.6  70.1  57.4
+C2   native_game_1080p60_c2_80pct_cap160    20.14  654.1  59.70  4.12  119.35    472   0.60 |  12.74    4   143 160000  93651/153909/158694    18.42 107.49  10.4   8.7  36.4  71.2  58.8
+B3   native_game_720p60_reference           20.12   30.0  59.92  0.65   12.72    180   0.35 |   7.09    4    96  90000  47655/ 86311/ 90027     9.74   0.00   9.9  10.0  27.8  70.5  57.4
+C3   native_game_1080p60_c3_80pct_cap90     20.24  313.4  59.92  1.28   35.03    190   0.20 |  12.75    4   128  90000  72961/ 87100/ 89922    12.65   0.00  11.0   9.1  35.1  71.3  59.0
+B4   native_game_720p60_reference           20.22   22.1  59.98  0.15    1.04     86   0.40 |   7.09    4    87  90000  47832/ 86311/ 89498    10.14   0.00   9.6   8.8  25.3  70.1  57.1
+
+  B1: MISSES video loss / min post-FEC 21.57 vs < 10; max output gap ms 314 vs <= 250 (any_override False, 1280 wide, bitrate 7000)
+  C1: MISSES spikes >= 20 ms / min 677.32 vs < 200; video loss / min post-FEC 220.87 vs < 10; max output gap ms 1752 vs <= 250 (any_override True, 1920 wide, bitrate 15750)
+  B2: MISSES video loss / min post-FEC 15.99 vs < 10 (any_override False, 1280 wide, bitrate 7000)
+  C2: MISSES spikes >= 20 ms / min 654.1 vs < 200; video loss / min post-FEC 119.35 vs < 10; max output gap ms 472 vs <= 250 (any_override True, 1920 wide, bitrate 12600)
+  B3: MISSES video loss / min post-FEC 12.72 vs < 10 (any_override False, 1280 wide, bitrate 7000)
+  C3: MISSES spikes >= 20 ms / min 313.42 vs < 200; video loss / min post-FEC 35.03 vs < 10 (any_override True, 1920 wide, bitrate 12600)
+  B4: MEETS EVERY TARGET (any_override False, 1280 wide, bitrate 7000)
+
+baseline holds ['B1', 'B2', 'B3', 'B4']: missed ['B1', 'B2', 'B3']; arms ['C1', 'C2', 'C3']; not run / no report none
+
+SCREENING OUTCOME: INCONCLUSIVE (link): B1 video loss / min post-FEC 21.57 vs < 10; max output gap ms 314 vs <= 250, B2 video loss / min post-FEC 15.99 vs < 10, B3 video loss / min post-FEC 12.72 vs < 10

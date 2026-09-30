@@ -1,0 +1,23 @@
+# flag-off smoke 2026-09-28T21:55:19Z: companion restarted through its unit, no PRIVYHUB_* anywhere
+native-stream-status.adaptive_bitrate:
+{"schema": "privyhub_adaptive_bitrate_v1", "mode": "off", "acted": false}
+bitrate 7000 any_override False profile native_game_720p60_reference
+POST .../adaptive-bitrate/disable:
+{
+  "ok": true,
+  "already_disabled": true,
+  "effective_mode": "off",
+  "note": "the controller is not in live mode"
+} HTTP 200
+POST .../adaptive-bitrate/inject?class=FALLBACK:
+{
+  "ok": false,
+  "error": "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live is not set"
+} HTTP 403
+POST .../adaptive-bitrate/enable:
+{
+  "ok": false,
+  "error": "unknown adaptive-bitrate route (disable, inject)"
+} HTTP 404
+GET .../adaptive-bitrate/disable:
+HTTP 404

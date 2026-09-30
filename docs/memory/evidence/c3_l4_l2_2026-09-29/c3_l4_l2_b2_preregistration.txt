@@ -1,0 +1,19 @@
+C3-L4-L2 -- Session B2 pre-registration, written 2026-09-29 before B2 ran
+(copied from handoffs/C3-L4-L2_INCREASE_RULE_AND_NFT_HARNESS_TASK.md section 3; not tightened or loosened after data)
+
+Gate: the live suite (54, the blend's tests included) and the unchanged shadow suite pass; parity re-run
+(zero actions); the loss replays re-run (c3_l4_l2_replays.txt); flag-off smoke. MET before B2.
+
+Setup: PRIVYHUB_ADAPTIVE_BITRATE_MODE=live + PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 (test-only); adopted profile and
+APK; attract mode, zero input, clean link; T2 sampler on. After 120 s of PLAYING one injected FALLBACK; 30 s later a
+second. Then no input, up to 25 minutes (1,500 s) after the first injection, then BACK. any_override at PLAYING recorded.
+
+WIRED if all of:
+ W1 one ssrc_change from the first injection, to 5000; its output gap reported against 186.5 ms; blackout 3; the
+    second injection refused `hold_down` (no transition, no ssrc_change);
+ W2 the stream then climbs 5000 -> 5500 -> 6000 -> 7000, one rung per event (INCREASE rows), each increase >= 93
+    reports after the previous SSRC change, each recorded with its time, window count, clean count and gap;
+ W3 at 7000, no further transition for the rest of the hold;
+ W4 ssrc_changes over the session = 4; the decoder report stored; lifecycle clean (session_started / session_ended
+    only in the recovery log); the close-out rows met (reported).
+PARTIAL naming what did not hold (e.g. the climb stopped at a rung -- then the per-report sample rows say why).

@@ -75,7 +75,9 @@ from diagnostics.client_feedback import (
     ClientHealthStore,
 )
 
-from adaptive_bitrate import get_shadow as adaptive_bitrate_shadow
+from adaptive_bitrate_live import get_controller as adaptive_bitrate_controller
+from adaptive_bitrate_live import handle_route as adaptive_bitrate_route
+from adaptive_bitrate_live import is_live as adaptive_bitrate_is_live
 from games.decoder_report_http import (
     access_log_path,
     body_length as decoder_report_body_length,
@@ -2193,12 +2195,27 @@ class PrivyHubRequestHandler(
                         # C3-L4-S1: the shadow controller reads the snapshot
                         # just built and writes down what it would do. It
                         # never acts; with the flag off it returns at once.
-                        adaptive_bitrate_shadow(PROJECT_ROOT).observe(
-                            telemetry,
-                            stream_bitrate_kbps=native_status.get(
-                                "bitrate_kbps"
-                            ),
+                        # C3-L4-L1: in live mode the same call decides with
+                        # the stream status as its guard inputs; a transition
+                        # runs on the controller's own worker, never here.
+                        abr_controller = adaptive_bitrate_controller(
+                            PROJECT_ROOT
                         )
+                        if adaptive_bitrate_is_live(abr_controller):
+                            abr_controller.observe(
+                                telemetry,
+                                stream_bitrate_kbps=native_status.get(
+                                    "bitrate_kbps"
+                                ),
+                                native_status=native_status,
+                            )
+                        else:
+                            abr_controller.observe(
+                                telemetry,
+                                stream_bitrate_kbps=native_status.get(
+                                    "bitrate_kbps"
+                                ),
+                            )
                     except Exception:
                         # Telemetry must never disturb client health/gameplay.
                         pass
@@ -2223,6 +2240,28 @@ class PrivyHubRequestHandler(
                 for part in request_path.split("/")
                 if part
             ]
+
+            # C3-L4-L1: POST /plugins/games/adaptive-bitrate/disable (any
+            # caller, idempotent, switches live to shadow for the session) and
+            # .../inject?class=FALLBACK|ROUTINE (test-only: loopback, the
+            # inject flag and live mode, else 403). No enable route.
+            if (
+                len(parts) == 4
+                and parts[0] == "plugins"
+                and parts[1] == "games"
+                and parts[2] == "adaptive-bitrate"
+            ):
+                code, payload = adaptive_bitrate_route(
+                    PROJECT_ROOT,
+                    parts[3],
+                    parsed.query,
+                    self.client_address[0],
+                )
+                self._send_json(
+                    code,
+                    payload,
+                )
+                return
 
             if (
                 len(parts) == 3

@@ -107,3 +107,17 @@ Record: `../evidence/C4_M1_FEC_ARM_2026-09-25.md`.
 - **Adoption is the user's call, and on this evidence there is nothing to
   adopt.** The profile stays 8+1 and the override is unset.
 - A lossier or warm night is the one measurement that could change it.
+
+## The user's call, 2026-09-28 — agreed, no adoption; C4 closed for Phase C
+
+Recorded by `C3-L3A-R4` (`../handoffs/C3-L3A-R4_GATE_RECORD_TASK.md`).
+The user agreed with the recommendation on `C4-M1`'s NOT SHOWN:
+
+- **no adoption**; the profile's FEC stays **`xor8_1` 8+1**;
+- the **8+2 arm (`xor8_2`) remains in the tree** behind
+  `PRIVYHUB_FEC_SCHEME`, **dormant** (unset everywhere; the adopted APK
+  does not carry its v2 decoder);
+- **C4 is closed for Phase C on this decision**: adaptive FEC is not
+  supported by the corpus (`C4-D1`) and the static k+2 arm did not show a
+  post-FEC gain (`C4-M1`). A lossier or warm night remains the one
+  measurement that could reopen it.

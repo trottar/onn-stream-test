@@ -1,0 +1,21 @@
+{"at_utc": "2026-09-29T19:06:00.658Z", "session": "setup", "event": "verify", "what": "before the night", "expect": "absent", "ok": true, "rc": 0}
+{"at_utc": "2026-09-29T19:06:00.658Z", "session": "setup", "event": "enter", "prompt": "the pre-registration above is the one for tonight"}
+{"at_utc": "2026-09-29T19:06:00.658Z", "session": "setup", "event": "preflight_ok", "apk": "f31b1c18...8ae7"}
+{"at_utc": "2026-09-29T19:06:03.858Z", "session": "setup", "event": "live_on", "flags": ["PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"]}
+{"at_utc": "2026-09-29T19:06:45.259Z", "session": "F1", "event": "playing", "any_override": false}
+{"at_utc": "2026-09-29T19:07:45.347Z", "session": "F1", "event": "verify", "what": "calibration counter", "expect": ["counter_rule"], "got": ["udp dport 48100 counter packets 19 bytes 23739"], "ok": true}
+{"at_utc": "2026-09-29T19:07:45.347Z", "session": "F1", "event": "fault_on", "what": "calibration counter", "steps": [["nft", "add", "table", "inet", "privyhub_fault"], ["nft", "add", "chain", "inet", "privyhub_fault", "flt", "{ type filter hook output priority 0; }"], ["nft", "add", "rule", "inet", "privyhub_fault", "flt", "udp", "dport", "48100", "counter"]]}
+{"at_utc": "2026-09-29T19:07:55.391Z", "session": "F1", "event": "calibrated", "rate_7000_bytes_per_s": 1082975.3372455651, "used": 1082975.3372455651, "source": "counter", "cap_kbytes_per_s": 869}
+{"at_utc": "2026-09-29T19:07:55.391Z", "session": "F1", "event": "expect", "text": "within ~60 s (nights 1-2: ~14 s) ONE decrease: FALLBACK (capacity) 7000->5000; >= 93 reports later INCREASE 5000->5500 (fits the cap); >= 93 later INCREASE 5500->6000 (over the cap); then capacity_mild 6000->5500 once the 120 s reversal hold-down has passed; then, instead of a third direction change inside 10 min, HOLD (oscillation) at 5500. Or 'climbed to <rung> and stayed'. rate_limited never true; never two transitions closer than the hold-downs; no ramp; at most one recovery cycle under the cap."}
+{"at_utc": "2026-09-29T19:07:55.457Z", "session": "F1", "event": "verify", "what": "F1 cap", "expect": ["cap_rule"], "got": ["udp dport 48100 limit rate over 869 kbytes/second burst 64 kbytes counter packets 0 bytes 428 drop"], "ok": true}
+{"at_utc": "2026-09-29T19:07:55.457Z", "session": "F1", "event": "fault_on", "what": "F1 cap", "steps": [["nft", "flush", "chain", "inet", "privyhub_fault", "flt"], ["nft", "add", "rule", "inet", "privyhub_fault", "flt", "udp", "dport", "48100", "limit", "rate", "over", "869", "kbytes/second", "burst", "64", "kbytes", "counter", "drop"]]}
+{"at_utc": "2026-09-29T19:08:55.508Z", "session": "F1", "event": "did", "label": "F1 cap on", "since": "2026-09-29T19:07:55.391Z", "transitions": [], "holds": 0, "refused": {}, "decisions_by_trigger": {}, "escalation_armed": 0, "rate_limited_ever": false, "level": 7000, "state": "REFERENCE", "mode": "live", "recovery_events": []}
+{"at_utc": "2026-09-29T19:08:55.508Z", "session": "F1", "event": "expect", "text": "after the cap is removed: at 5000 for the rest of the session if HOLD was reached; otherwise one rung per ~186 s back towards 7000."}
+{"at_utc": "2026-09-29T19:08:55.554Z", "session": "F1", "event": "verify", "what": "F1 cap", "expect": "absent", "ok": true, "rc": 0}
+{"at_utc": "2026-09-29T19:08:55.554Z", "session": "F1", "event": "fault_off", "what": "F1 cap"}
+{"at_utc": "2026-09-29T19:09:55.603Z", "session": "F1", "event": "did", "label": "F1 cap off", "since": "2026-09-29T19:08:55.508Z", "transitions": [], "holds": 0, "refused": {}, "decisions_by_trigger": {}, "escalation_armed": 0, "rate_limited_ever": false, "level": 7000, "state": "REFERENCE", "mode": "live", "recovery_events": []}
+{"at_utc": "2026-09-29T19:09:55.603Z", "session": "F1", "event": "expect", "text": "BACK -> session_ended_reset: the controller back at 7000, transitions 0."}
+{"at_utc": "2026-09-29T19:10:00.105Z", "session": "F1", "event": "back", "report": true, "level_after": 7000, "mode_after": "live"}
+{"at_utc": "2026-09-29T19:10:20.864Z", "session": "F1", "event": "verify", "what": "at the end", "expect": "absent", "ok": true, "rc": 0}
+{"at_utc": "2026-09-29T19:10:20.864Z", "session": "F1", "event": "fault_cleared_final", "ok": true, "why": "normal end"}
+{"at_utc": "2026-09-29T19:10:36.662Z", "session": "teardown", "event": "teardown", "clean": true}

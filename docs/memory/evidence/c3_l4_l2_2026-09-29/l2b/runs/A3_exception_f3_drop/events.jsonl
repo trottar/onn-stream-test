@@ -1,0 +1,15 @@
+{"at_utc": "2026-09-29T14:49:40.441Z", "session": "setup", "event": "verify", "what": "before the night", "expect": "absent", "ok": true, "rc": 0}
+{"at_utc": "2026-09-29T14:49:40.442Z", "session": "setup", "event": "enter", "prompt": "the pre-registration above is the one for tonight"}
+{"at_utc": "2026-09-29T14:49:40.442Z", "session": "setup", "event": "preflight_ok", "apk": "f31b1c18...8ae7"}
+{"at_utc": "2026-09-29T14:49:43.632Z", "session": "setup", "event": "live_on", "flags": ["PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"]}
+{"at_utc": "2026-09-29T14:50:21.828Z", "session": "F3", "event": "playing", "any_override": false}
+{"at_utc": "2026-09-29T14:51:21.829Z", "session": "F3", "event": "expect", "text": "the cap brings the stream to 5000 (one decrease)."}
+{"at_utc": "2026-09-29T14:51:21.915Z", "session": "F3", "event": "verify", "what": "F3 cap", "expect": ["cap_rule"], "got": ["udp dport 48100 limit rate over 869 kbytes/second burst 64 kbytes counter packets 0 bytes 415 drop"], "ok": true}
+{"at_utc": "2026-09-29T14:51:21.915Z", "session": "F3", "event": "fault_on", "what": "F3 cap", "steps": [["nft", "add", "table", "inet", "privyhub_fault"], ["nft", "add", "chain", "inet", "privyhub_fault", "flt", "{ type filter hook output priority 0; }"], ["nft", "add", "rule", "inet", "privyhub_fault", "flt", "udp", "dport", "48100", "limit", "rate", "over", "869", "kbytes/second", "burst", "64", "kbytes", "counter", "drop"]]}
+{"at_utc": "2026-09-29T14:52:21.939Z", "session": "F3", "event": "did", "label": "F3 cap", "since": "2026-09-29T14:51:21.829Z", "transitions": [], "holds": 0, "refused": {}, "rate_limited_ever": false, "level": 7000, "state": "REFERENCE", "mode": "live", "recovery_events": []}
+{"at_utc": "2026-09-29T14:52:21.939Z", "session": "F3", "event": "expect", "text": "recovery owns the drop: desync_pause, encoder_restart AT 5000 (C3-F1, level-preserving), resumed. The controller does NOTHING while recovery is not PLAYING (a refused/guard recovery_playing row, or no rows because reports stop); then ssrc_change (recovery_restart) and a 3-report blackout; the level still 5000 (no level_sync)."}
+{"at_utc": "2026-09-29T14:52:22.005Z", "session": "F3", "event": "verify", "what": "F3 full drop", "expect": ["drop_rule"], "got": ["udp dport { 48100, 48101 } counter packets 0 bytes 433 drop"], "ok": true}
+{"at_utc": "2026-09-29T14:52:22.005Z", "session": "F3", "event": "fault_on", "what": "F3 full drop", "steps": [["nft", "flush", "chain", "inet", "privyhub_fault", "flt"], ["nft", "add", "rule", "inet", "privyhub_fault", "flt", "udp", "dport", "{ 48100, 48101 }", "counter", "drop"]]}
+{"at_utc": "2026-09-29T14:52:23.051Z", "session": "F3", "event": "verify", "what": "at the end", "expect": "absent", "ok": true, "rc": 0}
+{"at_utc": "2026-09-29T14:52:23.051Z", "session": "F3", "event": "fault_cleared_final", "ok": true, "why": "error"}
+{"at_utc": "2026-09-29T14:52:38.032Z", "session": "teardown", "event": "teardown", "clean": true}

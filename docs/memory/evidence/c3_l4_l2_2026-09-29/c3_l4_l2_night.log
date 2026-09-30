@@ -1,0 +1,31 @@
+[night 03:28:37Z] flags set in the manager: PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_MODE=live 
+[night 03:28:37Z] sampler started (10 s)
+[night 03:28:37Z] last session_ended 2026-09-28T22:48:21.305Z
+[night 03:28:37Z] B2 begins (25 min after the first injection)
+[B2 03:28:37Z] mode=B hold/timeout=1500s probe_args=none heartbeat_ms=default
+[B2 03:28:41Z] companion MainPID 755688 serving 8765; PRIVYHUB_* other than the allowed flags in its environ: 0; flags: PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_MODE=live 
+[B2 03:28:41Z] adaptive_bitrate mode/configured/inject_enabled: live live True
+[B2] before launch: any_override False cap 90000 profile cushion 12 17 profile redundancy 2 4 profile -> ADOPTED
+[B2] at PLAYING: any_override False cap 90000 profile cushion 12 17 profile redundancy 2 4 profile -> ADOPTED
+[B2 03:29:21Z] PLAYING at 2026-09-29T03:29:21Z; first injection 120 s after PLAYING, zero input
+[B2 03:31:21Z] injection 1 at 03:31:21Z: HTTP 200; [('transition', 'decrease_fallback', 7000, 5000)]
+[B2 03:31:51Z] injection 2 at 03:31:51Z: HTTP 200; [('refused', 'hold_down', 5000, 5000)]
+[B2 03:31:51Z] level / transitions / window reports/clean: 5000 1 12/9
+[B2 03:35:17Z] level / transitions / window reports/clean: 5500 2 0/0
+[B2 03:39:18Z] level / transitions / window reports/clean: 6000 3 0/0
+[B2 03:42:24Z] level / transitions / window reports/clean: 7000 4 0/0
+[B2 03:56:23Z] hold over (1500 s after the first injection): 7000 4 90/86
+[B2 03:56:23Z] bitrate before BACK: 7000
+[B2 03:56:24Z] adb client processes seen during hold: 47 (# polls 3134)
+[B2 03:56:27Z] report: native_decoder_20260929_035626_616.json
+[frames] 1623 seconds in the session window
+[heartbeat] 808 lines
+[B2 03:56:49Z] decision log lines in the session: 876
+[B2 03:56:51Z] game active after stop: False
+[B2 03:56:51Z] done
+[night 03:56:51Z] B2 harness exit 0
+[night 03:57:25Z] flags unset: manager PRIVYHUB_* 0; MainPID 776945; 8765 776945; PRIVYHUB_* in its environ 0; ADAPTIVE_BITRATE_* in its environ 0
+[night] adaptive_bitrate {'schema': 'privyhub_adaptive_bitrate_v1', 'mode': 'off', 'acted': False} | bitrate 7000 profile native_game_720p60_reference cap 90000 profile cushion 12 17 profile redundancy 2 4 profile any_override False active False
+[night 03:57:25Z] inject route after teardown: HTTP 403
+[night 03:57:35Z] teardown: game active False; NOW PLAYING on the launcher: 0
+[night 03:57:35Z] night done

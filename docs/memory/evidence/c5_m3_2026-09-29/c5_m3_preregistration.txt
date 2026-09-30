@@ -1,0 +1,34 @@
+C5-M3 -- pre-registration (the task's rules, written down before the night; not changed after data)
+Written 2026-09-29 by Code from handoffs/C5-M3_LOW_RUNG_SCREENING_TASK.md.
+
+Profiles (companion/native_stream_profiles.py; selectable only through PRIVYHUB_NATIVE_PROFILE_ID; never the
+default; GOP 15, bframes 0, FEC 8, cushion 12/17, redundancy 2/4, cap 90,000 B in every arm):
+  L4 native_game_720p60_4000   1280x720, 4000 kbps
+  L3 native_game_720p60_3000   1280x720, 3000 kbps
+  S5 native_game_540p60_3500    960x540, 3500 kbps
+Nothing joins the live ladder (5000-7000), the controller, the actuator's validated list or the adopted
+profile. Golden: selector unset -> the argv byte-identical before and after.
+
+1. Offline objective quality (not a gate): a 60 s lossless reference of the attract-mode window (the same
+x11grab source and scale/pad, 1280x720, 4:2:0, libx264 -qp 0), encoded through the same h264_vaapi argv at
+7000, 6000, 5500, 5000, 4000, 3000 (720p) and 3500 (540p, scaled back to 1280x720 with a bilinear scaler
+before comparison); per arm mean SSIM, p5 SSIM, mean PSNR, the IDR pulse (mean |SSIM(IDR) - SSIM(frame
+before)| over every GOP boundary), the 4 Hz share of the SSIM series' variance (the 4 Hz periodogram bin
+and the GOP-phase fold), IDR size p50/p90/max and cap hits. Reported as the anchor for the user's later
+picture check (the user rated 5000-6000 at 7-9).
+
+2. The night -- seven 20-minute attract-mode holds B1 L4 B2 L3 B3 S5 B4, adopted between every arm, companion
+restarted through its unit before each with the selector set or unset, T2 on, any_override at PLAYING, the
+first hold >= 40 min after the last session_ended, one thing on the host at a time; the adaptive flag and
+PRIVYHUB_FEC_SCHEME unset.
+  An arm PASSES TRANSPORT if its hold meets: spikes >= 20 ms < 200/min, post-FEC video loss < 10/min, max
+  output gap <= 250 ms, rendered fps >= 59.5, stale drops < 20/min.
+  Reported, not gated: on-air Mbit/s (measured: the client's received video bytes incl. parity), frames of
+  >= 80 packets per minute, cap hits per minute, the per-second largest frame p50/p90/max (IDR proxy),
+  decoder queue and codec_ms, host CPU / GPU load, thermal.
+  If two or more B holds miss the baseline (the same five rows), the night is INCONCLUSIVE (link) and is
+  re-run once before anything else is decided.
+
+3. Teardown: selector unset and confirmed absent in the manager and the companion's environ, companion under
+systemd, profile adopted, adopted APK hash confirmed, stream at 7000, game inactive, banner cleared, samplers
+stopped.

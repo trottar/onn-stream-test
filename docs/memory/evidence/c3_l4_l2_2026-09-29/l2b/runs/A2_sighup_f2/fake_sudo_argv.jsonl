@@ -1,0 +1,8 @@
+{"t": 1790693251.7887526, "argv": ["-v"]}
+{"t": 1790693252.091982, "argv": ["-n", "nft", "list", "tables"]}
+{"t": 1790693353.8708963, "argv": ["-n", "nft", "add", "table", "inet", "privyhub_fault"]}
+{"t": 1790693353.8973892, "argv": ["-n", "nft", "add", "chain", "inet", "privyhub_fault", "flt", "{ type filter hook output priority 0; }"]}
+{"t": 1790693353.9185, "argv": ["-n", "nft", "add", "rule", "inet", "privyhub_fault", "flt", "udp", "dport", "48100", "numgen", "random", "mod", "1000", "<", "20", "counter", "drop"]}
+{"t": 1790693353.9412, "argv": ["-n", "nft", "list", "table", "inet", "privyhub_fault"]}
+{"t": 1790693364.1062233, "argv": ["-n", "nft", "delete", "table", "inet", "privyhub_fault"]}
+{"t": 1790693364.1279213, "argv": ["-n", "nft", "list", "tables"]}

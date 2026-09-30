@@ -1,0 +1,124 @@
+{
+ "classification": "PARTIAL (W4)",
+ "transitions": [
+  {
+   "at_utc": "2026-09-29T03:31:21.941Z",
+   "elapsed_ms": 125964,
+   "class": "FALLBACK",
+   "from": 7000,
+   "to": 5000,
+   "injected": true,
+   "window_reports": null,
+   "clean_reports": null,
+   "reports_since_prev_change": null,
+   "result": "transition_done",
+   "actuation_ms": 1375.8,
+   "cycle": {
+    "first_rtp_resume_ms": 620.218,
+    "ffmpeg_spawn_ms": 467.574,
+    "rtp_silence_after_spawn_ms": 152.644,
+    "host_verified_ms": 1373.13
+   },
+   "ssrc_elapsed_ms": 128443,
+   "gap_ms": 175
+  },
+  {
+   "at_utc": "2026-09-29T03:35:15.359Z",
+   "elapsed_ms": 361215,
+   "class": "INCREASE",
+   "from": 5000,
+   "to": 5500,
+   "injected": false,
+   "window_reports": 90,
+   "clean_reports": 85,
+   "reports_since_prev_change": 117,
+   "result": "transition_done",
+   "actuation_ms": 1222.9,
+   "cycle": {
+    "first_rtp_resume_ms": 469.136,
+    "ffmpeg_spawn_ms": 316.021,
+    "rtp_silence_after_spawn_ms": 153.115,
+    "host_verified_ms": 1221.6
+   },
+   "ssrc_elapsed_ms": 361704,
+   "gap_ms": 221
+  },
+  {
+   "at_utc": "2026-09-29T03:39:16.429Z",
+   "elapsed_ms": 602294,
+   "class": "INCREASE",
+   "from": 5500,
+   "to": 6000,
+   "injected": false,
+   "window_reports": 90,
+   "clean_reports": 85,
+   "reports_since_prev_change": 120,
+   "result": "transition_done",
+   "actuation_ms": 1373.4,
+   "cycle": {
+    "first_rtp_resume_ms": 618.513,
+    "ffmpeg_spawn_ms": 465.515,
+    "rtp_silence_after_spawn_ms": 152.998,
+    "host_verified_ms": 1371.486
+   },
+   "ssrc_elapsed_ms": 602920,
+   "gap_ms": 178
+  },
+  {
+   "at_utc": "2026-09-29T03:42:23.269Z",
+   "elapsed_ms": 789130,
+   "class": "INCREASE",
+   "from": 6000,
+   "to": 7000,
+   "injected": false,
+   "window_reports": 90,
+   "clean_reports": 86,
+   "reports_since_prev_change": 93,
+   "result": "transition_done",
+   "actuation_ms": 1273.9,
+   "cycle": {
+    "first_rtp_resume_ms": 519.082,
+    "ffmpeg_spawn_ms": 366.348,
+    "rtp_silence_after_spawn_ms": 152.734,
+    "host_verified_ms": 1272.578
+   },
+   "ssrc_elapsed_ms": 789662,
+   "gap_ms": 211
+  }
+ ],
+ "ssrc_changes": [
+  128443,
+  361704,
+  602920,
+  789662
+ ],
+ "missed": [
+  "W4"
+ ],
+ "any_override_at_playing": false,
+ "closeout_fails": [
+  "video_lost_per_min_post_fec"
+ ],
+ "sample_dispositions": {
+  "evaluated": 800,
+  "blackout": 12
+ },
+ "clean_share_by_level": {
+  "7000": [
+   480,
+   456
+  ],
+  "5000": [
+   113,
+   103
+  ],
+  "5500": [
+   117,
+   110
+  ],
+  "6000": [
+   90,
+   86
+  ]
+ }
+}

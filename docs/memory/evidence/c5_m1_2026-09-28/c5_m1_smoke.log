@@ -1,0 +1,30 @@
+[SB 17:17:34Z] mode=H hold/timeout=180s probe_args=none heartbeat_ms=default
+[SB 17:17:34Z] PROFILE_ARM B; PRIVYHUB_* in the user manager: ''
+[SB 17:17:39Z] companion MainPID 632558 serving 8765; PRIVYHUB_* in its environ: ''
+[SB] before launch: PROFILE_ARM B profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive off -> AS EXPECTED FOR THE ARM
+[SB] at PLAYING: PROFILE_ARM B profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive off -> AS EXPECTED FOR THE ARM
+[SB 17:18:18Z] SurfaceFlinger stream-surface lines: 11
+[SB 17:18:18Z] PLAYING at 2026-09-28T17:18:18Z; holding 180s, zero input
+[SB 17:21:23Z] adb client processes seen during hold: 0 (# polls 349)
+[SB 17:21:25Z] report: native_decoder_20260928_172125_024.json
+[frames] 181 seconds in the session window
+[heartbeat] 90 lines
+[SB 17:21:50Z] game active after stop: False
+[SB 17:21:50Z] done
+SB exit 0
+[SA 17:21:50Z] mode=H hold/timeout=180s probe_args=none heartbeat_ms=default
+[SA 17:21:50Z] PROFILE_ARM A; PRIVYHUB_* in the user manager: 'PRIVYHUB_NATIVE_PROFILE_ID=native_game_1080p60_candidate'
+[SA 17:21:54Z] companion MainPID 634711 serving 8765; PRIVYHUB_* in its environ: 'PRIVYHUB_NATIVE_PROFILE_ID=native_game_1080p60_candidate'
+[SA] before launch: PROFILE_ARM A profile ('native_game_1080p60_candidate', 1920, 1080, 15750, 200000) bitrate_kbps 15750 selection PRIVYHUB_NATIVE_PROFILE_ID native_game_1080p60_candidate any_override True fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive off -> AS EXPECTED FOR THE ARM
+[SA] at PLAYING: PROFILE_ARM A profile ('native_game_1080p60_candidate', 1920, 1080, 15750, 200000) bitrate_kbps 15750 selection PRIVYHUB_NATIVE_PROFILE_ID native_game_1080p60_candidate any_override True fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive off -> AS EXPECTED FOR THE ARM
+[SA 17:22:38Z] SurfaceFlinger stream-surface lines: 11
+[SA 17:22:38Z] PLAYING at 2026-09-28T17:22:38Z; holding 180s, zero input
+[SA 17:25:43Z] adb client processes seen during hold: 0 (# polls 348)
+[SA 17:25:45Z] report: native_decoder_20260928_172545_095.json
+[frames] 181 seconds in the session window
+[heartbeat] 90 lines
+[SA 17:26:08Z] game active after stop: False
+[SA 17:26:08Z] done
+SA exit 0
+smoke done
+[smoke] selector unset; manager PRIVYHUB_* 0; companion environ PRIVYHUB_* 0

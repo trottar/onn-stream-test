@@ -68,7 +68,8 @@ companion reports `active: false` and does not reclaim it. End the game
 first, or clean up afterwards (`tools/recover_orphan_game_session.py`, or
 kill the AppImage directly when the session holds nothing worth keeping).
 
-Android build and install. **The wrapper is in `PrivyHub/`, not the
+Android build and install (the adopted APK since 2026-09-30:
+`de072762…835e`, `runtime/cl_b1_apk/cl_b1_app-debug.apk`). **The wrapper is in `PrivyHub/`, not the
 repository root** — running it from the root fails with
 `sh: 0: cannot open ./gradlew: No such file` (cost `D-BASE-R5` a build):
 
@@ -912,9 +913,67 @@ systemctl --user unset-environment PRIVYHUB_FEC_SCHEME && systemctl --user resta
   plus the golden check that the unset relay's bytes are unchanged), and
   `cd PrivyHub && sh ./gradlew :app:testDebugUnitTest --tests
   'com.safeiot.privyhub.streaming.FecRs82Test'`.
-- **The adopted APK** `f31b1c18…8ae7` is kept at
+- **The previous adopted APK** `f31b1c18…8ae7` is kept at
   `runtime/c4_m1/adopted_app-debug.apk`, and the arm APK at
   `runtime/c4_m1/arm_app-debug.apk`.
+- **The adopted APK since 2026-09-30 is `de072762…835e`** (CL-B1; the
+  C4-M1 v2 decoder inside, inert while the scheme is unset). It is kept at
+  `runtime/cl_b1_apk/cl_b1_app-debug.apk`
+  (`decisions/CL-B1_APK_ADOPTION_2026-09-30.md`, with the rollback).
+  - `tools/c3_l4_nft_night.py`'s preflight checks it.
+  - **The C5 night scripts in `evidence/c5_m2_2026-09-29/` and
+    `c5_m3_2026-09-29/` still carry `ADOPTED_SHA` / `ADOPTED_APK` for
+    `f31b1c18…`**, and their teardown reinstalls it on a mismatch. Point
+    them at the new APK before any reuse.
+
+## The native profile selector (C5-M1, C5-M2, C5-M3) — never leave it set
+
+`PRIVYHUB_NATIVE_PROFILE_ID`, read once at companion start
+(`companion/native_stream_profiles.py` `select_native_profile`).
+
+- **Unset or empty**: the adopted `native_game_720p60_reference`; the
+  encoder argv is byte-for-byte as before the selector (golden test).
+- **`native_game_1080p60_candidate`**: 1920x1080, 15,750 kbps, cap
+  200,000 B, everything else as adopted. `encoder_overrides.any_override`
+  reads true; `native-stream-status` shows `profile_id`, `width`, `height`,
+  `bitrate_kbps` and `profile_selection`.
+- **Any other value**: the adopted profile, flagged `profile_id_ignored`,
+  and still `any_override` true (a variable is set).
+- Under the candidate, the C3 ladder routes and recovery's encoder-restart
+  refuse (their 7000 guard); a full stream start works.
+
+```bash
+systemctl --user set-environment PRIVYHUB_NATIVE_PROFILE_ID=native_game_1080p60_candidate && systemctl --user restart privyhub-companion
+systemctl --user unset-environment PRIVYHUB_NATIVE_PROFILE_ID && systemctl --user restart privyhub-companion
+```
+
+- **C5-M2 (2026-09-29): three more 1080p60 ids.** Each is 1920x1080,
+  GOP 15, B 0, FEC 8, the adopted cushion and redundancy; never the
+  default.
+  - `native_game_1080p60_c1_parity_cap90`: 15,750 kbps, cap 90,000;
+  - `native_game_1080p60_c2_80pct_cap160`: 12,600 kbps, cap 160,000;
+  - `native_game_1080p60_c3_80pct_cap90`: 12,600 kbps, cap 90,000.
+- **C5-M3 (2026-09-30): three low rungs**, never the default, never on
+  the live ladder, cap 90,000 each:
+  - `native_game_720p60_4000`;
+  - `native_game_720p60_3000`;
+  - `native_game_540p60_3500` (960x540).
+
+  Offline quality (lossless reference, SSIM / PSNR / IDR pulse):
+  `evidence/c5_m3_2026-09-29/c5_m3_quality.py capture|encode|score`. The
+  game is launched without a stream and unpaused through RetroArch's
+  command port (`ra_cmd.py <port> PAUSE_TOGGLE`); the port is in
+  `data/games/retroarch/config/privyhub-session.cfg`.
+- **The C5 hold harness takes any id**:
+  - `evidence/c5_m2_2026-09-29/c5_m2_night.sh <name>:<id> ...`, where an
+    empty id means the adopted profile;
+  - `c5_m2_run.sh`, one hold, with `ARM_PROFILE=<id>`;
+  - `c5_m2_score.py screen|confirm <runs dir>`;
+  - the teardown unsets the selector on every exit path.
+
+Tests: `python3 -m unittest tools/test_c5_m1_profile_selector.py -v`.
+Records: `evidence/C5_M1_1080P60_PROFILE_2026-09-28.md`,
+`evidence/C5_M2_1080P60_FOLLOWUP_2026-09-29.md`.
 
 ## The decoder report route's two forms (CL-B1)
 
@@ -1006,6 +1065,195 @@ tr '\0' '\n' < /proc/$(systemctl --user show -p MainPID --value privyhub-compani
   (21 tests).
 - **Harness**: `evidence/c3_l4_s1_2026-09-24/c3_l4_s1_night.sh`. It unsets
   the flag on every exit path.
+
+## The live adaptive-bitrate controller (C3-L4-L1) — never leave `live` or `INJECT` set
+
+`companion/adaptive_bitrate_live.py`. `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live`
+makes the controller **act**: one encoder-only restart per event, through
+the same actuator as the loopback `c3-validated-bitrate-transition` route.
+Off (the default) and `shadow` behave exactly as above; they never build
+the live controller.
+
+- **Mapping**: FALLBACK → 5000, ROUTINE → 6000, an increase is one rung
+  after 90 clean reports.
+- **Timers**: the blackout is 3 reports after any SSRC change. The
+  hold-downs are 30 / 60 reports. The rate limit is 4 transitions per 10
+  min.
+- **It never acts unless** the stream is PLAYING, the game is active and
+  unpaused, recovery reads PLAYING, the reference profile is in force,
+  `any_override` is false and the session is at least 60 s old.
+- **Status**: `native-stream-status` → `adaptive_bitrate`. It carries
+  `mode` (`live`, or `shadow` once disabled), `configured_mode`, `state`
+  (`ACTUATING` during a restart), `level`, `last_action`,
+  `transitions_this_session`, `rate_limited`, and `policy` (everything
+  else).
+- **Log**: `logs/games/adaptive_bitrate_shadow.jsonl`, rows `mode: live`.
+  - `transition` (acted true) is followed by `transition_done`,
+    `transition_aborted` or `actuator_failed`.
+  - The other rows are `refused` (with its reason), `ssrc_change`,
+    `level_sync`, `session_ended_reset`, `disabled` and `inject`.
+- **Kill switches:**
+  - Unset the flag and restart the unit: off.
+  - At runtime, the controller can be put into shadow for the rest of the
+    session (idempotent, any caller). There is **no enable route**; the
+    next session is live again:
+    `curl -X POST localhost:8765/plugins/games/adaptive-bitrate/disable`.
+- **Test-only injection.**
+  - It needs `PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1` **and** live. Then
+    `curl -X POST 'localhost:8765/plugins/games/adaptive-bitrate/inject?class=FALLBACK'`
+    (or `ROUTINE`) feeds one synthetic degraded report through every gate.
+  - It answers 403 unless the caller is loopback, both flags are set and
+    the controller is not disabled.
+  - `inject_enabled` appears in the status only when the flag is set.
+- **Commands** (a live session only; the rule: unset both, restart, and
+  confirm the count is 0 before anything else runs):
+
+```bash
+systemctl --user set-environment PRIVYHUB_ADAPTIVE_BITRATE_MODE=live      # [+ PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 for an injection session]
+systemctl --user restart privyhub-companion
+# ... session ...
+systemctl --user unset-environment PRIVYHUB_ADAPTIVE_BITRATE_MODE PRIVYHUB_ADAPTIVE_BITRATE_INJECT
+systemctl --user restart privyhub-companion
+tr '\0' '\n' < /proc/$(systemctl --user show -p MainPID --value privyhub-companion)/environ | grep -c PRIVYHUB_ADAPTIVE   # must be 0
+```
+
+- **Tests**: `python3 -m unittest tools/test_adaptive_bitrate_live.py -v`
+  (102 tests since C3-L4-N2; 43 at L1, 54 at L2, 85 at N1). Replays: `python3 tools/c3_l4_l1_replay.py <out_dir>`
+  (shadow-night parity, and the loss would-fire lists).
+- **Harness**: `evidence/c3_l4_l1_2026-09-28/c3_l4_l1_night.sh` with
+  `c3_l4_l1_run.sh` (arms `H` for a plain live hold, `B` for the
+  injection script). It unsets both flags on every exit path.
+  `C3-L4-L2`'s B2 variant is `evidence/c3_l4_l2_2026-09-29/c3_l4_l2_night.sh`
+  (it holds the full 25 minutes after the first injection).
+- **`C3-L4-L2` changes:**
+  - **The increase rule is the user's blend.** A report is clean when fps
+    ≥ 57, queue ≤ 1 and gap ≤ 150. The window is the last 90 reports since
+    the last SSRC change and its blackout; the controller steps up one
+    rung when ≥ 85 of the 90 are clean. The constants are
+    `INCREASE_*`. Status: `adaptive_bitrate.policy.increase_window`.
+  - **Every client report now writes one `sample` row** to the log: fps,
+    queue, gap, fresh, clean, disposition, the window count and its clean
+    count, state, level, blackout, hold-downs. That is about 0.5 kB a row (527 B measured in B2),
+    ~0.95 MB an hour; the log rotates at 4 MiB × 3.
+
+- **`C3-L4-N1` changes (the user's decision of 2026-09-29, live only):**
+  - **Capacity trigger**: FALLBACK → 5000 when fps < 50 on all 5 of the
+    last 5 evaluated reports and `lost_packets_delta` ≥ 50 on ≥ 3 of
+    them. Rows carry `trigger: capacity`.
+  - **Recovery-escalation backstop**: two recovery encoder restarts at
+    one level within 180 s arm it (an `escalation_armed` row). Then one
+    FALLBACK decision comes once recovery is PLAYING and the blackout
+    has passed; at 5000 it is `at_floor`.
+  - **Status**: `policy.capacity_trigger` and
+    `policy.recovery_escalation`; `sample` rows gain `escalation_armed`.
+  - **Replays**: `python3 tools/c3_l4_n1_replay.py [out_dir]`. It runs
+    parity, every live sample row open-loop, every heartbeat series with
+    the loss proxy, and every recovery restart pair, and prints the stop
+    rule's verdict.
+
+- **`C3-L4-N2` change (the user's "Go", 2026-09-29, live only):**
+  **`capacity_mild`**.
+  - The rule: ROUTINE **one rung down** (7000 → 6000, 6000 → 5500,
+    5500 → 5000; `at_floor` at 5000) when fps < 57 on ≥ 4 of the last 5
+    evaluated reports and `lost_packets_delta` ≥ 50 on ≥ 3.
+  - Strict capacity keeps precedence. ROUTINE's hold-downs (60 / 60) and
+    L1's deferral apply.
+  - The status carries `policy.capacity_mild`. After a session ends, the
+    status `level` reads 7000 (the cached stream bitrate is cleared).
+  - Replays: `python3 tools/c3_l4_n2_replay.py [out_dir]` (N1's tool, with
+    the stop rule on `capacity_mild`).
+
+## The `nft` night harness (C3-L4-L2, one window since L2B) — the user starts it; it runs `sudo -n nft` from an allow-list
+
+`tools/c3_l4_nft_night.py` is the user's fault-injection night for the
+live controller. **One window**: the user starts it in tmux over SSH,
+types the sudo password once, presses Enter to accept the
+pre-registration, and waits. Nothing is pasted.
+
+- **It runs `sudo -n nft …` itself, and only when the user runs it.**
+  Code never runs it against real `sudo` (tests use a fake, below).
+  - Commands are argument lists (no shell), built only from the fixed
+    allow-list `NFT_ALLOW`: table `inet privyhub_fault`, its output-hook
+    chain `flt`, the counter rule, the cap rule (`<CAP>` an integer
+    200-2000 kbytes/s), the 2 % loss rule, the 15 s drop of 48100 +
+    48101, `list table`, `list tables`, `flush chain`, `delete table`.
+    Anything else raises `NftRefused` before it reaches sudo.
+  - `sudo -v` once at the start (foreground, the password); a keepalive
+    `sudo -n -v` every 240 s. If `-n` is refused, the harness removes the
+    fault if it can, asks for the password again (`sudo -v`), and puts
+    the fault back before continuing.
+  - Every call (argv, exit code, output) goes to
+    `<run dir>/nft_commands.jsonl`; every listing to `nft_tables.txt`.
+  - Each step is verified from `nft list table` (the table present with
+    exactly the expected rule) or `nft list tables` (absent). A mismatch
+    removes the fault and stops the night through the normal teardown.
+- **Every exit removes the fault**: normal end, Ctrl-C, SIGHUP, SIGTERM,
+  a stop, an exception → `delete table`, then `list tables` confirms it
+  is absent, then the teardown. The on-screen line is `To stop: press
+  Ctrl-C — the fault is removed automatically.`
+  - Outside tmux, a real SSH drop can leave sudo's per-terminal ticket
+    unusable, so the automatic removal may be refused. The harness then
+    prints the delete line for the user. That is why the night starts
+    inside `tmux new -s nft`, and the harness warns when `$TMUX` is
+    unset.
+- **The flow** (unchanged from L2):
+  - preflight: the companion under its unit, no game, no `PRIVYHUB_*`,
+    the adopted profile, the adopted APK hash, no `privyhub_fault`
+    table (a leftover one is removed), and the pre-registration printed
+    and hashed;
+  - `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live` (never `INJECT`), then the `T2`
+    sampler and a 5 s status poller;
+  - F1: the capacity cap, calibrated with a counter rule first, 12 min on
+    and 5 min off;
+  - F2: 2 % random loss, 10 min on and 5 min off;
+  - F3: the cap to 5000, then a 15 s full drop of 48100 and 48101, timed
+    and removed by the harness;
+  - K: the disable route, called twice during the cap;
+  - teardown: the fault table confirmed absent, the flag unset and
+    confirmed absent, and everything collected into
+    `logs/streaming/c3_l4_nft_night_<stamp>/`.
+- **Before and after each fault** it prints one EXPECT line and one DID
+  line; each command it runs is printed with its exit code.
+- Every child process except the foreground `sudo -v` gets
+  `stdin=/dev/null`, so `adb shell` cannot read the keyboard.
+- **Commands:**
+
+```bash
+python3 tools/c3_l4_nft_night.py --dry-run     # the whole flow, no fault, no sudo, ~20 min
+python3 tools/c3_l4_nft_night.py               # the night, ~75-90 min (asks for the sudo password)
+python3 tools/c3_l4_nft_night.py --sessions F3,K   # a subset
+# TEST ONLY (never real sudo): the real command path against the fake sudo, 60 s holds
+FAKE_SUDO_DIR=<dir> python3 tools/c3_l4_nft_night.py --fast --sudo-cmd tools/c3_l4_fake_sudo.py
+python3 -m unittest tools/test_c3_l4_nft_night.py -v   # the allow-list, the parser, the fake
+```
+
+- `tools/c3_l4_fake_sudo.py` (TEST ONLY) logs its argv and models the one
+  table in `$FAKE_SUDO_DIR`. A `deny` file there makes `-n` refuse (the
+  re-password path); a `mangle` file makes `list table` show no rule (the
+  mismatch path). `--fast` and `--sudo-cmd` must be given together.
+  `--test-fail-at F1_cap_on|F2_loss_on|F3_drop` (hidden) raises an
+  exception at that point.
+- **C3-L4-N1 (2026-09-29):**
+  - `--only F1,F3` takes any subset of F1, F2, F3, K and always runs it
+    in that order. An unknown, empty or repeated name is refused before
+    anything runs. `--sessions` still works as a hidden alias.
+  - The default pre-registration is night 2's,
+    `evidence/c3_l4_n1_2026-09-29/c3_l4_nft_night2_preregistration.txt`;
+    night 1's is `--prereg evidence/c3_l4_l2_2026-09-29/c3_l4_l2_nft_preregistration.txt`.
+  - The `did` summary records each decision's trigger and the backstop's
+    `escalation_armed` rows.
+  - Night 2 is `python3 tools/c3_l4_nft_night.py --only F1,F3` (~45 min).
+  - **C3-L4-N2:** the default pre-registration is night 3's,
+    `evidence/c3_l4_n2_2026-09-29/c3_l4_nft_night3_preregistration.txt`;
+    night 2's is `--prereg evidence/c3_l4_n1_2026-09-29/c3_l4_nft_night2_preregistration.txt`.
+    Night 3 is `python3 tools/c3_l4_nft_night.py --only F1` (~25 min).
+  - The fake-sudo tests of the subset are
+    `evidence/c3_l4_n1_2026-09-29/n1_fake_tests.sh` (FULL, ABORT), with
+    `n1_check.py`; run dirs go to `logs/streaming/c3_l4_n1_tests/`.
+- **The rule**: never leave `live` or `INJECT` set, and never leave a
+  `privyhub_fault` table. The harness unsets the flag and deletes the
+  table on every exit path, and records whether `nft list tables` shows
+  it absent.
 
 ## Linux subsystem probes
 

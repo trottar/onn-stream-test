@@ -1,0 +1,99 @@
+{
+ "dry_run": false,
+ "fast": true,
+ "sudo_cmd": "tools/c3_l4_fake_sudo.py",
+ "started_utc": "2026-09-29T17:26:45.233Z",
+ "sessions": {
+  "F1": {
+   "any_override_at_playing": false,
+   "cap_on": {
+    "label": "F1 cap on",
+    "since": "2026-09-29T17:28:38.262Z",
+    "transitions": [],
+    "holds": 0,
+    "refused": {},
+    "decisions_by_trigger": {},
+    "escalation_armed": 0,
+    "rate_limited_ever": false,
+    "level": 7000,
+    "state": "REFERENCE",
+    "mode": "live",
+    "recovery_events": []
+   },
+   "cap_off": {
+    "label": "F1 cap off",
+    "since": "2026-09-29T17:29:38.368Z",
+    "transitions": [],
+    "holds": 0,
+    "refused": {},
+    "decisions_by_trigger": {},
+    "escalation_armed": 0,
+    "rate_limited_ever": false,
+    "level": 7000,
+    "state": "REFERENCE",
+    "mode": "live",
+    "recovery_events": []
+   }
+  },
+  "F3": {
+   "any_override_at_playing": false,
+   "cap_to_5000": {
+    "label": "F3 cap",
+    "since": "2026-09-29T17:32:22.502Z",
+    "transitions": [],
+    "holds": 0,
+    "refused": {},
+    "decisions_by_trigger": {},
+    "escalation_armed": 0,
+    "rate_limited_ever": false,
+    "level": 7000,
+    "state": "REFERENCE",
+    "mode": "live",
+    "recovery_events": []
+   }
+  }
+ },
+ "preregistration_sha256": "3cdcfa2e5eb6a021eff258214fefd5ac54541bd0c7c10c56ff3697a382dfb25d",
+ "calibration": {
+  "rate_7000_bytes_per_s": 1082869.5667378241,
+  "used": 1082869.5667378241,
+  "source": "counter",
+  "cap_kbytes_per_s": 869
+ },
+ "error": "RuntimeError: test exception at F3_drop",
+ "no_fault_table_at_end": true,
+ "banner_count_at_end": 0,
+ "teardown_clean": true,
+ "flags_after": [],
+ "ended_utc": "2026-09-29T17:33:43.001Z",
+ "files": {
+  "harness.log": true,
+  "events.jsonl": true,
+  "abr_series.jsonl": true,
+  "t2_samples.jsonl": true,
+  "decision_log.jsonl": true,
+  "heartbeat.jsonl": true,
+  "frames.jsonl": true,
+  "recovery_log.jsonl": true,
+  "companion_journal_redacted.log": true,
+  "preregistration.txt": true,
+  "preregistration.sha256": true,
+  "armcheck_F1.json": true,
+  "status_end_F1.json": true,
+  "report_F1.json": true,
+  "armcheck_F3.json": true,
+  "status_end_F3.json": false,
+  "report_F3.json": false
+ },
+ "rows": {
+  "events.jsonl": 29,
+  "abr_series.jsonl": 78,
+  "t2_samples.jsonl": 40,
+  "decision_log.jsonl": 189,
+  "heartbeat.jsonl": 170,
+  "frames.jsonl": 334,
+  "recovery_log.jsonl": 4
+ },
+ "decision_log_sample_rows": 164,
+ "complete": false
+}

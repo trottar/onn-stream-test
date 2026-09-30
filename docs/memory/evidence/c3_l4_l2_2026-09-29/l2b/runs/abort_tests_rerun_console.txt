@@ -1,0 +1,27 @@
+A1: SIGINT to 797843 at 15:01:34Z
+== A1_sigint_f1_cap: harness exit 130
+run A1_sigint_f1_cap: aborted_by SIGINT stopped None error None
+  nft/sudo calls 13; kinds after the last delete ['list_tables']
+  PASS  every fake-sudo call is -v, -n -v or -n nft
+  PASS  the delete-table call is logged
+  PASS  list tables after the last delete, rc 0, no privyhub_fault
+  PASS  no rule added after the last delete
+  PASS  summary no_fault_table_at_end
+  PASS  teardown clean (flag absent, stream 7000, game inactive, mode off)
+  PASS  flags after
+  PASS  fake table absent at the end
+  => PASS
+A4: deny (sudo -n refused) from 15:03:43Z
+== A4_keepalive_refused_f2: harness exit 0
+run A4_keepalive_refused_f2: aborted_by None stopped None error None
+  nft/sudo calls 26; kinds after the last delete ['list_tables']
+  PASS  every fake-sudo call is -v, -n -v or -n nft
+  PASS  the delete-table call is logged
+  PASS  list tables after the last delete, rc 0, no privyhub_fault
+  PASS  no rule added after the last delete
+  PASS  summary no_fault_table_at_end
+  PASS  teardown clean (flag absent, stream 7000, game inactive, mode off)
+  PASS  flags after
+  PASS  fake table absent at the end
+  => PASS
+ALL DONE 0

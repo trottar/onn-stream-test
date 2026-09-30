@@ -92,8 +92,8 @@ pass with the fixed script will score it directly.
 
 | D8 item | status |
 | --- | --- |
-| Linux is sufficient for normal core server operation | **met on the scripted rows** (boot, discovery, media, games, End); **the user's rows pending** |
-| PS1-and-below works through Linux-native A/V/input paths | PS1 **met on the scripted rows** (fps, audio, controller datagrams); feel and picture pending; NES / Genesis have no local fixture (`D090`) |
+| Linux is sufficient for normal core server operation | **met on the scripted rows** (boot, discovery, media, games, End); **the user's rows: reported fine 2026-09-28** |
+| PS1-and-below works through Linux-native A/V/input paths | PS1 **met on the scripted rows** (fps, audio, controller datagrams); feel and picture: **the user's rows: reported fine 2026-09-28**; NES / Genesis have no local fixture (`D090`) |
 | onn client remains functional | **met** (discovery, launch, stream, BACK/RESUME, End) |
 | media/Live TV remain functional | **met** by `D136` (automated; the visible-playback smoke is the user's) |
 | deferred UDP suite replayed/reclassified | **met** (`D6-R1`) |
@@ -171,3 +171,37 @@ is unchanged.
 - the scratch backup under `runtime/d7_r1/` was compared with the live
   files and removed;
 - the launcher shows no NOW PLAYING banner.
+
+## R3 — the user's rows, 2026-09-28
+
+Recorded by `C3-L3A-R4` (`../handoffs/C3-L3A-R4_GATE_RECORD_TASK.md`).
+The user did the six-step NEEDS USER list above with **Tekken 3**, on the
+adopted build (APK `f31b1c18…8ae7`, profile adopted, no override), right
+after `C3.L3a` session 4, and reported, verbatim:
+
+> everything ran fine with no issues to any questions (maybe the smallest
+> of screen artifacts in the beginning)
+
+| NEEDS USER row | the user's report |
+| --- | --- |
+| controller feel (direction, buttons, responsiveness) | fine |
+| picture and sound | fine ("maybe the smallest of screen artifacts in the beginning") |
+| BACK, then RESUME PLAYING | fine |
+| save to a slot, then load it, through the TV | fine |
+| END → Don't Save | fine |
+
+These are **the user's words, not a gate**; nothing was scored.
+
+**The early artifacts.** They match the first-IDR resync at stream start
+already characterized: the decoder waits for, and resyncs on, the first
+clean IDR after a start or restart (`C3_L2A_E2_ACTUATOR_IDR_RESOLVED_2026-09-18.md`;
+`D_BASE_R3C_RECOVERY_SEMANTICS_2026-09-22.md` for the launch/resume path).
+**No issue opened.** For context only, the companion journal shows the
+three client decoder reports of that window stored (12:39-12:42 local;
+first clean IDR at 431 / 600 / 317 ms after each stream start; max output
+gap 70 / 82 / 567 ms; lost 0 / 14 / 80 packets over 5 s / 76 s / 55 s).
+The 567 ms figure is recorded as a number and not attributed; the rows
+above are the user's.
+
+**D7: complete on the adopted build** — 9 scripted rows PASS (`D7-R2`),
+restart/recovery cited, the hands-on rows reported fine by the user.

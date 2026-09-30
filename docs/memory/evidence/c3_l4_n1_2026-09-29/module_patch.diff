@@ -1,0 +1,258 @@
+--- a/companion/adaptive_bitrate_live.py	2026-09-29 12:38:24.936704293 -0400
++++ companion/adaptive_bitrate_live.py	2026-09-29 12:52:48.235338345 -0400
+@@ -29,6 +29,21 @@
+ the disposition, the increase window, the state), so a night can be
+ re-scored offline under any rule.
+ 
++C3-L4-N1 (the user's decision of 2026-09-29, "Yes, add both", after the first
++nft night showed a capacity shortfall never queues frames): two more FALLBACK
++triggers, LIVE only (the shadow is unchanged), through every existing gate:
++
++  capacity            -- over the last 5 evaluated reports, fps < 50 on all 5
++                         and `lost_packets_delta` >= 50 on >= 3 of 5 (a
++                         missing delta does not count);
++  recovery_escalation -- recovery restarted the encoder twice at the same
++                         level within 180 s: after recovery is PLAYING again
++                         and the blackout has passed, ONE FALLBACK decision
++                         (at_floor at 5000). Recovery itself is unchanged; it
++                         tells the controller of each restart through
++                         `note_recovery_restart` (the games plugin's
++                         `_recovery_restart_encoder` / full start).
++
+ Serialization with link-drop recovery: the actuator runs on one worker
+ thread while holding `NativeStreamManager._lock` -- the lock recovery's own
+ restart (`recovery_restart_encoder`, C3-F1) and full start take -- and the
+@@ -106,6 +121,22 @@
+ # fps line, ROUTINE waits up to this many reports for FALLBACK to decide, so
+ # one failure is one transition (to 5000), not 6000 and then 5000.
+ ROUTINE_ESCALATION_DEFER_REPORTS = 4
++# C3-L4-N1 -- THE CAPACITY TRIGGER (FALLBACK, reason `capacity`). Night 1: under
++# a cap the client drops frames instead of queueing them (queue 0-1 on every
++# report) and loses ~250 packets per report, so the queue/gap FALLBACK only met
++# its bar inside freezes that recovery already owned. `lost_packets_delta` is
++# the per-report delta of the client's post-FEC lost video packets
++# (RtpH264Receiver.lostPackets: RTP sequence gaps after FEC reconstruction,
++# plus the jump of a sequence resync); an SSRC change adds 0.
++CAPACITY_FPS_BELOW = 50.0                   # on all 5
++CAPACITY_LOSS_AT_LEAST, CAPACITY_LOSS_OF = 50, 3          # >= 50 lost on >= 3 of 5
++# C3-L4-N1 -- THE RECOVERY-ESCALATION BACKSTOP (FALLBACK, reason
++# `recovery_escalation`): recovery's encoder restarts, not its pauses.
++ESCALATION_RESTARTS = 2
++ESCALATION_WINDOW_MS = 180_000
++TRIGGER_QUEUE_GAP = "fps_queue_gap"         # the shadow's FALLBACK / ROUTINE evidence
++TRIGGER_CAPACITY = "capacity"
++TRIGGER_ESCALATION = "recovery_escalation"
+ 
+ ACTUATING = "ACTUATING"
+ DISABLED = "DISABLED"
+@@ -150,6 +181,10 @@
+         self.actuator_failed = False
+         self.rate_limited_events = 0
+         self.last_action: dict[str, Any] | None = None
++        # C3-L4-N1 backstop: recovery's encoder restarts (clock_ms, level) and
++        # the one armed escalation, if any.
++        self.recovery_restarts: list[tuple[int, int]] = []
++        self.escalation: dict[str, Any] | None = None
+         super().__init__()
+ 
+     # -- lifecycle ---------------------------------------------------------
+@@ -175,6 +210,8 @@
+         self.actuator_failed = False
+         self.rate_limited_events = 0
+         self.last_action = None
++        self.recovery_restarts = []
++        self.escalation = None
+         self.reset(None)
+ 
+     # -- helpers -----------------------------------------------------------
+@@ -185,6 +222,31 @@
+                 and q is not None and q <= INCREASE_CLEAN_QUEUE_AT_MOST
+                 and gap is not None and gap <= INCREASE_CLEAN_GAP_AT_MOST_MS)
+ 
++    def _evidence(self) -> tuple[str | None, dict[str, Any]]:
++        """The shadow's FALLBACK / ROUTINE, then (C3-L4-N1) the capacity trigger.
++
++        Precedence: the queue/gap FALLBACK, then capacity (also FALLBACK), then
++        ROUTINE. The window holds evaluated reports only, so a stale report, a
++        blackout report or a resync never counts; a missing loss delta does
++        not count toward the 3.
++        """
++        cls, m = super()._evidence()
++        if cls == "FALLBACK":
++            m["trigger"] = TRIGGER_QUEUE_GAP
++            return cls, m
++        if len(self.window) < ab.WINDOW_REPORTS:
++            return cls, m
++        lost = [self._num(s.get("lost_packets_delta")) for s in self.window]
++        m["lost_packets_delta"] = lost
++        fps = m.get("fps") or []
++        if (len(fps) == ab.WINDOW_REPORTS and all(v is not None and v < CAPACITY_FPS_BELOW for v in fps)
++                and sum(1 for v in lost if v is not None and v >= CAPACITY_LOSS_AT_LEAST) >= CAPACITY_LOSS_OF):
++            m["trigger"] = TRIGGER_CAPACITY
++            return "FALLBACK", m
++        if cls == "ROUTINE":
++            m["trigger"] = TRIGGER_QUEUE_GAP
++        return cls, m
++
+     def _window_restart(self) -> None:
+         """After every SSRC change (and at a session start) the window starts empty."""
+         self.inc_window.clear()
+@@ -217,12 +279,18 @@
+         prev_state = self.state
+         self.state, self.reason, self.measurements = state, reason, m
+         key = (kind, reason)
+-        if key == self.last_refusal_key and not injected:
++        if m.get("trigger") == TRIGGER_ESCALATION:
++            pass                           # C3-L4-N1: the backstop's one decision is always logged
++        elif key == self.last_refusal_key and not injected:
+             return []                      # logged once per (class, reason) run
+-        self.last_refusal_key = key
+-        return [{"event": "refused", "class": kind, "reason": reason, "from_kbps": self.level_kbps,
+-                 "to_kbps": target, "injected": injected, "state_before": prev_state,
+-                 "holds_in_force": self.holds_in_force(), "measurements": m, "acted": False, **extra}]
++        else:
++            self.last_refusal_key = key
++        row = {"event": "refused", "class": kind, "reason": reason, "from_kbps": self.level_kbps,
++               "to_kbps": target, "injected": injected, "state_before": prev_state,
++               "holds_in_force": self.holds_in_force(), "measurements": m, "acted": False, **extra}
++        if m.get("trigger"):
++            row["trigger"] = m["trigger"]
++        return [row]
+ 
+     # -- the decision ------------------------------------------------------
+     def _decide(self, kind: str, m: dict[str, Any], elapsed: int, ctx: dict[str, Any],
+@@ -292,12 +360,17 @@
+         self.routine_defer = 0
+         self.last_refusal_key = None
+         self.state = ab.HOLD_DOWN
+-        self.reason = f"{'increase' if direction == 'up' else 'decrease'}_{kind.lower()}"
++        trigger = m.get("trigger")
++        # C3-L4-N1: the two new FALLBACK triggers carry their own reason.
++        self.reason = (trigger if trigger in (TRIGGER_CAPACITY, TRIGGER_ESCALATION)
++                       else f"{'increase' if direction == 'up' else 'decrease'}_{kind.lower()}")
+         self.measurements = m
+         row = {"event": "transition" if self.acting else "would_act", "class": kind, "direction": direction,
+                "from_kbps": prev, "to_kbps": target, "reason": self.reason, "injected": injected,
+                "holds_in_force_before": holds_before, "measurements": m, "acted": self.acting,
+                "decision_sequence": self.decision_seq}
++        if trigger:
++            row["trigger"] = trigger
+         if self.acting:
+             self.transitions += 1
+             self.transition_times_ms.append(clock)
+@@ -307,7 +380,7 @@
+             row["transitions_in_window"] = len(self._recent_transitions(clock))
+         self.last_action = {"class": kind, "direction": direction, "from_kbps": prev, "to_kbps": target,
+                             "acted": self.acting, "injected": injected, "decision_sequence": self.decision_seq,
+-                            "result": "requested" if self.acting else "shadow"}
++                            "result": "requested" if self.acting else "shadow", "reason": self.reason}
+         return [row]
+ 
+     # -- one report --------------------------------------------------------
+@@ -377,6 +450,22 @@
+         self.window.append(s)
+         self.inc_window.append(bool(self.last_clean))
+         self.clean_count = sum(self.inc_window)
++
++        if self.escalation is not None and (ctx.get("guards") or {}).get("recovery_playing"):
++            # C3-L4-N1 backstop: recovery is PLAYING again and the blackout
++            # after its last restart has passed -> ONE FALLBACK decision,
++            # through every gate (at_floor at 5000). Consumed whatever the
++            # outcome; re-arming needs two new restarts at one level.
++            esc, self.escalation = self.escalation, None
++            self.recovery_restarts = []
++            self.routine_defer = 0
++            return events + self._decide("FALLBACK", {"trigger": TRIGGER_ESCALATION,
++                                                      "restart_level_kbps": esc["level_kbps"],
++                                                      "restarts_ms_ago": [int(ctx.get("clock_ms", elapsed)) - t
++                                                                          for t in esc["restart_clock_ms"]],
++                                                      "armed_clock_ms": esc["armed_clock_ms"]},
++                                         int(elapsed), ctx)
++
+         cls, m = self._evidence()
+ 
+         if cls == "ROUTINE":
+@@ -453,13 +542,36 @@
+         self.state, self.reason = ab.ACTUATOR_FAILED, "actuator_failed"
+         return []
+ 
+-    def note_ssrc_change(self, source: str) -> list[dict[str, Any]]:
+-        """Recovery restarted the encoder (or a full start ran): blackout."""
++    def note_ssrc_change(self, source: str, clock_ms: int | None = None) -> list[dict[str, Any]]:
++        """Recovery restarted the encoder (or a full start ran): blackout.
++
++        C3-L4-N1: each call is one recovery `encoder_restart` (the games
++        plugin calls it after `recovery_restart_encoder` / the full start,
++        never for a desync pause alone). The level it ran at is the held
++        level for a restart (C3-F1 is level-preserving) and 7000 for a full
++        start (C1). Two at the same level within 180 s arm the backstop."""
+         self.blackout_remaining = BLACKOUT_REPORTS
+         self.window.clear()
+         self._window_restart()
+         self.routine_defer = 0
+-        return [{"event": "ssrc_change", "source": source, "blackout_reports": BLACKOUT_REPORTS}]
++        events: list[dict[str, Any]] = [{"event": "ssrc_change", "source": source,
++                                         "blackout_reports": BLACKOUT_REPORTS}]
++        if clock_ms is None:
++            return events
++        level = REFERENCE_KBPS if source == "recovery_full_start" else int(self.level_kbps)
++        self.recovery_restarts = [(t, lv) for t, lv in self.recovery_restarts
++                                  if clock_ms - t <= ESCALATION_WINDOW_MS] + [(int(clock_ms), level)]
++        same = [t for t, lv in self.recovery_restarts if lv == level]
++        events[0]["restart_level_kbps"] = level
++        events[0]["restarts_at_level_in_window"] = len(same)
++        if len(same) >= ESCALATION_RESTARTS and self.escalation is None:
++            self.escalation = {"level_kbps": level, "restart_clock_ms": same, "armed_clock_ms": int(clock_ms)}
++            events.append({"event": "escalation_armed", "trigger": TRIGGER_ESCALATION, "level_kbps": level,
++                           "restarts_at_level_in_window": len(same),
++                           "restart_gaps_ms": [b - a for a, b in zip(same, same[1:])],
++                           "window_ms": ESCALATION_WINDOW_MS,
++                           "note": "one FALLBACK decision once recovery is PLAYING and the blackout has passed"})
++        return events
+ 
+     def status(self) -> dict[str, Any]:
+         out = super().status()
+@@ -484,6 +596,14 @@
+                                               f"{INCREASE_CLEAN_GAP_AT_MOST_MS}"},
+             "actuator_failed": self.actuator_failed,
+             "pending": dict(self.pending) if self.pending else None,
++            "capacity_trigger": {"rule": f"fps < {CAPACITY_FPS_BELOW:g} on all {ab.WINDOW_REPORTS} and "
++                                         f"lost_packets_delta >= {CAPACITY_LOSS_AT_LEAST} on >= "
++                                         f"{CAPACITY_LOSS_OF} of {ab.WINDOW_REPORTS}",
++                                 "target_kbps": TARGET_KBPS["FALLBACK"]},
++            "recovery_escalation": {"rule": f"{ESCALATION_RESTARTS} recovery encoder restarts at one level "
++                                            f"within {ESCALATION_WINDOW_MS // 1000} s",
++                                    "restarts_in_window": [{"level_kbps": lv} for _, lv in self.recovery_restarts],
++                                    "armed": dict(self.escalation) if self.escalation else None},
+         })
+         return out
+ 
+@@ -588,6 +708,7 @@
+                      "stream_kbps": self._stream_kbps, "blackout_remaining": p.blackout_remaining,
+                      "holds": {"fallback": p.hold_left("FALLBACK"), "routine": p.hold_left("ROUTINE"),
+                                "increase": p.hold_left("INCREASE")},
++                     "escalation_armed": p.escalation is not None,
+                      "effective_mode": self.effective_mode})
+ 
+     def _emit(self, events: list[dict[str, Any]], s: dict[str, Any] | None,
+@@ -669,10 +790,18 @@
+ 
+     # -- lifecycle hooks (the games plugin) --------------------------------
+     def note_recovery_restart(self, source: str) -> None:
+-        """Recovery's restart (C3-F1) or full start changed the SSRC."""
++        """Recovery's restart (C3-F1) or full start changed the SSRC.
++
++        C3-L4-N1: called once per recovery `encoder_restart` (from the games
++        plugin, on recovery's monitor thread, after the restart returned and
++        so after it released the stream lock); the clock is the same
++        monotonic clock the report path's guards use. The controller only
++        READS recovery (these calls and `current_state()`); it never drives
++        it, and its own restart still re-checks PLAYING under the stream lock.
++        """
+         try:
+             with self._lock:
+-                self._emit(self._policy.note_ssrc_change(source), None)
++                self._emit(self._policy.note_ssrc_change(source, clock_ms=int(time.monotonic() * 1000)), None)
+         except Exception:
+             pass
+ 

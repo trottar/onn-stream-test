@@ -1,0 +1,118 @@
+C3-L4-N3 section 1 -- the user's nft night 3 (--only F1), scored read-only against its pre-registration
+run: c3_l4_nft_night_20260930_131404Z; preregistration.txt sha256 cf0ce814bf686d8f... MATCHES night 3's cf0ce814...
+rows: decision log 640 (601 sample rows), recovery log 2, events 21, status poller 255, host frame seconds 1211
+calibration: 7000 wire rate 1066 kB/s (counter); cap 856 kbytes/s = 877 kB/s (nights 1-2: 854 / 855)
+PLAYING 13:15:30Z; cap on 13:18:30Z; cap off 13:30:31Z; BACK 13:35:35Z
+
+== Per-report figures by rung and phase (evaluated reports; host payload from the frame series)
+   window | secs | reports (evaluated) | fps median [p10-p90] | fps<50 / <57 | lost median [max] | queue>=1 | gap median [max] | clean | payload kB/s
+   13:15:30-13:18:30Z baseline at 7000 | 180 | 89 (89) | 59.7 [57.7-61.8] | 3 % / 8 % | 0 [60] | 1 | 15 [64] | 82/89 | 877
+   13:18:30-13:18:47Z cap ON at 7000 | 17 | 8 (8) | 27.9 [17.9-59.8] | 75 % / 75 % | 244 [282] | 0 | 18 [66] | 2/8 | 874
+   13:18:47-13:22:30Z cap ON at 5000 | 223 | 111 (108) | 59.8 [57.8-61.8] | 0 % / 6 % | 0 [7] | 0 | 15 [40] | 101/108 | 626
+   13:22:30-13:25:37Z cap ON at 5500 | 187 | 93 (90) | 59.8 [57.8-61.8] | 0 % / 4 % | 0 [8] | 0 | 15 [33] | 86/90 | 689
+   13:25:37-13:27:39Z cap ON at 6000 | 123 | 61 (58) | 58.8 [49.9-59.8] | 14 % / 41 % | 51 [273] | 1 | 16 [83] | 34/58 | 751
+   13:27:39-13:30:31Z cap ON at 5500 | 171 | 85 (82) | 59.8 [57.8-61.8] | 0 % / 2 % | 0 [35] | 2 | 15 [61] | 79/82 | 689
+   13:30:31-13:35:35Z cap off at 5500 | 304 | 150 (8) | 59.8 [59.8-62.3] | 0 % / 12 % | 0 [2] | 0 | 16 [20] | 7/8 | 689
+
+== Transitions and decisions
+   13:18:46.428Z transition FALLBACK 7000->5000 reason capacity trigger capacity window None/None reports since the previous change None
+   13:22:29.058Z transition INCREASE 5000->5500 reason increase_increase trigger None window 90/85 reports since the previous change 111
+   13:25:35.925Z transition INCREASE 5500->6000 reason increase_increase trigger None window 90/86 reports since the previous change 93
+   13:26:20.120Z refused    ROUTINE  6000->5500 reason hold_down trigger capacity_mild window None/None reports since the previous change 22 hold_down_left 38
+   13:27:22.419Z refused    ROUTINE  6000->5500 reason hold_down trigger capacity_mild window None/None reports since the previous change 53 hold_down_left 7
+   13:27:38.470Z transition ROUTINE  6000->5500 reason capacity_mild trigger capacity_mild window None/None reports since the previous change 61
+   13:30:45.349Z hold       INCREASE 5500->6000 reason oscillation trigger None window 90/86 reports since the previous change 93
+      direction changes (the policy's elapsed ms): [425554, 734965, 921826]
+   capacity FALLBACK 15.5 s after the cap went in
+   arrived at 6000 (transition_done) 13:25:37.149Z; capacity_mild bar first met (refused hold_down) 43.0 s later; acted 121.3 s after arriving (61 reports after the change)
+   HOLD 13:30:45.349Z: 496 s after the first direction change (13:22:29Z); 14 s after the cap came off
+   escalation_armed 0; level_sync 0; rate_limited ever False; recovery log ['session_started', 'session_ended']
+   transitions 4, gaps [223, 187, 123] s; most in any 10-min window 4
+
+== The 6000 rung under the cap (F1g)
+      13:25:43 fps 59.8 lost 0 queue 0 gap 5 clean True
+      13:25:45 fps 59.8 lost 0 queue 0 gap 15 clean True
+      13:25:47 fps 61.8 lost 0 queue 0 gap 10 clean True
+      13:25:49 fps 59.8 lost 0 queue 0 gap 17 clean True
+      13:25:51 fps 61.8 lost 0 queue 0 gap 17 clean True
+      13:25:54 fps 59.7 lost 0 queue 0 gap 17 clean True
+      13:25:56 fps 59.7 lost 0 queue 0 gap 17 clean True
+      13:25:58 fps 59.8 lost 81 queue 0 gap 5 clean True
+      13:26:00 fps 53.8 lost 32 queue 0 gap 12 clean False
+      13:26:02 fps 55.8 lost 44 queue 0 gap 21 clean False
+      13:26:04 fps 53.8 lost 76 queue 0 gap 17 clean False
+      13:26:06 fps 57.8 lost 41 queue 0 gap 19 clean True
+      13:26:08 fps 49.8 lost 55 queue 0 gap 16 clean False
+      13:26:10 fps 61.8 lost 53 queue 0 gap 16 clean True
+      13:26:12 fps 51.9 lost 61 queue 1 gap 17 clean False
+      13:26:14 fps 59.8 lost 36 queue 0 gap 16 clean True
+      13:26:16 fps 53.8 lost 76 queue 0 gap 20 clean False
+      13:26:18 fps 55.8 lost 66 queue 0 gap 17 clean False
+      13:26:20 fps 51.8 lost 66 queue 0 gap 18 clean False
+      13:26:22 fps 57.8 lost 98 queue 0 gap 12 clean True
+      13:26:24 fps 59.8 lost 12 queue 0 gap 3 clean True
+      13:26:26 fps 61.8 lost 273 queue 0 gap 15 clean True
+      13:26:28 fps 63.8 lost 0 queue 0 gap 16 clean True
+      13:26:30 fps 59.8 lost 0 queue 0 gap 16 clean True
+      13:26:32 fps 59.8 lost 0 queue 0 gap 12 clean True
+      13:26:34 fps 57.8 lost 0 queue 0 gap 14 clean True
+      13:26:36 fps 59.8 lost 2 queue 0 gap 18 clean True
+      13:26:38 fps 59.8 lost 229 queue 0 gap 6 clean True
+      13:26:40 fps 59.8 lost 54 queue 0 gap 14 clean True
+      13:26:42 fps 51.8 lost 41 queue 0 gap 25 clean False
+      13:26:44 fps 59.7 lost 69 queue 0 gap 22 clean True
+      13:26:46 fps 59.8 lost 68 queue 0 gap 26 clean True
+      13:26:48 fps 59.8 lost 41 queue 0 gap 10 clean True
+      13:26:50 fps 55.8 lost 88 queue 0 gap 15 clean False
+      13:26:52 fps 47.9 lost 22 queue 0 gap 18 clean False
+      13:26:54 fps 59.7 lost 100 queue 0 gap 9 clean True
+      13:26:56 fps 57.8 lost 1 queue 0 gap 18 clean True
+      13:26:58 fps 49.8 lost 44 queue 0 gap 17 clean False
+      13:27:00 fps 51.8 lost 52 queue 0 gap 19 clean False
+      13:27:02 fps 59.7 lost 102 queue 0 gap 20 clean True
+      13:27:04 fps 57.8 lost 56 queue 0 gap 17 clean True
+      13:27:06 fps 49.9 lost 27 queue 0 gap 20 clean False
+      13:27:08 fps 59.8 lost 64 queue 0 gap 20 clean True
+      13:27:10 fps 59.8 lost 50 queue 0 gap 3 clean True
+      13:27:12 fps 59.8 lost 75 queue 0 gap 15 clean True
+      13:27:14 fps 55.9 lost 26 queue 0 gap 24 clean False
+      13:27:16 fps 45.9 lost 84 queue 0 gap 3 clean False
+      13:27:18 fps 43.8 lost 63 queue 0 gap 83 clean False
+      13:27:20 fps 49.9 lost 57 queue 0 gap 12 clean False
+      13:27:22 fps 54.8 lost 70 queue 0 gap 15 clean False
+      13:27:24 fps 59.8 lost 61 queue 0 gap 18 clean True
+      13:27:26 fps 55.8 lost 68 queue 0 gap 15 clean False
+      13:27:28 fps 59.8 lost 17 queue 0 gap 15 clean True
+      13:27:30 fps 47.9 lost 50 queue 0 gap 14 clean False
+      13:27:32 fps 51.8 lost 87 queue 0 gap 11 clean False
+      13:27:34 fps 59.8 lost 106 queue 0 gap 28 clean True
+      13:27:36 fps 55.8 lost 7 queue 0 gap 3 clean False
+      13:27:38 fps 51.8 lost 38 queue 0 gap 29 clean False
+   58 evaluated reports over 123 s: fps median 58.8 (p10 49.9); under 57 on 24; lost median 51, >= 50 on 31
+
+== After BACK, and the reset rows
+   session_ended_reset 13:15:30.260Z: before {'transitions_this_session': 0, 'level_kbps': 7000, 'disabled': False} -> level 7000
+   session_ended_reset 13:35:32.845Z: before {'transitions_this_session': 4, 'level_kbps': 5500, 'disabled': False} -> level 7000
+   session_ended_reset 13:35:35.235Z: before {'transitions_this_session': 0, 'level_kbps': 7000, 'disabled': False} -> level 7000
+   session_ended_reset 13:35:59.965Z: before {'transitions_this_session': 0, 'level_kbps': 7000, 'disabled': False} -> level 7000
+   session_ended_reset 13:36:00.008Z: before {'transitions_this_session': 0, 'level_kbps': 7000, 'disabled': False} -> level 7000
+   harness 'back' event: level_after 7000 mode_after live
+   status 13:35:38.7Z: stream 7000 active False; level 7000 state REFERENCE transitions 0
+
+== Close-out rows (decoder report; reported)
+   F1 (20.1 min): spikes_20_per_min 37.74; rendered_fps 59.16; stale_output_drops_per_min 3.33; video_lost_per_min_post_fec 250.80; audio_underruns_per_min 2.78; max gap 715 ms; ssrc_changes 4 at [203476, 426203, 612916, 735609] -> misses ['rendered_fps', 'video_lost_per_min_post_fec']
+
+== Rows
+   F1a            MET       strict capacity FALLBACK 7000->5000 15.5 s after the cap; one transition; one decoder ssrc_change for it
+   F1b            MET       HOLD branch: INCREASE 5000->5500 111 reports after the FALLBACK's change, 5500->6000 93 after that; capacity_mild 6000->5500 61 reports / 121.3 s after arriving at 6000 (bound: >= 60 reports, <= 150 s) after two hold_down refusals; the next increase became HOLD oscillation at 5500
+   F1c            MET       rate_limited never; 4 transitions, 4 inside one 10-min window (allowed); gaps [223, 187, 123] s, none closer than the hold-down table; no two same-direction transitions < 93 reports apart
+   F1d            MET       nothing after removal (HOLD); BACK -> level 7000
+   F1e            MET       escalation_armed 0
+   F1f            MET       recovery cycles under the cap: 0
+   F1g            REPORTED  at 6000 under the cap 123 s (night 2: 3 min 56 s)
+   ALL-override   MET       any_override at PLAYING False
+   ALL-report     MET       stored
+   ALL-lifecycle  MET       ['session_started', 'session_ended']
+   ALL-end        MET       no fault table; flag unset and absent; stream 7000; no game; 0 banners
+
+CLASSIFICATION: WORKS UNDER LOSS (F1)

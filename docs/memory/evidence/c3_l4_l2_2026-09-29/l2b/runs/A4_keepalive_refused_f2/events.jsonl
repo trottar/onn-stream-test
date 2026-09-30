@@ -1,0 +1,21 @@
+{"at_utc": "2026-09-29T15:01:59.138Z", "session": "setup", "event": "verify", "what": "before the night", "expect": "absent", "ok": true, "rc": 0}
+{"at_utc": "2026-09-29T15:01:59.139Z", "session": "setup", "event": "enter", "prompt": "the pre-registration above is the one for tonight"}
+{"at_utc": "2026-09-29T15:01:59.139Z", "session": "setup", "event": "preflight_ok", "apk": "f31b1c18...8ae7"}
+{"at_utc": "2026-09-29T15:02:02.333Z", "session": "setup", "event": "live_on", "flags": ["PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"]}
+{"at_utc": "2026-09-29T15:02:40.532Z", "session": "F2", "event": "playing", "any_override": false}
+{"at_utc": "2026-09-29T15:03:40.533Z", "session": "F2", "event": "expect", "text": "FEC recovers part of it; loss alone is never evidence. Either no transition, or AT MOST ONE decrease (ROUTINE ->6000 or FALLBACK ->5000) and then only at_or_below_target / at_floor / hold_down refusals. No second decrease, never a ramp."}
+{"at_utc": "2026-09-29T15:03:40.623Z", "session": "F2", "event": "verify", "what": "F2 2% loss", "expect": ["loss_rule"], "got": ["udp dport 48100 numgen random mod 1000 < 20 counter packets 0 bytes 430 drop"], "ok": true}
+{"at_utc": "2026-09-29T15:03:40.623Z", "session": "F2", "event": "fault_on", "what": "F2 2% loss", "steps": [["nft", "add", "table", "inet", "privyhub_fault"], ["nft", "add", "chain", "inet", "privyhub_fault", "flt", "{ type filter hook output priority 0; }"], ["nft", "add", "rule", "inet", "privyhub_fault", "flt", "udp", "dport", "48100", "numgen", "random", "mod", "1000", "<", "20", "counter", "drop"]]}
+{"at_utc": "2026-09-29T15:03:58.965Z", "session": "F2", "event": "sudo_keepalive_refused", "rc": 1, "output": "sudo: a password is required"}
+{"at_utc": "2026-09-29T15:03:59.647Z", "session": "F2", "event": "sudo_reauth_start", "why": "the keepalive `sudo -n -v` was refused", "fault_cleared": false}
+{"at_utc": "2026-09-29T15:03:59.724Z", "session": "F2", "event": "verify", "what": "re-applied after the password", "expect": ["loss_rule"], "got": ["udp dport 48100 numgen random mod 1000 < 20 counter packets 318 bytes 382461 drop"], "ok": true}
+{"at_utc": "2026-09-29T15:03:59.724Z", "session": "F2", "event": "sudo_reauth_done", "gap_s": 0.1, "reapplied": false, "fault_on": true}
+{"at_utc": "2026-09-29T15:04:40.646Z", "session": "F2", "event": "did", "label": "F2 loss on", "since": "2026-09-29T15:03:40.533Z", "transitions": [], "holds": 0, "refused": {}, "rate_limited_ever": false, "level": 7000, "state": "REFERENCE", "mode": "live", "recovery_events": []}
+{"at_utc": "2026-09-29T15:04:40.646Z", "session": "F2", "event": "expect", "text": "after removal: a stream that stepped down climbs one rung per ~186 s; otherwise nothing."}
+{"at_utc": "2026-09-29T15:04:40.691Z", "session": "F2", "event": "verify", "what": "F2 2% loss", "expect": "absent", "ok": true, "rc": 0}
+{"at_utc": "2026-09-29T15:04:40.691Z", "session": "F2", "event": "fault_off", "what": "F2 2% loss"}
+{"at_utc": "2026-09-29T15:05:40.710Z", "session": "F2", "event": "did", "label": "F2 loss off", "since": "2026-09-29T15:04:40.646Z", "transitions": [], "holds": 0, "refused": {}, "rate_limited_ever": false, "level": 7000, "state": "REFERENCE", "mode": "live", "recovery_events": []}
+{"at_utc": "2026-09-29T15:05:45.009Z", "session": "F2", "event": "back", "report": true, "level_after": 7000, "mode_after": "live"}
+{"at_utc": "2026-09-29T15:06:05.751Z", "session": "F2", "event": "verify", "what": "at the end", "expect": "absent", "ok": true, "rc": 0}
+{"at_utc": "2026-09-29T15:06:05.751Z", "session": "F2", "event": "fault_cleared_final", "ok": true, "why": "normal end"}
+{"at_utc": "2026-09-29T15:06:25.265Z", "session": "teardown", "event": "teardown", "clean": true}

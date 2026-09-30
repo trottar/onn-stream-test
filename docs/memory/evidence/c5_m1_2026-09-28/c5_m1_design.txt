@@ -1,0 +1,208 @@
+C5-M1 -- 1080p60 characterized as a capability: the design, on paper first
+Written 2026-09-28 17:25Z, BEFORE the build, the smoke and the holds.
+Task: docs/memory/handoffs/C5-M1_1080P60_PROFILE_TASK.md (queue 2026-09-28, item 2).
+
+========================================================================
+1a. Where 1280x720 is produced today, and what changes for 1080p
+========================================================================
+Source: companion/native_stream.py _build_linux_ffmpeg_command (read 2026-09-28).
+
+  capture : x11grab of the RetroArch WINDOW (-window_id), not the desktop,
+            -framerate 60, no -video_size. The window is RetroArch's own
+            windowed size for the core: Beetle PSX HW on the attract title
+            (Tekken 3) is 879x720 (xdotool getwindowgeometry, 2026-09-28;
+            the decoder reports say "Capture: RetroArch window 879x720").
+            data/games/retroarch/retroarch.cfg: video_fullscreen false,
+            video_windowed_fullscreen false, video_force_aspect true.
+  scale   : -vf scale=W:H:force_original_aspect_ratio=decrease:
+            flags=fast_bilinear, pad=W:H:(ow-iw)/2:(oh-ih)/2:black,
+            format=nv12,hwupload -- W x H are the PROFILE's width/height.
+            At 1280x720 the 879x720 window passes at 1:1 and is pillar-boxed.
+  display : the headless desktop is 1920x1080 @ 60 (H2); it does not set
+            the stream size.
+
+So the stream size is set by the scale filter alone. For 1080p only the
+profile's width/height change (scale/pad to 1920x1080). The capture stays
+the 879x720 window, which the filter upscales 1.5x to 1318x1080 and pads.
+
+CONSEQUENCE, stated up front: on this source a 1080p stream carries the
+same source pixels as 720p, upscaled by fast_bilinear. The picture gains
+no detail. What C5 measures is whether the ENCODER, the LINK and the
+CLIENT'S DECODER sustain 1920x1080 at 60 fps inside the close-out rows --
+the stream/client capability the roadmap asks for. A 1080p-detail source
+needs a larger RetroArch window (a source-side change, outside this task's
+scope: "no other companion change").
+
+========================================================================
+1b. Bitrate
+========================================================================
+  adopted : 7,000 kbps at 1280 x 720 x 60 = 55,296,000 px/s
+            -> 0.12659 bits per pixel
+  parity  : 0.12659 x 1920 x 1080 x 60 (124,416,000 px/s)
+            = 15,750 kbps (x 2.25 exactly)
+  80 %    : 12,600 kbps
+
+On-air estimate at parity: video 15,750 x 9/8 (FEC 8+1) = 17,719 kbps,
++ ~1.6 Mbps (audio redundancy's measured increment, P10)
+~= 19.3 Mbps, before RTP/UDP/IP headers (~3.5 % at 1,200-byte payloads).
+The same arithmetic gives ~9.5 Mbps for the adopted 720p stream.
+
+The link's measured headroom (O1, 2026-09-21, B2 topology unchanged since):
+  station tx PHY rate 94-200 Mbps (MCS 1-3 at -70 dBm);
+  channel utilization 2.9-3.3 % idle, 6.86-6.90 % streaming the 7 Mbps
+  profile -> the stream costs ~3.6 airtime points; the channel is ~93 %
+  idle while it runs. Linear scaling to ~19.3 Mbps: ~7.5-8 points, the
+  channel still ~89 % idle.
+No throughput (iperf-style) ceiling was ever measured on this link; the
+measured numbers are the PHY rate and the airtime above. ~19.3 Mbps is
+about 20 % of the LOWEST PHY rate seen (typical usable UDP goodput is
+50-65 % of PHY, i.e. >= ~47 Mbps at 94). The estimate is inside the
+measured headroom -> THE CANDIDATE IS PARITY, 15,750 kbps
+(max_bitrate 15,750, as the adopted profile's max = bitrate).
+
+The known risk is not the average rate: the loss mechanism on this hop is
+the per-frame burst meeting the wireless queue (P6). At 1080p every frame
+is ~2.25x the packets. That is what the holds measure.
+
+========================================================================
+1c. Encoder headroom offline (offline/, c5_m1_offline.py)
+========================================================================
+Method: the attract title launched through the companion (no stream
+running, nothing else on the host), unpaused through RetroArch's own
+command port (PAUSE_TOGGLE; GET_STATUS read PLAYING), then 60 s of
+x11grab of its window through the companion's h264_vaapi argv with only
+W/H/bitrate/cap changed, to -f null; then re-paused (GET_STATUS PAUSED)
+and the game stopped through the companion. Per second: encoded frames
+(ffmpeg -progress), host CPU busy %, ffmpeg CPU %, amdgpu gpu_busy_percent.
+First 2 s and the final block excluded (57 s scored).
+
+  label             W x H      kbps   cap      fps mean  p5     min    dup/drop  host CPU  ffmpeg CPU  GPU busy
+  enc_720p60_ref    1280x720   7000   90000    59.99     59.98  59.97  0 / 0     6.7 %     24.1 %      9.1 % (max 10)
+  enc_1080p60_cand  1920x1080  15750  200000   59.99     59.98  59.96  0 / 0     7.7 %     36.8 %      9.5 % (max 10)
+  (ffmpeg CPU % is of one core; host CPU % of 12 threads; GPU busy
+   includes RetroArch's HW renderer.)
+
+RULE: proceed only if 1080p60 encodes at >= 60 fps mean with p5 >= 58.
+The capture is paced at 60 fps, so "60" is realtime; 59.99 is realtime
+(3,600 frames in 60 s, speed 1x, 0 dup, 0 drop).
+-> MET: 59.99 mean, p5 59.98. Stop rule (b) not triggered.
+
+========================================================================
+1d. Frame cap
+========================================================================
+Scaled: 90,000 B x (15,750 / 7,000) = 202,500 B -> nearest 10 KB
+(10,000-byte units, as the adopted 90,000) = 200,000 B.
+
+IDR sizes measured offline (30 s each, uncapped unless stated; ffprobe
+key_frame / pkt_size; offline/idr_sizes.txt; GOP 15 = one IDR every 250 ms,
+120 IDRs per run):
+  720p  7000   uncapped: IDR median 29,650  p90 64,938   max 270,620 (the run's first IDR)
+                         non-IDR median 13,024, p99 43,580, max 115,590
+  1080p 15750  uncapped: IDR median 56,591  p90 67,783   max 187,566
+                         non-IDR median 30,897, p99 50,771, max 120,573
+  1080p 15750  cap 200k: IDR median 58,860  p90 189,946  max 191,795
+                         non-IDR p99 92,969, max 193,672 (content differs run to run)
+The scaled cap (200,000) is ABOVE the expected IDR size at the candidate
+bitrate (median ~57 K, p90 ~68 K; the largest uncapped IDR 188 K), so the
+"IDR + 20 %" alternative does not apply. P6a's own rule: the cap bounds
+the tail, not the typical frame. -> max_frame_size_bytes 200,000.
+In packets (1,200-byte payload): a capped frame is <= ~167 packets
+against ~75 at 720p -- the burst the holds will show (frames_ge_80).
+
+========================================================================
+1e. The client decoder
+========================================================================
+PrivyHub/app/src/main/java/streaming/AvcLowLatencyDecoder.kt and
+NativeStreamActivity.kt (read 2026-09-28):
+  - MediaFormat.createVideoFormat(AVC, VIDEO_WIDTH=1280, VIDEO_HEIGHT=720);
+    csd-0 / csd-1 = the SPS / PPS taken from the stream itself
+    (RtpH264Receiver onParameterSets) -> at 1080p the SPS says 1920x1080;
+  - KEY_MAX_INPUT_SIZE 1 MiB (> the 200,000 cap and > any IDR measured);
+    KEY_LOW_LATENCY 1; KEY_OPERATING_RATE 60; no KEY_MAX_WIDTH/HEIGHT;
+  - output to a SurfaceView, MATCH_PARENT, on a 1920x1080 @ 59.94 display
+    (adb wm size; dumpsys display): the 720p stream is scaled UP by the
+    compositor today; 1080p would be 1:1.
+  - the codec the app gets: c2.realtek.video.avc.decoder (every decoder
+    report: codec_name, hardware_accelerated true).
+Stop rule (a), how it was read: /vendor/etc/media_codecs_rtk_c2_video.xml
+and media_codecs_performance.xml on the onn (adb shell cat; `dumpsys
+media.codec` does not exist on this build):
+  c2.realtek.video.avc.decoder: size 16x16..4096x4096, blocks-per-second
+  <= 1,879,200 (1080p60 needs 489,600), bitrate <= 40 Mbps,
+  performance-point-1920x1080 = 60, measured-frame-rate-1920x1080 100-100,
+  feature adaptive-playback.
+-> The onn's decoder ADVERTISES 1080p60 H.264. Stop rule (a) not triggered.
+Is a client change needed? Not a priori: the format's 1280x720 is a hint;
+the C2 decoder takes the picture size from the SPS in csd-0 and supports
+adaptive playback. It is VERIFIED at the smoke, not assumed: the smoke
+reads the SurfaceView layer's buffer size (adb shell dumpsys SurfaceFlinger)
+and the decoder report's rendered fps. If the decoder does not deliver
+1920x1080 at >= 55 fps, stop rule (c) applies and the record says whether
+the cause is the client's configuration. Cosmetic, not changed: the
+client's status overlay and GameStreamStatusUi print VIDEO_WIDTH x
+VIDEO_HEIGHT (1280x720) regardless of the stream.
+-> NO client change; NO arm APK; the adopted APK f31b1c18...8ae7 stays
+installed throughout (its hash confirmed at the start and the end).
+
+========================================================================
+2. The profile and the selector, as they will be built
+========================================================================
+NATIVE_GAME_1080P60_CANDIDATE = NativeStreamProfile(
+  id="native_game_1080p60_candidate", width=1920, height=1080, fps=60,
+  bitrate_kbps=15750, max_bitrate_kbps=15750, gop_frames=15, bframes=0,
+  fec_group_size=8, max_frame_size_bytes=200_000,
+  audio_queue_target_packets=12, audio_queue_capacity_packets=17,
+  audio_redundancy_copies=2, audio_redundancy_offset_packets=4)
+PRIVYHUB_NATIVE_PROFILE_ID: unset (or empty) -> the adopted profile, argv
+byte-for-byte as today (golden test); set to a known id -> that profile,
+any_override true, native-stream-status shows the profile id, width,
+height, bitrate. Unknown id -> the adopted profile, flagged (never a
+guess), any_override true (an override variable is set).
+Read at companion start (the unit is restarted before every hold).
+
+========================================================================
+5. Scoring -- PRE-REGISTERED here, before step 4; not changed after
+========================================================================
+Holds: six 20-minute attract-mode holds, strictly B1 A1 B2 A2 B3 A3
+(B = adopted, selector unset; A = candidate, selector set), companion
+restarted through its unit before each, T2 sampler on, any_override
+recorded at PLAYING every time, the first hold >= 40 min after the last
+session_ended. Each hold's row from its client decoder report, as the
+close-out defines them (evidence/D_BASE_CLOSEOUT_2026-09-23.md,
+closeout_score.py):
+  spikes >= 20 ms / min      decoder.spike_20_ms / min             < 200
+  rendered fps               decoder.rendered_frames / s           >= 59.5
+  stale drops / min          decoder.stale_output_drops / min      < 20
+  video loss / min, post-FEC video.lost_packets / min              < 10
+  max output gap             decoder.max_output_gap_ms             <= 250 (transport bound; <= 100 stays the open row)
+  audio underruns            audio.underruns per hold (and /min)   reported, no target
+
+  CAPABLE            every row above meets its target on ALL THREE A holds,
+                     AND every B hold meets the same targets (the baseline
+                     stays met), AND no cost row is worse than noise.
+  CAPABLE WITH COST  all A holds meet the targets and the B holds do too,
+                     but a cost row is worse than noise by the S1 rule: all
+                     three A worse than the worst B AND the A median beyond
+                     that worst B by more than the B spread (max - min);
+                     "worse" = higher, except fps (lower). Cost rows:
+                     spikes/min, rendered fps, stale/min, video loss/min,
+                     max output gap, audio underruns/min. Named.
+  NOT CAPABLE        any A hold misses any row -- named, row and hold; a
+                     single miss is a miss.
+  Two cases the handoff does not enumerate, fixed here before data:
+  - all A holds meet the targets but a B hold misses one: the baseline was
+    not met that night -> INCONCLUSIVE (baseline not met), no capability
+    claim either way; the failing B row named.
+  - an A hold not run or without a decoder report -> INCOMPLETE for that
+    hold; the outcome needs three scored A holds. (A hold that reaches no
+    PLAYING under the candidate is a miss, NOT CAPABLE.)
+  Order: NOT CAPABLE, then INCOMPLETE, then INCONCLUSIVE, then CAPABLE
+  WITH COST, then CAPABLE.
+
+Reported, not gated: host CPU and GPU load (T2 encoder/RetroArch CPU %;
+a per-hold 5 s gpu_busy_percent + /proc/stat sampler), thermal (T2 host
+and onn), on-air Mbps (report video.bytes / duration, and the relay's
+frame-size log payload_bytes), encoder frame sizes vs the cap (per-second
+native_frame_sizes.jsonl: frames_over_cap per minute, max_bytes,
+frames_ge_80), the client's decoder queue depth (max_queue_depth) and
+codec_ms (max_codec_ms), audio underruns.
