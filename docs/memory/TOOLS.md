@@ -983,6 +983,54 @@ Tests: `python3 -m unittest tools/test_c5_m1_profile_selector.py -v`.
 Records: `evidence/C5_M1_1080P60_PROFILE_2026-09-28.md`,
 `evidence/C5_M2_1080P60_FOLLOWUP_2026-09-29.md`.
 
+## The adopted PS1 source config (C5-M4A, 2026-10-01) — 1920×1080 window, internal resolution 4x
+
+The decision is `decisions/C5-M4_PS1_4X_SOURCE_ADOPTION_2026-10-01.md`.
+The files are under `~/.config/retroarch/config/Beetle PSX HW/`:
+
+- `Beetle PSX HW.cfg`, the core override (`video_fullscreen` and
+  `video_windowed_fullscreen` "true"), sha256 `dc4d6019…85b9`;
+- `Beetle PSX HW.opt` and `Twisted Metal 2 (USA).opt`, `e409d6c1…3b9f`;
+- Bomberman, Crash Bash, FIFA 98, Nicktoons Racing and Speed Punks `.opt`,
+  `86a52347…c83c`.
+
+All carry `beetle_psx_hw_internal_resolution = "4x"`.
+
+**What to expect:**
+
+- Every PS1 launch logs "Core-specific overrides found … Beetle PSX
+  HW.cfg" and "HW render (4096x4096)".
+- The companion captures 1920×1080 and downscales it to the 720p stream.
+- SNES (bsnes) is untouched: 879×672.
+
+**The per-title copies:**
+
+- **A PS1 title's first multitap launch seeds its `.opt` from the base**
+  (`_prepare_ps1_multitap_options`), so a new copy inherits 4x. CTR has
+  multitap and no copy yet.
+- The multitap write edits only the two multitap keys.
+- **A copy made before 2026-10-01 must carry the line itself.** The six
+  copies were edited.
+- After any new copy appears, check:
+  `grep -L 'internal_resolution = "4x"' ~/.config/retroarch/config/"Beetle PSX HW"/*.opt`
+  should print nothing.
+
+**Edit `.opt` files only with no game running.** RetroArch rewrites them
+on exit with the values in force.
+
+**Revert**, with no game running:
+
+```bash
+D="$HOME/.config/retroarch/config/Beetle PSX HW"
+B=/home/privyhub/Projects/onn-stream-test/docs/memory/evidence/c5_m4a_2026-10-01/backup
+rm "$D/Beetle PSX HW.cfg" && cp "$B"/*.opt "$D"/ && (cd "$D" && sha256sum *.opt)   # 7885077…54f0 base/TM2, acd5b92a…1a2d the five
+```
+
+**Measuring.** C5-M4's `c5_m4_source.sh` seeds its game `.opt` from the
+base, which is now 4x. For RetroArch's frame counter on the adopted
+config, stack the counter-only game override
+`evidence/c5_m4a_2026-10-01/c5_m4a_counter.sh set` (then `clear`).
+
 ## The PS1 source at 1080p, measured without touching the adopted files (C5-M4)
 
 `evidence/c5_m4_2026-10-01/`. **Never leave the game-specific files in

@@ -1,0 +1,14 @@
+C5-M4 host table -- runs
+
+hold    HOLDS60  RA fps lost  ivmax enc fps dupdrop  slowcodec 1/L/max |   CPU core95   GPU GPU95 GPU W   RA%  enc%  Tctl  edge
+b_adopted True     59.999    0 4272.0    60.0       1             -/9/87 |  12.1   31.3  22.4    28  23.5  35.7  49.3  62.9  53.0
+
+R3 (codec_ms growth) is NOT EVALUABLE as pre-registered: the C2 per-report telemetry carries no codec_ms.
+HOLDS60 is read on R1 and R2. Substitutes (decide nothing): slow events (>= 50 ms) per minute and their
+codec_ms median, first full minute -> last minute; receive_to_decode_ms median first -> last minute.
+hold    slow ev 1st/last min codec med 1st/last codec max/end rx2dec 1st/last
+b_adopted                 0/89                -/9         87/14        10.0/9.0
+
+client rows (b, c; reported, not judged)
+hold    profile                                capture   min    fps  spk/m stale loss/m  gap codecmx   Mbps    frmax p50/p90/max cap s/m ge80/m abr events
+b_adopted native_game_720p60_reference         1920x1080 20.14  59.94   27.2  0.25   4.12  141      87   7.09  49664/ 86882/ 89590     9.7    0.0 {"session_ended_reset": 4, "controller_start": 1, "state": 88}

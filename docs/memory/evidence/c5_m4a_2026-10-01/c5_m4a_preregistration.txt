@@ -1,0 +1,56 @@
+C5-M4A -- pre-registration, written 2026-10-01 before any change.
+Task: docs/memory/handoffs/C5-M4A_PS1_4X_SOURCE_ADOPTION_TASK.md (the user, 2026-10-01: "Yes apply the 4x config"),
+under QUEUE_2026-09-29B.md's rules. ADOPTED HOLDS iff every row V1-V6 holds; otherwise every file is restored
+from the backups, the restore is hash-verified, the failed row is recorded, and the task stops.
+
+THE CHANGE (exactly C5-M4's proposal plus the per-title copies; directory ~/.config/retroarch/config/Beetle PSX HW/)
+  new   Beetle PSX HW.cfg  = evidence/c5_m4_2026-10-01/proposal/Beetle PSX HW.cfg (video_fullscreen and
+        video_windowed_fullscreen "true")
+  edit  beetle_psx_hw_internal_resolution "1x(native)" -> "4x", that one line only, in Beetle PSX HW.opt and in the
+        six per-title copies (Bomberman - Party Edition, Crash Bash, FIFA - Road to World Cup 98, Nicktoons Racing,
+        Speed Punks, Twisted Metal 2). Nothing else.
+
+BEFORE THE CHANGE (baseline for V3): one SNES title (Donkey Kong Country (USA), bsnes) launched through the
+companion with no stream: its window size and bsnes.opt hash recorded, then stopped. No other 2D core has
+content on this host (Genesis and NES are "games_empty"), so the "other 2D core" is shown by its config only:
+no fceumm / blastem options file exists before or after, and retroarch.cfg (the persistent PrivyHub config) is
+unchanged.
+
+ROWS
+  V1  With no game running: the override written; the one line changed in the base and the six copies; sha256
+      of every file before and after; backups kept in the evidence dir; a recursive sha256 listing of
+      ~/.config/retroarch/ before and after the apply differs ONLY in those eight files.
+  V2  Through the companion's launch route (POST /plugins/games/launch, the path the client uses), no stream:
+      (a) Tekken 3 (USA) [no multitap]: window 1920x1080 (xdotool), the RetroArch log's "HW render (4096x4096)",
+          the log names the core override, and the regenerated privyhub-session.cfg carries no video_fullscreen
+          / video_windowed_fullscreen key other than retroarch.cfg's own "false" lines that the override
+          supersedes (the window decides);
+      (b) Crash Bash (USA) [ps1_multitap port1, has its own copy]: the same window and render target, and after
+          the session its .opt still carries internal_resolution "4x" with the multitap port1 key enabled.
+      Both stopped through POST /plugins/games/stop.
+  V3  Donkey Kong Country (USA) launched the same way after the change: window size equal to the baseline,
+      bsnes.opt hash equal to the baseline; no fceumm / blastem options file appeared; retroarch.cfg hash equal.
+  V4  tools/d7_regression.py, one pass: the nine scripted rows PASS as in D7-R2's P3 (2026-09-25): server boot,
+      discovery, media, Games launch, video/audio/controller, pause/resume, Save/Load, profiles/cheats/mod,
+      End/teardown (restart/recovery is cited, not run). The PS1 reference title is Tekken 3, so every game row
+      runs on the 4x source. Feel and picture remain NEEDS USER.
+  V5  One 20-min attract hold of Tekken 3 on the adopted 7000 stream: no PRIVYHUB_* in the manager, the
+      companion's environ exactly PRIVYHUB_ADAPTIVE_BITRATE_MODE=live, any_override false, T2 at 10 s.
+      Measurement-only: a game override "Tekken 3 (USA).cfg" with the frame-counter keys alone (fps_show,
+      framecount_show, video_font_enable false, menu_enable_widgets false) for this hold, deleted after.
+      Met if ALL of:
+        R1 (C5-M4) RetroArch fps over the hold >= 59.88 and no 256-frame interval > 256/60 s + 12 ms;
+        R2 (C5-M4) the encoder's per-progress-line capture fps median >= 59.5, dup+drop <= 0.5 % of frames;
+        the capture window 1920x1080 (armcheck capture_target);
+        client: spikes >= 20 ms < 200/min, rendered fps >= 59.5, stale drops < 20/min, audio underruns
+        < 5/min (the handoff's "< 5", read per minute as C5's scorer does; the close-out had 17/14 per 20-min
+        session).
+      Reported, not gated: post-FEC video loss/min and max gap (against LINK-L1, MIXED); per-second largest
+      frame p50/p90, cap hits s/min, >= 80-packet frames/min beside C5-M4's b_4x; controller transitions
+      (0 expected; recorded either way; the stop rule stands). If link-drop recovery pauses the game in the
+      hold, R1 is read over the PLAYING span and the pause recorded.
+  V6  At the end: no game, stream 7000, any_override false, selector absent, the manager carries no PRIVYHUB_*,
+      the environ exactly the live default, live / configured live / acts true, APK de072762...835e on the onn,
+      the eight adopted files hashed as the adopted PS1 source config, no measurement file left.
+
+NOTHING ELSE ADOPTED. No 1080p arm, no selector, no nights, no nft, no real sudo, the Opal read-only.

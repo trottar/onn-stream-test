@@ -1,0 +1,26 @@
+[table 20:41:42Z] start: manager PRIVYHUB_* ''; MainPID 1450647; 8765 1450647; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 20:41:42Z] T2 sampler started (10 s); one hold, 1200s
+[table 20:41:42Z] b_adopted begins (adopted 7000, the adopted 4x PS1 source)
+[b_adopted 20:41:42Z] mode=H hold/timeout=1200s probe_args=none heartbeat_ms=default
+[b_adopted 20:41:42Z] ARM_PROFILE adopted; PRIVYHUB_* in the user manager: ''
+[b_adopted 20:41:47Z] companion MainPID 1451684 serving 8765; PRIVYHUB_* in its environ: 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[b_adopted] before launch: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[b_adopted] at PLAYING: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[b_adopted 20:42:26Z] SurfaceFlinger stream-surface lines: 11
+[b_adopted 20:42:26Z] PLAYING at 2026-10-01T20:42:26Z; holding 1200s, zero input
+[b_adopted 21:02:27Z] adb client processes seen during hold: 36 (# polls 2315)
+[b_adopted 21:02:28Z] report: native_decoder_20261001_210228_575.json
+[frames] 1201 seconds in the session window
+[heartbeat] 598 lines
+[b_adopted 21:02:48Z] decision log lines in the hold: 694
+[b_adopted 21:02:50Z] game active after stop: False
+[b_adopted 21:02:50Z] done
+[table 21:02:50Z] b_adopted exit 0
+[table 21:02:55Z] teardown: manager PRIVYHUB_* ''; MainPID 1464622; 8765 1464622; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 21:02:55Z] measurement files: 0 (want 0)
+[table 21:02:55Z] ADOPTED APK CONFIRMED (device hash de072762e55122c3060086f6f10b1bff54633d9165d0c475f17699127841835e)
+[table 21:03:04Z] teardown: game active False; NOW PLAYING on the launcher: 1
+[table 21:03:15Z] stale banner: force-stop + relaunch; NOW PLAYING now: 0
+[table 21:03:16Z] table done

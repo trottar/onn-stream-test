@@ -22,8 +22,16 @@ nothing adopted** (`../evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md`).
   - 1080p/12,600/90 KB 0.902;
   - IDR-rate pulse at 1080p under the 90 KB cap.
 - **C5-M3's FMV segment was reproduced**, and its T re-used.
+- **`C5-M4A` (2026-10-01): the 4x PS1 source ADOPTED** (the user: "Yes
+  apply the 4x config"), by the pre-registered rows:
+  - V1-V3: exactly the eight files changed; 1920×1080 / 4096² through the
+    companion; the multitap write keeps the line; SNES untouched;
+  - V4: D7 9/9 on the retry (P1's discovery row missed by 0.2 s of
+    client start-up);
+  - V5: the 20-min 7000 hold met every row;
+  - `../decisions/C5-M4_PS1_4X_SOURCE_ADOPTION_2026-10-01.md`.
 - **Open, the user's:**
-  - the picture decision on the proposed source config (TV only; nothing
+  - the picture look at 4x, dither mode first (TV only; nothing
     perceptual is a gate);
   - the 40 MHz change on the Opal;
   - then the LINK-L1 re-run, and Part 2 (the 1080p rung: the actuator's

@@ -2,27 +2,26 @@
 
 Authoritative state: `../CURRENT.md`. **Start there.**
 
-Baseline commit `cddacaf` (the LINK-L1 / D1 commit); nothing committed since.
+Baseline commit `fe8f125` (C5-M4 Part 1); nothing committed since.
 
-## 2026-10-01 (later) — C5 reopened; `C5-M4` Part 1: the PS1 source at native 1080p
+## 2026-10-01 (evening) — `C5-M4A`: the 4x PS1 source ADOPTED
 
-- **The user's reading**: 1080p60 is a Phase C deliverable through the
-  adaptive ladder, and the source should render at native 1080p.
-- **Part 1 is done; nothing is adopted.**
-  - The window becomes 1920×1080 through RetroArch fullscreen.
-  - 1x, 2x and 4x HOLD 60 (8x misses by one 256-frame interval), so the
-    **candidate is 4x**.
-  - Offline, on 3D, content SSIM: today 0.838, the 4x source at
-    720p/7000 0.873, 1080p/12,600 0.902.
-  - The proposal (a PS1 core override plus internal resolution 4x) is
-    written and not applied.
-  - Part 2's rung needs are listed
-    (`../evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md`).
+- **The user**: "Yes apply the 4x config". Adopted by the pre-registered
+  rows V1-V6 (`../decisions/C5-M4_PS1_4X_SOURCE_ADOPTION_2026-10-01.md`).
+- **The config.** PS1 renders at 4x into a 1920×1080 window, through the
+  core override `Beetle PSX HW.cfg` and the line in the base and six
+  per-title `.opt`. The 720p/7000 stream carries it.
+- **The checks.** The 20-min hold met every row (0 transitions). D7 passed
+  9/9 on the retry; P1's discovery row missed by 0.2 s of client
+  start-up. SNES is untouched.
+- **Revert**: `../TOOLS.md`, "The adopted PS1 source config".
+- **Part 1** (the same day, C5 reopened): 4x holds 60, and the 1080p
+  rung's design is in `../evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md`.
 - **Next, the user's:**
   1. the commit;
-  2. the picture decision on the proposed source config, and the 40 MHz
-     change on the Opal;
-  3. then the LINK-L1 re-run, and Part 2 on the user's word.
+  2. the 40 MHz change on the Opal, then the LINK-L1 re-run;
+  3. Part 2, the rung;
+  4. the picture look at 4x, dither mode first, whenever they like.
 
 ## 2026-10-01 — `LINK-L1` MIXED; live adaptive bitrate ON BY DEFAULT (`C3-L4-D1`)
 

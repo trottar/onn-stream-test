@@ -1,0 +1,48 @@
+# PrivyHub-managed RetroArch configuration
+# Linux Phase D baseline
+config_save_on_exit = "false"
+
+libretro_directory = "/home/privyhub/Projects/onn-stream-test/runtime/emulators/retroarch/cores-linux"
+savefile_directory = "/home/privyhub/Projects/onn-stream-test/data/games/retroarch/saves"
+savestate_directory = "/home/privyhub/Projects/onn-stream-test/data/games/retroarch/states"
+system_directory = "/home/privyhub/Projects/onn-stream-test/data/games/retroarch/system"
+log_dir = "/home/privyhub/Projects/onn-stream-test/logs/games"
+
+video_fullscreen = "false"
+video_windowed_fullscreen = "false"
+video_force_aspect = "true"
+video_vsync = "true"
+
+audio_driver = "pulse"
+audio_device = ""
+audio_out_rate = "48000"
+audio_sync = "true"
+
+stdin_cmd_enable = "false"
+
+input_load_state_btn = "4"
+input_save_state_btn = "5"
+input_enable_hotkey_btn = "6"
+input_exit_emulator_btn = "7"
+input_pause_toggle_btn = "9"
+
+state_slot = "0"
+
+input_joypad_driver = "udev"
+joypad_autoconfig_dir = "/home/privyhub/Projects/onn-stream-test/data/games/retroarch/autoconfig"
+
+# PrivyHub session-only overrides
+# Generated from persistent retroarch.cfg + active profile.
+# PrivyHub Phase A controller profile
+# Generated for the active emulator system; do not edit.
+input_player1_analog_dpad_mode = "0"
+input_player2_analog_dpad_mode = "0"
+input_player3_analog_dpad_mode = "0"
+input_player4_analog_dpad_mode = "0"
+game_specific_options = "true"
+network_cmd_enable = "true"
+network_cmd_port = "41373"
+
+# PrivyHub A4 host coexistence
+# Only explicit PrivyHub navigation controls emulator pause.
+pause_nonactive = "false"
