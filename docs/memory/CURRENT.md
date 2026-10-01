@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-09-30
-baseline_commit: f01c3b2
+as_of: 2026-10-01
+baseline_commit: 4e45a4f
 ---
 
 # Current State
@@ -9,55 +9,61 @@ baseline_commit: f01c3b2
 Headings are fixed by `tools/check_memory_health.py`; do not rename.
 ## Active Objective
 
-**Phase C — adaptive streaming on Linux — `C3.L4` CLOSED 2026-09-30:
-live adaptive bitrate VALIDATED UNDER REAL LOSS on the user's three `nft`
-nights.**
+**Phase C — `C3.L4` CLOSED 2026-09-30, and since 2026-10-01 live adaptive
+bitrate is ON BY DEFAULT (`C3-L4-D1`)**, through the unit drop-in
+`~/.config/systemd/user/privyhub-companion.service.d/adaptive.conf`. The
+user authorized it on 2026-09-30: "do the loss row look first and then
+the live default".
 
-- Night 1 NOT; nights 2 and 3 WORKS UNDER LOSS; night 3 showed the
-  pre-registered HOLD shape.
-- The controller as built is authorized. **Live stays behind
-  `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live`, off by default**; turning it on
-  by default is the user's call.
-- **C7 / D8 are met or explicitly deferred**, except the commit. The
-  checkpoint record is `evidence/C7_D8_CHECKPOINT_2026-09-30.md`.
-- **The `CL-B1` APK `de072762…835e` is adopted** (2026-09-30).
-- Earlier: `D-BASE` CLOSED (baseline met, 2026-09-23); C1 done; C4
-  closed (8+1); C5 characterized (1080p60 NOT CAPABLE at parity; the
-  follow-ups INCONCLUSIVE (link); the low rungs screened for Phase G); C6
-  contract on paper; D7 complete.
+- **The loss row look (`LINK-L1`) is MIXED.** 3 of 6 pre-registered
+  holds over one day meet loss < 10/min, and the misses bracket a meet.
+  No conclusion is drawn.
+- C7 / D8 are met or explicitly deferred. The checkpoint commit
+  `4e45a4f` is in.
+- **Earlier:**
+  - `D-BASE` CLOSED (baseline met, 2026-09-23); C1 done;
+  - C4 closed (8+1);
+  - C5 characterized (1080p60 NOT CAPABLE at parity; the low rungs
+    screened for Phase G);
+  - C6 contract on paper; D7 complete;
+  - the `CL-B1` APK `de072762…835e` adopted (2026-09-30).
 
 ## Current Work Item
 
-**The N3 prompt (under `handoffs/QUEUE_2026-09-29B.md`'s rules): Code
-ran `C3-L4-N3`, then `CL-B1` APK, and stopped.**
+**The LINK-L1 / D1 prompt (under `handoffs/QUEUE_2026-09-29B.md`'s
+rules): Code ran Part A, then Part B, and stopped.**
 
-- **`C3-L4-N3`: DONE.**
-  - The user's night 3 is **WORKS UNDER LOSS (F1)**: capacity at +15.5 s;
-    INCREASE ×2 (111 / 93 reports); `capacity_mild` 6000 → 5500 at 121 s
-    after two `hold_down` refusals; HOLD `oscillation` at 5500.
-  - 0 escalations and 0 recovery cycles. BACK reset to 7000 and the
-    status read 7000.
-  - **`C3.L4` is closed** in the decision (with the exact drop-in that
-    would make live the default, not made), `docs/ROADMAP.md` (C3 criteria
-    mapped to records; the C7 row), the architecture ("the controller as
-    closed" table) and `ACTIVE.md`.
-  - **The C7 / D8 checkpoint record** is written (it corrects the "PS1-
-    and-below" claim: NES / Genesis are not claimed), with
-    `logs/c7_d8_git_status_2026-09-30.txt`.
-  - Records: `evidence/C3_L4_NFT_NIGHT3_2026-09-30.md`,
-    `evidence/C7_D8_CHECKPOINT_2026-09-30.md`.
-- **`CL-B1` APK: ADOPTED** by the pre-registered rule.
-  - A clean, reproducible build `de072762…835e`; Kotlin 11/11.
-  - A3: the body form, key set identical, `slow_event_capacity` 1,280.
-  - A4: every client row met. A5: loss 10.29 against 11.81/min for the
-    paired old APK.
-  - `tools/c3_l4_nft_night.py` now expects the new hash (24/24 tests).
-  - Records: `evidence/CL_B1_APK_ADOPTION_2026-09-30.md`,
-    `decisions/CL-B1_APK_ADOPTION_2026-09-30.md`.
-- **Earlier:** 2026-09-29/30 `C3-L4-N2` (`capacity_mild`), `C5-M2`
-  (INCONCLUSIVE (link)), `C5-M3` (720p/4000 passes transport), `C3-L4-N1`,
-  `C3-L4-L2(B)`; 2026-09-28 `C3-L4-L1`, `C3-L3A-R4`, `C5-M1`; 2026-09-24/25
-  as before. Records under `evidence/` and in the daily files.
+- **`LINK-L1`: MIXED** (`evidence/LINK_L1_LOSS_ROW_2026-10-01.md`).
+  - Six 20-min holds, adaptive off, one per local 4-hour block, 12:40
+    EDT on 09-30 to 08:41 EDT on 10-01. Loss/min: 37.27 ✗, 4.25 ✓,
+    15.19 ✗, 3.16 ✓, 7.54 ✓, 16.78 ✗. The max gap met ≤ 100 on one hold.
+  - History since D-BASE: 16 of 36 holds meet, with meets and misses in
+    every block.
+  - Retries, link rate, RSSI and the MCS share do not predict the loss
+    across nights.
+  - The air (read-only, counts only) is as O1 found it: channel 36 at 80
+    MHz, idle 3.3 %, noise −89/−90. 3-4 strong BSSIDs share the 80 MHz
+    block's secondaries, and 0 are on 36.
+- **`C3-L4-D1`: live ON BY DEFAULT since 2026-10-01 13:07Z**
+  (`decisions/C3-L4_LIVE_DEFAULT_2026-10-01.md`,
+  `evidence/C3_L4_D1_LIVE_DEFAULT_2026-10-01.md`).
+  - B1: the drop-in is verified. The environ carries exactly the one
+    name and the manager none; mode live, acts true; `any_override`
+    false; the unit file and the shadow unchanged.
+  - B2: `tools/c3_l4_nft_night.py` and `tools/d7_regression.py` accept
+    the one name only. The nft teardown restores the baseline, not off,
+    and a skipped-teardown path was fixed. Tests 32/32, mutations 4/4,
+    fake-sudo FULL and ABORT PASS.
+  - B3a, the injection: **NOT PASS AS PRE-REGISTERED.** The controller
+    acted as intended (one FALLBACK 7000 → 5000, client SSRC change 1,
+    reset at BACK, inject flag gone, route 403). But two clauses failed
+    as worded:
+    - an `ssrc_change` row that is never emitted for an own transition;
+    - a stream read 0.3 s before the client's stop.
+  - B3b, the 30-min hold on the default: **SILENT** (0 transitions,
+    refusals or HOLDs; client rows met; loss 7.59, max gap 447 ms).
+- **Earlier** (records under `evidence/`, and the daily files): N3,
+  `CL-B1`, C7 / D8 (09-30); N2, C5-M2/M3, N1 (09-29); L1, R4, C5-M1 (09-28).
 
 ## Verified State
 
@@ -88,16 +94,30 @@ loss — the losses are not at transitions; no-transition H2 missed too).
   2/4** (`P10`). Env overrides exist for comparison sessions only
   (`TOOLS.md`, including `C5-M1`'s `PRIVYHUB_NATIVE_PROFILE_ID`); none set.
 - **Installed**: **APK `de072762…835e`** (the `CL-B1` APK, adopted
-  2026-09-30; hash confirmed on the onn 15:06Z; the previous
+  2026-09-30; hash confirmed on the onn at every LINK-L1 / D1 teardown,
+  last 2026-10-01 14:38Z; the previous
   `f31b1c18…8ae7` is kept at `runtime/c4_m1/adopted_app-debug.apk` for
   rollback).
   - The companion is the systemd user unit `privyhub-companion` (`H3`);
     restart it with `systemctl --user restart`.
-  - Last restarted 2026-09-30 15:05Z by the `CL-B1` paired hold's
-    teardown: no flag, no selector, `PRIVYHUB_FEC_SCHEME` absent, profile
-    adopted, `adaptive_bitrate` off.
+  - **Live adaptive bitrate by default, since 2026-10-01 13:07Z**,
+    through the drop-in
+    `~/.config/systemd/user/privyhub-companion.service.d/adaptive.conf`
+    (`Environment=PRIVYHUB_ADAPTIVE_BITRATE_MODE=live`). The unit file
+    is unchanged.
+    - The companion's environ carries exactly that one `PRIVYHUB_*`,
+      and the user manager none.
+    - `adaptive_bitrate.mode live`, `configured_mode live`, `acts true`.
+    - Kill switches: delete the drop-in + `daemon-reload` + restart
+      (off); `POST /plugins/games/adaptive-bitrate/disable` (shadow, one
+      session).
+  - Last restarted 2026-10-01 14:38Z by the D1 night's teardown:
+    - manager none, environ the one name, mode live;
+    - no selector, `PRIVYHUB_FEC_SCHEME` absent;
+    - profile adopted at 7000, `any_override` false;
+    - no game, 0 banners.
   - The companion tree carries the live controller through `C3-L4-N2`
-    (off unless its flag is set) and the C5 selector profiles (dormant).
+    (unchanged by D1) and the C5 selector profiles (dormant).
   - The C5 night scripts in evidence still name the old APK (`TOOLS.md`).
 - **Link-drop recovery** RUNTIME VALIDATED on real loss (`R3`-`R3d`);
   recovery never loads into a live core (`R3c2`).
@@ -106,27 +126,31 @@ loss — the losses are not at transitions; no-transition H2 missed too).
 
 ## Next Action
 
-1. **The user's commit** (C7 / D8 "clean checkpoint/push"). Cowork gives
-   the line from `logs/c7_d8_git_status_2026-09-30.txt`. What must not be
-   committed is listed in `evidence/C7_D8_CHECKPOINT_2026-09-30.md`; all
-   of it is already ignored.
-2. **The user's call: turn live adaptive bitrate on by default, or not.**
-   The one drop-in that would do it is in the decision's 2026-09-30 close.
-   Also open for the user: the adopted 720p's loss row on these evenings
-   (`investigations/ACTIVE.md`).
-3. **What the ROADMAP says follows C7 / D8** on the Linux order: **Phase
-   E — Linux core resource characterization and optimization**, starting
-   at E1, freezing the workload suite. It is not started.
+1. **The user's commit** of the LINK-L1 / D1 work. Cowork gives the line
+   from `logs/link_l1_d1_git_status_2026-10-01.txt`. Nothing is
+   committed by Code; `logs/` and the APKs stay out of git.
+2. **Part A was MIXED, not TIME OF DAY or MOVED**, so there is no window
+   to schedule into and no re-baselining is called for. The loss row is
+   met on about half the holds at any hour.
+   - If the user wants it to hold reliably, the levers are theirs, with
+     what the air view says about each in the LINK-L1 record: the Opal's
+     channel or width (read-only to Code), the onn's placement, or a
+     wired hop.
+   - Also for the user: B3a's two pre-registration clauses (the record
+     explains both). The controller acted; no rule changed.
+3. **Phase E per the ROADMAP** (Linux core resource characterization and
+   optimization, starting at E1, freezing the workload suite). It is not
+   started.
 
 **Open, not blocking:**
 
-- the max output gap;
-- `host_link`;
-- the thermal flag proposal;
-- the controller item (`CTRL-L1`: PATH);
-- the recent slow-event ring (fills in ~12 min in attract mode, `CL-B1`;
-  session 4's Phase A off-transition events were all evicted);
-- the `C6-D1` migration list.
+- the max output gap (447 ms on the D1 hold); `host_link`; the thermal
+  flag proposal; `CTRL-L1` (PATH); the recent slow-event ring; the
+  `C6-D1` migration list; the mild step's ~120 s bound (the user's ask);
+- **adaptive-off measurements now need the drop-in out for the session**
+  (`TOOLS.md`);
+- the evidence copies of older night scripts refuse or misreport on the
+  default-live companion; use the D1 pattern.
 
 ## Success Criteria
 
@@ -169,4 +193,4 @@ perceptual gate unless the user sets one.
 - `handoffs/CURRENT_HANDOFF.md` (Phase C); `investigations/ACTIVE.md`;
   `docs/ROADMAP.md` (Phase C, D-072 order); `docs/KNOWN_ISSUES.md`.
 - `evidence/RUNTIME_VALIDATION.md` — a classification per record;
-  `patches/PATCH_INDEX.md` lists all 137.
+  `patches/PATCH_INDEX.md` lists all 140.

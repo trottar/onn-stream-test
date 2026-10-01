@@ -1,0 +1,25 @@
+C3-L4-D1 B3 -- live from the default (the drop-in)
+
+I (2026-10-01T13:31:13Z .. 2026-10-01T13:36:13Z): decision-log events {'session_ended_reset': 4, 'controller_start': 1, 'sample': 154, 'state': 7, 'inject': 1, 'transition': 1, 'transition_done': 1}
+  transition_done 7000 -> 5000 at 2026-10-01T13:33:14.828Z, actuation 1237.0 ms; ssrc_change at []
+  status_end level 5000 stream 5000; after BACK level 7000 stream 5000
+  after I: manager '', environ 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live', inject route 403
+  FAIL  I1 one FALLBACK on the injection, acted 7000 -> 5000, transition_done, ssrc_change
+  PASS  I2 any_override false at PLAYING and at the end
+  FAIL  I3 after BACK level 7000 (session_ended_reset 5000 -> 7000), stream 7000
+  PASS  I4 inject flag absent (manager none, environ exactly the drop-in's name), route 403
+  diagnosis (after the data; the rows above stand):
+    I1: ssrc_change rows in the decision log 0 -- the live controller emits that row only from note_recovery_restart (recovery restarts), never for its own transition; the client report: ssrc_changes 1, discontinuities [('ssrc_change', 126996)]; blackout samples after transition_done 3
+    I3: status after BACK read level 7000, transitions 0, state REFERENCE, but active True and bitrate 5000: the read (09:36:16 local) preceded the client's native-stream-stop (09:36:17, companion_I.log), whose stop path resets the active bitrate to the profile's 7000; no native-stream-status read was taken between the stop and the companion's restart
+  => I NOT PASS AS PRE-REGISTERED
+
+H (2026-10-01T14:07:16Z .. 2026-10-01T14:37:16Z; local 2026-10-01 10:07 EDT): mode live configured live, any_override False
+  decision-log events {'session_ended_reset': 4, 'controller_start': 1, 'sample': 901, 'state': 108}; sample rows 901; clean 842; acting rows 0; HOLD states 0
+  client: 30.16 min, spikes 59.9/min, fps 59.93, stale 0.56/min, underruns 0.70/min
+  PASS  spikes/min < 200
+  PASS  rendered fps >= 59.5
+  PASS  stale/min < 20
+  PASS  audio underruns/min < 5
+  controller: 0 transitions / would_act / hold / refused
+  reported: loss 7.59/min (meets < 10), max gap 447 ms (misses <= 100); Part A was MIXED, so no window to place it in (local hour 10)
+  => H SILENT

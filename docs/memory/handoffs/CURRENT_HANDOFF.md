@@ -2,7 +2,32 @@
 
 Authoritative state: `../CURRENT.md`. **Start there.**
 
-Baseline commit `f01c3b2` (2026-09-28); nothing committed since.
+Baseline commit `4e45a4f` (2026-09-30); nothing committed since.
+
+## 2026-10-01 — `LINK-L1` MIXED; live adaptive bitrate ON BY DEFAULT (`C3-L4-D1`)
+
+- **`LINK-L1`** (Part A, adaptive off): six pre-registered 20-min holds,
+  one per local 4-hour block. **MIXED**: 3 of 6 meet loss < 10/min
+  (37.27 / 4.25 / 15.19 / 3.16 / 7.54 / 16.78), and there is no time
+  window. History since D-BASE: 16 of 36 meet. The air is as O1 left it.
+  No conclusion is drawn; the levers are the user's
+  (`../evidence/LINK_L1_LOSS_ROW_2026-10-01.md`).
+- **`C3-L4-D1`** (Part B, the user's authorization 2026-09-30):
+  - **Live is the default** through
+    `~/.config/systemd/user/privyhub-companion.service.d/adaptive.conf`.
+    The companion's environ carries exactly
+    `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live`, and the user manager none.
+  - Kill switches: delete the drop-in (off), or the disable route
+    (shadow, one session).
+  - The 30-min hold on the default was SILENT.
+  - The injection session acted as intended, but is NOT PASS AS
+    PRE-REGISTERED on two clauses traced to the pre-registration and the
+    harness's read timing.
+  - `tools/c3_l4_nft_night.py` and `tools/d7_regression.py` accept the
+    one name. **The evidence copies of older night scripts do not**: use
+    the D1 pattern (`../TOOLS.md`).
+  - Records: `../decisions/C3-L4_LIVE_DEFAULT_2026-10-01.md`,
+    `../evidence/C3_L4_D1_LIVE_DEFAULT_2026-10-01.md`.
 
 ## 2026-09-28 — `C3.L3a` closed; `C3.L4` authorized, single transition
 

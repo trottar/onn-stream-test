@@ -50,6 +50,7 @@ PKG = "com.safeiot.privyhub"
 HB_LOG = REPO / "logs/games/native_stream_heartbeat.log"
 SESSDIR = REPO / "logs/games/decoder_sessions"
 HOLD_S = 180
+DEFAULT_LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"   # C3-L4-D1: the unit drop-in's one name
 
 
 def now() -> str:
@@ -200,18 +201,25 @@ def row_boot() -> dict:
     code, st = http("GET", "/status")
     ns = stream_status()
     o, c, r = ns.get("encoder_overrides") or {}, ns.get("audio_cushion") or {}, ns.get("audio_redundancy") or {}
-    env_n = sum(1 for l in Path(f"/proc/{mp}/environ").read_bytes().split(b"\0")
-                if l.startswith(b"PRIVYHUB_")) if mp and mp != "0" else None
+    # C3-L4-D1 (2026-10-01): live adaptive bitrate is the default through the unit's drop-in, so the
+    # companion's environ may carry exactly PRIVYHUB_ADAPTIVE_BITRATE_MODE=live; any other PRIVYHUB_*
+    # fails the row, and the user manager must carry none (no set-environment residue).
+    env = ([l.decode(errors="replace") for l in Path(f"/proc/{mp}/environ").read_bytes().split(b"\0")
+            if l.startswith(b"PRIVYHUB_")] if mp and mp != "0" else None)
+    env_n = sum(1 for l in env if l != DEFAULT_LIVE) if env is not None else None
+    mgr_n = sum(1 for l in sh(["systemctl", "--user", "show-environment"]).splitlines() if l.startswith("PRIVYHUB_"))
     adopted = (o.get("any_override") is False and o.get("max_frame_size_bytes") == 90000
                and (c.get("queue_target_packets"), c.get("queue_capacity_packets")) == (12, 17)
                and (r.get("copies"), r.get("offset_packets")) == (2, 4)
                and (ns.get("fec") or {}).get("version") == "xor8_1")
-    ok = bool(mp and owner == mp and code == 200 and st.get("service") == "PrivyHub" and adopted and env_n == 0)
+    ok = bool(mp and owner == mp and code == 200 and st.get("service") == "PrivyHub" and adopted and env_n == 0 and mgr_n == 0)
     return {"verdict": "PASS" if ok else "FAIL",
             "evidence": {"mainpid_owns_8765": owner == mp, "seconds": secs, "status_http": code,
                          "service": st.get("service"), "native_stream_ready": ns.get("ready"),
                          "profile_adopted": adopted, "fec": (ns.get("fec") or {}).get("version"),
-                         "privyhub_env_in_companion": env_n}}
+                         "privyhub_env_in_companion_other_than_default": env_n,
+                         "default_live_in_companion": (DEFAULT_LIVE in env) if env is not None else None,
+                         "privyhub_env_in_manager": mgr_n}}
 
 
 def row_discovery() -> dict:

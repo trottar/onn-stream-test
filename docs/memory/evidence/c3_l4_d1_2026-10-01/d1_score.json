@@ -1,0 +1,56 @@
+{
+ "I": {
+  "verdict": "NOT PASS AS PRE-REGISTERED",
+  "rows": {
+   "I1 one FALLBACK on the injection, acted 7000 -> 5000, transition_done, ssrc_change": false,
+   "I2 any_override false at PLAYING and at the end": true,
+   "I3 after BACK level 7000 (session_ended_reset 5000 -> 7000), stream 7000": false,
+   "I4 inject flag absent (manager none, environ exactly the drop-in's name), route 403": true
+  },
+  "events": {
+   "session_ended_reset": 4,
+   "controller_start": 1,
+   "sample": 154,
+   "state": 7,
+   "inject": 1,
+   "transition": 1,
+   "transition_done": 1
+  },
+  "client": {
+   "minutes": 5.155633333333333,
+   "spikes": 47.326872223910414,
+   "fps": 59.766339731943695,
+   "stale": 1.9396259108160006,
+   "aund": 3.1034014573056012,
+   "loss": 13.965306557875204,
+   "maxgap": 202
+  }
+ },
+ "H": {
+  "verdict": "SILENT",
+  "client": {
+   "minutes": 30.164183333333334,
+   "spikes": 59.9054839321027,
+   "fps": 59.92979532569255,
+   "stale": 0.5635823059467326,
+   "aund": 0.6961899073459639,
+   "loss": 7.591785180105987,
+   "maxgap": 447
+  },
+  "events": {
+   "session_ended_reset": 4,
+   "controller_start": 1,
+   "sample": 901,
+   "state": 108
+  },
+  "acting": [],
+  "holds": [],
+  "local": "2026-10-01 10:07",
+  "client_rows": {
+   "spikes/min < 200": true,
+   "rendered fps >= 59.5": true,
+   "stale/min < 20": true,
+   "audio underruns/min < 5": true
+  }
+ }
+}

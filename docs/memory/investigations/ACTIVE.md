@@ -10,8 +10,15 @@
   (`../evidence/C3_L4_NFT_NIGHT3_2026-09-30.md`).
 - Live is **validated under real loss on three nights**. The controller
   as built is authorized (the decision's close).
-- **Live stays behind its flag, off by default**; turning it on by
-  default is the user's call.
+- ~~Live stays behind its flag, off by default~~. **Since 2026-10-01
+  (`C3-L4-D1`), live is ON BY DEFAULT** through the unit drop-in. It was
+  the user's call, made 2026-09-30.
+  - The 30-min hold on the default was SILENT.
+  - The injection session acted as intended, but is NOT PASS AS
+    PRE-REGISTERED on two clauses traced to the pre-registration and to
+    the harness's read timing.
+  - Records: `../decisions/C3-L4_LIVE_DEFAULT_2026-10-01.md`,
+    `../evidence/C3_L4_D1_LIVE_DEFAULT_2026-10-01.md`.
 
 **Open, not blocking** (carried; none gates anything):
 
@@ -25,7 +32,8 @@
   the sample rows);
 - **the ROUTINE reversal hold-down length** (~120 s bounds the mild step
   after an increase), a rule change only if the user asks;
-- the adopted 720p's loss row on the evenings of 2026-09-29/30 (below).
+- the adopted 720p's loss row: `LINK-L1` (2026-10-01) MIXED, no
+  conclusion drawn; the levers are the user's (below).
 
 The history of the item follows.
 
@@ -111,6 +119,21 @@ recovery-escalation backstop.
   MCS) are unchanged, and the Opal's retries do not predict the loss
   across nights. **Whether the baseline has shifted is worth the user's
   look before any further arm is judged on this link.**
+- **`LINK-L1` (2026-10-01): MIXED, by the pre-registered rule.**
+  - Six 20-min holds on the adopted profile at 7000, adaptive off, one
+    per local 4-hour block over one day: loss 37.27 / 4.25 / 15.19 /
+    3.16 / 7.54 / 16.78 per min (12:40 → 08:41 EDT).
+  - That is 3 of 6. The misses bracket a meet, so the day is not TIME OF
+    DAY, and it is not MOVED.
+  - History since D-BASE: 16 of 36 holds meet, and every block with more
+    than two holds has both meets and misses.
+  - The air is as O1 left it: channel 36 / 80 MHz, idle 3.3 %, noise
+    −89/−90. 3-4 strong neighbour BSSIDs share the 80 MHz block's
+    secondaries, and 0 are on 36.
+  - Retries and the MCS-1 share do not predict the loss across nights.
+  - **No conclusion is drawn.** The levers (channel or width, placement,
+    a wired hop) are the user's, laid out in
+    `../evidence/LINK_L1_LOSS_ROW_2026-10-01.md`.
 
 **C5 (2026-09-28, `C5-M1`): 1080p60 NOT CAPABLE (stream) at parity** —
 client and host capable; the wireless hop's per-frame burst loss at 2.25×

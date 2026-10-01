@@ -271,5 +271,69 @@ class AdoptedApk(unittest.TestCase):
                          "de072762e55122c3060086f6f10b1bff54633d9165d0c475f17699127841835e")
 
 
+
+class LiveDefault(unittest.TestCase):
+    """C3-L4-D1 (2026-10-01): live is the default through the unit's drop-in. The one name
+    PRIVYHUB_ADAPTIVE_BITRATE_MODE=live is the baseline in the companion's environ; nothing may be
+    left in the user manager; the teardown returns to the baseline, not to off."""
+
+    LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
+
+    def test_the_default_name(self):
+        self.assertEqual(h.DEFAULT_LIVE, self.LIVE)
+
+    def test_the_baseline_environments_accepted(self):
+        self.assertIsNone(h.env_baseline_refusal([], [self.LIVE]))   # the drop-in
+        self.assertIsNone(h.env_baseline_refusal([], []))            # the kill switch: drop-in deleted
+        self.assertEqual(h.baseline_mode([self.LIVE]), "live")
+        self.assertEqual(h.baseline_mode([]), "off")
+
+    def test_set_environment_residue_is_refused(self):
+        for mgr in ([self.LIVE], ["PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1"], ["PRIVYHUB_FEC_SCHEME=xor8_2"]):
+            self.assertIn("user manager", h.env_baseline_refusal(mgr, [self.LIVE]), mgr)
+
+    def test_any_other_name_or_value_in_the_environ_is_refused(self):
+        for other in ("PRIVYHUB_ADAPTIVE_BITRATE_MODE=shadow", "PRIVYHUB_ADAPTIVE_BITRATE_MODE=off",
+                      "PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1", "PRIVYHUB_FEC_SCHEME=xor8_2",
+                      "PRIVYHUB_NATIVE_PROFILE_ID=native_game_1080p60_candidate", "<unreadable>"):
+            why = h.env_baseline_refusal([], [self.LIVE, other])
+            self.assertIsNotNone(why, other)
+            self.assertIn(other, why)
+
+    def test_finish_tears_down_when_live_came_from_the_drop_in(self):
+        """flag_set stays False when live is the default; the teardown must still run."""
+        calls = []
+        n = h.Night.__new__(h.Night)
+        n.dry, n.sudo_ok, n.flag_set, n.entered = True, False, False, True
+        n.keepalive_stop = __import__("threading").Event()
+        n.clear_fault_final = lambda why: calls.append("clear")
+        n.teardown = lambda: calls.append("teardown")
+        n.collect = lambda: calls.append("collect")
+        n.finish("test")
+        self.assertEqual(calls, ["clear", "teardown", "collect"])
+
+    def test_finish_does_not_tear_down_before_setup(self):
+        calls = []
+        n = h.Night.__new__(h.Night)
+        n.dry, n.sudo_ok, n.flag_set, n.entered = True, False, False, False
+        n.keepalive_stop = __import__("threading").Event()
+        n.clear_fault_final = lambda why: calls.append("clear")
+        n.teardown = lambda: calls.append("teardown")
+        n.collect = lambda: calls.append("collect")
+        n.finish("test")
+        self.assertEqual(calls, ["clear"])
+
+    def test_the_teardown_no_longer_expects_off(self):
+        src = (HERE / "c3_l4_nft_night.py").read_text()
+        self.assertNotIn('a.get("mode") == "off"', src)
+        self.assertIn('a.get("mode") == self.baseline_mode', src)
+
+    def test_d7_boot_row_allows_only_the_default(self):
+        import d7_regression as d7
+        self.assertEqual(d7.DEFAULT_LIVE, self.LIVE)
+        src = (HERE / "d7_regression.py").read_text()
+        self.assertIn("env_n == 0 and mgr_n == 0", src)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,38 @@
+== D1_full_all_sessions: harness exit 0
+run D1_full_all_sessions: aborted_by None error None; sessions ['F1', 'F2', 'F3', 'K']
+  PASS  every fake-sudo call is -v, -n -v or -n nft
+  PASS  the delete-table call is logged
+  PASS  list tables after the last delete, rc 0, no privyhub_fault
+  PASS  no rule added after the last delete
+  PASS  summary no_fault_table_at_end
+  PASS  fake table absent at the end
+  PASS  live came up by default (live_on by_default, no set-environment)
+  PASS  teardown clean against the baseline
+  PASS  baseline recorded: live, environ the one name
+  PASS  flags after are exactly the drop-in's name
+  PASS  now: manager PRIVYHUB_* none
+  PASS  now: companion environ exactly the one name
+  PASS  now: adaptive_bitrate.mode live, configured live, acts true
+  PASS  now: stream 7000, any_override false
+  PASS  exit code: 0 for the full run, 4 (error) for the forced exception
+  PASS  every expected file present
+  => D1 PASS
+== D1_abort_exception_f1_cap: harness exit 4
+run D1_abort_exception_f1_cap: aborted_by None error RuntimeError: test exception at F1_cap_on; sessions ['F1']
+  PASS  every fake-sudo call is -v, -n -v or -n nft
+  PASS  the delete-table call is logged
+  PASS  list tables after the last delete, rc 0, no privyhub_fault
+  PASS  no rule added after the last delete
+  PASS  summary no_fault_table_at_end
+  PASS  fake table absent at the end
+  PASS  live came up by default (live_on by_default, no set-environment)
+  PASS  teardown clean against the baseline
+  PASS  baseline recorded: live, environ the one name
+  PASS  flags after are exactly the drop-in's name
+  PASS  now: manager PRIVYHUB_* none
+  PASS  now: companion environ exactly the one name
+  PASS  now: adaptive_bitrate.mode live, configured live, acts true
+  PASS  now: stream 7000, any_override false
+  PASS  exit code: 0 for the full run, 4 (error) for the forced exception
+  => D1 PASS
+DONE

@@ -1,0 +1,49 @@
+C3-L4-D1 -- live adaptive bitrate on by default. PRE-REGISTRATION.
+Written 2026-10-01 after Part A (LINK-L1) was recorded (evidence/LINK_L1_LOSS_ROW_2026-10-01.md,
+MIXED) and before the drop-in was written or any Part B session ran. Not changed after data.
+Task: handoffs/LINK-L1_LOSS_ROW_LOOK_AND_LIVE_DEFAULT_TASK.md, Part B. The user's authorization,
+2026-09-30: "do the loss row look first and then the live default".
+
+B1 -- THE CHANGE (as the C3.L4 close describes it)
+  ~/.config/systemd/user/privyhub-companion.service.d/adaptive.conf:
+      [Service]
+      Environment=PRIVYHUB_ADAPTIVE_BITRATE_MODE=live
+  then `systemctl --user daemon-reload && systemctl --user restart privyhub-companion`.
+  The unit file is not edited; no set-environment for the mode.
+  Expected and logged: `systemctl --user cat` lists the drop-in; the new MainPID's environ carries
+  exactly one PRIVYHUB_* name, PRIVYHUB_ADAPTIVE_BITRATE_MODE=live; the manager carries none;
+  native-stream-status: adaptive_bitrate.mode live, configured_mode live, acts true;
+  any_override false; profile adopted at 7000; PRIVYHUB_FEC_SCHEME and the profile selector absent;
+  the shadow module byte-identical to before (sha256).
+
+B3a -- THE INJECTION SESSION (on the default-live companion, no mode flag set anywhere)
+  PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 set in the manager for this session only (the companion
+  restarted to read it), unset after and the companion restarted again. One attract-mode
+  session; one POST .../adaptive-bitrate/inject?class=FALLBACK 120 s after PLAYING; held 120 s
+  after the injection, plus 60 s; BACK.
+  PASS requires all of:
+    I1 exactly one FALLBACK decision on the injection, acted (7000 -> 5000), followed by
+       transition_done and an ssrc_change row;
+    I2 any_override false at PLAYING and at the end of the hold;
+    I3 after BACK the status reads level 7000 (the session's reset) and the stream 7000;
+    I4 afterwards the inject flag is absent from the manager and the companion's environ (the
+       environ carries exactly PRIVYHUB_ADAPTIVE_BITRATE_MODE=live) and the inject route answers 403.
+  Otherwise FAIL, recorded with its rows.
+
+B3b -- THE 30-MINUTE HOLD ON THE DEFAULT (no flags at all in the manager; T2 on)
+  Started >= 30 min after the injection session's session_ended (as Part A's holds). 1800 s,
+  attract mode, zero input.
+  SILENT if: 0 transitions, 0 would_act, 0 HOLD, 0 refused rows from the live controller in the
+  session, AND the client rows met: spikes/min < 200, rendered fps >= 59.5, stale/min < 20,
+  audio underruns/min < 5.
+  The loss row (< 10/min) and the max output gap (<= 100) are REPORTED against Part A's
+  classification (MIXED: no window to place the hold in; its local hour is stated).
+  Anything that fires on a clean link is recorded with its samples; the rule stays as approved and
+  the user decides (the stop rule, unchanged).
+
+TEARDOWN (after both)
+  no set-environment residue (0 PRIVYHUB_* in the manager); mode live from the drop-in (environ
+  exactly the one name); stream 7000; no game; 0 NOW PLAYING banners; APK de072762...835e confirmed.
+
+B2 (the preflights) is code, judged by its tests and the fake-sudo FULL run with the new end state
+(live from the drop-in, not off); no outcome rule beyond "tests pass".

@@ -1,0 +1,51 @@
+[night 13:30:10Z] start: manager PRIVYHUB_* ''; MainPID 1368774; 8765 1368774; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[night] adaptive_bitrate mode live configured live acts True level 7000 inject_enabled None | bitrate 7000 profile native_game_720p60_reference any_override False fec_scheme_override None profile_id_override None active False
+[night 13:30:10Z] start: inject route HTTP 403
+[night 13:30:10Z] sampler started (10 s)
+[night 13:30:10Z] inject flag set for Session I only: manager 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 '
+[night 13:30:30Z] I begins
+[I 13:30:30Z] mode=B hold/timeout=120s probe_args=none heartbeat_ms=default
+[I 13:30:30Z] PRIVYHUB_* in the user manager: 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1' (want 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1')
+[I 13:30:34Z] companion MainPID 1369062 serving 8765; PRIVYHUB_* other than the allowed flags in its environ: 0; flags: PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_MODE=live 
+[I 13:30:34Z] adaptive_bitrate mode/configured/inject_enabled: live live True
+[I] before launch: any_override False cap 90000 profile cushion 12 17 profile redundancy 2 4 profile -> ADOPTED
+[I] at PLAYING: any_override False cap 90000 profile cushion 12 17 profile redundancy 2 4 profile -> ADOPTED
+[I 13:31:13Z] PLAYING at 2026-10-01T13:31:13Z; one injection 120 s after PLAYING, zero input
+[I 13:33:13Z] injection 1 at 13:33:13Z: HTTP 200; [('transition', 'decrease_fallback', 7000, 5000)]
+[I 13:35:13Z] level/transitions 120 s after the injection: 5000 1; holding 60 s more
+[I 13:36:13Z] bitrate before BACK: 5000
+[I 13:36:15Z] adb client processes seen during hold: 10 (# polls 581)
+[I 13:36:16Z] report: native_decoder_20261001_133616_697.json
+[frames] 301 seconds in the session window
+[heartbeat] 150 lines
+[I 13:36:37Z] decision log lines in the session: 169
+[I 13:36:38Z] game active after stop: False
+[I 13:36:38Z] done
+[night 13:36:38Z] I harness exit 0
+[night 13:36:41Z] after I (I4): manager PRIVYHUB_* ''; MainPID 1373081; 8765 1373081; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[night] adaptive_bitrate mode live configured live acts True level 7000 inject_enabled None | bitrate 7000 profile native_game_720p60_reference any_override False fec_scheme_override None profile_id_override None active False
+[night 13:36:42Z] after I (I4): inject route HTTP 403
+[night 13:36:42Z] last session_ended 2026-10-01T13:36:16.721Z; H not before 14:06:16Z
+[night 14:06:22Z] H begins (1800 s, local hour 10)
+[H 14:06:22Z] mode=H hold/timeout=1800s probe_args=none heartbeat_ms=default
+[H 14:06:22Z] PRIVYHUB_* in the user manager: '' (want '')
+[H 14:06:26Z] companion MainPID 1375059 serving 8765; PRIVYHUB_* other than the allowed flags in its environ: 0; flags: PRIVYHUB_ADAPTIVE_BITRATE_MODE=live 
+[H 14:06:26Z] adaptive_bitrate mode/configured/inject_enabled: live live False
+[H] before launch: any_override False cap 90000 profile cushion 12 17 profile redundancy 2 4 profile -> ADOPTED
+[H] at PLAYING: any_override False cap 90000 profile cushion 12 17 profile redundancy 2 4 profile -> ADOPTED
+[H 14:07:16Z] PLAYING at 2026-10-01T14:07:16Z; holding 1800s, zero input
+[H 14:37:19Z] adb client processes seen during hold: 54 (# polls 3481)
+[H 14:37:21Z] report: native_decoder_20261001_143720_603.json
+[frames] 1801 seconds in the session window
+[heartbeat] 896 lines
+[H 14:37:43Z] decision log lines in the session: 1014
+[H 14:37:45Z] game active after stop: False
+[H 14:37:45Z] done
+[night 14:37:45Z] H harness exit 0
+[night 14:38:19Z] teardown: manager PRIVYHUB_* ''; MainPID 1394507; 8765 1394507; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[night] adaptive_bitrate mode live configured live acts True level 7000 inject_enabled None | bitrate 7000 profile native_game_720p60_reference any_override False fec_scheme_override None profile_id_override None active False
+[night 14:38:19Z] teardown: inject route HTTP 403
+[night 14:38:20Z] ADOPTED APK CONFIRMED (device hash de072762e55122c3060086f6f10b1bff54633d9165d0c475f17699127841835e)
+[night 14:38:29Z] teardown: game active False; NOW PLAYING on the launcher: 1
+[night 14:38:40Z] stale banner: force-stop + relaunch; NOW PLAYING now: 0
+[night 14:38:40Z] night done

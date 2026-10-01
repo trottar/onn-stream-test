@@ -1311,6 +1311,10 @@ reports):
 
 ## C3.L4 — the controller as closed (2026-09-30)
 
+**Default live since 2026-10-01 (`C3-L4-D1`)**, through the unit drop-in
+`privyhub-companion.service.d/adaptive.conf`
+(`../decisions/C3-L4_LIVE_DEFAULT_2026-10-01.md`).
+
 Decision: `../decisions/C3-L4_LIVE_AUTHORIZATION_2026-09-28.md`, the close
 appended 2026-09-30. **Live only**, behind
 `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live`, off by default. **No new behaviour

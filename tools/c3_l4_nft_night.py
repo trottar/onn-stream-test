@@ -34,6 +34,9 @@ What it does (the L1 record's section 7, with the blend's expectations, and
 the pre-registration `c3_l4_l2_nft_preregistration.txt`, printed at start):
 
   preflight -> PRIVYHUB_ADAPTIVE_BITRATE_MODE=live (never INJECT) -> recorders
+      (C3-L4-D1, 2026-10-01: live is the default through the unit's drop-in; the preflight
+      accepts that one name in the companion environ and none in the user manager, and the
+      teardown returns to the baseline it found -- live by default, off without the drop-in)
   F1  capacity cap between the 5500 and 6000 wire rates (calibrated first
       with a counter rule), 12 min on, then removed, 5 min
   F2  2 % random loss on the video port, 10 min on, then removed, 5 min
@@ -93,6 +96,26 @@ PKG = "com.safeiot.privyhub"
 ADOPTED_APK_SHA256 = "de072762e55122c3060086f6f10b1bff54633d9165d0c475f17699127841835e"
 REFERENCE_PROFILE = "native_game_720p60_reference"
 MODE_ENV = "PRIVYHUB_ADAPTIVE_BITRATE_MODE"
+# C3-L4-D1 (2026-10-01): live is the companion's default through the systemd drop-in
+# ~/.config/systemd/user/privyhub-companion.service.d/adaptive.conf, so its environ carries this one
+# name. It is the only PRIVYHUB_* the harness accepts; the user manager must carry none (no
+# set-environment residue). Without the drop-in (the kill switch) the baseline is off.
+DEFAULT_LIVE = f"{MODE_ENV}=live"
+
+
+def env_baseline_refusal(manager: list[str], environ: list[str]) -> str | None:
+    """None if the environment is a baseline the night may start from, else the refusal."""
+    if manager:
+        return f"set-environment left PRIVYHUB_* in the user manager: {sorted(manager)}"
+    other = sorted(e for e in environ if e != DEFAULT_LIVE)
+    if other:
+        return f"PRIVYHUB_* other than the default {DEFAULT_LIVE} in the companion environ: {other}"
+    return None
+
+
+def baseline_mode(environ: list[str]) -> str:
+    """The adaptive mode the companion's environ implies: live from the drop-in, else off."""
+    return "live" if DEFAULT_LIVE in environ else "off"
 VIDEO_PORT, AUDIO_PORT = 48100, 48101
 TABLE = "inet privyhub_fault"
 DELETE = "sudo nft delete table inet privyhub_fault"   # what the user types if the harness is gone
@@ -276,7 +299,10 @@ class Night:
         self.prereg = Path(args.prereg)
         self.sessions = parse_only(args.only)
         self.nft_file = self.out / "nft_tables.txt"
-        self.flag_set = False
+        self.flag_set = False           # the harness itself put the mode in the user manager
+        self.entered = False            # setup ran: the teardown must restore the baseline
+        self.baseline_environ: list[str] = []
+        self.baseline_mode = "off"
         self.fault_may_be_on = False
         self.poller_stop = threading.Event()
         self.series: list[dict] = []
@@ -359,7 +385,8 @@ class Night:
         m = re.search(r"pid=(\d+)", sh("ss -lntp 2>/dev/null | grep ':8765 '"))
         return m.group(1) if m else ""
 
-    def env_counts(self) -> tuple[int, int, list[str]]:
+    def env_lists(self) -> tuple[list[str], list[str]]:
+        """PRIVYHUB_* in the user manager, and in the companion MainPID's environ."""
         mgr = [l for l in sh(["systemctl", "--user", "show-environment"]).splitlines() if l.startswith("PRIVYHUB_")]
         pid = self.main_pid()
         try:
@@ -367,6 +394,10 @@ class Night:
             envp = [e.decode(errors="replace") for e in env if e.startswith(b"PRIVYHUB_")]
         except Exception:
             envp = ["<unreadable>"]
+        return sorted(mgr), sorted(envp)
+
+    def env_counts(self) -> tuple[int, int, list[str]]:
+        mgr, envp = self.env_lists()
         return len(mgr), len(envp), sorted(set(mgr) | set(envp))
 
     def restart_unit(self) -> None:
@@ -708,9 +739,11 @@ class Night:
             raise Refused(f"the companion unit's MainPID ({mp or 'none'}) does not serve 8765 ({sp or 'none'})")
         if self.game_active():
             raise Refused("a game is active; end it first (POST /plugins/games/stop)")
-        m, e, names = self.env_counts()
-        if m or e:
-            raise Refused(f"PRIVYHUB_* set (manager {m}, companion environ {e}): {names}")
+        mgr, envp = self.env_lists()
+        why = env_baseline_refusal(mgr, envp)
+        if why:
+            raise Refused(why)
+        self.baseline_environ, self.baseline_mode = envp, baseline_mode(envp)
         d = self.status()
         o, c, r = d.get("encoder_overrides") or {}, d.get("audio_cushion") or {}, d.get("audio_redundancy") or {}
         adopted = (d.get("profile_id") == REFERENCE_PROFILE and o.get("any_override") is False
@@ -720,15 +753,19 @@ class Night:
                    and d.get("bitrate_kbps") == 7000)
         if not adopted:
             raise Refused("the stream is not on the adopted profile at 7000 with no override")
-        if (d.get("adaptive_bitrate") or {}).get("mode") != "off":
-            raise Refused("adaptive_bitrate.mode is not off")
+        mode = (d.get("adaptive_bitrate") or {}).get("mode")
+        if mode != self.baseline_mode:
+            raise Refused(f"adaptive_bitrate.mode is {mode}, not {self.baseline_mode} "
+                          f"(the companion environ carries {envp or 'no PRIVYHUB_*'})")
         if not self.adb_ok():
             raise Refused("no onn in `adb devices` (adb connect <onn-address>:<port> once, then retry)")
         path = sh(["adb", "shell", "pm", "path", PKG]).strip().replace("package:", "").splitlines()
         apk = sh(["adb", "shell", "sha256sum", path[0].strip()]).split()[0] if path else ""
         if apk != ADOPTED_APK_SHA256:
             raise Refused(f"installed APK is not the adopted one ({apk[:8]}...)")
-        self.log(f"  companion MainPID serves 8765; no game; no PRIVYHUB_*; adopted profile at 7000; "
+        self.log(f"  companion MainPID serves 8765; no game; PRIVYHUB_* manager none, companion "
+                 f"{envp or 'none'} (adaptive {self.baseline_mode}"
+                 f"{' by default, the drop-in' if self.baseline_mode == 'live' else ''}); adopted profile at 7000; "
                  f"any_override false; APK {apk[:8]}...{apk[-4:]} (adopted); onn in adb")
         if not self.prereg.exists():
             raise Refused(f"no pre-registration at {self.prereg}")
@@ -758,17 +795,23 @@ class Night:
     # -- setup / teardown -------------------------------------------------------------
     def setup(self) -> None:
         self.banner("SETUP: live mode on, recorders on")
-        sh(["systemctl", "--user", "set-environment", f"{MODE_ENV}=live"])
-        self.flag_set = True
+        self.entered = True
+        if self.baseline_mode == "live":
+            self.log("  live is the default (the drop-in); no set-environment")
+        else:
+            sh(["systemctl", "--user", "set-environment", DEFAULT_LIVE])
+            self.flag_set = True
         self.restart_unit()
-        m, e, names = self.env_counts()
+        mgr, envp = self.env_lists()
+        names = sorted(set(mgr) | set(envp))
         a = self.abr()
-        self.log(f"  flag set: {names}; MainPID {self.main_pid()} serves 8765 "
+        self.log(f"  manager {mgr or 'none'}, companion environ {envp}; MainPID {self.main_pid()} serves 8765 "
                  f"{self.main_pid() == self.serving_pid()}; adaptive_bitrate mode {a.get('mode')} level "
                  f"{a.get('level')} transitions {a.get('transitions_this_session')}")
-        if names != [f"{MODE_ENV}=live"] or a.get("mode") != "live" or a.get("level") != 7000:
+        if (envp != [DEFAULT_LIVE] or mgr != ([DEFAULT_LIVE] if self.flag_set else [])
+                or a.get("mode") != "live" or a.get("level") != 7000):
             raise Refused("live mode did not come up as expected (mode live, level 7000, only the one flag)")
-        self.event("live_on", flags=names)
+        self.event("live_on", flags=names, by_default=not self.flag_set)
         self.start_recorders()
         time.sleep(20)
 
@@ -781,16 +824,21 @@ class Night:
             if not self.game_active():
                 break
             time.sleep(1)
+        # C3-L4-D1: this clears the user manager only (set-environment residue). The drop-in is never
+        # touched, so the end state is the baseline found at preflight: live by default, or off without it.
         sh(["systemctl", "--user", "unset-environment", MODE_ENV, "PRIVYHUB_ADAPTIVE_BITRATE_INJECT"])
         self.restart_unit()
-        m, e, names = self.env_counts()
+        mgr, envp = self.env_lists()
+        names = sorted(set(mgr) | set(envp))
         d = self.status()
         a = d.get("adaptive_bitrate") or {}
-        ok = (m == 0 and e == 0 and a.get("mode") == "off" and d.get("bitrate_kbps") == 7000
-              and not self.game_active() and self.main_pid() == self.serving_pid())
-        self.log(f"  flag unset: PRIVYHUB_* manager {m}, companion environ {e}; MainPID serves 8765 "
-                 f"{self.main_pid() == self.serving_pid()}; adaptive_bitrate mode {a.get('mode')}; stream "
-                 f"{d.get('bitrate_kbps')}; game active {self.game_active()} -> {'CLEAN' if ok else 'CHECK BY HAND'}")
+        ok = (not mgr and envp == self.baseline_environ and a.get("mode") == self.baseline_mode
+              and d.get("bitrate_kbps") == 7000 and not self.game_active() and self.main_pid() == self.serving_pid())
+        self.log(f"  manager PRIVYHUB_* {mgr or 'none'} (set-environment residue); companion environ "
+                 f"{envp or 'none'} (baseline {self.baseline_environ or 'none'}); MainPID serves 8765 "
+                 f"{self.main_pid() == self.serving_pid()}; adaptive_bitrate mode {a.get('mode')} (baseline "
+                 f"{self.baseline_mode}); stream {d.get('bitrate_kbps')}; game active {self.game_active()} -> "
+                 f"{'CLEAN' if ok else 'CHECK BY HAND'}")
         if self.onn is not None or self.adb_ok():
             sh(["adb", "shell", "input", "keyevent", "KEYCODE_HOME"])
             sh(["adb", "shell", "am", "start", "-n", f"{PKG}/.MainActivity"])
@@ -800,7 +848,8 @@ class Night:
             sh(["adb", "shell", "rm", "-f", "/sdcard/l4night.xml"])
             self.log(f"  launcher NOW PLAYING banners: {banner}")
             self.summary["banner_count_at_end"] = banner
-        self.summary.update({"teardown_clean": ok, "flags_after": names, "ended_utc": utc()})
+        self.summary.update({"teardown_clean": ok, "flags_after": names, "baseline_mode": self.baseline_mode,
+                             "baseline_environ": self.baseline_environ, "ended_utc": utc()})
         self.event("teardown", clean=ok)
 
     def collect(self) -> None:
@@ -1103,7 +1152,7 @@ class Night:
             signal.signal(s, signal.SIG_IGN)
         self.clear_fault_final(why)
         self.keepalive_stop.set()
-        if self.flag_set:
+        if self.entered:
             self.teardown()
             self.collect()
         elif not self.dry and self.sudo_ok:

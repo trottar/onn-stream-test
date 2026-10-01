@@ -1,0 +1,22 @@
+# B1 2026-10-01T13:07:02Z
+$ cat adaptive.conf
+[Service]
+Environment=PRIVYHUB_ADAPTIVE_BITRATE_MODE=live
+daemon-reload rc 0
+restart rc 0
+MainPID 1364441; serving 8765: 1364441
+$ systemctl --user cat privyhub-companion (drop-in section)
+# /home/privyhub/.config/systemd/user/privyhub-companion.service.d/adaptive.conf
+[Service]
+Environment=PRIVYHUB_ADAPTIVE_BITRATE_MODE=live
+DropInPaths: ~/.config/systemd/user/privyhub-companion.service.d/adaptive.conf
+manager PRIVYHUB_*: 0
+environ PRIVYHUB_* count: 1
+environ PRIVYHUB_* names: PRIVYHUB_ADAPTIVE_BITRATE_MODE=live 
+adaptive_bitrate mode live configured_mode live acts True level 7000 False
+profile native_game_720p60_reference 1280 720 bitrate 7000 any_override False fec xor8_1 fec_scheme_override None profile_id_override None selection default cap 90000 profile cushion 12 17 profile redundancy 2 4 profile active False
+inject route: HTTP 403
+d66211b38175b8c5d11305964e5fa060a21854e3acb559d22d2eb63c33b924ec  companion/adaptive_bitrate.py
+d66211b38175b8c5d11305964e5fa060a21854e3acb559d22d2eb63c33b924ec  companion/adaptive_bitrate.py
+7e03ee1b7f2f86ee0845dde59d5faccc4c0f5529760f1f2fcf8a4da0636b831e  companion/adaptive_bitrate_live.py
+00d5fe5005c971a9daef9bc01ed98708b2b078d8cdedbd577694ca8aa9c41b1e  ~/.config/systemd/user/privyhub-companion.service

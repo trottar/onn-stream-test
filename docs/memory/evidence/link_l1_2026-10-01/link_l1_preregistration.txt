@@ -1,0 +1,71 @@
+LINK-L1 -- the loss row, looked at. PRE-REGISTRATION.
+Written 2026-09-30 before any new hold, air sample or history figure was collected for this task.
+Task: docs/memory/handoffs/LINK-L1_LOSS_ROW_LOOK_AND_LIVE_DEFAULT_TASK.md, Part A, under
+handoffs/QUEUE_2026-09-29B.md's rules. Baseline commit 4e45a4f. Nothing below is changed after data.
+
+QUESTION
+On the adopted profile with adaptive off, does post-FEC video loss < 10/min still hold, and if
+not, does it depend on the time of day?
+
+THE HOLDS
+- Six 20-minute (1200 s) attract-mode holds of the PS1 reference title, zero input, BACK to end.
+- Adopted profile native_game_720p60_reference at 7000 kbps; adaptive_bitrate mode off;
+  any_override false; no PRIVYHUB_* in the user manager or the companion's environ
+  (PRIVYHUB_FEC_SCHEME and the profile selector absent); APK de072762...835e checked at each end
+  (no reinstall).
+- Harness: CL-B1's copy of C5's (cl_b1_night.sh + c5_m2_run.sh + t2_sample.py from
+  evidence/cl_b1_apk_2026-09-30/), copied byte-identical into this directory, one hold per
+  invocation, EXPECT_SHA = the adopted APK, COLD_MIN = 30 (>= 30 min idle after the last
+  session_ended before each hold). T2 sampler on (10 s) during each invocation. Teardown after
+  each: no flags, stream 7000, no game, 0 NOW PLAYING banners.
+- Schedule (host local time, America/New_York, EDT = UTC-4), one hold per local 4-hour block,
+  4 hours apart, each launched at about :40 so the hold lies inside its block:
+    H1 2026-09-30 12:40 (block 12-16)   H2 2026-09-30 16:40 (block 16-20)
+    H3 2026-09-30 20:40 (block 20-24)   H4 2026-10-01 00:40 (block 00-04)
+    H5 2026-10-01 04:40 (block 04-08)   H6 2026-10-01 08:40 (block 08-12)
+  Each hold's UTC start (PLAYING) and the host's local hour (timedatectl) are recorded.
+- A hold that fails to reach PLAYING (or fails its preflight) is retried at most twice
+  (the two-retry limit), 5 min apart, inside its own block. A block whose hold cannot run is
+  recorded NOT RUN.
+
+SCORING (per hold, the D-BASE close-out table's rows and targets)
+  spikes >= 20 ms / min          < 200        (decoder.spike_20_ms / minutes)
+  rendered fps                   >= 59.5      (rendered_frames / duration, not recent_fps)
+  stale output drops / min       < 20
+  video loss / min, post-FEC     < 10         <-- THE CLASSIFYING ROW
+  audio underruns / min          < 5
+  max output gap ms              <= 100       <-- the row in question beside loss; reported
+Only the loss row enters the classification. The max output gap and the other rows are reported
+against their targets.
+
+CLASSIFICATION OF THE DAY (a hold "meets" if loss/min < 10)
+  STILL MET    >= 5 of 6 holds meet.
+  TIME OF DAY  the meets and the misses separate cleanly by clock: every miss inside one
+               contiguous <= 12-hour window of the local clock (circular, midnight wraps), every
+               meet outside it, with >= 2 meets and >= 2 misses.
+  MOVED        <= 1 of 6 meets.
+  MIXED        anything else; reported with the table, no conclusion drawn.
+  Precedence as listed (STILL MET first). If fewer than 6 holds score: the same rules over the
+  scored holds, except that STILL MET needs >= 5 meets and MOVED needs >= 5 scored holds with
+  <= 1 meet; with fewer than 5 scored holds and no rule met the day is INCOMPLETE.
+  For TIME OF DAY the "window" is judged on each hold's PLAYING time in local hours; the window
+  is the shortest arc containing all misses and must contain no meet.
+
+THE HISTORY TABLE (A1)
+Every >= 15-minute hold on the adopted profile with adaptive off or silent since D-BASE closed,
+from records already on disk, tabled by date, UTC start, local hour, minutes, loss/min, max gap,
+spikes, fps and (where T2 exists) onn link rate and RSSI, the Opal's signal, tx retries per hold
+and channel utilization (where sampled). Bucketed by local 4-hour block and by date.
+DESCRIPTIVE ONLY; it does not enter the classification.
+
+THE AIR VIEW (A2)
+Read-only over `ssh opal`, identifiers never written: channel and width, channel utilization,
+noise floor, stations, the onn's station row (signal, tx/rx rate, MCS, tx retries, tx failed, rx
+drop misc), and COUNTS ONLY of neighbouring BSSIDs from the Opal's cached scan list
+(`ubus call repeater scan {"cached":true}` -- a read of the GL daemon's cache, no scan
+triggered) by band, same primary channel, the in-use 80 MHz block, and the adjacent blocks.
+Sampled once at the start of each hold (before launch), once between holds (about 2 h after each
+start), and at 30 s beside each hold. Reported beside the holds; NO RULE on it.
+
+Part B (C3-L4-D1) runs only after Part A's record is written and A's flags are confirmed absent;
+its own expectations are pre-registered separately before its data.

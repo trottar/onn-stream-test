@@ -40,6 +40,14 @@ not the unit file, and comes out after:
 `systemctl --user unset-environment VAR` and restart again; check
 `/proc/$MP/environ`. The by-hand notes below predate `H3`.
 
+**One persistent exception since 2026-10-01 (`C3-L4-D1`): live adaptive
+bitrate is the default**, through the drop-in
+`~/.config/systemd/user/privyhub-companion.service.d/adaptive.conf`. So
+the companion's environ carries exactly
+`PRIVYHUB_ADAPTIVE_BITRATE_MODE=live`, and the user manager carries
+**none**. The section "Live adaptive bitrate is the default" below has
+the drop-in and both kill switches.
+
 **Check for an existing listener first, and check the log after.** Started
 as `nohup … &`, a second companion dies on
 `OSError: [Errno 98] Address already in use` into its redirected log and the
@@ -1039,6 +1047,86 @@ adb shell dumpsys power | grep -m1 mWakefulness=    # Awake
 `p9_run.sh`-derived harnesses already do this before each launch. The
 D6-R1 runner does too (`evidence/d6_r1_2026-09-24/d6_r1_run.sh`).
 
+## Live adaptive bitrate is the default (C3-L4-D1, 2026-10-01) — the drop-in and its kill switches
+
+**The user's authorization, 2026-09-30:** "do the loss row look first and
+then the live default". The record is
+`decisions/C3-L4_LIVE_DEFAULT_2026-10-01.md`.
+
+**The drop-in.** It is the only persistent `PRIVYHUB_*`. The unit file
+itself is unchanged, and no `set-environment` is used.
+`~/.config/systemd/user/privyhub-companion.service.d/adaptive.conf`
+(copy: `evidence/c3_l4_d1_2026-10-01/adaptive.conf`):
+
+```ini
+[Service]
+Environment=PRIVYHUB_ADAPTIVE_BITRATE_MODE=live
+```
+
+**What shows when it is in force:**
+
+- `systemctl --user cat privyhub-companion` lists it;
+- the MainPID's environ carries exactly that one `PRIVYHUB_*`, and
+  `systemctl --user show-environment` carries none;
+- `native-stream-status` → `adaptive_bitrate.mode live`,
+  `configured_mode live`, `acts true`;
+- `encoder_overrides.any_override` stays **false**: the adaptive mode is
+  not an encoder override.
+
+```bash
+systemctl --user cat privyhub-companion | grep -A2 adaptive.conf
+MP=$(systemctl --user show -p MainPID --value privyhub-companion)
+tr '\0' '\n' < /proc/$MP/environ | grep '^PRIVYHUB_'      # exactly PRIVYHUB_ADAPTIVE_BITRATE_MODE=live
+systemctl --user show-environment | grep -c '^PRIVYHUB_'    # 0 -- no set-environment residue
+```
+
+**The kill switches:**
+
+- **Off, persistently.** Delete the drop-in, then `daemon-reload`, then
+  restart. The mode reads `off`.
+
+  ```bash
+  rm ~/.config/systemd/user/privyhub-companion.service.d/adaptive.conf
+  systemctl --user daemon-reload && systemctl --user restart privyhub-companion
+  ```
+
+- **Shadow, for one session.** At runtime,
+  `curl -X POST localhost:8765/plugins/games/adaptive-bitrate/disable`.
+  The next session is live again.
+
+**What changed in `tools/` for it:**
+
+- `c3_l4_nft_night.py`:
+  - the preflight accepts that one name in the companion's environ, and
+    nothing in the manager;
+  - live comes up without `set-environment` when it is the default;
+  - the teardown clears manager residue only, then confirms the
+    **baseline it found** (live by default, off without the drop-in);
+    it no longer ends at `off`.
+- `d7_regression.py`'s boot row: the same rule.
+- Tests: `tools/test_c3_l4_nft_night.py` 32/32.
+- The harness's own exit path never touches the drop-in.
+
+**Evidence copies of older scripts are history and were not edited.**
+They still unset the mode into "off", or refuse any `PRIVYHUB_*`, and
+would now refuse or misreport on the default-live companion:
+
+- every `evidence/*/…_night.sh` and `…_run.sh`, including C5's and
+  CL-B1's;
+- `evidence/c3_l4_l2_2026-09-29/c3_l4_nft_night.py` and
+  `l2b/c3_l4_nft_night.L2.py`.
+
+Before any reuse, take the D1 pattern (`evidence/c3_l4_d1_2026-10-01/`).
+Its rules:
+
+- the mode comes from the drop-in;
+- the manager carries only a session flag, and only for its session;
+- the teardown checks for the default, not for off.
+
+**An adaptive-off measurement** (the adopted profile "as adopted", as
+in `LINK-L1`) now needs the drop-in removed for the session and put back
+after, or the disable route once each session is up.
+
 ## The shadow adaptive-bitrate controller (C3-L4-S1) — never leave the flag set
 
 `companion/adaptive_bitrate.py`. **It never acts in any mode.** Its state
@@ -1066,7 +1154,7 @@ tr '\0' '\n' < /proc/$(systemctl --user show -p MainPID --value privyhub-compani
 - **Harness**: `evidence/c3_l4_s1_2026-09-24/c3_l4_s1_night.sh`. It unsets
   the flag on every exit path.
 
-## The live adaptive-bitrate controller (C3-L4-L1) — never leave `live` or `INJECT` set
+## The live adaptive-bitrate controller (C3-L4-L1) — never leave `INJECT` set (live is the default since C3-L4-D1)
 
 `companion/adaptive_bitrate_live.py`. `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live`
 makes the controller **act**: one encoder-only restart per event, through
@@ -1093,7 +1181,10 @@ the live controller.
   - The other rows are `refused` (with its reason), `ssrc_change`,
     `level_sync`, `session_ended_reset`, `disabled` and `inject`.
 - **Kill switches:**
-  - Unset the flag and restart the unit: off.
+  - **Since `C3-L4-D1` (2026-10-01), live comes from the drop-in**, not
+    from the manager. Off is: delete the drop-in, `daemon-reload`,
+    restart (section above). The pre-D1 rule, "unset the flag and
+    restart: off", now only clears manager residue.
   - At runtime, the controller can be put into shadow for the rest of the
     session (idempotent, any caller). There is **no enable route**; the
     next session is live again:
@@ -1105,7 +1196,10 @@ the live controller.
   - It answers 403 unless the caller is loopback, both flags are set and
     the controller is not disabled.
   - `inject_enabled` appears in the status only when the flag is set.
-- **Commands** (a live session only; the rule: unset both, restart, and
+- **Commands, pre-D1, history.** Since `C3-L4-D1` only the `INJECT`
+  half applies: set it for the session, unset it after, and the
+  environ's count is then 1, the drop-in's name. A live session only;
+  the rule: unset both, restart, and
   confirm the count is 0 before anything else runs):
 
 ```bash

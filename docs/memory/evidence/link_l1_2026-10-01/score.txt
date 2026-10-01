@@ -1,0 +1,17 @@
+LINK-L1 -- the day's holds, adopted profile at 7000, adaptive off (close-out targets)
+hold local start      UTC start              min  spk/m    fps stale  loss/m aund/m  gap | link rssi  sig mcs  retries  ret% util%  umax noise | mode ovr
+H1   2026-09-30 12:40 2026-09-30T16:40:54Z 20.15   25.3  59.89  0.79   37.27   0.69  204 |  195  -69  -74   1  100,212   6.2  6.70  10.0   -90 | off False
+H2   2026-09-30 16:40 2026-09-30T20:40:55Z 20.22   30.4  59.95  0.94    4.25   0.54  171 |  260  -68  -72   3   75,502   4.7  6.44  10.0   -90 | off False
+H3   2026-09-30 20:40 2026-10-01T00:40:55Z 20.21   28.1  59.91  0.45   15.19   0.59  310 |  195  -68  -74   1  111,300   6.9  6.46   6.8   -90 | off False
+H4   2026-10-01 00:40 2026-10-01T04:40:59Z 20.26   26.1  59.95  0.74    3.16   0.49   93 |  260  -67  -73   3   56,222   3.5  6.61   6.8   -90 | off False
+H5   2026-10-01 04:40 2026-10-01T08:40:59Z 20.16   27.2  59.92  0.94    7.54   0.60  108 |  292  -66  -74   3  213,538  13.2  7.05  10.3   -90 | off False
+H6   2026-10-01 08:41 2026-10-01T12:41:01Z 20.26   39.2  59.89  1.78   16.78   0.94  255 |  260  -66  -75   2  109,566   6.8 11.15  36.6   -90 | off False
+
+  H1: loss MISSES (37.27/min); misses: video loss / min post-FEC 37.27 vs < 10; max output gap ms 204 vs <= 100
+  H2: loss MEETS (4.25/min); misses: max output gap ms 171 vs <= 100
+  H3: loss MISSES (15.19/min); misses: video loss / min post-FEC 15.19 vs < 10; max output gap ms 310 vs <= 100
+  H4: loss MEETS (3.16/min); all rows met
+  H5: loss MEETS (7.54/min); misses: max output gap ms 108 vs <= 100
+  H6: loss MISSES (16.78/min); misses: video loss / min post-FEC 16.78 vs < 10; max output gap ms 255 vs <= 100
+
+CLASSIFICATION OF THE DAY: MIXED -- 3 of 6 meet; misses not separable by a <= 12 h window

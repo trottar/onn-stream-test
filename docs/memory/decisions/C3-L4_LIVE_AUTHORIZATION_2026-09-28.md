@@ -298,3 +298,12 @@ is not made here.
 bounded by the 60-report ROUTINE reversal hold-down (~120 s; night 3: 121
 s). It is not the ~90 s once expected. Shortening it is a rule change for
 the user to ask for, or not.
+
+## Appended 2026-10-01 — made the default (`C3-L4-D1`)
+
+The user authorized it on 2026-09-30 ("do the loss row look first and
+then the live default"). The drop-in above was written on 2026-10-01 at
+13:07Z, exactly as described. Live is the default from then on.
+
+- Record: `C3-L4_LIVE_DEFAULT_2026-10-01.md`.
+- Evidence: `../evidence/C3_L4_D1_LIVE_DEFAULT_2026-10-01.md`.

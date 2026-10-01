@@ -5,7 +5,7 @@ record; the record file is authoritative, not this index.
 
 `PATCH_PROTOCOL.md` describes the workflow and is not a patch record.
 
-Records: 135
+Records: 140
 
 - `ADB_ENDPOINT_DEBUG_PROBE_V1_2026-09-15.md`
 - `ADB_ENDPOINT_DEBUG_WATCH_PORT_V1_2026-09-15.md`
@@ -35,6 +35,7 @@ Records: 135
 - `C3-L3A-R1_SPLIT_SESSION_FINALIZE.md`
 - `C3-L3A-R2B_DECODER_REPORT_CAP.md`
 - `C3-F1_RECOVERY_RESTART_LADDER.md`
+- `C3-L4-D1_LIVE_DEFAULT_PREFLIGHTS.md`
 - `C3-L4-L1_LIVE_CONTROLLER.md`
 - `C3-L4-L2_INCREASE_RULE_AND_SAMPLES.md`
 - `C3-L4-L2B_NFT_HARNESS_ONE_WINDOW.md`
