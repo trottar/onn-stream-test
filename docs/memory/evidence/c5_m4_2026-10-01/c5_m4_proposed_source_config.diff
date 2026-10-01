@@ -1,0 +1,23 @@
+# C5-M4 proposed PS1 source config -- NOT APPLIED. Paths are under ~/.config/retroarch/config/Beetle PSX HW/
+
+## 1. New file: the core override (window 879x720 -> 1920x1080 fullscreen on the headless display)
+--- /dev/null
++++ Beetle PSX HW/Beetle PSX HW.cfg (new)
+@@ -0,0 +1,4 @@
++# PrivyHub C5-M4 (PROPOSED, not applied): PS1 renders into a 1920x1080 window.
++# RetroArch core override for Beetle PSX HW only; the 2D systems are untouched.
++video_fullscreen = "true"
++video_windowed_fullscreen = "true"
+
+## 2. The base core options (internal resolution 1x -> 4x)
+--- Beetle PSX HW/Beetle PSX HW.opt (current, sha256 7885077140601f66...)
++++ Beetle PSX HW/Beetle PSX HW.opt (proposed)
+@@ -53,7 +53,7 @@
+ beetle_psx_hw_image_offset_cycles = "0"
+ beetle_psx_hw_initial_scanline = "0"
+ beetle_psx_hw_initial_scanline_pal = "0"
+-beetle_psx_hw_internal_resolution = "1x(native)"
++beetle_psx_hw_internal_resolution = "4x"
+ beetle_psx_hw_last_scanline = "239"
+ beetle_psx_hw_last_scanline_pal = "287"
+ beetle_psx_hw_line_render = "default"

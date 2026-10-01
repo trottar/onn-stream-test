@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-10-01
-baseline_commit: 4e45a4f
+baseline_commit: cddacaf
 ---
 
 # Current State
@@ -9,61 +9,55 @@ baseline_commit: 4e45a4f
 Headings are fixed by `tools/check_memory_health.py`; do not rename.
 ## Active Objective
 
-**Phase C — `C3.L4` CLOSED 2026-09-30, and since 2026-10-01 live adaptive
-bitrate is ON BY DEFAULT (`C3-L4-D1`)**, through the unit drop-in
-`~/.config/systemd/user/privyhub-companion.service.d/adaptive.conf`. The
-user authorized it on 2026-09-30: "do the loss row look first and then
-the live default".
+**Phase C continues. C5 was reopened by the user's reading of
+2026-10-01: 1080p60 is a Phase C deliverable through the adaptive
+ladder**, as a rung above 7000, not only a characterization, and the
+source should render natively at 1080p. PS1 comes first.
 
-- **The loss row look (`LINK-L1`) is MIXED.** 3 of 6 pre-registered
-  holds over one day meet loss < 10/min, and the misses bracket a meet.
-  No conclusion is drawn.
-- C7 / D8 are met or explicitly deferred. The checkpoint commit
-  `4e45a4f` is in.
-- **Earlier:**
-  - `D-BASE` CLOSED (baseline met, 2026-09-23); C1 done;
-  - C4 closed (8+1);
-  - C5 characterized (1080p60 NOT CAPABLE at parity; the low rungs
-    screened for Phase G);
-  - C6 contract on paper; D7 complete;
-  - the `CL-B1` APK `de072762…835e` adopted (2026-09-30).
+- C5-M1/M2 characterized the stream on a 720p-detail source and an
+  unsettled link.
+- **C5-M4 Part 1** (the source side) is done.
+- The rung is Part 2, after the user's link work (40 MHz on the Opal,
+  then the LINK-L1 re-run).
+- **Standing, unchanged:**
+  - live adaptive bitrate is ON BY DEFAULT (`C3-L4-D1`, the unit
+    drop-in);
+  - `C3.L4` is CLOSED;
+  - `LINK-L1` is MIXED;
+  - C7 / D8 are met or deferred, with the C7 1080p row reopened (ROADMAP).
+- **Earlier:** `D-BASE` CLOSED (2026-09-23); C1; C4 (8+1); C6; D7; the
+  `CL-B1` APK adopted (2026-09-30).
 
 ## Current Work Item
 
-**The LINK-L1 / D1 prompt (under `handoffs/QUEUE_2026-09-29B.md`'s
-rules): Code ran Part A, then Part B, and stopped.**
+**The C5-M4 prompt** (under `handoffs/QUEUE_2026-09-29B.md`'s rules):
+Code ran Part 1 and stopped. Nothing was adopted, and nothing was
+committed (`evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md`).
 
-- **`LINK-L1`: MIXED** (`evidence/LINK_L1_LOSS_ROW_2026-10-01.md`).
-  - Six 20-min holds, adaptive off, one per local 4-hour block, 12:40
-    EDT on 09-30 to 08:41 EDT on 10-01. Loss/min: 37.27 ✗, 4.25 ✓,
-    15.19 ✗, 3.16 ✓, 7.54 ✓, 16.78 ✗. The max gap met ≤ 100 on one hold.
-  - History since D-BASE: 16 of 36 holds meet, with meets and misses in
-    every block.
-  - Retries, link rate, RSSI and the MCS share do not predict the loss
-    across nights.
-  - The air (read-only, counts only) is as O1 found it: channel 36 at 80
-    MHz, idle 3.3 %, noise −89/−90. 3-4 strong BSSIDs share the 80 MHz
-    block's secondaries, and 0 are on 36.
-- **`C3-L4-D1`: live ON BY DEFAULT since 2026-10-01 13:07Z**
-  (`decisions/C3-L4_LIVE_DEFAULT_2026-10-01.md`,
-  `evidence/C3_L4_D1_LIVE_DEFAULT_2026-10-01.md`).
-  - B1: the drop-in is verified. The environ carries exactly the one
-    name and the manager none; mode live, acts true; `any_override`
-    false; the unit file and the shadow unchanged.
-  - B2: `tools/c3_l4_nft_night.py` and `tools/d7_regression.py` accept
-    the one name only. The nft teardown restores the baseline, not off,
-    and a skipped-teardown path was fixed. Tests 32/32, mutations 4/4,
-    fake-sudo FULL and ABORT PASS.
-  - B3a, the injection: **NOT PASS AS PRE-REGISTERED.** The controller
-    acted as intended (one FALLBACK 7000 → 5000, client SSRC change 1,
-    reset at BACK, inject flag gone, route 403). But two clauses failed
-    as worded:
-    - an `ssrc_change` row that is never emitted for an own transition;
-    - a stream read 0.3 s before the client's stop.
-  - B3b, the 30-min hold on the default: **SILENT** (0 transitions,
-    refusals or HOLDs; client rows met; loss 7.59, max gap 447 ms).
-- **Earlier** (records under `evidence/`, and the daily files): N3,
-  `CL-B1`, C7 / D8 (09-30); N2, C5-M2/M3, N1 (09-29); L1, R4, C5-M1 (09-28).
+- **Inventory.**
+  - The 879×720 window comes from RetroArch's default `video_scale` 3.
+    RetroArch fullscreen gives a 1920×1080 window with the 4:3 picture
+    pillarboxed. The companion's argv is unchanged.
+  - Beetle PSX HW (OpenGL) offers 1x/2x/4x/8x, not 3x.
+  - Six titles carry their own `.opt` copies, which a base-file change
+    does not reach.
+- **The host table** (pre-registered, `4193ef8a…`):
+  - **1x, 2x and 4x HOLD 60** with no stream, with the 7000 stream and
+    with the c3 arm;
+  - 8x misses R1 by one 256-frame interval;
+  - **the candidate is 4x**: GPU 21 % against 15 % with the stream, +1 W;
+  - R3 is not evaluable as worded (no `codec_ms` in the C2 telemetry).
+- **Offline** (deterministic replay; the repeat control is bit-identical).
+  3D content SSIM as shown at 1080:
+  - today 0.838;
+  - **the 4x source at 720p/7000 0.873** (the quick win, at the same link
+    cost);
+  - 1080p/12,600/90 KB 0.902 (parity 0.912, GOP 30 0.908);
+  - an IDR-rate pulse at 1080p under the 90 KB cap.
+- **The proposal is NOT applied**: a core override `Beetle PSX HW.cfg`
+  (fullscreen) plus `internal_resolution` `"4x"`. Part 2's needs are
+  listed: ~15.4 Mbit/s on the wire, the actuator carrying a size, and a
+  mid-session size change, which has never been shown.
 
 ## Verified State
 
@@ -126,31 +120,39 @@ loss — the losses are not at transitions; no-transition H2 missed too).
 
 ## Next Action
 
-1. **The user's commit** of the LINK-L1 / D1 work. Cowork gives the line
-   from `logs/link_l1_d1_git_status_2026-10-01.txt`. Nothing is
-   committed by Code; `logs/` and the APKs stay out of git.
-2. **Part A was MIXED, not TIME OF DAY or MOVED**, so there is no window
-   to schedule into and no re-baselining is called for. The loss row is
-   met on about half the holds at any hour.
-   - If the user wants it to hold reliably, the levers are theirs, with
-     what the air view says about each in the LINK-L1 record: the Opal's
-     channel or width (read-only to Code), the onn's placement, or a
-     wired hop.
-   - Also for the user: B3a's two pre-registration clauses (the record
-     explains both). The controller acted; no rule changed.
-3. **Phase E per the ROADMAP** (Linux core resource characterization and
-   optimization, starting at E1, freezing the workload suite). It is not
-   started.
+1. **The user's commit** of the C5-M4 Part 1 work. Cowork gives the
+   line from `logs/c5_m4_git_status.txt`. Nothing is committed by Code.
+   `logs/`, the clips (`runtime/c5_m4/`, 5.6 GB) and the APKs stay out of
+   git.
+2. **The user's two decisions:**
+   - **The picture decision on the proposed PS1 source config.** These
+     are hand steps, TV only, and nothing perceptual is a gate. Apply
+     with no game running:
+     1. write `~/.config/retroarch/config/Beetle PSX HW/Beetle PSX HW.cfg`
+        from `evidence/c5_m4_2026-10-01/proposal/`;
+     2. back up `Beetle PSX HW.opt` (sha256 `7885077…`) and set the one
+        line `beetle_psx_hw_internal_resolution = "4x"`.
+
+     Revert by deleting the `.cfg` and restoring the `.opt`. The adopted
+     720p/7000 stream then carries the 4x source; that is the quick win.
+   - **The 40 MHz change on the Opal.** Code keeps the Opal read-only.
+3. **Then, on the user's word:**
+   - the LINK-L1 re-run on the new width;
+   - C5-M4 Part 2, the 1080p rung. Its design is in the record's §4:
+     12,600 / 90 KB / GOP 15 first, GOP 30 screened beside it, entered
+     from 7000 after a long clean window, left on the first
+     `capacity_mild` bar. The actuator's size change and a mid-session
+     resolution change must be shown first.
 
 **Open, not blocking:**
 
-- the max output gap (447 ms on the D1 hold); `host_link`; the thermal
-  flag proposal; `CTRL-L1` (PATH); the recent slow-event ring; the
-  `C6-D1` migration list; the mild step's ~120 s bound (the user's ask);
-- **adaptive-off measurements now need the drop-in out for the session**
-  (`TOOLS.md`);
-- the evidence copies of older night scripts refuse or misreport on the
-  default-live companion; use the D1 pattern.
+- the max gap (447 ms, D1); `host_link`; the thermal flag; `CTRL-L1`;
+  the slow-event ring; `C6-D1`'s list; the mild step's ~120 s bound;
+  B3a's two clauses; C5-M4's R3 (no `codec_ms` in the C2 telemetry);
+- **adaptive-off measurements need the drop-in out** (`TOOLS.md`); old
+  evidence night scripts misreport on default-live, so use the D1
+  pattern (`c5_m4_run.sh` is one);
+- Phase E (E1 onward) is not started.
 
 ## Success Criteria
 
@@ -186,6 +188,7 @@ perceptual gate unless the user sets one.
 
 ## Relevant References
 
+- `evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md` — the PS1 source at native 1080p (C5-M4 Part 1).
 - `evidence/D_BASE_CLOSEOUT_2026-09-23.md` — the scored table and verdict.
 - `investigations/BASELINE_STREAM_HEALTH.md` (MET);
   `decisions/D-BASE_BASELINE_BEFORE_ADAPTATION.md` (closed);

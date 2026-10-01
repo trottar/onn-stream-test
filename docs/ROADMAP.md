@@ -22,7 +22,7 @@ Authority for the current position is `docs/memory/CURRENT.md`.
   pooled); `C3.L4` AUTHORIZED, single transition per event; live mode
   BUILT (`C3-L4-L1`: SILENT on a clean link, decrease proven on injection,
   increase rule unreachable in attract mode — the user's call; `nft` night
-  next); C4 closed (8+1 stays); D7 complete on the adopted build; C5: 1080p60 NOT CAPABLE (stream) at parity, capability-gated; C5-M2's follow-up arms INCONCLUSIVE (link); C5-M3's low rungs screened (720p/4000 passes transport).**
+  next); C4 closed (8+1 stays); D7 complete on the adopted build; C5: 1080p60 NOT CAPABLE (stream) at parity, capability-gated; C5-M2's follow-up arms INCONCLUSIVE (link); C5-M3's low rungs screened (720p/4000 passes transport). **2026-10-01: C5 reopened by the user's reading (1080p60 through the ladder); C5-M4 Part 1 measured the PS1 source at native 1080p (4x holds 60; proposal not applied).**
 - **`D-BASE`'s loss column is closed.** The wireless-hop packet loss was
   traced to the encoder's per-frame burst and fixed by a 90,000-byte frame
   cap, now a declared field of `native_game_720p60_reference`
@@ -397,6 +397,37 @@ adoption).** `xor8_1` 8+1 stays; the 8+2 arm remains in the tree behind
 
 ## C5 — 1080p60 capability characterization
 
+**Current status — the user's reading of 2026-10-01: C5 is reopened.
+1080p60 is a Phase C deliverable, delivered through the adaptive ladder
+as a rung above 7000, not only a characterization.** C5-M1 and C5-M2
+characterized the stream on a source with 720p detail (the 879×720
+window, upscaled 1.5×) and on an unsettled link. C5-M4 is the
+source-side step, with the PS1 source rendering natively at 1080p. The
+rung itself is Part 2, after the user's link work: the 40 MHz change on
+the Opal and the LINK-L1 re-run. PS1 comes first, because it maps onto
+PS2-class emulation later.
+
+**C5-M4 Part 1 (2026-10-01): the PS1 source at native 1080p — measured
+and proposed, nothing adopted.**
+
+- The window becomes 1920×1080 through RetroArch fullscreen, with the 4:3
+  picture pillarboxed. The companion's argv is unchanged.
+- Beetle PSX HW offers 1x, 2x, 4x and 8x (no 3x).
+- **1x, 2x and 4x hold 60** with no stream, with the adopted 7000 stream
+  and with the c3 1080p arm. 8x misses by one 256-frame interval.
+- **The candidate is 4x**: GPU 21 % against 15 % with the stream.
+- Offline, on the 3D demo segment, content SSIM against the 4x reference
+  as shown:
+  - today 0.838;
+  - **the 4x source through today's 720p/7000 0.873** (the quick win, at
+    the same link cost);
+  - 1080p/12,600/90 KB 0.902 (parity 0.912; GOP 30 0.908).
+- The 1080p arms pulse at the IDR rate under the 90 KB cap.
+- The proposed source config (a PS1 core override plus internal
+  resolution 4x) is written, not applied. The rung's needs are listed for
+  Part 2: ~15.4 Mbit/s on the wire, and the actuator's size change.
+- `docs/memory/evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md`.
+
 Characterize 1080p60 using the current development host and onn client.
 
 This is a **stream/client capability test**, not a future Linux resource-sizing
@@ -491,7 +522,7 @@ Acceptance:
 | transport telemetry contract | ✓ | C2 (`privyhub_stream_telemetry_v1`, heartbeat v3, decoder report v2) |
 | adaptive bitrate runtime validated | ✓ **`C3.L4` CLOSED 2026-09-30: live VALIDATED UNDER REAL LOSS on three `nft` nights (1 NOT → capacity + backstop; 2 WORKS UNDER LOSS → `capacity_mild`; 3 WORKS UNDER LOSS, the pre-registered HOLD shape); live behind its flag; **live ON BY DEFAULT since 2026-10-01 (`C3-L4-D1`, the unit drop-in; the user's authorization 2026-09-30).** History: shadow built and SILENT; live AUTHORIZED 2026-09-28 (single transition per event); **live BUILT (`C3-L4-L1`): SILENT on a clean link, decrease proven on injection; the increase rule replaced by the user's blend (`C3-L4-L2`: climb 5000→7000 shown on injection); `nft` night 1 (2026-09-29): no decrease under a cap → the user's capacity trigger + recovery-escalation backstop built (`C3-L4-N1`: replays PASS, 30-min live hold SILENT); `nft` night 2 WORKS UNDER LOSS (2026-09-29) → the user's `capacity_mild` built (`C3-L4-N2`: stop rule PASS, 30-min hold 0 transitions); night 3 WORKS UNDER LOSS (2026-09-30)** | `C3_L4_D1_LIVE_DEFAULT_2026-10-01.md`; `decisions/C3-L4_LIVE_DEFAULT_2026-10-01.md`; `C3_L4_NFT_NIGHT3_2026-09-30.md`; the decision's close; `C3-L4-S1`; `C3.L3a` sessions 1-4; `decisions/C3-L4_LIVE_AUTHORIZATION_2026-09-28.md`; `C3_L4_L1_LIVE_CONTROLLER_2026-09-28.md`; `C3_L4_NFT_NIGHT1_2026-09-29.md`; `C3_L4_N1_CAPACITY_TRIGGER_2026-09-29.md`; `C3_L4_NFT_NIGHT2_2026-09-29.md`; `C3_L4_N2_MILD_CAPACITY_2026-09-29.md` |
 | adaptive FEC validated or explicitly deferred | ✓ **explicitly deferred** (2026-09-28, the user's call): adaptive not supported; static 8+2 NOT SHOWN; 8+1 stays; arm dormant | `decisions/C4_ADAPTIVE_FEC_2026-09-24.md`, `C4_M1_FEC_ARM_2026-09-25.md` |
-| 1080p60 characterized | ✓ **characterized 2026-09-28: NOT CAPABLE (stream) at parity**; client and host capable; capability-gated, not adopted; **C5-M2 follow-up arms INCONCLUSIVE (link) twice (2026-09-30)**; low rungs screened for Phase G (C5-M3: 720p/4000 passes transport) | `C5_M1_1080P60_PROFILE_2026-09-28.md`, `decisions/C5_1080P60_CAPABILITY_2026-09-28.md` |
+| 1080p60 characterized → **delivered through the ladder** (the user's reading, 2026-10-01) | **open (reopened 2026-10-01)**: 1080p60 is a Phase C deliverable as a ladder rung above 7000, not only a characterization. Done so far: characterized on a 720p-detail source (C5-M1 NOT CAPABLE at parity; C5-M2 INCONCLUSIVE (link) twice); **C5-M4 Part 1 (2026-10-01): the PS1 source at native 1080p measured — 4x HOLDS 60, proposal written, not applied**. Remaining: the user's picture decision on the source config, the link work (40 MHz, LINK-L1 re-run), then Part 2 (the rung). Low rungs screened for Phase G (C5-M3: 720p/4000 passes transport) | `C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md`; `C5_M1_1080P60_PROFILE_2026-09-28.md`, `decisions/C5_1080P60_CAPABILITY_2026-09-28.md` |
 | generalized source contract established | ✓ on paper and as an unused interface | `architecture/NATIVE_SOURCE_CONTRACT.md` (`C6-D1`) |
 | Games regression passes | ✓ all 9 scripted rows PASS (D7-R2); the user's hands-on rows reported fine (2026-09-28) | `D7_R1_LINUX_REGRESSION_2026-09-25.md` §R3 |
 | reusable by Phase G remote/WAN | stated in the contract (a remote transport is another `Transport`; nothing implemented) | `architecture/NATIVE_SOURCE_CONTRACT.md` |

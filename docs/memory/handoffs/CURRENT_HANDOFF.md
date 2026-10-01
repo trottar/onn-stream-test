@@ -2,7 +2,27 @@
 
 Authoritative state: `../CURRENT.md`. **Start there.**
 
-Baseline commit `4e45a4f` (2026-09-30); nothing committed since.
+Baseline commit `cddacaf` (the LINK-L1 / D1 commit); nothing committed since.
+
+## 2026-10-01 (later) — C5 reopened; `C5-M4` Part 1: the PS1 source at native 1080p
+
+- **The user's reading**: 1080p60 is a Phase C deliverable through the
+  adaptive ladder, and the source should render at native 1080p.
+- **Part 1 is done; nothing is adopted.**
+  - The window becomes 1920×1080 through RetroArch fullscreen.
+  - 1x, 2x and 4x HOLD 60 (8x misses by one 256-frame interval), so the
+    **candidate is 4x**.
+  - Offline, on 3D, content SSIM: today 0.838, the 4x source at
+    720p/7000 0.873, 1080p/12,600 0.902.
+  - The proposal (a PS1 core override plus internal resolution 4x) is
+    written and not applied.
+  - Part 2's rung needs are listed
+    (`../evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md`).
+- **Next, the user's:**
+  1. the commit;
+  2. the picture decision on the proposed source config, and the 40 MHz
+     change on the Opal;
+  3. then the LINK-L1 re-run, and Part 2 on the user's word.
 
 ## 2026-10-01 — `LINK-L1` MIXED; live adaptive bitrate ON BY DEFAULT (`C3-L4-D1`)
 
@@ -29,30 +49,10 @@ Baseline commit `4e45a4f` (2026-09-30); nothing committed since.
   - Records: `../decisions/C3-L4_LIVE_DEFAULT_2026-10-01.md`,
     `../evidence/C3_L4_D1_LIVE_DEFAULT_2026-10-01.md`.
 
-## 2026-09-28 — `C3.L3a` closed; `C3.L4` authorized, single transition
+## 2026-09-28 — `C3.L3a` closed; `C3.L4` authorized; C5-M1; `C3-L4-L1` built
 
-Four pre-registered sessions pooled; the user's reading: **`C3.L4`
-AUTHORIZED, one restart per adaptation event, straight to the target, the
-existing hold-downs as spacing; ramps excluded; live build pending; no
-live run before a fault-injection night with the user's `nft`**
-(`../decisions/C3-L4_LIVE_AUTHORIZATION_2026-09-28.md`,
-`../evidence/C3_L3A_R4_SESSION4_2026-09-28.md`). C4 closed (8+1 stays).
-D7 complete (the user's rows reported fine). `CL-B1` ships in the next
-adopted APK. **C5-M1: 1080p60 NOT CAPABLE (stream) at parity**; the
-candidate stays behind `PRIVYHUB_NATIVE_PROFILE_ID`, never the default
-(`../evidence/C5_M1_1080P60_PROFILE_2026-09-28.md`).
-
-**`C3-L4-L1` (queue 2, same day): the `C3.L4` live mode is BUILT**, behind
-`PRIVYHUB_ADAPTIVE_BITRATE_MODE=live`, off by default.
-
-- **Session A**, 30 min on a clean link: SILENT.
-- **Session B**, an injected FALLBACK: the decrease path is proven (one
-  transition 7000 → 5000, the blackout, the hold-down refusal). The
-  increase path never fired: the 90-consecutive-clean rule is not
-  reachable in attract mode, and that is the user's call.
-- **Next**: the user's `nft` night, with the hand-step list in
-  `../evidence/C3_L4_L1_LIVE_CONTROLLER_2026-09-28.md` §7.
-- **`C5-M2`** was not started; the user queues it after the `nft` night.
+Condensed on 2026-10-01: the details are in `../2026-09-28.md` and the
+records it names.
 
 The section below is the 2026-09-23 state, kept as written.
 

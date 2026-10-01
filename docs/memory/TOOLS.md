@@ -983,6 +983,42 @@ Tests: `python3 -m unittest tools/test_c5_m1_profile_selector.py -v`.
 Records: `evidence/C5_M1_1080P60_PROFILE_2026-09-28.md`,
 `evidence/C5_M2_1080P60_FOLLOWUP_2026-09-29.md`.
 
+## The PS1 source at 1080p, measured without touching the adopted files (C5-M4)
+
+`evidence/c5_m4_2026-10-01/`. **Never leave the game-specific files in
+place.** Every teardown deletes them; `c5_m4_source.sh show` lists what is
+in force.
+
+- **`c5_m4_source.sh set <1x|2x|4x|8x>`** writes, for Tekken 3 only:
+  - `~/.config/retroarch/config/Beetle PSX HW/Tekken 3 (USA).cfg`, the
+    window override: RetroArch fullscreen, a 1920×1080 window on the
+    headless display;
+  - `Tekken 3 (USA).opt`, the base options with the internal resolution
+    set.
+
+  `clear` deletes both. The core options come from `~/.config/retroarch`
+  because the companion's environ carries `XDG_CONFIG_HOME`. **3x is not
+  offered by this core**: RetroArch rewrites it to 1x on exit.
+- **RetroArch's own frame counter.** The override also sets
+  `fps_show`/`framecount_show` with the OSD font and widgets off, so
+  nothing is drawn on the picture. The window title then carries
+  "|| Frames: n", rewritten every 256 frames.
+  - `c5_m4_sampler.py <prefix>` timestamps each rewrite with
+    `xprop -spy`; a missed vsync is +16.7 ms on an interval.
+  - It also writes 1 s per-core CPU, GPU busy, GPU power and temperature
+    rows, and with `--telemetry`, the C2 telemetry.
+  - **Paused frames count too.** A recovery pause inflates the counter.
+- **The RetroArch process's `comm` is `RetroArch-Linux`** (truncated). T2's
+  RetroArch CPU is the reliable reading.
+- **The attract loop is deterministic from the unpause.** It starts from
+  power-on with zero input, so `c5_m4_offline.py capture <work> <label>
+  1080|720 <offset_s> <s>` reproduces a segment: a second capture is
+  bit-identical after alignment. `encode` and `score` give the
+  as-shown-at-1080 SSIM table and the frame-size data.
+- **Each launch regenerates `privyhub-session.cfg` and `privyhub-input.cfg`
+  with a new command port.** Read the port from the session cfg each
+  time.
+
 ## The decoder report route's two forms (CL-B1)
 
 `POST /plugins/games/decoder-session-log` takes two forms:

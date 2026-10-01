@@ -1,0 +1,42 @@
+C5-M4 Part 1 -- pre-registration, written 2026-10-01 before any host-table measurement.
+Task: docs/memory/handoffs/C5-M4_PS1_NATIVE_1080P_SOURCE_TASK.md, under QUEUE_2026-09-29B.md's rules.
+
+THE ARMS (each 5 minutes, attract title Tekken 3, Beetle PSX HW, zero input)
+  window 1920x1080 (RetroArch fullscreen on the 1920x1080 headless display; the 4:3 picture
+  pillarboxed inside); internal resolution 1x, 2x, 3x, 4x.
+  3x is run only if the core accepts it (its log line "Building OpenGL state (3x internal res.");
+  otherwise it is reported as not offered by this core.
+  8x only if 4x HOLDS 60 in (b) with >= 40 % headroom, defined as: GPU busy p95 <= 60 % AND the
+  busiest logical CPU's p95 <= 60 % over the (b) hold.
+  (a) no stream; (b) the adopted 7000 stream (live adaptive default, as it is); (c) the c3 arm
+  native_game_1080p60_c3_80pct_cap90 behind PRIVYHUB_NATIVE_PROFILE_ID, for that hold only.
+
+THE BAR (on the frame rate only; CPU/GPU/temperatures are reported, not judged)
+  A scale HOLDS 60 in a hold if ALL of:
+  R1  RetroArch drops no frames over the 5 minutes. Measured from RetroArch's own frame counter
+      (the window title's "Frames:" field, which RetroArch rewrites every 256 frames; each rewrite
+      timestamped as it happens with `xprop -spy`). Over the hold:
+        frames-per-second from the counter >= 59.88 (60 Hz display; the 0.2 % allowance is the
+        timestamping resolution, stated, not a tolerance for drops), and
+        no 256-frame interval longer than 256/60 s + 12 ms (a missed vsync adds 16.7 ms).
+      If RetroArch cannot be made to report the counter without drawing on the picture, R1 falls
+      back to the title FPS field only and the record says so.
+  R2  (b), (c) only: the capture delivers 60 fps to the encoder -- the encoder's own progress
+      fps (ffmpeg stats in the companion log) >= 59.5 median over the hold, dup/drop growth
+      <= 0.5 % of frames; and
+  R3  (b), (c) only: no codec_ms growth -- the client's decode time (C2 telemetry, codec_ms) in
+      the last minute's median is no more than 2 ms above the first minute's, and its max is
+      reported.
+  (a) is judged on R1 alone.
+
+THE CANDIDATE
+  The highest scale that HOLDS 60 in (b). Ties are impossible (one value per scale).
+  If no scale above 1x holds in (b), the candidate is 1x at 1920x1080 and the record says so.
+
+NOT GATES
+  (c) is reported, not judged (one 5-minute hold is not a screening night).
+  The client rows (fps, spikes, stale, loss, max gap) are reported for (b) and (c), not judged.
+  The offline SSIM table is reported; nothing perceptual is a gate.
+
+NOTHING ADOPTED. Teardown after each hold: selector unset and absent, stream 7000, no game.
+At the end: the launch config and core options byte-identical to prestate_sha256.txt.

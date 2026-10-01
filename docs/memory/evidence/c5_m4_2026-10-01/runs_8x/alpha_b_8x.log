@@ -1,0 +1,656 @@
+
+========================================================================
+Starting PrivyHub Linux native-video backend v0.7
+Profile: native_game_720p60_reference 1280x720@60, 7000/7000 kbps H.264 VAAPI, GOP=15, BF=0
+Capture backend: exact X11 window via x11grab
+Capture: managed RetroArch window (pid=1427201, window_id=60817410, discovered=1920x1080)
+Window title: RetroArch Beetle PSX HW <ipv4> 82d8e05 || FPS:  61.04 || Frames: 512
+Video FEC: XOR 8+1; FFmpeg RTP -> loopback relay -> onn; encoder=7000 kbps
+========================================================================
+encoder argv: /usr/bin/ffmpeg -hide_banner -loglevel info -nostdin -vaapi_device /dev/dri/renderD128 -f x11grab -framerate 60 -window_id 60817410 -i :0 -vf scale=1280:720:force_original_aspect_ratio=decrease:flags=fast_bilinear,pad=1280:720:(ow-iw)/2:(oh-ih)/2:black,format=nv12,hwupload -an -c:v h264_vaapi -profile:v high -b:v 7000k -maxrate 7000k -bufsize 7000k -max_frame_size 90000 -g 15 -bf 0 -payload_type 96 -f rtp rtp://<ipv4>:48110?pkt_size=1200
+[x11grab @ 0x55748fe04d40] Stream #0: not enough frames to estimate rate; consider increasing probesize
+Input #0, x11grab, from ':0':
+  Duration: N/A, start: 1790875345.548841, bitrate: 3981312 kb/s
+  Stream #0:0: Video: rawvideo (BGR[0] / 0x524742), bgr0, 1920x1080, 3981312 kb/s, 60 fps, 1000k tbr, 1000k tbn
+Stream mapping:
+  Stream #0:0 -> #0:0 (rawvideo (native) -> h264 (h264_vaapi))
+Output #0, rtp, to 'rtp://<ipv4>:48110?pkt_size=1200':
+  Metadata:
+    encoder         : Lavf61.7.103
+  Stream #0:0: Video: h264 (High), vaapi(tv, progressive), 1280x720, q=2-31, 7000 kb/s, 60 fps, 90k tbn
+      Metadata:
+        encoder         : Lavc61.19.101 h264_vaapi
+SDP:
+v=0
+o=- 0 0 IN IP4 <ipv4>
+s=No Name
+c=IN IP4 <ipv4>
+t=0 0
+a=tool:libavformat 61.7.103
+m=video 48110 RTP/AVP 96
+b=AS:7000
+a=rtpmap:96 H264/90000
+a=fmtp:96 packetization-mode=1
+
+frame=   30 fps=0.0 q=-0.0 size=     202KiB time=00:00:00.50 bitrate=3317.2kbits/s speed=   1x    
+frame=   60 fps= 60 q=-0.0 size=     635KiB time=00:00:01.00 bitrate=5203.8kbits/s speed=   1x    
+frame=   90 fps= 60 q=-0.0 size=    1068KiB time=00:00:01.50 bitrate=5832.7kbits/s speed=   1x    
+frame=  120 fps= 60 q=-0.0 size=    1501KiB time=00:00:02.00 bitrate=6147.1kbits/s speed=   1x    
+frame=  150 fps= 60 q=-0.0 size=    1934KiB time=00:00:02.50 bitrate=6335.8kbits/s speed=   1x    
+frame=  180 fps= 60 q=-0.0 size=    2366KiB time=00:00:03.00 bitrate=6461.6kbits/s speed=   1x    
+frame=  210 fps= 60 q=-0.0 size=    2799KiB time=00:00:03.50 bitrate=6551.4kbits/s speed=   1x    
+frame=  240 fps= 60 q=-0.0 size=    3232KiB time=00:00:04.00 bitrate=6618.8kbits/s speed=   1x    
+frame=  270 fps= 60 q=-0.0 size=    3665KiB time=00:00:04.50 bitrate=6671.2kbits/s speed=   1x    
+frame=  300 fps= 60 q=-0.0 size=    4097KiB time=00:00:05.00 bitrate=6713.1kbits/s speed=   1x    
+frame=  330 fps= 60 q=-0.0 size=    4530KiB time=00:00:05.50 bitrate=6747.5kbits/s speed=   1x    
+frame=  360 fps= 60 q=-0.0 size=    4963KiB time=00:00:06.00 bitrate=6776.4kbits/s speed=   1x    
+frame=  390 fps= 60 q=-0.0 size=    5396KiB time=00:00:06.50 bitrate=6801.0kbits/s speed=   1x    
+frame=  420 fps= 60 q=-0.0 size=    5829KiB time=00:00:07.00 bitrate=6821.9kbits/s speed=   1x    
+frame=  450 fps= 60 q=-0.0 size=    6262KiB time=00:00:07.50 bitrate=6840.3kbits/s speed=   1x    
+frame=  480 fps= 60 q=-0.0 size=    6696KiB time=00:00:08.00 bitrate=6856.3kbits/s speed=   1x    
+frame=  510 fps= 60 q=-0.0 size=    7129KiB time=00:00:08.50 bitrate=6870.3kbits/s speed=   1x    
+frame=  540 fps= 60 q=-0.0 size=    7562KiB time=00:00:09.00 bitrate=6882.8kbits/s speed=   1x    
+frame=  570 fps= 60 q=-0.0 size=    7995KiB time=00:00:09.50 bitrate=6893.9kbits/s speed=   1x    
+frame=  600 fps= 60 q=-0.0 size=    8428KiB time=00:00:10.00 bitrate=6904.1kbits/s speed=   1x    
+frame=  630 fps= 60 q=-0.0 size=    8861KiB time=00:00:10.50 bitrate=6913.3kbits/s speed=   1x    
+frame=  660 fps= 60 q=-0.0 size=    9294KiB time=00:00:11.00 bitrate=6921.6kbits/s speed=   1x    
+frame=  690 fps= 60 q=-0.0 size=    9727KiB time=00:00:11.50 bitrate=6929.2kbits/s speed=   1x    
+frame=  720 fps= 60 q=-0.0 size=   10160KiB time=00:00:12.00 bitrate=6936.2kbits/s speed=   1x    
+frame=  750 fps= 60 q=-0.0 size=   10594KiB time=00:00:12.50 bitrate=6942.6kbits/s speed=   1x    
+frame=  780 fps= 60 q=-0.0 size=   11027KiB time=00:00:13.00 bitrate=6948.6kbits/s speed=   1x    
+frame=  810 fps= 60 q=-0.0 size=   11460KiB time=00:00:13.50 bitrate=6954.1kbits/s speed=   1x    
+frame=  840 fps= 60 q=-0.0 size=   11893KiB time=00:00:14.00 bitrate=6959.2kbits/s speed=   1x    
+frame=  870 fps= 60 q=-0.0 size=   12326KiB time=00:00:14.50 bitrate=6963.9kbits/s speed=   1x    
+frame=  900 fps= 60 q=-0.0 size=   12759KiB time=00:00:15.00 bitrate=6968.3kbits/s speed=   1x    
+frame=  930 fps= 60 q=-0.0 size=   13193KiB time=00:00:15.50 bitrate=6972.5kbits/s speed=   1x    
+frame=  960 fps= 60 q=-0.0 size=   13626KiB time=00:00:16.00 bitrate=6976.4kbits/s speed=   1x    
+frame=  990 fps= 60 q=-0.0 size=   14059KiB time=00:00:16.50 bitrate=6980.0kbits/s speed=   1x    
+frame= 1020 fps= 60 q=-0.0 size=   14492KiB time=00:00:17.00 bitrate=6983.5kbits/s speed=   1x    
+frame= 1050 fps= 60 q=-0.0 size=   14925KiB time=00:00:17.50 bitrate=6986.7kbits/s speed=   1x    
+frame= 1080 fps= 60 q=-0.0 size=   15358KiB time=00:00:18.00 bitrate=6989.8kbits/s speed=   1x    
+frame= 1110 fps= 60 q=-0.0 size=   15792KiB time=00:00:18.50 bitrate=6992.7kbits/s speed=   1x    
+frame= 1140 fps= 60 q=-0.0 size=   16225KiB time=00:00:19.00 bitrate=6995.3kbits/s speed=   1x    
+frame= 1170 fps= 60 q=-0.0 size=   16658KiB time=00:00:19.50 bitrate=6997.9kbits/s speed=   1x    
+frame= 1200 fps= 60 q=-0.0 size=   17091KiB time=00:00:20.00 bitrate=7000.4kbits/s speed=   1x    
+frame= 1230 fps= 60 q=-0.0 size=   17524KiB time=00:00:20.50 bitrate=7002.8kbits/s speed=   1x    
+frame= 1260 fps= 60 q=-0.0 size=   17957KiB time=00:00:21.00 bitrate=7005.0kbits/s speed=   1x    
+frame= 1290 fps= 60 q=-0.0 size=   18390KiB time=00:00:21.50 bitrate=7007.1kbits/s speed=   1x    
+frame= 1320 fps= 60 q=-0.0 size=   18823KiB time=00:00:22.00 bitrate=7009.1kbits/s speed=   1x    
+frame= 1350 fps= 60 q=-0.0 size=   19256KiB time=00:00:22.50 bitrate=7011.0kbits/s speed=   1x    
+frame= 1380 fps= 60 q=-0.0 size=   19689KiB time=00:00:23.00 bitrate=7012.8kbits/s speed=   1x    
+frame= 1410 fps= 60 q=-0.0 size=   20122KiB time=00:00:23.50 bitrate=7014.5kbits/s speed=   1x    
+frame= 1440 fps= 60 q=-0.0 size=   20555KiB time=00:00:24.00 bitrate=7016.2kbits/s speed=   1x    
+frame= 1470 fps= 60 q=-0.0 size=   21006KiB time=00:00:24.50 bitrate=7023.7kbits/s speed=   1x    
+frame= 1500 fps= 60 q=-0.0 size=   21421KiB time=00:00:25.00 bitrate=7019.4kbits/s speed=   1x    
+frame= 1530 fps= 60 q=-0.0 size=   21959KiB time=00:00:25.50 bitrate=7054.3kbits/s speed=   1x    
+frame= 1560 fps= 60 q=-0.0 size=   22374KiB time=00:00:26.00 bitrate=7049.6kbits/s speed=   1x    
+frame= 1590 fps= 60 q=-0.0 size=   22816KiB time=00:00:26.50 bitrate=7053.3kbits/s speed=   1x    
+frame= 1620 fps= 60 q=-0.0 size=   23279KiB time=00:00:27.00 bitrate=7063.0kbits/s speed=   1x    
+frame= 1650 fps= 60 q=-0.0 size=   23738KiB time=00:00:27.50 bitrate=7071.4kbits/s speed=   1x    
+frame= 1680 fps= 60 q=-0.0 size=   24182KiB time=00:00:28.00 bitrate=7074.9kbits/s speed=   1x    
+frame= 1710 fps= 60 q=-0.0 size=   24636KiB time=00:00:28.50 bitrate=7081.3kbits/s speed=   1x    
+frame= 1740 fps= 60 q=-0.0 size=   25054KiB time=00:00:29.00 bitrate=7077.3kbits/s speed=   1x    
+frame= 1770 fps= 60 q=-0.0 size=   25485KiB time=00:00:29.50 bitrate=7077.0kbits/s speed=   1x    
+frame= 1800 fps= 60 q=-0.0 size=   25930KiB time=00:00:30.00 bitrate=7080.6kbits/s speed=   1x    
+frame= 1830 fps= 60 q=-0.0 size=   26366KiB time=00:00:30.50 bitrate=7081.6kbits/s speed=   1x    
+frame= 1860 fps= 60 q=-0.0 size=   26802KiB time=00:00:31.00 bitrate=7082.7kbits/s speed=   1x    
+frame= 1890 fps= 60 q=-0.0 size=   27245KiB time=00:00:31.50 bitrate=7085.4kbits/s speed=   1x    
+frame= 1920 fps= 60 q=-0.0 size=   27662KiB time=00:00:32.00 bitrate=7081.4kbits/s speed=   1x    
+frame= 1950 fps= 60 q=-0.0 size=   28093KiB time=00:00:32.50 bitrate=7081.1kbits/s speed=   1x    
+frame= 1980 fps= 60 q=-0.0 size=   28506KiB time=00:00:33.00 bitrate=7076.3kbits/s speed=   1x    
+frame= 2010 fps= 60 q=-0.0 size=   28970KiB time=00:00:33.50 bitrate=7084.3kbits/s speed=   1x    
+frame= 2040 fps= 60 q=-0.0 size=   29407KiB time=00:00:34.00 bitrate=7085.5kbits/s speed=   1x    
+frame= 2071 fps= 60 q=-0.0 size=   29838KiB time=00:00:34.51 bitrate=7081.5kbits/s speed=   1x    
+frame= 2101 fps= 60 q=-0.0 size=   30272KiB time=00:00:35.01 bitrate=7081.9kbits/s speed=   1x    
+frame= 2131 fps= 60 q=-0.0 size=   30696KiB time=00:00:35.51 bitrate=7080.2kbits/s speed=   1x    
+frame= 2161 fps= 60 q=-0.0 size=   31143KiB time=00:00:36.01 bitrate=7083.5kbits/s speed=   1x    
+frame= 2191 fps= 60 q=-0.0 size=   31561KiB time=00:00:36.51 bitrate=7080.2kbits/s speed=   1x    
+frame= 2220 fps= 60 q=-0.0 size=   32018KiB time=00:00:37.00 bitrate=7089.0kbits/s speed=   1x    
+frame= 2251 fps= 60 q=-0.0 size=   32439KiB time=00:00:37.51 bitrate=7083.2kbits/s speed=   1x    
+frame= 2281 fps= 60 q=-0.0 size=   32880KiB time=00:00:38.01 bitrate=7085.0kbits/s speed=   1x    
+frame= 2311 fps= 60 q=-0.0 size=   33314KiB time=00:00:38.51 bitrate=7085.4kbits/s speed=   1x    
+frame= 2341 fps= 60 q=-0.0 size=   33738KiB time=00:00:39.01 bitrate=7083.6kbits/s speed=   1x    
+frame= 2371 fps= 60 q=-0.0 size=   34195KiB time=00:00:39.51 bitrate=7088.8kbits/s speed=   1x    
+frame= 2401 fps= 60 q=-0.0 size=   34598KiB time=00:00:40.01 bitrate=7082.6kbits/s speed=   1x    
+frame= 2431 fps= 60 q=-0.0 size=   35025KiB time=00:00:40.51 bitrate=7081.6kbits/s speed=   1x    
+frame= 2461 fps= 60 q=-0.0 size=   35480KiB time=00:00:41.01 bitrate=7086.2kbits/s speed=   1x    
+frame= 2491 fps= 60 q=-0.0 size=   35903KiB time=00:00:41.51 bitrate=7084.3kbits/s speed=   1x    
+frame= 2521 fps= 60 q=-0.0 size=   36334KiB time=00:00:42.01 bitrate=7084.1kbits/s speed=   1x    
+frame= 2551 fps= 60 q=-0.0 size=   36751KiB time=00:00:42.51 bitrate=7081.0kbits/s speed=   1x    
+frame= 2581 fps= 60 q=-0.0 size=   37175KiB time=00:00:43.01 bitrate=7079.5kbits/s speed=   1x    
+frame= 2611 fps= 60 q=-0.0 size=   37616KiB time=00:00:43.51 bitrate=7081.2kbits/s speed=   1x    
+frame= 2641 fps= 60 q=-0.0 size=   38059KiB time=00:00:44.01 bitrate=7083.3kbits/s speed=   1x    
+frame= 2671 fps= 60 q=-0.0 size=   38485KiB time=00:00:44.51 bitrate=7082.0kbits/s speed=   1x    
+frame= 2701 fps= 60 q=-0.0 size=   38923KiB time=00:00:45.01 bitrate=7083.1kbits/s speed=   1x    
+frame= 2731 fps= 60 q=-0.0 size=   39356KiB time=00:00:45.51 bitrate=7083.2kbits/s speed=   1x    
+frame= 2761 fps= 60 q=-0.0 size=   39827KiB time=00:00:46.01 bitrate=7090.0kbits/s speed=   1x    
+frame= 2791 fps= 60 q=-0.0 size=   40246KiB time=00:00:46.51 bitrate=7087.6kbits/s speed=   1x    
+frame= 2821 fps= 60 q=-0.0 size=   40682KiB time=00:00:47.01 bitrate=7088.3kbits/s speed=   1x    
+frame= 2851 fps= 60 q=-0.0 size=   41105KiB time=00:00:47.51 bitrate=7086.7kbits/s speed=   1x    
+frame= 2881 fps= 60 q=-0.0 size=   41540KiB time=00:00:48.01 bitrate=7087.0kbits/s speed=   1x    
+frame= 2911 fps= 60 q=-0.0 size=   41981KiB time=00:00:48.51 bitrate=7088.4kbits/s speed=   1x    
+frame= 2941 fps= 60 q=-0.0 size=   42405KiB time=00:00:49.01 bitrate=7086.9kbits/s speed=   1x    
+frame= 2971 fps= 60 q=-0.0 size=   42838KiB time=00:00:49.51 bitrate=7087.1kbits/s speed=   1x    
+frame= 3001 fps= 60 q=-0.0 size=   43299KiB time=00:00:50.01 bitrate=7091.8kbits/s speed=   1x    
+frame= 3031 fps= 60 q=-0.0 size=   43696KiB time=00:00:50.51 bitrate=7085.9kbits/s speed=   1x    
+frame= 3061 fps= 60 q=-0.0 size=   44144KiB time=00:00:51.01 bitrate=7088.5kbits/s speed=   1x    
+frame= 3091 fps= 60 q=-0.0 size=   44574KiB time=00:00:51.51 bitrate=7088.0kbits/s speed=   1x    
+frame= 3121 fps= 60 q=-0.0 size=   45015KiB time=00:00:52.01 bitrate=7089.3kbits/s speed=   1x    
+frame= 3151 fps= 60 q=-0.0 size=   45444KiB time=00:00:52.51 bitrate=7088.8kbits/s speed=   1x    
+frame= 3181 fps= 60 q=-0.0 size=   45872KiB time=00:00:53.01 bitrate=7088.0kbits/s speed=   1x    
+frame= 3211 fps= 60 q=-0.0 size=   46304KiB time=00:00:53.51 bitrate=7088.0kbits/s speed=   1x    
+frame= 3241 fps= 60 q=-0.0 size=   46732KiB time=00:00:54.01 bitrate=7087.3kbits/s speed=   1x    
+frame= 3271 fps= 60 q=-0.0 size=   47174KiB time=00:00:54.51 bitrate=7088.7kbits/s speed=   1x    
+frame= 3301 fps= 60 q=-0.0 size=   47606KiB time=00:00:55.01 bitrate=7088.5kbits/s speed=   1x    
+frame= 3331 fps= 60 q=-0.0 size=   48026KiB time=00:00:55.51 bitrate=7086.7kbits/s speed=   1x    
+frame= 3361 fps= 60 q=-0.0 size=   48452KiB time=00:00:56.01 bitrate=7085.7kbits/s speed=   1x    
+frame= 3391 fps= 60 q=-0.0 size=   48907KiB time=00:00:56.51 bitrate=7089.0kbits/s speed=   1x    
+frame= 3421 fps= 60 q=-0.0 size=   49344KiB time=00:00:57.01 bitrate=7089.6kbits/s speed=   1x    
+frame= 3451 fps= 60 q=-0.0 size=   49794KiB time=00:00:57.51 bitrate=7092.1kbits/s speed=   1x    
+frame= 3481 fps= 60 q=-0.0 size=   50194KiB time=00:00:58.01 bitrate=7087.4kbits/s speed=   1x    
+frame= 3511 fps= 60 q=-0.0 size=   50633KiB time=00:00:58.51 bitrate=7088.4kbits/s speed=   1x    
+frame= 3541 fps= 60 q=-0.0 size=   51076KiB time=00:00:59.01 bitrate=7089.8kbits/s speed=   1x    
+frame= 3571 fps= 60 q=-0.0 size=   51493KiB time=00:00:59.51 bitrate=7087.6kbits/s speed=   1x    
+frame= 3601 fps= 60 q=-0.0 size=   51944KiB time=00:01:00.01 bitrate=7090.1kbits/s speed=   1x    
+frame= 3631 fps= 60 q=-0.0 size=   52389KiB time=00:01:00.51 bitrate=7091.7kbits/s speed=   1x    
+frame= 3661 fps= 60 q=-0.0 size=   52778KiB time=00:01:01.01 bitrate=7085.8kbits/s speed=   1x    
+frame= 3691 fps= 60 q=-0.0 size=   53230KiB time=00:01:01.51 bitrate=7088.5kbits/s speed=   1x    
+frame= 3721 fps= 60 q=-0.0 size=   53657KiB time=00:01:02.01 bitrate=7087.7kbits/s speed=   1x    
+frame= 3751 fps= 60 q=-0.0 size=   54076KiB time=00:01:02.51 bitrate=7086.0kbits/s speed=   1x    
+frame= 3781 fps= 60 q=-0.0 size=   54527KiB time=00:01:03.01 bitrate=7088.4kbits/s speed=   1x    
+frame= 3811 fps= 60 q=-0.0 size=   54965KiB time=00:01:03.51 bitrate=7089.1kbits/s speed=   1x    
+frame= 3841 fps= 60 q=-0.0 size=   55402KiB time=00:01:04.01 bitrate=7089.6kbits/s speed=   1x    
+frame= 3871 fps= 60 q=-0.0 size=   55823KiB time=00:01:04.51 bitrate=7088.1kbits/s speed=   1x    
+frame= 3901 fps= 60 q=-0.0 size=   56262KiB time=00:01:05.01 bitrate=7088.9kbits/s speed=   1x    
+frame= 3931 fps= 60 q=-0.0 size=   56687KiB time=00:01:05.51 bitrate=7088.0kbits/s speed=   1x    
+frame= 3961 fps= 60 q=-0.0 size=   57113KiB time=00:01:06.01 bitrate=7087.1kbits/s speed=   1x    
+frame= 3991 fps= 60 q=-0.0 size=   57539KiB time=00:01:06.51 bitrate=7086.3kbits/s speed=   1x    
+frame= 4021 fps= 60 q=-0.0 size=   57995KiB time=00:01:07.01 bitrate=7089.2kbits/s speed=   1x    
+frame= 4051 fps= 60 q=-0.0 size=   58421KiB time=00:01:07.51 bitrate=7088.4kbits/s speed=   1x    
+frame= 4081 fps= 60 q=-0.0 size=   58852KiB time=00:01:08.01 bitrate=7088.3kbits/s speed=   1x    
+frame= 4111 fps= 60 q=-0.0 size=   59269KiB time=00:01:08.51 bitrate=7086.3kbits/s speed=   1x    
+frame= 4141 fps= 60 q=-0.0 size=   59731KiB time=00:01:09.01 bitrate=7089.8kbits/s speed=   1x    
+frame= 4171 fps= 60 q=-0.0 size=   60101KiB time=00:01:09.51 bitrate=7082.5kbits/s speed=   1x    
+frame= 4201 fps= 60 q=-0.0 size=   60629KiB time=00:01:10.01 bitrate=7093.7kbits/s speed=   1x    
+frame= 4231 fps= 60 q=-0.0 size=   61013KiB time=00:01:10.51 bitrate=7087.9kbits/s speed=   1x    
+frame= 4261 fps= 60 q=-0.0 size=   61457KiB time=00:01:11.01 bitrate=7089.3kbits/s speed=   1x    
+frame= 4291 fps= 60 q=-0.0 size=   61871KiB time=00:01:11.51 bitrate=7087.2kbits/s speed=   1x    
+frame= 4321 fps= 60 q=-0.0 size=   62298KiB time=00:01:12.01 bitrate=7086.5kbits/s speed=   1x    
+frame= 4351 fps= 60 q=-0.0 size=   62759KiB time=00:01:12.51 bitrate=7089.7kbits/s speed=   1x    
+frame= 4381 fps= 60 q=-0.0 size=   63154KiB time=00:01:13.01 bitrate=7085.5kbits/s speed=   1x    
+frame= 4411 fps= 60 q=-0.0 size=   63625KiB time=00:01:13.51 bitrate=7089.8kbits/s speed=   1x    
+frame= 4441 fps= 60 q=-0.0 size=   64079KiB time=00:01:14.01 bitrate=7092.1kbits/s speed=   1x    
+frame= 4471 fps= 60 q=-0.0 size=   64459KiB time=00:01:14.51 bitrate=7086.4kbits/s speed=   1x    
+frame= 4501 fps= 60 q=-0.0 size=   64939KiB time=00:01:15.01 bitrate=7091.5kbits/s speed=   1x    
+frame= 4531 fps= 60 q=-0.0 size=   65344KiB time=00:01:15.51 bitrate=7088.5kbits/s speed=   1x    
+frame= 4561 fps= 60 q=-0.0 size=   65784KiB time=00:01:16.01 bitrate=7089.3kbits/s speed=   1x    
+frame= 4591 fps= 60 q=-0.0 size=   66222KiB time=00:01:16.51 bitrate=7089.8kbits/s speed=   1x    
+frame= 4621 fps= 60 q=-0.0 size=   66633KiB time=00:01:17.01 bitrate=7087.6kbits/s speed=   1x    
+frame= 4651 fps= 60 q=-0.0 size=   67077KiB time=00:01:17.51 bitrate=7088.8kbits/s speed=   1x    
+frame= 4681 fps= 60 q=-0.0 size=   67504KiB time=00:01:18.01 bitrate=7088.1kbits/s speed=   1x    
+frame= 4711 fps= 60 q=-0.0 size=   67951KiB time=00:01:18.51 bitrate=7089.6kbits/s speed=   1x    
+frame= 4741 fps= 60 q=-0.0 size=   68387KiB time=00:01:19.01 bitrate=7089.9kbits/s speed=   1x    
+frame= 4771 fps= 60 q=-0.0 size=   68812KiB time=00:01:19.51 bitrate=7089.2kbits/s speed=   1x    
+frame= 4801 fps= 60 q=-0.0 size=   69249KiB time=00:01:20.01 bitrate=7089.6kbits/s speed=   1x    
+frame= 4831 fps= 60 q=-0.0 size=   69694KiB time=00:01:20.51 bitrate=7090.8kbits/s speed=   1x    
+frame= 4861 fps= 60 q=-0.0 size=   70110KiB time=00:01:21.01 bitrate=7089.2kbits/s speed=   1x    
+frame= 4891 fps= 60 q=-0.0 size=   70552KiB time=00:01:21.51 bitrate=7090.1kbits/s speed=   1x    
+frame= 4921 fps= 60 q=-0.0 size=   70977KiB time=00:01:22.01 bitrate=7089.4kbits/s speed=   1x    
+frame= 4951 fps= 60 q=-0.0 size=   71413KiB time=00:01:22.51 bitrate=7089.7kbits/s speed=   1x    
+frame= 4981 fps= 60 q=-0.0 size=   71840KiB time=00:01:23.01 bitrate=7089.1kbits/s speed=   1x    
+frame= 5011 fps= 60 q=-0.0 size=   72275KiB time=00:01:23.51 bitrate=7089.3kbits/s speed=   1x    
+frame= 5041 fps= 60 q=-0.0 size=   72710KiB time=00:01:24.01 bitrate=7089.6kbits/s speed=   1x    
+frame= 5071 fps= 60 q=-0.0 size=   73154KiB time=00:01:24.51 bitrate=7090.7kbits/s speed=   1x    
+frame= 5101 fps= 60 q=-0.0 size=   73570KiB time=00:01:25.01 bitrate=7089.0kbits/s speed=   1x    
+frame= 5131 fps= 60 q=-0.0 size=   74118KiB time=00:01:25.51 bitrate=7100.1kbits/s speed=   1x    
+frame= 5161 fps= 60 q=-0.0 size=   74417KiB time=00:01:26.01 bitrate=7087.3kbits/s speed=   1x    
+frame= 5191 fps= 60 q=-0.0 size=   74862KiB time=00:01:26.51 bitrate=7088.4kbits/s speed=   1x    
+frame= 5221 fps= 60 q=-0.0 size=   75282KiB time=00:01:27.01 bitrate=7087.3kbits/s speed=   1x    
+frame= 5251 fps= 60 q=-0.0 size=   75729KiB time=00:01:27.51 bitrate=7088.6kbits/s speed=   1x    
+frame= 5281 fps= 60 q=-0.0 size=   76172KiB time=00:01:28.01 bitrate=7089.6kbits/s speed=   1x    
+frame= 5311 fps= 60 q=-0.0 size=   76656KiB time=00:01:28.51 bitrate=7094.4kbits/s speed=   1x    
+frame= 5341 fps= 60 q=-0.0 size=   77048KiB time=00:01:29.01 bitrate=7090.5kbits/s speed=   1x    
+frame= 5371 fps= 60 q=-0.0 size=   77480KiB time=00:01:29.51 bitrate=7090.4kbits/s speed=   1x    
+frame= 5401 fps= 60 q=-0.0 size=   77903KiB time=00:01:30.01 bitrate=7089.6kbits/s speed=   1x    
+frame= 5431 fps= 60 q=-0.0 size=   78340KiB time=00:01:30.51 bitrate=7089.9kbits/s speed=   1x    
+frame= 5461 fps= 60 q=-0.0 size=   78770KiB time=00:01:31.01 bitrate=7089.7kbits/s speed=   1x    
+frame= 5491 fps= 60 q=-0.0 size=   79195KiB time=00:01:31.51 bitrate=7089.0kbits/s speed=   1x    
+frame= 5521 fps= 60 q=-0.0 size=   79635KiB time=00:01:32.01 bitrate=7089.7kbits/s speed=   1x    
+frame= 5551 fps= 60 q=-0.0 size=   80078KiB time=00:01:32.51 bitrate=7090.6kbits/s speed=   1x    
+frame= 5581 fps= 60 q=-0.0 size=   80544KiB time=00:01:33.01 bitrate=7093.6kbits/s speed=   1x    
+frame= 5611 fps= 60 q=-0.0 size=   80919KiB time=00:01:33.51 bitrate=7088.5kbits/s speed=   1x    
+frame= 5641 fps= 60 q=-0.0 size=   81374KiB time=00:01:34.01 bitrate=7090.4kbits/s speed=   1x    
+frame= 5671 fps= 60 q=-0.0 size=   81804KiB time=00:01:34.51 bitrate=7090.1kbits/s speed=   1x    
+frame= 5701 fps= 60 q=-0.0 size=   82232KiB time=00:01:35.01 bitrate=7089.8kbits/s speed=   1x    
+frame= 5731 fps= 60 q=-0.0 size=   82676KiB time=00:01:35.51 bitrate=7090.7kbits/s speed=   1x    
+frame= 5761 fps= 60 q=-0.0 size=   83102KiB time=00:01:36.01 bitrate=7090.2kbits/s speed=   1x    
+frame= 5791 fps= 60 q=-0.0 size=   83548KiB time=00:01:36.51 bitrate=7091.3kbits/s speed=   1x    
+frame= 5821 fps= 60 q=-0.0 size=   83989KiB time=00:01:37.01 bitrate=7092.0kbits/s speed=   1x    
+frame= 5851 fps= 60 q=-0.0 size=   84482KiB time=00:01:37.51 bitrate=7097.0kbits/s speed=   1x    
+frame= 5881 fps= 60 q=-0.0 size=   84829KiB time=00:01:38.01 bitrate=7089.8kbits/s speed=   1x    
+frame= 5911 fps= 60 q=-0.0 size=   85286KiB time=00:01:38.51 bitrate=7091.9kbits/s speed=   1x    
+frame= 5941 fps= 60 q=-0.0 size=   85703KiB time=00:01:39.01 bitrate=7090.5kbits/s speed=   1x    
+frame= 5971 fps= 60 q=-0.0 size=   86157KiB time=00:01:39.51 bitrate=7092.3kbits/s speed=   1x    
+frame= 6001 fps= 60 q=-0.0 size=   86546KiB time=00:01:40.01 bitrate=7088.7kbits/s speed=   1x    
+frame= 6031 fps= 60 q=-0.0 size=   86997KiB time=00:01:40.51 bitrate=7090.2kbits/s speed=   1x    
+frame= 6061 fps= 60 q=-0.0 size=   87456KiB time=00:01:41.01 bitrate=7092.3kbits/s speed=   1x    
+frame= 6091 fps= 60 q=-0.0 size=   87883KiB time=00:01:41.51 bitrate=7091.8kbits/s speed=   1x    
+frame= 6121 fps= 60 q=-0.0 size=   88293KiB time=00:01:42.01 bitrate=7090.0kbits/s speed=   1x    
+frame= 6151 fps= 60 q=-0.0 size=   88745KiB time=00:01:42.51 bitrate=7091.5kbits/s speed=   1x    
+frame= 6182 fps= 60 q=-0.0 size=   89220KiB time=00:01:43.03 bitrate=7093.7kbits/s speed=   1x    
+frame= 6211 fps= 60 q=-0.0 size=   89611KiB time=00:01:43.51 bitrate=7091.5kbits/s speed=   1x    
+frame= 6241 fps= 60 q=-0.0 size=   90024KiB time=00:01:44.01 bitrate=7090.0kbits/s speed=   1x    
+frame= 6272 fps= 60 q=-0.0 size=   90614KiB time=00:01:44.53 bitrate=7101.2kbits/s speed=   1x    
+frame= 6302 fps= 60 q=-0.0 size=   90897KiB time=00:01:45.03 bitrate=7089.5kbits/s speed=   1x    
+frame= 6331 fps= 60 q=-0.0 size=   91344KiB time=00:01:45.51 bitrate=7091.7kbits/s speed=   1x    
+frame= 6362 fps= 60 q=-0.0 size=   91815KiB time=00:01:46.03 bitrate=7093.5kbits/s speed=   1x    
+frame= 6392 fps= 60 q=-0.0 size=   92248KiB time=00:01:46.53 bitrate=7093.5kbits/s speed=   1x    
+frame= 6422 fps= 60 q=-0.0 size=   92675KiB time=00:01:47.03 bitrate=7093.1kbits/s speed=   1x    
+frame= 6452 fps= 60 q=-0.0 size=   93176KiB time=00:01:47.53 bitrate=7098.2kbits/s speed=   1x    
+frame= 6482 fps= 60 q=-0.0 size=   93518KiB time=00:01:48.03 bitrate=7091.3kbits/s speed=   1x    
+frame= 6512 fps= 60 q=-0.0 size=   93976KiB time=00:01:48.53 bitrate=7093.2kbits/s speed=   1x    
+frame= 6542 fps= 60 q=-0.0 size=   94391KiB time=00:01:49.03 bitrate=7091.8kbits/s speed=   1x    
+frame= 6572 fps= 60 q=-0.0 size=   94827KiB time=00:01:49.53 bitrate=7092.1kbits/s speed=   1x    
+frame= 6602 fps= 60 q=-0.0 size=   95263KiB time=00:01:50.03 bitrate=7092.3kbits/s speed=   1x    
+frame= 6632 fps= 60 q=-0.0 size=   95684KiB time=00:01:50.53 bitrate=7091.5kbits/s speed=   1x    
+frame= 6662 fps= 60 q=-0.0 size=   96151KiB time=00:01:51.03 bitrate=7094.0kbits/s speed=   1x    
+frame= 6692 fps= 60 q=-0.0 size=   96570KiB time=00:01:51.53 bitrate=7093.0kbits/s speed=   1x    
+frame= 6722 fps= 60 q=-0.0 size=   96992KiB time=00:01:52.03 bitrate=7092.1kbits/s speed=   1x    
+frame= 6752 fps= 60 q=-0.0 size=   97430KiB time=00:01:52.53 bitrate=7092.5kbits/s speed=   1x    
+frame= 6782 fps= 60 q=-0.0 size=   97878KiB time=00:01:53.03 bitrate=7093.6kbits/s speed=   1x    
+frame= 6812 fps= 60 q=-0.0 size=   98327KiB time=00:01:53.53 bitrate=7094.8kbits/s speed=   1x    
+frame= 6842 fps= 60 q=-0.0 size=   98745KiB time=00:01:54.03 bitrate=7093.7kbits/s speed=   1x    
+frame= 6872 fps= 60 q=-0.0 size=   99155KiB time=00:01:54.53 bitrate=7092.1kbits/s speed=   1x    
+frame= 6902 fps= 60 q=-0.0 size=   99587KiB time=00:01:55.03 bitrate=7092.0kbits/s speed=   1x    
+frame= 6932 fps= 60 q=-0.0 size=   99943KiB time=00:01:55.53 bitrate=7086.6kbits/s speed=   1x    
+frame= 6962 fps= 60 q=-0.0 size=  100310KiB time=00:01:56.03 bitrate=7081.9kbits/s speed=   1x    
+frame= 6992 fps= 60 q=-0.0 size=  100828KiB time=00:01:56.53 bitrate=7088.0kbits/s speed=   1x    
+frame= 7022 fps= 60 q=-0.0 size=  101341KiB time=00:01:57.03 bitrate=7093.6kbits/s speed=   1x    
+frame= 7052 fps= 60 q=-0.0 size=  101795KiB time=00:01:57.53 bitrate=7095.1kbits/s speed=   1x    
+frame= 7082 fps= 60 q=-0.0 size=  102178KiB time=00:01:58.03 bitrate=7091.6kbits/s speed=   1x    
+frame= 7112 fps= 60 q=-0.0 size=  102456KiB time=00:01:58.53 bitrate=7080.8kbits/s speed=   1x    
+frame= 7142 fps= 60 q=-0.0 size=  102857KiB time=00:01:59.03 bitrate=7078.8kbits/s speed=   1x    
+frame= 7172 fps= 60 q=-0.0 size=  103494KiB time=00:01:59.53 bitrate=7092.8kbits/s speed=   1x    
+frame= 7202 fps= 60 q=-0.0 size=  103943KiB time=00:02:00.03 bitrate=7093.9kbits/s speed=   1x    
+frame= 7232 fps= 60 q=-0.0 size=  104374KiB time=00:02:00.53 bitrate=7093.7kbits/s speed=   1x    
+frame= 7262 fps= 60 q=-0.0 size=  104766KiB time=00:02:01.03 bitrate=7091.0kbits/s speed=   1x    
+frame= 7292 fps= 60 q=-0.0 size=  105197KiB time=00:02:01.53 bitrate=7090.8kbits/s speed=   1x    
+frame= 7322 fps= 60 q=-0.0 size=  105614KiB time=00:02:02.03 bitrate=7089.8kbits/s speed=   1x    
+frame= 7352 fps= 60 q=-0.0 size=  106029KiB time=00:02:02.53 bitrate=7088.6kbits/s speed=   1x    
+frame= 7382 fps= 60 q=-0.0 size=  106458KiB time=00:02:03.03 bitrate=7088.3kbits/s speed=   1x    
+frame= 7412 fps= 60 q=-0.0 size=  106888KiB time=00:02:03.53 bitrate=7088.2kbits/s speed=   1x    
+frame= 7442 fps= 60 q=-0.0 size=  107308KiB time=00:02:04.03 bitrate=7087.3kbits/s speed=   1x    
+frame= 7472 fps= 60 q=-0.0 size=  107763KiB time=00:02:04.53 bitrate=7088.8kbits/s speed=   1x    
+frame= 7502 fps= 60 q=-0.0 size=  108194KiB time=00:02:05.03 bitrate=7088.7kbits/s speed=   1x    
+frame= 7532 fps= 60 q=-0.0 size=  108608KiB time=00:02:05.53 bitrate=7087.5kbits/s speed=   1x    
+frame= 7562 fps= 60 q=-0.0 size=  109018KiB time=00:02:06.03 bitrate=7086.0kbits/s speed=   1x    
+frame= 7592 fps= 60 q=-0.0 size=  109353KiB time=00:02:06.53 bitrate=7079.7kbits/s speed=   1x    
+frame= 7622 fps= 60 q=-0.0 size=  109786KiB time=00:02:07.03 bitrate=7079.8kbits/s speed=   1x    
+frame= 7652 fps= 60 q=-0.0 size=  110460KiB time=00:02:07.53 bitrate=7095.3kbits/s speed=   1x    
+frame= 7682 fps= 60 q=-0.0 size=  110867KiB time=00:02:08.03 bitrate=7093.7kbits/s speed=   1x    
+frame= 7712 fps= 60 q=-0.0 size=  111296KiB time=00:02:08.53 bitrate=7093.4kbits/s speed=   1x    
+frame= 7742 fps= 60 q=-0.0 size=  111734KiB time=00:02:09.03 bitrate=7093.7kbits/s speed=   1x    
+frame= 7772 fps= 60 q=-0.0 size=  112185KiB time=00:02:09.53 bitrate=7094.8kbits/s speed=   1x    
+frame= 7802 fps= 60 q=-0.0 size=  112596KiB time=00:02:10.03 bitrate=7093.5kbits/s speed=   1x    
+frame= 7832 fps= 60 q=-0.0 size=  113036KiB time=00:02:10.53 bitrate=7093.9kbits/s speed=   1x    
+frame= 7862 fps= 60 q=-0.0 size=  113486KiB time=00:02:11.03 bitrate=7095.0kbits/s speed=   1x    
+frame= 7892 fps= 60 q=-0.0 size=  113897KiB time=00:02:11.53 bitrate=7093.6kbits/s speed=   1x    
+frame= 7922 fps= 60 q=-0.0 size=  114327KiB time=00:02:12.03 bitrate=7093.4kbits/s speed=   1x    
+frame= 7952 fps= 60 q=-0.0 size=  114786KiB time=00:02:12.53 bitrate=7095.0kbits/s speed=   1x    
+frame= 7982 fps= 60 q=-0.0 size=  115199KiB time=00:02:13.03 bitrate=7093.8kbits/s speed=   1x    
+frame= 8012 fps= 60 q=-0.0 size=  115626KiB time=00:02:13.53 bitrate=7093.4kbits/s speed=   1x    
+frame= 8042 fps= 60 q=-0.0 size=  116112KiB time=00:02:14.03 bitrate=7096.6kbits/s speed=   1x    
+frame= 8072 fps= 60 q=-0.0 size=  116494KiB time=00:02:14.53 bitrate=7093.6kbits/s speed=   1x    
+frame= 8102 fps= 60 q=-0.0 size=  116949KiB time=00:02:15.03 bitrate=7094.9kbits/s speed=   1x    
+frame= 8132 fps= 60 q=-0.0 size=  117371KiB time=00:02:15.53 bitrate=7094.2kbits/s speed=   1x    
+frame= 8162 fps= 60 q=-0.0 size=  117802KiB time=00:02:16.03 bitrate=7094.1kbits/s speed=   1x    
+frame= 8192 fps= 60 q=-0.0 size=  118241KiB time=00:02:16.53 bitrate=7094.4kbits/s speed=   1x    
+frame= 8222 fps= 60 q=-0.0 size=  118658KiB time=00:02:17.03 bitrate=7093.5kbits/s speed=   1x    
+frame= 8252 fps= 60 q=-0.0 size=  119093KiB time=00:02:17.53 bitrate=7093.7kbits/s speed=   1x    
+frame= 8282 fps= 60 q=-0.0 size=  119517KiB time=00:02:18.03 bitrate=7093.1kbits/s speed=   1x    
+frame= 8312 fps= 60 q=-0.0 size=  119945KiB time=00:02:18.53 bitrate=7092.8kbits/s speed=   1x    
+frame= 8342 fps= 60 q=-0.0 size=  120382KiB time=00:02:19.03 bitrate=7093.0kbits/s speed=   1x    
+frame= 8372 fps= 60 q=-0.0 size=  120822KiB time=00:02:19.53 bitrate=7093.5kbits/s speed=   1x    
+frame= 8402 fps= 60 q=-0.0 size=  121246KiB time=00:02:20.03 bitrate=7092.9kbits/s speed=   1x    
+frame= 8432 fps= 60 q=-0.0 size=  121697KiB time=00:02:20.53 bitrate=7094.0kbits/s speed=   1x    
+frame= 8462 fps= 60 q=-0.0 size=  122119KiB time=00:02:21.03 bitrate=7093.4kbits/s speed=   1x    
+frame= 8492 fps= 60 q=-0.0 size=  122557KiB time=00:02:21.53 bitrate=7093.6kbits/s speed=   1x    
+frame= 8522 fps= 60 q=-0.0 size=  122989KiB time=00:02:22.03 bitrate=7093.6kbits/s speed=   1x    
+frame= 8552 fps= 60 q=-0.0 size=  123412KiB time=00:02:22.53 bitrate=7093.0kbits/s speed=   1x    
+frame= 8582 fps= 60 q=-0.0 size=  123845KiB time=00:02:23.03 bitrate=7093.0kbits/s speed=   1x    
+frame= 8612 fps= 60 q=-0.0 size=  124301KiB time=00:02:23.53 bitrate=7094.3kbits/s speed=   1x    
+frame= 8642 fps= 60 q=-0.0 size=  124722KiB time=00:02:24.03 bitrate=7093.7kbits/s speed=   1x    
+frame= 8672 fps= 60 q=-0.0 size=  125165KiB time=00:02:24.53 bitrate=7094.2kbits/s speed=   1x    
+frame= 8702 fps= 60 q=-0.0 size=  125582KiB time=00:02:25.03 bitrate=7093.3kbits/s speed=   1x    
+frame= 8732 fps= 60 q=-0.0 size=  126013KiB time=00:02:25.53 bitrate=7093.2kbits/s speed=   1x    
+frame= 8762 fps= 60 q=-0.0 size=  126439KiB time=00:02:26.03 bitrate=7092.8kbits/s speed=   1x    
+frame= 8792 fps= 60 q=-0.0 size=  126863KiB time=00:02:26.53 bitrate=7092.3kbits/s speed=   1x    
+frame= 8822 fps= 60 q=-0.0 size=  127326KiB time=00:02:27.03 bitrate=7094.0kbits/s speed=   1x    
+frame= 8852 fps= 60 q=-0.0 size=  127751KiB time=00:02:27.53 bitrate=7093.5kbits/s speed=   1x    
+frame= 8882 fps= 60 q=-0.0 size=  128180KiB time=00:02:28.03 bitrate=7093.4kbits/s speed=   1x    
+frame= 8912 fps= 60 q=-0.0 size=  128611KiB time=00:02:28.53 bitrate=7093.2kbits/s speed=   1x    
+frame= 8942 fps= 60 q=-0.0 size=  129060KiB time=00:02:29.03 bitrate=7094.1kbits/s speed=   1x    
+frame= 8972 fps= 60 q=-0.0 size=  129479KiB time=00:02:29.53 bitrate=7093.4kbits/s speed=   1x    
+frame= 9002 fps= 60 q=-0.0 size=  129924KiB time=00:02:30.03 bitrate=7094.0kbits/s speed=   1x    
+frame= 9032 fps= 60 q=-0.0 size=  130347KiB time=00:02:30.53 bitrate=7093.5kbits/s speed=   1x    
+frame= 9062 fps= 60 q=-0.0 size=  130771KiB time=00:02:31.03 bitrate=7093.0kbits/s speed=   1x    
+frame= 9092 fps= 60 q=-0.0 size=  131200KiB time=00:02:31.53 bitrate=7092.8kbits/s speed=   1x    
+frame= 9122 fps= 60 q=-0.0 size=  131636KiB time=00:02:32.03 bitrate=7092.9kbits/s speed=   1x    
+frame= 9152 fps= 60 q=-0.0 size=  132079KiB time=00:02:32.53 bitrate=7093.5kbits/s speed=   1x    
+frame= 9182 fps= 60 q=-0.0 size=  132522KiB time=00:02:33.03 bitrate=7094.0kbits/s speed=   1x    
+frame= 9212 fps= 60 q=-0.0 size=  132956KiB time=00:02:33.53 bitrate=7094.1kbits/s speed=   1x    
+frame= 9242 fps= 60 q=-0.0 size=  133371KiB time=00:02:34.03 bitrate=7093.1kbits/s speed=   1x    
+frame= 9272 fps= 60 q=-0.0 size=  133808KiB time=00:02:34.53 bitrate=7093.3kbits/s speed=   1x    
+frame= 9302 fps= 60 q=-0.0 size=  134242KiB time=00:02:35.03 bitrate=7093.4kbits/s speed=   1x    
+frame= 9332 fps= 60 q=-0.0 size=  134665KiB time=00:02:35.53 bitrate=7092.9kbits/s speed=   1x    
+frame= 9362 fps= 60 q=-0.0 size=  135107KiB time=00:02:36.03 bitrate=7093.3kbits/s speed=   1x    
+frame= 9392 fps= 60 q=-0.0 size=  135531KiB time=00:02:36.53 bitrate=7092.9kbits/s speed=   1x    
+frame= 9422 fps= 60 q=-0.0 size=  135973KiB time=00:02:37.03 bitrate=7093.3kbits/s speed=   1x    
+frame= 9452 fps= 60 q=-0.0 size=  136407KiB time=00:02:37.53 bitrate=7093.4kbits/s speed=   1x    
+frame= 9482 fps= 60 q=-0.0 size=  136839KiB time=00:02:38.03 bitrate=7093.4kbits/s speed=   1x    
+frame= 9512 fps= 60 q=-0.0 size=  137275KiB time=00:02:38.53 bitrate=7093.5kbits/s speed=   1x    
+frame= 9542 fps= 60 q=-0.0 size=  137723KiB time=00:02:39.03 bitrate=7094.3kbits/s speed=   1x    
+frame= 9572 fps= 60 q=-0.0 size=  138138KiB time=00:02:39.53 bitrate=7093.4kbits/s speed=   1x    
+frame= 9602 fps= 60 q=-0.0 size=  138580KiB time=00:02:40.03 bitrate=7093.8kbits/s speed=   1x    
+frame= 9632 fps= 60 q=-0.0 size=  138998KiB time=00:02:40.53 bitrate=7093.0kbits/s speed=   1x    
+frame= 9662 fps= 60 q=-0.0 size=  139458KiB time=00:02:41.03 bitrate=7094.4kbits/s speed=   1x    
+frame= 9692 fps= 60 q=-0.0 size=  139879KiB time=00:02:41.53 bitrate=7093.8kbits/s speed=   1x    
+frame= 9722 fps= 60 q=-0.0 size=  140306KiB time=00:02:42.03 bitrate=7093.5kbits/s speed=   1x    
+frame= 9752 fps= 60 q=-0.0 size=  140747KiB time=00:02:42.53 bitrate=7093.9kbits/s speed=   1x    
+frame= 9782 fps= 60 q=-0.0 size=  141184KiB time=00:02:43.03 bitrate=7094.1kbits/s speed=   1x    
+frame= 9812 fps= 60 q=-0.0 size=  141601KiB time=00:02:43.53 bitrate=7093.3kbits/s speed=   1x    
+frame= 9842 fps= 60 q=-0.0 size=  142047KiB time=00:02:44.03 bitrate=7094.0kbits/s speed=   1x    
+frame= 9872 fps= 60 q=-0.0 size=  142475KiB time=00:02:44.53 bitrate=7093.7kbits/s speed=   1x    
+frame= 9902 fps= 60 q=-0.0 size=  142928KiB time=00:02:45.03 bitrate=7094.7kbits/s speed=   1x    
+frame= 9933 fps= 60 q=-0.0 size=  143347KiB time=00:02:45.55 bitrate=7093.3kbits/s speed=   1x    
+frame= 9962 fps= 60 q=-0.0 size=  143775KiB time=00:02:46.03 bitrate=7093.8kbits/s speed=   1x    
+frame= 9993 fps= 60 q=-0.0 size=  144216KiB time=00:02:46.55 bitrate=7093.5kbits/s speed=   1x    
+frame=10023 fps= 60 q=-0.0 size=  144630KiB time=00:02:47.05 bitrate=7092.5kbits/s speed=   1x    
+frame=10053 fps= 60 q=-0.0 size=  145094KiB time=00:02:47.55 bitrate=7094.1kbits/s speed=   1x    
+frame=10083 fps= 60 q=-0.0 size=  145540KiB time=00:02:48.05 bitrate=7094.7kbits/s speed=   1x    
+frame=10113 fps= 60 q=-0.0 size=  145969KiB time=00:02:48.55 bitrate=7094.5kbits/s speed=   1x    
+frame=10143 fps= 60 q=-0.0 size=  146294KiB time=00:02:49.05 bitrate=7089.3kbits/s speed=   1x    
+frame=10173 fps= 60 q=-0.0 size=  146609KiB time=00:02:49.55 bitrate=7083.6kbits/s speed=   1x    
+frame=10203 fps= 60 q=-0.0 size=  147042KiB time=00:02:50.05 bitrate=7083.6kbits/s speed=   1x    
+frame=10233 fps= 60 q=-0.0 size=  147475KiB time=00:02:50.55 bitrate=7083.7kbits/s speed=   1x    
+frame=10263 fps= 60 q=-0.0 size=  148301KiB time=00:02:51.05 bitrate=7102.5kbits/s speed=   1x    
+frame=10293 fps= 60 q=-0.0 size=  148507KiB time=00:02:51.55 bitrate=7091.6kbits/s speed=   1x    
+frame=10323 fps= 60 q=-0.0 size=  148999KiB time=00:02:52.05 bitrate=7094.5kbits/s speed=   1x    
+frame=10353 fps= 60 q=-0.0 size=  149437KiB time=00:02:52.55 bitrate=7094.7kbits/s speed=   1x    
+frame=10383 fps= 60 q=-0.0 size=  149873KiB time=00:02:53.05 bitrate=7094.8kbits/s speed=   1x    
+frame=10413 fps= 60 q=-0.0 size=  150301KiB time=00:02:53.55 bitrate=7094.6kbits/s speed=   1x    
+frame=10443 fps= 60 q=-0.0 size=  150733KiB time=00:02:54.05 bitrate=7094.5kbits/s speed=   1x    
+frame=10473 fps= 60 q=-0.0 size=  151141KiB time=00:02:54.55 bitrate=7093.4kbits/s speed=   1x    
+frame=10503 fps= 60 q=-0.0 size=  151585KiB time=00:02:55.05 bitrate=7093.9kbits/s speed=   1x    
+frame=10533 fps= 60 q=-0.0 size=  152036KiB time=00:02:55.55 bitrate=7094.7kbits/s speed=   1x    
+frame=10563 fps= 60 q=-0.0 size=  152478KiB time=00:02:56.05 bitrate=7095.1kbits/s speed=   1x    
+frame=10593 fps= 60 q=-0.0 size=  152898KiB time=00:02:56.55 bitrate=7094.6kbits/s speed=   1x    
+frame=10623 fps= 60 q=-0.0 size=  153335KiB time=00:02:57.05 bitrate=7094.7kbits/s speed=   1x    
+frame=10653 fps= 60 q=-0.0 size=  153762KiB time=00:02:57.55 bitrate=7094.4kbits/s speed=   1x    
+frame=10683 fps= 60 q=-0.0 size=  154226KiB time=00:02:58.05 bitrate=7095.9kbits/s speed=   1x    
+frame=10713 fps= 60 q=-0.0 size=  154404KiB time=00:02:58.55 bitrate=7084.2kbits/s speed=   1x    
+frame=10743 fps= 60 q=-0.0 size=  154837KiB time=00:02:59.05 bitrate=7084.2kbits/s speed=   1x    
+frame=10773 fps= 60 q=-0.0 size=  155270KiB time=00:02:59.55 bitrate=7084.2kbits/s speed=   1x    
+frame=10803 fps= 60 q=-0.0 size=  155704KiB time=00:03:00.05 bitrate=7084.3kbits/s speed=   1x    
+frame=10833 fps= 60 q=-0.0 size=  156137KiB time=00:03:00.55 bitrate=7084.3kbits/s speed=   1x    
+frame=10863 fps= 60 q=-0.0 size=  156570KiB time=00:03:01.05 bitrate=7084.3kbits/s speed=   1x    
+frame=10893 fps= 60 q=-0.0 size=  157003KiB time=00:03:01.55 bitrate=7084.4kbits/s speed=   1x    
+frame=10923 fps= 60 q=-0.0 size=  157436KiB time=00:03:02.05 bitrate=7084.4kbits/s speed=   1x    
+frame=10953 fps= 60 q=-0.0 size=  157869KiB time=00:03:02.55 bitrate=7084.4kbits/s speed=   1x    
+frame=10983 fps= 60 q=-0.0 size=  158303KiB time=00:03:03.05 bitrate=7084.5kbits/s speed=   1x    
+frame=11013 fps= 60 q=-0.0 size=  158736KiB time=00:03:03.55 bitrate=7084.5kbits/s speed=   1x    
+frame=11043 fps= 60 q=-0.0 size=  159169KiB time=00:03:04.05 bitrate=7084.5kbits/s speed=   1x    
+frame=11073 fps= 60 q=-0.0 size=  159819KiB time=00:03:04.55 bitrate=7094.2kbits/s speed=   1x    
+frame=11103 fps= 60 q=-0.0 size=  160244KiB time=00:03:05.05 bitrate=7093.9kbits/s speed=   1x    
+frame=11133 fps= 60 q=-0.0 size=  160677KiB time=00:03:05.55 bitrate=7093.9kbits/s speed=   1x    
+frame=11163 fps= 60 q=-0.0 size=  161106KiB time=00:03:06.05 bitrate=7093.7kbits/s speed=   1x    
+frame=11193 fps= 60 q=-0.0 size=  161543KiB time=00:03:06.55 bitrate=7093.9kbits/s speed=   1x    
+frame=11223 fps= 60 q=-0.0 size=  161964KiB time=00:03:07.05 bitrate=7093.3kbits/s speed=   1x    
+frame=11253 fps= 60 q=-0.0 size=  162390KiB time=00:03:07.55 bitrate=7093.0kbits/s speed=   1x    
+frame=11283 fps= 60 q=-0.0 size=  162840KiB time=00:03:08.05 bitrate=7093.8kbits/s speed=   1x    
+frame=11313 fps= 60 q=-0.0 size=  163261KiB time=00:03:08.55 bitrate=7093.2kbits/s speed=   1x    
+frame=11343 fps= 60 q=-0.0 size=  163716KiB time=00:03:09.05 bitrate=7094.2kbits/s speed=   1x    
+frame=11373 fps= 60 q=-0.0 size=  164148KiB time=00:03:09.55 bitrate=7094.2kbits/s speed=   1x    
+frame=11403 fps= 60 q=-0.0 size=  164570KiB time=00:03:10.05 bitrate=7093.7kbits/s speed=   1x    
+frame=11433 fps= 60 q=-0.0 size=  165005KiB time=00:03:10.55 bitrate=7093.8kbits/s speed=   1x    
+frame=11463 fps= 60 q=-0.0 size=  165432KiB time=00:03:11.05 bitrate=7093.5kbits/s speed=   1x    
+frame=11493 fps= 60 q=-0.0 size=  165884KiB time=00:03:11.55 bitrate=7094.4kbits/s speed=   1x    
+frame=11523 fps= 60 q=-0.0 size=  166307KiB time=00:03:12.05 bitrate=7093.9kbits/s speed=   1x    
+frame=11553 fps= 60 q=-0.0 size=  166743KiB time=00:03:12.55 bitrate=7094.1kbits/s speed=   1x    
+frame=11583 fps= 60 q=-0.0 size=  167169KiB time=00:03:13.05 bitrate=7093.7kbits/s speed=   1x    
+frame=11613 fps= 60 q=-0.0 size=  167613KiB time=00:03:13.55 bitrate=7094.2kbits/s speed=   1x    
+frame=11643 fps= 60 q=-0.0 size=  168025KiB time=00:03:14.05 bitrate=7093.3kbits/s speed=   1x    
+frame=11673 fps= 60 q=-0.0 size=  168466KiB time=00:03:14.55 bitrate=7093.7kbits/s speed=   1x    
+frame=11703 fps= 60 q=-0.0 size=  168912KiB time=00:03:15.05 bitrate=7094.2kbits/s speed=   1x    
+frame=11733 fps= 60 q=-0.0 size=  169338KiB time=00:03:15.55 bitrate=7093.9kbits/s speed=   1x    
+frame=11763 fps= 60 q=-0.0 size=  169763KiB time=00:03:16.05 bitrate=7093.6kbits/s speed=   1x    
+frame=11793 fps= 60 q=-0.0 size=  170207KiB time=00:03:16.55 bitrate=7094.1kbits/s speed=   1x    
+frame=11823 fps= 60 q=-0.0 size=  170656KiB time=00:03:17.05 bitrate=7094.7kbits/s speed=   1x    
+frame=11853 fps= 60 q=-0.0 size=  171070KiB time=00:03:17.55 bitrate=7093.9kbits/s speed=   1x    
+frame=11882 fps= 60 q=-0.0 size=  171488KiB time=00:03:18.03 bitrate=7093.9kbits/s speed=   1x    
+frame=11913 fps= 60 q=-0.0 size=  171955KiB time=00:03:18.55 bitrate=7094.7kbits/s speed=   1x    
+frame=11943 fps= 60 q=-0.0 size=  172376KiB time=00:03:19.05 bitrate=7094.2kbits/s speed=   1x    
+frame=11973 fps= 60 q=-0.0 size=  172830KiB time=00:03:19.55 bitrate=7095.1kbits/s speed=   1x    
+frame=12003 fps= 60 q=-0.0 size=  173239KiB time=00:03:20.05 bitrate=7094.1kbits/s speed=   1x    
+frame=12033 fps= 60 q=-0.0 size=  173674KiB time=00:03:20.55 bitrate=7094.2kbits/s speed=   1x    
+frame=12063 fps= 60 q=-0.0 size=  174096KiB time=00:03:21.05 bitrate=7093.7kbits/s speed=   1x    
+frame=12093 fps= 60 q=-0.0 size=  174534KiB time=00:03:21.55 bitrate=7093.9kbits/s speed=   1x    
+frame=12123 fps= 60 q=-0.0 size=  174961KiB time=00:03:22.05 bitrate=7093.7kbits/s speed=   1x    
+frame=12153 fps= 60 q=-0.0 size=  175400KiB time=00:03:22.55 bitrate=7093.9kbits/s speed=   1x    
+frame=12183 fps= 60 q=-0.0 size=  175812KiB time=00:03:23.05 bitrate=7093.1kbits/s speed=   1x    
+frame=12213 fps= 60 q=-0.0 size=  176264KiB time=00:03:23.55 bitrate=7093.8kbits/s speed=   1x    
+frame=12243 fps= 60 q=-0.0 size=  176701KiB time=00:03:24.05 bitrate=7094.0kbits/s speed=   1x    
+frame=12273 fps= 60 q=-0.0 size=  177129KiB time=00:03:24.55 bitrate=7093.8kbits/s speed=   1x    
+frame=12303 fps= 60 q=-0.0 size=  177561KiB time=00:03:25.05 bitrate=7093.8kbits/s speed=   1x    
+frame=12333 fps= 60 q=-0.0 size=  178003KiB time=00:03:25.55 bitrate=7094.1kbits/s speed=   1x    
+frame=12363 fps= 60 q=-0.0 size=  178431KiB time=00:03:26.05 bitrate=7094.0kbits/s speed=   1x    
+frame=12393 fps= 60 q=-0.0 size=  178872KiB time=00:03:26.55 bitrate=7094.3kbits/s speed=   1x    
+frame=12423 fps= 60 q=-0.0 size=  179293KiB time=00:03:27.05 bitrate=7093.8kbits/s speed=   1x    
+frame=12453 fps= 60 q=-0.0 size=  179727KiB time=00:03:27.55 bitrate=7093.8kbits/s speed=   1x    
+frame=12483 fps= 60 q=-0.0 size=  180150KiB time=00:03:28.05 bitrate=7093.4kbits/s speed=   1x    
+frame=12513 fps= 60 q=-0.0 size=  180595KiB time=00:03:28.55 bitrate=7093.9kbits/s speed=   1x    
+frame=12543 fps= 60 q=-0.0 size=  181022KiB time=00:03:29.05 bitrate=7093.7kbits/s speed=   1x    
+frame=12573 fps= 60 q=-0.0 size=  181456KiB time=00:03:29.55 bitrate=7093.7kbits/s speed=   1x    
+frame=12603 fps= 60 q=-0.0 size=  181905KiB time=00:03:30.05 bitrate=7094.3kbits/s speed=   1x    
+frame=12633 fps= 60 q=-0.0 size=  182325KiB time=00:03:30.55 bitrate=7093.8kbits/s speed=   1x    
+frame=12663 fps= 60 q=-0.0 size=  182772KiB time=00:03:31.05 bitrate=7094.4kbits/s speed=   1x    
+frame=12693 fps= 60 q=-0.0 size=  183180KiB time=00:03:31.55 bitrate=7093.4kbits/s speed=   1x    
+frame=12723 fps= 60 q=-0.0 size=  183637KiB time=00:03:32.05 bitrate=7094.4kbits/s speed=   1x    
+frame=12753 fps= 60 q=-0.0 size=  184054KiB time=00:03:32.55 bitrate=7093.7kbits/s speed=   1x    
+frame=12783 fps= 60 q=-0.0 size=  184495KiB time=00:03:33.05 bitrate=7094.0kbits/s speed=   1x    
+frame=12813 fps= 60 q=-0.0 size=  184922KiB time=00:03:33.55 bitrate=7093.8kbits/s speed=   1x    
+frame=12843 fps= 60 q=-0.0 size=  185369KiB time=00:03:34.05 bitrate=7094.3kbits/s speed=   1x    
+frame=12873 fps= 60 q=-0.0 size=  185806KiB time=00:03:34.55 bitrate=7094.5kbits/s speed=   1x    
+frame=12903 fps= 60 q=-0.0 size=  186229KiB time=00:03:35.05 bitrate=7094.1kbits/s speed=   1x    
+frame=12933 fps= 60 q=-0.0 size=  186630KiB time=00:03:35.55 bitrate=7092.9kbits/s speed=   1x    
+frame=12963 fps= 60 q=-0.0 size=  187105KiB time=00:03:36.05 bitrate=7094.5kbits/s speed=   1x    
+frame=12993 fps= 60 q=-0.0 size=  187529KiB time=00:03:36.55 bitrate=7094.1kbits/s speed=   1x    
+frame=13023 fps= 60 q=-0.0 size=  187961KiB time=00:03:37.05 bitrate=7094.1kbits/s speed=   1x    
+frame=13053 fps= 60 q=-0.0 size=  188397KiB time=00:03:37.55 bitrate=7094.2kbits/s speed=   1x    
+frame=13083 fps= 60 q=-0.0 size=  188836KiB time=00:03:38.05 bitrate=7094.4kbits/s speed=   1x    
+frame=13113 fps= 60 q=-0.0 size=  189263KiB time=00:03:38.55 bitrate=7094.2kbits/s speed=   1x    
+frame=13143 fps= 60 q=-0.0 size=  189681KiB time=00:03:39.05 bitrate=7093.7kbits/s speed=   1x    
+frame=13173 fps= 60 q=-0.0 size=  190114KiB time=00:03:39.55 bitrate=7093.7kbits/s speed=   1x    
+frame=13203 fps= 60 q=-0.0 size=  190556KiB time=00:03:40.05 bitrate=7094.0kbits/s speed=   1x    
+frame=13233 fps= 60 q=-0.0 size=  190992KiB time=00:03:40.55 bitrate=7094.1kbits/s speed=   1x    
+frame=13263 fps= 60 q=-0.0 size=  191447KiB time=00:03:41.05 bitrate=7094.9kbits/s speed=   1x    
+frame=13293 fps= 60 q=-0.0 size=  191843KiB time=00:03:41.55 bitrate=7093.5kbits/s speed=   1x    
+frame=13323 fps= 60 q=-0.0 size=  192271KiB time=00:03:42.05 bitrate=7093.4kbits/s speed=   1x    
+frame=13353 fps= 60 q=-0.0 size=  192714KiB time=00:03:42.55 bitrate=7093.7kbits/s speed=   1x    
+frame=13383 fps= 60 q=-0.0 size=  193145KiB time=00:03:43.05 bitrate=7093.7kbits/s speed=   1x    
+frame=13413 fps= 60 q=-0.0 size=  193593KiB time=00:03:43.55 bitrate=7094.2kbits/s speed=   1x    
+frame=13444 fps= 60 q=-0.0 size=  194005KiB time=00:03:44.06 bitrate=7092.9kbits/s speed=   1x    
+frame=13473 fps= 60 q=-0.0 size=  194451KiB time=00:03:44.55 bitrate=7093.9kbits/s speed=   1x    
+frame=13503 fps= 60 q=-0.0 size=  194894KiB time=00:03:45.05 bitrate=7094.3kbits/s speed=   1x    
+frame=13534 fps= 60 q=-0.0 size=  195313KiB time=00:03:45.56 bitrate=7093.3kbits/s speed=   1x    
+frame=13564 fps= 60 q=-0.0 size=  195758KiB time=00:03:46.06 bitrate=7093.7kbits/s speed=   1x    
+frame=13594 fps= 60 q=-0.0 size=  196235KiB time=00:03:46.56 bitrate=7095.3kbits/s speed=   1x    
+frame=13624 fps= 60 q=-0.0 size=  196628KiB time=00:03:47.06 bitrate=7093.8kbits/s speed=   1x    
+frame=13654 fps= 60 q=-0.0 size=  197069KiB time=00:03:47.56 bitrate=7094.1kbits/s speed=   1x    
+frame=13684 fps= 60 q=-0.0 size=  197484KiB time=00:03:48.06 bitrate=7093.5kbits/s speed=   1x    
+frame=13714 fps= 60 q=-0.0 size=  197939KiB time=00:03:48.56 bitrate=7094.3kbits/s speed=   1x    
+frame=13744 fps= 60 q=-0.0 size=  198357KiB time=00:03:49.06 bitrate=7093.7kbits/s speed=   1x    
+frame=13774 fps= 60 q=-0.0 size=  198792KiB time=00:03:49.56 bitrate=7093.8kbits/s speed=   1x    
+frame=13804 fps= 60 q=-0.0 size=  199229KiB time=00:03:50.06 bitrate=7094.0kbits/s speed=   1x    
+frame=13834 fps= 60 q=-0.0 size=  199664KiB time=00:03:50.56 bitrate=7094.0kbits/s speed=   1x    
+frame=13864 fps= 60 q=-0.0 size=  200095KiB time=00:03:51.06 bitrate=7094.0kbits/s speed=   1x    
+frame=13894 fps= 60 q=-0.0 size=  200509KiB time=00:03:51.56 bitrate=7093.3kbits/s speed=   1x    
+frame=13924 fps= 60 q=-0.0 size=  200950KiB time=00:03:52.06 bitrate=7093.6kbits/s speed=   1x    
+frame=13954 fps= 60 q=-0.0 size=  201368KiB time=00:03:52.56 bitrate=7093.1kbits/s speed=   1x    
+frame=13984 fps= 60 q=-0.0 size=  201818KiB time=00:03:53.06 bitrate=7093.7kbits/s speed=   1x    
+frame=14014 fps= 60 q=-0.0 size=  202264KiB time=00:03:53.56 bitrate=7094.1kbits/s speed=   1x    
+frame=14044 fps= 60 q=-0.0 size=  202708KiB time=00:03:54.06 bitrate=7094.5kbits/s speed=   1x    
+frame=14074 fps= 60 q=-0.0 size=  203124KiB time=00:03:54.56 bitrate=7093.9kbits/s speed=   1x    
+frame=14104 fps= 60 q=-0.0 size=  203547KiB time=00:03:55.06 bitrate=7093.5kbits/s speed=   1x    
+frame=14134 fps= 60 q=-0.0 size=  203997KiB time=00:03:55.56 bitrate=7094.1kbits/s speed=   1x    
+frame=14164 fps= 60 q=-0.0 size=  204415KiB time=00:03:56.06 bitrate=7093.6kbits/s speed=   1x    
+frame=14194 fps= 60 q=-0.0 size=  204839KiB time=00:03:56.56 bitrate=7093.3kbits/s speed=   1x    
+frame=14224 fps= 60 q=-0.0 size=  205297KiB time=00:03:57.06 bitrate=7094.2kbits/s speed=   1x    
+frame=14254 fps= 60 q=-0.0 size=  205721KiB time=00:03:57.56 bitrate=7093.9kbits/s speed=   1x    
+frame=14284 fps= 60 q=-0.0 size=  206155KiB time=00:03:58.06 bitrate=7093.9kbits/s speed=   1x    
+frame=14314 fps= 60 q=-0.0 size=  206584KiB time=00:03:58.56 bitrate=7093.8kbits/s speed=   1x    
+frame=14344 fps= 60 q=-0.0 size=  206983KiB time=00:03:59.06 bitrate=7092.6kbits/s speed=   1x    
+frame=14374 fps= 60 q=-0.0 size=  207474KiB time=00:03:59.56 bitrate=7094.6kbits/s speed=   1x    
+frame=14404 fps= 60 q=-0.0 size=  207853KiB time=00:04:00.06 bitrate=7092.7kbits/s speed=   1x    
+frame=14434 fps= 60 q=-0.0 size=  208334KiB time=00:04:00.56 bitrate=7094.4kbits/s speed=   1x    
+frame=14464 fps= 60 q=-0.0 size=  208746KiB time=00:04:01.06 bitrate=7093.7kbits/s speed=   1x    
+frame=14494 fps= 60 q=-0.0 size=  209164KiB time=00:04:01.56 bitrate=7093.2kbits/s speed=   1x    
+frame=14524 fps= 60 q=-0.0 size=  209621KiB time=00:04:02.06 bitrate=7094.0kbits/s speed=   1x    
+frame=14554 fps= 60 q=-0.0 size=  210069KiB time=00:04:02.56 bitrate=7094.5kbits/s speed=   1x    
+frame=14584 fps= 60 q=-0.0 size=  210391KiB time=00:04:03.06 bitrate=7090.8kbits/s speed=   1x    
+frame=14614 fps= 60 q=-0.0 size=  210901KiB time=00:04:03.56 bitrate=7093.3kbits/s speed=   1x    
+frame=14644 fps= 60 q=-0.0 size=  211367KiB time=00:04:04.06 bitrate=7094.4kbits/s speed=   1x    
+frame=14674 fps= 60 q=-0.0 size=  211781KiB time=00:04:04.56 bitrate=7093.8kbits/s speed=   1x    
+frame=14704 fps= 60 q=-0.0 size=  212199KiB time=00:04:05.06 bitrate=7093.3kbits/s speed=   1x    
+frame=14734 fps= 60 q=-0.0 size=  212614KiB time=00:04:05.56 bitrate=7092.7kbits/s speed=   1x    
+frame=14764 fps= 60 q=-0.0 size=  213030KiB time=00:04:06.06 bitrate=7092.1kbits/s speed=   1x    
+frame=14794 fps= 60 q=-0.0 size=  213444KiB time=00:04:06.56 bitrate=7091.5kbits/s speed=   1x    
+frame=14824 fps= 60 q=-0.0 size=  213858KiB time=00:04:07.06 bitrate=7090.9kbits/s speed=   1x    
+frame=14854 fps= 60 q=-0.0 size=  214292KiB time=00:04:07.56 bitrate=7090.9kbits/s speed=   1x    
+frame=14884 fps= 60 q=-0.0 size=  214716KiB time=00:04:08.06 bitrate=7090.6kbits/s speed=   1x    
+frame=14914 fps= 60 q=-0.0 size=  215164KiB time=00:04:08.56 bitrate=7091.2kbits/s speed=   1x    
+frame=14944 fps= 60 q=-0.0 size=  215603KiB time=00:04:09.06 bitrate=7091.4kbits/s speed=   1x    
+frame=14974 fps= 60 q=-0.0 size=  216032KiB time=00:04:09.56 bitrate=7091.2kbits/s speed=   1x    
+frame=15004 fps= 60 q=-0.0 size=  216525KiB time=00:04:10.06 bitrate=7093.2kbits/s speed=   1x    
+frame=15034 fps= 60 q=-0.0 size=  216779KiB time=00:04:10.56 bitrate=7087.3kbits/s speed=   1x    
+frame=15064 fps= 60 q=-0.0 size=  217212KiB time=00:04:11.06 bitrate=7087.4kbits/s speed=   1x    
+frame=15094 fps= 60 q=-0.0 size=  217942KiB time=00:04:11.56 bitrate=7097.1kbits/s speed=   1x    
+frame=15124 fps= 60 q=-0.0 size=  218257KiB time=00:04:12.06 bitrate=7093.2kbits/s speed=   1x    
+frame=15154 fps= 60 q=-0.0 size=  218725KiB time=00:04:12.56 bitrate=7094.3kbits/s speed=   1x    
+frame=15184 fps= 60 q=-0.0 size=  219149KiB time=00:04:13.06 bitrate=7094.1kbits/s speed=   1x    
+frame=15214 fps= 60 q=-0.0 size=  219575KiB time=00:04:13.56 bitrate=7093.8kbits/s speed=   1x    
+frame=15244 fps= 60 q=-0.0 size=  220002KiB time=00:04:14.06 bitrate=7093.6kbits/s speed=   1x    
+frame=15274 fps= 60 q=-0.0 size=  220441KiB time=00:04:14.56 bitrate=7093.8kbits/s speed=   1x    
+frame=15304 fps= 60 q=-0.0 size=  220878KiB time=00:04:15.06 bitrate=7094.0kbits/s speed=   1x    
+frame=15334 fps= 60 q=-0.0 size=  221297KiB time=00:04:15.56 bitrate=7093.5kbits/s speed=   1x    
+frame=15364 fps= 60 q=-0.0 size=  221723KiB time=00:04:16.06 bitrate=7093.3kbits/s speed=   1x    
+frame=15394 fps= 60 q=-0.0 size=  222187KiB time=00:04:16.56 bitrate=7094.3kbits/s speed=   1x    
+frame=15424 fps= 60 q=-0.0 size=  222634KiB time=00:04:17.06 bitrate=7094.7kbits/s speed=   1x    
+frame=15454 fps= 60 q=-0.0 size=  223057KiB time=00:04:17.56 bitrate=7094.4kbits/s speed=   1x    
+frame=15484 fps= 60 q=-0.0 size=  223494KiB time=00:04:18.06 bitrate=7094.5kbits/s speed=   1x    
+frame=15514 fps= 60 q=-0.0 size=  223975KiB time=00:04:18.56 bitrate=7096.1kbits/s speed=   1x    
+frame=15544 fps= 60 q=-0.0 size=  224337KiB time=00:04:19.06 bitrate=7093.8kbits/s speed=   1x    
+frame=15574 fps= 60 q=-0.0 size=  224787KiB time=00:04:19.56 bitrate=7094.3kbits/s speed=   1x    
+frame=15604 fps= 60 q=-0.0 size=  225209KiB time=00:04:20.06 bitrate=7094.0kbits/s speed=   1x    
+frame=15634 fps= 60 q=-0.0 size=  225638KiB time=00:04:20.56 bitrate=7093.9kbits/s speed=   1x    
+frame=15664 fps= 60 q=-0.0 size=  226078KiB time=00:04:21.06 bitrate=7094.1kbits/s speed=   1x    
+frame=15694 fps= 60 q=-0.0 size=  226514KiB time=00:04:21.56 bitrate=7094.2kbits/s speed=   1x    
+frame=15724 fps= 60 q=-0.0 size=  226929KiB time=00:04:22.06 bitrate=7093.6kbits/s speed=   1x    
+frame=15754 fps= 60 q=-0.0 size=  227387KiB time=00:04:22.56 bitrate=7094.4kbits/s speed=   1x    
+frame=15784 fps= 60 q=-0.0 size=  227821KiB time=00:04:23.06 bitrate=7094.4kbits/s speed=   1x    
+frame=15814 fps= 60 q=-0.0 size=  228247KiB time=00:04:23.56 bitrate=7094.2kbits/s speed=   1x    
+frame=15844 fps= 60 q=-0.0 size=  228677KiB time=00:04:24.06 bitrate=7094.1kbits/s speed=   1x    
+frame=15874 fps= 60 q=-0.0 size=  229109KiB time=00:04:24.56 bitrate=7094.1kbits/s speed=   1x    
+frame=15904 fps= 60 q=-0.0 size=  229533KiB time=00:04:25.06 bitrate=7093.8kbits/s speed=   1x    
+frame=15934 fps= 60 q=-0.0 size=  229955KiB time=00:04:25.56 bitrate=7093.5kbits/s speed=   1x    
+frame=15964 fps= 60 q=-0.0 size=  230406KiB time=00:04:26.06 bitrate=7094.0kbits/s speed=   1x    
+frame=15994 fps= 60 q=-0.0 size=  230846KiB time=00:04:26.56 bitrate=7094.3kbits/s speed=   1x    
+frame=16024 fps= 60 q=-0.0 size=  231267KiB time=00:04:27.06 bitrate=7093.9kbits/s speed=   1x    
+frame=16054 fps= 60 q=-0.0 size=  231704KiB time=00:04:27.56 bitrate=7094.0kbits/s speed=   1x    
+frame=16084 fps= 60 q=-0.0 size=  232123KiB time=00:04:28.06 bitrate=7093.6kbits/s speed=   1x    
+frame=16114 fps= 60 q=-0.0 size=  232574KiB time=00:04:28.56 bitrate=7094.1kbits/s speed=   1x    
+frame=16144 fps= 60 q=-0.0 size=  233007KiB time=00:04:29.06 bitrate=7094.1kbits/s speed=   1x    
+frame=16174 fps= 60 q=-0.0 size=  233438KiB time=00:04:29.56 bitrate=7094.1kbits/s speed=   1x    
+frame=16204 fps= 60 q=-0.0 size=  233866KiB time=00:04:30.06 bitrate=7093.9kbits/s speed=   1x    
+frame=16234 fps= 60 q=-0.0 size=  234279KiB time=00:04:30.56 bitrate=7093.3kbits/s speed=   1x    
+frame=16264 fps= 60 q=-0.0 size=  234731KiB time=00:04:31.06 bitrate=7093.9kbits/s speed=   1x    
+frame=16294 fps= 60 q=-0.0 size=  235177KiB time=00:04:31.56 bitrate=7094.3kbits/s speed=   1x    
+frame=16324 fps= 60 q=-0.0 size=  235607KiB time=00:04:32.06 bitrate=7094.2kbits/s speed=   1x    
+frame=16354 fps= 60 q=-0.0 size=  236024KiB time=00:04:32.56 bitrate=7093.7kbits/s speed=   1x    
+frame=16384 fps= 60 q=-0.0 size=  236471KiB time=00:04:33.06 bitrate=7094.1kbits/s speed=   1x    
+frame=16414 fps= 60 q=-0.0 size=  236899KiB time=00:04:33.56 bitrate=7094.0kbits/s speed=   1x    
+frame=16444 fps= 60 q=-0.0 size=  237341KiB time=00:04:34.06 bitrate=7094.2kbits/s speed=   1x    
+frame=16474 fps= 60 q=-0.0 size=  237757KiB time=00:04:34.56 bitrate=7093.8kbits/s speed=   1x    
+frame=16504 fps= 60 q=-0.0 size=  238190KiB time=00:04:35.06 bitrate=7093.7kbits/s speed=   1x    
+frame=16534 fps= 60 q=-0.0 size=  238636KiB time=00:04:35.56 bitrate=7094.1kbits/s speed=   1x    
+frame=16564 fps= 60 q=-0.0 size=  239046KiB time=00:04:36.06 bitrate=7093.4kbits/s speed=   1x    
+frame=16594 fps= 60 q=-0.0 size=  239491KiB time=00:04:36.56 bitrate=7093.8kbits/s speed=   1x    
+frame=16624 fps= 60 q=-0.0 size=  239936KiB time=00:04:37.06 bitrate=7094.2kbits/s speed=   1x    
+frame=16654 fps= 60 q=-0.0 size=  240350KiB time=00:04:37.56 bitrate=7093.6kbits/s speed=   1x    
+frame=16684 fps= 60 q=-0.0 size=  240793KiB time=00:04:38.06 bitrate=7093.9kbits/s speed=   1x    
+frame=16714 fps= 60 q=-0.0 size=  241221KiB time=00:04:38.56 bitrate=7093.7kbits/s speed=   1x    
+frame=16744 fps= 60 q=-0.0 size=  241668KiB time=00:04:39.06 bitrate=7094.2kbits/s speed=   1x    
+frame=16774 fps= 60 q=-0.0 size=  242093KiB time=00:04:39.56 bitrate=7093.9kbits/s speed=   1x    
+frame=16804 fps= 60 q=-0.0 size=  242520KiB time=00:04:40.06 bitrate=7093.8kbits/s speed=   1x    
+frame=16834 fps= 60 q=-0.0 size=  242960KiB time=00:04:40.56 bitrate=7094.0kbits/s speed=   1x    
+frame=16864 fps= 60 q=-0.0 size=  243397KiB time=00:04:41.06 bitrate=7094.1kbits/s speed=   1x    
+frame=16894 fps= 60 q=-0.0 size=  243828KiB time=00:04:41.56 bitrate=7094.0kbits/s speed=   1x    
+frame=16924 fps= 60 q=-0.0 size=  244264KiB time=00:04:42.06 bitrate=7094.1kbits/s speed=   1x    
+frame=16954 fps= 60 q=-0.0 size=  244662KiB time=00:04:42.56 bitrate=7093.1kbits/s speed=   1x    
+frame=16984 fps= 60 q=-0.0 size=  245137KiB time=00:04:43.06 bitrate=7094.3kbits/s speed=   1x    
+frame=17014 fps= 60 q=-0.0 size=  245560KiB time=00:04:43.56 bitrate=7094.0kbits/s speed=   1x    
+frame=17044 fps= 60 q=-0.0 size=  246000KiB time=00:04:44.06 bitrate=7094.2kbits/s speed=   1x    
+frame=17074 fps= 60 q=-0.0 size=  246407KiB time=00:04:44.56 bitrate=7093.5kbits/s speed=   1x    
+frame=17104 fps= 60 q=-0.0 size=  246864KiB time=00:04:45.06 bitrate=7094.2kbits/s speed=   1x    
+frame=17134 fps= 60 q=-0.0 size=  247303KiB time=00:04:45.56 bitrate=7094.3kbits/s speed=   1x    
+frame=17164 fps= 60 q=-0.0 size=  247713KiB time=00:04:46.06 bitrate=7093.7kbits/s speed=   1x    
+frame=17194 fps= 60 q=-0.0 size=  248164KiB time=00:04:46.56 bitrate=7094.2kbits/s speed=   1x    
+frame=17224 fps= 60 q=-0.0 size=  248575KiB time=00:04:47.06 bitrate=7093.6kbits/s speed=   1x    
+frame=17254 fps= 60 q=-0.0 size=  249028KiB time=00:04:47.56 bitrate=7094.1kbits/s speed=   1x    
+frame=17284 fps= 60 q=-0.0 size=  249450KiB time=00:04:48.06 bitrate=7093.8kbits/s speed=   1x    
+frame=17314 fps= 60 q=-0.0 size=  249881KiB time=00:04:48.56 bitrate=7093.8kbits/s speed=   1x    
+frame=17344 fps= 60 q=-0.0 size=  250333KiB time=00:04:49.06 bitrate=7094.3kbits/s speed=   1x    
+frame=17375 fps= 60 q=-0.0 size=  250770KiB time=00:04:49.58 bitrate=7094.0kbits/s speed=   1x    
+frame=17405 fps= 60 q=-0.0 size=  251196KiB time=00:04:50.08 bitrate=7093.8kbits/s speed=   1x    
+frame=17435 fps= 60 q=-0.0 size=  251628KiB time=00:04:50.58 bitrate=7093.8kbits/s speed=   1x    
+frame=17464 fps= 60 q=-0.0 size=  251855KiB time=00:04:51.06 bitrate=7088.4kbits/s speed=   1x    
+frame=17495 fps= 60 q=-0.0 size=  252302KiB time=00:04:51.58 bitrate=7088.4kbits/s speed=   1x    
+frame=17525 fps= 60 q=-0.0 size=  252736KiB time=00:04:52.08 bitrate=7088.4kbits/s speed=   1x    
+frame=17555 fps= 60 q=-0.0 size=  253598KiB time=00:04:52.58 bitrate=7100.4kbits/s speed=   1x    
+frame=17585 fps= 60 q=-0.0 size=  253753KiB time=00:04:53.08 bitrate=7092.7kbits/s speed=   1x    
+frame=17615 fps= 60 q=-0.0 size=  254224KiB time=00:04:53.58 bitrate=7093.7kbits/s speed=   1x    
+frame=17645 fps= 60 q=-0.0 size=  254677KiB time=00:04:54.08 bitrate=7094.3kbits/s speed=   1x    
+frame=17675 fps= 60 q=-0.0 size=  255112KiB time=00:04:54.58 bitrate=7094.4kbits/s speed=   1x    
+frame=17705 fps= 60 q=-0.0 size=  255536KiB time=00:04:55.08 bitrate=7094.1kbits/s speed=   1x    
+frame=17735 fps= 60 q=-0.0 size=  256009KiB time=00:04:55.58 bitrate=7095.2kbits/s speed=   1x    
+frame=17765 fps= 60 q=-0.0 size=  256377KiB time=00:04:56.08 bitrate=7093.4kbits/s speed=   1x    
+frame=17795 fps= 60 q=-0.0 size=  256842KiB time=00:04:56.58 bitrate=7094.3kbits/s speed=   1x    
+frame=17825 fps= 60 q=-0.0 size=  257274KiB time=00:04:57.08 bitrate=7094.3kbits/s speed=   1x    
+frame=17855 fps= 60 q=-0.0 size=  257697KiB time=00:04:57.58 bitrate=7094.0kbits/s speed=   1x    
+frame=17885 fps= 60 q=-0.0 size=  258128KiB time=00:04:58.08 bitrate=7093.9kbits/s speed=   1x    
+frame=17915 fps= 60 q=-0.0 size=  258563KiB time=00:04:58.58 bitrate=7094.0kbits/s speed=   1x    
+frame=17945 fps= 60 q=-0.0 size=  259014KiB time=00:04:59.08 bitrate=7094.5kbits/s speed=   1x    
+frame=17975 fps= 60 q=-0.0 size=  259488KiB time=00:04:59.58 bitrate=7095.6kbits/s speed=   1x    
+frame=18005 fps= 60 q=-0.0 size=  259682KiB time=00:05:00.08 bitrate=7089.1kbits/s speed=   1x    
+frame=18035 fps= 60 q=-0.0 size=  260097KiB time=00:05:00.58 bitrate=7088.6kbits/s speed=   1x    
+frame=18065 fps= 60 q=-0.0 size=  260530KiB time=00:05:01.08 bitrate=7088.6kbits/s speed=   1x    
+frame=18095 fps= 60 q=-0.0 size=  260964KiB time=00:05:01.58 bitrate=7088.6kbits/s speed=   1x    
+frame=18125 fps= 60 q=-0.0 size=  261397KiB time=00:05:02.08 bitrate=7088.6kbits/s speed=   1x    
+frame=18155 fps= 60 q=-0.0 size=  261830KiB time=00:05:02.58 bitrate=7088.7kbits/s speed=   1x    
+frame=18185 fps= 60 q=-0.0 size=  262263KiB time=00:05:03.08 bitrate=7088.7kbits/s speed=   1x    
+frame=18215 fps= 60 q=-0.0 size=  262696KiB time=00:05:03.58 bitrate=7088.7kbits/s speed=   1x    
+frame=18245 fps= 60 q=-0.0 size=  263129KiB time=00:05:04.08 bitrate=7088.7kbits/s speed=   1x    
+frame=18275 fps= 60 q=-0.0 size=  263577KiB time=00:05:04.58 bitrate=7089.1kbits/s speed=   1x    
+frame=18305 fps= 60 q=-0.0 size=  264157KiB time=00:05:05.08 bitrate=7093.1kbits/s speed=   1x    
+frame=18335 fps= 60 q=-0.0 size=  264631KiB time=00:05:05.58 bitrate=7094.1kbits/s speed=   1x    
+frame=18365 fps= 60 q=-0.0 size=  265013KiB time=00:05:06.08 bitrate=7092.8kbits/s speed=   1x    
+frame=18395 fps= 60 q=-0.0 size=  265525KiB time=00:05:06.58 bitrate=7094.9kbits/s speed=   1x    
+frame=18425 fps= 60 q=-0.0 size=  265880KiB time=00:05:07.08 bitrate=7092.8kbits/s speed=   1x    
+frame=18455 fps= 60 q=-0.0 size=  266362KiB time=00:05:07.58 bitrate=7094.1kbits/s speed=   1x    
+frame=18485 fps= 60 q=-0.0 size=  266743KiB time=00:05:08.08 bitrate=7092.8kbits/s speed=   1x    
+frame=18515 fps= 60 q=-0.0 size=  267146KiB time=00:05:08.58 bitrate=7091.9kbits/s speed=   1x    
+frame=18545 fps= 60 q=-0.0 size=  267570KiB time=00:05:09.08 bitrate=7091.7kbits/s speed=   1x    
+frame=18575 fps= 60 q=-0.0 size=  268002KiB time=00:05:09.58 bitrate=7091.7kbits/s speed=   1x    
+[out#0/rtp @ 0x55748fe0dc80] video:265142KiB audio:0KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: 1.244658%
+frame=18606 fps= 60 q=-0.0 Lsize=  268443KiB time=00:05:10.10 bitrate=7091.5kbits/s speed=   1x    
+Exiting normally, received signal 15.

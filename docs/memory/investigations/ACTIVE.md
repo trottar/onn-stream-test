@@ -1,5 +1,35 @@
 # Active investigations
 
+## PHASE C — C5 reopened: 1080p60 through the ladder (the user's reading, 2026-10-01)
+
+**`C5-M4` Part 1 (2026-10-01): the PS1 source at native 1080p — DONE,
+nothing adopted** (`../evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md`).
+
+- **The window.** RetroArch fullscreen gives a 1920×1080 window (today's
+  is 879×720, from the default `video_scale` 3). The companion's argv is
+  unchanged.
+- **The host table** (pre-registered, sha256 `4193ef8a…`):
+  - 1x, 2x and 4x HOLD 60 with no stream, with the 7000 stream and with
+    the c3 1080p arm;
+  - 8x misses R1 by one 256-frame interval;
+  - **the candidate is 4x**;
+  - R3 (`codec_ms`) is not evaluable as worded, because the C2 telemetry
+    has no `codec_ms`. The substitutes are flat.
+- **Offline, the 3D demo segment** (content SSIM against the 4x
+  reference as shown):
+  - today 0.838;
+  - 4x source at 720p/7000 0.873;
+  - 1080p/12,600/90 KB 0.902;
+  - IDR-rate pulse at 1080p under the 90 KB cap.
+- **C5-M3's FMV segment was reproduced**, and its T re-used.
+- **Open, the user's:**
+  - the picture decision on the proposed source config (TV only; nothing
+    perceptual is a gate);
+  - the 40 MHz change on the Opal;
+  - then the LINK-L1 re-run, and Part 2 (the 1080p rung: the actuator's
+    size change, and a mid-session resolution change not yet shown) on
+    the user's word.
+
 ## PHASE C — `C3.L4` live — CLOSED 2026-09-30 (validated under real loss; live behind its flag)
 
 **2026-09-30: `C3.L4` is CLOSED.**

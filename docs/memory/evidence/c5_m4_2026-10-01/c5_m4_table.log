@@ -1,0 +1,136 @@
+[table 16:20:09Z] start: manager PRIVYHUB_* ''; MainPID 1398723; 8765 1398723; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 16:20:09Z] T2 sampler started (10 s); scales: 1x 2x 4x; hold 300s
+[table 16:20:09Z] a_1x begins (no stream, scale 1x)
+[a_1x 16:20:16Z] window 60817410 1920x1080; status: GET_STATUS PAUSED Beetle PSX HW,Tekken 3 (USA)
+[a_1x 16:20:18Z] status after unpause: GET_STATUS PLAYING Beetle PSX HW,Tekken 3 (USA)
+[a_1x 16:20:18Z] PLAYING at 2026-10-01T16:20:18Z; holding 300s, zero input, no stream
+[a_1x 16:25:19Z] status at end: GET_STATUS PLAYING Beetle PSX HW,Tekken 3 (USA)
+[a_1x 16:25:21Z] status after pause: GET_STATUS PAUSED Beetle PSX HW,Tekken 3 (USA)
+[a_1x 16:25:23Z] RetroArch: HW render (1024x1024); Using resolution 1920x1080; game active after stop: False
+[table 16:25:23Z] a_1x exit 0
+[table 16:25:43Z] b_1x begins (adopted 7000, scale 1x)
+[b_1x 16:25:43Z] mode=H hold/timeout=300s probe_args=none heartbeat_ms=default
+[b_1x 16:25:43Z] ARM_PROFILE adopted; PRIVYHUB_* in the user manager: ''
+[b_1x 16:25:47Z] companion MainPID 1400841 serving 8765; PRIVYHUB_* in its environ: 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[b_1x] before launch: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[b_1x] at PLAYING: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[b_1x 16:26:27Z] SurfaceFlinger stream-surface lines: 12
+[b_1x 16:26:27Z] PLAYING at 2026-10-01T16:26:27Z; holding 300s, zero input
+[b_1x 16:31:27Z] adb client processes seen during hold: 8 (# polls 579)
+[b_1x 16:31:30Z] report: native_decoder_20261001_163129_390.json
+[frames] 301 seconds in the session window
+[heartbeat] 149 lines
+[b_1x 16:31:51Z] decision log lines in the hold: 178
+[b_1x 16:31:52Z] game active after stop: False
+[b_1x 16:31:52Z] done
+[table 16:31:52Z] b_1x exit 0
+[table 16:31:53Z] c_1x begins (native_game_1080p60_c3_80pct_cap90, scale 1x)
+[c_1x 16:31:53Z] mode=H hold/timeout=300s probe_args=none heartbeat_ms=default
+[c_1x 16:31:53Z] ARM_PROFILE native_game_1080p60_c3_80pct_cap90; PRIVYHUB_* in the user manager: 'PRIVYHUB_NATIVE_PROFILE_ID=native_game_1080p60_c3_80pct_cap90'
+[c_1x 16:31:57Z] companion MainPID 1404573 serving 8765; PRIVYHUB_* in its environ: 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live PRIVYHUB_NATIVE_PROFILE_ID=native_game_1080p60_c3_80pct_cap90'
+[c_1x] before launch: ARM_PROFILE native_game_1080p60_c3_80pct_cap90 profile ('native_game_1080p60_c3_80pct_cap90', 1920, 1080, 12600, 90000) bitrate_kbps 12600 selection PRIVYHUB_NATIVE_PROFILE_ID native_game_1080p60_c3_80pct_cap90 any_override True fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[c_1x] at PLAYING: ARM_PROFILE native_game_1080p60_c3_80pct_cap90 profile ('native_game_1080p60_c3_80pct_cap90', 1920, 1080, 12600, 90000) bitrate_kbps 12600 selection PRIVYHUB_NATIVE_PROFILE_ID native_game_1080p60_c3_80pct_cap90 any_override True fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[c_1x 16:32:40Z] SurfaceFlinger stream-surface lines: 12
+[c_1x 16:32:40Z] PLAYING at 2026-10-01T16:32:40Z; holding 300s, zero input
+[c_1x 16:37:43Z] adb client processes seen during hold: 11 (# polls 579)
+[c_1x 16:37:44Z] report: native_decoder_20261001_163744_125.json
+[frames] 301 seconds in the session window
+[heartbeat] 149 lines
+[c_1x 16:38:04Z] decision log lines in the hold: 175
+[c_1x 16:38:06Z] game active after stop: False
+[c_1x 16:38:06Z] done
+[table 16:38:06Z] c_1x exit 0
+[table 16:38:10Z] after c_1x (selector unset): manager PRIVYHUB_* ''; MainPID 1408343; 8765 1408343; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 16:38:30Z] a_2x begins (no stream, scale 2x)
+[a_2x 16:38:37Z] window 60817410 1920x1080; status: GET_STATUS PAUSED Beetle PSX HW,Tekken 3 (USA)
+[a_2x 16:38:40Z] status after unpause: GET_STATUS PLAYING Beetle PSX HW,Tekken 3 (USA)
+[a_2x 16:38:40Z] PLAYING at 2026-10-01T16:38:40Z; holding 300s, zero input, no stream
+[a_2x 16:43:40Z] status at end: GET_STATUS PLAYING Beetle PSX HW,Tekken 3 (USA)
+[a_2x 16:43:43Z] status after pause: GET_STATUS PAUSED Beetle PSX HW,Tekken 3 (USA)
+[a_2x 16:43:45Z] RetroArch: HW render (2048x2048); Using resolution 1920x1080; game active after stop: False
+[table 16:43:45Z] a_2x exit 0
+[table 16:44:05Z] b_2x begins (adopted 7000, scale 2x)
+[b_2x 16:44:05Z] mode=H hold/timeout=300s probe_args=none heartbeat_ms=default
+[b_2x 16:44:05Z] ARM_PROFILE adopted; PRIVYHUB_* in the user manager: ''
+[b_2x 16:44:09Z] companion MainPID 1409451 serving 8765; PRIVYHUB_* in its environ: 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[b_2x] before launch: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[b_2x] at PLAYING: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[b_2x 16:44:49Z] SurfaceFlinger stream-surface lines: 11
+[b_2x 16:44:49Z] PLAYING at 2026-10-01T16:44:49Z; holding 300s, zero input
+[b_2x 16:49:50Z] adb client processes seen during hold: 10 (# polls 579)
+[b_2x 16:49:51Z] report: native_decoder_20261001_164951_628.json
+[frames] 301 seconds in the session window
+[heartbeat] 150 lines
+[b_2x 16:50:12Z] decision log lines in the hold: 175
+[b_2x 16:50:13Z] game active after stop: False
+[b_2x 16:50:13Z] done
+[table 16:50:13Z] b_2x exit 0
+[table 16:50:14Z] c_2x begins (native_game_1080p60_c3_80pct_cap90, scale 2x)
+[c_2x 16:50:14Z] mode=H hold/timeout=300s probe_args=none heartbeat_ms=default
+[c_2x 16:50:14Z] ARM_PROFILE native_game_1080p60_c3_80pct_cap90; PRIVYHUB_* in the user manager: 'PRIVYHUB_NATIVE_PROFILE_ID=native_game_1080p60_c3_80pct_cap90'
+[c_2x 16:50:18Z] companion MainPID 1413169 serving 8765; PRIVYHUB_* in its environ: 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live PRIVYHUB_NATIVE_PROFILE_ID=native_game_1080p60_c3_80pct_cap90'
+[c_2x] before launch: ARM_PROFILE native_game_1080p60_c3_80pct_cap90 profile ('native_game_1080p60_c3_80pct_cap90', 1920, 1080, 12600, 90000) bitrate_kbps 12600 selection PRIVYHUB_NATIVE_PROFILE_ID native_game_1080p60_c3_80pct_cap90 any_override True fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[c_2x] at PLAYING: ARM_PROFILE native_game_1080p60_c3_80pct_cap90 profile ('native_game_1080p60_c3_80pct_cap90', 1920, 1080, 12600, 90000) bitrate_kbps 12600 selection PRIVYHUB_NATIVE_PROFILE_ID native_game_1080p60_c3_80pct_cap90 any_override True fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[c_2x 16:51:00Z] SurfaceFlinger stream-surface lines: 11
+[c_2x 16:51:00Z] PLAYING at 2026-10-01T16:51:00Z; holding 300s, zero input
+[c_2x 16:56:00Z] adb client processes seen during hold: 11 (# polls 578)
+[c_2x 16:56:01Z] report: native_decoder_20261001_165601_739.json
+[frames] 301 seconds in the session window
+[heartbeat] 150 lines
+[c_2x 16:56:22Z] decision log lines in the hold: 183
+[c_2x 16:56:23Z] game active after stop: False
+[c_2x 16:56:23Z] done
+[table 16:56:23Z] c_2x exit 0
+[table 16:56:28Z] after c_2x (selector unset): manager PRIVYHUB_* ''; MainPID 1416875; 8765 1416875; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 16:56:48Z] a_4x begins (no stream, scale 4x)
+[a_4x 16:56:54Z] window 60817410 1920x1080; status: GET_STATUS PAUSED Beetle PSX HW,Tekken 3 (USA)
+[a_4x 16:56:57Z] status after unpause: GET_STATUS PLAYING Beetle PSX HW,Tekken 3 (USA)
+[a_4x 16:56:57Z] PLAYING at 2026-10-01T16:56:57Z; holding 300s, zero input, no stream
+[a_4x 17:01:57Z] status at end: GET_STATUS PLAYING Beetle PSX HW,Tekken 3 (USA)
+[a_4x 17:02:00Z] status after pause: GET_STATUS PAUSED Beetle PSX HW,Tekken 3 (USA)
+[a_4x 17:02:02Z] RetroArch: HW render (4096x4096); Using resolution 1920x1080; game active after stop: False
+[table 17:02:02Z] a_4x exit 0
+[table 17:02:22Z] b_4x begins (adopted 7000, scale 4x)
+[b_4x 17:02:22Z] mode=H hold/timeout=300s probe_args=none heartbeat_ms=default
+[b_4x 17:02:22Z] ARM_PROFILE adopted; PRIVYHUB_* in the user manager: ''
+[b_4x 17:02:26Z] companion MainPID 1418100 serving 8765; PRIVYHUB_* in its environ: 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[b_4x] before launch: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[b_4x] at PLAYING: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[b_4x 17:03:05Z] SurfaceFlinger stream-surface lines: 11
+[b_4x 17:03:05Z] PLAYING at 2026-10-01T17:03:05Z; holding 300s, zero input
+[b_4x 17:08:06Z] adb client processes seen during hold: 9 (# polls 578)
+[b_4x 17:08:07Z] report: native_decoder_20261001_170807_494.json
+[frames] 301 seconds in the session window
+[heartbeat] 149 lines
+[b_4x 17:08:27Z] decision log lines in the hold: 183
+[b_4x 17:08:29Z] game active after stop: False
+[b_4x 17:08:29Z] done
+[table 17:08:29Z] b_4x exit 0
+[table 17:08:29Z] c_4x begins (native_game_1080p60_c3_80pct_cap90, scale 4x)
+[c_4x 17:08:29Z] mode=H hold/timeout=300s probe_args=none heartbeat_ms=default
+[c_4x 17:08:29Z] ARM_PROFILE native_game_1080p60_c3_80pct_cap90; PRIVYHUB_* in the user manager: 'PRIVYHUB_NATIVE_PROFILE_ID=native_game_1080p60_c3_80pct_cap90'
+[c_4x 17:08:34Z] companion MainPID 1421869 serving 8765; PRIVYHUB_* in its environ: 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live PRIVYHUB_NATIVE_PROFILE_ID=native_game_1080p60_c3_80pct_cap90'
+[c_4x] before launch: ARM_PROFILE native_game_1080p60_c3_80pct_cap90 profile ('native_game_1080p60_c3_80pct_cap90', 1920, 1080, 12600, 90000) bitrate_kbps 12600 selection PRIVYHUB_NATIVE_PROFILE_ID native_game_1080p60_c3_80pct_cap90 any_override True fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[c_4x] at PLAYING: ARM_PROFILE native_game_1080p60_c3_80pct_cap90 profile ('native_game_1080p60_c3_80pct_cap90', 1920, 1080, 12600, 90000) bitrate_kbps 12600 selection PRIVYHUB_NATIVE_PROFILE_ID native_game_1080p60_c3_80pct_cap90 any_override True fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[c_4x 17:09:16Z] SurfaceFlinger stream-surface lines: 11
+[c_4x 17:09:16Z] PLAYING at 2026-10-01T17:09:16Z; holding 300s, zero input
+[c_4x 17:14:16Z] adb client processes seen during hold: 8 (# polls 578)
+[c_4x 17:14:18Z] report: native_decoder_20261001_171417_980.json
+[frames] 301 seconds in the session window
+[heartbeat] 149 lines
+[c_4x 17:14:39Z] decision log lines in the hold: 187
+[c_4x 17:14:41Z] game active after stop: False
+[c_4x 17:14:41Z] done
+[table 17:14:41Z] c_4x exit 0
+[table 17:14:45Z] after c_4x (selector unset): manager PRIVYHUB_* ''; MainPID 1425684; 8765 1425684; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 17:15:09Z] teardown: manager PRIVYHUB_* ''; MainPID 1425770; 8765 1425770; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 17:15:09Z] measurement source files: 0 (want 0)
+[table 17:15:09Z] ADOPTED APK CONFIRMED (device hash de072762e55122c3060086f6f10b1bff54633d9165d0c475f17699127841835e)
+[table 17:15:19Z] teardown: game active False; NOW PLAYING on the launcher: 1
+[table 17:15:30Z] stale banner: force-stop + relaunch; NOW PLAYING now: 0
+[table 17:15:30Z] table done
