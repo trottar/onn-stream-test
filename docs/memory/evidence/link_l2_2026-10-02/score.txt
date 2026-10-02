@@ -1,0 +1,54 @@
+LINK-L2 -- the day's holds on the 40 MHz link, adopted profile at 7000, 4x PS1 source, adaptive shadow (close-out targets)
+hold local start      UTC start              min  spk/m    fps stale  loss/m aund/m  gap | link rssi  sig mcs mcs<=1%  retries  ret% util%  umax noise wid | mode->after ovr capture
+H1   2026-10-01 20:41 2026-10-02T00:41:09Z 20.39   40.8  59.81  1.32   20.80   2.84  219 |  150  -69  -71   0     100  241,278  14.9 22.60  31.0   -89  40 | live->shadow False 1920x1080
+H2   2026-10-02 00:40 2026-10-02T04:40:59Z 20.15   30.5  59.95  0.60    1.64   1.19  225 |  180  -69  -69   0     100        8   0.0  7.75  13.3   -89  40 | live->shadow False 1920x1080
+H3   2026-10-02 04:40 2026-10-02T08:40:53Z 20.18   39.8  59.91  1.39    9.47   1.54  201 |  135  -68  -74   0     100  119,857   7.4  5.73  23.3   -89  40 | live->shadow False 1920x1080
+H4   2026-10-02 08:41 2026-10-02T12:41:02Z 20.16   40.0  59.88  0.84   12.84   0.35  109 |  135  -69  -75   0     100  278,193  17.2  3.56   6.8   -89  40 | live->shadow False 1920x1080
+H5   2026-10-02 12:40 2026-10-02T16:40:56Z 20.21   47.8  59.90  0.99   13.21   0.30  192 |  120  -70  -73   0     100  147,009   9.1  5.38  16.6   -89  40 | live->shadow False 1920x1080
+H6   2026-10-02 16:41 2026-10-02T20:41:05Z 20.18   45.3  59.91  0.99   11.49   0.35  114 |  135  -69  -76   0     100  161,566  10.0  3.98   6.8   -89  40 | live->shadow False 1920x1080
+
+  H1: loss MISSES (20.80/min); misses: video loss / min post-FEC 20.8 vs < 10; max output gap ms 219 vs <= 100
+  H2: loss MEETS (1.64/min); misses: max output gap ms 225 vs <= 100
+  H3: loss MEETS (9.47/min); misses: max output gap ms 201 vs <= 100
+  H4: loss MISSES (12.84/min); misses: video loss / min post-FEC 12.84 vs < 10; max output gap ms 109 vs <= 100
+  H5: loss MISSES (13.21/min); misses: video loss / min post-FEC 13.21 vs < 10; max output gap ms 192 vs <= 100
+  H6: loss MISSES (11.49/min); misses: video loss / min post-FEC 11.49 vs < 10; max output gap ms 114 vs <= 100
+
+CLASSIFICATION OF THE DAY: TIME OF DAY -- misses ['H1', 'H4', 'H5', 'H6'] inside 08.68 + 12.00 h (local), every meet outside it
+
+FRAME SIZE (reported; C5-M4's formulas): per-second largest frame p50/p90/max B, cap hits s/min, >= 80-pkt frames/min
+day   hold block     p50    p90    max cap s/m ge80/m
+L1 1x H1   12-16   47831  86311  89885     9.7    0.0
+L1 1x H2   16-20   48031  86311  89498    10.0    0.0
+L1 1x H3   20-24   47859  86311  89498    10.0    0.0
+L1 1x H4   00-04   47533  86311  89498     9.6    0.0
+L1 1x H5   04-08   47894  86311  89498     9.8    0.0
+L1 1x H6   08-12   47542  86311  89498     9.5    0.0
+L1 1x med          47845  86311            9.8   0.00
+L2 4x H1   20-24   50089  86850  89408     9.9    0.0
+L2 4x H2   00-04   49559  86934  89597     9.9    0.0
+L2 4x H3   04-08   49503  86906  89608    10.0    0.0
+L2 4x H4   08-12   49686  86860  89408     9.6    0.0
+L2 4x H5   12-16   49528  86906  89608    10.0    0.0
+L2 4x H6   16-20   49893  86906  89597    10.1    0.0
+L2 4x med          49622  86906            9.9   0.00
+
+SIDE BY SIDE by local 4-hour block (reported; the classification is LINK-L2's alone)
+block  | L1 hold  loss/m  gap  retries  ret% link mcs mcs<=1% | L2 hold  loss/m  gap  retries  ret% link mcs mcs<=1%
+00-04  | H4 00:40    3.16   93   56,222   3.5  260   3      23 | H2 00:40    1.64  225        8   0.0  180   0     100
+04-08  | H5 04:40    7.54  108  213,538  13.2  292   3       7 | H3 04:40    9.47  201  119,857   7.4  135   0     100
+08-12  | H6 08:41   16.78  255  109,566   6.8  260   2      45 | H4 08:41   12.84  109  278,193  17.2  135   0     100
+12-16  | H1 12:40   37.27  204  100,212   6.2  195   1      92 | H5 12:40   13.21  192  147,009   9.1  120   0     100
+16-20  | H2 16:40    4.25  171   75,502   4.7  260   3      35 | H6 16:41   11.49  114  161,566  10.0  135   0     100
+20-24  | H3 20:40   15.19  310  111,300   6.9  195   1      62 | H1 20:41   20.80  219  241,278  14.9  150   0     100
+L1: meets 3/6; loss median 11.37; max gap median 188, <= 100 on 1; retries median 104,889; link median 260
+L2: meets 2/6; loss median 12.17; max gap median 196, <= 100 on 0; retries median 154,288; link median 135
+
+DECISION LOG per hold (non-sample events; the shadow's would-be decisions)
+  H1: {"session_ended_reset": 4, "controller_start": 1, "disabled": 1, "state": 80}
+  H2: {"session_ended_reset": 4, "controller_start": 1, "state": 84, "disabled": 1}
+  H3: {"session_ended_reset": 4, "controller_start": 1, "state": 96, "disabled": 1}
+  H4: {"session_ended_reset": 5, "controller_start": 1, "disabled": 1, "state": 92}
+  H5: {"session_ended_reset": 4, "controller_start": 1, "disabled": 1, "state": 142}
+  H6: {"session_ended_reset": 4, "controller_start": 1, "state": 104, "disabled": 1}
+

@@ -1,0 +1,105 @@
+LINK-L2 -- the loss row at 40 MHz. PRE-REGISTRATION.
+Written 2026-10-01 (18:22 EDT, 22:22Z) before any hold, air sample or score was collected for
+this task. Task: docs/memory/handoffs/LINK-L2_LOSS_ROW_AT_40MHZ_TASK.md, under
+handoffs/QUEUE_2026-09-29B.md's rules. Baseline commit 598cb61. Nothing below is changed after data.
+
+BEFORE THIS FILE (the task's step 0, the access check)
+- One read-only air snapshot to /tmp (link_l1_air.py, unchanged), 18:17 EDT: its ssh round timed
+  out (25 s). Retried once (one bare `iw dev wlan1 info`, then the snapshot again, 18:18 EDT):
+  channel 36, width 40 MHz. The width is 40 MHz, so the task continues. That snapshot's numbers
+  are reported in the record as the access check; they are not one of the day's snapshots.
+
+QUESTION
+LINK-L1's question, asked again on the 40 MHz link: on the adopted profile with adaptive bitrate
+not acting, does post-FEC video loss < 10/min hold, and if not, does it depend on the time of day?
+
+THE RULE -- LINK-L1's, VERBATIM (from link_l1_2026-10-01/link_l1_preregistration.txt, sha256
+02a0e047...; six holds, one per local 4-hour block, >= 30 min idle before each):
+
+SCORING (per hold, the D-BASE close-out table's rows and targets)
+  spikes >= 20 ms / min          < 200        (decoder.spike_20_ms / minutes)
+  rendered fps                   >= 59.5      (rendered_frames / duration, not recent_fps)
+  stale output drops / min       < 20
+  video loss / min, post-FEC     < 10         <-- THE CLASSIFYING ROW
+  audio underruns / min          < 5
+  max output gap ms              <= 100       <-- the row in question beside loss; reported
+Only the loss row enters the classification. The max output gap and the other rows are reported
+against their targets.
+
+CLASSIFICATION OF THE DAY (a hold "meets" if loss/min < 10)
+  STILL MET    >= 5 of 6 holds meet.
+  TIME OF DAY  the meets and the misses separate cleanly by clock: every miss inside one
+               contiguous <= 12-hour window of the local clock (circular, midnight wraps), every
+               meet outside it, with >= 2 meets and >= 2 misses.
+  MOVED        <= 1 of 6 meets.
+  MIXED        anything else; reported with the table, no conclusion drawn.
+  Precedence as listed (STILL MET first). If fewer than 6 holds score: the same rules over the
+  scored holds, except that STILL MET needs >= 5 meets and MOVED needs >= 5 scored holds with
+  <= 1 meet; with fewer than 5 scored holds and no rule met the day is INCOMPLETE.
+  For TIME OF DAY the "window" is judged on each hold's PLAYING time in local hours; the window
+  is the shortest arc containing all misses and must contain no meet.
+
+THE HOLDS (what differs from LINK-L1, and nothing else)
+- Six 20-minute (1200 s) attract-mode holds of the PS1 reference title (Tekken 3), zero input,
+  BACK to end; the adopted profile native_game_720p60_reference at 7000 kbps; any_override false;
+  in the user manager no PRIVYHUB_*; in the companion's environ exactly the live default's
+  PRIVYHUB_ADAPTIVE_BITRATE_MODE=live (the drop-in, C3-L4-D1); APK de072762...835e checked at each
+  teardown (no reinstall).
+- The source is the ADOPTED 4x PS1 source (C5-M4A: Beetle PSX HW core override 1920x1080, internal
+  resolution 4x). LINK-L1 ran at 1x. Its frame-size effect is reported beside the rows.
+- Harness: C5-M4A's c5_m4a_hold.sh / c5_m4_run.sh copied into this directory as link_l2_hold.sh /
+  link_l2_run.sh (the counter-only game override, T2 at 10 s, the 1 s host sampler, as C5-M4A),
+  with three changes, each in the scripts' headers: the hold's name is an argument; LINK-L1's cold
+  start (the hold does not launch before 30 min after the last session_ended); the adaptive disable
+  below. Driven by link_l2_day.sh (LINK-L1's day driver's pattern).
+- ADAPTIVE BITRATE IN SHADOW FOR EVERY HOLD. The status must read mode live before launch and at
+  PLAYING (the new session is live by default). Right after PLAYING the per-session kill switch
+  POST /plugins/games/adaptive-bitrate/disable is called (C3-L4-D1); the status is re-read and must
+  read mode shadow, acts false; the hold's window starts after it. The decision log is kept
+  (decision_log_<hold>.jsonl). A hold is EXCLUDED and re-run ONCE, inside its block, as H<k>r, if:
+  the disable did not answer ok, or the status after it or at the end of the hold (before BACK)
+  does not read shadow / acts false / 0 transitions, or the decision log in the hold has any row
+  acted true or any transition / transition_done row (link_l2_valid.py). The re-run counts against
+  the two-retry limit. A block whose hold cannot be run validly is NOT RUN. This keeps the loss row
+  comparable with LINK-L1's adaptive-off holds.
+- Teardown after each hold: the unit restarted, so the companion is live by default again (the
+  disable is per-session); stream 7000, no game, 0 NOW PLAYING banners (one force-stop + relaunch
+  if stale), the counter override cleared.
+- A hold that fails to reach PLAYING (or its preflight) is retried at most twice, 5 min apart,
+  inside its own block (launched before block start + 3 h).
+- Schedule (host local time, America/New_York, EDT = UTC-4), LINK-L1's :40 slots, 4 hours apart:
+    H1 2026-10-01 20:40 (block 20-24)   H2 2026-10-02 00:40 (block 00-04)
+    H3 2026-10-02 04:40 (block 04-08)   H4 2026-10-02 08:40 (block 08-12)
+    H5 2026-10-02 12:40 (block 12-16)   H6 2026-10-02 16:40 (block 16-20)
+  Each hold's UTC start (PLAYING) and the host's local hour (timedatectl) are recorded.
+- Before H1, one SMOKE of the harness (a 60-s session through link_l2_hold.sh into smoke/, the same
+  checks), to prove the disable step; it is not a hold, does not score, and must end >= 30 min
+  before H1 (the cold start enforces it). If the smoke's status does not read shadow / acts false
+  after the disable, the day does not start and the record says so.
+
+REPORTED BESIDE THE ROWS (NO RULE)
+- Frame size (the 4x source): per-second largest frame p50 / p90 / max, cap hits (>= 95 % of the
+  90,000 B cap) s/min, frames >= 80 packets /min -- for these six and LINK-L1's six, from the
+  frames_<hold>.jsonl files, by C5-M4's formulas.
+- The side-by-side: LINK-L1's six holds and these six by local 4-hour block -- loss/min and max gap
+  in one table, with tx retries / retry share and the onn's link rate / the Opal's tx MCS.
+  REPORTED; the classification is THIS day's alone.
+- The decision log's events per hold (the shadow's would-be decisions), counted.
+
+THE AIR VIEW
+Read-only over `ssh opal`, identifiers never written (link_l2_air.py = link_l1_air.py + counts by
+40 MHz pair): channel and width, channel utilization, noise floor, stations, the onn's station row
+(signal, tx/rx rate, MCS, tx retries, tx failed, rx drop misc), and COUNTS ONLY of neighbouring
+BSSIDs from the Opal's cached scan list (no scan triggered): on primary 36, in the in-use 40 MHz
+pair (36-40), in the 44-48 pair, in 52-64, and (for comparison with LINK-L1) in the 36-48 80 MHz
+block, each with signal buckets. Sampled once at the start of each hold (before launch), once
+between holds (about 2 h after each start), after H6, and at 30 s beside each hold. Reported beside
+the holds and against LINK-L1's (80 MHz then, 40 MHz now); NO RULE on it.
+
+WHAT IT MEANS (the record gives options, not a decision)
+  STILL MET -> the baseline holds on this width; Part 2's screening can be scheduled.
+  TIME OF DAY -> the window named; screening in it.
+  MOVED -> 40 MHz made it worse: the user reverts to 80 MHz (by hand); the next lever is the
+           channel (the empty 52-64 block) or a wired hop.
+  MIXED -> no change from the width; the levers left are the channel, the onn's placement, or a
+           wired hop -- with what the air view says.

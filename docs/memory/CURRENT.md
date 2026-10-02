@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-10-01
-baseline_commit: fe8f125
+as_of: 2026-10-02
+baseline_commit: 598cb61
 ---
 
 # Current State
@@ -18,42 +18,39 @@ source should render natively at 1080p. PS1 comes first.
   unsettled link.
 - **C5-M4 Part 1** (the source side) is done, and **C5-M4A adopted the
   4x PS1 source** the same evening, through the quick win.
-- The rung is Part 2, after the user's link work (40 MHz on the Opal,
-  then the LINK-L1 re-run).
+- The rung is Part 2, after the user's call on the link. The user set the
+  Opal to 40 MHz, and **`LINK-L2` (2026-10-02) re-ran LINK-L1's day on
+  it: TIME OF DAY as scored, on the 12-h boundary by 7 s** (MIXED at
+  second resolution).
 - **Standing, unchanged:**
   - live adaptive bitrate is ON BY DEFAULT (`C3-L4-D1`, the unit
     drop-in);
   - `C3.L4` is CLOSED;
-  - `LINK-L1` is MIXED;
+  - `LINK-L1` (80 MHz) is MIXED; `LINK-L2` (40 MHz) is TIME OF DAY as
+    scored, on the boundary;
   - C7 / D8 are met or deferred, with the C7 1080p row reopened (ROADMAP).
 - **Earlier:** `D-BASE` CLOSED (2026-09-23); C1; C4 (8+1); C6; D7; the
   `CL-B1` APK adopted (2026-09-30).
 
 ## Current Work Item
 
-**The C5-M4A prompt** (under `handoffs/QUEUE_2026-09-29B.md`'s rules):
-**ADOPTED** by the pre-registered rows (sha256 `18312026…`), on the
-user's "Yes apply the 4x config". Nothing was committed.
+**The LINK-L2 prompt** (`QUEUE_2026-09-29B.md`'s rules): **TIME OF DAY
+as scored, on the boundary.** Nothing adopted, nothing committed.
 
-- **The change.** The core override `Beetle PSX HW.cfg` (fullscreen,
-  1920×1080), and `internal_resolution` `"4x"` in the base `.opt` and the
-  six per-title copies.
-  - Exactly eight files changed.
-  - The backups are in `evidence/c5_m4a_2026-10-01/backup/`.
-- **The checks:**
-  - Tekken 3 and Crash Bash (multitap) launched through the companion at
-    1920×1080 / 4096², and the multitap write keeps the line;
-  - SNES is untouched (879×672, `bsnes.opt` equal);
-  - D7: P1 8/9 (the discovery row's window closed 0.2 s before the
-    client's first request), and the one retry, P2, 9/9;
-  - **the 20-min attract hold on the adopted 7000 stream met every row**:
-    RetroArch 59.999, capture 60, client 59.94 fps, 27 spikes/min, stale
-    0.25, underruns 0.70/min. Loss 4.12/min and gap 141 ms are reported.
-    0 transitions.
-- Records: `decisions/C5-M4_PS1_4X_SOURCE_ADOPTION_2026-10-01.md`,
-  `evidence/C5_M4A_PS1_4X_SOURCE_ADOPTION_2026-10-01.md`, and C5-M4
-  Part 1's `evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md` (the
-  rung's design).
+- Opal 36 / 40 MHz (read-only). LINK-L1's rule verbatim (`cc755e1b…`).
+  Six valid 20-min holds, 20:41 → 16:41 EDT, adopted 7000, 4x source,
+  adaptive in shadow per session (confirmed, 0 acted rows).
+- Loss 20.80 / 1.64 / 9.47 / 12.84 / 13.21 / 11.49 per min; max gap
+  ≤ 100 on none.
+- 2 of 6 meet (00:40, 04:40). The misses span 08:41 → 20:41: 12.00 h at
+  the scorer's minute resolution (**TIME OF DAY**), 12 h 0 min 7 s with
+  seconds (**MIXED**). Both are reported.
+- Against LINK-L1 (80 MHz): 2/6 vs 3/6, the link rate halved. 00:40 and
+  04:40 met on both days. The neighbours are all on 44-48 now (0 on
+  36-40), and the loss did not improve.
+- H4's empty decision-log slice (log rotation), recovered by time:
+  VALID.
+- Record: `evidence/LINK_L2_LOSS_ROW_2026-10-02.md` (options in §6).
 
 ## Verified State
 
@@ -90,7 +87,7 @@ loss — the losses are not at transitions; no-transition H2 missed too).
   (`TOOLS.md`, including `C5-M1`'s `PRIVYHUB_NATIVE_PROFILE_ID`); none set.
 - **Installed**: **APK `de072762…835e`** (the `CL-B1` APK, adopted
   2026-09-30; hash confirmed on the onn at every teardown since,
-  last 2026-10-01 21:02Z (C5-M4A); the previous
+  last 2026-10-02 21:01Z (LINK-L2 H6); the previous
   `f31b1c18…8ae7` is kept at `runtime/c4_m1/adopted_app-debug.apk` for
   rollback).
   - The companion is the systemd user unit `privyhub-companion` (`H3`);
@@ -106,7 +103,7 @@ loss — the losses are not at transitions; no-transition H2 missed too).
     - Kill switches: delete the drop-in + `daemon-reload` + restart
       (off); `POST /plugins/games/adaptive-bitrate/disable` (shadow, one
       session).
-  - Last restarted 2026-10-01 21:02Z by C5-M4A's teardown:
+  - Last restarted 2026-10-02 21:01Z by LINK-L2 H6's teardown:
     - manager none, environ the one name, mode live;
     - no selector, `PRIVYHUB_FEC_SCHEME` absent;
     - profile adopted at 7000, `any_override` false;
@@ -121,22 +118,32 @@ loss — the losses are not at transitions; no-transition H2 missed too).
 
 ## Next Action
 
-1. **The user's commit** of the C5-M4A work. Cowork gives the line from
-   `logs/c5_m4a_git_status.txt`. Nothing is committed by Code, and
-   `logs/`, the clips and the APKs stay out of git.
-2. **The user's 40 MHz change on the Opal**, which Code keeps read-only.
-   Then the **LINK-L1 re-run** on the next prompt: the same rule, six
-   holds.
-3. **Part 2, the 1080p rung**, after that, on the user's word. The design
-   is in the C5-M4 record's §4. The actuator's size change and a
-   mid-session resolution change must be shown first.
+1. **The user's commit** of LINK-L2 (C5-M4A is in `598cb61`). Cowork gives the
+   line from `logs/link_l2_git_status.txt`. Nothing is committed by Code,
+   and `logs/`, the clips and the APKs stay out of git.
+2. **The user's call on the link**, from the options in
+   `evidence/LINK_L2_LOSS_ROW_2026-10-02.md` §6:
+   - **TIME OF DAY (as scored):** screening nights in 00:00-08:00 local,
+     where 4 of 4 holds met over the two days;
+   - **MIXED (the second-resolution reading):** the channel (52-64 is
+     empty, DFS), the onn's placement, or a wired hop;
+   - **40 vs 80 MHz**, by hand: 40 MHz did not improve the row and halved
+     the link rate.
+
+   The Opal stays read-only to Code.
+3. **Part 2, the 1080p rung**, on the user's word, after the link is
+   settled. The design is C5-M4 §4
+   (`evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md`):
+   - first, the mid-session size change on the encoder restart;
+   - then the rung, tests and replays;
+   - then one pre-registered night.
 
 The user's picture look at 4x, **dither mode first**, can come whenever
 they like: TV only, nothing perceptual as a gate.
 
 **Open, not blocking:**
 
-- the max gap (447 ms, D1); `host_link`; the thermal flag; `CTRL-L1`;
+- the max gap (447 ms, D1; ≤ 100 on 0 of LINK-L2's six); `host_link`; the thermal flag; `CTRL-L1`;
   the slow-event ring; `C6-D1`'s list; the mild step's ~120 s bound;
   B3a's two clauses; C5-M4's R3 (no `codec_ms` in the C2 telemetry);
 - **adaptive-off measurements need the drop-in out** (`TOOLS.md`); old
@@ -178,6 +185,7 @@ perceptual gate unless the user sets one.
 
 ## Relevant References
 
+- `evidence/LINK_L2_LOSS_ROW_2026-10-02.md` — the loss row at 40 MHz (TIME OF DAY as scored, on the boundary); `evidence/LINK_L1_LOSS_ROW_2026-10-01.md` (80 MHz, MIXED).
 - `evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md` — the PS1 source at native 1080p (C5-M4 Part 1).
 - `evidence/D_BASE_CLOSEOUT_2026-09-23.md` — the scored table and verdict.
 - `investigations/BASELINE_STREAM_HEALTH.md` (MET);

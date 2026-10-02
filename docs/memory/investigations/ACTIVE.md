@@ -33,10 +33,13 @@ nothing adopted** (`../evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md`).
 - **Open, the user's:**
   - the picture look at 4x, dither mode first (TV only; nothing
     perceptual is a gate);
-  - the 40 MHz change on the Opal;
-  - then the LINK-L1 re-run, and Part 2 (the 1080p rung: the actuator's
-    size change, and a mid-session resolution change not yet shown) on
-    the user's word.
+  - ~~the 40 MHz change on the Opal; then the LINK-L1 re-run~~ done:
+    the user set 40 MHz, and `LINK-L2` (2026-10-02) is TIME OF DAY as
+    scored, on the boundary (below);
+  - the user's call on the link (keep 40 MHz or revert; a screening
+    window, or the channel / placement / a wired hop);
+  - then Part 2 (the 1080p rung: the actuator's size change, and a
+    mid-session resolution change not yet shown) on the user's word.
 
 ## PHASE C — `C3.L4` live — CLOSED 2026-09-30 (validated under real loss; live behind its flag)
 
@@ -70,8 +73,9 @@ nothing adopted** (`../evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md`).
   the sample rows);
 - **the ROUTINE reversal hold-down length** (~120 s bounds the mild step
   after an increase), a rule change only if the user asks;
-- the adopted 720p's loss row: `LINK-L1` (2026-10-01) MIXED, no
-  conclusion drawn; the levers are the user's (below).
+- the adopted 720p's loss row: `LINK-L1` (2026-10-01, 80 MHz) MIXED;
+  `LINK-L2` (2026-10-02, 40 MHz) TIME OF DAY as scored, on the 12-h
+  boundary by 7 s; the levers are the user's (below).
 
 The history of the item follows.
 
@@ -172,6 +176,27 @@ recovery-escalation backstop.
   - **No conclusion is drawn.** The levers (channel or width, placement,
     a wired hop) are the user's, laid out in
     `../evidence/LINK_L1_LOSS_ROW_2026-10-01.md`.
+- **`LINK-L2` (2026-10-02): the same day on the user's 40 MHz link —
+  TIME OF DAY as scored, on the boundary.**
+  - Six valid 20-min holds: the adopted profile at 7000, the 4x PS1
+    source, adaptive switched to shadow per session (confirmed every
+    hold, 0 acted rows). Loss 20.80 / 1.64 / 9.47 / 12.84 / 13.21 /
+    11.49 per min (20:41 → 16:41 EDT); max gap ≤ 100 on none.
+  - 2 of 6 meet (00:40, 04:40). The four misses span 08:41 → 20:41:
+    exactly 12.00 h at LINK-L1's scorer's minute resolution, so TIME OF
+    DAY. At second resolution it is 12 h 0 min 7 s, which would read
+    MIXED. Both readings are reported; neither was chosen after the data.
+  - Against LINK-L1: 2/6 vs 3/6, loss median 12.17 vs 11.37, the onn's
+    link rate halved (135 vs 260). 00:40 and 04:40 met on both days
+    (4/4); 08:41 and 20:40 missed on both.
+  - Air: 36 / 40 MHz. 0 neighbours on 36-40; all 3-7 (3-4 strong) now on
+    44-48, so the width stepped off them, and the loss did not improve.
+    At 40 MHz the Opal's station dump reports tx 6.5 Mbit/s / MCS 0 at
+    every sample; that is not the data rate, so the tx-MCS columns are not
+    comparable across the days.
+  - Options, not a decision (the window 00:00-08:00 for screening, or the
+    channel 52-64 / placement / a wired hop; 40 vs 80 MHz by hand):
+    `../evidence/LINK_L2_LOSS_ROW_2026-10-02.md`.
 
 **C5 (2026-09-28, `C5-M1`): 1080p60 NOT CAPABLE (stream) at parity** —
 client and host capable; the wireless hop's per-frame burst loss at 2.25×

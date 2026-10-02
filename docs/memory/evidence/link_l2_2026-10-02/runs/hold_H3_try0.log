@@ -1,0 +1,28 @@
+[table 08:40:06Z] last session_ended 2026-10-02T05:01:02.133Z; H3 not before 05:31:02Z
+[table 08:40:06Z] start: manager PRIVYHUB_* ''; MainPID 1501378; 8765 1501378; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 08:40:06Z] T2 sampler started (10 s); one hold, 1200s
+[table 08:40:07Z] H3 begins (adopted 7000, the adopted 4x PS1 source, adaptive to shadow after PLAYING)
+[H3 08:40:07Z] mode=H hold/timeout=1200s probe_args=none heartbeat_ms=default
+[H3 08:40:07Z] ARM_PROFILE adopted; PRIVYHUB_* in the user manager: ''
+[H3 08:40:11Z] companion MainPID 1506150 serving 8765; PRIVYHUB_* in its environ: 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[H3] before launch: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[H3] at PLAYING: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[H3] adaptive at PLAYING: mode live configured live acts True | disable route: ok True already_disabled False effective shadow | after: mode shadow configured live acts False disabled True transitions 0 -> SHADOW CONFIRMED
+[H3 08:40:53Z] SurfaceFlinger stream-surface lines: 11
+[H3 08:40:53Z] PLAYING at 2026-10-02T08:40:53Z; holding 1200s, zero input
+[H3 09:00:54Z] adb client processes seen during hold: 40 (# polls 2317)
+[H3 09:00:56Z] report: native_decoder_20261002_090056_055.json
+[frames] 1201 seconds in the session window
+[heartbeat] 598 lines
+[H3 09:01:19Z] decision log lines in the hold: 704
+[H3 09:01:20Z] game active after stop: False
+[H3 09:01:20Z] done
+[table 09:01:20Z] H3 exit 0
+[table 09:01:25Z] teardown: manager PRIVYHUB_* ''; MainPID 1518981; 8765 1518981; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 09:01:25Z] measurement files: 0 (want 0)
+[table 09:01:25Z] ADOPTED APK CONFIRMED (device hash de072762e55122c3060086f6f10b1bff54633d9165d0c475f17699127841835e)
+[table 09:01:35Z] teardown: game active False; NOW PLAYING on the launcher: 1
+[table 09:01:46Z] stale banner: force-stop + relaunch; NOW PLAYING now: 0
+[table 09:01:46Z] table done
