@@ -1357,3 +1357,100 @@ byte-identical.
 - **Night 3**: capacity at +15.5 s, the climb to 6000, `capacity_mild`
   back to 5500 at 121 s (the reversal hold-down), then HOLD `oscillation`
   at 5500 for the session. It was **the pre-registered shape**.
+
+## C5-M5 — the 1080p rung, behind its flag (2026-10-02/03; NOT adopted)
+
+Task `../handoffs/C5-M5_1080P_RUNG_TASK.md`; patch
+`../patches/C5-M5_1080P_RUNG.md`; record
+`../evidence/C5_M5_1080P_RUNG_2026-10-03.md`.
+
+**What it rests on.** A mid-session size change works on the client with no
+client change (`R0`, 2026-10-02). On one encoder restart, 7000/1280×720 →
+12,600/1920×1080 and back:
+
+- one SSRC change each way;
+- the onn's SurfaceView buffers at 1920×1080 within 3 s, and back to
+  1280×720 within 5 s;
+- no recovery cycle, one decoder report;
+- a gap at the switch of 315 / 287 ms.
+
+The Codec2 decoder (`c2.realtek.video.avc.decoder`) takes the new SPS
+in-band; its `INFO_OUTPUT_FORMAT_CHANGED` was already ignored, and the
+compositor scales the surface.
+
+**The flag.** `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p` (exact). It is read once,
+when the companion starts, beside the live mode. Absent, the ladder tops
+at 7000 and every decision is byte-identical to the closed controller's.
+That is shown by `tools/c5_m5_replay.py`: 0 differences over 377 series.
+**Off by default; nothing sets it but a session's own `set-environment`.**
+
+**The ladder, with sizes.**
+
+| level | kbps | size | argv |
+| --- | --- | --- | --- |
+| 5000 / 5500 / 6000 / 7000 | as before | 1280×720 (the profile's) | unchanged |
+| `1080p_12600` (flag only) | 12,600 (`-maxrate`, `-bufsize` 12,600k) | 1920×1080 | C5-M2's c3 arm exactly: cap 90,000 B, GOP 15, bf 0, 8+1 FEC |
+
+The source is already 1920×1080 (`C5-M4A`), so the rung carries real
+detail, not an upscale.
+
+**The rows the rung adds** (beside the table in the section above):
+
+| class | trigger / reason | bar | target | hold-downs |
+| --- | --- | --- | --- | --- |
+| INCREASE | `increase_1080p` / `increase_1080p` | **at 7000 only**: the rung window full and ≥ 435 of the last 450 evaluated reports since the last SSRC change clean (the blend's clean and window rules) | 12600 / 1920×1080 | as INCREASE (30 after an up, 60 after a down), plus **no entry for 10 min after any leave** (`rung_reentry_hold`) |
+| (the leave) | the existing triggers | as in the table above | the existing mapping from 12600: `capacity_mild` → 7000 / 720p; strict or the queue/gap FALLBACK → 5000; the queue/gap ROUTINE → 6000; the backstop → 5000 | a decrease waits 60 reports after the entry |
+
+**Plus:**
+
+- **Rung oscillation.** A leave, then an entry, then a leave in one
+  session. The second leave is carried out, then HOLD
+  (`oscillation_rung`) for the session.
+  - The general guard (three direction changes within 10 min) cannot see
+    this, because of the 10-min re-entry hold-down; hence the rung's own
+    count.
+- **Guards** as before. `reference_profile` and `no_override` read the
+  profile and the env overrides, never the active level, so the rung is
+  a ladder level and not a selector: `any_override` stays false.
+- **Recovery** at the rung restarts at 12600 / 1920×1080 (C3-F1, sized). A
+  full start resets to 7000 / 720p (C1), and the backstop still falls
+  back to 5000.
+- **Actuator**: `NativeStreamManager.adaptive_level_transition`.
+  - Between 720p levels it is the C3.L3a transition, unchanged.
+  - To or from the rung it is the same encoder-only restart, with the
+    scale/pad rebuilt at the level's size.
+  - The loopback c3 route cannot reach the rung.
+- **Status**: `native-stream-status` `width` / `height` are the active
+  level's. The controller adds `level_size`, `rung_1080p` (window,
+  leaves, closed, re-entry hold) and the ladder.
+- **Cost of a sized switch** (R0, S1): the gap at the switch is 287-356 ms,
+  against 128-225 ms for a bitrate-only restart. A sized restart's
+  first RTP came 187-519 ms after the kill (R0 518 up / 187 down; S1 369
+  up / 519 down), against ~187 ms for a bitrate-only one.
+- **Kill switches**: unset the flag and restart the unit, so the ladder
+  tops at 7000; the disable route still puts the session in shadow.
+
+**What the replays say about this link** (`c5_m5_replays.txt`; reported,
+no gate):
+
+- The mild bar **does not catch the 1080p's loss** on any C2-telemetry
+  series: C5-M4's c_1x … c_8x never meet it. The losses there are short
+  bursts, fps < 57 on 7-17 of ~155 reports and lost ≥ 50 on only 2-4, not
+  the sustained shortfall the bar was built for.
+- Entry needs 15 clean minutes. The C2-telemetry and live-sample 720p
+  holds at 7000 (N1, N2, D1, LINK-L2, C5-M4A V5) never reach 435 of 450:
+  their best windows were 396-429. The heartbeat-proxy series (S1's
+  night, LINK-L1) would have entered on 6 of 10.
+
+**The sessions** (record §4):
+
+- **S1, injection: PASSES.** The entry `increase_1080p` gave 7000 →
+  12600, and the injected mild bar gave 12600 → 7000. Gaps 356 / 314 ms.
+- **S3, a 2-h night from 01:06: WORKS AS A RUNG.** One entry by its own
+  rule at 111.5 min, then 8.5 min at 1080p (loss 2.0/min, fps 60.1), no
+  leave, 0 recovery. The switch's gap was 403 ms.
+- **S2, a 30-min daytime hold: ENTRY NOT REACHED** (best window 431 of
+  450).
+- **Not adopted; the flag is off by default.** The user's picture look at
+  1080p decides whether the rung is worth adopting.
+

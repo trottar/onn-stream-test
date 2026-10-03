@@ -1,0 +1,6 @@
+C5-M5 mutation check, FIRST run (2026-10-02 ~19:55 EDT), before two tests were strengthened:
+caught 8 of 10. NOT CAUGHT: "entry from any level" and "entry without the flag". Both mutations can only
+produce a refused `at_reference` row (there is no rung above the level they fire at), never a transition,
+and the tests asserted transitions only. Strengthened: test_no_rung_without_the_flag asserts no row with
+trigger increase_1080p at all; test_entry_only_from_7000 asserts that at the rung a full clean window
+decides nothing. Second run (mutation_check.txt): 10 of 10. No rule changed.

@@ -1,0 +1,115 @@
+{
+ "verdict": "R0b FAILS -- STOP AFTER SECTION 1",
+ "r0a": true,
+ "r0b": false,
+ "directions": {
+  "up": {
+   "ssrc_elapsed_ms": 97924,
+   "ssrc_minus_inject_s": 1.59,
+   "gap_ms": 315,
+   "codec_ms_at_switch": 133,
+   "slow_rows_in_window": 9,
+   "actuation_ms": 1275.5,
+   "cycle": {
+    "first_rtp_resume_ms": 518.121,
+    "ffmpeg_spawn_ms": 365.705,
+    "rtp_silence_after_spawn_ms": 152.416,
+    "host_verified_ms": 1272.631
+   },
+   "fps_60s": 61.26,
+   "sf_first_new_size_s": 2.9,
+   "stale_reports_1_10s": [
+    [
+     102425,
+     0
+    ],
+    [
+     104441,
+     1
+    ],
+    [
+     106451,
+     0
+    ]
+   ],
+   "r0a": {
+    "actuator ok": true,
+    "encoder output 1920x1080 at 12600 kb/s (encoder log)": true,
+    "one SSRC change at the switch": true,
+    "SurfaceFlinger 1920x1080 in every capture 5-55 s after": true,
+    "rendered fps over the 60 s after >= 55": true,
+    "no recovery cycle": true
+   },
+   "r0b": {
+    "output gap at the switch <= 450 ms": true,
+    "no stale drops 1-10 s after": false
+   }
+  },
+  "down": {
+   "ssrc_elapsed_ms": 157600,
+   "ssrc_minus_inject_s": 1.26,
+   "gap_ms": 287,
+   "codec_ms_at_switch": 135,
+   "slow_rows_in_window": 12,
+   "actuation_ms": 943.5,
+   "cycle": {
+    "first_rtp_resume_ms": 186.552,
+    "ffmpeg_spawn_ms": 33.41,
+    "rtp_silence_after_spawn_ms": 153.142,
+    "host_verified_ms": 939.217
+   },
+   "fps_60s": 60.52,
+   "sf_first_new_size_s": 5.0,
+   "stale_reports_1_10s": [
+    [
+     160740,
+     0
+    ],
+    [
+     162753,
+     0
+    ],
+    [
+     164762,
+     0
+    ],
+    [
+     166772,
+     0
+    ]
+   ],
+   "r0a": {
+    "actuator ok": true,
+    "encoder output 1280x720 at 7000 kb/s (encoder log)": true,
+    "one SSRC change at the switch": true,
+    "SurfaceFlinger 1280x720 in every capture 5-55 s after": true,
+    "rendered fps over the 60 s after >= 55": true,
+    "no recovery cycle": true
+   },
+   "r0b": {
+    "output gap at the switch <= 450 ms": true,
+    "no stale drops 1-10 s after": true
+   }
+  }
+ },
+ "session": {
+  "two SSRC changes in the session (one per switch)": true,
+  "sequence resyncs 0 and no resync discontinuity": false,
+  "one decoder report (no session restart)": true
+ },
+ "encoder_outputs": [
+  [
+   "1280x720",
+   "7000"
+  ],
+  [
+   "1920x1080",
+   "12600"
+  ],
+  [
+   "1280x720",
+   "7000"
+  ]
+ ],
+ "recovery_events": []
+}

@@ -1,0 +1,153 @@
+C5-M5 -- h2_prep_redact.py --check over every text file written (2026-10-03T14:36:18Z)
+FLAG = the redactor's IPv4 pattern matched only 127.0.0.1 (loopback), 0.0.0.0 (bind), 0.9.44.1 (the core's version) or an RFC 5737 documentation address (203.0.113.9 in the live suite's route tests, present at the baseline); FAIL = anything else
+PASS docs/memory/evidence/c5_m5_2026-10-03/c5_m4a_counter.sh
+PASS docs/memory/evidence/c5_m5_2026-10-03/c5_m4_sampler.py
+PASS docs/memory/evidence/c5_m5_2026-10-03/c5_m5_final_state.txt
+PASS docs/memory/evidence/c5_m5_2026-10-03/c5_m5_hold.sh
+PASS docs/memory/evidence/c5_m5_2026-10-03/c5_m5_mutation_check.sh
+PASS docs/memory/evidence/c5_m5_2026-10-03/c5_m5_preregistration.sha256
+PASS docs/memory/evidence/c5_m5_2026-10-03/c5_m5_preregistration.txt
+PASS docs/memory/evidence/c5_m5_2026-10-03/c5_m5_r0_decision.txt
+PASS docs/memory/evidence/c5_m5_2026-10-03/c5_m5_r0_hook.sh
+PASS docs/memory/evidence/c5_m5_2026-10-03/c5_m5_r0_score.py
+FLAG docs/memory/evidence/c5_m5_2026-10-03/c5_m5_redact_check.py (non-benign matches: 0; benign IPv4 only: ['0.0.0.0', '0.9.44.1', '127.0.0.1', '203.0.113.9'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/c5_m5_replays.json
+PASS docs/memory/evidence/c5_m5_2026-10-03/c5_m5_replays.txt
+PASS docs/memory/evidence/c5_m5_2026-10-03/c5_m5_run.sh
+PASS docs/memory/evidence/c5_m5_2026-10-03/c5_m5_s1_hook.sh
+PASS docs/memory/evidence/c5_m5_2026-10-03/c5_m5_s1_score.py
+PASS docs/memory/evidence/c5_m5_2026-10-03/c5_m5_session_score.py
+PASS docs/memory/evidence/c5_m5_2026-10-03/c5_m5_sessions.sh
+PASS docs/memory/evidence/c5_m5_2026-10-03/companion_patch.diff
+PASS docs/memory/evidence/c5_m5_2026-10-03/mutation_check_first_run.txt
+PASS docs/memory/evidence/c5_m5_2026-10-03/mutation_check.txt
+PASS docs/memory/evidence/c5_m5_2026-10-03/post_patch_sha256.txt
+PASS docs/memory/evidence/c5_m5_2026-10-03/pre_patch_sha256.txt
+PASS docs/memory/evidence/c5_m5_2026-10-03/r0/adb_during_hold_R0.txt
+FLAG docs/memory/evidence/c5_m5_2026-10-03/r0/alpha_R0.log (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+FLAG docs/memory/evidence/c5_m5_2026-10-03/r0/armcheck_R0.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+FLAG docs/memory/evidence/c5_m5_2026-10-03/r0/companion_R0.log (non-benign matches: 0; benign IPv4 only: ['0.0.0.0', '127.0.0.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/r0/decision_log_R0.jsonl
+FLAG docs/memory/evidence/c5_m5_2026-10-03/r0/encoder_cmd_R0.txt (non-benign matches: 0; benign IPv4 only: ['127.0.0.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/r0/frames_R0.jsonl
+PASS docs/memory/evidence/c5_m5_2026-10-03/r0/heartbeat_R0.jsonl
+PASS docs/memory/evidence/c5_m5_2026-10-03/r0/hold_R0.log
+PASS docs/memory/evidence/c5_m5_2026-10-03/r0/index.txt
+PASS docs/memory/evidence/c5_m5_2026-10-03/r0/logcat_codec_R0.txt
+PASS docs/memory/evidence/c5_m5_2026-10-03/r0/R0_host.jsonl
+PASS docs/memory/evidence/c5_m5_2026-10-03/r0/r0_inject_R0_1080p.json
+PASS docs/memory/evidence/c5_m5_2026-10-03/r0/r0_inject_R0_720p.json
+FLAG docs/memory/evidence/c5_m5_2026-10-03/r0/r0_status_R0_down3.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+FLAG docs/memory/evidence/c5_m5_2026-10-03/r0/r0_status_R0_down55.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+FLAG docs/memory/evidence/c5_m5_2026-10-03/r0/r0_status_R0_pre.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+FLAG docs/memory/evidence/c5_m5_2026-10-03/r0/r0_status_R0_up3.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+FLAG docs/memory/evidence/c5_m5_2026-10-03/r0/r0_status_R0_up55.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/r0/R0_telemetry.jsonl
+PASS docs/memory/evidence/c5_m5_2026-10-03/r0/r0_times_R0.txt
+FLAG docs/memory/evidence/c5_m5_2026-10-03/r0/R0_title.txt (non-benign matches: 0; benign IPv4 only: ['0.9.44.1'])
+FLAG docs/memory/evidence/c5_m5_2026-10-03/r0/report_R0.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/r0_score.json
+PASS docs/memory/evidence/c5_m5_2026-10-03/r0_score.txt
+PASS docs/memory/evidence/c5_m5_2026-10-03/r0/sf_series_R0.txt
+FLAG docs/memory/evidence/c5_m5_2026-10-03/r0/status_end_R0.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+FLAG docs/memory/evidence/c5_m5_2026-10-03/r0/status_R0.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/r0/surfaceflinger_R0.txt
+PASS docs/memory/evidence/c5_m5_2026-10-03/r0/t2_sampler.log
+PASS docs/memory/evidence/c5_m5_2026-10-03/r0/t2_samples.jsonl
+PASS docs/memory/evidence/c5_m5_2026-10-03/s1/adb_during_hold_S1.txt
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s1/alpha_S1.log (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s1/armcheck_S1.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s1/companion_S1.log (non-benign matches: 0; benign IPv4 only: ['0.0.0.0', '127.0.0.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/s1/decision_log_S1.jsonl
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s1/encoder_cmd_S1.txt (non-benign matches: 0; benign IPv4 only: ['127.0.0.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/s1/frames_S1.jsonl
+PASS docs/memory/evidence/c5_m5_2026-10-03/s1/heartbeat_S1.jsonl
+PASS docs/memory/evidence/c5_m5_2026-10-03/s1/hold_S1.log
+PASS docs/memory/evidence/c5_m5_2026-10-03/s1/index.txt
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s1/r0_status_S1_down3.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s1/r0_status_S1_down55.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s1/r0_status_S1_pre.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s1/r0_status_S1_up140.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s1/r0_status_S1_up3.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s1/r0_status_S1_up55.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/s1/r0_times_S1.txt
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s1/report_S1.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/s1_rows.txt
+PASS docs/memory/evidence/c5_m5_2026-10-03/s1/S1_host.jsonl
+PASS docs/memory/evidence/c5_m5_2026-10-03/s1/s1_inject_S1_CAPACITY_MILD.json
+PASS docs/memory/evidence/c5_m5_2026-10-03/s1/s1_inject_S1_INCREASE_1080P.json
+PASS docs/memory/evidence/c5_m5_2026-10-03/s1/S1_telemetry.jsonl
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s1/S1_title.txt (non-benign matches: 0; benign IPv4 only: ['0.9.44.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/s1_score.json
+PASS docs/memory/evidence/c5_m5_2026-10-03/s1_score.txt
+PASS docs/memory/evidence/c5_m5_2026-10-03/s1/sf_series_S1.txt
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s1/status_end_S1.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s1/status_S1.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/s1/surfaceflinger_S1.txt
+PASS docs/memory/evidence/c5_m5_2026-10-03/s1/t2_sampler.log
+PASS docs/memory/evidence/c5_m5_2026-10-03/s1/t2_samples.jsonl
+PASS docs/memory/evidence/c5_m5_2026-10-03/s2/adb_during_hold_S2.txt
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s2/alpha_S2.log (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s2/armcheck_S2.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/s2/clock_S2.txt
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s2/companion_S2.log (non-benign matches: 0; benign IPv4 only: ['0.0.0.0', '127.0.0.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/s2/decision_log_S2.jsonl
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s2/encoder_cmd_S2.txt (non-benign matches: 0; benign IPv4 only: ['127.0.0.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/s2/frames_S2.jsonl
+PASS docs/memory/evidence/c5_m5_2026-10-03/s2/heartbeat_S2.jsonl
+PASS docs/memory/evidence/c5_m5_2026-10-03/s2/hold_S2_try0.log
+PASS docs/memory/evidence/c5_m5_2026-10-03/s2/index.txt
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s2/report_S2.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/s2/S2_host.jsonl
+PASS docs/memory/evidence/c5_m5_2026-10-03/s2/S2_telemetry.jsonl
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s2/S2_title.txt (non-benign matches: 0; benign IPv4 only: ['0.9.44.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/s2_session_score.json
+PASS docs/memory/evidence/c5_m5_2026-10-03/s2_session_score.txt
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s2/status_end_S2.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s2/status_S2.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/s2/surfaceflinger_S2.txt
+PASS docs/memory/evidence/c5_m5_2026-10-03/s2/t2_sampler.log
+PASS docs/memory/evidence/c5_m5_2026-10-03/s2/t2_samples.jsonl
+PASS docs/memory/evidence/c5_m5_2026-10-03/s3/adb_during_hold_S3.txt
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s3/alpha_S3.log (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s3/armcheck_S3.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/s3/clock_S3.txt
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s3/companion_S3.log (non-benign matches: 0; benign IPv4 only: ['0.0.0.0', '127.0.0.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/s3/decision_log_S3.jsonl
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s3/encoder_cmd_S3.txt (non-benign matches: 0; benign IPv4 only: ['127.0.0.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/s3/frames_S3.jsonl
+PASS docs/memory/evidence/c5_m5_2026-10-03/s3/heartbeat_S3.jsonl
+PASS docs/memory/evidence/c5_m5_2026-10-03/s3/hold_S3_try0.log
+PASS docs/memory/evidence/c5_m5_2026-10-03/s3/index.txt
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s3/report_S3.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/s3/S3_host.jsonl
+PASS docs/memory/evidence/c5_m5_2026-10-03/s3/S3_telemetry.jsonl
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s3/S3_title.txt (non-benign matches: 0; benign IPv4 only: ['0.9.44.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/s3_session_score.json
+PASS docs/memory/evidence/c5_m5_2026-10-03/s3_session_score.txt
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s3/status_end_S3.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1', '127.0.0.1'])
+FLAG docs/memory/evidence/c5_m5_2026-10-03/s3/status_S3.json (non-benign matches: 0; benign IPv4 only: ['0.9.44.1'])
+PASS docs/memory/evidence/c5_m5_2026-10-03/s3/surfaceflinger_S3.txt
+PASS docs/memory/evidence/c5_m5_2026-10-03/s3/t2_sampler.log
+PASS docs/memory/evidence/c5_m5_2026-10-03/s3/t2_samples.jsonl
+PASS docs/memory/evidence/c5_m5_2026-10-03/sessions.log
+PASS docs/memory/evidence/c5_m5_2026-10-03/t2_sample.py
+PASS docs/memory/evidence/C5_M5_1080P_RUNG_2026-10-03.md
+PASS docs/memory/patches/C5-M5_1080P_RUNG.md
+PASS docs/memory/patches/PATCH_INDEX.md
+PASS docs/memory/architecture/ADAPTIVE_BITRATE.md
+PASS docs/ROADMAP.md
+PASS docs/memory/decisions/C5_1080P60_CAPABILITY_2026-09-28.md
+PASS docs/memory/investigations/ACTIVE.md
+PASS docs/memory/evidence/RUNTIME_VALIDATION.md
+PASS docs/memory/TOOLS.md
+PASS docs/memory/2026-10-02.md
+PASS docs/memory/2026-10-03.md
+PASS docs/memory/CURRENT.md
+PASS tools/c5_m5_replay.py
+FLAG tools/test_adaptive_bitrate_live.py (non-benign matches: 0; benign IPv4 only: ['127.0.0.1', '203.0.113.9'])
+FLAG companion/adaptive_bitrate_live.py (non-benign matches: 0; benign IPv4 only: ['127.0.0.1'])
+FLAG companion/native_stream.py (non-benign matches: 0; benign IPv4 only: ['127.0.0.1'])
+PASS companion/diagnostics/c3_linux_actuator_probe.py
+FLAG companion/plugins/games.py (non-benign matches: 0; benign IPv4 only: ['127.0.0.1'])
+exit 0

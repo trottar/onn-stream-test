@@ -1,0 +1,39 @@
+{
+  "ok": true,
+  "class": "SIZE",
+  "size": "720p",
+  "events": [
+    {
+      "event": "transition",
+      "class": "SIZE",
+      "direction": "down",
+      "from_kbps": 12600,
+      "to_kbps": 7000,
+      "reason": "decrease_size",
+      "injected": true,
+      "holds_in_force_before": {
+        "blackout_reports": 0,
+        "fallback_reports": 30,
+        "routine_reports": 30,
+        "increase_reports": 0,
+        "window_reports": 27,
+        "clean_reports": 24,
+        "window_needed": 90,
+        "clean_needed": 85,
+        "last_direction": "up",
+        "reports_since_transition": 30
+      },
+      "measurements": {
+        "injected": true,
+        "class": "SIZE",
+        "target_kbps": 7000
+      },
+      "acted": true,
+      "decision_sequence": 2,
+      "transitions_this_session": 2,
+      "transitions_in_window": 2
+    }
+  ],
+  "level_kbps": 7000,
+  "state": "HOLD_DOWN"
+}

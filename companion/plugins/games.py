@@ -133,9 +133,11 @@ class GamesPlugin:
         )
         if adaptive_bitrate_live.is_live(self._adaptive_bitrate):
             self._adaptive_bitrate.bind(
+                # C5-M5: the sized entry point; between two 720p levels it
+                # is diagnostic_c3_validated_bitrate_transition, unchanged.
                 actuator=(
                     self._native_stream
-                    .diagnostic_c3_validated_bitrate_transition
+                    .adaptive_level_transition
                 ),
                 context=self._adaptive_bitrate_context,
                 serial_lock=self._native_stream._lock,

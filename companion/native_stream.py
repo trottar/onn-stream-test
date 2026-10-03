@@ -92,6 +92,10 @@ class NativeStreamManager:
         self._log_handle = None
         self._client_port: int | None = None
         self._active_bitrate_kbps = self.BITRATE_KBPS
+        # C5-M5: the active level's size. The profile's at every start; only
+        # the 1080p rung (the live controller, behind its flag) changes it.
+        self._active_width = self.WIDTH
+        self._active_height = self.HEIGHT
         self._capture_target: dict[str, Any] | None = None
         self._encoder_command: list[str] | None = None
         self._last_capture_target: dict[str, Any] | None = None
@@ -659,8 +663,8 @@ class NativeStreamManager:
                 "fec_group_size": self.FEC_GROUP_SIZE,
                 "source_bitrate_kbps": self._active_bitrate_kbps,
                 "reference_bitrate_kbps": self.BITRATE_KBPS,
-                "width": self.WIDTH,
-                "height": self.HEIGHT,
+                "width": getattr(self, "_active_width", self.WIDTH),
+                "height": getattr(self, "_active_height", self.HEIGHT),
                 "fps": self.FPS,
                 "gop_frames": self.GOP_FRAMES,
                 "bitrate_kbps": self._active_bitrate_kbps,
@@ -1361,7 +1365,14 @@ class NativeStreamManager:
         capture_target: dict[str, Any],
         bitrate_kbps: int | None = None,
         max_bitrate_kbps: int | None = None,
+        width: int | None = None,
+        height: int | None = None,
     ) -> list[str]:
+        # C5-M5: `width` / `height` are given only for a level that carries
+        # its own size (the 1080p rung); absent, the scale/pad is the
+        # profile's and the argv is byte for byte what it was.
+        out_width = self.WIDTH if width is None else int(width)
+        out_height = self.HEIGHT if height is None else int(height)
         target_bitrate_kbps = (
             self.BITRATE_KBPS
             if bitrate_kbps is None
@@ -1410,10 +1421,10 @@ class NativeStreamManager:
         )
 
         video_filter = (
-            f"scale={self.WIDTH}:{self.HEIGHT}:"
+            f"scale={out_width}:{out_height}:"
             "force_original_aspect_ratio=decrease:"
             "flags=fast_bilinear,"
-            f"pad={self.WIDTH}:{self.HEIGHT}:"
+            f"pad={out_width}:{out_height}:"
             "(ow-iw)/2:(oh-ih)/2:black,"
             "format=nv12,hwupload"
         )
@@ -1556,6 +1567,8 @@ class NativeStreamManager:
         self._encoder_command = None
         self._client_port = None
         self._active_bitrate_kbps = self.BITRATE_KBPS
+        self._active_width = self.WIDTH
+        self._active_height = self.HEIGHT
 
         if self._capture_target is not None:
             self._last_capture_target = self._capture_target
@@ -2532,6 +2545,59 @@ class NativeStreamManager:
             except Exception as exc:
                 raise NativeStreamError(
                     "C3 validated bitrate transition failed: "
+                    + type(exc).__name__ + ": " + str(exc)
+                ) from exc
+
+    def adaptive_level_transition(
+        self,
+        target_bitrate_kbps: int,
+    ) -> dict[str, Any]:
+        """C5-M5: the live controller's actuator.
+
+        A transition between two 720p ladder levels is exactly
+        `diagnostic_c3_validated_bitrate_transition` (the path C3.L3a and
+        C3.L4 validated), unchanged. A transition to or from a level that
+        carries its own size (the 1080p rung, 12,600 kbps at 1920x1080;
+        `LINUX_RUNG_LEVELS`) is the same encoder-only restart with the
+        scale/pad rebuilt at the level's size. The controller names the
+        rung only behind `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p` (or a
+        test-only injection); the loopback c3 route never reaches it.
+        """
+        from diagnostics.c3_linux_actuator_probe import (
+            LINUX_RUNG_LEVELS,
+        )
+
+        target = int(target_bitrate_kbps)
+        with self._lock:
+            sized = (
+                target in LINUX_RUNG_LEVELS
+                or int(self._active_bitrate_kbps) in LINUX_RUNG_LEVELS
+            )
+            if not sized:
+                return self.diagnostic_c3_validated_bitrate_transition(
+                    target
+                )
+
+            if not self._linux_host():
+                raise NativeStreamError(
+                    "C5-M5 sized level transition is implemented for "
+                    "the Linux host only"
+                )
+
+            from diagnostics.c3_linux_actuator_probe import (
+                run_c3_linux_level_transition as _cycle,
+            )
+
+            try:
+                return _cycle(
+                    self,
+                    target_bitrate_kbps=target,
+                )
+            except NativeStreamError:
+                raise
+            except Exception as exc:
+                raise NativeStreamError(
+                    "C5-M5 sized level transition failed: "
                     + type(exc).__name__ + ": " + str(exc)
                 ) from exc
 

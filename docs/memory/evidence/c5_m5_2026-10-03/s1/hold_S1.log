@@ -1,0 +1,40 @@
+[table 23:43:25Z] last session_ended 2026-10-02T23:33:37.680Z; S1 not before 23:33:37Z
+[table 23:43:25Z] session flags set in the manager: 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p'
+[table 23:43:25Z] start: manager PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p'; MainPID 1578080; 8765 1578080; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 23:43:25Z] T2 sampler started (10 s); one hold, 0s
+[table 23:43:25Z] S1 begins (adopted 7000, the 4x PS1 source, flags 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p', hook '/home/privyhub/Projects/onn-stream-test/docs/memory/evidence/c5_m5_2026-10-03/c5_m5_s1_hook.sh')
+[S1 23:43:25Z] mode=H hold/timeout=0s probe_args=none heartbeat_ms=default
+[S1 23:43:25Z] ARM_PROFILE adopted; PRIVYHUB_* in the user manager: 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p'
+[S1 23:43:30Z] companion MainPID 1579036 serving 8765; PRIVYHUB_* in its environ: 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_MODE=live PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p'
+[S1] before launch: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[S1] at PLAYING: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[S1 23:44:09Z] SurfaceFlinger stream-surface lines: 11
+[S1 23:44:09Z] PLAYING at 2026-10-02T23:44:09Z; hook c5_m5_s1_hook.sh, zero input
+[S1] status pre: bitrate 7000 size 1280 x 720 | controller level 7000 1280x720 state REFERENCE transitions 0 holds {'fallback': 0, 'routine': 0, 'increase': 0} | any_override False
+[S1 hook 23:45:39.462Z] inject INCREASE_1080P -> True transition 7000 -> 12600 increase_1080p increase_1080p
+[S1] status up3: bitrate 12600 size 1920 x 1080 | controller level 12600 1920x1080 state HOLD_DOWN transitions 1 holds {'fallback': 59, 'routine': 59, 'increase': 29} | any_override False
+[S1] status up55: bitrate 12600 size 1920 x 1080 | controller level 12600 1920x1080 state REFERENCE transitions 1 holds {'fallback': 33, 'routine': 33, 'increase': 3} | any_override False
+[S1] status up140: bitrate 12600 size 1920 x 1080 | controller level 12600 1920x1080 state REFERENCE transitions 1 holds {'fallback': 0, 'routine': 0, 'increase': 0} | any_override False
+[S1 hook 23:47:59.511Z] inject CAPACITY_MILD -> True transition 12600 -> 7000 capacity_mild capacity_mild
+[S1] status down3: bitrate 7000 size 1280 x 720 | controller level 7000 1280x720 state HOLD_DOWN transitions 2 holds {'fallback': 28, 'routine': 58, 'increase': 58} | any_override False
+[S1] status down55: bitrate 7000 size 1280 x 720 | controller level 7000 1280x720 state REFERENCE transitions 2 holds {'fallback': 2, 'routine': 32, 'increase': 32} | any_override False
+[S1 hook 23:49:03.845Z] hook done; SurfaceFlinger samples: 57
+[S1 23:49:03Z] hook exit 0
+[S1 23:49:05Z] adb client processes seen during hold: 27 (# polls 568)
+[S1 23:49:07Z] report: native_decoder_20261002_234907_247.json
+[frames] 295 seconds in the session window
+[heartbeat] 147 lines
+[S1 23:49:28Z] decision log lines in the hold: 182
+[S1 23:49:30Z] game active after stop: False
+[S1 23:49:30Z] done
+[table 23:49:30Z] S1 exit 0
+[table 23:49:34Z] teardown: manager PRIVYHUB_* ''; MainPID 1583387; 8765 1583387; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 23:49:34Z] FLAGS UNSET AND ABSENT: manager none, environ exactly the live default
+[table] teardown stream 7000 1280 720 level size 1280x720
+[table 23:49:34Z] measurement files: 0 (want 0)
+[table 23:49:34Z] ADOPTED APK CONFIRMED (device hash de072762e55122c3060086f6f10b1bff54633d9165d0c475f17699127841835e)
+[table 23:49:44Z] teardown: game active False; NOW PLAYING on the launcher: 1
+[table 23:49:55Z] stale banner: force-stop + relaunch; NOW PLAYING now: 0
+[table 23:49:55Z] table done

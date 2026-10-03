@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-10-02
-baseline_commit: 598cb61
+as_of: 2026-10-03
+baseline_commit: 5005615
 ---
 
 # Current State
@@ -14,14 +14,12 @@ Headings are fixed by `tools/check_memory_health.py`; do not rename.
 ladder**, as a rung above 7000, not only a characterization, and the
 source should render natively at 1080p. PS1 comes first.
 
-- C5-M1/M2 characterized the stream on a 720p-detail source and an
-  unsettled link.
 - **C5-M4 Part 1** (the source side) is done, and **C5-M4A adopted the
   4x PS1 source** the same evening, through the quick win.
-- The rung is Part 2, after the user's call on the link. The user set the
-  Opal to 40 MHz, and **`LINK-L2` (2026-10-02) re-ran LINK-L1's day on
-  it: TIME OF DAY as scored, on the 12-h boundary by 7 s** (MIXED at
-  second resolution).
+- **C5-M5 (2026-10-02/03) built the 1080p rung** on the live ladder
+  behind `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`: **off by default, NOT
+  adopted**. The night WORKS AS A RUNG. The user's picture look at
+  1080p is the gate for adoption.
 - **Standing, unchanged:**
   - live adaptive bitrate is ON BY DEFAULT (`C3-L4-D1`, the unit
     drop-in);
@@ -34,23 +32,26 @@ source should render natively at 1080p. PS1 comes first.
 
 ## Current Work Item
 
-**The LINK-L2 prompt** (`QUEUE_2026-09-29B.md`'s rules): **TIME OF DAY
-as scored, on the boundary.** Nothing adopted, nothing committed.
+**The C5-M5 prompt** (`QUEUE_2026-09-29B.md`'s rules): **the rung BUILT
+and SHOWN behind its flag.** Nothing adopted, nothing committed.
 
-- Opal 36 / 40 MHz (read-only). LINK-L1's rule verbatim (`cc755e1b…`).
-  Six valid 20-min holds, 20:41 → 16:41 EDT, adopted 7000, 4x source,
-  adaptive in shadow per session (confirmed, 0 acted rows).
-- Loss 20.80 / 1.64 / 9.47 / 12.84 / 13.21 / 11.49 per min; max gap
-  ≤ 100 on none.
-- 2 of 6 meet (00:40, 04:40). The misses span 08:41 → 20:41: 12.00 h at
-  the scorer's minute resolution (**TIME OF DAY**), 12 h 0 min 7 s with
-  seconds (**MIXED**). Both are reported.
-- Against LINK-L1 (80 MHz): 2/6 vs 3/6, the link rate halved. 00:40 and
-  04:40 met on both days. The neighbours are all on 44-48 now (0 on
-  36-40), and the loss did not improve.
-- H4's empty decision-log slice (log rotation), recovered by time:
-  VALID.
-- Record: `evidence/LINK_L2_LOSS_ROW_2026-10-02.md` (options in §6).
+- **R0** (gating): the mid-session size change needs no client change.
+  R0a holds both ways (SurfaceFlinger 1920×1080 within 3 s, back within
+  5 s, no recovery).
+- **R0b is NOT MET AS PRE-REGISTERED**: the resync count includes the
+  SSRC changes, and there was 1 stale drop. Code continued on the
+  prompt's stop condition, not the pre-registration's added stop:
+  `c5_m5_r0_decision.txt`, the user's to accept.
+- **The rung**: entry from 7000 at ≥ 435 of 450 clean; leave by the
+  existing triggers (mild bar → 7000/720p); 10-min re-entry hold.
+- Tests 119/119, mutations 10/10, stop rule 0 differences (377 series).
+- **Sessions**:
+  - S1 injection PASSES;
+  - **S3, the 2-h night from 01:06, WORKS AS A RUNG**: entry at 111.5
+    min, 8.5 min at 1080p, loss 2.0/min;
+  - S2, the daytime hold, ENTRY NOT REACHED (431 of 450).
+- Replays: entry rare on this link; the mild bar misses bursty 1080p loss.
+  Record: `evidence/C5_M5_1080P_RUNG_2026-10-03.md`.
 
 ## Verified State
 
@@ -87,7 +88,7 @@ loss — the losses are not at transitions; no-transition H2 missed too).
   (`TOOLS.md`, including `C5-M1`'s `PRIVYHUB_NATIVE_PROFILE_ID`); none set.
 - **Installed**: **APK `de072762…835e`** (the `CL-B1` APK, adopted
   2026-09-30; hash confirmed on the onn at every teardown since,
-  last 2026-10-02 21:01Z (LINK-L2 H6); the previous
+  last 2026-10-03 14:31Z (C5-M5 S2); the previous
   `f31b1c18…8ae7` is kept at `runtime/c4_m1/adopted_app-debug.apk` for
   rollback).
   - The companion is the systemd user unit `privyhub-companion` (`H3`);
@@ -103,14 +104,15 @@ loss — the losses are not at transitions; no-transition H2 missed too).
     - Kill switches: delete the drop-in + `daemon-reload` + restart
       (off); `POST /plugins/games/adaptive-bitrate/disable` (shadow, one
       session).
-  - Last restarted 2026-10-02 21:01Z by LINK-L2 H6's teardown:
+  - Last restarted 2026-10-03 14:31Z by C5-M5 S2's teardown (flags unset and absent):
     - manager none, environ the one name, mode live;
     - no selector, `PRIVYHUB_FEC_SCHEME` absent;
     - profile adopted at 7000, `any_override` false;
     - no game, 0 banners.
-  - The companion tree carries the live controller through `C3-L4-N2`
-    (unchanged by D1) and the C5 selector profiles (dormant).
-  - The C5 night scripts in evidence still name the old APK (`TOOLS.md`).
+  - The companion tree carries the live controller through `C3-L4-N2`,
+    the C5 selector profiles (dormant) and **the 1080p rung behind
+    `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`** (C5-M5; absent = the closed
+    ladder).
 - **Link-drop recovery** RUNTIME VALIDATED on real loss (`R3`-`R3d`);
   recovery never loads into a live core (`R3c2`).
 - **Host-shell operation**: open `MainActivity`, wake, tap RESUME PLAYING
@@ -118,34 +120,30 @@ loss — the losses are not at transitions; no-transition H2 missed too).
 
 ## Next Action
 
-1. **The user's commit** of LINK-L2 (C5-M4A is in `598cb61`). Cowork gives the
-   line from `logs/link_l2_git_status.txt`. Nothing is committed by Code,
-   and `logs/`, the clips and the APKs stay out of git.
-2. **The user's call on the link**, from the options in
-   `evidence/LINK_L2_LOSS_ROW_2026-10-02.md` §6:
-   - **TIME OF DAY (as scored):** screening nights in 00:00-08:00 local,
-     where 4 of 4 holds met over the two days;
-   - **MIXED (the second-resolution reading):** the channel (52-64 is
-     empty, DFS), the onn's placement, or a wired hop;
-   - **40 vs 80 MHz**, by hand: 40 MHz did not improve the row and halved
-     the link rate.
-
-   The Opal stays read-only to Code.
-3. **Part 2, the 1080p rung**, on the user's word, after the link is
-   settled. The design is C5-M4 §4
-   (`evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md`):
-   - first, the mid-session size change on the encoder restart;
-   - then the rung, tests and replays;
-   - then one pre-registered night.
-
-The user's picture look at 4x, **dither mode first**, can come whenever
-they like: TV only, nothing perceptual as a gate.
+1. **The user's commit** of C5-M5 (line: `logs/c5_m5_git_status.txt`).
+2. **The user's picture look at 1080p on the TV.** The look decides
+   whether the rung is worth adopting; nothing perceptual is a gate
+   otherwise. Hand steps (`TOOLS.md`, "The 1080p rung"):
+   - for one session, set `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p` and
+     `..._INJECT=1`, then restart;
+   - after 90 s, `inject?class=INCREASE_1080P` (the 15-min window is
+     rarely met here);
+   - look at the IDR pulse at the 90 KB cap (every 250 ms) and the
+     sharpness against 720p (`CAPACITY_MILD` goes back to 720p);
+   - unset both flags and restart.
+3. **The user's calls:**
+   - adopting the flag by default;
+   - the rung's `nft` capacity night;
+   - whether the R0b deviation stands.
+4. **The dither mode at 4x**, whenever they like.
 
 **Open, not blocking:**
 
 - the max gap (447 ms, D1; ≤ 100 on 0 of LINK-L2's six); `host_link`; the thermal flag; `CTRL-L1`;
   the slow-event ring; `C6-D1`'s list; the mild step's ~120 s bound;
   B3a's two clauses; C5-M4's R3 (no `codec_ms` in the C2 telemetry);
+  C5-M5: the leave misses bursty 1080p loss; `encoder_command` is the
+  full start's only;
 - **adaptive-off measurements need the drop-in out** (`TOOLS.md`); old
   evidence night scripts misreport on default-live, so use the D1
   pattern (`c5_m4_run.sh` is one);
@@ -185,6 +183,7 @@ perceptual gate unless the user sets one.
 
 ## Relevant References
 
+- `evidence/C5_M5_1080P_RUNG_2026-10-03.md` — the 1080p rung (behind its flag; not adopted).
 - `evidence/LINK_L2_LOSS_ROW_2026-10-02.md` — the loss row at 40 MHz (TIME OF DAY as scored, on the boundary); `evidence/LINK_L1_LOSS_ROW_2026-10-01.md` (80 MHz, MIXED).
 - `evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md` — the PS1 source at native 1080p (C5-M4 Part 1).
 - `evidence/D_BASE_CLOSEOUT_2026-09-23.md` — the scored table and verdict.
@@ -194,4 +193,4 @@ perceptual gate unless the user sets one.
 - `handoffs/CURRENT_HANDOFF.md` (Phase C); `investigations/ACTIVE.md`;
   `docs/ROADMAP.md` (Phase C, D-072 order); `docs/KNOWN_ISSUES.md`.
 - `evidence/RUNTIME_VALIDATION.md` — a classification per record;
-  `patches/PATCH_INDEX.md` lists all 140.
+  `patches/PATCH_INDEX.md` lists all 141.

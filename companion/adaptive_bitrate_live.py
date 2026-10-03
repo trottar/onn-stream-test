@@ -55,6 +55,23 @@ C3-L4-N2 (the user's decision of 2026-09-29, "Go", after nft night 2 sat at
                          hold-downs, the blackout, the rate limit, the
                          oscillation guard and the guards all apply.
 
+C5-M5 (the user's reading of 2026-10-01: 1080p as a rung of the ladder): with
+`PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p` the ladder gains a top rung above 7000,
+12,600 kbps at 1920x1080 (the c3 arm), LIVE only, OFF by default:
+
+  increase_1080p      -- class INCREASE, from 7000 only, when the rung window
+                         (the last 450 evaluated reports since the last SSRC
+                         change, the blend's window rules and clean) is full and
+                         >= 435 of 450 are clean; every gate applies, plus a
+                         10-minute re-entry hold-down after any leave;
+  the leave           -- the existing triggers and mapping: the mild bar one
+                         rung down = 7000 at 720p; strict -> 5000; the backstop;
+                         a leave, an entry and a leave in one session -> HOLD.
+
+Absent, the ladder tops at 7000 and every decision is what it was (the
+replays' stop rule). The actuator rebuilds the argv's size per level
+(`NativeStreamManager.adaptive_level_transition`).
+
 Serialization with link-drop recovery: the actuator runs on one worker
 thread while holding `NativeStreamManager._lock` -- the lock recovery's own
 restart (`recovery_restart_encoder`, C3-F1) and full start take -- and the
@@ -158,6 +175,29 @@ TRIGGER_CAPACITY_MILD = "capacity_mild"
 ACTUATING = "ACTUATING"
 DISABLED = "DISABLED"
 
+# C5-M5 -- levels that carry their own size. Every 720p level is the
+# profile's 1280x720; the 1080p rung is 12,600 kbps at 1920x1080 (the
+# actuator's LINUX_RUNG_LEVELS, the c3 arm's argv). Section 1's test-only
+# SIZE injection moves between 7000/720p and the rung with no policy rule.
+LEVEL_720P_SIZE = (1280, 720)
+RUNG_KBPS = 12600
+RUNG_LEVELS = {RUNG_KBPS: (1920, 1080)}
+SIZE_INJECT_TARGETS = {"1080p": RUNG_KBPS, "720p": REFERENCE_KBPS}
+
+# C5-M5 section 2 -- THE 1080p RUNG (pre-registered, c5_m5_preregistration.txt).
+TOP_ENV = "PRIVYHUB_ADAPTIVE_BITRATE_TOP"
+TOP_1080P = "1080p"
+LADDER_WITH_RUNG_KBPS = LADDER_KBPS + (RUNG_KBPS,)
+RUNG_WINDOW_REPORTS = 450                   # 15 min at the 2-s report rate
+RUNG_CLEAN_NEEDED = 435                     # N - 15
+RUNG_REENTRY_HOLD_MS = 10 * 60 * 1000       # no entry for 10 min after a leave
+RUNG_OSCILLATION_LEAVES = 2                 # leave, entry, leave -> HOLD for the session
+TRIGGER_RUNG_ENTRY = "increase_1080p"
+
+
+def level_size(kbps: int | None) -> tuple[int, int]:
+    return RUNG_LEVELS.get(int(kbps), LEVEL_720P_SIZE) if kbps else LEVEL_720P_SIZE
+
 
 def mode_from_env(environ: dict[str, str] | None = None) -> tuple[str, bool]:
     """(mode, ignored) over off / shadow / live; anything else is off, flagged."""
@@ -168,6 +208,11 @@ def mode_from_env(environ: dict[str, str] | None = None) -> tuple[str, bool]:
     if value in MODES:
         return value, False
     return "off", True
+
+
+def top_from_env(environ: dict[str, str] | None = None) -> bool:
+    """C5-M5: the 1080p rung is on only for PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p."""
+    return ((environ if environ is not None else os.environ).get(TOP_ENV) or "").strip().lower() == TOP_1080P
 
 
 def inject_from_env(environ: dict[str, str] | None = None) -> bool:
@@ -189,7 +234,14 @@ class LivePolicy(ab.ShadowPolicy):
     (`clock_ms`, the client's elapsed when absent, as in the replays).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, top_1080p: bool = False) -> None:
+        # C5-M5: the ladder this policy walks. Without the flag it is the
+        # closed controller's (5000-7000) and nothing below reads the rung.
+        self.top = bool(top_1080p)
+        self.ladder = LADDER_WITH_RUNG_KBPS if self.top else LADDER_KBPS
+        self.rung_leaves = 0
+        self.rung_left_clock_ms: int | None = None
+        self.rung_closed = False
         # Companion-session scope (survives a client-side elapsed reset;
         # cleared by end_session()).
         self.transition_times_ms: list[int] = []
@@ -207,11 +259,13 @@ class LivePolicy(ab.ShadowPolicy):
     # -- lifecycle ---------------------------------------------------------
     def reset(self, elapsed_ms: int | None, *, level_kbps: int | None = None) -> None:
         super().reset(elapsed_ms)
-        if level_kbps in LADDER_KBPS:
+        if level_kbps in self.ladder:
             self.level_kbps = int(level_kbps)
         self.pending: dict[str, Any] | None = None
         # The increase window (C3-L4-L2): one bool per evaluated report.
         self.inc_window: deque[bool] = deque(maxlen=INCREASE_WINDOW_REPORTS)
+        # C5-M5: the rung window, the same rules, 450 long.
+        self.rung_window: deque[bool] = deque(maxlen=RUNG_WINDOW_REPORTS)
         self.last_disposition: str | None = None
         self.last_clean: bool | None = None
         self.routine_defer = 0
@@ -229,6 +283,9 @@ class LivePolicy(ab.ShadowPolicy):
         self.last_action = None
         self.recovery_restarts = []
         self.escalation = None
+        self.rung_leaves = 0
+        self.rung_left_clock_ms = None
+        self.rung_closed = False
         self.reset(None)
 
     # -- helpers -----------------------------------------------------------
@@ -275,6 +332,7 @@ class LivePolicy(ab.ShadowPolicy):
     def _window_restart(self) -> None:
         """After every SSRC change (and at a session start) the window starts empty."""
         self.inc_window.clear()
+        self.rung_window.clear()
         self.clean_count = 0
 
     def hold_left(self, kind: str) -> int:
@@ -293,7 +351,10 @@ class LivePolicy(ab.ShadowPolicy):
                 "window_needed": INCREASE_WINDOW_REPORTS,
                 "clean_needed": INCREASE_CLEAN_NEEDED,
                 "last_direction": self.last_direction,
-                "reports_since_transition": self.reports_since_action}
+                "reports_since_transition": self.reports_since_action,
+                **({"rung_window_reports": len(self.rung_window), "rung_clean_reports": sum(self.rung_window),
+                    "rung_window_needed": RUNG_WINDOW_REPORTS, "rung_clean_needed": RUNG_CLEAN_NEEDED,
+                    "rung_leaves": self.rung_leaves} if self.top else {})}
 
     def _recent_transitions(self, clock: int) -> list[int]:
         return [t for t in self.transition_times_ms if clock - t < RATE_LIMIT_WINDOW_MS]
@@ -322,13 +383,13 @@ class LivePolicy(ab.ShadowPolicy):
                 *, injected: bool = False) -> list[dict[str, Any]]:
         direction = "up" if kind == "INCREASE" else "down"
         if kind == "INCREASE":
-            target = next((k for k in LADDER_KBPS if k > self.level_kbps), None)
+            target = next((k for k in self.ladder if k > self.level_kbps), None)
             if target is None:
                 return self._refuse(kind, "at_reference", None, m, injected=injected, state=ab.REFERENCE)
         elif kind == "ROUTINE" and m.get("trigger") == TRIGGER_CAPACITY_MILD:
             # C3-L4-N2: one rung down from where the stream is; at the floor the
             # "target" is the floor itself, so the check below says at_floor.
-            target = next((k for k in reversed(LADDER_KBPS) if k < self.level_kbps), self.level_kbps)
+            target = next((k for k in reversed(self.ladder) if k < self.level_kbps), self.level_kbps)
         else:
             target = TARGET_KBPS[kind]
 
@@ -336,6 +397,12 @@ class LivePolicy(ab.ShadowPolicy):
         if left > 0:
             return self._refuse(kind, "hold_down", target, m, injected=injected, state=ab.HOLD_DOWN,
                                 hold_down_left_reports=left)
+        if target == RUNG_KBPS and self.rung_left_clock_ms is not None:
+            # C5-M5: no entry for 10 minutes after a leave.
+            since = int(ctx.get("clock_ms", elapsed)) - self.rung_left_clock_ms
+            if since < RUNG_REENTRY_HOLD_MS:
+                return self._refuse(kind, "rung_reentry_hold", target, m, injected=injected, state=ab.HOLD_DOWN,
+                                    rung_reentry_left_ms=RUNG_REENTRY_HOLD_MS - since)
         if direction == "down" and target >= self.level_kbps:
             reason = "at_floor" if self.level_kbps <= LADDER_KBPS[0] else "at_or_below_target"
             return self._refuse(kind, reason, target, m, injected=injected, state=ab.PRESSURE)
@@ -377,7 +444,8 @@ class LivePolicy(ab.ShadowPolicy):
                     clock: int, *, injected: bool) -> list[dict[str, Any]]:
         holds_before = self.holds_in_force()
         self.decision_seq += 1
-        self.would_act["INCREASE" if direction == "up" else kind] += 1
+        key = "INCREASE" if direction == "up" else kind
+        self.would_act[key] = self.would_act.get(key, 0) + 1
         prev = self.level_kbps
         self.direction_changes = changes
         self.level_kbps = target
@@ -391,7 +459,8 @@ class LivePolicy(ab.ShadowPolicy):
         self.state = ab.HOLD_DOWN
         trigger = m.get("trigger")
         # C3-L4-N1: the two new FALLBACK triggers carry their own reason.
-        self.reason = (trigger if trigger in (TRIGGER_CAPACITY, TRIGGER_ESCALATION, TRIGGER_CAPACITY_MILD)
+        self.reason = (trigger if trigger in (TRIGGER_CAPACITY, TRIGGER_ESCALATION, TRIGGER_CAPACITY_MILD,
+                                              TRIGGER_RUNG_ENTRY)
                        else f"{'increase' if direction == 'up' else 'decrease'}_{kind.lower()}")
         self.measurements = m
         row = {"event": "transition" if self.acting else "would_act", "class": kind, "direction": direction,
@@ -410,6 +479,22 @@ class LivePolicy(ab.ShadowPolicy):
         self.last_action = {"class": kind, "direction": direction, "from_kbps": prev, "to_kbps": target,
                             "acted": self.acting, "injected": injected, "decision_sequence": self.decision_seq,
                             "result": "requested" if self.acting else "shadow", "reason": self.reason}
+        if self.top:
+            row["from_size"] = "%dx%d" % level_size(prev)
+            row["to_size"] = "%dx%d" % level_size(target)
+        if self.top and prev == RUNG_KBPS and direction == "down":
+            # C5-M5: a leave. The re-entry hold-down counts from here; a
+            # leave, an entry and a leave in one session close the rung.
+            self.rung_leaves += 1
+            self.rung_left_clock_ms = clock
+            row["rung_leave"] = self.rung_leaves
+            if self.rung_leaves >= RUNG_OSCILLATION_LEAVES:
+                self.rung_closed = True
+                self.suppressed["oscillation"] += 1
+                return [row, {"event": "hold", "class": kind, "direction": direction, "reason": "oscillation_rung",
+                              "level_kbps": target, "rung_leaves": self.rung_leaves,
+                              "note": "leave, entry, leave: the third direction change; HOLD for the session",
+                              "acted": False}]
         return [row]
 
     # -- one report --------------------------------------------------------
@@ -422,7 +507,7 @@ class LivePolicy(ab.ShadowPolicy):
             self.reset(int(elapsed), level_kbps=ctx.get("stream_kbps") if self.acting else None)
             events.append({"event": "session_reset", "level_kbps": self.level_kbps})
         stream_kbps = ctx.get("stream_kbps")
-        if self.acting and self.pending is None and stream_kbps in LADDER_KBPS \
+        if self.acting and self.pending is None and stream_kbps in self.ladder \
                 and stream_kbps != self.level_kbps:
             # The stream is the truth (a full start resets to 7000, C1).
             events.append({"event": "level_sync", "from_kbps": self.level_kbps, "to_kbps": int(stream_kbps)})
@@ -454,7 +539,7 @@ class LivePolicy(ab.ShadowPolicy):
             self.last_disposition = "actuator_failed"
             e = self._set_state(ab.ACTUATOR_FAILED, "actuator_failed")
             return events + ([e] if e else [])
-        if self.oscillation_hold:
+        if self.oscillation_hold or self.rung_closed:
             self.last_disposition = "oscillation_hold"
             e = self._set_state(ab.HOLD, "oscillation")
             return events + ([e] if e else [])
@@ -470,6 +555,7 @@ class LivePolicy(ab.ShadowPolicy):
             self.last_disposition = "resync"
             self.last_clean = False
             self.inc_window.append(False)
+            self.rung_window.append(False)
             self.clean_count = sum(self.inc_window)
             e = self._set_state(self.state if self.state != ab.TELEMETRY_STALE else ab.REFERENCE,
                                 "resync_ignored")
@@ -478,6 +564,7 @@ class LivePolicy(ab.ShadowPolicy):
         self.last_disposition = "evaluated"
         self.window.append(s)
         self.inc_window.append(bool(self.last_clean))
+        self.rung_window.append(bool(self.last_clean))
         self.clean_count = sum(self.inc_window)
 
         if self.escalation is not None and (ctx.get("guards") or {}).get("recovery_playing"):
@@ -511,6 +598,15 @@ class LivePolicy(ab.ShadowPolicy):
             return events + self._decide(cls, m, int(elapsed), ctx)
         self.last_refusal_key = None
 
+        if self.top and self.level_kbps == REFERENCE_KBPS and len(self.rung_window) >= RUNG_WINDOW_REPORTS \
+                and sum(self.rung_window) >= RUNG_CLEAN_NEEDED:
+            # C5-M5: the entry. Refused (hold-down, re-entry, guards, rate
+            # limit) it falls through to the 7000 state below next report.
+            return events + self._decide("INCREASE", {"trigger": TRIGGER_RUNG_ENTRY,
+                                                      "rung_window_reports": len(self.rung_window),
+                                                      "rung_clean_reports": sum(self.rung_window)},
+                                         int(elapsed), ctx)
+
         if self.level_kbps < REFERENCE_KBPS:
             if len(self.inc_window) >= INCREASE_WINDOW_REPORTS and self.clean_count >= INCREASE_CLEAN_NEEDED:
                 return events + self._decide("INCREASE", {"window_reports": len(self.inc_window),
@@ -533,16 +629,51 @@ class LivePolicy(ab.ShadowPolicy):
         ctx = ctx or {}
         m = {"injected": True, "class": kind}
         elapsed = int(self.last_elapsed_ms or 0)
+        # C5-M5: INCREASE_1080P is the policy's own entry decision (the window
+        # requirement replaced by the injection); CAPACITY_MILD a synthetic
+        # mild bar. Every other gate applies to both.
+        decide_kind, nominal = kind, TARGET_KBPS.get(kind)
+        if kind == "INCREASE_1080P":
+            decide_kind, nominal = "INCREASE", RUNG_KBPS
+            m["trigger"] = TRIGGER_RUNG_ENTRY
+            if not self.top:
+                return self._refuse(kind, "no_rung", nominal, m, injected=True, state=self.state)
+            if self.level_kbps != REFERENCE_KBPS:
+                return self._refuse(kind, "not_at_7000", nominal, m, injected=True, state=self.state)
+        elif kind == "CAPACITY_MILD":
+            decide_kind = "ROUTINE"
+            nominal = next((k for k in reversed(self.ladder) if k < self.level_kbps), self.level_kbps)
+            m["trigger"] = TRIGGER_CAPACITY_MILD
         if self.pending is not None:
-            return self._refuse(kind, "actuating", TARGET_KBPS[kind], m, injected=True, state=self.state)
+            return self._refuse(kind, "actuating", nominal, m, injected=True, state=self.state)
         if self.actuator_failed:
-            return self._refuse(kind, "actuator_failed", TARGET_KBPS[kind], m, injected=True,
+            return self._refuse(kind, "actuator_failed", nominal, m, injected=True,
                                 state=ab.ACTUATOR_FAILED)
-        if self.oscillation_hold:
-            return self._refuse(kind, "oscillation", TARGET_KBPS[kind], m, injected=True, state=ab.HOLD)
+        if self.oscillation_hold or self.rung_closed:
+            return self._refuse(kind, "oscillation", nominal, m, injected=True, state=ab.HOLD)
         if self.blackout_remaining > 0:
-            return self._refuse(kind, "blackout", TARGET_KBPS[kind], m, injected=True, state=ab.HOLD_DOWN)
-        return self._decide(kind, m, elapsed, ctx, injected=True)
+            return self._refuse(kind, "blackout", nominal, m, injected=True, state=ab.HOLD_DOWN)
+        return self._decide(decide_kind, m, elapsed, ctx, injected=True)
+
+    def inject_size(self, target_kbps: int, ctx: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        """C5-M5 section 1, test-only: one raw sized transition (7000/720p <->
+        12600/1080p) straight to the actuator. No rule decides it and it does
+        not count toward the oscillation guard; the blackout and the
+        hold-down bookkeeping follow it as after any transition."""
+        ctx = ctx or {}
+        m = {"injected": True, "class": "SIZE", "target_kbps": int(target_kbps)}
+        if self.pending is not None:
+            return self._refuse("SIZE", "actuating", target_kbps, m, injected=True, state=self.state)
+        if self.actuator_failed:
+            return self._refuse("SIZE", "actuator_failed", target_kbps, m, injected=True,
+                                state=ab.ACTUATOR_FAILED)
+        if int(target_kbps) == self.level_kbps:
+            return self._refuse("SIZE", "noop", target_kbps, m, injected=True, state=self.state)
+        elapsed = int(self.last_elapsed_ms or 0)
+        clock = int(ctx.get("clock_ms", elapsed))
+        direction = "up" if int(target_kbps) > self.level_kbps else "down"
+        return self._transition("SIZE", direction, int(target_kbps), m, self.direction_changes, clock,
+                                injected=True)
 
     def actuation_done(self, ok: bool, *, actual_kbps: int | None, aborted: bool = False) -> list[dict[str, Any]]:
         pend, self.pending = self.pending, None
@@ -558,7 +689,7 @@ class LivePolicy(ab.ShadowPolicy):
             return []
         if self.last_action is not None:
             self.last_action["result"] = "aborted" if aborted else "failed"
-        if actual_kbps in LADDER_KBPS:
+        if actual_kbps in self.ladder or actual_kbps == RUNG_KBPS:
             self.level_kbps = int(actual_kbps)
         if aborted:
             # Recovery took the stream between the decision and the restart:
@@ -625,6 +756,12 @@ class LivePolicy(ab.ShadowPolicy):
                                               f"{INCREASE_CLEAN_GAP_AT_MOST_MS}"},
             "actuator_failed": self.actuator_failed,
             "pending": dict(self.pending) if self.pending else None,
+            **({"rung_1080p": {"flag": f"{TOP_ENV}={TOP_1080P}", "level_kbps": RUNG_KBPS,
+                               "size": "%dx%d" % RUNG_LEVELS[RUNG_KBPS],
+                               "window": {"reports": len(self.rung_window), "clean": sum(self.rung_window),
+                                          "window_needed": RUNG_WINDOW_REPORTS, "clean_needed": RUNG_CLEAN_NEEDED},
+                               "leaves": self.rung_leaves, "closed": self.rung_closed,
+                               "reentry_hold_ms": RUNG_REENTRY_HOLD_MS}} if self.top else {}),
             "capacity_trigger": {"rule": f"fps < {CAPACITY_FPS_BELOW:g} on all {ab.WINDOW_REPORTS} and "
                                          f"lost_packets_delta >= {CAPACITY_LOSS_AT_LEAST} on >= "
                                          f"{CAPACITY_LOSS_OF} of {ab.WINDOW_REPORTS}",
@@ -648,9 +785,10 @@ class LiveController:
     def __init__(self, project_root: Path, environ: dict[str, str] | None = None) -> None:
         self.configured_mode = LIVE
         self.inject_enabled = inject_from_env(environ)
+        self.top_1080p = top_from_env(environ)
         self.log_path = Path(project_root) / "logs" / "games" / ab.LOG_NAME
         self._lock = threading.RLock()
-        self._policy = LivePolicy()
+        self._policy = LivePolicy(top_1080p=self.top_1080p)
         self._actuator: Callable[[int], dict[str, Any]] | None = None
         self._context: Callable[[], dict[str, Any]] | None = None
         self._serial_lock: Any = None
@@ -665,7 +803,8 @@ class LiveController:
         self.disabled_at_utc: str | None = None
         self._log_errors = 0
         self._write({"event": "controller_start", "configured_mode": LIVE,
-                     "inject_enabled": self.inject_enabled})
+                     "inject_enabled": self.inject_enabled,
+                     **({"top": TOP_1080P, "ladder_kbps": list(LADDER_WITH_RUNG_KBPS)} if self.top_1080p else {})})
 
     # -- wiring (the games plugin, once) -----------------------------------
     def bind(self, *, actuator: Callable[[int], dict[str, Any]], context: Callable[[], dict[str, Any]],
@@ -871,11 +1010,27 @@ class LiveController:
                     "disabled_at_utc": self.disabled_at_utc,
                     "note": "live resumes only with a new session; unset the flag and restart the unit for off"}
 
-    def inject(self, kind: str) -> tuple[int, dict[str, Any]]:
+    def inject(self, kind: str, size: str | None = None) -> tuple[int, dict[str, Any]]:
         if not self.inject_enabled:
             return 403, {"ok": False, "error": f"{INJECT_ENV}=1 is not set"}
-        if kind not in TARGET_KBPS:
-            return 400, {"ok": False, "error": "class must be FALLBACK or ROUTINE"}
+        if kind == "SIZE":
+            # C5-M5 section 1: a raw sized transition, test-only.
+            target = SIZE_INJECT_TARGETS.get((size or "").strip().lower())
+            if target is None:
+                return 400, {"ok": False, "error": "size must be 1080p or 720p"}
+            with self._lock:
+                if self.disabled:
+                    return 403, {"ok": False, "error": "live mode is disabled for this session"}
+                ctx = self._ctx(self._last_native_status)
+                events = self._policy.inject_size(target, ctx)
+                self._write({"event": "inject", "class": kind, "size": size,
+                             "at_elapsed_ms": self._policy.last_elapsed_ms})
+                self._emit(events, self._last_sample, ctx)
+                self._maybe_actuate()
+                return 200, {"ok": True, "class": kind, "size": size, "events": events,
+                             "level_kbps": self._policy.level_kbps, "state": self._policy.state}
+        if kind not in TARGET_KBPS and kind not in ("INCREASE_1080P", "CAPACITY_MILD"):
+            return 400, {"ok": False, "error": "class must be FALLBACK, ROUTINE, INCREASE_1080P, CAPACITY_MILD or SIZE"}
         with self._lock:
             if self.disabled:
                 return 403, {"ok": False, "error": "live mode is disabled for this session"}
@@ -916,11 +1071,12 @@ class LiveController:
                 "disabled_at_utc": self.disabled_at_utc,
                 "state": ACTUATING if self._inflight else p["state"],
                 "level": self._stream_kbps if self._stream_kbps else p["level_kbps"],
+                "level_size": "%dx%d" % level_size(self._stream_kbps if self._stream_kbps else p["level_kbps"]),
                 "last_action": p["last_action"],
                 "transitions_this_session": p["transitions_this_session"],
                 "rate_limited": p["rate_limited"],
                 "current_kbps": self._stream_kbps,
-                "validated_ladder_kbps": list(LADDER_KBPS),
+                "validated_ladder_kbps": list(self._policy.ladder),
                 "reference_kbps": REFERENCE_KBPS,
                 "target_kbps_by_class": dict(TARGET_KBPS),
                 "telemetry_age_ms": age,
@@ -979,6 +1135,9 @@ def handle_route(project_root: Path, verb: str, query: str, client_ip: str) -> t
             return 403, {"ok": False, "error": "inject is loopback-only"}
         if not is_live(controller):
             return 403, {"ok": False, "error": f"{MODE_ENV}=live is not set"}
-        kind = (parse_qs(query or "").get("class", [""])[0] or "").strip().upper()
+        q = parse_qs(query or "")
+        kind = (q.get("class", [""])[0] or "").strip().upper()
+        if kind == "SIZE":
+            return controller.inject(kind, (q.get("size", [""])[0] or ""))
         return controller.inject(kind)
     return 404, {"ok": False, "error": "unknown adaptive-bitrate route (disable, inject)"}

@@ -1296,7 +1296,7 @@ tr '\0' '\n' < /proc/$(systemctl --user show -p MainPID --value privyhub-compani
 ```
 
 - **Tests**: `python3 -m unittest tools/test_adaptive_bitrate_live.py -v`
-  (102 tests since C3-L4-N2; 43 at L1, 54 at L2, 85 at N1). Replays: `python3 tools/c3_l4_l1_replay.py <out_dir>`
+  (119 tests since C5-M5; 102 at N2, 43 at L1, 54 at L2, 85 at N1). Replays: `python3 tools/c3_l4_l1_replay.py <out_dir>`
   (shadow-night parity, and the loss would-fire lists).
 - **Harness**: `evidence/c3_l4_l1_2026-09-28/c3_l4_l1_night.sh` with
   `c3_l4_l1_run.sh` (arms `H` for a plain live hold, `B` for the
@@ -1340,6 +1340,79 @@ tr '\0' '\n' < /proc/$(systemctl --user show -p MainPID --value privyhub-compani
     status `level` reads 7000 (the cached stream bitrate is cleared).
   - Replays: `python3 tools/c3_l4_n2_replay.py [out_dir]` (N1's tool, with
     the stop rule on `capacity_mild`).
+
+## The 1080p rung (C5-M5) — `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`, off by default, never leave it set
+
+`companion/adaptive_bitrate_live.py` with the actuator change in
+`native_stream.py` / `diagnostics/c3_linux_actuator_probe.py`
+(`patches/C5-M5_1080P_RUNG.md`). **Not adopted.** With the flag, the
+live ladder gains a top rung:
+
+- the rung: 12,600 kbps at 1920×1080, the c3 arm's argv (cap 90 KB,
+  GOP 15);
+- entry from 7000 only, when ≥ 435 of the last 450 reports since the last
+  SSRC change are clean;
+- the leave: the first mild bar goes to 7000 at 720p, strict to 5000; no
+  re-entry for 10 min; leave-entry-leave → HOLD.
+
+Without the flag the ladder and every decision are the closed
+controller's (`tools/c5_m5_replay.py`'s stop rule).
+
+- **Set for one session, and always unset after.** Live comes from the
+  drop-in; this flag is the only addition:
+
+```bash
+systemctl --user set-environment PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p     # [+ PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 for an injection session]
+systemctl --user restart privyhub-companion
+# ... one session ...
+systemctl --user unset-environment PRIVYHUB_ADAPTIVE_BITRATE_TOP PRIVYHUB_ADAPTIVE_BITRATE_INJECT
+systemctl --user restart privyhub-companion
+tr '\0' '\n' < /proc/$(systemctl --user show -p MainPID --value privyhub-companion)/environ | grep '^PRIVYHUB_'   # exactly PRIVYHUB_ADAPTIVE_BITRATE_MODE=live
+```
+
+- **Kill switches.**
+  - Unset the flag and restart the unit: the ladder tops at 7000.
+  - The disable route puts the session in shadow, as for any live
+    session.
+  - Deleting the drop-in turns everything off.
+- **Status.**
+  - `native-stream-status`: `width` / `height` are the active level's
+    (1920×1080 at the rung).
+  - `adaptive_bitrate.level_size`.
+  - `policy.rung_1080p`: the window and its clean count, leaves, closed,
+    and the re-entry hold.
+  - `validated_ladder_kbps` lists 12600 only with the flag.
+  - `encoder_command` is still the full start's argv: **no restart
+    updates it**. Read a switch's argv in `native_video_alpha.log`
+    (`Output #0 ... 1920x1080 ... 12600 kb/s`).
+- **Rows.**
+  - `transition` with `reason: increase_1080p` is the entry.
+  - The leave carries its trigger's reason (`capacity_mild`, …) and
+    `rung_leave`.
+  - With the flag, every transition carries `from_size` / `to_size`.
+  - `hold` `oscillation_rung` closes the rung for the session.
+  - `controller_start` carries `top: 1080p`.
+- **Test-only injection** (`PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1`, live,
+  loopback):
+  - `inject?class=INCREASE_1080P` is the policy's own entry decision,
+    every gate but the window; flag only.
+  - `inject?class=CAPACITY_MILD` is a synthetic mild bar, one rung down.
+  - `inject?class=SIZE&size=1080p|720p` is a raw sized transition with no
+    rule: C5-M5 §1's size-change test. It works without the TOP flag;
+    with INJECT only.
+- **Harness**: `evidence/c5_m5_2026-10-03/c5_m5_hold.sh` + `c5_m5_run.sh`
+  (C5-M4A's, with `SESSION_FLAGS` and a `HOLD_HOOK`). Flags are set
+  before the run and unset and checked on every exit path. The decision
+  log is sliced by time over the rotated and live files.
+- **Replays**: `python3 tools/c5_m5_replay.py [out_dir]`. It gives the stop
+  rule against the closed controller (loaded from git), the leave on every
+  recorded 1080p series, and the entry on every recorded 720p series at
+  7000.
+- **Tests**: `tools/test_adaptive_bitrate_live.py` (119 since C5-M5:
+  classes `C5M5Rung`, `C5M5Actuator`).
+- **The mid-session size change needs no client change** (C5-M5 R0): the
+  onn's Codec2 decoder takes the in-band SPS, and SurfaceFlinger's buffers
+  follow within 3-5 s.
 
 ## The `nft` night harness (C3-L4-L2, one window since L2B) — the user starts it; it runs `sudo -n nft` from an allow-list
 

@@ -45,6 +45,15 @@ RECOVERY_SCHEMA = "privyhub_c3_recovery_restart_v1"
 RECOVERY_MODE = "encoder_only_restart_at_active_level"
 LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS = (5000, 5500, 6000, 7000)
 
+# C5-M5: levels that carry their own output size -- the 1080p rung. The
+# argv at 12,600 kbps / 1920x1080 is C5-M2's c3 arm's exactly (cap 90,000 B
+# from the profile, GOP 15, -maxrate / -bufsize 12,600k). Only the sized path
+# (`run_c3_linux_level_transition`, recovery's same-level restart) accepts
+# them; the C3.L3 / C3.L3a paths and their validated list are unchanged.
+LINUX_RUNG_LEVELS: dict[int, tuple[int, int]] = {12600: (1920, 1080)}
+LEVEL_SCHEMA = "privyhub_c5_m5_level_transition_v1"
+LEVEL_MODE = "sized_level_actuator_transition"
+
 
 def _dict(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
@@ -450,6 +459,7 @@ def _run_c3_linux_bitrate_cycle(
     *,
     validated_transition: bool = False,
     same_level_restart: bool = False,
+    level_transition: bool = False,
     popen_factory: Callable[..., Any] = subprocess.Popen,
     perf_counter_ns: Callable[[], int] = time.perf_counter_ns,
     monotonic: Callable[[], float] = time.monotonic,
@@ -498,11 +508,25 @@ def _run_c3_linux_bitrate_cycle(
 
     target = _int(target_bitrate_kbps)
 
+    # C5-M5: a level that carries its own size. The sized path covers a
+    # transition to or from such a level and recovery's restart at one; the
+    # size of a 720p level is the profile's (WIDTH x HEIGHT).
+    sized_levels = (
+        tuple(LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS)
+        + tuple(LINUX_RUNG_LEVELS)
+    )
+    sized = level_transition or (
+        same_level_restart and target in LINUX_RUNG_LEVELS
+    )
+
     # C3-F1: `same_level_restart` is recovery's restart at the active level
     # (target == current, any validated level). Same mechanics; only the
     # precondition, the label and the schema/mode strings differ.
     if same_level_restart:
-        if target not in LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS:
+        if target not in sized_levels:
+            raise RuntimeError("unsupported_validated_bitrate")
+    elif level_transition:
+        if target not in sized_levels:
             raise RuntimeError("unsupported_validated_bitrate")
     elif validated_transition:
         if target not in LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS:
@@ -535,6 +559,14 @@ def _run_c3_linux_bitrate_cycle(
     if same_level_restart:
         if target != current_bitrate_kbps:
             raise RuntimeError("recovery_restart_level_mismatch")
+    elif level_transition:
+        if current_bitrate_kbps not in sized_levels:
+            raise RuntimeError(
+                "validated_transition_requires_validated_start"
+            )
+
+        if target == current_bitrate_kbps:
+            raise RuntimeError("bitrate_transition_noop")
     elif validated_transition:
         if (
             current_bitrate_kbps
@@ -549,8 +581,19 @@ def _run_c3_linux_bitrate_cycle(
     elif current_bitrate_kbps != REFERENCE_BITRATE_KBPS:
         raise RuntimeError("characterization_requires_reference_start")
 
+    current_width = current_height = target_width = target_height = 0
+    if sized:
+        current_width = _int(getattr(manager, "_active_width", manager.WIDTH))
+        current_height = _int(getattr(manager, "_active_height", manager.HEIGHT))
+        target_width, target_height = LINUX_RUNG_LEVELS.get(
+            target,
+            (int(manager.WIDTH), int(manager.HEIGHT)),
+        )
+
     label = (
-        "C3-F1 Linux recovery restart at the active level"
+        "C5-M5 Linux sized level transition"
+        if level_transition
+        else "C3-F1 Linux recovery restart at the active level"
         if same_level_restart
         else "C3.L3a Linux validated-ladder transition probe"
         if validated_transition
@@ -655,12 +698,19 @@ def _run_c3_linux_bitrate_cycle(
             before_rtp_packets - pre_kill_rtp_packets,
         )
 
+        size_kwargs: dict[str, Any] = (
+            {"width": target_width, "height": target_height}
+            if sized
+            else {}
+        )
+
         replacement_ffmpeg = popen_factory(
             manager._build_linux_ffmpeg_command(
                 ffmpeg=ffmpeg,
                 capture_target=capture_target,
                 bitrate_kbps=target,
                 max_bitrate_kbps=target,
+                **size_kwargs,
             ),
             cwd=str(manager.project_root),
             stdin=subprocess.DEVNULL,
@@ -707,6 +757,10 @@ def _run_c3_linux_bitrate_cycle(
 
         manager._active_bitrate_kbps = target
 
+        if sized:
+            manager._active_width = target_width
+            manager._active_height = target_height
+
         session_after = manager._session_io.status()
         fec_after = manager._fec_relay.status()
 
@@ -724,7 +778,9 @@ def _run_c3_linux_bitrate_cycle(
 
         payload = {
             "schema": (
-                RECOVERY_SCHEMA
+                LEVEL_SCHEMA
+                if level_transition
+                else RECOVERY_SCHEMA
                 if same_level_restart
                 else BIDIRECTIONAL_SCHEMA
                 if validated_transition
@@ -732,7 +788,9 @@ def _run_c3_linux_bitrate_cycle(
             ),
             "ok": True,
             "mode": (
-                RECOVERY_MODE
+                LEVEL_MODE
+                if level_transition
+                else RECOVERY_MODE
                 if same_level_restart
                 else BIDIRECTIONAL_MODE
                 if validated_transition
@@ -745,6 +803,14 @@ def _run_c3_linux_bitrate_cycle(
             "from_bitrate_kbps": current_bitrate_kbps,
             "target_bitrate_kbps": target,
             "profile_id": str(manager.PROFILE.id),
+            **(
+                {
+                    "from_size": f"{current_width}x{current_height}",
+                    "target_size": f"{target_width}x{target_height}",
+                }
+                if sized
+                else {}
+            ),
             "video": {
                 "capture_restarted": False,
                 "capture_process_present": False,
@@ -831,6 +897,10 @@ def _run_c3_linux_bitrate_cycle(
         manager._process = None
         manager._active_bitrate_kbps = current_bitrate_kbps
 
+        if sized:
+            manager._active_width = current_width
+            manager._active_height = current_height
+
         _safe_log(
             manager,
             f"{label}: "
@@ -897,5 +967,28 @@ def run_c3_linux_validated_bitrate_transition(
         manager,
         target_bitrate_kbps,
         validated_transition=True,
+        **kwargs,
+    )
+
+
+def run_c3_linux_level_transition(
+    manager: Any,
+    *,
+    target_bitrate_kbps: int,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """C5-M5: one transition to or from a level that carries its own size.
+
+    The C3.L3a encoder-only restart (the same kill, RTP baseline, spawn,
+    resume poll and 0.75 s stability window), with the argv's scale/pad
+    rebuilt at the target level's size: 1920x1080 for the 1080p rung
+    (`LINUX_RUNG_LEVELS`), the profile's 1280x720 for every 720p level.
+    `manager._active_width` / `_active_height` follow the level, as
+    `_active_bitrate_kbps` does.
+    """
+    return _run_c3_linux_bitrate_cycle(
+        manager,
+        target_bitrate_kbps,
+        level_transition=True,
         **kwargs,
     )

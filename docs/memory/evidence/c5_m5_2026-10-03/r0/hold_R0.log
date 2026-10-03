@@ -1,0 +1,39 @@
+[table 23:29:16Z] last session_ended 2026-10-02T21:01:08.319Z; R0 not before 21:01:08Z
+[table 23:29:17Z] session flags set in the manager: 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1'
+[table 23:29:17Z] start: manager PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1'; MainPID 1571595; 8765 1571595; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 23:29:17Z] T2 sampler started (10 s); one hold, 0s
+[table 23:29:17Z] R0 begins (adopted 7000, the 4x PS1 source, flags 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1', hook '/home/privyhub/Projects/onn-stream-test/docs/memory/evidence/c5_m5_2026-10-03/c5_m5_r0_hook.sh')
+[R0 23:29:17Z] mode=H hold/timeout=0s probe_args=none heartbeat_ms=default
+[R0 23:29:17Z] ARM_PROFILE adopted; PRIVYHUB_* in the user manager: 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1'
+[R0 23:29:21Z] companion MainPID 1574742 serving 8765; PRIVYHUB_* in its environ: 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[R0] before launch: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[R0] at PLAYING: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[R0 23:30:02Z] SurfaceFlinger stream-surface lines: 11
+[R0 23:30:02Z] PLAYING at 2026-10-02T23:30:02Z; hook c5_m5_r0_hook.sh, zero input
+[R0] status pre: bitrate 7000 size 1280 x 720 | argv scale ('1280', '720') b:v 7000 maxrate 7000 | controller level 7000 1280x720 state REFERENCE transitions 0 | any_override False
+[R0 hook 23:31:32.121Z] inject SIZE 1080p -> True transition 7000 -> 12600 increase_size
+[R0] status up3: bitrate 12600 size 1920 x 1080 | argv scale ('1280', '720') b:v 7000 maxrate 7000 | controller level 12600 1920x1080 state HOLD_DOWN transitions 1 | any_override False
+[R0] status up55: bitrate 12600 size 1920 x 1080 | argv scale ('1280', '720') b:v 7000 maxrate 7000 | controller level 12600 1920x1080 state REFERENCE transitions 1 | any_override False
+[R0 hook 23:32:32.128Z] inject SIZE 720p -> True transition 12600 -> 7000 decrease_size
+[R0] status down3: bitrate 7000 size 1280 x 720 | argv scale ('1280', '720') b:v 7000 maxrate 7000 | controller level 7000 1280x720 state HOLD_DOWN transitions 2 | any_override False
+[R0] status down55: bitrate 7000 size 1280 x 720 | argv scale ('1280', '720') b:v 7000 maxrate 7000 | controller level 7000 1280x720 state REFERENCE transitions 2 | any_override False
+[R0 hook 23:33:34.685Z] hook done; SurfaceFlinger samples: 41
+[R0 23:33:34Z] hook exit 0
+[R0 23:33:36Z] adb client processes seen during hold: 20 (# polls 411)
+[R0 23:33:38Z] report: native_decoder_20261002_233337_632.json
+[frames] 213 seconds in the session window
+[heartbeat] 106 lines
+[R0 23:34:00Z] decision log lines in the hold: 136
+[R0 23:34:02Z] game active after stop: False
+[R0 23:34:02Z] done
+[table 23:34:02Z] R0 exit 0
+[table 23:34:06Z] teardown: manager PRIVYHUB_* ''; MainPID 1578080; 8765 1578080; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 23:34:06Z] FLAGS UNSET AND ABSENT: manager none, environ exactly the live default
+[table] teardown stream 7000 1280 720 level size 1280x720
+[table 23:34:06Z] measurement files: 0 (want 0)
+[table 23:34:07Z] ADOPTED APK CONFIRMED (device hash de072762e55122c3060086f6f10b1bff54633d9165d0c475f17699127841835e)
+[table 23:34:16Z] teardown: game active False; NOW PLAYING on the launcher: 1
+[table 23:34:27Z] stale banner: force-stop + relaunch; NOW PLAYING now: 0
+[table 23:34:27Z] table done

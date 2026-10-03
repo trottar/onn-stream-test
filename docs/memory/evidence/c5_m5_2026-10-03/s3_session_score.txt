@@ -1,0 +1,16 @@
+C5-M5 S3 (S3) -- 2026-10-03 05:06:03Z .. 07:06:03Z (120.0 min)
+
+transitions (min into the hold, class, from -> to, reason, named by a rule, spacing):
+   111.5 INCREASE 7000 -> 12600  increase_1080p   NAMED spacing ok (reports since previous None)
+oscillation holds: none
+recovery-log events in the hold: none
+longest rung window at 7000: 435 clean of the last 450 (needed 435) at 2026-10-03T06:57:33.368Z
+
+per level (C2 telemetry in the level's intervals; spikes and underruns are the session's):
+  7000: 111.5 min, 3343 reports, fps 60.21, stale/min 0.04, loss/min 4.66, telemetry gap max 77 ms
+  12600: 8.5 min, 254 reports, fps 60.12, stale/min 2.36, loss/min 2.01, telemetry gap max 49 ms
+session (decoder report): {"minutes": 120.15, "spikes_per_min": 50.3, "rendered_fps": 59.97, "stale_per_min": 0.34, "loss_per_min": 4.51, "underruns_per_min": 0.66, "max_gap_ms": 403, "ssrc_changes": 1, "sequence_resyncs_beyond_ssrc": 0}
+
+rows: every transition named True; spacing True; oscillation hold none; 0 recovery cycles True (0 events); client rows over the 1080p minutes True
+
+S3: WORKS AS A RUNG

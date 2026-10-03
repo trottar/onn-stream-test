@@ -1368,5 +1368,254 @@ class WrapperTests(unittest.TestCase):
                 os.environ[live.MODE_ENV] = saved_env
 
 
+
+# ---------------------------------------------------------------------------
+# C5-M5: the 1080p rung (handoffs/C5-M5_1080P_RUNG_TASK.md sections 2-3;
+# pre-registered in evidence/c5_m5_2026-10-03/c5_m5_preregistration.txt).
+class RungFeeder(Feeder):
+    def __init__(self, top=True, **kw):
+        super().__init__(**kw)
+        self.p = live.LivePolicy(top_1080p=top)
+
+    def enter(self):
+        """450 clean reports from a fresh session -> the entry (asserted)."""
+        ev = self.feed(live.RUNG_WINDOW_REPORTS, **CLEAN)
+        tr = self.transitions(ev)
+        assert tr and tr[-1]["to_kbps"] == live.RUNG_KBPS, tr
+        return tr[-1]
+
+
+MILD = dict(fps=55.0, queue=0, gap=20, lost=60)
+
+
+class C5M5Rung(unittest.TestCase):
+    """C5-M5: entry, leave, re-entry hold-down, rung oscillation, sizes, the
+    flag's absence; the actuator argv and recovery at the rung."""
+
+    def test_flag_is_exactly_1080p(self):
+        for raw, on in (("1080p", True), (" 1080P ", True), ("1080", False), ("on", False), ("", False), (None, False)):
+            env = {} if raw is None else {live.TOP_ENV: raw}
+            self.assertEqual(live.top_from_env(env), on, raw)
+
+    def test_entry_fires_at_435_of_450(self):
+        f = RungFeeder()
+        f.feed(15, **UNCLEAN_GAP)
+        ev = f.feed(434, **CLEAN)
+        self.assertEqual(f.transitions(ev), [])
+        ev = f.feed(1, **CLEAN)                          # 450 reports, 435 clean
+        tr = f.transitions(ev)
+        self.assertEqual(len(tr), 1)
+        self.assertEqual((tr[0]["from_kbps"], tr[0]["to_kbps"], tr[0]["class"]), (7000, 12600, "INCREASE"))
+        self.assertEqual((tr[0]["reason"], tr[0]["trigger"]), ("increase_1080p", "increase_1080p"))
+        self.assertEqual((tr[0]["from_size"], tr[0]["to_size"]), ("1280x720", "1920x1080"))
+
+    def test_entry_does_not_fire_at_434_of_450(self):
+        f = RungFeeder()
+        f.feed(16, **UNCLEAN_GAP)
+        ev = f.feed(434, **CLEAN)                        # 450 reports, 434 clean
+        self.assertEqual(f.transitions(ev), [])
+        ev = f.feed(1, **CLEAN)                          # the window rolls: 435 of 450
+        self.assertEqual([t["to_kbps"] for t in f.transitions(ev)], [12600])
+
+    def test_entry_only_from_7000(self):
+        f = RungFeeder()
+        f.p.level_kbps = 6000
+        f.feed(live.RUNG_WINDOW_REPORTS + 50, **CLEAN)
+        tos = [t["to_kbps"] for t in f.transitions()]
+        self.assertEqual(tos[0], 7000)                  # the blend's one rung first, never straight to the rung
+        self.assertNotIn(12600, tos[:1])
+        self.assertTrue(all(t["from_kbps"] == 7000 for t in f.transitions() if t["to_kbps"] == 12600))
+        # at the rung itself a full clean window decides nothing (the entry is a 7000 rule only)
+        g = RungFeeder()
+        g.enter()
+        ev = g.feed(3 + live.RUNG_WINDOW_REPORTS + 10, **CLEAN)
+        self.assertEqual([e for e in ev if e.get("trigger") == "increase_1080p"], [])
+        self.assertEqual(g.p.level_kbps, 12600)
+
+    def test_no_rung_without_the_flag(self):
+        f = RungFeeder(top=False)
+        f.feed(1200, **CLEAN)
+        self.assertEqual(f.transitions(), [])
+        self.assertEqual(f.p.level_kbps, 7000)
+        self.assertEqual(f.p.ladder, (5000, 5500, 6000, 7000))
+        self.assertNotIn("rung_1080p", f.p.status())
+        self.assertNotIn("rung_window_reports", f.p.holds_in_force())
+        self.assertEqual([e for e in f.events if e.get("trigger") == "increase_1080p"], [])   # not even a refusal
+        self.assertEqual(f.inject("INCREASE_1080P")[0]["reason"], "no_rung")
+
+    def test_window_restarts_after_an_ssrc_change(self):
+        f = RungFeeder()
+        f.feed(440, **CLEAN)
+        f.p.note_ssrc_change("recovery_restart")
+        ev = f.feed(3 + 449, **CLEAN)                     # blackout, then one short of a full window
+        self.assertEqual(f.transitions(ev), [])
+        self.assertEqual([t["to_kbps"] for t in f.transitions(f.feed(1, **CLEAN))], [12600])
+
+    def test_leave_on_the_first_mild_bar_to_7000_at_720p(self):
+        f = RungFeeder()
+        f.enter()
+        ev = f.feed(3 + 50, **CLEAN) + f.feed(5, **MILD)  # the bar met inside the 60-report hold after an up
+        self.assertEqual(f.transitions(ev), [])
+        self.assertTrue(f.refused("hold_down", ev))
+        f2 = RungFeeder()
+        f2.enter()
+        f2.feed(3 + 60, **CLEAN)
+        ev = f2.feed(5, **MILD)
+        tr = f2.transitions(ev)
+        self.assertEqual(len(tr), 1)
+        self.assertEqual((tr[0]["from_kbps"], tr[0]["to_kbps"], tr[0]["class"], tr[0]["trigger"]),
+                         (12600, 7000, "ROUTINE", "capacity_mild"))
+        self.assertEqual(tr[0]["to_size"], "1280x720")
+        self.assertEqual(tr[0]["rung_leave"], 1)
+
+    def test_strict_from_the_rung_is_fallback_5000(self):
+        f = RungFeeder()
+        f.enter()
+        f.feed(3 + 60, **CLEAN)
+        tr = f.transitions(f.feed(5, **FALLBACK))
+        self.assertEqual([(t["from_kbps"], t["to_kbps"], t["class"]) for t in tr], [(12600, 5000, "FALLBACK")])
+
+    def test_reentry_hold_is_ten_minutes(self):
+        f = RungFeeder()
+        f.p.inject  # noqa: B018
+        f.enter()
+        f.feed(3 + 60, **CLEAN)
+        f.feed(5, **MILD)                                # leave at t0
+        left_at = f.p.rung_left_clock_ms
+        f.feed(3 + 60, **CLEAN)                          # the INCREASE hold after a down (60) has passed
+        ev = f.inject("INCREASE_1080P")
+        self.assertEqual(ev[0]["event"], "refused")
+        self.assertEqual(ev[0]["reason"], "rung_reentry_hold")
+        while f.t - left_at < live.RUNG_REENTRY_HOLD_MS:
+            f.feed(1, **CLEAN)
+        ev = f.inject("INCREASE_1080P")
+        self.assertEqual([(e["from_kbps"], e["to_kbps"]) for e in f.transitions(ev)], [(7000, 12600)])
+
+    def test_leave_entry_leave_closes_the_rung(self):
+        f = RungFeeder()
+        f.enter()
+        f.feed(3 + 60, **CLEAN)
+        f.feed(5, **MILD)                                # leave 1
+        while f.t - f.p.rung_left_clock_ms < live.RUNG_REENTRY_HOLD_MS:
+            f.feed(1, **CLEAN)
+        self.assertEqual(f.transitions(f.inject("INCREASE_1080P"))[0]["to_kbps"], 12600)   # entry 2
+        f.feed(3 + 60, **CLEAN)
+        ev = f.feed(5, **MILD)                           # leave 2 -> carried out, then HOLD
+        self.assertEqual([(t["from_kbps"], t["to_kbps"]) for t in f.transitions(ev)], [(12600, 7000)])
+        self.assertTrue([e for e in ev if e["event"] == "hold" and e["reason"] == "oscillation_rung"])
+        self.assertTrue(f.p.rung_closed)
+        ev = f.feed(200, **FALLBACK)                     # nothing acts for the rest of the session
+        self.assertEqual(f.transitions(ev), [])
+        self.assertEqual(f.p.state, ab.HOLD)
+        self.assertEqual(f.inject("INCREASE_1080P")[0]["reason"], "oscillation")
+        f.p.end_session()
+        self.assertFalse(f.p.rung_closed)
+        self.assertEqual(f.p.rung_leaves, 0)
+
+    def test_injected_capacity_mild_from_the_rung(self):
+        f = RungFeeder()
+        f.feed(60, **CLEAN)
+        tr = f.transitions(f.inject("INCREASE_1080P"))
+        self.assertEqual([(t["to_kbps"], t["reason"], t["injected"]) for t in tr], [(12600, "increase_1080p", True)])
+        self.assertEqual(f.inject("CAPACITY_MILD")[0]["reason"], "blackout")
+        f.feed(3 + 60, **CLEAN)
+        tr = f.transitions(f.inject("CAPACITY_MILD"))
+        self.assertEqual([(t["from_kbps"], t["to_kbps"], t["trigger"]) for t in tr], [(12600, 7000, "capacity_mild")])
+
+    def test_size_on_every_level(self):
+        for k in (5000, 5500, 6000, 7000):
+            self.assertEqual(live.level_size(k), (1280, 720))
+        self.assertEqual(live.level_size(12600), (1920, 1080))
+        self.assertEqual(live.LivePolicy(top_1080p=True).ladder, (5000, 5500, 6000, 7000, 12600))
+
+    def test_mild_one_rung_down_below_the_rung_unchanged(self):
+        f = RungFeeder()
+        f.p.level_kbps = 6000
+        f.feed(70, **CLEAN)
+        f.p.level_kbps, f.p.last_direction, f.p.reports_since_action = 6000, None, None
+        tr = f.transitions(f.feed(5, **MILD))
+        self.assertEqual([(t["from_kbps"], t["to_kbps"]) for t in tr], [(6000, 5500)])
+
+    def test_controller_status_and_start_row_carry_the_rung_only_with_the_flag(self):
+        with tempfile.TemporaryDirectory() as d:
+            on = live.LiveController(Path(d), environ={live.TOP_ENV: "1080p"})
+            self.assertIn("rung_1080p", on.status()["policy"])
+            self.assertEqual(on.status()["validated_ladder_kbps"], [5000, 5500, 6000, 7000, 12600])
+            self.assertEqual(on.status()["level_size"], "1280x720")
+            off = live.LiveController(Path(d), environ={})
+            self.assertNotIn("rung_1080p", off.status()["policy"])
+            self.assertEqual(off.status()["validated_ladder_kbps"], [5000, 5500, 6000, 7000])
+            rows = [json.loads(x) for x in (Path(d) / "logs" / "games" / ab.LOG_NAME).read_text().splitlines()]
+            starts = [r for r in rows if r["event"] == "controller_start"]
+            self.assertEqual(starts[0].get("top"), "1080p")
+            self.assertNotIn("top", starts[1])
+
+
+class C5M5Actuator(unittest.TestCase):
+    """The sized actuator against C3-F1's fake manager: the real builder and
+    the real encoder-only cycle, nothing spawned."""
+
+    def setUp(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import test_c3_f1_recovery_restart as f1
+        from diagnostics import c3_linux_actuator_probe as probe
+        self.f1, self.probe = f1, probe
+
+    def _cycle(self, m, fn, **kw):
+        spawned = []
+
+        def popen(argv, **k):
+            p = self.f1.FakeProc(argv)
+            spawned.append(p)
+            return p
+        clock = self.f1.Clock()
+        out = fn(m, popen_factory=popen, monotonic=clock, sleep=lambda s: None,
+                 perf_counter_ns=lambda: int(clock() * 1e9), **kw)
+        return out, spawned[0].argv
+
+    def _vf(self, argv):
+        return argv[argv.index("-vf") + 1]
+
+    def test_up_down_and_recovery_at_the_rung(self):
+        m = self.f1.fake_manager(7000)
+        m._active_width, m._active_height = 1280, 720
+        out, argv = self._cycle(m, self.probe.run_c3_linux_level_transition, target_bitrate_kbps=12600)
+        self.assertTrue(out["ok"])
+        self.assertIn("scale=1920:1080", self._vf(argv))
+        self.assertEqual((argv[argv.index("-b:v") + 1], argv[argv.index("-maxrate") + 1]), ("12600k", "12600k"))
+        self.assertEqual((m._active_bitrate_kbps, m._active_width, m._active_height), (12600, 1920, 1080))
+        self.assertEqual((out["from_size"], out["target_size"]), ("1280x720", "1920x1080"))
+        out, argv = self._cycle(m, self.probe.run_c3_linux_recovery_restart)       # recovery at the rung
+        self.assertIn("scale=1920:1080", self._vf(argv))
+        self.assertEqual((m._active_bitrate_kbps, m._active_width), (12600, 1920))
+        out, argv = self._cycle(m, self.probe.run_c3_linux_level_transition, target_bitrate_kbps=5000)
+        self.assertIn("scale=1280:720", self._vf(argv))
+        self.assertEqual((m._active_bitrate_kbps, m._active_width, m._active_height), (5000, 1280, 720))
+
+    def test_the_c3_route_never_reaches_the_rung(self):
+        m = self.f1.fake_manager(7000)
+        with self.assertRaises(RuntimeError):
+            self._cycle(m, self.probe.run_c3_linux_validated_bitrate_transition, target_bitrate_kbps=12600)
+
+    def test_rung_argv_is_the_c3_arm_golden_and_720p_unchanged(self):
+        import re
+        import native_stream as ns
+        ev = Path(__file__).resolve().parents[1] / "docs" / "memory" / "evidence" / "c5_m2_2026-09-29"
+        M = ns.NativeStreamManager
+        m = object.__new__(M)
+        m._apply_profile_selection()
+        m._linux_display = lambda: ":0"
+        m._linux_vaapi_device = lambda: Path("/dev/dri/renderD128")
+
+        def line(**kw):
+            argv = m._build_linux_ffmpeg_command(Path("/usr/bin/ffmpeg"), {"_window_id": 12345}, **kw)
+            return re.sub(r"rtp://[0-9.]+", "rtp://<ipv4>", "argv: " + " ".join(argv))
+
+        def golden(name):
+            return [x for x in (ev / name).read_text().splitlines() if x.startswith("argv:")][0]
+        self.assertEqual(line(bitrate_kbps=12600, max_bitrate_kbps=12600, width=1920, height=1080),
+                         golden("golden_after_native_game_1080p60_c3_80pct_cap90.txt"))
+        self.assertEqual(line(), golden("golden_after_unset.txt"))
+
 if __name__ == "__main__":
     unittest.main()

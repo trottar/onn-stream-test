@@ -36,10 +36,35 @@ nothing adopted** (`../evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md`).
   - ~~the 40 MHz change on the Opal; then the LINK-L1 re-run~~ done:
     the user set 40 MHz, and `LINK-L2` (2026-10-02) is TIME OF DAY as
     scored, on the boundary (below);
-  - the user's call on the link (keep 40 MHz or revert; a screening
-    window, or the channel / placement / a wired hop);
-  - then Part 2 (the 1080p rung: the actuator's size change, and a
-    mid-session resolution change not yet shown) on the user's word.
+  - the user's call on the link (the handoff for C5-M5 records the width
+    back at 80 MHz; a screening window, or the channel / placement / a
+    wired hop);
+  - ~~Part 2, the 1080p rung~~ built: `C5-M5` (below).
+- **`C5-M5` (2026-10-02/03): the 1080p rung BUILT and SHOWN behind
+  `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`, off by default, NOT adopted**
+  (`../evidence/C5_M5_1080P_RUNG_2026-10-03.md`).
+  - **R0: the client takes a mid-session size change with no client
+    change.** R0a holds both ways (SurfaceFlinger 1920×1080 within 3 s,
+    back within 5 s; no recovery).
+  - R0b is NOT MET AS PRE-REGISTERED on two clauses: the report's resync
+    count includes the SSRC changes, and 1 stale drop.
+  - Code continued on the prompt's stop condition, a deviation from the
+    pre-registration's added stop. It was recorded before any further
+    work and is the user's to accept.
+  - The rung: entry from 7000 at ≥ 435 of 450 clean; the leave by the
+    existing triggers (mild bar → 7000/720p); a 10-min re-entry hold;
+    leave-entry-leave → HOLD.
+  - Tests 119/119, mutations 10/10, stop rule 0 differences (377 series).
+  - S1 injection PASSES (gaps 356 / 314 ms). **S3, the 2-h night from
+    01:06, WORKS AS A RUNG**: one entry at 111.5 min, 8.5 min at 1080p,
+    loss 2.0/min. S2, the daytime hold, ENTRY NOT REACHED (431 of 450).
+  - Replays: the entry is rarely reached on this link, and the mild bar
+    does not catch the 1080p's bursty loss.
+  - **Open, the user's:**
+    - the picture look at 1080p (the gate for adoption);
+    - adopting the flag;
+    - the rung's `nft` capacity night;
+    - the dither mode at 4x.
 
 ## PHASE C — `C3.L4` live — CLOSED 2026-09-30 (validated under real loss; live behind its flag)
 

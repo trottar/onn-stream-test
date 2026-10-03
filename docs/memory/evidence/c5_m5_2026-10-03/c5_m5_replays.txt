@@ -1,0 +1,58 @@
+C5-M5 replays: the 1080p rung (PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p) and the stop rule
+rung: 12600 kbps at (1920, 1080), entry from 7000 at >= 435 of the last 450 clean, re-entry hold 600 s, leave by the existing triggers (mild bar -> 7000)
+closed controller: companion/adaptive_bitrate_live.py at 5005615 (git)
+
+== 1. STOP RULE: the flag absent vs the closed controller, every series
+series compared: 377 (128530 reports fed to each policy); events emitted by the closed controller's policy: 65058
+series with ANY difference (flag absent vs closed controller): 0
+   -> PASS: zero differences
+
+== 2. LEAVE on every recorded 1080p series (the policy starts AT the rung, just entered; elapsed +60 s for the session-age guard)
+   C5-M1 A1 (1080p candidate, parity) [heartbeat proxies, 597 reports, 1197.9 s]: first raw mild bar at None s; never leaves in the series (64 unclean reports)
+   C5-M1 A2 [heartbeat proxies, 597 reports, 1197.9 s]: first raw mild bar at None s; never leaves in the series (66 unclean reports)
+   C5-M1 A3 [heartbeat proxies, 597 reports, 1197.9 s]: first raw mild bar at None s; never leaves in the series (53 unclean reports)
+   C5-M2 n1 C1 (parity, cap 90) [heartbeat proxies, 595 reports, 1195.9 s]: first raw mild bar at None s; never leaves in the series (84 unclean reports)
+   C5-M2 n1 C2 (80 %, cap 160) [heartbeat proxies, 596 reports, 1197.4 s]: first raw mild bar at None s; never leaves in the series (86 unclean reports)
+   C5-M2 n1 C3 (80 %, cap 90 = the rung) [heartbeat proxies, 596 reports, 1195.8 s]: first raw mild bar at None s; never leaves in the series (46 unclean reports)
+   C5-M2 n1r C1 [heartbeat proxies, 595 reports, 1196.8 s]: first raw mild bar at None s; never leaves in the series (93 unclean reports)
+   C5-M2 n1r C2 [heartbeat proxies, 596 reports, 1195.7 s]: first raw mild bar at None s; never leaves in the series (92 unclean reports)
+   C5-M2 n1r C3 (= the rung) [heartbeat proxies, 595 reports, 1196.4 s]: first raw mild bar at 739.406 s; LEAVES at 739.4 s (capacity_mild, ROUTINE) 12600 -> 7000; 61 unclean reports before it
+   C5-M4 c_1x (c3 at 1080p, 1x source) [C2 telemetry, 151 reports, 299.9 s]: first raw mild bar at None s; never leaves in the series (7 unclean reports)
+   C5-M4 c_2x [C2 telemetry, 150 reports, 299.8 s]: first raw mild bar at None s; never leaves in the series (13 unclean reports)
+   C5-M4 c_4x (the rung on the adopted source) [C2 telemetry, 150 reports, 296.9 s]: first raw mild bar at None s; never leaves in the series (15 unclean reports)
+   C5-M4 c_8x [C2 telemetry, 150 reports, 299.8 s]: first raw mild bar at None s; never leaves in the series (6 unclean reports)
+
+== 3. ENTRY on every recorded 720p series at 7000 (the policy with the flag from the session start; after an entry the SAME hold's 720p reports continue -- a preview, not a 1080p measurement)
+   C3-L4-S1 shadow night H1 [heartbeat proxies, 597 reports, 1197.7 s]: entries 0; best rung window 428 clean of 450 needed 435; seconds by level {7000: 1197.7}
+   C3-L4-S1 H2 [heartbeat proxies, 596 reports, 1195.7 s]: entries 1 (first at 902 s); seconds by level {7000: 902.4, 12600: 293.2}
+        t=  902.4s transition INCREASE  increase_1080p   increase_1080p 7000 -> 12600
+   C3-L4-S1 H3 [heartbeat proxies, 1792 reports, 3596.8 s]: entries 1 (first at 1330 s); seconds by level {7000: 1330.4, 12600: 2266.4}
+        t= 1330.4s transition INCREASE  increase_1080p   increase_1080p 7000 -> 12600
+   C3-L4-S1 H4 [heartbeat proxies, 596 reports, 1195.7 s]: entries 1 (first at 1029 s); seconds by level {7000: 1029.0, 12600: 166.7}
+        t= 1029.0s transition INCREASE  increase_1080p   increase_1080p 7000 -> 12600
+   C3-L4-N1 silent live hold [live sample rows, 902 reports, 1810.7 s]: entries 0; best rung window 420 clean of 450 needed 435; seconds by level {7000: 1810.7}
+   C3-L4-N2 hold [live sample rows, 901 reports, 1808.7 s]: entries 0; best rung window 424 clean of 450 needed 435; seconds by level {7000: 1808.7}
+   C3-L4-D1 B3b 30-min default hold [live sample rows, 901 reports, 1808.7 s]: entries 0; best rung window 429 clean of 450 needed 435; seconds by level {7000: 1808.7}
+   LINK-L1 H1 [heartbeat proxies, 597 reports, 1197.7 s]: entries 0; best rung window 433 clean of 450 needed 435; seconds by level {7000: 1197.7}
+   LINK-L1 H2 [heartbeat proxies, 597 reports, 1197.6 s]: entries 0; best rung window 433 clean of 450 needed 435; seconds by level {7000: 1197.6}
+   LINK-L1 H3 [heartbeat proxies, 597 reports, 1197.7 s]: entries 1 (first at 957 s); seconds by level {7000: 956.7, 12600: 241.0}
+        t=  956.7s transition INCREASE  increase_1080p   increase_1080p 7000 -> 12600
+   LINK-L1 H4 [heartbeat proxies, 597 reports, 1197.7 s]: entries 1 (first at 1091 s); seconds by level {7000: 1091.2, 12600: 106.5}
+        t= 1091.2s transition INCREASE  increase_1080p   increase_1080p 7000 -> 12600
+   LINK-L1 H5 [heartbeat proxies, 596 reports, 1195.7 s]: entries 1 (first at 902 s); seconds by level {7000: 902.5, 12600: 293.2}
+        t=  902.5s transition INCREASE  increase_1080p   increase_1080p 7000 -> 12600
+   LINK-L1 H6 [heartbeat proxies, 597 reports, 1197.6 s]: entries 0; best rung window 432 clean of 450 needed 435; seconds by level {7000: 1197.6}
+   LINK-L2 H1 [C2 telemetry, 600 reports, 1199.5 s]: entries 0; best rung window 424 clean of 450 needed 435; seconds by level {7000: 1199.5}
+   LINK-L2 H2 [C2 telemetry, 600 reports, 1199.7 s]: entries 0; best rung window 420 clean of 450 needed 435; seconds by level {7000: 1199.7}
+   LINK-L2 H3 [C2 telemetry, 600 reports, 1199.6 s]: entries 0; best rung window 414 clean of 450 needed 435; seconds by level {7000: 1199.6}
+   LINK-L2 H4 [C2 telemetry, 600 reports, 1197.7 s]: entries 0; best rung window 415 clean of 450 needed 435; seconds by level {7000: 1197.7}
+   LINK-L2 H5 [C2 telemetry, 600 reports, 1199.8 s]: entries 0; best rung window 396 clean of 450 needed 435; seconds by level {7000: 1199.8}
+   LINK-L2 H6 [C2 telemetry, 600 reports, 1199.6 s]: entries 0; best rung window 417 clean of 450 needed 435; seconds by level {7000: 1199.6}
+   C5-M4A V5 (adopted 7000, 4x source) [C2 telemetry, 600 reports, 1199.7 s]: entries 0; best rung window 416 clean of 450 needed 435; seconds by level {7000: 1199.7}
+   beside (5-min holds):
+   C5-M4 b_1x (720p at 7000, 1x source; 5-min) [C2 telemetry, 150 reports, 297.8 s]: entries 0; best rung window 138 clean of 450 needed 435; seconds by level {7000: 297.8}
+   C5-M4 b_2x (720p at 7000, 2x source; 5-min) [C2 telemetry, 150 reports, 299.9 s]: entries 0; best rung window 135 clean of 450 needed 435; seconds by level {7000: 299.9}
+   C5-M4 b_4x (720p at 7000, 4x source; 5-min) [C2 telemetry, 150 reports, 297.8 s]: entries 0; best rung window 136 clean of 450 needed 435; seconds by level {7000: 297.8}
+   C5-M4 b_8x (720p at 7000, 8x source; 5-min) [C2 telemetry, 150 reports, 297.7 s]: entries 0; best rung window 137 clean of 450 needed 435; seconds by level {7000: 297.7}
+
+SUMMARY: stop rule PASS (377 series, 128530 reports, 65058 events); entry reached on 6 of 20 720p holds, and left again on 0 of those; leave reached on 1 of 13 1080p series

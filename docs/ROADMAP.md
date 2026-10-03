@@ -22,7 +22,7 @@ Authority for the current position is `docs/memory/CURRENT.md`.
   pooled); `C3.L4` AUTHORIZED, single transition per event; live mode
   BUILT (`C3-L4-L1`: SILENT on a clean link, decrease proven on injection,
   increase rule unreachable in attract mode — the user's call; `nft` night
-  next); C4 closed (8+1 stays); D7 complete on the adopted build; C5: 1080p60 NOT CAPABLE (stream) at parity, capability-gated; C5-M2's follow-up arms INCONCLUSIVE (link); C5-M3's low rungs screened (720p/4000 passes transport). **2026-10-01: C5 reopened by the user's reading (1080p60 through the ladder); C5-M4 Part 1 measured the PS1 source at native 1080p (4x holds 60); C5-M4A adopted the 4x PS1 source (1920×1080 window) through today's 720p/7000 stream.**
+  next); C4 closed (8+1 stays); D7 complete on the adopted build; C5: 1080p60 NOT CAPABLE (stream) at parity, capability-gated; C5-M2's follow-up arms INCONCLUSIVE (link); C5-M3's low rungs screened (720p/4000 passes transport). **2026-10-01: C5 reopened by the user's reading (1080p60 through the ladder); C5-M4 Part 1 measured the PS1 source at native 1080p (4x holds 60); C5-M4A adopted the 4x PS1 source (1920×1080 window) through today's 720p/7000 stream. 2026-10-03: C5-M5 built the 1080p rung on the live ladder behind its flag (off by default, not adopted); the night WORKS AS A RUNG.**
 - **`D-BASE`'s loss column is closed.** The wireless-hop packet loss was
   traced to the encoder's per-frame burst and fixed by a 90,000-byte frame
   cap, now a declared field of `native_game_720p60_reference`
@@ -403,8 +403,7 @@ as a rung above 7000, not only a characterization.** C5-M1 and C5-M2
 characterized the stream on a source with 720p detail (the 879×720
 window, upscaled 1.5×) and on an unsettled link. C5-M4 is the
 source-side step, with the PS1 source rendering natively at 1080p. The
-rung itself is Part 2, after the user's link work: the 40 MHz change on
-the Opal and the LINK-L1 re-run. PS1 comes first, because it maps onto
+rung itself, Part 2, is C5-M5 (built behind its flag, below). PS1 comes first, because it maps onto
 PS2-class emulation later.
 
 **C5-M4 Part 1 (2026-10-01): the PS1 source at native 1080p — measured
@@ -442,6 +441,29 @@ the pre-registered rows.
 - **Next: the rung (Part 2)**, after the 40 MHz change and the LINK-L1
   re-run.
 - `docs/memory/decisions/C5-M4_PS1_4X_SOURCE_ADOPTION_2026-10-01.md`.
+
+**C5-M5 (2026-10-02/03): the 1080p rung — BUILT, SHOWN, behind its flag,
+NOT adopted.** It sits on the live ladder behind
+`PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`, off by default.
+
+- **The level**: 12,600 kbps at 1920×1080, the c3 arm's argv.
+- **Entry**: from 7000, after ≥ 435 clean of the last 450 reports.
+- **Leave**: the existing triggers; the mild bar goes to 7000 / 720p.
+- **Holds**: a 10-min re-entry hold; leave-entry-leave → HOLD.
+- **What it showed:**
+  - **The mid-session size change needs no client change** (R0a). R0b is
+    not met as pre-registered on two clauses (record).
+  - Tests 119/119, mutations 10/10. With the flag absent, the decisions
+    are identical to the closed controller's (377 series).
+  - The injection session passed.
+  - The 2-h night (01:06) **WORKS AS A RUNG**, with one entry at 111.5
+    min and 8.5 min at 1080p.
+  - The 30-min daytime hold did not reach the entry (431 of 450).
+- **What the replays say:** on this link the entry is rarely reached, and
+  the mild bar does not catch the 1080p's bursty loss.
+- **Next**: the user's picture look at 1080p (the gate), then the user's
+  call on adopting the flag, and the rung's `nft` capacity night.
+- `docs/memory/evidence/C5_M5_1080P_RUNG_2026-10-03.md`.
 
 Characterize 1080p60 using the current development host and onn client.
 
@@ -537,7 +559,7 @@ Acceptance:
 | transport telemetry contract | ✓ | C2 (`privyhub_stream_telemetry_v1`, heartbeat v3, decoder report v2) |
 | adaptive bitrate runtime validated | ✓ **`C3.L4` CLOSED 2026-09-30: live VALIDATED UNDER REAL LOSS on three `nft` nights (1 NOT → capacity + backstop; 2 WORKS UNDER LOSS → `capacity_mild`; 3 WORKS UNDER LOSS, the pre-registered HOLD shape); live behind its flag; **live ON BY DEFAULT since 2026-10-01 (`C3-L4-D1`, the unit drop-in; the user's authorization 2026-09-30).** History: shadow built and SILENT; live AUTHORIZED 2026-09-28 (single transition per event); **live BUILT (`C3-L4-L1`): SILENT on a clean link, decrease proven on injection; the increase rule replaced by the user's blend (`C3-L4-L2`: climb 5000→7000 shown on injection); `nft` night 1 (2026-09-29): no decrease under a cap → the user's capacity trigger + recovery-escalation backstop built (`C3-L4-N1`: replays PASS, 30-min live hold SILENT); `nft` night 2 WORKS UNDER LOSS (2026-09-29) → the user's `capacity_mild` built (`C3-L4-N2`: stop rule PASS, 30-min hold 0 transitions); night 3 WORKS UNDER LOSS (2026-09-30)** | `C3_L4_D1_LIVE_DEFAULT_2026-10-01.md`; `decisions/C3-L4_LIVE_DEFAULT_2026-10-01.md`; `C3_L4_NFT_NIGHT3_2026-09-30.md`; the decision's close; `C3-L4-S1`; `C3.L3a` sessions 1-4; `decisions/C3-L4_LIVE_AUTHORIZATION_2026-09-28.md`; `C3_L4_L1_LIVE_CONTROLLER_2026-09-28.md`; `C3_L4_NFT_NIGHT1_2026-09-29.md`; `C3_L4_N1_CAPACITY_TRIGGER_2026-09-29.md`; `C3_L4_NFT_NIGHT2_2026-09-29.md`; `C3_L4_N2_MILD_CAPACITY_2026-09-29.md` |
 | adaptive FEC validated or explicitly deferred | ✓ **explicitly deferred** (2026-09-28, the user's call): adaptive not supported; static 8+2 NOT SHOWN; 8+1 stays; arm dormant | `decisions/C4_ADAPTIVE_FEC_2026-09-24.md`, `C4_M1_FEC_ARM_2026-09-25.md` |
-| 1080p60 characterized → **delivered through the ladder** (the user's reading, 2026-10-01) | **open (reopened 2026-10-01)**: 1080p60 is a Phase C deliverable as a ladder rung above 7000, not only a characterization. Done so far: characterized on a 720p-detail source (C5-M1 NOT CAPABLE at parity; C5-M2 INCONCLUSIVE (link) twice); **C5-M4 Part 1 (2026-10-01): the PS1 source at native 1080p measured — 4x HOLDS 60; C5-M4A: the 4x source ADOPTED the same day (the quick win)**. Remaining: the link work (40 MHz, LINK-L1 re-run), then Part 2 (the rung). Low rungs screened for Phase G (C5-M3: 720p/4000 passes transport) | `C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md`; `C5_M1_1080P60_PROFILE_2026-09-28.md`, `decisions/C5_1080P60_CAPABILITY_2026-09-28.md` |
+| 1080p60 characterized → **delivered through the ladder** (the user's reading, 2026-10-01) | **open (reopened 2026-10-01)**: 1080p60 is a Phase C deliverable as a ladder rung above 7000, not only a characterization. Done so far: characterized on a 720p-detail source (C5-M1 NOT CAPABLE at parity; C5-M2 INCONCLUSIVE (link) twice); **C5-M4 Part 1 (2026-10-01): the PS1 source at native 1080p measured — 4x HOLDS 60; C5-M4A: the 4x source ADOPTED the same day (the quick win)**. LINK-L2 (40 MHz) TIME OF DAY on the boundary. **C5-M5 (2026-10-02/03): the 1080p rung BUILT and SHOWN behind `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`, NOT adopted** (mid-session size change needs no client change; S3 night WORKS AS A RUNG; S2 entry not reached). Remaining: the user's picture look at 1080p, the adoption call, the rung's `nft` night. Low rungs screened for Phase G (C5-M3: 720p/4000 passes transport) | `C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md`; `C5_M1_1080P60_PROFILE_2026-09-28.md`, `decisions/C5_1080P60_CAPABILITY_2026-09-28.md` |
 | generalized source contract established | ✓ on paper and as an unused interface | `architecture/NATIVE_SOURCE_CONTRACT.md` (`C6-D1`) |
 | Games regression passes | ✓ all 9 scripted rows PASS (D7-R2); the user's hands-on rows reported fine (2026-09-28) | `D7_R1_LINUX_REGRESSION_2026-09-25.md` §R3 |
 | reusable by Phase G remote/WAN | stated in the contract (a remote transport is another `Transport`; nothing implemented) | `architecture/NATIVE_SOURCE_CONTRACT.md` |

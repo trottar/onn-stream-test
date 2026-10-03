@@ -1,0 +1,136 @@
+C5-M5 -- the 1080p rung (C5-M4 Part 2). PRE-REGISTRATION.
+Written 2026-10-02 (19:25 EDT, 23:25Z) before any code change, session, replay or score of this
+task. Task: docs/memory/handoffs/C5-M5_1080P_RUNG_TASK.md, under handoffs/QUEUE_2026-09-29B.md's
+rules. Baseline commit 5005615. Nothing below is changed after data. Holds all rows of sections
+1 (R0), 2 (the rung's constants), 3 (tests / replays / the stop rule) and 4 (S1, S2, S3).
+
+STANDING
+- Adopted profile native_game_720p60_reference (7000, 1280x720, cap 90,000, GOP 15, 8+1 FEC, cushion
+  12/17, redundancy 2/4); the adopted 4x PS1 source (1920x1080 window); APK de072762...835e (never
+  reinstalled; checked at each teardown); live adaptive bitrate on by default (the unit drop-in;
+  never touched). The shadow (companion/adaptive_bitrate.py, sha256 d66211b3...) stays
+  byte-identical, and its test suite unchanged. No nft, no real sudo, the Opal read-only.
+- Session flags are set in the user manager for ONE session (systemctl --user set-environment, then
+  a unit restart) and unset after it (unset-environment + restart); at every teardown: the manager
+  carries no PRIVYHUB_*, the companion's environ exactly PRIVYHUB_ADAPTIVE_BITRATE_MODE=live, mode
+  live / acts true, stream 7000 at 1280x720, adopted profile, any_override false, no game,
+  0 NOW PLAYING banners, the APK hash confirmed.
+- Pre-existing at baseline (recorded, not caused here): tools/test_c3_f1_recovery_restart.py
+  8 tests, 1 ERROR (test_recovery_is_wired_to_the_new_primitive: a source-text search for
+  "restart_encoder=(" that the games plugin no longer contains). Every other suite passes:
+  live 102, shadow 21, nft harness 32, C5-M1 selector 14, source contract 7.
+
+SECTION 1 -- FIRST AND GATING: THE MID-SESSION SIZE CHANGE (session R0)
+How: the minimum test-only path. The actuator gains a level that carries a size (12,600 kbps at
+1920x1080: the c3 arm's argv exactly, golden-checked); the live controller's test-only inject
+route gains `class=SIZE&size=1080p|720p` (loopback, PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1, live, not
+disabled), which requests one transition straight through the controller's own actuator worker
+(serial lock, recovery interlock) with no policy rule. No rung, no policy change.
+Session R0: one attract session (Tekken 3, zero input), live by default, INJECT=1 for this session
+only, T2 at 10 s, the C2 telemetry (c5_m4_sampler --telemetry), SurfaceFlinger captured at 5 s
+intervals. After >= 90 s at PLAYING: inject SIZE 1080p; 60 s later inject SIZE 720p; then 60 s more;
+BACK.
+  R0a  For EACH direction (7000/1280x720 -> 12,600/1920x1080, then back):
+       - the actuator reports ok; the encoder argv after the switch carries scale/pad at the new
+         size and -b:v / -maxrate at the new rate (encoder_command in native-stream-status);
+       - the client reports exactly one SSRC change for the switch (report ssrc_changes total = 2);
+       - the client decodes the new size: SurfaceFlinger's stream SurfaceView buffers read
+         1920x1080 in a capture taken 5-55 s after the up switch and 1280x720 in one taken 5-55 s
+         after the down switch;
+       - rendering continues: rendered fps over each 60-s segment after a switch >= 55 (from the
+         C2 telemetry's rendered_frames_delta);
+       - no recovery cycle (no recovery-log event other than session_started / session_ended in
+         the session) and no session restart (one decoder report for the session at BACK).
+  R0b  Each direction's cost:
+       - the output gap at the switch (the largest output_gap_ms among the report's retained
+         slow events in [ssrc, ssrc + 1 s], LINK-L1's analysis method) <= 450 ms
+         (2x the C3.L3a-S1 restart max 225);
+       - sequence resyncs 0 outside the SSRC changes (report sequence_resyncs 0 and no
+         sequence_resync discontinuity);
+       - no stale-drop burst beyond the first second: stale_output_drops_delta 0 in every C2
+         telemetry report that starts more than 1 s after the switch, within 10 s of it;
+       - codec_ms at the switch (the same slow-event rows) and actuation_ms: reported.
+  R0 PASSES if R0a and R0b hold for both directions. A failing session may be re-run at most
+  twice (the two-retry limit) only for a harness/launch failure, never for a row that failed.
+  IF R0a FAILS: STOP AFTER SECTION 1. Record what the client did (the decoder report, the C2
+  telemetry, SurfaceFlinger, logcat lines from the codec, redacted) and list the client change the
+  rung needs; sections 2-4 wait for the user.
+  IF R0a holds and only R0b fails: also stop after section 1 and record the cost (the rung would
+  carry a switch cost above the bound); sections 2-4 wait for the user.
+
+SECTION 2 -- THE RUNG'S CONSTANTS (fixed here, before any replay)
+- Level `1080p_12600`: 1920x1080, 12,600 kbps (-maxrate and -bufsize 12,600k), cap 90,000 B,
+  GOP 15, bf 0, 8+1 FEC, the adopted cushion and redundancy. Every 720p level is 1280x720.
+- Flag PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p (exact, case-insensitive after strip); anything else or
+  absent = no rung. Ladder with the flag: 5000 / 5500 / 6000 / 7000 / 12600(1080p).
+- ENTRY: at 7000 only, class INCREASE, reason increase_1080p, when the rung window (the last
+  N = 450 evaluated reports since the last SSRC change and its blackout; resyncs enter it as not
+  clean, stale reports are skipped -- exactly the blend's window rules, only longer) is full and
+  >= 435 of its 450 are clean (the blend's clean: fps >= 57, queue <= 1, gap <= 150), and every
+  gate passes (the INCREASE hold-down as now: 30 reports after an up, 60 after a down; guards;
+  rate limit; the oscillation guard; the re-entry hold-down below).
+  N = 450 (15 min at the 2-s report rate), the middle of the allowed 300-600: five times the
+  increase window, long enough that the rung is entered only after a sustained clean stretch, and
+  short enough that a 30-min hold can show an entry and a 2-h night more than one opportunity
+  after the 10-min re-entry hold-down.
+- LEAVE: at 12600, the existing triggers with the existing mapping: the mild bar (capacity_mild:
+  fps < 57 on >= 4/5 and lost >= 50 on >= 3/5) -> ROUTINE one rung down = 7000 at 1280x720; the
+  strict capacity / the queue-gap FALLBACK -> 5000; the queue-gap ROUTINE -> 6000 (its fixed
+  target, as now); the recovery-escalation backstop as now. Every existing hold-down applies as
+  now (after the entry -- an up -- a decrease waits 60 reports).
+- RE-ENTRY HOLD-DOWN: no entry for 10 minutes (600,000 ms on the policy clock) after any transition
+  that leaves 12600 (refusal reason rung_reentry_hold).
+- RUNG OSCILLATION: a leave, then an entry, then a leave in one session -> the second leave is
+  carried out and the policy goes to HOLD (reason oscillation_rung) for the rest of the session
+  at the level it left to (7000 on the mild bar): no further decision is acted on.
+- Status: native-stream-status width / height = the active level's; the controller's status
+  carries the level's size and the rung's window / hold-down.
+- Recovery: a link-drop restart at 12600 restarts at 12600 / 1920x1080 (level-preserving); a full
+  start resets to 7000 / 1280x720 (C1); the backstop still falls back to 5000.
+- Test-only injection (INJECT=1): class INCREASE_1080P (the policy's own entry decision with the
+  window requirement replaced by the injection, every other gate applies), class CAPACITY_MILD (a
+  synthetic mild-bar decision through every gate), and section 1's raw SIZE.
+- NOT adopted. The flag is off by default and never set outside a session here.
+
+SECTION 3 -- TESTS AND REPLAYS (before any rung session)
+- Unit tests: the entry fires at 435 of 450 and not at 434; only from 7000; never without the flag;
+  the leave on the first mild bar -> 7000/720p; strict -> 5000; the re-entry hold-down; the rung
+  oscillation; the size on every level; the actuator argv at 12600 equals the c3 arm's golden argv;
+  the 720p argv byte-identical to golden_after_unset; recovery at 12600 keeps 12600/1080p.
+  Mutations of the new rules are caught. The shadow suite unchanged; the harness suite passes.
+- THE STOP RULE: with the flag absent, the live policy's decision stream (every non-sample row a
+  replay emits) on every recorded series replayed is IDENTICAL to the closed controller's
+  (the baseline module, pre_patch). Any difference -> no rung session runs; the record says why.
+- Replays (reported, no gate): the leave rule on every recorded 1080p series (C5-M1, C5-M2's C
+  holds, C5-M4's c_1x...c_8x) -- when it would have left and how long it sat degraded first;
+  the entry rule on every recorded 720p-at-7000 series (S1, N1, N2, D1 holds; LINK-L1, LINK-L2;
+  C5-M4A V5) -- where it would have entered, and, on that hold's own reports, where the mild bar
+  would then have taken it out (an honest preview: those reports are 720p, not 1080p).
+
+SECTION 4 -- SESSIONS (flag set for the session only; INJECT only for S1)
+S1 injection (attract, live, TOP=1080p, INJECT=1): after >= 90 s at PLAYING inject INCREASE_1080P
+   (expect transition 7000 -> 12600, reason increase_1080p); after the hold-down allows a decrease
+   (>= 63 reports after the entry's SSRC change) inject CAPACITY_MILD (expect 12600 -> 7000, reason
+   capacity_mild); 60 s more; BACK. Rows: both transitions acted, each one SSRC change, the sizes
+   in native-stream-status and SurfaceFlinger, both costs as R0b (gap <= 450 ms), any_override
+   false at PLAYING and at the end, level 7000 / 1280x720 after BACK. S1 PASSES on all rows.
+S2 a 30-min daytime hold (start 09:00-17:00 local), attract, live, TOP=1080p, T2 on.
+   RUNG SHOWN if: the controller enters 1080p by its own rule (increase_1080p, not injected) and
+   leaves by its own rule or stays; every transition is one the rules name, at the spacing the
+   hold-downs allow; 0 recovery cycles; the client rows met over the hold (spikes < 200/min,
+   fps >= 59.5, stale < 20/min, underruns < 5/min). Loss and gap reported. If the controller never
+   enters: "ENTRY NOT REACHED" with the longest clean run in the rung window (a 30-min hold with
+   the entry needing 450 reports after the start may not reach it; that is not a failure of the
+   rung, and it is not RUNG SHOWN).
+S3 one 2-hour attract session (7200 s) starting 01:00-06:00 local, live, TOP=1080p, T2 on.
+   WORKS AS A RUNG if: every transition is one the rules name, at the spacing the hold-downs
+   allow; no oscillation HOLD, or one with its three changes listed; 0 recovery cycles, or each
+   explained; at 1080p the client rows (spikes < 200/min, fps >= 59.5, stale < 20/min, underruns
+   < 5/min) met over the 1080p minutes (from the C2 telemetry: rendered fps and stale deltas per
+   report; spikes and underruns where the per-report telemetry has them, else the session's);
+   reported: the time at 1080p and at each 720p rung, the close-out rows per rung, the loss.
+   If the controller never enters 1080p in the 2 h: "ENTRY NOT REACHED", with the longest run.
+   The night is not a link test; its loss is reported.
+ORDER: R0, then (if it passes) the build, tests, replays and the stop rule, then S1; S3 in the
+first 01:00-06:00 window after S1 passes; S2 in the first daytime window after S1 passes. Neither
+S2 nor S3 gates the other. A session that fails to start is retried at most twice.

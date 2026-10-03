@@ -1,0 +1,30 @@
+[table 05:05:20Z] last session_ended 2026-10-02T23:49:07.313Z; S3 not before 23:59:07Z
+[table 05:05:20Z] session flags set in the manager: 'PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p'
+[table 05:05:20Z] start: manager PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p'; MainPID 1583387; 8765 1583387; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 05:05:20Z] T2 sampler started (10 s); one hold, 7200s
+[table 05:05:20Z] S3 begins (adopted 7000, the 4x PS1 source, flags 'PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p', hook 'none')
+[S3 05:05:20Z] mode=H hold/timeout=7200s probe_args=none heartbeat_ms=default
+[S3 05:05:20Z] ARM_PROFILE adopted; PRIVYHUB_* in the user manager: 'PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p'
+[S3 05:05:24Z] companion MainPID 1589711 serving 8765; PRIVYHUB_* in its environ: 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p'
+[S3] before launch: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[S3] at PLAYING: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[S3 05:06:03Z] SurfaceFlinger stream-surface lines: 11
+[S3 05:06:03Z] PLAYING at 2026-10-03T05:06:03Z; holding 7200s, zero input
+[S3 07:06:05Z] adb client processes seen during hold: 223 (# polls 13892)
+[S3 07:06:07Z] report: native_decoder_20261003_070607_374.json
+[frames] 7201 seconds in the session window
+[heartbeat] 3587 lines
+[S3 07:06:28Z] decision log lines in the hold: 3979
+[S3 07:06:30Z] game active after stop: False
+[S3 07:06:30Z] done
+[table 07:06:30Z] S3 exit 0
+[table 07:06:34Z] teardown: manager PRIVYHUB_* ''; MainPID 1663547; 8765 1663547; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 07:06:34Z] FLAGS UNSET AND ABSENT: manager none, environ exactly the live default
+[table] teardown stream 7000 1280 720 level size 1280x720
+[table 07:06:34Z] measurement files: 0 (want 0)
+[table 07:06:35Z] ADOPTED APK CONFIRMED (device hash de072762e55122c3060086f6f10b1bff54633d9165d0c475f17699127841835e)
+[table 07:06:44Z] teardown: game active False; NOW PLAYING on the launcher: 1
+[table 07:06:55Z] stale banner: force-stop + relaunch; NOW PLAYING now: 0
+[table 07:06:55Z] table done
