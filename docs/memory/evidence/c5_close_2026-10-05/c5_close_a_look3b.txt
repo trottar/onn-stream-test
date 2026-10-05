@@ -1,0 +1,33 @@
+== controller rows (not samples / states)
+  2026-10-05T05:01:29.459 session_ended_reset {}
+  2026-10-05T05:01:29.741 controller_start {'top': '1080p', 'inject_enabled': True}
+  2026-10-05T05:01:51.920 session_ended_reset {}
+  2026-10-05T05:04:04.084 inject {'class': 'INCREASE_1080P'}
+  2026-10-05T05:04:04.084 transition {'class': 'INCREASE', 'from_kbps': 7000, 'to_kbps': 12600, 'reason': 'increase_1080p', 'injected': True, 'session_elapsed_ms': 135956, 'from_size': '1280x720', 'to_size': '1920x1080'}
+  2026-10-05T05:04:05.459 transition_done {'class': 'INCREASE', 'from_kbps': 7000, 'to_kbps': 12600, 'injected': True, 'actuation_ms': 1374.5}
+  2026-10-05T05:05:34.001 session_ended_reset {}
+  2026-10-05T05:05:35.148 controller_start {'inject_enabled': False}
+  2026-10-05T05:05:44.785 session_ended_reset {}
+  2026-10-05T05:05:47.875 session_ended_reset {}
+  2026-10-05T05:05:48.137 controller_start {'inject_enabled': False}
+== C2 samples per stream level, inside the session (to its end at 05:05:34Z)
+  7000: 68 reports 05:01:48-05:04:03 (~2.27 min); fps median 59.73 min 0.00; lost_packets_delta 130 (~57.4/min); largest per-report gap 75 ms; unclean 12; dispositions {'evaluated': 67, 'resync': 1}
+  12600: 44 reports 05:04:06-05:05:32 (~1.47 min); fps median 59.76 min 53.73; lost_packets_delta 33 (~22.5/min); largest per-report gap 64 ms; unclean 8; dispositions {'blackout': 3, 'evaluated': 41}
+== recovery rows
+  2026-10-05T05:01:51 session_started PLAYING
+  2026-10-05T05:05:34 session_ended PLAYING
+== encoder (native_video_alpha.log, the last three Output #0 blocks and the sized-transition lines)
+   Stream #0:0: Video: h264 (High), vaapi(tv, progressive), 1280x720, q=2-31, 7000 kb/s, 60 fps, 90k tbn
+   Stream #0:0: Video: h264 (High), vaapi(tv, progressive), 1280x720, q=2-31, 7000 kb/s, 60 fps, 90k tbn
+   Stream #0:0: Video: h264 (High), vaapi(tv, progressive), 1920x1080, q=2-31, 12600 kb/s, 60 fps, 90k tbn
+   C5-M5 Linux sized level transition: 7000 -> 12600 kbps encoder-only cycle begin
+   C5-M5 Linux sized level transition: 12600 kbps active; first RTP resume=618.693 ms
+   last progress: frame= 5370 fps= 60 q=-0.0 Lsize=  139278KiB time=00:01:29.50 bitrate=12748.2kbits/s speed=   1x
+== decoder report native_decoder_20261005_050544_758.json
+  duration 236420 ms; video frames 13530, lost 163, ssrc_changes 1, sequence_resyncs 1; decoder rendered 13507, stale drops 20, spikes >=20/50/80/250 ms 554/32/15/0 (140.6/min over the report), max_codec_ms 151, max_output_gap_ms 9936; audio underruns 590
+  slow events by gap (elapsed_ms, codec_ms, ..., output_gap_ms):
+    [236420, -1, -1, -1, 0, 0, 9936]
+    [137156, 151, 0, 151, 10, 0, 329]
+    [76443, 9, 0, 9, 0, 0, 173]
+    [90584, 9, 0, 9, 0, 0, 113]
+  the report carries no decoded-size field (paused_frame_* is the pause thumbnail)

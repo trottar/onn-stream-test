@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-10-04
-baseline_commit: a402272
+as_of: 2026-10-05
+baseline_commit: 4493e68
 ---
 
 # Current State
@@ -9,52 +9,52 @@ baseline_commit: a402272
 Headings are fixed by `tools/check_memory_health.py`; do not rename.
 ## Active Objective
 
-**Phase C continues. C5 was reopened by the user's reading of
-2026-10-01: 1080p60 is a Phase C deliverable through the adaptive
-ladder**, as a rung above 7000, not only a characterization, and the
-source should render natively at 1080p. PS1 comes first.
+**Phase C CLOSED, 2026-10-05** (C5-CLOSE, the user's decisions, "Yep
+agreed"). **Phase E is next — E1 first (freeze the workload suite), NOT
+STARTED; it starts on the user's word.**
 
-- **C5-M4 Part 1** (the source side) is done, and **C5-M4A adopted the
-  4x PS1 source** the same evening, through the quick win.
-- **The 1080p rung** (C5-M5, behind `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`;
-  C5-M5B: entry 415 of 450) and **the PS1 look** (C5-M5B, behind
-  `PRIVYHUB_PS1_LOOK=remaster`): **off by default, NOT adopted.** The
-  user's look on the TV comes next.
-- **Standing, unchanged:**
-  - live adaptive bitrate is ON BY DEFAULT (`C3-L4-D1`, the unit
-    drop-in);
-  - `C3.L4` is CLOSED;
-  - `LINK-L1` (80 MHz) is MIXED; `LINK-L2` (40 MHz) is TIME OF DAY as
-    scored, on the boundary;
-  - C7 / D8 are met or deferred, with the C7 1080p row reopened (ROADMAP).
-- **Earlier:** `D-BASE` CLOSED (2026-09-23); C1; C4 (8+1); C6; D7; the
-  `CL-B1` APK adopted (2026-09-30).
+- **C5 CLOSED**: the 1080p rung NOT ADOPTED (stays behind
+  `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`, off, for a 1080p-detail source);
+  the `remaster` preset NOT ADOPTED (stays behind `PRIVYHUB_PS1_LOOK`);
+  **the 4x PS1 source stays adopted** (C5-M4A).
+- **The user's look, their words:** Look 1 (4x, 720p) and Look 3 (the
+  same at the 1080p rung) *"looked the best, little difference between
+  them"*; Look 2 (`remaster`) *"was the worst, a bit less smooth"*.
+- **Look 3, repeated (C5-CLOSE-A):** the user's words *"Looked the same
+  and loading the game still says 720"*. From the logs it **was at 1080p**:
+  the entry acted 132 s after PLAYING, ~1.5 min at 1920×1080 / 12600,
+  entry gap 329 ms (the first try was refused by the 60-s age guard). The
+  user saw no difference from the 4x 720p stream; the decision's grounds
+  include the look. The on-screen 720 is the client's constant
+  (`NativeStreamActivity.kt:66-67`), cosmetic.
+- **Phase C delivered**: explicit profiles (C1), the C2 telemetry
+  contract, live adaptive bitrate on by default (`C3.L4` closed, validated
+  under real loss), the FEC decision (C4: 8+1, adaptive deferred), 1080p60
+  characterized and built as a rung behind its flag (C5), the source
+  contract (C6), the Games regression (D7). C7: every row met or deferred
+  but the commit (`docs/ROADMAP.md`, `evidence/C7_D8_CHECKPOINT_2026-09-30.md`).
+- **Standing:** `D-BASE` CLOSED; `LINK-L1` (80 MHz) MIXED; `LINK-L2`
+  (40 MHz) TIME OF DAY on the boundary; the `CL-B1` APK adopted.
 
 ## Current Work Item
 
-**C5-M5B** (`QUEUE_2026-09-29B.md`'s rules): nothing adopted, nothing
-committed. Record: `evidence/C5_M5B_RUNG_RULES_AND_LOOK_2026-10-03.md`.
+**C5-CLOSE** (`handoffs/C5-CLOSE_PHASE_C_CLOSE_TASK.md`,
+`QUEUE_2026-09-29B.md`'s rules): done; nothing else adopted; nothing
+committed. Record: `evidence/C5_CLOSE_2026-10-05.md` (with the
+C5-CLOSE-A addendum, read-only from the logs).
 
-- **Selection** (pre-registered `6ba1e522…`, written before code):
-  - **entry ≥ 415 of 450** (8 of 10 real-input holds within 20 min; 435
-    entered on 0);
-  - **the leave unchanged** (no loss rule qualified: 1080p loss here is
-    rare bursts).
-- Tests 120 + 13 + 8 (the helper's fake run), mutations 14/14, stop rule
-  0 differences (386 series).
-- **S1b** PASSES (348 / 346 ms). **S2b** NOT RUNG SHOWN: recovery paused
-  the game, and the guards refused the entry.
-- **S3b night: DOES NOT WORK AS A RUNG by its rows.**
-  - It entered by rule at 15.1 min (434 of 450) and stayed 104.9 min at
-    1080p: no leave, 0 recovery, fps 60.18, loss 2.82/min.
-  - The miss: session spikes 317.9/min against < 200. That is the onn's
-    known 1080p decode rate, so a rung that is really used misses the
-    row.
-  - The entry switch cost 649 ms.
-- **Look:**
-  - `remaster` (4x + bilinear + dither off + PGXP) holds 60 at 720p.
-  - xBR and JINC2 miss; MSAA is not offered.
-  - `remaster-1080p` is not offered (1 dropped frame at the rung).
+- **The rung-window rule**, behind the rung flag: reports while recovery
+  is not PLAYING are skipped (skip, not reset). Tests 126/126, mutations
+  22/22, stop rule 0 differences (448 series); S2b replayed: 451 entry
+  decisions → 0; the injection check PASSES (`window_rule`,
+  `skipped_not_playing` in the status).
+- **The helper's `--attract`** fixed from the journal (the launcher drawn
+  before the launch never refreshed; nothing tapped RESUME): now
+  force-stop → start → tap the NOW PLAYING preview → confirm, else the
+  exact TV steps. Fake-run 11/11; one real `4x --attract` dry pass to
+  PLAYING and back. The plain route stays the default.
+- C5's close: `decisions/C5_1080P60_CAPABILITY_2026-09-28.md`; Phase C
+  CLOSED in `docs/ROADMAP.md`; C7 checkpoint appended.
 
 ## Verified State
 
@@ -69,7 +69,7 @@ one to two client reports (≤ ~4 s); each costs one 125-211 ms gap
 (`codec_ms` 7-11) — the restart's ~152 ms RTP silence.
 **`C3.L3a-S1` transition soak** (2026-09-24): each bitrate-only restart costs
 one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
-(C5-M5 / C5-M5B). The pool rule and the soak's rows are in their records.
+(C5-M5 / C5-M5B).
 
 - **The PS1 source, since 2026-10-01 (`C5-M4A`): a 1920×1080 window at
   internal resolution 4x.** It is set by the Beetle PSX HW core override
@@ -84,13 +84,13 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`, including `C5-M1`'s `PRIVYHUB_NATIVE_PROFILE_ID`); none set.
 - **Installed**: **APK `de072762…835e`** (the `CL-B1` APK, adopted
   2026-09-30; hash confirmed on the onn at every teardown since,
-  last 2026-10-04 07:01Z (C5-M5B S3b); the previous
+  last 2026-10-05 04:42Z (C5-CLOSE's final state); the previous
   `f31b1c18…8ae7` is kept at `runtime/c4_m1/adopted_app-debug.apk` for
   rollback).
   - The companion is the systemd user unit `privyhub-companion` (`H3`);
     restart it with `systemctl --user restart`.
-  - **Live adaptive bitrate by default, since 2026-10-01 13:07Z**,
-    through the drop-in
+  - **Live adaptive bitrate by default, since 2026-10-01 13:07Z**
+    (the ladder 5000-7000 at 720p), through the drop-in
     `~/.config/systemd/user/privyhub-companion.service.d/adaptive.conf`
     (`Environment=PRIVYHUB_ADAPTIVE_BITRATE_MODE=live`). The unit file
     is unchanged.
@@ -100,59 +100,50 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
     - Kill switches: delete the drop-in + `daemon-reload` + restart
       (off); `POST /plugins/games/adaptive-bitrate/disable` (shadow, one
       session).
-  - Last restarted 2026-10-04 07:01Z by C5-M5B S3b's teardown: manager
-    none, environ the one name, live, 7000, `any_override` false, no
-    game, 0 banners, the adopted PS1 files byte-identical.
+  - Last restarted 2026-10-05 04:32Z by the helper's `--attract` dry
+    pass teardown (C5-CLOSE): manager none, environ the one name, live,
+    7000 / 1280×720, `any_override` false, no game, the adopted PS1 files
+    byte-identical, the shadow `d66211b3…`.
   - The companion tree carries the live controller through `C3-L4-N2`,
     the C5 selector profiles (dormant), **the 1080p rung behind
     `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`** (C5-M5; entry 415 since
-    C5-M5B; absent = the closed ladder) and **the PS1 look behind
-    `PRIVYHUB_PS1_LOOK`** (C5-M5B; absent or `4x` = nothing written).
+    C5-M5B; since C5-CLOSE its window skips non-PLAYING reports; absent =
+    the closed ladder; NOT ADOPTED) and **the PS1 look behind
+    `PRIVYHUB_PS1_LOOK`** (C5-M5B; absent or `4x` = nothing written; NOT
+    ADOPTED). Both flags off and absent.
 - **Link-drop recovery** RUNTIME VALIDATED on real loss (`R3`-`R3d`);
   recovery never loads into a live core (`R3c2`).
 - **Host-shell operation**: open `MainActivity`, wake, tap RESUME PLAYING
-  (`TOOLS.md`); adb after a host reboot: `adb connect <onn-address>:5555`.
+  (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
 
-1. **The user's commit** of C5-M5B (`logs/c5_m5b_git_status.txt`).
-2. **The user's look** on the TV, in an SSH window (`TOOLS.md`, "The PS1
-   look per session"). Each command waits for PLAYING (`--attract` starts
-   Tekken 3), prints what to look at, and restores everything on Enter.
-   1. `tools/ps1_look.sh 4x`: the adopted look at 720p.
-   2. `tools/ps1_look.sh remaster`: bilinear, no dither, PGXP, at 720p.
-   3. `tools/ps1_look.sh remaster-1080p` **refuses** (not offered). For
-      1080p, use C5-M5's hand steps (`TOOLS.md`, the 1080p rung).
-   - Look at: edges, textures up close, the dither checkerboard in
-     gradients, polygon wobble; at 1080p, the IDR pulse every 250 ms.
-   - **Tell Claude what you saw**, in your own words.
-3. **The user's calls:**
-   - adopt the rung flag (S3b: 1080p misses the spike row when used);
-   - `remaster`;
-   - the rung's `nft` night;
-   - the rung window while recovery holds the game paused (S2b).
-4. **Phase E** when C is closed by the user.
+1. **The user's commit** of C5-CLOSE and C5-CLOSE-A
+   (`logs/c5_close_a_git_status.txt`; CURRENT.md also modified). That
+   is C7's last row, "clean checkpoint/push".
+2. **The user's go for Phase E** — E1 first, the workload suite frozen
+   (`docs/ROADMAP.md`, Phase E). Not started.
 
-**Open, not blocking:**
+**Open, not blocking** (carried past Phase C):
 
-- the max gap (447 ms, D1; ≤ 100 on 0 of LINK-L2's six); `host_link`; the thermal flag; `CTRL-L1`;
-  the slow-event ring; `C6-D1`'s list; the mild step's ~120 s bound;
-  B3a's two clauses; C5-M4's R3 (no `codec_ms` in the C2 telemetry);
-  C5-M5B: no loss leave qualified (bursty 1080p loss);
-  `encoder_command` is the full start's only;
+- the max output gap (447 ms in D1; ≤ 100 on 0 of LINK-L2's six);
+  `host_link`; the thermal flag; `CTRL-L1`; the slow-event ring;
+- the mild step's ~120 s bound;
+- **the onn's 1080p decode jitter** (~300-600 spikes ≥ 20 ms/min in every
+  1080p hold): a client item for later; the overlay's constant size text
+  (a later APK);
+- `C6-D1`'s list; B3a's two clauses; C5-M4's R3 (no `codec_ms` in the C2
+  telemetry); `encoder_command` is the full start's only;
 - **adaptive-off measurements need the drop-in out** (`TOOLS.md`); old
-  evidence night scripts misreport on default-live, so use the D1
-  pattern (`c5_m4_run.sh` is one);
-- Phase E (E1 onward) is not started.
+  evidence night scripts misreport on default-live, so use the D1 pattern.
 
 ## Success Criteria
 
-`C3` per `docs/ROADMAP.md`: bitrate first at fixed 720p60; bounded
-min/max; fast decrease, slow increase; hysteresis and congestion
-hold-down; no oscillation; reason codes; safe fallback to the reference
-profile; latency protected before image quality. **Every change measured
-against the close-out table** — the baseline must stay met. No
-perceptual gate unless the user sets one.
+Phase C: met (C7, `docs/ROADMAP.md`), the commit pending. **Phase E**
+(`docs/ROADMAP.md`): E1 freezes the workload suite before any
+measurement; every later change is measured against it and against the
+D-BASE close-out table, which must stay met. No perceptual gate unless the
+user sets one.
 
 ## Do Not Reopen Without New Evidence
 
@@ -173,21 +164,22 @@ perceptual gate unless the user sets one.
   status is 0 always; its CPU temperature is `dumpsys thermalservice`.
 - D4/D5 restoration; the Windows-era C3 record; `C3.L3a` Part 1 (chained
   ladder transitions are clean).
+- **C5 is closed** (C5-CLOSE, 2026-10-05): the rung and `remaster` not
+  adopted, the 4x source adopted. Reopen only with a 1080p-detail source
+  or a different client. **Phase C is closed.**
 - **`C3.L3a` is closed** (four sessions, the user's reading): single
   transitions are not reliably noticed, ramps are. Do not re-run the gate;
   build to the decision. **C4 is closed** for Phase C (8+1 stays).
 
 ## Relevant References
 
-- `evidence/C5_M5B_RUNG_RULES_AND_LOOK_2026-10-03.md` — the rung's rules from the data and the PS1 look (behind flags; not adopted).
-- `evidence/C5_M5_1080P_RUNG_2026-10-03.md` — the 1080p rung (behind its flag; not adopted).
-- `evidence/LINK_L2_LOSS_ROW_2026-10-02.md` — the loss row at 40 MHz (TIME OF DAY as scored, on the boundary); `evidence/LINK_L1_LOSS_ROW_2026-10-01.md` (80 MHz, MIXED).
-- `evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md` — the PS1 source at native 1080p (C5-M4 Part 1).
-- `evidence/D_BASE_CLOSEOUT_2026-09-23.md` — the scored table and verdict.
-- `investigations/BASELINE_STREAM_HEALTH.md` (MET);
-  `decisions/D-BASE_BASELINE_BEFORE_ADAPTATION.md` (closed);
-  `decisions/D-BASE-P{6A,9,10}_*` (the three adopted values).
-- `handoffs/CURRENT_HANDOFF.md` (Phase C); `investigations/ACTIVE.md`;
-  `docs/ROADMAP.md` (Phase C, D-072 order); `docs/KNOWN_ISSUES.md`.
+- `evidence/C5_CLOSE_2026-10-05.md` — the user's look, the rung-window rule, the `--attract` fix, C5 and Phase C closed.
+- `decisions/C5_1080P60_CAPABILITY_2026-09-28.md` — C5's decision record with its close.
+- `docs/ROADMAP.md` — Phase C CLOSED, the C7 table; Phase E (E1 next).
+- `evidence/C7_D8_CHECKPOINT_2026-09-30.md` — the checkpoint (appended 2026-10-05).
+- `evidence/C5_M5B_RUNG_RULES_AND_LOOK_2026-10-03.md`, `evidence/C5_M5_1080P_RUNG_2026-10-03.md` — the rung (behind its flag; not adopted).
+- `evidence/LINK_L2_LOSS_ROW_2026-10-02.md`; `evidence/LINK_L1_LOSS_ROW_2026-10-01.md` — the link.
+- `evidence/D_BASE_CLOSEOUT_2026-09-23.md` — the baseline table.
+- `handoffs/CURRENT_HANDOFF.md`; `investigations/ACTIVE.md`; `docs/KNOWN_ISSUES.md`.
 - `evidence/RUNTIME_VALIDATION.md` — a classification per record;
-  `patches/PATCH_INDEX.md` lists all 142.
+  `patches/PATCH_INDEX.md` lists all 143.

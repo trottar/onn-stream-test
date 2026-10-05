@@ -1503,3 +1503,35 @@ queue/gap triggers and the backstop.
   - The clean count during a paused, static picture is not a gameplay
     measurement.
 - **S3b, the night:** **DOES NOT WORK AS A RUNG by its rows.** One entry by its own rule at 15.1 min (434 of 450, one short of the old 435), then 104.9 min at 1080p with no leave, no oscillation and 0 recovery (fps 60.18, stale 0.70/min, loss 2.82/min). The miss is the session's spikes: 317.9/min against < 200, the 1080p decode's known rate on the onn (C5-M4's 1080p holds 328-607/min). The entry switch's gap was 649 ms.
+
+## C5-CLOSE — the rung window skips non-PLAYING reports; the rung NOT ADOPTED, C5 closed (2026-10-05)
+
+Task `../handoffs/C5-CLOSE_PHASE_C_CLOSE_TASK.md`; patch
+`../patches/C5-CLOSE_RUNG_WINDOW_RULE_AND_ATTRACT_FIX.md`; record
+`../evidence/C5_CLOSE_2026-10-05.md`.
+
+**The rule (the user's call after S2b), behind
+`PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`:** a report that arrives while
+link-drop recovery is not PLAYING (`desync_pause` … `resumed` /
+`gave_up_saved`) is **skipped by the rung window**: not appended, not
+counted, clean or not. A frozen picture streams clean and would
+overstate the link.
+
+- Skip, not reset (`LivePolicy._rung_append`, at the window's two
+  appends). The window keeps its pre-pause reports and resumes counting
+  on PLAYING; a recovery encoder restart still clears it (SSRC change).
+- The input is the existing `recovery_playing` guard; only an explicit
+  false is skipped.
+- Unchanged: the 90-report increase window, the evidence window, every
+  trigger, the entry threshold (415 of 450), the leave.
+- Status: `policy.rung_1080p.window_rule`, `skipped_not_playing`;
+  `holds_in_force.rung_skipped_not_playing`.
+- Tests 126/126 (`C5CloseRungWindow`); mutations 22/22; stop rule 0
+  differences (448 series); S2b replayed: 451 entry decisions → 0, the
+  window never qualifies in the pause (`tools/c5_close_replay.py`).
+
+**The flag's status: NOT ADOPTED, off, kept** for a source with 1080p
+detail (PS2-class, Phase H), on the user's look and decisions of
+2026-10-05. Without the flag the ladder is the closed controller's
+(5000-7000 at 720p), live by default since 2026-10-01. C5 and Phase C are
+CLOSED.

@@ -4,9 +4,12 @@
 #   tools/ps1_look.sh 4x               the adopted config (4x internal resolution), 720p stream
 #   tools/ps1_look.sh remaster         the "remaster" preset (only if offered: see TOOLS.md), 720p stream
 #   tools/ps1_look.sh remaster-1080p   the "remaster" preset at the 1080p rung (entry injected)
-#   add --attract to have the helper start the attract title (Tekken 3) and open the stream on the onn;
-#   otherwise start a PS1 game on the TV as usual (a title WITHOUT its own per-title core options: the six
-#   multitap titles keep their own file, so the look does not apply to them).
+#   THE DEFAULT (the plain route, the one the user's looks of 2026-10-04/05 used): start a PS1 game on the TV
+#   as usual once the helper says so (a title WITHOUT its own per-title core options: the six multitap titles
+#   keep their own file, so the look does not apply to them).
+#   add --attract to have the helper start the attract title (Tekken 3) and open the stream on the onn itself
+#   (C5-CLOSE: the hold harness's route -- a fresh launcher, its NOW PLAYING preview, RESUME PLAYING; if the
+#   stream does not open, the helper says exactly what to press on the TV and waits).
 #
 # What it does: sets the session flags in the user manager (PRIVYHUB_PS1_LOOK=<preset>; for -1080p also
 # PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p and PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1), restarts the companion through
@@ -15,21 +18,29 @@
 # the companion and verifies the adopted state: flags absent, live, 7000 at 1280x720, the PS1 .opt / .cfg
 # hashes unchanged. Kill switch at any time: Ctrl-C (the same teardown runs).
 #
+# Every line it prints is also appended to logs/games/ps1_look_helper.log (PS1_LOOK_LOG), UTC-stamped.
+#
 # Test hooks (tools/test_ps1_look_helper.py fake-runs it): PS1_LOOK_PROC (default /proc), PS1_LOOK_OPT_DIR,
 # PS1_LOOK_WAIT_S (PLAYING wait, default 600), PS1_LOOK_SETTLE_S (seconds at PLAYING before the -1080p entry,
-# default 90), PS1_LOOK_STEP_S (poll step, default 2), PS1_LOOK_TEST_OFFERED / PS1_LOOK_TEST_AT_RUNG (the
+# default 90), PS1_LOOK_STEP_S (poll step, default 2), PS1_LOOK_OPEN_S (--attract: seconds for the launcher
+# to draw, default 7), PS1_LOOK_LOG, PS1_LOOK_TEST_OFFERED / PS1_LOOK_TEST_AT_RUNG (the
 # offered presets, read from companion/games/ps1_look.py when unset); systemctl / curl / adb come from PATH.
 set -u
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 UNIT=privyhub-companion
 API=localhost:8765
 TITLE=game_ps1_b0a5986638f61a11
+APP=com.safeiot.privyhub
 FLAGS="PRIVYHUB_PS1_LOOK PRIVYHUB_ADAPTIVE_BITRATE_TOP PRIVYHUB_ADAPTIVE_BITRATE_INJECT"
 PROC="${PS1_LOOK_PROC:-/proc}"
 OPT_DIR="${PS1_LOOK_OPT_DIR:-$HOME/.config/retroarch/config/Beetle PSX HW}"
 WAIT_S="${PS1_LOOK_WAIT_S:-600}"; SETTLE_S="${PS1_LOOK_SETTLE_S:-90}"; STEP="${PS1_LOOK_STEP_S:-2}"
-say() { echo "[ps1_look] $*"; }
+OPEN_S="${PS1_LOOK_OPEN_S:-7}"
+LOG="${PS1_LOOK_LOG:-$REPO/logs/games/ps1_look_helper.log}"
+mkdir -p "$(dirname "$LOG")" 2>/dev/null
+say() { echo "[ps1_look] $*"; echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $*" >> "$LOG" 2>/dev/null; }
 LOOK="${1:-}"; ATTRACT=0; [ "${2:-}" = "--attract" ] && ATTRACT=1
+say "---- tools/ps1_look.sh ${*:-}"
 case "$LOOK" in
   4x) PRESET=4x; RUNG=0 ;;
   remaster) PRESET=remaster; RUNG=0 ;;
@@ -48,6 +59,40 @@ fi
 opt_hashes() { (cd "$OPT_DIR" && sha256sum ./*.opt ./*.cfg 2>/dev/null) | sort -k2; }
 status_json() { curl -s "$API/plugins/games/native-stream-status"; }
 playing() { curl -s "$API/plugins/games/status" | python3 -c "import sys,json;print((json.load(sys.stdin).get('recovery') or {}).get('state'))" 2>/dev/null; }
+game_active() { curl -s "$API/plugins/games/status" | python3 -c "import sys,json;print(json.load(sys.stdin).get('active'))" 2>/dev/null; }
+# C5-CLOSE: --attract opens the stream the way the hold harness does (c5_m5_run.sh). The launcher must be
+# drawn AFTER the game is active: an already-open launcher does not refresh on `am start`, so it shows no
+# NOW PLAYING (the user's first attempt, 2026-10-04 22:28 local: the launch went through and the TV made no
+# request in 2.7 min). So: force-stop the app (no stream is open yet), wake, start it, find the NOW PLAYING
+# preview in a uiautomator dump, tap its centre (RESUME PLAYING), confirm NativeStreamActivity; two attempts.
+open_stream() {
+  local attempt XML XY TOP
+  for attempt in 1 2; do
+    adb shell am force-stop "$APP" > /dev/null 2>&1
+    adb shell input keyevent KEYCODE_WAKEUP > /dev/null 2>&1
+    adb shell am start -n "$APP/.MainActivity" > /dev/null 2>&1
+    sleep "$OPEN_S"
+    adb shell uiautomator dump /sdcard/ps1_look.xml > /dev/null 2>&1
+    XML=$(adb shell cat /sdcard/ps1_look.xml 2>/dev/null)
+    if ! grep -q now_playing_preview_host <<< "$XML"; then
+      say "attract: attempt $attempt -- no NOW PLAYING preview on the launcher"; continue
+    fi
+    XY=$(python3 -c "
+import re, sys
+m = re.search(r'now_playing_preview_host[^>]*?bounds=\"\[(\d+),(\d+)\]\[(\d+),(\d+)\]', sys.stdin.read())
+print('%d %d' % ((int(m[1]) + int(m[3])) // 2, (int(m[2]) + int(m[4])) // 2) if m else '1008 298')" <<< "$XML")
+    adb shell input tap $XY > /dev/null 2>&1
+    sleep $(( OPEN_S < 3 ? OPEN_S : 3 ))
+    TOP=$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 topResumedActivity)
+    case "$TOP" in
+      *NativeStreamActivity*) adb shell rm -f /sdcard/ps1_look.xml > /dev/null 2>&1
+                              say "attract: RESUME PLAYING tapped ($XY); the stream is open on the TV"; return 0 ;;
+    esac
+    say "attract: attempt $attempt -- RESUME PLAYING tapped ($XY), the stream did not open"
+  done
+  adb shell rm -f /sdcard/ps1_look.xml > /dev/null 2>&1
+  return 1
+}
 restart() {
   systemctl --user restart "$UNIT"
   for _ in $(seq 1 30); do curl -s -o /dev/null "$API/plugins/games/status" && break; sleep 1; done
@@ -55,10 +100,12 @@ restart() {
 environ() { local MP; MP=$(systemctl --user show -p MainPID --value "$UNIT"); tr '\0' '\n' < "$PROC/$MP/environ" 2>/dev/null | grep '^PRIVYHUB_' | sort | tr '\n' ' ' | sed 's/ $//'; }
 
 BEFORE=$(opt_hashes)
-TORN=0
+TORN=0; OPENED=0
 teardown() {
   [ "$TORN" = 1 ] && return; TORN=1
   echo; say "ending the session and restoring the adopted state..."
+  # --attract opened the stream: BACK first, as on the TV (it posts the decoder report and stops the stream).
+  if [ "$OPENED" = 1 ]; then adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1; sleep "$STEP"; fi
   curl -s -X POST "$API/plugins/games/stop" > /dev/null
   systemctl --user unset-environment $FLAGS
   restart
@@ -67,6 +114,13 @@ teardown() {
   ENV=$(environ)
   ST=$(status_json | python3 -c "import sys,json;d=json.load(sys.stdin);a=d.get('adaptive_bitrate') or {};print(a.get('mode'),d.get('bitrate_kbps'),'%sx%s'%(d.get('width'),d.get('height')),(d.get('encoder_overrides') or {}).get('any_override'))" 2>/dev/null)
   AFTER=$(opt_hashes)
+  # --attract: the launcher keeps a stale NOW PLAYING bar after the stop (seen on the dry pass, and cleared at
+  # every hold-harness teardown the same way): the stream is closed, so force-stop and start it fresh.
+  if [ "$OPENED" = 1 ]; then
+    adb shell am force-stop "$APP" > /dev/null 2>&1
+    adb shell am start -n "$APP/.MainActivity" > /dev/null 2>&1
+    say "launcher restarted (no stale NOW PLAYING)"
+  fi
   say "manager PRIVYHUB_*: $MGR (want 0)"; [ "$MGR" = 0 ] || ok=0
   say "companion environ: '$ENV' (want PRIVYHUB_ADAPTIVE_BITRATE_MODE=live)"; [ "$ENV" = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live" ] || ok=0
   say "stream: mode / kbps / size / any_override = $ST (want live 7000 1280x720 False)"; [ "$ST" = "live 7000 1280x720 False" ] || ok=0
@@ -85,9 +139,18 @@ say "companion restarted; its environ: '$(environ)'"
 
 if [ "$ATTRACT" = 1 ]; then
   curl -s -X POST "$API/plugins/games/launch?id=$TITLE" > /dev/null
-  adb shell input keyevent KEYCODE_WAKEUP > /dev/null 2>&1
-  adb shell am start -n com.safeiot.privyhub/.MainActivity > /dev/null 2>&1
-  say "the attract title is launched; on the TV, open it from NOW PLAYING (RESUME PLAYING)"
+  T=0
+  until [ "$(game_active)" = True ]; do
+    sleep "$STEP"; T=$((T + STEP)); [ "$T" -ge 30 ] && break
+  done
+  say "the attract title is launched (game active: $(game_active)); opening the stream on the TV..."
+  if open_stream; then
+    OPENED=1
+  else
+    say "the stream did not open by itself. ON THE TV, with the remote: press HOME, open PrivyHub, then select"
+    say "RESUME PLAYING in the NOW PLAYING bar at the top of its home screen (or GAMES -> Tekken 3 -> Resume)."
+    say "If PrivyHub was already open, press BACK until it closes and open it again so NOW PLAYING appears."
+  fi
 else
   say "start a PS1 game on the TV as usual (Tekken 3 is the reference title)"
 fi

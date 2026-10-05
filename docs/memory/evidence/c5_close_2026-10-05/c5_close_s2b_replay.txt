@@ -1,0 +1,16 @@
+C5-CLOSE S2b replay: docs/memory/evidence/c5_m5b_2026-10-03/s2b/decision_log_S2b.jsonl, recovery state per report from the recovery logs, the rung flag on from the session's start
+
+recorded refused entries (live log): 448; the timeline's recovery_playing agrees on 380 of those that match a report by time (380)
+
+  [before (C5-M5B 4493e68)] reports 900; not PLAYING 767 (first 4.5 min)
+     window at the end: 450 reports, 424 clean; best clean 432
+     first qualified (full and >= 415): 15.0 min
+     reports with the window qualified while recovery was not PLAYING: 451
+     entry decisions: 451 {'refused:guard': 451}
+  [after (the rule)] reports 900; not PLAYING 767 (first 4.5 min)
+     window at the end: 133 reports, 120 clean; best clean 120
+     first qualified (full and >= 415): never
+     reports with the window qualified while recovery was not PLAYING: 0
+     entry decisions: 0 {}
+
+-> S2b: the window does NOT qualify during the pause under the rule (0 qualified reports, 0 entry decisions)

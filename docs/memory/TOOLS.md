@@ -1078,8 +1078,31 @@ showing the stream:
 tools/ps1_look.sh 4x               # the adopted config, 720p
 tools/ps1_look.sh remaster         # the remaster preset, 720p (refuses if not offered)
 tools/ps1_look.sh remaster-1080p   # the remaster preset at the 1080p rung (refuses if not offered)
-# add --attract to have it launch Tekken 3 and open the app; otherwise start a PS1 game on the TV as usual
+# THE DEFAULT is the plain route: start a PS1 game on the TV as usual when the helper says so.
+# add --attract to have it launch Tekken 3 and open the stream on the TV itself (fixed in C5-CLOSE)
 ```
+
+- **`--attract`** (C5-CLOSE, 2026-10-05). It launches Tekken 3 and, once
+  the companion reports the game active, opens the stream the hold
+  harness's way:
+  1. force-stop the app (no stream is open yet), wake, start
+     `MainActivity`, wait 7 s;
+  2. find `now_playing_preview_host` in a `uiautomator dump` and tap its
+     centre from its bounds (1008 298 on this layout): RESUME PLAYING;
+  3. confirm `NativeStreamActivity`; two attempts. If it does not open, it
+     prints exactly what to press on the TV (HOME, PrivyHub, RESUME
+     PLAYING in the NOW PLAYING bar, or GAMES → Tekken 3 → Resume) and
+     keeps waiting for PLAYING.
+  4. At the end: BACK first, then the teardown below, then force-stop and
+     restart the launcher, so no stale NOW PLAYING bar is left.
+  - Why: the first version only ran `am start`. An already-open launcher
+    does not redraw on `am start`, so it never showed NOW PLAYING, and
+    nothing tapped RESUME (the user's first attempt, 2026-10-04: the TV
+    made no request in 2.7 min).
+  - Verified: one real `4x --attract` dry pass to PLAYING and back
+    (`evidence/c5_close_2026-10-05/attract/`).
+- **Its log**: every line it prints is also appended, UTC-stamped, to
+  `logs/games/ps1_look_helper.log` (out of git).
 
 - It sets the session flags (`PRIVYHUB_PS1_LOOK`; for `-1080p` also
   `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p` and `..._INJECT=1`), restarts the
@@ -1095,9 +1118,10 @@ tools/ps1_look.sh remaster-1080p   # the remaster preset at the 1080p rung (refu
      the PS1 `.opt` / `.cfg` hashes unchanged from its start. It ends
      `ADOPTED STATE VERIFIED`.
 - It refuses to start if any `PRIVYHUB_*` is already in the manager.
-- **Fake-run tested:** `python3 tools/test_ps1_look_helper.py` uses
-  stubbed `systemctl` / `curl` / `adb` on `PATH` and checks the order of
-  calls and the restore.
+- **Fake-run tested:** `python3 tools/test_ps1_look_helper.py` (11 since
+  C5-CLOSE) uses stubbed `systemctl` / `curl` / `adb` on `PATH` (the adb
+  stub models the launcher, the tap and the top activity) and checks the
+  order of calls and the restore.
 - **Kill switches:** Ctrl-C in the helper; or by hand,
   `systemctl --user unset-environment PRIVYHUB_PS1_LOOK PRIVYHUB_ADAPTIVE_BITRATE_TOP PRIVYHUB_ADAPTIVE_BITRATE_INJECT && systemctl --user restart privyhub-companion`,
   then `rm -f data/games/retroarch/config/privyhub-look-session.opt` if a
@@ -1426,7 +1450,12 @@ live ladder gains a top rung:
   SSRC change are clean (C5-M5B's selection from the recorded data; 435 as
   C5-M5 first built it);
 - the leave: the first mild bar goes to 7000 at 720p, strict to 5000; no
-  re-entry for 10 min; leave-entry-leave → HOLD.
+  re-entry for 10 min; leave-entry-leave → HOLD;
+- **the window skips every report that arrives while link-drop recovery
+  is not PLAYING** (C5-CLOSE, 2026-10-05: a frozen picture streams clean;
+  S2b). It keeps its pre-pause reports and resumes counting on PLAYING.
+- **NOT ADOPTED** (C5 closed 2026-10-05, the user's decision): kept, off,
+  for a source with 1080p detail.
 
 Without the flag the ladder and every decision are the closed
 controller's (`tools/c5_m5_replay.py`'s stop rule).
@@ -1437,11 +1466,24 @@ controller's (`tools/c5_m5_replay.py`'s stop rule).
 ```bash
 systemctl --user set-environment PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p     # [+ PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 for an injection session]
 systemctl --user restart privyhub-companion
-# ... one session ...
+# ... one session; to SEE 1080p, wait >= 60 s at PLAYING, then:
+#   curl -s -X POST 'localhost:8765/plugins/games/adaptive-bitrate/inject?class=INCREASE_1080P'
+#   curl -s localhost:8765/plugins/games/native-stream-status | python3 -c "import sys,json;d=json.load(sys.stdin);print(d['width'],d['height'])"   # 1920 1080
+# ...
 systemctl --user unset-environment PRIVYHUB_ADAPTIVE_BITRATE_TOP PRIVYHUB_ADAPTIVE_BITRATE_INJECT
 systemctl --user restart privyhub-companion
 tr '\0' '\n' < /proc/$(systemctl --user show -p MainPID --value privyhub-companion)/environ | grep '^PRIVYHUB_'   # exactly PRIVYHUB_ADAPTIVE_BITRATE_MODE=live
 ```
+
+- **The on-screen "1280×720" is not the live size.** The client's loading
+  overlay and debug overlay print the constants `VIDEO_WIDTH` ×
+  `VIDEO_HEIGHT` (`PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt:66-67`,
+  printed by `GameStreamStatusUi.kt:97` and `NativeStreamActivity.kt:3376`),
+  and loading is at 720p anyway (the rung is entered later). Check the
+  size with `native-stream-status` (`width` / `height`, as above) or the
+  decision log's `transition` row (`to_size: 1920x1080`). The user's
+  repeated Look 3 (2026-10-05) was at 1080p for ~1.5 min while the
+  overlay read 720 (C5-CLOSE-A).
 
 - **Kill switches.**
   - Unset the flag and restart the unit: the ladder tops at 7000.
@@ -1453,7 +1495,9 @@ tr '\0' '\n' < /proc/$(systemctl --user show -p MainPID --value privyhub-compani
     (1920×1080 at the rung).
   - `adaptive_bitrate.level_size`.
   - `policy.rung_1080p`: the window and its clean count, leaves, closed,
-    and the re-entry hold.
+    and the re-entry hold; since C5-CLOSE `window_rule` and
+    `skipped_not_playing` (the reports skipped while recovery was not
+    PLAYING).
   - `validated_ladder_kbps` lists 12600 only with the flag.
   - `encoder_command` is still the full start's argv: **no restart
     updates it**. Read a switch's argv in `native_video_alpha.log`
@@ -1468,7 +1512,11 @@ tr '\0' '\n' < /proc/$(systemctl --user show -p MainPID --value privyhub-compani
 - **Test-only injection** (`PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1`, live,
   loopback):
   - `inject?class=INCREASE_1080P` is the policy's own entry decision,
-    every gate but the window; flag only.
+    every gate but the window; flag only. **The gates include the 60-s
+    session age: an injection in the first minute after PLAYING is
+    refused (`reason: guard`) and the stream stays at 720p.** The user's
+    Look 3 (2026-10-05) was injected at 6.6 s and stayed at 720p. Check
+    `width` 1920 in `native-stream-status` after an injection.
   - `inject?class=CAPACITY_MILD` is a synthetic mild bar, one rung down.
   - `inject?class=SIZE&size=1080p|720p` is a raw sized transition with no
     rule: C5-M5 §1's size-change test. It works without the TOP flag;
@@ -1481,8 +1529,10 @@ tr '\0' '\n' < /proc/$(systemctl --user show -p MainPID --value privyhub-compani
   rule against the closed controller (loaded from git), the leave on every
   recorded 1080p series, and the entry on every recorded 720p series at
   7000.
-- **Tests**: `tools/test_adaptive_bitrate_live.py` (120 since C5-M5B:
-  classes `C5M5Rung`, `C5M5Actuator`).
+- **Tests**: `tools/test_adaptive_bitrate_live.py` (126 since C5-CLOSE:
+  classes `C5M5Rung`, `C5M5Actuator`, `C5CloseRungWindow`).
+- **C5-CLOSE's replays** (the stop rule, flag on before/after, the S2b
+  replay): `python3 tools/c5_close_replay.py [out_dir]`.
 - **C5-M5B's replays** (the entry grid E405-E435 / E300 and the loss-leave
   candidates L-A…L-D, with the stop rule):
   `python3 tools/c5_m5b_replay.py [out_dir]` and `--stop-rule`.

@@ -5,7 +5,7 @@ record; the record file is authoritative, not this index.
 
 `PATCH_PROTOCOL.md` describes the workflow and is not a patch record.
 
-Records: 142
+Records: 143
 
 - `ADB_ENDPOINT_DEBUG_PROBE_V1_2026-09-15.md`
 - `ADB_ENDPOINT_DEBUG_WATCH_PORT_V1_2026-09-15.md`
@@ -43,6 +43,7 @@ Records: 142
 - `C3-L4-N2_MILD_CAPACITY.md`
 - `C3-L4-S1_SHADOW_CONTROLLER.md`
 - `C4-M1_FEC_XOR8_2_ARM.md`
+- `C5-CLOSE_RUNG_WINDOW_RULE_AND_ATTRACT_FIX.md`
 - `C5-M1_1080P60_CANDIDATE_PROFILE.md`
 - `C5-M2_1080P60_FOLLOWUP_PROFILES.md`
 - `C5-M3_LOW_RUNG_PROFILES.md`

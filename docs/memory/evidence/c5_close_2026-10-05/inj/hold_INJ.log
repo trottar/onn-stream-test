@@ -1,0 +1,36 @@
+[table 04:27:49Z] start: ADOPTED PS1 FILES BYTE-IDENTICAL (8 of 8)
+[table 04:27:49Z] last session_ended 2026-10-05T04:15:07.759Z; INJ not before 04:15:07Z
+[table 04:27:50Z] session flags set in the manager: 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p'
+[table 04:27:50Z] start: manager PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p'; MainPID 1871549; 8765 1871549; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 04:27:50Z] T2 sampler started (10 s); one hold, 60s
+[table 04:27:50Z] INJ begins (adopted 7000, the 4x PS1 source, flags 'PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1', hook '/home/privyhub/Projects/onn-stream-test/docs/memory/evidence/c5_close_2026-10-05/c5_close_inj_hook.sh')
+[INJ 04:27:50Z] mode=H hold/timeout=60s probe_args=none heartbeat_ms=default
+[INJ 04:27:50Z] ARM_PROFILE adopted; PRIVYHUB_* in the user manager: 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p'
+[INJ 04:27:54Z] companion MainPID 1873186 serving 8765; PRIVYHUB_* in its environ: 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_MODE=live PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p'
+[INJ] before launch: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[INJ] at PLAYING: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[INJ 04:28:34Z] SurfaceFlinger stream-surface lines: 11
+[INJ 04:28:34Z] PLAYING at 2026-10-05T04:28:34Z; hook c5_close_inj_hook.sh, zero input
+[INJ] status p20: bitrate 7000 size 1280 x 720 | mode live inject True ladder [5000, 5500, 6000, 7000, 12600] | rung window {'reports': 10, 'clean': 10, 'window_needed': 450, 'clean_needed': 415} | window_rule 'reports while recovery is not PLAYING are skipped' | skipped_not_playing 0 | any_override False
+[INJ] status p60: bitrate 7000 size 1280 x 720 | mode live inject True ladder [5000, 5500, 6000, 7000, 12600] | rung window {'reports': 30, 'clean': 28, 'window_needed': 450, 'clean_needed': 415} | window_rule 'reports while recovery is not PLAYING are skipped' | skipped_not_playing 0 | any_override False
+[INJ 04:29:34Z] hook exit 0
+[INJ 04:29:34Z] adb client processes seen during hold: 3 (# polls 116)
+[INJ 04:29:35Z] report: native_decoder_20261005_042935_837.json
+[frames] 61 seconds in the session window
+[heartbeat] 30 lines
+[INJ 04:29:56Z] decision log lines in the hold: 44
+[INJ 04:29:58Z] game active after stop: False
+[INJ 04:29:58Z] done
+[table 04:29:58Z] INJ exit 0
+[table 04:30:02Z] teardown: manager PRIVYHUB_* ''; MainPID 1874468; 8765 1874468; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 04:30:02Z] FLAGS UNSET AND ABSENT: manager none, environ exactly the live default
+[table] teardown stream 7000 1280 720 level size 1280x720
+[table 04:30:02Z] teardown: ADOPTED PS1 FILES BYTE-IDENTICAL (8 of 8)
+[table 04:30:02Z] measurement files: 0 (want 0)
+[table 04:30:02Z] ADOPTED APK CONFIRMED (device hash de072762e55122c3060086f6f10b1bff54633d9165d0c475f17699127841835e)
+[table 04:30:12Z] teardown: game active False; NOW PLAYING on the launcher: 1
+[table 04:30:22Z] stale banner: force-stop + relaunch; NOW PLAYING now: 0
+[table 04:30:23Z] table done
+EXIT 0

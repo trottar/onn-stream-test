@@ -1,6 +1,51 @@
 # Active investigations
 
-## PHASE C — C5 reopened: 1080p60 through the ladder (the user's reading, 2026-10-01)
+## PHASE C — CLOSED 2026-10-05. C5 (1080p60 through the ladder) and the PS1 look CLOSED (C5-CLOSE)
+
+**C5-CLOSE (2026-10-05), on the user's look and decisions**
+(`../evidence/C5_CLOSE_2026-10-05.md`; the close in
+`../decisions/C5_1080P60_CAPABILITY_2026-09-28.md`):
+
+- The user's words: Look 1 (4x, 720p) and Look 3 (the same at the 1080p
+  rung) *"looked the best, little difference between them"*; Look 2
+  (`remaster`) *"was the worst, a bit less smooth"*.
+- **The rung NOT ADOPTED** (behind `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`,
+  off, kept for a 1080p-detail source); **`remaster` NOT ADOPTED**
+  (behind `PRIVYHUB_PS1_LOOK`); **the 4x source stays adopted.**
+- **Look 3, from the logs:** the first try was at 720p (the injected entry
+  at 6.6 s refused by the 60-s session-age guard). **The repeated Look 3
+  (C5-CLOSE-A) was at 1080p:** the entry acted 132 s after PLAYING, ~1.5
+  min at 1920×1080 / 12600, entry gap 329 ms. The user: *"Looked the same
+  and loading the game still says 720"*. The user saw no difference from
+  the 4x 720p stream, and the decision's grounds include the look. The
+  on-screen 720 is the client's constant (`NativeStreamActivity.kt:66-67`),
+  cosmetic; `TOOLS.md` notes it.
+- **Built:** the rung window skips reports while recovery is not PLAYING
+  (tests 126/126, mutations 22/22, stop rule 0 differences, S2b replay
+  451 → 0 entry decisions, injection check PASSES); the helper's
+  `--attract` fixed (fake-run 11/11, one real dry pass to PLAYING and
+  back).
+- **Closed with it:** the look on the TV; the rung flag and `remaster`
+  adoption calls; the rung-window question. **Not run and not needed for
+  the close:** the rung's `nft` night (the rung is not adopted).
+
+**Open, not blocking, carried past Phase C:**
+
+- the max output gap (≤ 100 ms met on none of LINK-L2's six; 447 ms in
+  D1);
+- `host_link`; the thermal flag; `CTRL-L1`; the slow-event ring;
+- the mild step's ~120 s bound;
+- **the onn's 1080p decode jitter** (~300-600 spikes ≥ 20 ms/min in every
+  1080p hold) — a client item for later (a different client or decoder
+  path), relevant if a 1080p-detail source arrives.
+- the client overlay's size text is the constant 1280×720
+  (`NativeStreamActivity.kt:66-67`), not the live size — cosmetic, for a
+  later APK (the change is listed in `../evidence/C5_CLOSE_2026-10-05.md`,
+  addendum).
+
+The C5 history follows.
+
+### C5 reopened: 1080p60 through the ladder (the user's reading, 2026-10-01)
 
 **`C5-M4` Part 1 (2026-10-01): the PS1 source at native 1080p — DONE,
 nothing adopted** (`../evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md`).

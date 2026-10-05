@@ -74,6 +74,16 @@ threshold is 415 of 450 -- the strictest candidate that entered within 20 min
 on >= 7 of the 10 real-input holds. No loss-based leave met the pre-registered
 conditions, so the leave stays the existing triggers above.
 
+C5-CLOSE (the user's call of 2026-10-05, after S2b): the rung window SKIPS
+every report that arrives while link-drop recovery is not PLAYING
+(`desync_pause` ... `resumed` / `gave_up_saved`): such a report is neither
+appended nor counted, clean or not -- a frozen picture streams clean and would
+overstate the link. Skipping (not resetting) is the existing structure's
+simplest form: the window keeps the reports it held before the pause and
+resumes counting when recovery is PLAYING again (a recovery encoder restart
+still clears it, as every SSRC change does). Behind the same flag; the other
+windows and every other rule are unchanged.
+
 Absent, the ladder tops at 7000 and every decision is what it was (the
 replays' stop rule). The actuator rebuilds the argv's size per level
 (`NativeStreamManager.adaptive_level_transition`).
@@ -198,6 +208,7 @@ RUNG_WINDOW_REPORTS = 450                   # 15 min at the 2-s report rate
 RUNG_CLEAN_NEEDED = 415                     # C5-M5B's selection (E415; C5-M5 built 435 = N - 15)
 RUNG_REENTRY_HOLD_MS = 10 * 60 * 1000       # no entry for 10 min after a leave
 RUNG_OSCILLATION_LEAVES = 2                 # leave, entry, leave -> HOLD for the session
+RUNG_WINDOW_RULE = "reports while recovery is not PLAYING are skipped"   # C5-CLOSE
 TRIGGER_RUNG_ENTRY = "increase_1080p"
 
 
@@ -272,6 +283,7 @@ class LivePolicy(ab.ShadowPolicy):
         self.inc_window: deque[bool] = deque(maxlen=INCREASE_WINDOW_REPORTS)
         # C5-M5: the rung window, the same rules, 450 long.
         self.rung_window: deque[bool] = deque(maxlen=RUNG_WINDOW_REPORTS)
+        self.rung_skipped_not_playing = 0
         self.last_disposition: str | None = None
         self.last_clean: bool | None = None
         self.routine_defer = 0
@@ -335,6 +347,13 @@ class LivePolicy(ab.ShadowPolicy):
             m["trigger"] = TRIGGER_QUEUE_GAP
         return cls, m
 
+    def _rung_append(self, clean: bool, ctx: dict[str, Any]) -> None:
+        """C5-CLOSE: the rung window counts a report only while recovery is PLAYING."""
+        if self.top and (ctx.get("guards") or {}).get("recovery_playing") is False:
+            self.rung_skipped_not_playing += 1
+            return
+        self.rung_window.append(clean)
+
     def _window_restart(self) -> None:
         """After every SSRC change (and at a session start) the window starts empty."""
         self.inc_window.clear()
@@ -360,7 +379,8 @@ class LivePolicy(ab.ShadowPolicy):
                 "reports_since_transition": self.reports_since_action,
                 **({"rung_window_reports": len(self.rung_window), "rung_clean_reports": sum(self.rung_window),
                     "rung_window_needed": RUNG_WINDOW_REPORTS, "rung_clean_needed": RUNG_CLEAN_NEEDED,
-                    "rung_leaves": self.rung_leaves} if self.top else {})}
+                    "rung_leaves": self.rung_leaves,
+                    "rung_skipped_not_playing": self.rung_skipped_not_playing} if self.top else {})}
 
     def _recent_transitions(self, clock: int) -> list[int]:
         return [t for t in self.transition_times_ms if clock - t < RATE_LIMIT_WINDOW_MS]
@@ -561,7 +581,7 @@ class LivePolicy(ab.ShadowPolicy):
             self.last_disposition = "resync"
             self.last_clean = False
             self.inc_window.append(False)
-            self.rung_window.append(False)
+            self._rung_append(False, ctx)
             self.clean_count = sum(self.inc_window)
             e = self._set_state(self.state if self.state != ab.TELEMETRY_STALE else ab.REFERENCE,
                                 "resync_ignored")
@@ -570,7 +590,7 @@ class LivePolicy(ab.ShadowPolicy):
         self.last_disposition = "evaluated"
         self.window.append(s)
         self.inc_window.append(bool(self.last_clean))
-        self.rung_window.append(bool(self.last_clean))
+        self._rung_append(bool(self.last_clean), ctx)
         self.clean_count = sum(self.inc_window)
 
         if self.escalation is not None and (ctx.get("guards") or {}).get("recovery_playing"):
@@ -766,6 +786,8 @@ class LivePolicy(ab.ShadowPolicy):
                                "size": "%dx%d" % RUNG_LEVELS[RUNG_KBPS],
                                "window": {"reports": len(self.rung_window), "clean": sum(self.rung_window),
                                           "window_needed": RUNG_WINDOW_REPORTS, "clean_needed": RUNG_CLEAN_NEEDED},
+                               "window_rule": RUNG_WINDOW_RULE,
+                               "skipped_not_playing": self.rung_skipped_not_playing,
                                "leaves": self.rung_leaves, "closed": self.rung_closed,
                                "reentry_hold_ms": RUNG_REENTRY_HOLD_MS}} if self.top else {}),
             "capacity_trigger": {"rule": f"fps < {CAPACITY_FPS_BELOW:g} on all {ab.WINDOW_REPORTS} and "

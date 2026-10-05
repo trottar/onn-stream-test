@@ -1,0 +1,15 @@
+C5-CLOSE stop rule: PRIVYHUB_ADAPTIVE_BITRATE_TOP absent, the built live policy (the rung-window rule) vs the closed controller (5005615, loaded from git), every series C5-M5 / C5-M5B compared
+
+series compared: 448 (151451 reports fed to each policy); events emitted by the closed controller's policy: 74923
+series with ANY difference (flag absent vs closed controller): 0
+-> PASS: zero differences (448 series, 151451 reports, 74923 events)
+
+== flag ON: C5-M5B's policy vs the built policy (reported; only not-PLAYING series may differ)
+series: 216; series holding >= 1 report while recovery was not PLAYING: 13
+series whose events differ (flag on, C5-M5B 4493e68 vs built; the new holds key `rung_skipped_not_playing` removed before comparing): 5
+   live log session 39 2026-09-29T15:20:41Z: 52 reports not PLAYING; events 136 -> 136
+   live log session 43 2026-09-29T15:59:11Z: 40 reports not PLAYING; events 55 -> 55
+   live log session 81 2026-10-01T14:07:17Z: 632 reports not PLAYING; events 562 -> 232
+   live log session 139 2026-10-03T16:44:40Z: 767 reports not PLAYING; events 571 -> 256
+   live log session 165 2026-10-05T03:55:08Z: 10 reports not PLAYING; events 112 -> 112
+differing series with no not-PLAYING report: 0  -> OK

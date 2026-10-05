@@ -1568,6 +1568,75 @@ class C5M5Rung(unittest.TestCase):
             self.assertNotIn("top", starts[1])
 
 
+PAUSED = {"recovery_playing": False, "game_not_paused": False}
+
+
+class C5CloseRungWindow(unittest.TestCase):
+    """C5-CLOSE (the user's call after S2b): the rung window skips every report
+    while recovery is not PLAYING; the window keeps what it held and resumes
+    counting when PLAYING returns. Behind the flag only."""
+
+    def paused(self, f, n, **kw):
+        f.guards.update(PAUSED)
+        ev = f.feed(n, **kw)
+        f.guards.update(GOOD_GUARDS)
+        return ev
+
+    def test_a_paused_stretch_neither_counts_nor_qualifies(self):
+        f = RungFeeder()
+        f.feed(300, **CLEAN)
+        ev = self.paused(f, 300, **CLEAN)                 # 600 clean reports, 300 of them paused
+        self.assertEqual(f.transitions(ev), [])
+        self.assertEqual([e for e in ev if e.get("trigger") == "increase_1080p"], [])   # not even a refusal
+        self.assertEqual(f.p.status()["rung_1080p"]["window"]["reports"], 300)
+        self.assertEqual(f.p.rung_skipped_not_playing, 300)
+
+    def test_the_window_survives_the_pause_and_resumes_on_playing(self):
+        f = RungFeeder()
+        f.feed(300, **CLEAN)
+        self.paused(f, 200, **CLEAN)
+        ev = f.feed(149, **CLEAN)                         # 449 counted
+        self.assertEqual(f.transitions(ev), [])
+        self.assertEqual([t["to_kbps"] for t in f.transitions(f.feed(1, **CLEAN))], [12600])
+
+    def test_unclean_and_resync_reports_while_paused_are_skipped_too(self):
+        f = RungFeeder()
+        f.feed(449, **CLEAN)
+        self.paused(f, 50, **UNCLEAN_GAP)                 # counted, these 50 would hold the window under 415
+        self.paused(f, 5, idr=True, **CLEAN)
+        self.assertEqual(f.p.status()["rung_1080p"]["window"], {"reports": 449, "clean": 449,
+                                                              "window_needed": 450, "clean_needed": 415})
+        self.assertEqual([t["to_kbps"] for t in f.transitions(f.feed(1, **CLEAN))], [12600])
+
+    def test_reports_without_the_recovery_guard_count(self):
+        # Only an explicit "recovery not PLAYING" is skipped (a ctx without guards, as some replays feed, counts).
+        f = RungFeeder()
+        for _ in range(live.RUNG_WINDOW_REPORTS - 1):
+            f.t += ab.REPORT_INTERVAL_MS
+            f._after(f.p.feed(ab._sample(telemetry(f.t, **CLEAN)), {"clock_ms": f.t}))
+        self.assertEqual(f.p.rung_skipped_not_playing, 0)
+        self.assertEqual(len(f.p.rung_window), live.RUNG_WINDOW_REPORTS - 1)
+
+    def test_the_status_field_carries_the_rule(self):
+        f = RungFeeder()
+        f.feed(10, **CLEAN)
+        self.paused(f, 7, **CLEAN)
+        st = f.p.status()["rung_1080p"]
+        self.assertEqual(st["window_rule"], "reports while recovery is not PLAYING are skipped")
+        self.assertEqual(st["skipped_not_playing"], 7)
+        self.assertEqual(f.p.holds_in_force()["rung_skipped_not_playing"], 7)
+        f.p.end_session()
+        self.assertEqual(f.p.status()["rung_1080p"]["skipped_not_playing"], 0)
+
+    def test_without_the_flag_nothing_is_skipped_or_shown(self):
+        f = RungFeeder(top=False)
+        f.feed(20, **CLEAN)
+        self.paused(f, 20, **CLEAN)
+        self.assertEqual(f.p.rung_skipped_not_playing, 0)
+        self.assertNotIn("rung_1080p", f.p.status())
+        self.assertNotIn("rung_skipped_not_playing", f.p.holds_in_force())
+
+
 class C5M5Actuator(unittest.TestCase):
     """The sized actuator against C3-F1's fake manager: the real builder and
     the real encoder-only cycle, nothing spawned."""

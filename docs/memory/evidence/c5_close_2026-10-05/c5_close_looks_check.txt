@@ -1,0 +1,40 @@
+window 2026-10-05T02:20Z .. 2026-10-05T04:16Z
+
+== recovery session rows
+  2026-10-05T03:55:08 session_started PLAYING
+  2026-10-05T04:01:34 desync_pause PAUSED_RECOVERING
+  2026-10-05T04:01:35 resumed PLAYING
+  2026-10-05T04:02:51 desync_pause PAUSED_RECOVERING
+  2026-10-05T04:03:08 resumed PLAYING
+  2026-10-05T04:04:22 session_ended PLAYING
+  2026-10-05T04:06:07 session_started PLAYING
+  2026-10-05T04:09:10 session_ended PLAYING
+  2026-10-05T04:09:37 session_started PLAYING
+  2026-10-05T04:11:54 session_ended PLAYING
+  2026-10-05T04:12:43 session_started PLAYING
+  2026-10-05T04:15:07 session_ended PLAYING
+
+== the look's session file (ps1_look_sessions.jsonl)
+  2026-10-05T04:09:10 ps1_look_session_end preset remaster removed True
+
+== controller: starts, injections, refusals, transitions; samples per segment by (level, stream kbps)
+  2026-10-05T02:28:51 controller_start top None inject False
+  2026-10-05T03:54:19 controller_start top None inject False
+  2026-10-05T04:01:35 refused ROUTINE 7000 -> 6000 guard elapsed_ms 395352 injected False
+     samples: {(7000, 7000): 279}
+  2026-10-05T04:04:23 controller_start top None inject False
+     samples: {(7000, 7000): 36}
+  2026-10-05T04:05:38 controller_start top None inject False
+     samples: {(7000, 7000): 101}
+  2026-10-05T04:09:13 controller_start top None inject False
+     samples: {(7000, 7000): 2}
+  2026-10-05T04:09:22 controller_start top None inject False
+     samples: {(7000, 7000): 71}
+  2026-10-05T04:11:55 controller_start top None inject False
+     samples: {(7000, 7000): 1}
+  2026-10-05T04:12:28 controller_start top 1080p inject True
+  2026-10-05T04:12:46 inject INCREASE_1080P None -> None None elapsed_ms 6571 injected None
+  2026-10-05T04:12:46 refused INCREASE 7000 -> 12600 guard elapsed_ms 6571 injected True
+     samples: {(7000, 7000): 74}
+  2026-10-05T04:15:08 controller_start top None inject False
+     samples: {(7000, 7000): 25}

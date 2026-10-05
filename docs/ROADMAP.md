@@ -1,15 +1,19 @@
 # PrivyHub / Safe IoT Roadmap — Linux-First + Remote-Foundation Revision
 
-**Revision date:** 2026-09-14 (position marker updated 2026-09-22)
+**Revision date:** 2026-09-14 (position marker updated 2026-09-22, 2026-10-05)
 **Predecessor synchronized checkpoint:** C1.1 + native-status privacy checkpoint `0c31c100ec721d687aff6aedbd79bc0cf9343810`
 **Roadmap status:** Accepted project plan, **still authoritative and unchanged in structure**. Future secure remote access remains promoted to Phase G after Linux optimization.
 
 ---
 
-## 0. Where the work actually is — 2026-09-22
+## 0. Where the work actually is — 2026-09-22 (marker moved 2026-10-05)
 
 **The roadmap below is not restructured; only this marker moves.**
 Authority for the current position is `docs/memory/CURRENT.md`.
+
+- **2026-10-05: Phase C CLOSED** (C5-CLOSE, the user's decisions: the
+  1080p rung and the `remaster` preset not adopted, the 4x PS1 source
+  stays). **Phase E is next, E1 first, not started** — on the user's word.
 
 - **Phase D is ACTIVE.** The Linux host runs the companion and the games
   path; D4 PS1 multitap parity is the open functional item.
@@ -41,9 +45,9 @@ Authority for the current position is `docs/memory/CURRENT.md`.
 |---|---|---|
 | **A — Emulator Subsystem** | Finish Games/emulation as a normal-use subsystem | **COMPLETE / PUSHED** |
 | **B — Diagnostics & Clean Native Baseline** | Make PrivyHub self-diagnosing and remove active Sunshine/Moonlight legacy | **COMPLETE / PUSHED** |
-| **C — Adaptive Streaming Architecture** | Portable profile/telemetry/readiness foundation complete enough for Windows; automatic adaptation continues on Linux | **RESUMED 2026-09-23** at C3 (`D-BASE` closed, baseline met) |
+| **C — Adaptive Streaming Architecture** | Portable profile/telemetry/readiness foundation complete enough for Windows; automatic adaptation continues on Linux | **CLOSED 2026-10-05** (C5-CLOSE; resumed 2026-09-23 at C3 after `D-BASE`) |
 | **D — Linux Migration / Native Linux Baseline** | Move the core server to the HP EliteDesk Linux prototype and restore normal-use parity | **ACTIVE** |
-| **E — Linux Core Resource Characterization & Optimization** | Optimize and measure the Linux core with PS1-and-below only; select Prototype 2 from evidence | **PLANNED AFTER D** |
+| **E — Linux Core Resource Characterization & Optimization** | Optimize and measure the Linux core with PS1-and-below only; select Prototype 2 from evidence | **NEXT** — E1 first, not started (on the user's word) |
 | **F — Media Library, VOD & Live TV UX** | Finish local media polish plus substantial Live TV/channel/guide work on Linux | **PLANNED AFTER E** |
 | **G — Secure Remote Access / Portable Client Foundation** | Establish overlay/provider abstraction, portable trusted-LAN access, WAN session identity/auth, and off-site PS1-and-below validation | **FUTURE AFTER F** |
 | **H — Extended Emulation & User-Content Import** | Build safe user-content ingestion, then characterize N64, GameCube, and PS2 on the established local/remote foundation | **FUTURE AFTER G** |
@@ -120,8 +124,14 @@ Architectural statement:
 
 # Phase C — Adaptive Streaming Architecture
 
-**Status: RESUMED 2026-09-23 — see §0.** The baseline-stream-health target
-table was met (`D-BASE` close-out); Phase C continues on Linux at C3.
+**Status: CLOSED 2026-10-05** (C5-CLOSE, the user's decisions). Phase C
+delivered explicit stream profiles, the C2 telemetry contract, live
+adaptive bitrate on by default (validated under real loss), the FEC
+decision (8+1, adaptive deferred), 1080p60 characterized and built as a
+ladder rung behind its flag (not adopted), the 4x PS1 source, and the
+generalized source contract — the reusable base for Phase G.
+`docs/memory/evidence/C5_CLOSE_2026-10-05.md`. Earlier: RESUMED
+2026-09-23 on Linux at C3 after `D-BASE` (baseline met).
 
 Phase C turns the current proven native game stream into a reusable, measurable,
 adaptive streaming platform.
@@ -397,7 +407,35 @@ adoption).** `xor8_1` 8+1 stays; the 8+2 arm remains in the tree behind
 
 ## C5 — 1080p60 capability characterization
 
-**Current status — the user's reading of 2026-10-01: C5 is reopened.
+**Current status — C5 CLOSED 2026-10-05 (C5-CLOSE), on the user's look
+and decisions ("Yep agreed").** The user's words: Look 1 (the adopted 4x
+source, 720p) and Look 3 (the same at the 1080p rung) *"looked the best,
+little difference between them"*; Look 2 (`remaster`) *"was the worst, a
+bit less smooth"*.
+
+- **The 1080p rung: NOT ADOPTED.** Built and validated mechanically
+  (C5-M5/M5B), it buys nothing visible on PS1 at the TV while costing
+  ~1.8× the wire rate, the switch gaps (287-649 ms) and the onn's 1080p
+  decode jitter (~300 spikes ≥ 20 ms/min). It stays behind
+  `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`, off, for a 1080p-detail source
+  (PS2-class, Phase H). Since C5-CLOSE its window skips reports while
+  recovery is not PLAYING (S2b).
+- **The `remaster` preset: NOT ADOPTED** (stays behind
+  `PRIVYHUB_PS1_LOOK`). **The 4x PS1 source stays adopted** (C5-M4A).
+- **Look 3, from the logs:** the first try was not at 1080p (its injected
+  entry came 6.6 s in, and the 60-s session-age guard refused it).
+  **The user repeated it the same night (C5-CLOSE-A): the entry acted
+  132 s after PLAYING, and the stream ran ~1.5 min at 1920×1080 / 12600**
+  (entry gap 329 ms). The user's words: *"Looked the same and loading the
+  game still says 720"*. So the user has looked at the rung's picture and
+  saw no difference from the 4x 720p stream, and the decision's grounds
+  include the look. The on-screen 720 is the client's constant
+  (`NativeStreamActivity.kt:66-67`), not the live size.
+- What would reopen it: a 1080p-detail source or a different client.
+- `docs/memory/evidence/C5_CLOSE_2026-10-05.md`;
+  `docs/memory/decisions/C5_1080P60_CAPABILITY_2026-09-28.md` (the close).
+
+**Earlier status — the user's reading of 2026-10-01: C5 was reopened.
 1080p60 is a Phase C deliverable, delivered through the adaptive ladder
 as a rung above 7000, not only a characterization.** C5-M1 and C5-M2
 characterized the stream on a source with 720p detail (the 879×720
@@ -483,8 +521,8 @@ pre-registered before the replays.
   - At the rung the full preset drops one frame in 4.8 min, so
     `remaster-1080p` is not offered.
   - `tools/ps1_look.sh` is the user's one command per look.
-- **Next**: the user's look on the TV, and the user's calls (the rung
-  flag, the `remaster` preset, the rung's `nft` night).
+- **Then**: the user's look on the TV and the user's calls — made
+  2026-10-05 (C5-CLOSE, above).
 - `docs/memory/evidence/C5_M5B_RUNG_RULES_AND_LOOK_2026-10-03.md`.
 
 Characterize 1080p60 using the current development host and onn client.
@@ -573,7 +611,7 @@ Acceptance:
 - Phase C artifacts are explicitly reusable by future Phase G remote/WAN work without implementing remote transport here;
 - clean checkpoint/push.
 
-**C7 status, 2026-09-25 (`C6-D1`)** — each acceptance item and the record it rests on:
+**C7 status, 2026-09-25 (`C6-D1`), re-read 2026-10-05 after C5's close** — each acceptance item and the record it rests on:
 
 | item | status | record |
 | --- | --- | --- |
@@ -581,11 +619,11 @@ Acceptance:
 | transport telemetry contract | ✓ | C2 (`privyhub_stream_telemetry_v1`, heartbeat v3, decoder report v2) |
 | adaptive bitrate runtime validated | ✓ **`C3.L4` CLOSED 2026-09-30: live VALIDATED UNDER REAL LOSS on three `nft` nights (1 NOT → capacity + backstop; 2 WORKS UNDER LOSS → `capacity_mild`; 3 WORKS UNDER LOSS, the pre-registered HOLD shape); live behind its flag; **live ON BY DEFAULT since 2026-10-01 (`C3-L4-D1`, the unit drop-in; the user's authorization 2026-09-30).** History: shadow built and SILENT; live AUTHORIZED 2026-09-28 (single transition per event); **live BUILT (`C3-L4-L1`): SILENT on a clean link, decrease proven on injection; the increase rule replaced by the user's blend (`C3-L4-L2`: climb 5000→7000 shown on injection); `nft` night 1 (2026-09-29): no decrease under a cap → the user's capacity trigger + recovery-escalation backstop built (`C3-L4-N1`: replays PASS, 30-min live hold SILENT); `nft` night 2 WORKS UNDER LOSS (2026-09-29) → the user's `capacity_mild` built (`C3-L4-N2`: stop rule PASS, 30-min hold 0 transitions); night 3 WORKS UNDER LOSS (2026-09-30)** | `C3_L4_D1_LIVE_DEFAULT_2026-10-01.md`; `decisions/C3-L4_LIVE_DEFAULT_2026-10-01.md`; `C3_L4_NFT_NIGHT3_2026-09-30.md`; the decision's close; `C3-L4-S1`; `C3.L3a` sessions 1-4; `decisions/C3-L4_LIVE_AUTHORIZATION_2026-09-28.md`; `C3_L4_L1_LIVE_CONTROLLER_2026-09-28.md`; `C3_L4_NFT_NIGHT1_2026-09-29.md`; `C3_L4_N1_CAPACITY_TRIGGER_2026-09-29.md`; `C3_L4_NFT_NIGHT2_2026-09-29.md`; `C3_L4_N2_MILD_CAPACITY_2026-09-29.md` |
 | adaptive FEC validated or explicitly deferred | ✓ **explicitly deferred** (2026-09-28, the user's call): adaptive not supported; static 8+2 NOT SHOWN; 8+1 stays; arm dormant | `decisions/C4_ADAPTIVE_FEC_2026-09-24.md`, `C4_M1_FEC_ARM_2026-09-25.md` |
-| 1080p60 characterized → **delivered through the ladder** (the user's reading, 2026-10-01) | **open (reopened 2026-10-01)**: 1080p60 is a Phase C deliverable as a ladder rung above 7000, not only a characterization. Done so far: characterized on a 720p-detail source (C5-M1 NOT CAPABLE at parity; C5-M2 INCONCLUSIVE (link) twice); **C5-M4 Part 1 (2026-10-01): the PS1 source at native 1080p measured — 4x HOLDS 60; C5-M4A: the 4x source ADOPTED the same day (the quick win)**. LINK-L2 (40 MHz) TIME OF DAY on the boundary. **C5-M5 (2026-10-02/03): the 1080p rung BUILT and SHOWN behind `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`, NOT adopted** (mid-session size change needs no client change; S3 night WORKS AS A RUNG; S2 entry not reached). **C5-M5B (2026-10-03/04): entry 415 of 450 from the data; the leave unchanged (no candidate met its conditions); the PS1 look behind `PRIVYHUB_PS1_LOOK` (`remaster` holds 60 at 720p, not at the rung); `tools/ps1_look.sh`.** Remaining: the user's look on the TV (`tools/ps1_look.sh`), the adoption calls (the rung flag, `remaster`), the rung's `nft` night. Low rungs screened for Phase G (C5-M3: 720p/4000 passes transport) | `C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md`; `C5_M1_1080P60_PROFILE_2026-09-28.md`, `decisions/C5_1080P60_CAPABILITY_2026-09-28.md` |
+| 1080p60 characterized → **delivered through the ladder** (the user's reading, 2026-10-01) | ✓ **C5 CLOSED 2026-10-05 (C5-CLOSE, the user's decisions)**: 1080p60 characterized (C5-M1 NOT CAPABLE at parity; C5-M2 INCONCLUSIVE (link) twice) and **built as a ladder rung behind `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`** (C5-M5/M5B: no client change for the size switch, entry 415 of 450, 105 min at 1080p overnight; the window skips non-PLAYING reports since C5-CLOSE) — **NOT ADOPTED** on the user's look (no visible gain on PS1; cost: ~1.8× wire rate, 287-649 ms switches, the onn's 1080p decode jitter); the `remaster` preset NOT ADOPTED; **the 4x PS1 source ADOPTED** (C5-M4A). Low rungs screened for Phase G (C5-M3: 720p/4000 passes transport). Look 3's first try was at 720p (the entry refused by the 60-s age guard); **the repeated Look 3 was at 1080p (~1.5 min, C5-CLOSE-A) and "looked the same"**: the decision's grounds include the look | `C5_CLOSE_2026-10-05.md`; `decisions/C5_1080P60_CAPABILITY_2026-09-28.md`; `C5_M5B_RUNG_RULES_AND_LOOK_2026-10-03.md`; `C5_M5_1080P_RUNG_2026-10-03.md`; `C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md`; `C5_M1_1080P60_PROFILE_2026-09-28.md` |
 | generalized source contract established | ✓ on paper and as an unused interface | `architecture/NATIVE_SOURCE_CONTRACT.md` (`C6-D1`) |
 | Games regression passes | ✓ all 9 scripted rows PASS (D7-R2); the user's hands-on rows reported fine (2026-09-28) | `D7_R1_LINUX_REGRESSION_2026-09-25.md` §R3 |
 | reusable by Phase G remote/WAN | stated in the contract (a remote transport is another `Transport`; nothing implemented) | `architecture/NATIVE_SOURCE_CONTRACT.md` |
-| clean checkpoint/push | **pending the user's commit** (Code commits nothing); the checkpoint record and the git status file are ready | `C7_D8_CHECKPOINT_2026-09-30.md`; `logs/c7_d8_git_status_2026-09-30.txt` |
+| clean checkpoint/push | **pending the user's commit of C5-CLOSE** (Code commits nothing); the checkpoint record (appended 2026-10-05) and the git status file are ready | `C7_D8_CHECKPOINT_2026-09-30.md`; `logs/c5_close_git_status.txt` |
 
 **CL-B1 APK ADOPTED (2026-09-30)** by its pre-registered rule, as the
 user authorized. The onn now carries **`de072762…835e`**
@@ -895,7 +933,8 @@ Architectural statement:
 
 # Phase E — Linux Core Resource Characterization & Optimization
 
-**Status: PLANNED AFTER D**
+**Status: NEXT (Phase C closed 2026-10-05) — E1 first (freeze the workload
+suite), NOT STARTED; it starts on the user's word.** (Was: PLANNED AFTER D.)
 
 Phase E deliberately limits the core emulator workload to:
 

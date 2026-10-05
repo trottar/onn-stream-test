@@ -1,8 +1,8 @@
 ---
 memory_schema: 1
-as_of: 2026-09-30
+as_of: 2026-10-05
 baseline_commit: f01c3b2
-status: C7 / D8 CHECKPOINT RECORD — every C7 and D8 acceptance item met or explicitly deferred, except "clean checkpoint/push", which is pending the user's commit (Code commits nothing). C3.L4 closed 2026-09-30 (live validated under real loss; behind its flag). The git status for the commit is in logs/c7_d8_git_status_2026-09-30.txt; nothing that must not be committed is outside .gitignore
+status: C7 / D8 CHECKPOINT RECORD (appended 2026-10-05: the C7 rows re-read after C5's close; Phase C CLOSED; clean checkpoint/push pending the user's commit of C5-CLOSE, logs/c5_close_git_status.txt) — every C7 and D8 acceptance item met or explicitly deferred, except "clean checkpoint/push", which is pending the user's commit (Code commits nothing). C3.L4 closed 2026-09-30 (live validated under real loss; behind its flag). The git status for the commit is in logs/c7_d8_git_status_2026-09-30.txt; nothing that must not be committed is outside .gitignore
 ---
 
 # C7 / D8 — the Phase C and Linux-baseline checkpoint
@@ -153,3 +153,24 @@ files):
 - A separate grep over the CL-B1 run dirs found **0 private-range
   addresses and 0 MACs**.
 - Nothing was fixed, because nothing was an identifier.
+
+## Appended 2026-10-05 — the C7 rows re-read after C5's close (C5-CLOSE)
+
+Record: `C5_CLOSE_2026-10-05.md`. Each C7 row re-read against its
+record; the D8 rows are unchanged.
+
+| item | status 2026-10-05 | what changed since 2026-09-30 |
+| --- | --- | --- |
+| explicit profiles | ✓ | nothing; the PS1 source behind the profile is now the 4x source (C5-M4A), the profile unchanged |
+| transport telemetry contract | ✓ | nothing |
+| adaptive bitrate runtime validated | ✓ `C3.L4` CLOSED 2026-09-30 | unchanged as a row; live has been ON BY DEFAULT since 2026-10-01 (`C3-L4-D1`) |
+| adaptive FEC validated or explicitly deferred | ✓ explicitly deferred | nothing |
+| 1080p60 characterized (→ through the ladder, the user's reading of 2026-10-01) | ✓ **C5 CLOSED 2026-10-05** | the rung built and characterized behind `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p` (C5-M5/M5B; its window skips non-PLAYING reports since C5-CLOSE), NOT ADOPTED on the user's look; `remaster` NOT ADOPTED; the 4x source adopted. Look 3 was at 720p (the entry refused by the 60-s age guard): recorded, the decision stands on its other grounds |
+| generalized source contract established | ✓ on paper and as an unused interface | nothing |
+| Games regression passes | ✓ | nothing re-run; every C5 session since ran on the adopted build and APK |
+| reusable by Phase G remote/WAN | ✓ as a statement | nothing |
+| clean checkpoint/push | **pending the user's commit of C5-CLOSE** | `logs/c5_close_git_status.txt` (`git status --short`, `git diff --stat`) |
+
+**Phase C is CLOSED, 2026-10-05** (`docs/ROADMAP.md`), with every C7 row
+met or explicitly deferred except the commit, which is the user's. Phase
+E is next (E1 first), not started.

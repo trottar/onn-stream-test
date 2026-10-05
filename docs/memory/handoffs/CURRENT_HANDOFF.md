@@ -2,51 +2,40 @@
 
 Authoritative state: `../CURRENT.md`. **Start there.**
 
-Baseline commit `fe8f125` (C5-M4 Part 1); nothing committed since.
+Baseline commit `4493e68` (C5-M5B); C5-CLOSE is not committed (the
+user's commit: `../../../logs/c5_close_git_status.txt`).
 
-## 2026-10-01 (evening) — `C5-M4A`: the 4x PS1 source ADOPTED
+## 2026-10-05 — `C5-CLOSE`: C5 CLOSED, **Phase C CLOSED**; Phase E next
 
-- **The user**: "Yes apply the 4x config". Adopted by the pre-registered
-  rows V1-V6 (`../decisions/C5-M4_PS1_4X_SOURCE_ADOPTION_2026-10-01.md`).
-- **The config.** PS1 renders at 4x into a 1920×1080 window, through the
-  core override `Beetle PSX HW.cfg` and the line in the base and six
-  per-title `.opt`. The 720p/7000 stream carries it.
-- **The checks.** The 20-min hold met every row (0 transitions). D7 passed
-  9/9 on the retry; P1's discovery row missed by 0.2 s of client
-  start-up. SNES is untouched.
-- **Revert**: `../TOOLS.md`, "The adopted PS1 source config".
-- **Part 1** (the same day, C5 reopened): 4x holds 60, and the 1080p
-  rung's design is in `../evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md`.
-- **Next, the user's:**
-  1. the commit;
-  2. the 40 MHz change on the Opal, then the LINK-L1 re-run;
-  3. Part 2, the rung;
-  4. the picture look at 4x, dither mode first, whenever they like.
+- **The user's look**, their words: Look 1 (4x, 720p) and Look 3 (the
+  same at the 1080p rung) *"looked the best, little difference between
+  them"*; Look 2 (`remaster`) *"was the worst, a bit less smooth"*.
+- **The user's decisions** ("Yep agreed"): the 1080p rung NOT ADOPTED
+  (behind its flag, off); `remaster` NOT ADOPTED; the 4x source stays;
+  Phase C closes.
+- **Found:** Look 3 was at 720p: its injected entry came 6.6 s in and the
+  60-s session-age guard refused it. The 1080p picture is unlooked-at;
+  the decision stands on its other grounds; `../TOOLS.md`'s hand steps
+  fixed.
+- **Built, behind the rung flag:** the rung window skips reports while
+  recovery is not PLAYING (stop rule 0 differences; S2b replay 451 → 0
+  entry decisions; injection check PASSES).
+- **Fixed:** `tools/ps1_look.sh --attract` (force-stop → start → tap the
+  NOW PLAYING preview → confirm; or it says what to press). One real dry
+  pass to PLAYING and back. The plain route stays the default.
+- Records: `../evidence/C5_CLOSE_2026-10-05.md`; the decision's close;
+  `docs/ROADMAP.md` (Phase C CLOSED, Phase E next);
+  `../evidence/C7_D8_CHECKPOINT_2026-09-30.md` (appended).
+- **Next, the user's:** 1. the commit; 2. the go for Phase E (E1, the
+  workload suite frozen first).
 
-## 2026-10-01 — `LINK-L1` MIXED; live adaptive bitrate ON BY DEFAULT (`C3-L4-D1`)
+## 2026-10-01 — `C5-M4A` (the 4x PS1 source ADOPTED); `LINK-L1` MIXED; live adaptive bitrate ON BY DEFAULT (`C3-L4-D1`)
 
-- **`LINK-L1`** (Part A, adaptive off): six pre-registered 20-min holds,
-  one per local 4-hour block. **MIXED**: 3 of 6 meet loss < 10/min
-  (37.27 / 4.25 / 15.19 / 3.16 / 7.54 / 16.78), and there is no time
-  window. History since D-BASE: 16 of 36 meet. The air is as O1 left it.
-  No conclusion is drawn; the levers are the user's
-  (`../evidence/LINK_L1_LOSS_ROW_2026-10-01.md`).
-- **`C3-L4-D1`** (Part B, the user's authorization 2026-09-30):
-  - **Live is the default** through
-    `~/.config/systemd/user/privyhub-companion.service.d/adaptive.conf`.
-    The companion's environ carries exactly
-    `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live`, and the user manager none.
-  - Kill switches: delete the drop-in (off), or the disable route
-    (shadow, one session).
-  - The 30-min hold on the default was SILENT.
-  - The injection session acted as intended, but is NOT PASS AS
-    PRE-REGISTERED on two clauses traced to the pre-registration and the
-    harness's read timing.
-  - `tools/c3_l4_nft_night.py` and `tools/d7_regression.py` accept the
-    one name. **The evidence copies of older night scripts do not**: use
-    the D1 pattern (`../TOOLS.md`).
-  - Records: `../decisions/C3-L4_LIVE_DEFAULT_2026-10-01.md`,
-    `../evidence/C3_L4_D1_LIVE_DEFAULT_2026-10-01.md`.
+Condensed on 2026-10-05: the details are in `../2026-10-01.md` and the
+records it names (`../decisions/C5-M4_PS1_4X_SOURCE_ADOPTION_2026-10-01.md`,
+`../evidence/LINK_L1_LOSS_ROW_2026-10-01.md`,
+`../decisions/C3-L4_LIVE_DEFAULT_2026-10-01.md`). Reverts and kill
+switches: `../TOOLS.md`.
 
 ## 2026-09-28 — `C3.L3a` closed; `C3.L4` authorized; C5-M1; `C3-L4-L1` built
 

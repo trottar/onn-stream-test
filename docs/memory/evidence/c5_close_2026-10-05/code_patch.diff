@@ -1,0 +1,473 @@
+diff --git a/companion/adaptive_bitrate_live.py b/companion/adaptive_bitrate_live.py
+index f56905c..c6ff31a 100644
+--- a/companion/adaptive_bitrate_live.py
++++ b/companion/adaptive_bitrate_live.py
+@@ -74,6 +74,16 @@ threshold is 415 of 450 -- the strictest candidate that entered within 20 min
+ on >= 7 of the 10 real-input holds. No loss-based leave met the pre-registered
+ conditions, so the leave stays the existing triggers above.
+ 
++C5-CLOSE (the user's call of 2026-10-05, after S2b): the rung window SKIPS
++every report that arrives while link-drop recovery is not PLAYING
++(`desync_pause` ... `resumed` / `gave_up_saved`): such a report is neither
++appended nor counted, clean or not -- a frozen picture streams clean and would
++overstate the link. Skipping (not resetting) is the existing structure's
++simplest form: the window keeps the reports it held before the pause and
++resumes counting when recovery is PLAYING again (a recovery encoder restart
++still clears it, as every SSRC change does). Behind the same flag; the other
++windows and every other rule are unchanged.
++
+ Absent, the ladder tops at 7000 and every decision is what it was (the
+ replays' stop rule). The actuator rebuilds the argv's size per level
+ (`NativeStreamManager.adaptive_level_transition`).
+@@ -198,6 +208,7 @@ RUNG_WINDOW_REPORTS = 450                   # 15 min at the 2-s report rate
+ RUNG_CLEAN_NEEDED = 415                     # C5-M5B's selection (E415; C5-M5 built 435 = N - 15)
+ RUNG_REENTRY_HOLD_MS = 10 * 60 * 1000       # no entry for 10 min after a leave
+ RUNG_OSCILLATION_LEAVES = 2                 # leave, entry, leave -> HOLD for the session
++RUNG_WINDOW_RULE = "reports while recovery is not PLAYING are skipped"   # C5-CLOSE
+ TRIGGER_RUNG_ENTRY = "increase_1080p"
+ 
+ 
+@@ -272,6 +283,7 @@ class LivePolicy(ab.ShadowPolicy):
+         self.inc_window: deque[bool] = deque(maxlen=INCREASE_WINDOW_REPORTS)
+         # C5-M5: the rung window, the same rules, 450 long.
+         self.rung_window: deque[bool] = deque(maxlen=RUNG_WINDOW_REPORTS)
++        self.rung_skipped_not_playing = 0
+         self.last_disposition: str | None = None
+         self.last_clean: bool | None = None
+         self.routine_defer = 0
+@@ -335,6 +347,13 @@ class LivePolicy(ab.ShadowPolicy):
+             m["trigger"] = TRIGGER_QUEUE_GAP
+         return cls, m
+ 
++    def _rung_append(self, clean: bool, ctx: dict[str, Any]) -> None:
++        """C5-CLOSE: the rung window counts a report only while recovery is PLAYING."""
++        if self.top and (ctx.get("guards") or {}).get("recovery_playing") is False:
++            self.rung_skipped_not_playing += 1
++            return
++        self.rung_window.append(clean)
++
+     def _window_restart(self) -> None:
+         """After every SSRC change (and at a session start) the window starts empty."""
+         self.inc_window.clear()
+@@ -360,7 +379,8 @@ class LivePolicy(ab.ShadowPolicy):
+                 "reports_since_transition": self.reports_since_action,
+                 **({"rung_window_reports": len(self.rung_window), "rung_clean_reports": sum(self.rung_window),
+                     "rung_window_needed": RUNG_WINDOW_REPORTS, "rung_clean_needed": RUNG_CLEAN_NEEDED,
+-                    "rung_leaves": self.rung_leaves} if self.top else {})}
++                    "rung_leaves": self.rung_leaves,
++                    "rung_skipped_not_playing": self.rung_skipped_not_playing} if self.top else {})}
+ 
+     def _recent_transitions(self, clock: int) -> list[int]:
+         return [t for t in self.transition_times_ms if clock - t < RATE_LIMIT_WINDOW_MS]
+@@ -561,7 +581,7 @@ class LivePolicy(ab.ShadowPolicy):
+             self.last_disposition = "resync"
+             self.last_clean = False
+             self.inc_window.append(False)
+-            self.rung_window.append(False)
++            self._rung_append(False, ctx)
+             self.clean_count = sum(self.inc_window)
+             e = self._set_state(self.state if self.state != ab.TELEMETRY_STALE else ab.REFERENCE,
+                                 "resync_ignored")
+@@ -570,7 +590,7 @@ class LivePolicy(ab.ShadowPolicy):
+         self.last_disposition = "evaluated"
+         self.window.append(s)
+         self.inc_window.append(bool(self.last_clean))
+-        self.rung_window.append(bool(self.last_clean))
++        self._rung_append(bool(self.last_clean), ctx)
+         self.clean_count = sum(self.inc_window)
+ 
+         if self.escalation is not None and (ctx.get("guards") or {}).get("recovery_playing"):
+@@ -766,6 +786,8 @@ class LivePolicy(ab.ShadowPolicy):
+                                "size": "%dx%d" % RUNG_LEVELS[RUNG_KBPS],
+                                "window": {"reports": len(self.rung_window), "clean": sum(self.rung_window),
+                                           "window_needed": RUNG_WINDOW_REPORTS, "clean_needed": RUNG_CLEAN_NEEDED},
++                               "window_rule": RUNG_WINDOW_RULE,
++                               "skipped_not_playing": self.rung_skipped_not_playing,
+                                "leaves": self.rung_leaves, "closed": self.rung_closed,
+                                "reentry_hold_ms": RUNG_REENTRY_HOLD_MS}} if self.top else {}),
+             "capacity_trigger": {"rule": f"fps < {CAPACITY_FPS_BELOW:g} on all {ab.WINDOW_REPORTS} and "
+diff --git a/tools/ps1_look.sh b/tools/ps1_look.sh
+index d849d59..7e9673b 100755
+--- a/tools/ps1_look.sh
++++ b/tools/ps1_look.sh
+@@ -4,9 +4,12 @@
+ #   tools/ps1_look.sh 4x               the adopted config (4x internal resolution), 720p stream
+ #   tools/ps1_look.sh remaster         the "remaster" preset (only if offered: see TOOLS.md), 720p stream
+ #   tools/ps1_look.sh remaster-1080p   the "remaster" preset at the 1080p rung (entry injected)
+-#   add --attract to have the helper start the attract title (Tekken 3) and open the stream on the onn;
+-#   otherwise start a PS1 game on the TV as usual (a title WITHOUT its own per-title core options: the six
+-#   multitap titles keep their own file, so the look does not apply to them).
++#   THE DEFAULT (the plain route, the one the user's looks of 2026-10-04/05 used): start a PS1 game on the TV
++#   as usual once the helper says so (a title WITHOUT its own per-title core options: the six multitap titles
++#   keep their own file, so the look does not apply to them).
++#   add --attract to have the helper start the attract title (Tekken 3) and open the stream on the onn itself
++#   (C5-CLOSE: the hold harness's route -- a fresh launcher, its NOW PLAYING preview, RESUME PLAYING; if the
++#   stream does not open, the helper says exactly what to press on the TV and waits).
+ #
+ # What it does: sets the session flags in the user manager (PRIVYHUB_PS1_LOOK=<preset>; for -1080p also
+ # PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p and PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1), restarts the companion through
+@@ -15,21 +18,29 @@
+ # the companion and verifies the adopted state: flags absent, live, 7000 at 1280x720, the PS1 .opt / .cfg
+ # hashes unchanged. Kill switch at any time: Ctrl-C (the same teardown runs).
+ #
++# Every line it prints is also appended to logs/games/ps1_look_helper.log (PS1_LOOK_LOG), UTC-stamped.
++#
+ # Test hooks (tools/test_ps1_look_helper.py fake-runs it): PS1_LOOK_PROC (default /proc), PS1_LOOK_OPT_DIR,
+ # PS1_LOOK_WAIT_S (PLAYING wait, default 600), PS1_LOOK_SETTLE_S (seconds at PLAYING before the -1080p entry,
+-# default 90), PS1_LOOK_STEP_S (poll step, default 2), PS1_LOOK_TEST_OFFERED / PS1_LOOK_TEST_AT_RUNG (the
++# default 90), PS1_LOOK_STEP_S (poll step, default 2), PS1_LOOK_OPEN_S (--attract: seconds for the launcher
++# to draw, default 7), PS1_LOOK_LOG, PS1_LOOK_TEST_OFFERED / PS1_LOOK_TEST_AT_RUNG (the
+ # offered presets, read from companion/games/ps1_look.py when unset); systemctl / curl / adb come from PATH.
+ set -u
+ REPO="$(cd "$(dirname "$0")/.." && pwd)"
+ UNIT=privyhub-companion
+ API=localhost:8765
+ TITLE=game_ps1_b0a5986638f61a11
++APP=com.safeiot.privyhub
+ FLAGS="PRIVYHUB_PS1_LOOK PRIVYHUB_ADAPTIVE_BITRATE_TOP PRIVYHUB_ADAPTIVE_BITRATE_INJECT"
+ PROC="${PS1_LOOK_PROC:-/proc}"
+ OPT_DIR="${PS1_LOOK_OPT_DIR:-$HOME/.config/retroarch/config/Beetle PSX HW}"
+ WAIT_S="${PS1_LOOK_WAIT_S:-600}"; SETTLE_S="${PS1_LOOK_SETTLE_S:-90}"; STEP="${PS1_LOOK_STEP_S:-2}"
+-say() { echo "[ps1_look] $*"; }
++OPEN_S="${PS1_LOOK_OPEN_S:-7}"
++LOG="${PS1_LOOK_LOG:-$REPO/logs/games/ps1_look_helper.log}"
++mkdir -p "$(dirname "$LOG")" 2>/dev/null
++say() { echo "[ps1_look] $*"; echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $*" >> "$LOG" 2>/dev/null; }
+ LOOK="${1:-}"; ATTRACT=0; [ "${2:-}" = "--attract" ] && ATTRACT=1
++say "---- tools/ps1_look.sh ${*:-}"
+ case "$LOOK" in
+   4x) PRESET=4x; RUNG=0 ;;
+   remaster) PRESET=remaster; RUNG=0 ;;
+@@ -48,6 +59,40 @@ fi
+ opt_hashes() { (cd "$OPT_DIR" && sha256sum ./*.opt ./*.cfg 2>/dev/null) | sort -k2; }
+ status_json() { curl -s "$API/plugins/games/native-stream-status"; }
+ playing() { curl -s "$API/plugins/games/status" | python3 -c "import sys,json;print((json.load(sys.stdin).get('recovery') or {}).get('state'))" 2>/dev/null; }
++game_active() { curl -s "$API/plugins/games/status" | python3 -c "import sys,json;print(json.load(sys.stdin).get('active'))" 2>/dev/null; }
++# C5-CLOSE: --attract opens the stream the way the hold harness does (c5_m5_run.sh). The launcher must be
++# drawn AFTER the game is active: an already-open launcher does not refresh on `am start`, so it shows no
++# NOW PLAYING (the user's first attempt, 2026-10-04 22:28 local: the launch went through and the TV made no
++# request in 2.7 min). So: force-stop the app (no stream is open yet), wake, start it, find the NOW PLAYING
++# preview in a uiautomator dump, tap its centre (RESUME PLAYING), confirm NativeStreamActivity; two attempts.
++open_stream() {
++  local attempt XML XY TOP
++  for attempt in 1 2; do
++    adb shell am force-stop "$APP" > /dev/null 2>&1
++    adb shell input keyevent KEYCODE_WAKEUP > /dev/null 2>&1
++    adb shell am start -n "$APP/.MainActivity" > /dev/null 2>&1
++    sleep "$OPEN_S"
++    adb shell uiautomator dump /sdcard/ps1_look.xml > /dev/null 2>&1
++    XML=$(adb shell cat /sdcard/ps1_look.xml 2>/dev/null)
++    if ! grep -q now_playing_preview_host <<< "$XML"; then
++      say "attract: attempt $attempt -- no NOW PLAYING preview on the launcher"; continue
++    fi
++    XY=$(python3 -c "
++import re, sys
++m = re.search(r'now_playing_preview_host[^>]*?bounds=\"\[(\d+),(\d+)\]\[(\d+),(\d+)\]', sys.stdin.read())
++print('%d %d' % ((int(m[1]) + int(m[3])) // 2, (int(m[2]) + int(m[4])) // 2) if m else '1008 298')" <<< "$XML")
++    adb shell input tap $XY > /dev/null 2>&1
++    sleep $(( OPEN_S < 3 ? OPEN_S : 3 ))
++    TOP=$(adb shell dumpsys activity activities 2>/dev/null | grep -m1 topResumedActivity)
++    case "$TOP" in
++      *NativeStreamActivity*) adb shell rm -f /sdcard/ps1_look.xml > /dev/null 2>&1
++                              say "attract: RESUME PLAYING tapped ($XY); the stream is open on the TV"; return 0 ;;
++    esac
++    say "attract: attempt $attempt -- RESUME PLAYING tapped ($XY), the stream did not open"
++  done
++  adb shell rm -f /sdcard/ps1_look.xml > /dev/null 2>&1
++  return 1
++}
+ restart() {
+   systemctl --user restart "$UNIT"
+   for _ in $(seq 1 30); do curl -s -o /dev/null "$API/plugins/games/status" && break; sleep 1; done
+@@ -55,10 +100,12 @@ restart() {
+ environ() { local MP; MP=$(systemctl --user show -p MainPID --value "$UNIT"); tr '\0' '\n' < "$PROC/$MP/environ" 2>/dev/null | grep '^PRIVYHUB_' | sort | tr '\n' ' ' | sed 's/ $//'; }
+ 
+ BEFORE=$(opt_hashes)
+-TORN=0
++TORN=0; OPENED=0
+ teardown() {
+   [ "$TORN" = 1 ] && return; TORN=1
+   echo; say "ending the session and restoring the adopted state..."
++  # --attract opened the stream: BACK first, as on the TV (it posts the decoder report and stops the stream).
++  if [ "$OPENED" = 1 ]; then adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1; sleep "$STEP"; fi
+   curl -s -X POST "$API/plugins/games/stop" > /dev/null
+   systemctl --user unset-environment $FLAGS
+   restart
+@@ -67,6 +114,13 @@ teardown() {
+   ENV=$(environ)
+   ST=$(status_json | python3 -c "import sys,json;d=json.load(sys.stdin);a=d.get('adaptive_bitrate') or {};print(a.get('mode'),d.get('bitrate_kbps'),'%sx%s'%(d.get('width'),d.get('height')),(d.get('encoder_overrides') or {}).get('any_override'))" 2>/dev/null)
+   AFTER=$(opt_hashes)
++  # --attract: the launcher keeps a stale NOW PLAYING bar after the stop (seen on the dry pass, and cleared at
++  # every hold-harness teardown the same way): the stream is closed, so force-stop and start it fresh.
++  if [ "$OPENED" = 1 ]; then
++    adb shell am force-stop "$APP" > /dev/null 2>&1
++    adb shell am start -n "$APP/.MainActivity" > /dev/null 2>&1
++    say "launcher restarted (no stale NOW PLAYING)"
++  fi
+   say "manager PRIVYHUB_*: $MGR (want 0)"; [ "$MGR" = 0 ] || ok=0
+   say "companion environ: '$ENV' (want PRIVYHUB_ADAPTIVE_BITRATE_MODE=live)"; [ "$ENV" = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live" ] || ok=0
+   say "stream: mode / kbps / size / any_override = $ST (want live 7000 1280x720 False)"; [ "$ST" = "live 7000 1280x720 False" ] || ok=0
+@@ -85,9 +139,18 @@ say "companion restarted; its environ: '$(environ)'"
+ 
+ if [ "$ATTRACT" = 1 ]; then
+   curl -s -X POST "$API/plugins/games/launch?id=$TITLE" > /dev/null
+-  adb shell input keyevent KEYCODE_WAKEUP > /dev/null 2>&1
+-  adb shell am start -n com.safeiot.privyhub/.MainActivity > /dev/null 2>&1
+-  say "the attract title is launched; on the TV, open it from NOW PLAYING (RESUME PLAYING)"
++  T=0
++  until [ "$(game_active)" = True ]; do
++    sleep "$STEP"; T=$((T + STEP)); [ "$T" -ge 30 ] && break
++  done
++  say "the attract title is launched (game active: $(game_active)); opening the stream on the TV..."
++  if open_stream; then
++    OPENED=1
++  else
++    say "the stream did not open by itself. ON THE TV, with the remote: press HOME, open PrivyHub, then select"
++    say "RESUME PLAYING in the NOW PLAYING bar at the top of its home screen (or GAMES -> Tekken 3 -> Resume)."
++    say "If PrivyHub was already open, press BACK until it closes and open it again so NOW PLAYING appears."
++  fi
+ else
+   say "start a PS1 game on the TV as usual (Tekken 3 is the reference title)"
+ fi
+diff --git a/tools/test_adaptive_bitrate_live.py b/tools/test_adaptive_bitrate_live.py
+index 1d6870f..1b1a245 100644
+--- a/tools/test_adaptive_bitrate_live.py
++++ b/tools/test_adaptive_bitrate_live.py
+@@ -1568,6 +1568,75 @@ class C5M5Rung(unittest.TestCase):
+             self.assertNotIn("top", starts[1])
+ 
+ 
++PAUSED = {"recovery_playing": False, "game_not_paused": False}
++
++
++class C5CloseRungWindow(unittest.TestCase):
++    """C5-CLOSE (the user's call after S2b): the rung window skips every report
++    while recovery is not PLAYING; the window keeps what it held and resumes
++    counting when PLAYING returns. Behind the flag only."""
++
++    def paused(self, f, n, **kw):
++        f.guards.update(PAUSED)
++        ev = f.feed(n, **kw)
++        f.guards.update(GOOD_GUARDS)
++        return ev
++
++    def test_a_paused_stretch_neither_counts_nor_qualifies(self):
++        f = RungFeeder()
++        f.feed(300, **CLEAN)
++        ev = self.paused(f, 300, **CLEAN)                 # 600 clean reports, 300 of them paused
++        self.assertEqual(f.transitions(ev), [])
++        self.assertEqual([e for e in ev if e.get("trigger") == "increase_1080p"], [])   # not even a refusal
++        self.assertEqual(f.p.status()["rung_1080p"]["window"]["reports"], 300)
++        self.assertEqual(f.p.rung_skipped_not_playing, 300)
++
++    def test_the_window_survives_the_pause_and_resumes_on_playing(self):
++        f = RungFeeder()
++        f.feed(300, **CLEAN)
++        self.paused(f, 200, **CLEAN)
++        ev = f.feed(149, **CLEAN)                         # 449 counted
++        self.assertEqual(f.transitions(ev), [])
++        self.assertEqual([t["to_kbps"] for t in f.transitions(f.feed(1, **CLEAN))], [12600])
++
++    def test_unclean_and_resync_reports_while_paused_are_skipped_too(self):
++        f = RungFeeder()
++        f.feed(449, **CLEAN)
++        self.paused(f, 50, **UNCLEAN_GAP)                 # counted, these 50 would hold the window under 415
++        self.paused(f, 5, idr=True, **CLEAN)
++        self.assertEqual(f.p.status()["rung_1080p"]["window"], {"reports": 449, "clean": 449,
++                                                              "window_needed": 450, "clean_needed": 415})
++        self.assertEqual([t["to_kbps"] for t in f.transitions(f.feed(1, **CLEAN))], [12600])
++
++    def test_reports_without_the_recovery_guard_count(self):
++        # Only an explicit "recovery not PLAYING" is skipped (a ctx without guards, as some replays feed, counts).
++        f = RungFeeder()
++        for _ in range(live.RUNG_WINDOW_REPORTS - 1):
++            f.t += ab.REPORT_INTERVAL_MS
++            f._after(f.p.feed(ab._sample(telemetry(f.t, **CLEAN)), {"clock_ms": f.t}))
++        self.assertEqual(f.p.rung_skipped_not_playing, 0)
++        self.assertEqual(len(f.p.rung_window), live.RUNG_WINDOW_REPORTS - 1)
++
++    def test_the_status_field_carries_the_rule(self):
++        f = RungFeeder()
++        f.feed(10, **CLEAN)
++        self.paused(f, 7, **CLEAN)
++        st = f.p.status()["rung_1080p"]
++        self.assertEqual(st["window_rule"], "reports while recovery is not PLAYING are skipped")
++        self.assertEqual(st["skipped_not_playing"], 7)
++        self.assertEqual(f.p.holds_in_force()["rung_skipped_not_playing"], 7)
++        f.p.end_session()
++        self.assertEqual(f.p.status()["rung_1080p"]["skipped_not_playing"], 0)
++
++    def test_without_the_flag_nothing_is_skipped_or_shown(self):
++        f = RungFeeder(top=False)
++        f.feed(20, **CLEAN)
++        self.paused(f, 20, **CLEAN)
++        self.assertEqual(f.p.rung_skipped_not_playing, 0)
++        self.assertNotIn("rung_1080p", f.p.status())
++        self.assertNotIn("rung_skipped_not_playing", f.p.holds_in_force())
++
++
+ class C5M5Actuator(unittest.TestCase):
+     """The sized actuator against C3-F1's fake manager: the real builder and
+     the real encoder-only cycle, nothing spawned."""
+diff --git a/tools/test_ps1_look_helper.py b/tools/test_ps1_look_helper.py
+index 44b9a54..88e8bd7 100644
+--- a/tools/test_ps1_look_helper.py
++++ b/tools/test_ps1_look_helper.py
+@@ -1,7 +1,7 @@
+ #!/usr/bin/env python3
+-"""C5-M5B: tools/ps1_look.sh fake-run (pre-registered, c5_m5b_preregistration.txt section 5). systemctl,
++"""C5-M5B (C5-CLOSE: the --attract route and the helper's log): tools/ps1_look.sh fake-run (pre-registered, c5_m5b_preregistration.txt section 5). systemctl,
+ curl and adb are stubs on PATH that record every call and keep a tiny state (the user manager's
+-environment, the companion's environ, PLAYING, the rung); the helper is run for each look with Enter on
++environment, the companion's environ, PLAYING, the rung, the launcher and the stream on the onn); the helper is run for each look with Enter on
+ stdin, and the order of its calls and its final verification are checked. Nothing real is touched."""
+ 
+ from __future__ import annotations
+@@ -32,7 +32,7 @@ elif a[:2] == ["--user", "restart"]:
+     env = dict(st["mgr"]); env["PRIVYHUB_ADAPTIVE_BITRATE_MODE"] = "live"
+     os.makedirs(d + "/proc/4242", exist_ok=True)
+     open(d + "/proc/4242/environ", "w").write("\0".join(k + "=" + v for k, v in sorted(env.items())) + "\0")
+-    st.update(comp=env, rung=False, active=False, polls=st["polls_to_playing"])
++    st.update(comp=env, rung=False, active=False, stream_open=False, polls=st["polls_to_playing"])
+ elif a[:2] == ["--user", "show"]:
+     print("4242")
+ json.dump(st, open(d + "/state.json", "w"))
+@@ -45,7 +45,7 @@ url = next(x for x in a if "localhost:8765" in x); post = "POST" in a
+ open(d + "/calls.log", "a").write("curl " + ("POST " if post else "") + url.split("8765", 1)[1] + "\n")
+ out = None
+ if url.endswith("/plugins/games/status"):
+-    if st.get("active") or st["user_starts"]:
++    if st.get("stream_open") or st["user_starts"]:
+         st["polls"] -= 1
+     out = {"active": st.get("active"), "recovery": {"state": "PLAYING" if st["polls"] <= 0 else "IDLE"}}
+ elif "native-stream-status" in url:
+@@ -57,7 +57,7 @@ elif "inject?class=INCREASE_1080P" in url:
+                  st["comp"].get("PRIVYHUB_ADAPTIVE_BITRATE_TOP") == "1080p"
+     out = {"ok": st["rung"]}
+ elif url.endswith("/plugins/games/stop"):
+-    st.update(active=False, rung=False, polls=10**6)
++    st.update(active=False, rung=False, stream_open=False, polls=10**6)
+     out = {"ok": True}
+ elif "/plugins/games/launch" in url:
+     st["active"] = True; out = {"ok": True}
+@@ -65,8 +65,29 @@ json.dump(st, open(d + "/state.json", "w"))
+ if out is not None and "/dev/null" not in a:
+     print(json.dumps(out))
+ '''
+-STUB_ADB = r'''#!/bin/sh
+-echo "adb $*" >> "$FAKE_DIR/calls.log"
++STUB_ADB = r'''#!/usr/bin/env python3
++import json, os, sys
++d = os.environ["FAKE_DIR"]; st = json.load(open(d + "/state.json"))
++cmd = " ".join(sys.argv[1:])
++open(d + "/calls.log", "a").write("adb " + cmd + "\n")
++if "am force-stop" in cmd:
++    st["launcher"] = False
++elif "am start" in cmd:
++    st["launcher_after_active"] = bool(st.get("active"))     # a launcher drawn before the launch shows nothing
++elif "cat /sdcard/ps1_look.xml" in cmd:
++    if st.get("launcher_after_active") and st.get("np", True):
++        print('<hierarchy><node index="0" resource-id="com.safeiot.privyhub:id/now_playing_preview_host" '
++              'class="android.widget.FrameLayout" bounds="[100,100][300,200]" /></hierarchy>')
++elif "input tap" in cmd:
++    st["tapped"] = cmd.split("input tap ", 1)[1]
++    if st.get("tap_opens", True):
++        st["stream_open"] = True
++elif "dumpsys activity activities" in cmd:
++    act = "NativeStreamActivity" if st.get("stream_open") else "MainActivity"
++    print("  topResumedActivity=ActivityRecord{1 u0 com.safeiot.privyhub/." + act + " t9}")
++elif "KEYCODE_BACK" in cmd:
++    st["stream_open"] = False
++json.dump(st, open(d + "/state.json", "w"))
+ '''
+ 
+ 
+@@ -83,14 +104,16 @@ class FakeRun(unittest.TestCase):
+         (self.d / "opt" / "Beetle PSX HW.cfg").write_text('video_fullscreen = "true"\n')
+ 
+     def run_helper(self, look, *, extra=(), offered="4x remaster", at_rung="1", user_starts=True,
+-                   polls=3, wait_s=20, stdin="\n"):
++                   polls=3, wait_s=20, stdin="\n", np=True, tap_opens=True):
+         (self.d / "state.json").write_text(json.dumps({"mgr": {}, "comp": {}, "rung": False, "active": False,
+                                                        "polls": polls, "polls_to_playing": polls,
+-                                                       "user_starts": user_starts}))
++                                                       "user_starts": user_starts, "np": np,
++                                                       "tap_opens": tap_opens}))
+         (self.d / "calls.log").write_text("")
+         env = dict(os.environ, PATH=f"{self.d / 'bin'}:{os.environ['PATH']}", FAKE_DIR=str(self.d),
+                    PS1_LOOK_PROC=str(self.d / "proc"), PS1_LOOK_OPT_DIR=str(self.d / "opt"),
+-                   PS1_LOOK_WAIT_S=str(wait_s), PS1_LOOK_SETTLE_S="0", PS1_LOOK_STEP_S="0")
++                   PS1_LOOK_WAIT_S=str(wait_s), PS1_LOOK_SETTLE_S="0", PS1_LOOK_STEP_S="0",
++                   PS1_LOOK_OPEN_S="0", PS1_LOOK_LOG=str(self.d / "helper.log"))
+         if offered is not None:
+             env["PS1_LOOK_TEST_OFFERED"] = offered
+             env["PS1_LOOK_TEST_AT_RUNG"] = at_rung
+@@ -145,13 +168,56 @@ class FakeRun(unittest.TestCase):
+         self.assertIn("IDR pulse every 250 ms", r.stdout)
+         self.assert_restored(r, st)
+ 
+-    def test_attract_launches_the_title_and_opens_the_app(self):
++    def test_attract_launches_the_title_and_opens_the_stream(self):
++        # C5-CLOSE: the hold harness's route, after the game is active: a fresh launcher, the NOW PLAYING
++        # preview found in a dump, its centre tapped (RESUME PLAYING), NativeStreamActivity confirmed; at the
++        # end BACK before the stop.
+         r, calls, st = self.run_helper("4x", extra=("--attract",), user_starts=False)
+         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+         self.order(calls, "--user restart", "POST /plugins/games/launch?id=game_ps1_b0a5986638f61a11",
+-                   "adb shell am start -n com.safeiot.privyhub/.MainActivity", "games/status", "POST /plugins/games/stop")
++                   "games/status", "adb shell am force-stop com.safeiot.privyhub", "adb shell input keyevent KEYCODE_WAKEUP",
++                   "adb shell am start -n com.safeiot.privyhub/.MainActivity", "adb shell uiautomator dump",
++                   "adb shell cat /sdcard/ps1_look.xml", "adb shell input tap 200 150", "dumpsys activity activities",
++                   "games/status", "adb shell input keyevent KEYCODE_BACK", "POST /plugins/games/stop",
++                   "unset-environment", "--user restart", "adb shell am force-stop com.safeiot.privyhub",
++                   "adb shell am start -n com.safeiot.privyhub/.MainActivity")
++        self.assertEqual(st["tapped"], "200 150")                 # the preview's centre, from its bounds
++        self.assertIn("the stream is open on the TV", r.stdout)
++        self.assertNotIn("ON THE TV", r.stdout)
++        self.assertEqual(sum("am force-stop" in c for c in calls), 2)   # the open, and the stale bar at the end
++        self.assertIn("launcher restarted (no stale NOW PLAYING)", r.stdout)
++        self.assert_restored(r, st)
++
++    def test_attract_without_now_playing_says_what_to_press_and_waits(self):
++        # Two attempts, no preview: the helper names the TV steps and waits for PLAYING (the user's hand).
++        r, calls, st = self.run_helper("4x", extra=("--attract",), np=False, user_starts=True)
++        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
++        self.assertEqual(sum("am force-stop" in c for c in calls), 2)
++        self.assertFalse([c for c in calls if "input tap" in c])
++        self.assertIn("ON THE TV, with the remote: press HOME, open PrivyHub, then select", r.stdout)
++        self.assertIn("RESUME PLAYING in the NOW PLAYING bar", r.stdout)
++        self.order(calls, "adb shell cat /sdcard/ps1_look.xml", "adb shell cat /sdcard/ps1_look.xml", "games/status",
++                   "POST /plugins/games/stop")
++        self.assertFalse([c for c in calls if "KEYCODE_BACK" in c])  # the helper did not open the stream
++        self.assertNotIn("launcher restarted", r.stdout)
+         self.assert_restored(r, st)
+ 
++    def test_attract_tap_that_does_not_open_falls_back_to_the_tv_steps(self):
++        r, calls, st = self.run_helper("4x", extra=("--attract",), tap_opens=False, user_starts=False, wait_s=0)
++        self.assertEqual(r.returncode, 5, r.stdout)
++        self.assertEqual(sum("input tap" in c for c in calls), 2)
++        self.assertIn("RESUME PLAYING tapped (200 150), the stream did not open", r.stdout)
++        self.assertIn("ON THE TV", r.stdout)
++        self.assert_restored(r, st)
++
++    def test_the_helper_logs_what_it_says(self):
++        r, calls, st = self.run_helper("4x", extra=("--attract",), user_starts=False)
++        log = (self.d / "helper.log").read_text()
++        self.assertIn("---- tools/ps1_look.sh 4x --attract", log)
++        self.assertIn("attract: RESUME PLAYING tapped (200 150); the stream is open on the TV", log)
++        self.assertIn("ADOPTED STATE VERIFIED", log)
++        self.assertRegex(log.splitlines()[0], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ ")
++
+     def test_playing_never_reached_still_restores(self):
+         r, calls, st = self.run_helper("remaster", user_starts=False, wait_s=0)
+         self.assertEqual(r.returncode, 5, r.stdout)
+@@ -186,7 +252,8 @@ class FakeRun(unittest.TestCase):
+         s = json.loads(st_path.read_text()); s["mgr"] = {"PRIVYHUB_FEC_SCHEME": "x"}; st_path.write_text(json.dumps(s))
+         env = dict(os.environ, PATH=f"{self.d / 'bin'}:{os.environ['PATH']}", FAKE_DIR=str(self.d),
+                    PS1_LOOK_PROC=str(self.d / "proc"), PS1_LOOK_OPT_DIR=str(self.d / "opt"),
+-                   PS1_LOOK_TEST_OFFERED="4x remaster", PS1_LOOK_TEST_AT_RUNG="1")
++                   PS1_LOOK_TEST_OFFERED="4x remaster", PS1_LOOK_TEST_AT_RUNG="1",
++                   PS1_LOOK_LOG=str(self.d / "helper.log"))
+         r = subprocess.run(["bash", str(HELPER), "4x"], input="\n", capture_output=True, text=True, env=env, timeout=60)
+         self.assertEqual(r.returncode, 4, r.stdout)
+ 
