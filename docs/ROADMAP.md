@@ -13,7 +13,9 @@ Authority for the current position is `docs/memory/CURRENT.md`.
 
 - **2026-10-05: Phase C CLOSED** (C5-CLOSE, the user's decisions: the
   1080p rung and the `remaster` preset not adopted, the 4x PS1 source
-  stays). **Phase E is next, E1 first, not started** — on the user's word.
+  stays). **Phase E ACTIVE since 2026-10-05: E1 FROZEN (E1-S1, the suite in
+  `docs/memory/architecture/E1_WORKLOAD_SUITE.md`; 6 of 7 runnable rows
+  repeatable, the concurrency row not yet); E2 next** — on the user's word.
 
 - **Phase D is ACTIVE.** The Linux host runs the companion and the games
   path; D4 PS1 multitap parity is the open functional item.
@@ -47,7 +49,7 @@ Authority for the current position is `docs/memory/CURRENT.md`.
 | **B — Diagnostics & Clean Native Baseline** | Make PrivyHub self-diagnosing and remove active Sunshine/Moonlight legacy | **COMPLETE / PUSHED** |
 | **C — Adaptive Streaming Architecture** | Portable profile/telemetry/readiness foundation complete enough for Windows; automatic adaptation continues on Linux | **CLOSED 2026-10-05** (C5-CLOSE; resumed 2026-09-23 at C3 after `D-BASE`) |
 | **D — Linux Migration / Native Linux Baseline** | Move the core server to the HP EliteDesk Linux prototype and restore normal-use parity | **ACTIVE** |
-| **E — Linux Core Resource Characterization & Optimization** | Optimize and measure the Linux core with PS1-and-below only; select Prototype 2 from evidence | **NEXT** — E1 first, not started (on the user's word) |
+| **E — Linux Core Resource Characterization & Optimization** | Optimize and measure the Linux core with PS1-and-below only; select Prototype 2 from evidence | **ACTIVE** — E1 FROZEN 2026-10-05 (E1-S1); E2 next (on the user's word) |
 | **F — Media Library, VOD & Live TV UX** | Finish local media polish plus substantial Live TV/channel/guide work on Linux | **PLANNED AFTER E** |
 | **G — Secure Remote Access / Portable Client Foundation** | Establish overlay/provider abstraction, portable trusted-LAN access, WAN session identity/auth, and off-site PS1-and-below validation | **FUTURE AFTER F** |
 | **H — Extended Emulation & User-Content Import** | Build safe user-content ingestion, then characterize N64, GameCube, and PS2 on the established local/remote foundation | **FUTURE AFTER G** |
@@ -933,8 +935,8 @@ Architectural statement:
 
 # Phase E — Linux Core Resource Characterization & Optimization
 
-**Status: NEXT (Phase C closed 2026-10-05) — E1 first (freeze the workload
-suite), NOT STARTED; it starts on the user's word.** (Was: PLANNED AFTER D.)
+**Status: ACTIVE (started 2026-10-05, the user's "let's start E1") — E1
+FROZEN (E1-S1); E2 next, on the user's word.** (Was: NEXT; PLANNED AFTER D.)
 
 Phase E deliberately limits the core emulator workload to:
 
@@ -952,6 +954,18 @@ implementation as far as worthwhile, measure the complete system, and derive a
 lower-cost Prototype 2 from evidence**.
 
 ## E1 — Freeze the workload suite
+
+**Status: FROZEN 2026-10-05 (E1-S1)** — the suite document is
+`docs/memory/architecture/E1_WORKLOAD_SUITE.md` (it changes only by a
+dated amendment); the record `docs/memory/evidence/E1_S1_WORKLOAD_SUITE_2026-10-05.md`.
+One command (`tools/e1_suite.py`), one sampler set (`tools/e1_sampler.py`).
+Runnable rows, each run twice: idle, PS1 local, SNES streamed, PS1 streamed
+(= the 720p60 reference), the 1080p rung (flag, not adopted), the EPG grab
+(metadata/storage), PS1 streaming + EPG grabs (concurrency). REPEATABLE: 6
+of 7; the concurrency row NOT YET (the stream degrades under the grabs).
+ABSENT: Live TV (no unattended channel start), VOD (drive not attached),
+browser and camera sources (Windows-only; no camera), NES and Genesis (no
+fixtures). **E2 next**: the same suite at 20-min windows.
 
 Representative workloads should include, where present:
 

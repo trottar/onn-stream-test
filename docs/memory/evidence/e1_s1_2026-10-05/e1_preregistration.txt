@@ -1,0 +1,75 @@
+E1-S1 PRE-REGISTRATION -- written 2026-10-05 before any suite run; its SHA-256 is in e1_preregistration.sha256.
+Runner: tools/e1_suite.py (one command: the whole suite or one id). Sampler: tools/e1_sampler.py (1 s).
+Short smoke runs of the runner itself (windows < 60 s, out dir runs_smoke/) test the code only and are NOT data.
+
+1. THE SUITE (order as listed; every workload twice, back to back; nothing tuned between the two runs)
+
+Every run: (i) preflight -- no PRIVYHUB_* in the user manager, the companion's environ exactly
+PRIVYHUB_ADAPTIVE_BITRATE_MODE=live, no game active, adb device present; (ii) the session flags of that row
+only (1080p row) set in the user manager; (iii) `systemctl --user restart privyhub-companion`, MainPID owns
+8765; (iv) IDLE GAP >= 120 s (the idle gap between workloads and between runs; the sampler runs through it);
+(v) launch; (vi) warm-up; (vii) the 5-min steady-state window (300 s) = the summary's window;
+(viii) teardown to the idle state; flags unset and the unit restarted when any were set; checks.
+
+  E1-IDLE         idle Linux + PrivyHub. Launch: nothing. Warm-up 60 s. Steady state: companion idle, no game,
+                  no stream, onn not driven. Teardown: nothing. Main process: companion.
+  E1-PS1-LOCAL    Tekken 3 (USA) game_ps1_b0a5986638f61a11, adopted 4x source, NO stream. Launch: the counter
+                  override set; POST /plugins/games/launch (from the host, 127.0.0.1); RetroArch PAUSE_TOGGLE
+                  on its command port (127.0.0.1, the port in privyhub-input.cfg); GET_STATUS PLAYING.
+                  Warm-up 60 s after PLAYING. Steady state: the attract loop. Teardown: POST stop, active false,
+                  no RetroArch process, override cleared. Main process: retroarch.
+  E1-SNES-STREAM  Super Mario World (USA) game_snes_c6fecdcdddb35398 through the companion with the onn (adopted
+                  profile, live default). Launch: counter override (config/bsnes/<rom>.cfg); POST launch; the
+                  onn: force-stop, wake, MainActivity, tap now_playing_preview_host, NativeStreamActivity,
+                  recovery PLAYING. Warm-up 90 s after PLAYING (the stream's startup transient, P2a).
+                  Steady state: the title-screen demo loop. Teardown: BACK, the decoder report, POST stop,
+                  active false, NOW PLAYING banner cleared (force-stop + relaunch if left), override cleared,
+                  APK hash. Main process: retroarch.
+  E1-PS1-STREAM   Tekken 3 attract on the adopted stream (= the 720p60 reference profile row). As SNES-STREAM.
+                  Warm-up 90 s. Main process: retroarch.
+  E1-PS1-1080P    As PS1-STREAM with PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 for
+                  this row only. At 75 s after PLAYING: POST inject?class=INCREASE_1080P; confirm width/height
+                  1920x1080 in native-stream-status (one retry at +15 s). Warm-up 60 s after the switch, then
+                  the window. Teardown: as PS1-STREAM, then flags unset, unit restarted, manager none, environ
+                  exactly the live default. Main process: retroarch.
+  E1-META         The EPG grab cycle: POST /plugins/epg/refresh (forced, synchronous) over the fixed list
+                  ComedyCentral.us@East, CNBCUK.uk@SD, 10Bold.au@Sydney, FoxSports1.us@HD, NBC.us@East,
+                  FilmBox.nl@Netherlands, repeated in order for warm-up + window; plus GET /plugins/games/games
+                  every 30 s (the library scan, 5-s cache expired). Warm-up 60 s. Teardown: the cycle stops after
+                  its current grab. Main process: companion (the grab child reported as epg).
+  E1-CONC         PS1-STREAM with the E1-META grab cycle (and scan) started 30 s after PLAYING. Warm-up 90 s.
+                  Main process: retroarch.
+
+ABSENT (skipped and listed): Live TV (no unattended channel start), VOD (drive not attached), browser source,
+camera source (Windows-only; no camera), NES, Genesis (no fixtures), the metadata reconcile (writes library
+metadata). The 720p60 reference row is E1-PS1-STREAM.
+
+2. THE REPEATABILITY BAR (per workload, run 1 vs run 2, the same 300-s window; absolute differences)
+
+  host CPU mean (cpu.mean_pct)            |r1 - r2| <= 2.0 points
+  GPU busy mean (gpu.busy_pct)            |r1 - r2| <= 3.0 points
+  RSS of the main process (mean)          |r1 - r2| / mean(r1, r2) <= 5 %
+  the key figure, banded:
+    E1-IDLE         none beyond the three above
+    E1-PS1-LOCAL    RetroArch frames/s (title counter)           within +/- 0.5 fps
+    stream rows     rendered fps (heartbeat rendered_frames)     within +/- 0.5 fps
+    (SNES, PS1,     RetroArch frames/s (title counter)           within +/- 0.5 fps
+     1080P, CONC)   video loss/min (heartbeat lost_packets), audio underruns, max output gap, recent loss:
+                    REPORTED, NOT BANDED -- the link's loss row (LINK-L1/L2: time of day) is expected to differ
+                    run to run; this is said before the runs.
+    E1-PS1-1080P    precondition (not a band): >= 95 % of the window's status reads at 1920x1080
+    E1-META, CONC   median grab duration                         within +/- 30 % of the two runs' mean
+                    (network-bound: upstream guide sites); grabs completed and failed: reported
+  REPEATABLE if every banded metric holds. Otherwise NOT YET REPEATABLE, naming each metric that did not hold
+  and the suspected cause (e.g. a host-CPU difference sitting in the non-PrivyHub `other` row, the link, the
+  upstream sites). No band is widened or narrowed after the data.
+
+3. RECORDED, NOT BANDED: PSS, swap, PSI, disk, net, VCN activity, socket power, temperatures, cpufreq,
+   throttle_status, per-process rows, the sampler's own cost, missed samples.
+
+4. RULES: adopted profile, source and APK (de072762...835e) throughout; flags absent at the end (manager none,
+   environ exactly the live default); live default intact; no nft, no real sudo, the Opal not touched; the
+   measurement-only counter override is the only file written into the RetroArch config tree and it is removed
+   on every exit path; nothing optimized, nothing adopted, nothing committed. Two-retry limit on a failing
+   launch; a run that cannot reach its steady state is recorded FAILED with the reason, never repeated beyond
+   two retries.

@@ -2,32 +2,46 @@
 
 Authoritative state: `../CURRENT.md`. **Start there.**
 
-Baseline commit `4493e68` (C5-M5B); C5-CLOSE is not committed (the
-user's commit: `../../../logs/c5_close_git_status.txt`).
+Baseline commit `f60234e` (the PREPUSH audit; C5-CLOSE committed). E1-S1
+is not committed (the user's commit: `../../../logs/e1_s1_git_status.txt`).
 
-## 2026-10-05 — `C5-CLOSE`: C5 CLOSED, **Phase C CLOSED**; Phase E next
+## 2026-10-05 — `E1-S1`: **Phase E started; E1 FROZEN**
 
-- **The user's look**, their words: Look 1 (4x, 720p) and Look 3 (the
-  same at the 1080p rung) *"looked the best, little difference between
-  them"*; Look 2 (`remaster`) *"was the worst, a bit less smooth"*.
-- **The user's decisions** ("Yep agreed"): the 1080p rung NOT ADOPTED
-  (behind its flag, off); `remaster` NOT ADOPTED; the 4x source stays;
-  Phase C closes.
-- **Found:** Look 3 was at 720p: its injected entry came 6.6 s in and the
-  60-s session-age guard refused it. The 1080p picture is unlooked-at;
-  the decision stands on its other grounds; `../TOOLS.md`'s hand steps
-  fixed.
-- **Built, behind the rung flag:** the rung window skips reports while
-  recovery is not PLAYING (stop rule 0 differences; S2b replay 451 → 0
-  entry decisions; injection check PASSES).
-- **Fixed:** `tools/ps1_look.sh --attract` (force-stop → start → tap the
-  NOW PLAYING preview → confirm; or it says what to press). One real dry
-  pass to PLAYING and back. The plain route stays the default.
-- Records: `../evidence/C5_CLOSE_2026-10-05.md`; the decision's close;
-  `docs/ROADMAP.md` (Phase C CLOSED, Phase E next);
-  `../evidence/C7_D8_CHECKPOINT_2026-09-30.md` (appended).
-- **Next, the user's:** 1. the commit; 2. the go for Phase E (E1, the
-  workload suite frozen first).
+- The user's go: "let's start E1".
+- **The suite**: `../architecture/E1_WORKLOAD_SUITE.md`.
+  - Run with `tools/e1_suite.py` (one command; it requires a hashed
+    pre-registration) and the `tools/e1_sampler.py` sampler set at 1 s.
+  - The rows: idle, PS1 local (unpaused through RetroArch's command
+    port), SNES streamed, PS1 streamed (= the 720p60 reference), the
+    1080p rung (flag), the EPG grab, PS1 streaming + EPG.
+- **Dry runs, two per row, 5-min windows:**
+  - 6 of 7 REPEATABLE.
+  - **E1-CONC NOT YET REPEATABLE**: EPG grabs during a stream raise loss
+    to ~2,300-2,800/min, rendered fps falls to ~54, and the ladder steps
+    down to 5500. The suspect is the Node grabber child; untested, for E2.
+- **Also found:**
+  - SNES (bsnes) uses ~4.2 cores, and its stream renders 58.5-58.9 fps;
+  - the companion's RSS stays at ~172+ MB after the first EPG grab;
+  - VCN activity is unusable (encoder % of a core stands in);
+  - RAPL is root-only, and wall power is ABSENT.
+- **ABSENT, on the user's list:**
+  - Live TV;
+  - VOD (drive not attached);
+  - the browser and camera sources;
+  - NES and Genesis;
+  - a power meter.
+- Record: `../evidence/E1_S1_WORKLOAD_SUITE_2026-10-05.md`.
+- **Next, the user's:**
+  1. the commit;
+  2. the answers to the list;
+  3. E2 (the suite at 20-min windows) on their word.
+
+## 2026-10-05 — `C5-CLOSE`: C5 CLOSED, **Phase C CLOSED**
+
+Condensed on 2026-10-05 (E1-S1). The user's look and decisions: the 1080p
+rung and `remaster` are NOT ADOPTED (both behind their flags), the 4x
+source stays, and Phase C closes. The details are in `../2026-10-05.md`
+and `../evidence/C5_CLOSE_2026-10-05.md` (with the C5-CLOSE-A addendum).
 
 ## 2026-10-01 — `C5-M4A` (the 4x PS1 source ADOPTED); `LINK-L1` MIXED; live adaptive bitrate ON BY DEFAULT (`C3-L4-D1`)
 

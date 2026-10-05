@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-10-05
-baseline_commit: 4493e68
+baseline_commit: f60234e
 ---
 
 # Current State
@@ -9,52 +9,49 @@ baseline_commit: 4493e68
 Headings are fixed by `tools/check_memory_health.py`; do not rename.
 ## Active Objective
 
-**Phase C CLOSED, 2026-10-05** (C5-CLOSE, the user's decisions, "Yep
-agreed"). **Phase E is next — E1 first (freeze the workload suite), NOT
-STARTED; it starts on the user's word.**
+**Phase E ACTIVE since 2026-10-05** (the user's go: "let's start E1").
+**E1 is FROZEN** (E1-S1). **E2 is next, on the user's word.** Phase C is
+closed (C5-CLOSE, 2026-10-05).
 
-- **C5 CLOSED**: the 1080p rung NOT ADOPTED (stays behind
-  `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`, off, for a 1080p-detail source);
-  the `remaster` preset NOT ADOPTED (stays behind `PRIVYHUB_PS1_LOOK`);
-  **the 4x PS1 source stays adopted** (C5-M4A).
-- **The user's look, their words:** Look 1 (4x, 720p) and Look 3 (the
-  same at the 1080p rung) *"looked the best, little difference between
-  them"*; Look 2 (`remaster`) *"was the worst, a bit less smooth"*.
-- **Look 3, repeated (C5-CLOSE-A):** the user's words *"Looked the same
-  and loading the game still says 720"*. From the logs it **was at 1080p**:
-  the entry acted 132 s after PLAYING, ~1.5 min at 1920×1080 / 12600,
-  entry gap 329 ms (the first try was refused by the 60-s age guard). The
-  user saw no difference from the 4x 720p stream; the decision's grounds
-  include the look. The on-screen 720 is the client's constant
-  (`NativeStreamActivity.kt:66-67`), cosmetic.
-- **Phase C delivered**: explicit profiles (C1), the C2 telemetry
-  contract, live adaptive bitrate on by default (`C3.L4` closed, validated
-  under real loss), the FEC decision (C4: 8+1, adaptive deferred), 1080p60
-  characterized and built as a rung behind its flag (C5), the source
-  contract (C6), the Games regression (D7). C7: every row met or deferred
-  but the commit (`docs/ROADMAP.md`, `evidence/C7_D8_CHECKPOINT_2026-09-30.md`).
-- **Standing:** `D-BASE` CLOSED; `LINK-L1` (80 MHz) MIXED; `LINK-L2`
-  (40 MHz) TIME OF DAY on the boundary; the `CL-B1` APK adopted.
+- **The suite**: `architecture/E1_WORKLOAD_SUITE.md` (frozen; amended
+  only by date).
+  - One command: `tools/e1_suite.py` (a hashed pre-registration is
+    required).
+  - One sampler set: `tools/e1_sampler.py` (1 s).
+- **The rows:** idle; PS1 local (no stream); SNES streamed; PS1 streamed
+  (= the 720p60 reference); the 1080p rung (flag, not adopted); the EPG
+  grab; PS1 streaming + EPG.
+- **Dry runs** (2 × 5 min each): **6 of 7 REPEATABLE.**
+  - **E1-CONC NOT YET REPEATABLE**: EPG grabs during the stream raise
+    loss to ~2,300-2,800/min, rendered fps falls to ~54, and the ladder
+    steps down to 5500.
+  - The suspect is the Node grabber child; untested, for E2.
+- **ABSENT, on the user's list:** Live TV (no unattended channel start),
+  VOD (drive not attached), the browser and camera sources, NES and
+  Genesis fixtures, a power meter.
+- **Standing** (unchanged by E1): Phase C closed (4x PS1 source adopted;
+  the rung and `remaster` not); `D-BASE` CLOSED; `LINK-L1` MIXED,
+  `LINK-L2` TIME OF DAY; the `CL-B1` APK adopted.
 
 ## Current Work Item
 
-**C5-CLOSE** (`handoffs/C5-CLOSE_PHASE_C_CLOSE_TASK.md`,
-`QUEUE_2026-09-29B.md`'s rules): done; nothing else adopted; nothing
-committed. Record: `evidence/C5_CLOSE_2026-10-05.md` (with the
-C5-CLOSE-A addendum, read-only from the logs).
+**E1-S1** (`handoffs/E1-S1_WORKLOAD_SUITE_FREEZE_TASK.md`,
+`QUEUE_2026-09-29B.md`'s rules) is done. Nothing optimized, adopted or
+committed. Record: `evidence/E1_S1_WORKLOAD_SUITE_2026-10-05.md` (files in
+`evidence/e1_s1_2026-10-05/`).
 
-- **The rung-window rule**, behind the rung flag: reports while recovery
-  is not PLAYING are skipped (skip, not reset). Tests 126/126, mutations
-  22/22, stop rule 0 differences (448 series); S2b replayed: 451 entry
-  decisions → 0; the injection check PASSES (`window_rule`,
-  `skipped_not_playing` in the status).
-- **The helper's `--attract`** fixed from the journal (the launcher drawn
-  before the launch never refreshed; nothing tapped RESUME): now
-  force-stop → start → tap the NOW PLAYING preview → confirm, else the
-  exact TV steps. Fake-run 11/11; one real `4x --attract` dry pass to
-  PLAYING and back. The plain route stays the default.
-- C5's close: `decisions/C5_1080P60_CAPABILITY_2026-09-28.md`; Phase C
-  CLOSED in `docs/ROADMAP.md`; C7 checkpoint appended.
+- Inventory and pre-registration (hashed `244c203f…`) before any run.
+- **Runner smoke** (not data) fixed three sampler defects before the
+  runs (RetroArch's process is `AppRun`; re-key on exec; `gpu_metrics`
+  units).
+- **The suite** 06:35:54-08:40:55Z: 14 runs OK, 0 missed samples.
+  `runs/repeatability.md`, `--check` OK, redactor 0 findings.
+- **Findings, not acted on:** SNES (bsnes) ~4.2 cores, its stream 58.5-58.9
+  fps; the companion's RSS 37 → ~172-211 MB after the first EPG grab; VCN
+  activity unusable; RAPL root-only; `throttle_status` 0x800 (EDC_CPU).
+- **Costs** (host CPU / socket W): idle 0.8 % / 4; PS1 local 5 % / 13;
+  PS1 streamed 11 % / 19-20; 1080p rung 15-16 % / 23-27; SNES streamed
+  41 % / 21-22.
 
 ## Verified State
 
@@ -84,7 +81,7 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`, including `C5-M1`'s `PRIVYHUB_NATIVE_PROFILE_ID`); none set.
 - **Installed**: **APK `de072762…835e`** (the `CL-B1` APK, adopted
   2026-09-30; hash confirmed on the onn at every teardown since,
-  last 2026-10-05 04:42Z (C5-CLOSE's final state); the previous
+  last 2026-10-05 08:40Z (E1-S1's final state); the previous
   `f31b1c18…8ae7` is kept at `runtime/c4_m1/adopted_app-debug.apk` for
   rollback).
   - The companion is the systemd user unit `privyhub-companion` (`H3`);
@@ -100,10 +97,8 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
     - Kill switches: delete the drop-in + `daemon-reload` + restart
       (off); `POST /plugins/games/adaptive-bitrate/disable` (shadow, one
       session).
-  - Last restarted 2026-10-05 04:32Z by the helper's `--attract` dry
-    pass teardown (C5-CLOSE): manager none, environ the one name, live,
-    7000 / 1280×720, `any_override` false, no game, the adopted PS1 files
-    byte-identical, the shadow `d66211b3…`.
+  - Last restarted 08:40Z by E1-S1's teardown; checked 08:50Z: as
+    above, 7000 / 1280×720, no game, the adopted PS1 files identical.
   - The companion tree carries the live controller through `C3-L4-N2`,
     the C5 selector profiles (dormant), **the 1080p rung behind
     `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`** (C5-M5; entry 415 since
@@ -118,21 +113,27 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
-1. **The user's push**: `git push` (the PREPUSH audit reads **READY TO
-   PUSH** for `origin/main..HEAD`, 11 commits:
-   `evidence/PREPUSH_AUDIT_2026-10-05.md`). That completes C7's "clean
-   checkpoint/push".
-2. **The user's go for Phase E** — E1 first, the workload suite frozen
-   (`docs/ROADMAP.md`, Phase E). Not started.
+1. **The user's commit** of E1-S1 (`logs/e1_s1_git_status.txt`: the two
+   tools, the suite document, the record and its files, memory). The
+   push of the 11 earlier commits is the user's as before
+   (`evidence/PREPUSH_AUDIT_2026-10-05.md`).
+2. **The user's answers to the list**
+   (`evidence/E1_S1_WORKLOAD_SUITE_2026-10-05.md` §5):
+   NES / Genesis fixtures; a camera (none); a power meter (none); the VOD
+   drive; Live TV (hand-tuned in E2, a later APK, or ABSENT); which
+   concurrency pairs matter; whether the 1080p-rung row stays; optionally
+   the metadata reconcile as a workload.
+3. **E2, on the user's word**: whole-system measurements on the frozen
+   suite at 20-min windows, with a new hashed pre-registration. E1-CONC's
+   degradation is its first concurrency item.
 
 **Open, not blocking** (carried past Phase C):
 
 - the max output gap (447 ms in D1; ≤ 100 on 0 of LINK-L2's six);
-  `host_link`; the thermal flag; `CTRL-L1`; the slow-event ring;
+- `host_link`; the thermal flag; `CTRL-L1`; the slow-event ring;
 - the mild step's ~120 s bound;
-- **the onn's 1080p decode jitter** (~300-600 spikes ≥ 20 ms/min in every
-  1080p hold): a client item for later; the overlay's constant size text
-  (a later APK);
+- **the onn's 1080p decode jitter**: a client item for later; the
+  overlay's constant size text (a later APK);
 - `C6-D1`'s list; B3a's two clauses; C5-M4's R3 (no `codec_ms` in the C2
   telemetry); `encoder_command` is the full start's only;
 - **adaptive-off measurements need the drop-in out** (`TOOLS.md`); old
@@ -140,11 +141,13 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Success Criteria
 
-Phase C: met (C7, `docs/ROADMAP.md`), the commit pending. **Phase E**
-(`docs/ROADMAP.md`): E1 freezes the workload suite before any
-measurement; every later change is measured against it and against the
-D-BASE close-out table, which must stay met. No perceptual gate unless the
-user sets one.
+Phase C: met (C7, `docs/ROADMAP.md`). **Phase E** (`docs/ROADMAP.md`):
+
+- E1 froze the workload suite before any measurement.
+- Every later change is measured with that suite
+  (`architecture/E1_WORKLOAD_SUITE.md`) and against the D-BASE close-out
+  table, which must stay met.
+- No perceptual gate unless the user sets one.
 
 ## Do Not Reopen Without New Evidence
 
@@ -174,6 +177,8 @@ user sets one.
 
 ## Relevant References
 
+- `architecture/E1_WORKLOAD_SUITE.md` — the frozen E1 suite (Phase E's measurement base).
+- `evidence/E1_S1_WORKLOAD_SUITE_2026-10-05.md` — E1-S1: the inventory, the dry-run table, sampler coverage, the user's list.
 - `evidence/C5_CLOSE_2026-10-05.md` — the user's look, the rung-window rule, the `--attract` fix, C5 and Phase C closed.
 - `decisions/C5_1080P60_CAPABILITY_2026-09-28.md` — C5's decision record with its close.
 - `docs/ROADMAP.md` — Phase C CLOSED, the C7 table; Phase E (E1 next).

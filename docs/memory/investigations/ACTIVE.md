@@ -1,5 +1,36 @@
 # Active investigations
 
+## PHASE E — ACTIVE 2026-10-05. E1 FROZEN (E1-S1); E2 next on the user's word
+
+**E1-S1 (2026-10-05)** (`../evidence/E1_S1_WORKLOAD_SUITE_2026-10-05.md`;
+the suite: `../architecture/E1_WORKLOAD_SUITE.md`):
+
+- The suite is frozen: 7 runnable rows run by `tools/e1_suite.py`, with
+  the `tools/e1_sampler.py` sampler set at 1 s. The rows: idle, PS1
+  local, SNES streamed, PS1 streamed (= the 720p60 reference), the 1080p
+  rung, the EPG grab, PS1 streaming + EPG.
+- **REPEATABLE: 6 of 7. E1-CONC is NOT YET REPEATABLE**: rendered fps
+  53.91 / 54.95.
+- **Open (E2's first concurrency item): EPG grabs during a PS1 stream
+  degrade it.**
+  - Loss went from 8-54/min to 2,311-2,827/min.
+  - 38-45 resyncs.
+  - The ladder stepped down to 5500.
+  - The loss sits across each grab's body, so the suspect is the Node
+    grabber child while it runs. The mechanism is untested.
+- **Open:**
+  - SNES (bsnes) uses ~4.2 cores, and its stream renders 58.5-58.9 fps
+    while RetroArch makes 59.99;
+  - the companion's RSS stays at ~172-211 MB after the first EPG grab;
+  - the VCN activity counter is not usable (encoder % of a core stands
+    in).
+- **ABSENT, on the user's list:**
+  - Live TV;
+  - VOD (drive not attached);
+  - the browser and camera sources;
+  - NES and Genesis fixtures;
+  - a power meter.
+
 ## PHASE C — CLOSED 2026-10-05. C5 (1080p60 through the ladder) and the PS1 look CLOSED (C5-CLOSE)
 
 **C5-CLOSE (2026-10-05), on the user's look and decisions**

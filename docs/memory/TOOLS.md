@@ -1632,6 +1632,53 @@ python3 -m unittest tools/test_c3_l4_nft_night.py -v   # the allow-list, the par
   table on every exit path, and records whether `nft list tables` shows
   it absent.
 
+## The Phase E workload suite (E1-S1) — `tools/e1_suite.py` + `tools/e1_sampler.py`
+
+The frozen definition is `architecture/E1_WORKLOAD_SUITE.md`; it changes
+only by a dated amendment. The record is
+`evidence/E1_S1_WORKLOAD_SUITE_2026-10-05.md`.
+
+```bash
+python3 tools/e1_suite.py --list                         # the 7 rows + the ABSENT ones
+python3 tools/e1_suite.py run --out <dir> --prereg <prereg.txt> [--only E1-PS1-STREAM] [--runs 2] [--window 300] [--gap 120]
+python3 tools/e1_suite.py compare <dir>                  # repeatability.{json,md} against the bar
+python3 tools/e1_suite.py manifest <dir> && python3 tools/e1_suite.py --check <dir>
+python3 tools/e1_sampler.py --coverage                   # what this host exposes (RAPL root-only; no wall power)
+python3 tools/e1_sampler.py --once                       # one 1-s sample, printed
+python3 tools/e1_sampler.py run <dir> [--telemetry] [--title]   # stop: touch <dir>/sampler.stop
+python3 tools/e1_sampler.py summarize <dir> --from <utc> --to <utc>
+```
+
+- **Run it in tmux, and keep the host quiet.** Interactive tools and
+  agent sessions land in the sampler's `other` row and in host CPU.
+- **`--prereg` is required.** Its `.sha256` must match, so a new window
+  length (E2's 1200 s) needs a new hashed pre-registration.
+- **Each run:**
+  - preflight (manager none, environ exactly the live default, no game,
+    adb);
+  - the row's flags (the 1080p row only);
+  - a unit restart and the 120-s idle gap;
+  - launch, warm-up, window, teardown;
+  - flags unset and checked; the counter override removed; the APK hash
+    after stream rows; the adopted PS1 files hashed.
+- **Local PS1 without a stream:** a launch leaves RetroArch PAUSED. The
+  runner sends RetroArch's own `PAUSE_TOGGLE` to its command port on
+  loopback (the port is in `data/games/retroarch/config/privyhub-input.cfg`),
+  then checks `GET_STATUS` PLAYING.
+- **Process attribution:**
+  - RetroArch's working process is the AppImage's `AppRun` (`comm`), not
+    `RetroArch-Linux`, which is a 0 % wrapper. A `comm`-only match on
+    `retroarch` / `RetroArch-Linux` misses it; this was seen in E1-S1's
+    smoke. Whether older samplers were affected was not checked.
+  - The EPG grabber is the `npm run grab` / node child, matched by its
+    `data/epg` command line.
+- **`gpu_metrics`** (amdgpu v2.2, readable without root):
+  - activities are in hundredths of a percent;
+  - socket power is in whole W, CPU and SoC power in mW;
+  - **`average_mm_activity` (VCN) reads ~0 while encoding: not usable**;
+  - `throttle_status` 0x800 = EDC_CPU (seen under streaming).
+- **hwmon "power1"** on this APU is the socket PPT, not the GPU alone.
+
 ## Linux subsystem probes
 
 Under `tools/probes/`, named by the work item that created them:
