@@ -1,0 +1,367 @@
+diff --git a/companion/adaptive_bitrate_live.py b/companion/adaptive_bitrate_live.py
+index c566ca1..f56905c 100644
+--- a/companion/adaptive_bitrate_live.py
++++ b/companion/adaptive_bitrate_live.py
+@@ -62,12 +62,18 @@ C5-M5 (the user's reading of 2026-10-01: 1080p as a rung of the ladder): with
+   increase_1080p      -- class INCREASE, from 7000 only, when the rung window
+                          (the last 450 evaluated reports since the last SSRC
+                          change, the blend's window rules and clean) is full and
+-                         >= 435 of 450 are clean; every gate applies, plus a
++                         >= 415 of 450 are clean (C5-M5B; 435 as first built);
++                         every gate applies, plus a
+                          10-minute re-entry hold-down after any leave;
+   the leave           -- the existing triggers and mapping: the mild bar one
+                          rung down = 7000 at 720p; strict -> 5000; the backstop;
+                          a leave, an entry and a leave in one session -> HOLD.
+ 
++C5-M5B (the rules from the recorded data, pre-registered selection): the entry
++threshold is 415 of 450 -- the strictest candidate that entered within 20 min
++on >= 7 of the 10 real-input holds. No loss-based leave met the pre-registered
++conditions, so the leave stays the existing triggers above.
++
+ Absent, the ladder tops at 7000 and every decision is what it was (the
+ replays' stop rule). The actuator rebuilds the argv's size per level
+ (`NativeStreamManager.adaptive_level_transition`).
+@@ -189,7 +195,7 @@ TOP_ENV = "PRIVYHUB_ADAPTIVE_BITRATE_TOP"
+ TOP_1080P = "1080p"
+ LADDER_WITH_RUNG_KBPS = LADDER_KBPS + (RUNG_KBPS,)
+ RUNG_WINDOW_REPORTS = 450                   # 15 min at the 2-s report rate
+-RUNG_CLEAN_NEEDED = 435                     # N - 15
++RUNG_CLEAN_NEEDED = 415                     # C5-M5B's selection (E415; C5-M5 built 435 = N - 15)
+ RUNG_REENTRY_HOLD_MS = 10 * 60 * 1000       # no entry for 10 min after a leave
+ RUNG_OSCILLATION_LEAVES = 2                 # leave, entry, leave -> HOLD for the session
+ TRIGGER_RUNG_ENTRY = "increase_1080p"
+diff --git a/companion/games/emulator_manager.py b/companion/games/emulator_manager.py
+index 5e5011a..174ba7b 100644
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -15,6 +15,8 @@ from datetime import datetime, timezone
+ from pathlib import Path
+ from typing import Any, Callable
+ 
++from games import ps1_look  # C5-M5B
++
+ 
+ class EmulatorError(RuntimeError):
+     pass
+@@ -2352,6 +2354,113 @@ class EmulatorManager:
+             + (platform or "<blank>")
+         )
+ 
++    # C5-M5B: the PS1 look (companion/games/ps1_look.py)
++    def _ps1_look_session_options_path(self) -> Path:
++        return (
++            self._project_path("data/games/retroarch/config")
++            / ps1_look.SESSION_OPTIONS_NAME
++        ).resolve()
++
++    def _remove_ps1_look_session_options(self) -> None:
++        try:
++            self._ps1_look_session_options_path().unlink(missing_ok=True)
++        except OSError:
++            pass
++
++    def _end_ps1_look_session(self) -> dict[str, Any] | None:
++        written = getattr(self, "_ps1_look_written", None)
++        self._ps1_look_written = None
++        target = self._ps1_look_session_options_path()
++        if written is None and not target.exists():
++            return None
++        record: dict[str, Any] = {
++            "at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
++            "event": "ps1_look_session_end",
++        }
++        if written is not None:
++            record.update({k: v for k, v in written.items() if k != "text"})
++            try:
++                after = target.read_text(encoding="utf-8")
++            except OSError:
++                after = None
++            if after is None:
++                record["rewritten_keys"] = None
++            else:
++                before = dict(
++                    re.findall(r'(?m)^(\S+) = "([^"\n]*)"$', written["text"])
++                )
++                now = dict(re.findall(r'(?m)^(\S+) = "([^"\n]*)"$', after))
++                record["rewritten_keys"] = {
++                    k: {"written": before.get(k), "after_exit": now.get(k)}
++                    for k in sorted(set(before) | set(now))
++                    if before.get(k) != now.get(k)
++                }
++        self._remove_ps1_look_session_options()
++        record["removed"] = not target.exists()
++        try:
++            log = self._project_path("logs/games") / "ps1_look_sessions.jsonl"
++            log.parent.mkdir(parents=True, exist_ok=True)
++            with log.open("a", encoding="utf-8") as fh:
++                fh.write(json.dumps(record, sort_keys=True) + "\n")
++        except OSError:
++            pass
++        return record
++
++    def _prepare_ps1_look(
++        self,
++        game: dict[str, Any],
++        runtime: dict[str, Any],
++        core_path: Path,
++    ) -> dict[str, Any]:
++        # A stale session file never carries into another launch.
++        self._ps1_look_written = None
++        self._remove_ps1_look_session_options()
++        name, keys, ignored = ps1_look.look_from_env()
++        info: dict[str, Any] = {
++            "preset": name,
++            "keys": dict(keys),
++            "ignored_value": ignored,
++            "options_path": None,
++            "applied": False,
++            "cfg_text": "",
++        }
++        if not keys:
++            return info
++        system_id = str(game.get("system", "")).strip().casefold()
++        if system_id != "ps1" or "psx_hw" not in core_path.name:
++            info["not_applied"] = "not a Beetle PSX HW launch"
++            return info
++        adopted = (
++            self._retroarch_config_directory(runtime)
++            / ps1_look.CORE_LIBRARY
++            / (ps1_look.CORE_LIBRARY + ".opt")
++        ).resolve()
++        target = self._ps1_look_session_options_path()
++        try:
++            text = ps1_look.session_options_text(
++                adopted.read_text(encoding="utf-8"),
++                keys,
++            )
++            target.parent.mkdir(parents=True, exist_ok=True)
++            target.write_text(text, encoding="utf-8")
++        except (OSError, ValueError) as exc:
++            raise EmulatorError(
++                f"PS1 look {name} could not be prepared: {exc}"
++            ) from exc
++        info["options_path"] = str(target)
++        info["applied"] = True
++        self._ps1_look_written = {
++            "preset": name,
++            "keys": dict(keys),
++            "options_path": str(target),
++            "text": text,
++        }
++        info["cfg_text"] = ps1_look.session_cfg_text(
++            str(name),
++            str(target).replace("\\", "/"),
++        )
++        return info
++
+     def _prepare_ps1_multitap_options(
+         self,
+         game: dict[str, Any],
+@@ -4692,6 +4801,7 @@ class EmulatorManager:
+         cheat_database_path: Path | None = None,
+         cheat_session: dict[str, Any] | None = None,
+         mod_session: dict[str, Any] | None = None,
++        look_override: str = "",
+     ) -> Path:
+         # Create the exact base config RetroArch will read at startup.
+         # Session-critical controller and Network Command Interface settings
+@@ -4870,6 +4980,7 @@ class EmulatorManager:
+             + "# PrivyHub A4 host coexistence\n"
+             + "# Only explicit PrivyHub navigation controls emulator pause.\n"
+             + 'pause_nonactive = "false"\n'
++            + look_override
+         )
+ 
+         if expected_storage_settings:
+@@ -5265,6 +5376,14 @@ class EmulatorManager:
+                 content_path,
+             )
+ 
++            # C5-M5B: the PS1 look for this launch only (PRIVYHUB_PS1_LOOK;
++            # unset or "4x" -> nothing written, the session cfg unchanged).
++            ps1_look_session = self._prepare_ps1_look(
++                game,
++                runtime,
++                core_path,
++            )
++
+             if cheat_source_index is None and cheat_enabled_indexes is not None:
+                 raise EmulatorError(
+                     "Cheat indexes require an explicit cheat source index"
+@@ -5313,6 +5432,7 @@ class EmulatorManager:
+                     cheat_database_path=cheat_database_path,
+                     cheat_session=cheat_session,
+                     mod_session=mod_session,
++                    look_override=ps1_look_session["cfg_text"],
+                 )
+             )
+ 
+@@ -5460,6 +5580,15 @@ class EmulatorManager:
+                     )
+                     + "\n"
+                 )
++            if ps1_look_session["preset"] or ps1_look_session["ignored_value"]:
++                log_handle.write(
++                    "PS1 look (C5-M5B): "
++                    + json.dumps(
++                        {k: v for k, v in ps1_look_session.items() if k != "cfg_text"},
++                        sort_keys=True,
++                    )
++                    + "\n"
++                )
+             log_handle.write("Command uses project-local paths only.\n\n")
+             log_handle.flush()
+ 
+@@ -5576,6 +5705,11 @@ class EmulatorManager:
+                 )
+                 else None
+             )
++            payload["ps1_look"] = (
++                {k: v for k, v in ps1_look_session.items() if k != "cfg_text"}
++                if ps1_look_session["preset"] or ps1_look_session["ignored_value"]
++                else None
++            )
+             payload["cheat_session"] = (
+                 dict(self._active_cheat_session)
+                 if isinstance(self._active_cheat_session, dict)
+@@ -8370,6 +8504,7 @@ class EmulatorManager:
+             self._refresh_process()
+ 
+             if self.process is None:
++                self._end_ps1_look_session()
+                 payload = self.status()
+                 payload["action"] = "stop"
+                 payload["stopped"] = False
+@@ -8503,9 +8638,15 @@ class EmulatorManager:
+                         error=cleanup_error,
+                     )
+ 
++            # C5-M5B: the look's session file goes with the session, after
++            # RetroArch has exited (it rewrites a rejected value on exit).
++            ps1_look_end = self._end_ps1_look_session()
++
+             payload = self.status()
+             payload["action"] = "stop"
+             payload["stopped"] = True
++            if ps1_look_end is not None:
++                payload["ps1_look_end"] = ps1_look_end
+             payload["graceful"] = not forced
+             payload["frontend_close_requested"] = close_requested
+             payload["frontend_close_method"] = close_method
+diff --git a/companion/games/ps1_look.py b/companion/games/ps1_look.py
+new file mode 100644
+index 0000000..999b8db
+--- /dev/null
++++ b/companion/games/ps1_look.py
+@@ -0,0 +1,110 @@
++"""C5-M5B section 4: the PS1 look, per session, behind PRIVYHUB_PS1_LOOK.
++
++Pre-registered in docs/memory/evidence/c5_m5b_2026-10-03/c5_m5b_preregistration.txt
++(section 5). Pure: no I/O; the emulator manager reads the adopted options file,
++writes the session file and removes it.
++
++The mechanism: for a Beetle PSX HW launch with a preset that changes keys, the
++session core-options file is the ADOPTED `Beetle PSX HW.opt` (read, never
++written) with the preset's keys replaced; the regenerated privyhub-session.cfg
++points that launch at it (`global_core_options` + `core_options_path`). The
++file lives beside privyhub-session.cfg in the project's data directory and is
++removed at the session's end and at the next launch. Nothing in the RetroArch
++config directory is written. A title with its own per-title .opt keeps
++RetroArch's precedence (its own file wins), so the look applies to titles
++without one.
++
++Unset (or "4x") -> no keys, no file, a session cfg byte-identical to today's.
++An unknown value is ignored (flagged), exactly like unset.
++"""
++
++from __future__ import annotations
++
++import os
++import re
++
++LOOK_ENV = "PRIVYHUB_PS1_LOOK"
++CORE_LIBRARY = "Beetle PSX HW"
++SESSION_OPTIONS_NAME = "privyhub-look-session.opt"
++
++# The presets offered to the user: "4x" is the adopted config (the same as
++# unset); "remaster" is the full preset of the cost table (section 5), offered
++# only because it held 60 in its 720p hold. Values are this core build's own.
++PRESETS: dict[str, dict[str, str]] = {
++    "4x": {},
++    # C5-M5B: the full preset held 60 in its 720p hold (b_full: RetroArch 59.999 fps,
++    # longest 256-frame interval 4,276 ms of 4,278.7; encoder 60.0, 0 dup/drop; GPU 25.2 % / p95 34).
++    "remaster": {"beetle_psx_hw_filter": "bilinear",
++                 "beetle_psx_hw_dither_mode": "disabled",
++                 "beetle_psx_hw_pgxp_mode": "memory only",
++                 "beetle_psx_hw_pgxp_texture": "enabled",
++                 "beetle_psx_hw_pgxp_vertex": "enabled"},
++}
++
++# "remaster-1080p" in tools/ps1_look.sh: offered only if the full preset also
++# held 60 at the rung (section 5's rung hold). It did NOT (c_full_rung: one
++# 256-frame interval of 4,283 ms, 102 s after the entry, against the 4,278.7 bar;
++# 59.998 fps), so it is not offered.
++REMASTER_AT_RUNG_OFFERED = False
++
++# The cost table's levers, one per hold (measurement only, never offered;
++# the helper does not name them). Filled with this core build's values.
++MEASURE: dict[str, dict[str, str]] = {
++    "measure-dither-off": {"beetle_psx_hw_dither_mode": "disabled"},
++    "measure-filter-xbr": {"beetle_psx_hw_filter": "xBR"},
++    "measure-filter-sabr": {"beetle_psx_hw_filter": "SABR"},
++    "measure-filter-bilinear": {"beetle_psx_hw_filter": "bilinear"},
++    "measure-filter-3point": {"beetle_psx_hw_filter": "3-point"},
++    "measure-filter-jinc2": {"beetle_psx_hw_filter": "JINC2"},
++    "measure-pgxp": {"beetle_psx_hw_pgxp_mode": "memory only",
++                     "beetle_psx_hw_pgxp_texture": "enabled",
++                     "beetle_psx_hw_pgxp_vertex": "enabled"},
++    "measure-msaa-4x": {"beetle_psx_hw_msaa": "4x"},
++    # The full preset (section 5's rule): 4x + the best-cost filter (bilinear: the lowest GPU busy
++    # mean of the filters that held 60 -- SABR, bilinear, 3-point; xBR and JINC2 missed) + dither off
++    # + PGXP. Written after the filter holds, before its own hold.
++    "measure-full": {"beetle_psx_hw_filter": "bilinear",
++                     "beetle_psx_hw_dither_mode": "disabled",
++                     "beetle_psx_hw_pgxp_mode": "memory only",
++                     "beetle_psx_hw_pgxp_texture": "enabled",
++                     "beetle_psx_hw_pgxp_vertex": "enabled"},
++    # The mechanism's smoke: a lever whose effect RetroArch's log shows (the
++    # render target is 2048^2 at 2x, 4096^2 at the adopted 4x).
++    "measure-smoke-2x": {"beetle_psx_hw_internal_resolution": "2x"},
++}
++
++
++def look_from_env(environ: dict[str, str] | None = None) -> tuple[str | None, dict[str, str], bool]:
++    """(preset name or None, the keys it replaces, ignored-unknown flag)."""
++    raw = (environ if environ is not None else os.environ).get(LOOK_ENV)
++    if raw is None or raw.strip() == "":
++        return None, {}, False
++    name = raw.strip().lower()
++    if name in PRESETS:
++        return name, dict(PRESETS[name]), False
++    if name in MEASURE:
++        return name, dict(MEASURE[name]), False
++    return None, {}, True
++
++
++def session_options_text(base_text: str, keys: dict[str, str]) -> str:
++    """The adopted options with each key's value replaced. Every key must be
++    present exactly once in the adopted file (no new keys, no guessing)."""
++    out = base_text
++    for key, value in keys.items():
++        if '"' in value or "\n" in value:
++            raise ValueError(f"unsafe option value for {key}")
++        pattern = re.compile(rf'(?m)^{re.escape(key)} = "[^"\n]*"$')
++        if len(pattern.findall(out)) != 1:
++            raise ValueError(f"{key} is not exactly once in the adopted options")
++        out = pattern.sub(f'{key} = "{value}"', out, count=1)
++    return out
++
++
++def session_cfg_text(name: str, options_path: str) -> str:
++    """The lines appended to privyhub-session.cfg for this launch."""
++    if '"' in options_path or "\n" in options_path:
++        raise ValueError("unsafe options path")
++    return ("\n\n# PrivyHub C5-M5B session-only PS1 look (" + LOOK_ENV + "=" + name + ")\n"
++            + 'global_core_options = "true"\n'
++            + f'core_options_path = "{options_path}"\n')

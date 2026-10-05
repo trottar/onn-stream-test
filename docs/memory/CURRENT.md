@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-10-03
-baseline_commit: 5005615
+as_of: 2026-10-04
+baseline_commit: a402272
 ---
 
 # Current State
@@ -16,10 +16,10 @@ source should render natively at 1080p. PS1 comes first.
 
 - **C5-M4 Part 1** (the source side) is done, and **C5-M4A adopted the
   4x PS1 source** the same evening, through the quick win.
-- **C5-M5 (2026-10-02/03) built the 1080p rung** on the live ladder
-  behind `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`: **off by default, NOT
-  adopted**. The night WORKS AS A RUNG. The user's picture look at
-  1080p is the gate for adoption.
+- **The 1080p rung** (C5-M5, behind `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`;
+  C5-M5B: entry 415 of 450) and **the PS1 look** (C5-M5B, behind
+  `PRIVYHUB_PS1_LOOK=remaster`): **off by default, NOT adopted.** The
+  user's look on the TV comes next.
 - **Standing, unchanged:**
   - live adaptive bitrate is ON BY DEFAULT (`C3-L4-D1`, the unit
     drop-in);
@@ -32,26 +32,29 @@ source should render natively at 1080p. PS1 comes first.
 
 ## Current Work Item
 
-**The C5-M5 prompt** (`QUEUE_2026-09-29B.md`'s rules): **the rung BUILT
-and SHOWN behind its flag.** Nothing adopted, nothing committed.
+**C5-M5B** (`QUEUE_2026-09-29B.md`'s rules): nothing adopted, nothing
+committed. Record: `evidence/C5_M5B_RUNG_RULES_AND_LOOK_2026-10-03.md`.
 
-- **R0** (gating): the mid-session size change needs no client change.
-  R0a holds both ways (SurfaceFlinger 1920×1080 within 3 s, back within
-  5 s, no recovery).
-- **R0b is NOT MET AS PRE-REGISTERED**: the resync count includes the
-  SSRC changes, and there was 1 stale drop. Code continued on the
-  prompt's stop condition, not the pre-registration's added stop:
-  `c5_m5_r0_decision.txt`, the user's to accept.
-- **The rung**: entry from 7000 at ≥ 435 of 450 clean; leave by the
-  existing triggers (mild bar → 7000/720p); 10-min re-entry hold.
-- Tests 119/119, mutations 10/10, stop rule 0 differences (377 series).
-- **Sessions**:
-  - S1 injection PASSES;
-  - **S3, the 2-h night from 01:06, WORKS AS A RUNG**: entry at 111.5
-    min, 8.5 min at 1080p, loss 2.0/min;
-  - S2, the daytime hold, ENTRY NOT REACHED (431 of 450).
-- Replays: entry rare on this link; the mild bar misses bursty 1080p loss.
-  Record: `evidence/C5_M5_1080P_RUNG_2026-10-03.md`.
+- **Selection** (pre-registered `6ba1e522…`, written before code):
+  - **entry ≥ 415 of 450** (8 of 10 real-input holds within 20 min; 435
+    entered on 0);
+  - **the leave unchanged** (no loss rule qualified: 1080p loss here is
+    rare bursts).
+- Tests 120 + 13 + 8 (the helper's fake run), mutations 14/14, stop rule
+  0 differences (386 series).
+- **S1b** PASSES (348 / 346 ms). **S2b** NOT RUNG SHOWN: recovery paused
+  the game, and the guards refused the entry.
+- **S3b night: DOES NOT WORK AS A RUNG by its rows.**
+  - It entered by rule at 15.1 min (434 of 450) and stayed 104.9 min at
+    1080p: no leave, 0 recovery, fps 60.18, loss 2.82/min.
+  - The miss: session spikes 317.9/min against < 200. That is the onn's
+    known 1080p decode rate, so a rung that is really used misses the
+    row.
+  - The entry switch cost 649 ms.
+- **Look:**
+  - `remaster` (4x + bilinear + dither off + PGXP) holds 60 at 720p.
+  - xBR and JINC2 miss; MSAA is not offered.
+  - `remaster-1080p` is not offered (1 dropped frame at the rung).
 
 ## Verified State
 
@@ -64,16 +67,9 @@ audio underruns 17 / 14 per session; max output gap ≤ 100 / **163** /
 **Transitions on it** (`C3.L3a` smoke, 2026-09-24): telemetry settled within
 one to two client reports (≤ ~4 s); each costs one 125-211 ms gap
 (`codec_ms` 7-11) — the restart's ~152 ms RTP silence.
-**`C3.L3a` pool rule** (`C3-L3A-P2R3`): `--aggregate` pools only v2-state
-runs with the pre-registered config and lists every skipped file with its
-reason; `c3_l3a_runs/` holds the four pooled runs (2026-09-24 ×3, 2026-09-28).
-**`C3.L3a-S1` transition soak** (2026-09-24, n = 60 / 30, attract mode):
-each restart costs one gap of median 186.5 ms (128-225; codec ≤ 13 ms;
-2 of 60 an extra GOP, ~410-420 ms); telemetry settles within one to three
-client reports (≤ ~4 s; once 6 s); lifecycle CLEAN
-(`evidence/C3_L3A_S1_TRANSITION_SOAK_2026-09-24.md`: A PARTIAL 52/60, B,
-C CLEAN, D fps ELEVATED −0.24 else within noise, baseline in T NO on video
-loss — the losses are not at transitions; no-transition H2 missed too).
+**`C3.L3a-S1` transition soak** (2026-09-24): each bitrate-only restart costs
+one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
+(C5-M5 / C5-M5B). The pool rule and the soak's rows are in their records.
 
 - **The PS1 source, since 2026-10-01 (`C5-M4A`): a 1920×1080 window at
   internal resolution 4x.** It is set by the Beetle PSX HW core override
@@ -88,7 +84,7 @@ loss — the losses are not at transitions; no-transition H2 missed too).
   (`TOOLS.md`, including `C5-M1`'s `PRIVYHUB_NATIVE_PROFILE_ID`); none set.
 - **Installed**: **APK `de072762…835e`** (the `CL-B1` APK, adopted
   2026-09-30; hash confirmed on the onn at every teardown since,
-  last 2026-10-03 14:31Z (C5-M5 S2); the previous
+  last 2026-10-04 07:01Z (C5-M5B S3b); the previous
   `f31b1c18…8ae7` is kept at `runtime/c4_m1/adopted_app-debug.apk` for
   rollback).
   - The companion is the systemd user unit `privyhub-companion` (`H3`);
@@ -104,15 +100,14 @@ loss — the losses are not at transitions; no-transition H2 missed too).
     - Kill switches: delete the drop-in + `daemon-reload` + restart
       (off); `POST /plugins/games/adaptive-bitrate/disable` (shadow, one
       session).
-  - Last restarted 2026-10-03 14:31Z by C5-M5 S2's teardown (flags unset and absent):
-    - manager none, environ the one name, mode live;
-    - no selector, `PRIVYHUB_FEC_SCHEME` absent;
-    - profile adopted at 7000, `any_override` false;
-    - no game, 0 banners.
+  - Last restarted 2026-10-04 07:01Z by C5-M5B S3b's teardown: manager
+    none, environ the one name, live, 7000, `any_override` false, no
+    game, 0 banners, the adopted PS1 files byte-identical.
   - The companion tree carries the live controller through `C3-L4-N2`,
-    the C5 selector profiles (dormant) and **the 1080p rung behind
-    `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`** (C5-M5; absent = the closed
-    ladder).
+    the C5 selector profiles (dormant), **the 1080p rung behind
+    `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`** (C5-M5; entry 415 since
+    C5-M5B; absent = the closed ladder) and **the PS1 look behind
+    `PRIVYHUB_PS1_LOOK`** (C5-M5B; absent or `4x` = nothing written).
 - **Link-drop recovery** RUNTIME VALIDATED on real loss (`R3`-`R3d`);
   recovery never loads into a live core (`R3c2`).
 - **Host-shell operation**: open `MainActivity`, wake, tap RESUME PLAYING
@@ -120,30 +115,31 @@ loss — the losses are not at transitions; no-transition H2 missed too).
 
 ## Next Action
 
-1. **The user's commit** of C5-M5 (line: `logs/c5_m5_git_status.txt`).
-2. **The user's picture look at 1080p on the TV.** The look decides
-   whether the rung is worth adopting; nothing perceptual is a gate
-   otherwise. Hand steps (`TOOLS.md`, "The 1080p rung"):
-   - for one session, set `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p` and
-     `..._INJECT=1`, then restart;
-   - after 90 s, `inject?class=INCREASE_1080P` (the 15-min window is
-     rarely met here);
-   - look at the IDR pulse at the 90 KB cap (every 250 ms) and the
-     sharpness against 720p (`CAPACITY_MILD` goes back to 720p);
-   - unset both flags and restart.
+1. **The user's commit** of C5-M5B (`logs/c5_m5b_git_status.txt`).
+2. **The user's look** on the TV, in an SSH window (`TOOLS.md`, "The PS1
+   look per session"). Each command waits for PLAYING (`--attract` starts
+   Tekken 3), prints what to look at, and restores everything on Enter.
+   1. `tools/ps1_look.sh 4x`: the adopted look at 720p.
+   2. `tools/ps1_look.sh remaster`: bilinear, no dither, PGXP, at 720p.
+   3. `tools/ps1_look.sh remaster-1080p` **refuses** (not offered). For
+      1080p, use C5-M5's hand steps (`TOOLS.md`, the 1080p rung).
+   - Look at: edges, textures up close, the dither checkerboard in
+     gradients, polygon wobble; at 1080p, the IDR pulse every 250 ms.
+   - **Tell Claude what you saw**, in your own words.
 3. **The user's calls:**
-   - adopting the flag by default;
-   - the rung's `nft` capacity night;
-   - whether the R0b deviation stands.
-4. **The dither mode at 4x**, whenever they like.
+   - adopt the rung flag (S3b: 1080p misses the spike row when used);
+   - `remaster`;
+   - the rung's `nft` night;
+   - the rung window while recovery holds the game paused (S2b).
+4. **Phase E** when C is closed by the user.
 
 **Open, not blocking:**
 
 - the max gap (447 ms, D1; ≤ 100 on 0 of LINK-L2's six); `host_link`; the thermal flag; `CTRL-L1`;
   the slow-event ring; `C6-D1`'s list; the mild step's ~120 s bound;
   B3a's two clauses; C5-M4's R3 (no `codec_ms` in the C2 telemetry);
-  C5-M5: the leave misses bursty 1080p loss; `encoder_command` is the
-  full start's only;
+  C5-M5B: no loss leave qualified (bursty 1080p loss);
+  `encoder_command` is the full start's only;
 - **adaptive-off measurements need the drop-in out** (`TOOLS.md`); old
   evidence night scripts misreport on default-live, so use the D1
   pattern (`c5_m4_run.sh` is one);
@@ -183,6 +179,7 @@ perceptual gate unless the user sets one.
 
 ## Relevant References
 
+- `evidence/C5_M5B_RUNG_RULES_AND_LOOK_2026-10-03.md` — the rung's rules from the data and the PS1 look (behind flags; not adopted).
 - `evidence/C5_M5_1080P_RUNG_2026-10-03.md` — the 1080p rung (behind its flag; not adopted).
 - `evidence/LINK_L2_LOSS_ROW_2026-10-02.md` — the loss row at 40 MHz (TIME OF DAY as scored, on the boundary); `evidence/LINK_L1_LOSS_ROW_2026-10-01.md` (80 MHz, MIXED).
 - `evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md` — the PS1 source at native 1080p (C5-M4 Part 1).
@@ -193,4 +190,4 @@ perceptual gate unless the user sets one.
 - `handoffs/CURRENT_HANDOFF.md` (Phase C); `investigations/ACTIVE.md`;
   `docs/ROADMAP.md` (Phase C, D-072 order); `docs/KNOWN_ISSUES.md`.
 - `evidence/RUNTIME_VALIDATION.md` — a classification per record;
-  `patches/PATCH_INDEX.md` lists all 141.
+  `patches/PATCH_INDEX.md` lists all 142.

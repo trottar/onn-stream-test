@@ -1,0 +1,29 @@
+C5-M5B S3b (S3b) -- 2026-10-04 05:00:56Z .. 07:00:56Z (120.0 min)
+
+transitions (min into the hold, class, from -> to, reason, named by a rule, spacing):
+    15.1 INCREASE 7000 -> 12600  increase_1080p   NAMED spacing ok (reports since previous None)
+oscillation holds: none
+recovery-log events in the hold: none
+longest rung window at 7000: 434 clean of the last 450 (needed 415) at 2026-10-04T05:15:58.029Z
+
+per level (C2 telemetry in the level's intervals; spikes and underruns are the session's):
+  7000: 15.1 min, 452 reports, fps 60.35, stale/min 0.13, loss/min 3.05, telemetry gap max 72 ms
+  12600: 104.9 min, 3145 reports, fps 60.18, stale/min 0.7, loss/min 2.82, telemetry gap max 74 ms
+session (decoder report): {"minutes": 120.16, "spikes_per_min": 317.9, "rendered_fps": 59.97, "stale_per_min": 0.79, "loss_per_min": 2.87, "underruns_per_min": 1.09, "max_gap_ms": 649, "ssrc_changes": 1, "sequence_resyncs_beyond_ssrc": 0}
+
+rows: every transition named True; spacing True; oscillation hold none; 0 recovery cycles True (0 events); client rows over the 1080p minutes False
+
+S3b: DOES NOT WORK AS A RUNG (see rows)
+
+ADDENDUM (written after the score, reads the same files; changes no row):
+- The one miss is the client's spike row: the session's spikes >= 20 ms were 317.9/min (38,195 in 120.2 min;
+  >= 50 ms 248, >= 80 ms 37, >= 250 ms 6) against < 200. fps 60.18 / stale 0.70/min at 1080p and underruns
+  1.09/min met their bars. The decoder report carries spikes only as session totals, not per level.
+- 104.9 of the 120 minutes were at 1080p. Every recorded 1080p hold shows this spike rate on the onn: C5-M4's c_1x / c_2x / c_4x
+  328.5 / 364.6 / 607.0 per min (their 720p b holds 31.8-46.2); C5-M1's 517-529. C5-M5's S3 (8.5 min at 1080p
+  in 120) read 50.3/min for the session; the same arithmetic puts its 1080p minutes near 300/min.
+- 8.8 % of frames took >= 20 ms from receive to output (38,101 of 432,338: 37,409 in 20-40 ms, 689 in 40-60, 3 in 60-80;
+  the 720p baseline 0.7-0.9 %).
+- The max gap, 649 ms, is the entry switch itself (the SSRC change at 15.17 min; codec_ms 198, 8 in flight): the
+  largest of the seven sized switches recorded (287-649 ms). Outside the switch the largest gap was 177 ms.
+- The entry came at 434 of 450 clean: one short of C5-M5's 435, so the old threshold would not have entered here.

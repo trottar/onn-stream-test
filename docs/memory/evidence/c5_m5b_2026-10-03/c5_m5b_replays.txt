@@ -1,0 +1,320 @@
+C5-M5B replays: the rung's entry threshold and loss leave (pre-registration sha256 6ba1e522...)
+live module: companion/adaptive_bitrate_live.py as at a402272 (unchanged before the selection)
+
+== 1. ENTRY candidates (strictest first); per hold: first entry min / entries / unclean after entry % / best window
+-- E435: >= 435 of 450
+   [real  ] C3-L4-N1 silent live hold [live sample rows, 902 rep, 1810.7 s]: first entry - min; entries 0; unclean after - %; best window 420/450
+   [real  ] C3-L4-N2 hold [live sample rows, 901 rep, 1808.7 s]: first entry - min; entries 0; unclean after - %; best window 424/450
+   [real  ] C3-L4-D1 B3b 30-min default hold [live sample rows, 901 rep, 1808.7 s]: first entry - min; entries 0; unclean after - %; best window 429/450
+   [real  ] LINK-L2 H1 [C2 telemetry, 600 rep, 1199.5 s]: first entry - min; entries 0; unclean after - %; best window 424/450
+   [real  ] LINK-L2 H2 [C2 telemetry, 600 rep, 1199.7 s]: first entry - min; entries 0; unclean after - %; best window 420/450
+   [real  ] LINK-L2 H3 [C2 telemetry, 600 rep, 1199.6 s]: first entry - min; entries 0; unclean after - %; best window 414/450
+   [real  ] LINK-L2 H4 [C2 telemetry, 600 rep, 1197.7 s]: first entry - min; entries 0; unclean after - %; best window 415/450
+   [real  ] LINK-L2 H5 [C2 telemetry, 600 rep, 1199.8 s]: first entry - min; entries 0; unclean after - %; best window 396/450
+   [real  ] LINK-L2 H6 [C2 telemetry, 600 rep, 1199.6 s]: first entry - min; entries 0; unclean after - %; best window 417/450
+   [real  ] C5-M4A V5 (adopted 7000, 4x source) [C2 telemetry, 600 rep, 1199.7 s]: first entry - min; entries 0; unclean after - %; best window 416/450
+   [proxy ] C3-L4-S1 H1 [heartbeat proxies, 597 rep, 1197.7 s]: first entry - min; entries 0; unclean after - %; best window 428/450
+   [proxy ] C3-L4-S1 H2 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 435/450
+   [proxy ] C3-L4-S1 H3 [heartbeat proxies, 1792 rep, 3596.8 s]: first entry 22.2 min; entries 1; unclean after 3.5 %; best window 434/450
+   [proxy ] C3-L4-S1 H4 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 17.2 min; entries 1; unclean after 6.0 %; best window 434/450
+   [proxy ] LINK-L1 H1 [heartbeat proxies, 597 rep, 1197.7 s]: first entry - min; entries 0; unclean after - %; best window 433/450
+   [proxy ] LINK-L1 H2 [heartbeat proxies, 597 rep, 1197.6 s]: first entry - min; entries 0; unclean after - %; best window 433/450
+   [proxy ] LINK-L1 H3 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.9 min; entries 1; unclean after 4.2 %; best window 434/450
+   [proxy ] LINK-L1 H4 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 18.2 min; entries 1; unclean after 3.8 %; best window 434/450
+   [proxy ] LINK-L1 H5 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 15.0 min; entries 1; unclean after 4.1 %; best window 434/450
+   [proxy ] LINK-L1 H6 [heartbeat proxies, 597 rep, 1197.6 s]: first entry - min; entries 0; unclean after - %; best window 432/450
+   [beside] C5-M4 b_1x (720p at 7000, 1x source; 5-min) [C2 telemetry, 150 rep, 297.8 s]: first entry - min; entries 0; unclean after - %; best window 138/450
+   [beside] C5-M4 b_2x (720p at 7000, 2x source; 5-min) [C2 telemetry, 150 rep, 299.9 s]: first entry - min; entries 0; unclean after - %; best window 135/450
+   [beside] C5-M4 b_4x (720p at 7000, 4x source; 5-min) [C2 telemetry, 150 rep, 297.8 s]: first entry - min; entries 0; unclean after - %; best window 136/450
+   [beside] C5-M4 b_8x (720p at 7000, 8x source; 5-min) [C2 telemetry, 150 rep, 297.7 s]: first entry - min; entries 0; unclean after - %; best window 137/450
+   [m5    ] C5-M5 S2 daytime hold [C2 telemetry, 900 rep, 1800.1 s]: first entry - min; entries 0; unclean after - %; best window 431/450
+   [m5    ] C5-M5 S3 7000 stretch (start -> its real entry) [C2 telemetry, 3343 rep, 6688.6 s]: first entry 108.1 min; entries 1; unclean after 5.8 %; best window 434/450
+-- E430: >= 430 of 450
+   [real  ] C3-L4-N1 silent live hold [live sample rows, 902 rep, 1810.7 s]: first entry - min; entries 0; unclean after - %; best window 420/450
+   [real  ] C3-L4-N2 hold [live sample rows, 901 rep, 1808.7 s]: first entry - min; entries 0; unclean after - %; best window 424/450
+   [real  ] C3-L4-D1 B3b 30-min default hold [live sample rows, 901 rep, 1808.7 s]: first entry - min; entries 0; unclean after - %; best window 429/450
+   [real  ] LINK-L2 H1 [C2 telemetry, 600 rep, 1199.5 s]: first entry - min; entries 0; unclean after - %; best window 424/450
+   [real  ] LINK-L2 H2 [C2 telemetry, 600 rep, 1199.7 s]: first entry - min; entries 0; unclean after - %; best window 420/450
+   [real  ] LINK-L2 H3 [C2 telemetry, 600 rep, 1199.6 s]: first entry - min; entries 0; unclean after - %; best window 414/450
+   [real  ] LINK-L2 H4 [C2 telemetry, 600 rep, 1197.7 s]: first entry - min; entries 0; unclean after - %; best window 415/450
+   [real  ] LINK-L2 H5 [C2 telemetry, 600 rep, 1199.8 s]: first entry - min; entries 0; unclean after - %; best window 396/450
+   [real  ] LINK-L2 H6 [C2 telemetry, 600 rep, 1199.6 s]: first entry - min; entries 0; unclean after - %; best window 417/450
+   [real  ] C5-M4A V5 (adopted 7000, 4x source) [C2 telemetry, 600 rep, 1199.7 s]: first entry - min; entries 0; unclean after - %; best window 416/450
+   [proxy ] C3-L4-S1 H1 [heartbeat proxies, 597 rep, 1197.7 s]: first entry - min; entries 0; unclean after - %; best window 428/450
+   [proxy ] C3-L4-S1 H2 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 435/450
+   [proxy ] C3-L4-S1 H3 [heartbeat proxies, 1792 rep, 3596.8 s]: first entry 16.2 min; entries 1; unclean after 3.4 %; best window 429/450
+   [proxy ] C3-L4-S1 H4 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 15.0 min; entries 1; unclean after 4.1 %; best window 430/450
+   [proxy ] LINK-L1 H1 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.5 min; entries 1; unclean after 3.0 %; best window 429/450
+   [proxy ] LINK-L1 H2 [heartbeat proxies, 597 rep, 1197.6 s]: first entry 15.3 min; entries 1; unclean after 5.1 %; best window 429/450
+   [proxy ] LINK-L1 H3 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 433/450
+   [proxy ] LINK-L1 H4 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 2.7 %; best window 433/450
+   [proxy ] LINK-L1 H5 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 15.0 min; entries 1; unclean after 4.1 %; best window 434/450
+   [proxy ] LINK-L1 H6 [heartbeat proxies, 597 rep, 1197.6 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 431/450
+   [beside] C5-M4 b_1x (720p at 7000, 1x source; 5-min) [C2 telemetry, 150 rep, 297.8 s]: first entry - min; entries 0; unclean after - %; best window 138/450
+   [beside] C5-M4 b_2x (720p at 7000, 2x source; 5-min) [C2 telemetry, 150 rep, 299.9 s]: first entry - min; entries 0; unclean after - %; best window 135/450
+   [beside] C5-M4 b_4x (720p at 7000, 4x source; 5-min) [C2 telemetry, 150 rep, 297.8 s]: first entry - min; entries 0; unclean after - %; best window 136/450
+   [beside] C5-M4 b_8x (720p at 7000, 8x source; 5-min) [C2 telemetry, 150 rep, 297.7 s]: first entry - min; entries 0; unclean after - %; best window 137/450
+   [m5    ] C5-M5 S2 daytime hold [C2 telemetry, 900 rep, 1800.1 s]: first entry 23.1 min; entries 1; unclean after 7.8 %; best window 429/450
+   [m5    ] C5-M5 S3 7000 stretch (start -> its real entry) [C2 telemetry, 3343 rep, 6688.6 s]: first entry 27.8 min; entries 1; unclean after 5.5 %; best window 429/450
+-- E425: >= 425 of 450
+   [real  ] C3-L4-N1 silent live hold [live sample rows, 902 rep, 1810.7 s]: first entry - min; entries 0; unclean after - %; best window 420/450
+   [real  ] C3-L4-N2 hold [live sample rows, 901 rep, 1808.7 s]: first entry - min; entries 0; unclean after - %; best window 424/450
+   [real  ] C3-L4-D1 B3b 30-min default hold [live sample rows, 901 rep, 1808.7 s]: first entry 15.1 min; entries 1; unclean after 7.1 %; best window 424/450
+   [real  ] LINK-L2 H1 [C2 telemetry, 600 rep, 1199.5 s]: first entry - min; entries 0; unclean after - %; best window 424/450
+   [real  ] LINK-L2 H2 [C2 telemetry, 600 rep, 1199.7 s]: first entry - min; entries 0; unclean after - %; best window 420/450
+   [real  ] LINK-L2 H3 [C2 telemetry, 600 rep, 1199.6 s]: first entry - min; entries 0; unclean after - %; best window 414/450
+   [real  ] LINK-L2 H4 [C2 telemetry, 600 rep, 1197.7 s]: first entry - min; entries 0; unclean after - %; best window 415/450
+   [real  ] LINK-L2 H5 [C2 telemetry, 600 rep, 1199.8 s]: first entry - min; entries 0; unclean after - %; best window 396/450
+   [real  ] LINK-L2 H6 [C2 telemetry, 600 rep, 1199.6 s]: first entry - min; entries 0; unclean after - %; best window 417/450
+   [real  ] C5-M4A V5 (adopted 7000, 4x source) [C2 telemetry, 600 rep, 1199.7 s]: first entry - min; entries 0; unclean after - %; best window 416/450
+   [proxy ] C3-L4-S1 H1 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 16.0 min; entries 1; unclean after 1.7 %; best window 424/450
+   [proxy ] C3-L4-S1 H2 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 435/450
+   [proxy ] C3-L4-S1 H3 [heartbeat proxies, 1792 rep, 3596.8 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 426/450
+   [proxy ] C3-L4-S1 H4 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 15.0 min; entries 1; unclean after 4.1 %; best window 430/450
+   [proxy ] LINK-L1 H1 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 2.7 %; best window 428/450
+   [proxy ] LINK-L1 H2 [heartbeat proxies, 597 rep, 1197.6 s]: first entry 15.0 min; entries 1; unclean after 4.8 %; best window 427/450
+   [proxy ] LINK-L1 H3 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 433/450
+   [proxy ] LINK-L1 H4 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 2.7 %; best window 433/450
+   [proxy ] LINK-L1 H5 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 15.0 min; entries 1; unclean after 4.1 %; best window 434/450
+   [proxy ] LINK-L1 H6 [heartbeat proxies, 597 rep, 1197.6 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 431/450
+   [beside] C5-M4 b_1x (720p at 7000, 1x source; 5-min) [C2 telemetry, 150 rep, 297.8 s]: first entry - min; entries 0; unclean after - %; best window 138/450
+   [beside] C5-M4 b_2x (720p at 7000, 2x source; 5-min) [C2 telemetry, 150 rep, 299.9 s]: first entry - min; entries 0; unclean after - %; best window 135/450
+   [beside] C5-M4 b_4x (720p at 7000, 4x source; 5-min) [C2 telemetry, 150 rep, 297.8 s]: first entry - min; entries 0; unclean after - %; best window 136/450
+   [beside] C5-M4 b_8x (720p at 7000, 8x source; 5-min) [C2 telemetry, 150 rep, 297.7 s]: first entry - min; entries 0; unclean after - %; best window 137/450
+   [m5    ] C5-M5 S2 daytime hold [C2 telemetry, 900 rep, 1800.1 s]: first entry 20.5 min; entries 1; unclean after 6.7 %; best window 424/450
+   [m5    ] C5-M5 S3 7000 stretch (start -> its real entry) [C2 telemetry, 3343 rep, 6688.6 s]: first entry 22.1 min; entries 1; unclean after 5.4 %; best window 424/450
+-- E420: >= 420 of 450
+   [real  ] C3-L4-N1 silent live hold [live sample rows, 902 rep, 1810.7 s]: first entry 15.1 min; entries 1; unclean after 8.2 %; best window 419/450
+   [real  ] C3-L4-N2 hold [live sample rows, 901 rep, 1808.7 s]: first entry 21.7 min; entries 1; unclean after 8.0 %; best window 419/450
+   [real  ] C3-L4-D1 B3b 30-min default hold [live sample rows, 901 rep, 1808.7 s]: first entry 15.1 min; entries 1; unclean after 7.1 %; best window 422/450
+   [real  ] LINK-L2 H1 [C2 telemetry, 600 rep, 1199.5 s]: first entry 15.3 min; entries 1; unclean after 8.6 %; best window 419/450
+   [real  ] LINK-L2 H2 [C2 telemetry, 600 rep, 1199.7 s]: first entry 16.5 min; entries 1; unclean after 11.5 %; best window 419/450
+   [real  ] LINK-L2 H3 [C2 telemetry, 600 rep, 1199.6 s]: first entry - min; entries 0; unclean after - %; best window 414/450
+   [real  ] LINK-L2 H4 [C2 telemetry, 600 rep, 1197.7 s]: first entry - min; entries 0; unclean after - %; best window 415/450
+   [real  ] LINK-L2 H5 [C2 telemetry, 600 rep, 1199.8 s]: first entry - min; entries 0; unclean after - %; best window 396/450
+   [real  ] LINK-L2 H6 [C2 telemetry, 600 rep, 1199.6 s]: first entry - min; entries 0; unclean after - %; best window 417/450
+   [real  ] C5-M4A V5 (adopted 7000, 4x source) [C2 telemetry, 600 rep, 1199.7 s]: first entry - min; entries 0; unclean after - %; best window 416/450
+   [proxy ] C3-L4-S1 H1 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 1.4 %; best window 421/450
+   [proxy ] C3-L4-S1 H2 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 435/450
+   [proxy ] C3-L4-S1 H3 [heartbeat proxies, 1792 rep, 3596.8 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 426/450
+   [proxy ] C3-L4-S1 H4 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 15.0 min; entries 1; unclean after 4.1 %; best window 430/450
+   [proxy ] LINK-L1 H1 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 2.7 %; best window 428/450
+   [proxy ] LINK-L1 H2 [heartbeat proxies, 597 rep, 1197.6 s]: first entry 15.0 min; entries 1; unclean after 4.8 %; best window 427/450
+   [proxy ] LINK-L1 H3 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 433/450
+   [proxy ] LINK-L1 H4 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 2.7 %; best window 433/450
+   [proxy ] LINK-L1 H5 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 15.0 min; entries 1; unclean after 4.1 %; best window 434/450
+   [proxy ] LINK-L1 H6 [heartbeat proxies, 597 rep, 1197.6 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 431/450
+   [beside] C5-M4 b_1x (720p at 7000, 1x source; 5-min) [C2 telemetry, 150 rep, 297.8 s]: first entry - min; entries 0; unclean after - %; best window 138/450
+   [beside] C5-M4 b_2x (720p at 7000, 2x source; 5-min) [C2 telemetry, 150 rep, 299.9 s]: first entry - min; entries 0; unclean after - %; best window 135/450
+   [beside] C5-M4 b_4x (720p at 7000, 4x source; 5-min) [C2 telemetry, 150 rep, 297.8 s]: first entry - min; entries 0; unclean after - %; best window 136/450
+   [beside] C5-M4 b_8x (720p at 7000, 8x source; 5-min) [C2 telemetry, 150 rep, 297.7 s]: first entry - min; entries 0; unclean after - %; best window 137/450
+   [m5    ] C5-M5 S2 daytime hold [C2 telemetry, 900 rep, 1800.1 s]: first entry 18.0 min; entries 1; unclean after 5.6 %; best window 419/450
+   [m5    ] C5-M5 S3 7000 stretch (start -> its real entry) [C2 telemetry, 3343 rep, 6688.6 s]: first entry 19.6 min; entries 1; unclean after 5.3 %; best window 419/450
+-- E300: >= 280 of 300
+   [real  ] C3-L4-N1 silent live hold [live sample rows, 902 rep, 1810.7 s]: first entry 14.7 min; entries 1; unclean after 8.0 %; best window 279/300
+   [real  ] C3-L4-N2 hold [live sample rows, 901 rep, 1808.7 s]: first entry 17.8 min; entries 1; unclean after 7.3 %; best window 279/300
+   [real  ] C3-L4-D1 B3b 30-min default hold [live sample rows, 901 rep, 1808.7 s]: first entry 10.1 min; entries 1; unclean after 6.3 %; best window 279/300
+   [real  ] LINK-L2 H1 [C2 telemetry, 600 rep, 1199.5 s]: first entry 10.1 min; entries 1; unclean after 8.8 %; best window 281/300
+   [real  ] LINK-L2 H2 [C2 telemetry, 600 rep, 1199.7 s]: first entry 10.3 min; entries 1; unclean after 8.2 %; best window 279/300
+   [real  ] LINK-L2 H3 [C2 telemetry, 600 rep, 1199.6 s]: first entry - min; entries 0; unclean after - %; best window 278/300
+   [real  ] LINK-L2 H4 [C2 telemetry, 600 rep, 1197.7 s]: first entry - min; entries 0; unclean after - %; best window 277/300
+   [real  ] LINK-L2 H5 [C2 telemetry, 600 rep, 1199.8 s]: first entry - min; entries 0; unclean after - %; best window 265/300
+   [real  ] LINK-L2 H6 [C2 telemetry, 600 rep, 1199.6 s]: first entry - min; entries 0; unclean after - %; best window 277/300
+   [real  ] C5-M4A V5 (adopted 7000, 4x source) [C2 telemetry, 600 rep, 1199.7 s]: first entry - min; entries 0; unclean after - %; best window 279/300
+   [proxy ] C3-L4-S1 H1 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 10.0 min; entries 1; unclean after 4.4 %; best window 282/300
+   [proxy ] C3-L4-S1 H2 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 10.0 min; entries 1; unclean after 3.0 %; best window 289/300
+   [proxy ] C3-L4-S1 H3 [heartbeat proxies, 1792 rep, 3596.8 s]: first entry 10.0 min; entries 1; unclean after 3.4 %; best window 282/300
+   [proxy ] C3-L4-S1 H4 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 10.0 min; entries 1; unclean after 3.0 %; best window 283/300
+   [proxy ] LINK-L1 H1 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 10.0 min; entries 1; unclean after 4.4 %; best window 287/300
+   [proxy ] LINK-L1 H2 [heartbeat proxies, 597 rep, 1197.6 s]: first entry 10.0 min; entries 1; unclean after 4.4 %; best window 283/300
+   [proxy ] LINK-L1 H3 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 10.0 min; entries 1; unclean after 3.4 %; best window 288/300
+   [proxy ] LINK-L1 H4 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 10.0 min; entries 1; unclean after 4.0 %; best window 291/300
+   [proxy ] LINK-L1 H5 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 10.0 min; entries 1; unclean after 3.7 %; best window 289/300
+   [proxy ] LINK-L1 H6 [heartbeat proxies, 597 rep, 1197.6 s]: first entry 10.0 min; entries 1; unclean after 4.7 %; best window 290/300
+   [beside] C5-M4 b_1x (720p at 7000, 1x source; 5-min) [C2 telemetry, 150 rep, 297.8 s]: first entry - min; entries 0; unclean after - %; best window 138/300
+   [beside] C5-M4 b_2x (720p at 7000, 2x source; 5-min) [C2 telemetry, 150 rep, 299.9 s]: first entry - min; entries 0; unclean after - %; best window 135/300
+   [beside] C5-M4 b_4x (720p at 7000, 4x source; 5-min) [C2 telemetry, 150 rep, 297.8 s]: first entry - min; entries 0; unclean after - %; best window 136/300
+   [beside] C5-M4 b_8x (720p at 7000, 8x source; 5-min) [C2 telemetry, 150 rep, 297.7 s]: first entry - min; entries 0; unclean after - %; best window 137/300
+   [m5    ] C5-M5 S2 daytime hold [C2 telemetry, 900 rep, 1800.1 s]: first entry 16.3 min; entries 1; unclean after 5.3 %; best window 279/300
+   [m5    ] C5-M5 S3 7000 stretch (start -> its real entry) [C2 telemetry, 3343 rep, 6688.6 s]: first entry 16.2 min; entries 1; unclean after 5.3 %; best window 279/300
+-- E415: >= 415 of 450
+   [real  ] C3-L4-N1 silent live hold [live sample rows, 902 rep, 1810.7 s]: first entry 15.1 min; entries 1; unclean after 8.2 %; best window 418/450
+   [real  ] C3-L4-N2 hold [live sample rows, 901 rep, 1808.7 s]: first entry 15.5 min; entries 1; unclean after 6.9 %; best window 414/450
+   [real  ] C3-L4-D1 B3b 30-min default hold [live sample rows, 901 rep, 1808.7 s]: first entry 15.1 min; entries 1; unclean after 7.1 %; best window 422/450
+   [real  ] LINK-L2 H1 [C2 telemetry, 600 rep, 1199.5 s]: first entry 15.1 min; entries 1; unclean after 8.2 %; best window 417/450
+   [real  ] LINK-L2 H2 [C2 telemetry, 600 rep, 1199.7 s]: first entry 15.1 min; entries 1; unclean after 8.9 %; best window 416/450
+   [real  ] LINK-L2 H3 [C2 telemetry, 600 rep, 1199.6 s]: first entry - min; entries 0; unclean after - %; best window 414/450
+   [real  ] LINK-L2 H4 [C2 telemetry, 600 rep, 1197.7 s]: first entry 17.5 min; entries 1; unclean after 9.2 %; best window 414/450
+   [real  ] LINK-L2 H5 [C2 telemetry, 600 rep, 1199.8 s]: first entry - min; entries 0; unclean after - %; best window 396/450
+   [real  ] LINK-L2 H6 [C2 telemetry, 600 rep, 1199.6 s]: first entry 15.1 min; entries 1; unclean after 15.7 %; best window 416/450
+   [real  ] C5-M4A V5 (adopted 7000, 4x source) [C2 telemetry, 600 rep, 1199.7 s]: first entry 16.8 min; entries 1; unclean after 4.3 %; best window 414/450
+   [proxy ] C3-L4-S1 H1 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 1.4 %; best window 421/450
+   [proxy ] C3-L4-S1 H2 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 435/450
+   [proxy ] C3-L4-S1 H3 [heartbeat proxies, 1792 rep, 3596.8 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 426/450
+   [proxy ] C3-L4-S1 H4 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 15.0 min; entries 1; unclean after 4.1 %; best window 430/450
+   [proxy ] LINK-L1 H1 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 2.7 %; best window 428/450
+   [proxy ] LINK-L1 H2 [heartbeat proxies, 597 rep, 1197.6 s]: first entry 15.0 min; entries 1; unclean after 4.8 %; best window 427/450
+   [proxy ] LINK-L1 H3 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 433/450
+   [proxy ] LINK-L1 H4 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 2.7 %; best window 433/450
+   [proxy ] LINK-L1 H5 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 15.0 min; entries 1; unclean after 4.1 %; best window 434/450
+   [proxy ] LINK-L1 H6 [heartbeat proxies, 597 rep, 1197.6 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 431/450
+   [beside] C5-M4 b_1x (720p at 7000, 1x source; 5-min) [C2 telemetry, 150 rep, 297.8 s]: first entry - min; entries 0; unclean after - %; best window 138/450
+   [beside] C5-M4 b_2x (720p at 7000, 2x source; 5-min) [C2 telemetry, 150 rep, 299.9 s]: first entry - min; entries 0; unclean after - %; best window 135/450
+   [beside] C5-M4 b_4x (720p at 7000, 4x source; 5-min) [C2 telemetry, 150 rep, 297.8 s]: first entry - min; entries 0; unclean after - %; best window 136/450
+   [beside] C5-M4 b_8x (720p at 7000, 8x source; 5-min) [C2 telemetry, 150 rep, 297.7 s]: first entry - min; entries 0; unclean after - %; best window 137/450
+   [m5    ] C5-M5 S2 daytime hold [C2 telemetry, 900 rep, 1800.1 s]: first entry 15.0 min; entries 1; unclean after 5.1 %; best window 418/450
+   [m5    ] C5-M5 S3 7000 stretch (start -> its real entry) [C2 telemetry, 3343 rep, 6688.6 s]: first entry 15.1 min; entries 1; unclean after 5.3 %; best window 417/450
+-- E410: >= 410 of 450
+   [real  ] C3-L4-N1 silent live hold [live sample rows, 902 rep, 1810.7 s]: first entry 15.1 min; entries 1; unclean after 8.2 %; best window 418/450
+   [real  ] C3-L4-N2 hold [live sample rows, 901 rep, 1808.7 s]: first entry 15.0 min; entries 1; unclean after 6.9 %; best window 412/450
+   [real  ] C3-L4-D1 B3b 30-min default hold [live sample rows, 901 rep, 1808.7 s]: first entry 15.1 min; entries 1; unclean after 7.1 %; best window 422/450
+   [real  ] LINK-L2 H1 [C2 telemetry, 600 rep, 1199.5 s]: first entry 15.1 min; entries 1; unclean after 8.2 %; best window 417/450
+   [real  ] LINK-L2 H2 [C2 telemetry, 600 rep, 1199.7 s]: first entry 15.1 min; entries 1; unclean after 8.9 %; best window 416/450
+   [real  ] LINK-L2 H3 [C2 telemetry, 600 rep, 1199.6 s]: first entry 16.9 min; entries 1; unclean after 13.0 %; best window 409/450
+   [real  ] LINK-L2 H4 [C2 telemetry, 600 rep, 1197.7 s]: first entry 15.1 min; entries 1; unclean after 8.2 %; best window 411/450
+   [real  ] LINK-L2 H5 [C2 telemetry, 600 rep, 1199.8 s]: first entry - min; entries 0; unclean after - %; best window 396/450
+   [real  ] LINK-L2 H6 [C2 telemetry, 600 rep, 1199.6 s]: first entry 15.1 min; entries 1; unclean after 15.7 %; best window 416/450
+   [real  ] C5-M4A V5 (adopted 7000, 4x source) [C2 telemetry, 600 rep, 1199.7 s]: first entry 15.2 min; entries 1; unclean after 4.2 %; best window 409/450
+   [proxy ] C3-L4-S1 H1 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 1.4 %; best window 421/450
+   [proxy ] C3-L4-S1 H2 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 435/450
+   [proxy ] C3-L4-S1 H3 [heartbeat proxies, 1792 rep, 3596.8 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 426/450
+   [proxy ] C3-L4-S1 H4 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 15.0 min; entries 1; unclean after 4.1 %; best window 430/450
+   [proxy ] LINK-L1 H1 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 2.7 %; best window 428/450
+   [proxy ] LINK-L1 H2 [heartbeat proxies, 597 rep, 1197.6 s]: first entry 15.0 min; entries 1; unclean after 4.8 %; best window 427/450
+   [proxy ] LINK-L1 H3 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 433/450
+   [proxy ] LINK-L1 H4 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 2.7 %; best window 433/450
+   [proxy ] LINK-L1 H5 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 15.0 min; entries 1; unclean after 4.1 %; best window 434/450
+   [proxy ] LINK-L1 H6 [heartbeat proxies, 597 rep, 1197.6 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 431/450
+   [beside] C5-M4 b_1x (720p at 7000, 1x source; 5-min) [C2 telemetry, 150 rep, 297.8 s]: first entry - min; entries 0; unclean after - %; best window 138/450
+   [beside] C5-M4 b_2x (720p at 7000, 2x source; 5-min) [C2 telemetry, 150 rep, 299.9 s]: first entry - min; entries 0; unclean after - %; best window 135/450
+   [beside] C5-M4 b_4x (720p at 7000, 4x source; 5-min) [C2 telemetry, 150 rep, 297.8 s]: first entry - min; entries 0; unclean after - %; best window 136/450
+   [beside] C5-M4 b_8x (720p at 7000, 8x source; 5-min) [C2 telemetry, 150 rep, 297.7 s]: first entry - min; entries 0; unclean after - %; best window 137/450
+   [m5    ] C5-M5 S2 daytime hold [C2 telemetry, 900 rep, 1800.1 s]: first entry 15.0 min; entries 1; unclean after 5.1 %; best window 418/450
+   [m5    ] C5-M5 S3 7000 stretch (start -> its real entry) [C2 telemetry, 3343 rep, 6688.6 s]: first entry 15.1 min; entries 1; unclean after 5.3 %; best window 417/450
+-- E405: >= 405 of 450
+   [real  ] C3-L4-N1 silent live hold [live sample rows, 902 rep, 1810.7 s]: first entry 15.1 min; entries 1; unclean after 8.2 %; best window 418/450
+   [real  ] C3-L4-N2 hold [live sample rows, 901 rep, 1808.7 s]: first entry 15.0 min; entries 1; unclean after 6.9 %; best window 412/450
+   [real  ] C3-L4-D1 B3b 30-min default hold [live sample rows, 901 rep, 1808.7 s]: first entry 15.1 min; entries 1; unclean after 7.1 %; best window 422/450
+   [real  ] LINK-L2 H1 [C2 telemetry, 600 rep, 1199.5 s]: first entry 15.1 min; entries 1; unclean after 8.2 %; best window 417/450
+   [real  ] LINK-L2 H2 [C2 telemetry, 600 rep, 1199.7 s]: first entry 15.1 min; entries 1; unclean after 8.9 %; best window 416/450
+   [real  ] LINK-L2 H3 [C2 telemetry, 600 rep, 1199.6 s]: first entry 15.1 min; entries 1; unclean after 11.0 %; best window 407/450
+   [real  ] LINK-L2 H4 [C2 telemetry, 600 rep, 1197.7 s]: first entry 15.1 min; entries 1; unclean after 8.2 %; best window 411/450
+   [real  ] LINK-L2 H5 [C2 telemetry, 600 rep, 1199.8 s]: first entry - min; entries 0; unclean after - %; best window 396/450
+   [real  ] LINK-L2 H6 [C2 telemetry, 600 rep, 1199.6 s]: first entry 15.1 min; entries 1; unclean after 15.7 %; best window 416/450
+   [real  ] C5-M4A V5 (adopted 7000, 4x source) [C2 telemetry, 600 rep, 1199.7 s]: first entry 15.2 min; entries 1; unclean after 4.2 %; best window 409/450
+   [proxy ] C3-L4-S1 H1 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 1.4 %; best window 421/450
+   [proxy ] C3-L4-S1 H2 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 435/450
+   [proxy ] C3-L4-S1 H3 [heartbeat proxies, 1792 rep, 3596.8 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 426/450
+   [proxy ] C3-L4-S1 H4 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 15.0 min; entries 1; unclean after 4.1 %; best window 430/450
+   [proxy ] LINK-L1 H1 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 2.7 %; best window 428/450
+   [proxy ] LINK-L1 H2 [heartbeat proxies, 597 rep, 1197.6 s]: first entry 15.0 min; entries 1; unclean after 4.8 %; best window 427/450
+   [proxy ] LINK-L1 H3 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 433/450
+   [proxy ] LINK-L1 H4 [heartbeat proxies, 597 rep, 1197.7 s]: first entry 15.0 min; entries 1; unclean after 2.7 %; best window 433/450
+   [proxy ] LINK-L1 H5 [heartbeat proxies, 596 rep, 1195.7 s]: first entry 15.0 min; entries 1; unclean after 4.1 %; best window 434/450
+   [proxy ] LINK-L1 H6 [heartbeat proxies, 597 rep, 1197.6 s]: first entry 15.0 min; entries 1; unclean after 3.4 %; best window 431/450
+   [beside] C5-M4 b_1x (720p at 7000, 1x source; 5-min) [C2 telemetry, 150 rep, 297.8 s]: first entry - min; entries 0; unclean after - %; best window 138/450
+   [beside] C5-M4 b_2x (720p at 7000, 2x source; 5-min) [C2 telemetry, 150 rep, 299.9 s]: first entry - min; entries 0; unclean after - %; best window 135/450
+   [beside] C5-M4 b_4x (720p at 7000, 4x source; 5-min) [C2 telemetry, 150 rep, 297.8 s]: first entry - min; entries 0; unclean after - %; best window 136/450
+   [beside] C5-M4 b_8x (720p at 7000, 8x source; 5-min) [C2 telemetry, 150 rep, 297.7 s]: first entry - min; entries 0; unclean after - %; best window 137/450
+   [m5    ] C5-M5 S2 daytime hold [C2 telemetry, 900 rep, 1800.1 s]: first entry 15.0 min; entries 1; unclean after 5.1 %; best window 418/450
+   [m5    ] C5-M5 S3 7000 stretch (start -> its real entry) [C2 telemetry, 3343 rep, 6688.6 s]: first entry 15.1 min; entries 1; unclean after 5.3 %; best window 417/450
+
+ENTRY TABLE (the ten real-input holds): candidate -> holds entered within 20 min (<= 1200 s)
+   E435: 0 of 10 real (proxies 5 of 10); median minutes to first entry (real, entered) -; unclean after entry, real holds: -
+   E430: 0 of 10 real (proxies 9 of 10); median minutes to first entry (real, entered) -; unclean after entry, real holds: -
+   E425: 1 of 10 real (proxies 10 of 10); median minutes to first entry (real, entered) 15.1; unclean after entry, real holds: 7.1%
+   E420: 4 of 10 real (proxies 10 of 10); median minutes to first entry (real, entered) 15.3; unclean after entry, real holds: 8.2%, 8.0%, 7.1%, 8.6%, 11.5%
+   E300: 5 of 10 real (proxies 10 of 10); median minutes to first entry (real, entered) 10.3; unclean after entry, real holds: 8.0%, 7.3%, 6.3%, 8.8%, 8.2%
+   E415: 8 of 10 real (proxies 10 of 10); median minutes to first entry (real, entered) 15.1; unclean after entry, real holds: 8.2%, 6.9%, 7.1%, 8.2%, 8.9%, 9.2%, 15.7%, 4.3%
+   E410: 9 of 10 real (proxies 10 of 10); median minutes to first entry (real, entered) 15.1; unclean after entry, real holds: 8.2%, 6.9%, 7.1%, 8.2%, 8.9%, 13.0%, 8.2%, 15.7%, 4.2%
+   E405: 9 of 10 real (proxies 10 of 10); median minutes to first entry (real, entered) 15.1; unclean after entry, real holds: 8.2%, 6.9%, 7.1%, 8.2%, 8.9%, 11.0%, 8.2%, 15.7%, 4.2%
+ENTRY SELECTION (strictest with >= 7 of 10 within 20 min): E415
+
+== 2. LEAVE candidates; per series: leave s from start (trigger) / t_permit / s after permit
+-- as built (mild bar)
+   [13] C5-M1 A1 (1080p candidate, parity) [heartbeat proxies, 597 rep, 1197.9 s]: no leave (permit 118.8 s)
+   [13] C5-M1 A2 [heartbeat proxies, 597 rep, 1197.9 s]: no leave (permit 118.8 s)
+   [13] C5-M1 A3 [heartbeat proxies, 597 rep, 1197.9 s]: no leave (permit 118.8 s)
+   [13] C5-M2 n1 C1 (parity, cap 90) [heartbeat proxies, 595 rep, 1195.9 s]: no leave (permit 118.8 s)
+   [13] C5-M2 n1 C2 (80 %, cap 160) [heartbeat proxies, 596 rep, 1197.4 s]: no leave (permit 118.8 s)
+   [13] C5-M2 n1 C3 (80 %, cap 90 = the rung) [heartbeat proxies, 596 rep, 1195.8 s]: no leave (permit 118.8 s)
+   [13] C5-M2 n1r C1 [heartbeat proxies, 595 rep, 1196.8 s]: no leave (permit 118.8 s)
+   [13] C5-M2 n1r C2 [heartbeat proxies, 596 rep, 1195.7 s]: no leave (permit 118.8 s)
+   [13] C5-M2 n1r C3 (= the rung) [heartbeat proxies, 595 rep, 1196.4 s]: LEAVES at 739.4 s (capacity_mild, ROUTINE) -> 7000; permit 118.8 s; 620.6 s after permit
+   [13] C5-M4 c_1x (c3 at 1080p, 1x source) [C2 telemetry, 151 rep, 299.9 s]: no leave (permit 122.9 s)
+   [13] C5-M4 c_2x [C2 telemetry, 150 rep, 299.8 s]: no leave (permit 118.9 s)
+   [13] C5-M4 c_4x (the rung on the adopted source) [C2 telemetry, 150 rep, 296.9 s]: no leave (permit 120.9 s)
+   [13] C5-M4 c_8x [C2 telemetry, 150 rep, 299.8 s]: no leave (permit 118.9 s)
+   [S1] C5-M5 S1 1080p stretch (injected entry -> injected leave) [C2 telemetry, 69 rep, 136.8 s]: no leave (permit 118.7 s)
+   [S3] C5-M5 S3 1080p stretch (own entry -> session end) [C2 telemetry, 255 rep, 509.6 s]: no leave (permit 118.4 s)
+-- L-A
+   [13] C5-M1 A1 (1080p candidate, parity) [heartbeat proxies, 597 rep, 1197.9 s]: no leave (permit 118.8 s); raw bar first met - s
+   [13] C5-M1 A2 [heartbeat proxies, 597 rep, 1197.9 s]: no leave (permit 118.8 s); raw bar first met - s
+   [13] C5-M1 A3 [heartbeat proxies, 597 rep, 1197.9 s]: no leave (permit 118.8 s); raw bar first met - s
+   [13] C5-M2 n1 C1 (parity, cap 90) [heartbeat proxies, 595 rep, 1195.9 s]: LEAVES at 452.6 s (rung_loss, ROUTINE) -> 7000; permit 118.8 s; 333.8 s after permit; raw bar first met 450.6 s
+   [13] C5-M2 n1 C2 (80 %, cap 160) [heartbeat proxies, 596 rep, 1197.4 s]: LEAVES at 810.1 s (rung_loss, ROUTINE) -> 7000; permit 118.8 s; 691.3 s after permit; raw bar first met 810.1 s
+   [13] C5-M2 n1 C3 (80 %, cap 90 = the rung) [heartbeat proxies, 596 rep, 1195.8 s]: no leave (permit 118.8 s); raw bar first met - s
+   [13] C5-M2 n1r C1 [heartbeat proxies, 595 rep, 1196.8 s]: no leave (permit 118.8 s); raw bar first met 12.1 s
+   [13] C5-M2 n1r C2 [heartbeat proxies, 596 rep, 1195.7 s]: no leave (permit 118.8 s); raw bar first met - s
+   [13] C5-M2 n1r C3 (= the rung) [heartbeat proxies, 595 rep, 1196.4 s]: LEAVES at 714.2 s (rung_loss, ROUTINE) -> 7000; permit 118.8 s; 595.3 s after permit; raw bar first met 714.2 s
+   [13] C5-M4 c_1x (c3 at 1080p, 1x source) [C2 telemetry, 151 rep, 299.9 s]: no leave (permit 122.9 s); raw bar first met - s
+   [13] C5-M4 c_2x [C2 telemetry, 150 rep, 299.8 s]: no leave (permit 118.9 s); raw bar first met - s
+   [13] C5-M4 c_4x (the rung on the adopted source) [C2 telemetry, 150 rep, 296.9 s]: no leave (permit 120.9 s); raw bar first met - s
+   [13] C5-M4 c_8x [C2 telemetry, 150 rep, 299.8 s]: no leave (permit 118.9 s); raw bar first met - s
+   [S1] C5-M5 S1 1080p stretch (injected entry -> injected leave) [C2 telemetry, 69 rep, 136.8 s]: no leave (permit 118.7 s); raw bar first met - s
+   [S3] C5-M5 S3 1080p stretch (own entry -> session end) [C2 telemetry, 255 rep, 509.6 s]: no leave (permit 118.4 s); raw bar first met - s
+-- L-B
+   [13] C5-M1 A1 (1080p candidate, parity) [heartbeat proxies, 597 rep, 1197.9 s]: no leave (permit 118.8 s); raw bar first met - s
+   [13] C5-M1 A2 [heartbeat proxies, 597 rep, 1197.9 s]: no leave (permit 118.8 s); raw bar first met - s
+   [13] C5-M1 A3 [heartbeat proxies, 597 rep, 1197.9 s]: no leave (permit 118.8 s); raw bar first met - s
+   [13] C5-M2 n1 C1 (parity, cap 90) [heartbeat proxies, 595 rep, 1195.9 s]: LEAVES at 452.6 s (rung_loss, ROUTINE) -> 7000; permit 118.8 s; 333.8 s after permit; raw bar first met 448.5 s
+   [13] C5-M2 n1 C2 (80 %, cap 160) [heartbeat proxies, 596 rep, 1197.4 s]: LEAVES at 810.1 s (rung_loss, ROUTINE) -> 7000; permit 118.8 s; 691.3 s after permit; raw bar first met 808.1 s
+   [13] C5-M2 n1 C3 (80 %, cap 90 = the rung) [heartbeat proxies, 596 rep, 1195.8 s]: no leave (permit 118.8 s); raw bar first met - s
+   [13] C5-M2 n1r C1 [heartbeat proxies, 595 rep, 1196.8 s]: LEAVES at 1094.4 s (rung_loss, ROUTINE) -> 7000; permit 118.8 s; 975.6 s after permit; raw bar first met 34.3 s
+   [13] C5-M2 n1r C2 [heartbeat proxies, 596 rep, 1195.7 s]: LEAVES at 299.7 s (rung_loss, ROUTINE) -> 7000; permit 118.8 s; 180.9 s after permit; raw bar first met 299.7 s
+   [13] C5-M2 n1r C3 (= the rung) [heartbeat proxies, 595 rep, 1196.4 s]: LEAVES at 587.1 s (rung_loss, ROUTINE) -> 7000; permit 118.8 s; 468.3 s after permit; raw bar first met 587.1 s
+   [13] C5-M4 c_1x (c3 at 1080p, 1x source) [C2 telemetry, 151 rep, 299.9 s]: no leave (permit 122.9 s); raw bar first met - s
+   [13] C5-M4 c_2x [C2 telemetry, 150 rep, 299.8 s]: no leave (permit 118.9 s); raw bar first met - s
+   [13] C5-M4 c_4x (the rung on the adopted source) [C2 telemetry, 150 rep, 296.9 s]: no leave (permit 120.9 s); raw bar first met - s
+   [13] C5-M4 c_8x [C2 telemetry, 150 rep, 299.8 s]: no leave (permit 118.9 s); raw bar first met - s
+   [S1] C5-M5 S1 1080p stretch (injected entry -> injected leave) [C2 telemetry, 69 rep, 136.8 s]: no leave (permit 118.7 s); raw bar first met - s
+   [S3] C5-M5 S3 1080p stretch (own entry -> session end) [C2 telemetry, 255 rep, 509.6 s]: no leave (permit 118.4 s); raw bar first met - s
+-- L-C
+   [13] C5-M1 A1 (1080p candidate, parity) [heartbeat proxies, 597 rep, 1197.9 s]: no leave (permit 118.8 s); raw bar first met - s
+   [13] C5-M1 A2 [heartbeat proxies, 597 rep, 1197.9 s]: no leave (permit 118.8 s); raw bar first met - s
+   [13] C5-M1 A3 [heartbeat proxies, 597 rep, 1197.9 s]: no leave (permit 118.8 s); raw bar first met - s
+   [13] C5-M2 n1 C1 (parity, cap 90) [heartbeat proxies, 595 rep, 1195.9 s]: no leave (permit 118.8 s); raw bar first met - s
+   [13] C5-M2 n1 C2 (80 %, cap 160) [heartbeat proxies, 596 rep, 1197.4 s]: LEAVES at 810.1 s (rung_loss, ROUTINE) -> 7000; permit 118.8 s; 691.3 s after permit; raw bar first met 808.1 s
+   [13] C5-M2 n1 C3 (80 %, cap 90 = the rung) [heartbeat proxies, 596 rep, 1195.8 s]: no leave (permit 118.8 s); raw bar first met - s
+   [13] C5-M2 n1r C1 [heartbeat proxies, 595 rep, 1196.8 s]: no leave (permit 118.8 s); raw bar first met 20.2 s
+   [13] C5-M2 n1r C2 [heartbeat proxies, 596 rep, 1195.7 s]: no leave (permit 118.8 s); raw bar first met - s
+   [13] C5-M2 n1r C3 (= the rung) [heartbeat proxies, 595 rep, 1196.4 s]: LEAVES at 587.1 s (rung_loss, ROUTINE) -> 7000; permit 118.8 s; 468.3 s after permit; raw bar first met 587.1 s
+   [13] C5-M4 c_1x (c3 at 1080p, 1x source) [C2 telemetry, 151 rep, 299.9 s]: no leave (permit 122.9 s); raw bar first met - s
+   [13] C5-M4 c_2x [C2 telemetry, 150 rep, 299.8 s]: no leave (permit 118.9 s); raw bar first met - s
+   [13] C5-M4 c_4x (the rung on the adopted source) [C2 telemetry, 150 rep, 296.9 s]: no leave (permit 120.9 s); raw bar first met - s
+   [13] C5-M4 c_8x [C2 telemetry, 150 rep, 299.8 s]: no leave (permit 118.9 s); raw bar first met - s
+   [S1] C5-M5 S1 1080p stretch (injected entry -> injected leave) [C2 telemetry, 69 rep, 136.8 s]: no leave (permit 118.7 s); raw bar first met - s
+   [S3] C5-M5 S3 1080p stretch (own entry -> session end) [C2 telemetry, 255 rep, 509.6 s]: no leave (permit 118.4 s); raw bar first met - s
+-- L-D
+   [13] C5-M1 A1 (1080p candidate, parity) [heartbeat proxies, 597 rep, 1197.9 s]: no leave (permit 118.8 s); raw bar first met - s
+   [13] C5-M1 A2 [heartbeat proxies, 597 rep, 1197.9 s]: no leave (permit 118.8 s); raw bar first met - s
+   [13] C5-M1 A3 [heartbeat proxies, 597 rep, 1197.9 s]: no leave (permit 118.8 s); raw bar first met - s
+   [13] C5-M2 n1 C1 (parity, cap 90) [heartbeat proxies, 595 rep, 1195.9 s]: LEAVES at 452.6 s (rung_loss, ROUTINE) -> 7000; permit 118.8 s; 333.8 s after permit; raw bar first met 450.6 s
+   [13] C5-M2 n1 C2 (80 %, cap 160) [heartbeat proxies, 596 rep, 1197.4 s]: LEAVES at 810.1 s (rung_loss, ROUTINE) -> 7000; permit 118.8 s; 691.3 s after permit; raw bar first met 810.1 s
+   [13] C5-M2 n1 C3 (80 %, cap 90 = the rung) [heartbeat proxies, 596 rep, 1195.8 s]: no leave (permit 118.8 s); raw bar first met - s
+   [13] C5-M2 n1r C1 [heartbeat proxies, 595 rep, 1196.8 s]: no leave (permit 118.8 s); raw bar first met 12.1 s
+   [13] C5-M2 n1r C2 [heartbeat proxies, 596 rep, 1195.7 s]: no leave (permit 118.8 s); raw bar first met - s
+   [13] C5-M2 n1r C3 (= the rung) [heartbeat proxies, 595 rep, 1196.4 s]: LEAVES at 714.2 s (rung_loss, ROUTINE) -> 7000; permit 118.8 s; 595.3 s after permit; raw bar first met 714.2 s
+   [13] C5-M4 c_1x (c3 at 1080p, 1x source) [C2 telemetry, 151 rep, 299.9 s]: no leave (permit 122.9 s); raw bar first met - s
+   [13] C5-M4 c_2x [C2 telemetry, 150 rep, 299.8 s]: no leave (permit 118.9 s); raw bar first met 68.6 s
+   [13] C5-M4 c_4x (the rung on the adopted source) [C2 telemetry, 150 rep, 296.9 s]: LEAVES at 284.8 s (rung_loss, ROUTINE) -> 7000; permit 120.9 s; 163.9 s after permit; raw bar first met 284.8 s
+   [13] C5-M4 c_8x [C2 telemetry, 150 rep, 299.8 s]: no leave (permit 118.9 s); raw bar first met - s
+   [S1] C5-M5 S1 1080p stretch (injected entry -> injected leave) [C2 telemetry, 69 rep, 136.8 s]: no leave (permit 118.7 s); raw bar first met - s
+   [S3] C5-M5 S3 1080p stretch (own entry -> session end) [C2 telemetry, 255 rep, 509.6 s]: no leave (permit 118.4 s); raw bar first met - s
+
+LEAVE TABLE: candidate -> (1) S1 within 60 s of permit, (2) n1r C3 within 120 s of permit, (3) no leave on S3, fires on k of 13
+   L-A: (1) not met (S1 no leave); (2) not met (n1r C3 714.2 s from start, 595.3 s after permit); (3) MET (S3 no leave); fires on 3 of 13
+   L-B: (1) not met (S1 no leave); (2) not met (n1r C3 587.1 s from start, 468.3 s after permit); (3) MET (S3 no leave); fires on 5 of 13
+   L-C: (1) not met (S1 no leave); (2) not met (n1r C3 587.1 s from start, 468.3 s after permit); (3) MET (S3 no leave); fires on 2 of 13
+   L-D: (1) not met (S1 no leave); (2) not met (n1r C3 714.2 s from start, 595.3 s after permit); (3) MET (S3 no leave); fires on 4 of 13
+LEAVE SELECTION (all three hard conditions; most of 13; ties simplest): NONE -- the mild bar is kept (the user decides)

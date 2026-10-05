@@ -1,0 +1,42 @@
+[table 16:28:09Z] start: ADOPTED PS1 FILES BYTE-IDENTICAL (8 of 8)
+[table 16:28:10Z] last session_ended 2026-10-03T14:30:47.598Z; S1b not before 14:30:47Z
+[table 16:28:10Z] session flags set in the manager: 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p'
+[table 16:28:10Z] start: manager PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p'; MainPID 1690315; 8765 1690315; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 16:28:10Z] T2 sampler started (10 s); one hold, 0s
+[table 16:28:10Z] S1b begins (adopted 7000, the 4x PS1 source, flags 'PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1', hook '/home/privyhub/Projects/onn-stream-test/docs/memory/evidence/c5_m5b_2026-10-03/c5_m5b_s1_hook.sh')
+[S1b 16:28:10Z] mode=H hold/timeout=0s probe_args=none heartbeat_ms=default
+[S1b 16:28:10Z] ARM_PROFILE adopted; PRIVYHUB_* in the user manager: 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p'
+[S1b 16:28:14Z] companion MainPID 1693317 serving 8765; PRIVYHUB_* in its environ: 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_MODE=live PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p'
+[S1b] before launch: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[S1b] at PLAYING: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[S1b 16:28:53Z] SurfaceFlinger stream-surface lines: 11
+[S1b 16:28:53Z] PLAYING at 2026-10-03T16:28:53Z; hook c5_m5b_s1_hook.sh, zero input
+[S1b] status pre: bitrate 7000 size 1280 x 720 | controller level 7000 1280x720 state REFERENCE transitions 0 holds {'fallback': 0, 'routine': 0, 'increase': 0} | any_override False
+[S1b hook 16:30:23.928Z] inject INCREASE_1080P -> True transition 7000 -> 12600 increase_1080p increase_1080p
+[S1b] status up3: bitrate 12600 size 1920 x 1080 | controller level 12600 1920x1080 state HOLD_DOWN transitions 1 holds {'fallback': 59, 'routine': 59, 'increase': 29} | any_override False
+[S1b] status up55: bitrate 12600 size 1920 x 1080 | controller level 12600 1920x1080 state REFERENCE transitions 1 holds {'fallback': 33, 'routine': 33, 'increase': 3} | any_override False
+[S1b] status up140: bitrate 12600 size 1920 x 1080 | controller level 12600 1920x1080 state REFERENCE transitions 1 holds {'fallback': 0, 'routine': 0, 'increase': 0} | any_override False
+[S1b hook 16:32:43.975Z] inject CAPACITY_MILD -> True transition 12600 -> 7000 capacity_mild capacity_mild
+[S1b] status down3: bitrate 7000 size 1280 x 720 | controller level 7000 1280x720 state HOLD_DOWN transitions 2 holds {'fallback': 28, 'routine': 58, 'increase': 58} | any_override False
+[S1b] status down55: bitrate 7000 size 1280 x 720 | controller level 7000 1280x720 state REFERENCE transitions 2 holds {'fallback': 2, 'routine': 32, 'increase': 32} | any_override False
+[S1b hook 16:33:48.546Z] hook done; SurfaceFlinger samples: 57
+[S1b 16:33:48Z] hook exit 0
+[S1b 16:33:50Z] adb client processes seen during hold: 22 (# polls 569)
+[S1b 16:33:52Z] report: native_decoder_20261003_163351_479.json
+[frames] 296 seconds in the session window
+[heartbeat] 148 lines
+[S1b 16:34:12Z] decision log lines in the hold: 175
+[S1b 16:34:14Z] game active after stop: False
+[S1b 16:34:14Z] done
+[table 16:34:14Z] S1b exit 0
+[table 16:34:18Z] teardown: manager PRIVYHUB_* ''; MainPID 1697910; 8765 1697910; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 16:34:18Z] FLAGS UNSET AND ABSENT: manager none, environ exactly the live default
+[table] teardown stream 7000 1280 720 level size 1280x720
+[table 16:34:18Z] teardown: ADOPTED PS1 FILES BYTE-IDENTICAL (8 of 8)
+[table 16:34:18Z] measurement files: 0 (want 0)
+[table 16:34:19Z] ADOPTED APK CONFIRMED (device hash de072762e55122c3060086f6f10b1bff54633d9165d0c475f17699127841835e)
+[table 16:34:28Z] teardown: game active False; NOW PLAYING on the launcher: 1
+[table 16:34:39Z] stale banner: force-stop + relaunch; NOW PLAYING now: 0
+[table 16:34:39Z] table done

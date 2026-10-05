@@ -1,0 +1,32 @@
+[table 17:15:41Z] start: ADOPTED PS1 FILES BYTE-IDENTICAL (8 of 8)
+[table 17:15:41Z] last session_ended 2026-10-03T17:14:42.511Z; b_smoke2x not before 17:15:42Z
+[table 17:16:01Z] session flags set in the manager: 'PRIVYHUB_PS1_LOOK=measure-smoke-2x'
+[table 17:16:01Z] start: manager PRIVYHUB_* 'PRIVYHUB_PS1_LOOK=measure-smoke-2x'; MainPID 1718905; 8765 1718905; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 17:16:01Z] T2 sampler started (10 s); one hold, 60s
+[table 17:16:02Z] b_smoke2x begins (adopted 7000, the 4x PS1 source, flags 'PRIVYHUB_PS1_LOOK=measure-smoke-2x', hook 'none')
+[b_smoke2x 17:16:02Z] mode=H hold/timeout=60s probe_args=none heartbeat_ms=default
+[b_smoke2x 17:16:02Z] ARM_PROFILE adopted; PRIVYHUB_* in the user manager: 'PRIVYHUB_PS1_LOOK=measure-smoke-2x'
+[b_smoke2x 17:16:06Z] companion MainPID 1719205 serving 8765; PRIVYHUB_* in its environ: 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live PRIVYHUB_PS1_LOOK=measure-smoke-2x'
+[b_smoke2x] before launch: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[b_smoke2x] at PLAYING: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[b_smoke2x 17:16:44Z] SurfaceFlinger stream-surface lines: 11
+[b_smoke2x 17:16:44Z] PLAYING at 2026-10-03T17:16:44Z; holding 60s, zero input
+[b_smoke2x 17:17:47Z] adb client processes seen during hold: 2 (# polls 116)
+[b_smoke2x 17:17:49Z] report: native_decoder_20261003_171748_645.json
+[frames] 61 seconds in the session window
+[heartbeat] 30 lines
+[b_smoke2x 17:18:12Z] decision log lines in the hold: 47
+[b_smoke2x 17:18:13Z] game active after stop: False
+[b_smoke2x 17:18:13Z] done
+[table 17:18:13Z] b_smoke2x exit 0
+[table 17:18:18Z] teardown: manager PRIVYHUB_* ''; MainPID 1720381; 8765 1720381; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 17:18:18Z] FLAGS UNSET AND ABSENT: manager none, environ exactly the live default
+[table] teardown stream 7000 1280 720 level size 1280x720
+[table 17:18:18Z] teardown: ADOPTED PS1 FILES BYTE-IDENTICAL (8 of 8)
+[table 17:18:18Z] measurement files: 0 (want 0)
+[table 17:18:18Z] ADOPTED APK CONFIRMED (device hash de072762e55122c3060086f6f10b1bff54633d9165d0c475f17699127841835e)
+[table 17:18:27Z] teardown: game active False; NOW PLAYING on the launcher: 1
+[table 17:18:38Z] stale banner: force-stop + relaunch; NOW PLAYING now: 0
+[table 17:18:38Z] table done

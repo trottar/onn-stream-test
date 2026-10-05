@@ -62,11 +62,17 @@ C5-M5 (the user's reading of 2026-10-01: 1080p as a rung of the ladder): with
   increase_1080p      -- class INCREASE, from 7000 only, when the rung window
                          (the last 450 evaluated reports since the last SSRC
                          change, the blend's window rules and clean) is full and
-                         >= 435 of 450 are clean; every gate applies, plus a
+                         >= 415 of 450 are clean (C5-M5B; 435 as first built);
+                         every gate applies, plus a
                          10-minute re-entry hold-down after any leave;
   the leave           -- the existing triggers and mapping: the mild bar one
                          rung down = 7000 at 720p; strict -> 5000; the backstop;
                          a leave, an entry and a leave in one session -> HOLD.
+
+C5-M5B (the rules from the recorded data, pre-registered selection): the entry
+threshold is 415 of 450 -- the strictest candidate that entered within 20 min
+on >= 7 of the 10 real-input holds. No loss-based leave met the pre-registered
+conditions, so the leave stays the existing triggers above.
 
 Absent, the ladder tops at 7000 and every decision is what it was (the
 replays' stop rule). The actuator rebuilds the argv's size per level
@@ -189,7 +195,7 @@ TOP_ENV = "PRIVYHUB_ADAPTIVE_BITRATE_TOP"
 TOP_1080P = "1080p"
 LADDER_WITH_RUNG_KBPS = LADDER_KBPS + (RUNG_KBPS,)
 RUNG_WINDOW_REPORTS = 450                   # 15 min at the 2-s report rate
-RUNG_CLEAN_NEEDED = 435                     # N - 15
+RUNG_CLEAN_NEEDED = 415                     # C5-M5B's selection (E415; C5-M5 built 435 = N - 15)
 RUNG_REENTRY_HOLD_MS = 10 * 60 * 1000       # no entry for 10 min after a leave
 RUNG_OSCILLATION_LEAVES = 2                 # leave, entry, leave -> HOLD for the session
 TRIGGER_RUNG_ENTRY = "increase_1080p"

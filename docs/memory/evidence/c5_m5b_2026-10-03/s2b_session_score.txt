@@ -1,0 +1,29 @@
+C5-M5B S2b (S2b) -- 2026-10-03 16:44:39Z .. 17:14:39Z (30.0 min)
+
+transitions (min into the hold, class, from -> to, reason, named by a rule, spacing):
+  (none)
+oscillation holds: none
+recovery-log events in the hold: [('2026-10-03T16:49:02.791Z', 'desync_pause'), ('2026-10-03T16:51:03.083Z', 'gave_up_saved')]
+longest rung window at 7000: 432 clean of the last 450 (needed 415) at 2026-10-03T17:03:11.867Z
+
+per level (C2 telemetry in the level's intervals; spikes and underruns are the session's):
+  7000: 30.0 min, 899 reports, fps 60.13, stale/min 1.43, loss/min 20.19, telemetry gap max 165 ms
+session (decoder report): {"minutes": 30.14, "spikes_per_min": 91.6, "rendered_fps": 59.83, "stale_per_min": 1.79, "loss_per_min": 20.27, "underruns_per_min": 1.19, "max_gap_ms": 248, "ssrc_changes": 0, "sequence_resyncs_beyond_ssrc": 0}
+
+rows: entry by its own rule no; every transition named True; spacing True; 0 recovery cycles False; client rows over the hold (spikes < 200, fps >= 59.5, stale < 20, underruns < 5) True
+
+S2b: ENTRY NOT REACHED (the rung window's best was 432 of 450, needed 415)
+
+ADDENDUM (written after the score, reads the same files; changes no row):
+- The new threshold WAS met. The rung window was full and >= 415 clean from 16:59:42.9Z (15.1 min, the first
+  moment it was full: 448 entry decisions, 16:59:42.9Z-17:14:40.6Z, every one REFUSED by the guards
+  game_not_paused + recovery_playing).
+- Link-drop recovery paused the game at 16:49:02.8Z (4.4 min in: desync_pause, trigger controller_silence,
+  age 1,002 ms; the client's heartbeat that second arrived 3 s after the one before) and gave up at
+  16:51:03.1Z (gave_up_saved). The game stayed paused (the attract loop frozen) for the rest of the hold.
+- So 25.6 of the window's 30 minutes were a paused, static picture. The 426-432 clean counts are not a
+  gameplay measurement.
+- Loss: 62 lost in the 4.4 min before the pause (14/min); 543 in the 25.6 min paused (21/min).
+- No host request reached the companion around 16:49 (journal: client heartbeats only); the fake-run
+  tests of that minute used stubbed systemctl / curl / adb.
+- By the pre-registered rows: not RUNG SHOWN (no entry; 1 recovery cycle). A row that failed is not re-run.

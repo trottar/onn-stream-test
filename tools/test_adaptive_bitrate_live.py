@@ -1397,25 +1397,42 @@ class C5M5Rung(unittest.TestCase):
             env = {} if raw is None else {live.TOP_ENV: raw}
             self.assertEqual(live.top_from_env(env), on, raw)
 
-    def test_entry_fires_at_435_of_450(self):
+    def test_entry_fires_at_415_of_450(self):
+        # C5-M5B: the threshold is the selection's 415 of 450 (C5-M5 built 435).
+        self.assertEqual((live.RUNG_WINDOW_REPORTS, live.RUNG_CLEAN_NEEDED), (450, 415))
         f = RungFeeder()
-        f.feed(15, **UNCLEAN_GAP)
-        ev = f.feed(434, **CLEAN)
+        f.feed(35, **UNCLEAN_GAP)
+        ev = f.feed(414, **CLEAN)
         self.assertEqual(f.transitions(ev), [])
-        ev = f.feed(1, **CLEAN)                          # 450 reports, 435 clean
+        ev = f.feed(1, **CLEAN)                          # 450 reports, 415 clean
         tr = f.transitions(ev)
         self.assertEqual(len(tr), 1)
         self.assertEqual((tr[0]["from_kbps"], tr[0]["to_kbps"], tr[0]["class"]), (7000, 12600, "INCREASE"))
         self.assertEqual((tr[0]["reason"], tr[0]["trigger"]), ("increase_1080p", "increase_1080p"))
         self.assertEqual((tr[0]["from_size"], tr[0]["to_size"]), ("1280x720", "1920x1080"))
 
-    def test_entry_does_not_fire_at_434_of_450(self):
+    def test_entry_does_not_fire_at_414_of_450(self):
         f = RungFeeder()
-        f.feed(16, **UNCLEAN_GAP)
-        ev = f.feed(434, **CLEAN)                        # 450 reports, 434 clean
+        f.feed(36, **UNCLEAN_GAP)
+        ev = f.feed(414, **CLEAN)                        # 450 reports, 414 clean
         self.assertEqual(f.transitions(ev), [])
-        ev = f.feed(1, **CLEAN)                          # the window rolls: 435 of 450
+        self.assertEqual(f.p.status()["rung_1080p"]["window"], {"reports": 450, "clean": 414,
+                                                              "window_needed": 450, "clean_needed": 415})
+        ev = f.feed(1, **CLEAN)                          # the window rolls: 415 of 450
         self.assertEqual([t["to_kbps"] for t in f.transitions(ev)], [12600])
+
+    def test_entry_with_unclean_reports_spread_through_the_window(self):
+        # C5-M5B: 35 unclean reports spread through the window (as on the real holds) do not stop the
+        # entry; 36 do. One unclean report every 13th.
+        for unclean, fires in ((35, True), (36, False)):
+            f = RungFeeder()
+            ev, fed_unclean = [], 0
+            for i in range(450):
+                bad = i % 12 == 5 and i // 12 < unclean
+                fed_unclean += bad
+                ev += f.feed(1, **(UNCLEAN_GAP if bad else CLEAN))
+            self.assertEqual(fed_unclean, unclean)
+            self.assertEqual([t["to_kbps"] for t in f.transitions(ev)], [12600] if fires else [], unclean)
 
     def test_entry_only_from_7000(self):
         f = RungFeeder()

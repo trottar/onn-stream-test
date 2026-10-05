@@ -1,0 +1,188 @@
+C5-M5B -- the 1080p rung's rules from the data, and the PS1 look. PRE-REGISTRATION.
+Written 2026-10-03 (12:21 EDT, 16:21Z) before any replay, code change, session or score of this
+task. Task: docs/memory/handoffs/C5-M5B_RUNG_RULES_AND_LOOK_TASK.md, under
+handoffs/QUEUE_2026-09-29B.md's rules. Baseline commit a402272 (C5-M5; its controller is the
+rung's as built). The closed controller for the stop rule is 5005615 (as C5-M5 ran it).
+Nothing below is changed after data. The user accepted C5-M5's R0b deviation (2026-10-03).
+
+STANDING
+- Adopted profile native_game_720p60_reference (7000, 1280x720, cap 90,000, GOP 15, 8+1 FEC,
+  cushion 12/17, redundancy 2/4); the adopted 4x PS1 source (Beetle PSX HW.cfg dc4d6019...,
+  Beetle PSX HW.opt e409d6c1..., the six per-title copies 86a52347... x5 and e409d6c1... x1);
+  APK de072762...835e (never reinstalled; checked at each teardown); live adaptive bitrate on by
+  default (the unit drop-in; never touched). The shadow (companion/adaptive_bitrate.py) stays
+  byte-identical, its suite unchanged. No nft, no real sudo, the Opal read-only.
+- Session flags (PRIVYHUB_ADAPTIVE_BITRATE_TOP, _INJECT, PRIVYHUB_PS1_LOOK) are set in the user
+  manager for ONE session (systemctl --user set-environment + a unit restart) and unset after it
+  (unset-environment + restart). At every teardown: the manager carries no PRIVYHUB_*, the
+  companion's environ exactly PRIVYHUB_ADAPTIVE_BITRATE_MODE=live, mode live / acts true, stream
+  7000 at 1280x720, adopted profile, any_override false, no game, 0 NOW PLAYING banners, the APK
+  hash confirmed, the seven .opt and the .cfg hashes above unchanged.
+- Two-retry limit: a session that fails to START (harness / launch) is retried at most twice; a
+  row that fails is never re-run.
+
+SECTION 1 -- THE ENTRY: CANDIDATES, REPLAY, SELECTION
+Candidates (the rung window keeps the blend's window rules -- evaluated reports since the last SSRC
+change and its blackout, resyncs enter as not clean, stale reports skipped -- and the blend's
+clean: fps >= 57, queue <= 1, gap <= 150; every other gate unchanged):
+  E405 E410 E415 E420 E425 E430 E435 : >= k of the last 450 (N = 450, 15 min);
+  E300 : >= 280 of the last 300 (N = 300, 10 min; 93.3 %, the clean fraction of 420 of 450).
+STRICTNESS ORDER (fixed here, strictest first): by the required clean fraction, and at an equal
+fraction the longer window is stricter:
+  E435 (96.7 %) > E430 (95.6) > E425 (94.4) > E420 (93.3, N 450) > E300 (93.3, N 300)
+  > E415 (92.2) > E410 (91.1) > E405 (90.0).
+Replay: every candidate with the rung flag from the session's start (the C5-M5 replay's method,
+tools/c5_m5_replay.py extended), the existing leave triggers after an entry, on:
+  THE TEN REAL-INPUT HOLDS (the selection set): C3-L4-N1 H, C3-L4-N2 H, C3-L4-D1 B3b H,
+    LINK-L2 H1..H6, C5-M4A V5 (C2 telemetry or live sample rows);
+  marked PROXIES (reported, not in the selection): C3-L4-S1 H1..H4, LINK-L1 H1..H6
+    (heartbeat proxies);
+  also reported: C5-M5 S2 (C2 telemetry) and C5-M5 S3's 7000 stretch (C2 telemetry from the
+    session start to the real entry at 06:57:33Z; the reports after it are 1080p and are not used
+    here); C5-M4's 5-min b holds beside.
+Per hold and candidate: entries; minutes from the hold's first report to the first entry; on
+the same hold's own later reports (720p data -- a preview, not a 1080p measurement), the fraction
+of the fresh reports after the first entry that are NOT clean by the blend; the best window.
+ENTRY SELECTION RULE: the STRICTEST candidate (order above) whose first entry comes within 20
+minutes (<= 1200 s from the hold's first report) on AT LEAST 7 OF THE 10 real-input holds. If none
+does, the loosest candidate (E405) is reported as not enough and the entry stays at 435 of 450
+(the user decides).
+
+SECTION 2 -- THE LEAVE: CANDIDATES, REPLAY, SELECTION
+Candidates, RUNG-ONLY (they are evaluated only while the level is 12600; never at a 720p level),
+over the evaluated reports at the rung since the last SSRC change and its blackout (a window
+cleared at every SSRC change, as the blend's; stale, blackout and resync reports do not enter it;
+a missing value never counts toward a bar):
+  L-A  lost_packets_delta >= 100 on >= 2 of the last 10 evaluated reports;
+  L-B  the sum of lost_packets_delta over the last 15 evaluated reports >= 300 (~30 s; the
+       window must hold 15 reports);
+  L-C  lost_packets_delta >= 50 on >= 3 of the last 10 (the mild bar's loss half, no fps half);
+  L-D  L-A, or stale_output_drops_delta >= 5 in the newest evaluated report (the client's
+       decoder falling behind). On heartbeat-proxy series there is no per-report stale field, so
+       L-D reads as L-A there (stated in the table).
+Each, when met and no existing trigger has named a class for the report (the strict capacity /
+queue-gap FALLBACK, the mild bar and the queue-gap ROUTINE keep their precedence and mapping
+unchanged), names class ROUTINE, trigger/reason rung_loss, target one rung down = 7000 at
+1280x720, through every existing gate: ROUTINE's hold-downs (60 reports after an up), the
+blackout, guards, rate limit, the oscillation guard, the 10-min re-entry hold, the rung
+oscillation HOLD. The existing mild bar, strict capacity and the backstop stay.
+Replay (the policy starts AT the rung as if it had just entered: last direction up, 0 reports
+since, the 3-report blackout; the series' elapsed offset by 60 s for the session-age guard, as
+C5-M5 ran it) on:
+  the 13 recorded 1080p series: C5-M1 A1 A2 A3; C5-M2 n1 C1 C2 C3; C5-M2 n1r C1 C2 C3;
+    C5-M4 c_1x c_2x c_4x c_8x;
+  C5-M5 S1's 1080p stretch (C2 telemetry from the entry's transition_done, 23:45:40.569Z, to the
+    injected leave, 23:47:59.489Z; ~139 s);
+  C5-M5 S3's 1080p stretch (C2 telemetry from the entry's transition_done, 06:57:34.630Z, to the
+    session's end; ~8.5 min, loss 2.0/min). A leave there is a FALSE LEAVE.
+Reported per series and candidate: seconds from the stretch's start to the leave and its trigger;
+t_permit = the time of the first report at which the blackout and ROUTINE's post-up hold-down
+allow a decrease; seconds from t_permit to the leave.
+THE CLOCK OF THE BOUNDS (an interpretation, fixed here before data): every candidate inherits the
+same post-entry hold-down (60 reports + the 3-report blackout, ~126 s), which by itself exceeds
+both of the task's bounds when they are read from the stretch's start, so read that way no
+candidate could meet them by construction. The bounds are therefore read from t_permit: "leaves
+within X s" = (leave time - t_permit) <= X. Both readings are tabled.
+LEAVE SELECTION RULE: the candidate that (1) leaves S1's stretch within 60 s, (2) leaves C5-M2
+n1r C3 within 120 s, (3) does NOT leave on S3's stretch, and among those fires (leaves at all) on
+the most of the 13 series; ties -> the simplest, L-A before L-B before L-C before L-D. If none
+meets all three hard conditions, the table is reported and the mild bar is kept (the user
+decides).
+The selection (both rules) is written into the record WITH THE ROWS THAT CHOSE IT before any
+companion code changes.
+
+SECTION 3 -- THE BUILD, TESTS, MUTATIONS, THE STOP RULE
+- The chosen entry threshold and the chosen leave (reason rung_loss, class ROUTINE, visible in
+  the controller status and in the decision rows) behind the same flag
+  PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p. A test-only injection class RUNG_LOSS (INJECT=1, loopback,
+  live) makes the leave's decision through every gate, as CAPACITY_MILD does for the mild bar.
+- Tests: the entry fires at the chosen threshold and not one report below it; the leave fires at
+  its bar and not just below it; rung-only scope (never at 7000 or below); the 10-min re-entry
+  hold after a rung_loss leave; the rung oscillation count (leave, entry, leave -> HOLD); the
+  existing triggers keep precedence. Mutations of the new rules are caught (each mutation run
+  against the suite; a mutation the suite misses is recorded, and a test may be strengthened only
+  without changing a rule). The shadow byte-identical.
+- THE STOP RULE: flag absent -> 0 differences against 5005615's controller on every series, as
+  C5-M5 ran it (the named holds, every live-log sample session, every heartbeat series on disk).
+  Any difference -> no session runs; the record says why.
+
+SECTION 4 -- SESSIONS (flags for the session only)
+S1b injection (attract, live, TOP=1080p, INJECT=1): after >= 90 s at PLAYING inject
+   INCREASE_1080P (the policy path: expect 7000 -> 12600, reason increase_1080p); after the
+   hold-down allows a ROUTINE decrease (>= 63 reports after the entry's SSRC change) inject
+   RUNG_LOSS (expect 12600 -> 7000, reason rung_loss, class ROUTINE; NOT the mild bar); 60 s
+   more; BACK. Rows: both transitions acted; one SSRC change each; the gap at each switch <= 450
+   ms (R0b's method: the largest output_gap_ms among the report's retained slow events in
+   [ssrc, ssrc + 1 s]); any_override false at PLAYING and at the end; after BACK 7000 /
+   1280x720. S1b PASSES on all rows.
+S2b a 30-min daytime hold (start 09:00-17:00 local), attract, live, TOP=1080p, T2 on, C2
+   telemetry. RUNG SHOWN if: the controller enters by the NEW threshold (increase_1080p, not
+   injected) and then either stays or leaves by a named rule; every transition named and spaced
+   as the hold-downs allow; 0 recovery cycles; the client rows met over the hold (spikes <
+   200/min, fps >= 59.5, stale < 20/min, underruns < 5/min). Reported: minutes, loss and max gap
+   per level. If the controller never enters: ENTRY NOT REACHED, with the best window.
+S3b one 2-h attract session (7200 s) starting 01:00-06:00 local, live, TOP=1080p, T2 on.
+   WORKS AS A RUNG (C5-M5's S3 definition): every transition one the rules name, at the spacing
+   the hold-downs allow; no oscillation HOLD, or one with its three changes listed; 0 recovery
+   cycles, or each explained; at 1080p the client rows (fps >= 59.5, stale < 20/min from the C2
+   telemetry over the 1080p minutes; spikes < 200/min, underruns < 5/min, the session's) met over
+   the 1080p minutes. PLUS: the time at 1080p and at each 720p level; every leave named; loss and
+   max gap per level. Never entering in 2 h: ENTRY NOT REACHED, with the best window.
+Teardown after each (STANDING). S1b first; S2b in the first daytime window after S1b passes;
+S3b in the first 01:00-06:00 window after S1b passes. Neither S2b nor S3b gates the other.
+
+SECTION 5 -- THE LOOK: LEVERS, COST TABLE, PRESETS
+Mechanism (one, chosen here): with PRIVYHUB_PS1_LOOK set to a known preset, the companion, at a
+PS1 (Beetle PSX HW) launch, writes a session core-options file in its runtime directory -- the
+adopted Beetle PSX HW.opt read (never written) with the preset's keys replaced -- and points that
+launch at it through the regenerated privyhub-session.cfg (global_core_options + core_options_path);
+the file is removed at the session's end (BACK / session_ended) and at the next launch. Nothing
+in ~/.config/retroarch is written. A title with its own per-title .opt (the six) keeps RetroArch's
+precedence (its own file wins), so the look applies to titles without one (the attract title
+Tekken 3 has none); stated in TOOLS.md. Unset -> the session cfg is byte-identical to today's and
+nothing else changes. A smoke (one launch) must show RetroArch loading the session file before
+any cost hold; if it does not, the mechanism is recorded as not working and the cost holds use
+C5-M4's per-hold game options file (Tekken 3 (USA).opt in the core's config folder, created and
+deleted per hold) instead, and the presets wait.
+The adopted .opt (base + six) and Beetle PSX HW.cfg are hashed before and after EVERY session of
+this task; any change is a failure of the row "adopted files byte-identical".
+Levers (only the values this core build offers; MSAA is described by the core as Vulkan-only and
+the core runs OpenGL here, so it is listed as NOT OFFERED unless the smoke shows otherwise; a
+filter value RetroArch rewrites or rejects is NOT OFFERED):
+  base_4x       the adopted config;
+  dither_off    beetle_psx_hw_dither_mode = "disabled";
+  filter_<v>    beetle_psx_hw_filter = each of "xBR", "SABR", "bilinear", "3-point", "JINC2";
+  pgxp          beetle_psx_hw_pgxp_mode = "memory only", _pgxp_texture = "enabled",
+                _pgxp_vertex = "enabled";
+  msaa_4x       beetle_psx_hw_msaa = "4x" (only if offered);
+  full          4x + the best-cost filter + dither_off + pgxp.
+THE BEST-COST FILTER: among the filter_<v> holds that HOLD 60, the lowest GPU busy mean (ties:
+lower GPU busy p95, then the listed order). None holds -> the full preset is 4x + dither_off +
+pgxp (filter nearest), stated.
+Cost holds: C5-M4's method and bar, 5 min each, Tekken 3 attract with zero input, the adopted
+7000 stream, live by default, the counter-only game override (C5-M4A's c5_m4a_counter.sh) for
+RetroArch's frame counter, T2 at 10 s, c5_m4_sampler at 1 s, C2 telemetry. A lever HOLDS 60 if:
+  R1 RetroArch's counter >= 59.88 fps over the hold and no 256-frame interval > 4,278.7 ms;
+  R2 the encoder's progress fps median >= 59.5 and dup+drop growth <= 0.5 % of frames.
+  (C5-M4's R3 -- codec_ms -- is not evaluable: the C2 telemetry carries none; not a row.)
+Reported per hold: HOLDS 60; GPU busy mean / p95; GPU W; RetroArch and encoder % of a core (T2);
+Tctl max; the stream's per-second largest frame p50 / p90 and cap hits s/min; the client's fps,
+stale and loss (not judged).
+Then THE FULL PRESET AT THE RUNG once: 5 min, TOP=1080p and INJECT=1, INCREASE_1080P injected
+after >= 90 s at PLAYING, the same rows over the 1080p minutes. Reported.
+PRESETS behind PRIVYHUB_PS1_LOOK=: "4x" (today's adopted config; the same as unset) and
+"remaster" (the full preset, its exact option values named in the record) -- offered ONLY if the
+full preset HOLDS 60 in its 720p hold. If it misses, "remaster" is NOT offered (the flag accepts
+"4x" only) and no substitute preset is chosen after the data. The helper's "remaster-1080p" is
+offered only if the full preset also holds 60 at the rung. Unset -> nothing changes anywhere.
+tools/ps1_look.sh 4x | remaster | remaster-1080p: fake-run tested (a stubbed systemctl / curl /
+adb path that records every call and checks the order: set flags, restart, wait PLAYING, for
+-1080p inject the entry and see 1920x1080 in the status, print what to look at, wait for Enter,
+end the session, unset every flag, restart, verify the adopted state). The real run is the user's;
+nothing perceptual is a gate.
+
+ORDER: this file (hashed) -> section 1 and 2 replays -> the selection written into the record ->
+the build, tests, mutations, the stop rule -> S1b -> S2b (daytime); the look's mechanism (code
+and tests), its smoke and the cost holds (never overlapping a session) -> S3b (01:00-06:00) ->
+the "remaster" values filled from the table, the helper and its fake-run -> the records. One thing
+on the host at a time.

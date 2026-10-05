@@ -1398,8 +1398,8 @@ detail, not an upscale.
 
 | class | trigger / reason | bar | target | hold-downs |
 | --- | --- | --- | --- | --- |
-| INCREASE | `increase_1080p` / `increase_1080p` | **at 7000 only**: the rung window full and ≥ 435 of the last 450 evaluated reports since the last SSRC change clean (the blend's clean and window rules) | 12600 / 1920×1080 | as INCREASE (30 after an up, 60 after a down), plus **no entry for 10 min after any leave** (`rung_reentry_hold`) |
-| (the leave) | the existing triggers | as in the table above | the existing mapping from 12600: `capacity_mild` → 7000 / 720p; strict or the queue/gap FALLBACK → 5000; the queue/gap ROUTINE → 6000; the backstop → 5000 | a decrease waits 60 reports after the entry |
+| INCREASE | `increase_1080p` / `increase_1080p` | **at 7000 only**: the rung window full and **≥ 415** of the last 450 evaluated reports since the last SSRC change clean (the blend's clean and window rules; 435 as first built, 415 since C5-M5B's selection) | 12600 / 1920×1080 | as INCREASE (30 after an up, 60 after a down), plus **no entry for 10 min after any leave** (`rung_reentry_hold`) |
+| (the leave) | the existing triggers (C5-M5B: no loss-based candidate met its pre-registered conditions, so none was added) | as in the table above | the existing mapping from 12600: `capacity_mild` → 7000 / 720p; strict or the queue/gap FALLBACK → 5000; the queue/gap ROUTINE → 6000; the backstop → 5000 | a decrease waits 60 reports after the entry |
 
 **Plus:**
 
@@ -1454,3 +1454,52 @@ no gate):
 - **Not adopted; the flag is off by default.** The user's picture look at
   1080p decides whether the rung is worth adopting.
 
+
+## C5-M5B — the rung's rules chosen from the recorded data (2026-10-03; NOT adopted)
+
+Task `../handoffs/C5-M5B_RUNG_RULES_AND_LOOK_TASK.md`; patch
+`../patches/C5-M5B_RUNG_ENTRY_AND_PS1_LOOK.md`; record
+`../evidence/C5_M5B_RUNG_RULES_AND_LOOK_2026-10-03.md`. The selection
+criteria were pre-registered before any replay
+(`c5_m5b_preregistration.txt`), and the choice was written before any
+code changed (`c5_m5b_selection.txt`).
+
+**The entry, as chosen: ≥ 415 of the last 450 clean** (E415).
+
+- The rule: the strictest of E435 … E405 and E300 (280 of 300) that
+  enters within 20 min on ≥ 7 of the 10 real-input 720p holds.
+- E415 entered on 8 of 10, at 15.0-16.9 min. Entered on: E435 0, E430 0,
+  E425 1, E420 4, E300 5, E410 9, E405 9.
+- On those holds' own later 720p reports, 4.3-15.7 % were unclean after
+  the replayed entry (a preview).
+
+**The leave, as chosen: unchanged.** The mild bar, strict capacity, the
+queue/gap triggers and the backstop.
+
+- None of the four loss-based candidates met the three pre-registered
+  conditions:
+  - L-A: ≥ 100 lost on 2 of 10;
+  - L-B: ≥ 300 lost in 15;
+  - L-C: ≥ 50 on 3 of 10;
+  - L-D: L-A, or stale ≥ 5.
+- The conditions were: leave S1's stretch within 60 s; leave C5-M2 n1r C3
+  within 120 s; never fire on S3's stretch.
+- **On this link the 1080p loss is rare, large bursts:**
+  - S1's "80 lost/min" was one 183-packet resync jump;
+  - n1r C3's loss began 587-714 s in;
+  - S3's 8.5 min never met any bar.
+- The burst rules fire on 2-5 of 13 series (L-B 5, L-D 4, L-A 3, L-C 2;
+  the mild bar 1) and never on S3. They are recorded for the user,
+  not built.
+
+**The sessions:**
+
+- **S1b, injection: PASSES.** Gaps 348 / 346 ms.
+- **S2b, daytime: NOT RUNG SHOWN.**
+  - Link-drop recovery paused the game 4.4 min in.
+  - The window then reached 415 at 15.1 min, but the guards
+    (`game_not_paused`, `recovery_playing`) refused all 448 entry
+    decisions.
+  - The clean count during a paused, static picture is not a gameplay
+    measurement.
+- **S3b, the night:** **DOES NOT WORK AS A RUNG by its rows.** One entry by its own rule at 15.1 min (434 of 450, one short of the old 435), then 104.9 min at 1080p with no leave, no oscillation and 0 recovery (fps 60.18, stale 0.70/min, loss 2.82/min). The miss is the session's spikes: 317.9/min against < 200, the 1080p decode's known rate on the onn (C5-M4's 1080p holds 328-607/min). The entry switch's gap was 649 ms.

@@ -1,0 +1,39 @@
+[table 18:20:47Z] start: ADOPTED PS1 FILES BYTE-IDENTICAL (8 of 8)
+[table 18:20:47Z] last session_ended 2026-10-03T18:20:00.367Z; c_full_rung not before 18:21:00Z
+[table 18:21:07Z] session flags set in the manager: 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p PRIVYHUB_PS1_LOOK=measure-full'
+[table 18:21:07Z] start: manager PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p PRIVYHUB_PS1_LOOK=measure-full'; MainPID 1756203; 8765 1756203; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 18:21:07Z] T2 sampler started (10 s); one hold, 0s
+[table 18:21:07Z] c_full_rung begins (adopted 7000, the 4x PS1 source, flags 'PRIVYHUB_PS1_LOOK=measure-full PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1', hook '/home/privyhub/Projects/onn-stream-test/docs/memory/evidence/c5_m5b_2026-10-03/c5_m5b_rung_hook.sh')
+[c_full_rung 18:21:08Z] mode=H hold/timeout=0s probe_args=none heartbeat_ms=default
+[c_full_rung 18:21:08Z] ARM_PROFILE adopted; PRIVYHUB_* in the user manager: 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p PRIVYHUB_PS1_LOOK=measure-full'
+[c_full_rung 18:21:12Z] companion MainPID 1756489 serving 8765; PRIVYHUB_* in its environ: 'PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1 PRIVYHUB_ADAPTIVE_BITRATE_MODE=live PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p PRIVYHUB_PS1_LOOK=measure-full'
+[c_full_rung] before launch: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[c_full_rung] at PLAYING: ARM_PROFILE adopted profile ('native_game_720p60_reference', 1280, 720, 7000, 90000) bitrate_kbps 7000 selection default None any_override False fec xor8_1 cushion 12 17 profile redundancy 2 4 profile adaptive live -> AS EXPECTED FOR THE ARM
+[c_full_rung 18:21:51Z] SurfaceFlinger stream-surface lines: 11
+[c_full_rung 18:21:51Z] PLAYING at 2026-10-03T18:21:51Z; hook c5_m5b_rung_hook.sh, zero input
+[c_full_rung] status pre: bitrate 7000 size 1280 x 720 | controller level 7000 1280x720 state REFERENCE | any_override False
+[c_full_rung hook 18:23:21.187Z] inject INCREASE_1080P -> True transition 7000 -> 12600 increase_1080p
+[c_full_rung] status up5: bitrate 12600 size 1920 x 1080 | controller level 12600 1920x1080 state HOLD_DOWN | any_override False
+[c_full_rung] status up150: bitrate 12600 size 1920 x 1080 | controller level 12600 1920x1080 state REFERENCE | any_override False
+[c_full_rung] status up300: bitrate 12600 size 1920 x 1080 | controller level 12600 1920x1080 state REFERENCE | any_override False
+[c_full_rung hook 18:28:21.199Z] hook done
+[c_full_rung 18:28:21Z] hook exit 0
+[c_full_rung 18:28:23Z] adb client processes seen during hold: 14 (# polls 752)
+[c_full_rung 18:28:25Z] report: native_decoder_20261003_182824_807.json
+[frames] 391 seconds in the session window
+[heartbeat] 194 lines
+[c_full_rung 18:28:46Z] decision log lines in the hold: 231
+[c_full_rung 18:28:47Z] game active after stop: False
+[c_full_rung 18:28:47Z] done
+[table 18:28:47Z] c_full_rung exit 0
+[table 18:28:52Z] teardown: manager PRIVYHUB_* ''; MainPID 1761153; 8765 1761153; environ PRIVYHUB_* 'PRIVYHUB_ADAPTIVE_BITRATE_MODE=live'
+[table] adaptive_bitrate mode live configured live acts True | bitrate 7000 profile native_game_720p60_reference 1280 720 any_override False profile_id_override None fec_scheme_override None active False
+[table 18:28:52Z] FLAGS UNSET AND ABSENT: manager none, environ exactly the live default
+[table] teardown stream 7000 1280 720 level size 1280x720
+[table 18:28:52Z] teardown: ADOPTED PS1 FILES BYTE-IDENTICAL (8 of 8)
+[table 18:28:52Z] measurement files: 0 (want 0)
+[table 18:28:52Z] ADOPTED APK CONFIRMED (device hash de072762e55122c3060086f6f10b1bff54633d9165d0c475f17699127841835e)
+[table 18:29:02Z] teardown: game active False; NOW PLAYING on the launcher: 1
+[table 18:29:12Z] stale banner: force-stop + relaunch; NOW PLAYING now: 0
+[table 18:29:12Z] table done

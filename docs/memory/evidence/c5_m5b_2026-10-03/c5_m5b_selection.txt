@@ -1,0 +1,46 @@
+C5-M5B -- THE SELECTION, written 2026-10-03T16:25:29Z from c5_m5b_replays.txt (sha256 85ce4130e72e36bb...),
+by the pre-registered rules (c5_m5b_preregistration.txt, sha256 6ba1e522...), BEFORE any companion
+code change. Nothing below re-reads the rules after the data.
+
+ENTRY -- SELECTED: E415, >= 415 of the last 450 clean (N = 450 unchanged).
+  The strictest candidate entering within 20 min on >= 7 of the 10 real-input holds:
+  E435 0/10, E430 0/10, E425 1/10, E420 4/10, E300 5/10, E415 8/10 (first entries 15.0-16.9 min;
+  not on LINK-L2 H3 (best 409 of 450 by 20 min) and H5 (best 396)).
+  After the replayed entry the same holds' own 720p reports were unclean on 4.3-15.7 % (median
+  ~8 %) -- a preview, not a 1080p measurement.
+
+LEAVE -- NONE MEETS THE THREE HARD CONDITIONS. The mild bar is kept (the user decides).
+  (1) S1's stretch: no candidate leaves. Its "80 lost/min" (C5-M5) is ONE report of 183 lost
+      packets (a sequence resync's jump, 40 s after the entry); the other 68 reports lost 0-3.
+      No candidate's bar (>= 100 on 2 of 10; >= 300 in 15; >= 50 on 3 of 10; stale >= 5) is met
+      anywhere on the stretch, with or without the gates.
+  (2) C5-M2 n1r C3: its loss begins ~587-714 s into the hold; the earliest candidate leave is
+      L-B / L-C at 587.1 s (468 s after t_permit; the mild bar at 739.4 s). None within 120 s
+      under either reading of the clock.
+  (3) S3's stretch: no candidate leaves (MET by all four).
+  Fires on k of 13: L-A 3, L-B 5, L-C 2, L-D 4 (mild bar as built: 1).
+  The selection is NONE under both readings of the bounds' clock (from the stretch start, or from
+  t_permit), so the pre-registered interpretation does not decide it.
+
+THE BUILD THAT FOLLOWS: the entry threshold 435 -> 415 behind PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p;
+no rung_loss trigger and no RUNG_LOSS injection class (nothing was selected to build). S1b's
+"inject the loss leave's bar" row therefore has no leave to inject: S1b injects the entry and
+then the KEPT leave (CAPACITY_MILD) and records that row as NOT APPLICABLE AS WORDED.
+
+THE ROWS THAT CHOSE IT (verbatim from c5_m5b_replays.txt):
+ENTRY TABLE (the ten real-input holds): candidate -> holds entered within 20 min (<= 1200 s)
+   E435: 0 of 10 real (proxies 5 of 10); median minutes to first entry (real, entered) -; unclean after entry, real holds: -
+   E430: 0 of 10 real (proxies 9 of 10); median minutes to first entry (real, entered) -; unclean after entry, real holds: -
+   E425: 1 of 10 real (proxies 10 of 10); median minutes to first entry (real, entered) 15.1; unclean after entry, real holds: 7.1%
+   E420: 4 of 10 real (proxies 10 of 10); median minutes to first entry (real, entered) 15.3; unclean after entry, real holds: 8.2%, 8.0%, 7.1%, 8.6%, 11.5%
+   E300: 5 of 10 real (proxies 10 of 10); median minutes to first entry (real, entered) 10.3; unclean after entry, real holds: 8.0%, 7.3%, 6.3%, 8.8%, 8.2%
+   E415: 8 of 10 real (proxies 10 of 10); median minutes to first entry (real, entered) 15.1; unclean after entry, real holds: 8.2%, 6.9%, 7.1%, 8.2%, 8.9%, 9.2%, 15.7%, 4.3%
+   E410: 9 of 10 real (proxies 10 of 10); median minutes to first entry (real, entered) 15.1; unclean after entry, real holds: 8.2%, 6.9%, 7.1%, 8.2%, 8.9%, 13.0%, 8.2%, 15.7%, 4.2%
+   E405: 9 of 10 real (proxies 10 of 10); median minutes to first entry (real, entered) 15.1; unclean after entry, real holds: 8.2%, 6.9%, 7.1%, 8.2%, 8.9%, 11.0%, 8.2%, 15.7%, 4.2%
+ENTRY SELECTION (strictest with >= 7 of 10 within 20 min): E415
+LEAVE TABLE: candidate -> (1) S1 within 60 s of permit, (2) n1r C3 within 120 s of permit, (3) no leave on S3, fires on k of 13
+   L-A: (1) not met (S1 no leave); (2) not met (n1r C3 714.2 s from start, 595.3 s after permit); (3) MET (S3 no leave); fires on 3 of 13
+   L-B: (1) not met (S1 no leave); (2) not met (n1r C3 587.1 s from start, 468.3 s after permit); (3) MET (S3 no leave); fires on 5 of 13
+   L-C: (1) not met (S1 no leave); (2) not met (n1r C3 587.1 s from start, 468.3 s after permit); (3) MET (S3 no leave); fires on 2 of 13
+   L-D: (1) not met (S1 no leave); (2) not met (n1r C3 714.2 s from start, 595.3 s after permit); (3) MET (S3 no leave); fires on 4 of 13
+LEAVE SELECTION (all three hard conditions; most of 13; ties simplest): NONE -- the mild bar is kept (the user decides)

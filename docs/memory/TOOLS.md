@@ -1031,6 +1031,78 @@ base, which is now 4x. For RetroArch's frame counter on the adopted
 config, stack the counter-only game override
 `evidence/c5_m4a_2026-10-01/c5_m4a_counter.sh set` (then `clear`).
 
+## The PS1 look per session (C5-M5B) — `PRIVYHUB_PS1_LOOK`, off by default, never leave it set
+
+`companion/games/ps1_look.py` + `EmulatorManager._prepare_ps1_look`
+(`patches/C5-M5B_RUNG_ENTRY_AND_PS1_LOOK.md`). **Not adopted.** The adopted
+`.opt` / `.cfg` files are **never written**.
+
+- **What a preset does, at a Beetle PSX HW launch:**
+  1. the companion reads the adopted `Beetle PSX HW.opt`;
+  2. it writes `data/games/retroarch/config/privyhub-look-session.opt`
+     with the preset's keys replaced;
+  3. it appends `global_core_options = "true"` and `core_options_path`
+     to that launch's `privyhub-session.cfg`;
+  4. `stop()` removes the file after RetroArch exits and logs one row to
+     `logs/games/ps1_look_sessions.jsonl` (`removed`, and the keys
+     RetroArch rewrote, i.e. rejected).
+- **Unset or `4x`**: nothing is written; the session cfg is byte-identical
+  (`tools/test_ps1_look.py`). An unknown value is ignored and flagged in
+  the launch payload's `ps1_look`.
+- **Titles with their own `.opt`** (the six per-title copies: Bomberman,
+  Crash Bash, FIFA 98, Nicktoons Racing, Speed Punks, Twisted Metal 2)
+  keep RetroArch's precedence: **the look does not apply to them.**
+  Tekken 3 (the attract title) has none.
+- **Presets offered:**
+  - `4x`: the adopted config.
+  - `remaster`: 4x + `beetle_psx_hw_filter = "bilinear"` +
+    `dither_mode = "disabled"` + PGXP (`pgxp_mode = "memory only"`,
+    `pgxp_texture` and `pgxp_vertex` `"enabled"`). It held 60 in C5-M5B's
+    720p hold: GPU 25.2 % against 21.4 %, RetroArch +5.5 points of a core.
+  - **`remaster-1080p` is NOT offered**: at the rung the full preset
+    dropped one frame in 4.8 min, against C5-M4's bar. The helper refuses
+    it.
+  - Not offered at all: xBR and JINC2, which miss 60 (RetroArch 55.2 /
+    59.46 fps); MSAA, which the core lists as Vulkan-only.
+- **Measurement-only levers** (`measure-*`, never offered): the cost
+  table's. `measure-smoke-2x` sets internal resolution 2x, which RetroArch's
+  log shows as "Initializing HW render (2048x2048)": the mechanism's own
+  check.
+- **Evidence:** the RetroArch session log carries a `PS1 look (C5-M5B):`
+  line with the keys and the file.
+
+**The look helper**, one command per look, in the SSH window with the TV
+showing the stream:
+
+```bash
+tools/ps1_look.sh 4x               # the adopted config, 720p
+tools/ps1_look.sh remaster         # the remaster preset, 720p (refuses if not offered)
+tools/ps1_look.sh remaster-1080p   # the remaster preset at the 1080p rung (refuses if not offered)
+# add --attract to have it launch Tekken 3 and open the app; otherwise start a PS1 game on the TV as usual
+```
+
+- It sets the session flags (`PRIVYHUB_PS1_LOOK`; for `-1080p` also
+  `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p` and `..._INJECT=1`), restarts the
+  companion through its unit and waits for PLAYING.
+- For `-1080p`, after 90 s it injects `INCREASE_1080P` and confirms
+  1920×1080 in the status.
+- It prints what to look at and waits for Enter.
+- **On Enter or Ctrl-C** (the kill switch) it:
+  1. ends the session (`POST /plugins/games/stop`);
+  2. unsets every flag and restarts the unit;
+  3. prints the adopted state: manager `PRIVYHUB_*` 0, the environ exactly
+     the live default, live / 7000 / 1280×720 / `any_override` False, and
+     the PS1 `.opt` / `.cfg` hashes unchanged from its start. It ends
+     `ADOPTED STATE VERIFIED`.
+- It refuses to start if any `PRIVYHUB_*` is already in the manager.
+- **Fake-run tested:** `python3 tools/test_ps1_look_helper.py` uses
+  stubbed `systemctl` / `curl` / `adb` on `PATH` and checks the order of
+  calls and the restore.
+- **Kill switches:** Ctrl-C in the helper; or by hand,
+  `systemctl --user unset-environment PRIVYHUB_PS1_LOOK PRIVYHUB_ADAPTIVE_BITRATE_TOP PRIVYHUB_ADAPTIVE_BITRATE_INJECT && systemctl --user restart privyhub-companion`,
+  then `rm -f data/games/retroarch/config/privyhub-look-session.opt` if a
+  session was killed with RetroArch still running.
+
 ## The PS1 source at 1080p, measured without touching the adopted files (C5-M4)
 
 `evidence/c5_m4_2026-10-01/`. **Never leave the game-specific files in
@@ -1350,8 +1422,9 @@ live ladder gains a top rung:
 
 - the rung: 12,600 kbps at 1920×1080, the c3 arm's argv (cap 90 KB,
   GOP 15);
-- entry from 7000 only, when ≥ 435 of the last 450 reports since the last
-  SSRC change are clean;
+- entry from 7000 only, when ≥ 415 of the last 450 reports since the last
+  SSRC change are clean (C5-M5B's selection from the recorded data; 435 as
+  C5-M5 first built it);
 - the leave: the first mild bar goes to 7000 at 720p, strict to 5000; no
   re-entry for 10 min; leave-entry-leave → HOLD.
 
@@ -1408,8 +1481,11 @@ tr '\0' '\n' < /proc/$(systemctl --user show -p MainPID --value privyhub-compani
   rule against the closed controller (loaded from git), the leave on every
   recorded 1080p series, and the entry on every recorded 720p series at
   7000.
-- **Tests**: `tools/test_adaptive_bitrate_live.py` (119 since C5-M5:
+- **Tests**: `tools/test_adaptive_bitrate_live.py` (120 since C5-M5B:
   classes `C5M5Rung`, `C5M5Actuator`).
+- **C5-M5B's replays** (the entry grid E405-E435 / E300 and the loss-leave
+  candidates L-A…L-D, with the stop rule):
+  `python3 tools/c5_m5b_replay.py [out_dir]` and `--stop-rule`.
 - **The mid-session size change needs no client change** (C5-M5 R0): the
   onn's Codec2 decoder takes the in-band SPS, and SurfaceFlinger's buffers
   follow within 3-5 s.

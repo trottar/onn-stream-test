@@ -65,6 +65,30 @@ nothing adopted** (`../evidence/C5_M4_PS1_NATIVE_1080P_SOURCE_2026-10-01.md`).
     - adopting the flag;
     - the rung's `nft` capacity night;
     - the dither mode at 4x.
+- **`C5-M5B` (2026-10-03/04): the rung's rules from the data, and the PS1
+  look — behind flags, NOT adopted**
+  (`../evidence/C5_M5B_RUNG_RULES_AND_LOOK_2026-10-03.md`).
+  - Selection criteria pre-registered before the replays; the choice
+    written before the code.
+  - **Entry 415 of 450** (E415: 8 of 10 real-input holds within 20 min).
+  - **Leave unchanged**: none of L-A…L-D met the conditions. S1's "80
+    lost/min" was one 183-packet burst; n1r C3's loss began 587-714 s in.
+  - Tests 120/120, mutations 14/14, stop rule 0 differences (386 series).
+  - S1b PASSES (348 / 346 ms). S2b NOT RUNG SHOWN: recovery paused the
+    game at 4.4 min, then the guards refused 448 entry decisions.
+  - S3b night: **DOES NOT WORK AS A RUNG by its rows.** One entry by its own rule at 15.1 min (434 of 450, one short of the old 435), then 104.9 min at 1080p with no leave, no oscillation and 0 recovery (fps 60.18, stale 0.70/min, loss 2.82/min). The miss is the session's spikes: 317.9/min against < 200, the 1080p decode's known rate on the onn (C5-M4's 1080p holds 328-607/min). The entry switch's gap was 649 ms.
+  - **The look**: `PRIVYHUB_PS1_LOOK=remaster` = 4x + bilinear + dither
+    off + PGXP. It holds 60 at 720p (GPU 25.2 % vs 21.4 %).
+    - xBR and JINC2 miss 60; MSAA is not offered.
+    - `remaster-1080p` is not offered (one dropped frame at the rung).
+    - `tools/ps1_look.sh` was fake-run tested.
+  - **Open, the user's:**
+    - the look on the TV (`tools/ps1_look.sh 4x`, then `remaster`);
+    - adopting the rung flag or not;
+    - adopting `remaster` or not;
+    - the rung's `nft` night;
+    - whether the rung window should skip reports while recovery holds
+      the game paused (S2b's window filled on a frozen picture).
 
 ## PHASE C — `C3.L4` live — CLOSED 2026-09-30 (validated under real loss; live behind its flag)
 

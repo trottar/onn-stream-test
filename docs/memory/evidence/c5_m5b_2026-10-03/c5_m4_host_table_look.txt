@@ -1,0 +1,38 @@
+C5-M4 host table -- look
+
+hold    HOLDS60  RA fps lost  ivmax enc fps dupdrop  slowcodec 1/L/max |   CPU core95   GPU GPU95 GPU W   RA%  enc%  Tctl  edge
+b_base4x True     59.999    0 4272.0    60.0       0          9/9.0/151 |  10.5   35.6  21.4    26  23.0  33.0  35.9  60.1  50.0
+b_dither_off True     59.999    0 4273.0    60.0       0          9/9.0/153 |  11.5   33.0  22.3    27  23.3  32.5  35.7  59.9  50.0
+b_filter_xbr False    55.162 1414 5723.0    60.0      50          9.0/9/122 |  11.9   26.7  55.1    91  29.2  31.6  42.9  68.2  61.0
+b_filter_sabr True     59.999    0 4273.0    60.0       0        9.0/9.0/125 |  10.6   33.0  25.3    38  24.1  33.9  36.9  62.4  54.0
+b_filter_bilinear True     59.998    0 4274.0    60.0       0          9/9.0/105 |  10.6   35.6  23.8    32  24.2  33.7  35.6  61.9  53.0
+b_filter_3point True     59.999    0 4271.0    60.0       0        9.0/9.0/101 |  10.6   29.3  24.8    34  24.0  32.6  37.3  62.9  53.0
+b_filter_jinc2 False    59.464  160 4859.0    60.0      52           9.0/9/88 |  11.2   30.3  47.8    85  28.0  32.7  37.4  68.0  61.0
+b_pgxp  True     59.999    0 4275.0    60.0       0            9/9/110 |  11.3   43.6  20.2    25  23.3  40.6  36.5  62.0  52.0
+b_full  True     59.999    0 4276.0    60.0       0         9.0/9.0/93 |  11.7   40.7  25.2    34  24.4  38.5  35.7  62.5  53.0
+
+R3 (codec_ms growth) is NOT EVALUABLE as pre-registered: the C2 per-report telemetry carries no codec_ms.
+HOLDS60 is read on R1 and R2. Substitutes (decide nothing): slow events (>= 50 ms) per minute and their
+codec_ms median, first full minute -> last minute; receive_to_decode_ms median first -> last minute.
+hold    slow ev 1st/last min codec med 1st/last codec max/end rx2dec 1st/last
+b_base4x               117/76              9/9.0        151/11         9.0/9.0
+b_dither_off                97/68              9/9.0        153/22         9.0/9.0
+b_filter_xbr              150/113              9.0/9         122/9         9.5/9.0
+b_filter_sabr              100/100            9.0/9.0        125/11        10.0/9.0
+b_filter_bilinear              115/106              9/9.0        105/13         9.0/9.0
+b_filter_3point               96/102            9.0/9.0        101/14         9.0/9.0
+b_filter_jinc2               110/97              9.0/9         88/11         9.0/9.0
+b_pgxp                 99/97                9/9        110/11         9.0/9.0
+b_full               100/100            9.0/9.0         93/20         9.0/9.0
+
+client rows (b, c; reported, not judged)
+hold    profile                                capture   min    fps  spk/m stale loss/m  gap codecmx   Mbps    frmax p50/p90/max cap s/m ge80/m abr events
+b_base4x native_game_720p60_reference         1920x1080  5.16  59.77   48.6  3.49  26.35  189     151   7.09  47088/ 86340/ 89597     6.2    0.0 {"session_ended_reset": 3, "controller_start": 1, "state": 24}
+b_dither_off native_game_720p60_reference         1920x1080  5.16  59.82   48.6  4.26   8.14  118     153   7.09  47889/ 86950/ 89452     6.6    0.0 {"session_ended_reset": 3, "controller_start": 1, "state": 24}
+b_filter_xbr native_game_720p60_reference         1920x1080  5.13  59.28   64.5  4.09  95.46  172     122   7.07  52654/ 86001/ 89508     6.0    0.0 {"session_ended_reset": 3, "controller_start": 1, "state": 35}
+b_filter_sabr native_game_720p60_reference         1920x1080  5.16  59.67   53.6  5.62  50.74  301     125   7.08  46877/ 86603/ 89374     6.4    0.0 {"session_ended_reset": 3, "controller_start": 1, "state": 21}
+b_filter_bilinear native_game_720p60_reference         1920x1080  5.12  59.70   41.0  2.54  54.05  171     105   7.08  47335/ 86495/ 89084     6.2    0.0 {"session_ended_reset": 3, "controller_start": 1, "state": 22}
+b_filter_3point native_game_720p60_reference         1920x1080  5.16  59.81   47.1  2.71  21.51  271     101   7.09  47564/ 86330/ 89205     6.4    0.0 {"session_ended_reset": 3, "controller_start": 1, "state": 14}
+b_filter_jinc2 native_game_720p60_reference         1920x1080  5.13  59.74   46.6  0.78  42.71  195      88   7.08  49118/ 85910/ 89361     6.8    0.0 {"session_ended_reset": 3, "controller_start": 1, "state": 29}
+b_pgxp  native_game_720p60_reference         1920x1080  5.13  59.85   40.5  3.70   7.60  109     110   7.09  46954/ 86340/ 89589     6.6    0.0 {"session_ended_reset": 3, "controller_start": 1, "state": 6}
+b_full  native_game_720p60_reference         1920x1080  5.16  59.86   42.3  2.13   4.46  141      93   7.09  47886/ 86495/ 89367     6.4    0.0 {"session_ended_reset": 3, "controller_start": 1, "state": 20}

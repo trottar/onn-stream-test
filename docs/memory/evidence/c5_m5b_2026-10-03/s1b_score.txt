@@ -1,0 +1,37 @@
+C5-M5 R0 -- the mid-session size change, scored as pre-registered (S1b)
+report: duration 303.9 s, ssrc_changes 2, sequence_resyncs 2, discontinuities ['ssrc_change', 'ssrc_change'], lost 109, max gap 348, max codec 216
+encoder outputs in the session's encoder log (size, kb/s), in order: [('1280x720', '7000'), ('1920x1080', '12600'), ('1280x720', '7000')]
+recovery-log events in the session window (other than started/ended): none
+
+UP (7000/1280x720 -> 12600/1920x1080): inject 16:30:23.896Z, ssrc at elapsed 97038 (1.37 s after the injection)
+  MET    actuator ok
+  MET    encoder output 1920x1080 at 12600 kb/s (encoder log)
+  MET    one SSRC change at the switch
+  MET    SurfaceFlinger 1920x1080 in every capture 5-55 s after
+  MET    rendered fps over the 60 s after >= 55
+  MET    no recovery cycle
+  MET    output gap at the switch <= 450 ms
+  MISSED no stale drops 1-10 s after
+  gap at the switch 348 ms (rows in [ssrc, +1 s]: [(348, 158, 97226), (8, 158, 97235), (3, 160, 97239), (8, 157, 97248), (11, 80, 97259), (0, 54, 97260), (67, 11, 97419), (170, 15, 97638), (79, 11, 97837), (101, 16, 97939), (65, 12, 98005), (348, 158, 97226), (170, 15, 97638), (101, 16, 97939)]); codec_ms there 158; actuation 1214.2 ms, cycle {'first_rtp_resume_ms': 458.878, 'ffmpeg_spawn_ms': 316.437, 'rtp_silence_after_spawn_ms': 142.441, 'host_verified_ms': 1211.589}; rendered fps over 60 s 60.34; SurfaceFlinger first showed 1920x1080 2.9 s after the injection; stale deltas 1-10 s after [0, 0, 1, 0]
+
+DOWN (12600/1920x1080 -> 7000/1280x720): inject 16:32:43.937Z, ssrc at elapsed 237236 (1.53 s after the injection)
+  MET    actuator ok
+  MET    encoder output 1280x720 at 7000 kb/s (encoder log)
+  MET    one SSRC change at the switch
+  MET    SurfaceFlinger 1280x720 in every capture 5-55 s after
+  MET    rendered fps over the 60 s after >= 55
+  MET    no recovery cycle
+  MET    output gap at the switch <= 450 ms
+  MET    no stale drops 1-10 s after
+  gap at the switch 346 ms (rows in [ssrc, +1 s]: [(346, 147, 237438), (2, 127, 237441), (7, 127, 237448), (0, 113, 237449), (11, 121, 237460), (7, 125, 237467), (10, 73, 237478), (5, 77, 237484), (0, 76, 237484), (12, 84, 237496), (0, 81, 237497), (7, 76, 237505), (2, 61, 237508), (4, 50, 237512), (52, 8, 238190), (346, 147, 237438)]); codec_ms there 147; actuation 1374.8 ms, cycle {'first_rtp_resume_ms': 620.211, 'ffmpeg_spawn_ms': 467.039, 'rtp_silence_after_spawn_ms': 153.172, 'host_verified_ms': 1373.033}; rendered fps over 60 s 59.75; SurfaceFlinger first showed 1280x720 2.9 s after the injection; stale deltas 1-10 s after [0, 0, 0, 0]
+
+SESSION
+  MET    two SSRC changes in the session (one per switch)
+  MISSED sequence resyncs 0 and no resync discontinuity
+  MET    one decoder report (no session restart)
+
+R0a HOLDS; R0b FAILS -> R0's rows applied to S1b, reported only (the session's own rows are scored separately)
+
+As worded, R0a named `encoder_command in native-stream-status` as the argv's source. That field is set at a
+full start only; no encoder restart (C3.L1 onward) updates it, so it read 1280x720 / 7000k throughout.
+The argv row is read on the encoder's own output line (the session's encoder log) instead; see the record.

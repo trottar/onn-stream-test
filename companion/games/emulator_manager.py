@@ -15,6 +15,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from games import ps1_look  # C5-M5B
+
 
 class EmulatorError(RuntimeError):
     pass
@@ -2351,6 +2353,113 @@ class EmulatorManager:
             "PS1 multitap has no metadata-path adapter for host platform: "
             + (platform or "<blank>")
         )
+
+    # C5-M5B: the PS1 look (companion/games/ps1_look.py)
+    def _ps1_look_session_options_path(self) -> Path:
+        return (
+            self._project_path("data/games/retroarch/config")
+            / ps1_look.SESSION_OPTIONS_NAME
+        ).resolve()
+
+    def _remove_ps1_look_session_options(self) -> None:
+        try:
+            self._ps1_look_session_options_path().unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    def _end_ps1_look_session(self) -> dict[str, Any] | None:
+        written = getattr(self, "_ps1_look_written", None)
+        self._ps1_look_written = None
+        target = self._ps1_look_session_options_path()
+        if written is None and not target.exists():
+            return None
+        record: dict[str, Any] = {
+            "at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+            "event": "ps1_look_session_end",
+        }
+        if written is not None:
+            record.update({k: v for k, v in written.items() if k != "text"})
+            try:
+                after = target.read_text(encoding="utf-8")
+            except OSError:
+                after = None
+            if after is None:
+                record["rewritten_keys"] = None
+            else:
+                before = dict(
+                    re.findall(r'(?m)^(\S+) = "([^"\n]*)"$', written["text"])
+                )
+                now = dict(re.findall(r'(?m)^(\S+) = "([^"\n]*)"$', after))
+                record["rewritten_keys"] = {
+                    k: {"written": before.get(k), "after_exit": now.get(k)}
+                    for k in sorted(set(before) | set(now))
+                    if before.get(k) != now.get(k)
+                }
+        self._remove_ps1_look_session_options()
+        record["removed"] = not target.exists()
+        try:
+            log = self._project_path("logs/games") / "ps1_look_sessions.jsonl"
+            log.parent.mkdir(parents=True, exist_ok=True)
+            with log.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(record, sort_keys=True) + "\n")
+        except OSError:
+            pass
+        return record
+
+    def _prepare_ps1_look(
+        self,
+        game: dict[str, Any],
+        runtime: dict[str, Any],
+        core_path: Path,
+    ) -> dict[str, Any]:
+        # A stale session file never carries into another launch.
+        self._ps1_look_written = None
+        self._remove_ps1_look_session_options()
+        name, keys, ignored = ps1_look.look_from_env()
+        info: dict[str, Any] = {
+            "preset": name,
+            "keys": dict(keys),
+            "ignored_value": ignored,
+            "options_path": None,
+            "applied": False,
+            "cfg_text": "",
+        }
+        if not keys:
+            return info
+        system_id = str(game.get("system", "")).strip().casefold()
+        if system_id != "ps1" or "psx_hw" not in core_path.name:
+            info["not_applied"] = "not a Beetle PSX HW launch"
+            return info
+        adopted = (
+            self._retroarch_config_directory(runtime)
+            / ps1_look.CORE_LIBRARY
+            / (ps1_look.CORE_LIBRARY + ".opt")
+        ).resolve()
+        target = self._ps1_look_session_options_path()
+        try:
+            text = ps1_look.session_options_text(
+                adopted.read_text(encoding="utf-8"),
+                keys,
+            )
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(text, encoding="utf-8")
+        except (OSError, ValueError) as exc:
+            raise EmulatorError(
+                f"PS1 look {name} could not be prepared: {exc}"
+            ) from exc
+        info["options_path"] = str(target)
+        info["applied"] = True
+        self._ps1_look_written = {
+            "preset": name,
+            "keys": dict(keys),
+            "options_path": str(target),
+            "text": text,
+        }
+        info["cfg_text"] = ps1_look.session_cfg_text(
+            str(name),
+            str(target).replace("\\", "/"),
+        )
+        return info
 
     def _prepare_ps1_multitap_options(
         self,
@@ -4692,6 +4801,7 @@ class EmulatorManager:
         cheat_database_path: Path | None = None,
         cheat_session: dict[str, Any] | None = None,
         mod_session: dict[str, Any] | None = None,
+        look_override: str = "",
     ) -> Path:
         # Create the exact base config RetroArch will read at startup.
         # Session-critical controller and Network Command Interface settings
@@ -4870,6 +4980,7 @@ class EmulatorManager:
             + "# PrivyHub A4 host coexistence\n"
             + "# Only explicit PrivyHub navigation controls emulator pause.\n"
             + 'pause_nonactive = "false"\n'
+            + look_override
         )
 
         if expected_storage_settings:
@@ -5265,6 +5376,14 @@ class EmulatorManager:
                 content_path,
             )
 
+            # C5-M5B: the PS1 look for this launch only (PRIVYHUB_PS1_LOOK;
+            # unset or "4x" -> nothing written, the session cfg unchanged).
+            ps1_look_session = self._prepare_ps1_look(
+                game,
+                runtime,
+                core_path,
+            )
+
             if cheat_source_index is None and cheat_enabled_indexes is not None:
                 raise EmulatorError(
                     "Cheat indexes require an explicit cheat source index"
@@ -5313,6 +5432,7 @@ class EmulatorManager:
                     cheat_database_path=cheat_database_path,
                     cheat_session=cheat_session,
                     mod_session=mod_session,
+                    look_override=ps1_look_session["cfg_text"],
                 )
             )
 
@@ -5460,6 +5580,15 @@ class EmulatorManager:
                     )
                     + "\n"
                 )
+            if ps1_look_session["preset"] or ps1_look_session["ignored_value"]:
+                log_handle.write(
+                    "PS1 look (C5-M5B): "
+                    + json.dumps(
+                        {k: v for k, v in ps1_look_session.items() if k != "cfg_text"},
+                        sort_keys=True,
+                    )
+                    + "\n"
+                )
             log_handle.write("Command uses project-local paths only.\n\n")
             log_handle.flush()
 
@@ -5574,6 +5703,11 @@ class EmulatorManager:
                         "managed"
                     )
                 )
+                else None
+            )
+            payload["ps1_look"] = (
+                {k: v for k, v in ps1_look_session.items() if k != "cfg_text"}
+                if ps1_look_session["preset"] or ps1_look_session["ignored_value"]
                 else None
             )
             payload["cheat_session"] = (
@@ -8370,6 +8504,7 @@ class EmulatorManager:
             self._refresh_process()
 
             if self.process is None:
+                self._end_ps1_look_session()
                 payload = self.status()
                 payload["action"] = "stop"
                 payload["stopped"] = False
@@ -8503,9 +8638,15 @@ class EmulatorManager:
                         error=cleanup_error,
                     )
 
+            # C5-M5B: the look's session file goes with the session, after
+            # RetroArch has exited (it rewrites a rejected value on exit).
+            ps1_look_end = self._end_ps1_look_session()
+
             payload = self.status()
             payload["action"] = "stop"
             payload["stopped"] = True
+            if ps1_look_end is not None:
+                payload["ps1_look_end"] = ps1_look_end
             payload["graceful"] = not forced
             payload["frontend_close_requested"] = close_requested
             payload["frontend_close_method"] = close_method
