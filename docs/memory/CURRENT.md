@@ -118,9 +118,10 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
-1. **The user's commit** of C5-CLOSE and C5-CLOSE-A
-   (`logs/c5_close_a_git_status.txt`; CURRENT.md also modified). That
-   is C7's last row, "clean checkpoint/push".
+1. **The user's push**: `git push` (the PREPUSH audit reads **READY TO
+   PUSH** for `origin/main..HEAD`, 11 commits:
+   `evidence/PREPUSH_AUDIT_2026-10-05.md`). That completes C7's "clean
+   checkpoint/push".
 2. **The user's go for Phase E** — E1 first, the workload suite frozen
    (`docs/ROADMAP.md`, Phase E). Not started.
 
