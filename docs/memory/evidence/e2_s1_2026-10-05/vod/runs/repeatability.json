@@ -1,0 +1,88 @@
+{
+ "E1-IDLE": {
+  "verdict": "NOT RUN"
+ },
+ "E1-PS1-LOCAL": {
+  "verdict": "NOT RUN"
+ },
+ "E1-SNES-STREAM": {
+  "verdict": "NOT RUN"
+ },
+ "E1-PS1-STREAM": {
+  "verdict": "NOT RUN"
+ },
+ "E1-PS1-1080P": {
+  "verdict": "NOT RUN"
+ },
+ "E1-META": {
+  "verdict": "NOT RUN"
+ },
+ "E1-CONC": {
+  "verdict": "NOT RUN"
+ },
+ "E1-VOD": {
+  "verdict": "REPEATABLE",
+  "failed": [],
+  "rows": [
+   {
+    "metric": "host CPU mean %",
+    "run1": 0.796,
+    "run2": 0.85,
+    "band": "+/-2 points",
+    "holds": true
+   },
+   {
+    "metric": "GPU busy mean %",
+    "run1": 0.0,
+    "run2": 0.0,
+    "band": "+/-3 points",
+    "holds": true
+   },
+   {
+    "metric": "RSS range_server (kB)",
+    "run1": 24600.0,
+    "run2": 24612.0,
+    "band": "+/-5 %",
+    "holds": true
+   },
+   {
+    "metric": "VOD progress ratio (played / wall)",
+    "run1": 0.9978,
+    "run2": 1.0007,
+    "band": "+/-0.01",
+    "holds": true
+   },
+   {
+    "metric": "served kB/s (range server)",
+    "run1": 0.0,
+    "run2": 0.0,
+    "band": "reported, not banded",
+    "holds": null
+   }
+  ]
+ },
+ "E1-LIVETV": {
+  "verdict": "ABSENT",
+  "why": "Live TV: no unattended channel start (no intent/extra/deep link; video is upstream -> onn)"
+ },
+ "E1-BROWSER": {
+  "verdict": "ABSENT",
+  "why": "browser source: Windows-only (PowerShell/ddagrab); no Linux implementation"
+ },
+ "E1-CAMERA": {
+  "verdict": "ABSENT",
+  "why": "camera source: Windows-only (dshow); no camera attached (no /dev/video*)"
+ },
+ "E1-NES": {
+  "verdict": "ABSENT",
+  "why": "NES: no fixture (games/nes empty)"
+ },
+ "E1-GENESIS": {
+  "verdict": "ABSENT",
+  "why": "Genesis: no fixture (games/genesis empty)"
+ },
+ "E1-META-RECONCILE": {
+  "verdict": "ABSENT",
+  "why": "metadata reconcile: writes library metadata (outside E1's no-change rule)"
+ }
+}

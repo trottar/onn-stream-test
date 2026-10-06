@@ -1,6 +1,32 @@
 # Active investigations
 
-## PHASE E — ACTIVE 2026-10-05. E1 FROZEN (E1-S1); E2 next on the user's word
+## PHASE E — ACTIVE. E1 FROZEN (VOD added); E2 MEASURED 2026-10-06 (E2-S1); E3 next on the user's pick
+
+**E2-S1 (2026-10-05/06)** (`../evidence/E2_S1_WHOLE_SYSTEM_2026-10-06.md`):
+
+- **E1-VOD was added to the suite, REPEATABLE.** The fixed film plays
+  direct from the range server; no host transcode exists, so E1-CONC-VOD
+  is ABSENT.
+- **E2: 10 runs × 20 min**, all OK.
+- **Open — the CONC finding (E3 candidate 1):**
+  - During EPG grabs the busiest core rises first and most (to ~75 %,
+    1-2 s after each grab starts).
+  - Loss peaks at the same moment.
+  - There is no encoder dup/drop and no host tx drop, and the relay
+    thread's CPU stays flat.
+  - Hypothesis: the grab start-up burst delays the stream's send threads,
+    and the bursts are lost on the wireless hop.
+- **Open:**
+  - The companion gains ~110 MB anon at the first grab, then steps
+    (candidate 2).
+  - The node grabber costs ~70-80 % of a core and ~480-650 MB per grab
+    (candidate 3).
+  - bsnes costs 4.4-5.2 cores and varies run to run (SNES NOT YET
+    REPEATABLE at 20 min; candidate 4).
+  - Streaming's fixed cost: companion 24-30 % of a core (audio sender
+    13 %, relay 8 %) and encoder 36 % (candidate 5).
+
+### E1-S1 (2026-10-05) — E1 FROZEN
 
 **E1-S1 (2026-10-05)** (`../evidence/E1_S1_WORKLOAD_SUITE_2026-10-05.md`;
 the suite: `../architecture/E1_WORKLOAD_SUITE.md`):

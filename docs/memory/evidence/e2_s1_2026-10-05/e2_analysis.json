@@ -1,0 +1,804 @@
+{
+ "table_cols": [
+  "E1-IDLE run1",
+  "E1-PS1-LOCAL run1",
+  "E1-PS1-STREAM run1",
+  "E1-PS1-1080P run1",
+  "E1-META run1",
+  "E1-VOD run1",
+  "E1-SNES-STREAM run1",
+  "E1-SNES-STREAM run2",
+  "E1-CONC run1",
+  "E1-CONC run2"
+ ],
+ "conc": {
+  "baseline": {
+   "run": "E1-PS1-STREAM/run1",
+   "relay_tid": 1937389,
+   "relay_candidates": [
+    1937389
+   ],
+   "stats": {
+    "busiest": [
+     26.818583333333333,
+     5.429869212027323,
+     1200
+    ],
+    "dupdrop": [
+     0.0016680567139282735,
+     0.040807772552877625,
+     1199
+    ],
+    "relay": [
+     7.784166666666667,
+     0.87039223278295,
+     1200
+    ],
+    "txdrops": [
+     0,
+     0.0,
+     1200
+    ],
+    "compcpu": [
+     24.3415,
+     1.0404699659288585,
+     1200
+    ],
+    "loss": [
+     0.5493882337450724,
+     2.242560602446185,
+     1197
+    ]
+   }
+  },
+  "E1-CONC/run1": {
+   "relay_tid": 1972485,
+   "relay_candidates": [
+    1972485
+   ],
+   "grabs": 208,
+   "signals": {
+    "busiest": {
+     "label": "busiest core %",
+     "body_mean": 55.243,
+     "baseline_mean": 26.819,
+     "baseline_sd": 5.43,
+     "magnitude_sd": 5.23,
+     "first_rise_s": 0,
+     "threshold": 37.678
+    },
+    "dupdrop": {
+     "label": "encoder dup+drop /s",
+     "body_mean": 0.002,
+     "baseline_mean": 0.002,
+     "baseline_sd": 0.041,
+     "magnitude_sd": 0.0,
+     "first_rise_s": null,
+     "threshold": 0.083
+    },
+    "relay": {
+     "label": "relay thread CPU %",
+     "body_mean": 8.451,
+     "baseline_mean": 7.784,
+     "baseline_sd": 0.87,
+     "magnitude_sd": 0.77,
+     "first_rise_s": null,
+     "threshold": 9.525
+    },
+    "txdrops": {
+     "label": "eno1 tx drops /s (qdisc+softnet+if)",
+     "body_mean": 0,
+     "baseline_mean": 0,
+     "baseline_sd": 0.0,
+     "magnitude_sd": 0.0,
+     "first_rise_s": null,
+     "threshold": 0
+    },
+    "loss": {
+     "label": "lost packets /s (heartbeat)",
+     "body_mean": 26.262,
+     "baseline_mean": 0.549,
+     "baseline_sd": 2.243,
+     "magnitude_sd": 11.47,
+     "first_rise_s": 0,
+     "threshold": 5.035
+    }
+   },
+   "aligned": {
+    "busiest": [
+     40.461,
+     57.173,
+     78.371,
+     60.214,
+     52.078,
+     54.245,
+     31.613,
+     29.69,
+     31.3,
+     30.95,
+     33.8
+    ],
+    "dupdrop": [
+     0,
+     0,
+     0.005,
+     0.005,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "relay": [
+     7.649,
+     8.212,
+     8.899,
+     8.827,
+     8.507,
+     8.375,
+     8.009,
+     7.981,
+     7.448,
+     7.9,
+     7.8
+    ],
+    "txdrops": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "loss": [
+     34.195,
+     64.672,
+     43.102,
+     6.466,
+     9.515,
+     7.471,
+     20.495,
+     23.214,
+     20.998,
+     20.862,
+     18.607
+    ]
+   },
+   "most": [
+    "busiest"
+   ],
+   "first": [
+    "busiest"
+   ]
+  },
+  "E1-CONC/run2": {
+   "relay_tid": 1987642,
+   "relay_candidates": [
+    1987642
+   ],
+   "grabs": 214,
+   "signals": {
+    "busiest": {
+     "label": "busiest core %",
+     "body_mean": 54.803,
+     "baseline_mean": 26.819,
+     "baseline_sd": 5.43,
+     "magnitude_sd": 5.15,
+     "first_rise_s": 0,
+     "threshold": 37.678
+    },
+    "dupdrop": {
+     "label": "encoder dup+drop /s",
+     "body_mean": 0.002,
+     "baseline_mean": 0.002,
+     "baseline_sd": 0.041,
+     "magnitude_sd": 0.0,
+     "first_rise_s": null,
+     "threshold": 0.083
+    },
+    "relay": {
+     "label": "relay thread CPU %",
+     "body_mean": 8.173,
+     "baseline_mean": 7.784,
+     "baseline_sd": 0.87,
+     "magnitude_sd": 0.45,
+     "first_rise_s": null,
+     "threshold": 9.525
+    },
+    "txdrops": {
+     "label": "eno1 tx drops /s (qdisc+softnet+if)",
+     "body_mean": 0,
+     "baseline_mean": 0,
+     "baseline_sd": 0.0,
+     "magnitude_sd": 0.0,
+     "first_rise_s": null,
+     "threshold": 0
+    },
+    "loss": {
+     "label": "lost packets /s (heartbeat)",
+     "body_mean": 26.003,
+     "baseline_mean": 0.549,
+     "baseline_sd": 2.243,
+     "magnitude_sd": 11.35,
+     "first_rise_s": 0,
+     "threshold": 5.035
+    }
+   },
+   "aligned": {
+    "busiest": [
+     44.902,
+     66.931,
+     72.836,
+     48.802,
+     57.196,
+     44.023,
+     33.795,
+     35.929,
+     44.509,
+     38.9,
+     24.25
+    ],
+    "dupdrop": [
+     0,
+     0,
+     0,
+     0.009,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "relay": [
+     6.925,
+     8.743,
+     8.607,
+     8.229,
+     8.031,
+     7.987,
+     7.415,
+     7.154,
+     7.136,
+     8.2,
+     6.5
+    ],
+    "txdrops": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "loss": [
+     34.978,
+     61.035,
+     39.364,
+     9.132,
+     8.563,
+     8.134,
+     21.333,
+     26.468,
+     23.873,
+     29.374,
+     31.857
+    ]
+   },
+   "most": [
+    "busiest"
+   ],
+   "first": [
+    "busiest"
+   ]
+  }
+ },
+ "snes": {
+  "E1-SNES-STREAM/run1": {
+   "retroarch_fps": 59.993,
+   "capture_fps": 60.024,
+   "dupdrop_per_min": 0.1,
+   "rendered_fps": 59.659,
+   "rendered_per_min": [
+    58.97,
+    59.23,
+    59.24,
+    59.23,
+    59.58,
+    59.55,
+    59.42,
+    59.66,
+    59.64,
+    59.73,
+    59.84,
+    59.91,
+    59.91,
+    59.87,
+    59.9,
+    59.93,
+    59.89,
+    59.82,
+    59.86,
+    59.99
+   ],
+   "capture_per_min": [
+    60.01,
+    60.0,
+    59.99,
+    59.99,
+    60.01,
+    60.0,
+    59.99,
+    60.01,
+    60.0,
+    59.99,
+    60.0,
+    59.99,
+    60.01,
+    60.01,
+    59.99,
+    59.98,
+    60.5,
+    59.5,
+    60.51,
+    59.99
+   ],
+   "busiest_core_p95": 54.7,
+   "busiest_per_second_p95": 57.7,
+   "psi_cpu": 45.297,
+   "retroarch_threads_seen": 27,
+   "retroarch_top": [
+    {
+     "pid": 1963359,
+     "tid": 1963382,
+     "is_main": false,
+     "policy": 0,
+     "syscall_mode": "202",
+     "seen": 1200,
+     "cpu_mean": 37.382,
+     "cpu_p95": 44.0,
+     "cpu_max": 59.0
+    },
+    {
+     "pid": 1963359,
+     "tid": 1963383,
+     "is_main": false,
+     "policy": 0,
+     "syscall_mode": "running",
+     "seen": 1200,
+     "cpu_mean": 37.376,
+     "cpu_p95": 43.8,
+     "cpu_max": 57.0
+    },
+    {
+     "pid": 1963359,
+     "tid": 1963390,
+     "is_main": false,
+     "policy": 0,
+     "syscall_mode": "202",
+     "seen": 1200,
+     "cpu_mean": 37.362,
+     "cpu_p95": 44.0,
+     "cpu_max": 59.0
+    },
+    {
+     "pid": 1963359,
+     "tid": 1963384,
+     "is_main": false,
+     "policy": 0,
+     "syscall_mode": "running",
+     "seen": 1200,
+     "cpu_mean": 37.356,
+     "cpu_p95": 43.0,
+     "cpu_max": 57.0
+    },
+    {
+     "pid": 1963359,
+     "tid": 1963389,
+     "is_main": false,
+     "policy": 0,
+     "syscall_mode": "202",
+     "seen": 1200,
+     "cpu_mean": 37.344,
+     "cpu_p95": 43.0,
+     "cpu_max": 57.0
+    },
+    {
+     "pid": 1963359,
+     "tid": 1963391,
+     "is_main": false,
+     "policy": 0,
+     "syscall_mode": "202",
+     "seen": 1200,
+     "cpu_mean": 37.34,
+     "cpu_p95": 43.0,
+     "cpu_max": 56.0
+    }
+   ],
+   "encoder_top": [
+    {
+     "pid": 1963477,
+     "tid": 1963488,
+     "is_main": false,
+     "policy": 0,
+     "syscall_mode": "202",
+     "seen": 1200,
+     "cpu_mean": 3.563,
+     "cpu_p95": 4.0,
+     "cpu_max": 5.0
+    },
+    {
+     "pid": 1963477,
+     "tid": 1963503,
+     "is_main": false,
+     "policy": 0,
+     "syscall_mode": "202",
+     "seen": 1200,
+     "cpu_mean": 1.802,
+     "cpu_p95": 2.0,
+     "cpu_max": 3.0
+    },
+    {
+     "pid": 1963477,
+     "tid": 1963504,
+     "is_main": false,
+     "policy": 0,
+     "syscall_mode": "202",
+     "seen": 1200,
+     "cpu_mean": 1.794,
+     "cpu_p95": 2.0,
+     "cpu_max": 3.0
+    },
+    {
+     "pid": 1963477,
+     "tid": 1963505,
+     "is_main": false,
+     "policy": 0,
+     "syscall_mode": "202",
+     "seen": 1200,
+     "cpu_mean": 1.786,
+     "cpu_p95": 2.0,
+     "cpu_max": 3.0
+    }
+   ],
+   "retroarch_cpu": 436.259,
+   "encoder_cpu": 27.999,
+   "video_loss_per_min": 49.11,
+   "reading": "the emulator's load starves the capture/encoder"
+  },
+  "E1-SNES-STREAM/run2": {
+   "retroarch_fps": 59.999,
+   "capture_fps": 59.999,
+   "dupdrop_per_min": 0.1,
+   "rendered_fps": 59.978,
+   "rendered_per_min": [
+    59.9,
+    59.99,
+    59.97,
+    60.03,
+    59.99,
+    59.92,
+    59.87,
+    59.97,
+    60.0,
+    59.99,
+    60.03,
+    60.01,
+    59.99,
+    60.02,
+    60.0,
+    59.93,
+    60.03,
+    59.99,
+    60.01,
+    59.94
+   ],
+   "capture_per_min": [
+    60.02,
+    60.0,
+    60.01,
+    59.99,
+    59.98,
+    59.98,
+    59.99,
+    60.01,
+    60.0,
+    60.0,
+    60.01,
+    59.98,
+    60.0,
+    60.03,
+    59.99,
+    60.0,
+    59.99,
+    60.0,
+    59.98,
+    60.0
+   ],
+   "busiest_core_p95": 62.5,
+   "busiest_per_second_p95": 62.9,
+   "psi_cpu": 103.018,
+   "retroarch_threads_seen": 27,
+   "retroarch_top": [
+    {
+     "pid": 1967918,
+     "tid": 1967949,
+     "is_main": false,
+     "policy": 0,
+     "syscall_mode": "running",
+     "seen": 1200,
+     "cpu_mean": 44.085,
+     "cpu_p95": 47.0,
+     "cpu_max": 52.8
+    },
+    {
+     "pid": 1967918,
+     "tid": 1967939,
+     "is_main": false,
+     "policy": 0,
+     "syscall_mode": "running",
+     "seen": 1200,
+     "cpu_mean": 44.059,
+     "cpu_p95": 47.1,
+     "cpu_max": 52.0
+    },
+    {
+     "pid": 1967918,
+     "tid": 1967946,
+     "is_main": false,
+     "policy": 0,
+     "syscall_mode": "running",
+     "seen": 1200,
+     "cpu_mean": 44.029,
+     "cpu_p95": 47.1,
+     "cpu_max": 52.0
+    },
+    {
+     "pid": 1967918,
+     "tid": 1967945,
+     "is_main": false,
+     "policy": 0,
+     "syscall_mode": "running",
+     "seen": 1200,
+     "cpu_mean": 44.002,
+     "cpu_p95": 47.0,
+     "cpu_max": 52.0
+    },
+    {
+     "pid": 1967918,
+     "tid": 1967941,
+     "is_main": false,
+     "policy": 0,
+     "syscall_mode": "running",
+     "seen": 1200,
+     "cpu_mean": 44.0,
+     "cpu_p95": 47.1,
+     "cpu_max": 50.8
+    },
+    {
+     "pid": 1967918,
+     "tid": 1967943,
+     "is_main": false,
+     "policy": 0,
+     "syscall_mode": "running",
+     "seen": 1200,
+     "cpu_mean": 43.989,
+     "cpu_p95": 47.0,
+     "cpu_max": 52.8
+    }
+   ],
+   "encoder_top": [
+    {
+     "pid": 1967996,
+     "tid": 1968007,
+     "is_main": false,
+     "policy": 0,
+     "syscall_mode": "202",
+     "seen": 1200,
+     "cpu_mean": 2.752,
+     "cpu_p95": 4.0,
+     "cpu_max": 4.0
+    },
+    {
+     "pid": 1967996,
+     "tid": 1968022,
+     "is_main": false,
+     "policy": 0,
+     "syscall_mode": "202",
+     "seen": 1200,
+     "cpu_mean": 1.315,
+     "cpu_p95": 2.0,
+     "cpu_max": 3.0
+    },
+    {
+     "pid": 1967996,
+     "tid": 1968023,
+     "is_main": false,
+     "policy": 0,
+     "syscall_mode": "202",
+     "seen": 1200,
+     "cpu_mean": 1.292,
+     "cpu_p95": 2.0,
+     "cpu_max": 3.0
+    },
+    {
+     "pid": 1967996,
+     "tid": 1968024,
+     "is_main": false,
+     "policy": 0,
+     "syscall_mode": "202",
+     "seen": 1200,
+     "cpu_mean": 1.283,
+     "cpu_p95": 2.0,
+     "cpu_max": 3.0
+    }
+   ],
+   "retroarch_cpu": 516.502,
+   "encoder_cpu": 20.626,
+   "video_loss_per_min": 2.46,
+   "reading": "the emulator's load starves the capture/encoder"
+  }
+ },
+ "memory": {
+  "E1-META/run1": {
+   "before_mb": [
+    26.29296875,
+    24.515625,
+    1.77734375
+   ],
+   "after_first_grab_mb": [
+    132.8515625,
+    131.0234375,
+    1.828125
+   ],
+   "window_end_mb": [
+    160.9658203125,
+    159.13671875,
+    1.8291015625
+   ],
+   "growth_anon_share": 0.9995234429414568,
+   "last15_slope_pct": 22.036847431228672,
+   "reading": "keeps growing",
+   "pss_per_min_mb": [
+    132.3,
+    133.4,
+    134.7,
+    136.3,
+    135.5,
+    134.1,
+    138.0,
+    137.1,
+    137.4,
+    143.9,
+    163.8,
+    162.4,
+    161.6,
+    163.4,
+    163.2,
+    162.4,
+    161.6,
+    163.2,
+    163.0,
+    163.3,
+    161.0
+   ],
+   "node_pss_peak_first_last_mb": [
+    658.60546875,
+    634.98046875
+   ],
+   "node_pss_peak_mean_mb": 681.9060120141806,
+   "grabs": 238
+  },
+  "E1-CONC/run1": {
+   "before_mb": [
+    34.7353515625,
+    33.06640625,
+    1.6689453125
+   ],
+   "after_first_grab_mb": [
+    142.619140625,
+    140.94921875,
+    1.669921875
+   ],
+   "window_end_mb": [
+    158.271484375,
+    156.6015625,
+    1.669921875
+   ],
+   "growth_anon_share": 0.999990948014447,
+   "last15_slope_pct": -9.087301174581757,
+   "reading": "plateaus",
+   "pss_per_min_mb": [
+    185.9,
+    186.8,
+    178.6,
+    185.2,
+    170.9,
+    182.8,
+    181.7,
+    177.0,
+    160.7,
+    160.1,
+    160.5,
+    165.4,
+    159.9,
+    158.6,
+    155.6,
+    181.8,
+    161.3,
+    163.1,
+    160.7,
+    163.1,
+    159.2
+   ],
+   "node_pss_peak_first_last_mb": [
+    649.34765625,
+    633.8955078125
+   ],
+   "node_pss_peak_mean_mb": 685.1531205610795,
+   "grabs": 220
+  },
+  "E1-CONC/run2": {
+   "before_mb": [
+    53.6767578125,
+    52.01171875,
+    1.6650390625
+   ],
+   "after_first_grab_mb": [
+    167.173828125,
+    165.5078125,
+    1.666015625
+   ],
+   "window_end_mb": [
+    199.6162109375,
+    197.94921875,
+    1.6669921875
+   ],
+   "growth_anon_share": 0.9999913957030141,
+   "last15_slope_pct": -0.019370585323653742,
+   "reading": "plateaus",
+   "pss_per_min_mb": [
+    189.0,
+    190.3,
+    190.3,
+    193.9,
+    193.5,
+    194.5,
+    197.0,
+    199.0,
+    196.6,
+    197.8,
+    196.4,
+    184.3,
+    200.9,
+    207.3,
+    207.2,
+    204.5,
+    180.6,
+    177.5,
+    201.5,
+    204.7,
+    201.3
+   ],
+   "node_pss_peak_first_last_mb": [
+    652.0146484375,
+    635.296875
+   ],
+   "node_pss_peak_mean_mb": 682.5179151686947,
+   "grabs": 226
+  }
+ }
+}

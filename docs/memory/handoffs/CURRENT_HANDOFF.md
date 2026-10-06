@@ -2,39 +2,35 @@
 
 Authoritative state: `../CURRENT.md`. **Start there.**
 
-Baseline commit `f60234e` (the PREPUSH audit; C5-CLOSE committed). E1-S1
-is not committed (the user's commit: `../../../logs/e1_s1_git_status.txt`).
+Baseline commit `a56746e` (E1-S1 committed). E2-S1 is not committed (the
+user's commit: `../../../logs/e2_s1_git_status.txt`).
 
-## 2026-10-05 — `E1-S1`: **Phase E started; E1 FROZEN**
+## 2026-10-06 — `E2-S1`: E2 MEASURED; the VOD row added to the suite
 
-- The user's go: "let's start E1".
-- **The suite**: `../architecture/E1_WORKLOAD_SUITE.md`.
-  - Run with `tools/e1_suite.py` (one command; it requires a hashed
-    pre-registration) and the `tools/e1_sampler.py` sampler set at 1 s.
-  - The rows: idle, PS1 local (unpaused through RetroArch's command
-    port), SNES streamed, PS1 streamed (= the 720p60 reference), the
-    1080p rung (flag), the EPG grab, PS1 streaming + EPG.
-- **Dry runs, two per row, 5-min windows:**
-  - 6 of 7 REPEATABLE.
-  - **E1-CONC NOT YET REPEATABLE**: EPG grabs during a stream raise loss
-    to ~2,300-2,800/min, rendered fps falls to ~54, and the ladder steps
-    down to 5500. The suspect is the Node grabber child; untested, for E2.
-- **Also found:**
-  - SNES (bsnes) uses ~4.2 cores, and its stream renders 58.5-58.9 fps;
-  - the companion's RSS stays at ~172+ MB after the first EPG grab;
-  - VCN activity is unusable (encoder % of a core stands in);
-  - RAPL is root-only, and wall power is ABSENT.
-- **ABSENT, on the user's list:**
-  - Live TV;
-  - VOD (drive not attached);
-  - the browser and camera sources;
-  - NES and Genesis;
-  - a power meter.
-- Record: `../evidence/E1_S1_WORKLOAD_SUITE_2026-10-05.md`.
+- **E1-VOD joins the suite** (REPEATABLE). The fixed film plays direct
+  from the range server; no transcode, so E1-CONC-VOD is ABSENT. Suite
+  amendment dated 2026-10-05; the 1080p row is kept (the user).
+- **E2**: every row at 20 min (SNES and CONC twice), all OK. Answers:
+  - **CONC**: the busiest core rises first and most during grab
+    start-ups; there are no host tx drops, no encoder dup/drop, and the
+    relay is flat. The hypothesis is that the grab start-up delays the
+    stream's send threads.
+  - **SNES**: no starvation; bsnes costs 4.4-5.2 cores and varies (NOT
+    YET REPEATABLE).
+  - **Memory**: +~110 MB anon in the companion at the first grab.
+- The reference numbers for this host are in §6 of
+  `../evidence/E2_S1_WHOLE_SYSTEM_2026-10-06.md`; the ordered E3 list is
+  §8.
 - **Next, the user's:**
   1. the commit;
-  2. the answers to the list;
-  3. E2 (the suite at 20-min windows) on their word.
+  2. pick the first E3 optimization;
+  3. E3's loop on it.
+
+## 2026-10-05 — `E1-S1`: Phase E started; E1 FROZEN
+
+Condensed on 2026-10-06. The suite is `../architecture/E1_WORKLOAD_SUITE.md`
+(6 of 7 rows repeatable; CONC not). The record is
+`../evidence/E1_S1_WORKLOAD_SUITE_2026-10-05.md`.
 
 ## 2026-10-05 — `C5-CLOSE`: C5 CLOSED, **Phase C CLOSED**
 

@@ -1678,6 +1678,37 @@ python3 tools/e1_sampler.py summarize <dir> --from <utc> --to <utc>
   - **`average_mm_activity` (VCN) reads ~0 while encoding: not usable**;
   - `throttle_status` 0x800 = EDC_CPU (seen under streaming).
 - **hwmon "power1"** on this APU is the socket PPT, not the GPU alone.
+- **E2 additions (E2-S1, 2026-10-05):**
+  - `run --e2` passes `--e2` to the sampler. That adds:
+    - `threads.jsonl`: per-thread CPU, policy and syscall for the
+      companion, RetroArch, the encoder and the EPG child;
+    - `encoder.jsonl`: ffmpeg's `frame= … dup= drop=` records, tailed
+      from `native_video_alpha.log`;
+    - qdisc / softnet / interface tx drops (`/usr/sbin/tc -s qdisc`,
+      read-only);
+    - rchar/wchar, `Pss_Anon` and `Pss_File` per process;
+    - in the summary: per-core p95, `throttle_by_value`, `encoder`,
+      `threads`.
+  - `--plan ID[:runs[:first_gap_s]],...` sets an ordered schedule, e.g.
+    `E1-SNES-STREAM:2:600`.
+  - Stream rows under `--e2` also slice `decisions.jsonl` from the
+    controller's log.
+  - **Thread names**: Python 3.13 sets no OS thread names, and no ptrace
+    tool is installed. Roles are inferred:
+    - the audio sender = the SCHED_RR thread;
+    - the FEC relay = the poll-mode thread whose TID+1 is a
+      clock_nanosleep thread (the frames log).
+- **E1-VOD**: the onn plays `movies/Edge Of Tomorrow.mp4` by launcher taps:
+  1. `VOD >`, `MOVIES >`, the title;
+  2. "Start Over" if the resume dialog shows;
+  3. RESTART, then fullscreen.
+  - The key figure is the progress text over the run.
+  - The teardown is RESTART + STOP, which leaves no CONTINUE WATCHING.
+  - **Run the companion restart before a stream that follows VOD
+    playback**: without it, an inventory stream rendered ~2 fps. The
+    suite restarts every run.
+  - `range_server`'s socket `send()` is not in `wchar`; use `rchar` for
+    served bytes.
 
 ## Linux subsystem probes
 

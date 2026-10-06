@@ -74,7 +74,6 @@ between runs.
 | row | why | what fills it |
 | --- | --- | --- |
 | Live TV | the video goes upstream → the onn, with no host share beyond TV-state and the EPG; no intent, extra or deep link starts a channel | a channel extra in a later APK, or a hand-tuned channel in E2; the host share is E1-META |
-| VOD | the media drive (`vod_root`) is not attached; the range server serves files as-is (no transcode) | the user attaches the drive |
 | browser source | Windows-only (PowerShell, ddagrab); no Linux implementation | a Linux source (Phase G/I) |
 | camera source | Windows-only; no camera attached | a camera and a Linux source |
 | NES, Genesis | no fixtures | the user supplies ROMs |
@@ -175,4 +174,51 @@ fixed here.
 
 ## Amendments
 
-(none)
+### 2026-10-05 — E2-S1 §1: the VOD row added; the 1080p-rung row kept; the user's answers
+
+**E1-VOD joins the suite (REPEATABLE).** The user's answer was that the
+VOD drive is attached.
+
+- Inventory: `../evidence/e2_s1_2026-10-05/vod/e1_vod_inventory.md`.
+- Pre-registration: `e1_vod_preregistration.txt`, hashed `aa3ea03f…0a6f`
+  at 15:18:51Z, before any VOD suite run.
+- Two dry runs: 15:28-15:47Z.
+
+| id | what | launch | fixture | warm-up | steady state | main process |
+| --- | --- | --- | --- | --- | --- | --- |
+| **E1-VOD** | VOD: a local file played on the onn, **direct play** (no host transcode exists) | force-stop the app, wake, `MainActivity`; tap `VOD >`, `MOVIES >`, the title; tap "Start Over" if the resume dialog shows; NOW PLAYING shows the title; tap RESTART (0:00); read the progress; tap the preview (fullscreen). Window end: BACK, read the progress. Teardown: RESTART, STOP (`POST /stop`) | `movies/Edge Of Tomorrow.mp4` on the external drive (read-only exFAT): 720×360 H.264, 918 kbps, 1:53:29 | 60 s | the film playing fullscreen; the range server serving it | range_server |
+
+- **Key figure:** the progress ratio, played s / wall s, from the
+  launcher's progress text over warm-up + window. Band ± 0.01.
+- **Reported, not banded:** stall s/min; the range server's served kB/s.
+  Served kB/s is its file reads (`rchar`), because the server's socket
+  `send()` is not counted in `wchar`. The pre-registration named
+  `wchar`; `rchar` is reported instead (a reported, not-banded figure).
+
+| metric | run 1 | run 2 | band | holds |
+| --- | --- | --- | --- | --- |
+| host CPU mean % | 0.80 | 0.85 | ± 2 points | ✓ |
+| GPU busy mean % | 0 | 0 | ± 3 points | ✓ |
+| range_server RSS | 24.60 MB | 24.61 MB | ± 5 % | ✓ |
+| progress ratio | 0.998 | 1.001 | ± 0.01 | ✓ |
+| stall s/min (reported) | 0.13 | 0.0 | — | — |
+| served kB/s, rchar (reported) | 78.5 | 79.8 | — | — |
+
+- **E1-VOD is REPEATABLE.**
+- **E1-CONC-VOD is ABSENT**: no host transcode exists, and direct play
+  needs a second client.
+
+**The 1080p-rung row (E1-PS1-1080P) stays in the suite.** The user
+confirmed it on 2026-10-05. The rung itself remains NOT ADOPTED.
+
+**The user's answers against the ABSENT rows:**
+
+| row | answer, 2026-10-05 | status |
+| --- | --- | --- |
+| NES, Genesis | no fixtures | ABSENT |
+| camera | none | ABSENT |
+| wall power | no meter | ABSENT |
+| Live TV | no unattended start | ABSENT |
+| VOD | the drive is attached | **filled** (above) |
+| browser source | — | ABSENT |
+| metadata reconcile | — | ABSENT |

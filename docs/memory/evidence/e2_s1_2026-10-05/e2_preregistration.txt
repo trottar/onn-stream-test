@@ -1,0 +1,67 @@
+E2-S1 PRE-REGISTRATION -- written 2026-10-05 (~22:20Z) before any 20-min run; hash in e2_preregistration.sha256.
+The suite: docs/memory/architecture/E1_WORKLOAD_SUITE.md (frozen, amended 2026-10-05: E1-VOD added, REPEATABLE).
+Runner: tools/e1_suite.py run --e2 --window 1200 (the sampler's --e2: per-thread CPU, the encoder's progress
+records, softnet/qdisc/tx drops, rchar/wchar, PSS by mapping class). Short smoke runs (runs_smoke/, windows < 60 s)
+test the code only and are NOT data.
+
+1. THE RUNS (in this order; E1's launch, warm-up and teardown per row; window 1200 s; idle gap 120 s, except 600 s
+   before the first SNES-STREAM run -- the contended rows last, with the longest gap before them)
+   E1-IDLE x1, E1-PS1-LOCAL x1, E1-PS1-STREAM x1, E1-PS1-1080P x1 (its flags for that row only, entry injected at
+   75 s, 1920x1080 confirmed, flags unset after), E1-META x1, E1-VOD x1, E1-SNES-STREAM x2, E1-CONC x2.
+   E1-CONC is measured although NOT YET REPEATABLE; E1's bar is reported for the two-run rows, not re-judged.
+   Nothing is tuned between runs. Every teardown as E1 (flags absent, APK confirmed, no game, PS1 files identical).
+
+2. THE TABLE (per row, window statistics; E1's 5-min means beside, from e1_s1 and the VOD dry runs)
+   CPU mean, p95 (host); per-core p95 and the busiest core's p95; cpu.max_pct p95; PSI cpu/io/memory (ms/s);
+   per-process CPU mean and PSS mean (companion, retroarch, encoder, epg, range_server, xorg, pulseaudio, other);
+   swap in/out per s; GPU busy mean/p95; ENCODER HEADROOM = encoder % of a core, the encoder's capture fps and
+   dup + drop per min, and RetroArch fps minus rendered fps; disk write kB/s, await; eno1 tx/rx kB/s, qdisc /
+   softnet / interface tx drops per s; the C2 latency block (receive_to_decode_ms median, output_gap_ms max) and the
+   decoder report (spikes >= 20/50 ms per min, rendered fps, stale drops, video loss/min, audio underruns, max gap,
+   resyncs); Tctl and core max, cpufreq mean, throttle_status counts by value; socket / CPU / SoC W.
+   ABSENT, stated in the table: wall power (no meter), glass-to-glass latency (no camera), VCN duty (reads ~0),
+   RAPL (root-only), NES / Genesis / Live TV / camera / browser rows.
+
+3. THE CONC QUESTION (one, pre-registered)
+   "During grab bodies, which rises first and most: the busiest core's utilization, the encoder's dup+drop, the
+   relay thread's CPU, or eno1's transmit drops?"
+   Method: per-second series in each E1-CONC window. Baseline = the same series in the E1-PS1-STREAM 20-min window
+   (no grabs). For each signal: MAGNITUDE = (mean during grab bodies - baseline mean) / baseline sd; FIRST RISE =
+   the smallest offset (s since the grab's start, grabs averaged by offset 0..10 s) at which the grab-averaged signal
+   exceeds baseline mean + 2 sd. "Most" = the largest magnitude; "first" = the smallest first-rise offset; ties
+   reported as ties. The stream's lost packets (heartbeat, 2 s) are aligned the same way and reported beside.
+   The answer is reported as the narrow hypothesis for E3, not as a fix.
+   THREAD ROLES (Python 3.13 sets no OS thread names and no ptrace tool is installed, so roles are inferred and said
+   so): main = tid == pid; among the companion's other threads in TID (creation) order -- controller-rx = the first
+   poll-mode (syscall 7) thread; relay = the next poll-mode thread (the FEC relay's _run, created at stream start);
+   frames-log = the clock_nanosleep thread created right after it; audio-reader = the read-mode (syscall 0) thread;
+   audio-sender = the SCHED_RR (policy 2) thread; threads seen in < 10 samples = short-lived (HTTP handlers).
+
+4. THE SNES QUESTION
+   "Does the emulator starve the encoder, or the encoder starve the emulator?" From the two SNES windows: RetroArch's
+   fps (title), the encoder's capture fps and dup/drop per s, the rendered fps per minute, the busiest core and
+   per-thread CPU of RetroArch (bsnes: thread count and busiest threads) and the encoder. Reading, fixed now:
+   RetroArch >= 59.9 while capture < 59.5 or dup/drop rising -> the emulator's load starves the capture/encoder;
+   RetroArch < 59.9 while the encoder is busy -> the encoder starves the emulator; both >= 59.9 and rendered < 59.5
+   -> the loss is after the encoder (transport / client).
+
+5. THE MEMORY QUESTION
+   "What is the companion's growth at the first grab, and does it keep growing?" From E1-META and the two E1-CONC
+   windows: the companion's PSS per minute; Pss_Anon / Pss_File just before the first grab and just after it, and
+   at the window's end; the node child's PSS likewise. Reading: anon vs file share of the growth; "keeps growing" if
+   the PSS slope over the window's last 15 min exceeds 5 % of its level, otherwise "plateaus".
+
+6. RULES: measurement only; adopted profile, source and APK throughout; flags absent at the end; no nft, no sudo,
+   the Opal not touched; the VOD drive read only. No band, question or reading is changed after the data.
+
+AMENDMENT A1 -- 2026-10-05 22:22Z, BEFORE ANY 20-MIN RUN (v1 hash eefcc1c5...c239 kept in e2_preregistration_v1.sha256).
+The E2 smoke (runs_smoke/, 30-s CONC window, not data) showed the §3 TID-order rule is ambiguous: the first non-main
+poll-mode thread was the one immediately followed by a clock_nanosleep thread (the pair the FEC relay creates,
+native_fec_relay.py:350-361: _run then _frame_log_run), and other poll-mode threads (the controller, the per-request
+HTTP handler threads that live through each ~5-s forced EPG refresh) come before or after it. Replacement rule:
+  relay = the non-main, SCHED_OTHER, poll-mode thread whose TID is immediately followed (TID+1) by a clock_nanosleep
+  thread (frames-log = that TID+1 thread); if none or several, the relay is reported as UNIDENTIFIED and the CONC
+  answer uses the companion's total CPU in its place, said so.
+  audio-sender = the SCHED_RR thread; audio-reader = the read-mode thread; other poll-mode threads present in >= 50 %
+  of the window's samples = controller/other (reported together); threads seen in < 50 % = short-lived handlers.
+Nothing else changes.

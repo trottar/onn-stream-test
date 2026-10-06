@@ -1,0 +1,46 @@
+[e1 22:22:15Z] suite start: [('E1-IDLE', 1, 120), ('E1-PS1-LOCAL', 1, 120), ('E1-PS1-STREAM', 1, 120), ('E1-PS1-1080P', 1, 120), ('E1-META', 1, 120), ('E1-VOD', 1, 120), ('E1-SNES-STREAM', 2, 600), ('E1-CONC', 2, 120)], window 1200s, gap 120s, e2 True; ABSENT: ['E1-BROWSER', 'E1-CAMERA', 'E1-GENESIS', 'E1-LIVETV', 'E1-META-RECONCILE', 'E1-NES']
+[e1 22:22:18Z] E1-IDLE run1: idle gap 120s
+[e1 22:25:18Z] E1-IDLE run1: window 2026-10-05T22:25:18.558Z + 1200s
+[e1 22:45:19Z] E1-IDLE run1: OK; teardown {"flags_absent": true, "ps1_files_identical": true, "game_active": false}
+[e1 22:45:22Z] E1-PS1-LOCAL run1: idle gap 120s
+[e1 22:47:28Z] E1-PS1-LOCAL run1: launched, RetroArch PLAYING (no stream)
+[e1 22:48:28Z] E1-PS1-LOCAL run1: window 2026-10-05T22:48:28.458Z + 1200s
+[e1 23:08:31Z] E1-PS1-LOCAL run1: OK; teardown {"stopped": true, "retroarch_left": 0, "encoder_left": 0, "counter_override_removed": true, "flags_absent": true, "ps1_files_identical": true, "game_active": false}
+[e1 23:08:34Z] E1-PS1-STREAM run1: idle gap 120s
+[e1 23:11:03Z] E1-PS1-STREAM run1: PLAYING ({'ok': True, 'attempt': 2, 's_to_playing': 3.0})
+[e1 23:12:33Z] E1-PS1-STREAM run1: window 2026-10-05T23:12:33.955Z + 1200s
+[e1 23:33:00Z] E1-PS1-STREAM run1: OK; teardown {"report": "native_decoder_20261005_233235_206.json", "report_fields": {"lost_packets": 789, "rendered_frames": 77525, "stale_output_drops": 46, "max_output_gap_ms": 378, "slow_event_retained": 1024, "slow_event_capacity": 1280, "duration_ms": 1297197, "video.lost_packets": 789, "video.sequence_resyncs": 0, "video.recent_fps": 55.82049502369526, "decoder.spike_20_ms": 1293, "decoder.spike_50_ms": 
+[e1 23:33:03Z] E1-PS1-1080P run1: idle gap 120s
+[e1 23:35:22Z] E1-PS1-1080P run1: PLAYING ({'ok': True, 'attempt': 1, 's_to_playing': 4.1})
+[e1 23:36:53Z] E1-PS1-1080P run1: at 1920x1080 ({'attempt': 1, 'http': 200, 'reply_reason': None, 'size': '1920x1080', 'bitrate_kbps': 12600})
+[e1 23:37:53Z] E1-PS1-1080P run1: window 2026-10-05T23:37:53.015Z + 1200s
+[e1 23:58:22Z] E1-PS1-1080P run1: OK; teardown {"report": "native_decoder_20261005_235754_440.json", "report_fields": {"lost_packets": 522, "rendered_frames": 81236, "stale_output_drops": 67, "max_output_gap_ms": 334, "slow_event_retained": 1044, "slow_event_capacity": 1280, "duration_ms": 1358176, "video.lost_packets": 522, "video.sequence_resyncs": 1, "video.recent_fps": 43.68365910372469, "decoder.spike_20_ms": 11293, "decoder.spike_50_ms":
+[e1 23:58:25Z] E1-META run1: idle gap 120s
+[e1 00:01:25Z] E1-META run1: window 2026-10-06T00:01:25.946Z + 1200s
+[e1 00:21:29Z] E1-META run1: OK; teardown {"flags_absent": true, "ps1_files_identical": true, "game_active": false}
+[e1 00:21:33Z] E1-VOD run1: idle gap 120s
+[e1 00:23:55Z] E1-VOD run1: FAILED -- RuntimeError: VOD did not start: {'ok': False, 'step': 'VOD'}
+[e1 00:24:09Z] E1-VOD run1: FAILED; teardown {"vod": {"restart_tapped": false, "stop_tapped": false, "now_playing_left": 0}, "flags_absent": true, "ps1_files_identical": true, "game_active": false}
+[e1 00:24:09Z] E1-VOD run1: attempt 1 failed
+[e1 00:24:12Z] E1-VOD run1: idle gap 120s
+[e1 00:27:16Z] E1-VOD run1: VOD playing fullscreen from 6 s
+[e1 00:28:16Z] E1-VOD run1: window 2026-10-06T00:28:16.432Z + 1200s
+[e1 00:48:39Z] E1-VOD run1: OK; teardown {"vod": {"restart_tapped": true, "stop_tapped": true, "now_playing_left": 0}, "flags_absent": true, "ps1_files_identical": true, "game_active": false}
+[e1 00:48:43Z] E1-SNES-STREAM run1: idle gap 600s
+[e1 00:59:16Z] E1-SNES-STREAM run1: PLAYING ({'ok': True, 'attempt': 2, 's_to_playing': 7.1})
+[e1 01:00:46Z] E1-SNES-STREAM run1: window 2026-10-06T01:00:46.498Z + 1200s
+[e1 01:21:13Z] E1-SNES-STREAM run1: OK; teardown {"report": "native_decoder_20261006_012047_761.json", "report_fields": {"lost_packets": 1285, "rendered_frames": 77513, "stale_output_drops": 24, "max_output_gap_ms": 182, "slow_event_retained": 1024, "slow_event_capacity": 1280, "duration_ms": 1301125, "video.lost_packets": 1285, "video.sequence_resyncs": 0, "video.recent_fps": 50.195726853190244, "decoder.spike_20_ms": 847, "decoder.spike_50_ms"
+[e1 01:21:17Z] E1-SNES-STREAM run2: idle gap 120s
+[e1 01:23:35Z] E1-SNES-STREAM run2: PLAYING ({'ok': True, 'attempt': 1, 's_to_playing': 3.0})
+[e1 01:25:05Z] E1-SNES-STREAM run2: window 2026-10-06T01:25:05.699Z + 1200s
+[e1 01:45:21Z] E1-SNES-STREAM run2: OK; teardown {"report": "native_decoder_20261006_014506_909.json", "report_fields": {"lost_packets": 51, "rendered_frames": 77760, "stale_output_drops": 13, "max_output_gap_ms": 168, "slow_event_retained": 1024, "slow_event_capacity": 1280, "duration_ms": 1296951, "video.lost_packets": 51, "video.sequence_resyncs": 0, "video.recent_fps": 65.55371515817805, "decoder.spike_20_ms": 871, "decoder.spike_50_ms": 21,
+[e1 01:45:24Z] E1-CONC run1: idle gap 120s
+[e1 01:47:42Z] E1-CONC run1: PLAYING ({'ok': True, 'attempt': 1, 's_to_playing': 3.0})
+[e1 01:49:12Z] E1-CONC run1: window 2026-10-06T01:49:12.600Z + 1200s
+[e1 02:09:44Z] E1-CONC run1: OK; teardown {"report": "native_decoder_20261006_020919_618.json", "report_fields": {"lost_packets": 34121, "rendered_frames": 73775, "stale_output_drops": 76, "max_output_gap_ms": 473, "slow_event_retained": 1280, "slow_event_capacity": 1280, "duration_ms": 1302686, "video.lost_packets": 34121, "video.sequence_resyncs": 210, "video.recent_fps": 55.94178753530864, "decoder.spike_20_ms": 1498, "decoder.spike_50
+[e1 02:09:47Z] E1-CONC run2: idle gap 120s
+[e1 02:12:05Z] E1-CONC run2: PLAYING ({'ok': True, 'attempt': 1, 's_to_playing': 3.0})
+[e1 02:13:35Z] E1-CONC run2: window 2026-10-06T02:13:35.933Z + 1200s
+[e1 02:34:11Z] E1-CONC run2: OK; teardown {"report": "native_decoder_20261006_023345_638.json", "report_fields": {"lost_packets": 34130, "rendered_frames": 73938, "stale_output_drops": 81, "max_output_gap_ms": 473, "slow_event_retained": 1280, "slow_event_capacity": 1280, "duration_ms": 1305385, "video.lost_packets": 34130, "video.sequence_resyncs": 215, "video.recent_fps": 57.820128057467564, "decoder.spike_20_ms": 1670, "decoder.spike_5
+[e1 02:34:11Z] suite done
+[e1 02:34:11Z] final state: {"manager": [], "environ": ["PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"], "game_active": false, "ps1_files_identical": true, "apk": "CONFIRMED", "retroarch": 0, "encoder": 0, "at_utc": "2026-10-06T02:34:11.604Z", "flags_absent": true}

@@ -59,6 +59,11 @@ COUNTER = 'fps_show = "true"\nframecount_show = "true"\nmenu_enable_widgets = "f
 EPG_CHANNELS = ["ComedyCentral.us@East", "CNBCUK.uk@SD", "10Bold.au@Sydney", "FoxSports1.us@HD", "NBC.us@East",
                 "FilmBox.nl@Netherlands"]
 
+VOD_FILE = "movies/Edge Of Tomorrow.mp4"     # the E1-VOD fixed file (720x360 H.264 ~0.92 Mbps, 113 min)
+VOD_TITLE = "Edge Of Tomorrow"
+VOD_PATH = ["VOD", "MOVIES", VOD_TITLE]       # the launcher's tiles, tapped in order
+ABR_LOG = REPO / "logs/games/adaptive_bitrate_shadow.jsonl"
+
 TEKKEN = {"id": "game_ps1_b0a5986638f61a11", "override": PS1_DIR / "Tekken 3 (USA).cfg"}
 SMW = {"id": "game_snes_c6fecdcdddb35398", "override": RA_CFG / "bsnes" / "Super Mario World (USA).cfg"}
 
@@ -72,17 +77,18 @@ WORKLOADS = [
      "flags": ["PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p", "PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1"]},
     {"id": "E1-META", "kind": "meta", "warmup": 60, "main": "companion"},
     {"id": "E1-CONC", "kind": "stream", "game": TEKKEN, "warmup": 90, "main": "retroarch", "epg_at": 30},
+    # amended 2026-10-05 (E2-S1 §1): the VOD row, the drive attached
+    {"id": "E1-VOD", "kind": "vod", "warmup": 60, "main": "range_server"},
 ]
 ABSENT = {
     "E1-LIVETV": "Live TV: no unattended channel start (no intent/extra/deep link; video is upstream -> onn)",
-    "E1-VOD": "VOD: the configured media drive is not attached (vod_root: No such device)",
     "E1-BROWSER": "browser source: Windows-only (PowerShell/ddagrab); no Linux implementation",
     "E1-CAMERA": "camera source: Windows-only (dshow); no camera attached (no /dev/video*)",
     "E1-NES": "NES: no fixture (games/nes empty)",
     "E1-GENESIS": "Genesis: no fixture (games/genesis empty)",
     "E1-META-RECONCILE": "metadata reconcile: writes library metadata (outside E1's no-change rule)",
 }
-BAR = {"cpu_points": 2.0, "gpu_points": 3.0, "rss_frac": 0.05, "fps_abs": 0.5, "grab_frac": 0.30}
+BAR = {"cpu_points": 2.0, "gpu_points": 3.0, "rss_frac": 0.05, "fps_abs": 0.5, "grab_frac": 0.30, "vod_ratio_abs": 0.01}
 
 
 def _load_sampler():
@@ -304,6 +310,11 @@ def back_and_report(before: set) -> str | None:
     return None
 
 
+REPORT_PATHS = ["duration_ms", "video.lost_packets", "video.sequence_resyncs", "video.recent_fps",
+                "decoder.spike_20_ms", "decoder.spike_50_ms", "decoder.spike_80_ms", "decoder.stale_output_drops",
+                "decoder.max_output_gap_ms", "audio.lost_packets", "audio.underruns"]
+
+
 def report_fields(name: str | None) -> dict:
     if not name:
         return {}
@@ -311,6 +322,14 @@ def report_fields(name: str | None) -> dict:
         d = json.loads((SESSDIR / name).read_text(errors="replace"))
     except (OSError, ValueError):
         return {"unreadable": True}
+    rep = d.get("report") if isinstance(d.get("report"), dict) else d
+    paths = {}
+    for pth in REPORT_PATHS:
+        x = rep
+        for k in pth.split("."):
+            x = x.get(k) if isinstance(x, dict) else None
+        if isinstance(x, (int, float)):
+            paths[pth] = x
     keys = ("session_duration_ms", "max_output_gap_ms", "rendered_frames", "lost_packets", "stale_output_drops",
             "audio_underruns", "slow_event_retained", "slow_event_capacity")
     out = {}
@@ -322,7 +341,105 @@ def report_fields(name: str | None) -> dict:
                     out[k] = v
                 walk(v)
     walk(d)
+    out.update(paths)
     return out
+
+
+# ---------------------------------------------------------------- VOD on the onn (E1-VOD)
+def _tap_text(pattern: str, tries: int = 3) -> bool:
+    for _ in range(tries):
+        for t, r, c in ui_nodes():
+            if re.match(pattern, t.replace("&gt;", ">").strip(), re.I):
+                adb("shell", "input", "tap", str(c[0]), str(c[1]))
+                time.sleep(3)
+                return True
+        time.sleep(2)
+    return False
+
+
+def _tap_id(rid: str) -> bool:
+    for t, r, c in ui_nodes():
+        if r == rid:
+            adb("shell", "input", "tap", str(c[0]), str(c[1]))
+            time.sleep(2)
+            return True
+    return False
+
+
+def vod_progress() -> tuple:
+    """(position s, wall epoch) from the launcher's now_playing_progress text ("M:SS / H:MM:SS")."""
+    for t, r, c in ui_nodes():
+        if r == "now_playing_progress":
+            pos = t.split("/")[0].strip()
+            secs = 0
+            for part in pos.split(":"):
+                secs = secs * 60 + int(part)
+            return secs, time.time()
+    return None, time.time()
+
+
+def vod_start() -> dict:
+    out = {}
+    adb("shell", "am", "force-stop", PKG)
+    adb("shell", "input", "keyevent", "KEYCODE_WAKEUP")
+    adb("shell", "am", "start", "-n", f"{PKG}/.MainActivity")
+    time.sleep(7)
+    for name in VOD_PATH[:-1]:
+        if not _tap_text(rf"^{name}\s*>"):
+            return {"ok": False, "step": name}
+    if not _tap_text(rf"^{re.escape(VOD_TITLE)}$"):
+        return {"ok": False, "step": VOD_TITLE}
+    time.sleep(2)
+    nodes = ui_nodes()
+    if any(r == "message" and t.startswith("Resume from") for t, r, c in nodes):
+        out["resume_dialog"] = [t for t, r, c in nodes if r == "message"][0]
+        _tap_text(r"^Start Over$")                            # the app's own "play from the start"
+    time.sleep(6)
+    titles = [t for t, r, c in ui_nodes() if r == "now_playing_title"]
+    out["now_playing"] = titles[:1]
+    if titles[:1] != [VOD_TITLE]:
+        return dict(out, ok=False, step="now_playing")
+    out["restart_tapped"] = _tap_id("button_restart")        # from 0:00 every run (the app resumes otherwise)
+    time.sleep(3)
+    out["p0"], out["t0"] = vod_progress()
+    _tap_id("now_playing_preview_host")                       # fullscreen
+    time.sleep(2)
+    out["fullscreen"] = any(r == "fullscreen_player_host" for t, r, c in ui_nodes())
+    out["ok"] = out["p0"] is not None and out["fullscreen"]
+    return out
+
+
+def vod_end(start: dict) -> dict:
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")          # leaves fullscreen; playback continues in the preview
+    time.sleep(2)
+    p1, t1 = vod_progress()
+    out = {"p1": p1, "t1": t1}
+    if p1 is not None and start.get("p0") is not None:
+        wall = t1 - start["t0"]
+        played = p1 - start["p0"]
+        out.update({"wall_s": round(wall, 1), "played_s": played, "progress_ratio": round(played / wall, 4),
+                    "stall_s_per_min": round(max(0.0, wall - played) / (wall / 60), 3)})
+    return out
+
+
+def vod_teardown() -> dict:
+    out = {"restart_tapped": _tap_id("button_restart")}     # clears the saved position, so the onn keeps ~0
+    time.sleep(1)
+    out["stop_tapped"] = _tap_id("button_stop")              # STOP: POST /stop
+    time.sleep(3)
+    out["now_playing_left"] = sum(1 for t, r, c in ui_nodes() if r.startswith("now_playing"))
+    adb("shell", "rm", "-f", "/sdcard/e1s1.xml")
+    return out
+
+
+def vod_mount() -> dict:
+    root = json.loads((REPO / "data/storage.json").read_text()).get("vod_root", "")
+    f = Path(root) / VOD_FILE
+    lines = [l.split() for l in sh(["findmnt", "-n", "-T", str(f), "-o", "FSTYPE,OPTIONS"]).splitlines() if l.strip()]
+    real = [l for l in lines if l and l[0] != "autofs"]       # the autofs trigger is listed above the real mount
+    fm = real[-1] if real else (lines[-1] if lines else [])
+    return {"file_present": f.exists(), "size_bytes": f.stat().st_size if f.exists() else None,
+            "fstype": fm[0] if fm else None, "read_only": len(fm) > 1 and fm[1].split(",")[0] == "ro"}
 
 
 # ---------------------------------------------------------------- RetroArch's own command port (local row)
@@ -415,6 +532,20 @@ class EpgCycle(threading.Thread):
 
 
 # ---------------------------------------------------------------- key figures
+def decision_rows(t0: str, t1: str) -> list:
+    rows = []
+    for f in (HB_ARCH / (ABR_LOG.name + ".1"), ABR_LOG):
+        if f.exists():
+            for line in f.read_text(errors="replace").splitlines()[-30000:]:
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                if t0 <= r.get("at_utc", "") <= t1:
+                    rows.append(r)
+    return rows
+
+
 def heartbeat_figures(t0: str, t1: str) -> dict:
     files = sorted(HB_ARCH.glob("native_stream_heartbeat.log*")) + [HB_LIVE]
     rows, seen = [], set()
@@ -528,7 +659,7 @@ def teardown_flags(w: dict, rec: dict):
     rec["flags_absent"] = manager_flags() == [] and environ_flags(mp) == [LIVE]
 
 
-def run_once(w: dict, run_no: int, out: Path, window: int, gap: int) -> dict:
+def run_once(w: dict, run_no: int, out: Path, window: int, gap: int, e2: bool = False) -> dict:
     rd = out / w["id"] / f"run{run_no}"
     rd.mkdir(parents=True, exist_ok=True)
     rec = {"workload": w["id"], "run": run_no, "kind": w["kind"], "main_process": w["main"], "started_utc": utc(),
@@ -546,6 +677,10 @@ def run_once(w: dict, run_no: int, out: Path, window: int, gap: int) -> dict:
                 stop_game()
             raise RuntimeError(f"preflight not clean: {pf}")
         rec["ps1_files_identical_start"] = ps1_files_identical()
+        if w["kind"] == "vod":
+            rec["vod_mount"] = vm = vod_mount()
+            if not (vm["file_present"] and vm["read_only"]):
+                raise RuntimeError(f"the VOD file or its read-only mount is not as expected: {vm}")
         if game:
             if game["override"].exists():
                 raise RuntimeError("a file already sits at the counter override's path; refusing to overwrite")
@@ -568,6 +703,8 @@ def run_once(w: dict, run_no: int, out: Path, window: int, gap: int) -> dict:
             cmd.append("--telemetry")
         if game:
             cmd.append("--title")
+        if e2:
+            cmd.append("--e2")
         samp = subprocess.Popen(cmd, stdout=open(rd / "sampler.log", "w"), stderr=subprocess.STDOUT)
         g0 = utc()
         log(w["id"], f"run{run_no}: idle gap {gap}s")
@@ -603,6 +740,11 @@ def run_once(w: dict, run_no: int, out: Path, window: int, gap: int) -> dict:
             p = Poller(rd / "status_poll.jsonl", stop_ev)
             p.start()
             threads.append(p)
+        if w["kind"] == "vod":
+            rec["launch"] = v = vod_start()
+            if not v["ok"]:
+                raise RuntimeError(f"VOD did not start: {v}")
+            log(w["id"], f"run{run_no}: VOD playing fullscreen from {v['p0']} s")
         playing_t = time.time()
         if w["kind"] == "meta":
             e = EpgCycle(rd / "epg.jsonl", stop_ev)
@@ -638,6 +780,8 @@ def run_once(w: dict, run_no: int, out: Path, window: int, gap: int) -> dict:
         rec["window"] = {"from": t0, "to": t1}
         if stream:
             rec["status_end"] = {k: stream_status().get(k) for k in ("width", "height", "bitrate_kbps")}
+        if w["kind"] == "vod":
+            rec["vod_end"] = vod_end(rec["launch"])
         rec["status"] = "WINDOW_DONE"
     except Exception as exc:  # noqa: BLE001
         rec["status"] = "FAILED"
@@ -665,6 +809,8 @@ def run_once(w: dict, run_no: int, out: Path, window: int, gap: int) -> dict:
             td["counter_override_removed"] = not game["override"].exists()
         if stream:
             td["banner"] = banner_clear()
+        if w["kind"] == "vod":
+            td["vod"] = vod_teardown()
         teardown_flags(w, td)
         if stream or w.get("flags"):
             td["apk"] = "CONFIRMED" if apk_hash() == EXPECT_APK else "MISMATCH"
@@ -693,6 +839,18 @@ def run_once(w: dict, run_no: int, out: Path, window: int, gap: int) -> dict:
             key["retroarch"] = rec["host"].get("retroarch")
         if (rd / "epg.jsonl").exists():
             key["epg"] = epg_figures(rd / "epg.jsonl", t0, t1)
+        if w["kind"] == "vod":
+            ve = rec.get("vod_end") or {}
+            hh = rec["host"]["host"]
+            key["vod"] = {k: ve.get(k) for k in ("progress_ratio", "stall_s_per_min", "played_s", "wall_s")}
+            # rchar: the range server's file reads (what it serves); its socket send() is not counted in wchar
+            key["vod"]["served_kBps_mean"] = (hh.get("procs.range_server.rchar_kBps") or {}).get("mean")
+            key["vod"]["eno1_tx_kBps_mean"] = (hh.get("net.eno1.tx_kBps") or {}).get("mean")
+        if stream and e2:
+            dr = decision_rows(t0, t1)
+            (rd / "decisions.jsonl").write_text("".join(json.dumps(r) + "\n" for r in dr))
+            key["decisions"] = {"rows": len(dr), "transitions": sum(1 for r in dr if r.get("event") == "transition"
+                                                                   or r.get("kind") == "transition")}
         rec["key"] = key
         rec["status"] = "OK" if rec["status"] == "WINDOW_DONE" else rec["status"]
     (rd / "summary.json").write_text(json.dumps(rec, indent=1))
@@ -700,18 +858,26 @@ def run_once(w: dict, run_no: int, out: Path, window: int, gap: int) -> dict:
     return rec
 
 
-def run_suite(out: Path, only: list | None, runs: int, window: int, gap: int):
+def run_suite(out: Path, only: list | None, runs: int, window: int, gap: int, plan: list | None = None,
+              e2: bool = False):
+    """plan: [(id, runs, first_gap_s)] in order (E2); otherwise `only` x `runs` in suite order."""
     out.mkdir(parents=True, exist_ok=True)
     global log
     log = Log(out / "suite.log")
-    sel = [w for w in WORKLOADS if not only or w["id"] in only]
-    log(f"suite start: {[w['id'] for w in sel]} x{runs}, window {window}s, gap {gap}s; ABSENT: {sorted(ABSENT)}")
+    byid = {w["id"]: w for w in WORKLOADS}
+    if plan:
+        sched = [(byid[i], r, g) for i, r, g in plan]
+    else:
+        sched = [(w, runs, gap) for w in WORKLOADS if not only or w["id"] in only]
+    log(f"suite start: {[(w['id'], r, g) for w, r, g in sched]}, window {window}s, gap {gap}s, e2 {e2}; "
+        f"ABSENT: {sorted(ABSENT)}")
     (out / "absent.json").write_text(json.dumps(ABSENT, indent=1))
-    for w in sel:
-        for n in range(1, runs + 1):
+    for w, nruns, first_gap in sched:
+        for n in range(1, nruns + 1):
             rec = None
+            g = first_gap if n == 1 else gap
             for attempt in range(3):          # the run, plus at most two retries of a failing launch
-                rec = run_once(w, n, out, window, gap)
+                rec = run_once(w, n, out, window, g, e2)
                 if rec["status"] == "OK":
                     break
                 log(w["id"], f"run{n}: attempt {attempt + 1} failed")
@@ -778,6 +944,13 @@ def compare(out: Path) -> dict:
             y = (kb.get("status_poll") or {}).get("frac_1920x1080")
             pre = None if None in (x, y) else (x >= 0.95 and y >= 0.95)
             add("precondition: share of window at 1920x1080", x, y, pre, ">= 0.95 each")
+        if w["kind"] == "vod":
+            x = (ka.get("vod") or {}).get("progress_ratio")
+            y = (kb.get("vod") or {}).get("progress_ratio")
+            add("VOD progress ratio (played / wall)", x, y,
+                None if None in (x, y) else abs(x - y) <= BAR["vod_ratio_abs"], "+/-0.01")
+            add("served kB/s (range server)", (ka.get("vod") or {}).get("served_kBps_mean"),
+                (kb.get("vod") or {}).get("served_kBps_mean"), None, "reported, not banded")
         if "epg" in ka or "epg" in kb:
             x = (ka.get("epg") or {}).get("grab_s_median")
             y = (kb.get("epg") or {}).get("grab_s_median")
@@ -826,8 +999,11 @@ def check(out: Path) -> int:
             if not p.exists() or hashlib.sha256(p.read_bytes()).hexdigest() != h:
                 probs.append(f"changed or missing: {rel}")
     for w in WORKLOADS:
-        for n in (1, 2):
-            s = out / w["id"] / f"run{n}" / "summary.json"
+        if not (out / w["id"]).exists():
+            continue
+        for rdir in sorted((out / w["id"]).glob("run*")):
+            n = rdir.name[3:]
+            s = rdir / "summary.json"
             if not s.exists():
                 probs.append(f"{w['id']} run{n}: no summary")
                 continue
@@ -903,7 +1079,17 @@ def main(argv: list) -> int:
         runs = int(argv[argv.index("--runs") + 1]) if "--runs" in argv else 2
         window = int(argv[argv.index("--window") + 1]) if "--window" in argv else 300
         gap = int(argv[argv.index("--gap") + 1]) if "--gap" in argv else 120
-        run_suite(out, only, runs, window, gap)
+        plan = None
+        if "--plan" in argv:
+            plan = []
+            for item in argv[argv.index("--plan") + 1].split(","):
+                p = item.split(":")
+                plan.append((p[0], int(p[1]) if len(p) > 1 else 1, int(p[2]) if len(p) > 2 else gap))
+            unknown = [i for i, _, _ in plan if i not in {w["id"] for w in WORKLOADS}]
+            if unknown:
+                print("refusing: unknown ids", unknown)
+                return 2
+        run_suite(out, only, runs, window, gap, plan, "--e2" in argv)
         return 0
     print(__doc__)
     return 2

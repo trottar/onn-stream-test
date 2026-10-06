@@ -1,0 +1,64 @@
+{
+ "workload": "E1-VOD",
+ "run": 1,
+ "kind": "vod",
+ "main_process": "range_server",
+ "started_utc": "2026-10-06T00:21:29.977Z",
+ "window_s": 1200,
+ "gap_s": 120,
+ "warmup_s": 60,
+ "status": "FAILED",
+ "preflight": {
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
+  ],
+  "game_active": false,
+  "adb": true,
+  "drop_in_live": true,
+  "ok": true
+ },
+ "ps1_files_identical_start": true,
+ "vod_mount": {
+  "file_present": true,
+  "size_bytes": 781799332,
+  "fstype": "exfat",
+  "read_only": true
+ },
+ "restart": {
+  "mainpid_serves_8765": true,
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
+  ]
+ },
+ "profile_at_start": {
+  "profile_id": "native_game_720p60_reference",
+  "bitrate_kbps": 7000,
+  "width": 1280,
+  "height": 720,
+  "any_override": false,
+  "adaptive_mode": "live"
+ },
+ "gap": {
+  "from": "2026-10-06T00:21:33.197Z",
+  "to": "2026-10-06T00:23:33.197Z"
+ },
+ "launch": {
+  "ok": false,
+  "step": "VOD"
+ },
+ "error": "RuntimeError: VOD did not start: {'ok': False, 'step': 'VOD'}",
+ "trace": "Traceback (most recent call last):\n  File \"/home/privyhub/Projects/onn-stream-test/tools/e1_suite.py\", line 746, in run_once\n    raise RuntimeError(f\"VOD did not start: {v}\")\nRuntimeError: VOD did not start: {'ok': False, 'step': 'VOD'}\n",
+ "teardown": {
+  "vod": {
+   "restart_tapped": false,
+   "stop_tapped": false,
+   "now_playing_left": 0
+  },
+  "flags_absent": true,
+  "ps1_files_identical": true,
+  "game_active": false
+ },
+ "ended_utc": "2026-10-06T00:24:09.378Z"
+}

@@ -266,17 +266,52 @@ def classify(pid: int, comm: str) -> str:
     return "other"
 
 
+THREAD_CATS = ("companion", "encoder", "retroarch", "epg")
+
+
 class ProcTable:
-    def __init__(self):
-        self.cat = {}      # (pid, starttime) -> category
-        self.prev = {}     # (pid, starttime) -> (ticks, rbytes, wbytes, monotonic)
+    """Per-category process rows. With threads=True (E2) also per-thread CPU for THREAD_CATS: tid, % of a core,
+    scheduling policy (2 = SCHED_RR), the current syscall number (/proc/<pid>/task/<tid>/syscall; 7 poll, 0 read,
+    202 futex, 230 clock_nanosleep, ...) -- read-only, no ptrace."""
+
+    def __init__(self, threads: bool = False):
+        self.cat = {}      # (pid, starttime, comm) -> category
+        self.prev = {}     # (pid, starttime, comm) -> (ticks, rbytes, wbytes, monotonic, rchar, wchar)
+        self.threads = threads
+        self.tprev = {}    # (tid, tstart) -> (ticks, monotonic)
+        self.last_threads = {}
+
+    def _threads(self, cat: str, pid: int, now: float, seen: set) -> list:
+        rows = []
+        try:
+            tids = os.listdir(f"/proc/{pid}/task")
+        except OSError:
+            return rows
+        for t in tids:
+            st = rd(f"/proc/{pid}/task/{t}/stat")
+            if not st:
+                continue
+            try:
+                f = st.rsplit(")", 1)[1].split()
+                ticks, tstart, pol = int(f[11]) + int(f[12]), int(f[19]), int(f[38])
+            except (ValueError, IndexError):
+                continue
+            sc = (rd(f"/proc/{pid}/task/{t}/syscall") or "").split()
+            key = (int(t), tstart)
+            seen.add(key)
+            prev = self.tprev.get(key)
+            self.tprev[key] = (ticks, now)
+            cpu = round(100.0 * (ticks - prev[0]) / CLK / (now - prev[1]), 1) if prev and now > prev[1] else None
+            rows.append([pid, int(t), cpu, pol, sc[0] if sc else None])
+        return rows
 
     def sample(self) -> dict:
         now = time.monotonic()
-        acc = {c: {"n": 0, "cpu_pct": 0.0, "rss_kb": 0, "pss_kb": 0, "rss_anon_kb": 0, "threads": 0,
-                   "read_kBps": 0.0, "write_kBps": 0.0} for c in CATEGORIES}
+        acc = {c: {"n": 0, "cpu_pct": 0.0, "rss_kb": 0, "pss_kb": 0, "pss_anon_kb": 0, "pss_file_kb": 0,
+                   "rss_anon_kb": 0, "threads": 0, "read_kBps": 0.0, "write_kBps": 0.0, "rchar_kBps": 0.0,
+                   "wchar_kBps": 0.0} for c in CATEGORIES}
         other_cpu, other_by = 0.0, {}
-        seen = set()
+        seen, tseen, trows = set(), set(), {}
         for d in os.listdir("/proc"):
             if not d.isdigit():
                 continue
@@ -298,14 +333,14 @@ class ProcTable:
             c = self.cat[key]
             prev = self.prev.get(key)
             cpu = None
-            rb = wb = None
+            rb = wb = rc = wc = None
             if c != "other":
                 io = rd(f"/proc/{pid}/io") or ""
-                m1, m2 = re.search(r"read_bytes: (\d+)", io), re.search(r"write_bytes: (\d+)", io)
-                rb, wb = (int(m1.group(1)) if m1 else None), (int(m2.group(1)) if m2 else None)
+                g = lambda n: (lambda m: int(m.group(1)) if m else None)(re.search(n + r": (\d+)", io))
+                rb, wb, rc, wc = g("read_bytes"), g("write_bytes"), g("rchar"), g("wchar")
             if prev and now > prev[3]:
                 cpu = 100.0 * (ticks - prev[0]) / CLK / (now - prev[3])
-            self.prev[key] = (ticks, rb, wb, now)
+            self.prev[key] = (ticks, rb, wb, now, rc, wc)
             if c == "other":
                 if cpu:
                     other_cpu += cpu
@@ -316,22 +351,34 @@ class ProcTable:
             a["threads"] += threads
             if cpu is not None:
                 a["cpu_pct"] += cpu
-            if prev and rb is not None and prev[1] is not None and now > prev[3]:
-                a["read_kBps"] += (rb - prev[1]) / 1024 / (now - prev[3])
-                a["write_kBps"] += (wb - prev[2]) / 1024 / (now - prev[3])
+            if prev and now > prev[3]:
+                dt = now - prev[3]
+                if rb is not None and prev[1] is not None:
+                    a["read_kBps"] += (rb - prev[1]) / 1024 / dt
+                    a["write_kBps"] += (wb - prev[2]) / 1024 / dt
+                if rc is not None and len(prev) > 4 and prev[4] is not None:
+                    a["rchar_kBps"] += (rc - prev[4]) / 1024 / dt
+                    a["wchar_kBps"] += (wc - prev[5]) / 1024 / dt
             st = rd(f"/proc/{pid}/status") or ""
             for fld, k in (("VmRSS", "rss_kb"), ("RssAnon", "rss_anon_kb")):
                 m = re.search(fld + r":\s+(\d+)", st)
                 if m:
                     a[k] += int(m.group(1))
             sm = rd(f"/proc/{pid}/smaps_rollup") or ""
-            m = re.search(r"^Pss:\s+(\d+)", sm, re.M)
-            if m:
-                a["pss_kb"] += int(m.group(1))
+            for fld, k in (("Pss", "pss_kb"), ("Pss_Anon", "pss_anon_kb"), ("Pss_File", "pss_file_kb")):
+                m = re.search(r"^" + fld + r":\s+(\d+)", sm, re.M)
+                if m:
+                    a[k] += int(m.group(1))
+            if self.threads and c in THREAD_CATS:
+                trows.setdefault(c, []).extend(self._threads(c, pid, now, tseen))
         for k in list(self.prev):
             if k not in seen:
                 self.prev.pop(k, None)
                 self.cat.pop(k, None)
+        for k in list(self.tprev):
+            if k not in tseen:
+                self.tprev.pop(k, None)
+        self.last_threads = trows
         out = {}
         for c, a in acc.items():
             if a["n"]:
@@ -342,14 +389,48 @@ class ProcTable:
 
 
 # ---------------------------------------------------------------- the host loop
+def net_detail(iface: str = "eno1") -> dict:
+    """E2: the transmit-side drop counters -- softnet (dropped, time_squeeze, summed over CPUs), the root qdisc
+    (`tc -s qdisc show`, read-only, no root), and the interface's own tx_dropped / tx_errors."""
+    out = {}
+    drop = squeeze = 0
+    for line in (rd("/proc/net/softnet_stat") or "").splitlines():
+        f = line.split()
+        if len(f) > 2:
+            drop += int(f[1], 16)
+            squeeze += int(f[2], 16)
+    out["softnet_dropped"], out["softnet_squeeze"] = drop, squeeze
+    for tc in ("/usr/sbin/tc", "/sbin/tc"):
+        if os.path.exists(tc):
+            try:
+                t = subprocess.run([tc, "-s", "qdisc", "show", "dev", iface], capture_output=True, text=True,
+                                   timeout=2).stdout
+            except (OSError, subprocess.SubprocessError):
+                t = ""
+            m = re.search(r"dropped (\d+), overlimits (\d+) requeues (\d+)", t)
+            if m:
+                out["qdisc_dropped"], out["qdisc_overlimits"], out["qdisc_requeues"] = map(int, m.groups())
+            m = re.search(r"backlog (\d+)b (\d+)p", t)
+            if m:
+                out["qdisc_backlog_b"] = int(m.group(1))
+            break
+    for k in ("tx_dropped", "tx_errors"):
+        v = rd(f"/sys/class/net/{iface}/statistics/{k}")
+        if v:
+            out["if_" + k] = int(v)
+    return out
+
+
 class Host:
-    def __init__(self):
+    def __init__(self, e2: bool = False):
         self.dev = repo_block_device()
-        self.procs = ProcTable()
+        self.e2 = e2
+        self.procs = ProcTable(threads=e2)
         self.t0 = time.monotonic()
         self.c0, self.p0, self.v0 = cpu_times(), psi_totals(), vmstat()
         self.d0 = diskstats(self.dev) if self.dev else None
         self.n0 = netdev()
+        self.x0 = net_detail() if e2 else {}
         self.procs.sample()
 
     def sample(self) -> dict:
@@ -406,12 +487,19 @@ class Host:
         row["freq"] = cpufreq()
         row["throttled"] = 1 if gpu.get("throttle_status") else 0
         row["procs"] = self.procs.sample()
+        if self.e2:
+            x1 = net_detail()
+            row["netx"] = {k + "_per_s": round((x1[k] - self.x0[k]) / dt, 2) for k in x1
+                           if k in self.x0 and k != "qdisc_backlog_b"}
+            row["netx"]["qdisc_backlog_b"] = x1.get("qdisc_backlog_b")
+            self.x0 = x1
         self.t0, self.c0, self.p0, self.v0, self.d0, self.n0 = t1, c1, p1, v1, d1, n1
         return row
 
 
-def host_loop(out_dir: str, interval: float, stop: str):
-    h = Host()
+def host_loop(out_dir: str, interval: float, stop: str, e2: bool = False):
+    h = Host(e2)
+    tfh = open(os.path.join(out_dir, "threads.jsonl"), "w") if e2 else None
     with open(os.path.join(out_dir, "samples.jsonl"), "w") as fh:
         nxt = time.monotonic() + interval
         while not os.path.exists(stop):
@@ -422,6 +510,11 @@ def host_loop(out_dir: str, interval: float, stop: str):
             row["cost_ms"] = round((time.monotonic() - t) * 1000, 1)
             fh.write(json.dumps(row) + "\n")
             fh.flush()
+            if tfh:
+                tfh.write(json.dumps({"at_utc": row["at_utc"], "threads": h.procs.last_threads}) + "\n")
+                tfh.flush()
+    if tfh:
+        tfh.close()
 
 
 # ---------------------------------------------------------------- workload telemetry
@@ -471,16 +564,55 @@ def title_loop(out_dir: str, stop: str):
             fh.flush()
 
 
-def run(out_dir: str, telemetry: bool, title: bool, interval: float):
+ENC_LOG = os.path.join(REPO, "logs/games/native_video_alpha.log")
+ENC_RE = re.compile(r"frame=\s*(\d+)\s+fps=\s*([\d.]+).*?(?:dup=(\d+))?\s*(?:drop=(\d+))?\s*speed=\s*([\d.]+)x")
+
+
+def encoder_loop(out_dir: str, stop: str):
+    """E2: the encoder's own progress records (ffmpeg's `frame= fps= ... dup= drop= speed=` on stderr, which the
+    companion writes to native_video_alpha.log, ~2 per s), tailed once a second: the last record's cumulative
+    frame / dup / drop counts per second of host time. Read-only."""
+    try:
+        off = os.path.getsize(ENC_LOG)
+    except OSError:
+        off = 0
+    with open(os.path.join(out_dir, "encoder.jsonl"), "w") as fh:
+        while not os.path.exists(stop):
+            time.sleep(1)
+            try:
+                size = os.path.getsize(ENC_LOG)
+                if size < off:
+                    off = 0
+                with open(ENC_LOG, "rb") as f:
+                    f.seek(off)
+                    chunk = f.read(size - off).decode(errors="replace")
+                off = size
+            except OSError:
+                continue
+            recs = [m for m in ENC_RE.finditer(chunk.replace("\r", "\n"))]
+            if not recs:
+                fh.write(json.dumps({"at_utc": utc(), "records": 0}) + "\n")
+                fh.flush()
+                continue
+            m = recs[-1]
+            fh.write(json.dumps({"at_utc": utc(), "records": len(recs), "frame": int(m.group(1)),
+                                 "fps": float(m.group(2)), "dup": int(m.group(3) or 0), "drop": int(m.group(4) or 0),
+                                 "speed": float(m.group(5))}) + "\n")
+            fh.flush()
+
+
+def run(out_dir: str, telemetry: bool, title: bool, interval: float, e2: bool = False):
     os.makedirs(out_dir, exist_ok=True)
     stop = os.path.join(out_dir, "sampler.stop")
     if os.path.exists(stop):
         os.remove(stop)
     meta = {"started_utc": utc(), "interval_s": interval, "block_device": repo_block_device(),
-            "rapl": rapl_status(), "telemetry": telemetry, "title": title, "pid": os.getpid()}
+            "rapl": rapl_status(), "telemetry": telemetry, "title": title, "e2": e2, "pid": os.getpid()}
     with open(os.path.join(out_dir, "sampler_meta.json"), "w") as fh:
         json.dump(meta, fh, indent=1)
-    ts = [threading.Thread(target=host_loop, args=(out_dir, interval, stop))]
+    ts = [threading.Thread(target=host_loop, args=(out_dir, interval, stop, e2))]
+    if e2:
+        ts.append(threading.Thread(target=encoder_loop, args=(out_dir, stop)))
     if telemetry:
         ts.append(threading.Thread(target=telem_loop, args=(out_dir, stop)))
     if title:
@@ -524,7 +656,8 @@ def summarize_host(rows: list) -> dict:
             if c == "other":
                 series.setdefault("procs.other.cpu_pct", []).append(p.get("cpu_pct"))
                 continue
-            for k in ("cpu_pct", "rss_kb", "pss_kb", "rss_anon_kb", "threads", "read_kBps", "write_kBps", "n"):
+            for k in ("cpu_pct", "rss_kb", "pss_kb", "pss_anon_kb", "pss_file_kb", "rss_anon_kb", "threads", "read_kBps",
+                      "write_kBps", "rchar_kBps", "wchar_kBps", "n"):
                 series.setdefault(f"procs.{c}.{k}", []).append(p.get(k))
     out = {k: stats(v) for k, v in sorted(series.items())}
     # per-process presence: in how many of the window's samples each category was seen
@@ -612,9 +745,74 @@ def summarize(out_dir: str, t_from: str | None, t_to: str | None, out_name: str 
     if os.path.exists(os.path.join(out_dir, "title.txt")):
         s["retroarch"] = ra_fps(os.path.join(out_dir, "title.txt"),
                                 parse_utc(t_from) if t_from else 0, parse_utc(t_to) if t_to else 1e12)
+    if rows:
+        s.update(e2_extras(out_dir, rows, t_from, t_to))
     with open(os.path.join(out_dir, out_name), "w") as fh:
         json.dump(s, fh, indent=1)
     return s
+
+
+def _load_window(path: str, t_from, t_to) -> list:
+    out = []
+    for line in (rd(path) or "").splitlines():
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        if (t_from is None or r["at_utc"] >= t_from) and (t_to is None or r["at_utc"] <= t_to):
+            out.append(r)
+    return out
+
+
+def e2_extras(out_dir: str, rows: list, t_from, t_to) -> dict:
+    """E2 additions to a summary: per-core p95 and the busiest core's p95; throttle_status counts by value; the
+    encoder's capture fps and dup / drop per minute; per-thread CPU (mean, p95) for the thread categories."""
+    out = {}
+    per = {}
+    for r in rows:
+        for k, v in ((r.get("cpu") or {}).get("per_cpu") or {}).items():
+            per.setdefault(k, []).append(v)
+    p95 = {k: stats(v)["p95"] for k, v in per.items() if stats(v)}
+    if p95:
+        out["per_core_p95"] = p95
+        out["busiest_core_p95"] = max(p95.values())
+    tv = {}
+    for r in rows:
+        t = (r.get("gpu") or {}).get("throttle_status")
+        if t:
+            tv[hex(t)] = tv.get(hex(t), 0) + 1
+    out["throttle_by_value"] = tv
+    enc = [r for r in _load_window(os.path.join(out_dir, "encoder.jsonl"), t_from, t_to) if r.get("records")]
+    if len(enc) >= 2:
+        a, b = enc[0], enc[-1]
+        span = parse_utc(b["at_utc"]) - parse_utc(a["at_utc"])
+        if span > 0 and b["frame"] >= a["frame"]:
+            out["encoder"] = {"capture_fps": round((b["frame"] - a["frame"]) / span, 3),
+                              "dup_per_min": round((b["dup"] - a["dup"]) / span * 60, 2),
+                              "drop_per_min": round((b["drop"] - a["drop"]) / span * 60, 2),
+                              "speed": stats([r["speed"] for r in enc]), "rows": len(enc)}
+    th = _load_window(os.path.join(out_dir, "threads.jsonl"), t_from, t_to)
+    if th:
+        acc = {}
+        for r in th:
+            for cat, lst in (r.get("threads") or {}).items():
+                for pid, tid, cpu, pol, sc in lst:
+                    d = acc.setdefault((cat, pid, tid), {"cpu": [], "pol": pol, "sys": {}})
+                    if cpu is not None:
+                        d["cpu"].append(cpu)
+                    d["sys"][sc] = d["sys"].get(sc, 0) + 1
+        tout = {}
+        for (cat, pid, tid), d in acc.items():
+            st = stats(d["cpu"])
+            if not st:
+                continue
+            tout.setdefault(cat, []).append({"pid": pid, "tid": tid, "is_main": pid == tid, "policy": d["pol"],
+                                             "syscall_mode": max(d["sys"], key=d["sys"].get), "seen": st["n"],
+                                             "cpu_mean": st["mean"], "cpu_p95": st["p95"], "cpu_max": st["max"]})
+        for cat in tout:
+            tout[cat].sort(key=lambda x: -x["cpu_mean"])
+        out["threads"] = tout
+    return out
 
 
 # ---------------------------------------------------------------- coverage and self-test
@@ -674,7 +872,7 @@ def main(argv: list) -> int:
         return 0
     if len(argv) >= 2 and argv[0] == "run":
         iv = float(argv[argv.index("--interval") + 1]) if "--interval" in argv else 1.0
-        run(argv[1], "--telemetry" in argv, "--title" in argv, iv)
+        run(argv[1], "--telemetry" in argv, "--title" in argv, iv, "--e2" in argv)
         return 0
     if len(argv) >= 2 and argv[0] == "summarize":
         f = argv[argv.index("--from") + 1] if "--from" in argv else None

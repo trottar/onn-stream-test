@@ -14,8 +14,9 @@ Authority for the current position is `docs/memory/CURRENT.md`.
 - **2026-10-05: Phase C CLOSED** (C5-CLOSE, the user's decisions: the
   1080p rung and the `remaster` preset not adopted, the 4x PS1 source
   stays). **Phase E ACTIVE since 2026-10-05: E1 FROZEN (E1-S1, the suite in
-  `docs/memory/architecture/E1_WORKLOAD_SUITE.md`; 6 of 7 runnable rows
-  repeatable, the concurrency row not yet); E2 next** — on the user's word.
+  `docs/memory/architecture/E1_WORKLOAD_SUITE.md`; the VOD row added
+  2026-10-05); **E2 MEASURED 2026-10-06 (E2-S1)**; E3 next — the user picks
+  the first optimization from E2's ordered list.**
 
 - **Phase D is ACTIVE.** The Linux host runs the companion and the games
   path; D4 PS1 multitap parity is the open functional item.
@@ -49,7 +50,7 @@ Authority for the current position is `docs/memory/CURRENT.md`.
 | **B — Diagnostics & Clean Native Baseline** | Make PrivyHub self-diagnosing and remove active Sunshine/Moonlight legacy | **COMPLETE / PUSHED** |
 | **C — Adaptive Streaming Architecture** | Portable profile/telemetry/readiness foundation complete enough for Windows; automatic adaptation continues on Linux | **CLOSED 2026-10-05** (C5-CLOSE; resumed 2026-09-23 at C3 after `D-BASE`) |
 | **D — Linux Migration / Native Linux Baseline** | Move the core server to the HP EliteDesk Linux prototype and restore normal-use parity | **ACTIVE** |
-| **E — Linux Core Resource Characterization & Optimization** | Optimize and measure the Linux core with PS1-and-below only; select Prototype 2 from evidence | **ACTIVE** — E1 FROZEN 2026-10-05 (E1-S1); E2 next (on the user's word) |
+| **E — Linux Core Resource Characterization & Optimization** | Optimize and measure the Linux core with PS1-and-below only; select Prototype 2 from evidence | **ACTIVE** — E1 FROZEN (E1-S1, VOD added); E2 MEASURED 2026-10-06 (E2-S1); E3 next (the user's pick) |
 | **F — Media Library, VOD & Live TV UX** | Finish local media polish plus substantial Live TV/channel/guide work on Linux | **PLANNED AFTER E** |
 | **G — Secure Remote Access / Portable Client Foundation** | Establish overlay/provider abstraction, portable trusted-LAN access, WAN session identity/auth, and off-site PS1-and-below validation | **FUTURE AFTER F** |
 | **H — Extended Emulation & User-Content Import** | Build safe user-content ingestion, then characterize N64, GameCube, and PS2 on the established local/remote foundation | **FUTURE AFTER G** |
@@ -936,7 +937,8 @@ Architectural statement:
 # Phase E — Linux Core Resource Characterization & Optimization
 
 **Status: ACTIVE (started 2026-10-05, the user's "let's start E1") — E1
-FROZEN (E1-S1); E2 next, on the user's word.** (Was: NEXT; PLANNED AFTER D.)
+FROZEN (E1-S1; VOD added 2026-10-05); E2 MEASURED (E2-S1, 2026-10-06); E3
+next, on the user's pick.** (Was: NEXT; PLANNED AFTER D.)
 
 Phase E deliberately limits the core emulator workload to:
 
@@ -963,9 +965,10 @@ Runnable rows, each run twice: idle, PS1 local, SNES streamed, PS1 streamed
 (= the 720p60 reference), the 1080p rung (flag, not adopted), the EPG grab
 (metadata/storage), PS1 streaming + EPG grabs (concurrency). REPEATABLE: 6
 of 7; the concurrency row NOT YET (the stream degrades under the grabs).
-ABSENT: Live TV (no unattended channel start), VOD (drive not attached),
-browser and camera sources (Windows-only; no camera), NES and Genesis (no
-fixtures). **E2 next**: the same suite at 20-min windows.
+ABSENT: Live TV (no unattended channel start), browser and camera sources
+(Windows-only; no camera), NES and Genesis (no fixtures). **Amended
+2026-10-05 (E2-S1 §1):** E1-VOD added (direct play of a fixed file on the
+onn; REPEATABLE); the 1080p-rung row kept by the user.
 
 Representative workloads should include, where present:
 
@@ -983,6 +986,17 @@ Representative workloads should include, where present:
 - representative concurrent core workloads.
 
 ## E2 — Whole-system measurements
+
+**Status: MEASURED 2026-10-06 (E2-S1)** —
+`docs/memory/evidence/E2_S1_WHOLE_SYSTEM_2026-10-06.md`: every suite row at
+20-min windows (SNES and CONC twice), the table with E1's 5-min means beside,
+the known-good reference for this host, and the three pre-registered
+answers. **CONC**: during EPG grabs the busiest core rises first and most
+(no encoder dup/drop, no host tx drops, relay CPU flat) — hypothesis: the
+grab start-up burst delays the stream's send threads. **SNES**: neither
+emulator nor encoder starves the other at 20 min; bsnes costs 4.4-5.2 cores
+and varies (NOT YET REPEATABLE). **Memory**: the first grab adds ~110 MB
+anon to the companion, then steps. Ordered E3 candidates in §8 of the record.
 
 Measure:
 

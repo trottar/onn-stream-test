@@ -1,0 +1,20 @@
+E1-VOD PRE-REGISTRATION (E2-S1 §1) -- written 2026-10-05 before any VOD suite run; hash in e1_vod_preregistration.sha256.
+E1's rule, verbatim where it applies (evidence/e1_s1_2026-10-05/e1_preregistration.txt).
+
+THE ROW
+  E1-VOD   the fixed file movies/Edge Of Tomorrow.mp4 played on the onn through the companion's own route.
+           Preflight as E1, plus: the file present and its mount read-only.
+           Launch: force-stop the app, wake, MainActivity; tap VOD >, MOVIES >, Edge Of Tomorrow; NOW PLAYING shows
+           the title; tap RESTART (0:00); read the progress (p0, t0); tap the preview (fullscreen confirmed).
+           Warm-up 60 s. Window 300 s. At the window's end: BACK; read the progress (p1, t1).
+           Teardown: RESTART, STOP (POST /stop), no NOW PLAYING left; flags absent; idle.
+           Main process: range_server.
+  Run twice, back to back, 120-s idle gaps, unit restarted before each run (as every E1 run). Nothing tuned between.
+
+THE BAR (E1's, verbatim) + the key figure
+  host CPU mean +/- 2 points; GPU busy mean +/- 3 points; RSS of range_server +/- 5 %;
+  key figure: the progress ratio (p1-p0)/(t1-t0) within +/- 0.01 between the runs.
+  Reported, not banded: stall s/min, the range server's served kB/s (wchar), eno1 tx.
+  REPEATABLE if every banded metric holds; otherwise NOT YET REPEATABLE with the metric and the suspected cause.
+
+E1-CONC-VOD: ABSENT -- the VOD path does not transcode on the host (direct play over range requests).
