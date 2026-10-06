@@ -1,0 +1,39 @@
+E3-S5 PRE-REGISTRATION -- the audio sender's cost. Written 2026-10-06 after the probe (probe.md) and the change, BEFORE
+any benchmark run; hash in e3_s5_preregistration.sha256. Task: docs/memory/handoffs/E3-S5_AUDIO_SENDER_COST_TASK.md
+under QUEUE_2026-10-06.md. Baseline commit: d9fdbdd. E2 = e2_s1_2026-10-05/runs/E1-PS1-STREAM/run1 (host CPU 11.69,
+rendered 59.81, audio sender 12.9 % of a core, companion 24.3 %, underruns 11). D-BASE close-out:
+evidence/D_BASE_CLOSEOUT_2026-09-23.md. E3-S1..S4's flags are ABSENT (no compounding).
+
+PROBE: 85.8 wake-ups per original audio packet (17,167 voluntary switches/s at 200 packets/s) -> > 1.5, the
+hypothesis holds; the task proceeds.
+
+THE ONE CHANGE: companion/native_session_io.py: the Linux audio sender reads PRIVYHUB_AUDIO_SENDER_PACING once at
+its start; =frame -> _linux_wait_until does one timed Event.wait to the packet's deadline (re-armed if early) instead
+of 1-ms waits + yields + the final spin. Packetization, redundancy 2/4, SCHED_RR/1, the relay unchanged. Absent =
+today. Diff e3_s5_audio_sender_pacing.diff sha256 6cc5983634723eb8ebf2710506e3f79269279916946ca593d7e1895d0260bfc0; native_session_io.py before f753ffe7aaa7a8b8a0db4b25acd7d4fd55c2a156b62a7e3629d8b5077ed29da8, after 2048e9fc6f708e0d56ed4286607db0d8fd0b1e229e366cb06f973288fb38fdbf.
+
+1. THE RUNS, in order, window 1200 s, gap 120 s, E1's launch / warm-up / teardown, --e2:
+     E1-PS1-STREAM x1, flag ABSENT (the same-night control)                     -> runs/E1-PS1-STREAM/run1
+     E1-PS1-STREAM x2, flag SET (drop-in PRIVYHUB_AUDIO_SENDER_PACING=frame)    -> runs/E1-PS1-STREAM_flag/run1, run2
+   tools/e1_suite.py run --e2 --window 1200 --gap 120 --out runs --prereg e3_s5_preregistration.txt
+     --plan E1-PS1-STREAM:1:120,E1-PS1-STREAM:2:120:PRIVYHUB_AUDIO_SENDER_PACING=frame
+
+2. THE BAR -- ACCEPTED only if ALL hold in BOTH flagged runs:
+   a. the audio sender thread (SCHED_RR, tools/e3_table.py "audio sender thread CPU %", the sampler's per-thread mean)
+      <= 4 % of a core AND the companion's CPU (procs.companion.cpu_pct mean) <= 17 % of a core;
+   b. audio underruns (heartbeat, window) <= the control's + 5 AND <= 20;
+   c. rendered fps (heartbeat, window) >= 59.5; RetroArch fps 60 +/- 0.5; video loss/min (heartbeat, window)
+      <= 3 x the control's;
+   d. the D-BASE close-out table, from each flagged run's session report: spikes >= 20 ms per min (spike_20_ms /
+      session minutes) < 200 and stale output drops per min < 20; video loss/min < 10 GATED ONLY IF the control
+      itself meets it (< 10), otherwise reported; the max output gap reported (the open row);
+   e. COMPARABILITY: the control within E1's bands of E2's PS1-STREAM (host CPU 11.69 +/- 2; rendered 59.81 +/- 0.5);
+      if not, the task is INCONCLUSIVE, whatever (a)-(d) say.
+   (e) holds and all of (a)-(d) -> ACCEPTED; (e) holds and any of (a)-(d) fails -> REJECTED. The row breaking or
+   never reaching PLAYING after two retries -> REJECTED (broke the row).
+
+3. REPORTED, NOT GATED: wake-ups per packet before / after (the probe and the smoke above; the runs' per-thread
+   syscall modes); the relay's and the other poll thread's CPU; the C2 latency block (receive->decode median, output
+   gap max); audio lost packets; host CPU; socket W.
+
+4. RULES: as QUEUE_2026-10-06 and E2-S1's teardown; no nft, no sudo, the Opal not touched. No bar changed after data.

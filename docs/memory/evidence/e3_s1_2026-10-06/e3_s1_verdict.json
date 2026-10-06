@@ -1,0 +1,690 @@
+{
+ "a_loss": {
+  "conc_r1": 2604.51,
+  "conc_r2": 2045.75,
+  "control": 222.78,
+  "limit": 100.0,
+  "holds": false
+ },
+ "b_fps": {
+  "conc_r1": 54.005,
+  "conc_r2": 54.996,
+  "holds": false
+ },
+ "c_resyncs": {
+  "conc_r1": 177,
+  "conc_r2": 137,
+  "holds": false
+ },
+ "d_grabs": {
+  "meta": {
+   "ok": 232,
+   "failed": 0,
+   "median_s": 5.261,
+   "need_ok": 205,
+   "max_median_s": 7.8,
+   "holds": true
+  },
+  "conc_r1": {
+   "ok": 200,
+   "failed": 0,
+   "median_s": 5.949,
+   "need_ok": 187,
+   "max_median_s": 8.8,
+   "holds": true
+  },
+  "conc_r2": {
+   "ok": 203,
+   "failed": 0,
+   "median_s": 6.037,
+   "need_ok": 187,
+   "max_median_s": 8.8,
+   "holds": true
+  },
+  "holds": true
+ },
+ "e_comparable": {
+  "control_cpu": 11.756,
+  "e2_cpu": 11.694,
+  "control_fps": 59.298,
+  "e2_fps": 59.81,
+  "holds": false
+ },
+ "verdict": "INCONCLUSIVE",
+ "reported": {
+  "control": {
+   "busiest_core_per_second_p95": 35.6,
+   "audio_underruns": 22,
+   "max_output_gap_ms": 271,
+   "decisions": {
+    "rows": 724,
+    "transitions": 0
+   }
+  },
+  "conc_r1": {
+   "busiest_core_per_second_p95": 53.0,
+   "audio_underruns": 411,
+   "max_output_gap_ms": 390,
+   "decisions": {
+    "rows": 605,
+    "transitions": 1
+   }
+  },
+  "conc_r2": {
+   "busiest_core_per_second_p95": 53.9,
+   "audio_underruns": 542,
+   "max_output_gap_ms": 416,
+   "decisions": {
+    "rows": 613,
+    "transitions": 2
+   }
+  },
+  "meta": {
+   "busiest_core_per_second_p95": 63.0,
+   "audio_underruns": null,
+   "max_output_gap_ms": null,
+   "decisions": null
+  },
+  "epg_thread_policy_counts": {
+   "E1-CONC_flag/run1": {
+    "5": 37094
+   },
+   "E1-CONC_flag/run2": {
+    "5": 36803
+   },
+   "E1-META_flag/run1": {
+    "5": 36601
+   }
+  }
+ },
+ "aligned_ctl": {
+  "baseline": {
+   "run": "E1-PS1-STREAM/run1",
+   "relay_tid": 2005394,
+   "relay_candidates": [
+    2005394
+   ],
+   "stats": {
+    "busiest": [
+     25.672583333333332,
+     4.472205644465479,
+     1200
+    ],
+    "dupdrop": [
+     0.0016680567139282735,
+     0.040807772552877625,
+     1199
+    ],
+    "relay": [
+     7.754166666666666,
+     0.8054394073354549,
+     1200
+    ],
+    "txdrops": [
+     0,
+     0.0,
+     1200
+    ],
+    "compcpu": [
+     25.196583333333333,
+     0.9990395352815401,
+     1200
+    ],
+    "loss": [
+     3.4454238064890412,
+     30.30810924057462,
+     1197
+    ]
+   }
+  },
+  "E1-CONC/run1": {
+   "relay_tid": 2009984,
+   "relay_candidates": [
+    2009984
+   ],
+   "grabs": 200,
+   "signals": {
+    "busiest": {
+     "label": "busiest core %",
+     "body_mean": 35.705,
+     "baseline_mean": 25.673,
+     "baseline_sd": 4.472,
+     "magnitude_sd": 2.24,
+     "first_rise_s": 1,
+     "threshold": 34.617
+    },
+    "dupdrop": {
+     "label": "encoder dup+drop /s",
+     "body_mean": 0.002,
+     "baseline_mean": 0.002,
+     "baseline_sd": 0.041,
+     "magnitude_sd": 0.0,
+     "first_rise_s": null,
+     "threshold": 0.083
+    },
+    "relay": {
+     "label": "relay thread CPU %",
+     "body_mean": 7.133,
+     "baseline_mean": 7.754,
+     "baseline_sd": 0.805,
+     "magnitude_sd": -0.77,
+     "first_rise_s": null,
+     "threshold": 9.365
+    },
+    "txdrops": {
+     "label": "eno1 tx drops /s (qdisc+softnet+if)",
+     "body_mean": 0,
+     "baseline_mean": 0,
+     "baseline_sd": 0.0,
+     "magnitude_sd": 0.0,
+     "first_rise_s": null,
+     "threshold": 0
+    },
+    "loss": {
+     "label": "lost packets /s (heartbeat)",
+     "body_mean": 41.861,
+     "baseline_mean": 3.445,
+     "baseline_sd": 30.308,
+     "magnitude_sd": 1.27,
+     "first_rise_s": 1,
+     "threshold": 64.062
+    }
+   },
+   "aligned": {
+    "busiest": [
+     28.61,
+     47.142,
+     39.46,
+     38.932,
+     32.088,
+     33.574,
+     26.128,
+     23.854,
+     23.428,
+     25.231,
+     25.067
+    ],
+    "dupdrop": [
+     0,
+     0,
+     0,
+     0.005,
+     0,
+     0.007,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "relay": [
+     6.955,
+     6.445,
+     7.67,
+     7.455,
+     7.128,
+     7.212,
+     7.051,
+     6.754,
+     7.04,
+     6.846,
+     7.111
+    ],
+    "txdrops": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "loss": [
+     44.022,
+     65.142,
+     54.504,
+     31.071,
+     31.596,
+     32.119,
+     33.673,
+     33.702,
+     21.352,
+     14.435,
+     51.24
+    ]
+   },
+   "most": [
+    "busiest"
+   ],
+   "first": [
+    "busiest"
+   ]
+  },
+  "E1-CONC/run2": {
+   "relay_tid": 2024711,
+   "relay_candidates": [
+    2024711
+   ],
+   "grabs": 203,
+   "signals": {
+    "busiest": {
+     "label": "busiest core %",
+     "body_mean": 36.113,
+     "baseline_mean": 25.673,
+     "baseline_sd": 4.472,
+     "magnitude_sd": 2.33,
+     "first_rise_s": 1,
+     "threshold": 34.617
+    },
+    "dupdrop": {
+     "label": "encoder dup+drop /s",
+     "body_mean": 0.001,
+     "baseline_mean": 0.002,
+     "baseline_sd": 0.041,
+     "magnitude_sd": -0.02,
+     "first_rise_s": null,
+     "threshold": 0.083
+    },
+    "relay": {
+     "label": "relay thread CPU %",
+     "body_mean": 7.406,
+     "baseline_mean": 7.754,
+     "baseline_sd": 0.805,
+     "magnitude_sd": -0.43,
+     "first_rise_s": null,
+     "threshold": 9.365
+    },
+    "txdrops": {
+     "label": "eno1 tx drops /s (qdisc+softnet+if)",
+     "body_mean": 0,
+     "baseline_mean": 0,
+     "baseline_sd": 0.0,
+     "magnitude_sd": 0.0,
+     "first_rise_s": null,
+     "threshold": 0
+    },
+    "loss": {
+     "label": "lost packets /s (heartbeat)",
+     "body_mean": 33.511,
+     "baseline_mean": 3.445,
+     "baseline_sd": 30.308,
+     "magnitude_sd": 0.99,
+     "first_rise_s": null,
+     "threshold": 64.062
+    }
+   },
+   "aligned": {
+    "busiest": [
+     32.485,
+     46.02,
+     40.168,
+     36.51,
+     32.829,
+     33.519,
+     27.748,
+     27.809,
+     30.43,
+     25.856,
+     24.867
+    ],
+    "dupdrop": [
+     0,
+     0.005,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "relay": [
+     6.601,
+     7.532,
+     7.7,
+     7.739,
+     7.327,
+     7.323,
+     7.066,
+     6.587,
+     6.609,
+     6.0,
+     7.0
+    ],
+    "txdrops": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "loss": [
+     37.7,
+     55.627,
+     48.178,
+     25.503,
+     24.259,
+     23.321,
+     24.661,
+     23.116,
+     28.004,
+     8.741,
+     1.163
+    ]
+   },
+   "most": [
+    "busiest"
+   ],
+   "first": [
+    "busiest"
+   ]
+  }
+ },
+ "aligned_e2": {
+  "baseline": {
+   "run": "E1-PS1-STREAM/run1",
+   "relay_tid": 1937389,
+   "relay_candidates": [
+    1937389
+   ],
+   "stats": {
+    "busiest": [
+     26.818583333333333,
+     5.429869212027323,
+     1200
+    ],
+    "dupdrop": [
+     0.0016680567139282735,
+     0.040807772552877625,
+     1199
+    ],
+    "relay": [
+     7.784166666666667,
+     0.87039223278295,
+     1200
+    ],
+    "txdrops": [
+     0,
+     0.0,
+     1200
+    ],
+    "compcpu": [
+     24.3415,
+     1.0404699659288585,
+     1200
+    ],
+    "loss": [
+     0.5493882337450724,
+     2.242560602446185,
+     1197
+    ]
+   }
+  },
+  "E1-CONC/run1": {
+   "relay_tid": 2009984,
+   "relay_candidates": [
+    2009984
+   ],
+   "grabs": 200,
+   "signals": {
+    "busiest": {
+     "label": "busiest core %",
+     "body_mean": 35.705,
+     "baseline_mean": 26.819,
+     "baseline_sd": 5.43,
+     "magnitude_sd": 1.64,
+     "first_rise_s": 1,
+     "threshold": 37.678
+    },
+    "dupdrop": {
+     "label": "encoder dup+drop /s",
+     "body_mean": 0.002,
+     "baseline_mean": 0.002,
+     "baseline_sd": 0.041,
+     "magnitude_sd": 0.0,
+     "first_rise_s": null,
+     "threshold": 0.083
+    },
+    "relay": {
+     "label": "relay thread CPU %",
+     "body_mean": 7.133,
+     "baseline_mean": 7.784,
+     "baseline_sd": 0.87,
+     "magnitude_sd": -0.75,
+     "first_rise_s": null,
+     "threshold": 9.525
+    },
+    "txdrops": {
+     "label": "eno1 tx drops /s (qdisc+softnet+if)",
+     "body_mean": 0,
+     "baseline_mean": 0,
+     "baseline_sd": 0.0,
+     "magnitude_sd": 0.0,
+     "first_rise_s": null,
+     "threshold": 0
+    },
+    "loss": {
+     "label": "lost packets /s (heartbeat)",
+     "body_mean": 41.861,
+     "baseline_mean": 0.549,
+     "baseline_sd": 2.243,
+     "magnitude_sd": 18.42,
+     "first_rise_s": 0,
+     "threshold": 5.035
+    }
+   },
+   "aligned": {
+    "busiest": [
+     28.61,
+     47.142,
+     39.46,
+     38.932,
+     32.088,
+     33.574,
+     26.128,
+     23.854,
+     23.428,
+     25.231,
+     25.067
+    ],
+    "dupdrop": [
+     0,
+     0,
+     0,
+     0.005,
+     0,
+     0.007,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "relay": [
+     6.955,
+     6.445,
+     7.67,
+     7.455,
+     7.128,
+     7.212,
+     7.051,
+     6.754,
+     7.04,
+     6.846,
+     7.111
+    ],
+    "txdrops": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "loss": [
+     44.022,
+     65.142,
+     54.504,
+     31.071,
+     31.596,
+     32.119,
+     33.673,
+     33.702,
+     21.352,
+     14.435,
+     51.24
+    ]
+   },
+   "most": [
+    "busiest"
+   ],
+   "first": [
+    "busiest"
+   ]
+  },
+  "E1-CONC/run2": {
+   "relay_tid": 2024711,
+   "relay_candidates": [
+    2024711
+   ],
+   "grabs": 203,
+   "signals": {
+    "busiest": {
+     "label": "busiest core %",
+     "body_mean": 36.113,
+     "baseline_mean": 26.819,
+     "baseline_sd": 5.43,
+     "magnitude_sd": 1.71,
+     "first_rise_s": 1,
+     "threshold": 37.678
+    },
+    "dupdrop": {
+     "label": "encoder dup+drop /s",
+     "body_mean": 0.001,
+     "baseline_mean": 0.002,
+     "baseline_sd": 0.041,
+     "magnitude_sd": -0.02,
+     "first_rise_s": null,
+     "threshold": 0.083
+    },
+    "relay": {
+     "label": "relay thread CPU %",
+     "body_mean": 7.406,
+     "baseline_mean": 7.784,
+     "baseline_sd": 0.87,
+     "magnitude_sd": -0.43,
+     "first_rise_s": null,
+     "threshold": 9.525
+    },
+    "txdrops": {
+     "label": "eno1 tx drops /s (qdisc+softnet+if)",
+     "body_mean": 0,
+     "baseline_mean": 0,
+     "baseline_sd": 0.0,
+     "magnitude_sd": 0.0,
+     "first_rise_s": null,
+     "threshold": 0
+    },
+    "loss": {
+     "label": "lost packets /s (heartbeat)",
+     "body_mean": 33.511,
+     "baseline_mean": 0.549,
+     "baseline_sd": 2.243,
+     "magnitude_sd": 14.7,
+     "first_rise_s": 0,
+     "threshold": 5.035
+    }
+   },
+   "aligned": {
+    "busiest": [
+     32.485,
+     46.02,
+     40.168,
+     36.51,
+     32.829,
+     33.519,
+     27.748,
+     27.809,
+     30.43,
+     25.856,
+     24.867
+    ],
+    "dupdrop": [
+     0,
+     0.005,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "relay": [
+     6.601,
+     7.532,
+     7.7,
+     7.739,
+     7.327,
+     7.323,
+     7.066,
+     6.587,
+     6.609,
+     6.0,
+     7.0
+    ],
+    "txdrops": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    "loss": [
+     37.7,
+     55.627,
+     48.178,
+     25.503,
+     24.259,
+     23.321,
+     24.661,
+     23.116,
+     28.004,
+     8.741,
+     1.163
+    ]
+   },
+   "most": [
+    "busiest"
+   ],
+   "first": [
+    "busiest"
+   ]
+  }
+ }
+}

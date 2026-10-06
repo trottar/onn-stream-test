@@ -1,0 +1,64 @@
+E3 redactor check (h2_prep_redact.py --check, stdin per file), 2026-10-06T08:06:02Z
+Known false positives (classified, not findings):
+  - title.txt files: RetroArch's core version string (four dotted numbers) matches the IPv4 pattern
+  - companion/native_session_io.py: the controller socket's all-interfaces bind literal (pre-existing in d9fdbdd, not an address of any device)
+
+OK   docs/memory/evidence/e3_s5_2026-10-06/e3_s5_analysis.py
+OK   docs/memory/evidence/e3_s5_2026-10-06/e3_s5_audio_sender_pacing.diff
+OK   docs/memory/evidence/e3_s5_2026-10-06/e3_s5_preregistration.sha256
+OK   docs/memory/evidence/e3_s5_2026-10-06/e3_s5_preregistration.txt
+OK   docs/memory/evidence/e3_s5_2026-10-06/e3_s5_probe.py
+OK   docs/memory/evidence/e3_s5_2026-10-06/e3_s5_table.json
+OK   docs/memory/evidence/e3_s5_2026-10-06/e3_s5_table.md
+OK   docs/memory/evidence/e3_s5_2026-10-06/e3_s5_verdict.json
+OK   docs/memory/evidence/e3_s5_2026-10-06/loss_per_minute.txt
+OK   docs/memory/evidence/e3_s5_2026-10-06/precondition.json
+OK   docs/memory/evidence/e3_s5_2026-10-06/probe.md
+OK   docs/memory/evidence/e3_s5_2026-10-06/probe_run.json
+OK   docs/memory/evidence/e3_s5_2026-10-06/probe_threads.json
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/absent.json
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs_console.log
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run1/decisions.jsonl
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run1/encoder.jsonl
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run1/sampler.log
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run1/sampler_meta.json
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run1/sampler_summary_gap.json
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run1/sampler_summary.json
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run1/samples.jsonl
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run1/status_poll.jsonl
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run1/summary.json
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run1/telemetry.jsonl
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run1/threads.jsonl
+HIT  docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run1/title.txt
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run2/decisions.jsonl
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run2/encoder.jsonl
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run2/sampler.log
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run2/sampler_meta.json
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run2/sampler_summary_gap.json
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run2/sampler_summary.json
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run2/samples.jsonl
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run2/status_poll.jsonl
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run2/summary.json
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run2/telemetry.jsonl
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run2/threads.jsonl
+HIT  docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM_flag/run2/title.txt
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM/run1/decisions.jsonl
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM/run1/encoder.jsonl
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM/run1/sampler.log
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM/run1/sampler_meta.json
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM/run1/sampler_summary_gap.json
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM/run1/sampler_summary.json
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM/run1/samples.jsonl
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM/run1/status_poll.jsonl
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM/run1/summary.json
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM/run1/telemetry.jsonl
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM/run1/threads.jsonl
+HIT  docs/memory/evidence/e3_s5_2026-10-06/runs/E1-PS1-STREAM/run1/title.txt
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/final_state.json
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/manifest.sha256
+OK   docs/memory/evidence/e3_s5_2026-10-06/runs/suite.log
+OK   docs/memory/evidence/e3_s5_2026-10-06/smoke_flag_run.json
+OK   docs/memory/evidence/e3_s5_2026-10-06/smoke_flag_threads.json
+OK   docs/memory/evidence/E3_S5_AUDIO_SENDER_COST_2026-10-06.md
+OK   docs/memory/patches/E3-S5_AUDIO_SENDER_PACING.md
+HIT  companion/native_session_io.py

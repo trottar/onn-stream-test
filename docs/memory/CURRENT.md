@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-10-06
-baseline_commit: a56746e
+baseline_commit: d9fdbdd
 ---
 
 # Current State
@@ -9,43 +9,46 @@ baseline_commit: a56746e
 Headings are fixed by `tools/check_memory_health.py`; do not rename.
 ## Active Objective
 
-**Phase E ACTIVE.** E1 is FROZEN (`architecture/E1_WORKLOAD_SUITE.md`;
-the VOD row was added 2026-10-05, REPEATABLE). **E2 MEASURED 2026-10-06
-(E2-S1).** **E3 is next**: the user picks the first optimization from E2's
-ordered list.
+**Phase E ACTIVE.** E1 FROZEN; E2 MEASURED (E2-S1, committed `d9fdbdd`).
+**E3 ran the whole ordered list, unattended, 2026-10-06**
+(`handoffs/QUEUE_2026-10-06.md`). Each item was tested as one change behind
+its own flag, against a bar hashed before any run. **Nothing ACCEPTED,
+adopted or committed.**
 
-- **The E2 answers** (pre-registered):
-  - **CONC**: during EPG grabs the busiest core rises first and most
-    (~75 % at 1-2 s into each grab), and loss peaks with it. There are no
-    host tx drops and no encoder dup/drop, and the relay CPU stays flat.
-    The hypothesis is that the grab start-up delays the stream's send
-    threads.
-  - **SNES**: no starvation at 20 min; bsnes costs 4.4-5.2 cores and
-    varies (NOT YET REPEATABLE).
-  - **Memory**: the first grab adds ~110 MB anon to the companion.
-- **ABSENT**: Live TV, the browser and camera sources, NES / Genesis, a
-  power meter.
-- **Standing:** Phase C closed (4x PS1 source adopted; the rung and
-  `remaster` not; the 1080p row stays in the suite); `D-BASE` CLOSED; the
-  `CL-B1` APK adopted.
+| item | verdict | finding |
+| --- | --- | --- |
+| E3-S1 EPG grab priority | INCONCLUSIVE (control off-band by 0.01 fps) | loss peak at grab start unmoved: not host CPU |
+| E3-S2 companion memory | REJECTED | per-grab 25.6 MB metadata parse, live through each grab |
+| E3-S3 grabber cost | REJECTED | the node grabber's own start-up; 4.9 CPU-s per grab |
+| E3-S4 lighter SNES core | NOT RUN | no snes9x core; the fetch was refused by the session's permission policy |
+| E3-S5 audio sender | REJECTED (one run's loss) | sender 13 → 2.5 % of a core; run 2 met every clause |
+
+- **ABSENT** (unchanged): Live TV, the browser and camera sources, NES /
+  Genesis, a power meter.
+- **Standing:** Phase C closed (4x PS1 source adopted); `D-BASE` CLOSED;
+  the `CL-B1` APK adopted.
 
 ## Current Work Item
 
-**E2-S1** (`handoffs/E2-S1_WHOLE_SYSTEM_MEASUREMENTS_TASK.md`) is done.
-Nothing optimized, adopted or committed. Record:
-`evidence/E2_S1_WHOLE_SYSTEM_2026-10-06.md` (files in
-`evidence/e2_s1_2026-10-05/`).
+**The E3 queue is done** (03:13-08:06Z, 2026-10-06). The records:
+`evidence/E3_S1_EPG_GRAB_PRIORITY_2026-10-06.md`,
+`evidence/E3_S2_COMPANION_GUIDE_RETENTION_2026-10-06.md`,
+`evidence/E3_S3_GRABBER_COST_2026-10-06.md`,
+`evidence/E3_S4_SNES_LIGHTER_CORE_2026-10-06.md`,
+`evidence/E3_S5_AUDIO_SENDER_COST_2026-10-06.md` (files in
+`evidence/e3_s<n>_2026-10-06/`).
 
-- **E1-VOD**: direct play of a fixed film, driven by launcher taps;
-  progress ratio 0.998 / 1.001. No transcode exists, so E1-CONC-VOD is
-  ABSENT.
-- **E2**: 10 × 20-min runs, OK, 0 missed samples, `--check` OK; the
-  pre-registration was amended (A1) before any run. Redactor: 0 findings.
-- **Reference** (host CPU / socket W): idle 0.9 % / 4.7; PS1 local 5 % /
-  13; PS1 streamed 11.7 % / 20.4; 1080p 13.8 % / 20.6; SNES 43-50 % / 21;
-  PS1 + EPG 21 % / 25.6 (rendered 56.5, loss ~1,600/min).
-- **A ~6.5-h idle stretch** (15:47-22:14Z, 2026-10-05) was my missed
-  completion notice; nothing ran then.
+- Every flag was absent at every teardown and at the start of each task;
+  E2's final state was restored after each one.
+- The flags' code is in the tree, dormant (`TOOLS.md`, "The E3 flags").
+  E3-S4's change is a diff only, not applied.
+- **New hypotheses, untested:**
+  - a cached, slim guide-metadata index instead of the per-grab parse
+    (S2's memory; possibly S1's loss peak, via the companion's GIL);
+  - a precompiled grabber;
+  - a remembered source per channel.
+- Redactor: 0 findings beyond the classified false positives (`title.txt`
+  version strings, loopback and all-interfaces bind literals in code).
 
 ## Verified State
 
@@ -75,7 +78,7 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`, including `C5-M1`'s `PRIVYHUB_NATIVE_PROFILE_ID`); none set.
 - **Installed**: **APK `de072762…835e`** (the `CL-B1` APK, adopted
   2026-09-30; hash confirmed on the onn at every teardown since,
-  last 2026-10-06 02:34Z (E2-S1's final state); the previous
+  last 2026-10-06 08:06Z (the E3 queue's end); the previous
   `f31b1c18…8ae7` is kept at `runtime/c4_m1/adopted_app-debug.apk` for
   rollback).
   - The companion is the systemd user unit `privyhub-companion` (`H3`);
@@ -91,8 +94,9 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
     - Kill switches: delete the drop-in + `daemon-reload` + restart
       (off); `POST /plugins/games/adaptive-bitrate/disable` (shadow, one
       session).
-  - Last restarted 02:34Z 2026-10-06 by E2-S1's teardown; checked 02:40Z:
-    as above, 7000 / 1280×720, no game, the adopted PS1 files identical.
+  - Last restarted 08:05Z 2026-10-06 by E3-S5's teardown; checked 08:06Z:
+    environ the live default only, no `e3_flag.conf` drop-in, no game, the
+    adopted PS1 files identical, APK CONFIRMED.
   - The companion tree carries the live controller through `C3-L4-N2`,
     the C5 selector profiles (dormant), **the 1080p rung behind
     `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`** (C5-M5; entry 415 since
@@ -107,19 +111,18 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
-1. **The user's commit** of E2-S1 (`logs/e2_s1_git_status.txt`).
-2. **The user picks the first E3 optimization** from the ordered list
-   (record §8):
-   1. EPG grabs vs a live stream (metric: E1-CONC loss/min and rendered
-      fps);
-   2. the companion's memory after a grab;
-   3. the grabber's own cost;
-   4. the SNES core (a fidelity choice);
-   5. streaming's fixed cost (the audio sender 13 % of a core, the relay
-      8 %).
-3. **E3's loop on that one**, on the user's word: the measured
-   bottleneck, one change, a fresh benchmark on the suite, accept or
-   reject.
+1. **The user's commit** of the E3 queue (`logs/e3_s5_git_status.txt`,
+   the last of `logs/e3_s1..s5_git_status.txt`).
+2. **The user's adoption decisions, from the records.** No item is
+   ACCEPTED, so nothing is offered for adoption. The open choices:
+   - **E3-S4**: fetch `snes9x_libretro.so` yourself, then run the task as
+     written. The core is also a look, and its licence is
+     "Non-commercial".
+   - A decisive re-run of **E3-S1** (INCONCLUSIVE) or **E3-S5** (one run
+     failed). Each would be a new pre-registration.
+   - Whether to test the new hypotheses above.
+3. **E4** only after the adoptions are settled and the suite is re-run on
+   the adopted state.
 
 **Open, not blocking** (carried past Phase C):
 
@@ -169,6 +172,7 @@ Phase C: met (C7, `docs/ROADMAP.md`). **Phase E** (`docs/ROADMAP.md`):
 
 ## Relevant References
 
+- `handoffs/QUEUE_2026-10-06.md` and the five E3 records (`evidence/E3_S1…S5_*_2026-10-06.md`) — E3's verdicts; `TOOLS.md` "The E3 flags".
 - `evidence/E2_S1_WHOLE_SYSTEM_2026-10-06.md` — E2: the table, the reference numbers, the CONC / SNES / memory answers, the E3 list.
 - `architecture/E1_WORKLOAD_SUITE.md` — the frozen E1 suite (Phase E's measurement base).
 - `evidence/E1_S1_WORKLOAD_SUITE_2026-10-05.md` — E1-S1: the inventory, the dry-run table, sampler coverage, the user's list.

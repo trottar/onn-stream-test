@@ -1,0 +1,18 @@
+1216a1217,1233
+>         # E3-S2: after a forced refresh (the grab and its guide-metadata parse) hand the freed heap back to the
+>         # OS with malloc_trim(0). Absent = today's guide(), unchanged.
+>         if not force or os.environ.get("PRIVYHUB_EPG_MALLOC_TRIM") != "1":
+>             return self._guide(channel_id, force=force)
+>         try:
+>             return self._guide(channel_id, force=force)
+>         finally:
+>             import ctypes
+> 
+>             ctypes.CDLL("libc.so.6").malloc_trim(0)
+> 
+>     def _guide(
+>         self,
+>         channel_id: str,
+>         *,
+>         force: bool = False,
+>     ) -> dict[str, Any]:

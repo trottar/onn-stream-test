@@ -2,6 +2,43 @@
 
 ## PHASE E — ACTIVE. E1 FROZEN (VOD added); E2 MEASURED 2026-10-06 (E2-S1); E3 next on the user's pick
 
+**E3 (QUEUE_2026-10-06), in progress — nothing adopted:**
+
+- **E3-S1** (`../evidence/E3_S1_EPG_GRAB_PRIORITY_2026-10-06.md`):
+  the grabber at SCHED_IDLE / nice 19 / idle I/O halved the busiest
+  core's peak at each grab start, but **the loss peak 1 s after each grab
+  start did not move** (E1-CONC 2,046-2,605/min). Verdict INCONCLUSIVE
+  (the control fell 0.01 fps outside E1's band of E2's). **The CONC
+  loss is not host CPU competition.** Open, not tested: the grab's start
+  in the companion's own process (the 25.6 MB guide-metadata parse) or
+  the grabber's network traffic.
+- **E3-S2** (`../evidence/E3_S2_COMPANION_GUIDE_RETENTION_2026-10-06.md`):
+  the ~110 MB step is the allocator's high-water from the **per-grab
+  parse of the 25.6 MB guide metadata** (147 MB traced peak; `malloc_trim`
+  returns 98 % after an isolated grab). `malloc_trim` after each refresh
+  was **REJECTED** in E1-META (PSS 155 MB at the window's end): the
+  metadata list is live through each whole grab, and the row's grabs are
+  back to back. **Open, untested:** a slim cached channel → source index
+  instead of the per-grab parse (memory, and possibly E3-S1's loss peak
+  via the companion's GIL).
+- **E3-S3** (`../evidence/E3_S3_GRABBER_COST_2026-10-06.md`): 95 % of a
+  grab's CPU-s is start-up, but ~91 % of it is inside the node grabber
+  itself (tsx transform + module load, ~2 s at ~170 % of a core, ~595 MB
+  before any network). Starting node directly (no npm) was **REJECTED**
+  (3.3 CPU-s per grab vs bar 2.25). Exact cost: **4.9 CPU-s per
+  channel-grab** (reaped-children CPU). **Open, untested:** a precompiled
+  grabber, a remembered source per channel, batching.
+- **E3-S4** (`../evidence/E3_S4_SNES_LIGHTER_CORE_2026-10-06.md`): **NOT
+  RUN** — no snes9x-family core is installed and the session's permission
+  policy refused the fetch. The change and the runner support are ready;
+  snes9x's licence is "Non-commercial" (the user's point).
+- **E3-S5** (`../evidence/E3_S5_AUDIO_SENDER_COST_2026-10-06.md`): the
+  audio sender wakes 85.8 times per packet (1-ms waits, yields, spin).
+  One timed wait per packet cut it to **2.5 % of a core** (companion
+  25 → 15 %, −1-2 W), but **REJECTED**: flagged run 1 lost 106.5/min in
+  bursts (> 3 × the control's 29.6); run 2 met every clause. Link episode
+  or the change: two runs cannot tell. **Open.**
+
 **E2-S1 (2026-10-05/06)** (`../evidence/E2_S1_WHOLE_SYSTEM_2026-10-06.md`):
 
 - **E1-VOD was added to the suite, REPEATABLE.** The fixed film plays

@@ -1,0 +1,37 @@
+E3-S2 PRE-REGISTRATION -- the companion's memory after a grab. Written 2026-10-06 after the probe (probe.md) and the
+change, BEFORE any benchmark run; hash in e3_s2_preregistration.sha256. Task:
+docs/memory/handoffs/E3-S2_COMPANION_GUIDE_RETENTION_TASK.md under QUEUE_2026-10-06.md. Baseline commit: d9fdbdd.
+E2 = evidence/E2_S1_WHOLE_SYSTEM_2026-10-06.md (META: companion PSS 161.0 MB at the window's end, host CPU 9.8 %,
+grabs 228/0, median 5.2 s). E3-S1's flag (PRIVYHUB_EPG_GRAB_PRIORITY) is ABSENT (no compounding); its code and
+E3-S2's probe hook stay in the tree, dormant.
+
+PROBE ANSWER: allocator high-water (malloc_trim returned 98 % of the +109 MB anon step; live Python objects 0.3 %).
+
+THE ONE CHANGE: companion/plugins/epg.py: guide() becomes a wrapper over the unchanged body (_guide); with
+PRIVYHUB_EPG_MALLOC_TRIM=1 in the companion's environment, a forced guide() calls libc malloc_trim(0) when it returns.
+For the runs the unit's environment also carries MALLOC_ARENA_MAX=2 (the task's arena cap). Absent = today.
+Change diff (over the tree with E3-S1's change and the probe hook): e3_s2_malloc_trim_change.diff, sha256 64e2706794c3e4da8490dbec0fb976ab847c2c4c4c15a1ca0756fe6edeea630f;
+epg.py after: 1a4965e35482625a8f7e8b470b957fe0620c8f70b383dfc0aea9f305a6d50d1b.
+
+1. THE RUNS: E1-META x2, flag SET (drop-in PRIVYHUB_EPG_MALLOC_TRIM=1 + MALLOC_ARENA_MAX=2, for those runs only),
+   window 1200 s, gap 120 s, --e2:
+   tools/e1_suite.py run --e2 --window 1200 --gap 120 --out runs --prereg e3_s2_preregistration.txt
+     --plan E1-META:2:120:PRIVYHUB_EPG_MALLOC_TRIM=1+MALLOC_ARENA_MAX=2      -> runs/E1-META_flag/run1, run2
+   Then the guide read (tools/e3_guide_read.py) -> guide_read_after.json.
+
+2. THE BAR -- ACCEPTED only if ALL hold:
+   a. companion PSS at the window's end (the last 1-s sample in the window) <= 60 MB in BOTH runs;
+   b. companion PSS does not "keep growing" by E2's rule (slope over the window's last 15 min > 5 % of its level)
+      in either run (tools/e3_table.py computes both);
+   c. grabs failed = 0, grabs ok >= 205, median grab <= 6.8 s, each run;
+   d. the guide still serves: guide_read_after has the same channels serving (6) and a programme total within
+      +/- 5 % of 341 (324-358);
+   e. host CPU mean within +/- 2 points of E2's META (9.8): 7.8-11.8, each run.
+   All hold -> ACCEPTED; any fails -> REJECTED. A run that cannot start after the two retries, or the flag breaking
+   the row -> REJECTED (broke the row).
+
+3. REPORTED, NOT GATED: anon vs file at the window's first and last sample; the companion's PSS max; the EPG child's
+   peak PSS per grab (should be unchanged); the grab wall times.
+
+4. RULES: as QUEUE_2026-10-06 and E2-S1's teardown; the drop-in removed at each run's teardown (environ exactly the
+   live default, MALLOC_ARENA_MAX absent); no nft, no sudo, the Opal not touched. No bar changed after data.

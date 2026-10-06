@@ -1,0 +1,121 @@
+diff --git a/companion/plugins/epg.py b/companion/plugins/epg.py
+index c698716..46df50c 100644
+--- a/companion/plugins/epg.py
++++ b/companion/plugins/epg.py
+@@ -1131,19 +1131,25 @@ class EpgPlugin:
+             )
+ 
+             env = self._grab_environment(npm_cache)
++            args = [
++                str(self._npm_path()),
++                "run",
++                "grab",
++                "--",
++                f"--channels={channels}",
++                f"--output={output}",
++                f"--days={self.GRAB_DAYS}",
++                "--maxConnections=1",
++                f"--timeout={self.GRAB_HTTP_TIMEOUT_MS}",
++            ]
++            # E3-S1: the grabber tree at the lowest CPU and I/O priority (SCHED_IDLE, nice 19, idle I/O class);
++            # each wrapper execs the next, so the pid and the tree are today's. Absent = today's spawn.
++            if os.environ.get("PRIVYHUB_EPG_GRAB_PRIORITY") == "idle":
++                args = ["/usr/bin/chrt", "-i", "0", "/usr/bin/nice", "-n", "19",
++                        "/usr/bin/ionice", "-c", "3"] + args
+             started = time.monotonic()
+             result = self._run(
+-                [
+-                    str(self._npm_path()),
+-                    "run",
+-                    "grab",
+-                    "--",
+-                    f"--channels={channels}",
+-                    f"--output={output}",
+-                    f"--days={self.GRAB_DAYS}",
+-                    "--maxConnections=1",
+-                    f"--timeout={self.GRAB_HTTP_TIMEOUT_MS}",
+-                ],
++                args,
+                 cwd=self._epg_root(),
+                 env=env,
+                 timeout=self.GRAB_PROCESS_TIMEOUT_SECONDS,
+@@ -1207,6 +1213,23 @@ class EpgPlugin:
+         channel_id: str,
+         *,
+         force: bool = False,
++    ) -> dict[str, Any]:
++        # E3-S2: after a forced refresh (the grab and its guide-metadata parse) hand the freed heap back to the
++        # OS with malloc_trim(0). Absent = today's guide(), unchanged.
++        if not force or os.environ.get("PRIVYHUB_EPG_MALLOC_TRIM") != "1":
++            return self._guide(channel_id, force=force)
++        try:
++            return self._guide(channel_id, force=force)
++        finally:
++            import ctypes
++
++            ctypes.CDLL("libc.so.6").malloc_trim(0)
++
++    def _guide(
++        self,
++        channel_id: str,
++        *,
++        force: bool = False,
+     ) -> dict[str, Any]:
+         channel_id = self._validate_channel_id(channel_id)
+ 
+@@ -1392,8 +1415,55 @@ class EpgPlugin:
+                 self._record_error("guide_request_failed", exc)
+                 raise RuntimeError("EPG guide request failed") from exc
+ 
++        # E3-S2: a measurement-only memory probe, served only with PRIVYHUB_MEM_PROBE=1 (absent = the unknown
++        # action below, as today). op=start|snap|gc|trim; read-only apart from tracemalloc and malloc_trim.
++        if action == "memprobe" and os.environ.get("PRIVYHUB_MEM_PROBE") == "1":
++            return self._mem_probe(self._first(query, "op") or "snap")
++
+         raise ValueError(f"Unknown EPG action: {action}")
+ 
++    @staticmethod
++    def _mem_probe(op: str) -> dict[str, Any]:
++        import ctypes
++        import gc
++        import sys
++        import tracemalloc
++
++        out: dict[str, Any] = {"op": op}
++        if op == "start" and not tracemalloc.is_tracing():
++            tracemalloc.start(1)
++        elif op == "gc":
++            out["collected"] = gc.collect()
++        elif op == "trim":
++            out["malloc_trim"] = ctypes.CDLL("libc.so.6").malloc_trim(0)
++        if tracemalloc.is_tracing():
++            current, peak = tracemalloc.get_traced_memory()
++            out["traced_mb"] = round(current / 1048576, 2)
++            out["traced_peak_mb"] = round(peak / 1048576, 2)
++            top = tracemalloc.take_snapshot().statistics("filename")[:8]
++            out["traced_top"] = [
++                [Path(str(st.traceback[0].filename)).name, round(st.size / 1048576, 2), st.count]
++                for st in top
++            ]
++        sizes: dict[str, list[int]] = {}
++        for obj in gc.get_objects():
++            row = sizes.setdefault(type(obj).__name__, [0, 0])
++            row[0] += 1
++            row[1] += sys.getsizeof(obj)
++        out["gc_objects_top"] = sorted(
++            ([k, v[0], round(v[1] / 1048576, 2)] for k, v in sizes.items()),
++            key=lambda r: -r[2],
++        )[:8]
++        try:
++            text = Path("/proc/self/smaps_rollup").read_text()
++            for key in ("Rss", "Pss", "Pss_Anon", "Pss_File", "Anonymous"):
++                for line in text.splitlines():
++                    if line.startswith(key + ":"):
++                        out[key.lower() + "_mb"] = round(int(line.split()[1]) / 1024, 1)
++        except OSError:
++            pass
++        return out
++
+     def handle_post(
+         self,
+         action: str,

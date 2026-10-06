@@ -1,0 +1,276 @@
+{
+ "tag": "probe",
+ "started_utc": "2026-10-06T06:41:25.619Z",
+ "preflight": {
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
+  ],
+  "game_active": false,
+  "adb": true,
+  "drop_in_live": true,
+  "e3_dropin_absent": true,
+  "ok": true
+ },
+ "restart": {
+  "mainpid_serves_8765": true,
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
+  ]
+ },
+ "stream": {
+  "ok": true,
+  "attempt": 1,
+  "s_to_playing": 3.1
+ },
+ "threads": {
+  "secs": 180.1,
+  "threads": [
+   {
+    "tid_rel": 0,
+    "policy": 0,
+    "cpu_pct": 0.02,
+    "vol_per_s": 6.1,
+    "invol_per_s": 0.4,
+    "slices_per_s": 6.5,
+    "run_ms_per_s": 0.23,
+    "wait_ms_per_s": 0.044,
+    "syscall_modes": {
+     "7": 1794
+    }
+   },
+   {
+    "tid_rel": 142,
+    "policy": 0,
+    "cpu_pct": 7.86,
+    "vol_per_s": 311.9,
+    "invol_per_s": 6.6,
+    "slices_per_s": 318.5,
+    "run_ms_per_s": 78.59,
+    "wait_ms_per_s": 0.086,
+    "syscall_modes": {
+     "7": 1642,
+     "running": 142,
+     "202": 10
+    }
+   },
+   {
+    "tid_rel": 143,
+    "policy": 0,
+    "cpu_pct": 0.03,
+    "vol_per_s": 3.9,
+    "invol_per_s": 0.0,
+    "slices_per_s": 4.0,
+    "run_ms_per_s": 0.33,
+    "wait_ms_per_s": 0.021,
+    "syscall_modes": {
+     "230": 1793,
+     "202": 1
+    }
+   },
+   {
+    "tid_rel": 251,
+    "policy": 0,
+    "cpu_pct": 3.44,
+    "vol_per_s": 579.4,
+    "invol_per_s": 45.7,
+    "slices_per_s": 625.1,
+    "run_ms_per_s": 34.48,
+    "wait_ms_per_s": 3.094,
+    "syscall_modes": {
+     "7": 1702,
+     "running": 71,
+     "202": 21
+    }
+   },
+   {
+    "tid_rel": 260,
+    "policy": 0,
+    "cpu_pct": 0.08,
+    "vol_per_s": 25.5,
+    "invol_per_s": 0.2,
+    "slices_per_s": 25.7,
+    "run_ms_per_s": 0.87,
+    "wait_ms_per_s": 0.018,
+    "syscall_modes": {
+     "0": 1793,
+     "running": 1
+    }
+   },
+   {
+    "tid_rel": 261,
+    "policy": 2,
+    "cpu_pct": 13.74,
+    "vol_per_s": 17167.0,
+    "invol_per_s": 0.2,
+    "slices_per_s": 17167.2,
+    "run_ms_per_s": 137.43,
+    "wait_ms_per_s": 0.268,
+    "syscall_modes": {
+     "202": 1463,
+     "running": 250,
+     "230": 81
+    }
+   },
+   {
+    "tid_rel": 290,
+    "policy": 0,
+    "cpu_pct": 0.01,
+    "vol_per_s": 4.6,
+    "invol_per_s": 0.1,
+    "slices_per_s": 4.6,
+    "run_ms_per_s": 0.11,
+    "wait_ms_per_s": 0.017,
+    "syscall_modes": {
+     "230": 1794
+    }
+   }
+  ],
+  "status_keys_a": [
+   "active",
+   "adaptive_bitrate",
+   "alpha_version",
+   "audio",
+   "audio_cushion",
+   "audio_port",
+   "audio_redundancy",
+   "bitrate_kbps",
+   "capture_backend",
+   "capture_target",
+   "controller",
+   "encoder",
+   "encoder_command",
+   "encoder_overrides",
+   "fec",
+   "fec_enabled",
+   "fec_group_size",
+   "ffmpeg_found",
+   "fps",
+   "gop_frames",
+   "height",
+   "host_resource_sampler",
+   "host_telemetry",
+   "host_thermal_c",
+   "input_port",
+   "kind",
+   "last_heartbeat",
+   "loss_per_min_recent",
+   "managed",
+   "message",
+   "ok",
+   "payload_type",
+   "profile",
+   "profile_id",
+   "profile_selection",
+   "ready",
+   "recovery",
+   "reference_bitrate_kbps",
+   "source_bitrate_kbps",
+   "title",
+   "transport",
+   "vaapi_render_node_found",
+   "video_port",
+   "wgc_runtime_found",
+   "width",
+   "x11_display_found",
+   "x11_window_tool_found"
+  ],
+  "status_a": {
+   "audio_port": 48101
+  },
+  "status_b": {
+   "audio_port": 48101
+  }
+ },
+ "audio_counters": {
+  "before": {
+   "games.native_stream.fec.send_errors": 0,
+   "games.native_stream.audio.packets_sent": 12762,
+   "games.native_stream.audio.send_errors": 0,
+   "games.native_stream.audio.duplicates_sent": 12758,
+   "games.native_stream.audio.duplicate_send_errors": 0,
+   "games.native_stream.audio.helper_status.send.underflows": 27,
+   "games.native_stream.audio.helper_status.redundancy.duplicates_sent": 12758,
+   "games.native_stream.audio.helper_status.redundancy.duplicate_send_errors": 0,
+   "stream.fec.send_errors": 0,
+   "stream.audio.packets_sent": 12763,
+   "stream.audio.send_errors": 0,
+   "stream.audio.duplicates_sent": 12759,
+   "stream.audio.duplicate_send_errors": 0,
+   "stream.audio.helper_status.send.underflows": 27,
+   "stream.audio.helper_status.redundancy.duplicates_sent": 12759,
+   "stream.audio.helper_status.redundancy.duplicate_send_errors": 0
+  },
+  "after": {
+   "games.native_stream.fec.send_errors": 0,
+   "games.native_stream.audio.packets_sent": 48786,
+   "games.native_stream.audio.send_errors": 0,
+   "games.native_stream.audio.duplicates_sent": 48782,
+   "games.native_stream.audio.duplicate_send_errors": 0,
+   "games.native_stream.audio.helper_status.send.underflows": 27,
+   "games.native_stream.audio.helper_status.redundancy.duplicates_sent": 48782,
+   "games.native_stream.audio.helper_status.redundancy.duplicate_send_errors": 0,
+   "stream.fec.send_errors": 0,
+   "stream.audio.packets_sent": 48788,
+   "stream.audio.send_errors": 0,
+   "stream.audio.duplicates_sent": 48784,
+   "stream.audio.duplicate_send_errors": 0,
+   "stream.audio.helper_status.send.underflows": 27,
+   "stream.audio.helper_status.redundancy.duplicates_sent": 48784,
+   "stream.audio.helper_status.redundancy.duplicate_send_errors": 0
+  },
+  "secs": 180.1,
+  "per_s": {
+   "games.native_stream.fec.send_errors": 0.0,
+   "games.native_stream.audio.packets_sent": 200.0,
+   "games.native_stream.audio.send_errors": 0.0,
+   "games.native_stream.audio.duplicates_sent": 200.0,
+   "games.native_stream.audio.duplicate_send_errors": 0.0,
+   "games.native_stream.audio.helper_status.send.underflows": 0.0,
+   "games.native_stream.audio.helper_status.redundancy.duplicates_sent": 200.0,
+   "games.native_stream.audio.helper_status.redundancy.duplicate_send_errors": 0.0,
+   "stream.fec.send_errors": 0.0,
+   "stream.audio.packets_sent": 200.0,
+   "stream.audio.send_errors": 0.0,
+   "stream.audio.duplicates_sent": 200.0,
+   "stream.audio.duplicate_send_errors": 0.0,
+   "stream.audio.helper_status.send.underflows": 0.0,
+   "stream.audio.helper_status.redundancy.duplicates_sent": 200.0,
+   "stream.audio.helper_status.redundancy.duplicate_send_errors": 0.0
+  }
+ },
+ "teardown": {
+  "report": "native_decoder_20261006_064550_875.json",
+  "report_fields": {
+   "lost_packets": 115,
+   "rendered_frames": 14773,
+   "stale_output_drops": 14,
+   "max_output_gap_ms": 92,
+   "slow_event_retained": 642,
+   "slow_event_capacity": 1280,
+   "duration_ms": 247209,
+   "video.lost_packets": 115,
+   "video.sequence_resyncs": 0,
+   "video.recent_fps": 57.17067316967314,
+   "decoder.spike_20_ms": 192,
+   "decoder.spike_50_ms": 15,
+   "decoder.spike_80_ms": 12,
+   "decoder.stale_output_drops": 14,
+   "decoder.max_output_gap_ms": 92,
+   "audio.lost_packets": 4,
+   "audio.underruns": 2
+  },
+  "stopped": true,
+  "banner": {
+   "now_playing_before": 2,
+   "now_playing_after_relaunch": 0
+  },
+  "flags_absent": true,
+  "apk": "CONFIRMED",
+  "ps1_files_identical": true,
+  "retroarch_left": 0,
+  "encoder_left": 0
+ },
+ "ended_utc": "2026-10-06T06:46:14.297Z"
+}

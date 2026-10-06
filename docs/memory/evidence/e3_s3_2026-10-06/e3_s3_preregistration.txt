@@ -1,0 +1,42 @@
+E3-S3 PRE-REGISTRATION -- the EPG grabber's own cost. Written 2026-10-06 after the probe (probe.md) and the change,
+BEFORE any benchmark run; hash in e3_s3_preregistration.sha256. Task: docs/memory/handoffs/E3-S3_GRABBER_COST_TASK.md
+under QUEUE_2026-10-06.md. Baseline commit: d9fdbdd. E2 = e2_s1_2026-10-05/runs/E1-META/run1. E3-S1's and E3-S2's
+flags are ABSENT (no compounding); their code stays in the tree, dormant.
+
+PROBE ANSWER: (a) npm + (b) node until its first network byte = 95 % of each grab's CPU-seconds (>= 40 %) ->
+PRIVYHUB_EPG_DIRECT_NODE=1. Stated before the data: ~91 % of the cost is inside the grabber node, which direct
+invocation keeps; the expected saving is the npm + tsx-cli share (~4 % CPU-s, ~95 MB PSS).
+
+THE ONE CHANGE: companion/plugins/epg.py, _grab_from_candidate, the argv only: with PRIVYHUB_EPG_DIRECT_NODE=1 the
+companion runs "<toolchain node> --require <tsx>/dist/preflight.cjs --import <tsx>/dist/loader.mjs
+scripts/commands/epg/grab.ts <the same grab arguments>" in the same cwd with the same environment. Absent = npm run.
+Diff: e3_s3_direct_node_change.diff sha256 2145a2fa67757371d4938c2900b04e79f134f7a1df7f7778166ab570c859168e; epg.py after: f1110f93da821d44b15637c9251beb69f13bea0309b45741ecbe08072c1427e9.
+
+THE UNIT (said now so the variants compare): one channel-grab = one POST /plugins/epg/refresh of one channel
+(E1-META's cycle; each may run 1-3 source attempts, as in E2). No batching here.
+
+1. THE RUNS: E1-META x2, flag SET (drop-in PRIVYHUB_EPG_DIRECT_NODE=1 for those runs only), window 1200 s, gap 120 s,
+   --e2:  tools/e1_suite.py run --e2 --window 1200 --gap 120 --out runs --prereg e3_s3_preregistration.txt
+          --plan E1-META:2:120:PRIVYHUB_EPG_DIRECT_NODE=1                      -> runs/E1-META_flag/run1, run2
+   Alongside (reported only): tools/e3_children_log.py -> children_cpu.jsonl (the companion's reaped-children CPU,
+   exact). Then tools/e3_guide_read.py -> guide_read_after.json.
+
+2. THE BAR -- ACCEPTED only if ALL hold, both runs:
+   a. EPG child CPU-seconds per channel-grab <= 0.7 x E2's, BY THE SAME METHOD on both sides: tools/e3_table.py's
+      "EPG CPU-s per grab, window total / grabs" (the 1-s sampler's epg category, summed over the window, divided by
+      the grabs in the window). E2 META by that method = 3.21 CPU-s -> bar <= 2.25 CPU-s. (The handoff's "<= 3.3"
+      came from wall time x mean %; the 0.7 x is the bar, the method must match E2's, so this is the figure.)
+   b. peak PSS per invocation not above E2's: the median per-grab peak of the epg category (tools/e3_table.py)
+      <= 660 MB;
+   c. grabs failed = 0, and every configured channel (6) refreshed >= 34 times in the window (ok grabs per channel
+      from epg.jsonl; E2: 38 each);
+   d. the guide still serves: guide_read_after 6 channels serving, programme total within +/- 5 % of 342 (325-359);
+   (host CPU mean <= 9.8: reported, not gated, as the task says.)
+   All hold -> ACCEPTED; any fails -> REJECTED. The row breaking or never starting after two retries -> REJECTED
+   (broke the row).
+
+3. REPORTED, NOT GATED: median grab wall time; the companion's PSS; host CPU; the exact children CPU-s per grab from
+   children_cpu.jsonl (the window's delta / grabs; E2 has no such log, so it is compared with the probe's exact
+   chain: 3.57-3.76 CPU-s per single-attempt grab).
+
+4. RULES: as QUEUE_2026-10-06 and E2-S1's teardown; no nft, no sudo, the Opal not touched. No bar changed after data.

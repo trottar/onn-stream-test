@@ -49,6 +49,9 @@ LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
 FLAG_NAMES = ["PRIVYHUB_ADAPTIVE_BITRATE_INJECT", "PRIVYHUB_ADAPTIVE_BITRATE_TOP", "PRIVYHUB_PS1_LOOK",
               "PRIVYHUB_NATIVE_PROFILE_ID", "PRIVYHUB_FEC_SCHEME"]
 RA_CFG = Path.home() / ".config/retroarch/config"
+# E3: a run's flag lives in this drop-in for that run only (written before its restart, removed + daemon-reload +
+# restart at its teardown); the adopted adaptive.conf beside it is never touched
+DROPIN = Path.home() / ".config/systemd/user" / f"privyhub-companion.service.d" / "e3_flag.conf"
 PS1_DIR = RA_CFG / "Beetle PSX HW"
 PS1_SHA = REPO / "docs/memory/evidence/c5_close_2026-10-05/adopted_ps1_sha256.txt"
 INPUT_CFG = REPO / "data/games/retroarch/config/privyhub-input.cfg"
@@ -65,6 +68,8 @@ VOD_PATH = ["VOD", "MOVIES", VOD_TITLE]       # the launcher's tiles, tapped in 
 ABR_LOG = REPO / "logs/games/adaptive_bitrate_shadow.jsonl"
 
 TEKKEN = {"id": "game_ps1_b0a5986638f61a11", "override": PS1_DIR / "Tekken 3 (USA).cfg"}
+# E3-S4: RetroArch's per-core config dir is the core's corename (its .info); the counter override follows the core
+SNES_CORENAMES = {"snes9x": "Snes9x", "snes9x2010": "Snes9x 2010", "snes9x2005_plus": "Snes9x 2005 Plus"}
 SMW = {"id": "game_snes_c6fecdcdddb35398", "override": RA_CFG / "bsnes" / "Super Mario World (USA).cfg"}
 
 # The suite, as pre-registered (e1_preregistration.txt). kind: idle | local | stream | meta
@@ -646,21 +651,35 @@ def preflight() -> dict:
     mp = mainpid()
     d = {"manager": manager_flags(), "environ": environ_flags(mp), "game_active": games_status().get("active"),
          "adb": any(l.endswith("\tdevice") for l in adb("devices").splitlines()[1:]),
-         "drop_in_live": f"Environment={LIVE}" in sh(["systemctl", "--user", "cat", UNIT])}
-    d["ok"] = d["manager"] == [] and d["environ"] == [LIVE] and d["adb"] and d["drop_in_live"]
+         "drop_in_live": f"Environment={LIVE}" in sh(["systemctl", "--user", "cat", UNIT]),
+         "e3_dropin_absent": not DROPIN.exists()}
+    d["ok"] = d["manager"] == [] and d["environ"] == [LIVE] and d["adb"] and d["drop_in_live"] and d["e3_dropin_absent"]
     return d
+
+
+def environ_has(pid: int | None, kv: str) -> bool:
+    try:
+        return kv in open(f"/proc/{pid}/environ", "rb").read().decode(errors="replace").split("\0")
+    except (OSError, TypeError):
+        return False
 
 
 def teardown_flags(w: dict, rec: dict):
     sh(["systemctl", "--user", "unset-environment", *FLAG_NAMES])
-    if w.get("flags"):
+    if DROPIN.exists() or w.get("dropin"):
+        DROPIN.unlink(missing_ok=True)
+        sh(["systemctl", "--user", "daemon-reload"], 60)
+        rec["dropin_removed"] = not DROPIN.exists()
+    if w.get("flags") or w.get("dropin"):
         rec["restart_after_flags"] = restart_unit()
+    if w.get("dropin"):
+        rec["dropin_env_absent"] = not any(environ_has(mainpid(), kv) for kv in w["dropin"])
     mp = mainpid()
     rec["flags_absent"] = manager_flags() == [] and environ_flags(mp) == [LIVE]
 
 
 def run_once(w: dict, run_no: int, out: Path, window: int, gap: int, e2: bool = False) -> dict:
-    rd = out / w["id"] / f"run{run_no}"
+    rd = out / w.get("dir", w["id"]) / f"run{run_no}"
     rd.mkdir(parents=True, exist_ok=True)
     rec = {"workload": w["id"], "run": run_no, "kind": w["kind"], "main_process": w["main"], "started_utc": utc(),
            "window_s": window, "gap_s": gap, "warmup_s": w["warmup"], "status": "STARTED"}
@@ -684,13 +703,19 @@ def run_once(w: dict, run_no: int, out: Path, window: int, gap: int, e2: bool = 
         if game:
             if game["override"].exists():
                 raise RuntimeError("a file already sits at the counter override's path; refusing to overwrite")
+            game["override"].parent.mkdir(parents=True, exist_ok=True)   # E3-S4: a lighter core's config dir
             game["override"].write_text(COUNTER)
             rec["counter_override"] = "set"
         for kv in w.get("flags", []):
             sh(["systemctl", "--user", "set-environment", kv])
+        if w.get("dropin"):
+            DROPIN.write_text("[Service]\n" + "".join(f"Environment={kv}\n" for kv in w["dropin"]))
+            sh(["systemctl", "--user", "daemon-reload"], 60)
+            rec["dropin"] = list(w["dropin"])
         rec["restart"] = r = restart_unit()
-        want = sorted([LIVE] + w.get("flags", []))
-        if not (r["mainpid_serves_8765"] and r["environ"] == want and r["manager"] == sorted(w.get("flags", []))):
+        want = sorted([LIVE] + w.get("flags", []) + [kv for kv in w.get("dropin", []) if kv.startswith("PRIVYHUB_")])
+        if not (r["mainpid_serves_8765"] and r["environ"] == want and r["manager"] == sorted(w.get("flags", []))
+                and all(environ_has(mainpid(), kv) for kv in w.get("dropin", []))):
             raise RuntimeError(f"unit not as expected after restart: {r}")
         st = stream_status()
         ov = st.get("encoder_overrides") or {}
@@ -866,10 +891,19 @@ def run_suite(out: Path, only: list | None, runs: int, window: int, gap: int, pl
     log = Log(out / "suite.log")
     byid = {w["id"]: w for w in WORKLOADS}
     if plan:
-        sched = [(byid[i], r, g) for i, r, g in plan]
+        # E3: a 4th plan field KEY=VAL[+KEY=VAL] = the run's drop-in flag(s); its runs go to <ID>_flag/
+        sched = []
+        for row in plan:
+            i, r, g = row[:3]
+            fl = row[3] if len(row) > 3 else None
+            w = dict(byid[i], dropin=fl, dir=f"{i}_flag") if fl else byid[i]
+            core = next((kv.split("=", 1)[1] for kv in (fl or []) if kv.startswith("PRIVYHUB_SNES_CORE=")), None)
+            if core and w.get("game"):
+                w["game"] = dict(w["game"], override=RA_CFG / SNES_CORENAMES[core] / w["game"]["override"].name)
+            sched.append((w, r, g))
     else:
         sched = [(w, runs, gap) for w in WORKLOADS if not only or w["id"] in only]
-    log(f"suite start: {[(w['id'], r, g) for w, r, g in sched]}, window {window}s, gap {gap}s, e2 {e2}; "
+    log(f"suite start: {[(w.get('dir', w['id']), r, g, w.get('dropin')) for w, r, g in sched]}, window {window}s, gap {gap}s, e2 {e2}; "
         f"ABSENT: {sorted(ABSENT)}")
     (out / "absent.json").write_text(json.dumps(ABSENT, indent=1))
     for w, nruns, first_gap in sched:
@@ -882,13 +916,14 @@ def run_suite(out: Path, only: list | None, runs: int, window: int, gap: int, pl
                     break
                 log(w["id"], f"run{n}: attempt {attempt + 1} failed")
                 if attempt < 2:
-                    (out / w["id"] / f"run{n}" / "summary.json").rename(
-                        out / w["id"] / f"run{n}" / f"summary_failed_attempt{attempt + 1}.json")
+                    (out / w.get("dir", w["id"]) / f"run{n}" / "summary.json").rename(
+                        out / w.get("dir", w["id"]) / f"run{n}" / f"summary_failed_attempt{attempt + 1}.json")
     log("suite done")
     final = {"manager": manager_flags(), "environ": environ_flags(mainpid()), "game_active": games_status().get("active"),
              "ps1_files_identical": ps1_files_identical(), "apk": "CONFIRMED" if apk_hash() == EXPECT_APK else "MISMATCH",
              "retroarch": len(retroarch_pids()), "encoder": len(encoder_pids()), "at_utc": utc()}
-    final["flags_absent"] = final["manager"] == [] and final["environ"] == [LIVE]
+    final["e3_dropin_absent"] = not DROPIN.exists()
+    final["flags_absent"] = final["manager"] == [] and final["environ"] == [LIVE] and final["e3_dropin_absent"]
     (out / "final_state.json").write_text(json.dumps(final, indent=1))
     log("final state:", json.dumps(final))
 
@@ -998,10 +1033,9 @@ def check(out: Path) -> int:
             p = out / rel
             if not p.exists() or hashlib.sha256(p.read_bytes()).hexdigest() != h:
                 probs.append(f"changed or missing: {rel}")
-    for w in WORKLOADS:
-        if not (out / w["id"]).exists():
-            continue
-        for rdir in sorted((out / w["id"]).glob("run*")):
+    for wdir in sorted(d for d in out.iterdir() if d.is_dir() and d.name.split("_")[0] in {w["id"] for w in WORKLOADS}):
+        w = {"id": wdir.name}
+        for rdir in sorted(wdir.glob("run*")):
             n = rdir.name[3:]
             s = rdir / "summary.json"
             if not s.exists():
@@ -1084,8 +1118,11 @@ def main(argv: list) -> int:
             plan = []
             for item in argv[argv.index("--plan") + 1].split(","):
                 p = item.split(":")
-                plan.append((p[0], int(p[1]) if len(p) > 1 else 1, int(p[2]) if len(p) > 2 else gap))
-            unknown = [i for i, _, _ in plan if i not in {w["id"] for w in WORKLOADS}]
+                row = [p[0], int(p[1]) if len(p) > 1 else 1, int(p[2]) if len(p) > 2 else gap]
+                if len(p) > 3 and p[3]:
+                    row.append(p[3].split("+"))
+                plan.append(row)
+            unknown = [r[0] for r in plan if r[0] not in {w["id"] for w in WORKLOADS}]
             if unknown:
                 print("refusing: unknown ids", unknown)
                 return 2

@@ -1,0 +1,49 @@
+E3-S1 PRE-REGISTRATION -- the EPG grab's start-up vs the live stream. Written 2026-10-06 (~03:35Z) after the probe
+(probe.md) and the change, BEFORE any benchmark run; hash in e3_s1_preregistration.sha256. Task:
+docs/memory/handoffs/E3-S1_EPG_GRAB_PRIORITY_TASK.md under QUEUE_2026-10-06.md. Baseline commit: d9fdbdd (the user's
+E2-S1 commit). E2 = evidence/E2_S1_WHOLE_SYSTEM_2026-10-06.md (e2_s1_2026-10-05/runs).
+
+HYPOTHESIS (E2's, one sentence): the grab's start-up (npm, then node) saturates one core for ~1-3 s and delays the
+stream's send-side threads at sub-second scale; the resulting send bursts are lost on the wireless hop.
+
+THE ONE CHANGE: companion/plugins/epg.py, _grab_from_candidate, the grab's argv only: with
+PRIVYHUB_EPG_GRAB_PRIORITY=idle in the companion's environment the argv is prefixed with
+"/usr/bin/chrt -i 0 /usr/bin/nice -n 19 /usr/bin/ionice -c 3" (each execs the next; the whole grabber tree runs
+SCHED_IDLE, nice 19, idle I/O class -- confirmed in the probe's smoke). Absent = today's argv, byte for byte.
+No pinning, no deferral. Diff: e3_s1_epg_grab_priority.diff, sha256 b8b706a77cef01674a00c71464cdcba397db220c33dc81f847ab1046cb984f09;
+epg.py after the change sha256 bde31e0a57080804b15e29b8862086df13f4732a8ea12aea8d9d834dcde3ce6e (before: 342a179c...14ee).
+Runner: tools/e1_suite.py with the E3 drop-in extension (a 4th --plan field KEY=VAL is written to
+~/.config/systemd/user/privyhub-companion.service.d/e3_flag.conf before the run's restart; at the run's teardown the
+file is removed, daemon-reload, the unit restarted, and the environ checked to be exactly
+PRIVYHUB_ADAPTIVE_BITRATE_MODE=live; flagged runs go to <ID>_flag/).
+
+1. THE RUNS, in this order, window 1200 s, idle gap 120 s, E1's launch / warm-up / teardown per row, --e2:
+     E1-PS1-STREAM x1, flag ABSENT  (the same-night control)        -> runs/E1-PS1-STREAM/run1
+     E1-CONC x2, flag SET (PRIVYHUB_EPG_GRAB_PRIORITY=idle)           -> runs/E1-CONC_flag/run1, run2
+     E1-META x1, flag SET                                             -> runs/E1-META_flag/run1
+   Command: tools/e1_suite.py run --e2 --window 1200 --gap 120 --out runs --prereg e3_s1_preregistration.txt
+     --plan E1-PS1-STREAM:1:120,E1-CONC:2:120:PRIVYHUB_EPG_GRAB_PRIORITY=idle,E1-META:1:120:PRIVYHUB_EPG_GRAB_PRIORITY=idle
+   The runner's two-retry limit applies to a failing launch. Nothing is tuned between runs.
+
+2. THE BAR -- ACCEPTED only if ALL hold:
+   a. E1-CONC video loss/min (heartbeat, window) <= 100 in BOTH runs AND <= 3x the control's loss/min;
+   b. E1-CONC rendered fps (heartbeat, window) >= 59.5 in BOTH runs;
+   c. E1-CONC sequence resyncs (heartbeat stream_resyncs, window) <= 10 per run (E2: 199 / 204);
+   d. grabs: failed = 0 in E1-META and both E1-CONC runs; grabs ok >= 205 (META), >= 187 (each CONC run);
+      median grab s <= 7.8 (META), <= 8.8 (each CONC run);
+   e. COMPARABILITY: the control within E1's bands of E2's E1-PS1-STREAM (host CPU mean 11.7 +/- 2 points;
+      rendered fps 59.81 +/- 0.5). If (e) fails the task is INCONCLUSIVE (the night is not comparable), not
+      REJECTED, whatever (a)-(d) say.
+   If (e) holds: all of (a)-(d) -> ACCEPTED; any of (a)-(d) fails -> REJECTED.
+   If a flagged run never reaches PLAYING after the two retries, or the flag breaks the row: REJECTED (broke the row).
+
+3. REPORTED, NOT GATED: the busiest-core-per-second p95 (E2: 96-97); the aligned 0-10 s frame from
+   e2_analysis.py's CONC section (unchanged code) pointed at runs/E1-CONC_flag with the same-night control
+   (runs/E1-PS1-STREAM) as its baseline, and also with E2's E1-PS1-STREAM as its baseline; audio underruns; max
+   output gap (C2); the ladder's decisions (rows, transitions); host CPU; the EPG child's CPU % and PSS; the policy /
+   nice of the grabber processes as sampled (threads.jsonl policy column).
+
+4. RULES: adopted profile, 4x PS1 source and APK throughout; the companion through its unit only; the flag only inside
+   the flagged runs, absent at every teardown and at the end (final_state.json: manager none, environ exactly the live
+   default, the e3 drop-in absent); no nft, no sudo, the Opal not touched. No bar, band or reading is changed after
+   the data. Nothing adopted; nothing committed.

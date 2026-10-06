@@ -2,55 +2,48 @@
 
 Authoritative state: `../CURRENT.md`. **Start there.**
 
-Baseline commit `a56746e` (E1-S1 committed). E2-S1 is not committed (the
-user's commit: `../../../logs/e2_s1_git_status.txt`).
+Baseline commit `d9fdbdd` (E2-S1 committed). The E3 queue's work is not
+committed (the user's commit: `../../../logs/e3_s5_git_status.txt`, the
+last of `logs/e3_s1..s5_git_status.txt`).
 
-## 2026-10-06 — `E2-S1`: E2 MEASURED; the VOD row added to the suite
+## 2026-10-06 — `QUEUE_2026-10-06`: E3, all five items, unattended
 
-- **E1-VOD joins the suite** (REPEATABLE). The fixed film plays direct
-  from the range server; no transcode, so E1-CONC-VOD is ABSENT. Suite
-  amendment dated 2026-10-05; the 1080p row is kept (the user).
-- **E2**: every row at 20 min (SNES and CONC twice), all OK. Answers:
-  - **CONC**: the busiest core rises first and most during grab
-    start-ups; there are no host tx drops, no encoder dup/drop, and the
-    relay is flat. The hypothesis is that the grab start-up delays the
-    stream's send threads.
-  - **SNES**: no starvation; bsnes costs 4.4-5.2 cores and varies (NOT
-    YET REPEATABLE).
-  - **Memory**: +~110 MB anon in the companion at the first grab.
-- The reference numbers for this host are in §6 of
-  `../evidence/E2_S1_WHOLE_SYSTEM_2026-10-06.md`; the ordered E3 list is
-  §8.
+Each task's change is behind its own flag. Every flag was absent at every
+teardown and at the end; E2's final state was restored after each task
+(08:06Z, APK CONFIRMED). **Nothing accepted, adopted or committed.**
+
+| # | item | the one change (flag) | verdict | the finding |
+| --- | --- | --- | --- | --- |
+| S1 | EPG grabs vs a live stream | grabber at SCHED_IDLE / nice 19 / idle I/O (`PRIVYHUB_EPG_GRAB_PRIORITY=idle`) | **INCONCLUSIVE** (the control 0.01 fps outside E1's band; a bad-link hour) | the core peak halved; **the loss peak at +1 s did not move**: not host CPU |
+| S2 | the companion's memory after a grab | `malloc_trim(0)` after each refresh (`PRIVYHUB_EPG_MALLOC_TRIM=1`) | **REJECTED** (PSS 155 MB at the window's end) | the per-grab 25.6 MB metadata parse, live through each grab |
+| S3 | the grabber's own cost | node started directly, no npm (`PRIVYHUB_EPG_DIRECT_NODE=1`) | **REJECTED** (3.3 CPU-s per grab vs 2.25) | the cost is the node grabber's own start-up; 4.9 CPU-s per grab |
+| S4 | a lighter SNES core | `PRIVYHUB_SNES_CORE` (prepared, not applied) | **NOT RUN** | no snes9x core; the fetch was refused by the session's policy |
+| S5 | streaming's fixed cost | audio sender: one timed wait per packet (`PRIVYHUB_AUDIO_SENDER_PACING=frame`) | **REJECTED** (run 1's loss 106.5/min > 3 × control) | sender 13 → 2.5 %, companion 25 → 15 %; run 2 passed |
+
+- **New, untested hypotheses from the records:**
+  - a cached, slim guide-metadata index, which may serve S2 and S1's loss
+    peak (the GIL at each grab's start);
+  - a precompiled grabber;
+  - a remembered source per channel.
 - **Next, the user's:**
   1. the commit;
-  2. pick the first E3 optimization;
-  3. E3's loop on it.
+  2. decisions from the records: no item is ACCEPTED, so nothing is
+     offered for adoption. The open choices are S4 (fetch the core
+     yourself; the look and the licence are yours), and a decisive
+     re-run for S1 or S5 (a new pre-registration);
+  3. E4 only after that.
 
-## 2026-10-05 — `E1-S1`: Phase E started; E1 FROZEN
+## Earlier (condensed 2026-10-06, E3 queue)
 
-Condensed on 2026-10-06. The suite is `../architecture/E1_WORKLOAD_SUITE.md`
-(6 of 7 rows repeatable; CONC not). The record is
-`../evidence/E1_S1_WORKLOAD_SUITE_2026-10-05.md`.
-
-## 2026-10-05 — `C5-CLOSE`: C5 CLOSED, **Phase C CLOSED**
-
-Condensed on 2026-10-05 (E1-S1). The user's look and decisions: the 1080p
-rung and `remaster` are NOT ADOPTED (both behind their flags), the 4x
-source stays, and Phase C closes. The details are in `../2026-10-05.md`
-and `../evidence/C5_CLOSE_2026-10-05.md` (with the C5-CLOSE-A addendum).
-
-## 2026-10-01 — `C5-M4A` (the 4x PS1 source ADOPTED); `LINK-L1` MIXED; live adaptive bitrate ON BY DEFAULT (`C3-L4-D1`)
-
-Condensed on 2026-10-05: the details are in `../2026-10-01.md` and the
-records it names (`../decisions/C5-M4_PS1_4X_SOURCE_ADOPTION_2026-10-01.md`,
-`../evidence/LINK_L1_LOSS_ROW_2026-10-01.md`,
-`../decisions/C3-L4_LIVE_DEFAULT_2026-10-01.md`). Reverts and kill
-switches: `../TOOLS.md`.
-
-## 2026-09-28 — `C3.L3a` closed; `C3.L4` authorized; C5-M1; `C3-L4-L1` built
-
-Condensed on 2026-10-01: the details are in `../2026-09-28.md` and the
-records it names.
+- **E2-S1** (2026-10-06): `../evidence/E2_S1_WHOLE_SYSTEM_2026-10-06.md`
+  (the table, the answers, the reference numbers §6, the E3 list §8).
+- **E1-S1** (2026-10-05): `../architecture/E1_WORKLOAD_SUITE.md`,
+  `../evidence/E1_S1_WORKLOAD_SUITE_2026-10-05.md`.
+- **C5-CLOSE** (2026-10-05): Phase C closed; the rung and `remaster` not
+  adopted, the 4x source stays (`../evidence/C5_CLOSE_2026-10-05.md`).
+- **2026-10-01**: the 4x source adopted, live adaptive bitrate on by
+  default (`../2026-10-01.md`; reverts in `../TOOLS.md`).
+- **2026-09-28**: `../2026-09-28.md`.
 
 The section below is the 2026-09-23 state, kept as written.
 

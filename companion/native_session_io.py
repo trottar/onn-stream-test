@@ -309,6 +309,12 @@ class NativeAudioStreamer:
             if remaining_ns <= 0:
                 return True
 
+            # E3-S5: PRIVYHUB_AUDIO_SENDER_PACING=frame -> one timed wait to the packet's deadline instead of 1-ms
+            # polls, yields and the final spin. Absent = today's wait.
+            if self._linux_pacing_frame:
+                self._linux_stop_event.wait(remaining_ns / 1_000_000_000)
+                continue
+
             if remaining_ns > 1_500_000:
                 self._linux_stop_event.wait(0.001)
             elif remaining_ns > 250_000:
@@ -428,6 +434,8 @@ class NativeAudioStreamer:
 
         if not self._linux_prepare_sender_scheduler():
             return
+
+        self._linux_pacing_frame = os.environ.get("PRIVYHUB_AUDIO_SENDER_PACING") == "frame"  # E3-S5
 
         sock = socket.socket(
             socket.AF_INET,

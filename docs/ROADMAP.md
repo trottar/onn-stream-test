@@ -1049,6 +1049,19 @@ Potential areas:
 
 Optimize before deriving the hardware floor.
 
+**E3 status (QUEUE_2026-10-06, the five items in E2's order, each behind
+its own flag, nothing adopted):**
+
+| task | change (flag) | verdict | record |
+| --- | --- | --- | --- |
+| E3-S1 EPG grab vs stream | grabber at SCHED_IDLE / nice 19 / idle I/O (`PRIVYHUB_EPG_GRAB_PRIORITY=idle`) | **INCONCLUSIVE** (control 0.01 fps off-band); loss unmoved | `evidence/E3_S1_EPG_GRAB_PRIORITY_2026-10-06.md` |
+| E3-S2 companion memory after a grab | `malloc_trim(0)` after each forced refresh (`PRIVYHUB_EPG_MALLOC_TRIM=1`) | **REJECTED** (PSS 155 MB at the window's end; the parse is live through each grab) | `evidence/E3_S2_COMPANION_GUIDE_RETENTION_2026-10-06.md` |
+| E3-S3 grabber cost | node started directly, no `npm run` (`PRIVYHUB_EPG_DIRECT_NODE=1`) | **REJECTED** (3.3 CPU-s per grab vs bar 2.25; the cost is the node grabber's own start-up) | `evidence/E3_S3_GRABBER_COST_2026-10-06.md` |
+| E3-S4 SNES core | a lighter core (`PRIVYHUB_SNES_CORE`, prepared, not applied) | **NOT RUN** (no lighter core installed; the fetch was refused by the session's permission policy) | `evidence/E3_S4_SNES_LIGHTER_CORE_2026-10-06.md` |
+| E3-S5 streaming's fixed cost | the audio sender's pacer: one timed wait per packet (`PRIVYHUB_AUDIO_SENDER_PACING=frame`) | **REJECTED** (sender 13 → 2.5 % of a core; run 1's loss 106.5/min > 3 × control; run 2 met every clause) | `evidence/E3_S5_AUDIO_SENDER_COST_2026-10-06.md` |
+
+Nothing ACCEPTED; nothing adopted. The queue ran all five, in order, on 2026-10-06.
+
 ## E4 — Core Linux resource envelope
 
 Produce:

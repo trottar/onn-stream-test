@@ -1,0 +1,41 @@
+diff --git a/companion/plugins/epg.py b/companion/plugins/epg.py
+index c698716..d0f2f93 100644
+--- a/companion/plugins/epg.py
++++ b/companion/plugins/epg.py
+@@ -1131,19 +1131,25 @@ class EpgPlugin:
+             )
+ 
+             env = self._grab_environment(npm_cache)
++            args = [
++                str(self._npm_path()),
++                "run",
++                "grab",
++                "--",
++                f"--channels={channels}",
++                f"--output={output}",
++                f"--days={self.GRAB_DAYS}",
++                "--maxConnections=1",
++                f"--timeout={self.GRAB_HTTP_TIMEOUT_MS}",
++            ]
++            # E3-S1: the grabber tree at the lowest CPU and I/O priority (SCHED_IDLE, nice 19, idle I/O class);
++            # each wrapper execs the next, so the pid and the tree are today's. Absent = today's spawn.
++            if os.environ.get("PRIVYHUB_EPG_GRAB_PRIORITY") == "idle":
++                args = ["/usr/bin/chrt", "-i", "0", "/usr/bin/nice", "-n", "19",
++                        "/usr/bin/ionice", "-c", "3"] + args
+             started = time.monotonic()
+             result = self._run(
+-                [
+-                    str(self._npm_path()),
+-                    "run",
+-                    "grab",
+-                    "--",
+-                    f"--channels={channels}",
+-                    f"--output={output}",
+-                    f"--days={self.GRAB_DAYS}",
+-                    "--maxConnections=1",
+-                    f"--timeout={self.GRAB_HTTP_TIMEOUT_MS}",
+-                ],
++                args,
+                 cwd=self._epg_root(),
+                 env=env,
+                 timeout=self.GRAB_PROCESS_TIMEOUT_SECONDS,

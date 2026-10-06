@@ -1710,6 +1710,42 @@ python3 tools/e1_sampler.py summarize <dir> --from <utc> --to <utc>
   - `range_server`'s socket `send()` is not in `wchar`; use `rchar` for
     served bytes.
 
+## The E3 flags (QUEUE_2026-10-06) — each off by default, NOT ADOPTED, never leave one set
+
+Each E3 task's change lives behind its own `PRIVYHUB_*` flag in the
+companion's environment; absent = today's behaviour, byte for byte. The
+suite sets a flag for one run only through the drop-in
+`~/.config/systemd/user/privyhub-companion.service.d/e3_flag.conf`
+(`tools/e1_suite.py run … --plan ID:runs:gap:KEY=VAL[+KEY=VAL]`; the
+run's teardown removes the file, `daemon-reload`s, restarts the unit and
+checks the environ is exactly the live default; flagged runs go to
+`<ID>_flag/`; preflight refuses to start with the file present).
+
+| flag | task | what it does | verdict |
+| --- | --- | --- | --- |
+| `PRIVYHUB_EPG_GRAB_PRIORITY=idle` | E3-S1 | the grabber tree under `chrt -i 0` / `nice -n 19` / `ionice -c 3` (`companion/plugins/epg.py`, `_grab_from_candidate`) | INCONCLUSIVE (control off-band); the loss did not move |
+| `PRIVYHUB_EPG_MALLOC_TRIM=1` (+ `MALLOC_ARENA_MAX=2` in the runs) | E3-S2 | `malloc_trim(0)` after each forced refresh (`guide()` wrapper) | REJECTED (PSS 155 MB at the window's end; the metadata list is live through each grab) |
+| `PRIVYHUB_EPG_DIRECT_NODE=1` | E3-S3 | the grabber's node started directly (`node --require tsx/preflight.cjs --import tsx/loader.mjs grab.ts …`), no npm / sh / tsx cli | REJECTED (CPU-s per grab unchanged; grabs ~7 % shorter, ~36 MB less) |
+| `PRIVYHUB_SNES_CORE=<core>` | E3-S4 | **not in the tree**: the proposed diff (`evidence/e3_s4_2026-10-06/`) would select `<core>_libretro.so` for SNES; the runner already moves the counter override to the core's corename dir | NOT RUN (no lighter core installed; the fetch was refused by the session's permission policy) |
+| `PRIVYHUB_AUDIO_SENDER_PACING=frame` | E3-S5 | the Linux audio sender waits once per 5-ms packet (`Event.wait` to the deadline) instead of 1-ms waits + yields + spin (`companion/native_session_io.py`) | REJECTED (sender 13 → 2.5 %, companion 25 → 15 %; one run's loss 106.5/min > 3 × control) |
+| `PRIVYHUB_MEM_PROBE=1` | E3-S2 | serves `GET /plugins/epg/memprobe?op=start\|snap\|trim\|gc` (tracemalloc, gc by type, smaps) — measurement only | probe hook, off |
+
+E3 measurement tools:
+
+- `tools/e3_probe.py tree <out.jsonl> --channel <id>`: a forced grab's
+  process tree every ~50-80 ms (policy, nice, I/O class, CPU-s, RSS/PSS,
+  first TCP socket), stream idle. `threads <out.json> --secs N`: the
+  companion's per-thread context switches and schedstat.
+- `tools/e3_table.py <out.md> label=<run dir> …`: E2's table rows plus
+  the companion's PSS first/last, its thread roles, the EPG cost per grab.
+- `tools/e3_guide_read.py`: the six suite channels' cached guide (non-forced
+  read), the programme total and the cache-file count — "the guide still serves".
+- `tools/e3_children_log.py <out.jsonl>`: the companion's reaped-children CPU
+  (cutime+cstime) every 5 s; stop with `<out.jsonl>.stop`. Exact for the
+  short-lived grabber chain, which the 1-s sampler undercounts by ~⅓.
+- `tools/e3_redact_check.sh <paths…>`: `h2_prep_redact.py --check` per
+  file.
+
 ## Linux subsystem probes
 
 Under `tools/probes/`, named by the work item that created them:
