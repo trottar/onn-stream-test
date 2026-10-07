@@ -1,0 +1,45 @@
+E3-S5B PRE-REGISTRATION -- the audio sender's pacing, decided. Written 2026-10-06 (~23:31Z) after the probe
+(probe.md), BEFORE any benchmark run; hash in e3_s5b_preregistration.sha256. Task:
+docs/memory/handoffs/E3-S5B_AUDIO_SENDER_PACING_DECISIVE_TASK.md under QUEUE_2026-10-06B.md (every rule of
+QUEUE_2026-10-06.md). Baseline commit: bf2120c (the user's E3-queue commit). E2 = e2_s1_2026-10-05/runs/E1-PS1-STREAM/run1.
+
+THE QUESTION: does PRIVYHUB_AUDIO_SENDER_PACING=frame make the stream's loss burstier than the unchanged sender on
+the same night?
+
+NO NEW CHANGE: E3-S5's flag and code as committed (e3_s5_2026-10-06/e3_s5_audio_sender_pacing.diff, sha256 6cc5983634723eb8ebf2710506e3f79269279916946ca593d7e1895d0260bfc0). The
+tree adds only the measurement-only trace hook (PRIVYHUB_AUDIO_SEND_TRACE, absent in every run;
+e3_s5b_send_trace_hook.diff sha256 16cffc0d7e2edc14356cf573575a5e2bb43e918ab3ae5f2ca398342c049bcb69); native_session_io.py sha256 029cea753a78f71671e0c4e24bfa726a5c549d5e5ad143779349cdcf3e41994e.
+Runner: tools/e1_suite.py (the E3 drop-in; interleaved plan items for one row continue its run numbers).
+
+1. THE RUNS, in this order, window 1200 s, gap 120 s, E1's launch / warm-up / teardown, --e2, all E1-PS1-STREAM:
+     C1 (no flag) -> runs/E1-PS1-STREAM/run1        F1 (flag) -> runs/E1-PS1-STREAM_flag/run1
+     C2 (no flag) -> runs/E1-PS1-STREAM/run2        F2 (flag) -> runs/E1-PS1-STREAM_flag/run2
+     F3 (flag)    -> runs/E1-PS1-STREAM_flag/run3
+   --plan E1-PS1-STREAM:1:120,E1-PS1-STREAM:1:120:F,E1-PS1-STREAM:1:120,E1-PS1-STREAM:1:120:F,E1-PS1-STREAM:1:120:F
+   with F = PRIVYHUB_AUDIO_SENDER_PACING=frame (the drop-in for F runs only, removed at each teardown, environ checked).
+
+2. COMPARABILITY (else INCONCLUSIVE): C1 and C2 each within E1's bands of E2's PS1-STREAM (host CPU mean 11.69 +/- 2;
+   rendered fps 59.81 +/- 0.5), AND |rendered(C1) - rendered(C2)| <= 0.5.
+
+3. THE BAR -- ACCEPTED only if ALL hold:
+   a. every F run: the audio sender thread (SCHED_RR; tools/e3_table.py) <= 4 % of a core AND the companion's CPU
+      <= 17 % of a core;
+   b. every F run: audio underruns (heartbeat, window) <= max(C1, C2) + 5 AND <= 20;
+   c. every F run: rendered fps (heartbeat, window) >= 59.5; RetroArch fps 60 +/- 0.5;
+   d. LOSS, the deciding clause, on POOLED MINUTES: each run's window cut into its 20 one-minute bins of lost video
+      packets (the heartbeat loss series, e2_analysis.py's hb_loss_series, as loss_per_minute.txt in E3-S5); F = the
+      60 minute-values of F1-F3, C = the 40 of C1-C2:
+        median(F) <= 3 x median(C), AND
+        share of F minutes with > 100 lost <= share of C minutes with > 100 lost + 0.10;
+   e. every F run: D-BASE spikes >= 20 ms per min < 200 and stale output drops per min < 20 (session report); the loss
+      row (< 10/min) reported, not gated, as in E3-S5.
+   Comparability holds and (a)-(e) all hold -> ACCEPTED; any fails -> REJECTED. A run never reaching PLAYING after two
+   retries or the flag breaking the row -> REJECTED (broke the row).
+
+4. REPORTED, NOT GATED: the per-run loss table and per-minute lists (loss_per_minute.txt); the probe's gap statistics;
+   socket W; max output gap; the C2 block; the ladder's decisions (rows, transitions; any FALLBACK during an F run with
+   its minute); and, if REJECTED, whether the probe's mechanism explains it (the probe found none: no gap > 10 ms, no
+   bunch >= 4).
+
+5. RULES: as QUEUE_2026-10-06 / -06B and E2-S1's teardown; no nft, no sudo, the Opal not touched. The bar is not
+   changed after data. Nothing adopted; nothing committed.

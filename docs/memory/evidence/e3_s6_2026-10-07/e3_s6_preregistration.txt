@@ -1,0 +1,54 @@
+E3-S6 PRE-REGISTRATION -- the guide-metadata parse: a cached slim index. Written 2026-10-07 after the probe (probe.md),
+the change and its smoke, BEFORE any benchmark run; hash in e3_s6_preregistration.sha256. Task:
+docs/memory/handoffs/E3-S6_GUIDE_INDEX_TASK.md under QUEUE_2026-10-06B.md (every rule of QUEUE_2026-10-06.md).
+Baseline commit: bf2120c. E2 = e2_s1_2026-10-05/runs (META: 9.8 % host CPU, 161 MB companion PSS, 228/0 grabs, median
+5.2 s; PS1-STREAM 11.69 % / 59.81 fps). E3-S1..S5's flags are ABSENT (no compounding).
+
+PROBE ANSWER (reading rule as the task wrote it): parse reproduces (55.4 lost/s at 0-2 s = 318 x baseline), spawn
+reproduces (11.0 = 63 x) -> the probe names BOTH; the stream half below is GATED.
+
+THE ONE CHANGE: companion/plugins/epg.py: with PRIVYHUB_EPG_GUIDE_INDEX=cached the candidate loop reads the channel's
+rows from a slim index (per canonical channel id: channel, feed, site, site_id, lang, site_name, in file order, packed
+as one string) instead of today's whole-file parse. The index is built once from the metadata file (today's
+_fetch_guides_metadata, unchanged: TTL, download, parse) and keyed by the file's size + mtime; it is rebuilt only when
+that key changes, kept in-process (3.7 MB), saved beside the file (data/epg/metadata/guides_index.json) and reloaded
+from there on the next start (0.014 s). After a build the parse's heap is returned once (gc + malloc_trim(0)).
+_candidate_mappings, the grab's arguments, the child, the status and the refresh contract are unchanged. Absent =
+today. Diff e3_s6_guide_index.diff sha256 1d1f9906227fdcaefae4f13e9eb2d4b2140cbf1b194ea5b2d39c3506cb13d292; epg.py after
+64d29c54f6388d55bf50a65dd1875b1fbe4eaef27a3d06d348f37c1be7df0118. The index file already exists (the smoke built it), so the runs'
+grabs load it and never parse the 25.6 MB file; the metadata's 24-h TTL ends ~06:20Z, after the runs.
+
+1. THE RUNS, in this order, window 1200 s, gap 120 s, E1's launch / warm-up / teardown, --e2:
+     E1-PS1-STREAM x1, flag ABSENT (the same-night control)  -> runs/E1-PS1-STREAM/run1
+     E1-META x2, flag SET                                     -> runs/E1-META_flag/run1, run2
+     E1-CONC x2, flag SET                                     -> runs/E1-CONC_flag/run1, run2
+   --plan E1-PS1-STREAM:1:120,E1-META:2:120:PRIVYHUB_EPG_GUIDE_INDEX=cached,E1-CONC:2:120:PRIVYHUB_EPG_GUIDE_INDEX=cached
+   (the drop-in for the flagged runs only; removed at each teardown; environ checked). Then tools/e3_guide_read.py ->
+   guide_read_after.json.
+
+2. COMPARABILITY (else INCONCLUSIVE for the stream clauses only): the control within E1's bands of E2's PS1-STREAM
+   (host CPU 11.69 +/- 2; rendered 59.81 +/- 0.5).
+
+3. THE BAR, TWO VERDICTS (one change, two measured effects -- said here before the data):
+   MEMORY -- ACCEPTED only if all hold in BOTH META runs:
+     a. companion PSS at the window's end (the last 1-s sample) <= 60 MB, and not "keeps growing" (slope over the last
+        15 min <= 5 % of its level; tools/e3_table.py);
+     b. grabs failed 0, grabs ok >= 205, median grab <= 6.8 s;
+     c. the guide still serves: guide_read_after 6 channels serving, programme total within +/- 5 % of 343 (326-360);
+        and the candidates per channel identical by both paths (the smoke's dump: identical for all six -- held);
+     d. host CPU mean <= 11.8.
+   STREAM -- gated (the probe named both); ACCEPTED only if all hold in BOTH CONC runs:
+     e. video loss/min (heartbeat, window) <= 100 AND <= 3 x the control's;
+     f. rendered fps >= 59.5; sequence resyncs <= 10 per run;
+     g. the aligned frame: mean lost packets/s at offsets 0-2 s after each grab start (e2_analysis.py's CONC
+        alignment, unchanged code, pointed at runs/E1-CONC_flag with the control as its baseline) <= 3 x the control's
+        baseline loss/s (that analysis's baseline "loss" mean).
+     If comparability fails, the stream verdict is INCONCLUSIVE whatever (e)-(g) say.
+   A run never reaching PLAYING after two retries or the flag breaking the row -> that half REJECTED (broke the row).
+
+4. REPORTED, NOT GATED: the index's size and build time (index_cost.json); the companion's PSS per minute; the aligned
+   0-10 s frame for both CONC runs; the busiest core; grabs ok/failed and median grab; the EPG child's cost; companion
+   CPU.
+
+5. RULES: as QUEUE_2026-10-06 / -06B and E2-S1's teardown; no nft, no sudo, the Opal not touched. No bar changed after
+   data. Nothing adopted; nothing committed.

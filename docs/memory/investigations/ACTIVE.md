@@ -38,6 +38,20 @@
   25 → 15 %, −1-2 W), but **REJECTED**: flagged run 1 lost 106.5/min in
   bursts (> 3 × the control's 29.6); run 2 met every clause. Link episode
   or the change: two runs cannot tell. **Open.**
+- **E3-S5B** (`../evidence/E3_S5B_AUDIO_SENDER_PACING_DECISIVE_2026-10-06.md`):
+  five interleaved runs. **The loss is not burstier with the flag** (no
+  minute > 100 in any run; pooled median 10 vs 5). E3-S5's bursts were the
+  link. **REJECTED** on underruns: F2 had 18 against ≤ 16. The flagged
+  sender's tick jitter is wider (sd 0.17 vs 0.07 ms), with no gaps or
+  bunches. Open, untested: one timed wait plus a short final spin.
+- **E3-S6** (`../evidence/E3_S6_GUIDE_INDEX_2026-10-07.md`): **the CONC
+  loss is located.** The guide-metadata parse alone (0.42 s of one Python
+  thread, the companion's GIL) reproduces the +1 s peak at 318 × the
+  baseline; the grabber child alone does 63 ×. A cached slim index:
+  **MEMORY ACCEPTED** (META companion 33.6 / 34.1 MB, 0.22 % CPU);
+  **STREAM REJECTED** (CONC 773 / 1,273 loss/min, 58.65 / 57.64 fps; the
+  peak halved). **Open:** the child's share (the busiest core 73-78 % at
+  +1-2 s), e.g. a precompiled grabber or a remembered source per channel.
 
 **E2-S1 (2026-10-05/06)** (`../evidence/E2_S1_WHOLE_SYSTEM_2026-10-06.md`):
 

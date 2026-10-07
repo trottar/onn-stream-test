@@ -1,0 +1,47 @@
+--- a/companion/plugins/epg.py
++++ b/companion/plugins/epg.py
+@@ -1430,10 +1430,44 @@
+         # E3-S2: a measurement-only memory probe, served only with PRIVYHUB_MEM_PROBE=1 (absent = the unknown
+         # action below, as today). op=start|snap|gc|trim; read-only apart from tracemalloc and malloc_trim.
+         if action == "memprobe" and os.environ.get("PRIVYHUB_MEM_PROBE") == "1":
++            # E3-S6: the two halves of a grab, separately (parse | prepare | spawn | cands); probe only.
++            if self._first(query, "op") in ("parse", "prepare", "spawn", "cands"):
++                return self._grab_half_probe(self._first(query, "op"), self._first(query, "channel_id"))
+             return self._mem_probe(self._first(query, "op") or "snap")
+ 
+         raise ValueError(f"Unknown EPG action: {action}")
+ 
++    def _grab_half_probe(self, op: str, channel_id: str) -> dict[str, Any]:
++        """E3-S6, measurement only (PRIVYHUB_MEM_PROBE=1): parse = the guide-metadata parse alone, result discarded;
++        prepare = one channel's candidates, kept for spawn; spawn = the grabber child for the prepared candidate,
++        no parse, no cache write; cands = the channel's candidates by today's parse and by the E3-S6 index."""
++        out: dict[str, Any] = {"op": op}
++        wall, cpu = time.monotonic(), time.thread_time()
++        if op == "parse":
++            metadata = self._fetch_guides_metadata()
++            out["items"] = len(metadata)
++            del metadata
++        elif op == "prepare":
++            channel_id = self._validate_channel_id(channel_id)
++            candidates = self._candidate_mappings(channel_id, self._fetch_guides_metadata())
++            self._probe_candidate = (channel_id, candidates[0]) if candidates else None
++            out["candidates"] = len(candidates)
++        elif op == "spawn":
++            prepared = getattr(self, "_probe_candidate", None)
++            if prepared is None:
++                raise ValueError("memprobe spawn needs op=prepare first")
++            with self._grab_lock:
++                programmes, attempt = self._grab_from_candidate(prepared[0], prepared[1], now_ms=self._now_ms())
++            out.update({"programmes": len(programmes), "ok": attempt.get("ok")})
++        elif op == "cands":
++            channel_id = self._validate_channel_id(channel_id)
++            out["parsed"] = self._candidate_mappings(channel_id, self._fetch_guides_metadata())
++            if hasattr(self, "_guide_index_rows"):
++                out["index"] = self._candidate_mappings(channel_id, self._guide_index_rows(channel_id))
++        out["wall_s"] = round(time.monotonic() - wall, 3)
++        out["thread_cpu_s"] = round(time.thread_time() - cpu, 3)
++        return out
++
+     @staticmethod
+     def _mem_probe(op: str) -> dict[str, Any]:
+         import ctypes

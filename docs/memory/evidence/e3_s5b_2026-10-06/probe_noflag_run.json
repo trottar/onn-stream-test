@@ -1,0 +1,72 @@
+{
+ "tag": "noflag",
+ "flags": [],
+ "started_utc": "2026-10-06T23:24:19.246Z",
+ "preflight": {
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
+  ],
+  "game_active": false,
+  "adb": true,
+  "drop_in_live": true,
+  "e3_dropin_absent": true,
+  "ok": true
+ },
+ "restart": {
+  "mainpid_serves_8765": true,
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_AUDIO_SEND_TRACE=/home/privyhub/Projects/onn-stream-test/docs/memory/evidence/e3_s5b_2026-10-06/trace_noflag.txt"
+  ]
+ },
+ "stream": {
+  "ok": true,
+  "attempt": 1,
+  "s_to_playing": 7.1
+ },
+ "trace_bytes": 456000,
+ "teardown": {
+  "report": "native_decoder_20261006_232614_642.json",
+  "report_fields": {
+   "lost_packets": 84,
+   "rendered_frames": 5812,
+   "stale_output_drops": 49,
+   "max_output_gap_ms": 200,
+   "slow_event_retained": 227,
+   "slow_event_capacity": 1280,
+   "duration_ms": 98348,
+   "video.lost_packets": 84,
+   "video.sequence_resyncs": 0,
+   "video.recent_fps": 58.13280026640634,
+   "decoder.spike_20_ms": 143,
+   "decoder.spike_50_ms": 52,
+   "decoder.spike_80_ms": 44,
+   "decoder.stale_output_drops": 49,
+   "decoder.max_output_gap_ms": 200,
+   "audio.lost_packets": 2,
+   "audio.underruns": 7
+  },
+  "stopped": true,
+  "banner": {
+   "now_playing_before": 2,
+   "now_playing_after_relaunch": 0
+  },
+  "dropin_removed": true,
+  "restart_after_flags": {
+   "mainpid_serves_8765": true,
+   "manager": [],
+   "environ": [
+    "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
+   ]
+  },
+  "dropin_env_absent": true,
+  "flags_absent": true,
+  "apk": "CONFIRMED",
+  "ps1_files_identical": true,
+  "retroarch_left": 0,
+  "encoder_left": 0
+ },
+ "ended_utc": "2026-10-06T23:26:42.800Z"
+}

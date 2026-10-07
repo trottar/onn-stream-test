@@ -5,7 +5,7 @@ record; the record file is authoritative, not this index.
 
 `PATCH_PROTOCOL.md` describes the workflow and is not a patch record.
 
-Records: 150
+Records: 152
 
 - `ADB_ENDPOINT_DEBUG_PROBE_V1_2026-09-15.md`
 - `ADB_ENDPOINT_DEBUG_WATCH_PORT_V1_2026-09-15.md`
@@ -153,6 +153,8 @@ Records: 150
 - `E3-S3_EPG_DIRECT_NODE.md`
 - `E3-S4_SNES_CORE_RUNNER_SUPPORT.md`
 - `E3-S5_AUDIO_SENDER_PACING.md`
+- `E3-S5B_AUDIO_SEND_TRACE.md`
+- `E3-S6_GUIDE_INDEX.md`
 - `MEM-TOOLS_LINUX_TOOL_INVENTORY_REFRESH.md`
 - `MEMORY_MAINTENANCE_2026-09-17.md`
 - `MEMORY_NORMALIZATION_2026-09-15.md`

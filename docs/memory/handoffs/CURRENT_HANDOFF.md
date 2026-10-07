@@ -2,36 +2,30 @@
 
 Authoritative state: `../CURRENT.md`. **Start there.**
 
-Baseline commit `d9fdbdd` (E2-S1 committed). The E3 queue's work is not
-committed (the user's commit: `../../../logs/e3_s5_git_status.txt`, the
-last of `logs/e3_s1..s5_git_status.txt`).
+Baseline commit `bf2120c` (the E3 queue committed). Queue B's work is not
+committed (the user's commit: `../../../logs/e3_s6_git_status.txt`; also
+`logs/e3_s5b_git_status.txt`).
 
-## 2026-10-06 — `QUEUE_2026-10-06`: E3, all five items, unattended
+## 2026-10-07 — `QUEUE_2026-10-06B`: E3-S5B and E3-S6, unattended
 
-Each task's change is behind its own flag. Every flag was absent at every
-teardown and at the end; E2's final state was restored after each task
-(08:06Z, APK CONFIRMED). **Nothing accepted, adopted or committed.**
+Every flag was absent at every teardown; E2's final state was restored
+after each task (03:55Z, APK CONFIRMED). **Nothing adopted or committed.**
 
-| # | item | the one change (flag) | verdict | the finding |
-| --- | --- | --- | --- | --- |
-| S1 | EPG grabs vs a live stream | grabber at SCHED_IDLE / nice 19 / idle I/O (`PRIVYHUB_EPG_GRAB_PRIORITY=idle`) | **INCONCLUSIVE** (the control 0.01 fps outside E1's band; a bad-link hour) | the core peak halved; **the loss peak at +1 s did not move**: not host CPU |
-| S2 | the companion's memory after a grab | `malloc_trim(0)` after each refresh (`PRIVYHUB_EPG_MALLOC_TRIM=1`) | **REJECTED** (PSS 155 MB at the window's end) | the per-grab 25.6 MB metadata parse, live through each grab |
-| S3 | the grabber's own cost | node started directly, no npm (`PRIVYHUB_EPG_DIRECT_NODE=1`) | **REJECTED** (3.3 CPU-s per grab vs 2.25) | the cost is the node grabber's own start-up; 4.9 CPU-s per grab |
-| S4 | a lighter SNES core | `PRIVYHUB_SNES_CORE` (prepared, not applied) | **NOT RUN** | no snes9x core; the fetch was refused by the session's policy |
-| S5 | streaming's fixed cost | audio sender: one timed wait per packet (`PRIVYHUB_AUDIO_SENDER_PACING=frame`) | **REJECTED** (run 1's loss 106.5/min > 3 × control) | sender 13 → 2.5 %, companion 25 → 15 %; run 2 passed |
+| task | change (flag) | verdict | finding |
+| --- | --- | --- | --- |
+| S5B | E3-S5's `PRIVYHUB_AUDIO_SENDER_PACING=frame`, 5 interleaved runs | **REJECTED** (F2 underruns 18 > 16) | loss not burstier (no minute > 100; median 10 vs 5); sender 13 → 2 %; jitter sd 0.17 vs 0.07 ms |
+| S6 | cached slim guide index (`PRIVYHUB_EPG_GUIDE_INDEX=cached`) | **MEMORY ACCEPTED; STREAM REJECTED** | the parse alone reproduces the CONC peak (318 ×); META companion 34 MB / 0.2 % CPU; CONC 773-1,273 loss/min, peak halved |
 
-- **New, untested hypotheses from the records:**
-  - a cached, slim guide-metadata index, which may serve S2 and S1's loss
-    peak (the GIL at each grab's start);
-  - a precompiled grabber;
-  - a remembered source per channel.
-- **Next, the user's:**
-  1. the commit;
-  2. decisions from the records: no item is ACCEPTED, so nothing is
-     offered for adoption. The open choices are S4 (fetch the core
-     yourself; the look and the licence are yours), and a decisive
-     re-run for S1 or S5 (a new pre-registration);
-  3. E4 only after that.
+- **Adoptable (the user's decision):** `Environment=PRIVYHUB_EPG_GUIDE_INDEX=cached`
+  — the memory half only.
+- **Open:** the grabber child's share of the CONC loss; S5B's underrun
+  excess (one wait + a short final spin, untested); E3-S4 if the user
+  fetches the core.
+
+## 2026-10-06 — `QUEUE_2026-10-06`: E3 S1-S5 (committed `bf2120c`)
+
+S1 INCONCLUSIVE, S2 / S3 / S5 REJECTED, S4 NOT RUN; the records are
+`../evidence/E3_S1…S5_*_2026-10-06.md`, the flags in `../TOOLS.md`.
 
 ## Earlier (condensed 2026-10-06, E3 queue)
 

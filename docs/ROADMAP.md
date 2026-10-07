@@ -1062,6 +1062,15 @@ its own flag, nothing adopted):**
 
 Nothing ACCEPTED; nothing adopted. The queue ran all five, in order, on 2026-10-06.
 
+**Queue B (`QUEUE_2026-10-06B.md`):**
+
+| task | change (flag) | verdict | record |
+| --- | --- | --- | --- |
+| E3-S5B audio sender, decided | E3-S5's flag, 5 interleaved runs (C F C F F) | **REJECTED** (F2 underruns 18 > 16); loss not burstier (pooled median 10 vs 5, no minute > 100) | `evidence/E3_S5B_AUDIO_SENDER_PACING_DECISIVE_2026-10-06.md` |
+| E3-S6 guide-metadata parse | cached slim index (`PRIVYHUB_EPG_GUIDE_INDEX=cached`) | **MEMORY ACCEPTED** (META companion 34 MB vs 161); **STREAM REJECTED** (CONC 773 / 1,273 loss/min; +1 s peak 21-28 vs 56-65) | `evidence/E3_S6_GUIDE_INDEX_2026-10-07.md` |
+
+One item ACCEPTED (E3-S6's memory half); nothing adopted — the user's decision.
+
 ## E4 — Core Linux resource envelope
 
 Produce:

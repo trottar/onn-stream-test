@@ -906,10 +906,13 @@ def run_suite(out: Path, only: list | None, runs: int, window: int, gap: int, pl
     log(f"suite start: {[(w.get('dir', w['id']), r, g, w.get('dropin')) for w, r, g in sched]}, window {window}s, gap {gap}s, e2 {e2}; "
         f"ABSENT: {sorted(ABSENT)}")
     (out / "absent.json").write_text(json.dumps(ABSENT, indent=1))
+    done = {}   # E3-S5B: interleaved plan items for the same row continue its run numbers (run1, run2, ...)
     for w, nruns, first_gap in sched:
-        for n in range(1, nruns + 1):
+        base = done.get(w.get("dir", w["id"]), 0)
+        done[w.get("dir", w["id"])] = base + nruns
+        for n in range(base + 1, base + nruns + 1):
             rec = None
-            g = first_gap if n == 1 else gap
+            g = first_gap if n == base + 1 else gap
             for attempt in range(3):          # the run, plus at most two retries of a failing launch
                 rec = run_once(w, n, out, window, g, e2)
                 if rec["status"] == "OK":

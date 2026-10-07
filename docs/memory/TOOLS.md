@@ -1727,8 +1727,10 @@ checks the environ is exactly the live default; flagged runs go to
 | `PRIVYHUB_EPG_MALLOC_TRIM=1` (+ `MALLOC_ARENA_MAX=2` in the runs) | E3-S2 | `malloc_trim(0)` after each forced refresh (`guide()` wrapper) | REJECTED (PSS 155 MB at the window's end; the metadata list is live through each grab) |
 | `PRIVYHUB_EPG_DIRECT_NODE=1` | E3-S3 | the grabber's node started directly (`node --require tsx/preflight.cjs --import tsx/loader.mjs grab.ts …`), no npm / sh / tsx cli | REJECTED (CPU-s per grab unchanged; grabs ~7 % shorter, ~36 MB less) |
 | `PRIVYHUB_SNES_CORE=<core>` | E3-S4 | **not in the tree**: the proposed diff (`evidence/e3_s4_2026-10-06/`) would select `<core>_libretro.so` for SNES; the runner already moves the counter override to the core's corename dir | NOT RUN (no lighter core installed; the fetch was refused by the session's permission policy) |
-| `PRIVYHUB_AUDIO_SENDER_PACING=frame` | E3-S5 | the Linux audio sender waits once per 5-ms packet (`Event.wait` to the deadline) instead of 1-ms waits + yields + spin (`companion/native_session_io.py`) | REJECTED (sender 13 → 2.5 %, companion 25 → 15 %; one run's loss 106.5/min > 3 × control) |
-| `PRIVYHUB_MEM_PROBE=1` | E3-S2 | serves `GET /plugins/epg/memprobe?op=start\|snap\|trim\|gc` (tracemalloc, gc by type, smaps) — measurement only | probe hook, off |
+| `PRIVYHUB_AUDIO_SENDER_PACING=frame` | E3-S5 | the Linux audio sender waits once per 5-ms packet (`Event.wait` to the deadline) instead of 1-ms waits + yields + spin (`companion/native_session_io.py`) | REJECTED (E3-S5: one run's loss; E3-S5B, decisive, 5 interleaved runs: loss not burstier, but one run's underruns 18 > 16) |
+| `PRIVYHUB_AUDIO_SEND_TRACE=<path>` | E3-S5B | measurement only: the audio sender writes 60 s of `sendto` times (from 30 s after it starts) to `<path>` | probe hook, off |
+| `PRIVYHUB_EPG_GUIDE_INDEX=cached` | E3-S6 | the grab's candidates from a slim index (13,555 channels, 3.7 MB, built once per metadata file, saved as `data/epg/metadata/guides_index.json`) instead of the per-grab 25.6 MB parse | **MEMORY ACCEPTED** (companion 34 MB, 0.2 % CPU in META); **STREAM REJECTED** (CONC 773-1,273 loss/min) — not adopted |
+| `PRIVYHUB_MEM_PROBE=1` | E3-S2 | serves `GET /plugins/epg/memprobe?op=start\|snap\|trim\|gc` (tracemalloc, gc by type, smaps) and, since E3-S6, `op=parse\|prepare\|spawn\|cands&channel_id=` (a grab's halves separately; candidates by both paths) — measurement only | probe hook, off |
 
 E3 measurement tools:
 
@@ -1743,6 +1745,9 @@ E3 measurement tools:
 - `tools/e3_children_log.py <out.jsonl>`: the companion's reaped-children CPU
   (cutime+cstime) every 5 s; stop with `<out.jsonl>.stop`. Exact for the
   short-lived grabber chain, which the 1-s sampler undercounts by ~⅓.
+- `tools/e3_state.py`: E2's final state (preflight, PS1 files, APK, no game) as one JSON line.
+- `tools/e1_suite.py --plan` items for the same row continue its run numbers
+  (interleaved C, F, C, F, F plans).
 - `tools/e3_redact_check.sh <paths…>`: `h2_prep_redact.py --check` per
   file.
 

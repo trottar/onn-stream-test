@@ -1,0 +1,57 @@
+--- a/companion/native_session_io.py
++++ b/companion/native_session_io.py
+@@ -436,6 +436,13 @@
+             return
+ 
+         self._linux_pacing_frame = os.environ.get("PRIVYHUB_AUDIO_SENDER_PACING") == "frame"  # E3-S5
++        # E3-S5B, measurement only: PRIVYHUB_AUDIO_SEND_TRACE=<path> -> the perf_counter_ns of every sendto
++        # (o = original, d = duplicate) from 30 s after the sender starts, for 60 s, written once by a helper
++        # thread. Absent = no trace (one `is None` check per send).
++        trace_path = os.environ.get("PRIVYHUB_AUDIO_SEND_TRACE", "")
++        trace: list | None = [] if trace_path else None
++        trace_from_ns = time.perf_counter_ns() + 30_000_000_000
++        trace_to_ns = trace_from_ns + 60_000_000_000
+ 
+         sock = socket.socket(
+             socket.AF_INET,
+@@ -507,6 +514,8 @@
+ 
+                     self._linux_last_send_ns = now_ns
+                     self._linux_packets_sent += 1
++                    if trace is not None and now_ns >= trace_from_ns:
++                        trace = self._linux_send_trace(trace, trace_path, trace_to_ns, now_ns, "o")
+                 except (BlockingIOError, OSError):
+                     self._linux_send_errors += 1
+ 
+@@ -523,6 +532,10 @@
+                                 ),
+                             )
+                             self._linux_duplicates_sent += 1
++                            if trace is not None and now_ns >= trace_from_ns:
++                                trace = self._linux_send_trace(
++                                    trace, trace_path, trace_to_ns, time.perf_counter_ns(), "d"
++                                )
+                         except (BlockingIOError, OSError):
+                             self._linux_duplicate_send_errors += 1
+ 
+@@ -539,6 +552,20 @@
+             except OSError:
+                 pass
+ 
++    @staticmethod
++    def _linux_send_trace(trace: list, path: str, to_ns: int, t_ns: int, kind: str) -> list | None:
++        """E3-S5B: append one send time; past the window, hand the rows to a writer thread and stop tracing."""
++        if t_ns <= to_ns:
++            trace.append((t_ns, kind))
++            return trace
++
++        def write() -> None:
++            with open(path, "w") as handle:
++                handle.write("".join(f"{t} {k}\n" for t, k in trace))
++
++        threading.Thread(target=write, daemon=True).start()
++        return None
++
+     def _linux_interval_metrics(self) -> dict[str, Any]:
+         values = list(
+             self._linux_send_intervals_ns

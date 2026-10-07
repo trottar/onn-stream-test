@@ -827,6 +827,63 @@ class EpgPlugin:
             temp.unlink(missing_ok=True)
             raise
 
+    # E3-S6: the slim index. Per canonical channel id, the metadata rows the candidate loop reads (channel, feed,
+    # site, site_id, lang, site_name), in file order, packed as one string per channel. Keyed by the metadata
+    # file's size + mtime; rebuilt when that changes; kept beside the file (guides_index.json) for the next start.
+    _GUIDE_INDEX_FIELDS = ("channel", "feed", "site", "site_id", "lang", "site_name")
+
+    def _guide_index_file(self) -> Path:
+        return self.metadata_root / "guides_index.json"
+
+    def _guide_index_rows(self, channel_id: str) -> list[dict[str, str]]:
+        path = self._metadata_file()
+        key = None
+        if path.is_file():
+            st = path.stat()
+            if time.time() - st.st_mtime < self.METADATA_TTL_SECONDS:
+                key = f"{st.st_size}:{st.st_mtime_ns}"
+        index = getattr(self, "_guide_index", None)
+        if key is None or getattr(self, "_guide_index_key", None) != key:
+            index = None
+            if key is not None:
+                try:
+                    saved = json.loads(self._guide_index_file().read_text(encoding="utf-8"))
+                    if saved.get("key") == key and isinstance(saved.get("index"), dict):
+                        index = saved["index"]
+                except (OSError, ValueError):
+                    pass
+            if index is None:
+                payload = self._fetch_guides_metadata()  # today's TTL / download / parse, unchanged
+                grouped: dict[str, list[str]] = {}
+                for item in payload:
+                    if not isinstance(item, dict):
+                        continue
+                    row = [str(item.get(f, "") or "") for f in self._GUIDE_INDEX_FIELDS]
+                    canonical = self._canonical_id(row[0], row[1])
+                    if canonical:
+                        grouped.setdefault(canonical, []).append("\x1f".join(row))
+                del payload
+                index = {k: "\x1e".join(v) for k, v in grouped.items()}
+                del grouped
+                st = path.stat()
+                key = f"{st.st_size}:{st.st_mtime_ns}"
+                try:
+                    tmp = self._guide_index_file().with_suffix(".tmp")
+                    tmp.write_text(json.dumps({"key": key, "index": index}), encoding="utf-8")
+                    os.replace(tmp, self._guide_index_file())
+                except OSError:
+                    pass
+                import ctypes
+                import gc
+
+                gc.collect()
+                ctypes.CDLL("libc.so.6").malloc_trim(0)  # the one-time parse's heap back to the OS
+            self._guide_index, self._guide_index_key = index, key
+        packed = index.get(channel_id)
+        if not packed:
+            return []
+        return [dict(zip(self._GUIDE_INDEX_FIELDS, r.split("\x1f"))) for r in packed.split("\x1e")]
+
     def _candidate_mappings(
         self,
         channel_id: str,
@@ -1329,11 +1386,16 @@ class EpgPlugin:
             )
 
             try:
-                metadata = self._fetch_guides_metadata()
-                candidates = self._candidate_mappings(
-                    channel_id,
-                    metadata,
-                )
+                # E3-S6: PRIVYHUB_EPG_GUIDE_INDEX=cached -> the channel's rows from the slim index (built once per
+                # metadata file) instead of today's whole-file parse. Absent = today.
+                if os.environ.get("PRIVYHUB_EPG_GUIDE_INDEX") == "cached":
+                    candidates = self._candidate_mappings(channel_id, self._guide_index_rows(channel_id))
+                else:
+                    metadata = self._fetch_guides_metadata()
+                    candidates = self._candidate_mappings(
+                        channel_id,
+                        metadata,
+                    )
             except Exception as exc:
                 self._record_error("metadata_failed", exc)
                 if stale is not None:
@@ -1430,9 +1492,43 @@ class EpgPlugin:
         # E3-S2: a measurement-only memory probe, served only with PRIVYHUB_MEM_PROBE=1 (absent = the unknown
         # action below, as today). op=start|snap|gc|trim; read-only apart from tracemalloc and malloc_trim.
         if action == "memprobe" and os.environ.get("PRIVYHUB_MEM_PROBE") == "1":
+            # E3-S6: the two halves of a grab, separately (parse | prepare | spawn | cands); probe only.
+            if self._first(query, "op") in ("parse", "prepare", "spawn", "cands"):
+                return self._grab_half_probe(self._first(query, "op"), self._first(query, "channel_id"))
             return self._mem_probe(self._first(query, "op") or "snap")
 
         raise ValueError(f"Unknown EPG action: {action}")
+
+    def _grab_half_probe(self, op: str, channel_id: str) -> dict[str, Any]:
+        """E3-S6, measurement only (PRIVYHUB_MEM_PROBE=1): parse = the guide-metadata parse alone, result discarded;
+        prepare = one channel's candidates, kept for spawn; spawn = the grabber child for the prepared candidate,
+        no parse, no cache write; cands = the channel's candidates by today's parse and by the E3-S6 index."""
+        out: dict[str, Any] = {"op": op}
+        wall, cpu = time.monotonic(), time.thread_time()
+        if op == "parse":
+            metadata = self._fetch_guides_metadata()
+            out["items"] = len(metadata)
+            del metadata
+        elif op == "prepare":
+            channel_id = self._validate_channel_id(channel_id)
+            candidates = self._candidate_mappings(channel_id, self._fetch_guides_metadata())
+            self._probe_candidate = (channel_id, candidates[0]) if candidates else None
+            out["candidates"] = len(candidates)
+        elif op == "spawn":
+            prepared = getattr(self, "_probe_candidate", None)
+            if prepared is None:
+                raise ValueError("memprobe spawn needs op=prepare first")
+            with self._grab_lock:
+                programmes, attempt = self._grab_from_candidate(prepared[0], prepared[1], now_ms=self._now_ms())
+            out.update({"programmes": len(programmes), "ok": attempt.get("ok")})
+        elif op == "cands":
+            channel_id = self._validate_channel_id(channel_id)
+            out["parsed"] = self._candidate_mappings(channel_id, self._fetch_guides_metadata())
+            if hasattr(self, "_guide_index_rows"):
+                out["index"] = self._candidate_mappings(channel_id, self._guide_index_rows(channel_id))
+        out["wall_s"] = round(time.monotonic() - wall, 3)
+        out["thread_cpu_s"] = round(time.thread_time() - cpu, 3)
+        return out
 
     @staticmethod
     def _mem_probe(op: str) -> dict[str, Any]:

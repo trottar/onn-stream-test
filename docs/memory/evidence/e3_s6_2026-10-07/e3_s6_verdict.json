@@ -1,0 +1,174 @@
+{
+ "memory": {
+  "META r1": {
+   "pss_end_mb": 33.6,
+   "last15_pct": 3.8,
+   "a": true,
+   "grabs": [
+    248,
+    0,
+    4.813
+   ],
+   "b": true,
+   "host_cpu": 10.171,
+   "d": true,
+   "anon_first_last": [
+    30.7,
+    31.7
+   ],
+   "pss_max_mb": 33.6,
+   "companion_cpu": 0.223
+  },
+  "META r2": {
+   "pss_end_mb": 34.1,
+   "last15_pct": 3.7,
+   "a": true,
+   "grabs": [
+    249,
+    0,
+    4.925
+   ],
+   "b": true,
+   "host_cpu": 10.171,
+   "d": true,
+   "anon_first_last": [
+    30.7,
+    32.3
+   ],
+   "pss_max_mb": 34.1,
+   "companion_cpu": 0.22
+  },
+  "c_guide": {
+   "channels_serving": 6,
+   "programmes_total": 343,
+   "before": 343,
+   "candidates_identical_in_smoke": true,
+   "holds": true
+  },
+  "verdict": "ACCEPTED"
+ },
+ "stream": {
+  "CONC r1": {
+   "loss_per_min": 772.78,
+   "e": false,
+   "rendered_fps": 58.652,
+   "resyncs": 14,
+   "f": false,
+   "aligned_loss_0_10": [
+    11.885,
+    20.99,
+    17.07,
+    9.641,
+    8.812,
+    9.028,
+    7.791,
+    9.517,
+    0.226,
+    20.11,
+    8.085
+   ],
+   "aligned_busiest_0_10": [
+    40.81,
+    59.624,
+    78.428,
+    51.164,
+    51.582,
+    56.014,
+    32.373,
+    24.751,
+    25.309,
+    27.78,
+    27.775
+   ],
+   "loss_0_2_mean": 16.648,
+   "g_limit": 0.239,
+   "g": false,
+   "underruns": 10,
+   "grabs": [
+    217,
+    0,
+    5.854
+   ],
+   "companion_pss_end_mb": 49.2
+  },
+  "CONC r2": {
+   "loss_per_min": 1273.11,
+   "e": false,
+   "rendered_fps": 57.637,
+   "resyncs": 27,
+   "f": false,
+   "aligned_loss_0_10": [
+    15.806,
+    28.376,
+    30.507,
+    19.274,
+    17.309,
+    14.422,
+    9.591,
+    13.24,
+    13.006,
+    6.72,
+    8.96
+   ],
+   "aligned_busiest_0_10": [
+    44.346,
+    73.389,
+    68.331,
+    45.334,
+    58.954,
+    45.797,
+    34.079,
+    39.81,
+    42.107,
+    42.875,
+    29.35
+   ],
+   "loss_0_2_mean": 24.896,
+   "g_limit": 0.239,
+   "g": false,
+   "underruns": 10,
+   "grabs": [
+    222,
+    0,
+    5.79
+   ],
+   "companion_pss_end_mb": 47.2
+  },
+  "control": {
+   "loss_per_min": 4.81,
+   "rendered_fps": 59.97,
+   "host_cpu": 11.49,
+   "baseline_loss_per_s": 0.0798
+  },
+  "comparability": true,
+  "verdict": "REJECTED"
+ },
+ "aligned_vs_e2_baseline": {
+  "E1-CONC/run1": [
+   11.885,
+   20.99,
+   17.07,
+   9.641,
+   8.812,
+   9.028,
+   7.791,
+   9.517,
+   0.226,
+   20.11,
+   8.085
+  ],
+  "E1-CONC/run2": [
+   15.806,
+   28.376,
+   30.507,
+   19.274,
+   17.309,
+   14.422,
+   9.591,
+   13.24,
+   13.006,
+   6.72,
+   8.96
+  ]
+ }
+}

@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-10-06
-baseline_commit: d9fdbdd
+as_of: 2026-10-07
+baseline_commit: bf2120c
 ---
 
 # Current State
@@ -9,19 +9,18 @@ baseline_commit: d9fdbdd
 Headings are fixed by `tools/check_memory_health.py`; do not rename.
 ## Active Objective
 
-**Phase E ACTIVE.** E1 FROZEN; E2 MEASURED (E2-S1, committed `d9fdbdd`).
-**E3 ran the whole ordered list, unattended, 2026-10-06**
-(`handoffs/QUEUE_2026-10-06.md`). Each item was tested as one change behind
-its own flag, against a bar hashed before any run. **Nothing ACCEPTED,
-adopted or committed.**
+**Phase E ACTIVE.** E1 FROZEN; E2 MEASURED; **E3 ran queue A (S1-S5,
+committed `bf2120c`) and queue B (S5B, S6; 2026-10-06/07, unattended,
+`handoffs/QUEUE_2026-10-06B.md`).** Each change sits behind its own flag
+and was judged against a bar hashed before its runs. **One item is
+ACCEPTED, and nothing is adopted or committed.**
 
 | item | verdict | finding |
 | --- | --- | --- |
-| E3-S1 EPG grab priority | INCONCLUSIVE (control off-band by 0.01 fps) | loss peak at grab start unmoved: not host CPU |
-| E3-S2 companion memory | REJECTED | per-grab 25.6 MB metadata parse, live through each grab |
-| E3-S3 grabber cost | REJECTED | the node grabber's own start-up; 4.9 CPU-s per grab |
-| E3-S4 lighter SNES core | NOT RUN | no snes9x core; the fetch was refused by the session's permission policy |
-| E3-S5 audio sender | REJECTED (one run's loss) | sender 13 → 2.5 % of a core; run 2 met every clause |
+| E3-S1 / S2 / S3 (grab priority, `malloc_trim`, direct node) | INCONCLUSIVE / REJECTED / REJECTED | led to S6 |
+| E3-S4 lighter SNES core | NOT RUN | no snes9x core; the fetch was refused by the session's policy |
+| E3-S5 / **S5B** audio sender pacing | REJECTED (S5B: F2 underruns 18 > 16) | loss **not** burstier; sender 13 → 2 % |
+| **E3-S6 cached guide index** | **MEMORY ACCEPTED; STREAM REJECTED** | the parse alone reproduces the CONC peak; companion 34 MB / 0.2 % in META; CONC peak halved |
 
 - **ABSENT** (unchanged): Live TV, the browser and camera sources, NES /
   Genesis, a power meter.
@@ -30,25 +29,24 @@ adopted or committed.**
 
 ## Current Work Item
 
-**The E3 queue is done** (03:13-08:06Z, 2026-10-06). The records:
-`evidence/E3_S1_EPG_GRAB_PRIORITY_2026-10-06.md`,
-`evidence/E3_S2_COMPANION_GUIDE_RETENTION_2026-10-06.md`,
-`evidence/E3_S3_GRABBER_COST_2026-10-06.md`,
-`evidence/E3_S4_SNES_LIGHTER_CORE_2026-10-06.md`,
-`evidence/E3_S5_AUDIO_SENDER_COST_2026-10-06.md` (files in
-`evidence/e3_s<n>_2026-10-06/`).
+**Queue B is done** (2026-10-06 23:23Z → 2026-10-07 03:55Z). The records:
 
-- Every flag was absent at every teardown and at the start of each task;
-  E2's final state was restored after each one.
-- The flags' code is in the tree, dormant (`TOOLS.md`, "The E3 flags").
-  E3-S4's change is a diff only, not applied.
-- **New hypotheses, untested:**
-  - a cached, slim guide-metadata index instead of the per-grab parse
-    (S2's memory; possibly S1's loss peak, via the companion's GIL);
-  - a precompiled grabber;
-  - a remembered source per channel.
-- Redactor: 0 findings beyond the classified false positives (`title.txt`
-  version strings, loopback and all-interfaces bind literals in code).
+- `evidence/E3_S5B_AUDIO_SENDER_PACING_DECISIVE_2026-10-06.md`:
+  - five interleaved runs (C F C F F);
+  - pooled loss median 10 vs 5 per minute, no minute > 100;
+  - underruns 15 / 18 / 8 against controls 11 / 7, so REJECTED on F2;
+  - the send trace: no gaps or bunches, only wider jitter.
+- `evidence/E3_S6_GUIDE_INDEX_2026-10-07.md`:
+  - **the probe located the CONC loss**: the 25.6 MB metadata parse
+    (0.42 s of the companion's GIL) reproduces the +1 s peak at 318 × the
+    baseline; the grabber child alone does 63 ×;
+  - the index (13,555 channels, 3.7 MB, built once in 0.95 s, candidates
+    identical): META companion 33.6 / 34.1 MB and 0.22 % CPU (E2: 161 MB,
+    7.6 %);
+  - CONC 773 / 1,273 loss/min, 58.65 / 57.64 fps, 10 underruns; the peak
+    went from 56-65 to 21-28 lost/s.
+- Flags absent at every teardown; their code is dormant (`TOOLS.md`,
+  "The E3 flags"); the index file was removed. Redactor clean.
 
 ## Verified State
 
@@ -78,7 +76,7 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`, including `C5-M1`'s `PRIVYHUB_NATIVE_PROFILE_ID`); none set.
 - **Installed**: **APK `de072762…835e`** (the `CL-B1` APK, adopted
   2026-09-30; hash confirmed on the onn at every teardown since,
-  last 2026-10-06 08:06Z (the E3 queue's end); the previous
+  last 2026-10-07 03:55Z (queue B's end); the previous
   `f31b1c18…8ae7` is kept at `runtime/c4_m1/adopted_app-debug.apk` for
   rollback).
   - The companion is the systemd user unit `privyhub-companion` (`H3`);
@@ -94,7 +92,7 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
     - Kill switches: delete the drop-in + `daemon-reload` + restart
       (off); `POST /plugins/games/adaptive-bitrate/disable` (shadow, one
       session).
-  - Last restarted 08:05Z 2026-10-06 by E3-S5's teardown; checked 08:06Z:
+  - Last restarted 03:52Z 2026-10-07 by E3-S6's teardown; checked 03:55Z:
     environ the live default only, no `e3_flag.conf` drop-in, no game, the
     adopted PS1 files identical, APK CONFIRMED.
   - The companion tree carries the live controller through `C3-L4-N2`,
@@ -111,25 +109,28 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
-1. **The user's commit** of the E3 queue (`logs/e3_s5_git_status.txt`,
-   the last of `logs/e3_s1..s5_git_status.txt`).
-2. **The user's adoption decisions, from the records.** No item is
-   ACCEPTED, so nothing is offered for adoption. The open choices:
-   - **E3-S4**: fetch `snes9x_libretro.so` yourself, then run the task as
-     written. The core is also a look, and its licence is
-     "Non-commercial".
-   - A decisive re-run of **E3-S1** (INCONCLUSIVE) or **E3-S5** (one run
-     failed). Each would be a new pre-registration.
-   - Whether to test the new hypotheses above.
+1. **The user's commit** of queue B (`logs/e3_s6_git_status.txt`; also
+   `logs/e3_s5b_git_status.txt`).
+2. **The user's adoption decisions, per ACCEPTED item:**
+   - **E3-S6, memory half:** the drop-in line
+     `Environment=PRIVYHUB_EPG_GUIDE_INDEX=cached`, in
+     `~/.config/systemd/user/privyhub-companion.service.d/`, then
+     `daemon-reload` and a restart. Revert: delete the line. Its stream
+     half was REJECTED; adopting it still roughly halves the grab's hit
+     on a live stream.
+   - **E3-S4**, if the user fetches `snes9x_libretro.so` (the core is
+     also a look; licence "Non-commercial").
 3. **E4** only after the adoptions are settled and the suite is re-run on
    the adopted state.
 
-**Open, not blocking** (carried past Phase C):
+**Open, not blocking:**
 
+- E3: the grabber child's share of the CONC loss (a precompiled grabber;
+  a remembered source per channel); S5B's underrun excess (one timed wait
+  + a short final spin);
 - the max output gap; `host_link`; the thermal flag; `CTRL-L1`; the
   slow-event ring; the mild step's ~120 s bound;
-- **the onn's 1080p decode jitter** (499 spikes ≥ 20 ms per min in E2);
-  the overlay's constant size text;
+- **the onn's 1080p decode jitter**; the overlay's constant size text;
 - `C6-D1`'s list; B3a's two clauses; C5-M4's R3; `encoder_command` is the
   full start's only;
 - **adaptive-off measurements need the drop-in out** (`TOOLS.md`).
@@ -172,17 +173,16 @@ Phase C: met (C7, `docs/ROADMAP.md`). **Phase E** (`docs/ROADMAP.md`):
 
 ## Relevant References
 
+- `handoffs/QUEUE_2026-10-06B.md`, `evidence/E3_S5B_AUDIO_SENDER_PACING_DECISIVE_2026-10-06.md`, `evidence/E3_S6_GUIDE_INDEX_2026-10-07.md` — queue B's verdicts.
 - `handoffs/QUEUE_2026-10-06.md` and the five E3 records (`evidence/E3_S1…S5_*_2026-10-06.md`) — E3's verdicts; `TOOLS.md` "The E3 flags".
 - `evidence/E2_S1_WHOLE_SYSTEM_2026-10-06.md` — E2: the table, the reference numbers, the CONC / SNES / memory answers, the E3 list.
 - `architecture/E1_WORKLOAD_SUITE.md` — the frozen E1 suite (Phase E's measurement base).
-- `evidence/E1_S1_WORKLOAD_SUITE_2026-10-05.md` — E1-S1: the inventory, the dry-run table, sampler coverage, the user's list.
-- `evidence/C5_CLOSE_2026-10-05.md` — the user's look, the rung-window rule, the `--attract` fix, C5 and Phase C closed.
-- `decisions/C5_1080P60_CAPABILITY_2026-09-28.md` — C5's decision record with its close.
-- `docs/ROADMAP.md` — Phase C CLOSED, the C7 table; Phase E (E1 next).
+- `evidence/E1_S1_WORKLOAD_SUITE_2026-10-05.md` — E1-S1.
+- `evidence/C5_CLOSE_2026-10-05.md`, `decisions/C5_1080P60_CAPABILITY_2026-09-28.md` — C5 and Phase C closed.
+- `docs/ROADMAP.md` — Phase C CLOSED; Phase E with the E3 status tables.
 - `evidence/C7_D8_CHECKPOINT_2026-09-30.md` — the checkpoint (appended 2026-10-05).
-- `evidence/C5_M5B_RUNG_RULES_AND_LOOK_2026-10-03.md`, `evidence/C5_M5_1080P_RUNG_2026-10-03.md` — the rung (behind its flag; not adopted).
-- `evidence/LINK_L2_LOSS_ROW_2026-10-02.md`; `evidence/LINK_L1_LOSS_ROW_2026-10-01.md` — the link.
+- `evidence/C5_M5_1080P_RUNG_2026-10-03.md` (the rung, not adopted); `evidence/LINK_L2_LOSS_ROW_2026-10-02.md` (the link).
 - `evidence/D_BASE_CLOSEOUT_2026-09-23.md` — the baseline table.
 - `handoffs/CURRENT_HANDOFF.md`; `investigations/ACTIVE.md`; `docs/KNOWN_ISSUES.md`.
 - `evidence/RUNTIME_VALIDATION.md` — a classification per record;
-  `patches/PATCH_INDEX.md` lists all 143.
+  `patches/PATCH_INDEX.md` lists every patch record.
