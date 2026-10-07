@@ -1,0 +1,49 @@
+E3-S4 PRE-REGISTRATION -- a lighter SNES core. Written 2026-10-07 after the inventory, the change and the smoke, BEFORE
+any benchmark run; hash in e3_s4_preregistration.sha256. Task: docs/memory/handoffs/E3-S4_SNES_LIGHTER_CORE_TASK.md as
+written, item 3 of QUEUE_2026-10-07.md (every rule of QUEUE_2026-10-06.md and -06B.md). The user placed
+snes9x_libretro.so in runtime/emulators/retroarch/cores-linux/ by hand; nothing was fetched or deleted. Baseline commit:
+ccee2f5. E2 = e2_s1_2026-10-05/runs/E1-SNES-STREAM/run1, run2 (bsnes 115: RetroArch 436 / 517 % of a core, host CPU
+43.4 / 50.0 %, RetroArch 59.99 / 60.00, capture 60.02 / 60.00, rendered 59.66 / 59.98, dup+drop 0.1 / 0.1 per min; NOT
+YET REPEATABLE at 20 min).
+
+THE ADOPTED STATE (E3-S6A): environ exactly live + PRIVYHUB_EPG_GUIDE_INDEX=cached; tools/e1_suite.py checks it.
+
+THE CORE: snes9x_libretro.so sha256 9b2b6ea9d88f96c156590443ddd05ee56aaf4e495329a889c979921942717a31 (2,841,720 bytes;
+= the member of snes9x_libretro.so.zip, sha256 cfe816af4222f942e59629673d4951094a53225d379a2c7d7a2b4e8b2cddad04);
+retro_get_system_info "Snes9x" / "1.63 fae2fea"; corename "Snes9x"; licence "Non-commercial" (the bundled .info).
+bsnes_libretro.so (ab130614...b4f8) and its config dir untouched.
+
+THE ONE CHANGE: companion/games/emulator_manager.py, _resolve_game: PRIVYHUB_SNES_CORE=<name> ([a-z0-9_]+) -> the SNES
+core is <name>_libretro.so from the same cores directory; absent = the configured core (bsnes), unchanged. Diff
+e3_s4_snes_core.diff sha256 92577a4cd5692875413e50439484110b022d45317f0ea99d8d74ad0250114bbb (E3-S4 2026-10-06's
+prepared diff, unchanged); emulator_manager.py after e87c50a56c9e1114e945f94ce99e54043ab851b01d5580d31f699fdffff62c24.
+The runner puts the suite's counter override in config/Snes9x/ (SNES_CORENAMES); no other per-title or core option is
+written by this task (RetroArch itself saved Snes9x.opt with the core's defaults in the smoke). The resolution /
+fullscreen settings are the shared base config's, untouched; the 4x PS1 files untouched.
+
+THE SMOKE (smoke.json, smoke_read.txt; not data): the core loads (window title "RetroArch Snes9x 1.63 fae2fea"), the
+fixture's demo loop runs (RetroArch 59.999 frames/s, 8.5 % of a core over 180 s), the stream reached PLAYING on attempt
+1 (rendered 59.91). The script's own /proc/maps check came back empty (its defect; the title and RetroArch's log show
+the core) -- smoke passed on the task's three questions.
+
+1. THE RUNS: E1-SNES-STREAM x2 with the flag, E2's window (1200 s) and the 600-s gap before the pair (120 s between),
+   E1's launch / warm-up / teardown, --e2:
+   --plan E1-SNES-STREAM:2:600:PRIVYHUB_SNES_CORE=snes9x -> runs/E1-SNES-STREAM_flag/run1, run2
+   (the flag only inside those runs through the E3 drop-in; absent after; the environ checked against the adopted state).
+
+2. THE BAR -- ACCEPTED only if ALL hold, BOTH runs:
+   a. RetroArch CPU (procs.retroarch.cpu_pct mean, window) <= 150 % of a core;
+   b. host CPU mean <= 20 %;
+   c. RetroArch fps (title counter) >= 59.9; encoder capture fps 60 +/- 0.5; rendered fps (heartbeat) >= 59.5;
+   d. the row REPEATABLE at 20 min on E1's bands (tools/e1_suite.py compare, unchanged, on the flagged pair: host CPU
+      +/- 2 points, GPU busy +/- 3, RetroArch RSS +/- 5 %, RetroArch fps +/- 0.5, rendered fps +/- 0.5);
+   e. encoder dup + drop per minute <= 0.2 (E2: 0.1 / 0.1).
+   A run never reaching PLAYING after two retries -> REJECTED (broke the row). Computed by e3_s4_analysis.py.
+
+3. REPORTED, NOT GATED: PSI cpu, socket W, Tctl, RetroArch's thread count, the core's name / version / sha256, video
+   loss/min (the link's), audio underruns, the decoder report rows -- beside E2's two bsnes runs.
+
+4. NOTHING PERCEPTUAL GATES THIS TASK: the core is a fidelity choice; the look is the user's, afterwards.
+
+5. RULES: as QUEUE_2026-10-06 / -06B / -07; no nft, no real sudo, the Opal not touched; no addresses or identifiers.
+   The bar is not changed after data. Nothing adopted; nothing committed.

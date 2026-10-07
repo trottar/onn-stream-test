@@ -1,0 +1,84 @@
+{
+ "tag": "frame_spin",
+ "flags": [
+  "PRIVYHUB_AUDIO_SENDER_PACING=frame_spin"
+ ],
+ "started_utc": "2026-10-07T05:36:34.794Z",
+ "preflight": {
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached"
+  ],
+  "game_active": false,
+  "adb": true,
+  "drop_in_live": true,
+  "drop_in_index": true,
+  "e3_dropin_absent": true,
+  "ok": true
+ },
+ "restart": {
+  "mainpid_serves_8765": true,
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_AUDIO_SENDER_PACING=frame_spin",
+   "PRIVYHUB_AUDIO_SEND_TRACE=/home/privyhub/Projects/onn-stream-test/docs/memory/evidence/e3_s5c_2026-10-07/trace_frame_spin.txt",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached"
+  ]
+ },
+ "stream": {
+  "ok": true,
+  "attempt": 1,
+  "s_to_playing": 3.0
+ },
+ "sender_thread": {
+  "span_s": 50.0,
+  "voluntary_cs_per_s": 301.8,
+  "nonvoluntary_cs_per_s": 0.0,
+  "cpu_pct": 6.3
+ },
+ "trace_bytes": 456000,
+ "teardown": {
+  "report": "native_decoder_20261007_053827_954.json",
+  "report_fields": {
+   "lost_packets": 6,
+   "rendered_frames": 5786,
+   "stale_output_drops": 8,
+   "max_output_gap_ms": 81,
+   "slow_event_retained": 155,
+   "slow_event_capacity": 1280,
+   "duration_ms": 96890,
+   "video.lost_packets": 6,
+   "video.sequence_resyncs": 0,
+   "video.recent_fps": 55.7651749672894,
+   "decoder.spike_20_ms": 73,
+   "decoder.spike_50_ms": 17,
+   "decoder.spike_80_ms": 4,
+   "decoder.stale_output_drops": 8,
+   "decoder.max_output_gap_ms": 81,
+   "audio.lost_packets": 8,
+   "audio.underruns": 3
+  },
+  "stopped": true,
+  "banner": {
+   "now_playing_before": 0
+  },
+  "dropin_removed": true,
+  "restart_after_flags": {
+   "mainpid_serves_8765": true,
+   "manager": [],
+   "environ": [
+    "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+    "PRIVYHUB_EPG_GUIDE_INDEX=cached"
+   ]
+  },
+  "dropin_env_absent": true,
+  "flags_absent": true,
+  "apk": "CONFIRMED",
+  "ps1_files_identical": true,
+  "retroarch_left": 0,
+  "encoder_left": 0
+ },
+ "ended_utc": "2026-10-07T05:38:43.242Z"
+}

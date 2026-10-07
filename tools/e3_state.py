@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""E3: E2's final state as one JSON line (preflight, PS1 files, APK, no game / RetroArch / encoder). Read-only."""
+"""E3: the adopted state (since E3-S6A: live + the guide index) as one JSON line (preflight, PS1 files, APK, no game / RetroArch / encoder). Read-only."""
 import sys, json, importlib.util
 spec=importlib.util.spec_from_file_location('s','/home/privyhub/Projects/onn-stream-test/tools/e1_suite.py'); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 mp=m.mainpid()

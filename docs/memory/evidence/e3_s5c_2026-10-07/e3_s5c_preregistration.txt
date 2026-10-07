@@ -1,0 +1,52 @@
+E3-S5C PRE-REGISTRATION -- the audio sender's pacing: one timed wait plus the final spin. Written 2026-10-07 after the
+probe (probe.md), BEFORE any benchmark run; hash in e3_s5c_preregistration.sha256. Task:
+docs/memory/handoffs/E3-S5C_AUDIO_SENDER_PACING_SPIN_TASK.md, item 2 of QUEUE_2026-10-07.md (every rule of
+QUEUE_2026-10-06.md and -06B.md). Baseline commit: ccee2f5 (the user's queue-B commit). E2 =
+e2_s1_2026-10-05/runs/E1-PS1-STREAM/run1 (host CPU 11.69 %, rendered 59.81).
+
+THE ADOPTED STATE (E3-S6A, 2026-10-07): the companion's environ exactly PRIVYHUB_ADAPTIVE_BITRATE_MODE=live +
+PRIVYHUB_EPG_GUIDE_INDEX=cached (drop-ins adaptive.conf, epg-index.conf); every run's preflight and teardown check it
+(tools/e1_suite.py ADOPTED). The C runs are that state; the F runs add the flag below.
+
+THE HYPOTHESIS: E3-S5B's extra underruns come from =frame's oversleep; one timed wait ending ~0.25 ms early, followed by
+today's spin to the deadline, keeps most of the CPU saving and restores today's jitter and underrun count.
+
+THE ONE CHANGE: companion/native_session_io.py, _linux_wait_until: PRIVYHUB_AUDIO_SENDER_PACING=frame_spin -> one
+Event.wait to (deadline - 250 us), then the existing final spin to the deadline. =frame keeps its E3-S5 behaviour;
+absent = today's wait. Diff e3_s5c_frame_spin.diff sha256 10f8fc224b55ddb543108e80fc80ef93d6e017c8a69e697e5513205d72d08f4d;
+native_session_io.py after 27ed9e3d1a0d0f04bfe6e528dd047746abdc634b7850e91d4edcb08dd1fdc4bb.
+
+THE PROBE (probe.md), stated before the runs: frame_spin tick sd 0.102 ms (no flag 0.076, frame 0.181) -- NOT <= 0.10,
+so by the task's rule THE HYPOTHESIS IS ALREADY IN DOUBT; the runs still go. 1.51 wake-ups per packet (no flag 84.4);
+sender 6.3 % of a core (no flag 13.2, frame 2.0); no gap > 10 ms, no bunch >= 4.
+
+1. THE RUNS, in this order, window 1200 s, gap 120 s, E1's launch / warm-up / teardown, --e2, all E1-PS1-STREAM:
+     C1 (no flag) -> runs/E1-PS1-STREAM/run1        F1 (flag) -> runs/E1-PS1-STREAM_flag/run1
+     C2 (no flag) -> runs/E1-PS1-STREAM/run2        F2 (flag) -> runs/E1-PS1-STREAM_flag/run2
+     F3 (flag)    -> runs/E1-PS1-STREAM_flag/run3
+   --plan E1-PS1-STREAM:1:120,E1-PS1-STREAM:1:120:F,E1-PS1-STREAM:1:120,E1-PS1-STREAM:1:120:F,E1-PS1-STREAM:1:120:F
+   with F = PRIVYHUB_AUDIO_SENDER_PACING=frame_spin (the E3 drop-in for F runs only, removed at each teardown; the
+   environ checked against the adopted two lines).
+
+2. COMPARABILITY (else INCONCLUSIVE): C1 and C2 each within E1's bands of E2's PS1-STREAM (host CPU mean 11.69 +/- 2;
+   rendered fps 59.81 +/- 0.5), AND |rendered(C1) - rendered(C2)| <= 0.5.
+
+3. THE BAR -- ACCEPTED only if ALL hold:
+   a. every F run: the audio sender thread (SCHED_RR; tools/e3_table.py) <= 8 % of a core AND the companion's CPU
+      <= 20 % of a core;
+   b. every F run: audio underruns (heartbeat, window) <= max(C1, C2) + 5 AND <= 20 -- unchanged from E3-S5B;
+   c. every F run: rendered fps (heartbeat, window) >= 59.5; RetroArch fps 60 +/- 0.5;
+   d. pooled minutes as E3-S5B: each run's window in 20 one-minute bins of lost video packets (e2_analysis.py's
+      hb_loss_series); F = the 60 minute-values of F1-F3, C = the 40 of C1-C2:
+        median(F) <= 3 x median(C), AND share of F minutes > 100 lost <= share of C minutes > 100 + 0.10;
+   e. every F run: D-BASE spikes >= 20 ms per min < 200 and stale output drops per min < 20 (session report).
+   Comparability holds and (a)-(e) all hold -> ACCEPTED; any fails -> REJECTED. A run never reaching PLAYING after two
+   retries or the flag breaking the row -> REJECTED (broke the row). Computed by e3_s5c_analysis.py (E3-S5B's
+   analysis with clause (a)'s two limits changed to 8 and 20).
+
+4. REPORTED, NOT GATED: the probe's three-way table; socket W; max output gap; the C2 block; the per-minute loss lists
+   (loss_per_minute.txt); the ladder's decisions; the F runs beside E3-S5B's =frame runs (sender 2.0-2.35 %, companion
+   13.3-14.3 %, underruns 15 / 18 / 8).
+
+5. RULES: as QUEUE_2026-10-06 / -06B / -07 and E2-S1's teardown; no nft, no real sudo, the Opal not touched; no
+   addresses or identifiers. The bar is not changed after data. Nothing adopted; nothing committed.

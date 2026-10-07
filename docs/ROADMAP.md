@@ -1071,6 +1071,16 @@ Nothing ACCEPTED; nothing adopted. The queue ran all five, in order, on 2026-10-
 
 One item ACCEPTED (E3-S6's memory half); nothing adopted — the user's decision.
 
+**Queue 2026-10-07 (`QUEUE_2026-10-07.md`) — E3's first adoption:**
+
+| task | change (flag) | verdict | record |
+| --- | --- | --- | --- |
+| E3-S6A guide index adopted | `epg-index.conf`: `PRIVYHUB_EPG_GUIDE_INDEX=cached` (the user: "1. Adopt") | **ADOPTION STANDS** (META 33.6 MB, 257/0 grabs; PS1-STREAM 10.4 % / 59.98 fps; CONC reported 1,312/min) | `evidence/E3_S6A_GUIDE_INDEX_ADOPTION_2026-10-07.md` |
+| E3-S5C audio sender, timed wait + final spin | `PRIVYHUB_AUDIO_SENDER_PACING=frame_spin`, 5 interleaved runs | **ACCEPTED** (sender 6 %, companion 17.6 %; underruns 13 / 9 / 5 vs 17 / 14; loss median 4 vs 2.5) — not adopted | `evidence/E3_S5C_AUDIO_SENDER_PACING_SPIN_2026-10-07.md` |
+| E3-S4 SNES core, run | Snes9x 1.63 (`PRIVYHUB_SNES_CORE=snes9x`; the core placed by the user) | **ACCEPTED** (RetroArch 8.2 / 9.3 % of a core vs 436 / 517; host 7.4 / 7.9 % vs 43 / 50; REPEATABLE) — not adopted; the look and the licence are the user's | `evidence/E3_S4_SNES_LIGHTER_CORE_2026-10-07.md` (supersedes 2026-10-06's NOT RUN) |
+
+E3-S6A adopted; E3-S5C and E3-S4 ACCEPTED, awaiting the user's decisions.
+
 ## E4 — Core Linux resource envelope
 
 Produce:

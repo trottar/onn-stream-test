@@ -1,0 +1,54 @@
+E3-S6A PRE-REGISTRATION -- verifying the adopted cached guide index on the suite. Written 2026-10-07 after the
+adoption (drop-in epg-index.conf, 04:15:49Z), the state-check patch and the smoke, BEFORE any verification run; hash in
+e3_s6a_preregistration.sha256. Task: docs/memory/handoffs/E3-S6A_GUIDE_INDEX_ADOPTION_TASK.md, item 1 of
+QUEUE_2026-10-07.md (every rule of QUEUE_2026-10-06.md and -06B.md; this task alone adopts). The user's words,
+2026-10-07: "1. Adopt". Baseline commit: ccee2f5 (the user's queue-B commit).
+E2 = e2_s1_2026-10-05/runs (PS1-STREAM host CPU 11.69 %, rendered 59.81; META 9.8 %, companion PSS 161 MB, 228/0 grabs,
+median 5.2 s). E3-S6 = e3_s6_2026-10-07/runs (CONC r1 / r2 with the flag).
+
+THE ADOPTED STATE (what runs; no flag is set for these runs):
+  ~/.config/systemd/user/privyhub-companion.service.d/epg-index.conf = "[Service]\nEnvironment=PRIVYHUB_EPG_GUIDE_INDEX=cached\n"
+  (sha256 5f99559a959dd75b0fe24051d44c87740ae63e8f832f651fd700c4f4727ee08c); adaptive.conf and the unit file untouched.
+  The companion's environ = exactly PRIVYHUB_ADAPTIVE_BITRATE_MODE=live + PRIVYHUB_EPG_GUIDE_INDEX=cached; manager none.
+  companion/plugins/epg.py sha256 64d29c54f6388d55bf50a65dd1875b1fbe4eaef27a3d06d348f37c1be7df0118 (E3-S6's, unchanged).
+  The state check (tools/e1_suite.py preflight / teardown / final state; tools/e3_state.py through it) now expects those
+  two lines: e3_s6a_state_check.diff sha256 ed6d7e3ef632b2bc9befe82e605c6684c9f161c3e11757148ceedd8dcdb2a2d6;
+  e1_suite.py after 131e2518a2c90088b42d685f9ab41f5b1f24558373d1a42eb9fc23765f555fc3.
+  The index file data/epg/metadata/guides_index.json was absent at the adoption and built by the smoke's first grab
+  (04:16:16.723Z; 3,268,095 bytes; sha256 65644985673ae428b12b7a9d2a2d6514cc19f93b1649548df1644ebe6462681b; 13,555
+  channels); the six forced refreshes ok; candidates identical to E3-S6's smoke dump for all six (cands_check.json).
+  The pre-run guide read (guide_read_before.json): 6 channels serving, 344 programmes, none stale.
+  The metadata file's 24-h TTL ends 06:20:41Z; the runs are expected to end before it. If a grab after it re-downloads
+  the file and rebuilds the index, that is reported (when, how long), not a failure by itself.
+
+1. THE RUNS, in this order, window 1200 s, gap 120 s, E1's launch / warm-up / teardown, --e2, no flag:
+     E1-PS1-STREAM x1 -> runs/E1-PS1-STREAM/run1
+     E1-META x1       -> runs/E1-META/run1
+     E1-CONC x1       -> runs/E1-CONC/run1
+   --plan E1-PS1-STREAM:1:120,E1-META:1:120,E1-CONC:1:120. Then tools/e3_guide_read.py -> guide_read_after.json.
+
+2. THE BAR -- THE ADOPTION STANDS only if ALL hold; otherwise epg-index.conf is removed (daemon-reload, restart), the
+   state-check patch reverted, and the record says ADOPTION REVERTED with the failing clause:
+   META (runs/E1-META/run1):
+     m1. companion PSS at the window's end (the last 1-s sample) <= 60 MB, and not growing: last-15-min growth
+         (tools/e3_table.py) <= 5 %;
+     m2. grabs failed 0, grabs ok >= 205, median grab <= 6.8 s;
+     m3. the guide serves: guide_read_after 6 channels serving, programme total within +/- 5 % of 344 (327-361);
+     m4. host CPU mean <= 11.8.
+   CONC (runs/E1-CONC/run1):
+     c1. companion PSS at the window's end <= 60 MB;
+     c2. grabs failed 0.
+     The stream rows (loss/min, rendered fps, resyncs, underruns, the aligned frame 0-10 s with this run's
+     PS1-STREAM as baseline) are REPORTED beside E3-S6's two CONC runs and E2's -- NOT GATED; E3-S6's STREAM verdict
+     (REJECTED) stands and is not re-litigated.
+   PS1-STREAM (runs/E1-PS1-STREAM/run1):
+     p1. host CPU mean within 11.69 +/- 2 (9.69-13.69) AND rendered fps within 59.81 +/- 0.5 (59.31-60.31).
+     Companion PSS and CPU reported -- the index must not touch plain streaming.
+   A run never reaching PLAYING after two retries, or a run failing for the adopted state's sake -> ADOPTION REVERTED.
+
+3. REPORTED, NOT GATED: the index build (when, how long: the smoke), its reload at each run's restart (the file's
+   mtime and sha256 unchanged after the runs = reloaded, not rebuilt), the file's size and sha256 at the end; the
+   companion PSS per run; the EPG child's cost; any metadata re-download.
+
+4. RULES: as QUEUE_2026-10-06 / -06B / -07 and E2-S1's teardown; no nft, no real sudo, the Opal not touched; no
+   addresses or identifiers. The bar is not changed after data. Nothing adopted beyond this item; nothing committed.

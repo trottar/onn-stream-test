@@ -1,0 +1,84 @@
+{
+ "tag": "frame",
+ "flags": [
+  "PRIVYHUB_AUDIO_SENDER_PACING=frame"
+ ],
+ "started_utc": "2026-10-07T05:34:22.790Z",
+ "preflight": {
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached"
+  ],
+  "game_active": false,
+  "adb": true,
+  "drop_in_live": true,
+  "drop_in_index": true,
+  "e3_dropin_absent": true,
+  "ok": true
+ },
+ "restart": {
+  "mainpid_serves_8765": true,
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_AUDIO_SENDER_PACING=frame",
+   "PRIVYHUB_AUDIO_SEND_TRACE=/home/privyhub/Projects/onn-stream-test/docs/memory/evidence/e3_s5c_2026-10-07/trace_frame.txt",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached"
+  ]
+ },
+ "stream": {
+  "ok": true,
+  "attempt": 1,
+  "s_to_playing": 9.1
+ },
+ "sender_thread": {
+  "span_s": 50.0,
+  "voluntary_cs_per_s": 272.3,
+  "nonvoluntary_cs_per_s": 0.0,
+  "cpu_pct": 2.03
+ },
+ "trace_bytes": 456000,
+ "teardown": {
+  "report": "native_decoder_20261007_053619_277.json",
+  "report_fields": {
+   "lost_packets": 19,
+   "rendered_frames": 6020,
+   "stale_output_drops": 15,
+   "max_output_gap_ms": 92,
+   "slow_event_retained": 160,
+   "slow_event_capacity": 1280,
+   "duration_ms": 100968,
+   "video.lost_packets": 19,
+   "video.sequence_resyncs": 0,
+   "video.recent_fps": 59.72498638583866,
+   "decoder.spike_20_ms": 65,
+   "decoder.spike_50_ms": 15,
+   "decoder.spike_80_ms": 15,
+   "decoder.stale_output_drops": 15,
+   "decoder.max_output_gap_ms": 92,
+   "audio.lost_packets": 8,
+   "audio.underruns": 0
+  },
+  "stopped": true,
+  "banner": {
+   "now_playing_before": 0
+  },
+  "dropin_removed": true,
+  "restart_after_flags": {
+   "mainpid_serves_8765": true,
+   "manager": [],
+   "environ": [
+    "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+    "PRIVYHUB_EPG_GUIDE_INDEX=cached"
+   ]
+  },
+  "dropin_env_absent": true,
+  "flags_absent": true,
+  "apk": "CONFIRMED",
+  "ps1_files_identical": true,
+  "retroarch_left": 0,
+  "encoder_left": 0
+ },
+ "ended_utc": "2026-10-07T05:36:34.772Z"
+}

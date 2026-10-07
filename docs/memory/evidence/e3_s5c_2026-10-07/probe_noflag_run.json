@@ -1,0 +1,81 @@
+{
+ "tag": "noflag",
+ "flags": [],
+ "started_utc": "2026-10-07T05:32:12.636Z",
+ "preflight": {
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached"
+  ],
+  "game_active": false,
+  "adb": true,
+  "drop_in_live": true,
+  "drop_in_index": true,
+  "e3_dropin_absent": true,
+  "ok": true
+ },
+ "restart": {
+  "mainpid_serves_8765": true,
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_AUDIO_SEND_TRACE=/home/privyhub/Projects/onn-stream-test/docs/memory/evidence/e3_s5c_2026-10-07/trace_noflag.txt",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached"
+  ]
+ },
+ "stream": {
+  "ok": true,
+  "attempt": 1,
+  "s_to_playing": 3.0
+ },
+ "sender_thread": {
+  "span_s": 50.0,
+  "voluntary_cs_per_s": 16874.8,
+  "nonvoluntary_cs_per_s": 0.4,
+  "cpu_pct": 13.24
+ },
+ "trace_bytes": 456000,
+ "teardown": {
+  "report": "native_decoder_20261007_053405_881.json",
+  "report_fields": {
+   "lost_packets": 30,
+   "rendered_frames": 5782,
+   "stale_output_drops": 8,
+   "max_output_gap_ms": 83,
+   "slow_event_retained": 151,
+   "slow_event_capacity": 1280,
+   "duration_ms": 96942,
+   "video.lost_packets": 30,
+   "video.sequence_resyncs": 0,
+   "video.recent_fps": 59.711399282304804,
+   "decoder.spike_20_ms": 84,
+   "decoder.spike_50_ms": 13,
+   "decoder.spike_80_ms": 6,
+   "decoder.stale_output_drops": 8,
+   "decoder.max_output_gap_ms": 83,
+   "audio.lost_packets": 14,
+   "audio.underruns": 5
+  },
+  "stopped": true,
+  "banner": {
+   "now_playing_before": 0
+  },
+  "dropin_removed": true,
+  "restart_after_flags": {
+   "mainpid_serves_8765": true,
+   "manager": [],
+   "environ": [
+    "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+    "PRIVYHUB_EPG_GUIDE_INDEX=cached"
+   ]
+  },
+  "dropin_env_absent": true,
+  "flags_absent": true,
+  "apk": "CONFIRMED",
+  "ps1_files_identical": true,
+  "retroarch_left": 0,
+  "encoder_left": 0
+ },
+ "ended_utc": "2026-10-07T05:34:22.767Z"
+}

@@ -9,7 +9,7 @@
     e1_suite.py --self-test
 
 One command, no hands. Per run: preflight (no PRIVYHUB_* in the user manager, the companion's environ exactly the
-live default, no game, adb), the row's flags (1080p row only), a unit restart (MainPID owns 8765), the idle gap
+adopted state since E3-S6A: live + the guide index, no game, adb), the row's flags (1080p row only), a unit restart (MainPID owns 8765), the idle gap
 (>= 120 s), launch, warm-up, the 300-s window, teardown to idle, checks. The sampler (tools/e1_sampler.py) runs
 from the gap to the end of the teardown; the summary is over the window (and, separately, the gap).
 
@@ -46,6 +46,10 @@ UNIT = "privyhub-companion"
 PKG = "com.safeiot.privyhub"
 EXPECT_APK = "de072762e55122c3060086f6f10b1bff54633d9165d0c475f17699127841835e"
 LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
+# E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
+# is exactly these two names, at every precondition and teardown
+INDEX = "PRIVYHUB_EPG_GUIDE_INDEX=cached"
+ADOPTED = sorted([LIVE, INDEX])
 FLAG_NAMES = ["PRIVYHUB_ADAPTIVE_BITRATE_INJECT", "PRIVYHUB_ADAPTIVE_BITRATE_TOP", "PRIVYHUB_PS1_LOOK",
               "PRIVYHUB_NATIVE_PROFILE_ID", "PRIVYHUB_FEC_SCHEME"]
 RA_CFG = Path.home() / ".config/retroarch/config"
@@ -652,8 +656,10 @@ def preflight() -> dict:
     d = {"manager": manager_flags(), "environ": environ_flags(mp), "game_active": games_status().get("active"),
          "adb": any(l.endswith("\tdevice") for l in adb("devices").splitlines()[1:]),
          "drop_in_live": f"Environment={LIVE}" in sh(["systemctl", "--user", "cat", UNIT]),
+         "drop_in_index": f"Environment={INDEX}" in sh(["systemctl", "--user", "cat", UNIT]),
          "e3_dropin_absent": not DROPIN.exists()}
-    d["ok"] = d["manager"] == [] and d["environ"] == [LIVE] and d["adb"] and d["drop_in_live"] and d["e3_dropin_absent"]
+    d["ok"] = (d["manager"] == [] and d["environ"] == ADOPTED and d["adb"] and d["drop_in_live"] and d["drop_in_index"]
+               and d["e3_dropin_absent"])
     return d
 
 
@@ -675,7 +681,7 @@ def teardown_flags(w: dict, rec: dict):
     if w.get("dropin"):
         rec["dropin_env_absent"] = not any(environ_has(mainpid(), kv) for kv in w["dropin"])
     mp = mainpid()
-    rec["flags_absent"] = manager_flags() == [] and environ_flags(mp) == [LIVE]
+    rec["flags_absent"] = manager_flags() == [] and environ_flags(mp) == ADOPTED
 
 
 def run_once(w: dict, run_no: int, out: Path, window: int, gap: int, e2: bool = False) -> dict:
@@ -713,7 +719,7 @@ def run_once(w: dict, run_no: int, out: Path, window: int, gap: int, e2: bool = 
             sh(["systemctl", "--user", "daemon-reload"], 60)
             rec["dropin"] = list(w["dropin"])
         rec["restart"] = r = restart_unit()
-        want = sorted([LIVE] + w.get("flags", []) + [kv for kv in w.get("dropin", []) if kv.startswith("PRIVYHUB_")])
+        want = sorted(ADOPTED + w.get("flags", []) + [kv for kv in w.get("dropin", []) if kv.startswith("PRIVYHUB_")])
         if not (r["mainpid_serves_8765"] and r["environ"] == want and r["manager"] == sorted(w.get("flags", []))
                 and all(environ_has(mainpid(), kv) for kv in w.get("dropin", []))):
             raise RuntimeError(f"unit not as expected after restart: {r}")
@@ -926,7 +932,7 @@ def run_suite(out: Path, only: list | None, runs: int, window: int, gap: int, pl
              "ps1_files_identical": ps1_files_identical(), "apk": "CONFIRMED" if apk_hash() == EXPECT_APK else "MISMATCH",
              "retroarch": len(retroarch_pids()), "encoder": len(encoder_pids()), "at_utc": utc()}
     final["e3_dropin_absent"] = not DROPIN.exists()
-    final["flags_absent"] = final["manager"] == [] and final["environ"] == [LIVE] and final["e3_dropin_absent"]
+    final["flags_absent"] = final["manager"] == [] and final["environ"] == ADOPTED and final["e3_dropin_absent"]
     (out / "final_state.json").write_text(json.dumps(final, indent=1))
     log("final state:", json.dumps(final))
 

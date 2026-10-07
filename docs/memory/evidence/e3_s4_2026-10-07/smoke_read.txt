@@ -1,0 +1,22 @@
+# E3-S4 smoke, read by hand (2026-10-07T07:47:10Z). smoke.json's smoke_ok=false comes from the script's /proc/<pid>/maps check, which returned
+# no *_libretro.so line for the RetroArch process (a defect of that check, not of the core). The task's three smoke questions, answered from
+# the sampler's window title and RetroArch's own session log:
+#  - the core loads: yes -- the window title:
+#      1791358971.147 WM_NAME(STRING) = "RetroArch Snes9x 1.63 fae2fea"
+#      1791358974.598 WM_NAME(STRING) = "RetroArch Snes9x 1.63 fae2fea || FPS:  60.00 || Frames: 256"
+#  - the fixture runs its demo loop: yes -- RetroArch 59.999 frames/s over the 180 s (title counter), 8.5 % of a core; host CPU 7.4 %
+#  - the stream reaches PLAYING: yes -- attempt 1, 4.1 s; rendered 59.91 fps, 0 underruns, 0 resyncs over 180 s; 1280x720 at 7000 kbps
+# RetroArch's session log (logs/games/, out of git), the core-specific lines, paths shortened:
+#      Core: snes9x_libretro.so
+#      [INFO] [Core] Loading dynamic libretro core from: "<repo>/runtime/emulators/retroarch/cores-linux/snes9x_libretro.so".
+#      [INFO] [Override] Game-specific overrides found at "<...>/.config/retroarch/config/Snes9x/Super Mario World (USA).cfg".
+#      [INFO] [Config] Appending override config: "<...>/.config/retroarch/config/Snes9x/Super Mario World (USA).cfg".
+#      [INFO] [Override] Redirecting save file to "<...>/data/games/retroarch/saves/Snes9x/Super Mario World (USA).srm".
+#      [INFO] [Override] Redirecting save state to "<...>/data/games/retroarch/states/Snes9x/Super Mario World (USA).state".
+#      [INFO] [Environ] GET_SAVE_DIRECTORY: "<...>/data/games/retroarch/saves/Snes9x".
+#      [INFO] [SRAM] Saving RAM type #0 to "<...>/data/games/retroarch/saves/Snes9x/Super Mario World (USA).srm".
+#      [INFO] [SRAM] Saved successfully to "<...>/data/games/retroarch/saves/Snes9x/Super Mario World (USA).srm".
+#      [INFO] [SRAM] Saved successfully to "<...>/data/games/retroarch/saves/Snes9x/Super Mario World (USA).srm" (unchanged, skipping write).
+#      [INFO] [Core] Saved core options file to "<...>/.config/retroarch/config/Snes9x/Snes9x.opt".
+# side effects (additive; bsnes's files untouched): RetroArch wrote config/Snes9x/Snes9x.opt (default core options) and
+# saves/Snes9x/Super Mario World (USA).srm; the runner's counter override in config/Snes9x/ was removed at the teardown.

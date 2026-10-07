@@ -2,7 +2,7 @@
 
 ## PHASE E — ACTIVE. E1 FROZEN (VOD added); E2 MEASURED 2026-10-06 (E2-S1); E3 next on the user's pick
 
-**E3 (QUEUE_2026-10-06), in progress — nothing adopted:**
+**E3 (QUEUE_2026-10-06, -06B, -07), in progress — one adopted (the guide index, E3-S6A):**
 
 - **E3-S1** (`../evidence/E3_S1_EPG_GRAB_PRIORITY_2026-10-06.md`):
   the grabber at SCHED_IDLE / nice 19 / idle I/O halved the busiest
@@ -52,6 +52,25 @@
   **STREAM REJECTED** (CONC 773 / 1,273 loss/min, 58.65 / 57.64 fps; the
   peak halved). **Open:** the child's share (the busiest core 73-78 % at
   +1-2 s), e.g. a precompiled grabber or a remembered source per channel.
+- **E3-S6A** (`../evidence/E3_S6A_GUIDE_INDEX_ADOPTION_2026-10-07.md`):
+  **ADOPTED and verified** (the user: "1. Adopt"). The drop-in
+  `epg-index.conf` carries `PRIVYHUB_EPG_GUIDE_INDEX=cached`; the
+  adopted environ is two lines; the state check expects both. On the
+  adopted state: META 33.6 MB / 0.23 % / 257-0 grabs; PS1-STREAM
+  unchanged (10.4 %, 59.98 fps); CONC 1,312 loss/min, +1 s peak 27 lost/s
+  (reported; the stream half stays open).
+- **E3-S5C** (`../evidence/E3_S5C_AUDIO_SENDER_PACING_SPIN_2026-10-07.md`):
+  one timed wait to 0.25 ms before the deadline, then today's spin
+  (`=frame_spin`): **ACCEPTED**. Sender 5.9-6.1 % (13), companion 17.6 %
+  (24.5), underruns 13 / 9 / 5 vs controls 17 / 14. The probe's sd 0.102
+  ms missed its stated ≤ 0.10 by a hair; the underruns did not need it.
+  Not adopted (the user's decision).
+- **E3-S4, run** (`../evidence/E3_S4_SNES_LIGHTER_CORE_2026-10-07.md`;
+  supersedes 2026-10-06's NOT RUN): Snes9x 1.63 behind
+  `PRIVYHUB_SNES_CORE=snes9x` (the core placed by the user). **ACCEPTED**:
+  RetroArch 8.2 / 9.3 % of a core (bsnes 436 / 517), host 7.4 / 7.9 %
+  (43 / 50), 60 fps throughout, REPEATABLE (bsnes's row was not). The
+  look and the licence ("Non-commercial") are the user's.
 
 **E2-S1 (2026-10-05/06)** (`../evidence/E2_S1_WHOLE_SYSTEM_2026-10-06.md`):
 

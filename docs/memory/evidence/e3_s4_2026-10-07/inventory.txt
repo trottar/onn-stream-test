@@ -1,0 +1,33 @@
+# E3-S4 inventory (re-run), 2026-10-07T07:42:31Z
+# installed cores (runtime/emulators/retroarch/cores-linux; emulators.json platforms.linux.cores_directory), sha256 / bytes / mtime / file
+44f7216250915cc00ed911993c762f19d0f09af01ab1a79f0335857fd04f15a3  11505752  2026-09-14 02:05:03.  blastem_libretro.so
+ab1306145a383a3b6d41e4e89874673980f3b1c6c7a90d92030017163511b4f8  5914928  2026-09-14 01:17:07.0  bsnes_libretro.so
+9be9deeb159c7898944c688dcb414f4cfdaff73276db493c8890577a2099dcf6  4461880  2026-09-14 03:30:47.0  fceumm_libretro.so
+25176f77c060cf74c4561f745bab181d9bb6b620591f92f82ad0d53c1cc7fb56  18251664  2026-09-14 03:34:37.  mednafen_psx_hw_libretro.so
+9b2b6ea9d88f96c156590443ddd05ee56aaf4e495329a889c979921942717a31  2841720  2026-10-06 01:09:54.0  snes9x_libretro.so
+cfe816af4222f942e59629673d4951094a53225d379a2c7d7a2b4e8b2cddad04  917066  2026-10-07 00:12:26.89  snes9x_libretro.so.zip
+
+# snes9x_libretro.so: placed by the user by hand (QUEUE_2026-10-07); the zip's member:
+  2841720  2026-10-06 01:09   snes9x_libretro.so
+# the zip's member sha256: 9b2b6ea9d88f96c156590443ddd05ee56aaf4e495329a889c979921942717a31 (= the .so on disk)
+# fetched nothing; deleted nothing (both files stay)
+
+# retro_get_system_info (ctypes, its own process; no init): library_name / library_version / extensions
+snes9x: Snes9x / 1.63 fae2fea / smc|sfc|swc|fig|bs|st
+bsnes: bsnes / 115 / smc|sfc|gb|gbc|bs
+
+# the bundled snes9x_libretro.info (RetroArch AppImage home cores/), selected keys:
+display_name = "Nintendo - SNES / SFC (Snes9x)"
+corename = "Snes9x"
+supported_extensions = "smc|sfc|swc|fig|bs|st"
+license = "Non-commercial"
+display_version = "1.61"
+
+# how the row selects the core today: emulators.json platforms.linux.cores.snes =
+19:        "snes": "bsnes_libretro.so",
+37:    "snes": {
+# RetroArch per-core config dirs today:
+#   Beetle PSX HW
+#   bsnes
+#   remaps
+# the one line that selects another core: PRIVYHUB_SNES_CORE=snes9x (emulator_manager._resolve_game, e3_s4_snes_core.diff); the suite's counter override goes to config/Snes9x/Super Mario World (USA).cfg (SNES_CORENAMES)

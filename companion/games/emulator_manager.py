@@ -517,6 +517,13 @@ class EmulatorManager:
             )
 
         core_file = system_config.get("core")
+        # E3-S4: a lighter SNES core by name (PRIVYHUB_SNES_CORE=snes9x -> snes9x_libretro.so in the same cores
+        # directory). Absent = the configured core (bsnes), unchanged.
+        snes_core = os.environ.get("PRIVYHUB_SNES_CORE", "")
+        if system_id == "snes" and snes_core:
+            if not re.fullmatch(r"[a-z0-9_]+", snes_core):
+                raise EmulatorError("PRIVYHUB_SNES_CORE is not a core name")
+            core_file = f"{snes_core}_libretro.so"
         if not isinstance(core_file, str) or not core_file:
             raise EmulatorError(
                 f"No core configured for system: {system_id}"

@@ -1,0 +1,118 @@
+{
+ "started_utc": "2026-10-07T07:42:45.670Z",
+ "preflight": {
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached"
+  ],
+  "game_active": false,
+  "adb": true,
+  "drop_in_live": true,
+  "drop_in_index": true,
+  "e3_dropin_absent": true,
+  "ok": true
+ },
+ "override_dir_existed": false,
+ "restart": {
+  "mainpid_serves_8765": true,
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+   "PRIVYHUB_SNES_CORE=snes9x"
+  ]
+ },
+ "launch_http": 200,
+ "stream": {
+  "ok": true,
+  "attempt": 1,
+  "s_to_playing": 4.1
+ },
+ "loaded_cores_at_playing": [
+  []
+ ],
+ "window": {
+  "from": "2026-10-07T07:43:08.773Z",
+  "to": "2026-10-07T07:46:08.773Z"
+ },
+ "loaded_cores_at_end": [
+  []
+ ],
+ "status_end": {
+  "width": 1280,
+  "height": 720,
+  "bitrate_kbps": 7000,
+  "profile_id": "native_game_720p60_reference"
+ },
+ "recovery_end": "PLAYING",
+ "teardown": {
+  "report": "native_decoder_20261007_074610_098.json",
+  "report_fields": {
+   "lost_packets": 37,
+   "rendered_frames": 11233,
+   "stale_output_drops": 14,
+   "max_output_gap_ms": 98,
+   "slow_event_retained": 285,
+   "slow_event_capacity": 1280,
+   "duration_ms": 188087,
+   "video.lost_packets": 37,
+   "video.sequence_resyncs": 0,
+   "video.recent_fps": 55.74564299968205,
+   "decoder.spike_20_ms": 164,
+   "decoder.spike_50_ms": 18,
+   "decoder.spike_80_ms": 9,
+   "decoder.stale_output_drops": 14,
+   "decoder.max_output_gap_ms": 98,
+   "audio.lost_packets": 10,
+   "audio.underruns": 2
+  },
+  "stopped": true,
+  "retroarch_left": 0,
+  "encoder_left": 0,
+  "override_removed": true,
+  "banner": {
+   "now_playing_before": 2,
+   "now_playing_after_relaunch": 0
+  },
+  "dropin_removed": true,
+  "restart_after_flags": {
+   "mainpid_serves_8765": true,
+   "manager": [],
+   "environ": [
+    "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+    "PRIVYHUB_EPG_GUIDE_INDEX=cached"
+   ]
+  },
+  "dropin_env_absent": true,
+  "flags_absent": true,
+  "apk": "CONFIRMED",
+  "ps1_files_identical": true,
+  "game_active": false
+ },
+ "ended_utc": "2026-10-07T07:46:37.373Z",
+ "retroarch_title": {
+  "titles": 42,
+  "frames_per_s": 59.999,
+  "fps_reading": {
+   "n": 42,
+   "mean": 60.012,
+   "p95": 60.01,
+   "max": 60.55,
+   "min": 59.99
+  }
+ },
+ "retroarch_cpu_mean": 8.456,
+ "host_cpu_mean": 7.364,
+ "heartbeat": {
+  "heartbeats": 90,
+  "segments": 1,
+  "span_s": 179.2,
+  "rendered_fps": 59.908,
+  "video_loss_per_min": 11.72,
+  "audio_underruns": 0,
+  "stream_resyncs": 0,
+  "max_last_output_age_ms": 42
+ },
+ "smoke_ok": false
+}

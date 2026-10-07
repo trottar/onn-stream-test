@@ -1,0 +1,109 @@
+{
+ "E1-IDLE": {
+  "verdict": "NOT RUN"
+ },
+ "E1-PS1-LOCAL": {
+  "verdict": "NOT RUN"
+ },
+ "E1-SNES-STREAM": {
+  "verdict": "REPEATABLE",
+  "failed": [],
+  "rows": [
+   {
+    "metric": "host CPU mean %",
+    "run1": 7.444,
+    "run2": 7.857,
+    "band": "+/-2 points",
+    "holds": true
+   },
+   {
+    "metric": "GPU busy mean %",
+    "run1": 7.366,
+    "run2": 8.039,
+    "band": "+/-3 points",
+    "holds": true
+   },
+   {
+    "metric": "RSS retroarch (kB)",
+    "run1": 147351.85,
+    "run2": 147187.75,
+    "band": "+/-5 %",
+    "holds": true
+   },
+   {
+    "metric": "RetroArch frames/s",
+    "run1": 59.999,
+    "run2": 59.999,
+    "band": "+/-0.5",
+    "holds": true
+   },
+   {
+    "metric": "rendered fps (heartbeat)",
+    "run1": 59.986,
+    "run2": 59.968,
+    "band": "+/-0.5",
+    "holds": true
+   },
+   {
+    "metric": "video loss/min",
+    "run1": 1.85,
+    "run2": 5.41,
+    "band": "reported, not banded",
+    "holds": null
+   },
+   {
+    "metric": "audio underruns",
+    "run1": 7,
+    "run2": 11,
+    "band": "reported, not banded",
+    "holds": null
+   },
+   {
+    "metric": "max output gap ms (C2)",
+    "run1": 64,
+    "run2": 64,
+    "band": "reported, not banded",
+    "holds": null
+   }
+  ]
+ },
+ "E1-PS1-STREAM": {
+  "verdict": "NOT RUN"
+ },
+ "E1-PS1-1080P": {
+  "verdict": "NOT RUN"
+ },
+ "E1-META": {
+  "verdict": "NOT RUN"
+ },
+ "E1-CONC": {
+  "verdict": "NOT RUN"
+ },
+ "E1-VOD": {
+  "verdict": "NOT RUN"
+ },
+ "E1-LIVETV": {
+  "verdict": "ABSENT",
+  "why": "Live TV: no unattended channel start (no intent/extra/deep link; video is upstream -> onn)"
+ },
+ "E1-BROWSER": {
+  "verdict": "ABSENT",
+  "why": "browser source: Windows-only (PowerShell/ddagrab); no Linux implementation"
+ },
+ "E1-CAMERA": {
+  "verdict": "ABSENT",
+  "why": "camera source: Windows-only (dshow); no camera attached (no /dev/video*)"
+ },
+ "E1-NES": {
+  "verdict": "ABSENT",
+  "why": "NES: no fixture (games/nes empty)"
+ },
+ "E1-GENESIS": {
+  "verdict": "ABSENT",
+  "why": "Genesis: no fixture (games/genesis empty)"
+ },
+ "E1-META-RECONCILE": {
+  "verdict": "ABSENT",
+  "why": "metadata reconcile: writes library metadata (outside E1's no-change rule)"
+ }
+}

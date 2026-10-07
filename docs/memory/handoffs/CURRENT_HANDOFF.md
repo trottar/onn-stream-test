@@ -2,30 +2,40 @@
 
 Authoritative state: `../CURRENT.md`. **Start there.**
 
-Baseline commit `bf2120c` (the E3 queue committed). Queue B's work is not
-committed (the user's commit: `../../../logs/e3_s6_git_status.txt`; also
-`logs/e3_s5b_git_status.txt`).
+Baseline commit `ccee2f5` (queue B committed). The 2026-10-07 queue's
+work is not committed (the user's commit: `../../../logs/e3_s4_git_status.txt`,
+the last of `logs/e3_s6a_`, `e3_s5c_`, `e3_s4_git_status.txt`).
 
-## 2026-10-07 — `QUEUE_2026-10-06B`: E3-S5B and E3-S6, unattended
+## 2026-10-07 — `QUEUE_2026-10-07`: E3-S6A, E3-S5C, E3-S4, unattended
 
-Every flag was absent at every teardown; E2's final state was restored
-after each task (03:55Z, APK CONFIRMED). **Nothing adopted or committed.**
+**E3's first adoption.** The cached guide index is now the companion's
+default, through `epg-index.conf`. The adopted state is two environ
+lines: live + `PRIVYHUB_EPG_GUIDE_INDEX=cached`. `tools/e1_suite.py`
+checks for both. Every other flag was absent at every teardown; the
+adopted state was restored after each task (08:44Z, APK CONFIRMED).
+**Nothing else adopted; nothing committed.**
 
 | task | change (flag) | verdict | finding |
 | --- | --- | --- | --- |
-| S5B | E3-S5's `PRIVYHUB_AUDIO_SENDER_PACING=frame`, 5 interleaved runs | **REJECTED** (F2 underruns 18 > 16) | loss not burstier (no minute > 100; median 10 vs 5); sender 13 → 2 %; jitter sd 0.17 vs 0.07 ms |
-| S6 | cached slim guide index (`PRIVYHUB_EPG_GUIDE_INDEX=cached`) | **MEMORY ACCEPTED; STREAM REJECTED** | the parse alone reproduces the CONC peak (318 ×); META companion 34 MB / 0.2 % CPU; CONC 773-1,273 loss/min, peak halved |
+| S6A | adopt the guide index (the user: "1. Adopt") | **ADOPTION STANDS** | META 33.6 MB, 0.23 %, 257/0 grabs; PS1-STREAM unchanged (10.4 %, 59.98); CONC reported 1,312/min |
+| S5C | `PRIVYHUB_AUDIO_SENDER_PACING=frame_spin` (one timed wait + the final spin), C F C F F | **ACCEPTED** | sender 13 → 6 %, companion 24.5 → 17.6 %; underruns 13 / 9 / 5 vs 17 / 14; probe sd 0.102 ms (stated ≤ 0.10: in doubt) |
+| S4 | `PRIVYHUB_SNES_CORE=snes9x` (Snes9x 1.63, placed by the user) | **ACCEPTED** | RetroArch 8-9 % of a core vs bsnes 436-517; host 7.4-7.9 % vs 43-50; REPEATABLE |
 
-- **Adoptable (the user's decision):** `Environment=PRIVYHUB_EPG_GUIDE_INDEX=cached`
-  — the memory half only.
-- **Open:** the grabber child's share of the CONC loss; S5B's underrun
-  excess (one wait + a short final spin, untested); E3-S4 if the user
-  fetches the core.
+- **The user's decisions:**
+  - S5C: `Environment=PRIVYHUB_AUDIO_SENDER_PACING=frame_spin`.
+  - S4: `Environment=PRIVYHUB_SNES_CORE=snes9x`. A fidelity choice
+    (licence "Non-commercial"); first a look by hand (the record's §4).
+  - Each in its own drop-in; `ADOPTED` gains the name.
+- **The index's kill switch:** `../TOOLS.md`.
+- **Open:** the grabber child's share of the CONC loss;
+  `d7_regression.py` and `c3_l4_nft_night.py` still expect the one-line
+  environ.
 
-## 2026-10-06 — `QUEUE_2026-10-06`: E3 S1-S5 (committed `bf2120c`)
+## Queues A and B (committed `bf2120c`, `ccee2f5`)
 
-S1 INCONCLUSIVE, S2 / S3 / S5 REJECTED, S4 NOT RUN; the records are
-`../evidence/E3_S1…S5_*_2026-10-06.md`, the flags in `../TOOLS.md`.
+A (2026-10-06): S1 INCONCLUSIVE, S2 / S3 / S5 REJECTED, S4 NOT RUN. B:
+S5B REJECTED (F2 underruns 18 > 16); S6 MEMORY ACCEPTED (adopted since,
+S6A), STREAM REJECTED. Records `../evidence/E3_S*`; flags `../TOOLS.md`.
 
 ## Earlier (condensed 2026-10-06, E3 queue)
 

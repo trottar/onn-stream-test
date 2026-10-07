@@ -1,0 +1,23 @@
+--- a/companion/native_session_io.py	2026-10-07 01:32:06.684439030 -0400
++++ b/companion/native_session_io.py	2026-10-07 01:32:06.688439123 -0400
+@@ -315,6 +315,12 @@
+                 self._linux_stop_event.wait(remaining_ns / 1_000_000_000)
+                 continue
+ 
++            # E3-S5C: =frame_spin -> one timed wait to 0.25 ms before the deadline, then today's final spin below.
++            if self._linux_pacing_frame_spin:
++                if remaining_ns > 250_000:
++                    self._linux_stop_event.wait((remaining_ns - 250_000) / 1_000_000_000)
++                continue
++
+             if remaining_ns > 1_500_000:
+                 self._linux_stop_event.wait(0.001)
+             elif remaining_ns > 250_000:
+@@ -436,6 +442,7 @@
+             return
+ 
+         self._linux_pacing_frame = os.environ.get("PRIVYHUB_AUDIO_SENDER_PACING") == "frame"  # E3-S5
++        self._linux_pacing_frame_spin = os.environ.get("PRIVYHUB_AUDIO_SENDER_PACING") == "frame_spin"  # E3-S5C
+         # E3-S5B, measurement only: PRIVYHUB_AUDIO_SEND_TRACE=<path> -> the perf_counter_ns of every sendto
+         # (o = original, d = duplicate) from 30 s after the sender starts, for 60 s, written once by a helper
+         # thread. Absent = no trace (one `is None` check per send).
