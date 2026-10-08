@@ -1,0 +1,13 @@
+--- a/companion/plugins/epg.py	2026-10-08 00:04:00.343201983 -0400
++++ b/companion/plugins/epg.py	2026-10-08 00:04:00.351202187 -0400
+@@ -1216,6 +1216,10 @@
+             if os.environ.get("PRIVYHUB_EPG_GRAB_PRIORITY") == "idle":
+                 args = ["/usr/bin/chrt", "-i", "0", "/usr/bin/nice", "-n", "19",
+                         "/usr/bin/ionice", "-c", "3"] + args
++            # E3-S7, measurement only: PRIVYHUB_EPG_GRAB_NONET=1 -> the grabber child in its own user + network namespace
++            # (no route, loopback down): its start-up as today, its fetch fails fast without leaving the host. Absent = today.
++            if os.environ.get("PRIVYHUB_EPG_GRAB_NONET") == "1":
++                args = ["/usr/bin/unshare", "-rn"] + args
+             started = time.monotonic()
+             result = self._run(
+                 args,

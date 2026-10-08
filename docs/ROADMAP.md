@@ -1092,11 +1092,18 @@ companion's default environ is three lines (live, index, Snes9x).
 
 | item | status |
 | --- | --- |
-| 1. EPG grabs vs the stream (CONC) | the parse's share removed (S6, **adopted** S6A); **the grabber child's spawn share remains** (S1 INCONCLUSIVE; not yet tried as a change) |
+| 1. EPG grabs vs the stream (CONC) | the parse's share removed (S6, **adopted** S6A); the child's spawn share: pacing its requests (S7) cut CONC loss ~20× but slowed the guide cycle below the bar — REJECTED; a shorter delay is the next try |
 | 2. the companion's memory after a grab | **solved by the index** (S6/S6A: ~34 MB, not ~160) |
 | 3. the grabber's own cost | REJECTED as a launcher change (S3); **the node grabber's start-up remains** (a precompiled grabber, untested) |
 | 4. the SNES core | **Snes9x adopted** (S4 ACCEPTED, A2 stands) |
 | 5. streaming's fixed cost (the audio sender) | `=frame` REJECTED (S5/S5B); `=frame_spin` ACCEPTED (S5C) then REVERTED (A2, underruns); off |
+
+**Queue 2026-10-08 (`QUEUE_2026-10-08.md`):**
+
+| task | change (flag) | verdict | record |
+| --- | --- | --- | --- |
+| E3-R1 recovery's false pause | the host's controller-silence trigger at 5 s on two checks (`PRIVYHUB_RECOVERY_TRIGGER=v2`) | **INCONCLUSIVE** (today's rule not faithfully replayable at the records' 1-s resolution; stopped before runs). The probe: the harmful pause is an uplink stall with the client playing, and no exit | `evidence/E3_R1_RECOVERY_FALSE_PAUSE_2026-10-08.md` |
+| E3-S7 the grab's spawn share | the grabber paced (`PRIVYHUB_EPG_GRAB_NET=paced`, `--delay=4000`); probe: CPU-off and network-off arms each removed the peak, so network | **REJECTED** (guide cycle 12 refreshes per channel < 20; loss 60-67/min > 3 × control) — but CONC loss 1,312 → ~60/min, 59.8 fps, resyncs 52 → 1-3 | `evidence/E3_S7_CONC_GRAB_SPAWN_2026-10-08.md` |
 
 ## E4 — Core Linux resource envelope
 

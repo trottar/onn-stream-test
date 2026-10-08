@@ -1683,6 +1683,8 @@ class NativeControllerBridge:
         self._silence_callback: Callable[[float], None] | None = None
         self._silence_threshold_s = 1.0
         self._silence_reported = False
+        self._silence_confirm_s = 0.0           # E3-R1 v2: a second check this long after the first; 0 = today
+        self._silence_first_over_at: float | None = None
 
     @staticmethod
     def _selected_backend() -> str:
@@ -1922,12 +1924,25 @@ class NativeControllerBridge:
         self,
         callback: "Callable[[float], None] | None",
         threshold_ms: float,
+        confirm_ms: float = 0.0,
     ) -> None:
         self._silence_callback = callback
         self._silence_threshold_s = max(
             0.05,
             float(threshold_ms) / 1000.0,
         )
+        self._silence_confirm_s = max(0.0, float(confirm_ms) / 1000.0)
+
+    def _silence_confirmed(self, now: float) -> bool:
+        """E3-R1: with a confirm interval (v2), the silence must be over the threshold on two checks that far apart
+        with no packet between; without one (today), the first check over the threshold fires."""
+        if self._silence_confirm_s <= 0.0:
+            return True
+        first = self._silence_first_over_at
+        if first is None or first < self._last_any_packet_at:
+            self._silence_first_over_at = now
+            return False
+        return now - first >= self._silence_confirm_s
 
     def last_client_packet_age_ms(self) -> float | None:
         last = self._last_any_packet_at
@@ -2432,6 +2447,7 @@ class NativeControllerBridge:
                     and self._last_any_packet_at > 0.0
                     and now - self._last_any_packet_at
                     > self._silence_threshold_s
+                    and self._silence_confirmed(now)
                 ):
                     self._silence_reported = True
 

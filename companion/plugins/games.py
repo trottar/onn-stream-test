@@ -114,9 +114,14 @@ class GamesPlugin:
             ),
         )
 
+        # E3-R1: PRIVYHUB_RECOVERY_TRIGGER=v2 -> the host's controller-silence trigger needs 5 s of silence, seen on
+        # two checks 250 ms apart (uplink stalls of 1-3 s with the client still playing paused the game). The
+        # client-posted desync and everything after the pause are unchanged. Absent = DESYNC_MS, first check.
+        trigger_v2 = os.environ.get("PRIVYHUB_RECOVERY_TRIGGER") == "v2"
         self._native_stream._session_io.controller.set_client_silence_callback(
             self._recovery.note_client_silence,
-            DESYNC_MS,
+            5_000 if trigger_v2 else DESYNC_MS,
+            confirm_ms=250 if trigger_v2 else 0,
         )
 
         # The client target of the live native-stream session, remembered so

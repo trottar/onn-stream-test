@@ -1,0 +1,86 @@
+{
+ "arm": "B_r1",
+ "flags": [
+  "PRIVYHUB_MEM_PROBE=1",
+  "PRIVYHUB_EPG_GRAB_PRIORITY=idle"
+ ],
+ "started_utc": "2026-10-08T04:30:27.382Z",
+ "preflight": {
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+   "PRIVYHUB_SNES_CORE=snes9x"
+  ],
+  "game_active": false,
+  "adb": true,
+  "drop_in_live": true,
+  "drop_in_index": true,
+  "drop_in_snes_core": true,
+  "e3_dropin_absent": true,
+  "ok": true
+ },
+ "channel": "CNBCUK.uk@SD",
+ "restart": {
+  "mainpid_serves_8765": true,
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_EPG_GRAB_PRIORITY=idle",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+   "PRIVYHUB_MEM_PROBE=1",
+   "PRIVYHUB_SNES_CORE=snes9x"
+  ]
+ },
+ "stream": {
+  "ok": true,
+  "attempt": 1,
+  "s_to_playing": 6.1
+ },
+ "quiet_from": "2026-10-08T04:31:52.301Z",
+ "triggers_to": "2026-10-08T04:38:07.304Z",
+ "teardown": {
+  "report": "native_decoder_20261008_043824_381.json",
+  "report_fields": {
+   "lost_packets": 809,
+   "rendered_frames": 27343,
+   "stale_output_drops": 82,
+   "max_output_gap_ms": 543,
+   "slow_event_retained": 1034,
+   "slow_event_capacity": 1280,
+   "duration_ms": 460788,
+   "video.lost_packets": 809,
+   "video.sequence_resyncs": 2,
+   "video.recent_fps": 61.838615066526145,
+   "decoder.spike_20_ms": 705,
+   "decoder.spike_50_ms": 127,
+   "decoder.spike_80_ms": 24,
+   "decoder.stale_output_drops": 82,
+   "decoder.max_output_gap_ms": 543,
+   "audio.lost_packets": 126,
+   "audio.underruns": 20
+  },
+  "stopped": true,
+  "banner": {
+   "now_playing_before": 2,
+   "now_playing_after_relaunch": 0
+  },
+  "dropin_removed": true,
+  "restart_after_flags": {
+   "mainpid_serves_8765": true,
+   "manager": [],
+   "environ": [
+    "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+    "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+    "PRIVYHUB_SNES_CORE=snes9x"
+   ]
+  },
+  "dropin_env_absent": true,
+  "flags_absent": true,
+  "apk": "CONFIRMED",
+  "ps1_files_identical": true,
+  "retroarch_left": 0,
+  "encoder_left": 0
+ },
+ "ended_utc": "2026-10-08T04:38:51.074Z"
+}

@@ -78,6 +78,28 @@
   per minute); the replacement run had 14; SNES had 46 (not gated). Open:
   whether `frame_spin` raises underruns on a lossy link -- only a
   same-night interleaved control can tell.
+- **E3-R1** (`../evidence/E3_R1_RECOVERY_FALSE_PAUSE_2026-10-08.md`):
+  **INCONCLUSIVE** (the replay of today's rule was not faithful at 1-s
+  resolution; stopped before runs).
+  - The probe located the harmful false pause: the host's
+    `controller_silence` on a 1-3-s client→host stall with the client
+    still playing, which has no exit (gave up and saved in 3 of 4).
+  - The client's own output-silence pauses resumed by themselves.
+  - Idle, the client sends 460 controller packets/s.
+  - v2 (5 s on two checks) is dormant. Next: a silence-gap log for a
+    faithful replay; the user's `r3b_run.sh` night; and the self-clearing
+    pause (a resume-path decision).
+- **E3-S7** (`../evidence/E3_S7_CONC_GRAB_SPAWN_2026-10-08.md`):
+  **REJECTED** by its bar, but the clearest CONC gain in E3.
+  - The probe: removing the child's network (`unshare -rn`) or its CPU
+    priority each removed the per-grab peak in valid sessions; CPU alone
+    does not make it.
+  - The pacing change (`--delay=4000`): CONC loss 1,312 → 67 / 60 per
+    min, 59.8 fps, resyncs 1 / 3, per-grab peak ~27 → ~3.7 lost/s.
+  - It fails on the guide cycle (12 refreshes per channel, median grab
+    15 s) and on loss > 3 × the control.
+  - Next: a shorter delay (1-1.5 s); measure today's effective
+    per-request delay.
 - **Open, found by E3-A2's validity check:** the companion's link
   recovery can pause the game mid-window (`desync_pause`,
   `controller_silence`) and the suite still marks the run OK.

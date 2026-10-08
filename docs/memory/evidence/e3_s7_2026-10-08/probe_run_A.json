@@ -1,0 +1,84 @@
+{
+ "arm": "A",
+ "flags": [
+  "PRIVYHUB_MEM_PROBE=1"
+ ],
+ "started_utc": "2026-10-08T04:04:40.345Z",
+ "preflight": {
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+   "PRIVYHUB_SNES_CORE=snes9x"
+  ],
+  "game_active": false,
+  "adb": true,
+  "drop_in_live": true,
+  "drop_in_index": true,
+  "drop_in_snes_core": true,
+  "e3_dropin_absent": true,
+  "ok": true
+ },
+ "channel": "CNBCUK.uk@SD",
+ "restart": {
+  "mainpid_serves_8765": true,
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+   "PRIVYHUB_MEM_PROBE=1",
+   "PRIVYHUB_SNES_CORE=snes9x"
+  ]
+ },
+ "stream": {
+  "ok": true,
+  "attempt": 1,
+  "s_to_playing": 3.1
+ },
+ "quiet_from": "2026-10-08T04:06:02.704Z",
+ "triggers_to": "2026-10-08T04:12:17.707Z",
+ "teardown": {
+  "report": "native_decoder_20261008_041234_805.json",
+  "report_fields": {
+   "lost_packets": 4403,
+   "rendered_frames": 26981,
+   "stale_output_drops": 19,
+   "max_output_gap_ms": 382,
+   "slow_event_retained": 1053,
+   "slow_event_capacity": 1280,
+   "duration_ms": 457911,
+   "video.lost_packets": 4403,
+   "video.sequence_resyncs": 7,
+   "video.recent_fps": 57.74419480328844,
+   "decoder.spike_20_ms": 542,
+   "decoder.spike_50_ms": 43,
+   "decoder.spike_80_ms": 2,
+   "decoder.stale_output_drops": 19,
+   "decoder.max_output_gap_ms": 382,
+   "audio.lost_packets": 845,
+   "audio.underruns": 39
+  },
+  "stopped": true,
+  "banner": {
+   "now_playing_before": 2,
+   "now_playing_after_relaunch": 0
+  },
+  "dropin_removed": true,
+  "restart_after_flags": {
+   "mainpid_serves_8765": true,
+   "manager": [],
+   "environ": [
+    "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+    "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+    "PRIVYHUB_SNES_CORE=snes9x"
+   ]
+  },
+  "dropin_env_absent": true,
+  "flags_absent": true,
+  "apk": "CONFIRMED",
+  "ps1_files_identical": true,
+  "retroarch_left": 0,
+  "encoder_left": 0
+ },
+ "ended_utc": "2026-10-08T04:13:02.788Z"
+}

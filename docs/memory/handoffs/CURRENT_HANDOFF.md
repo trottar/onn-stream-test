@@ -2,28 +2,33 @@
 
 Authoritative state: `../CURRENT.md`. **Start there.**
 
-Baseline commit `e553673` (queue C committed). E3-A2's work is not
-committed (the user's commit: `../../../logs/e3_a2_git_status.txt`).
+Baseline commit `def1ad1` (E3-A2 committed). The 2026-10-08 queue's work
+is not committed (the user's commit: `../../../logs/e3_s7_git_status.txt`;
+also `logs/e3_r1_git_status.txt`).
 
-## 2026-10-07/08 — `E3-A2`: adopting `frame_spin` and Snes9x, unattended
+## 2026-10-08 — `QUEUE_2026-10-08`: E3-R1, E3-S7, unattended
 
-The user: "Adopt frame_spin if you think helps"; after the look, "Sure
-it ran smoothly from what I can tell". Both were adopted through their
-own drop-ins and verified on PS1-STREAM ×2, SNES-STREAM and META.
+Both ran on the adopted state (live, the guide index, Snes9x), with
+E3-A2's validity rule standing. Every task flag was absent at every
+teardown; the adopted state held after each task (06:01Z, APK
+CONFIRMED). **Nothing adopted or committed.**
 
-| item | verdict | finding |
-| --- | --- | --- |
-| Snes9x (`snes-core.conf`) | **ADOPTION STANDS** | RetroArch 8.9 % of a core, host 8.05 %, 60 fps, title Snes9x |
-| `frame_spin` (`audio-pacing.conf`) | **ADOPTION REVERTED** | valid PS1 run 2: 24 underruns > 20 (noisy link, loss median 50/min); the replacement run 14; SNES 46 (not gated). Removed 01:05Z |
-| the index with the others (META) | m1 / m2 hold; **m3 fails high** | 343 programmes vs the pre-run 285 ± 5 %; 6 channels serve; the user's call |
+| task | change (flag) | verdict | finding |
+| --- | --- | --- | --- |
+| R1 recovery's false pause | the host's controller-silence trigger at 5 s on two checks (`PRIVYHUB_RECOVERY_TRIGGER=v2`) | **INCONCLUSIVE** (today's rule not faithfully replayable at 1-s resolution; stopped before runs) | the harmful pause: a 1-3-s onn→host stall with the client still playing; no exit (gave up and saved in 3 of 4) |
+| S7 the grab's spawn share | the grabber paced (`PRIVYHUB_EPG_GRAB_NET=paced`, `--delay=4000`) | **REJECTED** (guide cycle 12 refreshes per channel < 20; loss > 3 × control) | CONC loss 1,312 → ~60/min, 59.8 fps, resyncs 1-3 — the clearest CONC gain in E3 |
 
-- **The adopted state is three lines:** live, the guide index, Snes9x
-  (`../TOOLS.md`, the kill switches). APK CONFIRMED at 01:05Z.
-- **One run was invalid.** A recovery pause (`controller_silence`) held
-  the game for 17 of 20 minutes. It was replaced under an addendum hashed
-  before further data.
-- **The same check on earlier runs** found pauses in E2's PS1-1080P r1
-  and in E3-S1's control and CONC runs (open).
+- Task 1's flag was absent from task 2's runs (task 1 INCONCLUSIVE). All
+  of task 2's runs were valid; two of its probe sessions were not, and
+  were replaced.
+- **Next, the user's:** the nft night for R1 if wanted (`r3b_run.sh`;
+  the hand step and the expected reply are in R1 §4); a decision on
+  S7's direction (a shorter delay); E4.
+
+## E3-A2 (committed `def1ad1`)
+
+Snes9x adopted (stands); `frame_spin` adopted then REVERTED (24 underruns > 20).
+The validity rule (recovery pauses invalidate a run) was born there.
 
 ## Queues A, B, C (committed `bf2120c`, `ccee2f5`, `e553673`)
 

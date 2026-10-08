@@ -1,0 +1,57 @@
+E3-R1 PRE-REGISTRATION -- recovery's false pause: the change, the offline replay bar, the run bar. Written 2026-10-08
+after the probe (probe.md: the timelines and the idle probe) and BEFORE the replay is run or any benchmark run; hash in
+e3_r1_preregistration.sha256. Task: docs/memory/handoffs/E3-R1_RECOVERY_FALSE_PAUSE_TASK.md, item 1 of
+QUEUE_2026-10-08.md (every rule of QUEUE_2026-10-06 / -06B / -07; E3-A2's validity rule standing). Baseline commit: def1ad1
+(the user's E3-A2 commit). The adopted state: environ exactly live + the guide index + Snes9x (three drop-ins).
+
+THE PROBE'S READING (probe.md): (b) no -- idle, the client sends 460 controller packets/s with no input, max age 295 ms
+in 10 min; (c) no -- every fired age (1,002-1,004 ms) agrees with the neighbouring seconds; (a) YES for the host's
+controller trigger: each controller false pause (E2-1080P r1, S1-CONC r1b, S1-CONC r2a, A2 r1) sits on a client->host
+stall of ~1.2-3.2 s (rx dips, then a catch-up burst; heartbeats 2-3 s late) with the client still playing (its output
+age 26-174 ms on the next heartbeat), and three of the four then gave up and saved; real drops (3-150 s) never used
+this trigger. For the client's own trigger (client_output_silence; the three false ones S1 control, S1-CONC r1a,
+S1-CONC r2b) no length separates false from real: false output stalls reach 3.2 s, real drops start at 3.06 s (N3) and
+look the same at every signal the host has.
+
+THE ONE CHANGE (behind PRIVYHUB_RECOVERY_TRIGGER=v2; absent = today's rule, byte for byte in behaviour):
+  the host's controller-silence trigger fires only after 5,000 ms of controller silence, seen on two checks >= 250 ms
+  apart with no packet between (today: 1,000 ms, first check). 5,000 ms = above the longest false client->host stall
+  (~3.2 s, A2) by ~1.8 s; the real-drop floor (3.06 s, N3) does not bound it because no real drop fired through this
+  trigger (stated). The client-posted desync, the give-up timer, the restart path and the save-and-prompt flow (R3c2)
+  are unchanged. Files: companion/plugins/games.py (the wiring), companion/native_session_io.py
+  (set_client_silence_callback's confirm_ms; _silence_confirmed). Diff e3_r1_trigger_v2.diff sha256
+  457c31e81553f5deda27444759cd4e9c459388f0725b398307ec98a9b415de67; games.py after
+  279e19b189d8c0e5de906d02f9721dea2755b7cb7bc11615d35edee4bba37569, native_session_io.py after
+  00309a3ebf8fe43d05831c50179a131a08953aa62424d196b2807d83921af77a. A unit check of the confirm logic passed (not data).
+
+1. THE OFFLINE REPLAY (e3_r1_replay.py sha256 84dda11d089c14695e4875e59f040a220118682f182ffb81a8041d10731e1229 over
+   timelines.json sha256 5876889e2118e7e41a80a3534f7b0df84c0d2629e7afbb47d476d0c1fdf9efed; its model is in its docstring:
+   the controller channel's silence per second from the 1-s sampler, contiguous runs as an upper bound, the client's
+   trigger replayed as its recorded post). THE BAR, as the task wrote it:
+     r1. today's rule, replayed, reproduces every recorded event (each recorded desync_pause in the suite events and the
+         real drops: a replayed firing of the same trigger within +/-2 s; and no firing where none was recorded, N05/F05)
+         -- otherwise the task STOPS HERE, INCONCLUSIVE, with the disagreement recorded;
+     r2. v2 fires on EVERY real drop (R3b N3, N15, N15b, N150, E30; R3 F3, F15, F150) within +2 s of today's firing
+         time, and on neither N05 nor F05;
+     r3. v2 fires on NONE of the five false pauses (the runs E2-1080P r1, S1 control, S1-CONC r1, S1-CONC r2, A2 r1).
+   STATED BEFORE THE REPLAY: v2 leaves the client's trigger unchanged, so it is expected to fire on S1 control,
+   S1-CONC r1 (r1a) and S1-CONC r2 (r2b) -- r3 is expected to FAIL on those three runs by construction, and pass on
+   E2-1080P r1 and A2 r1. If so, the task's bar is not met (REJECTED), whatever the runs show; the record says why (the
+   probe's finding) and does not change the bar. The out-of-suite events (10-05) are replayed and reported, not gated.
+
+2. THE RUNS (the second half; they run whatever the replay says, as the task lists them): E1-PS1-STREAM x2 and
+   E1-CONC x2 with the flag, E2's windows and gaps, the drop-in for those runs only, the environ checked against the
+   adopted three lines + the flag; --plan E1-PS1-STREAM:2:120:PRIVYHUB_RECOVERY_TRIGGER=v2,E1-CONC:2:120:PRIVYHUB_RECOVERY_TRIGGER=v2
+   BAR, ACCEPTED only if ALL hold: (i) the replay bar r1-r3 held; (ii) no recovery event leaves PLAYING in any of the
+   four windows (e3_a2_validity.py's rule, here a clause: with the flag a pausing run is a FAILURE, not an invalid
+   attempt); (iii) each row within E1's bands of its E2 numbers for what the trigger does not touch: host CPU +/- 2 and
+   rendered +/- 0.5 of E2's PS1-STREAM (11.69 %, 59.81) for the PS1 runs, of E3-S6A's CONC run (22.2 %, 57.64) for the
+   CONC runs (the adopted index; the task names E3-S6's CONC, whose runs carried the same index as a flag) -- loss,
+   underruns, resyncs reported; (iv) the companion's stream cost unchanged: its CPU within +/- 2 points of a core of
+   the same row's reference (E2 PS1-STREAM 24.3 %; E3-S6A CONC 26.5 %).
+
+3. WHAT THIS CANNOT SHOW: that a real link drop still triggers recovery on the air (the user's nft night with the flag
+   on; the record writes the hand step). Adoption waits for it in any case.
+
+4. RULES: as the earlier queues; no nft, no real sudo, the Opal not touched; no addresses or identifiers; nothing
+   fetched, nothing deleted. The bar is not changed after data. Nothing adopted; nothing committed.

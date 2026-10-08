@@ -1,0 +1,67 @@
+diff --git a/companion/native_session_io.py b/companion/native_session_io.py
+index 4a2de29..c2981a2 100644
+--- a/companion/native_session_io.py
++++ b/companion/native_session_io.py
+@@ -1683,6 +1683,8 @@ class NativeControllerBridge:
+         self._silence_callback: Callable[[float], None] | None = None
+         self._silence_threshold_s = 1.0
+         self._silence_reported = False
++        self._silence_confirm_s = 0.0           # E3-R1 v2: a second check this long after the first; 0 = today
++        self._silence_first_over_at: float | None = None
+ 
+     @staticmethod
+     def _selected_backend() -> str:
+@@ -1922,12 +1924,25 @@ class NativeControllerBridge:
+         self,
+         callback: "Callable[[float], None] | None",
+         threshold_ms: float,
++        confirm_ms: float = 0.0,
+     ) -> None:
+         self._silence_callback = callback
+         self._silence_threshold_s = max(
+             0.05,
+             float(threshold_ms) / 1000.0,
+         )
++        self._silence_confirm_s = max(0.0, float(confirm_ms) / 1000.0)
++
++    def _silence_confirmed(self, now: float) -> bool:
++        """E3-R1: with a confirm interval (v2), the silence must be over the threshold on two checks that far apart
++        with no packet between; without one (today), the first check over the threshold fires."""
++        if self._silence_confirm_s <= 0.0:
++            return True
++        first = self._silence_first_over_at
++        if first is None or first < self._last_any_packet_at:
++            self._silence_first_over_at = now
++            return False
++        return now - first >= self._silence_confirm_s
+ 
+     def last_client_packet_age_ms(self) -> float | None:
+         last = self._last_any_packet_at
+@@ -2432,6 +2447,7 @@ class NativeControllerBridge:
+                     and self._last_any_packet_at > 0.0
+                     and now - self._last_any_packet_at
+                     > self._silence_threshold_s
++                    and self._silence_confirmed(now)
+                 ):
+                     self._silence_reported = True
+ 
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index 0fcb1ee..4918e9f 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -114,9 +114,14 @@ class GamesPlugin:
+             ),
+         )
+ 
++        # E3-R1: PRIVYHUB_RECOVERY_TRIGGER=v2 -> the host's controller-silence trigger needs 5 s of silence, seen on
++        # two checks 250 ms apart (uplink stalls of 1-3 s with the client still playing paused the game). The
++        # client-posted desync and everything after the pause are unchanged. Absent = DESYNC_MS, first check.
++        trigger_v2 = os.environ.get("PRIVYHUB_RECOVERY_TRIGGER") == "v2"
+         self._native_stream._session_io.controller.set_client_silence_callback(
+             self._recovery.note_client_silence,
+-            DESYNC_MS,
++            5_000 if trigger_v2 else DESYNC_MS,
++            confirm_ms=250 if trigger_v2 else 0,
+         )
+ 
+         # The client target of the live native-stream session, remembered so

@@ -1,0 +1,69 @@
+{
+ "started_utc": "2026-10-08T03:45:14.676Z",
+ "preflight": {
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+   "PRIVYHUB_SNES_CORE=snes9x"
+  ],
+  "game_active": false,
+  "adb": true,
+  "drop_in_live": true,
+  "drop_in_index": true,
+  "drop_in_snes_core": true,
+  "e3_dropin_absent": true,
+  "ok": true
+ },
+ "restart": {
+  "mainpid_serves_8765": true,
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+   "PRIVYHUB_SNES_CORE=snes9x"
+  ]
+ },
+ "stream": {
+  "ok": true,
+  "attempt": 2,
+  "s_to_playing": 3.0
+ },
+ "window": {
+  "from": "2026-10-08T03:46:17.203Z",
+  "to": "2026-10-08T03:56:17.451Z"
+ },
+ "teardown": {
+  "report": "native_decoder_20261008_035618_738.json",
+  "report_fields": {
+   "lost_packets": 281,
+   "rendered_frames": 38132,
+   "stale_output_drops": 26,
+   "max_output_gap_ms": 236,
+   "slow_event_retained": 1024,
+   "slow_event_capacity": 1280,
+   "duration_ms": 637301,
+   "video.lost_packets": 281,
+   "video.sequence_resyncs": 0,
+   "video.recent_fps": 51.610220518859975,
+   "decoder.spike_20_ms": 529,
+   "decoder.spike_50_ms": 35,
+   "decoder.spike_80_ms": 17,
+   "decoder.stale_output_drops": 26,
+   "decoder.max_output_gap_ms": 236,
+   "audio.lost_packets": 22,
+   "audio.underruns": 14
+  },
+  "stopped": true,
+  "banner": {
+   "now_playing_before": 2,
+   "now_playing_after_relaunch": 0
+  },
+  "flags_absent": true,
+  "apk": "CONFIRMED",
+  "ps1_files_identical": true,
+  "retroarch_left": 0,
+  "encoder_left": 0
+ },
+ "ended_utc": "2026-10-08T03:56:43.082Z"
+}

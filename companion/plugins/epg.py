@@ -1199,6 +1199,10 @@ class EpgPlugin:
                 "--maxConnections=1",
                 f"--timeout={self.GRAB_HTTP_TIMEOUT_MS}",
             ]
+            # E3-S7: PRIVYHUB_EPG_GRAB_NET=paced -> the grabber's own pacing at its most conservative for the guide
+            # cycle: one connection (as today) and 4 s before each request (the library's default is 3 s). Absent = today.
+            if os.environ.get("PRIVYHUB_EPG_GRAB_NET") == "paced":
+                args.append("--delay=4000")
             # E3-S3: the grabber's own node process, started directly (no npm run -> sh -> tsx cli parent); the same
             # arguments, environment and working directory, through tsx's own preflight + loader. Absent = npm run.
             if os.environ.get("PRIVYHUB_EPG_DIRECT_NODE") == "1":
@@ -1216,6 +1220,10 @@ class EpgPlugin:
             if os.environ.get("PRIVYHUB_EPG_GRAB_PRIORITY") == "idle":
                 args = ["/usr/bin/chrt", "-i", "0", "/usr/bin/nice", "-n", "19",
                         "/usr/bin/ionice", "-c", "3"] + args
+            # E3-S7, measurement only: PRIVYHUB_EPG_GRAB_NONET=1 -> the grabber child in its own user + network namespace
+            # (no route, loopback down): its start-up as today, its fetch fails fast without leaving the host. Absent = today.
+            if os.environ.get("PRIVYHUB_EPG_GRAB_NONET") == "1":
+                args = ["/usr/bin/unshare", "-rn"] + args
             started = time.monotonic()
             result = self._run(
                 args,

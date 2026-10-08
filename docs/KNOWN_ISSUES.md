@@ -1429,3 +1429,31 @@ unrecoverable. Neither was right. The defect itself is real and stays open.
   plainly that the companion is left stopped. **Narrowed 2026-09-23**:
   `H3` designed the autostart unit (`docs/memory/evidence/H3_COMPANION_AUTOSTART_DESIGN_2026-09-23.md`).
   **Status: open — designed, awaiting the user's install.**
+
+## 2026-10-08 link-drop recovery pauses a running game with the link up (`E3-R1`) — OPEN
+
+- **Seen:** five times in 20-min suite windows across four nights (E2's
+  PS1-1080P r1, E3-S1's control and both CONC runs, E3-A2's PS1 r1), and
+  more outside the suite on 10-05.
+- **Cause, the harmful case:** the host's `controller_silence` trigger
+  (1 s without a controller packet) fires on a 1-3-s client→host stall.
+  The onn's uplink queues the packets and delivers them late in a burst,
+  and the client keeps receiving and showing video.
+  - The client never sees an output stall, so it never runs its re-entry
+    gate.
+  - The pause then has no exit: it gives up after 120 s, saves, and stays
+    `PAUSED_SAVED`. That happened in 3 of 4 such pauses.
+- **Also seen:** the client's own `client_output_silence` pauses on real
+  1-3-s output stalls (10-06, before the index). These resumed by
+  themselves, and the host cannot tell them from a short real drop.
+- **Change prepared, dormant:** `PRIVYHUB_RECOVERY_TRIGGER=v2`, the
+  controller trigger at 5 s on two checks.
+  - Its replay was INCONCLUSIVE: the records' 1-s resolution cannot
+    replay today's rule faithfully.
+  - Not adopted. The on-air test is the user's (`r3b_run.sh`; the hand
+    step is in the record).
+- **Meanwhile:** the suite counts such a run as invalid and replaces it
+  (E3-A2's validity rule).
+- **Open design question:** a controller-silence pause that clears itself
+  when the packets return and the client's output is fresh.
+- Record: `memory/evidence/E3_R1_RECOVERY_FALSE_PAUSE_2026-10-08.md`.

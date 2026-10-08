@@ -1,0 +1,86 @@
+{
+ "arm": "C_r1",
+ "flags": [
+  "PRIVYHUB_MEM_PROBE=1",
+  "PRIVYHUB_EPG_GRAB_NONET=1"
+ ],
+ "started_utc": "2026-10-08T04:38:51.075Z",
+ "preflight": {
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+   "PRIVYHUB_SNES_CORE=snes9x"
+  ],
+  "game_active": false,
+  "adb": true,
+  "drop_in_live": true,
+  "drop_in_index": true,
+  "drop_in_snes_core": true,
+  "e3_dropin_absent": true,
+  "ok": true
+ },
+ "channel": "CNBCUK.uk@SD",
+ "restart": {
+  "mainpid_serves_8765": true,
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_EPG_GRAB_NONET=1",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+   "PRIVYHUB_MEM_PROBE=1",
+   "PRIVYHUB_SNES_CORE=snes9x"
+  ]
+ },
+ "stream": {
+  "ok": true,
+  "attempt": 1,
+  "s_to_playing": 6.1
+ },
+ "quiet_from": "2026-10-08T04:40:15.681Z",
+ "triggers_to": "2026-10-08T04:46:30.683Z",
+ "teardown": {
+  "report": "native_decoder_20261008_044647_644.json",
+  "report_fields": {
+   "lost_packets": 850,
+   "rendered_frames": 27437,
+   "stale_output_drops": 44,
+   "max_output_gap_ms": 1075,
+   "slow_event_retained": 994,
+   "slow_event_capacity": 1280,
+   "duration_ms": 460696,
+   "video.lost_packets": 850,
+   "video.sequence_resyncs": 1,
+   "video.recent_fps": 59.89475820162683,
+   "decoder.spike_20_ms": 668,
+   "decoder.spike_50_ms": 66,
+   "decoder.spike_80_ms": 23,
+   "decoder.stale_output_drops": 44,
+   "decoder.max_output_gap_ms": 1075,
+   "audio.lost_packets": 131,
+   "audio.underruns": 49
+  },
+  "stopped": true,
+  "banner": {
+   "now_playing_before": 2,
+   "now_playing_after_relaunch": 0
+  },
+  "dropin_removed": true,
+  "restart_after_flags": {
+   "mainpid_serves_8765": true,
+   "manager": [],
+   "environ": [
+    "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+    "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+    "PRIVYHUB_SNES_CORE=snes9x"
+   ]
+  },
+  "dropin_env_absent": true,
+  "flags_absent": true,
+  "apk": "CONFIRMED",
+  "ps1_files_identical": true,
+  "retroarch_left": 0,
+  "encoder_left": 0
+ },
+ "ended_utc": "2026-10-08T04:47:14.275Z"
+}

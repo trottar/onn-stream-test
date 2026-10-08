@@ -1,0 +1,54 @@
+E3-S7 PRE-REGISTRATION -- the grab's spawn share of the CONC loss. Written 2026-10-08 after the probe (probe.md,
+probe_aligned.json) and BEFORE any benchmark run; hash in e3_s7_preregistration.sha256. Task:
+docs/memory/handoffs/E3-S7_CONC_GRAB_SPAWN_TASK.md, item 2 of QUEUE_2026-10-08.md (every rule of the earlier queues;
+E3-A2's validity rule standing). Baseline commit: def1ad1. The adopted state: live + the guide index + Snes9x.
+TASK 1'S FLAG IS ABSENT IN EVERY RUN: E3-R1 was INCONCLUSIVE, so by the queue's stated exception this task runs without
+PRIVYHUB_RECOVERY_TRIGGER and relies on the replacement rule (said in every table of the record).
+
+THE PROBE (three spawn-only arms, 20 triggers each, one session each; e3_s7_probe.py; sessions that left PLAYING are
+invalid and were replaced): A (as today) 0-2 s loss 39.8 lost/s (baseline 1.6); B (SCHED_IDLE/nice 19/idle I/O) first
+session INVALID (a client desync; 44.9 on a lossy link, baseline 10.2), its replacement B_r1 3.6 (baseline 1.5); C (the
+child in its own network namespace, `unshare -rn`) first session INVALID (a controller false pause, then saved), its
+replacement C_r1 3.1 (baseline 2.0). B_r1 and C_r1 are both <= 25 % of A -> the rule names BOTH -> the change is the
+network one (the task: "both -> the network one, since E3-S1 already measured the CPU one"). Stated: the arms ran as
+sequential sessions and A was not repeated; link drift between sessions is a confound the probe cannot remove.
+
+THE ONE CHANGE (PRIVYHUB_EPG_GRAB_NET=paced; absent = today, byte for byte): companion/plugins/epg.py
+_grab_from_candidate appends `--delay=4000` to the grabber's arguments; `--maxConnections=1` is already today's (the
+minimum). The grabber library's default delay before each request is 3,000 ms (epg-grabber defaultConfig), so paced =
++1 s before each request -- the most conservative value that keeps the cycle's clause in reach (at CONC's ~5.8-s grabs
+two more seconds per grab still leave > 20 refreshes per channel in 20 min). No metadata is downloaded inside the grab
+today (the child gets its source from the adopted index), so that half of the task's network change is already true.
+Diff e3_s7_grab_net_paced.diff sha256 a802126be865026f228a9377ab5263d6444e474436d376cc90414186973eb2f1; epg.py after
+(this change and the probe hook) 6b63950bda82d4461ea8b7ca35a1c2217cc09876d0c4e3db1e4e3cd1e36ca0cf; probe hook diff
+e3_s7_nonet_probe_hook.diff sha256 09d9af54c3290a3a1c3179fddfd57f3567a9f5b7e65c12d91d53e47d63d5cbe4. The probe hook PRIVYHUB_EPG_GRAB_NONET (e3_s7_nonet_probe_hook.diff) is
+measurement only and absent in every run.
+STATED BEFORE THE RUNS: pacing moves each request later and spaces the grabs out; it does not remove the request, its
+DNS lookup or its download. If the per-grab peak is the request itself, the aligned-frame and loss clauses are
+expected to FAIL; a pass would mean the spacing alone is enough.
+
+1. THE RUNS, in this order, window 1200 s, gap 120 s, E1's launch / warm-up / teardown, --e2:
+     E1-PS1-STREAM x1, no flag (the same-night control)           -> runs/E1-PS1-STREAM/run1
+     E1-CONC x2, PRIVYHUB_EPG_GRAB_NET=paced (the E3 drop-in)      -> runs/E1-CONC_flag/run1, run2
+   --plan E1-PS1-STREAM:1:120,E1-CONC:2:120:PRIVYHUB_EPG_GRAB_NET=paced. Every run checked by E3-A2's validity rule
+   (e3_a2_validity.py); an invalid run is replaced (at most twice, runs_retry<n>/), reported, not judged.
+   Pre-run guide read (guide_read_before.json, no background refresh since the companion's last start, none pending):
+   6 channels, 343 programmes.
+
+2. COMPARABILITY (else INCONCLUSIVE): the control within E1's bands of E2's PS1-STREAM (host CPU 11.69 +/- 2; rendered
+   59.81 +/- 0.5).
+
+3. THE BAR -- ACCEPTED only if ALL hold in BOTH CONC runs:
+   a. video loss/min (heartbeat, window) <= 100 AND <= 3 x the control's;
+   b. rendered fps >= 59.5; sequence resyncs <= 10;
+   c. the aligned frame (e2_analysis.py's CONC alignment, unchanged, the control as baseline): mean lost packets/s at
+      offsets 0-2 s <= 3 x the control's baseline loss/s;
+   d. grabs failed 0; every configured channel (the six) refreshed >= 20 times in the window; median grab <= 11.8 s;
+   e. the guide serves: guide_read_after 6 channels, programme total within +/- 5 % of 343 (326-360).
+   A run never reaching PLAYING after two retries or the flag breaking the row -> REJECTED (broke the row).
+
+4. REPORTED, NOT GATED: the probe's three arms (and the invalid sessions); the child's CPU and PSS; eno1 tx/rx per
+   second around grabs; underruns; the companion's PSS and CPU; E3-S6A's CONC beside.
+
+5. RULES: as the earlier queues; no nft, no real sudo, the Opal not touched; no addresses or identifiers; nothing
+   fetched by this task, nothing deleted. The bar is not changed after data. Nothing adopted; nothing committed.

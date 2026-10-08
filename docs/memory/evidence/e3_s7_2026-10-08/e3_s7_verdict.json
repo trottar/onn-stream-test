@@ -1,0 +1,177 @@
+{
+ "task1_flag": "ABSENT in every run (E3-R1 INCONCLUSIVE)",
+ "judged": {
+  "control": "runs/E1-PS1-STREAM/run1",
+  "conc": [
+   "runs/E1-CONC_flag/run1",
+   "runs/E1-CONC_flag/run2"
+  ]
+ },
+ "validity": {
+  "runs/E1-CONC_flag/run1": {
+   "window": [
+    "2026-10-08T05:16:27.827Z",
+    "2026-10-08T05:36:27.827Z"
+   ],
+   "valid": true,
+   "events": []
+  },
+  "runs/E1-CONC_flag/run2": {
+   "window": [
+    "2026-10-08T05:40:47.865Z",
+    "2026-10-08T06:00:47.865Z"
+   ],
+   "valid": true,
+   "events": []
+  },
+  "runs/E1-PS1-STREAM/run1": {
+   "window": [
+    "2026-10-08T04:52:18.767Z",
+    "2026-10-08T05:12:18.767Z"
+   ],
+   "valid": true,
+   "events": []
+  }
+ },
+ "control": {
+  "host_cpu": 12.633,
+  "rendered_fps": 59.954,
+  "loss_per_min": 9.02,
+  "baseline_loss_per_s": 0.1526,
+  "underruns": 23,
+  "comparable": true
+ },
+ "CONC paced r1": {
+  "loss_per_min": 66.7,
+  "rendered_fps": 59.825,
+  "resyncs": 1,
+  "underruns": 12,
+  "aligned_loss_0_10": [
+   1.97,
+   3.877,
+   3.622,
+   0.823,
+   0.443,
+   0.512,
+   0.214,
+   0.394,
+   0.367,
+   0.407,
+   2.005
+  ],
+  "aligned_busiest_0_10": [
+   38.086,
+   72.206,
+   71.653,
+   27.919,
+   25.853,
+   26.111,
+   25.932,
+   33.879,
+   27.544,
+   25.828,
+   26.587
+  ],
+  "loss_0_2_mean": 3.156,
+  "grabs_ok_failed_median": [
+   72,
+   0,
+   14.787
+  ],
+  "refreshes_per_channel": {
+   "ComedyCentral.us@East": 12,
+   "CNBCUK.uk@SD": 12,
+   "10Bold.au@Sydney": 12,
+   "FoxSports1.us@HD": 12,
+   "NBC.us@East": 12,
+   "FilmBox.nl@Netherlands": 12
+  },
+  "companion_cpu": 25.116,
+  "companion_pss_end_mb": 46.7,
+  "epg_cost": {
+   "grabs": 72,
+   "cpu_s_per_grab_median": 4.54,
+   "cpu_s_per_grab_mean": 4.64,
+   "cpu_s_window_total": 343.1,
+   "cpu_s_per_grab_window_avg": 4.77,
+   "peak_pss_mb_median": 657.7,
+   "peak_pss_mb_max": 863.4,
+   "channels": 6
+  },
+  "host_cpu": 14.592,
+  "a": false,
+  "b": true,
+  "c": false,
+  "d": false
+ },
+ "CONC paced r2": {
+  "loss_per_min": 59.57,
+  "rendered_fps": 59.815,
+  "resyncs": 3,
+  "underruns": 12,
+  "aligned_loss_0_10": [
+   1.043,
+   3.573,
+   3.312,
+   1.3,
+   0.055,
+   0.035,
+   0.042,
+   0.89,
+   0.952,
+   0.883,
+   0.055
+  ],
+  "aligned_busiest_0_10": [
+   33.167,
+   61.933,
+   78.544,
+   41.557,
+   26.165,
+   25.549,
+   25.283,
+   30.033,
+   30.078,
+   26.392,
+   27.007
+  ],
+  "loss_0_2_mean": 2.643,
+  "grabs_ok_failed_median": [
+   72,
+   0,
+   15.09
+  ],
+  "refreshes_per_channel": {
+   "ComedyCentral.us@East": 12,
+   "CNBCUK.uk@SD": 12,
+   "10Bold.au@Sydney": 12,
+   "FoxSports1.us@HD": 12,
+   "NBC.us@East": 12,
+   "FilmBox.nl@Netherlands": 12
+  },
+  "companion_cpu": 25.187,
+  "companion_pss_end_mb": 48.6,
+  "epg_cost": {
+   "grabs": 72,
+   "cpu_s_per_grab_median": 4.47,
+   "cpu_s_per_grab_mean": 4.56,
+   "cpu_s_window_total": 338.1,
+   "cpu_s_per_grab_window_avg": 4.7,
+   "peak_pss_mb_median": 657.9,
+   "peak_pss_mb_max": 874.3,
+   "channels": 6
+  },
+  "host_cpu": 14.03,
+  "a": false,
+  "b": true,
+  "c": false,
+  "d": false
+ },
+ "e_guide": {
+  "channels": 6,
+  "programmes": 340,
+  "holds": true
+ },
+ "comparability": true,
+ "verdict": "REJECTED"
+}
