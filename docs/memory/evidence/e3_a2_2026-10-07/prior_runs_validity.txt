@@ -1,0 +1,7 @@
+# E3-A2: the addendum's validity rule applied read-only to every earlier E1/E2/E3 stream run (recovery logs readable from 2026-09-20), 2026-10-07T23:22:36Z
+# runs with a recovery pause inside their window (all others clean, including every run behind E3-S5B, S5C, S6, S6A and S4):
+e2_s1_2026-10-05/runs/E1-PS1-1080P/run1: 23:50:31Z desync_pause (controller_silence), 23:52:32Z gave_up_saved -- E2's 1080p row
+e3_s1_2026-10-06/runs/E1-PS1-STREAM/run1 (S1's control): 03:30:38Z desync_pause (client_output_silence)
+e3_s1_2026-10-06/runs/E1-CONC_flag/run1: 03:50:03Z desync_pause (client_output_silence), encoder_restart, 03:50:24Z desync_pause (controller_silence)
+e3_s1_2026-10-06/runs/E1-CONC_flag/run2: 04:22:51Z desync_pause (controller_silence), encoder_restart, 04:24:49Z desync_pause (client_output_silence)
+# not re-judged here (E3-S1 was INCONCLUSIVE; E2's 1080p row is not an E3 item); an open item for the user

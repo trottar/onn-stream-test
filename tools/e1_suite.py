@@ -9,7 +9,7 @@
     e1_suite.py --self-test
 
 One command, no hands. Per run: preflight (no PRIVYHUB_* in the user manager, the companion's environ exactly the
-adopted state since E3-S6A: live + the guide index, no game, adb), the row's flags (1080p row only), a unit restart (MainPID owns 8765), the idle gap
+adopted state since E3-A2: live + the guide index + Snes9x, no game, adb), the row's flags (1080p row only), a unit restart (MainPID owns 8765), the idle gap
 (>= 120 s), launch, warm-up, the 300-s window, teardown to idle, checks. The sampler (tools/e1_sampler.py) runs
 from the gap to the end of the teardown; the summary is over the window (and, separately, the gap).
 
@@ -49,7 +49,10 @@ LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
 # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
 # is exactly these two names, at every precondition and teardown
 INDEX = "PRIVYHUB_EPG_GUIDE_INDEX=cached"
-ADOPTED = sorted([LIVE, INDEX])
+# E3-A2 (adopted 2026-10-07): the Snes9x core through its own drop-in (snes-core.conf); the adopted environ is exactly
+# these three names. (frame_spin was adopted with it and REVERTED by E3-A2's bar: one run's underruns 24 > 20.)
+SNES_CORE = "PRIVYHUB_SNES_CORE=snes9x"
+ADOPTED = sorted([LIVE, INDEX, SNES_CORE])
 FLAG_NAMES = ["PRIVYHUB_ADAPTIVE_BITRATE_INJECT", "PRIVYHUB_ADAPTIVE_BITRATE_TOP", "PRIVYHUB_PS1_LOOK",
               "PRIVYHUB_NATIVE_PROFILE_ID", "PRIVYHUB_FEC_SCHEME"]
 RA_CFG = Path.home() / ".config/retroarch/config"
@@ -74,7 +77,8 @@ ABR_LOG = REPO / "logs/games/adaptive_bitrate_shadow.jsonl"
 TEKKEN = {"id": "game_ps1_b0a5986638f61a11", "override": PS1_DIR / "Tekken 3 (USA).cfg"}
 # E3-S4: RetroArch's per-core config dir is the core's corename (its .info); the counter override follows the core
 SNES_CORENAMES = {"snes9x": "Snes9x", "snes9x2010": "Snes9x 2010", "snes9x2005_plus": "Snes9x 2005 Plus"}
-SMW = {"id": "game_snes_c6fecdcdddb35398", "override": RA_CFG / "bsnes" / "Super Mario World (USA).cfg"}
+# E3-A2: the adopted SNES core is Snes9x, so the SNES row's counter override goes to its corename dir (was bsnes/)
+SMW = {"id": "game_snes_c6fecdcdddb35398", "override": RA_CFG / SNES_CORENAMES["snes9x"] / "Super Mario World (USA).cfg"}
 
 # The suite, as pre-registered (e1_preregistration.txt). kind: idle | local | stream | meta
 WORKLOADS = [
@@ -657,9 +661,10 @@ def preflight() -> dict:
          "adb": any(l.endswith("\tdevice") for l in adb("devices").splitlines()[1:]),
          "drop_in_live": f"Environment={LIVE}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_index": f"Environment={INDEX}" in sh(["systemctl", "--user", "cat", UNIT]),
+         "drop_in_snes_core": f"Environment={SNES_CORE}" in sh(["systemctl", "--user", "cat", UNIT]),
          "e3_dropin_absent": not DROPIN.exists()}
     d["ok"] = (d["manager"] == [] and d["environ"] == ADOPTED and d["adb"] and d["drop_in_live"] and d["drop_in_index"]
-               and d["e3_dropin_absent"])
+               and d["drop_in_snes_core"] and d["e3_dropin_absent"])
     return d
 
 

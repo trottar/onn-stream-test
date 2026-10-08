@@ -1,0 +1,24 @@
+E3-A2 PRE-REGISTRATION ADDENDUM -- run validity. Written 2026-10-07 ~23:22Z, after PS1-STREAM run 1 ended and BEFORE
+run 2's window, the SNES-STREAM and META runs, or any replacement run; hash in e3_a2_preregistration_addendum.sha256.
+The main pre-registration (e3_a2_preregistration.txt, sha256 854a4fc2...c145) and its bar are UNCHANGED.
+
+WHAT HAPPENED: in PS1-STREAM run 1 (window 22:58:54-23:18:54Z) the companion's link-drop recovery paused the game at
+23:00:07Z (native_stream_recovery.log: desync_pause, trigger controller_silence), gave up and saved at 23:02:07Z
+(gave_up_saved) and stayed PAUSED_SAVED until the session ended at 23:18:56Z. For ~17 of the window's 20 minutes the
+fixture's demo loop was not running (RetroArch 4.3 % of a core vs ~33.6 in every earlier PS1 run; RetroArch's log:
+content ran 2 min 44 s). The suite marked the run OK because it does not read the recovery state. The same event type
+is in the recovery logs on 2026-10-05 and 2026-10-06 (desync_pause, controller_silence / client_output_silence).
+
+THE VALIDITY RULE (the existing "never reaching PLAYING" rule, extended to the window; applied to EVERY run of this task,
+read from native_stream_recovery.log and the archive, not from any metric):
+  A stream run whose recovery state leaves PLAYING at any time inside its window (any desync_pause / PAUSED_* event
+  between the window's from and to) is an INVALID ATTEMPT, not a measurement. It is replaced by a new run of the same
+  row, at the end of the plan, within the two-retry limit (at most two replacements per run). Its numbers are reported
+  in full beside the replacement but are not judged against the bar. If both replacements are also invalid, the row
+  is broken and the item(s) whose row it is are REVERTED, as the main pre-registration says for a run that never
+  reaches PLAYING.
+  Replacement runs go to runs_retry<n>/ (tools/e1_suite.py, the same window, gaps and --e2; the pre-registration's
+  hash required), and the bar is judged on the valid runs: PS1-STREAM run 2 plus the first valid PS1-STREAM
+  replacement for run 1.
+
+Nothing else changes: the clauses, limits and attributions are as hashed at 22:54:47Z.

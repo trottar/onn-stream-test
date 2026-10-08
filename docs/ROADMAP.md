@@ -1079,7 +1079,24 @@ One item ACCEPTED (E3-S6's memory half); nothing adopted — the user's decision
 | E3-S5C audio sender, timed wait + final spin | `PRIVYHUB_AUDIO_SENDER_PACING=frame_spin`, 5 interleaved runs | **ACCEPTED** (sender 6 %, companion 17.6 %; underruns 13 / 9 / 5 vs 17 / 14; loss median 4 vs 2.5) — not adopted | `evidence/E3_S5C_AUDIO_SENDER_PACING_SPIN_2026-10-07.md` |
 | E3-S4 SNES core, run | Snes9x 1.63 (`PRIVYHUB_SNES_CORE=snes9x`; the core placed by the user) | **ACCEPTED** (RetroArch 8.2 / 9.3 % of a core vs 436 / 517; host 7.4 / 7.9 % vs 43 / 50; REPEATABLE) — not adopted; the look and the licence are the user's | `evidence/E3_S4_SNES_LIGHTER_CORE_2026-10-07.md` (supersedes 2026-10-06's NOT RUN) |
 
-E3-S6A adopted; E3-S5C and E3-S4 ACCEPTED, awaiting the user's decisions.
+E3-S6A adopted; E3-S5C and E3-S4 ACCEPTED, then decided in E3-A2:
+
+| task | change (flag) | verdict | record |
+| --- | --- | --- | --- |
+| E3-A2 adopt `frame_spin` and Snes9x | `audio-pacing.conf`, `snes-core.conf` (the user: "Adopt frame_spin if you think helps"; after the look, "Sure it ran smoothly from what I can tell"); verified on PS1-STREAM ×2, SNES-STREAM, META | **Snes9x: ADOPTION STANDS** (RetroArch 8.9 %, host 8.05 %, 60 fps). **`frame_spin`: ADOPTION REVERTED** (valid run 2 underruns 24 > 20 on a noisy link; the replacement 14). One run invalid (recovery pause) and replaced under a hashed addendum | `evidence/E3_A2_FRAME_SPIN_AND_SNES9X_ADOPTION_2026-10-07.md` |
+
+**E3's adoptions: two stand** (the guide index, the Snes9x core); the
+companion's default environ is three lines (live, index, Snes9x).
+
+**E3's list, by item (E2-S1 §8's order):**
+
+| item | status |
+| --- | --- |
+| 1. EPG grabs vs the stream (CONC) | the parse's share removed (S6, **adopted** S6A); **the grabber child's spawn share remains** (S1 INCONCLUSIVE; not yet tried as a change) |
+| 2. the companion's memory after a grab | **solved by the index** (S6/S6A: ~34 MB, not ~160) |
+| 3. the grabber's own cost | REJECTED as a launcher change (S3); **the node grabber's start-up remains** (a precompiled grabber, untested) |
+| 4. the SNES core | **Snes9x adopted** (S4 ACCEPTED, A2 stands) |
+| 5. streaming's fixed cost (the audio sender) | `=frame` REJECTED (S5/S5B); `=frame_spin` ACCEPTED (S5C) then REVERTED (A2, underruns); off |
 
 ## E4 — Core Linux resource envelope
 

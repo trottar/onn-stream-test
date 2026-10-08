@@ -101,13 +101,16 @@ MODE_ENV = "PRIVYHUB_ADAPTIVE_BITRATE_MODE"
 # name. It is the only PRIVYHUB_* the harness accepts; the user manager must carry none (no
 # set-environment residue). Without the drop-in (the kill switch) the baseline is off.
 DEFAULT_LIVE = f"{MODE_ENV}=live"
+# E3-S6A / E3-A2 (2026-10-07): the other adopted names, each through its own drop-in (tools/e1_suite.py ADOPTED);
+# accepted beside the live default, never set or unset by the harness
+ADOPTED_E3 = ["PRIVYHUB_EPG_GUIDE_INDEX=cached", "PRIVYHUB_SNES_CORE=snes9x"]
 
 
 def env_baseline_refusal(manager: list[str], environ: list[str]) -> str | None:
     """None if the environment is a baseline the night may start from, else the refusal."""
     if manager:
         return f"set-environment left PRIVYHUB_* in the user manager: {sorted(manager)}"
-    other = sorted(e for e in environ if e != DEFAULT_LIVE)
+    other = sorted(e for e in environ if e != DEFAULT_LIVE and e not in ADOPTED_E3)
     if other:
         return f"PRIVYHUB_* other than the default {DEFAULT_LIVE} in the companion environ: {other}"
     return None
@@ -808,7 +811,7 @@ class Night:
         self.log(f"  manager {mgr or 'none'}, companion environ {envp}; MainPID {self.main_pid()} serves 8765 "
                  f"{self.main_pid() == self.serving_pid()}; adaptive_bitrate mode {a.get('mode')} level "
                  f"{a.get('level')} transitions {a.get('transitions_this_session')}")
-        if (envp != [DEFAULT_LIVE] or mgr != ([DEFAULT_LIVE] if self.flag_set else [])
+        if ([e for e in envp if e not in ADOPTED_E3] != [DEFAULT_LIVE] or mgr != ([DEFAULT_LIVE] if self.flag_set else [])
                 or a.get("mode") != "live" or a.get("level") != 7000):
             raise Refused("live mode did not come up as expected (mode live, level 7000, only the one flag)")
         self.event("live_on", flags=names, by_default=not self.flag_set)

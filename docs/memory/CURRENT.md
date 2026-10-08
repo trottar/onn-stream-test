@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-10-07
-baseline_commit: ccee2f5
+as_of: 2026-10-08
+baseline_commit: e553673
 ---
 
 # Current State
@@ -9,39 +9,37 @@ baseline_commit: ccee2f5
 Headings are fixed by `tools/check_memory_health.py`; do not rename.
 ## Active Objective
 
-**Phase E ACTIVE.** E1 FROZEN; E2 MEASURED; E3 ran queues A (`bf2120c`),
-B (`ccee2f5`) and **2026-10-07 (S6A, S5C, S4; `handoffs/QUEUE_2026-10-07.md`)**,
-each change behind a flag, judged by a pre-hashed bar.
-**E3's first adoption is in place: the cached guide index (E3-S6A).**
-Nothing is committed.
+**Phase E ACTIVE.** E1 FROZEN; E2 MEASURED; E3 ran queues A-C
+(`bf2120c`, `ccee2f5`, `e553673`) and **E3-A2** (2026-10-07/08,
+unattended), each change behind a flag, judged by a pre-hashed bar.
+**Two E3 adoptions stand: the guide index (E3-S6A) and the Snes9x core
+(E3-A2).** Nothing is committed since `e553673`.
 
 | item | verdict | finding |
 | --- | --- | --- |
 | E3-S1 / S2 / S3 / S5 / S5B | INCONCLUSIVE / REJECTED ×4 | led to S6 and S5C |
-| E3-S6 → **S6A the index adopted** | **ADOPTION STANDS** | META 33.6 MB, 0.23 %; PS1-STREAM unchanged |
-| **E3-S5C audio sender `=frame_spin`** | **ACCEPTED** | sender 13 → 6 %, companion 24.5 → 17.6 %; underruns 13 / 9 / 5 vs 17 / 14 |
-| **E3-S4 Snes9x 1.63** | **ACCEPTED** | RetroArch 8-9 % of a core vs bsnes 436-517; REPEATABLE |
+| E3-S6 → S6A the guide index | **ADOPTED, stands** | companion ~34 MB in META |
+| E3-S4 → **A2 Snes9x** | **ADOPTED, stands** | RetroArch 8.9 % of a core (bsnes 436-517); "Sure it ran smoothly" |
+| E3-S5C → **A2 `frame_spin`** | ACCEPTED, then **REVERTED** | one valid run's underruns 24 > 20 on a noisy link |
 
 - **ABSENT:** Live TV, browser / camera sources, NES / Genesis, a power meter.
 - **Standing:** Phase C closed; `D-BASE` CLOSED; the `CL-B1` APK adopted.
 
 ## Current Work Item
 
-**The 2026-10-07 queue is done** (04:15Z → 08:44Z):
+**E3-A2 is done** (22:51Z → 01:05Z 10-08;
+`evidence/E3_A2_FRAME_SPIN_AND_SNES9X_ADOPTION_2026-10-07.md`):
 
-- **S6A** (`evidence/E3_S6A_GUIDE_INDEX_ADOPTION_2026-10-07.md`, the
-  user: "1. Adopt"): `epg-index.conf`, the environ exactly two lines, the
-  state check updated, the kill switch in `TOOLS.md`. On the adopted
-  state: META 33.6 MB, 257/0 grabs, guide 6 / 346; CONC 47 MB, 0 failed
-  (1,312 loss/min reported); PS1-STREAM 10.45 % / 59.98 → **STANDS**.
-- **S5C** (`evidence/E3_S5C_AUDIO_SENDER_PACING_SPIN_2026-10-07.md`):
-  probe sd 0.102 ms (stated ≤ 0.10: in doubt); C F C F F all OK →
-  **ACCEPTED**.
-- **S4** (`evidence/E3_S4_SNES_LIGHTER_CORE_2026-10-07.md`, supersedes
-  2026-10-06's NOT RUN): the user's `snes9x_libretro.so` verified
-  (`9b2b6ea9…7a31`, zip `cfe816af…ad04`, both kept); two runs →
-  **ACCEPTED**.
-- Flags absent at every teardown; the adopted state restored each time.
+- `audio-pacing.conf` and `snes-core.conf` written (four lines); state
+  checks extended, including `d7_regression.py` and
+  `c3_l4_nft_night.py`; pre-registration hashed 22:54:47Z.
+- **Snes9x STANDS** (SNES: RetroArch 8.9 %, host 8.05 %, 60 fps).
+  **`frame_spin` REVERTED** (PS1 r2: 24 underruns > 20; the replacement
+  14); its drop-in and names removed at 01:05Z.
+- PS1 run 1 was invalid (a recovery pause, `controller_silence`) and was
+  replaced under an addendum hashed before further data. The same check
+  found pauses in E2's PS1-1080P r1 and E3-S1's control and CONC runs.
+- META: the index holds (33.9 MB, 256/0); its guide clause failed high.
 
 ## Verified State
 
@@ -71,7 +69,7 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`, including `C5-M1`'s `PRIVYHUB_NATIVE_PROFILE_ID`); none set.
 - **Installed**: **APK `de072762…835e`** (the `CL-B1` APK, adopted
   2026-09-30; hash confirmed on the onn at every teardown since,
-  last 2026-10-07 08:44Z (the 2026-10-07 queue's end); the previous
+  last 2026-10-08 01:05Z (E3-A2's end); the previous
   `f31b1c18…8ae7` is kept at `runtime/c4_m1/adopted_app-debug.apk` for
   rollback).
   - The companion is the systemd user unit `privyhub-companion` (`H3`);
@@ -92,11 +90,18 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
     rebuilt once per 24-h metadata refresh) instead of parsing the 25.6
     MB file. Kill switch: delete `epg-index.conf` + `daemon-reload` +
     restart, revert the state-check diff (`TOOLS.md`).
-  - **The adopted environ is exactly those two `PRIVYHUB_*`**, the
-    manager none; `tools/e1_suite.py` (`ADOPTED`) / `e3_state.py` check
-    it (`d7_regression.py`, `c3_l4_nft_night.py` do not yet). Last
-    restarted ~08:44Z 2026-10-07 by E3-S4's teardown; checked 08:44:18Z:
-    the two lines, no `e3_flag.conf`, no game, PS1 files identical, APK
+  - **The Snes9x core by default, since 2026-10-07 22:52:28Z (E3-A2)**:
+    `snes-core.conf` (`Environment=PRIVYHUB_SNES_CORE=snes9x`); SNES
+    runs on `snes9x_libretro.so` (Snes9x 1.63, `9b2b6ea9…7a31`, licence
+    "Non-commercial"), not bsnes; `emulators.json` unchanged. Saves and
+    states per core (`Snes9x/` vs `bsnes/`). Kill switch: delete
+    `snes-core.conf` + `daemon-reload` + restart (`TOOLS.md`).
+  - **The adopted environ is exactly three `PRIVYHUB_*`** (live, the
+    index, Snes9x) in three drop-ins; the manager none. `tools/e1_suite.py`
+    (`ADOPTED`), `e3_state.py`, `d7_regression.py` and
+    `c3_l4_nft_night.py` (`ADOPTED_E3`) check it. Last restarted 01:05Z
+    2026-10-08 (the `frame_spin` revert); checked 01:05:05Z: the three
+    lines, no `e3_flag.conf`, no game, PS1 files identical, APK
     CONFIRMED.
   - The companion tree carries the live controller through `C3-L4-N2`,
     the C5 selector profiles (dormant), **the 1080p rung behind
@@ -105,9 +110,8 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
     the closed ladder; NOT ADOPTED) and **the PS1 look behind
     `PRIVYHUB_PS1_LOOK`** (C5-M5B; absent or `4x` = nothing written; NOT
     ADOPTED). Both flags off and absent.
-  - The E3 flags' code is dormant (`TOOLS.md`, "The E3 flags"), each
-    absent and NOT ADOPTED, including the ACCEPTED `=frame_spin` (S5C)
-    and `PRIVYHUB_SNES_CORE=snes9x` (S4; the `.so` sits unused).
+  - The other E3 flags' code is dormant (`TOOLS.md`, "The E3 flags"),
+    each absent, including `=frame_spin` (reverted by E3-A2).
 - **Link-drop recovery** RUNTIME VALIDATED on real loss (`R3`-`R3d`);
   recovery never loads into a live core (`R3c2`).
 - **Host-shell operation**: open `MainActivity`, wake, tap RESUME PLAYING
@@ -115,22 +119,18 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
-1. **The user's commit** of the 2026-10-07 queue (`logs/e3_s4_git_status.txt`).
-2. **The user's decisions on the two ACCEPTED items**, each one drop-in
-   line in its own file beside `epg-index.conf` (`daemon-reload`, a
-   restart; the state check's `ADOPTED` gains the name; revert = delete):
-   - **E3-S5C:** `Environment=PRIVYHUB_AUDIO_SENDER_PACING=frame_spin`
-     (sender 13 → 6 %, companion 24.5 → 17.6 % while streaming).
-   - **E3-S4:** `Environment=PRIVYHUB_SNES_CORE=snes9x` (RetroArch
-     ~4.4-5.2 cores → ~0.1). **Also a look** (another emulator;
-     licence "Non-commercial"): a session by hand first, the record's §4.
-3. **E4** only after the adoptions are settled and the suite is re-run
-   on the adopted state.
+1. **The user's commit** of E3-A2 (`logs/e3_a2_git_status.txt`).
+2. **What E3 has left**, the user's pick, or E4:
+   - the CONC grab's spawn share (E3-S1's and S6's remainder);
+   - the node grabber's start-up (a precompiled grabber).
+   Both untested as changes; or `frame_spin` again, with a control.
+3. **E4** after that, with the suite re-run on the adopted state as its
+   base.
 
 **Open, not blocking:**
 
-- E3: the grabber child's share of the CONC loss; `d7_regression.py` /
-  `c3_l4_nft_night.py` need the index name before their next use;
+- the suite marks a run OK through a recovery pause; E3-A2's validity
+  check found pauses in E2's PS1-1080P r1 and E3-S1's control / CONC runs;
 - the max output gap; `host_link`; the thermal flag; `CTRL-L1`; the
   slow-event ring; the mild step's ~120 s bound;
 - **the onn's 1080p decode jitter**; the overlay's constant size text;
@@ -176,7 +176,7 @@ Phase C: met (C7, `docs/ROADMAP.md`). **Phase E** (`docs/ROADMAP.md`):
 
 ## Relevant References
 
-- `handoffs/QUEUE_2026-10-07.md` and its records `evidence/E3_S6A_…`, `E3_S5C_…`, `E3_S4_…_2026-10-07.md`; `TOOLS.md` "The cached guide index is the default" and "The E3 flags".
+- `evidence/E3_A2_FRAME_SPIN_AND_SNES9X_ADOPTION_2026-10-07.md`; `handoffs/QUEUE_2026-10-07.md` and its records `evidence/E3_S6A_…`, `E3_S5C_…`, `E3_S4_…_2026-10-07.md`; `TOOLS.md` (the index's and Snes9x's drop-ins, "The E3 flags").
 - Earlier E3: `handoffs/QUEUE_2026-10-06.md`, `-06B.md`; `evidence/E3_S1…S6_*`.
 - `evidence/E2_S1_WHOLE_SYSTEM_2026-10-06.md` (E2); `architecture/E1_WORKLOAD_SUITE.md` (the frozen suite); `evidence/E1_S1_WORKLOAD_SUITE_2026-10-05.md`.
 - `evidence/C5_CLOSE_2026-10-05.md`, `decisions/C5_1080P60_CAPABILITY_2026-09-28.md` — C5 and Phase C closed; `evidence/C7_D8_CHECKPOINT_2026-09-30.md`.

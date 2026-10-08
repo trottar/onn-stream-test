@@ -2,37 +2,33 @@
 
 Authoritative state: `../CURRENT.md`. **Start there.**
 
-Baseline commit `ccee2f5` (queue B committed). The 2026-10-07 queue's
-work is not committed (the user's commit: `../../../logs/e3_s4_git_status.txt`,
-the last of `logs/e3_s6a_`, `e3_s5c_`, `e3_s4_git_status.txt`).
+Baseline commit `e553673` (queue C committed). E3-A2's work is not
+committed (the user's commit: `../../../logs/e3_a2_git_status.txt`).
 
-## 2026-10-07 — `QUEUE_2026-10-07`: E3-S6A, E3-S5C, E3-S4, unattended
+## 2026-10-07/08 — `E3-A2`: adopting `frame_spin` and Snes9x, unattended
 
-**E3's first adoption.** The cached guide index is now the companion's
-default, through `epg-index.conf`. The adopted state is two environ
-lines: live + `PRIVYHUB_EPG_GUIDE_INDEX=cached`. `tools/e1_suite.py`
-checks for both. Every other flag was absent at every teardown; the
-adopted state was restored after each task (08:44Z, APK CONFIRMED).
-**Nothing else adopted; nothing committed.**
+The user: "Adopt frame_spin if you think helps"; after the look, "Sure
+it ran smoothly from what I can tell". Both were adopted through their
+own drop-ins and verified on PS1-STREAM ×2, SNES-STREAM and META.
 
-| task | change (flag) | verdict | finding |
-| --- | --- | --- | --- |
-| S6A | adopt the guide index (the user: "1. Adopt") | **ADOPTION STANDS** | META 33.6 MB, 0.23 %, 257/0 grabs; PS1-STREAM unchanged (10.4 %, 59.98); CONC reported 1,312/min |
-| S5C | `PRIVYHUB_AUDIO_SENDER_PACING=frame_spin` (one timed wait + the final spin), C F C F F | **ACCEPTED** | sender 13 → 6 %, companion 24.5 → 17.6 %; underruns 13 / 9 / 5 vs 17 / 14; probe sd 0.102 ms (stated ≤ 0.10: in doubt) |
-| S4 | `PRIVYHUB_SNES_CORE=snes9x` (Snes9x 1.63, placed by the user) | **ACCEPTED** | RetroArch 8-9 % of a core vs bsnes 436-517; host 7.4-7.9 % vs 43-50; REPEATABLE |
+| item | verdict | finding |
+| --- | --- | --- |
+| Snes9x (`snes-core.conf`) | **ADOPTION STANDS** | RetroArch 8.9 % of a core, host 8.05 %, 60 fps, title Snes9x |
+| `frame_spin` (`audio-pacing.conf`) | **ADOPTION REVERTED** | valid PS1 run 2: 24 underruns > 20 (noisy link, loss median 50/min); the replacement run 14; SNES 46 (not gated). Removed 01:05Z |
+| the index with the others (META) | m1 / m2 hold; **m3 fails high** | 343 programmes vs the pre-run 285 ± 5 %; 6 channels serve; the user's call |
 
-- **The user's decisions:**
-  - S5C: `Environment=PRIVYHUB_AUDIO_SENDER_PACING=frame_spin`.
-  - S4: `Environment=PRIVYHUB_SNES_CORE=snes9x`. A fidelity choice
-    (licence "Non-commercial"); first a look by hand (the record's §4).
-  - Each in its own drop-in; `ADOPTED` gains the name.
-- **The index's kill switch:** `../TOOLS.md`.
-- **Open:** the grabber child's share of the CONC loss;
-  `d7_regression.py` and `c3_l4_nft_night.py` still expect the one-line
-  environ.
+- **The adopted state is three lines:** live, the guide index, Snes9x
+  (`../TOOLS.md`, the kill switches). APK CONFIRMED at 01:05Z.
+- **One run was invalid.** A recovery pause (`controller_silence`) held
+  the game for 17 of 20 minutes. It was replaced under an addendum hashed
+  before further data.
+- **The same check on earlier runs** found pauses in E2's PS1-1080P r1
+  and in E3-S1's control and CONC runs (open).
 
-## Queues A and B (committed `bf2120c`, `ccee2f5`)
+## Queues A, B, C (committed `bf2120c`, `ccee2f5`, `e553673`)
 
+C (2026-10-07): S6A the guide index ADOPTED (stands); S5C `frame_spin`
+and S4 Snes9x ACCEPTED (decided in E3-A2, above).
 A (2026-10-06): S1 INCONCLUSIVE, S2 / S3 / S5 REJECTED, S4 NOT RUN. B:
 S5B REJECTED (F2 underruns 18 > 16); S6 MEMORY ACCEPTED (adopted since,
 S6A), STREAM REJECTED. Records `../evidence/E3_S*`; flags `../TOOLS.md`.

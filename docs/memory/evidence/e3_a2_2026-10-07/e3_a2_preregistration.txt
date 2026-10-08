@@ -1,0 +1,63 @@
+E3-A2 PRE-REGISTRATION -- verifying the adopted frame_spin pacing and the adopted Snes9x core on the suite. Written
+2026-10-07 after the precondition, the adoption (drop-ins at 22:52:28Z) and the state-check patches, BEFORE any
+verification run; hash in e3_a2_preregistration.sha256. Task: docs/memory/handoffs/E3-A2_FRAME_SPIN_AND_SNES9X_ADOPTION_TASK.md
+under every rule of QUEUE_2026-10-07.md. The user's words, 2026-10-07: "Adopt frame_spin if you think helps"; after the
+look by hand, "Sure it ran smoothly from what I can tell". Baseline commit: e553673 (the user's queue-C commit).
+E2 = e2_s1_2026-10-05/runs (PS1-STREAM host CPU 11.69 %, rendered 59.81; SNES-STREAM bsnes 436 / 517 % RetroArch).
+
+PRECONDITION: the adopted state as E3-S6A left it (precondition.json, ok). The user's look drop-in e3_flag.conf was
+ALREADY ABSENT (the drop-in dir last changed 22:45:54Z, before this task); nothing removed by this task.
+
+THE ADOPTED STATE (what runs; no flag is set for these runs):
+  ~/.config/systemd/user/privyhub-companion.service.d/
+    adaptive.conf    Environment=PRIVYHUB_ADAPTIVE_BITRATE_MODE=live      (C3-L4-D1, untouched)
+    epg-index.conf   Environment=PRIVYHUB_EPG_GUIDE_INDEX=cached         (E3-S6A, untouched)
+    audio-pacing.conf Environment=PRIVYHUB_AUDIO_SENDER_PACING=frame_spin (NEW, sha256 ea998cbbab5054d330446593a5a44a82ffd74f525b04a925918d38386e7045e0)
+    snes-core.conf   Environment=PRIVYHUB_SNES_CORE=snes9x               (NEW, sha256 1758974edfcec9fa13b0886126040fc4b88c7c0734f3f608b80e7020a2ed32aa)
+  The companion's environ = exactly those four PRIVYHUB_* (environ_after.txt); manager none; emulators.json unchanged.
+  Code as committed in e553673: native_session_io.py 27ed9e3d...c4bb (frame_spin), emulator_manager.py e87c50a5...2c24
+  (PRIVYHUB_SNES_CORE), epg.py 64d29c54...0118. snes9x_libretro.so 9b2b6ea9...7a31 ("Snes9x" 1.63).
+  The state checks (e3_a2_state_checks.diff, sha256 9f23e6b9417cb0b3bfa843d6f02683e4fb8f7770f000f75891245bca3c57204f):
+  tools/e1_suite.py ADOPTED = the four names (preflight also checks both new drop-ins are listed) and the SNES row's
+  counter override in config/Snes9x/ (the adopted core's corename dir); e3_state.py through it; d7_regression.py and
+  c3_l4_nft_night.py accept the three adopted E3 names beside the live default (ADOPTED_E3); their tests 33/33.
+  Before the runs the companion's own background refresh re-downloaded the (TTL-expired) guide metadata and rebuilt the
+  index at 22:53:18Z (6 refreshes, 0 failed); the next TTL end is 2026-10-08 22:53Z, after the runs. Pre-run guide read
+  (guide_read_before.json): 6 channels serving, 285 programmes, none stale.
+
+1. THE RUNS, in this order, window 1200 s, E2's gaps, E1's launch / warm-up / teardown, --e2, no flag:
+     E1-PS1-STREAM x2 (120 s)  -> runs/E1-PS1-STREAM/run1, run2
+     E1-SNES-STREAM x1 (600 s) -> runs/E1-SNES-STREAM/run1
+     E1-META x1 (120 s)        -> runs/E1-META/run1
+   --plan E1-PS1-STREAM:2:120,E1-SNES-STREAM:1:600,E1-META:1:120. Then tools/e3_guide_read.py -> guide_read_after.json.
+
+2. THE BAR. Each adoption stands if ALL ITS clauses hold; otherwise that item's drop-in is removed (daemon-reload,
+   restart), its name taken out of the state checks, and the record says ADOPTION REVERTED for it with the failing
+   clause; the other item may stand.
+   frame_spin (audio-pacing.conf) -- both PS1-STREAM runs AND the SNES-STREAM run:
+     f1. the audio sender thread (SCHED_RR; tools/e3_table.py) <= 8 % of a core AND the companion <= 20 % of a core;
+     and both PS1-STREAM runs:
+     f2. audio underruns (heartbeat, window) <= 20;
+     f3. rendered fps >= 59.5, AND within E1's bands of E2's PS1-STREAM: host CPU 11.69 +/- 2, rendered 59.81 +/- 0.5;
+     f4. D-BASE: spikes >= 20 ms per min < 200 and stale output drops per min < 20 (session report).
+     Video loss/min and the per-minute lists reported, not gated.
+   Snes9x (snes-core.conf) -- the SNES-STREAM run:
+     s1. RetroArch CPU <= 150 % of a core;
+     s2. host CPU mean <= 20 %;
+     s3. RetroArch fps (title counter) >= 59.9; encoder capture fps 60 +/- 0.5; rendered fps >= 59.5;
+     s4. the window title names Snes9x (title.txt).
+   The guide index with the others present (E3-S6A; not adopted by this task) -- the META run:
+     m1. companion PSS at the window's end <= 60 MB;
+     m2. grabs failed 0, grabs ok >= 205;
+     m3. the guide serves: guide_read_after 6 channels serving, programme total within +/- 5 % of 285 (271-299).
+     META runs no stream and no SNES game, so neither new item is live in it: a failing m-clause is recorded as the
+     index's (E3-S6A's kill switch is then the user's call) and reverts neither new item.
+   A run never reaching PLAYING after two retries -> the item(s) whose row it is REVERTED (PS1-STREAM: frame_spin;
+   SNES-STREAM: both).
+
+3. REPORTED, NOT GATED: socket W per row beside E2 and the E3-S5C / E3-S4 / E3-S6A records; the per-minute loss lists;
+   the C2 block; Tctl; RetroArch threads; the index file at the end.
+
+4. RULES: as QUEUE_2026-10-07 (and -06 / -06B); no nft, no real sudo, the Opal not touched; no addresses or identifiers;
+   nothing fetched by this task, nothing deleted. The bar is not changed after data. Nothing adopted beyond these two;
+   nothing committed.

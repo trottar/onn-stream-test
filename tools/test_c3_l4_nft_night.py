@@ -288,6 +288,18 @@ class LiveDefault(unittest.TestCase):
         self.assertEqual(h.baseline_mode([self.LIVE]), "live")
         self.assertEqual(h.baseline_mode([]), "off")
 
+    def test_the_adopted_e3_names_are_accepted(self):
+        """E3-S6A / E3-A2: the guide index and the Snes9x core are adopted through their own drop-ins (frame_spin was
+        reverted by E3-A2's bar, so it is refused like any other flag)."""
+        adopted = ["PRIVYHUB_EPG_GUIDE_INDEX=cached", "PRIVYHUB_SNES_CORE=snes9x"]
+        self.assertEqual(h.ADOPTED_E3, adopted)
+        self.assertIsNone(h.env_baseline_refusal([], sorted([self.LIVE] + adopted)))
+        self.assertEqual(h.baseline_mode(sorted([self.LIVE] + adopted)), "live")
+        self.assertIsNotNone(h.env_baseline_refusal([], [self.LIVE, "PRIVYHUB_AUDIO_SENDER_PACING=frame"]))
+        self.assertIsNotNone(h.env_baseline_refusal([], [self.LIVE, "PRIVYHUB_AUDIO_SENDER_PACING=frame_spin"]))
+        import d7_regression as d7
+        self.assertEqual(d7.ADOPTED_E3, adopted)
+
     def test_set_environment_residue_is_refused(self):
         for mgr in ([self.LIVE], ["PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1"], ["PRIVYHUB_FEC_SCHEME=xor8_2"]):
             self.assertIn("user manager", h.env_baseline_refusal(mgr, [self.LIVE]), mgr)

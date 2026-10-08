@@ -51,6 +51,8 @@ HB_LOG = REPO / "logs/games/native_stream_heartbeat.log"
 SESSDIR = REPO / "logs/games/decoder_sessions"
 HOLD_S = 180
 DEFAULT_LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"   # C3-L4-D1: the unit drop-in's one name
+# E3-S6A / E3-A2 (2026-10-07): the other adopted names, each through its own drop-in (tools/e1_suite.py ADOPTED)
+ADOPTED_E3 = ["PRIVYHUB_EPG_GUIDE_INDEX=cached", "PRIVYHUB_SNES_CORE=snes9x"]
 
 
 def now() -> str:
@@ -206,7 +208,7 @@ def row_boot() -> dict:
     # fails the row, and the user manager must carry none (no set-environment residue).
     env = ([l.decode(errors="replace") for l in Path(f"/proc/{mp}/environ").read_bytes().split(b"\0")
             if l.startswith(b"PRIVYHUB_")] if mp and mp != "0" else None)
-    env_n = sum(1 for l in env if l != DEFAULT_LIVE) if env is not None else None
+    env_n = sum(1 for l in env if l != DEFAULT_LIVE and l not in ADOPTED_E3) if env is not None else None
     mgr_n = sum(1 for l in sh(["systemctl", "--user", "show-environment"]).splitlines() if l.startswith("PRIVYHUB_"))
     adopted = (o.get("any_override") is False and o.get("max_frame_size_bytes") == 90000
                and (c.get("queue_target_packets"), c.get("queue_capacity_packets")) == (12, 17)

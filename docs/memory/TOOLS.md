@@ -1233,8 +1233,8 @@ D6-R1 runner does too (`evidence/d6_r1_2026-09-24/d6_r1_run.sh`).
 then the live default". The record is
 `decisions/C3-L4_LIVE_DEFAULT_2026-10-01.md`.
 
-**The drop-in.** Since 2026-10-07 one of two persistent `PRIVYHUB_*`
-(the other: the guide index, next section). The unit file itself is
+**The drop-in.** One of three persistent `PRIVYHUB_*` since 2026-10-07
+(the others: the guide index and the Snes9x core; next sections). The unit file itself is
 unchanged, and no `set-environment` is used.
 `~/.config/systemd/user/privyhub-companion.service.d/adaptive.conf`
 (copy: `evidence/c3_l4_d1_2026-10-01/adaptive.conf`):
@@ -1247,8 +1247,8 @@ Environment=PRIVYHUB_ADAPTIVE_BITRATE_MODE=live
 **What shows when it is in force:**
 
 - `systemctl --user cat privyhub-companion` lists it;
-- the MainPID's environ carries that `PRIVYHUB_*` and, since E3-S6A,
-  `PRIVYHUB_EPG_GUIDE_INDEX=cached` (exactly those two), and
+- the MainPID's environ carries that `PRIVYHUB_*` and the two adopted
+  E3 names (E3-S6A, E3-A2; exactly three), and
   `systemctl --user show-environment` carries none;
 - `native-stream-status` → `adaptive_bitrate.mode live`,
   `configured_mode live`, `acts true`;
@@ -1258,7 +1258,7 @@ Environment=PRIVYHUB_ADAPTIVE_BITRATE_MODE=live
 ```bash
 systemctl --user cat privyhub-companion | grep -A2 adaptive.conf
 MP=$(systemctl --user show -p MainPID --value privyhub-companion)
-tr '\0' '\n' < /proc/$MP/environ | grep '^PRIVYHUB_'      # exactly ..._MODE=live + PRIVYHUB_EPG_GUIDE_INDEX=cached (E3-S6A)
+tr '\0' '\n' < /proc/$MP/environ | grep '^PRIVYHUB_'      # exactly three: ..._MODE=live + the two E3 adoptions
 systemctl --user show-environment | grep -c '^PRIVYHUB_'    # 0 -- no set-environment residue
 ```
 
@@ -1348,7 +1348,7 @@ index instead of parsing the 25.6 MB guide metadata
 ```bash
 systemctl --user cat privyhub-companion | grep -A2 epg-index.conf
 MP=$(systemctl --user show -p MainPID --value privyhub-companion)
-tr '\0' '\n' < /proc/$MP/environ | grep '^PRIVYHUB_'      # exactly the two lines
+tr '\0' '\n' < /proc/$MP/environ | grep '^PRIVYHUB_'      # exactly the three lines (since E3-A2)
 python3 tools/e3_state.py                                   # "ok": true -- the adopted state
 ```
 
@@ -1362,12 +1362,55 @@ systemctl --user daemon-reload && systemctl --user restart privyhub-companion
 ```
 
 **The state check follows the adoption.** `tools/e1_suite.py`'s
-preflight, teardown and final state expect exactly the two lines
-(`ADOPTED`), and `e3_state.py` reads through it; with the kill switch
-used, revert `evidence/e3_s6a_2026-10-07/e3_s6a_state_check.diff` too.
-`tools/d7_regression.py` and `tools/c3_l4_nft_night.py` still expect the
-live default alone and would refuse the adopted environ; extend them by
-the one name before their next use.
+preflight, teardown and final state expect exactly the adopted lines
+(`ADOPTED`, three since E3-A2), and `e3_state.py` reads through it;
+`tools/d7_regression.py` and `tools/c3_l4_nft_night.py` accept the
+adopted E3 names beside the live default (`ADOPTED_E3`, since E3-A2).
+With a kill switch used, take its name out of `ADOPTED` / `ADOPTED_E3`
+too.
+
+## The Snes9x core is the default (E3-A2, 2026-10-07) — the drop-in and its kill switch; `frame_spin` was reverted
+
+**The user's words, 2026-10-07:** "Adopt frame_spin if you think helps";
+after a look by hand at Super Mario World on Snes9x, "Sure it ran
+smoothly from what I can tell". The record is
+`evidence/E3_A2_FRAME_SPIN_AND_SNES9X_ADOPTION_2026-10-07.md`; the
+measurements are E3-S5C's and E3-S4's (both ACCEPTED).
+
+**Snes9x STANDS. `frame_spin` was REVERTED by the verification bar**
+(01:05Z 10-08): one valid run had 24 audio underruns against ≤ 20, on a
+noisy link. `audio-pacing.conf` was removed. The flag stays dormant
+(the E3 flags table).
+
+**The drop-in**, beside `adaptive.conf` and `epg-index.conf` (copy in
+`evidence/e3_a2_2026-10-07/`):
+
+```ini
+# ~/.config/systemd/user/privyhub-companion.service.d/snes-core.conf
+[Service]
+Environment=PRIVYHUB_SNES_CORE=snes9x
+```
+
+**What it does:**
+
+- **Snes9x.** SNES games run on `snes9x_libretro.so` (Snes9x 1.63,
+  licence "Non-commercial"), not bsnes (`emulator_manager._resolve_game`).
+  `emulators.json` still names bsnes; the flag overrides it.
+  - RetroArch drops from ~4.4-5.2 cores to ~0.1 on SNES.
+  - **Saves and states are per core.** Snes9x uses `saves/Snes9x/` and
+    `states/Snes9x/`, so bsnes's `saves/bsnes/` is not seen while
+    Snes9x is the default. RetroArch's per-core config is
+    `config/Snes9x/` (`Snes9x.opt` holds the core's defaults).
+
+**The kill switch**, one line: delete the file, `daemon-reload`,
+restart. Absent = bsnes, byte for byte. The `.so` and RetroArch's
+`Snes9x/` files stay. Then take the name out of `ADOPTED` /
+`ADOPTED_E3`, and move `SMW`'s override in `tools/e1_suite.py` back to
+`config/bsnes/`.
+
+```bash
+rm ~/.config/systemd/user/privyhub-companion.service.d/snes-core.conf && systemctl --user daemon-reload && systemctl --user restart privyhub-companion     # back to bsnes
+```
 
 ## The shadow adaptive-bitrate controller (C3-L4-S1) — never leave the flag set
 
@@ -1772,7 +1815,7 @@ python3 tools/e1_sampler.py summarize <dir> --from <utc> --to <utc>
   - `range_server`'s socket `send()` is not in `wchar`; use `rchar` for
     served bytes.
 
-## The E3 flags (QUEUE_2026-10-06) — each off by default, never leave one set (one adopted: the guide index)
+## The E3 flags (QUEUE_2026-10-06) — each off by default, never leave one set (two adopted: the guide index, Snes9x)
 
 Each E3 task's change lives behind its own `PRIVYHUB_*` flag in the
 companion's environment; absent = today's behaviour, byte for byte. The
@@ -1782,18 +1825,19 @@ suite sets a flag for one run only through the drop-in
 run's teardown removes the file, `daemon-reload`s, restarts the unit and
 checks the environ is exactly the live default; flagged runs go to
 `<ID>_flag/`; preflight refuses to start with the file present).
-**Since E3-S6A (2026-10-07) "the adopted state" is two lines**: the live
-default and `PRIVYHUB_EPG_GUIDE_INDEX=cached`, through their own drop-ins;
-every other flag below is absent at every teardown.
+**Since E3-A2 (2026-10-07) "the adopted state" is three lines**: the live
+default, `PRIVYHUB_EPG_GUIDE_INDEX=cached` and `PRIVYHUB_SNES_CORE=snes9x`,
+each through its own drop-in; every other flag below is absent at every
+teardown.
 
 | flag | task | what it does | verdict |
 | --- | --- | --- | --- |
 | `PRIVYHUB_EPG_GRAB_PRIORITY=idle` | E3-S1 | the grabber tree under `chrt -i 0` / `nice -n 19` / `ionice -c 3` (`companion/plugins/epg.py`, `_grab_from_candidate`) | INCONCLUSIVE (control off-band); the loss did not move |
 | `PRIVYHUB_EPG_MALLOC_TRIM=1` (+ `MALLOC_ARENA_MAX=2` in the runs) | E3-S2 | `malloc_trim(0)` after each forced refresh (`guide()` wrapper) | REJECTED (PSS 155 MB at the window's end; the metadata list is live through each grab) |
 | `PRIVYHUB_EPG_DIRECT_NODE=1` | E3-S3 | the grabber's node started directly (`node --require tsx/preflight.cjs --import tsx/loader.mjs grab.ts …`), no npm / sh / tsx cli | REJECTED (CPU-s per grab unchanged; grabs ~7 % shorter, ~36 MB less) |
-| `PRIVYHUB_SNES_CORE=<core>` | E3-S4 | the SNES core is `<core>_libretro.so` from the same cores dir (`companion/games/emulator_manager.py`, `_resolve_game`; applied 2026-10-07); the runner moves the counter override to the core's corename dir (`snes9x` → `config/Snes9x/`). `snes9x_libretro.so` (Snes9x 1.63, licence "Non-commercial") was placed by the user. **A look by hand:** the flag in `e3_flag.conf`, `daemon-reload` + restart, start Super Mario World from the launcher, then remove the file, `daemon-reload` + restart, `tools/e3_state.py` ok (the full lines in the E3-S4 record §4) | **ACCEPTED** (E3-S4 2026-10-07: RetroArch 8-9 % of a core vs bsnes 436-517; host 7.4-7.9 % vs 43-50; REPEATABLE) — NOT ADOPTED; a fidelity choice and the user's look; adopting it = `Environment=PRIVYHUB_SNES_CORE=snes9x` |
+| `PRIVYHUB_SNES_CORE=<core>` | E3-S4 | the SNES core is `<core>_libretro.so` from the same cores dir (`companion/games/emulator_manager.py`, `_resolve_game`; applied 2026-10-07); the runner moves the counter override to the core's corename dir (`snes9x` → `config/Snes9x/`). `snes9x_libretro.so` (Snes9x 1.63, licence "Non-commercial") was placed by the user. **A look by hand:** the flag in `e3_flag.conf`, `daemon-reload` + restart, start Super Mario World from the launcher, then remove the file, `daemon-reload` + restart, `tools/e3_state.py` ok (the full lines in the E3-S4 record §4) | **ACCEPTED** (E3-S4 2026-10-07: RetroArch 8-9 % of a core vs bsnes 436-517; host 7.4-7.9 % vs 43-50; REPEATABLE) — **`=snes9x` ADOPTED 2026-10-07 (E3-A2)** through `snes-core.conf`, after the user's look |
 | `PRIVYHUB_AUDIO_SENDER_PACING=frame` | E3-S5 | the Linux audio sender waits once per 5-ms packet (`Event.wait` to the deadline) instead of 1-ms waits + yields + spin (`companion/native_session_io.py`) | REJECTED (E3-S5: one run's loss; E3-S5B, decisive, 5 interleaved runs: loss not burstier, but one run's underruns 18 > 16) |
-| `PRIVYHUB_AUDIO_SENDER_PACING=frame_spin` | E3-S5C | one timed wait to 0.25 ms before the packet's deadline, then today's final spin (`_linux_wait_until`) | **ACCEPTED** (sender 13 → 6 %, companion 24.5 → 17.6 %; underruns 13 / 9 / 5 vs controls 17 / 14) — NOT ADOPTED; adopting it = one drop-in line `Environment=PRIVYHUB_AUDIO_SENDER_PACING=frame_spin` |
+| `PRIVYHUB_AUDIO_SENDER_PACING=frame_spin` | E3-S5C | one timed wait to 0.25 ms before the packet's deadline, then today's final spin (`_linux_wait_until`) | **ACCEPTED** (sender 13 → 6 %, companion 24.5 → 17.6 %; underruns 13 / 9 / 5 vs controls 17 / 14) — adopted by E3-A2, then **REVERTED by its bar** (one run's underruns 24 > 20 on a noisy link; the replacement run 14); off, dormant |
 | `PRIVYHUB_AUDIO_SEND_TRACE=<path>` | E3-S5B | measurement only: the audio sender writes 60 s of `sendto` times (from 30 s after it starts) to `<path>` | probe hook, off |
 | `PRIVYHUB_EPG_GUIDE_INDEX=cached` | E3-S6 | the grab's candidates from a slim index (13,555 channels, 3.7 MB, built once per metadata file, saved as `data/epg/metadata/guides_index.json`) instead of the per-grab 25.6 MB parse | **MEMORY ACCEPTED** (companion 34 MB, 0.2 % CPU in META); **STREAM REJECTED** (CONC 773-1,273 loss/min) — **ADOPTED 2026-10-07 (E3-S6A)** through `epg-index.conf`, see above |
 | `PRIVYHUB_MEM_PROBE=1` | E3-S2 | serves `GET /plugins/epg/memprobe?op=start\|snap\|trim\|gc` (tracemalloc, gc by type, smaps) and, since E3-S6, `op=parse\|prepare\|spawn\|cands&channel_id=` (a grab's halves separately; candidates by both paths) — measurement only | probe hook, off |
@@ -1811,7 +1855,7 @@ E3 measurement tools:
 - `tools/e3_children_log.py <out.jsonl>`: the companion's reaped-children CPU
   (cutime+cstime) every 5 s; stop with `<out.jsonl>.stop`. Exact for the
   short-lived grabber chain, which the 1-s sampler undercounts by ~⅓.
-- `tools/e3_state.py`: the adopted state (preflight with the two environ lines, PS1 files, APK, no game) as one JSON line.
+- `tools/e3_state.py`: the adopted state (preflight with the three environ lines, PS1 files, APK, no game) as one JSON line.
 - `tools/e1_suite.py --plan` items for the same row continue its run numbers
   (interleaved C, F, C, F, F plans).
 - `tools/e3_redact_check.sh <paths…>`: `h2_prep_redact.py --check` per

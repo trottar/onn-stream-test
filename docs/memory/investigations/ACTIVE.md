@@ -2,7 +2,7 @@
 
 ## PHASE E — ACTIVE. E1 FROZEN (VOD added); E2 MEASURED 2026-10-06 (E2-S1); E3 next on the user's pick
 
-**E3 (QUEUE_2026-10-06, -06B, -07), in progress — one adopted (the guide index, E3-S6A):**
+**E3 (QUEUE_2026-10-06, -06B, -07; E3-A2), in progress — two adopted (the guide index, E3-S6A; Snes9x, E3-A2):**
 
 - **E3-S1** (`../evidence/E3_S1_EPG_GRAB_PRIORITY_2026-10-06.md`):
   the grabber at SCHED_IDLE / nice 19 / idle I/O halved the busiest
@@ -71,6 +71,20 @@
   RetroArch 8.2 / 9.3 % of a core (bsnes 436 / 517), host 7.4 / 7.9 %
   (43 / 50), 60 fps throughout, REPEATABLE (bsnes's row was not). The
   look and the licence ("Non-commercial") are the user's.
+- **E3-A2** (`../evidence/E3_A2_FRAME_SPIN_AND_SNES9X_ADOPTION_2026-10-07.md`):
+  both adopted through their own drop-ins and verified. **Snes9x
+  STANDS** (RetroArch 8.9 %, host 8.05 %). **`frame_spin` REVERTED**:
+  valid PS1 run 2 had 24 underruns > 20 on a noisy link (loss median 50
+  per minute); the replacement run had 14; SNES had 46 (not gated). Open:
+  whether `frame_spin` raises underruns on a lossy link -- only a
+  same-night interleaved control can tell.
+- **Open, found by E3-A2's validity check:** the companion's link
+  recovery can pause the game mid-window (`desync_pause`,
+  `controller_silence`) and the suite still marks the run OK.
+  - It happened in E3-A2's run 1, in E2's PS1-1080P run 1, and in E3-S1's
+    control and both CONC runs (`../evidence/e3_a2_2026-10-07/prior_runs_validity.txt`).
+  - The suite does not read the recovery state; `e3_a2_validity.py`
+    does.
 
 **E2-S1 (2026-10-05/06)** (`../evidence/E2_S1_WHOLE_SYSTEM_2026-10-06.md`):
 
