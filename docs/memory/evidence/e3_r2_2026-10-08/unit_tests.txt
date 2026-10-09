@@ -1,0 +1,40 @@
+test_today_fires_on_first_check_over_1s (__main__.Confirm.test_today_fires_on_first_check_over_1s) ... ok
+test_v2_a_3s_uplink_stall_never_fires (__main__.Confirm.test_v2_a_3s_uplink_stall_never_fires) ... ok
+test_v2_a_packet_between_restarts_the_confirm (__main__.Confirm.test_v2_a_packet_between_restarts_the_confirm) ... ok
+test_v2_needs_5s_and_a_second_check_250ms_later (__main__.Confirm.test_v2_needs_5s_and_a_second_check_250ms_later) ... ok
+test_a_client_triggered_pause_keeps_its_own_exit (__main__.Exit.test_a_client_triggered_pause_keeps_its_own_exit) ... ok
+test_a_failed_resume_stays_paused_and_retries_on_a_newer_heartbeat (__main__.Exit.test_a_failed_resume_stays_paused_and_retries_on_a_newer_heartbeat) ... ok
+test_a_heartbeat_before_the_packets_return_does_not_count (__main__.Exit.test_a_heartbeat_before_the_packets_return_does_not_count) ... ok
+test_a_stale_output_age_waits_for_a_fresh_heartbeat (__main__.Exit.test_a_stale_output_age_waits_for_a_fresh_heartbeat) ... ok
+test_controller_pause_exits_when_packets_return_and_output_is_fresh (__main__.Exit.test_controller_pause_exits_when_packets_return_and_output_is_fresh) ... ok
+test_flag_absent_no_exit_then_gives_up_at_120s (__main__.Exit.test_flag_absent_no_exit_then_gives_up_at_120s) ... ok
+test_one_good_check_is_not_two (__main__.Exit.test_one_good_check_is_not_two) ... ok
+test_packets_never_return_gives_up_at_120s_with_the_flag (__main__.Exit.test_packets_never_return_gives_up_at_120s_with_the_flag) ... ok
+test_250ms_is_not_a_gap_but_260_is (__main__.GapLog.test_250ms_is_not_a_gap_but_260_is) ... ok
+test_a_second_gap_inside_the_burst_window_truncates_the_first (__main__.GapLog.test_a_second_gap_inside_the_burst_window_truncates_the_first) ... ok
+test_off_by_default (__main__.GapLog.test_off_by_default) ... ok
+test_one_gap_with_its_catch_up_burst (__main__.GapLog.test_one_gap_with_its_catch_up_burst) ... ok
+test_steady_460pps_logs_nothing (__main__.GapLog.test_steady_460pps_logs_nothing) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.008s
+
+OK
+{"ns_per_packet_on": 65.3, "ns_per_packet_off": 13.4, "core_points_at_460pps": 0.00238}
+..E.....
+======================================================================
+ERROR: test_recovery_is_wired_to_the_new_primitive (tools.test_c3_f1_recovery_restart.RecoveryRestartTests.test_recovery_is_wired_to_the_new_primitive)
+Rule: link-drop recovery's restart_encoder is recovery_restart_encoder.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/privyhub/Projects/onn-stream-test/tools/test_c3_f1_recovery_restart.py", line 210, in test_recovery_is_wired_to_the_new_primitive
+    i = src.index("restart_encoder=(")
+ValueError: substring not found
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.002s
+
+FAILED (errors=1)
+{"us_per_line": 42.4}
+{"schema": "privyhub_ctrl_gap_v1", "start_utc": "2026-10-08T13:16:54.593Z", "end_utc": "2026-10-08T13:16:55.893Z", "gap_ms": 1300.0, "burst_500ms": 2, "burst_truncated": false, "logged_utc": "2026-10-08T13:16:54.583Z"}
+

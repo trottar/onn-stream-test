@@ -47,6 +47,14 @@ RESTART_BACKOFF_CAP_MS = 30_000
 
 MONITOR_INTERVAL_S = 0.25
 
+# E3-R2 (PRIVYHUB_RECOVERY_TRIGGER=v2 only): a pause the host's controller-silence
+# trigger started resumes by itself once the controller packets are back
+# (age < EXIT_CTRL_AGE_MS on two checks >= EXIT_CONFIRM_S apart) and a heartbeat
+# received after that shows the client's output fresh (<= EXIT_OUTPUT_AGE_MS).
+EXIT_CTRL_AGE_MS = 500
+EXIT_CONFIRM_S = 0.25
+EXIT_OUTPUT_AGE_MS = 300
+
 # D-BASE-R4 item 4. This log gets a handful of lines per session rather than
 # one every two seconds, so a smaller bound still covers a long history.
 MAX_LOG_BYTES = 1024 * 1024
@@ -121,6 +129,13 @@ class LinkDropRecovery:
         self._saved_at_utc: str | None = None
         self._last_desync_reason: str | None = None
         self._pending_transition_error: str | None = None
+        # E3-R2: off unless enable_controller_exit(True) (the v2 flag); off = today.
+        self._controller_exit = False
+        self._exit_ok_since: float | None = None
+        self._exit_packets_back_at: float | None = None
+
+    def enable_controller_exit(self, enabled: bool) -> None:
+        self._controller_exit = bool(enabled)
 
     # --- log ---------------------------------------------------------------
 
@@ -338,6 +353,8 @@ class LinkDropRecovery:
             self._last_desync_reason = trigger
             self._restart_backoff_ms = RESTART_BACKOFF_MS
             self._last_restart_at = None
+            self._exit_ok_since = None
+            self._exit_packets_back_at = None
 
         paused_error = ""
 
@@ -510,6 +527,103 @@ class LinkDropRecovery:
                 RESTART_BACKOFF_CAP_MS,
             )
 
+    def _maybe_exit_controller_pause(
+        self,
+        now: float,
+        age_ms: float | None,
+    ) -> bool:
+        """E3-R2: resume a controller_silence pause whose cause has gone.
+
+        (a) the controller packets are flowing again: age < EXIT_CTRL_AGE_MS on
+        two checks >= EXIT_CONFIRM_S apart; (b) a heartbeat received after (a)
+        held shows the client's output fresh (0 <= age <= EXIT_OUTPUT_AGE_MS).
+        Then the game resumes through the same EmulatorManager.resume() the
+        client's gate uses; nothing is loaded. A client-triggered pause keeps
+        its own exit; GIVE_UP_MS still applies if (a)/(b) never come. True when
+        this resumed the game.
+        """
+        with self._lock:
+            if (
+                self._state != STATE_PAUSED_RECOVERING
+                or self._last_desync_reason != "controller_silence"
+            ):
+                return False
+
+            if age_ms is None or age_ms >= EXIT_CTRL_AGE_MS:
+                self._exit_ok_since = None
+                self._exit_packets_back_at = None
+                return False
+
+            if self._exit_ok_since is None:
+                self._exit_ok_since = now
+                return False
+
+            if now - self._exit_ok_since < EXIT_CONFIRM_S:
+                return False
+
+            if self._exit_packets_back_at is None:
+                self._exit_packets_back_at = now
+
+            back_at = self._exit_packets_back_at
+
+            if not self._heartbeat_history:
+                return False
+
+            hb_at, hb_age = self._heartbeat_history[-1]
+
+            if hb_at <= back_at or not 0 <= hb_age <= EXIT_OUTPUT_AGE_MS:
+                return False
+
+        try:
+            has_encoder = bool(self._stream_active())
+        except Exception:
+            has_encoder = False
+
+        if not has_encoder:
+            return False
+
+        error = ""
+
+        try:
+            self._resume_game()
+        except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"
+
+        with self._lock:
+            if self._state != STATE_PAUSED_RECOVERING:
+                return False
+
+            if error:
+                # wait for a newer heartbeat before trying again
+                self._exit_packets_back_at = now
+                self._log(
+                    "controller_exit_failed",
+                    resume_error=error,
+                )
+                return False
+
+            recovering_ms = int(
+                (now - self._state_since) * 1000.0
+            )
+            self._state = STATE_PLAYING
+            self._state_since = time.monotonic()
+            self._restart_backoff_ms = RESTART_BACKOFF_MS
+            self._last_restart_at = None
+            self._client_present_since = time.monotonic()
+            self._exit_ok_since = None
+            self._exit_packets_back_at = None
+            self._log(
+                "resumed",
+                from_state=STATE_PAUSED_RECOVERING,
+                recovering_ms=recovering_ms,
+                restarts=self._restarts,
+                via="controller_return",
+                ctrl_age_ms=round(float(age_ms), 1),
+                output_age_ms=hb_age,
+                packets_back_to_resume_ms=int((now - back_at) * 1000.0),
+            )
+            return True
+
     # --- monitor -----------------------------------------------------------
 
     def _monitor_loop(self) -> None:
@@ -546,6 +660,12 @@ class LinkDropRecovery:
         if state == STATE_PAUSED_RECOVERING:
             if state_ms >= GIVE_UP_MS:
                 self._give_up_and_save()
+                return
+
+            if self._controller_exit and self._maybe_exit_controller_pause(
+                now,
+                age_ms,
+            ):
                 return
 
             self._maybe_restart_encoder(now)

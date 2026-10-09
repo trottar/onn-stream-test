@@ -1446,14 +1446,21 @@ unrecoverable. Neither was right. The defect itself is real and stays open.
 - **Also seen:** the client's own `client_output_silence` pauses on real
   1-3-s output stalls (10-06, before the index). These resumed by
   themselves, and the host cannot tell them from a short real drop.
-- **Change prepared, dormant:** `PRIVYHUB_RECOVERY_TRIGGER=v2`, the
-  controller trigger at 5 s on two checks.
-  - Its replay was INCONCLUSIVE: the records' 1-s resolution cannot
-    replay today's rule faithfully.
-  - Not adopted. The on-air test is the user's (`r3b_run.sh`; the hand
-    step is in the record).
+- **The fix, behind a flag, pending the air check (E3-R2, 2026-10-08):**
+  `PRIVYHUB_RECOVERY_TRIGGER=v2`, three parts:
+  - the controller trigger at 5 s on two checks;
+  - **an exit**: the pause resumes by itself when the packets return and
+    the client's output is fresh;
+  - a silence-gap log (`logs/games/native_stream_ctrl_gaps.log`).
+- **How it did:** the faithful replay held (r1-r4), and the four suite
+  runs had no recovery pause at all. One run logged a 1,253-ms uplink
+  silence, which today's rule would have paused on.
+- **Verdict: REJECTED** on two clauses that don't touch the fix: the
+  CONC rendered fps was *above* its cross-night band, and one gap began
+  41 ms after a log write. NOT ADOPTED.
+- **Adoption waits for the user's nft paste** (`r3b_run.sh`; the paste
+  and the expected reply are in the E3-R2 record §4).
 - **Meanwhile:** the suite counts such a run as invalid and replaces it
   (E3-A2's validity rule).
-- **Open design question:** a controller-silence pause that clears itself
-  when the packets return and the client's output is fresh.
-- Record: `memory/evidence/E3_R1_RECOVERY_FALSE_PAUSE_2026-10-08.md`.
+- Records: `memory/evidence/E3_R1_RECOVERY_FALSE_PAUSE_2026-10-08.md`,
+  `memory/evidence/E3_R2_RECOVERY_PAUSE_EXIT_2026-10-08.md`.

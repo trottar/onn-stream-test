@@ -3,6 +3,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import os
+import queue
 
 from collections import deque
 import re
@@ -1685,6 +1686,11 @@ class NativeControllerBridge:
         self._silence_reported = False
         self._silence_confirm_s = 0.0           # E3-R1 v2: a second check this long after the first; 0 = today
         self._silence_first_over_at: float | None = None
+        # E3-R2: the silence-gap log (with PRIVYHUB_RECOVERY_TRIGGER=v2, or PRIVYHUB_RECOVERY_GAP_LOG=1 alone): every
+        # client->host silence > 250 ms, one line at its end (start, length, the catch-up burst's packets in the next
+        # 500 ms), written by its own thread so the receive loop never waits on the file. None = off (today).
+        self._gap_queue: "queue.SimpleQueue | None" = None
+        self._gap_open: dict[str, Any] | None = None
 
     @staticmethod
     def _selected_backend() -> str:
@@ -1944,6 +1950,58 @@ class NativeControllerBridge:
             return False
         return now - first >= self._silence_confirm_s
 
+    GAP_LOG_MIN_S = 0.25
+    GAP_LOG_BURST_S = 0.5
+    GAP_LOG_MAX_BYTES = 512 * 1024
+
+    def set_gap_log(self, path: "Path | None") -> None:
+        """E3-R2: start the silence-gap log into <path> (bounded, one rotated copy). None: leave it off."""
+        if path is None or self._gap_queue is not None:
+            return
+        q: "queue.SimpleQueue" = queue.SimpleQueue()
+        threading.Thread(target=self._gap_writer, args=(q, Path(path)), name="PrivyHub-Ctrl-Gap-Log",
+                         daemon=True).start()
+        self._gap_queue = q
+
+    @staticmethod
+    def _gap_utc(at: float) -> str:
+        return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(at)) + f".{int(at * 1000) % 1000:03d}Z"
+
+    def _gap_writer(self, q: "queue.SimpleQueue", path: Path) -> None:
+        from games.log_rotation import append_line
+
+        while True:
+            rec = q.get()
+            rec["logged_utc"] = self._gap_utc(time.time())
+            try:
+                append_line(path, json.dumps(rec), max_bytes=self.GAP_LOG_MAX_BYTES, keep=1)
+            except OSError:
+                pass
+
+    def _gap_flush(self, truncated: bool = False) -> None:
+        g, self._gap_open = self._gap_open, None
+        q = self._gap_queue
+        if g is None or q is None:
+            return
+        wall = time.time() - time.monotonic()
+        q.put({"schema": "privyhub_ctrl_gap_v1", "start_utc": self._gap_utc(wall + g["start"]),
+               "end_utc": self._gap_utc(wall + g["end"]), "gap_ms": round((g["end"] - g["start"]) * 1000.0, 1),
+               "burst_500ms": g["burst"], "burst_truncated": truncated})
+
+    def _gap_note_packet(self, now: float) -> None:
+        """Called for every accepted packet, before _last_any_packet_at moves; only while the gap log is on."""
+        g = self._gap_open
+        if g is not None:
+            if now - g["end"] < self.GAP_LOG_BURST_S:
+                g["burst"] += 1
+            else:
+                self._gap_flush()
+        prev = self._last_any_packet_at
+        if prev > 0.0 and now - prev > self.GAP_LOG_MIN_S:
+            if self._gap_open is not None:
+                self._gap_flush(truncated=True)
+            self._gap_open = {"start": prev, "end": now, "burst": 1}
+
     def last_client_packet_age_ms(self) -> float | None:
         last = self._last_any_packet_at
 
@@ -2038,6 +2096,7 @@ class NativeControllerBridge:
         ]
         self._last_any_packet_at = 0.0
         self._silence_reported = False
+        self._gap_open = None
 
         with self._meta_lock:
             self._forced_buttons = [
@@ -2423,6 +2482,12 @@ class NativeControllerBridge:
             except socket.timeout:
                 now = time.monotonic()
 
+                if (
+                    self._gap_open is not None
+                    and now - self._gap_open["end"] >= self.GAP_LOG_BURST_S
+                ):
+                    self._gap_flush()
+
                 for player in range(
                     self.MAX_PLAYERS
                 ):
@@ -2519,9 +2584,12 @@ class NativeControllerBridge:
 
             self._last_sequence = sequence
             self._packets += 1
-            self._last_packet_at[player] = (
-                time.monotonic()
-            )
+            now_packet = time.monotonic()
+
+            if self._gap_queue is not None:
+                self._gap_note_packet(now_packet)
+
+            self._last_packet_at[player] = now_packet
             self._last_any_packet_at = (
                 self._last_packet_at[player]
             )

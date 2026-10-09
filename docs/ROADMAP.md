@@ -1104,6 +1104,8 @@ companion's default environ is three lines (live, index, Snes9x).
 | --- | --- | --- | --- |
 | E3-R1 recovery's false pause | the host's controller-silence trigger at 5 s on two checks (`PRIVYHUB_RECOVERY_TRIGGER=v2`) | **INCONCLUSIVE** (today's rule not faithfully replayable at the records' 1-s resolution; stopped before runs). The probe: the harmful pause is an uplink stall with the client playing, and no exit | `evidence/E3_R1_RECOVERY_FALSE_PAUSE_2026-10-08.md` |
 | E3-S7 the grab's spawn share | the grabber paced (`PRIVYHUB_EPG_GRAB_NET=paced`, `--delay=4000`); probe: CPU-off and network-off arms each removed the peak, so network | **REJECTED** (guide cycle 12 refreshes per channel < 20; loss 60-67/min > 3 × control) — but CONC loss 1,312 → ~60/min, 59.8 fps, resyncs 52 → 1-3 | `evidence/E3_S7_CONC_GRAB_SPAWN_2026-10-08.md` |
+| E3-R2 the false pause, fixed | v2 threshold + an exit for a `controller_silence` pause (packets back, output fresh) + a silence-gap log (`PRIVYHUB_RECOVERY_TRIGGER=v2`) | **REJECTED** (iii: CONC rendered fps above its cross-night band; v: one gap 41 ms after a log write) — the replay, made faithful, held r1-r4; no recovery pause in 4 runs; a 1,253-ms uplink silence passed. Adoption waits for the user's nft paste | `evidence/E3_R2_RECOVERY_PAUSE_EXIT_2026-10-08.md` |
+| E3-S7B the grab paced, shorter | `PRIVYHUB_EPG_GRAB_NET=paced` at `PRIVYHUB_EPG_GRAB_DELAY_MS=1500` (probe: today's request groups go back to back) | **REJECTED** (loss 309 / 346 per min, 59.33 fps, aligned 0-2 s 7.6 / 11.7) — the cycle held (20-21 refreshes, median 10 s), but per-grab cost equals tonight's unpaced grab | `evidence/E3_S7B_GRAB_PACING_SHORT_2026-10-08.md` |
 
 ## E4 — Core Linux resource envelope
 

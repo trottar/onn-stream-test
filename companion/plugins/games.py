@@ -123,6 +123,14 @@ class GamesPlugin:
             5_000 if trigger_v2 else DESYNC_MS,
             confirm_ms=250 if trigger_v2 else 0,
         )
+        # E3-R2: with v2, a controller_silence pause also resumes by itself when the packets return and the client's
+        # output is fresh (link_drop_recovery), and the silence-gap log runs (also alone: PRIVYHUB_RECOVERY_GAP_LOG=1;
+        # logs/games/native_stream_ctrl_gaps.log, beside the recovery log). Absent = neither.
+        self._recovery.enable_controller_exit(trigger_v2)
+        if trigger_v2 or os.environ.get("PRIVYHUB_RECOVERY_GAP_LOG") == "1":
+            self._native_stream._session_io.controller.set_gap_log(
+                self.PROJECT_ROOT / "logs" / "games" / "native_stream_ctrl_gaps.log"
+            )
 
         # The client target of the live native-stream session, remembered so
         # a recovery can bring the encoder up again without the client.

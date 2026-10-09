@@ -1,0 +1,67 @@
+E3-S7B PRE-REGISTRATION -- the grab's network pacing, shorter. Written 2026-10-08 after the spacing probe
+(spacing_table.md/.json) and BEFORE any benchmark run; hash in e3_s7b_preregistration.sha256. Task:
+docs/memory/handoffs/E3-S7B_GRAB_PACING_SHORT_TASK.md, item 2 of QUEUE_2026-10-08B.md (every rule of the earlier E3
+queues; E3-A2's validity rule standing). Baseline commit: 969085f (the user's E3-R1/S7 commit). The adopted state:
+live + the guide index + Snes9x.
+TASK 1'S FLAG IS ABSENT IN EVERY RUN: E3-R2 was REJECTED by its bar (iii, v), so by the queue's stated exception this
+task runs without PRIVYHUB_RECOVERY_TRIGGER and relies on E3-A2's replacement rule (said in every table of the record).
+
+THE SPACING PROBE (e3_s7b_spacing_probe.py sha256 403aa771da8f9e3c23f1c09063ef5ddaf9030840bb547c2539a685df6d3c0f0b;
+stream idle, one forced grab of CNBCUK.uk@SD (site mytelly.co.uk) per setting, eno1 bytes per 100 ms):
+  A FIRST PASS (spacing_first_pass/) IS NOT USED for spacing: its child detector matched the tool shell running the
+  probe (its command text named the grabber's path), so the child looked alive for the whole sampling period and the
+  bursts included unrelated traffic. Its companion-side request wall times are sound and are reported. The second
+  pass counts only the grabber's own npm / sh / node processes.
+  | setting | --delay seen on the child | request wall s (pass 1 / pass 2) | child wall s | request groups (bursts) | spacing start-to-start s | quiet between s |
+  | today   | (none)        | 2.98 / 7.97  | 7.82  | 3 | 0.36, 0.36        | 0.26, 0.26 |
+  | 1000    | --delay=1000  | 4.95 / 4.94  | 4.73  | 2 | 1.55              | 1.21 |
+  | 1500    | --delay=1500  | 6.07 / 5.97  | 5.80  | 2 | 2.14              | 1.81 |
+  | 4000    | --delay=4000  | 10.99 / 10.94| 10.78 | 4 | 2.26, 0.47, 1.90  | 1.92, 0.26, 1.80 |
+  READING: today's grab sends its request groups BACK TO BACK (0.26-0.36 s apart): the library's 3-s default is not
+  in effect today (S7's inference was wrong, as S7 found; today's effective spacing is ~0). With --delay=N the grabber
+  sleeps N ms before each grab(channel, day) call (GRAB_DAYS 2); the site's own requests inside one call stay back
+  to back (the burst count is request groups, not single HTTP requests). Idle, each 1 s of delay adds ~2 s per grab
+  (1000 +2.0, 1500 +3.0, 4000 +8.0 against pass 1's 2.98 s). The today wall time varies with start-up (2.98 / 7.97).
+
+THE CHOICE, BY THE TASK'S RULE (stated here, before the runs): projected CONC median grab = S6A's / S7's today
+median 5.6 s + (S7's 14.8 - 5.6) x delay / 4000: 1,000 -> ~7.9 s, 1,500 -> ~9.1 s. BOTH keep the median <= 11.8 s
+with margin (>= 2.7 s), so the task's pre-registered preference applies: **1,500 ms**. STATED RISK: the refreshes
+clause (each channel >= 20 in 1,200 s) is projected near its edge at 1,500 -- S7's 4,000 made 72 grabs (mean cycle
+16.7 s, ~2.9 delays per grab under CONC); at 1,500 the mean cycle projects to ~9.5 s, ~126 grabs, ~21 per channel.
+The rule is followed regardless.
+
+THE ONE CHANGE (PRIVYHUB_EPG_GRAB_NET=paced, value from PRIVYHUB_EPG_GRAB_DELAY_MS; absent flag = today, byte for
+byte): companion/plugins/epg.py _grab_from_candidate appends --delay=<PRIVYHUB_EPG_GRAB_DELAY_MS> (default 4000 =
+S7's value, so S7's result stays reproducible; an unparsable value -> 4000). Diff e3_s7b_grab_delay.diff sha256
+a79b34014a728e551085596694b4e82a5dd017e9d9131839a1440b5301431ce4 (on top of 969085f); epg.py after
+d176e1421ff71836c2652566b2f8381a1de0e14cef946f15655be6c5d69aeb68. The probe saw the value on the child's command line.
+
+1. THE RUNS, in this order, window 1200 s, gap 120 s, E1's launch / warm-up / teardown, --e2:
+     E1-PS1-STREAM x1, no flag (the same-night control)                          -> runs/E1-PS1-STREAM/run1
+     E1-CONC x2, PRIVYHUB_EPG_GRAB_NET=paced + PRIVYHUB_EPG_GRAB_DELAY_MS=1500 (the E3 drop-in) -> runs/E1-CONC_flag/run1, run2
+   --plan E1-PS1-STREAM:1:120,E1-CONC:2:120:PRIVYHUB_EPG_GRAB_NET=paced+PRIVYHUB_EPG_GRAB_DELAY_MS=1500
+   Every run checked by E3-A2's validity rule (re-implemented in e3_s7b_analysis.py; no other task's script runs);
+   an invalid run is replaced (at most twice, runs_retry<n>/), reported, not judged.
+   Pre-run guide read (guide_read_before.json, 15:11:30Z; no background refresh since the companion's last start,
+   none pending; the probe's last forced grab ~70 s before): 6 channels, 321 programmes.
+
+2. COMPARABILITY (else INCONCLUSIVE): the control within E1's bands of E2's PS1-STREAM (host CPU 11.69 +/- 2;
+   rendered 59.81 +/- 0.5).
+
+3. THE BAR -- E3-S7's, unchanged; ACCEPTED only if ALL hold in BOTH CONC runs:
+   a. video loss/min (heartbeat, window) <= 100 AND <= 3 x the control's;
+   b. rendered fps >= 59.5; sequence resyncs <= 10;
+   c. the aligned frame (e2_analysis.py's CONC alignment, unchanged, the control as baseline): mean lost packets/s at
+      offsets 0-2 s <= 3 x the control's baseline loss/s;
+   d. grabs failed 0; every configured channel (the six) refreshed >= 20 times in the window; median grab <= 11.8 s;
+   e. the guide serves: guide_read_after 6 channels, programme total within +/- 5 % of 321 (305-337), read >= 60 s
+      after the last run's teardown.
+   A run never reaching PLAYING after two retries or the flag breaking the row -> REJECTED (broke the row).
+
+4. REPORTED, NOT GATED: the probe's spacing table (both passes); the aligned frame beside S7's (4,000) and S6A's
+   (today); the child's CPU and PSS; eno1 rx per second; the companion's PSS and CPU; socket W; underruns; if
+   REJECTED, the table of loss vs cycle speed across today (S6A) / 1,500 / 4,000 (S7).
+
+5. RULES: as the earlier queues; no nft, no real sudo, the Opal not touched; no addresses or identifiers; nothing
+   fetched by this task beyond the companion's own guide grabs, nothing deleted. The bar is not changed after data.
+   Nothing adopted; nothing committed.

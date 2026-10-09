@@ -2,33 +2,34 @@
 
 Authoritative state: `../CURRENT.md`. **Start there.**
 
-Baseline commit `def1ad1` (E3-A2 committed). The 2026-10-08 queue's work
-is not committed (the user's commit: `../../../logs/e3_s7_git_status.txt`;
-also `logs/e3_r1_git_status.txt`).
+Baseline commit `969085f` (E3-R1 / E3-S7 committed). Queue B's work is
+not committed (the user's commit: `../../../logs/e3_s7b_git_status.txt`;
+also `logs/e3_r2_git_status.txt`).
 
-## 2026-10-08 — `QUEUE_2026-10-08`: E3-R1, E3-S7, unattended
+## 2026-10-08 (B) — `QUEUE_2026-10-08B`: E3-R2, E3-S7B, unattended
 
 Both ran on the adopted state (live, the guide index, Snes9x), with
 E3-A2's validity rule standing. Every task flag was absent at every
-teardown; the adopted state held after each task (06:01Z, APK
+teardown; the adopted state held after each task (16:29Z, APK
 CONFIRMED). **Nothing adopted or committed.**
 
 | task | change (flag) | verdict | finding |
 | --- | --- | --- | --- |
-| R1 recovery's false pause | the host's controller-silence trigger at 5 s on two checks (`PRIVYHUB_RECOVERY_TRIGGER=v2`) | **INCONCLUSIVE** (today's rule not faithfully replayable at 1-s resolution; stopped before runs) | the harmful pause: a 1-3-s onn→host stall with the client still playing; no exit (gave up and saved in 3 of 4) |
-| S7 the grab's spawn share | the grabber paced (`PRIVYHUB_EPG_GRAB_NET=paced`, `--delay=4000`) | **REJECTED** (guide cycle 12 refreshes per channel < 20; loss > 3 × control) | CONC loss 1,312 → ~60/min, 59.8 fps, resyncs 1-3 — the clearest CONC gain in E3 |
+| R2 the false pause, fixed | the 5-s / two-check threshold + **an exit** for a `controller_silence` pause + a silence-gap log (`PRIVYHUB_RECOVERY_TRIGGER=v2`) | **REJECTED** (iii: CONC fps *above* its cross-night band; v: one gap 41 ms after a log write) | the replay, made faithful, held r1-r4; **no recovery pause in 4 runs**; a 1,253-ms uplink silence passed that today's rule pauses on. Adoption waits for the user's nft paste (record §4) |
+| S7B the grab paced, shorter | `PRIVYHUB_EPG_GRAB_NET=paced` + `PRIVYHUB_EPG_GRAB_DELAY_MS=1500` | **REJECTED** (loss 309 / 346 per min; 59.33 fps; aligned 0-2 s 7.6 / 11.7) | today's request groups go back to back; at 1,500 the cycle holds (20-21 refreshes) but the cost per grab equals tonight's unpaced grab; only 4,000 cut it |
 
-- Task 1's flag was absent from task 2's runs (task 1 INCONCLUSIVE). All
-  of task 2's runs were valid; two of its probe sessions were not, and
-  were replaced.
-- **Next, the user's:** the nft night for R1 if wanted (`r3b_run.sh`;
-  the hand step and the expected reply are in R1 §4); a decision on
-  S7's direction (a shorter delay); E4.
+- Task 1's flag was absent from task 2's runs; all seven runs valid.
+- **Next, the user's:** the commit; the nft paste for R2 (R2 §4);
+  decisions on R2 and CONC (S7B §4); E4.
+
+## 2026-10-08 (A) — `QUEUE_2026-10-08` (committed `969085f`)
+
+R1 INCONCLUSIVE (the replay not faithful; v2 dormant); S7 REJECTED (the
+cycle), with CONC loss 1,312 → ~60/min at `--delay=4000`.
 
 ## E3-A2 (committed `def1ad1`)
 
-Snes9x adopted (stands); `frame_spin` adopted then REVERTED (24 underruns > 20).
-The validity rule (recovery pauses invalidate a run) was born there.
+Snes9x adopted; `frame_spin` REVERTED. The validity rule was born there.
 
 ## Queues A, B, C (committed `bf2120c`, `ccee2f5`, `e553673`)
 

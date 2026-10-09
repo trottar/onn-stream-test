@@ -1,0 +1,23 @@
+diff --git a/companion/plugins/epg.py b/companion/plugins/epg.py
+index 343223c..cc11a30 100644
+--- a/companion/plugins/epg.py
++++ b/companion/plugins/epg.py
+@@ -1199,10 +1199,15 @@ class EpgPlugin:
+                 "--maxConnections=1",
+                 f"--timeout={self.GRAB_HTTP_TIMEOUT_MS}",
+             ]
+-            # E3-S7: PRIVYHUB_EPG_GRAB_NET=paced -> the grabber's own pacing at its most conservative for the guide
+-            # cycle: one connection (as today) and 4 s before each request (the library's default is 3 s). Absent = today.
++            # E3-S7: PRIVYHUB_EPG_GRAB_NET=paced -> the grabber's own pacing: one connection (as today) and a delay
++            # before each request. E3-S7B: the delay is PRIVYHUB_EPG_GRAB_DELAY_MS (default 4000, S7's value, so both
++            # results stay reproducible). Absent flag = today.
+             if os.environ.get("PRIVYHUB_EPG_GRAB_NET") == "paced":
+-                args.append("--delay=4000")
++                try:
++                    delay_ms = max(0, int(os.environ.get("PRIVYHUB_EPG_GRAB_DELAY_MS", "4000")))
++                except ValueError:
++                    delay_ms = 4000
++                args.append(f"--delay={delay_ms}")
+             # E3-S3: the grabber's own node process, started directly (no npm run -> sh -> tsx cli parent); the same
+             # arguments, environment and working directory, through tsx's own preflight + loader. Absent = npm run.
+             if os.environ.get("PRIVYHUB_EPG_DIRECT_NODE") == "1":

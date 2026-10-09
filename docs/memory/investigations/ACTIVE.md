@@ -100,6 +100,26 @@
     15 s) and on loss > 3 × the control.
   - Next: a shorter delay (1-1.5 s); measure today's effective
     per-request delay.
+- **E3-R2** (`../evidence/E3_R2_RECOVERY_PAUSE_EXIT_2026-10-08.md`):
+  **REJECTED** by its bar (iii: the CONC rows' rendered fps was 58.97 /
+  59.42, above E3-S6A's 57.64 + 0.5 on a cleaner night; v: one gap began
+  41 ms after a gap-log write). The fix itself held:
+  - the replay, made faithful (neighbours' state carried), held r1-r4;
+  - no recovery pause in four 20-min runs with the flag;
+  - the gap log caught a 1,253.5-ms uplink silence that today's rule
+    would have paused on.
+  - Dormant behind `PRIVYHUB_RECOVERY_TRIGGER=v2` (threshold + exit +
+    gap log). **Adoption waits for the user's nft paste** (record §4).
+- **E3-S7B** (`../evidence/E3_S7B_GRAB_PACING_SHORT_2026-10-08.md`):
+  **REJECTED** by E3-S7's bar (a, b, c), with the cycle held (20-21
+  refreshes per channel, median 10.0 s) at `--delay=1500`.
+  - Today's grab sends its request groups back to back; the 3-s default
+    is not in effect.
+  - At 1,500 the cost per grab equals tonight's unpaced grab (~49-55 vs
+    ~26-48 lost packets per grab); only S7's 4,000 cut it (~17-19).
+  - The loss-vs-cycle table is in the record (§4), for the user's
+    choice: leave CONC, accept 4,000 with fewer refreshes, or try a
+    different lever (fewer requests per grab).
 - **Open, found by E3-A2's validity check:** the companion's link
   recovery can pause the game mid-window (`desync_pause`,
   `controller_silence`) and the suite still marks the run OK.

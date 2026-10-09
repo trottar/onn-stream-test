@@ -1,0 +1,82 @@
+{
+ "started_utc": "2026-10-08T13:11:45.504Z",
+ "preflight": {
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+   "PRIVYHUB_SNES_CORE=snes9x"
+  ],
+  "game_active": false,
+  "adb": true,
+  "drop_in_live": true,
+  "drop_in_index": true,
+  "drop_in_snes_core": true,
+  "e3_dropin_absent": true,
+  "ok": true
+ },
+ "flag": "PRIVYHUB_RECOVERY_GAP_LOG=1",
+ "restart": {
+  "mainpid_serves_8765": true,
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+   "PRIVYHUB_RECOVERY_GAP_LOG=1",
+   "PRIVYHUB_SNES_CORE=snes9x"
+  ]
+ },
+ "stream": {
+  "ok": true,
+  "attempt": 1,
+  "s_to_playing": 3.0
+ },
+ "window": {
+  "from": "2026-10-08T13:12:38.023Z",
+  "to": "2026-10-08T13:22:38.264Z"
+ },
+ "teardown": {
+  "report": "native_decoder_20261008_132239_756.json",
+  "report_fields": {
+   "lost_packets": 184,
+   "rendered_frames": 38165,
+   "stale_output_drops": 15,
+   "max_output_gap_ms": 140,
+   "slow_event_retained": 1024,
+   "slow_event_capacity": 1280,
+   "duration_ms": 637385,
+   "video.lost_packets": 184,
+   "video.sequence_resyncs": 0,
+   "video.recent_fps": 57.55944941393544,
+   "decoder.spike_20_ms": 506,
+   "decoder.spike_50_ms": 21,
+   "decoder.spike_80_ms": 15,
+   "decoder.stale_output_drops": 15,
+   "decoder.max_output_gap_ms": 140,
+   "audio.lost_packets": 10,
+   "audio.underruns": 12
+  },
+  "stopped": true,
+  "banner": {
+   "now_playing_before": 2,
+   "now_playing_after_relaunch": 0
+  },
+  "dropin_removed": true,
+  "restart_after_flags": {
+   "mainpid_serves_8765": true,
+   "manager": [],
+   "environ": [
+    "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+    "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+    "PRIVYHUB_SNES_CORE=snes9x"
+   ]
+  },
+  "dropin_env_absent": true,
+  "flags_absent": true,
+  "apk": "CONFIRMED",
+  "ps1_files_identical": true,
+  "retroarch_left": 0,
+  "encoder_left": 0
+ },
+ "ended_utc": "2026-10-08T13:23:09.662Z"
+}

@@ -1,0 +1,91 @@
+E3-R2 PRE-REGISTRATION -- the false pause, fixed: threshold, exit, and a faithful replay. Written 2026-10-08 after the
+code change, its unit tests and the 10-min gap-log probe, and BEFORE the replay is run (scored) or any benchmark run;
+hash in e3_r2_preregistration.sha256. Task: docs/memory/handoffs/E3-R2_RECOVERY_PAUSE_EXIT_TASK.md, item 1 of
+QUEUE_2026-10-08B.md (every rule of the earlier E3 queues; E3-A2's validity rule standing). Baseline commit: 969085f
+(the user's E3-R1/S7 commit). The adopted state: environ exactly live + the guide index + Snes9x (three drop-ins).
+
+THE ONE CHANGE, three parts, all behind PRIVYHUB_RECOVERY_TRIGGER=v2 (absent = today, byte for byte in behaviour):
+  1. the gap log (also alone as PRIVYHUB_RECOVERY_GAP_LOG=1): the controller receive loop notes every client->host
+     silence > 250 ms and, 500 ms after it ends, hands one line to its own writer thread (start, end, length, the
+     packets of the catch-up burst in the 500 ms from the first returning packet, a truncated mark if a second gap
+     opened inside them, the time written) -> logs/games/native_stream_ctrl_gaps.log, 512 KB + one rotated copy;
+  2. the threshold: E3-R1's v2 as written (5,000 ms, confirmed on two checks >= 250 ms apart with no packet between);
+  3. the exit: a pause whose trigger was controller_silence resumes by itself when (a) the controller age the
+     recovery monitor reads is < 500 ms on two checks >= 250 ms apart and (b) a heartbeat received after (a) held
+     shows last_output_age_ms in 0..300 (a stale one waits for the next). 300 ms: the task's figure; R1's
+     idle_stats.json has the client's idle output age max at 144 ms (295 ms is the controller age max), so 300
+     covers the idle maximum with margin and stays far below a real drop's ages (>= 1,000, rising 2 s per heartbeat).
+     The resume is EmulatorManager.resume() -- the call the client's gate (native-stream-ready) makes -- and the
+     state moves to PLAYING with a `resumed` line (via controller_return, the ages, packets-back-to-resume ms).
+     Nothing is loaded (R3c2 untouched); it needs the encoder up; a failed resume stays paused, logs
+     controller_exit_failed and waits for a newer heartbeat; GIVE_UP_MS (120 s) still applies; a
+     client_output_silence pause keeps its own exit.
+  Files: companion/native_session_io.py, companion/games/link_drop_recovery.py, companion/plugins/games.py.
+  Diff e3_r2_recovery_exit.diff sha256 93f3fb95ec61f790a45128d8b96f7dd16ca2556409abedf0df62027243beba74 (on top of
+  969085f, which carries R1's v2 threshold); after: games.py d72e5f8e39e8dbd6e58282c02d9284128bd7d11f2021b383ff6eaa590b13d419,
+  native_session_io.py b7e9927982424c5ca029f1d2136b7e694d7a3baad2792ad0232216557920b936, link_drop_recovery.py
+  822fe173e8f9e2d906b9bc93a4bde45821f34d690ed9a83f1c5d36d3f6290ef9.
+  Unit tests (test_e3_r2.py sha256 6e515f8d8ed6fe61102fc45ff8cae3fff26bbba12b712821cd6704175bdd023e; synthetic
+  timelines, not data): 17/17 (confirm 4, gap log 5, exit 8). tools/test_c3_f1_recovery_restart.py 7/8, the same
+  pre-existing error R1 recorded at def1ad1. Micro-benchmarks on this host: the gap log adds 51.5 ns per accepted
+  packet (65.0 vs 13.5) = 0.0024 points of a core at 460 packets/s; a line costs 42.4 us on the writer thread.
+
+THE GAP-LOG PROBE (gap_stats.json; PS1 stream PLAYING 600 s, nobody at the controller, PRIVYHUB_RECOVERY_GAP_LOG=1
+alone, today's trigger live): window 13:12:38-13:22:38Z, PLAYING throughout, no recovery event; ONE gap > 250 ms in 10 min (254.6 ms, its
+catch-up burst 335 packets in 500 ms, none truncated), none > 500, none > 1,000 (today's rule would not have paused),
+none > 5,000; the 4-Hz controller age max 178 ms, the client's output age max 59 ms over 298 heartbeats; teardown to
+the adopted state (drop-in removed, environ the three lines, APK CONFIRMED). The live hook writes (one line logged);
+its writer thread was also exercised end-to-end against a temp file (unit_tests.txt). Idle, the uplink is quiet at
+this resolution; the stalls R1 found are a load (CONC) / link phenomenon, which the runs below will log.
+
+1. THE REPLAY (e3_r2_replay.py sha256 bf1dea690e05a452f658337817c3c627b8a9e33295aef917b06a0b50f6ee5804, over R1's
+   timelines.json sha256 5876889e2118e7e41a80a3534f7b0df84c0d2629e7afbb47d476d0c1fdf9efed, read in place; its model
+   is in its docstring: R1's model plus the fix -- the recorded recovery state of neighbouring events before the
+   event's own time is carried, and a replayed controller firing while it is not PLAYING does not happen; the exit
+   replayed conservatively at 1-s resolution). It was exercised on a synthetic timeline only before this hash.
+   S1-CONC r2a is EXCLUDED FROM r1 BY NAME, before the hash: a resolution limit of the 1-s records (R1 §3), not
+   reproducible from them; its today-replay is reported. THE BAR:
+     r1. today's rule, replayed, reproduces every recorded event in the suite and real-drop timelines (a replayed
+         firing of the same trigger within +/-2 s) except S1-CONC r2a; no firing on N05 / F05. It must reproduce
+         S1-CONC r1b. The three out-of-suite events (10-05) are reported, not gated.
+     r2. v2 fires on every real drop (R3b N3, N15, N15b, N150, E30; R3 F3, F15, F150) within +2 s of today's rule.
+         (v2 on N05 / F05 reported.)
+     r3. v2's controller rule fires on none of the four controller false pauses (E2-1080P r1, S1-CONC r1b,
+         S1-CONC r2a at its recorded time, A2 r1): no replayed v2 controller_silence firing anywhere in each event's
+         +/-60 s. The three client_output_silence pauses (S1 control, S1-CONC r1a, S1-CONC r2b) are the client's
+         and are reported, not gated (R1 §1).
+     r4. the exit (part 3), replayed, resumes each of the four controller pauses within 10 s of the packets' return
+         (resume_s - return_s <= 10, the script's definitions), on the recorded heartbeat ages. E2-1080P r1 has no
+         heartbeat log (R1); for it alone (b) reads the client telemetry's out_gap_ms <= 300 in the same rows -- the
+         only recorded output-freshness signal that night -- stated here as a substitute.
+
+2. THE RUNS (the second half; they run whatever the replay says): E1-PS1-STREAM x2 and E1-CONC x2 with the flag
+   (the E3 drop-in e3_flag.conf for those runs only; the environ checked by the suite as the adopted three lines +
+   the flag; the gap log on through the flag), E2's windows and gaps, in this order:
+     --plan E1-PS1-STREAM:2:120:PRIVYHUB_RECOVERY_TRIGGER=v2,E1-CONC:2:120:PRIVYHUB_RECOVERY_TRIGGER=v2
+     --window 1200 --gap 120 --e2   -> runs/E1-PS1-STREAM_flag/run1, run2; runs/E1-CONC_flag/run1, run2
+   E3-A2's validity rule, as always: a run whose recovery state leaves PLAYING inside its window is invalid for
+   (iii)-(v) and is replaced (at most twice, runs_retry<n>/), reported. With the flag, a pause that does not exit
+   is a FAILURE of (ii), not only an invalid attempt; (ii) reads every window run, replaced or not.
+   BAR, ACCEPTED only if ALL hold:
+   (i)   §1's r1-r4 held;
+   (ii)  no gave_up_saved in any window; no desync_pause from controller_silence in any window, except one that
+         resumed by part 3 (a `resumed` line via controller_return) within 10 s of its pause -- reported, not
+         counted; one that did not is a failure;
+   (iii) each judged row within E1's bands of its reference, for what the trigger does not touch: host CPU +/- 2
+         and rendered fps +/- 0.5 of E2's PS1-STREAM (11.69 %, 59.81) for the PS1 runs and of E3-S6A's CONC
+         (22.2 %, 57.64) for the CONC runs; loss, underruns, resyncs reported;
+   (iv)  the companion's CPU within +/- 2 points of a core of the same row's reference (E2 PS1-STREAM 24.3 %;
+         E3-S6A CONC 26.5 %);
+   (v)   the gap log's cost <= 0.5 point of a core in each judged run, computed as the micro-benchmarks above x the
+         run's controller packet rate (eno1 rx packets/s median in the window) + its lines x 42.4 us / window; and
+         no gap caused by its own write: no logged gap starting within 50 ms after an earlier line's logged_utc
+         (the write is on its own thread, so none is expected).
+   A run never reaching PLAYING after two retries, or the flag breaking the row -> REJECTED (broke the row).
+
+3. THE HAND STEP (the record writes it): the real-drop check on the air with the flag, R1's four r3b_run.sh runs
+   (V2-N3, V2-N15 host->client; V2-C2, V2-C8 client->host), one paste; adoption waits for it whatever this bar says.
+   c3_l4_nft_night.py's preflight refuses an unadopted flag, so the harness is r3b_run.sh.
+
+4. RULES: as the earlier queues; no nft, no real sudo, the Opal not touched; no addresses or identifiers; nothing
+   fetched, nothing deleted. The bar is not changed after data. Nothing adopted; nothing committed.
