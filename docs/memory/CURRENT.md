@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-10-08
-baseline_commit: 969085f
+as_of: 2026-10-09
+baseline_commit: 75b2b6b
 ---
 
 # Current State
@@ -9,26 +9,22 @@ baseline_commit: 969085f
 Headings are fixed by `tools/check_memory_health.py`; do not rename.
 ## Active Objective
 
-**Phase E ACTIVE.** E1 FROZEN; E2 MEASURED; E3 ran queues A-C, E3-A2, the
-2026-10-08 queue (`969085f`) and **queue B (E3-R2, E3-S7B; unattended)**,
-each change behind a flag, judged by a pre-hashed bar. **Two E3 adoptions
-stand: the guide index and Snes9x.** Nothing committed since `969085f`.
+**Phase E ACTIVE — E4, the resource envelope on the adopted state.** E1
+FROZEN; E2 MEASURED; **E3 CLOSED 2026-10-09** (`docs/ROADMAP.md`, every
+item's verdict). Nothing committed since `75b2b6b`.
 
-| item | verdict | finding |
-| --- | --- | --- |
-| S1-S3, S5, S5B; S5C → A2 `frame_spin` | INCONCLUSIVE / REJECTED; REVERTED | led to S6; 24 underruns > 20 |
-| S6 → S6A the index; S4 → A2 Snes9x | **ADOPTED, stand** | ~34 MB in META; RetroArch 8.9 % on SNES |
-| R1 → **R2 the false pause** (threshold + exit + gap log) | INCONCLUSIVE → **REJECTED** (iii, v) | replay held; **no pause in 4 runs**; failed on CONC fps *above* its band, one gap 41 ms after a write; adoption needs the nft paste |
-| S7 (4,000) → **S7B (1,500)** the grab paced | REJECTED → **REJECTED** (a, b, c) | cycle kept, gain lost (cost per grab = unpaced); today's requests go back to back |
+| E3 item | verdict |
+| --- | --- |
+| S6 → S6A the guide index; S4 → A2 Snes9x; **R1 → R2 → A3 → A3B recovery v2** | **ADOPTED, stand** (v2: 0 controller pauses, 0 saves under a bar judged on its own trigger) |
+| S1, S2, S3, S5/S5B, S5C (`frame_spin`, reverted), S7/S7B (pacing) | INCONCLUSIVE / REJECTED; not adopted |
 
 - **ABSENT:** Live TV, browser / camera sources, NES / Genesis, a power meter.
 - **Standing:** Phase C, `D-BASE` closed; the `CL-B1` APK adopted.
 
 ## Current Work Item
 
-**Queue B of 2026-10-08 is done** (13:06Z → 16:29Z): R2 (the nft hand
-step, §4) and S7B (the loss-vs-cycle table, §4); task 1's flag absent
-from task 2's runs.
+**E3-A3B is done** (`evidence/E3_A3B_RECOVERY_V2_READOPTION_2026-10-09.md`):
+recovery v2 re-adopted, ADOPTION STANDS; E3 closed with three adoptions.
 
 ## Verified State
 
@@ -58,7 +54,7 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`, including `C5-M1`'s `PRIVYHUB_NATIVE_PROFILE_ID`); none set.
 - **Installed**: **APK `de072762…835e`** (the `CL-B1` APK, adopted
   2026-09-30; hash confirmed on the onn at every teardown since,
-  last 2026-10-08 16:29Z (queue B's end); the previous
+  last 2026-10-09 05:40Z (E3-A3B's end); the previous
   `f31b1c18…8ae7` is kept at `runtime/c4_m1/adopted_app-debug.apk` for
   rollback).
   - The companion is the systemd user unit `privyhub-companion` (`H3`);
@@ -85,12 +81,20 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
     "Non-commercial"), not bsnes; `emulators.json` unchanged. Saves and
     states per core (`Snes9x/` vs `bsnes/`). Kill switch: delete
     `snes-core.conf` + `daemon-reload` + restart (`TOOLS.md`).
-  - **The adopted environ is exactly three `PRIVYHUB_*`** (live, the
-    index, Snes9x) in three drop-ins; the manager none. `tools/e1_suite.py`
-    (`ADOPTED`), `e3_state.py`, `d7_regression.py` and
-    `c3_l4_nft_night.py` (`ADOPTED_E3`) check it. Last restarted ~16:25Z
-    2026-10-08 (E3-S7B's last teardown); checked 16:29Z: the three lines,
-    no `e3_flag.conf`, no game, PS1 files identical, APK CONFIRMED.
+  - **Recovery v2 by default, since 2026-10-09 04:50:43Z (E3-A3B)**:
+    `recovery.conf` (`Environment=PRIVYHUB_RECOVERY_TRIGGER=v2`). It
+    gives the gap log (`logs/games/native_stream_ctrl_gaps.log`), the
+    5-s two-check controller trigger, and the controller-return exit.
+    Kill switch: delete `recovery.conf` + `daemon-reload` + restart,
+    reverse the state-check diff (`TOOLS.md`, "Recovery v2").
+  - **The adopted environ is exactly four `PRIVYHUB_*`** (live, the
+    index, Snes9x, recovery v2) in **four drop-ins** (`adaptive.conf`,
+    `epg-index.conf`, `snes-core.conf`, `recovery.conf`); the manager
+    none. `tools/e1_suite.py` (`ADOPTED`), `e3_state.py`,
+    `d7_regression.py` and `c3_l4_nft_night.py` (`ADOPTED_E3`) check it.
+    Restarted 05:40Z 2026-10-09 (E3-A3B's last teardown); checked then:
+    the four lines, no `e3_flag.conf`, no game, PS1 files identical, APK
+    CONFIRMED.
   - The companion tree carries the live controller through `C3-L4-N2`,
     the C5 selector profiles (dormant), **the 1080p rung behind
     `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`** (C5-M5; entry 415 since
@@ -99,9 +103,8 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
     `PRIVYHUB_PS1_LOOK`** (C5-M5B; absent or `4x` = nothing written; NOT
     ADOPTED). Both flags off and absent.
   - The other E3 flags' code is dormant and absent (`TOOLS.md`, "The E3
-    flags"): `frame_spin`, `RECOVERY_TRIGGER=v2` (R1 + R2's exit and gap
-    log), `RECOVERY_GAP_LOG`, `EPG_GRAB_NET=paced` + `EPG_GRAB_DELAY_MS`
-    (S7, S7B), `GRAB_NONET`.
+    flags"): `frame_spin`, `RECOVERY_GAP_LOG` (alone), `EPG_GRAB_NET=paced`
+    + `EPG_GRAB_DELAY_MS` (S7, S7B), `GRAB_NONET`.
 - **Link-drop recovery** RUNTIME VALIDATED on real loss (`R3`-`R3d`);
   recovery never loads into a live core (`R3c2`).
 - **Host-shell operation**: open `MainActivity`, wake, tap RESUME PLAYING
@@ -109,21 +112,20 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
-1. **The user's commit** of queue B (`logs/e3_s7b_git_status.txt`, `logs/e3_r2_git_status.txt`).
-2. **The user's nft paste for R2** (one paste, R2 §4; adoption waits for
-   it). The reply must contain, per run's `recovery_lines.jsonl`: V2-N3 /
-   V2-N15 `desync_pause client_output_silence` ~+1.3 s then `resumed`;
-   **V2-C2 no `desync_pause`**; **V2-C8 `desync_pause controller_silence`
-   ~+5.25 s, then `resumed` `"via": "controller_return"` within ~10 s of
-   the clear, no `gave_up_saved`**; last line `e3_state.py` `"ok": true`.
-3. **The user's decisions:** R2 (adopt after the paste, re-run, or
-   leave); CONC (S7B §4).
-4. **E4**, with the suite re-run on the adopted state as its base.
+1. **The user's commit** of E3-A3 + E3-A3B (`logs/e3_a3b_git_status.txt`).
+2. **E4-S1 as Cowork hands it:**
+   - the reference re-measured on the four-line adopted state;
+   - then the floor, without sudo: `CPUQuota=` / `MemoryMax=` steps in
+     a `systemd --user` drop-in on the companion's unit (cpu and memory
+     delegated; RetroArch and ffmpeg in its cgroup, so the steps cover
+     the whole stack);
+   - cpuset is not delegated: no `AllowedCPUs=` (measured, `E3_A3_…` §6).
 
 **Open, not blocking:**
 
-- the false pause (`docs/KNOWN_ISSUES.md`): fixed behind v2 (R2),
-  pending the air check;
+- the false pause: fixed and adopted (v2); the client's own 1-3-s
+  output stalls stay open; **the link at its worst on 10-09** (a LINK
+  item, `docs/KNOWN_ISSUES.md`): use same-night controls;
 - the max output gap; `host_link`; the thermal flag; `CTRL-L1`; the
   slow-event ring; the mild step's ~120 s bound;
 - **the onn's 1080p decode jitter**; the overlay's constant size text;
@@ -169,6 +171,7 @@ Phase C: met (C7, `docs/ROADMAP.md`). **Phase E** (`docs/ROADMAP.md`):
 
 ## Relevant References
 
+- `evidence/E3_A3B_RECOVERY_V2_READOPTION_2026-10-09.md`, `E3_A3_RECOVERY_V2_ADOPTION_2026-10-09.md`; `docs/ROADMAP.md` (E3 CLOSED).
 - `handoffs/QUEUE_2026-10-08B.md`, `evidence/E3_R2_…`, `E3_S7B_…_2026-10-08.md`; `QUEUE_2026-10-08.md`, `evidence/E3_R1_…`, `E3_S7_…_2026-10-08.md`.
 - `evidence/E3_A2_…_2026-10-07.md`; earlier E3: `handoffs/QUEUE_2026-10-06.md`, `-06B`, `-07`; `evidence/E3_S*`; `TOOLS.md` ("The E3 flags", the drop-ins).
 - `evidence/E2_S1_WHOLE_SYSTEM_2026-10-06.md` (E2); `architecture/E1_WORKLOAD_SUITE.md` (the frozen suite); `evidence/E1_S1_WORKLOAD_SUITE_2026-10-05.md`.

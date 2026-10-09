@@ -1,0 +1,40 @@
+E3-A3B PRE-REGISTRATION -- recovery v2 re-adopted; the verification bar judged on the trigger's own events. Written
+2026-10-09 after the adoption (recovery.conf written 04:50:43Z, environ verified, state checks applied) and BEFORE
+either run; hash in e3_a3b_preregistration.sha256. Task: docs/memory/handoffs/E3-A3B_RECOVERY_V2_READOPTION_TASK.md.
+The user's authorizations, quoted: "Adopt"; after E3-A3's revert, "Code application why not". Every rule of the E3
+queues. Baseline commit: 75b2b6b (E3-A3's work is in the tree, uncommitted). The bar below was written in the task
+before any data of this task; it replaces E3-A2's validity rule FOR THIS TASK ONLY, for the reason E3-A3 recorded
+(that rule voids a run on the client's own detector, which v2 does not touch).
+
+WHAT IS ADOPTED: PRIVYHUB_RECOVERY_TRIGGER=v2 through ~/.config/systemd/user/privyhub-companion.service.d/recovery.conf
+(copy here, sha256 921ed2619baf7312ce024b1c043a312c3071446a271f66aaf89162d56eb8d28f, byte-identical to E3-A3's): the
+gap log, the 5-s two-check controller-silence trigger, the controller-return exit (E3-R2). The companion code is
+E3-R2's, unchanged (games.py d72e5f8e…d419, native_session_io.py b7e99279…b936, link_drop_recovery.py 822fe173…f9ef).
+Environ exactly four PRIVYHUB_* lines (environ_after.txt); manager none; four drop-ins (unit_cat_files.txt). State
+checks: E3-A3's e3_a3_state_checks.diff applied cleanly (e3_a3b_state_checks_applied.diff, sha256
+d7790c749229dee10f4e3d1d33902bc0b4cb0c9272bb53ea0eb79b3990b1c29e, the same bytes); e1_suite.py after 334528a3…b186;
+self-test OK; test_c3_l4_nft_night 33/33; e3_state.py ok on four lines.
+
+1. THE RUNS (no flag; the adopted defaults run), E2's windows and gaps, in this order:
+     --plan E1-PS1-STREAM:1:120,E1-CONC:1:120 --window 1200 --gap 120 --e2  -> runs/E1-PS1-STREAM/run1, runs/E1-CONC/run1
+   VALIDITY FOR THIS TASK: a run is judged on CONTROLLER-TRIGGER EVENTS ONLY. A client_output_silence pause (the
+   client's detector, unchanged by v2) does NOT void the run; it is counted and reported with its resume time. A run
+   that never reaches PLAYING (the suite's own failed attempt) is an invalid attempt, replaced at most twice
+   (runs_retry<n>/); a row with no run that reached PLAYING after two replacements -> REVERTED (broke the row).
+
+2. THE BAR -- the adoption STANDS only if ALL hold, in both windows (else the pre-registered revert as E3-A3 did it:
+   recovery.conf removed, daemon-reload, restart, the state-check diff reversed; the record names the clause):
+   (i)   no gave_up_saved;
+   (ii)  no controller_silence desync_pause that fails to exit within 10 s (one that resumed via controller_return
+         within 10 s is reported and counts);
+   (iii) host CPU mean within +/- 2 of its reference (PS1-STREAM 11.7 -> 9.7-13.7; CONC 22.2 -> 20.2-24.2) AND the
+         companion's CPU within +/- 2 points of a core of its reference (24.3 -> 22.3-26.3; 26.5 -> 24.5-28.5);
+   (iv)  the gap log <= 0.5 point of a core (E3-R2's micro-benchmarks: 51.5 ns per packet x eno1 rx packets/s median
+         + lines x 42.4 us / window).
+   REPORTED, NOT BANDED: rendered fps, loss/min, resyncs, underruns; the client pauses and their resume times; the
+   gap count, the count > 1 s and the max; how many of the > 1 s gaps the old rule (1 s, first check) would have
+   paused on (a > 1-s gap that started while the recovery state was PLAYING, i.e. not inside a client pause).
+
+3. RULES: no nft, no real sudo, the Opal not touched; no addresses or identifiers; nothing fetched, nothing deleted
+   (the drop-in removal only as the pre-registered revert); no other task's scripts run in their directories. Nothing
+   adopted beyond v2; nothing committed. The bar is not changed after data.

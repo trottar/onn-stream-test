@@ -1,0 +1,89 @@
+diff --git a/tools/c3_l4_nft_night.py b/tools/c3_l4_nft_night.py
+index 41dff64..2b29512 100644
+--- a/tools/c3_l4_nft_night.py
++++ b/tools/c3_l4_nft_night.py
+@@ -103,7 +103,8 @@ MODE_ENV = "PRIVYHUB_ADAPTIVE_BITRATE_MODE"
+ DEFAULT_LIVE = f"{MODE_ENV}=live"
+ # E3-S6A / E3-A2 (2026-10-07): the other adopted names, each through its own drop-in (tools/e1_suite.py ADOPTED);
+ # accepted beside the live default, never set or unset by the harness
+-ADOPTED_E3 = ["PRIVYHUB_EPG_GUIDE_INDEX=cached", "PRIVYHUB_SNES_CORE=snes9x"]
++ADOPTED_E3 = ["PRIVYHUB_EPG_GUIDE_INDEX=cached", "PRIVYHUB_SNES_CORE=snes9x",
++              "PRIVYHUB_RECOVERY_TRIGGER=v2"]   # E3-A3 (2026-10-09): recovery v2, through recovery.conf
+ 
+ 
+ def env_baseline_refusal(manager: list[str], environ: list[str]) -> str | None:
+diff --git a/tools/d7_regression.py b/tools/d7_regression.py
+index 0ff1fa9..26720ce 100644
+--- a/tools/d7_regression.py
++++ b/tools/d7_regression.py
+@@ -52,7 +52,8 @@ SESSDIR = REPO / "logs/games/decoder_sessions"
+ HOLD_S = 180
+ DEFAULT_LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"   # C3-L4-D1: the unit drop-in's one name
+ # E3-S6A / E3-A2 (2026-10-07): the other adopted names, each through its own drop-in (tools/e1_suite.py ADOPTED)
+-ADOPTED_E3 = ["PRIVYHUB_EPG_GUIDE_INDEX=cached", "PRIVYHUB_SNES_CORE=snes9x"]
++ADOPTED_E3 = ["PRIVYHUB_EPG_GUIDE_INDEX=cached", "PRIVYHUB_SNES_CORE=snes9x",
++              "PRIVYHUB_RECOVERY_TRIGGER=v2"]   # E3-A3 (2026-10-09): recovery v2, through recovery.conf
+ 
+ 
+ def now() -> str:
+diff --git a/tools/e1_suite.py b/tools/e1_suite.py
+index acab100..37ee6ab 100644
+--- a/tools/e1_suite.py
++++ b/tools/e1_suite.py
+@@ -52,7 +52,10 @@ INDEX = "PRIVYHUB_EPG_GUIDE_INDEX=cached"
+ # E3-A2 (adopted 2026-10-07): the Snes9x core through its own drop-in (snes-core.conf); the adopted environ is exactly
+ # these three names. (frame_spin was adopted with it and REVERTED by E3-A2's bar: one run's underruns 24 > 20.)
+ SNES_CORE = "PRIVYHUB_SNES_CORE=snes9x"
+-ADOPTED = sorted([LIVE, INDEX, SNES_CORE])
++# E3-A3 (adopted 2026-10-09): recovery v2 (E3-R2: the gap log, the 5-s two-check controller trigger, the
++# controller-return exit) through its own drop-in (recovery.conf); the adopted environ is exactly these four names
++RECOVERY = "PRIVYHUB_RECOVERY_TRIGGER=v2"
++ADOPTED = sorted([LIVE, INDEX, SNES_CORE, RECOVERY])
+ FLAG_NAMES = ["PRIVYHUB_ADAPTIVE_BITRATE_INJECT", "PRIVYHUB_ADAPTIVE_BITRATE_TOP", "PRIVYHUB_PS1_LOOK",
+               "PRIVYHUB_NATIVE_PROFILE_ID", "PRIVYHUB_FEC_SCHEME"]
+ RA_CFG = Path.home() / ".config/retroarch/config"
+@@ -662,9 +665,10 @@ def preflight() -> dict:
+          "drop_in_live": f"Environment={LIVE}" in sh(["systemctl", "--user", "cat", UNIT]),
+          "drop_in_index": f"Environment={INDEX}" in sh(["systemctl", "--user", "cat", UNIT]),
+          "drop_in_snes_core": f"Environment={SNES_CORE}" in sh(["systemctl", "--user", "cat", UNIT]),
++         "drop_in_recovery": f"Environment={RECOVERY}" in sh(["systemctl", "--user", "cat", UNIT]),
+          "e3_dropin_absent": not DROPIN.exists()}
+     d["ok"] = (d["manager"] == [] and d["environ"] == ADOPTED and d["adb"] and d["drop_in_live"] and d["drop_in_index"]
+-               and d["drop_in_snes_core"] and d["e3_dropin_absent"])
++               and d["drop_in_snes_core"] and d["drop_in_recovery"] and d["e3_dropin_absent"])
+     return d
+ 
+ 
+diff --git a/tools/e3_state.py b/tools/e3_state.py
+index 45ae0b2..2a060da 100644
+--- a/tools/e3_state.py
++++ b/tools/e3_state.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""E3: the adopted state (since E3-A2: live, the guide index, Snes9x) as one JSON line (preflight, PS1 files, APK, no game / RetroArch / encoder). Read-only."""
++"""E3: the adopted state (since E3-A3: live, the guide index, Snes9x, recovery v2) as one JSON line (preflight, PS1 files, APK, no game / RetroArch / encoder). Read-only."""
+ import sys, json, importlib.util
+ spec=importlib.util.spec_from_file_location('s','/home/privyhub/Projects/onn-stream-test/tools/e1_suite.py'); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+ mp=m.mainpid()
+diff --git a/tools/test_c3_l4_nft_night.py b/tools/test_c3_l4_nft_night.py
+index dab13ea..8d1c9c8 100644
+--- a/tools/test_c3_l4_nft_night.py
++++ b/tools/test_c3_l4_nft_night.py
+@@ -290,13 +290,15 @@ class LiveDefault(unittest.TestCase):
+ 
+     def test_the_adopted_e3_names_are_accepted(self):
+         """E3-S6A / E3-A2: the guide index and the Snes9x core are adopted through their own drop-ins (frame_spin was
+-        reverted by E3-A2's bar, so it is refused like any other flag)."""
+-        adopted = ["PRIVYHUB_EPG_GUIDE_INDEX=cached", "PRIVYHUB_SNES_CORE=snes9x"]
++        reverted by E3-A2's bar, so it is refused like any other flag). E3-A3: recovery v2 joins them; the gap log
++        alone stays a probe hook and is refused."""
++        adopted = ["PRIVYHUB_EPG_GUIDE_INDEX=cached", "PRIVYHUB_SNES_CORE=snes9x", "PRIVYHUB_RECOVERY_TRIGGER=v2"]
+         self.assertEqual(h.ADOPTED_E3, adopted)
+         self.assertIsNone(h.env_baseline_refusal([], sorted([self.LIVE] + adopted)))
+         self.assertEqual(h.baseline_mode(sorted([self.LIVE] + adopted)), "live")
+         self.assertIsNotNone(h.env_baseline_refusal([], [self.LIVE, "PRIVYHUB_AUDIO_SENDER_PACING=frame"]))
+         self.assertIsNotNone(h.env_baseline_refusal([], [self.LIVE, "PRIVYHUB_AUDIO_SENDER_PACING=frame_spin"]))
++        self.assertIsNotNone(h.env_baseline_refusal([], [self.LIVE, "PRIVYHUB_RECOVERY_GAP_LOG=1"]))
+         import d7_regression as d7
+         self.assertEqual(d7.ADOPTED_E3, adopted)
+ 

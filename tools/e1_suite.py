@@ -52,7 +52,10 @@ INDEX = "PRIVYHUB_EPG_GUIDE_INDEX=cached"
 # E3-A2 (adopted 2026-10-07): the Snes9x core through its own drop-in (snes-core.conf); the adopted environ is exactly
 # these three names. (frame_spin was adopted with it and REVERTED by E3-A2's bar: one run's underruns 24 > 20.)
 SNES_CORE = "PRIVYHUB_SNES_CORE=snes9x"
-ADOPTED = sorted([LIVE, INDEX, SNES_CORE])
+# E3-A3 (adopted 2026-10-09): recovery v2 (E3-R2: the gap log, the 5-s two-check controller trigger, the
+# controller-return exit) through its own drop-in (recovery.conf); the adopted environ is exactly these four names
+RECOVERY = "PRIVYHUB_RECOVERY_TRIGGER=v2"
+ADOPTED = sorted([LIVE, INDEX, SNES_CORE, RECOVERY])
 FLAG_NAMES = ["PRIVYHUB_ADAPTIVE_BITRATE_INJECT", "PRIVYHUB_ADAPTIVE_BITRATE_TOP", "PRIVYHUB_PS1_LOOK",
               "PRIVYHUB_NATIVE_PROFILE_ID", "PRIVYHUB_FEC_SCHEME"]
 RA_CFG = Path.home() / ".config/retroarch/config"
@@ -662,9 +665,10 @@ def preflight() -> dict:
          "drop_in_live": f"Environment={LIVE}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_index": f"Environment={INDEX}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_snes_core": f"Environment={SNES_CORE}" in sh(["systemctl", "--user", "cat", UNIT]),
+         "drop_in_recovery": f"Environment={RECOVERY}" in sh(["systemctl", "--user", "cat", UNIT]),
          "e3_dropin_absent": not DROPIN.exists()}
     d["ok"] = (d["manager"] == [] and d["environ"] == ADOPTED and d["adb"] and d["drop_in_live"] and d["drop_in_index"]
-               and d["drop_in_snes_core"] and d["e3_dropin_absent"])
+               and d["drop_in_snes_core"] and d["drop_in_recovery"] and d["e3_dropin_absent"])
     return d
 
 

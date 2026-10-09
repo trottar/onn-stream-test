@@ -938,7 +938,7 @@ Architectural statement:
 
 **Status: ACTIVE (started 2026-10-05, the user's "let's start E1") — E1
 FROZEN (E1-S1; VOD added 2026-10-05); E2 MEASURED (E2-S1, 2026-10-06); E3
-next, on the user's pick.** (Was: NEXT; PLANNED AFTER D.)
+CLOSED (2026-10-09, E3-A3); E4 next.** (Was: NEXT; PLANNED AFTER D.)
 
 Phase E deliberately limits the core emulator workload to:
 
@@ -1085,14 +1085,15 @@ E3-S6A adopted; E3-S5C and E3-S4 ACCEPTED, then decided in E3-A2:
 | --- | --- | --- | --- |
 | E3-A2 adopt `frame_spin` and Snes9x | `audio-pacing.conf`, `snes-core.conf` (the user: "Adopt frame_spin if you think helps"; after the look, "Sure it ran smoothly from what I can tell"); verified on PS1-STREAM ×2, SNES-STREAM, META | **Snes9x: ADOPTION STANDS** (RetroArch 8.9 %, host 8.05 %, 60 fps). **`frame_spin`: ADOPTION REVERTED** (valid run 2 underruns 24 > 20 on a noisy link; the replacement 14). One run invalid (recovery pause) and replaced under a hashed addendum | `evidence/E3_A2_FRAME_SPIN_AND_SNES9X_ADOPTION_2026-10-07.md` |
 
-**E3's adoptions: two stand** (the guide index, the Snes9x core); the
-companion's default environ is three lines (live, index, Snes9x).
+**E3's adoptions after E3-A2: two stood** (the guide index, the Snes9x
+core). At E3's close (2026-10-09) three stand, with recovery v2; see
+"E3 — CLOSED" below.
 
 **E3's list, by item (E2-S1 §8's order):**
 
 | item | status |
 | --- | --- |
-| 1. EPG grabs vs the stream (CONC) | the parse's share removed (S6, **adopted** S6A); the child's spawn share: pacing its requests (S7) cut CONC loss ~20× but slowed the guide cycle below the bar — REJECTED; a shorter delay is the next try |
+| 1. EPG grabs vs the stream (CONC) | the parse's share removed (S6, **adopted** S6A); the child's spawn share: pacing its requests (S7) cut CONC loss ~20× but slowed the guide cycle below the bar — REJECTED; a shorter delay (S7B, 1,500 ms) kept the cycle but not the gain — REJECTED; pacing not adopted |
 | 2. the companion's memory after a grab | **solved by the index** (S6/S6A: ~34 MB, not ~160) |
 | 3. the grabber's own cost | REJECTED as a launcher change (S3); **the node grabber's start-up remains** (a precompiled grabber, untested) |
 | 4. the SNES core | **Snes9x adopted** (S4 ACCEPTED, A2 stands) |
@@ -1106,6 +1107,38 @@ companion's default environ is three lines (live, index, Snes9x).
 | E3-S7 the grab's spawn share | the grabber paced (`PRIVYHUB_EPG_GRAB_NET=paced`, `--delay=4000`); probe: CPU-off and network-off arms each removed the peak, so network | **REJECTED** (guide cycle 12 refreshes per channel < 20; loss 60-67/min > 3 × control) — but CONC loss 1,312 → ~60/min, 59.8 fps, resyncs 52 → 1-3 | `evidence/E3_S7_CONC_GRAB_SPAWN_2026-10-08.md` |
 | E3-R2 the false pause, fixed | v2 threshold + an exit for a `controller_silence` pause (packets back, output fresh) + a silence-gap log (`PRIVYHUB_RECOVERY_TRIGGER=v2`) | **REJECTED** (iii: CONC rendered fps above its cross-night band; v: one gap 41 ms after a log write) — the replay, made faithful, held r1-r4; no recovery pause in 4 runs; a 1,253-ms uplink silence passed. Adoption waits for the user's nft paste | `evidence/E3_R2_RECOVERY_PAUSE_EXIT_2026-10-08.md` |
 | E3-S7B the grab paced, shorter | `PRIVYHUB_EPG_GRAB_NET=paced` at `PRIVYHUB_EPG_GRAB_DELAY_MS=1500` (probe: today's request groups go back to back) | **REJECTED** (loss 309 / 346 per min, 59.33 fps, aligned 0-2 s 7.6 / 11.7) — the cycle held (20-21 refreshes, median 10 s), but per-grab cost equals tonight's unpaced grab | `evidence/E3_S7B_GRAB_PACING_SHORT_2026-10-08.md` |
+
+**2026-10-09 (`E3-A3_…`, `E3-A3B_RECOVERY_V2_READOPTION_TASK.md`):**
+
+| task | change | verdict | record |
+| --- | --- | --- | --- |
+| E3-A3 adopt recovery v2 | `recovery.conf`: `PRIVYHUB_RECOVERY_TRIGGER=v2` (the user: "Adopt", after the nft check passed: real drops unchanged, a 2-s controller drop no pause, an 8-s one resumed via `controller_return` 1.6 s after the clear) | **ADOPTION REVERTED** (ii: no valid run in either row after two replacements — all six windows voided by the client's own output-silence pauses on a poor link; v2 fired no controller pause and no save, and passed 27 silences > 1 s) | `evidence/E3_A3_RECOVERY_V2_ADOPTION_2026-10-09.md` |
+| E3-A3B re-adopt recovery v2 | the same `recovery.conf` and state checks (the user: "Code application why not"); the bar judged on controller-trigger events only, client pauses reported | **ADOPTION STANDS** (0 controller pauses, 0 saves; host / companion CPU in band; gap log 0.003 point; two > 1-s silences the old rule would have paused on passed) | `evidence/E3_A3B_RECOVERY_V2_READOPTION_2026-10-09.md` |
+
+### E3 — CLOSED (2026-10-09)
+
+Every E3 item and its final verdict:
+
+| item | verdict | adopted? |
+| --- | --- | --- |
+| S1 EPG grab priority (idle class) | INCONCLUSIVE | no |
+| S2 `malloc_trim` after a grab | REJECTED | no |
+| S3 the grabber's node started directly | REJECTED | no |
+| S4 the SNES core (Snes9x) | ACCEPTED (S4, 10-07) → **ADOPTED** (A2) | **yes** (`snes-core.conf`) |
+| S5 / S5B audio sender `=frame` | REJECTED / REJECTED | no |
+| S5C audio sender `=frame_spin` | ACCEPTED → adopted by A2 → **REVERTED** by A2's bar (underruns 24 > 20) | no |
+| S6 the cached guide index | MEMORY ACCEPTED → **ADOPTED** (S6A); STREAM REJECTED | **yes** (`epg-index.conf`) |
+| S7 / S7B the grab paced (4,000 / 1,500 ms) | REJECTED / REJECTED | no (the user's decision: pacing not adopted) |
+| R1 → R2 → A3 → A3B recovery's false pause (v2: gap log, 5-s two-check trigger, controller-return exit) | INCONCLUSIVE → REJECTED (bar defects) → nft check PASSED → adopted, REVERTED (A3's validity clause) → **ADOPTED** (A3B, stands) | **yes** (`recovery.conf`) |
+
+**Three E3 adoptions stand** (the guide index, Snes9x, recovery v2).
+**The adopted state at E3's close is four lines**, each through its own
+drop-in in `~/.config/systemd/user/privyhub-companion.service.d/`:
+
+- `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live` (`adaptive.conf`, from C3-L4);
+- `PRIVYHUB_EPG_GUIDE_INDEX=cached` (`epg-index.conf`);
+- `PRIVYHUB_SNES_CORE=snes9x` (`snes-core.conf`);
+- `PRIVYHUB_RECOVERY_TRIGGER=v2` (`recovery.conf`).
 
 ## E4 — Core Linux resource envelope
 

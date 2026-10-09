@@ -1,0 +1,6 @@
+table inet privyhub_fault {
+	chain flt {
+		type filter hook input priority filter; policy accept;
+		udp dport 48102 drop
+	}
+}

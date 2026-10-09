@@ -1247,8 +1247,8 @@ Environment=PRIVYHUB_ADAPTIVE_BITRATE_MODE=live
 **What shows when it is in force:**
 
 - `systemctl --user cat privyhub-companion` lists it;
-- the MainPID's environ carries that `PRIVYHUB_*` and the two adopted
-  E3 names (E3-S6A, E3-A2; exactly three), and
+- the MainPID's environ carries that `PRIVYHUB_*` and the three adopted
+  E3 names (E3-S6A, E3-A2, E3-A3B; exactly four), and
   `systemctl --user show-environment` carries none;
 - `native-stream-status` → `adaptive_bitrate.mode live`,
   `configured_mode live`, `acts true`;
@@ -1348,7 +1348,7 @@ index instead of parsing the 25.6 MB guide metadata
 ```bash
 systemctl --user cat privyhub-companion | grep -A2 epg-index.conf
 MP=$(systemctl --user show -p MainPID --value privyhub-companion)
-tr '\0' '\n' < /proc/$MP/environ | grep '^PRIVYHUB_'      # exactly the three lines (since E3-A2)
+tr '\0' '\n' < /proc/$MP/environ | grep '^PRIVYHUB_'      # exactly the four lines (since E3-A3B)
 python3 tools/e3_state.py                                   # "ok": true -- the adopted state
 ```
 
@@ -1815,7 +1815,44 @@ python3 tools/e1_sampler.py summarize <dir> --from <utc> --to <utc>
   - `range_server`'s socket `send()` is not in `wchar`; use `rchar` for
     served bytes.
 
-## The E3 flags (QUEUE_2026-10-06) — each off by default, never leave one set (two adopted: the guide index, Snes9x)
+## Recovery v2 — ADOPTED by default since 2026-10-09 04:50:43Z (E3-A3B)
+
+`PRIVYHUB_RECOVERY_TRIGGER=v2` (E3-R2) gives three things:
+
+- the controller receive loop's gap log
+  (`logs/games/native_stream_ctrl_gaps.log`, 512 KB + one rotated copy);
+- the host's `controller_silence` trigger at 5,000 ms, confirmed on two
+  checks ≥ 250 ms apart;
+- the exit: a `controller_silence` pause resumes itself when the packets
+  are back (age < 500 ms on two checks) and a later heartbeat shows the
+  output age ≤ 300 ms. The log line is `resumed` `via: controller_return`.
+
+The client-side trigger, the give-up timer, the restart path and R3c2's
+flow are unchanged. Records: `evidence/E3_A3B_RECOVERY_V2_READOPTION_2026-10-09.md`
+(the adoption that stands), `E3_A3_…` (the nft check; the first adoption,
+reverted by a validity rule that voided runs on the client's own pauses).
+
+**The drop-in**, beside the other three:
+
+```ini
+# ~/.config/systemd/user/privyhub-companion.service.d/recovery.conf
+[Service]
+Environment=PRIVYHUB_RECOVERY_TRIGGER=v2
+```
+
+**The kill switch** (today's 1-s rule, no gap log, byte for byte), then
+take the name out of the state checks:
+
+```bash
+rm ~/.config/systemd/user/privyhub-companion.service.d/recovery.conf && systemctl --user daemon-reload && systemctl --user restart privyhub-companion
+git apply -R docs/memory/evidence/e3_a3_2026-10-09/e3_a3_state_checks.diff    # ADOPTED / ADOPTED_E3 + the preflight's drop-in check
+python3 tools/e3_state.py                                                       # "ok": true on three lines
+```
+
+The gap log alone stays available as `PRIVYHUB_RECOVERY_GAP_LOG=1`, a
+probe hook. The state checks refuse it as an unadopted flag.
+
+## The E3 flags (QUEUE_2026-10-06) — each off by default, never leave one set (three adopted: the guide index, Snes9x, recovery v2)
 
 Each E3 task's change lives behind its own `PRIVYHUB_*` flag in the
 companion's environment; absent = today's behaviour, byte for byte. The
@@ -1825,10 +1862,10 @@ suite sets a flag for one run only through the drop-in
 run's teardown removes the file, `daemon-reload`s, restarts the unit and
 checks the environ is exactly the live default; flagged runs go to
 `<ID>_flag/`; preflight refuses to start with the file present).
-**Since E3-A2 (2026-10-07) "the adopted state" is three lines**: the live
-default, `PRIVYHUB_EPG_GUIDE_INDEX=cached` and `PRIVYHUB_SNES_CORE=snes9x`,
-each through its own drop-in; every other flag below is absent at every
-teardown.
+**Since E3-A3B (2026-10-09) "the adopted state" is four lines**: the live
+default, `PRIVYHUB_EPG_GUIDE_INDEX=cached`, `PRIVYHUB_SNES_CORE=snes9x`
+and `PRIVYHUB_RECOVERY_TRIGGER=v2`, each through its own drop-in; every
+other flag below is absent at every teardown.
 
 | flag | task | what it does | verdict |
 | --- | --- | --- | --- |
@@ -1840,7 +1877,7 @@ teardown.
 | `PRIVYHUB_AUDIO_SENDER_PACING=frame_spin` | E3-S5C | one timed wait to 0.25 ms before the packet's deadline, then today's final spin (`_linux_wait_until`) | **ACCEPTED** (sender 13 → 6 %, companion 24.5 → 17.6 %; underruns 13 / 9 / 5 vs controls 17 / 14) — adopted by E3-A2, then **REVERTED by its bar** (one run's underruns 24 > 20 on a noisy link; the replacement run 14); off, dormant |
 | `PRIVYHUB_AUDIO_SEND_TRACE=<path>` | E3-S5B | measurement only: the audio sender writes 60 s of `sendto` times (from 30 s after it starts) to `<path>` | probe hook, off |
 | `PRIVYHUB_EPG_GUIDE_INDEX=cached` | E3-S6 | the grab's candidates from a slim index (13,555 channels, 3.7 MB, built once per metadata file, saved as `data/epg/metadata/guides_index.json`) instead of the per-grab 25.6 MB parse | **MEMORY ACCEPTED** (companion 34 MB, 0.2 % CPU in META); **STREAM REJECTED** (CONC 773-1,273 loss/min) — **ADOPTED 2026-10-07 (E3-S6A)** through `epg-index.conf`, see above |
-| `PRIVYHUB_RECOVERY_TRIGGER=v2` | E3-R1, E3-R2 | the host's controller-silence recovery trigger needs 5 s of silence on two checks 250 ms apart (today 1 s, first check); **since E3-R2 also** a `controller_silence` pause resumes by itself when the controller age is < 500 ms on two checks and a later heartbeat's output age is ≤ 300 ms (`link_drop_recovery.py` `_maybe_exit_controller_pause`; logs `resumed` `via: controller_return`), and the gap log runs; the client's desync post unchanged | R1 INCONCLUSIVE; **E3-R2 REJECTED** by its bar (iii: CONC fps above its cross-night band; v: one gap 41 ms after a write) — replay r1-r4 held, no pause in 4 runs; **adoption waits for the user's nft paste** (E3-R2 record §4); dormant |
+| `PRIVYHUB_RECOVERY_TRIGGER=v2` | E3-R1, E3-R2 | the host's controller-silence recovery trigger needs 5 s of silence on two checks 250 ms apart (today 1 s, first check); **since E3-R2 also** a `controller_silence` pause resumes by itself when the controller age is < 500 ms on two checks and a later heartbeat's output age is ≤ 300 ms (`link_drop_recovery.py` `_maybe_exit_controller_pause`; logs `resumed` `via: controller_return`), and the gap log runs; the client's desync post unchanged | R1 INCONCLUSIVE; E3-R2 REJECTED by its bar (replay held, no pause in 4 runs); the user's nft check PASSED (2026-10-09); E3-A3 adopted, then reverted by a validity rule that voided runs on the client's own pauses; **E3-A3B: ADOPTED 2026-10-09 04:50:43Z — ADOPTION STANDS** (0 controller pauses, 0 saves; CPU in band; gap log 0.003 point) through `recovery.conf` ("Recovery v2" above) |
 | `PRIVYHUB_RECOVERY_GAP_LOG=1` | E3-R2 | measurement only (also on with `…TRIGGER=v2`): every client→host controller silence > 250 ms, one JSON line at its end (start, end, `gap_ms`, `burst_500ms`, `burst_truncated`, `logged_utc`) written by its own thread to `logs/games/native_stream_ctrl_gaps.log` (512 KB + one rotated copy) | probe hook, off |
 | `PRIVYHUB_EPG_GRAB_NET=paced` (+ `PRIVYHUB_EPG_GRAB_DELAY_MS=<ms>`, default 4000) | E3-S7, E3-S7B | the grabber gets `--delay=<ms>` (one connection, as today) (`epg.py` `_grab_from_candidate`); it sleeps that long before each `grab(channel, day)` call (GRAB_DAYS 2), and the site's own requests inside a call stay back to back. **Today (no flag) the request groups go back to back (~0.3 s apart): the library's 3-s default is not in effect** (E3-S7B probe) | S7 (4000) **REJECTED** (CONC loss 1,312 → ~60/min, 59.8 fps, but 12 refreshes per channel < 20 and loss > 3 × the control); **S7B (1500) REJECTED** (cycle held: 20-21 refreshes, median 10.0 s; but loss 309 / 346 per min, 59.33 fps, aligned 0-2 s 7.6 / 11.7 — per-grab cost no lower than tonight's unpaced grab); dormant |
 | `PRIVYHUB_EPG_GRAB_NONET=1` | E3-S7 | measurement only: the grabber child under `unshare -rn` (its own network namespace, no route) -- its start-up as today, no traffic leaves the host | probe hook, off |

@@ -290,13 +290,15 @@ class LiveDefault(unittest.TestCase):
 
     def test_the_adopted_e3_names_are_accepted(self):
         """E3-S6A / E3-A2: the guide index and the Snes9x core are adopted through their own drop-ins (frame_spin was
-        reverted by E3-A2's bar, so it is refused like any other flag)."""
-        adopted = ["PRIVYHUB_EPG_GUIDE_INDEX=cached", "PRIVYHUB_SNES_CORE=snes9x"]
+        reverted by E3-A2's bar, so it is refused like any other flag). E3-A3: recovery v2 joins them; the gap log
+        alone stays a probe hook and is refused."""
+        adopted = ["PRIVYHUB_EPG_GUIDE_INDEX=cached", "PRIVYHUB_SNES_CORE=snes9x", "PRIVYHUB_RECOVERY_TRIGGER=v2"]
         self.assertEqual(h.ADOPTED_E3, adopted)
         self.assertIsNone(h.env_baseline_refusal([], sorted([self.LIVE] + adopted)))
         self.assertEqual(h.baseline_mode(sorted([self.LIVE] + adopted)), "live")
         self.assertIsNotNone(h.env_baseline_refusal([], [self.LIVE, "PRIVYHUB_AUDIO_SENDER_PACING=frame"]))
         self.assertIsNotNone(h.env_baseline_refusal([], [self.LIVE, "PRIVYHUB_AUDIO_SENDER_PACING=frame_spin"]))
+        self.assertIsNotNone(h.env_baseline_refusal([], [self.LIVE, "PRIVYHUB_RECOVERY_GAP_LOG=1"]))
         import d7_regression as d7
         self.assertEqual(d7.ADOPTED_E3, adopted)
 

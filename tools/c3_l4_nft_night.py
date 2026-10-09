@@ -103,7 +103,8 @@ MODE_ENV = "PRIVYHUB_ADAPTIVE_BITRATE_MODE"
 DEFAULT_LIVE = f"{MODE_ENV}=live"
 # E3-S6A / E3-A2 (2026-10-07): the other adopted names, each through its own drop-in (tools/e1_suite.py ADOPTED);
 # accepted beside the live default, never set or unset by the harness
-ADOPTED_E3 = ["PRIVYHUB_EPG_GUIDE_INDEX=cached", "PRIVYHUB_SNES_CORE=snes9x"]
+ADOPTED_E3 = ["PRIVYHUB_EPG_GUIDE_INDEX=cached", "PRIVYHUB_SNES_CORE=snes9x",
+              "PRIVYHUB_RECOVERY_TRIGGER=v2"]   # E3-A3 (2026-10-09): recovery v2, through recovery.conf
 
 
 def env_baseline_refusal(manager: list[str], environ: list[str]) -> str | None:

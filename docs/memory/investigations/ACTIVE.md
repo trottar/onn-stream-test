@@ -1,8 +1,8 @@
 # Active investigations
 
-## PHASE E — ACTIVE. E1 FROZEN (VOD added); E2 MEASURED 2026-10-06 (E2-S1); E3 next on the user's pick
+## PHASE E — ACTIVE. E1 FROZEN (VOD added); E2 MEASURED 2026-10-06 (E2-S1); E3 CLOSED 2026-10-09 (E3-A3); E4 next
 
-**E3 (QUEUE_2026-10-06, -06B, -07; E3-A2), in progress — two adopted (the guide index, E3-S6A; Snes9x, E3-A2):**
+**E3 (QUEUE_2026-10-06 … -08B; E3-A2, E3-A3, E3-A3B), CLOSED 2026-10-09 — three adopted (the guide index, E3-S6A; Snes9x, E3-A2; recovery v2, E3-A3B):**
 
 - **E3-S1** (`../evidence/E3_S1_EPG_GRAB_PRIORITY_2026-10-06.md`):
   the grabber at SCHED_IDLE / nice 19 / idle I/O halved the busiest
@@ -120,6 +120,19 @@
   - The loss-vs-cycle table is in the record (§4), for the user's
     choice: leave CONC, accept 4,000 with fewer refreshes, or try a
     different lever (fewer requests per grab).
+- **E3-A3** (`../evidence/E3_A3_RECOVERY_V2_ADOPTION_2026-10-09.md`):
+  recovery v2 **ADOPTED, then REVERTED** by the verification bar (ii).
+  - The user's nft check passed.
+  - All six verification windows were voided by the client's own
+    output-silence pauses on a poor link. v2 fired no controller pause
+    and no save, and passed 27 silences over 1 s.
+  - **E3-A3B** (`../evidence/E3_A3B_RECOVERY_V2_READOPTION_2026-10-09.md`):
+    **re-adopted, ADOPTION STANDS** under a bar judged on the trigger's
+    own events. 0 controller pauses, 0 saves; two > 1-s silences that
+    the old rule would have paused on passed.
+  - **E3 CLOSED** (`docs/ROADMAP.md`). The four-line adopted state.
+  - Measured for E4: the user manager delegates cpu and memory (not
+    cpuset); RetroArch and ffmpeg share the companion's cgroup.
 - **Open, found by E3-A2's validity check:** the companion's link
   recovery can pause the game mid-window (`desync_pause`,
   `controller_silence`) and the suite still marks the run OK.

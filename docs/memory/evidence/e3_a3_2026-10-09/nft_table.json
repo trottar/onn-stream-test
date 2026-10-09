@@ -1,0 +1,165 @@
+{
+ "V2-N3": {
+  "fault": "host->client 48100,48101, 3 s",
+  "t_on_utc": "00:12:00.248Z",
+  "t_off_utc": "00:12:03.317Z",
+  "fault_s": 3.07,
+  "events": [
+   {
+    "at_utc": "2026-10-09T00:12:01.588Z",
+    "event": "desync_pause",
+    "trigger": "client_output_silence",
+    "via": null,
+    "from_on_s": 1.34,
+    "from_off_s": -1.73
+   },
+   {
+    "at_utc": "2026-10-09T00:12:05.646Z",
+    "event": "resumed",
+    "trigger": null,
+    "via": null,
+    "from_on_s": 5.4,
+    "from_off_s": 2.33
+   }
+  ],
+  "gaps": [],
+  "files": [
+   "heartbeat_lines.jsonl",
+   "native_decoder_20261009_001238_493.json",
+   "nft_table_active.txt",
+   "recovery_lines.jsonl",
+   "report_name",
+   "state_after_clear.txt",
+   "state_during_fault.txt",
+   "status_end.json",
+   "timings.txt"
+  ]
+ },
+ "V2-N15": {
+  "fault": "host->client 48100,48101, 15 s",
+  "t_on_utc": "00:13:27.868Z",
+  "t_off_utc": "00:13:42.933Z",
+  "fault_s": 15.07,
+  "events": [
+   {
+    "at_utc": "2026-10-09T00:13:29.224Z",
+    "event": "desync_pause",
+    "trigger": "client_output_silence",
+    "via": null,
+    "from_on_s": 1.36,
+    "from_off_s": -13.71
+   },
+   {
+    "at_utc": "2026-10-09T00:13:33.411Z",
+    "event": "encoder_restart",
+    "trigger": null,
+    "via": null,
+    "from_on_s": 5.54,
+    "from_off_s": -9.52
+   },
+   {
+    "at_utc": "2026-10-09T00:13:46.644Z",
+    "event": "resumed",
+    "trigger": null,
+    "via": null,
+    "from_on_s": 18.78,
+    "from_off_s": 3.71
+   }
+  ],
+  "gaps": [],
+  "files": [
+   "heartbeat_lines.jsonl",
+   "native_decoder_20261009_001430_297.json",
+   "nft_table_active.txt",
+   "recovery_lines.jsonl",
+   "report_name",
+   "state_after_clear.txt",
+   "state_during_fault.txt",
+   "status_end.json",
+   "timings.txt"
+  ]
+ },
+ "V2-C2": {
+  "fault": "client->host 48102, 2 s",
+  "t_on_utc": "00:15:20.487Z",
+  "t_off_utc": "00:15:22.569Z",
+  "fault_s": 2.08,
+  "events": [],
+  "gaps": [
+   {
+    "start_from_on_s": -0.033,
+    "gap_ms": 2064.3,
+    "burst_500ms": 227
+   }
+  ],
+  "files": [
+   "heartbeat_lines.jsonl",
+   "native_decoder_20261009_001557_266.json",
+   "nft_table_active.txt",
+   "recovery_lines.jsonl",
+   "report_name",
+   "state_after_clear.txt",
+   "state_during_fault.txt",
+   "status_end.json",
+   "timings.txt"
+  ]
+ },
+ "V2-C8": {
+  "fault": "client->host 48102, 8 s",
+  "t_on_utc": "00:16:46.914Z",
+  "t_off_utc": "00:16:54.973Z",
+  "fault_s": 8.06,
+  "events": [
+   {
+    "at_utc": "2026-10-09T00:16:29.411Z",
+    "event": "desync_pause",
+    "trigger": "client_output_silence",
+    "via": null,
+    "from_on_s": -17.5,
+    "from_off_s": -25.56
+   },
+   {
+    "at_utc": "2026-10-09T00:16:32.411Z",
+    "event": "resumed",
+    "trigger": null,
+    "via": null,
+    "from_on_s": -14.5,
+    "from_off_s": -22.56
+   },
+   {
+    "at_utc": "2026-10-09T00:16:52.261Z",
+    "event": "desync_pause",
+    "trigger": "controller_silence",
+    "via": null,
+    "from_on_s": 5.35,
+    "from_off_s": -2.71
+   },
+   {
+    "at_utc": "2026-10-09T00:16:56.598Z",
+    "event": "resumed",
+    "trigger": null,
+    "via": "controller_return",
+    "from_on_s": 9.68,
+    "from_off_s": 1.62
+   }
+  ],
+  "gaps": [
+   {
+    "start_from_on_s": -0.004,
+    "gap_ms": 8038.1,
+    "burst_500ms": 227
+   }
+  ],
+  "files": [
+   "heartbeat_lines.jsonl",
+   "native_decoder_20261009_001741_164.json",
+   "nft_table_active.txt",
+   "recovery_lines.jsonl",
+   "report_name",
+   "state_after_clear.txt",
+   "state_during_fault.txt",
+   "status_end.json",
+   "timings.txt"
+  ]
+ }
+}

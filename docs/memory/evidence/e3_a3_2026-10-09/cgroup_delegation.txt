@@ -1,0 +1,10 @@
+measured 2026-10-09T00:41:42Z, read-only (no cgroup or unit property was changed)
+root cgroup.controllers: cpuset cpu io memory hugetlb pids rdma misc
+user-1000.slice cgroup.subtree_control: cpu memory pids
+user@1000.service cgroup.controllers: cpu memory pids
+user@1000.service cgroup.subtree_control: cpu memory pids
+app.slice cgroup.subtree_control: memory pids
+privyhub-companion.service cgroup.controllers: memory pids
+systemctl show user@1000.service: Delegate=yes DelegateControllers=cpu memory pids 
+systemctl --user show privyhub-companion: ControlGroup=/user.slice/user-1000.slice/user@1000.service/app.slice/privyhub-companion.service CPUQuotaPerSecUSec=infinity AllowedCPUs= MemoryMax=infinity 
+mounts: /sys/fs/cgroup cgroup2;/opt/expressvpn/etc/cgroup/net_cls cgroup;

@@ -1,0 +1,45 @@
+E3-A3 PRE-REGISTRATION -- the verification of recovery v2's adoption. Written 2026-10-09 after the adoption (recovery.conf
+written 00:33:20Z, environ verified, state checks extended) and BEFORE either run; hash in e3_a3_preregistration.sha256.
+Task: docs/memory/handoffs/E3-A3_RECOVERY_V2_ADOPTION_TASK.md (the user's authorization, 2026-10-09: "Adopt", after
+the nft check of 00:11-00:18Z passed). Every rule of the E3 queues; E3-A2's validity rule standing. Baseline commit:
+75b2b6b (the user's E3-R2/S7B commit).
+
+WHAT IS ADOPTED: PRIVYHUB_RECOVERY_TRIGGER=v2 through its own drop-in
+~/.config/systemd/user/privyhub-companion.service.d/recovery.conf (copy here; sha256
+921ed2619baf7312ce024b1c043a312c3071446a271f66aaf89162d56eb8d28f): the gap log, the 5-s two-check controller-silence
+trigger, the controller-return exit (E3-R2). The companion code is E3-R2's, unchanged (games.py d72e5f8e…d419,
+native_session_io.py b7e99279…b936, link_drop_recovery.py 822fe173…f9ef). The adopted environ is exactly four
+PRIVYHUB_* lines (live, the index, Snes9x, recovery v2; environ_after.txt); the manager none; four drop-ins
+(unit_cat_files.txt). State checks: e3_a3_state_checks.diff sha256
+d7790c749229dee10f4e3d1d33902bc0b4cb0c9272bb53ea0eb79b3990b1c29e (e1_suite.py ADOPTED + the preflight's
+drop_in_recovery; d7_regression.py and c3_l4_nft_night.py ADOPTED_E3; e3_state.py's docstring; the test); e1_suite.py
+after 334528a3…b186; e1_suite --self-test OK; test_c3_l4_nft_night 33/33; e3_state.py ok on the four lines.
+
+THE NFT CHECK (recorded first, nft_table.md; the user's runs, cited in place): V2-N3 / V2-N15 desync_pause
+client_output_silence at +1.34 / +1.36 s, resumed (N15 after one encoder_restart); V2-C2 no recovery event (gap
+2,064 ms); V2-C8 desync_pause controller_silence at +5.35 s, resumed via controller_return 1.62 s after the clear, no
+gave_up_saved (gap 8,038 ms); V2-C8's earlier client_output_silence at 00:16:29Z (resumed in 3 s) is the client's.
+
+1. THE RUNS (no flag; the adopted defaults run), E2's windows and gaps, in this order:
+     --plan E1-PS1-STREAM:1:120,E1-CONC:1:120 --window 1200 --gap 120 --e2  -> runs/E1-PS1-STREAM/run1, runs/E1-CONC/run1
+   E3-A2's validity rule: a run whose recovery state leaves PLAYING in its window is invalid and replaced (at most
+   twice, runs_retry<n>/), EXCEPT that a controller_silence pause which resumed via controller_return within 10 s is
+   reported and the run still counts.
+
+2. THE BAR -- the adoption STANDS only if ALL hold (else recovery.conf is removed, daemon-reload + restart, the state
+   checks reverted, and the record says ADOPTION REVERTED with the clause):
+   (i)   no gave_up_saved and no controller_silence desync_pause that did not resume via controller_return within
+         10 s, in either window (judged runs and any replaced ones);
+   (ii)  each judged run valid by (1)'s rule; a row with no valid run after two replacements -> REVERTED (broke the row);
+   (iii) host CPU mean within +/- 2 of its reference: PS1-STREAM 11.7 (E2: 11.69) -> 9.69-13.69; CONC: E3-R2's runs
+         with the same code, 20.9-23.4 -> 18.9-25.4;
+   (iv)  the companion's stream cost (its CPU, % of a core) within +/- 2 points of the same code's runs (E3-R2):
+         PS1 25.0-25.2 -> 23.0-27.2; CONC 26.0-27.1 -> 24.0-29.1;
+   (v)   the gap log <= 0.5 point of a core (E3-R2's micro-benchmarks, 51.5 ns per packet x eno1 rx packets/s median
+         + lines x 42.4 us / window).
+   REPORTED, NOT BANDED (R2's lesson: cross-night fps bands do not belong in a trigger's bar): rendered fps, video
+   loss/min, underruns, resyncs, the gap count and max, any gap > 1 s, any gap starting <= 50 ms after a write.
+
+3. RULES: no nft, no real sudo, the Opal not touched; no addresses or identifiers; nothing fetched, nothing deleted
+   (the drop-in removal is the pre-registered revert, if it comes to that); no other task's scripts run in their
+   directories. Nothing adopted beyond v2; nothing committed. The bar is not changed after data.

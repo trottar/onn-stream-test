@@ -52,7 +52,8 @@ SESSDIR = REPO / "logs/games/decoder_sessions"
 HOLD_S = 180
 DEFAULT_LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"   # C3-L4-D1: the unit drop-in's one name
 # E3-S6A / E3-A2 (2026-10-07): the other adopted names, each through its own drop-in (tools/e1_suite.py ADOPTED)
-ADOPTED_E3 = ["PRIVYHUB_EPG_GUIDE_INDEX=cached", "PRIVYHUB_SNES_CORE=snes9x"]
+ADOPTED_E3 = ["PRIVYHUB_EPG_GUIDE_INDEX=cached", "PRIVYHUB_SNES_CORE=snes9x",
+              "PRIVYHUB_RECOVERY_TRIGGER=v2"]   # E3-A3 (2026-10-09): recovery v2, through recovery.conf
 
 
 def now() -> str:

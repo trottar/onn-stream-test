@@ -1,0 +1,118 @@
+{
+ "judged": {
+  "E1-PS1-STREAM": "runs/E1-PS1-STREAM/run1",
+  "E1-CONC": "runs/E1-CONC/run1"
+ },
+ "rows": {
+  "E1-PS1-STREAM": {
+   "window": [
+    "2026-10-09T04:55:16.470Z",
+    "2026-10-09T05:15:16.470Z"
+   ],
+   "host_cpu": 11.089,
+   "companion_cpu": 23.239,
+   "rendered_fps": 58.659,
+   "loss_per_min": 381.11,
+   "resyncs": 21,
+   "underruns": 24,
+   "gave_up_saved": [],
+   "controller_pauses": [],
+   "client_pauses": [
+    {
+     "at_utc": "2026-10-09T05:09:37.649Z",
+     "trigger": "client_output_silence",
+     "age_ms": 1344.0,
+     "next": "resumed",
+     "via": null,
+     "after_s": 6.5
+    }
+   ],
+   "gaps": 48,
+   "gaps_over_1s": 0,
+   "gap_max_ms": 984.0,
+   "old_rule_would_have_paused": 0,
+   "old_rule_gaps": [],
+   "rx_pps_median": 491.0,
+   "gap_log_cost_core_points": 0.0027,
+   "i": true,
+   "ii": true,
+   "iii": true,
+   "iv": true
+  },
+  "E1-CONC": {
+   "window": [
+    "2026-10-09T05:19:35.174Z",
+    "2026-10-09T05:39:35.175Z"
+   ],
+   "host_cpu": 21.477,
+   "companion_cpu": 24.774,
+   "rendered_fps": 56.783,
+   "loss_per_min": 1130.33,
+   "resyncs": 58,
+   "underruns": 67,
+   "gave_up_saved": [],
+   "controller_pauses": [],
+   "client_pauses": [
+    {
+     "at_utc": "2026-10-09T05:20:14.193Z",
+     "trigger": "client_output_silence",
+     "age_ms": 1189.0,
+     "next": "resumed",
+     "via": null,
+     "after_s": 3.69
+    },
+    {
+     "at_utc": "2026-10-09T05:21:36.199Z",
+     "trigger": "client_output_silence",
+     "age_ms": 1024.0,
+     "next": "resumed",
+     "via": null,
+     "after_s": 5.76
+    },
+    {
+     "at_utc": "2026-10-09T05:22:45.999Z",
+     "trigger": "client_output_silence",
+     "age_ms": 1222.0,
+     "next": "resumed",
+     "via": null,
+     "after_s": 0.25
+    },
+    {
+     "at_utc": "2026-10-09T05:26:24.949Z",
+     "trigger": "client_output_silence",
+     "age_ms": 1000.0,
+     "next": "resumed",
+     "via": null,
+     "after_s": 9.09
+    }
+   ],
+   "gaps": 83,
+   "gaps_over_1s": 2,
+   "gap_max_ms": 1299.1,
+   "old_rule_would_have_paused": 2,
+   "old_rule_gaps": [
+    [
+     "2026-10-09T05:21:16.367Z",
+     1299.1
+    ],
+    [
+     "2026-10-09T05:22:43.089Z",
+     1166.7
+    ]
+   ],
+   "rx_pps_median": 543.0,
+   "gap_log_cost_core_points": 0.00309,
+   "i": true,
+   "ii": true,
+   "iii": true,
+   "iv": true
+  }
+ },
+ "clauses": {
+  "i": true,
+  "ii": true,
+  "iii": true,
+  "iv": true
+ },
+ "verdict": "ADOPTION STANDS"
+}

@@ -1430,37 +1430,58 @@ unrecoverable. Neither was right. The defect itself is real and stays open.
   `H3` designed the autostart unit (`docs/memory/evidence/H3_COMPANION_AUTOSTART_DESIGN_2026-09-23.md`).
   **Status: open — designed, awaiting the user's install.**
 
-## 2026-10-08 link-drop recovery pauses a running game with the link up (`E3-R1`) — OPEN
+## 2026-10-08 link-drop recovery pauses a running game with the link up (`E3-R1`) — FIXED AND ADOPTED (recovery v2, E3-A3B, 2026-10-09)
 
 - **Seen:** five times in 20-min suite windows across four nights (E2's
   PS1-1080P r1, E3-S1's control and both CONC runs, E3-A2's PS1 r1), and
   more outside the suite on 10-05.
 - **Cause, the harmful case:** the host's `controller_silence` trigger
   (1 s without a controller packet) fires on a 1-3-s client→host stall.
-  The onn's uplink queues the packets and delivers them late in a burst,
-  and the client keeps receiving and showing video.
-  - The client never sees an output stall, so it never runs its re-entry
-    gate.
-  - The pause then has no exit: it gives up after 120 s, saves, and stays
-    `PAUSED_SAVED`. That happened in 3 of 4 such pauses.
-- **Also seen:** the client's own `client_output_silence` pauses on real
-  1-3-s output stalls (10-06, before the index). These resumed by
-  themselves, and the host cannot tell them from a short real drop.
-- **The fix, behind a flag, pending the air check (E3-R2, 2026-10-08):**
-  `PRIVYHUB_RECOVERY_TRIGGER=v2`, three parts:
-  - the controller trigger at 5 s on two checks;
-  - **an exit**: the pause resumes by itself when the packets return and
-    the client's output is fresh;
-  - a silence-gap log (`logs/games/native_stream_ctrl_gaps.log`).
-- **How it did:** the faithful replay held (r1-r4), and the four suite
-  runs had no recovery pause at all. One run logged a 1,253-ms uplink
-  silence, which today's rule would have paused on.
-- **Verdict: REJECTED** on two clauses that don't touch the fix: the
-  CONC rendered fps was *above* its cross-night band, and one gap began
-  41 ms after a log write. NOT ADOPTED.
-- **Adoption waits for the user's nft paste** (`r3b_run.sh`; the paste
-  and the expected reply are in the E3-R2 record §4).
-- **Meanwhile:** the suite counts such a run as invalid and replaces it
-  (E3-A2's validity rule).
+  The client keeps playing, so the pause has no exit: it gives up after
+  120 s, saves, and stays `PAUSED_SAVED` (3 of 4).
+- **The fix:** `PRIVYHUB_RECOVERY_TRIGGER=v2` (E3-R2):
+  - the threshold at 5 s on two checks;
+  - **an exit when the packets return and the output is fresh**;
+  - a silence-gap log.
+- **How it has done:**
+  - the user's nft check (2026-10-09) passed: real drops unchanged; a 2-s
+    controller drop no pause; an 8-s one paused at +5.35 s and resumed
+    itself 1.6 s after the clear;
+  - in ~3 h of suite windows (E3-R2 4, E3-A3 6) it fired **no**
+    controller pause and no save, while the gap log saw 28 silences over
+    1 s.
+- **Adopted 2026-10-09** (E3-A3, then reverted by a validity rule that
+  voided runs on the client's own pauses).
+- **Re-adopted (E3-A3B), and the adoption stands**, under a bar judged
+  on the trigger's own events.
+  - 0 controller pauses and 0 saves in both windows.
+  - Two > 1-s uplink silences that the old rule would have paused on
+    passed.
+  - `recovery.conf`; the kill switch is in `memory/TOOLS.md`.
+- **Still open, the client's:** `client_output_silence` pauses on real
+  1-3-s output stalls. They resume by themselves, and the host cannot
+  tell them from a short real drop: 19 in six windows on 2026-10-09
+  night, 5 in two windows the next morning.
 - Records: `memory/evidence/E3_R1_RECOVERY_FALSE_PAUSE_2026-10-08.md`,
-  `memory/evidence/E3_R2_RECOVERY_PAUSE_EXIT_2026-10-08.md`.
+  `memory/evidence/E3_R2_RECOVERY_PAUSE_EXIT_2026-10-08.md`,
+  `memory/evidence/E3_A3_RECOVERY_V2_ADOPTION_2026-10-09.md`,
+  `memory/evidence/E3_A3B_RECOVERY_V2_READOPTION_2026-10-09.md`.
+
+## 2026-10-09 the onn ↔ host link at its worst recorded (E3-A3) — OPEN, a LINK item
+
+- **Seen:** E3-A3's six suite windows (00:38-03:01Z), the worst link of
+  E3.
+  - Plain PS1-STREAM: loss 201-2,938 per min, rendered down to 52.6 fps,
+    resyncs up to 189.
+  - CONC: 932-1,952 per min.
+  - The gap log: 364 client→host silences > 250 ms, 27 over 1 s.
+- **Still lossy that morning** (E3-A3B, 04:55-05:40Z): PS1 381, CONC
+  1,130 per min.
+- **For comparison:** E2's PS1-STREAM ran at 32.3 per min, E3-R2's at
+  40-59.
+- **Not a host change:** the code and the adopted state were E3-R2's.
+  The cause between the ends (the air, the onn) is not located; see
+  `host_link` / the warm-state loss (`T3`).
+- **Effect:** the client's own output-stall pauses rise with it. Any
+  performance comparison across these nights carries the link's drift;
+  use same-night controls.

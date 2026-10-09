@@ -2,30 +2,39 @@
 
 Authoritative state: `../CURRENT.md`. **Start there.**
 
-Baseline commit `969085f` (E3-R1 / E3-S7 committed). Queue B's work is
-not committed (the user's commit: `../../../logs/e3_s7b_git_status.txt`;
-also `logs/e3_r2_git_status.txt`).
+Baseline commit `75b2b6b` (E3-R2 / E3-S7B committed). E3-A3's and
+E3-A3B's work is not committed (the user's commit:
+`../../../logs/e3_a3b_git_status.txt`).
 
-## 2026-10-08 (B) — `QUEUE_2026-10-08B`: E3-R2, E3-S7B, unattended
+## 2026-10-09 — recovery v2 ADOPTED (E3-A3B); **E3 CLOSED**
 
-Both ran on the adopted state (live, the guide index, Snes9x), with
-E3-A2's validity rule standing. Every task flag was absent at every
-teardown; the adopted state held after each task (16:29Z, APK
-CONFIRMED). **Nothing adopted or committed.**
+- **E3-A3** (00:32-03:05Z): the user's nft check was recorded (it
+  passed). v2 was adopted, then **reverted**: E3-A2's validity rule
+  voided all six windows on the client's own pauses, though v2 fired
+  nothing.
+- **E3-A3B** (04:50-05:45Z; the user: "Code application why not"):
+  re-adopted with a bar judged on the trigger's own events →
+  **ADOPTION STANDS**. 0 controller pauses, 0 saves; CPU in band; two
+  > 1-s silences the old rule would have paused on passed.
+- **State: four lines, four drop-ins** (live, the index, Snes9x,
+  `recovery.conf`). The kill switch is in `../TOOLS.md` ("Recovery v2").
+- **E3 is CLOSED** with three adoptions (`../../ROADMAP.md`). Next:
+  **E4**.
+- Measured for E4-S1: the user manager delegates **cpu, memory — not
+  cpuset**. RetroArch and ffmpeg share the companion's cgroup, so
+  `CPUQuota=` / `MemoryMax=` on its unit cover the whole stack.
+- The link was at its worst recorded on 10-09 (LINK item in
+  `docs/KNOWN_ISSUES.md`); use same-night controls.
 
-| task | change (flag) | verdict | finding |
-| --- | --- | --- | --- |
-| R2 the false pause, fixed | the 5-s / two-check threshold + **an exit** for a `controller_silence` pause + a silence-gap log (`PRIVYHUB_RECOVERY_TRIGGER=v2`) | **REJECTED** (iii: CONC fps *above* its cross-night band; v: one gap 41 ms after a log write) | the replay, made faithful, held r1-r4; **no recovery pause in 4 runs**; a 1,253-ms uplink silence passed that today's rule pauses on. Adoption waits for the user's nft paste (record §4) |
-| S7B the grab paced, shorter | `PRIVYHUB_EPG_GRAB_NET=paced` + `PRIVYHUB_EPG_GRAB_DELAY_MS=1500` | **REJECTED** (loss 309 / 346 per min; 59.33 fps; aligned 0-2 s 7.6 / 11.7) | today's request groups go back to back; at 1,500 the cycle holds (20-21 refreshes) but the cost per grab equals tonight's unpaced grab; only 4,000 cut it |
+## 2026-10-08 (B) — `QUEUE_2026-10-08B` (committed `75b2b6b`)
 
-- Task 1's flag was absent from task 2's runs; all seven runs valid.
-- **Next, the user's:** the commit; the nft paste for R2 (R2 §4);
-  decisions on R2 and CONC (S7B §4); E4.
+R2 the false pause fixed (threshold + exit + gap log): REJECTED on two
+bar clauses, no pause in 4 runs. S7B the grab paced at 1,500 ms:
+REJECTED (no per-grab gain).
 
-## 2026-10-08 (A) — `QUEUE_2026-10-08` (committed `969085f`)
+## 2026-10-08 (A) (committed `969085f`)
 
-R1 INCONCLUSIVE (the replay not faithful; v2 dormant); S7 REJECTED (the
-cycle), with CONC loss 1,312 → ~60/min at `--delay=4000`.
+R1 INCONCLUSIVE (replay not faithful); S7 REJECTED (the cycle).
 
 ## E3-A2 (committed `def1ad1`)
 
