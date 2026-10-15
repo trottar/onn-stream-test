@@ -1,0 +1,27 @@
+E4-S3B ADDENDUM -- written 2026-10-10 08:46Z after the pre-registered ladder ended (08:45:51Z) and BEFORE any addendum
+run; hash in e4_s3b_addendum.sha256. It changes NO pre-registered verdict: those stand as judged (ladder.json):
+control INCONCLUSIVE (link); E1-META at 1G PASS; E1-CONC at 1G INCONCLUSIVE, repeated, INCONCLUSIVE.
+
+A. WHAT THE PRE-REGISTERED GATES DID NOT SEE (reported). Both E1-CONC runs at MemoryMax=1G + MemorySwapMax=0 were
+   OOM-killed BEFORE their windows: the unit's journal reads "A process of this unit has been killed by the OOM killer"
+   / "Failed with result 'oom-kill'" / "restart counter is at 1" at 07:36:01Z (window from 07:36:48Z) and 08:24:43Z
+   (window from 08:25:30Z) -- the first grab of the cycle (started 30 s after PLAYING) took the cgroup to its limit. The
+   unit restarted (OOMPolicy=stop, Restart=on-failure), the stream was lost, and each 20-min window ran on the restarted
+   unit with the grab cycle alone (267-268 grabs, peak 976 MB) and no stream (rendered 0.0, RetroArch unread). The
+   three kill gates are window-scoped (pre-registration §3) and read 0; the verdicts are INCONCLUSIVE by the link
+   clause plus unreadable gates. In fact the row fails at 1G the way E4-S3's 768M runs failed.
+   THE RUN-SPAN READING (reported for every run of this task and the addendum, never replacing a verdict): the unit's
+   journal kill lines (tools/e1_suite.py journal_kills, the same regex) from the run's idle-gap start to its window's
+   end. Read on the runs so far: E1-CONC 1G run1 3, run2 3; E1-META 1G 0; control 0; (E4-S3's SNES 384M / 512M 0).
+
+B. THE ADDENDUM RUNS, so the four-row floor table can close: E1-CONC (CPU unset) at MemoryMax=1536M + MemorySwapMax=0,
+   then -- only if it does not HOLD -- at 2G + MemorySwapMax=0; tools/e1_suite.py run --e2 --window 1200 --gap 120,
+   the constraint discipline as §1 (written, read back, read back every 60 s under load, removed at teardown, read
+   back infinity / max). A step HOLDS if: the pre-registered judge (e4_s3b_ladder.py judge(), the same control,
+   loss/min 218.23) returns PASS, or INCONCLUSIVE with every gate readable and only link-observed metrics failing; AND
+   the run-span kill count is 0. A row that does not hold at 2G: "above 2G".
+   CONC's swap-off floor, AS AN ADDENDUM READING (labelled so in the floor table): the smallest step that holds,
+   with 1G "OOM-killed before the window (x2)". The stack's swap-off floor is then the max over the four rows, labelled
+   as resting on the addendum.
+
+C. Nothing else changes: rows, windows, the pass rule, the control, the caveat, the rules (§6).

@@ -20,6 +20,13 @@ files' hashes, flags set in the user manager and unset on every exit path.
 
 Writes only under <dir>, plus (removed on every exit path) the counter override in the RetroArch config tree and
 the onn's /sdcard/e1s1.xml dump. Never runs nft or sudo; never touches the Opal.
+
+E4-S2: a --plan item's 5th field (ID:runs:gap:flags:CPUQuota=N%[+MemoryMax=X]) is the run's resource constraint,
+written to the drop-in e4_constraint.conf before its restart and removed (daemon-reload + restart) at its teardown,
+the unit's properties and the cgroup's cpu.max / memory.max read back both ways; the preflight and the final state
+require no e4_constraint.conf. With --e2 every run also records the cgroup (cgroup.jsonl: cpu.stat throttling,
+memory), RetroArch's and the encoder's cgroup membership, and per stream run the gap log's and the recovery log's
+window slices (gaps.jsonl, recovery.jsonl); META/CONC read the guide at the window's end.
 """
 from __future__ import annotations
 
@@ -55,13 +62,22 @@ SNES_CORE = "PRIVYHUB_SNES_CORE=snes9x"
 # E3-A3 (adopted 2026-10-09): recovery v2 (E3-R2: the gap log, the 5-s two-check controller trigger, the
 # controller-return exit) through its own drop-in (recovery.conf); the adopted environ is exactly these four names
 RECOVERY = "PRIVYHUB_RECOVERY_TRIGGER=v2"
-ADOPTED = sorted([LIVE, INDEX, SNES_CORE, RECOVERY])
+# E4-S5D (adopted 2026-10-15): the encoder's output rate is the profile's fps (-r 60), not x11grab's probed tbr
+# (E4-S5 / S5B / S5C), through its own drop-in (snes-capture.conf); the adopted environ is exactly these five names
+SNES_CAPTURE = "PRIVYHUB_SNES_CAPTURE_FIX=output_rate"
+ADOPTED = sorted([LIVE, INDEX, SNES_CORE, RECOVERY, SNES_CAPTURE])
 FLAG_NAMES = ["PRIVYHUB_ADAPTIVE_BITRATE_INJECT", "PRIVYHUB_ADAPTIVE_BITRATE_TOP", "PRIVYHUB_PS1_LOOK",
               "PRIVYHUB_NATIVE_PROFILE_ID", "PRIVYHUB_FEC_SCHEME"]
 RA_CFG = Path.home() / ".config/retroarch/config"
 # E3: a run's flag lives in this drop-in for that run only (written before its restart, removed + daemon-reload +
 # restart at its teardown); the adopted adaptive.conf beside it is never touched
 DROPIN = Path.home() / ".config/systemd/user" / f"privyhub-companion.service.d" / "e3_flag.conf"
+# E4-S2: a run's resource constraint (CPUQuota= / MemoryMax=) lives in this drop-in for that run only, the same way:
+# written before its restart, removed + daemon-reload + restart at its teardown, the unit's properties read back
+E4_DROPIN = DROPIN.parent / "e4_constraint.conf"
+CGROOT = Path("/sys/fs/cgroup")
+GAPS_LOG = REPO / "logs/games/native_stream_ctrl_gaps.log"
+RECOVERY_LOG = REPO / "logs/games/native_stream_recovery.log"
 PS1_DIR = RA_CFG / "Beetle PSX HW"
 PS1_SHA = REPO / "docs/memory/evidence/c5_close_2026-10-05/adopted_ps1_sha256.txt"
 INPUT_CFG = REPO / "data/games/retroarch/config/privyhub-input.cfg"
@@ -204,6 +220,105 @@ def restart_unit() -> dict:
     time.sleep(2)
     mp, sp = mainpid(), serving_pid()
     return {"mainpid_serves_8765": bool(mp and mp == sp), "manager": manager_flags(), "environ": environ_flags(mp)}
+
+
+UNIT_PROPS = ["ControlGroup", "CPUQuotaPerSecUSec", "CPUQuotaPeriodUSec", "MemoryMax", "MemorySwapMax"]
+
+
+def unit_props() -> dict:
+    """E4-S2: the unit's constraint properties as the user manager reports them, and the cgroup's own files."""
+    out = {}
+    for l in sh(["systemctl", "--user", "show", *[f"-p{k}" for k in UNIT_PROPS], UNIT]).splitlines():
+        k, _, v = l.partition("=")
+        out[k] = v
+    cg = CGROOT / out.get("ControlGroup", "").lstrip("/")
+    for f in ("cgroup.controllers", "cpu.max", "memory.max", "memory.swap.max"):
+        try:
+            out[f] = (cg / f).read_text().strip()
+        except OSError:
+            out[f] = None
+    out["dropin_present"] = E4_DROPIN.exists()
+    return out
+
+
+def _size_bytes(v: str) -> int:
+    mult = {"K": 1 << 10, "M": 1 << 20, "G": 1 << 30}
+    return int(float(v[:-1]) * mult[v[-1]]) if v[-1] in mult else int(v)
+
+
+def constraint_holds(cons: list, p: dict) -> bool:
+    """The read-back matches the drop-in: CPUQuota=N% -> cpu.max quota/period = N/100; MemoryMax=X -> memory.max."""
+    for kv in cons:
+        k, _, v = kv.partition("=")
+        if k == "CPUQuota":
+            q = (p.get("cpu.max") or "").split()
+            if len(q) != 2 or q[0] == "max" or abs(int(q[0]) / int(q[1]) - float(v.rstrip("%")) / 100) > 0.005:
+                return False
+        elif k == "MemoryMax":
+            if p.get("memory.max") != str(_size_bytes(v)):
+                return False
+        elif k == "MemorySwapMax":
+            if p.get("memory.swap.max") != str(_size_bytes(v)):
+                return False
+        elif k == "CPUQuotaPeriodSec":
+            q = (p.get("cpu.max") or "").split()
+            if len(q) != 2 or int(q[1]) != int(v.rstrip("ms")) * 1000:
+                return False
+    return True
+
+
+def cgroup_path() -> Path:
+    return CGROOT / sh(["systemctl", "--user", "show", "-p", "ControlGroup", "--value", UNIT]).strip().lstrip("/")
+
+
+def cgroup_read(cg: Path) -> dict:
+    """cpu.stat, memory.current/.peak/.swap.current and memory.events of the unit's cgroup (read-only)."""
+    d = {"at_utc": utc()}
+    try:
+        for l in (cg / "cpu.stat").read_text().splitlines():
+            k, v = l.split()
+            d["cpu." + k] = int(v)
+    except (OSError, ValueError):
+        pass
+    for f in ("memory.current", "memory.peak", "memory.swap.current"):
+        try:
+            d[f] = int((cg / f).read_text().split()[0])
+        except (OSError, ValueError, IndexError):
+            pass
+    try:
+        for l in (cg / "memory.events").read_text().splitlines():
+            k, v = l.split()
+            d["memory.events." + k] = int(v)
+    except (OSError, ValueError):
+        pass
+    try:   # E4-S3: page cache vs anon, and the cgroup's own memory pressure (stall totals, us)
+        for l in (cg / "memory.stat").read_text().splitlines():
+            k, v = l.split()
+            if k in ("anon", "file", "shmem", "file_mapped", "pgmajfault"):
+                d["memory.stat." + k] = int(v)
+        for l in (cg / "memory.pressure").read_text().splitlines():
+            kind, *kv = l.split()
+            d[f"memory.pressure.{kind}_total_us"] = int(dict(x.split("=") for x in kv)["total"])
+    except (OSError, ValueError, KeyError):
+        pass
+    return d
+
+
+def journal_kills(t0: str, t1: str) -> dict:
+    """E4-S3: the unit's journal over [t0, t1] -- lines that report a kill (OOM / SIGKILL / signal 9 / killed),
+    counted; the first few kept, cut to 160 characters."""
+    since, until = t0[:19].replace("T", " ") + " UTC", t1[:19].replace("T", " ") + " UTC"
+    out = sh(["journalctl", "--user", "-u", f"{UNIT}.service", "--since", since, "--until", until, "-o", "cat",
+              "--no-pager"], 60)
+    hits = [l[:160] for l in out.splitlines() if re.search(r"oom|sigkill|signal 9|killed", l, re.I)]
+    return {"count": len(hits), "first": hits[:5], "read": not out.startswith("__error__")}
+
+
+def in_unit_cgroup(pid: int) -> bool:
+    try:
+        return f"/{UNIT}.service" in open(f"/proc/{pid}/cgroup").read()
+    except OSError:
+        return False
 
 
 def comm_pids(names: set) -> list:
@@ -511,6 +626,22 @@ class Poller(threading.Thread):
                 self.stop.wait(10)
 
 
+class CgroupPoller(threading.Thread):
+    """E4-S2: the unit's cgroup every 5 s (cpu.stat throttling, memory.current/peak/swap, memory.events)."""
+
+    def __init__(self, path: Path, stop: threading.Event):
+        super().__init__(daemon=True)
+        self.path, self.stop = path, stop
+
+    def run(self):
+        cg = cgroup_path()
+        with open(self.path, "w") as fh:
+            while not self.stop.is_set():
+                fh.write(json.dumps(cgroup_read(cg)) + "\n")
+                fh.flush()
+                self.stop.wait(5)
+
+
 class EpgCycle(threading.Thread):
     """The E1-META grab cycle: forced refreshes over the fixed list, in order, until stopped; plus the library
     scan (GET /plugins/games/games) every 30 s on its own timer."""
@@ -536,15 +667,48 @@ class EpgCycle(threading.Thread):
     def run(self):
         threading.Thread(target=self.scans, daemon=True).start()
         i = 0
+        streak = None      # E4-S3B: a run of refresh calls failing at the connection (refused / reset / timeout)
         while not self.stop.is_set():
             ch = EPG_CHANNELS[i % len(EPG_CHANNELS)]
             t0 = time.time()
             code, d = http("POST", f"/plugins/epg/refresh?channel_id={urllib.parse.quote(ch)}", 150)
+            if code is None:
+                # E4-S3B: no HTTP reply at all -- back off 1 s, doubling to 30 s, until a call is answered; the
+                # streak is written as ONE row (first failure, count, duration) when it ends or the cycle stops
+                if streak is None:
+                    streak = {"kind": "grab_fail_streak", "channel": ch, "start_utc": utc(t0),
+                              "first_error": d.get("error"), "count": 0, "backoff_s": 1.0, "_t0": t0}
+                streak["count"] += 1
+                streak["_t1"] = time.time()
+                streak["end_utc"] = utc(streak["_t1"])
+                i += 1
+                self.stop.wait(streak["backoff_s"])
+                streak["backoff_s"] = min(30.0, streak["backoff_s"] * 2)
+                continue
+            if streak is not None:
+                self.write(self.close_streak(streak))
+                streak = None
+            if d.get("refresh_deferred"):
+                # E4-S4: the grab was deferred (a stream is live); the cycle keeps its normal pace (~5 s per grab,
+                # E4-S1's median) instead of re-asking at once
+                self.write({"kind": "deferred", "channel": ch, "start_utc": utc(t0), "end_utc": utc(),
+                            "stream_state": d.get("stream_state"), "pending": d.get("deferred_pending")})
+                i += 1
+                self.stop.wait(5.0)
+                continue
             self.write({"kind": "grab", "channel": ch, "start_utc": utc(t0), "end_utc": utc(),
                         "s": round(time.time() - t0, 3), "http": code, "ok": bool(d.get("ok")),
                         "programmes": d.get("programme_count"), "cached": d.get("cached")})
             i += 1
+        if streak is not None:
+            self.write(self.close_streak(streak))
         self.fh.close()
+
+    @staticmethod
+    def close_streak(s: dict) -> dict:
+        out = {k: v for k, v in s.items() if k not in ("backoff_s", "_t0", "_t1")}
+        out["duration_s"] = round(s["_t1"] - s["_t0"], 3)
+        return out
 
 
 # ---------------------------------------------------------------- key figures
@@ -643,18 +807,149 @@ def poll_figures(path: Path, t0: str, t1: str) -> dict:
 
 
 def epg_figures(path: Path, t0: str, t1: str) -> dict:
-    grabs, scans = [], []
+    grabs, scans, deferred, streaks = [], [], [], []
     if path.exists():
         for line in path.read_text().splitlines():
             r = json.loads(line)
+            if r["kind"] == "grab_fail_streak":
+                # E4-S3B: a failure streak counts if it overlaps the window; its attempts count as failed grabs
+                if r["start_utc"] <= t1 and r["end_utc"] >= t0:
+                    streaks.append(r)
+                continue
             if not (t0 <= r["start_utc"] and r["end_utc"] <= t1):
                 continue
-            (grabs if r["kind"] == "grab" else scans).append(r)
+            (grabs if r["kind"] == "grab" else deferred if r["kind"] == "deferred" else scans).append(r)
     ok = [g["s"] for g in grabs if g["ok"]]
-    return {"grabs_in_window": len(grabs), "grabs_ok": len(ok), "grabs_failed": len(grabs) - len(ok),
+    per_ch = {}
+    for g in grabs:
+        if g["ok"]:
+            per_ch[g.get("channel")] = per_ch.get(g.get("channel"), 0) + 1
+    fails = sum(r["count"] for r in streaks)
+    return {"grabs_in_window": len(grabs) + fails, "grabs_ok": len(ok), "grabs_failed": len(grabs) - len(ok) + fails,
+            "fail_streaks": len(streaks), "fail_streak_attempts": fails,
+            "fail_streak_s": round(sum(r["duration_s"] for r in streaks), 1),
+            "grabs_ok_per_channel": per_ch, "deferred_in_window": len(deferred),
             "grab_s_median": round(statistics.median(ok), 3) if ok else None,
             "grab_s_max": max(ok, default=None),
             "scans": len(scans), "scan_s_median": round(statistics.median([s["s"] for s in scans]), 4) if scans else None}
+
+
+def _jsonl_files(paths: list) -> list:
+    seen, out = set(), []
+    for f in paths:
+        try:
+            lines = Path(f).read_text(errors="replace").splitlines()
+        except OSError:
+            continue
+        for l in lines:
+            if l not in seen:
+                seen.add(l)
+                try:
+                    out.append(json.loads(l))
+                except ValueError:
+                    pass
+    return out
+
+
+def gap_recovery_figures(rd: Path, t0: str, t1: str) -> dict:
+    """E4: the window's slice of the gap log (recovery v2's) and of the recovery events -> gaps.jsonl, recovery.jsonl
+    in the run dir; controller pauses (trigger controller_silence) and client pauses (client_*) with resume times."""
+    gaps = [g for g in _jsonl_files([str(GAPS_LOG) + ".1", GAPS_LOG]) if t0 <= g.get("start_utc", "") <= t1]
+    rec = sorted([r for r in _jsonl_files(sorted(HB_ARCH.glob("native_stream_recovery.log*"))
+                                         + [str(RECOVERY_LOG) + ".1", RECOVERY_LOG])
+                  if t0 <= (r.get("at_utc") or "") <= t1], key=lambda r: r["at_utc"])
+    (rd / "gaps.jsonl").write_text("".join(json.dumps(g) + "\n" for g in gaps))
+    (rd / "recovery.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rec))
+    ts = lambda s: time.mktime(time.strptime(s[:19], "%Y-%m-%dT%H:%M:%S")) + float("0." + s[20:-1] if len(s) > 20 else 0)
+    pauses = []
+    for i, r in enumerate(rec):
+        if r.get("event") != "desync_pause":
+            continue
+        nxt = next((x for x in rec[i + 1:] if x.get("event") in ("resumed", "gave_up_saved", "session_ended")), None)
+        pauses.append({"at_utc": r["at_utc"], "trigger": r.get("trigger"), "next": (nxt or {}).get("event"),
+                       "via": (nxt or {}).get("via"),
+                       "after_s": round(ts(nxt["at_utc"]) - ts(r["at_utc"]), 2) if nxt else None})
+    ms = [g.get("gap_ms") or 0 for g in gaps]
+    return {"gaps": {"count": len(gaps), "over_1s": sum(1 for m in ms if m > 1000), "max_ms": max(ms, default=None)},
+            "recovery": {"controller_pauses": [p for p in pauses if p["trigger"] == "controller_silence"],
+                         "client_pauses": [p for p in pauses if str(p["trigger"]).startswith("client_")],
+                         "other_pauses": [p for p in pauses if p["trigger"] != "controller_silence"
+                                          and not str(p["trigger"]).startswith("client_")],
+                         "gave_up_saved": [r["at_utc"] for r in rec if str(r.get("event", "")).startswith("gave_up")]}}
+
+
+DEFER = "PRIVYHUB_EPG_DEFER_WHILE_STREAMING=1"
+
+
+def wait_deferred_drain(timeout: float = 600) -> dict:
+    """E4-S4: after the stream ended, wait for the deferred grab queue to drain (the EPG status's "deferred"), then
+    read the guide. Recorded in the teardown."""
+    t0 = time.time()
+    first = (http("GET", "/plugins/epg/status", 10)[1] or {}).get("deferred") or {}
+    out = {"pending_at_start": first.get("pending"), "requests": first.get("requests")}
+    d = first
+    while time.time() - t0 < timeout:
+        d = (http("GET", "/plugins/epg/status", 10)[1] or {}).get("deferred") or {}
+        if d.get("pending") == 0 and not d.get("draining"):
+            break
+        time.sleep(2)
+    out.update({"waited_s": round(time.time() - t0, 1), "pending_at_end": d.get("pending"),
+                "drained_ok": d.get("drained_ok"), "drained_failed": d.get("drained_failed"),
+                "cap_fired": d.get("cap_fired"), "last_drain": d.get("last_drain")})
+    out["guide_after"] = guide_read()
+    return out
+
+
+def guide_read() -> dict:
+    """E4-S2: "the guide serves" -- tools/e3_guide_read.py's check (non-forced cached reads of the six channels)."""
+    out = {"channels_serving": 0, "programmes_total": 0}
+    for c in EPG_CHANNELS:
+        code, d = http("GET", "/plugins/epg/guide?channel_id=" + urllib.parse.quote(c), 30)
+        if code == 200 and d.get("ok") and (d.get("programme_count") or 0) > 0:
+            out["channels_serving"] += 1
+            out["programmes_total"] += d.get("programme_count") or 0
+    out["serves"] = out["channels_serving"] == len(EPG_CHANNELS)
+    return out
+
+
+def cgroup_figures(path: Path, t0: str, t1: str, window: int) -> dict:
+    """E4-S2: the window's cgroup deltas: CPU used (cores), throttled periods and seconds, memory, OOM events."""
+    rows = [json.loads(l) for l in path.read_text().splitlines()] if path.exists() else []
+    w = [r for r in rows if t0 <= r["at_utc"] <= t1]
+    if len(w) < 2:
+        return {"rows": len(w)}
+    a, b = w[0], w[-1]
+    span = len(w) and (time.mktime(time.strptime(b["at_utc"][:19], "%Y-%m-%dT%H:%M:%S"))
+                       - time.mktime(time.strptime(a["at_utc"][:19], "%Y-%m-%dT%H:%M:%S")))
+    d = lambda k: (b.get(k, 0) - a.get(k, 0)) if k in a or k in b else None
+    out = {"rows": len(w), "span_s": span,
+           "usage_cores": round(d("cpu.usage_usec") / 1e6 / span, 4) if span and d("cpu.usage_usec") is not None else None,
+           "nr_periods": d("cpu.nr_periods"), "nr_throttled": d("cpu.nr_throttled"),
+           "throttled_s": round(d("cpu.throttled_usec") / 1e6, 3) if d("cpu.throttled_usec") is not None else None}
+    if out["nr_periods"]:
+        out["throttled_period_frac"] = round(out["nr_throttled"] / out["nr_periods"], 4)
+    mc = [r["memory.current"] for r in w if "memory.current" in r]
+    sw = [r.get("memory.swap.current", 0) for r in w]
+    out.update({"memory_current_mean_mb": round(statistics.mean(mc) / 2**20, 1) if mc else None,
+                "memory_current_max_mb": round(max(mc) / 2**20, 1) if mc else None,
+                "swap_current_max_mb": round(max(sw) / 2**20, 1),
+                "memory_peak_mb": round(b["memory.peak"] / 2**20, 1) if "memory.peak" in b else None})
+    for k in ("high", "max", "oom", "oom_kill"):
+        out[f"memory_events_{k}"] = d(f"memory.events.{k}")
+    # E4-S3: anon / file at the window's memory.current peak; memory PSI (ms of stall per s); major faults
+    if mc:
+        pk = max((r for r in w if "memory.current" in r), key=lambda r: r["memory.current"])
+        out["anon_mb_at_peak"] = round(pk.get("memory.stat.anon", 0) / 2**20, 1) if "memory.stat.anon" in pk else None
+        out["file_mb_at_peak"] = round(pk.get("memory.stat.file", 0) / 2**20, 1) if "memory.stat.file" in pk else None
+        an = [r["memory.stat.anon"] for r in w if "memory.stat.anon" in r]
+        out["anon_mb_max"] = round(max(an) / 2**20, 1) if an else None
+    for kind in ("some", "full"):
+        x = d(f"memory.pressure.{kind}_total_us")
+        out[f"memory_psi_{kind}_ms_per_s"] = round(x / 1000 / span, 3) if x is not None and span else None
+    out["pgmajfault"] = d("memory.stat.pgmajfault")
+    # whole run (gap to teardown): any OOM at all
+    out["oom_kill_run"] = (rows[-1].get("memory.events.oom_kill", 0) - rows[0].get("memory.events.oom_kill", 0)) if rows else None
+    return out
 
 
 # ---------------------------------------------------------------- one run
@@ -666,9 +961,11 @@ def preflight() -> dict:
          "drop_in_index": f"Environment={INDEX}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_snes_core": f"Environment={SNES_CORE}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_recovery": f"Environment={RECOVERY}" in sh(["systemctl", "--user", "cat", UNIT]),
-         "e3_dropin_absent": not DROPIN.exists()}
+         "drop_in_snes_capture": f"Environment={SNES_CAPTURE}" in sh(["systemctl", "--user", "cat", UNIT]),
+         "e3_dropin_absent": not DROPIN.exists(), "e4_constraint_absent": not E4_DROPIN.exists()}
     d["ok"] = (d["manager"] == [] and d["environ"] == ADOPTED and d["adb"] and d["drop_in_live"] and d["drop_in_index"]
-               and d["drop_in_snes_core"] and d["drop_in_recovery"] and d["e3_dropin_absent"])
+               and d["drop_in_snes_core"] and d["drop_in_recovery"] and d["drop_in_snes_capture"] and d["e3_dropin_absent"]
+               and d["e4_constraint_absent"])
     return d
 
 
@@ -685,12 +982,21 @@ def teardown_flags(w: dict, rec: dict):
         DROPIN.unlink(missing_ok=True)
         sh(["systemctl", "--user", "daemon-reload"], 60)
         rec["dropin_removed"] = not DROPIN.exists()
-    if w.get("flags") or w.get("dropin"):
+    if E4_DROPIN.exists() or w.get("constraint"):
+        E4_DROPIN.unlink(missing_ok=True)
+        sh(["systemctl", "--user", "daemon-reload"], 60)
+        rec["constraint_removed"] = not E4_DROPIN.exists()
+    if w.get("flags") or w.get("dropin") or w.get("constraint"):
         rec["restart_after_flags"] = restart_unit()
     if w.get("dropin"):
         rec["dropin_env_absent"] = not any(environ_has(mainpid(), kv) for kv in w["dropin"])
+    if w.get("constraint"):
+        rec["constraint_readback_after"] = p = unit_props()
+        rec["constraint_lifted"] = (p.get("CPUQuotaPerSecUSec") == "infinity" and p.get("MemoryMax") == "infinity"
+                                    and p.get("cpu.max") in (None, "max 100000") and p.get("memory.max") == "max"
+                                    and p.get("MemorySwapMax") == "infinity" and p.get("memory.swap.max") == "max")
     mp = mainpid()
-    rec["flags_absent"] = manager_flags() == [] and environ_flags(mp) == ADOPTED
+    rec["flags_absent"] = manager_flags() == [] and environ_flags(mp) == ADOPTED and not E4_DROPIN.exists()
 
 
 def run_once(w: dict, run_no: int, out: Path, window: int, gap: int, e2: bool = False) -> dict:
@@ -719,7 +1025,8 @@ def run_once(w: dict, run_no: int, out: Path, window: int, gap: int, e2: bool = 
             if game["override"].exists():
                 raise RuntimeError("a file already sits at the counter override's path; refusing to overwrite")
             game["override"].parent.mkdir(parents=True, exist_ok=True)   # E3-S4: a lighter core's config dir
-            game["override"].write_text(COUNTER)
+            # E4-S5: E1_COUNTER_EXTRA (lines, "\\n"-separated) appended to the per-run counter override; absent = today
+            game["override"].write_text(COUNTER + os.environ.get("E1_COUNTER_EXTRA", "").replace("\\n", "\n"))
             rec["counter_override"] = "set"
         for kv in w.get("flags", []):
             sh(["systemctl", "--user", "set-environment", kv])
@@ -727,10 +1034,19 @@ def run_once(w: dict, run_no: int, out: Path, window: int, gap: int, e2: bool = 
             DROPIN.write_text("[Service]\n" + "".join(f"Environment={kv}\n" for kv in w["dropin"]))
             sh(["systemctl", "--user", "daemon-reload"], 60)
             rec["dropin"] = list(w["dropin"])
+        if w.get("constraint"):
+            rec["constraint_readback_before"] = unit_props()
+            E4_DROPIN.write_text("[Service]\n" + "".join(f"{kv}\n" for kv in w["constraint"]))
+            sh(["systemctl", "--user", "daemon-reload"], 60)
+            rec["constraint"] = list(w["constraint"])
         rec["restart"] = r = restart_unit()
-        want = sorted(ADOPTED + w.get("flags", []) + [kv for kv in w.get("dropin", []) if kv.startswith("PRIVYHUB_")])
+        if w.get("constraint"):
+            rec["constraint_readback"] = p = unit_props()
+            if not constraint_holds(w["constraint"], p):
+                raise RuntimeError(f"the constraint did not take effect: {p}")
+        want = sorted(ADOPTED + w.get("flags", []) + [kv for kv in (w.get("dropin") or []) if kv.startswith("PRIVYHUB_")])
         if not (r["mainpid_serves_8765"] and r["environ"] == want and r["manager"] == sorted(w.get("flags", []))
-                and all(environ_has(mainpid(), kv) for kv in w.get("dropin", []))):
+                and all(environ_has(mainpid(), kv) for kv in (w.get("dropin") or []))):
             raise RuntimeError(f"unit not as expected after restart: {r}")
         st = stream_status()
         ov = st.get("encoder_overrides") or {}
@@ -745,6 +1061,9 @@ def run_once(w: dict, run_no: int, out: Path, window: int, gap: int, e2: bool = 
             cmd.append("--title")
         if e2:
             cmd.append("--e2")
+            cgp = CgroupPoller(rd / "cgroup.jsonl", stop_ev)
+            cgp.start()
+            threads.append(cgp)
         samp = subprocess.Popen(cmd, stdout=open(rd / "sampler.log", "w"), stderr=subprocess.STDOUT)
         g0 = utc()
         log(w["id"], f"run{run_no}: idle gap {gap}s")
@@ -813,6 +1132,10 @@ def run_once(w: dict, run_no: int, out: Path, window: int, gap: int, e2: bool = 
             playing_t = time.time()
         # ---- warm-up from PLAYING (or the switch), then the window
         time.sleep(max(0, w["warmup"] - (time.time() - playing_t)))
+        if e2:
+            rec["mainpid_window_start"] = mainpid()
+            rec["cgroup_membership"] = {"retroarch": [in_unit_cgroup(p) for p in retroarch_pids()],
+                                        "encoder": [in_unit_cgroup(p) for p in encoder_pids()]}
         t0 = utc()
         log(w["id"], f"run{run_no}: window {t0} + {window}s")
         time.sleep(window)
@@ -822,6 +1145,13 @@ def run_once(w: dict, run_no: int, out: Path, window: int, gap: int, e2: bool = 
             rec["status_end"] = {k: stream_status().get(k) for k in ("width", "height", "bitrate_kbps")}
         if w["kind"] == "vod":
             rec["vod_end"] = vod_end(rec["launch"])
+        if e2 and (w["kind"] == "meta" or w.get("epg_at")):
+            rec["guide_at_end"] = guide_read()
+        if e2:
+            rec["cgroup_membership_end"] = {"retroarch": [in_unit_cgroup(p) for p in retroarch_pids()],
+                                            "encoder": [in_unit_cgroup(p) for p in encoder_pids()]}
+            rec["mainpid_window_end"] = mainpid()
+            rec["kills_in_window"] = journal_kills(t0, utc())
         rec["status"] = "WINDOW_DONE"
     except Exception as exc:  # noqa: BLE001
         rec["status"] = "FAILED"
@@ -849,6 +1179,8 @@ def run_once(w: dict, run_no: int, out: Path, window: int, gap: int, e2: bool = 
             td["counter_override_removed"] = not game["override"].exists()
         if stream:
             td["banner"] = banner_clear()
+        if e2 and DEFER in (w.get("dropin") or []):
+            td["deferred_drain"] = wait_deferred_drain()
         if w["kind"] == "vod":
             td["vod"] = vod_teardown()
         teardown_flags(w, td)
@@ -891,11 +1223,21 @@ def run_once(w: dict, run_no: int, out: Path, window: int, gap: int, e2: bool = 
             (rd / "decisions.jsonl").write_text("".join(json.dumps(r) + "\n" for r in dr))
             key["decisions"] = {"rows": len(dr), "transitions": sum(1 for r in dr if r.get("event") == "transition"
                                                                    or r.get("kind") == "transition")}
+            key.update(gap_recovery_figures(rd, t0, t1))
+        if e2:
+            key["cgroup"] = cgroup_figures(rd / "cgroup.jsonl", t0, t1, window)
         rec["key"] = key
         rec["status"] = "OK" if rec["status"] == "WINDOW_DONE" else rec["status"]
     (rd / "summary.json").write_text(json.dumps(rec, indent=1))
     log(w["id"], f"run{run_no}: {rec['status']}; teardown {json.dumps(rec.get('teardown'))[:400]}")
     return rec
+
+
+def constraint_tag(cons: list) -> str:
+    """['CPUQuota=150%', 'MemoryMax=2G'] -> 'cpu150_mem2G' (the run dir's suffix)."""
+    return "_".join(("cpu" + v.rstrip("%")) if k == "CPUQuota" else ("per" + v) if k == "CPUQuotaPeriodSec"
+                    else ("swap" + v) if k == "MemorySwapMax" else ("mem" + v)
+                    for k, _, v in (kv.partition("=") for kv in cons))
 
 
 def run_suite(out: Path, only: list | None, runs: int, window: int, gap: int, plan: list | None = None,
@@ -911,19 +1253,23 @@ def run_suite(out: Path, only: list | None, runs: int, window: int, gap: int, pl
         for row in plan:
             i, r, g = row[:3]
             fl = row[3] if len(row) > 3 else None
-            w = dict(byid[i], dropin=fl, dir=f"{i}_flag") if fl else byid[i]
+            cons = row[4] if len(row) > 4 else None      # E4-S2: a 5th field = the run's constraint drop-in
+            tag = "_".join((["flag"] if fl else []) + ([constraint_tag(cons)] if cons else []))
+            w = dict(byid[i], dropin=fl, constraint=cons, dir=f"{i}_{tag}") if tag else byid[i]
             core = next((kv.split("=", 1)[1] for kv in (fl or []) if kv.startswith("PRIVYHUB_SNES_CORE=")), None)
             if core and w.get("game"):
                 w["game"] = dict(w["game"], override=RA_CFG / SNES_CORENAMES[core] / w["game"]["override"].name)
             sched.append((w, r, g))
     else:
         sched = [(w, runs, gap) for w in WORKLOADS if not only or w["id"] in only]
-    log(f"suite start: {[(w.get('dir', w['id']), r, g, w.get('dropin')) for w, r, g in sched]}, window {window}s, gap {gap}s, e2 {e2}; "
+    log(f"suite start: {[(w.get('dir', w['id']), r, g, w.get('dropin'), w.get('constraint')) for w, r, g in sched]}, window {window}s, gap {gap}s, e2 {e2}; "
         f"ABSENT: {sorted(ABSENT)}")
     (out / "absent.json").write_text(json.dumps(ABSENT, indent=1))
     done = {}   # E3-S5B: interleaved plan items for the same row continue its run numbers (run1, run2, ...)
     for w, nruns, first_gap in sched:
-        base = done.get(w.get("dir", w["id"]), 0)
+        # E4-S2: a later invocation into the same <dir> continues after the run dirs already there (never overwrites)
+        base = done.get(w.get("dir", w["id"]), max((int(d.name[3:]) for d in (out / w.get("dir", w["id"])).glob("run*")
+                                                    if d.name[3:].isdigit()), default=0))
         done[w.get("dir", w["id"])] = base + nruns
         for n in range(base + 1, base + nruns + 1):
             rec = None
@@ -941,7 +1287,10 @@ def run_suite(out: Path, only: list | None, runs: int, window: int, gap: int, pl
              "ps1_files_identical": ps1_files_identical(), "apk": "CONFIRMED" if apk_hash() == EXPECT_APK else "MISMATCH",
              "retroarch": len(retroarch_pids()), "encoder": len(encoder_pids()), "at_utc": utc()}
     final["e3_dropin_absent"] = not DROPIN.exists()
-    final["flags_absent"] = final["manager"] == [] and final["environ"] == ADOPTED and final["e3_dropin_absent"]
+    final["e4_constraint_absent"] = not E4_DROPIN.exists()
+    final["unit_props"] = unit_props()
+    final["flags_absent"] = (final["manager"] == [] and final["environ"] == ADOPTED and final["e3_dropin_absent"]
+                             and final["e4_constraint_absent"])
     (out / "final_state.json").write_text(json.dumps(final, indent=1))
     log("final state:", json.dumps(final))
 
@@ -1137,8 +1486,15 @@ def main(argv: list) -> int:
             for item in argv[argv.index("--plan") + 1].split(","):
                 p = item.split(":")
                 row = [p[0], int(p[1]) if len(p) > 1 else 1, int(p[2]) if len(p) > 2 else gap]
-                if len(p) > 3 and p[3]:
-                    row.append(p[3].split("+"))
+                if len(p) > 3:
+                    row.append(p[3].split("+") if p[3] else None)
+                if len(p) > 4:
+                    row.append(p[4].split("+") if p[4] else None)
+                bad = [kv for kv in (row[4] if len(row) > 4 and row[4] else [])
+                       if not re.fullmatch(r"CPUQuota=\d+%|MemoryMax=\d+[KMG]?|CPUQuotaPeriodSec=\d+ms|MemorySwapMax=\d+[KMG]?", kv)]
+                if bad:
+                    print("refusing: a constraint is CPUQuota=N%, MemoryMax=X, MemorySwapMax=X or CPUQuotaPeriodSec=Nms only", bad)
+                    return 2
                 plan.append(row)
             unknown = [r[0] for r in plan if r[0] not in {w["id"] for w in WORKLOADS}]
             if unknown:

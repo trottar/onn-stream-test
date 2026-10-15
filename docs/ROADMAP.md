@@ -938,7 +938,12 @@ Architectural statement:
 
 **Status: ACTIVE (started 2026-10-05, the user's "let's start E1") — E1
 FROZEN (E1-S1; VOD added 2026-10-05); E2 MEASURED (E2-S1, 2026-10-06); E3
-CLOSED (2026-10-09, E3-A3); E4 next.** (Was: NEXT; PLANNED AFTER D.)
+CLOSED (2026-10-09, E3-A3); E4 ACTIVE — reference re-measured (E4-S1), the
+CPU-time floor (E4-S2) and the memory floor (E4-S3, swap off) measured; grab
+deferral (E4-S4) and the SNES capture fix (E4-S5) built behind flags, both
+REJECTED by their bars on a lossy link; the memory floor closed at 1.5G swap
+off (E4-S3B); the fix's bench and deferral's clean-link rerun INCONCLUSIVE
+(E4-S5B, E4-S4B, 2026-10-10); the alpha proposal is the user's call.** (Was: NEXT; PLANNED AFTER D.)
 
 Phase E deliberately limits the core emulator workload to:
 
@@ -1149,7 +1154,57 @@ Produce:
 - **Recommended alpha:** floor plus reliability/update/concurrency headroom;
 - **Optional higher tier:** stronger profiles without redefining Core.
 
+**Status (2026-10-15, E4-C1): CLOSED on the host side** — the close-out
+is `docs/memory/evidence/E4_CLOSEOUT_2026-10-15.md` (the reference, both
+floors final, the alpha in two columns with margins, adopted / not adopted,
+the link, E7's list). **Open, and not the host's: the link** — 60 stream
+runs since 2026-10-09, 0 under D-BASE's loss row (< 10/min; the close-out
+held 8.4); the watch (E4-S4D, session A) is the open item. The SNES capture
+fix (E4-S5D): in adoption, session A, at the close-out's writing. The alpha
+is the user's call (E6).
+
+| item | result (final, E4-C1) | record |
+| --- | --- | --- |
+| E4-S1 known-good reference | **re-measured on the adopted state** (live, the guide index, Snes9x, recovery v2): idle 1.2 % host CPU / 5.3 W; PS1 streamed 10.9 %, stack 95 % of a core, 354 MB, 20.1 W, 59.53 fps; contended (PS1 + grabs) 21.4 %, stack 172 %, 856 MB, 25.7 W, 58.46 fps; heaviest (1080p rung) 15.3 %, 139 %, 22.0 W. Drift from E2: 14 of 89 metrics, explained by Snes9x (SNES 43-50 → 7.4 % host) and the guide index (META companion 153 → 34 MB). Found: the SNES encoder intermittently outputs 59 fps (a drop per second) | `docs/memory/evidence/E4_S1_REFERENCE_ON_ADOPTED_STATE_2026-10-09.md` |
+| CPU-time floor (final) | **CPU-TIME, not slow-core; cgroup, not host.** PS1-STREAM 150 %, SNES-STREAM ≤ 100 %, META ≤ 100 %, CONC 400 % → **the stack 400 % today; 150 % with grab deferral** (CONC + deferral at 150 %: 0 s throttled, host-side gates pass; E4-S4 (d) link-INCONCLUSIVE) | `E4_S2_CPU_MEMORY_FLOOR_2026-10-09.md`, `E4_S4_GRAB_DEFERRAL_2026-10-10.md` |
+| memory floor, swap off (final) | PS1-STREAM / SNES-STREAM **≤ 384M** (228 / 197 MB peak), META **1G** (976 MB), CONC **1.5G** (1,166 MB; addendum) → **the stack 1.5G** (between 1G and 1.5G). With swap every row passed at 1G (CONC pinned, 127.5 MB swapped) | `E4_S3_…`, `E4_S3B_MEMORY_FLOOR_1G_SWAPOFF_2026-10-10.md` |
+| recommended alpha | **today:** ≥ 6 cores of this speed class (+50 % over 400 %), 1.5 GB stack no swap (+32 % over 1,166 MB; 2 GB to absorb a second activity), 8 GB system, VAAPI H.264 720p60. **With deferral:** ≥ 4 cores (+167 % over 150 %), 1.25 GB stack (~+30 % over 976 MB). **Optional higher tier:** C5's 1080p rung — host 139 % of a core, its floor not measured; limited by the client (onn spike row 317.9/min, switch gaps), not adopted | the user's call (E6); close-out §3 |
+
+**Queue 2026-10-10 (`QUEUE_2026-10-10.md`):**
+
+| task | result | verdict | record |
+| --- | --- | --- | --- |
+| E4-S3 the memory floor, swap off | `MemoryMax=` 768M / 512M / 384M with `MemorySwapMax=0`: PS1-STREAM and SNES-STREAM **≤ 384M** (228 / 197 MB peak, no pressure); CONC and META **> 768M** (the EPG grabber OOM-killed, the unit restarted); with E4-S2: the stack's memory floor between 768M and 1G, set by the grabber | MEASURED | `docs/memory/evidence/E4_S3_MEMORY_FLOOR_CLOSE_2026-10-10.md` |
+| E4-S4 grab deferral while streaming (`PRIVYHUB_EPG_DEFER_WHILE_STREAMING=1`) | the deferral works: 0 grabs and 0 grabber processes in every flagged window, drains 6/6 in 33-36 s, the guide serves; CONC + flag at 150 %: every host-side gate passes, **0 s throttled** (E4-S2's CONC: 21 s throttled at 400 %). Stream quality on a lossy link: loss 530 / 364 per min vs the control's 148 | **REJECTED** (a: loss / rendered / resyncs; d: link-INCONCLUSIVE) — not adopted | `docs/memory/evidence/E4_S4_GRAB_DEFERRAL_2026-10-10.md` |
+| E4-S5 the SNES 59-fps capture fault | **cause LOCATED**: the encoder adopts x11grab's probed input rate (`tbr`); the SNES window sometimes probes 59 / 59.94. Fix `PRIVYHUB_SNES_CAPTURE_FIX=output_rate` (output `-r 60`): capture 59.97 / 59.99, 0.05-0.1 dup+drop, but no bad probe occurred under it | **REJECTED** (rendered fps on the link) — not adopted | `docs/memory/evidence/E4_S5_SNES_CAPTURE_59FPS_2026-10-10.md` |
+
+**Queue 2026-10-10B (`QUEUE_2026-10-10B.md`):**
+
+| task | result | verdict | record |
+| --- | --- | --- | --- |
+| E4-S3B the memory floor at 1G, swap off | META **1G PASS** (976 MB peak, 0 events); CONC at 1G **OOM-killed before the window in both runs** (judged INCONCLUSIVE ×2: the kill gates are window-scoped); on a hashed addendum CONC **1536M PASS** (1,166 MB peak, 0 events). **The closed four-row floor, swap off: streams ≤ 384M, META 1G, CONC 1.5G → the stack 1.5G** (CONC's on the addendum). The runner's refresh loop backs off on a refused call (tool patch) | MEASURED (floor closed) | `docs/memory/evidence/E4_S3B_MEMORY_FLOOR_1G_SWAPOFF_2026-10-10.md` |
+| E4-S5B the SNES capture fix on bad probes (a bench of 48 × 60-s encoder sessions) | with the flag, 4 / 4 bad probes (59, 59.94 ×3) output 60; the no-flag arm's one bad probe (59.94) output 59.94 but **0 drops**: the bench's `-f null` sink passes frames through, hiding drops in both arms (synthetic check: constant-rate mode drops 58/min at 59, 0 with `-r 60`); the fault live in the companion's own stream that night (59.944 fps); PS1 with the flag unchanged | **INCONCLUSIVE** (the mechanism did not reproduce in arm A) — not adopted | `docs/memory/evidence/E4_S5B_SNES_CAPTURE_PROBE_BENCH_2026-10-10.md` |
+| E4-S4B grab deferral on a clean link | the clean-link gate (loss < 10) failed all four controls (426 / 66 / 652 / 109 per min, host-side clean); no flagged run | **INCONCLUSIVE (link)** — E4-S4's REJECTED stands; not adopted | `docs/memory/evidence/E4_S4B_GRAB_DEFERRAL_CLEAN_LINK_2026-10-10.md` |
+
+**Queue 2026-10-10C, and 2026-10-15:**
+
+| task | result | verdict | record |
+| --- | --- | --- | --- |
+| E4-S5C the capture bench, the companion's sink mode (cfr) | bad probes drop 58 (at 59) / 2-3 (at 59.94) without the flag, 0 with `-r 60`; good probes 0 in both arms. The session then stalled five days; the record written 10-15 | **INCONCLUSIVE** (the 59.94 drop count outside its pre-registered window) — not adopted | `docs/memory/evidence/E4_S5C_SNES_CAPTURE_PROBE_BENCH_CFR_2026-10-10.md` |
+| E4-S4C the link watch | never started (the stall) | — | superseded by E4-S4D |
+| E4-S5D adopt the SNES capture fix (`snes-capture.conf`; the user, 10-15) | session A | in adoption at E4-C1's writing | session A's record |
+| E4-S4D the link watch, detached (`systemd-run --user`, to 2026-10-20T04:00Z) | session A | the open item | session A's record |
+| **E4-C1 the close-out** | the reference, both floors final, the alpha in two columns, adopted / not, the link (60 runs since 10-09, 0 under 10/min), E7's list | **E4 CLOSED (host side)** | `docs/memory/evidence/E4_CLOSEOUT_2026-10-15.md` |
+
 ## E5 — Capability detection and graceful scaling
+
+**Status (2026-10-15, E5-S1): model DRAFTED, probe v1 runs on the
+reference; E5-S2: run on a second machine (the user's choice) and on the
+alpha candidate.** The model is `docs/CAPABILITY_MODEL.md` (thresholds from
+E4's numbers; "not measured; E5-S2" where none); the probe
+`tools/capability_probe.py`; the run
+`docs/memory/evidence/E5_S1_CAPABILITY_PROBE_2026-10-15.md` — the reference
+`known-good` on all seven classes (storage, decode, NES, Genesis `unknown`).
 
 PrivyHub should classify:
 
@@ -1181,15 +1236,15 @@ similar benchmark score.
 
 ## E7 — Resource checkpoint
 
-Acceptance:
+Acceptance (marked 2026-10-15, E4-C1 §6):
 
-- repeatable workload suite;
-- PS1-and-below scope preserved;
-- worthwhile bottlenecks optimized;
-- resource/power envelope documented;
-- capability model established;
-- Prototype 2 class selected from evidence;
-- clean checkpoint/push.
+- repeatable workload suite — **met, in part** (E1: 6 of 7 rows; SNES on Snes9x; CONC NOT YET);
+- PS1-and-below scope preserved — **met** (NES and Genesis rows ABSENT, no fixtures);
+- worthwhile bottlenecks optimized — **met** (E3's three adoptions; the SNES capture fix in adoption; grab-vs-stream open: deferral not adopted);
+- resource/power envelope documented — **met for this host** (E4-C1; socket watts, wall power ABSENT);
+- capability model established — **not met** (DRAFTED, E5-S1; E5-S2 next);
+- Prototype 2 class selected from evidence — **not met** (E6, the user's call);
+- clean checkpoint/push — **not met** (the tree carries E4-S1..S5C and later uncommitted; the user's commit).
 
 ---
 

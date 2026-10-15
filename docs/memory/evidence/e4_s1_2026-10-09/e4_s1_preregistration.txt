@@ -1,0 +1,62 @@
+E4-S1 PRE-REGISTRATION -- written 2026-10-09 (~06:00Z) before any run; hash in e4_s1_preregistration.sha256.
+Task: docs/memory/handoffs/E4-S1_REFERENCE_ON_ADOPTED_STATE_TASK.md, under handoffs/QUEUE_2026-10-09.md (every
+standing rule of QUEUE_2026-10-06.md and after; E3-A3B's validity reading). Baseline commit: 7331184 (the user's
+E3-close commit). The suite: architecture/E1_WORKLOAD_SUITE.md (frozen; amended 2026-10-05 with E1-VOD).
+
+STATED VERBATIM: "the known-good reference for this host on the adopted state, 2026-10-09; no floor and no
+lower-tier claim."
+
+0. THE STATE MEASURED: the adopted state, four lines -- PRIVYHUB_ADAPTIVE_BITRATE_MODE=live, PRIVYHUB_EPG_GUIDE_INDEX=
+   cached, PRIVYHUB_SNES_CORE=snes9x, PRIVYHUB_RECOVERY_TRIGGER=v2, in four drop-ins; the manager none; no e3_flag.conf;
+   the adopted profile, 4x PS1 source and APK (precondition.json, before this file). No E3 task flag anywhere.
+   Nothing in the adopted system is changed by this task.
+
+1. THE RUNS -- E2's order, gaps and per-row handling (e2_s1_2026-10-05/e2_preregistration.txt §1), ONE run each:
+   E1-IDLE, E1-PS1-LOCAL, E1-PS1-STREAM, E1-PS1-1080P, E1-META, E1-VOD, E1-SNES-STREAM, E1-CONC.
+   Runner: tools/e1_suite.py run --e2 --window 1200 --plan (as E2: idle gap 120 s, 600 s before E1-SNES-STREAM);
+   E1's warm-ups and teardowns. E1-PS1-1080P: its rung flags (PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p,
+   PRIVYHUB_ADAPTIVE_BITRATE_INJECT=1) in the user manager for that row only, entry injected at 75 s (>= 60 s),
+   1920x1080 confirmed, unset after -- as E2 did. E1-SNES-STREAM runs on the adopted Snes9x core (its counter override
+   in the Snes9x corename dir, as since E3-A2).
+   VALIDITY (E3-A3B's reading): a stream run is valid if it reaches PLAYING; it is judged on controller-trigger events;
+   client-side pauses are counted and reported, not voiding. A run that never reaches PLAYING (or a row that fails to
+   launch) is an invalid attempt, replaced at most twice (the runner's own retry). Non-stream rows are valid if the
+   window completes with the row running (the runner's checks).
+
+2. THE TABLE -- every E2 metric (e2_preregistration §2): host CPU mean/p95; per-core p95 and the busiest core;
+   cpu.max_pct p95; PSI cpu/io/memory; per-process CPU and PSS (companion, retroarch, encoder, epg, range_server,
+   xorg, pulseaudio, other); swap; GPU busy mean/p95; encoder headroom (encoder % of a core, capture fps, dup+drop/min,
+   RetroArch fps - rendered fps); disk write/await; eno1 tx/rx and tx drops; the C2 block (receive_to_decode median,
+   output_gap max) and the decoder report rows (spikes >= 20/50 ms per min, stale drops, max gap; rendered fps,
+   video loss/min, audio underruns, resyncs); Tctl/core max, cpufreq, throttle_status counts; socket/CPU/SoC W;
+   VOD progress ratio and served kB/s; EPG grabs ok/failed and median s.
+   PLUS, per stream row: the gap log (logs/games/native_stream_ctrl_gaps.log and its .1) sliced to the window --
+   count, count > 1 s, max ms; and the recovery events (the recovery log and its archive) in the window --
+   controller pauses (trigger controller_silence; expected 0) and client pauses (client_* triggers) each with its
+   resume time (s to the next resumed / gave_up / session_ended), and any gave_up_saved.
+   E2's column beside each row (e2_s1_2026-10-05/runs: the run1 of each row; for SNES and CONC both E2 runs shown).
+   ABSENT, stated: wall power, glass-to-glass latency, VCN duty, RAPL, NES / Genesis / Live TV / camera / browser.
+
+3. NO BAR. This is a reference, reported. Two things are checked and said:
+   (a) the D-BASE close-out table on E1-PS1-STREAM (evidence/D_BASE_CLOSEOUT_2026-09-23.md): spikes >= 20 ms/min < 200
+       (decoder report, session), stale drops/min < 20 (report, session), rendered fps >= 59.5 (heartbeat, window);
+       the loss row (video loss/min < 10) by this night's own numbers, reported, not judged as the system's;
+   (b) each row's validity (§1).
+
+4. DRIFT FROM E2 IS ITSELF THE FINDING: every metric of the table whose E4 value differs from E2's by more than E1's
+   bands (architecture/E1_WORKLOAD_SUITE.md §5: host CPU +/- 2 points; GPU busy +/- 3 points; main-process RSS
+   +/- 5 %; RetroArch fps +/- 0.5; rendered fps +/- 0.5; median EPG grab +/- 30 %) is listed with the adoption that
+   explains it (the guide index E3-S6A; Snes9x E3-A2; recovery v2 E3-A3B) or "nothing does". For the per-process
+   rows (companion, encoder, epg CPU % and PSS) the same bands are applied as reported comparisons (CPU +/- 2 points
+   of a core, PSS +/- 5 %), said so. For SNES and CONC E4's one run is compared with the E2 runs' range (outside
+   [min - band, max + band] = drift). Link rows (loss, underruns, resyncs, max gap) are reported, not banded.
+
+5. THE ANALYSIS: e4_s1_analysis.py -- e2_analysis.py's table section copied and pointed at these runs, the E2 columns
+   from e2_s1_2026-10-05/runs beside; the CONC aligned frame as E2 (§3 method, the PS1-STREAM window as baseline),
+   reported. Outputs: e4_s1_table.md/.json, the drift list, validity.json, gaps/, the four-row reference (idle /
+   streaming / contended / heaviest, the ROADMAP's form) with the full table behind it.
+
+6. RULES: measurement only; nothing adopted; nothing committed; no sudo, no nft, the Opal not touched; no addresses or
+   identifiers in any file; nothing fetched, nothing deleted; the VOD drive read only; no other task's scripts run in
+   their directories. Final state: the four-line adopted state, no game, PS1 files identical, APK CONFIRMED.
+   No band, rule or reading is changed after the data.

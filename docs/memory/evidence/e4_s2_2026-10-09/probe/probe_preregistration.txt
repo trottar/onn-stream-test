@@ -1,0 +1,15 @@
+E4-S2 PROBE, part B -- the CFS period and the cgroup membership under the drop-in. Written 2026-10-09 before the
+probe's runs; hash in probe_preregistration.sha256. THESE RUNS ARE NOT DATA (runs_smoke/, 180-s windows); they choose
+the period the pre-registration then fixes, and re-check that RetroArch and the encoder sit in the constrained cgroup.
+
+Runs (tools/e1_suite.py run --e2 --window 180, idle gap 120 s; the adopted state; nothing else changes):
+  B1 E1-PS1-STREAM at CPUQuota=100% (the default period, 100 ms);
+  B2 E1-PS1-STREAM at CPUQuota=100% + CPUQuotaPeriodSec=10ms.
+Each run's e4_constraint.conf is written before its restart and removed at its teardown by the runner; the unit's
+properties and cpu.max / memory.max are read back both ways.
+
+Decision, fixed now: use the DEFAULT period unless B1 stutters and B2 does not. "Stutters" = any of: decoder spikes
+>= 20 ms per min >= 200 (session report), rendered fps < 59.5, RetroArch fps < 59.9, the segment-aware capture fps
+outside 60 +/- 0.5, encoder dup+drop > 0.2/min. If both stutter or neither does, the default period. Said which.
+Membership: RetroArch's and the encoder's /proc/<pid>/cgroup name privyhub-companion.service in both runs
+(the runner's cgroup_membership at the window's start and end).

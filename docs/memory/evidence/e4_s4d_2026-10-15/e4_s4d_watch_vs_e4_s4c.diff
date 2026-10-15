@@ -1,0 +1,331 @@
+--- ../e4_s4c_2026-10-10/e4_s4c_watch.py	2026-10-10 11:32:08.825648234 -0400
++++ e4_s4d_watch.py	2026-10-15 17:39:22.603176048 -0400
+@@ -1,7 +1,20 @@
+ #!/usr/bin/env python3
+-"""E4-S4C -- the link watch, and grab deferral on the first clean window, run as pre-registered
+-(e4_s4c_preregistration.txt §1-§6). One process from the hash to the cap (2026-10-15T04:00:00Z); resumable from
+-watch_state.json if restarted.
++"""E4-S4D -- E4-S4C's link watch (and grab deferral on the first clean window), DETACHED, run as pre-registered
++(e4_s4d_preregistration.txt: E4-S4C §1 verbatim, the cap and the stop file added). One process from the hash to the
++cap (2026-10-20T04:00:00Z), launched as a systemd --user transient unit (privyhub-link-watch), not a Code-session
++child; resumable from watch_state.json if restarted.
++
++E4-S4D's changes to e4_s4c_watch.py (the only ones; the diff is e4_s4d_watch_vs_e4_s4c.diff):
++- STATUS: ~/privyhub_link_watch/status.txt, one line rewritten after every probe and every run, and every 5 min as a
++  heartbeat even when idle: UTC, probe number, loss/min, rendered, resyncs, clean/dirty, what the watch does next and
++  when, the deferral set's progress, the adopted state, the cap, the heartbeat. history.csv beside it: one row per probe.
++  The watch's log goes to the journal (stdout) and ~/privyhub_link_watch/watch.log.
++- STOP FILE: ~/privyhub_link_watch/STOP -- the probe or run in flight finishes (its own teardown), a final status line
++  is written, the watch exits. The file is never removed by the watch.
++- BUSY SKIP: a game session active at probe time -> the probe is skipped and logged busy; the next 45 min later. The
++  ping trace continues through it.
++- THE CAP: 2026-10-20T04:00:00Z. The adopted state is five lines (E4-S5D; tools/e1_suite.py's ADOPTED).
++- --dry: about 2 min, no stream: the preflight, the busy check, the ping trace, status lines into dry_run/, then exit.
+ 
+ THE PING TRACE (a thread, from start to the cap): the unprivileged `ping` as installed (ICMP datagram socket; no sudo),
+ 1 echo/s, host -> client. The client's address is read from adb's device list at (re)start and never written. Parsed
+@@ -43,10 +56,17 @@
+ HERE = Path(__file__).resolve().parent
+ REPO = HERE.parents[3]
+ SUITE = REPO / "tools/e1_suite.py"
+-PRE = HERE / "e4_s4c_preregistration.txt"
++PRE = HERE / "e4_s4d_preregistration.txt"
+ WATCH = Path.home() / "privyhub_link_watch"
+ RUNS = HERE / "runs"
+-CAP = datetime(2026, 10, 15, 4, 0, 0, tzinfo=timezone.utc).timestamp()
++CAP_UTC = "2026-10-20T04:00:00Z"
++CAP = datetime(2026, 10, 20, 4, 0, 0, tzinfo=timezone.utc).timestamp()
++DRY = "--dry" in sys.argv
++STOPFILE = WATCH / "STOP"
++STATUS_P = (HERE / "dry_run" if DRY else WATCH) / "status.txt"
++HIST_P = (HERE / "dry_run" if DRY else WATCH) / "history.csv"
++WLOG_P = (HERE / "dry_run" if DRY else WATCH) / "watch.log"
++HEARTBEAT = 30 if DRY else 300
+ PERIOD = 45 * 60
+ ET = ZoneInfo("America/New_York")
+ FLAG = "PRIVYHUB_EPG_DEFER_WHILE_STREAMING=1"
+@@ -55,6 +75,8 @@
+          ("conc_flag_cpu150", "E1-CONC_flag_cpu150", f"E1-CONC:1:120:{FLAG}:CPUQuota=150%")]
+ MAX_RERUNS = 2
+ STATE_P, LW_P, PING_P, DEF_P = HERE / "watch_state.json", HERE / "link_watch.jsonl", HERE / "ping.jsonl", HERE / "deferral.json"
++if DRY:
++    STATE_P, LW_P, PING_P, DEF_P = (HERE / "dry_run" / p.name for p in (STATE_P, LW_P, PING_P, DEF_P))
+ 
+ spec = importlib.util.spec_from_file_location("e1_suite", SUITE)
+ E1 = importlib.util.module_from_spec(spec)
+@@ -74,9 +96,9 @@
+ 
+ 
+ def log(*a):
+-    line = f"[e4s4c {time.strftime('%m-%d %H:%M:%SZ', time.gmtime())}] " + " ".join(str(x) for x in a)
++    line = f"[e4s4d {time.strftime('%m-%d %H:%M:%SZ', time.gmtime())}] " + " ".join(str(x) for x in a)
+     print(line, flush=True)
+-    with open(HERE / "watch_console.log", "a") as fh:
++    with open(WLOG_P, "a") as fh:
+         fh.write(line + "\n")
+ 
+ 
+@@ -105,6 +127,88 @@
+     return xs[i]
+ 
+ 
++# ---------------------------------------------------------------- E4-S4D: the status line, the history, the stop file
++STATUS = {"probe": 0, "last": "-", "last_at": "-", "doing": "starting", "next": "-", "deferral": "-", "state": "-"}
++STATUS_LOCK = threading.Lock()
++SLOT_SHORT = {"conc_flag_r1": "conc1", "conc_flag_r2": "conc2", "conc_flag_cpu150": "conc150"}
++HIST_COLS = ["probe", "start_utc", "start_et", "hour_et", "day_et", "weekday_et", "busy", "attempts", "no_play", "status",
++             "clean", "loss_per_min", "rendered_fps", "resyncs", "stale_per_min", "spikes20_per_min", "client_pauses",
++             "controller_pauses", "underruns", "receiver_lost_per_min", "retroarch_fps", "host_cpu", "companion_cpu",
++             "socket_w", "host_tctl_c", "host_soc_c", "client_cpu_thermal_c", "air_rounds", "air_channel", "air_width_mhz",
++             "air_util_mean_pct", "air_util_max_pct", "air_stations_median", "station_signal_dbm_median",
++             "station_tx_bitrate_mbps_median", "station_retry_pct", "client_rssi_median", "client_tx_link_mbps_median",
++             "client_rx_link_mbps_median", "client_scans_in_window", "ping_sent", "ping_loss_pct", "ping_rtt_median",
++             "ping_rtt_p99", "preflight_ok", "flags_absent_after", "final_flags_absent"]
++
++
++def write_status(**kw):
++    """One line, rewritten (atomic replace of the watch's own status file) after every probe and every run, and every
++    HEARTBEAT s by the heartbeat thread: a reader can tell idle from dead by the heartbeat's age."""
++    with STATUS_LOCK:
++        STATUS.update(kw)
++        s = STATUS
++        line = (f"{utc()} heartbeat | probe {s['probe']} | last: {s['last']} (at {s['last_at']}) | doing: {s['doing']} | "
++                f"next: {s['next']} | deferral: {s['deferral']} | state: {s['state']} | cap {CAP_UTC} | "
++                "stop: touch ~/privyhub_link_watch/STOP\n")
++        STATUS_P.parent.mkdir(parents=True, exist_ok=True)
++        tmp = STATUS_P.with_suffix(".tmp")
++        tmp.write_text(line)
++        os.replace(tmp, STATUS_P)
++
++
++def heartbeat_thread():
++    while not STOP.wait(HEARTBEAT):
++        write_status()
++
++
++def deferral_progress(d):
++    c = "clean" if d.get("control") else (f"not_clean x{len(d['controls'])}" if d.get("controls") else "-")
++    parts = [f"control: {c}"]
++    for name, short in SLOT_SHORT.items():
++        a = d["slots"].get(name) or []
++        if not a:
++            v = "-"
++        else:
++            v = "link_voided" if a[-1].get("link_voided") else ("ok" if a[-1].get("status") == "OK" else str(a[-1].get("status")).lower())
++            v += f" (attempt {len(a)})" if len(a) > 1 else ""
++        parts.append(f"{short}: {v}")
++    return ", ".join(parts) + f" [{set_state(d)}]"
++
++
++def hist_append(row):
++    g = lambda *p: k(row, *p)
++    vals = {"client_cpu_thermal_c": g("client_thermal", "cpu_thermal_c"), "air_rounds": g("air", "rounds"),
++            "air_channel": g("air", "channel"), "air_width_mhz": g("air", "width_mhz"),
++            "air_util_mean_pct": g("air", "utilization_mean_pct"), "air_util_max_pct": g("air", "utilization_max_pct"),
++            "air_stations_median": g("air", "stations_median"),
++            "station_signal_dbm_median": g("air", "client_station", "signal_dbm_median"),
++            "station_tx_bitrate_mbps_median": g("air", "client_station", "tx_bitrate_mbps_median"),
++            "station_retry_pct": g("air", "client_station", "retry_pct"), "client_rssi_median": g("client", "rssi_median"),
++            "client_tx_link_mbps_median": g("client", "tx_link_mbps_median"),
++            "client_rx_link_mbps_median": g("client", "rx_link_mbps_median"),
++            "client_scans_in_window": g("client", "scans_in_window"), "ping_sent": g("ping_40min_before", "sent"),
++            "ping_loss_pct": g("ping_40min_before", "loss_pct"), "ping_rtt_median": g("ping_40min_before", "rtt_median"),
++            "ping_rtt_p99": g("ping_40min_before", "rtt_p99")}
++    new = not HIST_P.exists()
++    with open(HIST_P, "a") as fh:
++        if new:
++            fh.write(",".join(HIST_COLS) + "\n")
++        fh.write(",".join("" if (v := vals.get(c, row.get(c))) is None else str(v).replace(",", ";") for c in HIST_COLS) + "\n")
++
++
++def stop_requested():
++    return STOPFILE.exists()
++
++
++def adopted_state():
++    """The five-line adopted state (E4-S5D), read back: the suite's own preflight."""
++    try:
++        p = E1.preflight()
++    except Exception as e:      # noqa: BLE001 -- a read failure is reported, not fatal
++        return {"ok": False, "error": repr(e)[:200]}, f"read failed"
++    return p, ("adopted5 ok" if p.get("ok") else f"NOT ok (environ {len(p.get('environ') or [])} lines, game {p.get('game_active')})")
++
++
+ # ---------------------------------------------------------------- the ping trace
+ RAW = deque()           # (send epoch, rtt ms or None) for the last 3 h, in memory only
+ RAW_LOCK = threading.Lock()
+@@ -345,6 +449,7 @@
+     pdir.mkdir(parents=True, exist_ok=True)
+     ACTIVITY = f"probe_{n}"
+     t_start = time.time()
++    write_status(probe=n, doing=f"probe {n} (E1-PS1-STREAM 300 s, started {utc(t_start)[11:16]}Z)", next="-")
+     attempts, f, s, rd = 0, None, None, None
+     therm = {}
+     for attempt in (1, 2):
+@@ -403,6 +508,7 @@
+            "client": client_summary(pdir / "air_harvest_probe.json", t0, t1) if t0 else {"harvest": None},
+            "ping_40min_before": ping_before(t_start)}
+     append(LW_P, row)
++    hist_append(row)
+     dst = HERE / "probes" / f"{n:03d}"
+     dst.mkdir(parents=True, exist_ok=True)
+     if rd:
+@@ -421,7 +527,7 @@
+     """The pre-run guide read, >= 60 s after the EPG's background refresh last moved (worker idle, nothing pending,
+     the completed / failed counts unchanged for 60 s)."""
+     t0, quiet_since, last = time.time(), None, None
+-    while time.time() - t0 < limit_s:
++    while time.time() - t0 < limit_s and not stop_requested():
+         b = (E1.http("GET", "/plugins/epg/status", 10)[1] or {}).get("background_refresh") or {}
+         sig = (b.get("worker_alive"), b.get("pending_count"), b.get("completed_count"), b.get("failed_count"))
+         idle = not b.get("worker_alive") and (b.get("pending_count") or 0) == 0
+@@ -443,6 +549,7 @@
+     global ACTIVITY
+     ACTIVITY = act
+     t = time.time()
++    write_status(doing=f"{act} ({plan.split(':')[0]}, {window} s, started {utc(t)[11:16]}Z)", next="-")
+     before = latest_run(RUNS / wdir_name)
+     suite(RUNS, plan, window, 4 * 3600)
+     ACTIVITY = "idle"
+@@ -467,6 +574,9 @@
+         if time.time() >= CAP:
+             log("the cap: no flagged run starts after it")
+             return
++        if stop_requested():
++            log("the stop file: no further flagged run starts")
++            return
+         t, rd, f = run_one(wdir, plan, 1200, name)
+         st["last_start"] = t
+         voided = bool(f["status"] == "OK" and f["loss_per_min"] is not None and
+@@ -477,6 +587,9 @@
+         jdump(STATE_P, st)
+         log(f"{name} attempt {len(d['slots'][name])}: {f['status']} loss {f['loss_per_min']} rendered {f['rendered_fps']} "
+             f"resyncs {f['resyncs']} link_voided {voided} flags_absent {f['flags_absent_after']}")
++        write_status(last=f"{SLOT_SHORT[name]} {f['status']} loss/min {f['loss_per_min']} rendered {f['rendered_fps']} "
++                          f"resyncs {f['resyncs']}" + (" link_voided" if voided else ""), last_at=utc(),
++                     deferral=deferral_progress(d), doing="idle")
+ 
+ 
+ def set_state(d):
+@@ -487,30 +600,82 @@
+     return "await_rerun" if pend else "set_complete"
+ 
+ 
++def dry():
++    """--dry: about 2 min, no stream -- the preflight (the five-line state), the busy check, the ping trace's first
++    bins, heartbeat status lines (every 30 s), all into dry_run/; then a final status line and exit."""
++    (HERE / "dry_run").mkdir(exist_ok=True)
++    p, sline = adopted_state()
++    log("dry: start; preflight", json.dumps(p), "| busy", bool(p.get("game_active")), "| stop file present", stop_requested())
++    write_status(doing="dry run (no stream)", state=sline, next=f"exit at {utc(time.time() + 120)[11:16]}Z",
++                 deferral=deferral_progress({"controls": [], "control": None, "slots": {sl[0]: [] for sl in SLOTS}}))
++    threading.Thread(target=ping_thread, daemon=True).start()
++    threading.Thread(target=heartbeat_thread, daemon=True).start()
++    t0 = time.time()
++    while time.time() - t0 < 120 and not stop_requested():
++        time.sleep(5)
++    STOP.set()
++    time.sleep(3)
++    bins = [l for l in PING_P.read_text().splitlines() if '"bin_utc"' in l] if PING_P.exists() else []
++    write_status(doing="dry run done; exited", next="-", last=f"dry: {len(bins)} ping bins", last_at=utc())
++    log(f"dry: done; {len(bins)} ping bins written; exit")
++    return 0
++
++
+ def main():
++    if DRY:
++        return dry()
+     WATCH.mkdir(parents=True, exist_ok=True)
+     st = json.loads(STATE_P.read_text()) if STATE_P.exists() else {"probes": 0, "last_start": None, "started_utc": utc()}
+     d = json.loads(DEF_P.read_text()) if DEF_P.exists() else {"controls": [], "control": None, "guide_reads": [],
+                                                               "slots": {sl[0]: [] for sl in SLOTS}}
+-    log("start; state", {x: st.get(x) for x in ("probes", "last_start")}, "deferral", set_state(d))
++    p, sline = adopted_state()
++    st.setdefault("preflight_at_start", []).append({"at_utc": utc(), **p})
++    jdump(STATE_P, st)
++    log("start; state", {x: st.get(x) for x in ("probes", "last_start")}, "deferral", set_state(d), "| adopted state", sline,
++        "| cap", CAP_UTC)
++    write_status(probe=st["probes"], state=sline, deferral=deferral_progress(d), doing="starting")
+     pt = threading.Thread(target=ping_thread, daemon=True)
+     pt.start()
++    threading.Thread(target=heartbeat_thread, daemon=True).start()
++    why = "the cap"
+     while True:
++        if stop_requested():
++            why = "the stop file"
++            log("the stop file: exiting")
++            break
+         now = time.time()
+         nxt = max(now, (st["last_start"] or 0) + PERIOD)
+         if nxt >= CAP:
+             log("the cap: no probe starts after it")
+             break
+         if now < nxt:
++            write_status(doing="idle", next=f"probe {st['probes'] + 1} at {utc(nxt)[:16]}Z")
+             time.sleep(min(30, nxt - now))
+             continue
+         n = st["probes"] + 1
+         st["probes"] = n
+         st["last_start"] = now
+         jdump(STATE_P, st)
++        busy = bool((E1.games_status() or {}).get("active"))
++        if busy:
++            # E4-S4D: a game session is active (the user playing) -> the probe is skipped and logged busy
++            et = datetime.fromtimestamp(now, timezone.utc).astimezone(ET)
++            row = {"probe": n, "start_utc": utc(now), "start_et": et.isoformat(timespec="seconds"), "hour_et": et.hour,
++                   "day_et": et.strftime("%Y-%m-%d"), "weekday_et": et.strftime("%a"), "busy": True, "clean": False,
++                   "ping_40min_before": ping_before(now)}
++            append(LW_P, row)
++            hist_append(row)
++            log(f"probe {n}: busy (a game session is active) -- skipped")
++            write_status(probe=n, last=f"probe {n} busy (skipped)", last_at=utc(), doing="idle",
++                         next=f"probe {n + 1} at {utc(now + PERIOD)[:16]}Z")
++            continue
+         row = run_probe(n)
++        _, sline = adopted_state()
++        write_status(probe=n, last=(f"probe {n} " + ("no_play" if row["no_play"] else
++                                    f"loss/min {row['loss_per_min']} rendered {row['rendered_fps']} resyncs {row['resyncs']} "
++                                    + ("clean" if row["clean"] else "dirty"))), last_at=utc(), state=sline, doing="idle")
+         phase = set_state(d)
+-        if row["clean"] and phase == "await_clean_probe" and time.time() < CAP:
++        if row["clean"] and phase == "await_clean_probe" and time.time() < CAP and not stop_requested():
+             log(f"probe {n} clean: the control")
+             t, rd, f = run_one("E1-PS1-STREAM", "E1-PS1-STREAM:1:120", 1200, "control")
+             st["last_start"] = t
+@@ -521,22 +686,33 @@
+                 d["control"] = c
+             jdump(DEF_P, d)
+             jdump(STATE_P, st)
++            write_status(last=f"control {f['status']} loss/min {f['loss_per_min']} rendered {f['rendered_fps']} "
++                              f"resyncs {f['resyncs']} " + ("clean" if c["clean"] else "dirty"), last_at=utc(),
++                         deferral=deferral_progress(d), doing="idle")
+             if c["clean"]:
+                 flagged_pass(st, d)
+-        elif row["clean"] and phase == "await_rerun" and time.time() < CAP:
++        elif row["clean"] and phase == "await_rerun" and time.time() < CAP and not stop_requested():
+             log(f"probe {n} clean: the voided flagged run(s) re-run")
+             flagged_pass(st, d)
+         d["state"] = set_state(d)
+         jdump(DEF_P, d)
+         jdump(STATE_P, st)
++        write_status(deferral=deferral_progress(d))
+     STOP.set()
+     pt.join(timeout=30)
+     d["state"] = set_state(d)
+     d["closed_utc"] = utc()
++    d["closed_by"] = why
+     jdump(DEF_P, d)
+-    log("watch closed; deferral state", d["state"])
++    write_status(doing=f"EXITED ({why})", next="-", deferral=deferral_progress(d))
++    log("watch closed (" + why + "); deferral state", d["state"])
+     return 0
+ 
+ 
+ if __name__ == "__main__":
+-    sys.exit(main())
++    try:
++        sys.exit(main())
++    except Exception as e:      # E4-S4D: a crash is written to the status line, so a reader sees it, then re-raised
++        STOP.set()
++        write_status(doing=f"CRASHED: {repr(e)[:160]}", next="-")
++        raise

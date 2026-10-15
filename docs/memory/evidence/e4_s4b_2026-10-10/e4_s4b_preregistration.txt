@@ -1,0 +1,60 @@
+E4-S4B PRE-REGISTRATION -- written 2026-10-10 before any E4-S4B run; hash in e4_s4b_preregistration.sha256.
+Task: docs/memory/handoffs/E4-S4B_GRAB_DEFERRAL_CLEAN_LINK_TASK.md under QUEUE_2026-10-10B.md (every standing rule;
+E3-A3B's validity reading; E4-S2's constraint discipline). Baseline: 7331184 plus the uncommitted E4-S1..S5 work
+(untouched; E4-S3B's / E4-S5B's files and E4-S3B's runner patch beside it). References: E4-S1 (e4_s1_2026-10-09/),
+E4-S2 (e4_s2_2026-10-09/), E4-S4 (e4_s4_2026-10-10/: its pre-registration, bar and pass-rule copy).
+
+0. THE CHANGE, E4-S4's, unchanged (e4_s4_2026-10-10/e4_s4_change.diff; companion/plugins/epg.py sha256 707bda2dd7ec0a4b773411992c7a07e4d08f9c8768150d636c35490edcacc3c2):
+   behind PRIVYHUB_EPG_DEFER_WHILE_STREAMING=1, a forced grab while a stream session is live is queued and answered
+   with the cached guide marked refresh_deferred; the queue drains when the session ends. The runner (tools/e1_suite.py
+   sha256 76e1aa137dbe6766291b77b2a9aa9ca0a012b4c59b0701e69fb9b2ff8367a147 -- E4-S3B's back-off patch included; answered calls take E4-S4's path unchanged): the deferred
+   row + 5-s wait, the teardown's drain wait and record. The flag lives in e3_flag.conf for its runs only.
+   Driver: e4_s4b_run.py sha256 9006c6ac6b0a144a1cb3a6ac3be73daa33b11f2a6fd0b98916ae7237a7c8080e.
+
+1. THE CLEAN-LINK GATE (the only addition): THE CONTROL, E1-PS1-STREAM x1, no flag (tools/e1_suite.py run --e2 --window
+   1200 --gap 120, E2's warm-up), runs first. It is CLEAN if its video loss/min < 10 (D-BASE's row) AND rendered fps
+   >= 59.5 AND resyncs <= 10. If not clean: idle 30 min, run the control again -- up to 4 controls. The first clean
+   control is THE control; the flagged runs start after it. If none of the four is clean: INCONCLUSIVE (link), no
+   flagged run, the four controls' figures in the record, and the task ends there. (A control that never reaches
+   PLAYING after the runner's two replacements counts as a not-clean attempt.)
+
+2. THE RUNS after a clean control, E2's windows and gaps, exactly E4-S4's: E1-CONC x2 with the flag (unconstrained;
+   runs/E1-CONC_flag/run1, run2), E1-CONC x1 with the flag at CPUQuota=150% (runs/E1-CONC_flag_cpu150/run1; the drop-in
+   e4_constraint.conf as E4-S2: written, read back, removed at teardown, properties read back infinity / max), one
+   suite invocation. Each CONC teardown waits for the deferred queue to drain (<= 600 s) and records it.
+   THE PRE-RUN GUIDE READ (tools/e1_suite.py guide_read, the six channels, non-forced) is taken 60 s after the clean
+   control's teardown, immediately before the flagged runs (not before the first control as in E4-S4: the gate may
+   span hours and the guide's programme totals move with the clock) -> pre_guide.json.
+
+3. COMPARABILITY (else INCONCLUSIVE): the control within E1's bands of E4-S1's PS1-STREAM: host CPU 10.9 +/- 2;
+   rendered fps 59.53 +/- 0.5.
+
+4. THE BAR = E4-S4's, verbatim (e4_s4_preregistration.txt §3) -- ACCEPTED only if all hold; REJECTED if any fails
+   (comparability holding):
+   (a) CONC with the flag, BOTH unconstrained runs: video loss/min <= 3 x the control's AND <= 100; rendered fps
+       >= 59.5; resyncs <= 10; host CPU within +/- 2 points of the control's;
+   (b) the deferral did what it says, in each of the three CONC runs: 0 grabber processes during the window (no
+       sampler row with an EPG child, samples.jsonl procs.epg); the queue grew (epg.jsonl "deferred" rows with pending
+       rising to the six channels); after teardown the queue drained with failed 0 and pending 0, every queued channel
+       refreshed (drained ok = queued), within 2 x the cycle's normal time for that many grabs (E4-S1 CONC's median
+       grab 5.3 s: 2 x 5.3 x the count; 63.6 s for six);
+   (c) the guide serves after each drain: all six channels serve, programmes total within +/- 5 % of the pre-run read;
+   (d) CONC with the flag at CPUQuota=150% passes E4-S2's pass rule as a stream row (rendered >= 59.5, RetroArch
+       >= 59.9, capture 60 +/- 0.5 segment-aware, dup+drop <= 0.2/min, spikes < 200, stale < 20; grabs failed 0 is
+       vacuous here; the link-INCONCLUSIVE clause as E4-S2 with THIS task's control), its throttled time reported;
+   (e) the companion's CPU (% of a core) in each unconstrained CONC run within +/- 2 points of the control's.
+   (The analysis is e4_s4_analysis.py's, copied as e4_s4b_analysis.py with THE control taken from the gate; the pass
+   rule e4_s4_passrule.py copied byte for byte as e4_s4b_passrule.py, one comment line added.)
+   REPORTED: cap_fired (expected 0), the drain times, the client's pauses, the gap log, socket W, the deferred rows per
+   window; and -- if a flagged run's link goes bad mid-night (loss > 3 x the clean control's) -- that it did, with the
+   host-side clauses (b), (c), (e) and (d)'s host gates stated on their own, so the record says which clause the link
+   took.
+
+5. WHAT ADOPTION WOULD MEAN (stated in the record, the user's call): E4-S2 §5's table with the deferral line -- the
+   stack's CPU-time floor PS1-STREAM's 150 %, 4 cores; the one-line adoption, a drop-in epg-defer.conf,
+   "[Service]\nEnvironment=PRIVYHUB_EPG_DEFER_WHILE_STREAMING=1" + daemon-reload + restart (the state checks' adopted
+   list gains the line), and its revert (delete it + daemon-reload + restart). Nothing is adopted here.
+
+6. RULES: nothing adopted, nothing committed; the flag and the constraint absent at every teardown and at the end; no
+   sudo, no nft, the Opal read-only; no addresses or identifiers; nothing fetched, nothing deleted; no other task's
+   scripts run in their directories. No band, rule or reading changes after the data.

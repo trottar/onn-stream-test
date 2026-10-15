@@ -1,0 +1,267 @@
+{
+  "probe": "tools/capability_probe.py",
+  "probe_version": "1",
+  "model": "docs/CAPABILITY_MODEL.md",
+  "time_utc": "2026-10-15T21:03:43Z",
+  "host_reads_only": true,
+  "stream_live_at_probe": true,
+  "adopted_lines": [
+    "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+    "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+    "PRIVYHUB_RECOVERY_TRIGGER=v2",
+    "PRIVYHUB_SNES_CAPTURE_FIX=output_rate",
+    "PRIVYHUB_SNES_CORE=snes9x"
+  ],
+  "summary": {
+    "cpu_ram_storage": "known-good",
+    "gpu": "known-good",
+    "hw_encode_decode": "known-good",
+    "validated_stream_profiles": "known-good",
+    "emulator_tiers": "known-good",
+    "concurrency_headroom": "known-good",
+    "network": "known-good"
+  },
+  "classes": {
+    "cpu_ram_storage": {
+      "verdict": "known-good",
+      "threshold": "the worse of cpu and ram; storage not measured; E5-S2",
+      "cpu": {
+        "model": "AMD Ryzen 5 PRO 4650G with Radeon Graphics",
+        "physical_cores": 6,
+        "logical_cpus": 12,
+        "threads_per_core": "2",
+        "max_mhz": 4308,
+        "speed_class": "reference",
+        "check": {
+          "verdict": "known-good",
+          "threshold": "reference speed class (AMD Ryzen 5 PRO 4650G with Radeon Graphics); physical cores >= 6 known-good (alpha today: 400 % floor + 50 %); >= 4 deferral-only (alpha with deferral: 150 % floor); logical CPUs x 100 >= 150 % below-alpha; else below-floor (E4-S2, E4-S4; CPU-time, not slow-core)"
+        }
+      },
+      "ram": {
+        "mem_total_gib": 14.94,
+        "mem_available_gib": 9.78,
+        "swap_total_gib": 12.3,
+        "check": {
+          "verdict": "known-good",
+          "threshold": "system MemTotal >= 8000000000 B (8 GB, alpha E4-S2 \u00a75); MemAvailable >= 1.5 GiB known-good (stack swap-off floor, CONC 1,166 MB peak, E4-S3B); >= 1.25 GiB deferral-only (grab alone 976 MB, E4-S3B \u00a74); >= 384 MiB below-alpha (a stream alone, E4-S3); else below-floor"
+        }
+      },
+      "storage": {
+        "disks": [
+          {
+            "size_gb": 2000.4,
+            "rotational": true,
+            "transport": "usb"
+          },
+          {
+            "size_gb": 256.1,
+            "rotational": false,
+            "transport": "nvme"
+          }
+        ],
+        "media_root_free_gb": 149.3,
+        "vod_root_configured": true,
+        "vod_root_present": true,
+        "vod_root_free_gb": 1852.2,
+        "verdict": "unknown",
+        "threshold": "not measured; E5-S2"
+      }
+    },
+    "gpu": {
+      "render_nodes": 1,
+      "drivers": [
+        "amdgpu"
+      ],
+      "verdict": "known-good",
+      "threshold": "exactly one usable render node (the companion fails closed otherwise: native_stream._linux_vaapi_device); driver amdgpu (the reference) known-good; another driver unknown (not measured; E5-S2); none or several below-floor. iGPU headroom not probed (reference 18-23 % busy at PS1-STREAM, E4-S1)"
+    },
+    "hw_encode_decode": {
+      "vainfo_present": true,
+      "va_driver": {
+        "name": "radeonsi",
+        "family": "renoir"
+      },
+      "mesa_version": "25.0.7",
+      "encode_profiles": [
+        "VAProfileH264ConstrainedBaseline",
+        "VAProfileH264High",
+        "VAProfileH264Main",
+        "VAProfileHEVCMain",
+        "VAProfileHEVCMain10"
+      ],
+      "decode_profiles": [
+        "VAProfileH264ConstrainedBaseline",
+        "VAProfileH264High",
+        "VAProfileH264Main",
+        "VAProfileHEVCMain",
+        "VAProfileHEVCMain10",
+        "VAProfileJPEGBaseline",
+        "VAProfileMPEG2Main",
+        "VAProfileMPEG2Simple",
+        "VAProfileVC1Advanced",
+        "VAProfileVC1Main",
+        "VAProfileVC1Simple",
+        "VAProfileVP9Profile0",
+        "VAProfileVP9Profile2"
+      ],
+      "ffmpeg_vaapi_encoders": [
+        "av1_vaapi",
+        "h264_vaapi",
+        "hevc_vaapi",
+        "mjpeg_vaapi",
+        "mpeg2_vaapi",
+        "vp8_vaapi",
+        "vp9_vaapi"
+      ],
+      "verdict": "known-good",
+      "threshold": "H.264 VAEntrypointEncSlice + ffmpeg h264_vaapi + VA driver radeonsi (the reference) known-good: the live ladder 720p60 5000-7000 (C3-L4; encoder 36 % of a core at 720p, 73 % at 1080p, E4-S1); H.264 encode with another driver unknown (720p60 rate not measured; E5-S2); none below-floor (E4-S2 \u00a75: out of scope)",
+      "decode": {
+        "verdict": "unknown",
+        "threshold": "not measured; E5-S2"
+      }
+    },
+    "validated_stream_profiles": {
+      "source": "companion/native_stream_profiles.py (repo, not measured)",
+      "profiles": [
+        {
+          "id": "native_game_720p60_reference",
+          "width": 1280,
+          "height": 720,
+          "fps": 60,
+          "bitrate_kbps": 7000,
+          "status": "ADOPTED, the default (D-BASE close-out 2026-09-23); live ladder 5000-7000 (C3-L4)"
+        },
+        {
+          "id": "native_game_1080p60_candidate",
+          "width": 1920,
+          "height": 1080,
+          "fps": 60,
+          "bitrate_kbps": 15750,
+          "status": "candidate, not adopted (C5-M1; the rung flag, C5-CLOSE)"
+        },
+        {
+          "id": "native_game_1080p60_c1_parity_cap90",
+          "width": 1920,
+          "height": 1080,
+          "fps": 60,
+          "bitrate_kbps": 15750,
+          "status": "candidate, not adopted (C5-M2)"
+        },
+        {
+          "id": "native_game_1080p60_c2_80pct_cap160",
+          "width": 1920,
+          "height": 1080,
+          "fps": 60,
+          "bitrate_kbps": 12600,
+          "status": "candidate, not adopted (C5-M2); the 1080p rung's arm (12600 kbps)"
+        },
+        {
+          "id": "native_game_1080p60_c3_80pct_cap90",
+          "width": 1920,
+          "height": 1080,
+          "fps": 60,
+          "bitrate_kbps": 12600,
+          "status": "candidate, not adopted (C5-M2)"
+        },
+        {
+          "id": "native_game_720p60_4000",
+          "width": 1280,
+          "height": 720,
+          "fps": 60,
+          "bitrate_kbps": 4000,
+          "status": "screened, never the default, never on the live ladder (C5-M3, Phase G)"
+        },
+        {
+          "id": "native_game_720p60_3000",
+          "width": 1280,
+          "height": 720,
+          "fps": 60,
+          "bitrate_kbps": 3000,
+          "status": "screened, never the default, never on the live ladder (C5-M3, Phase G)"
+        },
+        {
+          "id": "native_game_540p60_3500",
+          "width": 960,
+          "height": 540,
+          "fps": 60,
+          "bitrate_kbps": 3500,
+          "status": "screened, never the default, never on the live ladder (C5-M3, Phase G)"
+        }
+      ],
+      "verdict": "known-good",
+      "threshold": "the encode class's verdict: the profiles were validated on the reference only",
+      "enabled_by_default": [
+        "native_game_720p60_reference",
+        "live ladder 5000-7000"
+      ],
+      "flag_only": [
+        "the 1080p rung (PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p), client-limited (C5-CLOSE)"
+      ]
+    },
+    "emulator_tiers": {
+      "cores_directory_found": true,
+      "cores": [
+        "blastem_libretro.so",
+        "bsnes_libretro.so",
+        "fceumm_libretro.so",
+        "mednafen_psx_hw_libretro.so",
+        "snes9x_libretro.so"
+      ],
+      "verdict": "known-good",
+      "threshold": "the worse of PS1 and SNES (Snes9x); bsnes, NES and Genesis reported, not counted",
+      "tiers": {
+        "ps1_4x": {
+          "core": "mednafen_psx_hw_libretro.so",
+          "present": true,
+          "verdict": "known-good",
+          "threshold": "core present; CPU time >= 150 % (PS1-STREAM floor, E4-S2); memory >= 384M (E4-S3); reference speed class"
+        },
+        "snes_snes9x": {
+          "core": "snes9x_libretro.so",
+          "present": true,
+          "verdict": "known-good",
+          "threshold": "core present; CPU time >= 100 % (SNES-STREAM <= 100 %, E4-S2); memory >= 384M (E4-S3); reference speed class"
+        },
+        "snes_bsnes": {
+          "core": "bsnes_libretro.so",
+          "present": true,
+          "verdict": "known-good",
+          "threshold": "RetroArch alone 436-517 % of a core (E2-S1), no floor measured: known-good only on the reference speed class with >= 6 physical cores; else unknown"
+        },
+        "nes": {
+          "core": "fceumm_libretro.so",
+          "present": true,
+          "verdict": "unknown",
+          "threshold": "not measured; E5-S2 (no fixtures, E1-S1)"
+        },
+        "genesis": {
+          "core": "blastem_libretro.so",
+          "present": true,
+          "verdict": "unknown",
+          "threshold": "not measured; E5-S2 (no fixtures, E1-S1)"
+        }
+      }
+    },
+    "concurrency_headroom": {
+      "logical_cpus_pct": 1200,
+      "stack_floor_pct_today": 400,
+      "stack_floor_pct_with_deferral": 150,
+      "mem_available_gib": 9.78,
+      "second_activity": true,
+      "grabs_under_stream": "allowed",
+      "threshold": "grabs under a stream: stack 400 % (CONC, E4-S2) + margin -> >= 6 physical cores at the reference speed class and MemAvailable >= 1.5 GiB known-good; >= 4 cores and >= 1.25 GiB deferral-only (stack floor 150 % with deferral, E4-S4); second activity: MemAvailable >= 2 GiB for the stack (E4-S2/S3B)",
+      "verdict": "known-good"
+    },
+    "network": {
+      "default_route": true,
+      "type": "wired",
+      "operstate": "up",
+      "link_speed_mbps": 1000,
+      "duplex": "full",
+      "carries_1080p_rung": true,
+      "threshold": "wired, up, link speed >= 11.6 Mb/s known-good for the 720p reference (wire rate 1.45 MB/s, E2-S1 \u00a76; the reference host wired, D-BASE); >= 18.1 Mb/s also carries the 1080p rung (2.26 MB/s); wireless unknown (not measured; E5-S2); down or slower below-floor",
+      "loss_row": "post-FEC video loss < 10/min on the client's link (D-BASE 8.67 / 8.40): not measurable by a host probe; 0 of 60 stream runs met it since 2026-10-09 (E4-C1 \u00a75); the link watch E4-S4D",
+      "verdict": "known-good"
+    }
+  }
+}

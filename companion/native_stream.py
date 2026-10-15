@@ -1495,6 +1495,14 @@ class NativeStreamManager:
             destination,
         ]
 
+        # E4-S5: PRIVYHUB_SNES_CAPTURE_FIX=output_rate -> the encoder's output rate is the profile's fps (an output -r)
+        # instead of x11grab's probed input rate (tbr). A small capture window (the SNES core's 897x672) is sometimes
+        # probed at 59 or 59.94 from its first frames, and the encoder then drops one frame per second (or per ~16 s)
+        # for the whole session (E4-S5 §1). Absent = today.
+        if os.environ.get("PRIVYHUB_SNES_CAPTURE_FIX") == "output_rate":
+            at = command.index("-an")
+            command[at:at] = ["-r", str(self.FPS)]
+
         return command
     @staticmethod
     def _kill_managed_process(

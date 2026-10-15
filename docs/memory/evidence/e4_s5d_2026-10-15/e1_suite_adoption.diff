@@ -1,0 +1,13 @@
+65c65,68
+< ADOPTED = sorted([LIVE, INDEX, SNES_CORE, RECOVERY])
+---
+> # E4-S5D (adopted 2026-10-15): the encoder's output rate is the profile's fps (-r 60), not x11grab's probed tbr
+> # (E4-S5 / S5B / S5C), through its own drop-in (snes-capture.conf); the adopted environ is exactly these five names
+> SNES_CAPTURE = "PRIVYHUB_SNES_CAPTURE_FIX=output_rate"
+> ADOPTED = sorted([LIVE, INDEX, SNES_CORE, RECOVERY, SNES_CAPTURE])
+960a964
+>          "drop_in_snes_capture": f"Environment={SNES_CAPTURE}" in sh(["systemctl", "--user", "cat", UNIT]),
+963c967
+<                and d["drop_in_snes_core"] and d["drop_in_recovery"] and d["e3_dropin_absent"]
+---
+>                and d["drop_in_snes_core"] and d["drop_in_recovery"] and d["drop_in_snes_capture"] and d["e3_dropin_absent"]

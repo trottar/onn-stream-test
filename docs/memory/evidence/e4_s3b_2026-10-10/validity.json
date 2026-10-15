@@ -1,0 +1,226 @@
+{
+ "control E1-PS1-STREAM": {
+  "run_span_kills": 0,
+  "summary": "runs/E1-PS1-STREAM/run1/summary.json",
+  "status": "OK",
+  "valid": true,
+  "replaced_attempts": 0,
+  "constraint": [],
+  "readback_under": {
+   "MemoryMax": null,
+   "MemorySwapMax": null,
+   "CPUQuotaPerSecUSec": null,
+   "memory.max": null,
+   "memory.swap.max": null,
+   "cpu.max": null
+  },
+  "readback_after": {
+   "MemoryMax": null,
+   "MemorySwapMax": null,
+   "CPUQuotaPerSecUSec": null,
+   "memory.max": null,
+   "memory.swap.max": null,
+   "dropin_present": null
+  },
+  "constraint_lifted": null,
+  "flags_absent": true,
+  "membership": [
+   {
+    "retroarch": [
+     true
+    ],
+    "encoder": [
+     true
+    ]
+   },
+   {
+    "retroarch": [
+     true
+    ],
+    "encoder": [
+     true
+    ]
+   }
+  ],
+  "epg_jsonl_bytes": null,
+  "controller_pauses": 0,
+  "client_pauses_reported": 1
+ },
+ "mem:1G E1-CONC": {
+  "run_span_kills": 3,
+  "summary": "runs/E1-CONC_mem1G_swap0/run1/summary.json",
+  "status": "OK",
+  "valid": true,
+  "replaced_attempts": 0,
+  "constraint": [
+   "MemoryMax=1G",
+   "MemorySwapMax=0"
+  ],
+  "readback_under": {
+   "MemoryMax": "1073741824",
+   "MemorySwapMax": "0",
+   "CPUQuotaPerSecUSec": "infinity",
+   "memory.max": "1073741824",
+   "memory.swap.max": "0",
+   "cpu.max": null
+  },
+  "readback_after": {
+   "MemoryMax": "infinity",
+   "MemorySwapMax": "infinity",
+   "CPUQuotaPerSecUSec": "infinity",
+   "memory.max": "max",
+   "memory.swap.max": "max",
+   "dropin_present": false
+  },
+  "constraint_lifted": true,
+  "flags_absent": true,
+  "membership": [
+   {
+    "retroarch": [],
+    "encoder": []
+   },
+   {
+    "retroarch": [],
+    "encoder": []
+   }
+  ],
+  "epg_jsonl_bytes": 61962,
+  "controller_pauses": 0,
+  "client_pauses_reported": 0
+ },
+ "mem:1G E1-META": {
+  "run_span_kills": 0,
+  "summary": "runs/E1-META_cpu150_mem1G_swap0/run1/summary.json",
+  "status": "OK",
+  "valid": true,
+  "replaced_attempts": 0,
+  "constraint": [
+   "CPUQuota=150%",
+   "MemoryMax=1G",
+   "MemorySwapMax=0"
+  ],
+  "readback_under": {
+   "MemoryMax": "1073741824",
+   "MemorySwapMax": "0",
+   "CPUQuotaPerSecUSec": "1.500000s",
+   "memory.max": "1073741824",
+   "memory.swap.max": "0",
+   "cpu.max": "150000 100000"
+  },
+  "readback_after": {
+   "MemoryMax": "infinity",
+   "MemorySwapMax": "infinity",
+   "CPUQuotaPerSecUSec": "infinity",
+   "memory.max": "max",
+   "memory.swap.max": "max",
+   "dropin_present": false
+  },
+  "constraint_lifted": true,
+  "flags_absent": true,
+  "membership": [
+   {
+    "retroarch": [],
+    "encoder": []
+   },
+   {
+    "retroarch": [],
+    "encoder": []
+   }
+  ],
+  "epg_jsonl_bytes": 54348,
+  "controller_pauses": null,
+  "client_pauses_reported": null
+ },
+ "mem_repeat:1G E1-CONC": {
+  "run_span_kills": 3,
+  "summary": "runs/E1-CONC_mem1G_swap0/run2/summary.json",
+  "status": "OK",
+  "valid": true,
+  "replaced_attempts": 0,
+  "constraint": [
+   "MemoryMax=1G",
+   "MemorySwapMax=0"
+  ],
+  "readback_under": {
+   "MemoryMax": "1073741824",
+   "MemorySwapMax": "0",
+   "CPUQuotaPerSecUSec": "infinity",
+   "memory.max": "1073741824",
+   "memory.swap.max": "0",
+   "cpu.max": null
+  },
+  "readback_after": {
+   "MemoryMax": "infinity",
+   "MemorySwapMax": "infinity",
+   "CPUQuotaPerSecUSec": "infinity",
+   "memory.max": "max",
+   "memory.swap.max": "max",
+   "dropin_present": false
+  },
+  "constraint_lifted": true,
+  "flags_absent": true,
+  "membership": [
+   {
+    "retroarch": [],
+    "encoder": []
+   },
+   {
+    "retroarch": [],
+    "encoder": []
+   }
+  ],
+  "epg_jsonl_bytes": 61553,
+  "controller_pauses": 0,
+  "client_pauses_reported": 0
+ },
+ "addendum:1536M E1-CONC": {
+  "run_span_kills": 0,
+  "summary": "runs/E1-CONC_mem1536M_swap0/run1/summary.json",
+  "status": "OK",
+  "valid": true,
+  "replaced_attempts": 0,
+  "constraint": [
+   "MemoryMax=1536M",
+   "MemorySwapMax=0"
+  ],
+  "readback_under": {
+   "MemoryMax": "1610612736",
+   "MemorySwapMax": "0",
+   "CPUQuotaPerSecUSec": "infinity",
+   "memory.max": "1610612736",
+   "memory.swap.max": "0",
+   "cpu.max": null
+  },
+  "readback_after": {
+   "MemoryMax": "infinity",
+   "MemorySwapMax": "infinity",
+   "CPUQuotaPerSecUSec": "infinity",
+   "memory.max": "max",
+   "memory.swap.max": "max",
+   "dropin_present": false
+  },
+  "constraint_lifted": true,
+  "flags_absent": true,
+  "membership": [
+   {
+    "retroarch": [
+     true
+    ],
+    "encoder": [
+     true
+    ]
+   },
+   {
+    "retroarch": [
+     true
+    ],
+    "encoder": [
+     true
+    ]
+   }
+  ],
+  "epg_jsonl_bytes": 56941,
+  "controller_pauses": 0,
+  "client_pauses_reported": 0
+ }
+}

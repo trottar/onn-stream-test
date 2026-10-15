@@ -1,0 +1,44 @@
+E4-S5 PRE-REGISTRATION -- written 2026-10-10 after the offline pass (offline.md) and before any session; hash in
+e4_s5_preregistration.sha256. Task: docs/memory/handoffs/E4-S5_SNES_CAPTURE_59FPS_TASK.md under QUEUE_2026-10-10.md
+(every standing rule). Baseline: 7331184 plus the uncommitted E4-S1/S2 work and E4-S3 / E4-S4's files (untouched).
+
+1. WHAT THE OFFLINE PASS FOUND (offline.md, by the task's reading rule; written before this file). Of the 13 recorded
+   Snes9x windows, 2 are FAULT (E4-S1 SNES, E4-S2 SNES 400 %) and 11 CLEAN. Exactly one recorded value separates every
+   faulty window from every clean one: x11grab's probed input frame rate (the "tbr" of its input line), 59 in both
+   faulty windows, 60 or 59.94 in the clean ones. In EVERY Snes9x encoder session in native_video_alpha.log (15) the
+   encoder's output rate equals that probed tbr (the command sets no output -r): tbr 60 -> output 60, 0 drops;
+   59.94 -> 59.94, 75 drops per ~22 min (E4-S2's two "partial" runs, dup+drop ~3.5/min); 59 -> 59, 1,295 drops
+   (one per second). PS1's 1920x1080 window probes "1000k tbr" (no estimate) and the output falls back to -framerate
+   60. THE CAUSE IS NAMED: ffmpeg estimates the x11grab input's frame rate from its first frames; for the small SNES
+   window the estimate is sometimes 59 or 59.94; with no output rate the encoder adopts it for the whole session and
+   drops the surplus input frames (60 in, 59 out).
+
+2. THE FRESH SESSIONS (instrumented; as the task's §2): three E1-SNES-STREAM sessions of 10 min (tools/e1_suite.py run
+   --e2 --window 600, idle gap 120 s, E2's 90-s warm-up), no flag, with:
+   - the suite's instrumentation (encoder.jsonl: the encoder's progress at 1 s with its dup / drop counters);
+   - e4_s5_sidecar.py: per encoder session the header's input tbr and output rate (these stand for the input/output
+     pts: they are the values the offline pass named; no change to the encoder command is made for instrumentation),
+     and the RetroArch window's own update rate -- a second x11grab of the window at 120 fps for 60 s into framemd5,
+     distinct consecutive frames per second -- inside each window;
+   - RetroArch's log at the verbose level: the per-session counter override gains log_verbosity = "true" and
+     frontend_log_level = "0" (E1_COUNTER_EXTRA; removed with the override at teardown); what it prints is reported.
+   STATED BEFORE THE RUNS: (i) the fault appears in a session (capture 59.0 +/- 0.05 with ~1 drop/s for >= 2 min,
+   the offline classifier) IF AND ONLY IF that session's probed tbr is 59; a 59.94 probe shows ~1 drop per 16-17 s;
+   a 60 probe shows none; (ii) the window's own update rate is ~60 distinct frames/s in every session, faulty or not
+   (the fault is in the encoder's rate, not RetroArch's). Whether any of the three is faulty is chance (2 whole + 2
+   partial of 15 sessions so far); a clean set is reported as such.
+
+3. THE ONE CHANGE (the cause is named in §1): behind PRIVYHUB_SNES_CAPTURE_FIX=output_rate (absent = today), the
+   x11grab encoder's output rate is set to the profile's fps (an output "-r 60" before "-an"; e4_s5_change.diff,
+   companion/native_stream.py). It applies to every x11grab session while the flag is set (the mechanism is the
+   probe, not the core); only SNES runs here. The flag lives in e3_flag.conf for its runs only.
+   THE RUNS: E1-SNES-STREAM x2 at 20 min with the flag (--e2 --window 1200, idle gap 120 s), the sidecar running.
+   ACCEPTED only if, in BOTH: capture fps (segment-aware) 60.0 +/- 0.1; encoder dup+drop <= 0.2/min; rendered fps
+   >= 59.5; RetroArch fps >= 59.9; host CPU within E1's band (+/- 2) of E4-S1's SNES 7.4 %. Otherwise REJECTED.
+   REPORTED: each flagged session's probed tbr (whether a bad probe occurred under the flag and the output still held
+   60), the window's distinct frames/s, the link (loss, resyncs), socket W.
+
+4. RULES: nothing adopted, nothing committed; every flag absent at every teardown and at the end; no
+   e4_constraint.conf; no sudo, no nft, the Opal read-only; no addresses or identifiers (the window id is never
+   written); nothing fetched, nothing deleted; no other task's scripts run in their directories. No bar or reading
+   changes after the data.

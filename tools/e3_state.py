@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""E3: the adopted state (since E3-A3: live, the guide index, Snes9x, recovery v2) as one JSON line (preflight, PS1 files, APK, no game / RetroArch / encoder). Read-only."""
+"""E3: the adopted state (since E4-S5D: live, the guide index, Snes9x, recovery v2, the SNES capture fix output_rate) as one JSON line (preflight -- since E4-S2 also no e4_constraint.conf --, PS1 files, APK, no game / RetroArch / encoder). Read-only."""
 import sys, json, importlib.util
 spec=importlib.util.spec_from_file_location('s','/home/privyhub/Projects/onn-stream-test/tools/e1_suite.py'); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 mp=m.mainpid()

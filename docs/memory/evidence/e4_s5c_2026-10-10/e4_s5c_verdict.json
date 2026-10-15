@@ -1,0 +1,378 @@
+{
+ "verdict": "INCONCLUSIVE (the mechanism did not reproduce in arm A)",
+ "arms": {
+  "A": {
+   "sessions": 24,
+   "rc_nonzero": 0,
+   "bad_probes": 5,
+   "bad_rate": 0.208,
+   "tbr_counts": {
+    "59": 1,
+    "59.94": 4,
+    "60": 19
+   },
+   "output_fps_counts": {
+    "59": 1,
+    "59.94": 4,
+    "60": 19
+   },
+   "built_has_output_r": [
+    false
+   ],
+   "drops_good_probe": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "dups_good_probe": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "dups_all_max": 0,
+   "bad": [
+    {
+     "index": 10,
+     "tbr": "59.94",
+     "output_fps": "59.94",
+     "drop": 2,
+     "dup": 0,
+     "frames": 3597
+    },
+    {
+     "index": 14,
+     "tbr": "59",
+     "output_fps": "59",
+     "drop": 58,
+     "dup": 0,
+     "frames": 3540
+    },
+    {
+     "index": 18,
+     "tbr": "59.94",
+     "output_fps": "59.94",
+     "drop": 2,
+     "dup": 0,
+     "frames": 3597
+    },
+    {
+     "index": 22,
+     "tbr": "59.94",
+     "output_fps": "59.94",
+     "drop": 2,
+     "dup": 0,
+     "frames": 3597
+    },
+    {
+     "index": 24,
+     "tbr": "59.94",
+     "output_fps": "59.94",
+     "drop": 2,
+     "dup": 0,
+     "frames": 3597
+    }
+   ],
+   "cpu_s_mean": 15.64
+  },
+  "B": {
+   "sessions": 24,
+   "rc_nonzero": 0,
+   "bad_probes": 4,
+   "bad_rate": 0.167,
+   "tbr_counts": {
+    "59": 2,
+    "59.94": 2,
+    "60": 20
+   },
+   "output_fps_counts": {
+    "60": 24
+   },
+   "built_has_output_r": [
+    true
+   ],
+   "drops_good_probe": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "dups_good_probe": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "dups_all_max": 0,
+   "bad": [
+    {
+     "index": 7,
+     "tbr": "59.94",
+     "output_fps": "60",
+     "drop": 0,
+     "dup": 0,
+     "frames": 3600
+    },
+    {
+     "index": 9,
+     "tbr": "59",
+     "output_fps": "60",
+     "drop": 0,
+     "dup": 0,
+     "frames": 3600
+    },
+    {
+     "index": 15,
+     "tbr": "59.94",
+     "output_fps": "60",
+     "drop": 0,
+     "dup": 0,
+     "frames": 3600
+    },
+    {
+     "index": 33,
+     "tbr": "59",
+     "output_fps": "60",
+     "drop": 0,
+     "dup": 0,
+     "frames": 3600
+    }
+   ],
+   "cpu_s_mean": 15.71
+  }
+ },
+ "mechanism_A": [
+  {
+   "index": 10,
+   "tbr": "59.94",
+   "output_fps": "59.94",
+   "drop": 2,
+   "expected": 3.6,
+   "holds": false
+  },
+  {
+   "index": 14,
+   "tbr": "59",
+   "output_fps": "59",
+   "drop": 58,
+   "expected": 60.0,
+   "holds": true
+  },
+  {
+   "index": 18,
+   "tbr": "59.94",
+   "output_fps": "59.94",
+   "drop": 2,
+   "expected": 3.6,
+   "holds": false
+  },
+  {
+   "index": 22,
+   "tbr": "59.94",
+   "output_fps": "59.94",
+   "drop": 2,
+   "expected": 3.6,
+   "holds": false
+  },
+  {
+   "index": 24,
+   "tbr": "59.94",
+   "output_fps": "59.94",
+   "drop": 2,
+   "expected": 3.6,
+   "holds": false
+  }
+ ],
+ "mechanism_reproduces": false,
+ "fix_B": [
+  {
+   "index": 7,
+   "tbr": "59.94",
+   "output_fps": "60",
+   "drop": 0,
+   "holds": true
+  },
+  {
+   "index": 9,
+   "tbr": "59",
+   "output_fps": "60",
+   "drop": 0,
+   "holds": true
+  },
+  {
+   "index": 15,
+   "tbr": "59.94",
+   "output_fps": "60",
+   "drop": 0,
+   "holds": true
+  },
+  {
+   "index": 33,
+   "tbr": "59",
+   "output_fps": "60",
+   "drop": 0,
+   "holds": true
+  }
+ ],
+ "fix_works": true,
+ "sampled_enough": true,
+ "live": [
+  {
+   "run": "runs_bench/E1-SNES-STREAM/run1",
+   "status": "OK",
+   "window": {
+    "from": "2026-10-10T15:31:22.721Z",
+    "to": "2026-10-10T16:46:22.721Z"
+   },
+   "window_s": 4500.0,
+   "retroarch_fps": 59.999,
+   "host_cpu": 10.439,
+   "xorg_core_pct": 9.469,
+   "encoder_core_pct": 43.763,
+   "capture_fps": 59.97,
+   "dupdrop_per_min": 1.669,
+   "encoder_segments": 6,
+   "rendered_fps": 58.912,
+   "loss_per_min": 339.73,
+   "resyncs": 43,
+   "underruns": 128,
+   "socket_w": 16.657,
+   "flags_absent_after": true,
+   "apk": "CONFIRMED",
+   "dropin": null,
+   "replaced_attempts": 0
+  }
+ ],
+ "host_clean": [
+  {
+   "run": "runs_bench/E1-SNES-STREAM/run1",
+   "host_cpu": 10.439,
+   "bench_ffmpeg_host_pct": 1.393,
+   "xorg_extra_host_pct": 0.148,
+   "bench_cost_host_pct": 1.541,
+   "host_minus_bench": 8.898,
+   "retroarch_fps": 59.999,
+   "holds": true
+  }
+ ],
+ "host_clean_ok": true,
+ "snes_companion_probes_live": [
+  [
+   "60",
+   "60"
+  ],
+  [
+   "59.94",
+   "59.94"
+  ],
+  [
+   "59.94",
+   "59.94"
+  ],
+  [
+   "60",
+   "60"
+  ],
+  [
+   "60",
+   "60"
+  ],
+  [
+   "60",
+   "60"
+  ]
+ ],
+ "bench_events": [
+  {
+   "event": "bench_start",
+   "per_arm": 24,
+   "start_index": 0,
+   "session_s": 60,
+   "live_encoder": true,
+   "profile": "native_game_720p60_reference",
+   "fps": 60,
+   "at_utc": "2026-10-10T15:31:23Z"
+  },
+  {
+   "event": "check_session",
+   "index": -1,
+   "arm": "A",
+   "rc": 0,
+   "ok": true,
+   "input_tbr": "60",
+   "output_fps": "60",
+   "frames": 300,
+   "dup": 0,
+   "drop": 0,
+   "stats_line_seen": true,
+   "at_utc": "2026-10-10T15:31:28Z"
+  },
+  {
+   "event": "bench_done",
+   "at_utc": "2026-10-10T16:23:41Z"
+  }
+ ]
+}

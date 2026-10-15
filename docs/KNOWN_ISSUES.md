@@ -1,5 +1,86 @@
 # Known issues and deferred work
 
+## 2026-10-10 SNES capture at 59 fps (or 59.94) for a whole encoder session — FIXED, ADOPTED 2026-10-15 (E4-S5D)
+
+- **Adopted (E4-S5D, the user's decision, 2026-10-15)**
+  (`docs/memory/evidence/E4_S5D_SNES_CAPTURE_FIX_ADOPTION_2026-10-15.md`):
+  - the drop-in `snes-capture.conf`,
+    `Environment=PRIVYHUB_SNES_CAPTURE_FIX=output_rate`, is the fifth
+    adopted line;
+  - the encoder's argv carries `-r 60`;
+  - the state checks require it (`tools/e1_suite.py` `ADOPTED`).
+- **Confirmed** on the adopted state:
+  - a 20-min SNES-STREAM: capture 59.964, dup+drop 0.05/min, RetroArch
+    59.999, host 7.81 %;
+  - a 10-min PS1-STREAM: capture 59.942, 0.10/min.
+  - Both SNES starts probed 60, so tonight's run did not exercise a bad
+    probe; E4-S5C's 4 / 4 is the evidence for that case.
+- **The revert:** delete the drop-in, `systemctl --user daemon-reload`,
+  restart the companion, and take the line out of `ADOPTED`.
+- The history below is kept as it was.
+
+- **Seen** (E4-S1 §4, E4-S2 §2): on SNES-STREAM (Snes9x), the encoder
+  sometimes outputs exactly 59 fps, dropping one frame per second, for a
+  whole session; or 59.94, one drop per ~17-20 s. RetroArch holds
+  59.999. It is not load.
+- **Cause, located** (`docs/memory/evidence/E4_S5_SNES_CAPTURE_59FPS_2026-10-10.md`):
+  - ffmpeg estimates the x11grab input's frame rate (`tbr`) from its
+    first frames, and the encoder command sets no output rate.
+  - The SNES window (897×672) is usually probed at 60, but sometimes at
+    59.94 or 59.
+  - The encoder keeps that rate until it restarts; each restart re-probes.
+  - Output = probe in 15 / 15 logged sessions and 6 / 6 fresh segments.
+    PS1's 1920×1080 window never gets an estimate (`1000k tbr`) and
+    falls back to `-framerate 60`.
+- **Fix, built and dormant:** `PRIVYHUB_SNES_CAPTURE_FIX=output_rate`
+  (an output `-r 60`; `companion/native_stream.py`; absent = today).
+  - The verification was REJECTED on rendered fps on a lossy link.
+  - All five of its probes read 60, so the fix was not exercised.
+- **E4-S5B** (`docs/memory/evidence/E4_S5B_SNES_CAPTURE_PROBE_BENCH_2026-10-10.md`),
+  a bench of 48 × 60-s encoder sessions beside a live SNES-STREAM:
+  **INCONCLUSIVE** (the mechanism did not reproduce in the no-flag arm).
+  - With the flag, all 4 bad probes (59, 59.94 ×3) output 60.
+  - The bench's `-f null` sink passes frames through, so it shows no drops
+    in either arm. A synthetic check shows the companion's rtp
+    constant-rate mode drops: 58 per minute at 59, 2 at 59.94, 0 with
+    `-r 60`.
+  - The fault was live in the companion's own unflagged stream the same
+    night: 2 bad probes in 11 encoder starts; capture 59.944, 2.25
+    dup+drop/min.
+  - PS1 with the flag: unchanged (capture 59.99, 0.10/min).
+- **E4-S5C** (`docs/memory/evidence/E4_S5C_SNES_CAPTURE_PROBE_BENCH_CFR_2026-10-10.md`),
+  E4-S5B's bench with the sink in `-fps_mode cfr`:
+  **INCONCLUSIVE** (the mechanism clause, by its pre-registered window).
+  - With the flag, all 4 bad probes (59 ×2, 59.94 ×2) output 60 with 0
+    drops. **The fix works.**
+  - Without the flag, all 5 bad probes output their probe and dropped:
+    59 → 58 drops (inside 60 ± 12); 59.94 → **2** drops ×4, against the
+    pre-registered 3-4. 3,597 frames came out, 3 short of 3,600, but
+    ffmpeg's drop counter reads 2 (the synthetic check read 2 too). The
+    window was the task's formula; it was not changed after the data.
+  - The live SNES-STREAM was host-clean (RetroArch 59.999; host 8.90 %
+    net of the bench). The companion's own unflagged stream probed
+    59.94 on 2 of 6 starts; capture 59.97, 1.67 dup+drop/min.
+- **Decided 2026-10-15:** adopt. The user adopted it on this evidence; it
+  was applied and confirmed by E4-S5D (above).
+
+## 2026-10-10 runner: the EPG refresh loop has no back-off on a refused call — FIXED (E4-S3B)
+
+- **Fixed 2026-10-10** (`docs/memory/patches/E4-S3B_RUNNER_REFRESH_BACKOFF.md`):
+  - A call with no HTTP reply now backs off 1 s, doubling to 30 s. Each
+    failure streak is written as one row.
+  - In E4-S3B's two OOM-killed runs each restart wrote one row, and every
+    `epg.jsonl` stayed at 53-62 KB.
+  - The history below is kept.
+
+- E4-S3: while the companion's unit was restarting after OOM kills, the
+  suite's `EpgCycle` re-asked at once and logged ~1.4-1.5 M failed
+  "grabs".
+  - That produced two ~300 MB `epg.jsonl` files in
+    `evidence/e4_s3_2026-10-10/` (kept; the user's call before commit).
+- A one-line back-off in `tools/e1_suite.py` would prevent it.
+  Measurement tooling only.
+
 <!-- PRIVYHUB_BASELINE_STREAM_HEALTH:KNOWN_ISSUES:BEGIN -->
 ## 2026-09-20 baseline stream health — open faults, corrected by Group A
 
@@ -1485,3 +1566,28 @@ unrecoverable. Neither was right. The defect itself is real and stays open.
 - **Effect:** the client's own output-stall pauses rise with it. Any
   performance comparison across these nights carries the link's drift;
   use same-night controls.
+- **Still lossy on 10-10** (`QUEUE_2026-10-10B`, 07:12-14:04Z):
+  - every stream run lost 39-863 per min;
+  - E4-S4B's clean-link gate (loss < 10) failed all four of its
+    controls, at 426, 66, 652 and 109 per min, 30 min apart;
+  - host-side, every run was clean (RetroArch 59.999, host CPU in band).
+  - Records: `docs/memory/evidence/E4_S4B_GRAB_DEFERRAL_CLEAN_LINK_2026-10-10.md`.
+  - A link-gated bar has now waited on this item twice: E4-S4 and E4-S4B.
+- **The planned watch never ran.** E4-S4C, a link watch planned to
+  start 2026-10-10, never started: the 10-10 Code session stalled after
+  its first job, and nobody saw it for five days.
+- **Still lossy on 10-15.** E4-S5D's runs (21:01-21:36Z):
+  - SNES 1,006 lost/min, PS1 3,349;
+  - rendered 57.7 / 53.3;
+  - host-side clean.
+- **The watch, detached (E4-S4D), launched 2026-10-15 21:41:41Z:**
+  - it runs in the `systemd --user` transient unit
+    `privyhub-link-watch`, not inside a Code session;
+  - one 5-min PS1 probe every 45 min until `2026-10-20T04:00:00Z`;
+  - grab deferral runs on the first clean window.
+- **Reading the watch:**
+  - its status is `cat ~/privyhub_link_watch/status.txt`: one line,
+    rewritten after every probe and run, with a 5-min heartbeat;
+  - beside it are `history.csv` (one row per probe) and `watch.log`;
+  - to stop it: `touch ~/privyhub_link_watch/STOP`.
+  - Record: `docs/memory/evidence/E4_S4D_LINK_WATCH_LAUNCH_2026-10-15.md`.

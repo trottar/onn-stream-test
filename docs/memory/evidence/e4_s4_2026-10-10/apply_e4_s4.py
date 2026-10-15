@@ -1,0 +1,288 @@
+#!/usr/bin/env python3
+"""E4-S4 -- apply the one change (companion/plugins/epg.py, behind PRIVYHUB_EPG_DEFER_WHILE_STREAMING=1) and the
+runner's support (tools/e1_suite.py). Staged while E4-S3 ran (the companion restarts at every run of a ladder, so no
+companion or runner file was changed until E4-S3 ended). Refuses on any predecessor mismatch; writes
+e4_s4_change.diff (git diff of the two files against their predecessors) and the predecessor/after sha256."""
+import hashlib
+import subprocess
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[4]
+HERE = Path(__file__).resolve().parent
+EPG = REPO / "companion/plugins/epg.py"
+SUITE = REPO / "tools/e1_suite.py"
+FLAG = "PRIVYHUB_EPG_DEFER_WHILE_STREAMING"
+
+
+def sha(p):
+    return hashlib.sha256(p.read_bytes()).hexdigest()
+
+
+def rep(s, a, b):
+    if s.count(a) != 1:
+        sys.exit(f"refusing: anchor found {s.count(a)} times: {a[:80]!r}")
+    return s.replace(a, b)
+
+
+EPG_CLASS = '''
+
+class DeferredGrabs:
+    """E4-S4 (PRIVYHUB_EPG_DEFER_WHILE_STREAMING=1 only): a forced grab -- the refresh endpoint or the background
+    warmer -- asked for while a native stream session is live (recovery PLAYING / PAUSED_*) is queued, not run (one
+    entry per channel, the first request's time kept). When the session ends the queue drains in order, one grab at a
+    time. A grab already running when a stream starts is not touched. A deferral older than CAP_S runs anyway (the
+    safety valve, counted as cap_fired)."""
+
+    CAP_S = 3600
+    POLL_S = 2.0
+
+    def __init__(self, run_one, live_state) -> None:
+        self._run_one = run_one
+        self._live_state = live_state
+        self._lock = threading.Lock()
+        self._items: dict[str, float] = {}
+        self._requests = 0
+        self._drained_ok = 0
+        self._drained_failed = 0
+        self._cap_fired = 0
+        self._drain: dict[str, Any] | None = None
+        self._last_drain: dict[str, Any] | None = None
+        self._thread: threading.Thread | None = None
+
+    def add(self, channel_id: str) -> int:
+        with self._lock:
+            self._requests += 1
+            self._items.setdefault(channel_id, time.time())
+            if self._thread is None or not self._thread.is_alive():
+                self._thread = threading.Thread(target=self._loop, name="PrivyHubEpgDeferred", daemon=True)
+                self._thread.start()
+            return len(self._items)
+
+    def _loop(self) -> None:
+        while True:
+            with self._lock:
+                if not self._items:
+                    self._thread = None
+                    return
+                channel_id, first = next(iter(self._items.items()))
+            capped = time.time() - first > self.CAP_S
+            if self._live_state() and not capped:
+                time.sleep(self.POLL_S)
+                continue
+            with self._lock:
+                if self._drain is None:
+                    self._drain = {"started_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+                                   "queued": len(self._items), "ok": 0, "failed": 0, "t0": time.time()}
+                if capped:
+                    self._cap_fired += 1
+            ok = False
+            try:
+                result = self._run_one(channel_id)
+                ok = bool(result.get("ok")) and not result.get("refresh_error_code")
+            except Exception:
+                ok = False
+            with self._lock:
+                self._items.pop(channel_id, None)
+                if ok:
+                    self._drained_ok += 1
+                    self._drain["ok"] += 1
+                else:
+                    self._drained_failed += 1
+                    self._drain["failed"] += 1
+                if not self._items:
+                    d = self._drain
+                    d["s"] = round(time.time() - d.pop("t0"), 2)
+                    d["ended_utc"] = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+                    self._last_drain = d
+                    self._drain = None
+
+    def status(self) -> dict[str, Any]:
+        with self._lock:
+            oldest = min(self._items.values(), default=None)
+            return {
+                "pending": len(self._items),
+                "channels": list(self._items),
+                "oldest_age_s": round(time.time() - oldest, 1) if oldest else None,
+                "requests": self._requests,
+                "drained_ok": self._drained_ok,
+                "drained_failed": self._drained_failed,
+                "cap_fired": self._cap_fired,
+                "cap_s": self.CAP_S,
+                "draining": self._drain is not None,
+                "last_drain": dict(self._last_drain) if self._last_drain else None,
+            }
+
+
+class EpgPlugin:'''
+
+EPG_METHODS = '''
+    # E4-S4: the native stream's recovery state (games plugin), read through the plugin registry at call time.
+    def _stream_live_state(self) -> str | None:
+        try:
+            from . import PLUGINS
+
+            state = PLUGINS["games"]._recovery.current_state()
+        except Exception:
+            return None
+        return state if state in ("PLAYING", "PAUSED_RECOVERING", "PAUSED_SAVED") else None
+
+    def _drain_one(self, channel_id: str) -> dict[str, Any]:
+        return self._guide(channel_id, force=True, _drain=True)
+
+    def _background_refresh('''
+
+EPG_HOOK = '''        # E4-S4: PRIVYHUB_EPG_DEFER_WHILE_STREAMING=1 -> while a native stream session is live, a forced grab is
+        # queued (DeferredGrabs) and answered with the cached guide marked refresh_deferred -- the same marker the
+        # toolchain-preparing path already returns. Absent = today.
+        if self._deferred is not None and not _drain:
+            live = self._stream_live_state()
+            if live:
+                pending = self._deferred.add(channel_id)
+                out = stale if stale is not None else {
+                    "schema": self.GUIDE_SCHEMA,
+                    "ok": True,
+                    "ready": self._toolchain_ready(),
+                    "channel_id": channel_id,
+                    "cached": False,
+                    "stale": False,
+                    "empty_reason": "refresh_deferred_stream_live",
+                    "programmes": [],
+                    "programme_count": 0,
+                }
+                out["refresh_deferred"] = True
+                out["deferred_reason"] = "stream_live"
+                out["stream_state"] = live
+                out["deferred_pending"] = pending
+                return out
+
+        if not self._toolchain_ready():
+            started = self._start_bootstrap_async()'''
+
+
+def patch_epg(s):
+    s = rep(s, "\n\nclass EpgPlugin:", EPG_CLASS)
+    s = rep(s, '''        self._warmer = BackgroundGuideWarmer(
+            self._background_refresh,
+        )
+''', '''        self._warmer = BackgroundGuideWarmer(
+            self._background_refresh,
+        )
+        # E4-S4: absent = None (today)
+        self._deferred = (
+            DeferredGrabs(self._drain_one, self._stream_live_state)
+            if os.environ.get("PRIVYHUB_EPG_DEFER_WHILE_STREAMING") == "1"
+            else None
+        )
+''')
+    s = rep(s, '''            "background_refresh": self._warmer.status(),
+            "last_error": last_error,
+        }''', '''            "background_refresh": self._warmer.status(),
+            "last_error": last_error,
+            **({"deferred": self._deferred.status()} if self._deferred is not None else {}),
+        }''')
+    s = rep(s, "\n    def _background_refresh(", EPG_METHODS)
+    s = rep(s, '''    def _guide(
+        self,
+        channel_id: str,
+        *,
+        force: bool = False,
+    ) -> dict[str, Any]:''', '''    def _guide(
+        self,
+        channel_id: str,
+        *,
+        force: bool = False,
+        _drain: bool = False,
+    ) -> dict[str, Any]:''')
+    s = rep(s, '''        if not self._toolchain_ready():
+            started = self._start_bootstrap_async()''', EPG_HOOK)
+    return s
+
+
+def patch_suite(s):
+    s = rep(s, '''            code, d = http("POST", f"/plugins/epg/refresh?channel_id={urllib.parse.quote(ch)}", 150)
+            self.write({"kind": "grab", "channel": ch, "start_utc": utc(t0), "end_utc": utc(),''',
+            '''            code, d = http("POST", f"/plugins/epg/refresh?channel_id={urllib.parse.quote(ch)}", 150)
+            if d.get("refresh_deferred"):
+                # E4-S4: the grab was deferred (a stream is live); the cycle keeps its normal pace (~5 s per grab,
+                # E4-S1's median) instead of re-asking at once
+                self.write({"kind": "deferred", "channel": ch, "start_utc": utc(t0), "end_utc": utc(),
+                            "stream_state": d.get("stream_state"), "pending": d.get("deferred_pending")})
+                i += 1
+                self.stop.wait(5.0)
+                continue
+            self.write({"kind": "grab", "channel": ch, "start_utc": utc(t0), "end_utc": utc(),''')
+    s = rep(s, '''    grabs, scans = [], []
+    if path.exists():
+        for line in path.read_text().splitlines():
+            r = json.loads(line)
+            if not (t0 <= r["start_utc"] and r["end_utc"] <= t1):
+                continue
+            (grabs if r["kind"] == "grab" else scans).append(r)''', '''    grabs, scans, deferred = [], [], []
+    if path.exists():
+        for line in path.read_text().splitlines():
+            r = json.loads(line)
+            if not (t0 <= r["start_utc"] and r["end_utc"] <= t1):
+                continue
+            (grabs if r["kind"] == "grab" else deferred if r["kind"] == "deferred" else scans).append(r)''')
+    s = rep(s, '''            "grabs_ok_per_channel": per_ch,''', '''            "grabs_ok_per_channel": per_ch, "deferred_in_window": len(deferred),''')
+    s = rep(s, '''def guide_read() -> dict:''', '''DEFER = "PRIVYHUB_EPG_DEFER_WHILE_STREAMING=1"
+
+
+def wait_deferred_drain(timeout: float = 600) -> dict:
+    """E4-S4: after the stream ended, wait for the deferred grab queue to drain (the EPG status's "deferred"), then
+    read the guide. Recorded in the teardown."""
+    t0 = time.time()
+    first = (http("GET", "/plugins/epg/status", 10)[1] or {}).get("deferred") or {}
+    out = {"pending_at_start": first.get("pending"), "requests": first.get("requests")}
+    d = first
+    while time.time() - t0 < timeout:
+        d = (http("GET", "/plugins/epg/status", 10)[1] or {}).get("deferred") or {}
+        if d.get("pending") == 0 and not d.get("draining"):
+            break
+        time.sleep(2)
+    out.update({"waited_s": round(time.time() - t0, 1), "pending_at_end": d.get("pending"),
+                "drained_ok": d.get("drained_ok"), "drained_failed": d.get("drained_failed"),
+                "cap_fired": d.get("cap_fired"), "last_drain": d.get("last_drain")})
+    out["guide_after"] = guide_read()
+    return out
+
+
+def guide_read() -> dict:''')
+    s = rep(s, '''        if stream:
+            td["banner"] = banner_clear()''', '''        if stream:
+            td["banner"] = banner_clear()
+        if e2 and DEFER in (w.get("dropin") or []):
+            td["deferred_drain"] = wait_deferred_drain()''')
+    return s
+
+
+def main():
+    pre = {"epg": sha(EPG), "suite": sha(SUITE)}
+    want = (HERE / "predecessor_sha256.txt").read_text().split() if (HERE / "predecessor_sha256.txt").exists() else None
+    if want and (want[0] != pre["epg"] or want[2] != pre["suite"]):
+        sys.exit(f"refusing: predecessor mismatch {pre}")
+    e, s = patch_epg(EPG.read_text()), patch_suite(SUITE.read_text())
+    bk_e, bk_s = HERE / "predecessor_epg.py.txt", HERE / "predecessor_e1_suite.py.txt"
+    bk_e.write_bytes(EPG.read_bytes())
+    bk_s.write_bytes(SUITE.read_bytes())
+    EPG.write_text(e)
+    SUITE.write_text(s)
+    for p in (EPG, SUITE):
+        r = subprocess.run([sys.executable, "-c", f"import ast; ast.parse(open({str(p)!r}).read())"], capture_output=True, text=True)
+        if r.returncode:
+            EPG.write_bytes(bk_e.read_bytes())
+            SUITE.write_bytes(bk_s.read_bytes())
+            sys.exit(f"parse failed, predecessors restored: {r.stderr}")
+    diff = subprocess.run(["diff", "-u", "--label", "a/companion/plugins/epg.py", "--label", "b/companion/plugins/epg.py",
+                           str(bk_e), str(EPG)], capture_output=True, text=True).stdout
+    diff += subprocess.run(["diff", "-u", "--label", "a/tools/e1_suite.py", "--label", "b/tools/e1_suite.py",
+                            str(bk_s), str(SUITE)], capture_output=True, text=True).stdout
+    (HERE / "e4_s4_change.diff").write_text(diff)
+    (HERE / "change_sha256.txt").write_text(f"predecessor companion/plugins/epg.py {pre['epg']}\npredecessor tools/e1_suite.py {pre['suite']}\n"
+                                           f"after companion/plugins/epg.py {sha(EPG)}\nafter tools/e1_suite.py {sha(SUITE)}\n")
+    print("applied", (HERE / "change_sha256.txt").read_text())
+
+
+if __name__ == "__main__":
+    main()

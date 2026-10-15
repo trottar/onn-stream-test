@@ -1,0 +1,26 @@
+E4-S5D -- adopt PRIVYHUB_SNES_CAPTURE_FIX=output_rate (the user's decision, 2026-10-15), and confirm it. Pre-registered
+before the first run; the gates are the task's (handoffs/E4-S5D_SNES_CAPTURE_FIX_ADOPTION_TASK.md section 2), verbatim
+in substance, not changed after data.
+
+1. The adoption. Precondition: the four-line adopted state, no flag, no constraint, no game (precondition.json).
+   The drop-in ~/.config/systemd/user/privyhub-companion.service.d/snes-capture.conf:
+     [Service]
+     Environment=PRIVYHUB_SNES_CAPTURE_FIX=output_rate
+   systemctl --user daemon-reload; restart the companion; the unit's environment read back: five PRIVYHUB_* lines
+   (live, cached, snes9x, v2, output_rate). tools/e1_suite.py's ADOPTED list (read by tools/e3_state.py) gains the
+   name and the preflight its drop-in; tools/e3_state.py passes on the new state.
+   The revert: delete the drop-in, systemctl --user daemon-reload, restart the companion (and the ADOPTED line out).
+
+2. The confirmation runs (tools/e1_suite.py, --e2, the sidecar-free suite, gap 120 s):
+   (A) E1-SNES-STREAM x1, --window 1200, on the adopted state. GATES:
+       - the encoder's argv (the companion's log, native_video_alpha.log 'encoder argv:' line) carries -r 60 at every
+         encoder start in the run; every encoder start's probed input tbr reported;
+       - capture 60.0 +/- 0.1 frames/s over the window (encoder.jsonl, segment-aware as E4-S5);
+       - dup+drop <= 0.2 per min over the window;
+       - RetroArch fps >= 59.9;
+       - host CPU within E1's band (+/- 2 points) of E4-S1's SNES 7.4 %.
+       Loss/min and rendered fps reported, NOT gated (the link).
+   (B) then E1-PS1-STREAM x1, --window 600. GATES: capture 60.0 +/- 0.1; dup+drop <= 0.2 per min.
+   If any gate fails: revert (section 1), say so, stop -- the user decides.
+
+3. The final state: the five-line adopted state, no flag, no constraint, no game. Nothing committed.

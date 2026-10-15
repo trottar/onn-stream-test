@@ -1,0 +1,50 @@
+E4-S4 PRE-REGISTRATION -- written 2026-10-10 after the smoke (smoke.jsonl) and before any benchmark run; hash in
+e4_s4_preregistration.sha256. Task: docs/memory/handoffs/E4-S4_GRAB_DEFERRAL_TASK.md under QUEUE_2026-10-10.md (every
+standing rule; E3-A3B's validity reading; E4-S2's constraint discipline). Baseline: 7331184 plus the uncommitted
+E4-S1/S2 work and E4-S3's files (untouched). References: E4-S1 (e4_s1_2026-10-09/), E4-S2 (e4_s2_2026-10-09/).
+
+0. THE CHANGE (e4_s4_change.diff; behind PRIVYHUB_EPG_DEFER_WHILE_STREAMING=1, absent = today): companion/plugins/
+   epg.py -- while the games plugin's recovery state is PLAYING / PAUSED_RECOVERING / PAUSED_SAVED, a forced grab (the
+   refresh endpoint or the background warmer) is queued (one entry per channel) and answered with the cached guide
+   marked "refresh_deferred": true (the marker the toolchain-preparing path already returns), "deferred_reason":
+   "stream_live"; the EPG status gains "deferred" (pending, requests, drained ok / failed, cap_fired, last_drain).
+   When the state leaves those (ENDED), the queue drains in order, one grab at a time. A running grab is not touched.
+   A deferral older than 60 min runs anyway (cap_fired). tools/e1_suite.py: the E1-CONC cycle, when a refresh comes
+   back deferred, records a "deferred" row and waits 5 s (E4-S1's median grab ~5 s) before the next instead of
+   re-asking at once; with the flag, each run's teardown waits for the queue to drain (<= 600 s) and records it
+   (pending at start, wall time, drained ok / failed, cap_fired, the drain's own record) and reads the guide after.
+   The flag lives in e3_flag.conf for its runs only (removed + daemon-reload + restart at their teardown).
+
+1. THE RUNS (tools/e1_suite.py run --e2 --window 1200, idle gap 120 s, E2's warm-ups), in this order:
+   E1-PS1-STREAM x1 (no flag; THE CONTROL); E1-CONC x2 with the flag (unconstrained; E1-CONC_flag/run1, run2);
+   E1-CONC x1 with the flag at CPUQuota=150% (E1-CONC_flag_cpu150/run1; the drop-in e4_constraint.conf as E4-S2,
+   read back under, removed at teardown). A run that never reaches PLAYING is replaced at most twice (the runner).
+   PRE-RUN GUIDE READ: tools/e1_suite.py guide_read() (the six channels, non-forced) before the first run, >= 60 s
+   after any background refresh (e3_guide_read's check) -> pre_guide.json.
+
+2. COMPARABILITY (else INCONCLUSIVE): the control within E1's bands of E4-S1's PS1-STREAM: host CPU 10.9 +/- 2;
+   rendered fps 59.53 +/- 0.5.
+
+3. THE BAR -- ACCEPTED only if all hold; REJECTED if any fails (comparability holding):
+   (a) CONC with the flag, BOTH unconstrained runs: video loss/min <= 3 x the control's AND <= 100; rendered fps
+       >= 59.5; resyncs <= 10; host CPU within +/- 2 points of the control's;
+   (b) the deferral did what it says, in each of the three CONC runs: 0 grabber processes during the window (no
+       sampler row with an EPG child, samples.jsonl procs.epg); the queue grew (epg.jsonl "deferred" rows with pending
+       rising to the six channels); after teardown the queue drained with failed 0 and pending 0, every queued
+       channel refreshed (drained ok = queued), within 2 x the cycle's normal time for that many grabs (E4-S1 CONC's
+       median grab 5.3 s: 2 x 5.3 x the count; 63.6 s for six);
+   (c) the guide serves after each drain: all six channels serve, programmes total within +/- 5 % of the pre-run read;
+   (d) CONC with the flag at CPUQuota=150% passes E4-S2's pass rule as a stream row (rendered >= 59.5, RetroArch
+       >= 59.9, capture 60 +/- 0.5 segment-aware, dup+drop <= 0.2/min, spikes < 200, stale < 20; grabs failed 0 is
+       vacuous here; the link-INCONCLUSIVE clause as E4-S2 with THIS task's control), its throttled time reported;
+   (e) the companion's CPU (% of a core) in each unconstrained CONC run within +/- 2 points of the control's.
+   REPORTED: cap_fired (expected 0), the drain times, the client's pauses, the gap log, socket W, the deferred rows'
+   count per window.
+
+4. WHAT ADOPTION WOULD MEAN (stated in the record, the user's call): the stack's CPU-time floor becomes PS1-STREAM's
+   150 % (E4-S2), the alpha spec restated; the one-line adoption Environment=PRIVYHUB_EPG_DEFER_WHILE_STREAMING=1 in
+   its own drop-in and its revert. Nothing is adopted here.
+
+5. RULES: nothing adopted, nothing committed; the flag and the constraint absent at every teardown and at the end;
+   no sudo, no nft, the Opal read-only; no addresses or identifiers; nothing fetched, nothing deleted; no other
+   task's scripts run in their directories. No band, rule or reading changes after the data.

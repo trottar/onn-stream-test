@@ -1,0 +1,1217 @@
+{
+ "steps": [
+  {
+   "label": "mem:768M",
+   "items": [
+    [
+     "E1-PS1-STREAM",
+     [
+      "CPUQuota=200%",
+      "MemoryMax=768M",
+      "MemorySwapMax=0"
+     ]
+    ],
+    [
+     "E1-SNES-STREAM",
+     [
+      "CPUQuota=150%",
+      "MemoryMax=768M",
+      "MemorySwapMax=0"
+     ]
+    ],
+    [
+     "E1-CONC",
+     [
+      "MemoryMax=768M",
+      "MemorySwapMax=0"
+     ]
+    ],
+    [
+     "E1-META",
+     [
+      "CPUQuota=150%",
+      "MemoryMax=768M",
+      "MemorySwapMax=0"
+     ]
+    ]
+   ],
+   "s": 5759
+  },
+  {
+   "label": "mem:512M",
+   "items": [
+    [
+     "E1-PS1-STREAM",
+     [
+      "CPUQuota=200%",
+      "MemoryMax=512M",
+      "MemorySwapMax=0"
+     ]
+    ],
+    [
+     "E1-SNES-STREAM",
+     [
+      "CPUQuota=150%",
+      "MemoryMax=512M",
+      "MemorySwapMax=0"
+     ]
+    ]
+   ],
+   "s": 2941
+  },
+  {
+   "label": "mem:384M",
+   "items": [
+    [
+     "E1-PS1-STREAM",
+     [
+      "CPUQuota=200%",
+      "MemoryMax=384M",
+      "MemorySwapMax=0"
+     ]
+    ],
+    [
+     "E1-SNES-STREAM",
+     [
+      "CPUQuota=150%",
+      "MemoryMax=384M",
+      "MemorySwapMax=0"
+     ]
+    ]
+   ],
+   "s": 2906
+  },
+  {
+   "label": "mem_repeat:768M:E1-PS1-STREAM",
+   "items": [
+    [
+     "E1-PS1-STREAM",
+     [
+      "CPUQuota=200%",
+      "MemoryMax=768M",
+      "MemorySwapMax=0"
+     ]
+    ]
+   ],
+   "s": 1464
+  },
+  {
+   "label": "mem_repeat:512M:E1-PS1-STREAM",
+   "items": [
+    [
+     "E1-PS1-STREAM",
+     [
+      "CPUQuota=200%",
+      "MemoryMax=512M",
+      "MemorySwapMax=0"
+     ]
+    ]
+   ],
+   "s": 1456
+  }
+ ],
+ "runs": [
+  {
+   "step": "mem:768M",
+   "row": "E1-PS1-STREAM",
+   "constraint": [
+    "CPUQuota=200%",
+    "MemoryMax=768M",
+    "MemorySwapMax=0"
+   ],
+   "summary": "runs/E1-PS1-STREAM_cpu200_mem768M_swap0/run1/summary.json",
+   "verdict": "INCONCLUSIVE",
+   "why": "fails only on link-observed metrics while the control fails D-BASE's loss row",
+   "failing": [
+    "rendered_fps"
+   ],
+   "judged": {
+    "metrics": {
+     "rendered_fps": 59.35,
+     "retroarch_fps": 59.999,
+     "capture_fps": 60.017,
+     "encoder_segments": 1,
+     "capture_fps_sampler_first_to_last": 60.017,
+     "spikes_20ms_per_min": 88.73,
+     "stale_drops_per_min": 6.051,
+     "encoder_dupdrop_per_min": 0.1,
+     "grabs_failed": null,
+     "grabs_ok_min_per_channel": null,
+     "guide_serves": null,
+     "video_loss_per_min": 184.94,
+     "resyncs": 2,
+     "underruns": 57,
+     "throttled_s": 0.0,
+     "throttled_period_frac": 0.0,
+     "usage_cores": 0.9539,
+     "memory_current_max_mb": 223.0,
+     "memory_peak_mb": 224.3,
+     "swap_current_max_mb": 0.0,
+     "memory_events_high": 0,
+     "memory_events_max": 0,
+     "oom_kill_run": 0,
+     "oom_kill_window": 0,
+     "memory_events_oom": 0,
+     "journal_kills": 0,
+     "mainpid_same": true,
+     "anon_mb_at_peak": 189.2,
+     "file_mb_at_peak": 21.4,
+     "anon_mb_max": 189.2,
+     "memory_psi_some_ms_per_s": 0.0,
+     "memory_psi_full_ms_per_s": 0.0,
+     "pgmajfault": 0,
+     "companion_pss_mb": 37.471798828125,
+     "bitrate_kbps_min": 7000,
+     "bitrate_kbps_max": 7000,
+     "transitions": 0,
+     "grab_s_median": null,
+     "grabs_ok": null,
+     "host_cpu": 10.842,
+     "socket_w": 21.031,
+     "tctl": 58.834,
+     "controller_pauses": 0,
+     "client_pauses": 0
+    },
+    "gates": {
+     "rendered_fps": {
+      "value": 59.35,
+      "passes": false
+     },
+     "retroarch_fps": {
+      "value": 59.999,
+      "passes": true
+     },
+     "capture_fps": {
+      "value": 60.017,
+      "passes": true
+     },
+     "spikes_20ms_per_min": {
+      "value": 88.73,
+      "passes": true
+     },
+     "stale_drops_per_min": {
+      "value": 6.051,
+      "passes": true
+     },
+     "encoder_dupdrop_per_min": {
+      "value": 0.1,
+      "passes": true
+     },
+     "no_oom_kill": {
+      "value": 0,
+      "passes": true
+     },
+     "no_journal_kill": {
+      "value": 0,
+      "passes": true
+     },
+     "unit_not_restarted": {
+      "value": true,
+      "passes": true
+     }
+    },
+    "failing": [
+     "rendered_fps"
+    ],
+    "missing": [],
+    "control_loss_per_min": 184.94,
+    "verdict": "INCONCLUSIVE",
+    "why": "fails only on link-observed metrics while the control fails D-BASE's loss row"
+   }
+  },
+  {
+   "step": "mem:768M",
+   "row": "E1-SNES-STREAM",
+   "constraint": [
+    "CPUQuota=150%",
+    "MemoryMax=768M",
+    "MemorySwapMax=0"
+   ],
+   "summary": "runs/E1-SNES-STREAM_cpu150_mem768M_swap0/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": [],
+   "judged": {
+    "metrics": {
+     "rendered_fps": 58.636,
+     "retroarch_fps": 59.999,
+     "capture_fps": 59.968,
+     "encoder_segments": 3,
+     "capture_fps_sampler_first_to_last": 3.731,
+     "spikes_20ms_per_min": 166.26,
+     "stale_drops_per_min": 7.026,
+     "encoder_dupdrop_per_min": 0.05,
+     "grabs_failed": null,
+     "grabs_ok_min_per_channel": null,
+     "guide_serves": null,
+     "video_loss_per_min": 405.53,
+     "resyncs": 11,
+     "underruns": 46,
+     "throttled_s": 0.0,
+     "throttled_period_frac": 0.0,
+     "usage_cores": 0.601,
+     "memory_current_max_mb": 194.5,
+     "memory_peak_mb": 196.4,
+     "swap_current_max_mb": 0.0,
+     "memory_events_high": 0,
+     "memory_events_max": 0,
+     "oom_kill_run": 0,
+     "oom_kill_window": 0,
+     "memory_events_oom": 0,
+     "journal_kills": 0,
+     "mainpid_same": true,
+     "anon_mb_at_peak": 163.5,
+     "file_mb_at_peak": 19.3,
+     "anon_mb_max": 163.6,
+     "memory_psi_some_ms_per_s": 0.0,
+     "memory_psi_full_ms_per_s": 0.0,
+     "pgmajfault": 0,
+     "companion_pss_mb": 38.7819560546875,
+     "bitrate_kbps_min": 5000,
+     "bitrate_kbps_max": 7000,
+     "transitions": 2,
+     "grab_s_median": null,
+     "grabs_ok": null,
+     "host_cpu": 7.356,
+     "socket_w": 16.858,
+     "tctl": 51.74,
+     "controller_pauses": 0,
+     "client_pauses": 2
+    },
+    "gates": {
+     "rendered_fps": {
+      "value": 58.636,
+      "passes": true
+     },
+     "retroarch_fps": {
+      "value": 59.999,
+      "passes": true
+     },
+     "capture_fps": {
+      "value": 59.968,
+      "passes": true
+     },
+     "spikes_20ms_per_min": {
+      "value": 166.26,
+      "passes": true
+     },
+     "stale_drops_per_min": {
+      "value": 7.026,
+      "passes": true
+     },
+     "encoder_dupdrop_per_min": {
+      "value": 0.05,
+      "passes": true
+     },
+     "no_oom_kill": {
+      "value": 0,
+      "passes": true
+     },
+     "no_journal_kill": {
+      "value": 0,
+      "passes": true
+     },
+     "unit_not_restarted": {
+      "value": true,
+      "passes": true
+     }
+    },
+    "failing": [],
+    "missing": [],
+    "control_loss_per_min": 184.94,
+    "verdict": "PASS",
+    "why": "every gated metric holds"
+   }
+  },
+  {
+   "step": "mem:768M",
+   "row": "E1-CONC",
+   "constraint": [
+    "MemoryMax=768M",
+    "MemorySwapMax=0"
+   ],
+   "summary": "runs/E1-CONC_mem768M_swap0/run1/summary.json",
+   "verdict": "FAIL",
+   "why": "fails rendered_fps, grabs_failed, no_journal_kill, unit_not_restarted",
+   "failing": [
+    "rendered_fps",
+    "grabs_failed",
+    "no_journal_kill",
+    "unit_not_restarted"
+   ],
+   "judged": {
+    "metrics": {
+     "rendered_fps": 0.0,
+     "retroarch_fps": null,
+     "capture_fps": null,
+     "encoder_segments": 0,
+     "capture_fps_sampler_first_to_last": null,
+     "spikes_20ms_per_min": 2.22,
+     "stale_drops_per_min": 0.278,
+     "encoder_dupdrop_per_min": null,
+     "grabs_failed": 1489544,
+     "grabs_ok_min_per_channel": 0,
+     "guide_serves": false,
+     "video_loss_per_min": 0.0,
+     "resyncs": 0,
+     "underruns": 78494,
+     "throttled_s": null,
+     "throttled_period_frac": null,
+     "usage_cores": -0.0125,
+     "memory_current_max_mb": 765.5,
+     "memory_peak_mb": null,
+     "swap_current_max_mb": 0.0,
+     "memory_events_high": 0,
+     "memory_events_max": 0,
+     "oom_kill_run": 0,
+     "oom_kill_window": 0,
+     "memory_events_oom": 0,
+     "journal_kills": 574,
+     "mainpid_same": false,
+     "anon_mb_at_peak": 742.7,
+     "file_mb_at_peak": 0.1,
+     "anon_mb_max": 742.7,
+     "memory_psi_some_ms_per_s": 0.0,
+     "memory_psi_full_ms_per_s": 0.0,
+     "pgmajfault": 0,
+     "companion_pss_mb": 31.9952607421875,
+     "bitrate_kbps_min": 7000,
+     "bitrate_kbps_max": 7000,
+     "transitions": 0,
+     "grab_s_median": 4.831,
+     "grabs_ok": 158,
+     "host_cpu": 13.64,
+     "socket_w": 18.033,
+     "tctl": 60.42,
+     "controller_pauses": 0,
+     "client_pauses": 0
+    },
+    "gates": {
+     "rendered_fps": {
+      "value": 0.0,
+      "passes": false
+     },
+     "retroarch_fps": {
+      "value": null,
+      "passes": false
+     },
+     "capture_fps": {
+      "value": null,
+      "passes": false
+     },
+     "spikes_20ms_per_min": {
+      "value": 2.22,
+      "passes": true
+     },
+     "stale_drops_per_min": {
+      "value": 0.278,
+      "passes": true
+     },
+     "encoder_dupdrop_per_min": {
+      "value": null,
+      "passes": false
+     },
+     "grabs_failed": {
+      "value": 1489544,
+      "passes": false
+     },
+     "no_oom_kill": {
+      "value": 0,
+      "passes": true
+     },
+     "no_journal_kill": {
+      "value": 574,
+      "passes": false
+     },
+     "unit_not_restarted": {
+      "value": false,
+      "passes": false
+     }
+    },
+    "failing": [
+     "rendered_fps",
+     "grabs_failed",
+     "no_journal_kill",
+     "unit_not_restarted"
+    ],
+    "missing": [
+     "retroarch_fps",
+     "capture_fps",
+     "encoder_dupdrop_per_min"
+    ],
+    "control_loss_per_min": 184.94,
+    "verdict": "FAIL",
+    "why": "fails rendered_fps, grabs_failed, no_journal_kill, unit_not_restarted"
+   }
+  },
+  {
+   "step": "mem:768M",
+   "row": "E1-META",
+   "constraint": [
+    "CPUQuota=150%",
+    "MemoryMax=768M",
+    "MemorySwapMax=0"
+   ],
+   "summary": "runs/E1-META_cpu150_mem768M_swap0/run1/summary.json",
+   "verdict": "FAIL",
+   "why": "fails grabs_failed, grabs_ok_min_per_channel, no_journal_kill, unit_not_restarted",
+   "failing": [
+    "grabs_failed",
+    "grabs_ok_min_per_channel",
+    "no_journal_kill",
+    "unit_not_restarted"
+   ],
+   "judged": {
+    "metrics": {
+     "rendered_fps": null,
+     "retroarch_fps": null,
+     "capture_fps": null,
+     "encoder_segments": null,
+     "capture_fps_sampler_first_to_last": null,
+     "spikes_20ms_per_min": null,
+     "stale_drops_per_min": null,
+     "encoder_dupdrop_per_min": null,
+     "grabs_failed": 1368917,
+     "grabs_ok_min_per_channel": 0,
+     "guide_serves": true,
+     "video_loss_per_min": null,
+     "resyncs": null,
+     "underruns": null,
+     "throttled_s": -2.672,
+     "throttled_period_frac": 0.3953,
+     "usage_cores": -0.0056,
+     "memory_current_max_mb": 765.3,
+     "memory_peak_mb": 666.1,
+     "swap_current_max_mb": 0.0,
+     "memory_events_high": 0,
+     "memory_events_max": 0,
+     "oom_kill_run": 0,
+     "oom_kill_window": 0,
+     "memory_events_oom": 0,
+     "journal_kills": 546,
+     "mainpid_same": false,
+     "anon_mb_at_peak": 742.1,
+     "file_mb_at_peak": 0.2,
+     "anon_mb_max": 742.1,
+     "memory_psi_some_ms_per_s": 0.0,
+     "memory_psi_full_ms_per_s": 0.0,
+     "pgmajfault": 0,
+     "companion_pss_mb": 31.5122998046875,
+     "bitrate_kbps_min": null,
+     "bitrate_kbps_max": null,
+     "transitions": null,
+     "grab_s_median": 5.519,
+     "grabs_ok": 149,
+     "host_cpu": 12.845,
+     "socket_w": 16.871,
+     "tctl": 59.258,
+     "controller_pauses": null,
+     "client_pauses": null
+    },
+    "gates": {
+     "grabs_failed": {
+      "value": 1368917,
+      "passes": false
+     },
+     "grabs_ok_min_per_channel": {
+      "value": 0,
+      "passes": false
+     },
+     "guide_serves": {
+      "value": true,
+      "passes": true
+     },
+     "no_oom_kill": {
+      "value": 0,
+      "passes": true
+     },
+     "no_journal_kill": {
+      "value": 546,
+      "passes": false
+     },
+     "unit_not_restarted": {
+      "value": false,
+      "passes": false
+     }
+    },
+    "failing": [
+     "grabs_failed",
+     "grabs_ok_min_per_channel",
+     "no_journal_kill",
+     "unit_not_restarted"
+    ],
+    "missing": [],
+    "control_loss_per_min": 184.94,
+    "verdict": "FAIL",
+    "why": "fails grabs_failed, grabs_ok_min_per_channel, no_journal_kill, unit_not_restarted"
+   }
+  },
+  {
+   "step": "mem:512M",
+   "row": "E1-PS1-STREAM",
+   "constraint": [
+    "CPUQuota=200%",
+    "MemoryMax=512M",
+    "MemorySwapMax=0"
+   ],
+   "summary": "runs/E1-PS1-STREAM_cpu200_mem512M_swap0/run1/summary.json",
+   "verdict": "INCONCLUSIVE",
+   "why": "fails only on link-observed metrics while the control fails D-BASE's loss row",
+   "failing": [
+    "rendered_fps"
+   ],
+   "judged": {
+    "metrics": {
+     "rendered_fps": 59.387,
+     "retroarch_fps": 59.999,
+     "capture_fps": 59.992,
+     "encoder_segments": 1,
+     "capture_fps_sampler_first_to_last": 59.992,
+     "spikes_20ms_per_min": 92.42,
+     "stale_drops_per_min": 3.007,
+     "encoder_dupdrop_per_min": 0.1,
+     "grabs_failed": null,
+     "grabs_ok_min_per_channel": null,
+     "guide_serves": null,
+     "video_loss_per_min": 181.93,
+     "resyncs": 4,
+     "underruns": 19,
+     "throttled_s": 0.0,
+     "throttled_period_frac": 0.0,
+     "usage_cores": 0.9553,
+     "memory_current_max_mb": 219.3,
+     "memory_peak_mb": 220.8,
+     "swap_current_max_mb": 0.0,
+     "memory_events_high": 0,
+     "memory_events_max": 0,
+     "oom_kill_run": 0,
+     "oom_kill_window": 0,
+     "memory_events_oom": 0,
+     "journal_kills": 0,
+     "mainpid_same": true,
+     "anon_mb_at_peak": 183.4,
+     "file_mb_at_peak": 21.5,
+     "anon_mb_max": 185.2,
+     "memory_psi_some_ms_per_s": 0.0,
+     "memory_psi_full_ms_per_s": 0.0,
+     "pgmajfault": 0,
+     "companion_pss_mb": 38.1408369140625,
+     "bitrate_kbps_min": 7000,
+     "bitrate_kbps_max": 7000,
+     "transitions": 0,
+     "grab_s_median": null,
+     "grabs_ok": null,
+     "host_cpu": 11.946,
+     "socket_w": 20.602,
+     "tctl": 59.569,
+     "controller_pauses": 0,
+     "client_pauses": 1
+    },
+    "gates": {
+     "rendered_fps": {
+      "value": 59.387,
+      "passes": false
+     },
+     "retroarch_fps": {
+      "value": 59.999,
+      "passes": true
+     },
+     "capture_fps": {
+      "value": 59.992,
+      "passes": true
+     },
+     "spikes_20ms_per_min": {
+      "value": 92.42,
+      "passes": true
+     },
+     "stale_drops_per_min": {
+      "value": 3.007,
+      "passes": true
+     },
+     "encoder_dupdrop_per_min": {
+      "value": 0.1,
+      "passes": true
+     },
+     "no_oom_kill": {
+      "value": 0,
+      "passes": true
+     },
+     "no_journal_kill": {
+      "value": 0,
+      "passes": true
+     },
+     "unit_not_restarted": {
+      "value": true,
+      "passes": true
+     }
+    },
+    "failing": [
+     "rendered_fps"
+    ],
+    "missing": [],
+    "control_loss_per_min": 184.94,
+    "verdict": "INCONCLUSIVE",
+    "why": "fails only on link-observed metrics while the control fails D-BASE's loss row"
+   }
+  },
+  {
+   "step": "mem:512M",
+   "row": "E1-SNES-STREAM",
+   "constraint": [
+    "CPUQuota=150%",
+    "MemoryMax=512M",
+    "MemorySwapMax=0"
+   ],
+   "summary": "runs/E1-SNES-STREAM_cpu150_mem512M_swap0/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": [],
+   "judged": {
+    "metrics": {
+     "rendered_fps": 58.452,
+     "retroarch_fps": 59.999,
+     "capture_fps": 58.994,
+     "encoder_segments": 1,
+     "capture_fps_sampler_first_to_last": 58.994,
+     "spikes_20ms_per_min": 114.45,
+     "stale_drops_per_min": 2.769,
+     "encoder_dupdrop_per_min": 59.928,
+     "grabs_failed": null,
+     "grabs_ok_min_per_channel": null,
+     "guide_serves": null,
+     "video_loss_per_min": 126.21,
+     "resyncs": 0,
+     "underruns": 13,
+     "throttled_s": 0.0,
+     "throttled_period_frac": 0.0,
+     "usage_cores": 0.6373,
+     "memory_current_max_mb": 196.8,
+     "memory_peak_mb": 198.3,
+     "swap_current_max_mb": 0.0,
+     "memory_events_high": 0,
+     "memory_events_max": 0,
+     "oom_kill_run": 0,
+     "oom_kill_window": 0,
+     "memory_events_oom": 0,
+     "journal_kills": 0,
+     "mainpid_same": true,
+     "anon_mb_at_peak": 165.1,
+     "file_mb_at_peak": 19.9,
+     "anon_mb_max": 165.1,
+     "memory_psi_some_ms_per_s": 0.0,
+     "memory_psi_full_ms_per_s": 0.0,
+     "pgmajfault": 0,
+     "companion_pss_mb": 38.5808212890625,
+     "bitrate_kbps_min": 7000,
+     "bitrate_kbps_max": 7000,
+     "transitions": 0,
+     "grab_s_median": null,
+     "grabs_ok": null,
+     "host_cpu": 7.67,
+     "socket_w": 17.462,
+     "tctl": 52.235,
+     "controller_pauses": 0,
+     "client_pauses": 0
+    },
+    "gates": {
+     "rendered_fps": {
+      "value": 58.452,
+      "passes": true
+     },
+     "retroarch_fps": {
+      "value": 59.999,
+      "passes": true
+     },
+     "capture_fps": {
+      "value": 58.994,
+      "passes": true
+     },
+     "spikes_20ms_per_min": {
+      "value": 114.45,
+      "passes": true
+     },
+     "stale_drops_per_min": {
+      "value": 2.769,
+      "passes": true
+     },
+     "encoder_dupdrop_per_min": {
+      "value": 59.928,
+      "passes": true
+     },
+     "no_oom_kill": {
+      "value": 0,
+      "passes": true
+     },
+     "no_journal_kill": {
+      "value": 0,
+      "passes": true
+     },
+     "unit_not_restarted": {
+      "value": true,
+      "passes": true
+     }
+    },
+    "failing": [],
+    "missing": [],
+    "control_loss_per_min": 184.94,
+    "verdict": "PASS",
+    "why": "every gated metric holds"
+   }
+  },
+  {
+   "step": "mem:384M",
+   "row": "E1-PS1-STREAM",
+   "constraint": [
+    "CPUQuota=200%",
+    "MemoryMax=384M",
+    "MemorySwapMax=0"
+   ],
+   "summary": "runs/E1-PS1-STREAM_cpu200_mem384M_swap0/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": [],
+   "judged": {
+    "metrics": {
+     "rendered_fps": 59.559,
+     "retroarch_fps": 59.999,
+     "capture_fps": 59.993,
+     "encoder_segments": 1,
+     "capture_fps_sampler_first_to_last": 59.993,
+     "spikes_20ms_per_min": 89.53,
+     "stale_drops_per_min": 3.605,
+     "encoder_dupdrop_per_min": 0.1,
+     "grabs_failed": null,
+     "grabs_ok_min_per_channel": null,
+     "guide_serves": null,
+     "video_loss_per_min": 92.1,
+     "resyncs": 0,
+     "underruns": 27,
+     "throttled_s": 0.0,
+     "throttled_period_frac": 0.0,
+     "usage_cores": 0.9845,
+     "memory_current_max_mb": 226.1,
+     "memory_peak_mb": 227.9,
+     "swap_current_max_mb": 0.0,
+     "memory_events_high": 0,
+     "memory_events_max": 0,
+     "oom_kill_run": 0,
+     "oom_kill_window": 0,
+     "memory_events_oom": 0,
+     "journal_kills": 0,
+     "mainpid_same": true,
+     "anon_mb_at_peak": 191.1,
+     "file_mb_at_peak": 21.4,
+     "anon_mb_max": 191.1,
+     "memory_psi_some_ms_per_s": 0.0,
+     "memory_psi_full_ms_per_s": 0.0,
+     "pgmajfault": 0,
+     "companion_pss_mb": 37.5966435546875,
+     "bitrate_kbps_min": 7000,
+     "bitrate_kbps_max": 7000,
+     "transitions": 0,
+     "grab_s_median": null,
+     "grabs_ok": null,
+     "host_cpu": 10.957,
+     "socket_w": 19.759,
+     "tctl": 59.122,
+     "controller_pauses": 0,
+     "client_pauses": 0
+    },
+    "gates": {
+     "rendered_fps": {
+      "value": 59.559,
+      "passes": true
+     },
+     "retroarch_fps": {
+      "value": 59.999,
+      "passes": true
+     },
+     "capture_fps": {
+      "value": 59.993,
+      "passes": true
+     },
+     "spikes_20ms_per_min": {
+      "value": 89.53,
+      "passes": true
+     },
+     "stale_drops_per_min": {
+      "value": 3.605,
+      "passes": true
+     },
+     "encoder_dupdrop_per_min": {
+      "value": 0.1,
+      "passes": true
+     },
+     "no_oom_kill": {
+      "value": 0,
+      "passes": true
+     },
+     "no_journal_kill": {
+      "value": 0,
+      "passes": true
+     },
+     "unit_not_restarted": {
+      "value": true,
+      "passes": true
+     }
+    },
+    "failing": [],
+    "missing": [],
+    "control_loss_per_min": 184.94,
+    "verdict": "PASS",
+    "why": "every gated metric holds"
+   }
+  },
+  {
+   "step": "mem:384M",
+   "row": "E1-SNES-STREAM",
+   "constraint": [
+    "CPUQuota=150%",
+    "MemoryMax=384M",
+    "MemorySwapMax=0"
+   ],
+   "summary": "runs/E1-SNES-STREAM_cpu150_mem384M_swap0/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": [],
+   "judged": {
+    "metrics": {
+     "rendered_fps": 58.697,
+     "retroarch_fps": 59.999,
+     "capture_fps": 58.992,
+     "encoder_segments": 1,
+     "capture_fps_sampler_first_to_last": 58.992,
+     "spikes_20ms_per_min": 98.34,
+     "stale_drops_per_min": 1.665,
+     "encoder_dupdrop_per_min": 59.927,
+     "grabs_failed": null,
+     "grabs_ok_min_per_channel": null,
+     "guide_serves": null,
+     "video_loss_per_min": 68.3,
+     "resyncs": 0,
+     "underruns": 12,
+     "throttled_s": 0.0,
+     "throttled_period_frac": 0.0,
+     "usage_cores": 0.6208,
+     "memory_current_max_mb": 196.3,
+     "memory_peak_mb": 197.4,
+     "swap_current_max_mb": 0.0,
+     "memory_events_high": 0,
+     "memory_events_max": 0,
+     "oom_kill_run": 0,
+     "oom_kill_window": 0,
+     "memory_events_oom": 0,
+     "journal_kills": 0,
+     "mainpid_same": true,
+     "anon_mb_at_peak": 165.3,
+     "file_mb_at_peak": 19.4,
+     "anon_mb_max": 165.4,
+     "memory_psi_some_ms_per_s": 0.0,
+     "memory_psi_full_ms_per_s": 0.0,
+     "pgmajfault": 0,
+     "companion_pss_mb": 38.6439091796875,
+     "bitrate_kbps_min": 7000,
+     "bitrate_kbps_max": 7000,
+     "transitions": 0,
+     "grab_s_median": null,
+     "grabs_ok": null,
+     "host_cpu": 7.604,
+     "socket_w": 15.063,
+     "tctl": 52.263,
+     "controller_pauses": 0,
+     "client_pauses": 0
+    },
+    "gates": {
+     "rendered_fps": {
+      "value": 58.697,
+      "passes": true
+     },
+     "retroarch_fps": {
+      "value": 59.999,
+      "passes": true
+     },
+     "capture_fps": {
+      "value": 58.992,
+      "passes": true
+     },
+     "spikes_20ms_per_min": {
+      "value": 98.34,
+      "passes": true
+     },
+     "stale_drops_per_min": {
+      "value": 1.665,
+      "passes": true
+     },
+     "encoder_dupdrop_per_min": {
+      "value": 59.927,
+      "passes": true
+     },
+     "no_oom_kill": {
+      "value": 0,
+      "passes": true
+     },
+     "no_journal_kill": {
+      "value": 0,
+      "passes": true
+     },
+     "unit_not_restarted": {
+      "value": true,
+      "passes": true
+     }
+    },
+    "failing": [],
+    "missing": [],
+    "control_loss_per_min": 184.94,
+    "verdict": "PASS",
+    "why": "every gated metric holds"
+   }
+  },
+  {
+   "step": "mem_repeat:768M",
+   "row": "E1-PS1-STREAM",
+   "constraint": [
+    "CPUQuota=200%",
+    "MemoryMax=768M",
+    "MemorySwapMax=0"
+   ],
+   "summary": "runs/E1-PS1-STREAM_cpu200_mem768M_swap0/run2/summary.json",
+   "verdict": "INCONCLUSIVE",
+   "why": "fails only on link-observed metrics while the control fails D-BASE's loss row",
+   "failing": [
+    "rendered_fps"
+   ],
+   "judged": {
+    "metrics": {
+     "rendered_fps": 59.336,
+     "retroarch_fps": 59.999,
+     "capture_fps": 60.018,
+     "encoder_segments": 1,
+     "capture_fps_sampler_first_to_last": 60.018,
+     "spikes_20ms_per_min": 78.04,
+     "stale_drops_per_min": 2.22,
+     "encoder_dupdrop_per_min": 0.1,
+     "grabs_failed": null,
+     "grabs_ok_min_per_channel": null,
+     "guide_serves": null,
+     "video_loss_per_min": 217.59,
+     "resyncs": 6,
+     "underruns": 30,
+     "throttled_s": 0.0,
+     "throttled_period_frac": 0.0,
+     "usage_cores": 1.083,
+     "memory_current_max_mb": 224.0,
+     "memory_peak_mb": 225.7,
+     "swap_current_max_mb": 0.0,
+     "memory_events_high": 0,
+     "memory_events_max": 0,
+     "oom_kill_run": 0,
+     "oom_kill_window": 0,
+     "memory_events_oom": 0,
+     "journal_kills": 0,
+     "mainpid_same": true,
+     "anon_mb_at_peak": 190.3,
+     "file_mb_at_peak": 21.4,
+     "anon_mb_max": 190.3,
+     "memory_psi_some_ms_per_s": 0.0,
+     "memory_psi_full_ms_per_s": 0.0,
+     "pgmajfault": 0,
+     "companion_pss_mb": 37.8167548828125,
+     "bitrate_kbps_min": 7000,
+     "bitrate_kbps_max": 7000,
+     "transitions": 0,
+     "grab_s_median": null,
+     "grabs_ok": null,
+     "host_cpu": 13.09,
+     "socket_w": 19.658,
+     "tctl": 59.436,
+     "controller_pauses": 0,
+     "client_pauses": 1
+    },
+    "gates": {
+     "rendered_fps": {
+      "value": 59.336,
+      "passes": false
+     },
+     "retroarch_fps": {
+      "value": 59.999,
+      "passes": true
+     },
+     "capture_fps": {
+      "value": 60.018,
+      "passes": true
+     },
+     "spikes_20ms_per_min": {
+      "value": 78.04,
+      "passes": true
+     },
+     "stale_drops_per_min": {
+      "value": 2.22,
+      "passes": true
+     },
+     "encoder_dupdrop_per_min": {
+      "value": 0.1,
+      "passes": true
+     },
+     "no_oom_kill": {
+      "value": 0,
+      "passes": true
+     },
+     "no_journal_kill": {
+      "value": 0,
+      "passes": true
+     },
+     "unit_not_restarted": {
+      "value": true,
+      "passes": true
+     }
+    },
+    "failing": [
+     "rendered_fps"
+    ],
+    "missing": [],
+    "control_loss_per_min": 184.94,
+    "verdict": "INCONCLUSIVE",
+    "why": "fails only on link-observed metrics while the control fails D-BASE's loss row"
+   }
+  },
+  {
+   "step": "mem_repeat:512M",
+   "row": "E1-PS1-STREAM",
+   "constraint": [
+    "CPUQuota=200%",
+    "MemoryMax=512M",
+    "MemorySwapMax=0"
+   ],
+   "summary": "runs/E1-PS1-STREAM_cpu200_mem512M_swap0/run2/summary.json",
+   "verdict": "INCONCLUSIVE",
+   "why": "fails only on link-observed metrics while the control fails D-BASE's loss row",
+   "failing": [
+    "rendered_fps"
+   ],
+   "judged": {
+    "metrics": {
+     "rendered_fps": 58.768,
+     "retroarch_fps": 59.999,
+     "capture_fps": 59.993,
+     "encoder_segments": 3,
+     "capture_fps_sampler_first_to_last": 14.66,
+     "spikes_20ms_per_min": 121.25,
+     "stale_drops_per_min": 7.116,
+     "encoder_dupdrop_per_min": 0.05,
+     "grabs_failed": null,
+     "grabs_ok_min_per_channel": null,
+     "guide_serves": null,
+     "video_loss_per_min": 352.67,
+     "resyncs": 12,
+     "underruns": 29,
+     "throttled_s": 0.0,
+     "throttled_period_frac": 0.0,
+     "usage_cores": 1.0458,
+     "memory_current_max_mb": 223.2,
+     "memory_peak_mb": 224.8,
+     "swap_current_max_mb": 0.0,
+     "memory_events_high": 0,
+     "memory_events_max": 0,
+     "oom_kill_run": 0,
+     "oom_kill_window": 0,
+     "memory_events_oom": 0,
+     "journal_kills": 0,
+     "mainpid_same": true,
+     "anon_mb_at_peak": 189.6,
+     "file_mb_at_peak": 21.2,
+     "anon_mb_max": 189.6,
+     "memory_psi_some_ms_per_s": 0.0,
+     "memory_psi_full_ms_per_s": 0.0,
+     "pgmajfault": 0,
+     "companion_pss_mb": 38.3341630859375,
+     "bitrate_kbps_min": 6000,
+     "bitrate_kbps_max": 7000,
+     "transitions": 2,
+     "grab_s_median": null,
+     "grabs_ok": null,
+     "host_cpu": 11.689,
+     "socket_w": 20.972,
+     "tctl": 59.753,
+     "controller_pauses": 0,
+     "client_pauses": 1
+    },
+    "gates": {
+     "rendered_fps": {
+      "value": 58.768,
+      "passes": false
+     },
+     "retroarch_fps": {
+      "value": 59.999,
+      "passes": true
+     },
+     "capture_fps": {
+      "value": 59.993,
+      "passes": true
+     },
+     "spikes_20ms_per_min": {
+      "value": 121.25,
+      "passes": true
+     },
+     "stale_drops_per_min": {
+      "value": 7.116,
+      "passes": true
+     },
+     "encoder_dupdrop_per_min": {
+      "value": 0.05,
+      "passes": true
+     },
+     "no_oom_kill": {
+      "value": 0,
+      "passes": true
+     },
+     "no_journal_kill": {
+      "value": 0,
+      "passes": true
+     },
+     "unit_not_restarted": {
+      "value": true,
+      "passes": true
+     }
+    },
+    "failing": [
+     "rendered_fps"
+    ],
+    "missing": [],
+    "control_loss_per_min": 184.94,
+    "verdict": "INCONCLUSIVE",
+    "why": "fails only on link-observed metrics while the control fails D-BASE's loss row"
+   }
+  }
+ ],
+ "control": {
+  "summary": "runs/E1-PS1-STREAM_cpu200_mem768M_swap0/run1/summary.json",
+  "video_loss_per_min": 184.94
+ },
+ "memory_ladder_ended": {
+  "remaining_rows_after_384M": [
+   "E1-PS1-STREAM",
+   "E1-SNES-STREAM"
+  ]
+ },
+ "memory_floor": {
+  "E1-PS1-STREAM": {
+   "floor": "384M",
+   "inconclusive_steps": [
+    "768M",
+    "512M"
+   ]
+  },
+  "E1-SNES-STREAM": {
+   "floor": "384M",
+   "inconclusive_steps": []
+  },
+  "E1-CONC": {
+   "floor": null,
+   "inconclusive_steps": []
+  },
+  "E1-META": {
+   "floor": null,
+   "inconclusive_steps": []
+  }
+ }
+}

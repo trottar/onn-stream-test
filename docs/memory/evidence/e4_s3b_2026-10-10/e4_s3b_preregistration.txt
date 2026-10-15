@@ -1,0 +1,65 @@
+E4-S3B PRE-REGISTRATION -- written 2026-10-10 (07:08Z) before any constrained run; hash in e4_s3b_preregistration.sha256.
+Task: docs/memory/handoffs/E4-S3B_MEMORY_FLOOR_1G_SWAPOFF_TASK.md under QUEUE_2026-10-10B.md (every standing rule; E3-A3B's
+validity reading; E4-S2's constraint discipline). Baseline: 7331184 plus the uncommitted E4-S1..S5 work (untouched: no
+stash, reset, checkout or clean). The pass rule's reference: E4-S1 (e4_s1_2026-10-09/). E4-S3's runs: e4_s3_2026-10-10/.
+
+CAVEAT, quoted with the floor (E4-S3's, unchanged): "MemorySwapMax=0: no swap for the stack's cgroup. The floor is the
+smallest MemoryMax at which the stack runs with page cache reclaim only; a host with swap would degrade more softly below
+it. It is a memory floor for the STACK's cgroup (companion, RetroArch, the encoder, the grabber children), not for the
+host: Xorg, pulseaudio, the desktop and the OS are outside it."
+
+0. THE TOOL PATCH, made and shown BEFORE this pre-registration (tools/e1_suite.py, e4_s3b_tools.diff;
+   patches/E4-S3B_RUNNER_REFRESH_BACKOFF.md): in the forced-refresh cycle (EpgCycle, the CONC/META rows) a refresh call
+   that gets no HTTP reply at all (refused, reset, timeout: http() returns code None) backs off 1 s, doubling to 30 s,
+   until a call is answered, and the streak is written as ONE row (kind grab_fail_streak: first failure, channel, error,
+   count, duration) when it ends or the cycle stops; epg_figures counts a streak overlapping the window and its attempts
+   as failed grabs (so grabs_failed still gates). Every answered call takes today's path unchanged. Shown
+   (backoff_demo/): 60 s against the running companion, predecessor 15 rows (14 grabs, 1 scan) / patched 14 rows
+   (13 grabs, 1 scan), every grab http 200, same kinds and cadence (~4.8 s median); 60 s against the stopped companion,
+   patched 2 rows (1 grab_fail_streak of 6 attempts over 31 s, 1 scan) -- the predecessor wrote 22,585 rows in 5 s.
+   tools/e1_suite.py sha256 at this pre-registration: 76e1aa137dbe6766291b77b2a9aa9ca0a012b4c59b0701e69fb9b2ff8367a147
+   Driver: e4_s3b_ladder.py sha256 bbe8e9ed03b90e131290dba6fe8da5ca7daa4eb009dc5643671779836dce9a3c (a copy of e4_s3_2026-10-10/e4_s3_ladder.py, fa16a670...e520,
+   changed for this ladder only: rows, steps, the control, a read-back thread; e4_s3b_ladder_vs_e4_s3.diff).
+
+1. THE CONSTRAINT per run, as E4-S3: e4_constraint.conf written by tools/e1_suite.py before the run's restart, read back
+   after the restart (memory.max, memory.swap.max, cpu.max must match or the run is refused), read back UNDER LOAD every
+   60 s by the driver's thread (runs/constraint_readback.jsonl), removed (daemon-reload + restart) at teardown and read
+   back as infinity / max (CPUQuotaPerSecUSec, MemoryMax, MemorySwapMax, memory.max, memory.swap.max). The adopted
+   four-line environ unchanged. OOMPolicy=stop / Restart=on-failure stand.
+
+2. THE RUNS (tools/e1_suite.py run --e2 --window 1200 --gap 120, E2's warm-ups), in this order:
+   a. THE CONTROL: E1-PS1-STREAM, unconstrained (no drop-in), for the link clause only; its video loss/min against
+      D-BASE's loss row (< 10); reported.
+   b. E1-CONC (CPU unset) and E1-META (CPUQuota=150%) at MemoryMax=1G + MemorySwapMax=0, one suite invocation.
+   c. A row that FAILS at 1G ascends: MemoryMax=1536M (= 1.5G; the runner takes integers), then 2G, each with
+      MemorySwapMax=0 and the row's CPU quota; it stops at its first PASS or after 2G. A row that PASSES (or is
+      INCONCLUSIVE) does not ascend.
+   d. An INCONCLUSIVE run is repeated once, after the ascending steps (as E4-S3); the repeat's verdict replaces the
+      original's; a repeat that FAILS sends the row on up the ladder from that step (same rule c).
+
+3. THE PASS RULE = E4-S3's, verbatim (e4_s3_preregistration.txt §2): E4-S2's per-run rule (e4_s2_preregistration.txt §3,
+   unchanged: valid / reaches PLAYING; rendered >= 59.5, RetroArch >= 59.9, capture 60 +/- 0.5 segment-aware, spikes
+   < 200, stale < 20, dup+drop <= 0.2/min, with the SNES / CONC reference-relative clause against E4-S1; CONC grabs
+   failed 0; META grabs failed 0, every channel >= 20 refreshes, the guide serves; a gated metric that cannot be read =
+   INCONCLUSIVE; the link-INCONCLUSIVE clause: a run failing only on link-observed metrics (rendered fps, spikes, stale)
+   while the control fails D-BASE's loss row is INCONCLUSIVE) PLUS: no_oom_kill (the cgroup's memory.events oom_kill
+   unchanged over the window), no_journal_kill (the unit's journal over the window has no kill line), unit_not_restarted
+   (the unit's MainPID at the window's end equals its MainPID at the window's start) -- host-side, never
+   link-INCONCLUSIVE. The control here is (2a) instead of E4-S3's PS1 at 768M: the only change, the one the task names.
+
+4. THE FLOOR per row = the smallest MemoryMax that passed swap-off, over E4-S3's runs and this task's together (E4-S3:
+   PS1-STREAM <= 384M, SNES-STREAM <= 384M, CONC / META FAIL at 768M). THE STACK'S SWAP-OFF MEMORY FLOOR = the maximum
+   over the four rows, with the peak figures and memory events beside it, and the caveat. A row that fails at 2G:
+   "above 2G", and the task ends there. The closed four-row floor table is written (e4_s3b_floor.md). The alpha
+   proposal's memory line (E4-S3 §3: "1.5 GB for the stack, no swap assumed") is restated from this floor with its
+   margin.
+
+5. REPORTED, NOT GATED: memory.events max / high / oom / oom_kill; memory PSI some / full; memory.current mean / max and
+   memory.peak; anon vs file at the peak, anon max; major faults; the grab cycle's speed (median grab s, refreshes per
+   channel) and fail streaks; the companion's PSS; the stream's loss, resyncs, underruns; socket W; the epg.jsonl sizes
+   (they must now stay small even if a row fails).
+
+6. RULES: measurement only; nothing adopted, nothing committed; the git tree untouched beyond this task's files and the
+   tool patch; no sudo, no nft, the Opal read-only; no addresses or identifiers; nothing fetched, nothing deleted; no
+   other task's scripts run in their directories. Final state: the four-line adopted state, no e4_constraint.conf, no
+   game, PS1 files identical, APK CONFIRMED. No band, rule or reading changes after the data.

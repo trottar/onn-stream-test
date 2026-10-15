@@ -1,0 +1,50 @@
+E4-S3 PRE-REGISTRATION -- written 2026-10-09 (~22:30Z) before any constrained run; hash in e4_s3_preregistration.sha256.
+Task: docs/memory/handoffs/E4-S3_MEMORY_FLOOR_CLOSE_TASK.md under QUEUE_2026-10-10.md (every standing rule; E3-A3B's
+validity reading; E4-S2's constraint discipline). Baseline: 7331184 plus the uncommitted E4-S1/S2 work (untouched).
+The pass rule's reference: E4-S1 (e4_s1_2026-10-09/). E4-S2's figures: e4_s2_2026-10-09/.
+
+CAVEAT, quoted with the floor: "MemorySwapMax=0: no swap for the stack's cgroup. The floor is the smallest MemoryMax
+at which the stack runs with page cache reclaim only; a host with swap would degrade more softly below it. It is a
+memory floor for the STACK's cgroup (companion, RetroArch, the encoder, the grabber children), not for the host:
+Xorg, pulseaudio, the desktop and the OS are outside it."
+
+0. THE CONSTRAINT per run, in e4_constraint.conf, written by tools/e1_suite.py before the run's restart, read back
+   under (memory.max, memory.swap.max, cpu.max must match or the run is refused), removed (daemon-reload + restart)
+   at teardown and read back as infinity / max (CPUQuotaPerSecUSec, MemoryMax, MemorySwapMax, memory.max,
+   memory.swap.max). The adopted four-line environ unchanged. OOMPolicy=stop / Restart=on-failure stand (an OOM kill
+   of any process stops and restarts the unit).
+
+1. THE LADDER, descending: MemoryMax= 768M, 512M, 384M, each with MemorySwapMax=0. Rows and CPU quotas as E4-S2's
+   memory ladder: E1-PS1-STREAM at CPUQuota=200%, E1-SNES-STREAM 150 %, E1-CONC unset, E1-META 150 % -- in that
+   order within each step. tools/e1_suite.py run --e2 --window 1200, idle gap 120 s, E2's warm-ups. A row stops
+   descending at its first FAIL; the ladder stops when every row has failed or 384M has run. INCONCLUSIVE runs are
+   repeated once at the end; the repeat's verdict replaces the original's. Driver: e4_s3_ladder.py (a copy of
+   E4-S2's, the memory ladder only).
+
+2. THE PASS RULE = E4-S2's per-run rule (e4_s2_preregistration.txt §3, unchanged: valid / reaches PLAYING; rendered
+   >= 59.5, RetroArch >= 59.9, capture 60 +/- 0.5 segment-aware, spikes < 200, stale < 20, dup+drop <= 0.2/min, with
+   the SNES / CONC reference-relative clause against E4-S1; CONC grabs failed 0; META grabs failed 0, every channel
+   >= 20 refreshes, the guide serves; a gated metric that cannot be read = INCONCLUSIVE; the link-INCONCLUSIVE clause)
+   PLUS three gates:
+   - no_oom_kill: the cgroup's memory.events oom_kill unchanged over the window;
+   - no_journal_kill: the unit's journal over the window has no line reporting a kill (oom / sigkill / signal 9 /
+     killed; tools/e1_suite.py journal_kills -- 0 such lines in E4-S2's 12 h);
+   - unit_not_restarted: the unit's MainPID at the window's end equals its MainPID at the window's start.
+   These three are host-side (never link-INCONCLUSIVE).
+   THE CONTROL for the link clause: the first E1-PS1-STREAM run (at 768M), its video loss/min against D-BASE's loss
+   row (< 10); reported.
+
+3. REPORTED, NOT GATED: memory.events max / high / oom; the cgroup's memory PSI some / full (ms of stall per s);
+   memory.current mean / max and memory.peak; anon vs file (memory.stat) at the window's memory.current peak and the
+   anon max; major faults; the grab cycle's speed (median grab s, refreshes per channel); the companion's PSS; the
+   stream's loss, resyncs, underruns; socket W.
+
+4. THE FLOOR per row = the smallest MemoryMax that PASSES with no FAIL above it (INCONCLUSIVE steps listed beside).
+   A row that fails at 768M: "above 768M (E4-S2 passed 1G with swap)". A row that passes 384M: "<= 384M". The
+   stack's memory floor = the maximum over rows, stated with the caveat and the peaks beside. The alpha proposal's
+   memory line (E4-S2 §5, "2 GB for the stack") is restated from this floor with the margin stated.
+
+5. RULES: measurement only; nothing adopted, nothing committed; the git tree untouched beyond this task's files and
+   the tool patch; no sudo, no nft, the Opal read-only; no addresses or identifiers; nothing fetched, nothing deleted;
+   no other task's scripts run in their directories. Final state: the four-line adopted state, no e4_constraint.conf,
+   no game, PS1 files identical, APK CONFIRMED. No band, rule or reading changes after the data.

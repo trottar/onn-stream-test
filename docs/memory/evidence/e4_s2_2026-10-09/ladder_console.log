@@ -1,0 +1,43 @@
+[e4s2 09:36:22Z] start; state new
+[e4s2 09:36:22Z] step cpu:400: [('E1-PS1-STREAM', 'CPUQuota=400%'), ('E1-SNES-STREAM', 'CPUQuota=400%'), ('E1-CONC', 'CPUQuota=400%'), ('E1-META', 'CPUQuota=400%')]
+[e4s2 11:12:36Z]   E1-PS1-STREAM CPUQuota=400%: PASS (every gated metric holds)
+[e4s2 11:12:36Z]   E1-SNES-STREAM CPUQuota=400%: PASS (every gated metric holds)
+[e4s2 11:12:36Z]   E1-CONC CPUQuota=400%: PASS (every gated metric holds)
+[e4s2 11:12:36Z]   E1-META CPUQuota=400%: PASS (every gated metric holds)
+[e4s2 11:12:36Z] step cpu:300: [('E1-PS1-STREAM', 'CPUQuota=300%'), ('E1-SNES-STREAM', 'CPUQuota=300%'), ('E1-CONC', 'CPUQuota=300%'), ('E1-META', 'CPUQuota=300%')]
+[e4s2 12:48:25Z]   E1-PS1-STREAM CPUQuota=300%: PASS (every gated metric holds)
+[e4s2 12:48:25Z]   E1-SNES-STREAM CPUQuota=300%: PASS (every gated metric holds)
+[e4s2 12:48:25Z]   E1-CONC CPUQuota=300%: FAIL (fails retroarch_fps, encoder_dupdrop_per_min)
+[e4s2 12:48:25Z]   E1-META CPUQuota=300%: PASS (every gated metric holds)
+[e4s2 12:48:25Z] step cpu:200: [('E1-PS1-STREAM', 'CPUQuota=200%'), ('E1-SNES-STREAM', 'CPUQuota=200%'), ('E1-META', 'CPUQuota=200%')]
+[e4s2 14:00:19Z]   E1-PS1-STREAM CPUQuota=200%: PASS (every gated metric holds)
+[e4s2 14:00:19Z]   E1-SNES-STREAM CPUQuota=200%: PASS (every gated metric holds)
+[e4s2 14:00:19Z]   E1-META CPUQuota=200%: PASS (every gated metric holds)
+[e4s2 14:00:19Z] step cpu:150: [('E1-PS1-STREAM', 'CPUQuota=150%'), ('E1-SNES-STREAM', 'CPUQuota=150%'), ('E1-META', 'CPUQuota=150%')]
+[e4s2 15:12:08Z]   E1-PS1-STREAM CPUQuota=150%: PASS (every gated metric holds)
+[e4s2 15:12:08Z]   E1-SNES-STREAM CPUQuota=150%: INCONCLUSIVE (fails only on link-observed metrics while the control fails D-BASE's loss row)
+[e4s2 15:12:08Z]   E1-META CPUQuota=150%: PASS (every gated metric holds)
+[e4s2 15:12:08Z] step cpu:100: [('E1-PS1-STREAM', 'CPUQuota=100%'), ('E1-SNES-STREAM', 'CPUQuota=100%'), ('E1-META', 'CPUQuota=100%')]
+[e4s2 16:23:54Z]   E1-PS1-STREAM CPUQuota=100%: FAIL (fails rendered_fps, encoder_dupdrop_per_min)
+[e4s2 16:23:54Z]   E1-SNES-STREAM CPUQuota=100%: PASS (every gated metric holds)
+[e4s2 16:23:55Z]   E1-META CPUQuota=100%: PASS (every gated metric holds)
+[e4s2 16:23:55Z] step cpu_repeat:150:E1-SNES-STREAM: [('E1-SNES-STREAM', 'CPUQuota=150%')]
+[e4s2 16:48:30Z]   E1-SNES-STREAM CPUQuota=150%: PASS (every gated metric holds)
+[e4s2 16:48:30Z] CPU floors: {"E1-PS1-STREAM": {"floor": 150, "inconclusive_steps": []}, "E1-SNES-STREAM": {"floor": 100, "inconclusive_steps": []}, "E1-CONC": {"floor": 400, "inconclusive_steps": []}, "E1-META": {"floor": 100, "inconclusive_steps": []}}
+[e4s2 16:48:30Z] step mem:4G: [('E1-PS1-STREAM', 'CPUQuota=200%+MemoryMax=4G'), ('E1-SNES-STREAM', 'CPUQuota=150%+MemoryMax=4G'), ('E1-CONC', 'MemoryMax=4G'), ('E1-META', 'CPUQuota=150%+MemoryMax=4G')]
+[e4s2 18:24:26Z]   E1-PS1-STREAM CPUQuota=200%+MemoryMax=4G: PASS (every gated metric holds)
+[e4s2 18:24:26Z]   E1-SNES-STREAM CPUQuota=150%+MemoryMax=4G: PASS (every gated metric holds)
+[e4s2 18:24:26Z]   E1-CONC MemoryMax=4G: PASS (every gated metric holds)
+[e4s2 18:24:27Z]   E1-META CPUQuota=150%+MemoryMax=4G: PASS (every gated metric holds)
+[e4s2 18:24:27Z] step mem:2G: [('E1-PS1-STREAM', 'CPUQuota=200%+MemoryMax=2G'), ('E1-SNES-STREAM', 'CPUQuota=150%+MemoryMax=2G'), ('E1-CONC', 'MemoryMax=2G'), ('E1-META', 'CPUQuota=150%+MemoryMax=2G')]
+[e4s2 20:01:02Z]   E1-PS1-STREAM CPUQuota=200%+MemoryMax=2G: PASS (every gated metric holds)
+[e4s2 20:01:02Z]   E1-SNES-STREAM CPUQuota=150%+MemoryMax=2G: PASS (every gated metric holds)
+[e4s2 20:01:02Z]   E1-CONC MemoryMax=2G: PASS (every gated metric holds)
+[e4s2 20:01:02Z]   E1-META CPUQuota=150%+MemoryMax=2G: PASS (every gated metric holds)
+[e4s2 20:01:02Z] step mem:1G: [('E1-PS1-STREAM', 'CPUQuota=200%+MemoryMax=1G'), ('E1-SNES-STREAM', 'CPUQuota=150%+MemoryMax=1G'), ('E1-CONC', 'MemoryMax=1G'), ('E1-META', 'CPUQuota=150%+MemoryMax=1G')]
+[e4s2 21:37:18Z]   E1-PS1-STREAM CPUQuota=200%+MemoryMax=1G: PASS (every gated metric holds)
+[e4s2 21:37:18Z]   E1-SNES-STREAM CPUQuota=150%+MemoryMax=1G: PASS (every gated metric holds)
+[e4s2 21:37:18Z]   E1-CONC MemoryMax=1G: PASS (every gated metric holds)
+[e4s2 21:37:18Z]   E1-META CPUQuota=150%+MemoryMax=1G: PASS (every gated metric holds)
+[e4s2 21:37:18Z] memory floors: {"E1-PS1-STREAM": {"floor": "1G", "inconclusive_steps": []}, "E1-SNES-STREAM": {"floor": "1G", "inconclusive_steps": []}, "E1-CONC": {"floor": "1G", "inconclusive_steps": []}, "E1-META": {"floor": "1G", "inconclusive_steps": []}}
+[e4s2 21:37:18Z] ladder done

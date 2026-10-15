@@ -1,0 +1,18 @@
+[e4s2 22:18:15Z] start; state new
+[e4s2 22:18:15Z] step mem:768M: [('E1-PS1-STREAM', 'CPUQuota=200%+MemoryMax=768M+MemorySwapMax=0'), ('E1-SNES-STREAM', 'CPUQuota=150%+MemoryMax=768M+MemorySwapMax=0'), ('E1-CONC', 'MemoryMax=768M+MemorySwapMax=0'), ('E1-META', 'CPUQuota=150%+MemoryMax=768M+MemorySwapMax=0')]
+[e4s2 23:54:15Z]   E1-PS1-STREAM CPUQuota=200%+MemoryMax=768M+MemorySwapMax=0: INCONCLUSIVE (fails only on link-observed metrics while the control fails D-BASE's loss row)
+[e4s2 23:54:15Z]   E1-SNES-STREAM CPUQuota=150%+MemoryMax=768M+MemorySwapMax=0: PASS (every gated metric holds)
+[e4s2 23:54:15Z]   E1-CONC MemoryMax=768M+MemorySwapMax=0: FAIL (fails rendered_fps, grabs_failed, no_journal_kill, unit_not_restarted)
+[e4s2 23:54:15Z]   E1-META CPUQuota=150%+MemoryMax=768M+MemorySwapMax=0: FAIL (fails grabs_failed, grabs_ok_min_per_channel, no_journal_kill, unit_not_restarted)
+[e4s2 23:54:15Z] step mem:512M: [('E1-PS1-STREAM', 'CPUQuota=200%+MemoryMax=512M+MemorySwapMax=0'), ('E1-SNES-STREAM', 'CPUQuota=150%+MemoryMax=512M+MemorySwapMax=0')]
+[e4s2 00:43:16Z]   E1-PS1-STREAM CPUQuota=200%+MemoryMax=512M+MemorySwapMax=0: INCONCLUSIVE (fails only on link-observed metrics while the control fails D-BASE's loss row)
+[e4s2 00:43:16Z]   E1-SNES-STREAM CPUQuota=150%+MemoryMax=512M+MemorySwapMax=0: PASS (every gated metric holds)
+[e4s2 00:43:16Z] step mem:384M: [('E1-PS1-STREAM', 'CPUQuota=200%+MemoryMax=384M+MemorySwapMax=0'), ('E1-SNES-STREAM', 'CPUQuota=150%+MemoryMax=384M+MemorySwapMax=0')]
+[e4s2 01:31:42Z]   E1-PS1-STREAM CPUQuota=200%+MemoryMax=384M+MemorySwapMax=0: PASS (every gated metric holds)
+[e4s2 01:31:42Z]   E1-SNES-STREAM CPUQuota=150%+MemoryMax=384M+MemorySwapMax=0: PASS (every gated metric holds)
+[e4s2 01:31:42Z] step mem_repeat:768M:E1-PS1-STREAM: [('E1-PS1-STREAM', 'CPUQuota=200%+MemoryMax=768M+MemorySwapMax=0')]
+[e4s2 01:56:05Z]   E1-PS1-STREAM CPUQuota=200%+MemoryMax=768M+MemorySwapMax=0: INCONCLUSIVE (fails only on link-observed metrics while the control fails D-BASE's loss row)
+[e4s2 01:56:05Z] step mem_repeat:512M:E1-PS1-STREAM: [('E1-PS1-STREAM', 'CPUQuota=200%+MemoryMax=512M+MemorySwapMax=0')]
+[e4s2 02:20:21Z]   E1-PS1-STREAM CPUQuota=200%+MemoryMax=512M+MemorySwapMax=0: INCONCLUSIVE (fails only on link-observed metrics while the control fails D-BASE's loss row)
+[e4s2 02:20:21Z] memory floors: {"E1-PS1-STREAM": {"floor": "384M", "inconclusive_steps": ["768M", "512M"]}, "E1-SNES-STREAM": {"floor": "384M", "inconclusive_steps": []}, "E1-CONC": {"floor": null, "inconclusive_steps": []}, "E1-META": {"floor": null, "inconclusive_steps": []}}
+[e4s2 02:20:21Z] ladder done

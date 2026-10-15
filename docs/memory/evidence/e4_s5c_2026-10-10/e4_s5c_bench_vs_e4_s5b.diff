@@ -1,0 +1,22 @@
+2c2,8
+< """E4-S5B -- the SNES capture fix on bad probes: a bench of 60-s encoder sessions beside one live E1-SNES-STREAM.
+---
+> """E4-S5C -- E4-S5B's bench (e4_s5b_2026-10-10/e4_s5b_bench.py) byte for byte except the sink, which is now in
+> constant-frame-rate mode (-fps_mode cfr: the mode ffmpeg picks by default for the companion's rtp muxer; E4-S5B's
+> -f null without it was pass-through and could not drop). ffmpeg 7.1.5 has -fps_mode, so that form is used.
+> 
+> E4-S5B's docstring follows, the sink sentence updated.
+> 
+> The SNES capture fix on bad probes: a bench of 60-s encoder sessions beside one live E1-SNES-STREAM.
+8c14
+< rtp://127.0.0.1:<fec port>...`) become `-t 60 -f null -`, so nothing reaches the companion's FEC relay or the network.
+---
+> rtp://127.0.0.1:<fec port>...`) become `-fps_mode cfr -t 60 -f null -`, so nothing reaches the companion's FEC relay or the network.
+17c23
+<     e4_s5b_bench.py <out_dir> --per-arm 24 [--start-index 0]
+---
+>     e4_s5c_bench.py <out_dir> --per-arm 24 [--start-index 0]
+82c88
+<     return cmd[:-5] + ["-t", str(secs), "-f", "null", "-"], masked
+---
+>     return cmd[:-5] + ["-fps_mode", "cfr", "-t", str(secs), "-f", "null", "-"], masked   # E4-S5C: the sink in cfr mode

@@ -1,0 +1,90 @@
+E4-S2 PRE-REGISTRATION -- written 2026-10-09 after the probe (probe/) and before any constrained run; hash in
+e4_s2_preregistration.sha256. Task: docs/memory/handoffs/E4-S2_CPU_MEMORY_FLOOR_TASK.md under QUEUE_2026-10-09.md
+(every standing rule; E3-A3B's validity reading). Baseline commit 7331184. The reference the rule compares against:
+E4-S1 (e4_s1_2026-10-09/, the adopted state, 2026-10-09).
+
+THE CAVEAT, quoted wherever the floor is: "CPUQuota= is CFS bandwidth: the stack gets at most N % of one core's time
+per period, on full-speed cores. This is a CPU-TIME floor, not a slow-core floor: a machine with fewer, equally fast
+cores behaves like this; a machine with slower cores does not, exactly. No lower-tier hardware claim."
+
+0. WHAT IS CONSTRAINED: the systemd --user unit privyhub-companion (its cgroup holds the companion, RetroArch with its
+   AppRun wrapper, the encoder and the EPG grabber's node children; NOT Xorg or pulseaudio, which the capture and the
+   audio path also use). The constraint lives in ~/.config/systemd/user/privyhub-companion.service.d/e4_constraint.conf,
+   written by tools/e1_suite.py before the run's restart and removed (daemon-reload + restart) at its teardown; the
+   unit's CPUQuotaPerSecUSec / CPUQuotaPeriodUSec / MemoryMax and the cgroup's cpu.max / memory.max read back before,
+   under and after; the state check requires no e4_constraint.conf at every preflight, teardown and the end.
+   The adopted four-line environ is unchanged throughout. MemorySwapMax is left unset (the task's form); swap use of the
+   cgroup is reported (memory.swap.current). The unit's own OOMPolicy=stop / Restart=on-failure stand: an OOM kill of
+   any process in the cgroup stops and restarts the unit, i.e. the run fails.
+   THE PERIOD (the probe's decision, probe/period_decision.json): the DEFAULT CFS period (100 ms; no CPUQuotaPeriodSec=). Probe B (probe/runs_smoke2/, 180-s
+   windows, NOT data): at CPUQuota=100 % both stuttered by the probe's rule -- default: dup+drop 2.0/min (RetroArch
+   59.97, capture 60.17, rendered 59.57, throttled 39 % of periods); 10 ms: RetroArch 59.75, rendered 59.37 (dup+drop
+   0, throttled 63 % of periods) -- so by the rule fixed before it, the default. Probe A (probe/idle_check.json): the
+   drop-in takes effect (CPUQuotaPerSecUSec 1s, cpu.max 100000 100000, memory.max 4294967296, the cpu controller
+   enabled on the unit's cgroup) and is lifted after (infinity, memory.max max, cpu controller off again). RetroArch
+   and the encoder were inside the constrained cgroup at the window's start and end in both probe runs.
+
+1. ROWS: E1-PS1-STREAM (the control at 400 %), E1-SNES-STREAM, E1-CONC, E1-META -- in that order within each step.
+   tools/e1_suite.py run --e2 --window 1200, E1/E2's warm-ups and teardowns, idle gap 120 s before every run (E2's
+   600-s gap before SNES is not used: the rows interleave at every step; said so). One run per row per step.
+   e4_s2_ladder.py drives the steps and judges each run (one runner invocation per step).
+
+2. THE CPU LADDER, descending, each step every row still in: CPUQuota= 400 %, 300 %, 200 %, 150 %, 100 % (MemoryMax
+   unset). A row stops descending once it FAILS at a step (its CPU floor is the last passing step). The ladder stops
+   when every row has failed or 100 % has run.
+   THE MEMORY LADDER, after the CPU ladder and its repeats: MemoryMax= 4G, 2G, 1G, each row at the CPU quota one step
+   above its CPU floor (floor 100 % -> 150 %; floor 400 %, or no CPU floor, -> CPUQuota unset), so memory is the only
+   constraint binding. Same stop rule.
+
+3. THE PASS RULE PER RUN (fixed now; e4_s2_ladder.py gates()/judge()):
+   - the row reaches PLAYING (stream rows) or runs its window (META) and is valid (E3-A3B: judged on controller-trigger
+     events; client pauses reported, not voiding). The runner replaces a run that never reaches PLAYING at most twice;
+     a step where all three attempts fail is a FAIL ("reaches PLAYING / runs").
+   - stream rows (PS1-STREAM, SNES-STREAM, CONC): rendered fps (heartbeat, window) >= 59.5; RetroArch fps >= 59.9;
+     the encoder's capture fps 60 +/- 0.5; decoder spikes >= 20 ms per min < 200 and stale drops per min < 20 (the
+     session's decoder report, D-BASE); encoder dup+drop <= 0.2 per min.
+     CAPTURE FPS AND DUP+DROP ARE SEGMENT-AWARE (found in drafting, before any run: the sampler's summary figure is
+     first-to-last over the window and is broken by any encoder restart -- a live-ladder transition or a recovery --
+     e.g. E3-A3B's PS1 window reads 12.3 fps by it and 59.99 segment-aware). e4_s2_ladder.py capture(): summed over
+     consecutive progress records of one encoder (frame not decreasing, <= 3 s apart); a restart starts a new
+     segment; its dead time is not counted. The sampler's figure is reported beside.
+   - CONC: as the stream rows, plus EPG grabs failed = 0.
+   - META: grabs failed = 0; every one of the six channels refreshed >= 20 times in the window; the guide serves at
+     the window's end (tools/e3_guide_read.py's check: all six channels answer a non-forced read with programmes).
+   - NOT GATED, reported: video loss/min, resyncs, audio underruns (the link's; with the same-night control);
+     cpu.stat throttled time and the share of throttled periods (how much the quota bit); CPU used (cores); memory
+     current/peak/swap and memory.events high/max/oom_kill; the live ladder's bitrate range and transitions (does the
+     adaptive bitrate step down under the quota -- the controller doing its job, part of the finding); socket W; Tctl;
+     the gap log and the recovery events.
+   - THE REFERENCE-RELATIVE CLAUSE (the task: "the pass rule compares against it"): a gated metric that the row's own
+     E4-S1 run (unconstrained, the adopted state, 2026-10-09) already fails is judged against that run's value within
+     the gate's own tolerance: rendered fps >= ref - 0.5 (E1's band); RetroArch fps >= ref - 0.1; capture fps
+     >= ref - 0.5 (and <= 60.5); dup+drop <= ref + 0.2/min. From E4-S1 (e4_s2_ladder.py relative_gates()), it applies
+     to: SNES-STREAM rendered 58.738, capture 59.017, dup+drop 59.977/min; CONC rendered 58.462. Every other gate is
+     absolute. (Found in E4-S1 before this file: the SNES row's encoder output exactly 59 fps with one frame dropped
+     per second for its whole session -- deterministic from the first minute, RetroArch 59.999, its log unchanged from
+     E3-A2's; E3-A2's and E3-S4's Snes9x runs captured 60.0 with 0 drops. Not chased here; recorded in E4-S1.)
+   - A gated metric that cannot be read makes the run INCONCLUSIVE.
+   - INCONCLUSIVE (the link): a run that fails ONLY on the link-observed gated metrics (rendered fps, spikes, stale
+     drops) while every host-side gated metric holds (RetroArch fps, capture fps, dup+drop, grabs, the guide), on a
+     night whose control -- the 400 % E1-PS1-STREAM run -- fails D-BASE's loss row (video loss/min >= 10, its own
+     window), is INCONCLUSIVE, not FAIL. One control for the session (it runs first). An INCONCLUSIVE step does not
+     stop the row's descent. Every INCONCLUSIVE run is repeated ONCE at the end of its ladder (the CPU repeats before
+     the memory ladder); the repeat's verdict replaces the original's (PASS / FAIL / INCONCLUSIVE again).
+   - Otherwise any failing gated metric = FAIL; all hold = PASS.
+
+4. THE FLOOR: per row and ladder, walking down the steps: the floor is the smallest step that PASSES with no FAIL at
+   any step above it (INCONCLUSIVE steps above it are listed beside: a conditional floor). The floor of the stack =
+   the maximum over the rows (CPU), and the maximum over the rows (memory). Stated with the cgroup's throttled time and
+   CPU used at the floor beside it, and the first failing metric at the step below. A row that FAILS at 400 % has no
+   CPU floor in this ladder ("above 400 %"); a row that passes 100 % has floor "<= 100 %".
+
+5. REPORTED THROUGHOUT: E2's full table per run (the E4-S1 analysis's table, copied); the ladder table; the throttle
+   stats; e4_s2_verdict.json; the alpha proposal (floor + reliability, update and concurrency headroom; a proposal, the
+   user's call).
+
+6. RULES: measurement only; nothing in the adopted system changes (the drop-in per run is removed at every teardown);
+   nothing adopted; nothing committed; no sudo, no nft, the Opal read-only; no addresses or identifiers; nothing
+   fetched, nothing deleted; no other task's scripts run in their directories. Final state: the four-line adopted
+   state, no e4_constraint.conf, no game, PS1 files identical, APK CONFIRMED. No band, rule or reading is changed
+   after the data.

@@ -1,0 +1,109 @@
+--- a/tools/e1_suite.py
++++ b/tools/e1_suite.py
+@@ -254,6 +254,9 @@
+         elif k == "MemoryMax":
+             if p.get("memory.max") != str(_size_bytes(v)):
+                 return False
++        elif k == "MemorySwapMax":
++            if p.get("memory.swap.max") != str(_size_bytes(v)):
++                return False
+         elif k == "CPUQuotaPeriodSec":
+             q = (p.get("cpu.max") or "").split()
+             if len(q) != 2 or int(q[1]) != int(v.rstrip("ms")) * 1000:
+@@ -285,9 +288,29 @@
+             d["memory.events." + k] = int(v)
+     except (OSError, ValueError):
+         pass
++    try:   # E4-S3: page cache vs anon, and the cgroup's own memory pressure (stall totals, us)
++        for l in (cg / "memory.stat").read_text().splitlines():
++            k, v = l.split()
++            if k in ("anon", "file", "shmem", "file_mapped", "pgmajfault"):
++                d["memory.stat." + k] = int(v)
++        for l in (cg / "memory.pressure").read_text().splitlines():
++            kind, *kv = l.split()
++            d[f"memory.pressure.{kind}_total_us"] = int(dict(x.split("=") for x in kv)["total"])
++    except (OSError, ValueError, KeyError):
++        pass
+     return d
+ 
+ 
++def journal_kills(t0: str, t1: str) -> dict:
++    """E4-S3: the unit's journal over [t0, t1] -- lines that report a kill (OOM / SIGKILL / signal 9 / killed),
++    counted; the first few kept, cut to 160 characters."""
++    since, until = t0[:19].replace("T", " ") + " UTC", t1[:19].replace("T", " ") + " UTC"
++    out = sh(["journalctl", "--user", "-u", f"{UNIT}.service", "--since", since, "--until", until, "-o", "cat",
++              "--no-pager"], 60)
++    hits = [l[:160] for l in out.splitlines() if re.search(r"oom|sigkill|signal 9|killed", l, re.I)]
++    return {"count": len(hits), "first": hits[:5], "read": not out.startswith("__error__")}
++
++
+ def in_unit_cgroup(pid: int) -> bool:
+     try:
+         return f"/{UNIT}.service" in open(f"/proc/{pid}/cgroup").read()
+@@ -847,6 +870,17 @@
+                 "memory_peak_mb": round(b["memory.peak"] / 2**20, 1) if "memory.peak" in b else None})
+     for k in ("high", "max", "oom", "oom_kill"):
+         out[f"memory_events_{k}"] = d(f"memory.events.{k}")
++    # E4-S3: anon / file at the window's memory.current peak; memory PSI (ms of stall per s); major faults
++    if mc:
++        pk = max((r for r in w if "memory.current" in r), key=lambda r: r["memory.current"])
++        out["anon_mb_at_peak"] = round(pk.get("memory.stat.anon", 0) / 2**20, 1) if "memory.stat.anon" in pk else None
++        out["file_mb_at_peak"] = round(pk.get("memory.stat.file", 0) / 2**20, 1) if "memory.stat.file" in pk else None
++        an = [r["memory.stat.anon"] for r in w if "memory.stat.anon" in r]
++        out["anon_mb_max"] = round(max(an) / 2**20, 1) if an else None
++    for kind in ("some", "full"):
++        x = d(f"memory.pressure.{kind}_total_us")
++        out[f"memory_psi_{kind}_ms_per_s"] = round(x / 1000 / span, 3) if x is not None and span else None
++    out["pgmajfault"] = d("memory.stat.pgmajfault")
+     # whole run (gap to teardown): any OOM at all
+     out["oom_kill_run"] = (rows[-1].get("memory.events.oom_kill", 0) - rows[0].get("memory.events.oom_kill", 0)) if rows else None
+     return out
+@@ -892,7 +926,8 @@
+     if w.get("constraint"):
+         rec["constraint_readback_after"] = p = unit_props()
+         rec["constraint_lifted"] = (p.get("CPUQuotaPerSecUSec") == "infinity" and p.get("MemoryMax") == "infinity"
+-                                    and p.get("cpu.max") in (None, "max 100000") and p.get("memory.max") == "max")
++                                    and p.get("cpu.max") in (None, "max 100000") and p.get("memory.max") == "max"
++                                    and p.get("MemorySwapMax") == "infinity" and p.get("memory.swap.max") == "max")
+     mp = mainpid()
+     rec["flags_absent"] = manager_flags() == [] and environ_flags(mp) == ADOPTED and not E4_DROPIN.exists()
+ 
+@@ -1030,6 +1065,7 @@
+         # ---- warm-up from PLAYING (or the switch), then the window
+         time.sleep(max(0, w["warmup"] - (time.time() - playing_t)))
+         if e2:
++            rec["mainpid_window_start"] = mainpid()
+             rec["cgroup_membership"] = {"retroarch": [in_unit_cgroup(p) for p in retroarch_pids()],
+                                         "encoder": [in_unit_cgroup(p) for p in encoder_pids()]}
+         t0 = utc()
+@@ -1046,6 +1082,8 @@
+         if e2:
+             rec["cgroup_membership_end"] = {"retroarch": [in_unit_cgroup(p) for p in retroarch_pids()],
+                                             "encoder": [in_unit_cgroup(p) for p in encoder_pids()]}
++            rec["mainpid_window_end"] = mainpid()
++            rec["kills_in_window"] = journal_kills(t0, utc())
+         rec["status"] = "WINDOW_DONE"
+     except Exception as exc:  # noqa: BLE001
+         rec["status"] = "FAILED"
+@@ -1128,7 +1166,8 @@
+ def constraint_tag(cons: list) -> str:
+     """['CPUQuota=150%', 'MemoryMax=2G'] -> 'cpu150_mem2G' (the run dir's suffix)."""
+     return "_".join(("cpu" + v.rstrip("%")) if k == "CPUQuota" else ("per" + v) if k == "CPUQuotaPeriodSec"
+-                    else ("mem" + v) for k, _, v in (kv.partition("=") for kv in cons))
++                    else ("swap" + v) if k == "MemorySwapMax" else ("mem" + v)
++                    for k, _, v in (kv.partition("=") for kv in cons))
+ 
+ 
+ def run_suite(out: Path, only: list | None, runs: int, window: int, gap: int, plan: list | None = None,
+@@ -1382,9 +1421,9 @@
+                 if len(p) > 4:
+                     row.append(p[4].split("+") if p[4] else None)
+                 bad = [kv for kv in (row[4] if len(row) > 4 and row[4] else [])
+-                       if not re.fullmatch(r"CPUQuota=\d+%|MemoryMax=\d+[KMG]?|CPUQuotaPeriodSec=\d+ms", kv)]
++                       if not re.fullmatch(r"CPUQuota=\d+%|MemoryMax=\d+[KMG]?|CPUQuotaPeriodSec=\d+ms|MemorySwapMax=\d+[KMG]?", kv)]
+                 if bad:
+-                    print("refusing: a constraint is CPUQuota=N%, MemoryMax=X or CPUQuotaPeriodSec=Nms only", bad)
++                    print("refusing: a constraint is CPUQuota=N%, MemoryMax=X, MemorySwapMax=X or CPUQuotaPeriodSec=Nms only", bad)
+                     return 2
+                 plan.append(row)
+             unknown = [r[0] for r in plan if r[0] not in {w["id"] for w in WORKLOADS}]

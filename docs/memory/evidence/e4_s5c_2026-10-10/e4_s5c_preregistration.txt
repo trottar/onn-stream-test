@@ -1,0 +1,46 @@
+E4-S5C PRE-REGISTRATION -- written 2026-10-10 before the bench (and before any E4-S5C session); hash in
+e4_s5c_preregistration.sha256. Task: docs/memory/handoffs/E4-S5C_SNES_CAPTURE_PROBE_BENCH_CFR_TASK.md under
+QUEUE_2026-10-10C.md (every standing rule). Baseline: 7331184 plus the uncommitted E4-S1..S5B work (untouched). The
+change under test is E4-S5's, unchanged: companion/native_stream.py behind PRIVYHUB_SNES_CAPTURE_FIX=output_rate (an
+output "-r <profile fps>" before "-an"); companion/native_stream.py sha256
+b1a71fe19e774529a9d3807a3fd060a6d091b3aac0043eb37763d61b3e0d4057 (as in E4-S5B).
+
+1. THE BENCH = E4-S5B's (e4_s5b_2026-10-10/e4_s5b_bench.py), byte for byte EXCEPT THE SINK: the built command's last
+   five arguments (-payload_type 96 -f rtp rtp://127.0.0.1:<fec>...) become "-fps_mode cfr -t 60 -f null -" (E4-S5B:
+   "-t 60 -f null -"). ffmpeg here is 7.1.5 (ffmpeg version 7.1.5-0+deb13u1), which has -fps_mode: that form is used
+   (not -vsync cfr). The diff is e4_s5c_bench_vs_e4_s5b.diff (the sink line, the docstring, the usage line).
+   e4_s5c_bench.py sha256 fd32b90c990b39cb8f7fa59f1936938e7fe3fbfbae7716cd0ac3009578b3c432; driver e4_s5c_run.py sha256 df3671c58be00836937c913c07e648980fe891e3235e11b200485f3983138496; analysis e4_s5c_analysis.py sha256 39c71e11cb0784915cfd8bf4d476a38eac1eed7fdc301a6aafc482493eb972a2.
+   The command is otherwise the companion's own NativeStreamManager._build_linux_ffmpeg_command on an instance holding
+   only the adopted profile, the flag unset (arm A) or set (arm B) in the bench process's environment at build time;
+   hashed per arm with the window id masked (the window id is read from the companion's encoder in /proc and never
+   written). Setting: ONE live E1-SNES-STREAM session (tools/e1_suite.py run --e2 --window 4500 --gap 120; E2's warm-up;
+   NO flag for the companion's encoder; its own metrics reported). From its window's opening: a 5-s check session (arm
+   A, never counted, must parse header + stats or the bench stops), then 24 INTERLEAVED 60-s SESSIONS PER ARM (A B A B
+   ...). Per session (bench/bench.jsonl): probed input tbr, output rate, final frames / dup / drop (absent = 0), wall
+   time, CPU seconds, the built command's masked hash and whether it carries an output -r.
+   EXTENSION: if EITHER arm holds < 3 bad-probe sessions after 24 per arm, a second live E1-SNES-STREAM session (the
+   same) carries the next 24 per arm (indices 48-95, same interleave); read as one bench.
+
+2. THE READING RULE (the task's, verbatim): BAD PROBE = tbr != 60. MECHANISM REPRODUCES if every bad-probe A session has
+   output rate = tbr and drops ~ (60 - tbr) x 60 +/- 20 % (59 -> 60 +/- 12; 59.94 -> 3.6 +/- 0.7, i.e. 3-4). FIX WORKS
+   if every bad-probe B session has output 60 and drops <= 2. SAMPLED ENOUGH if EACH arm holds >= 3 bad probes; if
+   either does not after 24, both arms continue to 48 (§1's extension); if still not, INCONCLUSIVE with the bad-probe
+   rate per arm.
+
+3. THE BAR -- ACCEPTED only if ALL hold: sampled enough; mechanism reproduces in A; fix works in B; the live session
+   host-clean: RetroArch >= 59.9 and host CPU within E1's band (+/- 2 points) of E4-S1's SNES 7.4 % net of the bench's
+   cost (reported separately; E4-S5B's definition: the bench sessions' CPU seconds inside the window / (window s x 12
+   cores) x 100, plus Xorg's CPU above E4-S1 SNES's 7.692 % of a core, / 12). REJECTED if any bad-probe B session drops
+   > 2 or outputs != 60. Any other unmet clause = INCONCLUSIVE, the clause named. The link (loss, rendered) REPORTED,
+   NOT GATED. No PS1 run (E4-S5B's PS1-STREAM with the flag passed and is not in question).
+   REPORTED: the companion's own encoder starts during the live session (probe tbr -> output fps per start; its capture
+   fps and dup+drop per min over the window, segment-aware), the bench's cost, the drops at good (tbr 60) probes per arm.
+
+4. IF ACCEPTED the record writes (does not apply) the one-line adoption -- drop-in snes-capture.conf beside the four,
+   "[Service]\nEnvironment=PRIVYHUB_SNES_CAPTURE_FIX=output_rate" + daemon-reload + restart; the state checks' adopted
+   list gains the fifth line -- and its revert (delete the drop-in + daemon-reload + restart). Nothing is adopted here.
+
+5. RULES: nothing adopted, nothing committed; the flag absent at every teardown and at the end; no e3_flag.conf, no
+   e4_constraint.conf; no sudo, no nft, the Opal read-only; no addresses or identifiers; nothing fetched, nothing
+   deleted; no other task's scripts run in their directories (E4-S5B's bench is copied, not run). No bar or reading
+   changes after the data.

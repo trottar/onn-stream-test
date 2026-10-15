@@ -1,0 +1,369 @@
+{
+ "caveat": "MemorySwapMax=0: no swap for the stack's cgroup. The floor is the smallest MemoryMax at which the stack runs with page cache reclaim only; a host with swap would degrade more softly below it. It is a memory floor for the STACK's cgroup (companion, RetroArch, the encoder, the grabber children), not for the host: Xorg, pulseaudio, the desktop and the OS are outside it.",
+ "control_video_loss_per_min": 184.94,
+ "floor": {
+  "E1-PS1-STREAM": {
+   "floor": "384M",
+   "floor_text": "<= 384M (384M passed)",
+   "inconclusive_steps": [
+    "768M",
+    "512M"
+   ],
+   "cpu_quota": 200,
+   "at_floor": {
+    "memory_current_max_mb": 226.1,
+    "memory_peak_mb": 227.9,
+    "anon_mb_at_peak": 191.1,
+    "file_mb_at_peak": 21.4,
+    "anon_mb_max": 191.1,
+    "memory_events_max": 0,
+    "memory_psi_some_ms_per_s": 0.0,
+    "memory_psi_full_ms_per_s": 0.0
+   },
+   "step_below": null
+  },
+  "E1-SNES-STREAM": {
+   "floor": "384M",
+   "floor_text": "<= 384M (384M passed)",
+   "inconclusive_steps": [],
+   "cpu_quota": 150,
+   "at_floor": {
+    "memory_current_max_mb": 196.3,
+    "memory_peak_mb": 197.4,
+    "anon_mb_at_peak": 165.3,
+    "file_mb_at_peak": 19.4,
+    "anon_mb_max": 165.4,
+    "memory_events_max": 0,
+    "memory_psi_some_ms_per_s": 0.0,
+    "memory_psi_full_ms_per_s": 0.0
+   },
+   "step_below": null
+  },
+  "E1-CONC": {
+   "floor": null,
+   "floor_text": "above 768M (failed at 768M; E4-S2 passed 1G with swap)",
+   "inconclusive_steps": [],
+   "cpu_quota": null,
+   "at_floor": {
+    "memory_current_max_mb": null,
+    "memory_peak_mb": null,
+    "anon_mb_at_peak": null,
+    "file_mb_at_peak": null,
+    "anon_mb_max": null,
+    "memory_events_max": null,
+    "memory_psi_some_ms_per_s": null,
+    "memory_psi_full_ms_per_s": null
+   },
+   "step_below": {
+    "step": "mem:768M",
+    "verdict": "FAIL",
+    "failing": [
+     "rendered_fps",
+     "grabs_failed",
+     "no_journal_kill",
+     "unit_not_restarted"
+    ],
+    "values": {
+     "rendered_fps": 0.0,
+     "grabs_failed": 1489544,
+     "no_journal_kill": 574,
+     "unit_not_restarted": false
+    }
+   }
+  },
+  "E1-META": {
+   "floor": null,
+   "floor_text": "above 768M (failed at 768M; E4-S2 passed 1G with swap)",
+   "inconclusive_steps": [],
+   "cpu_quota": 150,
+   "at_floor": {
+    "memory_current_max_mb": null,
+    "memory_peak_mb": null,
+    "anon_mb_at_peak": null,
+    "file_mb_at_peak": null,
+    "anon_mb_max": null,
+    "memory_events_max": null,
+    "memory_psi_some_ms_per_s": null,
+    "memory_psi_full_ms_per_s": null
+   },
+   "step_below": {
+    "step": "mem:768M",
+    "verdict": "FAIL",
+    "failing": [
+     "grabs_failed",
+     "grabs_ok_min_per_channel",
+     "no_journal_kill",
+     "unit_not_restarted"
+    ],
+    "values": {
+     "grabs_failed": 1368917,
+     "grabs_ok_min_per_channel": 0,
+     "no_journal_kill": 546,
+     "unit_not_restarted": false
+    }
+   }
+  }
+ },
+ "stack_memory_floor": null,
+ "steps": [
+  {
+   "label": "mem:768M",
+   "items": [
+    [
+     "E1-PS1-STREAM",
+     [
+      "CPUQuota=200%",
+      "MemoryMax=768M",
+      "MemorySwapMax=0"
+     ]
+    ],
+    [
+     "E1-SNES-STREAM",
+     [
+      "CPUQuota=150%",
+      "MemoryMax=768M",
+      "MemorySwapMax=0"
+     ]
+    ],
+    [
+     "E1-CONC",
+     [
+      "MemoryMax=768M",
+      "MemorySwapMax=0"
+     ]
+    ],
+    [
+     "E1-META",
+     [
+      "CPUQuota=150%",
+      "MemoryMax=768M",
+      "MemorySwapMax=0"
+     ]
+    ]
+   ],
+   "s": 5759
+  },
+  {
+   "label": "mem:512M",
+   "items": [
+    [
+     "E1-PS1-STREAM",
+     [
+      "CPUQuota=200%",
+      "MemoryMax=512M",
+      "MemorySwapMax=0"
+     ]
+    ],
+    [
+     "E1-SNES-STREAM",
+     [
+      "CPUQuota=150%",
+      "MemoryMax=512M",
+      "MemorySwapMax=0"
+     ]
+    ]
+   ],
+   "s": 2941
+  },
+  {
+   "label": "mem:384M",
+   "items": [
+    [
+     "E1-PS1-STREAM",
+     [
+      "CPUQuota=200%",
+      "MemoryMax=384M",
+      "MemorySwapMax=0"
+     ]
+    ],
+    [
+     "E1-SNES-STREAM",
+     [
+      "CPUQuota=150%",
+      "MemoryMax=384M",
+      "MemorySwapMax=0"
+     ]
+    ]
+   ],
+   "s": 2906
+  },
+  {
+   "label": "mem_repeat:768M:E1-PS1-STREAM",
+   "items": [
+    [
+     "E1-PS1-STREAM",
+     [
+      "CPUQuota=200%",
+      "MemoryMax=768M",
+      "MemorySwapMax=0"
+     ]
+    ]
+   ],
+   "s": 1464
+  },
+  {
+   "label": "mem_repeat:512M:E1-PS1-STREAM",
+   "items": [
+    [
+     "E1-PS1-STREAM",
+     [
+      "CPUQuota=200%",
+      "MemoryMax=512M",
+      "MemorySwapMax=0"
+     ]
+    ]
+   ],
+   "s": 1456
+  }
+ ],
+ "runs": [
+  {
+   "step": "mem:768M",
+   "row": "E1-PS1-STREAM",
+   "constraint": [
+    "CPUQuota=200%",
+    "MemoryMax=768M",
+    "MemorySwapMax=0"
+   ],
+   "summary": "runs/E1-PS1-STREAM_cpu200_mem768M_swap0/run1/summary.json",
+   "verdict": "INCONCLUSIVE",
+   "why": "fails only on link-observed metrics while the control fails D-BASE's loss row",
+   "failing": [
+    "rendered_fps"
+   ]
+  },
+  {
+   "step": "mem:768M",
+   "row": "E1-SNES-STREAM",
+   "constraint": [
+    "CPUQuota=150%",
+    "MemoryMax=768M",
+    "MemorySwapMax=0"
+   ],
+   "summary": "runs/E1-SNES-STREAM_cpu150_mem768M_swap0/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "mem:768M",
+   "row": "E1-CONC",
+   "constraint": [
+    "MemoryMax=768M",
+    "MemorySwapMax=0"
+   ],
+   "summary": "runs/E1-CONC_mem768M_swap0/run1/summary.json",
+   "verdict": "FAIL",
+   "why": "fails rendered_fps, grabs_failed, no_journal_kill, unit_not_restarted",
+   "failing": [
+    "rendered_fps",
+    "grabs_failed",
+    "no_journal_kill",
+    "unit_not_restarted"
+   ]
+  },
+  {
+   "step": "mem:768M",
+   "row": "E1-META",
+   "constraint": [
+    "CPUQuota=150%",
+    "MemoryMax=768M",
+    "MemorySwapMax=0"
+   ],
+   "summary": "runs/E1-META_cpu150_mem768M_swap0/run1/summary.json",
+   "verdict": "FAIL",
+   "why": "fails grabs_failed, grabs_ok_min_per_channel, no_journal_kill, unit_not_restarted",
+   "failing": [
+    "grabs_failed",
+    "grabs_ok_min_per_channel",
+    "no_journal_kill",
+    "unit_not_restarted"
+   ]
+  },
+  {
+   "step": "mem:512M",
+   "row": "E1-PS1-STREAM",
+   "constraint": [
+    "CPUQuota=200%",
+    "MemoryMax=512M",
+    "MemorySwapMax=0"
+   ],
+   "summary": "runs/E1-PS1-STREAM_cpu200_mem512M_swap0/run1/summary.json",
+   "verdict": "INCONCLUSIVE",
+   "why": "fails only on link-observed metrics while the control fails D-BASE's loss row",
+   "failing": [
+    "rendered_fps"
+   ]
+  },
+  {
+   "step": "mem:512M",
+   "row": "E1-SNES-STREAM",
+   "constraint": [
+    "CPUQuota=150%",
+    "MemoryMax=512M",
+    "MemorySwapMax=0"
+   ],
+   "summary": "runs/E1-SNES-STREAM_cpu150_mem512M_swap0/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "mem:384M",
+   "row": "E1-PS1-STREAM",
+   "constraint": [
+    "CPUQuota=200%",
+    "MemoryMax=384M",
+    "MemorySwapMax=0"
+   ],
+   "summary": "runs/E1-PS1-STREAM_cpu200_mem384M_swap0/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "mem:384M",
+   "row": "E1-SNES-STREAM",
+   "constraint": [
+    "CPUQuota=150%",
+    "MemoryMax=384M",
+    "MemorySwapMax=0"
+   ],
+   "summary": "runs/E1-SNES-STREAM_cpu150_mem384M_swap0/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "mem_repeat:768M",
+   "row": "E1-PS1-STREAM",
+   "constraint": [
+    "CPUQuota=200%",
+    "MemoryMax=768M",
+    "MemorySwapMax=0"
+   ],
+   "summary": "runs/E1-PS1-STREAM_cpu200_mem768M_swap0/run2/summary.json",
+   "verdict": "INCONCLUSIVE",
+   "why": "fails only on link-observed metrics while the control fails D-BASE's loss row",
+   "failing": [
+    "rendered_fps"
+   ]
+  },
+  {
+   "step": "mem_repeat:512M",
+   "row": "E1-PS1-STREAM",
+   "constraint": [
+    "CPUQuota=200%",
+    "MemoryMax=512M",
+    "MemorySwapMax=0"
+   ],
+   "summary": "runs/E1-PS1-STREAM_cpu200_mem512M_swap0/run2/summary.json",
+   "verdict": "INCONCLUSIVE",
+   "why": "fails only on link-observed metrics while the control fails D-BASE's loss row",
+   "failing": [
+    "rendered_fps"
+   ]
+  }
+ ],
+ "rejudge_disagreements": []
+}

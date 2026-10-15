@@ -1,0 +1,54 @@
+E4-S5B PRE-REGISTRATION -- written 2026-10-10 before the bench (and before any E4-S5B session); hash in
+e4_s5b_preregistration.sha256. Task: docs/memory/handoffs/E4-S5B_SNES_CAPTURE_PROBE_BENCH_TASK.md under
+QUEUE_2026-10-10B.md (every standing rule). Baseline: 7331184 plus the uncommitted E4-S1..S5 work (untouched; E4-S3B's
+files and its runner patch beside it). The change under test is E4-S5's, unchanged: companion/native_stream.py behind
+PRIVYHUB_SNES_CAPTURE_FIX=output_rate (an output "-r <profile fps>" before "-an"; e4_s5_2026-10-10/e4_s5_change.diff);
+companion/native_stream.py sha256 __NS_SHA__.
+
+1. THE BENCH. Setting: ONE live E1-SNES-STREAM session (tools/e1_suite.py run --e2 --window 4500 --gap 120, E2's 90-s
+   warm-up; NO flag for the companion; its own metrics reported, gated only as in §3). Beside it, from the moment its
+   window opens, e4_s5b_bench.py (sha256 __BENCH_SHA__; driver e4_s5b_run.py sha256 __RUN_SHA__) runs the encoder
+   command EXACTLY as the companion builds it -- NativeStreamManager._build_linux_ffmpeg_command imported from the
+   companion, on an instance holding only the adopted profile, with the flag set (arm B) or unset (arm A) in the bench
+   process's environment at build time; nothing retyped -- against the same RetroArch window (its id read from the
+   companion's encoder command line, never written). The ONLY change to the built command is the sink: its last five
+   arguments (-payload_type 96 -f rtp rtp://127.0.0.1:<fec>...) become "-t 60 -f null -" (no file, no socket). Each
+   session 60 s; a 5-s check session (arm A, index -1, never counted) first, which must parse (header + stats) or the
+   bench stops before any counted session. ARMS INTERLEAVED A B A B ..., 24 SESSIONS PER ARM (48 x ~65 s). Per session
+   (bench/bench.jsonl): the header's probed input tbr, the output rate, the final frame / dup / drop counters (ffmpeg
+   omits dup= / drop= while both are 0: absent = 0), wall time, the session's CPU seconds (rusage), the built command's
+   hash (window masked) and whether it carries an output -r.
+   EXTENSION: if arm B holds < 3 bad-probe sessions after 24 per arm, a second live E1-SNES-STREAM session (the same,
+   --window 4500) carries the next 24 per arm (indices 48-95, the same interleave); the two benches are read as one.
+
+2. THE READING RULE (the task's, verbatim): a session is a BAD PROBE if its tbr != 60. THE MECHANISM REPRODUCES if every
+   bad-probe session in A has output rate = tbr and drops ~ (60 - tbr) x 60 +/- 20 %. THE FIX WORKS if every bad-probe
+   session in B has output rate 60 and drops <= 2 in the minute. SAMPLED ENOUGH if arm B holds >= 3 bad-probe sessions;
+   if not after 24, continue to 48 per arm (§1's extension); if still < 3, INCONCLUSIVE (the probe did not misread
+   tonight). The bad-probe rate per arm is reported either way.
+
+3. THE BAR -- ACCEPTED only if ALL hold: sampled enough; the mechanism reproduces in A; the fix works in B; the live
+   session's companion-side metrics are host-clean: RetroArch >= 59.9, and host CPU within E1's band (+/- 2 points) of
+   E4-S1's SNES 7.4 % plus the bench's own cost, reported separately. THE BENCH'S OWN COST (host %, over the live
+   window) = the bench sessions' CPU seconds inside the window / (window s x 12 cores) x 100, plus Xorg's CPU above
+   E4-S1 SNES's (procs.xorg.cpu_pct 7.69 % of a core) / 12 -- the second x11grab's server-side cost; i.e. the gate is
+   |host CPU - bench cost - 7.4| <= 2. AND §4 passes (the flag changes nothing for PS1; the flag applies to every
+   x11grab session, so it is part of what an adoption would carry). REJECTED if any bad-probe B session drops > 2 or
+   outputs != 60, or if §4 fails. Any other unmet condition (not sampled enough; the mechanism not reproducing in A; the
+   live session not host-clean) = INCONCLUSIVE, the clause named. The link (loss, rendered fps) is REPORTED, NOT
+   GATED; so is the companion's own encoder (no flag: its probe and drops are the fault itself, reported as a sample).
+
+4. PS1-STREAM WITH THE FLAG (after the bench): E1-PS1-STREAM x1 at 20 min (--e2 --window 1200 --gap 120) with
+   PRIVYHUB_SNES_CAPTURE_FIX=output_rate in the runner's e3_flag.conf (that run only). PASS if: capture 60 +/- 0.1
+   (segment-aware, E4-S5's reading), encoder dup+drop <= 0.2/min, RetroArch >= 59.9, host CPU within +/- 2 of E4-S1's
+   PS1-STREAM 10.9 %. Gated host-side; the link reported. Reported: the encoder's probe ("1000k" expected) and the -r 60
+   in its command.
+
+5. IF ACCEPTED the record writes (does not apply) the one-line adoption -- a drop-in snes-capture.conf beside the four,
+   "[Service]\nEnvironment=PRIVYHUB_SNES_CAPTURE_FIX=output_rate" + daemon-reload + restart; the state checks' adopted
+   list gains the fifth line -- and its revert (delete the drop-in + daemon-reload + restart). Nothing is adopted here.
+
+6. RULES: nothing adopted, nothing committed; the flag absent at every teardown and at the end (the bench sets it only
+   in its own process at build time); no e4_constraint.conf; no sudo, no nft, the Opal read-only; no addresses or
+   identifiers (the window id is never written); nothing fetched, nothing deleted; no other task's scripts run in their
+   directories (E4-S5's sidecar is not used). No bar or reading changes after the data.

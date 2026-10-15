@@ -1,6 +1,62 @@
 # Active investigations
 
-## PHASE E — ACTIVE. E1 FROZEN (VOD added); E2 MEASURED 2026-10-06 (E2-S1); E3 CLOSED 2026-10-09 (E3-A3); E4 next
+## PHASE E — ACTIVE. E1 FROZEN (VOD added); E2 MEASURED 2026-10-06 (E2-S1); E3 CLOSED 2026-10-09 (E3-A3); E4: reference, CPU-time floor measured, memory floor closed at 1.5G (E4-S3B); deferral and SNES fix REJECTED, their reruns INCONCLUSIVE (2026-10-10)
+
+**E4 (QUEUE_2026-10-10B), 2026-10-10 — nothing adopted:**
+
+- **E4-S3B** (`../evidence/E4_S3B_MEMORY_FLOOR_1G_SWAPOFF_2026-10-10.md`):
+  META passes at 1G swap off. CONC is OOM-killed at 1G before the window,
+  in both runs; that is INCONCLUSIVE as judged, because the kill gates are
+  window-scoped. On a hashed addendum CONC passes at 1536M (1,166 MB
+  peak). **The four-row swap-off floor is closed:** streams ≤ 384M, META
+  1G, CONC 1.5G, so the stack needs 1.5G. The runner's refresh loop now
+  backs off (patch).
+- **E4-S5B** (`../evidence/E4_S5B_SNES_CAPTURE_PROBE_BENCH_2026-10-10.md`):
+  the fix outputs 60 on 4 / 4 bad probes. The run is **INCONCLUSIVE**
+  because the bench's null sink hides the drops in both arms.
+  **Open:** a bench with constant-rate semantics, or the user's call on
+  tonight's evidence.
+- **E4-S4B** (`../evidence/E4_S4B_GRAB_DEFERRAL_CLEAN_LINK_2026-10-10.md`):
+  **INCONCLUSIVE (link)**. No control in four was clean (loss 66-652/min),
+  so no flagged run was made. **Open:** a clean night, or the user's
+  call on E4-S4's host evidence.
+
+**E4 (QUEUE_2026-10-10), 2026-10-10 — nothing adopted:**
+
+- **E4-S3** (`../evidence/E4_S3_MEMORY_FLOOR_CLOSE_2026-10-10.md`):
+  memory floor with swap off — streams ≤ 384M; CONC / META > 768M (the
+  grabber OOM-killed). The stack's memory floor is between 768M and 1G.
+- **E4-S4** (`../evidence/E4_S4_GRAB_DEFERRAL_2026-10-10.md`): grab
+  deferral behind `PRIVYHUB_EPG_DEFER_WHILE_STREAMING=1` works (0 grabs
+  in flagged windows; drains 6/6; 0 s throttled at 150 %) but **REJECTED**
+  by its bar on stream quality on a lossy link. **Open:** a clean-link
+  rerun of the four runs.
+- **E4-S5** (`../evidence/E4_S5_SNES_CAPTURE_59FPS_2026-10-10.md`): the
+  SNES 59-fps fault **LOCATED** (x11grab's probed `tbr` adopted as the
+  output rate); the fix (`PRIVYHUB_SNES_CAPTURE_FIX=output_rate`)
+  **REJECTED** on rendered fps, and not exercised by a bad probe.
+  **Open:** a forced-probe, clean-link verification.
+
+**E4 (QUEUE_2026-10-09), 2026-10-09 — measurement only, nothing adopted:**
+
+- **E4-S1** (`../evidence/E4_S1_REFERENCE_ON_ADOPTED_STATE_2026-10-09.md`):
+  the known-good reference re-measured on the four-line adopted state,
+  8 rows, all valid; the four-row reference, the full table with E2
+  beside, and the drift list (14 of 89; Snes9x and the guide index explain
+  the large ones). **Open: the SNES encoder intermittently outputs exactly
+  59 fps** (one drop per second, RetroArch 59.999) — 4 of 10 SNES windows
+  on 10-09, 0 of 3 in E3; not chased.
+- **E4-S2** (`../evidence/E4_S2_CPU_MEMORY_FLOOR_2026-10-09.md`): a
+  CPU-TIME floor (CFS quota on full-speed cores; not a slow-core floor):
+  **stack 400 %** (CONC; the grab bursts), PS1-STREAM 150 %, SNES ≤ 100 %,
+  META ≤ 100 %; **memory ≤ 1G** every row (CONC pinned at 1G, 127 MB
+  swapped). Alpha proposal in its §5 (the user's call). **Open:** the
+  memory floor below 1G (`MemorySwapMax=0`, 768M / 512M); grabs deferred
+  while streaming would take the stack's floor to 150 %.
+- **Also found:** the sampler's capture fps / dup+drop are first-to-last
+  over the window and broken by encoder restarts; E4 uses a segment-aware
+  figure (E4-S2 §4).
+
 
 **E3 (QUEUE_2026-10-06 … -08B; E3-A2, E3-A3, E3-A3B), CLOSED 2026-10-09 — three adopted (the guide index, E3-S6A; Snes9x, E3-A2; recovery v2, E3-A3B):**
 

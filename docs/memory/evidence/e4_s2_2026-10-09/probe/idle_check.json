@@ -1,0 +1,175 @@
+{
+ "constraint": [
+  "CPUQuota=100%",
+  "MemoryMax=4G"
+ ],
+ "state_before": {
+  "at_utc": "2026-10-09T09:17:48.770Z",
+  "preflight": {
+   "manager": [],
+   "environ": [
+    "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+    "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+    "PRIVYHUB_RECOVERY_TRIGGER=v2",
+    "PRIVYHUB_SNES_CORE=snes9x"
+   ],
+   "game_active": false,
+   "adb": true,
+   "drop_in_live": true,
+   "drop_in_index": true,
+   "drop_in_snes_core": true,
+   "drop_in_recovery": true,
+   "e3_dropin_absent": true,
+   "e4_constraint_absent": true,
+   "ok": true
+  },
+  "ps1_files_identical": true,
+  "apk": "CONFIRMED",
+  "retroarch": 0,
+  "encoder": 0,
+  "mainpid_serves_8765": true,
+  "ok": true
+ },
+ "props_before": {
+  "ControlGroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/privyhub-companion.service",
+  "CPUQuotaPerSecUSec": "infinity",
+  "CPUQuotaPeriodUSec": "infinity",
+  "MemoryMax": "infinity",
+  "MemorySwapMax": "infinity",
+  "cgroup.controllers": "memory pids",
+  "cpu.max": null,
+  "memory.max": "max",
+  "memory.swap.max": "max",
+  "dropin_present": false
+ },
+ "dropin_text": "[Service]\nCPUQuota=100%\nMemoryMax=4G\n",
+ "restart": {
+  "mainpid_serves_8765": true,
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+   "PRIVYHUB_RECOVERY_TRIGGER=v2",
+   "PRIVYHUB_SNES_CORE=snes9x"
+  ]
+ },
+ "props_under": {
+  "ControlGroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/privyhub-companion.service",
+  "CPUQuotaPerSecUSec": "1s",
+  "CPUQuotaPeriodUSec": "infinity",
+  "MemoryMax": "4294967296",
+  "MemorySwapMax": "infinity",
+  "cgroup.controllers": "cpu memory pids",
+  "cpu.max": "100000 100000",
+  "memory.max": "4294967296",
+  "memory.swap.max": "max",
+  "dropin_present": true
+ },
+ "takes_effect": true,
+ "environ_under": [
+  "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+  "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+  "PRIVYHUB_RECOVERY_TRIGGER=v2",
+  "PRIVYHUB_SNES_CORE=snes9x"
+ ],
+ "idle_60s": {
+  "start": {
+   "at_utc": "2026-10-09T09:17:52.529Z",
+   "cpu.usage_usec": 329909,
+   "cpu.user_usec": 274262,
+   "cpu.system_usec": 55647,
+   "cpu.nice_usec": 0,
+   "cpu.nr_periods": 7,
+   "cpu.nr_throttled": 1,
+   "cpu.throttled_usec": 44723,
+   "cpu.nr_bursts": 0,
+   "cpu.burst_usec": 0,
+   "memory.current": 39182336,
+   "memory.peak": 40255488,
+   "memory.swap.current": 0,
+   "memory.events.low": 0,
+   "memory.events.high": 0,
+   "memory.events.max": 0,
+   "memory.events.oom": 0,
+   "memory.events.oom_kill": 0,
+   "memory.events.oom_group_kill": 0
+  },
+  "end": {
+   "at_utc": "2026-10-09T09:18:52.530Z",
+   "cpu.usage_usec": 348047,
+   "cpu.user_usec": 286627,
+   "cpu.system_usec": 61420,
+   "cpu.nice_usec": 0,
+   "cpu.nr_periods": 43,
+   "cpu.nr_throttled": 1,
+   "cpu.throttled_usec": 44723,
+   "cpu.nr_bursts": 0,
+   "cpu.burst_usec": 0,
+   "memory.current": 39174144,
+   "memory.peak": 40255488,
+   "memory.swap.current": 0,
+   "memory.events.low": 0,
+   "memory.events.high": 0,
+   "memory.events.max": 0,
+   "memory.events.oom": 0,
+   "memory.events.oom_kill": 0,
+   "memory.events.oom_group_kill": 0
+  },
+  "usage_cores": 0.0003,
+  "nr_periods": 36,
+  "nr_throttled": 0,
+  "throttled_s": 0.0,
+  "memory_current_mb": 37.4
+ },
+ "serving_under": 200,
+ "restart_after": {
+  "mainpid_serves_8765": true,
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+   "PRIVYHUB_RECOVERY_TRIGGER=v2",
+   "PRIVYHUB_SNES_CORE=snes9x"
+  ]
+ },
+ "props_after": {
+  "ControlGroup": "/user.slice/user-1000.slice/user@1000.service/app.slice/privyhub-companion.service",
+  "CPUQuotaPerSecUSec": "infinity",
+  "CPUQuotaPeriodUSec": "infinity",
+  "MemoryMax": "infinity",
+  "MemorySwapMax": "infinity",
+  "cgroup.controllers": "memory pids",
+  "cpu.max": null,
+  "memory.max": "max",
+  "memory.swap.max": "max",
+  "dropin_present": false
+ },
+ "lifted": true,
+ "state_after": {
+  "at_utc": "2026-10-09T09:18:56.014Z",
+  "preflight": {
+   "manager": [],
+   "environ": [
+    "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+    "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+    "PRIVYHUB_RECOVERY_TRIGGER=v2",
+    "PRIVYHUB_SNES_CORE=snes9x"
+   ],
+   "game_active": false,
+   "adb": true,
+   "drop_in_live": true,
+   "drop_in_index": true,
+   "drop_in_snes_core": true,
+   "drop_in_recovery": true,
+   "e3_dropin_absent": true,
+   "e4_constraint_absent": true,
+   "ok": true
+  },
+  "ps1_files_identical": true,
+  "apk": "CONFIRMED",
+  "retroarch": 0,
+  "encoder": 0,
+  "mainpid_serves_8765": true,
+  "ok": true
+ }
+}

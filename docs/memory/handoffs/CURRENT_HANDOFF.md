@@ -2,51 +2,79 @@
 
 Authoritative state: `../CURRENT.md`. **Start there.**
 
-Baseline commit `75b2b6b` (E3-R2 / E3-S7B committed). E3-A3's and
-E3-A3B's work is not committed (the user's commit:
-`../../../logs/e3_a3b_git_status.txt`).
+Baseline commit `7331184` (the user's E3-close commit). Nothing since it
+is committed: E4-S1 to E4-S5D, E4-C1 and E5-S1. The user commits tonight,
+2026-10-15 (`../../../logs/e4_s4d_git_status.txt`).
 
-## 2026-10-09 — recovery v2 ADOPTED (E3-A3B); **E3 CLOSED**
+## 2026-10-15 — session A: E4-S5D adopted; E4-S4D's watch launched (`QUEUE_2026-10-15`)
 
-- **E3-A3** (00:32-03:05Z): the user's nft check was recorded (it
-  passed). v2 was adopted, then **reverted**: E3-A2's validity rule
-  voided all six windows on the client's own pauses, though v2 fired
-  nothing.
-- **E3-A3B** (04:50-05:45Z; the user: "Code application why not"):
-  re-adopted with a bar judged on the trigger's own events →
-  **ADOPTION STANDS**. 0 controller pauses, 0 saves; CPU in band; two
-  > 1-s silences the old rule would have paused on passed.
-- **State: four lines, four drop-ins** (live, the index, Snes9x,
-  `recovery.conf`). The kill switch is in `../TOOLS.md` ("Recovery v2").
-- **E3 is CLOSED** with three adoptions (`../../ROADMAP.md`). Next:
-  **E4**.
-- Measured for E4-S1: the user manager delegates **cpu, memory — not
-  cpuset**. RetroArch and ffmpeg share the companion's cgroup, so
-  `CPUQuota=` / `MemoryMax=` on its unit cover the whole stack.
-- The link was at its worst recorded on 10-09 (LINK item in
-  `docs/KNOWN_ISSUES.md`); use same-night controls.
+- **E4-S5D: the SNES capture fix ADOPTED and CONFIRMED.**
+  - `snes-capture.conf` (`PRIVYHUB_SNES_CAPTURE_FIX=output_rate`) is the
+    fifth adopted line; `tools/e1_suite.py` `ADOPTED` has five names.
+  - SNES 20 min: capture 59.964, dup+drop 0.05/min, RA 59.999, host 7.81 %.
+  - PS1 10 min: 59.942, 0.10/min.
+  - The link was very lossy (1,006 / 3,349 per min), reported only.
+  - Revert: delete the drop-in, daemon-reload, restart, and take the line
+    out of `ADOPTED`.
+- **E4-S4D: the link watch is RUNNING detached**, as the unit
+  `privyhub-link-watch`, launched 21:41:41Z, cap 2026-10-20T04:00Z.
+  - Status: `cat ~/privyhub_link_watch/status.txt`.
+  - Stop: `touch ~/privyhub_link_watch/STOP`.
+  - Record: `../evidence/E4_S4D_LINK_WATCH_LAUNCH_2026-10-15.md`.
+- Session B (E4-C1 close-out, E5-S1 capability probe) ran beside it.
+  Its summary is in `SESSION_B_DONE_2026-10-15.md`.
+- End state: five lines, no flag or constraint, APK CONFIRMED, the watch
+  running.
 
-## 2026-10-08 (B) — `QUEUE_2026-10-08B` (committed `75b2b6b`)
+## 2026-10-10 (B) — E4-S3B / S5B / S4B (`QUEUE_2026-10-10B`, uncommitted)
 
-R2 the false pause fixed (threshold + exit + gap log): REJECTED on two
-bar clauses, no pause in 4 runs. S7B the grab paced at 1,500 ms:
-REJECTED (no per-grab gain).
+- **E4-S3B**: memory floor closed, swap off — META 1G; CONC OOM-killed at
+  1G (before the window, ×2; INCONCLUSIVE as judged), 1536M PASS on a
+  hashed addendum. **The stack 1.5G.** Runner: refresh back-off (patch).
+- **E4-S5B**: the SNES fix outputs 60 on 4 / 4 bad probes; INCONCLUSIVE
+  (the bench's null sink hides drops in both arms). Not adopted.
+- **E4-S4B**: the clean-link gate failed 4 / 4 controls (loss 66-652/min);
+  INCONCLUSIVE (link), no flagged run. Not adopted.
+- Files for the user before the commit: E4-S3's two ~300 MB `epg.jsonl`,
+  plus E4-S3B's 4.4 MB `backoff_demo/stopped_predecessor_5s.jsonl`.
+- End state: four lines, no flag or constraint, APK CONFIRMED.
 
-## 2026-10-08 (A) (committed `969085f`)
+## 2026-10-10 — E4-S3 / S4 / S5 (`QUEUE_2026-10-10`, uncommitted)
 
-R1 INCONCLUSIVE (replay not faithful); S7 REJECTED (the cycle).
+- **E4-S3**: memory floor, swap off — streams ≤ 384M; CONC / META > 768M
+  (grabber OOM). Stack floor between 768M and 1G.
+- **E4-S4**: grab deferral (flag) works on the host (0 s throttled at
+  150 %) but REJECTED on the link's stream quality.
+- **E4-S5**: the SNES 59-fps fault LOCATED (probed `tbr`); the `-r 60`
+  fix (flag) REJECTED on rendered fps, not exercised.
+- Both flags dormant in the tree. Two ~300 MB `epg.jsonl` in
+  `../evidence/e4_s3_2026-10-10/` (the user's call before commit).
+- End state: four lines, no flag or constraint, APK CONFIRMED.
 
-## E3-A2 (committed `def1ad1`)
+## 2026-10-09 (B) — E4: reference re-measured, floor measured (`QUEUE_2026-10-09`)
 
-Snes9x adopted; `frame_spin` REVERTED. The validity rule was born there.
+- **E4-S1**: the reference on the adopted state, 8 rows, all valid; drift
+  from E2 by Snes9x and the index. Open: SNES capture at exactly 59 fps
+  in some sessions.
+- **E4-S2**: 30 runs. **CPU-time floor (not slow-core): the stack 400 %
+  (CONC), PS1-STREAM 150 %, SNES / META ≤ 100 %; memory ≤ 1G.** Alpha:
+  a proposal (§5).
+- The runner writes a per-run `e4_constraint.conf`; the state check
+  requires none (`../patches/E4-S2_…`). End state clean, APK CONFIRMED.
 
-## Queues A, B, C (committed `bf2120c`, `ccee2f5`, `e553673`)
+## 2026-10-09 (A) — recovery v2 ADOPTED (E3-A3B); **E3 CLOSED** (committed `7331184`)
 
-C (2026-10-07): S6A the guide index ADOPTED (stands); S5C `frame_spin`
-and S4 Snes9x ACCEPTED (decided in E3-A2, above).
-A (2026-10-06): S1 INCONCLUSIVE, S2 / S3 / S5 REJECTED, S4 NOT RUN. B:
-S5B REJECTED (F2 underruns 18 > 16); S6 MEMORY ACCEPTED (adopted since,
-S6A), STREAM REJECTED. Records `../evidence/E3_S*`; flags `../TOOLS.md`.
+E3-A3 adopted v2 and reverted it on its validity rule; E3-A3B re-adopted
+it under a bar judged on its own trigger (0 controller pauses, 0 saves).
+State: four lines, four drop-ins; kill switch in `../TOOLS.md`. cpu and
+memory are delegated (not cpuset). The link was at its worst on 10-09.
+
+## E3, before 10-09 (committed `75b2b6b` … `bf2120c`)
+
+10-08 B: R2 REJECTED (two bar clauses), S7B REJECTED. 10-08 A: R1
+INCONCLUSIVE, S7 REJECTED. E3-A2: Snes9x adopted, `frame_spin` REVERTED.
+Queues A-C (10-06/07): S6A the index ADOPTED; S1 INCONCLUSIVE; S2, S3, S5,
+S5B REJECTED. Records `../evidence/E3_*`; flags `../TOOLS.md`.
 
 ## Earlier (condensed 2026-10-06, E3 queue)
 

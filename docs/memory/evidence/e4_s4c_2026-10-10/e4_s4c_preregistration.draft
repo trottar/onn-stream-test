@@ -1,0 +1,103 @@
+E4-S4C PRE-REGISTRATION -- written 2026-10-10 before the first probe; hash in e4_s4c_preregistration.sha256.
+Task: docs/memory/handoffs/E4-S4C_LINK_WATCH_AND_DEFERRAL_TASK.md under QUEUE_2026-10-10C.md (every standing rule;
+E3-A3B's validity reading; E4-S2's constraint discipline). Baseline: 7331184 plus the uncommitted E4-S1..S5B work
+(untouched; E4-S5C's files beside it). References: E4-S1 (e4_s1_2026-10-09/), E4-S2 (e4_s2_2026-10-09/), E4-S4
+(e4_s4_2026-10-10/: its pre-registration, bar and pass-rule copy), E4-S4B (e4_s4b_2026-10-10/: the gate and its copies),
+O1 (o1_2026-09-21/: the Opal read-only), D-BASE P4 (d_base_p4_2026-09-21/: the client's radio series).
+
+0. THE CHANGE, E4-S4's, unchanged (companion/plugins/epg.py sha256 __EPG__): behind
+   PRIVYHUB_EPG_DEFER_WHILE_STREAMING=1 a forced grab while a stream session is live is queued and answered with the
+   cached guide marked refresh_deferred; the queue drains when the session ends. The runner tools/e1_suite.py sha256
+   __SUITE__ (unchanged since E4-S3B). The watch driver e4_s4c_watch.py sha256 __WATCH__; O1's sampler copied
+   (o1_opal_sample.sh sha256 __OPAL__, one change: it never removes its stop file; o1_redact.py __RED__, o1_parse.py
+   __PARSE__ byte for byte); D-BASE P4's harvest copied byte for byte (p4_harvest.py __P4__). No tool changed: the
+   probe is the runner's own --window 300.
+
+1. THE PROBE. E1-PS1-STREAM x1, E2's warm-up and gap (tools/e1_suite.py run --e2 --window 300 --gap 120), no flag,
+   every 45 MIN START-TO-START from the hash to the cap (next start = max(now, last start + 45 min); the last start is
+   the probe's, or the control's / the last flagged run's when one ran). Run directory OUTSIDE the repo,
+   ~/privyhub_link_watch/probe_<n>/; its summary.json, encoder.jsonl and title.txt copied into probes/<n>/. A probe
+   whose status is not OK after the runner's own two launch replacements is retried once (one more invocation), then
+   recorded no_play and skipped. Per probe, one row in link_watch.jsonl: UTC and US-Eastern start, hour-of-day, day;
+   loss/min, rendered, resyncs, stale/min, spikes/min (20 ms), client pauses, controller pauses, underruns; host CPU,
+   socket W, host Tctl / SoC temps; the client's cpu-thermal (dumpsys thermalservice, once, 150 s into the window); THE
+   AIR: the Opal's status as O1 read it (10-s rounds over ssh, read-only, redacted before storage): channel, width,
+   channel utilisation mean / max, station count, and for the client station (the station whose tx packets advanced
+   most in the window -- by behaviour, never by identifier) signal, tx bitrate, tx retries / tx packets; THE CLIENT: the
+   WifiScoreReport series harvested after the teardown as D-BASE P4 did (RSSI median / min / max, Tx / Rx link speed
+   medians, scans in the window, band / channel / width); THE PING TRACE's loss % and RTT median / p99 over the 40 min
+   before the probe; flags_absent (the run's teardown and the runner's final state) and the preflight.
+
+2. THE PING TRACE. From the hash to the cap, the unprivileged ping as installed (ping_group_range permits ICMP
+   datagram sockets here; no sudo), 1 echo/s host -> client (ping -D -O -n -i 1 -W 2), the address read from adb's
+   device list at (re)start and never written. ping.jsonl: 60-s bins (sent, lost, RTT min / median / p99), each tagged
+   with what was running (idle / probe_<n> / control / the flagged slot). A late reply (after "no answer yet") counts
+   as answered.
+
+3. CLEAN. A probe is CLEAN if loss/min < 10 AND rendered >= 59.5 AND resyncs <= 2 (5-min window). A control (20 min)
+   is clean by E4-S4B's gate: loss < 10, rendered >= 59.5, resyncs <= 10.
+
+4. THE DEFERRAL RUNS, launched by the watch (deferral.json), into runs/ (kept in full):
+   - on the FIRST CLEAN PROBE -> THE CONTROL (E1-PS1-STREAM x1, no flag, --window 1200 --gap 120). Not clean -> back to
+     probing (the next probe 45 min after the control started), and the next clean probe launches a control again.
+   - after a clean control -> the PRE-RUN GUIDE READ (tools/e1_suite.py guide_read, the six channels, non-forced),
+     taken once the EPG's background refresh has been idle (worker not alive, nothing pending, its counts unchanged)
+     for >= 60 s (capped at 30 min of waiting, recorded) -> then E1-CONC x2 with the flag (runs/E1-CONC_flag/), then
+     E1-CONC x1 with the flag at CPUQuota=150% (runs/E1-CONC_flag_cpu150/), --window 1200 --gap 120, one suite
+     invocation each; each CONC teardown drains the deferred queue and records it (the runner's own code); the flag in
+     e3_flag.conf and the constraint in e4_constraint.conf, each for its run only, removed at its teardown.
+   - LINK-VOIDED: a flagged run whose loss/min > 3 x the control's AND > 100. Its host-side clauses are recorded on
+     their own; it is RE-RUN on the next clean probe (a fresh pre-run guide read first, as above; its clause (c) is read
+     against that read) -- at most 2 re-runs per slot. The slot is then judged on its last attempt; a slot whose every
+     attempt was voided is INCONCLUSIVE on its link clauses ((a)'s loss / rendered / resyncs, and (d)'s link gates),
+     its host clauses still read.
+   - After the set is complete (every slot has an un-voided run, or its re-runs are spent): the verdict, written once,
+     judged once; THE PROBING CONTINUES until the cap; no further flagged run.
+   - No probe and no run starts after the cap; a run in flight finishes.
+
+5. COMPARABILITY (else INCONCLUSIVE): the control within E1's bands of E4-S1's PS1-STREAM: host CPU 10.9 +/- 2;
+   rendered fps 59.53 +/- 0.5.
+
+6. THE BAR = E4-S4's, verbatim (e4_s4_preregistration.txt §3) -- ACCEPTED only if all hold; REJECTED if any fails
+   (comparability holding):
+   (a) CONC with the flag, BOTH unconstrained runs: video loss/min <= 3 x the control's AND <= 100; rendered fps
+       >= 59.5; resyncs <= 10; host CPU within +/- 2 points of the control's;
+   (b) the deferral did what it says, in each of the three CONC runs: 0 grabber processes during the window (no
+       sampler row with an EPG child, samples.jsonl procs.epg); the queue grew (epg.jsonl "deferred" rows with pending
+       rising to the six channels); after teardown the queue drained with failed 0 and pending 0, every queued channel
+       refreshed (drained ok = queued), within 2 x the cycle's normal time for that many grabs (E4-S1 CONC's median
+       grab 5.3 s: 2 x 5.3 x the count; 63.6 s for six);
+   (c) the guide serves after each drain: all six channels serve, programmes total within +/- 5 % of the pre-run read;
+   (d) CONC with the flag at CPUQuota=150% passes E4-S2's pass rule as a stream row (rendered >= 59.5, RetroArch
+       >= 59.9, capture 60 +/- 0.5 segment-aware, dup+drop <= 0.2/min, spikes < 200, stale < 20; grabs failed 0 is
+       vacuous here; the link-INCONCLUSIVE clause as E4-S2 with THIS task's control), its throttled time reported;
+   (e) the companion's CPU (% of a core) in each unconstrained CONC run within +/- 2 points of the control's.
+   (The analysis is e4_s4_analysis.py's, copied as e4_s4b_analysis.py with THE control taken from the gate; the pass
+   rule e4_s4_passrule.py copied byte for byte as e4_s4b_passrule.py, one comment line added.)
+   REPORTED: cap_fired (expected 0), the drain times, the client's pauses, the gap log, socket W, the deferred rows per
+   window; and -- if a flagged run's link goes bad mid-night (loss > 3 x the clean control's) -- that it did, with the
+   host-side clauses (b), (c), (e) and (d)'s host gates stated on their own, so the record says which clause the link
+   took.
+
+   (E4-S4C: "THE control" = the clean control above. The analysis is E4-S4B's (e4_s4b_analysis.py, itself E4-S4's)
+   copied as e4_s4c_analysis.py with each slot taken from deferral.json as above; the pass rule e4_s4b_passrule.py
+   copied byte for byte as e4_s4c_passrule.py, one comment line added. VERDICT: ACCEPTED only if comparability holds and (a)-(e) all hold on a
+   clean set; REJECTED if any clause fails on a non-voided run (comparability holding); INCONCLUSIVE (link) if the
+   only unmet clauses are link clauses of voided slots, or if no probe / no control is ever clean.)
+
+7. THE LINK HISTORY (the second product, no bar): every probe in time order (US-Eastern time, loss, rendered, resyncs,
+   RSSI, air utilisation, ping loss / RTT); loss by hour-of-day (US Eastern: median, min, max, count, clean count) and
+   by day; the clean windows (start, length = consecutive clean probes, what ran in them); ping loss by hour; and in
+   words what moves with the loss (air utilisation, client RSSI / station signal, retries, time of day, ping loss /
+   RTT, the probe's own pauses), Spearman's rho across probes stated as seen, not as cause.
+
+8. WHAT ADOPTION WOULD MEAN (stated in the record, the user's call): E4-S2 §5's table with the deferral line -- the
+   stack's CPU-time floor PS1-STREAM's 150 %, 4 cores; the one-line adoption, a drop-in epg-defer.conf,
+   "[Service]\nEnvironment=PRIVYHUB_EPG_DEFER_WHILE_STREAMING=1" + daemon-reload + restart (the state checks' adopted
+   list gains the line), and its revert (delete it + daemon-reload + restart). Written, not applied.
+
+9. RULES: nothing adopted, nothing committed; the flag and the constraint absent at every teardown, at every probe and
+   at the end (flags_absent read back per probe and per run); no sudo, no nft, the Opal read-only (O1's read commands
+   only; nothing written to it); no addresses or identifiers written (the client's address, MACs, SSIDs never stored;
+   the Opal's output redacted before storage); nothing fetched, nothing deleted; no other task's scripts run in their
+   directories (O1's, P4's, E4-S4B's are copied here). No band, rule or reading changes after the data.

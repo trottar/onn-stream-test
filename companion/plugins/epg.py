@@ -194,6 +194,93 @@ class BackgroundGuideWarmer:
             )
 
 
+class DeferredGrabs:
+    """E4-S4 (PRIVYHUB_EPG_DEFER_WHILE_STREAMING=1 only): a forced grab -- the refresh endpoint or the background
+    warmer -- asked for while a native stream session is live (recovery PLAYING / PAUSED_*) is queued, not run (one
+    entry per channel, the first request's time kept). When the session ends the queue drains in order, one grab at a
+    time. A grab already running when a stream starts is not touched. A deferral older than CAP_S runs anyway (the
+    safety valve, counted as cap_fired)."""
+
+    CAP_S = 3600
+    POLL_S = 2.0
+
+    def __init__(self, run_one, live_state) -> None:
+        self._run_one = run_one
+        self._live_state = live_state
+        self._lock = threading.Lock()
+        self._items: dict[str, float] = {}
+        self._requests = 0
+        self._drained_ok = 0
+        self._drained_failed = 0
+        self._cap_fired = 0
+        self._drain: dict[str, Any] | None = None
+        self._last_drain: dict[str, Any] | None = None
+        self._thread: threading.Thread | None = None
+
+    def add(self, channel_id: str) -> int:
+        with self._lock:
+            self._requests += 1
+            self._items.setdefault(channel_id, time.time())
+            if self._thread is None or not self._thread.is_alive():
+                self._thread = threading.Thread(target=self._loop, name="PrivyHubEpgDeferred", daemon=True)
+                self._thread.start()
+            return len(self._items)
+
+    def _loop(self) -> None:
+        while True:
+            with self._lock:
+                if not self._items:
+                    self._thread = None
+                    return
+                channel_id, first = next(iter(self._items.items()))
+            capped = time.time() - first > self.CAP_S
+            if self._live_state() and not capped:
+                time.sleep(self.POLL_S)
+                continue
+            with self._lock:
+                if self._drain is None:
+                    self._drain = {"started_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+                                   "queued": len(self._items), "ok": 0, "failed": 0, "t0": time.time()}
+                if capped:
+                    self._cap_fired += 1
+            ok = False
+            try:
+                result = self._run_one(channel_id)
+                ok = bool(result.get("ok")) and not result.get("refresh_error_code")
+            except Exception:
+                ok = False
+            with self._lock:
+                self._items.pop(channel_id, None)
+                if ok:
+                    self._drained_ok += 1
+                    self._drain["ok"] += 1
+                else:
+                    self._drained_failed += 1
+                    self._drain["failed"] += 1
+                if not self._items:
+                    d = self._drain
+                    d["s"] = round(time.time() - d.pop("t0"), 2)
+                    d["ended_utc"] = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+                    self._last_drain = d
+                    self._drain = None
+
+    def status(self) -> dict[str, Any]:
+        with self._lock:
+            oldest = min(self._items.values(), default=None)
+            return {
+                "pending": len(self._items),
+                "channels": list(self._items),
+                "oldest_age_s": round(time.time() - oldest, 1) if oldest else None,
+                "requests": self._requests,
+                "drained_ok": self._drained_ok,
+                "drained_failed": self._drained_failed,
+                "cap_fired": self._cap_fired,
+                "cap_s": self.CAP_S,
+                "draining": self._drain is not None,
+                "last_drain": dict(self._last_drain) if self._last_drain else None,
+            }
+
+
 class EpgPlugin:
     """Linux-owned EPG acquisition/cache adapter.
 
@@ -306,6 +393,12 @@ class EpgPlugin:
         self._last_error: dict[str, Any] | None = None
         self._warmer = BackgroundGuideWarmer(
             self._background_refresh,
+        )
+        # E4-S4: absent = None (today)
+        self._deferred = (
+            DeferredGrabs(self._drain_one, self._stream_live_state)
+            if os.environ.get("PRIVYHUB_EPG_DEFER_WHILE_STREAMING") == "1"
+            else None
         )
 
     @staticmethod
@@ -471,6 +564,7 @@ class EpgPlugin:
             "guide_cache_files": self._cache_file_count(),
             "background_refresh": self._warmer.status(),
             "last_error": last_error,
+            **({"deferred": self._deferred.status()} if self._deferred is not None else {}),
         }
 
     @staticmethod
@@ -1278,6 +1372,19 @@ class EpgPlugin:
             }
 
 
+    # E4-S4: the native stream's recovery state (games plugin), read through the plugin registry at call time.
+    def _stream_live_state(self) -> str | None:
+        try:
+            from . import PLUGINS
+
+            state = PLUGINS["games"]._recovery.current_state()
+        except Exception:
+            return None
+        return state if state in ("PLAYING", "PAUSED_RECOVERING", "PAUSED_SAVED") else None
+
+    def _drain_one(self, channel_id: str) -> dict[str, Any]:
+        return self._guide(channel_id, force=True, _drain=True)
+
     def _background_refresh(
         self,
         channel_id: str,
@@ -1312,6 +1419,7 @@ class EpgPlugin:
         channel_id: str,
         *,
         force: bool = False,
+        _drain: bool = False,
     ) -> dict[str, Any]:
         channel_id = self._validate_channel_id(channel_id)
 
@@ -1362,6 +1470,30 @@ class EpgPlugin:
                 "programmes": [],
                 "programme_count": 0,
             }
+
+        # E4-S4: PRIVYHUB_EPG_DEFER_WHILE_STREAMING=1 -> while a native stream session is live, a forced grab is
+        # queued (DeferredGrabs) and answered with the cached guide marked refresh_deferred -- the same marker the
+        # toolchain-preparing path already returns. Absent = today.
+        if self._deferred is not None and not _drain:
+            live = self._stream_live_state()
+            if live:
+                pending = self._deferred.add(channel_id)
+                out = stale if stale is not None else {
+                    "schema": self.GUIDE_SCHEMA,
+                    "ok": True,
+                    "ready": self._toolchain_ready(),
+                    "channel_id": channel_id,
+                    "cached": False,
+                    "stale": False,
+                    "empty_reason": "refresh_deferred_stream_live",
+                    "programmes": [],
+                    "programme_count": 0,
+                }
+                out["refresh_deferred"] = True
+                out["deferred_reason"] = "stream_live"
+                out["stream_state"] = live
+                out["deferred_pending"] = pending
+                return out
 
         if not self._toolchain_ready():
             started = self._start_bootstrap_async()

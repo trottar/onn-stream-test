@@ -1,0 +1,76 @@
+--- docs/memory/evidence/e4_s3b_2026-10-10/backoff_demo/e1_suite_predecessor.py	2026-10-10 03:01:47.575676360 -0400
++++ tools/e1_suite.py	2026-10-10 03:02:15.868227987 -0400
+@@ -664,10 +664,27 @@
+     def run(self):
+         threading.Thread(target=self.scans, daemon=True).start()
+         i = 0
++        streak = None      # E4-S3B: a run of refresh calls failing at the connection (refused / reset / timeout)
+         while not self.stop.is_set():
+             ch = EPG_CHANNELS[i % len(EPG_CHANNELS)]
+             t0 = time.time()
+             code, d = http("POST", f"/plugins/epg/refresh?channel_id={urllib.parse.quote(ch)}", 150)
++            if code is None:
++                # E4-S3B: no HTTP reply at all -- back off 1 s, doubling to 30 s, until a call is answered; the
++                # streak is written as ONE row (first failure, count, duration) when it ends or the cycle stops
++                if streak is None:
++                    streak = {"kind": "grab_fail_streak", "channel": ch, "start_utc": utc(t0),
++                              "first_error": d.get("error"), "count": 0, "backoff_s": 1.0, "_t0": t0}
++                streak["count"] += 1
++                streak["_t1"] = time.time()
++                streak["end_utc"] = utc(streak["_t1"])
++                i += 1
++                self.stop.wait(streak["backoff_s"])
++                streak["backoff_s"] = min(30.0, streak["backoff_s"] * 2)
++                continue
++            if streak is not None:
++                self.write(self.close_streak(streak))
++                streak = None
+             if d.get("refresh_deferred"):
+                 # E4-S4: the grab was deferred (a stream is live); the cycle keeps its normal pace (~5 s per grab,
+                 # E4-S1's median) instead of re-asking at once
+@@ -680,8 +697,16 @@
+                         "s": round(time.time() - t0, 3), "http": code, "ok": bool(d.get("ok")),
+                         "programmes": d.get("programme_count"), "cached": d.get("cached")})
+             i += 1
++        if streak is not None:
++            self.write(self.close_streak(streak))
+         self.fh.close()
+ 
++    @staticmethod
++    def close_streak(s: dict) -> dict:
++        out = {k: v for k, v in s.items() if k not in ("backoff_s", "_t0", "_t1")}
++        out["duration_s"] = round(s["_t1"] - s["_t0"], 3)
++        return out
++
+ 
+ # ---------------------------------------------------------------- key figures
+ def decision_rows(t0: str, t1: str) -> list:
+@@ -779,10 +804,15 @@
+ 
+ 
+ def epg_figures(path: Path, t0: str, t1: str) -> dict:
+-    grabs, scans, deferred = [], [], []
++    grabs, scans, deferred, streaks = [], [], [], []
+     if path.exists():
+         for line in path.read_text().splitlines():
+             r = json.loads(line)
++            if r["kind"] == "grab_fail_streak":
++                # E4-S3B: a failure streak counts if it overlaps the window; its attempts count as failed grabs
++                if r["start_utc"] <= t1 and r["end_utc"] >= t0:
++                    streaks.append(r)
++                continue
+             if not (t0 <= r["start_utc"] and r["end_utc"] <= t1):
+                 continue
+             (grabs if r["kind"] == "grab" else deferred if r["kind"] == "deferred" else scans).append(r)
+@@ -791,7 +821,10 @@
+     for g in grabs:
+         if g["ok"]:
+             per_ch[g.get("channel")] = per_ch.get(g.get("channel"), 0) + 1
+-    return {"grabs_in_window": len(grabs), "grabs_ok": len(ok), "grabs_failed": len(grabs) - len(ok),
++    fails = sum(r["count"] for r in streaks)
++    return {"grabs_in_window": len(grabs) + fails, "grabs_ok": len(ok), "grabs_failed": len(grabs) - len(ok) + fails,
++            "fail_streaks": len(streaks), "fail_streak_attempts": fails,
++            "fail_streak_s": round(sum(r["duration_s"] for r in streaks), 1),
+             "grabs_ok_per_channel": per_ch, "deferred_in_window": len(deferred),
+             "grab_s_median": round(statistics.median(ok), 3) if ok else None,
+             "grab_s_max": max(ok, default=None),

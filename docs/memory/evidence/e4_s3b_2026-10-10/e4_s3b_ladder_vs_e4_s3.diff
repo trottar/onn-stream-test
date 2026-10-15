@@ -1,0 +1,142 @@
+--- ../e4_s3_2026-10-10/e4_s3_ladder.py	2026-10-09 18:17:42.616526030 -0400
++++ e4_s3b_ladder.py	2026-10-10 03:07:09.214083553 -0400
+@@ -1,11 +1,13 @@
+ #!/usr/bin/env python3
+-"""E4-S3 -- the memory floor closed: MemoryMax= 768M / 512M / 384M with MemorySwapMax=0, the four rows at their
+-E4-S2 CPU quotas (PS1-STREAM 200 %, SNES-STREAM 150 %, META 150 %, CONC unset), judged by E4-S2's pass rule plus no
+-OOM kill (e4_s3_preregistration.txt). A copy of e4_s2_2026-10-09/e4_s2_ladder.py (sha256 82aa1b24...ea5a), changed
+-for this ladder only; E4-S2's directory is not touched.
++"""E4-S3B -- the memory floor at 1G, swap off: an unconstrained E1-PS1-STREAM control (the link clause only), then
++E1-CONC (CPU unset) and E1-META (CPUQuota=150%) at MemoryMax=1G + MemorySwapMax=0; a row that FAILS ascends to 1536M
++(1.5G), then 2G, stopping at its first PASS or at 2G (e4_s3b_preregistration.txt). The pass rule is E4-S3's,
++unchanged. A copy of e4_s3_2026-10-10/e4_s3_ladder.py (sha256 below in the pre-registration), changed for this ladder
++only; E4-S3's directory is not touched. Beside each step a thread reads the unit's constraint back every 60 s
++(constraint_readback.jsonl: the drop-in under load).
+ 
+-    e4_s3_ladder.py run      the memory ladder, its INCONCLUSIVE repeats at the end; resumable (ladder.json)
+-    e4_s3_ladder.py judge    re-judge every run from ladder.json (read-only)
++    e4_s3b_ladder.py run      control, 1G, the ascents, the INCONCLUSIVE repeats at the end; resumable (ladder.json)
++    e4_s3b_ladder.py judge    re-judge every run from ladder.json (read-only)
+ """
+ import json
+ import os
+@@ -17,20 +19,19 @@
+ HERE = os.path.dirname(os.path.abspath(__file__))
+ REPO = os.path.abspath(os.path.join(HERE, "../../../.."))
+ SUITE = os.path.join(REPO, "tools/e1_suite.py")
+-PRE = os.path.join(HERE, "e4_s3_preregistration.txt")
++PRE = os.path.join(HERE, "e4_s3b_preregistration.txt")
+ OUT = os.path.join(HERE, "runs")
+ STATE = os.path.join(HERE, "ladder.json")
+-ROWS = ["E1-PS1-STREAM", "E1-SNES-STREAM", "E1-CONC", "E1-META"]       # the control (PS1-STREAM at 400 %) first
+-CPU = [400, 300, 200, 150, 100]
+-MEM = ["768M", "512M", "384M"]
++ROWS = ["E1-CONC", "E1-META"]                 # the ladder's rows; the control (E1-PS1-STREAM, unconstrained) first
++MEM = ["1G", "1536M", "2G"]                    # ascending: a row climbs only on FAIL
+ SWAP = ["MemorySwapMax=0"]
+-CPU_Q = {"E1-PS1-STREAM": 200, "E1-SNES-STREAM": 150, "E1-CONC": None, "E1-META": 150}   # E4-S2 memory_cpu_quota
++CPU_Q = {"E1-PS1-STREAM": None, "E1-SNES-STREAM": 150, "E1-CONC": None, "E1-META": 150}   # E4-S2 memory_cpu_quota
+ CHANNELS = 6
+ LINK = {"rendered_fps", "spikes_20ms_per_min", "stale_drops_per_min"}   # observed at the client, across the link
+ 
+ 
+ def log(*a):
+-    line = f"[e4s2 {time.strftime('%H:%M:%SZ', time.gmtime())}] " + " ".join(str(x) for x in a)
++    line = f"[e4s3b {time.strftime('%H:%M:%SZ', time.gmtime())}] " + " ".join(str(x) for x in a)
+     print(line, flush=True)
+     with open(os.path.join(HERE, "ladder_console.log"), "a") as fh:
+         fh.write(line + "\n")
+@@ -143,6 +144,37 @@
+ 
+ 
+ REF_RUNS = os.path.join(HERE, "..", "e4_s1_2026-10-09", "runs")
++SUITE_MOD = None
++
++
++def suite_mod():
++    """tools/e1_suite.py as a module (unit_props for the read-back thread); loaded once."""
++    global SUITE_MOD
++    if SUITE_MOD is None:
++        import importlib.util
++        spec = importlib.util.spec_from_file_location("e1_suite", SUITE)
++        SUITE_MOD = importlib.util.module_from_spec(spec)
++        spec.loader.exec_module(SUITE_MOD)
++    return SUITE_MOD
++
++
++def readback_thread(label, stop):
++    """The drop-in under load: the unit's constraint properties and the cgroup's files every 60 s while a step runs."""
++    import threading
++    m = suite_mod()
++
++    def run():
++        with open(os.path.join(OUT, "constraint_readback.jsonl"), "a") as fh:
++            while not stop.wait(60):
++                p = m.unit_props()
++                fh.write(json.dumps({"at_utc": m.utc(), "step": label, "game_active": m.games_status().get("active"),
++                                     **{k: p.get(k) for k in ("MemoryMax", "MemorySwapMax", "CPUQuotaPerSecUSec",
++                                                              "memory.max", "memory.swap.max", "cpu.max",
++                                                              "dropin_present")}}) + "\n")
++                fh.flush()
++    t = threading.Thread(target=run, daemon=True)
++    t.start()
++    return t
+ # the reference-relative clause (pre-registration §3): a gated metric the row's own E4-S1 run (unconstrained, the
+ # adopted state) already fails is judged against that run's value within the gate's own tolerance
+ REL = {"rendered_fps": 0.5, "retroarch_fps": 0.1, "capture_fps": 0.5, "encoder_dupdrop_per_min": 0.2}
+@@ -246,19 +278,25 @@
+     done = {x["label"] for x in st["steps"]}
+     if label in done:
+         return [r for r in st["runs"] if r["step"] == label]
+-    plan = ",".join(f"{r}:1:120::{'+'.join(c)}" for r, c in items)
++    plan = ",".join(f"{r}:1:120::{'+'.join(c)}" if c else f"{r}:1:120" for r, c in items)
+     log(f"step {label}: {[(r, '+'.join(c)) for r, c in items]}")
+     t0 = time.time()
++    import threading
++    os.makedirs(OUT, exist_ok=True)
++    stop = threading.Event()
++    rb = readback_thread(label, stop)
+     with open(os.path.join(HERE, "runs_console.log"), "a") as fh:
+         subprocess.run([sys.executable, SUITE, "run", "--out", OUT, "--prereg", PRE, "--e2", "--window", "1200",
+                         "--gap", "120", "--plan", plan], stdout=fh, stderr=subprocess.STDOUT)
++    stop.set()
++    rb.join(timeout=90)
+     if os.path.exists(os.path.join(OUT, "final_state.json")):
+         shutil.copy(os.path.join(OUT, "final_state.json"), os.path.join(OUT, f"final_state_{label}.json"))
+     res = []
+     for r, c in items:
+         sp = latest_summary(r, c)
+         s = json.load(open(os.path.join(HERE, sp))) if sp else None
+-        if st["control"] is None and r == "E1-PS1-STREAM" and "MemoryMax=768M" in c:
++        if st["control"] is None and r == "E1-PS1-STREAM" and not c:
+             st["control"] = {"summary": sp, "video_loss_per_min": k(s, "key", "heartbeat", "video_loss_per_min") if s else None}
+         j = judge(r, s, (st["control"] or {}).get("video_loss_per_min"),
+                   os.path.dirname(os.path.join(HERE, sp)) if sp else None)
+@@ -323,18 +361,23 @@
+         return 2
+     log("start; state", "resumed" if st["steps"] else "new")
+     cons_m = lambda row, m: ([f"CPUQuota={CPU_Q[row]}%"] if CPU_Q[row] else []) + [f"MemoryMax={m}"] + SWAP
+-    active = list(ROWS)
++    run_step(st, "control", [("E1-PS1-STREAM", [])])
++    active = list(ROWS)                       # rows still climbing (failed every step so far)
+     for m in MEM:
+         if not active:
+             break
+         res = run_step(st, f"mem:{m}", [(r, cons_m(r, m)) for r in ROWS if r in active])
+         for x in res:
+-            if x["verdict"] == "FAIL":
++            if x["verdict"] != "FAIL":        # PASS (or INCONCLUSIVE) -> the row stops climbing
+                 active.remove(x["row"])
+-    st["memory_ladder_ended"] = {"remaining_rows_after_384M": active}
++    st["memory_ladder_ended"] = {"rows_failing_at_2G": active}
+     repeats(st, "mem", MEM, cons_m)
+     v = final_verdicts(st, "mem")
+-    st["memory_floor"] = {r: dict(zip(("floor", "inconclusive_steps"), floor_of(MEM, v, r))) for r in ROWS}
++    st["memory_floor"] = {}
++    for r in ROWS:
++        passed = [m for m in MEM if v.get((r, m)) == "PASS"]
++        st["memory_floor"][r] = {"floor": passed[0] if passed else None,
++                                 "verdicts": {m: v.get((r, m)) for m in MEM if (r, m) in v}}
+     save(st)
+     log("memory floors:", json.dumps(st["memory_floor"]))
+     log("ladder done")

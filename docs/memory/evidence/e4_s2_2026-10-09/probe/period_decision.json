@@ -1,0 +1,97 @@
+{
+ "runs": {
+  "probe/runs_smoke2/E1-PS1-STREAM_cpu100/run1": {
+   "stutters": true,
+   "which": [
+    "dupdrop>0.2"
+   ],
+   "metrics": {
+    "rendered_fps": 59.573,
+    "retroarch_fps": 59.97,
+    "capture_fps": 60.17,
+    "encoder_dupdrop_per_min": 2.01,
+    "spikes_20ms_per_min": 76.67,
+    "stale_drops_per_min": 4.332,
+    "video_loss_per_min": 108.89,
+    "usage_cores": 1.0483,
+    "throttled_s": 18.396,
+    "throttled_period_frac": 0.3943,
+    "bitrate_kbps_min": 7000,
+    "bitrate_kbps_max": 7000,
+    "encoder_segments": 1
+   },
+   "readback": {
+    "CPUQuotaPerSecUSec": "1s",
+    "CPUQuotaPeriodUSec": "infinity",
+    "cpu.max": "100000 100000"
+   },
+   "lifted": true,
+   "membership": [
+    {
+     "retroarch": [
+      true
+     ],
+     "encoder": [
+      true
+     ]
+    },
+    {
+     "retroarch": [
+      true
+     ],
+     "encoder": [
+      true
+     ]
+    }
+   ]
+  },
+  "probe/runs_smoke2/E1-PS1-STREAM_cpu100_per10ms/run1": {
+   "stutters": true,
+   "which": [
+    "rendered<59.5",
+    "retroarch<59.9"
+   ],
+   "metrics": {
+    "rendered_fps": 59.372,
+    "retroarch_fps": 59.75,
+    "capture_fps": 60.002,
+    "encoder_dupdrop_per_min": 0.0,
+    "spikes_20ms_per_min": 94.89,
+    "stale_drops_per_min": 8.783,
+    "video_loss_per_min": 99.61,
+    "usage_cores": 0.9946,
+    "throttled_s": 96.43,
+    "throttled_period_frac": 0.6291,
+    "bitrate_kbps_min": 7000,
+    "bitrate_kbps_max": 7000,
+    "encoder_segments": 1
+   },
+   "readback": {
+    "CPUQuotaPerSecUSec": "1s",
+    "CPUQuotaPeriodUSec": "10ms",
+    "cpu.max": "10000 10000"
+   },
+   "lifted": true,
+   "membership": [
+    {
+     "retroarch": [
+      true
+     ],
+     "encoder": [
+      true
+     ]
+    },
+    {
+     "retroarch": [
+      true
+     ],
+     "encoder": [
+      true
+     ]
+    }
+   ]
+  }
+ },
+ "decision": "default",
+ "rule": "default unless B1 stutters and B2 does not (probe_preregistration.txt)"
+}

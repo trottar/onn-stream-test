@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-10-09
-baseline_commit: 75b2b6b
+as_of: 2026-10-15
+baseline_commit: 7331184 (E4-S1..S5D, E4-C1, E5-S1 uncommitted; the user commits 2026-10-15)
 ---
 
 # Current State
@@ -9,24 +9,84 @@ baseline_commit: 75b2b6b
 Headings are fixed by `tools/check_memory_health.py`; do not rename.
 ## Active Objective
 
-**Phase E ACTIVE — E4, the resource envelope on the adopted state.** E1
-FROZEN; E2 MEASURED; **E3 CLOSED 2026-10-09** (`docs/ROADMAP.md`, every
-item's verdict). Nothing committed since `75b2b6b`.
+**Phase E ACTIVE. E4 is CLOSED on the host side (E4-C1, session B,
+2026-10-15). The SNES capture fix is ADOPTED (E4-S5D, the fifth line). The
+link watch (E4-S4D) runs detached until 2026-10-20T04:00Z. Next is E5-S2.**
+E1 FROZEN; E2 MEASURED; E3 CLOSED. Nothing committed since `7331184`. The
+user commits tonight.
 
-| E3 item | verdict |
-| --- | --- |
-| S6 → S6A the guide index; S4 → A2 Snes9x; **R1 → R2 → A3 → A3B recovery v2** | **ADOPTED, stand** (v2: 0 controller pauses, 0 saves under a bar judged on its own trigger) |
-| S1, S2, S3, S5/S5B, S5C (`frame_spin`, reverted), S7/S7B (pacing) | INCONCLUSIVE / REJECTED; not adopted |
-
+- **The E4 floors and the alpha** are in
+  `evidence/E4_CLOSEOUT_2026-10-15.md` (B).
+  - Alpha today: ≥ 6 cores, 1.5 GB stack, 8 GB system.
+  - With grab deferral: ≥ 4 cores, 1.25 GB.
+  - VAAPI H.264 720p60.
+  - Grab deferral is not adopted. Its verdict waits on a clean link: the
+    watch.
+- **Five adoptions stand:** the guide index, Snes9x, recovery v2 (E3),
+  live adaptive (C), and the SNES capture fix (E4-S5D).
 - **ABSENT:** Live TV, browser / camera sources, NES / Genesis, a power meter.
 - **Standing:** Phase C, `D-BASE` closed; the `CL-B1` APK adopted.
 
 ## Current Work Item
 
-**E3-A3B is done** (`evidence/E3_A3B_RECOVERY_V2_READOPTION_2026-10-09.md`):
-recovery v2 re-adopted, ADOPTION STANDS; E3 closed with three adoptions.
+**`QUEUE_2026-10-15` is done.** Two sessions ran side by side.
+
+- **Session A (this):**
+  - **E4-S5D, ADOPTED and CONFIRMED**
+    (`evidence/E4_S5D_SNES_CAPTURE_FIX_ADOPTION_2026-10-15.md`):
+    `snes-capture.conf`.
+    - SNES 20 min: capture 59.964, dup+drop 0.05/min, RA 59.999, host
+      7.81 %.
+    - PS1 10 min: 59.942, 0.10/min.
+    - Both SNES starts probed 60, so the bad-probe case rests on E4-S5C.
+  - **E4-S4D, the watch LAUNCHED**
+    (`evidence/E4_S4D_LINK_WATCH_LAUNCH_2026-10-15.md`): the unit
+    `privyhub-link-watch`, from 21:41:41Z.
+    - Probe 1 was dirty: 1,645 loss/min.
+- **Session B** (`handoffs/SESSION_B_DONE_2026-10-15.md`, folded here):
+  1. Session B finished on 2026-10-15 (E4-C1 + E5-S1). It adopted and
+     committed nothing, touched none of A's files, and used no sudo, no
+     nft, nothing fetched.
+  2. It wrote `evidence/E4_CLOSEOUT_2026-10-15.md`: the reference, both
+     floors final, the alpha in two columns with margins, adopted / not,
+     the link, and E7's list.
+  3. E4 is CLOSED on the host side. Alpha today ≥ 6 cores / 1.5 GB stack
+     / 8 GB system; with deferral ≥ 4 cores / 1.25 GB; VAAPI H.264
+     720p60.
+  4. The link: 60 stream runs since 10-09, none under D-BASE's 10/min
+     (min 34, median 218). The 10-10 stall is noted. The open item is the
+     watch (E4-S4D).
+  5. E4-S5D had no `state_at_end.json` at B's end (21:04Z), so B wrote it
+     as "in adoption, session A". It is now adopted and confirmed.
+  6. ROADMAP:
+     - §E4 status, the final tables and a 10-10C/10-15 table (one link to
+       the close-out);
+     - §E7 items marked; the §E5 status line;
+     - Phase E's header line was left alone (not B's section).
+  7. It wrote `docs/CAPABILITY_MODEL.md` (seven classes; E4 thresholds;
+     "not measured; E5-S2" where there are none) and
+     `tools/capability_probe.py` (host reads, JSON, the threshold beside
+     each verdict).
+  8. The probe (21:03:43Z, with A's stream live) found the reference
+     known-good on all seven classes. Storage, decode, NES and Genesis
+     are unknown. The model needed no fix.
+  9. Files: `evidence/E5_S1_CAPABILITY_PROBE_2026-10-15.md` +
+     `e5_s1_2026-10-15/` (probe.json, console, redact_check all OK,
+     manifest.sha256).
+  10. Git status: `logs/e4_c1_git_status.txt`, `logs/e5_s1_git_status.txt`.
+      The tree is dirty on purpose: B's new paths are untracked and
+      ROADMAP is modified. B's next item: E5-S2 (a second machine, the
+      alpha candidate).
+
+Before it: `QUEUE_2026-10-10B` (E4-S3B, S5B, S4B) and `QUEUE_2026-10-10`
+(E4-S3, S4, S5). `QUEUE_2026-10-10C`'s session stalled after its first
+job (E4-S5C), and its watch never started.
 
 ## Verified State
+
+**The E4 reference** (E4-S1, 20-min means): idle 1.2 % host CPU / 5.3 W;
+PS1 streamed 10.9 % / 20.1 W (stack 95 % of a core, 354 MB); PS1 + grabs
+21.4 % / 25.7 W (172 %, 856 MB); SNES 7.4 % / 15.2 W.
 
 **The baseline, cold and warm, on the adopted build** (close-out,
 2026-09-23; target / cold / warm): spikes ≥ 20 ms/min < 200 / **32.8** /
@@ -87,14 +147,24 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
     5-s two-check controller trigger, and the controller-return exit.
     Kill switch: delete `recovery.conf` + `daemon-reload` + restart,
     reverse the state-check diff (`TOOLS.md`, "Recovery v2").
-  - **The adopted environ is exactly four `PRIVYHUB_*`** (live, the
-    index, Snes9x, recovery v2) in **four drop-ins** (`adaptive.conf`,
-    `epg-index.conf`, `snes-core.conf`, `recovery.conf`); the manager
-    none. `tools/e1_suite.py` (`ADOPTED`), `e3_state.py`,
-    `d7_regression.py` and `c3_l4_nft_night.py` (`ADOPTED_E3`) check it.
-    Restarted 05:40Z 2026-10-09 (E3-A3B's last teardown); checked then:
-    the four lines, no `e3_flag.conf`, no game, PS1 files identical, APK
-    CONFIRMED.
+  - **The SNES capture fix by default, since 2026-10-15 20:56Z
+    (E4-S5D)**: `snes-capture.conf`
+    (`Environment=PRIVYHUB_SNES_CAPTURE_FIX=output_rate`). The encoder's
+    output rate is `-r 60`, not x11grab's probed `tbr`. Kill switch:
+    delete `snes-capture.conf` + `daemon-reload` + restart, and take the
+    line out of `tools/e1_suite.py` `ADOPTED`.
+  - **The adopted environ is exactly five `PRIVYHUB_*`** (live, the
+    index, Snes9x, recovery v2, output_rate) in **five drop-ins**
+    (`adaptive.conf`, `epg-index.conf`, `snes-core.conf`, `recovery.conf`,
+    `snes-capture.conf`). The manager has none. Last checked 2026-10-15
+    21:36Z (E4-S5D's end, `state_at_end.json`).
+    - `d7_regression.py` and `c3_l4_nft_night.py` (`ADOPTED_E3`) still
+      list four lines. They were not run or changed here.
+    - `tools/e1_suite.py` (`ADOPTED`, five) and `e3_state.py` check it.
+      Since E4-S2 they also require no `e4_constraint.conf` (the per-run
+      constraint drop-in).
+    - On 10-15 the state was five lines, with no `e3_flag.conf` or
+      `e4_constraint.conf`, no game, PS1 files identical, APK CONFIRMED.
   - The companion tree carries the live controller through `C3-L4-N2`,
     the C5 selector profiles (dormant), **the 1080p rung behind
     `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`** (C5-M5; entry 415 since
@@ -104,7 +174,9 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
     ADOPTED). Both flags off and absent.
   - The other E3 flags' code is dormant and absent (`TOOLS.md`, "The E3
     flags"): `frame_spin`, `RECOVERY_GAP_LOG` (alone), `EPG_GRAB_NET=paced`
-    + `EPG_GRAB_DELAY_MS` (S7, S7B), `GRAB_NONET`.
+    + `EPG_GRAB_DELAY_MS` (S7, S7B), `GRAB_NONET`. **E4's, dormant and
+    absent:** `PRIVYHUB_EPG_DEFER_WHILE_STREAMING=1` (`epg.py`, E4-S4),
+    (`PRIVYHUB_SNES_CAPTURE_FIX=output_rate` is adopted since E4-S5D.)
 - **Link-drop recovery** RUNTIME VALIDATED on real loss (`R3`-`R3d`);
   recovery never loads into a live core (`R3c2`).
 - **Host-shell operation**: open `MainActivity`, wake, tap RESUME PLAYING
@@ -112,20 +184,34 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
-1. **The user's commit** of E3-A3 + E3-A3B (`logs/e3_a3b_git_status.txt`).
-2. **E4-S1 as Cowork hands it:**
-   - the reference re-measured on the four-line adopted state;
-   - then the floor, without sudo: `CPUQuota=` / `MemoryMax=` steps in
-     a `systemd --user` drop-in on the companion's unit (cpu and memory
-     delegated; RetroArch and ffmpeg in its cgroup, so the steps cover
-     the whole stack);
-   - cpuset is not delegated: no `AllowedCPUs=` (measured, `E3_A3_…` §6).
+1. **The user's commit tonight (2026-10-15):** everything since `7331184`.
+   - E4-S1 to E4-S5D, E4-C1, E5-S1, the runner patches;
+   - the git status in `logs/e4_s4d_git_status.txt`.
+   - Before it, the user decides what to do with E4-S3's two ~300 MB
+     `epg.jsonl` and E4-S3B's 4.4 MB `stopped_predecessor_5s.jsonl`.
+   - The watch keeps writing into `evidence/e4_s4d_2026-10-15/` while it
+     runs, so its later files are not in tonight's commit.
+2. **The watch's status:** `cat ~/privyhub_link_watch/status.txt`.
+   - The line ends with a heartbeat at most 5 min old.
+   - Stop it: `touch ~/privyhub_link_watch/STOP`.
+   - Unit: `systemctl --user status privyhub-link-watch`.
+   - It runs the deferral set on its own on the first clean probe.
+3. **The watch's record when it ends** (the cap is 2026-10-20T04:00Z):
+   a one-line Code task, "write E4-S4C's record from the watch's files".
+   The record covers the link history and the deferral verdict.
+4. **E5-S2**, as `docs/ROADMAP.md` has it: a second machine, the alpha
+   candidate.
 
 **Open, not blocking:**
 
+- the SNES 59-fps fault is FIXED and adopted (E4-S5D); the sampler's first-to-last capture fps
+  (E4 uses a segment-aware one); the pass rule's kill gates are
+  window-scoped (E4-S3B's addendum reads the run span);
+
 - the false pause: fixed and adopted (v2); the client's own 1-3-s
-  output stalls stay open; **the link at its worst on 10-09** (a LINK
-  item, `docs/KNOWN_ISSUES.md`): use same-night controls;
+  output stalls stay open; **the link lossy since 10-09** (a LINK
+  item, `docs/KNOWN_ISSUES.md`; 10-10: 39-863 loss/min, 0 of 4 clean
+  controls): use same-night controls;
 - the max output gap; `host_link`; the thermal flag; `CTRL-L1`; the
   slow-event ring; the mild step's ~120 s bound;
 - **the onn's 1080p decode jitter**; the overlay's constant size text;
@@ -171,9 +257,8 @@ Phase C: met (C7, `docs/ROADMAP.md`). **Phase E** (`docs/ROADMAP.md`):
 
 ## Relevant References
 
-- `evidence/E3_A3B_RECOVERY_V2_READOPTION_2026-10-09.md`, `E3_A3_RECOVERY_V2_ADOPTION_2026-10-09.md`; `docs/ROADMAP.md` (E3 CLOSED).
-- `handoffs/QUEUE_2026-10-08B.md`, `evidence/E3_R2_…`, `E3_S7B_…_2026-10-08.md`; `QUEUE_2026-10-08.md`, `evidence/E3_R1_…`, `E3_S7_…_2026-10-08.md`.
-- `evidence/E3_A2_…_2026-10-07.md`; earlier E3: `handoffs/QUEUE_2026-10-06.md`, `-06B`, `-07`; `evidence/E3_S*`; `TOOLS.md` ("The E3 flags", the drop-ins).
+- E4: `evidence/E4_S1_…`, `E4_S2_…` (10-09), `E4_S3_MEMORY_FLOOR_CLOSE_…`, `E4_S4_GRAB_DEFERRAL_…`, `E4_S5_SNES_CAPTURE_59FPS_…`, `E4_S3B_MEMORY_FLOOR_1G_SWAPOFF_…`, `E4_S5B_SNES_CAPTURE_PROBE_BENCH_…`, `E4_S4B_GRAB_DEFERRAL_CLEAN_LINK_…` (10-10); `handoffs/QUEUE_2026-10-09.md`, `QUEUE_2026-10-10.md`, `QUEUE_2026-10-10B.md`; `patches/E4-S2_…` … `E4-S5_…`, `E4-S3B_RUNNER_REFRESH_BACKOFF.md`.
+- E3: `evidence/E3_A3B_…`, `E3_A3_…` (10-09), `E3_R2_…`, `E3_S7B_…`, `E3_R1_…`, `E3_S7_…` (10-08), `E3_A2_…`, `E3_S*`; `handoffs/QUEUE_2026-10-06.md` … `-08B`; `TOOLS.md` ("The E3 flags", the drop-ins).
 - `evidence/E2_S1_WHOLE_SYSTEM_2026-10-06.md` (E2); `architecture/E1_WORKLOAD_SUITE.md` (the frozen suite); `evidence/E1_S1_WORKLOAD_SUITE_2026-10-05.md`.
 - `evidence/C5_CLOSE_2026-10-05.md`, `decisions/C5_1080P60_CAPABILITY_2026-09-28.md` — C5 and Phase C closed; `evidence/C7_D8_CHECKPOINT_2026-09-30.md`.
 - `evidence/D_BASE_CLOSEOUT_2026-09-23.md` — the baseline table.

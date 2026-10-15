@@ -1,0 +1,15 @@
+[e4s3b 07:08:25Z] start; state new
+[e4s3b 07:08:25Z] step control: [('E1-PS1-STREAM', '')]
+[e4s3b 07:32:56Z]   E1-PS1-STREAM : FAIL (never reached PLAYING / never ran (after the runner's two replacements))
+[e4s3b 07:32:56Z] step mem:1G: [('E1-CONC', 'MemoryMax=1G+MemorySwapMax=0'), ('E1-META', 'CPUQuota=150%+MemoryMax=1G+MemorySwapMax=0')]
+[e4s3b 07:34:27Z]   control repaired: INCONCLUSIVE (fails only on link-observed metrics while the control fails D-BASE's loss row); loss/min 218.23
+[e4s3b 08:21:35Z]   E1-CONC MemoryMax=1G+MemorySwapMax=0: INCONCLUSIVE (fails only on link-observed metrics while the control fails D-BASE's loss row)
+[e4s3b 08:21:35Z]   E1-META CPUQuota=150%+MemoryMax=1G+MemorySwapMax=0: PASS (every gated metric holds)
+[e4s3b 08:21:35Z] start; state resumed
+[e4s3b 08:21:35Z] step mem_repeat:1G:E1-CONC: [('E1-CONC', 'MemoryMax=1G+MemorySwapMax=0')]
+[e4s3b 08:45:51Z]   E1-CONC MemoryMax=1G+MemorySwapMax=0: INCONCLUSIVE (fails only on link-observed metrics while the control fails D-BASE's loss row)
+[e4s3b 08:45:51Z] memory floors: {"E1-CONC": {"floor": null, "verdicts": {"1G": "INCONCLUSIVE"}}, "E1-META": {"floor": "1G", "verdicts": {"1G": "PASS"}}}
+[e4s3b 08:45:51Z] ladder done
+[e4s3b 08:47:05Z] addendum step 1536M: E1-CONC MemoryMax=1536M+MemorySwapMax=0
+[e4s3b 09:11:29Z]   addendum 1536M: verdict PASS (every gated metric holds); run-span kills 0; HOLDS True
+[e4s3b 09:11:29Z] addendum done: 1536M

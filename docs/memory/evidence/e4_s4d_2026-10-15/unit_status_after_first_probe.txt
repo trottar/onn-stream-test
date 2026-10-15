@@ -1,0 +1,16 @@
+● privyhub-link-watch.service - [systemd-run] /usr/bin/python3 /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/e4_s4d_2026-10-15/e4_s4d_watch.py
+     Loaded: loaded (/run/user/1000/systemd/transient/privyhub-link-watch.service; transient)
+  Transient: yes
+     Active: active (running) since Thu 2026-10-15 17:41:41 EDT; 9min ago
+ Invocation: 7b9d884f4514416b99b292295edaaa1b
+   Main PID: 3357164 (python3)
+      Tasks: 5 (limit: 18065)
+     Memory: 27.6M (peak: 71M)
+        CPU: 20.248s
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/privyhub-link-watch.service
+             ├─3357164 /usr/bin/python3 /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/e4_s4d_2026-10-15/e4_s4d_watch.py
+             └─3357181 ping -D -O -n -i 1 -W 2 <client>
+
+Oct 15 17:41:41 PrivyHub systemd[1310]: Started privyhub-link-watch.service - [systemd-run] /usr/bin/python3 /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/e4_s4d_2026-10-15/e4_s4d_watch.py.
+Oct 15 17:41:41 PrivyHub python3[3357164]: [e4s4d 10-15 21:41:41Z] start; state {'probes': 0, 'last_start': None} deferral await_clean_probe | adopted state adopted5 ok | cap 2026-10-20T04:00:00Z
+Oct 15 17:51:10 PrivyHub python3[3357164]: [e4s4d 10-15 21:51:10Z] probe 1: not clean loss 1645.01 rendered 56.08 resyncs 25 flags_absent True/True

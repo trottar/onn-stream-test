@@ -1,0 +1,782 @@
+{
+ "caveat": "CPUQuota= is CFS bandwidth: the stack gets at most N % of one core's time per period, on full-speed cores. This is a CPU-TIME floor, not a slow-core floor: a machine with fewer, equally fast cores behaves like this; a machine with slower cores does not, exactly. No lower-tier hardware claim.",
+ "control_video_loss_per_min": 40.74,
+ "control_fails_dbase_loss_row": true,
+ "floor": {
+  "E1-PS1-STREAM": {
+   "cpu_floor_pct": 150,
+   "cpu_floor_text": "150 %",
+   "cpu_inconclusive_steps": [],
+   "cpu_at_floor": {
+    "usage_cores": 1.1214,
+    "throttled_s": 0.008,
+    "throttled_period_frac": 0.0002,
+    "bitrate_kbps_min": 7000,
+    "transitions": 0,
+    "rendered_fps": 59.798,
+    "video_loss_per_min": 33.98
+   },
+   "cpu_step_below": {
+    "step": "cpu:100",
+    "verdict": "FAIL",
+    "first_failing": [
+     "rendered_fps"
+    ],
+    "failing": [
+     "rendered_fps",
+     "encoder_dupdrop_per_min"
+    ],
+    "values": {
+     "rendered_fps": 55.081,
+     "encoder_dupdrop_per_min": 0.653
+    }
+   },
+   "memory_cpu_quota": 200,
+   "memory_floor": "1G",
+   "memory_floor_text": "<= 1G (1G passed)",
+   "memory_inconclusive_steps": [],
+   "memory_at_floor": {
+    "memory_current_max_mb": 219.3,
+    "memory_peak_mb": 221.1,
+    "swap_current_max_mb": 0.0,
+    "memory_events_max": 0,
+    "oom_kill_run": 0
+   },
+   "memory_step_below": null
+  },
+  "E1-SNES-STREAM": {
+   "cpu_floor_pct": 100,
+   "cpu_floor_text": "<= 100 % (100 % passed)",
+   "cpu_inconclusive_steps": [],
+   "cpu_at_floor": {
+    "usage_cores": 0.6137,
+    "throttled_s": 0.0,
+    "throttled_period_frac": 0.0,
+    "bitrate_kbps_min": 7000,
+    "transitions": 0,
+    "rendered_fps": 59.312,
+    "video_loss_per_min": 169.88
+   },
+   "cpu_step_below": null,
+   "memory_cpu_quota": 150,
+   "memory_floor": "1G",
+   "memory_floor_text": "<= 1G (1G passed)",
+   "memory_inconclusive_steps": [],
+   "memory_at_floor": {
+    "memory_current_max_mb": 194.8,
+    "memory_peak_mb": 196.7,
+    "swap_current_max_mb": 0.0,
+    "memory_events_max": 0,
+    "oom_kill_run": 0
+   },
+   "memory_step_below": null
+  },
+  "E1-CONC": {
+   "cpu_floor_pct": 400,
+   "cpu_floor_text": "400 %",
+   "cpu_inconclusive_steps": [],
+   "cpu_at_floor": {
+    "usage_cores": 2.1807,
+    "throttled_s": 21.011,
+    "throttled_period_frac": 0.0153,
+    "bitrate_kbps_min": 7000,
+    "transitions": 0,
+    "rendered_fps": 58.749,
+    "video_loss_per_min": 539.78
+   },
+   "cpu_step_below": {
+    "step": "cpu:300",
+    "verdict": "FAIL",
+    "first_failing": [
+     "retroarch_fps"
+    ],
+    "failing": [
+     "retroarch_fps",
+     "encoder_dupdrop_per_min"
+    ],
+    "values": {
+     "retroarch_fps": 59.872,
+     "encoder_dupdrop_per_min": 7.459
+    }
+   },
+   "memory_cpu_quota": null,
+   "memory_floor": "1G",
+   "memory_floor_text": "<= 1G (1G passed)",
+   "memory_inconclusive_steps": [],
+   "memory_at_floor": {
+    "memory_current_max_mb": 1023.8,
+    "memory_peak_mb": 1024.1,
+    "swap_current_max_mb": 127.5,
+    "memory_events_max": 204,
+    "oom_kill_run": 0
+   },
+   "memory_step_below": null
+  },
+  "E1-META": {
+   "cpu_floor_pct": 100,
+   "cpu_floor_text": "<= 100 % (100 % passed)",
+   "cpu_inconclusive_steps": [],
+   "cpu_at_floor": {
+    "usage_cores": 0.708,
+    "throttled_s": 792.696,
+    "throttled_period_frac": 0.7266,
+    "bitrate_kbps_min": null,
+    "transitions": null,
+    "rendered_fps": null,
+    "video_loss_per_min": null
+   },
+   "cpu_step_below": null,
+   "memory_cpu_quota": 150,
+   "memory_floor": "1G",
+   "memory_floor_text": "<= 1G (1G passed)",
+   "memory_inconclusive_steps": [],
+   "memory_at_floor": {
+    "memory_current_max_mb": 931.8,
+    "memory_peak_mb": 966.1,
+    "swap_current_max_mb": 0.0,
+    "memory_events_max": 0,
+    "oom_kill_run": 0
+   },
+   "memory_step_below": null
+  }
+ },
+ "stack_cpu_floor_pct": 400,
+ "stack_memory_floor": "1G",
+ "cpu_floor_by_ladder": {
+  "E1-PS1-STREAM": {
+   "floor": 150,
+   "inconclusive_steps": []
+  },
+  "E1-SNES-STREAM": {
+   "floor": 100,
+   "inconclusive_steps": []
+  },
+  "E1-CONC": {
+   "floor": 400,
+   "inconclusive_steps": []
+  },
+  "E1-META": {
+   "floor": 100,
+   "inconclusive_steps": []
+  }
+ },
+ "memory_floor_by_ladder": {
+  "E1-PS1-STREAM": {
+   "floor": "1G",
+   "inconclusive_steps": []
+  },
+  "E1-SNES-STREAM": {
+   "floor": "1G",
+   "inconclusive_steps": []
+  },
+  "E1-CONC": {
+   "floor": "1G",
+   "inconclusive_steps": []
+  },
+  "E1-META": {
+   "floor": "1G",
+   "inconclusive_steps": []
+  }
+ },
+ "memory_cpu_quota": {
+  "E1-PS1-STREAM": 200,
+  "E1-SNES-STREAM": 150,
+  "E1-CONC": null,
+  "E1-META": 150
+ },
+ "steps": [
+  {
+   "label": "cpu:400",
+   "items": [
+    [
+     "E1-PS1-STREAM",
+     [
+      "CPUQuota=400%"
+     ]
+    ],
+    [
+     "E1-SNES-STREAM",
+     [
+      "CPUQuota=400%"
+     ]
+    ],
+    [
+     "E1-CONC",
+     [
+      "CPUQuota=400%"
+     ]
+    ],
+    [
+     "E1-META",
+     [
+      "CPUQuota=400%"
+     ]
+    ]
+   ],
+   "s": 5774
+  },
+  {
+   "label": "cpu:300",
+   "items": [
+    [
+     "E1-PS1-STREAM",
+     [
+      "CPUQuota=300%"
+     ]
+    ],
+    [
+     "E1-SNES-STREAM",
+     [
+      "CPUQuota=300%"
+     ]
+    ],
+    [
+     "E1-CONC",
+     [
+      "CPUQuota=300%"
+     ]
+    ],
+    [
+     "E1-META",
+     [
+      "CPUQuota=300%"
+     ]
+    ]
+   ],
+   "s": 5749
+  },
+  {
+   "label": "cpu:200",
+   "items": [
+    [
+     "E1-PS1-STREAM",
+     [
+      "CPUQuota=200%"
+     ]
+    ],
+    [
+     "E1-SNES-STREAM",
+     [
+      "CPUQuota=200%"
+     ]
+    ],
+    [
+     "E1-META",
+     [
+      "CPUQuota=200%"
+     ]
+    ]
+   ],
+   "s": 4314
+  },
+  {
+   "label": "cpu:150",
+   "items": [
+    [
+     "E1-PS1-STREAM",
+     [
+      "CPUQuota=150%"
+     ]
+    ],
+    [
+     "E1-SNES-STREAM",
+     [
+      "CPUQuota=150%"
+     ]
+    ],
+    [
+     "E1-META",
+     [
+      "CPUQuota=150%"
+     ]
+    ]
+   ],
+   "s": 4309
+  },
+  {
+   "label": "cpu:100",
+   "items": [
+    [
+     "E1-PS1-STREAM",
+     [
+      "CPUQuota=100%"
+     ]
+    ],
+    [
+     "E1-SNES-STREAM",
+     [
+      "CPUQuota=100%"
+     ]
+    ],
+    [
+     "E1-META",
+     [
+      "CPUQuota=100%"
+     ]
+    ]
+   ],
+   "s": 4307
+  },
+  {
+   "label": "cpu_repeat:150:E1-SNES-STREAM",
+   "items": [
+    [
+     "E1-SNES-STREAM",
+     [
+      "CPUQuota=150%"
+     ]
+    ]
+   ],
+   "s": 1476
+  },
+  {
+   "label": "mem:4G",
+   "items": [
+    [
+     "E1-PS1-STREAM",
+     [
+      "CPUQuota=200%",
+      "MemoryMax=4G"
+     ]
+    ],
+    [
+     "E1-SNES-STREAM",
+     [
+      "CPUQuota=150%",
+      "MemoryMax=4G"
+     ]
+    ],
+    [
+     "E1-CONC",
+     [
+      "MemoryMax=4G"
+     ]
+    ],
+    [
+     "E1-META",
+     [
+      "CPUQuota=150%",
+      "MemoryMax=4G"
+     ]
+    ]
+   ],
+   "s": 5756
+  },
+  {
+   "label": "mem:2G",
+   "items": [
+    [
+     "E1-PS1-STREAM",
+     [
+      "CPUQuota=200%",
+      "MemoryMax=2G"
+     ]
+    ],
+    [
+     "E1-SNES-STREAM",
+     [
+      "CPUQuota=150%",
+      "MemoryMax=2G"
+     ]
+    ],
+    [
+     "E1-CONC",
+     [
+      "MemoryMax=2G"
+     ]
+    ],
+    [
+     "E1-META",
+     [
+      "CPUQuota=150%",
+      "MemoryMax=2G"
+     ]
+    ]
+   ],
+   "s": 5796
+  },
+  {
+   "label": "mem:1G",
+   "items": [
+    [
+     "E1-PS1-STREAM",
+     [
+      "CPUQuota=200%",
+      "MemoryMax=1G"
+     ]
+    ],
+    [
+     "E1-SNES-STREAM",
+     [
+      "CPUQuota=150%",
+      "MemoryMax=1G"
+     ]
+    ],
+    [
+     "E1-CONC",
+     [
+      "MemoryMax=1G"
+     ]
+    ],
+    [
+     "E1-META",
+     [
+      "CPUQuota=150%",
+      "MemoryMax=1G"
+     ]
+    ]
+   ],
+   "s": 5776
+  }
+ ],
+ "runs": [
+  {
+   "step": "cpu:400",
+   "row": "E1-PS1-STREAM",
+   "constraint": [
+    "CPUQuota=400%"
+   ],
+   "summary": "runs/E1-PS1-STREAM_cpu400/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "cpu:400",
+   "row": "E1-SNES-STREAM",
+   "constraint": [
+    "CPUQuota=400%"
+   ],
+   "summary": "runs/E1-SNES-STREAM_cpu400/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "cpu:400",
+   "row": "E1-CONC",
+   "constraint": [
+    "CPUQuota=400%"
+   ],
+   "summary": "runs/E1-CONC_cpu400/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "cpu:400",
+   "row": "E1-META",
+   "constraint": [
+    "CPUQuota=400%"
+   ],
+   "summary": "runs/E1-META_cpu400/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "cpu:300",
+   "row": "E1-PS1-STREAM",
+   "constraint": [
+    "CPUQuota=300%"
+   ],
+   "summary": "runs/E1-PS1-STREAM_cpu300/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "cpu:300",
+   "row": "E1-SNES-STREAM",
+   "constraint": [
+    "CPUQuota=300%"
+   ],
+   "summary": "runs/E1-SNES-STREAM_cpu300/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "cpu:300",
+   "row": "E1-CONC",
+   "constraint": [
+    "CPUQuota=300%"
+   ],
+   "summary": "runs/E1-CONC_cpu300/run1/summary.json",
+   "verdict": "FAIL",
+   "why": "fails retroarch_fps, encoder_dupdrop_per_min",
+   "failing": [
+    "retroarch_fps",
+    "encoder_dupdrop_per_min"
+   ]
+  },
+  {
+   "step": "cpu:300",
+   "row": "E1-META",
+   "constraint": [
+    "CPUQuota=300%"
+   ],
+   "summary": "runs/E1-META_cpu300/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "cpu:200",
+   "row": "E1-PS1-STREAM",
+   "constraint": [
+    "CPUQuota=200%"
+   ],
+   "summary": "runs/E1-PS1-STREAM_cpu200/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "cpu:200",
+   "row": "E1-SNES-STREAM",
+   "constraint": [
+    "CPUQuota=200%"
+   ],
+   "summary": "runs/E1-SNES-STREAM_cpu200/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "cpu:200",
+   "row": "E1-META",
+   "constraint": [
+    "CPUQuota=200%"
+   ],
+   "summary": "runs/E1-META_cpu200/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "cpu:150",
+   "row": "E1-PS1-STREAM",
+   "constraint": [
+    "CPUQuota=150%"
+   ],
+   "summary": "runs/E1-PS1-STREAM_cpu150/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "cpu:150",
+   "row": "E1-SNES-STREAM",
+   "constraint": [
+    "CPUQuota=150%"
+   ],
+   "summary": "runs/E1-SNES-STREAM_cpu150/run1/summary.json",
+   "verdict": "INCONCLUSIVE",
+   "why": "fails only on link-observed metrics while the control fails D-BASE's loss row",
+   "failing": [
+    "rendered_fps"
+   ]
+  },
+  {
+   "step": "cpu:150",
+   "row": "E1-META",
+   "constraint": [
+    "CPUQuota=150%"
+   ],
+   "summary": "runs/E1-META_cpu150/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "cpu:100",
+   "row": "E1-PS1-STREAM",
+   "constraint": [
+    "CPUQuota=100%"
+   ],
+   "summary": "runs/E1-PS1-STREAM_cpu100/run1/summary.json",
+   "verdict": "FAIL",
+   "why": "fails rendered_fps, encoder_dupdrop_per_min",
+   "failing": [
+    "rendered_fps",
+    "encoder_dupdrop_per_min"
+   ]
+  },
+  {
+   "step": "cpu:100",
+   "row": "E1-SNES-STREAM",
+   "constraint": [
+    "CPUQuota=100%"
+   ],
+   "summary": "runs/E1-SNES-STREAM_cpu100/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "cpu:100",
+   "row": "E1-META",
+   "constraint": [
+    "CPUQuota=100%"
+   ],
+   "summary": "runs/E1-META_cpu100/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "cpu_repeat:150",
+   "row": "E1-SNES-STREAM",
+   "constraint": [
+    "CPUQuota=150%"
+   ],
+   "summary": "runs/E1-SNES-STREAM_cpu150/run2/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "mem:4G",
+   "row": "E1-PS1-STREAM",
+   "constraint": [
+    "CPUQuota=200%",
+    "MemoryMax=4G"
+   ],
+   "summary": "runs/E1-PS1-STREAM_cpu200_mem4G/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "mem:4G",
+   "row": "E1-SNES-STREAM",
+   "constraint": [
+    "CPUQuota=150%",
+    "MemoryMax=4G"
+   ],
+   "summary": "runs/E1-SNES-STREAM_cpu150_mem4G/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "mem:4G",
+   "row": "E1-CONC",
+   "constraint": [
+    "MemoryMax=4G"
+   ],
+   "summary": "runs/E1-CONC_mem4G/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "mem:4G",
+   "row": "E1-META",
+   "constraint": [
+    "CPUQuota=150%",
+    "MemoryMax=4G"
+   ],
+   "summary": "runs/E1-META_cpu150_mem4G/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "mem:2G",
+   "row": "E1-PS1-STREAM",
+   "constraint": [
+    "CPUQuota=200%",
+    "MemoryMax=2G"
+   ],
+   "summary": "runs/E1-PS1-STREAM_cpu200_mem2G/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "mem:2G",
+   "row": "E1-SNES-STREAM",
+   "constraint": [
+    "CPUQuota=150%",
+    "MemoryMax=2G"
+   ],
+   "summary": "runs/E1-SNES-STREAM_cpu150_mem2G/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "mem:2G",
+   "row": "E1-CONC",
+   "constraint": [
+    "MemoryMax=2G"
+   ],
+   "summary": "runs/E1-CONC_mem2G/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "mem:2G",
+   "row": "E1-META",
+   "constraint": [
+    "CPUQuota=150%",
+    "MemoryMax=2G"
+   ],
+   "summary": "runs/E1-META_cpu150_mem2G/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "mem:1G",
+   "row": "E1-PS1-STREAM",
+   "constraint": [
+    "CPUQuota=200%",
+    "MemoryMax=1G"
+   ],
+   "summary": "runs/E1-PS1-STREAM_cpu200_mem1G/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "mem:1G",
+   "row": "E1-SNES-STREAM",
+   "constraint": [
+    "CPUQuota=150%",
+    "MemoryMax=1G"
+   ],
+   "summary": "runs/E1-SNES-STREAM_cpu150_mem1G/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "mem:1G",
+   "row": "E1-CONC",
+   "constraint": [
+    "MemoryMax=1G"
+   ],
+   "summary": "runs/E1-CONC_mem1G/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  },
+  {
+   "step": "mem:1G",
+   "row": "E1-META",
+   "constraint": [
+    "CPUQuota=150%",
+    "MemoryMax=1G"
+   ],
+   "summary": "runs/E1-META_cpu150_mem1G/run1/summary.json",
+   "verdict": "PASS",
+   "why": "every gated metric holds",
+   "failing": []
+  }
+ ],
+ "rejudge_disagreements": []
+}
