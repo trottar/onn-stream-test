@@ -62,8 +62,16 @@ class Parse(unittest.TestCase):
                 imp.parse(bad)
         self.assertIsNone(imp.from_environ({}))
         self.assertIsNone(imp.from_environ({imp.FLAG_ENV: "  "}))
-        self.assertEqual(set(imp.PROFILES), {"loss-1", "loss-5", "burst-50x20", "delay-50", "delay-150",
+        self.assertEqual(set(imp.PROFILES), {"none", "loss-1", "loss-5", "burst-50x20", "delay-50", "delay-150",
                                              "jitter-30", "reorder-5", "cap-6000", "cap-4500"})
+
+    def test_none_through_the_flag(self):
+        """G8-S1: `none` is selectable through the flag -- the shim in the path, every stage off."""
+        p = imp.from_environ({imp.FLAG_ENV: "none@post-fec,seed=1"})
+        self.assertEqual((p.label, p.placement, p.seed), ("none", "post-fec", 1))
+        self.assertEqual((p.loss, p.burst_packets, p.delay_ms, p.jitter_ms, p.reorder, p.cap_kbps), (0.0, 0, 0.0, 0.0, 0.0, 0))
+        im, out = run_offers("none", 2000)
+        self.assertEqual([s for _, s in out], list(range(2000)))
 
 
 class Stages(unittest.TestCase):

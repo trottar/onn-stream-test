@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-10-16
-baseline_commit: 92e388e (G3-S3, G-A1 and CL-B3 uncommitted; the user commits)
+baseline_commit: 64d9489 (G8-S1 running; its launch and the shim fix uncommitted; the user commits)
 ---
 
 # Current State
@@ -14,7 +14,12 @@ session identity v2 run on the host, and `identity_v2` is on in the client. The 
 CL-B3 is OPEN on two G5-S1 smoke gates (NOT MET; the user decides). Everything else passed: G3-S3's hardened APK
 `59f736d2…` is installed and CONFIRMED, the signed LAN path passed, and the VOD play through the range server
 passed.** E1 FROZEN; E2
-MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `92e388e`.
+MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `64d9489`.
+
+**State (2026-10-16 21:26Z): the seven adopted lines; nothing running.** No `e3_flag.conf`, no stream, no game; APK
+CONFIRMED; one device paired. **G8-S1 is PARTIAL: 5 of 22 cells**
+(`evidence/G8_S1_ADVERSE_NETWORK_ENVELOPE_2026-10-16.md`). The driver `privyhub-g8-s1` stopped through its STOP file
+at 21:25:52Z; its transient unit was collected.
 
 - **Nine adoptions stand:**
   - live adaptive (C);
@@ -161,20 +166,28 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
-1. **The user's commit:** everything since `92e388e`.
-   - G3-S3 (session B), G-A1 and CL-B3 (with patches `G3-S3_HARDENING_AND_HUB_HOST`,
-     `G-A1_OVERLAY_AND_IDENTITY_ADOPTED` and `CL-B3_HARDENED_APK_HASH`);
-   - the git status in `logs/g_a1_git_status.txt` and `logs/cl_b3_git_status.txt`.
-   - **Before or with it, the user's call on CL-B3:** the two W gates not met (the companion CPU +0.633 point, and
-     no `wan_sessions.jsonl` line). The VOD play passed.
-2. **G4-S1, the first off-site session** (a phone hotspot):
+1. **The user's commit:** everything since `64d9489`.
+   - G8-S1's launch (`evidence/G8_S1_LAUNCH_2026-10-16.md`), the shim's `none` profile (patch
+     `G8-S1_SHIM_NONE_PROFILE`), and this partial record (`evidence/G8_S1_ADVERSE_NETWORK_ENVELOPE_2026-10-16.md`,
+     `g8_s1_2026-10-16/` complete with its manifest);
+   - the git status in `logs/g8_s1_stop_git_status.txt`.
+   - Still the user's call from CL-B3: the two W gates not met (the companion CPU +0.633 point, and no
+     `wan_sessions.jsonl` line).
+2. **The G8-S1 resume: a later task.** Cells 6-22 are not run. A relaunch with `g8_s1_state.json` skips the five done
+   cells (from the code). It needs:
+   - `~/privyhub_g8_s1/STOP` removed;
+   - a new `CAP` in `g8_s1_driver.py` if it runs after 2026-10-17T06:00Z (a disclosed edit);
+   - the same unit name.
+
+   About 4.2 h. The record is §6.
+3. **G4-S1, the first off-site session** (a phone hotspot). **No longer blocked by the G8-S1 driver** (it is stopped):
    - the draft is `handoffs/G4-S1_OFFSITE_FIRST_SESSION_TASK.draft.md`;
    - the runbook is `handoffs/G4_RUNBOOK_HOTSPOT.md`;
    - it uses `tools/e1_suite.py --remote` (G4-P1).
    - The user's hand steps: the Tailscale app on the onn, "Hub host" set to the hub's tailnet name before
      leaving, and the phone hotspot.
    - The hub's firewall on the tailnet interface is still unverified (G3-S3 §4).
-3. **G5-S2:** WAN adaptation (`docs/WAN_ADAPTATION_RULES.md`). It also takes:
+4. **G5-S2:** WAN adaptation (`docs/WAN_ADAPTATION_RULES.md`; built behind its flag, committed in `64d9489`). It also takes:
    - the per-session line at stream stop / shutdown;
    - the live recovery state;
    - the unclassified measures' thresholds;

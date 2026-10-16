@@ -1,0 +1,14 @@
+● privyhub-g8-s1.service - [systemd-run] /usr/bin/python3 -B /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/g8_s1_2026-10-16/g8_s1_driver.py
+     Loaded: loaded (/run/user/1000/systemd/transient/privyhub-g8-s1.service; transient)
+  Transient: yes
+     Active: active (running) since Fri 2026-10-16 16:13:52 EDT; 14min ago
+ Invocation: b4eb8fc560ca49d0a45ca61b6e93b27d
+   Main PID: 3427842 (python3)
+      Tasks: 10 (limit: 18065)
+     Memory: 56.8M (peak: 74.8M)
+        CPU: 26.722s
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/privyhub-g8-s1.service
+             ├─3427842 /usr/bin/python3 -B /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/g8_s1_2026-10-16/g8_s1_driver.py
+             ├─3432774 /usr/bin/python3 /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/g8_s1_2026-10-16/g8_s1_suite_call.py /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/g8_s1_2026-10-16/runs/02_none_on 600 120 PRIVYHUB_WAN_TELEMETRY=1 PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 PRIVYHUB_WAN_ADAPTATION=1
+             └─3432853 /usr/bin/python3 /home/privyhub/Projects/onn-stream-test/tools/e1_sampler.py run /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/g8_s1_2026-10-16/runs/02_none_on/E1-PS1-STREAM_flag/run1 --telemetry --title --e2
+

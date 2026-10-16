@@ -1,0 +1,50 @@
+G8-S1 -- the first adverse-network envelope (ROADMAP G8), run on the LAN through G8-P1's impairment shim at @post-fec,
+one E1-PS1-STREAM per cell, G5-S1's classifier on, G5-S2's rules off then on. Pre-registered and hashed before the first
+run; the task is handoffs/G8-S1_ADVERSE_NETWORK_ENVELOPE_TASK.md, its section 1 carried here unchanged in substance. Baseline:
+baseline_head.txt. Measurement only; nothing adopted; nothing committed.
+
+STATE: the seven-line adopted state (G-A1), no e3_flag.conf, no game, one device paired, identity_v2 on, APK 59f736d2...
+CONFIRMED, tools/e3_state.py ok. Before this file: companion/impairment.py gained the profile `none` (the shim in the path,
+every stage off), the user's decision 2026-10-16 (the parser had rejected it; patch G8-S1_SHIM_NONE_PROFILE, 14/14
+impairment tests); the driver's --dry passed (dry_run/).
+
+CELLS (22, in this order; n = 2i+1 off, 2i+2 on): none, loss-1, loss-5, burst-50x20, delay-50, delay-150, jitter-30,
+reorder-5, cap-6000, cap-4500, delay-50+loss-1; each @post-fec,seed=1; each with PRIVYHUB_WAN_ADAPTATION absent ("off")
+then present ("on"). Per cell: E1-PS1-STREAM x1, --e2 (E2's warm-up), --window 600, idle gap 120 s, through
+g8_s1_suite_call.py (tools/e1_suite.py run_suite unedited; the plan row built in Python because the flag value carries
+"," and "+", which the CLI --plan splits on; the suite's pre-registration hash rule kept). The run's e3_flag.conf carries
+exactly: PRIVYHUB_WAN_TELEMETRY=1, PRIVYHUB_IMPAIRMENT=<profile>@post-fec,seed=1, and PRIVYHUB_WAN_ADAPTATION=1 in the on
+arm only. The suite writes it, restarts, checks the unit's environ (seven + the cell's lines), and removes it at teardown
+with flags_absent true before the next cell. The driver reads the companion's environ again 150 s into the window (the
+flags under load) and the shim's newest line (the shim live).
+
+VALIDITY: E3-A3B's reading -- the run reaches PLAYING; a failing launch is replaced at most twice (the suite's own); a
+run whose shim telemetry (logs/impairment.jsonl from the run's start, per-second deltas, filtered to the cell's profile,
+post-fec, seed 1) is outside these tolerances is `profile-not-applied` and its cell is run once more:
+  none: no drop, no delay, no reorder.  loss-1 / loss-5: dropped_loss / packets_in in 0.7-1.3 % / 4.5-5.5 %, nothing else.
+  burst-50x20: dropped_burst a multiple of 50, bursts within 1 of floor((duration-10)/20)+1, nothing else.
+  delay-50 / delay-150: delayed >= 95 % of packets_in, no drop, no reorder.  jitter-30: delayed >= 90 %, no reorder, no drop.
+  reorder-5: reordered / packets_in in 4-6 %, no drop.  cap-6000 / cap-4500: every second's out <= 1.05 x the cap (in
+  kbit/s), no random / burst drop (tail drop is the cap's); the seconds whose input exceeded the cap are reported.
+  delay-50+loss-1: loss 0.7-1.3 %, delayed >= 95 % of the packets not dropped.
+(G8-P1 measured delay and jitter in milliseconds in process; the live shim reports counts only, so these are count
+tolerances, written before the first run.) BUSY: a game session active at a cell's start -> wait 10 min, retry, up to 3
+times, then the cell is `busy`. STOP: ~/privyhub_g8_s1/STOP after the run in flight. CAP: no cell starts at or after
+2026-10-17T06:00:00Z.
+
+GATES (host side only): RetroArch >= 59.9; capture 60 +/- 0.1 (E4-S5D's segment-aware reading); dup+drop <= 0.2/min;
+flags_absent after. Reported beside them, not gated: host CPU, the companion's CPU with the two or three flags, the shim's
+own CPU (cpu_s / duration, % of a core; G8-P1's bar was not met -- 2.1-7.0 % in process -- and it is reported).
+EVERYTHING LINK-SIDE IS REPORTED, NOT GATED (the envelope; there is no pass / fail): per cell, pre-/post-FEC loss per min,
+FEC recovered / unrecoverable groups, rendered fps, stale drops/min, spikes/min, resyncs, client pauses, the ladder's rung
+path (status_poll) and the rules' suggestions (decisions with source wan_rules), the `wan` class and window counts
+(/diagnostics/stream-telemetry, polled every 30 s), the shim's counters (in / dropped / delayed / reordered / queue max).
+
+COMPARISONS, written now: (i) `none` vs CL-B3's R1 and W (the shim's cost on the stream); (ii) per profile, off vs on:
+what the rules changed and whether rendered / stale / loss moved with it -- stated, not judged; (iii) the class G5-S1
+assigns vs the profile's intent (does cap-4500 read capacity-limited, delay-150 latency-limited, loss-5 lossy?) -- a
+classifier check, a table. REPORTED: the link's own loss tonight (the `none` cells are the baseline), the ladder's
+behaviour under the cap profiles, any session loss or recovery event.
+
+No address, token, key or identifier is written to any file in the repo; the wan polls are scrubbed of address-like
+strings and long hex before writing (the count of any match is kept).

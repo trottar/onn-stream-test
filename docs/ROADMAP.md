@@ -1682,6 +1682,10 @@ FEC-recoverable. Video only; no `nft`, no `sudo`. The shim's own cost is 2.1-7.0
 of a core, **over the ≤ 1-point bar**. Not adopted. Next proposed: G8-S1, the
 envelope. Record: `docs/memory/evidence/G8_P1_IMPAIRMENT_SHIM_2026-10-16.md`.
 
+**Status (2026-10-16, G8-S1): envelope: 5/22 cells measured (partial, 2026-10-16); resume pending.** Cells 1-5
+(none off/on, loss-1 off/on, loss-5 off), all valid, every host gate met. The rest are not run. The driver was stopped
+by its STOP file at 21:25:52Z. Record: `docs/memory/evidence/G8_S1_ADVERSE_NETWORK_ENVELOPE_2026-10-16.md`.
+
 Exercise bounded representative conditions:
 
 - reduced bandwidth;

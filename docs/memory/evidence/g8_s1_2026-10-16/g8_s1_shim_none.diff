@@ -1,0 +1,32 @@
+--- docs/memory/evidence/g8_s1_2026-10-16/predecessors/impairment.py.txt	2026-10-16 16:08:10.711287528 -0400
++++ companion/impairment.py	2026-10-16 16:08:10.723287797 -0400
+@@ -43,6 +43,8 @@
+ 
+ # name -> parameters (one table; the record's profile table is this one)
+ PROFILES: dict[str, dict[str, Any]] = {
++    # G8-S1: the control -- the shim in the path with no stage (its own cost), selectable through the flag
++    "none": {},
+     "loss-1": {"loss": 0.01},
+     "loss-5": {"loss": 0.05},
+     "burst-50x20": {"burst_packets": 50, "burst_every_s": 20.0, "burst_first_s": 10.0},
+--- docs/memory/evidence/g8_s1_2026-10-16/predecessors/test_impairment.py.txt	2026-10-16 16:08:10.711287528 -0400
++++ tests/impairment/test_impairment.py	2026-10-16 16:08:10.723287797 -0400
+@@ -62,9 +62,17 @@
+                 imp.parse(bad)
+         self.assertIsNone(imp.from_environ({}))
+         self.assertIsNone(imp.from_environ({imp.FLAG_ENV: "  "}))
+-        self.assertEqual(set(imp.PROFILES), {"loss-1", "loss-5", "burst-50x20", "delay-50", "delay-150",
++        self.assertEqual(set(imp.PROFILES), {"none", "loss-1", "loss-5", "burst-50x20", "delay-50", "delay-150",
+                                              "jitter-30", "reorder-5", "cap-6000", "cap-4500"})
+ 
++    def test_none_through_the_flag(self):
++        """G8-S1: `none` is selectable through the flag -- the shim in the path, every stage off."""
++        p = imp.from_environ({imp.FLAG_ENV: "none@post-fec,seed=1"})
++        self.assertEqual((p.label, p.placement, p.seed), ("none", "post-fec", 1))
++        self.assertEqual((p.loss, p.burst_packets, p.delay_ms, p.jitter_ms, p.reorder, p.cap_kbps), (0.0, 0, 0.0, 0.0, 0.0, 0))
++        im, out = run_offers("none", 2000)
++        self.assertEqual([s for _, s in out], list(range(2000)))
++
+ 
+ class Stages(unittest.TestCase):
+     def test_none_passes_everything_in_order(self):

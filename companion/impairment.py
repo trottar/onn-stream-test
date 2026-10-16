@@ -43,6 +43,8 @@ RECV_BYTES = 65535
 
 # name -> parameters (one table; the record's profile table is this one)
 PROFILES: dict[str, dict[str, Any]] = {
+    # G8-S1: the control -- the shim in the path with no stage (its own cost), selectable through the flag
+    "none": {},
     "loss-1": {"loss": 0.01},
     "loss-5": {"loss": 0.05},
     "burst-50x20": {"burst_packets": 50, "burst_every_s": 20.0, "burst_first_s": 10.0},
