@@ -27,7 +27,9 @@ and CL-B3 (`../../../logs/g_a1_git_status.txt`, `../../../logs/cl_b3_git_status.
     MET:**
     - companion CPU +0.633 point (≤ 0.5), from two runs, not paired arms;
     - no `wan_sessions.jsonl` line (written only when a next session starts). The user decides.
-  - **VOD: PENDING.** The user was away; the steps are in the record §5.
+  - **VOD: PASSED** (19:58Z, the user back home): `media_session` for the paired device, the header
+    (`media_token_used` false), `lan`; the range server answered 200 / 206; the movie streamed (~1.3 Mbit/s). No
+    `legacy-*` or `media-token-unknown`.
 - End state: seven lines, no flag, no game; APK `59f736d2…` CONFIRMED; one paired device; `identity_v2` on, hub
   host empty.
 

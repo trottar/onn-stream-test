@@ -11,8 +11,9 @@ Headings are fixed by `tools/check_memory_health.py`; do not rename.
 
 **Phase E ACTIVE; the G track (remote) under way. G-A1 ADOPTED (2026-10-16, the user's): the overlay provider and
 session identity v2 run on the host, and `identity_v2` is on in the client. The adopted environ is SEVEN lines.
-CL-B3 is OPEN: G3-S3's hardened APK `59f736d2…` is installed and CONFIRMED, and the signed LAN path passed. Two
-G5-S1 smoke gates were NOT MET (the user decides). The VOD play is pending (the user was away).** E1 FROZEN; E2
+CL-B3 is OPEN on two G5-S1 smoke gates (NOT MET; the user decides). Everything else passed: G3-S3's hardened APK
+`59f736d2…` is installed and CONFIRMED, the signed LAN path passed, and the VOD play through the range server
+passed.** E1 FROZEN; E2
 MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `92e388e`.
 
 - **Nine adoptions stand:**
@@ -51,8 +52,8 @@ range-server gate, `diagnostics`, the Hub host setting; built and tested, the AP
     `server.pid`. **NOT MET:**
     - companion CPU +0.633 point (≤ 0.5; two runs, not paired arms);
     - no `logs/wan_sessions.jsonl` line (G5-S1 writes it only when a next session starts; `docs/KNOWN_ISSUES.md`).
-  - **VOD PENDING:** a 60-s movie play from the onn, then the audit's `media_session`. The steps are in the record
-    §5.
+  - **VOD PASSED** (19:58Z): `media_session` for the paired device with the header (`media_token_used` false), on
+    `lan`; the range server answered 200 / 206, and the movie streamed to the onn.
 - Git status: `logs/g_a1_git_status.txt`, `logs/cl_b3_git_status.txt`.
 
 ## Verified State
@@ -164,9 +165,8 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
    - G3-S3 (session B), G-A1 and CL-B3 (with patches `G3-S3_HARDENING_AND_HUB_HOST`,
      `G-A1_OVERLAY_AND_IDENTITY_ADOPTED` and `CL-B3_HARDENED_APK_HASH`);
    - the git status in `logs/g_a1_git_status.txt` and `logs/cl_b3_git_status.txt`.
-   - **Before or with it, the user's calls on CL-B3:**
-     - the VOD play (60 s from the onn, the record §5);
-     - the two W gates not met: the companion CPU +0.633 point, and no `wan_sessions.jsonl` line.
+   - **Before or with it, the user's call on CL-B3:** the two W gates not met (the companion CPU +0.633 point, and
+     no `wan_sessions.jsonl` line). The VOD play passed.
 2. **G4-S1, the first off-site session** (a phone hotspot):
    - the draft is `handoffs/G4-S1_OFFSITE_FIRST_SESSION_TASK.draft.md`;
    - the runbook is `handoffs/G4_RUNBOOK_HOTSPOT.md`;

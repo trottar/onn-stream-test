@@ -1,6 +1,6 @@
-G-A1 + CL-B3 -- the redactor over everything written by this task (both evidence dirs, both records, both patches, the four state-tool files, KNOWN_ISSUES, CURRENT_HANDOFF, CURRENT, both git status logs)
-FLAG rule (as C3-L4-D1 / CL-B2): a HIT is benign only if it re-checks OK with 127.0.0.1 (loopback), 0.0.0.0 (bind) and 'Beetle PSX HW 0.9.44.1' masked; all 5 did; also grepped: no token_ref, key_hex or device id in either directory or record.
-E3 redactor check (h2_prep_redact.py --check, stdin per file), 2026-10-16T18:02:52Z
+G-A1 + CL-B3 (re-run after the VOD step) -- the redactor over everything written by this task (both evidence dirs, both records, both patches, the four state-tool files, KNOWN_ISSUES, CURRENT_HANDOFF, CURRENT, both git status logs)
+FLAG rule (as C3-L4-D1 / CL-B2): a HIT is benign only if it re-checks OK with 127.0.0.1 (loopback), 0.0.0.0 (bind) and 'Beetle PSX HW 0.9.44.1' masked; all 7 did (two are the previous redact_check.txt files, which name those strings); no token_ref, key_hex or device id in either directory or record.
+E3 redactor check (h2_prep_redact.py --check, stdin per file), 2026-10-16T20:00:59Z
 OK   docs/memory/evidence/g_a1_2026-10-16/adopted_at.txt
 OK   docs/memory/evidence/g_a1_2026-10-16/after_sha256.txt
 OK   docs/memory/evidence/g_a1_2026-10-16/baseline_head.txt
@@ -8,10 +8,13 @@ OK   docs/memory/evidence/g_a1_2026-10-16/check_after.json
 OK   docs/memory/evidence/g_a1_2026-10-16/check_before.json
 OK   docs/memory/evidence/g_a1_2026-10-16/g_a1_state_tools.diff
 OK   docs/memory/evidence/g_a1_2026-10-16/git_status_at_start.txt
+OK   docs/memory/evidence/g_a1_2026-10-16/manifest_check.txt
+OK   docs/memory/evidence/g_a1_2026-10-16/manifest.sha256
 OK   docs/memory/evidence/g_a1_2026-10-16/overlay.conf.txt
 HIT  docs/memory/evidence/g_a1_2026-10-16/predecessors/e1_suite.py.txt
 OK   docs/memory/evidence/g_a1_2026-10-16/predecessors/e3_state.py.txt
 OK   docs/memory/evidence/g_a1_2026-10-16/predecessor_sha256.txt
+HIT  docs/memory/evidence/g_a1_2026-10-16/redact_check.txt
 OK   docs/memory/evidence/g_a1_2026-10-16/restart_adoption.json
 OK   docs/memory/evidence/g_a1_2026-10-16/session-identity.conf.txt
 OK   docs/memory/evidence/g_a1_2026-10-16/session_status_after_adoption.json
@@ -30,6 +33,10 @@ OK   docs/memory/evidence/cl_b3_2026-10-16/audit_r1_early.jsonl
 OK   docs/memory/evidence/cl_b3_2026-10-16/audit_r1.jsonl
 OK   docs/memory/evidence/cl_b3_2026-10-16/audit_setting_on_counts.json
 OK   docs/memory/evidence/cl_b3_2026-10-16/audit_setting_on.jsonl
+OK   docs/memory/evidence/cl_b3_2026-10-16/audit_vod_counts.json
+OK   docs/memory/evidence/cl_b3_2026-10-16/audit_vod_early_counts.json
+OK   docs/memory/evidence/cl_b3_2026-10-16/audit_vod_early.jsonl
+OK   docs/memory/evidence/cl_b3_2026-10-16/audit_vod.jsonl
 OK   docs/memory/evidence/cl_b3_2026-10-16/audit_w_counts.json
 OK   docs/memory/evidence/cl_b3_2026-10-16/audit_w.jsonl
 OK   docs/memory/evidence/cl_b3_2026-10-16/baseline_head.txt
@@ -52,6 +59,8 @@ OK   docs/memory/evidence/cl_b3_2026-10-16/device_apk_after.txt
 OK   docs/memory/evidence/cl_b3_2026-10-16/device_apk_before.txt
 OK   docs/memory/evidence/cl_b3_2026-10-16/install_at.txt
 OK   docs/memory/evidence/cl_b3_2026-10-16/install.log
+OK   docs/memory/evidence/cl_b3_2026-10-16/manifest_check.txt
+OK   docs/memory/evidence/cl_b3_2026-10-16/manifest.sha256
 OK   docs/memory/evidence/cl_b3_2026-10-16/pairing_end.json
 OK   docs/memory/evidence/cl_b3_2026-10-16/pairing_survived.json
 OK   docs/memory/evidence/cl_b3_2026-10-16/poll_r1.jsonl
@@ -63,6 +72,8 @@ OK   docs/memory/evidence/cl_b3_2026-10-16/predecessors/test_c3_l4_nft_night.py.
 OK   docs/memory/evidence/cl_b3_2026-10-16/preregistration_hashed_at.txt
 OK   docs/memory/evidence/cl_b3_2026-10-16/r1_end_at.txt
 OK   docs/memory/evidence/cl_b3_2026-10-16/r1_start_at.txt
+OK   docs/memory/evidence/cl_b3_2026-10-16/range_vod_requests.txt
+HIT  docs/memory/evidence/cl_b3_2026-10-16/redact_check.txt
 OK   docs/memory/evidence/cl_b3_2026-10-16/rollback_apk_sha256.txt
 OK   docs/memory/evidence/cl_b3_2026-10-16/runs/absent.json
 OK   docs/memory/evidence/cl_b3_2026-10-16/runs/E1-PS1-STREAM_flag/run1/cgroup.jsonl
@@ -107,6 +118,8 @@ OK   docs/memory/evidence/cl_b3_2026-10-16/tests_nft_night.txt
 OK   docs/memory/evidence/cl_b3_2026-10-16/validity.json
 OK   docs/memory/evidence/cl_b3_2026-10-16/vod_asked_at.txt
 OK   docs/memory/evidence/cl_b3_2026-10-16/vod_serverlog_offset.txt
+OK   docs/memory/evidence/cl_b3_2026-10-16/vod_stream_progress.txt
+OK   docs/memory/evidence/cl_b3_2026-10-16/vod_user_said_running_at.txt
 OK   docs/memory/evidence/cl_b3_2026-10-16/wan_excerpt_last.json
 OK   docs/memory/evidence/cl_b3_2026-10-16/wan_sessions_offset.txt
 OK   docs/memory/evidence/cl_b3_2026-10-16/w_end_at.txt
@@ -126,7 +139,9 @@ OK   logs/cl_b3_git_status.txt
 
 HIT re-check with the benign strings masked:
 BENIGN-ONLY docs/memory/evidence/g_a1_2026-10-16/predecessors/e1_suite.py.txt
+BENIGN-ONLY docs/memory/evidence/g_a1_2026-10-16/redact_check.txt
 BENIGN-ONLY docs/memory/evidence/cl_b3_2026-10-16/predecessors/e1_suite.py.txt
+BENIGN-ONLY docs/memory/evidence/cl_b3_2026-10-16/redact_check.txt
 BENIGN-ONLY docs/memory/evidence/cl_b3_2026-10-16/runs/E1-PS1-STREAM_flag/run1/title.txt
 BENIGN-ONLY docs/memory/evidence/cl_b3_2026-10-16/runs/E1-PS1-STREAM/run1/title.txt
 BENIGN-ONLY tools/e1_suite.py

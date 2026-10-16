@@ -6,7 +6,7 @@ baseline_commit: 92e388e (G3-S3 uncommitted beside it, not touched)
 
 # CL-B3 — G3-S3's hardened APK on the onn, on the seven-line state
 
-**Classification: OPEN, awaiting the user.**
+**Classification: OPEN on two W gates, awaiting the user. Everything else PASSED.**
 
 - **The APK:** INSTALLED and CONFIRMED (`59f736d2…f65f`).
 - **The signed path on the LAN: PASSED** (R1, every host gate held).
@@ -14,7 +14,8 @@ baseline_commit: 92e388e (G3-S3 uncommitted beside it, not touched)
   MET:**
   - the companion's CPU cost was **+0.633 point** of a core, against ≤ 0.5;
   - **no `logs/wan_sessions.jsonl` line** was written.
-- **The VOD play: PENDING.** The user was away; they chose to run W now and do VOD later.
+- **The VOD play: PASSED** (§5): the header on the LAN path (`media_session`, `media_token_used` false), 200 /
+  206 from the range server, and the movie streaming to the onn. The user started it after returning.
 - The pre-registration says "if a gate fails: stop and say so — the user decides". Nothing was rerun, and nothing
   was adopted beyond G-A1's three adoptions and the APK.
 
@@ -125,16 +126,29 @@ sat at its usual ~36 %. \* The link: reported, not gated. It was the cleanest si
   **except `server.pid`**, with no `wan` key (`status_compare_after_w.json`). `--check` was ok on the seven lines
   (`check_end.json`).
 
-## 5. The VOD play (PENDING)
+## 5. The VOD play — PASSED
 
-- Asked at 17:42Z (`vod_asked_at.txt`). The user was away from home and chose: run W now, VOD later.
-- **To finish CL-B3:**
-  1. Play a movie on the onn (VOD → MOVIES) for ≥ 60 s.
-  2. Reduce the audit from that time (`cl_b3_audit.py vod <since>`). Expect `media_session` for `paired-device`,
-     `media_token_used` false (the header), routing `lan`, with no `legacy-*` and no `media-token-unknown`.
-  3. Count the range server's 200 / 206 `GET /vod/…` lines in `logs/server.log` after line 16,921
-     (`vod_serverlog_offset.txt`), keeping the status codes only.
-  4. Add §5 here.
+- **The play:** asked at 17:42Z, when the user was away; they ran W first. Later the user started a movie on the
+  onn and said "VOD is running" at 19:58:37Z (`vod_user_said_running_at.txt`). The play ran past 60 s
+  (19:58:11-20:00:23Z+). Nothing was rerun or changed on the host for it.
+- **The audit** (`audit_vod.jsonl`, 18:03-19:59:50Z):
+  1. 19:57:55Z `session_refused token-unknown` on `/sources`: the client's token predated W's teardown restart.
+  2. 19:57:56Z `token_issued` for the paired device, `sig_v` 2, media token issued, routing `lan`. This is the
+     designed single fresh setup and retry, as in CL-B2.
+  3. **19:58:11Z `media_session`** for the paired device, path `/vod/movies/<the title>.mp4`,
+     **`media_token_used` false**, routing **`lan`**.
+     - Under G3-S3 the media check runs only when a credential is presented, and `media_token_used` false means
+       the credential was the `X-PrivyHub-Session` header (the player's `MediaDataSource`), not `?media_token=`.
+     - That is the token on the LAN path, audited once per token.
+  - **No `legacy-*` refusal, no `media-token-unknown`**, no `permission-denied`.
+- **The range server** (`range_vod_requests.txt`: after line 16,921 of `logs/server.log`; time, method, path and
+  status only):
+  - `GET` of the movie at 19:58:11Z → **200**, then three → **206** (19:58:12-18Z);
+  - no `media_token=` in the log (the header form);
+  - no 401 / 403.
+- **The play reached the client:** the range server's one established connection was acknowledged 9.05 MB →
+  13.26 MB between 19:59:58Z and 20:00:23Z, about 1.3 Mbit/s (`vod_stream_progress.txt`, from `ss`: count and
+  bytes only). The user reported it playing.
 
 ## 6. State at the end (18:00Z)
 
@@ -158,6 +172,8 @@ sat at its usual ~36 %. \* The link: reported, not gated. It was the cleanest si
     booleans, `paired-device` / `host-local`; no device id, token_ref or address);
   - `access_r1_identity.txt`, `access_w_identity.txt` (time, request line and status; no source address);
   - `poll_r1.jsonl`, `poll_w.jsonl`, `wan_excerpt_last.json`;
+  - the VOD files: `audit_vod*.jsonl`, `range_vod_requests.txt`, `vod_stream_progress.txt`, `vod_*_at.txt`,
+    `vod_serverlog_offset.txt`;
   - the hashes, the client reads, the `--check` readings, `status_*.json`, `status_compare_after_w.json`;
   - `predecessors/`, `cl_b3_hash.diff`, `tests_nft_night.txt`;
   - `redact_check.txt`, `manifest.sha256`, `manifest_check.txt`.
