@@ -1,0 +1,24 @@
+test_defaults (tools.test_e1_remote.Args.test_defaults) ... ok
+test_refusals (tools.test_e1_remote.Args.test_refusals) ... ok
+test_values_and_adb (tools.test_e1_remote.Args.test_values_and_adb) ... ok
+test_classes_and_hashes_only (tools.test_e1_remote.Endpoint.test_classes_and_hashes_only) ... ok
+test_classify (tools.test_e1_remote.Endpoint.test_classify) ... ok
+test_both_flags (tools.test_e1_remote.Preflight.test_both_flags) ... ok
+test_flags_absent_refuses_with_a_clear_line (tools.test_e1_remote.Preflight.test_flags_absent_refuses_with_a_clear_line) ... ok
+test_main_refuses_without_flags (tools.test_e1_remote.Preflight.test_main_refuses_without_flags) ... ok
+test_one_flag_absent (tools.test_e1_remote.Preflight.test_one_flag_absent) ... ok
+test_dispatch_refuses_without_prereg (tools.test_e1_remote.SuiteDispatch.test_dispatch_refuses_without_prereg) ... ok
+test_guarded_import (tools.test_e1_remote.SuiteDispatch.test_guarded_import) ... ok
+test_hash_logged_never_the_address (tools.test_e1_remote.WholeRun.test_hash_logged_never_the_address) ... /home/privyhub/Projects/onn-stream-test/tools/e1_remote.py:227: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmprkz0wm60/out/E1-PS1-STREAM-REMOTE/run1/sampler.log' mode='w' encoding='UTF-8'>
+  samp = subprocess.Popen([sys.executable, str(E.REPO / "tools/e1_sampler.py"), "run", str(rd), "--telemetry",
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_not_over_the_overlay_fails (tools.test_e1_remote.WholeRun.test_not_over_the_overlay_fails) ... /home/privyhub/Projects/onn-stream-test/tools/e1_remote.py:227: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpvy8ho9sg/out/E1-PS1-STREAM-REMOTE/run1/sampler.log' mode='w' encoding='UTF-8'>
+  samp = subprocess.Popen([sys.executable, str(E.REPO / "tools/e1_sampler.py"), "run", str(rd), "--telemetry",
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.087s
+
+OK

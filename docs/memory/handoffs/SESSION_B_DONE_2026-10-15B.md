@@ -1,0 +1,10 @@
+1. Session B done, queue 2026-10-15B (G1-S1, then G3-S1). Baseline 3107fb5. Nothing adopted or committed. The companion was never restarted, and the watch and e4_s4d were not touched.
+2. G1-S1: docs/REMOTE_TRUST.md (G0: topologies, threat model, fail-closed rules; ROADMAP quoted or "G1-S1 proposal") and the source-address audit (g1_s1_2026-10-15/, 80 lines, all categorized; the client sends no identity).
+3. G1-S1: companion/overlay/ (contract, none, read-only tailscale) behind PRIVYHUB_OVERLAY_PROVIDER, plus one guarded import and one guarded status field in privyhub_service.py. 17 tests OK; the /status document is byte for byte with the flag absent.
+4. Tailscale is not installed on the hub (--state reads binary-absent). The user installs it by hand. Session A's live smoke is pending on the stream.
+5. G3-S1: companion/session_identity.py behind PRIVYHUB_SESSION_IDENTITY=v2. Pairing window and code, HMAC-signed nonce setup, 8-h tokens, declared endpoints, permissions failing closed, an audit log with no addresses.
+6. G3-S1: the legacy path accepts today's client only from the hub's LAN (legacy_unpaired_lan, default on), audited; never over the overlay; loopback is host-local.
+7. G3-S1 verification: 38 tests OK. The handler replay (D6-R1's GETs plus the client's calls) is 14/14 byte for byte with the flag absent; the mutation check catches changes; the redactor passes on the audit sample.
+8. Pending: the D6-R1 UDP runs and both live smokes (session A, after the watch); G3-S2 (client APK: key, pairing UI, signed setup, token); whether `diagnostics` becomes a permission.
+9. Records: evidence/G1_S1_…_2026-10-15.md and G3_S1_…_2026-10-15.md, with their directories; patches G1-S1_… and G3-S1_…; ROADMAP §G0/§G1/§G3 status lines. PATCH_INDEX not updated (not B's file).
+10. Git: logs/g1_s1_git_status.txt, logs/g3_s1_git_status.txt. Modified: privyhub_service.py, ROADMAP. New: companion/overlay/, session_identity.py, REMOTE_TRUST.md, tests/. Disclosed slip: a stray `rm -f /dev/null`; it failed, /dev/null is intact.

@@ -1,0 +1,104 @@
+    def status(
+        self,
+    ) -> dict[str, Any]:
+        with self.lock:
+            if (
+                self.server is not None
+                and not self._running(
+                    self.server
+                )
+            ):
+                self._close_log(
+                    self.server
+                )
+                self.server = None
+
+            if (
+                self.source_process
+                is not None
+                and not self._running(
+                    self.source_process
+                )
+            ):
+                self._close_log(
+                    self.source_process
+                )
+                self.source_process = None
+
+                if (
+                    self.active_source_id
+                    is not None
+                ):
+                    active = (
+                        self.catalog.get_source(
+                            self.active_source_id
+                        )
+                    )
+
+                    if (
+                        active["playback"]["type"]
+                        != "vod"
+                    ):
+                        self.active_source_id = None
+
+            payload = {
+                "service": "PrivyHub",
+                "api_version": 4,
+                "project_root": str(
+                    PROJECT_ROOT
+                ),
+                "media_root": str(
+                    MEDIA_ROOT
+                ),
+                "storage": {
+                    "vod": (
+                        self.catalog.vod_storage_status()
+                    ),
+                },
+                "control_port": CONTROL_PORT,
+                "server": {
+                    "running": self._running(
+                        self.server
+                    ),
+                    "pid": (
+                        self.server.process.pid
+                        if self._running(
+                            self.server
+                        )
+                        else None
+                    ),
+                    "log": (
+                        str(
+                            self.server.log_path
+                        )
+                        if self.server
+                        else None
+                    ),
+                },
+                "active_source": {
+                    "id": self.active_source_id,
+                    "runner_running": self._running(
+                        self.source_process
+                    ),
+                    "pid": (
+                        self.source_process.process.pid
+                        if self._running(
+                            self.source_process
+                        )
+                        else None
+                    ),
+                    "log": (
+                        str(
+                            self.source_process.log_path
+                        )
+                        if self.source_process
+                        else None
+                    ),
+                },
+            }
+
+        # G1-S1: the overlay object, outside the lock, only with the flag set.
+        if OVERLAY_STATUS is not None:
+            payload["overlay"] = OVERLAY_STATUS.status_field()
+
+        return payload

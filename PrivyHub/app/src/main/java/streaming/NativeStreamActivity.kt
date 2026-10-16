@@ -1,6 +1,7 @@
 package com.safeiot.privyhub.streaming
 
 import android.app.Activity
+import com.safeiot.privyhub.identity.PrivyHubIdentity
 import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -3847,7 +3848,8 @@ class NativeStreamActivity :
 
     private fun httpPostJson(
         address: String,
-        payload: JSONObject
+        payload: JSONObject,
+        identityAttempt: Int = 0
     ) {
         val body =
             payload.toString()
@@ -3874,6 +3876,9 @@ class NativeStreamActivity :
                     )
                 }
 
+        // G3-S2: the session header, only with identity_v2 on.
+        PrivyHubIdentity.decorate(this, connection, address)
+
         try {
             connection.outputStream.use {
                 it.write(body)
@@ -3889,11 +3894,23 @@ class NativeStreamActivity :
                     connection.errorStream
                 }
 
+            // G3-S2: the refusal body is read only with identity_v2 on.
+            val errorBody =
+                if (code !in 200..299 && PrivyHubIdentity.isEnabled(this)) {
+                    stream?.bufferedReader()?.use { it.readText() }
+                } else {
+                    null
+                }
+
             stream?.close()
 
             if (code !in 200..299) {
+                val identity = PrivyHubIdentity.get(this)
+                if (identity.onResponse(code, errorBody, identityAttempt)) {
+                    return httpPostJson(address, payload, identityAttempt + 1)
+                }
                 throw IllegalStateException(
-                    "HTTP $code"
+                    identity.refusalMessage(code, errorBody) ?: "HTTP $code"
                 )
             }
         } finally {
@@ -3908,7 +3925,8 @@ class NativeStreamActivity :
         address: String,
         body: ByteArray,
         contentType: String,
-        readTimeoutMs: Int = 10_000
+        readTimeoutMs: Int = 10_000,
+        identityAttempt: Int = 0
     ): String {
         val connection =
             (URL(address).openConnection() as HttpURLConnection).apply {
@@ -3921,6 +3939,9 @@ class NativeStreamActivity :
                 setFixedLengthStreamingMode(body.size)
             }
 
+        // G3-S2: the session header, only with identity_v2 on.
+        PrivyHubIdentity.decorate(this, connection, address)
+
         try {
             connection.outputStream.use { it.write(body) }
 
@@ -3930,6 +3951,12 @@ class NativeStreamActivity :
             val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
 
             if (code !in 200..299) {
+                // G3-S2: one fresh setup on a token refusal; the reason code shown.
+                val identity = PrivyHubIdentity.get(this)
+                if (identity.onResponse(code, text, identityAttempt)) {
+                    return httpPostBody(address, body, contentType, readTimeoutMs, identityAttempt + 1)
+                }
+                identity.refusalMessage(code, text)?.let { throw IllegalStateException(it) }
                 val message =
                     try {
                         JSONObject(text).optString("error", text)
@@ -3948,7 +3975,8 @@ class NativeStreamActivity :
     private fun httpPost(
         address: String,
         readTimeoutMs: Int =
-            10_000
+            10_000,
+        identityAttempt: Int = 0
     ): String {
         val connection =
             (
@@ -3966,6 +3994,9 @@ class NativeStreamActivity :
                     doInput =
                         true
                 }
+
+        // G3-S2: the session header, only with identity_v2 on.
+        PrivyHubIdentity.decorate(this, connection, address)
 
         try {
             val code =
@@ -3993,6 +4024,12 @@ class NativeStreamActivity :
                 code !in
                 200..299
             ) {
+                // G3-S2: one fresh setup on a token refusal; the reason code shown.
+                val identity = PrivyHubIdentity.get(this)
+                if (identity.onResponse(code, body, identityAttempt)) {
+                    return httpPost(address, readTimeoutMs, identityAttempt + 1)
+                }
+                identity.refusalMessage(code, body)?.let { throw IllegalStateException(it) }
                 val message =
                     try {
                         JSONObject(

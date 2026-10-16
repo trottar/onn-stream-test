@@ -1,0 +1,35 @@
+$ python3 -m companion.overlay --state
+{
+  "selected_by": "default (none)",
+  "tailscale_binary_installed": false,
+  "state": {
+    "provider": "none",
+    "available": false,
+    "connected": false,
+    "path": "none",
+    "peer_ready": null,
+    "mtu": null,
+    "reason": "absent",
+    "endpoint": "absent",
+    "endpoint_hash": null
+  }
+}
+rc=0
+$ python3 -m companion.overlay --state --provider tailscale --diagnostics
+{
+  "selected_by": "--provider",
+  "tailscale_binary_installed": false,
+  "state": {
+    "provider": "tailscale",
+    "available": false,
+    "connected": false,
+    "path": "none",
+    "peer_ready": null,
+    "mtu": null,
+    "reason": "binary-absent",
+    "endpoint": "absent",
+    "endpoint_hash": null
+  },
+  "diagnostics": {}
+}
+rc=0

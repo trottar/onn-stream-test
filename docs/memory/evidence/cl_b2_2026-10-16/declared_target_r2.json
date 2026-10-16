@@ -1,0 +1,6 @@
+{
+ "native_stream_start_audited_legacy_setup": false,
+ "reading": "native-stream-start is a SETUP_PATH: without a header from the LAN the gate writes legacy_setup; none was written in R2, so the client's call carried the session token (Decision kind=session), and privyhub_service passes SESSION_IDENTITY.client_target(self) = the session's declared media_host to the native-stream handler (companion/privyhub_service.py, the G3-S1 edit). endpoint-port-mismatch (the signed video_port vs the call's port) was not refused.",
+ "wire_check": "not possible unprivileged: the encoder sends to the loopback FEC sender (rtp to the loopback address, port 48110) and every UDP socket in the companion's cgroup is unconnected (sendto), so ss shows no peer; a packet capture needs privileges (not used).",
+ "on_the_lan": "the client declares media_host = its own address on the route to the hub (G3-S2), i.e. the same LAN address the source shows; the stream reached the onn (PLAYING in 3.0 s, rendered fps in the run)."
+}

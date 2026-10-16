@@ -1,0 +1,99 @@
+{
+  "generated_by": "docs/memory/evidence/g3_s2_2026-10-16/make_vectors.py (G3-S1's sign() and SessionGate)",
+  "header": "X-PrivyHub-Session",
+  "host_responses": {
+    "host_flag_off_nonce": {
+      "body": "{\n  \"ok\": false,\n  \"error\": \"Not found\"\n}",
+      "status": 404
+    },
+    "legacy_overlay": {
+      "body": "{\n  \"ok\": false,\n  \"error\": \"session refused\",\n  \"reason\": \"legacy-overlay\"\n}",
+      "status": 401
+    },
+    "nonce_ok": {
+      "body": "{\n  \"ok\": true,\n  \"nonce\": \"7kyZ8wpUlTz24qB3RkrJVJGF1W8_6fiV\",\n  \"expires_in_s\": 60\n}",
+      "status": 200
+    },
+    "pair_closed": {
+      "body": "{\n  \"ok\": false,\n  \"error\": \"session refused\",\n  \"reason\": \"pairing-closed\"\n}",
+      "status": 403
+    },
+    "pair_ok": {
+      "body": "{\n  \"ok\": true,\n  \"device_id\": \"dev-4cf6e8c8da9dcc28\",\n  \"permissions\": [\n    \"games\",\n    \"tv\",\n    \"vod\"\n  ]\n}",
+      "status": 200
+    },
+    "permission_unknown": {
+      "body": "{\n  \"ok\": false,\n  \"error\": \"session refused\",\n  \"reason\": \"permission-unknown\"\n}",
+      "status": 403
+    },
+    "setup_nonce_unknown": {
+      "body": "{\n  \"ok\": false,\n  \"error\": \"session refused\",\n  \"reason\": \"nonce-unknown\"\n}",
+      "status": 401
+    },
+    "setup_ok": {
+      "body": "{\n  \"ok\": true,\n  \"token\": \"f9yhL0ODb4XacgO1LbXvii-DQdANJm-F8qz1RT5gEuA\",\n  \"expires_in_s\": 28800,\n  \"client_id\": \"dev-4cf6e8c8da9dcc28\",\n  \"permissions\": [\n    \"games\",\n    \"tv\",\n    \"vod\"\n  ]\n}",
+      "status": 200
+    },
+    "token_expired": {
+      "body": "{\n  \"ok\": false,\n  \"error\": \"session refused\",\n  \"reason\": \"token-expired\"\n}",
+      "status": 401
+    }
+  },
+  "permission_paths": {
+    "/diagnostics/client-health": "games",
+    "/diagnostics/health": "diagnostics",
+    "/no/such": null,
+    "/plugins/epg/guide": "tv",
+    "/plugins/games/launch": "games",
+    "/plugins/games/native-stream-heartbeat": "games",
+    "/plugins/games/native-stream-start": "games",
+    "/plugins/games/status": "games",
+    "/sources": "tv",
+    "/sources/x/start": "tv",
+    "/status": "diagnostics",
+    "/stop": "tv"
+  },
+  "setup_canon": "privyhub-session-setup-v1",
+  "token_ttl_s": 28800,
+  "vectors": [
+    {
+      "canonical_bytes": 97,
+      "canonical_sha256": "d5edf69446b9c973c9862e6332a5ed195c7ed44262cfe3616708b2c105b5c5dc",
+      "device_id": "dev-0123456789abcdef",
+      "key_hex": "13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb",
+      "media_host": {
+        "text": "media-host-fixture"
+      },
+      "name": "text-host",
+      "nonce": "fixture-nonce-AAAA_bbbb-1",
+      "sig": "848f1593d46c042741fd7e164c43ecd86002eff2c027bdbddfd1ec82d906929b",
+      "video_port": 48100
+    },
+    {
+      "canonical_bytes": 93,
+      "canonical_sha256": "99147466fb4a60bda0afab91e6784f2b829e8e00db047a945cd5096b93cf565c",
+      "device_id": "dev-0123456789abcdef",
+      "key_hex": "13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb",
+      "media_host": {
+        "ipv4_int": "0xC0A86439"
+      },
+      "name": "lan-ipv4",
+      "nonce": "fixture-nonce-CCCC_dddd-2",
+      "sig": "80ec627755a8936f42b60064ed63c3a881ee887caf9cb8bc2f2e05c0772335cd",
+      "video_port": 48100
+    },
+    {
+      "canonical_bytes": 79,
+      "canonical_sha256": "a21c325f050749e29db602fdf3aaa7c3da52acbfcb246a5b81023daa4c9bc8da",
+      "device_id": "dev-fedcba9876543210",
+      "key_hex": "13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb",
+      "media_host": {
+        "ipv4_int": "0x64401235"
+      },
+      "name": "overlay-ipv4-port-50000",
+      "nonce": "Zz-09_fixture",
+      "sig": "31c3cad2f265ae085f684a57a495ccb4fbcc8490630f0eb0fc76a15fff272044",
+      "video_port": 50000
+    }
+  ]
+}

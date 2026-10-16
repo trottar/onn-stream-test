@@ -1,0 +1,28 @@
+Calculating task graph as no cached configuration is available for tasks: :app:assembleRelease
+
+1 problem was found storing the configuration cache.
+- Task `:app:lintVitalAnalyzeRelease` of type `com.android.build.gradle.internal.lint.AndroidLintAnalysisTask`: error writing value of type 'org.gradle.api.internal.file.collections.DefaultConfigurableFileCollection'
+
+See the complete report at file:///home/privyhub/Projects/onn-stream-test/PrivyHub/build/reports/configuration-cache/ba33oiclqp0gbb3oumh7j2cpc/12abhxwpgwma02fhfcio2wog5/configuration-cache-report.html
+
+[Incubating] Problems report is available at: file:///home/privyhub/Projects/onn-stream-test/PrivyHub/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Configuration cache state could not be cached: field `__classpath__` of `com.android.build.gradle.internal.lint.LintTool_Decorated` bean found in field `__lintTool__` of task `:app:lintVitalAnalyzeRelease` of type `com.android.build.gradle.internal.lint.AndroidLintAnalysisTask`: error writing value of type 'org.gradle.api.internal.file.collections.DefaultConfigurableFileCollection'
+> Could not resolve all files for configuration ':app:androidLintTool'.
+   > Could not resolve com.android.tools.lint:lint-gradle:32.3.2.
+     Required by:
+         project ':app'
+      > No cached version of com.android.tools.lint:lint-gradle:32.3.2 available for offline mode.
+      > No cached version of com.android.tools.lint:lint-gradle:32.3.2 available for offline mode.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 1s
+Configuration cache entry discarded due to serialization error.

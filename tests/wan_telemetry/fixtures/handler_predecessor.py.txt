@@ -1,0 +1,694 @@
+class PrivyHubRequestHandler(
+    BaseHTTPRequestHandler
+):
+    server_version = "PrivyHubControl/0.6"
+
+    def log_message(
+        self,
+        format: str,
+        *args: Any,
+    ) -> None:
+        # PRIVYHUB_B1_CLIENT_HEALTH_ENDPOINT_V1
+        # PRIVYHUB_B1_B2_COMPLETION_API_V1
+        # CL-B1: `self.path` does not exist yet on http.server's 414 path.
+        if (
+            access_log_path(self).startswith(
+                "/diagnostics/"
+            )
+        ):
+            return
+
+        print(
+            f"{self.client_address[0]} - "
+            f"{self.log_date_time_string()} - "
+            f"{format % args}"
+        )
+
+    def _send_json(
+        self,
+        status_code: int,
+        payload: dict[str, Any],
+    ) -> None:
+        body = json.dumps(
+            payload,
+            indent=2,
+        ).encode("utf-8")
+
+        self.send_response(
+            status_code
+        )
+
+        self.send_header(
+            "Content-Type",
+            "application/json; charset=utf-8",
+        )
+
+        self.send_header(
+            "Content-Length",
+            str(len(body)),
+        )
+
+        self.send_header(
+            "Cache-Control",
+            "no-store",
+        )
+
+        # G3-S1: a session token header, only under the flag.
+        if SESSION_IDENTITY is not None:
+            for name, value in getattr(self, "_session_headers", ()):
+                self.send_header(name, value)
+
+        self.end_headers()
+
+        self.wfile.write(
+            body
+        )
+
+    def _read_json_body(
+        self,
+        *,
+        max_bytes: int,
+    ) -> tuple[
+        dict[str, Any],
+        int,
+    ]:
+        raw_length = self.headers.get(
+            "Content-Length"
+        )
+
+        if raw_length is None:
+            raise ValueError(
+                "Content-Length is required"
+            )
+
+        try:
+            length = int(raw_length)
+        except ValueError as exc:
+            raise ValueError(
+                "Invalid Content-Length"
+            ) from exc
+
+        if length <= 0 or length > max_bytes:
+            raise ValueError(
+                "Client health payload size is invalid"
+            )
+
+        body = self.rfile.read(length)
+
+        try:
+            payload = json.loads(
+                body.decode("utf-8")
+            )
+        except (
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+        ) as exc:
+            raise ValueError(
+                "Client health payload is not valid JSON"
+            ) from exc
+
+        if not isinstance(payload, dict):
+            raise ValueError(
+                "Client health payload must be an object"
+            )
+
+        return payload, length
+
+    def _current_health_snapshot(
+        self,
+    ) -> dict[str, Any]:
+        return build_live_health_snapshot(
+            project_root=(
+                PROJECT_ROOT
+            ),
+            companion_status=(
+                CONTROLLER.status()
+            ),
+            games_plugin=(
+                PLUGINS.get(
+                    "games"
+                )
+            ),
+            client_health_feedback=(
+                CLIENT_HEALTH_STORE.snapshot()
+            ),
+        )
+
+    def _native_stream_status(
+        self,
+    ) -> dict[str, Any]:
+        games = PLUGINS.get(
+            "games"
+        )
+        if games is None:
+            return {}
+
+        try:
+            payload = games.handle(
+                "native-stream-status",
+                "",
+            )
+        except Exception:
+            return {}
+
+        return (
+            payload
+            if isinstance(payload, dict)
+            else {}
+        )
+
+    def do_GET(
+        self,
+    ) -> None:
+        parsed = urlsplit(self.path)
+        request_path = parsed.path
+
+        # G3-S1: identity and authorization, only under the flag.
+        if SESSION_IDENTITY is not None and SESSION_IDENTITY.intercept(self, "GET", parsed):
+            return
+
+        if request_path == "/status":
+            self._send_json(
+                200,
+                CONTROLLER.status(),
+            )
+            return
+
+        # PRIVYHUB_B1_HEALTH_ENDPOINT_V1
+        if request_path == "/diagnostics/health":
+            self._send_json(
+                200,
+                self._current_health_snapshot(),
+            )
+            return
+
+        if request_path == "/diagnostics/stream-telemetry":
+            self._send_json(
+                200,
+                STREAM_TELEMETRY_STORE.snapshot(),
+            )
+            return
+
+        if request_path == "/sources":
+            self._send_json(
+                200,
+                CONTROLLER.catalog.public_catalog(),
+            )
+            return
+
+        parts = [
+            part
+            for part in request_path.split("/")
+            if part
+        ]
+
+        if (
+            len(parts) == 3
+            and parts[0] == "plugins"
+        ):
+            plugin_id = parts[1]
+            action = parts[2]
+            plugin = PLUGINS.get(plugin_id)
+
+            if plugin is None:
+                self._send_json(
+                    404,
+                    {
+                        "ok": False,
+                        "error": f"Unknown plugin: {plugin_id}",
+                    },
+                )
+                return
+
+            try:
+                payload = plugin.handle(
+                    action,
+                    parsed.query,
+                )
+            except ValueError as exc:
+                self._send_json(
+                    400,
+                    {
+                        "ok": False,
+                        "error": str(exc),
+                    },
+                )
+                return
+            except RuntimeError as exc:
+                self._send_json(
+                    502,
+                    {
+                        "ok": False,
+                        "error": str(exc),
+                    },
+                )
+                return
+
+            self._send_json(
+                200,
+                payload,
+            )
+            return
+
+        self._send_json(
+            404,
+            {
+                "ok": False,
+                "error": "Not found",
+            },
+        )
+
+    def do_POST(
+        self,
+    ) -> None:
+        try:
+            parsed = urlsplit(self.path)
+            request_path = parsed.path
+
+            # G3-S1: identity and authorization, only under the flag.
+            if SESSION_IDENTITY is not None and SESSION_IDENTITY.intercept(self, "POST", parsed):
+                return
+
+            if request_path == "/diagnostics/self-test":
+                try:
+                    result = run_diagnostics_self_test(
+                        project_root=(
+                            PROJECT_ROOT
+                        ),
+                        health_snapshot=(
+                            self._current_health_snapshot()
+                        ),
+                    )
+                except Exception as exc:
+                    self._send_json(
+                        500,
+                        {
+                            "ok": False,
+                            "error": "Diagnostics self-test failed.",
+                            "error_class": type(exc).__name__,
+                        },
+                    )
+                    return
+
+                self._send_json(
+                    200,
+                    result,
+                )
+                return
+
+            if request_path == "/diagnostics/bundle":
+                companion_status = CONTROLLER.status()
+
+                try:
+                    result = create_sanitized_support_bundle(
+                        project_root=(
+                            PROJECT_ROOT
+                        ),
+                        health_snapshot=(
+                            build_live_health_snapshot(
+                                project_root=(
+                                    PROJECT_ROOT
+                                ),
+                                companion_status=(
+                                    companion_status
+                                ),
+                                games_plugin=(
+                                    PLUGINS.get(
+                                        "games"
+                                    )
+                                ),
+                                client_health_feedback=(
+                                    CLIENT_HEALTH_STORE.snapshot()
+                                ),
+                            )
+                        ),
+                        companion_status=(
+                            companion_status
+                        ),
+                    )
+                except SupportBundleError as exc:
+                    self._send_json(
+                        500,
+                        {
+                            "ok": False,
+                            "error": "Sanitized diagnostics bundle creation failed.",
+                            "error_code": exc.code,
+                        },
+                    )
+                    return
+                except Exception as exc:
+                    self._send_json(
+                        500,
+                        {
+                            "ok": False,
+                            "error": "Sanitized diagnostics bundle creation failed.",
+                            "error_class": type(exc).__name__,
+                        },
+                    )
+                    return
+
+                self._send_json(
+                    200,
+                    result,
+                )
+                return
+
+            if request_path == "/diagnostics/client-health":
+                try:
+                    payload, payload_bytes = self._read_json_body(
+                        max_bytes=8_192
+                    )
+                    accepted = CLIENT_HEALTH_STORE.accept(
+                        payload,
+                        payload_bytes=payload_bytes,
+                    )
+
+                    try:
+                        native_status = self._native_stream_status()
+                        telemetry = STREAM_TELEMETRY_STORE.accept(
+                            client_health_feedback=(
+                                CLIENT_HEALTH_STORE.snapshot()
+                            ),
+                            native_stream_status=native_status,
+                        )
+                        # C3-L4-S1: the shadow controller reads the snapshot
+                        # just built and writes down what it would do. It
+                        # never acts; with the flag off it returns at once.
+                        # C3-L4-L1: in live mode the same call decides with
+                        # the stream status as its guard inputs; a transition
+                        # runs on the controller's own worker, never here.
+                        abr_controller = adaptive_bitrate_controller(
+                            PROJECT_ROOT
+                        )
+                        if adaptive_bitrate_is_live(abr_controller):
+                            abr_controller.observe(
+                                telemetry,
+                                stream_bitrate_kbps=native_status.get(
+                                    "bitrate_kbps"
+                                ),
+                                native_status=native_status,
+                            )
+                        else:
+                            abr_controller.observe(
+                                telemetry,
+                                stream_bitrate_kbps=native_status.get(
+                                    "bitrate_kbps"
+                                ),
+                            )
+                    except Exception:
+                        # Telemetry must never disturb client health/gameplay.
+                        pass
+                except ValueError as exc:
+                    self._send_json(
+                        400,
+                        {
+                            "ok": False,
+                            "error": str(exc),
+                        },
+                    )
+                    return
+
+                self._send_json(
+                    200,
+                    accepted,
+                )
+                return
+
+            parts = [
+                part
+                for part in request_path.split("/")
+                if part
+            ]
+
+            # C3-L4-L1: POST /plugins/games/adaptive-bitrate/disable (any
+            # caller, idempotent, switches live to shadow for the session) and
+            # .../inject?class=FALLBACK|ROUTINE (test-only: loopback, the
+            # inject flag and live mode, else 403). No enable route.
+            if (
+                len(parts) == 4
+                and parts[0] == "plugins"
+                and parts[1] == "games"
+                and parts[2] == "adaptive-bitrate"
+            ):
+                code, payload = adaptive_bitrate_route(
+                    PROJECT_ROOT,
+                    parts[3],
+                    parsed.query,
+                    self.client_address[0],
+                )
+                self._send_json(
+                    code,
+                    payload,
+                )
+                return
+
+            if (
+                len(parts) == 3
+                and parts[0] == "plugins"
+            ):
+                plugin_id = parts[1]
+                action = parts[2]
+                plugin = PLUGINS.get(plugin_id)
+
+                if plugin is None:
+                    self._send_json(
+                        404,
+                        {
+                            "ok": False,
+                            "error": f"Unknown plugin: {plugin_id}",
+                        },
+                    )
+                    return
+
+                # CL-B1: the decoder report as a POST body. The target form
+                # (`?report=`, no body) falls through to the plugin as before.
+                if (
+                    plugin_id == "games"
+                    and action == "decoder-session-log"
+                    and hasattr(plugin, "handle_decoder_session_log")
+                    and self.headers.get("Content-Length") not in (None, "", "0")
+                ):
+                    report = None
+                    try:
+                        length = decoder_report_body_length(self.headers)
+                        report = decoder_report_from_body(
+                            self.rfile.read(length),
+                            self.headers.get("Content-Type"),
+                        )
+                        print(
+                            "decoder-session-log received as body: "
+                            f"report_chars={len(report)}"
+                        )
+                        payload = plugin.handle_decoder_session_log(report)
+                    except (ValueError, UnicodeDecodeError) as exc:
+                        self.close_connection = True
+                        print(
+                            "WARNING decoder-session-log rejected (400): "
+                            f"{exc}; report_chars="
+                            + (
+                                str(len(report))
+                                if report is not None
+                                else f"body_bytes={self.headers.get('Content-Length')}"
+                            )
+                        )
+                        self._send_json(
+                            400,
+                            {
+                                "ok": False,
+                                "error": str(exc),
+                            },
+                        )
+                        return
+
+                    self._send_json(
+                        200,
+                        payload,
+                    )
+                    return
+
+                json_request_handler = getattr(
+                    plugin,
+                    "handle_post_json_request",
+                    None,
+                )
+
+                request_handler = getattr(
+                    plugin,
+                    "handle_post_request",
+                    None,
+                )
+
+                handler = (
+                    json_request_handler
+                    or request_handler
+                    or getattr(
+                        plugin,
+                        "handle_post",
+                        None,
+                    )
+                )
+
+                if handler is None:
+                    self._send_json(
+                        405,
+                        {
+                            "ok": False,
+                            "error": f"Plugin does not support POST: {plugin_id}",
+                        },
+                    )
+                    return
+
+                try:
+                    if json_request_handler is not None:
+                        request_payload, _ = self._read_json_body(
+                            max_bytes=4_194_304
+                        )
+                        payload = json_request_handler(
+                            action,
+                            parsed.query,
+                            request_payload,
+                            # G3-S1: a session's declared endpoint; else the source (today).
+                            SESSION_IDENTITY.client_target(self)
+                            if SESSION_IDENTITY is not None
+                            else self.client_address[0],
+                        )
+                    elif request_handler is not None:
+                        payload = request_handler(
+                            action,
+                            parsed.query,
+                            # G3-S1: a session's declared endpoint; else the source (today).
+                            SESSION_IDENTITY.client_target(self)
+                            if SESSION_IDENTITY is not None
+                            else self.client_address[0],
+                        )
+                    else:
+                        payload = handler(
+                            action,
+                            parsed.query,
+                        )
+                except ValueError as exc:
+                    # C3-L3A-R2B: a refused decoder report was invisible in
+                    # the journal (the reason went only to the client, which
+                    # discards it). One line, reason and length, no content.
+                    if action == "decoder-session-log":
+                        report_chars = len(
+                            parse_qs(parsed.query)
+                            .get("report", [""])[0]
+                            .strip()
+                        )
+                        print(
+                            "WARNING decoder-session-log rejected (400): "
+                            f"{exc}; report_chars={report_chars}"
+                        )
+
+                    self._send_json(
+                        400,
+                        {
+                            "ok": False,
+                            "error": str(exc),
+                        },
+                    )
+                    return
+                except RuntimeError as exc:
+                    self._send_json(
+                        503,
+                        {
+                            "ok": False,
+                            "error": str(exc),
+                        },
+                    )
+                    return
+
+                self._send_json(
+                    200,
+                    payload,
+                )
+                return
+
+            if self.path == "/stop":
+                status = (
+                    CONTROLLER.stop_source()
+                )
+
+                self._send_json(
+                    200,
+                    {
+                        "ok": True,
+                        "action": "stop",
+                        "status": status,
+                    },
+                )
+                return
+
+            prefix = "/sources/"
+            suffix = "/start"
+
+            if (
+                self.path.startswith(
+                    prefix
+                )
+                and self.path.endswith(
+                    suffix
+                )
+            ):
+                source_id = (
+                    self.path[
+                        len(prefix):
+                        -len(suffix)
+                    ]
+                    .strip("/")
+                )
+
+                if not source_id:
+                    raise CatalogError(
+                        "Missing source id"
+                    )
+
+                result = (
+                    CONTROLLER.start_source(
+                        source_id
+                    )
+                )
+
+                self._send_json(
+                    200,
+                    result,
+                )
+                return
+
+            self._send_json(
+                404,
+                {
+                    "ok": False,
+                    "error": "Not found",
+                },
+            )
+
+        except CatalogError as exc:
+            self._send_json(
+                404,
+                {
+                    "ok": False,
+                    "error": str(exc),
+                },
+            )
+
+        except SourceStartError as exc:
+            self._send_json(
+                503,
+                {
+                    "ok": False,
+                    "error": str(exc),
+                    "status": CONTROLLER.status(),
+                },
+            )
+
+        except Exception as exc:
+            self._send_json(
+                500,
+                {
+                    "ok": False,
+                    "error": str(exc),
+                    "status": CONTROLLER.status(),
+                },
+            )

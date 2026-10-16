@@ -1,0 +1,921 @@
+--- companion/privyhub_service.py (predecessor 32a7d2ea…, G1/G3 state)
++++ companion/privyhub_service.py (G5-S1)
+@@ -1851,7 +1851,38 @@
+ 
+     SESSION_IDENTITY = _session_gate_from_environ(os.environ, PROJECT_ROOT)
+ 
++# G5-S1: WAN telemetry classification, only with PRIVYHUB_WAN_TELEMETRY=1.
++# Absent = today: nothing imported, constructed or called; no field.
++WAN_TELEMETRY = None
++
++if os.environ.get("PRIVYHUB_WAN_TELEMETRY", "").strip():
++    from wan_telemetry import from_environ as _wan_from_environ
++
++    WAN_TELEMETRY = _wan_from_environ(
++        os.environ,
++        PROJECT_ROOT,
++        overlay_state=(
++            OVERLAY_STATUS.status_field
++            if OVERLAY_STATUS is not None
++            else None
++        ),
++    )
++
+ CONTROLLER = PrivyHubController()
++
++# G5-S1: /status gains the wan object while a stream reports, only with the
++# flag set (the status method itself is unchanged).
++if WAN_TELEMETRY is not None:
++    _controller_status_without_wan = CONTROLLER.status
++
++    def _controller_status_with_wan() -> dict[str, Any]:
++        payload = _controller_status_without_wan()
++        wan = WAN_TELEMETRY.status_field()
++        if wan is not None:
++            payload["wan"] = wan
++        return payload
++
++    CONTROLLER.status = _controller_status_with_wan
+ CLIENT_HEALTH_STORE = ClientHealthStore()
+ STREAM_TELEMETRY_STORE = StreamTelemetryStore()
+ 
+@@ -2043,7 +2074,13 @@
+         if request_path == "/diagnostics/stream-telemetry":
+             self._send_json(
+                 200,
+-                STREAM_TELEMETRY_STORE.snapshot(),
++                STREAM_TELEMETRY_STORE.snapshot()
++                # G5-S1: the session's wan object, only with the flag set.
++                if WAN_TELEMETRY is None
++                else {
++                    **STREAM_TELEMETRY_STORE.snapshot(),
++                    "wan": WAN_TELEMETRY.status_field(),
++                },
+             )
+             return
+ 
+@@ -2253,6 +2290,12 @@
+                                     "bitrate_kbps"
+                                 ),
+                             )
++                        # G5-S1: classification only; it never acts.
++                        if WAN_TELEMETRY is not None:
++                            WAN_TELEMETRY.observe(
++                                telemetry,
++                                native_status,
++                            )
+                     except Exception:
+                         # Telemetry must never disturb client health/gameplay.
+                         pass
+diff --git a/companion/wan_telemetry.py b/companion/wan_telemetry.py
+new file mode 100644
+index 0000000..edc9c39
+--- /dev/null
++++ b/companion/wan_telemetry.py
+@@ -0,0 +1,417 @@
++"""G5-S1: WAN-aware telemetry classification (ROADMAP §G5).
++
++Behind `PRIVYHUB_WAN_TELEMETRY=1`. **Absent = today**: the companion never
++imports this module, builds nothing, starts no thread and adds no field.
++
++It reuses Phase C's telemetry (ROADMAP §G5: "Reuse Phase C telemetry/adaptation
++instead of creating a parallel WAN streamer"):
++
++- the stream telemetry the client's health report already produces;
++- the live ladder's transitions;
++- the recovery state's pauses;
++- the heartbeat's FEC and resync counters;
++- G1-S1's overlay provider.
++
++From these it reports §G5's eleven measures, each with its source field.
++It classifies every 10-s window (5 reports, the ladder's own evidence
++window) and the whole session.
++
++The thresholds are §1 of
++`docs/memory/evidence/G5_S1_WAN_TELEMETRY_CLASSIFICATION_2026-10-16.md`,
++each from an existing record; nothing is invented. A measure with no
++recorded threshold is reported and "not classified; G5-S2". **Nothing
++here adapts anything** (that is G5-S2; the rules are in
++`docs/WAN_ADAPTATION_RULES.md`).
++"""
++
++from __future__ import annotations
++
++import json
++import statistics
++import threading
++import time
++from dataclasses import dataclass, field
++from pathlib import Path
++from typing import Any, Callable, Iterable, Mapping
++
++FLAG_ENV = "PRIVYHUB_WAN_TELEMETRY"
++SCHEMA = "privyhub_wan_telemetry_v1"
++
++# ---- thresholds (record §1; each with its source) ----------------------------
++REPORT_INTERVAL_S = 2.0          # adaptive_bitrate.REPORT_INTERVAL_MS: the client's report cadence
++WINDOW_REPORTS = 5               # adaptive_bitrate.WINDOW_REPORTS: "10 s of evidence for a decrease"
++LOSS_PER_MIN_AT_LEAST = 10.0     # D-BASE close-out: post-FEC video loss < 10 / min
++STALE_PER_MIN_AT_LEAST = 20.0    # D-BASE close-out: stale output drops < 20 / min
++CAPACITY_FPS_BELOW = 50.0        # C3-L4-N1 capacity: fps < 50 on all 5 ...
++CAPACITY_LOSS_AT_LEAST, CAPACITY_LOSS_OF = 50, 3          # ... and >= 50 lost on >= 3 of 5
++CAPACITY_MILD_FPS_BELOW, CAPACITY_MILD_FPS_OF = 57.0, 4   # C3-L4-N2 capacity_mild: < 57 on >= 4 of 5
++QUEUE_AT_LEAST, QUEUE_OF = 1, 3  # adaptive_bitrate ROUTINE queue clause: >= 1 on >= 3 of 5
++GAP_ABOVE_MS, GAP_OF = 250, 2    # adaptive_bitrate FALLBACK gap clause: > 250 on >= 2 of 5
++
++CLASSES = ("path-changed", "latency-limited", "starved", "capacity-limited", "lossy", "clean")
++# Priority (ROADMAP §G5's order): session correctness, runaway latency,
++# starvation, capacity, loss.
++PRIORITY = {name: i for i, name in enumerate(CLASSES)}
++
++NOT_CLASSIFIED = "not classified; G5-S2"
++
++
++@dataclass
++class Report:
++    """One client report, from the stream-telemetry schema (no address)."""
++    elapsed_ms: int | None
++    fps: float | None
++    queue: int | None
++    gap_ms: int | None
++    lost: int | None
++    packets: int | None
++    mbps: float | None
++    jitter_ms: float | None
++    rtt_ms: int | None
++    stale: int | None
++    waiting_for_idr: bool | None
++    queue_delta: int | None
++    fec_recovered: int | None = None
++    fec_unrecoverable: int | None = None
++    sender_avg_us: float | None = None
++    sender_max_us: float | None = None
++    sender_errors: int | None = None
++    sent_bytes: int | None = None
++
++
++@dataclass
++class Event:
++    elapsed_s: float
++    kind: str        # overlay_path | recovery_pause | recovery_resume | ladder_transition | stream_resync
++    detail: str = ""
++
++
++def _num(x: Any) -> float | None:
++    return x if isinstance(x, (int, float)) and not isinstance(x, bool) else None
++
++
++def report_from_telemetry(row: Mapping[str, Any]) -> Report | None:
++    """A report from a stream-telemetry payload (live) or a recorded row; None if not fresh."""
++    if not row.get("fresh"):
++        return None
++    rec = row.get("receiver") or {}
++    dec = row.get("decoder") or {}
++    lat = row.get("latency") or {}
++    fec = row.get("fec") or {}
++    snd = row.get("sender") or {}
++    elapsed = row.get("elapsed_ms", row.get("session_elapsed_ms"))
++    return Report(
++        elapsed_ms=int(elapsed) if _num(elapsed) is not None else None,
++        fps=_num(rec.get("recent_fps")),
++        queue=_num(dec.get("queue_depth")),
++        gap_ms=_num(lat.get("output_gap_ms")),
++        lost=_num(rec.get("lost_packets_delta")),
++        packets=_num(rec.get("packets_delta")),
++        mbps=_num(rec.get("recent_mbps")),
++        jitter_ms=_num(rec.get("interarrival_jitter_ms")),
++        rtt_ms=_num(lat.get("control_round_trip_ms")),
++        stale=_num(dec.get("stale_output_drops_delta")),
++        waiting_for_idr=rec.get("waiting_for_idr") if isinstance(rec.get("waiting_for_idr"), bool) else None,
++        queue_delta=_num(dec.get("queue_depth_delta")),
++        fec_recovered=_num(fec.get("recovered_packets_delta")),
++        fec_unrecoverable=_num(fec.get("unrecoverable_groups_delta")),
++        sender_avg_us=_num(snd.get("send_call_avg_us")),
++        sender_max_us=_num(snd.get("send_call_max_us")),
++        sender_errors=_num(snd.get("send_errors_delta")),
++        sent_bytes=_num(snd.get("sent_bytes_delta")),
++    )
++
++
++def _vals(reports: Iterable[Report], name: str) -> list[float]:
++    return [v for v in (getattr(r, name) for r in reports) if v is not None]
++
++
++def _pct(xs: list[float], q: float) -> float | None:
++    if not xs:
++        return None
++    s = sorted(xs)
++    k = (len(s) - 1) * q
++    lo, hi = int(k), min(int(k) + 1, len(s) - 1)
++    return round(s[lo] + (s[hi] - s[lo]) * (k - lo), 3)
++
++
++def _measure(value: Any, source: str, **extra: Any) -> dict[str, Any]:
++    return {"value": value, "source": source, **extra}
++
++
++def measures(reports: list[Report], events: list[Event], overlay: Mapping[str, Any] | None,
++             heartbeat: Mapping[str, Any] | None = None, span_s: float | None = None) -> dict[str, Any]:
++    """§G5's eleven measures over a span of reports, each with its source.
++
++    `span_s`: the span the rates are over (the session's elapsed span); default
++    the reports' count × the report interval."""
++    span_s = span_s or len(reports) * REPORT_INTERVAL_S
++    per_min = (lambda total: round(total * 60.0 / span_s, 2)) if span_s else (lambda total: None)
++    lost = _vals(reports, "lost")
++    rec = _vals(reports, "fec_recovered")
++    unrec = _vals(reports, "fec_unrecoverable")
++    hb = heartbeat or {}
++    if not rec and hb.get("fec_recovered_packets") is not None:
++        rec = [hb["fec_recovered_packets"]]
++        unrec = [hb.get("fec_unrecoverable_groups") or 0]
++        fec_source = "heartbeat fec_recovered_packets / fec_unrecoverable_groups (deltas over the span)"
++    else:
++        fec_source = "fec.recovered_packets_delta / fec.unrecoverable_groups_delta"
++    mbps = _vals(reports, "mbps")
++    queue = _vals(reports, "queue")
++    jitter = _vals(reports, "jitter_ms")
++    rtt = _vals(reports, "rtt_ms")
++    stale = _vals(reports, "stale")
++    ov = overlay or {}
++    return {
++        "delivered_goodput_kbps": _measure(
++            round(statistics.fmean(mbps) * 1000.0, 1) if mbps else None, "receiver.recent_mbps (mean)"),
++        "packet_loss_per_min": _measure(
++            {"post_fec": per_min(sum(lost)) if lost else None,
++             "pre_fec": per_min(sum(lost) + sum(rec)) if lost and rec else "not recorded"},
++            "receiver.lost_packets_delta (+ FEC recovered for pre-FEC)"),
++        "fec_groups": _measure(
++            {"recovered_packets": sum(rec) if rec else "not recorded",
++             "unrecoverable_groups": sum(unrec) if unrec else "not recorded"},
++            fec_source, classified=NOT_CLASSIFIED),
++        "jitter_ms": _measure(
++            {"p50": _pct(jitter, 0.5), "p95": _pct(jitter, 0.95)},
++            "receiver.interarrival_jitter_ms (client running estimate; no per-packet arrival times carried)",
++            classified=NOT_CLASSIFIED),
++        "rtt_ms": _measure(
++            {"p50": _pct(rtt, 0.5), "p95": _pct(rtt, 0.95)},
++            "latency.control_round_trip_ms (the client's control echo)", classified=NOT_CLASSIFIED),
++        "sender_pacing": _measure(
++            {"send_call_avg_us": _pct(_vals(reports, "sender_avg_us"), 0.5),
++             "send_call_max_us": max(_vals(reports, "sender_max_us"), default=None),
++             "send_errors": sum(_vals(reports, "sender_errors")) if _vals(reports, "sender_errors") else None}
++            if _vals(reports, "sender_avg_us") or _vals(reports, "sender_max_us") else "not recorded",
++            "sender.send_call_avg_us / send_call_max_us / send_errors_delta"),
++        "queue_depth": _measure(
++            {"max": max(queue) if queue else None,
++             "trend": (queue[-1] - queue[0]) if len(queue) > 1 else None},
++            "decoder.queue_depth"),
++        "decoder_starvation": _measure(
++            {"stale_drops_per_min": per_min(sum(stale)) if stale else None,
++             "waiting_for_idr_reports": sum(1 for r in reports if r.waiting_for_idr),
++             "audio_prolonged_starvation_events": hb.get("audio_prolonged_starvation_events", "not recorded")},
++            "decoder.stale_output_drops_delta, receiver.waiting_for_idr, heartbeat audio_prolonged_starvation_events"),
++        "overlay_path": _measure(ov.get("path", "none"), "overlay provider state().path (G1-S1)"),
++        "mtu_fragmentation": _measure(
++            {"mtu": ov.get("mtu"), "oversize_drops": "not observed (no oversize-drop counter exists)"},
++            "overlay provider state().mtu", classified=NOT_CLASSIFIED),
++        "path_change_events": _measure(
++            {"count": len(events),
++             "events": [{"t_s": round(e.elapsed_s, 1), "kind": e.kind, "detail": e.detail} for e in events]},
++            "overlay transitions, recovery pauses / resumes, ladder transitions, heartbeat stream_resyncs"),
++    }
++
++
++def classify_window(reports: list[Report], events: list[Event]) -> dict[str, Any]:
++    """The classes one window meets (record §1), and its primary class."""
++    span_s = len(reports) * REPORT_INTERVAL_S
++    met: list[str] = []
++    fps = [r.fps for r in reports]
++    lost = [r.lost for r in reports]
++    queue = [r.queue for r in reports]
++    gap = [r.gap_ms for r in reports]
++    n = len(reports)
++    if events:
++        met.append("path-changed")
++    if (sum(1 for q in queue if q is not None and q >= QUEUE_AT_LEAST) >= QUEUE_OF
++            or sum(1 for g in gap if g is not None and g > GAP_ABOVE_MS) >= GAP_OF):
++        met.append("latency-limited")
++    stale = _vals(reports, "stale")
++    if stale and span_s and sum(stale) * 60.0 / span_s >= STALE_PER_MIN_AT_LEAST:
++        met.append("starved")
++    lost_hits = sum(1 for x in lost if x is not None and x >= CAPACITY_LOSS_AT_LEAST)
++    capacity = (n == WINDOW_REPORTS and all(f is not None and f < CAPACITY_FPS_BELOW for f in fps)
++                and lost_hits >= CAPACITY_LOSS_OF)
++    mild = (sum(1 for f in fps if f is not None and f < CAPACITY_MILD_FPS_BELOW) >= CAPACITY_MILD_FPS_OF
++            and lost_hits >= CAPACITY_LOSS_OF)
++    if capacity or mild:
++        met.append("capacity-limited")
++    lv = [x for x in lost if x is not None]
++    if lv and span_s and sum(lv) * 60.0 / span_s >= LOSS_PER_MIN_AT_LEAST:
++        met.append("lossy")
++    if not met:
++        met.append("clean")
++    return {"classes": met, "primary": min(met, key=PRIORITY.__getitem__)}
++
++
++@dataclass
++class SessionClassifier:
++    """Feeds reports and events; produces per-window and per-session output."""
++    reports: list[Report] = field(default_factory=list)
++    events: list[Event] = field(default_factory=list)
++
++    def add_report(self, r: Report) -> bool:
++        if self.reports and r.elapsed_ms is not None and r.elapsed_ms == self.reports[-1].elapsed_ms:
++            return False                      # a repeated snapshot (e1_suite's dedupe)
++        self.reports.append(r)
++        return True
++
++    def add_event(self, e: Event) -> None:
++        self.events.append(e)
++
++    def _t(self, r: Report) -> float | None:
++        return r.elapsed_ms / 1000.0 if r.elapsed_ms is not None else None
++
++    def windows(self) -> list[dict[str, Any]]:
++        out = []
++        for i in range(0, len(self.reports) - WINDOW_REPORTS + 1, WINDOW_REPORTS):
++            chunk = self.reports[i:i + WINDOW_REPORTS]
++            t0, t1 = self._t(chunk[0]), self._t(chunk[-1])
++            lo = (t0 - REPORT_INTERVAL_S) if t0 is not None else None
++            evs = [e for e in self.events if lo is not None and t1 is not None and lo < e.elapsed_s <= t1]
++            c = classify_window(chunk, evs)
++            lost = [x for x in (r.lost for r in chunk) if x is not None]
++            out.append({
++                "t_s": [t0, t1], "primary": c["primary"], "classes": c["classes"],
++                "loss_per_min": round(sum(lost) * 60.0 / (len(chunk) * REPORT_INTERVAL_S), 1) if lost else None,
++                "fps_min": min(_vals(chunk, "fps"), default=None),
++                "queue_max": max(_vals(chunk, "queue"), default=None),
++                "gap_max_ms": max(_vals(chunk, "gap_ms"), default=None),
++                "events": [e.kind for e in evs],
++            })
++        return out
++
++    def session(self, overlay: Mapping[str, Any] | None = None,
++                heartbeat: Mapping[str, Any] | None = None) -> dict[str, Any]:
++        wins = self.windows()
++        counts = {name: sum(1 for w in wins if name in w["classes"]) for name in CLASSES}
++        primaries = {name: sum(1 for w in wins if w["primary"] == name) for name in CLASSES}
++        lost = _vals(self.reports, "lost")
++        stale = _vals(self.reports, "stale")
++        el = [r.elapsed_ms for r in self.reports if r.elapsed_ms is not None]
++        span_min = (el[-1] - el[0]) / 60000.0 if len(el) > 1 else None   # e1_suite.telemetry_figures' span
++        loss_pm = round(sum(lost) / span_min, 2) if lost and span_min else None
++        stale_pm = round(sum(stale) / span_min, 2) if stale and span_min else None
++        met = []
++        if self.events:
++            met.append("path-changed")
++        if counts["latency-limited"]:
++            met.append("latency-limited")
++        if stale_pm is not None and stale_pm >= STALE_PER_MIN_AT_LEAST:
++            met.append("starved")
++        if counts["capacity-limited"]:
++            met.append("capacity-limited")
++        if loss_pm is not None and loss_pm >= LOSS_PER_MIN_AT_LEAST:
++            met.append("lossy")
++        if not met:
++            met.append("clean")
++        return {
++            "schema": SCHEMA,
++            "reports": len(self.reports),
++            "windows": len(wins),
++            "class": min(met, key=PRIORITY.__getitem__),
++            "classes": met,
++            "window_counts": counts,
++            "window_primary_counts": primaries,
++            "loss_per_min_post_fec": loss_pm,
++            "stale_per_min": stale_pm,
++            "measures": measures(self.reports, self.events, overlay, heartbeat,
++                                 span_s=span_min * 60.0 if span_min else None),
++        }
++
++
++# ---- replay: recorded runs (the fixtures are redacted to counters) ---------------
++
++def classifier_from_fixture(fx: Mapping[str, Any]) -> SessionClassifier:
++    """A fixture: {"telemetry": [rows], "events": [{t_s, kind, detail}], "heartbeat": {...}}."""
++    sc = SessionClassifier()
++    for row in fx.get("telemetry", []):
++        r = report_from_telemetry(row)
++        if r is not None:
++            sc.add_report(r)
++    for e in fx.get("events", []):
++        sc.add_event(Event(float(e["t_s"]), str(e["kind"]), str(e.get("detail", ""))))
++    return sc
++
++
++# ---- live (only with the flag) ------------------------------------------------------
++
++class WanTelemetry:
++    """Fed once per client health report; read by /status and the stream telemetry."""
++
++    def __init__(self, project_root: Path, overlay_state: Callable[[], Mapping[str, Any]] | None = None,
++                 clock: Callable[[], float] = time.time) -> None:
++        self._log_path = Path(project_root) / "logs" / "wan_sessions.jsonl"
++        self._overlay_state = overlay_state
++        self._clock = clock
++        self._lock = threading.Lock()
++        self._session = SessionClassifier()
++        self._last_kbps: Any = None
++        self._last_path: Any = None
++        self._last_recovery: Any = None
++        self._last_report_at: float | None = None
++
++    def _overlay(self) -> dict[str, Any]:
++        if self._overlay_state is None:
++            return {"path": "none", "mtu": None}
++        try:
++            return dict(self._overlay_state())
++        except Exception:
++            return {"path": "none", "mtu": None, "reason": "error"}
++
++    def observe(self, telemetry: Mapping[str, Any], native_status: Mapping[str, Any] | None = None,
++                recovery_state: str | None = None) -> None:
++        r = report_from_telemetry(telemetry)
++        if r is None:
++            return
++        ov = self._overlay()
++        with self._lock:
++            if self._session.reports and r.elapsed_ms is not None and \
++                    self._session.reports[-1].elapsed_ms is not None and r.elapsed_ms < self._session.reports[-1].elapsed_ms:
++                self._close_session_locked(ov)           # a new stream session began
++            if not self._session.add_report(r):
++                return
++            self._last_report_at = self._clock()
++            t = (r.elapsed_ms or 0) / 1000.0
++            kbps = (native_status or {}).get("bitrate_kbps")
++            if self._last_kbps is not None and kbps is not None and kbps != self._last_kbps:
++                self._session.add_event(Event(t, "ladder_transition", f"{self._last_kbps}->{kbps}"))
++            self._last_kbps = kbps if kbps is not None else self._last_kbps
++            path = ov.get("path")
++            if self._last_path is not None and path != self._last_path:
++                self._session.add_event(Event(t, "overlay_path", f"{self._last_path}->{path}"))
++            self._last_path = path
++            if recovery_state is not None and recovery_state != self._last_recovery:
++                if self._last_recovery is not None:
++                    kind = "recovery_resume" if recovery_state == "PLAYING" else "recovery_pause"
++                    self._session.add_event(Event(t, kind, recovery_state))
++                self._last_recovery = recovery_state
++
++    def _close_session_locked(self, ov: Mapping[str, Any]) -> None:
++        if self._session.reports:
++            doc = self._session.session(overlay=ov)
++            doc["closed_unix_s"] = round(self._clock(), 3)
++            try:
++                self._log_path.parent.mkdir(parents=True, exist_ok=True)
++                with self._log_path.open("a", encoding="utf-8") as handle:
++                    handle.write(json.dumps(doc, sort_keys=True) + "\n")
++            except OSError:
++                pass
++        self._session = SessionClassifier()
++        self._last_kbps = self._last_path = self._last_recovery = None
++
++    FRESH_S = WINDOW_REPORTS * REPORT_INTERVAL_S
++
++    def status_field(self) -> dict[str, Any] | None:
++        """The `wan` object while a stream is reporting (a report within one window); else None."""
++        with self._lock:
++            if self._last_report_at is None or self._clock() - self._last_report_at > self.FRESH_S:
++                return None
++        ov = self._overlay()
++        with self._lock:
++            doc = self._session.session(overlay=ov)
++            wins = self._session.windows()
++        doc["last_window"] = wins[-1] if wins else None
++        return doc
++
++
++def from_environ(environ: Mapping[str, str], project_root: Path,
++                 overlay_state: Callable[[], Mapping[str, Any]] | None = None) -> WanTelemetry | None:
++    if (environ.get(FLAG_ENV) or "").strip() != "1":
++        return None
++    return WanTelemetry(project_root, overlay_state=overlay_state)
+diff --git a/tests/wan_telemetry/test_wan_telemetry.py b/tests/wan_telemetry/test_wan_telemetry.py
+new file mode 100644
+index 0000000..56ec9d6
+--- /dev/null
++++ b/tests/wan_telemetry/test_wan_telemetry.py
+@@ -0,0 +1,332 @@
++#!/usr/bin/env python3
++"""G5-S1: WAN telemetry classification.
++
++    python3 -m unittest discover -s tests/wan_telemetry -v
++
++- Measures and classes with hand fixtures (each class triggered by its
++  record §1 rule).
++- Replays of three recorded runs (`fixtures/*.json`, made by
++  `docs/memory/evidence/g5_s1_2026-10-16/make_fixtures.py`: counters only).
++- The live object fed like the companion feeds it.
++- The flag absent, byte for byte: tonight's `status()` and request handler
++  (kept as goldens before G5-S1's edit) against the edited ones, in process.
++
++With `G5_S1_REPLAY_OUT=<dir>`, each replay's per-window output is written
++there.
++"""
++
++from __future__ import annotations
++
++import ast
++import io
++import json
++import os
++import sys
++import tempfile
++import textwrap
++import threading
++import unittest
++from http.server import BaseHTTPRequestHandler
++from pathlib import Path
++from types import SimpleNamespace
++from typing import Any
++from urllib.parse import parse_qs, urlsplit
++
++ROOT = Path(__file__).resolve().parents[2]
++FIX = Path(__file__).resolve().parent / "fixtures"
++sys.path.insert(0, str(ROOT / "companion"))
++
++import wan_telemetry as w  # noqa: E402
++
++
++def row(t_ms, fps=59.9, queue=0, gap=16, lost=0, stale=0, mbps=6.9, jitter=0.8, rtt=40, fresh=True, fec=None):
++    r = {"fresh": fresh, "elapsed_ms": t_ms,
++         "receiver": {"recent_fps": fps, "lost_packets_delta": lost, "recent_mbps": mbps,
++                      "interarrival_jitter_ms": jitter, "packets_delta": 1600, "waiting_for_idr": False},
++         "decoder": {"queue_depth": queue, "stale_output_drops_delta": stale, "queue_depth_delta": 0},
++         "latency": {"output_gap_ms": gap, "control_round_trip_ms": rtt}}
++    if fec is not None:
++        r["fec"] = {"recovered_packets_delta": fec[0], "unrecoverable_groups_delta": fec[1]}
++    return r
++
++
++def window(**kw):
++    reps = [w.report_from_telemetry(row(2000 * (i + 1), **{k: (v[i] if isinstance(v, list) else v) for k, v in kw.items()}))
++            for i in range(5)]
++    return reps
++
++
++class Classes(unittest.TestCase):
++    def test_clean(self):
++        self.assertEqual(w.classify_window(window(), [])["classes"], ["clean"])
++
++    def test_lossy_is_the_dbase_row_scaled(self):
++        # 10/min over 10 s = 1.67 packets: 1 lost is under, 2 lost is over.
++        self.assertEqual(w.classify_window(window(lost=[1, 0, 0, 0, 0]), [])["primary"], "clean")
++        self.assertEqual(w.classify_window(window(lost=[1, 1, 0, 0, 0]), [])["primary"], "lossy")
++
++    def test_starved_is_the_stale_row_scaled(self):
++        self.assertEqual(w.classify_window(window(stale=[1, 1, 1, 0, 0]), [])["primary"], "clean")
++        self.assertEqual(w.classify_window(window(stale=[1, 1, 1, 1, 0]), [])["primary"], "starved")
++
++    def test_capacity_n1_and_n2(self):
++        n1 = window(fps=49.0, lost=[60, 60, 60, 0, 0])
++        self.assertIn("capacity-limited", w.classify_window(n1, [])["classes"])
++        n2 = window(fps=[56, 56, 56, 56, 59], lost=[50, 50, 50, 0, 0])
++        self.assertIn("capacity-limited", w.classify_window(n2, [])["classes"])
++        not_yet = window(fps=[56, 56, 56, 59, 59], lost=[50, 50, 50, 0, 0])
++        self.assertNotIn("capacity-limited", w.classify_window(not_yet, [])["classes"])
++
++    def test_latency_queue_or_gap(self):
++        self.assertEqual(w.classify_window(window(queue=[1, 1, 1, 0, 0]), [])["primary"], "latency-limited")
++        self.assertEqual(w.classify_window(window(gap=[300, 260, 16, 16, 16]), [])["primary"], "latency-limited")
++        self.assertEqual(w.classify_window(window(gap=[300, 250, 16, 16, 16]), [])["primary"], "clean")
++
++    def test_path_changed_wins_priority(self):
++        c = w.classify_window(window(lost=60, queue=2), [w.Event(4.0, "overlay_path", "direct->relayed")])
++        self.assertEqual(c["primary"], "path-changed")
++        self.assertEqual(c["classes"][:2], ["path-changed", "latency-limited"])
++
++
++class Measures(unittest.TestCase):
++    def test_eleven_measures_each_with_a_source(self):
++        reps = window(lost=[2, 0, 0, 0, 0], fec=(3, 1))
++        m = w.measures(reps, [w.Event(1.0, "recovery_pause")], {"path": "direct", "mtu": 1280})
++        self.assertEqual(len(m), 11)
++        for name, v in m.items():
++            self.assertIn("source", v, name)
++        self.assertEqual(m["packet_loss_per_min"]["value"], {"post_fec": 12.0, "pre_fec": 102.0})  # (2 + 3 x 5) in 10 s
++        self.assertEqual(m["fec_groups"]["value"], {"recovered_packets": 3 * 5, "unrecoverable_groups": 5})
++        self.assertEqual(m["overlay_path"]["value"], "direct")
++        self.assertEqual(m["mtu_fragmentation"]["value"]["mtu"], 1280)
++        self.assertEqual(m["rtt_ms"]["value"]["p50"], 40)
++        self.assertEqual(m["delivered_goodput_kbps"]["value"], 6900.0)
++        self.assertEqual(m["path_change_events"]["value"]["count"], 1)
++        self.assertEqual(m["sender_pacing"]["value"], "not recorded")
++
++    def test_not_fresh_is_skipped_and_repeats_deduped(self):
++        sc = w.SessionClassifier()
++        self.assertIsNone(w.report_from_telemetry(row(2000, fresh=False)))
++        self.assertTrue(sc.add_report(w.report_from_telemetry(row(2000))))
++        self.assertFalse(sc.add_report(w.report_from_telemetry(row(2000))))
++
++
++class Replays(unittest.TestCase):
++    """Three recorded runs; the classes those nights earned."""
++
++    def replay(self, name):
++        fx = json.loads((FIX / f"{name}.json").read_text())
++        sc = w.classifier_from_fixture(fx)
++        s = sc.session(heartbeat=fx.get("heartbeat"))
++        out = os.environ.get("G5_S1_REPLAY_OUT")
++        if out:
++            Path(out).mkdir(parents=True, exist_ok=True)
++            (Path(out) / f"replay_{name}.json").write_text(
++                json.dumps({"session": s, "windows": sc.windows()}, indent=1) + "\n")
++        return fx, s
++
++    def test_run3_lossy_652(self):
++        fx, s = self.replay("e4_s4b_run3_lossy")
++        self.assertAlmostEqual(s["loss_per_min_post_fec"], fx["recorded_loss_per_min"], places=2)
++        self.assertNotEqual(s["class"], "clean")
++        self.assertIn("lossy", s["classes"])
++        self.assertIn("capacity-limited", s["classes"])
++        self.assertIn("path-changed", s["classes"])      # the ladder acted 4 times
++        self.assertEqual(s["measures"]["path_change_events"]["value"]["count"], 4)
++        self.assertEqual(s["measures"]["fec_groups"]["value"]["recovered_packets"], "not recorded")
++
++    def test_run2_cleanest_still_lossy(self):
++        fx, s = self.replay("e4_s4b_run2_cleanest")
++        self.assertAlmostEqual(s["loss_per_min_post_fec"], fx["recorded_loss_per_min"], places=2)
++        self.assertEqual(s["classes"], ["lossy"])         # 60.93/min fails the < 10 row; nothing else met
++        self.assertGreater(s["window_counts"]["clean"], 0)
++
++    def test_cl_b2_flag_run1(self):
++        fx, s = self.replay("cl_b2_flag_run1")
++        self.assertAlmostEqual(s["loss_per_min_post_fec"], fx["recorded_loss_per_min"], places=2)
++        self.assertIn("lossy", s["classes"])
++        self.assertIn("path-changed", s["classes"])      # the recovery pause at ~942 s
++        kinds = [e["kind"] for e in s["measures"]["path_change_events"]["value"]["events"]]
++        self.assertEqual(kinds, ["recovery_pause", "recovery_resume"])
++        fec = s["measures"]["fec_groups"]["value"]
++        self.assertEqual(fec, {"recovered_packets": fx["heartbeat"]["fec_recovered_packets"],
++                               "unrecoverable_groups": fx["heartbeat"]["fec_unrecoverable_groups"]})
++        pre = s["measures"]["packet_loss_per_min"]["value"]["pre_fec"]
++        self.assertGreater(pre, s["loss_per_min_post_fec"])
++
++
++class Live(unittest.TestCase):
++    def test_flag(self):
++        self.assertIsNone(w.from_environ({}, ROOT))
++        self.assertIsNone(w.from_environ({w.FLAG_ENV: "0"}, ROOT))
++        self.assertIsNotNone(w.from_environ({w.FLAG_ENV: "1"}, Path(tempfile.mkdtemp())))
++
++    def test_observe_events_freshness_and_session_close(self):
++        root = Path(tempfile.mkdtemp())
++        now = [100.0]
++        path = ["direct"]
++        wt = w.WanTelemetry(root, overlay_state=lambda: {"path": path[0], "mtu": 1280}, clock=lambda: now[0])
++        self.assertIsNone(wt.status_field())
++        for i in range(10):
++            wt.observe(row(2000 * (i + 1), lost=3), {"bitrate_kbps": 7000 if i < 6 else 6000})
++            now[0] += 2.0
++        path[0] = "relayed"
++        wt.observe(row(22000), {"bitrate_kbps": 6000})
++        doc = wt.status_field()
++        self.assertEqual(doc["windows"], 2)
++        kinds = [e["kind"] for e in doc["measures"]["path_change_events"]["value"]["events"]]
++        self.assertEqual(kinds, ["ladder_transition", "overlay_path"])
++        self.assertEqual(doc["class"], "path-changed")
++        now[0] += 60.0
++        self.assertIsNone(wt.status_field())               # no report within one window
++        wt.observe(row(2000), {"bitrate_kbps": 7000})        # elapsed went back: a new session
++        lines = (root / "logs" / "wan_sessions.jsonl").read_text().splitlines()
++        self.assertEqual(len(lines), 1)
++        self.assertEqual(json.loads(lines[0])["schema"], w.SCHEMA)
++
++
++# ---- the flag absent, byte for byte (in process) -----------------------------------
++
++def _status_fn(source: str, wan: Any):
++    ns = {"Any": Any, "PROJECT_ROOT": Path("/fixture/project"), "MEDIA_ROOT": Path("/fixture/project/media"),
++          "CONTROL_PORT": 8765, "OVERLAY_STATUS": None, "WAN_TELEMETRY": wan}
++    exec(compile(textwrap.dedent(source), "<status>", "exec"), ns)
++    return ns["status"]
++
++
++def _controller():
++    return SimpleNamespace(lock=threading.Lock(), server=None, source_process=None, active_source_id=None,
++                           catalog=SimpleNamespace(vod_storage_status=lambda: {"configured": True}),
++                           _running=lambda p: False, _close_log=lambda p: None)
++
++
++def _current(cls_or_fn: str) -> str:
++    src = (ROOT / "companion" / "privyhub_service.py").read_text()
++    for node in ast.parse(src).body:
++        if isinstance(node, ast.ClassDef) and node.name == cls_or_fn:
++            return ast.get_source_segment(src, node)
++        if isinstance(node, ast.ClassDef) and node.name == "PrivyHubController" and cls_or_fn == "status":
++            for f in node.body:
++                if isinstance(f, ast.FunctionDef) and f.name == "status":
++                    return ast.get_source_segment(src, f, padded=True)
++    raise AssertionError(cls_or_fn)
++
++
++class FakeWan:
++    def __init__(self):
++        self.observed = 0
++
++    def status_field(self):
++        return {"schema": w.SCHEMA, "class": "clean"}
++
++    def observe(self, telemetry, native_status):
++        self.observed += 1
++
++
++class Games:
++    def handle(self, action, query):
++        return {"ok": True, "action": action, "active": True, "bitrate_kbps": 7000}
++
++
++def _handler(source: str, wan: Any, log: list):
++    snapshot = {"schema": "privyhub_stream_telemetry_v1", "fresh": True, "receiver": {"lost_packets_delta": 0}}
++    abr = SimpleNamespace(observe=lambda *a, **k: None)
++    ns = {
++        "Any": Any, "json": json, "urlsplit": urlsplit, "parse_qs": parse_qs,
++        "BaseHTTPRequestHandler": BaseHTTPRequestHandler,
++        "PLUGINS": {"games": Games()}, "CONTROLLER": SimpleNamespace(status=lambda: {"service": "PrivyHub"}),
++        "PROJECT_ROOT": Path("/fixture/project"),
++        "access_log_path": lambda h: urlsplit(getattr(h, "path", "")).path,
++        "print": lambda *a, **k: log.append(" ".join(map(str, a))),
++        "SESSION_IDENTITY": None, "WAN_TELEMETRY": wan,
++        "STREAM_TELEMETRY_STORE": SimpleNamespace(snapshot=lambda: dict(snapshot), accept=lambda **k: dict(snapshot)),
++        "CLIENT_HEALTH_STORE": SimpleNamespace(accept=lambda p, payload_bytes: {"ok": True, "accepted": True},
++                                               snapshot=lambda: {"available": True}),
++        "adaptive_bitrate_controller": lambda root: abr, "adaptive_bitrate_is_live": lambda c: False,
++        "CatalogError": type("CatalogError", (Exception,), {}),
++        "SourceStartError": type("SourceStartError", (Exception,), {}),
++    }
++    node = next(n for n in ast.parse(source).body if isinstance(n, ast.ClassDef) and n.name == "PrivyHubRequestHandler")
++    exec(compile(ast.get_source_segment(source, node), "<handler>", "exec"), ns)
++
++    class Fixed(ns["PrivyHubRequestHandler"]):
++        def version_string(self):
++            return "PrivyHubControl/0.6 Python/fixture"
++
++        def date_time_string(self, timestamp=None):
++            return "Thu, 01 Jan 2026 00:00:00 GMT"
++    return Fixed
++
++
++def _run(cls, method, target, body=b""):
++    head = f"{method} {target} HTTP/1.0\r\nContent-Type: application/json\r\nContent-Length: {len(body)}\r\n\r\n"
++    h = cls.__new__(cls)
++    h.rfile, h.wfile = io.BytesIO(head.encode() + body), io.BytesIO()
++    h.client_address, h.server, h.request, h.close_connection = ("fixture-client", 1), SimpleNamespace(), None, True
++    h.handle_one_request()
++    return h.wfile.getvalue()
++
++
++REQUESTS = [
++    ("GET", "/status", b""),
++    ("GET", "/diagnostics/stream-telemetry", b""),
++    ("POST", "/diagnostics/client-health", b'{"schema": "fixture", "report": {}}'),
++    ("GET", "/plugins/games/native-stream-status", b""),
++    ("GET", "/plugins/games/status", b""),
++]
++
++
++class FlagAbsentByteForByte(unittest.TestCase):
++    def test_status_document(self):
++        a = json.dumps(_status_fn((FIX / "status_method_predecessor.py.txt").read_text(), None)(_controller()), indent=2)
++        b = json.dumps(_status_fn(_current("status"), None)(_controller()), indent=2)
++        self.assertEqual(a, b)
++
++    def test_status_with_flag_adds_only_wan(self):
++        # The /status hook is a guarded module-level wrapper around CONTROLLER.status.
++        src = (ROOT / "companion" / "privyhub_service.py").read_text()
++        block = next(n for n in ast.parse(src).body if isinstance(n, ast.If)
++                     and ast.get_source_segment(src, n.test) == "WAN_TELEMETRY is not None")
++        code = compile(ast.Module(body=[block], type_ignores=[]), "<wan-status>", "exec")
++        for wan, expect in ((None, set()), (FakeWan(), {"wan"})):
++            base = {"service": "PrivyHub", "api_version": 4}
++            ns = {"Any": Any, "WAN_TELEMETRY": wan, "CONTROLLER": SimpleNamespace(status=lambda: dict(base))}
++            exec(code, ns)
++            self.assertEqual(set(ns["CONTROLLER"].status()) - set(base), expect)
++
++    def test_handler_requests(self):
++        la, lb = [], []
++        before = _handler((FIX / "handler_predecessor.py.txt").read_text(), None, la)
++        after = _handler(_current("PrivyHubRequestHandler"), None, lb)
++        table = []
++        for method, target, body in REQUESTS:
++            a, b = _run(before, method, target, body), _run(after, method, target, body)
++            self.assertEqual(a, b, f"{method} {target}")
++            table.append(f"| `{method} {target}` | identical ({len(a)} bytes) |")
++        self.assertEqual(la, lb)
++        out = os.environ.get("G5_S1_REPLAY_OUT")
++        if out:
++            Path(out).mkdir(parents=True, exist_ok=True)
++            (Path(out) / "handler_byte_comparison.md").write_text(
++                "| request | flag absent vs tonight's predecessor |\n| --- | --- |\n" + "\n".join(table) + "\n")
++
++    def test_handler_with_flag(self):
++        fake = FakeWan()
++        cls = _handler(_current("PrivyHubRequestHandler"), fake, [])
++        raw = _run(cls, "GET", "/diagnostics/stream-telemetry")
++        self.assertIn(b'"wan"', raw)
++        _run(cls, "POST", "/diagnostics/client-health", b'{"schema": "fixture"}')
++        self.assertEqual(fake.observed, 1)
++
++    def test_imported_only_under_the_flag(self):
++        src = (ROOT / "companion" / "privyhub_service.py").read_text()
++        tree = ast.parse(src)
++        self.assertFalse([n for n in tree.body if isinstance(n, (ast.Import, ast.ImportFrom))
++                          and (getattr(n, "module", "") or "").startswith("wan_telemetry")])
++        guarded = [n for n in tree.body if isinstance(n, ast.If)
++                   and "PRIVYHUB_WAN_TELEMETRY" in ast.get_source_segment(src, n.test)]
++        self.assertEqual(len(guarded), 1)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/docs/WAN_ADAPTATION_RULES.md b/docs/WAN_ADAPTATION_RULES.md
+new file mode 100644
+index 0000000..a5108d6
+--- /dev/null
++++ b/docs/WAN_ADAPTATION_RULES.md
+@@ -0,0 +1,85 @@
++# WAN adaptation rules (G5) — written, not implemented
++
++**Status: DRAFT (G5-S1, 2026-10-16). Not implemented: G5-S2 implements
++them, behind its own flag, after the live smoke of G5-S1's classes.** The
++classes are those of `companion/wan_telemetry.py`. Their thresholds are §1
++of `docs/memory/evidence/G5_S1_WAN_TELEMETRY_CLASSIFICATION_2026-10-16.md`.
++Every number below is quoted from an existing record or the live ladder's
++code. Where none exists, the rule says so.
++
++ROADMAP §G5's priority order, as rules:
++
++## 1. Preserve control / session correctness (`path-changed`)
++
++- **R1.1** On a path change (overlay path transition, recovery pause /
++  resume, reconnect), the ladder **does not move** for the blackout that
++  follows. That is today's `BLACKOUT_REPORTS = 3` after any SSRC change
++  (`adaptive_bitrate.py`), applied to every path event.
++- **R1.2** No bitrate increase is evaluated across a path change. The
++  increase window empties, as it does today after an SSRC change
++  (`INCREASE_WINDOW_REPORTS = 90`, C3-L4-L2).
++- **R1.3** An overlay path of `relayed` caps the ladder below the reference
++  until G5-S2 measures a relayed path. **No number exists:**
++  "not classified; G5-S2".
++- **R1.4** The session's identity and declared endpoints (G3) are never
++  renegotiated by adaptation. Only recovery, or a new setup, changes them.
++
++## 2. Prevent runaway latency (`latency-limited`)
++
++- **R2.1** A window that is `latency-limited` (queue ≥ 1 on ≥ 3 of 5, or
++  output gap > 250 ms on ≥ 2 of 5) is a **decrease** signal, whatever the
++  fps. It goes one rung down (`ROUTINE`, target 6000), or straight to 5000
++  when FALLBACK's gap clause holds (`TARGET_KBPS`, `adaptive_bitrate_live.py`).
++- **R2.2** **No buffer may grow to hide the path** (ROADMAP §G5: "Do not hide
++  a bad WAN path with ever-growing buffers"). The audio cushion (12 / 17
++  packets, D-BASE-P9) and the frame cap (90,000 B, D-BASE-P6a) stay as
++  adopted. G5-S2 adds no queue.
++
++## 3. Reduce bitrate when capacity tightens (`capacity-limited`)
++
++- **R3.1** `capacity-limited` (C3-L4-N1 / N2's rules) gives today's live
++  actions: FALLBACK to 5000 (`capacity`) or one rung down (`capacity_mild`),
++  with today's hold-downs (`HOLDDOWN_REPORTS` in `adaptive_bitrate_live.py`:
++  30-60 reports, 60-120 s, by the kind and direction of the last transition).
++- **R3.2** Below the live ladder's floor (5000), the off-site rungs are
++  C5-M3's screened ones:
++  - **720p/4000 is the only one that passed transport** (loss 2.2/min,
++    gap 130 ms; "5.0 Mbit/s on the wire");
++  - 720p/3000 and 540p/3500 did not.
++
++  So the remote ladder's lowest rung is **720p/4000**, entered only when
++  `capacity-limited` persists at 5000 for the hold-down. The persistence
++  count is **not set: G5-S2**.
++
++## 4. Use FEC only when loss justifies it (`lossy`)
++
++- **R4.1** `lossy` without `capacity-limited` (loss ≥ 10 / min post-FEC, fps
++  held) is the case FEC addresses. **C4-M1's stronger arm (`xor8_2`) did not
++  show a post-FEC gain** (lower in 1 of 3 pairs; the median 69 % of B's
++  against the ≤ 60 % rule), and pre-FEC loss rose 2-3× under it. So
++  **G5-S2 does not switch FEC schemes on the WAN** until a measured WAN
++  night shows the gain. Today's `xor8_1` stays.
++- **R4.2** The FEC measures (recovered / unrecoverable) are reported
++  per window. A class on them is "not classified; G5-S2".
++
++## 5. Recover upward slowly, with hysteresis (`clean`)
++
++- **R5.1** An increase needs today's increase rule: 85 of the last 90
++  reports clean (fps ≥ 57, queue ≤ 1, gap ≤ 150), after the blackout, at
++  least 60 s into the session, one rung per event (`INCREASE_*`, C3-L4-L2).
++- **R5.2** At most 4 transitions in 10 minutes (`RATE_LIMIT_*`, the live
++  ladder). G5-S1 proposal: carry over the shadow controller's oscillation
++  rule (three direction changes in 10 minutes → HOLD; `OSCILLATION_*` in
++  `adaptive_bitrate.py`).
++- **R5.3** On the WAN, a `lossy` window counts as **not clean** for the
++  increase window even when fps / queue / gap pass. This is a G5-S1
++  proposal; G5-S2 tests it.
++
++## Not set by any record (G5-S2 measures them)
++
++- RTT and jitter bars (both are carried and reported:
++  `latency.control_round_trip_ms`, `receiver.interarrival_jitter_ms`).
++- A relayed-path cap.
++- MTU / fragmentation handling (no oversize-drop counter exists).
++- The persistence before 720p/4000.
++- An audio-starvation bar.

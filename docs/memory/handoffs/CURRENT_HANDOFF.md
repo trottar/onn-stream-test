@@ -2,9 +2,48 @@
 
 Authoritative state: `../CURRENT.md`. **Start there.**
 
-Baseline commit `7331184` (the user's E3-close commit). Nothing since it
-is committed: E4-S1 to E4-S5D, E4-C1 and E5-S1. The user commits tonight,
-2026-10-15 (`../../../logs/e4_s4d_git_status.txt`).
+Baseline commit `3107fb5` (the user's E4-close commit, 2026-10-15). Not
+committed since: G1-S1, G3-S1, G3-S2, last night's G5-S1 and G4-P1
+(`QUEUE_2026-10-16B`, session B), and this queue's E4-S4C, G1-S2 and
+CL-B2 (`../../../logs/cl_b2_git_status.txt`).
+
+## 2026-10-16 — session A: the watch's record; G1-S2; CL-B2 (`QUEUE_2026-10-16`, uncommitted)
+
+- Baseline `3107fb5`. G1-S1 / G3-S1 / G3-S2 are uncommitted beside it and
+  untouched.
+- **E4-S4C** (`../evidence/E4_S4C_LINK_WATCH_2026-10-16.md`):
+  - the watch was stopped after 6 probes, none clean (102-4,299 lost/min);
+  - deferral INCONCLUSIVE (link);
+  - the loss moved with the AP's retry %;
+  - the two ends' signal disagrees by about 10 dB;
+  - the LAN loss row is parked; the hand option is a wired adapter.
+- **G1-S2** (`../evidence/G1_S2_OVERLAY_PROVIDER_LIVE_SMOKE_2026-10-16.md`):
+  PASSED.
+  - The overlay object appears behind the flag, at +0.28 point CPU and
+    +0.55 MB.
+  - With the flag off, `/status` is identical except `server.pid`.
+  - Path `no-peer`, because no second tailnet device was online.
+  - Not adopted; `overlay.conf` is written in the record.
+- **CL-B2: CLOSED** (`../evidence/CL_B2_IDENTITY_APK_AND_LAN_SMOKE_2026-10-16.md`):
+  - APK `77011eef…` is CONFIRMED (patch `CL-B2_IDENTITY_APK_HASH`) and
+    **stays**: the user's decision, the only adoption.
+  - G3 passed end to end on the LAN: pairing, signed setup and token, a
+    20-min stream with every gate, a forged token → 401, an unpaired
+    device → `unknown-device`, then re-paired (second sitting, 13:49Z).
+  - Flag and setting off (R3, 13:54Z): the stream is today's, but **host
+    CPU 12.963 % FAILED the 10.9 ± 2 band by 0.06**, recorded so.
+    - Against R1, the encoder was 46.65 vs 35.75 % of a core, and the
+      ladder held 7000 vs 5000-7000.
+    - The E4-S1 reference and R2 also held 7000 at about 36 %, so the
+      rung mix does not explain it, and the cause is not located (§2a).
+    - The bar lesson is in `docs/KNOWN_ISSUES.md`.
+  - Not adopted: `session-identity.conf` and the client setting are
+    written in the record.
+  - The G3-S3 follow-ups: the declared port (`audio_port` unsigned, the
+    chosen target unobservable), the store directory's mode, and two
+    setups per entry.
+- End state: five lines, no flag; APK `77011eef…`; one paired device;
+  `identity_v2` off.
 
 ## 2026-10-15 — session A: E4-S5D adopted; E4-S4D's watch launched (`QUEUE_2026-10-15`)
 

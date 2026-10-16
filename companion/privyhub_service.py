@@ -1770,7 +1770,7 @@ class PrivyHubController:
                     ):
                         self.active_source_id = None
 
-            return {
+            payload = {
                 "service": "PrivyHub",
                 "api_version": 4,
                 "project_root": str(
@@ -1826,8 +1826,63 @@ class PrivyHubController:
                 },
             }
 
+        # G1-S1: the overlay object, outside the lock, only with the flag set.
+        if OVERLAY_STATUS is not None:
+            payload["overlay"] = OVERLAY_STATUS.status_field()
+
+        return payload
+
+
+# G1-S1: the overlay provider, only with PRIVYHUB_OVERLAY_PROVIDER set. Absent
+# = today: nothing imported, constructed or called; no status field.
+OVERLAY_STATUS = None
+
+if os.environ.get("PRIVYHUB_OVERLAY_PROVIDER", "").strip():
+    from overlay import reporter_from_environ as _overlay_reporter_from_environ
+
+    OVERLAY_STATUS = _overlay_reporter_from_environ(os.environ)
+
+# G3-S1: session identity, only with PRIVYHUB_SESSION_IDENTITY set. Absent =
+# today: nothing imported or constructed; no store read, no audit, no header.
+SESSION_IDENTITY = None
+
+if os.environ.get("PRIVYHUB_SESSION_IDENTITY", "").strip():
+    from session_identity import gate_from_environ as _session_gate_from_environ
+
+    SESSION_IDENTITY = _session_gate_from_environ(os.environ, PROJECT_ROOT)
+
+# G5-S1: WAN telemetry classification, only with PRIVYHUB_WAN_TELEMETRY=1.
+# Absent = today: nothing imported, constructed or called; no field.
+WAN_TELEMETRY = None
+
+if os.environ.get("PRIVYHUB_WAN_TELEMETRY", "").strip():
+    from wan_telemetry import from_environ as _wan_from_environ
+
+    WAN_TELEMETRY = _wan_from_environ(
+        os.environ,
+        PROJECT_ROOT,
+        overlay_state=(
+            OVERLAY_STATUS.status_field
+            if OVERLAY_STATUS is not None
+            else None
+        ),
+    )
 
 CONTROLLER = PrivyHubController()
+
+# G5-S1: /status gains the wan object while a stream reports, only with the
+# flag set (the status method itself is unchanged).
+if WAN_TELEMETRY is not None:
+    _controller_status_without_wan = CONTROLLER.status
+
+    def _controller_status_with_wan() -> dict[str, Any]:
+        payload = _controller_status_without_wan()
+        wan = WAN_TELEMETRY.status_field()
+        if wan is not None:
+            payload["wan"] = wan
+        return payload
+
+    CONTROLLER.status = _controller_status_with_wan
 CLIENT_HEALTH_STORE = ClientHealthStore()
 STREAM_TELEMETRY_STORE = StreamTelemetryStore()
 
@@ -1886,6 +1941,11 @@ class PrivyHubRequestHandler(
             "Cache-Control",
             "no-store",
         )
+
+        # G3-S1: a session token header, only under the flag.
+        if SESSION_IDENTITY is not None:
+            for name, value in getattr(self, "_session_headers", ()):
+                self.send_header(name, value)
 
         self.end_headers()
 
@@ -1992,6 +2052,10 @@ class PrivyHubRequestHandler(
         parsed = urlsplit(self.path)
         request_path = parsed.path
 
+        # G3-S1: identity and authorization, only under the flag.
+        if SESSION_IDENTITY is not None and SESSION_IDENTITY.intercept(self, "GET", parsed):
+            return
+
         if request_path == "/status":
             self._send_json(
                 200,
@@ -2010,7 +2074,13 @@ class PrivyHubRequestHandler(
         if request_path == "/diagnostics/stream-telemetry":
             self._send_json(
                 200,
-                STREAM_TELEMETRY_STORE.snapshot(),
+                STREAM_TELEMETRY_STORE.snapshot()
+                # G5-S1: the session's wan object, only with the flag set.
+                if WAN_TELEMETRY is None
+                else {
+                    **STREAM_TELEMETRY_STORE.snapshot(),
+                    "wan": WAN_TELEMETRY.status_field(),
+                },
             )
             return
 
@@ -2089,6 +2159,10 @@ class PrivyHubRequestHandler(
         try:
             parsed = urlsplit(self.path)
             request_path = parsed.path
+
+            # G3-S1: identity and authorization, only under the flag.
+            if SESSION_IDENTITY is not None and SESSION_IDENTITY.intercept(self, "POST", parsed):
+                return
 
             if request_path == "/diagnostics/self-test":
                 try:
@@ -2215,6 +2289,12 @@ class PrivyHubRequestHandler(
                                 stream_bitrate_kbps=native_status.get(
                                     "bitrate_kbps"
                                 ),
+                            )
+                        # G5-S1: classification only; it never acts.
+                        if WAN_TELEMETRY is not None:
+                            WAN_TELEMETRY.observe(
+                                telemetry,
+                                native_status,
                             )
                     except Exception:
                         # Telemetry must never disturb client health/gameplay.
@@ -2368,13 +2448,19 @@ class PrivyHubRequestHandler(
                             action,
                             parsed.query,
                             request_payload,
-                            self.client_address[0],
+                            # G3-S1: a session's declared endpoint; else the source (today).
+                            SESSION_IDENTITY.client_target(self)
+                            if SESSION_IDENTITY is not None
+                            else self.client_address[0],
                         )
                     elif request_handler is not None:
                         payload = request_handler(
                             action,
                             parsed.query,
-                            self.client_address[0],
+                            # G3-S1: a session's declared endpoint; else the source (today).
+                            SESSION_IDENTITY.client_target(self)
+                            if SESSION_IDENTITY is not None
+                            else self.client_address[0],
                         )
                     else:
                         payload = handler(

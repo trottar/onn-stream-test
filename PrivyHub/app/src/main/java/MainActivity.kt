@@ -1,6 +1,7 @@
 package com.safeiot.privyhub
 
 import android.content.Intent
+import com.safeiot.privyhub.identity.PrivyHubIdentity
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
@@ -25,6 +26,7 @@ import android.widget.EditText
 import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -772,6 +774,153 @@ class MainActivity : AppCompatActivity() {
      */
 
 
+    // G3-S2: the identity's state for the settings screen: the pairing the
+    // host returned and the last refusal's reason code. No address.
+    private fun identityStatusText(): String {
+
+        val identity =
+            PrivyHubIdentity.get(this)
+
+        val pairing =
+            identity.currentPairing()
+
+        val paired =
+            if (pairing == null) {
+                "not paired"
+            } else {
+                "paired as \"${pairing.displayName}\" " +
+                    "(${pairing.deviceId}); permissions: " +
+                    pairing.permissions.joinToString(", ")
+            }
+
+        val setting =
+            if (identity.isEnabled) "on" else "off (today's requests)"
+
+        val reason =
+            identity.lastReason?.let {
+                "\nLast refusal: $it"
+            }.orEmpty()
+
+        return "Identity v2: $setting; $paired$reason"
+    }
+
+
+    // G3-S2: pair once with the code the hub shows. The hub opens the window
+    // itself (on the hub: POST /session/pairing/open on the companion's
+    // loopback; see docs/REMOTE_TRUST.md); the code lives 2 minutes.
+    private fun showIdentityPairingDialog(
+        host: String
+    ) {
+
+        if (host.isBlank()) {
+            Toast.makeText(
+                this,
+                "Set the companion host first",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        val codeInput =
+            EditText(this).apply {
+                inputType =
+                    InputType.TYPE_CLASS_NUMBER
+                hint =
+                    "6-digit code from the hub"
+                setSingleLine(true)
+            }
+
+        val nameInput =
+            EditText(this).apply {
+                inputType =
+                    InputType.TYPE_CLASS_TEXT
+                hint =
+                    "Name for this device"
+                setSingleLine(true)
+                setText(
+                    PrivyHubIdentity.get(this@MainActivity)
+                        .currentPairing()?.displayName
+                        ?: "PrivyHub client"
+                )
+            }
+
+        val box =
+            androidx.appcompat.widget.LinearLayoutCompat(this).apply {
+                orientation =
+                    androidx.appcompat.widget.LinearLayoutCompat.VERTICAL
+                val padding = dp(24)
+                setPadding(padding, padding, padding, padding)
+                addView(codeInput)
+                addView(nameInput)
+            }
+
+        fun runPairing(newSecret: Boolean) {
+            val code = codeInput.text.toString().trim()
+            val name = nameInput.text.toString().trim()
+            if (code.length != 6 || name.isEmpty()) {
+                codeInput.error = "Enter the 6-digit code and a name"
+                return
+            }
+            Thread {
+                val message =
+                    try {
+                        when (
+                            val result =
+                                PrivyHubIdentity.get(this).pair(
+                                    host,
+                                    code,
+                                    name,
+                                    newSecret
+                                )
+                        ) {
+                            is com.safeiot.privyhub.identity.IdentitySession.PairResult.Paired ->
+                                "Paired as \"${result.pairing.displayName}\" " +
+                                    "(${result.pairing.deviceId}). Permissions: " +
+                                    result.pairing.permissions.joinToString(", ")
+                            is com.safeiot.privyhub.identity.IdentitySession.PairResult.Refused ->
+                                "Pairing refused (${result.status}): ${result.reason}"
+                        }
+                    } catch (exc: Exception) {
+                        "Pairing failed: ${exc.javaClass.simpleName}"
+                    }
+                runOnUiThread {
+                    AlertDialog.Builder(this)
+                        .setTitle("PrivyHub pairing")
+                        .setMessage(message)
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            }.start()
+        }
+
+        val dialog =
+            AlertDialog.Builder(this)
+                .setTitle("Pair with the hub")
+                .setMessage(
+                    "On the hub, open the pairing window, then enter the " +
+                        "code it shows within 2 minutes."
+                )
+                .setView(box)
+                .setPositiveButton("Pair", null)
+                .setNeutralButton("Re-pair (new key)", null)
+                .setNegativeButton("Cancel", null)
+                .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                runPairing(newSecret = false)
+                dialog.dismiss()
+            }
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+                runPairing(newSecret = true)
+                dialog.dismiss()
+            }
+        }
+
+        dialog.show()
+    }
+
+
     private fun getCompanionHost(): String {
 
         return getSharedPreferences(
@@ -916,6 +1065,57 @@ class MainActivity : AppCompatActivity() {
         )
 
 
+        // G3-S2: the paired identity (identity_v2), default off.
+        val identityCheckBox =
+            CheckBox(this).apply {
+                text =
+                    "Use paired identity (identity v2)"
+                isChecked =
+                    PrivyHubIdentity.isEnabled(
+                        this@MainActivity
+                    )
+            }
+
+        container.addView(
+            identityCheckBox,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        container.addView(
+            TextView(this).apply {
+                text =
+                    identityStatusText()
+                textSize =
+                    13f
+            },
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        container.addView(
+            Button(this).apply {
+                text =
+                    "Pair with hub…"
+                setOnClickListener {
+                    showIdentityPairingDialog(
+                        normalizeHost(
+                            input.text.toString()
+                        )
+                    )
+                }
+            },
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+
         val dialog =
             AlertDialog.Builder(this)
                 .setTitle(
@@ -982,6 +1182,11 @@ class MainActivity : AppCompatActivity() {
 
                 saveGameAutoOpenAfterLaunch(
                     gameAutoOpenCheckBox.isChecked
+                )
+
+                PrivyHubIdentity.setEnabled(
+                    this,
+                    identityCheckBox.isChecked
                 )
 
                 dialog.dismiss()
@@ -14903,7 +15108,8 @@ private fun requestGameStateAction(
 
 
     private fun httpGet(
-        urlString: String
+        urlString: String,
+        identityAttempt: Int = 0
     ): String {
 
         val connection =
@@ -14932,6 +15138,13 @@ private fun requestGameStateAction(
                 "no-cache"
             )
 
+            // G3-S2: the session header, only with identity_v2 on.
+            PrivyHubIdentity.decorate(
+                this,
+                connection,
+                urlString
+            )
+
 
             val responseCode =
                 connection.responseCode
@@ -14951,8 +15164,29 @@ private fun requestGameStateAction(
                 HttpURLConnection.HTTP_MULT_CHOICE
             ) {
 
+                // G3-S2: a token refusal gets one fresh setup and one retry;
+                // the host's reason code is the message. Off: unchanged.
+                val identity =
+                    PrivyHubIdentity.get(this)
+
+                if (
+                    identity.onResponse(
+                        responseCode,
+                        body,
+                        identityAttempt
+                    )
+                ) {
+                    return httpGet(
+                        urlString,
+                        identityAttempt + 1
+                    )
+                }
+
                 throw IllegalStateException(
-                    "HTTP $responseCode: $body"
+                    identity.refusalMessage(
+                        responseCode,
+                        body
+                    ) ?: "HTTP $responseCode: $body"
                 )
             }
 
@@ -14967,7 +15201,8 @@ private fun requestGameStateAction(
 
 
     private fun httpPost(
-        urlString: String
+        urlString: String,
+        identityAttempt: Int = 0
     ): String {
 
         val connection =
@@ -15004,6 +15239,13 @@ private fun requestGameStateAction(
                 "no-cache"
             )
 
+            // G3-S2: the session header, only with identity_v2 on.
+            PrivyHubIdentity.decorate(
+                this,
+                connection,
+                urlString
+            )
+
 
             val responseCode =
                 connection.responseCode
@@ -15023,8 +15265,29 @@ private fun requestGameStateAction(
                 HttpURLConnection.HTTP_MULT_CHOICE
             ) {
 
+                // G3-S2: a token refusal gets one fresh setup and one retry;
+                // the host's reason code is the message. Off: unchanged.
+                val identity =
+                    PrivyHubIdentity.get(this)
+
+                if (
+                    identity.onResponse(
+                        responseCode,
+                        body,
+                        identityAttempt
+                    )
+                ) {
+                    return httpPost(
+                        urlString,
+                        identityAttempt + 1
+                    )
+                }
+
                 throw IllegalStateException(
-                    "HTTP $responseCode: $body"
+                    identity.refusalMessage(
+                        responseCode,
+                        body
+                    ) ?: "HTTP $responseCode: $body"
                 )
             }
 

@@ -1,0 +1,36 @@
+CL-B2 -- the identity APK (G3-S2's debug APK 77011eefa538fb965e46ad1f25ddac99036e1d77557ba7b7a677dc5947807d9d, the
+flavour CL-B1 installed; the user, 2026-10-16) installed as the CONFIRMED client, paired on the LAN, G3 end to end with the
+host flag on. Pre-registered before the install; the gates are the task's (handoffs/CL-B2_IDENTITY_APK_INSTALL_AND_LAN_
+SMOKE_TASK.md), not changed after data. Baseline: baseline_head.txt.
+
+0. Precondition: the link watch inactive; tools/e3_state.py ok on the five-line state; the onn's APK = de072762...835e
+   (CL-B1's CONFIRMED). Install: adb install -r of 77011eef...; the device hash read back = 77011eef...; the state tools'
+   pinned hash updated (tools/e1_suite.py EXPECT_APK, tools/c3_l4_nft_night.py ADOPTED_APK_SHA256 and its test) as
+   patch CL-B2; e3_state.py ok (APK CONFIRMED). The previous APK de072762... is kept at
+   PrivyHub/app/build/g3_s2_preserved/app-debug.apk (G3-S2 preserved it); rollback = adb install -r of that file +
+   the three hashes back.
+
+R1. identity_v2 OFF (the client default), host flag ABSENT: E1-PS1-STREAM x1, --window 600, --e2, gap 120.
+    GATES (host side, E4-S1 PS1-STREAM's): status OK; RetroArch >= 59.9; capture 60.0 +/- 0.1 (segment-aware);
+    dup+drop <= 0.2/min; host CPU within E1's band (+/- 2 points) of E4-S1's PS1-STREAM 10.9 %. flags_absent true.
+    The audit log (logs/session_audit.jsonl) gains no line (the gate is not constructed). Loss / rendered: reported.
+
+P.  Pairing: e3_flag.conf = PRIVYHUB_SESSION_IDENTITY=v2, daemon-reload, restart; the user turns identity_v2 on and
+    opens "Pair with hub..." on the onn; the window opened on the hub (POST /session/pairing/open, loopback); the user
+    types the code (waited for, up to 10 min). GATE: paired_devices.json holds one device; the audit shows pairing_ok.
+    Then e3_flag.conf removed, daemon-reload, restart (the suite's preflight needs the flag absent).
+
+R2. identity_v2 ON, host flag ON (the suite's per-run drop-in, plan E1-PS1-STREAM:1:120:PRIVYHUB_SESSION_IDENTITY=v2),
+    --window 1200. GATES: the audit over the run shows nonce -> signed setup (setup_ok / token_issued) -> calls with the
+    header, for the paired device, endpoints DECLARED (the plugin target = the declared media_host, the source as
+    routing evidence only), no legacy_setup for the paired client; host side as R1. Link reported.
+F.  After R2, flag on again (e3_flag.conf, restart): (i) a forged token from the hub (curl with a bad
+    X-PrivyHub-Session) -> 401, audited; (ii) the pairing removed from paired_devices.json (the store backed up beside
+    itself, 0600, outside the repo) -> the client's next setup refused device-unknown (or device-revoked for a live
+    token), audited; the client's reason shown (its PrivyHubIdentity log line / the toast); (iii) re-paired (the user
+    types a fresh code) -> one device, pairing_ok.
+R3. Flag off (e3_flag.conf removed, restart), identity_v2 OFF (the user, on the onn): E1-PS1-STREAM x1, --window 600.
+    GATES as R1; flags_absent true. The APK stays (CL-B2, the user's adoption).
+If a gate fails: stop and say so -- the user decides (the APK rollback above is written, not applied unasked).
+No address, token, key or pairing code is written to any file in the repo; audit excerpts are reduced to event,
+reason, routing and device-id prefix.

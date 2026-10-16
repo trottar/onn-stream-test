@@ -1,0 +1,91 @@
+{
+ "runs": [
+  {
+   "run": "runs/E1-PS1-STREAM/run1",
+   "status": "OK",
+   "window": {
+    "from": "2026-10-16T02:20:32.130Z",
+    "to": "2026-10-16T02:30:32.130Z"
+   },
+   "capture_fps": 59.942,
+   "dupdrop_per_min": 0.101,
+   "retroarch_fps": 59.999,
+   "host_cpu": 12.198,
+   "rendered_fps": 57.316,
+   "loss_per_min": 1249.16,
+   "resyncs": 35,
+   "flags_absent_after": true,
+   "dropin": [
+    "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+    "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+    "PRIVYHUB_RECOVERY_TRIGGER=v2",
+    "PRIVYHUB_SNES_CAPTURE_FIX=output_rate",
+    "PRIVYHUB_SNES_CORE=snes9x"
+   ],
+   "gates": {
+    "retroarch_ge_59.9": true,
+    "capture_60_pm_0.1": true,
+    "dupdrop_le_0.2": true,
+    "host_cpu_pm_2_of_10.9": true,
+    "flags_absent_after": true
+   }
+  },
+  {
+   "run": "runs/E1-PS1-STREAM_flag/run1",
+   "status": "OK",
+   "window": {
+    "from": "2026-10-16T02:50:08.236Z",
+    "to": "2026-10-16T03:10:08.237Z"
+   },
+   "capture_fps": 59.989,
+   "dupdrop_per_min": 0.1,
+   "retroarch_fps": 59.999,
+   "host_cpu": 11.223,
+   "rendered_fps": 58.534,
+   "loss_per_min": 730.83,
+   "resyncs": 49,
+   "flags_absent_after": true,
+   "dropin": [
+    "PRIVYHUB_SESSION_IDENTITY=v2"
+   ],
+   "gates": {
+    "retroarch_ge_59.9": true,
+    "capture_60_pm_0.1": true,
+    "dupdrop_le_0.2": true,
+    "host_cpu_pm_2_of_10.9": true,
+    "flags_absent_after": true
+   }
+  },
+  {
+   "run": "runs/E1-PS1-STREAM/run2",
+   "status": "OK",
+   "window": {
+    "from": "2026-10-16T13:54:14.311Z",
+    "to": "2026-10-16T14:04:14.311Z"
+   },
+   "capture_fps": 59.99,
+   "dupdrop_per_min": 0.1,
+   "retroarch_fps": 59.999,
+   "host_cpu": 12.963,
+   "rendered_fps": 59.483,
+   "loss_per_min": 216.11,
+   "resyncs": 3,
+   "flags_absent_after": true,
+   "dropin": [
+    "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+    "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+    "PRIVYHUB_RECOVERY_TRIGGER=v2",
+    "PRIVYHUB_SNES_CAPTURE_FIX=output_rate",
+    "PRIVYHUB_SNES_CORE=snes9x"
+   ],
+   "gates": {
+    "retroarch_ge_59.9": true,
+    "capture_60_pm_0.1": true,
+    "dupdrop_le_0.2": true,
+    "host_cpu_pm_2_of_10.9": false,
+    "flags_absent_after": true
+   }
+  }
+ ],
+ "verdict": "FAILED (runs/E1-PS1-STREAM/run2:host_cpu_pm_2_of_10.9)"
+}

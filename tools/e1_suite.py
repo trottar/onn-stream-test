@@ -51,7 +51,8 @@ REPO = Path(__file__).resolve().parent.parent
 BASE = "http://localhost:8765"
 UNIT = "privyhub-companion"
 PKG = "com.safeiot.privyhub"
-EXPECT_APK = "de072762e55122c3060086f6f10b1bff54633d9165d0c475f17699127841835e"
+# CL-B2 (installed 2026-10-16): G3-S2's identity APK; the previous CONFIRMED APK was de072762... (CL-B1)
+EXPECT_APK = "77011eefa538fb965e46ad1f25ddac99036e1d77557ba7b7a677dc5947807d9d"
 LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
 # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
 # is exactly these two names, at every precondition and teardown
@@ -1449,6 +1450,10 @@ def self_test() -> int:
 
 
 def main(argv: list) -> int:
+    # G4-P1: the off-site row (tools/e1_remote.py), only with --remote; absent = today.
+    if "--remote" in argv:
+        from e1_remote import main_remote
+        return main_remote(argv, sys.modules[__name__])
     if "--self-test" in argv:
         return self_test()
     if "--list" in argv:

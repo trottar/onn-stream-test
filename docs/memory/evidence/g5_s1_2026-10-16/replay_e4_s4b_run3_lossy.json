@@ -1,0 +1,1916 @@
+{
+ "session": {
+  "schema": "privyhub_wan_telemetry_v1",
+  "reports": 593,
+  "windows": 118,
+  "class": "path-changed",
+  "classes": [
+   "path-changed",
+   "capacity-limited",
+   "lossy"
+  ],
+  "window_counts": {
+   "path-changed": 4,
+   "latency-limited": 0,
+   "starved": 4,
+   "capacity-limited": 2,
+   "lossy": 58,
+   "clean": 59
+  },
+  "window_primary_counts": {
+   "path-changed": 4,
+   "latency-limited": 0,
+   "starved": 2,
+   "capacity-limited": 0,
+   "lossy": 53,
+   "clean": 59
+  },
+  "loss_per_min_post_fec": 649.94,
+  "stale_per_min": 3.15,
+  "measures": {
+   "delivered_goodput_kbps": {
+    "value": 7044.5,
+    "source": "receiver.recent_mbps (mean)"
+   },
+   "packet_loss_per_min": {
+    "value": {
+     "post_fec": 649.94,
+     "pre_fec": "not recorded"
+    },
+    "source": "receiver.lost_packets_delta (+ FEC recovered for pre-FEC)"
+   },
+   "fec_groups": {
+    "value": {
+     "recovered_packets": "not recorded",
+     "unrecoverable_groups": "not recorded"
+    },
+    "source": "fec.recovered_packets_delta / fec.unrecoverable_groups_delta",
+    "classified": "not classified; G5-S2"
+   },
+   "jitter_ms": {
+    "value": {
+     "p50": 0.727,
+     "p95": 2.195
+    },
+    "source": "receiver.interarrival_jitter_ms (client running estimate; no per-packet arrival times carried)",
+    "classified": "not classified; G5-S2"
+   },
+   "rtt_ms": {
+    "value": {
+     "p50": 38.0,
+     "p95": 106.2
+    },
+    "source": "latency.control_round_trip_ms (the client's control echo)",
+    "classified": "not classified; G5-S2"
+   },
+   "sender_pacing": {
+    "value": "not recorded",
+    "source": "sender.send_call_avg_us / send_call_max_us / send_errors_delta"
+   },
+   "queue_depth": {
+    "value": {
+     "max": 1,
+     "trend": 0
+    },
+    "source": "decoder.queue_depth"
+   },
+   "decoder_starvation": {
+    "value": {
+     "stale_drops_per_min": 3.15,
+     "waiting_for_idr_reports": 6,
+     "audio_prolonged_starvation_events": "not recorded"
+    },
+    "source": "decoder.stale_output_drops_delta, receiver.waiting_for_idr, heartbeat audio_prolonged_starvation_events"
+   },
+   "overlay_path": {
+    "value": "none",
+    "source": "overlay provider state().path (G1-S1)"
+   },
+   "mtu_fragmentation": {
+    "value": {
+     "mtu": null,
+     "oversize_drops": "not observed (no oversize-drop counter exists)"
+    },
+    "source": "overlay provider state().mtu",
+    "classified": "not classified; G5-S2"
+   },
+   "path_change_events": {
+    "value": {
+     "count": 4,
+     "events": [
+      {
+       "t_s": 428.4,
+       "kind": "recovery_pause",
+       "detail": "client_output_silence"
+      },
+      {
+       "t_s": 440.0,
+       "kind": "recovery_resume",
+       "detail": "PAUSED_RECOVERING"
+      },
+      {
+       "t_s": 876.1,
+       "kind": "recovery_pause",
+       "detail": "client_output_silence"
+      },
+      {
+       "t_s": 886.6,
+       "kind": "recovery_resume",
+       "detail": "PAUSED_RECOVERING"
+      }
+     ]
+    },
+    "source": "overlay transitions, recovery pauses / resumes, ladder transitions, heartbeat stream_resyncs"
+   }
+  }
+ },
+ "windows": [
+  {
+   "t_s": [
+    95.829,
+    103.871
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.72079429803055,
+   "queue_max": 1,
+   "gap_max_ms": 21,
+   "events": []
+  },
+  {
+   "t_s": [
+    105.88,
+    113.921
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.75515433072265,
+   "queue_max": 0,
+   "gap_max_ms": 16,
+   "events": []
+  },
+  {
+   "t_s": [
+    115.931,
+    123.97
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.753426410355985,
+   "queue_max": 0,
+   "gap_max_ms": 16,
+   "events": []
+  },
+  {
+   "t_s": [
+    125.984,
+    134.025
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.48117438575908,
+   "queue_max": 0,
+   "gap_max_ms": 33,
+   "events": []
+  },
+  {
+   "t_s": [
+    136.049,
+    144.106
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.674328545449775,
+   "queue_max": 0,
+   "gap_max_ms": 20,
+   "events": []
+  },
+  {
+   "t_s": [
+    146.115,
+    154.155
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 55.7635337314681,
+   "queue_max": 0,
+   "gap_max_ms": 26,
+   "events": []
+  },
+  {
+   "t_s": [
+    156.165,
+    164.204
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.75626971247295,
+   "queue_max": 0,
+   "gap_max_ms": 18,
+   "events": []
+  },
+  {
+   "t_s": [
+    166.213,
+    174.255
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.76405592972957,
+   "queue_max": 1,
+   "gap_max_ms": 20,
+   "events": []
+  },
+  {
+   "t_s": [
+    176.264,
+    184.305
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 55.78697231381823,
+   "queue_max": 0,
+   "gap_max_ms": 18,
+   "events": []
+  },
+  {
+   "t_s": [
+    186.317,
+    194.361
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 108.0,
+   "fps_min": 59.68671553190214,
+   "queue_max": 0,
+   "gap_max_ms": 18,
+   "events": []
+  },
+  {
+   "t_s": [
+    196.373,
+    204.412
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 55.773966741302395,
+   "queue_max": 0,
+   "gap_max_ms": 18,
+   "events": []
+  },
+  {
+   "t_s": [
+    206.421,
+    214.464
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 108.0,
+   "fps_min": 53.785642271007994,
+   "queue_max": 0,
+   "gap_max_ms": 19,
+   "events": []
+  },
+  {
+   "t_s": [
+    216.472,
+    224.518
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 51.80015500200228,
+   "queue_max": 0,
+   "gap_max_ms": 34,
+   "events": []
+  },
+  {
+   "t_s": [
+    226.528,
+    234.569
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.74643612508515,
+   "queue_max": 0,
+   "gap_max_ms": 51,
+   "events": []
+  },
+  {
+   "t_s": [
+    236.577,
+    244.615
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 90.0,
+   "fps_min": 53.736187239947085,
+   "queue_max": 0,
+   "gap_max_ms": 17,
+   "events": []
+  },
+  {
+   "t_s": [
+    246.624,
+    254.662
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 57.749972533416084,
+   "queue_max": 0,
+   "gap_max_ms": 22,
+   "events": []
+  },
+  {
+   "t_s": [
+    256.671,
+    264.71
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 132.0,
+   "fps_min": 59.77637443130301,
+   "queue_max": 1,
+   "gap_max_ms": 16,
+   "events": []
+  },
+  {
+   "t_s": [
+    266.718,
+    274.756
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 57.70497374271473,
+   "queue_max": 0,
+   "gap_max_ms": 22,
+   "events": []
+  },
+  {
+   "t_s": [
+    276.765,
+    284.804
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 18.0,
+   "fps_min": 59.78460265294772,
+   "queue_max": 0,
+   "gap_max_ms": 13,
+   "events": []
+  },
+  {
+   "t_s": [
+    286.813,
+    294.855
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.66419238399033,
+   "queue_max": 0,
+   "gap_max_ms": 21,
+   "events": []
+  },
+  {
+   "t_s": [
+    296.864,
+    304.901
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.76034333416836,
+   "queue_max": 0,
+   "gap_max_ms": 17,
+   "events": []
+  },
+  {
+   "t_s": [
+    306.911,
+    314.949
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 51.78398404267768,
+   "queue_max": 1,
+   "gap_max_ms": 16,
+   "events": []
+  },
+  {
+   "t_s": [
+    316.958,
+    324.996
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.69763375354836,
+   "queue_max": 0,
+   "gap_max_ms": 16,
+   "events": []
+  },
+  {
+   "t_s": [
+    327.005,
+    335.039
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 53.781900410541155,
+   "queue_max": 0,
+   "gap_max_ms": 32,
+   "events": []
+  },
+  {
+   "t_s": [
+    337.048,
+    345.086
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 126.0,
+   "fps_min": 53.83625809772094,
+   "queue_max": 0,
+   "gap_max_ms": 16,
+   "events": []
+  },
+  {
+   "t_s": [
+    347.093,
+    355.129
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 30.0,
+   "fps_min": 55.81023281854526,
+   "queue_max": 0,
+   "gap_max_ms": 21,
+   "events": []
+  },
+  {
+   "t_s": [
+    357.137,
+    365.175
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.75852690785138,
+   "queue_max": 0,
+   "gap_max_ms": 16,
+   "events": []
+  },
+  {
+   "t_s": [
+    367.182,
+    375.217
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.741606559175956,
+   "queue_max": 0,
+   "gap_max_ms": 20,
+   "events": []
+  },
+  {
+   "t_s": [
+    377.225,
+    385.261
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.755771469358336,
+   "queue_max": 0,
+   "gap_max_ms": 21,
+   "events": []
+  },
+  {
+   "t_s": [
+    387.268,
+    397.326
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 18.0,
+   "fps_min": 57.82274553003259,
+   "queue_max": 0,
+   "gap_max_ms": 23,
+   "events": []
+  },
+  {
+   "t_s": [
+    399.333,
+    407.371
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 57.76988763292704,
+   "queue_max": 0,
+   "gap_max_ms": 17,
+   "events": []
+  },
+  {
+   "t_s": [
+    409.38,
+    417.416
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 192.0,
+   "fps_min": 47.82024198883526,
+   "queue_max": 0,
+   "gap_max_ms": 25,
+   "events": []
+  },
+  {
+   "t_s": [
+    419.424,
+    429.498
+   ],
+   "primary": "path-changed",
+   "classes": [
+    "path-changed",
+    "starved",
+    "capacity-limited",
+    "lossy"
+   ],
+   "loss_per_min": 17154.0,
+   "fps_min": 1.9932474675810854,
+   "queue_max": 0,
+   "gap_max_ms": 1329,
+   "events": [
+    "recovery_pause"
+   ]
+  },
+  {
+   "t_s": [
+    431.541,
+    442.266
+   ],
+   "primary": "path-changed",
+   "classes": [
+    "path-changed",
+    "lossy"
+   ],
+   "loss_per_min": 31266.0,
+   "fps_min": 0.0,
+   "queue_max": 0,
+   "gap_max_ms": 71,
+   "events": [
+    "recovery_resume"
+   ]
+  },
+  {
+   "t_s": [
+    444.276,
+    452.311
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 24.0,
+   "fps_min": 59.6160374262806,
+   "queue_max": 0,
+   "gap_max_ms": 27,
+   "events": []
+  },
+  {
+   "t_s": [
+    454.324,
+    462.358
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 60.0,
+   "fps_min": 59.61593649080901,
+   "queue_max": 1,
+   "gap_max_ms": 19,
+   "events": []
+  },
+  {
+   "t_s": [
+    464.369,
+    472.401
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.64274449333351,
+   "queue_max": 0,
+   "gap_max_ms": 21,
+   "events": []
+  },
+  {
+   "t_s": [
+    474.41,
+    482.445
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 57.73295736038867,
+   "queue_max": 0,
+   "gap_max_ms": 16,
+   "events": []
+  },
+  {
+   "t_s": [
+    484.453,
+    492.486
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 57.696159217015854,
+   "queue_max": 0,
+   "gap_max_ms": 22,
+   "events": []
+  },
+  {
+   "t_s": [
+    494.496,
+    502.531
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 55.68841308213744,
+   "queue_max": 0,
+   "gap_max_ms": 22,
+   "events": []
+  },
+  {
+   "t_s": [
+    504.54,
+    512.576
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 30.0,
+   "fps_min": 57.683973046737925,
+   "queue_max": 0,
+   "gap_max_ms": 24,
+   "events": []
+  },
+  {
+   "t_s": [
+    514.586,
+    522.618
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 51.75107350685259,
+   "queue_max": 0,
+   "gap_max_ms": 81,
+   "events": []
+  },
+  {
+   "t_s": [
+    524.627,
+    532.661
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 57.68200556371188,
+   "queue_max": 0,
+   "gap_max_ms": 17,
+   "events": []
+  },
+  {
+   "t_s": [
+    534.673,
+    542.706
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 162.0,
+   "fps_min": 55.712158010122174,
+   "queue_max": 0,
+   "gap_max_ms": 31,
+   "events": []
+  },
+  {
+   "t_s": [
+    544.716,
+    552.749
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 12.0,
+   "fps_min": 57.70611349729539,
+   "queue_max": 0,
+   "gap_max_ms": 20,
+   "events": []
+  },
+  {
+   "t_s": [
+    554.758,
+    562.79
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 57.73062038116964,
+   "queue_max": 0,
+   "gap_max_ms": 20,
+   "events": []
+  },
+  {
+   "t_s": [
+    564.801,
+    572.833
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 18.0,
+   "fps_min": 59.69037492286537,
+   "queue_max": 0,
+   "gap_max_ms": 40,
+   "events": []
+  },
+  {
+   "t_s": [
+    574.843,
+    582.877
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 24.0,
+   "fps_min": 57.69207822474456,
+   "queue_max": 0,
+   "gap_max_ms": 18,
+   "events": []
+  },
+  {
+   "t_s": [
+    584.889,
+    592.922
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 6.0,
+   "fps_min": 57.67521161984795,
+   "queue_max": 0,
+   "gap_max_ms": 17,
+   "events": []
+  },
+  {
+   "t_s": [
+    594.934,
+    602.966
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 12.0,
+   "fps_min": 59.72191267746603,
+   "queue_max": 0,
+   "gap_max_ms": 20,
+   "events": []
+  },
+  {
+   "t_s": [
+    604.976,
+    613.007
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 55.736855936070604,
+   "queue_max": 0,
+   "gap_max_ms": 17,
+   "events": []
+  },
+  {
+   "t_s": [
+    615.016,
+    623.049
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 138.0,
+   "fps_min": 49.77617317447621,
+   "queue_max": 0,
+   "gap_max_ms": 19,
+   "events": []
+  },
+  {
+   "t_s": [
+    625.058,
+    633.091
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 57.7293946173192,
+   "queue_max": 1,
+   "gap_max_ms": 17,
+   "events": []
+  },
+  {
+   "t_s": [
+    635.101,
+    643.135
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 55.677921818704675,
+   "queue_max": 0,
+   "gap_max_ms": 28,
+   "events": []
+  },
+  {
+   "t_s": [
+    645.145,
+    653.175
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.68866832298875,
+   "queue_max": 0,
+   "gap_max_ms": 19,
+   "events": []
+  },
+  {
+   "t_s": [
+    655.185,
+    663.216
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 49.75456996073371,
+   "queue_max": 0,
+   "gap_max_ms": 38,
+   "events": []
+  },
+  {
+   "t_s": [
+    665.226,
+    673.259
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 6.0,
+   "fps_min": 59.56512609350478,
+   "queue_max": 0,
+   "gap_max_ms": 21,
+   "events": []
+  },
+  {
+   "t_s": [
+    675.269,
+    683.3
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.69624782099741,
+   "queue_max": 0,
+   "gap_max_ms": 21,
+   "events": []
+  },
+  {
+   "t_s": [
+    685.311,
+    693.343
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 57.704344290463055,
+   "queue_max": 0,
+   "gap_max_ms": 10,
+   "events": []
+  },
+  {
+   "t_s": [
+    695.359,
+    705.4
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 51.77828919725077,
+   "queue_max": 0,
+   "gap_max_ms": 20,
+   "events": []
+  },
+  {
+   "t_s": [
+    707.408,
+    715.444
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 30.0,
+   "fps_min": 55.73450145682522,
+   "queue_max": 0,
+   "gap_max_ms": 18,
+   "events": []
+  },
+  {
+   "t_s": [
+    717.454,
+    725.49
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 30.0,
+   "fps_min": 57.77478533609168,
+   "queue_max": 0,
+   "gap_max_ms": 19,
+   "events": []
+  },
+  {
+   "t_s": [
+    727.496,
+    735.532
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 57.665629079060295,
+   "queue_max": 1,
+   "gap_max_ms": 20,
+   "events": []
+  },
+  {
+   "t_s": [
+    737.539,
+    745.571
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 55.77878557559489,
+   "queue_max": 0,
+   "gap_max_ms": 26,
+   "events": []
+  },
+  {
+   "t_s": [
+    747.578,
+    755.615
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 57.64239935103881,
+   "queue_max": 0,
+   "gap_max_ms": 25,
+   "events": []
+  },
+  {
+   "t_s": [
+    757.633,
+    765.671
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.36275624601565,
+   "queue_max": 0,
+   "gap_max_ms": 20,
+   "events": []
+  },
+  {
+   "t_s": [
+    767.679,
+    775.714
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 12.0,
+   "fps_min": 57.68357777243371,
+   "queue_max": 1,
+   "gap_max_ms": 23,
+   "events": []
+  },
+  {
+   "t_s": [
+    777.721,
+    785.755
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 51.735009556132795,
+   "queue_max": 0,
+   "gap_max_ms": 32,
+   "events": []
+  },
+  {
+   "t_s": [
+    787.762,
+    795.796
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 78.0,
+   "fps_min": 55.76137033089634,
+   "queue_max": 0,
+   "gap_max_ms": 25,
+   "events": []
+  },
+  {
+   "t_s": [
+    797.804,
+    805.841
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 48.0,
+   "fps_min": 59.547527162098355,
+   "queue_max": 0,
+   "gap_max_ms": 27,
+   "events": []
+  },
+  {
+   "t_s": [
+    807.848,
+    815.88
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 504.0,
+   "fps_min": 53.73061062259903,
+   "queue_max": 1,
+   "gap_max_ms": 23,
+   "events": []
+  },
+  {
+   "t_s": [
+    817.888,
+    825.928
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.49030479661345,
+   "queue_max": 0,
+   "gap_max_ms": 20,
+   "events": []
+  },
+  {
+   "t_s": [
+    827.936,
+    835.968
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 114.0,
+   "fps_min": 51.75510642951935,
+   "queue_max": 1,
+   "gap_max_ms": 18,
+   "events": []
+  },
+  {
+   "t_s": [
+    837.977,
+    846.011
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 24.0,
+   "fps_min": 51.72915010148404,
+   "queue_max": 1,
+   "gap_max_ms": 20,
+   "events": []
+  },
+  {
+   "t_s": [
+    848.02,
+    856.051
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 36.0,
+   "fps_min": 53.776568253794046,
+   "queue_max": 0,
+   "gap_max_ms": 32,
+   "events": []
+  },
+  {
+   "t_s": [
+    858.058,
+    866.093
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 174.0,
+   "fps_min": 57.67799448489779,
+   "queue_max": 0,
+   "gap_max_ms": 17,
+   "events": []
+  },
+  {
+   "t_s": [
+    868.111,
+    877.184
+   ],
+   "primary": "path-changed",
+   "classes": [
+    "path-changed",
+    "capacity-limited",
+    "lossy"
+   ],
+   "loss_per_min": 17964.0,
+   "fps_min": 0.0,
+   "queue_max": 0,
+   "gap_max_ms": 93,
+   "events": [
+    "recovery_pause"
+   ]
+  },
+  {
+   "t_s": [
+    879.729,
+    887.888
+   ],
+   "primary": "path-changed",
+   "classes": [
+    "path-changed",
+    "starved",
+    "lossy"
+   ],
+   "loss_per_min": 7848.0,
+   "fps_min": 17.742287350312733,
+   "queue_max": 1,
+   "gap_max_ms": 115,
+   "events": [
+    "recovery_resume"
+   ]
+  },
+  {
+   "t_s": [
+    889.903,
+    897.94
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 72.0,
+   "fps_min": 57.83090670827211,
+   "queue_max": 0,
+   "gap_max_ms": 23,
+   "events": []
+  },
+  {
+   "t_s": [
+    899.947,
+    907.98
+   ],
+   "primary": "starved",
+   "classes": [
+    "starved",
+    "lossy"
+   ],
+   "loss_per_min": 66.0,
+   "fps_min": 57.81857813752879,
+   "queue_max": 0,
+   "gap_max_ms": 19,
+   "events": []
+  },
+  {
+   "t_s": [
+    909.988,
+    918.025
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 61.810384160888866,
+   "queue_max": 0,
+   "gap_max_ms": 23,
+   "events": []
+  },
+  {
+   "t_s": [
+    920.033,
+    928.068
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.75576706543091,
+   "queue_max": 0,
+   "gap_max_ms": 18,
+   "events": []
+  },
+  {
+   "t_s": [
+    930.075,
+    938.111
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 24.0,
+   "fps_min": 53.8420076280764,
+   "queue_max": 0,
+   "gap_max_ms": 35,
+   "events": []
+  },
+  {
+   "t_s": [
+    940.118,
+    948.153
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 102.0,
+   "fps_min": 55.84616659626326,
+   "queue_max": 1,
+   "gap_max_ms": 17,
+   "events": []
+  },
+  {
+   "t_s": [
+    950.16,
+    958.196
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 12.0,
+   "fps_min": 57.92672489422435,
+   "queue_max": 0,
+   "gap_max_ms": 18,
+   "events": []
+  },
+  {
+   "t_s": [
+    960.204,
+    968.236
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 55.821264442030184,
+   "queue_max": 0,
+   "gap_max_ms": 21,
+   "events": []
+  },
+  {
+   "t_s": [
+    970.243,
+    978.275
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 78.0,
+   "fps_min": 59.78205674048518,
+   "queue_max": 0,
+   "gap_max_ms": 17,
+   "events": []
+  },
+  {
+   "t_s": [
+    980.282,
+    988.314
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 54.0,
+   "fps_min": 59.78321291765375,
+   "queue_max": 1,
+   "gap_max_ms": 19,
+   "events": []
+  },
+  {
+   "t_s": [
+    990.322,
+    998.352
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 12.0,
+   "fps_min": 51.8353517437816,
+   "queue_max": 1,
+   "gap_max_ms": 23,
+   "events": []
+  },
+  {
+   "t_s": [
+    1000.36,
+    1008.392
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.778933081822366,
+   "queue_max": 0,
+   "gap_max_ms": 18,
+   "events": []
+  },
+  {
+   "t_s": [
+    1010.4,
+    1018.436
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 90.0,
+   "fps_min": 55.824636283653795,
+   "queue_max": 0,
+   "gap_max_ms": 18,
+   "events": []
+  },
+  {
+   "t_s": [
+    1020.444,
+    1028.477
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 55.80903799146844,
+   "queue_max": 1,
+   "gap_max_ms": 73,
+   "events": []
+  },
+  {
+   "t_s": [
+    1030.486,
+    1038.517
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 24.0,
+   "fps_min": 55.836811780584554,
+   "queue_max": 0,
+   "gap_max_ms": 19,
+   "events": []
+  },
+  {
+   "t_s": [
+    1040.525,
+    1048.563
+   ],
+   "primary": "starved",
+   "classes": [
+    "starved"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.73090118023541,
+   "queue_max": 0,
+   "gap_max_ms": 19,
+   "events": []
+  },
+  {
+   "t_s": [
+    1050.571,
+    1058.605
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 66.0,
+   "fps_min": 55.83057285878492,
+   "queue_max": 0,
+   "gap_max_ms": 13,
+   "events": []
+  },
+  {
+   "t_s": [
+    1060.613,
+    1068.648
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.79046765437144,
+   "queue_max": 0,
+   "gap_max_ms": 18,
+   "events": []
+  },
+  {
+   "t_s": [
+    1070.655,
+    1078.69
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.727659551830875,
+   "queue_max": 0,
+   "gap_max_ms": 19,
+   "events": []
+  },
+  {
+   "t_s": [
+    1080.698,
+    1088.73
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 24.0,
+   "fps_min": 57.80839730440481,
+   "queue_max": 0,
+   "gap_max_ms": 18,
+   "events": []
+  },
+  {
+   "t_s": [
+    1090.737,
+    1098.769
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.7586061859667,
+   "queue_max": 0,
+   "gap_max_ms": 64,
+   "events": []
+  },
+  {
+   "t_s": [
+    1100.776,
+    1108.807
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 30.0,
+   "fps_min": 59.80810020813697,
+   "queue_max": 0,
+   "gap_max_ms": 50,
+   "events": []
+  },
+  {
+   "t_s": [
+    1110.813,
+    1118.845
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.800642478567916,
+   "queue_max": 0,
+   "gap_max_ms": 23,
+   "events": []
+  },
+  {
+   "t_s": [
+    1120.852,
+    1128.881
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 30.0,
+   "fps_min": 55.940293135047575,
+   "queue_max": 0,
+   "gap_max_ms": 25,
+   "events": []
+  },
+  {
+   "t_s": [
+    1130.889,
+    1138.922
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.79470492614651,
+   "queue_max": 0,
+   "gap_max_ms": 18,
+   "events": []
+  },
+  {
+   "t_s": [
+    1140.931,
+    1148.964
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 57.77670804534882,
+   "queue_max": 0,
+   "gap_max_ms": 18,
+   "events": []
+  },
+  {
+   "t_s": [
+    1150.972,
+    1159.003
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 55.8121529252751,
+   "queue_max": 0,
+   "gap_max_ms": 18,
+   "events": []
+  },
+  {
+   "t_s": [
+    1161.011,
+    1169.044
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 138.0,
+   "fps_min": 57.781393803817416,
+   "queue_max": 0,
+   "gap_max_ms": 29,
+   "events": []
+  },
+  {
+   "t_s": [
+    1171.05,
+    1179.083
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 114.0,
+   "fps_min": 55.80102592936365,
+   "queue_max": 0,
+   "gap_max_ms": 17,
+   "events": []
+  },
+  {
+   "t_s": [
+    1181.096,
+    1189.127
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 12.0,
+   "fps_min": 55.30055449451238,
+   "queue_max": 0,
+   "gap_max_ms": 12,
+   "events": []
+  },
+  {
+   "t_s": [
+    1191.134,
+    1199.167
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 30.0,
+   "fps_min": 57.83143213198166,
+   "queue_max": 0,
+   "gap_max_ms": 16,
+   "events": []
+  },
+  {
+   "t_s": [
+    1201.176,
+    1209.208
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 36.0,
+   "fps_min": 57.83206435990848,
+   "queue_max": 0,
+   "gap_max_ms": 22,
+   "events": []
+  },
+  {
+   "t_s": [
+    1211.215,
+    1219.25
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 12.0,
+   "fps_min": 57.83685299535477,
+   "queue_max": 0,
+   "gap_max_ms": 21,
+   "events": []
+  },
+  {
+   "t_s": [
+    1221.257,
+    1229.304
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 12.0,
+   "fps_min": 55.841344465565946,
+   "queue_max": 0,
+   "gap_max_ms": 22,
+   "events": []
+  },
+  {
+   "t_s": [
+    1231.311,
+    1239.344
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 216.0,
+   "fps_min": 57.83302114702908,
+   "queue_max": 0,
+   "gap_max_ms": 26,
+   "events": []
+  },
+  {
+   "t_s": [
+    1241.352,
+    1249.384
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 57.83991634784423,
+   "queue_max": 0,
+   "gap_max_ms": 16,
+   "events": []
+  },
+  {
+   "t_s": [
+    1251.391,
+    1259.421
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 18.0,
+   "fps_min": 57.804629024591236,
+   "queue_max": 0,
+   "gap_max_ms": 21,
+   "events": []
+  },
+  {
+   "t_s": [
+    1261.428,
+    1269.46
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 36.0,
+   "fps_min": 59.76816157245061,
+   "queue_max": 0,
+   "gap_max_ms": 20,
+   "events": []
+  },
+  {
+   "t_s": [
+    1271.467,
+    1279.506
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 12.0,
+   "fps_min": 57.80156088331588,
+   "queue_max": 0,
+   "gap_max_ms": 36,
+   "events": []
+  },
+  {
+   "t_s": [
+    1281.514,
+    1289.545
+   ],
+   "primary": "lossy",
+   "classes": [
+    "lossy"
+   ],
+   "loss_per_min": 60.0,
+   "fps_min": 59.78969524761847,
+   "queue_max": 0,
+   "gap_max_ms": 21,
+   "events": []
+  }
+ ]
+}

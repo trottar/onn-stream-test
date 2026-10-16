@@ -1,0 +1,5 @@
+G3-S1 mutation check of the in-process handler comparison (in memory; no file changed)
+unmutated: requests differing = 0 of 7
+mutation: flag-absent target no longer the source (reversed string): requests differing = 3 of 7
+mutation: session header sent without the flag guard: requests differing = 7 of 7
+mutation: GET intercept without the None guard (returns early): requests differing = 4 of 7

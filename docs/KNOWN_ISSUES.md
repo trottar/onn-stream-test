@@ -1,5 +1,54 @@
 # Known issues and deferred work
 
+## 2026-10-16 the host-CPU band gate fails on the encoder's share, not on the stack — a BAR item (CL-B2 R3), OPEN
+
+- **Seen:** CL-B2's R3 (PS1-STREAM ×10 min, flag and setting off,
+  2026-10-16 13:54Z) read host CPU **12.963 %**, against the band
+  10.9 ± 2. It **FAILED by 0.06**, and every other gate held. The user
+  decided the APK stays and CL-B2 closes, with the gate recorded FAILED
+  (`docs/memory/evidence/CL_B2_IDENTITY_APK_AND_LAN_SMOKE_2026-10-16.md`
+  §2a; `cl_b2_cpu_split.json`).
+- **The split (% of one core):**
+  - The companion and RetroArch were within a point of R1.
+  - The **encoder was 46.65, against 35.75** in R1.
+  - The ladder polled 7000-7000 in R3, against 5000-7000 in R1.
+- **Not explained by the rung mix:** E4-S1's 10.9 reference and CL-B2's
+  R2 held 7000 for every poll, with no ladder action, at 36.04 and 35.64 %
+  encoder. The cause of R3's +10.9 points is not located.
+- **The bar lesson (the user's, extended by the files):**
+  - Host-CPU bands must compare runs at an equal rung mix, or report the
+    encoder together with its rung.
+  - At an equal rung the encoder can still move by ~11 points, so a
+    near-edge failure is read through the per-process split before a
+    cause is named.
+  - Not applied to any tool. Changing the gate or the band is the user's
+    call.
+
+## 2026-10-16 session identity (G3) on the LAN — three follow-ups for G3-S3, seen in CL-B2
+
+- **Context:** CL-B2 (`docs/memory/evidence/CL_B2_IDENTITY_APK_AND_LAN_SMOKE_2026-10-16.md`)
+  ran G3 end to end on the LAN. It is CLOSED, and the APK `77011eef…`
+  stays.
+  - Pairing, signed setup and token, a 20-min stream with every host gate,
+    a forged token → 401, and an unpaired device → `unknown-device`.
+  - R3's host CPU FAILED by 0.06 (the entry above).
+  - The host flag and the client setting are NOT adopted (the user's call).
+  - G3-S3 also carries the range server over the overlay and the
+    TV-sync / EPG / diagnostics tokens.
+- **The declared ports:**
+  - `audio_port` is declared but unsigned and ignored by the host; only
+    `video_port` is signed and checked.
+  - The host's chosen destination cannot be seen from outside: the
+    encoder feeds the loopback FEC sender, and its sends are unconnected.
+  - A smoke can therefore show the declared target only through the code
+    path and the audit (no `legacy_setup`), not on the wire.
+  - G3-S3: sign and check `audio_port`; report the chosen target's class
+    and hash (no address).
+- **The store's directory:** `~/.config/privyhub` is 0775 (it predates
+  G3). The store file itself is 0600.
+- **Two setups per stream entry:** the client issues `token_issued` twice
+  for one device within two minutes. Seen; not a fault.
+
 ## 2026-10-10 SNES capture at 59 fps (or 59.94) for a whole encoder session — FIXED, ADOPTED 2026-10-15 (E4-S5D)
 
 - **Adopted (E4-S5D, the user's decision, 2026-10-15)**
@@ -1591,3 +1640,22 @@ unrecoverable. Neither was right. The defect itself is real and stays open.
   - beside it are `history.csv` (one row per probe) and `watch.log`;
   - to stop it: `touch ~/privyhub_link_watch/STOP`.
   - Record: `docs/memory/evidence/E4_S4D_LINK_WATCH_LAUNCH_2026-10-15.md`.
+- **PARKED 2026-10-16** (the user: remote first). The watch was stopped
+  after six probes, 10-15 17:41-21:26 US Eastern
+  (`docs/memory/evidence/E4_S4C_LINK_WATCH_2026-10-16.md`).
+  - None was clean: 102-4,299 loss/min. Grab deferral stays INCONCLUSIVE
+    (link).
+  - The host side was clean throughout.
+- **What the watch saw, with no cause claimed:**
+  - Loss rose and fell with the AP's retry % (ρ +0.77) and the client's
+    pauses.
+  - Air utilisation (8-14 %), the channel (36 / 80 MHz) and the client's
+    own RSSI did not move.
+  - The two ends disagree. The client hears the AP at −68/−69 dBm; the AP
+    hears the client at −78 to −80 dBm. The AP's tx rate to the client
+    read 6.5 Mb/s in every probe, against the client's reported 117-195
+    Mb/s link.
+  - Ping loss was 0.14 % idle and 1.66 % while a stream ran.
+- **The one hand option** the user has: a wired (USB Ethernet) adapter on
+  the client. That takes the onn's radio out of the path.
+  - Nothing else is queued for the LAN loss row.

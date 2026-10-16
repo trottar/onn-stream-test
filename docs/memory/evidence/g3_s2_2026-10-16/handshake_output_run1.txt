@@ -1,0 +1,20 @@
+PASS  0 port = vectors (text-host): canonical sha256 and sig match G3-S1's
+PASS  0 port = vectors (lan-ipv4): canonical sha256 and sig match G3-S1's
+PASS  0 port = vectors (overlay-ipv4-port-50000): canonical sha256 and sig match G3-S1's
+PASS  1a hub opens the pairing window: status 200, 6-digit code, 120 s
+PASS  1b client pairs (body as the APK sends it): status 200, device id dev-…, permissions ['games', 'tv', 'vod']
+PASS  2 nonce + 3 signed setup: status 200, token, expires_in_s 28800; audio_port declared and ignored by the host
+PASS  4 call with the token: allowed as session; plugin target = lan-declared (source = lan-source)
+PASS  4b no header on /status: client sends none (legacy on the LAN); with a token the host would answer permission-unknown
+PASS  5 refresh inside the 10-min margin: client re-runs nonce + setup; a new token
+PASS  6 expired token → one retry: first 401 token-expired; client retries once after a fresh setup → allowed
+FAIL  7a replayed setup: 401 nonce-unknown
+PASS  7b wrong key: 401 bad-signature
+PASS  7c declared overlay host from the LAN: 403 endpoint-class-mismatch
+PASS  7d no token over the overlay: 401 legacy-overlay
+PASS  7e forged token: 401 token-unknown; no fallback
+PASS  7f one retry only: token-unknown is retried once, then shown (client unit tests: attempt 1 → shown)
+PASS  8 unpaired client, legacy LAN: accepted as legacy-lan; the host's token header is ignored by the client
+PASS  9 host audit: 12 lines, no address, key or token
+
+17 / 18 steps PASS

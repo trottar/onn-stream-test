@@ -1,0 +1,1716 @@
+diff --git a/PrivyHub/app/src/main/java/MainActivity.kt b/PrivyHub/app/src/main/java/MainActivity.kt
+index 91e9675..a497349 100644
+--- a/PrivyHub/app/src/main/java/MainActivity.kt
++++ b/PrivyHub/app/src/main/java/MainActivity.kt
+@@ -1,6 +1,7 @@
+ package com.safeiot.privyhub
+ 
+ import android.content.Intent
++import com.safeiot.privyhub.identity.PrivyHubIdentity
+ import android.graphics.Bitmap
+ import android.graphics.BitmapFactory
+ import android.graphics.drawable.BitmapDrawable
+@@ -25,6 +26,7 @@ import android.widget.EditText
+ import android.widget.GridLayout
+ import android.widget.ImageView
+ import android.widget.TextView
++import android.widget.Toast
+ 
+ import androidx.appcompat.app.AlertDialog
+ import androidx.appcompat.app.AppCompatActivity
+@@ -772,6 +774,153 @@ class MainActivity : AppCompatActivity() {
+      */
+ 
+ 
++    // G3-S2: the identity's state for the settings screen: the pairing the
++    // host returned and the last refusal's reason code. No address.
++    private fun identityStatusText(): String {
++
++        val identity =
++            PrivyHubIdentity.get(this)
++
++        val pairing =
++            identity.currentPairing()
++
++        val paired =
++            if (pairing == null) {
++                "not paired"
++            } else {
++                "paired as \"${pairing.displayName}\" " +
++                    "(${pairing.deviceId}); permissions: " +
++                    pairing.permissions.joinToString(", ")
++            }
++
++        val setting =
++            if (identity.isEnabled) "on" else "off (today's requests)"
++
++        val reason =
++            identity.lastReason?.let {
++                "\nLast refusal: $it"
++            }.orEmpty()
++
++        return "Identity v2: $setting; $paired$reason"
++    }
++
++
++    // G3-S2: pair once with the code the hub shows. The hub opens the window
++    // itself (on the hub: POST /session/pairing/open on the companion's
++    // loopback; see docs/REMOTE_TRUST.md); the code lives 2 minutes.
++    private fun showIdentityPairingDialog(
++        host: String
++    ) {
++
++        if (host.isBlank()) {
++            Toast.makeText(
++                this,
++                "Set the companion host first",
++                Toast.LENGTH_LONG
++            ).show()
++            return
++        }
++
++        val codeInput =
++            EditText(this).apply {
++                inputType =
++                    InputType.TYPE_CLASS_NUMBER
++                hint =
++                    "6-digit code from the hub"
++                setSingleLine(true)
++            }
++
++        val nameInput =
++            EditText(this).apply {
++                inputType =
++                    InputType.TYPE_CLASS_TEXT
++                hint =
++                    "Name for this device"
++                setSingleLine(true)
++                setText(
++                    PrivyHubIdentity.get(this@MainActivity)
++                        .currentPairing()?.displayName
++                        ?: "PrivyHub client"
++                )
++            }
++
++        val box =
++            androidx.appcompat.widget.LinearLayoutCompat(this).apply {
++                orientation =
++                    androidx.appcompat.widget.LinearLayoutCompat.VERTICAL
++                val padding = dp(24)
++                setPadding(padding, padding, padding, padding)
++                addView(codeInput)
++                addView(nameInput)
++            }
++
++        fun runPairing(newSecret: Boolean) {
++            val code = codeInput.text.toString().trim()
++            val name = nameInput.text.toString().trim()
++            if (code.length != 6 || name.isEmpty()) {
++                codeInput.error = "Enter the 6-digit code and a name"
++                return
++            }
++            Thread {
++                val message =
++                    try {
++                        when (
++                            val result =
++                                PrivyHubIdentity.get(this).pair(
++                                    host,
++                                    code,
++                                    name,
++                                    newSecret
++                                )
++                        ) {
++                            is com.safeiot.privyhub.identity.IdentitySession.PairResult.Paired ->
++                                "Paired as \"${result.pairing.displayName}\" " +
++                                    "(${result.pairing.deviceId}). Permissions: " +
++                                    result.pairing.permissions.joinToString(", ")
++                            is com.safeiot.privyhub.identity.IdentitySession.PairResult.Refused ->
++                                "Pairing refused (${result.status}): ${result.reason}"
++                        }
++                    } catch (exc: Exception) {
++                        "Pairing failed: ${exc.javaClass.simpleName}"
++                    }
++                runOnUiThread {
++                    AlertDialog.Builder(this)
++                        .setTitle("PrivyHub pairing")
++                        .setMessage(message)
++                        .setPositiveButton("OK", null)
++                        .show()
++                }
++            }.start()
++        }
++
++        val dialog =
++            AlertDialog.Builder(this)
++                .setTitle("Pair with the hub")
++                .setMessage(
++                    "On the hub, open the pairing window, then enter the " +
++                        "code it shows within 2 minutes."
++                )
++                .setView(box)
++                .setPositiveButton("Pair", null)
++                .setNeutralButton("Re-pair (new key)", null)
++                .setNegativeButton("Cancel", null)
++                .create()
++
++        dialog.setOnShowListener {
++            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
++                runPairing(newSecret = false)
++                dialog.dismiss()
++            }
++            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
++                runPairing(newSecret = true)
++                dialog.dismiss()
++            }
++        }
++
++        dialog.show()
++    }
++
++
+     private fun getCompanionHost(): String {
+ 
+         return getSharedPreferences(
+@@ -916,6 +1065,57 @@ class MainActivity : AppCompatActivity() {
+         )
+ 
+ 
++        // G3-S2: the paired identity (identity_v2), default off.
++        val identityCheckBox =
++            CheckBox(this).apply {
++                text =
++                    "Use paired identity (identity v2)"
++                isChecked =
++                    PrivyHubIdentity.isEnabled(
++                        this@MainActivity
++                    )
++            }
++
++        container.addView(
++            identityCheckBox,
++            ViewGroup.LayoutParams(
++                ViewGroup.LayoutParams.MATCH_PARENT,
++                ViewGroup.LayoutParams.WRAP_CONTENT
++            )
++        )
++
++        container.addView(
++            TextView(this).apply {
++                text =
++                    identityStatusText()
++                textSize =
++                    13f
++            },
++            ViewGroup.LayoutParams(
++                ViewGroup.LayoutParams.MATCH_PARENT,
++                ViewGroup.LayoutParams.WRAP_CONTENT
++            )
++        )
++
++        container.addView(
++            Button(this).apply {
++                text =
++                    "Pair with hub…"
++                setOnClickListener {
++                    showIdentityPairingDialog(
++                        normalizeHost(
++                            input.text.toString()
++                        )
++                    )
++                }
++            },
++            ViewGroup.LayoutParams(
++                ViewGroup.LayoutParams.MATCH_PARENT,
++                ViewGroup.LayoutParams.WRAP_CONTENT
++            )
++        )
++
++
+         val dialog =
+             AlertDialog.Builder(this)
+                 .setTitle(
+@@ -984,6 +1184,11 @@ class MainActivity : AppCompatActivity() {
+                     gameAutoOpenCheckBox.isChecked
+                 )
+ 
++                PrivyHubIdentity.setEnabled(
++                    this,
++                    identityCheckBox.isChecked
++                )
++
+                 dialog.dismiss()
+ 
+ 
+@@ -14903,7 +15108,8 @@ private fun requestGameStateAction(
+ 
+ 
+     private fun httpGet(
+-        urlString: String
++        urlString: String,
++        identityAttempt: Int = 0
+     ): String {
+ 
+         val connection =
+@@ -14932,6 +15138,13 @@ private fun requestGameStateAction(
+                 "no-cache"
+             )
+ 
++            // G3-S2: the session header, only with identity_v2 on.
++            PrivyHubIdentity.decorate(
++                this,
++                connection,
++                urlString
++            )
++
+ 
+             val responseCode =
+                 connection.responseCode
+@@ -14951,8 +15164,29 @@ private fun requestGameStateAction(
+                 HttpURLConnection.HTTP_MULT_CHOICE
+             ) {
+ 
++                // G3-S2: a token refusal gets one fresh setup and one retry;
++                // the host's reason code is the message. Off: unchanged.
++                val identity =
++                    PrivyHubIdentity.get(this)
++
++                if (
++                    identity.onResponse(
++                        responseCode,
++                        body,
++                        identityAttempt
++                    )
++                ) {
++                    return httpGet(
++                        urlString,
++                        identityAttempt + 1
++                    )
++                }
++
+                 throw IllegalStateException(
+-                    "HTTP $responseCode: $body"
++                    identity.refusalMessage(
++                        responseCode,
++                        body
++                    ) ?: "HTTP $responseCode: $body"
+                 )
+             }
+ 
+@@ -14967,7 +15201,8 @@ private fun requestGameStateAction(
+ 
+ 
+     private fun httpPost(
+-        urlString: String
++        urlString: String,
++        identityAttempt: Int = 0
+     ): String {
+ 
+         val connection =
+@@ -15004,6 +15239,13 @@ private fun requestGameStateAction(
+                 "no-cache"
+             )
+ 
++            // G3-S2: the session header, only with identity_v2 on.
++            PrivyHubIdentity.decorate(
++                this,
++                connection,
++                urlString
++            )
++
+ 
+             val responseCode =
+                 connection.responseCode
+@@ -15023,8 +15265,29 @@ private fun requestGameStateAction(
+                 HttpURLConnection.HTTP_MULT_CHOICE
+             ) {
+ 
++                // G3-S2: a token refusal gets one fresh setup and one retry;
++                // the host's reason code is the message. Off: unchanged.
++                val identity =
++                    PrivyHubIdentity.get(this)
++
++                if (
++                    identity.onResponse(
++                        responseCode,
++                        body,
++                        identityAttempt
++                    )
++                ) {
++                    return httpPost(
++                        urlString,
++                        identityAttempt + 1
++                    )
++                }
++
+                 throw IllegalStateException(
+-                    "HTTP $responseCode: $body"
++                    identity.refusalMessage(
++                        responseCode,
++                        body
++                    ) ?: "HTTP $responseCode: $body"
+                 )
+             }
+ 
+diff --git a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+index 147759c..151b0cd 100644
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -1,6 +1,7 @@
+ package com.safeiot.privyhub.streaming
+ 
+ import android.app.Activity
++import com.safeiot.privyhub.identity.PrivyHubIdentity
+ import android.content.pm.ActivityInfo
+ import android.graphics.Bitmap
+ import android.graphics.Color
+@@ -3847,7 +3848,8 @@ class NativeStreamActivity :
+ 
+     private fun httpPostJson(
+         address: String,
+-        payload: JSONObject
++        payload: JSONObject,
++        identityAttempt: Int = 0
+     ) {
+         val body =
+             payload.toString()
+@@ -3874,6 +3876,9 @@ class NativeStreamActivity :
+                     )
+                 }
+ 
++        // G3-S2: the session header, only with identity_v2 on.
++        PrivyHubIdentity.decorate(this, connection, address)
++
+         try {
+             connection.outputStream.use {
+                 it.write(body)
+@@ -3889,11 +3894,23 @@ class NativeStreamActivity :
+                     connection.errorStream
+                 }
+ 
++            // G3-S2: the refusal body is read only with identity_v2 on.
++            val errorBody =
++                if (code !in 200..299 && PrivyHubIdentity.isEnabled(this)) {
++                    stream?.bufferedReader()?.use { it.readText() }
++                } else {
++                    null
++                }
++
+             stream?.close()
+ 
+             if (code !in 200..299) {
++                val identity = PrivyHubIdentity.get(this)
++                if (identity.onResponse(code, errorBody, identityAttempt)) {
++                    return httpPostJson(address, payload, identityAttempt + 1)
++                }
+                 throw IllegalStateException(
+-                    "HTTP $code"
++                    identity.refusalMessage(code, errorBody) ?: "HTTP $code"
+                 )
+             }
+         } finally {
+@@ -3908,7 +3925,8 @@ class NativeStreamActivity :
+         address: String,
+         body: ByteArray,
+         contentType: String,
+-        readTimeoutMs: Int = 10_000
++        readTimeoutMs: Int = 10_000,
++        identityAttempt: Int = 0
+     ): String {
+         val connection =
+             (URL(address).openConnection() as HttpURLConnection).apply {
+@@ -3921,6 +3939,9 @@ class NativeStreamActivity :
+                 setFixedLengthStreamingMode(body.size)
+             }
+ 
++        // G3-S2: the session header, only with identity_v2 on.
++        PrivyHubIdentity.decorate(this, connection, address)
++
+         try {
+             connection.outputStream.use { it.write(body) }
+ 
+@@ -3930,6 +3951,12 @@ class NativeStreamActivity :
+             val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+ 
+             if (code !in 200..299) {
++                // G3-S2: one fresh setup on a token refusal; the reason code shown.
++                val identity = PrivyHubIdentity.get(this)
++                if (identity.onResponse(code, text, identityAttempt)) {
++                    return httpPostBody(address, body, contentType, readTimeoutMs, identityAttempt + 1)
++                }
++                identity.refusalMessage(code, text)?.let { throw IllegalStateException(it) }
+                 val message =
+                     try {
+                         JSONObject(text).optString("error", text)
+@@ -3948,7 +3975,8 @@ class NativeStreamActivity :
+     private fun httpPost(
+         address: String,
+         readTimeoutMs: Int =
+-            10_000
++            10_000,
++        identityAttempt: Int = 0
+     ): String {
+         val connection =
+             (
+@@ -3967,6 +3995,9 @@ class NativeStreamActivity :
+                         true
+                 }
+ 
++        // G3-S2: the session header, only with identity_v2 on.
++        PrivyHubIdentity.decorate(this, connection, address)
++
+         try {
+             val code =
+                 connection.responseCode
+@@ -3993,6 +4024,12 @@ class NativeStreamActivity :
+                 code !in
+                 200..299
+             ) {
++                // G3-S2: one fresh setup on a token refusal; the reason code shown.
++                val identity = PrivyHubIdentity.get(this)
++                if (identity.onResponse(code, body, identityAttempt)) {
++                    return httpPost(address, readTimeoutMs, identityAttempt + 1)
++                }
++                identity.refusalMessage(code, body)?.let { throw IllegalStateException(it) }
+                 val message =
+                     try {
+                         JSONObject(
+diff --git a/PrivyHub/app/src/main/java/identity/AndroidIdentity.kt b/PrivyHub/app/src/main/java/identity/AndroidIdentity.kt
+new file mode 100644
+index 0000000..ca8e158
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/identity/AndroidIdentity.kt
+@@ -0,0 +1,150 @@
++package com.safeiot.privyhub.identity
++
++import android.content.Context
++import android.os.Handler
++import android.os.Looper
++import android.util.Log
++import android.widget.Toast
++import java.io.File
++import java.net.DatagramSocket
++import java.net.HttpURLConnection
++import java.net.InetAddress
++import java.net.URL
++import java.security.SecureRandom
++
++/**
++ * G3-S2: the Android side of [IdentitySession].
++ *
++ * - The setting: `identity_v2` in `privyhub_settings`, **default off**.
++ * - The device secret: `files/identity/device_secret` (app-private; owner
++ *   read/write only), never logged.
++ * - The pairing (device id, name, permissions): `privyhub_identity` prefs.
++ * - The token: in memory only.
++ * - The declared media host: the local address of the route to the hub
++ *   (a UDP `connect`, which sends nothing).
++ * Log lines carry states and reason codes only; never an address.
++ */
++object PrivyHubIdentity {
++    const val SETTINGS_PREFS = "privyhub_settings"
++    const val PREF_IDENTITY_V2 = "identity_v2"
++    private const val IDENTITY_PREFS = "privyhub_identity"
++    private const val TAG = "PrivyHubIdentity"
++
++    @Volatile private var session: IdentitySession? = null
++
++    fun get(context: Context): IdentitySession {
++        session?.let { return it }
++        synchronized(this) {
++            session?.let { return it }
++            val app = context.applicationContext
++            val s = IdentitySession(
++                enabled = { isEnabled(app) },
++                store = PrefsIdentityStore(app),
++                transport = HttpControlTransport,
++                routes = UdpRoute,
++                clock = System::currentTimeMillis,
++                randomBytes = { n -> ByteArray(n).also { SecureRandom().nextBytes(it) } },
++                log = { line -> Log.i(TAG, line) },
++            )
++            // The visible state: the host's reason code, on screen.
++            s.onRefusal = { reason ->
++                Handler(Looper.getMainLooper()).post {
++                    Toast.makeText(app, "PrivyHub session refused: $reason", Toast.LENGTH_LONG).show()
++                }
++            }
++            session = s
++            return s
++        }
++    }
++
++    fun isEnabled(context: Context): Boolean =
++        context.getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
++            .getBoolean(PREF_IDENTITY_V2, false)
++
++    fun setEnabled(context: Context, enabled: Boolean) {
++        context.getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
++            .edit().putBoolean(PREF_IDENTITY_V2, enabled).apply()
++        if (!enabled) session?.endSessionLocally()
++    }
++
++    /**
++     * Adds `X-PrivyHub-Session` to a control-port connection when the setting
++     * is on, the device is paired and the path needs a granted permission.
++     * Off: returns at once and touches nothing (today's request).
++     */
++    fun decorate(context: Context, connection: HttpURLConnection, url: String) =
++        decorateConnection(connection, url, isEnabled(context)) { get(context) }
++
++    private class PrefsIdentityStore(private val context: Context) : IdentitySession.IdentityStore {
++        private val secretFile get() = File(File(context.filesDir, "identity"), "device_secret")
++        private val prefs get() = context.getSharedPreferences(IDENTITY_PREFS, Context.MODE_PRIVATE)
++
++        override fun secretHex(): String? =
++            secretFile.takeIf { it.isFile }?.readText(Charsets.US_ASCII)?.trim()?.takeIf { it.isNotEmpty() }
++
++        override fun saveSecretHex(hex: String) {
++            val dir = secretFile.parentFile!!
++            dir.mkdirs()
++            dir.setReadable(false, false); dir.setReadable(true, true)
++            dir.setExecutable(false, false); dir.setExecutable(true, true)
++            val tmp = File(dir, "device_secret.tmp")
++            tmp.writeText(hex, Charsets.US_ASCII)
++            tmp.setReadable(false, false); tmp.setReadable(true, true)
++            tmp.setWritable(false, false); tmp.setWritable(true, true)
++            if (!tmp.renameTo(secretFile)) throw IllegalStateException("identity: could not store the secret")
++        }
++
++        override fun pairing(): IdentitySession.Pairing? {
++            val id = prefs.getString("device_id", null) ?: return null
++            return IdentitySession.Pairing(
++                id,
++                prefs.getString("display_name", "") ?: "",
++                (prefs.getString("permissions", "") ?: "").split(',').filter { it.isNotBlank() },
++            )
++        }
++
++        override fun savePairing(pairing: IdentitySession.Pairing) {
++            prefs.edit()
++                .putString("device_id", pairing.deviceId)
++                .putString("display_name", pairing.displayName)
++                .putString("permissions", pairing.permissions.joinToString(","))
++                .apply()
++        }
++    }
++
++    private object HttpControlTransport : IdentitySession.ControlTransport {
++        override fun post(url: String, jsonBody: String?): Pair<Int, String> {
++            val body = (jsonBody ?: "").toByteArray(Charsets.UTF_8)
++            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
++                requestMethod = "POST"
++                connectTimeout = 3_000
++                readTimeout = 5_000
++                useCaches = false
++                doInput = true
++                doOutput = true
++                setRequestProperty("Content-Type", "application/json")
++                setFixedLengthStreamingMode(body.size)
++            }
++            try {
++                connection.outputStream.use { it.write(body) }
++                val code = connection.responseCode
++                val stream = if (code in 200..299) connection.inputStream else connection.errorStream
++                return code to (stream?.bufferedReader()?.use { it.readText() }.orEmpty())
++            } finally {
++                connection.disconnect()
++            }
++        }
++    }
++
++    private object UdpRoute : IdentitySession.LocalRoute {
++        override fun localAddressFor(host: String, port: Int): String? =
++            try {
++                DatagramSocket().use { socket ->
++                    socket.connect(InetAddress.getByName(host), port)
++                    socket.localAddress?.takeIf { !it.isAnyLocalAddress }?.hostAddress
++                }
++            } catch (_: Exception) {
++                null
++            }
++    }
++}
+diff --git a/PrivyHub/app/src/main/java/identity/IdentitySession.kt b/PrivyHub/app/src/main/java/identity/IdentitySession.kt
+new file mode 100644
+index 0000000..1eeded4
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/identity/IdentitySession.kt
+@@ -0,0 +1,245 @@
++package com.safeiot.privyhub.identity
++
++/**
++ * G3-S2: the client's session identity, behind the `identity_v2` setting
++ * (default off). Pure Kotlin; Android supplies the store, the transport and
++ * the route lookup (`AndroidIdentity.kt`).
++ *
++ * Off: every entry point returns at once — no nonce, no header, no declared
++ * endpoint, no store read — so the requests are today's, byte for byte.
++ *
++ * On, not paired: no header either (the host's legacy LAN path, as today).
++ * On and paired: a nonce-signed setup issues a token (refreshed before it
++ * expires); it rides as `X-PrivyHub-Session` on every control call whose path
++ * needs a permission the host granted. A refusal shows the host's reason code;
++ * a token refusal gets one fresh setup and one retry, then a visible state.
++ *
++ * The device secret never leaves the store except once, in the pairing body
++ * — G3-S1's host verifies HMAC-SHA256 and so must hold the key. Nothing here
++ * logs an address, the secret or a token.
++ */
++class IdentitySession(
++    private val enabled: () -> Boolean,
++    private val store: IdentityStore,
++    private val transport: ControlTransport,
++    private val routes: LocalRoute,
++    private val clock: () -> Long,
++    private val randomBytes: (Int) -> ByteArray,
++    private val log: (String) -> Unit = {},
++    private val videoPort: Int = 48100,
++    private val audioPort: Int = 48101,
++    private val controlPort: Int = 8765,
++) {
++    data class Pairing(val deviceId: String, val displayName: String, val permissions: List<String>)
++
++    interface IdentityStore {
++        fun secretHex(): String?
++        fun saveSecretHex(hex: String)
++        fun pairing(): Pairing?
++        fun savePairing(pairing: Pairing)
++    }
++
++    /** POST `jsonBody` (or an empty body) to `url`; returns (status, body). Throws on I/O failure. */
++    fun interface ControlTransport {
++        fun post(url: String, jsonBody: String?): Pair<Int, String>
++    }
++
++    /** The local address this device uses to reach `host` (no packet is sent). */
++    fun interface LocalRoute {
++        fun localAddressFor(host: String, port: Int): String?
++    }
++
++    class IdentityRefused(val reason: String) : IllegalStateException("Session refused: $reason")
++
++    sealed class PairResult {
++        data class Paired(val pairing: Pairing) : PairResult()
++        data class Refused(val status: Int, val reason: String) : PairResult()
++    }
++
++    private data class Token(val value: String, val expiresAtMs: Long, val permissions: Set<String>)
++
++    private var token: Token? = null
++    private var hostIdentityOffUntilMs = 0L
++    private var setupRefusedUntilMs = 0L
++    private var setupRefusedReason: String? = null
++
++    @Volatile var lastReason: String? = null
++        private set
++
++    @Volatile var stateText: String = "off"
++        private set
++
++    var onRefusal: ((String) -> Unit)? = null
++
++    val isEnabled: Boolean get() = enabled()
++
++    fun currentPairing(): Pairing? = store.pairing()
++
++    // ---- the secret and pairing ---------------------------------------------
++
++    @Synchronized
++    fun ensureSecret(): String {
++        store.secretHex()?.let { if (it.length == SessionProtocol.SECRET_BYTES * 2) return it }
++        val hex = SessionProtocol.bytesToHex(randomBytes(SessionProtocol.SECRET_BYTES))
++        store.saveSecretHex(hex)
++        log("identity: device secret created")
++        return hex
++    }
++
++    /** Pair with the code the hub shows. `newSecret` replaces the secret first (explicit re-pair only). */
++    @Synchronized
++    fun pair(host: String, code: String, displayName: String, newSecret: Boolean = false): PairResult {
++        if (newSecret) {
++            store.saveSecretHex(SessionProtocol.bytesToHex(randomBytes(SessionProtocol.SECRET_BYTES)))
++            log("identity: device secret replaced (re-pair)")
++        }
++        val secret = ensureSecret()
++        val (status, body) = transport.post(
++            controlUrl(host, "/session/pair"),
++            SessionProtocol.pairBody(code.trim(), displayName.trim(), secret),
++        )
++        val deviceId = SessionProtocol.jsonStringField(body, "device_id")
++        if (status != 200 || deviceId == null) {
++            val reason = SessionProtocol.reasonOf(body) ?: "http-$status"
++            refused(reason)
++            return PairResult.Refused(status, reason)
++        }
++        val pairing = Pairing(deviceId, displayName.trim(), SessionProtocol.jsonStringArray(body, "permissions"))
++        store.savePairing(pairing)
++        token = null
++        lastReason = null
++        stateText = "paired"
++        log("identity: paired, permissions=" + pairing.permissions.joinToString(","))
++        return PairResult.Paired(pairing)
++    }
++
++    // ---- the session ------------------------------------------------------------
++
++    /**
++     * The header value for a control call to `url`, or null for none.
++     * Throws [IdentityRefused] when paired but the host refused the setup
++     * (fail closed: the call is not made without the identity it needs).
++     */
++    @Synchronized
++    fun headerFor(host: String, url: String): String? {
++        if (!enabled()) return null
++        val pairing = store.pairing() ?: run { stateText = "on, not paired (legacy)"; return null }
++        val permission = SessionProtocol.requiredPermission(SessionProtocol.pathOf(url)) ?: return null
++        if (permission !in pairing.permissions) return null
++        val now = clock()
++        if (now < hostIdentityOffUntilMs) return null
++        token?.let { if (now < it.expiresAtMs - SessionProtocol.REFRESH_MARGIN_MS) return headerIfGranted(it, permission) }
++        if (now < setupRefusedUntilMs) throw IdentityRefused(setupRefusedReason ?: "setup-refused")
++        return setup(host, pairing, now)?.let { headerIfGranted(it, permission) }
++    }
++
++    private fun headerIfGranted(t: Token, permission: String): String? =
++        if (permission in t.permissions) t.value else null
++
++    private fun setup(host: String, pairing: Pairing, now: Long): Token? {
++        val (nonceStatus, nonceBody) = transport.post(controlUrl(host, "/session/nonce"), null)
++        if (nonceStatus == 404) {
++            // The host runs without the identity layer (flag absent): today's requests.
++            hostIdentityOffUntilMs = now + HOST_OFF_RECHECK_MS
++            stateText = "paired; host identity off"
++            log("identity: host identity layer absent")
++            return null
++        }
++        val nonce = SessionProtocol.jsonStringField(nonceBody, "nonce")
++        if (nonceStatus != 200 || nonce == null) {
++            return setupRefused(SessionProtocol.reasonOf(nonceBody) ?: "http-$nonceStatus", now)
++        }
++        val mediaHost = routes.localAddressFor(host, controlPort)
++            ?: return setupRefused("no-local-route", now)
++        val secret = ensureSecret()
++        val sig = SessionProtocol.sign(secret, pairing.deviceId, nonce, mediaHost, videoPort)
++        val (status, body) = transport.post(
++            controlUrl(host, "/session/setup"),
++            SessionProtocol.setupBody(pairing.deviceId, nonce, mediaHost, videoPort, audioPort, sig),
++        )
++        val value = SessionProtocol.jsonStringField(body, "token")
++        val ttl = SessionProtocol.jsonLongField(body, "expires_in_s")
++        if (status != 200 || value == null || ttl == null) {
++            return setupRefused(SessionProtocol.reasonOf(body) ?: "http-$status", now)
++        }
++        val granted = SessionProtocol.jsonStringArray(body, "permissions").toSet()
++        val t = Token(value, now + ttl * 1000L, granted)
++        token = t
++        setupRefusedUntilMs = 0L
++        lastReason = null
++        stateText = "session active"
++        log("identity: session set up, expires_in_s=$ttl")
++        return t
++    }
++
++    private fun setupRefused(reason: String, now: Long): Token? {
++        setupRefusedUntilMs = now + SETUP_COOLDOWN_MS
++        setupRefusedReason = reason
++        refused(reason)
++        throw IdentityRefused(reason)
++    }
++
++    private fun refused(reason: String) {
++        lastReason = reason
++        stateText = "refused: $reason"
++        log("identity: refused, reason=$reason")
++        onRefusal?.invoke(reason)
++    }
++
++    /**
++     * After a non-2xx answer to a control call: true = retry the call once
++     * (a token refusal; the token is dropped so the retry sets up afresh).
++     * Off, or no reason code: false, and nothing changes.
++     */
++    @Synchronized
++    fun onResponse(status: Int, body: String?, attempt: Int): Boolean {
++        if (!enabled() || (status != 401 && status != 403)) return false
++        val reason = SessionProtocol.reasonOf(body) ?: return false
++        if (reason in SessionProtocol.RETRYABLE_REASONS && attempt == 0 && store.pairing() != null) {
++            token = null
++            log("identity: token refused ($reason), one fresh setup")
++            return true
++        }
++        refused(reason)
++        return false
++    }
++
++    /** The error text for a refused call: the host's reason code, under the setting only. */
++    fun refusalMessage(status: Int, body: String?): String? {
++        if (!enabled()) return null
++        val reason = SessionProtocol.reasonOf(body) ?: return null
++        return "Session refused ($status): $reason"
++    }
++
++    @Synchronized
++    fun endSessionLocally() {
++        token = null
++    }
++
++    private fun controlUrl(host: String, path: String): String = "http://$host:$controlPort$path"
++
++    companion object {
++        const val SETUP_COOLDOWN_MS = 30_000L
++        const val HOST_OFF_RECHECK_MS = 60_000L
++    }
++}
++
++
++/**
++ * Adds the session header to a control-port connection. Off: returns before
++ * touching the connection or the session (today's request, byte for byte).
++ */
++fun decorateConnection(
++    connection: java.net.HttpURLConnection,
++    url: String,
++    enabled: Boolean,
++    session: () -> IdentitySession,
++) {
++    if (!enabled) return
++    val host = try {
++        java.net.URL(url).host
++    } catch (_: Exception) {
++        return
++    }
++    session().headerFor(host, url)?.let { connection.setRequestProperty(SessionProtocol.HEADER, it) }
++}
+diff --git a/PrivyHub/app/src/main/java/identity/SessionProtocol.kt b/PrivyHub/app/src/main/java/identity/SessionProtocol.kt
+new file mode 100644
+index 0000000..5b3efb5
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/identity/SessionProtocol.kt
+@@ -0,0 +1,165 @@
++package com.safeiot.privyhub.identity
++
++import java.net.URI
++import javax.crypto.Mac
++import javax.crypto.spec.SecretKeySpec
++
++/**
++ * G3-S2: the bytes of G3-S1's session protocol, client side. Pure Kotlin (no
++ * Android), so the JVM unit tests check it against the host's own vectors.
++ *
++ * Host contract: `companion/session_identity.py` and §1 of
++ * `docs/memory/evidence/G3_S1_SESSION_IDENTITY_HOST_SIDE_2026-10-15.md`.
++ */
++object SessionProtocol {
++    const val HEADER = "X-PrivyHub-Session"
++    const val SETUP_CANON = "privyhub-session-setup-v1"
++    const val SECRET_BYTES = 32
++
++    /** Re-run the setup when less than this remains of the token. */
++    const val REFRESH_MARGIN_MS = 10L * 60L * 1000L
++
++    /** Refusals that one fresh setup may cure; anything else is shown at once. */
++    val RETRYABLE_REASONS = setOf("token-unknown", "token-expired")
++
++    /** The audit's session-setup actions (G3-S1 `SETUP_PATHS`). */
++    val SETUP_PATHS = setOf(
++        "/plugins/games/launch",
++        "/plugins/games/native-stream-start",
++        "/plugins/games/recovery-resume",
++        "/plugins/games/recovery-copy",
++    )
++
++    /** The exact HMAC input G3-S1 signs: five lines joined by '\n', no trailing newline. */
++    fun setupCanonical(deviceId: String, nonce: String, mediaHost: String, videoPort: Int): String =
++        listOf(SETUP_CANON, deviceId, nonce, mediaHost, videoPort.toString()).joinToString("\n")
++
++    fun hmacSha256Hex(keyHex: String, message: String): String {
++        val mac = Mac.getInstance("HmacSHA256")
++        mac.init(SecretKeySpec(hexToBytes(keyHex), "HmacSHA256"))
++        return bytesToHex(mac.doFinal(message.toByteArray(Charsets.UTF_8)))
++    }
++
++    fun sign(keyHex: String, deviceId: String, nonce: String, mediaHost: String, videoPort: Int): String =
++        hmacSha256Hex(keyHex, setupCanonical(deviceId, nonce, mediaHost, videoPort))
++
++    /** G3-S1 `required_permission`, mirrored: the header is sent only where it is honoured. */
++    fun requiredPermission(path: String): String? = when {
++        path.startsWith("/plugins/games/") || path == "/diagnostics/client-health" -> "games"
++        path.startsWith("/plugins/tv_state/") || path.startsWith("/plugins/epg/") ||
++            path.startsWith("/plugins/iptv_org/") || path.startsWith("/sources/") ||
++            path == "/sources" || path == "/stop" -> "tv"
++        path == "/status" || path.startsWith("/diagnostics/") -> "diagnostics"
++        else -> null
++    }
++
++    fun pathOf(url: String): String =
++        try {
++            URI(url).rawPath ?: ""
++        } catch (_: Exception) {
++            ""
++        }
++
++    // ---- JSON, minimal and exact for this protocol's flat bodies ----------
++
++    fun jsonString(value: String): String {
++        val out = StringBuilder("\"")
++        for (ch in value) {
++            when {
++                ch == '"' -> out.append("\\\"")
++                ch == '\\' -> out.append("\\\\")
++                ch == '\n' -> out.append("\\n")
++                ch == '\r' -> out.append("\\r")
++                ch == '\t' -> out.append("\\t")
++                ch < ' ' -> out.append(String.format("\\u%04x", ch.code))
++                else -> out.append(ch)
++            }
++        }
++        return out.append('"').toString()
++    }
++
++    /**
++     * The setup body. The signed fields are exactly G3-S1's; `audio_port` is
++     * declared too, but the host as written reads only `media_host` and
++     * `video_port` (it ignores the rest, and the signature does not cover it).
++     */
++    fun setupBody(
++        deviceId: String,
++        nonce: String,
++        mediaHost: String,
++        videoPort: Int,
++        audioPort: Int,
++        sig: String,
++    ): String =
++        "{" +
++            "\"device_id\":" + jsonString(deviceId) + "," +
++            "\"nonce\":" + jsonString(nonce) + "," +
++            "\"media_host\":" + jsonString(mediaHost) + "," +
++            "\"video_port\":" + videoPort + "," +
++            "\"audio_port\":" + audioPort + "," +
++            "\"sig\":" + jsonString(sig) +
++            "}"
++
++    fun pairBody(code: String, deviceName: String, keyHex: String): String =
++        "{" +
++            "\"code\":" + jsonString(code) + "," +
++            "\"device_name\":" + jsonString(deviceName) + "," +
++            "\"key\":" + jsonString(keyHex) +
++            "}"
++
++    private fun unescape(raw: String): String {
++        val out = StringBuilder()
++        var i = 0
++        while (i < raw.length) {
++            val ch = raw[i]
++            if (ch == '\\' && i + 1 < raw.length) {
++                when (val n = raw[i + 1]) {
++                    'n' -> out.append('\n')
++                    'r' -> out.append('\r')
++                    't' -> out.append('\t')
++                    'u' -> if (i + 5 < raw.length) {
++                        out.append(raw.substring(i + 2, i + 6).toInt(16).toChar()); i += 4
++                    }
++                    else -> out.append(n)
++                }
++                i += 2
++            } else {
++                out.append(ch); i += 1
++            }
++        }
++        return out.toString()
++    }
++
++    fun jsonStringField(body: String, name: String): String? =
++        Regex("\"" + Regex.escape(name) + "\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
++            .find(body)?.groupValues?.get(1)?.let(::unescape)
++
++    fun jsonLongField(body: String, name: String): Long? =
++        Regex("\"" + Regex.escape(name) + "\"\\s*:\\s*(-?\\d+)")
++            .find(body)?.groupValues?.get(1)?.toLongOrNull()
++
++    fun jsonStringArray(body: String, name: String): List<String> {
++        val inner = Regex("\"" + Regex.escape(name) + "\"\\s*:\\s*\\[([^\\]]*)\\]")
++            .find(body)?.groupValues?.get(1) ?: return emptyList()
++        return Regex("\"((?:[^\"\\\\]|\\\\.)*)\"").findAll(inner).map { unescape(it.groupValues[1]) }.toList()
++    }
++
++    fun reasonOf(body: String?): String? = body?.let { jsonStringField(it, "reason") }
++
++    // ---- hex ----------------------------------------------------------------
++
++    fun bytesToHex(bytes: ByteArray): String {
++        val digits = "0123456789abcdef"
++        val out = StringBuilder(bytes.size * 2)
++        for (b in bytes) {
++            val v = b.toInt() and 0xff
++            out.append(digits[v ushr 4]).append(digits[v and 0x0f])
++        }
++        return out.toString()
++    }
++
++    fun hexToBytes(hex: String): ByteArray {
++        require(hex.length % 2 == 0) { "odd hex length" }
++        return ByteArray(hex.length / 2) { i -> hex.substring(2 * i, 2 * i + 2).toInt(16).toByte() }
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/identity/IdentitySessionTest.kt b/PrivyHub/app/src/test/java/identity/IdentitySessionTest.kt
+new file mode 100644
+index 0000000..9fbd7ed
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/identity/IdentitySessionTest.kt
+@@ -0,0 +1,239 @@
++package com.safeiot.privyhub.identity
++
++import java.net.InetAddress
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotNull
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Assert.fail
++import org.junit.Test
++
++/**
++ * G3-S2: the client's session behaviour — the setting off is today, the
++ * header by setting and permission, refresh before expiry, one retry on a
++ * token refusal, the reason code shown, fail closed on a refused setup, a
++ * host without the identity layer, and no secret or address in a log line.
++ *
++ * The fake host speaks G3-S1's protocol: it verifies the setup HMAC with the
++ * key the client sent at pairing.
++ */
++class IdentitySessionTest {
++
++    private val hub = "hub.invalid"
++    private val localAddress: String =
++        InetAddress.getByAddress(byteArrayOf(0xC0.toByte(), 0xA8.toByte(), 0x64, 0x39)).hostAddress!!
++
++    private class FakeStore : IdentitySession.IdentityStore {
++        var secret: String? = null
++        var pairing: IdentitySession.Pairing? = null
++        var reads = 0
++        override fun secretHex(): String? { reads++; return secret }
++        override fun saveSecretHex(hex: String) { secret = hex }
++        override fun pairing(): IdentitySession.Pairing? { reads++; return pairing }
++        override fun savePairing(pairing: IdentitySession.Pairing) { this.pairing = pairing }
++    }
++
++    private inner class FakeHost : IdentitySession.ControlTransport {
++        val calls = mutableListOf<String>()
++        val bodies = mutableListOf<String>()
++        var key: String? = null
++        var nonces = mutableSetOf<String>()
++        var identityLayer = true
++        var refuseSetupWith: String? = null
++        var counter = 0
++        override fun post(url: String, jsonBody: String?): Pair<Int, String> {
++            val path = SessionProtocol.pathOf(url)
++            calls += path
++            bodies += jsonBody ?: ""
++            if (!identityLayer) return 404 to "{\n  \"ok\": false,\n  \"error\": \"Not found\"\n}"
++            return when (path) {
++                "/session/pair" -> {
++                    if (SessionProtocol.jsonStringField(jsonBody!!, "code") != "123456")
++                        return 403 to "{\"ok\": false, \"error\": \"session refused\", \"reason\": \"pairing-bad-code\"}"
++                    key = SessionProtocol.jsonStringField(jsonBody, "key")
++                    200 to "{\n  \"ok\": true,\n  \"device_id\": \"dev-00112233aabbccdd\",\n  \"permissions\": [\n    \"games\",\n    \"tv\",\n    \"vod\"\n  ]\n}"
++                }
++                "/session/nonce" -> {
++                    val n = "nonce-" + (++counter)
++                    nonces += n
++                    200 to "{\n  \"ok\": true,\n  \"nonce\": \"$n\",\n  \"expires_in_s\": 60\n}"
++                }
++                "/session/setup" -> {
++                    refuseSetupWith?.let { return 401 to "{\"ok\": false, \"error\": \"session refused\", \"reason\": \"$it\"}" }
++                    val b = jsonBody!!
++                    val nonce = SessionProtocol.jsonStringField(b, "nonce")!!
++                    if (!nonces.remove(nonce)) return 401 to "{\"ok\": false, \"error\": \"session refused\", \"reason\": \"nonce-replayed\"}"
++                    val expected = SessionProtocol.sign(
++                        key!!, SessionProtocol.jsonStringField(b, "device_id")!!, nonce,
++                        SessionProtocol.jsonStringField(b, "media_host")!!, SessionProtocol.jsonLongField(b, "video_port")!!.toInt(),
++                    )
++                    if (expected != SessionProtocol.jsonStringField(b, "sig"))
++                        return 401 to "{\"ok\": false, \"error\": \"session refused\", \"reason\": \"bad-signature\"}"
++                    200 to "{\n  \"ok\": true,\n  \"token\": \"tok-${++counter}\",\n  \"expires_in_s\": 28800,\n  \"client_id\": \"dev-00112233aabbccdd\",\n  \"permissions\": [\n    \"games\",\n    \"tv\",\n    \"vod\"\n  ]\n}"
++                }
++                else -> 404 to "{}"
++            }
++        }
++    }
++
++    private var now = 1_000_000L
++    private var on = true
++    private val logs = mutableListOf<String>()
++    private val refusals = mutableListOf<String>()
++    private val store = FakeStore()
++    private val host = FakeHost()
++    private var seed = 0
++    private val session = IdentitySession(
++        enabled = { on },
++        store = store,
++        transport = host,
++        routes = { _, _ -> localAddress },
++        clock = { now },
++        randomBytes = { n -> ByteArray(n) { (it + 31 * ++seed).toByte() } },
++        log = { logs += it },
++    ).also { s -> s.onRefusal = { refusals += it } }
++
++    private val launch = "http://$hub:8765/plugins/games/launch?id=x"
++
++    private fun paired() {
++        val r = session.pair(hub, "123456", "onn fixture")
++        assertTrue(r is IdentitySession.PairResult.Paired)
++    }
++
++    @Test
++    fun offIsToday() {
++        on = false
++        assertNull(session.headerFor(hub, launch))
++        assertFalse(session.onResponse(401, "{\"reason\": \"token-expired\"}", 0))
++        assertNull(session.refusalMessage(401, "{\"reason\": \"token-expired\"}"))
++        assertEquals(emptyList<String>(), host.calls)
++        assertEquals(0, store.reads)
++    }
++
++    @Test
++    fun onButUnpairedIsLegacy() {
++        assertNull(session.headerFor(hub, launch))
++        assertEquals(emptyList<String>(), host.calls)
++    }
++
++    @Test
++    fun pairingSendsTheKeyOnceAndStoresThePairing() {
++        paired()
++        assertEquals(listOf("/session/pair"), host.calls)
++        assertEquals(store.secret, host.key)
++        assertEquals(64, store.secret!!.length)
++        assertEquals(listOf("games", "tv", "vod"), store.pairing!!.permissions)
++        val r = session.pair(hub, "000000", "onn fixture")
++        assertEquals(IdentitySession.PairResult.Refused(403, "pairing-bad-code"), r)
++    }
++
++    @Test
++    fun rePairReplacesTheSecretOnlyWhenAsked() {
++        paired()
++        val first = store.secret
++        session.pair(hub, "123456", "onn fixture")
++        assertEquals(first, store.secret)
++        session.pair(hub, "123456", "onn fixture", newSecret = true)
++        assertTrue(first != store.secret)
++    }
++
++    @Test
++    fun headerByPermissionAndDeclaredEndpoints() {
++        paired()
++        val token = session.headerFor(hub, launch)
++        assertNotNull(token)
++        assertEquals(listOf("/session/pair", "/session/nonce", "/session/setup"), host.calls)
++        val setupBody = host.bodies.last()
++        assertEquals(localAddress, SessionProtocol.jsonStringField(setupBody, "media_host"))
++        assertEquals(48100L, SessionProtocol.jsonLongField(setupBody, "video_port"))
++        assertEquals(48101L, SessionProtocol.jsonLongField(setupBody, "audio_port"))
++        // reused, no new setup
++        assertEquals(token, session.headerFor(hub, "http://$hub:8765/plugins/games/native-stream-heartbeat"))
++        assertEquals(token, session.headerFor(hub, "http://$hub:8765/sources"))
++        // not sent where the host would deny it
++        assertNull(session.headerFor(hub, "http://$hub:8765/status"))
++        assertNull(session.headerFor(hub, "http://$hub:8765/diagnostics/health"))
++        assertEquals(3, host.calls.size)
++    }
++
++    @Test
++    fun refreshBeforeExpiry() {
++        paired()
++        val t1 = session.headerFor(hub, launch)
++        now += 28_800_000L - SessionProtocol.REFRESH_MARGIN_MS - 1_000L
++        assertEquals(t1, session.headerFor(hub, launch))
++        now += 2_000L
++        val t2 = session.headerFor(hub, launch)
++        assertTrue(t1 != t2)
++        assertEquals(5, host.calls.size)
++    }
++
++    @Test
++    fun oneRetryOnATokenRefusalThenVisible() {
++        paired()
++        session.headerFor(hub, launch)
++        val expired = "{\n  \"ok\": false,\n  \"error\": \"session refused\",\n  \"reason\": \"token-expired\"\n}"
++        assertTrue(session.onResponse(401, expired, 0))
++        assertTrue(refusals.isEmpty())
++        assertNotNull(session.headerFor(hub, launch))     // a fresh setup
++        assertFalse(session.onResponse(401, expired, 1))
++        assertEquals(listOf("token-expired"), refusals)
++        assertEquals("token-expired", session.lastReason)
++        assertEquals("Session refused (401): token-expired", session.refusalMessage(401, expired))
++    }
++
++    @Test
++    fun permissionRefusalIsShownNotRetried() {
++        paired()
++        assertFalse(session.onResponse(403, "{\"reason\": \"permission-denied\"}", 0))
++        assertEquals(listOf("permission-denied"), refusals)
++        assertFalse(session.onResponse(500, "{\"error\": \"x\"}", 0))
++        assertEquals(1, refusals.size)
++    }
++
++    @Test
++    fun refusedSetupFailsClosedWithCooldown() {
++        paired()
++        host.refuseSetupWith = "bad-signature"
++        try {
++            session.headerFor(hub, launch); fail("expected a refusal")
++        } catch (e: IdentitySession.IdentityRefused) {
++            assertEquals("bad-signature", e.reason)
++        }
++        val calls = host.calls.size
++        try {
++            session.headerFor(hub, launch); fail("expected a refusal")
++        } catch (e: IdentitySession.IdentityRefused) {
++            assertEquals("bad-signature", e.reason)
++        }
++        assertEquals("no storm inside the cooldown", calls, host.calls.size)
++        now += IdentitySession.SETUP_COOLDOWN_MS + 1
++        host.refuseSetupWith = null
++        assertNotNull(session.headerFor(hub, launch))
++    }
++
++    @Test
++    fun hostWithoutTheIdentityLayerStillWorks() {
++        paired()
++        host.identityLayer = false
++        assertNull(session.headerFor(hub, launch))
++        assertNull(session.headerFor(hub, launch))
++        assertEquals(listOf("/session/pair", "/session/nonce"), host.calls)
++        assertEquals("paired; host identity off", session.stateText)
++    }
++
++    @Test
++    fun noSecretTokenOrAddressInLogs() {
++        paired()
++        val t = session.headerFor(hub, launch)!!
++        session.onResponse(401, "{\"reason\": \"token-unknown\"}", 1)
++        assertTrue(logs.isNotEmpty())
++        for (line in logs) {
++            assertFalse(line, line.contains(store.secret!!))
++            assertFalse(line, line.contains(t))
++            assertFalse(line, line.contains(localAddress))
++            assertFalse(line, line.contains(hub))
++        }
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/identity/MiniJson.kt b/PrivyHub/app/src/test/java/identity/MiniJson.kt
+new file mode 100644
+index 0000000..0117655
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/identity/MiniJson.kt
+@@ -0,0 +1,64 @@
++package com.safeiot.privyhub.identity
++
++/** A small JSON reader for the tests (Android's org.json is a stub on the JVM). */
++object MiniJson {
++    fun parse(text: String): Any? = Reader(text).run { val v = value(); ws(); require(i == s.length) { "trailing" }; v }
++
++    private class Reader(val s: String) {
++        var i = 0
++        fun ws() { while (i < s.length && s[i].isWhitespace()) i++ }
++        fun value(): Any? {
++            ws()
++            return when (s[i]) {
++                '{' -> obj()
++                '[' -> arr()
++                '"' -> str()
++                't' -> { i += 4; true }
++                'f' -> { i += 5; false }
++                'n' -> { i += 4; null }
++                else -> num()
++            }
++        }
++        fun obj(): Map<String, Any?> {
++            val m = LinkedHashMap<String, Any?>(); i++; ws()
++            if (s[i] == '}') { i++; return m }
++            while (true) {
++                ws(); val k = str(); ws(); require(s[i] == ':'); i++
++                m[k] = value(); ws()
++                if (s[i] == ',') { i++; continue }
++                require(s[i] == '}'); i++; return m
++            }
++        }
++        fun arr(): List<Any?> {
++            val l = ArrayList<Any?>(); i++; ws()
++            if (s[i] == ']') { i++; return l }
++            while (true) {
++                l.add(value()); ws()
++                if (s[i] == ',') { i++; continue }
++                require(s[i] == ']'); i++; return l
++            }
++        }
++        fun str(): String {
++            require(s[i] == '"'); i++
++            val b = StringBuilder()
++            while (s[i] != '"') {
++                if (s[i] == '\\') {
++                    when (val c = s[i + 1]) {
++                        'n' -> b.append('\n'); 't' -> b.append('\t'); 'r' -> b.append('\r')
++                        'u' -> { b.append(s.substring(i + 2, i + 6).toInt(16).toChar()); i += 4 }
++                        else -> b.append(c)
++                    }
++                    i += 2
++                } else b.append(s[i++])
++            }
++            i++
++            return b.toString()
++        }
++        fun num(): Any {
++            val start = i
++            while (i < s.length && (s[i].isDigit() || s[i] in "+-.eE")) i++
++            val t = s.substring(start, i)
++            return t.toLongOrNull() ?: t.toDouble()
++        }
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/identity/SessionProtocolTest.kt b/PrivyHub/app/src/test/java/identity/SessionProtocolTest.kt
+new file mode 100644
+index 0000000..2189bfa
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/identity/SessionProtocolTest.kt
+@@ -0,0 +1,116 @@
++package com.safeiot.privyhub.identity
++
++import java.math.BigInteger
++import java.net.InetAddress
++import java.security.MessageDigest
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * G3-S2: the client's protocol bytes against G3-S1's own vectors
++ * (`resources/g3_s2/setup_vectors.json`, made by G3-S1's `sign()` and
++ * `SessionGate`; addresses given as integers and built here).
++ */
++@Suppress("UNCHECKED_CAST")
++class SessionProtocolTest {
++
++    companion object {
++        val doc: Map<String, Any?> by lazy {
++            val text = SessionProtocolTest::class.java.classLoader!!
++                .getResource("g3_s2/setup_vectors.json")!!.readText()
++            MiniJson.parse(text) as Map<String, Any?>
++        }
++
++        fun hostOf(spec: Map<String, Any?>): String =
++            (spec["ipv4_int"] as String?)?.let {
++                val v = BigInteger(it.removePrefix("0x").removePrefix("0X"), 16).toInt()
++                InetAddress.getByAddress(
++                    byteArrayOf((v ushr 24).toByte(), (v ushr 16).toByte(), (v ushr 8).toByte(), v.toByte())
++                ).hostAddress!!
++            } ?: spec["text"] as String
++
++        fun sha256Hex(s: String): String =
++            SessionProtocol.bytesToHex(MessageDigest.getInstance("SHA-256").digest(s.toByteArray(Charsets.UTF_8)))
++
++        fun response(name: String): Pair<Int, String> {
++            val r = (doc["host_responses"] as Map<String, Any?>)[name] as Map<String, Any?>
++            return (r["status"] as Long).toInt() to (r["body"] as String)
++        }
++    }
++
++    private val vectors get() = doc["vectors"] as List<Map<String, Any?>>
++
++    @Test
++    fun constantsMatchTheHost() {
++        assertEquals(doc["setup_canon"], SessionProtocol.SETUP_CANON)
++        assertEquals(doc["header"], SessionProtocol.HEADER)
++    }
++
++    @Test
++    fun hmacInputAndSignatureMatchEveryVector() {
++        assertEquals(3, vectors.size)
++        for (v in vectors) {
++            val host = hostOf(v["media_host"] as Map<String, Any?>)
++            val port = (v["video_port"] as Long).toInt()
++            val canon = SessionProtocol.setupCanonical(v["device_id"] as String, v["nonce"] as String, host, port)
++            assertEquals(v["name"] as String, v["canonical_sha256"], sha256Hex(canon))
++            assertEquals(v["name"] as String, (v["canonical_bytes"] as Long).toInt(), canon.toByteArray().size)
++            assertEquals(
++                v["name"] as String,
++                v["sig"],
++                SessionProtocol.sign(v["key_hex"] as String, v["device_id"] as String, v["nonce"] as String, host, port),
++            )
++        }
++    }
++
++    @Test
++    fun setupBodyShape() {
++        val v = vectors[1]
++        val host = hostOf(v["media_host"] as Map<String, Any?>)
++        val body = SessionProtocol.setupBody(v["device_id"] as String, v["nonce"] as String, host, 48100, 48101, v["sig"] as String)
++        val parsed = MiniJson.parse(body) as Map<String, Any?>
++        assertEquals(listOf("device_id", "nonce", "media_host", "video_port", "audio_port", "sig"), parsed.keys.toList())
++        assertEquals(48100L, parsed["video_port"])
++        assertEquals(48101L, parsed["audio_port"])
++        assertEquals(host, parsed["media_host"])
++        assertEquals(v["sig"], parsed["sig"])
++    }
++
++    @Test
++    fun pairBodyEscapes() {
++        val name = "onn \"living room\" \\ tab\t"
++        val parsed = MiniJson.parse(SessionProtocol.pairBody("012345", name, "ab".repeat(32))) as Map<String, Any?>
++        assertEquals(listOf("code", "device_name", "key"), parsed.keys.toList())
++        assertEquals(name, parsed["device_name"])
++    }
++
++    @Test
++    fun permissionMapMatchesTheHost() {
++        for ((path, permission) in doc["permission_paths"] as Map<String, Any?>) {
++            assertEquals(path, permission, SessionProtocol.requiredPermission(path))
++        }
++        assertEquals("/plugins/games/launch", SessionProtocol.pathOf("http://hub.invalid:8765/plugins/games/launch?id=x"))
++    }
++
++    @Test
++    fun hostResponsesParse() {
++        val (st, nonce) = response("nonce_ok")
++        assertEquals(200, st)
++        assertTrue(SessionProtocol.jsonStringField(nonce, "nonce")!!.length >= 24)
++        val (_, setup) = response("setup_ok")
++        assertTrue(SessionProtocol.jsonStringField(setup, "token")!!.isNotEmpty())
++        assertEquals(doc["token_ttl_s"], SessionProtocol.jsonLongField(setup, "expires_in_s"))
++        assertEquals(listOf("games", "tv", "vod"), SessionProtocol.jsonStringArray(setup, "permissions"))
++        val (_, pair) = response("pair_ok")
++        assertTrue(SessionProtocol.jsonStringField(pair, "device_id")!!.startsWith("dev-"))
++        assertEquals("pairing-closed", SessionProtocol.reasonOf(response("pair_closed").second))
++        assertEquals("nonce-unknown", SessionProtocol.reasonOf(response("setup_nonce_unknown").second))
++        assertEquals("legacy-overlay", SessionProtocol.reasonOf(response("legacy_overlay").second))
++        assertEquals("permission-unknown", SessionProtocol.reasonOf(response("permission_unknown").second))
++        assertEquals("token-expired", SessionProtocol.reasonOf(response("token_expired").second))
++        assertEquals(404, response("host_flag_off_nonce").first)
++        assertNull(SessionProtocol.reasonOf(response("host_flag_off_nonce").second))
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/identity/WireRequestTest.kt b/PrivyHub/app/src/test/java/identity/WireRequestTest.kt
+new file mode 100644
+index 0000000..6f2c78e
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/identity/WireRequestTest.kt
+@@ -0,0 +1,113 @@
++package com.safeiot.privyhub.identity
++
++import java.io.ByteArrayOutputStream
++import java.net.HttpURLConnection
++import java.net.InetAddress
++import java.net.ServerSocket
++import java.net.URL
++import kotlin.concurrent.thread
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * G3-S2: the bytes on the wire. A control POST is built exactly as
++ * `MainActivity.httpPost` builds it, captured raw by a loopback socket, with
++ * and without the identity hook. Off = today's request, byte for byte; on and
++ * paired = the same request plus one `X-PrivyHub-Session` line.
++ */
++class WireRequestTest {
++
++    private fun capture(build: (HttpURLConnection, String) -> Unit): String {
++        ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { server ->
++            val got = ByteArrayOutputStream()
++            val t = thread {
++                server.accept().use { s ->
++                    val input = s.getInputStream()
++                    val buf = ByteArray(1)
++                    while (true) {
++                        if (input.read(buf) < 0) break
++                        got.write(buf[0].toInt())
++                        if (got.toString(Charsets.ISO_8859_1.name()).endsWith("\r\n\r\n")) break
++                    }
++                    s.getOutputStream().write(
++                        "HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}".toByteArray()
++                    )
++                }
++            }
++            val url = "http://localhost:${server.localPort}/plugins/games/launch?id=fixture"
++            val c = URL(url).openConnection() as HttpURLConnection
++            try {
++                // MainActivity.httpPost's request, field by field.
++                c.requestMethod = "POST"
++                c.connectTimeout = 2_000
++                c.readTimeout = 5_000
++                c.useCaches = false
++                c.doOutput = false
++                c.setRequestProperty("Content-Length", "0")
++                c.setRequestProperty("Cache-Control", "no-cache")
++                build(c, url)
++                assertEquals(200, c.responseCode)
++                c.inputStream.close()
++            } finally {
++                c.disconnect()
++            }
++            t.join(5_000)
++            return got.toString(Charsets.ISO_8859_1.name())
++        }
++    }
++
++    private fun normalisePort(raw: String): String = raw.replace(Regex("localhost:\\d+"), "localhost:<port>")
++
++    private fun pairedSession(): IdentitySession {
++        var counter = 0
++        var key: String? = null
++        val store = object : IdentitySession.IdentityStore {
++            var secret: String? = null
++            var pairing: IdentitySession.Pairing? = null
++            override fun secretHex() = secret
++            override fun saveSecretHex(hex: String) { secret = hex }
++            override fun pairing() = pairing
++            override fun savePairing(pairing: IdentitySession.Pairing) { this.pairing = pairing }
++        }
++        val session = IdentitySession(
++            enabled = { true },
++            store = store,
++            transport = { url, body ->
++                when (SessionProtocol.pathOf(url)) {
++                    "/session/pair" -> { key = SessionProtocol.jsonStringField(body!!, "key")
++                        200 to "{\"device_id\": \"dev-0011223344556677\", \"permissions\": [\"games\", \"tv\", \"vod\"]}" }
++                    "/session/nonce" -> 200 to "{\"nonce\": \"n-${++counter}\"}"
++                    else -> 200 to "{\"token\": \"tok-wire\", \"expires_in_s\": 28800, \"permissions\": [\"games\", \"tv\", \"vod\"]}"
++                }
++            },
++            routes = { _, _ -> "media-host-fixture" },
++            clock = { 0L },
++            randomBytes = { n -> ByteArray(n) { it.toByte() } },
++        )
++        session.pair("localhost", "123456", "wire fixture")
++        assertTrue(key != null)
++        return session
++    }
++
++    @Test
++    fun offIsTodayByteForByte() {
++        val today = normalisePort(capture { _, _ -> })
++        var touched = false
++        val off = normalisePort(capture { c, url -> decorateConnection(c, url, false) { touched = true; pairedSession() } })
++        assertEquals(today, off)
++        assertFalse("the session is not even built when off", touched)
++        assertFalse(today.contains(SessionProtocol.HEADER))
++    }
++
++    @Test
++    fun onAndPairedAddsOnlyTheHeader() {
++        val session = pairedSession()
++        val today = normalisePort(capture { _, _ -> })
++        val on = normalisePort(capture { c, url -> decorateConnection(c, url, true) { session } })
++        assertTrue(on.contains("${SessionProtocol.HEADER}: tok-wire\r\n"))
++        val without = on.split("\r\n").filterNot { it.startsWith(SessionProtocol.HEADER + ":") }.joinToString("\r\n")
++        assertEquals(today, without)
++    }
++}
+diff --git a/PrivyHub/app/src/test/resources/g3_s2/setup_vectors.json b/PrivyHub/app/src/test/resources/g3_s2/setup_vectors.json
+new file mode 100644
+index 0000000..c0da5c6
+--- /dev/null
++++ b/PrivyHub/app/src/test/resources/g3_s2/setup_vectors.json
+@@ -0,0 +1,99 @@
++{
++  "generated_by": "docs/memory/evidence/g3_s2_2026-10-16/make_vectors.py (G3-S1's sign() and SessionGate)",
++  "header": "X-PrivyHub-Session",
++  "host_responses": {
++    "host_flag_off_nonce": {
++      "body": "{\n  \"ok\": false,\n  \"error\": \"Not found\"\n}",
++      "status": 404
++    },
++    "legacy_overlay": {
++      "body": "{\n  \"ok\": false,\n  \"error\": \"session refused\",\n  \"reason\": \"legacy-overlay\"\n}",
++      "status": 401
++    },
++    "nonce_ok": {
++      "body": "{\n  \"ok\": true,\n  \"nonce\": \"7kyZ8wpUlTz24qB3RkrJVJGF1W8_6fiV\",\n  \"expires_in_s\": 60\n}",
++      "status": 200
++    },
++    "pair_closed": {
++      "body": "{\n  \"ok\": false,\n  \"error\": \"session refused\",\n  \"reason\": \"pairing-closed\"\n}",
++      "status": 403
++    },
++    "pair_ok": {
++      "body": "{\n  \"ok\": true,\n  \"device_id\": \"dev-4cf6e8c8da9dcc28\",\n  \"permissions\": [\n    \"games\",\n    \"tv\",\n    \"vod\"\n  ]\n}",
++      "status": 200
++    },
++    "permission_unknown": {
++      "body": "{\n  \"ok\": false,\n  \"error\": \"session refused\",\n  \"reason\": \"permission-unknown\"\n}",
++      "status": 403
++    },
++    "setup_nonce_unknown": {
++      "body": "{\n  \"ok\": false,\n  \"error\": \"session refused\",\n  \"reason\": \"nonce-unknown\"\n}",
++      "status": 401
++    },
++    "setup_ok": {
++      "body": "{\n  \"ok\": true,\n  \"token\": \"f9yhL0ODb4XacgO1LbXvii-DQdANJm-F8qz1RT5gEuA\",\n  \"expires_in_s\": 28800,\n  \"client_id\": \"dev-4cf6e8c8da9dcc28\",\n  \"permissions\": [\n    \"games\",\n    \"tv\",\n    \"vod\"\n  ]\n}",
++      "status": 200
++    },
++    "token_expired": {
++      "body": "{\n  \"ok\": false,\n  \"error\": \"session refused\",\n  \"reason\": \"token-expired\"\n}",
++      "status": 401
++    }
++  },
++  "permission_paths": {
++    "/diagnostics/client-health": "games",
++    "/diagnostics/health": "diagnostics",
++    "/no/such": null,
++    "/plugins/epg/guide": "tv",
++    "/plugins/games/launch": "games",
++    "/plugins/games/native-stream-heartbeat": "games",
++    "/plugins/games/native-stream-start": "games",
++    "/plugins/games/status": "games",
++    "/sources": "tv",
++    "/sources/x/start": "tv",
++    "/status": "diagnostics",
++    "/stop": "tv"
++  },
++  "setup_canon": "privyhub-session-setup-v1",
++  "token_ttl_s": 28800,
++  "vectors": [
++    {
++      "canonical_bytes": 97,
++      "canonical_sha256": "d5edf69446b9c973c9862e6332a5ed195c7ed44262cfe3616708b2c105b5c5dc",
++      "device_id": "dev-0123456789abcdef",
++      "key_hex": "13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb",
++      "media_host": {
++        "text": "media-host-fixture"
++      },
++      "name": "text-host",
++      "nonce": "fixture-nonce-AAAA_bbbb-1",
++      "sig": "848f1593d46c042741fd7e164c43ecd86002eff2c027bdbddfd1ec82d906929b",
++      "video_port": 48100
++    },
++    {
++      "canonical_bytes": 93,
++      "canonical_sha256": "99147466fb4a60bda0afab91e6784f2b829e8e00db047a945cd5096b93cf565c",
++      "device_id": "dev-0123456789abcdef",
++      "key_hex": "13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb",
++      "media_host": {
++        "ipv4_int": "0xC0A86439"
++      },
++      "name": "lan-ipv4",
++      "nonce": "fixture-nonce-CCCC_dddd-2",
++      "sig": "80ec627755a8936f42b60064ed63c3a881ee887caf9cb8bc2f2e05c0772335cd",
++      "video_port": 48100
++    },
++    {
++      "canonical_bytes": 79,
++      "canonical_sha256": "a21c325f050749e29db602fdf3aaa7c3da52acbfcb246a5b81023daa4c9bc8da",
++      "device_id": "dev-fedcba9876543210",
++      "key_hex": "13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb",
++      "media_host": {
++        "ipv4_int": "0x64401235"
++      },
++      "name": "overlay-ipv4-port-50000",
++      "nonce": "Zz-09_fixture",
++      "sig": "31c3cad2f265ae085f684a57a495ccb4fbcc8490630f0eb0fc76a15fff272044",
++      "video_port": 50000
++    }
++  ]
++}

@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-10-15
-baseline_commit: 7331184 (E4-S1..S5D, E4-C1, E5-S1 uncommitted; the user commits 2026-10-15)
+as_of: 2026-10-16
+baseline_commit: 3107fb5 (G1-S1, G3-S1, G3-S2, G1-S2, E4-S4C, G5-S1, G4-P1 and CL-B2 uncommitted; the user commits)
 ---
 
 # Current State
@@ -9,78 +9,61 @@ baseline_commit: 7331184 (E4-S1..S5D, E4-C1, E5-S1 uncommitted; the user commits
 Headings are fixed by `tools/check_memory_health.py`; do not rename.
 ## Active Objective
 
-**Phase E ACTIVE. E4 is CLOSED on the host side (E4-C1, session B,
-2026-10-15). The SNES capture fix is ADOPTED (E4-S5D, the fifth line). The
-link watch (E4-S4D) runs detached until 2026-10-20T04:00Z. Next is E5-S2.**
-E1 FROZEN; E2 MEASURED; E3 CLOSED. Nothing committed since `7331184`. The
-user commits tonight.
+**Phase E ACTIVE; the G track (remote) under way. CL-B2 is CLOSED
+(2026-10-16): the identity APK `77011eef…` is the onn's CONFIRMED client
+and stays. G3 passed end to end on the LAN. R3's host-CPU gate FAILED by
+0.06 and is recorded so (the user's decision). The host flag
+`PRIVYHUB_SESSION_IDENTITY=v2` and the client setting `identity_v2` are
+NOT adopted.** E1 FROZEN; E2 MEASURED; E3 CLOSED; E4 CLOSED (host side).
+Nothing committed since `3107fb5`.
 
-- **The E4 floors and the alpha** are in
-  `evidence/E4_CLOSEOUT_2026-10-15.md` (B).
-  - Alpha today: ≥ 6 cores, 1.5 GB stack, 8 GB system.
-  - With grab deferral: ≥ 4 cores, 1.25 GB.
-  - VAAPI H.264 720p60.
-  - Grab deferral is not adopted. Its verdict waits on a clean link: the
-    watch.
-- **Five adoptions stand:** the guide index, Snes9x, recovery v2 (E3),
-  live adaptive (C), and the SNES capture fix (E4-S5D).
+- **Six adoptions stand:** the guide index, Snes9x, recovery v2 (E3),
+  live adaptive (C), the SNES capture fix (E4-S5D), and the CL-B2 APK.
+- **The link watch is stopped** (E4-S4C): 6 probes, none clean. Grab
+  deferral is INCONCLUSIVE (link). The LAN loss row is parked; the user's
+  priority is remote first.
+- **Built behind flags, not adopted:**
+  - G1-S1/S2: the overlay provider, `PRIVYHUB_OVERLAY_PROVIDER`;
+  - G3-S1/S2: session identity;
+  - G5-S1: WAN telemetry, `PRIVYHUB_WAN_TELEMETRY`;
+  - G4-P1: the suite's `--remote` row and the hotspot runbook.
 - **ABSENT:** Live TV, browser / camera sources, NES / Genesis, a power meter.
-- **Standing:** Phase C, `D-BASE` closed; the `CL-B1` APK adopted.
 
 ## Current Work Item
 
-**`QUEUE_2026-10-15` is done.** Two sessions ran side by side.
+**`QUEUE_2026-10-16` (session A) is done**, and `QUEUE_2026-10-16B`
+(session B, overnight) is done.
 
-- **Session A (this):**
-  - **E4-S5D, ADOPTED and CONFIRMED**
-    (`evidence/E4_S5D_SNES_CAPTURE_FIX_ADOPTION_2026-10-15.md`):
-    `snes-capture.conf`.
-    - SNES 20 min: capture 59.964, dup+drop 0.05/min, RA 59.999, host
-      7.81 %.
-    - PS1 10 min: 59.942, 0.10/min.
-    - Both SNES starts probed 60, so the bad-probe case rests on E4-S5C.
-  - **E4-S4D, the watch LAUNCHED**
-    (`evidence/E4_S4D_LINK_WATCH_LAUNCH_2026-10-15.md`): the unit
-    `privyhub-link-watch`, from 21:41:41Z.
-    - Probe 1 was dirty: 1,645 loss/min.
-- **Session B** (`handoffs/SESSION_B_DONE_2026-10-15.md`, folded here):
-  1. Session B finished on 2026-10-15 (E4-C1 + E5-S1). It adopted and
-     committed nothing, touched none of A's files, and used no sudo, no
-     nft, nothing fetched.
-  2. It wrote `evidence/E4_CLOSEOUT_2026-10-15.md`: the reference, both
-     floors final, the alpha in two columns with margins, adopted / not,
-     the link, and E7's list.
-  3. E4 is CLOSED on the host side. Alpha today ≥ 6 cores / 1.5 GB stack
-     / 8 GB system; with deferral ≥ 4 cores / 1.25 GB; VAAPI H.264
-     720p60.
-  4. The link: 60 stream runs since 10-09, none under D-BASE's 10/min
-     (min 34, median 218). The 10-10 stall is noted. The open item is the
-     watch (E4-S4D).
-  5. E4-S5D had no `state_at_end.json` at B's end (21:04Z), so B wrote it
-     as "in adoption, session A". It is now adopted and confirmed.
-  6. ROADMAP:
-     - §E4 status, the final tables and a 10-10C/10-15 table (one link to
-       the close-out);
-     - §E7 items marked; the §E5 status line;
-     - Phase E's header line was left alone (not B's section).
-  7. It wrote `docs/CAPABILITY_MODEL.md` (seven classes; E4 thresholds;
-     "not measured; E5-S2" where there are none) and
-     `tools/capability_probe.py` (host reads, JSON, the threshold beside
-     each verdict).
-  8. The probe (21:03:43Z, with A's stream live) found the reference
-     known-good on all seven classes. Storage, decode, NES and Genesis
-     are unknown. The model needed no fix.
-  9. Files: `evidence/E5_S1_CAPABILITY_PROBE_2026-10-15.md` +
-     `e5_s1_2026-10-15/` (probe.json, console, redact_check all OK,
-     manifest.sha256).
-  10. Git status: `logs/e4_c1_git_status.txt`, `logs/e5_s1_git_status.txt`.
-      The tree is dirty on purpose: B's new paths are untracked and
-      ROADMAP is modified. B's next item: E5-S2 (a second machine, the
-      alpha candidate).
-
-Before it: `QUEUE_2026-10-10B` (E4-S3B, S5B, S4B) and `QUEUE_2026-10-10`
-(E4-S3, S4, S5). `QUEUE_2026-10-10C`'s session stalled after its first
-job (E4-S5C), and its watch never started.
+- **E4-S4C** (`evidence/E4_S4C_LINK_WATCH_2026-10-16.md`):
+  - the watch was stopped after 6 probes, all lossy (102-4,299 loss/min);
+  - the loss moved with the AP's retry %;
+  - the two ends' signal disagrees by about 10 dB;
+  - the hand option is a wired adapter.
+- **G1-S2** (`evidence/G1_S2_OVERLAY_PROVIDER_LIVE_SMOKE_2026-10-16.md`):
+  PASSED. The overlay object appears behind the flag, at +0.28 point CPU;
+  with the flag off, `/status` is unchanged; path `no-peer`. Not adopted.
+- **CL-B2** (`evidence/CL_B2_IDENTITY_APK_AND_LAN_SMOKE_2026-10-16.md`,
+  CLOSED):
+  - The APK is installed, its hash pinned (patch
+    `CL-B2_IDENTITY_APK_HASH`), and kept.
+  - Pairing worked; so did signed setup and token. The 20-min flag run
+    held every gate. A forged token → 401; an unpaired device →
+    `unknown-device`; then re-paired (`dev-2fb1…`).
+  - **R3** (flag and setting off): today's stream, but **host CPU 12.963
+    against 10.9 ± 2, FAILED by 0.06**.
+    - Against R1, the encoder was 46.65 vs 35.75 % of a core, and the
+      ladder held 7000 vs 5000-7000.
+    - The E4-S1 reference and R2 also held 7000 at about 36 %. So the
+      rung mix does not explain it, and the cause is not located.
+    - The bar lesson is in `docs/KNOWN_ISSUES.md`.
+  - The adoption lines for the flag and the setting are written in §7
+    and not applied.
+- **G5-S1** (`evidence/G5_S1_WAN_TELEMETRY_CLASSIFICATION_2026-10-16.md`)
+  and **G4-P1** (`evidence/G4_P1_OFFSITE_TEST_PREP_2026-10-16.md`):
+  session B, software only, nothing adopted. G4-S1's task is a draft
+  (`handoffs/G4-S1_OFFSITE_FIRST_SESSION_TASK.draft.md`), with the
+  runbook `handoffs/G4_RUNBOOK_HOTSPOT.md`.
+- Git status: `logs/cl_b2_git_status.txt`.
 
 ## Verified State
 
@@ -112,11 +95,20 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   **cap 90,000 B** (`P6a`), **cushion 12/17** (`P9`), **audio redundancy
   2/4** (`P10`). Env overrides exist for comparison sessions only
   (`TOOLS.md`, including `C5-M1`'s `PRIVYHUB_NATIVE_PROFILE_ID`); none set.
-- **Installed**: **APK `de072762…835e`** (the `CL-B1` APK, adopted
-  2026-09-30; hash confirmed on the onn at every teardown since,
-  last 2026-10-09 05:40Z (E3-A3B's end); the previous
-  `f31b1c18…8ae7` is kept at `runtime/c4_m1/adopted_app-debug.apk` for
-  rollback).
+- **Installed**: **APK `77011eef…7d9d`** (the `CL-B2` identity APK,
+  G3-S2's debug build, installed 2026-10-16 02:16Z and kept by the
+  user's decision). Its hash is pinned in `tools/e1_suite.py`
+  `EXPECT_APK` and `tools/c3_l4_nft_night.py` (patch
+  `CL-B2_IDENTITY_APK_HASH`), and it read CONFIRMED at 14:04:41Z
+  (CL-B2's end).
+  - Its setting `identity_v2` is **off**. One device is paired
+    (`dev-2fb1…`); the hub does not read the store while the host flag is
+    absent.
+  - Rollback, written and not applied: `adb install -r
+    PrivyHub/app/build/g3_s2_preserved/app-debug.apk` (the CL-B1 APK
+    `de072762…835e`), plus the three hash predecessors in
+    `evidence/cl_b2_2026-10-16/predecessors/`. The older `f31b1c18…8ae7`
+    is kept at `runtime/c4_m1/adopted_app-debug.apk`.
   - The companion is the systemd user unit `privyhub-companion` (`H3`);
     restart it with `systemctl --user restart`.
   - **Live adaptive bitrate by default, since 2026-10-01 13:07Z**
@@ -184,23 +176,32 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
-1. **The user's commit tonight (2026-10-15):** everything since `7331184`.
-   - E4-S1 to E4-S5D, E4-C1, E5-S1, the runner patches;
-   - the git status in `logs/e4_s4d_git_status.txt`.
-   - Before it, the user decides what to do with E4-S3's two ~300 MB
-     `epg.jsonl` and E4-S3B's 4.4 MB `stopped_predecessor_5s.jsonl`.
-   - The watch keeps writing into `evidence/e4_s4d_2026-10-15/` while it
-     runs, so its later files are not in tonight's commit.
-2. **The watch's status:** `cat ~/privyhub_link_watch/status.txt`.
-   - The line ends with a heartbeat at most 5 min old.
-   - Stop it: `touch ~/privyhub_link_watch/STOP`.
-   - Unit: `systemctl --user status privyhub-link-watch`.
-   - It runs the deferral set on its own on the first clean probe.
-3. **The watch's record when it ends** (the cap is 2026-10-20T04:00Z):
-   a one-line Code task, "write E4-S4C's record from the watch's files".
-   The record covers the link history and the deferral verdict.
-4. **E5-S2**, as `docs/ROADMAP.md` has it: a second machine, the alpha
-   candidate.
+1. **The user's commit:** everything since `3107fb5`.
+   - G1-S1, G3-S1 and G3-S2;
+   - this queue's E4-S4C, G1-S2 and CL-B2 (with patch
+     `CL-B2_IDENTITY_APK_HASH`);
+   - last night's G5-S1 and G4-P1;
+   - the git status in `logs/cl_b2_git_status.txt`.
+   - The E4-S4D watch's later files in `evidence/e4_s4d_2026-10-15/`
+     are final: the watch is stopped.
+2. **G3-S3, the identity hardening:**
+   - the declared port: sign and check `audio_port`, and report the
+     chosen target's class and hash, with no address;
+   - the range server over the overlay;
+   - tokens on the TV-sync, EPG and diagnostics paths.
+   - CL-B2's notes (`docs/KNOWN_ISSUES.md`, the G3 entry) also apply: the
+     store directory is 0775, and the client sets up twice per entry.
+3. **The host flag and the client setting, the user's call.** The lines
+   are written in CL-B2 §7 and not applied:
+   - `session-identity.conf` = `Environment=PRIVYHUB_SESSION_IDENTITY=v2`,
+     then `daemon-reload`, a restart, and the line added to `e1_suite.py`
+     `ADOPTED`;
+   - then `identity_v2` on, on the onn.
+   - The flag goes first.
+4. **G4-S1, the first off-site session** (a phone hotspot):
+   - the task draft is `handoffs/G4-S1_OFFSITE_FIRST_SESSION_TASK.draft.md`;
+   - the runbook is `handoffs/G4_RUNBOOK_HOTSPOT.md`;
+   - it uses `tools/e1_suite.py --remote` (G4-P1).
 
 **Open, not blocking:**
 
@@ -217,7 +218,12 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 - **the onn's 1080p decode jitter**; the overlay's constant size text;
 - `C6-D1`'s list; B3a's two clauses; C5-M4's R3; `encoder_command` is the
   full start's only;
-- **adaptive-off measurements need the drop-in out** (`TOOLS.md`).
+- **adaptive-off measurements need the drop-in out** (`TOOLS.md`);
+- **the host-CPU band gate** (CL-B2 R3): FAILED by 0.06 on the encoder's
+  share (46.65 vs ~36 % of a core) at the same 7000 rung as the
+  reference. The cause is not located. A BAR item in
+  `docs/KNOWN_ISSUES.md`: report the encoder with its rung;
+- E5-S2 (a second machine, the alpha candidate) is not on this Next Action list.
 
 ## Success Criteria
 
@@ -257,6 +263,7 @@ Phase C: met (C7, `docs/ROADMAP.md`). **Phase E** (`docs/ROADMAP.md`):
 
 ## Relevant References
 
+- G (remote): `evidence/CL_B2_IDENTITY_APK_AND_LAN_SMOKE_2026-10-16.md`, `G1_S2_…`, `G3_S2_…`, `G3_S1_…`, `G1_S1_…`, `G5_S1_…`, `G4_P1_…`, `E4_S4C_LINK_WATCH_2026-10-16.md`; `docs/REMOTE_TRUST.md`, `docs/WAN_ADAPTATION_RULES.md`; `handoffs/QUEUE_2026-10-16.md`, `QUEUE_2026-10-16B.md`; `patches/CL-B2_IDENTITY_APK_HASH.md`.
 - E4: `evidence/E4_S1_…`, `E4_S2_…` (10-09), `E4_S3_MEMORY_FLOOR_CLOSE_…`, `E4_S4_GRAB_DEFERRAL_…`, `E4_S5_SNES_CAPTURE_59FPS_…`, `E4_S3B_MEMORY_FLOOR_1G_SWAPOFF_…`, `E4_S5B_SNES_CAPTURE_PROBE_BENCH_…`, `E4_S4B_GRAB_DEFERRAL_CLEAN_LINK_…` (10-10); `handoffs/QUEUE_2026-10-09.md`, `QUEUE_2026-10-10.md`, `QUEUE_2026-10-10B.md`; `patches/E4-S2_…` … `E4-S5_…`, `E4-S3B_RUNNER_REFRESH_BACKOFF.md`.
 - E3: `evidence/E3_A3B_…`, `E3_A3_…` (10-09), `E3_R2_…`, `E3_S7B_…`, `E3_R1_…`, `E3_S7_…` (10-08), `E3_A2_…`, `E3_S*`; `handoffs/QUEUE_2026-10-06.md` … `-08B`; `TOOLS.md` ("The E3 flags", the drop-ins).
 - `evidence/E2_S1_WHOLE_SYSTEM_2026-10-06.md` (E2); `architecture/E1_WORKLOAD_SUITE.md` (the frozen suite); `evidence/E1_S1_WORKLOAD_SUITE_2026-10-05.md`.

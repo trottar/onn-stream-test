@@ -1394,6 +1394,13 @@ connectivity is absent.
 
 ## G0 — Correct trust topology and threat model
 
+**Status (2026-10-15, G1-S1): WRITTEN** — `docs/REMOTE_TRUST.md` (the two
+topologies, the threat model, the fail-closed rules; ROADMAP quoted or marked
+"G1-S1 proposal"); the source-address audit
+`docs/memory/evidence/g1_s1_2026-10-15/source_address_audit.md` (80 lines,
+every one categorized for G3). Record:
+`docs/memory/evidence/G1_S1_TRUST_TOPOLOGY_AND_OVERLAY_PROVIDER_2026-10-15.md`.
+
 Home topology:
 
 ```text
@@ -1430,6 +1437,12 @@ hotel/friend/work network.
 Remote access must never flatten or expose the ordinary household LAN.
 
 ## G1 — Overlay provider abstraction
+
+**Status (2026-10-15, G1-S1): BUILT behind `PRIVYHUB_OVERLAY_PROVIDER=none|tailscale`
+(absent = today, byte for byte), NOT ADOPTED** — `companion/overlay/`
+(contract, `none`, read-only `tailscale`), 17 tests OK; Tailscale not
+installed on the hub (the user's install); the live smoke pending on the
+stream (session A).
 
 Use a provider boundary instead of hard-coding one overlay product into the
 PrivyHub session architecture.
@@ -1475,6 +1488,27 @@ Required behavior:
 
 ## G3 — WAN session identity and application authorization
 
+**Status (2026-10-15, G3-S1): HOST SIDE BUILT behind `PRIVYHUB_SESSION_IDENTITY=v2`
+(absent = today, byte for byte), NOT ADOPTED** — `companion/session_identity.py`:
+LAN pairing window + one-time code, nonce-signed setup, expiring tokens,
+declared endpoints (not the source), per-device permissions failing closed,
+`logs/session_audit.jsonl` with no addresses; today's client accepted only as
+audited `legacy-lan` on the hub's LAN, never over the overlay. 38 tests OK;
+the request handler replayed in process byte for byte. Next: G3-S2 (the
+client side, an APK change); the live smoke pending on the stream. Record:
+`docs/memory/evidence/G3_S1_SESSION_IDENTITY_HOST_SIDE_2026-10-15.md`;
+identity model in `docs/REMOTE_TRUST.md` §5.
+
+**G3-S2 (2026-10-16): CLIENT SIDE BUILT behind the client setting `identity_v2`
+(default off = today's requests, byte for byte), NOT INSTALLED, NOT ADOPTED**:
+device secret in app-private storage, the pairing screen with the hub's code,
+nonce-signed setup (HMAC input byte for byte G3-S1's vectors), declared
+endpoint, the token on control calls, refresh before expiry, the reason code
+shown with one retry. 30 client unit tests OK; the handshake against G3-S1's
+host logic 18/18; debug APK `77011eef…` built (release skipped by the user).
+Next: CL-B2 (install after the watch; pair by hand; the live G3 smoke on the
+LAN). Record: `docs/memory/evidence/G3_S2_SESSION_IDENTITY_CLIENT_SIDE_2026-10-16.md`.
+
 The current LAN prototype may derive reachable media/controller targets from the
 request source address. That mechanism is not a durable remote identity model
 because a portable client may sit behind NAT/SNAT on the travel router.
@@ -1499,6 +1533,15 @@ Add explicit application authentication/authorization with fail-closed session
 setup and auditable permissions.
 
 ## G4 — PS1-and-below off-site remote baseline
+
+**Status (2026-10-16, G4-P1): PREPARED, nothing run off-site** — `tools/e1_suite.py run --remote`
+(a PS1-STREAM row over the overlay: both host flags read back, the user's launch, the
+endpoint class + hash only, the path every 10 s, adb optional; 13 tests OK); the G4-S1
+pre-registration drafted (`handoffs/G4-S1_OFFSITE_FIRST_SESSION_TASK.draft.md`: a phone
+hotspot + the Tailscale app on the onn substituting for §G2's router; three gates, the rest
+reported); the user's runbook `handoffs/G4_RUNBOOK_HOTSPOT.md`. **Blockers:** CL-B2's pairing,
+the overlay flag on the companion, the Tailscale app on the onn (unverified). Record:
+`docs/memory/evidence/G4_P1_OFFSITE_TEST_PREP_2026-10-16.md`.
 
 Use the mature Core workload first:
 
@@ -1528,6 +1571,16 @@ packet/tunnel overhead are considered. Measure the real envelope rather than
 turning this estimate into a hard requirement.
 
 ## G5 — WAN-aware telemetry and adaptation
+
+**Status (2026-10-16, G5-S1): CLASSIFICATION BUILT behind `PRIVYHUB_WAN_TELEMETRY=1`
+(absent = today, byte for byte), NOT ADOPTED** — `companion/wan_telemetry.py`: the
+eleven measures below from Phase C's existing telemetry + the overlay path, each
+with its source field; per-10-s-window and per-session classes (clean / lossy /
+capacity-limited / latency-limited / path-changed / starved) on thresholds from
+D-BASE and the live ladder; replays of three recorded runs reproduce their loss
+(649.94 / 60.93 / 663.98 per min), none clean. The five priorities below written as
+rules in `docs/WAN_ADAPTATION_RULES.md` (G5-S2 implements them). Live smoke pending
+on the stream. Record: `docs/memory/evidence/G5_S1_WAN_TELEMETRY_CLASSIFICATION_2026-10-16.md`.
 
 Reuse Phase C telemetry/adaptation instead of creating a parallel WAN streamer.
 

@@ -1,0 +1,1405 @@
+# companion/privyhub_service.py against the baseline 3107fb5 (G1-S1 + G3-S1 hunks), then the new G3-S1 files
+diff --git a/companion/privyhub_service.py b/companion/privyhub_service.py
+index d27494b..16d9189 100644
+--- a/companion/privyhub_service.py
++++ b/companion/privyhub_service.py
+@@ -1770,7 +1770,7 @@ class PrivyHubController:
+                     ):
+                         self.active_source_id = None
+ 
+-            return {
++            payload = {
+                 "service": "PrivyHub",
+                 "api_version": 4,
+                 "project_root": str(
+@@ -1826,6 +1826,30 @@ class PrivyHubController:
+                 },
+             }
+ 
++        # G1-S1: the overlay object, outside the lock, only with the flag set.
++        if OVERLAY_STATUS is not None:
++            payload["overlay"] = OVERLAY_STATUS.status_field()
++
++        return payload
++
++
++# G1-S1: the overlay provider, only with PRIVYHUB_OVERLAY_PROVIDER set. Absent
++# = today: nothing imported, constructed or called; no status field.
++OVERLAY_STATUS = None
++
++if os.environ.get("PRIVYHUB_OVERLAY_PROVIDER", "").strip():
++    from overlay import reporter_from_environ as _overlay_reporter_from_environ
++
++    OVERLAY_STATUS = _overlay_reporter_from_environ(os.environ)
++
++# G3-S1: session identity, only with PRIVYHUB_SESSION_IDENTITY set. Absent =
++# today: nothing imported or constructed; no store read, no audit, no header.
++SESSION_IDENTITY = None
++
++if os.environ.get("PRIVYHUB_SESSION_IDENTITY", "").strip():
++    from session_identity import gate_from_environ as _session_gate_from_environ
++
++    SESSION_IDENTITY = _session_gate_from_environ(os.environ, PROJECT_ROOT)
+ 
+ CONTROLLER = PrivyHubController()
+ CLIENT_HEALTH_STORE = ClientHealthStore()
+@@ -1887,6 +1911,11 @@ class PrivyHubRequestHandler(
+             "no-store",
+         )
+ 
++        # G3-S1: a session token header, only under the flag.
++        if SESSION_IDENTITY is not None:
++            for name, value in getattr(self, "_session_headers", ()):
++                self.send_header(name, value)
++
+         self.end_headers()
+ 
+         self.wfile.write(
+@@ -1992,6 +2021,10 @@ class PrivyHubRequestHandler(
+         parsed = urlsplit(self.path)
+         request_path = parsed.path
+ 
++        # G3-S1: identity and authorization, only under the flag.
++        if SESSION_IDENTITY is not None and SESSION_IDENTITY.intercept(self, "GET", parsed):
++            return
++
+         if request_path == "/status":
+             self._send_json(
+                 200,
+@@ -2090,6 +2123,10 @@ class PrivyHubRequestHandler(
+             parsed = urlsplit(self.path)
+             request_path = parsed.path
+ 
++            # G3-S1: identity and authorization, only under the flag.
++            if SESSION_IDENTITY is not None and SESSION_IDENTITY.intercept(self, "POST", parsed):
++                return
++
+             if request_path == "/diagnostics/self-test":
+                 try:
+                     result = run_diagnostics_self_test(
+@@ -2368,13 +2405,19 @@ class PrivyHubRequestHandler(
+                             action,
+                             parsed.query,
+                             request_payload,
+-                            self.client_address[0],
++                            # G3-S1: a session's declared endpoint; else the source (today).
++                            SESSION_IDENTITY.client_target(self)
++                            if SESSION_IDENTITY is not None
++                            else self.client_address[0],
+                         )
+                     elif request_handler is not None:
+                         payload = request_handler(
+                             action,
+                             parsed.query,
+-                            self.client_address[0],
++                            # G3-S1: a session's declared endpoint; else the source (today).
++                            SESSION_IDENTITY.client_target(self)
++                            if SESSION_IDENTITY is not None
++                            else self.client_address[0],
+                         )
+                     else:
+                         payload = handler(
+diff --git a/companion/session_identity.py b/companion/session_identity.py
+new file mode 100644
+index 0000000..fcb7fbc
+--- /dev/null
++++ b/companion/session_identity.py
+@@ -0,0 +1,636 @@
++"""G3-S1: session identity and authorization, host side (ROADMAP §G3).
++
++Behind `PRIVYHUB_SESSION_IDENTITY=v2`. **Absent = today**: the companion
++never imports this module, reads no store, writes no audit line and adds no
++header. The design is §1 of
++`docs/memory/evidence/G3_S1_SESSION_IDENTITY_HOST_SIDE_2026-10-15.md`.
++
++The rule: a request's source address is routing evidence, never identity;
++overlay membership is transport, never authorization; setup fails closed;
++every decision that matters is audited, with no address in the audit.
++
++- Client identity: a device paired once on the home LAN (a 120-s window the
++  host opens, a one-time code), stored in `~/.config/privyhub/paired_devices.json`
++  (0600, outside git): id, name, HMAC key, permissions — no address.
++- Session identity: a nonce-bound, HMAC-SHA256-signed setup issues a token
++  with an expiry; every call carries it (`X-PrivyHub-Session`).
++- Declared endpoints: the media host comes from the setup, not the source.
++- Authorization: per-device permissions (games, tv, vod, pairing-admin);
++  unknown → denied.
++- Legacy: today's client (no token) is accepted only from the hub's own LAN
++  with `legacy_unpaired_lan` on, as `legacy-lan`, exactly as today; never
++  over the overlay. The hub itself (loopback) is `host-local`.
++"""
++
++from __future__ import annotations
++
++import hashlib
++import hmac
++import ipaddress
++import json
++import os
++import secrets
++import threading
++import time
++from dataclasses import dataclass
++from pathlib import Path
++from typing import Any, Callable, Mapping
++from urllib.parse import parse_qs
++
++FLAG_ENV = "PRIVYHUB_SESSION_IDENTITY"
++MODE_V2 = "v2"
++SESSION_HEADER = "X-PrivyHub-Session"
++
++PERMISSIONS = ("games", "tv", "vod", "pairing-admin")
++DEFAULT_PAIRED_PERMISSIONS = ("games", "tv", "vod")
++LEGACY_CLIENT = "legacy-lan"
++HOST_LOCAL_CLIENT = "host-local"
++
++PAIRING_WINDOW_S = 120.0
++PAIRING_MAX_ATTEMPTS = 5
++NONCE_TTL_S = 60.0
++NONCE_MAX = 256
++TOKEN_TTL_S = 8 * 3600.0
++KEY_MIN_HEX = 64          # 32 bytes
++KEY_MAX_HEX = 256
++BODY_MAX_BYTES = 16_384
++SETUP_CANON = "privyhub-session-setup-v1"
++
++# The session-setup actions: a legacy token is issued and audited on these.
++SETUP_PATHS = frozenset({
++    "/plugins/games/launch",
++    "/plugins/games/native-stream-start",
++    "/plugins/games/recovery-resume",
++    "/plugins/games/recovery-copy",
++})
++
++# The overlay's address space, built from integers (no literal in source):
++# the shared CGNAT block (Tailscale's IPv4 range) and Tailscale's IPv6 ULA.
++OVERLAY_NETWORKS = (
++    ipaddress.ip_network((0x64400000, 10)),
++    ipaddress.ip_network((0xFD7A115CA1E0 << 80, 48)),
++)
++
++ROUTING_LOCAL = "local"
++ROUTING_LAN = "lan"
++ROUTING_OVERLAY = "overlay"
++ROUTING_UNKNOWN = "unknown"
++
++
++# --------------------------------------------------------------------------
++# Routing evidence
++
++def read_onlink_networks(route_path: Path = Path("/proc/net/route")) -> list[ipaddress.IPv4Network]:
++    """The hub's own on-link IPv4 subnets (no gateway), overlay interfaces excluded."""
++    nets: list[ipaddress.IPv4Network] = []
++    try:
++        lines = route_path.read_text().splitlines()[1:]
++    except OSError:
++        return nets
++    for line in lines:
++        parts = line.split()
++        if len(parts) < 8:
++            continue
++        iface, dest, gateway, mask = parts[0], parts[1], parts[2], parts[7]
++        if gateway != "00000000" or dest == "00000000":
++            continue
++        if iface == "lo" or iface.startswith(("tailscale", "wg")):
++            continue
++        try:
++            d = int.from_bytes(bytes.fromhex(dest), "little")
++            m = int.from_bytes(bytes.fromhex(mask), "little")
++            nets.append(ipaddress.ip_network((d, bin(m).count("1")), strict=False))
++        except ValueError:
++            continue
++    return nets
++
++
++class RoutingClassifier:
++    REFRESH_S = 60.0
++
++    def __init__(
++        self,
++        lan_reader: Callable[[], list[Any]] = read_onlink_networks,
++        clock: Callable[[], float] = time.monotonic,
++    ) -> None:
++        self._lan_reader = lan_reader
++        self._clock = clock
++        self._lan: list[Any] = []
++        self._read_at: float | None = None
++        self._lock = threading.Lock()
++
++    def _lan_networks(self) -> list[Any]:
++        with self._lock:
++            now = self._clock()
++            if self._read_at is None or now - self._read_at >= self.REFRESH_S:
++                self._lan = list(self._lan_reader())
++                self._read_at = now
++            return self._lan
++
++    def classify(self, source: str) -> str:
++        try:
++            ip = ipaddress.ip_address(str(source).split("%", 1)[0])
++        except ValueError:
++            return ROUTING_UNKNOWN
++        if getattr(ip, "ipv4_mapped", None):
++            ip = ip.ipv4_mapped
++        if ip.is_loopback:
++            return ROUTING_LOCAL
++        if any(ip.version == n.version and ip in n for n in OVERLAY_NETWORKS):
++            return ROUTING_OVERLAY
++        if any(ip.version == n.version and ip in n for n in self._lan_networks()):
++            return ROUTING_LAN
++        return ROUTING_UNKNOWN
++
++
++# --------------------------------------------------------------------------
++# Stores
++
++def _atomic_write_json(path: Path, doc: dict[str, Any]) -> None:
++    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
++    tmp = path.with_name(path.name + ".tmp")
++    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
++    with os.fdopen(fd, "w", encoding="utf-8") as handle:
++        json.dump(doc, handle, indent=2)
++        handle.write("\n")
++    os.replace(tmp, path)
++
++
++class _JsonFile:
++    """A JSON file re-read when its mtime changes; a broken file reads as `None`."""
++
++    def __init__(self, path: Path) -> None:
++        self.path = path
++        self._mtime: tuple[int, int] | None = None
++        self._doc: dict[str, Any] | None = None
++        self._missing = True
++
++    def read(self) -> tuple[bool, dict[str, Any] | None]:
++        """(present, doc). A present but unreadable file returns (True, None)."""
++        try:
++            st = self.path.stat()
++            mtime = (st.st_mtime_ns, st.st_size)
++        except OSError:
++            self._mtime, self._doc, self._missing = None, None, True
++            return False, None
++        if mtime != self._mtime:
++            self._mtime, self._missing = mtime, False
++            try:
++                doc = json.loads(self.path.read_text(encoding="utf-8"))
++                self._doc = doc if isinstance(doc, dict) else None
++            except (OSError, ValueError):
++                self._doc = None
++        return True, self._doc
++
++
++class DeviceStore:
++    def __init__(self, path: Path) -> None:
++        self._file = _JsonFile(path)
++
++    def _devices(self) -> list[dict[str, Any]]:
++        present, doc = self._file.read()
++        if not present or doc is None:
++            return []  # absent: none paired; broken: fail closed, none trusted
++        devices = doc.get("devices")
++        return [d for d in devices if isinstance(d, dict)] if isinstance(devices, list) else []
++
++    def get(self, device_id: str) -> dict[str, Any] | None:
++        for d in self._devices():
++            if d.get("device_id") == device_id:
++                return d
++        return None
++
++    def count(self) -> int:
++        return len(self._devices())
++
++    def add(self, display_name: str, key_hex: str, permissions: tuple[str, ...], paired_at: str) -> dict[str, Any]:
++        devices = self._devices()
++        device = {
++            "device_id": "dev-" + secrets.token_hex(8),
++            "display_name": display_name,
++            "key_hex": key_hex,
++            "paired_at": paired_at,
++            "permissions": list(permissions),
++        }
++        devices.append(device)
++        _atomic_write_json(self._file.path, {"version": 1, "devices": devices})
++        return device
++
++
++class Settings:
++    def __init__(self, path: Path) -> None:
++        self._file = _JsonFile(path)
++
++    def legacy_unpaired_lan(self) -> bool:
++        present, doc = self._file.read()
++        if not present:
++            return True          # the transition default
++        if doc is None:
++            return False         # a broken settings file fails closed
++        value = doc.get("legacy_unpaired_lan", True)
++        return value is True
++
++
++class AuditLog:
++    def __init__(self, path: Path, wall: Callable[[], float] = time.time) -> None:
++        self.path = path
++        self._wall = wall
++        self._lock = threading.Lock()
++
++    def write(self, event: str, **fields: Any) -> None:
++        line = {
++            "t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self._wall())),
++            "event": event,
++            **{k: v for k, v in fields.items() if v is not None},
++        }
++        with self._lock:
++            self.path.parent.mkdir(parents=True, exist_ok=True)
++            with self.path.open("a", encoding="utf-8") as handle:
++                handle.write(json.dumps(line, sort_keys=True) + "\n")
++
++
++# --------------------------------------------------------------------------
++# The gate
++
++def token_ref(token: str) -> str:
++    return hashlib.sha256(token.encode("utf-8")).hexdigest()[:8]
++
++
++def required_permission(path: str) -> str | None:
++    if path.startswith("/plugins/games/") or path == "/diagnostics/client-health":
++        return "games"
++    if (
++        path.startswith(("/plugins/tv_state/", "/plugins/epg/", "/plugins/iptv_org/", "/sources/"))
++        or path in ("/sources", "/stop")
++    ):
++        return "tv"
++    if path == "/status" or path.startswith("/diagnostics/"):
++        return "diagnostics"     # not grantable in v1: a token session is denied
++    return None
++
++
++@dataclass
++class Session:
++    client_id: str
++    expires_at: float
++    media_host: str | None = None
++    video_port: int | None = None
++    permissions: tuple[str, ...] = ()
++
++
++@dataclass
++class Decision:
++    allowed: bool
++    status: int = 200
++    reason: str | None = None
++    kind: str | None = None          # host-local | legacy | session
++    client_id: str | None = None
++    media_host: str | None = None
++    issued_token: str | None = None
++
++
++@dataclass
++class _Pairing:
++    code: str
++    expires_at: float
++    attempts: int = 0
++
++
++@dataclass
++class _Nonce:
++    expires_at: float
++    used: bool = False
++
++
++class SessionGate:
++    def __init__(
++        self,
++        mode: str,
++        config_dir: Path,
++        audit_path: Path,
++        classifier: RoutingClassifier | None = None,
++        clock: Callable[[], float] = time.monotonic,
++        wall: Callable[[], float] = time.time,
++    ) -> None:
++        self.mode = mode
++        self.devices = DeviceStore(config_dir / "paired_devices.json")
++        self.settings = Settings(config_dir / "session_identity.json")
++        self.audit = AuditLog(audit_path, wall=wall)
++        self.classifier = classifier or RoutingClassifier()
++        self._clock = clock
++        self._wall = wall
++        self._lock = threading.RLock()
++        self._tokens: dict[str, Session] = {}
++        self._nonces: dict[str, _Nonce] = {}
++        self._pairing: _Pairing | None = None
++
++    # ---- helpers -----------------------------------------------------------
++
++    def _evidence(self, routing: str) -> dict[str, Any]:
++        return {
++            "routing_evidence": ROUTING_LAN if routing == ROUTING_LOCAL else routing,
++            "host_local": routing == ROUTING_LOCAL,
++        }
++
++    def _refuse(self, status: int, reason: str, event: str, routing: str, **fields: Any) -> Decision:
++        self.audit.write(event, reason=reason, **self._evidence(routing), **fields)
++        return Decision(False, status, reason)
++
++    def _session_for(self, token: str, routing: str, path: str) -> tuple[Session | None, Decision | None]:
++        with self._lock:
++            sess = self._tokens.get(token)
++            if sess is None:
++                return None, self._refuse(401, "token-unknown", "session_refused", routing, path=path)
++            if self._clock() >= sess.expires_at:
++                del self._tokens[token]
++                return None, self._refuse(401, "token-expired", "token_expired", routing,
++                                          client_id=sess.client_id, token_ref=token_ref(token), path=path)
++            if sess.client_id == LEGACY_CLIENT:
++                if routing != ROUTING_LAN or not self.settings.legacy_unpaired_lan():
++                    reason = "legacy-overlay" if routing == ROUTING_OVERLAY else (
++                        "legacy-disabled" if routing == ROUTING_LAN else "legacy-unknown-network")
++                    return None, self._refuse(401, reason, "legacy_refused", routing, path=path)
++                return sess, None
++            device = self.devices.get(sess.client_id)
++            if device is None:
++                self._tokens = {t: s for t, s in self._tokens.items() if s.client_id != sess.client_id}
++                return None, self._refuse(401, "device-revoked", "session_refused", routing,
++                                          client_id=sess.client_id, path=path)
++            sess.permissions = tuple(p for p in device.get("permissions", []) if p in PERMISSIONS)
++            return sess, None
++
++    def _issue_token(self, sess: Session) -> str:
++        token = secrets.token_urlsafe(32)
++        with self._lock:
++            now = self._clock()
++            self._tokens = {t: s for t, s in self._tokens.items() if s.expires_at > now}
++            self._tokens[token] = sess
++        return token
++
++    # ---- authorization of ordinary routes ------------------------------------
++
++    def authorize(self, method: str, path: str, query: str, token: str | None, source: str) -> Decision:
++        routing = self.classifier.classify(source)
++        if self.mode != MODE_V2:
++            if routing == ROUTING_LOCAL:
++                return Decision(True, kind="host-local", client_id=HOST_LOCAL_CLIENT)
++            return self._refuse(401, "identity-flag-unknown", "session_refused", routing, path=path)
++
++        if token:
++            sess, refusal = self._session_for(token, routing, path)
++            if refusal is not None:
++                return refusal
++            assert sess is not None
++            if sess.client_id == LEGACY_CLIENT:
++                return Decision(True, kind="legacy", client_id=LEGACY_CLIENT)
++            permission = required_permission(path)
++            if permission is None or permission not in PERMISSIONS:
++                return self._refuse(403, "permission-unknown", "permission_denied", routing,
++                                    client_id=sess.client_id, path=path, permission=permission)
++            if permission not in sess.permissions:
++                return self._refuse(403, "permission-denied", "permission_denied", routing,
++                                    client_id=sess.client_id, path=path, permission=permission)
++            if path == "/plugins/games/native-stream-start":
++                port = (parse_qs(query).get("port") or [""])[0]
++                if not port.isdigit() or int(port) != sess.video_port:
++                    return self._refuse(403, "endpoint-port-mismatch", "session_refused", routing,
++                                        client_id=sess.client_id, path=path)
++            return Decision(True, kind="session", client_id=sess.client_id, media_host=sess.media_host)
++
++        if routing == ROUTING_LOCAL:
++            if path in SETUP_PATHS:
++                self.audit.write("host_local_setup", client_id=HOST_LOCAL_CLIENT, path=path,
++                                 **self._evidence(routing))
++            return Decision(True, kind="host-local", client_id=HOST_LOCAL_CLIENT)
++        if routing == ROUTING_LAN:
++            if not self.settings.legacy_unpaired_lan():
++                return self._refuse(401, "legacy-disabled", "legacy_refused", routing, path=path)
++            issued = None
++            if path in SETUP_PATHS:
++                issued = self._issue_token(Session(LEGACY_CLIENT, self._clock() + TOKEN_TTL_S,
++                                                   permissions=DEFAULT_PAIRED_PERMISSIONS))
++                self.audit.write("legacy_setup", client_id=LEGACY_CLIENT, path=path,
++                                 token_ref=token_ref(issued), **self._evidence(routing))
++            return Decision(True, kind="legacy", client_id=LEGACY_CLIENT, issued_token=issued)
++        reason = "legacy-overlay" if routing == ROUTING_OVERLAY else "legacy-unknown-network"
++        return self._refuse(401, reason, "legacy_refused", routing, path=path)
++
++    # ---- /session/* ------------------------------------------------------------
++
++    def session_route(self, method: str, path: str, body: dict[str, Any] | None,
++                      token: str | None, source: str) -> tuple[int, dict[str, Any]]:
++        routing = self.classifier.classify(source)
++
++        def refused(status: int, reason: str, event: str = "session_refused", **f: Any):
++            self._refuse(status, reason, event, routing, path=path, **f)
++            return status, {"ok": False, "error": "session refused", "reason": reason}
++
++        if self.mode != MODE_V2 and not (routing == ROUTING_LOCAL and path == "/session/status"):
++            return refused(401, "identity-flag-unknown")
++
++        if path == "/session/status":
++            if method != "GET":
++                return 405, {"ok": False, "error": "GET only"}
++            if routing != ROUTING_LOCAL:
++                return refused(403, "host-local-only")
++            with self._lock:
++                now = self._clock()
++                active = sum(1 for s in self._tokens.values() if s.expires_at > now)
++                window = self._pairing is not None and self._pairing.expires_at > now
++            return 200, {
++                "ok": True, "mode": self.mode, "paired_devices": self.devices.count(),
++                "active_sessions": active, "legacy_unpaired_lan": self.settings.legacy_unpaired_lan(),
++                "pairing_window_open": window,
++            }
++
++        if method != "POST":
++            return 405, {"ok": False, "error": "POST only"}
++        if routing == ROUTING_UNKNOWN:
++            return refused(401, "network-unknown")
++        body = body if isinstance(body, dict) else {}
++
++        if path in ("/session/pairing/open", "/session/pairing/close"):
++            allowed = routing == ROUTING_LOCAL
++            if not allowed and token:
++                sess, refusal = self._session_for(token, routing, path)
++                if refusal is not None:
++                    return refusal.status, {"ok": False, "error": "session refused", "reason": refusal.reason}
++                allowed = sess is not None and "pairing-admin" in sess.permissions
++            if not allowed:
++                return refused(403, "pairing-admin-required", "pairing_refused")
++            with self._lock:
++                if path.endswith("/close"):
++                    self._pairing = None
++                    self.audit.write("pairing_close", **self._evidence(routing))
++                    return 200, {"ok": True, "pairing_window_open": False}
++                code = f"{secrets.randbelow(10**6):06d}"
++                self._pairing = _Pairing(code, self._clock() + PAIRING_WINDOW_S)
++            self.audit.write("pairing_open", window_s=int(PAIRING_WINDOW_S), **self._evidence(routing))
++            return 200, {"ok": True, "code": code, "expires_in_s": int(PAIRING_WINDOW_S)}
++
++        if path == "/session/pair":
++            if routing not in (ROUTING_LAN, ROUTING_LOCAL):
++                return refused(403, "pairing-not-lan", "pairing_refused")
++            name = str(body.get("device_name") or "").strip()
++            name = "".join(ch for ch in name if ch.isprintable())[:64]
++            key = str(body.get("key") or "").strip().lower()
++            code = str(body.get("code") or "")
++            with self._lock:
++                window = self._pairing
++                if window is None or self._clock() >= window.expires_at:
++                    self._pairing = None
++                    return refused(403, "pairing-closed", "pairing_refused")
++                window.attempts += 1
++                if not hmac.compare_digest(code.encode(), window.code.encode()):
++                    if window.attempts >= PAIRING_MAX_ATTEMPTS:
++                        self._pairing = None
++                        return refused(403, "pairing-attempts-exhausted", "pairing_refused")
++                    return refused(403, "pairing-bad-code", "pairing_refused")
++                if not name or not (KEY_MIN_HEX <= len(key) <= KEY_MAX_HEX) or any(
++                        c not in "0123456789abcdef" for c in key) or len(key) % 2:
++                    return refused(400, "pairing-bad-request", "pairing_refused")
++                self._pairing = None
++                device = self.devices.add(
++                    name, key, DEFAULT_PAIRED_PERMISSIONS,
++                    time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self._wall())),
++                )
++            self.audit.write("pairing_ok", client_id=device["device_id"],
++                             permissions=",".join(device["permissions"]), **self._evidence(routing))
++            return 200, {"ok": True, "device_id": device["device_id"], "permissions": device["permissions"]}
++
++        if path == "/session/nonce":
++            nonce = secrets.token_urlsafe(24)
++            with self._lock:
++                now = self._clock()
++                self._nonces = {n: v for n, v in self._nonces.items() if v.expires_at > now}
++                while len(self._nonces) >= NONCE_MAX:
++                    self._nonces.pop(next(iter(self._nonces)))
++                self._nonces[nonce] = _Nonce(now + NONCE_TTL_S)
++            return 200, {"ok": True, "nonce": nonce, "expires_in_s": int(NONCE_TTL_S)}
++
++        if path == "/session/setup":
++            return self._setup(body, routing, refused)
++
++        if path == "/session/end":
++            if not token:
++                return refused(401, "token-missing")
++            with self._lock:
++                sess = self._tokens.pop(token, None)
++            if sess is None:
++                return refused(401, "token-unknown")
++            self.audit.write("token_end", client_id=sess.client_id, token_ref=token_ref(token),
++                             **self._evidence(routing))
++            return 200, {"ok": True}
++
++        return 404, {"ok": False, "error": "Not found"}
++
++    def _setup(self, body: dict[str, Any], routing: str, refused) -> tuple[int, dict[str, Any]]:
++        device_id = str(body.get("device_id") or "")
++        nonce = str(body.get("nonce") or "")
++        media_host = str(body.get("media_host") or "")
++        port_raw = body.get("video_port")
++        sig = str(body.get("sig") or "").lower()
++
++        device = self.devices.get(device_id) if device_id else None
++        if device is None:
++            return refused(401, "unknown-device")
++        with self._lock:
++            entry = self._nonces.get(nonce)
++            now = self._clock()
++            if entry is None:
++                return refused(401, "nonce-unknown", client_id=device_id)
++            if now >= entry.expires_at:
++                self._nonces.pop(nonce, None)
++                return refused(401, "nonce-expired", client_id=device_id)
++            if entry.used:
++                return refused(401, "nonce-replayed", client_id=device_id)
++            entry.used = True     # spent whatever the outcome below
++
++        canonical = "\n".join([SETUP_CANON, device_id, nonce, media_host, str(port_raw)])
++        try:
++            key = bytes.fromhex(str(device.get("key_hex") or ""))
++        except ValueError:
++            key = b""
++        expected = hmac.new(key, canonical.encode("utf-8"), hashlib.sha256).hexdigest() if key else ""
++        if not key or not hmac.compare_digest(sig.encode(), expected.encode()):
++            return refused(401, "bad-signature", client_id=device_id)
++
++        try:
++            host = ipaddress.ip_address(media_host)
++            port = int(port_raw)
++        except (ValueError, TypeError):
++            return refused(403, "endpoint-invalid", client_id=device_id)
++        if (host.version != 4 or host.is_loopback or host.is_unspecified or host.is_multicast
++                or not (1024 <= port <= 65535) or isinstance(port_raw, bool)):
++            return refused(403, "endpoint-invalid", client_id=device_id)
++        declared = self.classifier.classify(str(host))
++        if not (declared == routing or (routing == ROUTING_LOCAL and declared == ROUTING_LAN)):
++            return refused(403, "endpoint-class-mismatch", client_id=device_id)
++
++        permissions = tuple(p for p in device.get("permissions", []) if p in PERMISSIONS)
++        token = self._issue_token(Session(device_id, self._clock() + TOKEN_TTL_S,
++                                          media_host=str(host), video_port=port, permissions=permissions))
++        self.audit.write("token_issued", client_id=device_id, token_ref=token_ref(token),
++                         expires_in_s=int(TOKEN_TTL_S), permissions=",".join(permissions),
++                         **self._evidence(routing))
++        return 200, {"ok": True, "token": token, "expires_in_s": int(TOKEN_TTL_S),
++                     "client_id": device_id, "permissions": list(permissions)}
++
++    # ---- the HTTP glue ------------------------------------------------------------
++
++    def intercept(self, handler: Any, method: str, parsed: Any) -> bool:
++        """True when the gate answered (a /session/* route or a refusal)."""
++        handler._session_decision = None
++        handler._session_headers = []
++        source = str(handler.client_address[0])
++        token = (handler.headers.get(SESSION_HEADER) or "").strip() or None
++        path = parsed.path
++
++        if path.startswith("/session/"):
++            body: dict[str, Any] | None = None
++            if method == "POST":
++                try:
++                    length = int(handler.headers.get("Content-Length") or 0)
++                except ValueError:
++                    length = -1
++                if length < 0 or length > BODY_MAX_BYTES:
++                    handler._send_json(400, {"ok": False, "error": "session refused", "reason": "bad-request"})
++                    return True
++                raw = handler.rfile.read(length) if length else b""
++                try:
++                    body = json.loads(raw.decode("utf-8")) if raw else {}
++                except (UnicodeDecodeError, ValueError):
++                    handler._send_json(400, {"ok": False, "error": "session refused", "reason": "bad-request"})
++                    return True
++            status, payload = self.session_route(method, path, body, token, source)
++            handler._send_json(status, payload)
++            return True
++
++        decision = self.authorize(method, path, parsed.query, token, source)
++        if not decision.allowed:
++            handler._send_json(decision.status, {"ok": False, "error": "session refused",
++                                                 "reason": decision.reason})
++            return True
++        handler._session_decision = decision
++        if decision.issued_token:
++            handler._session_headers = [(SESSION_HEADER, decision.issued_token)]
++        return False
++
++    @staticmethod
++    def client_target(handler: Any) -> str:
++        """The declared media host for a token session; else the source (today)."""
++        decision = getattr(handler, "_session_decision", None)
++        if decision is not None and decision.kind == "session" and decision.media_host:
++            return decision.media_host
++        return str(handler.client_address[0])
++
++
++def gate_from_environ(environ: Mapping[str, str], project_root: Path) -> SessionGate | None:
++    raw = environ.get(FLAG_ENV)
++    if raw is None or not raw.strip():
++        return None
++    return SessionGate(
++        mode=raw.strip().lower(),
++        config_dir=Path.home() / ".config" / "privyhub",
++        audit_path=Path(project_root) / "logs" / "session_audit.jsonl",
++    )
+diff --git a/tests/session_identity/common.py b/tests/session_identity/common.py
+new file mode 100644
+index 0000000..b1b9ac8
+--- /dev/null
++++ b/tests/session_identity/common.py
+@@ -0,0 +1,97 @@
++"""G3-S1 test helpers: addresses built from integers (never written), a gate on
++temporary stores, and the audit collection the record's redactor check reads."""
++
++from __future__ import annotations
++
++import atexit
++import hashlib
++import hmac
++import ipaddress
++import json
++import os
++import sys
++import tempfile
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++
++import session_identity as si  # noqa: E402
++
++# In-memory only. No address literal appears in any test file or output.
++LAN_NET = ipaddress.ip_network((0xC0A86400, 24))
++LAN_SRC = str(LAN_NET[23])
++LAN_DECLARED = str(LAN_NET[57])
++OVERLAY_SRC = str(si.OVERLAY_NETWORKS[0][0x1234])
++OVERLAY_DECLARED = str(si.OVERLAY_NETWORKS[0][0x1235])
++UNKNOWN_SRC = str(ipaddress.ip_address(0xC6336405))
++LOCAL_SRC = str(ipaddress.ip_address(0x7F000001))
++ALL_ADDRESSES = (LAN_SRC, LAN_DECLARED, OVERLAY_SRC, OVERLAY_DECLARED, UNKNOWN_SRC)
++
++KEY_HEX = hashlib.sha256(b"g3-s1 fixture device key").hexdigest() * 2   # 64 bytes
++
++_TMP = Path(tempfile.mkdtemp(prefix="g3_s1_tests_"))
++_AUDITS: list[Path] = []
++
++
++class Clock:
++    def __init__(self, t: float = 1000.0) -> None:
++        self.t = t
++
++    def __call__(self) -> float:
++        return self.t
++
++
++def make_gate(mode: str = "v2", clock: Clock | None = None) -> si.SessionGate:
++    d = Path(tempfile.mkdtemp(dir=_TMP))
++    audit = d / "logs" / "session_audit.jsonl"
++    _AUDITS.append(audit)
++    clock = clock or Clock()
++    return si.SessionGate(
++        mode=mode,
++        config_dir=d / "config",
++        audit_path=audit,
++        classifier=si.RoutingClassifier(lan_reader=lambda: [LAN_NET], clock=clock),
++        clock=clock,
++        wall=lambda: 1_792_000_000.0,
++    )
++
++
++def sign(device_id: str, nonce: str, media_host: str, port, key_hex: str = KEY_HEX) -> str:
++    canon = "\n".join([si.SETUP_CANON, device_id, nonce, media_host, str(port)])
++    return hmac.new(bytes.fromhex(key_hex), canon.encode(), hashlib.sha256).hexdigest()
++
++
++def pair(gate: si.SessionGate, source: str = LAN_SRC, name: str = "onn-fixture") -> str:
++    status, opened = gate.session_route("POST", "/session/pairing/open", {}, None, LOCAL_SRC)
++    assert status == 200, opened
++    status, paired = gate.session_route(
++        "POST", "/session/pair", {"code": opened["code"], "device_name": name, "key": KEY_HEX}, None, source)
++    assert status == 200, paired
++    return paired["device_id"]
++
++
++def setup(gate: si.SessionGate, device_id: str, source: str = LAN_SRC, media_host: str = LAN_DECLARED,
++          port=50000, key_hex: str = KEY_HEX):
++    _, n = gate.session_route("POST", "/session/nonce", {}, None, source)
++    body = {"device_id": device_id, "nonce": n["nonce"], "media_host": media_host, "video_port": port,
++            "sig": sign(device_id, n["nonce"], media_host, port, key_hex)}
++    return gate.session_route("POST", "/session/setup", body, None, source), body
++
++
++def audit_lines(gate: si.SessionGate) -> list[dict]:
++    if not gate.audit.path.exists():
++        return []
++    return [json.loads(line) for line in gate.audit.path.read_text().splitlines()]
++
++
++def _collect() -> None:
++    out = os.environ.get("G3_S1_AUDIT_OUT")
++    if out:
++        with open(out, "a", encoding="utf-8") as handle:
++            for path in _AUDITS:
++                if path.exists():
++                    handle.write(path.read_text())
++
++
++atexit.register(_collect)
+diff --git a/tests/session_identity/test_gate.py b/tests/session_identity/test_gate.py
+new file mode 100644
+index 0000000..63fb1c7
+--- /dev/null
++++ b/tests/session_identity/test_gate.py
+@@ -0,0 +1,349 @@
++#!/usr/bin/env python3
++"""G3-S1: the session gate — every accept / refuse case.
++
++    python3 -m unittest discover -s tests/session_identity -v
++
++Stores and audit logs live in a temporary directory (removed at exit); the
++addresses are built from integers in memory and never written.
++"""
++
++from __future__ import annotations
++
++import ast
++import json
++import os
++import stat
++import unittest
++
++from common import (
++    ALL_ADDRESSES, KEY_HEX, LAN_DECLARED, LAN_SRC, LOCAL_SRC, OVERLAY_DECLARED, OVERLAY_SRC, ROOT,
++    UNKNOWN_SRC, Clock, audit_lines, make_gate, pair, setup, sign, si,
++)
++
++
++def reasons(gate) -> list[str]:
++    return [line.get("reason") for line in audit_lines(gate) if line.get("reason")]
++
++
++class Routing(unittest.TestCase):
++    def test_classes(self):
++        g = make_gate()
++        c = g.classifier.classify
++        self.assertEqual(c(LOCAL_SRC), "local")
++        self.assertEqual(c(LAN_SRC), "lan")
++        self.assertEqual(c(OVERLAY_SRC), "overlay")
++        self.assertEqual(c(UNKNOWN_SRC), "unknown")
++        self.assertEqual(c("not-an-address"), "unknown")
++
++    def test_flag_absent_builds_nothing(self):
++        self.assertIsNone(si.gate_from_environ({}, ROOT))
++        self.assertIsNone(si.gate_from_environ({si.FLAG_ENV: " "}, ROOT))
++
++
++class Pairing(unittest.TestCase):
++    def test_window_closed(self):
++        g = make_gate()
++        st, p = g.session_route("POST", "/session/pair", {"code": "000000", "device_name": "x", "key": KEY_HEX}, None, LAN_SRC)
++        self.assertEqual((st, p["reason"]), (403, "pairing-closed"))
++
++    def test_open_needs_host_or_admin(self):
++        g = make_gate()
++        st, p = g.session_route("POST", "/session/pairing/open", {}, None, LAN_SRC)
++        self.assertEqual((st, p["reason"]), (403, "pairing-admin-required"))
++        st, p = g.session_route("POST", "/session/pairing/open", {}, None, OVERLAY_SRC)
++        self.assertEqual((st, p["reason"]), (403, "pairing-admin-required"))
++
++    def test_pair_ok_store_has_no_address(self):
++        g = make_gate()
++        dev = pair(g)
++        self.assertTrue(dev.startswith("dev-"))
++        path = g.devices._file.path
++        self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
++        text = path.read_text()
++        for a in ALL_ADDRESSES:
++            self.assertNotIn(a, text)
++        self.assertEqual(json.loads(text)["devices"][0]["permissions"], ["games", "tv", "vod"])
++        # the window closes on success
++        st, p = g.session_route("POST", "/session/pair", {"code": "000000", "device_name": "x", "key": KEY_HEX}, None, LAN_SRC)
++        self.assertEqual(p["reason"], "pairing-closed")
++
++    def test_pair_over_overlay_or_unknown_refused(self):
++        g = make_gate()
++        _, opened = g.session_route("POST", "/session/pairing/open", {}, None, LOCAL_SRC)
++        st, p = g.session_route("POST", "/session/pair", {"code": opened["code"], "device_name": "x", "key": KEY_HEX}, None, OVERLAY_SRC)
++        self.assertEqual((st, p["reason"]), (403, "pairing-not-lan"))
++        st, p = g.session_route("POST", "/session/pair", {"code": opened["code"], "device_name": "x", "key": KEY_HEX}, None, UNKNOWN_SRC)
++        self.assertEqual((st, p["reason"]), (401, "network-unknown"))
++
++    def test_bad_code_and_exhaustion(self):
++        g = make_gate()
++        _, opened = g.session_route("POST", "/session/pairing/open", {}, None, LOCAL_SRC)
++        wrong = "%06d" % ((int(opened["code"]) + 1) % 10**6)
++        for _ in range(si.PAIRING_MAX_ATTEMPTS - 1):
++            st, p = g.session_route("POST", "/session/pair", {"code": wrong, "device_name": "x", "key": KEY_HEX}, None, LAN_SRC)
++            self.assertEqual(p["reason"], "pairing-bad-code")
++        st, p = g.session_route("POST", "/session/pair", {"code": wrong, "device_name": "x", "key": KEY_HEX}, None, LAN_SRC)
++        self.assertEqual(p["reason"], "pairing-attempts-exhausted")
++        st, p = g.session_route("POST", "/session/pair", {"code": opened["code"], "device_name": "x", "key": KEY_HEX}, None, LAN_SRC)
++        self.assertEqual(p["reason"], "pairing-closed")
++
++    def test_window_expires(self):
++        clock = Clock()
++        g = make_gate(clock=clock)
++        _, opened = g.session_route("POST", "/session/pairing/open", {}, None, LOCAL_SRC)
++        clock.t += si.PAIRING_WINDOW_S + 1
++        st, p = g.session_route("POST", "/session/pair", {"code": opened["code"], "device_name": "x", "key": KEY_HEX}, None, LAN_SRC)
++        self.assertEqual(p["reason"], "pairing-closed")
++
++    def test_short_key_refused(self):
++        g = make_gate()
++        _, opened = g.session_route("POST", "/session/pairing/open", {}, None, LOCAL_SRC)
++        st, p = g.session_route("POST", "/session/pair", {"code": opened["code"], "device_name": "x", "key": "ab" * 8}, None, LAN_SRC)
++        self.assertEqual((st, p["reason"]), (400, "pairing-bad-request"))
++
++
++class Setup(unittest.TestCase):
++    def test_signed_setup_accepted(self):
++        g = make_gate()
++        dev = pair(g)
++        (st, p), _ = setup(g, dev)
++        self.assertEqual(st, 200)
++        self.assertEqual(p["client_id"], dev)
++        self.assertEqual(p["expires_in_s"], int(si.TOKEN_TTL_S))
++        d = g.authorize("POST", "/plugins/games/launch", "id=x", p["token"], LAN_SRC)
++        self.assertTrue(d.allowed)
++        self.assertEqual((d.kind, d.media_host), ("session", LAN_DECLARED))
++
++    def test_wrong_signature(self):
++        g = make_gate()
++        dev = pair(g)
++        _, n = g.session_route("POST", "/session/nonce", {}, None, LAN_SRC)
++        body = {"device_id": dev, "nonce": n["nonce"], "media_host": LAN_DECLARED, "video_port": 50000,
++                "sig": sign(dev, n["nonce"], LAN_DECLARED, 50001)}
++        st, p = g.session_route("POST", "/session/setup", body, None, LAN_SRC)
++        self.assertEqual((st, p["reason"]), (401, "bad-signature"))
++
++    def test_replayed_nonce(self):
++        g = make_gate()
++        dev = pair(g)
++        (st, _), body = setup(g, dev)
++        self.assertEqual(st, 200)
++        st, p = g.session_route("POST", "/session/setup", body, None, LAN_SRC)
++        self.assertEqual((st, p["reason"]), (401, "nonce-replayed"))
++
++    def test_expired_and_unknown_nonce(self):
++        clock = Clock()
++        g = make_gate(clock=clock)
++        dev = pair(g)
++        _, n = g.session_route("POST", "/session/nonce", {}, None, LAN_SRC)
++        clock.t += si.NONCE_TTL_S + 1
++        body = {"device_id": dev, "nonce": n["nonce"], "media_host": LAN_DECLARED, "video_port": 50000,
++                "sig": sign(dev, n["nonce"], LAN_DECLARED, 50000)}
++        st, p = g.session_route("POST", "/session/setup", body, None, LAN_SRC)
++        self.assertEqual(p["reason"], "nonce-expired")
++        body["nonce"] = "never-issued"
++        st, p = g.session_route("POST", "/session/setup", body, None, LAN_SRC)
++        self.assertEqual(p["reason"], "nonce-unknown")
++
++    def test_unknown_device(self):
++        g = make_gate()
++        (st, p), _ = setup(g, "dev-0000000000000000")
++        self.assertEqual((st, p["reason"]), (401, "unknown-device"))
++
++    def test_expired_token(self):
++        clock = Clock()
++        g = make_gate(clock=clock)
++        (st, p), _ = setup(g, pair(g))
++        clock.t += si.TOKEN_TTL_S + 1
++        d = g.authorize("GET", "/plugins/games/status", "", p["token"], LAN_SRC)
++        self.assertEqual((d.allowed, d.status, d.reason), (False, 401, "token-expired"))
++
++    def test_unknown_token_never_falls_back(self):
++        g = make_gate()
++        d = g.authorize("GET", "/plugins/games/status", "", "forged", LAN_SRC)
++        self.assertEqual((d.allowed, d.reason), (False, "token-unknown"))
++
++    def test_session_end(self):
++        g = make_gate()
++        (_, p), _ = setup(g, pair(g))
++        st, _ = g.session_route("POST", "/session/end", {}, p["token"], LAN_SRC)
++        self.assertEqual(st, 200)
++        self.assertEqual(g.authorize("GET", "/plugins/games/status", "", p["token"], LAN_SRC).reason, "token-unknown")
++
++    def test_revoked_device(self):
++        g = make_gate()
++        dev = pair(g)
++        (_, p), _ = setup(g, dev)
++        path = g.devices._file.path
++        doc = json.loads(path.read_text())
++        doc["devices"] = []
++        path.write_text(json.dumps(doc))
++        d = g.authorize("GET", "/plugins/games/status", "", p["token"], LAN_SRC)
++        self.assertEqual((d.allowed, d.reason), (False, "device-revoked"))
++
++    def test_overlay_session_with_overlay_endpoint(self):
++        g = make_gate()
++        dev = pair(g)
++        (st, p), _ = setup(g, dev, source=OVERLAY_SRC, media_host=OVERLAY_DECLARED)
++        self.assertEqual(st, 200)
++        d = g.authorize("POST", "/plugins/games/native-stream-start", "port=50000", p["token"], OVERLAY_SRC)
++        self.assertEqual((d.allowed, d.media_host), (True, OVERLAY_DECLARED))
++
++
++class Endpoints(unittest.TestCase):
++    def test_class_mismatch(self):
++        g = make_gate()
++        (st, p), _ = setup(g, pair(g), source=LAN_SRC, media_host=OVERLAY_DECLARED)
++        self.assertEqual((st, p["reason"]), (403, "endpoint-class-mismatch"))
++        g2 = make_gate()
++        (st, p), _ = setup(g2, pair(g2), source=OVERLAY_SRC, media_host=LAN_DECLARED)
++        self.assertEqual(p["reason"], "endpoint-class-mismatch")
++
++    def test_invalid(self):
++        g = make_gate()
++        dev = pair(g)
++        (st, p), _ = setup(g, dev, media_host=LOCAL_SRC)
++        self.assertEqual(p["reason"], "endpoint-invalid")
++        (st, p), _ = setup(g, dev, port=80)
++        self.assertEqual(p["reason"], "endpoint-invalid")
++        (st, p), _ = setup(g, dev, media_host="not-an-address")
++        self.assertEqual(p["reason"], "endpoint-invalid")
++
++    def test_port_mismatch(self):
++        g = make_gate()
++        (_, p), _ = setup(g, pair(g), port=50000)
++        d = g.authorize("POST", "/plugins/games/native-stream-start", "port=50002", p["token"], LAN_SRC)
++        self.assertEqual((d.allowed, d.reason), (False, "endpoint-port-mismatch"))
++
++    def test_client_target_declared_not_source(self):
++        g = make_gate()
++        (_, p), _ = setup(g, pair(g))
++        d = g.authorize("POST", "/plugins/games/native-stream-start", "port=50000", p["token"], LAN_SRC)
++
++        class H:
++            client_address = (LAN_SRC, 1)
++        h = H()
++        h._session_decision = d
++        self.assertEqual(si.SessionGate.client_target(h), LAN_DECLARED)
++        h._session_decision = si.Decision(True, kind="legacy")
++        self.assertEqual(si.SessionGate.client_target(h), LAN_SRC)
++
++
++class Permissions(unittest.TestCase):
++    def _session(self, perms):
++        g = make_gate()
++        dev = pair(g)
++        path = g.devices._file.path
++        doc = json.loads(path.read_text())
++        doc["devices"][0]["permissions"] = perms
++        path.write_text(json.dumps(doc))
++        (_, p), _ = setup(g, dev)
++        return g, p["token"]
++
++    def test_denied(self):
++        g, tok = self._session(["tv"])
++        d = g.authorize("POST", "/plugins/games/launch", "id=x", tok, LAN_SRC)
++        self.assertEqual((d.allowed, d.status, d.reason), (False, 403, "permission-denied"))
++        self.assertTrue(g.authorize("GET", "/sources", "", tok, LAN_SRC).allowed)
++
++    def test_unknown_permission_denied(self):
++        g, tok = self._session(["games", "tv", "vod"])
++        for path in ("/status", "/diagnostics/health", "/no/such/route"):
++            d = g.authorize("GET", path, "", tok, LAN_SRC)
++            self.assertEqual((d.allowed, d.reason), (False, "permission-unknown"), path)
++
++    def test_pairing_admin(self):
++        g, tok = self._session(["games", "pairing-admin"])
++        st, p = g.session_route("POST", "/session/pairing/open", {}, tok, LAN_SRC)
++        self.assertEqual(st, 200)
++        g2, tok2 = self._session(["games"])
++        st, p = g2.session_route("POST", "/session/pairing/open", {}, tok2, LAN_SRC)
++        self.assertEqual(p["reason"], "pairing-admin-required")
++
++
++class Legacy(unittest.TestCase):
++    def test_lan_accepted_and_audited(self):
++        g = make_gate()
++        d = g.authorize("GET", "/plugins/games/status", "", None, LAN_SRC)
++        self.assertEqual((d.allowed, d.kind, d.issued_token), (True, "legacy", None))
++        d = g.authorize("POST", "/plugins/games/native-stream-start", "port=50000", None, LAN_SRC)
++        self.assertTrue(d.allowed and d.issued_token)
++        lines = audit_lines(g)
++        self.assertEqual(lines[-1]["event"], "legacy_setup")
++        self.assertEqual(lines[-1]["client_id"], "legacy-lan")
++        self.assertEqual(lines[-1]["routing_evidence"], "lan")
++
++    def test_overlay_and_unknown_refused(self):
++        g = make_gate()
++        self.assertEqual(g.authorize("GET", "/plugins/games/status", "", None, OVERLAY_SRC).reason, "legacy-overlay")
++        self.assertEqual(g.authorize("GET", "/plugins/games/status", "", None, UNKNOWN_SRC).reason,
++                         "legacy-unknown-network")
++
++    def test_legacy_token_never_over_overlay(self):
++        g = make_gate()
++        d = g.authorize("POST", "/plugins/games/launch", "id=x", None, LAN_SRC)
++        d2 = g.authorize("GET", "/plugins/games/status", "", d.issued_token, OVERLAY_SRC)
++        self.assertEqual((d2.allowed, d2.reason), (False, "legacy-overlay"))
++
++    def test_turned_off(self):
++        g = make_gate()
++        p = g.settings._file.path
++        p.parent.mkdir(parents=True, exist_ok=True)
++        p.write_text(json.dumps({"legacy_unpaired_lan": False}))
++        self.assertEqual(g.authorize("GET", "/plugins/games/status", "", None, LAN_SRC).reason, "legacy-disabled")
++
++    def test_broken_settings_fail_closed(self):
++        g = make_gate()
++        p = g.settings._file.path
++        p.parent.mkdir(parents=True, exist_ok=True)
++        p.write_text("{not json")
++        self.assertEqual(g.authorize("GET", "/plugins/games/status", "", None, LAN_SRC).reason, "legacy-disabled")
++
++    def test_host_local_always(self):
++        g = make_gate()
++        p = g.settings._file.path
++        p.parent.mkdir(parents=True, exist_ok=True)
++        p.write_text(json.dumps({"legacy_unpaired_lan": False}))
++        d = g.authorize("POST", "/plugins/games/launch", "id=x", None, LOCAL_SRC)
++        self.assertEqual((d.allowed, d.kind), (True, "host-local"))
++
++
++class UnknownMode(unittest.TestCase):
++    def test_fails_closed(self):
++        g = make_gate(mode="v3")
++        self.assertEqual(g.authorize("GET", "/plugins/games/status", "", None, LAN_SRC).reason, "identity-flag-unknown")
++        self.assertTrue(g.authorize("GET", "/plugins/games/status", "", None, LOCAL_SRC).allowed)
++        st, p = g.session_route("POST", "/session/nonce", {}, None, LAN_SRC)
++        self.assertEqual(p["reason"], "identity-flag-unknown")
++
++
++class AuditPrivacy(unittest.TestCase):
++    def test_no_address_key_or_token(self):
++        g = make_gate()
++        dev = pair(g)
++        (_, p), _ = setup(g, dev)
++        g.authorize("GET", "/plugins/games/status", "", None, OVERLAY_SRC)
++        g.authorize("GET", "/plugins/games/status", "", "forged", UNKNOWN_SRC)
++        g.authorize("POST", "/plugins/games/launch", "id=x", None, LAN_SRC)
++        text = g.audit.path.read_text()
++        for secret in (*ALL_ADDRESSES, KEY_HEX, p["token"]):
++            self.assertNotIn(secret, text)
++        for line in audit_lines(g):
++            if "routing_evidence" in line:
++                self.assertIn(line["routing_evidence"], ("lan", "overlay", "unknown"))
++
++
++class ServiceGlue(unittest.TestCase):
++    def test_imported_only_under_the_flag(self):
++        src = (ROOT / "companion" / "privyhub_service.py").read_text()
++        tree = ast.parse(src)
++        top = [n for n in tree.body if isinstance(n, (ast.Import, ast.ImportFrom))
++               and (getattr(n, "module", "") or "").startswith("session_identity")]
++        self.assertEqual(top, [])
++        guarded = [n for n in tree.body if isinstance(n, ast.If)
++                   and "PRIVYHUB_SESSION_IDENTITY" in ast.get_source_segment(src, n.test)]
++        self.assertEqual(len(guarded), 1)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/session_identity/test_handler_replay.py b/tests/session_identity/test_handler_replay.py
+new file mode 100644
+index 0000000..72982bb
+--- /dev/null
++++ b/tests/session_identity/test_handler_replay.py
+@@ -0,0 +1,198 @@
++#!/usr/bin/env python3
++"""G3-S1: the request handler, in process, byte for byte.
++
++The baseline's `PrivyHubRequestHandler` (`3107fb5`, kept as
++`fixtures/handler_predecessor.py.txt`) and the edited one are executed with
++the same stubs (plugins, controller) and fed the same raw HTTP requests:
++
++- the D6-R1 suite's companion requests (`GET /plugins/games/native-stream-status`,
++  `GET /plugins/games/status`);
++- today's client's setup and in-session calls (launch, native-stream-start,
++  heartbeat) and `GET /status`.
++
++With the flag absent every response (status line, headers, body) and every
++access-log line must be identical. With `v2` on the legacy LAN path the
++bodies are identical; the setup calls add one `X-PrivyHub-Session` header.
++No socket is opened; no companion runs. If `G3_S1_REPLAY_OUT` is set, the
++comparison table is written there (labels only, no address).
++"""
++
++from __future__ import annotations
++
++import ast
++import hashlib
++import io
++import json
++import os
++import unittest
++from http.server import BaseHTTPRequestHandler
++from pathlib import Path
++from types import SimpleNamespace
++from typing import Any
++from urllib.parse import parse_qs, urlsplit
++
++from common import (
++    LAN_DECLARED, LAN_SRC, LOCAL_SRC, OVERLAY_SRC, ROOT, make_gate, pair, setup, si,
++)
++
++FIX = Path(__file__).resolve().parent / "fixtures"
++LABELS = {LAN_SRC: "source", LAN_DECLARED: "declared", LOCAL_SRC: "loopback"}
++
++REQUESTS = [
++    ("d6-r1", "GET", "/plugins/games/native-stream-status"),
++    ("d6-r1", "GET", "/plugins/games/status"),
++    ("client", "POST", "/plugins/games/launch?id=fixture-game"),
++    ("client", "POST", "/plugins/games/native-stream-start?port=50000"),
++    ("client", "POST", "/plugins/games/native-stream-heartbeat?seq=1"),
++    ("client", "GET", "/status"),
++    ("client", "GET", "/plugins/nosuch/status"),
++]
++
++
++class GamesStub:
++    def handle(self, action: str, query: str) -> dict[str, Any]:
++        return {"ok": True, "plugin": "games", "action": action, "query": parse_qs(query), "active": False}
++
++    def handle_post_request(self, action: str, query: str, client_ip: str) -> dict[str, Any]:
++        return {"ok": True, "plugin": "games", "action": action, "active": True,
++                "target": LABELS.get(client_ip, "other")}
++
++
++class ControllerStub:
++    def status(self) -> dict[str, Any]:
++        return {"service": "PrivyHub", "api_version": 4, "control_port": 8765}
++
++
++def handler_class(source: str, session_identity: Any, log: list[str]):
++    ns: dict[str, Any] = {
++        "__name__": "privyhub_service_fixture",
++        "Any": Any, "json": json, "urlsplit": urlsplit, "parse_qs": parse_qs,
++        "BaseHTTPRequestHandler": BaseHTTPRequestHandler,
++        "PLUGINS": {"games": GamesStub()},
++        "CONTROLLER": ControllerStub(),
++        "PROJECT_ROOT": Path("/fixture/project"),
++        "access_log_path": lambda h: urlsplit(getattr(h, "path", "")).path,
++        "print": lambda *a, **k: log.append(" ".join(str(x) for x in a)),
++        "SESSION_IDENTITY": session_identity,
++        "CatalogError": type("CatalogError", (Exception,), {}),
++        "SourceStartError": type("SourceStartError", (Exception,), {}),
++    }
++    tree = ast.parse(source)
++    node = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "PrivyHubRequestHandler")
++    exec(compile(ast.get_source_segment(source, node), "<handler>", "exec"), ns)
++    base = ns["PrivyHubRequestHandler"]
++
++    class Fixed(base):  # deterministic Date / Server headers
++        def version_string(self) -> str:
++            return "PrivyHubControl/0.6 Python/fixture"
++
++        def date_time_string(self, timestamp=None) -> str:
++            return "Thu, 01 Jan 2026 00:00:00 GMT"
++
++    return Fixed
++
++
++def current_source() -> str:
++    return (ROOT / "companion" / "privyhub_service.py").read_text()
++
++
++def run(cls, method: str, target: str, source: str, headers: dict[str, str] | None = None) -> bytes:
++    lines = [f"{method} {target} HTTP/1.0"]
++    for k, v in (headers or {}).items():
++        lines.append(f"{k}: {v}")
++    if method == "POST":
++        lines.append("Content-Length: 0")
++    raw = ("\r\n".join(lines) + "\r\n\r\n").encode()
++    h = cls.__new__(cls)
++    h.rfile = io.BytesIO(raw)
++    h.wfile = io.BytesIO()
++    h.client_address = (source, 50123)
++    h.server = SimpleNamespace()
++    h.request = None
++    h.close_connection = True
++    h.handle_one_request()
++    return h.wfile.getvalue()
++
++
++def without_session_header(raw: bytes) -> bytes:
++    head, _, body = raw.partition(b"\r\n\r\n")
++    kept = [ln for ln in head.split(b"\r\n") if not ln.lower().startswith(si.SESSION_HEADER.lower().encode() + b":")]
++    return b"\r\n".join(kept) + b"\r\n\r\n" + body
++
++
++def short(raw: bytes) -> str:
++    return hashlib.sha256(raw).hexdigest()[:12]
++
++
++class HandlerReplay(unittest.TestCase):
++    table: list[str] = []
++
++    @classmethod
++    def setUpClass(cls):
++        cls.table = ["| source | request | baseline | flag absent | v2, legacy LAN |", "| --- | --- | --- | --- | --- |"]
++
++    @classmethod
++    def tearDownClass(cls):
++        out = os.environ.get("G3_S1_REPLAY_OUT")
++        if out:
++            Path(out).write_text("\n".join(cls.table) + "\n")
++
++    def test_flag_absent_and_legacy(self):
++        before_log: list[str] = []
++        absent_log: list[str] = []
++        before = handler_class((FIX / "handler_predecessor.py.txt").read_text(), None, before_log)
++        absent = handler_class(current_source(), None, absent_log)
++        gate = make_gate()
++        v2 = handler_class(current_source(), gate, [])
++        for origin, method, target in REQUESTS:
++            for src in (LAN_SRC, LOCAL_SRC):
++                a = run(before, method, target, src)
++                b = run(absent, method, target, src)
++                c = run(v2, method, target, src)
++                self.assertEqual(a, b, f"flag absent differs: {method} {target}")
++                path = urlsplit(target).path
++                if src == LAN_SRC and path in si.SETUP_PATHS:
++                    self.assertIn(si.SESSION_HEADER.encode(), c)
++                    self.assertEqual(without_session_header(c), a, f"v2 legacy differs beyond the header: {target}")
++                    v2_cell = f"same + `{si.SESSION_HEADER}` header"
++                else:
++                    self.assertEqual(c, a, f"v2 legacy differs: {method} {target}")
++                    v2_cell = "identical"
++                self.table.append(f"| {LABELS[src]} ({origin}) | `{method} {target}` | {short(a)} | identical ({short(b)}) | {v2_cell} |")
++        self.assertEqual(before_log, absent_log, "the access-log lines differ")
++        self.assertTrue(before_log)
++
++    def test_v2_refusals_and_declared_target(self):
++        gate = make_gate()
++        v2 = handler_class(current_source(), gate, [])
++        raw = run(v2, "GET", "/plugins/games/status", OVERLAY_SRC)
++        self.assertTrue(raw.startswith(b"HTTP/1.0 401"))
++        self.assertIn(b'"reason": "legacy-overlay"', raw)
++
++        dev = pair(gate)
++        (st, p), _ = setup(gate, dev)
++        self.assertEqual(st, 200)
++        raw = run(v2, "POST", "/plugins/games/native-stream-start?port=50000", LAN_SRC,
++                  {si.SESSION_HEADER: p["token"]})
++        self.assertTrue(raw.startswith(b"HTTP/1.0 200"))
++        self.assertIn(b'"target": "declared"', raw)
++        raw = run(v2, "POST", "/plugins/games/native-stream-start?port=50000", LAN_SRC)
++        self.assertIn(b'"target": "source"', raw)   # legacy: as today
++        raw = run(v2, "GET", "/status", LAN_SRC, {si.SESSION_HEADER: p["token"]})
++        self.assertTrue(raw.startswith(b"HTTP/1.0 403"))
++        self.assertIn(b'"reason": "permission-unknown"', raw)
++
++    def test_session_routes_over_http(self):
++        gate = make_gate()
++        v2 = handler_class(current_source(), gate, [])
++        raw = run(v2, "POST", "/session/nonce", LAN_SRC)
++        self.assertTrue(raw.startswith(b"HTTP/1.0 200"))
++        self.assertIn(b'"nonce"', raw)
++        raw = run(v2, "GET", "/session/status", LOCAL_SRC)
++        self.assertIn(b'"paired_devices": 0', raw)
++        raw = run(v2, "GET", "/session/status", LAN_SRC)
++        self.assertTrue(raw.startswith(b"HTTP/1.0 403"))
++
++
++if __name__ == "__main__":
++    unittest.main()
