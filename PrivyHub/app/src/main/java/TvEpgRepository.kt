@@ -10,6 +10,7 @@ import org.json.JSONObject
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 
+import com.safeiot.privyhub.identity.PrivyHubIdentity
 import java.io.BufferedInputStream
 import java.io.InputStream
 import java.io.InputStreamReader
@@ -440,7 +441,8 @@ class TvEpgRepository(
 
     fun prefetchCompanionGuides(
         channelIds: List<String>,
-        forceRefresh: Boolean = false
+        forceRefresh: Boolean = false,
+        identityAttempt: Int = 0
     ): Int {
         val baseUrl =
             companionBaseUrl()
@@ -489,10 +491,13 @@ class TvEpgRepository(
                     )
             }
 
+        val prefetchUrl =
+            "$baseUrl/plugins/epg/prefetch?$query"
+
         val connection =
             try {
                 URL(
-                    "$baseUrl/plugins/epg/prefetch?$query"
+                    prefetchUrl
                 ).openConnection()
                     as HttpURLConnection
             } catch (_: Exception) {
@@ -520,6 +525,13 @@ class TvEpgRepository(
                 "PrivyHub/1.0"
             )
 
+            // G3-S3: the session header (tv), only with identity_v2 on.
+            PrivyHubIdentity.decorate(
+                appContext,
+                connection,
+                prefetchUrl
+            )
+
             val response =
                 connection.responseCode
 
@@ -527,6 +539,20 @@ class TvEpgRepository(
                 response < 200 ||
                 response >= 300
             ) {
+                if (
+                    identityRetry(
+                        connection,
+                        response,
+                        identityAttempt
+                    )
+                ) {
+                    return prefetchCompanionGuides(
+                        channelIds,
+                        forceRefresh,
+                        identityAttempt + 1
+                    )
+                }
+
                 return 0
             }
 
@@ -751,15 +777,48 @@ class TvEpgRepository(
                 PROGRAMME_REFRESH_INTERVAL_MS
     }
 
+    // G3-S3: a non-2xx answer under identity_v2: true = retry once (a token
+    // refusal); the host's reason code is shown. Off: false, nothing read.
+    private fun identityRetry(
+        connection: HttpURLConnection,
+        status: Int,
+        identityAttempt: Int
+    ): Boolean {
+        if (!PrivyHubIdentity.isEnabled(appContext)) {
+            return false
+        }
+
+        val body =
+            try {
+                connection.errorStream
+                    ?.bufferedReader()
+                    ?.use {
+                        it.readText()
+                    }
+            } catch (_: Exception) {
+                null
+            }
+
+        return PrivyHubIdentity.get(appContext).onResponse(
+            status,
+            body,
+            identityAttempt
+        )
+    }
+
     private fun companionBaseUrl(): String? {
+        // G3-S3: the "Hub host" while identity_v2 is on and one is set.
         val host =
-            appContext.getSharedPreferences(
-                COMPANION_PREFS_NAME,
-                Context.MODE_PRIVATE
-            ).getString(
-                COMPANION_HOST_PREF,
-                ""
-            )?.trim().orEmpty()
+            PrivyHubIdentity.effectiveHost(
+                appContext,
+                appContext.getSharedPreferences(
+                    COMPANION_PREFS_NAME,
+                    Context.MODE_PRIVATE
+                ).getString(
+                    COMPANION_HOST_PREF,
+                    ""
+                )?.trim().orEmpty()
+            ).trim()
 
         if (host.isBlank()) {
             return null
@@ -808,7 +867,8 @@ class TvEpgRepository(
     private fun fetchCompanionGuide(
         channelId: String,
         force: Boolean,
-        nowMs: Long
+        nowMs: Long,
+        identityAttempt: Int = 0
     ): CompanionGuideResult? {
         val baseUrl =
             companionBaseUrl()
@@ -827,11 +887,14 @@ class TvEpgRepository(
                 ""
             }
 
+        val guideUrl =
+            "$baseUrl/plugins/epg/guide" +
+                "?channel_id=$encodedChannelId" +
+                forceQuery
+
         val connection =
             URL(
-                "$baseUrl/plugins/epg/guide" +
-                    "?channel_id=$encodedChannelId" +
-                    forceQuery
+                guideUrl
             ).openConnection()
                 as HttpURLConnection
 
@@ -856,6 +919,13 @@ class TvEpgRepository(
                 "PrivyHub/1.0"
             )
 
+            // G3-S3: the session header (tv), only with identity_v2 on.
+            PrivyHubIdentity.decorate(
+                appContext,
+                connection,
+                guideUrl
+            )
+
             val response =
                 connection.responseCode
 
@@ -863,6 +933,21 @@ class TvEpgRepository(
                 response < 200 ||
                 response >= 300
             ) {
+                if (
+                    identityRetry(
+                        connection,
+                        response,
+                        identityAttempt
+                    )
+                ) {
+                    return fetchCompanionGuide(
+                        channelId,
+                        force,
+                        nowMs,
+                        identityAttempt + 1
+                    )
+                }
+
                 return null
             }
 

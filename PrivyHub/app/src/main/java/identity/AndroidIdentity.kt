@@ -8,7 +8,9 @@ import android.widget.Toast
 import java.io.File
 import java.net.DatagramSocket
 import java.net.HttpURLConnection
+import java.net.Inet4Address
 import java.net.InetAddress
+import java.net.NetworkInterface
 import java.net.URL
 import java.security.SecureRandom
 
@@ -23,10 +25,16 @@ import java.security.SecureRandom
  * - The declared media host: the local address of the route to the hub
  *   (a UDP `connect`, which sends nothing).
  * Log lines carry states and reason codes only; never an address.
+ *
+ * G3-S3: "Hub host" (`hub_host`, empty = today) overrides the companion host
+ * for every call while the setting is on; the overlay interface address is
+ * declared at setup; the hub's media requests carry the token.
  */
 object PrivyHubIdentity {
     const val SETTINGS_PREFS = "privyhub_settings"
     const val PREF_IDENTITY_V2 = "identity_v2"
+    const val PREF_HUB_HOST = "hub_host"
+    const val MEDIA_PORT = 8000
     private const val IDENTITY_PREFS = "privyhub_identity"
     private const val TAG = "PrivyHubIdentity"
 
@@ -66,6 +74,54 @@ object PrivyHubIdentity {
             .edit().putBoolean(PREF_IDENTITY_V2, enabled).apply()
         if (!enabled) session?.endSessionLocally()
     }
+
+    /** G3-S3: the stored "Hub host" (the hub's tailnet name, or any hostname); "" = none. */
+    fun hubHost(context: Context): String =
+        context.getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
+            .getString(PREF_HUB_HOST, "")?.trim().orEmpty()
+
+    fun setHubHost(context: Context, host: String) {
+        val clean = host.trim()
+        if (clean == hubHost(context)) return
+        context.getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
+            .edit().putString(PREF_HUB_HOST, clean).apply()
+        session?.endSessionLocally()   // a new host is a new session
+    }
+
+    /**
+     * G3-S3: the host every call goes to. The setting off, or no hub host:
+     * `companionHost` as given (today). The setting on and a hub host set: the hub host.
+     */
+    fun effectiveHost(context: Context, companionHost: String): String {
+        if (!isEnabled(context)) return companionHost
+        return SessionProtocol.effectiveHost(true, hubHost(context), companionHost)
+    }
+
+    /**
+     * G3-S3: the session header for a request to the hub's range server, only
+     * when the URL's host and port are the hub's media endpoint (never on a
+     * third-party URL). Off: null at once. A refused setup: null (the host's
+     * reason code was already shown).
+     */
+    fun mediaHeader(context: Context, url: String, hubHost: String): String? {
+        if (!isEnabled(context)) return null
+        if (!SessionProtocol.isHubMediaUrl(url, hubHost, MEDIA_PORT)) return null
+        return try {
+            get(context).mediaHeaderFor(hubHost.trim())
+        } catch (_: IdentitySession.IdentityRefused) {
+            null
+        }
+    }
+
+    /** G3-S3: adds the media header to a range-server connection (artwork). Off: touches nothing. */
+    fun decorateMedia(context: Context, connection: HttpURLConnection, url: String, hubHost: String) {
+        if (!isEnabled(context)) return
+        mediaHeader(context, url, hubHost)?.let { connection.setRequestProperty(SessionProtocol.HEADER, it) }
+    }
+
+    /** G3-S3: a URL as a log line may carry it: under the setting, the host is a 12-hex hash. */
+    fun urlForLog(context: Context, url: String): String =
+        if (isEnabled(context)) SessionProtocol.urlForLog(url) else url
 
     /**
      * Adds `X-PrivyHub-Session` to a control-port connection when the setting
@@ -143,6 +199,20 @@ object PrivyHubIdentity {
                     socket.connect(InetAddress.getByName(host), port)
                     socket.localAddress?.takeIf { !it.isAnyLocalAddress }?.hostAddress
                 }
+            } catch (_: Exception) {
+                null
+            }
+
+        // G3-S3: the overlay interface (the Tailscale app's tunnel): an up
+        // interface holding an IPv4 address in the overlay block. Nothing is sent.
+        override fun overlayAddress(): String? =
+            try {
+                NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
+                    .filter { it.isUp && !it.isLoopback }
+                    .flatMap { it.inetAddresses.toList() }
+                    .filterIsInstance<Inet4Address>()
+                    .mapNotNull { it.hostAddress }
+                    .firstOrNull { SessionProtocol.isOverlayIpv4(it) }
             } catch (_: Exception) {
                 null
             }

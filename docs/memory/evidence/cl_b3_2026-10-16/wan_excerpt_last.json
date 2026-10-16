@@ -1,0 +1,124 @@
+{
+ "at_utc": "2026-10-16T17:58:49Z",
+ "wan": {
+  "schema": "privyhub_wan_telemetry_v1",
+  "reports": 341,
+  "windows": 68,
+  "class": "lossy",
+  "classes": [
+   "lossy"
+  ],
+  "window_counts": {
+   "path-changed": 0,
+   "latency-limited": 0,
+   "starved": 1,
+   "capacity-limited": 0,
+   "lossy": 25,
+   "clean": 42
+  },
+  "window_primary_counts": {
+   "path-changed": 0,
+   "latency-limited": 0,
+   "starved": 1,
+   "capacity-limited": 0,
+   "lossy": 25,
+   "clean": 42
+  },
+  "loss_per_min_post_fec": 67.32,
+  "stale_per_min": 1.58,
+  "measures": {
+   "delivered_goodput_kbps": {
+    "value": 7056.7,
+    "source": "receiver.recent_mbps (mean)"
+   },
+   "packet_loss_per_min": {
+    "value": {
+     "post_fec": 67.32,
+     "pre_fec": 76.89
+    },
+    "source": "receiver.lost_packets_delta (+ FEC recovered for pre-FEC)"
+   },
+   "fec_groups": {
+    "value": {
+     "recovered_packets": 109,
+     "unrecoverable_groups": 33
+    },
+    "source": "fec.recovered_packets_delta / fec.unrecoverable_groups_delta",
+    "classified": "not classified; G5-S2"
+   },
+   "jitter_ms": {
+    "value": {
+     "p50": 0.772,
+     "p95": 2.14
+    },
+    "source": "receiver.interarrival_jitter_ms (client running estimate; no per-packet arrival times carried)",
+    "classified": "not classified; G5-S2"
+   },
+   "rtt_ms": {
+    "value": {
+     "p50": 48.0,
+     "p95": 318.25
+    },
+    "source": "latency.control_round_trip_ms (the client's control echo)",
+    "classified": "not classified; G5-S2"
+   },
+   "sender_pacing": {
+    "value": {
+     "send_call_avg_us": 13.345,
+     "send_call_max_us": 1819.796,
+     "send_errors": 0
+    },
+    "source": "sender.send_call_avg_us / send_call_max_us / send_errors_delta"
+   },
+   "queue_depth": {
+    "value": {
+     "max": 1,
+     "trend": 0
+    },
+    "source": "decoder.queue_depth"
+   },
+   "decoder_starvation": {
+    "value": {
+     "stale_drops_per_min": 1.58,
+     "waiting_for_idr_reports": 2,
+     "audio_prolonged_starvation_events": "not recorded"
+    },
+    "source": "decoder.stale_output_drops_delta, receiver.waiting_for_idr, heartbeat audio_prolonged_starvation_events"
+   },
+   "overlay_path": {
+    "value": "no-peer",
+    "source": "overlay provider state().path (G1-S1)"
+   },
+   "mtu_fragmentation": {
+    "value": {
+     "mtu": 1280,
+     "oversize_drops": "not observed (no oversize-drop counter exists)"
+    },
+    "source": "overlay provider state().mtu",
+    "classified": "not classified; G5-S2"
+   },
+   "path_change_events": {
+    "value": {
+     "count": 0,
+     "events": []
+    },
+    "source": "overlay transitions, recovery pauses / resumes, ladder transitions, heartbeat stream_resyncs"
+   }
+  },
+  "last_window": {
+   "t_s": [
+    674.402,
+    682.435
+   ],
+   "primary": "clean",
+   "classes": [
+    "clean"
+   ],
+   "loss_per_min": 0.0,
+   "fps_min": 59.78360558727534,
+   "queue_max": 0,
+   "gap_max_ms": 26,
+   "events": []
+  }
+ }
+}

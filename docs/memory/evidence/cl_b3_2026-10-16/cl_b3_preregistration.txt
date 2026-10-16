@@ -1,0 +1,37 @@
+CL-B3 -- G3-S3's hardened debug APK (59f736d29b96700253a178efa5efd0cd8846858a89d32848a0994586712bf65f) on the onn as the
+CONFIRMED client, on the SEVEN-line adopted state (G-A1: + PRIVYHUB_OVERLAY_PROVIDER=tailscale, + PRIVYHUB_SESSION_IDENTITY=v2),
+identity_v2 ON, Hub host empty (LAN). Pre-registered after the install / hash patch / setting, before any run; the gates
+are handoffs/G-A1_ADOPTION_AND_CL-B3_TASK.md's, not changed after data. Baseline: baseline_head.txt.
+
+0. Done before this file: adb install -r (Success; device read back 59f736d2...); the pairing survived (the client's
+   device id is in the host's store, 1 device); the pinned hash patched (patch CL-B3); e3_state.py ok, seven lines, APK
+   CONFIRMED; identity_v2 read true via run-as; a v2 token_issued (sig_v 2, games,tv,vod,diagnostics) at 17:26:00Z.
+
+R1. E1-PS1-STREAM x1, --window 600, --e2, gap 120, no flag (tools/e1_suite.py run ... --plan E1-PS1-STREAM:1:120).
+    GATES (host side, CL-B2's): status OK; RetroArch >= 59.9; capture 60.0 +/- 0.1 (segment-aware); dup+drop <= 0.2/min;
+    flags_absent true (seven lines). HOST CPU: REPORTED, NOT GATED, beside the ladder's rung range (status_poll
+    bitrate_kbps min-max and counts, the acted decisions) and the per-process split (the CL-B2 bar lesson).
+    AUDIT over R1 (logs/session_audit.jsonl from line 15): token_issued for the paired device with sig_v 2; no
+    legacy_setup; no endpoint-port-mismatch (the port binding: native-stream-start's port = the signed video_port, else
+    403 audited); no session_refused for the paired client other than a token-unknown followed by token_issued
+    (CL-B2's designed retry). /session/status during PLAYING: the session's permissions and media_token_live true.
+    The link: reported.
+V.  VOD: the user starts a movie on the onn and lets it play >= 60 s (waited for, up to 10 min). GATES: the audit shows
+    media_session for the paired device (media_token_used true or false = the header), routing lan; no legacy_* refusal
+    and no media-token-unknown for the client; the play reaches the client (the range server's / companion's log
+    shows 200/206 responses to the onn over the window; the user's confirmation on the screen).
+W.  G5-S1 live smoke: E1-PS1-STREAM x1, --window 600, --e2, gap 120, the suite's per-run drop-in
+    PRIVYHUB_WAN_TELEMETRY=1 (e3_flag.conf, removed + restart at teardown by the suite).
+    GATES: host side as R1 (host CPU reported, not gated); /status and /diagnostics/stream-telemetry carry `wan` while
+    PLAYING (polled every 30 s, the wan object only); its eleven measures each present with a value or a "not
+    recorded / not classified" mark; a primary class per window; logs/wan_sessions.jsonl gains a session line.
+    COST: the companion's mean CPU (% of one core) and PSS, W minus R1: <= 0.5 point and <= 2 MB (two runs, not
+    paired arms -- reported with the rung ranges beside them).
+    AFTER: flags_absent true; e3_state.py --check ok, seven lines; GET /status byte for byte equal to
+    g_a1_2026-10-16/status_after_adoption.json except server.pid (and the overlay endpoint_hash only if the provider's
+    endpoint changed -- reported).
+END. Seven adopted lines, no e3_flag.conf, no game, APK CONFIRMED (59f736d2...), the device paired, identity_v2 on.
+If a gate fails: stop and say so -- the user decides. Rollback (written, not applied): adb install -r
+PrivyHub/app/build/g3_s3_preserved/app-debug.apk (77011eef...) + the three predecessors in predecessors/.
+No address, token, media token, key or pairing code is written to any file in the repo; audit excerpts are reduced to
+event, reason, routing, path, sig_v, port_kind, permissions, media_token_used and a device-id flag (paired: yes/no).

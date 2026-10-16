@@ -2,6 +2,7 @@ package com.safeiot.privyhub
 
 import android.content.Intent
 import com.safeiot.privyhub.identity.PrivyHubIdentity
+import com.safeiot.privyhub.identity.hubMediaDataSourceFactory
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
@@ -921,7 +922,18 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    // G3-S3: the host every call goes to — the "Hub host" while identity_v2
+    // is on and one is set; else the stored companion host (today).
     private fun getCompanionHost(): String {
+
+        return PrivyHubIdentity.effectiveHost(
+            this,
+            getStoredCompanionHost()
+        )
+    }
+
+
+    private fun getStoredCompanionHost(): String {
 
         return getSharedPreferences(
             PREFS_NAME,
@@ -996,7 +1008,7 @@ class MainActivity : AppCompatActivity() {
         )
 
         input.setText(
-            getCompanionHost()
+            getStoredCompanionHost()
         )
 
         input.hint =
@@ -1078,6 +1090,31 @@ class MainActivity : AppCompatActivity() {
 
         container.addView(
             identityCheckBox,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        // G3-S3: "Hub host" overrides the companion host while identity v2 is
+        // on (the hub's tailnet name, off-site); empty = the companion host.
+        val hubHostInput =
+            EditText(this).apply {
+                inputType =
+                    InputType.TYPE_CLASS_TEXT or
+                        InputType.TYPE_TEXT_VARIATION_URI
+                setSingleLine(true)
+                hint =
+                    "Hub host (identity v2; empty = companion host)"
+                setText(
+                    PrivyHubIdentity.hubHost(
+                        this@MainActivity
+                    )
+                )
+            }
+
+        container.addView(
+            hubHostInput,
             ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -1176,6 +1213,24 @@ class MainActivity : AppCompatActivity() {
                 }
 
 
+                val hubHost =
+                    normalizeHost(
+                        hubHostInput.text
+                            .toString()
+                    )
+
+                if (
+                    hubHost.contains("/") ||
+                    hubHost.contains(" ")
+                ) {
+
+                    hubHostInput.error =
+                        "Enter only a hostname or IP address"
+
+                    return@setOnClickListener
+                }
+
+
                 saveCompanionHost(
                     host
                 )
@@ -1187,6 +1242,11 @@ class MainActivity : AppCompatActivity() {
                 PrivyHubIdentity.setEnabled(
                     this,
                     identityCheckBox.isChecked
+                )
+
+                PrivyHubIdentity.setHubHost(
+                    this,
+                    hubHost
                 )
 
                 dialog.dismiss()
@@ -2462,6 +2522,14 @@ class MainActivity : AppCompatActivity() {
 
                 connection.useCaches =
                     true
+
+                // G3-S3: the range server's token, only with identity_v2 on.
+                PrivyHubIdentity.decorateMedia(
+                    this,
+                    connection,
+                    url.toString(),
+                    host
+                )
 
                 val status =
                     connection.responseCode
@@ -15443,11 +15511,21 @@ private fun requestGameStateAction(
             )
         }
 
+        // G3-S3: with identity_v2 on, the hub's media requests carry the
+        // session header (never a third-party URL); off, today's factory.
         val mediaSourceFactory =
             DefaultMediaSourceFactory(
                 this
             ).setDataSourceFactory(
-                httpDataSourceFactory
+                if (PrivyHubIdentity.isEnabled(this)) {
+                    hubMediaDataSourceFactory(
+                        this,
+                        httpDataSourceFactory,
+                        getCompanionHost()
+                    )
+                } else {
+                    httpDataSourceFactory
+                }
             )
 
 
@@ -15680,7 +15758,11 @@ private fun requestGameStateAction(
 
                     Log.d(
                         TAG,
-                        "Opening media: $url"
+                        "Opening media: " +
+                            PrivyHubIdentity.urlForLog(
+                                this,
+                                url
+                            )
                     )
 
 

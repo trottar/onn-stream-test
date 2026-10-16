@@ -1,0 +1,716 @@
+diff --git a/companion/adaptive_bitrate_live.py b/companion/adaptive_bitrate_live.py
+index c6ff31a..5b3301e 100644
+--- a/companion/adaptive_bitrate_live.py
++++ b/companion/adaptive_bitrate_live.py
+@@ -110,6 +110,14 @@ from typing import Any, Callable
+ 
+ import adaptive_bitrate as ab
+ 
++# G5-S2: the WAN adaptation rules, only with PRIVYHUB_WAN_ADAPTATION=1. Absent =
++# today: nothing imported, and observe() feeds the policy exactly as before.
++WAN_ADAPTATION = None
++if (os.environ.get("PRIVYHUB_WAN_ADAPTATION") or "").strip() == "1":
++    import wan_adaptation as _wan_adaptation
++
++    WAN_ADAPTATION = _wan_adaptation.from_environ(os.environ)
++
+ try:  # the reference profile's id; a pure module, safe for the unit tests
+     from native_stream_profiles import NATIVE_GAME_720P60_REFERENCE as _REFERENCE_PROFILE
+     REFERENCE_PROFILE_ID = _REFERENCE_PROFILE.id
+@@ -888,7 +896,10 @@ class LiveController:
+                     return
+                 self._last_sample = s
+                 ctx = self._ctx(native_status)
+-                events = self._policy.feed(s, ctx)
++                if WAN_ADAPTATION is None:
++                    events = self._policy.feed(s, ctx)
++                else:   # G5-S2: the rules' one suggestion, as a constraint on the ladder
++                    events = WAN_ADAPTATION.feed(self._policy, s, ctx, telemetry)
+                 self._write_sample(s, self._policy.last_disposition, self._policy.last_clean)
+                 self._emit(events, s, ctx)
+                 self._maybe_actuate()
+diff --git a/docs/WAN_ADAPTATION_RULES.md b/docs/WAN_ADAPTATION_RULES.md
+index a5108d6..f39a5d5 100644
+--- a/docs/WAN_ADAPTATION_RULES.md
++++ b/docs/WAN_ADAPTATION_RULES.md
+@@ -1,7 +1,10 @@
+-# WAN adaptation rules (G5) — written, not implemented
++# WAN adaptation rules (G5) — written (G5-S1); implemented behind a flag (G5-S2)
+ 
+-**Status: DRAFT (G5-S1, 2026-10-16). Not implemented: G5-S2 implements
+-them, behind its own flag, after the live smoke of G5-S1's classes.** The
++**Status: DRAFT (G5-S1, 2026-10-16).** **G5-S2 (2026-10-16): IMPLEMENTED behind
++`PRIVYHUB_WAN_ADAPTATION=1` (`companion/wan_adaptation.py`), proved by replay,
++NOT ADOPTED; the live smoke is pending on the stream** (record:
++`docs/memory/evidence/G5_S2_WAN_ADAPTATION_RULES_2026-10-16.md`). Per rule,
++the G5-S2 line says what was built. The
+ classes are those of `companion/wan_telemetry.py`. Their thresholds are §1
+ of `docs/memory/evidence/G5_S1_WAN_TELEMETRY_CLASSIFICATION_2026-10-16.md`.
+ Every number below is quoted from an existing record or the live ladder's
+@@ -24,6 +27,8 @@ ROADMAP §G5's priority order, as rules:
+ - **R1.4** The session's identity and declared endpoints (G3) are never
+   renegotiated by adaptation. Only recovery, or a new setup, changes them.
+ 
++- **G5-S2:** R1.1 → `hold` for 3 reports after a path event (an SSRC change or ladder transition, a recovery pause / resume, an overlay path change if the context carries one — not wired today); R1.2 → `no_step_up` until 90 reports after it; R1.3 not implemented (no number); R1.4: no suggestion touches identity or endpoints.
++
+ ## 2. Prevent runaway latency (`latency-limited`)
+ 
+ - **R2.1** A window that is `latency-limited` (queue ≥ 1 on ≥ 3 of 5, or
+@@ -35,6 +40,8 @@ ROADMAP §G5's priority order, as rules:
+   packets, D-BASE-P9) and the frame cap (90,000 B, D-BASE-P6a) stay as
+   adopted. G5-S2 adds no queue.
+ 
++- **G5-S2:** `latency-limited` or `starved` on 2 consecutive 5-report windows → `step_down` one rung, through the ladder's own gates; no queue added.
++
+ ## 3. Reduce bitrate when capacity tightens (`capacity-limited`)
+ 
+ - **R3.1** `capacity-limited` (C3-L4-N1 / N2's rules) gives today's live
+@@ -51,6 +58,8 @@ ROADMAP §G5's priority order, as rules:
+   `capacity-limited` persists at 5000 for the hold-down. The persistence
+   count is **not set: G5-S2**.
+ 
++- **G5-S2:** `capacity-limited` → `step_down` one rung to the LAN floor 5000. At 5000 on a remote path, after 60 reports (ROUTINE's down hold-down, the persistence this sets) → `floor_4000`, **recorded only**: the actuator's validated ladder is 5000-7000, so 4000 needs an actuator change and its own validation first.
++
+ ## 4. Use FEC only when loss justifies it (`lossy`)
+ 
+ - **R4.1** `lossy` without `capacity-limited` (loss ≥ 10 / min post-FEC, fps
+@@ -62,6 +71,8 @@ ROADMAP §G5's priority order, as rules:
+ - **R4.2** The FEC measures (recovered / unrecoverable) are reported
+   per window. A class on them is "not classified; G5-S2".
+ 
++- **G5-S2:** "FEC switch: not implemented; the fixed 8+1 stays" — no suggestion is FEC-related.
++
+ ## 5. Recover upward slowly, with hysteresis (`clean`)
+ 
+ - **R5.1** An increase needs today's increase rule: 85 of the last 90
+@@ -75,6 +86,8 @@ ROADMAP §G5's priority order, as rules:
+   increase window even when fps / queue / gap pass. This is a G5-S1
+   proposal; G5-S2 tests it.
+ 
++- **G5-S2:** an increase only after K consecutive `clean` windows (a `lossy` window is not clean, R5.3): K = 18 (the ladder's 90 reports) on the LAN, 36 on a remote path; short of K → `no_step_up`. R5.2's rate limit and oscillation guard are the ladder's own. The ladder sees no client address today, so "remote" needs the context to carry it (G5-S3).
++
+ ## Not set by any record (G5-S2 measures them)
+ 
+ - RTT and jitter bars (both are carried and reported:
+diff --git a/docs/ROADMAP.md b/docs/ROADMAP.md
+index 00d2e98..504299d 100644
+--- a/docs/ROADMAP.md
++++ b/docs/ROADMAP.md
+@@ -1582,6 +1601,18 @@ D-BASE and the live ladder; replays of three recorded runs reproduce their loss
+ rules in `docs/WAN_ADAPTATION_RULES.md` (G5-S2 implements them). Live smoke pending
+ on the stream. Record: `docs/memory/evidence/G5_S1_WAN_TELEMETRY_CLASSIFICATION_2026-10-16.md`.
+ 
++**G5-S2 (2026-10-16): THE RULES BUILT behind `PRIVYHUB_WAN_ADAPTATION=1` (absent =
++the ladder exactly as adopted), NOT ADOPTED** — `companion/wan_adaptation.py`
++gives the live ladder at most one suggestion per report (hold / step down / no step
++up / remote floor 720p/4000), applied only as a constraint through the ladder's own
++gates; R4 recorded as no FEC change; every suggestion in `decisions.jsonl` with
++`source: wan_rules`. The remote floor is recorded, not actuated (the actuator's
++validated ladder ends at 5000). Flag absent: the four named runs' recorded
++decisions reproduced exactly and the controller's rows identical to HEAD's;
++flag present, open loop, tabulated per rule with no claim of improvement. Live
++smoke (LAN, 10 min) and the first off-site run with it (G4-S2) pending on the
++stream. Record: `docs/memory/evidence/G5_S2_WAN_ADAPTATION_RULES_2026-10-16.md`.
++
+ Reuse Phase C telemetry/adaptation instead of creating a parallel WAN streamer.
+ 
+ Measure and classify:
+
+diff --git a/companion/wan_adaptation.py b/companion/wan_adaptation.py
+new file mode 100644
+index 0000000..a20c4b4
+--- /dev/null
++++ b/companion/wan_adaptation.py
+@@ -0,0 +1,304 @@
++"""G5-S2: the WAN adaptation rules (docs/WAN_ADAPTATION_RULES.md R1-R5) as a
++guarded input to the live ladder.
++
++Behind `PRIVYHUB_WAN_ADAPTATION=1`. **Absent = today**: `adaptive_bitrate_live`
++never imports this module and its `LiveController.observe` calls
++`policy.feed(s, ctx)` exactly as before. The design is
++`docs/memory/evidence/g5_s2_2026-10-16/design_written_before_code.md` (hashed
++before this code).
++
++The ladder stays the decider. Per decision tick (one client report) the rules
++give **at most one suggestion**, applied only as an additional constraint:
++
++- `no_step_up` / `hold` -- an increase the ladder would take this tick is
++  refused (`wan_no_step_up`); nothing else changes;
++- `step_down` -- a one-rung decrease the ladder did not take, through the
++  ladder's own `_decide` and so every existing gate (hold-downs, blackout,
++  guards, rate limit, oscillation); its rows are labelled `wan_rules`;
++- `floor_4000` -- recorded only: the remote floor 720p/4000 (C5-M3) is below
++  the actuator's validated ladder (5000-7000), so it is never actuated here.
++
++R4 (FEC) is "FEC switch: not implemented; the fixed 8+1 stays" (C4-M1): no
++suggestion is ever about FEC. Every non-`none` suggestion is one
++`decisions.jsonl` row with `source: wan_rules`.
++"""
++
++from __future__ import annotations
++
++import ipaddress
++from dataclasses import dataclass
++from typing import Any, Mapping
++
++import adaptive_bitrate as ab
++import wan_telemetry as wt
++
++FLAG_ENV = "PRIVYHUB_WAN_ADAPTATION"
++SOURCE = "wan_rules"
++
++# ---- constants (each from an existing record or the ladder's code) ------------
++WINDOW_REPORTS = wt.WINDOW_REPORTS               # 5: the ladder's evidence window
++BLACKOUT_REPORTS = ab.BLACKOUT_REPORTS           # 3: R1.1
++INCREASE_WINDOW_REPORTS = 90                     # adaptive_bitrate_live.INCREASE_WINDOW_REPORTS: R1.2
++R2_CONSECUTIVE_WINDOWS = 2                       # R2 (the task): 2 consecutive windows
++R5_CLEAN_WINDOWS_LAN = INCREASE_WINDOW_REPORTS // WINDOW_REPORTS   # 18: the ladder's hysteresis, in windows
++R5_CLEAN_WINDOWS_REMOTE = 2 * R5_CLEAN_WINDOWS_LAN                 # 36: doubled on a remote path
++LAN_FLOOR_KBPS = 5000                            # the ladder's floor (LADDER_KBPS[0])
++REMOTE_FLOOR_KBPS = 4000                         # C5-M3: 720p/4000, the only lower rung that passed
++R3_FLOOR_PERSIST_REPORTS = 60                    # ROUTINE's down hold-down (HOLDDOWN_REPORTS): the persistence
++R4_NOTE = "FEC switch: not implemented; the fixed 8+1 stays (C4-M1)"
++RELAYED_NOTE = "not classified; no relayed-path cap exists (R1.3)"
++
++HISTORY = R5_CLEAN_WINDOWS_REMOTE * WINDOW_REPORTS   # enough reports for the longest rule
++
++# The overlay's address space, built from integers (no literal), as G3-S1's.
++OVERLAY_NETWORKS = (
++    ipaddress.ip_network((0x64400000, 10)),
++    ipaddress.ip_network((0xFD7A115CA1E0 << 80, 48)),
++)
++
++PATH_LAN, PATH_REMOTE = "lan", "remote"
++
++
++def flag_on(environ: Mapping[str, str]) -> bool:
++    return (environ.get(FLAG_ENV) or "").strip() == "1"
++
++
++def is_overlay_address(value: Any) -> bool:
++    try:
++        ip = ipaddress.ip_address(str(value))
++    except ValueError:
++        return False
++    return any(ip.version == n.version and ip in n for n in OVERLAY_NETWORKS)
++
++
++def path_class(ctx: Mapping[str, Any]) -> str:
++    """remote / lan. The ladder's context carries no client address today; a
++    caller may supply `path_class` ("remote" / "overlay") or `target_address`."""
++    pc = str(ctx.get("path_class") or "").lower()
++    if pc in (PATH_REMOTE, "overlay"):
++        return PATH_REMOTE
++    if is_overlay_address(ctx.get("target_address")):
++        return PATH_REMOTE
++    return PATH_LAN
++
++
++@dataclass
++class Suggestion:
++    kind: str                    # none | hold | no_step_up | step_down | floor_4000
++    rule: str | None = None
++    primary: str | None = None
++    classes: tuple[str, ...] = ()
++    target_kbps: int | None = None
++    detail: str | None = None
++
++    @property
++    def blocks_increase(self) -> bool:
++        return self.kind in ("hold", "no_step_up", "step_down", "floor_4000")
++
++
++class WanRules:
++    """Pure: no clock, no I/O. One `tick` per evaluated client report."""
++
++    def __init__(self) -> None:
++        self.reports: list[wt.Report] = []
++        self.since_event: int | None = None       # evaluated reports since the last path event
++        self.capacity_at_floor = 0                # consecutive reports with a capacity window at 5000 (R3)
++        self._last_recovery_playing: bool | None = None
++        self._last_overlay_path: Any = None
++
++    # -- inputs ------------------------------------------------------------
++    def note_path_event(self) -> None:
++        self.since_event = 0
++
++    def observe_context(self, ctx: Mapping[str, Any]) -> bool:
++        """Recovery pause / resume and overlay path changes from the context. True = an event."""
++        event = False
++        playing = (ctx.get("guards") or {}).get("recovery_playing")
++        if isinstance(playing, bool):
++            if self._last_recovery_playing is not None and playing != self._last_recovery_playing:
++                event = True
++            self._last_recovery_playing = playing
++        ov = ctx.get("overlay_path")
++        if ov is not None:
++            if self._last_overlay_path is not None and ov != self._last_overlay_path:
++                event = True
++            self._last_overlay_path = ov
++        if event:
++            self.note_path_event()
++        return event
++
++    def add_report(self, r: wt.Report) -> None:
++        self.reports.append(r)
++        if len(self.reports) > HISTORY:
++            del self.reports[: len(self.reports) - HISTORY]
++        if self.since_event is not None:
++            self.since_event += 1
++
++    # -- the windows ---------------------------------------------------------
++    def _window(self, back: int) -> list[wt.Report] | None:
++        """The `back`-th non-overlapping 5-report window counted from the newest (0 = current)."""
++        end = len(self.reports) - back * WINDOW_REPORTS
++        start = end - WINDOW_REPORTS
++        if start < 0:
++            return None
++        return self.reports[start:end]
++
++    def _classify(self, back: int) -> dict[str, Any] | None:
++        w = self._window(back)
++        return wt.classify_window(w, []) if w is not None else None
++
++    def clean_windows(self, limit: int) -> int:
++        """Consecutive `clean` windows (G5-S1's class: a lossy window is not clean), newest first."""
++        n = 0
++        for back in range(limit):
++            c = self._classify(back)
++            if c is None or c["classes"] != ["clean"]:
++                break
++            n += 1
++        return n
++
++    # -- the suggestion --------------------------------------------------------
++    def tick(self, level_kbps: int, path: str, top_kbps: int = 7000) -> Suggestion:
++        """Only constraining suggestions: a step down above the floor, a block below the top."""
++        cur = self._classify(0)
++        if cur is None:   # under one window of history: no K clean windows yet (R5)
++            if level_kbps >= top_kbps:
++                return Suggestion("none")
++            return Suggestion("no_step_up", "R5.1", None, (), detail="under one window of history")
++        classes = tuple(cur["classes"])
++        primary = cur["primary"]
++        prev = self._classify(1)
++
++        def s(kind: str, rule: str, **kw: Any) -> Suggestion:
++            return Suggestion(kind, rule, primary, classes, **kw)
++
++        # R2: latency-limited or starved on 2 consecutive windows -> one rung down.
++        latency = ("latency-limited", "starved")
++        if prev is not None and any(c in classes for c in latency) and any(c in prev["classes"] for c in latency):
++            if level_kbps > LAN_FLOOR_KBPS:
++                return s("step_down", "R2.1", detail="latency-limited / starved on 2 consecutive windows")
++        # R3: capacity-limited -> the next rung down; the floor by path.
++        if "capacity-limited" in classes:
++            if level_kbps > LAN_FLOOR_KBPS:
++                self.capacity_at_floor = 0
++                return s("step_down", "R3.1", detail="capacity-limited")
++            self.capacity_at_floor += 1
++            if path == PATH_REMOTE and self.capacity_at_floor >= R3_FLOOR_PERSIST_REPORTS:
++                return s("floor_4000", "R3.2", target_kbps=REMOTE_FLOOR_KBPS,
++                         detail="capacity-limited persisted at 5000 for the hold-down on a remote path; "
++                                "recorded only (the actuator's validated ladder ends at 5000)")
++        else:
++            self.capacity_at_floor = 0
++        if level_kbps >= top_kbps:
++            return Suggestion("none", None, primary, classes)    # no increase to block
++        # R1: a path event -> hold for the blackout, then no step up until the window refills.
++        if self.since_event is not None:
++            if self.since_event <= BLACKOUT_REPORTS:
++                return s("hold", "R1.1", detail="blackout after a path event")
++            if self.since_event < INCREASE_WINDOW_REPORTS:
++                return s("no_step_up", "R1.2", detail="the increase window refills after a path event")
++        # R5: an increase only after K consecutive clean windows (doubled on a remote path).
++        k = R5_CLEAN_WINDOWS_REMOTE if path == PATH_REMOTE else R5_CLEAN_WINDOWS_LAN
++        if self.clean_windows(k) < k:
++            return s("no_step_up", "R5.1", detail=f"fewer than {k} consecutive clean windows")
++        return Suggestion("none", None, primary, classes)
++
++
++class WanAdaptation:
++    """The hook's object: feeds the rules and the ladder's policy for one report."""
++
++    def __init__(self) -> None:
++        self.rules = WanRules()
++        self.counts: dict[str, int] = {}
++        self._last_blackout = 0
++
++    @staticmethod
++    def _report(s: Mapping[str, Any], telemetry: Mapping[str, Any] | None) -> wt.Report | None:
++        if telemetry is not None:
++            return wt.report_from_telemetry({**telemetry, "fresh": bool(s.get("available") and s.get("fresh"))})
++        return None
++
++    def feed(self, policy: Any, s: dict[str, Any], ctx: dict[str, Any] | None,
++             telemetry: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
++        """The ladder's `feed` with the rules' one suggestion applied as a constraint."""
++        ctx = ctx or {}
++        el = s.get("elapsed_ms")
++        if (self.rules.reports and (policy.last_elapsed_ms is None or
++                                    (isinstance(el, (int, float)) and el < policy.last_elapsed_ms))):
++            self.rules = WanRules()               # a new stream session: the rules start empty
++            self._last_blackout = 0
++        rules = self.rules
++        # a blackout re-armed since the last tick = an SSRC change or a transition (path event)
++        if policy.blackout_remaining > self._last_blackout:
++            rules.note_path_event()
++        rules.observe_context(ctx)
++        path = path_class(ctx)
++
++        evaluated_before = policy.reports
++        r = self._report(s, telemetry)
++        suggestion = Suggestion("none")
++        will_evaluate = (r is not None and s.get("available") and s.get("fresh")
++                         and isinstance(s.get("elapsed_ms"), (int, float))
++                         and s.get("elapsed_ms") != policy.last_elapsed_ms)
++        if will_evaluate:
++            rules.add_report(r)
++            suggestion = rules.tick(int(policy.level_kbps), path, top_kbps=max(policy.ladder))
++
++        blocked: list[dict[str, Any]] = []
++        if suggestion.blocks_increase:
++            original = policy._decide
++
++            def decide(kind: str, m: dict[str, Any], elapsed: int, c: dict[str, Any], *, injected: bool = False):
++                if kind == "INCREASE" and not injected:
++                    blocked.append({"class": kind, "trigger": m.get("trigger")})
++                    return policy._refuse(kind, "wan_no_step_up", None, dict(m, wan_rule=suggestion.rule),
++                                          injected=False, state=ab.HOLD_DOWN)
++                return original(kind, m, elapsed, c, injected=injected)
++
++            policy._decide = decide
++            try:
++                events = policy.feed(s, ctx)
++            finally:
++                del policy._decide
++        else:
++            events = policy.feed(s, ctx)
++
++        decided = [e for e in events if e.get("event") in ("transition", "would_act", "refused", "hold")]
++        if (suggestion.kind == "step_down" and not decided and policy.last_disposition == "evaluated"
++                and policy.pending is None and policy.reports > evaluated_before
++                and policy.reason != "routine_deferred_escalating"):
++            m = {"trigger": "capacity_mild", "wan_rule": suggestion.rule, "wan_class": suggestion.primary}
++            forced = policy._decide("ROUTINE", m, int(s["elapsed_ms"]), ctx)
++            for e in forced:
++                if e.get("event") in ("transition", "would_act"):
++                    e["reason"] = SOURCE
++                    e["trigger"] = SOURCE
++                    policy.reason = SOURCE
++                    if policy.last_action is not None:
++                        policy.last_action["reason"] = SOURCE
++                elif e.get("event") == "refused":
++                    e["trigger"] = SOURCE
++            events = events + forced
++            decided = forced
++
++        self._last_blackout = policy.blackout_remaining
++        if suggestion.kind != "none":
++            self.counts[suggestion.rule or suggestion.kind] = self.counts.get(suggestion.rule or suggestion.kind, 0) + 1
++            if blocked:
++                result = "blocked_increase"
++            elif decided:
++                d = decided[-1]
++                result = d["event"] if d["event"] != "refused" else f"refused:{d.get('reason')}"
++            else:
++                result = "none"
++            events = events + [{
++                "event": "wan_suggestion", "source": SOURCE, "suggestion": suggestion.kind,
++                "rule": suggestion.rule, "wan_class": suggestion.primary, "wan_classes": list(suggestion.classes),
++                "path": path, "target_kbps": suggestion.target_kbps, "detail": suggestion.detail,
++                "ladder_result": result, "level_kbps": policy.level_kbps, "fec": R4_NOTE,
++            }]
++        return events
++
++
++def from_environ(environ: Mapping[str, str]) -> WanAdaptation | None:
++    return WanAdaptation() if flag_on(environ) else None
+diff --git a/tests/wan_adaptation/test_wan_adaptation.py b/tests/wan_adaptation/test_wan_adaptation.py
+new file mode 100644
+index 0000000..5f79ddf
+--- /dev/null
++++ b/tests/wan_adaptation/test_wan_adaptation.py
+@@ -0,0 +1,282 @@
++#!/usr/bin/env python3
++"""G5-S2: the WAN adaptation rules, per rule, with hand fixtures.
++
++    python3 -m unittest discover -s tests/wan_adaptation -v
++
++No stream, no companion: the rules (`WanRules`) alone, then `WanAdaptation`
++with the live ladder's real `LivePolicy`. Addresses are built from integers.
++"""
++
++from __future__ import annotations
++
++import ast
++import ipaddress
++import sys
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++
++import adaptive_bitrate as ab  # noqa: E402
++import adaptive_bitrate_live as live  # noqa: E402
++import wan_adaptation as wa  # noqa: E402
++import wan_telemetry as wt  # noqa: E402
++
++GUARDS = {"stream_active": True, "game_active": True, "game_not_paused": True, "recovery_playing": True,
++          "reference_profile": True, "no_override": True, "actuator_bound": True}
++
++
++def tel(elapsed, fps=59.9, queue=0, gap=16, lost=0, stale=0, idr=False):
++    return {"available": True, "fresh": True, "session_elapsed_ms": elapsed,
++            "receiver": {"recent_fps": fps, "waiting_for_idr": idr, "lost_packets_delta": lost},
++            "decoder": {"queue_depth": queue, "stale_output_drops_delta": stale},
++            "latency": {"output_gap_ms": gap}, "fec": {}}
++
++
++def rep(**kw):
++    return wt.report_from_telemetry(tel(kw.pop("elapsed", 1000), **kw))
++
++
++CLEAN = dict(fps=59.9, queue=0, gap=16, lost=0)
++LATENCY = dict(fps=58.0, queue=2, gap=300, lost=0)
++CAPACITY = dict(fps=45.0, queue=0, gap=16, lost=120)
++LOSSY = dict(fps=59.0, queue=0, gap=16, lost=3)        # 15 lost per window of 10 s = 90 / min, fps held
++
++
++def fill(rules, spec, n, level=7000, path=wa.PATH_LAN, top=7000):
++    out = None
++    for i in range(n):
++        rules.add_report(rep(elapsed=len(rules.reports) * 2000 + 2000, **spec))
++        out = rules.tick(level, path, top_kbps=top)
++    return out
++
++
++class Flag(unittest.TestCase):
++    def test_flag(self):
++        self.assertTrue(wa.flag_on({wa.FLAG_ENV: "1"}))
++        for v in (None, "", "0", "true", "yes", " 2"):
++            self.assertFalse(wa.flag_on({} if v is None else {wa.FLAG_ENV: v}), v)
++        self.assertIsNone(wa.from_environ({}))
++        self.assertIsInstance(wa.from_environ({wa.FLAG_ENV: "1"}), wa.WanAdaptation)
++
++    def test_ladder_imports_only_under_the_flag(self):
++        self.assertIsNone(live.WAN_ADAPTATION)          # this process carries no flag
++        tree = ast.parse((ROOT / "companion" / "adaptive_bitrate_live.py").read_text())
++        top = [n for n in tree.body if isinstance(n, (ast.Import, ast.ImportFrom))]
++        self.assertFalse(any("wan_adaptation" in ast.unparse(n) for n in top))
++        guarded = [n for n in tree.body if isinstance(n, ast.If) and "wan_adaptation" in ast.unparse(n)]
++        self.assertEqual(len(guarded), 1)
++        self.assertIn("PRIVYHUB_WAN_ADAPTATION", ast.unparse(guarded[0].test))
++
++    def test_overlay_block_is_g3s(self):
++        import session_identity as si   # read only: the same block, built the same way
++        self.assertEqual(wa.OVERLAY_NETWORKS, si.OVERLAY_NETWORKS)
++        self.assertEqual(wa.path_class({}), wa.PATH_LAN)
++        self.assertEqual(wa.path_class({"path_class": "remote"}), wa.PATH_REMOTE)
++        self.assertEqual(wa.path_class({"target_address": str(wa.OVERLAY_NETWORKS[0][77])}), wa.PATH_REMOTE)
++        self.assertEqual(wa.path_class({"target_address": str(ipaddress.ip_address(0xC0A86439))}), wa.PATH_LAN)
++
++
++class R1PathChanged(unittest.TestCase):
++    def test_hold_then_no_step_up_until_the_window_refills(self):
++        r = wa.WanRules()
++        fill(r, CLEAN, 100, level=6000)
++        r.note_path_event()
++        seen = []
++        for _ in range(95):
++            seen.append(fill(r, CLEAN, 1, level=6000))
++        self.assertEqual([s.rule for s in seen[:3]], ["R1.1"] * 3)
++        self.assertEqual({s.rule for s in seen[3:89]}, {"R1.2"})
++        self.assertEqual(seen[-1].kind, "none")             # 18 clean windows and the window refilled
++
++    def test_recovery_and_overlay_changes_are_events(self):
++        r = wa.WanRules()
++        self.assertFalse(r.observe_context({"guards": {"recovery_playing": True}}))
++        self.assertTrue(r.observe_context({"guards": {"recovery_playing": False}}))
++        self.assertEqual(r.since_event, 0)
++        r2 = wa.WanRules()
++        r2.observe_context({"overlay_path": "direct"})
++        self.assertTrue(r2.observe_context({"overlay_path": "relayed"}))
++
++    def test_never_at_the_top(self):
++        r = wa.WanRules()
++        fill(r, CLEAN, 20)
++        r.note_path_event()
++        self.assertEqual(fill(r, CLEAN, 1, level=7000).kind, "none")
++
++
++class R2Latency(unittest.TestCase):
++    def test_two_consecutive_windows(self):
++        r = wa.WanRules()
++        fill(r, CLEAN, 20)
++        s = fill(r, LATENCY, 5)
++        self.assertNotEqual(s.kind, "step_down")              # one window only
++        s = fill(r, LATENCY, 5)
++        self.assertEqual((s.kind, s.rule, s.primary), ("step_down", "R2.1", "latency-limited"))
++
++    def test_starved(self):
++        r = wa.WanRules()
++        s = fill(r, dict(CLEAN, stale=5), 10)             # 25 stale / 10 s = 150 / min >= 20
++        self.assertEqual((s.kind, s.rule), ("step_down", "R2.1"))
++        self.assertIn("starved", s.classes)
++
++    def test_not_below_the_floor(self):
++        r = wa.WanRules()
++        self.assertNotEqual(fill(r, LATENCY, 10, level=5000).kind, "step_down")
++
++
++class R3Capacity(unittest.TestCase):
++    def test_step_down(self):
++        r = wa.WanRules()
++        s = fill(r, CAPACITY, 5, level=6000)
++        self.assertEqual((s.kind, s.rule, s.primary), ("step_down", "R3.1", "capacity-limited"))
++
++    def test_lan_floor(self):
++        r = wa.WanRules()
++        kinds = {fill(r, CAPACITY, 1, level=5000).kind for _ in range(100)}
++        self.assertNotIn("step_down", kinds)
++        self.assertNotIn("floor_4000", kinds)
++
++    def test_remote_floor_after_the_hold_down_recorded_only(self):
++        r = wa.WanRules()
++        seen = [fill(r, CAPACITY, 1, level=5000, path=wa.PATH_REMOTE) for _ in range(70)]
++        floor = [i for i, s in enumerate(seen) if s.kind == "floor_4000"]
++        self.assertTrue(floor)
++        # the first full capacity window is report 5; persistence 60 reports from there
++        self.assertEqual(floor[0], 4 + wa.R3_FLOOR_PERSIST_REPORTS - 1)
++        self.assertEqual(seen[floor[0]].target_kbps, 4000)
++        self.assertGreaterEqual(min(s.target_kbps or 4000 for s in seen), wa.REMOTE_FLOOR_KBPS)
++
++
++class R4Fec(unittest.TestCase):
++    def test_no_fec_suggestion(self):
++        r = wa.WanRules()
++        for spec in (CLEAN, LATENCY, CAPACITY, LOSSY):
++            s = fill(r, spec, 10, level=6000)
++            self.assertIn(s.kind, ("none", "hold", "no_step_up", "step_down", "floor_4000"))
++        self.assertIn("not implemented", wa.R4_NOTE)
++
++
++class R5Recovery(unittest.TestCase):
++    def test_k_clean_windows_lan_and_remote(self):
++        for path, k in ((wa.PATH_LAN, 18), (wa.PATH_REMOTE, 36)):
++            r = wa.WanRules()
++            seen = [fill(r, CLEAN, 1, level=6000, path=path) for _ in range(k * 5 + 1)]
++            first_none = next(i for i, s in enumerate(seen) if s.kind == "none")
++            self.assertEqual(first_none, k * 5 - 1, path)
++            self.assertTrue(all(s.rule == "R5.1" for s in seen[:first_none]))
++
++    def test_lossy_is_not_clean(self):
++        r = wa.WanRules()
++        fill(r, CLEAN, 90, level=6000)
++        s = fill(r, LOSSY, 5, level=6000)
++        self.assertEqual((s.kind, s.rule), ("no_step_up", "R5.1"))
++        self.assertIn("lossy", s.classes)
++
++
++class Precedence(unittest.TestCase):
++    def test_step_down_beats_hold(self):
++        r = wa.WanRules()
++        fill(r, CLEAN, 20, level=6000)
++        r.note_path_event()
++        s = fill(r, CAPACITY, 5, level=6000)
++        self.assertEqual(s.kind, "step_down")
++
++
++# ---- with the real ladder ------------------------------------------------------
++
++def drive(adapt, policy, specs, start=0):
++    """Feed (spec, n) blocks; return all events."""
++    out = []
++    el = start
++    for spec, n in specs:
++        for _ in range(n):
++            el += 2000
++            t = tel(el, **spec)
++            ctx = {"guards": GUARDS, "clock_ms": el, "stream_kbps": policy.level_kbps}
++            evs = adapt.feed(policy, ab._sample(t), ctx, t) if adapt else policy.feed(ab._sample(t), ctx)
++            out.extend(evs)
++            if policy.pending:
++                policy.actuation_done(True, actual_kbps=policy.pending["to_kbps"])
++    return out
++
++
++class WithTheLadder(unittest.TestCase):
++    def test_no_suggestion_means_the_ladder_unchanged(self):
++        specs = [(CLEAN, 200)]
++        a = drive(None, live.LivePolicy(), specs)
++        b = [e for e in drive(wa.WanAdaptation(), live.LivePolicy(), specs) if e["event"] != "wan_suggestion"]
++        self.assertEqual(a, b)
++
++    def test_increase_blocked_by_r5(self):
++        # down to 6000 by the ladder's own capacity trigger, then a lossy-but-ladder-clean stretch
++        specs = [(CLEAN, 40), (CAPACITY, 6), (dict(LOSSY, fps=59.5), 200)]
++        plain = drive(None, live.LivePolicy(), specs)
++        self.assertTrue(any(e["event"] == "transition" and e["direction"] == "up" for e in plain))
++        p = live.LivePolicy()
++        evs = drive(wa.WanAdaptation(), p, specs)
++        self.assertFalse(any(e["event"] == "transition" and e["direction"] == "up" for e in evs))
++        refused = [e for e in evs if e["event"] == "refused" and e["reason"] == "wan_no_step_up"]
++        self.assertTrue(refused)
++        rows = [e for e in evs if e["event"] == "wan_suggestion"]
++        self.assertTrue(any(r["ladder_result"] == "blocked_increase" for r in rows))
++        self.assertTrue(all(r["source"] == "wan_rules" for r in rows))
++        self.assertLess(p.level_kbps, 7000)
++        self.assertFalse(hasattr(p, "_decide") and "_decide" in vars(p))    # the wrapper removed
++
++    def test_forced_step_down_through_the_gates(self):
++        # latency on 2 windows that the ladder's own rules do not act on (queue 1 on 3 of 5 and
++        # gap <= 250 is ROUTINE-level only for the ladder at fps < 57; here fps holds at 58)
++        lat = dict(fps=58.5, queue=1, gap=120, lost=0)
++        p = live.LivePolicy()
++        plain = drive(None, live.LivePolicy(), [(CLEAN, 40), (lat, 10)])
++        self.assertFalse(any(e["event"] == "transition" for e in plain))
++        evs = drive(wa.WanAdaptation(), p, [(CLEAN, 40), (lat, 10)])
++        tr = [e for e in evs if e["event"] == "transition"]
++        self.assertEqual(len(tr), 1)
++        self.assertEqual((tr[0]["from_kbps"], tr[0]["to_kbps"], tr[0]["reason"], tr[0]["trigger"]),
++                         (7000, 6000, "wan_rules", "wan_rules"))
++        # the next suggestions meet the ladder's ROUTINE hold-down: refused, not acted
++        adapt = wa.WanAdaptation()
++        p2 = live.LivePolicy()
++        evs3 = drive(adapt, p2, [(CLEAN, 40), (lat, 30)])
++        downs = [e for e in evs3 if e["event"] == "transition"]
++        refusals = [e for e in evs3 if e["event"] == "refused" and e.get("trigger") == "wan_rules"]
++        self.assertEqual(len(downs), 1)
++        self.assertTrue(refusals and all(e["reason"] in ("hold_down",) for e in refusals))
++
++    def test_session_age_guard_applies(self):
++        lat = dict(fps=58.5, queue=1, gap=120, lost=0)
++        evs = drive(wa.WanAdaptation(), live.LivePolicy(), [(lat, 12)])      # < 60 s into the session
++        self.assertFalse(any(e["event"] == "transition" for e in evs))
++        self.assertTrue(any(e["event"] == "refused" and e["reason"] == "guard" for e in evs))
++
++    def test_one_suggestion_per_tick(self):
++        adapt = wa.WanAdaptation()
++        p = live.LivePolicy()
++        el = 0
++        for spec, n in [(CLEAN, 40), (CAPACITY, 20), (LATENCY, 20), (LOSSY, 40)]:
++            for _ in range(n):
++                el += 2000
++                t = tel(el, **spec)
++                evs = adapt.feed(p, ab._sample(t), {"guards": GUARDS, "clock_ms": el, "stream_kbps": p.level_kbps}, t)
++                self.assertLessEqual(sum(1 for e in evs if e["event"] == "wan_suggestion"), 1)
++                if p.pending:
++                    p.actuation_done(True, actual_kbps=p.pending["to_kbps"])
++
++    def test_never_below_the_ladder_floor(self):
++        p = live.LivePolicy()
++        drive(wa.WanAdaptation(), p, [(CLEAN, 40), (CAPACITY, 400)])
++        self.assertGreaterEqual(p.level_kbps, 5000)
++
++    def test_new_session_resets_the_rules(self):
++        adapt = wa.WanAdaptation()
++        p = live.LivePolicy()
++        drive(adapt, p, [(CLEAN, 30)], start=100_000)
++        drive(adapt, p, [(CLEAN, 2)], start=0)                 # elapsed went back: a new session
++        self.assertEqual(len(adapt.rules.reports), 2)
++
++
++if __name__ == "__main__":
++    unittest.main()

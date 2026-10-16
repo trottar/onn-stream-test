@@ -1,0 +1,46 @@
+test_always_absent (test_overlay.NoneProviderState.test_always_absent) ... ok
+test_endpoint_never_exported (test_overlay.PublicFormAndLog.test_endpoint_never_exported) ... ok
+test_one_log_line_per_change (test_overlay.PublicFormAndLog.test_one_log_line_per_change) ... ok
+test_absent_is_today (test_overlay.Selection.test_absent_is_today) ... ok
+test_named_providers (test_overlay.Selection.test_named_providers) ... ok
+test_unknown_name_fails_closed (test_overlay.Selection.test_unknown_name_fails_closed) ... ok
+test_flag_absent_byte_for_byte (test_overlay.StatusDocument.test_flag_absent_byte_for_byte) ... ok
+test_flag_set_adds_only_overlay (test_overlay.StatusDocument.test_flag_set_adds_only_overlay) ... ok
+test_service_imports_overlay_only_under_the_flag (test_overlay.StatusDocument.test_service_imports_overlay_only_under_the_flag) ... ok
+test_binary_absent (test_overlay.TailscaleStates.test_binary_absent) ... ok
+test_cache (test_overlay.TailscaleStates.test_cache) ... ok
+test_connected_direct (test_overlay.TailscaleStates.test_connected_direct) ... ok
+test_connected_no_peer (test_overlay.TailscaleStates.test_connected_no_peer) ... ok
+test_connected_relayed (test_overlay.TailscaleStates.test_connected_relayed) ... ok
+test_daemon_down (test_overlay.TailscaleStates.test_daemon_down) ... ok
+test_needs_login (test_overlay.TailscaleStates.test_needs_login) ... ok
+test_stopped (test_overlay.TailscaleStates.test_stopped) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.044s
+
+OK
+===
+test_capacity_n1_and_n2 (test_wan_telemetry.Classes.test_capacity_n1_and_n2) ... ok
+test_clean (test_wan_telemetry.Classes.test_clean) ... ok
+test_latency_queue_or_gap (test_wan_telemetry.Classes.test_latency_queue_or_gap) ... ok
+test_lossy_is_the_dbase_row_scaled (test_wan_telemetry.Classes.test_lossy_is_the_dbase_row_scaled) ... ok
+test_path_changed_wins_priority (test_wan_telemetry.Classes.test_path_changed_wins_priority) ... ok
+test_starved_is_the_stale_row_scaled (test_wan_telemetry.Classes.test_starved_is_the_stale_row_scaled) ... ok
+test_handler_requests (test_wan_telemetry.FlagAbsentByteForByte.test_handler_requests) ... ok
+test_handler_with_flag (test_wan_telemetry.FlagAbsentByteForByte.test_handler_with_flag) ... ok
+test_imported_only_under_the_flag (test_wan_telemetry.FlagAbsentByteForByte.test_imported_only_under_the_flag) ... ok
+test_status_document (test_wan_telemetry.FlagAbsentByteForByte.test_status_document) ... ok
+test_status_with_flag_adds_only_wan (test_wan_telemetry.FlagAbsentByteForByte.test_status_with_flag_adds_only_wan) ... ok
+test_flag (test_wan_telemetry.Live.test_flag) ... ok
+test_observe_events_freshness_and_session_close (test_wan_telemetry.Live.test_observe_events_freshness_and_session_close) ... ok
+test_eleven_measures_each_with_a_source (test_wan_telemetry.Measures.test_eleven_measures_each_with_a_source) ... ok
+test_not_fresh_is_skipped_and_repeats_deduped (test_wan_telemetry.Measures.test_not_fresh_is_skipped_and_repeats_deduped) ... ok
+test_cl_b2_flag_run1 (test_wan_telemetry.Replays.test_cl_b2_flag_run1) ... ok
+test_run2_cleanest_still_lossy (test_wan_telemetry.Replays.test_run2_cleanest_still_lossy) ... ok
+test_run3_lossy_652 (test_wan_telemetry.Replays.test_run3_lossy_652) ... ok
+
+----------------------------------------------------------------------
+Ran 18 tests in 0.093s
+
+OK

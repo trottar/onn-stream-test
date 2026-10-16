@@ -20,6 +20,12 @@ every decision that matters is audited, with no address in the audit.
 - Legacy: today's client (no token) is accepted only from the hub's own LAN
   with `legacy_unpaired_lan` on, as `legacy-lan`, exactly as today; never
   over the overlay. The hub itself (loopback) is `host-local`.
+
+G3-S3 (`docs/memory/evidence/G3_S3_HARDENING_AND_HUB_HOST_2026-10-16.md`):
+the setup canon v2 (the audio port and the overlay address signed), the
+declared-port binding, a per-session media token, the range server's gate
+(`MediaGate`, asking the companion's `/session/media-check` on loopback), and
+`diagnostics` as a grantable permission (default on for a paired device).
 """
 
 from __future__ import annotations
@@ -35,14 +41,21 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlsplit
 
 FLAG_ENV = "PRIVYHUB_SESSION_IDENTITY"
 MODE_V2 = "v2"
 SESSION_HEADER = "X-PrivyHub-Session"
 
-PERMISSIONS = ("games", "tv", "vod", "pairing-admin")
-DEFAULT_PAIRED_PERMISSIONS = ("games", "tv", "vod")
+PERMISSIONS = ("games", "tv", "vod", "diagnostics", "pairing-admin")
+# G3-S3: `diagnostics` (the user's own device reporting its health) is on for a
+# paired device. A record written since G3-S3 lists it (`permissions_v` 2) and
+# can drop it; a record paired before G3-S3 (no `permissions_v`) is granted it.
+DEFAULT_PAIRED_PERMISSIONS = ("games", "tv", "vod", "diagnostics")
+PERMISSIONS_V = 2
+MEDIA_PERMISSION = "vod"
+MEDIA_TOKEN_PARAM = "media_token"
+MEDIA_CHECK_PATH = "/session/media-check"
 LEGACY_CLIENT = "legacy-lan"
 HOST_LOCAL_CLIENT = "host-local"
 
@@ -55,6 +68,7 @@ KEY_MIN_HEX = 64          # 32 bytes
 KEY_MAX_HEX = 256
 BODY_MAX_BYTES = 16_384
 SETUP_CANON = "privyhub-session-setup-v1"
+SETUP_CANON_V2 = "privyhub-session-setup-v2"
 
 # The session-setup actions: a legacy token is issued and audited on these.
 SETUP_PATHS = frozenset({
@@ -211,6 +225,7 @@ class DeviceStore:
             "key_hex": key_hex,
             "paired_at": paired_at,
             "permissions": list(permissions),
+            "permissions_v": PERMISSIONS_V,
         }
         devices.append(device)
         _atomic_write_json(self._file.path, {"version": 1, "devices": devices})
@@ -256,6 +271,14 @@ def token_ref(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()[:8]
 
 
+def device_permissions(device: Mapping[str, Any]) -> tuple[str, ...]:
+    """The record's permissions; a pre-G3-S3 record (no `permissions_v`) also gets `diagnostics`."""
+    listed = [p for p in device.get("permissions", []) if p in PERMISSIONS]
+    if device.get("permissions_v") is None and "diagnostics" not in listed:
+        listed.append("diagnostics")
+    return tuple(listed)
+
+
 def required_permission(path: str) -> str | None:
     if path.startswith("/plugins/games/") or path == "/diagnostics/client-health":
         return "games"
@@ -265,7 +288,7 @@ def required_permission(path: str) -> str | None:
     ):
         return "tv"
     if path == "/status" or path.startswith("/diagnostics/"):
-        return "diagnostics"     # not grantable in v1: a token session is denied
+        return "diagnostics"     # G3-S3: grantable, default on for a paired device
     return None
 
 
@@ -276,6 +299,19 @@ class Session:
     media_host: str | None = None
     video_port: int | None = None
     permissions: tuple[str, ...] = ()
+    # G3-S3
+    audio_port: int | None = None
+    overlay_host: str | None = None
+    media_token: str | None = None
+    media_audited: tuple[bool, ...] = ()
+
+    def target_for(self, routing: str, classify: Callable[[str], str]) -> str | None:
+        """The declared address whose class matches the request's routing class."""
+        want = ROUTING_LAN if routing == ROUTING_LOCAL else routing
+        for host in (self.media_host, self.overlay_host):
+            if host and classify(host) == want:
+                return host
+        return self.media_host
 
 
 @dataclass
@@ -356,7 +392,7 @@ class SessionGate:
                 self._tokens = {t: s for t, s in self._tokens.items() if s.client_id != sess.client_id}
                 return None, self._refuse(401, "device-revoked", "session_refused", routing,
                                           client_id=sess.client_id, path=path)
-            sess.permissions = tuple(p for p in device.get("permissions", []) if p in PERMISSIONS)
+            sess.permissions = device_permissions(device)
             return sess, None
 
     def _issue_token(self, sess: Session) -> str:
@@ -391,11 +427,12 @@ class SessionGate:
                 return self._refuse(403, "permission-denied", "permission_denied", routing,
                                     client_id=sess.client_id, path=path, permission=permission)
             if path == "/plugins/games/native-stream-start":
-                port = (parse_qs(query).get("port") or [""])[0]
-                if not port.isdigit() or int(port) != sess.video_port:
+                mismatch = self._port_mismatch(sess, parse_qs(query, keep_blank_values=True))
+                if mismatch is not None:
                     return self._refuse(403, "endpoint-port-mismatch", "session_refused", routing,
-                                        client_id=sess.client_id, path=path)
-            return Decision(True, kind="session", client_id=sess.client_id, media_host=sess.media_host)
+                                        client_id=sess.client_id, path=path, port_kind=mismatch)
+            return Decision(True, kind="session", client_id=sess.client_id,
+                            media_host=sess.target_for(routing, self.classifier.classify))
 
         if routing == ROUTING_LOCAL:
             if path in SETUP_PATHS:
@@ -415,6 +452,79 @@ class SessionGate:
         reason = "legacy-overlay" if routing == ROUTING_OVERLAY else "legacy-unknown-network"
         return self._refuse(401, reason, "legacy_refused", routing, path=path)
 
+    @staticmethod
+    def _port_mismatch(sess: Session, query: dict[str, list[str]]) -> str | None:
+        """G3-S3: the stream-start ports must be the signed ones. None = bound."""
+        ports = query.get("port") or []
+        if len(ports) != 1 or not ports[0].isdigit() or int(ports[0]) != sess.video_port:
+            return "video"
+        for name, signed in (("audio_port", sess.audio_port), ("controller_port", None)):
+            if name in query:
+                values = query[name]
+                if (signed is None or len(values) != 1 or not values[0].isdigit()
+                        or int(values[0]) != signed):
+                    return name.split("_", 1)[0]
+        return None
+
+    # ---- the range server's check (G3-S3) ------------------------------------------
+
+    def _session_by_media_token(self, media_token: str) -> str | None:
+        with self._lock:
+            for token, sess in self._tokens.items():
+                if sess.media_token and hmac.compare_digest(sess.media_token.encode(), media_token.encode()):
+                    return token
+        return None
+
+    def _media_check(self, method: str, body: dict[str, Any] | None, routing: str) -> tuple[int, dict[str, Any]]:
+        """`POST /session/media-check` from the range server (loopback only)."""
+        body = body if isinstance(body, dict) else {}
+        forwarded = body.get("routing")
+        fwd = forwarded if forwarded in (ROUTING_LAN, ROUTING_OVERLAY, ROUTING_UNKNOWN) else ROUTING_UNKNOWN
+        path = urlsplit(str(body.get("path") or "/")).path[:256]
+
+        def refused(status: int, reason: str, event: str = "media_refused", at: str = fwd, **f: Any):
+            self._refuse(status, reason, event, at, path=path, **f)
+            return status, {"ok": False, "error": "session refused", "reason": reason}
+
+        if routing != ROUTING_LOCAL:
+            return refused(403, "host-local-only", at=routing)
+        if method != "POST":
+            return 405, {"ok": False, "error": "POST only"}
+        if self.mode != MODE_V2:
+            return refused(401, "identity-flag-unknown")
+
+        token = str(body.get("token") or "").strip() or None
+        media_token = str(body.get("media_token") or "").strip() or None
+        used_media_token = token is None and media_token is not None
+        if used_media_token:
+            token = self._session_by_media_token(media_token)
+            if token is None:
+                return refused(401, "media-token-unknown", media_token_used=True)
+        if token is None:
+            if fwd == ROUTING_LAN:
+                if self.settings.legacy_unpaired_lan():
+                    return 200, {"ok": True, "kind": "legacy", "client_id": LEGACY_CLIENT}
+                return refused(401, "legacy-disabled", "legacy_refused")
+            reason = "legacy-overlay" if fwd == ROUTING_OVERLAY else "legacy-unknown-network"
+            return refused(401, reason, "legacy_refused")
+
+        sess, refusal = self._session_for(token, fwd, path)
+        if refusal is not None:
+            return refusal.status, {"ok": False, "error": "session refused", "reason": refusal.reason}
+        assert sess is not None
+        if sess.client_id != LEGACY_CLIENT and MEDIA_PERMISSION not in sess.permissions:
+            return refused(403, "permission-denied", "permission_denied", client_id=sess.client_id,
+                           permission=MEDIA_PERMISSION, media_token_used=used_media_token)
+        with self._lock:
+            first = used_media_token not in sess.media_audited
+            if first:
+                sess.media_audited = sess.media_audited + (used_media_token,)
+        if first:
+            self.audit.write("media_session", client_id=sess.client_id, token_ref=token_ref(token),
+                             media_token_used=used_media_token, path=path, **self._evidence(fwd))
+        kind = "legacy" if sess.client_id == LEGACY_CLIENT else "session"
+        return 200, {"ok": True, "kind": kind, "client_id": sess.client_id}
+
     # ---- /session/* ------------------------------------------------------------
 
     def session_route(self, method: str, path: str, body: dict[str, Any] | None,
@@ -424,6 +534,9 @@ class SessionGate:
         def refused(status: int, reason: str, event: str = "session_refused", **f: Any):
             self._refuse(status, reason, event, routing, path=path, **f)
             return status, {"ok": False, "error": "session refused", "reason": reason}
+
+        if path == MEDIA_CHECK_PATH:
+            return self._media_check(method, body, routing)
 
         if self.mode != MODE_V2 and not (routing == ROUTING_LOCAL and path == "/session/status"):
             return refused(401, "identity-flag-unknown")
@@ -435,12 +548,25 @@ class SessionGate:
                 return refused(403, "host-local-only")
             with self._lock:
                 now = self._clock()
-                active = sum(1 for s in self._tokens.values() if s.expires_at > now)
+                live = [s for s in self._tokens.values() if s.expires_at > now]
+                active = len(live)
                 window = self._pairing is not None and self._pairing.expires_at > now
+                # G3-S3: each live session's permission set and whether a media
+                # token is live (a boolean; never the token).
+                sessions = [{
+                    "client_id": s.client_id,
+                    "kind": "legacy" if s.client_id == LEGACY_CLIENT else "session",
+                    "permissions": list(s.permissions),
+                    "media_token_live": bool(s.media_token),
+                    "expires_in_s": int(s.expires_at - now),
+                } for s in live]
             return 200, {
                 "ok": True, "mode": self.mode, "paired_devices": self.devices.count(),
                 "active_sessions": active, "legacy_unpaired_lan": self.settings.legacy_unpaired_lan(),
                 "pairing_window_open": window,
+                "permissions_known": list(PERMISSIONS),
+                "default_paired_permissions": list(DEFAULT_PAIRED_PERMISSIONS),
+                "sessions": sessions,
             }
 
         if method != "POST":
@@ -530,6 +656,10 @@ class SessionGate:
         media_host = str(body.get("media_host") or "")
         port_raw = body.get("video_port")
         sig = str(body.get("sig") or "").lower()
+        # G3-S3: `sig_v` 2 signs the audio port and the overlay address too.
+        v2 = body.get("sig_v") == 2 and not isinstance(body.get("sig_v"), bool)
+        audio_raw = body.get("audio_port") if v2 else None
+        overlay_raw = str(body.get("overlay_host") or "") if v2 else ""
 
         device = self.devices.get(device_id) if device_id else None
         if device is None:
@@ -546,7 +676,11 @@ class SessionGate:
                 return refused(401, "nonce-replayed", client_id=device_id)
             entry.used = True     # spent whatever the outcome below
 
-        canonical = "\n".join([SETUP_CANON, device_id, nonce, media_host, str(port_raw)])
+        if v2:
+            canonical = "\n".join([SETUP_CANON_V2, device_id, nonce, media_host, str(port_raw),
+                                   "" if audio_raw is None else str(audio_raw), overlay_raw])
+        else:
+            canonical = "\n".join([SETUP_CANON, device_id, nonce, media_host, str(port_raw)])
         try:
             key = bytes.fromhex(str(device.get("key_hex") or ""))
         except ValueError:
@@ -563,18 +697,40 @@ class SessionGate:
         if (host.version != 4 or host.is_loopback or host.is_unspecified or host.is_multicast
                 or not (1024 <= port <= 65535) or isinstance(port_raw, bool)):
             return refused(403, "endpoint-invalid", client_id=device_id)
-        declared = self.classifier.classify(str(host))
-        if not (declared == routing or (routing == ROUTING_LOCAL and declared == ROUTING_LAN)):
+        audio_port: int | None = None
+        if audio_raw is not None:
+            if isinstance(audio_raw, bool) or not isinstance(audio_raw, int) or not (1024 <= audio_raw <= 65535):
+                return refused(403, "endpoint-invalid", client_id=device_id)
+            audio_port = audio_raw
+        overlay_host: str | None = None
+        if overlay_raw:
+            try:
+                ov = ipaddress.ip_address(overlay_raw)
+            except ValueError:
+                return refused(403, "endpoint-invalid", client_id=device_id)
+            if ov.version != 4 or self.classifier.classify(str(ov)) != ROUTING_OVERLAY:
+                return refused(403, "endpoint-invalid", client_id=device_id)
+            overlay_host = str(ov)
+        want = ROUTING_LAN if routing == ROUTING_LOCAL else routing
+        declared = [self.classifier.classify(str(host))]
+        if overlay_host:
+            declared.append(ROUTING_OVERLAY)
+        if want not in declared:
             return refused(403, "endpoint-class-mismatch", client_id=device_id)
 
-        permissions = tuple(p for p in device.get("permissions", []) if p in PERMISSIONS)
+        permissions = device_permissions(device)
+        media_token = secrets.token_urlsafe(24)
         token = self._issue_token(Session(device_id, self._clock() + TOKEN_TTL_S,
-                                          media_host=str(host), video_port=port, permissions=permissions))
+                                          media_host=str(host), video_port=port, permissions=permissions,
+                                          audio_port=audio_port, overlay_host=overlay_host,
+                                          media_token=media_token))
         self.audit.write("token_issued", client_id=device_id, token_ref=token_ref(token),
                          expires_in_s=int(TOKEN_TTL_S), permissions=",".join(permissions),
-                         **self._evidence(routing))
+                         sig_v=2 if v2 else 1, overlay_declared=overlay_host is not None,
+                         media_token_issued=True, **self._evidence(routing))
         return 200, {"ok": True, "token": token, "expires_in_s": int(TOKEN_TTL_S),
-                     "client_id": device_id, "permissions": list(permissions)}
+                     "client_id": device_id, "permissions": list(permissions),
+                     "media_token": media_token}
 
     # ---- the HTTP glue ------------------------------------------------------------
 
@@ -623,6 +779,115 @@ class SessionGate:
         if decision is not None and decision.kind == "session" and decision.media_host:
             return decision.media_host
         return str(handler.client_address[0])
+
+
+class MediaGate:
+    """G3-S3: the range server's gate (a separate process; the tokens live in
+    the companion). Loopback → allowed; the LAN without a token → today's
+    legacy path (if `legacy_unpaired_lan`); anything else → the companion's
+    `/session/media-check` on loopback decides and audits. The media token
+    is never logged: the range server's own log lines mask it."""
+
+    def __init__(
+        self,
+        mode: str,
+        config_dir: Path,
+        audit_path: Path,
+        control_port: int = 8765,
+        classifier: RoutingClassifier | None = None,
+        transport: Callable[[str, bytes], tuple[int, bytes]] | None = None,
+        wall: Callable[[], float] = time.time,
+    ) -> None:
+        self.mode = mode
+        self.settings = Settings(config_dir / "session_identity.json")
+        self.audit = AuditLog(audit_path, wall=wall)
+        self.classifier = classifier or RoutingClassifier()
+        loopback = str(ipaddress.ip_address(0x7F000001))
+        self.check_url = f"http://{loopback}:{int(control_port)}{MEDIA_CHECK_PATH}"
+        self._transport = transport or self._post
+
+    @staticmethod
+    def _post(url: str, body: bytes) -> tuple[int, bytes]:
+        import urllib.error
+        import urllib.request
+        req = urllib.request.Request(url, data=body, method="POST",
+                                     headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=2.0) as resp:
+                return resp.status, resp.read(BODY_MAX_BYTES)
+        except urllib.error.HTTPError as exc:
+            return exc.code, exc.read(BODY_MAX_BYTES)
+
+    def decide(self, source: str, request_path: str, header_token: str | None) -> tuple[int, dict[str, Any]] | None:
+        """None = serve the request as today; else (status, refusal body)."""
+        routing = self.classifier.classify(source)
+        if routing == ROUTING_LOCAL:
+            return None
+        split = urlsplit(request_path)
+        media_token = ((parse_qs(split.query).get(MEDIA_TOKEN_PARAM) or [""])[0]).strip() or None
+        token = (header_token or "").strip() or None
+        if (token is None and media_token is None and routing == ROUTING_LAN
+                and self.mode == MODE_V2 and self.settings.legacy_unpaired_lan()):
+            return None
+        body = {"routing": routing, "path": split.path}
+        if token is not None:
+            body["token"] = token
+        elif media_token is not None:
+            body["media_token"] = media_token
+        try:
+            status, raw = self._transport(self.check_url, json.dumps(body).encode("utf-8"))
+            payload = json.loads(raw.decode("utf-8")) if raw else {}
+        except Exception:
+            self.audit.write("media_refused", reason="identity-unavailable", path=split.path[:256],
+                             media_token_used=token is None and media_token is not None,
+                             routing_evidence=routing, host_local=False)
+            return 503, {"ok": False, "error": "session refused", "reason": "identity-unavailable"}
+        if status == 200 and isinstance(payload, dict) and payload.get("ok") is True:
+            return None
+        reason = payload.get("reason") if isinstance(payload, dict) else None
+        return (status if status in (401, 403) else 503), {
+            "ok": False, "error": "session refused", "reason": str(reason or "identity-unavailable")}
+
+    @staticmethod
+    def mask(text: str) -> str:
+        """The request line with the media token's value masked."""
+        if MEDIA_TOKEN_PARAM + "=" not in text:
+            return text
+        out, rest = [], text
+        key = MEDIA_TOKEN_PARAM + "="
+        while key in rest:
+            head, _, tail = rest.partition(key)
+            end = min([i for i in (tail.find("&"), tail.find(" "), tail.find("#")) if i >= 0] or [len(tail)])
+            out.append(head + key + "<redacted>")
+            rest = tail[end:]
+        return "".join(out) + rest
+
+    def refuse(self, handler: Any) -> bool:
+        """True when the gate answered the request (a refusal)."""
+        decision = self.decide(str(handler.client_address[0]), handler.path,
+                               handler.headers.get(SESSION_HEADER))
+        if decision is None:
+            return False
+        status, payload = decision
+        data = json.dumps(payload, indent=2).encode("utf-8")
+        handler.send_response(status)
+        handler.send_header("Content-Type", "application/json")
+        handler.send_header("Content-Length", str(len(data)))
+        handler.end_headers()
+        if handler.command != "HEAD":
+            handler.wfile.write(data)
+        return True
+
+
+def media_gate_from_environ(environ: Mapping[str, str], project_root: Path) -> MediaGate | None:
+    raw = environ.get(FLAG_ENV)
+    if raw is None or not raw.strip():
+        return None
+    return MediaGate(
+        mode=raw.strip().lower(),
+        config_dir=Path.home() / ".config" / "privyhub",
+        audit_path=Path(project_root) / "logs" / "session_audit.jsonl",
+    )
 
 
 def gate_from_environ(environ: Mapping[str, str], project_root: Path) -> SessionGate | None:

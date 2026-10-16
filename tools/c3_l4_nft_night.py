@@ -95,7 +95,9 @@ PKG = "com.safeiot.privyhub"
 # f31b1c180c5d0849230860d2f5b7ab1b4a8637f7be56a7dcf1f71aba77668ae7 (runtime/c4_m1/adopted_app-debug.apk).
 # CL-B2 (installed 2026-10-16): G3-S2's identity APK replaced CL-B1's de072762e55122c3060086f6f10b1bff54633d9165d0c475f17699127841835e
 # (kept at PrivyHub/app/build/g3_s2_preserved/app-debug.apk).
-ADOPTED_APK_SHA256 = "77011eefa538fb965e46ad1f25ddac99036e1d77557ba7b7a677dc5947807d9d"
+# CL-B3 (installed 2026-10-16): G3-S3's hardened identity APK replaced CL-B2's 77011eefa538fb965e46ad1f25ddac99036e1d77557ba7b7a677dc5947807d9d
+# (kept at PrivyHub/app/build/g3_s3_preserved/app-debug.apk).
+ADOPTED_APK_SHA256 = "59f736d29b96700253a178efa5efd0cd8846858a89d32848a0994586712bf65f"
 REFERENCE_PROFILE = "native_game_720p60_reference"
 MODE_ENV = "PRIVYHUB_ADAPTIVE_BITRATE_MODE"
 # C3-L4-D1 (2026-10-01): live is the companion's default through the systemd drop-in

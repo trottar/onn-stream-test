@@ -17,6 +17,11 @@ import org.junit.Test
  *
  * The fake host speaks G3-S1's protocol: it verifies the setup HMAC with the
  * key the client sent at pairing.
+ *
+ * G3-S3: the fake host verifies the v2 canon when `sig_v` is 2 (the audio
+ * port and the overlay address signed), can grant `diagnostics`, and issues a
+ * media token; the new cases cover the declared overlay address, diagnostics,
+ * the media header and media token, the hub host and the hub-only media rule.
  */
 class IdentitySessionTest {
 
@@ -42,6 +47,7 @@ class IdentitySessionTest {
         var identityLayer = true
         var refuseSetupWith: String? = null
         var counter = 0
+        var grant = listOf("games", "tv", "vod")
         override fun post(url: String, jsonBody: String?): Pair<Int, String> {
             val path = SessionProtocol.pathOf(url)
             calls += path
@@ -64,13 +70,23 @@ class IdentitySessionTest {
                     val b = jsonBody!!
                     val nonce = SessionProtocol.jsonStringField(b, "nonce")!!
                     if (!nonces.remove(nonce)) return 401 to "{\"ok\": false, \"error\": \"session refused\", \"reason\": \"nonce-replayed\"}"
-                    val expected = SessionProtocol.sign(
-                        key!!, SessionProtocol.jsonStringField(b, "device_id")!!, nonce,
-                        SessionProtocol.jsonStringField(b, "media_host")!!, SessionProtocol.jsonLongField(b, "video_port")!!.toInt(),
-                    )
+                    val deviceId = SessionProtocol.jsonStringField(b, "device_id")!!
+                    val mediaHost = SessionProtocol.jsonStringField(b, "media_host")!!
+                    val videoPort = SessionProtocol.jsonLongField(b, "video_port")!!.toInt()
+                    val expected = if (SessionProtocol.jsonLongField(b, "sig_v") == 2L) {
+                        SessionProtocol.signV2(
+                            key!!, deviceId, nonce, mediaHost, videoPort,
+                            SessionProtocol.jsonLongField(b, "audio_port")!!.toInt(),
+                            SessionProtocol.jsonStringField(b, "overlay_host"),
+                        )
+                    } else {
+                        SessionProtocol.sign(key!!, deviceId, nonce, mediaHost, videoPort)
+                    }
                     if (expected != SessionProtocol.jsonStringField(b, "sig"))
                         return 401 to "{\"ok\": false, \"error\": \"session refused\", \"reason\": \"bad-signature\"}"
-                    200 to "{\n  \"ok\": true,\n  \"token\": \"tok-${++counter}\",\n  \"expires_in_s\": 28800,\n  \"client_id\": \"dev-00112233aabbccdd\",\n  \"permissions\": [\n    \"games\",\n    \"tv\",\n    \"vod\"\n  ]\n}"
+                    val perms = grant.joinToString(",\n    ", "[\n    ", "\n  ]") { "\"$it\"" }
+                    val n = ++counter
+                    200 to "{\n  \"ok\": true,\n  \"token\": \"tok-$n\",\n  \"expires_in_s\": 28800,\n  \"client_id\": \"dev-00112233aabbccdd\",\n  \"permissions\": $perms,\n  \"media_token\": \"mtok-$n\"\n}"
                 }
                 else -> 404 to "{}"
             }
@@ -84,11 +100,18 @@ class IdentitySessionTest {
     private val store = FakeStore()
     private val host = FakeHost()
     private var seed = 0
+    private var overlay: String? = null
+    private val overlayAddress: String =
+        InetAddress.getByAddress(byteArrayOf(0x64, 0x41, 0x12, 0x35)).hostAddress!!
+    private val routes = object : IdentitySession.LocalRoute {
+        override fun localAddressFor(host: String, port: Int): String? = localAddress
+        override fun overlayAddress(): String? = overlay
+    }
     private val session = IdentitySession(
         enabled = { on },
         store = store,
         transport = host,
-        routes = { _, _ -> localAddress },
+        routes = routes,
         clock = { now },
         randomBytes = { n -> ByteArray(n) { (it + 31 * ++seed).toByte() } },
         log = { logs += it },
@@ -235,5 +258,106 @@ class IdentitySessionTest {
             assertFalse(line, line.contains(localAddress))
             assertFalse(line, line.contains(hub))
         }
+    }
+
+    // ---- G3-S3 ----------------------------------------------------------------
+
+    @Test
+    fun setupSignsV2AndDeclaresTheOverlayAddressWhenPresent() {
+        paired()
+        session.headerFor(hub, launch)
+        var body = host.bodies.last()
+        assertEquals(2L, SessionProtocol.jsonLongField(body, "sig_v"))
+        assertNull(SessionProtocol.jsonStringField(body, "overlay_host"))
+        session.endSessionLocally()
+        overlay = overlayAddress
+        assertNotNull(session.headerFor(hub, launch))      // the fake host verified the v2 signature
+        body = host.bodies.last()
+        assertEquals(overlayAddress, SessionProtocol.jsonStringField(body, "overlay_host"))
+        assertEquals(localAddress, SessionProtocol.jsonStringField(body, "media_host"))
+        // an address outside the overlay block is never declared as the overlay one
+        session.endSessionLocally()
+        overlay = localAddress
+        session.headerFor(hub, launch)
+        assertNull(SessionProtocol.jsonStringField(host.bodies.last(), "overlay_host"))
+        for (line in logs) {
+            assertFalse(line, line.contains(overlayAddress))
+            assertFalse(line, line.contains(localAddress))
+        }
+    }
+
+    @Test
+    fun diagnosticsWhenTheHostGrantsIt() {
+        host.grant = listOf("games", "tv", "vod", "diagnostics")
+        paired()                                   // the pairing listed games, tv, vod
+        assertNotNull(session.headerFor(hub, "http://$hub:8765/status"))
+        assertNotNull(session.headerFor(hub, "http://$hub:8765/diagnostics/health"))
+        assertNotNull(session.headerFor(hub, "http://$hub:8765/diagnostics/client-health"))
+        // the host's grant became the stored record
+        assertEquals(listOf("games", "tv", "vod", "diagnostics"), store.pairing!!.permissions)
+        assertEquals(listOf("/session/pair", "/session/nonce", "/session/setup"), host.calls)
+    }
+
+    @Test
+    fun tvAndEpgCarryTheToken() {
+        paired()
+        val t = session.headerFor(hub, launch)
+        for (path in listOf("/plugins/tv_state/state", "/plugins/epg/guide?channel_id=x", "/plugins/epg/prefetch", "/sources"))
+            assertEquals(path, t, session.headerFor(hub, "http://$hub:8765$path"))
+    }
+
+    @Test
+    fun mediaHeaderAndMediaToken() {
+        paired()
+        val header = session.mediaHeaderFor(hub)
+        assertNotNull(header)
+        assertEquals(header, session.headerFor(hub, launch))   // the same session token
+        assertTrue(session.mediaTokenFor(hub)!!.startsWith("mtok-"))
+        assertTrue(session.mediaTokenFor(hub) != header)
+        on = false
+        assertNull(session.mediaHeaderFor(hub))
+        assertNull(session.mediaTokenFor(hub))
+    }
+
+    @Test
+    fun noMediaHeaderWithoutVod() {
+        host.grant = listOf("games", "tv")
+        paired()
+        assertNull(session.mediaHeaderFor(hub))
+        assertNotNull(session.headerFor(hub, launch))
+    }
+
+    @Test
+    fun portMismatchIsShownNotRetried() {
+        paired()
+        val body = "{\n  \"ok\": false,\n  \"error\": \"session refused\",\n  \"reason\": \"endpoint-port-mismatch\"\n}"
+        assertFalse(session.onResponse(403, body, 0))
+        assertEquals(listOf("endpoint-port-mismatch"), refusals)
+        assertEquals("Session refused (403): endpoint-port-mismatch", session.refusalMessage(403, body))
+    }
+
+    @Test
+    fun hubHostAndHubOnlyMedia() {
+        assertEquals("companion", SessionProtocol.effectiveHost(false, "hub.tailnet.invalid", "companion"))
+        assertEquals("companion", SessionProtocol.effectiveHost(true, "", "companion"))
+        assertEquals("companion", SessionProtocol.effectiveHost(true, "  ", "companion"))
+        assertEquals("hub.tailnet.invalid", SessionProtocol.effectiveHost(true, " hub.tailnet.invalid ", "companion"))
+        assertTrue(SessionProtocol.isHubMediaUrl("http://$hub:8000/vod/a.mp4", hub, 8000))
+        assertTrue(SessionProtocol.isHubMediaUrl("http://HUB.invalid:8000/live/s.m3u8", hub, 8000))
+        assertFalse(SessionProtocol.isHubMediaUrl("http://$hub:8765/plugins/games/status", hub, 8000))
+        assertFalse(SessionProtocol.isHubMediaUrl("https://iptv.example.invalid/live.m3u8", hub, 8000))
+        assertFalse(SessionProtocol.isHubMediaUrl("http://iptv.example.invalid:8000/x", hub, 8000))
+        assertFalse(SessionProtocol.isHubMediaUrl("http://$hub.evil.invalid:8000/x", hub, 8000))
+        assertFalse(SessionProtocol.isHubMediaUrl("not a url", hub, 8000))
+        assertFalse(SessionProtocol.isHubMediaUrl("http://$hub:8000/x", "", 8000))
+    }
+
+    @Test
+    fun urlForLogHidesTheHost() {
+        val line = SessionProtocol.urlForLog("http://hub.tailnet.invalid:8000/vod/a.mp4")
+        assertFalse(line, line.contains("hub.tailnet.invalid"))
+        assertTrue(line, line.startsWith("http://h-") && line.endsWith(":8000/vod/a.mp4"))
+        assertEquals(12, SessionProtocol.hostHash("x").length)
+        assertFalse(SessionProtocol.urlForLog("http://$localAddress:8000/v").contains(localAddress))
     }
 }

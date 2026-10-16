@@ -17,6 +17,12 @@ from games.log_rotation import append_line
 import native_fec_rs
 
 
+# G8-P1: the impairment shim, only with PRIVYHUB_IMPAIRMENT set. Absent = today:
+# nothing imported, the same port bound, the same target, no thread, no file.
+_impairment = None
+if os.environ.get("PRIVYHUB_IMPAIRMENT", "").strip():
+    import impairment as _impairment
+
 FEC_MAGIC = b"PHF1"
 FEC_VERSION = 1
 
@@ -253,6 +259,13 @@ class NativeVideoFecRelay:
         with self._lock:
             self.stop()
 
+            # G8-P1: under the flag only, the shim decides the bind port and the send target.
+            shim = None
+            if _impairment is not None:
+                shim = _impairment.relay_shim_from_environ(
+                    os.environ, self.local_port, (client_ip, int(client_port)),
+                    Path(__file__).resolve().parents[1])
+
             recv_socket = socket.socket(
                 socket.AF_INET,
                 socket.SOCK_DGRAM,
@@ -265,7 +278,7 @@ class NativeVideoFecRelay:
             recv_socket.bind(
                 (
                     "127.0.0.1",
-                    self.local_port,
+                    self.local_port if shim is None else shim.relay_bind_port,
                 )
             )
             recv_socket.settimeout(
@@ -287,7 +300,7 @@ class NativeVideoFecRelay:
             self._client = (
                 client_ip,
                 int(client_port),
-            )
+            ) if shim is None else shim.relay_send_target
             self._group = []
             self._group_timestamp = None
 
@@ -371,9 +384,17 @@ class NativeVideoFecRelay:
                 )
                 self._pace_thread.start()
 
+            if shim is not None:
+                shim.attach(recv_socket.getsockname()[1])
+                self._shim = shim
+
     def stop(self) -> None:
         with self._lock:
             self._running = False
+            # G8-P1: under the flag only.
+            if _impairment is not None and getattr(self, "_shim", None) is not None:
+                self._shim.stop()
+                self._shim = None
 
             recv_socket = self._recv_socket
             self._recv_socket = None

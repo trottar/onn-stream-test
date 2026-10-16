@@ -1,0 +1,2725 @@
+diff --git a/PrivyHub/app/src/main/java/MainActivity.kt b/PrivyHub/app/src/main/java/MainActivity.kt
+index a497349..7f19a41 100644
+--- a/PrivyHub/app/src/main/java/MainActivity.kt
++++ b/PrivyHub/app/src/main/java/MainActivity.kt
+@@ -2,6 +2,7 @@ package com.safeiot.privyhub
+ 
+ import android.content.Intent
+ import com.safeiot.privyhub.identity.PrivyHubIdentity
++import com.safeiot.privyhub.identity.hubMediaDataSourceFactory
+ import android.graphics.Bitmap
+ import android.graphics.BitmapFactory
+ import android.graphics.drawable.BitmapDrawable
+@@ -921,8 +922,19 @@ class MainActivity : AppCompatActivity() {
+     }
+ 
+ 
++    // G3-S3: the host every call goes to — the "Hub host" while identity_v2
++    // is on and one is set; else the stored companion host (today).
+     private fun getCompanionHost(): String {
+ 
++        return PrivyHubIdentity.effectiveHost(
++            this,
++            getStoredCompanionHost()
++        )
++    }
++
++
++    private fun getStoredCompanionHost(): String {
++
+         return getSharedPreferences(
+             PREFS_NAME,
+             MODE_PRIVATE
+@@ -996,7 +1008,7 @@ class MainActivity : AppCompatActivity() {
+         )
+ 
+         input.setText(
+-            getCompanionHost()
++            getStoredCompanionHost()
+         )
+ 
+         input.hint =
+@@ -1084,6 +1096,31 @@ class MainActivity : AppCompatActivity() {
+             )
+         )
+ 
++        // G3-S3: "Hub host" overrides the companion host while identity v2 is
++        // on (the hub's tailnet name, off-site); empty = the companion host.
++        val hubHostInput =
++            EditText(this).apply {
++                inputType =
++                    InputType.TYPE_CLASS_TEXT or
++                        InputType.TYPE_TEXT_VARIATION_URI
++                setSingleLine(true)
++                hint =
++                    "Hub host (identity v2; empty = companion host)"
++                setText(
++                    PrivyHubIdentity.hubHost(
++                        this@MainActivity
++                    )
++                )
++            }
++
++        container.addView(
++            hubHostInput,
++            ViewGroup.LayoutParams(
++                ViewGroup.LayoutParams.MATCH_PARENT,
++                ViewGroup.LayoutParams.WRAP_CONTENT
++            )
++        )
++
+         container.addView(
+             TextView(this).apply {
+                 text =
+@@ -1176,6 +1213,24 @@ class MainActivity : AppCompatActivity() {
+                 }
+ 
+ 
++                val hubHost =
++                    normalizeHost(
++                        hubHostInput.text
++                            .toString()
++                    )
++
++                if (
++                    hubHost.contains("/") ||
++                    hubHost.contains(" ")
++                ) {
++
++                    hubHostInput.error =
++                        "Enter only a hostname or IP address"
++
++                    return@setOnClickListener
++                }
++
++
+                 saveCompanionHost(
+                     host
+                 )
+@@ -1189,6 +1244,11 @@ class MainActivity : AppCompatActivity() {
+                     identityCheckBox.isChecked
+                 )
+ 
++                PrivyHubIdentity.setHubHost(
++                    this,
++                    hubHost
++                )
++
+                 dialog.dismiss()
+ 
+ 
+@@ -2463,6 +2523,14 @@ class MainActivity : AppCompatActivity() {
+                 connection.useCaches =
+                     true
+ 
++                // G3-S3: the range server's token, only with identity_v2 on.
++                PrivyHubIdentity.decorateMedia(
++                    this,
++                    connection,
++                    url.toString(),
++                    host
++                )
++
+                 val status =
+                     connection.responseCode
+ 
+@@ -15443,11 +15511,21 @@ private fun requestGameStateAction(
+             )
+         }
+ 
++        // G3-S3: with identity_v2 on, the hub's media requests carry the
++        // session header (never a third-party URL); off, today's factory.
+         val mediaSourceFactory =
+             DefaultMediaSourceFactory(
+                 this
+             ).setDataSourceFactory(
+-                httpDataSourceFactory
++                if (PrivyHubIdentity.isEnabled(this)) {
++                    hubMediaDataSourceFactory(
++                        this,
++                        httpDataSourceFactory,
++                        getCompanionHost()
++                    )
++                } else {
++                    httpDataSourceFactory
++                }
+             )
+ 
+ 
+@@ -15680,7 +15758,11 @@ private fun requestGameStateAction(
+ 
+                     Log.d(
+                         TAG,
+-                        "Opening media: $url"
++                        "Opening media: " +
++                            PrivyHubIdentity.urlForLog(
++                                this,
++                                url
++                            )
+                     )
+ 
+ 
+diff --git a/PrivyHub/app/src/main/java/TvEpgRepository.kt b/PrivyHub/app/src/main/java/TvEpgRepository.kt
+index 5216e77..eb5bd2f 100644
+--- a/PrivyHub/app/src/main/java/TvEpgRepository.kt
++++ b/PrivyHub/app/src/main/java/TvEpgRepository.kt
+@@ -10,6 +10,7 @@ import org.json.JSONObject
+ import org.xmlpull.v1.XmlPullParser
+ import org.xmlpull.v1.XmlPullParserFactory
+ 
++import com.safeiot.privyhub.identity.PrivyHubIdentity
+ import java.io.BufferedInputStream
+ import java.io.InputStream
+ import java.io.InputStreamReader
+@@ -440,7 +441,8 @@ class TvEpgRepository(
+ 
+     fun prefetchCompanionGuides(
+         channelIds: List<String>,
+-        forceRefresh: Boolean = false
++        forceRefresh: Boolean = false,
++        identityAttempt: Int = 0
+     ): Int {
+         val baseUrl =
+             companionBaseUrl()
+@@ -489,10 +491,13 @@ class TvEpgRepository(
+                     )
+             }
+ 
++        val prefetchUrl =
++            "$baseUrl/plugins/epg/prefetch?$query"
++
+         val connection =
+             try {
+                 URL(
+-                    "$baseUrl/plugins/epg/prefetch?$query"
++                    prefetchUrl
+                 ).openConnection()
+                     as HttpURLConnection
+             } catch (_: Exception) {
+@@ -520,6 +525,13 @@ class TvEpgRepository(
+                 "PrivyHub/1.0"
+             )
+ 
++            // G3-S3: the session header (tv), only with identity_v2 on.
++            PrivyHubIdentity.decorate(
++                appContext,
++                connection,
++                prefetchUrl
++            )
++
+             val response =
+                 connection.responseCode
+ 
+@@ -527,6 +539,20 @@ class TvEpgRepository(
+                 response < 200 ||
+                 response >= 300
+             ) {
++                if (
++                    identityRetry(
++                        connection,
++                        response,
++                        identityAttempt
++                    )
++                ) {
++                    return prefetchCompanionGuides(
++                        channelIds,
++                        forceRefresh,
++                        identityAttempt + 1
++                    )
++                }
++
+                 return 0
+             }
+ 
+@@ -751,15 +777,48 @@ class TvEpgRepository(
+                 PROGRAMME_REFRESH_INTERVAL_MS
+     }
+ 
++    // G3-S3: a non-2xx answer under identity_v2: true = retry once (a token
++    // refusal); the host's reason code is shown. Off: false, nothing read.
++    private fun identityRetry(
++        connection: HttpURLConnection,
++        status: Int,
++        identityAttempt: Int
++    ): Boolean {
++        if (!PrivyHubIdentity.isEnabled(appContext)) {
++            return false
++        }
++
++        val body =
++            try {
++                connection.errorStream
++                    ?.bufferedReader()
++                    ?.use {
++                        it.readText()
++                    }
++            } catch (_: Exception) {
++                null
++            }
++
++        return PrivyHubIdentity.get(appContext).onResponse(
++            status,
++            body,
++            identityAttempt
++        )
++    }
++
+     private fun companionBaseUrl(): String? {
++        // G3-S3: the "Hub host" while identity_v2 is on and one is set.
+         val host =
+-            appContext.getSharedPreferences(
+-                COMPANION_PREFS_NAME,
+-                Context.MODE_PRIVATE
+-            ).getString(
+-                COMPANION_HOST_PREF,
+-                ""
+-            )?.trim().orEmpty()
++            PrivyHubIdentity.effectiveHost(
++                appContext,
++                appContext.getSharedPreferences(
++                    COMPANION_PREFS_NAME,
++                    Context.MODE_PRIVATE
++                ).getString(
++                    COMPANION_HOST_PREF,
++                    ""
++                )?.trim().orEmpty()
++            ).trim()
+ 
+         if (host.isBlank()) {
+             return null
+@@ -808,7 +867,8 @@ class TvEpgRepository(
+     private fun fetchCompanionGuide(
+         channelId: String,
+         force: Boolean,
+-        nowMs: Long
++        nowMs: Long,
++        identityAttempt: Int = 0
+     ): CompanionGuideResult? {
+         val baseUrl =
+             companionBaseUrl()
+@@ -827,11 +887,14 @@ class TvEpgRepository(
+                 ""
+             }
+ 
++        val guideUrl =
++            "$baseUrl/plugins/epg/guide" +
++                "?channel_id=$encodedChannelId" +
++                forceQuery
++
+         val connection =
+             URL(
+-                "$baseUrl/plugins/epg/guide" +
+-                    "?channel_id=$encodedChannelId" +
+-                    forceQuery
++                guideUrl
+             ).openConnection()
+                 as HttpURLConnection
+ 
+@@ -856,6 +919,13 @@ class TvEpgRepository(
+                 "PrivyHub/1.0"
+             )
+ 
++            // G3-S3: the session header (tv), only with identity_v2 on.
++            PrivyHubIdentity.decorate(
++                appContext,
++                connection,
++                guideUrl
++            )
++
+             val response =
+                 connection.responseCode
+ 
+@@ -863,6 +933,21 @@ class TvEpgRepository(
+                 response < 200 ||
+                 response >= 300
+             ) {
++                if (
++                    identityRetry(
++                        connection,
++                        response,
++                        identityAttempt
++                    )
++                ) {
++                    return fetchCompanionGuide(
++                        channelId,
++                        force,
++                        nowMs,
++                        identityAttempt + 1
++                    )
++                }
++
+                 return null
+             }
+ 
+diff --git a/PrivyHub/app/src/main/java/TvStateSyncClient.kt b/PrivyHub/app/src/main/java/TvStateSyncClient.kt
+index b721989..6f2eeec 100644
+--- a/PrivyHub/app/src/main/java/TvStateSyncClient.kt
++++ b/PrivyHub/app/src/main/java/TvStateSyncClient.kt
+@@ -4,6 +4,7 @@ import android.content.Context
+ 
+ import org.json.JSONObject
+ 
++import com.safeiot.privyhub.identity.PrivyHubIdentity
+ import java.net.HttpURLConnection
+ import java.net.URL
+ import java.nio.charset.StandardCharsets
+@@ -189,9 +190,12 @@ class TvStateSyncClient(
+     }
+ 
+ 
++    // G3-S3: null = retry once (a token refusal, identity_v2 on); a refusal
++    // otherwise throws with the host's reason code. Off: unchanged.
+     private fun readResponse(
+-        connection: HttpURLConnection
+-    ): JSONObject {
++        connection: HttpURLConnection,
++        identityAttempt: Int
++    ): JSONObject? {
+         val status =
+             connection.responseCode
+ 
+@@ -221,6 +225,31 @@ class TvStateSyncClient(
+             )
+         }
+ 
++        if (
++            status !in 200..299 &&
++            PrivyHubIdentity.isEnabled(appContext)
++        ) {
++            val identity =
++                PrivyHubIdentity.get(appContext)
++
++            if (
++                identity.onResponse(
++                    status,
++                    text,
++                    identityAttempt
++                )
++            ) {
++                return null
++            }
++
++            identity.refusalMessage(
++                status,
++                text
++            )?.let {
++                throw IllegalStateException(it)
++            }
++        }
++
+         val payload =
+             JSONObject(
+                 text
+@@ -242,11 +271,15 @@ class TvStateSyncClient(
+ 
+ 
+     private fun getEnvelope(
+-        baseUrl: String
++        baseUrl: String,
++        identityAttempt: Int = 0
+     ): JSONObject {
++        val url =
++            "$baseUrl/plugins/tv_state/state"
++
+         val connection =
+             URL(
+-                "$baseUrl/plugins/tv_state/state"
++                url
+             ).openConnection()
+                 as HttpURLConnection
+ 
+@@ -268,8 +301,19 @@ class TvStateSyncClient(
+                 "application/json"
+             )
+ 
++            // G3-S3: the session header (tv), only with identity_v2 on.
++            PrivyHubIdentity.decorate(
++                appContext,
++                connection,
++                url
++            )
++
+             readResponse(
+-                connection
++                connection,
++                identityAttempt
++            ) ?: getEnvelope(
++                baseUrl,
++                identityAttempt + 1
+             )
+         } finally {
+             connection.disconnect()
+@@ -280,7 +324,8 @@ class TvStateSyncClient(
+     private fun putState(
+         baseUrl: String,
+         baseRevision: Long,
+-        state: JSONObject
++        state: JSONObject,
++        identityAttempt: Int = 0
+     ): JSONObject {
+         val payload =
+             JSONObject()
+@@ -308,9 +353,12 @@ class TvStateSyncClient(
+                     StandardCharsets.UTF_8
+                 )
+ 
++        val url =
++            "$baseUrl/plugins/tv_state/state"
++
+         val connection =
+             URL(
+-                "$baseUrl/plugins/tv_state/state"
++                url
+             ).openConnection()
+                 as HttpURLConnection
+ 
+@@ -344,6 +392,13 @@ class TvStateSyncClient(
+                 bytes.size
+             )
+ 
++            // G3-S3: the session header (tv), only with identity_v2 on.
++            PrivyHubIdentity.decorate(
++                appContext,
++                connection,
++                url
++            )
++
+             connection.outputStream.use {
+                 it.write(
+                     bytes
+@@ -351,7 +406,13 @@ class TvStateSyncClient(
+             }
+ 
+             readResponse(
+-                connection
++                connection,
++                identityAttempt
++            ) ?: putState(
++                baseUrl,
++                baseRevision,
++                state,
++                identityAttempt + 1
+             )
+         } finally {
+             connection.disconnect()
+diff --git a/PrivyHub/app/src/main/java/diagnostics/DiagnosticsActivity.kt b/PrivyHub/app/src/main/java/diagnostics/DiagnosticsActivity.kt
+index 8b57903..509fe0c 100644
+--- a/PrivyHub/app/src/main/java/diagnostics/DiagnosticsActivity.kt
++++ b/PrivyHub/app/src/main/java/diagnostics/DiagnosticsActivity.kt
+@@ -13,6 +13,7 @@ import android.widget.ScrollView
+ import android.widget.TextView
+ 
+ import androidx.appcompat.app.AppCompatActivity
++import com.safeiot.privyhub.identity.PrivyHubIdentity
+ 
+ import org.json.JSONArray
+ import org.json.JSONObject
+@@ -579,14 +580,18 @@ class DiagnosticsActivity : AppCompatActivity() {
+         host: String,
+         path: String,
+         method: String,
+-        readTimeoutMs: Int
++        readTimeoutMs: Int,
++        identityAttempt: Int = 0
+     ): JSONObject {
+ 
++        val url =
++            "http://$host:$CONTROL_PORT" +
++                path
++
+         val connection =
+             (
+                 URL(
+-                    "http://$host:$CONTROL_PORT" +
+-                        path
++                    url
+                 )
+                     .openConnection()
+                     as HttpURLConnection
+@@ -611,6 +616,13 @@ class DiagnosticsActivity : AppCompatActivity() {
+ 
+             }
+ 
++        // G3-S3: the session header (diagnostics), only with identity_v2 on.
++        PrivyHubIdentity.decorate(
++            this,
++            connection,
++            url
++        )
++
+         try {
+ 
+             val code =
+@@ -638,6 +650,36 @@ class DiagnosticsActivity : AppCompatActivity() {
+                 code !in
+                 200..299
+             ) {
++                // G3-S3: a token refusal gets one fresh setup and one retry;
++                // the host's reason code is the message. Off: unchanged.
++                if (PrivyHubIdentity.isEnabled(this)) {
++                    val identity =
++                        PrivyHubIdentity.get(this)
++
++                    if (
++                        identity.onResponse(
++                            code,
++                            body,
++                            identityAttempt
++                        )
++                    ) {
++                        return requestJson(
++                            host,
++                            path,
++                            method,
++                            readTimeoutMs,
++                            identityAttempt + 1
++                        )
++                    }
++
++                    identity.refusalMessage(
++                        code,
++                        body
++                    )?.let {
++                        throw IllegalStateException(it)
++                    }
++                }
++
+                 throw IllegalStateException(
+                     "Diagnostics endpoint HTTP status was not successful"
+                 )
+diff --git a/PrivyHub/app/src/main/java/identity/AndroidIdentity.kt b/PrivyHub/app/src/main/java/identity/AndroidIdentity.kt
+index ca8e158..79a8121 100644
+--- a/PrivyHub/app/src/main/java/identity/AndroidIdentity.kt
++++ b/PrivyHub/app/src/main/java/identity/AndroidIdentity.kt
+@@ -8,7 +8,9 @@ import android.widget.Toast
+ import java.io.File
+ import java.net.DatagramSocket
+ import java.net.HttpURLConnection
++import java.net.Inet4Address
+ import java.net.InetAddress
++import java.net.NetworkInterface
+ import java.net.URL
+ import java.security.SecureRandom
+ 
+@@ -23,10 +25,16 @@ import java.security.SecureRandom
+  * - The declared media host: the local address of the route to the hub
+  *   (a UDP `connect`, which sends nothing).
+  * Log lines carry states and reason codes only; never an address.
++ *
++ * G3-S3: "Hub host" (`hub_host`, empty = today) overrides the companion host
++ * for every call while the setting is on; the overlay interface address is
++ * declared at setup; the hub's media requests carry the token.
+  */
+ object PrivyHubIdentity {
+     const val SETTINGS_PREFS = "privyhub_settings"
+     const val PREF_IDENTITY_V2 = "identity_v2"
++    const val PREF_HUB_HOST = "hub_host"
++    const val MEDIA_PORT = 8000
+     private const val IDENTITY_PREFS = "privyhub_identity"
+     private const val TAG = "PrivyHubIdentity"
+ 
+@@ -67,6 +75,54 @@ object PrivyHubIdentity {
+         if (!enabled) session?.endSessionLocally()
+     }
+ 
++    /** G3-S3: the stored "Hub host" (the hub's tailnet name, or any hostname); "" = none. */
++    fun hubHost(context: Context): String =
++        context.getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
++            .getString(PREF_HUB_HOST, "")?.trim().orEmpty()
++
++    fun setHubHost(context: Context, host: String) {
++        val clean = host.trim()
++        if (clean == hubHost(context)) return
++        context.getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
++            .edit().putString(PREF_HUB_HOST, clean).apply()
++        session?.endSessionLocally()   // a new host is a new session
++    }
++
++    /**
++     * G3-S3: the host every call goes to. The setting off, or no hub host:
++     * `companionHost` as given (today). The setting on and a hub host set: the hub host.
++     */
++    fun effectiveHost(context: Context, companionHost: String): String {
++        if (!isEnabled(context)) return companionHost
++        return SessionProtocol.effectiveHost(true, hubHost(context), companionHost)
++    }
++
++    /**
++     * G3-S3: the session header for a request to the hub's range server, only
++     * when the URL's host and port are the hub's media endpoint (never on a
++     * third-party URL). Off: null at once. A refused setup: null (the host's
++     * reason code was already shown).
++     */
++    fun mediaHeader(context: Context, url: String, hubHost: String): String? {
++        if (!isEnabled(context)) return null
++        if (!SessionProtocol.isHubMediaUrl(url, hubHost, MEDIA_PORT)) return null
++        return try {
++            get(context).mediaHeaderFor(hubHost.trim())
++        } catch (_: IdentitySession.IdentityRefused) {
++            null
++        }
++    }
++
++    /** G3-S3: adds the media header to a range-server connection (artwork). Off: touches nothing. */
++    fun decorateMedia(context: Context, connection: HttpURLConnection, url: String, hubHost: String) {
++        if (!isEnabled(context)) return
++        mediaHeader(context, url, hubHost)?.let { connection.setRequestProperty(SessionProtocol.HEADER, it) }
++    }
++
++    /** G3-S3: a URL as a log line may carry it: under the setting, the host is a 12-hex hash. */
++    fun urlForLog(context: Context, url: String): String =
++        if (isEnabled(context)) SessionProtocol.urlForLog(url) else url
++
+     /**
+      * Adds `X-PrivyHub-Session` to a control-port connection when the setting
+      * is on, the device is paired and the path needs a granted permission.
+@@ -146,5 +202,19 @@ object PrivyHubIdentity {
+             } catch (_: Exception) {
+                 null
+             }
++
++        // G3-S3: the overlay interface (the Tailscale app's tunnel): an up
++        // interface holding an IPv4 address in the overlay block. Nothing is sent.
++        override fun overlayAddress(): String? =
++            try {
++                NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
++                    .filter { it.isUp && !it.isLoopback }
++                    .flatMap { it.inetAddresses.toList() }
++                    .filterIsInstance<Inet4Address>()
++                    .mapNotNull { it.hostAddress }
++                    .firstOrNull { SessionProtocol.isOverlayIpv4(it) }
++            } catch (_: Exception) {
++                null
++            }
+     }
+ }
+diff --git a/PrivyHub/app/src/main/java/identity/IdentitySession.kt b/PrivyHub/app/src/main/java/identity/IdentitySession.kt
+index 1eeded4..7bbb329 100644
+--- a/PrivyHub/app/src/main/java/identity/IdentitySession.kt
++++ b/PrivyHub/app/src/main/java/identity/IdentitySession.kt
+@@ -17,6 +17,12 @@ package com.safeiot.privyhub.identity
+  * The device secret never leaves the store except once, in the pairing body
+  * — G3-S1's host verifies HMAC-SHA256 and so must hold the key. Nothing here
+  * logs an address, the secret or a token.
++ *
++ * G3-S3: the setup signs v2 (the audio port and, when the device holds one,
++ * its overlay interface address); `diagnostics` is on for a paired device;
++ * the media requests to the hub's range server carry the token too
++ * ([mediaHeaderFor]), or the session's media token for a player that cannot
++ * set headers ([mediaTokenFor]).
+  */
+ class IdentitySession(
+     private val enabled: () -> Boolean,
+@@ -47,6 +53,9 @@ class IdentitySession(
+     /** The local address this device uses to reach `host` (no packet is sent). */
+     fun interface LocalRoute {
+         fun localAddressFor(host: String, port: Int): String?
++
++        /** G3-S3: this device's overlay interface address (IPv4, the overlay block), if any. */
++        fun overlayAddress(): String? = null
+     }
+ 
+     class IdentityRefused(val reason: String) : IllegalStateException("Session refused: $reason")
+@@ -56,7 +65,12 @@ class IdentitySession(
+         data class Refused(val status: Int, val reason: String) : PairResult()
+     }
+ 
+-    private data class Token(val value: String, val expiresAtMs: Long, val permissions: Set<String>)
++    private data class Token(
++        val value: String,
++        val expiresAtMs: Long,
++        val permissions: Set<String>,
++        val mediaToken: String? = null,
++    )
+ 
+     private var token: Token? = null
+     private var hostIdentityOffUntilMs = 0L
+@@ -123,18 +137,37 @@ class IdentitySession(
+     @Synchronized
+     fun headerFor(host: String, url: String): String? {
+         if (!enabled()) return null
+-        val pairing = store.pairing() ?: run { stateText = "on, not paired (legacy)"; return null }
++        if (store.pairing() == null) { stateText = "on, not paired (legacy)"; return null }
+         val permission = SessionProtocol.requiredPermission(SessionProtocol.pathOf(url)) ?: return null
+-        if (permission !in pairing.permissions) return null
++        return liveToken(host, permission)?.value
++    }
++
++    /** G3-S3: the header value for a request to the hub's range server (the `vod` permission). */
++    @Synchronized
++    fun mediaHeaderFor(host: String): String? {
++        if (!enabled()) return null
++        return liveToken(host, SessionProtocol.MEDIA_PERMISSION)?.value
++    }
++
++    /** G3-S3: the session's media token, for a player that cannot set headers (`?media_token=`). */
++    @Synchronized
++    fun mediaTokenFor(host: String): String? {
++        if (!enabled()) return null
++        return liveToken(host, SessionProtocol.MEDIA_PERMISSION)?.mediaToken
++    }
++
++    private fun liveToken(host: String, permission: String): Token? {
++        val pairing = store.pairing() ?: run { stateText = "on, not paired (legacy)"; return null }
++        if (permission !in pairing.permissions && permission !in SessionProtocol.IMPLIED_FOR_PAIRED) return null
+         val now = clock()
+         if (now < hostIdentityOffUntilMs) return null
+-        token?.let { if (now < it.expiresAtMs - SessionProtocol.REFRESH_MARGIN_MS) return headerIfGranted(it, permission) }
++        token?.let { if (now < it.expiresAtMs - SessionProtocol.REFRESH_MARGIN_MS) return grantedOrNull(it, permission) }
+         if (now < setupRefusedUntilMs) throw IdentityRefused(setupRefusedReason ?: "setup-refused")
+-        return setup(host, pairing, now)?.let { headerIfGranted(it, permission) }
++        return setup(host, pairing, now)?.let { grantedOrNull(it, permission) }
+     }
+ 
+-    private fun headerIfGranted(t: Token, permission: String): String? =
+-        if (permission in t.permissions) t.value else null
++    private fun grantedOrNull(t: Token, permission: String): Token? =
++        if (permission in t.permissions) t else null
+ 
+     private fun setup(host: String, pairing: Pairing, now: Long): Token? {
+         val (nonceStatus, nonceBody) = transport.post(controlUrl(host, "/session/nonce"), null)
+@@ -152,10 +185,12 @@ class IdentitySession(
+         val mediaHost = routes.localAddressFor(host, controlPort)
+             ?: return setupRefused("no-local-route", now)
+         val secret = ensureSecret()
+-        val sig = SessionProtocol.sign(secret, pairing.deviceId, nonce, mediaHost, videoPort)
++        // G3-S3: v2 signs the audio port and the overlay interface address (when present).
++        val overlayHost = routes.overlayAddress()?.takeIf { SessionProtocol.isOverlayIpv4(it) }
++        val sig = SessionProtocol.signV2(secret, pairing.deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost)
+         val (status, body) = transport.post(
+             controlUrl(host, "/session/setup"),
+-            SessionProtocol.setupBody(pairing.deviceId, nonce, mediaHost, videoPort, audioPort, sig),
++            SessionProtocol.setupBodyV2(pairing.deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost, sig),
+         )
+         val value = SessionProtocol.jsonStringField(body, "token")
+         val ttl = SessionProtocol.jsonLongField(body, "expires_in_s")
+@@ -163,12 +198,16 @@ class IdentitySession(
+             return setupRefused(SessionProtocol.reasonOf(body) ?: "http-$status", now)
+         }
+         val granted = SessionProtocol.jsonStringArray(body, "permissions").toSet()
+-        val t = Token(value, now + ttl * 1000L, granted)
++        val t = Token(value, now + ttl * 1000L, granted, SessionProtocol.jsonStringField(body, "media_token"))
+         token = t
++        // G3-S3: the host's grant is the record (diagnostics added, or a permission revoked).
++        if (granted != pairing.permissions.toSet()) {
++            store.savePairing(pairing.copy(permissions = granted.toList()))
++        }
+         setupRefusedUntilMs = 0L
+         lastReason = null
+         stateText = "session active"
+-        log("identity: session set up, expires_in_s=$ttl")
++        log("identity: session set up, expires_in_s=$ttl, overlay_declared=${overlayHost != null}")
+         return t
+     }
+ 
+diff --git a/PrivyHub/app/src/main/java/identity/SessionProtocol.kt b/PrivyHub/app/src/main/java/identity/SessionProtocol.kt
+index 5b3efb5..38741a0 100644
+--- a/PrivyHub/app/src/main/java/identity/SessionProtocol.kt
++++ b/PrivyHub/app/src/main/java/identity/SessionProtocol.kt
+@@ -16,6 +16,14 @@ object SessionProtocol {
+     const val SETUP_CANON = "privyhub-session-setup-v1"
+     const val SECRET_BYTES = 32
+ 
++    // G3-S3: the v2 canon signs the audio port and the overlay address too.
++    const val SETUP_CANON_V2 = "privyhub-session-setup-v2"
++    const val MEDIA_PERMISSION = "vod"
++    const val MEDIA_TOKEN_PARAM = "media_token"
++
++    /** Granted to a paired device without being listed at pairing (G3-S3: diagnostics, default on). */
++    val IMPLIED_FOR_PAIRED = setOf("diagnostics")
++
+     /** Re-run the setup when less than this remains of the token. */
+     const val REFRESH_MARGIN_MS = 10L * 60L * 1000L
+ 
+@@ -43,6 +51,71 @@ object SessionProtocol {
+     fun sign(keyHex: String, deviceId: String, nonce: String, mediaHost: String, videoPort: Int): String =
+         hmacSha256Hex(keyHex, setupCanonical(deviceId, nonce, mediaHost, videoPort))
+ 
++    /** G3-S3: seven lines; an absent overlay address is the empty string. */
++    fun setupCanonicalV2(
++        deviceId: String,
++        nonce: String,
++        mediaHost: String,
++        videoPort: Int,
++        audioPort: Int,
++        overlayHost: String?,
++    ): String =
++        listOf(SETUP_CANON_V2, deviceId, nonce, mediaHost, videoPort.toString(), audioPort.toString(), overlayHost ?: "")
++            .joinToString("\n")
++
++    fun signV2(
++        keyHex: String,
++        deviceId: String,
++        nonce: String,
++        mediaHost: String,
++        videoPort: Int,
++        audioPort: Int,
++        overlayHost: String?,
++    ): String = hmacSha256Hex(keyHex, setupCanonicalV2(deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost))
++
++    /** G3-S3: an IPv4 address in the overlay's block (the shared CGNAT /10, Tailscale's range). */
++    fun isOverlayIpv4(address: String): Boolean {
++        val parts = address.split('.')
++        if (parts.size != 4) return false
++        val octets = parts.map { it.toIntOrNull() ?: return false }
++        if (octets.any { it !in 0..255 }) return false
++        val value = (octets[0].toLong() shl 24) or (octets[1].toLong() shl 16) or
++            (octets[2].toLong() shl 8) or octets[3].toLong()
++        return (value and 0xFFC00000L) == 0x64400000L
++    }
++
++    /** G3-S3: the host every call goes to: the hub host when the setting is on and one is set. */
++    fun effectiveHost(enabled: Boolean, hubHost: String, companionHost: String): String =
++        if (enabled && hubHost.isNotBlank()) hubHost.trim() else companionHost
++
++    /** G3-S3: true only for the hub's own media endpoint (host and port); never a third-party URL. */
++    fun isHubMediaUrl(url: String, hubHost: String, mediaPort: Int): Boolean =
++        try {
++            val uri = URI(url)
++            val port = if (uri.port >= 0) uri.port else if (uri.scheme == "http") 80 else 443
++            hubHost.isNotBlank() && uri.host != null && uri.host.equals(hubHost.trim(), ignoreCase = true) &&
++                port == mediaPort
++        } catch (_: Exception) {
++            false
++        }
++
++    /** G3-S3: a host for a log line: a 12-hex hash, never the value. */
++    fun hostHash(host: String): String =
++        java.security.MessageDigest.getInstance("SHA-256")
++            .digest(host.toByteArray(Charsets.UTF_8))
++            .let { bytesToHex(it) }
++            .substring(0, 12)
++
++    /** G3-S3: a URL for a log line, its host replaced by [hostHash]. */
++    fun urlForLog(url: String): String =
++        try {
++            val uri = URI(url)
++            val host = uri.host ?: return "(url)"
++            URI(uri.scheme, null, "h-" + hostHash(host), uri.port, uri.rawPath, null, null).toString()
++        } catch (_: Exception) {
++            "(url)"
++        }
++
+     /** G3-S1 `required_permission`, mirrored: the header is sent only where it is honoured. */
+     fun requiredPermission(path: String): String? = when {
+         path.startsWith("/plugins/games/") || path == "/diagnostics/client-health" -> "games"
+@@ -100,6 +173,27 @@ object SessionProtocol {
+             "\"sig\":" + jsonString(sig) +
+             "}"
+ 
++    /** G3-S3: the v2 setup body (`sig_v` 2); `overlay_host` only when present. */
++    fun setupBodyV2(
++        deviceId: String,
++        nonce: String,
++        mediaHost: String,
++        videoPort: Int,
++        audioPort: Int,
++        overlayHost: String?,
++        sig: String,
++    ): String =
++        "{" +
++            "\"device_id\":" + jsonString(deviceId) + "," +
++            "\"nonce\":" + jsonString(nonce) + "," +
++            "\"media_host\":" + jsonString(mediaHost) + "," +
++            "\"video_port\":" + videoPort + "," +
++            "\"audio_port\":" + audioPort + "," +
++            (if (overlayHost != null) "\"overlay_host\":" + jsonString(overlayHost) + "," else "") +
++            "\"sig_v\":2," +
++            "\"sig\":" + jsonString(sig) +
++            "}"
++
+     fun pairBody(code: String, deviceName: String, keyHex: String): String =
+         "{" +
+             "\"code\":" + jsonString(code) + "," +
+diff --git a/PrivyHub/app/src/test/java/identity/IdentitySessionTest.kt b/PrivyHub/app/src/test/java/identity/IdentitySessionTest.kt
+index 9fbd7ed..2a4a699 100644
+--- a/PrivyHub/app/src/test/java/identity/IdentitySessionTest.kt
++++ b/PrivyHub/app/src/test/java/identity/IdentitySessionTest.kt
+@@ -17,6 +17,11 @@ import org.junit.Test
+  *
+  * The fake host speaks G3-S1's protocol: it verifies the setup HMAC with the
+  * key the client sent at pairing.
++ *
++ * G3-S3: the fake host verifies the v2 canon when `sig_v` is 2 (the audio
++ * port and the overlay address signed), can grant `diagnostics`, and issues a
++ * media token; the new cases cover the declared overlay address, diagnostics,
++ * the media header and media token, the hub host and the hub-only media rule.
+  */
+ class IdentitySessionTest {
+ 
+@@ -42,6 +47,7 @@ class IdentitySessionTest {
+         var identityLayer = true
+         var refuseSetupWith: String? = null
+         var counter = 0
++        var grant = listOf("games", "tv", "vod")
+         override fun post(url: String, jsonBody: String?): Pair<Int, String> {
+             val path = SessionProtocol.pathOf(url)
+             calls += path
+@@ -64,13 +70,23 @@ class IdentitySessionTest {
+                     val b = jsonBody!!
+                     val nonce = SessionProtocol.jsonStringField(b, "nonce")!!
+                     if (!nonces.remove(nonce)) return 401 to "{\"ok\": false, \"error\": \"session refused\", \"reason\": \"nonce-replayed\"}"
+-                    val expected = SessionProtocol.sign(
+-                        key!!, SessionProtocol.jsonStringField(b, "device_id")!!, nonce,
+-                        SessionProtocol.jsonStringField(b, "media_host")!!, SessionProtocol.jsonLongField(b, "video_port")!!.toInt(),
+-                    )
++                    val deviceId = SessionProtocol.jsonStringField(b, "device_id")!!
++                    val mediaHost = SessionProtocol.jsonStringField(b, "media_host")!!
++                    val videoPort = SessionProtocol.jsonLongField(b, "video_port")!!.toInt()
++                    val expected = if (SessionProtocol.jsonLongField(b, "sig_v") == 2L) {
++                        SessionProtocol.signV2(
++                            key!!, deviceId, nonce, mediaHost, videoPort,
++                            SessionProtocol.jsonLongField(b, "audio_port")!!.toInt(),
++                            SessionProtocol.jsonStringField(b, "overlay_host"),
++                        )
++                    } else {
++                        SessionProtocol.sign(key!!, deviceId, nonce, mediaHost, videoPort)
++                    }
+                     if (expected != SessionProtocol.jsonStringField(b, "sig"))
+                         return 401 to "{\"ok\": false, \"error\": \"session refused\", \"reason\": \"bad-signature\"}"
+-                    200 to "{\n  \"ok\": true,\n  \"token\": \"tok-${++counter}\",\n  \"expires_in_s\": 28800,\n  \"client_id\": \"dev-00112233aabbccdd\",\n  \"permissions\": [\n    \"games\",\n    \"tv\",\n    \"vod\"\n  ]\n}"
++                    val perms = grant.joinToString(",\n    ", "[\n    ", "\n  ]") { "\"$it\"" }
++                    val n = ++counter
++                    200 to "{\n  \"ok\": true,\n  \"token\": \"tok-$n\",\n  \"expires_in_s\": 28800,\n  \"client_id\": \"dev-00112233aabbccdd\",\n  \"permissions\": $perms,\n  \"media_token\": \"mtok-$n\"\n}"
+                 }
+                 else -> 404 to "{}"
+             }
+@@ -84,11 +100,18 @@ class IdentitySessionTest {
+     private val store = FakeStore()
+     private val host = FakeHost()
+     private var seed = 0
++    private var overlay: String? = null
++    private val overlayAddress: String =
++        InetAddress.getByAddress(byteArrayOf(0x64, 0x41, 0x12, 0x35)).hostAddress!!
++    private val routes = object : IdentitySession.LocalRoute {
++        override fun localAddressFor(host: String, port: Int): String? = localAddress
++        override fun overlayAddress(): String? = overlay
++    }
+     private val session = IdentitySession(
+         enabled = { on },
+         store = store,
+         transport = host,
+-        routes = { _, _ -> localAddress },
++        routes = routes,
+         clock = { now },
+         randomBytes = { n -> ByteArray(n) { (it + 31 * ++seed).toByte() } },
+         log = { logs += it },
+@@ -236,4 +259,105 @@ class IdentitySessionTest {
+             assertFalse(line, line.contains(hub))
+         }
+     }
++
++    // ---- G3-S3 ----------------------------------------------------------------
++
++    @Test
++    fun setupSignsV2AndDeclaresTheOverlayAddressWhenPresent() {
++        paired()
++        session.headerFor(hub, launch)
++        var body = host.bodies.last()
++        assertEquals(2L, SessionProtocol.jsonLongField(body, "sig_v"))
++        assertNull(SessionProtocol.jsonStringField(body, "overlay_host"))
++        session.endSessionLocally()
++        overlay = overlayAddress
++        assertNotNull(session.headerFor(hub, launch))      // the fake host verified the v2 signature
++        body = host.bodies.last()
++        assertEquals(overlayAddress, SessionProtocol.jsonStringField(body, "overlay_host"))
++        assertEquals(localAddress, SessionProtocol.jsonStringField(body, "media_host"))
++        // an address outside the overlay block is never declared as the overlay one
++        session.endSessionLocally()
++        overlay = localAddress
++        session.headerFor(hub, launch)
++        assertNull(SessionProtocol.jsonStringField(host.bodies.last(), "overlay_host"))
++        for (line in logs) {
++            assertFalse(line, line.contains(overlayAddress))
++            assertFalse(line, line.contains(localAddress))
++        }
++    }
++
++    @Test
++    fun diagnosticsWhenTheHostGrantsIt() {
++        host.grant = listOf("games", "tv", "vod", "diagnostics")
++        paired()                                   // the pairing listed games, tv, vod
++        assertNotNull(session.headerFor(hub, "http://$hub:8765/status"))
++        assertNotNull(session.headerFor(hub, "http://$hub:8765/diagnostics/health"))
++        assertNotNull(session.headerFor(hub, "http://$hub:8765/diagnostics/client-health"))
++        // the host's grant became the stored record
++        assertEquals(listOf("games", "tv", "vod", "diagnostics"), store.pairing!!.permissions)
++        assertEquals(listOf("/session/pair", "/session/nonce", "/session/setup"), host.calls)
++    }
++
++    @Test
++    fun tvAndEpgCarryTheToken() {
++        paired()
++        val t = session.headerFor(hub, launch)
++        for (path in listOf("/plugins/tv_state/state", "/plugins/epg/guide?channel_id=x", "/plugins/epg/prefetch", "/sources"))
++            assertEquals(path, t, session.headerFor(hub, "http://$hub:8765$path"))
++    }
++
++    @Test
++    fun mediaHeaderAndMediaToken() {
++        paired()
++        val header = session.mediaHeaderFor(hub)
++        assertNotNull(header)
++        assertEquals(header, session.headerFor(hub, launch))   // the same session token
++        assertTrue(session.mediaTokenFor(hub)!!.startsWith("mtok-"))
++        assertTrue(session.mediaTokenFor(hub) != header)
++        on = false
++        assertNull(session.mediaHeaderFor(hub))
++        assertNull(session.mediaTokenFor(hub))
++    }
++
++    @Test
++    fun noMediaHeaderWithoutVod() {
++        host.grant = listOf("games", "tv")
++        paired()
++        assertNull(session.mediaHeaderFor(hub))
++        assertNotNull(session.headerFor(hub, launch))
++    }
++
++    @Test
++    fun portMismatchIsShownNotRetried() {
++        paired()
++        val body = "{\n  \"ok\": false,\n  \"error\": \"session refused\",\n  \"reason\": \"endpoint-port-mismatch\"\n}"
++        assertFalse(session.onResponse(403, body, 0))
++        assertEquals(listOf("endpoint-port-mismatch"), refusals)
++        assertEquals("Session refused (403): endpoint-port-mismatch", session.refusalMessage(403, body))
++    }
++
++    @Test
++    fun hubHostAndHubOnlyMedia() {
++        assertEquals("companion", SessionProtocol.effectiveHost(false, "hub.tailnet.invalid", "companion"))
++        assertEquals("companion", SessionProtocol.effectiveHost(true, "", "companion"))
++        assertEquals("companion", SessionProtocol.effectiveHost(true, "  ", "companion"))
++        assertEquals("hub.tailnet.invalid", SessionProtocol.effectiveHost(true, " hub.tailnet.invalid ", "companion"))
++        assertTrue(SessionProtocol.isHubMediaUrl("http://$hub:8000/vod/a.mp4", hub, 8000))
++        assertTrue(SessionProtocol.isHubMediaUrl("http://HUB.invalid:8000/live/s.m3u8", hub, 8000))
++        assertFalse(SessionProtocol.isHubMediaUrl("http://$hub:8765/plugins/games/status", hub, 8000))
++        assertFalse(SessionProtocol.isHubMediaUrl("https://iptv.example.invalid/live.m3u8", hub, 8000))
++        assertFalse(SessionProtocol.isHubMediaUrl("http://iptv.example.invalid:8000/x", hub, 8000))
++        assertFalse(SessionProtocol.isHubMediaUrl("http://$hub.evil.invalid:8000/x", hub, 8000))
++        assertFalse(SessionProtocol.isHubMediaUrl("not a url", hub, 8000))
++        assertFalse(SessionProtocol.isHubMediaUrl("http://$hub:8000/x", "", 8000))
++    }
++
++    @Test
++    fun urlForLogHidesTheHost() {
++        val line = SessionProtocol.urlForLog("http://hub.tailnet.invalid:8000/vod/a.mp4")
++        assertFalse(line, line.contains("hub.tailnet.invalid"))
++        assertTrue(line, line.startsWith("http://h-") && line.endsWith(":8000/vod/a.mp4"))
++        assertEquals(12, SessionProtocol.hostHash("x").length)
++        assertFalse(SessionProtocol.urlForLog("http://$localAddress:8000/v").contains(localAddress))
++    }
+ }
+diff --git a/companion/range_server.py b/companion/range_server.py
+index cf606f9..c8c1337 100644
+--- a/companion/range_server.py
++++ b/companion/range_server.py
+@@ -41,6 +41,19 @@ RANGE_RE = re.compile(
+     r"^bytes=(\d*)-(\d*)$"
+ )
+ 
++# G3-S3: the range server's session gate, only with PRIVYHUB_SESSION_IDENTITY
++# set (the companion's environment is inherited). Absent = today: nothing
++# imported, no check, no audit line, the same response bytes.
++RANGE_GATE = None
++
++if os.environ.get("PRIVYHUB_SESSION_IDENTITY", "").strip():
++    from session_identity import media_gate_from_environ as _media_gate_from_environ
++
++    RANGE_GATE = _media_gate_from_environ(
++        os.environ,
++        Path(__file__).resolve().parents[1],
++    )
++
+ 
+ class RangeRequestHandler(SimpleHTTPRequestHandler):
+     server_version = "PrivyHubMedia/0.3"
+@@ -128,6 +141,32 @@ class RangeRequestHandler(SimpleHTTPRequestHandler):
+ 
+         super().end_headers()
+ 
++    # G3-S3: over the overlay a request needs the session token (the header)
++    # or the session's media token (`?media_token=`); the LAN as today.
++    def do_GET(self) -> None:
++        if RANGE_GATE is not None and RANGE_GATE.refuse(self):
++            return
++
++        super().do_GET()
++
++    def do_HEAD(self) -> None:
++        if RANGE_GATE is not None and RANGE_GATE.refuse(self):
++            return
++
++        super().do_HEAD()
++
++    def log_message(self, format, *args) -> None:
++        # G3-S3: the media token's value never reaches the log.
++        if RANGE_GATE is not None:
++            args = tuple(
++                RANGE_GATE.mask(arg)
++                if isinstance(arg, str)
++                else arg
++                for arg in args
++            )
++
++        super().log_message(format, *args)
++
+     def send_head(self) -> Optional[BinaryIO]:
+         try:
+             vod_relative = (
+diff --git a/companion/session_identity.py b/companion/session_identity.py
+index fcb7fbc..5e2daf8 100644
+--- a/companion/session_identity.py
++++ b/companion/session_identity.py
+@@ -20,6 +20,12 @@ every decision that matters is audited, with no address in the audit.
+ - Legacy: today's client (no token) is accepted only from the hub's own LAN
+   with `legacy_unpaired_lan` on, as `legacy-lan`, exactly as today; never
+   over the overlay. The hub itself (loopback) is `host-local`.
++
++G3-S3 (`docs/memory/evidence/G3_S3_HARDENING_AND_HUB_HOST_2026-10-16.md`):
++the setup canon v2 (the audio port and the overlay address signed), the
++declared-port binding, a per-session media token, the range server's gate
++(`MediaGate`, asking the companion's `/session/media-check` on loopback), and
++`diagnostics` as a grantable permission (default on for a paired device).
+ """
+ 
+ from __future__ import annotations
+@@ -35,14 +41,21 @@ import time
+ from dataclasses import dataclass
+ from pathlib import Path
+ from typing import Any, Callable, Mapping
+-from urllib.parse import parse_qs
++from urllib.parse import parse_qs, urlsplit
+ 
+ FLAG_ENV = "PRIVYHUB_SESSION_IDENTITY"
+ MODE_V2 = "v2"
+ SESSION_HEADER = "X-PrivyHub-Session"
+ 
+-PERMISSIONS = ("games", "tv", "vod", "pairing-admin")
+-DEFAULT_PAIRED_PERMISSIONS = ("games", "tv", "vod")
++PERMISSIONS = ("games", "tv", "vod", "diagnostics", "pairing-admin")
++# G3-S3: `diagnostics` (the user's own device reporting its health) is on for a
++# paired device. A record written since G3-S3 lists it (`permissions_v` 2) and
++# can drop it; a record paired before G3-S3 (no `permissions_v`) is granted it.
++DEFAULT_PAIRED_PERMISSIONS = ("games", "tv", "vod", "diagnostics")
++PERMISSIONS_V = 2
++MEDIA_PERMISSION = "vod"
++MEDIA_TOKEN_PARAM = "media_token"
++MEDIA_CHECK_PATH = "/session/media-check"
+ LEGACY_CLIENT = "legacy-lan"
+ HOST_LOCAL_CLIENT = "host-local"
+ 
+@@ -55,6 +68,7 @@ KEY_MIN_HEX = 64          # 32 bytes
+ KEY_MAX_HEX = 256
+ BODY_MAX_BYTES = 16_384
+ SETUP_CANON = "privyhub-session-setup-v1"
++SETUP_CANON_V2 = "privyhub-session-setup-v2"
+ 
+ # The session-setup actions: a legacy token is issued and audited on these.
+ SETUP_PATHS = frozenset({
+@@ -211,6 +225,7 @@ class DeviceStore:
+             "key_hex": key_hex,
+             "paired_at": paired_at,
+             "permissions": list(permissions),
++            "permissions_v": PERMISSIONS_V,
+         }
+         devices.append(device)
+         _atomic_write_json(self._file.path, {"version": 1, "devices": devices})
+@@ -256,6 +271,14 @@ def token_ref(token: str) -> str:
+     return hashlib.sha256(token.encode("utf-8")).hexdigest()[:8]
+ 
+ 
++def device_permissions(device: Mapping[str, Any]) -> tuple[str, ...]:
++    """The record's permissions; a pre-G3-S3 record (no `permissions_v`) also gets `diagnostics`."""
++    listed = [p for p in device.get("permissions", []) if p in PERMISSIONS]
++    if device.get("permissions_v") is None and "diagnostics" not in listed:
++        listed.append("diagnostics")
++    return tuple(listed)
++
++
+ def required_permission(path: str) -> str | None:
+     if path.startswith("/plugins/games/") or path == "/diagnostics/client-health":
+         return "games"
+@@ -265,7 +288,7 @@ def required_permission(path: str) -> str | None:
+     ):
+         return "tv"
+     if path == "/status" or path.startswith("/diagnostics/"):
+-        return "diagnostics"     # not grantable in v1: a token session is denied
++        return "diagnostics"     # G3-S3: grantable, default on for a paired device
+     return None
+ 
+ 
+@@ -276,6 +299,19 @@ class Session:
+     media_host: str | None = None
+     video_port: int | None = None
+     permissions: tuple[str, ...] = ()
++    # G3-S3
++    audio_port: int | None = None
++    overlay_host: str | None = None
++    media_token: str | None = None
++    media_audited: tuple[bool, ...] = ()
++
++    def target_for(self, routing: str, classify: Callable[[str], str]) -> str | None:
++        """The declared address whose class matches the request's routing class."""
++        want = ROUTING_LAN if routing == ROUTING_LOCAL else routing
++        for host in (self.media_host, self.overlay_host):
++            if host and classify(host) == want:
++                return host
++        return self.media_host
+ 
+ 
+ @dataclass
+@@ -356,7 +392,7 @@ class SessionGate:
+                 self._tokens = {t: s for t, s in self._tokens.items() if s.client_id != sess.client_id}
+                 return None, self._refuse(401, "device-revoked", "session_refused", routing,
+                                           client_id=sess.client_id, path=path)
+-            sess.permissions = tuple(p for p in device.get("permissions", []) if p in PERMISSIONS)
++            sess.permissions = device_permissions(device)
+             return sess, None
+ 
+     def _issue_token(self, sess: Session) -> str:
+@@ -391,11 +427,12 @@ class SessionGate:
+                 return self._refuse(403, "permission-denied", "permission_denied", routing,
+                                     client_id=sess.client_id, path=path, permission=permission)
+             if path == "/plugins/games/native-stream-start":
+-                port = (parse_qs(query).get("port") or [""])[0]
+-                if not port.isdigit() or int(port) != sess.video_port:
++                mismatch = self._port_mismatch(sess, parse_qs(query, keep_blank_values=True))
++                if mismatch is not None:
+                     return self._refuse(403, "endpoint-port-mismatch", "session_refused", routing,
+-                                        client_id=sess.client_id, path=path)
+-            return Decision(True, kind="session", client_id=sess.client_id, media_host=sess.media_host)
++                                        client_id=sess.client_id, path=path, port_kind=mismatch)
++            return Decision(True, kind="session", client_id=sess.client_id,
++                            media_host=sess.target_for(routing, self.classifier.classify))
+ 
+         if routing == ROUTING_LOCAL:
+             if path in SETUP_PATHS:
+@@ -415,6 +452,79 @@ class SessionGate:
+         reason = "legacy-overlay" if routing == ROUTING_OVERLAY else "legacy-unknown-network"
+         return self._refuse(401, reason, "legacy_refused", routing, path=path)
+ 
++    @staticmethod
++    def _port_mismatch(sess: Session, query: dict[str, list[str]]) -> str | None:
++        """G3-S3: the stream-start ports must be the signed ones. None = bound."""
++        ports = query.get("port") or []
++        if len(ports) != 1 or not ports[0].isdigit() or int(ports[0]) != sess.video_port:
++            return "video"
++        for name, signed in (("audio_port", sess.audio_port), ("controller_port", None)):
++            if name in query:
++                values = query[name]
++                if (signed is None or len(values) != 1 or not values[0].isdigit()
++                        or int(values[0]) != signed):
++                    return name.split("_", 1)[0]
++        return None
++
++    # ---- the range server's check (G3-S3) ------------------------------------------
++
++    def _session_by_media_token(self, media_token: str) -> str | None:
++        with self._lock:
++            for token, sess in self._tokens.items():
++                if sess.media_token and hmac.compare_digest(sess.media_token.encode(), media_token.encode()):
++                    return token
++        return None
++
++    def _media_check(self, method: str, body: dict[str, Any] | None, routing: str) -> tuple[int, dict[str, Any]]:
++        """`POST /session/media-check` from the range server (loopback only)."""
++        body = body if isinstance(body, dict) else {}
++        forwarded = body.get("routing")
++        fwd = forwarded if forwarded in (ROUTING_LAN, ROUTING_OVERLAY, ROUTING_UNKNOWN) else ROUTING_UNKNOWN
++        path = urlsplit(str(body.get("path") or "/")).path[:256]
++
++        def refused(status: int, reason: str, event: str = "media_refused", at: str = fwd, **f: Any):
++            self._refuse(status, reason, event, at, path=path, **f)
++            return status, {"ok": False, "error": "session refused", "reason": reason}
++
++        if routing != ROUTING_LOCAL:
++            return refused(403, "host-local-only", at=routing)
++        if method != "POST":
++            return 405, {"ok": False, "error": "POST only"}
++        if self.mode != MODE_V2:
++            return refused(401, "identity-flag-unknown")
++
++        token = str(body.get("token") or "").strip() or None
++        media_token = str(body.get("media_token") or "").strip() or None
++        used_media_token = token is None and media_token is not None
++        if used_media_token:
++            token = self._session_by_media_token(media_token)
++            if token is None:
++                return refused(401, "media-token-unknown", media_token_used=True)
++        if token is None:
++            if fwd == ROUTING_LAN:
++                if self.settings.legacy_unpaired_lan():
++                    return 200, {"ok": True, "kind": "legacy", "client_id": LEGACY_CLIENT}
++                return refused(401, "legacy-disabled", "legacy_refused")
++            reason = "legacy-overlay" if fwd == ROUTING_OVERLAY else "legacy-unknown-network"
++            return refused(401, reason, "legacy_refused")
++
++        sess, refusal = self._session_for(token, fwd, path)
++        if refusal is not None:
++            return refusal.status, {"ok": False, "error": "session refused", "reason": refusal.reason}
++        assert sess is not None
++        if sess.client_id != LEGACY_CLIENT and MEDIA_PERMISSION not in sess.permissions:
++            return refused(403, "permission-denied", "permission_denied", client_id=sess.client_id,
++                           permission=MEDIA_PERMISSION, media_token_used=used_media_token)
++        with self._lock:
++            first = used_media_token not in sess.media_audited
++            if first:
++                sess.media_audited = sess.media_audited + (used_media_token,)
++        if first:
++            self.audit.write("media_session", client_id=sess.client_id, token_ref=token_ref(token),
++                             media_token_used=used_media_token, path=path, **self._evidence(fwd))
++        kind = "legacy" if sess.client_id == LEGACY_CLIENT else "session"
++        return 200, {"ok": True, "kind": kind, "client_id": sess.client_id}
++
+     # ---- /session/* ------------------------------------------------------------
+ 
+     def session_route(self, method: str, path: str, body: dict[str, Any] | None,
+@@ -425,6 +535,9 @@ class SessionGate:
+             self._refuse(status, reason, event, routing, path=path, **f)
+             return status, {"ok": False, "error": "session refused", "reason": reason}
+ 
++        if path == MEDIA_CHECK_PATH:
++            return self._media_check(method, body, routing)
++
+         if self.mode != MODE_V2 and not (routing == ROUTING_LOCAL and path == "/session/status"):
+             return refused(401, "identity-flag-unknown")
+ 
+@@ -435,12 +548,25 @@ class SessionGate:
+                 return refused(403, "host-local-only")
+             with self._lock:
+                 now = self._clock()
+-                active = sum(1 for s in self._tokens.values() if s.expires_at > now)
++                live = [s for s in self._tokens.values() if s.expires_at > now]
++                active = len(live)
+                 window = self._pairing is not None and self._pairing.expires_at > now
++                # G3-S3: each live session's permission set and whether a media
++                # token is live (a boolean; never the token).
++                sessions = [{
++                    "client_id": s.client_id,
++                    "kind": "legacy" if s.client_id == LEGACY_CLIENT else "session",
++                    "permissions": list(s.permissions),
++                    "media_token_live": bool(s.media_token),
++                    "expires_in_s": int(s.expires_at - now),
++                } for s in live]
+             return 200, {
+                 "ok": True, "mode": self.mode, "paired_devices": self.devices.count(),
+                 "active_sessions": active, "legacy_unpaired_lan": self.settings.legacy_unpaired_lan(),
+                 "pairing_window_open": window,
++                "permissions_known": list(PERMISSIONS),
++                "default_paired_permissions": list(DEFAULT_PAIRED_PERMISSIONS),
++                "sessions": sessions,
+             }
+ 
+         if method != "POST":
+@@ -530,6 +656,10 @@ class SessionGate:
+         media_host = str(body.get("media_host") or "")
+         port_raw = body.get("video_port")
+         sig = str(body.get("sig") or "").lower()
++        # G3-S3: `sig_v` 2 signs the audio port and the overlay address too.
++        v2 = body.get("sig_v") == 2 and not isinstance(body.get("sig_v"), bool)
++        audio_raw = body.get("audio_port") if v2 else None
++        overlay_raw = str(body.get("overlay_host") or "") if v2 else ""
+ 
+         device = self.devices.get(device_id) if device_id else None
+         if device is None:
+@@ -546,7 +676,11 @@ class SessionGate:
+                 return refused(401, "nonce-replayed", client_id=device_id)
+             entry.used = True     # spent whatever the outcome below
+ 
+-        canonical = "\n".join([SETUP_CANON, device_id, nonce, media_host, str(port_raw)])
++        if v2:
++            canonical = "\n".join([SETUP_CANON_V2, device_id, nonce, media_host, str(port_raw),
++                                   "" if audio_raw is None else str(audio_raw), overlay_raw])
++        else:
++            canonical = "\n".join([SETUP_CANON, device_id, nonce, media_host, str(port_raw)])
+         try:
+             key = bytes.fromhex(str(device.get("key_hex") or ""))
+         except ValueError:
+@@ -563,18 +697,40 @@ class SessionGate:
+         if (host.version != 4 or host.is_loopback or host.is_unspecified or host.is_multicast
+                 or not (1024 <= port <= 65535) or isinstance(port_raw, bool)):
+             return refused(403, "endpoint-invalid", client_id=device_id)
+-        declared = self.classifier.classify(str(host))
+-        if not (declared == routing or (routing == ROUTING_LOCAL and declared == ROUTING_LAN)):
++        audio_port: int | None = None
++        if audio_raw is not None:
++            if isinstance(audio_raw, bool) or not isinstance(audio_raw, int) or not (1024 <= audio_raw <= 65535):
++                return refused(403, "endpoint-invalid", client_id=device_id)
++            audio_port = audio_raw
++        overlay_host: str | None = None
++        if overlay_raw:
++            try:
++                ov = ipaddress.ip_address(overlay_raw)
++            except ValueError:
++                return refused(403, "endpoint-invalid", client_id=device_id)
++            if ov.version != 4 or self.classifier.classify(str(ov)) != ROUTING_OVERLAY:
++                return refused(403, "endpoint-invalid", client_id=device_id)
++            overlay_host = str(ov)
++        want = ROUTING_LAN if routing == ROUTING_LOCAL else routing
++        declared = [self.classifier.classify(str(host))]
++        if overlay_host:
++            declared.append(ROUTING_OVERLAY)
++        if want not in declared:
+             return refused(403, "endpoint-class-mismatch", client_id=device_id)
+ 
+-        permissions = tuple(p for p in device.get("permissions", []) if p in PERMISSIONS)
++        permissions = device_permissions(device)
++        media_token = secrets.token_urlsafe(24)
+         token = self._issue_token(Session(device_id, self._clock() + TOKEN_TTL_S,
+-                                          media_host=str(host), video_port=port, permissions=permissions))
++                                          media_host=str(host), video_port=port, permissions=permissions,
++                                          audio_port=audio_port, overlay_host=overlay_host,
++                                          media_token=media_token))
+         self.audit.write("token_issued", client_id=device_id, token_ref=token_ref(token),
+                          expires_in_s=int(TOKEN_TTL_S), permissions=",".join(permissions),
+-                         **self._evidence(routing))
++                         sig_v=2 if v2 else 1, overlay_declared=overlay_host is not None,
++                         media_token_issued=True, **self._evidence(routing))
+         return 200, {"ok": True, "token": token, "expires_in_s": int(TOKEN_TTL_S),
+-                     "client_id": device_id, "permissions": list(permissions)}
++                     "client_id": device_id, "permissions": list(permissions),
++                     "media_token": media_token}
+ 
+     # ---- the HTTP glue ------------------------------------------------------------
+ 
+@@ -625,6 +781,115 @@ class SessionGate:
+         return str(handler.client_address[0])
+ 
+ 
++class MediaGate:
++    """G3-S3: the range server's gate (a separate process; the tokens live in
++    the companion). Loopback → allowed; the LAN without a token → today's
++    legacy path (if `legacy_unpaired_lan`); anything else → the companion's
++    `/session/media-check` on loopback decides and audits. The media token
++    is never logged: the range server's own log lines mask it."""
++
++    def __init__(
++        self,
++        mode: str,
++        config_dir: Path,
++        audit_path: Path,
++        control_port: int = 8765,
++        classifier: RoutingClassifier | None = None,
++        transport: Callable[[str, bytes], tuple[int, bytes]] | None = None,
++        wall: Callable[[], float] = time.time,
++    ) -> None:
++        self.mode = mode
++        self.settings = Settings(config_dir / "session_identity.json")
++        self.audit = AuditLog(audit_path, wall=wall)
++        self.classifier = classifier or RoutingClassifier()
++        loopback = str(ipaddress.ip_address(0x7F000001))
++        self.check_url = f"http://{loopback}:{int(control_port)}{MEDIA_CHECK_PATH}"
++        self._transport = transport or self._post
++
++    @staticmethod
++    def _post(url: str, body: bytes) -> tuple[int, bytes]:
++        import urllib.error
++        import urllib.request
++        req = urllib.request.Request(url, data=body, method="POST",
++                                     headers={"Content-Type": "application/json"})
++        try:
++            with urllib.request.urlopen(req, timeout=2.0) as resp:
++                return resp.status, resp.read(BODY_MAX_BYTES)
++        except urllib.error.HTTPError as exc:
++            return exc.code, exc.read(BODY_MAX_BYTES)
++
++    def decide(self, source: str, request_path: str, header_token: str | None) -> tuple[int, dict[str, Any]] | None:
++        """None = serve the request as today; else (status, refusal body)."""
++        routing = self.classifier.classify(source)
++        if routing == ROUTING_LOCAL:
++            return None
++        split = urlsplit(request_path)
++        media_token = ((parse_qs(split.query).get(MEDIA_TOKEN_PARAM) or [""])[0]).strip() or None
++        token = (header_token or "").strip() or None
++        if (token is None and media_token is None and routing == ROUTING_LAN
++                and self.mode == MODE_V2 and self.settings.legacy_unpaired_lan()):
++            return None
++        body = {"routing": routing, "path": split.path}
++        if token is not None:
++            body["token"] = token
++        elif media_token is not None:
++            body["media_token"] = media_token
++        try:
++            status, raw = self._transport(self.check_url, json.dumps(body).encode("utf-8"))
++            payload = json.loads(raw.decode("utf-8")) if raw else {}
++        except Exception:
++            self.audit.write("media_refused", reason="identity-unavailable", path=split.path[:256],
++                             media_token_used=token is None and media_token is not None,
++                             routing_evidence=routing, host_local=False)
++            return 503, {"ok": False, "error": "session refused", "reason": "identity-unavailable"}
++        if status == 200 and isinstance(payload, dict) and payload.get("ok") is True:
++            return None
++        reason = payload.get("reason") if isinstance(payload, dict) else None
++        return (status if status in (401, 403) else 503), {
++            "ok": False, "error": "session refused", "reason": str(reason or "identity-unavailable")}
++
++    @staticmethod
++    def mask(text: str) -> str:
++        """The request line with the media token's value masked."""
++        if MEDIA_TOKEN_PARAM + "=" not in text:
++            return text
++        out, rest = [], text
++        key = MEDIA_TOKEN_PARAM + "="
++        while key in rest:
++            head, _, tail = rest.partition(key)
++            end = min([i for i in (tail.find("&"), tail.find(" "), tail.find("#")) if i >= 0] or [len(tail)])
++            out.append(head + key + "<redacted>")
++            rest = tail[end:]
++        return "".join(out) + rest
++
++    def refuse(self, handler: Any) -> bool:
++        """True when the gate answered the request (a refusal)."""
++        decision = self.decide(str(handler.client_address[0]), handler.path,
++                               handler.headers.get(SESSION_HEADER))
++        if decision is None:
++            return False
++        status, payload = decision
++        data = json.dumps(payload, indent=2).encode("utf-8")
++        handler.send_response(status)
++        handler.send_header("Content-Type", "application/json")
++        handler.send_header("Content-Length", str(len(data)))
++        handler.end_headers()
++        if handler.command != "HEAD":
++            handler.wfile.write(data)
++        return True
++
++
++def media_gate_from_environ(environ: Mapping[str, str], project_root: Path) -> MediaGate | None:
++    raw = environ.get(FLAG_ENV)
++    if raw is None or not raw.strip():
++        return None
++    return MediaGate(
++        mode=raw.strip().lower(),
++        config_dir=Path.home() / ".config" / "privyhub",
++        audit_path=Path(project_root) / "logs" / "session_audit.jsonl",
++    )
++
++
+ def gate_from_environ(environ: Mapping[str, str], project_root: Path) -> SessionGate | None:
+     raw = environ.get(FLAG_ENV)
+     if raw is None or not raw.strip():
+diff --git a/docs/REMOTE_TRUST.md b/docs/REMOTE_TRUST.md
+index d55cf92..a1b9729 100644
+--- a/docs/REMOTE_TRUST.md
++++ b/docs/REMOTE_TRUST.md
+@@ -145,3 +145,42 @@ first, then latency, capacity, loss, and a slow recovery upward. No
+ adaptation decision ever changes a session's identity or its declared
+ endpoints.
+ 
++## 8. Hardening: the media token and the permission set (G3-S3)
++
++Built behind the same flags (the host's `PRIVYHUB_SESSION_IDENTITY=v2`, the
++client's `identity_v2`; absent / off = today), not installed, not adopted
++(record: `docs/memory/evidence/G3_S3_HARDENING_AND_HUB_HOST_2026-10-16.md`).
++Every point below is a **[G3-S3 proposal]**.
++
++- **The permission set.** `games`, `tv`, `vod`, `diagnostics`,
++  `pairing-admin`. A paired device gets the first four. `diagnostics` (the
++  user's own device reporting its health: `/status`, `/diagnostics/*`) is
++  **on by default** and listed in the pairing record (`permissions_v` 2), so it
++  can be revoked by removing it from the record's list (no restart). A record
++  paired before G3-S3 has no `permissions_v` and is granted `diagnostics`
++  implicitly; to revoke it there, list the permissions without it and add
++  `"permissions_v": 2`. TV-sync and EPG need `tv`, the range server `vod`.
++- **The signed endpoints.** The setup signs the video port, the audio port
++  and, when the client holds one, its overlay interface address
++  (`privyhub-session-setup-v2`). The stream-start ports must equal the signed
++  ones (`endpoint-port-mismatch`, audited). The hub streams to the declared
++  address whose class matches the request's: the overlay address off-site,
++  the LAN address at home.
++- **The media token.** Issued with every session token, bound to the
++  device, expiring and revoked with the session; for a player that cannot
++  send headers, as `?media_token=`. It is never logged: the audit records only
++  `media_token_used`, and the range server's own log masks its value. The
++  client's player sends the header (Media3 can), only to the hub's own media
++  endpoint, never to a third-party stream.
++- **The range server over the overlay** answers only with the session token
++  or the media token; it asks the companion on loopback, which decides and
++  audits (refusals each time, the first accepted use of a token once). On the
++  LAN without a token it serves as today (legacy). A presented token that
++  fails is refused, never falls back. The companion unreachable: refused
++  (`identity-unavailable`).
++- **Status.** The hub's session status document lists the permission set
++  and, per live session, its permissions and whether a media token is live
++  (a boolean, never the value).
++- **The hub host.** Off-site the client reaches the hub by a name the user
++  types ("Hub host", e.g. the hub's tailnet name), overriding the companion
++  host while `identity_v2` is on; the client never logs it (a hash if needed).
+diff --git a/docs/ROADMAP.md b/docs/ROADMAP.md
+index 00d2e98..359a05d 100644
+--- a/docs/ROADMAP.md
++++ b/docs/ROADMAP.md
+@@ -1509,6 +1509,25 @@ host logic 18/18; debug APK `77011eef…` built (release skipped by the user).
+ Next: CL-B2 (install after the watch; pair by hand; the live G3 smoke on the
+ LAN). Record: `docs/memory/evidence/G3_S2_SESSION_IDENTITY_CLIENT_SIDE_2026-10-16.md`.
+ 
++**G3-S3 (2026-10-16): HARDENING AND THE HUB HOST BUILT behind the same flags
++(absent / off = today, byte for byte), NOT INSTALLED, NOT ADOPTED.** Host: the
++setup signs the audio port and the overlay address (v2 canon; v1 still
++accepted), the stream-start ports bound to the signed ones
++(`endpoint-port-mismatch`), the media target chosen by the request's routing
++class, a per-session media token, the range server gated over the overlay
++(the token header or `?media_token=`, checked by the companion on loopback,
++audited), `diagnostics` grantable and default on, the status document's
++permission set and media-token boolean. Client: "Hub host" (overrides the
++companion host while `identity_v2` is on), the overlay interface address
++declared, the token on TV-sync, EPG, diagnostics, the player's hub media
++requests and artwork, reason codes shown with one retry. 80 host tests (the
++handler replay extended: the range server byte for byte), G1 / G5 suites
++green, 44 client unit tests, the handshake harness 24/24, debug APK
++`59f736d2…` built, not installed. Next: CL-B3 (install, a LAN PS1-STREAM and
++a VOD play with the flag and the setting on), then G4-S1 off-site. Record:
++`docs/memory/evidence/G3_S3_HARDENING_AND_HUB_HOST_2026-10-16.md`; trust model
++`docs/REMOTE_TRUST.md` §8.
++
+ The current LAN prototype may derive reachable media/controller targets from the
+ request source address. That mechanism is not a durable remote identity model
+ because a portable client may sit behind NAT/SNAT on the travel router.
+diff --git a/tests/session_identity/test_gate.py b/tests/session_identity/test_gate.py
+index 63fb1c7..841d646 100644
+--- a/tests/session_identity/test_gate.py
++++ b/tests/session_identity/test_gate.py
+@@ -62,7 +62,9 @@ class Pairing(unittest.TestCase):
+         text = path.read_text()
+         for a in ALL_ADDRESSES:
+             self.assertNotIn(a, text)
+-        self.assertEqual(json.loads(text)["devices"][0]["permissions"], ["games", "tv", "vod"])
++        # G3-S3: a new record lists `diagnostics` (default on) and carries permissions_v 2.
++        self.assertEqual(json.loads(text)["devices"][0]["permissions"], ["games", "tv", "vod", "diagnostics"])
++        self.assertEqual(json.loads(text)["devices"][0]["permissions_v"], 2)
+         # the window closes on success
+         st, p = g.session_route("POST", "/session/pair", {"code": "000000", "device_name": "x", "key": KEY_HEX}, None, LAN_SRC)
+         self.assertEqual(p["reason"], "pairing-closed")
+@@ -247,10 +249,13 @@ class Permissions(unittest.TestCase):
+         self.assertTrue(g.authorize("GET", "/sources", "", tok, LAN_SRC).allowed)
+ 
+     def test_unknown_permission_denied(self):
++        # G3-S3: `diagnostics` is grantable now; a record without it (revoked) is
++        # denied `/status` and `/diagnostics/*`; an unknown path stays unknown.
+         g, tok = self._session(["games", "tv", "vod"])
+-        for path in ("/status", "/diagnostics/health", "/no/such/route"):
++        for path, reason in (("/status", "permission-denied"), ("/diagnostics/health", "permission-denied"),
++                             ("/no/such/route", "permission-unknown")):
+             d = g.authorize("GET", path, "", tok, LAN_SRC)
+-            self.assertEqual((d.allowed, d.reason), (False, "permission-unknown"), path)
++            self.assertEqual((d.allowed, d.reason), (False, reason), path)
+ 
+     def test_pairing_admin(self):
+         g, tok = self._session(["games", "pairing-admin"])
+diff --git a/tests/session_identity/test_handler_replay.py b/tests/session_identity/test_handler_replay.py
+index 72982bb..5136cef 100644
+--- a/tests/session_identity/test_handler_replay.py
++++ b/tests/session_identity/test_handler_replay.py
+@@ -46,9 +46,36 @@ REQUESTS = [
+     ("client", "POST", "/plugins/games/native-stream-heartbeat?seq=1"),
+     ("client", "GET", "/status"),
+     ("client", "GET", "/plugins/nosuch/status"),
++    # G3-S3: TV-sync, EPG and diagnostics, now carrying the token (tv / diagnostics)
++    ("g3-s3", "GET", "/plugins/tv_state/state"),
++    ("g3-s3", "GET", "/plugins/epg/guide?channels=a,b&hours=6"),
++    ("g3-s3", "GET", "/plugins/epg/prefetch?channels=a"),
++    ("g3-s3", "GET", "/sources"),
++    ("g3-s3", "GET", "/diagnostics/health"),
++    ("g3-s3", "GET", "/diagnostics/stream-telemetry"),
+ ]
+ 
+ 
++class TvStateStub:
++    def handle(self, action: str, query: str) -> dict[str, Any]:
++        return {"ok": True, "plugin": "tv_state", "action": action}
++
++
++class EpgStub:
++    def handle(self, action: str, query: str) -> dict[str, Any]:
++        return {"ok": True, "plugin": "epg", "action": action, "query": parse_qs(query)}
++
++
++class CatalogStub:
++    def public_catalog(self) -> dict[str, Any]:
++        return {"ok": True, "sources": ["fixture"]}
++
++
++class SnapshotStub:
++    def snapshot(self) -> dict[str, Any]:
++        return {"ok": True, "fixture": "snapshot"}
++
++
+ class GamesStub:
+     def handle(self, action: str, query: str) -> dict[str, Any]:
+         return {"ok": True, "plugin": "games", "action": action, "query": parse_qs(query), "active": False}
+@@ -59,6 +86,8 @@ class GamesStub:
+ 
+ 
+ class ControllerStub:
++    catalog = CatalogStub()
++
+     def status(self) -> dict[str, Any]:
+         return {"service": "PrivyHub", "api_version": 4, "control_port": 8765}
+ 
+@@ -68,7 +97,11 @@ def handler_class(source: str, session_identity: Any, log: list[str]):
+         "__name__": "privyhub_service_fixture",
+         "Any": Any, "json": json, "urlsplit": urlsplit, "parse_qs": parse_qs,
+         "BaseHTTPRequestHandler": BaseHTTPRequestHandler,
+-        "PLUGINS": {"games": GamesStub()},
++        "PLUGINS": {"games": GamesStub(), "tv_state": TvStateStub(), "epg": EpgStub()},
++        "build_live_health_snapshot": lambda **kw: {"ok": True, "fixture": "health"},
++        "CLIENT_HEALTH_STORE": SnapshotStub(),
++        "STREAM_TELEMETRY_STORE": SnapshotStub(),
++        "WAN_TELEMETRY": None,
+         "CONTROLLER": ControllerStub(),
+         "PROJECT_ROOT": Path("/fixture/project"),
+         "access_log_path": lambda h: urlsplit(getattr(h, "path", "")).path,
+@@ -178,9 +211,35 @@ class HandlerReplay(unittest.TestCase):
+         self.assertIn(b'"target": "declared"', raw)
+         raw = run(v2, "POST", "/plugins/games/native-stream-start?port=50000", LAN_SRC)
+         self.assertIn(b'"target": "source"', raw)   # legacy: as today
++        # G3-S3: `diagnostics` is on for a paired device: /status answers.
+         raw = run(v2, "GET", "/status", LAN_SRC, {si.SESSION_HEADER: p["token"]})
++        self.assertTrue(raw.startswith(b"HTTP/1.0 200"))
++
++    def test_g3_s3_tv_epg_diagnostics_over_the_overlay(self):
++        from test_g3s3 import setup_v2
++        from common import OVERLAY_DECLARED
++        gate = make_gate()
++        v2 = handler_class(current_source(), gate, [])
++        paths = [t for o, m, t in REQUESTS if o == "g3-s3"]
++        for target in paths:
++            raw = run(v2, "GET", target, OVERLAY_SRC)
++            self.assertTrue(raw.startswith(b"HTTP/1.0 401"), target)
++            self.assertIn(b'"reason": "legacy-overlay"', raw)
++        dev = pair(gate)
++        st, p = setup_v2(gate, dev, source=OVERLAY_SRC, media_host=OVERLAY_DECLARED)
++        self.assertEqual(st, 200)
++        absent = handler_class(current_source(), None, [])
++        for target in paths:
++            raw = run(v2, "GET", target, OVERLAY_SRC, {si.SESSION_HEADER: p["token"]})
++            self.assertTrue(raw.startswith(b"HTTP/1.0 200"), target)
++            self.assertEqual(raw, run(absent, "GET", target, OVERLAY_SRC), target)   # the same answer as today's LAN
++        raw = run(v2, "POST", "/plugins/games/native-stream-start?port=48101", OVERLAY_SRC,
++                  {si.SESSION_HEADER: p["token"]})
+         self.assertTrue(raw.startswith(b"HTTP/1.0 403"))
+-        self.assertIn(b'"reason": "permission-unknown"', raw)
++        self.assertIn(b'"reason": "endpoint-port-mismatch"', raw)
++        raw = run(v2, "POST", "/plugins/games/native-stream-start?port=48100", OVERLAY_SRC,
++                  {si.SESSION_HEADER: p["token"]})
++        self.assertIn(b'"target": "other"', raw)    # the declared overlay host (not a LAN label)
+ 
+     def test_session_routes_over_http(self):
+         gate = make_gate()
+diff --git a/PrivyHub/app/src/main/java/identity/MediaDataSource.kt b/PrivyHub/app/src/main/java/identity/MediaDataSource.kt
+new file mode 100644
+index 0000000..925b5c3
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/identity/MediaDataSource.kt
+@@ -0,0 +1,26 @@
++package com.safeiot.privyhub.identity
++
++import android.content.Context
++import androidx.media3.common.util.UnstableApi
++import androidx.media3.datasource.DataSource
++import androidx.media3.datasource.ResolvingDataSource
++
++/**
++ * G3-S3: the player's requests to the hub's range server carry the session
++ * header (Media3 can set headers, so the media token is not needed). The
++ * resolver adds it only when the URI's host and port are the hub's media
++ * endpoint; a third-party stream (IPTV) is never given a token. Built only
++ * with `identity_v2` on; off, the player keeps today's factory untouched.
++ */
++@UnstableApi
++fun hubMediaDataSourceFactory(
++    context: Context,
++    upstream: DataSource.Factory,
++    hubHost: String,
++): DataSource.Factory {
++    val app = context.applicationContext
++    return ResolvingDataSource.Factory(upstream) { dataSpec ->
++        val header = PrivyHubIdentity.mediaHeader(app, dataSpec.uri.toString(), hubHost)
++        if (header == null) dataSpec else dataSpec.withAdditionalHeaders(mapOf(SessionProtocol.HEADER to header))
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/identity/SessionProtocolV2Test.kt b/PrivyHub/app/src/test/java/identity/SessionProtocolV2Test.kt
+new file mode 100644
+index 0000000..1b678aa
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/identity/SessionProtocolV2Test.kt
+@@ -0,0 +1,119 @@
++package com.safeiot.privyhub.identity
++
++import java.math.BigInteger
++import java.net.InetAddress
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * G3-S3: the v2 setup bytes against the host's own vectors
++ * (`resources/g3_s3/setup_vectors_v2.json`, made by
++ * `docs/memory/evidence/g3_s3_2026-10-16/make_vectors_v2.py`: each vector was
++ * accepted by the host's `SessionGate._setup` in process). Addresses are
++ * given as integers and built here.
++ */
++@Suppress("UNCHECKED_CAST")
++class SessionProtocolV2Test {
++
++    companion object {
++        val doc: Map<String, Any?> by lazy {
++            val text = SessionProtocolV2Test::class.java.classLoader!!
++                .getResource("g3_s3/setup_vectors_v2.json")!!.readText()
++            MiniJson.parse(text) as Map<String, Any?>
++        }
++
++        fun ip(hexint: Any?): String? =
++            (hexint as String?)?.let {
++                val v = BigInteger(it.removePrefix("0x").removePrefix("0X"), 16).toInt()
++                InetAddress.getByAddress(
++                    byteArrayOf((v ushr 24).toByte(), (v ushr 16).toByte(), (v ushr 8).toByte(), v.toByte())
++                ).hostAddress!!
++            }
++
++        fun body(name: String): String = (doc["host_bodies"] as Map<String, Any?>)[name] as String
++    }
++
++    private val vectors get() = doc["vectors"] as List<Map<String, Any?>>
++
++    @Test
++    fun constantsMatchTheHost() {
++        assertEquals(doc["setup_canon_v2"], SessionProtocol.SETUP_CANON_V2)
++        assertEquals(doc["media_permission"], SessionProtocol.MEDIA_PERMISSION)
++        assertEquals(doc["media_token_param"], SessionProtocol.MEDIA_TOKEN_PARAM)
++        val implied = (doc["default_paired_permissions"] as List<String>).toSet() - setOf("games", "tv", "vod")
++        assertEquals(implied, SessionProtocol.IMPLIED_FOR_PAIRED)
++    }
++
++    @Test
++    fun canonAndSignatureMatchEveryHostAcceptedVector() {
++        assertEquals(3, vectors.size)
++        for (v in vectors) {
++            val name = v["name"] as String
++            assertEquals(name, true, v["host_accepted"])
++            val media = ip(v["media_host"])!!
++            val overlay = ip(v["overlay_host"])
++            val video = (v["video_port"] as Long).toInt()
++            val audio = (v["audio_port"] as Long).toInt()
++            val canon = SessionProtocol.setupCanonicalV2(v["device_id"] as String, v["nonce"] as String, media, video, audio, overlay)
++            assertEquals(name, v["canonical_sha256"], SessionProtocolTest.sha256Hex(canon))
++            assertEquals(name, (v["canonical_bytes"] as Long).toInt(), canon.toByteArray().size)
++            assertEquals(
++                name,
++                v["sig"],
++                SessionProtocol.signV2(v["key_hex"] as String, v["device_id"] as String, v["nonce"] as String, media, video, audio, overlay),
++            )
++            overlay?.let { assertTrue(name, SessionProtocol.isOverlayIpv4(it)) }
++        }
++    }
++
++    @Test
++    fun setupBodyV2Shape() {
++        val v = vectors[1]
++        val media = ip(v["media_host"])!!
++        val overlay = ip(v["overlay_host"])!!
++        val parsed = MiniJson.parse(
++            SessionProtocol.setupBodyV2(v["device_id"] as String, v["nonce"] as String, media, 48100, 48101, overlay, v["sig"] as String)
++        ) as Map<String, Any?>
++        assertEquals(
++            listOf("device_id", "nonce", "media_host", "video_port", "audio_port", "overlay_host", "sig_v", "sig"),
++            parsed.keys.toList(),
++        )
++        assertEquals(2L, parsed["sig_v"])
++        assertEquals(overlay, parsed["overlay_host"])
++        val without = MiniJson.parse(
++            SessionProtocol.setupBodyV2("d", "n", media, 48100, 48101, null, "s")
++        ) as Map<String, Any?>
++        assertFalse(without.containsKey("overlay_host"))
++    }
++
++    @Test
++    fun overlayBlock() {
++        assertTrue(SessionProtocol.isOverlayIpv4(ip("0x64400000")!!))
++        assertTrue(SessionProtocol.isOverlayIpv4(ip("0x647FFFFF")!!))
++        assertFalse(SessionProtocol.isOverlayIpv4(ip("0x64800000")!!))
++        assertFalse(SessionProtocol.isOverlayIpv4(ip("0x643FFFFF")!!))
++        assertFalse(SessionProtocol.isOverlayIpv4(ip("0xC0A86439")!!))
++        assertFalse(SessionProtocol.isOverlayIpv4("hub.invalid"))
++        assertFalse(SessionProtocol.isOverlayIpv4("1.2.3"))
++    }
++
++    @Test
++    fun permissionMapMatchesTheHost() {
++        for ((path, permission) in doc["permission_map"] as Map<String, Any?>) {
++            assertEquals(path, permission, SessionProtocol.requiredPermission(path))
++        }
++    }
++
++    @Test
++    fun hostBodiesParse() {
++        val ok = body("setup_ok_v2")
++        assertEquals("fixture-media-token", SessionProtocol.jsonStringField(ok, "media_token"))
++        assertEquals("fixture-token", SessionProtocol.jsonStringField(ok, "token"))
++        assertEquals(listOf("games", "tv", "vod", "diagnostics"), SessionProtocol.jsonStringArray(ok, "permissions"))
++        assertEquals("endpoint-port-mismatch", SessionProtocol.reasonOf(body("port_mismatch")))
++        assertEquals("media-token-unknown", SessionProtocol.reasonOf(body("media_token_unknown")))
++        assertEquals("permission-denied", SessionProtocol.reasonOf(body("diagnostics_denied")))
++    }
++}
+diff --git a/PrivyHub/app/src/test/resources/g3_s3/setup_vectors_v2.json b/PrivyHub/app/src/test/resources/g3_s3/setup_vectors_v2.json
+new file mode 100644
+index 0000000..62ce070
+--- /dev/null
++++ b/PrivyHub/app/src/test/resources/g3_s3/setup_vectors_v2.json
+@@ -0,0 +1,83 @@
++{
++  "setup_canon_v2": "privyhub-session-setup-v2",
++  "vectors": [
++    {
++      "name": "lan-no-overlay",
++      "device_id": "dev-0123456789abcdef",
++      "nonce": "fixture-nonce-v2-1",
++      "media_host": "0xC0A86439",
++      "video_port": 48100,
++      "audio_port": 48101,
++      "overlay_host": null,
++      "source": "lan",
++      "key_hex": "13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb",
++      "sig_v": 2,
++      "canonical_sha256": "05f7b5e790351c0ecf1cd0820a6ee0ba4d2758255e5a60cb6f476579291df49b",
++      "canonical_bytes": 93,
++      "sig": "d141095cb7f798c23243600b53d11e7a8aac01c587279f89fa8a1176ee9b5548",
++      "host_accepted": true
++    },
++    {
++      "name": "lan-with-overlay",
++      "device_id": "dev-0123456789abcdef",
++      "nonce": "fixture-nonce-v2-2",
++      "media_host": "0xC0A86439",
++      "video_port": 48100,
++      "audio_port": 48101,
++      "overlay_host": "0x64401235",
++      "source": "lan",
++      "key_hex": "13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb",
++      "sig_v": 2,
++      "canonical_sha256": "8d8050e98cb5c41105a8afe7b322a10179842447891d60ed77c4672154147cb3",
++      "canonical_bytes": 105,
++      "sig": "09a2c1be9a9bf02f418736368e6db6a81ce20717b0705cb6cc7f63ec50fd8e9d",
++      "host_accepted": true
++    },
++    {
++      "name": "overlay-only",
++      "device_id": "dev-fedcba9876543210",
++      "nonce": "Zz-09_fixture-v2",
++      "media_host": "0x64401235",
++      "video_port": 50000,
++      "audio_port": 50001,
++      "overlay_host": "0x64401235",
++      "source": "overlay",
++      "key_hex": "13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb",
++      "sig_v": 2,
++      "canonical_sha256": "e2b2a15287d2e18f40d12e93ec803092b46ac0a3ea6a909f1355d2a0c4e29012",
++      "canonical_bytes": 101,
++      "sig": "0054a6cf50fb300d87e66ef9a839913b4a851eafbba9bae7276833dc1f71858d",
++      "host_accepted": true
++    }
++  ],
++  "host_bodies": {
++    "setup_ok_v2": "{\n  \"ok\": true,\n  \"token\": \"fixture-token\",\n  \"expires_in_s\": 28800,\n  \"client_id\": \"dev-0123456789abcdef\",\n  \"permissions\": [\n    \"games\",\n    \"tv\",\n    \"vod\",\n    \"diagnostics\"\n  ],\n  \"media_token\": \"fixture-media-token\"\n}",
++    "port_mismatch": "{\n  \"ok\": false,\n  \"error\": \"session refused\",\n  \"reason\": \"endpoint-port-mismatch\"\n}",
++    "media_token_unknown": "{\n  \"ok\": false,\n  \"error\": \"session refused\",\n  \"reason\": \"media-token-unknown\"\n}",
++    "diagnostics_denied": "{\n  \"ok\": false,\n  \"error\": \"session refused\",\n  \"reason\": \"permission-denied\"\n}"
++  },
++  "permission_map": {
++    "/status": "diagnostics",
++    "/diagnostics/health": "diagnostics",
++    "/diagnostics/bundle": "diagnostics",
++    "/diagnostics/self-test": "diagnostics",
++    "/diagnostics/stream-telemetry": "diagnostics",
++    "/diagnostics/client-health": "games",
++    "/plugins/tv_state/state": "tv",
++    "/plugins/epg/guide": "tv",
++    "/plugins/epg/prefetch": "tv",
++    "/plugins/iptv_org/channels": "tv",
++    "/sources": "tv",
++    "/plugins/games/launch": "games",
++    "/vod/x.mp4": null,
++    "/session/nonce": null
++  },
++  "default_paired_permissions": [
++    "games",
++    "tv",
++    "vod",
++    "diagnostics"
++  ],
++  "media_permission": "vod",
++  "media_token_param": "media_token"
++}
+diff --git a/tests/session_identity/test_g3s3.py b/tests/session_identity/test_g3s3.py
+new file mode 100644
+index 0000000..35abf4a
+--- /dev/null
++++ b/tests/session_identity/test_g3s3.py
+@@ -0,0 +1,431 @@
++#!/usr/bin/env python3
++"""G3-S3: hardening — every new accept / refuse case.
++
++    python3 -m unittest discover -s tests/session_identity -v
++
++The setup canon v2 (the audio port and the overlay address signed), the
++declared-port binding, `diagnostics` as a grantable permission, TV / EPG
++with a token, the media token, the companion's `/session/media-check`, the
++range server's `MediaGate`, and the status document. Addresses are built
++from integers in memory, as in G3-S1's tests; no token value is written.
++"""
++
++from __future__ import annotations
++
++import hashlib
++import hmac
++import json
++import unittest
++
++from common import (
++    ALL_ADDRESSES, KEY_HEX, LAN_DECLARED, LAN_SRC, LOCAL_SRC, OVERLAY_DECLARED, OVERLAY_SRC,
++    UNKNOWN_SRC, Clock, audit_lines, make_gate, pair, setup, si,
++)
++
++
++def sign_v2(device_id, nonce, media_host, video_port, audio_port, overlay_host, key_hex=KEY_HEX):
++    canon = "\n".join([si.SETUP_CANON_V2, device_id, nonce, media_host, str(video_port),
++                       "" if audio_port is None else str(audio_port), overlay_host or ""])
++    return hmac.new(bytes.fromhex(key_hex), canon.encode(), hashlib.sha256).hexdigest()
++
++
++def setup_v2(gate, device_id, source=LAN_SRC, media_host=LAN_DECLARED, video_port=48100,
++             audio_port=48101, overlay_host=None, tamper=None):
++    _, n = gate.session_route("POST", "/session/nonce", {}, None, source)
++    body = {"device_id": device_id, "nonce": n["nonce"], "media_host": media_host,
++            "video_port": video_port, "audio_port": audio_port, "sig_v": 2,
++            "sig": sign_v2(device_id, n["nonce"], media_host, video_port, audio_port, overlay_host)}
++    if overlay_host is not None:
++        body["overlay_host"] = overlay_host
++    if tamper:
++        body.update(tamper)
++    return gate.session_route("POST", "/session/setup", body, None, source)
++
++
++def reasons(gate):
++    return [line.get("reason") for line in audit_lines(gate) if line.get("reason")]
++
++
++def media_check(gate, routing, path="/vod/fixture.mp4", source=LOCAL_SRC, **creds):
++    return gate.session_route("POST", si.MEDIA_CHECK_PATH, {"routing": routing, "path": path, **creds},
++                              None, source)
++
++
++class SetupV2(unittest.TestCase):
++    def test_v2_accepted_with_media_token(self):
++        g = make_gate()
++        dev = pair(g)
++        st, p = setup_v2(g, dev)
++        self.assertEqual(st, 200, p)
++        self.assertTrue(p["media_token"])
++        self.assertNotEqual(p["media_token"], p["token"])
++        issued = [a for a in audit_lines(g) if a["event"] == "token_issued"][-1]
++        self.assertEqual((issued["sig_v"], issued["media_token_issued"]), (2, True))
++
++    def test_v1_still_accepted(self):
++        g = make_gate()
++        dev = pair(g)
++        (st, p), _ = setup(g, dev)
++        self.assertEqual(st, 200)
++        self.assertIn("media_token", p)
++        issued = [a for a in audit_lines(g) if a["event"] == "token_issued"][-1]
++        self.assertEqual(issued["sig_v"], 1)
++
++    def test_signed_audio_port_and_overlay_host(self):
++        g = make_gate()
++        dev = pair(g)
++        st, p = setup_v2(g, dev, tamper={"audio_port": 48999})
++        self.assertEqual((st, p["reason"]), (401, "bad-signature"))
++        st, p = setup_v2(g, dev, overlay_host=OVERLAY_DECLARED, tamper={"overlay_host": str(si.OVERLAY_NETWORKS[0][7])})
++        self.assertEqual((st, p["reason"]), (401, "bad-signature"))
++        # a v1 signature presented as v2 fails too
++        _, n = g.session_route("POST", "/session/nonce", {}, None, LAN_SRC)
++        from common import sign
++        body = {"device_id": dev, "nonce": n["nonce"], "media_host": LAN_DECLARED, "video_port": 48100,
++                "sig_v": 2, "sig": sign(dev, n["nonce"], LAN_DECLARED, 48100)}
++        st, p = g.session_route("POST", "/session/setup", body, None, LAN_SRC)
++        self.assertEqual((st, p["reason"]), (401, "bad-signature"))
++
++    def test_invalid_audio_port_or_overlay_host(self):
++        g = make_gate()
++        dev = pair(g)
++        self.assertEqual(setup_v2(g, dev, audio_port=80)[1]["reason"], "endpoint-invalid")
++        self.assertEqual(setup_v2(g, dev, overlay_host=LAN_DECLARED)[1]["reason"], "endpoint-invalid")
++        self.assertEqual(setup_v2(g, dev, overlay_host="not-an-address")[1]["reason"], "endpoint-invalid")
++
++    def test_overlay_source_streams_to_the_overlay_address(self):
++        g = make_gate()
++        dev = pair(g)
++        # off-site: the route-local address is a LAN-class one (the remote
++        # network), the overlay interface address is declared beside it.
++        st, p = setup_v2(g, dev, source=OVERLAY_SRC, media_host=LAN_DECLARED, overlay_host=OVERLAY_DECLARED)
++        self.assertEqual(st, 200, p)
++        d = g.authorize("POST", "/plugins/games/native-stream-start", "port=48100", p["token"], OVERLAY_SRC)
++        self.assertEqual((d.allowed, d.media_host), (True, OVERLAY_DECLARED))
++        # at home the same declaration streams to the LAN address
++        st, p = setup_v2(g, dev, source=LAN_SRC, media_host=LAN_DECLARED, overlay_host=OVERLAY_DECLARED)
++        d = g.authorize("POST", "/plugins/games/native-stream-start", "port=48100", p["token"], LAN_SRC)
++        self.assertEqual((d.allowed, d.media_host), (True, LAN_DECLARED))
++
++    def test_overlay_source_without_an_overlay_address_still_mismatches(self):
++        g = make_gate()
++        dev = pair(g)
++        st, p = setup_v2(g, dev, source=OVERLAY_SRC, media_host=LAN_DECLARED)
++        self.assertEqual((st, p["reason"]), (403, "endpoint-class-mismatch"))
++
++
++class PortBinding(unittest.TestCase):
++    def _token(self, v2=True):
++        g = make_gate()
++        dev = pair(g)
++        if v2:
++            st, p = setup_v2(g, dev)
++        else:
++            (st, p), _ = setup(g, dev, port=48100)
++        self.assertEqual(st, 200)
++        return g, p["token"]
++
++    def test_bound(self):
++        g, tok = self._token()
++        for q in ("port=48100", "port=48100&audio_port=48101"):
++            self.assertTrue(g.authorize("POST", "/plugins/games/native-stream-start", q, tok, LAN_SRC).allowed, q)
++
++    def test_mismatch_refused_and_audited(self):
++        g, tok = self._token()
++        cases = [("port=48102", "video"), ("", "video"), ("port=", "video"), ("port=48100&port=48100", "video"),
++                 ("port=48100&audio_port=48105", "audio"), ("port=48100&audio_port=", "audio"),
++                 ("port=48100&controller_port=48103", "controller")]
++        for q, kind in cases:
++            d = g.authorize("POST", "/plugins/games/native-stream-start", q, tok, LAN_SRC)
++            self.assertEqual((d.allowed, d.status, d.reason), (False, 403, "endpoint-port-mismatch"), q)
++            last = audit_lines(g)[-1]
++            self.assertEqual((last["reason"], last["port_kind"]), ("endpoint-port-mismatch", kind), q)
++
++    def test_v1_session_naming_an_audio_port_is_refused(self):
++        g, tok = self._token(v2=False)
++        d = g.authorize("POST", "/plugins/games/native-stream-start", "port=48100&audio_port=48101", tok, LAN_SRC)
++        self.assertEqual(d.reason, "endpoint-port-mismatch")
++
++    def test_legacy_lan_unchanged(self):
++        g = make_gate()
++        d = g.authorize("POST", "/plugins/games/native-stream-start", "port=40000", None, LAN_SRC)
++        self.assertTrue(d.allowed)
++        self.assertEqual(d.kind, "legacy")
++
++
++class Diagnostics(unittest.TestCase):
++    def _store(self, g, edit):
++        path = g.devices._file.path
++        doc = json.loads(path.read_text())
++        edit(doc["devices"][0])
++        path.write_text(json.dumps(doc))
++
++    def test_default_on_for_a_new_pairing(self):
++        g = make_gate()
++        dev = pair(g)
++        (st, p), _ = setup(g, dev)
++        self.assertIn("diagnostics", p["permissions"])
++        for path in ("/status", "/diagnostics/health", "/diagnostics/stream-telemetry"):
++            self.assertTrue(g.authorize("GET", path, "", p["token"], OVERLAY_SRC).allowed, path)
++
++    def test_record_paired_before_g3_s3_is_granted_diagnostics(self):
++        g = make_gate()
++        dev = pair(g)
++        self._store(g, lambda d: (d.pop("permissions_v"), d.update(permissions=["games", "tv", "vod"])))
++        (st, p), _ = setup(g, dev)
++        self.assertEqual(p["permissions"], ["games", "tv", "vod", "diagnostics"])
++        self.assertTrue(g.authorize("GET", "/status", "", p["token"], LAN_SRC).allowed)
++
++    def test_revoked_at_next_use(self):
++        g = make_gate()
++        dev = pair(g)
++        (st, p), _ = setup(g, dev)
++        self.assertTrue(g.authorize("GET", "/diagnostics/health", "", p["token"], LAN_SRC).allowed)
++        self._store(g, lambda d: d.update(permissions=["games", "tv", "vod"]))
++        d = g.authorize("GET", "/diagnostics/health", "", p["token"], LAN_SRC)
++        self.assertEqual((d.allowed, d.status, d.reason), (False, 403, "permission-denied"))
++        self.assertEqual(audit_lines(g)[-1]["permission"], "diagnostics")
++
++    def test_client_health_stays_games(self):
++        self.assertEqual(si.required_permission("/diagnostics/client-health"), "games")
++
++    def test_overlay_without_token_refused(self):
++        g = make_gate()
++        for path in ("/status", "/diagnostics/health"):
++            d = g.authorize("GET", path, "", None, OVERLAY_SRC)
++            self.assertEqual((d.allowed, d.reason), (False, "legacy-overlay"))
++        self.assertTrue(g.authorize("GET", "/status", "", None, LAN_SRC).allowed)   # LAN legacy: today
++
++
++class TvAndEpg(unittest.TestCase):
++    PATHS = ("/plugins/tv_state/state", "/plugins/epg/guide", "/plugins/epg/prefetch", "/plugins/iptv_org/channels")
++
++    def test_token_allowed_over_the_overlay(self):
++        g = make_gate()
++        dev = pair(g)
++        st, p = setup_v2(g, dev, source=OVERLAY_SRC, media_host=OVERLAY_DECLARED)
++        for path in self.PATHS:
++            self.assertTrue(g.authorize("GET", path, "", p["token"], OVERLAY_SRC).allowed, path)
++
++    def test_no_token_over_the_overlay_refused_lan_legacy(self):
++        g = make_gate()
++        for path in self.PATHS:
++            self.assertEqual(g.authorize("GET", path, "", None, OVERLAY_SRC).reason, "legacy-overlay")
++            self.assertEqual(g.authorize("GET", path, "", None, UNKNOWN_SRC).reason, "legacy-unknown-network")
++            self.assertTrue(g.authorize("GET", path, "", None, LAN_SRC).allowed)
++
++    def test_tv_revoked(self):
++        g = make_gate()
++        dev = pair(g)
++        path = g.devices._file.path
++        doc = json.loads(path.read_text())
++        doc["devices"][0]["permissions"] = ["games", "vod", "diagnostics"]
++        path.write_text(json.dumps(doc))
++        (st, p), _ = setup(g, dev)
++        d = g.authorize("POST", "/plugins/tv_state/state", "", p["token"], LAN_SRC)
++        self.assertEqual((d.allowed, d.reason), (False, "permission-denied"))
++
++
++class MediaCheck(unittest.TestCase):
++    def _session(self, source=OVERLAY_SRC, host=OVERLAY_DECLARED):
++        g = make_gate()
++        dev = pair(g)
++        st, p = setup_v2(g, dev, source=source, media_host=host)
++        self.assertEqual(st, 200, p)
++        return g, dev, p
++
++    def test_host_local_only(self):
++        g, _, p = self._session()
++        for src in (LAN_SRC, OVERLAY_SRC):
++            st, body = media_check(g, "overlay", source=src, token=p["token"])
++            self.assertEqual((st, body["reason"]), (403, "host-local-only"))
++
++    def test_header_token_over_the_overlay(self):
++        g, dev, p = self._session()
++        for _ in range(3):
++            st, body = media_check(g, "overlay", token=p["token"])
++            self.assertEqual((st, body["kind"], body["client_id"]), (200, "session", dev))
++        seen = [a for a in audit_lines(g) if a["event"] == "media_session"]
++        self.assertEqual(len(seen), 1)            # audited once per token, not per range request
++        self.assertEqual((seen[0]["media_token_used"], seen[0]["routing_evidence"]), (False, "overlay"))
++
++    def test_media_token_over_the_overlay(self):
++        g, dev, p = self._session()
++        st, body = media_check(g, "overlay", media_token=p["media_token"])
++        self.assertEqual((st, body["client_id"]), (200, dev))
++        seen = [a for a in audit_lines(g) if a["event"] == "media_session"]
++        self.assertEqual(seen[-1]["media_token_used"], True)
++
++    def test_media_token_refusals(self):
++        g, dev, p = self._session()
++        self.assertEqual(media_check(g, "overlay", media_token="forged")[1]["reason"], "media-token-unknown")
++        # the session token is not a media token, and vice versa
++        self.assertEqual(media_check(g, "overlay", media_token=p["token"])[1]["reason"], "media-token-unknown")
++        self.assertEqual(media_check(g, "overlay", token=p["media_token"])[1]["reason"], "token-unknown")
++        # ends with the session
++        g.session_route("POST", "/session/end", {}, p["token"], OVERLAY_SRC)
++        self.assertEqual(media_check(g, "overlay", media_token=p["media_token"])[1]["reason"], "media-token-unknown")
++
++    def test_media_token_expires_with_the_session(self):
++        clock = Clock()
++        g = make_gate(clock=clock)
++        dev = pair(g)
++        st, p = setup_v2(g, dev, source=OVERLAY_SRC, media_host=OVERLAY_DECLARED)
++        clock.t += si.TOKEN_TTL_S + 1
++        self.assertEqual(media_check(g, "overlay", media_token=p["media_token"])[1]["reason"], "token-expired")
++        self.assertEqual(media_check(g, "overlay", media_token=p["media_token"])[1]["reason"], "media-token-unknown")
++
++    def test_bound_to_the_device(self):
++        g, dev, p = self._session()
++        path = g.devices._file.path
++        path.write_text(json.dumps({"version": 1, "devices": []}))
++        self.assertEqual(media_check(g, "overlay", media_token=p["media_token"])[1]["reason"], "device-revoked")
++
++    def test_vod_permission(self):
++        g = make_gate()
++        dev = pair(g)
++        path = g.devices._file.path
++        doc = json.loads(path.read_text())
++        doc["devices"][0]["permissions"] = ["games", "tv", "diagnostics"]
++        path.write_text(json.dumps(doc))
++        st, p = setup_v2(g, dev, source=OVERLAY_SRC, media_host=OVERLAY_DECLARED)
++        st, body = media_check(g, "overlay", media_token=p["media_token"])
++        self.assertEqual((st, body["reason"]), (403, "permission-denied"))
++        self.assertEqual(audit_lines(g)[-1]["permission"], "vod")
++
++    def test_no_credentials(self):
++        g = make_gate()
++        self.assertEqual(media_check(g, "overlay")[1]["reason"], "legacy-overlay")
++        self.assertEqual(media_check(g, "unknown")[1]["reason"], "legacy-unknown-network")
++        self.assertEqual(media_check(g, "bogus")[1]["reason"], "legacy-unknown-network")
++        self.assertEqual(media_check(g, "lan")[0], 200)
++        g.settings._file.path.parent.mkdir(parents=True, exist_ok=True)
++        g.settings._file.path.write_text(json.dumps({"legacy_unpaired_lan": False}))
++        self.assertEqual(media_check(g, "lan")[1]["reason"], "legacy-disabled")
++
++    def test_legacy_token_never_over_the_overlay(self):
++        g = make_gate()
++        d = g.authorize("POST", "/plugins/games/launch", "id=x", None, LAN_SRC)
++        self.assertEqual(media_check(g, "lan", token=d.issued_token)[0], 200)
++        self.assertEqual(media_check(g, "overlay", token=d.issued_token)[1]["reason"], "legacy-overlay")
++
++    def test_unknown_flag_value(self):
++        g = make_gate(mode="v3")
++        self.assertEqual(media_check(g, "overlay", token="x")[1]["reason"], "identity-flag-unknown")
++
++    def test_path_audited_without_query(self):
++        g, _, p = self._session()
++        media_check(g, "overlay", path="/vod/a.mp4?media_token=" + p["media_token"], media_token="forged")
++        self.assertEqual(audit_lines(g)[-1]["path"], "/vod/a.mp4")
++
++
++class StatusDocument(unittest.TestCase):
++    def test_permissions_and_media_token_boolean(self):
++        g, = (make_gate(),)
++        dev = pair(g)
++        st, p = setup_v2(g, dev)
++        g.authorize("POST", "/plugins/games/launch", "id=x", None, LAN_SRC)   # one legacy token too
++        st, doc = g.session_route("GET", "/session/status", None, None, LOCAL_SRC)
++        self.assertEqual(st, 200)
++        self.assertEqual(doc["permissions_known"], list(si.PERMISSIONS))
++        self.assertIn("diagnostics", doc["default_paired_permissions"])
++        mine = [s for s in doc["sessions"] if s["client_id"] == dev][0]
++        self.assertEqual((mine["kind"], mine["media_token_live"]), ("session", True))
++        self.assertEqual(mine["permissions"], ["games", "tv", "vod", "diagnostics"])
++        legacy = [s for s in doc["sessions"] if s["kind"] == "legacy"][0]
++        self.assertFalse(legacy["media_token_live"])
++        text = json.dumps(doc)
++        self.assertNotIn(p["token"], text)
++        self.assertNotIn(p["media_token"], text)
++
++
++class RangeGate(unittest.TestCase):
++    """`MediaGate` with its transport wired to a gate in process (no socket)."""
++
++    def _gates(self, raising=False):
++        g = make_gate()
++        calls = []
++
++        def transport(url, body):
++            calls.append(json.loads(body))
++            if raising:
++                raise OSError("companion down")
++            st, payload = g.session_route("POST", si.MEDIA_CHECK_PATH, json.loads(body), None, LOCAL_SRC)
++            return st, json.dumps(payload).encode()
++
++        m = si.MediaGate("v2", g.devices._file.path.parent, g.audit.path, classifier=g.classifier,
++                         transport=transport)
++        return g, m, calls
++
++    def test_check_url_is_loopback(self):
++        _, m, _ = self._gates()
++        self.assertTrue(m.check_url.endswith(":8765" + si.MEDIA_CHECK_PATH))
++        self.assertEqual(si.RoutingClassifier().classify(m.check_url.split("/")[2].rsplit(":", 1)[0]), "local")
++
++    def test_local_and_lan_legacy_need_no_call(self):
++        _, m, calls = self._gates()
++        self.assertIsNone(m.decide(LOCAL_SRC, "/vod/a.mp4", None))
++        self.assertIsNone(m.decide(LAN_SRC, "/vod/a.mp4", None))
++        self.assertEqual(calls, [])
++
++    def test_overlay(self):
++        g, m, calls = self._gates()
++        st, body = m.decide(OVERLAY_SRC, "/vod/a.mp4", None)
++        self.assertEqual((st, body["reason"]), (401, "legacy-overlay"))
++        dev = pair(g)
++        _, p = setup_v2(g, dev, source=OVERLAY_SRC, media_host=OVERLAY_DECLARED)
++        self.assertIsNone(m.decide(OVERLAY_SRC, "/vod/a.mp4", p["token"]))
++        self.assertIsNone(m.decide(OVERLAY_SRC, "/vod/a.mp4?media_token=" + p["media_token"], None))
++        st, body = m.decide(OVERLAY_SRC, "/vod/a.mp4?media_token=forged", None)
++        self.assertEqual((st, body["reason"]), (401, "media-token-unknown"))
++        self.assertEqual(calls[-1]["path"], "/vod/a.mp4")          # no query forwarded
++        self.assertNotIn(LAN_SRC, json.dumps(calls))
++        self.assertNotIn(OVERLAY_SRC, json.dumps(calls))            # the class, never the address
++        self.assertEqual({c["routing"] for c in calls}, {"overlay"})
++
++    def test_lan_with_a_token_is_checked(self):
++        g, m, calls = self._gates()
++        dev = pair(g)
++        (st, p), _ = setup(g, dev)
++        self.assertIsNone(m.decide(LAN_SRC, "/vod/a.mp4", p["token"]))
++        self.assertEqual(len(calls), 1)
++        self.assertEqual([a for a in audit_lines(g) if a["event"] == "media_session"][-1]["routing_evidence"], "lan")
++
++    def test_companion_unreachable_fails_closed(self):
++        g, m, _ = self._gates(raising=True)
++        st, body = m.decide(OVERLAY_SRC, "/vod/a.mp4?media_token=abc", None)
++        self.assertEqual((st, body["reason"]), (503, "identity-unavailable"))
++        last = audit_lines(g)[-1]
++        self.assertEqual((last["event"], last["reason"], last["media_token_used"]),
++                         ("media_refused", "identity-unavailable", True))
++
++    def test_mask(self):
++        line = 'GET /vod/a.mp4?x=1&media_token=SECRETVALUE&y=2 HTTP/1.1'
++        self.assertEqual(si.MediaGate.mask(line), 'GET /vod/a.mp4?x=1&media_token=<redacted>&y=2 HTTP/1.1')
++        self.assertEqual(si.MediaGate.mask("GET /a?media_token=Z"), "GET /a?media_token=<redacted>")
++        self.assertEqual(si.MediaGate.mask("GET /a"), "GET /a")
++
++    def test_flag_absent_builds_nothing(self):
++        self.assertIsNone(si.media_gate_from_environ({}, ROOT_PATH))
++        self.assertIsNone(si.media_gate_from_environ({si.FLAG_ENV: " "}, ROOT_PATH))
++
++
++class AuditPrivacy(unittest.TestCase):
++    def test_no_address_token_or_media_token(self):
++        g = make_gate()
++        dev = pair(g)
++        st, p = setup_v2(g, dev, source=OVERLAY_SRC, media_host=LAN_DECLARED, overlay_host=OVERLAY_DECLARED)
++        media_check(g, "overlay", media_token=p["media_token"])
++        media_check(g, "overlay", media_token="forged")
++        g.authorize("POST", "/plugins/games/native-stream-start", "port=1", p["token"], OVERLAY_SRC)
++        text = g.audit.path.read_text()
++        for secret in (p["token"], p["media_token"], KEY_HEX, *ALL_ADDRESSES):
++            self.assertNotIn(secret, text)
++        for line in audit_lines(g):
++            self.assertIn(line["routing_evidence"], ("lan", "overlay", "unknown"))
++
++
++from common import ROOT as ROOT_PATH  # noqa: E402
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/session_identity/test_range_replay.py b/tests/session_identity/test_range_replay.py
+new file mode 100644
+index 0000000..7c0a085
+--- /dev/null
++++ b/tests/session_identity/test_range_replay.py
+@@ -0,0 +1,225 @@
++#!/usr/bin/env python3
++"""G3-S3: the range server's handler, in process, byte for byte.
++
++The baseline's `range_server.py` (HEAD, kept as
++`fixtures/range_server_predecessor.py.txt`) and the edited one are loaded as
++modules and fed the same raw HTTP requests over a fixture media tree: VOD
++full and ranged reads (start-end, open-ended, suffix, unsatisfiable), HEAD,
++the live HLS playlist, artwork, a missing file, a traversal, a directory
++listing, and a request carrying `?media_token=`. With the flag absent every
++response (status line, headers, body) and every log line must be identical.
++With the gate set (in process, its transport wired to a `SessionGate`):
++the LAN as today, the overlay refused without a token and served with the
++header or the media token, and the media token masked in the log. No socket
++is opened. If `G3_S3_RANGE_REPLAY_OUT` is set, the table is written there.
++"""
++
++from __future__ import annotations
++
++import hashlib
++import io
++import json
++import os
++import sys
++import tempfile
++import types
++import unittest
++from pathlib import Path
++from types import SimpleNamespace
++
++from common import LAN_DECLARED, LAN_SRC, LOCAL_SRC, OVERLAY_DECLARED, OVERLAY_SRC, ROOT, make_gate, pair, si
++from test_g3s3 import setup_v2
++
++FIX = Path(__file__).resolve().parent / "fixtures"
++LABELS = {LAN_SRC: "lan", LOCAL_SRC: "loopback", OVERLAY_SRC: "overlay"}
++
++REQUESTS = [
++    ("GET", "/vod/movie.mp4", {}),
++    ("GET", "/vod/movie.mp4", {"Range": "bytes=0-1023"}),
++    ("GET", "/vod/movie.mp4", {"Range": "bytes=70000-"}),
++    ("GET", "/vod/movie.mp4", {"Range": "bytes=-500"}),
++    ("GET", "/vod/movie.mp4", {"Range": "bytes=999999-"}),
++    ("HEAD", "/vod/movie.mp4", {}),
++    ("GET", "/live/stream.m3u8", {}),
++    ("GET", "/artwork/game.png", {}),
++    ("GET", "/vod/missing.mp4", {}),
++    ("GET", "/vod/../secret.txt", {}),
++    ("GET", "/live/", {}),
++    ("GET", "/vod/movie.mp4?media_token=fixture-value", {"Range": "bytes=0-99"}),
++]
++
++
++def media_tree() -> tuple[Path, Path]:
++    base = Path(tempfile.mkdtemp(prefix="g3_s3_range_"))
++    root, vod = base / "media", base / "vod"
++    (root / "live").mkdir(parents=True)
++    (root / "artwork").mkdir()
++    vod.mkdir()
++    data = b"".join(hashlib.sha256(i.to_bytes(4, "big")).digest() for i in range(2500))   # 80,000 bytes
++    (vod / "movie.mp4").write_bytes(data)
++    (root / "live" / "stream.m3u8").write_text("#EXTM3U\n#EXT-X-VERSION:3\nseg0.ts\n")
++    (root / "artwork" / "game.png").write_bytes(b"\x89PNG fixture")
++    (base / "secret.txt").write_text("outside the roots\n")
++    for p in (vod / "movie.mp4", root / "live" / "stream.m3u8", root / "artwork" / "game.png"):
++        os.utime(p, (1_790_000_000, 1_790_000_000))
++    return root, vod
++
++
++def load(name: str, source: str) -> types.ModuleType:
++    mod = types.ModuleType(name)
++    mod.__file__ = str(ROOT / "companion" / "range_server.py")
++    exec(compile(source, f"<{name}>", "exec"), mod.__dict__)
++    return mod
++
++
++def handler_class(mod: types.ModuleType):
++    class Fixed(mod.RangeRequestHandler):   # deterministic Date / Server / log time
++        def version_string(self) -> str:
++            return "PrivyHubMedia/0.3 Python/fixture"
++
++        def date_time_string(self, timestamp=None) -> str:
++            return "Thu, 01 Jan 2026 00:00:00 GMT"
++
++        def log_date_time_string(self) -> str:
++            return "01/Jan/2026 00:00:00"
++
++    return Fixed
++
++
++def run(cls, root: Path, vod: Path, method: str, target: str, source: str,
++        headers: dict[str, str] | None = None) -> tuple[bytes, str]:
++    lines = [f"{method} {target} HTTP/1.0"] + [f"{k}: {v}" for k, v in (headers or {}).items()]
++    raw = ("\r\n".join(lines) + "\r\n\r\n").encode()
++    h = cls.__new__(cls)
++    h._range = None
++    h._vod_directory = Path(os.path.abspath(vod))
++    h.directory = str(root)
++    h.rfile = io.BytesIO(raw)
++    h.wfile = io.BytesIO()
++    h.client_address = (source, 50123)
++    h.server = SimpleNamespace()
++    h.request = None
++    h.close_connection = True
++    err, sys.stderr = sys.stderr, io.StringIO()
++    try:
++        h.handle_one_request()
++        log = sys.stderr.getvalue()
++    finally:
++        sys.stderr = err
++    return h.wfile.getvalue(), log
++
++
++def short(raw: bytes) -> str:
++    return hashlib.sha256(raw).hexdigest()[:12]
++
++
++def wired_gate():
++    g = make_gate()
++
++    def transport(url, body):
++        st, payload = g.session_route("POST", si.MEDIA_CHECK_PATH, json.loads(body), None, LOCAL_SRC)
++        return st, json.dumps(payload).encode()
++
++    return g, si.MediaGate("v2", g.devices._file.path.parent, g.audit.path, classifier=g.classifier,
++                           transport=transport)
++
++
++class RangeReplay(unittest.TestCase):
++    table: list[str] = []
++
++    @classmethod
++    def setUpClass(cls):
++        cls.root, cls.vod = media_tree()
++        cls.before = load("range_before", (FIX / "range_server_predecessor.py.txt").read_text())
++        cls.after = load("range_after", (ROOT / "companion" / "range_server.py").read_text())
++        cls.table = ["| source | request | baseline | flag absent | v2 (the gate) |", "| --- | --- | --- | --- | --- |"]
++
++    @classmethod
++    def tearDownClass(cls):
++        out = os.environ.get("G3_S3_RANGE_REPLAY_OUT")
++        if out:
++            Path(out).write_text("\n".join(cls.table) + "\n")
++
++    def test_flag_absent_byte_for_byte(self):
++        self.assertIsNone(self.after.RANGE_GATE)   # the environment carries no flag here
++        before, after = handler_class(self.before), handler_class(self.after)
++        for method, target, headers in REQUESTS:
++            for src in (LAN_SRC, LOCAL_SRC, OVERLAY_SRC):
++                a, la = run(before, self.root, self.vod, method, target, src, headers)
++                b, lb = run(after, self.root, self.vod, method, target, src, headers)
++                self.assertEqual(a, b, f"flag absent differs: {method} {target} {headers}")
++                self.assertEqual(la, lb, f"log differs: {method} {target}")
++                self.assertTrue(a.startswith(b"HTTP/1.0 "))
++                rng = f" `{headers['Range']}`" if headers else ""
++                self.table.append(f"| {LABELS[src]} | `{method} {target}`{rng} | {short(a)} | identical | (below) |")
++
++    def test_gate_lan_today_overlay_needs_a_token(self):
++        g, gate = wired_gate()
++        self.after.RANGE_GATE = gate
++        try:
++            before, after = handler_class(self.before), handler_class(self.after)
++            # the LAN with no token, and the hub itself: today's bytes
++            for method, target, headers in REQUESTS:
++                for src in (LAN_SRC, LOCAL_SRC):
++                    a, _ = run(before, self.root, self.vod, method, target, src, headers)
++                    b, _ = run(after, self.root, self.vod, method, target, src, headers)
++                    if src == LAN_SRC and "media_token=" in target:
++                        # a presented credential that fails is refused; it never
++                        # falls back to the legacy path (G3-S1's token rule)
++                        self.assertIn(b'"reason": "media-token-unknown"', b)
++                        continue
++                    self.assertEqual(a, b, f"v2 LAN differs: {target}")
++            self.table.append("| lan, loopback | all of the above, no token | — | — | identical to the baseline |")
++            self.table.append("| lan | `GET /vod/movie.mp4?media_token=fixture-value` (not issued) | — | — | 401 `media-token-unknown` (no fallback) |")
++            # the overlay, no token: refused
++            raw, _ = run(after, self.root, self.vod, "GET", "/vod/movie.mp4", OVERLAY_SRC, {"Range": "bytes=0-99"})
++            self.assertTrue(raw.startswith(b"HTTP/1.0 401"))
++            self.assertIn(b'"reason": "legacy-overlay"', raw)
++            self.assertNotIn(b"\x89PNG", raw)
++            self.table.append("| overlay | `GET /vod/movie.mp4` no token | — | — | 401 `legacy-overlay` |")
++            raw, _ = run(after, self.root, self.vod, "HEAD", "/vod/movie.mp4", OVERLAY_SRC)
++            self.assertTrue(raw.startswith(b"HTTP/1.0 401"))
++            self.assertTrue(raw.endswith(b"\r\n\r\n"))   # HEAD: no body
++            # a paired session over the overlay: the header, then the media token
++            dev = pair(g)
++            st, p = setup_v2(g, dev, source=OVERLAY_SRC, media_host=OVERLAY_DECLARED)
++            self.assertEqual(st, 200)
++            want, _ = run(before, self.root, self.vod, "GET", "/vod/movie.mp4", LAN_SRC, {"Range": "bytes=0-1023"})
++            raw, _ = run(after, self.root, self.vod, "GET", "/vod/movie.mp4", OVERLAY_SRC,
++                         {"Range": "bytes=0-1023", si.SESSION_HEADER: p["token"]})
++            self.assertEqual(raw, want)
++            self.table.append("| overlay | `GET /vod/movie.mp4` `bytes=0-1023` + header | — | — | 206, the baseline's bytes |")
++            raw, log = run(after, self.root, self.vod, "GET", "/vod/movie.mp4?media_token=" + p["media_token"],
++                           OVERLAY_SRC, {"Range": "bytes=0-1023"})
++            self.assertEqual(raw, want)
++            self.assertNotIn(p["media_token"], log)
++            self.assertIn("media_token=<redacted>", log)
++            self.table.append("| overlay | `GET /vod/movie.mp4?media_token=…` `bytes=0-1023` | — | — | 206, the baseline's bytes; the log masks the value |")
++            raw, log = run(after, self.root, self.vod, "GET", "/vod/movie.mp4?media_token=forged", OVERLAY_SRC)
++            self.assertIn(b'"reason": "media-token-unknown"', raw)
++            self.assertNotIn("forged", log)
++            self.table.append("| overlay | `GET /vod/movie.mp4?media_token=forged` | — | — | 401 `media-token-unknown` |")
++            # a LAN session sends its header: checked, audited once
++            raw, _ = run(after, self.root, self.vod, "GET", "/artwork/game.png", LAN_SRC, {si.SESSION_HEADER: p["token"]})
++            self.assertTrue(raw.startswith(b"HTTP/1.0 200"))
++            events = [json.loads(x)["event"] for x in g.audit.path.read_text().splitlines()]
++            self.assertIn("media_session", events)
++            self.assertNotIn(p["media_token"], g.audit.path.read_text())
++        finally:
++            self.after.RANGE_GATE = None
++
++
++class Glue(unittest.TestCase):
++    def test_imported_only_under_the_flag(self):
++        import ast
++        tree = ast.parse((ROOT / "companion" / "range_server.py").read_text())
++        top_imports = [n for n in tree.body if isinstance(n, (ast.Import, ast.ImportFrom))]
++        self.assertFalse(any(getattr(n, "module", "") == "session_identity" for n in top_imports))
++        guarded = [n for n in tree.body if isinstance(n, ast.If)
++                   and any(isinstance(m, ast.ImportFrom) and m.module == "session_identity" for m in n.body)]
++        self.assertEqual(len(guarded), 1)
++        self.assertIn("PRIVYHUB_SESSION_IDENTITY", ast.unparse(guarded[0].test))
++
++
++if __name__ == "__main__":
++    unittest.main()
+# new file tests/session_identity/fixtures/range_server_predecessor.py.txt: not inlined; a verbatim copy of
+# git show 92e388e:companion/range_server.py, sha256 d9e477e3a5e01efb0a5dd6a150fb2461dd061bd00ecc4e25d082dd7d3639eb42

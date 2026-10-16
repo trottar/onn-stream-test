@@ -41,6 +41,19 @@ RANGE_RE = re.compile(
     r"^bytes=(\d*)-(\d*)$"
 )
 
+# G3-S3: the range server's session gate, only with PRIVYHUB_SESSION_IDENTITY
+# set (the companion's environment is inherited). Absent = today: nothing
+# imported, no check, no audit line, the same response bytes.
+RANGE_GATE = None
+
+if os.environ.get("PRIVYHUB_SESSION_IDENTITY", "").strip():
+    from session_identity import media_gate_from_environ as _media_gate_from_environ
+
+    RANGE_GATE = _media_gate_from_environ(
+        os.environ,
+        Path(__file__).resolve().parents[1],
+    )
+
 
 class RangeRequestHandler(SimpleHTTPRequestHandler):
     server_version = "PrivyHubMedia/0.3"
@@ -127,6 +140,32 @@ class RangeRequestHandler(SimpleHTTPRequestHandler):
         )
 
         super().end_headers()
+
+    # G3-S3: over the overlay a request needs the session token (the header)
+    # or the session's media token (`?media_token=`); the LAN as today.
+    def do_GET(self) -> None:
+        if RANGE_GATE is not None and RANGE_GATE.refuse(self):
+            return
+
+        super().do_GET()
+
+    def do_HEAD(self) -> None:
+        if RANGE_GATE is not None and RANGE_GATE.refuse(self):
+            return
+
+        super().do_HEAD()
+
+    def log_message(self, format, *args) -> None:
+        # G3-S3: the media token's value never reaches the log.
+        if RANGE_GATE is not None:
+            args = tuple(
+                RANGE_GATE.mask(arg)
+                if isinstance(arg, str)
+                else arg
+                for arg in args
+            )
+
+        super().log_message(format, *args)
 
     def send_head(self) -> Optional[BinaryIO]:
         try:

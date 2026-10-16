@@ -4,6 +4,7 @@ import android.content.Context
 
 import org.json.JSONObject
 
+import com.safeiot.privyhub.identity.PrivyHubIdentity
 import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.StandardCharsets
@@ -189,9 +190,12 @@ class TvStateSyncClient(
     }
 
 
+    // G3-S3: null = retry once (a token refusal, identity_v2 on); a refusal
+    // otherwise throws with the host's reason code. Off: unchanged.
     private fun readResponse(
-        connection: HttpURLConnection
-    ): JSONObject {
+        connection: HttpURLConnection,
+        identityAttempt: Int
+    ): JSONObject? {
         val status =
             connection.responseCode
 
@@ -221,6 +225,31 @@ class TvStateSyncClient(
             )
         }
 
+        if (
+            status !in 200..299 &&
+            PrivyHubIdentity.isEnabled(appContext)
+        ) {
+            val identity =
+                PrivyHubIdentity.get(appContext)
+
+            if (
+                identity.onResponse(
+                    status,
+                    text,
+                    identityAttempt
+                )
+            ) {
+                return null
+            }
+
+            identity.refusalMessage(
+                status,
+                text
+            )?.let {
+                throw IllegalStateException(it)
+            }
+        }
+
         val payload =
             JSONObject(
                 text
@@ -242,11 +271,15 @@ class TvStateSyncClient(
 
 
     private fun getEnvelope(
-        baseUrl: String
+        baseUrl: String,
+        identityAttempt: Int = 0
     ): JSONObject {
+        val url =
+            "$baseUrl/plugins/tv_state/state"
+
         val connection =
             URL(
-                "$baseUrl/plugins/tv_state/state"
+                url
             ).openConnection()
                 as HttpURLConnection
 
@@ -268,8 +301,19 @@ class TvStateSyncClient(
                 "application/json"
             )
 
+            // G3-S3: the session header (tv), only with identity_v2 on.
+            PrivyHubIdentity.decorate(
+                appContext,
+                connection,
+                url
+            )
+
             readResponse(
-                connection
+                connection,
+                identityAttempt
+            ) ?: getEnvelope(
+                baseUrl,
+                identityAttempt + 1
             )
         } finally {
             connection.disconnect()
@@ -280,7 +324,8 @@ class TvStateSyncClient(
     private fun putState(
         baseUrl: String,
         baseRevision: Long,
-        state: JSONObject
+        state: JSONObject,
+        identityAttempt: Int = 0
     ): JSONObject {
         val payload =
             JSONObject()
@@ -308,9 +353,12 @@ class TvStateSyncClient(
                     StandardCharsets.UTF_8
                 )
 
+        val url =
+            "$baseUrl/plugins/tv_state/state"
+
         val connection =
             URL(
-                "$baseUrl/plugins/tv_state/state"
+                url
             ).openConnection()
                 as HttpURLConnection
 
@@ -344,6 +392,13 @@ class TvStateSyncClient(
                 bytes.size
             )
 
+            // G3-S3: the session header (tv), only with identity_v2 on.
+            PrivyHubIdentity.decorate(
+                appContext,
+                connection,
+                url
+            )
+
             connection.outputStream.use {
                 it.write(
                     bytes
@@ -351,7 +406,13 @@ class TvStateSyncClient(
             }
 
             readResponse(
-                connection
+                connection,
+                identityAttempt
+            ) ?: putState(
+                baseUrl,
+                baseRevision,
+                state,
+                identityAttempt + 1
             )
         } finally {
             connection.disconnect()

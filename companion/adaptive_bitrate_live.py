@@ -110,6 +110,14 @@ from typing import Any, Callable
 
 import adaptive_bitrate as ab
 
+# G5-S2: the WAN adaptation rules, only with PRIVYHUB_WAN_ADAPTATION=1. Absent =
+# today: nothing imported, and observe() feeds the policy exactly as before.
+WAN_ADAPTATION = None
+if (os.environ.get("PRIVYHUB_WAN_ADAPTATION") or "").strip() == "1":
+    import wan_adaptation as _wan_adaptation
+
+    WAN_ADAPTATION = _wan_adaptation.from_environ(os.environ)
+
 try:  # the reference profile's id; a pure module, safe for the unit tests
     from native_stream_profiles import NATIVE_GAME_720P60_REFERENCE as _REFERENCE_PROFILE
     REFERENCE_PROFILE_ID = _REFERENCE_PROFILE.id
@@ -888,7 +896,10 @@ class LiveController:
                     return
                 self._last_sample = s
                 ctx = self._ctx(native_status)
-                events = self._policy.feed(s, ctx)
+                if WAN_ADAPTATION is None:
+                    events = self._policy.feed(s, ctx)
+                else:   # G5-S2: the rules' one suggestion, as a constraint on the ladder
+                    events = WAN_ADAPTATION.feed(self._policy, s, ctx, telemetry)
                 self._write_sample(s, self._policy.last_disposition, self._policy.last_clean)
                 self._emit(events, s, ctx)
                 self._maybe_actuate()

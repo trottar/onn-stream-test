@@ -1,0 +1,83 @@
+{
+  "setup_canon_v2": "privyhub-session-setup-v2",
+  "vectors": [
+    {
+      "name": "lan-no-overlay",
+      "device_id": "dev-0123456789abcdef",
+      "nonce": "fixture-nonce-v2-1",
+      "media_host": "0xC0A86439",
+      "video_port": 48100,
+      "audio_port": 48101,
+      "overlay_host": null,
+      "source": "lan",
+      "key_hex": "13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb",
+      "sig_v": 2,
+      "canonical_sha256": "05f7b5e790351c0ecf1cd0820a6ee0ba4d2758255e5a60cb6f476579291df49b",
+      "canonical_bytes": 93,
+      "sig": "d141095cb7f798c23243600b53d11e7a8aac01c587279f89fa8a1176ee9b5548",
+      "host_accepted": true
+    },
+    {
+      "name": "lan-with-overlay",
+      "device_id": "dev-0123456789abcdef",
+      "nonce": "fixture-nonce-v2-2",
+      "media_host": "0xC0A86439",
+      "video_port": 48100,
+      "audio_port": 48101,
+      "overlay_host": "0x64401235",
+      "source": "lan",
+      "key_hex": "13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb",
+      "sig_v": 2,
+      "canonical_sha256": "8d8050e98cb5c41105a8afe7b322a10179842447891d60ed77c4672154147cb3",
+      "canonical_bytes": 105,
+      "sig": "09a2c1be9a9bf02f418736368e6db6a81ce20717b0705cb6cc7f63ec50fd8e9d",
+      "host_accepted": true
+    },
+    {
+      "name": "overlay-only",
+      "device_id": "dev-fedcba9876543210",
+      "nonce": "Zz-09_fixture-v2",
+      "media_host": "0x64401235",
+      "video_port": 50000,
+      "audio_port": 50001,
+      "overlay_host": "0x64401235",
+      "source": "overlay",
+      "key_hex": "13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb",
+      "sig_v": 2,
+      "canonical_sha256": "e2b2a15287d2e18f40d12e93ec803092b46ac0a3ea6a909f1355d2a0c4e29012",
+      "canonical_bytes": 101,
+      "sig": "0054a6cf50fb300d87e66ef9a839913b4a851eafbba9bae7276833dc1f71858d",
+      "host_accepted": true
+    }
+  ],
+  "host_bodies": {
+    "setup_ok_v2": "{\n  \"ok\": true,\n  \"token\": \"fixture-token\",\n  \"expires_in_s\": 28800,\n  \"client_id\": \"dev-0123456789abcdef\",\n  \"permissions\": [\n    \"games\",\n    \"tv\",\n    \"vod\",\n    \"diagnostics\"\n  ],\n  \"media_token\": \"fixture-media-token\"\n}",
+    "port_mismatch": "{\n  \"ok\": false,\n  \"error\": \"session refused\",\n  \"reason\": \"endpoint-port-mismatch\"\n}",
+    "media_token_unknown": "{\n  \"ok\": false,\n  \"error\": \"session refused\",\n  \"reason\": \"media-token-unknown\"\n}",
+    "diagnostics_denied": "{\n  \"ok\": false,\n  \"error\": \"session refused\",\n  \"reason\": \"permission-denied\"\n}"
+  },
+  "permission_map": {
+    "/status": "diagnostics",
+    "/diagnostics/health": "diagnostics",
+    "/diagnostics/bundle": "diagnostics",
+    "/diagnostics/self-test": "diagnostics",
+    "/diagnostics/stream-telemetry": "diagnostics",
+    "/diagnostics/client-health": "games",
+    "/plugins/tv_state/state": "tv",
+    "/plugins/epg/guide": "tv",
+    "/plugins/epg/prefetch": "tv",
+    "/plugins/iptv_org/channels": "tv",
+    "/sources": "tv",
+    "/plugins/games/launch": "games",
+    "/vod/x.mp4": null,
+    "/session/nonce": null
+  },
+  "default_paired_permissions": [
+    "games",
+    "tv",
+    "vod",
+    "diagnostics"
+  ],
+  "media_permission": "vod",
+  "media_token_param": "media_token"
+}

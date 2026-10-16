@@ -51,8 +51,9 @@ REPO = Path(__file__).resolve().parent.parent
 BASE = "http://localhost:8765"
 UNIT = "privyhub-companion"
 PKG = "com.safeiot.privyhub"
-# CL-B2 (installed 2026-10-16): G3-S2's identity APK; the previous CONFIRMED APK was de072762... (CL-B1)
-EXPECT_APK = "77011eefa538fb965e46ad1f25ddac99036e1d77557ba7b7a677dc5947807d9d"
+# CL-B3 (installed 2026-10-16): G3-S3's hardened identity APK; the previous CONFIRMED APK was 77011eef... (CL-B2),
+# before it de072762... (CL-B1)
+EXPECT_APK = "59f736d29b96700253a178efa5efd0cd8846858a89d32848a0994586712bf65f"
 LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
 # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
 # is exactly these two names, at every precondition and teardown
@@ -66,7 +67,11 @@ RECOVERY = "PRIVYHUB_RECOVERY_TRIGGER=v2"
 # E4-S5D (adopted 2026-10-15): the encoder's output rate is the profile's fps (-r 60), not x11grab's probed tbr
 # (E4-S5 / S5B / S5C), through its own drop-in (snes-capture.conf); the adopted environ is exactly these five names
 SNES_CAPTURE = "PRIVYHUB_SNES_CAPTURE_FIX=output_rate"
-ADOPTED = sorted([LIVE, INDEX, SNES_CORE, RECOVERY, SNES_CAPTURE])
+# G-A1 (adopted 2026-10-16, the user): the overlay provider (G1-S1/S2) and session identity v2 on the host (G3-S1..S3),
+# each through its own drop-in (overlay.conf, session-identity.conf); the adopted environ is exactly these seven names
+OVERLAY = "PRIVYHUB_OVERLAY_PROVIDER=tailscale"
+IDENTITY = "PRIVYHUB_SESSION_IDENTITY=v2"
+ADOPTED = sorted([LIVE, INDEX, SNES_CORE, RECOVERY, SNES_CAPTURE, OVERLAY, IDENTITY])
 FLAG_NAMES = ["PRIVYHUB_ADAPTIVE_BITRATE_INJECT", "PRIVYHUB_ADAPTIVE_BITRATE_TOP", "PRIVYHUB_PS1_LOOK",
               "PRIVYHUB_NATIVE_PROFILE_ID", "PRIVYHUB_FEC_SCHEME"]
 RA_CFG = Path.home() / ".config/retroarch/config"
@@ -963,10 +968,12 @@ def preflight() -> dict:
          "drop_in_snes_core": f"Environment={SNES_CORE}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_recovery": f"Environment={RECOVERY}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_snes_capture": f"Environment={SNES_CAPTURE}" in sh(["systemctl", "--user", "cat", UNIT]),
+         "drop_in_overlay": f"Environment={OVERLAY}" in sh(["systemctl", "--user", "cat", UNIT]),
+         "drop_in_identity": f"Environment={IDENTITY}" in sh(["systemctl", "--user", "cat", UNIT]),
          "e3_dropin_absent": not DROPIN.exists(), "e4_constraint_absent": not E4_DROPIN.exists()}
     d["ok"] = (d["manager"] == [] and d["environ"] == ADOPTED and d["adb"] and d["drop_in_live"] and d["drop_in_index"]
-               and d["drop_in_snes_core"] and d["drop_in_recovery"] and d["drop_in_snes_capture"] and d["e3_dropin_absent"]
-               and d["e4_constraint_absent"])
+               and d["drop_in_snes_core"] and d["drop_in_recovery"] and d["drop_in_snes_capture"] and d["drop_in_overlay"]
+               and d["drop_in_identity"] and d["e3_dropin_absent"] and d["e4_constraint_absent"])
     return d
 
 

@@ -2,10 +2,34 @@
 
 Authoritative state: `../CURRENT.md`. **Start there.**
 
-Baseline commit `3107fb5` (the user's E4-close commit, 2026-10-15). Not
-committed since: G1-S1, G3-S1, G3-S2, last night's G5-S1 and G4-P1
-(`QUEUE_2026-10-16B`, session B), and this queue's E4-S4C, G1-S2 and
-CL-B2 (`../../../logs/cl_b2_git_status.txt`).
+Baseline commit `92e388e` (the user's Phase-G commit, 2026-10-16). Not committed since: G3-S3 (session B), G-A1
+and CL-B3 (`../../../logs/g_a1_git_status.txt`, `../../../logs/cl_b3_git_status.txt`).
+
+## 2026-10-16 (later) — session A: G-A1 adopted; CL-B3 (`G-A1_ADOPTION_AND_CL-B3_TASK.md`, uncommitted)
+
+- Baseline `92e388e`. G3-S3 (session B) is uncommitted beside it and untouched.
+- **G-A1: ADOPTED** (`../evidence/G_A1_OVERLAY_AND_IDENTITY_ADOPTION_2026-10-16.md`; patch
+  `G-A1_OVERLAY_AND_IDENTITY_ADOPTED`):
+  - `overlay.conf` (`PRIVYHUB_OVERLAY_PROVIDER=tailscale`) and `session-identity.conf`
+    (`PRIVYHUB_SESSION_IDENTITY=v2`). The user wrote both by hand, after this session's write was refused by its
+    permission check.
+  - **Seven lines** read back. `e1_suite.ADOPTED` and the preflight have seven (e3_state reads them).
+  - `/status` shows the overlay object (connected, `no-peer`); `/session/status` reads v2, 1 paired device.
+  - The reverts are written in the record.
+- **CL-B3: OPEN** (`../evidence/CL_B3_HARDENED_APK_LAN_2026-10-16.md`; patch `CL-B3_HARDENED_APK_HASH`):
+  - APK `59f736d2…` installed and CONFIRMED. The pairing survived `-r`.
+  - `identity_v2` on (the user, on the TV).
+  - **R1** (10-min PS1-STREAM, seven lines, signed path): every host gate held.
+    - Host CPU 11.57 %, at the 7000-7000 rung, reported only.
+    - `sig_v` 2, `?port=48100` → 200 (the binding), no `legacy_setup`, `media_token_live` true.
+  - **W** (G5-S1 smoke, `PRIVYHUB_WAN_TELEMETRY=1` per run): host gates held, and `wan` was live with eleven
+    measures and a class per window. `/status` after was byte for byte equal except `server.pid`. **Two gates NOT
+    MET:**
+    - companion CPU +0.633 point (≤ 0.5), from two runs, not paired arms;
+    - no `wan_sessions.jsonl` line (written only when a next session starts). The user decides.
+  - **VOD: PENDING.** The user was away; the steps are in the record §5.
+- End state: seven lines, no flag, no game; APK `59f736d2…` CONFIRMED; one paired device; `identity_v2` on, hub
+  host empty.
 
 ## 2026-10-16 — session A: the watch's record; G1-S2; CL-B2 (`QUEUE_2026-10-16`, uncommitted)
 

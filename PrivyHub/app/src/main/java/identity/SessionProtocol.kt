@@ -16,6 +16,14 @@ object SessionProtocol {
     const val SETUP_CANON = "privyhub-session-setup-v1"
     const val SECRET_BYTES = 32
 
+    // G3-S3: the v2 canon signs the audio port and the overlay address too.
+    const val SETUP_CANON_V2 = "privyhub-session-setup-v2"
+    const val MEDIA_PERMISSION = "vod"
+    const val MEDIA_TOKEN_PARAM = "media_token"
+
+    /** Granted to a paired device without being listed at pairing (G3-S3: diagnostics, default on). */
+    val IMPLIED_FOR_PAIRED = setOf("diagnostics")
+
     /** Re-run the setup when less than this remains of the token. */
     const val REFRESH_MARGIN_MS = 10L * 60L * 1000L
 
@@ -42,6 +50,71 @@ object SessionProtocol {
 
     fun sign(keyHex: String, deviceId: String, nonce: String, mediaHost: String, videoPort: Int): String =
         hmacSha256Hex(keyHex, setupCanonical(deviceId, nonce, mediaHost, videoPort))
+
+    /** G3-S3: seven lines; an absent overlay address is the empty string. */
+    fun setupCanonicalV2(
+        deviceId: String,
+        nonce: String,
+        mediaHost: String,
+        videoPort: Int,
+        audioPort: Int,
+        overlayHost: String?,
+    ): String =
+        listOf(SETUP_CANON_V2, deviceId, nonce, mediaHost, videoPort.toString(), audioPort.toString(), overlayHost ?: "")
+            .joinToString("\n")
+
+    fun signV2(
+        keyHex: String,
+        deviceId: String,
+        nonce: String,
+        mediaHost: String,
+        videoPort: Int,
+        audioPort: Int,
+        overlayHost: String?,
+    ): String = hmacSha256Hex(keyHex, setupCanonicalV2(deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost))
+
+    /** G3-S3: an IPv4 address in the overlay's block (the shared CGNAT /10, Tailscale's range). */
+    fun isOverlayIpv4(address: String): Boolean {
+        val parts = address.split('.')
+        if (parts.size != 4) return false
+        val octets = parts.map { it.toIntOrNull() ?: return false }
+        if (octets.any { it !in 0..255 }) return false
+        val value = (octets[0].toLong() shl 24) or (octets[1].toLong() shl 16) or
+            (octets[2].toLong() shl 8) or octets[3].toLong()
+        return (value and 0xFFC00000L) == 0x64400000L
+    }
+
+    /** G3-S3: the host every call goes to: the hub host when the setting is on and one is set. */
+    fun effectiveHost(enabled: Boolean, hubHost: String, companionHost: String): String =
+        if (enabled && hubHost.isNotBlank()) hubHost.trim() else companionHost
+
+    /** G3-S3: true only for the hub's own media endpoint (host and port); never a third-party URL. */
+    fun isHubMediaUrl(url: String, hubHost: String, mediaPort: Int): Boolean =
+        try {
+            val uri = URI(url)
+            val port = if (uri.port >= 0) uri.port else if (uri.scheme == "http") 80 else 443
+            hubHost.isNotBlank() && uri.host != null && uri.host.equals(hubHost.trim(), ignoreCase = true) &&
+                port == mediaPort
+        } catch (_: Exception) {
+            false
+        }
+
+    /** G3-S3: a host for a log line: a 12-hex hash, never the value. */
+    fun hostHash(host: String): String =
+        java.security.MessageDigest.getInstance("SHA-256")
+            .digest(host.toByteArray(Charsets.UTF_8))
+            .let { bytesToHex(it) }
+            .substring(0, 12)
+
+    /** G3-S3: a URL for a log line, its host replaced by [hostHash]. */
+    fun urlForLog(url: String): String =
+        try {
+            val uri = URI(url)
+            val host = uri.host ?: return "(url)"
+            URI(uri.scheme, null, "h-" + hostHash(host), uri.port, uri.rawPath, null, null).toString()
+        } catch (_: Exception) {
+            "(url)"
+        }
 
     /** G3-S1 `required_permission`, mirrored: the header is sent only where it is honoured. */
     fun requiredPermission(path: String): String? = when {
@@ -97,6 +170,27 @@ object SessionProtocol {
             "\"media_host\":" + jsonString(mediaHost) + "," +
             "\"video_port\":" + videoPort + "," +
             "\"audio_port\":" + audioPort + "," +
+            "\"sig\":" + jsonString(sig) +
+            "}"
+
+    /** G3-S3: the v2 setup body (`sig_v` 2); `overlay_host` only when present. */
+    fun setupBodyV2(
+        deviceId: String,
+        nonce: String,
+        mediaHost: String,
+        videoPort: Int,
+        audioPort: Int,
+        overlayHost: String?,
+        sig: String,
+    ): String =
+        "{" +
+            "\"device_id\":" + jsonString(deviceId) + "," +
+            "\"nonce\":" + jsonString(nonce) + "," +
+            "\"media_host\":" + jsonString(mediaHost) + "," +
+            "\"video_port\":" + videoPort + "," +
+            "\"audio_port\":" + audioPort + "," +
+            (if (overlayHost != null) "\"overlay_host\":" + jsonString(overlayHost) + "," else "") +
+            "\"sig_v\":2," +
             "\"sig\":" + jsonString(sig) +
             "}"
 

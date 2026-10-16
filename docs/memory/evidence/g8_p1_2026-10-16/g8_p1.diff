@@ -1,0 +1,677 @@
+# native_fec_relay.py: zero-context diff (its unchanged loopback bind line is not repeated here)
+diff --git a/companion/native_fec_relay.py b/companion/native_fec_relay.py
+index ed88703..dd89f3c 100644
+--- a/companion/native_fec_relay.py
++++ b/companion/native_fec_relay.py
+@@ -19,0 +20,6 @@ import native_fec_rs
++# G8-P1: the impairment shim, only with PRIVYHUB_IMPAIRMENT set. Absent = today:
++# nothing imported, the same port bound, the same target, no thread, no file.
++_impairment = None
++if os.environ.get("PRIVYHUB_IMPAIRMENT", "").strip():
++    import impairment as _impairment
++
+@@ -255,0 +262,7 @@ class NativeVideoFecRelay:
++            # G8-P1: under the flag only, the shim decides the bind port and the send target.
++            shim = None
++            if _impairment is not None:
++                shim = _impairment.relay_shim_from_environ(
++                    os.environ, self.local_port, (client_ip, int(client_port)),
++                    Path(__file__).resolve().parents[1])
++
+@@ -268 +281 @@ class NativeVideoFecRelay:
+-                    self.local_port,
++                    self.local_port if shim is None else shim.relay_bind_port,
+@@ -290 +303 @@ class NativeVideoFecRelay:
+-            )
++            ) if shim is None else shim.relay_send_target
+@@ -373,0 +387,4 @@ class NativeVideoFecRelay:
++            if shim is not None:
++                shim.attach(recv_socket.getsockname()[1])
++                self._shim = shim
++
+@@ -376,0 +394,4 @@ class NativeVideoFecRelay:
++            # G8-P1: under the flag only.
++            if _impairment is not None and getattr(self, "_shim", None) is not None:
++                self._shim.stop()
++                self._shim = None
+diff --git a/docs/ROADMAP.md b/docs/ROADMAP.md
+index 00d2e98..5b1123c 100644
+--- a/docs/ROADMAP.md
++++ b/docs/ROADMAP.md
+@@ -1640,6 +1671,17 @@ same PrivyHub authorization/session boundary.
+ 
+ ## G8 — Adverse-network characterization
+ 
++**Status (2026-10-16, G8-P1): HARNESS BUILT; ENVELOPE NOT MEASURED.** A
++user-space impairment shim (`companion/impairment.py`) on the loopback video
++hop, behind `PRIVYHUB_IMPAIRMENT=<profile>[@pre-fec|@post-fec][,seed=N]`
++(absent = today: the FEC sender byte for byte, no port, no thread). The
++profiles cover random loss, burst loss, delay, jitter, reordering and a rate
++cap with a bounded queue, plus combinations. All eleven passed their tolerance
++in process. `@post-fec` is the WAN-like placement; pre-FEC loss is never
++FEC-recoverable. Video only; no `nft`, no `sudo`. The shim's own cost is 2.1-7.0 %
++of a core, **over the ≤ 1-point bar**. Not adopted. Next proposed: G8-S1, the
++envelope. Record: `docs/memory/evidence/G8_P1_IMPAIRMENT_SHIM_2026-10-16.md`.
++
+ Exercise bounded representative conditions:
+ 
+ - reduced bandwidth;
+
+diff --git a/companion/impairment.py b/companion/impairment.py
+new file mode 100644
+index 0000000..7a9c030
+--- /dev/null
++++ b/companion/impairment.py
+@@ -0,0 +1,376 @@
++"""G8-P1: a user-space network-impairment shim on the loopback media hop.
++
++Behind `PRIVYHUB_IMPAIRMENT=<profile>[@pre-fec|@post-fec][,seed=N]`. **Absent =
++today**: `native_fec_relay` never imports this module; no thread, no port, no
++file. The design is
++`docs/memory/evidence/g8_p1_2026-10-16/design_written_before_code.md` (hashed
++before this code).
++
++A UDP relay thread on the loopback, no privileges:
++
++- `@pre-fec` (the default): encoder -> shim -> FEC sender. The shim takes the
++  sender's own port, so the encoder command is unchanged. Loss here is never
++  FEC-recoverable: the sender emits parity only for gap-free groups.
++- `@post-fec`: encoder -> FEC sender -> shim -> client. RTP and parity alike
++  are impaired, as on a WAN or under the nft harness.
++
++Video only: the audio sender and the controller return path do not use this
++hop. Every queue is bounded (ROADMAP §G5: no ever-growing buffer). One JSON
++line per second to `logs/impairment.jsonl`, with no address.
++"""
++
++from __future__ import annotations
++
++import heapq
++import ipaddress
++import json
++import random
++import select
++import socket
++import threading
++import time
++from dataclasses import dataclass, field
++from pathlib import Path
++from typing import Any, Mapping
++
++FLAG_ENV = "PRIVYHUB_IMPAIRMENT"
++SCHEMA = "privyhub_impairment_v1"
++PRE_FEC, POST_FEC = "pre-fec", "post-fec"
++LOOPBACK = str(ipaddress.ip_address(0x7F000001))   # built from an integer, no literal
++QUEUE_LIMIT_S = 0.100            # the cap's FIFO holds at most 100 ms of the cap's bytes
++REORDER_HOLD_MAX_S = 0.050       # a held packet with nothing behind it waits at most this
++RECV_BYTES = 65535
++
++# name -> parameters (one table; the record's profile table is this one)
++PROFILES: dict[str, dict[str, Any]] = {
++    "loss-1": {"loss": 0.01},
++    "loss-5": {"loss": 0.05},
++    "burst-50x20": {"burst_packets": 50, "burst_every_s": 20.0, "burst_first_s": 10.0},
++    "delay-50": {"delay_ms": 50.0},
++    "delay-150": {"delay_ms": 150.0},
++    "jitter-30": {"jitter_ms": 30.0},
++    "reorder-5": {"reorder": 0.05},
++    "cap-6000": {"cap_kbps": 6000},
++    "cap-4500": {"cap_kbps": 4500},
++}
++
++
++@dataclass
++class Profile:
++    names: tuple[str, ...]
++    placement: str = PRE_FEC
++    seed: int = 1
++    loss: float = 0.0
++    burst_packets: int = 0
++    burst_every_s: float = 0.0
++    burst_first_s: float = 0.0
++    delay_ms: float = 0.0
++    jitter_ms: float = 0.0
++    reorder: float = 0.0
++    cap_kbps: int = 0
++
++    @property
++    def label(self) -> str:
++        return "+".join(self.names)
++
++
++def parse(spec: str) -> Profile:
++    """`loss-1+delay-50@post-fec,seed=7` -> a Profile. Unknown names raise ValueError."""
++    raw = spec.strip()
++    seed = 1
++    if "," in raw:
++        raw, _, tail = raw.partition(",")
++        key, _, value = tail.partition("=")
++        if key.strip() != "seed" or not value.strip().lstrip("-").isdigit():
++            raise ValueError(f"impairment: bad option {tail!r}")
++        seed = int(value)
++    placement = PRE_FEC
++    if "@" in raw:
++        raw, _, placement = raw.partition("@")
++        placement = placement.strip().lower()
++        if placement not in (PRE_FEC, POST_FEC):
++            raise ValueError(f"impairment: bad placement {placement!r}")
++    names = tuple(n.strip() for n in raw.split("+") if n.strip())
++    if not names:
++        raise ValueError("impairment: empty profile")
++    p = Profile(names=names, placement=placement, seed=seed)
++    for n in names:
++        if n not in PROFILES:
++            raise ValueError(f"impairment: unknown profile {n!r}")
++        for k, v in PROFILES[n].items():
++            # a combination of two of a kind keeps the stronger
++            cur = getattr(p, k)
++            setattr(p, k, max(cur, v) if isinstance(v, (int, float)) else v)
++    return p
++
++
++def from_environ(environ: Mapping[str, str]) -> Profile | None:
++    raw = (environ.get(FLAG_ENV) or "").strip()
++    return parse(raw) if raw else None
++
++
++@dataclass
++class Counters:
++    packets_in: int = 0
++    packets_out: int = 0
++    bytes_in: int = 0
++    bytes_out: int = 0
++    dropped_loss: int = 0
++    dropped_burst: int = 0
++    dropped_queue: int = 0
++    delayed: int = 0
++    reordered: int = 0
++    queue_max: int = 0
++    send_errors: int = 0
++    cpu_s: float = 0.0
++
++    def as_dict(self) -> dict[str, Any]:
++        return dict(self.__dict__)
++
++
++@dataclass(order=True)
++class _Due:
++    at: float
++    seq: int
++    data: bytes = field(compare=False)
++
++
++class Impairer:
++    """The pure part: given (arrival time, packet), decide drop / when to release.
++
++    No socket, no clock of its own: `offer` and `due` take the time. One stage
++    order: burst, loss, reorder, delay + jitter, cap."""
++
++    def __init__(self, p: Profile, start: float) -> None:
++        self.p = p
++        self.rng = random.Random(p.seed)
++        self.start = start
++        self.counters = Counters()
++        self._heap: list[_Due] = []
++        self._seq = 0
++        self._last_release = 0.0
++        self._link_free_at = 0.0
++        self._held: tuple[bytes, float] | None = None
++        self._burst_left = 0
++        self._next_burst = start + p.burst_first_s if p.burst_packets else None
++
++    def _push(self, at: float, data: bytes) -> None:
++        self._seq += 1
++        heapq.heappush(self._heap, _Due(at, self._seq, data))
++        depth = len(self._heap)
++        if depth > self.counters.queue_max:
++            self.counters.queue_max = depth
++
++    def _schedule(self, now: float, data: bytes) -> None:
++        p = self.p
++        at = now
++        if p.delay_ms or p.jitter_ms:
++            at = now + (p.delay_ms + (self.rng.uniform(0.0, p.jitter_ms) if p.jitter_ms else 0.0)) / 1000.0
++            at = max(at, self._last_release)        # FIFO: jitter never reorders
++            self._last_release = at
++            self.counters.delayed += 1
++        if p.cap_kbps:
++            depart = max(at, self._link_free_at)
++            if depart - at > QUEUE_LIMIT_S:
++                self.counters.dropped_queue += 1      # tail drop: the queue is bounded
++                return
++            self._link_free_at = depart + len(data) * 8.0 / (p.cap_kbps * 1000.0)
++            at = depart
++        self._push(at, data)
++
++    def offer(self, now: float, data: bytes) -> None:
++        p, c = self.p, self.counters
++        c.packets_in += 1
++        c.bytes_in += len(data)
++        if self._next_burst is not None and now >= self._next_burst:
++            self._burst_left = p.burst_packets
++            self._next_burst += p.burst_every_s
++        if self._burst_left > 0:
++            self._burst_left -= 1
++            c.dropped_burst += 1
++            return
++        if p.loss and self.rng.random() < p.loss:
++            c.dropped_loss += 1
++            return
++        if self._held is not None:
++            held, _ = self._held
++            self._held = None
++            self._schedule(now, data)
++            self._schedule(now, held)                  # one slot later: a swap
++            c.reordered += 1
++            return
++        if p.reorder and self.rng.random() < p.reorder:
++            self._held = (data, now)
++            return
++        self._schedule(now, data)
++
++    def due(self, now: float) -> list[bytes]:
++        if self._held is not None and now - self._held[1] >= REORDER_HOLD_MAX_S:
++            held, _ = self._held
++            self._held = None
++            self._schedule(now, held)
++        out = []
++        while self._heap and self._heap[0].at <= now:
++            out.append(heapq.heappop(self._heap).data)
++        return out
++
++    def next_due(self) -> float | None:
++        t = self._heap[0].at if self._heap else None
++        if self._held is not None:
++            h = self._held[1] + REORDER_HOLD_MAX_S
++            t = h if t is None else min(t, h)
++        return t
++
++    def depth(self) -> int:
++        return len(self._heap) + (1 if self._held is not None else 0)
++
++
++class Shim:
++    """The relay thread: listen on the loopback, impair, forward."""
++
++    def __init__(self, profile: Profile, listen_port: int = 0, forward: tuple[str, int] | None = None,
++                 log_path: Path | None = None, clock=time.monotonic) -> None:
++        self.profile = profile
++        self._clock = clock
++        self.sock_in = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++        self.sock_in.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 2 * 1024 * 1024)
++        self.sock_in.bind((LOOPBACK, int(listen_port)))
++        self.sock_out = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++        self.sock_out.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 2 * 1024 * 1024)
++        self.forward = forward
++        self.log_path = log_path
++        self.impairer = Impairer(profile, clock())
++        self._running = False
++        self._thread: threading.Thread | None = None
++        self._lock = threading.Lock()
++        self.lines: list[dict[str, Any]] = []        # the per-second lines (also written, if a path)
++
++    @property
++    def port(self) -> int:
++        return int(self.sock_in.getsockname()[1])
++
++    def start(self) -> None:
++        if self.forward is None:
++            raise ValueError("impairment: no forward target")
++        self._running = True
++        self._thread = threading.Thread(target=self._run, name="PrivyHub-Impairment", daemon=True)
++        self._thread.start()
++
++    def stop(self) -> None:
++        self._running = False
++        t = self._thread
++        if t is not None:
++            t.join(timeout=2.0)
++        for s in (self.sock_in, self.sock_out):
++            try:
++                s.close()
++            except OSError:
++                pass
++
++    def counters(self) -> dict[str, Any]:
++        with self._lock:
++            return self.impairer.counters.as_dict()
++
++    def _send(self, packets: list[bytes]) -> None:
++        c = self.impairer.counters
++        for data in packets:
++            try:
++                self.sock_out.sendto(data, self.forward)
++                c.packets_out += 1
++                c.bytes_out += len(data)
++            except OSError:
++                c.send_errors += 1
++
++    def _write_line(self, now: float, prev: dict[str, Any]) -> dict[str, Any]:
++        cur = self.impairer.counters.as_dict()
++        line = {"schema": SCHEMA, "t_s": round(now - self.impairer.start, 3), "profile": self.profile.label,
++                "placement": self.profile.placement, "seed": self.profile.seed,
++                **{k: (round(cur[k] - prev.get(k, 0), 6) if k == "cpu_s" else cur[k] - prev.get(k, 0))
++                   for k in cur if k != "queue_max"},
++                "queue_depth": self.impairer.depth(), "queue_max": cur["queue_max"]}
++        self.lines.append(line)
++        if self.log_path is not None:
++            try:
++                self.log_path.parent.mkdir(parents=True, exist_ok=True)
++                with self.log_path.open("a", encoding="utf-8") as fh:
++                    fh.write(json.dumps(line, sort_keys=True) + "\n")
++            except OSError:
++                pass
++        return cur
++
++    def _run(self) -> None:
++        cpu0 = time.thread_time()
++        next_line = self._clock() + 1.0
++        prev: dict[str, Any] = {}
++        sock = self.sock_in
++        while self._running:
++            now = self._clock()
++            nd = self.impairer.next_due()
++            timeout = 0.05 if nd is None else max(0.0, min(0.05, nd - now))
++            try:
++                ready, _, _ = select.select([sock], [], [], timeout)
++            except (OSError, ValueError):
++                break
++            now = self._clock()
++            if ready:
++                for _ in range(64):              # drain what is there, bounded
++                    try:
++                        data = sock.recv(RECV_BYTES, socket.MSG_DONTWAIT)
++                    except (BlockingIOError, InterruptedError):
++                        break
++                    except OSError:
++                        self._running = False
++                        break
++                    with self._lock:
++                        self.impairer.offer(now, data)
++            with self._lock:
++                out = self.impairer.due(self._clock())
++            if out:
++                self._send(out)
++            if now >= next_line:
++                with self._lock:
++                    self.impairer.counters.cpu_s = time.thread_time() - cpu0
++                    prev = self._write_line(now, prev)
++                next_line += 1.0
++        with self._lock:
++            self.impairer.counters.cpu_s = time.thread_time() - cpu0
++
++
++# ---- the FEC sender's hook (native_fec_relay, under the flag only) ------------
++
++class RelayShim:
++    """What `NativeVideoFecRelay.start()` asks for: where to bind, where to send."""
++
++    def __init__(self, profile: Profile, relay_port: int, client: tuple[str, int], log_path: Path | None) -> None:
++        self.profile = profile
++        self.client = client
++        if profile.placement == PRE_FEC:
++            # the shim takes the sender's port; the sender binds an ephemeral one
++            self.shim = Shim(profile, listen_port=relay_port, forward=None, log_path=log_path)
++            self.relay_bind_port = 0
++            self.relay_send_target = client
++        else:
++            self.shim = Shim(profile, listen_port=0, forward=client, log_path=log_path)
++            self.relay_bind_port = relay_port
++            self.relay_send_target = (LOOPBACK, self.shim.port)
++
++    def attach(self, relay_recv_port: int) -> None:
++        if self.profile.placement == PRE_FEC:
++            self.shim.forward = (LOOPBACK, int(relay_recv_port))
++        self.shim.start()
++
++    def stop(self) -> None:
++        self.shim.stop()
++
++    def status(self) -> dict[str, Any]:
++        return {"profile": self.profile.label, "placement": self.profile.placement, "seed": self.profile.seed,
++                "counters": self.shim.counters()}
++
++
++def relay_shim_from_environ(environ: Mapping[str, str], relay_port: int, client: tuple[str, int],
++                            project_root: Path | None = None) -> RelayShim | None:
++    p = from_environ(environ)
++    if p is None:
++        return None
++    log = (Path(project_root) / "logs" / "impairment.jsonl") if project_root is not None else None
++    return RelayShim(p, relay_port, client, log)
+diff --git a/tests/impairment/test_impairment.py b/tests/impairment/test_impairment.py
+new file mode 100644
+index 0000000..cee1411
+--- /dev/null
++++ b/tests/impairment/test_impairment.py
+@@ -0,0 +1,230 @@
++#!/usr/bin/env python3
++"""G8-P1: the impairment shim — the parser, each stage on a fake clock, the
++bounded queue, both placements against the real FEC sender, and the hook's
++inertness without the flag.
++
++    python3 -m unittest discover -s tests/impairment -v
++
++Loopback sockets only (ephemeral ports); no stream, no companion.
++"""
++
++from __future__ import annotations
++
++import ast
++import os
++import socket
++import struct
++import sys
++import threading
++import time
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++
++import impairment as imp  # noqa: E402
++import native_fec_relay as relay_mod  # noqa: E402
++
++PKT = 1200
++
++
++def rtp(seq: int, ts: int, marker: bool = False, size: int = PKT) -> bytes:
++    hdr = struct.pack("!BBHII", 0x80, (0x80 if marker else 0) | 96, seq & 0xFFFF, ts, 0x1234ABCD)
++    return hdr + bytes((seq + i) & 0xFF for i in range(size - len(hdr)))
++
++
++def run_offers(spec: str, n: int, pps: float = 730.0, size: int = PKT):
++    p = imp.parse(spec)
++    t0 = 1000.0
++    im = imp.Impairer(p, t0)
++    out = []
++    for i in range(n):
++        now = t0 + i / pps
++        im.offer(now, i.to_bytes(4, "big") + bytes(size - 4))
++        out += [(now, int.from_bytes(d[:4], "big")) for d in im.due(now)]
++    end = t0 + n / pps
++    for k in range(1, 400):                       # drain
++        now = end + k * 0.01
++        out += [(now, int.from_bytes(d[:4], "big")) for d in im.due(now)]
++    return im, out
++
++
++class Parse(unittest.TestCase):
++    def test_specs(self):
++        p = imp.parse("loss-1")
++        self.assertEqual((p.loss, p.placement, p.seed), (0.01, "pre-fec", 1))
++        p = imp.parse("loss-1+delay-50+jitter-30@post-fec,seed=7")
++        self.assertEqual((p.loss, p.delay_ms, p.jitter_ms, p.placement, p.seed), (0.01, 50.0, 30.0, "post-fec", 7))
++        self.assertEqual(p.label, "loss-1+delay-50+jitter-30")
++        for bad in ("", "nope", "loss-1@mid", "loss-1,sed=3", "loss-1,seed=x"):
++            with self.assertRaises(ValueError):
++                imp.parse(bad)
++        self.assertIsNone(imp.from_environ({}))
++        self.assertIsNone(imp.from_environ({imp.FLAG_ENV: "  "}))
++        self.assertEqual(set(imp.PROFILES), {"loss-1", "loss-5", "burst-50x20", "delay-50", "delay-150",
++                                             "jitter-30", "reorder-5", "cap-6000", "cap-4500"})
++
++
++class Stages(unittest.TestCase):
++    def test_none_passes_everything_in_order(self):
++        im, out = run_offers("delay-50", 2000)
++        self.assertEqual([s for _, s in out], list(range(2000)))
++
++    def test_random_loss(self):
++        for spec, rate in (("loss-1", 0.01), ("loss-5", 0.05)):
++            im, out = run_offers(spec, 50_000)
++            got = 1 - len(out) / 50_000
++            self.assertAlmostEqual(got, rate, delta=rate * 0.15, msg=spec)
++            self.assertEqual(im.counters.dropped_loss, 50_000 - len(out))
++
++    def test_seeded(self):
++        a = [s for _, s in run_offers("loss-5,seed=3", 5000)[1]]
++        b = [s for _, s in run_offers("loss-5,seed=3", 5000)[1]]
++        c = [s for _, s in run_offers("loss-5,seed=4", 5000)[1]]
++        self.assertEqual(a, b)
++        self.assertNotEqual(a, c)
++
++    def test_bursts(self):
++        im, out = run_offers("burst-50x20", int(730 * 60))
++        got = {s for _, s in out}
++        missing = sorted(set(range(int(730 * 60))) - got)
++        runs, prev = [], None
++        for s in missing:
++            if prev is None or s != prev + 1:
++                runs.append(1)
++            else:
++                runs[-1] += 1
++            prev = s
++        self.assertEqual(runs, [50, 50, 50])            # at 10, 30, 50 s
++
++    def test_delay_and_jitter(self):
++        im, out = run_offers("delay-150", 1000)
++        sent = {i: 1000.0 + i / 730.0 for i in range(1000)}
++        d = [(t - sent[s]) * 1000 for t, s in out]
++        self.assertTrue(all(150 <= x <= 161 for x in d))  # the drain step is 10 ms
++        im, out = run_offers("jitter-30", 5000)
++        self.assertEqual([s for _, s in out], list(range(5000)))   # FIFO: never reordered
++        d = [(t - sent.get(s, 1000.0 + s / 730.0)) * 1000 for t, s in out]
++        self.assertTrue(min(d) >= 0 and max(d) <= 45)
++
++    def test_reorder(self):
++        im, out = run_offers("reorder-5", 20_000)
++        seqs = [s for _, s in out]
++        self.assertEqual(sorted(seqs), list(range(20_000)))        # nothing lost
++        late = sum(1 for a, b in zip(seqs, seqs[1:]) if b < a)
++        self.assertAlmostEqual(late / 20_000, 0.05, delta=0.01)
++
++    def test_cap_bounded_queue(self):
++        im, out = run_offers("cap-4500", 730 * 20)                 # 7 Mbit/s into 4.5
++        dur = out[-1][0] - out[0][0]
++        kbps = len(out) * PKT * 8 / dur / 1000
++        self.assertAlmostEqual(kbps, 4500, delta=4500 * 0.05)
++        limit = int(4500e3 / 8 * imp.QUEUE_LIMIT_S / PKT) + 2
++        self.assertLessEqual(im.counters.queue_max, limit)          # bounded
++        self.assertGreater(im.counters.dropped_queue, 0)
++
++
++def free_port() -> int:
++    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++    s.bind((imp.LOOPBACK, 0))
++    p = s.getsockname()[1]
++    s.close()
++    return p
++
++
++class Placements(unittest.TestCase):
++    def _run(self, spec, frames=120, per=8):
++        cap = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++        cap.bind((imp.LOOPBACK, 0))
++        cap.settimeout(0.3)
++        got: list[bytes] = []
++        done = threading.Event()
++
++        def reader():       # read while sending: a capture buffer must not be the loss
++            idle = 0
++            while not done.is_set() or idle < 2:
++                try:
++                    got.append(cap.recv(65535))
++                    idle = 0
++                except socket.timeout:
++                    idle += 1
++
++        rt = threading.Thread(target=reader, daemon=True)
++        rt.start()
++        old = relay_mod._impairment
++        os.environ[imp.FLAG_ENV] = spec
++        relay_mod._impairment = imp
++        try:
++            r = relay_mod.NativeVideoFecRelay(local_port=free_port(), pacing_us=0)
++            r.start(imp.LOOPBACK, cap.getsockname()[1])
++            src = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++            seq = 0
++            for f in range(frames):
++                for k in range(per):
++                    src.sendto(rtp(seq, f * 1500, marker=(k == per - 1)), (imp.LOOPBACK, r.local_port))
++                    seq += 1
++                time.sleep(1 / 120)
++            done.set()
++            rt.join(timeout=5)
++            src.close()
++            shim = r._shim
++            r.stop()
++            return got, shim, seq
++        finally:
++            relay_mod._impairment = old
++            os.environ.pop(imp.FLAG_ENV, None)
++            cap.close()
++
++    def test_pre_fec_the_shim_takes_the_port(self):
++        got, shim, sent = self._run("delay-50@pre-fec")
++        self.assertEqual(shim.profile.placement, "pre-fec")
++        rtp_pkts = [g for g in got if not g.startswith(relay_mod.FEC_MAGIC)]
++        parity = [g for g in got if g.startswith(relay_mod.FEC_MAGIC)]
++        self.assertEqual(len(rtp_pkts), sent)
++        self.assertEqual(len(parity), sent // 8)                    # delay alone loses nothing
++
++    def test_post_fec_parity_is_impaired_too(self):
++        got, shim, sent = self._run("loss-5@post-fec,seed=2", frames=400)
++        c = shim.shim.counters()
++        self.assertEqual(c["packets_in"], sent + sent // 8)        # RTP and parity both pass the shim
++        self.assertEqual(len(got), c["packets_out"])
++        self.assertGreater(c["dropped_loss"], 0)
++
++    def test_stop_releases_the_port(self):
++        got, shim, _ = self._run("loss-1")
++        for _ in range(20):
++            if not any(t.name == "PrivyHub-Impairment" and t.is_alive() for t in threading.enumerate()):
++                break
++            time.sleep(0.05)
++        self.assertFalse(any(t.name == "PrivyHub-Impairment" and t.is_alive() for t in threading.enumerate()))
++
++
++class FlagAbsent(unittest.TestCase):
++    def test_not_imported_and_inert(self):
++        self.assertIsNone(relay_mod._impairment)                  # this process carries no flag
++        tree = ast.parse((ROOT / "companion" / "native_fec_relay.py").read_text())
++        top = [n for n in tree.body if isinstance(n, (ast.Import, ast.ImportFrom))]
++        self.assertFalse(any("impairment" in ast.unparse(n) for n in top))
++        guarded = [n for n in tree.body if isinstance(n, ast.If) and "impairment" in ast.unparse(n)]
++        self.assertEqual(len(guarded), 1)
++        self.assertIn("PRIVYHUB_IMPAIRMENT", ast.unparse(guarded[0].test))
++
++    def test_same_port_same_target_no_thread(self):
++        cap = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++        cap.bind((imp.LOOPBACK, 0))
++        port = free_port()
++        r = relay_mod.NativeVideoFecRelay(local_port=port, pacing_us=0)
++        r.start(imp.LOOPBACK, cap.getsockname()[1])
++        try:
++            self.assertEqual(r._recv_socket.getsockname()[1], port)
++            self.assertEqual(r._client, (imp.LOOPBACK, cap.getsockname()[1]))
++            self.assertIsNone(getattr(r, "_shim", None))
++            self.assertFalse(any(t.name == "PrivyHub-Impairment" for t in threading.enumerate()))
++        finally:
++            r.stop()
++            cap.close()
++
++
++if __name__ == "__main__":
++    unittest.main()

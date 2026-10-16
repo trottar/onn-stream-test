@@ -1509,6 +1509,25 @@ host logic 18/18; debug APK `77011eef…` built (release skipped by the user).
 Next: CL-B2 (install after the watch; pair by hand; the live G3 smoke on the
 LAN). Record: `docs/memory/evidence/G3_S2_SESSION_IDENTITY_CLIENT_SIDE_2026-10-16.md`.
 
+**G3-S3 (2026-10-16): HARDENING AND THE HUB HOST BUILT behind the same flags
+(absent / off = today, byte for byte), NOT INSTALLED, NOT ADOPTED.** Host: the
+setup signs the audio port and the overlay address (v2 canon; v1 still
+accepted), the stream-start ports bound to the signed ones
+(`endpoint-port-mismatch`), the media target chosen by the request's routing
+class, a per-session media token, the range server gated over the overlay
+(the token header or `?media_token=`, checked by the companion on loopback,
+audited), `diagnostics` grantable and default on, the status document's
+permission set and media-token boolean. Client: "Hub host" (overrides the
+companion host while `identity_v2` is on), the overlay interface address
+declared, the token on TV-sync, EPG, diagnostics, the player's hub media
+requests and artwork, reason codes shown with one retry. 80 host tests (the
+handler replay extended: the range server byte for byte), G1 / G5 suites
+green, 44 client unit tests, the handshake harness 24/24, debug APK
+`59f736d2…` built, not installed. Next: CL-B3 (install, a LAN PS1-STREAM and
+a VOD play with the flag and the setting on), then G4-S1 off-site. Record:
+`docs/memory/evidence/G3_S3_HARDENING_AND_HUB_HOST_2026-10-16.md`; trust model
+`docs/REMOTE_TRUST.md` §8.
+
 The current LAN prototype may derive reachable media/controller targets from the
 request source address. That mechanism is not a durable remote identity model
 because a portable client may sit behind NAT/SNAT on the travel router.
@@ -1582,6 +1601,18 @@ D-BASE and the live ladder; replays of three recorded runs reproduce their loss
 rules in `docs/WAN_ADAPTATION_RULES.md` (G5-S2 implements them). Live smoke pending
 on the stream. Record: `docs/memory/evidence/G5_S1_WAN_TELEMETRY_CLASSIFICATION_2026-10-16.md`.
 
+**G5-S2 (2026-10-16): THE RULES BUILT behind `PRIVYHUB_WAN_ADAPTATION=1` (absent =
+the ladder exactly as adopted), NOT ADOPTED** — `companion/wan_adaptation.py`
+gives the live ladder at most one suggestion per report (hold / step down / no step
+up / remote floor 720p/4000), applied only as a constraint through the ladder's own
+gates; R4 recorded as no FEC change; every suggestion in `decisions.jsonl` with
+`source: wan_rules`. The remote floor is recorded, not actuated (the actuator's
+validated ladder ends at 5000). Flag absent: the four named runs' recorded
+decisions reproduced exactly and the controller's rows identical to HEAD's;
+flag present, open loop, tabulated per rule with no claim of improvement. Live
+smoke (LAN, 10 min) and the first off-site run with it (G4-S2) pending on the
+stream. Record: `docs/memory/evidence/G5_S2_WAN_ADAPTATION_RULES_2026-10-16.md`.
+
 Reuse Phase C telemetry/adaptation instead of creating a parallel WAN streamer.
 
 Measure and classify:
@@ -1639,6 +1670,17 @@ streaming better than routing media through the Linux hub, while preserving the
 same PrivyHub authorization/session boundary.
 
 ## G8 — Adverse-network characterization
+
+**Status (2026-10-16, G8-P1): HARNESS BUILT; ENVELOPE NOT MEASURED.** A
+user-space impairment shim (`companion/impairment.py`) on the loopback video
+hop, behind `PRIVYHUB_IMPAIRMENT=<profile>[@pre-fec|@post-fec][,seed=N]`
+(absent = today: the FEC sender byte for byte, no port, no thread). The
+profiles cover random loss, burst loss, delay, jitter, reordering and a rate
+cap with a bounded queue, plus combinations. All eleven passed their tolerance
+in process. `@post-fec` is the WAN-like placement; pre-FEC loss is never
+FEC-recoverable. Video only; no `nft`, no `sudo`. The shim's own cost is 2.1-7.0 %
+of a core, **over the ≤ 1-point bar**. Not adopted. Next proposed: G8-S1, the
+envelope. Record: `docs/memory/evidence/G8_P1_IMPAIRMENT_SHIM_2026-10-16.md`.
 
 Exercise bounded representative conditions:
 

@@ -145,3 +145,42 @@ first, then latency, capacity, loss, and a slow recovery upward. No
 adaptation decision ever changes a session's identity or its declared
 endpoints.
 
+## 8. Hardening: the media token and the permission set (G3-S3)
+
+Built behind the same flags (the host's `PRIVYHUB_SESSION_IDENTITY=v2`, the
+client's `identity_v2`; absent / off = today), not installed, not adopted
+(record: `docs/memory/evidence/G3_S3_HARDENING_AND_HUB_HOST_2026-10-16.md`).
+Every point below is a **[G3-S3 proposal]**.
+
+- **The permission set.** `games`, `tv`, `vod`, `diagnostics`,
+  `pairing-admin`. A paired device gets the first four. `diagnostics` (the
+  user's own device reporting its health: `/status`, `/diagnostics/*`) is
+  **on by default** and listed in the pairing record (`permissions_v` 2), so it
+  can be revoked by removing it from the record's list (no restart). A record
+  paired before G3-S3 has no `permissions_v` and is granted `diagnostics`
+  implicitly; to revoke it there, list the permissions without it and add
+  `"permissions_v": 2`. TV-sync and EPG need `tv`, the range server `vod`.
+- **The signed endpoints.** The setup signs the video port, the audio port
+  and, when the client holds one, its overlay interface address
+  (`privyhub-session-setup-v2`). The stream-start ports must equal the signed
+  ones (`endpoint-port-mismatch`, audited). The hub streams to the declared
+  address whose class matches the request's: the overlay address off-site,
+  the LAN address at home.
+- **The media token.** Issued with every session token, bound to the
+  device, expiring and revoked with the session; for a player that cannot
+  send headers, as `?media_token=`. It is never logged: the audit records only
+  `media_token_used`, and the range server's own log masks its value. The
+  client's player sends the header (Media3 can), only to the hub's own media
+  endpoint, never to a third-party stream.
+- **The range server over the overlay** answers only with the session token
+  or the media token; it asks the companion on loopback, which decides and
+  audits (refusals each time, the first accepted use of a token once). On the
+  LAN without a token it serves as today (legacy). A presented token that
+  fails is refused, never falls back. The companion unreachable: refused
+  (`identity-unavailable`).
+- **Status.** The hub's session status document lists the permission set
+  and, per live session, its permissions and whether a media token is live
+  (a boolean, never the value).
+- **The hub host.** Off-site the client reaches the hub by a name the user
+  types ("Hub host", e.g. the hub's tailnet name), overriding the companion
+  host while `identity_v2` is on; the client never logs it (a hash if needed).

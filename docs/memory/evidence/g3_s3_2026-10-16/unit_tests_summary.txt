@@ -1,0 +1,53 @@
+client unit tests (sh ./gradlew --offline :app:testDebugUnitTest --rerun), from the JUnit XML
+com.safeiot.privyhub.ExampleUnitTest: tests=1 failures=0 errors=0
+    addition_isCorrect: ok
+com.safeiot.privyhub.identity.IdentitySessionTest: tests=19 failures=0 errors=0
+    refreshBeforeExpiry: ok
+    pairingSendsTheKeyOnceAndStoresThePairing: ok
+    rePairReplacesTheSecretOnlyWhenAsked: ok
+    noSecretTokenOrAddressInLogs: ok
+    headerByPermissionAndDeclaredEndpoints: ok
+    onButUnpairedIsLegacy: ok
+    setupSignsV2AndDeclaresTheOverlayAddressWhenPresent: ok
+    hubHostAndHubOnlyMedia: ok
+    hostWithoutTheIdentityLayerStillWorks: ok
+    oneRetryOnATokenRefusalThenVisible: ok
+    permissionRefusalIsShownNotRetried: ok
+    noMediaHeaderWithoutVod: ok
+    diagnosticsWhenTheHostGrantsIt: ok
+    mediaHeaderAndMediaToken: ok
+    refusedSetupFailsClosedWithCooldown: ok
+    offIsToday: ok
+    urlForLogHidesTheHost: ok
+    portMismatchIsShownNotRetried: ok
+    tvAndEpgCarryTheToken: ok
+com.safeiot.privyhub.identity.SessionProtocolTest: tests=6 failures=0 errors=0
+    pairBodyEscapes: ok
+    setupBodyShape: ok
+    hmacInputAndSignatureMatchEveryVector: ok
+    hostResponsesParse: ok
+    permissionMapMatchesTheHost: ok
+    constantsMatchTheHost: ok
+com.safeiot.privyhub.identity.SessionProtocolV2Test: tests=6 failures=0 errors=0
+    hostBodiesParse: ok
+    setupBodyV2Shape: ok
+    permissionMapMatchesTheHost: ok
+    overlayBlock: ok
+    constantsMatchTheHost: ok
+    canonAndSignatureMatchEveryHostAcceptedVector: ok
+com.safeiot.privyhub.identity.WireRequestTest: tests=2 failures=0 errors=0
+    onAndPairedAddsOnlyTheHeader: ok
+    offIsTodayByteForByte: ok
+com.safeiot.privyhub.streaming.DecoderReportUploadTest: tests=4 failures=0 errors=0
+    aFullReportStaysUnderTheCompanionCap: ok
+    reportedTotalCapacityIsTheSumOfTheSegments: ok
+    ringsHoldATwentyFourTransitionSession: ok
+    bodyIsTheReportAsUtf8: ok
+com.safeiot.privyhub.streaming.FecRs82Test: tests=6 failures=0 errors=0
+    everySingleLossRecoversFromQWhenPIsLost: ok
+    threeLossesAreNotRecovered: ok
+    fieldInverses: ok
+    encoderMatchesThePythonRelay: ok
+    knownPacketsMayCarryAnRtpHeader: ok
+    everyTwoLossPatternRecovers: ok
+total 44, failures 0, errors 0

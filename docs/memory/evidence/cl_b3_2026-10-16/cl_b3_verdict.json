@@ -1,0 +1,100 @@
+{
+ "runs": [
+  {
+   "run": "runs/E1-PS1-STREAM/run1",
+   "label": "R1",
+   "status": "OK",
+   "window": {
+    "from": "2026-10-16T17:30:55.046Z",
+    "to": "2026-10-16T17:40:55.046Z"
+   },
+   "capture_fps": 59.988,
+   "dupdrop_per_min": 0.1,
+   "retroarch_fps": 59.999,
+   "host_cpu": 11.569,
+   "procs_cpu_pct_of_core": {
+    "companion": 24.802,
+    "retroarch": 34.393,
+    "encoder": 36.005,
+    "xorg": 9.593
+   },
+   "companion_pss_kb": 38411.975,
+   "rung_kbps_range": [
+    7000,
+    7000
+   ],
+   "rung_kbps_polls": {
+    "7000": 69
+   },
+   "ladder_acted": [],
+   "rendered_fps": 59.674,
+   "loss_per_min": 80.05,
+   "resyncs": 0,
+   "flags_absent_after": true,
+   "dropin": [
+    "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+    "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+    "PRIVYHUB_OVERLAY_PROVIDER=tailscale",
+    "PRIVYHUB_RECOVERY_TRIGGER=v2",
+    "PRIVYHUB_SESSION_IDENTITY=v2",
+    "PRIVYHUB_SNES_CAPTURE_FIX=output_rate",
+    "PRIVYHUB_SNES_CORE=snes9x"
+   ],
+   "gates": {
+    "retroarch_ge_59.9": true,
+    "capture_60_pm_0.1": true,
+    "dupdrop_le_0.2": true,
+    "flags_absent_after": true
+   }
+  },
+  {
+   "run": "runs/E1-PS1-STREAM_flag/run1",
+   "label": "W",
+   "status": "OK",
+   "window": {
+    "from": "2026-10-16T17:48:59.768Z",
+    "to": "2026-10-16T17:58:59.768Z"
+   },
+   "capture_fps": 60.036,
+   "dupdrop_per_min": 0.1,
+   "retroarch_fps": 59.999,
+   "host_cpu": 11.593,
+   "procs_cpu_pct_of_core": {
+    "companion": 25.435,
+    "retroarch": 35.743,
+    "encoder": 35.381,
+    "xorg": 9.74
+   },
+   "companion_pss_kb": 38770.41,
+   "rung_kbps_range": [
+    7000,
+    7000
+   ],
+   "rung_kbps_polls": {
+    "7000": 69
+   },
+   "ladder_acted": [],
+   "rendered_fps": 59.795,
+   "loss_per_min": 60.32,
+   "resyncs": 3,
+   "flags_absent_after": true,
+   "dropin": [
+    "PRIVYHUB_WAN_TELEMETRY=1"
+   ],
+   "gates": {
+    "retroarch_ge_59.9": true,
+    "capture_60_pm_0.1": true,
+    "dupdrop_le_0.2": true,
+    "flags_absent_after": true
+   }
+  }
+ ],
+ "verdict": "ALL HOST GATES HOLD",
+ "wan_cost": {
+  "companion_cpu_point_of_core_W_minus_R1": 0.633,
+  "companion_pss_mb_W_minus_R1": 0.35,
+  "le_0.5_point": false,
+  "le_2_mb": true,
+  "note": "two runs, not paired arms; read beside the rung ranges"
+ }
+}

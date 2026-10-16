@@ -1,5 +1,19 @@
 # Known issues and deferred work
 
+## 2026-10-16 G5-S1 WAN telemetry: no per-session line when a run ends in a restart; CPU cost over its bar — OPEN (CL-B3 W)
+
+- **Seen:** CL-B3's live smoke, with `PRIVYHUB_WAN_TELEMETRY=1` as a per-run drop-in
+  (`docs/memory/evidence/CL_B3_HARDENED_APK_LAN_2026-10-16.md` §4).
+  - The `wan` object was live on `/status` and `/diagnostics/stream-telemetry`, with all eleven measures and a
+    class per window.
+  - **`logs/wan_sessions.jsonl` was never written.** `wan_telemetry.py` closes a session (and writes its line) only
+    when the next stream session starts in the same process. The suite's teardown restart ends the process first,
+    so a one-session run never logs. The fix belongs to G5-S2: write the line at stream stop and at shutdown.
+- **The cost:** the companion was +0.633 point of a core (≤ 0.5 set) and +0.35 MB PSS (≤ 2), W minus R1.
+  - These are two runs, not paired arms, at the same 7000 rung. RetroArch was also +1.35 in W.
+  - The provider's own cost is not isolated. An idle A/B in G1-S2's way would settle it.
+- Not adopted, so the flag stays off. Whether these block G5's adoption is the user's call.
+
 ## 2026-10-16 the host-CPU band gate fails on the encoder's share, not on the stack — a BAR item (CL-B2 R3), OPEN
 
 - **Seen:** CL-B2's R3 (PS1-STREAM ×10 min, flag and setting off,
@@ -24,7 +38,15 @@
   - Not applied to any tool. Changing the gate or the band is the user's
     call.
 
-## 2026-10-16 session identity (G3) on the LAN — three follow-ups for G3-S3, seen in CL-B2
+## 2026-10-16 session identity (G3) on the LAN — three follow-ups for G3-S3, seen in CL-B2 — PORTS ADDRESSED (G3-S3, CL-B3)
+
+- **Update 2026-10-16 (G3-S3 built; G-A1 adopted the host flag; CL-B3 installed the APK):**
+  - `audio_port` is now signed (setup canon v2). The stream-start port is bound to the signed one (403
+    `endpoint-port-mismatch`, audited). The host chooses the declared target by routing class.
+  - CL-B3's R1 showed `?port=48100` → 200 under a `sig_v` 2 token, with no refusal.
+  - The wire destination is still not observable unprivileged (unchanged).
+  - **Still open:** the store directory's 0775, and the extra setup per entry. CL-B3 saw a fresh setup after
+    each teardown restart, which is expected.
 
 - **Context:** CL-B2 (`docs/memory/evidence/CL_B2_IDENTITY_APK_AND_LAN_SMOKE_2026-10-16.md`)
   ran G3 end to end on the LAN. It is CLOSED, and the APK `77011eef…`

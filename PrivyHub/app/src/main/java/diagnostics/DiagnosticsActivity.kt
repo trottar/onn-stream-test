@@ -13,6 +13,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 
 import androidx.appcompat.app.AppCompatActivity
+import com.safeiot.privyhub.identity.PrivyHubIdentity
 
 import org.json.JSONArray
 import org.json.JSONObject
@@ -579,14 +580,18 @@ class DiagnosticsActivity : AppCompatActivity() {
         host: String,
         path: String,
         method: String,
-        readTimeoutMs: Int
+        readTimeoutMs: Int,
+        identityAttempt: Int = 0
     ): JSONObject {
+
+        val url =
+            "http://$host:$CONTROL_PORT" +
+                path
 
         val connection =
             (
                 URL(
-                    "http://$host:$CONTROL_PORT" +
-                        path
+                    url
                 )
                     .openConnection()
                     as HttpURLConnection
@@ -610,6 +615,13 @@ class DiagnosticsActivity : AppCompatActivity() {
                 )
 
             }
+
+        // G3-S3: the session header (diagnostics), only with identity_v2 on.
+        PrivyHubIdentity.decorate(
+            this,
+            connection,
+            url
+        )
 
         try {
 
@@ -638,6 +650,36 @@ class DiagnosticsActivity : AppCompatActivity() {
                 code !in
                 200..299
             ) {
+                // G3-S3: a token refusal gets one fresh setup and one retry;
+                // the host's reason code is the message. Off: unchanged.
+                if (PrivyHubIdentity.isEnabled(this)) {
+                    val identity =
+                        PrivyHubIdentity.get(this)
+
+                    if (
+                        identity.onResponse(
+                            code,
+                            body,
+                            identityAttempt
+                        )
+                    ) {
+                        return requestJson(
+                            host,
+                            path,
+                            method,
+                            readTimeoutMs,
+                            identityAttempt + 1
+                        )
+                    }
+
+                    identity.refusalMessage(
+                        code,
+                        body
+                    )?.let {
+                        throw IllegalStateException(it)
+                    }
+                }
+
                 throw IllegalStateException(
                     "Diagnostics endpoint HTTP status was not successful"
                 )

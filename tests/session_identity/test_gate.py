@@ -62,7 +62,9 @@ class Pairing(unittest.TestCase):
         text = path.read_text()
         for a in ALL_ADDRESSES:
             self.assertNotIn(a, text)
-        self.assertEqual(json.loads(text)["devices"][0]["permissions"], ["games", "tv", "vod"])
+        # G3-S3: a new record lists `diagnostics` (default on) and carries permissions_v 2.
+        self.assertEqual(json.loads(text)["devices"][0]["permissions"], ["games", "tv", "vod", "diagnostics"])
+        self.assertEqual(json.loads(text)["devices"][0]["permissions_v"], 2)
         # the window closes on success
         st, p = g.session_route("POST", "/session/pair", {"code": "000000", "device_name": "x", "key": KEY_HEX}, None, LAN_SRC)
         self.assertEqual(p["reason"], "pairing-closed")
@@ -247,10 +249,13 @@ class Permissions(unittest.TestCase):
         self.assertTrue(g.authorize("GET", "/sources", "", tok, LAN_SRC).allowed)
 
     def test_unknown_permission_denied(self):
+        # G3-S3: `diagnostics` is grantable now; a record without it (revoked) is
+        # denied `/status` and `/diagnostics/*`; an unknown path stays unknown.
         g, tok = self._session(["games", "tv", "vod"])
-        for path in ("/status", "/diagnostics/health", "/no/such/route"):
+        for path, reason in (("/status", "permission-denied"), ("/diagnostics/health", "permission-denied"),
+                             ("/no/such/route", "permission-unknown")):
             d = g.authorize("GET", path, "", tok, LAN_SRC)
-            self.assertEqual((d.allowed, d.reason), (False, "permission-unknown"), path)
+            self.assertEqual((d.allowed, d.reason), (False, reason), path)
 
     def test_pairing_admin(self):
         g, tok = self._session(["games", "pairing-admin"])

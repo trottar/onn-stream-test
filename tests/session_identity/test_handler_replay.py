@@ -46,7 +46,34 @@ REQUESTS = [
     ("client", "POST", "/plugins/games/native-stream-heartbeat?seq=1"),
     ("client", "GET", "/status"),
     ("client", "GET", "/plugins/nosuch/status"),
+    # G3-S3: TV-sync, EPG and diagnostics, now carrying the token (tv / diagnostics)
+    ("g3-s3", "GET", "/plugins/tv_state/state"),
+    ("g3-s3", "GET", "/plugins/epg/guide?channels=a,b&hours=6"),
+    ("g3-s3", "GET", "/plugins/epg/prefetch?channels=a"),
+    ("g3-s3", "GET", "/sources"),
+    ("g3-s3", "GET", "/diagnostics/health"),
+    ("g3-s3", "GET", "/diagnostics/stream-telemetry"),
 ]
+
+
+class TvStateStub:
+    def handle(self, action: str, query: str) -> dict[str, Any]:
+        return {"ok": True, "plugin": "tv_state", "action": action}
+
+
+class EpgStub:
+    def handle(self, action: str, query: str) -> dict[str, Any]:
+        return {"ok": True, "plugin": "epg", "action": action, "query": parse_qs(query)}
+
+
+class CatalogStub:
+    def public_catalog(self) -> dict[str, Any]:
+        return {"ok": True, "sources": ["fixture"]}
+
+
+class SnapshotStub:
+    def snapshot(self) -> dict[str, Any]:
+        return {"ok": True, "fixture": "snapshot"}
 
 
 class GamesStub:
@@ -59,6 +86,8 @@ class GamesStub:
 
 
 class ControllerStub:
+    catalog = CatalogStub()
+
     def status(self) -> dict[str, Any]:
         return {"service": "PrivyHub", "api_version": 4, "control_port": 8765}
 
@@ -68,7 +97,11 @@ def handler_class(source: str, session_identity: Any, log: list[str]):
         "__name__": "privyhub_service_fixture",
         "Any": Any, "json": json, "urlsplit": urlsplit, "parse_qs": parse_qs,
         "BaseHTTPRequestHandler": BaseHTTPRequestHandler,
-        "PLUGINS": {"games": GamesStub()},
+        "PLUGINS": {"games": GamesStub(), "tv_state": TvStateStub(), "epg": EpgStub()},
+        "build_live_health_snapshot": lambda **kw: {"ok": True, "fixture": "health"},
+        "CLIENT_HEALTH_STORE": SnapshotStub(),
+        "STREAM_TELEMETRY_STORE": SnapshotStub(),
+        "WAN_TELEMETRY": None,
         "CONTROLLER": ControllerStub(),
         "PROJECT_ROOT": Path("/fixture/project"),
         "access_log_path": lambda h: urlsplit(getattr(h, "path", "")).path,
@@ -178,9 +211,35 @@ class HandlerReplay(unittest.TestCase):
         self.assertIn(b'"target": "declared"', raw)
         raw = run(v2, "POST", "/plugins/games/native-stream-start?port=50000", LAN_SRC)
         self.assertIn(b'"target": "source"', raw)   # legacy: as today
+        # G3-S3: `diagnostics` is on for a paired device: /status answers.
         raw = run(v2, "GET", "/status", LAN_SRC, {si.SESSION_HEADER: p["token"]})
+        self.assertTrue(raw.startswith(b"HTTP/1.0 200"))
+
+    def test_g3_s3_tv_epg_diagnostics_over_the_overlay(self):
+        from test_g3s3 import setup_v2
+        from common import OVERLAY_DECLARED
+        gate = make_gate()
+        v2 = handler_class(current_source(), gate, [])
+        paths = [t for o, m, t in REQUESTS if o == "g3-s3"]
+        for target in paths:
+            raw = run(v2, "GET", target, OVERLAY_SRC)
+            self.assertTrue(raw.startswith(b"HTTP/1.0 401"), target)
+            self.assertIn(b'"reason": "legacy-overlay"', raw)
+        dev = pair(gate)
+        st, p = setup_v2(gate, dev, source=OVERLAY_SRC, media_host=OVERLAY_DECLARED)
+        self.assertEqual(st, 200)
+        absent = handler_class(current_source(), None, [])
+        for target in paths:
+            raw = run(v2, "GET", target, OVERLAY_SRC, {si.SESSION_HEADER: p["token"]})
+            self.assertTrue(raw.startswith(b"HTTP/1.0 200"), target)
+            self.assertEqual(raw, run(absent, "GET", target, OVERLAY_SRC), target)   # the same answer as today's LAN
+        raw = run(v2, "POST", "/plugins/games/native-stream-start?port=48101", OVERLAY_SRC,
+                  {si.SESSION_HEADER: p["token"]})
         self.assertTrue(raw.startswith(b"HTTP/1.0 403"))
-        self.assertIn(b'"reason": "permission-unknown"', raw)
+        self.assertIn(b'"reason": "endpoint-port-mismatch"', raw)
+        raw = run(v2, "POST", "/plugins/games/native-stream-start?port=48100", OVERLAY_SRC,
+                  {si.SESSION_HEADER: p["token"]})
+        self.assertIn(b'"target": "other"', raw)    # the declared overlay host (not a LAN label)
 
     def test_session_routes_over_http(self):
         gate = make_gate()

@@ -1,0 +1,26 @@
+PASS  port matches the host-made v2 vectors: 3/3 canon + signature
+PASS  pair on the LAN (window opened on the hub's loopback): 200, permissions games,tv,vod,diagnostics
+PASS  LAN v2 setup: 200, media token issued: True
+PASS  LAN stream start to the declared LAN host: target lan-declared
+PASS  overlay v2 setup with the overlay address declared: 200
+PASS  overlay stream start to the declared overlay host: target overlay-declared
+PASS  port mismatch refused, shown, not retried: 403 endpoint-port-mismatch
+PASS  signed audio port accepted: port + audio_port as signed
+PASS  TV-sync GET over the overlay with the token: with token allowed; without: legacy-overlay
+PASS  TV-sync POST over the overlay with the token: with token allowed; without: legacy-overlay
+PASS  EPG guide over the overlay with the token: with token allowed; without: legacy-overlay
+PASS  EPG prefetch over the overlay with the token: with token allowed; without: legacy-overlay
+PASS  diagnostics /status over the overlay with the token: with token allowed; without: legacy-overlay
+PASS  diagnostics health over the overlay with the token: with token allowed; without: legacy-overlay
+PASS  range server, overlay, no token: 401 legacy-overlay
+PASS  range server, overlay, the header (the client's player): 206, the baseline's bytes
+PASS  range server, overlay, the media token (a header-less player): 206, the baseline's bytes; the log masks it
+PASS  range server, a forged media token: 401 media-token-unknown
+PASS  range server, LAN, no token (legacy): today's bytes
+PASS  range server, LAN, the header (artwork): 200, checked and audited
+PASS  expiry: token-expired, one fresh setup, one retry: allowed after the retry
+PASS  diagnostics revoked: refused, shown: 403 permission-denied
+PASS  status document: permission set and media-token boolean: 1 live sessions listed
+PASS  audit: no address, key, token or media token; media use and the port mismatch recorded: 19 lines; media_session media_token_used [False, True]
+
+24 / 24 PASS

@@ -17,6 +17,12 @@ package com.safeiot.privyhub.identity
  * The device secret never leaves the store except once, in the pairing body
  * — G3-S1's host verifies HMAC-SHA256 and so must hold the key. Nothing here
  * logs an address, the secret or a token.
+ *
+ * G3-S3: the setup signs v2 (the audio port and, when the device holds one,
+ * its overlay interface address); `diagnostics` is on for a paired device;
+ * the media requests to the hub's range server carry the token too
+ * ([mediaHeaderFor]), or the session's media token for a player that cannot
+ * set headers ([mediaTokenFor]).
  */
 class IdentitySession(
     private val enabled: () -> Boolean,
@@ -47,6 +53,9 @@ class IdentitySession(
     /** The local address this device uses to reach `host` (no packet is sent). */
     fun interface LocalRoute {
         fun localAddressFor(host: String, port: Int): String?
+
+        /** G3-S3: this device's overlay interface address (IPv4, the overlay block), if any. */
+        fun overlayAddress(): String? = null
     }
 
     class IdentityRefused(val reason: String) : IllegalStateException("Session refused: $reason")
@@ -56,7 +65,12 @@ class IdentitySession(
         data class Refused(val status: Int, val reason: String) : PairResult()
     }
 
-    private data class Token(val value: String, val expiresAtMs: Long, val permissions: Set<String>)
+    private data class Token(
+        val value: String,
+        val expiresAtMs: Long,
+        val permissions: Set<String>,
+        val mediaToken: String? = null,
+    )
 
     private var token: Token? = null
     private var hostIdentityOffUntilMs = 0L
@@ -123,18 +137,37 @@ class IdentitySession(
     @Synchronized
     fun headerFor(host: String, url: String): String? {
         if (!enabled()) return null
-        val pairing = store.pairing() ?: run { stateText = "on, not paired (legacy)"; return null }
+        if (store.pairing() == null) { stateText = "on, not paired (legacy)"; return null }
         val permission = SessionProtocol.requiredPermission(SessionProtocol.pathOf(url)) ?: return null
-        if (permission !in pairing.permissions) return null
-        val now = clock()
-        if (now < hostIdentityOffUntilMs) return null
-        token?.let { if (now < it.expiresAtMs - SessionProtocol.REFRESH_MARGIN_MS) return headerIfGranted(it, permission) }
-        if (now < setupRefusedUntilMs) throw IdentityRefused(setupRefusedReason ?: "setup-refused")
-        return setup(host, pairing, now)?.let { headerIfGranted(it, permission) }
+        return liveToken(host, permission)?.value
     }
 
-    private fun headerIfGranted(t: Token, permission: String): String? =
-        if (permission in t.permissions) t.value else null
+    /** G3-S3: the header value for a request to the hub's range server (the `vod` permission). */
+    @Synchronized
+    fun mediaHeaderFor(host: String): String? {
+        if (!enabled()) return null
+        return liveToken(host, SessionProtocol.MEDIA_PERMISSION)?.value
+    }
+
+    /** G3-S3: the session's media token, for a player that cannot set headers (`?media_token=`). */
+    @Synchronized
+    fun mediaTokenFor(host: String): String? {
+        if (!enabled()) return null
+        return liveToken(host, SessionProtocol.MEDIA_PERMISSION)?.mediaToken
+    }
+
+    private fun liveToken(host: String, permission: String): Token? {
+        val pairing = store.pairing() ?: run { stateText = "on, not paired (legacy)"; return null }
+        if (permission !in pairing.permissions && permission !in SessionProtocol.IMPLIED_FOR_PAIRED) return null
+        val now = clock()
+        if (now < hostIdentityOffUntilMs) return null
+        token?.let { if (now < it.expiresAtMs - SessionProtocol.REFRESH_MARGIN_MS) return grantedOrNull(it, permission) }
+        if (now < setupRefusedUntilMs) throw IdentityRefused(setupRefusedReason ?: "setup-refused")
+        return setup(host, pairing, now)?.let { grantedOrNull(it, permission) }
+    }
+
+    private fun grantedOrNull(t: Token, permission: String): Token? =
+        if (permission in t.permissions) t else null
 
     private fun setup(host: String, pairing: Pairing, now: Long): Token? {
         val (nonceStatus, nonceBody) = transport.post(controlUrl(host, "/session/nonce"), null)
@@ -152,10 +185,12 @@ class IdentitySession(
         val mediaHost = routes.localAddressFor(host, controlPort)
             ?: return setupRefused("no-local-route", now)
         val secret = ensureSecret()
-        val sig = SessionProtocol.sign(secret, pairing.deviceId, nonce, mediaHost, videoPort)
+        // G3-S3: v2 signs the audio port and the overlay interface address (when present).
+        val overlayHost = routes.overlayAddress()?.takeIf { SessionProtocol.isOverlayIpv4(it) }
+        val sig = SessionProtocol.signV2(secret, pairing.deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost)
         val (status, body) = transport.post(
             controlUrl(host, "/session/setup"),
-            SessionProtocol.setupBody(pairing.deviceId, nonce, mediaHost, videoPort, audioPort, sig),
+            SessionProtocol.setupBodyV2(pairing.deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost, sig),
         )
         val value = SessionProtocol.jsonStringField(body, "token")
         val ttl = SessionProtocol.jsonLongField(body, "expires_in_s")
@@ -163,12 +198,16 @@ class IdentitySession(
             return setupRefused(SessionProtocol.reasonOf(body) ?: "http-$status", now)
         }
         val granted = SessionProtocol.jsonStringArray(body, "permissions").toSet()
-        val t = Token(value, now + ttl * 1000L, granted)
+        val t = Token(value, now + ttl * 1000L, granted, SessionProtocol.jsonStringField(body, "media_token"))
         token = t
+        // G3-S3: the host's grant is the record (diagnostics added, or a permission revoked).
+        if (granted != pairing.permissions.toSet()) {
+            store.savePairing(pairing.copy(permissions = granted.toList()))
+        }
         setupRefusedUntilMs = 0L
         lastReason = null
         stateText = "session active"
-        log("identity: session set up, expires_in_s=$ttl")
+        log("identity: session set up, expires_in_s=$ttl, overlay_declared=${overlayHost != null}")
         return t
     }
 

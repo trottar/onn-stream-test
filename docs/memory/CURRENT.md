@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-10-16
-baseline_commit: 3107fb5 (G1-S1, G3-S1, G3-S2, G1-S2, E4-S4C, G5-S1, G4-P1 and CL-B2 uncommitted; the user commits)
+baseline_commit: 92e388e (G3-S3, G-A1 and CL-B3 uncommitted; the user commits)
 ---
 
 # Current State
@@ -9,61 +9,51 @@ baseline_commit: 3107fb5 (G1-S1, G3-S1, G3-S2, G1-S2, E4-S4C, G5-S1, G4-P1 and C
 Headings are fixed by `tools/check_memory_health.py`; do not rename.
 ## Active Objective
 
-**Phase E ACTIVE; the G track (remote) under way. CL-B2 is CLOSED
-(2026-10-16): the identity APK `77011eef…` is the onn's CONFIRMED client
-and stays. G3 passed end to end on the LAN. R3's host-CPU gate FAILED by
-0.06 and is recorded so (the user's decision). The host flag
-`PRIVYHUB_SESSION_IDENTITY=v2` and the client setting `identity_v2` are
-NOT adopted.** E1 FROZEN; E2 MEASURED; E3 CLOSED; E4 CLOSED (host side).
-Nothing committed since `3107fb5`.
+**Phase E ACTIVE; the G track (remote) under way. G-A1 ADOPTED (2026-10-16, the user's): the overlay provider and
+session identity v2 run on the host, and `identity_v2` is on in the client. The adopted environ is SEVEN lines.
+CL-B3 is OPEN: G3-S3's hardened APK `59f736d2…` is installed and CONFIRMED, and the signed LAN path passed. Two
+G5-S1 smoke gates were NOT MET (the user decides). The VOD play is pending (the user was away).** E1 FROZEN; E2
+MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `92e388e`.
 
-- **Six adoptions stand:** the guide index, Snes9x, recovery v2 (E3),
-  live adaptive (C), the SNES capture fix (E4-S5D), and the CL-B2 APK.
-- **The link watch is stopped** (E4-S4C): 6 probes, none clean. Grab
-  deferral is INCONCLUSIVE (link). The LAN loss row is parked; the user's
-  priority is remote first.
-- **Built behind flags, not adopted:**
-  - G1-S1/S2: the overlay provider, `PRIVYHUB_OVERLAY_PROVIDER`;
-  - G3-S1/S2: session identity;
-  - G5-S1: WAN telemetry, `PRIVYHUB_WAN_TELEMETRY`;
-  - G4-P1: the suite's `--remote` row and the hotspot runbook.
+- **Nine adoptions stand:**
+  - live adaptive (C);
+  - the guide index, Snes9x, recovery v2 (E3);
+  - the SNES capture fix (E4-S5D);
+  - the overlay provider and session identity v2 (G-A1, host);
+  - `identity_v2` on (G-A1, client);
+  - the CONFIRMED APK (CL-B3).
+- **Built behind flags, not adopted:** G5-S1 WAN telemetry (`PRIVYHUB_WAN_TELEMETRY`); G4-P1's `--remote` row and
+  the hotspot runbook.
+- **The link watch is stopped** (E4-S4C); the LAN loss row is parked (remote first). The LAN read clean today:
+  60-80 loss/min.
 - **ABSENT:** Live TV, browser / camera sources, NES / Genesis, a power meter.
 
 ## Current Work Item
 
-**`QUEUE_2026-10-16` (session A) is done**, and `QUEUE_2026-10-16B`
-(session B, overnight) is done.
+**`G-A1_ADOPTION_AND_CL-B3_TASK.md` (session A)**, after session B's G3-S3
+(`evidence/G3_S3_HARDENING_AND_HUB_HOST_2026-10-16.md`: setup canon v2, the port binding, the media token and the
+range-server gate, `diagnostics`, the Hub host setting; built and tested, the APK built).
 
-- **E4-S4C** (`evidence/E4_S4C_LINK_WATCH_2026-10-16.md`):
-  - the watch was stopped after 6 probes, all lossy (102-4,299 loss/min);
-  - the loss moved with the AP's retry %;
-  - the two ends' signal disagrees by about 10 dB;
-  - the hand option is a wired adapter.
-- **G1-S2** (`evidence/G1_S2_OVERLAY_PROVIDER_LIVE_SMOKE_2026-10-16.md`):
-  PASSED. The overlay object appears behind the flag, at +0.28 point CPU;
-  with the flag off, `/status` is unchanged; path `no-peer`. Not adopted.
-- **CL-B2** (`evidence/CL_B2_IDENTITY_APK_AND_LAN_SMOKE_2026-10-16.md`,
-  CLOSED):
-  - The APK is installed, its hash pinned (patch
-    `CL-B2_IDENTITY_APK_HASH`), and kept.
-  - Pairing worked; so did signed setup and token. The 20-min flag run
-    held every gate. A forged token → 401; an unpaired device →
-    `unknown-device`; then re-paired (`dev-2fb1…`).
-  - **R3** (flag and setting off): today's stream, but **host CPU 12.963
-    against 10.9 ± 2, FAILED by 0.06**.
-    - Against R1, the encoder was 46.65 vs 35.75 % of a core, and the
-      ladder held 7000 vs 5000-7000.
-    - The E4-S1 reference and R2 also held 7000 at about 36 %. So the
-      rung mix does not explain it, and the cause is not located.
-    - The bar lesson is in `docs/KNOWN_ISSUES.md`.
-  - The adoption lines for the flag and the setting are written in §7
-    and not applied.
-- **G5-S1** (`evidence/G5_S1_WAN_TELEMETRY_CLASSIFICATION_2026-10-16.md`)
-  and **G4-P1** (`evidence/G4_P1_OFFSITE_TEST_PREP_2026-10-16.md`):
-  session B, software only, nothing adopted. G4-S1's task is a draft
-  (`handoffs/G4-S1_OFFSITE_FIRST_SESSION_TASK.draft.md`), with the
-  runbook `handoffs/G4_RUNBOOK_HOTSPOT.md`.
-- Git status: `logs/cl_b2_git_status.txt`.
+- **G-A1 ADOPTED** (`evidence/G_A1_OVERLAY_AND_IDENTITY_ADOPTION_2026-10-16.md`):
+  - `overlay.conf` and `session-identity.conf` were written by the user by hand (this session's write was refused
+    by its permission check);
+  - seven lines read back; `e1_suite.ADOPTED` and the preflight have seven (patch
+    `G-A1_OVERLAY_AND_IDENTITY_ADOPTED`);
+  - `/status` shows the overlay object (connected, `no-peer`); `/session/status` reads v2, 1 paired device;
+  - the reverts are in the record.
+- **CL-B3 OPEN** (`evidence/CL_B3_HARDENED_APK_LAN_2026-10-16.md`):
+  - The APK is installed, and the pairing survived `-r`. Its hash is pinned (patch `CL-B3_HARDENED_APK_HASH`).
+  - **R1** (PS1-STREAM 10 min, signed path): every host gate held.
+    - Host CPU 11.57 % at 7000-7000, reported only.
+    - `sig_v` 2, `native-stream-start?port=48100` → 200 (the binding), no `legacy_setup`, `media_token_live` true.
+  - **W** (`PRIVYHUB_WAN_TELEMETRY=1` per run): host gates held, and `wan` was live on `/status` and the telemetry
+    with eleven measures and a class per window. The flag came off, and `/status` was byte for byte equal except
+    `server.pid`. **NOT MET:**
+    - companion CPU +0.633 point (≤ 0.5; two runs, not paired arms);
+    - no `logs/wan_sessions.jsonl` line (G5-S1 writes it only when a next session starts; `docs/KNOWN_ISSUES.md`).
+  - **VOD PENDING:** a 60-s movie play from the onn, then the audit's `media_session`. The steps are in the record
+    §5.
+- Git status: `logs/g_a1_git_status.txt`, `logs/cl_b3_git_status.txt`.
 
 ## Verified State
 
@@ -95,20 +85,14 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   **cap 90,000 B** (`P6a`), **cushion 12/17** (`P9`), **audio redundancy
   2/4** (`P10`). Env overrides exist for comparison sessions only
   (`TOOLS.md`, including `C5-M1`'s `PRIVYHUB_NATIVE_PROFILE_ID`); none set.
-- **Installed**: **APK `77011eef…7d9d`** (the `CL-B2` identity APK,
-  G3-S2's debug build, installed 2026-10-16 02:16Z and kept by the
-  user's decision). Its hash is pinned in `tools/e1_suite.py`
-  `EXPECT_APK` and `tools/c3_l4_nft_night.py` (patch
-  `CL-B2_IDENTITY_APK_HASH`), and it read CONFIRMED at 14:04:41Z
-  (CL-B2's end).
-  - Its setting `identity_v2` is **off**. One device is paired
-    (`dev-2fb1…`); the hub does not read the store while the host flag is
-    absent.
-  - Rollback, written and not applied: `adb install -r
-    PrivyHub/app/build/g3_s2_preserved/app-debug.apk` (the CL-B1 APK
-    `de072762…835e`), plus the three hash predecessors in
-    `evidence/cl_b2_2026-10-16/predecessors/`. The older `f31b1c18…8ae7`
-    is kept at `runtime/c4_m1/adopted_app-debug.apk`.
+- **Installed**: **APK `59f736d2…f65f`** (the `CL-B3` hardened identity APK, G3-S3's debug build, installed
+  2026-10-16 17:24Z). Its hash is pinned in `tools/e1_suite.py` `EXPECT_APK` and `tools/c3_l4_nft_night.py`
+  (patch `CL-B3_HARDENED_APK_HASH`), and it read CONFIRMED at 17:59:43Z.
+  - **`identity_v2` is on; the Hub host is empty (LAN).** One device is paired, and its stored permissions are
+    games, tv, vod, diagnostics.
+  - Rollback, written and not applied: `adb install -r PrivyHub/app/build/g3_s3_preserved/app-debug.apk`
+    (`77011eef…`, CL-B2), plus the predecessors in `evidence/cl_b3_2026-10-16/predecessors/`. Older APKs:
+    `g3_s2_preserved/` (`de072762…`, CL-B1) and `runtime/c4_m1/` (`f31b1c18…`).
   - The companion is the systemd user unit `privyhub-companion` (`H3`);
     restart it with `systemctl --user restart`.
   - **Live adaptive bitrate by default, since 2026-10-01 13:07Z**
@@ -145,18 +129,18 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
     output rate is `-r 60`, not x11grab's probed `tbr`. Kill switch:
     delete `snes-capture.conf` + `daemon-reload` + restart, and take the
     line out of `tools/e1_suite.py` `ADOPTED`.
-  - **The adopted environ is exactly five `PRIVYHUB_*`** (live, the
-    index, Snes9x, recovery v2, output_rate) in **five drop-ins**
-    (`adaptive.conf`, `epg-index.conf`, `snes-core.conf`, `recovery.conf`,
-    `snes-capture.conf`). The manager has none. Last checked 2026-10-15
-    21:36Z (E4-S5D's end, `state_at_end.json`).
-    - `d7_regression.py` and `c3_l4_nft_night.py` (`ADOPTED_E3`) still
-      list four lines. They were not run or changed here.
-    - `tools/e1_suite.py` (`ADOPTED`, five) and `e3_state.py` check it.
-      Since E4-S2 they also require no `e4_constraint.conf` (the per-run
-      constraint drop-in).
-    - On 10-15 the state was five lines, with no `e3_flag.conf` or
-      `e4_constraint.conf`, no game, PS1 files identical, APK CONFIRMED.
+  - **The overlay provider and session identity v2 by default, since 2026-10-16 17:23:17Z (G-A1):** `overlay.conf`
+    (`Environment=PRIVYHUB_OVERLAY_PROVIDER=tailscale`) and `session-identity.conf`
+    (`Environment=PRIVYHUB_SESSION_IDENTITY=v2`). Kill switch: delete the drop-in(s) + `daemon-reload` + restart,
+    and take the name(s) out of `tools/e1_suite.py` `ADOPTED` (G-A1 record §4).
+  - **The adopted environ is exactly seven `PRIVYHUB_*`** (live, the index, Snes9x, recovery v2, output_rate, the
+    overlay provider, identity v2) in **seven drop-ins** (`adaptive.conf`, `epg-index.conf`, `snes-core.conf`,
+    `recovery.conf`, `snes-capture.conf`, `overlay.conf`, `session-identity.conf`). The manager has none. Last
+    checked 2026-10-16 17:59:43Z (CL-B3's end, `check_end.json`).
+    - `d7_regression.py` and `c3_l4_nft_night.py` (`ADOPTED_E3`) still list four lines. They were not run or
+      changed.
+    - `tools/e1_suite.py` (`ADOPTED`, seven, with a preflight key per drop-in) and `e3_state.py` check it. Since
+      E4-S2 they also require no `e4_constraint.conf`.
   - The companion tree carries the live controller through `C3-L4-N2`,
     the C5 selector profiles (dormant), **the 1080p rung behind
     `PRIVYHUB_ADAPTIVE_BITRATE_TOP=1080p`** (C5-M5; entry 415 since
@@ -176,32 +160,25 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
-1. **The user's commit:** everything since `3107fb5`.
-   - G1-S1, G3-S1 and G3-S2;
-   - this queue's E4-S4C, G1-S2 and CL-B2 (with patch
-     `CL-B2_IDENTITY_APK_HASH`);
-   - last night's G5-S1 and G4-P1;
-   - the git status in `logs/cl_b2_git_status.txt`.
-   - The E4-S4D watch's later files in `evidence/e4_s4d_2026-10-15/`
-     are final: the watch is stopped.
-2. **G3-S3, the identity hardening:**
-   - the declared port: sign and check `audio_port`, and report the
-     chosen target's class and hash, with no address;
-   - the range server over the overlay;
-   - tokens on the TV-sync, EPG and diagnostics paths.
-   - CL-B2's notes (`docs/KNOWN_ISSUES.md`, the G3 entry) also apply: the
-     store directory is 0775, and the client sets up twice per entry.
-3. **The host flag and the client setting, the user's call.** The lines
-   are written in CL-B2 §7 and not applied:
-   - `session-identity.conf` = `Environment=PRIVYHUB_SESSION_IDENTITY=v2`,
-     then `daemon-reload`, a restart, and the line added to `e1_suite.py`
-     `ADOPTED`;
-   - then `identity_v2` on, on the onn.
-   - The flag goes first.
-4. **G4-S1, the first off-site session** (a phone hotspot):
-   - the task draft is `handoffs/G4-S1_OFFSITE_FIRST_SESSION_TASK.draft.md`;
+1. **The user's commit:** everything since `92e388e`.
+   - G3-S3 (session B), G-A1 and CL-B3 (with patches `G3-S3_HARDENING_AND_HUB_HOST`,
+     `G-A1_OVERLAY_AND_IDENTITY_ADOPTED` and `CL-B3_HARDENED_APK_HASH`);
+   - the git status in `logs/g_a1_git_status.txt` and `logs/cl_b3_git_status.txt`.
+   - **Before or with it, the user's calls on CL-B3:**
+     - the VOD play (60 s from the onn, the record §5);
+     - the two W gates not met: the companion CPU +0.633 point, and no `wan_sessions.jsonl` line.
+2. **G4-S1, the first off-site session** (a phone hotspot):
+   - the draft is `handoffs/G4-S1_OFFSITE_FIRST_SESSION_TASK.draft.md`;
    - the runbook is `handoffs/G4_RUNBOOK_HOTSPOT.md`;
    - it uses `tools/e1_suite.py --remote` (G4-P1).
+   - The user's hand steps: the Tailscale app on the onn, "Hub host" set to the hub's tailnet name before
+     leaving, and the phone hotspot.
+   - The hub's firewall on the tailnet interface is still unverified (G3-S3 §4).
+3. **G5-S2:** WAN adaptation (`docs/WAN_ADAPTATION_RULES.md`). It also takes:
+   - the per-session line at stream stop / shutdown;
+   - the live recovery state;
+   - the unclassified measures' thresholds;
+   - an isolated cost A/B.
 
 **Open, not blocking:**
 
@@ -219,6 +196,7 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 - `C6-D1`'s list; B3a's two clauses; C5-M4's R3; `encoder_command` is the
   full start's only;
 - **adaptive-off measurements need the drop-in out** (`TOOLS.md`);
+- **G5-S1 WAN telemetry** (CL-B3 W): no session line on a one-session run, and the CPU cost over its bar; `docs/KNOWN_ISSUES.md`;
 - **the host-CPU band gate** (CL-B2 R3): FAILED by 0.06 on the encoder's
   share (46.65 vs ~36 % of a core) at the same 7000 rung as the
   reference. The cause is not located. A BAR item in
@@ -263,7 +241,7 @@ Phase C: met (C7, `docs/ROADMAP.md`). **Phase E** (`docs/ROADMAP.md`):
 
 ## Relevant References
 
-- G (remote): `evidence/CL_B2_IDENTITY_APK_AND_LAN_SMOKE_2026-10-16.md`, `G1_S2_…`, `G3_S2_…`, `G3_S1_…`, `G1_S1_…`, `G5_S1_…`, `G4_P1_…`, `E4_S4C_LINK_WATCH_2026-10-16.md`; `docs/REMOTE_TRUST.md`, `docs/WAN_ADAPTATION_RULES.md`; `handoffs/QUEUE_2026-10-16.md`, `QUEUE_2026-10-16B.md`; `patches/CL-B2_IDENTITY_APK_HASH.md`.
+- G (remote): `evidence/CL_B3_HARDENED_APK_LAN_2026-10-16.md`, `G_A1_OVERLAY_AND_IDENTITY_ADOPTION_2026-10-16.md`, `G3_S3_HARDENING_AND_HUB_HOST_2026-10-16.md`, `CL_B2_IDENTITY_APK_AND_LAN_SMOKE_2026-10-16.md`, `G1_S2_…`, `G3_S2_…`, `G3_S1_…`, `G1_S1_…`, `G5_S1_…`, `G4_P1_…`, `E4_S4C_LINK_WATCH_2026-10-16.md`; `docs/REMOTE_TRUST.md`, `docs/WAN_ADAPTATION_RULES.md`; `handoffs/QUEUE_2026-10-16.md`, `QUEUE_2026-10-16B.md`; `patches/CL-B2_IDENTITY_APK_HASH.md`.
 - E4: `evidence/E4_S1_…`, `E4_S2_…` (10-09), `E4_S3_MEMORY_FLOOR_CLOSE_…`, `E4_S4_GRAB_DEFERRAL_…`, `E4_S5_SNES_CAPTURE_59FPS_…`, `E4_S3B_MEMORY_FLOOR_1G_SWAPOFF_…`, `E4_S5B_SNES_CAPTURE_PROBE_BENCH_…`, `E4_S4B_GRAB_DEFERRAL_CLEAN_LINK_…` (10-10); `handoffs/QUEUE_2026-10-09.md`, `QUEUE_2026-10-10.md`, `QUEUE_2026-10-10B.md`; `patches/E4-S2_…` … `E4-S5_…`, `E4-S3B_RUNNER_REFRESH_BACKOFF.md`.
 - E3: `evidence/E3_A3B_…`, `E3_A3_…` (10-09), `E3_R2_…`, `E3_S7B_…`, `E3_R1_…`, `E3_S7_…` (10-08), `E3_A2_…`, `E3_S*`; `handoffs/QUEUE_2026-10-06.md` … `-08B`; `TOOLS.md` ("The E3 flags", the drop-ins).
 - `evidence/E2_S1_WHOLE_SYSTEM_2026-10-06.md` (E2); `architecture/E1_WORKLOAD_SUITE.md` (the frozen suite); `evidence/E1_S1_WORKLOAD_SUITE_2026-10-05.md`.
