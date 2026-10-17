@@ -1,5 +1,23 @@
 # Known issues and deferred work
 
+## 2026-10-17 G8-S1: the rate-cap cells never reached PLAYING; delay-150 not read as latency-limited — OPEN
+
+(`docs/memory/evidence/G8_S1_ADVERSE_NETWORK_ENVELOPE_2026-10-17.md` §4 (iii), §5)
+
+- **The four cap cells (17-20: `cap-6000`, `cap-4500` @post-fec, off and on) did not reach PLAYING** in any of 12
+  suite attempts (23 client sessions).
+  - The stream entered the shim at ~8.25 Mbit/s (the 7000 rung with FEC and audio), above both caps.
+  - The cap held its rate: 6,000.0 / 4,500.0 kbps out per second, `send_errors` 0, the queue at its 100-ms bound.
+  - 27-29 % / 44-45 % was tail-dropped in every second.
+  - The client received ~600 packets/s, rendered 9-27 frames and then nothing; each session ended after ~49 s.
+  - No ladder decision was written: no PLAYING, so no window.
+  - **Candidate readings, none chosen:** (a) the stream's own rate exceeds the cap and the bounded queue drops it;
+    (b) the cap stage mis-paces within a second (not visible in 1-s lines); (c) a client start-up timeout.
+  - G8-P1's cap proof used a steady synthetic ~6.9 Mbit/s source.
+  - A follow-up (G8-S2) is the user's option.
+- **`delay-150` read lossy (off) and path-changed (on), with 0 latency-limited windows.** Reported. The `rtt_ms`
+  measure's source is the client's control echo, which the shim's video-only delay does not cross.
+
 ## 2026-10-16 G4-S1, the first off-site session: three items — OPEN
 
 (`docs/memory/evidence/G4_S1_OFFSITE_FIRST_SESSION_2026-10-16.md` §6)

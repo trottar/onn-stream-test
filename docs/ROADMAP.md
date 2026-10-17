@@ -1559,6 +1559,13 @@ phone hotspot + the Tailscale app on the onn); gates 1-2 met, gate 3 not evaluab
 RetroArch FPS or encoder progress); run 2's hotspot toggle ended the session and the stream came back after a LAN
 setup; run 3 not started. Overlay wire rate at 7000: 11.42 Mbit/s.
 
+**G4-P2 (2026-10-17): the remote row records gate 3 from G4-S2** — `tools/e1_remote.py`
+writes the home row's per-run RetroArch counter override (for the PS1-STREAM fixture),
+starts the sampler with `--e2` and keeps `encoder.jsonl`, and reports `retroarch_fps`,
+`capture_fps`, `dupdrop_per_min` as the gates' clauses read them (20 tests OK; the home
+row byte for byte, by file and masked AST hash). G4-S1's gate 3 stays NOT EVALUABLE from
+its files. Record: `docs/memory/evidence/G4_P2_REMOTE_ROW_GATE3_2026-10-17.md`.
+
 **Status (2026-10-16, G4-P1): PREPARED, nothing run off-site** — `tools/e1_suite.py run --remote`
 (a PS1-STREAM row over the overlay: both host flags read back, the user's launch, the
 endpoint class + hash only, the path every 10 s, adb optional; 13 tests OK); the G4-S1
@@ -1618,6 +1625,32 @@ decisions reproduced exactly and the controller's rows identical to HEAD's;
 flag present, open loop, tabulated per rule with no claim of improvement. Live
 smoke (LAN, 10 min) and the first off-site run with it (G4-S2) pending on the
 stream. Record: `docs/memory/evidence/G5_S2_WAN_ADAPTATION_RULES_2026-10-16.md`.
+
+**G5-S3 (2026-10-17): THE REMOTE LADDER BUILT behind `PRIVYHUB_REMOTE_LADDER=1`
+(absent = today, byte for byte), NOT ADOPTED, unvalidated live** —
+`companion/remote_ladder.py`: the session's routing class (G3's overlay test over
+the class-matched target the gate hands the games plugin) reaches the ladder's
+context as `path_class`; on a remote path only, the ladder and the actuator's
+validated list gain 720p/4000 (`floor_4000` and the one-rung step from 5000 can
+land there; nothing below 4000; refused on the LAN); `path_class` on every
+ladder row, each 4000 actuation labelled with its rule and result. Flag absent:
+actuator 200/200 cases, the games plugin's stream start and G5-S2's replay
+identical. Flag present: no replayed run reaches 4000 — G4-S1 run 1's 2,259
+loss/min is one report of 21,407 (the resync after its 24.5-s pause), not
+sustained loss. Pending on the stream: the LAN smoke, then G4-S2. Record:
+`docs/memory/evidence/G5_S3_REMOTE_LADDER_2026-10-17.md`.
+
+**G5-S4 (2026-10-17): THE REMOTE RUNG CAP BUILT behind
+`PRIVYHUB_REMOTE_RUNG_CAP=<kbps>` (needs G5-S3's flag; absent = today, byte for
+byte), NOT ADOPTED, unvalidated live** — `companion/remote_cap.py`: the user's data
+saver. Valid only at a remote rung (4000-7000); on a remote path the ladder's
+target is clamped to it (the stream moves to the cap through the ladder's gates,
+after the 60-s guard; never above it; the ladder's own steps below it); on the
+LAN nothing; every clamp recorded `source: remote_cap`. Replay over G4-S1's runs:
+at either cap about 60 s at 7000, then the cap. Arithmetic, not a result: 4000 is
+2.3-3.5 GB/h by the basis, against 5.1 at 7000. Pending on the stream: the first
+off-site run with the cap at 4000 (the user judges the picture). Record:
+`docs/memory/evidence/G5_S4_REMOTE_RUNG_CAP_2026-10-17.md`.
 
 Reuse Phase C telemetry/adaptation instead of creating a parallel WAN streamer.
 
@@ -1691,6 +1724,14 @@ envelope. Record: `docs/memory/evidence/G8_P1_IMPAIRMENT_SHIM_2026-10-16.md`.
 **Status (2026-10-16, G8-S1): envelope: 5/22 cells measured (partial, 2026-10-16); resume pending.** Cells 1-5
 (none off/on, loss-1 off/on, loss-5 off), all valid, every host gate met. The rest are not run. The driver was stopped
 by its STOP file at 21:25:52Z. Record: `docs/memory/evidence/G8_S1_ADVERSE_NETWORK_ENVELOPE_2026-10-16.md`.
+
+**Status (2026-10-17, G8-S1 final): envelope measured: 18/22 cells valid; the rate-cap profiles did not reach
+PLAYING (open); see the record.** Resumed 00:21Z, all 22 cells done 04:30:30Z; every host gate met in every valid cell.
+The four cap cells (cap-6000 / cap-4500, off and on) never reached PLAYING: the stream entered the shim at ~8.25
+Mbit/s (the 7000 rung with FEC and audio), the cap held its rate, and 27-45 % was tail-dropped. The rules acted once
+(delay-150 on, R2.1, 7000→6000). From cell 6 the companion ran session B's flag-absent G5-S3 / G5-S4 edits (disclosed,
+bounded by B's in-process proofs). Record: `docs/memory/evidence/G8_S1_ADVERSE_NETWORK_ENVELOPE_2026-10-17.md`
+(supersedes the 10-16 partial).
 
 Exercise bounded representative conditions:
 

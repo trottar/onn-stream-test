@@ -1,0 +1,49 @@
+G4-P2 tests, 2026-10-17T00:49:51Z, baseline 1dab25d
+$ (cd tools && python3 -m unittest test_e1_remote -v)
+test_defaults (test_e1_remote.Args.test_defaults) ... ok
+test_refusals (test_e1_remote.Args.test_refusals) ... ok
+test_values_and_adb (test_e1_remote.Args.test_values_and_adb) ... ok
+test_classes_and_hashes_only (test_e1_remote.Endpoint.test_classes_and_hashes_only) ... ok
+test_classify (test_e1_remote.Endpoint.test_classify) ... ok
+test_counter_extra_as_the_home_row (test_e1_remote.Gate3.test_counter_extra_as_the_home_row) ... /home/privyhub/Projects/onn-stream-test/tools/e1_remote.py:285: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmp6rv16h3s/out/E1-PS1-STREAM-REMOTE/run1/sampler.log' mode='w' encoding='UTF-8'>
+  samp = subprocess.Popen([sys.executable, str(E.REPO / "tools/e1_sampler.py"), "run", str(rd), "--telemetry",
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_counter_override_written_then_removed (test_e1_remote.Gate3.test_counter_override_written_then_removed) ... /home/privyhub/Projects/onn-stream-test/tools/e1_remote.py:285: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmp6t35dvh9/out/E1-PS1-STREAM-REMOTE/run1/sampler.log' mode='w' encoding='UTF-8'>
+  samp = subprocess.Popen([sys.executable, str(E.REPO / "tools/e1_sampler.py"), "run", str(rd), "--telemetry",
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_dry_dispatch_with_no_companion_refuses_as_today (test_e1_remote.Gate3.test_dry_dispatch_with_no_companion_refuses_as_today) ... ok
+test_gate3_from_fixtures_and_segcap_is_e4_s5ds (test_e1_remote.Gate3.test_gate3_from_fixtures_and_segcap_is_e4_s5ds) ... /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/e4_s5d_2026-10-15/e4_s5d_analysis.py:27: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpi8iij67v/run1/encoder.jsonl' mode='r' encoding='UTF-8'>
+  for l in open(p, errors="replace"):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_refuses_over_an_existing_file_and_leaves_it (test_e1_remote.Gate3.test_refuses_over_an_existing_file_and_leaves_it) ... ok
+test_sampler_started_with_e2 (test_e1_remote.Gate3.test_sampler_started_with_e2) ... /home/privyhub/Projects/onn-stream-test/tools/e1_remote.py:285: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpnog03kzh/out/E1-PS1-STREAM-REMOTE/run1/sampler.log' mode='w' encoding='UTF-8'>
+  samp = subprocess.Popen([sys.executable, str(E.REPO / "tools/e1_sampler.py"), "run", str(rd), "--telemetry",
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_summary_keys_present (test_e1_remote.Gate3.test_summary_keys_present) ... /home/privyhub/Projects/onn-stream-test/tools/e1_remote.py:285: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpho95v3ao/out/E1-PS1-STREAM-REMOTE/run1/sampler.log' mode='w' encoding='UTF-8'>
+  samp = subprocess.Popen([sys.executable, str(E.REPO / "tools/e1_sampler.py"), "run", str(rd), "--telemetry",
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_both_flags (test_e1_remote.Preflight.test_both_flags) ... ok
+test_flags_absent_refuses_with_a_clear_line (test_e1_remote.Preflight.test_flags_absent_refuses_with_a_clear_line) ... ok
+test_main_refuses_without_flags (test_e1_remote.Preflight.test_main_refuses_without_flags) ... ok
+test_one_flag_absent (test_e1_remote.Preflight.test_one_flag_absent) ... ok
+test_dispatch_refuses_without_prereg (test_e1_remote.SuiteDispatch.test_dispatch_refuses_without_prereg) ... ok
+test_guarded_import (test_e1_remote.SuiteDispatch.test_guarded_import) ... ok
+test_hash_logged_never_the_address (test_e1_remote.WholeRun.test_hash_logged_never_the_address) ... /home/privyhub/Projects/onn-stream-test/tools/e1_remote.py:285: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpiolgq9qf/out/E1-PS1-STREAM-REMOTE/run1/sampler.log' mode='w' encoding='UTF-8'>
+  samp = subprocess.Popen([sys.executable, str(E.REPO / "tools/e1_sampler.py"), "run", str(rd), "--telemetry",
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_not_over_the_overlay_fails (test_e1_remote.WholeRun.test_not_over_the_overlay_fails) ... /home/privyhub/Projects/onn-stream-test/tools/e1_remote.py:285: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmps9jnlwyw/out/E1-PS1-STREAM-REMOTE/run1/sampler.log' mode='w' encoding='UTF-8'>
+  samp = subprocess.Popen([sys.executable, str(E.REPO / "tools/e1_sampler.py"), "run", str(rd), "--telemetry",
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 0.040s
+
+OK
+note: the ResourceWarning (sampler.log opened inside the Popen call) is HEAD's line, unchanged; the fake Popen never closes it

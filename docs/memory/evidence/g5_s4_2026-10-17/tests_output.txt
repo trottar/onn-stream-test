@@ -1,0 +1,23 @@
+G5-S4 unit tests, 2026-10-17T00:40:45Z, baseline 1dab25d + G5-S3
+$ python3 -m unittest discover -s tests/remote_cap -v
+test_cap_7000_is_no_move (test_remote_cap.TheEffect.test_cap_7000_is_no_move) ... ok
+test_clean_link_moves_to_each_cap_after_the_guard_and_stays (test_remote_cap.TheEffect.test_clean_link_moves_to_each_cap_after_the_guard_and_stays) ... ok
+test_fallback_target_clamped (test_remote_cap.TheEffect.test_fallback_target_clamped) ... ok
+test_floor_4000_under_a_5000_cap_lands_on_4000 (test_remote_cap.TheEffect.test_floor_4000_under_a_5000_cap_lands_on_4000) ... ok
+test_full_start_back_at_7000_moves_again (test_remote_cap.TheEffect.test_full_start_back_at_7000_moves_again) ... ok
+test_inactive_cap_is_today (test_remote_cap.TheEffect.test_inactive_cap_is_today) ... ok
+test_lan_unaffected (test_remote_cap.TheEffect.test_lan_unaffected) ... ok
+test_the_ladders_own_steps_below_the_cap (test_remote_cap.TheEffect.test_the_ladders_own_steps_below_the_cap) ... ok
+test_absent_or_empty_is_none (test_remote_cap.TheFlag.test_absent_or_empty_is_none) ... ok
+test_depends_on_g5_s3 (test_remote_cap.TheFlag.test_depends_on_g5_s3) ... ok
+test_imports_only_under_the_flag (test_remote_cap.TheFlag.test_imports_only_under_the_flag) ... ok
+test_real_environment (test_remote_cap.TheFlag.test_real_environment) ... ok
+test_valid_only_at_a_remote_rung (test_remote_cap.TheFlag.test_valid_only_at_a_remote_rung) ... ok
+test_config_row_once_and_the_clamp_recorded (test_remote_cap.TheRows.test_config_row_once_and_the_clamp_recorded) ... ok
+test_inactive_says_so_once_and_nothing_else (test_remote_cap.TheRows.test_inactive_says_so_once_and_nothing_else) ... ok
+test_lan_rows_no_clamp (test_remote_cap.TheRows.test_lan_rows_no_clamp) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 0.458s
+
+OK

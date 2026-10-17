@@ -118,6 +118,24 @@ if (os.environ.get("PRIVYHUB_WAN_ADAPTATION") or "").strip() == "1":
 
     WAN_ADAPTATION = _wan_adaptation.from_environ(os.environ)
 
+# G5-S3: the remote ladder (the session's path class; 720p/4000 on a remote
+# path only), only with PRIVYHUB_REMOTE_LADDER=1. Absent = today: nothing
+# imported; the context, the policy's ladder and every row are as before.
+REMOTE_LADDER = None
+if (os.environ.get("PRIVYHUB_REMOTE_LADDER") or "").strip() == "1":
+    import remote_ladder as _remote_ladder
+
+    REMOTE_LADDER = _remote_ladder.shared_from_environ(os.environ)
+
+# G5-S4: the user's remote rung cap (a data saver), only with
+# PRIVYHUB_REMOTE_RUNG_CAP set. Absent = today: nothing imported, no row, no
+# clamp. Without G5-S3's flag it does nothing and says so once.
+REMOTE_CAP = None
+if (os.environ.get("PRIVYHUB_REMOTE_RUNG_CAP") or "").strip():
+    import remote_cap as _remote_cap
+
+    REMOTE_CAP = _remote_cap.from_environ(os.environ, REMOTE_LADDER)
+
 try:  # the reference profile's id; a pure module, safe for the unit tests
     from native_stream_profiles import NATIVE_GAME_720P60_REFERENCE as _REFERENCE_PROFILE
     REFERENCE_PROFILE_ID = _REFERENCE_PROFILE.id
@@ -426,6 +444,10 @@ class LivePolicy(ab.ShadowPolicy):
             target = next((k for k in reversed(self.ladder) if k < self.level_kbps), self.level_kbps)
         else:
             target = TARGET_KBPS[kind]
+        if REMOTE_CAP is not None:   # G5-S4: the user's remote cap on the ladder's target
+            target, m, blocked = REMOTE_CAP.clamp(self, direction, target, m)
+            if blocked is not None:
+                return self._refuse(kind, "remote_cap", target, m, injected=injected, state=ab.HOLD_DOWN, **blocked)
 
         left = self.hold_left(kind)
         if left > 0:
@@ -841,6 +863,8 @@ class LiveController:
         self._write({"event": "controller_start", "configured_mode": LIVE,
                      "inject_enabled": self.inject_enabled,
                      **({"top": TOP_1080P, "ladder_kbps": list(LADDER_WITH_RUNG_KBPS)} if self.top_1080p else {})})
+        if REMOTE_CAP is not None:   # G5-S4: the cap's configuration, once
+            self._write(REMOTE_CAP.config_row())
 
     # -- wiring (the games plugin, once) -----------------------------------
     def bind(self, *, actuator: Callable[[int], dict[str, Any]], context: Callable[[], dict[str, Any]],
@@ -876,8 +900,11 @@ class LiveController:
             "no_override": overrides.get("any_override") is False,
             "actuator_bound": self._actuator is not None,
         }
-        return {"stream_kbps": ns.get("bitrate_kbps"), "guards": guards,
-                "clock_ms": int(time.monotonic() * 1000)}
+        ctx = {"stream_kbps": ns.get("bitrate_kbps"), "guards": guards,
+               "clock_ms": int(time.monotonic() * 1000)}
+        if REMOTE_LADDER is not None:   # G5-S3: the session's path_class; the policy's ladder by class
+            REMOTE_LADDER.apply(self._policy, ctx)
+        return ctx
 
     def observe(self, telemetry: dict[str, Any], stream_bitrate_kbps: int | None = None,
                 native_status: dict[str, Any] | None = None) -> None:
@@ -900,6 +927,8 @@ class LiveController:
                     events = self._policy.feed(s, ctx)
                 else:   # G5-S2: the rules' one suggestion, as a constraint on the ladder
                     events = WAN_ADAPTATION.feed(self._policy, s, ctx, telemetry)
+                if REMOTE_CAP is not None:   # G5-S4: the move to the cap, through the ladder's gates
+                    events = REMOTE_CAP.after_feed(self._policy, s, ctx, events)
                 self._write_sample(s, self._policy.last_disposition, self._policy.last_clean)
                 self._emit(events, s, ctx)
                 self._maybe_actuate()
@@ -1085,6 +1114,8 @@ class LiveController:
     def _write(self, row: dict[str, Any]) -> None:
         base = {"schema": SCHEMA, "mode": LIVE, "at_utc": _now_utc(), "acted": False}
         base.update(row)
+        if REMOTE_LADDER is not None:   # G5-S3: path_class on every row; a 4000 actuation labelled
+            base = REMOTE_LADDER.annotate(base)
         try:
             import json
             self.log_path.parent.mkdir(parents=True, exist_ok=True)

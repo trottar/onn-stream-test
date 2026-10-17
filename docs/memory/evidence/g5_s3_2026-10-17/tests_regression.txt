@@ -1,0 +1,30 @@
+G5-S3 regression suites, 2026-10-17T00:32:15Z, with the G5-S3 code present (flag absent in this process)
+== tests/overlay
+Ran 17 tests in 0.047s
+
+OK
+== tests/session_identity
+Ran 80 tests in 0.169s
+
+OK
+== tests/wan_telemetry
+Ran 18 tests in 0.100s
+
+OK
+== tests/wan_adaptation
+Ran 23 tests in 0.110s
+
+OK
+== tests/remote_ladder
+Ran 26 tests in 0.506s
+
+OK
+== tools/test_adaptive_bitrate_live.py
+Ran 126 tests in 0.734s
+
+OK
+== tools/test_c3_f1_recovery_restart.py
+Ran 8 tests in 0.002s
+
+FAILED (errors=1)
+note: tools/test_c3_f1_recovery_restart.py's 1 ERROR (test_recovery_is_wired_to_the_new_primitive: 'restart_encoder=(' not in games.py) is pre-existing -- HEAD's games.py has no such substring (git show HEAD:companion/plugins/games.py | grep -c 'restart_encoder=(' -> 0); recorded as pre-existing since C5-M5, E3-R1, E3-R2. 7/8, as at HEAD.

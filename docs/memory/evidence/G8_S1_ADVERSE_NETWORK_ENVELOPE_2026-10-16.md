@@ -6,6 +6,9 @@ baseline_commit: 64d9489 (the G8-S1 launch and the shim's `none` profile uncommi
 
 # G8-S1 — the adverse-network envelope (first pass)
 
+> **SUPERSEDED (2026-10-17)** by `G8_S1_ADVERSE_NETWORK_ENVELOPE_2026-10-17.md`, the final record over all 22 cells.
+> Kept as the 10-16 partial reading; its five rows are unchanged there.
+
 **Classification: PARTIAL — 5 of 22 cells, stopped by the user's STOP file at 2026-10-16T21:25:52Z.** All five cells
 are valid, and every host gate was met in each. The link-side numbers below are reported, not judged: this is the
 envelope, with no pass or fail. Measurement only; nothing adopted; nothing committed. The driver was not relaunched.

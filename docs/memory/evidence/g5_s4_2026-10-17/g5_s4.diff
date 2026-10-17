@@ -1,0 +1,539 @@
+# G5-S4's changes, against G5-S3's after-state (rebuilt from HEAD + g5_s3.diff; sha256 equal to g5_s3_2026-10-17/after_sha256.txt)
+--- a/companion/adaptive_bitrate_live.py (G5-S3 after)
++++ b/companion/adaptive_bitrate_live.py
+@@ -127,6 +127,15 @@
+ 
+     REMOTE_LADDER = _remote_ladder.shared_from_environ(os.environ)
+ 
++# G5-S4: the user's remote rung cap (a data saver), only with
++# PRIVYHUB_REMOTE_RUNG_CAP set. Absent = today: nothing imported, no row, no
++# clamp. Without G5-S3's flag it does nothing and says so once.
++REMOTE_CAP = None
++if (os.environ.get("PRIVYHUB_REMOTE_RUNG_CAP") or "").strip():
++    import remote_cap as _remote_cap
++
++    REMOTE_CAP = _remote_cap.from_environ(os.environ, REMOTE_LADDER)
++
+ try:  # the reference profile's id; a pure module, safe for the unit tests
+     from native_stream_profiles import NATIVE_GAME_720P60_REFERENCE as _REFERENCE_PROFILE
+     REFERENCE_PROFILE_ID = _REFERENCE_PROFILE.id
+@@ -435,6 +444,10 @@
+             target = next((k for k in reversed(self.ladder) if k < self.level_kbps), self.level_kbps)
+         else:
+             target = TARGET_KBPS[kind]
++        if REMOTE_CAP is not None:   # G5-S4: the user's remote cap on the ladder's target
++            target, m, blocked = REMOTE_CAP.clamp(self, direction, target, m)
++            if blocked is not None:
++                return self._refuse(kind, "remote_cap", target, m, injected=injected, state=ab.HOLD_DOWN, **blocked)
+ 
+         left = self.hold_left(kind)
+         if left > 0:
+@@ -850,6 +863,8 @@
+         self._write({"event": "controller_start", "configured_mode": LIVE,
+                      "inject_enabled": self.inject_enabled,
+                      **({"top": TOP_1080P, "ladder_kbps": list(LADDER_WITH_RUNG_KBPS)} if self.top_1080p else {})})
++        if REMOTE_CAP is not None:   # G5-S4: the cap's configuration, once
++            self._write(REMOTE_CAP.config_row())
+ 
+     # -- wiring (the games plugin, once) -----------------------------------
+     def bind(self, *, actuator: Callable[[int], dict[str, Any]], context: Callable[[], dict[str, Any]],
+@@ -912,6 +927,8 @@
+                     events = self._policy.feed(s, ctx)
+                 else:   # G5-S2: the rules' one suggestion, as a constraint on the ladder
+                     events = WAN_ADAPTATION.feed(self._policy, s, ctx, telemetry)
++                if REMOTE_CAP is not None:   # G5-S4: the move to the cap, through the ladder's gates
++                    events = REMOTE_CAP.after_feed(self._policy, s, ctx, events)
+                 self._write_sample(s, self._policy.last_disposition, self._policy.last_clean)
+                 self._emit(events, s, ctx)
+                 self._maybe_actuate()
+--- a/companion/remote_ladder.py (G5-S3 after)
++++ b/companion/remote_ladder.py
+@@ -128,11 +128,17 @@
+             if ev == "wan_suggestion" and out.get("suggestion") == "floor_4000":
+                 # G5-S2's row says "recorded only"; with this flag, on a remote path, it is actuatable.
+                 out["floor_actuatable"] = self.path_class == PATH_REMOTE
++            cap = (out.get("measurements") or {}).get("remote_cap") if isinstance(out.get("measurements"), dict) else None
++            if isinstance(cap, dict):   # G5-S4: a clamped target, hoisted
++                for k, v in cap.items():
++                    out.setdefault(k, v)
+             seq = out.get("decision_sequence")
+             if ev in ("transition", "would_act") and seq is not None:
+                 m = out.get("measurements") or {}
+                 self._decisions[seq] = {"reason": out.get("reason"), "trigger": out.get("trigger"),
+-                                        "wan_rule": m.get("wan_rule") if isinstance(m, dict) else None}
++                                        "wan_rule": m.get("wan_rule") if isinstance(m, dict) else None,
++                                        **({"source": cap["source"], "wish_kbps": cap.get("wish_kbps"),
++                                            "capped_kbps": cap.get("capped_kbps")} if isinstance(cap, dict) else {})}
+                 while len(self._decisions) > _MEMO_MAX:
+                     del self._decisions[next(iter(self._decisions))]
+             elif ev in RESULT_EVENTS and seq is not None and seq in self._decisions:
+--- a/docs/WAN_ADAPTATION_RULES.md (G5-S3 after)
++++ b/docs/WAN_ADAPTATION_RULES.md
+@@ -64,6 +64,7 @@
+ 
+ - **G5-S2:** `capacity-limited` → `step_down` one rung to the LAN floor 5000. At 5000 on a remote path, after 60 reports (ROUTINE's down hold-down, the persistence this sets) → `floor_4000`, **recorded only**: the actuator's validated ladder is 5000-7000, so 4000 needs an actuator change and its own validation first.
+ - **G5-S3:** R3.2's floor is **actuatable behind `PRIVYHUB_REMOTE_LADDER=1`, unvalidated live**: on a remote path (`path_class` from the session's routing evidence) the ladder and the actuator's validated list are `4000 / 5000 / 5500 / 6000 / 7000`; `floor_4000` and the ladder's own one-rung `capacity_mild` step from 5000 can land on 4000, through every gate; nothing below 4000; on the LAN, 4000 is refused as before.
++- **G5-S4 (the user's cap, a data saver):** `PRIVYHUB_REMOTE_RUNG_CAP=<kbps>` (a rung of the remote list; anything else ignored and logged once; it needs G5-S3's flag). On a remote path the ladder's target is clamped to it: the stream moves down to the cap through the ladder's gates (after the 60-s session guard), an increase never goes above it, every step below it is the ladder's own (so `floor_4000` under a 5000 cap still lands on 4000); on the LAN nothing. The user's choice, never automatic; unvalidated live (record: `docs/memory/evidence/G5_S4_REMOTE_RUNG_CAP_2026-10-17.md`).
+ 
+ ## 4. Use FEC only when loss justifies it (`lossy`)
+ 
+--- a/docs/ROADMAP.md (G5-S3 after)
++++ b/docs/ROADMAP.md
+@@ -1633,6 +1633,18 @@
+ sustained loss. Pending on the stream: the LAN smoke, then G4-S2. Record:
+ `docs/memory/evidence/G5_S3_REMOTE_LADDER_2026-10-17.md`.
+ 
++**G5-S4 (2026-10-17): THE REMOTE RUNG CAP BUILT behind
++`PRIVYHUB_REMOTE_RUNG_CAP=<kbps>` (needs G5-S3's flag; absent = today, byte for
++byte), NOT ADOPTED, unvalidated live** — `companion/remote_cap.py`: the user's data
++saver. Valid only at a remote rung (4000-7000); on a remote path the ladder's
++target is clamped to it (the stream moves to the cap through the ladder's gates,
++after the 60-s guard; never above it; the ladder's own steps below it); on the
++LAN nothing; every clamp recorded `source: remote_cap`. Replay over G4-S1's runs:
++at either cap about 60 s at 7000, then the cap. Arithmetic, not a result: 4000 is
++2.3-3.5 GB/h by the basis, against 5.1 at 7000. Pending on the stream: the first
++off-site run with the cap at 4000 (the user judges the picture). Record:
++`docs/memory/evidence/G5_S4_REMOTE_RUNG_CAP_2026-10-17.md`.
++
+ Reuse Phase C telemetry/adaptation instead of creating a parallel WAN streamer.
+ 
+ Measure and classify:
+diff --git a/companion/remote_cap.py b/companion/remote_cap.py
+new file mode 100644
+index 0000000..96b510f
+--- /dev/null
++++ b/companion/remote_cap.py
+@@ -0,0 +1,130 @@
++"""G5-S4: the remote rung cap -- a data saver the user sets, for remote sessions.
++
++`PRIVYHUB_REMOTE_RUNG_CAP=<kbps>`. **Absent (or empty) = today**: nothing imports
++this module; the ladder has no cap and writes no row about one. The design is
++`docs/memory/evidence/g5_s4_2026-10-17/design_written_before_code.md` (hashed
++before this code).
++
++- **Valid** only at a rung of G5-S3's remote list (4000 / 5000 / 5500 / 6000 /
++  7000). Anything else is logged once (a `remote_cap_config` row) and ignored.
++- **Depends on G5-S3** (`PRIVYHUB_REMOTE_LADDER=1`): without it the cap does
++  nothing and says so once.
++- **Effect, on a remote path only** (`path_class` from G5-S3's shared
++  `RemoteLadder`):
++  - the clamp in the ladder's target selection (`LivePolicy._decide`): a
++    decrease aimed above the cap goes to the cap; an increase aimed above it is
++    refused `remote_cap`;
++  - the move to the cap (`LiveController.observe`, after the feed): with the
++    stream above the cap, one ROUTINE decision (trigger `remote_cap`) through
++    every gate of the ladder, aimed at the cap.
++
++  Below the cap every step is the ladder's own; the cap never lowers the floor
++  (every valid cap is >= 4000). On the LAN: nothing.
++- **Recorded:** every clamp's row carries `source: remote_cap`, `wish_kbps` (the
++  ladder's target), `capped_kbps`, `cap_kbps`.
++"""
++
++from __future__ import annotations
++
++from typing import Any, Mapping
++
++import remote_ladder as rl
++
++FLAG_ENV = "PRIVYHUB_REMOTE_RUNG_CAP"
++SOURCE = TRIGGER = "remote_cap"
++VALID_KBPS = rl.REMOTE_LADDER_KBPS          # 4000 / 5000 / 5500 / 6000 / 7000
++DECISION_EVENTS = ("transition", "would_act", "refused", "hold")
++
++
++def parse(raw: Any) -> tuple[int | None, str | None, Any]:
++    """(cap, refusal reason, the value as it may be recorded)."""
++    text = str(raw or "").strip()
++    if not text.isdigit():
++        return None, "not_a_remote_rung", "non-numeric"
++    value = int(text)
++    if value not in VALID_KBPS:
++        return None, "not_a_remote_rung", value
++    return value, None, value
++
++
++class RemoteCap:
++    def __init__(self, raw: Any, ladder: Any) -> None:
++        self.ladder = ladder
++        self.cap_kbps, reason, self.value = parse(raw)
++        if reason is None and ladder is None:
++            reason = "remote_ladder_flag_absent"
++        self.reason = reason
++        self.active = reason is None
++        self.clamps = 0              # every target the cap changed or blocked
++        self.moves = 0               # transitions to the cap it initiated
++
++    # -- the log -------------------------------------------------------------
++    def config_row(self) -> dict[str, Any]:
++        row = {"event": "remote_cap_config", "source": SOURCE, "active": self.active, "value": self.value,
++               "cap_kbps": self.cap_kbps if self.active else None, "valid_kbps": list(VALID_KBPS)}
++        if self.reason:
++            row["reason"] = self.reason
++            row["note"] = ("ignored; the ladder behaves as without the cap" if self.reason == "not_a_remote_rung"
++                           else "the cap needs PRIVYHUB_REMOTE_LADDER=1 (G5-S3); it does nothing")
++        return row
++
++    def status(self) -> dict[str, Any]:
++        return {"flag": FLAG_ENV, "active": self.active, "cap_kbps": self.cap_kbps, "reason": self.reason,
++                "applies_now": self.applies(), "clamps": self.clamps, "moves": self.moves}
++
++    # -- the effect ------------------------------------------------------------
++    def applies(self) -> bool:
++        return bool(self.active and self.ladder is not None and self.ladder.path_class == rl.PATH_REMOTE)
++
++    def clamp(self, policy: Any, direction: str, target: int | None,
++              m: dict[str, Any]) -> tuple[int | None, dict[str, Any], dict[str, Any] | None]:
++        """In `_decide`, after the target is chosen: (target, measurements, blocked).
++
++        `blocked` is not None for an increase the cap refuses (the caller refuses it)."""
++        if target is None or not self.applies():
++            return target, m, None
++        cap = int(self.cap_kbps)
++        level = int(policy.level_kbps)
++        if direction == "up":
++            if target <= cap:
++                return target, m, None
++            self.clamps += 1
++            info = {"source": SOURCE, "wish_kbps": int(target), "capped_kbps": level, "cap_kbps": cap}
++            return target, dict(m, remote_cap=info), info
++        if m.get("trigger") == TRIGGER:
++            new = cap                                  # the move to the cap is aimed at the cap
++        elif target > cap:
++            new = cap                                  # a decrease aimed above the cap goes to the cap
++        else:
++            return target, m, None                     # at or below the cap: the ladder's own step
++        if new != target:
++            self.clamps += 1
++        info = {"source": SOURCE, "wish_kbps": int(target if m.get("trigger") != TRIGGER else level),
++                "capped_kbps": new, "cap_kbps": cap}
++        return new, dict(m, remote_cap=info), None
++
++    def after_feed(self, policy: Any, s: Mapping[str, Any], ctx: dict[str, Any],
++                   events: list[dict[str, Any]]) -> list[dict[str, Any]]:
++        """The move to the cap: one ROUTINE decision through every gate, when the stream is above it."""
++        if not self.applies() or int(policy.level_kbps) <= int(self.cap_kbps):
++            return events
++        if (any(e.get("event") in DECISION_EVENTS for e in events) or policy.last_disposition != "evaluated"
++                or policy.pending is not None or policy.reason == "routine_deferred_escalating"):
++            return events
++        m = {"trigger": TRIGGER, "cap_kbps": int(self.cap_kbps)}
++        forced = policy._decide("ROUTINE", m, int(s["elapsed_ms"]), ctx)
++        for e in forced:
++            if e.get("event") in ("transition", "would_act"):
++                e["reason"] = SOURCE
++                policy.reason = SOURCE
++                if policy.last_action is not None:
++                    policy.last_action["reason"] = SOURCE
++                self.moves += 1
++        return events + forced
++
++
++def from_environ(environ: Mapping[str, str], ladder: Any) -> RemoteCap | None:
++    raw = environ.get(FLAG_ENV)
++    if raw is None or str(raw).strip() == "":
++        return None
++    return RemoteCap(raw, ladder)
+diff --git a/tests/remote_cap/test_remote_cap.py b/tests/remote_cap/test_remote_cap.py
+new file mode 100644
+index 0000000..333ceb7
+--- /dev/null
++++ b/tests/remote_cap/test_remote_cap.py
+@@ -0,0 +1,297 @@
++#!/usr/bin/env python3
++"""G5-S4: the remote rung cap -- the user's data saver on a remote path.
++
++    python3 -m unittest discover -s tests/remote_cap -v
++
++No stream, no companion. This process carries neither flag, so the globals are
++None; `Flags` sets them as the two flags would and restores them; one test runs
++child interpreters with the real variables.
++"""
++
++from __future__ import annotations
++
++import ast
++import json
++import os
++import subprocess
++import sys
++import tempfile
++import threading
++import types
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++
++import adaptive_bitrate as ab  # noqa: E402
++import adaptive_bitrate_live as live  # noqa: E402
++import remote_cap as rc  # noqa: E402
++import remote_ladder as rl  # noqa: E402
++import wan_adaptation as wa  # noqa: E402
++from diagnostics import c3_linux_actuator_probe as probe  # noqa: E402
++
++GUARDS = {"stream_active": True, "game_active": True, "game_not_paused": True, "recovery_playing": True,
++          "reference_profile": True, "no_override": True, "actuator_bound": True}
++CLEAN = dict(fps=59.9, queue=0, gap=16, lost=0)
++MILD = dict(fps=54.0, queue=0, gap=16, lost=80)
++STRICT = dict(fps=45.0, queue=0, gap=16, lost=120)
++
++
++def tel(elapsed, fps=59.9, queue=0, gap=16, lost=0, stale=0, idr=False):
++    return {"available": True, "fresh": True, "session_elapsed_ms": elapsed,
++            "receiver": {"recent_fps": fps, "waiting_for_idr": idr, "lost_packets_delta": lost},
++            "decoder": {"queue_depth": queue, "stale_output_drops_delta": stale},
++            "latency": {"output_gap_ms": gap}, "fec": {}}
++
++
++class Flags:
++    """G5-S3's shared instance (with a class) and a cap, as the flags would set them."""
++
++    def __init__(self, cap: str | None, evidence: str | None = rl.EVIDENCE_OVERLAY, ladder: bool = True):
++        self.r = rl.RemoteLadder() if ladder else None
++        if self.r is not None and evidence:
++            self.r.set_routing_evidence(evidence)
++        self.c = rc.from_environ({rc.FLAG_ENV: cap} if cap is not None else {}, self.r)
++
++    def __enter__(self):
++        self.saved = (live.REMOTE_LADDER, live.REMOTE_CAP, probe.REMOTE_LADDER, wa.REMOTE_LADDER)
++        live.REMOTE_LADDER = probe.REMOTE_LADDER = wa.REMOTE_LADDER = self.r
++        live.REMOTE_CAP = self.c
++        return self
++
++    def __exit__(self, *exc):
++        live.REMOTE_LADDER, live.REMOTE_CAP, probe.REMOTE_LADDER, wa.REMOTE_LADDER = self.saved
++
++
++def drive(policy, specs, flags=None, adapt=None, start=0):
++    """The controller's report path in order: context hook, feed (or the rules), the cap's move; sync actuation."""
++    out = []
++    el = start
++    for spec, n in specs:
++        for _ in range(n):
++            el += 2000
++            t = tel(el, **spec)
++            ctx = {"guards": GUARDS, "clock_ms": el, "stream_kbps": policy.level_kbps}
++            if live.REMOTE_LADDER is not None:
++                live.REMOTE_LADDER.apply(policy, ctx)
++            s = ab._sample(t)
++            evs = adapt.feed(policy, s, ctx, t) if adapt else policy.feed(s, ctx)
++            if live.REMOTE_CAP is not None:
++                evs = live.REMOTE_CAP.after_feed(policy, s, ctx, evs)
++            out.extend(evs)
++            if policy.pending:
++                policy.actuation_done(True, actual_kbps=policy.pending["to_kbps"])
++    return out
++
++
++def transitions(evs):
++    return [(e["from_kbps"], e["to_kbps"], e["reason"]) for e in evs if e.get("event") == "transition"]
++
++
++# ------------------------------------------------------------------ the flag ---
++class TheFlag(unittest.TestCase):
++    def test_absent_or_empty_is_none(self):
++        self.assertIsNone(rc.from_environ({}, rl.RemoteLadder()))
++        self.assertIsNone(rc.from_environ({rc.FLAG_ENV: "  "}, rl.RemoteLadder()))
++        self.assertIsNone(live.REMOTE_CAP)                           # this process carries no flag
++
++    def test_valid_only_at_a_remote_rung(self):
++        for v in ("4000", "5000", "5500", "6000", "7000", " 5000 "):
++            c = rc.from_environ({rc.FLAG_ENV: v}, rl.RemoteLadder())
++            self.assertTrue(c.active, v)
++            self.assertEqual(c.cap_kbps, int(v))
++        for v, shown in (("3000", 3000), ("4500", 4500), ("8000", 8000), ("12600", 12600), ("-4000", "non-numeric"),
++                         ("4000.0", "non-numeric"), ("data-saver", "non-numeric")):
++            c = rc.from_environ({rc.FLAG_ENV: v}, rl.RemoteLadder())
++            self.assertFalse(c.active, v)
++            row = c.config_row()
++            self.assertEqual((row["reason"], row["value"], row["cap_kbps"]), ("not_a_remote_rung", shown, None))
++
++    def test_depends_on_g5_s3(self):
++        c = rc.from_environ({rc.FLAG_ENV: "4000"}, None)
++        self.assertFalse(c.active)
++        self.assertEqual(c.config_row()["reason"], "remote_ladder_flag_absent")
++        self.assertFalse(c.applies())
++
++    def test_imports_only_under_the_flag(self):
++        tree = ast.parse((ROOT / "companion" / "adaptive_bitrate_live.py").read_text())
++        top = [n for n in tree.body if isinstance(n, (ast.Import, ast.ImportFrom))]
++        self.assertFalse(any("remote_cap" in ast.unparse(n) for n in top))
++        guarded = [n for n in tree.body if isinstance(n, ast.If) and "remote_cap" in ast.unparse(n)]
++        self.assertEqual(len(guarded), 1)
++        self.assertIn("PRIVYHUB_REMOTE_RUNG_CAP", ast.unparse(guarded[0].test))
++
++    def test_real_environment(self):
++        code = ("import sys; sys.path.insert(0, %r)\nimport adaptive_bitrate_live as l\n"
++                "c = l.REMOTE_CAP\nprint(None if c is None else [c.active, c.reason, c.ladder is l.REMOTE_LADDER],"
++                " 'remote_cap' in sys.modules)\n" % str(ROOT / "companion"))
++        base = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++        base["PYTHONDONTWRITEBYTECODE"] = "1"
++
++        def run(**env):
++            out = subprocess.run([sys.executable, "-c", code], env=dict(base, **env), capture_output=True, text=True,
++                                 timeout=60)
++            return out.stdout.strip() or out.stderr
++        self.assertEqual(run(), "None False")
++        self.assertEqual(run(PRIVYHUB_REMOTE_RUNG_CAP="4000"), "[False, 'remote_ladder_flag_absent', True] True")
++        self.assertEqual(run(PRIVYHUB_REMOTE_RUNG_CAP="4000", PRIVYHUB_REMOTE_LADDER="1"), "[True, None, True] True")
++        self.assertEqual(run(PRIVYHUB_REMOTE_RUNG_CAP="4500", PRIVYHUB_REMOTE_LADDER="1"),
++                         "[False, 'not_a_remote_rung', True] True")
++
++
++# ---------------------------------------------------------------- the effect ---
++class TheEffect(unittest.TestCase):
++    def test_lan_unaffected(self):
++        plain = transitions(drive(live.LivePolicy(), [(CLEAN, 40), (MILD, 600)]))
++        with Flags("4000", rl.EVIDENCE_NOT_OVERLAY):
++            capped = transitions(drive(live.LivePolicy(), [(CLEAN, 40), (MILD, 600)]))
++        self.assertEqual(capped, plain)
++        self.assertEqual([t[1] for t in plain], [6000, 5500, 5000])
++
++    def test_inactive_cap_is_today(self):
++        specs = [(CLEAN, 40), (MILD, 600), (CLEAN, 300)]
++        plain = drive(live.LivePolicy(), specs)                       # neither flag
++        with Flags("4000", ladder=False):                             # the cap without G5-S3
++            self.assertEqual(drive(live.LivePolicy(), specs), plain)
++        with Flags(None):                                             # G5-S3 alone, remote
++            ladder_only = drive(live.LivePolicy(), specs)
++        with Flags("4500"):                                           # G5-S3 + an invalid cap
++            self.assertEqual(drive(live.LivePolicy(), specs), ladder_only)
++
++    def test_clean_link_moves_to_each_cap_after_the_guard_and_stays(self):
++        for cap in (4000, 5000, 5500, 6000):
++            with Flags(str(cap)) as f:
++                p = live.LivePolicy()
++                evs = drive(p, [(CLEAN, 400)])
++            tr = [e for e in evs if e.get("event") == "transition"]
++            self.assertEqual([(e["from_kbps"], e["to_kbps"], e["reason"]) for e in tr], [(7000, cap, "remote_cap")], cap)
++            self.assertGreaterEqual(min(e["holds_in_force_before"]["reports_since_transition"] or 0 for e in tr), 0)
++            self.assertEqual((tr[0]["measurements"]["remote_cap"]["wish_kbps"],
++                              tr[0]["measurements"]["remote_cap"]["capped_kbps"]), (7000, cap))
++            before = [e for e in evs if e.get("event") == "refused" and e.get("trigger") == "remote_cap"]
++            self.assertTrue(before and {e["reason"] for e in before} == {"guard"})   # the 60-s guard first
++            blocked = [e for e in evs if e.get("event") == "refused" and e.get("reason") == "remote_cap"]
++            self.assertTrue(blocked, cap)                                            # the increase never above
++            self.assertTrue(all(e["wish_kbps"] > cap and e["capped_kbps"] == cap and e["source"] == "remote_cap"
++                                for e in blocked))
++            self.assertEqual(p.level_kbps, cap)
++            self.assertGreater(f.c.clamps, 0)
++            self.assertEqual(f.c.moves, 1)
++
++    def test_cap_7000_is_no_move(self):
++        with Flags("7000"):
++            evs = drive(live.LivePolicy(), [(CLEAN, 300)])
++        self.assertEqual(transitions(evs), [])
++
++    def test_the_ladders_own_steps_below_the_cap(self):
++        with Flags("5000"):
++            p = live.LivePolicy()
++            evs = drive(p, [(MILD, 400), (CLEAN, 400)])           # the evidence from the start: the ladder decides first
++        tr = transitions(evs)
++        self.assertEqual(tr[0], (7000, 5000, "capacity_mild"))      # the ladder's 6000 clamped to the cap
++        self.assertIn((5000, 4000, "capacity_mild"), tr)            # below the cap: the ladder's own
++        self.assertIn((4000, 5000, "increase_increase"), tr)        # up to the cap: allowed
++        self.assertFalse([t for t in tr if t[1] > 5000])           # never above it
++        first = next(e for e in evs if e.get("event") == "transition")
++        self.assertEqual((first["measurements"]["remote_cap"]["wish_kbps"], first["to_kbps"]), (6000, 5000))
++
++    def test_fallback_target_clamped(self):
++        with Flags("4000"):
++            p = live.LivePolicy()
++            drive(p, [(CLEAN, 20)])                                 # before the 60-s guard: no move yet
++            evs = p._decide("FALLBACK", {"trigger": "capacity"}, 120_000,
++                            live.REMOTE_LADDER.apply(p, {"guards": GUARDS, "clock_ms": 120_000}))
++        self.assertEqual((evs[0]["event"], evs[0]["from_kbps"], evs[0]["to_kbps"]), ("transition", 7000, 4000))
++        self.assertEqual(evs[0]["measurements"]["remote_cap"]["wish_kbps"], 5000)
++
++    def test_floor_4000_under_a_5000_cap_lands_on_4000(self):
++        with Flags("5000"):
++            p = live.LivePolicy()
++            evs = drive(p, [(CLEAN, 40), (STRICT, 300)], adapt=wa.WanAdaptation())
++        tr = [e for e in evs if e.get("event") == "transition"]
++        self.assertEqual(tr[0]["to_kbps"], 5000)                     # FALLBACK -> 5000 (at the cap)
++        floor = [e for e in tr if e["to_kbps"] == 4000]
++        self.assertEqual(len(floor), 1)
++        self.assertEqual((floor[0]["reason"], floor[0]["measurements"]["wan_rule"]), ("wan_rules", "R3.2"))
++        self.assertEqual(p.level_kbps, 4000)
++
++    def test_full_start_back_at_7000_moves_again(self):
++        with Flags("4000"):
++            p = live.LivePolicy()
++            evs = drive(p, [(CLEAN, 100)])
++            el = 202_000
++            # a recovery full start: the stream is at 7000 again (C1); the ladder syncs to it
++            t = tel(el)
++            ctx = live.REMOTE_LADDER.apply(p, {"guards": GUARDS, "clock_ms": el, "stream_kbps": 7000})
++            p.note_ssrc_change("recovery_full_start", clock_ms=el)
++            evs2 = p.feed(ab._sample(t), ctx)
++            self.assertTrue(any(e.get("event") == "level_sync" and e["to_kbps"] == 7000 for e in evs2))
++            evs3 = drive(p, [(CLEAN, 80)], start=el)
++        self.assertEqual(transitions(evs)[0][1:], (4000, "remote_cap"))
++        self.assertIn((7000, 4000, "remote_cap"), transitions(evs3))
++
++
++# ------------------------------------------------------------------ the rows ---
++class _SyncThread:
++    def __init__(self, target, args=(), **kw):
++        self._t, self._a = target, args
++
++    def start(self):
++        self._t(*self._a)
++
++
++class TheRows(unittest.TestCase):
++    def rows(self, cap, evidence=rl.EVIDENCE_OVERLAY, ladder=True, n=200):
++        d = tempfile.mkdtemp(prefix="g5_s4_rows_")
++        saved = live.threading
++        live.threading = types.SimpleNamespace(Thread=_SyncThread, RLock=threading.RLock)
++        state = {"kbps": 7000}
++
++        def actuator(k):
++            state["kbps"] = k
++            return {"ok": True, "target_bitrate_kbps": k}
++        try:
++            with Flags(cap, evidence, ladder):
++                c = live.LiveController(Path(d), environ={})
++                c.bind(actuator=actuator, context=lambda: {"game_active": True, "game_paused": False,
++                                                           "recovery_state": "PLAYING"},
++                       serial_lock=None, recovery_state=lambda: "PLAYING")
++                for i in range(n):
++                    ns = {"active": True, "profile_id": live.REFERENCE_PROFILE_ID, "profile": {"bitrate_kbps": 7000},
++                          "encoder_overrides": {"any_override": False}, "bitrate_kbps": state["kbps"]}
++                    c.observe(tel(2000 * (i + 1)), stream_bitrate_kbps=state["kbps"], native_status=ns)
++        finally:
++            live.threading = saved
++        return [json.loads(x) for x in c.log_path.read_text().splitlines()]
++
++    def test_config_row_once_and_the_clamp_recorded(self):
++        rows = self.rows("4000")
++        cfg = [r for r in rows if r.get("event") == "remote_cap_config"]
++        self.assertEqual(len(cfg), 1)
++        self.assertEqual((cfg[0]["active"], cfg[0]["cap_kbps"]), (True, 4000))
++        tr = [r for r in rows if r.get("event") == "transition"]
++        self.assertEqual(len(tr), 1)
++        self.assertEqual({k: tr[0][k] for k in ("source", "wish_kbps", "capped_kbps", "cap_kbps", "path_class",
++                                                 "reason")},
++                         {"source": "remote_cap", "wish_kbps": 7000, "capped_kbps": 4000, "cap_kbps": 4000,
++                          "path_class": "remote", "reason": "remote_cap"})
++        done = [r for r in rows if r.get("event") == "transition_done"]
++        self.assertEqual(done[0]["decision"]["source"], "remote_cap")
++
++    def test_inactive_says_so_once_and_nothing_else(self):
++        for cap, ladder, reason in (("4500", True, "not_a_remote_rung"), ("4000", False, "remote_ladder_flag_absent")):
++            rows = self.rows(cap, ladder=ladder)
++            cfg = [r for r in rows if r.get("event") == "remote_cap_config"]
++            self.assertEqual([(r["active"], r["reason"]) for r in cfg], [(False, reason)])
++            self.assertFalse([r for r in rows if r.get("event") == "transition"])
++            self.assertFalse([r for r in rows if r.get("source") == "remote_cap" and r.get("event") != "remote_cap_config"])
++
++    def test_lan_rows_no_clamp(self):
++        rows = self.rows("4000", evidence=rl.EVIDENCE_NOT_OVERLAY)
++        self.assertFalse([r for r in rows if r.get("event") == "transition"])
++        self.assertFalse([r for r in rows if r.get("source") == "remote_cap" and r.get("event") != "remote_cap_config"])
++
++
++if __name__ == "__main__":
++    unittest.main()

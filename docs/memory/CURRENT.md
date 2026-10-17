@@ -16,14 +16,16 @@ CL-B3 is OPEN on two G5-S1 smoke gates (NOT MET; the user decides). Everything e
 passed.** E1 FROZEN; E2
 MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `af3ed73`.
 
-**State (2026-10-16 23:40Z): the seven adopted lines; nothing running.** No `e3_flag.conf`, no stream, no game; one
-device paired. The APK was last read CONFIRMED at 21:26Z. Since the onn changed networks, adb has not been reconnected,
-so `--check` reads not ok on `adb` / APK only. **G4-S1 MEASURED: 2 of 3 valid** (`evidence/G4_S1_OFFSITE_FIRST_SESSION_2026-10-16.md`):
+**State (2026-10-17 05:57Z): the seven adopted lines; nothing running; `--check` ok** (adb reconnected at the resume,
+APK CONFIRMED). No `e3_flag.conf`, no stream, no game; one device paired. The G8-S1 unit ended by itself (04:30:30Z)
+and was collected. **G4-S1 MEASURED: 2 of 3 valid** (`evidence/G4_S1_OFFSITE_FIRST_SESSION_2026-10-16.md`):
 - runs 1 and 2 PLAYING over the overlay; gates 1-2 met, gate 3 not evaluable;
 - run 2's hotspot toggle ended the session, and the stream came back after a LAN setup;
 - run 3 not started.
 
-**G8-S1 PARTIAL: 5 of 22** (stopped 21:25:52Z).
+**G8-S1 MEASURED: 18 of 22 valid** (`evidence/G8_S1_ADVERSE_NETWORK_ENVELOPE_2026-10-17.md`, superseding the 10-16
+partial): the four rate-cap cells never reached PLAYING (open, `docs/KNOWN_ISSUES.md`). From cell 6 the companion ran
+session B's flag-absent G5-S3 / G5-S4 edits (disclosed, §3).
 
 - **Nine adoptions stand:**
   - live adaptive (C);
@@ -170,13 +172,31 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
+0. **G8-S1 MEASURED, 18 of 22 valid** (`evidence/G8_S1_ADVERSE_NETWORK_ENVELOPE_2026-10-17.md`). The driver ended
+   by itself at 04:30:30Z, so there is nothing to wait for (`cat ~/privyhub_g8_s1/status.txt` reads `EXITED (all 22 cells
+   done)`).
+   - **The cap cells (17-20) never reached PLAYING.** The stream entered the shim at ~8.25 Mbit/s, above both caps, and
+     27-45 % was tail-dropped. Three readings are listed in §5, none chosen.
+   - **The code version** (§3): cells 1-5 ran the pre-registered modules; from cell 6, session B's flag-absent edits,
+     bounded by B's in-process proofs only.
+   - **Options for the user, not decided:**
+     - **(a) a cap follow-up (G8-S2):** the cap cells with a start below the cap, or the shim's cap stage re-proved
+       against a bursty, real-rate source;
+     - **(b) a re-run of the on-arm cells on committed code**, if the user wants the arm on one code version;
+     - **(c) G5-S3's LAN smoke, then G4-S2 off-site** with G5-S3 + G5-S2 + the cap (the user judging 4000's
+       picture).
 1. **The user's commit:** everything since `af3ed73`.
+   - Session B's three tasks: G5-S3 (`evidence/G5_S3_REMOTE_LADDER_2026-10-17.md`), G5-S4
+     (`evidence/G5_S4_REMOTE_RUNG_CAP_2026-10-17.md`), G4-P2 (`evidence/G4_P2_REMOTE_ROW_GATE3_2026-10-17.md`),
+     each with its own git status log;
+   - the G8-S1 resume (`evidence/G8_S1_RESUME_2026-10-17.md`) and this final record, with `g8_s1_2026-10-16/` complete
+     and its manifest (`logs/g8_s1_final_git_status.txt`);
    - G4-S1: the launch (`evidence/G4_S1_LAUNCH_2026-10-16.md`), the session record
      (`evidence/G4_S1_OFFSITE_FIRST_SESSION_2026-10-16.md`), and `g4_s1_2026-10-16/` complete with its manifest;
    - the git status in `logs/g4_s1_git_status.txt`.
    - Still the user's call from CL-B3: the two W gates not met.
-   - Before the next stream on the LAN, adb needs reconnecting by hand (`adb connect <onn-address>:5555`), so the state
-     tool can read the APK again.
+   - adb was reconnected at the G8-S1 resume (2026-10-17), and `--check` reads the APK again. After the onn next
+     changes networks it needs `adb connect <onn-address>:5555` by hand.
 2. **G4-S2, as the draft frames it** (`handoffs/G4-S1_OFFSITE_FIRST_SESSION_TASK.draft.md`, "What G4-S2 would gate"):
    - the D-BASE table on the remote path at the remote ladder's level (720p/4000 is the lowest screened rung, R3.2);
    - the reconnect gated: a hotspot toggle resumes within the recovery bound;
@@ -187,8 +207,7 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
    - **G5-S3:** make 720p/4000 actuatable, the remote floor `floor_4000`, recorded and never actuated. The data
      volume: ~5.1 GB/h at 7000 (11.42 Mbit/s measured on the overlay) against ~2.3 GB/h at 4000 (C5-M3's
      5.02 Mbit/s).
-   - **The G8-S1 resume:** cells 6-22. Remove `~/privyhub_g8_s1/STOP`; a new `CAP` if after 2026-10-17T06:00Z; the
-     same unit name.
+   - **G8-S1:** measured (item 0).
    - **G5-S2's open items:** the per-session line at stream stop / shutdown, the live recovery state, the unclassified
      measures' thresholds, an isolated cost A/B.
 

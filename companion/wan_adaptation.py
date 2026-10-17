@@ -17,6 +17,9 @@ give **at most one suggestion**, applied only as an additional constraint:
   guards, rate limit, oscillation); its rows are labelled `wan_rules`;
 - `floor_4000` -- recorded only: the remote floor 720p/4000 (C5-M3) is below
   the actuator's validated ladder (5000-7000), so it is never actuated here.
+  G5-S3: with `PRIVYHUB_REMOTE_LADDER=1` and a remote path, the ladder and the
+  actuator hold 4000, and `floor_4000` goes through the ladder's own `_decide`
+  as `step_down` does (`remote_ladder.floor_actuates`).
 
 R4 (FEC) is "FEC switch: not implemented; the fixed 8+1 stays" (C4-M1): no
 suggestion is ever about FEC. Every non-`none` suggestion is one
@@ -26,6 +29,7 @@ suggestion is ever about FEC. Every non-`none` suggestion is one
 from __future__ import annotations
 
 import ipaddress
+import os
 from dataclasses import dataclass
 from typing import Any, Mapping
 
@@ -34,6 +38,14 @@ import wan_telemetry as wt
 
 FLAG_ENV = "PRIVYHUB_WAN_ADAPTATION"
 SOURCE = "wan_rules"
+
+# G5-S3: R3.2's floor actuated on a remote path, only with PRIVYHUB_REMOTE_LADDER=1.
+# Absent = today: nothing imported; `floor_4000` is recorded only.
+REMOTE_LADDER = None
+if (os.environ.get("PRIVYHUB_REMOTE_LADDER") or "").strip() == "1":
+    import remote_ladder as _remote_ladder
+
+    REMOTE_LADDER = _remote_ladder.shared_from_environ(os.environ)
 
 # ---- constants (each from an existing record or the ladder's code) ------------
 WINDOW_REPORTS = wt.WINDOW_REPORTS               # 5: the ladder's evidence window
@@ -264,7 +276,10 @@ class WanAdaptation:
             events = policy.feed(s, ctx)
 
         decided = [e for e in events if e.get("event") in ("transition", "would_act", "refused", "hold")]
-        if (suggestion.kind == "step_down" and not decided and policy.last_disposition == "evaluated"
+        force_down = suggestion.kind == "step_down"
+        if REMOTE_LADDER is not None:   # G5-S3: R3.2's floor, through the ladder's own gates, on a remote path
+            force_down = force_down or REMOTE_LADDER.floor_actuates(suggestion, policy)
+        if (force_down and not decided and policy.last_disposition == "evaluated"
                 and policy.pending is None and policy.reports > evaluated_before
                 and policy.reason != "routine_deferred_escalating"):
             m = {"trigger": "capacity_mild", "wan_rule": suggestion.rule, "wan_class": suggestion.primary}

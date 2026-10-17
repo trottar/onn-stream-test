@@ -3740,6 +3740,10 @@ class GamesPlugin:
                     "client_ip": client_ip,
                     "port": port,
                 }
+                # G5-S3: the session's routing class for the ladder's context, only with
+                # PRIVYHUB_REMOTE_LADDER=1 (the class is kept, never the address).
+                if adaptive_bitrate_live.REMOTE_LADDER is not None:
+                    adaptive_bitrate_live.REMOTE_LADDER.note_stream_start(client_ip)
                 payload["game_session"] = game_status
                 payload["paused"] = True
                 payload["stabilization_required"] = True

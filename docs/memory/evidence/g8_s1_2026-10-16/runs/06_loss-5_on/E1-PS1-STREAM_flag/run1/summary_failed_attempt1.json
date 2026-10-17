@@ -1,0 +1,129 @@
+{
+ "workload": "E1-PS1-STREAM",
+ "run": 1,
+ "kind": "stream",
+ "main_process": "retroarch",
+ "started_utc": "2026-10-17T00:21:54.295Z",
+ "window_s": 600,
+ "gap_s": 120,
+ "warmup_s": 90,
+ "status": "FAILED",
+ "preflight": {
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+   "PRIVYHUB_OVERLAY_PROVIDER=tailscale",
+   "PRIVYHUB_RECOVERY_TRIGGER=v2",
+   "PRIVYHUB_SESSION_IDENTITY=v2",
+   "PRIVYHUB_SNES_CAPTURE_FIX=output_rate",
+   "PRIVYHUB_SNES_CORE=snes9x"
+  ],
+  "game_active": false,
+  "adb": true,
+  "drop_in_live": true,
+  "drop_in_index": true,
+  "drop_in_snes_core": true,
+  "drop_in_recovery": true,
+  "drop_in_snes_capture": true,
+  "drop_in_overlay": true,
+  "drop_in_identity": true,
+  "e3_dropin_absent": true,
+  "e4_constraint_absent": true,
+  "ok": true
+ },
+ "ps1_files_identical_start": true,
+ "counter_override": "set",
+ "dropin": [
+  "PRIVYHUB_WAN_TELEMETRY=1",
+  "PRIVYHUB_IMPAIRMENT=loss-5@post-fec,seed=1",
+  "PRIVYHUB_WAN_ADAPTATION=1"
+ ],
+ "restart": {
+  "mainpid_serves_8765": true,
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+   "PRIVYHUB_IMPAIRMENT=loss-5@post-fec,seed=1",
+   "PRIVYHUB_OVERLAY_PROVIDER=tailscale",
+   "PRIVYHUB_RECOVERY_TRIGGER=v2",
+   "PRIVYHUB_SESSION_IDENTITY=v2",
+   "PRIVYHUB_SNES_CAPTURE_FIX=output_rate",
+   "PRIVYHUB_SNES_CORE=snes9x",
+   "PRIVYHUB_WAN_ADAPTATION=1",
+   "PRIVYHUB_WAN_TELEMETRY=1"
+  ]
+ },
+ "profile_at_start": {
+  "profile_id": "native_game_720p60_reference",
+  "bitrate_kbps": 7000,
+  "width": 1280,
+  "height": 720,
+  "any_override": false,
+  "adaptive_mode": "live"
+ },
+ "gap": {
+  "from": "2026-10-17T00:21:58.017Z",
+  "to": "2026-10-17T00:23:58.018Z"
+ },
+ "launch": {
+  "http": 200,
+  "stream": {
+   "ok": false,
+   "recovery": "ENDED"
+  }
+ },
+ "error": "RuntimeError: stream did not reach PLAYING: {'ok': False, 'recovery': 'ENDED'}",
+ "trace": "Traceback (most recent call last):\n  File \"/home/privyhub/Projects/onn-stream-test/tools/e1_suite.py\", line 1099, in run_once\n    raise RuntimeError(f\"stream did not reach PLAYING: {o}\")\nRuntimeError: stream did not reach PLAYING: {'ok': False, 'recovery': 'ENDED'}\n",
+ "teardown": {
+  "report": "native_decoder_20261017_002513_639.json",
+  "report_fields": {
+   "lost_packets": 2958,
+   "rendered_frames": 2355,
+   "stale_output_drops": 20,
+   "max_output_gap_ms": 279,
+   "slow_event_retained": 185,
+   "slow_event_capacity": 1280,
+   "duration_ms": 51375,
+   "video.lost_packets": 2958,
+   "video.sequence_resyncs": 1,
+   "video.recent_fps": 49.35306130525971,
+   "decoder.spike_20_ms": 80,
+   "decoder.spike_50_ms": 24,
+   "decoder.spike_80_ms": 15,
+   "decoder.stale_output_drops": 20,
+   "decoder.max_output_gap_ms": 279,
+   "audio.lost_packets": 92,
+   "audio.underruns": 54
+  },
+  "stopped": true,
+  "retroarch_left": 0,
+  "encoder_left": 0,
+  "counter_override_removed": true,
+  "banner": {
+   "now_playing_before": 2,
+   "now_playing_after_relaunch": 0
+  },
+  "dropin_removed": true,
+  "restart_after_flags": {
+   "mainpid_serves_8765": true,
+   "manager": [],
+   "environ": [
+    "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+    "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+    "PRIVYHUB_OVERLAY_PROVIDER=tailscale",
+    "PRIVYHUB_RECOVERY_TRIGGER=v2",
+    "PRIVYHUB_SESSION_IDENTITY=v2",
+    "PRIVYHUB_SNES_CAPTURE_FIX=output_rate",
+    "PRIVYHUB_SNES_CORE=snes9x"
+   ]
+  },
+  "dropin_env_absent": true,
+  "flags_absent": true,
+  "apk": "CONFIRMED",
+  "ps1_files_identical": true,
+  "game_active": false
+ },
+ "ended_utc": "2026-10-17T00:25:41.741Z"
+}

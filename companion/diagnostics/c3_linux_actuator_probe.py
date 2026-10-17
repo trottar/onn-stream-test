@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import time
 
@@ -53,6 +54,15 @@ LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS = (5000, 5500, 6000, 7000)
 LINUX_RUNG_LEVELS: dict[int, tuple[int, int]] = {12600: (1920, 1080)}
 LEVEL_SCHEMA = "privyhub_c5_m5_level_transition_v1"
 LEVEL_MODE = "sized_level_actuator_transition"
+
+# G5-S3: 720p/4000 (C5-M3) joins the validated list on a remote path only,
+# with PRIVYHUB_REMOTE_LADDER=1. Absent = today: nothing imported, and the
+# list `_run_c3_linux_bitrate_cycle` checks is the one above.
+REMOTE_LADDER = None
+if (os.environ.get("PRIVYHUB_REMOTE_LADDER") or "").strip() == "1":
+    import remote_ladder as _remote_ladder
+
+    REMOTE_LADDER = _remote_ladder.shared_from_environ(os.environ)
 
 
 def _dict(value: Any) -> dict[str, Any]:
@@ -508,11 +518,15 @@ def _run_c3_linux_bitrate_cycle(
 
     target = _int(target_bitrate_kbps)
 
+    validated = LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS
+    if REMOTE_LADDER is not None:   # G5-S3: + 4000 on a remote path only; never below it
+        validated = validated + REMOTE_LADDER.actuator_levels()
+
     # C5-M5: a level that carries its own size. The sized path covers a
     # transition to or from such a level and recovery's restart at one; the
     # size of a 720p level is the profile's (WIDTH x HEIGHT).
     sized_levels = (
-        tuple(LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS)
+        tuple(validated)
         + tuple(LINUX_RUNG_LEVELS)
     )
     sized = level_transition or (
@@ -529,7 +543,7 @@ def _run_c3_linux_bitrate_cycle(
         if target not in sized_levels:
             raise RuntimeError("unsupported_validated_bitrate")
     elif validated_transition:
-        if target not in LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS:
+        if target not in validated:
             raise RuntimeError("unsupported_validated_bitrate")
     elif target not in SUPPORTED_FIXED_BITRATES_KBPS:
         raise RuntimeError("unsupported_characterization_bitrate")
@@ -570,7 +584,7 @@ def _run_c3_linux_bitrate_cycle(
     elif validated_transition:
         if (
             current_bitrate_kbps
-            not in LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS
+            not in validated
         ):
             raise RuntimeError(
                 "validated_transition_requires_validated_start"

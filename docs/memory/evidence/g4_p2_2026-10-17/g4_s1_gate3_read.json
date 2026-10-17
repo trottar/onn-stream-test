@@ -1,0 +1,71 @@
+{
+ "run1": {
+  "sampler_e2": false,
+  "sampler_title": true,
+  "title_lines": 20,
+  "titles_with_fps_counter": 0,
+  "encoder_jsonl_present": false,
+  "samples_process_keys": [
+   "companion",
+   "e1_sampler",
+   "other",
+   "pulseaudio",
+   "range_server",
+   "xorg"
+  ],
+  "window_cpu_pct_means": {
+   "procs.companion.cpu_pct": 24.456,
+   "procs.e1_sampler.cpu_pct": 2.245,
+   "procs.encoder.cpu_pct": 44.714,
+   "procs.ffmpeg_other.cpu_pct": 0.922,
+   "procs.host_resource_sampler.cpu_pct": 0.012,
+   "procs.other.cpu_pct": 28.192,
+   "procs.pulseaudio.cpu_pct": 1.457,
+   "procs.range_server.cpu_pct": 0.005,
+   "procs.retroarch.cpu_pct": 34.912,
+   "procs.xorg.cpu_pct": 9.658
+  },
+  "fixed_row_reads": {
+   "retroarch_fps": null,
+   "retroarch_titles": 0,
+   "capture_fps": null,
+   "dupdrop_per_min": null,
+   "clauses": "retroarch_fps >= 59.9; capture_fps 60 +/- 0.1; dupdrop_per_min <= 0.2 (E4-S4 / E4-S5)"
+  }
+ },
+ "run2": {
+  "sampler_e2": false,
+  "sampler_title": true,
+  "title_lines": 76,
+  "titles_with_fps_counter": 0,
+  "encoder_jsonl_present": false,
+  "samples_process_keys": [
+   "companion",
+   "e1_sampler",
+   "host_resource_sampler",
+   "other",
+   "pulseaudio",
+   "range_server",
+   "xorg"
+  ],
+  "window_cpu_pct_means": {
+   "procs.companion.cpu_pct": 18.498,
+   "procs.e1_sampler.cpu_pct": 2.002,
+   "procs.encoder.cpu_pct": 42.815,
+   "procs.ffmpeg_other.cpu_pct": 0.937,
+   "procs.host_resource_sampler.cpu_pct": 0.013,
+   "procs.other.cpu_pct": 23.012,
+   "procs.pulseaudio.cpu_pct": 1.193,
+   "procs.range_server.cpu_pct": 0.018,
+   "procs.retroarch.cpu_pct": 37.149,
+   "procs.xorg.cpu_pct": 7.508
+  },
+  "fixed_row_reads": {
+   "retroarch_fps": null,
+   "retroarch_titles": 0,
+   "capture_fps": null,
+   "dupdrop_per_min": null,
+   "clauses": "retroarch_fps >= 59.9; capture_fps 60 +/- 0.1; dupdrop_per_min <= 0.2 (E4-S4 / E4-S5)"
+  }
+ }
+}

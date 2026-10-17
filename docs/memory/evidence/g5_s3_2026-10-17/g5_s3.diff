@@ -1,0 +1,882 @@
+diff --git a/companion/adaptive_bitrate_live.py b/companion/adaptive_bitrate_live.py
+index 5b3301e..4eccd30 100644
+--- a/companion/adaptive_bitrate_live.py
++++ b/companion/adaptive_bitrate_live.py
+@@ -118,6 +118,15 @@ if (os.environ.get("PRIVYHUB_WAN_ADAPTATION") or "").strip() == "1":
+ 
+     WAN_ADAPTATION = _wan_adaptation.from_environ(os.environ)
+ 
++# G5-S3: the remote ladder (the session's path class; 720p/4000 on a remote
++# path only), only with PRIVYHUB_REMOTE_LADDER=1. Absent = today: nothing
++# imported; the context, the policy's ladder and every row are as before.
++REMOTE_LADDER = None
++if (os.environ.get("PRIVYHUB_REMOTE_LADDER") or "").strip() == "1":
++    import remote_ladder as _remote_ladder
++
++    REMOTE_LADDER = _remote_ladder.shared_from_environ(os.environ)
++
+ try:  # the reference profile's id; a pure module, safe for the unit tests
+     from native_stream_profiles import NATIVE_GAME_720P60_REFERENCE as _REFERENCE_PROFILE
+     REFERENCE_PROFILE_ID = _REFERENCE_PROFILE.id
+@@ -876,8 +885,11 @@ class LiveController:
+             "no_override": overrides.get("any_override") is False,
+             "actuator_bound": self._actuator is not None,
+         }
+-        return {"stream_kbps": ns.get("bitrate_kbps"), "guards": guards,
+-                "clock_ms": int(time.monotonic() * 1000)}
++        ctx = {"stream_kbps": ns.get("bitrate_kbps"), "guards": guards,
++               "clock_ms": int(time.monotonic() * 1000)}
++        if REMOTE_LADDER is not None:   # G5-S3: the session's path_class; the policy's ladder by class
++            REMOTE_LADDER.apply(self._policy, ctx)
++        return ctx
+ 
+     def observe(self, telemetry: dict[str, Any], stream_bitrate_kbps: int | None = None,
+                 native_status: dict[str, Any] | None = None) -> None:
+@@ -1085,6 +1097,8 @@ class LiveController:
+     def _write(self, row: dict[str, Any]) -> None:
+         base = {"schema": SCHEMA, "mode": LIVE, "at_utc": _now_utc(), "acted": False}
+         base.update(row)
++        if REMOTE_LADDER is not None:   # G5-S3: path_class on every row; a 4000 actuation labelled
++            base = REMOTE_LADDER.annotate(base)
+         try:
+             import json
+             self.log_path.parent.mkdir(parents=True, exist_ok=True)
+diff --git a/companion/diagnostics/c3_linux_actuator_probe.py b/companion/diagnostics/c3_linux_actuator_probe.py
+index df5dc60..53e2343 100644
+--- a/companion/diagnostics/c3_linux_actuator_probe.py
++++ b/companion/diagnostics/c3_linux_actuator_probe.py
+@@ -1,5 +1,6 @@
+ from __future__ import annotations
+ 
++import os
+ import subprocess
+ import time
+ 
+@@ -54,6 +55,15 @@ LINUX_RUNG_LEVELS: dict[int, tuple[int, int]] = {12600: (1920, 1080)}
+ LEVEL_SCHEMA = "privyhub_c5_m5_level_transition_v1"
+ LEVEL_MODE = "sized_level_actuator_transition"
+ 
++# G5-S3: 720p/4000 (C5-M3) joins the validated list on a remote path only,
++# with PRIVYHUB_REMOTE_LADDER=1. Absent = today: nothing imported, and the
++# list `_run_c3_linux_bitrate_cycle` checks is the one above.
++REMOTE_LADDER = None
++if (os.environ.get("PRIVYHUB_REMOTE_LADDER") or "").strip() == "1":
++    import remote_ladder as _remote_ladder
++
++    REMOTE_LADDER = _remote_ladder.shared_from_environ(os.environ)
++
+ 
+ def _dict(value: Any) -> dict[str, Any]:
+     return value if isinstance(value, dict) else {}
+@@ -508,11 +518,15 @@ def _run_c3_linux_bitrate_cycle(
+ 
+     target = _int(target_bitrate_kbps)
+ 
++    validated = LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS
++    if REMOTE_LADDER is not None:   # G5-S3: + 4000 on a remote path only; never below it
++        validated = validated + REMOTE_LADDER.actuator_levels()
++
+     # C5-M5: a level that carries its own size. The sized path covers a
+     # transition to or from such a level and recovery's restart at one; the
+     # size of a 720p level is the profile's (WIDTH x HEIGHT).
+     sized_levels = (
+-        tuple(LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS)
++        tuple(validated)
+         + tuple(LINUX_RUNG_LEVELS)
+     )
+     sized = level_transition or (
+@@ -529,7 +543,7 @@ def _run_c3_linux_bitrate_cycle(
+         if target not in sized_levels:
+             raise RuntimeError("unsupported_validated_bitrate")
+     elif validated_transition:
+-        if target not in LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS:
++        if target not in validated:
+             raise RuntimeError("unsupported_validated_bitrate")
+     elif target not in SUPPORTED_FIXED_BITRATES_KBPS:
+         raise RuntimeError("unsupported_characterization_bitrate")
+@@ -570,7 +584,7 @@ def _run_c3_linux_bitrate_cycle(
+     elif validated_transition:
+         if (
+             current_bitrate_kbps
+-            not in LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS
++            not in validated
+         ):
+             raise RuntimeError(
+                 "validated_transition_requires_validated_start"
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index 6170366..c0ae6ff 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -3740,6 +3740,10 @@ class GamesPlugin:
+                     "client_ip": client_ip,
+                     "port": port,
+                 }
++                # G5-S3: the session's routing class for the ladder's context, only with
++                # PRIVYHUB_REMOTE_LADDER=1 (the class is kept, never the address).
++                if adaptive_bitrate_live.REMOTE_LADDER is not None:
++                    adaptive_bitrate_live.REMOTE_LADDER.note_stream_start(client_ip)
+                 payload["game_session"] = game_status
+                 payload["paused"] = True
+                 payload["stabilization_required"] = True
+diff --git a/companion/wan_adaptation.py b/companion/wan_adaptation.py
+index a20c4b4..f9c4ff0 100644
+--- a/companion/wan_adaptation.py
++++ b/companion/wan_adaptation.py
+@@ -17,6 +17,9 @@ give **at most one suggestion**, applied only as an additional constraint:
+   guards, rate limit, oscillation); its rows are labelled `wan_rules`;
+ - `floor_4000` -- recorded only: the remote floor 720p/4000 (C5-M3) is below
+   the actuator's validated ladder (5000-7000), so it is never actuated here.
++  G5-S3: with `PRIVYHUB_REMOTE_LADDER=1` and a remote path, the ladder and the
++  actuator hold 4000, and `floor_4000` goes through the ladder's own `_decide`
++  as `step_down` does (`remote_ladder.floor_actuates`).
+ 
+ R4 (FEC) is "FEC switch: not implemented; the fixed 8+1 stays" (C4-M1): no
+ suggestion is ever about FEC. Every non-`none` suggestion is one
+@@ -26,6 +29,7 @@ suggestion is ever about FEC. Every non-`none` suggestion is one
+ from __future__ import annotations
+ 
+ import ipaddress
++import os
+ from dataclasses import dataclass
+ from typing import Any, Mapping
+ 
+@@ -35,6 +39,14 @@ import wan_telemetry as wt
+ FLAG_ENV = "PRIVYHUB_WAN_ADAPTATION"
+ SOURCE = "wan_rules"
+ 
++# G5-S3: R3.2's floor actuated on a remote path, only with PRIVYHUB_REMOTE_LADDER=1.
++# Absent = today: nothing imported; `floor_4000` is recorded only.
++REMOTE_LADDER = None
++if (os.environ.get("PRIVYHUB_REMOTE_LADDER") or "").strip() == "1":
++    import remote_ladder as _remote_ladder
++
++    REMOTE_LADDER = _remote_ladder.shared_from_environ(os.environ)
++
+ # ---- constants (each from an existing record or the ladder's code) ------------
+ WINDOW_REPORTS = wt.WINDOW_REPORTS               # 5: the ladder's evidence window
+ BLACKOUT_REPORTS = ab.BLACKOUT_REPORTS           # 3: R1.1
+@@ -264,7 +276,10 @@ class WanAdaptation:
+             events = policy.feed(s, ctx)
+ 
+         decided = [e for e in events if e.get("event") in ("transition", "would_act", "refused", "hold")]
+-        if (suggestion.kind == "step_down" and not decided and policy.last_disposition == "evaluated"
++        force_down = suggestion.kind == "step_down"
++        if REMOTE_LADDER is not None:   # G5-S3: R3.2's floor, through the ladder's own gates, on a remote path
++            force_down = force_down or REMOTE_LADDER.floor_actuates(suggestion, policy)
++        if (force_down and not decided and policy.last_disposition == "evaluated"
+                 and policy.pending is None and policy.reports > evaluated_before
+                 and policy.reason != "routine_deferred_escalating"):
+             m = {"trigger": "capacity_mild", "wan_rule": suggestion.rule, "wan_class": suggestion.primary}
+diff --git a/docs/ROADMAP.md b/docs/ROADMAP.md
+index 33ed016..4321275 100644
+--- a/docs/ROADMAP.md
++++ b/docs/ROADMAP.md
+@@ -1619,6 +1619,20 @@ flag present, open loop, tabulated per rule with no claim of improvement. Live
+ smoke (LAN, 10 min) and the first off-site run with it (G4-S2) pending on the
+ stream. Record: `docs/memory/evidence/G5_S2_WAN_ADAPTATION_RULES_2026-10-16.md`.
+ 
++**G5-S3 (2026-10-17): THE REMOTE LADDER BUILT behind `PRIVYHUB_REMOTE_LADDER=1`
++(absent = today, byte for byte), NOT ADOPTED, unvalidated live** —
++`companion/remote_ladder.py`: the session's routing class (G3's overlay test over
++the class-matched target the gate hands the games plugin) reaches the ladder's
++context as `path_class`; on a remote path only, the ladder and the actuator's
++validated list gain 720p/4000 (`floor_4000` and the one-rung step from 5000 can
++land there; nothing below 4000; refused on the LAN); `path_class` on every
++ladder row, each 4000 actuation labelled with its rule and result. Flag absent:
++actuator 200/200 cases, the games plugin's stream start and G5-S2's replay
++identical. Flag present: no replayed run reaches 4000 — G4-S1 run 1's 2,259
++loss/min is one report of 21,407 (the resync after its 24.5-s pause), not
++sustained loss. Pending on the stream: the LAN smoke, then G4-S2. Record:
++`docs/memory/evidence/G5_S3_REMOTE_LADDER_2026-10-17.md`.
++
+ Reuse Phase C telemetry/adaptation instead of creating a parallel WAN streamer.
+ 
+ Measure and classify:
+diff --git a/docs/WAN_ADAPTATION_RULES.md b/docs/WAN_ADAPTATION_RULES.md
+index f39a5d5..0261671 100644
+--- a/docs/WAN_ADAPTATION_RULES.md
++++ b/docs/WAN_ADAPTATION_RULES.md
+@@ -4,7 +4,11 @@
+ `PRIVYHUB_WAN_ADAPTATION=1` (`companion/wan_adaptation.py`), proved by replay,
+ NOT ADOPTED; the live smoke is pending on the stream** (record:
+ `docs/memory/evidence/G5_S2_WAN_ADAPTATION_RULES_2026-10-16.md`). Per rule,
+-the G5-S2 line says what was built. The
++the G5-S2 line says what was built. **G5-S3 (2026-10-17): the session's routing
++class reaches the ladder's context (`path_class`) and 720p/4000 is actuatable on a
++remote path, behind `PRIVYHUB_REMOTE_LADDER=1` (`companion/remote_ladder.py`),
++replay-proved, NOT ADOPTED, unvalidated live** (record:
++`docs/memory/evidence/G5_S3_REMOTE_LADDER_2026-10-17.md`). The
+ classes are those of `companion/wan_telemetry.py`. Their thresholds are §1
+ of `docs/memory/evidence/G5_S1_WAN_TELEMETRY_CLASSIFICATION_2026-10-16.md`.
+ Every number below is quoted from an existing record or the live ladder's
+@@ -59,6 +63,7 @@ ROADMAP §G5's priority order, as rules:
+   count is **not set: G5-S2**.
+ 
+ - **G5-S2:** `capacity-limited` → `step_down` one rung to the LAN floor 5000. At 5000 on a remote path, after 60 reports (ROUTINE's down hold-down, the persistence this sets) → `floor_4000`, **recorded only**: the actuator's validated ladder is 5000-7000, so 4000 needs an actuator change and its own validation first.
++- **G5-S3:** R3.2's floor is **actuatable behind `PRIVYHUB_REMOTE_LADDER=1`, unvalidated live**: on a remote path (`path_class` from the session's routing evidence) the ladder and the actuator's validated list are `4000 / 5000 / 5500 / 6000 / 7000`; `floor_4000` and the ladder's own one-rung `capacity_mild` step from 5000 can land on 4000, through every gate; nothing below 4000; on the LAN, 4000 is refused as before.
+ 
+ ## 4. Use FEC only when loss justifies it (`lossy`)
+ 
+@@ -87,6 +92,7 @@ ROADMAP §G5's priority order, as rules:
+   proposal; G5-S2 tests it.
+ 
+ - **G5-S2:** an increase only after K consecutive `clean` windows (a `lossy` window is not clean, R5.3): K = 18 (the ladder's 90 reports) on the LAN, 36 on a remote path; short of K → `no_step_up`. R5.2's rate limit and oscillation guard are the ladder's own. The ladder sees no client address today, so "remote" needs the context to carry it (G5-S3).
++- **G5-S3:** behind `PRIVYHUB_REMOTE_LADDER=1` the context carries `path_class` (`remote` when the stream's setup was overlay-routed, `lan` otherwise), so R5's K = 36 and R3.2 apply on a remote path live; R5's strictness itself is unchanged.
+ 
+ ## Not set by any record (G5-S2 measures them)
+ 
+diff --git a/companion/remote_ladder.py b/companion/remote_ladder.py
+new file mode 100644
+index 0000000..ea45f8b
+--- /dev/null
++++ b/companion/remote_ladder.py
+@@ -0,0 +1,162 @@
++"""G5-S3: the remote ladder -- the session's routing class reaches the live
++ladder, and on a remote path only the ladder (and its actuator) can use the
++720p/4000 rung (C5-M3's, screened on transport only).
++
++Behind `PRIVYHUB_REMOTE_LADDER=1`. **Absent = today**: nothing imports this
++module; the ladder's context, its rows and the actuator's validated list are
++exactly as before. The design is
++`docs/memory/evidence/g5_s3_2026-10-17/design_written_before_code.md` (hashed
++before this code).
++
++One shared `RemoteLadder` per process (`shared_from_environ`), read by four
++guarded hooks:
++
++- the games plugin, at `native-stream-start`: `note_stream_start(client_ip)` --
++  the class of the target the gate handed the plugin (G3-S3: the declared
++  endpoint whose class matches the request's routing class), under G3's own
++  overlay test. `overlay` -> path `remote`; anything else -> `lan`. Only the
++  class is kept; the address is never stored or logged;
++- the ladder's context builder (`LiveController._ctx`): `apply` -- the
++  context's `path_class`, and the policy's ladder `(4000,) + base` on a remote
++  path, `base` otherwise;
++- the ladder's log (`LiveController._write`): `annotate` -- `path_class` on
++  every row; a move to or from 4000 labelled `remote_rung`, its actuation
++  result carrying the decision's reason / trigger / rule;
++- the actuator (`c3_linux_actuator_probe`): `actuator_levels` -- `(4000,)` on
++  a remote path, `()` otherwise; nothing below 4000, ever;
++- G5-S2's rules (`wan_adaptation`): `floor_actuates` -- R3.2's `floor_4000`
++  goes through the ladder's own `_decide` when the ladder holds 4000.
++"""
++
++from __future__ import annotations
++
++import ipaddress
++import threading
++from typing import Any, Mapping
++
++FLAG_ENV = "PRIVYHUB_REMOTE_LADDER"
++
++PATH_LAN, PATH_REMOTE = "lan", "remote"
++EVIDENCE_OVERLAY, EVIDENCE_NOT_OVERLAY = "overlay", "not_overlay"
++
++REMOTE_RUNG_KBPS = 4000                      # C5-M3: 720p/4000, the only lower rung that passed transport
++REMOTE_LADDER_KBPS = (4000, 5000, 5500, 6000, 7000)
++
++# G3's overlay address space, built from integers (no literal), as G3-S1's and
++# G5-S2's; a test asserts equality with session_identity.OVERLAY_NETWORKS.
++OVERLAY_NETWORKS = (
++    ipaddress.ip_network((0x64400000, 10)),
++    ipaddress.ip_network((0xFD7A115CA1E0 << 80, 48)),
++)
++
++DECISION_EVENTS = ("transition", "would_act", "refused", "hold")
++RESULT_EVENTS = ("transition_done", "transition_aborted", "actuator_failed")
++_MEMO_MAX = 32
++
++
++def flag_on(environ: Mapping[str, str]) -> bool:
++    return (environ.get(FLAG_ENV) or "").strip() == "1"
++
++
++def routing_evidence_of(target: Any) -> str:
++    """G3's overlay test (`RoutingClassifier.classify`'s overlay branch) over one address."""
++    try:
++        ip = ipaddress.ip_address(str(target).split("%", 1)[0])
++    except ValueError:
++        return EVIDENCE_NOT_OVERLAY
++    if getattr(ip, "ipv4_mapped", None):
++        ip = ip.ipv4_mapped
++    if any(ip.version == n.version and ip in n for n in OVERLAY_NETWORKS):
++        return EVIDENCE_OVERLAY
++    return EVIDENCE_NOT_OVERLAY
++
++
++class RemoteLadder:
++    def __init__(self) -> None:
++        self._lock = threading.Lock()
++        self.routing_evidence: str | None = None    # None until the first stream start
++        self.path_class = PATH_LAN                  # G5-S2's default
++        self.stream_starts = 0
++        self._decisions: dict[Any, dict[str, Any]] = {}
++
++    # -- the class (the games plugin) ----------------------------------------
++    def set_routing_evidence(self, evidence: str) -> str:
++        with self._lock:
++            self.routing_evidence = evidence
++            self.path_class = PATH_REMOTE if evidence == EVIDENCE_OVERLAY else PATH_LAN
++            self.stream_starts += 1
++            return self.path_class
++
++    def note_stream_start(self, target: Any) -> str | None:
++        """At every `native-stream-start`; never raises."""
++        try:
++            return self.set_routing_evidence(routing_evidence_of(target))
++        except Exception:
++            return None
++
++    # -- the ladder ------------------------------------------------------------
++    def ladder_for(self, ladder: tuple[int, ...]) -> tuple[int, ...]:
++        base = tuple(k for k in ladder if k != REMOTE_RUNG_KBPS)
++        return (REMOTE_RUNG_KBPS,) + base if self.path_class == PATH_REMOTE else base
++
++    def apply(self, policy: Any, ctx: dict[str, Any]) -> dict[str, Any]:
++        """The context's `path_class`; the policy's ladder by class."""
++        ctx["path_class"] = self.path_class
++        want = self.ladder_for(tuple(policy.ladder))
++        if tuple(policy.ladder) != want:
++            policy.ladder = want
++        return ctx
++
++    def actuator_levels(self) -> tuple[int, ...]:
++        return (REMOTE_RUNG_KBPS,) if self.path_class == PATH_REMOTE else ()
++
++    def floor_actuates(self, suggestion: Any, policy: Any) -> bool:
++        """G5-S2's `floor_4000`, through the ladder's own `_decide`, when the ladder holds 4000."""
++        return (getattr(suggestion, "kind", None) == "floor_4000"
++                and REMOTE_RUNG_KBPS in tuple(policy.ladder)
++                and int(policy.level_kbps) > REMOTE_RUNG_KBPS)
++
++    # -- the log ---------------------------------------------------------------
++    def annotate(self, row: dict[str, Any]) -> dict[str, Any]:
++        try:
++            out = dict(row)
++            out["path_class"] = self.path_class
++            ev = out.get("event")
++            if ev in DECISION_EVENTS + RESULT_EVENTS and REMOTE_RUNG_KBPS in (out.get("to_kbps"),
++                                                                              out.get("from_kbps")):
++                out["remote_rung"] = True
++            if ev == "wan_suggestion" and out.get("suggestion") == "floor_4000":
++                # G5-S2's row says "recorded only"; with this flag, on a remote path, it is actuatable.
++                out["floor_actuatable"] = self.path_class == PATH_REMOTE
++            seq = out.get("decision_sequence")
++            if ev in ("transition", "would_act") and seq is not None:
++                m = out.get("measurements") or {}
++                self._decisions[seq] = {"reason": out.get("reason"), "trigger": out.get("trigger"),
++                                        "wan_rule": m.get("wan_rule") if isinstance(m, dict) else None}
++                while len(self._decisions) > _MEMO_MAX:
++                    del self._decisions[next(iter(self._decisions))]
++            elif ev in RESULT_EVENTS and seq is not None and seq in self._decisions:
++                out["decision"] = self._decisions.pop(seq)
++            return out
++        except Exception:
++            return row
++
++    def status(self) -> dict[str, Any]:
++        return {"flag": f"{FLAG_ENV}=1", "path_class": self.path_class,
++                "routing_evidence": self.routing_evidence, "stream_starts": self.stream_starts,
++                "remote_ladder_kbps": list(REMOTE_LADDER_KBPS)}
++
++
++_SHARED: RemoteLadder | None = None
++_SHARED_LOCK = threading.Lock()
++
++
++def shared_from_environ(environ: Mapping[str, str]) -> RemoteLadder | None:
++    """The one instance the hooks share; None without the flag."""
++    global _SHARED
++    if not flag_on(environ):
++        return None
++    with _SHARED_LOCK:
++        if _SHARED is None:
++            _SHARED = RemoteLadder()
++        return _SHARED
+diff --git a/tests/remote_ladder/test_remote_ladder.py b/tests/remote_ladder/test_remote_ladder.py
+new file mode 100644
+index 0000000..0156778
+--- /dev/null
++++ b/tests/remote_ladder/test_remote_ladder.py
+@@ -0,0 +1,481 @@
++#!/usr/bin/env python3
++"""G5-S3: the remote ladder -- the session's path class in the ladder's context,
++and 720p/4000 on a remote path only.
++
++    python3 -m unittest discover -s tests/remote_ladder -v
++
++No stream, no companion. This process carries no flag, so every module global
++is None; a test that needs the flag sets the globals to one `RemoteLadder` and
++restores them (`FlagOn`), and one test runs a child interpreter with the real
++environment variable. The actuator runs C3-F1's fake manager through the real
++encoder-only cycle: nothing is spawned. Addresses are built from integers.
++"""
++
++from __future__ import annotations
++
++import ast
++import ipaddress
++import os
++import subprocess
++import sys
++import tempfile
++import threading
++import types
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(ROOT / "tools"))
++
++import adaptive_bitrate as ab  # noqa: E402
++import adaptive_bitrate_live as live  # noqa: E402
++import remote_ladder as rl  # noqa: E402
++import wan_adaptation as wa  # noqa: E402
++import test_c3_f1_recovery_restart as f1  # noqa: E402
++from diagnostics import c3_linux_actuator_probe as probe  # noqa: E402
++
++GUARDS = {"stream_active": True, "game_active": True, "game_not_paused": True, "recovery_playing": True,
++          "reference_profile": True, "no_override": True, "actuator_bound": True}
++OVERLAY_V4 = str(rl.OVERLAY_NETWORKS[0][77])
++OVERLAY_V6 = str(rl.OVERLAY_NETWORKS[1][5])
++LAN_V4 = str(ipaddress.ip_address(0xC0A80117))
++LOOPBACK = str(ipaddress.ip_address(0x7F000001))
++
++CLEAN = dict(fps=59.9, queue=0, gap=16, lost=0)
++MILD = dict(fps=54.0, queue=0, gap=16, lost=80)          # capacity_mild: < 57 on 4/5, >= 50 lost on 3/5
++STRICT = dict(fps=45.0, queue=0, gap=16, lost=120)       # capacity: < 50 on all 5
++
++
++def tel(elapsed, fps=59.9, queue=0, gap=16, lost=0, stale=0, idr=False):
++    return {"available": True, "fresh": True, "session_elapsed_ms": elapsed,
++            "receiver": {"recent_fps": fps, "waiting_for_idr": idr, "lost_packets_delta": lost},
++            "decoder": {"queue_depth": queue, "stale_output_drops_delta": stale},
++            "latency": {"output_gap_ms": gap}, "fec": {}}
++
++
++class FlagOn:
++    """The four hooks' globals set to one shared instance, as the flag would."""
++
++    def __init__(self, evidence: str | None = None):
++        self.r = rl.RemoteLadder()
++        if evidence:
++            self.r.set_routing_evidence(evidence)
++
++    def __enter__(self):
++        self.saved = (live.REMOTE_LADDER, probe.REMOTE_LADDER, wa.REMOTE_LADDER)
++        live.REMOTE_LADDER = probe.REMOTE_LADDER = wa.REMOTE_LADDER = self.r
++        return self.r
++
++    def __exit__(self, *exc):
++        live.REMOTE_LADDER, probe.REMOTE_LADDER, wa.REMOTE_LADDER = self.saved
++
++
++def drive(policy, specs, remote=None, adapt=None, start=0, events=None):
++    """Feed (spec, n) blocks through the context hook; actuate synchronously."""
++    out = [] if events is None else events
++    el = start
++    for spec, n in specs:
++        for _ in range(n):
++            el += 2000
++            t = tel(el, **spec)
++            ctx = {"guards": GUARDS, "clock_ms": el, "stream_kbps": policy.level_kbps}
++            if remote is not None:
++                remote.apply(policy, ctx)
++            evs = adapt.feed(policy, ab._sample(t), ctx, t) if adapt else policy.feed(ab._sample(t), ctx)
++            out.extend(evs)
++            if policy.pending:
++                policy.actuation_done(True, actual_kbps=policy.pending["to_kbps"])
++    return out
++
++
++def levels(events):
++    return [e["to_kbps"] for e in events if e.get("event") == "transition"]
++
++
++# ------------------------------------------------------------------ the flag ---
++class Flag(unittest.TestCase):
++    def test_flag_exactly_one(self):
++        self.assertTrue(rl.flag_on({rl.FLAG_ENV: "1"}))
++        for v in (None, "", "0", "true", "yes", "2", "remote"):
++            self.assertFalse(rl.flag_on({} if v is None else {rl.FLAG_ENV: v}), v)
++        self.assertIsNone(rl.shared_from_environ({}))
++
++    def test_this_process_has_no_flag(self):
++        self.assertIsNone(live.REMOTE_LADDER)
++        self.assertIsNone(probe.REMOTE_LADDER)
++        self.assertIsNone(wa.REMOTE_LADDER)
++
++    def test_imports_only_under_the_flag(self):
++        for rel in ("companion/adaptive_bitrate_live.py", "companion/wan_adaptation.py",
++                    "companion/diagnostics/c3_linux_actuator_probe.py"):
++            tree = ast.parse((ROOT / rel).read_text())
++            top = [n for n in tree.body if isinstance(n, (ast.Import, ast.ImportFrom))]
++            self.assertFalse(any("remote_ladder" in ast.unparse(n) for n in top), rel)
++            guarded = [n for n in tree.body if isinstance(n, ast.If) and "remote_ladder" in ast.unparse(n)]
++            self.assertEqual(len(guarded), 1, rel)
++            self.assertIn("PRIVYHUB_REMOTE_LADDER", ast.unparse(guarded[0].test), rel)
++        games = (ROOT / "companion" / "plugins" / "games.py").read_text()
++        self.assertNotIn("import remote_ladder", games)
++        self.assertEqual(games.count("adaptive_bitrate_live.REMOTE_LADDER is not None"), 1)
++
++    def test_one_shared_instance_under_the_real_flag(self):
++        code = ("import sys; sys.path.insert(0, %r)\n"
++                "import adaptive_bitrate_live as l, wan_adaptation as w\n"
++                "from diagnostics import c3_linux_actuator_probe as p\n"
++                "print(l.REMOTE_LADDER is not None and l.REMOTE_LADDER is w.REMOTE_LADDER is p.REMOTE_LADDER)\n"
++                % str(ROOT / "companion"))
++        env = dict(os.environ, PRIVYHUB_REMOTE_LADDER="1", PYTHONDONTWRITEBYTECODE="1")
++        out = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=60)
++        self.assertEqual(out.stdout.strip(), "True", out.stderr)
++        env["PRIVYHUB_REMOTE_LADDER"] = "0"
++        code0 = code.replace("print(l.REMOTE_LADDER is not None and l.REMOTE_LADDER is w.REMOTE_LADDER "
++                             "is p.REMOTE_LADDER)",
++                             "print(l.REMOTE_LADDER is None and w.REMOTE_LADDER is None and "
++                             "p.REMOTE_LADDER is None and 'remote_ladder' not in sys.modules)")
++        self.assertNotEqual(code0, code)
++        out = subprocess.run([sys.executable, "-c", code0], env=env, capture_output=True, text=True, timeout=60)
++        self.assertEqual(out.stdout.strip(), "True", out.stderr)
++
++
++# ----------------------------------------------------------------- the class ---
++class TheClass(unittest.TestCase):
++    def test_overlay_block_is_g3s(self):
++        import session_identity as si    # read only
++        self.assertEqual(rl.OVERLAY_NETWORKS, si.OVERLAY_NETWORKS)
++
++    def test_routing_evidence_is_g3s_overlay_test(self):
++        import session_identity as si    # read only: G3's classifier, no LAN table needed for overlay
++        c = si.RoutingClassifier(lan_reader=lambda: [])
++        for addr in (OVERLAY_V4, OVERLAY_V6, "::ffff:" + OVERLAY_V4, LAN_V4, LOOPBACK, "not-an-address", ""):
++            want = rl.EVIDENCE_OVERLAY if c.classify(addr) == si.ROUTING_OVERLAY else rl.EVIDENCE_NOT_OVERLAY
++            self.assertEqual(rl.routing_evidence_of(addr), want, addr)
++        self.assertEqual(rl.routing_evidence_of(OVERLAY_V4), rl.EVIDENCE_OVERLAY)
++        self.assertEqual(rl.routing_evidence_of(LAN_V4), rl.EVIDENCE_NOT_OVERLAY)
++
++    def test_set_at_every_stream_start_and_no_address_kept(self):
++        r = rl.RemoteLadder()
++        self.assertEqual(r.path_class, rl.PATH_LAN)                  # G5-S2's default
++        self.assertEqual(r.note_stream_start(OVERLAY_V4), rl.PATH_REMOTE)
++        self.assertEqual(r.note_stream_start(LAN_V4), rl.PATH_LAN)    # a re-setup over the LAN
++        self.assertEqual(r.note_stream_start(OVERLAY_V6), rl.PATH_REMOTE)
++        self.assertEqual(r.stream_starts, 3)
++        blob = repr(vars(r)) + repr(r.status())
++        for addr in (OVERLAY_V4, OVERLAY_V6, LAN_V4):
++            self.assertNotIn(addr, blob)
++        self.assertIsNone(r.note_stream_start(object.__new__(_Boom)))  # never raises
++
++    def test_games_plugin_hook(self):
++        g = load_games_plugin()
++        calls = []
++
++        class Emu:
++            def status(self):
++                return {"active": True, "paused": True, "pid": 1}
++
++        p = object.__new__(g.GamesPlugin)
++        p._emulator = Emu()
++        p._recovery = types.SimpleNamespace(note_stream_start=lambda: calls.append("recovery"))
++        p._native_stream = types.SimpleNamespace(start=lambda **kw: calls.append("start") or {"ok": True})
++        p._diagnostic_heartbeat_interval_ms = lambda: 2000
++        p.handle_post_request("native-stream-start", "port=48100", OVERLAY_V4)    # flag absent: nothing
++        with FlagOn() as r:
++            p.handle_post_request("native-stream-start", "port=48100", OVERLAY_V4)
++            self.assertEqual((r.path_class, r.routing_evidence), (rl.PATH_REMOTE, rl.EVIDENCE_OVERLAY))
++            p.handle_post_request("native-stream-start", "port=48100", LAN_V4)
++            self.assertEqual(r.path_class, rl.PATH_LAN)
++            self.assertEqual(r.stream_starts, 2)
++        self.assertEqual(calls.count("start"), 3)
++
++
++def load_games_plugin():
++    """`plugins/games.py` alone: importing the `plugins` package would construct every
++    plugin (its `__init__` builds PLUGINS), and GamesPlugin() writes the startup
++    reconcile's status file under logs/. This loads the module and constructs nothing."""
++    import importlib.util
++    spec = importlib.util.spec_from_file_location("g5_s3_games_plugin", ROOT / "companion" / "plugins" / "games.py")
++    mod = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(mod)
++    return mod
++
++
++class _Boom:
++    def __str__(self):
++        raise RuntimeError("boom")
++
++
++# --------------------------------------------------------------- the context ---
++class TheContext(unittest.TestCase):
++    def ctl(self, **kw):
++        d = tempfile.mkdtemp(prefix="g5_s3_test_")
++        return live.LiveController(Path(d), environ=kw.get("environ", {}))
++
++    def test_without_the_flag_as_today(self):
++        c = self.ctl()
++        ctx = c._ctx({"bitrate_kbps": 7000})
++        self.assertNotIn("path_class", ctx)
++        self.assertEqual(set(ctx), {"stream_kbps", "guards", "clock_ms"})
++        self.assertEqual(c._policy.ladder, live.LADDER_KBPS)
++
++    def test_with_the_flag_by_class(self):
++        with FlagOn() as r:
++            c = self.ctl()
++            self.assertEqual(c._ctx({})["path_class"], "lan")
++            self.assertEqual(c._policy.ladder, (5000, 5500, 6000, 7000))
++            r.set_routing_evidence(rl.EVIDENCE_OVERLAY)
++            self.assertEqual(c._ctx({})["path_class"], "remote")
++            self.assertEqual(c._policy.ladder, (4000, 5000, 5500, 6000, 7000))
++            self.assertEqual(c.status()["validated_ladder_kbps"], [4000, 5000, 5500, 6000, 7000])
++            r.set_routing_evidence(rl.EVIDENCE_NOT_OVERLAY)
++            self.assertEqual(c._ctx({})["path_class"], "lan")
++            self.assertEqual(c._policy.ladder, (5000, 5500, 6000, 7000))
++
++    def test_with_the_1080p_rung(self):
++        with FlagOn(rl.EVIDENCE_OVERLAY):
++            c = self.ctl(environ={live.TOP_ENV: live.TOP_1080P})
++            c._ctx({})
++            self.assertEqual(c._policy.ladder, (4000,) + live.LADDER_WITH_RUNG_KBPS)
++
++    def test_wan_rules_read_the_class(self):
++        with FlagOn(rl.EVIDENCE_OVERLAY):
++            c = self.ctl()
++            self.assertEqual(wa.path_class(c._ctx({})), wa.PATH_REMOTE)    # G5-S2 finding 2, closed
++        self.assertEqual(wa.path_class(self.ctl()._ctx({})), wa.PATH_LAN)
++
++
++# ---------------------------------------------------------------- the policy ---
++class ThePolicy(unittest.TestCase):
++    def test_remote_steps_down_to_4000_and_no_further(self):
++        r = rl.RemoteLadder()
++        r.set_routing_evidence(rl.EVIDENCE_OVERLAY)
++        p = live.LivePolicy()
++        evs = drive(p, [(CLEAN, 40), (MILD, 600)], remote=r)
++        self.assertEqual(levels(evs), [6000, 5500, 5000, 4000])
++        self.assertEqual(p.level_kbps, 4000)
++        at4000 = [e for e in evs if e.get("event") == "refused" and e.get("from_kbps") == 4000]
++        self.assertEqual({e["reason"] for e in at4000}, {"hold_down", "at_floor"})   # the hold-down first
++        self.assertTrue(all(e["to_kbps"] == 4000 for e in at4000 if e["reason"] == "at_floor"))
++        self.assertGreaterEqual(min(e["to_kbps"] for e in evs if e.get("event") == "transition"), 4000)
++
++    def test_lan_never_reaches_4000(self):
++        r = rl.RemoteLadder()                     # lan
++        for remote in (r, None):                  # with the flag on the LAN, and without the flag
++            p = live.LivePolicy()
++            evs = drive(p, [(CLEAN, 40), (MILD, 600), (STRICT, 200)], remote=remote)
++            self.assertEqual(levels(evs), [6000, 5500, 5000])
++            self.assertEqual(p.level_kbps, 5000)
++            self.assertNotIn(4000, [e.get("to_kbps") for e in evs])
++
++    def test_strict_fallback_still_names_5000(self):
++        r = rl.RemoteLadder()
++        r.set_routing_evidence(rl.EVIDENCE_OVERLAY)
++        p = live.LivePolicy()
++        evs = drive(p, [(CLEAN, 40), (STRICT, 200)], remote=r)
++        self.assertEqual(levels(evs), [5000])                  # TARGET_KBPS unchanged
++        self.assertTrue(any(e.get("event") == "refused" and e.get("reason") == "at_floor" for e in evs))
++
++    def test_increase_from_4000_is_5000(self):
++        r = rl.RemoteLadder()
++        r.set_routing_evidence(rl.EVIDENCE_OVERLAY)
++        p = live.LivePolicy()
++        evs = drive(p, [(CLEAN, 40), (MILD, 600), (CLEAN, 200)], remote=r)
++        ups = [(e["from_kbps"], e["to_kbps"]) for e in evs if e.get("event") == "transition" and e["direction"] == "up"]
++        self.assertEqual(ups[0], (4000, 5000))
++
++
++# -------------------------------------------------------------- the actuator ---
++class TheActuator(unittest.TestCase):
++    def cycle(self, m, fn, **kw):
++        spawned = []
++
++        def popen(argv, **k):
++            p = f1.FakeProc(argv)
++            spawned.append(p)
++            return p
++        clock = f1.Clock()
++        out = fn(m, popen_factory=popen, monotonic=clock, sleep=lambda s: None,
++                 perf_counter_ns=lambda: int(clock() * 1e9), **kw)
++        return out, spawned[0].argv
++
++    def rate(self, argv):
++        return tuple(argv[argv.index(f) + 1] for f in ("-b:v", "-maxrate", "-bufsize"))
++
++    def test_remote_4000_transition_recovery_and_back(self):
++        with FlagOn(rl.EVIDENCE_OVERLAY):
++            m = f1.fake_manager(5000)
++            out, argv = self.cycle(m, probe.run_c3_linux_validated_bitrate_transition, target_bitrate_kbps=4000)
++            self.assertTrue(out["ok"])
++            self.assertEqual(out["schema"], probe.BIDIRECTIONAL_SCHEMA)
++            self.assertEqual(self.rate(argv), ("4000k", "4000k", "4000k"))
++            self.assertEqual(m._active_bitrate_kbps, 4000)
++            out, argv = self.cycle(m, probe.run_c3_linux_recovery_restart)        # C3-F1 at 4000
++            self.assertTrue(out["ok"])
++            self.assertEqual((self.rate(argv)[0], m._active_bitrate_kbps), ("4000k", 4000))
++            out, argv = self.cycle(m, probe.run_c3_linux_validated_bitrate_transition, target_bitrate_kbps=5000)
++            self.assertEqual((self.rate(argv)[0], m._active_bitrate_kbps), ("5000k", 5000))
++
++    def test_4000_argv_is_5000s_but_the_rate(self):
++        with FlagOn(rl.EVIDENCE_OVERLAY):
++            _, a4 = self.cycle(f1.fake_manager(7000), probe.run_c3_linux_validated_bitrate_transition,
++                               target_bitrate_kbps=4000)
++        _, a5 = self.cycle(f1.fake_manager(7000), probe.run_c3_linux_validated_bitrate_transition,
++                           target_bitrate_kbps=5000)
++        self.assertEqual([x.replace("4000k", "5000k") for x in a4], a5)
++
++    def test_refused_on_the_lan_and_without_the_flag(self):
++        for ctx in (FlagOn(), FlagOn(rl.EVIDENCE_NOT_OVERLAY), None):
++            with (ctx or _Nothing()):
++                m = f1.fake_manager(5000)
++                with self.assertRaisesRegex(RuntimeError, "unsupported_validated_bitrate"):
++                    self.cycle(m, probe.run_c3_linux_validated_bitrate_transition, target_bitrate_kbps=4000)
++                self.assertEqual(m._active_bitrate_kbps, 5000)
++                m4 = f1.fake_manager(4000)                     # a stream left at 4000 is not "validated" here
++                with self.assertRaises(RuntimeError):
++                    self.cycle(m4, probe.run_c3_linux_recovery_restart)
++                with self.assertRaisesRegex(RuntimeError, "validated_transition_requires_validated_start"):
++                    self.cycle(m4, probe.run_c3_linux_validated_bitrate_transition, target_bitrate_kbps=5000)
++
++    def test_below_4000_refused_everywhere(self):
++        for ctx in (FlagOn(rl.EVIDENCE_OVERLAY), FlagOn(), None):
++            with (ctx or _Nothing()):
++                for fn, kw in ((probe.run_c3_linux_validated_bitrate_transition, {"target_bitrate_kbps": 3000}),
++                               (probe.run_c3_linux_level_transition, {"target_bitrate_kbps": 3000}),
++                               (probe.run_c3_linux_validated_bitrate_transition, {"target_bitrate_kbps": 3500})):
++                    with self.assertRaisesRegex(RuntimeError, "unsupported_validated_bitrate"):
++                        self.cycle(f1.fake_manager(5000), fn, **kw)
++                with self.assertRaises(RuntimeError):
++                    self.cycle(f1.fake_manager(3000), probe.run_c3_linux_recovery_restart)
++
++    def test_manager_routes_4000_to_the_validated_transition(self):
++        import native_stream as ns
++        seen = []
++        saved = probe.run_c3_linux_validated_bitrate_transition
++        probe.run_c3_linux_validated_bitrate_transition = lambda m, **kw: seen.append(kw) or {"ok": True}
++        try:
++            m = f1.fake_manager(5000)
++            self.assertTrue(ns.NativeStreamManager.adaptive_level_transition(m, 4000)["ok"])
++        finally:
++            probe.run_c3_linux_validated_bitrate_transition = saved
++        self.assertEqual(seen, [{"target_bitrate_kbps": 4000}])
++
++
++class _Nothing:
++    def __enter__(self):
++        return None
++
++    def __exit__(self, *exc):
++        return False
++
++
++# ------------------------------------------------------- G5-S2's floor_4000 ---
++class TheFloor(unittest.TestCase):
++    def run_floor(self, evidence=None, flag=True):
++        """7000 -> 5000 by the strict trigger, then capacity-limited at 5000 for 200 reports."""
++        p = live.LivePolicy()
++        adapt = wa.WanAdaptation()
++        if flag:
++            with FlagOn(evidence) as r:
++                evs = drive(p, [(CLEAN, 40), (STRICT, 260)], remote=r, adapt=adapt)
++                return p, evs
++        ctx_path = {"path_class": "remote"} if evidence == rl.EVIDENCE_OVERLAY else {}
++        out, el = [], 0
++        for spec, n in [(CLEAN, 40), (STRICT, 260)]:
++            for _ in range(n):
++                el += 2000
++                t = tel(el, **spec)
++                ctx = {"guards": GUARDS, "clock_ms": el, "stream_kbps": p.level_kbps, **ctx_path}
++                out.extend(adapt.feed(p, ab._sample(t), ctx, t))
++                if p.pending:
++                    p.actuation_done(True, actual_kbps=p.pending["to_kbps"])
++        return p, out
++
++    def test_without_the_flag_recorded_only(self):
++        p, evs = self.run_floor(rl.EVIDENCE_OVERLAY, flag=False)      # remote read from the context
++        floor = [e for e in evs if e.get("suggestion") == "floor_4000"]
++        self.assertTrue(floor)
++        self.assertTrue(all(e["ladder_result"] in ("none",) or e["ladder_result"].startswith("refused")
++                            for e in floor))
++        self.assertEqual(p.level_kbps, 5000)
++
++    def test_with_the_flag_on_remote_actuated_through_the_gates(self):
++        p, evs = self.run_floor(rl.EVIDENCE_OVERLAY)
++        tr = [e for e in evs if e.get("event") == "transition" and e["to_kbps"] == 4000]
++        self.assertEqual(len(tr), 1)
++        self.assertEqual((tr[0]["from_kbps"], tr[0]["reason"], tr[0]["measurements"]["wan_rule"]),
++                         (5000, "wan_rules", "R3.2"))
++        self.assertEqual(p.level_kbps, 4000)
++        self.assertGreaterEqual(min(levels(evs)), 4000)
++        rows = [e for e in evs if e.get("suggestion") == "floor_4000"]
++        self.assertTrue(any(e["ladder_result"] == "transition" for e in rows))
++
++    def test_with_the_flag_on_the_lan_no_floor(self):
++        p, evs = self.run_floor()
++        self.assertFalse([e for e in evs if e.get("suggestion") == "floor_4000"])
++        self.assertEqual(p.level_kbps, 5000)
++
++
++# ------------------------------------------------------------------ the rows ---
++class _SyncThread:
++    def __init__(self, target, args=(), **kw):
++        self._t, self._a = target, args
++
++    def start(self):
++        self._t(*self._a)
++
++
++class TheRows(unittest.TestCase):
++    def run_controller(self, evidence=None, flag=True):
++        d = tempfile.mkdtemp(prefix="g5_s3_rows_")
++        saved_threading = live.threading
++        live.threading = types.SimpleNamespace(Thread=_SyncThread, RLock=threading.RLock)
++        state = {"kbps": 7000}
++
++        def actuator(k):
++            state["kbps"] = k
++            return {"ok": True, "target_bitrate_kbps": k}
++        try:
++            with (FlagOn(evidence) if flag else _Nothing()):
++                c = live.LiveController(Path(d), environ={})
++                c.bind(actuator=actuator,
++                       context=lambda: {"game_active": True, "game_paused": False, "recovery_state": "PLAYING"},
++                       serial_lock=None, recovery_state=lambda: "PLAYING")
++                el = 0
++                for spec, n in [(CLEAN, 40), (MILD, 600)]:
++                    for _ in range(n):
++                        el += 2000
++                        ns = {"active": True, "profile_id": live.REFERENCE_PROFILE_ID,
++                              "profile": {"bitrate_kbps": 7000}, "encoder_overrides": {"any_override": False},
++                              "bitrate_kbps": state["kbps"]}
++                        c.observe(tel(el, **spec), stream_bitrate_kbps=state["kbps"], native_status=ns)
++        finally:
++            live.threading = saved_threading
++        import json
++        return [json.loads(x) for x in c.log_path.read_text().splitlines()]
++
++    def test_every_row_carries_the_class_and_4000_is_labelled(self):
++        rows = self.run_controller(rl.EVIDENCE_OVERLAY)
++        self.assertTrue(all(r.get("path_class") == "remote" for r in rows))
++        tr = [r for r in rows if r.get("event") == "transition" and r.get("to_kbps") == 4000]
++        done = [r for r in rows if r.get("event") == "transition_done" and r.get("to_kbps") == 4000]
++        self.assertEqual((len(tr), len(done)), (1, 1))
++        self.assertTrue(tr[0]["remote_rung"] and done[0]["remote_rung"])
++        self.assertEqual(tr[0]["trigger"], "capacity_mild")
++        self.assertEqual(done[0]["decision"]["trigger"], "capacity_mild")
++        self.assertEqual(done[0]["decision_sequence"], tr[0]["decision_sequence"])
++        self.assertFalse([r for r in rows if r.get("remote_rung") and r.get("event") not in
++                          ("transition", "transition_done", "refused")])
++
++    def test_lan_rows_and_no_flag_rows(self):
++        lan = self.run_controller()
++        self.assertTrue(all(r.get("path_class") == "lan" for r in lan))
++        self.assertFalse(any(r.get("remote_rung") for r in lan))
++        off = self.run_controller(flag=False)
++        self.assertFalse(any("path_class" in r or "remote_rung" in r or "decision" in r for r in off))
++        strip = lambda rs: [{k: v for k, v in r.items() if k not in ("at_utc", "actuation_ms", "path_class",
++                                                                        "decision")} for r in rs]
++        self.assertEqual(strip(lan), strip(off))      # on the LAN the flag adds the class and the decision copy
++        self.assertTrue(any("decision" in r for r in lan if r.get("event") == "transition_done"))
++
++
++if __name__ == "__main__":
++    unittest.main()

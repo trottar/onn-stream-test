@@ -1,0 +1,35 @@
+G5-S3 unit tests, 2026-10-17T00:27:11Z, baseline 1dab25d
+$ python3 -m unittest discover -s tests/remote_ladder -v
+test_flag_exactly_one (test_remote_ladder.Flag.test_flag_exactly_one) ... ok
+test_imports_only_under_the_flag (test_remote_ladder.Flag.test_imports_only_under_the_flag) ... ok
+test_one_shared_instance_under_the_real_flag (test_remote_ladder.Flag.test_one_shared_instance_under_the_real_flag) ... ok
+test_this_process_has_no_flag (test_remote_ladder.Flag.test_this_process_has_no_flag) ... ok
+test_4000_argv_is_5000s_but_the_rate (test_remote_ladder.TheActuator.test_4000_argv_is_5000s_but_the_rate) ... ok
+test_below_4000_refused_everywhere (test_remote_ladder.TheActuator.test_below_4000_refused_everywhere) ... ok
+test_manager_routes_4000_to_the_validated_transition (test_remote_ladder.TheActuator.test_manager_routes_4000_to_the_validated_transition) ... ok
+test_refused_on_the_lan_and_without_the_flag (test_remote_ladder.TheActuator.test_refused_on_the_lan_and_without_the_flag) ... ok
+test_remote_4000_transition_recovery_and_back (test_remote_ladder.TheActuator.test_remote_4000_transition_recovery_and_back) ... ok
+test_games_plugin_hook (test_remote_ladder.TheClass.test_games_plugin_hook) ... <frozen importlib._bootstrap_external>:784: ResourceWarning: unclosed file <_io.FileIO name='/dev/null' mode='wb' closefd=True>
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_overlay_block_is_g3s (test_remote_ladder.TheClass.test_overlay_block_is_g3s) ... ok
+test_routing_evidence_is_g3s_overlay_test (test_remote_ladder.TheClass.test_routing_evidence_is_g3s_overlay_test) ... ok
+test_set_at_every_stream_start_and_no_address_kept (test_remote_ladder.TheClass.test_set_at_every_stream_start_and_no_address_kept) ... ok
+test_wan_rules_read_the_class (test_remote_ladder.TheContext.test_wan_rules_read_the_class) ... ok
+test_with_the_1080p_rung (test_remote_ladder.TheContext.test_with_the_1080p_rung) ... ok
+test_with_the_flag_by_class (test_remote_ladder.TheContext.test_with_the_flag_by_class) ... ok
+test_without_the_flag_as_today (test_remote_ladder.TheContext.test_without_the_flag_as_today) ... ok
+test_with_the_flag_on_remote_actuated_through_the_gates (test_remote_ladder.TheFloor.test_with_the_flag_on_remote_actuated_through_the_gates) ... ok
+test_with_the_flag_on_the_lan_no_floor (test_remote_ladder.TheFloor.test_with_the_flag_on_the_lan_no_floor) ... ok
+test_without_the_flag_recorded_only (test_remote_ladder.TheFloor.test_without_the_flag_recorded_only) ... ok
+test_increase_from_4000_is_5000 (test_remote_ladder.ThePolicy.test_increase_from_4000_is_5000) ... ok
+test_lan_never_reaches_4000 (test_remote_ladder.ThePolicy.test_lan_never_reaches_4000) ... ok
+test_remote_steps_down_to_4000_and_no_further (test_remote_ladder.ThePolicy.test_remote_steps_down_to_4000_and_no_further) ... ok
+test_strict_fallback_still_names_5000 (test_remote_ladder.ThePolicy.test_strict_fallback_still_names_5000) ... ok
+test_every_row_carries_the_class_and_4000_is_labelled (test_remote_ladder.TheRows.test_every_row_carries_the_class_and_4000_is_labelled) ... ok
+test_lan_rows_and_no_flag_rows (test_remote_ladder.TheRows.test_lan_rows_and_no_flag_rows) ... ok
+
+----------------------------------------------------------------------
+Ran 26 tests in 0.461s
+
+OK

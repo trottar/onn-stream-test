@@ -35,6 +35,17 @@ What differs from the home row:
 
 The host sampler, telemetry, heartbeat and status-poll figures are the home
 row's own functions (`e1_suite`).
+
+G4-P2: gate 3 (the host side) is recorded as the home row records it:
+
+- the home row's per-run RetroArch counter override (`TEKKEN["override"]`,
+  `COUNTER` + `E1_COUNTER_EXTRA`), written before the sampler starts, refused if
+  a file is already there, removed at teardown. It is per game: it applies when the
+  user starts the PS1-STREAM fixture, Tekken 3;
+- the sampler started with `--e2`, so `encoder.jsonl` is written and kept;
+- the summary's `key["retroarch"]` (the home row's key) and `key["gate3"]`:
+  `retroarch_fps` (`frames_per_s`), `capture_fps` and `dupdrop_per_min` (E4-S5's
+  `segcap` over `encoder.jsonl`), as the gates' clauses compute them.
 """
 
 from __future__ import annotations
@@ -42,10 +53,12 @@ from __future__ import annotations
 import hashlib
 import ipaddress
 import json
+import os
 import subprocess
 import sys
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
@@ -209,6 +222,44 @@ def path_figures(path: Path, t0: str, t1: str) -> dict[str, Any]:
             "wan_last_class": wan[-1] if wan else "not sampled (PRIVYHUB_WAN_TELEMETRY absent)"}
 
 
+# ---- gate 3: the host side, as the home row's gates read it (G4-P2) --------------------------
+
+def _ep(t: str) -> float:
+    return datetime.fromisoformat(t.replace("Z", "+00:00")).timestamp()
+
+
+def segcap(rd: Path, t0: str, t1: str) -> tuple[float | None, float | None]:
+    """E4-S5's segcap, verbatim in effect (E4-S5D's copy): frames / s and (dup + drop) / min over the
+    window from `encoder.jsonl`, a counter reset or a > 3-s hole skipping its pair."""
+    rows = []
+    p = Path(rd) / "encoder.jsonl"
+    if p.exists():
+        for line in p.read_text(errors="replace").splitlines():
+            try:
+                r = json.loads(line)
+            except ValueError:
+                continue
+            if r.get("records") and t0 <= r["at_utc"] <= t1:
+                rows.append(r)
+    fr = dt = dd = 0.0
+    for a, b in zip(rows, rows[1:]):
+        d = _ep(b["at_utc"]) - _ep(a["at_utc"])
+        if b["frame"] < a["frame"] or d > 3 or b["dup"] < a["dup"] or b["drop"] < a["drop"]:
+            continue
+        fr += b["frame"] - a["frame"]
+        dt += d
+        dd += (b["dup"] - a["dup"]) + (b["drop"] - a["drop"])
+    return (round(fr / dt, 3) if dt else None, round(dd / (dt / 60), 3) if dt else None)
+
+
+def gate3_figures(rd: Path, host: dict[str, Any], t0: str, t1: str) -> dict[str, Any]:
+    cap, dd = segcap(rd, t0, t1)
+    ra = (host or {}).get("retroarch") or {}
+    return {"retroarch_fps": ra.get("frames_per_s"), "retroarch_titles": ra.get("titles"),
+            "capture_fps": cap, "dupdrop_per_min": dd,
+            "clauses": "retroarch_fps >= 59.9; capture_fps 60 +/- 0.1; dupdrop_per_min <= 0.2 (E4-S4 / E4-S5)"}
+
+
 # ---- one run -------------------------------------------------------------------------------
 
 def run_remote_once(E: Any, run_no: int, out: Path, window: int, gap: int, wait: int, use_adb: bool) -> dict:
@@ -224,13 +275,22 @@ def run_remote_once(E: Any, run_no: int, out: Path, window: int, gap: int, wait:
         rec["preflight"] = pf = preflight_remote(lambda kv: E.environ_has(mp, kv), lambda: E.adb("devices"))
         if not pf["ok"]:
             raise RuntimeError(pf["refusal"])
+        # G4-P2: the home row's per-run counter override (RetroArch's title then carries "FPS / Frames")
+        override = E.TEKKEN["override"]
+        if override.exists():
+            raise RuntimeError("a file already sits at the counter override's path; refusing to overwrite")
+        override.parent.mkdir(parents=True, exist_ok=True)
+        override.write_text(E.COUNTER + os.environ.get("E1_COUNTER_EXTRA", "").replace("\\n", "\n"))
+        rec["counter_override"] = "set"
         samp = subprocess.Popen([sys.executable, str(E.REPO / "tools/e1_sampler.py"), "run", str(rd), "--telemetry",
-                                 "--title"], stdout=open(rd / "sampler.log", "w"), stderr=subprocess.STDOUT)
+                                 "--title", "--e2"], stdout=open(rd / "sampler.log", "w"), stderr=subprocess.STDOUT)
         E.log("E1-PS1-STREAM-REMOTE", f"run{run_no}: idle gap {gap}s")
         g0 = E.utc()
         time.sleep(gap)
         rec["gap"] = {"from": g0, "to": E.utc()}
         E.log("E1-PS1-STREAM-REMOTE", f"run{run_no}: waiting up to {wait}s -- start a PS1 game on the onn")
+        E.log("E1-PS1-STREAM-REMOTE", f"run{run_no}: gate 3 reads RetroArch's counter for the PS1-STREAM fixture "
+                                      f"only ({override.stem}; the override is per game)")
         deadline = time.time() + wait
         while time.time() < deadline:
             if E.games_status().get("active") and E.stream_status().get("active"):
@@ -280,6 +340,12 @@ def run_remote_once(E: Any, run_no: int, out: Path, window: int, gap: int, wait:
             td["client"] = "not harvested (no adb device or --adb not given)"
         if rec.get("playing_utc"):
             td["stopped"] = E.stop_game()
+        if rec.get("counter_override") == "set":       # G4-P2: only the file this run wrote
+            try:
+                E.TEKKEN["override"].unlink()
+            except FileNotFoundError:
+                pass
+            td["counter_override_removed"] = not E.TEKKEN["override"].exists()
         td["game_active"] = E.games_status().get("active")
         if samp:
             (rd / "sampler.stop").touch()
@@ -297,6 +363,8 @@ def run_remote_once(E: Any, run_no: int, out: Path, window: int, gap: int, wait:
             "telemetry": E.telemetry_figures(rd / "telemetry.jsonl", t0, t1),
             "status_poll": E.poll_figures(rd / "status_poll.jsonl", t0, t1),
             "path": path_figures(rd / "path.jsonl", t0, t1),
+            "retroarch": rec["host"].get("retroarch"),            # G4-P2: the home row's key
+            "gate3": gate3_figures(rd, rec["host"], t0, t1),      # G4-P2: as the gates' clauses read it
         }
         rec["status"] = "OK" if rec["status"] == "WINDOW_DONE" else rec["status"]
     (rd / "summary.json").write_text(json.dumps(rec, indent=1))

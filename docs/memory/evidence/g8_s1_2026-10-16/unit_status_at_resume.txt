@@ -1,0 +1,16 @@
+● privyhub-g8-s1.service - [systemd-run] /usr/bin/python3 -B <repo>/docs/memory/evidence/g8_s1_2026-10-16/g8_s1_driver.py
+     Loaded: loaded (/run/user/1000/systemd/transient/privyhub-g8-s1.service; transient)
+  Transient: yes
+     Active: active (running) since Fri 2026-10-16 20:21:53 EDT; 1min 5s ago
+ Invocation: ce780fdbdc2b4e0fbdcddf471a13c1b6
+   Main PID: 3468627 (python3)
+      Tasks: 10 (limit: 18065)
+     Memory: 49.2M (peak: 50.9M)
+        CPU: 1.883s
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/privyhub-g8-s1.service
+             ├─3468627 /usr/bin/python3 -B <repo>/docs/memory/evidence/g8_s1_2026-10-16/g8_s1_driver.py
+             ├─3468647 /usr/bin/python3 <repo>/docs/memory/evidence/g8_s1_2026-10-16/g8_s1_suite_call.py <repo>/docs/memory/evidence/g8_s1_2026-10-16/runs/06_loss-5_on 600 120 PRIVYHUB_WAN_TELEMETRY=1 PRIVYHUB_IMPAIRMENT=loss-5@post-fec,seed=1 PRIVYHUB_WAN_ADAPTATION=1
+             └─3468734 /usr/bin/python3 <repo>/tools/e1_sampler.py run <repo>/docs/memory/evidence/g8_s1_2026-10-16/runs/06_loss-5_on/E1-PS1-STREAM_flag/run1 --telemetry --title --e2
+
+Oct 16 20:21:53 PrivyHub systemd[1310]: Started privyhub-g8-s1.service - [systemd-run] /usr/bin/python3 -B <repo>/docs/memory/evidence/g8_s1_2026-10-16/g8_s1_driver.py.
+Oct 16 20:21:54 PrivyHub python3[3468627]: [g8s1 10-17 00:21:54Z] start; cells done 5 | adopted state adopted7 ok | cap 2026-10-17T14:00:00Z

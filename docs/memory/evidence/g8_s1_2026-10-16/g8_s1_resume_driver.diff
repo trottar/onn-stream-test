@@ -1,0 +1,13 @@
+--- a/g8_s1_driver.py
++++ b/g8_s1_driver.py
+@@ -47,8 +47,8 @@
+ PRE = HERE / "g8_s1_preregistration.txt"
+ WATCH = Path.home() / "privyhub_g8_s1"
+ RUNS = HERE / "runs"
+-CAP_UTC = "2026-10-17T06:00:00Z"
+-CAP = datetime(2026, 10, 17, 6, 0, 0, tzinfo=timezone.utc).timestamp()
++CAP_UTC = "2026-10-17T14:00:00Z"
++CAP = datetime(2026, 10, 17, 14, 0, 0, tzinfo=timezone.utc).timestamp()
+ DRY = "--dry" in sys.argv
+ STOPFILE = WATCH / "STOP"
+ OUTD = HERE / "dry_run" if DRY else WATCH
