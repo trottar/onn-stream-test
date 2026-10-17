@@ -1,5 +1,26 @@
 # Known issues and deferred work
 
+## 2026-10-16 G4-S1, the first off-site session: three items — OPEN
+
+(`docs/memory/evidence/G4_S1_OFFSITE_FIRST_SESSION_2026-10-16.md` §6)
+
+- **The remote row cannot read the host gate (a harness gap, G4-P1).** `tools/e1_remote.py` writes no RetroArch
+  FPS-counter override (the title carries no "FPS / Frames"), and it starts the sampler without `--e2`, so no
+  `encoder.jsonl`. RetroArch ≥ 59.9, capture 60 ± 0.1 and dup+drop ≤ 0.2/min are therefore not evaluable for any
+  remote run. To fix before G4-S2: the remote row writes the same counter override as the local suite, and keeps the
+  encoder progress.
+- **The hotspot toggle ended the session; the stream came back after a LAN setup** (run 2).
+  - The recovery log has `session_ended` 23:12:47.6Z, then `session_started` 157.4 s later, with no `desync_pause` or
+    `resumed`. The next `token_issued` was `routing_evidence: lan`, and the overlay path read no-peer to the end.
+  - The pre-registered "recovery pause, then a resume" over the overlay was not shown.
+  - Whether the onn joined the home Wi-Fi by itself, or the LAN check began then, is not in the files. The hub's
+    tailnet-interface firewall is still unread (no `nft`).
+- **Run 1 was very lossy and had one 24.5-s controller-silence pause:** 2,259 post-FEC loss/min, 2,344 audio
+  underruns, rendered 57.16. The pause coincided with a direct → relayed → direct path change (22:55:52-22:56:23Z).
+  Reported, not gated. Run 2's overlay part (before the toggle) read 13.9 loss/min.
+- **Also seen:** after the onn changed networks, `tools/e3_state.py` cannot reach it over adb (`adb connect` needed),
+  so `--check` reads not ok on `adb` and on the APK while every host field holds.
+
 ## 2026-10-16 G5-S1 WAN telemetry: no per-session line when a run ends in a restart; CPU cost over its bar — OPEN (CL-B3 W)
 
 - **Seen:** CL-B3's live smoke, with `PRIVYHUB_WAN_TELEMETRY=1` as a per-run drop-in

@@ -1,0 +1,86 @@
+G4-S1 -- the first off-site session: pre-registration. Hashed before the first run; the suite's --prereg points at this
+file. Source: handoffs/G4-S1_OFFSITE_FIRST_SESSION_TASK.md section 1 = the draft's (handoffs/G4-S1_OFFSITE_FIRST_SESSION_
+TASK.draft.md) "Pre-registration" section, carried VERBATIM below between the markers, plus the task's two additions A1 and
+A2 after it. Nothing else in the draft's pre-registration changes; the planning figure (10-11 Mbit/s outbound) is reported
+against, not required. Baseline: baseline_head.txt.
+
+The command as launched (the task's section 2 step 4; the draft's command plus --wait 900, the remote row's default, and
+no --adb): tools/e1_suite.py run --remote --out docs/memory/evidence/g4_s1_2026-10-16/runs --prereg
+docs/memory/evidence/g4_s1_2026-10-16/g4_s1_preregistration.txt --runs 3 --window 600 --gap 300 --wait 900
+
+----- the draft's Pre-registration section, verbatim -----
+## Pre-registration (draft; hash before the first run)
+
+**Runs.**
+
+- `python3 tools/e1_suite.py run --remote --out <dir> --prereg <this file> --runs 3 --window 600 --gap 300`:
+  three PS1-STREAM `--remote` runs at 10 min, 5-min idle gaps, the E2
+  warm-up (90 s from PLAYING). **The user starts the PS1 game on the onn**
+  when the suite says "waiting".
+- **After them, one LAN check, overlay absent:** the Tailscale app off on
+  the onn, the onn back on the home Wi-Fi, one PS1 session of ≥ 2 min by
+  hand.
+
+**§G4's minimum list, checked per run:**
+
+| item | how it is checked | source of the reading |
+| --- | --- | --- |
+| authenticated control / session setup | a `token_issued` line in `logs/session_audit.jsonl` with `routing_evidence: overlay` at the run's start; no `legacy_setup` for it | G3-S1 audit |
+| Games discovery / launch | the games list loads on the onn; the launch succeeds | the user's observation + `games_status` |
+| video | PLAYING; rendered fps reported | telemetry |
+| process audio | heard on the onn; audio counters in the heartbeat | the user + heartbeat |
+| controller input | the game responds; no controller-silence pause | the user + recovery log |
+| Pause / Resume | the user pauses and resumes once | recovery / games status |
+| Save / Load | one save-state and one load, by hand | games plugin |
+| End / teardown | BACK ends the session; no RetroArch or encoder left | the suite's teardown |
+| reconnect / recovery | **run 2 only:** the hotspot toggled off for 10 s at ~5 min, then on; the session resumes (a recovery pause, then a resume) | recovery log, `path.jsonl` |
+| local behaviour unchanged when the overlay is absent | the LAN check: setup over the LAN (`token_issued` with `routing_evidence: lan`), PLAYING, the same game playable | audit + the user |
+
+**The only gates** (the first look; everything else is reported):
+
+1. **The session is set up through G3 over the overlay:** `token_issued`,
+   overlay; the suite's endpoint class is `overlay`.
+2. **The stream reaches PLAYING** within the suite's `--wait`.
+3. **The host side is clean:** RetroArch ≥ 59.9 fps, capture 60 ± 0.1,
+   encoder dup+drop ≤ 0.2 / min (the host-side clauses E4-S4 / E4-S5 used;
+   E4-S1's reference).
+
+**Reported, not gated:**
+
+- delivered goodput (kbit/s);
+- post-FEC loss / min (and pre-FEC, from the heartbeat);
+- resyncs;
+- rendered fps;
+- the overlay path (direct / relayed, `path.jsonl`) and its changes;
+- RTT (`latency.control_round_trip_ms`, the client's echo);
+- G5-S1's `wan` classes per window, if the flag is set;
+- the client's device readings, **only if adb reaches the onn over the
+  overlay** (else `client: not harvested`);
+- **the measured wire rate** against ROADMAP §G4's planning figure of
+  10-11 Mbps outbound:
+  - the hub's tailnet-interface tx rate in the sampler;
+  - at home, 720p/7000 measured 1.45 MB/s ≈ 11.6 Mbit/s on the wire
+    (E2-S1 §6);
+  - C5-M3's 720p/4000 passed transport at 5.0 Mbit/s on the wire.
+
+  **Not turned into a requirement** (§G4: "Measure the real envelope").
+
+**Validity.**
+
+- A run is valid if it reached PLAYING over the overlay.
+- A run whose client turns out to be on the LAN (endpoint class not
+  `overlay`) is **void**, not failed.
+- No run is replaced except for a void, at most once.
+
+----- end of the draft's section -----
+
+A1. The telemetry flag is on for the runs: e3_flag.conf carries exactly PRIVYHUB_WAN_TELEMETRY=1 (the --remote preflight
+    allows it; G5-S1's wan classes are then reported per run). Written before the runs, read back (eight environ lines),
+    removed at teardown with flags_absent true before the LAN check. PRIVYHUB_WAN_ADAPTATION stays absent (its first
+    off-site run is G4-S2, as G5-S2 recorded).
+A2. Hand observations are recorded as the user's report, not as readings: audio heard, the game responding, Pause/Resume,
+    Save/Load -- one line each in the record, "the user reported ...". Nothing perceptual is a gate (the three gates are
+    the draft's).
+
+Privacy: no address or identifier is written to any file in the repo; the endpoint as class and hash only; the hotspot
+and the tailnet as placeholders.

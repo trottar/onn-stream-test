@@ -1,0 +1,34 @@
+[e1 22:41:16Z] E1-PS1-STREAM-REMOTE run1: idle gap 300s
+[e1 22:46:16Z] E1-PS1-STREAM-REMOTE run1: waiting up to 900s -- start a PS1 game on the onn
+[e1 22:51:00Z] E1-PS1-STREAM-REMOTE run1: PLAYING; client control peer class ['local', 'overlay'], overlay hash e53b0955f641
+[e1 22:52:26Z] E1-PS1-STREAM-REMOTE run1: window 2026-10-16T22:52:26.224Z + 600s
+[e1 23:02:31Z] E1-PS1-STREAM-REMOTE run2: idle gap 300s
+[e1 23:07:31Z] E1-PS1-STREAM-REMOTE run2: waiting up to 900s -- start a PS1 game on the onn
+[e1 23:07:40Z] E1-PS1-STREAM-REMOTE run2: PLAYING; client control peer class ['local', 'overlay'], overlay hash e53b0955f641
+[e1 23:09:06Z] E1-PS1-STREAM-REMOTE run2: window 2026-10-16T23:09:06.329Z + 600s
+[e1 23:19:11Z] E1-PS1-STREAM-REMOTE run3: idle gap 300s
+[e1 23:24:11Z] E1-PS1-STREAM-REMOTE run3: waiting up to 900s -- start a PS1 game on the onn
+[e1 23:39:11Z] E1-PS1-STREAM-REMOTE run3: FAILED -- RuntimeError: no stream reached PLAYING within 900s
+[
+ {
+  "run": 1,
+  "status": "OK",
+  "endpoint": {
+   "class": "overlay",
+   "hash": "e53b0955f641"
+  }
+ },
+ {
+  "run": 2,
+  "status": "OK",
+  "endpoint": {
+   "class": "overlay",
+   "hash": "e53b0955f641"
+  }
+ },
+ {
+  "run": 3,
+  "status": "FAILED",
+  "endpoint": null
+ }
+]

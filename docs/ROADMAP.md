@@ -1553,6 +1553,12 @@ setup and auditable permissions.
 
 ## G4 — PS1-and-below off-site remote baseline
 
+**Status (2026-10-16, G4-S1): first off-site session measured: 2 of 3 valid; see the record**
+(`docs/memory/evidence/G4_S1_OFFSITE_FIRST_SESSION_2026-10-16.md`). Runs 1 and 2 reached PLAYING over the overlay (a
+phone hotspot + the Tailscale app on the onn); gates 1-2 met, gate 3 not evaluable (the remote row records no
+RetroArch FPS or encoder progress); run 2's hotspot toggle ended the session and the stream came back after a LAN
+setup; run 3 not started. Overlay wire rate at 7000: 11.42 Mbit/s.
+
 **Status (2026-10-16, G4-P1): PREPARED, nothing run off-site** — `tools/e1_suite.py run --remote`
 (a PS1-STREAM row over the overlay: both host flags read back, the user's launch, the
 endpoint class + hash only, the path every 10 s, adb optional; 13 tests OK); the G4-S1

@@ -1,0 +1,12 @@
+● privyhub-g4-s1.service - [systemd-run] /usr/bin/python3 tools/e1_suite.py run --remote --out docs/memory/evidence/g4_s1_2026-10-16/runs --prereg docs/memory/evidence/g4_s1_2026-10-16/g4_s1_preregistration.txt --runs 3 --window 600 --gap 300 --wait 900
+     Loaded: loaded (/run/user/1000/systemd/transient/privyhub-g4-s1.service; transient)
+  Transient: yes
+     Active: active (running) since Fri 2026-10-16 18:41:15 EDT; 21s ago
+ Invocation: 2a9e841a9a6b46e4b80e2e779153cfe7
+   Main PID: 3453231 (python3)
+      Tasks: 5 (limit: 18065)
+     Memory: 37.7M (peak: 39.5M)
+        CPU: 650ms
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/privyhub-g4-s1.service
+             ├─3453231 /usr/bin/python3 tools/e1_suite.py run --remote --out docs/memory/evidence/g4_s1_2026-10-16/runs --prereg docs/memory/evidence/g4_s1_2026-10-16/g4_s1_preregistration.txt --runs 3 --window 600 --gap 300 --wait 900
+             └─3453248 /usr/bin/python3 /home/privyhub/Projects/onn-stream-test/tools/e1_sampler.py run docs/memory/evidence/g4_s1_2026-10-16/runs/E1-PS1-STREAM-REMOTE/run1 --telemetry --title

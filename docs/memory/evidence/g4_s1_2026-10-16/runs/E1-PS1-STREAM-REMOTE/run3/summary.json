@@ -1,0 +1,30 @@
+{
+ "workload": "E1-PS1-STREAM-REMOTE",
+ "run": 3,
+ "started_utc": "2026-10-16T23:19:11.241Z",
+ "window_s": 600,
+ "gap_s": 300,
+ "warmup_s": 90,
+ "status": "FAILED",
+ "preflight": {
+  "flags": {
+   "PRIVYHUB_SESSION_IDENTITY=v2": true,
+   "PRIVYHUB_OVERLAY_PROVIDER=tailscale": true
+  },
+  "optional": {
+   "PRIVYHUB_WAN_TELEMETRY=1": true
+  },
+  "adb_device": false,
+  "ok": true
+ },
+ "gap": {
+  "from": "2026-10-16T23:19:11.258Z",
+  "to": "2026-10-16T23:24:11.259Z"
+ },
+ "error": "RuntimeError: no stream reached PLAYING within 900s",
+ "teardown": {
+  "client": "not harvested (no adb device or --adb not given)",
+  "game_active": false
+ },
+ "ended_utc": "2026-10-16T23:39:13.105Z"
+}

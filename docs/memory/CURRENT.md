@@ -14,12 +14,16 @@ session identity v2 run on the host, and `identity_v2` is on in the client. The 
 CL-B3 is OPEN on two G5-S1 smoke gates (NOT MET; the user decides). Everything else passed: G3-S3's hardened APK
 `59f736d2…` is installed and CONFIRMED, the signed LAN path passed, and the VOD play through the range server
 passed.** E1 FROZEN; E2
-MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `64d9489`.
+MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `af3ed73`.
 
-**State (2026-10-16 21:26Z): the seven adopted lines; nothing running.** No `e3_flag.conf`, no stream, no game; APK
-CONFIRMED; one device paired. **G8-S1 is PARTIAL: 5 of 22 cells**
-(`evidence/G8_S1_ADVERSE_NETWORK_ENVELOPE_2026-10-16.md`). The driver `privyhub-g8-s1` stopped through its STOP file
-at 21:25:52Z; its transient unit was collected.
+**State (2026-10-16 23:40Z): the seven adopted lines; nothing running.** No `e3_flag.conf`, no stream, no game; one
+device paired. The APK was last read CONFIRMED at 21:26Z. Since the onn changed networks, adb has not been reconnected,
+so `--check` reads not ok on `adb` / APK only. **G4-S1 MEASURED: 2 of 3 valid** (`evidence/G4_S1_OFFSITE_FIRST_SESSION_2026-10-16.md`):
+- runs 1 and 2 PLAYING over the overlay; gates 1-2 met, gate 3 not evaluable;
+- run 2's hotspot toggle ended the session, and the stream came back after a LAN setup;
+- run 3 not started.
+
+**G8-S1 PARTIAL: 5 of 22** (stopped 21:25:52Z).
 
 - **Nine adoptions stand:**
   - live adaptive (C);
@@ -166,32 +170,27 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
-1. **The user's commit:** everything since `64d9489`.
-   - G8-S1's launch (`evidence/G8_S1_LAUNCH_2026-10-16.md`), the shim's `none` profile (patch
-     `G8-S1_SHIM_NONE_PROFILE`), and this partial record (`evidence/G8_S1_ADVERSE_NETWORK_ENVELOPE_2026-10-16.md`,
-     `g8_s1_2026-10-16/` complete with its manifest);
-   - the git status in `logs/g8_s1_stop_git_status.txt`.
-   - Still the user's call from CL-B3: the two W gates not met (the companion CPU +0.633 point, and no
-     `wan_sessions.jsonl` line).
-2. **The G8-S1 resume: a later task.** Cells 6-22 are not run. A relaunch with `g8_s1_state.json` skips the five done
-   cells (from the code). It needs:
-   - `~/privyhub_g8_s1/STOP` removed;
-   - a new `CAP` in `g8_s1_driver.py` if it runs after 2026-10-17T06:00Z (a disclosed edit);
-   - the same unit name.
-
-   About 4.2 h. The record is §6.
-3. **G4-S1, the first off-site session** (a phone hotspot). **No longer blocked by the G8-S1 driver** (it is stopped):
-   - the draft is `handoffs/G4-S1_OFFSITE_FIRST_SESSION_TASK.draft.md`;
-   - the runbook is `handoffs/G4_RUNBOOK_HOTSPOT.md`;
-   - it uses `tools/e1_suite.py --remote` (G4-P1).
-   - The user's hand steps: the Tailscale app on the onn, "Hub host" set to the hub's tailnet name before
-     leaving, and the phone hotspot.
-   - The hub's firewall on the tailnet interface is still unverified (G3-S3 §4).
-4. **G5-S2:** WAN adaptation (`docs/WAN_ADAPTATION_RULES.md`; built behind its flag, committed in `64d9489`). It also takes:
-   - the per-session line at stream stop / shutdown;
-   - the live recovery state;
-   - the unclassified measures' thresholds;
-   - an isolated cost A/B.
+1. **The user's commit:** everything since `af3ed73`.
+   - G4-S1: the launch (`evidence/G4_S1_LAUNCH_2026-10-16.md`), the session record
+     (`evidence/G4_S1_OFFSITE_FIRST_SESSION_2026-10-16.md`), and `g4_s1_2026-10-16/` complete with its manifest;
+   - the git status in `logs/g4_s1_git_status.txt`.
+   - Still the user's call from CL-B3: the two W gates not met.
+   - Before the next stream on the LAN, adb needs reconnecting by hand (`adb connect <onn-address>:5555`), so the state
+     tool can read the APK again.
+2. **G4-S2, as the draft frames it** (`handoffs/G4-S1_OFFSITE_FIRST_SESSION_TASK.draft.md`, "What G4-S2 would gate"):
+   - the D-BASE table on the remote path at the remote ladder's level (720p/4000 is the lowest screened rung, R3.2);
+   - the reconnect gated: a hotspot toggle resumes within the recovery bound;
+   - the §G4 list gated item by item, for NES / SNES / Genesis / PS1.
+   - G4-S1 found two things to settle first (`docs/KNOWN_ISSUES.md`): the remote row cannot read the host gate (no
+     RetroArch FPS counter, no encoder progress), and the toggle's session came back over the LAN, not the overlay.
+3. **Later tasks:**
+   - **G5-S3:** make 720p/4000 actuatable, the remote floor `floor_4000`, recorded and never actuated. The data
+     volume: ~5.1 GB/h at 7000 (11.42 Mbit/s measured on the overlay) against ~2.3 GB/h at 4000 (C5-M3's
+     5.02 Mbit/s).
+   - **The G8-S1 resume:** cells 6-22. Remove `~/privyhub_g8_s1/STOP`; a new `CAP` if after 2026-10-17T06:00Z; the
+     same unit name.
+   - **G5-S2's open items:** the per-session line at stream stop / shutdown, the live recovery state, the unclassified
+     measures' thresholds, an isolated cost A/B.
 
 **Open, not blocking:**
 
