@@ -16,7 +16,7 @@ CL-B3 is OPEN on two G5-S1 smoke gates (NOT MET; the user decides). Everything e
 passed.** E1 FROZEN; E2
 MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `af3ed73`.
 
-**State (2026-10-17 05:57Z): the seven adopted lines; nothing running; `--check` ok** (adb reconnected at the resume,
+**State (2026-10-17 16:11Z, after the G5-S3 LAN smoke): the seven adopted lines; nothing running; `--check` ok** (adb connected,
 APK CONFIRMED). No `e3_flag.conf`, no stream, no game; one device paired. The G8-S1 unit ended by itself (04:30:30Z)
 and was collected. **G4-S1 MEASURED: 2 of 3 valid** (`evidence/G4_S1_OFFSITE_FIRST_SESSION_2026-10-16.md`):
 - runs 1 and 2 PLAYING over the overlay; gates 1-2 met, gate 3 not evaluable;
@@ -172,31 +172,22 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
-0. **G8-S1 MEASURED, 18 of 22 valid** (`evidence/G8_S1_ADVERSE_NETWORK_ENVELOPE_2026-10-17.md`). The driver ended
-   by itself at 04:30:30Z, so there is nothing to wait for (`cat ~/privyhub_g8_s1/status.txt` reads `EXITED (all 22 cells
-   done)`).
-   - **The cap cells (17-20) never reached PLAYING.** The stream entered the shim at ~8.25 Mbit/s, above both caps, and
-     27-45 % was tail-dropped. Three readings are listed in §5, none chosen.
-   - **The code version** (§3): cells 1-5 ran the pre-registered modules; from cell 6, session B's flag-absent edits,
-     bounded by B's in-process proofs only.
-   - **Options for the user, not decided:**
-     - **(a) a cap follow-up (G8-S2):** the cap cells with a start below the cap, or the shim's cap stage re-proved
-       against a bursty, real-rate source;
-     - **(b) a re-run of the on-arm cells on committed code**, if the user wants the arm on one code version;
-     - **(c) G5-S3's LAN smoke, then G4-S2 off-site** with G5-S3 + G5-S2 + the cap (the user judging 4000's
-       picture).
-1. **The user's commit:** everything since `af3ed73`.
-   - Session B's three tasks: G5-S3 (`evidence/G5_S3_REMOTE_LADDER_2026-10-17.md`), G5-S4
-     (`evidence/G5_S4_REMOTE_RUNG_CAP_2026-10-17.md`), G4-P2 (`evidence/G4_P2_REMOTE_ROW_GATE3_2026-10-17.md`),
-     each with its own git status log;
-   - the G8-S1 resume (`evidence/G8_S1_RESUME_2026-10-17.md`) and this final record, with `g8_s1_2026-10-16/` complete
-     and its manifest (`logs/g8_s1_final_git_status.txt`);
-   - G4-S1: the launch (`evidence/G4_S1_LAUNCH_2026-10-16.md`), the session record
-     (`evidence/G4_S1_OFFSITE_FIRST_SESSION_2026-10-16.md`), and `g4_s1_2026-10-16/` complete with its manifest;
-   - the git status in `logs/g4_s1_git_status.txt`.
+0. **G5-S3 / G5-S4 LAN smoke: PASSED on the LAN** (`evidence/G5_S3_LAN_SMOKE_2026-10-17.md`, 2026-10-17
+   15:56-16:10Z).
+   - One 10-min PS1-STREAM with `PRIVYHUB_REMOTE_LADDER=1`, `PRIVYHUB_REMOTE_RUNG_CAP=4000` and
+     `PRIVYHUB_WAN_TELEMETRY=1`. Host gates met.
+   - `path_class` `lan` on every ladder row; the cap's configuration row once; no 4000; 7000 held on a lossy link.
+   - Flags removed. Not adopted.
+   - **Next, the user's:**
+     - **G4-S2 off-site with the flags** (G5-S3 + G5-S2 + the cap): the first run where `path_class` reads `remote` and
+       4000 can be actuated. The user judges 4000's picture.
+     - **G8-S2 from session B** (`handoffs/G8-S2_START_RUNG_TASK.md`): the cap follow-up from G8-S1
+       (`evidence/G8_S1_ADVERSE_NETWORK_ENVELOPE_2026-10-17.md` §5, §8). Session B starts after session A has exited.
+   - Still open from G8-S1: (b) a re-run of the on-arm cells on committed code, if the user wants it.
+1. **The user's commit:** everything since `80f3fc4`: the smoke record, `g5_s3_smoke_2026-10-17/`, the status lines
+   in `docs/WAN_ADAPTATION_RULES.md`, ROADMAP §G5, this file (`logs/g5_s3_smoke_git_status.txt`).
    - Still the user's call from CL-B3: the two W gates not met.
-   - adb was reconnected at the G8-S1 resume (2026-10-17), and `--check` reads the APK again. After the onn next
-     changes networks it needs `adb connect <onn-address>:5555` by hand.
+   - After the onn next changes networks, adb needs `adb connect <onn-address>:5555` by hand.
 2. **G4-S2, as the draft frames it** (`handoffs/G4-S1_OFFSITE_FIRST_SESSION_TASK.draft.md`, "What G4-S2 would gate"):
    - the D-BASE table on the remote path at the remote ladder's level (720p/4000 is the lowest screened rung, R3.2);
    - the reconnect gated: a hotspot toggle resumes within the recovery bound;

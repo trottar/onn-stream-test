@@ -1,0 +1,333 @@
+{
+ "G4-S1 run 1 (overlay) / rules off": {
+  "today": {
+   "start_rungs": [],
+   "transitions": [],
+   "reports_by_level": {
+    "7000": 328
+   },
+   "reached_7000_again": false
+  },
+  "floor": {
+   "start_rungs": [
+    [
+     4000,
+     "floor",
+     "remote"
+    ],
+    [
+     4000,
+     "floor",
+     "remote"
+    ]
+   ],
+   "transitions": [
+    [
+     183.963,
+     4000,
+     5000,
+     "increase_increase"
+    ],
+    [
+     501.8,
+     4000,
+     5000,
+     "increase_increase"
+    ],
+    [
+     688.64,
+     5000,
+     5500,
+     "increase_increase"
+    ]
+   ],
+   "reports_by_level": {
+    "4000": 180,
+    "5000": 147,
+    "5500": 1
+   },
+   "reached_7000_again": false
+  },
+  "first_recorded_action": null
+ },
+ "G4-S1 run 1 (overlay) / rules on": {
+  "today": {
+   "start_rungs": [],
+   "transitions": [],
+   "reports_by_level": {
+    "7000": 328
+   },
+   "reached_7000_again": false
+  },
+  "floor": {
+   "start_rungs": [
+    [
+     4000,
+     "floor",
+     "remote"
+    ],
+    [
+     4000,
+     "floor",
+     "remote"
+    ]
+   ],
+   "transitions": [],
+   "reports_by_level": {
+    "4000": 328
+   },
+   "reached_7000_again": false
+  },
+  "first_recorded_action": null
+ },
+ "G4-S1 run 2 (overlay, then a LAN setup) / rules off": {
+  "today": {
+   "start_rungs": [],
+   "transitions": [],
+   "reports_by_level": {
+    "7000": 257
+   },
+   "reached_7000_again": false
+  },
+  "floor": {
+   "start_rungs": [
+    [
+     4000,
+     "floor",
+     "remote"
+    ],
+    [
+     5000,
+     "floor",
+     "lan"
+    ],
+    [
+     5000,
+     "floor",
+     "lan"
+    ],
+    [
+     5000,
+     "floor",
+     "lan"
+    ]
+   ],
+   "transitions": [
+    [
+     213.859,
+     4000,
+     5000,
+     "increase_increase"
+    ]
+   ],
+   "reports_by_level": {
+    "4000": 104,
+    "5000": 153
+   },
+   "reached_7000_again": false
+  },
+  "first_recorded_action": null
+ },
+ "G4-S1 run 2 (overlay, then a LAN setup) / rules on": {
+  "today": {
+   "start_rungs": [],
+   "transitions": [],
+   "reports_by_level": {
+    "7000": 257
+   },
+   "reached_7000_again": false
+  },
+  "floor": {
+   "start_rungs": [
+    [
+     4000,
+     "floor",
+     "remote"
+    ],
+    [
+     5000,
+     "floor",
+     "lan"
+    ],
+    [
+     5000,
+     "floor",
+     "lan"
+    ],
+    [
+     5000,
+     "floor",
+     "lan"
+    ]
+   ],
+   "transitions": [],
+   "reports_by_level": {
+    "4000": 152,
+    "5000": 105
+   },
+   "reached_7000_again": false
+  },
+  "first_recorded_action": null
+ },
+ "G8-S1 cell 6 loss-5 on / rules on": {
+  "today": {
+   "start_rungs": [],
+   "transitions": [
+    [
+     113.082,
+     7000,
+     5000,
+     "recovery_escalation"
+    ]
+   ],
+   "reports_by_level": {
+    "5000": 294,
+    "7000": 36
+   },
+   "reached_7000_again": false,
+   "level_at_first_recorded_action": 7000,
+   "floor_ladder_at_that_time": [
+    [
+     "transition",
+     "FALLBACK",
+     "recovery_escalation",
+     5000
+    ]
+   ]
+  },
+  "floor": {
+   "start_rungs": [
+    [
+     5000,
+     "floor",
+     "lan"
+    ]
+   ],
+   "transitions": [],
+   "reports_by_level": {
+    "5000": 330
+   },
+   "reached_7000_again": false,
+   "level_at_first_recorded_action": 5000,
+   "floor_ladder_at_that_time": [
+    [
+     "refused",
+     "FALLBACK",
+     "at_floor",
+     5000
+    ],
+    [
+     "refused",
+     "ROUTINE",
+     "at_floor",
+     5000
+    ]
+   ]
+  },
+  "first_recorded_action": [
+   "2026-10-17T00:33:38.578Z",
+   "7000\u21925000 recovery_escalation"
+  ]
+ },
+ "G8-S1 cell 7 burst-50x20 off / rules off": {
+  "today": {
+   "start_rungs": [],
+   "transitions": [
+    [
+     192.593,
+     7000,
+     6000,
+     "capacity_mild"
+    ]
+   ],
+   "reports_by_level": {
+    "6000": 244,
+    "7000": 84
+   },
+   "reached_7000_again": false,
+   "level_at_first_recorded_action": 7000,
+   "floor_ladder_at_that_time": [
+    [
+     "transition",
+     "ROUTINE",
+     "capacity_mild",
+     6000
+    ]
+   ]
+  },
+  "floor": {
+   "start_rungs": [
+    [
+     5000,
+     "floor",
+     "lan"
+    ]
+   ],
+   "transitions": [],
+   "reports_by_level": {
+    "5000": 328
+   },
+   "reached_7000_again": false,
+   "level_at_first_recorded_action": 5000,
+   "floor_ladder_at_that_time": [
+    [
+     "refused",
+     "ROUTINE",
+     "at_floor",
+     5000
+    ]
+   ]
+  },
+  "first_recorded_action": [
+   "2026-10-17T00:49:35.872Z",
+   "7000\u21926000 capacity_mild"
+  ]
+ },
+ "G8-S1 cell 12 delay-150 on / rules on": {
+  "today": {
+   "start_rungs": [],
+   "transitions": [
+    [
+     462.631,
+     7000,
+     6000,
+     "wan_rules"
+    ]
+   ],
+   "reports_by_level": {
+    "6000": 111,
+    "7000": 220
+   },
+   "reached_7000_again": false,
+   "level_at_first_recorded_action": 7000,
+   "floor_ladder_at_that_time": [
+    [
+     "transition",
+     "ROUTINE",
+     "wan_rules",
+     6000
+    ]
+   ]
+  },
+  "floor": {
+   "start_rungs": [
+    [
+     5000,
+     "floor",
+     "lan"
+    ]
+   ],
+   "transitions": [],
+   "reports_by_level": {
+    "5000": 331
+   },
+   "reached_7000_again": false,
+   "level_at_first_recorded_action": 5000,
+   "floor_ladder_at_that_time": "no decision within 4 s"
+  },
+  "first_recorded_action": [
+   "2026-10-17T02:06:05.095Z",
+   "7000\u21926000 wan_rules"
+  ]
+ }
+}

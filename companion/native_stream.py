@@ -46,6 +46,14 @@ from native_stream_profiles import NATIVE_GAME_720P60_REFERENCE
 from native_stream_profiles import PROFILE_ID_ENV, select_native_profile
 from native_stream_profiles import AUDIO_PACKET_MS, AUDIO_QUEUE_MAX_PACKETS, AUDIO_REDUNDANCY_MAX_OFFSET
 
+# G8-S2: the start rung, only with PRIVYHUB_START_RUNG set. Absent = today:
+# nothing imported; every stream starts at the profile's bitrate, same argv.
+START_RUNG = None
+if (os.environ.get("PRIVYHUB_START_RUNG") or "").strip():
+    import start_rung as _start_rung
+
+    START_RUNG = _start_rung.shared_from_environ(os.environ)
+
 
 class NativeStreamError(RuntimeError):
     pass
@@ -1714,9 +1722,15 @@ class NativeStreamManager:
                 client_port=port,
             )
 
+            start_kw: dict[str, Any] = {}
+            if START_RUNG is not None:   # G8-S2: the session's first target
+                start_kw = START_RUNG.encoder_kwargs(client_ip)
+                self._active_bitrate_kbps = int(start_kw.get("bitrate_kbps", self.BITRATE_KBPS))
+
             linux_command = self._build_linux_ffmpeg_command(
                 ffmpeg=ffmpeg,
                 capture_target=capture_target,
+                **start_kw,
             )
             self._encoder_command = list(linux_command)
 

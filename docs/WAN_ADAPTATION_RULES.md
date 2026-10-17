@@ -7,8 +7,9 @@ NOT ADOPTED; the live smoke is pending on the stream** (record:
 the G5-S2 line says what was built. **G5-S3 (2026-10-17): the session's routing
 class reaches the ladder's context (`path_class`) and 720p/4000 is actuatable on a
 remote path, behind `PRIVYHUB_REMOTE_LADDER=1` (`companion/remote_ladder.py`),
-replay-proved, NOT ADOPTED, unvalidated live** (record:
-`docs/memory/evidence/G5_S3_REMOTE_LADDER_2026-10-17.md`). The
+replay-proved, NOT ADOPTED; LAN smoke done (2026-10-17: `path_class` `lan` on every row, 7000 held, no 4000);
+off-site pending** (records:
+`docs/memory/evidence/G5_S3_REMOTE_LADDER_2026-10-17.md`, `docs/memory/evidence/G5_S3_LAN_SMOKE_2026-10-17.md`). The
 classes are those of `companion/wan_telemetry.py`. Their thresholds are §1
 of `docs/memory/evidence/G5_S1_WAN_TELEMETRY_CLASSIFICATION_2026-10-16.md`.
 Every number below is quoted from an existing record or the live ladder's
@@ -63,8 +64,8 @@ ROADMAP §G5's priority order, as rules:
   count is **not set: G5-S2**.
 
 - **G5-S2:** `capacity-limited` → `step_down` one rung to the LAN floor 5000. At 5000 on a remote path, after 60 reports (ROUTINE's down hold-down, the persistence this sets) → `floor_4000`, **recorded only**: the actuator's validated ladder is 5000-7000, so 4000 needs an actuator change and its own validation first.
-- **G5-S3:** R3.2's floor is **actuatable behind `PRIVYHUB_REMOTE_LADDER=1`, unvalidated live**: on a remote path (`path_class` from the session's routing evidence) the ladder and the actuator's validated list are `4000 / 5000 / 5500 / 6000 / 7000`; `floor_4000` and the ladder's own one-rung `capacity_mild` step from 5000 can land on 4000, through every gate; nothing below 4000; on the LAN, 4000 is refused as before.
-- **G5-S4 (the user's cap, a data saver):** `PRIVYHUB_REMOTE_RUNG_CAP=<kbps>` (a rung of the remote list; anything else ignored and logged once; it needs G5-S3's flag). On a remote path the ladder's target is clamped to it: the stream moves down to the cap through the ladder's gates (after the 60-s session guard), an increase never goes above it, every step below it is the ladder's own (so `floor_4000` under a 5000 cap still lands on 4000); on the LAN nothing. The user's choice, never automatic; unvalidated live (record: `docs/memory/evidence/G5_S4_REMOTE_RUNG_CAP_2026-10-17.md`).
+- **G5-S3:** R3.2's floor is **actuatable behind `PRIVYHUB_REMOTE_LADDER=1`, unvalidated live**: on a remote path (`path_class` from the session's routing evidence) the ladder and the actuator's validated list are `4000 / 5000 / 5500 / 6000 / 7000`; `floor_4000` and the ladder's own one-rung `capacity_mild` step from 5000 can land on 4000, through every gate; nothing below 4000; on the LAN, 4000 is refused as before. **LAN smoke done (2026-10-17, `G5_S3_LAN_SMOKE_2026-10-17.md`); off-site pending.**
+- **G5-S4 (the user's cap, a data saver):** `PRIVYHUB_REMOTE_RUNG_CAP=<kbps>` (a rung of the remote list; anything else ignored and logged once; it needs G5-S3's flag). On a remote path the ladder's target is clamped to it: the stream moves down to the cap through the ladder's gates (after the 60-s session guard), an increase never goes above it, every step below it is the ladder's own (so `floor_4000` under a 5000 cap still lands on 4000); on the LAN nothing. The user's choice, never automatic. **LAN smoke done (2026-10-17: the config row once, no clamp, no 4000); off-site pending** (records: `docs/memory/evidence/G5_S4_REMOTE_RUNG_CAP_2026-10-17.md`, `docs/memory/evidence/G5_S3_LAN_SMOKE_2026-10-17.md`).
 
 ## 4. Use FEC only when loss justifies it (`lossy`)
 

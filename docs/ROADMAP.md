@@ -1652,6 +1652,12 @@ at either cap about 60 s at 7000, then the cap. Arithmetic, not a result: 4000 i
 off-site run with the cap at 4000 (the user judges the picture). Record:
 `docs/memory/evidence/G5_S4_REMOTE_RUNG_CAP_2026-10-17.md`.
 
+**G5-S3 / G5-S4 LAN smoke (2026-10-17): PASSED on the LAN.** One 10-min PS1-STREAM with
+`PRIVYHUB_REMOTE_LADDER=1`, `PRIVYHUB_REMOTE_RUNG_CAP=4000` and `PRIVYHUB_WAN_TELEMETRY=1`: host gates met;
+`path_class` `lan` on every ladder row; the cap's configuration row once, no clamp, no 4000; 7000 held with no acted
+decision on a lossy link (646.8 loss/min); companion 24.45 % of a core (CL-B3 W 25.44). Flags removed at teardown.
+Not adopted; off-site pending (G4-S2). Record: `docs/memory/evidence/G5_S3_LAN_SMOKE_2026-10-17.md`.
+
 Reuse Phase C telemetry/adaptation instead of creating a parallel WAN streamer.
 
 Measure and classify:
@@ -1732,6 +1738,14 @@ Mbit/s (the 7000 rung with FEC and audio), the cap held its rate, and 27-45 % wa
 (delay-150 on, R2.1, 7000→6000). From cell 6 the companion ran session B's flag-absent G5-S3 / G5-S4 edits (disclosed,
 bounded by B's in-process proofs). Record: `docs/memory/evidence/G8_S1_ADVERSE_NETWORK_ENVELOPE_2026-10-17.md`
 (supersedes the 10-16 partial).
+
+**G8-S2 (2026-10-17): start rung built behind a flag; the cap cells' live re-run pending.**
+`PRIVYHUB_START_RUNG=<floor|cap|kbps>` (`companion/start_rung.py`; absent = today, byte for byte) starts a
+stream at the active list's floor (5000 LAN, 4000 remote with G5-S3), at G5-S4's cap, or at a named rung; the
+ladder's own increase rule climbs. In process through the real FEC sender and the shim: 5000 under cap-6000
+still enters at ~6.1 Mbit/s (1.8-2.4 % tail-dropped); **4000 under cap-4500 enters at ~4.65 Mbit/s (5.5-5.8 %
+dropped)** — the floor sits above that cap; no claim about PLAYING. Proposed next: G8-S3, the four cap cells
+re-run with the flag. Record: `docs/memory/evidence/G8_S2_START_RUNG_2026-10-17.md`.
 
 Exercise bounded representative conditions:
 

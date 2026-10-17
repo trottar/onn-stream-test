@@ -1,0 +1,190 @@
+{
+ "status": "OK",
+ "window": {
+  "from": "2026-10-17T16:00:29.561Z",
+  "to": "2026-10-17T16:10:29.561Z"
+ },
+ "playing": {
+  "ok": true,
+  "attempt": 1,
+  "s_to_playing": 7.1
+ },
+ "environ_at_restart": [
+  "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+  "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+  "PRIVYHUB_OVERLAY_PROVIDER=tailscale",
+  "PRIVYHUB_RECOVERY_TRIGGER=v2",
+  "PRIVYHUB_REMOTE_LADDER=1",
+  "PRIVYHUB_REMOTE_RUNG_CAP=4000",
+  "PRIVYHUB_SESSION_IDENTITY=v2",
+  "PRIVYHUB_SNES_CAPTURE_FIX=output_rate",
+  "PRIVYHUB_SNES_CORE=snes9x",
+  "PRIVYHUB_WAN_TELEMETRY=1"
+ ],
+ "environ_under_load": null,
+ "gates": {
+  "retroarch_fps": 59.999,
+  "capture_fps": 60.035,
+  "dupdrop_per_min": 0.1,
+  "flags_absent_after": true
+ },
+ "host_cpu": 12.559,
+ "companion_cpu": 24.445,
+ "retroarch_cpu": 34.356,
+ "encoder_cpu": 35.845,
+ "loss_per_min": 646.79,
+ "rendered_fps": 58.751,
+ "resyncs_window": 9,
+ "resyncs_session": 9,
+ "stale_per_min": 7.271,
+ "spikes20_per_min": 130.2,
+ "client_pauses": 1,
+ "recovery_key": {
+  "controller_pauses": [],
+  "client_pauses": [
+   {
+    "at_utc": "2026-10-17T16:06:18.219Z",
+    "trigger": "client_output_silence",
+    "next": "resumed",
+    "via": null,
+    "after_s": 3.45
+   }
+  ],
+  "other_pauses": [],
+  "gave_up_saved": []
+ },
+ "decisions_rows": 346,
+ "decisions_path_class": {
+  "lan": 346
+ },
+ "decisions_events": {
+  "sample": 276,
+  "state": 70
+ },
+ "acted": [],
+ "rows_4000_window": 0,
+ "rows_remote_cap_window": 0,
+ "rung_polls": {
+  "7000": 69
+ },
+ "live_rows": 417,
+ "live_events": {
+  "session_ended_reset": 5,
+  "controller_start": 2,
+  "remote_cap_config": 1,
+  "sample": 325,
+  "state": 84
+ },
+ "flagged_rows": 415,
+ "flagged_path_class": {
+  "lan": 415
+ },
+ "flagged_rows_4000": 0,
+ "flagged_rows_remote_cap_decision": 0,
+ "remote_cap_config_rows": [
+  {
+   "schema": "privyhub_adaptive_bitrate_v1",
+   "mode": "live",
+   "at_utc": "2026-10-17T15:56:32.784Z",
+   "acted": false,
+   "event": "remote_cap_config",
+   "source": "remote_cap",
+   "active": true,
+   "value": 4000,
+   "cap_kbps": 4000,
+   "valid_kbps": [
+    4000,
+    5000,
+    5500,
+    6000,
+    7000
+   ],
+   "path_class": "lan"
+  }
+ ],
+ "unflagged_rows": [
+  {
+   "at_utc": "2026-10-17T15:56:32.239Z",
+   "event": "session_ended_reset",
+   "path_class": null
+  },
+  {
+   "at_utc": "2026-10-17T16:10:43.571Z",
+   "event": "controller_start",
+   "path_class": null
+  }
+ ],
+ "reference": {
+  "CL-B3 R1": {
+   "host_cpu": 11.569,
+   "companion_cpu": 24.802,
+   "rung": [
+    7000,
+    7000
+   ],
+   "ladder_acted": [],
+   "rendered_fps": 59.674,
+   "loss_per_min": 80.05,
+   "resyncs": 0,
+   "dropin": [
+    "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+    "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+    "PRIVYHUB_OVERLAY_PROVIDER=tailscale",
+    "PRIVYHUB_RECOVERY_TRIGGER=v2",
+    "PRIVYHUB_SESSION_IDENTITY=v2",
+    "PRIVYHUB_SNES_CAPTURE_FIX=output_rate",
+    "PRIVYHUB_SNES_CORE=snes9x"
+   ]
+  },
+  "CL-B3 W": {
+   "host_cpu": 11.593,
+   "companion_cpu": 25.435,
+   "rung": [
+    7000,
+    7000
+   ],
+   "ladder_acted": [],
+   "rendered_fps": 59.795,
+   "loss_per_min": 60.32,
+   "resyncs": 3,
+   "dropin": [
+    "PRIVYHUB_WAN_TELEMETRY=1"
+   ]
+  },
+  "G8-S1 01_none_off": {
+   "host_cpu": 12.847,
+   "companion_cpu": 29.545,
+   "rung": [
+    7000,
+    7000
+   ],
+   "ladder_acted": 0,
+   "rendered_fps": 59.959,
+   "loss_per_min": 6.03,
+   "resyncs": 0
+  },
+  "G8-S1 02_none_on": {
+   "host_cpu": 12.611,
+   "companion_cpu": 30.173,
+   "rung": [
+    7000,
+    7000
+   ],
+   "ladder_acted": 0,
+   "rendered_fps": 59.97,
+   "loss_per_min": 3.82,
+   "resyncs": 0
+  }
+ },
+ "gate_results": {
+  "retroarch": true,
+  "capture": true,
+  "dupdrop": true,
+  "flags_absent": true
+ },
+ "expected": {
+  "1_path_class_lan": true,
+  "2_no_4000_no_remote_cap_row_config_once": true,
+  "3_rung_path_adopted": true
+ }
+}

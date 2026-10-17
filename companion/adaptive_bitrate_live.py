@@ -136,6 +136,14 @@ if (os.environ.get("PRIVYHUB_REMOTE_RUNG_CAP") or "").strip():
 
     REMOTE_CAP = _remote_cap.from_environ(os.environ, REMOTE_LADDER)
 
+# G8-S2: the start rung's record (the rung, its source, the active list) on the
+# session's first sample row, only with PRIVYHUB_START_RUNG set. Absent = today.
+START_RUNG = None
+if (os.environ.get("PRIVYHUB_START_RUNG") or "").strip():
+    import start_rung as _start_rung
+
+    START_RUNG = _start_rung.shared_from_environ(os.environ)
+
 try:  # the reference profile's id; a pure module, safe for the unit tests
     from native_stream_profiles import NATIVE_GAME_720P60_REFERENCE as _REFERENCE_PROFILE
     REFERENCE_PROFILE_ID = _REFERENCE_PROFILE.id
@@ -1116,6 +1124,8 @@ class LiveController:
         base.update(row)
         if REMOTE_LADDER is not None:   # G5-S3: path_class on every row; a 4000 actuation labelled
             base = REMOTE_LADDER.annotate(base)
+        if START_RUNG is not None:   # G8-S2: the start rung on the session's first sample row
+            base = START_RUNG.annotate(base)
         try:
             import json
             self.log_path.parent.mkdir(parents=True, exist_ok=True)

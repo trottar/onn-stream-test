@@ -1,0 +1,28 @@
+G5-S3 / G5-S4 LAN SMOKE -- pre-registration (session A, 2026-10-17). Task: docs/memory/handoffs/G5-S3_LAN_SMOKE_TASK.md.
+Written and hashed before the run; the hashes of the five companion files under test are in code_sha256.txt beside it.
+
+RUN: tools/e1_suite.py run --prereg <this file> --out <dir>/runs --e2 --window 600 --gap 120
+  --plan E1-PS1-STREAM:1:120:PRIVYHUB_REMOTE_LADDER=1+PRIVYHUB_REMOTE_RUNG_CAP=4000+PRIVYHUB_WAN_TELEMETRY=1
+  One E1-PS1-STREAM, E2's warm-up, an idle gap of 120 s, on the LAN. The suite writes e3_flag.conf with exactly the
+  three lines, restarts the companion, reads the environ back (ten lines: the seven adopted + the three), reads it
+  again under load, and at teardown removes the drop-in, restarts, and records flags_absent.
+STATE: the seven-line adopted state (G-A1), no e3_flag.conf, no game, one device paired, APK 59f736d2... CONFIRMED,
+  the privyhub-g8-s1 unit collected, HEAD committed (baseline_head.txt).
+VALIDITY: E3-A3B's reading -- the stream reaches PLAYING; a run that does not is replaced at most twice (the suite's
+  own retry).
+GATES (host side only): RetroArch >= 59.9; capture 60 +/- 0.1 (E4-S5D's segment-aware reading); dup+drop <= 0.2/min;
+  flags_absent after.
+EXPECTED AND CHECKED -- reported as MET / NOT MET; not gates; a miss is written up as a finding about session B's
+code (G5-S3 / G5-S4), nothing else:
+  1. every row of the run's decisions.jsonl carries path_class "lan" (G5-S3: the games plugin's routing class
+     reached the ladder). The live ladder log from the restart onward is read the same way.
+  2. no actuation to 4000 (no transition / transition_done with to_kbps 4000, no rung 4000 in the status polls), no
+     decision row with reason or trigger "remote_cap", and the cap's configuration line (remote_cap_config) logged
+     exactly once per companion start in the live ladder log (G5-S4: on a LAN path the cap does nothing).
+  3. the ladder's rung path as the adopted ladder's: 7000 held unless the link forces a step; compared with CL-B3 R1
+     (7000-7000, no acted decision) and the G8-S1 none cells (7000-7000). A step, if any, is named with its reason.
+  4. the cost with the three flags: host CPU and the companion's % of a core against CL-B3 W (11.593 / 25.435) and
+     R1 (11.569 / 24.802); reported, with the separate-runs caveat.
+REPORTED: heartbeat loss/min, rendered fps, stale drops/min, resyncs (window and session), client pauses, the wan
+  class and window counts (WAN_TELEMETRY=1), the link's own state tonight (no impairment; this is the link itself).
+No address, token or identifier is written to any file.

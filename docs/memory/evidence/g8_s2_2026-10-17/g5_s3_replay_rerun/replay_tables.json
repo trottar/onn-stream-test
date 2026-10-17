@@ -1,0 +1,346 @@
+{
+ "G4-S1 run 1 (overlay) / as set up / rules off": {
+  "segments": 2,
+  "reports": 328,
+  "transitions": [],
+  "reached_4000": null,
+  "refused_to_4000": [],
+  "min_level": 7000,
+  "wan_suggestions": 0,
+  "wan_by_rule": {},
+  "floor_4000_suggestions": 0,
+  "path_classes_in_rows": [
+   "lan",
+   "remote"
+  ],
+  "rows_without_path_class": 0,
+  "actuations": []
+ },
+ "G4-S1 run 1 (overlay) / as set up / rules on": {
+  "segments": 2,
+  "reports": 328,
+  "transitions": [],
+  "reached_4000": null,
+  "refused_to_4000": [],
+  "min_level": 7000,
+  "wan_suggestions": 0,
+  "wan_by_rule": {},
+  "floor_4000_suggestions": 0,
+  "path_classes_in_rows": [
+   "lan",
+   "remote"
+  ],
+  "rows_without_path_class": 0,
+  "actuations": []
+ },
+ "G4-S1 run 2 (overlay, then a LAN setup) / as set up / rules off": {
+  "segments": 4,
+  "reports": 257,
+  "transitions": [],
+  "reached_4000": null,
+  "refused_to_4000": [],
+  "min_level": 7000,
+  "wan_suggestions": 0,
+  "wan_by_rule": {},
+  "floor_4000_suggestions": 0,
+  "path_classes_in_rows": [
+   "lan",
+   "remote"
+  ],
+  "rows_without_path_class": 0,
+  "actuations": []
+ },
+ "G4-S1 run 2 (overlay, then a LAN setup) / as set up / rules on": {
+  "segments": 4,
+  "reports": 257,
+  "transitions": [],
+  "reached_4000": null,
+  "refused_to_4000": [],
+  "min_level": 7000,
+  "wan_suggestions": 0,
+  "wan_by_rule": {},
+  "floor_4000_suggestions": 0,
+  "path_classes_in_rows": [
+   "lan",
+   "remote"
+  ],
+  "rows_without_path_class": 0,
+  "actuations": []
+ },
+ "e4_s4b run3 (lossy) / lan (as recorded) / rules off": {
+  "segments": 1,
+  "reports": 639,
+  "transitions": [],
+  "reached_4000": null,
+  "refused_to_4000": [],
+  "min_level": 7000,
+  "wan_suggestions": 0,
+  "wan_by_rule": {},
+  "floor_4000_suggestions": 0,
+  "path_classes_in_rows": [
+   "lan"
+  ],
+  "rows_without_path_class": 0,
+  "actuations": [
+   [
+    7000,
+    "recovery_restart ok"
+   ],
+   [
+    7000,
+    "recovery_restart ok"
+   ]
+  ]
+ },
+ "e4_s4b run3 (lossy) / lan (as recorded) / rules on": {
+  "segments": 1,
+  "reports": 639,
+  "transitions": [
+   {
+    "segment": 0,
+    "elapsed_s": 889.9,
+    "utc": "2026-10-10T13:03:02.780Z",
+    "from": 7000,
+    "to": 6000,
+    "reason": "wan_rules",
+    "trigger": "wan_rules",
+    "wan_rule": "R2.1",
+    "path_class": "lan"
+   }
+  ],
+  "reached_4000": null,
+  "refused_to_4000": [],
+  "min_level": 6000,
+  "wan_suggestions": 213,
+  "wan_by_rule": {
+   "R3.1": 10,
+   "R2.1": 6,
+   "R1.2": 82,
+   "R5.1": 115
+  },
+  "floor_4000_suggestions": 0,
+  "path_classes_in_rows": [
+   "lan"
+  ],
+  "rows_without_path_class": 0,
+  "actuations": [
+   [
+    7000,
+    "recovery_restart ok"
+   ],
+   [
+    7000,
+    "recovery_restart ok"
+   ],
+   [
+    6000,
+    "ok"
+   ]
+  ]
+ },
+ "e4_s4b run3 (lossy) / read as remote (hypothetical) / rules off": {
+  "segments": 1,
+  "reports": 639,
+  "transitions": [],
+  "reached_4000": null,
+  "refused_to_4000": [],
+  "min_level": 7000,
+  "wan_suggestions": 0,
+  "wan_by_rule": {},
+  "floor_4000_suggestions": 0,
+  "path_classes_in_rows": [
+   "lan",
+   "remote"
+  ],
+  "rows_without_path_class": 0,
+  "actuations": [
+   [
+    7000,
+    "recovery_restart ok"
+   ],
+   [
+    7000,
+    "recovery_restart ok"
+   ]
+  ]
+ },
+ "e4_s4b run3 (lossy) / read as remote (hypothetical) / rules on": {
+  "segments": 1,
+  "reports": 639,
+  "transitions": [
+   {
+    "segment": 0,
+    "elapsed_s": 889.9,
+    "utc": "2026-10-10T13:03:02.780Z",
+    "from": 7000,
+    "to": 6000,
+    "reason": "wan_rules",
+    "trigger": "wan_rules",
+    "wan_rule": "R2.1",
+    "path_class": "remote"
+   }
+  ],
+  "reached_4000": null,
+  "refused_to_4000": [],
+  "min_level": 6000,
+  "wan_suggestions": 213,
+  "wan_by_rule": {
+   "R3.1": 10,
+   "R2.1": 6,
+   "R1.2": 82,
+   "R5.1": 115
+  },
+  "floor_4000_suggestions": 0,
+  "path_classes_in_rows": [
+   "lan",
+   "remote"
+  ],
+  "rows_without_path_class": 0,
+  "actuations": [
+   [
+    7000,
+    "recovery_restart ok"
+   ],
+   [
+    7000,
+    "recovery_restart ok"
+   ],
+   [
+    6000,
+    "ok"
+   ]
+  ]
+ },
+ "e4_s4b run2 (cleanest) / lan (as recorded) / rules off": {
+  "segments": 1,
+  "reports": 643,
+  "transitions": [],
+  "reached_4000": null,
+  "refused_to_4000": [],
+  "min_level": 7000,
+  "wan_suggestions": 0,
+  "wan_by_rule": {},
+  "floor_4000_suggestions": 0,
+  "path_classes_in_rows": [
+   "lan"
+  ],
+  "rows_without_path_class": 0,
+  "actuations": []
+ },
+ "e4_s4b run2 (cleanest) / lan (as recorded) / rules on": {
+  "segments": 1,
+  "reports": 643,
+  "transitions": [],
+  "reached_4000": null,
+  "refused_to_4000": [],
+  "min_level": 7000,
+  "wan_suggestions": 0,
+  "wan_by_rule": {},
+  "floor_4000_suggestions": 0,
+  "path_classes_in_rows": [
+   "lan"
+  ],
+  "rows_without_path_class": 0,
+  "actuations": []
+ },
+ "e4_s4b run2 (cleanest) / read as remote (hypothetical) / rules off": {
+  "segments": 1,
+  "reports": 643,
+  "transitions": [],
+  "reached_4000": null,
+  "refused_to_4000": [],
+  "min_level": 7000,
+  "wan_suggestions": 0,
+  "wan_by_rule": {},
+  "floor_4000_suggestions": 0,
+  "path_classes_in_rows": [
+   "lan",
+   "remote"
+  ],
+  "rows_without_path_class": 0,
+  "actuations": []
+ },
+ "e4_s4b run2 (cleanest) / read as remote (hypothetical) / rules on": {
+  "segments": 1,
+  "reports": 643,
+  "transitions": [],
+  "reached_4000": null,
+  "refused_to_4000": [],
+  "min_level": 7000,
+  "wan_suggestions": 0,
+  "wan_by_rule": {},
+  "floor_4000_suggestions": 0,
+  "path_classes_in_rows": [
+   "lan",
+   "remote"
+  ],
+  "rows_without_path_class": 0,
+  "actuations": []
+ },
+ "cl_b3 run1 (today's best link) / lan (as recorded) / rules off": {
+  "segments": 1,
+  "reports": 343,
+  "transitions": [],
+  "reached_4000": null,
+  "refused_to_4000": [],
+  "min_level": 7000,
+  "wan_suggestions": 0,
+  "wan_by_rule": {},
+  "floor_4000_suggestions": 0,
+  "path_classes_in_rows": [
+   "lan"
+  ],
+  "rows_without_path_class": 0,
+  "actuations": []
+ },
+ "cl_b3 run1 (today's best link) / lan (as recorded) / rules on": {
+  "segments": 1,
+  "reports": 343,
+  "transitions": [],
+  "reached_4000": null,
+  "refused_to_4000": [],
+  "min_level": 7000,
+  "wan_suggestions": 0,
+  "wan_by_rule": {},
+  "floor_4000_suggestions": 0,
+  "path_classes_in_rows": [
+   "lan"
+  ],
+  "rows_without_path_class": 0,
+  "actuations": []
+ },
+ "cl_b3 run1 (today's best link) / read as remote (hypothetical) / rules off": {
+  "segments": 1,
+  "reports": 343,
+  "transitions": [],
+  "reached_4000": null,
+  "refused_to_4000": [],
+  "min_level": 7000,
+  "wan_suggestions": 0,
+  "wan_by_rule": {},
+  "floor_4000_suggestions": 0,
+  "path_classes_in_rows": [
+   "lan",
+   "remote"
+  ],
+  "rows_without_path_class": 0,
+  "actuations": []
+ },
+ "cl_b3 run1 (today's best link) / read as remote (hypothetical) / rules on": {
+  "segments": 1,
+  "reports": 343,
+  "transitions": [],
+  "reached_4000": null,
+  "refused_to_4000": [],
+  "min_level": 7000,
+  "wan_suggestions": 0,
+  "wan_by_rule": {},
+  "floor_4000_suggestions": 0,
+  "path_classes_in_rows": [
+   "lan",
+   "remote"
+  ],
+  "rows_without_path_class": 0,
+  "actuations": []
+ }
+}
