@@ -1,0 +1,17 @@
+● privyhub-g8-s3.service - [systemd-run] /usr/bin/python3 -B /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/g8_s3_2026-10-17/g8_s3_driver.py
+     Loaded: loaded (/run/user/1000/systemd/transient/privyhub-g8-s3.service; transient)
+  Transient: yes
+     Active: active (running) since Sat 2026-10-17 13:38:38 EDT; 14min ago
+ Invocation: <id>
+   Main PID: 3572251 (python3)
+      Tasks: 10 (limit: 18065)
+     Memory: 58.7M (peak: 76.9M)
+        CPU: 27.338s
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/privyhub-g8-s3.service
+             ├─3572251 /usr/bin/python3 -B /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/g8_s3_2026-10-17/g8_s3_driver.py
+             ├─3577127 /usr/bin/python3 /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/g8_s3_2026-10-17/g8_s3_suite_call.py /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/g8_s3_2026-10-17/runs/02_cap-6000_floor_on 600 120 PRIVYHUB_WAN_TELEMETRY=1 PRIVYHUB_IMPAIRMENT=cap-6000@post-fec,seed=1 PRIVYHUB_START_RUNG=floor PRIVYHUB_WAN_ADAPTATION=1
+             └─3577231 /usr/bin/python3 /home/privyhub/Projects/onn-stream-test/tools/e1_sampler.py run /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/g8_s3_2026-10-17/runs/02_cap-6000_floor_on/E1-PS1-STREAM_flag/run1 --telemetry --title --e2
+
+Oct 17 13:38:38 PrivyHub systemd[1310]: Started privyhub-g8-s3.service - [systemd-run] /usr/bin/python3 -B /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/g8_s3_2026-10-17/g8_s3_driver.py.
+Oct 17 13:38:38 PrivyHub python3[3572251]: [g8s3 10-17 17:38:38Z] start; cells done 0 | adopted state adopted7 ok | cap 2026-10-18T00:00:00Z
+Oct 17 13:53:22 PrivyHub python3[3572251]: [g8s3 10-17 17:53:22Z] cell 1 cap-6000 rules-off attempt 1: OK playing valid start 5000 (floor) wire [5000] enc ['5000k'] path 5000 loss 2378.7 rendered 53.079 class capacity-limited rules {} shim in 6052.5 drop 0.0655 gates True flags_at_stream True flags_under_load True flags_absent True/True

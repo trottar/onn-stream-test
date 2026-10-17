@@ -16,9 +16,17 @@ CL-B3 is OPEN on two G5-S1 smoke gates (NOT MET; the user decides). Everything e
 passed.** E1 FROZEN; E2
 MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `af3ed73`.
 
-**State (2026-10-17 16:11Z, after the G5-S3 LAN smoke): the seven adopted lines; nothing running; `--check` ok** (adb connected,
-APK CONFIRMED). No `e3_flag.conf`, no stream, no game; one device paired. The G8-S1 unit ended by itself (04:30:30Z)
-and was collected. **G4-S1 MEASURED: 2 of 3 valid** (`evidence/G4_S1_OFFSITE_FIRST_SESSION_2026-10-16.md`):
+**State (2026-10-17 18:51Z, after the G8-S3 record): the seven adopted lines; nothing running; `--check` ok** (adb connected,
+APK CONFIRMED). No `e3_flag.conf`, no stream, no game; one device paired. The G8-S3 unit ended by itself (18:21:36Z,
+all 3 cells done) and was collected. **G8-S3 MEASURED: 3 of 3 valid**
+(`evidence/G8_S3_CAP_CELLS_START_RUNG_2026-10-17.md`):
+- cap-6000 at the 5000 start reached PLAYING, rules off and on, with host gates met;
+- the ladder held 5000 at the floor;
+- the tail drop was 6.75 % / 9.18 %, against the bench's ~2 %;
+- cell 2 went silent 417 s in, and recovery gave up;
+- cap-4500 was `no_play` (27.76 % dropped), as predicted.
+
+**G4-S1 MEASURED: 2 of 3 valid** (`evidence/G4_S1_OFFSITE_FIRST_SESSION_2026-10-16.md`):
 - runs 1 and 2 PLAYING over the overlay; gates 1-2 met, gate 3 not evaluable;
 - run 2's hotspot toggle ended the session, and the stream came back after a LAN setup;
 - run 3 not started.
@@ -171,6 +179,28 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
+
+**G8-S3 MEASURED** (`evidence/G8_S3_CAP_CELLS_START_RUNG_2026-10-17.md`, 2026-10-17 17:38-18:21Z; driver collected).
+- **Cells 1 and 2** (cap-6000, `PRIVYHUB_START_RUNG=floor`, rules off / on): PLAYING in 9.1 s / 7.1 s, host gates met.
+  - The ladder held 5000: down refused `at_floor`, and no clean reports to go up.
+  - Cell 1 stayed up for the window: 2,379 loss/min, 53.1 fps, 6.75 % tail-dropped.
+  - Cell 2 went silent on the client 417 s in, and recovery gave up after 5 restarts.
+- **Cell 3** (cap-4500): `no_play`, 27.76 % dropped, as predicted.
+- 5000's wire rate: 6,039 kbit/s mean, as the bench; the drop is ~3× the bench's (the spread, §3). Playability: the
+  user's.
+
+1. **The user's commit:** everything since `0093b7c` (G8-S3 launch + record + directory, ROADMAP §G8, this file, the
+   two task files; `logs/g8_s3_record_git_status.txt`).
+2. **Options, not decided here (the user's call):**
+   - **(a) G4-S2 off-site with G5-S3 + G8-S2** (`PRIVYHUB_REMOTE_LADDER=1` + `PRIVYHUB_START_RUNG=floor`). On the
+     remote path the floor is 4000. This is the first real test of a 4000 start; G8-S2's bench put 4000 under
+     cap-4500 at 5.5-5.8 % dropped.
+   - **(b) A wire-overhead measurement task for session B:** the per-rung wire rate and spread, measured, not the
+     1.18 ratio (G8-S3: parity 0.178 per data packet, not 0.125; frames up to 89 KB).
+   - **(c) Whether a LAN rung below 5000 should exist.** C5-M3 screened 720p/4000 as passing transport. The LAN list
+     stops at 5000 by C3-L4's validation.
+
+Nothing adopted; nothing committed.
 
 0. **G5-S3 / G5-S4 LAN smoke: PASSED on the LAN** (`evidence/G5_S3_LAN_SMOKE_2026-10-17.md`, 2026-10-17
    15:56-16:10Z).

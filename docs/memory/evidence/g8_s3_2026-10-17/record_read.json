@@ -1,0 +1,1306 @@
+{
+ "cells": {
+  "01_cap-6000_floor_off": {
+   "n": 1,
+   "profile": "cap-6000",
+   "arm": "off",
+   "outcome": "playing",
+   "validity": "valid",
+   "profile_applied": true,
+   "suite_attempts": 1,
+   "playing_attempt": 2,
+   "s_to_playing": 9.1,
+   "start_rung_first_row": {
+    "at_utc": "2026-10-17T17:41:08.459Z",
+    "kbps": 5000,
+    "source": "floor",
+    "requested": "floor",
+    "active_list": [
+     5000,
+     5500,
+     6000,
+     7000
+    ],
+    "path_class": "lan"
+   },
+   "wire_bitrate_kbps_seen": [
+    5000
+   ],
+   "encoder_bv_seen": [
+    "5000k"
+   ],
+   "rung_path": "5000",
+   "transitions": [],
+   "rules_by_id": {},
+   "flags_at_stream": true,
+   "flags_under_load": true,
+   "environ_at_stream_count": 10,
+   "loss_per_min": 2378.7,
+   "rendered_fps": 53.079,
+   "resyncs": 3,
+   "stale_per_min": 2.985,
+   "spikes20_per_min": 226.51,
+   "client_pauses": 0,
+   "pauses": {
+    "controller_pauses": [],
+    "client_pauses": [],
+    "other_pauses": [],
+    "gave_up_saved": []
+   },
+   "fec_recovered": [
+    806
+   ],
+   "fec_unrecoverable": [
+    517
+   ],
+   "wan_class": "capacity-limited",
+   "wan_windows": {
+    "path-changed": 0,
+    "latency-limited": 0,
+    "starved": 2,
+    "capacity-limited": 18,
+    "lossy": 48,
+    "clean": 0
+   },
+   "retroarch_fps": 59.999,
+   "capture_fps": 59.987,
+   "dupdrop_per_min": 0.1,
+   "host_gates": {
+    "retroarch_ge_59_9": true,
+    "capture_60_pm_0_1": true,
+    "dupdrop_le_0_2": true,
+    "flags_absent": true
+   },
+   "host_gates_met": true,
+   "host_cpu": 11.879,
+   "companion_cpu": 28.332,
+   "shim": {
+    "lines": 706,
+    "duration_s": 706.0,
+    "packets_in": 505346,
+    "packets_out": 472268,
+    "dropped_loss": 0,
+    "dropped_burst": 0,
+    "dropped_queue": 33078,
+    "delayed": 0,
+    "reordered": 0,
+    "queue_max": 76,
+    "shim_cpu_pct_core": 5.065,
+    "send_errors": 0,
+    "seconds_input_over_cap": 156,
+    "out_kbps_max": 6012.9,
+    "stream_starts": 1,
+    "seconds_each": [
+     706.0
+    ],
+    "steady_in_kbps_median": 6052.5,
+    "steady_in_kbps_range": [
+     0.0,
+     9422.1
+    ],
+    "steady_drop_frac": 0.0655,
+    "loss_frac": 0.0
+   },
+   "flags_absent_after": true,
+   "final_flags_absent": true,
+   "failed_attempts": [],
+   "journal": {
+    "client_sessions": 1,
+    "fec_recovered": [
+     806
+    ],
+    "fec_unrecoverable": [
+     517
+    ],
+    "rendered_frames": [
+     37147
+    ],
+    "lost_packets": [
+     26587
+    ],
+    "rx_packets": [
+     402181
+    ],
+    "last_output_age_ms": [
+     13
+    ]
+   },
+   "window": {
+    "from": "2026-10-17T17:42:48.478Z",
+    "to": "2026-10-17T17:52:48.478Z"
+   },
+   "report_fields": {
+    "lost_packets": 26897,
+    "rendered_frames": 37236,
+    "stale_output_drops": 35,
+    "max_output_gap_ms": 492,
+    "slow_event_retained": 1072,
+    "slow_event_capacity": 1280,
+    "duration_ms": 703545,
+    "video.lost_packets": 26897,
+    "video.sequence_resyncs": 5,
+    "video.recent_fps": 46.433384799710105,
+    "decoder.spike_20_ms": 2656,
+    "decoder.spike_50_ms": 52,
+    "decoder.spike_80_ms": 23,
+    "decoder.stale_output_drops": 35,
+    "decoder.max_output_gap_ms": 492,
+    "audio.lost_packets": 63,
+    "audio.underruns": 21
+   },
+   "ladder_events": {
+    "session_ended_reset::": 5,
+    "controller_start::": 2,
+    "sample:resync_ignored:": 3,
+    "level_sync::": 2,
+    "sample:counting_clean_reports:": 263,
+    "state:counting_clean_reports:": 20,
+    "sample:routine_deferred_escalating:": 41,
+    "state:routine_deferred_escalating:": 11,
+    "sample:at_floor:": 41,
+    "refused:at_floor:FALLBACK": 1,
+    "refused:at_floor:ROUTINE": 15
+   },
+   "ladder_sample_states": {
+    "REFERENCE": 1,
+    "RECOVERY_PROBATION": 265,
+    "PRESSURE": 82
+   },
+   "suggestions": {},
+   "recovery_rows": [],
+   "gaps": {
+    "rows": 133,
+    "max_ms": 767.8
+   },
+   "shim_starts": [
+    {
+     "seconds": 706.0,
+     "packets_in": 505346,
+     "packets_out": 472268,
+     "dropped_queue": 33078,
+     "drop_frac": 0.0655,
+     "steady_in_kbps": [
+      0.0,
+      6052.5,
+      9422.1
+     ],
+     "steady_out_kbps_max": 6012.9,
+     "steady_drop_frac": 0.0655,
+     "queue_max": 76
+    }
+   ],
+   "wire": {
+    "window_s": 600,
+    "align_lag_score": 0.031,
+    "payload_kbps": {
+     "mean": 5012.1,
+     "median": 5011.4,
+     "p95": 5943.8,
+     "max": 7886.2,
+     "share_seconds_over_5000": 0.523
+    },
+    "rtp_hdr_kbps_mean": 58.5,
+    "parity_kbps_mean": 968.4,
+    "parity_packets_per_s": 108.6,
+    "data_packets_per_s": 609.1,
+    "parity_per_data_packet": 0.1783,
+    "parity_bytes_per_packet": 1114.9,
+    "parity_per_frame": 1.81,
+    "frames_per_s": 60.0,
+    "mean_frame_packets": 10.15,
+    "max_frame_bytes": {
+     "median": 40325.0,
+     "max": 89248
+    },
+    "mean_frame_bytes_mean": 10441.1,
+    "shim_in_kbps": {
+     "mean": 6039.0,
+     "median": 6034.2,
+     "p95": 6988.6,
+     "max": 9422.1,
+     "share_seconds_over_cap": 0.547
+    },
+    "sum_of_terms_kbps": 6039.0,
+    "shim_out_kbps_mean": 5593.5,
+    "drop_frac_window": 0.0675,
+    "drop_frac_in_seconds_over_cap": 0.0819,
+    "drop_frac_in_seconds_at_or_under_cap": 0.048,
+    "share_of_drops_in_seconds_over_cap": 0.698,
+    "per_second_drop_frac": {
+     "median": 0.0348,
+     "p95": 0.2335
+    }
+   },
+   "wire_before_first_client_pause": null,
+   "summary_key_heartbeat": {
+    "heartbeats": 299,
+    "segments": 1,
+    "span_s": 598.9,
+    "rendered_fps": 53.079,
+    "video_loss_per_min": 2378.7,
+    "audio_underruns": 9,
+    "stream_resyncs": 3,
+    "max_last_output_age_ms": 247
+   }
+  },
+  "02_cap-6000_floor_on": {
+   "n": 2,
+   "profile": "cap-6000",
+   "arm": "on",
+   "outcome": "playing",
+   "validity": "valid",
+   "profile_applied": true,
+   "suite_attempts": 1,
+   "playing_attempt": 1,
+   "s_to_playing": 7.1,
+   "start_rung_first_row": {
+    "at_utc": "2026-10-17T17:55:41.554Z",
+    "kbps": 5000,
+    "source": "floor",
+    "requested": "floor",
+    "active_list": [
+     5000,
+     5500,
+     6000,
+     7000
+    ],
+    "path_class": "lan"
+   },
+   "wire_bitrate_kbps_seen": [
+    5000
+   ],
+   "encoder_bv_seen": [
+    "5000k"
+   ],
+   "rung_path": "5000",
+   "transitions": [],
+   "rules_by_id": {
+    "R5.1": 255,
+    "R1.1": 17,
+    "R1.2": 73
+   },
+   "flags_at_stream": true,
+   "flags_under_load": true,
+   "environ_at_stream_count": 11,
+   "loss_per_min": 3244.62,
+   "rendered_fps": 36.648,
+   "resyncs": 13,
+   "stale_per_min": 2.738,
+   "spikes20_per_min": 171.63,
+   "client_pauses": 1,
+   "pauses": {
+    "controller_pauses": [],
+    "client_pauses": [
+     {
+      "at_utc": "2026-10-17T18:04:16.138Z",
+      "trigger": "client_output_silence",
+      "next": "gave_up_saved",
+      "via": null,
+      "after_s": 120.41
+     }
+    ],
+    "other_pauses": [],
+    "gave_up_saved": [
+     "2026-10-17T18:06:16.546Z"
+    ]
+   },
+   "fec_recovered": [
+    746
+   ],
+   "fec_unrecoverable": [
+    719
+   ],
+   "wan_class": "latency-limited",
+   "wan_windows": {
+    "path-changed": 0,
+    "latency-limited": 1,
+    "starved": 2,
+    "capacity-limited": 30,
+    "lossy": 36,
+    "clean": 0
+   },
+   "retroarch_fps": 59.999,
+   "capture_fps": 60.041,
+   "dupdrop_per_min": 0.101,
+   "host_gates": {
+    "retroarch_ge_59_9": true,
+    "capture_60_pm_0_1": true,
+    "dupdrop_le_0_2": true,
+    "flags_absent": true
+   },
+   "host_gates_met": true,
+   "host_cpu": 12.26,
+   "companion_cpu": 28.578,
+   "shim": {
+    "lines": 702,
+    "duration_s": 702.0,
+    "packets_in": 500946,
+    "packets_out": 457706,
+    "dropped_loss": 0,
+    "dropped_burst": 0,
+    "dropped_queue": 43207,
+    "delayed": 0,
+    "reordered": 0,
+    "queue_max": 75,
+    "shim_cpu_pct_core": 5.063,
+    "send_errors": 0,
+    "seconds_input_over_cap": 118,
+    "out_kbps_max": 6013.3,
+    "stream_starts": 1,
+    "seconds_each": [
+     702.0
+    ],
+    "steady_in_kbps_median": 6047.0,
+    "steady_in_kbps_range": [
+     3202.2,
+     9008.6
+    ],
+    "steady_drop_frac": 0.0864,
+    "loss_frac": 0.0
+   },
+   "flags_absent_after": true,
+   "final_flags_absent": true,
+   "failed_attempts": [],
+   "journal": {
+    "client_sessions": 1,
+    "fec_recovered": [
+     746
+    ],
+    "fec_unrecoverable": [
+     719
+    ],
+    "rendered_frames": [
+     27219
+    ],
+    "lost_packets": [
+     35174
+    ],
+    "rx_packets": [
+     392198
+    ],
+    "last_output_age_ms": [
+     184781
+    ]
+   },
+   "window": {
+    "from": "2026-10-17T17:57:19.451Z",
+    "to": "2026-10-17T18:07:19.452Z"
+   },
+   "report_fields": {
+    "lost_packets": 35269,
+    "rendered_frames": 27219,
+    "stale_output_drops": 32,
+    "max_output_gap_ms": 185954,
+    "slow_event_retained": 1045,
+    "slow_event_capacity": 1280,
+    "duration_ms": 701292,
+    "video.lost_packets": 35269,
+    "video.sequence_resyncs": 8,
+    "video.recent_fps": 0,
+    "decoder.spike_20_ms": 2006,
+    "decoder.spike_50_ms": 40,
+    "decoder.spike_80_ms": 25,
+    "decoder.stale_output_drops": 32,
+    "decoder.max_output_gap_ms": 185954,
+    "audio.lost_packets": 137,
+    "audio.underruns": 26
+   },
+   "ladder_events": {
+    "session_ended_reset::": 5,
+    "controller_start::": 2,
+    "sample:resync_ignored:": 77,
+    "level_sync::": 2,
+    "sample:counting_clean_reports:": 194,
+    "state:counting_clean_reports:": 14,
+    "wan_suggestion:R5.1:none": 240,
+    "sample:routine_deferred_escalating:": 25,
+    "state:routine_deferred_escalating:": 9,
+    "sample:at_floor:": 36,
+    "refused:at_floor:FALLBACK": 4,
+    "wan_suggestion:R5.1:refused:at_floor": 15,
+    "refused:at_floor:ROUTINE": 11,
+    "wan_suggestion:R1.1:none": 17,
+    "ssrc_change::": 5,
+    "sample:blackout:": 15,
+    "state:blackout:": 1,
+    "wan_suggestion:R1.2:none": 73,
+    "escalation_armed::": 1
+   },
+   "ladder_sample_states": {
+    "REFERENCE": 1,
+    "RECOVERY_PROBATION": 194,
+    "PRESSURE": 64,
+    "HOLD_DOWN": 88
+   },
+   "suggestions": {
+    "R5.1 no_step_up -> none": 240,
+    "R5.1 no_step_up -> refused:at_floor": 15,
+    "R1.1 hold -> none": 17,
+    "R1.2 no_step_up -> none": 73
+   },
+   "recovery_rows": [
+    {
+     "schema": "privyhub_native_stream_recovery_v1",
+     "at_utc": "2026-10-17T18:04:16.138Z",
+     "event": "desync_pause",
+     "state": "PAUSED_RECOVERING",
+     "trigger": "client_output_silence",
+     "age_ms": 1386.0,
+     "pause_error": null
+    },
+    {
+     "schema": "privyhub_native_stream_recovery_v1",
+     "at_utc": "2026-10-17T18:04:21.012Z",
+     "event": "encoder_restart",
+     "state": "PAUSED_RECOVERING",
+     "attempt": 1,
+     "method": "restart",
+     "backoff_ms": 5000,
+     "last_output_age_ms": 4959,
+     "age_pair_ms": [
+      2920,
+      4959
+     ],
+     "cycle": {
+      "capture_restarted": false,
+      "capture_process_present": false,
+      "encoder_restarted": true,
+      "source_width": 1920,
+      "source_height": 1080,
+      "ffmpeg_spawn_ms": 366.092,
+      "first_rtp_resume_ms": 509.96,
+      "rtp_silence_after_spawn_ms": 143.869,
+      "rtp_baseline_residual_packets": 174,
+      "host_verified_ms": 1263.69
+     },
+     "restart_error": null
+    },
+    {
+     "schema": "privyhub_native_stream_recovery_v1",
+     "at_utc": "2026-10-17T18:04:33.187Z",
+     "event": "encoder_restart",
+     "state": "PAUSED_RECOVERING",
+     "attempt": 2,
+     "method": "restart",
+     "backoff_ms": 10000,
+     "last_output_age_ms": 17177,
+     "age_pair_ms": [
+      15142,
+      17177
+     ],
+     "cycle": {
+      "capture_restarted": false,
+      "capture_process_present": false,
+      "encoder_restarted": true,
+      "source_width": 1920,
+      "source_height": 1080,
+      "ffmpeg_spawn_ms": 265.541,
+      "first_rtp_resume_ms": 408.513,
+      "rtp_silence_after_spawn_ms": 142.972,
+      "rtp_baseline_residual_packets": 137,
+      "host_verified_ms": 1161.218
+     },
+     "restart_error": null
+    },
+    {
+     "schema": "privyhub_native_stream_recovery_v1",
+     "at_utc": "2026-10-17T18:04:55.871Z",
+     "event": "encoder_restart",
+     "state": "PAUSED_RECOVERING",
+     "attempt": 3,
+     "method": "restart",
+     "backoff_ms": 20000,
+     "last_output_age_ms": 39651,
+     "age_pair_ms": [
+      37608,
+      39651
+     ],
+     "cycle": {
+      "capture_restarted": false,
+      "capture_process_present": false,
+      "encoder_restarted": true,
+      "source_width": 1920,
+      "source_height": 1080,
+      "ffmpeg_spawn_ms": 516.577,
+      "first_rtp_resume_ms": 659.941,
+      "rtp_silence_after_spawn_ms": 143.364,
+      "rtp_baseline_residual_packets": 287,
+      "host_verified_ms": 1412.865
+     },
+     "restart_error": null
+    },
+    {
+     "schema": "privyhub_native_stream_recovery_v1",
+     "at_utc": "2026-10-17T18:05:28.056Z",
+     "event": "encoder_restart",
+     "state": "PAUSED_RECOVERING",
+     "attempt": 4,
+     "method": "restart",
+     "backoff_ms": 30000,
+     "last_output_age_ms": 72182,
+     "age_pair_ms": [
+      70151,
+      72182
+     ],
+     "cycle": {
+      "capture_restarted": false,
+      "capture_process_present": false,
+      "encoder_restarted": true,
+      "source_width": 1920,
+      "source_height": 1080,
+      "ffmpeg_spawn_ms": 265.672,
+      "first_rtp_resume_ms": 408.629,
+      "rtp_silence_after_spawn_ms": 142.957,
+      "rtp_baseline_residual_packets": 133,
+      "host_verified_ms": 1160.97
+     },
+     "restart_error": null
+    },
+    {
+     "schema": "privyhub_native_stream_recovery_v1",
+     "at_utc": "2026-10-17T18:06:00.764Z",
+     "event": "encoder_restart",
+     "state": "PAUSED_RECOVERING",
+     "attempt": 5,
+     "method": "restart",
+     "backoff_ms": 30000,
+     "last_output_age_ms": 104656,
+     "age_pair_ms": [
+      102624,
+      104656
+     ],
+     "cycle": {
+      "capture_restarted": false,
+      "capture_process_present": false,
+      "encoder_restarted": true,
+      "source_width": 1920,
+      "source_height": 1080,
+      "ffmpeg_spawn_ms": 518.0,
+      "first_rtp_resume_ms": 681.668,
+      "rtp_silence_after_spawn_ms": 163.667,
+      "rtp_baseline_residual_packets": 291,
+      "host_verified_ms": 1434.488
+     },
+     "restart_error": null
+    },
+    {
+     "schema": "privyhub_native_stream_recovery_v1",
+     "at_utc": "2026-10-17T18:06:16.546Z",
+     "event": "gave_up_saved",
+     "state": "PAUSED_SAVED",
+     "restarts": 5,
+     "state_file": "data/games/retroarch/states/Beetle PSX HW/Tekken 3 (USA).state.recovery",
+     "save_error": null
+    }
+   ],
+   "gaps": {
+    "rows": 112,
+    "max_ms": 771.3
+   },
+   "shim_starts": [
+    {
+     "seconds": 702.0,
+     "packets_in": 500946,
+     "packets_out": 457706,
+     "dropped_queue": 43207,
+     "drop_frac": 0.0863,
+     "steady_in_kbps": [
+      3202.2,
+      6047.0,
+      9008.6
+     ],
+     "steady_out_kbps_max": 6013.3,
+     "steady_drop_frac": 0.0864,
+     "queue_max": 75
+    }
+   ],
+   "wire": {
+    "window_s": 600,
+    "align_lag_score": 0.04,
+    "payload_kbps": {
+     "mean": 4997.8,
+     "median": 4999.7,
+     "p95": 5709.1,
+     "max": 7945.6,
+     "share_seconds_over_5000": 0.498
+    },
+    "rtp_hdr_kbps_mean": 58.1,
+    "parity_kbps_mean": 971.7,
+    "parity_packets_per_s": 108.7,
+    "data_packets_per_s": 605.0,
+    "parity_per_data_packet": 0.1796,
+    "parity_bytes_per_packet": 1117.5,
+    "parity_per_frame": 1.814,
+    "frames_per_s": 59.92,
+    "mean_frame_packets": 10.1,
+    "max_frame_bytes": {
+     "median": 57305.5,
+     "max": 89157
+    },
+    "mean_frame_bytes_mean": 10426.6,
+    "shim_in_kbps": {
+     "mean": 6027.6,
+     "median": 6033.1,
+     "p95": 7012.6,
+     "max": 9008.6,
+     "share_seconds_over_cap": 0.63
+    },
+    "sum_of_terms_kbps": 6027.6,
+    "shim_out_kbps_mean": 5421.4,
+    "drop_frac_window": 0.0918,
+    "drop_frac_in_seconds_over_cap": 0.1091,
+    "drop_frac_in_seconds_at_or_under_cap": 0.059,
+    "share_of_drops_in_seconds_over_cap": 0.778,
+    "per_second_drop_frac": {
+     "median": 0.0927,
+     "p95": 0.2019
+    }
+   },
+   "wire_before_first_client_pause": {
+    "window_s": 417,
+    "align_lag_score": 0.04,
+    "payload_kbps": {
+     "mean": 5010.9,
+     "median": 5005.0,
+     "p95": 5955.4,
+     "max": 7945.6,
+     "share_seconds_over_5000": 0.513
+    },
+    "rtp_hdr_kbps_mean": 58.4,
+    "parity_kbps_mean": 971.6,
+    "parity_packets_per_s": 108.8,
+    "data_packets_per_s": 608.1,
+    "parity_per_data_packet": 0.179,
+    "parity_bytes_per_packet": 1116.0,
+    "parity_per_frame": 1.814,
+    "frames_per_s": 60.0,
+    "mean_frame_packets": 10.14,
+    "max_frame_bytes": {
+     "median": 41269,
+     "max": 89157
+    },
+    "mean_frame_bytes_mean": 10440.6,
+    "shim_in_kbps": {
+     "mean": 6041.0,
+     "median": 6039.7,
+     "p95": 7283.1,
+     "max": 9008.6,
+     "share_seconds_over_cap": 0.549
+    },
+    "sum_of_terms_kbps": 6041.0,
+    "shim_out_kbps_mean": 5574.0,
+    "drop_frac_window": 0.0707,
+    "drop_frac_in_seconds_over_cap": 0.09,
+    "drop_frac_in_seconds_at_or_under_cap": 0.0437,
+    "share_of_drops_in_seconds_over_cap": 0.742,
+    "per_second_drop_frac": {
+     "median": 0.0336,
+     "p95": 0.2396
+    }
+   },
+   "summary_key_heartbeat": {
+    "heartbeats": 297,
+    "segments": 1,
+    "span_s": 598.1,
+    "rendered_fps": 36.648,
+    "video_loss_per_min": 3244.62,
+    "audio_underruns": 22,
+    "stream_resyncs": 13,
+    "max_last_output_age_ms": 184781
+   }
+  },
+  "03_cap-4500_floor_off": {
+   "n": 3,
+   "profile": "cap-4500",
+   "arm": "off",
+   "outcome": "no_play",
+   "validity": "valid",
+   "profile_applied": true,
+   "suite_attempts": 2,
+   "playing_attempt": null,
+   "s_to_playing": null,
+   "start_rung_first_row": {
+    "at_utc": "2026-10-17T18:10:10.696Z",
+    "kbps": 5000,
+    "source": "floor",
+    "requested": "floor",
+    "active_list": [
+     5000,
+     5500,
+     6000,
+     7000
+    ],
+    "path_class": "lan"
+   },
+   "wire_bitrate_kbps_seen": [
+    5000
+   ],
+   "encoder_bv_seen": [
+    "5000k"
+   ],
+   "rung_path": "5000",
+   "transitions": [],
+   "rules_by_id": {},
+   "flags_at_stream": true,
+   "flags_under_load": null,
+   "environ_at_stream_count": 10,
+   "loss_per_min": null,
+   "rendered_fps": null,
+   "resyncs": null,
+   "stale_per_min": 10.708,
+   "spikes20_per_min": 16.66,
+   "client_pauses": 0,
+   "pauses": null,
+   "fec_recovered": [
+    48,
+    49,
+    62,
+    77,
+    78,
+    74
+   ],
+   "fec_unrecoverable": [
+    92,
+    87,
+    95,
+    94,
+    107,
+    111
+   ],
+   "wan_class": "latency-limited",
+   "wan_windows": {
+    "path-changed": 0,
+    "latency-limited": 2,
+    "starved": 1,
+    "capacity-limited": 0,
+    "lossy": 0,
+    "clean": 0
+   },
+   "retroarch_fps": null,
+   "capture_fps": null,
+   "dupdrop_per_min": null,
+   "host_gates": null,
+   "host_gates_met": null,
+   "host_cpu": null,
+   "companion_cpu": null,
+   "shim": {
+    "lines": 326,
+    "duration_s": 60.0,
+    "packets_in": 233226,
+    "packets_out": 168213,
+    "dropped_loss": 0,
+    "dropped_burst": 0,
+    "dropped_queue": 64745,
+    "delayed": 0,
+    "reordered": 0,
+    "queue_max": 55,
+    "shim_cpu_pct_core": 23.102,
+    "send_errors": 0,
+    "seconds_input_over_cap": 320,
+    "out_kbps_max": 4509.7,
+    "stream_starts": 6,
+    "seconds_each": [
+     60.0,
+     49.0,
+     60.0,
+     48.0,
+     60.0,
+     49.0
+    ],
+    "steady_in_kbps_median": 6203.9,
+    "steady_in_kbps_range": [
+     6102.9,
+     6295.2
+    ],
+    "steady_drop_frac": 0.2792,
+    "loss_frac": 0.0
+   },
+   "flags_absent_after": true,
+   "final_flags_absent": true,
+   "failed_attempts": [
+    {
+     "file": "summary_failed_attempt1.json",
+     "error": "RuntimeError: stream did not reach PLAYING: {'ok': False, 'recovery': 'ENDED'}",
+     "launch": {
+      "ok": false,
+      "recovery": "ENDED"
+     },
+     "flags_absent": true,
+     "duration_ms": 49974,
+     "rendered_frames": 19,
+     "lost_packets": 5592,
+     "max_output_gap_ms": 47758,
+     "video.sequence_resyncs": 1,
+     "audio.underruns": 5218,
+     "stale_output_drops": 9
+    },
+    {
+     "file": "summary_failed_attempt2.json",
+     "error": "RuntimeError: stream did not reach PLAYING: {'ok': False, 'recovery': 'ENDED'}",
+     "launch": {
+      "ok": false,
+      "recovery": "ENDED"
+     },
+     "flags_absent": true,
+     "duration_ms": 49424,
+     "rendered_frames": 26,
+     "lost_packets": 5773,
+     "max_output_gap_ms": 21000,
+     "video.sequence_resyncs": 1,
+     "audio.underruns": 5731,
+     "stale_output_drops": 11
+    }
+   ],
+   "journal": {
+    "client_sessions": 6,
+    "fec_recovered": [
+     48,
+     49,
+     62,
+     77,
+     78,
+     74
+    ],
+    "fec_unrecoverable": [
+     92,
+     87,
+     95,
+     94,
+     107,
+     111
+    ],
+    "rendered_frames": [
+     20,
+     19,
+     32,
+     26,
+     29,
+     26
+    ],
+    "lost_packets": [
+     5368,
+     5383,
+     5684,
+     5587,
+     5694,
+     5816
+    ],
+    "rx_packets": [
+     23209,
+     23053,
+     22958,
+     22815,
+     23058,
+     23628
+    ],
+    "last_output_age_ms": [
+     46719,
+     46005,
+     1601,
+     1650,
+     1587,
+     3809
+    ]
+   },
+   "window": null,
+   "report_fields": {
+    "lost_packets": 5904,
+    "rendered_frames": 26,
+    "stale_output_drops": 9,
+    "max_output_gap_ms": 22798,
+    "slow_event_retained": 16,
+    "slow_event_capacity": 1280,
+    "duration_ms": 50430,
+    "video.lost_packets": 5904,
+    "video.sequence_resyncs": 1,
+    "video.recent_fps": 0,
+    "decoder.spike_20_ms": 14,
+    "decoder.spike_50_ms": 10,
+    "decoder.spike_80_ms": 2,
+    "decoder.stale_output_drops": 9,
+    "decoder.max_output_gap_ms": 22798,
+    "audio.lost_packets": 0,
+    "audio.underruns": 4543
+   },
+   "ladder_events": {
+    "session_ended_reset::": 12,
+    "controller_start::": 6,
+    "sample:resync_ignored:": 3,
+    "level_sync::": 3,
+    "sample:counting_clean_reports:": 24,
+    "state:counting_clean_reports:": 6,
+    "sample:at_floor:": 115,
+    "refused:at_floor:FALLBACK": 6,
+    "sample:session_start:": 3,
+    "session_reset::": 3
+   },
+   "ladder_sample_states": {
+    "REFERENCE": 6,
+    "RECOVERY_PROBATION": 24,
+    "PRESSURE": 115
+   },
+   "suggestions": {},
+   "recovery_rows": null,
+   "gaps": {
+    "rows": 0,
+    "max_ms": null
+   },
+   "shim_starts": [
+    {
+     "seconds": 60.0,
+     "packets_in": 42953,
+     "packets_out": 31357,
+     "dropped_queue": 11551,
+     "drop_frac": 0.2689,
+     "steady_in_kbps": [
+      6232.5,
+      6232.5,
+      6232.5
+     ],
+     "steady_out_kbps_max": 4508.9,
+     "steady_drop_frac": 0.2702,
+     "queue_max": 55
+    },
+    {
+     "seconds": 49.0,
+     "packets_in": 35033,
+     "packets_out": 25577,
+     "dropped_queue": 9411,
+     "drop_frac": 0.2686,
+     "steady_in_kbps": [
+      6222.4,
+      6232.5,
+      6242.6
+     ],
+     "steady_out_kbps_max": 4507.6,
+     "steady_drop_frac": 0.2701,
+     "queue_max": 54
+    },
+    {
+     "seconds": 60.0,
+     "packets_in": 42951,
+     "packets_out": 30794,
+     "dropped_queue": 12112,
+     "drop_frac": 0.282,
+     "steady_in_kbps": [
+      6131.8,
+      6194.3,
+      6242.4
+     ],
+     "steady_out_kbps_max": 4507.2,
+     "steady_drop_frac": 0.2835,
+     "queue_max": 54
+    },
+    {
+     "seconds": 48.0,
+     "packets_in": 34309,
+     "packets_out": 24589,
+     "dropped_queue": 9677,
+     "drop_frac": 0.2821,
+     "steady_in_kbps": [
+      6107.8,
+      6194.3,
+      6274.1
+     ],
+     "steady_out_kbps_max": 4509.7,
+     "steady_drop_frac": 0.284,
+     "queue_max": 54
+    },
+    {
+     "seconds": 60.0,
+     "packets_in": 42949,
+     "packets_out": 30783,
+     "dropped_queue": 12122,
+     "drop_frac": 0.2822,
+     "steady_in_kbps": [
+      6181.8,
+      6194.3,
+      6206.8
+     ],
+     "steady_out_kbps_max": 4508.7,
+     "steady_drop_frac": 0.2837,
+     "queue_max": 54
+    },
+    {
+     "seconds": 49.0,
+     "packets_in": 35031,
+     "packets_out": 25113,
+     "dropped_queue": 9872,
+     "drop_frac": 0.2818,
+     "steady_in_kbps": [
+      6102.9,
+      6194.3,
+      6295.2
+     ],
+     "steady_out_kbps_max": 4509.6,
+     "steady_drop_frac": 0.2837,
+     "queue_max": 54
+    }
+   ],
+   "summary_key_heartbeat": null
+  }
+ },
+ "g8_s1": {
+  "17_cap-6000_off": {
+   "validity": "no_play (FAILED)",
+   "status": "FAILED",
+   "shim": {
+    "lines": 326,
+    "duration_s": 62.0,
+    "packets_in": 304866,
+    "packets_out": 219609,
+    "dropped_loss": 0,
+    "dropped_burst": 0,
+    "dropped_queue": 84913,
+    "delayed": 0,
+    "reordered": 0,
+    "queue_max": 73,
+    "shim_cpu_pct_core": 27.973,
+    "send_errors": 0,
+    "seconds_input_over_cap": 320,
+    "out_kbps_max": 6011.5,
+    "loss_frac": 0.0
+   },
+   "wan_class": "capacity-limited",
+   "wan_windows": {
+    "path-changed": 0,
+    "latency-limited": 0,
+    "starved": 1,
+    "capacity-limited": 2,
+    "lossy": 0,
+    "clean": 0
+   },
+   "rendered_fps": null,
+   "loss_per_min": null
+  },
+  "18_cap-6000_on": {
+   "validity": "no_play (FAILED)",
+   "status": "FAILED",
+   "shim": {
+    "lines": 328,
+    "duration_s": 62.0,
+    "packets_in": 292555,
+    "packets_out": 213949,
+    "dropped_loss": 0,
+    "dropped_burst": 0,
+    "dropped_queue": 78378,
+    "delayed": 0,
+    "reordered": 0,
+    "queue_max": 69,
+    "shim_cpu_pct_core": 28.477,
+    "send_errors": 0,
+    "seconds_input_over_cap": 320,
+    "out_kbps_max": 6009.7,
+    "loss_frac": 0.0
+   },
+   "wan_class": "capacity-limited",
+   "wan_windows": {
+    "path-changed": 0,
+    "latency-limited": 0,
+    "starved": 1,
+    "capacity-limited": 2,
+    "lossy": 0,
+    "clean": 0
+   },
+   "rendered_fps": null,
+   "loss_per_min": null
+  },
+  "19_cap-4500_off": {
+   "validity": "no_play (FAILED)",
+   "status": "FAILED",
+   "shim": {
+    "lines": 324,
+    "duration_s": 60.0,
+    "packets_in": 296996,
+    "packets_out": 165208,
+    "dropped_loss": 0,
+    "dropped_burst": 0,
+    "dropped_queue": 131524,
+    "delayed": 0,
+    "reordered": 0,
+    "queue_max": 56,
+    "shim_cpu_pct_core": 24.042,
+    "send_errors": 0,
+    "seconds_input_over_cap": 324,
+    "out_kbps_max": 4510.7,
+    "loss_frac": 0.0
+   },
+   "wan_class": "capacity-limited",
+   "wan_windows": {
+    "path-changed": 0,
+    "latency-limited": 0,
+    "starved": 1,
+    "capacity-limited": 3,
+    "lossy": 0,
+    "clean": 0
+   },
+   "rendered_fps": null,
+   "loss_per_min": null
+  }
+ },
+ "encoder_log_sessions_at_5000": [
+  {
+   "encoder_starts": 1,
+   "recovery_restarts": 0,
+   "out_kbps": [
+    5000
+   ],
+   "per_start": [
+    {
+     "frames": 42280,
+     "s": 704.66,
+     "cum_bitrate_kbps": 5069.5,
+     "mux_pct": 1.26289,
+     "video_kib": 430634
+    }
+   ]
+  },
+  {
+   "encoder_starts": 6,
+   "recovery_restarts": 5,
+   "out_kbps": [
+    5000
+   ],
+   "per_start": [
+    {
+     "frames": 31239,
+     "s": 520.65,
+     "cum_bitrate_kbps": 5068.9,
+     "mux_pct": 1.261249,
+     "video_kib": 318145
+    },
+    {
+     "frames": 721,
+     "s": 12.01,
+     "cum_bitrate_kbps": 5018.3,
+     "mux_pct": 1.256872,
+     "video_kib": 7270
+    },
+    {
+     "frames": 1351,
+     "s": 22.51,
+     "cum_bitrate_kbps": 5043.6,
+     "mux_pct": 1.256287,
+     "video_kib": 13691
+    },
+    {
+     "frames": 1921,
+     "s": 32.01,
+     "cum_bitrate_kbps": 5050.8,
+     "mux_pct": 1.25603,
+     "video_kib": 19495
+    },
+    {
+     "frames": 1951,
+     "s": 32.51,
+     "cum_bitrate_kbps": 5052.9,
+     "mux_pct": 1.255992,
+     "video_kib": 19808
+    },
+    {
+     "frames": 4922,
+     "s": 82.03,
+     "cum_bitrate_kbps": 5063.9,
+     "mux_pct": 1.25539,
+     "video_kib": 50081
+    }
+   ]
+  },
+  {
+   "encoder_starts": 1,
+   "recovery_restarts": 0,
+   "out_kbps": [
+    5000
+   ],
+   "per_start": [
+    {
+     "frames": 3632,
+     "s": 60.53,
+     "cum_bitrate_kbps": 5049.1,
+     "mux_pct": 1.24478,
+     "video_kib": 36851
+    }
+   ]
+  },
+  {
+   "encoder_starts": 1,
+   "recovery_restarts": 0,
+   "out_kbps": [
+    5000
+   ],
+   "per_start": [
+    {
+     "frames": 2933,
+     "s": 48.88,
+     "cum_bitrate_kbps": 5044.2,
+     "mux_pct": 1.24481,
+     "video_kib": 29729
+    }
+   ]
+  },
+  {
+   "encoder_starts": 1,
+   "recovery_restarts": 0,
+   "out_kbps": [
+    5000
+   ],
+   "per_start": [
+    {
+     "frames": 3632,
+     "s": 60.53,
+     "cum_bitrate_kbps": 5049.6,
+     "mux_pct": 1.254888,
+     "video_kib": 36851
+    }
+   ]
+  },
+  {
+   "encoder_starts": 1,
+   "recovery_restarts": 0,
+   "out_kbps": [
+    5000
+   ],
+   "per_start": [
+    {
+     "frames": 2912,
+     "s": 48.53,
+     "cum_bitrate_kbps": 5044.5,
+     "mux_pct": 1.254891,
+     "video_kib": 29516
+    }
+   ]
+  },
+  {
+   "encoder_starts": 1,
+   "recovery_restarts": 0,
+   "out_kbps": [
+    5000
+   ],
+   "per_start": [
+    {
+     "frames": 3632,
+     "s": 60.53,
+     "cum_bitrate_kbps": 5049.6,
+     "mux_pct": 1.254888,
+     "video_kib": 36851
+    }
+   ]
+  },
+  {
+   "encoder_starts": 1,
+   "recovery_restarts": 0,
+   "out_kbps": [
+    5000
+   ],
+   "per_start": [
+    {
+     "frames": 2972,
+     "s": 49.53,
+     "cum_bitrate_kbps": 5045.0,
+     "mux_pct": 1.254868,
+     "video_kib": 30127
+    }
+   ]
+  }
+ ]
+}

@@ -1747,6 +1747,18 @@ still enters at ~6.1 Mbit/s (1.8-2.4 % tail-dropped); **4000 under cap-4500 ente
 dropped)** — the floor sits above that cap; no claim about PLAYING. Proposed next: G8-S3, the four cap cells
 re-run with the flag. Record: `docs/memory/evidence/G8_S2_START_RUNG_2026-10-17.md`.
 
+**Status (2026-10-17, G8-S3): start rung: PLAYING reached under cap-6000 at the 5000 start (G8-S3); the 5000
+rung's live wire rate exceeds 6 Mbit/s; cap-4500 needs a rung below 5000, remote-only today.** 3/3 cells valid.
+- Cells 1 and 2 (cap-6000, `START_RUNG=floor`, rules off / on): PLAYING in 9.1 s and 7.1 s, host gates met.
+  - The ladder held 5000 for the window: `at_floor` down, no clean reports to go up.
+  - The shim's input was 6,039 / 6,028 kbit/s mean, and 6.75 % / 9.18 % was tail-dropped.
+  - Cell 1 stayed up for the window at 2,379 loss/min and 53.1 fps. Cell 2 went silent on the client 417 s in;
+    recovery gave up after 5 restarts.
+- Cell 3 (cap-4500 at 5000): `no_play`, 27.76 % dropped, as predicted.
+- The mean wire rate matched G8-S2's bench (~6.1 Mbit/s). The drop is about 3× the bench's and is not explained by the
+  mean: it comes with the per-second and frame-size spread.
+- Record: `docs/memory/evidence/G8_S3_CAP_CELLS_START_RUNG_2026-10-17.md`.
+
 Exercise bounded representative conditions:
 
 - reduced bandwidth;

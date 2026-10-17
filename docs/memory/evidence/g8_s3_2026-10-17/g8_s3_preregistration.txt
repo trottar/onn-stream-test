@@ -1,0 +1,62 @@
+G8-S3 -- the cap cells with the start rung: PRE-REGISTRATION (written and hashed before the first run)
+Task: docs/memory/handoffs/G8-S3_CAP_CELLS_START_RUNG_TASK.md (session A). Baseline: 0093b7c. Measurement only; nothing
+adopted; nothing committed. No session B runs tonight.
+
+THE QUESTION (G8-S1 §5 left it open): can the client reach PLAYING, and does the ladder then settle under a cap, when
+the stream starts at the floor instead of 7000. On the LAN the floor is 5000 (G8-S2: 4000 exists only on a remote path
+with G5-S3, so 4000 cannot be started on the LAN). Not run: "=cap under cap-4500" on the LAN (it would fall back to the
+floor 5000 because path_class is lan).
+
+CELLS, in order -- each one E1-PS1-STREAM, --e2, --window 600, E2's warm-up (90 s), an idle gap of 120 s; e3_flag.conf
+written per cell by the suite, read back after its restart, read again under load by the driver, removed at teardown
+with flags_absent true:
+  1. 01_cap-6000_floor_off: PRIVYHUB_IMPAIRMENT=cap-6000@post-fec,seed=1, PRIVYHUB_START_RUNG=floor,
+     PRIVYHUB_WAN_TELEMETRY=1 -- rules off (PRIVYHUB_WAN_ADAPTATION absent). Counterpart: G8-S1 cell 17.
+  2. 02_cap-6000_floor_on: the same plus PRIVYHUB_WAN_ADAPTATION=1 -- rules on. Counterpart: G8-S1 cell 18.
+  3. 03_cap-4500_floor_off: PRIVYHUB_IMPAIRMENT=cap-4500@post-fec,seed=1, PRIVYHUB_START_RUNG=floor,
+     PRIVYHUB_WAN_TELEMETRY=1 -- rules off (the prediction check). Counterpart: G8-S1 cell 19.
+Driver: g8_s3_driver.py (from g8_s1_driver.py's scaffolding), wrapper g8_s3_suite_call.py (tools/e1_suite.py's
+run_suite, unedited), detached as systemd --user unit privyhub-g8-s3; status ~/privyhub_g8_s3/status.txt (5-min
+heartbeat), history.csv, STOP file ~/privyhub_g8_s3/STOP, the busy skip (10 min x 3), cap 2026-10-18T00:00:00Z.
+
+VALIDITY (as G8-S1): the shim's profile applied by the count tolerances (cap: every second's output <= 1.05 x the cap;
+no random / burst / reorder drop), and flags_absent true after (the suite's teardown, every failed attempt's teardown,
+the final state). A playing run with the profile not applied is profile-not-applied and run once more.
+PLAYING IS THE MEASURED OUTCOME, NOT A VALIDITY CONDITION: a cell that never reaches PLAYING is `no_play`, recorded
+with the reading G8-S1 §5 used (the suite's attempts, the client's last state per attempt -- duration, rendered frames,
+lost packets, max output gap, resyncs, audio underruns -- the client's heartbeats from the companion's journal, and the
+shim's counters per stream start: steady input kbps, output, tail-dropped fraction, queue max); not repeated beyond the
+suite's own attempts.
+
+PREDICTIONS, written beforehand, from G8-S2's in-process table (G8_S2_START_RUNG_2026-10-17.md §3):
+  - Cells 1-2 (5000 under cap-6000): the start enters the shim at ~6.1 Mbit/s (6,103-6,137 kbps steady in process);
+    ~2 % tail drop (1.8-2.4 %); 96-100 % of frames complete in process. Whether the client reaches PLAYING at that
+    drop is UNKNOWN -- that is the measurement.
+  - Cell 3 (5000 under cap-4500): ~29 % tail drop (28.9-29.9 % in process); `no_play` expected.
+  - If cells 1-2 reach PLAYING: the ladder's climb (first step at report 90, then one every 93; ~9.2 min to 7000 from
+    5000 on a clean link) will push the stream above the cap again (6000 enters at ~7.07 Mbit/s by the ratio, above
+    6000). Reported: what the ladder does then (its own capacity trigger; in cell 2 also the rules), the rung path,
+    and whether the stream stays up for the window. That is the first measurement of "settling under a cap".
+  - The start rung read from the ladder's first row carrying `start_rung` is expected to read kbps 5000, source
+    `floor`, path_class `lan`, active list 5000-7000.
+
+GATES (host only): RetroArch >= 59.9; capture 60 +/- 0.1; dup+drop <= 0.2/min; flags_absent after. Evaluated for a
+playing cell; a no_play cell has no window and no host gate reading.
+
+EVERYTHING LINK-SIDE REPORTED (not gated): PLAYING reached (the suite attempt, the client launch attempt, s to
+PLAYING); the start rung and its source from the first row carrying `start_rung` (the ladder's log; G8-S2: the suite's
+window decisions.jsonl does not hold it) -- and, beside it, the wire rung read from native-stream-status and the
+encoder's -b:v while it runs; the rung path; every acted transition with its reason; the rules' suggestions by rule
+id; post-FEC loss/min; FEC recovered / unrecoverable (the client's heartbeats); rendered; stale; resyncs; the `wan`
+class and windows; the shim's counters (in / out / dropped_queue / queue_max, steady input and drop fraction); the
+client's pauses.
+
+COMPARISONS: each cell against its G8-S1 counterpart (cells 17, 18, 19: the same profile at a 7000 start); cell 1 vs
+cell 2 (rules off vs on), stated not judged.
+
+THE RECORD is a later task ("write G8-S3's record from the driver's files"), with the G8-S1 §5 reading for any no_play
+cell and the rung path for any playing one.
+
+Standing rules: no sudo (systemd --user is not sudo), no nft, the Opal read-only (not touched), adb only to read
+state, no addresses or identifiers written anywhere; nothing fetched, nothing deleted; nothing adopted; nothing
+committed. The onn stays idle on the LAN.
