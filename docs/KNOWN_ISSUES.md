@@ -1720,3 +1720,18 @@ unrecoverable. Neither was right. The defect itself is real and stays open.
 - **The one hand option** the user has: a wired (USB Ethernet) adapter on
   the client. That takes the onn's radio out of the path.
   - Nothing else is queued for the LAN loss row.
+
+## 2026-10-18 the off-site wire rate at 4000 is ~2× the encoder's rate (G4-S2) — OPEN
+
+- At 720p/4000 over the overlay the hub's tailnet interface sent **8.29 Mbit/s** steady (~62 MB/min, ~3.7 GB/h);
+  the pre-registered expectation was ~4.65. At 7000 (G4-S1) it was 11.42. The excess over the encoder's rate is
+  ~4.3 Mbit/s at both rungs, so dropping to 4000 saves ~27 % of the data, not ~43 %. Source not identified
+  (candidates: audio + its 2/4 redundancy, FEC parity, the overlay's per-packet cost). This made a cellular session
+  impractical for the user (run 2 not run). Record: `docs/memory/evidence/G4_S2_OFFSITE_REMOTE_LADDER_2026-10-17.md` §4.
+
+## 2026-10-18 the remote row's RetroArch counter was not on the title (G4-S2) — OPEN
+
+- RetroArch's title carried no "FPS / Frames" counter in any of 112 reads, so gate 3's RetroArch clause was not read.
+  The row's override is per game (Tekken 3, the PS1-STREAM fixture); whether another title was launched or the
+  override did not take is not determined. Also: the remote row's window is a fixed sleep and runs on after the
+  stream ends (G4-S2 §6).

@@ -1558,6 +1558,12 @@ setup and auditable permissions.
 phone hotspot + the Tailscale app on the onn); gates 1-2 met, gate 3 not evaluable (the remote row records no
 RetroArch FPS or encoder progress); run 2's hotspot toggle ended the session and the stream came back after a LAN
 setup; run 3 not started. Overlay wire rate at 7000: 11.42 Mbit/s.
+**Status (2026-10-18, G4-S2): off-site with the remote ladder: 1 of 2 runs, valid.** Run 1 (G5-S3 + G5-S4 cap 4000 +
+G8-S2 floor) played over the overlay: start 4000 / `floor` / `path_class` remote, held 4000 (73 up-moves refused by
+`remote_cap`, no transition), 7.75 loss/min, 59.92 fps; capture 60.004, dup+drop 0.0, the RetroArch counter not on
+the title (gate 3 not evaluable). **Wire rate at 4000: 8.29 Mbit/s (~62 MB/min), not ~4.65** — the excess over the
+encoder ~4.3 Mbit/s, as at 7000. Run 2 not run (the user's phone data). Record:
+`docs/memory/evidence/G4_S2_OFFSITE_REMOTE_LADDER_2026-10-17.md`.
 
 **G4-P2 (2026-10-17): the remote row records gate 3 from G4-S2** — `tools/e1_remote.py`
 writes the home row's per-run RetroArch counter override (for the PS1-STREAM fixture),
@@ -1657,6 +1663,9 @@ off-site run with the cap at 4000 (the user judges the picture). Record:
 `path_class` `lan` on every ladder row; the cap's configuration row once, no clamp, no 4000; 7000 held with no acted
 decision on a lossy link (646.8 loss/min); companion 24.45 % of a core (CL-B3 W 25.44). Flags removed at teardown.
 Not adopted; off-site pending (G4-S2). Record: `docs/memory/evidence/G5_S3_LAN_SMOKE_2026-10-17.md`.
+**G5-S3 / G5-S4 off-site (2026-10-18, G4-S2 run 1): the remote floor and the cap held on a real remote path**
+(start 4000 `floor` `remote`; 73 clamps as `refused`, `source: remote_cap`; no rung above 4000). G5-S2's rules and the
+climb from 4000 off-site: not yet run (G4-S2 run 2 stopped for data).
 
 Reuse Phase C telemetry/adaptation instead of creating a parallel WAN streamer.
 

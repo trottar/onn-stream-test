@@ -1,0 +1,14 @@
+● privyhub-g4-s2.service - [systemd-run] /usr/bin/python3 docs/memory/evidence/g4_s2_2026-10-17/g4_s2_driver.py
+     Loaded: loaded (/run/user/1000/systemd/transient/privyhub-g4-s2.service; transient)
+  Transient: yes
+     Active: active (running) since Sun 2026-10-18 13:55:40 EDT; 14s ago
+   Main PID: 3602422 (python3)
+      Tasks: 9 (limit: 18065)
+     Memory: 54.2M (peak: 55.6M)
+        CPU: 749ms
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/privyhub-g4-s2.service
+             ├─3602422 /usr/bin/python3 docs/memory/evidence/g4_s2_2026-10-17/g4_s2_driver.py
+             ├─3602470 /usr/bin/python3 ~/Projects/onn-stream-test/tools/e1_suite.py run --remote --out ~/Projects/onn-stream-test/docs/memory/evidence/g4_s2_2026-10-17/runs/run1_capped --prereg ~/Projects/onn-stream-test/docs/memory/evidence/g4_s2_2026-10-17/g4_s2_preregistration.txt --runs 1 --window 600 --gap 300 --wait 900
+             └─3602478 /usr/bin/python3 ~/Projects/onn-stream-test/tools/e1_sampler.py run ~/Projects/onn-stream-test/docs/memory/evidence/g4_s2_2026-10-17/runs/run1_capped/E1-PS1-STREAM-REMOTE/run1 --telemetry --title --e2
+
+Oct 18 13:55:40 PrivyHub systemd[1310]: Started privyhub-g4-s2.service - [systemd-run] /usr/bin/python3 docs/memory/evidence/g4_s2_2026-10-17/g4_s2_driver.py.

@@ -180,6 +180,17 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
+**G4-S2 PARTIALLY MEASURED: 1 of 2 valid** (`evidence/G4_S2_OFFSITE_REMOTE_LADDER_2026-10-17.md`, 2026-10-18
+17:55-18:12Z; unit collected, `flags_absent` true, the seven lines). Run 1 (cap 4000, floor) held 4000 over the overlay,
+7.75 loss/min; **the wire rate at 4000 is 8.29 Mbit/s (~62 MB/min)**, not ~4.65 — known issue. Run 2 not run (the
+user's phone data). `--check` reads ok false on adb only until the onn is back on the LAN.
+
+1. **The user's commit:** everything since `49d1667` (G4-S2 launch + record + directory, ROADMAP §G4/§G5,
+   `KNOWN_ISSUES.md`, this file, the two task files; `logs/g4_s2_git_status.txt`).
+2. **Pending:** G8-S4 (the encoder's rate-control headroom, session B) — and now the per-rung wire overhead (the
+   ~4.3 Mbit/s excess) before any further cellular session; G4-S2 run 2 (the climb from 4000 off-site); the reconnect
+   test on a true off-site day.
+
 **G8-S3 MEASURED** (`evidence/G8_S3_CAP_CELLS_START_RUNG_2026-10-17.md`, 2026-10-17 17:38-18:21Z; driver collected).
 - **Cells 1 and 2** (cap-6000, `PRIVYHUB_START_RUNG=floor`, rules off / on): PLAYING in 9.1 s / 7.1 s, host gates met.
   - The ladder held 5000: down refused `at_floor`, and no clean reports to go up.

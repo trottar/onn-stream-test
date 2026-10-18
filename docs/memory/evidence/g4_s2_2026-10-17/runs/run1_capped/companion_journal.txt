@@ -1,0 +1,57 @@
+2026-10-18T13:55:40-04:00 Stopping privyhub-companion.service - PrivyHub companion (control API :8765, native game stream)...
+2026-10-18T13:55:40-04:00 Stopping PrivyHub companion service...
+2026-10-18T13:55:40-04:00 overlay: provider=tailscale available=True connected=True path=direct peer_ready=True mtu=1280 reason=running endpoint=present
+2026-10-18T13:55:40-04:00 PrivyHub companion service stopped.
+2026-10-18T13:55:40-04:00 Stopped privyhub-companion.service - PrivyHub companion (control API :8765, native game stream).
+2026-10-18T13:55:40-04:00 privyhub-companion.service: Consumed 28.061s CPU time, 61M memory peak.
+2026-10-18T13:55:40-04:00 Starting privyhub-companion.service - PrivyHub companion (control API :8765, native game stream)...
+2026-10-18T13:55:40-04:00 Started privyhub-companion.service - PrivyHub companion (control API :8765, native game stream).
+2026-10-18T13:55:40-04:00   GET  /status
+2026-10-18T13:55:40-04:00   GET  /diagnostics/health
+2026-10-18T13:55:40-04:00   GET  /sources
+2026-10-18T13:55:40-04:00   GET  /plugins/<plugin>/<action>
+2026-10-18T13:55:40-04:00 PrivyHub game metadata startup reconciliation: SKIPPED_CURRENT
+2026-10-18T14:00:39-04:00 <addr> - 18/Oct/2026 14:00:39 - "POST /session/nonce HTTP/1.1" 200 -
+2026-10-18T14:00:39-04:00 <addr> - 18/Oct/2026 14:00:39 - "POST /session/setup HTTP/1.1" 200 -
+2026-10-18T14:00:47-04:00 <addr> - 18/Oct/2026 14:00:47 - "POST /plugins/games/launch?id=game_ps1_<id> HTTP/1.1" 200 -
+2026-10-18T14:00:49-04:00 <addr> - 18/Oct/2026 14:00:49 - "POST /plugins/games/load-state?slot=1 HTTP/1.1" 200 -
+2026-10-18T14:00:50-04:00 <addr> - 18/Oct/2026 14:00:50 - "POST /plugins/games/native-stream-start?port=48100 HTTP/1.1" 200 -
+2026-10-18T14:00:51-04:00 overlay: provider=tailscale available=True connected=True path=direct peer_ready=True mtu=1280 reason=running endpoint=present
+2026-10-18T14:00:55-04:00 <addr> - 18/Oct/2026 14:00:55 - "POST /plugins/games/native-stream-ready HTTP/1.1" 200 -
+2026-10-18T14:01:05-04:00 <addr> - 18/Oct/2026 14:01:05 - "POST /plugins/games/native-stream-ready HTTP/1.1" 200 -
+2026-10-18T14:01:12-04:00 overlay: provider=tailscale available=True connected=True path=relayed peer_ready=True mtu=1280 reason=running endpoint=present
+2026-10-18T14:01:33-04:00 overlay: provider=tailscale available=True connected=True path=direct peer_ready=True mtu=1280 reason=running endpoint=present
+2026-10-18T14:02:53-04:00 decoder-session-log received as body: report_chars=25520
+2026-10-18T14:02:53-04:00 Native decoder session log: logs/games/decoder_sessions/native_decoder_20261018_180253_519.json
+2026-10-18T14:02:53-04:00 <addr> - 18/Oct/2026 14:02:53 - "POST /plugins/games/decoder-session-log HTTP/1.1" 200 -
+  session 2026-10-18T14:00:50-04:00: heartbeats 58; first rendered_frames=0 queued_frames=0 rx_packets=1 lost_packets=0 stream_resyncs=0 fec_recovered_packets=0 fec_unrecoverable_groups=0 last_output_age_ms=-1 elapsed_ms=1276 forward_gap_events=0 max_forward_gap_packets=0
+    last  rendered_frames=6820 queued_frames=6922 rx_packets=56752 lost_packets=2659 stream_resyncs=1 fec_recovered_packets=3 fec_unrecoverable_groups=2 last_output_age_ms=7 elapsed_ms=121407 forward_gap_events=5 max_forward_gap_packets=80
+2026-10-18T14:02:56-04:00 <addr> - 18/Oct/2026 14:02:56 - "POST /plugins/games/native-stream-stop HTTP/1.1" 200 -
+2026-10-18T14:03:01-04:00 <addr> - 18/Oct/2026 14:03:01 - "POST /plugins/games/save-state?slot=1 HTTP/1.1" 200 -
+2026-10-18T14:03:05-04:00 <addr> - 18/Oct/2026 14:03:05 - "POST /plugins/games/native-stream-start?port=48100 HTTP/1.1" 200 -
+2026-10-18T14:03:08-04:00 <addr> - 18/Oct/2026 14:03:08 - "POST /plugins/games/native-stream-ready HTTP/1.1" 200 -
+2026-10-18T14:08:34-04:00 decoder-session-log received as body: report_chars=26997
+2026-10-18T14:08:34-04:00 Native decoder session log: logs/games/decoder_sessions/native_decoder_20261018_180834_365.json
+2026-10-18T14:08:34-04:00 <addr> - 18/Oct/2026 14:08:34 - "POST /plugins/games/decoder-session-log HTTP/1.1" 200 -
+  session 2026-10-18T14:03:05-04:00: heartbeats 164; first rendered_frames=0 queued_frames=0 rx_packets=3 lost_packets=0 stream_resyncs=0 fec_recovered_packets=0 fec_unrecoverable_groups=0 last_output_age_ms=-1 elapsed_ms=655 forward_gap_events=0 max_forward_gap_packets=0
+    last  rendered_frames=19650 queued_frames=19687 rx_packets=162941 lost_packets=35 stream_resyncs=0 fec_recovered_packets=7 fec_unrecoverable_groups=1 last_output_age_ms=7 elapsed_ms=328610 forward_gap_events=4 max_forward_gap_packets=22
+2026-10-18T14:08:35-04:00 <addr> - 18/Oct/2026 14:08:35 - "POST /plugins/games/native-stream-stop HTTP/1.1" 200 -
+2026-10-18T14:08:39-04:00 <addr> - 18/Oct/2026 14:08:39 - "POST /plugins/games/stop HTTP/1.1" 200 -
+2026-10-18T14:09:15-04:00 overlay: provider=tailscale available=True connected=True path=relayed peer_ready=True mtu=1280 reason=running endpoint=present
+2026-10-18T14:09:25-04:00 overlay: provider=tailscale available=True connected=True path=direct peer_ready=True mtu=1280 reason=running endpoint=present
+2026-10-18T14:09:37-04:00 <addr> - 18/Oct/2026 14:09:37 - "POST /session/nonce HTTP/1.1" 200 -
+2026-10-18T14:09:37-04:00 <addr> - 18/Oct/2026 14:09:37 - "POST /session/setup HTTP/1.1" 200 -
+2026-10-18T14:09:46-04:00 overlay: provider=tailscale available=True connected=True path=relayed peer_ready=True mtu=1280 reason=running endpoint=present
+2026-10-18T14:12:21-04:00 <addr> - 18/Oct/2026 14:12:21 - "POST /plugins/games/stop HTTP/1.1" 200 -
+2026-10-18T14:12:23-04:00 Stopping privyhub-companion.service - PrivyHub companion (control API :8765, native game stream)...
+2026-10-18T14:12:23-04:00 Stopping PrivyHub companion service...
+2026-10-18T14:12:23-04:00 PrivyHub companion service stopped.
+2026-10-18T14:12:23-04:00 Stopped privyhub-companion.service - PrivyHub companion (control API :8765, native game stream).
+2026-10-18T14:12:23-04:00 privyhub-companion.service: Consumed 7min 10.210s CPU time, 291.9M memory peak.
+2026-10-18T14:12:23-04:00 Starting privyhub-companion.service - PrivyHub companion (control API :8765, native game stream)...
+2026-10-18T14:12:23-04:00 Started privyhub-companion.service - PrivyHub companion (control API :8765, native game stream).
+2026-10-18T14:12:23-04:00   GET  /status
+2026-10-18T14:12:23-04:00   GET  /diagnostics/health
+2026-10-18T14:12:23-04:00   GET  /sources
+2026-10-18T14:12:23-04:00   GET  /plugins/<plugin>/<action>
+2026-10-18T14:12:23-04:00 PrivyHub game metadata startup reconciliation: SKIPPED_CURRENT

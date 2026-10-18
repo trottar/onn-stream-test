@@ -1,0 +1,63 @@
+G4-S2 -- off-site with the remote ladder: PRE-REGISTRATION (written and hashed before the first run)
+Task: docs/memory/handoffs/G4-S2_OFFSITE_REMOTE_LADDER_TASK.md (session A), Part 1. Baseline: 49d1667. Measurement only;
+nothing adopted; nothing committed. No session B runs until Part 2 is done.
+
+=== The task's §1, verbatim (lines 13-23) ===
+## 1. Pre-registration (Code writes it to `evidence/g4_s2_2026-10-17/g4_s2_preregistration.txt`, hashes it before the first run)
+
+- **Runs:** two E1-PS1-STREAM `--remote` runs, `--window 600 --gap 300 --wait 900`, E2's warm-up, no `--adb`. The companion's `e3_flag.conf` per run, written before the run, read back, removed at teardown with `flags_absent` true:
+  - **run 1 (capped):** `PRIVYHUB_REMOTE_LADDER=1`, `PRIVYHUB_START_RUNG=floor`, `PRIVYHUB_REMOTE_RUNG_CAP=4000`, `PRIVYHUB_WAN_TELEMETRY=1` → the session starts and stays at 720p/4000 (the first decisions row: start rung 4000, source `floor`, `path_class` remote; every clamp row `source: remote_cap`);
+  - **run 2 (uncapped, rules on):** `PRIVYHUB_REMOTE_LADDER=1`, `PRIVYHUB_START_RUNG=floor`, `PRIVYHUB_WAN_TELEMETRY=1`, `PRIVYHUB_WAN_ADAPTATION=1` → starts at 4000; the ladder's own increase rule and G5-S2's R5 (K = 36 clean windows on a remote path) decide the climb; R2/R3 may step it down.
+  - The remote row's preflight (`tools/e1_remote.py`) allows the two adopted flags plus `WAN_TELEMETRY`; **if it refuses the G5-S3 / G5-S4 / G8-S2 / G5-S2 flags, Code patches the allow-list by one line (a patch, disclosed in the launch record, the row otherwise unchanged) — not a reason to stop.**
+- **Validity:** PLAYING over the overlay (endpoint class `overlay`); a LAN-class run is void, replaced at most once.
+- **Gates (host, now readable — G4-P2):** RetroArch ≥ 59.9, capture 60 ± 0.1, dup+drop ≤ 0.2/min, `flags_absent` after. **Everything link-side reported:** the start rung and its source, the rung path and every acted transition with its reason, the clamps (run 1), the rules' suggestions by rule id (run 2), goodput, post-/pre-FEC loss/min, FEC recovered / unrecoverable, rendered, stale, resyncs, pauses, RTT, the overlay path (direct / relayed) and its changes, the `wan` class and windows, the hub's tailnet-interface tx rate (the wire rate at 4000, measured — the number G8-S3 §3 needs for the remote floor), the data per run from that rate.
+- **Expected, written beforehand (reported as met / not met, not gated):** run 1 holds 4000 for the window with no clamp violated; run 2 starts at 4000 and, if the windows read clean, climbs one rung at a time (the first step at ~report 90); the wire rate at 4000 is near 4.65 Mbit/s (G8-S2's bench) — the measured value is the result.
+- **The user's report, recorded as such:** the picture at 4000 in run 1 against what they remember of 7000 (G4-S1), and anything seen in run 2 as it climbed; Pause/Resume and Save/Load once per run. **Nothing perceptual is a gate.**
+- **Comparisons:** run 1 and run 2 against G4-S1's run 1 and run 2 (7000 start, no remote ladder): loss, rendered, stale, the wire rate, the data per 10 min.
+
+=== Added at launch (disclosed; nothing above changed) ===
+A1. THE CAP. The task's cap is 2026-10-18T02:00:00Z. Launch is 2026-10-18 ~17:55Z, so that cap had already passed.
+    The user chose "now + 2 h": THE CAP IS 2026-10-18T19:55:00Z (no run starts at or after it). The evidence
+    paths keep the task's 2026-10-17 names.
+A2. THE PRECONDITION. tools/e3_state.py --check reads ok false, on the client side only: adb false (the onn is on
+    the phone hotspot, off the LAN) and so apk MISMATCH (unreadable without adb). That is G4-S1 §1's deviation.
+    Every host field held: seven adopted lines, the seven drop-ins, no manager flags, no e3_flag.conf, no
+    e4_constraint.conf, no game, RetroArch 0, encoder 0, PS1 files identical, MainPID serves 8765. One device
+    paired. No privyhub-g8-* unit. Overlay: connected true, path direct, 2 devices online (count only).
+A3. THE PREFLIGHT. tools/e1_remote.py's preflight_remote requires PRIVYHUB_SESSION_IDENTITY=v2 and
+    PRIVYHUB_OVERLAY_PROVIDER=tailscale, and only reads PRIVYHUB_WAN_TELEMETRY=1. It does not refuse other flags. No
+    allow-list patch is made; tools/e1_remote.py is unedited (its hash is below).
+A4. THE DRIVER. g4_s2_driver.py, detached as systemd --user unit privyhub-g4-s2 (--collect); status
+    ~/privyhub_g4_s2/status.txt (5-min heartbeat), history.csv, STOP file ~/privyhub_g4_s2/STOP, the cap above.
+    Per run:
+      e3_flag.conf written ([Service] + one Environment= line per flag),
+      daemon-reload, restart,
+      environ read back (eleven lines: the seven adopted + the run's four; otherwise the run is not started, and
+        the drop-in is removed),
+      python3 tools/e1_suite.py run --remote --out docs/memory/evidence/g4_s2_2026-10-17/runs/run<N>_<arm>
+        --prereg <this file> --runs 1 --window 600 --gap 300 --wait 900 (no --adb),
+      e3_flag.conf removed, daemon-reload, restart,
+      flags_absent read (the environ equals the seven adopted lines, and no manager flags).
+    Run 2 starts right after run 1's teardown; its own 300-s idle gap is the "wait 5 min". A LAN-class run
+    (endpoint class not `overlay`) is void and is replaced at most once, before the cap. A teardown that does not
+    read flags_absent true ends the driver.
+    Beside each run (read-only), every 10 s:
+      /sys/class/net/<the tailnet interface>/statistics/tx_bytes, which gives the hub's tailnet tx rate;
+      native-stream-status (the rung on the wire);
+      the encoder's -b:v / -maxrate (only those two argv values).
+    Every 30 s: /diagnostics/stream-telemetry's `wan` (scrubbed).
+    After each run, the ladder's log over the run (logs/games/adaptive_bitrate_shadow.jsonl from the run's start
+    offset) gives:
+      the first row carrying `start_rung` (rung and source);
+      the remote_cap_config row;
+      every clamp row (source remote_cap);
+      every acted transition with its reason;
+      the rules' suggestions by rule id.
+    The companion's journal over the run is reduced by G8-S1's g8_s1_cap_log_read.py, which masks ids and gives
+    FEC recovered / unrecoverable from the client's heartbeats.
+A5. THE WIRE RATE AT 4000 is the tailnet interface's tx rate. It is reported as the median of the 10-s rates over
+    the run's window, and the data per run is that rate's integral over the window. They are reported for each run
+    and for each rung held.
+A6. The user's cues: start the PS1 game (Tekken 3, the PS1-STREAM fixture) within 15 min of launch, when the TV
+    shows nothing; Pause/Resume once; Save/Load once; the game ends by itself. Wait 5 min, then start it again for
+    run 2. Hand observations are recorded as the user's report, not as readings.
