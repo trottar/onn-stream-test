@@ -54,6 +54,22 @@ if (os.environ.get("PRIVYHUB_START_RUNG") or "").strip():
 
     START_RUNG = _start_rung.shared_from_environ(os.environ)
 
+# G4-W2: the Opus audio path, only with PRIVYHUB_AUDIO_CODEC set. Absent = today:
+# nothing imported; no start is refused for its audio.
+AUDIO_CODEC = None
+if (os.environ.get("PRIVYHUB_AUDIO_CODEC") or "").strip():
+    import audio_codec as _audio_codec
+
+    AUDIO_CODEC = _audio_codec.shared_from_environ(os.environ)
+
+# G8-S4: the encoder's rate-control profile, only with PRIVYHUB_ENCODER_RC set.
+# Absent = today: nothing imported; the encoder command byte for byte.
+ENCODER_RC = None
+if (os.environ.get("PRIVYHUB_ENCODER_RC") or "").strip():
+    import encoder_rc as _encoder_rc
+
+    ENCODER_RC = _encoder_rc.shared_from_environ(os.environ)
+
 
 class NativeStreamError(RuntimeError):
     pass
@@ -1503,6 +1519,9 @@ class NativeStreamManager:
             destination,
         ]
 
+        if ENCODER_RC is not None:   # G8-S4: the rate profile, from this command's own target (start and live)
+            command = ENCODER_RC.apply(command, target_bitrate_kbps)
+
         # E4-S5: PRIVYHUB_SNES_CAPTURE_FIX=output_rate -> the encoder's output rate is the profile's fps (an output -r)
         # instead of x11grab's probed input rate (tbr). A small capture window (the SNES core's 897x672) is sometimes
         # probed at 59 or 59.94 from its first frames, and the encoder then drops one frame per second (or per ~16 s)
@@ -1649,6 +1668,9 @@ class NativeStreamManager:
                 "Linux native video requires exactly one accessible DRM "
                 "render node."
             )
+
+        if AUDIO_CODEC is not None and (refusal := AUDIO_CODEC.prepare(self._session_io.audio, client_ip)):
+            raise NativeStreamError(refusal)   # G4-W2: fails closed before anything is spawned
 
         self._stop_locked()
 

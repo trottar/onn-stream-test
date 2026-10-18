@@ -1851,6 +1851,13 @@ if os.environ.get("PRIVYHUB_SESSION_IDENTITY", "").strip():
 
     SESSION_IDENTITY = _session_gate_from_environ(os.environ, PROJECT_ROOT)
 
+# G4-W2: with PRIVYHUB_AUDIO_CODEC set, record each setup's declared audio codecs
+# (the gate's `_setup` wrapped from outside). Absent = today: nothing imported.
+if SESSION_IDENTITY is not None and (os.environ.get("PRIVYHUB_AUDIO_CODEC") or "").strip():
+    import audio_codec as _audio_codec
+
+    _audio_codec.shared_from_environ(os.environ).install_setup_capture(SESSION_IDENTITY)
+
 # G5-S1: WAN telemetry classification, only with PRIVYHUB_WAN_TELEMETRY=1.
 # Absent = today: nothing imported, constructed or called; no field.
 WAN_TELEMETRY = None

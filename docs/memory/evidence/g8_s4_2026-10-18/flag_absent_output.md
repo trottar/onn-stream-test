@@ -1,0 +1,29 @@
+# G8-S4 — flag absent, the encoder command byte for byte (in process)
+
+No `PRIVYHUB_*` in this process: True; today's `ENCODER_RC` = None, `AUDIO_CODEC` = None; HEAD has `ENCODER_RC`: False.
+
+| case | PRIVYHUB_ENC_BUFSIZE_K | rate args (today) | masked sha256 (HEAD = today) | identical |
+| --- | --- | --- | --- | --- |
+| 7000 (no kwargs) | unset | `-b:v 7000k -maxrate 7000k -bufsize 7000k -max_frame_size 90000` | `77c5df88f3a59db3…` | True |
+| 7000 (no kwargs) | 300 | `-b:v 7000k -maxrate 7000k -bufsize 300k -max_frame_size 90000` | `f7b622757bdbb82a…` | True |
+| 4000 | unset | `-b:v 4000k -maxrate 4000k -bufsize 4000k -max_frame_size 90000` | `f71012123846c5ac…` | True |
+| 4000 | 300 | `-b:v 4000k -maxrate 4000k -bufsize 300k -max_frame_size 90000` | `23f7493a5d88eaea…` | True |
+| 5000 | unset | `-b:v 5000k -maxrate 5000k -bufsize 5000k -max_frame_size 90000` | `7aeaeb82cc66df80…` | True |
+| 5000 | 300 | `-b:v 5000k -maxrate 5000k -bufsize 300k -max_frame_size 90000` | `e2ad9b324d0e7bc4…` | True |
+| 5500 | unset | `-b:v 5500k -maxrate 5500k -bufsize 5500k -max_frame_size 90000` | `228d2b87f4f2223e…` | True |
+| 5500 | 300 | `-b:v 5500k -maxrate 5500k -bufsize 300k -max_frame_size 90000` | `8f9603fd10f47103…` | True |
+| 6000 | unset | `-b:v 6000k -maxrate 6000k -bufsize 6000k -max_frame_size 90000` | `80080b3e7712eacc…` | True |
+| 6000 | 300 | `-b:v 6000k -maxrate 6000k -bufsize 300k -max_frame_size 90000` | `0ec34fdd200b6cf6…` | True |
+| 7000 | unset | `-b:v 7000k -maxrate 7000k -bufsize 7000k -max_frame_size 90000` | `77c5df88f3a59db3…` | True |
+| 7000 | 300 | `-b:v 7000k -maxrate 7000k -bufsize 300k -max_frame_size 90000` | `f7b622757bdbb82a…` | True |
+| 12600 @1920x1080 | unset | `-b:v 12600k -maxrate 12600k -bufsize 12600k -max_frame_size 90000` | `c995848e9e20272c…` | True |
+| 12600 @1920x1080 | 300 | `-b:v 12600k -maxrate 12600k -bufsize 300k -max_frame_size 90000` | `468118df1dba3fde…` | True |
+
+## The start handler (`_start_linux_locked`), HEAD vs today
+
+| target class | identical (argv, level, payload, calls, log) | calls |
+| --- | --- | --- |
+| LAN | True | 8 |
+| overlay | True | 8 |
+
+**All identical: True.**

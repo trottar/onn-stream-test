@@ -18,6 +18,14 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
+# G4-W2: the Opus audio path, only with PRIVYHUB_AUDIO_CODEC set. Absent = today:
+# nothing imported; the PCM sender byte for byte.
+AUDIO_CODEC = None
+if (os.environ.get("PRIVYHUB_AUDIO_CODEC") or "").strip():
+    import audio_codec as _audio_codec
+
+    AUDIO_CODEC = _audio_codec.shared_from_environ(os.environ)
+
 
 class NativeSessionIOError(RuntimeError):
     pass
@@ -441,6 +449,9 @@ class NativeAudioStreamer:
 
         if not self._linux_prepare_sender_scheduler():
             return
+
+        if AUDIO_CODEC is not None and AUDIO_CODEC.session_for(self) is not None:   # G4-W2: this start chose Opus
+            return AUDIO_CODEC.run_sender(self, client_ip, client_port)
 
         self._linux_pacing_frame = os.environ.get("PRIVYHUB_AUDIO_SENDER_PACING") == "frame"  # E3-S5
         self._linux_pacing_frame_spin = os.environ.get("PRIVYHUB_AUDIO_SENDER_PACING") == "frame_spin"  # E3-S5C

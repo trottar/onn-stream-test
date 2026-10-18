@@ -1,0 +1,809 @@
+diff --git a/companion/native_session_io.py b/companion/native_session_io.py
+index d431fa8..85a0465 100644
+--- a/companion/native_session_io.py
++++ b/companion/native_session_io.py
+@@ -18,6 +18,14 @@ import time
+ from pathlib import Path
+ from typing import Any, Callable
+ 
++# G4-W2: the Opus audio path, only with PRIVYHUB_AUDIO_CODEC set. Absent = today:
++# nothing imported; the PCM sender byte for byte.
++AUDIO_CODEC = None
++if (os.environ.get("PRIVYHUB_AUDIO_CODEC") or "").strip():
++    import audio_codec as _audio_codec
++
++    AUDIO_CODEC = _audio_codec.shared_from_environ(os.environ)
++
+ 
+ class NativeSessionIOError(RuntimeError):
+     pass
+@@ -442,6 +450,9 @@ class NativeAudioStreamer:
+         if not self._linux_prepare_sender_scheduler():
+             return
+ 
++        if AUDIO_CODEC is not None and AUDIO_CODEC.session_for(self) is not None:   # G4-W2: this start chose Opus
++            return AUDIO_CODEC.run_sender(self, client_ip, client_port)
++
+         self._linux_pacing_frame = os.environ.get("PRIVYHUB_AUDIO_SENDER_PACING") == "frame"  # E3-S5
+         self._linux_pacing_frame_spin = os.environ.get("PRIVYHUB_AUDIO_SENDER_PACING") == "frame_spin"  # E3-S5C
+         # E3-S5B, measurement only: PRIVYHUB_AUDIO_SEND_TRACE=<path> -> the perf_counter_ns of every sendto
+diff --git a/companion/native_stream.py b/companion/native_stream.py
+index 367925f..9a15924 100644
+--- a/companion/native_stream.py
++++ b/companion/native_stream.py
+@@ -54,6 +54,14 @@ if (os.environ.get("PRIVYHUB_START_RUNG") or "").strip():
+ 
+     START_RUNG = _start_rung.shared_from_environ(os.environ)
+ 
++# G4-W2: the Opus audio path, only with PRIVYHUB_AUDIO_CODEC set. Absent = today:
++# nothing imported; no start is refused for its audio.
++AUDIO_CODEC = None
++if (os.environ.get("PRIVYHUB_AUDIO_CODEC") or "").strip():
++    import audio_codec as _audio_codec
++
++    AUDIO_CODEC = _audio_codec.shared_from_environ(os.environ)
++
+ 
+ class NativeStreamError(RuntimeError):
+     pass
+@@ -1650,6 +1658,9 @@ class NativeStreamManager:
+                 "render node."
+             )
+ 
++        if AUDIO_CODEC is not None and (refusal := AUDIO_CODEC.prepare(self._session_io.audio, client_ip)):
++            raise NativeStreamError(refusal)   # G4-W2: fails closed before anything is spawned
++
+         self._stop_locked()
+ 
+         capture_target = self._select_capture_target(
+diff --git a/companion/privyhub_service.py b/companion/privyhub_service.py
+index 80b9ec9..cef254b 100644
+--- a/companion/privyhub_service.py
++++ b/companion/privyhub_service.py
+@@ -1851,6 +1851,13 @@ if os.environ.get("PRIVYHUB_SESSION_IDENTITY", "").strip():
+ 
+     SESSION_IDENTITY = _session_gate_from_environ(os.environ, PROJECT_ROOT)
+ 
++# G4-W2: with PRIVYHUB_AUDIO_CODEC set, record each setup's declared audio codecs
++# (the gate's `_setup` wrapped from outside). Absent = today: nothing imported.
++if SESSION_IDENTITY is not None and (os.environ.get("PRIVYHUB_AUDIO_CODEC") or "").strip():
++    import audio_codec as _audio_codec
++
++    _audio_codec.shared_from_environ(os.environ).install_setup_capture(SESSION_IDENTITY)
++
+ # G5-S1: WAN telemetry classification, only with PRIVYHUB_WAN_TELEMETRY=1.
+ # Absent = today: nothing imported, constructed or called; no field.
+ WAN_TELEMETRY = None
+diff --git a/companion/audio_codec.py b/companion/audio_codec.py
+new file mode 100644
+index 0000000..306446e
+--- /dev/null
++++ b/companion/audio_codec.py
+@@ -0,0 +1,412 @@
++"""G4-W2: a compressed (Opus) audio path, host side.
++
++`PRIVYHUB_AUDIO_CODEC=opus[,bitrate=<kbps>][,frame=<ms>]`. **Absent (or empty) =
++today**: nothing imports this module; the PCM sender is byte for byte as before.
++The design is `docs/memory/evidence/g4_w2_2026-10-18/design_written_before_code.md`
++(hashed before this code).
++
++- Defaults: 128 kbit/s, 10-ms frames; bitrate 48-256, frame 5 / 10 / 20. `pcm`, an
++  unknown codec or a malformed part -> logged once, ignored (today's PCM path).
++- The encoder: the host's libopus through ctypes, RESTRICTED_LOWDELAY (CELT only,
++  2.5-ms lookahead), hard CBR, complexity 10, no in-band FEC.
++- The datagram: today's 16-B PHA1 header (`<4sBBHII`) with **version 2 = Opus**;
++  frames = samples per channel; the payload one Opus packet. Old clients drop v2.
++- Protection: today's duplication (the profile's copies), the copy the same ~20 ms
++  behind its original: offset = round(offset_packets x 5 ms / frame), at least 1.
++- The negotiation: the client's `/session/setup` body carries `"audio_codecs":
++  ["opus"]`; the gate's `_setup` is wrapped from outside (the identity module is not
++  edited) to record it per declared host. A stream start to a target that did not
++  declare it is refused with a message (fails closed).
++"""
++
++from __future__ import annotations
++
++import ctypes
++import ctypes.util
++import os
++import socket
++import threading
++import time
++from collections import deque
++from typing import Any, Callable, Mapping
++
++FLAG_ENV = "PRIVYHUB_AUDIO_CODEC"
++CODEC_OPUS = "opus"
++CAPABILITY_FIELD = "audio_codecs"
++DEFAULT_BITRATE_KBPS = 128
++DEFAULT_FRAME_MS = 10
++BITRATE_MIN_KBPS = 48
++BITRATE_MAX_KBPS = 256
++FRAMES_MS = (5, 10, 20)
++PHA_VERSION_OPUS = 2
++SAMPLE_RATE = 48_000
++CHANNELS = 2
++PCM_PACKET_MS = 5                  # the PCM path's tick (native_stream_profiles.AUDIO_PACKET_MS)
++MAX_PACKET_BYTES = 1500
++DECLARED_MAX_HOSTS = 64
++
++REFUSAL = ("audio codec opus is required by this host ({flag}) and the client did not "
++           "declare it in session/setup").format(flag=FLAG_ENV)
++
++# libopus constants (opus_defines.h)
++OPUS_OK = 0
++OPUS_APPLICATION_RESTRICTED_LOWDELAY = 2051
++OPUS_SET_BITRATE_REQUEST = 4002
++OPUS_SET_VBR_REQUEST = 4006
++OPUS_SET_COMPLEXITY_REQUEST = 4010
++OPUS_SET_INBAND_FEC_REQUEST = 4012
++OPUS_GET_LOOKAHEAD_REQUEST = 4027
++
++
++def parse(raw: Any) -> dict[str, Any]:
++    """`opus[,bitrate=N][,frame=N]` -> {"codec": "opus", ...}; anything else -> {"invalid": why}."""
++    text = str(raw or "").strip().lower()
++    parts = [p.strip() for p in text.split(",")]
++    if not parts or parts[0] != CODEC_OPUS:
++        return {"invalid": f"codec {parts[0] if parts else ''!r} is not opus"}
++    cfg: dict[str, Any] = {"codec": CODEC_OPUS, "bitrate_kbps": DEFAULT_BITRATE_KBPS, "frame_ms": DEFAULT_FRAME_MS}
++    seen: set[str] = set()
++    for part in parts[1:]:
++        key, sep, value = part.partition("=")
++        key, value = key.strip(), value.strip()
++        if not sep or key not in ("bitrate", "frame") or key in seen or not value.isdigit():
++            return {"invalid": f"part {part!r} is not bitrate=<kbps> or frame=<ms>"}
++        seen.add(key)
++        number = int(value)
++        if key == "bitrate":
++            if not BITRATE_MIN_KBPS <= number <= BITRATE_MAX_KBPS:
++                return {"invalid": f"bitrate {number} outside {BITRATE_MIN_KBPS}-{BITRATE_MAX_KBPS}"}
++            cfg["bitrate_kbps"] = number
++        else:
++            if number not in FRAMES_MS:
++                return {"invalid": f"frame {number} not one of {FRAMES_MS}"}
++            cfg["frame_ms"] = number
++    return cfg
++
++
++def wire_numbers(bitrate_kbps: int, frame_ms: int, copies: int = 2) -> dict[str, float]:
++    """The datagram size and rate the design states (IP-level: + UDP 8 + IPv4 20)."""
++    payload = bitrate_kbps * frame_ms // 8
++    per_s = (1000 // frame_ms) * max(1, copies)
++    ip_bytes = payload + 16 + 28
++    return {"payload_bytes": payload, "datagrams_per_s": per_s, "ip_bytes": ip_bytes,
++            "kbit_s": per_s * ip_bytes * 8 / 1000}
++
++
++def copy_offset_packets(offset_pcm_packets: int, frame_ms: int) -> int:
++    return max(1, int(round(int(offset_pcm_packets) * PCM_PACKET_MS / frame_ms)))
++
++
++# ---- libopus through ctypes ------------------------------------------------------------
++
++_LIB: Any = None
++_LIB_LOCK = threading.Lock()
++
++
++def libopus() -> Any:
++    global _LIB
++    with _LIB_LOCK:
++        if _LIB is None:
++            name = ctypes.util.find_library("opus") or "libopus.so.0"
++            lib = ctypes.CDLL(name)
++            lib.opus_get_version_string.restype = ctypes.c_char_p
++            lib.opus_encoder_create.restype = ctypes.c_void_p
++            lib.opus_encoder_create.argtypes = [ctypes.c_int32, ctypes.c_int, ctypes.c_int,
++                                                ctypes.POINTER(ctypes.c_int)]
++            lib.opus_encode.restype = ctypes.c_int32
++            lib.opus_encode.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int,
++                                        ctypes.c_char_p, ctypes.c_int32]
++            lib.opus_encoder_destroy.argtypes = [ctypes.c_void_p]
++            lib.opus_decoder_create.restype = ctypes.c_void_p
++            lib.opus_decoder_create.argtypes = [ctypes.c_int32, ctypes.c_int, ctypes.POINTER(ctypes.c_int)]
++            lib.opus_decode.restype = ctypes.c_int
++            lib.opus_decode.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int32,
++                                        ctypes.c_char_p, ctypes.c_int, ctypes.c_int]
++            lib.opus_decoder_destroy.argtypes = [ctypes.c_void_p]
++            _LIB = lib
++        return _LIB
++
++
++def libopus_version() -> str:
++    return libopus().opus_get_version_string().decode("ascii", "replace")
++
++
++class OpusEncoder:
++    def __init__(self, bitrate_kbps: int, frame_ms: int) -> None:
++        lib = libopus()
++        err = ctypes.c_int(0)
++        self._lib = lib
++        self._st = lib.opus_encoder_create(SAMPLE_RATE, CHANNELS, OPUS_APPLICATION_RESTRICTED_LOWDELAY,
++                                           ctypes.byref(err))
++        if err.value != OPUS_OK or not self._st:
++            raise RuntimeError(f"opus_encoder_create failed ({err.value})")
++        for request, value in ((OPUS_SET_BITRATE_REQUEST, int(bitrate_kbps) * 1000), (OPUS_SET_VBR_REQUEST, 0),
++                               (OPUS_SET_COMPLEXITY_REQUEST, 10), (OPUS_SET_INBAND_FEC_REQUEST, 0)):
++            rc = lib.opus_encoder_ctl(ctypes.c_void_p(self._st), ctypes.c_int(request), ctypes.c_int32(value))
++            if rc != OPUS_OK:
++                raise RuntimeError(f"opus_encoder_ctl({request}) failed ({rc})")
++        look = ctypes.c_int32(0)
++        lib.opus_encoder_ctl(ctypes.c_void_p(self._st), ctypes.c_int(OPUS_GET_LOOKAHEAD_REQUEST), ctypes.byref(look))
++        self.lookahead_samples = int(look.value)
++        self.frame_samples = SAMPLE_RATE * int(frame_ms) // 1000
++        self._out = ctypes.create_string_buffer(MAX_PACKET_BYTES)
++
++    def encode(self, pcm: bytes) -> bytes:
++        n = self._lib.opus_encode(self._st, pcm, self.frame_samples, self._out, MAX_PACKET_BYTES)
++        if n < 0:
++            raise RuntimeError(f"opus_encode failed ({n})")
++        return self._out.raw[:n]
++
++    def close(self) -> None:
++        if self._st:
++            self._lib.opus_encoder_destroy(self._st)
++            self._st = None
++
++    def __del__(self) -> None:  # pragma: no cover - best effort
++        try:
++            self.close()
++        except Exception:
++            pass
++
++
++class OpusDecoder:
++    """For the proof and the tests (the client decodes with MediaCodec)."""
++
++    def __init__(self) -> None:
++        lib = libopus()
++        err = ctypes.c_int(0)
++        self._lib = lib
++        self._st = lib.opus_decoder_create(SAMPLE_RATE, CHANNELS, ctypes.byref(err))
++        if err.value != OPUS_OK or not self._st:
++            raise RuntimeError(f"opus_decoder_create failed ({err.value})")
++        self._out = ctypes.create_string_buffer(SAMPLE_RATE // 10 * CHANNELS * 2)
++
++    def decode(self, packet: bytes | None, frame_samples: int) -> bytes:
++        """packet None -> the decoder's loss concealment for one frame."""
++        if packet is None:
++            n = self._lib.opus_decode(self._st, None, 0, self._out, frame_samples, 0)
++        else:
++            n = self._lib.opus_decode(self._st, packet, len(packet), self._out, frame_samples, 0)
++        if n < 0:
++            raise RuntimeError(f"opus_decode failed ({n})")
++        return self._out.raw[: n * CHANNELS * 2]
++
++    def close(self) -> None:
++        if self._st:
++            self._lib.opus_decoder_destroy(self._st)
++            self._st = None
++
++    def __del__(self) -> None:  # pragma: no cover
++        try:
++            self.close()
++        except Exception:
++            pass
++
++
++# ---- the session's choice and the sender -------------------------------------------------
++
++class OpusSession:
++    """What one stream start chose: set on the audio streamer by `prepare`."""
++
++    def __init__(self, bitrate_kbps: int, frame_ms: int) -> None:
++        self.bitrate_kbps = int(bitrate_kbps)
++        self.frame_ms = int(frame_ms)
++        self.encoder_cpu_ns = 0
++        self.encoded_frames = 0
++        self.payload_bytes = 0
++
++
++def run_opus_sender(streamer: Any, session: OpusSession, client_ip: str, client_port: int,
++                    sock_factory: Callable[[], Any] | None = None) -> None:
++    """The PCM loop's twin (`NativeAudioStreamer._linux_sender_loop`): the same pacer,
++    buffer, silence on underflow, duplication and counters, one Opus packet per frame."""
++    frame_samples = SAMPLE_RATE * session.frame_ms // 1000
++    frame_bytes = frame_samples * CHANNELS * 2
++    frame_ns = session.frame_ms * 1_000_000
++    silence = bytes(frame_bytes)
++    encoder = OpusEncoder(session.bitrate_kbps, session.frame_ms)
++    header = streamer.LINUX_HEADER
++    # E3-S5 / E3-S5C pacing variants, read as the PCM loop reads them (the pacer uses them).
++    streamer._linux_pacing_frame = os.environ.get("PRIVYHUB_AUDIO_SENDER_PACING") == "frame"
++    streamer._linux_pacing_frame_spin = os.environ.get("PRIVYHUB_AUDIO_SENDER_PACING") == "frame_spin"
++    sock = sock_factory() if sock_factory is not None else socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++    try:
++        if sock_factory is None:
++            sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 64 * 1024)
++            sock.setblocking(False)
++        sequence = 0
++        sample_timestamp = 0
++        copies = streamer._redundancy_copies
++        offset = copy_offset_packets(streamer._redundancy_offset_packets, session.frame_ms)
++        history: deque[bytes] = deque(maxlen=offset + 1)
++        deadline_ns = time.perf_counter_ns()
++        target = (client_ip, int(client_port))
++        while not streamer._linux_stop_event.is_set():
++            deadline_ns += frame_ns
++            if not streamer._linux_wait_until(deadline_ns):
++                break
++            with streamer._linux_buffer_condition:
++                if len(streamer._linux_buffer) >= frame_bytes:
++                    pcm = bytes(streamer._linux_buffer[:frame_bytes])
++                    del streamer._linux_buffer[:frame_bytes]
++                else:
++                    pcm = silence
++                    streamer._linux_sender_underflows += 1
++            t0 = time.thread_time_ns()
++            packet = encoder.encode(pcm)
++            session.encoder_cpu_ns += time.thread_time_ns() - t0
++            session.encoded_frames += 1
++            session.payload_bytes += len(packet)
++            datagram = header.pack(b"PHA1", PHA_VERSION_OPUS, CHANNELS, sequence, sample_timestamp,
++                                   frame_samples) + packet
++            try:
++                sock.sendto(datagram, target)
++                now_ns = time.perf_counter_ns()
++                if streamer._linux_last_send_ns > 0:
++                    streamer._linux_send_intervals_ns.append(now_ns - streamer._linux_last_send_ns)
++                streamer._linux_last_send_ns = now_ns
++                streamer._linux_packets_sent += 1
++            except (BlockingIOError, OSError):
++                streamer._linux_send_errors += 1
++            if copies >= 2:
++                history.append(datagram)
++                if len(history) > offset:
++                    try:
++                        sock.sendto(history[0], target)
++                        streamer._linux_duplicates_sent += 1
++                    except (BlockingIOError, OSError):
++                        streamer._linux_duplicate_send_errors += 1
++            sequence = (sequence + 1) & 0xFFFF
++            sample_timestamp = (sample_timestamp + frame_samples) & 0xFFFFFFFF
++    finally:
++        encoder.close()
++        try:
++            sock.close()
++        except OSError:
++            pass
++
++
++class AudioCodec:
++    def __init__(self, raw: Any, log: Any = print, wall: Callable[[], float] = time.time) -> None:
++        self.raw = str(raw or "").strip()
++        self.config = parse(raw)
++        self.active = "invalid" not in self.config
++        self._log = log
++        self._wall = wall
++        self._logged: set[str] = set()
++        self._lock = threading.Lock()
++        self._declared: dict[str, tuple[tuple[str, ...], float]] = {}
++        self.starts_opus = 0
++        self.starts_refused = 0
++        if not self.active:
++            self._once("invalid", f"ignored ({self.config['invalid']}); audio stays PCM")
++
++    def _once(self, key: str, text: str) -> None:
++        if key not in self._logged:
++            self._logged.add(key)
++            try:
++                self._log(f"PrivyHub audio codec ({FLAG_ENV}): {text}")
++            except Exception:
++                pass
++
++    # -- the capability, captured from session/setup --
++    def note_setup(self, body: Any, status: int, payload: Any) -> None:
++        if status != 200 or not isinstance(payload, dict) or payload.get("ok") is not True:
++            return
++        if not isinstance(body, dict):
++            return
++        raw = body.get(CAPABILITY_FIELD)
++        codecs: tuple[str, ...] = ()
++        if isinstance(raw, list):
++            codecs = tuple(sorted({str(c).strip().lower() for c in raw if isinstance(c, str)}))[:8]
++        hosts = [str(body.get("media_host") or "").strip()]
++        if body.get("sig_v") == 2 and not isinstance(body.get("sig_v"), bool):
++            hosts.append(str(body.get("overlay_host") or "").strip())
++        with self._lock:
++            for host in hosts:
++                if host:
++                    self._declared.pop(host, None)
++                    self._declared[host] = (codecs, self._wall())
++            while len(self._declared) > DECLARED_MAX_HOSTS:
++                self._declared.pop(next(iter(self._declared)))
++
++    def install_setup_capture(self, gate: Any) -> bool:
++        """Wrap the gate instance's `_setup` (the module file is not edited). Idempotent."""
++        original = getattr(gate, "_setup", None)
++        if original is None or getattr(original, "_g4_w2_capture", False):
++            return False
++        codec = self
++
++        def _setup(body, routing, refused):
++            status, payload = original(body, routing, refused)
++            try:
++                codec.note_setup(body, status, payload)
++            except Exception:
++                pass
++            return status, payload
++
++        _setup._g4_w2_capture = True  # type: ignore[attr-defined]
++        gate._setup = _setup
++        return True
++
++    def declared(self, host: str) -> tuple[str, ...]:
++        with self._lock:
++            entry = self._declared.get(str(host))
++        return entry[0] if entry else ()
++
++    # -- the stream start --
++    def prepare(self, streamer: Any, client_ip: str) -> str | None:
++        """None = go on (Opus configured, or the flag invalid -> PCM); else the refusal text."""
++        if not self.active:
++            streamer._audio_codec_opus = None
++            return None
++        if CODEC_OPUS in self.declared(client_ip):
++            streamer._audio_codec_opus = OpusSession(self.config["bitrate_kbps"], self.config["frame_ms"])
++            with self._lock:
++                self.starts_opus += 1
++            self._once("opus", "opus {b} kbit/s, {f}-ms frames, libopus {v}".format(
++                b=self.config["bitrate_kbps"], f=self.config["frame_ms"], v=libopus_version()))
++            return None
++        streamer._audio_codec_opus = None
++        with self._lock:
++            self.starts_refused += 1
++        self._once("refused", "a start was refused: the client did not declare opus")
++        return REFUSAL
++
++    @staticmethod
++    def session_for(streamer: Any) -> OpusSession | None:
++        return getattr(streamer, "_audio_codec_opus", None)
++
++    @staticmethod
++    def run_sender(streamer: Any, client_ip: str, client_port: int) -> None:
++        run_opus_sender(streamer, streamer._audio_codec_opus, client_ip, client_port)
++
++    def status(self) -> dict[str, Any]:
++        out: dict[str, Any] = {"flag": FLAG_ENV, "active": self.active, "starts_opus": self.starts_opus,
++                               "starts_refused": self.starts_refused}
++        out.update({k: v for k, v in self.config.items()})
++        return out
++
++
++_SHARED: AudioCodec | None = None
++_SHARED_LOCK = threading.Lock()
++
++
++def shared_from_environ(environ: Mapping[str, str]) -> AudioCodec | None:
++    """The one instance the hooks share; None when the flag is absent or empty."""
++    global _SHARED
++    raw = environ.get(FLAG_ENV)
++    if raw is None or str(raw).strip() == "":
++        return None
++    with _SHARED_LOCK:
++        if _SHARED is None:
++            _SHARED = AudioCodec(raw)
++        return _SHARED
++
++
++def from_environ_fresh(environ: Mapping[str, str] = os.environ, log: Any = print) -> AudioCodec | None:
++    """A new instance (tests and harnesses)."""
++    raw = environ.get(FLAG_ENV)
++    if raw is None or str(raw).strip() == "":
++        return None
++    return AudioCodec(raw, log=log)
+diff --git a/tests/audio_codec/test_audio_codec.py b/tests/audio_codec/test_audio_codec.py
+new file mode 100644
+index 0000000..969976b
+--- /dev/null
++++ b/tests/audio_codec/test_audio_codec.py
+@@ -0,0 +1,309 @@
++#!/usr/bin/env python3
++"""G4-W2: the Opus audio path (host side).
++
++    python3 -m unittest discover -s tests/audio_codec -v
++
++No stream, no companion, no socket: the sender runs on a real `NativeAudioStreamer`
++(rooted in a temp directory) with a capturing socket and a pacer that returns at once;
++the stream start runs the real `_start_linux_locked` on G8-S2's stub manager. This
++process carries no flag; cases that need it load fresh module copies or set the hook's
++global and restore it. Addresses are built from integers.
++"""
++
++from __future__ import annotations
++
++import ast
++import importlib.util
++import ipaddress
++import os
++import struct
++import subprocess
++import sys
++import tempfile
++import types
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(ROOT / "tests" / "start_rung"))
++
++import audio_codec as ac  # noqa: E402
++import native_session_io as nsio  # noqa: E402
++import native_stream as ns  # noqa: E402
++import stub_manager as stub  # noqa: E402
++
++LAN = str(ipaddress.ip_address(0xC0A80117))
++OVERLAY = str(ipaddress.ip_network((0x64400000, 10))[77])
++HEADER = struct.Struct("<4sBBHII")
++
++
++class CaptureSocket:
++    def __init__(self, log):
++        self.log = log
++
++    def setsockopt(self, *a):
++        pass
++
++    def setblocking(self, *a):
++        pass
++
++    def sendto(self, data, addr):
++        self.log.append(bytes(data))
++
++    def close(self):
++        pass
++
++
++def fake_socket(log):
++    import socket as real
++    return types.SimpleNamespace(socket=lambda *a, **k: CaptureSocket(log), AF_INET=real.AF_INET,
++                                 SOCK_DGRAM=real.SOCK_DGRAM, SOL_SOCKET=real.SOL_SOCKET, SO_SNDBUF=real.SO_SNDBUF)
++
++
++def run_loop(source: bytes, ticks: int, codec: ac.AudioCodec | None = None, declared: bool = True,
++             tick_bytes: int = 960):
++    """The real `_linux_sender_loop` for `ticks` ticks; the buffer fed `tick_bytes` per tick."""
++    tmp = Path(tempfile.mkdtemp(prefix="g4_w2_test_"))
++    st = nsio.NativeAudioStreamer(tmp)
++    st._client_ip, st._client_port = LAN, 48101
++    st.set_redundancy(copies=2, offset_packets=4)
++    st._linux_prepare_sender_scheduler = lambda: True
++    sent: list = []
++    state = {"n": 0, "fed": 0}
++
++    def wait_until(deadline_ns):
++        if state["n"] >= ticks:
++            return False
++        state["n"] += 1
++        chunk = source[state["fed"]: state["fed"] + tick_bytes]
++        state["fed"] += len(chunk)
++        with st._linux_buffer_condition:
++            st._linux_buffer.extend(chunk)
++        return True
++
++    st._linux_wait_until = wait_until
++    saved = (nsio.AUDIO_CODEC, nsio.socket, ac.socket)
++    nsio.socket = fake_socket(sent)
++    ac.socket = fake_socket(sent)
++    if codec is not None:
++        nsio.AUDIO_CODEC = codec
++        if declared:
++            codec.note_setup({"media_host": LAN, "audio_codecs": ["opus"]}, 200, {"ok": True})
++        codec.prepare(st, LAN)
++    try:
++        st._linux_sender_loop()
++    finally:
++        nsio.AUDIO_CODEC, nsio.socket, ac.socket = saved
++    return sent, st
++
++
++def tone(seconds: float) -> bytes:
++    import math
++    n = int(48_000 * seconds)
++    return b"".join(struct.pack("<hh", int(6000 * math.sin(2 * math.pi * 440 * i / 48_000)),
++                                int(6000 * math.sin(2 * math.pi * 660 * i / 48_000))) for i in range(n))
++
++
++class TestParse(unittest.TestCase):
++    def test_defaults_and_parts(self):
++        self.assertEqual(ac.parse("opus"), {"codec": "opus", "bitrate_kbps": 128, "frame_ms": 10})
++        self.assertEqual(ac.parse(" OPUS ,bitrate=96, frame=20"), {"codec": "opus", "bitrate_kbps": 96, "frame_ms": 20})
++        self.assertEqual(ac.parse("opus,frame=5")["frame_ms"], 5)
++
++    def test_invalid(self):
++        for raw in ("pcm", "", "opus,frame=40", "opus,frame=2.5", "opus,bitrate=47", "opus,bitrate=257",
++                    "opus,bitrate=", "opus,bitrate=96,bitrate=96", "opus,rate=96", "opus;bitrate=96", "aac"):
++            self.assertIn("invalid", ac.parse(raw), raw)
++
++    def test_invalid_logged_once_and_inert(self):
++        lines: list = []
++        codec = ac.AudioCodec("opus,frame=40", log=lines.append)
++        self.assertFalse(codec.active)
++        st = types.SimpleNamespace()
++        self.assertIsNone(codec.prepare(st, LAN))
++        self.assertIsNone(codec.prepare(st, LAN))
++        self.assertIsNone(ac.AudioCodec.session_for(st))
++        self.assertEqual(len(lines), 1)
++        self.assertIn("ignored", lines[0])
++
++    def test_wire_numbers(self):
++        self.assertEqual(ac.wire_numbers(128, 10), {"payload_bytes": 160, "datagrams_per_s": 200, "ip_bytes": 204,
++                                                    "kbit_s": 326.4})
++        self.assertAlmostEqual(ac.wire_numbers(128, 5)["kbit_s"], 396.8)
++        self.assertAlmostEqual(ac.wire_numbers(128, 20)["kbit_s"], 291.2)
++        self.assertEqual([ac.copy_offset_packets(4, f) for f in (5, 10, 20)], [4, 2, 1])
++
++
++class TestLibopus(unittest.TestCase):
++    def test_cbr_lookahead_roundtrip(self):
++        enc = ac.OpusEncoder(128, 10)
++        dec = ac.OpusDecoder()
++        self.assertEqual(enc.lookahead_samples, 120)        # RESTRICTED_LOWDELAY: 2.5 ms
++        pcm = tone(0.2)
++        sizes = set()
++        for i in range(20):
++            p = enc.encode(pcm[i * 1920:(i + 1) * 1920])
++            sizes.add(len(p))
++            self.assertEqual(len(dec.decode(p, 480)), 1920)
++        self.assertEqual(sizes, {160})                       # hard CBR
++        self.assertEqual(len(dec.decode(None, 480)), 1920)   # concealment for a hole
++        enc.close()
++        dec.close()
++
++
++class TestNegotiation(unittest.TestCase):
++    def test_note_setup_records_only_ok_answers(self):
++        codec = ac.AudioCodec("opus", log=lambda s: None)
++        codec.note_setup({"media_host": LAN, "audio_codecs": ["opus"]}, 401, {"ok": False})
++        self.assertEqual(codec.declared(LAN), ())
++        codec.note_setup({"media_host": LAN, "audio_codecs": ["Opus", "pcm_s16le", 7]}, 200, {"ok": True})
++        self.assertEqual(codec.declared(LAN), ("opus", "pcm_s16le"))
++        codec.note_setup({"media_host": LAN}, 200, {"ok": True})          # a later setup without the field
++        self.assertEqual(codec.declared(LAN), ())
++
++    def test_overlay_host_only_with_sig_v2(self):
++        codec = ac.AudioCodec("opus", log=lambda s: None)
++        codec.note_setup({"media_host": LAN, "overlay_host": OVERLAY, "audio_codecs": ["opus"]}, 200, {"ok": True})
++        self.assertEqual(codec.declared(OVERLAY), ())
++        codec.note_setup({"media_host": LAN, "overlay_host": OVERLAY, "sig_v": 2, "audio_codecs": ["opus"]},
++                         200, {"ok": True})
++        self.assertEqual(codec.declared(OVERLAY), ("opus",))
++
++    def test_install_wraps_the_instance_once(self):
++        class Gate:
++            def _setup(self, body, routing, refused):
++                return (200, {"ok": True}) if body.get("good") else (401, {"ok": False})
++
++        gate = Gate()
++        codec = ac.AudioCodec("opus", log=lambda s: None)
++        self.assertTrue(codec.install_setup_capture(gate))
++        self.assertFalse(codec.install_setup_capture(gate))
++        self.assertIs(Gate.__dict__["_setup"], Gate._setup)           # the class is not changed
++        self.assertEqual(gate._setup({"good": True, "media_host": LAN, "audio_codecs": ["opus"]}, "lan", None),
++                         (200, {"ok": True}))
++        self.assertEqual(gate._setup({"media_host": OVERLAY, "audio_codecs": ["opus"]}, "lan", None),
++                         (401, {"ok": False}))
++        self.assertEqual(codec.declared(LAN), ("opus",))
++        self.assertEqual(codec.declared(OVERLAY), ())
++
++    def test_prepare(self):
++        codec = ac.AudioCodec("opus,bitrate=96,frame=20", log=lambda s: None)
++        st = types.SimpleNamespace()
++        self.assertEqual(codec.prepare(st, LAN), ac.REFUSAL)
++        self.assertIsNone(ac.AudioCodec.session_for(st))
++        codec.note_setup({"media_host": LAN, "audio_codecs": ["opus"]}, 200, {"ok": True})
++        self.assertIsNone(codec.prepare(st, LAN))
++        sess = ac.AudioCodec.session_for(st)
++        self.assertEqual((sess.bitrate_kbps, sess.frame_ms), (96, 20))
++        self.assertEqual((codec.starts_opus, codec.starts_refused), (1, 1))
++
++
++class TestStart(unittest.TestCase):
++    def setUp(self):
++        self.saved = ns.AUDIO_CODEC
++
++    def tearDown(self):
++        ns.AUDIO_CODEC = self.saved
++
++    def test_absent_global_is_none(self):
++        self.assertIsNone(ns.AUDIO_CODEC)
++        self.assertIsNone(nsio.AUDIO_CODEC)
++
++    def test_old_client_refused_before_anything(self):
++        ns.AUDIO_CODEC = ac.AudioCodec("opus", log=lambda s: None)
++        calls: list = []
++        with self.assertRaises(ns.NativeStreamError) as cm:
++            stub.run_start(ns, LAN, calls)
++        self.assertIn("did not declare it in session/setup", str(cm.exception))
++        self.assertEqual(calls, [])
++
++    def test_declaring_client_starts_with_opus(self):
++        codec = ac.AudioCodec("opus", log=lambda s: None)
++        codec.note_setup({"media_host": LAN, "audio_codecs": ["opus"]}, 200, {"ok": True})
++        ns.AUDIO_CODEC = codec
++        out = stub.run_start(ns, LAN)
++        self.assertIsNotNone(out["argv"])
++        self.assertIsNotNone(ac.AudioCodec.session_for(out["manager"]._session_io.audio))
++
++    def test_invalid_flag_starts_pcm(self):
++        ns.AUDIO_CODEC = ac.AudioCodec("opus,frame=3", log=lambda s: None)
++        out = stub.run_start(ns, LAN)
++        self.assertIsNotNone(out["argv"])
++        self.assertIsNone(ac.AudioCodec.session_for(out["manager"]._session_io.audio))
++
++
++class TestSender(unittest.TestCase):
++    def test_pcm_unchanged_when_session_not_opus(self):
++        src = tone(0.5)
++        a, _ = run_loop(src, 60)
++        b, _ = run_loop(src, 60, codec=ac.AudioCodec("opus,frame=3", log=lambda s: None))   # invalid -> PCM
++        self.assertEqual(a, b)
++        self.assertEqual(HEADER.unpack(a[0][:16])[1], 1)
++        self.assertEqual({len(x) for x in a}, {976})
++
++    def test_opus_datagrams(self):
++        src = tone(1.0)
++        sent, st = run_loop(src, 30, codec=ac.AudioCodec("opus", log=lambda s: None), tick_bytes=1920)
++        heads = [HEADER.unpack(x[:16]) for x in sent]
++        self.assertTrue(all(h[0] == b"PHA1" and h[1] == 2 and h[2] == 2 and h[5] == 480 for h in heads))
++        self.assertEqual({len(x) for x in sent}, {176})
++        # originals 0..29, each followed (from tick 2 on) by the copy of n - 2
++        seqs = [h[3] for h in heads]
++        self.assertEqual(seqs[:5], [0, 1, 2, 0, 3])
++        self.assertEqual(st._linux_packets_sent, 30)
++        self.assertEqual(st._linux_duplicates_sent, 28)
++        self.assertEqual([h[4] for h in heads if h[3] in (0, 1, 2)][:3], [0, 480, 960])
++        self.assertEqual(st._linux_sender_underflows, 0)
++
++    def test_opus_underflow_sends_encoded_silence(self):
++        sent, st = run_loop(b"", 10, codec=ac.AudioCodec("opus", log=lambda s: None), tick_bytes=0)
++        self.assertEqual(st._linux_sender_underflows, 10)
++        self.assertEqual(st._linux_packets_sent, 10)
++
++    def test_undeclared_client_never_reaches_the_opus_loop(self):
++        src = tone(0.5)
++        a, _ = run_loop(src, 40)
++        b, _ = run_loop(src, 40, codec=ac.AudioCodec("opus", log=lambda s: None), declared=False)
++        self.assertEqual(a, b)
++
++
++class TestGuardedImports(unittest.TestCase):
++    def _guarded(self, rel):
++        tree = ast.parse((ROOT / rel).read_text())
++        found = []
++        for node in ast.walk(tree):
++            if isinstance(node, ast.If):
++                src = ast.unparse(node.test)
++                for sub in node.body:
++                    if isinstance(sub, ast.Import) and any(a.name == "audio_codec" for a in sub.names):
++                        found.append(src)
++        top = [n for n in tree.body if isinstance(n, ast.Import) and any(a.name == "audio_codec" for a in n.names)]
++        return found, top
++
++    def test_imports_only_under_the_flag(self):
++        for rel in ("companion/native_stream.py", "companion/native_session_io.py", "companion/privyhub_service.py"):
++            found, top = self._guarded(rel)
++            self.assertEqual(top, [], rel)
++            self.assertEqual(len(found), 1, rel)
++            self.assertIn("PRIVYHUB_AUDIO_CODEC", found[0], rel)
++
++    def test_child_interpreter_shares_one_instance(self):
++        code = ("import sys; sys.path.insert(0, 'companion'); import native_stream as ns, native_session_io as io, "
++                "audio_codec as ac; print(ns.AUDIO_CODEC is io.AUDIO_CODEC is ac._SHARED, "
++                "ns.AUDIO_CODEC.config['frame_ms'])")
++        env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++        env["PRIVYHUB_AUDIO_CODEC"] = "opus,frame=20"
++        env["PYTHONDONTWRITEBYTECODE"] = "1"
++        out = subprocess.run([sys.executable, "-c", code], cwd=str(ROOT), env=env, capture_output=True, text=True)
++        self.assertEqual(out.stdout.strip(), "True 20", out.stderr)
++        env.pop("PRIVYHUB_AUDIO_CODEC")
++        code2 = ("import sys; sys.path.insert(0, 'companion'); import native_stream as ns, native_session_io as io; "
++                 "print(ns.AUDIO_CODEC, io.AUDIO_CODEC, 'audio_codec' in sys.modules)")
++        out = subprocess.run([sys.executable, "-c", code2], cwd=str(ROOT), env=env, capture_output=True, text=True)
++        self.assertEqual(out.stdout.strip(), "None None False", out.stderr)
++
++
++if __name__ == "__main__":
++    unittest.main()

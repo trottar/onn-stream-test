@@ -1,0 +1,61 @@
+G8-S4 regression suites, 2026-10-18T19:48:43Z, run from a slim /tmp copy of the tree (companion/, tools/, tests/ only, 5.7M; only its logs/ writable by the tests; PRIVYHUB_* in this process: 0)
+== tests/overlay
+Ran 17 tests in 0.044s
+OK
+== tests/session_identity
+Ran 80 tests in 0.156s
+OK
+== tests/wan_telemetry
+Ran 18 tests in 0.094s
+OK
+== tests/wan_adaptation
+Ran 23 tests in 0.107s
+OK
+== tests/remote_ladder
+Ran 26 tests in 0.548s
+OK
+== tests/remote_cap
+Ran 16 tests in 0.424s
+OK
+== tests/impairment
+Ran 14 tests in 9.353s
+OK
+== tests/start_rung
+Ran 17 tests in 0.272s
+OK
+== tests/audio_codec
+Ran 19 tests in 0.278s
+OK
+== tests/encoder_rc
+Ran 16 tests in 0.197s
+OK
+== tools/test_adaptive_bitrate_live.py
+ERROR: test_rung_argv_is_the_c3_arm_golden_and_720p_unchanged (__main__.C5M5Actuator.test_rung_argv_is_the_c3_arm_golden_and_720p_unchanged)
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/b_slim_tree_GJzi/docs/memory/evidence/c5_m2_2026-09-29/golden_after_native_game_1080p60_c3_80pct_cap90.txt'
+Ran 126 tests in 0.767s
+FAILED (errors=1)
+== tools/test_c3_f1_recovery_restart.py
+ERROR: test_recovery_is_wired_to_the_new_primitive (__main__.RecoveryRestartTests.test_recovery_is_wired_to_the_new_primitive)
+ValueError: substring not found
+Ran 8 tests in 0.006s
+FAILED (errors=1)
+== tools/test_e1_remote.py
+ERROR: test_gate3_from_fixtures_and_segcap_is_e4_s5ds (__main__.Gate3.test_gate3_from_fixtures_and_segcap_is_e4_s5ds)
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/b_slim_tree_GJzi/docs/memory/evidence/e4_s5d_2026-10-15/e4_s5d_analysis.py'
+Ran 20 tests in 0.031s
+FAILED (errors=1)
+the copy's logs/ after: 1 file(s) (written there, not in the tree)
+== re-run of the two tool tests whose fixtures live in docs/memory: those two files only, symlinked read-only into the slim copy (not copied), 2026-10-18T19:49:08Z
+== tools/test_adaptive_bitrate_live.py
+ERROR: test_rung_argv_is_the_c3_arm_golden_and_720p_unchanged (__main__.C5M5Actuator.test_rung_argv_is_the_c3_arm_golden_and_720p_unchanged)
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/b_slim_tree_GJzi/docs/memory/evidence/c5_m2_2026-09-29/golden_after_unset.txt'
+Ran 126 tests in 0.763s
+FAILED (errors=1)
+== tools/test_e1_remote.py
+Ran 20 tests in 0.032s
+OK
+the copy's logs/ after: 1 file(s)
+== re-run of tools/test_adaptive_bitrate_live.py with its second golden (c5_m2 golden_after_unset.txt) also symlinked read-only, 2026-10-18T19:49:28Z
+Ran 126 tests in 0.760s
+OK
+the copy's logs/ after: 1 file(s); symlinked into the copy (read-only use, 3 files, nothing copied): c5_m2_2026-09-29/golden_after_native_game_1080p60_c3_80pct_cap90.txt, c5_m2_2026-09-29/golden_after_unset.txt, e4_s5d_2026-10-15/e4_s5d_analysis.py

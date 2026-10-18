@@ -1564,6 +1564,18 @@ G8-S2 floor) played over the overlay: start 4000 / `floor` / `path_class` remote
 the title (gate 3 not evaluable). **Wire rate at 4000: 8.29 Mbit/s (~62 MB/min), not ~4.65** — the excess over the
 encoder ~4.3 Mbit/s, as at 7000. Run 2 not run (the user's phone data). Record:
 `docs/memory/evidence/G4_S2_OFFSITE_REMOTE_LADDER_2026-10-17.md`.
+**G4-W1 (2026-10-18): wire overhead accounted: audio (PCM 2/4) is the largest term** — 3,213 kbit/s at every rung
+(400 × 1,004 B), then FEC parity 889 / 1,229 (4000 / 7000), headers 179 / 292, control ~10; no fragmentation; the
+overlay's ~69-74 B per packet is on the underlay, not the tailnet counter. The terms close to −0.1 % at 7000. G4-S1's
+11.42 is KiB-based (11.70 decimal), so the excess is 4.27 / 4.69, not constant. Proposed: cut audio first (G4-W2).
+Record: `docs/memory/evidence/G4_W1_WIRE_OVERHEAD_2026-10-18.md`.
+**G4-W2 (2026-10-18): Opus audio path built behind a flag, host side; the APK decode and live test pending.**
+`PRIVYHUB_AUDIO_CODEC=opus[,bitrate=<kbps>][,frame=<ms>]` (`companion/audio_codec.py`; absent = today, datagram for
+datagram): 128 kbit/s CBR, 10-ms frames, PHA1 v2, today's duplication ~20 ms apart → 200 datagrams/s, 326.4 kbit/s
+against PCM 2/4's 3,212.8 (−1.30 GB/h at any rung), +7.5 ms; same audio-ms lost under loss-1/loss-5 within noise, half
+the holes. The client declares `audio_codecs` in `/session/setup`; an undeclared client is refused at stream start
+(fails closed). Not adopted. Next: the APK's Opus decode (CL-B), a LAN smoke, an off-site run at 4000. Record:
+`docs/memory/evidence/G4_W2_OPUS_AUDIO_PATH_2026-10-18.md`.
 
 **G4-P2 (2026-10-17): the remote row records gate 3 from G4-S2** — `tools/e1_remote.py`
 writes the home row's per-run RetroArch counter override (for the PS1-STREAM fixture),
@@ -1767,6 +1779,15 @@ rung's live wire rate exceeds 6 Mbit/s; cap-4500 needs a rung below 5000, remote
 - The mean wire rate matched G8-S2's bench (~6.1 Mbit/s). The drop is about 3× the bench's and is not explained by the
   mean: it comes with the per-second and frame-size spread.
 - Record: `docs/memory/evidence/G8_S3_CAP_CELLS_START_RUNG_2026-10-17.md`.
+
+**G8-S4 (2026-10-18): rate headroom built behind a flag; live test pending.** `PRIVYHUB_ENCODER_RC=<tight|headroom>`
+(`companion/encoder_rc.py`; absent = today, byte for byte) narrows the encoder's 1-s CBR VBV: `tight` = CBR, maxrate T,
+bufsize T×0.25 (250 ms); `headroom` = VBR, maxrate 1.1 T. Follows live rung changes (one `if` in the builder). Offline on
+the host's VAAPI (C5-M3's attract reference, less bursty than live): `tight` at 5000 p95 5,605 → 5,298, max 5,976 →
+5,535; through cap-6000 in process the tail drop 4.67 % → 3.42 % (per-second p95 17 % → 8 %), not to 0 — the wire mean
+sits at the cap; `headroom` worse (8.72 %). Cost: −0.45 dB PSNR avg, −2.4 to −3.4 dB on the worst frame; CPU unchanged.
+Not adopted. Proposed: G8-S5, G8-S3's cell 1 with `tight`. Record:
+`docs/memory/evidence/G8_S4_ENCODER_RATE_HEADROOM_2026-10-18.md`.
 
 Exercise bounded representative conditions:
 
