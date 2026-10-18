@@ -22,6 +22,10 @@ import org.junit.Test
  * port and the overlay address signed), can grant `diagnostics`, and issues a
  * media token; the new cases cover the declared overlay address, diagnostics,
  * the media header and media token, the hub host and the hub-only media rule.
+ *
+ * CL-B4: the fake host verifies the v3 canon when `sig_v` is 3 (the audio
+ * codecs signed); with `v3 = false` it is a host that predates v3 (it
+ * verifies the body as v1), and the client falls back to v2 once.
  */
 class IdentitySessionTest {
 
@@ -48,6 +52,7 @@ class IdentitySessionTest {
         var refuseSetupWith: String? = null
         var counter = 0
         var grant = listOf("games", "tv", "vod")
+        var v3 = true
         override fun post(url: String, jsonBody: String?): Pair<Int, String> {
             val path = SessionProtocol.pathOf(url)
             calls += path
@@ -73,7 +78,14 @@ class IdentitySessionTest {
                     val deviceId = SessionProtocol.jsonStringField(b, "device_id")!!
                     val mediaHost = SessionProtocol.jsonStringField(b, "media_host")!!
                     val videoPort = SessionProtocol.jsonLongField(b, "video_port")!!.toInt()
-                    val expected = if (SessionProtocol.jsonLongField(b, "sig_v") == 2L) {
+                    val expected = if (v3 && SessionProtocol.jsonLongField(b, "sig_v") == 3L) {
+                        SessionProtocol.signV3(
+                            key!!, deviceId, nonce, mediaHost, videoPort,
+                            SessionProtocol.jsonLongField(b, "audio_port")!!.toInt(),
+                            SessionProtocol.jsonStringField(b, "overlay_host"),
+                            SessionProtocol.jsonStringArray(b, "audio_codecs"),
+                        )
+                    } else if (SessionProtocol.jsonLongField(b, "sig_v") == 2L) {
                         SessionProtocol.signV2(
                             key!!, deviceId, nonce, mediaHost, videoPort,
                             SessionProtocol.jsonLongField(b, "audio_port")!!.toInt(),
@@ -263,11 +275,11 @@ class IdentitySessionTest {
     // ---- G3-S3 ----------------------------------------------------------------
 
     @Test
-    fun setupSignsV2AndDeclaresTheOverlayAddressWhenPresent() {
+    fun setupSignsV3AndDeclaresTheOverlayAddressWhenPresent() {
         paired()
         session.headerFor(hub, launch)
         var body = host.bodies.last()
-        assertEquals(2L, SessionProtocol.jsonLongField(body, "sig_v"))
+        assertEquals(3L, SessionProtocol.jsonLongField(body, "sig_v"))
         assertNull(SessionProtocol.jsonStringField(body, "overlay_host"))
         session.endSessionLocally()
         overlay = overlayAddress
@@ -284,6 +296,43 @@ class IdentitySessionTest {
             assertFalse(line, line.contains(overlayAddress))
             assertFalse(line, line.contains(localAddress))
         }
+    }
+
+    // ---- CL-B4 ----------------------------------------------------------------
+
+    @Test
+    fun setupDeclaresOpusUnderV3() {
+        paired()
+        assertNotNull(session.headerFor(hub, launch))      // the fake host verified the v3 signature
+        assertEquals(listOf("/session/pair", "/session/nonce", "/session/setup"), host.calls)
+        val body = host.bodies.last()
+        assertEquals(3L, SessionProtocol.jsonLongField(body, "sig_v"))
+        assertEquals(listOf("opus"), SessionProtocol.jsonStringArray(body, "audio_codecs"))
+        assertEquals(3, session.lastSigV)
+    }
+
+    @Test
+    fun aHostWithoutV3GetsTodaysV2Once() {
+        host.v3 = false
+        paired()
+        assertNotNull(session.headerFor(hub, launch))
+        assertEquals(
+            listOf("/session/pair", "/session/nonce", "/session/setup", "/session/nonce", "/session/setup"),
+            host.calls,
+        )
+        assertEquals(3L, SessionProtocol.jsonLongField(host.bodies[2], "sig_v"))
+        val v2 = host.bodies[4]
+        assertEquals(2L, SessionProtocol.jsonLongField(v2, "sig_v"))
+        assertFalse(v2.contains("audio_codecs"))
+        // today's v2 body, byte for byte
+        val nonce = SessionProtocol.jsonStringField(v2, "nonce")!!
+        val sig = SessionProtocol.signV2(store.secret!!, "dev-00112233aabbccdd", nonce, localAddress, 48100, 48101, null)
+        assertEquals(
+            SessionProtocol.setupBodyV2("dev-00112233aabbccdd", nonce, localAddress, 48100, 48101, null, sig), v2,
+        )
+        assertEquals(2, session.lastSigV)
+        assertTrue(logs.any { it.contains("host refused sig_v 3") })
+        assertTrue(refusals.isEmpty())
     }
 
     @Test

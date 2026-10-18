@@ -1,0 +1,1480 @@
+diff --git a/PrivyHub/app/src/main/java/identity/IdentitySession.kt b/PrivyHub/app/src/main/java/identity/IdentitySession.kt
+index 7bbb329..75d41c1 100644
+--- a/PrivyHub/app/src/main/java/identity/IdentitySession.kt
++++ b/PrivyHub/app/src/main/java/identity/IdentitySession.kt
+@@ -23,6 +23,10 @@ package com.safeiot.privyhub.identity
+  * the media requests to the hub's range server carry the token too
+  * ([mediaHeaderFor]), or the session's media token for a player that cannot
+  * set headers ([mediaTokenFor]).
++ *
++ * CL-B4: the setup signs v3 — v2 plus the audio codecs this client decodes
++ * (`audio_codecs`, G4-W2's Opus). A host that predates v3 verifies it as v1
++ * and answers `bad-signature`; then one fresh nonce and today's v2 setup.
+  */
+ class IdentitySession(
+     private val enabled: () -> Boolean,
+@@ -83,6 +87,10 @@ class IdentitySession(
+     @Volatile var stateText: String = "off"
+         private set
+ 
++    /** CL-B4: the signature version of the last session set up (3, or 2 after the fallback); 0 before any. */
++    @Volatile var lastSigV: Int = 0
++        private set
++
+     var onRefusal: ((String) -> Unit)? = null
+ 
+     val isEnabled: Boolean get() = enabled()
+@@ -178,7 +186,7 @@ class IdentitySession(
+             log("identity: host identity layer absent")
+             return null
+         }
+-        val nonce = SessionProtocol.jsonStringField(nonceBody, "nonce")
++        var nonce = SessionProtocol.jsonStringField(nonceBody, "nonce")
+         if (nonceStatus != 200 || nonce == null) {
+             return setupRefused(SessionProtocol.reasonOf(nonceBody) ?: "http-$nonceStatus", now)
+         }
+@@ -187,11 +195,31 @@ class IdentitySession(
+         val secret = ensureSecret()
+         // G3-S3: v2 signs the audio port and the overlay interface address (when present).
+         val overlayHost = routes.overlayAddress()?.takeIf { SessionProtocol.isOverlayIpv4(it) }
+-        val sig = SessionProtocol.signV2(secret, pairing.deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost)
+-        val (status, body) = transport.post(
++        // CL-B4: v3 adds the audio codecs.
++        val codecs = SessionProtocol.AUDIO_CODECS
++        val sigV3 = SessionProtocol.signV3(secret, pairing.deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost, codecs)
++        var (status, body) = transport.post(
+             controlUrl(host, "/session/setup"),
+-            SessionProtocol.setupBodyV2(pairing.deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost, sig),
++            SessionProtocol.setupBodyV3(pairing.deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost, codecs, sigV3),
+         )
++        var sigV = 3
++        if (status == 401 && SessionProtocol.reasonOf(body) == SessionProtocol.V3_FALLBACK_REASON) {
++            // A host without v3 (it verified the body as v1): one fresh nonce, today's v2 setup.
++            log("identity: host refused sig_v 3 (${SessionProtocol.V3_FALLBACK_REASON}), v2 setup")
++            val (n2Status, n2Body) = transport.post(controlUrl(host, "/session/nonce"), null)
++            nonce = SessionProtocol.jsonStringField(n2Body, "nonce")
++            if (n2Status != 200 || nonce == null) {
++                return setupRefused(SessionProtocol.reasonOf(n2Body) ?: "http-$n2Status", now)
++            }
++            val sig = SessionProtocol.signV2(secret, pairing.deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost)
++            val answer = transport.post(
++                controlUrl(host, "/session/setup"),
++                SessionProtocol.setupBodyV2(pairing.deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost, sig),
++            )
++            status = answer.first
++            body = answer.second
++            sigV = 2
++        }
+         val value = SessionProtocol.jsonStringField(body, "token")
+         val ttl = SessionProtocol.jsonLongField(body, "expires_in_s")
+         if (status != 200 || value == null || ttl == null) {
+@@ -207,7 +235,8 @@ class IdentitySession(
+         setupRefusedUntilMs = 0L
+         lastReason = null
+         stateText = "session active"
+-        log("identity: session set up, expires_in_s=$ttl, overlay_declared=${overlayHost != null}")
++        lastSigV = sigV
++        log("identity: session set up, expires_in_s=$ttl, overlay_declared=${overlayHost != null}, sig_v=$sigV")
+         return t
+     }
+ 
+diff --git a/PrivyHub/app/src/main/java/identity/SessionProtocol.kt b/PrivyHub/app/src/main/java/identity/SessionProtocol.kt
+index 38741a0..456d409 100644
+--- a/PrivyHub/app/src/main/java/identity/SessionProtocol.kt
++++ b/PrivyHub/app/src/main/java/identity/SessionProtocol.kt
+@@ -19,6 +19,11 @@ object SessionProtocol {
+     // G3-S3: the v2 canon signs the audio port and the overlay address too.
+     const val SETUP_CANON_V2 = "privyhub-session-setup-v2"
+     const val MEDIA_PERMISSION = "vod"
++
++    // CL-B4: the v3 canon signs v2's fields and the audio codecs this client decodes (G4-W2).
++    const val SETUP_CANON_V3 = "privyhub-session-setup-v3"
++    val AUDIO_CODECS = listOf("opus")
++    const val V3_FALLBACK_REASON = "bad-signature"
+     const val MEDIA_TOKEN_PARAM = "media_token"
+ 
+     /** Granted to a paired device without being listed at pairing (G3-S3: diagnostics, default on). */
+@@ -73,6 +78,33 @@ object SessionProtocol {
+         overlayHost: String?,
+     ): String = hmacSha256Hex(keyHex, setupCanonicalV2(deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost))
+ 
++    /** CL-B4: v2's seven lines (named v3) and an eighth, the codecs joined by ','. */
++    fun setupCanonicalV3(
++        deviceId: String,
++        nonce: String,
++        mediaHost: String,
++        videoPort: Int,
++        audioPort: Int,
++        overlayHost: String?,
++        audioCodecs: List<String>,
++    ): String =
++        listOf(
++            SETUP_CANON_V3, deviceId, nonce, mediaHost, videoPort.toString(), audioPort.toString(), overlayHost ?: "",
++            audioCodecs.joinToString(","),
++        ).joinToString("\n")
++
++    fun signV3(
++        keyHex: String,
++        deviceId: String,
++        nonce: String,
++        mediaHost: String,
++        videoPort: Int,
++        audioPort: Int,
++        overlayHost: String?,
++        audioCodecs: List<String>,
++    ): String =
++        hmacSha256Hex(keyHex, setupCanonicalV3(deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost, audioCodecs))
++
+     /** G3-S3: an IPv4 address in the overlay's block (the shared CGNAT /10, Tailscale's range). */
+     fun isOverlayIpv4(address: String): Boolean {
+         val parts = address.split('.')
+@@ -194,6 +226,29 @@ object SessionProtocol {
+             "\"sig\":" + jsonString(sig) +
+             "}"
+ 
++    /** CL-B4: the v3 setup body (`sig_v` 3): v2's, with `audio_codecs`. */
++    fun setupBodyV3(
++        deviceId: String,
++        nonce: String,
++        mediaHost: String,
++        videoPort: Int,
++        audioPort: Int,
++        overlayHost: String?,
++        audioCodecs: List<String>,
++        sig: String,
++    ): String =
++        "{" +
++            "\"device_id\":" + jsonString(deviceId) + "," +
++            "\"nonce\":" + jsonString(nonce) + "," +
++            "\"media_host\":" + jsonString(mediaHost) + "," +
++            "\"video_port\":" + videoPort + "," +
++            "\"audio_port\":" + audioPort + "," +
++            (if (overlayHost != null) "\"overlay_host\":" + jsonString(overlayHost) + "," else "") +
++            "\"audio_codecs\":[" + audioCodecs.joinToString(",") { jsonString(it) } + "]," +
++            "\"sig_v\":3," +
++            "\"sig\":" + jsonString(sig) +
++            "}"
++
+     fun pairBody(code: String, deviceName: String, keyHex: String): String =
+         "{" +
+             "\"code\":" + jsonString(code) + "," +
+diff --git a/PrivyHub/app/src/main/java/streaming/NativeAudioReceiver.kt b/PrivyHub/app/src/main/java/streaming/NativeAudioReceiver.kt
+index ffd4357..3fe0813 100644
+--- a/PrivyHub/app/src/main/java/streaming/NativeAudioReceiver.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeAudioReceiver.kt
+@@ -60,7 +60,23 @@ data class NativeAudioMetrics(
+     // per-heartbeat window figure is `takeWindowMaxArrivalGapMs()`, which
+     // is separate precisely so a heartbeat read cannot steal from the
+     // end-of-session report -- both read `snapshot()`.
+-    val maxArrivalGapMs: Long
++    val maxArrivalGapMs: Long,
++    // CL-B4: the stream's codec ("none" before the first valid datagram,
++    // "pcm" or "opus") and the Opus path's counters. With Opus the loss
++    // counters above (lost_packets, sequence_gap_*, recovered_by_duplicate,
++    // late_unplaced) count Opus frames, not 5-ms packets.
++    val codec: String = "none",
++    val opusFrameSamples: Int = 0,
++    val opusFramesDecoded: Long = 0,
++    val opusFramesAbandoned: Long = 0,
++    val opusDecodeErrors: Long = 0,
++    val opusDrainTimeouts: Long = 0,
++    val opusFormatErrors: Long = 0,
++    val opusMaxHeldFrames: Int = 0,
++    val opusDecodeAvgUs: Double = 0.0,
++    val opusDecodeMaxUs: Long = 0,
++    val opusDecoder: String = "",
++    val opusCopyOffsetFrames: Int = 0
+ )
+ 
+ /**
+@@ -644,6 +660,39 @@ class NativeAudioReceiver(
+     private var expectedSequence =
+         -1
+ 
++    // CL-B4: the Opus path (PHA1 version 2). Receive thread only, except
++    // the @Volatile fields the snapshot reads.
++    @Volatile
++    private var streamCodec =
++        "none"
++
++    @Volatile
++    private var opusFrameSamples =
++        0
++
++    @Volatile
++    private var opusDecoderName =
++        ""
++
++    private var opusDecoder:
++        OpusAudioDecoder? =
++        null
++
++    private var opusDecoderFailed =
++        false
++
++    private val opusReorder =
++        OpusReorder(SEEN_WINDOW)
++
++    private val opusFramesDecoded =
++        AtomicLong(0)
++
++    private val opusFramesAbandoned =
++        AtomicLong(0)
++
++    private val opusDecodeFailures =
++        AtomicLong(0)
++
+     fun start() {
+         if (running) {
+             return
+@@ -867,7 +916,38 @@ class NativeAudioReceiver(
+                     sequenceGapHistogram.get(it)
+                 },
+             startupPrefillMs =
+-                startupPrefillMs
++                startupPrefillMs,
++            codec =
++                streamCodec,
++            opusFrameSamples =
++                opusFrameSamples,
++            opusFramesDecoded =
++                opusFramesDecoded.get(),
++            opusFramesAbandoned =
++                opusFramesAbandoned.get(),
++            opusDecodeErrors =
++                opusDecodeFailures.get() +
++                    (opusDecoder?.decodeErrors ?: 0L),
++            opusDrainTimeouts =
++                opusDecoder?.drainTimeouts ?: 0L,
++            opusFormatErrors =
++                opusDecoder?.formatErrors ?: 0L,
++            opusMaxHeldFrames =
++                opusReorder.maxHeld,
++            opusDecodeAvgUs =
++                opusDecoder?.let {
++                    if (it.decodeCalls > 0L) it.decodeNsTotal.toDouble() / it.decodeCalls / 1000.0 else 0.0
++                } ?: 0.0,
++            opusDecodeMaxUs =
++                (opusDecoder?.decodeNsMax ?: 0L) / 1000L,
++            opusDecoder =
++                opusDecoderName,
++            opusCopyOffsetFrames =
++                if (opusFrameSamples > 0) {
++                    OpusFraming.copyOffsetFrames(redundancyCopies, redundancyOffsetPackets, opusFrameSamples)
++                } else {
++                    0
++                }
+         )
+     }
+ 
+@@ -1108,6 +1188,18 @@ class NativeAudioReceiver(
+                     packet.length -
+                         HEADER_BYTES
+ 
++                // CL-B4: version 2 is Opus (G4-W2). Version 1 below is unchanged.
++                if (version == OpusFraming.PHA_VERSION_OPUS) {
++                    receiveOpus(
++                        buffer,
++                        channels,
++                        sequence,
++                        frames,
++                        payloadBytes
++                    )
++                    continue
++                }
++
+                 if (
+                     version != 1 ||
+                     channels != CHANNELS ||
+@@ -1265,6 +1357,11 @@ class NativeAudioReceiver(
+ 
+                 packets.incrementAndGet()
+ 
++                if (streamCodec != "pcm") {
++                    streamCodec =
++                        "pcm"
++                }
++
+                 enqueueLatest(
+                     buffer.copyOfRange(
+                         HEADER_BYTES,
+@@ -1278,6 +1375,180 @@ class NativeAudioReceiver(
+                 localSocket.close()
+             } catch (_: Exception) {
+             }
++
++            opusDecoder?.release()
++        }
++    }
++
++    /**
++     * CL-B4: one PHA1 version-2 datagram (one Opus packet). De-duplicated by
++     * sequence in today's window; the arrival gap measured as for PCM; the
++     * frames released strictly in order by [OpusReorder] (a missing one waits
++     * for its copy, then is concealed with frames/240 of today's concealment
++     * slots); each decoded frame split into 5-ms packets for today's queue.
++     * Loss is counted in Opus frames (10 ms each at the host's default).
++     */
++    private fun receiveOpus(
++        buffer: ByteArray,
++        channels: Int,
++        sequence: Int,
++        frames: Int,
++        payloadBytes: Int
++    ) {
++        if (
++            channels != CHANNELS ||
++            frames !in OpusFraming.FRAME_SAMPLES ||
++            payloadBytes < 1 ||
++            payloadBytes > OpusFraming.MAX_PAYLOAD_BYTES
++        ) {
++            return
++        }
++
++        val seenSlot =
++            sequence and
++                SEEN_WINDOW_MASK
++
++        if (seenSequences[seenSlot] == sequence) {
++            duplicatesDropped.incrementAndGet()
++            return
++        }
++
++        seenSequences[seenSlot] =
++            sequence
++
++        val arrivalNs =
++            System.nanoTime()
++
++        if (lastArrivalNs != 0L) {
++            val gapNs =
++                arrivalNs -
++                    lastArrivalNs
++
++            updateMax(maxArrivalGapNs, gapNs)
++            updateMax(windowMaxArrivalGapNs, gapNs)
++
++            if (gapNs > HOLE_THRESHOLD_NS) {
++                recordArrivalHole(lastArrivalNs, gapNs)
++            }
++        }
++
++        lastArrivalNs =
++            arrivalNs
++
++        if (streamCodec != "opus" || opusFrameSamples != frames) {
++            streamCodec = "opus"
++            opusFrameSamples = frames
++        }
++
++        val decoder =
++            opusDecoder ?: if (opusDecoderFailed) {
++                null
++            } else {
++                try {
++                    OpusAudioDecoder(frames).also {
++                        opusDecoder = it
++                        opusDecoderName = it.name
++                    }
++                } catch (_: Exception) {
++                    opusDecoderFailed = true
++                    opusDecoderName = "unavailable"
++                    null
++                }
++            }
++
++        val slotsPerFrame =
++            frames /
++                FRAMES_PER_PACKET
++
++        val k =
++            OpusFraming.copyOffsetFrames(
++                redundancyCopies,
++                redundancyOffsetPackets,
++                frames
++            )
++
++        val emit: (Int, ByteArray?) -> Unit = { seq, opus ->
++            if (opus == null) {
++                opusFramesAbandoned.incrementAndGet()
++                repeat(slotsPerFrame) { enqueueConcealment(-1) }
++            } else if (decoder == null) {
++                opusDecodeFailures.incrementAndGet()
++                repeat(slotsPerFrame) { enqueueConcealment(-1) }
++            } else {
++                var produced = 0
++                val ok =
++                    decoder.decode(opus, 0, opus.size) { pcm, length ->
++                        for (chunk in OpusFraming.split(pcm, length)) {
++                            enqueueLatest(chunk)
++                            produced += 1
++                        }
++                    }
++
++                if (ok) {
++                    opusFramesDecoded.incrementAndGet()
++                } else if (produced == 0) {
++                    repeat(slotsPerFrame) { enqueueConcealment(-1) }
++                }
++            }
++        }
++
++        val payload =
++            buffer.copyOfRange(
++                HEADER_BYTES,
++                HEADER_BYTES + payloadBytes
++            )
++
++        val offer =
++            opusReorder.offer(sequence, payload, k, emit) { skipped ->
++                // An outage: today's cap on concealment, then the crossfade.
++                if (skipped > 0) {
++                    lostPackets.addAndGet(skipped.toLong())
++                    sequenceGapPackets.addAndGet(skipped.toLong())
++                    sequenceGapHistogram.incrementAndGet(4)
++
++                    val slots =
++                        minOf(skipped * slotsPerFrame, placeholderCap)
++
++                    repeat(slots) { enqueueConcealment(-1) }
++
++                    if (skipped * slotsPerFrame > slots) {
++                        trimCrossfadePending = true
++                    }
++                }
++            }
++
++        when (offer.kind) {
++            OpusReorder.Kind.LATE -> {
++                packets.incrementAndGet()
++                lateUnplaced.incrementAndGet()
++            }
++            OpusReorder.Kind.DUPLICATE -> {
++                duplicatesDropped.incrementAndGet()
++            }
++            OpusReorder.Kind.RECOVERED -> {
++                packets.incrementAndGet()
++                recoveredByDuplicate.incrementAndGet()
++                lostPackets.decrementAndGet()
++            }
++            OpusReorder.Kind.IN_ORDER,
++            OpusReorder.Kind.JUMP -> {
++                packets.incrementAndGet()
++
++                val gap =
++                    offer.newGap
++
++                if (offer.kind == OpusReorder.Kind.IN_ORDER && gap > 0) {
++                    lostPackets.addAndGet(gap.toLong())
++                    sequenceGapPackets.addAndGet(gap.toLong())
++                    sequenceGapHistogram.incrementAndGet(
++                        when {
++                            gap <= 3 -> gap - 1
++                            gap <= 7 -> 3
++                            else -> 4
++                        }
++                    )
++                }
++            }
+         }
+     }
+ 
+diff --git a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+index 151b0cd..e65a9e9 100644
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -2160,6 +2160,30 @@ class NativeStreamActivity :
+                         "startup_prefill_ms",
+                         audio.startupPrefillMs
+                     )
++                    // CL-B4: the codec; with "opus" the loss counters
++                    // above count Opus frames (frame_samples each).
++                    put(
++                        "codec",
++                        audio.codec
++                    )
++                    if (audio.codec == "opus") {
++                        put(
++                            "opus",
++                            JSONObject().apply {
++                                put("frame_samples", audio.opusFrameSamples)
++                                put("frames_decoded", audio.opusFramesDecoded)
++                                put("frames_abandoned", audio.opusFramesAbandoned)
++                                put("decode_errors", audio.opusDecodeErrors)
++                                put("drain_timeouts", audio.opusDrainTimeouts)
++                                put("format_errors", audio.opusFormatErrors)
++                                put("max_held_frames", audio.opusMaxHeldFrames)
++                                put("decode_avg_us", audio.opusDecodeAvgUs)
++                                put("decode_max_us", audio.opusDecodeMaxUs)
++                                put("decoder", audio.opusDecoder)
++                                put("copy_offset_frames", audio.opusCopyOffsetFrames)
++                            }
++                        )
++                    }
+                 }
+             )
+         }
+@@ -2267,6 +2291,8 @@ class NativeStreamActivity :
+             "&audio_queue_ms=${aud.bufferedMs}" +
+             "&audio_session_max_arrival_gap_ms=" +
+             "${aud.maxArrivalGapMs}" +
++            // CL-B4: the codec (the host keeps only the fields it knows).
++            "&audio_codec=${aud.codec}" +
+             (
+                 if (windowGapMs != null) {
+                     "&audio_max_arrival_gap_ms=$windowGapMs"
+diff --git a/PrivyHub/app/src/test/java/identity/IdentitySessionTest.kt b/PrivyHub/app/src/test/java/identity/IdentitySessionTest.kt
+index 2a4a699..bf4ad00 100644
+--- a/PrivyHub/app/src/test/java/identity/IdentitySessionTest.kt
++++ b/PrivyHub/app/src/test/java/identity/IdentitySessionTest.kt
+@@ -22,6 +22,10 @@ import org.junit.Test
+  * port and the overlay address signed), can grant `diagnostics`, and issues a
+  * media token; the new cases cover the declared overlay address, diagnostics,
+  * the media header and media token, the hub host and the hub-only media rule.
++ *
++ * CL-B4: the fake host verifies the v3 canon when `sig_v` is 3 (the audio
++ * codecs signed); with `v3 = false` it is a host that predates v3 (it
++ * verifies the body as v1), and the client falls back to v2 once.
+  */
+ class IdentitySessionTest {
+ 
+@@ -48,6 +52,7 @@ class IdentitySessionTest {
+         var refuseSetupWith: String? = null
+         var counter = 0
+         var grant = listOf("games", "tv", "vod")
++        var v3 = true
+         override fun post(url: String, jsonBody: String?): Pair<Int, String> {
+             val path = SessionProtocol.pathOf(url)
+             calls += path
+@@ -73,7 +78,14 @@ class IdentitySessionTest {
+                     val deviceId = SessionProtocol.jsonStringField(b, "device_id")!!
+                     val mediaHost = SessionProtocol.jsonStringField(b, "media_host")!!
+                     val videoPort = SessionProtocol.jsonLongField(b, "video_port")!!.toInt()
+-                    val expected = if (SessionProtocol.jsonLongField(b, "sig_v") == 2L) {
++                    val expected = if (v3 && SessionProtocol.jsonLongField(b, "sig_v") == 3L) {
++                        SessionProtocol.signV3(
++                            key!!, deviceId, nonce, mediaHost, videoPort,
++                            SessionProtocol.jsonLongField(b, "audio_port")!!.toInt(),
++                            SessionProtocol.jsonStringField(b, "overlay_host"),
++                            SessionProtocol.jsonStringArray(b, "audio_codecs"),
++                        )
++                    } else if (SessionProtocol.jsonLongField(b, "sig_v") == 2L) {
+                         SessionProtocol.signV2(
+                             key!!, deviceId, nonce, mediaHost, videoPort,
+                             SessionProtocol.jsonLongField(b, "audio_port")!!.toInt(),
+@@ -263,11 +275,11 @@ class IdentitySessionTest {
+     // ---- G3-S3 ----------------------------------------------------------------
+ 
+     @Test
+-    fun setupSignsV2AndDeclaresTheOverlayAddressWhenPresent() {
++    fun setupSignsV3AndDeclaresTheOverlayAddressWhenPresent() {
+         paired()
+         session.headerFor(hub, launch)
+         var body = host.bodies.last()
+-        assertEquals(2L, SessionProtocol.jsonLongField(body, "sig_v"))
++        assertEquals(3L, SessionProtocol.jsonLongField(body, "sig_v"))
+         assertNull(SessionProtocol.jsonStringField(body, "overlay_host"))
+         session.endSessionLocally()
+         overlay = overlayAddress
+@@ -286,6 +298,43 @@ class IdentitySessionTest {
+         }
+     }
+ 
++    // ---- CL-B4 ----------------------------------------------------------------
++
++    @Test
++    fun setupDeclaresOpusUnderV3() {
++        paired()
++        assertNotNull(session.headerFor(hub, launch))      // the fake host verified the v3 signature
++        assertEquals(listOf("/session/pair", "/session/nonce", "/session/setup"), host.calls)
++        val body = host.bodies.last()
++        assertEquals(3L, SessionProtocol.jsonLongField(body, "sig_v"))
++        assertEquals(listOf("opus"), SessionProtocol.jsonStringArray(body, "audio_codecs"))
++        assertEquals(3, session.lastSigV)
++    }
++
++    @Test
++    fun aHostWithoutV3GetsTodaysV2Once() {
++        host.v3 = false
++        paired()
++        assertNotNull(session.headerFor(hub, launch))
++        assertEquals(
++            listOf("/session/pair", "/session/nonce", "/session/setup", "/session/nonce", "/session/setup"),
++            host.calls,
++        )
++        assertEquals(3L, SessionProtocol.jsonLongField(host.bodies[2], "sig_v"))
++        val v2 = host.bodies[4]
++        assertEquals(2L, SessionProtocol.jsonLongField(v2, "sig_v"))
++        assertFalse(v2.contains("audio_codecs"))
++        // today's v2 body, byte for byte
++        val nonce = SessionProtocol.jsonStringField(v2, "nonce")!!
++        val sig = SessionProtocol.signV2(store.secret!!, "dev-00112233aabbccdd", nonce, localAddress, 48100, 48101, null)
++        assertEquals(
++            SessionProtocol.setupBodyV2("dev-00112233aabbccdd", nonce, localAddress, 48100, 48101, null, sig), v2,
++        )
++        assertEquals(2, session.lastSigV)
++        assertTrue(logs.any { it.contains("host refused sig_v 3") })
++        assertTrue(refusals.isEmpty())
++    }
++
+     @Test
+     fun diagnosticsWhenTheHostGrantsIt() {
+         host.grant = listOf("games", "tv", "vod", "diagnostics")
+diff --git a/PrivyHub/app/src/main/java/streaming/OpusAudioDecoder.kt b/PrivyHub/app/src/main/java/streaming/OpusAudioDecoder.kt
+new file mode 100644
+index 0000000..8665942
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/OpusAudioDecoder.kt
+@@ -0,0 +1,147 @@
++package com.safeiot.privyhub.streaming
++
++import android.media.AudioFormat
++import android.media.MediaCodec
++import android.media.MediaFormat
++import java.nio.ByteBuffer
++
++/**
++ * CL-B4: MediaCodec `audio/opus`, synchronous, on the audio receive thread
++ * (so the queue keeps its one producer). 48 kHz stereo; csd-0 the OpusHead
++ * (pre-skip 120), csd-1 the pre-skip and csd-2 the seek pre-roll in ns.
++ *
++ * One input is queued per frame and its output drained before returning
++ * (bounded by [DRAIN_WAIT_NS]); an output that has not come by then is
++ * counted and picked up by the next call. Output is s16 interleaved PCM.
++ */
++class OpusAudioDecoder(private val frameSamples: Int) {
++    companion object {
++        private const val MIME = "audio/opus"
++        private const val INPUT_WAIT_US = 10_000L
++        private const val DRAIN_WAIT_NS = 4_000_000L
++    }
++
++    private val codec: MediaCodec = MediaCodec.createDecoderByType(MIME)
++    private val info = MediaCodec.BufferInfo()
++    private val frameUs = frameSamples * 1_000_000L / OpusFraming.SAMPLE_RATE
++    private var ptsUs = 0L
++    private var inputs = 0L
++    private var outputs = 0L
++
++    val name: String
++    var decodeErrors = 0L
++        private set
++    var drainTimeouts = 0L
++        private set
++    var formatErrors = 0L
++        private set
++    var decodeNsTotal = 0L
++        private set
++    var decodeNsMax = 0L
++        private set
++    var decodeCalls = 0L
++        private set
++
++    init {
++        val format = MediaFormat.createAudioFormat(MIME, OpusFraming.SAMPLE_RATE, OpusFraming.CHANNELS)
++        format.setByteBuffer("csd-0", ByteBuffer.wrap(OpusFraming.opusHead()))
++        format.setByteBuffer("csd-1", ByteBuffer.wrap(OpusFraming.nsBuffer(OpusFraming.preSkipNs())))
++        format.setByteBuffer("csd-2", ByteBuffer.wrap(OpusFraming.nsBuffer(OpusFraming.SEEK_PRE_ROLL_NS)))
++        try {
++            codec.configure(format, null, null, 0)
++            codec.start()
++        } catch (e: Exception) {
++            codec.release()
++            throw e
++        }
++        name = codec.name
++    }
++
++    /** Decode one Opus packet; [out] gets each PCM output (bytes, length). False if it could not be queued. */
++    fun decode(packet: ByteArray, offset: Int, length: Int, out: (ByteArray, Int) -> Unit): Boolean {
++        val t0 = System.nanoTime()
++        try {
++            val index = codec.dequeueInputBuffer(INPUT_WAIT_US)
++            if (index < 0) {
++                decodeErrors += 1
++                drain(out)
++                return false
++            }
++            val buffer = codec.getInputBuffer(index)
++            if (buffer == null) {
++                decodeErrors += 1
++                return false
++            }
++            buffer.clear()
++            buffer.put(packet, offset, length)
++            codec.queueInputBuffer(index, 0, length, ptsUs, 0)
++            ptsUs += frameUs
++            inputs += 1
++            drain(out)
++            return true
++        } catch (_: Exception) {
++            decodeErrors += 1
++            return false
++        } finally {
++            val ns = System.nanoTime() - t0
++            decodeNsTotal += ns
++            decodeCalls += 1
++            if (ns > decodeNsMax) decodeNsMax = ns
++        }
++    }
++
++    private fun drain(out: (ByteArray, Int) -> Unit) {
++        val deadline = System.nanoTime() + DRAIN_WAIT_NS
++        while (true) {
++            val pending = inputs - outputs
++            val waitUs = if (pending > 0) maxOf(0L, (deadline - System.nanoTime()) / 1000L) else 0L
++            val index = codec.dequeueOutputBuffer(info, waitUs)
++            when {
++                index >= 0 -> {
++                    if (info.size > 0) {
++                        val buffer = codec.getOutputBuffer(index)
++                        if (buffer != null) {
++                            buffer.position(info.offset)
++                            buffer.limit(info.offset + info.size)
++                            val pcm = ByteArray(info.size)
++                            buffer.get(pcm)
++                            out(pcm, pcm.size)
++                        }
++                    }
++                    codec.releaseOutputBuffer(index, false)
++                    outputs += 1
++                }
++                index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
++                    val f = codec.outputFormat
++                    val ch = if (f.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) f.getInteger(MediaFormat.KEY_CHANNEL_COUNT) else 2
++                    val enc = if (f.containsKey(MediaFormat.KEY_PCM_ENCODING)) {
++                        f.getInteger(MediaFormat.KEY_PCM_ENCODING)
++                    } else {
++                        AudioFormat.ENCODING_PCM_16BIT
++                    }
++                    if (ch != OpusFraming.CHANNELS || enc != AudioFormat.ENCODING_PCM_16BIT) formatErrors += 1
++                }
++                index == MediaCodec.INFO_TRY_AGAIN_LATER -> {
++                    if (pending > 0) {
++                        // Not come within the wait: picked up by a later call.
++                        drainTimeouts += 1
++                        outputs = inputs
++                    }
++                    return
++                }
++                else -> Unit
++            }
++        }
++    }
++
++    fun release() {
++        try {
++            codec.stop()
++        } catch (_: Exception) {
++        }
++        try {
++            codec.release()
++        } catch (_: Exception) {
++        }
++    }
++}
+diff --git a/PrivyHub/app/src/main/java/streaming/OpusFraming.kt b/PrivyHub/app/src/main/java/streaming/OpusFraming.kt
+new file mode 100644
+index 0000000..2979fb5
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/OpusFraming.kt
+@@ -0,0 +1,170 @@
++package com.safeiot.privyhub.streaming
++
++import java.nio.ByteBuffer
++import java.nio.ByteOrder
++
++/**
++ * CL-B4: the pure parts of the client's Opus path (G4-W2's PHA1 version 2),
++ * so the JVM unit tests check them without Android: the decoder's csd
++ * buffers, the copy offset, the split of a decoded frame into the queue's
++ * 5-ms packets, and the in-order release that waits for a redundant copy.
++ *
++ * Host contract: `companion/audio_codec.py` and
++ * `docs/memory/evidence/G4_W2_OPUS_AUDIO_PATH_2026-10-18.md` §1, §5.1.
++ */
++object OpusFraming {
++    const val PHA_VERSION_OPUS = 2
++    const val SAMPLE_RATE = 48_000
++    const val CHANNELS = 2
++    const val PRE_SKIP_SAMPLES = 120          // the host encoder's lookahead (RESTRICTED_LOWDELAY)
++    const val SEEK_PRE_ROLL_NS = 80_000_000L
++    const val QUEUE_PACKET_FRAMES = 240       // the PCM queue's 5-ms packet
++    const val QUEUE_PACKET_BYTES = QUEUE_PACKET_FRAMES * CHANNELS * 2
++    const val MAX_PAYLOAD_BYTES = 1500
++    const val PCM_PACKET_MS = 5
++    val FRAME_SAMPLES = setOf(240, 480, 960)  // 5 / 10 / 20 ms, the host's accepted frames
++
++    /** csd-0: the OpusHead (RFC 7845 §5.1), mapping family 0. */
++    fun opusHead(channels: Int = CHANNELS, preSkip: Int = PRE_SKIP_SAMPLES, rate: Int = SAMPLE_RATE): ByteArray =
++        ByteBuffer.allocate(19).order(ByteOrder.LITTLE_ENDIAN).apply {
++            put("OpusHead".toByteArray(Charsets.US_ASCII))
++            put(1)                      // version
++            put(channels.toByte())
++            putShort(preSkip.toShort())
++            putInt(rate)
++            putShort(0)                 // output gain
++            put(0)                      // mapping family
++        }.array()
++
++    /** csd-1 / csd-2: a duration in ns as an 8-byte long, in the given order (the device's native one). */
++    fun nsBuffer(ns: Long, order: ByteOrder = ByteOrder.nativeOrder()): ByteArray =
++        ByteBuffer.allocate(8).order(order).putLong(ns).array()
++
++    fun preSkipNs(preSkip: Int = PRE_SKIP_SAMPLES): Long = preSkip * 1_000_000_000L / SAMPLE_RATE
++
++    /** The host's `copy_offset_packets`: the copy the same ~20 ms behind; 0 with redundancy off. */
++    fun copyOffsetFrames(copies: Int, offsetPcmPackets: Int, frameSamples: Int): Int {
++        if (copies < 2) return 0
++        val frameMs = frameSamples * 1000 / SAMPLE_RATE
++        return maxOf(1, Math.rint(offsetPcmPackets * PCM_PACKET_MS.toDouble() / frameMs).toInt())
++    }
++
++    /**
++     * A decoded output as queue packets of [QUEUE_PACKET_BYTES]. An output that
++     * is not a whole number of them (the pre-skip's first, 360 frames) is
++     * left-padded with silence, so the packets after it stay aligned.
++     */
++    fun split(pcm: ByteArray, length: Int = pcm.size): List<ByteArray> {
++        if (length <= 0) return emptyList()
++        val usable = length - length % 4
++        val pad = (QUEUE_PACKET_BYTES - usable % QUEUE_PACKET_BYTES) % QUEUE_PACKET_BYTES
++        val whole = ByteArray(pad + usable)
++        System.arraycopy(pcm, 0, whole, pad, usable)
++        return (0 until whole.size / QUEUE_PACKET_BYTES).map {
++            whole.copyOfRange(it * QUEUE_PACKET_BYTES, (it + 1) * QUEUE_PACKET_BYTES)
++        }
++    }
++}
++
++/**
++ * CL-B4: release Opus frames strictly in sequence order (the decoder is
++ * stateful). A missing sequence holds the frames after it until its copy can
++ * no longer come: a frame more than `k` sequences ahead of it has arrived
++ * (the host sends the copy of n right after the original of n + k). Then it
++ * is released as lost. Receive thread only.
++ */
++class OpusReorder(private val window: Int = 64) {
++    enum class Kind { IN_ORDER, RECOVERED, LATE, DUPLICATE, JUMP }
++
++    data class Offer(val kind: Kind, val newGap: Int)
++
++    private val slots = arrayOfNulls<ByteArray>(window)
++    private val slotSeq = IntArray(window) { -1 }
++
++    var next = -1
++        private set
++    var highest = -1
++        private set
++    var held = 0
++        private set
++    var maxHeld = 0
++        private set
++
++    private fun ahead(a: Int, b: Int): Int = (a - b) and 0xffff   // how far a is ahead of b
++
++    /**
++     * Offer one de-duplicated frame; [emit] gets (sequence, payload) in order,
++     * payload null for a frame given up as lost. A JUMP (a gap of a window or
++     * more, an outage) first releases what is held, then [onJump] gets the
++     * number of sequences skipped, and the frame starts a new run.
++     */
++    fun offer(seq: Int, payload: ByteArray, k: Int, emit: (Int, ByteArray?) -> Unit, onJump: (Int) -> Unit = {}): Offer {
++        if (next < 0) {
++            next = seq
++            highest = seq
++            store(seq, payload)
++            drain(k, emit)
++            return Offer(Kind.IN_ORDER, 0)
++        }
++        val behindNext = ahead(seq, next)
++        if (behindNext > 32767) return Offer(Kind.LATE, 0)
++        if (behindNext >= window) {
++            flush(emit)
++            val skipped = ahead(seq, highest) - 1
++            onJump(maxOf(0, skipped))
++            next = seq
++            highest = seq
++            store(seq, payload)
++            drain(k, emit)
++            return Offer(Kind.JUMP, maxOf(0, skipped))
++        }
++        val idx = seq % window
++        if (slotSeq[idx] == seq) return Offer(Kind.DUPLICATE, 0)
++        val pastHighest = ahead(seq, highest)
++        val offer =
++            if (pastHighest in 1..32767) {
++                val gap = pastHighest - 1
++                highest = seq
++                Offer(Kind.IN_ORDER, gap)
++            } else {
++                Offer(Kind.RECOVERED, 0)
++            }
++        store(seq, payload)
++        drain(k, emit)
++        return offer
++    }
++
++    private fun store(seq: Int, payload: ByteArray) {
++        val idx = seq % window
++        slots[idx] = payload
++        slotSeq[idx] = seq
++        held += 1
++        if (held > maxHeld) maxHeld = held
++    }
++
++    private fun drain(k: Int, emit: (Int, ByteArray?) -> Unit) {
++        while (true) {
++            val distance = ahead(highest, next)
++            if (distance > 32767) return               // next is past highest: nothing held
++            val idx = next % window
++            if (slotSeq[idx] == next) {
++                val p = slots[idx]
++                slots[idx] = null
++                slotSeq[idx] = -1
++                held -= 1
++                emit(next, p)
++            } else if (distance > k) {
++                emit(next, null)                       // its copy can no longer come
++            } else {
++                return
++            }
++            next = (next + 1) and 0xffff
++        }
++    }
++
++    /** Release everything up to [highest]: held frames in order, the missing ones as lost. */
++    fun flush(emit: (Int, ByteArray?) -> Unit) {
++        if (next < 0) return
++        drain(-1, emit)
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/identity/SessionProtocolV3Test.kt b/PrivyHub/app/src/test/java/identity/SessionProtocolV3Test.kt
+new file mode 100644
+index 0000000..17e1b07
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/identity/SessionProtocolV3Test.kt
+@@ -0,0 +1,71 @@
++package com.safeiot.privyhub.identity
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * CL-B4: the v3 setup bytes against the host's own vectors
++ * (`resources/cl_b4/setup_vectors_v3.json`, made by
++ * `docs/memory/evidence/cl_b4_2026-10-18/make_vectors_v3.py`: each body, in
++ * the exact form [SessionProtocol.setupBodyV3] writes, was accepted by the
++ * host's `SessionGate._setup` in process, with `token_issued` at sig_v 3).
++ */
++@Suppress("UNCHECKED_CAST")
++class SessionProtocolV3Test {
++
++    private val doc: Map<String, Any?> by lazy {
++        val text = SessionProtocolV3Test::class.java.classLoader!!
++            .getResource("cl_b4/setup_vectors_v3.json")!!.readText()
++        MiniJson.parse(text) as Map<String, Any?>
++    }
++
++    private val vectors get() = doc["vectors"] as List<Map<String, Any?>>
++
++    @Test
++    fun constantsMatchTheHost() {
++        assertEquals(doc["setup_canon_v3"], SessionProtocol.SETUP_CANON_V3)
++        assertEquals(listOf("opus"), SessionProtocol.AUDIO_CODECS)
++    }
++
++    @Test
++    fun canonSignatureAndBodyMatchEveryHostAcceptedVector() {
++        assertEquals(3, vectors.size)
++        for (v in vectors) {
++            val name = v["name"] as String
++            assertEquals(name, true, v["host_accepted"])
++            val media = SessionProtocolV2Test.ip(v["media_host"])!!
++            val overlay = SessionProtocolV2Test.ip(v["overlay_host"])
++            val video = (v["video_port"] as Long).toInt()
++            val audio = (v["audio_port"] as Long).toInt()
++            val codecs = v["audio_codecs"] as List<String>
++            val device = v["device_id"] as String
++            val nonce = v["nonce"] as String
++            val canon = SessionProtocol.setupCanonicalV3(device, nonce, media, video, audio, overlay, codecs)
++            assertEquals(name, v["canonical_sha256"], SessionProtocolTest.sha256Hex(canon))
++            assertEquals(name, (v["canonical_bytes"] as Long).toInt(), canon.toByteArray().size)
++            val sig = SessionProtocol.signV3(v["key_hex"] as String, device, nonce, media, video, audio, overlay, codecs)
++            assertEquals(name, v["sig"], sig)
++            val body = SessionProtocol.setupBodyV3(device, nonce, media, video, audio, overlay, codecs, sig)
++            assertEquals(name, v["body_sha256"], SessionProtocolTest.sha256Hex(body))
++        }
++    }
++
++    @Test
++    fun theFixedVector() {
++        // The same inputs and digest as the host's tests/session_identity/test_cl_b4_sig_v3.py.
++        val canon = SessionProtocol.setupCanonicalV3("dev-fixture", "nonce-fixture", "media-host", 48100, 48101, null, listOf("opus"))
++        assertEquals("privyhub-session-setup-v3\ndev-fixture\nnonce-fixture\nmedia-host\n48100\n48101\n\nopus", canon)
++        assertEquals(
++            "c3b6e94a4c75b7ba9b25098d1aac482a8d471905acc05070b8a50161eb90db6e",
++            SessionProtocol.hmacSha256Hex("11".repeat(32), canon),
++        )
++    }
++
++    @Test
++    fun v2IsUnchanged() {
++        val v2 = SessionProtocol.setupBodyV2("d", "n", "m", 1, 2, null, "s")
++        assertEquals("{\"device_id\":\"d\",\"nonce\":\"n\",\"media_host\":\"m\",\"video_port\":1,\"audio_port\":2,\"sig_v\":2,\"sig\":\"s\"}", v2)
++        assertTrue(!v2.contains("audio_codecs"))
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/OpusFramingTest.kt b/PrivyHub/app/src/test/java/streaming/OpusFramingTest.kt
+new file mode 100644
+index 0000000..85c6e3a
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/OpusFramingTest.kt
+@@ -0,0 +1,180 @@
++package com.safeiot.privyhub.streaming
++
++import java.nio.ByteOrder
++import org.junit.Assert.assertArrayEquals
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * CL-B4: the client's Opus framing (csd bytes, the copy offset, the split)
++ * and the in-order release ([OpusReorder]), including the host's send
++ * pattern (`companion/audio_codec.py` `run_opus_sender`: original n, then the
++ * copy of n - k) under seeded independent loss.
++ */
++class OpusFramingTest {
++
++    private fun hex(b: ByteArray) = b.joinToString("") { "%02x".format(it.toInt() and 0xff) }
++
++    @Test
++    fun opusHeadIsRfc7845() {
++        // "OpusHead", v1, 2 ch, pre-skip 120, 48000 Hz, gain 0, family 0
++        assertEquals("4f7075734865616401027800" + "80bb0000" + "0000" + "00", hex(OpusFraming.opusHead()))
++        assertEquals(19, OpusFraming.opusHead().size)
++    }
++
++    @Test
++    fun csdDurations() {
++        assertEquals(2_500_000L, OpusFraming.preSkipNs())
++        assertEquals("a025260000000000", hex(OpusFraming.nsBuffer(2_500_000L, ByteOrder.LITTLE_ENDIAN)))
++        assertEquals("0000000004c4b400", hex(OpusFraming.nsBuffer(80_000_000L, ByteOrder.BIG_ENDIAN)))
++    }
++
++    @Test
++    fun copyOffsetMatchesTheHost() {
++        // audio_codec.copy_offset_packets(4, frame): 5 ms -> 4, 10 -> 2, 20 -> 1; redundancy off -> 0
++        assertEquals(4, OpusFraming.copyOffsetFrames(2, 4, 240))
++        assertEquals(2, OpusFraming.copyOffsetFrames(2, 4, 480))
++        assertEquals(1, OpusFraming.copyOffsetFrames(2, 4, 960))
++        assertEquals(1, OpusFraming.copyOffsetFrames(2, 1, 960))
++        assertEquals(0, OpusFraming.copyOffsetFrames(1, 4, 480))
++    }
++
++    @Test
++    fun splitIntoQueuePackets() {
++        val frame = ByteArray(1920) { (it % 251).toByte() }
++        val parts = OpusFraming.split(frame)
++        assertEquals(2, parts.size)
++        assertArrayEquals(frame.copyOfRange(0, 960), parts[0])
++        assertArrayEquals(frame.copyOfRange(960, 1920), parts[1])
++        // the pre-skip's first output: 360 frames, left-padded with 120 frames of silence
++        val first = ByteArray(1440) { 7 }
++        val padded = OpusFraming.split(first)
++        assertEquals(2, padded.size)
++        assertTrue(padded[0].copyOfRange(0, 480).all { it.toInt() == 0 })
++        assertTrue(padded[0].copyOfRange(480, 960).all { it.toInt() == 7 })
++        assertTrue(padded[1].all { it.toInt() == 7 })
++        assertEquals(0, OpusFraming.split(ByteArray(0)).size)
++        assertEquals(1, OpusFraming.split(ByteArray(4000), 960).size)
++    }
++
++    private class Sink {
++        val order = mutableListOf<Int>()
++        val lost = mutableListOf<Int>()
++        val emit: (Int, ByteArray?) -> Unit = { seq, p -> order += seq; if (p == null) lost += seq }
++    }
++
++    private fun p(seq: Int) = byteArrayOf(seq.toByte())
++
++    @Test
++    fun inOrderIsReleasedAtOnce() {
++        val r = OpusReorder()
++        val s = Sink()
++        for (q in 0..9) assertEquals(OpusReorder.Kind.IN_ORDER, r.offer(q, p(q), 2, s.emit).kind)
++        assertEquals((0..9).toList(), s.order)
++        assertEquals(0, r.held)
++    }
++
++    @Test
++    fun aMissingFrameWaitsForItsCopy() {
++        val r = OpusReorder()
++        val s = Sink()
++        for (q in 0..2) r.offer(q, p(q), 2, s.emit)
++        assertEquals(1, r.offer(4, p(4), 2, s.emit).newGap)
++        r.offer(5, p(5), 2, s.emit)
++        assertEquals(listOf(0, 1, 2), s.order)          // 4 and 5 held for 3
++        assertEquals(OpusReorder.Kind.RECOVERED, r.offer(3, p(3), 2, s.emit).kind)
++        assertEquals(listOf(0, 1, 2, 3, 4, 5), s.order)
++        assertTrue(s.lost.isEmpty())
++        assertEquals(3, r.maxHeld)
++    }
++
++    @Test
++    fun aFrameWhoseCopyIsAlsoLostIsGivenUp() {
++        val r = OpusReorder()
++        val s = Sink()
++        for (q in listOf(0, 1, 2, 4, 5)) r.offer(q, p(q), 2, s.emit)
++        r.offer(6, p(6), 2, s.emit)                      // 6 - 3 > k: 3 cannot come any more
++        assertEquals(listOf(0, 1, 2, 3, 4, 5, 6), s.order)
++        assertEquals(listOf(3), s.lost)
++        assertEquals(OpusReorder.Kind.LATE, r.offer(3, p(3), 2, s.emit).kind)
++    }
++
++    @Test
++    fun redundancyOffGivesUpAtOnce() {
++        val r = OpusReorder()
++        val s = Sink()
++        r.offer(0, p(0), 0, s.emit)
++        r.offer(2, p(2), 0, s.emit)
++        assertEquals(listOf(0, 1, 2), s.order)
++        assertEquals(listOf(1), s.lost)
++    }
++
++    @Test
++    fun theSequenceWraps() {
++        val r = OpusReorder()
++        val s = Sink()
++        for (q in listOf(65534, 65535, 0, 1)) r.offer(q, p(q), 2, s.emit)
++        assertEquals(listOf(65534, 65535, 0, 1), s.order)
++    }
++
++    @Test
++    fun anOutageIsAJump() {
++        val r = OpusReorder()
++        val s = Sink()
++        var skipped = -1
++        r.offer(0, p(0), 2, s.emit)
++        val o = r.offer(200, p(200), 2, s.emit) { skipped = it }
++        assertEquals(OpusReorder.Kind.JUMP, o.kind)
++        assertEquals(199, skipped)
++        assertEquals(listOf(0, 200), s.order)
++    }
++
++    /** The host's datagram order, each datagram dropped with probability [loss]; the client de-duplicates first. */
++    private fun simulate(loss: Double, seed: Long, k: Int, n: Int = 20_000): Triple<Sink, Int, OpusReorder> {
++        val rnd = java.util.Random(seed)
++        val wire = mutableListOf<Int>()
++        for (q in 0 until n) {
++            wire += q
++            if (q - k >= 0) wire += q - k
++        }
++        val received = wire.filter { rnd.nextDouble() >= loss }
++        val r = OpusReorder()
++        val s = Sink()
++        val seen = IntArray(64) { -1 }
++        for (q16 in received.map { it and 0xffff }) {
++            if (seen[q16 and 63] == q16) continue
++            seen[q16 and 63] = q16
++            r.offer(q16, p(q16), k, s.emit)
++        }
++        r.flush(s.emit)
++        val got = received.toHashSet()
++        val bothLost = (s.order[0] until n - k).count { q -> q !in got }
++        return Triple(s, bothLost, r)
++    }
++
++    @Test
++    fun theHostsPatternUnderLoss() {
++        for ((loss, seed) in listOf(0.01 to 1L, 0.05 to 2L, 0.2 to 3L)) {
++            val (s, bothLost, r) = simulate(loss, seed, 2)
++            // every sequence released once, in order (mod 2^16)
++            val expected = (0 until s.order.size).map { (s.order[0] + it) and 0xffff }
++            assertEquals("order at $loss", expected, s.order)
++            // a frame is given up only if neither datagram of it arrived
++            val lostInRange = s.lost.count { it < 20_000 - 2 }
++            assertEquals("lost at $loss", bothLost, lostInRange)
++            assertTrue(r.maxHeld <= 2 + 2)
++        }
++    }
++
++    @Test
++    fun aGivenUpFrameIsNullAndOthersCarryTheirPayload() {
++        val r = OpusReorder()
++        val got = mutableMapOf<Int, ByteArray?>()
++        val emit: (Int, ByteArray?) -> Unit = { q, b -> got[q] = b }
++        for (q in listOf(0, 2, 3, 4)) r.offer(q, p(q), 2, emit)
++        assertNull(got[1])
++        assertArrayEquals(p(4), got[4])
++    }
++}
+diff --git a/tests/session_identity/test_cl_b4_sig_v3.py b/tests/session_identity/test_cl_b4_sig_v3.py
+new file mode 100644
+index 0000000..2658516
+--- /dev/null
++++ b/tests/session_identity/test_cl_b4_sig_v3.py
+@@ -0,0 +1,260 @@
++#!/usr/bin/env python3
++"""CL-B4: `sig_v` 3 — v2's fields plus the declared audio codecs, signed.
++
++    python3 -m unittest discover -s tests/session_identity -v
++
++- v3 accepted; `token_issued` carries `sig_v` 3 and `audio_codecs`;
++- a v3 claim without the field (or with a malformed one) refused, a tampered list refused;
++- v1 / v2 byte for byte as HEAD's module (`fixtures/session_identity_predecessor_cl_b4.py.txt`):
++  the same scenarios on both, statuses, payloads and audit rows equal (tokens made deterministic);
++- the vector the APK's JVM test checks (`SessionProtocolV3Test.kt`).
++"""
++
++from __future__ import annotations
++
++import hashlib
++import hmac
++import importlib.machinery
++import importlib.util
++import itertools
++import json
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++from common import (
++    KEY_HEX, LAN_DECLARED, LAN_NET, LAN_SRC, LOCAL_SRC, OVERLAY_DECLARED, OVERLAY_SRC, Clock,
++    audit_lines, make_gate, pair, setup, si,
++)
++from test_g3s3 import setup_v2, sign_v2
++
++FIX = Path(__file__).resolve().parent / "fixtures"
++
++
++def sign_v3(device_id, nonce, media_host, video_port, audio_port, overlay_host, codecs, key_hex=KEY_HEX):
++    canon = "\n".join([si.SETUP_CANON_V3, device_id, nonce, media_host, str(video_port),
++                       "" if audio_port is None else str(audio_port), overlay_host or "", ",".join(codecs)])
++    return hmac.new(bytes.fromhex(key_hex), canon.encode(), hashlib.sha256).hexdigest()
++
++
++def setup_v3(gate, device_id, source=LAN_SRC, media_host=LAN_DECLARED, video_port=48100, audio_port=48101,
++             overlay_host=None, codecs=("opus",), tamper=None, drop=()):
++    _, n = gate.session_route("POST", "/session/nonce", {}, None, source)
++    body = {"device_id": device_id, "nonce": n["nonce"], "media_host": media_host,
++            "video_port": video_port, "audio_port": audio_port, "audio_codecs": list(codecs), "sig_v": 3,
++            "sig": sign_v3(device_id, n["nonce"], media_host, video_port, audio_port, overlay_host, codecs)}
++    if overlay_host is not None:
++        body["overlay_host"] = overlay_host
++    if tamper:
++        body.update(tamper)
++    for k in drop:
++        body.pop(k, None)
++    return gate.session_route("POST", "/session/setup", body, None, source)
++
++
++def issued(gate):
++    return [a for a in audit_lines(gate) if a["event"] == "token_issued"][-1]
++
++
++class SetupV3(unittest.TestCase):
++    def test_v3_accepted_and_audited(self):
++        g = make_gate()
++        dev = pair(g)
++        st, p = setup_v3(g, dev)
++        self.assertEqual(st, 200, p)
++        self.assertTrue(p["token"] and p["media_token"])
++        row = issued(g)
++        self.assertEqual((row["sig_v"], row["audio_codecs"], row["media_token_issued"]), (3, "opus", True))
++        d = g.authorize("POST", "/plugins/games/native-stream-start", "port=48100", p["token"], LAN_SRC)
++        self.assertEqual((d.allowed, d.media_host), (True, LAN_DECLARED))
++
++    def test_v3_without_the_field_refused(self):
++        g = make_gate()
++        dev = pair(g)
++        st, p = setup_v3(g, dev, drop=("audio_codecs",))
++        self.assertEqual((st, p["reason"]), (403, "audio-codecs-invalid"))
++        for bad in ([], [""], ["OPUS"], [7], "opus", ["opus"] * 9, ["a" * 17], [None], {"opus": 1}):
++            st, p = setup_v3(g, dev, tamper={"audio_codecs": bad})
++            self.assertEqual((st, p["reason"]), (403, "audio-codecs-invalid"), bad)
++        self.assertFalse([a for a in audit_lines(g) if a["event"] == "token_issued"])
++
++    def test_v3_tampered_fields_refused(self):
++        g = make_gate()
++        dev = pair(g)
++        for tamper in ({"audio_codecs": ["opus", "pcm"]}, {"audio_codecs": ["pcm"]}, {"audio_port": 48999},
++                       {"video_port": 48102}):
++            st, p = setup_v3(g, dev, tamper=tamper)
++            self.assertEqual((st, p["reason"]), (401, "bad-signature"), tamper)
++
++    def test_signatures_do_not_cross_versions(self):
++        g = make_gate()
++        dev = pair(g)
++        # a v2 signature presented as v3
++        _, n = g.session_route("POST", "/session/nonce", {}, None, LAN_SRC)
++        body = {"device_id": dev, "nonce": n["nonce"], "media_host": LAN_DECLARED, "video_port": 48100,
++                "audio_port": 48101, "audio_codecs": ["opus"], "sig_v": 3,
++                "sig": sign_v2(dev, n["nonce"], LAN_DECLARED, 48100, 48101, None)}
++        self.assertEqual(g.session_route("POST", "/session/setup", body, None, LAN_SRC)[1]["reason"], "bad-signature")
++        # a v3 signature presented as v2
++        _, n = g.session_route("POST", "/session/nonce", {}, None, LAN_SRC)
++        body = {"device_id": dev, "nonce": n["nonce"], "media_host": LAN_DECLARED, "video_port": 48100,
++                "audio_port": 48101, "audio_codecs": ["opus"], "sig_v": 2,
++                "sig": sign_v3(dev, n["nonce"], LAN_DECLARED, 48100, 48101, None, ["opus"])}
++        self.assertEqual(g.session_route("POST", "/session/setup", body, None, LAN_SRC)[1]["reason"], "bad-signature")
++        # sig_v true is not 3 (bool excluded, as for 2): verified as v1, so a v3 signature fails
++        st, p = setup_v3(g, dev, tamper={"sig_v": True})
++        self.assertEqual((st, p["reason"]), (401, "bad-signature"))
++
++    def test_v2_with_an_unsigned_field_is_v2_as_today(self):
++        g = make_gate()
++        dev = pair(g)
++        st, p = setup_v2(g, dev, tamper={"audio_codecs": ["opus"]})
++        self.assertEqual(st, 200, p)
++        row = issued(g)
++        self.assertEqual(row["sig_v"], 2)
++        self.assertNotIn("audio_codecs", row)
++
++    def test_v3_over_the_overlay(self):
++        g = make_gate()
++        dev = pair(g)
++        st, p = setup_v3(g, dev, source=OVERLAY_SRC, media_host=LAN_DECLARED, overlay_host=OVERLAY_DECLARED)
++        self.assertEqual(st, 200, p)
++        d = g.authorize("POST", "/plugins/games/native-stream-start", "port=48100", p["token"], OVERLAY_SRC)
++        self.assertEqual((d.allowed, d.media_host), (True, OVERLAY_DECLARED))
++        self.assertEqual((issued(g)["overlay_declared"], issued(g)["sig_v"]), (True, 3))
++
++    def test_the_client_vector(self):
++        # The APK's SessionProtocolV3Test checks the same inputs and digest.
++        key = "11" * 32
++        canon = "\n".join([si.SETUP_CANON_V3, "dev-fixture", "nonce-fixture", "media-host", "48100", "48101", "", "opus"])
++        self.assertEqual(canon, "privyhub-session-setup-v3\ndev-fixture\nnonce-fixture\nmedia-host\n48100\n48101\n\nopus")
++        digest = hmac.new(bytes.fromhex(key), canon.encode(), hashlib.sha256).hexdigest()
++        self.assertEqual(digest, VECTOR_V3)
++
++
++VECTOR_V3 = hmac.new(bytes.fromhex("11" * 32),
++                     b"privyhub-session-setup-v3\ndev-fixture\nnonce-fixture\nmedia-host\n48100\n48101\n\nopus",
++                     hashlib.sha256).hexdigest()
++
++
++# ---- v1 / v2 byte for byte against HEAD's module ------------------------------------------------
++
++def load_predecessor():
++    loader = importlib.machinery.SourceFileLoader("session_identity_head",
++                                                  str(FIX / "session_identity_predecessor_cl_b4.py.txt"))
++    spec = importlib.util.spec_from_loader("session_identity_head", loader)
++    mod = importlib.util.module_from_spec(spec)
++    sys.modules["session_identity_head"] = mod
++    loader.exec_module(mod)
++    return mod
++
++
++class _Det:
++    """Deterministic `secrets` for both modules: the same call order gives the same values."""
++
++    def __init__(self):
++        self.n = itertools.count(1)
++
++    def token_urlsafe(self, nbytes=None):
++        return "tok%06d" % next(self.n)
++
++    def token_hex(self, nbytes=None):
++        return "%032x" % next(self.n)
++
++    def randbelow(self, k):
++        return next(self.n) % k
++
++    def choice(self, seq):
++        return seq[next(self.n) % len(seq)]
++
++
++def scenarios(mod):
++    """Run v1 / v2 scenarios on a gate built from `mod`; return every answer and the audit rows."""
++    det = _Det()
++    real = mod.secrets
++    mod.secrets = det
++    try:
++        d = Path(tempfile.mkdtemp(prefix="cl_b4_cmp_"))
++        clock = Clock()
++        gate = mod.SessionGate(mode="v2", config_dir=d / "config", audit_path=d / "audit.jsonl",
++                               classifier=mod.RoutingClassifier(lan_reader=lambda: [LAN_NET], clock=clock),
++                               clock=clock, wall=lambda: 1_792_000_000.0)
++        out = []
++
++        def route(path, body, source):
++            st, p = gate.session_route("POST", path, body, None, source)
++            out.append((path, st, json.dumps(p, sort_keys=True)))
++            return st, p
++
++        _, opened = route("/session/pairing/open", {}, LOCAL_SRC)
++        _, paired = route("/session/pair", {"code": opened["code"], "device_name": "onn-fixture", "key": KEY_HEX},
++                          LAN_SRC)
++        dev = paired["device_id"]
++
++        def v1(tamper=None, source=LAN_SRC, media_host=LAN_DECLARED, port=48100):
++            _, n = route("/session/nonce", {}, source)
++            canon = "\n".join([mod.SETUP_CANON, dev, n["nonce"], media_host, str(port)])
++            body = {"device_id": dev, "nonce": n["nonce"], "media_host": media_host, "video_port": port,
++                    "sig": hmac.new(bytes.fromhex(KEY_HEX), canon.encode(), hashlib.sha256).hexdigest()}
++            body.update(tamper or {})
++            return route("/session/setup", body, source)
++
++        def v2(tamper=None, source=LAN_SRC, media_host=LAN_DECLARED, overlay=None, audio=48101):
++            _, n = route("/session/nonce", {}, source)
++            body = {"device_id": dev, "nonce": n["nonce"], "media_host": media_host, "video_port": 48100,
++                    "audio_port": audio, "sig_v": 2,
++                    "sig": sign_v2(dev, n["nonce"], media_host, 48100, audio, overlay)}
++            if overlay:
++                body["overlay_host"] = overlay
++            body.update(tamper or {})
++            return route("/session/setup", body, source)
++
++        v1()
++        v1({"video_port": 48102})
++        v1(port=80)
++        v1({"sig_v": "3"})
++        v1({"sig_v": 4})
++        v1({"sig_v": True})
++        v1({"audio_codecs": ["opus"]})
++        st, p = v2()
++        v2({"audio_codecs": ["opus"]})
++        v2({"audio_codecs": "junk"})
++        v2({"audio_port": 48999})
++        v2(audio=80)
++        v2(source=OVERLAY_SRC, overlay=OVERLAY_DECLARED)
++        v2(source=OVERLAY_SRC)
++        v2(overlay=LAN_DECLARED)
++        v2({"device_id": "nosuch"})
++        v2({"nonce": "nosuch"})
++        dec = gate.authorize("POST", "/plugins/games/native-stream-start", "port=48100", p["token"], LAN_SRC)
++        out.append(("authorize", dec.allowed, dec.status, dec.reason, dec.media_host))
++        audit = (d / "audit.jsonl").read_text()
++        return out, audit
++    finally:
++        mod.secrets = real
++
++
++class V2ByteForByte(unittest.TestCase):
++    def test_v1_v2_identical_to_head(self):
++        head = load_predecessor()
++        self.assertFalse(hasattr(head, "SETUP_CANON_V3"))
++        a_out, a_audit = scenarios(head)
++        b_out, b_audit = scenarios(si)
++        self.assertEqual(len(a_out), len(b_out))
++        for x, y in zip(a_out, b_out):
++            self.assertEqual(x, y)
++        self.assertEqual(a_audit, b_audit)
++        self.assertGreater(a_audit.count("token_issued"), 3)
++        out = __import__("os").environ.get("CL_B4_COMPARE_OUT")
++        if out:
++            Path(out).write_text(json.dumps({
++                "answers": len(a_out), "answers_equal": a_out == b_out,
++                "audit_rows": a_audit.count("\n"), "audit_equal": a_audit == b_audit,
++                "statuses": [r[1] for r in a_out],
++                "audit_sha256_head": hashlib.sha256(a_audit.encode()).hexdigest(),
++                "audit_sha256_edited": hashlib.sha256(b_audit.encode()).hexdigest()}, indent=1) + "\n")
++
++
++if __name__ == "__main__":
++    unittest.main()

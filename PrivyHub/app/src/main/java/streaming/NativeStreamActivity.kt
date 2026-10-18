@@ -2160,6 +2160,30 @@ class NativeStreamActivity :
                         "startup_prefill_ms",
                         audio.startupPrefillMs
                     )
+                    // CL-B4: the codec; with "opus" the loss counters
+                    // above count Opus frames (frame_samples each).
+                    put(
+                        "codec",
+                        audio.codec
+                    )
+                    if (audio.codec == "opus") {
+                        put(
+                            "opus",
+                            JSONObject().apply {
+                                put("frame_samples", audio.opusFrameSamples)
+                                put("frames_decoded", audio.opusFramesDecoded)
+                                put("frames_abandoned", audio.opusFramesAbandoned)
+                                put("decode_errors", audio.opusDecodeErrors)
+                                put("drain_timeouts", audio.opusDrainTimeouts)
+                                put("format_errors", audio.opusFormatErrors)
+                                put("max_held_frames", audio.opusMaxHeldFrames)
+                                put("decode_avg_us", audio.opusDecodeAvgUs)
+                                put("decode_max_us", audio.opusDecodeMaxUs)
+                                put("decoder", audio.opusDecoder)
+                                put("copy_offset_frames", audio.opusCopyOffsetFrames)
+                            }
+                        )
+                    }
                 }
             )
         }
@@ -2267,6 +2291,8 @@ class NativeStreamActivity :
             "&audio_queue_ms=${aud.bufferedMs}" +
             "&audio_session_max_arrival_gap_ms=" +
             "${aud.maxArrivalGapMs}" +
+            // CL-B4: the codec (the host keeps only the fields it knows).
+            "&audio_codec=${aud.codec}" +
             (
                 if (windowGapMs != null) {
                     "&audio_max_arrival_gap_ms=$windowGapMs"

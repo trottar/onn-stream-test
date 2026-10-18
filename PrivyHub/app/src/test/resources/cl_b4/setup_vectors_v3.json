@@ -1,0 +1,65 @@
+{
+  "setup_canon_v3": "privyhub-session-setup-v3",
+  "vectors": [
+    {
+      "name": "lan-no-overlay",
+      "device_id": "dev-0123456789abcdef",
+      "nonce": "fixture-nonce-v3-1",
+      "media_host": "0xC0A86439",
+      "video_port": 48100,
+      "audio_port": 48101,
+      "overlay_host": null,
+      "audio_codecs": [
+        "opus"
+      ],
+      "source": "lan",
+      "key_hex": "13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb",
+      "sig_v": 3,
+      "canonical_sha256": "d9605ec66c65c15635406763a611d7d795de79a9fc7df0a8e9eeedff4ba841f8",
+      "canonical_bytes": 98,
+      "sig": "2af1c5affd42129dba006d9eddd3e20ea2fcd95252be12f6a5491c542c03c4da",
+      "body_sha256": "7e47cc48fd134da2be3e594f39c32e18981cd0f8affb35fd70bbd3432c7a3551",
+      "host_accepted": true
+    },
+    {
+      "name": "lan-with-overlay",
+      "device_id": "dev-0123456789abcdef",
+      "nonce": "fixture-nonce-v3-2",
+      "media_host": "0xC0A86439",
+      "video_port": 48100,
+      "audio_port": 48101,
+      "overlay_host": "0x64401235",
+      "audio_codecs": [
+        "opus"
+      ],
+      "source": "lan",
+      "key_hex": "13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb",
+      "sig_v": 3,
+      "canonical_sha256": "33ac1c55cc8de4a51e44631e434780733190b5b0974bd79aa21477081db5ff36",
+      "canonical_bytes": 110,
+      "sig": "d288f4f512e01d22c1c434e18c5958f4b2852b06f53415c8007240f92169926e",
+      "body_sha256": "68aa172781fbb2d59aa72c9b7962e51b0650ab4f89ed8b48c3d73c97197809db",
+      "host_accepted": true
+    },
+    {
+      "name": "overlay-only",
+      "device_id": "dev-fedcba9876543210",
+      "nonce": "Zz-09_fixture-v3",
+      "media_host": "0x64401235",
+      "video_port": 50000,
+      "audio_port": 50001,
+      "overlay_host": "0x64401235",
+      "audio_codecs": [
+        "opus"
+      ],
+      "source": "overlay",
+      "key_hex": "13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb13348dbbfb318caaabdc9ee3ea7f43654e5ff1090c8fc77bf2d3cd42925874fb",
+      "sig_v": 3,
+      "canonical_sha256": "679f0079e7603517c050a02e42b8d052904ab4b56d2e9bbf9c38eb4f54fcb5c1",
+      "canonical_bytes": 106,
+      "sig": "dc5ed25979791078273c4df899e5590e8a0d3a350ee40353a7d8afeb1cb2355f",
+      "body_sha256": "b1702cda2dfa255e3da758b19dc58e65fd728ae9940110a049038ffe67db744a",
+      "host_accepted": true
+    }
+  ]
+}

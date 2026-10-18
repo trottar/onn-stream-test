@@ -1,5 +1,23 @@
 # Known issues and deferred work
 
+## 2026-10-18 CL-B4, the first Opus session: underruns 40 against 9; an off-site Opus start would be refused — OPEN
+
+(`docs/memory/evidence/CL_B4_APK_OPUS_DECODE_2026-10-18.md` §4)
+
+- **Underruns 40** (session report; 32 in the heartbeat window) against CL-B3 R1's 9, on the same rung, with 0 audio
+  frames lost net.
+  - The client's MediaCodec `audio/opus` runs synchronously on the audio receive thread: 3.3 ms per frame on average,
+    84 ms at most, 4 drain timeouts. While it waits, the socket is not read and the queue is not fed.
+  - The likely cause, not proven. **Next:** decode off the receive thread (or the async callback, the release order
+    kept), then a paired PCM / Opus A/B on one day.
+- **Decoder spikes ≥ 20 ms 178/min against 87** (CL-B3 R1), max output gap 501 against 410 ms. The cause is not
+  located: the link (the runs are not paired) or the onn's CPU shared with the Codec2 thread. Under the < 200 bar.
+- **Off-site, fails closed:** `companion/audio_codec.py` `note_setup` adds the declared overlay host only when
+  `sig_v` == 2.
+  - A `sig_v` 3 client (every client from CL-B4) has its media host recorded but not its overlay host, so an Opus
+    start over the overlay is refused ("the client did not declare it").
+  - **Fix before the off-site run at 4000 with Opus:** accept `sig_v` in (2, 3) there (one line, B's module).
+
 ## 2026-10-17 G8-S1: the rate-cap cells never reached PLAYING; delay-150 not read as latency-limited — OPEN
 
 (`docs/memory/evidence/G8_S1_ADVERSE_NETWORK_ENVELOPE_2026-10-17.md` §4 (iii), §5)

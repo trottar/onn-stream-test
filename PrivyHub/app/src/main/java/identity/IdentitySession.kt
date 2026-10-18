@@ -23,6 +23,10 @@ package com.safeiot.privyhub.identity
  * the media requests to the hub's range server carry the token too
  * ([mediaHeaderFor]), or the session's media token for a player that cannot
  * set headers ([mediaTokenFor]).
+ *
+ * CL-B4: the setup signs v3 — v2 plus the audio codecs this client decodes
+ * (`audio_codecs`, G4-W2's Opus). A host that predates v3 verifies it as v1
+ * and answers `bad-signature`; then one fresh nonce and today's v2 setup.
  */
 class IdentitySession(
     private val enabled: () -> Boolean,
@@ -81,6 +85,10 @@ class IdentitySession(
         private set
 
     @Volatile var stateText: String = "off"
+        private set
+
+    /** CL-B4: the signature version of the last session set up (3, or 2 after the fallback); 0 before any. */
+    @Volatile var lastSigV: Int = 0
         private set
 
     var onRefusal: ((String) -> Unit)? = null
@@ -178,7 +186,7 @@ class IdentitySession(
             log("identity: host identity layer absent")
             return null
         }
-        val nonce = SessionProtocol.jsonStringField(nonceBody, "nonce")
+        var nonce = SessionProtocol.jsonStringField(nonceBody, "nonce")
         if (nonceStatus != 200 || nonce == null) {
             return setupRefused(SessionProtocol.reasonOf(nonceBody) ?: "http-$nonceStatus", now)
         }
@@ -187,11 +195,31 @@ class IdentitySession(
         val secret = ensureSecret()
         // G3-S3: v2 signs the audio port and the overlay interface address (when present).
         val overlayHost = routes.overlayAddress()?.takeIf { SessionProtocol.isOverlayIpv4(it) }
-        val sig = SessionProtocol.signV2(secret, pairing.deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost)
-        val (status, body) = transport.post(
+        // CL-B4: v3 adds the audio codecs.
+        val codecs = SessionProtocol.AUDIO_CODECS
+        val sigV3 = SessionProtocol.signV3(secret, pairing.deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost, codecs)
+        var (status, body) = transport.post(
             controlUrl(host, "/session/setup"),
-            SessionProtocol.setupBodyV2(pairing.deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost, sig),
+            SessionProtocol.setupBodyV3(pairing.deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost, codecs, sigV3),
         )
+        var sigV = 3
+        if (status == 401 && SessionProtocol.reasonOf(body) == SessionProtocol.V3_FALLBACK_REASON) {
+            // A host without v3 (it verified the body as v1): one fresh nonce, today's v2 setup.
+            log("identity: host refused sig_v 3 (${SessionProtocol.V3_FALLBACK_REASON}), v2 setup")
+            val (n2Status, n2Body) = transport.post(controlUrl(host, "/session/nonce"), null)
+            nonce = SessionProtocol.jsonStringField(n2Body, "nonce")
+            if (n2Status != 200 || nonce == null) {
+                return setupRefused(SessionProtocol.reasonOf(n2Body) ?: "http-$n2Status", now)
+            }
+            val sig = SessionProtocol.signV2(secret, pairing.deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost)
+            val answer = transport.post(
+                controlUrl(host, "/session/setup"),
+                SessionProtocol.setupBodyV2(pairing.deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost, sig),
+            )
+            status = answer.first
+            body = answer.second
+            sigV = 2
+        }
         val value = SessionProtocol.jsonStringField(body, "token")
         val ttl = SessionProtocol.jsonLongField(body, "expires_in_s")
         if (status != 200 || value == null || ttl == null) {
@@ -207,7 +235,8 @@ class IdentitySession(
         setupRefusedUntilMs = 0L
         lastReason = null
         stateText = "session active"
-        log("identity: session set up, expires_in_s=$ttl, overlay_declared=${overlayHost != null}")
+        lastSigV = sigV
+        log("identity: session set up, expires_in_s=$ttl, overlay_declared=${overlayHost != null}, sig_v=$sigV")
         return t
     }
 

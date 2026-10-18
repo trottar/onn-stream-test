@@ -1527,6 +1527,10 @@ green, 44 client unit tests, the handshake harness 24/24, debug APK
 a VOD play with the flag and the setting on), then G4-S1 off-site. Record:
 `docs/memory/evidence/G3_S3_HARDENING_AND_HUB_HOST_2026-10-16.md`; trust model
 `docs/REMOTE_TRUST.md` §8.
+**CL-B4 (2026-10-18): `sig_v` 3** in `companion/session_identity.py`: v2's fields plus the client's `audio_codecs`
+signed (required under v3; `token_issued` records them); v1 / v2 byte for byte as HEAD's. The APK signs v3 (one v2
+fallback for an older host). Live on the companion since 22:00Z. Record:
+`docs/memory/evidence/CL_B4_APK_OPUS_DECODE_2026-10-18.md`.
 
 The current LAN prototype may derive reachable media/controller targets from the
 request source address. That mechanism is not a durable remote identity model
@@ -1576,6 +1580,13 @@ against PCM 2/4's 3,212.8 (−1.30 GB/h at any rung), +7.5 ms; same audio-ms los
 the holes. The client declares `audio_codecs` in `/session/setup`; an undeclared client is refused at stream start
 (fails closed). Not adopted. Next: the APK's Opus decode (CL-B), a LAN smoke, an off-site run at 4000. Record:
 `docs/memory/evidence/G4_W2_OPUS_AUDIO_PATH_2026-10-18.md`.
+**CL-B4 (2026-10-18): the APK decodes Opus; the first live Opus session (LAN, 10 min) VALID, host gates held.** APK
+`8e10497e…` CONFIRMED (sig_v 3 declares `audio_codecs`; MediaCodec `audio/opus`, in-order release that waits for the
+copy). With `PRIVYHUB_AUDIO_CODEC=opus`: 200 datagrams/s, ~326 kbit/s; the LAN interface −2,952 kbit/s against
+CL-B3 R1 at 7000 (−2,909 predicted); 0 audio frames lost net (68 recovered). **Underruns 40 against 9**: the decode is
+synchronous on the receive thread (avg 3.3 ms, max 84 ms); decoder spikes 178/min against 87 (not located). Off-site
+blocker: `audio_codec.py` records the overlay host only for sig_v 2. Flag removed; not adopted. Record:
+`docs/memory/evidence/CL_B4_APK_OPUS_DECODE_2026-10-18.md`.
 
 **G4-P2 (2026-10-17): the remote row records gate 3 from G4-S2** — `tools/e1_remote.py`
 writes the home row's per-run RetroArch counter override (for the PS1-STREAM fixture),

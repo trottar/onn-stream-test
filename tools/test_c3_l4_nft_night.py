@@ -264,11 +264,11 @@ class OnlySubset(unittest.TestCase):
 
 
 class AdoptedApk(unittest.TestCase):
-    """CL-B3 (2026-10-16; CL-B2 and CL-B1 before it): the preflight checks the CONFIRMED APK."""
+    """CL-B4 (2026-10-18; CL-B3, CL-B2 and CL-B1 before it): the preflight checks the CONFIRMED APK."""
 
-    def test_the_preflight_expects_the_cl_b3_apk(self):
+    def test_the_preflight_expects_the_cl_b4_apk(self):
         self.assertEqual(h.ADOPTED_APK_SHA256,
-                         "59f736d29b96700253a178efa5efd0cd8846858a89d32848a0994586712bf65f")
+                         "8e10497ef43850d54165593a680f68a41b89114536a806f0788b9a04945fd84e")
 
 
 

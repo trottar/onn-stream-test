@@ -19,6 +19,11 @@ object SessionProtocol {
     // G3-S3: the v2 canon signs the audio port and the overlay address too.
     const val SETUP_CANON_V2 = "privyhub-session-setup-v2"
     const val MEDIA_PERMISSION = "vod"
+
+    // CL-B4: the v3 canon signs v2's fields and the audio codecs this client decodes (G4-W2).
+    const val SETUP_CANON_V3 = "privyhub-session-setup-v3"
+    val AUDIO_CODECS = listOf("opus")
+    const val V3_FALLBACK_REASON = "bad-signature"
     const val MEDIA_TOKEN_PARAM = "media_token"
 
     /** Granted to a paired device without being listed at pairing (G3-S3: diagnostics, default on). */
@@ -72,6 +77,33 @@ object SessionProtocol {
         audioPort: Int,
         overlayHost: String?,
     ): String = hmacSha256Hex(keyHex, setupCanonicalV2(deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost))
+
+    /** CL-B4: v2's seven lines (named v3) and an eighth, the codecs joined by ','. */
+    fun setupCanonicalV3(
+        deviceId: String,
+        nonce: String,
+        mediaHost: String,
+        videoPort: Int,
+        audioPort: Int,
+        overlayHost: String?,
+        audioCodecs: List<String>,
+    ): String =
+        listOf(
+            SETUP_CANON_V3, deviceId, nonce, mediaHost, videoPort.toString(), audioPort.toString(), overlayHost ?: "",
+            audioCodecs.joinToString(","),
+        ).joinToString("\n")
+
+    fun signV3(
+        keyHex: String,
+        deviceId: String,
+        nonce: String,
+        mediaHost: String,
+        videoPort: Int,
+        audioPort: Int,
+        overlayHost: String?,
+        audioCodecs: List<String>,
+    ): String =
+        hmacSha256Hex(keyHex, setupCanonicalV3(deviceId, nonce, mediaHost, videoPort, audioPort, overlayHost, audioCodecs))
 
     /** G3-S3: an IPv4 address in the overlay's block (the shared CGNAT /10, Tailscale's range). */
     fun isOverlayIpv4(address: String): Boolean {
@@ -191,6 +223,29 @@ object SessionProtocol {
             "\"audio_port\":" + audioPort + "," +
             (if (overlayHost != null) "\"overlay_host\":" + jsonString(overlayHost) + "," else "") +
             "\"sig_v\":2," +
+            "\"sig\":" + jsonString(sig) +
+            "}"
+
+    /** CL-B4: the v3 setup body (`sig_v` 3): v2's, with `audio_codecs`. */
+    fun setupBodyV3(
+        deviceId: String,
+        nonce: String,
+        mediaHost: String,
+        videoPort: Int,
+        audioPort: Int,
+        overlayHost: String?,
+        audioCodecs: List<String>,
+        sig: String,
+    ): String =
+        "{" +
+            "\"device_id\":" + jsonString(deviceId) + "," +
+            "\"nonce\":" + jsonString(nonce) + "," +
+            "\"media_host\":" + jsonString(mediaHost) + "," +
+            "\"video_port\":" + videoPort + "," +
+            "\"audio_port\":" + audioPort + "," +
+            (if (overlayHost != null) "\"overlay_host\":" + jsonString(overlayHost) + "," else "") +
+            "\"audio_codecs\":[" + audioCodecs.joinToString(",") { jsonString(it) } + "]," +
+            "\"sig_v\":3," +
             "\"sig\":" + jsonString(sig) +
             "}"
 

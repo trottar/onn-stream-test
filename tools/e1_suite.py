@@ -51,9 +51,9 @@ REPO = Path(__file__).resolve().parent.parent
 BASE = "http://localhost:8765"
 UNIT = "privyhub-companion"
 PKG = "com.safeiot.privyhub"
-# CL-B3 (installed 2026-10-16): G3-S3's hardened identity APK; the previous CONFIRMED APK was 77011eef... (CL-B2),
-# before it de072762... (CL-B1)
-EXPECT_APK = "59f736d29b96700253a178efa5efd0cd8846858a89d32848a0994586712bf65f"
+# CL-B4 (installed 2026-10-18): the Opus-decode APK (sig_v 3); the previous CONFIRMED APK was 59f736d2... (CL-B3),
+# before it 77011eef... (CL-B2), de072762... (CL-B1)
+EXPECT_APK = "8e10497ef43850d54165593a680f68a41b89114536a806f0788b9a04945fd84e"
 LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
 # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
 # is exactly these two names, at every precondition and teardown

@@ -60,7 +60,23 @@ data class NativeAudioMetrics(
     // per-heartbeat window figure is `takeWindowMaxArrivalGapMs()`, which
     // is separate precisely so a heartbeat read cannot steal from the
     // end-of-session report -- both read `snapshot()`.
-    val maxArrivalGapMs: Long
+    val maxArrivalGapMs: Long,
+    // CL-B4: the stream's codec ("none" before the first valid datagram,
+    // "pcm" or "opus") and the Opus path's counters. With Opus the loss
+    // counters above (lost_packets, sequence_gap_*, recovered_by_duplicate,
+    // late_unplaced) count Opus frames, not 5-ms packets.
+    val codec: String = "none",
+    val opusFrameSamples: Int = 0,
+    val opusFramesDecoded: Long = 0,
+    val opusFramesAbandoned: Long = 0,
+    val opusDecodeErrors: Long = 0,
+    val opusDrainTimeouts: Long = 0,
+    val opusFormatErrors: Long = 0,
+    val opusMaxHeldFrames: Int = 0,
+    val opusDecodeAvgUs: Double = 0.0,
+    val opusDecodeMaxUs: Long = 0,
+    val opusDecoder: String = "",
+    val opusCopyOffsetFrames: Int = 0
 )
 
 /**
@@ -644,6 +660,39 @@ class NativeAudioReceiver(
     private var expectedSequence =
         -1
 
+    // CL-B4: the Opus path (PHA1 version 2). Receive thread only, except
+    // the @Volatile fields the snapshot reads.
+    @Volatile
+    private var streamCodec =
+        "none"
+
+    @Volatile
+    private var opusFrameSamples =
+        0
+
+    @Volatile
+    private var opusDecoderName =
+        ""
+
+    private var opusDecoder:
+        OpusAudioDecoder? =
+        null
+
+    private var opusDecoderFailed =
+        false
+
+    private val opusReorder =
+        OpusReorder(SEEN_WINDOW)
+
+    private val opusFramesDecoded =
+        AtomicLong(0)
+
+    private val opusFramesAbandoned =
+        AtomicLong(0)
+
+    private val opusDecodeFailures =
+        AtomicLong(0)
+
     fun start() {
         if (running) {
             return
@@ -867,7 +916,38 @@ class NativeAudioReceiver(
                     sequenceGapHistogram.get(it)
                 },
             startupPrefillMs =
-                startupPrefillMs
+                startupPrefillMs,
+            codec =
+                streamCodec,
+            opusFrameSamples =
+                opusFrameSamples,
+            opusFramesDecoded =
+                opusFramesDecoded.get(),
+            opusFramesAbandoned =
+                opusFramesAbandoned.get(),
+            opusDecodeErrors =
+                opusDecodeFailures.get() +
+                    (opusDecoder?.decodeErrors ?: 0L),
+            opusDrainTimeouts =
+                opusDecoder?.drainTimeouts ?: 0L,
+            opusFormatErrors =
+                opusDecoder?.formatErrors ?: 0L,
+            opusMaxHeldFrames =
+                opusReorder.maxHeld,
+            opusDecodeAvgUs =
+                opusDecoder?.let {
+                    if (it.decodeCalls > 0L) it.decodeNsTotal.toDouble() / it.decodeCalls / 1000.0 else 0.0
+                } ?: 0.0,
+            opusDecodeMaxUs =
+                (opusDecoder?.decodeNsMax ?: 0L) / 1000L,
+            opusDecoder =
+                opusDecoderName,
+            opusCopyOffsetFrames =
+                if (opusFrameSamples > 0) {
+                    OpusFraming.copyOffsetFrames(redundancyCopies, redundancyOffsetPackets, opusFrameSamples)
+                } else {
+                    0
+                }
         )
     }
 
@@ -1108,6 +1188,18 @@ class NativeAudioReceiver(
                     packet.length -
                         HEADER_BYTES
 
+                // CL-B4: version 2 is Opus (G4-W2). Version 1 below is unchanged.
+                if (version == OpusFraming.PHA_VERSION_OPUS) {
+                    receiveOpus(
+                        buffer,
+                        channels,
+                        sequence,
+                        frames,
+                        payloadBytes
+                    )
+                    continue
+                }
+
                 if (
                     version != 1 ||
                     channels != CHANNELS ||
@@ -1265,6 +1357,11 @@ class NativeAudioReceiver(
 
                 packets.incrementAndGet()
 
+                if (streamCodec != "pcm") {
+                    streamCodec =
+                        "pcm"
+                }
+
                 enqueueLatest(
                     buffer.copyOfRange(
                         HEADER_BYTES,
@@ -1277,6 +1374,180 @@ class NativeAudioReceiver(
             try {
                 localSocket.close()
             } catch (_: Exception) {
+            }
+
+            opusDecoder?.release()
+        }
+    }
+
+    /**
+     * CL-B4: one PHA1 version-2 datagram (one Opus packet). De-duplicated by
+     * sequence in today's window; the arrival gap measured as for PCM; the
+     * frames released strictly in order by [OpusReorder] (a missing one waits
+     * for its copy, then is concealed with frames/240 of today's concealment
+     * slots); each decoded frame split into 5-ms packets for today's queue.
+     * Loss is counted in Opus frames (10 ms each at the host's default).
+     */
+    private fun receiveOpus(
+        buffer: ByteArray,
+        channels: Int,
+        sequence: Int,
+        frames: Int,
+        payloadBytes: Int
+    ) {
+        if (
+            channels != CHANNELS ||
+            frames !in OpusFraming.FRAME_SAMPLES ||
+            payloadBytes < 1 ||
+            payloadBytes > OpusFraming.MAX_PAYLOAD_BYTES
+        ) {
+            return
+        }
+
+        val seenSlot =
+            sequence and
+                SEEN_WINDOW_MASK
+
+        if (seenSequences[seenSlot] == sequence) {
+            duplicatesDropped.incrementAndGet()
+            return
+        }
+
+        seenSequences[seenSlot] =
+            sequence
+
+        val arrivalNs =
+            System.nanoTime()
+
+        if (lastArrivalNs != 0L) {
+            val gapNs =
+                arrivalNs -
+                    lastArrivalNs
+
+            updateMax(maxArrivalGapNs, gapNs)
+            updateMax(windowMaxArrivalGapNs, gapNs)
+
+            if (gapNs > HOLE_THRESHOLD_NS) {
+                recordArrivalHole(lastArrivalNs, gapNs)
+            }
+        }
+
+        lastArrivalNs =
+            arrivalNs
+
+        if (streamCodec != "opus" || opusFrameSamples != frames) {
+            streamCodec = "opus"
+            opusFrameSamples = frames
+        }
+
+        val decoder =
+            opusDecoder ?: if (opusDecoderFailed) {
+                null
+            } else {
+                try {
+                    OpusAudioDecoder(frames).also {
+                        opusDecoder = it
+                        opusDecoderName = it.name
+                    }
+                } catch (_: Exception) {
+                    opusDecoderFailed = true
+                    opusDecoderName = "unavailable"
+                    null
+                }
+            }
+
+        val slotsPerFrame =
+            frames /
+                FRAMES_PER_PACKET
+
+        val k =
+            OpusFraming.copyOffsetFrames(
+                redundancyCopies,
+                redundancyOffsetPackets,
+                frames
+            )
+
+        val emit: (Int, ByteArray?) -> Unit = { seq, opus ->
+            if (opus == null) {
+                opusFramesAbandoned.incrementAndGet()
+                repeat(slotsPerFrame) { enqueueConcealment(-1) }
+            } else if (decoder == null) {
+                opusDecodeFailures.incrementAndGet()
+                repeat(slotsPerFrame) { enqueueConcealment(-1) }
+            } else {
+                var produced = 0
+                val ok =
+                    decoder.decode(opus, 0, opus.size) { pcm, length ->
+                        for (chunk in OpusFraming.split(pcm, length)) {
+                            enqueueLatest(chunk)
+                            produced += 1
+                        }
+                    }
+
+                if (ok) {
+                    opusFramesDecoded.incrementAndGet()
+                } else if (produced == 0) {
+                    repeat(slotsPerFrame) { enqueueConcealment(-1) }
+                }
+            }
+        }
+
+        val payload =
+            buffer.copyOfRange(
+                HEADER_BYTES,
+                HEADER_BYTES + payloadBytes
+            )
+
+        val offer =
+            opusReorder.offer(sequence, payload, k, emit) { skipped ->
+                // An outage: today's cap on concealment, then the crossfade.
+                if (skipped > 0) {
+                    lostPackets.addAndGet(skipped.toLong())
+                    sequenceGapPackets.addAndGet(skipped.toLong())
+                    sequenceGapHistogram.incrementAndGet(4)
+
+                    val slots =
+                        minOf(skipped * slotsPerFrame, placeholderCap)
+
+                    repeat(slots) { enqueueConcealment(-1) }
+
+                    if (skipped * slotsPerFrame > slots) {
+                        trimCrossfadePending = true
+                    }
+                }
+            }
+
+        when (offer.kind) {
+            OpusReorder.Kind.LATE -> {
+                packets.incrementAndGet()
+                lateUnplaced.incrementAndGet()
+            }
+            OpusReorder.Kind.DUPLICATE -> {
+                duplicatesDropped.incrementAndGet()
+            }
+            OpusReorder.Kind.RECOVERED -> {
+                packets.incrementAndGet()
+                recoveredByDuplicate.incrementAndGet()
+                lostPackets.decrementAndGet()
+            }
+            OpusReorder.Kind.IN_ORDER,
+            OpusReorder.Kind.JUMP -> {
+                packets.incrementAndGet()
+
+                val gap =
+                    offer.newGap
+
+                if (offer.kind == OpusReorder.Kind.IN_ORDER && gap > 0) {
+                    lostPackets.addAndGet(gap.toLong())
+                    sequenceGapPackets.addAndGet(gap.toLong())
+                    sequenceGapHistogram.incrementAndGet(
+                        when {
+                            gap <= 3 -> gap - 1
+                            gap <= 7 -> 3
+                            else -> 4
+                        }
+                    )
+                }
             }
         }
     }

@@ -1,0 +1,64 @@
+CL-B4 — the APK's Opus decode, and the first Opus session. Pre-registration (session A, 2026-10-18).
+Written and hashed before any code edit and before the build. Baseline HEAD f314126 (tree clean at start).
+
+0. Precondition read at 20:32Z: the seven lines, no e3_flag.conf, no game, the companion active, HEAD f314126,
+   tree clean. tools/e3_state.py --check: ok false on adb only (adb not connected after G4-S2's network change;
+   apk MISMATCH follows from that). The user is asked to reconnect adb. The offline part (code, tests, build)
+   proceeds; nothing touches the device until --check reads ok.
+
+1. The client change (the debug APK only; the seven items of G4-W2 §5.1):
+   a. setup: IdentitySession signs sig_v 3 and sends "audio_codecs":["opus"] (canon privyhub-session-setup-v3 =
+      v2's seven lines with the v3 name, plus line 8 = the codecs joined by ","). Declared always (under
+      identity_v2, as setup is). If the host answers 401 bad-signature to a v3 setup (a host that predates
+      sig_v3), one fresh nonce and today's v2 setup, byte for byte (no audio_codecs); logged. Disclosed: this is
+      what lets the -r install talk to the running, pre-restart companion.
+   b. NativeAudioReceiver accepts PHA1 version 2 (2 ch; frames 240/480/960; payload 1-1500 B), de-duplicated by
+      sequence in the same window as today. Version 1 path unchanged.
+   c. MediaCodec "audio/opus", 48 kHz, 2 ch, csd-0 = OpusHead (version 1, 2 ch, pre-skip 120, 48000, gain 0,
+      family 0), csd-1 = pre-skip in ns (2,500,000) LE64, csd-2 = seek pre-roll in ns (80,000,000) LE64.
+      Synchronous, on the receive thread (one producer for the queue, as today). New file OpusAudioDecoder.kt.
+   d. Concealment: decode strictly in sequence order. A missing sequence holds later frames until its copy can
+      no longer come (a frame with sequence > missing + K arrives, K = max(1, round(offset x 5 / frame_ms)) with
+      redundancy on, 0 with it off); then it is abandoned and filled with frames/240 concealment slots — the
+      existing concealment (the continuity packet + crossfade). A jump >= 64 sequences: today's cap and crossfade.
+   e. The split: each decoded output into 240-frame (960 B) packets for the existing queue; an output that is not
+      a multiple of 240 frames (the pre-skip's first) is left-padded with zeros.
+   f. Holes per 10 ms: with Opus, lost_packets / sequence_gap_* / recovered_by_duplicate / late_unplaced count Opus
+      frames (10 ms each at the default), net of recovery as today. New counters: opus frames decoded,
+      abandoned, decode errors, max held, decode time.
+   g. The codec in the reports: the end-of-session report's audio block carries "codec" ("pcm" | "opus") and an
+      "opus" object; the heartbeat query carries audio_codec=<pcm|opus> (the host ignores unknown keys).
+   Unit tests: the pure parts (OpusHead/csd bytes, the reorder/abandon rule, the split/pad, v3 canonical and its
+   host vector) as JVM tests; ./gradlew :app:testDebugUnitTest and :app:assembleDebug, offline.
+
+2. The host change: sig_v 3 in companion/session_identity.py `_setup` only. v3 = v2's fields plus
+   audio_codecs, which must be a list of 1-8 strings [a-z0-9]{1,16} (else 403 audio-codecs-invalid, a v3 claim
+   without the field included); token_issued for v3 carries sig_v 3 and audio_codecs "opus". v1 / v2: byte for
+   byte as today (the handler comparison over G3-S1's fixtures: HEAD's module vs the edited one on every fixture,
+   statuses, payloads and audit rows equal). Tests in tests/session_identity: v2 unchanged, v3 verified, v3 without
+   the field refused, v3 tampered codecs refused. The G1/G3 suites green. audio_codec.py is NOT touched; its
+   capture adds the overlay host only for sig_v 2 — a v3 client's overlay host is therefore not recorded (an
+   off-site Opus start would be refused, fail closed). Recorded as a known issue for the off-site run, not fixed.
+
+3. Build / pin / install: ./gradlew --offline :app:assembleDebug; the sha256 pinned beside the CONFIRMED one
+   (59f736d2…) in tools/e1_suite.py EXPECT_APK and tools/c3_l4_nft_night.py (+ its test), as CL-B3; the current
+   APK preserved as the rollback; adb install -r; the client's pairing read back (secret and prefs present, the
+   device id in the hub's store: a boolean). If not paired: stop and tell the user.
+
+4. The smoke: one E1-PS1-STREAM --e2 --window 600 on the LAN; e3_flag.conf = PRIVYHUB_AUDIO_CODEC=opus (defaults
+   128 kbit/s, 10 ms), restart, environ read back (eight lines), the run, teardown with the drop-in removed,
+   flags_absent true, --check ok on the new APK hash.
+
+5. Gates (host): RetroArch >= 59.9, capture 60 +- 0.1, dup+drop <= 0.2/min, flags_absent after.
+   Reported, not gated: the audio stream on the LAN interface (packets/s and kbit/s; expected 200 and ~326),
+   audio holes/min (sequence holes, 10 ms, and the arrival holes > 15 ms — not comparable one-to-one: Opus
+   arrives every 10 ms, PCM every 5) and underruns vs CL-B3 R1 and D-BASE-P10, queue residence (the +7.5 ms is
+   upstream of the queue), companion / encoder CPU, the video figures. The user's listen (present, in sync,
+   artefacts) recorded as the user's report.
+
+6. Validity: PLAYING; token_issued in the audit with sig_v 3 and audio_codecs opus; the companion's log showing
+   the Opus session (starts_opus). A PCM fallback or a refused start is void, said so, its reason read from the
+   companion's log. No rerun unless the user says.
+
+No sudo, no nft, the Opal read-only, adb only for the install and state reads; no addresses or identifiers;
+nothing fetched, deleted, adopted or committed.

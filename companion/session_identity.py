@@ -35,6 +35,7 @@ import hmac
 import ipaddress
 import json
 import os
+import re
 import secrets
 import threading
 import time
@@ -69,6 +70,10 @@ KEY_MAX_HEX = 256
 BODY_MAX_BYTES = 16_384
 SETUP_CANON = "privyhub-session-setup-v1"
 SETUP_CANON_V2 = "privyhub-session-setup-v2"
+# CL-B4: `sig_v` 3 = v2 plus the client's declared audio codecs (G4-W2's `audio_codecs`).
+SETUP_CANON_V3 = "privyhub-session-setup-v3"
+AUDIO_CODECS_MAX = 8
+_AUDIO_CODEC_RE = re.compile(r"[a-z0-9]{1,16}")
 
 # The session-setup actions: a legacy token is issued and audited on these.
 SETUP_PATHS = frozenset({
@@ -658,8 +663,10 @@ class SessionGate:
         sig = str(body.get("sig") or "").lower()
         # G3-S3: `sig_v` 2 signs the audio port and the overlay address too.
         v2 = body.get("sig_v") == 2 and not isinstance(body.get("sig_v"), bool)
-        audio_raw = body.get("audio_port") if v2 else None
-        overlay_raw = str(body.get("overlay_host") or "") if v2 else ""
+        # CL-B4: `sig_v` 3 signs v2's fields and the declared audio codecs (required).
+        v3 = body.get("sig_v") == 3 and not isinstance(body.get("sig_v"), bool)
+        audio_raw = body.get("audio_port") if (v2 or v3) else None
+        overlay_raw = str(body.get("overlay_host") or "") if (v2 or v3) else ""
 
         device = self.devices.get(device_id) if device_id else None
         if device is None:
@@ -676,7 +683,15 @@ class SessionGate:
                 return refused(401, "nonce-replayed", client_id=device_id)
             entry.used = True     # spent whatever the outcome below
 
-        if v2:
+        codecs_raw = body.get("audio_codecs") if v3 else None
+        if v3 and not (isinstance(codecs_raw, list) and 1 <= len(codecs_raw) <= AUDIO_CODECS_MAX
+                       and all(isinstance(c, str) and _AUDIO_CODEC_RE.fullmatch(c) for c in codecs_raw)):
+            return refused(403, "audio-codecs-invalid", client_id=device_id)
+        if v3:
+            canonical = "\n".join([SETUP_CANON_V3, device_id, nonce, media_host, str(port_raw),
+                                   "" if audio_raw is None else str(audio_raw), overlay_raw,
+                                   ",".join(codecs_raw)])
+        elif v2:
             canonical = "\n".join([SETUP_CANON_V2, device_id, nonce, media_host, str(port_raw),
                                    "" if audio_raw is None else str(audio_raw), overlay_raw])
         else:
@@ -724,10 +739,11 @@ class SessionGate:
                                           media_host=str(host), video_port=port, permissions=permissions,
                                           audio_port=audio_port, overlay_host=overlay_host,
                                           media_token=media_token))
+        extra: dict[str, Any] = {"audio_codecs": ",".join(codecs_raw)} if v3 else {}
         self.audit.write("token_issued", client_id=device_id, token_ref=token_ref(token),
                          expires_in_s=int(TOKEN_TTL_S), permissions=",".join(permissions),
-                         sig_v=2 if v2 else 1, overlay_declared=overlay_host is not None,
-                         media_token_issued=True, **self._evidence(routing))
+                         sig_v=3 if v3 else 2 if v2 else 1, overlay_declared=overlay_host is not None,
+                         media_token_issued=True, **extra, **self._evidence(routing))
         return 200, {"ok": True, "token": token, "expires_in_s": int(TOKEN_TTL_S),
                      "client_id": device_id, "permissions": list(permissions),
                      "media_token": media_token}

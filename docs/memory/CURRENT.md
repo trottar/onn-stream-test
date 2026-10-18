@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-10-16
-baseline_commit: 64d9489 (G8-S1 running; its launch and the shim fix uncommitted; the user commits)
+as_of: 2026-10-18
+baseline_commit: f314126 (CL-B4 uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -16,8 +16,14 @@ CL-B3 is OPEN on two G5-S1 smoke gates (NOT MET; the user decides). Everything e
 passed.** E1 FROZEN; E2
 MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `af3ed73`.
 
-**State (2026-10-17 18:51Z, after the G8-S3 record): the seven adopted lines; nothing running; `--check` ok** (adb connected,
-APK CONFIRMED). No `e3_flag.conf`, no stream, no game; one device paired. The G8-S3 unit ended by itself (18:21:36Z,
+**State (2026-10-18 22:17Z, after CL-B4): the seven adopted lines; nothing running; `--check` ok** (adb connected,
+**APK `8e10497e…d84e` CONFIRMED**, the Opus-decode APK, `sig_v` 3). No `e3_flag.conf`, no stream, no game; one device
+paired, `identity_v2` on. **CL-B4 VALID** (`evidence/CL_B4_APK_OPUS_DECODE_2026-10-18.md`): the first live Opus
+session (LAN, 10 min, `PRIVYHUB_AUDIO_CODEC=opus`, removed at teardown) held every host gate; 200 datagrams/s, the
+LAN interface −2,952 kbit/s against PCM; 0 audio frames lost net; **underruns 40 against CL-B3's 9** (the decode on the
+receive thread) and decoder spikes 178/min against 87 — open (`docs/KNOWN_ISSUES.md`). The user's listen: pending.
+
+**Earlier (2026-10-17 18:51Z, after the G8-S3 record):** the G8-S3 unit ended by itself (18:21:36Z,
 all 3 cells done) and was collected. **G8-S3 MEASURED: 3 of 3 valid**
 (`evidence/G8_S3_CAP_CELLS_START_RUNG_2026-10-17.md`):
 - cap-6000 at the 5000 start reached PLAYING, rules off and on, with host gates met;
@@ -41,9 +47,10 @@ session B's flag-absent G5-S3 / G5-S4 edits (disclosed, §3).
   - the SNES capture fix (E4-S5D);
   - the overlay provider and session identity v2 (G-A1, host);
   - `identity_v2` on (G-A1, client);
-  - the CONFIRMED APK (CL-B3).
+  - the CONFIRMED APK (CL-B4 since 2026-10-18; CL-B3's before it).
 - **Built behind flags, not adopted:** G5-S1 WAN telemetry (`PRIVYHUB_WAN_TELEMETRY`); G4-P1's `--remote` row and
-  the hotspot runbook.
+  the hotspot runbook; G4-W2's Opus audio (`PRIVYHUB_AUDIO_CODEC=opus`, LAN-smoked in CL-B4); G8-S4's
+  `PRIVYHUB_ENCODER_RC`.
 - **The link watch is stopped** (E4-S4C); the LAN loss row is parked (remote first). The LAN read clean today:
   60-80 loss/min.
 - **ABSENT:** Live TV, browser / camera sources, NES / Genesis, a power meter.
@@ -105,13 +112,15 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   **cap 90,000 B** (`P6a`), **cushion 12/17** (`P9`), **audio redundancy
   2/4** (`P10`). Env overrides exist for comparison sessions only
   (`TOOLS.md`, including `C5-M1`'s `PRIVYHUB_NATIVE_PROFILE_ID`); none set.
-- **Installed**: **APK `59f736d2…f65f`** (the `CL-B3` hardened identity APK, G3-S3's debug build, installed
-  2026-10-16 17:24Z). Its hash is pinned in `tools/e1_suite.py` `EXPECT_APK` and `tools/c3_l4_nft_night.py`
-  (patch `CL-B3_HARDENED_APK_HASH`), and it read CONFIRMED at 17:59:43Z.
+- **Installed**: **APK `8e10497e…d84e`** (CL-B4's Opus-decode debug build, installed 2026-10-18 21:59Z: `sig_v` 3
+  declares `audio_codecs: ["opus"]`; PHA1 v2 decoded with MediaCodec). Its hash is pinned in `tools/e1_suite.py`
+  `EXPECT_APK` and `tools/c3_l4_nft_night.py` (patch `CL-B4_OPUS_APK_HASH`), and it read CONFIRMED at 22:16Z. The
+  host's `session_identity.py` verifies `sig_v` 3 since the 22:00Z restart.
   - **`identity_v2` is on; the Hub host is empty (LAN).** One device is paired, and its stored permissions are
     games, tv, vod, diagnostics.
-  - Rollback, written and not applied: `adb install -r PrivyHub/app/build/g3_s3_preserved/app-debug.apk`
-    (`77011eef…`, CL-B2), plus the predecessors in `evidence/cl_b3_2026-10-16/predecessors/`. Older APKs:
+  - Rollback, written and not applied: `adb install -r PrivyHub/app/build/cl_b4_preserved/app-debug.apk`
+    (`59f736d2…`, CL-B3), plus the predecessors in `evidence/cl_b4_2026-10-18/predecessors/`. Before it:
+    `g3_s3_preserved/` (`77011eef…`, CL-B2), with `evidence/cl_b3_2026-10-16/predecessors/`. Older APKs:
     `g3_s2_preserved/` (`de072762…`, CL-B1) and `runtime/c4_m1/` (`f31b1c18…`).
   - The companion is the systemd user unit `privyhub-companion` (`H3`);
     restart it with `systemctl --user restart`.
@@ -179,6 +188,20 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
+
+**CL-B4 VALID** (`evidence/CL_B4_APK_OPUS_DECODE_2026-10-18.md`, 2026-10-18 20:32-22:17Z; flags removed, the seven
+lines, APK `8e10497e…` CONFIRMED).
+
+1. **The user's commit:** everything since `f314126` — the APK sources and tests (`identity/`, `streaming/`,
+   `OpusFraming.kt`, `OpusAudioDecoder.kt`, `resources/cl_b4/`), `companion/session_identity.py` (sig_v 3),
+   `tests/session_identity/test_cl_b4_sig_v3.py` + its fixture, the three pinned-hash files, the record + directory,
+   patch `CL-B4_OPUS_APK_HASH`, ROADMAP §G3/§G4, `KNOWN_ISSUES.md`, this file (`logs/cl_b4_git_status.txt`).
+2. **The adoption question (the user's call):** `PRIVYHUB_AUDIO_CODEC=opus` as the eighth line, with the picture and
+   the listen in hand. Against it, today: underruns 40 against 9 (the synchronous decode). Not adopted here.
+3. **Then the off-site run at 4000 with Opus** (predicted ~5.4 Mbit/s on the tailnet, ~2.4 GB/h). **First:**
+   `audio_codec.py`'s capture must accept `sig_v` 3 for the overlay host (one line; `KNOWN_ISSUES.md`). Otherwise the
+   start is refused (fail closed).
+4. Open from CL-B4: decode off the receive thread, then a paired PCM / Opus A/B; the doubled decoder spikes.
 
 **G4-S2 PARTIALLY MEASURED: 1 of 2 valid** (`evidence/G4_S2_OFFSITE_REMOTE_LADDER_2026-10-17.md`, 2026-10-18
 17:55-18:12Z; unit collected, `flags_absent` true, the seven lines). Run 1 (cap 4000, floor) held 4000 over the overlay,
