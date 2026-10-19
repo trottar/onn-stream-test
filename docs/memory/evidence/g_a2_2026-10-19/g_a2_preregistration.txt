@@ -1,0 +1,15 @@
+G-A2 — the confirmation run after adopting PRIVYHUB_AUDIO_CODEC=opus (session A, 2026-10-19). Written and hashed
+before the run. Baseline HEAD 263c26d.
+Done before this: audio-codec.conf (Environment=PRIVYHUB_AUDIO_CODEC=opus) written at 01:48:30Z, daemon-reload,
+restart, environ eight lines; tools updated (e1_suite ADOPTED + preflight drop-in check, e3_state's docstring,
+e1_remote's preflight requires the adopted set); --check ok on eight lines.
+The run: one E1-PS1-STREAM --e2 --window 600 on the LAN with NO e3_flag.conf (the suite's plan without a flag field):
+Opus must be on by the drop-in alone. The user is asked for a one-line listen while it plays, if present; else
+"no listen".
+Gates (host): RetroArch >= 59.9, capture 60 +- 0.1, dup+drop <= 0.2/min, flags_absent after (the suite's
+flags_absent now means the eight lines and no e3_flag.conf).
+Reported: underruns, net audio loss, the LAN interface's kbit/s and packets/s (expected ~9,000 and ~1,180 at 7000,
+as CL-B5 B), decoder spikes/min, decode queue maxima, CPU.
+Validity: PLAYING; token_issued sig_v 3 with audio_codecs opus; the companion's "opus 128 kbit/s, 10-ms frames" line;
+the heartbeats' audio_codec=opus; e3_flag.conf absent throughout.
+Nothing else adopted; nothing committed.

@@ -1,6 +1,16 @@
 # Known issues and deferred work
 
-## 2026-10-18 CL-B4, the first Opus session: underruns 40 against 9; an off-site Opus start would be refused — UNDERRUNS UNDER THE BAR, OFF-SITE FIXED (CL-B5); SPIKES OPEN
+## 2026-10-18 CL-B4, the first Opus session: underruns 40 against 9; an off-site Opus start would be refused — OFF-SITE FIXED (CL-B5); UNDERRUNS UNDER THE BAR IN CL-B5, REOPENED BY G-A2's RUN (78); SPIKES OPEN
+
+**G-A2 (2026-10-19, Opus ADOPTED; `docs/memory/evidence/G_A2_OPUS_ADOPTION_2026-10-19.md` §4):**
+- **Underruns REOPENED:** the confirmation run read **78** (50 in the window), over ≤ 20, against CL-B5's 11 / 13 on
+  the same APK and codec.
+  - One burst of 22 at ~11 s (start-up); ≥ 50-ms decoder spikes 138 (51 / 34); two > 1-s host ctrl gaps.
+  - Net audio loss ~0, and the onn's thermal status 0.
+  - Not located. The onn had run five sessions since 22:00Z, so a client-side long-uptime effect is a candidate,
+    not shown.
+  - **Next:** a paired A/B after an onn restart, or the next sessions' underruns watched.
+- **Spikes: still OPEN** (163 / min here, under 200).
 
 **CL-B5 (2026-10-18, `docs/memory/evidence/CL_B5_OPUS_DECODE_THREAD_AB_2026-10-18.md`):**
 - **Underruns:** with the decode on its own thread, the paired A/B read A (PCM) 19, B (Opus) 11: under ≤ 20. The

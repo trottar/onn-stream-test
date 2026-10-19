@@ -184,3 +184,21 @@ Every point below is a **[G3-S3 proposal]**.
 - **The hub host.** Off-site the client reaches the hub by a name the user
   types ("Hub host", e.g. the hub's tailnet name), overriding the companion
   host while `identity_v2` is on; the client never logs it (a hash if needed).
+
+## 9. The audio codec (G4-W2; adopted G-A2, 2026-10-19)
+
+- **Adopted:** `PRIVYHUB_AUDIO_CODEC=opus` (128 kbit/s, 10-ms frames) through the drop-in
+  `~/.config/systemd/user/privyhub-companion.service.d/audio-codec.conf`, the eighth adopted line. The audio is
+  then ~326 kbit/s on the wire instead of PCM 2/4's ~3,213 (G4-W1, CL-B5: −2.9 Mbit/s, ~1.3 GB/h).
+- **The declaration is signed.** The client declares `audio_codecs: ["opus"]` in `/session/setup` under `sig_v` 3
+  (CL-B4), so an on-path party cannot add or strip it without failing the signature. `token_issued` records it.
+- **Fails closed.** A client that did not declare Opus (any APK before CL-B4, or a client with `identity_v2` off,
+  which runs no setup) is **refused at stream start, with the reason**: "audio codec opus is required by this host
+  (PRIVYHUB_AUDIO_CODEC) and the client did not declare it in session/setup". Nothing is stopped or spawned
+  first (G4-W2 §3). Such a client never gets Opus datagrams that it would drop as silence.
+- **Turning Opus off (back to PCM 2/4):**
+  1. Delete `audio-codec.conf`.
+  2. Run `systemctl --user daemon-reload && systemctl --user restart privyhub-companion`.
+  3. Take `AUDIO_CODEC` out of `tools/e1_suite.py` `ADOPTED`.
+
+  An Opus-capable client then gets PCM, as before.

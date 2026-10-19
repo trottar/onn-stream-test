@@ -163,9 +163,12 @@ def read_control_peers() -> dict[str, Any]:
 
 # ---- preflight ------------------------------------------------------------------------
 
-def preflight_remote(environ_has: Callable[[str], bool], adb_devices: Callable[[], str]) -> dict[str, Any]:
+def preflight_remote(environ_has: Callable[[str], bool], adb_devices: Callable[[], str],
+                     adopted: tuple[str, ...] | list[str] = ()) -> dict[str, Any]:
+    # G-A2: the callers pass the home row's adopted set (e1_suite.ADOPTED, eight lines); each must be read back too
+    need = list(REQUIRED_FLAGS) + [kv for kv in adopted if kv not in REQUIRED_FLAGS]
     d = {
-        "flags": {kv: environ_has(kv) for kv in REQUIRED_FLAGS},
+        "flags": {kv: environ_has(kv) for kv in need},
         "optional": {kv: environ_has(kv) for kv in OPTIONAL_FLAGS},
         "adb_device": any(l.endswith("\tdevice") for l in adb_devices().splitlines()[1:]),
     }
@@ -173,7 +176,8 @@ def preflight_remote(environ_has: Callable[[str], bool], adb_devices: Callable[[
     if not d["ok"]:
         missing = [kv for kv, ok in d["flags"].items() if not ok]
         d["refusal"] = ("refusing: --remote needs the companion running with "
-                        + " and ".join(REQUIRED_FLAGS) + "; not read back: " + ", ".join(missing))
+                        + " and ".join(REQUIRED_FLAGS) + (" and the adopted set" if adopted else "")
+                        + "; not read back: " + ", ".join(missing))
     return d
 
 
@@ -272,7 +276,7 @@ def run_remote_once(E: Any, run_no: int, out: Path, window: int, gap: int, wait:
     samp = None
     try:
         mp = E.mainpid()
-        rec["preflight"] = pf = preflight_remote(lambda kv: E.environ_has(mp, kv), lambda: E.adb("devices"))
+        rec["preflight"] = pf = preflight_remote(lambda kv: E.environ_has(mp, kv), lambda: E.adb("devices"), getattr(E, "ADOPTED", ()))
         if not pf["ok"]:
             raise RuntimeError(pf["refusal"])
         # G4-P2: the home row's per-run counter override (RetroArch's title then carries "FPS / Frames")
@@ -387,7 +391,7 @@ def main_remote(argv: list[str], E: Any) -> int:
         print("refusing: the pre-registration does not match its hash")
         return 2
     mp = E.mainpid()
-    pf = preflight_remote(lambda kv: E.environ_has(mp, kv), lambda: E.adb("devices"))
+    pf = preflight_remote(lambda kv: E.environ_has(mp, kv), lambda: E.adb("devices"), getattr(E, "ADOPTED", ()))
     if not pf["ok"]:
         print(pf["refusal"])
         return 2

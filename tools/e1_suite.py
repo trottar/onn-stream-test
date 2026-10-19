@@ -71,7 +71,10 @@ SNES_CAPTURE = "PRIVYHUB_SNES_CAPTURE_FIX=output_rate"
 # each through its own drop-in (overlay.conf, session-identity.conf); the adopted environ is exactly these seven names
 OVERLAY = "PRIVYHUB_OVERLAY_PROVIDER=tailscale"
 IDENTITY = "PRIVYHUB_SESSION_IDENTITY=v2"
-ADOPTED = sorted([LIVE, INDEX, SNES_CORE, RECOVERY, SNES_CAPTURE, OVERLAY, IDENTITY])
+# G-A2 (adopted 2026-10-19, the user): the Opus audio path (G4-W2, CL-B4/B5) through its own drop-in (audio-codec.conf);
+# the adopted environ is exactly these eight names
+AUDIO_CODEC = "PRIVYHUB_AUDIO_CODEC=opus"
+ADOPTED = sorted([LIVE, INDEX, SNES_CORE, RECOVERY, SNES_CAPTURE, OVERLAY, IDENTITY, AUDIO_CODEC])
 FLAG_NAMES = ["PRIVYHUB_ADAPTIVE_BITRATE_INJECT", "PRIVYHUB_ADAPTIVE_BITRATE_TOP", "PRIVYHUB_PS1_LOOK",
               "PRIVYHUB_NATIVE_PROFILE_ID", "PRIVYHUB_FEC_SCHEME"]
 RA_CFG = Path.home() / ".config/retroarch/config"
@@ -970,10 +973,11 @@ def preflight() -> dict:
          "drop_in_snes_capture": f"Environment={SNES_CAPTURE}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_overlay": f"Environment={OVERLAY}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_identity": f"Environment={IDENTITY}" in sh(["systemctl", "--user", "cat", UNIT]),
+         "drop_in_audio_codec": f"Environment={AUDIO_CODEC}" in sh(["systemctl", "--user", "cat", UNIT]),
          "e3_dropin_absent": not DROPIN.exists(), "e4_constraint_absent": not E4_DROPIN.exists()}
     d["ok"] = (d["manager"] == [] and d["environ"] == ADOPTED and d["adb"] and d["drop_in_live"] and d["drop_in_index"]
                and d["drop_in_snes_core"] and d["drop_in_recovery"] and d["drop_in_snes_capture"] and d["drop_in_overlay"]
-               and d["drop_in_identity"] and d["e3_dropin_absent"] and d["e4_constraint_absent"])
+               and d["drop_in_identity"] and d["drop_in_audio_codec"] and d["e3_dropin_absent"] and d["e4_constraint_absent"])
     return d
 
 

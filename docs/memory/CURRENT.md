@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-10-18
-baseline_commit: f9a8260 (CL-B5 uncommitted beside it; the user commits)
+baseline_commit: 263c26d (G-A2 uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -10,21 +10,29 @@ Headings are fixed by `tools/check_memory_health.py`; do not rename.
 ## Active Objective
 
 **Phase E ACTIVE; the G track (remote) under way. G-A1 ADOPTED (2026-10-16, the user's): the overlay provider and
-session identity v2 run on the host, and `identity_v2` is on in the client. The adopted environ is SEVEN lines.
+session identity v2 run on the host, and `identity_v2` is on in the client. **G-A2 ADOPTED (2026-10-19, the user's):
+the Opus audio path. The adopted environ is EIGHT lines.**
 CL-B3 is OPEN on two G5-S1 smoke gates (NOT MET; the user decides). Everything else passed: G3-S3's hardened APK
 `59f736d2…` is installed and CONFIRMED, the signed LAN path passed, and the VOD play through the range server
 passed.** E1 FROZEN; E2
 MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `af3ed73`.
 
-**State (2026-10-18 23:59Z, after CL-B5): the seven adopted lines; nothing running; `--check` ok** (adb connected,
-**APK `043891e1…1607` CONFIRMED**: the Opus decode on its own thread, `sig_v` 3). No `e3_flag.conf`, no stream, no
-game; one device paired, `identity_v2` on. **CL-B5: the paired A/B both VALID**
-(`evidence/CL_B5_OPUS_DECODE_THREAD_AB_2026-10-18.md`; one evening, same title; PCM, then Opus 5 min later): every
-host gate held in both. Underruns **A 19 / B 11** (≤ 20; CL-B4's 40). The LAN interface −2,909.5 kbit/s and −200.7
-pkt/s, B against A. Net audio loss 135 / 300 ms. Decoder spikes 100 / 144 per min (B higher, open). The user: A
-"Sound is fine"; B "Run B nothing is running so I can't determine sound" (asked after B ended: no listen of B). **Run L
-(2026-10-19 00:16-00:28Z, Opus again, the listen): VALID, underruns 13; the user, while it played: "No visual or audio
-problems".** CL-B4 (`evidence/CL_B4_…`): valid, no listen (the TV was muted).
+**State (2026-10-19 02:05Z, after G-A2): the EIGHT adopted lines; nothing running; `--check` ok on eight** (adb
+connected, **APK `043891e1…1607` CONFIRMED**). No `e3_flag.conf`, no stream, no game; one device paired, `identity_v2`
+on. The eight lines:
+1. `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live` (`adaptive.conf`);
+2. `PRIVYHUB_EPG_GUIDE_INDEX=cached` (`epg-index.conf`);
+3. `PRIVYHUB_SNES_CORE=snes9x` (`snes-core.conf`);
+4. `PRIVYHUB_RECOVERY_TRIGGER=v2` (`recovery.conf`);
+5. `PRIVYHUB_SNES_CAPTURE_FIX=output_rate` (`snes-capture.conf`);
+6. `PRIVYHUB_OVERLAY_PROVIDER=tailscale` (`overlay.conf`);
+7. `PRIVYHUB_SESSION_IDENTITY=v2` (`session-identity.conf`);
+8. **`PRIVYHUB_AUDIO_CODEC=opus` (`audio-codec.conf`, G-A2)**.
+
+**G-A2** (`evidence/G_A2_OPUS_ADOPTION_2026-10-19.md`): the confirmation run, Opus by the drop-in alone, was VALID
+with host gates held (`sig_v` 3 / opus, 8,994 kbit/s and 1,177 pkt/s at 7000, net audio loss 10 ms). **But underruns
+were 78**, against CL-B5's Opus 11 / 13. ≥ 50-ms spikes 138; two > 1-s ctrl gaps; not located. No listen. CL-B5
+(`evidence/CL_B5_…`): the paired A/B and the listen run, all valid; the user, on Opus: "No visual or audio problems".
 
 **Earlier (2026-10-17 18:51Z, after the G8-S3 record):** the G8-S3 unit ended by itself (18:21:36Z,
 all 3 cells done) and was collected. **G8-S3 MEASURED: 3 of 3 valid**
@@ -44,15 +52,16 @@ all 3 cells done) and was collected. **G8-S3 MEASURED: 3 of 3 valid**
 partial): the four rate-cap cells never reached PLAYING (open, `docs/KNOWN_ISSUES.md`). From cell 6 the companion ran
 session B's flag-absent G5-S3 / G5-S4 edits (disclosed, §3).
 
-- **Nine adoptions stand:**
+- **Ten adoptions stand:**
   - live adaptive (C);
   - the guide index, Snes9x, recovery v2 (E3);
   - the SNES capture fix (E4-S5D);
   - the overlay provider and session identity v2 (G-A1, host);
   - `identity_v2` on (G-A1, client);
+  - the Opus audio path (G-A2, 2026-10-19);
   - the CONFIRMED APK (CL-B5 since 2026-10-18; CL-B4's and CL-B3's before it).
 - **Built behind flags, not adopted:** G5-S1 WAN telemetry (`PRIVYHUB_WAN_TELEMETRY`); G4-P1's `--remote` row and
-  the hotspot runbook; G4-W2's Opus audio (`PRIVYHUB_AUDIO_CODEC=opus`, LAN-smoked in CL-B4, paired A/B in CL-B5); G8-S4's
+  the hotspot runbook; G8-S4's
   `PRIVYHUB_ENCODER_RC`.
 - **The link watch is stopped** (E4-S4C); the LAN loss row is parked (remote first). The LAN read clean today:
   60-80 loss/min.
@@ -167,13 +176,18 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
     (`Environment=PRIVYHUB_OVERLAY_PROVIDER=tailscale`) and `session-identity.conf`
     (`Environment=PRIVYHUB_SESSION_IDENTITY=v2`). Kill switch: delete the drop-in(s) + `daemon-reload` + restart,
     and take the name(s) out of `tools/e1_suite.py` `ADOPTED` (G-A1 record §4).
-  - **The adopted environ is exactly seven `PRIVYHUB_*`** (live, the index, Snes9x, recovery v2, output_rate, the
-    overlay provider, identity v2) in **seven drop-ins** (`adaptive.conf`, `epg-index.conf`, `snes-core.conf`,
-    `recovery.conf`, `snes-capture.conf`, `overlay.conf`, `session-identity.conf`). The manager has none. Last
-    checked 2026-10-16 17:59:43Z (CL-B3's end, `check_end.json`).
+  - **The Opus audio path by default, since 2026-10-19 01:48:30Z (G-A2):** `audio-codec.conf`
+    (`Environment=PRIVYHUB_AUDIO_CODEC=opus`, 128 kbit/s, 10 ms). A client without `audio_codecs` is refused at
+    stream start, with the reason. Kill switch: delete `audio-codec.conf` + `daemon-reload` + restart, and take
+    `AUDIO_CODEC` out of `tools/e1_suite.py` `ADOPTED` (`docs/REMOTE_TRUST.md` §9).
+  - **The adopted environ is exactly eight `PRIVYHUB_*`** (live, the index, Snes9x, recovery v2, output_rate, the
+    overlay provider, identity v2, Opus) in **eight drop-ins** (`adaptive.conf`, `epg-index.conf`, `snes-core.conf`,
+    `recovery.conf`, `snes-capture.conf`, `overlay.conf`, `session-identity.conf`, `audio-codec.conf`). The manager
+    has none. Last checked 2026-10-19 02:05Z (G-A2's end, `check_end.json`).
     - `d7_regression.py` and `c3_l4_nft_night.py` (`ADOPTED_E3`) still list four lines. They were not run or
       changed.
-    - `tools/e1_suite.py` (`ADOPTED`, seven, with a preflight key per drop-in) and `e3_state.py` check it. Since
+    - `tools/e1_suite.py` (`ADOPTED`, eight, with a preflight key per drop-in), `e3_state.py` and `e1_remote.py`'s
+      preflight check it. Since
       E4-S2 they also require no `e4_constraint.conf`.
   - The companion tree carries the live controller through `C3-L4-N2`,
     the C5 selector profiles (dormant), **the 1080p rung behind
@@ -194,7 +208,24 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
-**CL-B5: the paired A/B both VALID** (`evidence/CL_B5_OPUS_DECODE_THREAD_AB_2026-10-18.md`, 2026-10-18
+**G-A2: `PRIVYHUB_AUDIO_CODEC=opus` ADOPTED, the eighth line** (`evidence/G_A2_OPUS_ADOPTION_2026-10-19.md`,
+2026-10-19 01:47-02:05Z; the eight lines, no `e3_flag.conf`, `--check` ok).
+
+1. **The user's commit:** everything since `263c26d`:
+   - `tools/e1_suite.py`, `tools/e3_state.py`, `tools/e1_remote.py`, `tools/test_e1_remote.py`;
+   - `docs/REMOTE_TRUST.md` §9, `docs/CAPABILITY_MODEL.md`;
+   - the record + directory, patch `G-A2_OPUS_ADOPTED`, ROADMAP §G4, `KNOWN_ISSUES.md`, this file;
+   - the task file and the prompt (`logs/g_a2_git_status.txt`).
+
+   The drop-in lives outside the repo.
+2. **G4-S3, the off-site run at 4000 with Opus** (predicted ~5.4 Mbit/s on the tailnet, ~2.4 GB/h). A v3 client's
+   overlay host is recorded (CL-B5). `e1_remote.py`'s preflight now requires the eight lines.
+3. **Underruns and spikes** (`KNOWN_ISSUES.md`): the confirmation run's underruns were 78 against CL-B5's 11 / 13,
+   with ≥ 50-ms spikes 138, not located. The spikes item stays open. Proposed: a paired PCM / Opus A/B after an onn
+   restart, or watch the next sessions' underruns. If the user prefers PCM meanwhile: delete the drop-in, restart
+   (`docs/REMOTE_TRUST.md` §9).
+
+**Earlier — CL-B5: the paired A/B both VALID** (`evidence/CL_B5_OPUS_DECODE_THREAD_AB_2026-10-18.md`, 2026-10-18
 23:23-23:59Z; the flag removed, the seven lines, APK `043891e1…` CONFIRMED).
 
 1. **The user's commit:** everything since `f9a8260`:

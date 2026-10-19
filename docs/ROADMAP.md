@@ -1595,6 +1595,13 @@ located). `audio_codec.py` records the overlay host for sig_v 2 and 3 (one line;
 user's lines: A "Sound is fine"; B "Run B nothing is running so I can't determine sound" (after B ended). **Run L
 (2026-10-19, Opus, the listen): valid, underruns 13, "No visual or audio problems".** Flag removed; not adopted. Record:
 `docs/memory/evidence/CL_B5_OPUS_DECODE_THREAD_AB_2026-10-18.md`.
+**G-A2 (2026-10-19): `PRIVYHUB_AUDIO_CODEC=opus` ADOPTED (the user's decision): the eighth adopted line**
+(`audio-codec.conf`). The tools (e1_suite, e3_state, e1_remote) read eight lines. The confirmation run (no flag file,
+Opus by the drop-in alone) was VALID, host gates held: `sig_v` 3 / opus, 8,994 kbit/s and 1,177 pkt/s on the LAN at
+7000, net audio loss 10 ms. **Its client side was worse than CL-B5's:** underruns 78 (CL-B5 Opus 11 / 13), ≥ 50-ms
+decoder spikes 138, two > 1-s ctrl gaps; not located (the onn's thermal status 0). No listen. An old client is
+refused at start with the reason. Off: delete the drop-in, restart. Record:
+`docs/memory/evidence/G_A2_OPUS_ADOPTION_2026-10-19.md`.
 
 **G4-P2 (2026-10-17): the remote row records gate 3 from G4-S2** — `tools/e1_remote.py`
 writes the home row's per-run RetroArch counter override (for the PS1-STREAM fixture),

@@ -132,6 +132,16 @@ class Preflight(unittest.TestCase):
         self.assertTrue(pf["ok"])
         self.assertTrue(pf["adb_device"])
 
+    def test_the_adopted_set_is_required_too(self):
+        # G-A2: the callers pass e1_suite.ADOPTED (eight lines); one missing refuses, naming it
+        adopted = ("PRIVYHUB_AUDIO_CODEC=opus", R.REQUIRED_FLAGS[0])
+        pf = R.preflight_remote(lambda kv: kv in R.REQUIRED_FLAGS, lambda: "", adopted)
+        self.assertFalse(pf["ok"])
+        self.assertIn("and the adopted set; not read back: PRIVYHUB_AUDIO_CODEC=opus", pf["refusal"])
+        self.assertEqual(list(pf["flags"]), list(R.REQUIRED_FLAGS) + ["PRIVYHUB_AUDIO_CODEC=opus"])
+        pf = R.preflight_remote(lambda kv: True, lambda: "", adopted)
+        self.assertTrue(pf["ok"])
+
     def test_main_refuses_without_flags(self):
         d = Path(tempfile.mkdtemp())
         pre = d / "prereg.txt"
