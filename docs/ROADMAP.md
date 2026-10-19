@@ -1821,6 +1821,14 @@ sits at the cap; `headroom` worse (8.72 %). Cost: −0.45 dB PSNR avg, −2.4 to
 Not adopted. Proposed: G8-S5, G8-S3's cell 1 with `tight`. Record:
 `docs/memory/evidence/G8_S4_ENCODER_RATE_HEADROOM_2026-10-18.md`.
 
+**G8-S5 (2026-10-19): `tight` live under cap-6000 — MEASURED, 2/2 valid; the bench's p95 halving did not transfer; not
+adopted.** G8-S3's cell 1 run twice, paired (flag absent, then `PRIVYHUB_ENCODER_RC=tight`). Both reached PLAYING at the
+5000 floor with host gates met, and the encoder command was read back (B = A with `-maxrate 5000k -bufsize 1250k
+-rc_mode CBR`). Before the control's pause (first 235 s): tail drop 6.52 → 4.43 %, per-second drop p95 19.68 → 15.75 %
+(not halved), payload p95 5,758 → 5,367 kbit/s, largest frame 89,248 B in both, rendered 53.45 → 55.12 fps, loss 2,286 →
+1,534/min. The control cell went silent 235 s in and recovery gave up; the `tight` cell held 600 s (one run each).
+Record: `docs/memory/evidence/G8_S5_CAP_CELL_ENCODER_RC_TIGHT_2026-10-19.md`.
+
 Exercise bounded representative conditions:
 
 - reduced bandwidth;

@@ -2186,6 +2186,10 @@ class NativeStreamActivity :
                                 put("decode_queue_wait_max_us", audio.opusDecodeQueueWaitMaxUs)
                                 put("decode_queue_drops", audio.opusDecodeQueueDrops)
                                 put("decode_failures", audio.opusDecodeFailures)
+                                // CL-B7P: only when not today's drain
+                                if (audio.opusDecodeMode.isNotEmpty()) {
+                                    put("decode_mode", audio.opusDecodeMode)
+                                }
                             }
                         )
                     }

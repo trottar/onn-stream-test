@@ -1,0 +1,99 @@
+{
+ "cell": "B_cap-6000_floor_tight",
+ "kvs": [
+  "PRIVYHUB_WAN_TELEMETRY=1",
+  "PRIVYHUB_IMPAIRMENT=cap-6000@post-fec,seed=1",
+  "PRIVYHUB_START_RUNG=floor",
+  "PRIVYHUB_ENCODER_RC=tight"
+ ],
+ "preflight_before": {
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_AUDIO_CODEC=opus",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+   "PRIVYHUB_OVERLAY_PROVIDER=tailscale",
+   "PRIVYHUB_RECOVERY_TRIGGER=v2",
+   "PRIVYHUB_SESSION_IDENTITY=v2",
+   "PRIVYHUB_SNES_CAPTURE_FIX=output_rate",
+   "PRIVYHUB_SNES_CORE=snes9x"
+  ],
+  "game_active": false,
+  "adb": true,
+  "drop_in_live": true,
+  "drop_in_index": true,
+  "drop_in_snes_core": true,
+  "drop_in_recovery": true,
+  "drop_in_snes_capture": true,
+  "drop_in_overlay": true,
+  "drop_in_identity": true,
+  "drop_in_audio_codec": true,
+  "e3_dropin_absent": true,
+  "e4_constraint_absent": true,
+  "ok": true
+ },
+ "restart": {
+  "mainpid_serves_8765": true,
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_AUDIO_CODEC=opus",
+   "PRIVYHUB_ENCODER_RC=tight",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+   "PRIVYHUB_IMPAIRMENT=cap-6000@post-fec,seed=1",
+   "PRIVYHUB_OVERLAY_PROVIDER=tailscale",
+   "PRIVYHUB_RECOVERY_TRIGGER=v2",
+   "PRIVYHUB_SESSION_IDENTITY=v2",
+   "PRIVYHUB_SNES_CAPTURE_FIX=output_rate",
+   "PRIVYHUB_SNES_CORE=snes9x",
+   "PRIVYHUB_START_RUNG=floor",
+   "PRIVYHUB_WAN_TELEMETRY=1"
+  ]
+ },
+ "environ_has_all": true,
+ "teardown": {
+  "dropin_removed": true,
+  "restart_after_flags": {
+   "mainpid_serves_8765": true,
+   "manager": [],
+   "environ": [
+    "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+    "PRIVYHUB_AUDIO_CODEC=opus",
+    "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+    "PRIVYHUB_OVERLAY_PROVIDER=tailscale",
+    "PRIVYHUB_RECOVERY_TRIGGER=v2",
+    "PRIVYHUB_SESSION_IDENTITY=v2",
+    "PRIVYHUB_SNES_CAPTURE_FIX=output_rate",
+    "PRIVYHUB_SNES_CORE=snes9x"
+   ]
+  },
+  "dropin_env_absent": true,
+  "flags_absent": true
+ },
+ "preflight_after": {
+  "manager": [],
+  "environ": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_AUDIO_CODEC=opus",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+   "PRIVYHUB_OVERLAY_PROVIDER=tailscale",
+   "PRIVYHUB_RECOVERY_TRIGGER=v2",
+   "PRIVYHUB_SESSION_IDENTITY=v2",
+   "PRIVYHUB_SNES_CAPTURE_FIX=output_rate",
+   "PRIVYHUB_SNES_CORE=snes9x"
+  ],
+  "game_active": false,
+  "adb": true,
+  "drop_in_live": true,
+  "drop_in_index": true,
+  "drop_in_snes_core": true,
+  "drop_in_recovery": true,
+  "drop_in_snes_capture": true,
+  "drop_in_overlay": true,
+  "drop_in_identity": true,
+  "drop_in_audio_codec": true,
+  "e3_dropin_absent": true,
+  "e4_constraint_absent": true,
+  "ok": true
+ }
+}

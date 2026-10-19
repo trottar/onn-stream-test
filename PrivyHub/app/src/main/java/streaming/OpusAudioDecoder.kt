@@ -15,8 +15,12 @@ import java.nio.ByteBuffer
  * counted and picked up by the next call. Output is s16 interleaved PCM.
  *
  * CL-B5: called on [OpusDecodePipeline]'s decode thread, not the receive thread.
+ * CL-B7P: [mode] LEAN returns from the drain once the outputs have caught up.
  */
-class OpusAudioDecoder(private val frameSamples: Int) : OpusDecodePipeline.FrameDecoder {
+class OpusAudioDecoder(
+    private val frameSamples: Int,
+    val mode: OpusDecodeMode = OpusDecodeMode.TODAY,
+) : OpusDecodePipeline.FrameDecoder {
     companion object {
         private const val MIME = "audio/opus"
         private const val INPUT_WAIT_US = 10_000L
@@ -115,6 +119,7 @@ class OpusAudioDecoder(private val frameSamples: Int) : OpusDecodePipeline.Frame
                     }
                     codec.releaseOutputBuffer(index, false)
                     outputs += 1
+                    if (!mode.pollAfterOutput(inputs - outputs)) return
                 }
                 index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                     val f = codec.outputFormat

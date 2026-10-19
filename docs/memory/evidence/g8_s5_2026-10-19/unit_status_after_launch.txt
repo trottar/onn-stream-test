@@ -1,0 +1,16 @@
+● privyhub-g8-s5.service - [systemd-run] /usr/bin/python3 -B /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/g8_s5_2026-10-19/g8_s5_driver.py
+     Loaded: loaded (/run/user/1000/systemd/transient/privyhub-g8-s5.service; transient)
+  Transient: yes
+     Active: active (running) since Mon 2026-10-19 10:42:17 EDT; 4min 7s ago
+ Invocation: <masked>
+   Main PID: 3749030 (python3)
+      Tasks: 10 (limit: 18065)
+     Memory: 55M (peak: 58.1M)
+        CPU: 7.490s
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/privyhub-g8-s5.service
+             ├─3749030 /usr/bin/python3 -B /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/g8_s5_2026-10-19/g8_s5_driver.py
+             ├─3749072 /usr/bin/python3 /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/g8_s5_2026-10-19/g8_s5_suite_call.py /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/g8_s5_2026-10-19/runs/A_cap-6000_floor_control 600 120 PRIVYHUB_WAN_TELEMETRY=1 PRIVYHUB_IMPAIRMENT=cap-6000@post-fec,seed=1 PRIVYHUB_START_RUNG=floor
+             └─3751495 /usr/bin/python3 /home/privyhub/Projects/onn-stream-test/tools/e1_sampler.py run /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/g8_s5_2026-10-19/runs/A_cap-6000_floor_control/E1-PS1-STREAM_flag/run1 --telemetry --title --e2
+
+Oct 19 10:42:17 PrivyHub systemd[1310]: Started privyhub-g8-s5.service - [systemd-run] /usr/bin/python3 -B /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/g8_s5_2026-10-19/g8_s5_driver.py.
+Oct 19 10:42:17 PrivyHub python3[3749030]: [g8s5 10-19 14:42:17Z] start; cells done 0 | adopted state adopted8 ok | cap 2026-10-19T16:45:00Z

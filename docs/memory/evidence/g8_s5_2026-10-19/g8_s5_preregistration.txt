@@ -1,0 +1,49 @@
+G8-S5 PRE-REGISTRATION -- the cap cell with the encoder's tight rate control (session A, 2026-10-19)
+Task: docs/memory/handoffs/G8-S5_CAP_CELL_ENCODER_RC_TIGHT_TASK.md §1. Baseline HEAD 7a1ab60. Written and hashed before the first cell.
+
+PLANNED LAUNCH: 2026-10-19T14:45:00Z (approximate; the unit's start is recorded in launched_at.txt)
+CAP_UTC: 2026-10-19T16:45:00Z
+(the cap = launch + 2 h; no cell starts at or after it)
+
+CELLS, in order. Each one E1-PS1-STREAM, --e2, --window 600, E2's warm-up, the suite launching the title itself as
+G8-S3 did, a 120-s gap; the run's e3_flag.conf written per cell by the suite, read back under load, removed at
+teardown with flags_absent true. The adopted state is eight lines (G-A2, Opus).
+  A -- control: PRIVYHUB_IMPAIRMENT=cap-6000@post-fec,seed=1, PRIVYHUB_START_RUNG=floor, PRIVYHUB_WAN_TELEMETRY=1
+       (G8-S3 cell 1's three lines; the environ reads eleven).
+  B -- tight:   the same plus PRIVYHUB_ENCODER_RC=tight (the environ reads twelve).
+  The encoder command read back (masked, E4-S5B's method) must carry -rc_mode CBR -maxrate 5000k -bufsize 1250k
+  (encoder_rc.py's spelling: -maxrate/-bufsize values replaced, -rc_mode CBR right after the -bufsize value) in cell B,
+  and today's options (-b:v 5000k -maxrate 5000k -bufsize 5000k, no -rc_mode) in cell A, byte for byte by the masked
+  hash: A's masked argv, with encoder_rc.apply_to(.., "tight", 5000) applied, equals B's masked argv.
+
+VALIDITY: as G8-S3. The shim's profile applied by the count tolerances (output <= ~6,013 kbit/s, i.e. every second
+<= 1.05 x cap; no random / burst / reorder drop; send_errors 0); flags_absent after. PLAYING is the measured
+outcome: a no_play cell is recorded as G8-S1 §5 reads one, not repeated beyond the suite's attempts. A playing cell
+whose shim shows the profile not applied runs once more (G8-S1's rule).
+
+GATES (host): RetroArch >= 59.9; capture 60 +/- 0.1; dup+drop <= 0.2/min; flags_absent after.
+
+REPORTED, paired A vs B and against G8-S3 cell 1 (not gated): PLAYING reached (attempt, s); the start rung and
+source; the rung path and transitions (none expected: at_floor); the shim's input kbit/s mean / median / p95 / max and
+the share of seconds over 6000; the tail-dropped fraction (whole stream and window); the per-second drop median / p95 /
+max; the H.264 payload per second mean / p95 / max from the relay's frame log and the largest frame per second median /
+max (G8-S3 §3's table, both cells); post-FEC loss/min; FEC recovered / unrecoverable; rendered fps; stale/min; resyncs;
+client pauses and recovery rows; max output gap; the wan class and windows; host CPU and the encoder's % of a core; the
+audio columns (underruns, net loss, spikes) reported, not compared (audio is not on the shim; G8-S3 ran PCM, today Opus).
+Cell A is today's control, not G8-S3's: HEAD and the adopted state changed since 0093b7c (disclosed, not controlled).
+
+WRITTEN BEFOREHAND (met / not met, not gated):
+  1. cell B's per-second drop p95 at most half of cell A's;
+  2. cell B's tail drop lower than cell A's by about a quarter (the bench's 4.67 -> 3.42 %);
+  3. cell B's largest-frame-per-second max well under cell A's ~89 KB (CBR with a 250-ms buffer caps the burst);
+  4. whether rendered fps rises from ~53 is the open question -- stated as the result;
+  5. the encoder's CPU in cell B within 10 % of cell A's.
+
+THE READING, written beforehand:
+  - if B's drop p95 halves and rendered rises: tight is a candidate for adoption on the capped-link case -- the user's
+    call, with the picture cost (G8-S4: -0.45 dB PSNR avg, -2.4 to -3.4 dB minimum) stated beside it;
+  - if the drop p95 halves but rendered does not move: tight buys smoothness and no frames -- recorded, not adopted;
+  - if neither: the bench did not transfer and the item closes as measured.
+
+Measurement only; nothing adopted; nothing committed. Session B (CL-B7P) does not build or bench while the unit
+privyhub-g8-s5 is active.

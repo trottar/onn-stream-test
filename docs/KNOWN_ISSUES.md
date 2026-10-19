@@ -2,6 +2,8 @@
 
 ## 2026-10-18 CL-B4, the first Opus session: underruns 40 against 9; an off-site Opus start would be refused — OFF-SITE FIXED (CL-B5); UNDERRUNS: G-A2's 78 NOT REPEATED AFTER AN ONN RESTART (CL-B6: 22 / 13), A WATCH ITEM; SPIKES OPEN (the client's CPU measured)
 
+**The user's decision 2026-10-19: Opus stays adopted — the data saving with nothing noticeable; a watch item; hands-on testing will be needed as things change.**
+
 **G4-S3 (2026-10-19, off-site at 4000):** underruns **34** in the window, across three client starts (Pause/Resume
 and a relaunch). Net audio loss 0. Decoder spikes ~45 / min (≥ 50 ms ~4.7). Spikes are lower at 4000 than at 7000 on
 the LAN; there is no PCM arm in the run. Underruns stay a watch item.
@@ -19,6 +21,18 @@ the LAN; there is no PCM arm in the run. Underruns stay a watch item.
     The Opus decode costs the client ~0.2 core.
   - The ≥ 50-ms spikes are small in both arms (2.9 / 2.2 per min). G-A2's 11.8 did not recur.
   - Not located.
+- **CL-B7P (2026-10-19, software only; `docs/memory/evidence/CL_B7P_OPUS_CLIENT_COST_2026-10-19.md`): a hypothesis
+  added, a candidate built, CL-B7 pending.**
+  - **Hypothesis, from the code:** the ~0.2 core is the MediaCodec client-side per-buffer machinery. That is
+    500 synchronous calls/s (5 per 10-ms frame), each a post-and-wait to the codec's looper, plus ~200 Codec2 binder
+    transactions/s. The decode itself is expected in `media.swcodec`, outside the process.
+  - The count alone gives ~0.03-0.05 core, so the size is unproved.
+  - **The spikes would follow** because the client sets no thread priority: the video threads compete as equals with
+    a ~6-8-thread audio wake-up chain every 10 ms.
+  - **Candidate:** `debug.privyhub.opus_decode=lean` (absent = today) drops one of the five calls. The APK
+    `93d29b4a…1624` is built, NOT installed.
+  - **CL-B7 (session A):** install it; three arms (PCM, Opus today, Opus lean) with per-thread reads
+    (`tools/cl_b7_onn_threads.py`).
 
 **G-A2 (2026-10-19, Opus ADOPTED; `docs/memory/evidence/G_A2_OPUS_ADOPTION_2026-10-19.md` §4):**
 - **Underruns REOPENED:** the confirmation run read **78** (50 in the window), over ≤ 20, against CL-B5's 11 / 13 on
@@ -72,6 +86,22 @@ the LAN; there is no PCM arm in the run. Underruns stay a watch item.
     (b) the cap stage mis-paces within a second (not visible in 1-s lines); (c) a client start-up timeout.
   - G8-P1's cap proof used a steady synthetic ~6.9 Mbit/s source.
   - A follow-up (G8-S2) is the user's option.
+- **G8-S3 / G8-S5 (the 5000 start under cap-6000): PLAYING reached; the drop above the bench, by the spread — MEASURED.**
+  - G8-S3 (`docs/memory/evidence/G8_S3_CAP_CELLS_START_RUNG_2026-10-17.md` §3): 6.75 % tail-dropped against the bench's
+    1.8-2.4 %, at the bench's mean wire rate (~6.04 Mbit/s); not explained by the mean, it comes with the per-second and
+    frame-size spread. Its rules-on cell went silent 417 s in and recovery gave up.
+  - **G8-S5 (2026-10-19, `docs/memory/evidence/G8_S5_CAP_CELL_ENCODER_RC_TIGHT_2026-10-19.md`):** paired, flag absent
+    against `PRIVYHUB_ENCODER_RC=tight`, both valid with host gates met.
+    - Before the control's pause (the first 235 s), the tail drop was 6.52 → 4.43 %, the loss 2,286 → 1,534/min and
+      rendered 53.45 → 55.12 fps.
+    - **The per-second drop p95 was 19.68 → 15.75 %: not halved** (the bench: 17.1 → 8.0). The largest frame was
+      89,248 B in both.
+    - **The control cell went silent 235 s in** (`client_output_silence`, 5 restarts, `gave_up_saved`; max gap 366.8 s).
+      The `tight` cell held 600 s. That is one run each.
+    - By the pre-registered reading the bench did not transfer, and the `tight` item closes as measured; nothing
+      adopted.
+  - **Still open:** the silences under the cap (G8-S3 cell 2 at 417 s, G8-S5 cell A at 235 s, both without `tight`), not
+    located.
 - **`delay-150` read lossy (off) and path-changed (on), with 0 latency-limited windows.** Reported. The `rtt_ms`
   measure's source is the client's control echo, which the shim's video-only delay does not cross.
 

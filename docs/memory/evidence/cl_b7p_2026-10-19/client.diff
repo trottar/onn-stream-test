@@ -1,0 +1,177 @@
+diff --git a/PrivyHub/app/src/main/java/streaming/NativeAudioReceiver.kt b/PrivyHub/app/src/main/java/streaming/NativeAudioReceiver.kt
+index 8d6aea6..14a3cfb 100644
+--- a/PrivyHub/app/src/main/java/streaming/NativeAudioReceiver.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeAudioReceiver.kt
+@@ -81,7 +81,9 @@ data class NativeAudioMetrics(
+     val opusDecodeQueueDepthMax: Long = 0,
+     val opusDecodeQueueWaitMaxUs: Long = 0,
+     val opusDecodeQueueDrops: Long = 0,
+-    val opusDecodeFailures: Long = 0
++    val opusDecodeFailures: Long = 0,
++    // CL-B7P: the drain mode, "" = today (the report then has no key).
++    val opusDecodeMode: String = ""
+ )
+ 
+ /**
+@@ -686,7 +688,7 @@ class NativeAudioReceiver(
+     // that thread is the PCM queue's producer.
+     private val opusPipeline =
+         OpusDecodePipeline(
+-            decoderFactory = { frames -> OpusAudioDecoder(frames) },
++            decoderFactory = { frames -> OpusAudioDecoder(frames, OpusDecodeMode.fromSystem()) },
+             sink = object : OpusDecodePipeline.Sink {
+                 override fun pcm(packet: ByteArray) = enqueueLatest(packet)
+ 
+@@ -965,7 +967,9 @@ class NativeAudioReceiver(
+             opusDecodeQueueDrops =
+                 opusPipeline.queueDrops.get(),
+             opusDecodeFailures =
+-                opusPipeline.decodeFailures.get()
++                opusPipeline.decodeFailures.get(),
++            opusDecodeMode =
++                opusDecoder?.mode?.reportName ?: ""
+         )
+     }
+ 
+diff --git a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+index 4778034..9efe74d 100644
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -2186,6 +2186,10 @@ class NativeStreamActivity :
+                                 put("decode_queue_wait_max_us", audio.opusDecodeQueueWaitMaxUs)
+                                 put("decode_queue_drops", audio.opusDecodeQueueDrops)
+                                 put("decode_failures", audio.opusDecodeFailures)
++                                // CL-B7P: only when not today's drain
++                                if (audio.opusDecodeMode.isNotEmpty()) {
++                                    put("decode_mode", audio.opusDecodeMode)
++                                }
+                             }
+                         )
+                     }
+diff --git a/PrivyHub/app/src/main/java/streaming/OpusAudioDecoder.kt b/PrivyHub/app/src/main/java/streaming/OpusAudioDecoder.kt
+index 5efc7f9..c212645 100644
+--- a/PrivyHub/app/src/main/java/streaming/OpusAudioDecoder.kt
++++ b/PrivyHub/app/src/main/java/streaming/OpusAudioDecoder.kt
+@@ -15,8 +15,12 @@ import java.nio.ByteBuffer
+  * counted and picked up by the next call. Output is s16 interleaved PCM.
+  *
+  * CL-B5: called on [OpusDecodePipeline]'s decode thread, not the receive thread.
++ * CL-B7P: [mode] LEAN returns from the drain once the outputs have caught up.
+  */
+-class OpusAudioDecoder(private val frameSamples: Int) : OpusDecodePipeline.FrameDecoder {
++class OpusAudioDecoder(
++    private val frameSamples: Int,
++    val mode: OpusDecodeMode = OpusDecodeMode.TODAY,
++) : OpusDecodePipeline.FrameDecoder {
+     companion object {
+         private const val MIME = "audio/opus"
+         private const val INPUT_WAIT_US = 10_000L
+@@ -115,6 +119,7 @@ class OpusAudioDecoder(private val frameSamples: Int) : OpusDecodePipeline.Frame
+                     }
+                     codec.releaseOutputBuffer(index, false)
+                     outputs += 1
++                    if (!mode.pollAfterOutput(inputs - outputs)) return
+                 }
+                 index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                     val f = codec.outputFormat
+diff --git a/PrivyHub/app/src/main/java/streaming/OpusDecodeMode.kt b/PrivyHub/app/src/main/java/streaming/OpusDecodeMode.kt
+new file mode 100644
+index 0000000..d35a294
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/OpusDecodeMode.kt
+@@ -0,0 +1,39 @@
++package com.safeiot.privyhub.streaming
++
++/**
++ * CL-B7P: the Opus decoder's drain mode, a runtime client flag. System
++ * property `debug.privyhub.opus_decode`: `lean` = [LEAN]; absent, empty or
++ * anything else = [TODAY], CL-B5's drain unchanged. Not persistent: a reboot
++ * clears it.
++ *
++ * [LEAN] returns from the drain as soon as the outputs have caught up with
++ * the inputs, instead of one more `dequeueOutputBuffer(0)` that almost always
++ * comes back empty: 4 synchronous MediaCodec calls per frame instead of 5.
++ */
++enum class OpusDecodeMode(val reportName: String) {
++    TODAY(""),
++    LEAN("lean");
++
++    /** After an output buffer: poll the codec again? [pending] = inputs - outputs. */
++    fun pollAfterOutput(pending: Long): Boolean =
++        when (this) {
++            TODAY -> true
++            LEAN -> pending > 0
++        }
++
++    companion object {
++        const val PROPERTY = "debug.privyhub.opus_decode"
++
++        fun parse(value: String?): OpusDecodeMode =
++            if (value?.trim()?.lowercase() == "lean") LEAN else TODAY
++
++        /** The property, read through reflection; any failure is [TODAY]. */
++        fun fromSystem(): OpusDecodeMode =
++            try {
++                val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
++                parse(get.invoke(null, PROPERTY) as? String)
++            } catch (_: Throwable) {
++                TODAY
++            }
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/OpusDecodeModeTest.kt b/PrivyHub/app/src/test/java/streaming/OpusDecodeModeTest.kt
+new file mode 100644
+index 0000000..fc8beed
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/OpusDecodeModeTest.kt
+@@ -0,0 +1,50 @@
++package com.safeiot.privyhub.streaming
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * CL-B7P: the drain mode flag. Absent, empty or anything but `lean` is
++ * today's drain, which polls again after every output; `lean` polls again
++ * only while an output is still pending.
++ */
++class OpusDecodeModeTest {
++
++    @Test
++    fun parseTable() {
++        assertEquals(OpusDecodeMode.TODAY, OpusDecodeMode.parse(null))
++        assertEquals(OpusDecodeMode.TODAY, OpusDecodeMode.parse(""))
++        assertEquals(OpusDecodeMode.TODAY, OpusDecodeMode.parse("today"))
++        assertEquals(OpusDecodeMode.TODAY, OpusDecodeMode.parse("lean2"))
++        assertEquals(OpusDecodeMode.TODAY, OpusDecodeMode.parse("0"))
++        assertEquals(OpusDecodeMode.LEAN, OpusDecodeMode.parse("lean"))
++        assertEquals(OpusDecodeMode.LEAN, OpusDecodeMode.parse(" LEAN "))
++    }
++
++    @Test
++    fun noAndroidPropertyIsToday() {
++        // The JVM has no android.os.SystemProperties: the read fails to today.
++        assertEquals(OpusDecodeMode.TODAY, OpusDecodeMode.fromSystem())
++    }
++
++    @Test
++    fun todayPollsAfterEveryOutput() {
++        for (pending in -2L..3L) assertTrue(OpusDecodeMode.TODAY.pollAfterOutput(pending))
++    }
++
++    @Test
++    fun leanPollsOnlyWhilePending() {
++        assertFalse(OpusDecodeMode.LEAN.pollAfterOutput(0))
++        assertFalse(OpusDecodeMode.LEAN.pollAfterOutput(-1))
++        assertTrue(OpusDecodeMode.LEAN.pollAfterOutput(1))
++        assertTrue(OpusDecodeMode.LEAN.pollAfterOutput(2))
++    }
++
++    @Test
++    fun reportNameEmptyForToday() {
++        assertEquals("", OpusDecodeMode.TODAY.reportName)
++        assertEquals("lean", OpusDecodeMode.LEAN.reportName)
++    }
++}

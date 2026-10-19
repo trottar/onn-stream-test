@@ -81,7 +81,9 @@ data class NativeAudioMetrics(
     val opusDecodeQueueDepthMax: Long = 0,
     val opusDecodeQueueWaitMaxUs: Long = 0,
     val opusDecodeQueueDrops: Long = 0,
-    val opusDecodeFailures: Long = 0
+    val opusDecodeFailures: Long = 0,
+    // CL-B7P: the drain mode, "" = today (the report then has no key).
+    val opusDecodeMode: String = ""
 )
 
 /**
@@ -686,7 +688,7 @@ class NativeAudioReceiver(
     // that thread is the PCM queue's producer.
     private val opusPipeline =
         OpusDecodePipeline(
-            decoderFactory = { frames -> OpusAudioDecoder(frames) },
+            decoderFactory = { frames -> OpusAudioDecoder(frames, OpusDecodeMode.fromSystem()) },
             sink = object : OpusDecodePipeline.Sink {
                 override fun pcm(packet: ByteArray) = enqueueLatest(packet)
 
@@ -965,7 +967,9 @@ class NativeAudioReceiver(
             opusDecodeQueueDrops =
                 opusPipeline.queueDrops.get(),
             opusDecodeFailures =
-                opusPipeline.decodeFailures.get()
+                opusPipeline.decodeFailures.get(),
+            opusDecodeMode =
+                opusDecoder?.mode?.reportName ?: ""
         )
     }
 

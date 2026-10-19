@@ -1,0 +1,72 @@
+{
+ "cells": {
+  "A_cap-6000_floor_control": {
+   "outcome": "playing",
+   "validity": "valid",
+   "profile_applied": true,
+   "shim_out_kbps_max": 6015.1,
+   "out_le_1_05_cap": true,
+   "dropped_loss": 0,
+   "dropped_burst": 0,
+   "reordered": 0,
+   "send_errors": 0,
+   "flags_at_stream": true,
+   "environ_at_stream_count": 11,
+   "flags_under_load": true,
+   "environ_under_load_count": 11,
+   "flags_absent_after": true,
+   "final_flags_absent": true,
+   "failed_attempts_flags_absent": [
+    true
+   ],
+   "host_gates": {
+    "retroarch_ge_59_9": true,
+    "capture_60_pm_0_1": true,
+    "dupdrop_le_0_2": true,
+    "flags_absent": true
+   },
+   "host_gates_met": true,
+   "retroarch_fps": 59.999,
+   "capture_fps": 60.002,
+   "dupdrop_per_min": 0.0
+  },
+  "B_cap-6000_floor_tight": {
+   "outcome": "playing",
+   "validity": "valid",
+   "profile_applied": true,
+   "shim_out_kbps_max": 6014.4,
+   "out_le_1_05_cap": true,
+   "dropped_loss": 0,
+   "dropped_burst": 0,
+   "reordered": 0,
+   "send_errors": 0,
+   "flags_at_stream": true,
+   "environ_at_stream_count": 12,
+   "flags_under_load": true,
+   "environ_under_load_count": 12,
+   "flags_absent_after": true,
+   "final_flags_absent": true,
+   "failed_attempts_flags_absent": [],
+   "host_gates": {
+    "retroarch_ge_59_9": true,
+    "capture_60_pm_0_1": true,
+    "dupdrop_le_0_2": true,
+    "flags_absent": true
+   },
+   "host_gates_met": true,
+   "retroarch_fps": 59.999,
+   "capture_fps": 59.996,
+   "dupdrop_per_min": 0.1
+  }
+ },
+ "encoder_cmd": {
+  "control_is_today": true,
+  "tight_applied_to_control_equals_tight": true,
+  "tight_options": {
+   "-rc_mode": "CBR",
+   "-maxrate": "5000k",
+   "-bufsize": "1250k"
+  }
+ },
+ "state_at_record": true
+}

@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-10-18
-baseline_commit: 1c8c2c2 (G4-S3 uncommitted beside it; the user commits)
+as_of: 2026-10-19
+baseline_commit: 7a1ab60 (G8-S5 uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -207,6 +207,34 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
+
+**G8-S5 MEASURED, 2/2 valid** (`evidence/G8_S5_CAP_CELL_ENCODER_RC_TIGHT_2026-10-19.md`, 2026-10-19 14:42-15:15Z,
+the unit `privyhub-g8-s5` closed by itself and collected; at the record the eight lines, no `e3_flag.conf`, `--check` ok
+with adb reconnected by hand and only read).
+- G8-S3's cell 1 (cap-6000, 5000 floor) run paired: A flag absent, B `PRIVYHUB_ENCODER_RC=tight`. Both reached PLAYING
+  with host gates met, and the encoder command was read back in each.
+- **Before A's pause (first 235 s):** tail drop 6.52 → 4.43 %, **per-second drop p95 19.68 → 15.75 % (not halved)**,
+  largest frame 89,248 B in both, rendered 53.45 → 55.12 fps, loss 2,286 → 1,534/min.
+- **A went silent 235 s in** and recovery gave up (max gap 366.8 s); B held 600 s. One run each.
+- **The pre-registered reading:** the p95 did not halve, so the bench did not transfer and the `tight` item closes as
+  measured. **Not a candidate by the written reading; nothing adopted.**
+- **The user's decision 2026-10-19:** Opus stays adopted. It is a watch item, with hands-on testing as things change
+  (`KNOWN_ISSUES.md`).
+
+1. **The user's commit:** everything since `7a1ab60` that is session A's:
+   - the record and `g8_s5_2026-10-19/`;
+   - ROADMAP §G8, `KNOWN_ISSUES.md` (the rate-cap item's G8-S3 / G8-S5 entry, the Opus decision line), this file;
+   - the G8-S5 task file and `_cowork_prompt.txt` (`logs/g8_s5_git_status.txt`).
+
+   Session B's CL-B7P files (`PrivyHub/…`, `tools/cl_b7_onn_threads.py`, `cl_b7p_2026-10-19/`, its task file and
+   `_cowork_prompt_b.txt`) are its own.
+2. **`tight`:** no adoption question by the written reading. If the user wants to pursue it anyway (the tail drop and
+   loss fell by a third; only the flag-absent cell went silent), the next step is more paired runs aimed at the
+   silences under the cap. Those silences are open in `KNOWN_ISSUES.md` and not located. The picture cost is
+   G8-S4's −0.45 dB PSNR avg.
+3. **CL-B7:** the client A/B, after session B's CL-B7P.
+4. **The off-site reconnect test** (a hotspot toggle resuming over the overlay; G4-S1 run 2) is held until the user
+   says.
 
 **G4-S3 VALID** (`evidence/G4_S3_OFFSITE_4000_OPUS_2026-10-19.md`, 2026-10-19 13:49-14:12Z; the eight lines, no
 `e3_flag.conf`; `--check` host fields ok, the client fields pending `adb connect` after the network change).
