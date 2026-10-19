@@ -76,7 +76,12 @@ data class NativeAudioMetrics(
     val opusDecodeAvgUs: Double = 0.0,
     val opusDecodeMaxUs: Long = 0,
     val opusDecoder: String = "",
-    val opusCopyOffsetFrames: Int = 0
+    val opusCopyOffsetFrames: Int = 0,
+    // CL-B5: the decode thread's queue (CL-B4 decoded on the receive thread).
+    val opusDecodeQueueDepthMax: Long = 0,
+    val opusDecodeQueueWaitMaxUs: Long = 0,
+    val opusDecodeQueueDrops: Long = 0,
+    val opusDecodeFailures: Long = 0
 )
 
 /**
@@ -670,28 +675,34 @@ class NativeAudioReceiver(
     private var opusFrameSamples =
         0
 
-    @Volatile
-    private var opusDecoderName =
-        ""
-
-    private var opusDecoder:
-        OpusAudioDecoder? =
-        null
-
-    private var opusDecoderFailed =
-        false
-
     private val opusReorder =
         OpusReorder(SEEN_WINDOW)
-
-    private val opusFramesDecoded =
-        AtomicLong(0)
 
     private val opusFramesAbandoned =
         AtomicLong(0)
 
-    private val opusDecodeFailures =
-        AtomicLong(0)
+    // CL-B5: the decode runs on its own thread, fed in release order by the
+    // receive thread (which never waits on the codec). For an Opus session
+    // that thread is the PCM queue's producer.
+    private val opusPipeline =
+        OpusDecodePipeline(
+            decoderFactory = { frames -> OpusAudioDecoder(frames) },
+            sink = object : OpusDecodePipeline.Sink {
+                override fun pcm(packet: ByteArray) = enqueueLatest(packet)
+
+                override fun conceal(slots: Int) = repeat(slots) { enqueueConcealment(-1) }
+
+                override fun crossfade() {
+                    trimCrossfadePending = true
+                }
+            }
+        )
+
+    private var opusPipelineStarted =
+        false
+
+    private val opusDecoder: OpusAudioDecoder?
+        get() = opusPipeline.decoder as? OpusAudioDecoder
 
     fun start() {
         if (running) {
@@ -922,12 +933,11 @@ class NativeAudioReceiver(
             opusFrameSamples =
                 opusFrameSamples,
             opusFramesDecoded =
-                opusFramesDecoded.get(),
+                opusPipeline.framesDecoded.get(),
             opusFramesAbandoned =
                 opusFramesAbandoned.get(),
             opusDecodeErrors =
-                opusDecodeFailures.get() +
-                    (opusDecoder?.decodeErrors ?: 0L),
+                opusDecoder?.decodeErrors ?: 0L,
             opusDrainTimeouts =
                 opusDecoder?.drainTimeouts ?: 0L,
             opusFormatErrors =
@@ -941,13 +951,21 @@ class NativeAudioReceiver(
             opusDecodeMaxUs =
                 (opusDecoder?.decodeNsMax ?: 0L) / 1000L,
             opusDecoder =
-                opusDecoderName,
+                opusPipeline.decoderName,
             opusCopyOffsetFrames =
                 if (opusFrameSamples > 0) {
                     OpusFraming.copyOffsetFrames(redundancyCopies, redundancyOffsetPackets, opusFrameSamples)
                 } else {
                     0
-                }
+                },
+            opusDecodeQueueDepthMax =
+                opusPipeline.queueDepthMax.get(),
+            opusDecodeQueueWaitMaxUs =
+                opusPipeline.queueWaitMaxNs.get() / 1000L,
+            opusDecodeQueueDrops =
+                opusPipeline.queueDrops.get(),
+            opusDecodeFailures =
+                opusPipeline.decodeFailures.get()
         )
     }
 
@@ -1376,7 +1394,8 @@ class NativeAudioReceiver(
             } catch (_: Exception) {
             }
 
-            opusDecoder?.release()
+            // CL-B5: the decode thread releases the decoder as it ends.
+            opusPipeline.stop()
         }
     }
 
@@ -1387,6 +1406,10 @@ class NativeAudioReceiver(
      * for its copy, then is concealed with frames/240 of today's concealment
      * slots); each decoded frame split into 5-ms packets for today's queue.
      * Loss is counted in Opus frames (10 ms each at the host's default).
+     *
+     * CL-B5: the released frames go to [OpusDecodePipeline]'s bounded queue;
+     * its decode thread decodes, splits and conceals. This thread never waits
+     * on the codec.
      */
     private fun receiveOpus(
         buffer: ByteArray,
@@ -1440,21 +1463,10 @@ class NativeAudioReceiver(
             opusFrameSamples = frames
         }
 
-        val decoder =
-            opusDecoder ?: if (opusDecoderFailed) {
-                null
-            } else {
-                try {
-                    OpusAudioDecoder(frames).also {
-                        opusDecoder = it
-                        opusDecoderName = it.name
-                    }
-                } catch (_: Exception) {
-                    opusDecoderFailed = true
-                    opusDecoderName = "unavailable"
-                    null
-                }
-            }
+        if (!opusPipelineStarted) {
+            opusPipelineStarted = true
+            opusPipeline.start()
+        }
 
         val slotsPerFrame =
             frames /
@@ -1467,29 +1479,13 @@ class NativeAudioReceiver(
                 frames
             )
 
-        val emit: (Int, ByteArray?) -> Unit = { seq, opus ->
+        // CL-B5: offered to the decode thread in release order; never blocks.
+        val emit: (Int, ByteArray?) -> Unit = { _, opus ->
             if (opus == null) {
                 opusFramesAbandoned.incrementAndGet()
-                repeat(slotsPerFrame) { enqueueConcealment(-1) }
-            } else if (decoder == null) {
-                opusDecodeFailures.incrementAndGet()
-                repeat(slotsPerFrame) { enqueueConcealment(-1) }
-            } else {
-                var produced = 0
-                val ok =
-                    decoder.decode(opus, 0, opus.size) { pcm, length ->
-                        for (chunk in OpusFraming.split(pcm, length)) {
-                            enqueueLatest(chunk)
-                            produced += 1
-                        }
-                    }
-
-                if (ok) {
-                    opusFramesDecoded.incrementAndGet()
-                } else if (produced == 0) {
-                    repeat(slotsPerFrame) { enqueueConcealment(-1) }
-                }
             }
+
+            opusPipeline.offerFrame(frames, opus)
         }
 
         val payload =
@@ -1509,11 +1505,7 @@ class NativeAudioReceiver(
                     val slots =
                         minOf(skipped * slotsPerFrame, placeholderCap)
 
-                    repeat(slots) { enqueueConcealment(-1) }
-
-                    if (skipped * slotsPerFrame > slots) {
-                        trimCrossfadePending = true
-                    }
+                    opusPipeline.offerConceal(slots, skipped * slotsPerFrame > slots)
                 }
             }
 

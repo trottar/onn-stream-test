@@ -1,0 +1,10 @@
+CL-B5 addendum — run L, a listen of Opus (session A, 2026-10-19). Written and hashed before the run.
+Why: run B's line came after B had ended ("Run B nothing is running so I can't determine sound"), so no listen of
+Opus was taken. The user asked to hear it ("Yep I'd like to hear").
+The run: one E1-PS1-STREAM --e2 --window 600 on the LAN, the same title, e3_flag.conf = PRIVYHUB_AUDIO_CODEC=opus
+(written, restart, eight lines; removed at teardown, restart, flags_absent true, --check ok on 043891e1…).
+The user is told when it is PLAYING and reports while it plays, in one line, verbatim: sound present, in sync,
+clicks/gaps/robotic patches, any difference from A.
+Gates (host) as CL-B5 §5. Reported beside A and B, not merged into the paired table: underruns, net loss, decode
+queue maxima, spikes, max output gap, the interface rate. Validity: PLAYING; token_issued sig_v 3 / audio_codecs
+opus; the journal's opus line. Nothing adopted; nothing committed.

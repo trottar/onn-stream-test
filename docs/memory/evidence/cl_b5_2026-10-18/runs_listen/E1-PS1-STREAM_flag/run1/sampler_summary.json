@@ -1,0 +1,2231 @@
+{
+ "window": {
+  "from": "2026-10-19T00:18:05.081Z",
+  "to": "2026-10-19T00:28:05.081Z",
+  "host_rows": 600
+ },
+ "meta": {
+  "started_utc": "2026-10-19T00:14:01.995Z",
+  "interval_s": 1.0,
+  "block_device": "nvme0n1",
+  "rapl": "not readable (root-only)",
+  "telemetry": true,
+  "title": true,
+  "e2": true,
+  "pid": 3658830
+ },
+ "host": {
+  "cost_ms": {
+   "n": 600,
+   "mean": 28.617,
+   "p95": 31.8,
+   "max": 34.4,
+   "min": 25.5
+  },
+  "cpu.iowait_pct": {
+   "n": 600,
+   "mean": 0.031,
+   "p95": 0.08,
+   "max": 0.17,
+   "min": 0.0
+  },
+  "cpu.max_pct": {
+   "n": 600,
+   "mean": 25.991,
+   "p95": 39.2,
+   "max": 48.5,
+   "min": 13.9
+  },
+  "cpu.mean_pct": {
+   "n": 600,
+   "mean": 11.07,
+   "p95": 12.9,
+   "max": 15.7,
+   "min": 8.0
+  },
+  "disk.await_ms": {
+   "n": 369,
+   "mean": 0.4,
+   "p95": 1.5,
+   "max": 9.0,
+   "min": 0.0
+  },
+  "disk.read_kBps": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "disk.reads_per_s": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "disk.util_pct": {
+   "n": 600,
+   "mean": 0.076,
+   "p95": 0.4,
+   "max": 1.2,
+   "min": 0.0
+  },
+  "disk.write_kBps": {
+   "n": 600,
+   "mean": 75.14,
+   "p95": 236.0,
+   "max": 1780.0,
+   "min": 0.0
+  },
+  "disk.writes_per_s": {
+   "n": 600,
+   "mean": 10.397,
+   "p95": 41.0,
+   "max": 80.0,
+   "min": 0.0
+  },
+  "freq.cpu_mhz_max": {
+   "n": 600,
+   "mean": 4148.193,
+   "p95": 4291,
+   "max": 4299,
+   "min": 3247
+  },
+  "freq.cpu_mhz_mean": {
+   "n": 600,
+   "mean": 3230.585,
+   "p95": 3599,
+   "max": 3902,
+   "min": 2452
+  },
+  "freq.cpu_mhz_min": {
+   "n": 600,
+   "mean": 1643.058,
+   "p95": 2959,
+   "max": 3280,
+   "min": 400
+  },
+  "gpu.busy_pct": {
+   "n": 600,
+   "mean": 22.193,
+   "p95": 27,
+   "max": 29,
+   "min": 17
+  },
+  "gpu.cpu_power_w": {
+   "n": 600,
+   "mean": 10.567,
+   "p95": 13.252,
+   "max": 17.193,
+   "min": 5.327
+  },
+  "gpu.dclk_mhz": {
+   "n": 600,
+   "mean": 400.0,
+   "p95": 400,
+   "max": 400,
+   "min": 400
+  },
+  "gpu.fclk_mhz": {
+   "n": 600,
+   "mean": 1595.912,
+   "p95": 1599,
+   "max": 1599,
+   "min": 1581
+  },
+  "gpu.gfx_activity_pct": {
+   "n": 600,
+   "mean": 22.697,
+   "p95": 27.43,
+   "max": 29.62,
+   "min": 17.15
+  },
+  "gpu.gfxclk_mhz": {
+   "n": 600,
+   "mean": 1105.61,
+   "p95": 1392,
+   "max": 1914,
+   "min": 890
+  },
+  "gpu.gpu_edge_c": {
+   "n": 600,
+   "mean": 44.957,
+   "p95": 48.0,
+   "max": 49.0,
+   "min": 38.0
+  },
+  "gpu.nvme_c": {
+   "n": 600,
+   "mean": 37.302,
+   "p95": 37.85,
+   "max": 37.85,
+   "min": 36.85
+  },
+  "gpu.ppt_w": {
+   "n": 600,
+   "mean": 19.117,
+   "p95": 25.0,
+   "max": 27.0,
+   "min": 10.0
+  },
+  "gpu.soc_power_w": {
+   "n": 600,
+   "mean": 6.05,
+   "p95": 9.259,
+   "max": 10.252,
+   "min": 3.592
+  },
+  "gpu.socket_power_w": {
+   "n": 600,
+   "mean": 19.117,
+   "p95": 25,
+   "max": 27,
+   "min": 10
+  },
+  "gpu.t_core_max_c": {
+   "n": 600,
+   "mean": 53.464,
+   "p95": 58.25,
+   "max": 63.0,
+   "min": 39.75
+  },
+  "gpu.t_gfx_c": {
+   "n": 600,
+   "mean": 45.335,
+   "p95": 48.0,
+   "max": 49.25,
+   "min": 38.0
+  },
+  "gpu.t_soc_c": {
+   "n": 600,
+   "mean": 45.832,
+   "p95": 48.5,
+   "max": 50.5,
+   "min": 38.5
+  },
+  "gpu.tctl_c": {
+   "n": 600,
+   "mean": 55.236,
+   "p95": 58.125,
+   "max": 58.75,
+   "min": 47.375
+  },
+  "gpu.throttle_status": {
+   "n": 600,
+   "mean": 10.24,
+   "p95": 0,
+   "max": 2048,
+   "min": 0
+  },
+  "gpu.vclk_mhz": {
+   "n": 600,
+   "mean": 400.0,
+   "p95": 400,
+   "max": 400,
+   "min": 400
+  },
+  "gpu.vcn_activity_pct": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "mem.available_mb": {
+   "n": 600,
+   "mean": 10212.338,
+   "p95": 10239,
+   "max": 10243,
+   "min": 10150
+  },
+  "mem.cached_mb": {
+   "n": 600,
+   "mean": 4806.97,
+   "p95": 4809,
+   "max": 4810,
+   "min": 4804
+  },
+  "mem.majfault_per_s": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "mem.pswpin_per_s": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "mem.pswpout_per_s": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "mem.swap_used_mb": {
+   "n": 600,
+   "mean": 682.0,
+   "p95": 682,
+   "max": 682,
+   "min": 682
+  },
+  "mem.used_mb": {
+   "n": 600,
+   "mean": 5087.937,
+   "p95": 5117,
+   "max": 5150,
+   "min": 5058
+  },
+  "net.eno1.rx_drop_per_s": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "net.eno1.rx_kBps": {
+   "n": 600,
+   "mean": 36.515,
+   "p95": 47.5,
+   "max": 102.6,
+   "min": 4.4
+  },
+  "net.eno1.rx_pps": {
+   "n": 600,
+   "mean": 457.64,
+   "p95": 561.0,
+   "max": 1362.0,
+   "min": 52.0
+  },
+  "net.eno1.tx_drop_per_s": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "net.eno1.tx_kBps": {
+   "n": 600,
+   "mean": 1099.312,
+   "p95": 1168.8,
+   "max": 1599.1,
+   "min": 851.3
+  },
+  "net.eno1.tx_pps": {
+   "n": 600,
+   "mean": 1178.198,
+   "p95": 1246.0,
+   "max": 2963.0,
+   "min": 971.0
+  },
+  "net.tailscale0.rx_drop_per_s": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "net.tailscale0.rx_kBps": {
+   "n": 600,
+   "mean": 0.009,
+   "p95": 0.0,
+   "max": 1.0,
+   "min": 0.0
+  },
+  "net.tailscale0.rx_pps": {
+   "n": 600,
+   "mean": 0.083,
+   "p95": 0.0,
+   "max": 8.0,
+   "min": 0.0
+  },
+  "net.tailscale0.tx_drop_per_s": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "net.tailscale0.tx_kBps": {
+   "n": 600,
+   "mean": 0.005,
+   "p95": 0.0,
+   "max": 0.5,
+   "min": 0.0
+  },
+  "net.tailscale0.tx_pps": {
+   "n": 600,
+   "mean": 0.085,
+   "p95": 0.0,
+   "max": 8.0,
+   "min": 0.0
+  },
+  "netx.if_tx_dropped_per_s": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "netx.if_tx_errors_per_s": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "netx.qdisc_backlog_b": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0,
+   "max": 0,
+   "min": 0
+  },
+  "netx.qdisc_dropped_per_s": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "netx.qdisc_overlimits_per_s": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "netx.qdisc_requeues_per_s": {
+   "n": 600,
+   "mean": 0.46,
+   "p95": 2.0,
+   "max": 4.0,
+   "min": 0.0
+  },
+  "netx.softnet_dropped_per_s": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "netx.softnet_squeeze_per_s": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "procs.companion.cpu_pct": {
+   "n": 600,
+   "mean": 21.33,
+   "p95": 23.0,
+   "max": 24.0,
+   "min": 18.0
+  },
+  "procs.companion.n": {
+   "n": 600,
+   "mean": 1.0,
+   "p95": 1,
+   "max": 1,
+   "min": 1
+  },
+  "procs.companion.pss_anon_kb": {
+   "n": 600,
+   "mean": 36787.34,
+   "p95": 37236,
+   "max": 37288,
+   "min": 36020
+  },
+  "procs.companion.pss_file_kb": {
+   "n": 600,
+   "mean": 2057.055,
+   "p95": 2058,
+   "max": 2058,
+   "min": 2056
+  },
+  "procs.companion.pss_kb": {
+   "n": 600,
+   "mean": 38844.395,
+   "p95": 39293,
+   "max": 39346,
+   "min": 38077
+  },
+  "procs.companion.rchar_kBps": {
+   "n": 600,
+   "mean": 242.443,
+   "p95": 348.3,
+   "max": 358.1,
+   "min": 179.7
+  },
+  "procs.companion.read_kBps": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "procs.companion.rss_anon_kb": {
+   "n": 600,
+   "mean": 36787.34,
+   "p95": 37236,
+   "max": 37288,
+   "min": 36020
+  },
+  "procs.companion.rss_kb": {
+   "n": 600,
+   "mean": 49543.34,
+   "p95": 49992,
+   "max": 50044,
+   "min": 48776
+  },
+  "procs.companion.threads": {
+   "n": 600,
+   "mean": 8.013,
+   "p95": 8,
+   "max": 10,
+   "min": 8
+  },
+  "procs.companion.wchar_kBps": {
+   "n": 600,
+   "mean": 196.893,
+   "p95": 239.2,
+   "max": 384.2,
+   "min": 22.8
+  },
+  "procs.companion.write_kBps": {
+   "n": 600,
+   "mean": 3.727,
+   "p95": 12.0,
+   "max": 20.0,
+   "min": 0.0
+  },
+  "procs.e1_sampler.cpu_pct": {
+   "n": 600,
+   "mean": 2.69,
+   "p95": 4.0,
+   "max": 4.0,
+   "min": 1.0
+  },
+  "procs.e1_sampler.n": {
+   "n": 600,
+   "mean": 1.0,
+   "p95": 1,
+   "max": 1,
+   "min": 1
+  },
+  "procs.e1_sampler.pss_anon_kb": {
+   "n": 600,
+   "mean": 18371.04,
+   "p95": 18412,
+   "max": 18416,
+   "min": 18324
+  },
+  "procs.e1_sampler.pss_file_kb": {
+   "n": 600,
+   "mean": 1770.722,
+   "p95": 1772,
+   "max": 1772,
+   "min": 1770
+  },
+  "procs.e1_sampler.pss_kb": {
+   "n": 600,
+   "mean": 20141.762,
+   "p95": 20184,
+   "max": 20188,
+   "min": 20094
+  },
+  "procs.e1_sampler.rchar_kBps": {
+   "n": 600,
+   "mean": 143.192,
+   "p95": 144.2,
+   "max": 144.7,
+   "min": 141.3
+  },
+  "procs.e1_sampler.read_kBps": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "procs.e1_sampler.rss_anon_kb": {
+   "n": 600,
+   "mean": 18371.04,
+   "p95": 18412,
+   "max": 18416,
+   "min": 18324
+  },
+  "procs.e1_sampler.rss_kb": {
+   "n": 600,
+   "mean": 31535.04,
+   "p95": 31576,
+   "max": 31580,
+   "min": 31488
+  },
+  "procs.e1_sampler.threads": {
+   "n": 600,
+   "mean": 6.0,
+   "p95": 6,
+   "max": 6,
+   "min": 6
+  },
+  "procs.e1_sampler.wchar_kBps": {
+   "n": 600,
+   "mean": 7.074,
+   "p95": 7.5,
+   "max": 7.5,
+   "min": 6.7
+  },
+  "procs.e1_sampler.write_kBps": {
+   "n": 600,
+   "mean": 10.466,
+   "p95": 24.0,
+   "max": 32.0,
+   "min": 0.0
+  },
+  "procs.encoder.cpu_pct": {
+   "n": 600,
+   "mean": 36.683,
+   "p95": 38.0,
+   "max": 39.0,
+   "min": 33.0
+  },
+  "procs.encoder.n": {
+   "n": 600,
+   "mean": 1.0,
+   "p95": 1,
+   "max": 1,
+   "min": 1
+  },
+  "procs.encoder.pss_anon_kb": {
+   "n": 600,
+   "mean": 28969.84,
+   "p95": 28988,
+   "max": 28988,
+   "min": 28928
+  },
+  "procs.encoder.pss_file_kb": {
+   "n": 600,
+   "mean": 36884.835,
+   "p95": 36888,
+   "max": 36888,
+   "min": 36884
+  },
+  "procs.encoder.pss_kb": {
+   "n": 600,
+   "mean": 73954.675,
+   "p95": 73976,
+   "max": 73976,
+   "min": 73912
+  },
+  "procs.encoder.rchar_kBps": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "procs.encoder.read_kBps": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "procs.encoder.rss_anon_kb": {
+   "n": 600,
+   "mean": 28969.84,
+   "p95": 28988,
+   "max": 28988,
+   "min": 28928
+  },
+  "procs.encoder.rss_kb": {
+   "n": 600,
+   "mean": 132369.84,
+   "p95": 132388,
+   "max": 132388,
+   "min": 132328
+  },
+  "procs.encoder.threads": {
+   "n": 600,
+   "mean": 38.0,
+   "p95": 38,
+   "max": 38,
+   "min": 38
+  },
+  "procs.encoder.wchar_kBps": {
+   "n": 600,
+   "mean": 4.197,
+   "p95": 4.2,
+   "max": 4.3,
+   "min": 4.1
+  },
+  "procs.encoder.write_kBps": {
+   "n": 600,
+   "mean": 0.953,
+   "p95": 4.0,
+   "max": 8.0,
+   "min": 0.0
+  },
+  "procs.ffmpeg_other.cpu_pct": {
+   "n": 600,
+   "mean": 0.94,
+   "p95": 2.0,
+   "max": 2.0,
+   "min": 0.0
+  },
+  "procs.ffmpeg_other.n": {
+   "n": 600,
+   "mean": 1.0,
+   "p95": 1,
+   "max": 1,
+   "min": 1
+  },
+  "procs.ffmpeg_other.pss_anon_kb": {
+   "n": 600,
+   "mean": 10896.0,
+   "p95": 10896,
+   "max": 10896,
+   "min": 10896
+  },
+  "procs.ffmpeg_other.pss_file_kb": {
+   "n": 600,
+   "mean": 12640.17,
+   "p95": 12643,
+   "max": 12643,
+   "min": 12640
+  },
+  "procs.ffmpeg_other.pss_kb": {
+   "n": 600,
+   "mean": 23623.41,
+   "p95": 23627,
+   "max": 23627,
+   "min": 23620
+  },
+  "procs.ffmpeg_other.rchar_kBps": {
+   "n": 600,
+   "mean": 0.779,
+   "p95": 0.8,
+   "max": 0.8,
+   "min": 0.7
+  },
+  "procs.ffmpeg_other.read_kBps": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "procs.ffmpeg_other.rss_anon_kb": {
+   "n": 600,
+   "mean": 10896.0,
+   "p95": 10896,
+   "max": 10896,
+   "min": 10896
+  },
+  "procs.ffmpeg_other.rss_kb": {
+   "n": 600,
+   "mean": 50134.48,
+   "p95": 50136,
+   "max": 50136,
+   "min": 50128
+  },
+  "procs.ffmpeg_other.threads": {
+   "n": 600,
+   "mean": 19.0,
+   "p95": 19,
+   "max": 19,
+   "min": 19
+  },
+  "procs.ffmpeg_other.wchar_kBps": {
+   "n": 600,
+   "mean": 188.24,
+   "p95": 190.7,
+   "max": 197.5,
+   "min": 179.6
+  },
+  "procs.ffmpeg_other.write_kBps": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "procs.host_resource_sampler.cpu_pct": {
+   "n": 600,
+   "mean": 0.01,
+   "p95": 0.0,
+   "max": 1.0,
+   "min": 0.0
+  },
+  "procs.host_resource_sampler.n": {
+   "n": 600,
+   "mean": 1.0,
+   "p95": 1,
+   "max": 1,
+   "min": 1
+  },
+  "procs.host_resource_sampler.pss_anon_kb": {
+   "n": 600,
+   "mean": 7098.74,
+   "p95": 7112,
+   "max": 7112,
+   "min": 7080
+  },
+  "procs.host_resource_sampler.pss_file_kb": {
+   "n": 600,
+   "mean": 921.057,
+   "p95": 922,
+   "max": 922,
+   "min": 921
+  },
+  "procs.host_resource_sampler.pss_kb": {
+   "n": 600,
+   "mean": 8019.797,
+   "p95": 8034,
+   "max": 8034,
+   "min": 8001
+  },
+  "procs.host_resource_sampler.rchar_kBps": {
+   "n": 600,
+   "mean": 24.345,
+   "p95": 0.0,
+   "max": 738.7,
+   "min": 0.0
+  },
+  "procs.host_resource_sampler.read_kBps": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "procs.host_resource_sampler.rss_anon_kb": {
+   "n": 600,
+   "mean": 7098.74,
+   "p95": 7112,
+   "max": 7112,
+   "min": 7080
+  },
+  "procs.host_resource_sampler.rss_kb": {
+   "n": 600,
+   "mean": 14394.74,
+   "p95": 14408,
+   "max": 14408,
+   "min": 14376
+  },
+  "procs.host_resource_sampler.threads": {
+   "n": 600,
+   "mean": 1.0,
+   "p95": 1,
+   "max": 1,
+   "min": 1
+  },
+  "procs.host_resource_sampler.wchar_kBps": {
+   "n": 600,
+   "mean": 1.131,
+   "p95": 0.0,
+   "max": 34.2,
+   "min": 0.0
+  },
+  "procs.host_resource_sampler.write_kBps": {
+   "n": 600,
+   "mean": 0.16,
+   "p95": 0.0,
+   "max": 8.0,
+   "min": 0.0
+  },
+  "procs.other.cpu_pct": {
+   "n": 600,
+   "mean": 8.332,
+   "p95": 13.0,
+   "max": 66.0,
+   "min": 3.0
+  },
+  "procs.pulseaudio.cpu_pct": {
+   "n": 600,
+   "mean": 1.59,
+   "p95": 2.0,
+   "max": 3.0,
+   "min": 0.0
+  },
+  "procs.pulseaudio.n": {
+   "n": 600,
+   "mean": 1.0,
+   "p95": 1,
+   "max": 1,
+   "min": 1
+  },
+  "procs.pulseaudio.pss_anon_kb": {
+   "n": 600,
+   "mean": 6556.0,
+   "p95": 6556,
+   "max": 6556,
+   "min": 6556
+  },
+  "procs.pulseaudio.pss_file_kb": {
+   "n": 600,
+   "mean": 3850.05,
+   "p95": 3851,
+   "max": 3851,
+   "min": 3846
+  },
+  "procs.pulseaudio.pss_kb": {
+   "n": 600,
+   "mean": 10577.35,
+   "p95": 10584,
+   "max": 10589,
+   "min": 10508
+  },
+  "procs.pulseaudio.rchar_kBps": {
+   "n": 600,
+   "mean": 2.448,
+   "p95": 2.5,
+   "max": 2.7,
+   "min": 2.3
+  },
+  "procs.pulseaudio.read_kBps": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "procs.pulseaudio.rss_anon_kb": {
+   "n": 600,
+   "mean": 6556.0,
+   "p95": 6556,
+   "max": 6556,
+   "min": 6556
+  },
+  "procs.pulseaudio.rss_kb": {
+   "n": 600,
+   "mean": 22658.6,
+   "p95": 22672,
+   "max": 22680,
+   "min": 22520
+  },
+  "procs.pulseaudio.threads": {
+   "n": 600,
+   "mean": 3.0,
+   "p95": 3,
+   "max": 3,
+   "min": 3
+  },
+  "procs.pulseaudio.wchar_kBps": {
+   "n": 600,
+   "mean": 2.496,
+   "p95": 2.5,
+   "max": 2.6,
+   "min": 2.4
+  },
+  "procs.pulseaudio.write_kBps": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "procs.range_server.cpu_pct": {
+   "n": 600,
+   "mean": 0.007,
+   "p95": 0.0,
+   "max": 1.0,
+   "min": 0.0
+  },
+  "procs.range_server.n": {
+   "n": 600,
+   "mean": 1.0,
+   "p95": 1,
+   "max": 1,
+   "min": 1
+  },
+  "procs.range_server.pss_anon_kb": {
+   "n": 600,
+   "mean": 15020.0,
+   "p95": 15020,
+   "max": 15020,
+   "min": 15020
+  },
+  "procs.range_server.pss_file_kb": {
+   "n": 600,
+   "mean": 1234.057,
+   "p95": 1235,
+   "max": 1235,
+   "min": 1234
+  },
+  "procs.range_server.pss_kb": {
+   "n": 600,
+   "mean": 16254.057,
+   "p95": 16255,
+   "max": 16255,
+   "min": 16254
+  },
+  "procs.range_server.rchar_kBps": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "procs.range_server.read_kBps": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "procs.range_server.rss_anon_kb": {
+   "n": 600,
+   "mean": 15020.0,
+   "p95": 15020,
+   "max": 15020,
+   "min": 15020
+  },
+  "procs.range_server.rss_kb": {
+   "n": 600,
+   "mean": 26556.0,
+   "p95": 26556,
+   "max": 26556,
+   "min": 26556
+  },
+  "procs.range_server.threads": {
+   "n": 600,
+   "mean": 1.0,
+   "p95": 1,
+   "max": 1,
+   "min": 1
+  },
+  "procs.range_server.wchar_kBps": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "procs.range_server.write_kBps": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "procs.retroarch.cpu_pct": {
+   "n": 600,
+   "mean": 34.016,
+   "p95": 45.0,
+   "max": 47.0,
+   "min": 19.0
+  },
+  "procs.retroarch.n": {
+   "n": 600,
+   "mean": 2.0,
+   "p95": 2,
+   "max": 2,
+   "min": 2
+  },
+  "procs.retroarch.pss_anon_kb": {
+   "n": 600,
+   "mean": 88375.713,
+   "p95": 91668,
+   "max": 91668,
+   "min": 85452
+  },
+  "procs.retroarch.pss_file_kb": {
+   "n": 600,
+   "mean": 132913.943,
+   "p95": 153129,
+   "max": 153129,
+   "min": 77302
+  },
+  "procs.retroarch.pss_kb": {
+   "n": 600,
+   "mean": 223419.777,
+   "p95": 246907,
+   "max": 246937,
+   "min": 164878
+  },
+  "procs.retroarch.rchar_kBps": {
+   "n": 600,
+   "mean": 1.977,
+   "p95": 0.6,
+   "max": 116.8,
+   "min": 0.5
+  },
+  "procs.retroarch.read_kBps": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "procs.retroarch.rss_anon_kb": {
+   "n": 600,
+   "mean": 88375.713,
+   "p95": 91668,
+   "max": 91668,
+   "min": 85452
+  },
+  "procs.retroarch.rss_kb": {
+   "n": 600,
+   "mean": 257490.94,
+   "p95": 280956,
+   "max": 281016,
+   "min": 198944
+  },
+  "procs.retroarch.threads": {
+   "n": 600,
+   "mean": 25.0,
+   "p95": 25,
+   "max": 25,
+   "min": 25
+  },
+  "procs.retroarch.wchar_kBps": {
+   "n": 600,
+   "mean": 6.313,
+   "p95": 6.7,
+   "max": 8.2,
+   "min": 6.1
+  },
+  "procs.retroarch.write_kBps": {
+   "n": 600,
+   "mean": 0.813,
+   "p95": 4.0,
+   "max": 12.0,
+   "min": 0.0
+  },
+  "procs.xorg.cpu_pct": {
+   "n": 600,
+   "mean": 9.642,
+   "p95": 11.0,
+   "max": 11.0,
+   "min": 8.0
+  },
+  "procs.xorg.n": {
+   "n": 600,
+   "mean": 1.0,
+   "p95": 1,
+   "max": 1,
+   "min": 1
+  },
+  "procs.xorg.pss_anon_kb": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0,
+   "max": 0,
+   "min": 0
+  },
+  "procs.xorg.pss_file_kb": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0,
+   "max": 0,
+   "min": 0
+  },
+  "procs.xorg.pss_kb": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0,
+   "max": 0,
+   "min": 0
+  },
+  "procs.xorg.rchar_kBps": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "procs.xorg.read_kBps": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "procs.xorg.rss_anon_kb": {
+   "n": 600,
+   "mean": 7096.0,
+   "p95": 7096,
+   "max": 7096,
+   "min": 7096
+  },
+  "procs.xorg.rss_kb": {
+   "n": 600,
+   "mean": 38844.0,
+   "p95": 38844,
+   "max": 38844,
+   "min": 38844
+  },
+  "procs.xorg.threads": {
+   "n": 600,
+   "mean": 16.0,
+   "p95": 16,
+   "max": 16,
+   "min": 16
+  },
+  "procs.xorg.wchar_kBps": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "procs.xorg.write_kBps": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "psi_ms_per_s.cpu_full": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "psi_ms_per_s.cpu_some": {
+   "n": 600,
+   "mean": 8.726,
+   "p95": 12.34,
+   "max": 15.5,
+   "min": 5.58
+  },
+  "psi_ms_per_s.io_full": {
+   "n": 600,
+   "mean": 0.376,
+   "p95": 0.94,
+   "max": 2.21,
+   "min": 0.0
+  },
+  "psi_ms_per_s.io_some": {
+   "n": 600,
+   "mean": 0.401,
+   "p95": 1.01,
+   "max": 2.83,
+   "min": 0.0
+  },
+  "psi_ms_per_s.memory_full": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "psi_ms_per_s.memory_some": {
+   "n": 600,
+   "mean": 0.0,
+   "p95": 0.0,
+   "max": 0.0,
+   "min": 0.0
+  },
+  "throttled": {
+   "n": 600,
+   "mean": 0.005,
+   "p95": 0,
+   "max": 1,
+   "min": 0
+  },
+  "_rows": 600
+ },
+ "throttled_samples": 3,
+ "missed_samples": 0,
+ "stream": {
+  "rows": 300,
+  "fresh_rows": 300,
+  "span_min": 9.98,
+  "rendered_fps": null
+ },
+ "retroarch": {
+  "titles": 141,
+  "frames_per_s": 59.999,
+  "fps_reading": {
+   "n": 141,
+   "mean": 59.999,
+   "p95": 60.05,
+   "max": 60.07,
+   "min": 59.93
+  }
+ },
+ "per_core_p95": {
+  "cpu0": 26.2,
+  "cpu1": 25.0,
+  "cpu2": 26.0,
+  "cpu3": 26.0,
+  "cpu4": 25.8,
+  "cpu5": 23.0,
+  "cpu6": 22.3,
+  "cpu7": 24.0,
+  "cpu8": 22.9,
+  "cpu9": 22.4,
+  "cpu10": 20.4,
+  "cpu11": 12.0
+ },
+ "busiest_core_p95": 26.2,
+ "throttle_by_value": {
+  "0x800": 3
+ },
+ "encoder": {
+  "capture_fps": 59.999,
+  "dup_per_min": 0.1,
+  "drop_per_min": 0.0,
+  "speed": {
+   "n": 600,
+   "mean": 1.0,
+   "p95": 1.0,
+   "max": 1.0,
+   "min": 1.0
+  },
+  "rows": 600
+ },
+ "threads": {
+  "companion": [
+   {
+    "pid": 3658816,
+    "tid": 3659607,
+    "is_main": false,
+    "policy": 2,
+    "syscall_mode": "running",
+    "seen": 600,
+    "cpu_mean": 10.24,
+    "cpu_p95": 12.0,
+    "cpu_max": 13.0
+   },
+   {
+    "pid": 3658816,
+    "tid": 3659475,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "7",
+    "seen": 600,
+    "cpu_mean": 7.58,
+    "cpu_p95": 9.0,
+    "cpu_max": 10.0
+   },
+   {
+    "pid": 3658816,
+    "tid": 3659597,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "7",
+    "seen": 600,
+    "cpu_mean": 2.785,
+    "cpu_p95": 4.0,
+    "cpu_max": 4.0
+   },
+   {
+    "pid": 3658816,
+    "tid": 3659606,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "0",
+    "seen": 600,
+    "cpu_mean": 0.087,
+    "cpu_p95": 1.0,
+    "cpu_max": 1.0
+   },
+   {
+    "pid": 3658816,
+    "tid": 3658816,
+    "is_main": true,
+    "policy": 0,
+    "syscall_mode": "7",
+    "seen": 600,
+    "cpu_mean": 0.033,
+    "cpu_p95": 0.0,
+    "cpu_max": 1.0
+   },
+   {
+    "pid": 3658816,
+    "tid": 3659476,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "230",
+    "seen": 600,
+    "cpu_mean": 0.033,
+    "cpu_p95": 0.0,
+    "cpu_max": 1.0
+   },
+   {
+    "pid": 3658816,
+    "tid": 3659664,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "230",
+    "seen": 600,
+    "cpu_mean": 0.01,
+    "cpu_p95": 0.0,
+    "cpu_max": 1.0
+   },
+   {
+    "pid": 3658816,
+    "tid": 3658819,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.002,
+    "cpu_p95": 0.0,
+    "cpu_max": 1.0
+   }
+  ],
+  "retroarch": [
+   {
+    "pid": 3659324,
+    "tid": 3659324,
+    "is_main": true,
+    "policy": 0,
+    "syscall_mode": "7",
+    "seen": 600,
+    "cpu_mean": 32.278,
+    "cpu_p95": 43.0,
+    "cpu_max": 46.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659335,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.61,
+    "cpu_p95": 1.0,
+    "cpu_max": 2.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3660197,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 182,
+    "cpu_mean": 0.522,
+    "cpu_p95": 1.0,
+    "cpu_max": 2.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3661755,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 166,
+    "cpu_mean": 0.5,
+    "cpu_p95": 1.0,
+    "cpu_max": 2.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3661053,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 83,
+    "cpu_mean": 0.482,
+    "cpu_p95": 1.0,
+    "cpu_max": 2.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3660198,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "7",
+    "seen": 182,
+    "cpu_mean": 0.44,
+    "cpu_p95": 1.0,
+    "cpu_max": 2.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659761,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 23,
+    "cpu_mean": 0.435,
+    "cpu_p95": 1.0,
+    "cpu_max": 2.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3661054,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "7",
+    "seen": 83,
+    "cpu_mean": 0.422,
+    "cpu_p95": 1.0,
+    "cpu_max": 2.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3661756,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "7",
+    "seen": 166,
+    "cpu_mean": 0.416,
+    "cpu_p95": 1.0,
+    "cpu_max": 2.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3661381,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 97,
+    "cpu_mean": 0.392,
+    "cpu_p95": 1.0,
+    "cpu_max": 2.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659762,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "7",
+    "seen": 23,
+    "cpu_mean": 0.391,
+    "cpu_p95": 1.0,
+    "cpu_max": 2.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3660960,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 18,
+    "cpu_mean": 0.389,
+    "cpu_p95": 1.0,
+    "cpu_max": 1.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3662437,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 18,
+    "cpu_mean": 0.389,
+    "cpu_p95": 1.0,
+    "cpu_max": 1.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3661382,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "7",
+    "seen": 97,
+    "cpu_mean": 0.381,
+    "cpu_p95": 1.0,
+    "cpu_max": 2.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3660961,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "7",
+    "seen": 18,
+    "cpu_mean": 0.333,
+    "cpu_p95": 1.0,
+    "cpu_max": 1.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3662438,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "7",
+    "seen": 18,
+    "cpu_mean": 0.333,
+    "cpu_p95": 1.0,
+    "cpu_max": 1.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3662513,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 6,
+    "cpu_mean": 0.333,
+    "cpu_p95": 1.0,
+    "cpu_max": 1.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3662514,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "7",
+    "seen": 6,
+    "cpu_mean": 0.333,
+    "cpu_p95": 1.0,
+    "cpu_max": 1.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659332,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.205,
+    "cpu_p95": 1.0,
+    "cpu_max": 2.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659344,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.01,
+    "cpu_p95": 0.0,
+    "cpu_max": 1.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659343,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.003,
+    "cpu_p95": 0.0,
+    "cpu_max": 2.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659331,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659333,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659334,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659336,
+    "is_main": false,
+    "policy": 3,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659337,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659338,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659339,
+    "is_main": false,
+    "policy": 3,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659340,
+    "is_main": false,
+    "policy": 3,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659341,
+    "is_main": false,
+    "policy": 3,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659342,
+    "is_main": false,
+    "policy": 3,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659347,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659348,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659349,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659350,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659351,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659324,
+    "tid": 3659354,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659329,
+    "tid": 3659329,
+    "is_main": true,
+    "policy": 0,
+    "syscall_mode": "0",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659329,
+    "tid": 3659330,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "1",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   }
+  ],
+  "encoder": [
+   {
+    "pid": 3659477,
+    "tid": 3659489,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 3.6,
+    "cpu_p95": 4.0,
+    "cpu_max": 5.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659506,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 2.583,
+    "cpu_p95": 3.0,
+    "cpu_max": 4.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659505,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 2.575,
+    "cpu_p95": 3.0,
+    "cpu_max": 4.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659504,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 2.562,
+    "cpu_p95": 3.0,
+    "cpu_max": 4.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659509,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 2.552,
+    "cpu_p95": 3.0,
+    "cpu_max": 4.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659507,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 2.548,
+    "cpu_p95": 3.0,
+    "cpu_max": 4.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659508,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 2.545,
+    "cpu_p95": 3.0,
+    "cpu_max": 4.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659510,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 2.517,
+    "cpu_p95": 3.0,
+    "cpu_max": 4.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659511,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 2.495,
+    "cpu_p95": 3.0,
+    "cpu_max": 4.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659512,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 2.48,
+    "cpu_p95": 3.0,
+    "cpu_max": 4.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659513,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 2.445,
+    "cpu_p95": 3.0,
+    "cpu_max": 4.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659514,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 2.283,
+    "cpu_p95": 3.0,
+    "cpu_max": 4.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659515,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 2.052,
+    "cpu_p95": 3.0,
+    "cpu_max": 3.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659516,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 1.112,
+    "cpu_p95": 2.0,
+    "cpu_max": 2.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659488,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.94,
+    "cpu_p95": 2.0,
+    "cpu_max": 2.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659491,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "230",
+    "seen": 600,
+    "cpu_mean": 0.85,
+    "cpu_p95": 2.0,
+    "cpu_max": 2.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659479,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.352,
+    "cpu_p95": 1.0,
+    "cpu_max": 2.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659490,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.185,
+    "cpu_p95": 1.0,
+    "cpu_max": 2.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659477,
+    "is_main": true,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.012,
+    "cpu_p95": 0.0,
+    "cpu_max": 1.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659480,
+    "is_main": false,
+    "policy": 3,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659481,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659482,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659483,
+    "is_main": false,
+    "policy": 3,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659484,
+    "is_main": false,
+    "policy": 3,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659485,
+    "is_main": false,
+    "policy": 3,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659486,
+    "is_main": false,
+    "policy": 3,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659492,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659493,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659494,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659495,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659496,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659497,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659498,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659499,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659500,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659501,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659502,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   },
+   {
+    "pid": 3659477,
+    "tid": 3659503,
+    "is_main": false,
+    "policy": 0,
+    "syscall_mode": "202",
+    "seen": 600,
+    "cpu_mean": 0.0,
+    "cpu_p95": 0.0,
+    "cpu_max": 0.0
+   }
+  ]
+ }
+}

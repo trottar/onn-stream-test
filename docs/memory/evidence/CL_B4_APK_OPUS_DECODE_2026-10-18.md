@@ -24,7 +24,7 @@ baseline_commit: f314126 (tree clean at the start)
     proven (§4).
   - **Video:** decoder spikes ≥ 20 ms **178/min against CL-B3 R1's 87** (under the 200 bar); max output gap 501 ms
     against 410. The cause is not located (§4).
-- **The user's listen:** *pending* — see §5.
+- **The user's listen:** none — the TV was muted (the user, 2026-10-18; §5). The paired listen is CL-B5's.
 
 Task: `handoffs/CL-B4_APK_OPUS_DECODE_TASK.md`, session A. Pre-registration: `cl_b4_2026-10-18/cl_b4_preregistration.txt`,
 sha256 `afa3b96d…3a97`, hashed at 20:37:13Z, before any code edit and before the build (20:44:29Z).
@@ -196,6 +196,9 @@ start, since those were committed in `f314126`.
 *Asked at 22:03Z; not yet answered when this record was written.* It will be recorded here verbatim as the user's
 report: audio present, in sync, artefacts. Nothing perceptual is a gate. The user's confirmation that the TV shows the
 app paired is also pending; the device read paired at 21:59:09Z and 22:16:57Z.
+
+**Completed 2026-10-18 (CL-B5):** no listen: the TV was muted (the user, 2026-10-18). The paired PCM / Opus listen
+was taken in CL-B5 (`CL_B5_OPUS_DECODE_THREAD_AB_2026-10-18.md` §4).
 
 ## 6. State at the end (22:16Z)
 

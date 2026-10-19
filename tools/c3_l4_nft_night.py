@@ -99,7 +99,9 @@ PKG = "com.safeiot.privyhub"
 # (kept at PrivyHub/app/build/g3_s3_preserved/app-debug.apk).
 # CL-B4 (installed 2026-10-18): the Opus-decode APK replaced CL-B3's 59f736d29b96700253a178efa5efd0cd8846858a89d32848a0994586712bf65f
 # (kept at PrivyHub/app/build/cl_b4_preserved/app-debug.apk).
-ADOPTED_APK_SHA256 = "8e10497ef43850d54165593a680f68a41b89114536a806f0788b9a04945fd84e"
+# CL-B5 (installed 2026-10-18): the decode-thread APK replaced CL-B4's 8e10497ef43850d54165593a680f68a41b89114536a806f0788b9a04945fd84e
+# (kept at PrivyHub/app/build/cl_b5_preserved/app-debug.apk).
+ADOPTED_APK_SHA256 = "043891e1cc7d643dc496eb6f6dcef50472418e9444300f667ac6abb7d0201607"
 REFERENCE_PROFILE = "native_game_720p60_reference"
 MODE_ENV = "PRIVYHUB_ADAPTIVE_BITRATE_MODE"
 # C3-L4-D1 (2026-10-01): live is the companion's default through the systemd drop-in

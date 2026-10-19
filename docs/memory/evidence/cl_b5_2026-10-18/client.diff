@@ -1,0 +1,591 @@
+diff --git a/PrivyHub/app/src/main/java/streaming/NativeAudioReceiver.kt b/PrivyHub/app/src/main/java/streaming/NativeAudioReceiver.kt
+index 3fe0813..8d6aea6 100644
+--- a/PrivyHub/app/src/main/java/streaming/NativeAudioReceiver.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeAudioReceiver.kt
+@@ -76,7 +76,12 @@ data class NativeAudioMetrics(
+     val opusDecodeAvgUs: Double = 0.0,
+     val opusDecodeMaxUs: Long = 0,
+     val opusDecoder: String = "",
+-    val opusCopyOffsetFrames: Int = 0
++    val opusCopyOffsetFrames: Int = 0,
++    // CL-B5: the decode thread's queue (CL-B4 decoded on the receive thread).
++    val opusDecodeQueueDepthMax: Long = 0,
++    val opusDecodeQueueWaitMaxUs: Long = 0,
++    val opusDecodeQueueDrops: Long = 0,
++    val opusDecodeFailures: Long = 0
+ )
+ 
+ /**
+@@ -670,28 +675,34 @@ class NativeAudioReceiver(
+     private var opusFrameSamples =
+         0
+ 
+-    @Volatile
+-    private var opusDecoderName =
+-        ""
+-
+-    private var opusDecoder:
+-        OpusAudioDecoder? =
+-        null
+-
+-    private var opusDecoderFailed =
+-        false
+-
+     private val opusReorder =
+         OpusReorder(SEEN_WINDOW)
+ 
+-    private val opusFramesDecoded =
+-        AtomicLong(0)
+-
+     private val opusFramesAbandoned =
+         AtomicLong(0)
+ 
+-    private val opusDecodeFailures =
+-        AtomicLong(0)
++    // CL-B5: the decode runs on its own thread, fed in release order by the
++    // receive thread (which never waits on the codec). For an Opus session
++    // that thread is the PCM queue's producer.
++    private val opusPipeline =
++        OpusDecodePipeline(
++            decoderFactory = { frames -> OpusAudioDecoder(frames) },
++            sink = object : OpusDecodePipeline.Sink {
++                override fun pcm(packet: ByteArray) = enqueueLatest(packet)
++
++                override fun conceal(slots: Int) = repeat(slots) { enqueueConcealment(-1) }
++
++                override fun crossfade() {
++                    trimCrossfadePending = true
++                }
++            }
++        )
++
++    private var opusPipelineStarted =
++        false
++
++    private val opusDecoder: OpusAudioDecoder?
++        get() = opusPipeline.decoder as? OpusAudioDecoder
+ 
+     fun start() {
+         if (running) {
+@@ -922,12 +933,11 @@ class NativeAudioReceiver(
+             opusFrameSamples =
+                 opusFrameSamples,
+             opusFramesDecoded =
+-                opusFramesDecoded.get(),
++                opusPipeline.framesDecoded.get(),
+             opusFramesAbandoned =
+                 opusFramesAbandoned.get(),
+             opusDecodeErrors =
+-                opusDecodeFailures.get() +
+-                    (opusDecoder?.decodeErrors ?: 0L),
++                opusDecoder?.decodeErrors ?: 0L,
+             opusDrainTimeouts =
+                 opusDecoder?.drainTimeouts ?: 0L,
+             opusFormatErrors =
+@@ -941,13 +951,21 @@ class NativeAudioReceiver(
+             opusDecodeMaxUs =
+                 (opusDecoder?.decodeNsMax ?: 0L) / 1000L,
+             opusDecoder =
+-                opusDecoderName,
++                opusPipeline.decoderName,
+             opusCopyOffsetFrames =
+                 if (opusFrameSamples > 0) {
+                     OpusFraming.copyOffsetFrames(redundancyCopies, redundancyOffsetPackets, opusFrameSamples)
+                 } else {
+                     0
+-                }
++                },
++            opusDecodeQueueDepthMax =
++                opusPipeline.queueDepthMax.get(),
++            opusDecodeQueueWaitMaxUs =
++                opusPipeline.queueWaitMaxNs.get() / 1000L,
++            opusDecodeQueueDrops =
++                opusPipeline.queueDrops.get(),
++            opusDecodeFailures =
++                opusPipeline.decodeFailures.get()
+         )
+     }
+ 
+@@ -1376,7 +1394,8 @@ class NativeAudioReceiver(
+             } catch (_: Exception) {
+             }
+ 
+-            opusDecoder?.release()
++            // CL-B5: the decode thread releases the decoder as it ends.
++            opusPipeline.stop()
+         }
+     }
+ 
+@@ -1387,6 +1406,10 @@ class NativeAudioReceiver(
+      * for its copy, then is concealed with frames/240 of today's concealment
+      * slots); each decoded frame split into 5-ms packets for today's queue.
+      * Loss is counted in Opus frames (10 ms each at the host's default).
++     *
++     * CL-B5: the released frames go to [OpusDecodePipeline]'s bounded queue;
++     * its decode thread decodes, splits and conceals. This thread never waits
++     * on the codec.
+      */
+     private fun receiveOpus(
+         buffer: ByteArray,
+@@ -1440,21 +1463,10 @@ class NativeAudioReceiver(
+             opusFrameSamples = frames
+         }
+ 
+-        val decoder =
+-            opusDecoder ?: if (opusDecoderFailed) {
+-                null
+-            } else {
+-                try {
+-                    OpusAudioDecoder(frames).also {
+-                        opusDecoder = it
+-                        opusDecoderName = it.name
+-                    }
+-                } catch (_: Exception) {
+-                    opusDecoderFailed = true
+-                    opusDecoderName = "unavailable"
+-                    null
+-                }
+-            }
++        if (!opusPipelineStarted) {
++            opusPipelineStarted = true
++            opusPipeline.start()
++        }
+ 
+         val slotsPerFrame =
+             frames /
+@@ -1467,29 +1479,13 @@ class NativeAudioReceiver(
+                 frames
+             )
+ 
+-        val emit: (Int, ByteArray?) -> Unit = { seq, opus ->
++        // CL-B5: offered to the decode thread in release order; never blocks.
++        val emit: (Int, ByteArray?) -> Unit = { _, opus ->
+             if (opus == null) {
+                 opusFramesAbandoned.incrementAndGet()
+-                repeat(slotsPerFrame) { enqueueConcealment(-1) }
+-            } else if (decoder == null) {
+-                opusDecodeFailures.incrementAndGet()
+-                repeat(slotsPerFrame) { enqueueConcealment(-1) }
+-            } else {
+-                var produced = 0
+-                val ok =
+-                    decoder.decode(opus, 0, opus.size) { pcm, length ->
+-                        for (chunk in OpusFraming.split(pcm, length)) {
+-                            enqueueLatest(chunk)
+-                            produced += 1
+-                        }
+-                    }
+-
+-                if (ok) {
+-                    opusFramesDecoded.incrementAndGet()
+-                } else if (produced == 0) {
+-                    repeat(slotsPerFrame) { enqueueConcealment(-1) }
+-                }
+             }
++
++            opusPipeline.offerFrame(frames, opus)
+         }
+ 
+         val payload =
+@@ -1509,11 +1505,7 @@ class NativeAudioReceiver(
+                     val slots =
+                         minOf(skipped * slotsPerFrame, placeholderCap)
+ 
+-                    repeat(slots) { enqueueConcealment(-1) }
+-
+-                    if (skipped * slotsPerFrame > slots) {
+-                        trimCrossfadePending = true
+-                    }
++                    opusPipeline.offerConceal(slots, skipped * slotsPerFrame > slots)
+                 }
+             }
+ 
+diff --git a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+index e65a9e9..4778034 100644
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -2181,6 +2181,11 @@ class NativeStreamActivity :
+                                 put("decode_max_us", audio.opusDecodeMaxUs)
+                                 put("decoder", audio.opusDecoder)
+                                 put("copy_offset_frames", audio.opusCopyOffsetFrames)
++                                // CL-B5: the decode thread's queue
++                                put("decode_queue_depth_max", audio.opusDecodeQueueDepthMax)
++                                put("decode_queue_wait_max_us", audio.opusDecodeQueueWaitMaxUs)
++                                put("decode_queue_drops", audio.opusDecodeQueueDrops)
++                                put("decode_failures", audio.opusDecodeFailures)
+                             }
+                         )
+                     }
+diff --git a/PrivyHub/app/src/main/java/streaming/OpusAudioDecoder.kt b/PrivyHub/app/src/main/java/streaming/OpusAudioDecoder.kt
+index 8665942..5efc7f9 100644
+--- a/PrivyHub/app/src/main/java/streaming/OpusAudioDecoder.kt
++++ b/PrivyHub/app/src/main/java/streaming/OpusAudioDecoder.kt
+@@ -13,8 +13,10 @@ import java.nio.ByteBuffer
+  * One input is queued per frame and its output drained before returning
+  * (bounded by [DRAIN_WAIT_NS]); an output that has not come by then is
+  * counted and picked up by the next call. Output is s16 interleaved PCM.
++ *
++ * CL-B5: called on [OpusDecodePipeline]'s decode thread, not the receive thread.
+  */
+-class OpusAudioDecoder(private val frameSamples: Int) {
++class OpusAudioDecoder(private val frameSamples: Int) : OpusDecodePipeline.FrameDecoder {
+     companion object {
+         private const val MIME = "audio/opus"
+         private const val INPUT_WAIT_US = 10_000L
+@@ -28,7 +30,7 @@ class OpusAudioDecoder(private val frameSamples: Int) {
+     private var inputs = 0L
+     private var outputs = 0L
+ 
+-    val name: String
++    override val name: String
+     var decodeErrors = 0L
+         private set
+     var drainTimeouts = 0L
+@@ -57,6 +59,9 @@ class OpusAudioDecoder(private val frameSamples: Int) {
+         name = codec.name
+     }
+ 
++    override fun decode(packet: ByteArray, out: (ByteArray, Int) -> Unit): Boolean =
++        decode(packet, 0, packet.size, out)
++
+     /** Decode one Opus packet; [out] gets each PCM output (bytes, length). False if it could not be queued. */
+     fun decode(packet: ByteArray, offset: Int, length: Int, out: (ByteArray, Int) -> Unit): Boolean {
+         val t0 = System.nanoTime()
+@@ -134,7 +139,7 @@ class OpusAudioDecoder(private val frameSamples: Int) {
+         }
+     }
+ 
+-    fun release() {
++    override fun release() {
+         try {
+             codec.stop()
+         } catch (_: Exception) {
+diff --git a/PrivyHub/app/src/main/java/streaming/OpusDecodePipeline.kt b/PrivyHub/app/src/main/java/streaming/OpusDecodePipeline.kt
+new file mode 100644
+index 0000000..3001c57
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/OpusDecodePipeline.kt
+@@ -0,0 +1,186 @@
++package com.safeiot.privyhub.streaming
++
++import java.util.concurrent.ArrayBlockingQueue
++import java.util.concurrent.TimeUnit
++import java.util.concurrent.atomic.AtomicLong
++
++/**
++ * CL-B5: the Opus decode off the audio receive thread. CL-B4 decoded
++ * synchronously on it (3.3 ms per frame on average, 84 ms at most), so the
++ * socket was not read while the codec worked; the likely cause of its 40
++ * underruns.
++ *
++ * The receive thread offers what [OpusReorder] releases, in order, to a
++ * bounded queue and never waits: a full queue drops the item and counts it.
++ * One decode thread takes the items in that order, owns the decoder (made on
++ * its first frame, released at its end) and feeds the [Sink] — for an Opus
++ * session it is the PCM queue's only producer. Pure Kotlin: the decoder and
++ * the sink are injected, so the JVM tests drive it.
++ */
++class OpusDecodePipeline(
++    private val decoderFactory: (Int) -> FrameDecoder,
++    private val sink: Sink,
++    capacity: Int = DEFAULT_CAPACITY,
++    private val clock: () -> Long = System::nanoTime,
++) {
++    companion object {
++        const val DEFAULT_CAPACITY = 64          // ~640 ms of 10-ms frames
++        private const val POLL_MS = 200L
++        private const val JOIN_MS = 1000L
++    }
++
++    interface FrameDecoder {
++        val name: String
++
++        /** Decode one packet; [out] gets each PCM output (bytes, length). False if it was not decoded. */
++        fun decode(packet: ByteArray, out: (ByteArray, Int) -> Unit): Boolean
++
++        fun release()
++    }
++
++    interface Sink {
++        fun pcm(packet: ByteArray)
++
++        fun conceal(slots: Int)
++
++        fun crossfade()
++    }
++
++    private class Item(
++        val frames: Int,
++        val payload: ByteArray?,
++        val concealSlots: Int,
++        val crossfade: Boolean,
++        val enqueuedNs: Long,
++    )
++
++    private val queue = ArrayBlockingQueue<Item>(capacity)
++
++    @Volatile private var running = false
++    private var worker: Thread? = null
++
++    @Volatile var decoder: FrameDecoder? = null
++        private set
++    @Volatile var decoderName: String = ""
++        private set
++    @Volatile private var decoderFailed = false
++
++    val framesDecoded = AtomicLong(0)
++    val decodeFailures = AtomicLong(0)
++    val queueDrops = AtomicLong(0)
++    val queueDepthMax = AtomicLong(0)
++    val queueWaitMaxNs = AtomicLong(0)
++    val decodeCallMaxNs = AtomicLong(0)
++
++    val queueDepth: Int get() = queue.size
++
++    fun start(threadName: String = "PrivyHub-Native-Audio-Opus") {
++        if (running) return
++        running = true
++        worker = Thread({ loop() }, threadName).apply {
++            isDaemon = true
++            start()
++        }
++    }
++
++    /** A frame in release order; [payload] null = given up (concealed as frames / 240 slots). Never blocks. */
++    fun offerFrame(frames: Int, payload: ByteArray?): Boolean =
++        offer(Item(frames, payload, 0, false, clock()))
++
++    /** An outage's concealment (today's cap) and, past the cap, the crossfade. Never blocks. */
++    fun offerConceal(slots: Int, crossfade: Boolean): Boolean =
++        offer(Item(0, null, slots, crossfade, clock()))
++
++    private fun offer(item: Item): Boolean {
++        if (!queue.offer(item)) {
++            queueDrops.incrementAndGet()
++            return false
++        }
++        max(queueDepthMax, queue.size.toLong())
++        return true
++    }
++
++    private fun max(cell: AtomicLong, value: Long) {
++        while (true) {
++            val old = cell.get()
++            if (value <= old || cell.compareAndSet(old, value)) return
++        }
++    }
++
++    private fun loop() {
++        try {
++            while (running) {
++                val item = try {
++                    queue.poll(POLL_MS, TimeUnit.MILLISECONDS)
++                } catch (_: InterruptedException) {
++                    if (!running) break else continue
++                } ?: continue
++                max(queueWaitMaxNs, clock() - item.enqueuedNs)
++                handle(item)
++            }
++        } finally {
++            decoder?.release()
++        }
++    }
++
++    private fun handle(item: Item) {
++        if (item.frames == 0) {
++            sink.conceal(item.concealSlots)
++            if (item.crossfade) sink.crossfade()
++            return
++        }
++        val slots = item.frames / OpusFraming.QUEUE_PACKET_FRAMES
++        val payload = item.payload
++        if (payload == null) {
++            sink.conceal(slots)
++            return
++        }
++        val d = decoder ?: if (decoderFailed) null else try {
++            decoderFactory(item.frames).also {
++                decoder = it
++                decoderName = it.name
++            }
++        } catch (_: Exception) {
++            decoderFailed = true
++            decoderName = "unavailable"
++            null
++        }
++        if (d == null) {
++            decodeFailures.incrementAndGet()
++            sink.conceal(slots)
++            return
++        }
++        var produced = 0
++        val t0 = clock()
++        val ok = try {
++            d.decode(payload) { pcm, length ->
++                for (chunk in OpusFraming.split(pcm, length)) {
++                    sink.pcm(chunk)
++                    produced += 1
++                }
++            }
++        } catch (_: Exception) {
++            false
++        }
++        max(decodeCallMaxNs, clock() - t0)
++        if (ok) {
++            framesDecoded.incrementAndGet()
++        } else {
++            decodeFailures.incrementAndGet()
++            if (produced == 0) sink.conceal(slots)
++        }
++    }
++
++    /** Stop the thread (it releases the decoder) and drop what is queued. */
++    fun stop() {
++        running = false
++        worker?.interrupt()
++        try {
++            worker?.join(JOIN_MS)
++        } catch (_: InterruptedException) {
++            Thread.currentThread().interrupt()
++        }
++        worker = null
++        queue.clear()
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/OpusDecodePipelineTest.kt b/PrivyHub/app/src/test/java/streaming/OpusDecodePipelineTest.kt
+new file mode 100644
+index 0000000..488f823
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/OpusDecodePipelineTest.kt
+@@ -0,0 +1,131 @@
++package com.safeiot.privyhub.streaming
++
++import java.util.concurrent.CountDownLatch
++import java.util.concurrent.TimeUnit
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * CL-B5: the decode off the receive thread. The offer never waits on the
++ * codec; the decode thread keeps the release order (frames, given-up frames
++ * and an outage's concealment interleaved); a full queue drops and counts;
++ * the maxima are tracked; stop releases the decoder.
++ */
++class OpusDecodePipelineTest {
++
++    /** "Decodes" a packet to 480 frames whose bytes all equal the packet's first byte. */
++    private class FakeDecoder(private val gate: CountDownLatch? = null, private val failOn: Int = -1) :
++        OpusDecodePipeline.FrameDecoder {
++        override val name = "fake"
++        @Volatile var released = false
++        @Volatile var calls = 0
++        override fun decode(packet: ByteArray, out: (ByteArray, Int) -> Unit): Boolean {
++            gate?.await(5, TimeUnit.SECONDS)
++            calls += 1
++            if (packet[0].toInt() == failOn) return false
++            out(ByteArray(1920) { packet[0] }, 1920)
++            return true
++        }
++        override fun release() { released = true }
++    }
++
++    private class Recorder : OpusDecodePipeline.Sink {
++        val events = java.util.Collections.synchronizedList(mutableListOf<String>())
++        override fun pcm(packet: ByteArray) { events += "pcm${packet[0]}" }
++        override fun conceal(slots: Int) { events += "conceal$slots" }
++        override fun crossfade() { events += "crossfade" }
++    }
++
++    private fun waitFor(cond: () -> Boolean) {
++        val deadline = System.nanoTime() + 5_000_000_000L
++        while (!cond() && System.nanoTime() < deadline) Thread.sleep(2)
++        assertTrue("timed out", cond())
++    }
++
++    @Test
++    fun theReleaseOrderIsKept() {
++        val dec = FakeDecoder()
++        val sink = Recorder()
++        val p = OpusDecodePipeline({ dec }, sink)
++        p.start()
++        p.offerFrame(480, byteArrayOf(1))
++        p.offerFrame(480, null)                 // given up: 2 slots
++        p.offerFrame(480, byteArrayOf(3))
++        p.offerConceal(6, true)                 // an outage past the cap
++        p.offerFrame(480, byteArrayOf(4))
++        waitFor { sink.events.size == 9 }
++        assertEquals(
++            listOf("pcm1", "pcm1", "conceal2", "pcm3", "pcm3", "conceal6", "crossfade", "pcm4", "pcm4"),
++            sink.events.toList(),
++        )
++        assertEquals(3, p.framesDecoded.get())
++        assertEquals("fake", p.decoderName)
++        p.stop()
++        assertTrue(dec.released)
++    }
++
++    @Test
++    fun theOfferNeverWaitsOnTheCodec() {
++        val gate = CountDownLatch(1)                       // the decoder blocks until released
++        val sink = Recorder()
++        val p = OpusDecodePipeline({ FakeDecoder(gate) }, sink, capacity = 8)
++        p.start()
++        val t0 = System.nanoTime()
++        var accepted = 0
++        for (i in 0 until 20) if (p.offerFrame(480, byteArrayOf(i.toByte()))) accepted += 1
++        val elapsedMs = (System.nanoTime() - t0) / 1_000_000
++        assertTrue("offers took $elapsedMs ms", elapsedMs < 200)
++        // one item is inside the blocked decode call, 8 queued; the rest dropped and counted
++        assertTrue(accepted in 8..9)
++        assertEquals((20 - accepted).toLong(), p.queueDrops.get())
++        assertEquals(8L, p.queueDepthMax.get())
++        gate.countDown()
++        waitFor { p.framesDecoded.get() == accepted.toLong() }
++        assertTrue(p.queueWaitMaxNs.get() > 0)
++        assertTrue(p.decodeCallMaxNs.get() > 0)
++        p.stop()
++    }
++
++    @Test
++    fun aFailedDecodeIsConcealedAndCounted() {
++        val sink = Recorder()
++        val p = OpusDecodePipeline({ FakeDecoder(failOn = 2) }, sink)
++        p.start()
++        p.offerFrame(480, byteArrayOf(1))
++        p.offerFrame(480, byteArrayOf(2))
++        p.offerFrame(480, byteArrayOf(3))
++        waitFor { sink.events.size == 5 }
++        assertEquals(listOf("pcm1", "pcm1", "conceal2", "pcm3", "pcm3"), sink.events.toList())
++        assertEquals(1L, p.decodeFailures.get())
++        p.stop()
++    }
++
++    @Test
++    fun noDecoderMeansConcealment() {
++        val sink = Recorder()
++        val p = OpusDecodePipeline({ throw IllegalStateException("no codec") }, sink)
++        p.start()
++        p.offerFrame(960, byteArrayOf(1))                  // 20-ms frame: 4 slots
++        p.offerFrame(480, byteArrayOf(2))
++        waitFor { sink.events.size == 2 }
++        assertEquals(listOf("conceal4", "conceal2"), sink.events.toList())
++        assertEquals("unavailable", p.decoderName)
++        assertEquals(2L, p.decodeFailures.get())
++        p.stop()
++    }
++
++    @Test
++    fun stopEndsTheThreadAndClears() {
++        val dec = FakeDecoder()
++        val p = OpusDecodePipeline({ dec }, Recorder())
++        p.start()
++        p.offerFrame(480, byteArrayOf(1))
++        waitFor { p.framesDecoded.get() == 1L }
++        p.stop()
++        assertTrue(dec.released)
++        assertEquals(0, p.queueDepth)
++        assertFalse(Thread.getAllStackTraces().keys.any { it.name == "PrivyHub-Native-Audio-Opus" && it.isAlive })
++    }
++}

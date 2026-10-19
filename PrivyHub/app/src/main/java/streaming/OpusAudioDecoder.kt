@@ -13,8 +13,10 @@ import java.nio.ByteBuffer
  * One input is queued per frame and its output drained before returning
  * (bounded by [DRAIN_WAIT_NS]); an output that has not come by then is
  * counted and picked up by the next call. Output is s16 interleaved PCM.
+ *
+ * CL-B5: called on [OpusDecodePipeline]'s decode thread, not the receive thread.
  */
-class OpusAudioDecoder(private val frameSamples: Int) {
+class OpusAudioDecoder(private val frameSamples: Int) : OpusDecodePipeline.FrameDecoder {
     companion object {
         private const val MIME = "audio/opus"
         private const val INPUT_WAIT_US = 10_000L
@@ -28,7 +30,7 @@ class OpusAudioDecoder(private val frameSamples: Int) {
     private var inputs = 0L
     private var outputs = 0L
 
-    val name: String
+    override val name: String
     var decodeErrors = 0L
         private set
     var drainTimeouts = 0L
@@ -56,6 +58,9 @@ class OpusAudioDecoder(private val frameSamples: Int) {
         }
         name = codec.name
     }
+
+    override fun decode(packet: ByteArray, out: (ByteArray, Int) -> Unit): Boolean =
+        decode(packet, 0, packet.size, out)
 
     /** Decode one Opus packet; [out] gets each PCM output (bytes, length). False if it could not be queued. */
     fun decode(packet: ByteArray, offset: Int, length: Int, out: (ByteArray, Int) -> Unit): Boolean {
@@ -134,7 +139,7 @@ class OpusAudioDecoder(private val frameSamples: Int) {
         }
     }
 
-    fun release() {
+    override fun release() {
         try {
             codec.stop()
         } catch (_: Exception) {

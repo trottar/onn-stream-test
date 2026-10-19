@@ -171,6 +171,22 @@ class TestNegotiation(unittest.TestCase):
                          200, {"ok": True})
         self.assertEqual(codec.declared(OVERLAY), ("opus",))
 
+    def test_overlay_host_with_sig_v3(self):
+        # CL-B5: a sig_v 3 setup (CL-B4's APK) over the overlay records both hosts; an overlay-class start is Opus.
+        codec = ac.AudioCodec("opus", log=lambda s: None)
+        codec.note_setup({"media_host": LAN, "overlay_host": OVERLAY, "sig_v": 3, "audio_codecs": ["opus"]},
+                         200, {"ok": True})
+        self.assertEqual(codec.declared(OVERLAY), ("opus",))
+        self.assertEqual(codec.declared(LAN), ("opus",))
+        st = types.SimpleNamespace()
+        self.assertIsNone(codec.prepare(st, OVERLAY))
+        self.assertIsNotNone(ac.AudioCodec.session_for(st))
+        for sig_v in (True, 4, "3"):
+            c = ac.AudioCodec("opus", log=lambda s: None)
+            c.note_setup({"media_host": LAN, "overlay_host": OVERLAY, "sig_v": sig_v, "audio_codecs": ["opus"]},
+                         200, {"ok": True})
+            self.assertEqual(c.declared(OVERLAY), (), sig_v)
+
     def test_install_wraps_the_instance_once(self):
         class Gate:
             def _setup(self, body, routing, refused):

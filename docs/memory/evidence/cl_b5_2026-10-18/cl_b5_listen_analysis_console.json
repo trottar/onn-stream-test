@@ -1,0 +1,154 @@
+{
+ "verdict": "ALL HOST GATES HOLD",
+ "runs": {
+  "L opus": {
+   "label": "L opus",
+   "status": "OK",
+   "window": [
+    "2026-10-19T00:18:05.081Z",
+    "2026-10-19T00:28:05.081Z"
+   ],
+   "report": "native_decoder_20261019_002806_909.json",
+   "capture_fps": 59.999,
+   "dupdrop_per_min": 0.1,
+   "retroarch_fps": 59.999,
+   "host_cpu_pct": 11.07,
+   "procs_cpu_pct_of_core": {
+    "companion": 21.33,
+    "retroarch": 34.02,
+    "encoder": 36.68,
+    "xorg": 9.64
+   },
+   "rung_kbps": [
+    7000
+   ],
+   "eno1_tx_kbit_s_mean": 9005.6,
+   "eno1_tx_pps_mean": 1178.2,
+   "rendered_fps": 59.845,
+   "video_loss_per_min": 48.49,
+   "heartbeat_audio_underruns": 10,
+   "output_gap_ms_max": 234,
+   "gaps_over_1s": 1,
+   "gaps_max_ms": 1007.0,
+   "resyncs": 1,
+   "flags_absent_after": true,
+   "report_duration_min": 11.69,
+   "audio": {
+    "codec": "opus",
+    "rx_unique": 69917,
+    "lost_net": 28,
+    "lost_unit_ms": 10,
+    "audio_ms_lost_per_min": 23.94,
+    "sequence_holes_per_min": 2.39,
+    "recovered_by_duplicate": 81,
+    "underruns": 13,
+    "arrival_holes_gt15ms": 10712,
+    "arrival_holes_per_min": 916.0,
+    "avg_queue_residence_ms": 58.12,
+    "max_queue_residence_ms": 94,
+    "stale_drops": 845,
+    "concealed_underruns": 840,
+    "concealed_loss_packets": 40,
+    "prolonged_starvation_events": 103,
+    "opus": {
+     "frame_samples": 480,
+     "frames_decoded": 69913,
+     "frames_abandoned": 28,
+     "decode_errors": 3,
+     "drain_timeouts": 4,
+     "format_errors": 0,
+     "max_held_frames": 3,
+     "decode_avg_us": 3141.333347202357,
+     "decode_max_us": 45523,
+     "decoder": "c2.android.opus.decoder",
+     "copy_offset_frames": 2,
+     "decode_queue_depth_max": 20,
+     "decode_queue_wait_max_us": 86502,
+     "decode_queue_drops": 0,
+     "decode_failures": 3
+    }
+   },
+   "video_report": {
+    "spike_20_ms": 1598,
+    "spike_50_ms": 34,
+    "max_output_gap_ms": 310
+   },
+   "gates": {
+    "status_ok": true,
+    "retroarch_ge_59.9": true,
+    "capture_60_pm_0.1": true,
+    "dupdrop_le_0.2": true,
+    "flags_absent_after": true
+   }
+  },
+  "A pcm": {
+   "label": "A pcm",
+   "status": "OK",
+   "window": [
+    "2026-10-18T23:31:04.714Z",
+    "2026-10-18T23:41:04.714Z"
+   ],
+   "report": "native_decoder_20261018_234106_140.json",
+   "capture_fps": 59.998,
+   "dupdrop_per_min": 0.1,
+   "retroarch_fps": 59.999,
+   "host_cpu_pct": 10.291,
+   "procs_cpu_pct_of_core": {
+    "companion": 24.76,
+    "retroarch": 34.39,
+    "encoder": 36.18,
+    "xorg": 9.64
+   },
+   "rung_kbps": [
+    7000
+   ],
+   "eno1_tx_kbit_s_mean": 11913.0,
+   "eno1_tx_pps_mean": 1378.9,
+   "rendered_fps": 59.881,
+   "video_loss_per_min": 19.91,
+   "heartbeat_audio_underruns": 17,
+   "output_gap_ms_max": 63,
+   "gaps_over_1s": 0,
+   "gaps_max_ms": 694.4,
+   "resyncs": 0,
+   "flags_absent_after": true,
+   "report_duration_min": 11.62,
+   "audio": {
+    "codec": "pcm",
+    "rx_unique": 138965,
+    "lost_net": 27,
+    "lost_unit_ms": 5,
+    "audio_ms_lost_per_min": 11.62,
+    "sequence_holes_per_min": 2.32,
+    "recovered_by_duplicate": 441,
+    "underruns": 19,
+    "arrival_holes_gt15ms": 9635,
+    "arrival_holes_per_min": 829.2,
+    "avg_queue_residence_ms": 65.31,
+    "max_queue_residence_ms": 106,
+    "stale_drops": 868,
+    "concealed_underruns": 869,
+    "concealed_loss_packets": 27,
+    "prolonged_starvation_events": 110,
+    "opus": null
+   },
+   "video_report": {
+    "spike_20_ms": 1167,
+    "spike_50_ms": 54,
+    "max_output_gap_ms": 180
+   },
+   "gates": {
+    "status_ok": true,
+    "retroarch_ge_59.9": true,
+    "capture_60_pm_0.1": true,
+    "dupdrop_le_0.2": true,
+    "flags_absent_after": true
+   }
+  }
+ },
+ "eno1_tx_kbit_s_L_minus_A": -2907.4,
+ "eno1_tx_pps_L_minus_A": -200.7,
+ "predicted_saving_kbit_s_ip": 2886.4,
+ "predicted_saving_kbit_s_eno1": 2908.8,
+ "predicted_pps_saving": 200
+}

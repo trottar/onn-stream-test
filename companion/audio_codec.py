@@ -320,7 +320,7 @@ class AudioCodec:
         if isinstance(raw, list):
             codecs = tuple(sorted({str(c).strip().lower() for c in raw if isinstance(c, str)}))[:8]
         hosts = [str(body.get("media_host") or "").strip()]
-        if body.get("sig_v") == 2 and not isinstance(body.get("sig_v"), bool):
+        if body.get("sig_v") in (2, 3) and not isinstance(body.get("sig_v"), bool):   # CL-B5: v3 (CL-B4) too
             hosts.append(str(body.get("overlay_host") or "").strip())
         with self._lock:
             for host in hosts:

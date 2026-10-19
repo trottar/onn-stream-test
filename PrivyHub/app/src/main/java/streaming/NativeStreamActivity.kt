@@ -2181,6 +2181,11 @@ class NativeStreamActivity :
                                 put("decode_max_us", audio.opusDecodeMaxUs)
                                 put("decoder", audio.opusDecoder)
                                 put("copy_offset_frames", audio.opusCopyOffsetFrames)
+                                // CL-B5: the decode thread's queue
+                                put("decode_queue_depth_max", audio.opusDecodeQueueDepthMax)
+                                put("decode_queue_wait_max_us", audio.opusDecodeQueueWaitMaxUs)
+                                put("decode_queue_drops", audio.opusDecodeQueueDrops)
+                                put("decode_failures", audio.opusDecodeFailures)
                             }
                         )
                     }

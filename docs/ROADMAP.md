@@ -1587,6 +1587,14 @@ CL-B3 R1 at 7000 (−2,909 predicted); 0 audio frames lost net (68 recovered). *
 synchronous on the receive thread (avg 3.3 ms, max 84 ms); decoder spikes 178/min against 87 (not located). Off-site
 blocker: `audio_codec.py` records the overlay host only for sig_v 2. Flag removed; not adopted. Record:
 `docs/memory/evidence/CL_B4_APK_OPUS_DECODE_2026-10-18.md`.
+**CL-B5 (2026-10-18): the decode on its own thread; the paired A/B (PCM / Opus, one evening, same title) both VALID,
+host gates held.** APK `043891e1…` CONFIRMED. **Underruns A 19 / B 11** (≤ 20; CL-B4's 40). The LAN interface
+−2,909.5 kbit/s and −200.7 pkt/s, B against A (−2,908.8 / −200 predicted). Net loss 135 / 300 ms (2.3 / 2.6 holes/min).
+The decode queue's depth max 19, wait max 186 ms, 0 drops. Decoder spikes 100 / 144 per min (B still higher, not
+located). `audio_codec.py` records the overlay host for sig_v 2 and 3 (one line; the off-site blocker closed). The
+user's lines: A "Sound is fine"; B "Run B nothing is running so I can't determine sound" (after B ended). **Run L
+(2026-10-19, Opus, the listen): valid, underruns 13, "No visual or audio problems".** Flag removed; not adopted. Record:
+`docs/memory/evidence/CL_B5_OPUS_DECODE_THREAD_AB_2026-10-18.md`.
 
 **G4-P2 (2026-10-17): the remote row records gate 3 from G4-S2** — `tools/e1_remote.py`
 writes the home row's per-run RetroArch counter override (for the PS1-STREAM fixture),

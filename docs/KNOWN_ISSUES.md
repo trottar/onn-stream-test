@@ -1,6 +1,17 @@
 # Known issues and deferred work
 
-## 2026-10-18 CL-B4, the first Opus session: underruns 40 against 9; an off-site Opus start would be refused — OPEN
+## 2026-10-18 CL-B4, the first Opus session: underruns 40 against 9; an off-site Opus start would be refused — UNDERRUNS UNDER THE BAR, OFF-SITE FIXED (CL-B5); SPIKES OPEN
+
+**CL-B5 (2026-10-18, `docs/memory/evidence/CL_B5_OPUS_DECODE_THREAD_AB_2026-10-18.md`):**
+- **Underruns:** with the decode on its own thread, the paired A/B read A (PCM) 19, B (Opus) 11: under ≤ 20. The
+  item is closed for underruns.
+  - The codec call is still 3.2 ms average and 102 ms max. The decode queue once held 19 frames (185.5 ms behind),
+    with 0 dropped.
+- **Off-site: FIXED.** `audio_codec.py` `note_setup` records the overlay host for `sig_v` in (2, 3) (one line, with a
+  test).
+- **Spikes: still OPEN.** On the same evening: 144 / min in B against 100 in A, and max output gap 227 against 180 ms.
+  Not located: the onn's CPU shared with the Codec2 thread is the remaining candidate; the onn's CPU was not read.
+
 
 (`docs/memory/evidence/CL_B4_APK_OPUS_DECODE_2026-10-18.md` §4)
 

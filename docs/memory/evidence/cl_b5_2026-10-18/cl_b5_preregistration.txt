@@ -1,0 +1,61 @@
+CL-B5 — the Opus decode off the receive thread, and the paired A/B. Pre-registration (session A, 2026-10-18).
+Written and hashed before any code edit and before the build. Baseline HEAD f9a8260 (CL-B4 committed); the tree
+carries only the user's _cowork_prompt.txt and the task file (not touched).
+
+0. Precondition read at 23:23Z: seven lines, tools/e3_state.py --check ok (adb to the onn), APK 8e10497e… CONFIRMED,
+   no e3_flag.conf, no game, one device paired (the client's id in the hub's store), identity_v2 on.
+
+1. Client change (the debug APK). The Opus decode leaves the receive thread:
+   - The receive thread keeps validation, de-dup, the arrival gap and OpusReorder's in-order release. What it
+     releases (a frame, a given-up frame, an outage's concealment) is offered to a bounded queue (64 items, about
+     640 ms of 10-ms frames) without blocking. If the queue is full, the item is dropped and counted; the socket read
+     never waits on the codec.
+   - A dedicated decode thread owns the MediaCodec (created on its first item, released at its end). It decodes in
+     queue order and is the PCM queue's producer for an Opus session: the split packets, the concealment slots and
+     the crossfade flag.
+   - The pipeline is a pure class (OpusDecodePipeline.kt) with an injected decoder, so it is JVM-testable.
+   - The session report's opus object gains decode_queue_depth_max, decode_queue_wait_max_us (enqueue to taken),
+     decode_max_us (the codec call, kept) and decode_queue_drops.
+   - Nothing else in the receiver changes. The PCM (version-1) path is byte for byte as CL-B4 left it: the diff
+     touches only receiveOpus, the Opus state, the snapshot's Opus fields and the end-of-loop release. The existing
+     JVM tests are unchanged and green.
+   - Tests: OpusDecodePipelineTest (order kept; the offer returns at once while the decoder blocks; drops counted
+     when full; the maxima tracked; concealment and crossfade in order; stop releases the decoder).
+   - ./gradlew --offline :app:testDebugUnitTest --rerun :app:assembleDebug.
+
+2. Host change, one line, disclosed (B's file companion/audio_codec.py): note_setup records the overlay host for
+   sig_v in (2, 3) (bool excluded, as today). A unit test in tests/audio_codec: a v3 setup over the overlay records
+   both hosts, so an overlay-class start prepares Opus. The G1 (overlay), G3 (session_identity) and audio_codec
+   suites green.
+
+3. Build / pin / install as CL-B4:
+   - build offline;
+   - the current APK (8e10497e…) preserved as the rollback;
+   - the sha256 pinned in tools/e1_suite.py EXPECT_APK and tools/c3_l4_nft_night.py (+ its test);
+   - adb install -r;
+   - the pairing read back (cl_b4_client_read.py). If not paired: stop and tell the user.
+
+4. The paired A/B on the LAN, the same PS1 title (the suite's E1-PS1-STREAM), one evening:
+   run A = E1-PS1-STREAM --e2 --window 600, no drop-in (PCM 2/4); the user told "start the game, sound on"; their
+   one-line report verbatim. A 5-min gap (the second run's idle gap, 300 s). Run B = the same with
+   e3_flag.conf = PRIVYHUB_AUDIO_CODEC=opus, restart, environ eight lines; the user's line verbatim. Teardown: the
+   drop-in removed, restart, flags_absent true, --check ok on the new hash. Order fixed A then B (not randomised:
+   disclosed).
+
+5. Gates (host, both runs): RetroArch >= 59.9, capture 60 +- 0.1, dup+drop <= 0.2/min, flags_absent after.
+   Reported, paired A vs B:
+   - underruns (B's number of interest: <= 20, D-BASE-P10's; not a gate);
+   - net audio loss (ms/min);
+   - arrival holes;
+   - queue residence avg/max;
+   - B's decode queue depth max, queue wait max and decode max;
+   - decoder spikes/min, max output gap, video loss, rendered;
+   - the LAN interface's kbit/s and packets/s (decimal; the saving, paired);
+   - companion / encoder CPU; the onn's CPU only if the state reads give it (not attempted otherwise).
+
+6. Validity: both PLAYING; B's token_issued with sig_v 3 and audio_codecs opus; A's token_issued sig_v 3 and the
+   companion's journal with no Opus line for A (A's heartbeats audio_codec=pcm). A void run is said so; no rerun
+   unless the user says.
+
+No sudo, no nft, the Opal read-only, adb only for the install and state reads; no addresses or identifiers;
+nothing fetched, deleted, adopted or committed.

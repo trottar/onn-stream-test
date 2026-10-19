@@ -1,0 +1,45 @@
+--- docs/memory/evidence/cl_b5_2026-10-18/predecessors/e1_suite.py	2026-10-18 19:24:19.741202124 -0400
++++ tools/e1_suite.py	2026-10-18 19:26:43.304299107 -0400
+@@ -51,9 +51,9 @@
+ BASE = "http://localhost:8765"
+ UNIT = "privyhub-companion"
+ PKG = "com.safeiot.privyhub"
+-# CL-B4 (installed 2026-10-18): the Opus-decode APK (sig_v 3); the previous CONFIRMED APK was 59f736d2... (CL-B3),
+-# before it 77011eef... (CL-B2), de072762... (CL-B1)
+-EXPECT_APK = "8e10497ef43850d54165593a680f68a41b89114536a806f0788b9a04945fd84e"
++# CL-B5 (installed 2026-10-18): the Opus decode on its own thread; the previous CONFIRMED APK was 8e10497e... (CL-B4),
++# before it 59f736d2... (CL-B3), 77011eef... (CL-B2), de072762... (CL-B1)
++EXPECT_APK = "043891e1cc7d643dc496eb6f6dcef50472418e9444300f667ac6abb7d0201607"
+ LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
+ # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
+ # is exactly these two names, at every precondition and teardown
+--- docs/memory/evidence/cl_b5_2026-10-18/predecessors/c3_l4_nft_night.py	2026-10-18 19:24:19.745202210 -0400
++++ tools/c3_l4_nft_night.py	2026-10-18 19:26:43.304299107 -0400
+@@ -99,7 +99,9 @@
+ # (kept at PrivyHub/app/build/g3_s3_preserved/app-debug.apk).
+ # CL-B4 (installed 2026-10-18): the Opus-decode APK replaced CL-B3's 59f736d29b96700253a178efa5efd0cd8846858a89d32848a0994586712bf65f
+ # (kept at PrivyHub/app/build/cl_b4_preserved/app-debug.apk).
+-ADOPTED_APK_SHA256 = "8e10497ef43850d54165593a680f68a41b89114536a806f0788b9a04945fd84e"
++# CL-B5 (installed 2026-10-18): the decode-thread APK replaced CL-B4's 8e10497ef43850d54165593a680f68a41b89114536a806f0788b9a04945fd84e
++# (kept at PrivyHub/app/build/cl_b5_preserved/app-debug.apk).
++ADOPTED_APK_SHA256 = "043891e1cc7d643dc496eb6f6dcef50472418e9444300f667ac6abb7d0201607"
+ REFERENCE_PROFILE = "native_game_720p60_reference"
+ MODE_ENV = "PRIVYHUB_ADAPTIVE_BITRATE_MODE"
+ # C3-L4-D1 (2026-10-01): live is the companion's default through the systemd drop-in
+--- docs/memory/evidence/cl_b5_2026-10-18/predecessors/test_c3_l4_nft_night.py	2026-10-18 19:24:19.749202297 -0400
++++ tools/test_c3_l4_nft_night.py	2026-10-18 19:26:43.304299107 -0400
+@@ -264,11 +264,11 @@
+ 
+ 
+ class AdoptedApk(unittest.TestCase):
+-    """CL-B4 (2026-10-18; CL-B3, CL-B2 and CL-B1 before it): the preflight checks the CONFIRMED APK."""
++    """CL-B5 (2026-10-18; CL-B4, CL-B3, CL-B2 and CL-B1 before it): the preflight checks the CONFIRMED APK."""
+ 
+-    def test_the_preflight_expects_the_cl_b4_apk(self):
++    def test_the_preflight_expects_the_cl_b5_apk(self):
+         self.assertEqual(h.ADOPTED_APK_SHA256,
+-                         "8e10497ef43850d54165593a680f68a41b89114536a806f0788b9a04945fd84e")
++                         "043891e1cc7d643dc496eb6f6dcef50472418e9444300f667ac6abb7d0201607")
+ 
+ 
+ 
