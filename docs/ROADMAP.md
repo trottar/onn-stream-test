@@ -1602,6 +1602,12 @@ Opus by the drop-in alone) was VALID, host gates held: `sig_v` 3 / opus, 8,994 k
 decoder spikes 138, two > 1-s ctrl gaps; not located (the onn's thermal status 0). No listen. An old client is
 refused at start with the reason. Off: delete the drop-in, restart. Record:
 `docs/memory/evidence/G_A2_OPUS_ADOPTION_2026-10-19.md`.
+**G4-S3 (2026-10-19): off-site at 4000 with Opus (adopted) — VALID, 1 of 1, host gates met (the RetroArch counter
+read: 59.999).** Over the overlay on the phone hotspot (direct throughout): **the tailnet wire rate 5,299 kbit/s
+median**, against the pre-registered ~5,370 ±10 % (met) and G4-S2's 8,243 with PCM (−35.7 %): ~40 MB/min, ~2.4 GB/h;
+the whole run 443 MB. Loss 0.21/min, rendered 59.95, 70 `remote_cap` refusals, no transitions. Underruns 34 in the
+window (three client starts), net audio loss 0, spikes ~45/min. The user: "Audio and visual looked good, consistent
+with lan". Record: `docs/memory/evidence/G4_S3_OFFSITE_4000_OPUS_2026-10-19.md`.
 
 **G4-P2 (2026-10-17): the remote row records gate 3 from G4-S2** — `tools/e1_remote.py`
 writes the home row's per-run RetroArch counter override (for the PS1-STREAM fixture),

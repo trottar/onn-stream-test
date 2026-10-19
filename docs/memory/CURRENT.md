@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-10-18
-baseline_commit: dfa1626 (CL-B6 uncommitted beside it; the user commits)
+baseline_commit: 1c8c2c2 (G4-S3 uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -207,6 +207,25 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
+
+**G4-S3 VALID** (`evidence/G4_S3_OFFSITE_4000_OPUS_2026-10-19.md`, 2026-10-19 13:49-14:12Z; the eight lines, no
+`e3_flag.conf`; `--check` host fields ok, the client fields pending `adb connect` after the network change).
+- **Off-site at 4000 with Opus: the tailnet wire rate is 5,299 kbit/s** (expected ~5,370 ±10 %, met; G4-S2 with PCM
+  8,243): ~40 MB/min, ~2.4 GB/h, 443 MB for the run.
+- Host gates met, with the RetroArch counter read (59.999). Loss 0.21/min. Underruns 34 in the window (three client
+  starts); spikes ~45/min.
+- The user: "Audio and visual looked good, consistent with lan".
+
+1. **The user's commit:** everything since `1c8c2c2`:
+   - the launch record and the record, with `g4_s3_2026-10-19/`;
+   - ROADMAP §G4, `KNOWN_ISSUES.md` (the wire-rate item addressed, the counter item closed), this file;
+   - the task file and the prompt (`logs/g4_s3_launch_git_status.txt`, `logs/g4_s3_git_status.txt`).
+2. **adb:** `adb connect <onn-address>:5555` by hand after the onn's network change, then `--check` reads ok.
+3. **Pending:**
+   - the reconnect-over-overlay test (a hotspot toggle resuming over the overlay; G4-S1 run 2), on a true off-site
+     day;
+   - G8-S5 (G8-S3 cell 1 with `PRIVYHUB_ENCODER_RC=tight`);
+   - the spikes item (Opus's ~0.2 core on the onn; `KNOWN_ISSUES.md`), with underruns a watch item.
 
 **CL-B6: the A/B repeated after an onn power-cycle, both VALID** (`evidence/CL_B6_AB_REPEAT_AFTER_RESTART_2026-10-19.md`,
 2026-10-19 02:32-03:06Z; the adopted state unchanged: the eight lines, no `e3_flag.conf`, `--check` ok).

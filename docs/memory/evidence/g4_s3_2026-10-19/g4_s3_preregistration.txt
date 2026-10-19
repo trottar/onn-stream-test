@@ -1,0 +1,56 @@
+G4-S3 — off-site at 4000 with Opus (adopted). Pre-registration (session A, 2026-10-19). Written and hashed before
+the launch. Baseline HEAD 1c8c2c2; the tree carries only the user's prompt and the task file.
+
+0. Precondition (13:49-13:51Z):
+   - the eight adopted lines (Opus adopted); the host fields of --check ok;
+   - the client fields not ok (adb off-LAN: adb false, APK MISMATCH; disclosed, not a stop, as G4-S1/G4-S2);
+   - no e3_flag.conf; no G4/G8 units; one device paired.
+   - At 13:49Z a game WAS active (Tekken 3, started before the launch). The launch waited; by 13:50:47Z it was no
+     longer active, and the launch proceeds with no game.
+   - The overlay: connected, path direct, peer_ready true, 2 devices online (count only).
+   - The counter: the remote row writes the RetroArch counter override for Tekken 3 (E.TEKKEN, the fixture title);
+     the user starts Tekken 3; the override file is absent before the run.
+
+1. The run: ONE E1-PS1-STREAM --remote run (tools/e1_suite.py run --remote --runs 1 --window 600 --gap 0 --wait 900,
+   E2's 90-s warm-up, no --adb), as the detached driver g4_s3_driver.py (unit privyhub-g4-s3,
+   ~/privyhub_g4_s3/status.txt, STOP).
+   - --gap 0 is a choice, disclosed: the user's cue is "start within 15 min", and with the default 300-s gap a start
+     during the gap would spend cellular data outside the window.
+   - The cap: no run starts at or after 2026-10-19T16:55:00Z (the launch, ~13:55Z, + 3 h).
+   - e3_flag.conf = exactly PRIVYHUB_REMOTE_LADDER=1, PRIVYHUB_START_RUNG=floor, PRIVYHUB_REMOTE_RUNG_CAP=4000,
+     PRIVYHUB_WAN_TELEMETRY=1. No codec line: Opus is on by the adopted drop-in alone.
+   - The environ is read back as twelve lines (8 + 4), else the run is not started.
+   - After the run: removed, restart, flags_absent read.
+   - e1_remote.py's preflight requires the overlay pair and the eight adopted lines and does not refuse extra flags:
+     no allow-list patch is needed.
+
+2. Validity:
+   - PLAYING over the overlay (the row's endpoint class "overlay"; the audit's routing overlay, not lan). A LAN-class
+     run is void and not replaced automatically (the user's call).
+   - Opus by the drop-in alone: token_issued sig_v 3 / audio_codecs opus; the companion's "opus 128 kbit/s, 10-ms
+     frames"; the heartbeats' audio_codec=opus.
+   - flags_absent after.
+
+3. Gates (host): RetroArch >= 59.9 (the counter on the title within 60 s of PLAYING, noted if not; not a stop),
+   capture 60 +- 0.1, dup+drop <= 0.2/min, flags_absent after.
+
+4. THE HEADLINE, written now:
+   - The hub's tailnet-interface tx rate at 4000 in steady play, from tx_bytes every 10 s (G4-S2 §4).
+   - Expected ~5.4 Mbit/s = G4-S2's 8,286 minus the LAN's -2,916 = 5,370 kbit/s; met if within +-10 %
+     (4,833-5,907). Not gated.
+   - ~40 MB/min, ~470 MB for a full run (90-s warm-up + 10-min window at 5.37 Mbit/s = 463 MB).
+   - Packets/s on the same interface if readable: expected ~-200/s against G4-S2.
+
+5. Reported, as G4-S2:
+   - the ladder: the start rung and its source (floor, path_class remote); the clamps (remote_cap refusals);
+   - the link: goodput, post-/pre-FEC loss/min, FEC recovered / unrecoverable, rendered, stale, resyncs, pauses, RTT;
+   - the overlay: the path and its changes; the wan class and windows;
+   - the audio: underruns (the watch item; beside them "the onn power-cycled before the session by the user's hand
+     step; uptime not read, adb off-LAN"), net audio loss, decoder spikes >= 20 / >= 50 ms per min, the decode
+     queue maxima;
+   - the data per run.
+   Compared with G4-S2 run 1 (4000, PCM, the same cap) and G4-S1 run 1 (7000, PCM). The user's one line, verbatim.
+   Nothing perceptual is a gate.
+
+No sudo, no nft, the Opal read-only, adb only for state reads (none off-LAN), no addresses or identifiers; nothing
+fetched, deleted, adopted or committed.

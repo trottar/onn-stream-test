@@ -2,6 +2,10 @@
 
 ## 2026-10-18 CL-B4, the first Opus session: underruns 40 against 9; an off-site Opus start would be refused — OFF-SITE FIXED (CL-B5); UNDERRUNS: G-A2's 78 NOT REPEATED AFTER AN ONN RESTART (CL-B6: 22 / 13), A WATCH ITEM; SPIKES OPEN (the client's CPU measured)
 
+**G4-S3 (2026-10-19, off-site at 4000):** underruns **34** in the window, across three client starts (Pause/Resume
+and a relaunch). Net audio loss 0. Decoder spikes ~45 / min (≥ 50 ms ~4.7). Spikes are lower at 4000 than at 7000 on
+the LAN; there is no PCM arm in the run. Underruns stay a watch item.
+
 **CL-B6 (2026-10-19, the A/B repeated after an onn power-cycle; `docs/memory/evidence/CL_B6_AB_REPEAT_AFTER_RESTART_2026-10-19.md`):**
 - **Underruns: G-A2's 78 not repeated.** On a fresh onn (uptime ~7-17 min in the window), Opus read **22 / 13**
   (session / window) and PCM 11 / 8.
@@ -1774,7 +1778,15 @@ unrecoverable. Neither was right. The defect itself is real and stays open.
   the client. That takes the onn's radio out of the path.
   - Nothing else is queued for the LAN loss row.
 
-## 2026-10-18 the off-site wire rate at 4000 is ~2× the encoder's rate (G4-S2) — OPEN
+## 2026-10-18 the off-site wire rate at 4000 is ~2× the encoder's rate (G4-S2) — ADDRESSED BY OPUS (G4-W1 → G-A2; G4-S3)
+
+**G4-S3 (2026-10-19, `docs/memory/evidence/G4_S3_OFFSITE_4000_OPUS_2026-10-19.md` §4):** with Opus adopted, the
+tailnet wire rate at 4000 is **5,299 kbit/s** (median; G4-S2 8,243 on the same reader), which is ~40 MB/min and
+~2.4 GB/h.
+- The excess over the encoder is ~1.3 Mbit/s: FEC parity, headers and control (G4-W1) plus Opus's ~0.33.
+- The source was G4-W1's largest term, audio, and it is cut. The rest is by design.
+- A cellular session at 4000 is now ~440 MB per 11.5 min.
+
 
 - At 720p/4000 over the overlay the hub's tailnet interface sent **8.29 Mbit/s** steady (~62 MB/min, ~3.7 GB/h);
   the pre-registered expectation was ~4.65. At 7000 (G4-S1) it was 11.42. The excess over the encoder's rate is
@@ -1782,7 +1794,12 @@ unrecoverable. Neither was right. The defect itself is real and stays open.
   (candidates: audio + its 2/4 redundancy, FEC parity, the overlay's per-packet cost). This made a cellular session
   impractical for the user (run 2 not run). Record: `docs/memory/evidence/G4_S2_OFFSITE_REMOTE_LADDER_2026-10-17.md` §4.
 
-## 2026-10-18 the remote row's RetroArch counter was not on the title (G4-S2) — OPEN
+## 2026-10-18 the remote row's RetroArch counter was not on the title (G4-S2) — CLOSED (G4-S3: the counter read)
+
+**G4-S3 (2026-10-19):** with the user starting Tekken 3 (the fixture), the counter was on the title and read
+RetroArch **59.999**, so gate 3 was evaluable and met. The window's fixed sleep after the stream ends (below) is
+unchanged: G4-S3's teardown stopped the game at the window's end, and the onn then sat "reconnecting" (by design).
+
 
 - RetroArch's title carried no "FPS / Frames" counter in any of 112 reads, so gate 3's RetroArch clause was not read.
   The row's override is per game (Tekken 3, the PS1-STREAM fixture); whether another title was launched or the
