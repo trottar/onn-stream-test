@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-10-18
-baseline_commit: 263c26d (G-A2 uncommitted beside it; the user commits)
+baseline_commit: dfa1626 (CL-B6 uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -207,6 +207,26 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
+
+**CL-B6: the A/B repeated after an onn power-cycle, both VALID** (`evidence/CL_B6_AB_REPEAT_AFTER_RESTART_2026-10-19.md`,
+2026-10-19 02:32-03:06Z; the adopted state unchanged: the eight lines, no `e3_flag.conf`, `--check` ok).
+- **Underruns:** Opus (adopted, fresh onn) 22 / 13 and PCM (override) 11 / 8. G-A2's 78 was not repeated, which is
+  consistent with the onn's state after a long evening, not the codec (the pre-registered reading).
+- **Spikes:** still Opus over PCM, 104.7 against 61.4 / min. The onn's PrivyHub process used 107 % against 85 % of a
+  core.
+- **The wire:** −2,916 kbit/s.
+- **The user:** "It sounds fine" (PCM); "Both are fine".
+- One disclosed tool patch: `e1_suite.expected_environ()`, so a run drop-in can override an adopted key.
+
+1. **The user's commit:** everything since `dfa1626`:
+   - `tools/e1_suite.py`;
+   - the record + directory, `KNOWN_ISSUES.md`, this file;
+   - the task file and the prompt (`logs/cl_b6_git_status.txt`).
+2. **G4-S3, the 4000 hotspot run with Opus** (predicted ~5.4 Mbit/s on the tailnet, ~2.4 GB/h). The underrun
+   question reads settled by CL-B6's reading, a watch item with the onn's uptime beside each session. If the user
+   does not take it as settled, the adoption is the user's call (off: delete `audio-codec.conf`, restart;
+   `docs/REMOTE_TRUST.md` §9).
+3. Open: the spikes (the Opus decode's ~0.2 core on the onn, the measured candidate); `KNOWN_ISSUES.md`.
 
 **G-A2: `PRIVYHUB_AUDIO_CODEC=opus` ADOPTED, the eighth line** (`evidence/G_A2_OPUS_ADOPTION_2026-10-19.md`,
 2026-10-19 01:47-02:05Z; the eight lines, no `e3_flag.conf`, `--check` ok).

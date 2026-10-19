@@ -1,0 +1,48 @@
+CL-B6 — the A/B repeated after an onn power-cycle. Pre-registration (session A, 2026-10-19). Written and hashed
+before the first run. Baseline HEAD dfa1626 (G-A2 committed); the tree carries only the user's prompt and the task
+file. Measurement only: nothing adopted or un-adopted.
+
+0. Precondition (02:32Z): the eight adopted lines (PRIVYHUB_AUDIO_CODEC=opus adopted), --check ok, adb to the onn,
+   no e3_flag.conf, no game, one device paired, APK 043891e1... CONFIRMED, the onn power-cycled by the user, uptime
+   71 s (< 10 min).
+
+1. One tool patch before the runs, disclosed: tools/e1_suite.py's post-restart check expected sorted(ADOPTED +
+   drop-in), which cannot hold when the drop-in overrides an adopted key (PRIVYHUB_AUDIO_CODEC=pcm over =opus).
+   New expected_environ(): a run drop-in's KEY=VAL replaces the adopted line of the same KEY; with no shared KEY the
+   result is exactly the former rule. Self-test cases added (OK). Nothing else changes in the suite.
+
+2. The runs: one suite invocation, E1-PS1-STREAM --e2 --window 600 twice, the same PS1 title, 5 min apart.
+   - run 1: Opus as adopted, no e3_flag.conf (plan E1-PS1-STREAM:1:120). Validity: token_issued sig_v 3 with
+     audio_codecs opus; the companion's "opus 128 kbit/s, 10-ms frames" line; heartbeats audio_codec=opus.
+   - run 2: PCM, e3_flag.conf = PRIVYHUB_AUDIO_CODEC=pcm (plan E1-PS1-STREAM:1:300:PRIVYHUB_AUDIO_CODEC=pcm). It
+     overrides the adopted drop-in by drop-in order (e3_flag.conf after audio-codec.conf). Verified, not assumed:
+     the environ read back shows =pcm and not =opus; the companion's log "ignored (codec 'pcm' is not opus); audio
+     stays PCM"; heartbeats audio_codec=pcm. If the log still says opus, the run is stopped and that is written.
+     No other way to turn Opus off is tried.
+   - Teardown: the override removed, restart, flags_absent true, the eight lines, --check ok.
+   - The user is told "start the game, sound on" (the suite launches the title itself after the idle gap). Their one
+     line per run is recorded verbatim.
+
+3. The onn, over adb (state reads only; cl_b6_onn_read.py): uptime, load, top (the second of two 1-s iterations:
+   total CPU and the PrivyHub process), thermal status and the cpu-thermal temperature, meminfo. Read before each
+   run and 150 s into each window.
+
+4. Gates (host, both runs): RetroArch >= 59.9, capture 60 +- 0.1, dup+drop <= 0.2/min, flags_absent after.
+   Reported, in a table across CL-B5 A/B/L, G-A2 and these two:
+   - underruns (<= 20 the number of interest);
+   - net audio loss; arrival holes; queue residence; the decode queue depth / wait maxima (Opus);
+   - decoder spikes >= 20 and >= 50 ms per min; max output gap; host control gaps > 1 s;
+   - video loss; rendered;
+   - the LAN interface's kbit/s and packets/s; host CPU;
+   - the onn's CPU and uptime.
+
+5. The reading, written now:
+   - If run 1 (Opus, fresh onn) is back near 11-13 underruns, G-A2's 78 reads as the client's state after many
+     sessions, not the codec. Stated as consistent-with, not proved.
+   - If it repeats near 78, the codec path on the onn is the suspect and the adoption should be revisited (the
+     user's call).
+   - If PCM (run 2) is also high, it is the evening's link or the onn, not the codec.
+   - Whichever the files show. Nothing perceptual is a gate.
+
+No sudo, no nft, the Opal read-only, adb only for state reads, no addresses or identifiers; nothing fetched,
+deleted or committed; the adopted state unchanged at the end.

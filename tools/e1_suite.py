@@ -981,6 +981,15 @@ def preflight() -> dict:
     return d
 
 
+def expected_environ(dropin: list | None, flags: list | None = None) -> list:
+    """CL-B6: the environ a run expects after its restart. A run drop-in's KEY=VAL replaces an adopted line of the same
+    KEY (an override, e.g. PRIVYHUB_AUDIO_CODEC=pcm over the adopted =opus; e3_flag.conf sorts after audio-codec.conf);
+    a new KEY is added. With no shared KEY this is exactly the former sorted(ADOPTED + flags + dropin)."""
+    extra = [kv for kv in (dropin or []) if kv.startswith("PRIVYHUB_")]
+    keys = {kv.split("=", 1)[0] for kv in extra}
+    return sorted([a for a in ADOPTED if a.split("=", 1)[0] not in keys] + list(flags or []) + extra)
+
+
 def environ_has(pid: int | None, kv: str) -> bool:
     try:
         return kv in open(f"/proc/{pid}/environ", "rb").read().decode(errors="replace").split("\0")
@@ -1056,7 +1065,7 @@ def run_once(w: dict, run_no: int, out: Path, window: int, gap: int, e2: bool = 
             rec["constraint_readback"] = p = unit_props()
             if not constraint_holds(w["constraint"], p):
                 raise RuntimeError(f"the constraint did not take effect: {p}")
-        want = sorted(ADOPTED + w.get("flags", []) + [kv for kv in (w.get("dropin") or []) if kv.startswith("PRIVYHUB_")])
+        want = expected_environ(w.get("dropin"), w.get("flags", []))
         if not (r["mainpid_serves_8765"] and r["environ"] == want and r["manager"] == sorted(w.get("flags", []))
                 and all(environ_has(mainpid(), kv) for kv in (w.get("dropin") or []))):
             raise RuntimeError(f"unit not as expected after restart: {r}")
@@ -1456,6 +1465,11 @@ def self_test() -> int:
              "receiver": {"lost_packets_delta": 2}}]))
         t = telemetry_figures(q, "2026-01-01T00:00:00Z", "2026-01-01T00:05:00Z")
         assert t["reports"] == 2 and t["output_gap_ms_max"] == 40 and t["receiver_lost_packets_per_min"] == 3.0, t
+    # CL-B6: a run drop-in overriding an adopted key replaces it; any other is added (the former rule, unchanged)
+    assert expected_environ(["PRIVYHUB_WAN_TELEMETRY=1"]) == sorted(ADOPTED + ["PRIVYHUB_WAN_TELEMETRY=1"])
+    assert expected_environ(None) == ADOPTED
+    over = expected_environ(["PRIVYHUB_AUDIO_CODEC=pcm"])
+    assert "PRIVYHUB_AUDIO_CODEC=pcm" in over and AUDIO_CODEC not in over and len(over) == len(ADOPTED), over
     print("E1_SUITE_SELF_TEST_OK")
     return 0
 

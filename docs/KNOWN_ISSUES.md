@@ -1,6 +1,20 @@
 # Known issues and deferred work
 
-## 2026-10-18 CL-B4, the first Opus session: underruns 40 against 9; an off-site Opus start would be refused — OFF-SITE FIXED (CL-B5); UNDERRUNS UNDER THE BAR IN CL-B5, REOPENED BY G-A2's RUN (78); SPIKES OPEN
+## 2026-10-18 CL-B4, the first Opus session: underruns 40 against 9; an off-site Opus start would be refused — OFF-SITE FIXED (CL-B5); UNDERRUNS: G-A2's 78 NOT REPEATED AFTER AN ONN RESTART (CL-B6: 22 / 13), A WATCH ITEM; SPIKES OPEN (the client's CPU measured)
+
+**CL-B6 (2026-10-19, the A/B repeated after an onn power-cycle; `docs/memory/evidence/CL_B6_AB_REPEAT_AFTER_RESTART_2026-10-19.md`):**
+- **Underruns: G-A2's 78 not repeated.** On a fresh onn (uptime ~7-17 min in the window), Opus read **22 / 13**
+  (session / window) and PCM 11 / 8.
+  - By the pre-registered reading, G-A2's 78 is consistent with the onn's state after a long evening, not the codec.
+    Not proved: one restart, one run per arm.
+  - Opus's session count is 2 over ≤ 20; the window count is under.
+  - **Watch item:** the underruns of the next sessions, with the onn's uptime beside them.
+- **Spikes: OPEN, now with a measured candidate.** ≥ 20 ms: Opus 104.7 / min against PCM 61.4 on the same evening
+  (CL-B5: 144 against 100).
+  - The onn's PrivyHub process used 107 % against 85 % of a core 150 s into each window (onn busy 51 % against 46 %).
+    The Opus decode costs the client ~0.2 core.
+  - The ≥ 50-ms spikes are small in both arms (2.9 / 2.2 per min). G-A2's 11.8 did not recur.
+  - Not located.
 
 **G-A2 (2026-10-19, Opus ADOPTED; `docs/memory/evidence/G_A2_OPUS_ADOPTION_2026-10-19.md` §4):**
 - **Underruns REOPENED:** the confirmation run read **78** (50 in the window), over ≤ 20, against CL-B5's 11 / 13 on
