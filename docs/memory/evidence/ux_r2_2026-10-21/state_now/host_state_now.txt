@@ -1,0 +1,47 @@
+# host state now 2026-10-21T15:32:19Z
+## uptime
+ 11:32:19 up 28 days,  9:33,  5 users,  load average: 0.20, 0.10, 0.09
+## free -m
+               total        used        free      shared  buff/cache   available
+Mem:           15300        2919        5865         671        7536       12380
+Swap:          12595         679       11916
+## /proc/swaps
+Filename				Type		Size		Used		Priority
+/dev/nvme0n1p3                          partition	12898300	695828		-2
+## loadavg
+0.20 0.10 0.09 1/797 4040209
+## df
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/nvme0n1p2  221G   71G  139G  34% /
+## companion MainPID present: yes
+etimes_s=164660 etime=1-21:44:20 rss_kb=86444 threads=2 pcpu=0.7 stat=Ssl
+open_fds=5
+VmHWM:	   86848 kB
+VmRSS:	   86444 kB
+VmSwap:	       0 kB
+Threads:	2
+## encoder / retroarch / ffmpeg / grabber processes
+## systemctl --user status (no restart)
+● privyhub-companion.service - PrivyHub companion (control API :8765, native game stream)
+     Loaded: loaded (/home/privyhub/.config/systemd/user/privyhub-companion.service; enabled; preset: enabled)
+    Drop-In: /home/privyhub/.config/systemd/user/privyhub-companion.service.d
+             └─adaptive.conf, audio-codec.conf, epg-index.conf, overlay.conf, recovery.conf, session-identity.conf, snes-capture.conf, snes-core.conf
+     Active: active (running) since Mon 2026-10-19 13:47:59 EDT; 1 day 21h ago
+ Invocation: <invocation>
+    Process: 3794644 ExecStartPre=/bin/sh -c i=0; while [ "$i" -lt 60 ]; do xrandr --current >/dev/null 2>&1 && exit 0; i=$((i+1)); sleep 1; done; echo "X on :0 did not answer within 60 s" >&2; exit 1 (code=exited, status=0/SUCCESS)
+   Main PID: 3794647 (python3)
+      Tasks: 3 (limit: 18065)
+     Memory: 316.5M (peak: 521.6M)
+        CPU: 1h 12min 13.431s
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/privyhub-companion.service
+## journal since 2026-10-20 18:31Z
+priority 0..4 (warning or worse): 0
+lines total: 1352
+error: 0 warn: 0 traceback: 0 epg/grab: 0
+## pressure
+some avg10=0.00 avg60=0.00 avg300=0.00 total=7706451937
+full avg10=0.00 avg60=0.00 avg300=0.00 total=0
+some avg10=0.00 avg60=0.00 avg300=0.00 total=2483120
+full avg10=0.00 avg60=0.00 avg300=0.00 total=2390566
+some avg10=0.03 avg60=0.07 avg300=0.02 total=278491042
+full avg10=0.03 avg60=0.07 avg300=0.02 total=265515281

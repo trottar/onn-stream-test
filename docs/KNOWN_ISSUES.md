@@ -1,6 +1,35 @@
 # Known issues and deferred work
 
-## 2026-10-20 UX-R1, the user's extended evening (2026-10-20 04:19-05:22Z) was bad and got worse — OPEN; the files agree; link vs onn not separable from them
+## 2026-10-20 UX-R1, the user's extended evening (2026-10-20 04:19-05:22Z) was bad and got worse — OPEN; the files agree; link vs onn not separable from them; UX-R2: the second evening mostly clean, the damage not repeated (one event so far, untested past play-minute 44); H5 closed (not new)
+
+**UX-R2 (2026-10-21, the second evening, 2026-10-21 04:42-05:26Z, 43 min, SNES first;
+`docs/memory/evidence/UX_R2_SECOND_EVENING_2026-10-21.md`, read-only).** The user: "Ran a few games last night." How it
+felt: **no report yet.**
+- **Mostly clean.**
+  - After the first 5 minutes: post-FEC loss 37.5 / min (UX-R1: 173), underruns 3.9 / min (39.4), concealed 120 / min
+    (328).
+  - No silence pause, no encoder restart, no resync. Max output gap 534 ms. Only Soul Reaver's first ~2 minutes were
+    rough.
+- **The single-loss step repeated by the clock, not by play-minute.** FEC-recovered rose ~5 → 20-38 / min at 04:52Z;
+  on UX-R1 it came at 04:54-04:56Z.
+  - That is play-minute 10 against 35, and SNES was on screen both times.
+  - On R2 it fell back to 10-15 / min under PS1.
+  - The clock and SNES content cannot be split with two evenings.
+- **UX-R1's damage did not repeat at its clock** (05:04-05:21Z read clean on R2). R2 ended at play-minute 44, so
+  UX-R1's damaging play-minutes (45-64) are **untested**.
+- **SNES played first was clean**, so H3 is weakened. H4 (Opus) is weakened: the same codec was clean.
+- **H2 (onn uptime):** weakened *if* the onn was not power-cycled between 10-20 18:31Z and the evening. Its uptime at
+  the first frame cannot be read from the device: 14 h 20 m if not cycled. It was cold-booted again ~15:01Z 10-21.
+- **H5 CLOSED: not new.** The client ends its stream session at the **Pause menu** (load, save, or anything else) and
+  starts a new one at Resume. The gap is the time in the menu.
+  - The user's play on 2026-09-20 05:59-06:20Z (same titles, PCM) did the same: 8 reports, every one ending with the
+    pause image `saved`, 6-18 s gaps.
+- **Added to the instrumented evening:**
+  - ≥ 65 min of play;
+  - 00:40-01:30 EDT on the clock, starting on PS1 and switching to SNES after ~00:56;
+  - the Opal's station counters every 5 min (read-only), required;
+  - `boot_count` read at the start and the end.
+
 
 **The user's report, verbatim (2026-10-20):**
 > "I just played for an extended play session and it was horrible. It is much worse than it was weeks ago when I last did one"
@@ -35,7 +64,7 @@
 2. **H2 — the onn's state with time / sessions.** Tested by the same evening.
 3. **H3 — SNES.** Test: the order reversed for one evening; then its kill switches, one per evening.
 4. **H4 — Opus (G-A2).** Test: its kill switch for one evening, as a bisect step after H1.
-5. **H5 — Load State's restart cost.** A read of September's logs, then one timed load.
+5. **H5 — Load State's restart cost.** CLOSED by UX-R2: not new (the Pause menu ends the stream session; same on 2026-09-20).
 
 ## 2026-10-18 CL-B4, the first Opus session: underruns 40 against 9; an off-site Opus start would be refused — OFF-SITE FIXED (CL-B5); UNDERRUNS: G-A2's 78 NOT REPEATED AFTER AN ONN RESTART (CL-B6: 22 / 13), A WATCH ITEM; SPIKES OPEN (the client's CPU measured)
 

@@ -1,6 +1,6 @@
 ---
 memory_schema: 1
-as_of: 2026-10-20
+as_of: 2026-10-21
 baseline_commit: d3a8ee3 (CL-B7 uncommitted beside it; the user commits)
 ---
 
@@ -209,6 +209,34 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
+
+**UX-R2: the second evening read** (`evidence/UX_R2_SECOND_EVENING_2026-10-21.md`, read 2026-10-21 15:31-15:45Z; nothing
+run, changed or adopted).
+- At the read: the eight lines, `--check` ok, APK `93d29b4a…` CONFIRMED, nothing streaming. The onn was cold-booted
+  again ~15:01Z today. The user: "Ran a few games last night"; how it felt: **no report yet**.
+- **Mostly clean:** 04:42-05:26Z, 43 min, Zelda (SNES) first, then three PS1 titles.
+  - After the first 5 min: loss 37.5 / min, underruns 3.9 / min. No pause, no encoder restart.
+  - UX-R1's damage did not repeat at its clock. R2 ended at play-minute 44, before UX-R1's damaging play-minutes 45-64.
+- **The single-loss step repeated at the same clock** (04:52Z against 04:54-04:56Z; play-minute 10 against 35), under
+  SNES both nights.
+- **H5 CLOSED, not new:** the Pause menu ends the stream session; 2026-09-20 did the same.
+- **H2 / H3 / H4 are weakened;** H1 stays first.
+
+1. **The night queue `QUEUE_2026-10-19N.md` is still HELD until the user says.**
+2. **The next task, for the user's say-so: the instrumented evening.** This is UX-R1's H1 test plus UX-R2's additions:
+   - **≥ 65 min of play** (past play-minute 45);
+   - **00:40-01:30 EDT on the clock, starting on PS1 and switching to SNES after ~00:56.** A step at ~00:52 on PS1
+     means the clock; a step only at SNES means the content.
+   - **Every 5 min:** the onn's `udp6` drops while PrivyHub runs, `cl_b6_onn_read.py`, `cl_b7_onn_threads.py`, and
+     **the Opal's station counters read-only (required)**, or the link watch resumed for the evening;
+   - `settings global boot_count` at the start and the end;
+   - the user narrating against the host clock.
+3. **Questions for the user:**
+   - How did last night feel?
+   - Was the onn power-cycled between 10-20 ~18:30Z and the evening?
+   - Do they cold-boot the onn the day after playing? Both evenings were followed by one.
+4. **The user's commit:** UX-R2's record, `ux_r2_2026-10-21/`, `KNOWN_ISSUES.md`, this file, the task file and
+   `_cowork_prompt.txt` (`logs/ux_r2_git_status.txt`).
 
 **UX-R1: the user's extended evening read; OPEN** (`evidence/UX_R1_EXTENDED_SESSION_REGRESSION_2026-10-20.md`, read
 2026-10-20 18:25-18:40Z; nothing run, changed or adopted). At the read: the eight lines, `--check` ok, APK

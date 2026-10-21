@@ -1,0 +1,49 @@
+# onn state now 2026-10-21T15:32:35Z (adb state reads only)
+## uptime
+ 11:32:35 up 31 min,  0 users,  load average: 1.70, 2.12, 2.26
+## /proc/uptime
+1880.68 5315.50
+## boot reason / history
+sys.boot.reason=[cold ]
+ro.boot.bootreason=[cold ]
+sys.boot.reason.last=[cold ]
+persist.sys.boot.reason.history=[cold,7 cold,1577836802 cold,1577836800 cold,1577836801 ]
+## boot count / last boot (settings)
+boot_count=[77]
+## top -b -n 2 -d 1 (second iteration, head)
+Tasks: 314 total,   1 running, 313 sleeping,   0 stopped,   0 zombie
+  Mem:  1927208K total,  1533664K used,   393544K free,     1716K buffers
+ Swap:   963600K total,   352512K used,   611088K free,   561072K cached
+400%cpu  48%user   2%nice  35%sys 308%idle   1%iow   5%irq   1%sirq   0%host
+  PID USER         PR  NI VIRT  RES  SHR S[%CPU] %MEM     TIME+ ARGS
+<pid> system       -3  -8 116M  12M 8.4M S 26.0   0.6   8:18.50 surfaceflinger
+<pid> u0_a69       -2   0 1.5G 242M 160M S 23.0  12.8   5:16.53 com.google.android.apps.tv.dreamx
+<pid> shell        20   0  20M 4.2M 3.2M R 12.0   0.2   0:00.17 top -b -n 2 -d 1 -o PID,USER,PR,NI,VIRT,RES,SHR,S,%CPU,%MEM,TIME+,ARGS
+<pid> system       -3   0  81M 3.8M 3.3M S  7.0   0.2   2:06.71 android.hardware.graphics.composer3-service.rtk
+<pid> root         RT   0    0    0    0 S  5.0   0.0   1:43.05 [sugov:0]
+<pid> shell        20   0  42M 6.0M 2.6M S  4.0   0.3   0:00.29 adbd --root_seclabel=u:r:su:s0
+<pid> system       18  -2 2.2G 262M 194M S  2.0  13.9   1:29.98 system_server
+<pid> root          0 -20    0    0    0 I  2.0   0.0   0:17.41 [kworker/u9:0-mali_jd]
+<pid> root         20   0    0    0    0 I  1.0   0.0   0:00.31 [kworker/0:0-events]
+<pid> root          0 -20    0    0    0 I  1.0   0.0   0:06.31 [kworker/u9:2-mali_jd]
+<pid> root         20   0    0    0    0 I  1.0   0.0   0:00.28 [kworker/3:0-events]
+## PrivyHub process
+not running
+## dumpsys thermalservice (status / temps)
+Thermal Status: 0
+	Temperature{mValue=30.508001, mType=0, mName=cpu-thermal, mStatus=0}
+	Temperature{mValue=55.329002, mType=0, mName=cpu-thermal, mStatus=0}
+## /proc/meminfo
+MemTotal:        1927208 kB
+MemFree:          393096 kB
+MemAvailable:     795944 kB
+Buffers:            1720 kB
+Cached:           561116 kB
+SwapCached:         3372 kB
+SwapTotal:        963600 kB
+SwapFree:         611088 kB
+## /proc/net/udp6 (header + rows with nonzero drops; addresses/inodes masked)
+sl local rem st tx:rx tr tm->when retrnsmt uid timeout inode ref pointer drops
+sockets=7 nonzero_drop_rows=0 drops_total=0
+## getprop debug.privyhub.opus_decode (empty expected)
+[]
