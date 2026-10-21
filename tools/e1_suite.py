@@ -53,7 +53,9 @@ UNIT = "privyhub-companion"
 PKG = "com.safeiot.privyhub"
 # CL-B5 (installed 2026-10-18): the Opus decode on its own thread; the previous CONFIRMED APK was 8e10497e... (CL-B4),
 # before it 59f736d2... (CL-B3), 77011eef... (CL-B2), de072762... (CL-B1)
-EXPECT_APK = "043891e1cc7d643dc496eb6f6dcef50472418e9444300f667ac6abb7d0201607"
+# CL-B7 (installed 2026-10-19): CL-B7P's lean-drain flag APK (debug.privyhub.opus_decode; absent = CL-B5's drain);
+# the previous CONFIRMED APK was 043891e1... (CL-B5)
+EXPECT_APK = "93d29b4a38d224fddbcf261dab72b40f1290f009b7dc506d60eb3104071e1624"
 LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
 # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
 # is exactly these two names, at every precondition and teardown

@@ -1,0 +1,87 @@
+{
+ "CL-B7 1 pcm": {
+  "status": "OK",
+  "gates": {
+   "status_ok": true,
+   "retroarch_ge_59.9": true,
+   "capture_60_pm_0.1": true,
+   "dupdrop_le_0.2": true,
+   "flags_absent_after": true
+  },
+  "report_codec": "pcm",
+  "heartbeat_audio_codec_in_window": {
+   "pcm": 299
+  },
+  "opus_decode_mode_key": [
+   false,
+   null
+  ],
+  "environ_150s_audio_codec": [
+   "PRIVYHUB_AUDIO_CODEC=pcm"
+  ],
+  "environ_150s_lines": 8,
+  "readbacks_ok": true,
+  "valid": true
+ },
+ "CL-B7 2 opus today": {
+  "status": "OK",
+  "gates": {
+   "status_ok": true,
+   "retroarch_ge_59.9": true,
+   "capture_60_pm_0.1": true,
+   "dupdrop_le_0.2": true,
+   "flags_absent_after": true
+  },
+  "report_codec": "opus",
+  "heartbeat_audio_codec_in_window": {
+   "opus": 298
+  },
+  "opus_decode_mode_key": [
+   false,
+   null
+  ],
+  "environ_150s_audio_codec": [
+   "PRIVYHUB_AUDIO_CODEC=opus"
+  ],
+  "environ_150s_lines": 8,
+  "getprop_before_start": "",
+  "readbacks_ok": true,
+  "read_as_today": true,
+  "valid": true
+ },
+ "CL-B7 3 opus lean": {
+  "status": "OK",
+  "gates": {
+   "status_ok": true,
+   "retroarch_ge_59.9": true,
+   "capture_60_pm_0.1": true,
+   "dupdrop_le_0.2": true,
+   "flags_absent_after": true
+  },
+  "report_codec": "opus",
+  "heartbeat_audio_codec_in_window": {
+   "opus": 299
+  },
+  "opus_decode_mode_key": [
+   true,
+   "lean"
+  ],
+  "environ_150s_audio_codec": [
+   "PRIVYHUB_AUDIO_CODEC=opus"
+  ],
+  "environ_150s_lines": 8,
+  "setprop_getprop": "lean",
+  "readbacks_ok": true,
+  "void": false,
+  "valid": true
+ },
+ "teardown_property_read_back": "",
+ "all_three_valid_and_arm2_today": true,
+ "token_issued_sig_v3_opus": [
+  "2026-10-19T16:59:50Z",
+  "2026-10-19T17:17:28Z",
+  "2026-10-19T17:29:29Z",
+  "2026-10-19T17:35:12Z",
+  "2026-10-19T17:47:20Z"
+ ]
+}

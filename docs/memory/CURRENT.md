@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-10-19
-baseline_commit: 7a1ab60 (G8-S5 uncommitted beside it; the user commits)
+as_of: 2026-10-20
+baseline_commit: d3a8ee3 (CL-B7 uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -17,8 +17,8 @@ CL-B3 is OPEN on two G5-S1 smoke gates (NOT MET; the user decides). Everything e
 passed.** E1 FROZEN; E2
 MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `af3ed73`.
 
-**State (2026-10-19 02:05Z, after G-A2): the EIGHT adopted lines; nothing running; `--check` ok on eight** (adb
-connected, **APK `043891e1…1607` CONFIRMED**). No `e3_flag.conf`, no stream, no game; one device paired, `identity_v2`
+**State (2026-10-19 17:48Z, after CL-B7): the EIGHT adopted lines; nothing running; `--check` ok on eight** (adb
+connected, **APK `93d29b4a…1624` CONFIRMED** (CL-B7; `debug.privyhub.opus_decode` empty = CL-B5's drain)). No `e3_flag.conf`, no stream, no game; one device paired, `identity_v2`
 on. The eight lines:
 1. `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live` (`adaptive.conf`);
 2. `PRIVYHUB_EPG_GUIDE_INDEX=cached` (`epg-index.conf`);
@@ -124,7 +124,9 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   **cap 90,000 B** (`P6a`), **cushion 12/17** (`P9`), **audio redundancy
   2/4** (`P10`). Env overrides exist for comparison sessions only
   (`TOOLS.md`, including `C5-M1`'s `PRIVYHUB_NATIVE_PROFILE_ID`); none set.
-- **Installed**: **APK `043891e1…1607`** (CL-B5's debug build, installed 2026-10-18 23:26Z: CL-B4's Opus decode,
+- **Installed (CL-B7, 2026-10-19 16:56Z): APK `93d29b4a…1624`**, CL-B7P's build: CL-B5's client plus the lean-drain flag
+  `debug.privyhub.opus_decode` (absent = today). Pinned by patch `CL-B7_LEAN_APK_HASH`; CONFIRMED at 17:48Z. Before it,
+  APK `043891e1…1607` (CL-B5's debug build, installed 2026-10-18 23:26Z: CL-B4's Opus decode,
   now on its own thread; `sig_v` 3 declares `audio_codecs: ["opus"]`). Its hash is pinned in `tools/e1_suite.py`
   `EXPECT_APK` and `tools/c3_l4_nft_night.py` (patch `CL-B5_DECODE_THREAD_APK_HASH`), and it read CONFIRMED at
   23:59Z. The host's `session_identity.py` verifies `sig_v` 3 (since CL-B4). `audio_codec.py` records a v3 client's
@@ -207,6 +209,58 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
+
+**UX-R1: the user's extended evening read; OPEN** (`evidence/UX_R1_EXTENDED_SESSION_REGRESSION_2026-10-20.md`, read
+2026-10-20 18:25-18:40Z; nothing run, changed or adopted). At the read: the eight lines, `--check` ok, APK
+`93d29b4a…` CONFIRMED, nothing streaming. The onn was cold-booted ~14:22Z today (after the session).
+- **The files agree with the user's "horrible."** Play ran 04:19-05:22Z on the LAN: five games, 20 client sessions.
+  - First 5 min: underruns 3.9 / min, post-FEC loss 26 / min, the week's clean figures.
+  - After: 39.4 / 173. SNES was worst, and SNES was also the last 31 min.
+  - Bursts at 05:06 / 05:10 / 05:20-21 hit both directions and ended in two silence pauses and an encoder restart.
+- **Ruled out by the files:** the host, the grabs (none ran), the ladder (7000 throughout), the frame-size tail (cap
+  held, ρ −0.13).
+- **Loss rose with the evening (ρ 0.52) and the audio followed it (ρ 0.83).** Link vs the onn's receive side is not
+  separable from the files: neither end was read, and the onn's end state is lost.
+
+1. **The night queue `QUEUE_2026-10-19N.md` is HELD until the user says.**
+2. **The next task, for the user's say-so (H1, ranked first; written, not run):** one instrumented evening.
+   - The user plays the same games for ≥ 60 min, and the onn is power-cycled first.
+   - Every 5 min: the onn's `/proc/net/udp6` drops, `cl_b6_onn_read.py` and `cl_b7_onn_threads.py`; the Opal's
+     station counters read-only (or the link watch resumed for the evening); the user narrating against the host
+     clock.
+   - `udp6` drops moving with the loss → the onn. Drops at 0 while the Opal's counters move → the air.
+   - Then, as the files direct: the order reversed (SNES first) and the kill switches, one per evening.
+3. **Questions only the user can answer:**
+   - Was the onn power-cycled between CL-B7 (~16:52Z) and the evening?
+   - Did they cold-boot it today because of the evening?
+   - Were the Load States in Emperor's New Groove (16 in 19 min) part of what felt bad?
+4. **The user's commit:** everything since `d3a8ee3`: CL-B7's files (below) and UX-R1's.
+   - The record, `ux_r1_2026-10-20/`, `KNOWN_ISSUES.md`, this file.
+   - The task file and `_cowork_prompt.txt` (`logs/ux_r1_git_status.txt`).
+
+**CL-B7: three arms on a fresh onn, all VALID** (`evidence/CL_B7_OPUS_CLIENT_THREADS_AB_2026-10-19.md`, 2026-10-19
+16:55-17:48Z; host gates held; the eight lines and `--check` ok at the end; **APK `93d29b4a…1624` installed and now
+CONFIRMED**, the property empty).
+- **The Opus cost on the onn is located: the platform's Opus MediaCodec.** Today − PCM: the process +19.5 % of a core
+  plus `media.swcodec` +11.1, ≈ 0.31 core. Three quarters of it is framework-side (`MediaCodec_loop` +9.8, binder +2.2,
+  `media.swcodec`); our own threads +7.5. B's hypothesis holds.
+- **Lean moved nothing** (framework / binder ~0): the per-call count is not the owner.
+- **Spikes ≥ 20 / min:** PCM 70.1, today 121.0, lean 108.7 (between; one run each).
+- **Underruns:** 16 / 25 / 12.
+- **The user:**
+  - PCM: "Sounds fine, maybe small (<1 second) stutter every 20 seconds or so";
+  - Opus today: "Sounds good, no stutters noticed";
+  - lean: "Sound is good, no stutters" (after the arm ended).
+
+1. **The user's commit:** everything since `d3a8ee3`:
+   - `tools/e1_suite.py`, `tools/c3_l4_nft_night.py`, `tools/test_c3_l4_nft_night.py` (the CONFIRMED hash);
+   - the record, `cl_b7_2026-10-19/`, patch `CL-B7_LEAN_APK_HASH`, `KNOWN_ISSUES.md`, this file;
+   - the task file and `_cowork_prompt.txt` (`logs/cl_b7_git_status.txt`).
+2. **What to build next, if anything, is the user's call.** The table names the owner as the platform codec. The
+   options are fewer frames through MediaCodec (20-ms Opus frames: half the frames, +10 ms latency; host and client)
+   or a decoder outside MediaCodec (libopus via JNI; no NDK on the host today). Or leave it: the user hears no problem
+   on Opus, and Opus stays adopted (2026-10-19 decision).
+3. **The off-site reconnect test** is held until the user says.
 
 **G8-S5 MEASURED, 2/2 valid** (`evidence/G8_S5_CAP_CELL_ENCODER_RC_TIGHT_2026-10-19.md`, 2026-10-19 14:42-15:15Z,
 the unit `privyhub-g8-s5` closed by itself and collected; at the record the eight lines, no `e3_flag.conf`, `--check` ok

@@ -1,8 +1,61 @@
 # Known issues and deferred work
 
+## 2026-10-20 UX-R1, the user's extended evening (2026-10-20 04:19-05:22Z) was bad and got worse — OPEN; the files agree; link vs onn not separable from them
+
+**The user's report, verbatim (2026-10-20):**
+> "I just played for an extended play session and it was horrible. It is much worse than it was weeks ago when I last did one"
+> 1. "All the above. Every issue from audio to visual to gameplay. Multiple games all played terrible, especially later on with SNES"
+> 2. "Every game got worse as time went on"
+> 3. "besides the first 5 minutes, it was not good to terrible"
+> 4. (when the earlier good session was) "Earlier" — before the October adoptions.
+
+**The read** (`docs/memory/evidence/UX_R1_EXTENDED_SESSION_REGRESSION_2026-10-20.md`, read-only; nothing run):
+- **The files agree with the user.** Five games, 20 client sessions, on the LAN.
+  - First 5 minutes: underruns 3.9 / min, concealed 37 / min, post-FEC loss 26 / min. This is the week's clean windows.
+  - After: 39.4 / 328 / 173. Bursts at 05:06, 05:10 and 05:20-21 hit video, audio and the onn's control uplink
+    together. They ended in two `client_output_silence` pauses, one with an encoder restart (max output gap 4.9 s).
+- **SNES is worst, and is also the last 31 minutes.** SimCity, the first SNES game, was clean. The step came at
+  04:56Z, one minute into Super Mario RPG, and held into Zelda.
+- **Ruled out by the files:**
+  - the host (flat);
+  - the guide grabs (none in the span);
+  - the ladder (7000 throughout);
+  - the frame-size tail (the cap held; loss vs frames ≥ 40, ρ −0.13).
+- **Loss rose with the minute of the evening (ρ 0.52), and the audio followed the loss (ρ 0.83).**
+- **Not separable from the files:** the link, or the onn's receive side. Neither end was read: the link watch is
+  stopped, and the onn's `udp6` drops and the Opal were not read. The onn was cold-booted afterwards, so its end state
+  is lost. It was ~11.5 h up at the start, not ~1 h.
+- **Load State restarts the client session.** That was 16 times in 19 minutes of Emperor's New Groove, at 6-21 s each.
+  It is a gameplay cost, but not the trend. Whether it is new since October is unread.
+
+**The hypotheses, ranked by the files** (each test written in the record, none run):
+1. **H1 — the receive path degraded over the evening (link or onn).** Test: one instrumented evening, the user
+   playing ≥ 60 min, the onn power-cycled first. Every 5 min, read the onn's `udp6` drops plus
+   `cl_b6_onn_read` / `cl_b7_onn_threads`, and the Opal's station counters read-only (or the link watch resumed).
+2. **H2 — the onn's state with time / sessions.** Tested by the same evening.
+3. **H3 — SNES.** Test: the order reversed for one evening; then its kill switches, one per evening.
+4. **H4 — Opus (G-A2).** Test: its kill switch for one evening, as a bisect step after H1.
+5. **H5 — Load State's restart cost.** A read of September's logs, then one timed load.
+
 ## 2026-10-18 CL-B4, the first Opus session: underruns 40 against 9; an off-site Opus start would be refused — OFF-SITE FIXED (CL-B5); UNDERRUNS: G-A2's 78 NOT REPEATED AFTER AN ONN RESTART (CL-B6: 22 / 13), A WATCH ITEM; SPIKES OPEN (the client's CPU measured)
 
 **The user's decision 2026-10-19: Opus stays adopted — the data saving with nothing noticeable; a watch item; hands-on testing will be needed as things change.**
+
+**CL-B7 (2026-10-19, three arms on a fresh onn, per thread; `docs/memory/evidence/CL_B7_OPUS_CLIENT_THREADS_AB_2026-10-19.md`):**
+- **Where the cost is: LOCATED (the platform's Opus MediaCodec).**
+  - Opus today minus PCM, 150 s in: the PrivyHub process +19.5 % of a core, **plus `media.swcodec` +11.1 %**, ≈ 0.31
+    core on the onn.
+  - Three quarters of it is framework-side: `MediaCodec_loop` +9.8 (a second looper thread), binder +2.2,
+    `media.swcodec` +11.1.
+  - Our own threads add +7.5. The `PrivyHub-Native` group (+6.8) cannot be split by name (15-char `comm`).
+- **Lean (one call per frame fewer) moved nothing:** framework / binder −0.1 / 0.0, process −0.7. The per-call count
+  is not the owner.
+- **Spikes ≥ 20 ms:** PCM 70.1, today 121.0, lean 108.7 per min. Lean sits between them, which by the letter of the
+  reading means the spikes follow the call count; this is one run each, with lean on the longest uptime and its CPU
+  unchanged. **Spikes stay OPEN** with the owner named.
+- **Underruns:** PCM 16 / 6, today 25 / 14 (decode queue 45 / 218 ms), lean 12 / 7. Still a watch item.
+- **What would cut it** is the user's call: fewer frames through MediaCodec (20-ms frames, +10 ms) or a decoder
+  outside it (libopus via JNI; no NDK on the host today).
 
 **G4-S3 (2026-10-19, off-site at 4000):** underruns **34** in the window, across three client starts (Pause/Resume
 and a relaunch). Net audio loss 0. Decoder spikes ~45 / min (≥ 50 ms ~4.7). Spikes are lower at 4000 than at 7000 on

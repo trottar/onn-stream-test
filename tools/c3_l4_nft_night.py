@@ -101,7 +101,9 @@ PKG = "com.safeiot.privyhub"
 # (kept at PrivyHub/app/build/cl_b4_preserved/app-debug.apk).
 # CL-B5 (installed 2026-10-18): the decode-thread APK replaced CL-B4's 8e10497ef43850d54165593a680f68a41b89114536a806f0788b9a04945fd84e
 # (kept at PrivyHub/app/build/cl_b5_preserved/app-debug.apk).
-ADOPTED_APK_SHA256 = "043891e1cc7d643dc496eb6f6dcef50472418e9444300f667ac6abb7d0201607"
+# CL-B7 (installed 2026-10-19): the lean-drain flag APK replaced CL-B5's 043891e1cc7d643dc496eb6f6dcef50472418e9444300f667ac6abb7d0201607
+# (kept at PrivyHub/app/build/cl_b7_preserved/app-debug.apk).
+ADOPTED_APK_SHA256 = "93d29b4a38d224fddbcf261dab72b40f1290f009b7dc506d60eb3104071e1624"
 REFERENCE_PROFILE = "native_game_720p60_reference"
 MODE_ENV = "PRIVYHUB_ADAPTIVE_BITRATE_MODE"
 # C3-L4-D1 (2026-10-01): live is the companion's default through the systemd drop-in

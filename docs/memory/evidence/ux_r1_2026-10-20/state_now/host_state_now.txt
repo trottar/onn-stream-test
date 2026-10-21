@@ -1,0 +1,64 @@
+# host state now 2026-10-20T18:27:00Z
+## uptime
+ 14:27:00 up 27 days, 12:28,  5 users,  load average: 0.27, 0.14, 0.10
+## free -m
+               total        used        free      shared  buff/cache   available
+Mem:           15300        3815        5537         670        6966       11484
+Swap:          12595         681       11914
+## swapon
+/bin/bash: line 15: swapon: command not found
+Filename				Type		Size		Used		Priority
+/dev/nvme0n1p3                          partition	12898300	697876		-2
+## loadavg
+0.27 0.14 0.10 1/874 3960188
+## df
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/nvme0n1p2  221G   71G  139G  34% /
+/dev/nvme0n1p2  221G   71G  139G  34% /
+## companion MainPID present: yes
+etimes_s=88741 etime=1-00:39:01 rss_kb=77436 vsz_kb=766496 threads=2 pcpu=0.8 pmem=0.4 stat=Ssl
+open_fds=5
+VmHWM:	   77436 kB
+VmRSS:	   77436 kB
+VmSwap:	       0 kB
+Threads:	2
+## children of companion
+  88741 35340    1  0.0 python3
+## encoder / retroarch / ffmpeg / grabber processes
+## systemctl --user status (no restart)
+● privyhub-companion.service - PrivyHub companion (control API :8765, native game stream)
+     Loaded: loaded (/home/privyhub/.config/systemd/user/privyhub-companion.service; enabled; preset: enabled)
+    Drop-In: /home/privyhub/.config/systemd/user/privyhub-companion.service.d
+             └─adaptive.conf, audio-codec.conf, epg-index.conf, overlay.conf, recovery.conf, session-identity.conf, snes-capture.conf, snes-core.conf
+     Active: active (running) since Mon 2026-10-19 13:47:59 EDT; 24h ago
+ Invocation: <invocation>
+    Process: 3794644 ExecStartPre=/bin/sh -c i=0; while [ "$i" -lt 60 ]; do xrandr --current >/dev/null 2>&1 && exit 0; i=$((i+1)); sleep 1; done; echo "X on :0 did not answer within 60 s" >&2; exit 1 (code=exited, status=0/SUCCESS)
+   Main PID: 3794647 (python3)
+      Tasks: 3 (limit: 18065)
+     Memory: 129.2M (peak: 319.5M)
+        CPU: 44min 56.113s
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/privyhub-companion.service
+             ├─3794647 /usr/bin/python3 -u ./companion/privyhub_service.py
+             └─3794654 /usr/bin/python3 /home/privyhub/Projects/onn-stream-test/companion/range_server.py --root /home/privyhub/Projects/onn-stream-test/media --vod-root /mnt/privyhub-media/onn-stream-test/media/vod --host <ipv4> --port 8000
+## journal counts since 2026-10-19 17:48Z
+priority 0..3: 0
+priority 4: 0
+priority 0..7: 2018
+journal lines total: 2018
+grep -ci error: 0  warn: 0  traceback: 0
+## host load/memory pressure
+some avg10=0.00 avg60=0.00 avg300=0.00 total=7660848626
+full avg10=0.00 avg60=0.00 avg300=0.00 total=0
+some avg10=0.00 avg60=0.00 avg300=0.00 total=2482894
+full avg10=0.00 avg60=0.00 avg300=0.00 total=2390339
+some avg10=0.09 avg60=0.20 avg300=0.06 total=269556270
+full avg10=0.09 avg60=0.20 avg300=0.06 total=256795956
+## top 8 by rss
+376792 0.1 2377707 expressvpn-daem
+366308 0.0 2377708 systemd-journal
+327620 0.0 2377703 claude-desktop
+319880 6.1     118 2.1.302
+316768 0.6  100263 2.1.302
+315012 0.7  165336 2.1.302
+305008 0.5  167972 2.1.302
+296740 0.6  172709 2.1.302

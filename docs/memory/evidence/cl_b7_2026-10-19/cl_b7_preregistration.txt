@@ -1,0 +1,57 @@
+CL-B7 PRE-REGISTRATION -- the Opus path's cost on the client, read per thread, three arms (session A, 2026-10-19)
+Task: docs/memory/handoffs/CL-B7_OPUS_CLIENT_THREADS_AB_TASK.md §1. Baseline HEAD d3a8ee3. Written and hashed BEFORE the install.
+
+PRECONDITION (read before this was written): the eight adopted lines, --check ok (adb reconnected by hand, the
+endpoint never printed), no e3_flag.conf, no game, one device paired (the client's id in the hub's store), APK
+043891e1...1607 CONFIRMED on the onn, the onn power-cycled by the user (uptime 131 s at the first read), PrivyHub
+opened once, getprop debug.privyhub.opus_decode empty, the tree carrying only the prompt and the task file.
+
+THE INSTALL: the candidate /tmp/b_cl_b7p/PrivyHub/app/build/outputs/apk/debug/app-debug.apk, sha256 read
+93d29b4a38d224fddbcf261dab72b40f1290f009b7dc506d60eb3104071e1624 (= CL-B7P §3's pin) before the install;
+adb install -r; the device's APK hash and the paired line read back. "not paired" = stop and tell the user.
+
+THREE ARMS, each one E1-PS1-STREAM --e2 --window 600, the same PS1 title, ~5 min apart (one suite invocation per
+arm; the suite starts the stream on the onn as in CL-B5/CL-B6), the user playing with the sound on, their one line
+each verbatim:
+  1. PCM: e3_flag.conf = PRIVYHUB_AUDIO_CODEC=pcm; the environ read back =pcm and no =opus; the companion's log
+     "ignored ... audio stays PCM"; heartbeats audio_codec=pcm; removed at teardown. If the log says opus: stop, write it.
+  2. Opus today: no e3_flag.conf; the property empty (getprop read before the start); token_issued sig_v 3
+     audio_codecs opus; the companion's opus line; heartbeats opus; the report's opus object has NO decode_mode key.
+  3. Opus lean: adb shell setprop debug.privyhub.opus_decode lean before the start, getprop read back "lean"; the
+     same Opus read-backs; the report's opus.decode_mode = "lean". If absent, the arm is VOID (the property was not
+     read by the decoder): written, not repeated. At teardown setprop debug.privyhub.opus_decode "" and getprop
+     read back empty.
+  adb in this task: the install, the two setprops of this property, the suite's own stream start, state reads.
+
+READS ON THE ONN (state), before each arm and 150 s into each window: cl_b6_onn_read.py (uptime, load, top,
+thermal, meminfo) then tools/cl_b7_onn_threads.py <arm> (top -H of PrivyHub over 10 s by thread name; top by
+process: PrivyHub, media.swcodec, the codec HALs, audioserver, surfaceflinger; busy %; getprop). The thread script's
+first live run: if it fails to parse the onn's top -H, the smallest parser patch (disclosed) and a re-read within the
+window; if it cannot be fixed, the arm stays valid and its per-thread column reads "not read".
+
+GATES (host): RetroArch >= 59.9; capture 60 +/- 0.1; dup+drop <= 0.2/min; flags_absent after.
+
+REPORTED, one table across the three arms plus CL-B6's two (Opus 1 / PCM 2) as reference: the PrivyHub process %
+of a core; per thread by category (our RX / Opus decode / playback / video: RTP-H264-FEC, MediaCodec drain /
+controller / HTTP; the framework's looper and binder threads) and by process (media.swcodec, the codec HALs), mean
+and max; the onn busy %; underruns (<= 20 of interest); net audio loss; the decode queue depth / wait maxima;
+decoder spikes >= 20 and >= 50 ms per min; max output gap; host control gaps > 1 s; video loss; rendered; the LAN
+interface's kbit/s; host CPU; uptime.
+
+THE READING, written beforehand:
+  - Where the ~0.2 core is: the per-thread delta, Opus today minus PCM, by category. If the framework looper /
+    binder threads and media.swcodec carry most of it, B's hypothesis (the MediaCodec per-buffer machinery) holds;
+    if our own decode thread or the playback thread carries it, the hypothesis is wrong and the table says where; if
+    the whole-process delta is well under 0.2 core, CL-B6's single samples overstated it. Whichever the files show.
+  - Lean: if lean minus today on the framework-codec / binder threads is near -1/5 of their Opus share, the call
+    count is the cost and a larger cut (fewer, bigger calls) is the next engineering step -- the user's call; if lean
+    moves nothing, the per-call count is not the owner.
+  - Spikes: if lean's >= 20-ms rate sits between today's and PCM's, the spikes follow the call count; if lean equals
+    today, they do not.
+  - Nothing adopted on this; the user decides what, if anything, is built next. The user's three lines verbatim;
+    nothing perceptual is a gate.
+
+AT THE END: the override removed, the property cleared and read back empty, restart, the eight lines, --check ok.
+The candidate APK stays installed and becomes CONFIRMED only if all three arms are valid and arm 2 read as today (no
+decode_mode key); otherwise the CONFIRMED hash stays 043891e1... and the user is told which APK is on the onn.
+Measurement only; nothing adopted; nothing committed.
