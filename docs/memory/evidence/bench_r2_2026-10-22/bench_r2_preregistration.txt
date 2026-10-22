@@ -1,0 +1,95 @@
+BENCH-R2 PRE-REGISTRATION -- the lock, the hold, the stall signal, on the bench (session A, 2026-10-22)
+Task: docs/memory/handoffs/BENCH-R2_LOCK_HOLD_STALL_CELLS_TASK.md §1. Baseline HEAD 43a8df6 (queue C, ML-R1 and BENCH-R1's
+record committed by the user). Written and hashed BEFORE the install and before the first cell. The strings are session B's
+(SESSION_B_DONE_2026-10-22C.md items 8-9; the B5 / B6 / B7 / B1b / LAN-R2 records), not the task file's spelling where they
+differ.
+
+PLANNED LAUNCH: 2026-10-22T15:00:00Z (approximate; the unit's start is recorded in launched_at.txt)
+CAP_UTC: 2026-10-22T20:00:00Z
+(the cap = launch + 5 h; no cell starts at or after it)
+
+THE INSTALL (before the first cell)
+- The candidate /tmp/b_q22c_scratch/b7_apk/app-debug.apk (B5 Wi-Fi lock + B7 stall signal; B3 link report inside) must read
+  sha256 cb0935c8cadd5ee65a3f52f390d0994899de27ebaa5c207b547e57185e761080 (B's pin), and its signer certificate digest must
+  equal the CONFIRMED APK's (compared, not printed). If the /tmp copy were gone: rebuilt offline in a fresh /tmp/b_bench_r2/
+  copy of PrivyHub/ only with --no-configuration-cache, the signer checked, that hash pinned, disclosed.
+- The CONFIRMED 93d29b4a38d224fddbcf261dab72b40f1290f009b7dc506d60eb3104071e1624 preserved (a copy into the gitignored
+  PrivyHub/app/build/bench_r2_preserved/); `adb install -r`; the device's APK read back; the paired line read back (one device
+  paired, the client's id in the hub's store) -- "not paired" = stop and tell the user. The three properties
+  debug.privyhub.wifi_lock / debug.privyhub.stall_signal / debug.privyhub.link_report read empty before the first cell.
+- While the candidate is on the onn, the suite's own `apk` field reads MISMATCH (its EXPECT_APK is 93d29b4a...): expected,
+  not a validity failure; the pin moves only by the CONFIRMED rule below.
+
+THE CELLS, in this order. Each: E1-PS1-STREAM (the PS1 fixture) unless marked SNES (E1-SNES-STREAM, the snes9x title; the
+adopted PRIVYHUB_SNES_CORE=snes9x line), --e2, --window 600, E2's warm-up, the suite launching the title itself, a 120-s gap,
+a 7000 start (no PRIVYHUB_START_RUNG), the pad untouched, nobody plays (the TV and the onn on and idle). The run's
+e3_flag.conf per cell holds PRIVYHUB_WAN_TELEMETRY=1 (the scaffolding's base line, as BENCH-R1; telemetry only) + the shim
+line + the flags below; read back at stream time and under load; removed at teardown with flags_absent true. The
+properties: `adb shell setprop debug.privyhub.<p> <v>` before the cell (the suite then force-stops the app and starts a new
+stream activity, which reads them: each is a lazy value per activity), read back with getprop; cleared after the cell
+(setprop to empty) and read back empty.
+ #  | PRIVYHUB_IMPAIRMENT=                 | flags                                                                  | properties
+ a1 | none@post-fec,seed=1                 | --                                                                     | (none: wifi_lock empty)
+ a2 | none@post-fec,seed=1                 | --                                                                     | wifi_lock=low_latency
+ a3 | none@post-fec,seed=1                 | --                                                                     | wifi_lock=high_perf
+ d1 | none@post-fec,seed=1                 | PRIVYHUB_INPUT_HOLD=1 PRIVYHUB_INPUT_HOLD_B6=1 PRIVYHUB_INPUT_HOLD_REWIND=1 PRIVYHUB_STALL_SIGNAL=1   | wifi_lock=low_latency stall_signal=1
+ d2 | none@post-fec,seed=1                 | the same but PRIVYHUB_STALL_SIGNAL=400                                 | wifi_lock=low_latency stall_signal=1
+ b1 | blackout-4s@both,every=120s,seed=1   | as d1                                                                  | as d1
+ b2 | blackout-4s@both,every=120s,seed=1   | PRIVYHUB_INPUT_HOLD=1 PRIVYHUB_INPUT_HOLD_B6=1 PRIVYHUB_INPUT_HOLD_REWIND=1 (no STALL_SIGNAL)          | wifi_lock=low_latency
+ c1 | blackout-4s@down,every=120s,seed=1   | as d1                                                                  | as d1
+ e1 | loss-1@post-fec,seed=1               | PRIVYHUB_LAN_LOSS_RULE=bidir                                           | wifi_lock=low_latency
+ e2 | loss-5@post-fec,seed=1               | PRIVYHUB_LAN_LOSS_RULE=bidir                                           | wifi_lock=low_latency
+ e3 | burst-50x20@post-fec,seed=1          | PRIVYHUB_LAN_LOSS_RULE=bidir                                           | wifi_lock=low_latency
+ f1 | none@post-fec,seed=1   SNES (snes9x) | --  (rewind off)                                                       | wifi_lock=low_latency
+ f2 | none@post-fec,seed=1   SNES (snes9x) | PRIVYHUB_INPUT_HOLD=1 PRIVYHUB_INPUT_HOLD_REWIND=1 PRIVYHUB_INPUT_HOLD_B6=1 (rewind on)              | wifi_lock=low_latency
+ f3 | none@post-fec,seed=1   PS1 (Beetle PSX HW) | --  (rewind off)                                                 | wifi_lock=low_latency
+ f4 | none@post-fec,seed=1   PS1 (Beetle PSX HW) | PRIVYHUB_INPUT_HOLD=1 PRIVYHUB_INPUT_HOLD_REWIND=1 PRIVYHUB_INPUT_HOLD_B6=1 (rewind on)        | wifi_lock=low_latency
+Fifteen cells, ~14.5 min each, ~3.6 h. a1-a3 back to back, the same hour, the lock question first.
+- "Does Beetle PSX HW with the hardware renderer rewind at all": read in b1 / b2 / c1 (the PS1 fixture, rewind on, holds
+  forced by the blackouts: rewound_frames or rewind_failed) and in f4 (any hold), and in RetroArch's own log for the cell
+  (rewind unavailable / failed to initialize the buffer, B4 §7).
+
+VALIDITY: as BENCH-R1 -- the shim's counters (G8-S1's tolerances for none / loss-1 / loss-5 / burst-50x20; B1's blackout
+spans; uplink_dropped > 0 on @both, now including the desync POSTs (B1b), and 0 on @down), flags_absent after (teardown,
+every failed attempt, the final state), and the properties read back empty at teardown. A no_play cell is an outcome. A
+playing cell whose shim shows the profile not applied runs once more. A cell whose teardown does not read flags_absent, or
+whose properties do not read back empty, ends the driver.
+
+GATES (host): RetroArch >= 59.9; capture 60 +/- 0.1; dup+drop <= 0.2/min; flags_absent after.
+
+REPORTED PER CELL (not gated): the rung path and the rule rows (lan_bidir with its uplink_windows); hitch seconds per 10 min
+and the longest run (UX-R3's script); unattended frames core-running and --net per blackout and per 10 min
+(tools/unattended_frames.py); every hold / release / handover / cap / client_stall / stall_end / stall_quiet /
+client_ready_after_hold / rewind / rewind_failed row with its timing; the per-blackout table (uplink gaps, output gaps,
+heartbeat hold, loss, the recovery rows) against BENCH-R1's cells 5-7; the uplink-silence count (>= 250 ms per 10 min) and its
+length distribution (B6's gap_distribution.py bins) in every cell; host CPU, the encoder's, RetroArch's CPU and RSS, the
+host's available memory; the client report's link / wifi_lock_* / stall_signal_* columns if the report carries them.
+Comparison rows: BENCH-R1 cell 8 (none + hold 250, no lock): 15.6 silences >= 250 ms / 10 min; cell 5 (blackout@both,
+plain): 85.0 unattended core-running per blackout; cells 6, 7; cells 1-4 (the loss cells).
+
+WRITTEN BEFOREHAND (met / not met, not gated):
+  1. a2 and/or a3 cut the uplink silences >= 250 ms per 10 min against a1 by >= 80 % (if not, the lock is not the cause and
+     B6's H stands);
+  2. d1: <= 1 false hold / 10 min and <= 2 stall pauses / 10 min;
+  3. b1: net unattended ~0 (<= 5 per blackout) with one hold and one stall-end resume per blackout and no new client session;
+  4. c1: the pause within 0.3 s of the client's last frame in every blackout;
+  5. e1-e3: 0 lan_bidir steps when the uplink is quiet;
+  6. f: the CPU cost of rewind per core stated; PSX HW's answer stated.
+
+THE READING, written beforehand:
+  - if a2/a3 cut the silences by >= 80 %: the Wi-Fi lock is the first adoption question (the client property -> a default in
+    the app, the user's call), and B6's H can be re-derived from the locked distribution (a B task);
+  - if b1 and c1 meet their bars with d1 clean: the hold + rewind + stall stack is a candidate for the user's adoption call on
+    the LAN with its costs stated (the frozen picture during a hold; ~1 s of unattended game at H 950 unless the lock lets H
+    fall; the rewind buffer's memory per core);
+  - if d1 shows false holds: the stack is not a candidate until the lock result is in;
+  - e: the bidirectional rule's false-trigger count on the bench is its out-of-sample check;
+  - f: whether PS1 can have rewind at all decides whether the stack is SNES-only.
+
+THE CONFIRMED APK: if every cell is valid and the flag-absent / property-empty cells (a1, and the host-flag-absent f1 / f3)
+behaved as today, the candidate cb0935c8... stays and becomes CONFIRMED (CL-B7's rule; the pin moved by the record's patch);
+else 93d29b4a... is reinstalled and the user is told which is on the onn.
+
+Measurement only; nothing adopted; nothing committed. adb: the install, the pre-registered setprops, state reads only. Session
+B does not build or bench while the unit privyhub-bench-r2 is active. The driver closes with the eight adopted lines only, no
+e3_flag.conf, and the three properties empty.

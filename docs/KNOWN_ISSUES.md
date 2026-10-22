@@ -1,6 +1,6 @@
 # Known issues and deferred work
 
-## 2026-10-21 LAN-R1: the ladder does not step down on loss on the LAN — OPEN; a rule BUILT behind `PRIVYHUB_LAN_LOSS_RULE=1`, NOT ADOPTED; BENCH-R1 (2026-10-22): the rule back to B, the input hold not a candidate until its trigger is fixed, the death reproduced on the bench
+## 2026-10-21 LAN-R1: the ladder does not step down on loss on the LAN — OPEN; a rule BUILT behind `PRIVYHUB_LAN_LOSS_RULE=1`, NOT ADOPTED; BENCH-R1 (2026-10-22): the rule back to B, the input hold not a candidate until its trigger is fixed, the death reproduced on the bench; BENCH-R2 (2026-10-22): the Wi-Fi lock not the cause, the hold + rewind + stall stack not a candidate, APK cb0935c8 CONFIRMED
 
 **The standard (the user, 2026-10-21):** "This product needs to work at any house especially lan as long as the Internet
 is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.md`.
@@ -105,6 +105,30 @@ is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.m
     - Record: `docs/memory/evidence/LAN_R2_LOSS_RULE_RETHOUGHT_2026-10-22.md`.
   - **Next (session A):** BENCH-R2, as in `handoffs/SESSION_B_DONE_2026-10-22C.md`.
 
+
+- **BENCH-R2, measured (2026-10-22, session A; 15 / 15 cells valid, host gates met in all; nothing adopted):**
+  - **The Wi-Fi lock is not the cause of the uplink silences.**
+    - ≥ 250-ms silences per 10 min: none 41.8, `low_latency` 151.6, `high_perf` 29.5 (bar −80 %).
+    - The room changed across that hour (~1,100-1,300 lost/min after FEC with no shim in the first two cells).
+    - With the lock on, every later cell read 9-28, as BENCH-R1 cell 8 did without it.
+    - B6's H (950) stands.
+  - **The hold + rewind + stall stack is not a candidate.**
+    - `@both` with the stack: ~45 unattended frames per blackout (bar ≤ 5; BENCH-R1 cell 5: 85, raw ~226).
+    - The stall takes the hold over at the return, so the ~57 pre-hold frames are never rewound. The core resumes
+      2-4 s after the link's return; without the stall pair, 1.1 s.
+    - Clean hour: 2.6 stall pauses per 10 min at 150 ms (bar ≤ 2), 0 at 400.
+    - `@down`: the pause 0.15-0.21 s after the client's last frame (met; BENCH-R1: ~2.4 s of game without a
+      picture). But 77 stall pauses per 10 min on that hour's flapping link.
+  - **Beetle PSX HW's rewind is not confirmed:** 118 of 123 rewinds failed B4's after-check (the core read PAUSED). The
+    buffer is 1,074 MB, +16.6 points of a core and +1.0 GB RSS. snes9x: +0.3 points, +29 MB; its rewind was not
+    exercised (no hold on SNES).
+  - **The bidirectional LAN rule: 0 asks, 0 steps** on loss-1 / loss-5 / burst (its out-of-sample check).
+  - **The user saw corrupted pictures** ("NPC models were missing faces … a rainbow like bar at the top") in the
+    loss-1 cell (16:05-16:17Z: 50-99 lost / 14-30 unrecoverable groups per minute after FEC).
+    - The client dropped 488 incomplete frames and kept decoding the following ones; no error counter moved. The same
+      mechanism shows with the previous APK. A B question: freeze to the next IDR, or count it.
+  - **APK `cb0935c8…` CONFIRMED** and pinned (`e1_suite` `EXPECT_APK`, `c3_l4_nft_night`); `93d29b4a…` preserved.
+  - Record: `docs/memory/evidence/BENCH_R2_LOCK_HOLD_STALL_CELLS_2026-10-23.md`.
 ## 2026-10-20 UX-R1, the user's extended evening (2026-10-20 04:19-05:22Z) was bad and got worse — OPEN; the files agree; link vs onn not separable from them; UX-R2: the second evening mostly clean, the damage not repeated (one event so far, untested past play-minute 44); H5 closed (not new); UX-R3: one of last night's two "deaths" found (04:54:55-59Z, a 4-s drop in both directions); the second not distinguishable
 
 **The user's standard, verbatim (2026-10-21): "This product needs to work at any house especially lan as long as the Internet is over 50mb/s."**

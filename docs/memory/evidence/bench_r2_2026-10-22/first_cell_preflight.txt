@@ -1,0 +1,10 @@
+cell a1 (a1_lock_none) preflight confirmed at 14:12:00Z (read-only):
+  the properties set as pre-registered (none) and read back: wifi_lock / stall_signal / link_report all empty (driver.log)
+  the suite passed its preflight (it refuses otherwise), wrote the drop-in, restarted, and reached PLAYING on attempt 1
+  in 4.1 s at 14:11:25Z (runs/a1_lock_none/suite.log)
+  the companion's environ: 10 lines = the eight adopted, all present, + PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 and
+  PRIVYHUB_WAN_TELEMETRY=1; no START_RUNG
+  encoder command read back 14:11:24Z: -b:v 7000k -maxrate 7000k -bufsize 7000k, no -rc_mode (masked sha256 76bc41b84b4a...)
+  stream poll 14:11:42Z: active, 1280x720, bitrate_kbps 7000 (the 7000 start)
+  the shim live: profile none, post-fec, seed 1; at t_s 23: 958 packets in the second, 0 dropped of any kind
+  the unit privyhub-bench-r2: active (running) (unit_status_after_launch.txt)

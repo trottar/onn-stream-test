@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-10-22
-baseline_commit: 144e5c7 (BENCH-R1's record uncommitted beside it; the user commits)
+baseline_commit: 43a8df6 (BENCH-R2's record and its pin patch uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -209,6 +209,44 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
+
+**BENCH-R2: the lock, the hold, the stall signal — MEASURED, 15 / 15 valid, host gates met in all**
+(`evidence/BENCH_R2_LOCK_HOLD_STALL_CELLS_2026-10-23.md`; run 14:09:00-17:45:11Z on `43a8df6`; nothing adopted).
+- **The Wi-Fi lock is not the cause of the uplink silences** (none 41.8, `low_latency` 151.6, `high_perf` 29.5 per
+  10 min; bar −80 %). The room changed across that hour. B6's H (950) stands.
+- **The hold + rewind + stall stack is NOT a candidate:**
+  - `@both`: ~45 unattended frames per blackout (bar ≤ 5). The stall takes the hold over, so the pre-hold frames are not
+    rewound, and the core resumes 2-4 s after the link's return.
+  - Clean hour: 2.6 stall pauses per 10 min (bar ≤ 2).
+  - `@down`: the pause 0.15-0.21 s after the client's last frame (met).
+- **Beetle PSX HW's rewind is not confirmed:** 118 / 123 failed B4's after-check; +1 GB RSS, +16.6 points of a core.
+  snes9x's rewind is untested.
+- **The bidirectional LAN rule never fired** (0 asks on the three loss cells).
+- **The user's glitches (16:05-16:17Z, the loss-1 cell)** are loss-corrupted frames the client decoded through: 488
+  frames dropped for missing packets and no error counter. The same happens with the previous APK.
+- **APK `cb0935c8…` CONFIRMED (the pre-registered rule) and pinned;** `93d29b4a…` preserved. At the record: `--check`
+  ok, the eight lines, no `e3_flag.conf`, the properties empty.
+
+1. **The user's commit:**
+   - BENCH-R2's record, `bench_r2_2026-10-22/` (`logs_bench/`, `record/`, the client reports in `runs/`);
+   - `BENCH_R2_LAUNCH_2026-10-22.md`, the task file, `_cowork_prompt.txt`;
+   - the pin: `tools/e1_suite.py`, `tools/c3_l4_nft_night.py`, `tools/test_c3_l4_nft_night.py`;
+   - `KNOWN_ISSUES.md`, `ROADMAP.md`, this file (`logs/bench_r2_git_status.txt`).
+2. **Adoption questions: none. The reading gives none.**
+   - The lock did not cut the silences. Its cost if adopted anyway: battery / scan behaviour on the onn, for no measured
+     gain.
+   - The stack missed b1's bar and d1's. Its costs, stated for when B returns it:
+     - the frozen picture during a hold;
+     - ~1 s (57 frames) of unattended game at H 950 unless rewound;
+     - the rewind buffer: SNES +29 MB / +0.3 points, PSX HW +1 GB / +16.6 points (and not confirmed to rewind).
+3. **For session B (the user's call which):**
+   - the hold's ownership at the return (rewind the pre-hold frames; resume at the return, as b2's 1.1 s);
+   - PSX HW's after-check, or a SNES-only stack;
+   - the stall threshold (0 at 400 on a clean hour);
+   - the decode-through-loss pictures (freeze to the next IDR, or count frames decoded after a dropped reference).
+   - A bench on snes9x is what would exercise rewind at all.
+4. **Then the user plays,** wherever they like. The onn has the CONFIRMED `cb0935c8…`, every flag and property absent,
+   i.e. today's stream.
 
 **ML-R1: the hitch early-warning detector — MEASURED offline, NO FLAG PROPOSED**
 (`evidence/ML_R1_HITCH_EARLY_WARNING_2026-10-23.md`; run 13:24:47-13:28:48Z, 4 min; nothing adopted).

@@ -55,7 +55,9 @@ PKG = "com.safeiot.privyhub"
 # before it 59f736d2... (CL-B3), 77011eef... (CL-B2), de072762... (CL-B1)
 # CL-B7 (installed 2026-10-19): CL-B7P's lean-drain flag APK (debug.privyhub.opus_decode; absent = CL-B5's drain);
 # the previous CONFIRMED APK was 043891e1... (CL-B5)
-EXPECT_APK = "93d29b4a38d224fddbcf261dab72b40f1290f009b7dc506d60eb3104071e1624"
+# BENCH-R2 (installed 2026-10-22): B5 Wi-Fi lock + B7 stall signal APK (debug.privyhub.wifi_lock / stall_signal; absent =
+# CL-B7's client); the previous CONFIRMED APK was 93d29b4a... (CL-B7)
+EXPECT_APK = "cb0935c8cadd5ee65a3f52f390d0994899de27ebaa5c207b547e57185e761080"
 LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
 # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
 # is exactly these two names, at every precondition and teardown

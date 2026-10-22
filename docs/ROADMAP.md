@@ -1865,6 +1865,8 @@ pending (BENCH-R2: net unattended ≈ 0, rewind's CPU per core, PSX HW).** Recor
 fixed (18 false holds on a clean link; −73 % per blackout, not ≥ 90 %). The LAN loss rule is back to B: it stepped at
 0.9-1.5 min, not 3-4. Record: `docs/memory/evidence/BENCH_R1_BLACKOUT_AND_LOSS_CELLS_2026-10-22.md`.
 
+**BENCH-R2 (2026-10-22): the lock, the hold, the stall signal — MEASURED, 15/15 valid; nothing adopted; APK cb0935c8 CONFIRMED.** The Wi-Fi lock did not cut the uplink silences (the room did). The hold + rewind + stall stack is not a candidate: ~45 unattended frames per blackout, and stall pauses on a clean hour. The `@down` pause lands 0.2 s after the client's last frame. Beetle PSX HW's rewind is not confirmed (+1 GB, +16.6 points); snes9x's is untested. The bidirectional LAN rule never fired. Record: `docs/memory/evidence/BENCH_R2_LOCK_HOLD_STALL_CELLS_2026-10-23.md`.
+
 **ML-R1 (2026-10-22): a hitch early-warning detector — MEASURED offline; not built into the companion; no flag.** It ranks better than the hand rules (AUPRC 0.67 against 0.40), but at a usable operating point it is about the 250-ms silence rule. Record: `docs/memory/evidence/ML_R1_HITCH_EARLY_WARNING_2026-10-23.md`.
 
 **B5 (2026-10-22): the client's Wi-Fi lock (none was held), built behind `debug.privyhub.wifi_lock`; APK pinned, not

@@ -1,0 +1,43 @@
+--- docs/memory/evidence/bench_r2_2026-10-22/record/predecessors/e1_suite.py	2026-10-19 13:50:01.121829734 -0400
++++ tools/e1_suite.py	2026-10-22 14:03:47.877286205 -0400
+@@ -55,7 +55,9 @@
+ # before it 59f736d2... (CL-B3), 77011eef... (CL-B2), de072762... (CL-B1)
+ # CL-B7 (installed 2026-10-19): CL-B7P's lean-drain flag APK (debug.privyhub.opus_decode; absent = CL-B5's drain);
+ # the previous CONFIRMED APK was 043891e1... (CL-B5)
+-EXPECT_APK = "93d29b4a38d224fddbcf261dab72b40f1290f009b7dc506d60eb3104071e1624"
++# BENCH-R2 (installed 2026-10-22): B5 Wi-Fi lock + B7 stall signal APK (debug.privyhub.wifi_lock / stall_signal; absent =
++# CL-B7's client); the previous CONFIRMED APK was 93d29b4a... (CL-B7)
++EXPECT_APK = "cb0935c8cadd5ee65a3f52f390d0994899de27ebaa5c207b547e57185e761080"
+ LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
+ # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
+ # is exactly these two names, at every precondition and teardown
+--- docs/memory/evidence/bench_r2_2026-10-22/record/predecessors/c3_l4_nft_night.py	2026-10-19 13:50:01.121829734 -0400
++++ tools/c3_l4_nft_night.py	2026-10-22 14:03:47.877286205 -0400
+@@ -103,7 +103,9 @@
+ # (kept at PrivyHub/app/build/cl_b5_preserved/app-debug.apk).
+ # CL-B7 (installed 2026-10-19): the lean-drain flag APK replaced CL-B5's 043891e1cc7d643dc496eb6f6dcef50472418e9444300f667ac6abb7d0201607
+ # (kept at PrivyHub/app/build/cl_b7_preserved/app-debug.apk).
+-ADOPTED_APK_SHA256 = "93d29b4a38d224fddbcf261dab72b40f1290f009b7dc506d60eb3104071e1624"
++# BENCH-R2 (installed 2026-10-22): the Wi-Fi lock + stall signal APK replaced CL-B7's 93d29b4a38d224fddbcf261dab72b40f1290f009b7dc506d60eb3104071e1624
++# (kept at PrivyHub/app/build/bench_r2_preserved/app-debug.apk).
++ADOPTED_APK_SHA256 = "cb0935c8cadd5ee65a3f52f390d0994899de27ebaa5c207b547e57185e761080"
+ REFERENCE_PROFILE = "native_game_720p60_reference"
+ MODE_ENV = "PRIVYHUB_ADAPTIVE_BITRATE_MODE"
+ # C3-L4-D1 (2026-10-01): live is the companion's default through the systemd drop-in
+--- docs/memory/evidence/bench_r2_2026-10-22/record/predecessors/test_c3_l4_nft_night.py	2026-10-19 13:50:01.121829734 -0400
++++ tools/test_c3_l4_nft_night.py	2026-10-22 14:03:47.877286205 -0400
+@@ -264,11 +264,11 @@
+ 
+ 
+ class AdoptedApk(unittest.TestCase):
+-    """CL-B7 (2026-10-19; CL-B5, CL-B4, CL-B3, CL-B2 and CL-B1 before it): the preflight checks the CONFIRMED APK."""
++    """BENCH-R2 (2026-10-22; CL-B7, CL-B5, CL-B4, CL-B3, CL-B2 and CL-B1 before it): the preflight checks the CONFIRMED APK."""
+ 
+-    def test_the_preflight_expects_the_cl_b7_apk(self):
++    def test_the_preflight_expects_the_bench_r2_apk(self):
+         self.assertEqual(h.ADOPTED_APK_SHA256,
+-                         "93d29b4a38d224fddbcf261dab72b40f1290f009b7dc506d60eb3104071e1624")
++                         "cb0935c8cadd5ee65a3f52f390d0994899de27ebaa5c207b547e57185e761080")
+ 
+ 
+ 

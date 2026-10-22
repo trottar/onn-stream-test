@@ -1,0 +1,50 @@
+E3 redactor check (h2_prep_redact.py --check, stdin per file), 2026-10-22T14:11:54Z
+OK   docs/memory/evidence/bench_r2_2026-10-22/baseline_head.txt
+OK   docs/memory/evidence/bench_r2_2026-10-22/bench_r2_driver.py
+OK   docs/memory/evidence/bench_r2_2026-10-22/bench_r2_preregistration.sha256
+OK   docs/memory/evidence/bench_r2_2026-10-22/bench_r2_preregistration.txt
+OK   docs/memory/evidence/bench_r2_2026-10-22/bench_r2_state.json
+OK   docs/memory/evidence/bench_r2_2026-10-22/bench_r2_suite_call.py
+OK   docs/memory/evidence/bench_r2_2026-10-22/candidate_apk_sha256.txt
+OK   docs/memory/evidence/bench_r2_2026-10-22/check_before.json
+OK   docs/memory/evidence/bench_r2_2026-10-22/check_before_launch.json
+OK   docs/memory/evidence/bench_r2_2026-10-22/client_after_install.json
+OK   docs/memory/evidence/bench_r2_2026-10-22/client_before_install.json
+OK   docs/memory/evidence/bench_r2_2026-10-22/dry_run_console.txt
+OK   docs/memory/evidence/bench_r2_2026-10-22/dry_run/driver.log
+OK   docs/memory/evidence/bench_r2_2026-10-22/dry_run/dry_record.json
+OK   docs/memory/evidence/bench_r2_2026-10-22/dry_run/status.txt
+OK   docs/memory/evidence/bench_r2_2026-10-22/first_cell_preflight.txt
+OK   docs/memory/evidence/bench_r2_2026-10-22/git_status_at_start.txt
+OK   docs/memory/evidence/bench_r2_2026-10-22/install_at.txt
+OK   docs/memory/evidence/bench_r2_2026-10-22/install.log
+OK   docs/memory/evidence/bench_r2_2026-10-22/launch_console.txt
+OK   docs/memory/evidence/bench_r2_2026-10-22/launched_at.txt
+OK   docs/memory/evidence/bench_r2_2026-10-22/preregistration_hashed_at.txt
+OK   docs/memory/evidence/bench_r2_2026-10-22/properties_after_install.txt
+OK   docs/memory/evidence/bench_r2_2026-10-22/redact_check.txt
+OK   docs/memory/evidence/bench_r2_2026-10-22/runs/a1_lock_none/absent.json
+OK   docs/memory/evidence/bench_r2_2026-10-22/runs/a1_lock_none/E1-PS1-STREAM_flag/run1/cgroup.jsonl
+OK   docs/memory/evidence/bench_r2_2026-10-22/runs/a1_lock_none/E1-PS1-STREAM_flag/run1/encoder.jsonl
+OK   docs/memory/evidence/bench_r2_2026-10-22/runs/a1_lock_none/E1-PS1-STREAM_flag/run1/sampler.log
+OK   docs/memory/evidence/bench_r2_2026-10-22/runs/a1_lock_none/E1-PS1-STREAM_flag/run1/sampler_meta.json
+OK   docs/memory/evidence/bench_r2_2026-10-22/runs/a1_lock_none/E1-PS1-STREAM_flag/run1/samples.jsonl
+OK   docs/memory/evidence/bench_r2_2026-10-22/runs/a1_lock_none/E1-PS1-STREAM_flag/run1/status_poll.jsonl
+OK   docs/memory/evidence/bench_r2_2026-10-22/runs/a1_lock_none/E1-PS1-STREAM_flag/run1/telemetry.jsonl
+OK   docs/memory/evidence/bench_r2_2026-10-22/runs/a1_lock_none/E1-PS1-STREAM_flag/run1/threads.jsonl
+HIT  docs/memory/evidence/bench_r2_2026-10-22/runs/a1_lock_none/E1-PS1-STREAM_flag/run1/title.txt
+OK   docs/memory/evidence/bench_r2_2026-10-22/runs/a1_lock_none/encoder_cmd_run1.jsonl
+OK   docs/memory/evidence/bench_r2_2026-10-22/runs/a1_lock_none/stream_poll_run1.jsonl
+OK   docs/memory/evidence/bench_r2_2026-10-22/runs/a1_lock_none/suite_console.log
+OK   docs/memory/evidence/bench_r2_2026-10-22/runs/a1_lock_none/suite.log
+OK   docs/memory/evidence/bench_r2_2026-10-22/runs/a1_lock_none/wan_poll_run1.jsonl
+OK   docs/memory/evidence/bench_r2_2026-10-22/session_status_before.json
+OK   docs/memory/evidence/bench_r2_2026-10-22/signer_check.txt
+OK   docs/memory/evidence/bench_r2_2026-10-22/tools_at_preregistration_sha256.txt
+OK   docs/memory/evidence/bench_r2_2026-10-22/units_before.txt
+OK   docs/memory/evidence/bench_r2_2026-10-22/unit_status_after_launch.txt
+OK   docs/memory/evidence/BENCH_R2_LAUNCH_2026-10-22.md
+OK   logs/bench_r2_launch_git_status.txt
+
+Re-check of each HIT, per the FLAG rule (as G8-S3 / G8-S5 / BENCH-R1): benign only if OK with 127.0.0.1, 0.0.0.0 and the core's version string (the 'Beetle PSX HW <version>' token in the window title) masked:
+OK (benign)  docs/memory/evidence/bench_r2_2026-10-22/runs/a1_lock_none/E1-PS1-STREAM_flag/run1/title.txt
