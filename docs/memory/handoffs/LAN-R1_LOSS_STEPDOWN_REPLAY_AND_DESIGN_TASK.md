@@ -1,0 +1,33 @@
+---
+memory_schema: 1
+as_of: 2026-10-21
+status: TASK HANDOFF — LAN-R1 (session B, software only, no stream, no companion restart): why the ladder sat at 7000 through Sunday's 50 bad minutes, what it would have done with the existing rules on, and a LAN step-down-on-loss rule built behind a flag and proved by replay against both evenings and the week's clean windows. The live test is a later session-A task. Nothing adopted; nothing committed
+---
+
+# LAN-R1 — the ladder on a lossy LAN: replay, then a rule behind a flag
+
+**The standard (the user, 2026-10-21, verbatim):** "This product needs to work at any house especially lan as long as the Internet is over 50mb/s." Two evenings on a different TV (a different room, the same router): Sunday 7× the loss for 50 minutes with bursts to 5,398/min and two silence pauses, the ladder at 7000 throughout; last night mostly clean with two "deaths" the user felt in Zelda. **The ladder was tuned in one clean room. It must step down when the room is not clean.**
+
+Read first: `UX_R1_…` §1 (the per-minute table; the 04:56Z step; the 05:06 / 05:10 / 05:20-21 bursts; "the ladder: `live`, 7000 throughout; one acted step 7000 → 6000 `capacity_mild` at 05:11:01, reset at the next start"), `UX_R2_…` §1 (the 04:52Z step; the pairing table; the clean minutes), **`UX_R3_…` if it has landed** (the deaths' seconds; §3 the ladder in those seconds — read it; if not yet, use the steps and bursts), `C3_L4_D1_LIVE_DEFAULT_2026-10-01.md`, `C3_L4_L2_INCREASE_RULE_…`, `C3_L4_N1_CAPACITY_TRIGGER_…`, `C3_L4_N2_MILD_CAPACITY_…` (what `live` reacts to: capacity, not loss — confirm from `companion/adaptive_bitrate_live.py`), `G5_S1_…` (`classify_window`: clean / lossy / starved / capacity-limited / latency-limited — the lossy class exists), `G5_S2_…` (R1-R5 behind `PRIVYHUB_WAN_ADAPTATION=1`; R2/R3 step down on loss; **are they gated on `path_class` remote? read `wan_adaptation.py` and say**; the replay harness G5-S2 used — reuse it), `G8_S1_ADVERSE_NETWORK_ENVELOPE_2026-10-17.md` (the loss-1 / loss-5 / burst cells at a 7000 start: what the ladder did under injected loss, from the record), `MEMORY.md` (the D-BASE transfer function and P5/S3 on the onn's socket).
+
+## 1. The replay (before any design; the harness proves HEAD first)
+
+Copy both evenings' ladder logs from `ux_r1_2026-10-20/session/` and `ux_r2_2026-10-21/session/` into `lan_r1_2026-10-21/inputs/` (copies; the ladder log rotates). Then, through the real controller in process (G5-S2's harness):
+1. **HEAD, flag absent:** the replay must reproduce the recorded decisions row for row (the byte-for-byte check that G5-S2 made). State it.
+2. **`PRIVYHUB_WAN_ADAPTATION=1` on the same inputs:** every suggestion by rule id per minute, and where (if anywhere) R2/R3 would have forced a step down on Sunday — at 04:56Z? at 05:06 / 05:10 / 05:20? — and on last night at 04:52Z and in UX-R3's death seconds. If the rules are gated on a remote `path_class`, show the result both as gated (nothing on the LAN) and with the gate lifted in the harness only.
+3. **What `live` saw:** per bad minute, the inputs the adopted controller reads (its sample states, the capacity trigger's terms) and why none of its rules fired. One table. This is the answer to "why 7000 throughout".
+4. **The G8-S1 loss cells:** from the record, the ladder's decisions under loss-1 and loss-5 at a 7000 start (did it step? on what?) — the bench's evidence of the same gap.
+
+## 2. The design (hashed before the code)
+
+- **The flag:** `PRIVYHUB_LAN_LOSS_RULE=1` (or the name the module convention gives it). **Absent = today byte for byte** (the replay in §1.1 is the proof, repeated after the code).
+- **The rule, in words first:** on any path class, a step down of one rung when post-FEC loss (or FEC-unrecoverable groups, whichever the two evenings separate better — show both) is sustained over K windows above a threshold T, applied through the ladder's own `_decide` so every existing guard holds (hold-downs, blackout, the 60-s session age, the rate limit, the oscillation guard); the re-climb by the existing increase rule; a floor at the LAN list's 5000. The thresholds come from the data, not from taste: **T and K must not fire in any clean minute on file** (CL-B5 B/L, CL-B6, CL-B7's three arms, G4-S3's LAN parts, last night's clean minutes — list the false-trigger count per window, which must be 0) **and must fire on Sunday before the 05:06 burst** (state at which minute it first fires, and at the 04:56Z step or not). If no T/K separates them, say so — that is a finding, and the rule may need the client's per-second output gap instead of the host's per-minute loss.
+- **What the client already sends that the host could use:** the heartbeat's receiver loss, the output gap, the decode queue; whether the ladder reads them today; what a per-second signal would add (noted, not built).
+- **Proof:** the replay of §1 with the rule on — Sunday's and last night's step-down minutes and the rung path that would have resulted; the false-trigger table over the clean windows; the G8-S1 loss cells if their logs allow; unit tests for parsing, the flag absent, the rule's windows and the guards; the suites green; the actuator path unchanged (the rung change rides the existing actuator).
+- **Not in this task:** FEC changes, frame-size changes, the client, any live run. **The live test** is session A's, after the instrumented evening: the shim's loss-1 / loss-5 / burst profiles at a 7000 start with the flag on vs absent, then the user's room.
+
+## 3. Record
+
+`evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.md` + `lan_r1_2026-10-21/` (the inputs, the replay outputs for §1.1-1.4, the design + hash, the diff, the threshold tables, the test output, `redact_check.txt`, `manifest.sha256`); `patches/LAN-R1_…md`; `docs/KNOWN_ISSUES.md` (the top item: "the ladder does not step down on loss on the LAN" with the replay's numbers); `docs/ROADMAP.md` (a §G8 or a new §LAN line: built behind a flag, live test pending); `logs/lan_r1_git_status.txt`; `SESSION_B_STATUS.txt`; `SESSION_B_DONE_2026-10-21.md` (ten lines; the live test sketched).
+
+Rules: the `/tmp/b_*` copy holds `companion/`, `tools/`, `tests/` only; any recorded log used for a replay is copied into the evidence directory first; session A is read-only today (UX-R3) and runs no stream — but **check `systemctl --user is-active privyhub-*` reads nothing active before any replay that loads the host**; nothing of A's touched (`ux_r3_2026-10-21/`). No companion restart, no stream, no adb, no sudo, no nft, the Opal read-only, no addresses or identifiers; nothing fetched, nothing deleted; nothing adopted; nothing committed.

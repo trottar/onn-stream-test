@@ -118,6 +118,14 @@ if (os.environ.get("PRIVYHUB_WAN_ADAPTATION") or "").strip() == "1":
 
     WAN_ADAPTATION = _wan_adaptation.from_environ(os.environ)
 
+# LAN-R1: one rung down on sustained FEC-unrecoverable groups, only with
+# PRIVYHUB_LAN_LOSS_RULE=1. Absent = today: nothing imported, observe() unchanged.
+LAN_LOSS_RULE = None
+if (os.environ.get("PRIVYHUB_LAN_LOSS_RULE") or "").strip() == "1":
+    import lan_loss_rule as _lan_loss_rule
+
+    LAN_LOSS_RULE = _lan_loss_rule.from_environ(os.environ)
+
 # G5-S3: the remote ladder (the session's path class; 720p/4000 on a remote
 # path only), only with PRIVYHUB_REMOTE_LADDER=1. Absent = today: nothing
 # imported; the context, the policy's ladder and every row are as before.
@@ -937,6 +945,8 @@ class LiveController:
                     events = WAN_ADAPTATION.feed(self._policy, s, ctx, telemetry)
                 if REMOTE_CAP is not None:   # G5-S4: the move to the cap, through the ladder's gates
                     events = REMOTE_CAP.after_feed(self._policy, s, ctx, events)
+                if LAN_LOSS_RULE is not None:   # LAN-R1: one rung down on sustained unrecoverable groups
+                    events = LAN_LOSS_RULE.after_feed(self._policy, s, ctx, telemetry, events)
                 self._write_sample(s, self._policy.last_disposition, self._policy.last_clean)
                 self._emit(events, s, ctx)
                 self._maybe_actuate()

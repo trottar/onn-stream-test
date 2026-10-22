@@ -1,0 +1,18 @@
+UX-R3 §3: the ladder at each top-ranked second (live mode; read from the copies; no change proposed).
+live's step-down rules over the last 5 evaluated reports (10 s): capacity_mild (one rung) fps < 57 on >= 4 of 5 AND loss >= 50 on >= 3 of 5;
+  capacity (fallback) fps < 50 on all 5 AND loss >= 50 on >= 3 of 5; queue/gap FALLBACK fps < 50 on all 5 AND (queue >= 2 on >= 3 of 5 OR gap > 250 on >= 2 of 5);
+  ROUTINE fps < 57 on >= 4 of 5 AND queue >= 1 on >= 3 of 5; none before 60 s of session age; stale / blackout / resync reports do not count.
+evening | second | state / reason at or before | last acted decision this evening | the 5 samples from it (fps / loss / gap / queue / disposition) | fps<57 | fps<50 | loss>=50 | gap>250 | queue>=1 | what capacity_mild needed
+R2 | 04:42:47 | PRESSURE / pressure_sample | none | 45/24/29/0/evaluated; 40/18/9/0/evaluated; 40/5/5/0/evaluated; 58/4/2/0/evaluated; 57/19/20/0/evaluated | 3/5 | 3/5 | 0/5 | 0/5 | 0/5 | 1 more at fps<57, 3 more with loss>=50
+R2 | 04:54:56 | REFERENCE / clean | none | 40/29/6/0/evaluated; 90/39/12/0/evaluated; 61/0/10/0/evaluated; 60/0/17/0/evaluated; 62/0/7/0/evaluated | 1/5 | 1/5 | 0/5 | 0/5 | 0/5 | 3 more at fps<57, 3 more with loss>=50
+R2 | 04:54:59 | REFERENCE / clean | none | 40/29/6/0/evaluated; 90/39/12/0/evaluated; 61/0/10/0/evaluated; 60/0/17/0/evaluated; 62/0/7/0/evaluated | 1/5 | 1/5 | 0/5 | 0/5 | 0/5 | 3 more at fps<57, 3 more with loss>=50
+R2 | 04:55:53 | PRESSURE / pressure_sample | none | 78/2/4/0/evaluated; 60/0/3/0/evaluated; 64/0/11/0/evaluated; 60/0/22/0/evaluated; 60/0/7/0/evaluated | 0/5 | 0/5 | 0/5 | 0/5 | 0/5 | 4 more at fps<57, 3 more with loss>=50
+R2 | 04:59:57 | PRESSURE / pressure_sample | none | 42/10/35/4/evaluated; 60/4/7/0/evaluated; 62/0/6/0/evaluated; 60/0/6/0/evaluated; 58/0/10/0/evaluated | 1/5 | 1/5 | 0/5 | 0/5 | 1/5 | 3 more at fps<57, 3 more with loss>=50
+R2 | 05:03:10 | PRESSURE / pressure_sample | none | 38/2/3/0/evaluated; 62/16/19/0/evaluated; 58/4/14/0/evaluated; 60/0/4/0/evaluated; 58/0/4/0/evaluated | 1/5 | 1/5 | 0/5 | 0/5 | 0/5 | 3 more at fps<57, 3 more with loss>=50
+R2 | 05:12:46 | PRESSURE / pressure_sample | none | 14/23/107/0/evaluated; 96/11/15/0/evaluated; 56/0/8/0/evaluated; 58/6/10/0/evaluated; 64/12/25/0/evaluated | 2/5 | 1/5 | 0/5 | 0/5 | 0/5 | 2 more at fps<57, 3 more with loss>=50
+R2 | 05:17:38 | PRESSURE / pressure_sample | none | 28/2/6/0/evaluated; 54/19/8/3/evaluated; 60/0/22/0/evaluated; 60/0/26/0/evaluated; 64/0/24/0/evaluated | 2/5 | 1/5 | 0/5 | 0/5 | 1/5 | 2 more at fps<57, 3 more with loss>=50
+R1 | 05:06:04 | PRESSURE / pressure_sample | none | 20/46/2/0/evaluated; 74/12/8/0/evaluated; 64/0/10/0/evaluated; 60/0/9/1/evaluated; 54/1/40/1/evaluated | 2/5 | 1/5 | 0/5 | 0/5 | 2/5 | 2 more at fps<57, 3 more with loss>=50
+R1 | 05:10:05 | PRESSURE / resync_ignored | none | 0/1592/3/0/resync; 103/603/3/1/blackout; 59/2/23/0/blackout; 58/5/8/0/blackout; 66/0/6/0/evaluated | 1/5 | 1/5 | 2/5 | 0/5 | 1/5 | 3 more at fps<57, 1 more with loss>=50
+R1 | 05:10:55 | PRESSURE / pressure_sample | none | 52/87/8/0/evaluated; 30/785/1/0/evaluated; 16/429/157/0/evaluated; 110/829/18/0/evaluated; 30/5/10/0/blackout | 4/5 | 3/5 | 4/5 | 0/5 | 0/5 | met
+R1 | 05:20:50 | REFERENCE / clean | 05:11:02 transition_done None -> 6000 | 70/36/1/0/evaluated; 74/102/38/0/evaluated; 68/2/2/0/evaluated; 72/19/22/0/evaluated; 56/0/3/0/evaluated | 1/5 | 0/5 | 1/5 | 0/5 | 0/5 | 3 more at fps<57, 2 more with loss>=50
+R1 | 05:21:43 | PRESSURE / pressure_sample | 05:11:02 transition_done None -> 6000 | 60/252/1/0/evaluated; 58/156/32/0/evaluated; 52/0/3/2/evaluated; 64/1/5/0/evaluated; 56/12/22/0/evaluated | 2/5 | 0/5 | 2/5 | 0/5 | 1/5 | 2 more at fps<57, 1 more with loss>=50

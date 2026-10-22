@@ -1,0 +1,38 @@
+{
+ "R2": {
+  "startup": {
+   "hitch_seconds_in_first_15_s_of_a_client_session": 20,
+   "client_sessions": 6
+  },
+  "report_only_G": {
+   "seconds_with_output_gap_ge_200": 24,
+   "report_minutes": 39.6,
+   "per_10_min": 6.1,
+   "reports": 6,
+   "reports_with_slow_list_full (older rows dropped)": 2
+  }
+ },
+ "R1": {
+  "startup": {
+   "hitch_seconds_in_first_15_s_of_a_client_session": 8,
+   "client_sessions": 21
+  },
+  "report_only_G": {
+   "seconds_with_output_gap_ge_200": 66,
+   "report_minutes": 57.5,
+   "per_10_min": 11.5,
+   "reports": 20,
+   "reports_with_slow_list_full (older rows dropped)": 3
+  }
+ },
+ "SEPT20": {
+  "report_only_G": {
+   "seconds_with_output_gap_ge_200": 4,
+   "report_minutes": 18.3,
+   "per_10_min": 2.2,
+   "reports": 8,
+   "reports_with_slow_list_full (older rows dropped)": 8
+  },
+  "note": "2026-09-20 05:59-06:20Z, the 8 client reports read in place (UX-R2 H5). Its heartbeat and control-gap logs have rotated out, so R, C and L cannot be computed; only G, from the reports."
+ }
+}

@@ -1,6 +1,70 @@
 # Known issues and deferred work
 
-## 2026-10-20 UX-R1, the user's extended evening (2026-10-20 04:19-05:22Z) was bad and got worse — OPEN; the files agree; link vs onn not separable from them; UX-R2: the second evening mostly clean, the damage not repeated (one event so far, untested past play-minute 44); H5 closed (not new)
+## 2026-10-21 LAN-R1: the ladder does not step down on loss on the LAN — OPEN; a rule BUILT behind `PRIVYHUB_LAN_LOSS_RULE=1`, NOT ADOPTED, live test pending
+
+**The standard (the user, 2026-10-21):** "This product needs to work at any house especially lan as long as the Internet
+is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.md`.
+- **Why 7000 throughout Sunday (UX-R1):**
+  - Every decrease bar of the adopted `live` ladder carries an fps term (capacity_mild: fps < 57 on ≥ 4 of 5 AND
+    lost ≥ 50 on ≥ 3).
+  - Sunday's loss came as < 50 per report from 04:56 to 05:05, then as single-report bursts (05:06 491, 05:10
+    5,376, 05:20 279, 05:21 899), with fps ≥ 57 on most reports.
+  - At 05:21 both terms reached their counts, never in the same 5-report window. The one acted step was
+    `capacity_mild` at 05:11:01.
+  - The replay through the real controller reproduces both evenings exactly.
+- **G5-S2's rules** are not gated on the path, and add nothing: R3.1 once, at 05:11, on the ladder's own tick.
+- **G8-S1 showed the same gap:** loss-1 and loss-5 (809 lost/min, fps 52.6) held 7000.
+- **Built, not adopted:** one rung down when 2 consecutive 10-s windows each hold ≥ 4 FEC-unrecoverable groups
+  (the telemetry carries them; the ladder did not read them), through every gate, floor 5000.
+  - Replayed: Sunday 7000→6000 at 05:03:05Z (~3 min before the 05:06 burst), →5500 at 05:06:07, →5000 at 05:10:48.
+  - 0 asks in every clean window on file (CL-B5 A/B/L, CL-B6, CL-B7 ×3, G4-S3). Last night, 2 asks, refused by the
+    60-s session-age guard.
+- **Caveats:**
+  - Post-FEC loss does not separate Sunday's early minutes from the clean windows. The unrecoverable groups do only
+    at an edge cell, chosen in sample.
+  - The rule also steps down under random loss (G8-S1 loss-1: 5000 within 9-11 min), where a lower rate does not
+    help.
+  - It does not address last night's death (UX-R3: 04:54:55-04:54:59Z, a 4-s bidirectional drop). No 2 × 10-s run
+    reached ≥ 4 there, so it made no ask.
+- **Next (session A):** the shim's loss-1 / loss-5 / burst at 7000 with the flag on vs absent, then the user's room.
+
+## 2026-10-20 UX-R1, the user's extended evening (2026-10-20 04:19-05:22Z) was bad and got worse — OPEN; the files agree; link vs onn not separable from them; UX-R2: the second evening mostly clean, the damage not repeated (one event so far, untested past play-minute 44); H5 closed (not new); UX-R3: one of last night's two "deaths" found (04:54:55-59Z, a 4-s drop in both directions); the second not distinguishable
+
+**The user's standard, verbatim (2026-10-21): "This product needs to work at any house especially lan as long as the Internet is over 50mb/s."**
+On last night, verbatim: "It felt better but there were two memorable instances where I literally died because of
+lag. That is completely unacceptable especially over LAN." Where: "Zelda and no idea probably halfway through to last
+third of the playthrough." Both evenings were played on a different TV and room from the usual test TV.
+
+**UX-R3 (2026-10-21, read-only from the copies; `docs/memory/evidence/UX_R3_FIND_THE_DEATHS_2026-10-21.md`):**
+- **Death 1, seen by the instruments: 04:54:55-04:54:59Z**, 12.3 of 26.4 min into Zelda, both directions at once.
+  - The uplink was silent 2.65 s of 4 s (gaps of 967, 350, 342, 546 and 442 ms).
+  - Output gaps 410 and 307 ms, the session's largest.
+  - A heartbeat was held ~1.5 s, with 61 packets lost after FEC and a 406-ms audio arrival gap.
+  - Frame sizes were normal. No recovery row. The ladder read clean.
+- **Death 2 is not distinguishable.** The user's window 04:56-05:03Z holds only small hitches (control gaps
+  277-297 ms, output gaps 215 / 223 ms).
+- **Hitch seconds** (rendered < 50 fps, or a control gap ≥ 250 ms, or an output gap ≥ 200 ms, or post-FEC loss ≥ 30;
+  pauses excluded):
+  - Sunday 43.3 / 10 min (longest run 28 s); last night 12.9 (mid-play 7.8, longest run 5 s = death 1). This orders
+    the two evenings as the user does.
+  - September cannot be scored (its logs have rotated). Its reports do not show it cleaner.
+  - A candidate metric, not adopted.
+- **live cannot act on a 3-5-s drop.** Its rules need 4 of 5 two-second reports bad. In death 1 the window had 1 slow
+  report and 0 lossy ones, and the heartbeat was held through the worst of it.
+- **What the instruments CAN see:**
+  - uplink silences ≥ 250 ms (start and length);
+  - downlink loss, FEC, rendered frames and audio per ~2 s;
+  - each session's 16 largest output gaps;
+  - host transmit per second;
+  - the ladder per report.
+- **What they CANNOT see:**
+  - controller-to-screen latency;
+  - input delayed less than 250 ms;
+  - the client's send timing;
+  - output gaps below the top 16 outside the last 1,024 slow events (so 04:56-05:03:48 last night);
+  - the Wi-Fi link's retries and rate (no Opal read);
+  - the game's frame on the host;
+  - a clock mark from the user at the moment of a death.
 
 **UX-R2 (2026-10-21, the second evening, 2026-10-21 04:42-05:26Z, 43 min, SNES first;
 `docs/memory/evidence/UX_R2_SECOND_EVENING_2026-10-21.md`, read-only).** The user: "Ran a few games last night." How it

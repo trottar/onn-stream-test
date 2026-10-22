@@ -210,6 +210,33 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
+**UX-R3: find the deaths** (`evidence/UX_R3_FIND_THE_DEATHS_2026-10-21.md`; read-only from the copies; no run, no
+adb).
+- The user: "It felt better but there were two memorable instances where I literally died because of lag."
+- **Their standard: "This product needs to work at any house especially lan as long as the Internet is over 50mb/s."**
+- **Death 1 found:** 04:54:55-04:54:59Z, halfway through Zelda. A ~4-s drop in both directions: the uplink silent
+  2.65 s, output gaps 410 / 307 ms, 61 lost after FEC, frame sizes normal. The ladder saw nothing and could not have
+  acted.
+- **Death 2 is not distinguishable** in 04:56-05:03Z; the instruments' blind spots are named in the record.
+- **Hitch seconds per 10 min:** Sunday 43.3, last night 12.9. This orders the two as the user does (a candidate metric,
+  not adopted). September cannot be scored.
+
+1. **The night queue `QUEUE_2026-10-19N.md` is still HELD until the user says.**
+2. **The next run, for the user's say-so: the instrumented evening in the user's own room** (the TV and Wi-Fi path the
+   two evenings used). This is UX-R1's H1 test with UX-R2's additions, plus:
+   - **the Opal's view (station counters for the onn: retries, rate, signal) every 5 min, read-only, and densely around
+     any user mark;**
+   - **the user's clock marks:** the user says "now" (or notes the host clock) at each hitch or death, so a death has
+     a second, not a 13-minute window;
+   - the heartbeat and control-gap logs preserved that night (they rotate);
+   - ≥ 65 min of play, 00:40-01:30 EDT, PS1 first then SNES after ~00:56;
+   - the onn's `udp6` drops, `cl_b6_onn_read.py` and `cl_b7_onn_threads.py` every 5 min; `boot_count` at the start and
+     the end.
+3. **LAN-R1 (session B):** the loss step-down replay and design. UX-R3 §3's table is its input: no live rule acts on a
+   3-5-s bidirectional drop.
+4. **The user's commit:** UX-R3's record, `ux_r3_2026-10-21/`, `KNOWN_ISSUES.md`, this file, the task file and
+   `_cowork_prompt.txt` (`logs/ux_r3_git_status.txt`).
+
 **UX-R2: the second evening read** (`evidence/UX_R2_SECOND_EVENING_2026-10-21.md`, read 2026-10-21 15:31-15:45Z; nothing
 run, changed or adopted).
 - At the read: the eight lines, `--check` ok, APK `93d29b4a…` CONFIRMED, nothing streaming. The onn was cold-booted

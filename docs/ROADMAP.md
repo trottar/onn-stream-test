@@ -1842,6 +1842,11 @@ Exercise bounded representative conditions:
 Record the operating envelope and failure behavior. Avoid claiming a universal
 Internet requirement from one ISP/path.
 
+**LAN-R1 (2026-10-21): the ladder on a lossy LAN — a step-down rule built behind `PRIVYHUB_LAN_LOSS_RULE=1`, live
+test pending.** The adopted ladder needs an fps term to step down, so Sunday's 50 lossy minutes stayed at 7000. The
+rule steps one rung on 2 × 10 s of ≥ 4 FEC-unrecoverable groups, through every gate, floor 5000. Replayed: Sunday
+6000 at 05:03Z; 0 asks in the clean windows. Not adopted. Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.md`.
+
 ## G9 — Remote foundation checkpoint
 
 Acceptance:
