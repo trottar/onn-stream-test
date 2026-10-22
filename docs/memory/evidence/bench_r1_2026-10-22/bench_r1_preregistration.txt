@@ -1,0 +1,76 @@
+BENCH-R1 PRE-REGISTRATION -- the loss cells and the blackout cells, the hold off and on (session A, 2026-10-22)
+Task: docs/memory/handoffs/BENCH-R1_BLACKOUT_AND_LOSS_CELLS_TASK.md §1. Baseline HEAD b909735 (session B's
+QUEUE_2026-10-22B committed by the user). Written and hashed before the first cell. The strings are session B's
+(SESSION_B_DONE_2026-10-22.md item 8; B1 / B2 records), not the task file's spelling where they differ.
+
+PLANNED LAUNCH: 2026-10-22T02:40:00Z (approximate; the unit's start is recorded in launched_at.txt)
+CAP_UTC: 2026-10-22T05:40:00Z
+(the cap = launch + 3 h; no cell starts at or after it)
+
+CELLS, in order. Each one E1-PS1-STREAM, --e2, --window 600, E2's warm-up, the suite launching the title itself, a
+120-s gap, a 7000 start (no PRIVYHUB_START_RUNG); nobody plays (the TV and the onn on and idle). The run's
+e3_flag.conf written per cell by the suite, read back at stream time and under load, removed at teardown with
+flags_absent true. The adopted state is eight lines. Every cell's drop-in carries PRIVYHUB_WAN_TELEMETRY=1 (the
+scaffolding's base line, as G8-S1's cells; telemetry only, the WAN rules off) and the shim line below.
+  # | PRIVYHUB_IMPAIRMENT=                 | other flags                | environ | question
+  1 | loss-1@post-fec,seed=1               | --                         | 10      | LAN-R1's control (G8-S1 cell 03 again on today's HEAD)
+  2 | loss-1@post-fec,seed=1               | PRIVYHUB_LAN_LOSS_RULE=1   | 11      | the rule out of sample: first step at 3-4 min, 5000 by 8-11?
+  3 | loss-5@post-fec,seed=1               | PRIVYHUB_LAN_LOSS_RULE=1   | 11      | the same under 5 %
+  4 | burst-50x20@post-fec,seed=1          | PRIVYHUB_LAN_LOSS_RULE=1   | 11      | steps ~2 s before capacity_mild?
+  5 | blackout-4s@both,every=120s,seed=1   | --                         | 10      | the death reproduced
+  6 | blackout-4s@both,every=120s,seed=1   | PRIVYHUB_INPUT_HOLD=250    | 11      | the hold
+  7 | blackout-4s@down,every=120s,seed=1   | --                         | 10      | the downlink only: the control for "the missing input kills"
+  8 | none@post-fec,seed=1                 | PRIVYHUB_INPUT_HOLD=250    | 11      | the hold's false-trigger check on a clean link
+  B2 was built (B2_INPUT_HOLD_2026-10-22.md): cells 6 and 8 run with the hold. A blackout spec takes no @post-fec
+  (B1: its placement is @both / @down, applied at post-fec). The first blackout falls 120 s after the companion's
+  restart (the suite's restart for the cell's drop-in), then every 120 s on the companion's clock: a 10-min window
+  after restart + launch + warm-up sees 4-5.
+
+VALIDITY: as G8-S1 / G8-S5. The shim's profile applied by its counters: none -- no drop of any kind; loss-1 --
+random loss 0.7-1.3 % and no other drop; loss-5 -- 4.5-5.5 %; burst-50x20 -- whole 50-packet bursts, one per 20 s
+(+/- 1), no other drop; blackout-4s -- dark spans of 3-6 s on the shim's 1-s lines, their starts 117-123 s apart within
+a stream start, no drop but dropped_blackout, uplink_dropped > 0 on @both and 0 on @down. flags_absent after (the
+suite's teardown, every failed attempt, the final state). PLAYING is the measured outcome: a no_play cell is an
+outcome, recorded as G8-S1 §5 reads one, not repeated beyond the suite's attempts. A playing cell whose shim shows
+the profile not applied runs once more (G8-S1's rule). A cell whose teardown does not read flags_absent ends the
+driver.
+
+GATES (host): RetroArch >= 59.9; capture 60 +/- 0.1; dup+drop <= 0.2/min; flags_absent after. Read as always; in
+cells 5-7 the blackouts, and in cell 6 the hold's pauses, are in the window (disclosed beforehand, not excused).
+
+REPORTED PER CELL (not gated): PLAYING reached (attempt, s); the rung path and every decision with its reason (the
+lan_loss_rule rows in 2-4, with their window sums and the ladder's answer); hitch seconds per 10 min and the longest
+run (UX-R3's definition, ux_r3_seconds.py's criteria R / C / G / L, over the cell's copied logs); unattended frames per
+blackout and per 10 min (B2's reader, tools/unattended_frames.py, the core-running count); the hold rows
+(desync_pause input_hold, resumed input_release, input_hold_handover, input_hold_cap, input_hold_skipped_paused) and
+the time held (6, 8); the per-blackout table in 5-7 (uplink gaps from the control-gap log, output gaps, the heartbeat
+hold, post-FEC loss and FEC-unrecoverable groups, the recovery log); post-FEC loss/min, rendered fps, resyncs, max
+output gap; host CPU and the encoder's % of a core; the encoder command read back (masked). In cell 8: what the idle
+onn sends when nobody touches the pad (the control-gap log's gaps; B2: ~430 packets/s, unconditionally).
+The comparison rows: G8-S1 (2026-10-16/17, §2c, the flag absent, 7000 start): 03 loss-1 off -- 7000 throughout, no
+transition; 05 loss-5 off -- 7000 throughout, no transition; 07 burst-50x20 off -- 7000->6000 capacity_mild in window.
+The death (UX-R3, 04:54:55-04:54:59Z): the uplink silent 2.65 s of 4 s in five control gaps (967 ms the longest);
+output gaps 410 / 307 ms; audio arrival stopped 406 ms; 61 packets lost after FEC; a heartbeat held ~1.5 s; 83.8
+unattended frames (B2's reader). Today's HEAD and adopted state differ from G8-S1's (disclosed, not controlled).
+
+WRITTEN BEFOREHAND (met / not met, not gated):
+  1. cell 1 at 7000 throughout, as G8-S1 cell 03;
+  2. cells 2-3 as LAN-R1 §3 predicts: the first lan_loss step 3-4 min into the stream, 5000 reached by ~8-11 min;
+  3. cell 4 as LAN-R1 §3 predicts: the lan_loss step ~2 s before capacity_mild (G8-S1 cell 07's step);
+  4. cell 5 reproduces the death's shape, per blackout: uplink (control) gaps >= 250 ms inside it, output gaps
+     >= 200 ms, a heartbeat hold, FEC-unrecoverable loss;
+  5. cell 6 cuts unattended frames (core running) per blackout by >= 90 % against cell 5, with exactly one hold
+     (desync_pause input_hold) and one release (resumed input_release) per blackout;
+  6. cell 7: unattended frames ~0 by definition (input present); whether the game runs on, stated;
+  7. cell 8 shows 0 holds per 10 min.
+
+THE READING, written beforehand:
+  - if 6 cuts unattended frames by >= 90 % with 0 false holds in 8: the hold is a candidate -- the user's call to
+    adopt, with its cost stated (up to 250 ms of unattended game per event; the picture frozen while held);
+  - if 8 shows holds on a clean link: the hold is not a candidate until its trigger is fixed;
+  - if 2-4 match LAN-R1's prediction: the rule is a candidate for the sustained-loss case, with LAN-R1's random-loss
+    cost stated;
+  - if they do not: the thresholds were in-sample and the rule goes back to B.
+
+Measurement only; nothing adopted; nothing committed. Session B does not build or bench while the unit
+privyhub-bench-r1 is active. The driver closes with the eight adopted lines only and no e3_flag.conf.

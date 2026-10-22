@@ -1,0 +1,12 @@
+● privyhub-bench-r1.service - [systemd-run] /usr/bin/python3 -B /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/bench_r1_2026-10-22/bench_r1_driver.py
+     Loaded: loaded (/run/user/1000/systemd/transient/privyhub-bench-r1.service; transient)
+  Transient: yes
+     Active: active (running) since Wed 2026-10-21 22:31:50 EDT; 2min 44s ago
+ Invocation: <masked>
+   Main PID: 4086162 (python3)
+      Tasks: 13 (limit: 18065)
+     Memory: 52.6M (peak: 54.5M)
+        CPU: 4.837s
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/privyhub-bench-r1.service
+             ├─4086162 /usr/bin/python3 -B /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/bench_r1_2026-10-22/bench_r1_driver.py
+             ├─4086183 /usr/bin/python3 /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/bench_r1_2026-10-22/bench_r1_suite_call.py /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/bench_r1_2026-10-22/runs/01_loss-1_plain 600 120 PRIVYHUB_WAN_TELEMETRY=1 PRIVYHUB_IMPAIRMENT=loss-1@post-fec,seed=1
