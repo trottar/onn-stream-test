@@ -1,0 +1,1234 @@
+diff --git a/companion/games/emulator_manager.py b/companion/games/emulator_manager.py
+index 25ff00d..a39f2b9 100644
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -17,6 +17,13 @@ from typing import Any, Callable
+ 
+ from games import ps1_look  # C5-M5B
+ 
++# B4: RetroArch's rewind in the launch config, only with PRIVYHUB_INPUT_HOLD and PRIVYHUB_INPUT_HOLD_REWIND set.
++# Absent = today's config byte for byte: nothing imported.
++_hold_rewind = None
++if ((os.environ.get("PRIVYHUB_INPUT_HOLD") or "").strip()
++        and (os.environ.get("PRIVYHUB_INPUT_HOLD_REWIND") or "").strip()):
++    import hold_rewind as _hold_rewind
++
+ 
+ class EmulatorError(RuntimeError):
+     pass
+@@ -5008,6 +5015,11 @@ class EmulatorManager:
+                         f"ambiguous {key} assignment"
+                     )
+ 
++        # B4: the rewind keys for the hold's release (flag on only; a base that sets one is left alone)
++        if _hold_rewind is not None:
++            session_text = _hold_rewind.apply_session_config(
++                session_text, getattr(self, "_hold_rewind_core", ""), os.environ)
++
+         temporary = session_config.with_name(
+             session_config.name + ".tmp"
+         )
+@@ -5390,6 +5402,9 @@ class EmulatorManager:
+                 runtime,
+                 core_path,
+             )
++            # B4: the core whose savestate size sizes the rewind buffer
++            if _hold_rewind is not None:
++                self._hold_rewind_core = core_path.name
+ 
+             if cheat_source_index is None and cheat_enabled_indexes is not None:
+                 raise EmulatorError(
+diff --git a/companion/games/link_drop_recovery.py b/companion/games/link_drop_recovery.py
+index 0d2e14c..f8fb4fa 100644
+--- a/companion/games/link_drop_recovery.py
++++ b/companion/games/link_drop_recovery.py
+@@ -87,6 +87,9 @@ class LinkDropRecovery:
+     either.
+     """
+ 
++    # B4: the hold's rewind (hold_rewind.Rewinder; only PRIVYHUB_INPUT_HOLD_REWIND=1 wires it). None = B2.
++    _input_hold_rewind: Any = None
++
+     def __init__(
+         self,
+         project_root: Path,
+@@ -274,6 +277,10 @@ class LinkDropRecovery:
+             if self._state != STATE_PAUSED_RECOVERING or self._last_desync_reason != INPUT_HOLD:
+                 return False
+ 
++        # B4: rewind the frames run without the player, before the resume; never fails the resume
++        if self._input_hold_rewind is not None:
++            self._input_hold_rewind.rewind(self, "input_release")
++
+         error = ""
+ 
+         try:
+@@ -667,6 +674,10 @@ class LinkDropRecovery:
+         if not has_encoder:
+             return False
+ 
++        # B4: a hold handed over to v2 -- the same rewind, before v2's resume (no pending hold = nothing)
++        if self._input_hold_rewind is not None:
++            self._input_hold_rewind.rewind(self, "controller_return")
++
+         error = ""
+ 
+         try:
+diff --git a/companion/input_hold.py b/companion/input_hold.py
+index a4c5437..1c8cf5b 100644
+--- a/companion/input_hold.py
++++ b/companion/input_hold.py
+@@ -102,6 +102,9 @@ class HoldDispatcher:
+             threading.Thread(target=self._run, name="PrivyHub-Input-Hold", daemon=True).start()
+ 
+     def put(self, event: tuple) -> None:
++        # B4: a hold's detection time, for the rewind's onset (PRIVYHUB_INPUT_HOLD_REWIND only)
++        if getattr(self.recovery, "_input_hold_rewind", None) is not None:
++            self.recovery._input_hold_rewind.stamp(event, self._clock())
+         self._q.put(event)
+ 
+     def _run(self) -> None:
+@@ -113,6 +116,9 @@ class HoldDispatcher:
+                 pass                                  # the hold must never take the worker down
+ 
+     def handle(self, event: tuple) -> None:
++        # B4: one stamp popped per hold event, on every path (PRIVYHUB_INPUT_HOLD_REWIND only)
++        if getattr(self.recovery, "_input_hold_rewind", None) is not None:
++            self.recovery._input_hold_rewind.on_handle(event)
+         kind, ms = event
+         if kind == "hold":
+             try:
+@@ -128,6 +134,9 @@ class HoldDispatcher:
+             self._skipped_reported = False
+             self._ours = bool(self.recovery.note_input_hold(ms))
+             self._paused_at = self._clock() if self._ours else None
++            # B4: the pending hold: onset and confirmed pause (PRIVYHUB_INPUT_HOLD_REWIND only)
++            if getattr(self.recovery, "_input_hold_rewind", None) is not None:
++                self.recovery._input_hold_rewind.note_paused(self._ours, self._paused_at, self.recovery)
+         elif kind == "release":
+             if not self._ours:
+                 return
+diff --git a/companion/native_session_io.py b/companion/native_session_io.py
+index e32c1d3..e9b058d 100644
+--- a/companion/native_session_io.py
++++ b/companion/native_session_io.py
+@@ -1632,6 +1632,8 @@ class NativeControllerBridge:
+ 
+     # B2: the fast input hold's detector (set_input_hold; only PRIVYHUB_INPUT_HOLD wires it). None = today.
+     _input_hold: Any = None
++    # B4: the hold's rewind masks the player's input while it runs (set_input_mask; only PRIVYHUB_INPUT_HOLD_REWIND=1).
++    _input_mask: Any = None
+ 
+     LINUX_VENDOR_ID = 0x1209
+     LINUX_PRODUCT_ID = 0x5048
+@@ -1952,6 +1954,10 @@ class NativeControllerBridge:
+         """B2: the input-hold detector's on_quiet / on_packet, called from the receive loop (never blocking)."""
+         self._input_hold = detector
+ 
++    def set_input_mask(self, mask: Any) -> None:
++        """B4: the rewind's mask (`masked()`); while it reads True no report is applied (the pads stay neutral)."""
++        self._input_mask = mask
++
+     def set_client_silence_callback(
+         self,
+         callback: "Callable[[float], None] | None",
+@@ -2632,6 +2638,10 @@ class NativeControllerBridge:
+             if self._input_hold is not None:
+                 self._input_hold.on_packet(now_packet)
+ 
++            # B4: no input reaches the core while the hold's rewind runs
++            if self._input_mask is not None and self._input_mask.masked():
++                continue
++
+             try:
+                 self._apply_report(
+                     player=player,
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index 9e0cd9e..15903fd 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -36,6 +36,11 @@ _input_hold = None
+ if (os.environ.get("PRIVYHUB_INPUT_HOLD") or "").strip():
+     import input_hold as _input_hold
+ 
++# B4: rewind on the hold's release, only with PRIVYHUB_INPUT_HOLD and PRIVYHUB_INPUT_HOLD_REWIND set. Absent = B2.
++_hold_rewind = None
++if _input_hold is not None and (os.environ.get("PRIVYHUB_INPUT_HOLD_REWIND") or "").strip():
++    import hold_rewind as _hold_rewind
++
+ # B1: the impairment shim's uplink blackout, only with PRIVYHUB_IMPAIRMENT set
+ # (a gate only for `blackout-<D>s@both`). Absent = today: nothing imported.
+ _impairment_uplink = None
+@@ -149,6 +154,10 @@ class GamesPlugin:
+         if _input_hold is not None:
+             _input_hold.wire(self._recovery, self._native_stream._session_io.controller,
+                              lambda: bool(getattr(self._emulator, "_paused", False)), os.environ)
++        # B4: the rewind inside the hold's own release (one owner: the recovery)
++        if _hold_rewind is not None:
++            _hold_rewind.wire(self._recovery, self._native_stream._session_io.controller, self._emulator,
++                              os.environ, self.PROJECT_ROOT)
+         if trigger_v2 or os.environ.get("PRIVYHUB_RECOVERY_GAP_LOG") == "1":
+             self._native_stream._session_io.controller.set_gap_log(
+                 self.PROJECT_ROOT / "logs" / "games" / "native_stream_ctrl_gaps.log"
+diff --git a/tools/unattended_frames.py b/tools/unattended_frames.py
+index 52526d6..672cc11 100644
+--- a/tools/unattended_frames.py
++++ b/tools/unattended_frames.py
+@@ -20,6 +20,11 @@ The number the fast input hold (PRIVYHUB_INPUT_HOLD) exists to cut. Defined in
+   also subtracts the spans in which recovery had the core paused (`native_stream_recovery.log`: a `desync_pause` to
+   the next `resumed` / `session_ended` / `session_started`): the frames the game advanced without the player. This
+   is the number the input hold exists to cut.
++- **`--net` (B4)**: the hold's rewind (PRIVYHUB_INPUT_HOLD_REWIND=1) returns the core to the silence's onset, so per
++  episode `unattended_frames_core_running_net` = core running - the episode's `rewound_frames` (the recovery log's
++  `input_release` rows, the latest episode that started before the row and ended <= 30 s before it), floored at 0.
++  The rewind also returns the first 250 ms, which the measure does not count: that excess is
++  `rewound_beyond_threshold`. Without `--net` the output is the B2 tool's, byte for byte.
+ """
+ from __future__ import annotations
+ 
+@@ -32,6 +37,7 @@ from pathlib import Path
+ 
+ THRESHOLD_S = 0.25
+ EPISODE_JOIN_S = 0.5
++NET_ASSIGN_S = 30.0     # B4: a rewind row belongs to an episode that ended at most this long before it
+ 
+ 
+ def ts(t: str) -> float:
+@@ -95,6 +101,18 @@ def paused_spans(logs: Path, a: float, b: float) -> list[tuple[float, float]]:
+     return out
+ 
+ 
++def rewound_rows(logs: Path, a: float, b: float) -> list[tuple[float, float]]:
++    """B4: (time, rewound_frames) of the recovery log's input_release rows in [a, b + NET_ASSIGN_S]."""
++    rows = {}
++    for r in jl(sorted(glob.glob(str(logs / "native_stream_recovery.log*")))
++                + sorted(glob.glob(str(logs / "stream_log_archive" / "native_stream_recovery*")))):
++        if r.get("event") == "input_release" and r.get("at_utc") and isinstance(r.get("rewound_frames"), (int, float)):
++            t = ts(r["at_utc"])
++            if a <= t <= b + NET_ASSIGN_S:
++                rows[r["at_utc"]] = (t, float(r["rewound_frames"]))
++    return sorted(rows.values())
++
++
+ def running_frames_in(frames: dict, s: float, e: float, paused: list[tuple[float, float]]) -> float:
+     """Frames in [s, e] outside the paused spans."""
+     n, cur = 0.0, s
+@@ -131,7 +149,7 @@ def episodes(gaps):
+     return out
+ 
+ 
+-def measure(logs: Path, a: float, b: float, windows=(), holds=(250, 500, 1000)) -> dict:
++def measure(logs: Path, a: float, b: float, windows=(), holds=(250, 500, 1000), net: bool = False) -> dict:
+     gaps, frames = load(logs, a, b)
+     paused = paused_spans(logs, a, b)
+     stream_s = sum(1 for t, f in frames.items() if a <= t < b and f > 0)
+@@ -161,6 +179,8 @@ def measure(logs: Path, a: float, b: float, windows=(), holds=(250, 500, 1000))
+                              "unattended_frames_core_running": ep["unattended_frames_core_running"]}
+                             for ep in sorted(eps, key=lambda x: -x["unattended_frames"])[:10]],
+            "windows": {}}
++    if net:
++        add_net(res, eps, rewound_rows(logs, a, b), per10)
+     for name, wa, wb in windows:
+         n = sum(frames_in(frames, max(s + THRESHOLD_S, wa), min(e, wb)) for s, e in gaps if e - s >= THRESHOLD_S)
+         nr = sum(running_frames_in(frames, max(s + THRESHOLD_S, wa), min(e, wb), paused)
+@@ -171,6 +191,35 @@ def measure(logs: Path, a: float, b: float, windows=(), holds=(250, 500, 1000))
+     return res
+ 
+ 
++def add_net(res: dict, eps: list, rewinds: list, per10) -> None:
++    """B4 --net: per episode, core running minus its rewound frames (floored at 0)."""
++    unassigned = 0.0
++    for ep in eps:
++        ep["rewound_frames"] = 0.0
++    for t, n in rewinds:
++        owner = [ep for ep in eps if ep["start"] <= t <= ep["end"] + NET_ASSIGN_S]
++        if owner:
++            owner[-1]["rewound_frames"] += n
++        else:
++            unassigned += n
++    for ep in eps:
++        run = ep["unattended_frames_core_running"]
++        ep["unattended_frames_core_running_net"] = round(max(0.0, run - ep["rewound_frames"]), 1)
++        ep["rewound_beyond_threshold"] = round(max(0.0, ep["rewound_frames"] - run), 1)
++    total = sum(ep["unattended_frames_core_running_net"] for ep in eps)
++    res["net"] = {"unattended_frames_core_running_net": round(total, 1),
++                  "unattended_frames_core_running_net_per_10min": per10(total),
++                  "rewound_frames": round(sum(n for _, n in rewinds), 1),
++                  "rewound_unassigned": round(unassigned, 1),
++                  "rewinds": len(rewinds),
++                  "episodes": [{"start": utc(ep["start"]), "end": utc(ep["end"]),
++                                "unattended_frames_core_running": ep["unattended_frames_core_running"],
++                                "rewound_frames": round(ep["rewound_frames"], 1),
++                                "unattended_frames_core_running_net": ep["unattended_frames_core_running_net"],
++                                "rewound_beyond_threshold": ep["rewound_beyond_threshold"]}
++                               for ep in eps if ep["unattended_frames_core_running"] > 0 or ep["rewound_frames"] > 0]}
++
++
+ def main() -> int:
+     ap = argparse.ArgumentParser()
+     ap.add_argument("--logs", required=True, type=Path)
+@@ -178,9 +227,10 @@ def main() -> int:
+     ap.add_argument("--window", nargs=3, action="append", default=[])
+     ap.add_argument("--hold-ms", default="250,500,1000")
+     ap.add_argument("--json", type=Path)
++    ap.add_argument("--net", action="store_true", help="B4: minus the hold's rewound_frames per episode")
+     a = ap.parse_args()
+     res = measure(a.logs, ts(a.span[0]), ts(a.span[1]), [(n, ts(x), ts(y)) for n, x, y in a.window],
+-                  tuple(int(x) for x in a.hold_ms.split(",")))
++                  tuple(int(x) for x in a.hold_ms.split(",")), net=a.net)
+     print(json.dumps(res, indent=1))
+     if a.json:
+         a.json.write_text(json.dumps(res, indent=1) + "\n")
+diff --git a/companion/hold_rewind.py b/companion/hold_rewind.py
+new file mode 100644
+index 0000000..c5e234b
+--- /dev/null
++++ b/companion/hold_rewind.py
+@@ -0,0 +1,311 @@
++"""B4: on the input hold's release, rewind the core by the frames it ran without the player before the pause landed.
++
++`PRIVYHUB_INPUT_HOLD_REWIND=1`, read only when `PRIVYHUB_INPUT_HOLD` is set and valid (B2). **Absent = B2's hold
++byte for byte**: nothing imports this module. `PRIVYHUB_INPUT_HOLD_REWIND_CAP` (5-120, default 30). Design:
++`docs/memory/evidence/b4_2026-10-22/design_written_before_code.md` (hashed before this code).
++
++RetroArch 1.22.2's command interface reads no frame counter, so the counter is the host's monotonic clock x 60 fps:
++the onset (the receive loop's stamp of the last controller packet) and the confirmed pause (B2's dispatcher, when
++EmulatorManager.pause() returned PAUSED). On release, before the resume: mask the player's input, `REWIND` +
++`PAUSE_TOGGLE` in one instant, `REWIND` every half frame for N frames, one `GET_STATUS` within 2 frames' time
++(PLAYING = confirmed), unmask; then B2's resume as today. Never raises: a failure is a `rewind_failed` row and the
++resume proceeds. One owner: the recovery calls `rewind` from its own two resumes (the hold's release, and v2's
++controller-return exit after a handover).
++"""
++
++from __future__ import annotations
++
++import math
++import socket
++import threading
++import time
++from collections import deque
++from pathlib import Path
++from typing import Any, Callable, Mapping
++
++FLAG_ENV = "PRIVYHUB_INPUT_HOLD_REWIND"
++CAP_ENV = "PRIVYHUB_INPUT_HOLD_REWIND_CAP"
++HOLD_ENV = "PRIVYHUB_INPUT_HOLD"
++DEFAULT_CAP = 30
++MIN_CAP, MAX_CAP = 5, 120
++FPS = 60.0                  # the cores' nominal rate (snes 60.10, psx 59.94: < 0.05 frame over 20)
++CONFIRM_FRAMES = 2          # GET_STATUS must answer within this many frames' time
++# pause()'s PAUSED read trails the pause itself: RetroArch answers a GET_STATUS read in the same poll as the toggle
++# with the old state, so PAUSED is pause()'s next poll, 50 ms later. Measured on this host, 20 / 20 pauses: 61-67 ms
++# = 3.66-4.01 frames after the poll that read the toggle (b4_2026-10-22/pause_confirm_lag.json); that poll's frame
++# runs no core frame (the pause). floor(3.66 + 1) = 4 frames are subtracted: the rewind lands within 1 frame of the
++# onset (0-1 before it if the toggle's frame does not run, 0-1 after if it does).
++PAUSE_CONFIRM_LAG_FRAMES = 4
++MASK_INPUT = True           # the task's "with input masked" (design §5: the trade-off)
++MASK_MAX_S = 1.0            # the mask can never outlive this
++METHOD = "unpaused_per_frame"
++HOST = "127.0.0.1"
++CONFIG_MARK = 'rewind_enable = "true"'
++
++# Real savestates on disk, uncompressed (RZIP header), bytes: b4_2026-10-22/savestate_sizes.json.
++STATE_BYTES = {
++    "snes9x_libretro.so": 823_536,
++    "bsnes_libretro.so": 284_304,
++    "mednafen_psx_hw_libretro.so": 16_777_240,
++}
++DEFAULT_BUFFER_BYTES = 20 * 1024 * 1024     # RetroArch's own default (its saved config: "20971520")
++KEYS = ("rewind_enable", "rewind_granularity", "rewind_buffer_size", "audio_rewind_mute")
++
++
++def parse_cap(raw: Any) -> tuple[int, str | None]:
++    if raw is None or str(raw).strip() == "":
++        return DEFAULT_CAP, None
++    v = str(raw).strip()
++    if v.isdigit() and MIN_CAP <= int(v) <= MAX_CAP:
++        return int(v), None
++    return DEFAULT_CAP, f"cap ignored: {v[:32]!r} is not {MIN_CAP}-{MAX_CAP}; {DEFAULT_CAP}"
++
++
++def parse(environ: Mapping[str, str]) -> tuple[bool, str | None]:
++    """(on, None) / (False, why when set but ignored) / (False, None) when absent."""
++    raw = (environ.get(FLAG_ENV) or "").strip()
++    if not raw:
++        return False, None
++    if raw != "1":
++        return False, f"ignored: {raw[:32]!r} is not 1"
++    import input_hold
++    hold_ms, _ = input_hold.parse(environ.get(HOLD_ENV))
++    if hold_ms is None:
++        return False, "ignored: the hold is not active (PRIVYHUB_INPUT_HOLD absent or invalid)"
++    return True, None
++
++
++def buffer_bytes(core_name: str, cap: int) -> int:
++    raw = STATE_BYTES.get(str(core_name))
++    if raw is None:
++        return DEFAULT_BUFFER_BYTES
++    mib = 1024 * 1024
++    return int(math.ceil(raw * (cap + 2) / mib)) * mib
++
++
++def config_block(core_name: str, environ: Mapping[str, str]) -> str:
++    cap, _ = parse_cap(environ.get(CAP_ENV))
++    return ("\n\n# PrivyHub B4 input-hold rewind (PRIVYHUB_INPUT_HOLD_REWIND=1)\n"
++            'rewind_enable = "true"\n'
++            'rewind_granularity = "1"\n'
++            f'rewind_buffer_size = "{buffer_bytes(core_name, cap)}"\n'
++            'audio_rewind_mute = "true"\n')
++
++
++def apply_session_config(session_text: str, core_name: str, environ: Mapping[str, str]) -> str:
++    """The generator's one call: the block appended, flag on only. A base that already sets a key is refused
++    (RetroArch ignored a duplicate assignment appended after the persistent one, A7.3), so nothing is appended."""
++    on, _ = parse(environ)
++    if not on:
++        return session_text
++    for line in session_text.splitlines():
++        if line.strip().split("=", 1)[0].strip() in KEYS:
++            return session_text
++    return session_text + config_block(core_name, environ)
++
++
++class InputMask:
++    """The bridge's mask (`masked()` read by the receive loop). Expires by itself after MASK_MAX_S."""
++
++    def __init__(self, clock: Callable[[], float] = time.monotonic):
++        self._clock = clock
++        self._until = 0.0
++
++    def on(self) -> None:
++        self._until = self._clock() + MASK_MAX_S
++
++    def off(self) -> None:
++        self._until = 0.0
++
++    def masked(self) -> bool:
++        return self._until > 0.0 and self._clock() < self._until
++
++
++class Nci:
++    """Raw loopback UDP to RetroArch's command port (no per-datagram logging, a timeout below 50 ms)."""
++
++    def __init__(self, port: int):
++        self.port = int(port)
++        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++        self.sock.bind((HOST, 0))
++
++    def send(self, cmd: str) -> None:
++        self.sock.sendto(cmd.encode("utf-8"), (HOST, self.port))
++
++    def status(self, timeout: float) -> str:
++        self.sock.settimeout(timeout)
++        deadline = time.monotonic() + timeout
++        self.send("GET_STATUS")
++        while True:
++            left = deadline - time.monotonic()
++            if left <= 0:
++                raise socket.timeout("GET_STATUS")
++            self.sock.settimeout(left)
++            data, src = self.sock.recvfrom(4096)
++            if src[0] == HOST and int(src[1]) == self.port:
++                return data.decode("utf-8", errors="replace").strip()
++
++    def close(self) -> None:
++        try:
++            self.sock.close()
++        except OSError:
++            pass
++
++
++class Rewinder:
++    """Stamps (loop thread), the pending hold (worker), the rewind (the recovery's resumes)."""
++
++    def __init__(self, emulator: Any, controller: Any, cap: int, *, fps: float = FPS,
++                 clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep,
++                 session_config: Path | None = None, nci_factory: Callable[[int], Any] = Nci,
++                 mask: InputMask | None = None):
++        self.emulator = emulator
++        self.controller = controller
++        self.cap = int(cap)
++        self.fps = float(fps)
++        self._clock = clock
++        self._sleep = sleep
++        self.session_config = session_config
++        self._nci_factory = nci_factory
++        self.mask = mask or InputMask(clock)
++        self._puts: deque[float] = deque()
++        self._onset: float | None = None
++        self._pending: dict[str, Any] | None = None
++        self._lock = threading.Lock()
++
++    # --- B2's dispatcher (input_hold.HoldDispatcher) -----------------------------------------------------------
++
++    def stamp(self, event: tuple, now: float) -> None:
++        """put(), in the receive loop at detection time: a hold's put time, in order."""
++        if event and event[0] == "hold":
++            self._puts.append(now)
++
++    def on_handle(self, event: tuple) -> None:
++        """handle()'s first statement: one stamp popped per hold event, on every path."""
++        if event and event[0] == "hold":
++            put_at = self._puts.popleft() if self._puts else None
++            self._onset = None if put_at is None else put_at - float(event[1]) / 1000.0
++
++    def note_paused(self, ours: bool, paused_at: float | None, recovery: Any) -> None:
++        """After B2's `_paused_at`: the pending hold of this pause episode (or none)."""
++        with self._lock:
++            if ours and paused_at is not None and self._onset is not None:
++                self._pending = {"onset": self._onset, "paused_at": paused_at,
++                                 "key": getattr(recovery, "_state_since", None)}
++            else:
++                self._pending = None
++            self._onset = None
++
++    # --- the recovery's two resumes ----------------------------------------------------------------------------
++
++    def counter_before(self, pending: Mapping[str, float]) -> int:
++        """Frames the core ran since the onset (0 at the onset), at the confirmed pause less its measured lag."""
++        raw = int(round((pending["paused_at"] - pending["onset"]) * self.fps))
++        return max(0, raw - PAUSE_CONFIRM_LAG_FRAMES)
++
++    def rewind(self, recovery: Any, via: str) -> dict[str, Any] | None:
++        """Before the resume. None when there is no pending hold for this pause; else the row written. Never raises."""
++        with self._lock:
++            pending, self._pending = self._pending, None
++            if pending is None or pending.get("key") != getattr(recovery, "_state_since", None):
++                return None                                       # none, or a stale one from another pause: dropped
++        fields: dict[str, Any] = {"via": via, "method": METHOD, "cap": self.cap}
++        try:
++            before = self.counter_before(pending)
++            requested = min(before, self.cap)
++            fields.update(counter_before=before, requested_frames=requested, rewound_frames=0,
++                          counter_after=before,
++                          onset_to_pause_ms=round((pending["paused_at"] - pending["onset"]) * 1000.0, 1),
++                          pause_confirm_lag_frames=PAUSE_CONFIRM_LAG_FRAMES)
++            if requested <= 0:
++                return self._row(recovery, "input_release", fields, rewind_ms=0.0)
++            why = self._precondition()
++            if why:
++                return self._row(recovery, "rewind_failed", fields, reason=why)
++            ok, rewound, ms, why = self._run(requested)
++            fields.update(rewound_frames=rewound, counter_after=before - rewound)
++            if not ok:
++                return self._row(recovery, "rewind_failed", fields, rewind_ms=ms, reason=why)
++            return self._row(recovery, "input_release", fields, rewind_ms=ms)
++        except Exception as exc:                                  # the hold never fails because the rewind did
++            try:
++                return self._row(recovery, "rewind_failed", fields, reason=f"{type(exc).__name__}: {exc}")
++            except Exception:
++                return None
++
++    def _precondition(self) -> str | None:
++        port = getattr(self.emulator, "_network_cmd_port", None)
++        if port is None:
++            return "no RetroArch command port"
++        if self.session_config is not None:
++            try:
++                text = Path(self.session_config).read_text(encoding="utf-8", errors="replace")
++            except OSError as exc:
++                return f"session config unreadable: {exc}"
++            if CONFIG_MARK not in text:
++                return "the session config carries no rewind_enable (the running RetroArch was not launched with it)"
++        return None
++
++    def _run(self, requested: int) -> tuple[bool, int, float, str | None]:
++        frame = 1.0 / self.fps
++        lock = getattr(self.emulator, "lock", None) or threading.RLock()
++        with lock:
++            nci = self._nci_factory(int(self.emulator._network_cmd_port))
++            try:
++                if MASK_INPUT:
++                    self.mask.on()
++                    try:
++                        self.controller._neutralize()
++                    except Exception:
++                        pass
++                t0 = self._clock()
++                nci.send("REWIND")
++                nci.send("PAUSE_TOGGLE")
++                last = t0
++                end = t0 + (requested - 0.5) * frame
++                while True:
++                    self._sleep(frame / 2.0)
++                    now = self._clock()
++                    if now >= end:
++                        break
++                    nci.send("REWIND")
++                    last = now
++                rewound = min(requested, int(math.floor((last - t0) * self.fps + 1e-9)) + 1)   # polls that saw one
++                ms = round((last - t0) * 1000.0, 1)
++                try:
++                    status = nci.status(CONFIRM_FRAMES * frame)
++                except (OSError, socket.timeout) as exc:
++                    return False, rewound, ms, f"GET_STATUS not answered within {CONFIRM_FRAMES} frames: {exc}"
++                if not status.upper().startswith("GET_STATUS PLAYING"):
++                    return False, rewound, ms, f"not playing after the rewind: {status[:40]}"
++                return True, rewound, ms, None
++            finally:
++                if MASK_INPUT:
++                    self.mask.off()
++                nci.close()
++
++    def _row(self, recovery: Any, event: str, fields: dict[str, Any], **extra: Any) -> dict[str, Any]:
++        row = dict(fields, **extra)
++        recovery._log(event, **row)
++        return row
++
++
++def wire(recovery: Any, controller: Any, emulator: Any, environ: Mapping[str, str],
++         project_root: Path | None = None) -> Rewinder | None:
++    """The plugin's one call (after B2's wire): parse, one config row, the rewinder on the recovery, the mask on the
++    bridge. Acts only when B2 wired its detector (the hold is active)."""
++    on, why = parse(environ)
++    if on and getattr(controller, "_input_hold", None) is None:
++        on, why = False, "ignored: the hold is not active (no detector)"
++    cap, cap_why = parse_cap(environ.get(CAP_ENV))
++    if not on:
++        if why:
++            recovery._log("input_hold_rewind_config", ignored=True, reason=why)
++        return None
++    cfg = None if project_root is None else Path(project_root) / "data/games/retroarch/config/privyhub-session.cfg"
++    rw = Rewinder(emulator, controller, cap, session_config=cfg)
++    recovery._input_hold_rewind = rw
++    controller.set_input_mask(rw.mask)
++    recovery._log("input_hold_rewind_config", ignored=False, cap=cap, cap_note=cap_why, fps=FPS, method=METHOD,
++                  mask_input=MASK_INPUT, confirm_frames=CONFIRM_FRAMES)
++    return rw
+diff --git a/tests/input_hold_rewind/test_hold_rewind.py b/tests/input_hold_rewind/test_hold_rewind.py
+new file mode 100644
+index 0000000..45c873f
+--- /dev/null
++++ b/tests/input_hold_rewind/test_hold_rewind.py
+@@ -0,0 +1,630 @@
++#!/usr/bin/env python3
++"""B4: rewind on the input hold's release (PRIVYHUB_INPUT_HOLD_REWIND=1).
++
++    python3 -m unittest discover -s tests/input_hold_rewind -v
++
++A fake core speaks RetroArch 1.22.2's command interface over loopback UDP at 60 fps, as measured on the host
++(b4_2026-10-22/pause_confirm_lag.json): every pending datagram is read once per frame; a GET_STATUS is answered
++with the state before that frame's hotkeys; PAUSE_TOGGLE / REWIND are hotkeys for that frame; playing, the frame
++counter goes -1 (REWIND, with history) or +1. A fake emulator pauses / resumes it as EmulatorManager does (status,
++toggle, a 50-ms poll). The recovery is the real LinkDropRecovery; the dispatcher is B2's, synchronous.
++"""
++
++from __future__ import annotations
++
++import ast
++import hashlib
++import json
++import os
++import re
++import socket
++import subprocess
++import sys
++import tempfile
++import threading
++import time
++import unittest
++from collections import deque
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++
++import hold_rewind as hr  # noqa: E402
++import input_hold as ih  # noqa: E402
++from games import link_drop_recovery as ldr  # noqa: E402
++
++FRAME = 1.0 / 60.0
++
++
++class FakeCore(threading.Thread):
++    def __init__(self, honour_rewind=True):
++        super().__init__(daemon=True)
++        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++        self.sock.bind(("127.0.0.1", 0))
++        self.sock.setblocking(False)
++        self.port = self.sock.getsockname()[1]
++        self.honour_rewind = honour_rewind
++        self.drop_status_after_rewind = 0     # GET_STATUS replies to swallow once a REWIND was seen
++        self.counter = 0
++        self.paused = False
++        self.history = deque(maxlen=600)
++        self.timeline = []                    # (monotonic, counter) per frame
++        self.rewind_cmds = 0
++        self.rewind_steps = 0
++        self.last_rewind_counter = None
++        self._stop = threading.Event()
++
++    def run(self):
++        nxt = time.monotonic()
++        while not self._stop.is_set():
++            pressed, replies = set(), []
++            while True:
++                try:
++                    data, src = self.sock.recvfrom(256)
++                except (BlockingIOError, OSError):
++                    break
++                cmd = data.decode().strip()
++                if cmd == "GET_STATUS":
++                    if self.drop_status_after_rewind and self.rewind_cmds:
++                        self.drop_status_after_rewind -= 1
++                    else:
++                        replies.append(src)
++                else:
++                    pressed.add(cmd)
++                    if cmd == "REWIND":
++                        self.rewind_cmds += 1
++            state = "PAUSED" if self.paused else "PLAYING"
++            for src in replies:                                     # the state before this frame's hotkeys
++                self.sock.sendto(f"GET_STATUS {state} snes,fake,crc32=0".encode(), src)
++            if "PAUSE_TOGGLE" in pressed:
++                self.paused = not self.paused
++            if not self.paused:
++                if "REWIND" in pressed and self.honour_rewind and self.history:
++                    self.counter = self.history.pop()
++                    self.rewind_steps += 1
++                    self.last_rewind_counter = self.counter
++                else:
++                    self.history.append(self.counter)
++                    self.counter += 1
++            self.timeline.append((time.monotonic(), self.counter))
++            nxt += FRAME
++            time.sleep(max(0.0, nxt - time.monotonic()))
++
++    def counter_at(self, t):
++        best = None
++        for at, c in list(self.timeline):
++            if at <= t:
++                best = c
++        return best
++
++    def stop(self):
++        self._stop.set()
++        self.join(1.0)
++        self.sock.close()
++
++
++class FakeEmulator:
++    """EmulatorManager.pause() / resume() as written: GET_STATUS, PAUSE_TOGGLE, then poll every 50 ms."""
++
++    def __init__(self, core):
++        self.lock = threading.RLock()
++        self._network_cmd_port = core.port
++        self._paused = False
++        self.calls = []
++
++    def _req(self, cmd, expect):
++        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
++            s.bind(("127.0.0.1", 0))
++            s.settimeout(0.45)
++            s.sendto(cmd.encode(), ("127.0.0.1", self._network_cmd_port))
++            if expect:
++                return s.recvfrom(4096)[0].decode().strip()
++
++    def _status(self):
++        return self._req("GET_STATUS", True).split()[1]
++
++    def _set(self, want, name):
++        with self.lock:
++            self.calls.append(name)
++            if self._status() != want:
++                self._req("PAUSE_TOGGLE", False)
++                deadline = time.monotonic() + 1.5
++                while self._status() != want:
++                    if time.monotonic() > deadline:
++                        raise RuntimeError(f"not {want}")
++                    time.sleep(0.05)
++            self._paused = want == "PAUSED"
++
++    def pause(self):
++        self._set("PAUSED", "pause")
++
++    def resume(self):
++        self._set("PLAYING", "resume")
++
++
++class FakeController:
++    _input_hold = object()                    # B2 wired its detector
++
++    def __init__(self):
++        self.neutralized = 0
++        self.mask = None
++
++    def _neutralize(self, player=None):
++        self.neutralized += 1
++
++    def set_input_mask(self, mask):
++        self.mask = mask
++
++
++def session_cfg(on=True):
++    d = Path(tempfile.mkdtemp(prefix="b4_cfg_"))
++    p = d / "privyhub-session.cfg"
++    p.write_text('video_vsync = "true"\n' + ('rewind_enable = "true"\n' if on else ""))
++    return p
++
++
++class Rig:
++    """A live fake core, the fake emulator, the real recovery, B2's dispatcher (synchronous), the rewinder."""
++
++    def __init__(self, rewind=True, honour_rewind=True, cfg_on=True, cap=30, nci_factory=hr.Nci):
++        self.core = FakeCore(honour_rewind)
++        self.core.start()
++        self.emu = FakeEmulator(self.core)
++        self.ctrl = FakeController()
++        self.root = Path(tempfile.mkdtemp(prefix="b4_rec_"))
++        self.rec = ldr.LinkDropRecovery(
++            self.root, pause_game=self.emu.pause, resume_game=self.emu.resume,
++            save_recovery_state=lambda: {}, restart_encoder=lambda: {}, full_start_encoder=lambda: {},
++            stream_active=lambda: True, end_session=lambda: None, client_packet_age_ms=lambda: 10.0,
++            recovery_save_detail=lambda: {})
++        self.rec._state = ldr.STATE_PLAYING
++        self.rec._state_since = time.monotonic()
++        self.rw = None
++        if rewind:
++            self.rw = hr.Rewinder(self.emu, self.ctrl, cap, session_config=session_cfg(cfg_on),
++                                  nci_factory=nci_factory)
++            self.rec._input_hold_rewind = self.rw
++        self.d = ih.HoldDispatcher(self.rec, lambda: self.emu._paused, threaded=False)
++        time.sleep(0.3)
++
++    def hold(self, silence_s=0.25):
++        """The player's last packet now; B2's detector fires `silence_s` later (put + handle)."""
++        onset = time.monotonic()
++        onset_counter = self.core.counter_at(onset)
++        time.sleep(silence_s)
++        ev = ("hold", round((time.monotonic() - onset) * 1000.0, 1))
++        self.d.put(ev)
++        self.d.handle(ev)
++        return onset, onset_counter
++
++    def release(self, held_ms=500.0):
++        self.d.handle(("release", held_ms))
++
++    def rows(self):
++        p = self.rec.log_path()
++        return [json.loads(x) for x in p.read_text().splitlines()] if p.exists() else []
++
++    def events(self):
++        return [r["event"] for r in self.rows()]
++
++    def close(self):
++        self.core.stop()
++
++
++class TheCount(unittest.TestCase):
++    def test_counter_from_the_two_stamps(self):
++        rw = hr.Rewinder(object(), FakeController(), 30)
++        p = {"onset": 100.0, "paused_at": 100.0 + 22 / 60.0}
++        self.assertEqual(rw.counter_before(p), 22 - hr.PAUSE_CONFIRM_LAG_FRAMES)
++        self.assertEqual(rw.counter_before({"onset": 100.0, "paused_at": 100.01}), 0)
++
++    def test_fifo_stays_aligned_across_a_skipped_hold(self):
++        rw = hr.Rewinder(object(), FakeController(), 30)
++        rec = type("R", (), {"_state_since": 7.0})()
++        rw.stamp(("hold", 250.0), 10.25)                # skipped (the user's pause): popped, no pending
++        rw.stamp(("release", 400.0), 10.40)
++        rw.stamp(("hold", 300.0), 20.30)
++        rw.on_handle(("hold", 250.0))
++        rw.note_paused(False, None, rec)
++        self.assertIsNone(rw._pending)
++        rw.on_handle(("release", 400.0))
++        rw.on_handle(("hold", 300.0))
++        rw.note_paused(True, 20.40, rec)
++        self.assertAlmostEqual(rw._pending["onset"], 20.0)
++        self.assertEqual(rw._pending["key"], 7.0)
++
++
++class TheCap(unittest.TestCase):
++    def test_parse_cap(self):
++        self.assertEqual(hr.parse_cap(None), (30, None))
++        self.assertEqual(hr.parse_cap("10"), (10, None))
++        self.assertEqual(hr.parse_cap("5"), (5, None))
++        self.assertEqual(hr.parse_cap("120"), (120, None))
++        for bad in ("4", "121", "x", "-3"):
++            cap, why = hr.parse_cap(bad)
++            self.assertEqual(cap, 30, bad)
++            self.assertTrue(why and "ignored" in why, bad)
++
++    def test_requested_is_capped(self):
++        rig = Rig(cap=10)
++        try:
++            rig.hold(silence_s=0.6)                       # ~36 + frames: capped at 10
++            rig.release()
++            row = [r for r in rig.rows() if r["event"] == "input_release"][0]
++            self.assertGreater(row["counter_before"], 10)
++            self.assertEqual(row["requested_frames"], 10)
++            self.assertLessEqual(abs(row["rewound_frames"] - 10), 1)
++        finally:
++            rig.close()
++
++
++class TheRewind(unittest.TestCase):
++    def test_requested_on_release_confirmed_back_to_the_onset(self):
++        rig = Rig()
++        try:
++            onset, onset_counter = rig.hold()
++            self.assertEqual(rig.emu.calls, ["pause"])
++            time.sleep(0.5)                               # the blackout
++            seen = []
++
++            class Spy(hr.Nci):
++                def send(self, cmd):
++                    seen.append(rig.rw.mask.masked())
++                    super().send(cmd)
++
++            rig.rw._nci_factory = Spy
++            rig.release()
++            self.assertTrue(seen and all(seen))           # masked on every datagram of the rewind
++            self.assertFalse(rig.rw.mask.masked())        # and not after
++            self.assertGreaterEqual(rig.ctrl.neutralized, 1)
++            self.assertEqual(rig.events(), ["desync_pause", "input_release", "resumed"])
++            row = [r for r in rig.rows() if r["event"] == "input_release"][0]
++            for k in ("requested_frames", "rewound_frames", "counter_before", "counter_after", "onset_to_pause_ms",
++                      "rewind_ms", "via", "method", "cap", "pause_confirm_lag_frames"):
++                self.assertIn(k, row)
++            self.assertEqual(row["via"], "input_release")
++            self.assertGreaterEqual(row["requested_frames"], 15)
++            self.assertLessEqual(abs(row["counter_after"]), 1)
++            self.assertLessEqual(abs(row["rewound_frames"] - row["requested_frames"]), 1)
++            # the fake core's own counter: back at the onset's, +-1
++            self.assertIsNotNone(rig.core.last_rewind_counter)
++            self.assertLessEqual(abs(rig.core.last_rewind_counter - onset_counter), 1,
++                                 (rig.core.last_rewind_counter, onset_counter, row))
++            self.assertEqual(rig.emu.calls, ["pause", "resume"])
++            self.assertEqual(rig.rec.current_state(), ldr.STATE_PLAYING)
++            self.assertFalse(rig.core.paused)
++        finally:
++            rig.close()
++
++
++class RewindFailed(unittest.TestCase):
++    def _assert_resumed(self, rig, reason_part):
++        ev = rig.events()
++        self.assertEqual(ev, ["desync_pause", "rewind_failed", "resumed"], rig.rows())
++        row = [r for r in rig.rows() if r["event"] == "rewind_failed"][0]
++        self.assertIn(reason_part, row["reason"])
++        self.assertEqual(rig.emu.calls, ["pause", "resume"])
++        self.assertEqual(rig.rec.current_state(), ldr.STATE_PLAYING)
++        self.assertFalse(rig.core.paused)
++        self.assertFalse(rig.rw.mask.masked())
++        return row
++
++    def test_status_not_answered_within_two_frames(self):
++        rig = Rig()
++        try:
++            rig.hold()
++            rig.core.drop_status_after_rewind = 1
++            rig.release()
++            self._assert_resumed(rig, "not answered within 2 frames")
++        finally:
++            rig.close()
++
++    def test_session_config_without_rewind(self):
++        rig = Rig(cfg_on=False)
++        try:
++            rig.hold()
++            rig.release()
++            self._assert_resumed(rig, "no rewind_enable")
++            self.assertEqual(rig.core.rewind_cmds, 0)
++        finally:
++            rig.close()
++
++    def test_no_port(self):
++        rig = Rig()
++        try:
++            rig.hold()
++            port, rig.emu._network_cmd_port = rig.emu._network_cmd_port, None
++            orig_set = rig.emu._set
++            rig.emu._set = lambda w, n: (setattr(rig.emu, "_network_cmd_port", port), orig_set(w, n))[1]
++            rig.release()
++            self._assert_resumed(rig, "no RetroArch command port")
++        finally:
++            rig.close()
++
++    def test_the_transport_raises(self):
++        def broken(port):
++            raise OSError("socket refused")
++        rig = Rig(nci_factory=broken)
++        try:
++            rig.hold()
++            rig.release()
++            self._assert_resumed(rig, "socket refused")
++        finally:
++            rig.close()
++
++
++class FlagAbsent(unittest.TestCase):
++    def test_no_rewinder_b2_exactly(self):
++        rig = Rig(rewind=False)
++        try:
++            rig.hold()
++            rig.release()
++            self.assertEqual(rig.events(), ["desync_pause", "resumed"])
++            self.assertEqual(rig.rows()[-1]["via"], "input_release")
++            self.assertEqual(rig.core.rewind_cmds, 0)
++            self.assertEqual(rig.emu.calls, ["pause", "resume"])
++            self.assertIsNone(ldr.LinkDropRecovery._input_hold_rewind)
++        finally:
++            rig.close()
++
++    def test_parse_and_wire(self):
++        self.assertEqual(hr.parse({}), (False, None))
++        self.assertEqual(hr.parse({"PRIVYHUB_INPUT_HOLD_REWIND": "1", "PRIVYHUB_INPUT_HOLD": "250"}), (True, None))
++        for env in ({"PRIVYHUB_INPUT_HOLD_REWIND": "0", "PRIVYHUB_INPUT_HOLD": "250"},
++                    {"PRIVYHUB_INPUT_HOLD_REWIND": "yes", "PRIVYHUB_INPUT_HOLD": "250"},
++                    {"PRIVYHUB_INPUT_HOLD_REWIND": "1"},
++                    {"PRIVYHUB_INPUT_HOLD_REWIND": "1", "PRIVYHUB_INPUT_HOLD": "0"}):
++            on, why = hr.parse(env)
++            self.assertFalse(on, env)
++            self.assertTrue(why.startswith("ignored"), env)
++        logged = []
++        rec = type("R", (), {"_log": lambda self, e, **k: logged.append((e, k))})()
++        self.assertIsNone(hr.wire(rec, FakeController(), object(), {"PRIVYHUB_INPUT_HOLD_REWIND": "yes",
++                                                                   "PRIVYHUB_INPUT_HOLD": "250"}))
++        self.assertEqual([(e, k["ignored"]) for e, k in logged], [("input_hold_rewind_config", True)])
++        logged.clear()
++        self.assertIsNone(hr.wire(rec, FakeController(), object(), {}))
++        self.assertEqual(logged, [])
++        ctrl = FakeController()
++        rw = hr.wire(rec, ctrl, object(), {"PRIVYHUB_INPUT_HOLD_REWIND": "1", "PRIVYHUB_INPUT_HOLD": "250",
++                                           "PRIVYHUB_INPUT_HOLD_REWIND_CAP": "500"})
++        self.assertIs(rec._input_hold_rewind, rw)
++        self.assertIs(ctrl.mask, rw.mask)
++        self.assertEqual(rw.cap, 30)
++        self.assertEqual(logged[-1][1]["ignored"], False)
++        self.assertIn("cap ignored", logged[-1][1]["cap_note"])
++        self.assertIsNone(hr.wire(rec, type("C", (), {"_input_hold": None})(), object(),
++                                  {"PRIVYHUB_INPUT_HOLD_REWIND": "1", "PRIVYHUB_INPUT_HOLD": "250"}))
++
++    def _imports(self, env_extra):
++        env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++        env.update(env_extra)
++        code = ("import sys; sys.path.insert(0, 'companion'); import native_session_io as n; "
++                "from games import emulator_manager as em; "
++                "print('hold_rewind' in sys.modules, em._hold_rewind is None, n.NativeControllerBridge._input_mask)")
++        out = subprocess.run([sys.executable, "-B", "-c", code], cwd=ROOT, env=env, capture_output=True, text=True,
++                             timeout=120)
++        return out.stdout.strip(), out.stderr[-500:]
++
++    def test_fresh_process_hold_only_imports_nothing(self):
++        out, err = self._imports({"PRIVYHUB_INPUT_HOLD": "250"})
++        self.assertEqual(out, "False True None", err)
++        out, err = self._imports({})
++        self.assertEqual(out, "False True None", err)
++
++    def test_fresh_process_both_flags_imports_it(self):
++        out, err = self._imports({"PRIVYHUB_INPUT_HOLD": "250", "PRIVYHUB_INPUT_HOLD_REWIND": "1"})
++        self.assertEqual(out, "True False None", err)
++
++
++GEN = r"""
++import hashlib, importlib.util, json, re, sys
++from pathlib import Path
++sys.path.insert(0, sys.argv[1])
++spec = importlib.util.spec_from_file_location("emx", sys.argv[2])
++m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
++root = Path(sys.argv[3]); em = object.__new__(m.EmulatorManager); em.project_root = root.resolve()
++if len(sys.argv) > 4:
++    em._hold_rewind_core = sys.argv[4]
++out = em._prepare_retroarch_session_config(root / "retroarch.cfg", root / "privyhub-input.cfg")
++text = out.read_text()
++masked = re.sub(r'network_cmd_port = "\d+"', 'network_cmd_port = "<port>"', text)
++print(json.dumps({"sha256": hashlib.sha256(masked.encode()).hexdigest(), "text": masked}))
++"""
++
++
++def gen_root():
++    root = Path(tempfile.mkdtemp(prefix="b4_gen_"))
++    (root / "autoconfig").mkdir()
++    (root / "retroarch.cfg").write_text('# PrivyHub-managed RetroArch configuration\nvideo_vsync = "true"\n'
++                                        'joypad_autoconfig_dir = "autoconfig"\nstate_slot = "0"\n')
++    (root / "privyhub-input.cfg").write_text('# PrivyHub Phase A controller profile\n'
++                                             'network_cmd_enable = "true"\nnetwork_cmd_port = "54321"\n')
++    return root
++
++
++_GEN_ROOT = []
++
++
++def generate(module_path, env_extra, core=None):
++    """One project root for every generation (its autoconfig path is in the config text)."""
++    if not _GEN_ROOT:
++        _GEN_ROOT.append(gen_root())
++    env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++    env.update(env_extra)
++    args = [sys.executable, "-B", "-c", GEN, str(ROOT / "companion"), str(module_path), str(_GEN_ROOT[0])]
++    if core:
++        args.append(core)
++    out = subprocess.run(args, cwd=ROOT, env=env, capture_output=True, text=True, timeout=120)
++    if out.returncode:
++        raise AssertionError(out.stderr[-800:])
++    return json.loads(out.stdout)
++
++
++PREDECESSOR = Path(os.environ.get("B4_PREDECESSOR_EM", ""))
++
++
++class TheConfig(unittest.TestCase):
++    ON = {"PRIVYHUB_INPUT_HOLD": "250", "PRIVYHUB_INPUT_HOLD_REWIND": "1"}
++
++    @unittest.skipUnless(PREDECESSOR.is_file(), "B4_PREDECESSOR_EM (the predecessor emulator_manager.py) not given")
++    def test_masked_hash_flag_absent_is_the_predecessor(self):
++        new = ROOT / "companion" / "games" / "emulator_manager.py"
++        a = generate(PREDECESSOR, {})
++        self.assertEqual(generate(new, {})["sha256"], a["sha256"])
++        self.assertEqual(generate(new, {"PRIVYHUB_INPUT_HOLD": "250"})["sha256"], a["sha256"])
++        self.assertEqual(generate(new, {"PRIVYHUB_INPUT_HOLD": "250", "PRIVYHUB_INPUT_HOLD_REWIND": "yes"})["sha256"],
++                         a["sha256"])
++        on = generate(new, self.ON, "snes9x_libretro.so")
++        self.assertTrue(on["text"].startswith(a["text"]))
++        self.assertEqual(on["text"][len(a["text"]):], hr.config_block("snes9x_libretro.so", self.ON))
++
++    def test_the_keys_once_and_the_bytes_per_core(self):
++        new = ROOT / "companion" / "games" / "emulator_manager.py"
++        want = {"snes9x_libretro.so": 27_262_976, "bsnes_libretro.so": 9_437_184,
++                "mednafen_psx_hw_libretro.so": 537_919_488, "fceumm_libretro.so": 20_971_520}
++        for core, size in want.items():
++            text = generate(new, self.ON, core)["text"]
++            for key in hr.KEYS:
++                self.assertEqual(len(re.findall(rf"(?m)^{key} = ", text)), 1, (core, key))
++            self.assertIn(f'rewind_buffer_size = "{size}"', text, core)
++            self.assertIn('rewind_enable = "true"', text)
++            self.assertIn('rewind_granularity = "1"', text)
++            self.assertIn('audio_rewind_mute = "true"', text)
++        self.assertEqual(hr.buffer_bytes("snes9x_libretro.so", 10), 10 * 1024 * 1024)   # 823,536 x 12 = 9.42 MiB -> 10
++        text = generate(new, dict(self.ON, PRIVYHUB_INPUT_HOLD_REWIND_CAP="10"), "mednafen_psx_hw_libretro.so")["text"]
++        self.assertIn(f'rewind_buffer_size = "{hr.buffer_bytes("mednafen_psx_hw_libretro.so", 10)}"', text)
++
++    def test_a_base_with_a_rewind_key_is_left_alone(self):
++        base = 'video_vsync = "true"\nrewind_enable = "false"\n'
++        self.assertEqual(hr.apply_session_config(base, "snes9x_libretro.so", self.ON), base)
++        self.assertEqual(hr.apply_session_config("x = 1\n", "snes9x_libretro.so", {}), "x = 1\n")
++
++
++class TheHandover(unittest.TestCase):
++    def _exit(self, rig):
++        rig.rec.enable_controller_exit(True)
++        now = time.monotonic()
++        self.assertFalse(rig.rec._maybe_exit_controller_pause(now, 20.0))
++        self.assertFalse(rig.rec._maybe_exit_controller_pause(now + 0.3, 20.0))
++        rig.rec._heartbeat_history = [(now + 0.4, 30)]
++        self.assertTrue(rig.rec._maybe_exit_controller_pause(now + 0.5, 20.0))
++
++    def test_v2_takes_the_hold_over_and_its_exit_rewinds_once(self):
++        rig = Rig()
++        try:
++            onset, onset_counter = rig.hold()
++            rig.rec.note_client_silence(5350.0)                 # v2's controller_silence while held
++            rig.release(5600.0)                                  # the hold no longer owns it: no rewind here
++            self.assertNotIn("input_release", rig.events())
++            self._exit(rig)
++            ev = rig.events()
++            self.assertEqual(ev, ["desync_pause", "input_hold_handover", "input_release", "resumed"])
++            row = [r for r in rig.rows() if r["event"] == "input_release"][0]
++            self.assertEqual(row["via"], "controller_return")
++            self.assertLessEqual(abs(rig.core.last_rewind_counter - onset_counter), 1)
++            self.assertEqual(rig.rows()[-1]["via"], "controller_return")
++            self.assertEqual(rig.emu.calls, ["pause", "resume"])
++        finally:
++            rig.close()
++
++    def test_a_v2_pause_without_a_hold_is_not_rewound(self):
++        rig = Rig()
++        try:
++            rig.rec.note_client_silence(5350.0)
++            self._exit(rig)
++            self.assertEqual(rig.events(), ["desync_pause", "resumed"])
++            self.assertEqual(rig.core.rewind_cmds, 0)
++        finally:
++            rig.close()
++
++    def test_a_stale_pending_hold_is_not_used_by_a_later_pause(self):
++        rig = Rig()
++        try:
++            rig.hold()
++            rig.rec.note_client_desync("output_silence", 1300.0)   # the client's desync takes the hold over
++            self.assertTrue(rig.rec.note_stream_ready())           # the client's gate resumes it (no rewind there)
++            rig.emu.resume()
++            time.sleep(0.05)
++            rig.rec.note_client_silence(5350.0)                    # a later v2 pause of its own
++            self._exit(rig)
++            self.assertNotIn("input_release", rig.events())
++            self.assertEqual(rig.core.rewind_cmds, 0)
++        finally:
++            rig.close()
++
++
++class TheHooks(unittest.TestCase):
++    def _ifs(self, rel, test_text):
++        tree = ast.parse((ROOT / "companion" / rel).read_text())
++        return [n for n in ast.walk(tree) if isinstance(n, ast.If) and ast.unparse(n.test) == test_text]
++
++    def test_shapes(self):
++        self.assertEqual(len(self._ifs("native_session_io.py",
++                                       "self._input_mask is not None and self._input_mask.masked()")), 1)
++        self.assertEqual(len(self._ifs("input_hold.py",
++                                       "getattr(self.recovery, '_input_hold_rewind', None) is not None")), 3)
++        self.assertEqual(len(self._ifs("games/link_drop_recovery.py", "self._input_hold_rewind is not None")), 2)
++        self.assertEqual(len(self._ifs("plugins/games.py", "_hold_rewind is not None")), 1)
++        self.assertEqual(len(self._ifs("games/emulator_manager.py", "_hold_rewind is not None")), 2)
++        for rel in ("plugins/games.py", "games/emulator_manager.py"):
++            tree = ast.parse((ROOT / "companion" / rel).read_text())
++            guarded = [n for n in tree.body if isinstance(n, ast.If) and "import hold_rewind" in ast.unparse(n)]
++            self.assertEqual(len(guarded), 1, rel)
++            self.assertIn("PRIVYHUB_INPUT_HOLD_REWIND", ast.unparse(guarded[0].test))
++            top = [n for n in tree.body if isinstance(n, (ast.Import, ast.ImportFrom))]
++            self.assertFalse(any("hold_rewind" in ast.unparse(n) for n in top), rel)
++
++
++class UnattendedNet(unittest.TestCase):
++    def _logs(self):
++        d = Path(tempfile.mkdtemp(prefix="b4_uf_"))
++        (d / "native_frame_sizes.jsonl").write_text("".join(
++            json.dumps({"at_utc": f"2026-10-22T00:00:{s:02d}.000Z", "frames": 60}) + "\n" for s in range(0, 40)))
++        (d / "native_stream_ctrl_gaps.log").write_text("".join(json.dumps(r) + "\n" for r in (
++            {"start_utc": "2026-10-22T00:00:10.000Z", "end_utc": "2026-10-22T00:00:14.000Z", "gap_ms": 4000},
++            {"start_utc": "2026-10-22T00:00:30.000Z", "end_utc": "2026-10-22T00:00:31.000Z", "gap_ms": 1000})))
++        (d / "native_stream_recovery.log").write_text("".join(json.dumps(r) + "\n" for r in (
++            {"at_utc": "2026-10-22T00:00:10.330Z", "event": "desync_pause", "trigger": "input_hold"},
++            {"at_utc": "2026-10-22T00:00:14.330Z", "event": "input_release", "rewound_frames": 19},
++            {"at_utc": "2026-10-22T00:00:14.340Z", "event": "resumed", "via": "input_release"})))
++        return d
++
++    def test_net(self):
++        sys.path.insert(0, str(ROOT / "tools"))
++        import unattended_frames as uf
++        d = self._logs()
++        a, b = uf.ts("2026-10-22T00:00:00"), uf.ts("2026-10-22T00:00:40")
++        plain = uf.measure(d, a, b)
++        self.assertNotIn("net", plain)
++        r = uf.measure(d, a, b, net=True)
++        eps = {e["start"]: e for e in r["net"]["episodes"]}
++        first = eps["2026-10-22T00:00:10.000Z"]
++        self.assertAlmostEqual(first["unattended_frames_core_running"], 0.08 * 60, delta=0.5)   # 250 -> 330 ms
++        self.assertEqual(first["rewound_frames"], 19.0)
++        self.assertEqual(first["unattended_frames_core_running_net"], 0.0)
++        self.assertAlmostEqual(first["rewound_beyond_threshold"], 19 - 4.8, delta=0.5)
++        second = eps["2026-10-22T00:00:30.000Z"]
++        self.assertEqual(second["rewound_frames"], 0.0)
++        self.assertAlmostEqual(second["unattended_frames_core_running_net"], 45.0, delta=0.5)
++        self.assertAlmostEqual(r["net"]["unattended_frames_core_running_net"], 45.0, delta=0.5)
++        self.assertEqual(r["net"]["rewinds"], 1)
++        self.assertEqual(r["net"]["rewound_unassigned"], 0.0)
++
++    def test_without_net_the_cli_output_is_the_predecessors(self):
++        pred = Path(os.environ.get("B4_PREDECESSOR_UF", ""))
++        if not pred.is_file():
++            self.skipTest("B4_PREDECESSOR_UF not given")
++        d = self._logs()
++        args = ["--logs", str(d), "--span", "2026-10-22T00:00:00", "2026-10-22T00:00:40"]
++        new = subprocess.run([sys.executable, "-B", str(ROOT / "tools" / "unattended_frames.py"), *args],
++                             capture_output=True, text=True, timeout=60).stdout
++        old = subprocess.run([sys.executable, "-B", str(pred), *args], capture_output=True, text=True,
++                             timeout=60).stdout
++        self.assertEqual(new, old)
++        self.assertTrue(new)
++
++
++if __name__ == "__main__":
++    unittest.main()

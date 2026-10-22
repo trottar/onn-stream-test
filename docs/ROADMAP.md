@@ -1857,6 +1857,9 @@ pending (BENCH-R1).** Record: `docs/memory/evidence/B2_INPUT_HOLD_2026-10-22.md`
 `PRIVYHUB_LINK_REPORT=1`; APK pinned, not installed (CL-B8 pending).** Record:
 `docs/memory/evidence/B3_CLIENT_LINK_REPORT_2026-10-22.md`.
 
+**B4 (2026-10-22): rewind on the hold's release, built behind `PRIVYHUB_INPUT_HOLD_REWIND=1` (with the hold); bench run
+pending (BENCH-R2: net unattended ≈ 0, rewind's CPU per core, PSX HW).** Record: `docs/memory/evidence/B4_INPUT_HOLD_REWIND_2026-10-22.md`.
+
 ## G9 — Remote foundation checkpoint
 
 Acceptance:

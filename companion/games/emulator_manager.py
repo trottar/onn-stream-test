@@ -17,6 +17,13 @@ from typing import Any, Callable
 
 from games import ps1_look  # C5-M5B
 
+# B4: RetroArch's rewind in the launch config, only with PRIVYHUB_INPUT_HOLD and PRIVYHUB_INPUT_HOLD_REWIND set.
+# Absent = today's config byte for byte: nothing imported.
+_hold_rewind = None
+if ((os.environ.get("PRIVYHUB_INPUT_HOLD") or "").strip()
+        and (os.environ.get("PRIVYHUB_INPUT_HOLD_REWIND") or "").strip()):
+    import hold_rewind as _hold_rewind
+
 
 class EmulatorError(RuntimeError):
     pass
@@ -5008,6 +5015,11 @@ class EmulatorManager:
                         f"ambiguous {key} assignment"
                     )
 
+        # B4: the rewind keys for the hold's release (flag on only; a base that sets one is left alone)
+        if _hold_rewind is not None:
+            session_text = _hold_rewind.apply_session_config(
+                session_text, getattr(self, "_hold_rewind_core", ""), os.environ)
+
         temporary = session_config.with_name(
             session_config.name + ".tmp"
         )
@@ -5390,6 +5402,9 @@ class EmulatorManager:
                 runtime,
                 core_path,
             )
+            # B4: the core whose savestate size sizes the rewind buffer
+            if _hold_rewind is not None:
+                self._hold_rewind_core = core_path.name
 
             if cheat_source_index is None and cheat_enabled_indexes is not None:
                 raise EmulatorError(

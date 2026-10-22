@@ -87,6 +87,9 @@ class LinkDropRecovery:
     either.
     """
 
+    # B4: the hold's rewind (hold_rewind.Rewinder; only PRIVYHUB_INPUT_HOLD_REWIND=1 wires it). None = B2.
+    _input_hold_rewind: Any = None
+
     def __init__(
         self,
         project_root: Path,
@@ -273,6 +276,10 @@ class LinkDropRecovery:
         with self._lock:
             if self._state != STATE_PAUSED_RECOVERING or self._last_desync_reason != INPUT_HOLD:
                 return False
+
+        # B4: rewind the frames run without the player, before the resume; never fails the resume
+        if self._input_hold_rewind is not None:
+            self._input_hold_rewind.rewind(self, "input_release")
 
         error = ""
 
@@ -666,6 +673,10 @@ class LinkDropRecovery:
 
         if not has_encoder:
             return False
+
+        # B4: a hold handed over to v2 -- the same rewind, before v2's resume (no pending hold = nothing)
+        if self._input_hold_rewind is not None:
+            self._input_hold_rewind.rewind(self, "controller_return")
 
         error = ""
 

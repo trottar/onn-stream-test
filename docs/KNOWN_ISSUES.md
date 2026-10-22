@@ -43,8 +43,16 @@ is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.m
   - **B3, the link beside the loss:** the client reports RSSI / link speed / band (`debug.privyhub.link_report=1`),
     and the host records `link.*` (`PRIVYHUB_LINK_REPORT=1`). APK `e4d02354…` pinned, not installed.
     - Record: `docs/memory/evidence/B3_CLIENT_LINK_REPORT_2026-10-22.md`.
+  - **B4, the blackout costs nothing (2026-10-22, session B):** `PRIVYHUB_INPUT_HOLD_REWIND=1` (with the hold) rewinds
+    the core on the hold's release by the frames it ran without the player before the pause landed (clock × 60 from
+    the last packet to the confirmed pause, less a measured 4-frame lag; cap 30), before the resume. RetroArch 1.22.2's
+    rewind is on in the launch config under the flag only (buffer per core from a real savestate: snes9x 26 MiB, PSX
+    513 MiB). A handover to v2 is rewound too, so a 20-s outage costs nothing either.
+    - Fake-core tests: back at the onset ± 1; a failed rewind still resumes. Flag absent = B2 (AST, config hash).
+    - Open (A, BENCH-R2): the CPU per core with rewind on; whether Beetle PSX HW's hardware renderer rewinds at all.
+    - Record: `docs/memory/evidence/B4_INPUT_HOLD_REWIND_2026-10-22.md`.
   - **Next (session A):** BENCH-R1 (the blackout cells, the hold on / off, the loss cells with the LAN loss rule),
-    then CL-B8 (install B3's APK, one LAN window).
+    then CL-B8 (install B3's APK, one LAN window), then BENCH-R2 (the hold + rewind; rewind's CPU per core).
 
 ## 2026-10-20 UX-R1, the user's extended evening (2026-10-20 04:19-05:22Z) was bad and got worse — OPEN; the files agree; link vs onn not separable from them; UX-R2: the second evening mostly clean, the damage not repeated (one event so far, untested past play-minute 44); H5 closed (not new); UX-R3: one of last night's two "deaths" found (04:54:55-59Z, a 4-s drop in both directions); the second not distinguishable
 

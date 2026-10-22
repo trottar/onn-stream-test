@@ -36,6 +36,11 @@ _input_hold = None
 if (os.environ.get("PRIVYHUB_INPUT_HOLD") or "").strip():
     import input_hold as _input_hold
 
+# B4: rewind on the hold's release, only with PRIVYHUB_INPUT_HOLD and PRIVYHUB_INPUT_HOLD_REWIND set. Absent = B2.
+_hold_rewind = None
+if _input_hold is not None and (os.environ.get("PRIVYHUB_INPUT_HOLD_REWIND") or "").strip():
+    import hold_rewind as _hold_rewind
+
 # B1: the impairment shim's uplink blackout, only with PRIVYHUB_IMPAIRMENT set
 # (a gate only for `blackout-<D>s@both`). Absent = today: nothing imported.
 _impairment_uplink = None
@@ -149,6 +154,10 @@ class GamesPlugin:
         if _input_hold is not None:
             _input_hold.wire(self._recovery, self._native_stream._session_io.controller,
                              lambda: bool(getattr(self._emulator, "_paused", False)), os.environ)
+        # B4: the rewind inside the hold's own release (one owner: the recovery)
+        if _hold_rewind is not None:
+            _hold_rewind.wire(self._recovery, self._native_stream._session_io.controller, self._emulator,
+                              os.environ, self.PROJECT_ROOT)
         if trigger_v2 or os.environ.get("PRIVYHUB_RECOVERY_GAP_LOG") == "1":
             self._native_stream._session_io.controller.set_gap_log(
                 self.PROJECT_ROOT / "logs" / "games" / "native_stream_ctrl_gaps.log"

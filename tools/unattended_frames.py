@@ -20,6 +20,11 @@ The number the fast input hold (PRIVYHUB_INPUT_HOLD) exists to cut. Defined in
   also subtracts the spans in which recovery had the core paused (`native_stream_recovery.log`: a `desync_pause` to
   the next `resumed` / `session_ended` / `session_started`): the frames the game advanced without the player. This
   is the number the input hold exists to cut.
+- **`--net` (B4)**: the hold's rewind (PRIVYHUB_INPUT_HOLD_REWIND=1) returns the core to the silence's onset, so per
+  episode `unattended_frames_core_running_net` = core running - the episode's `rewound_frames` (the recovery log's
+  `input_release` rows, the latest episode that started before the row and ended <= 30 s before it), floored at 0.
+  The rewind also returns the first 250 ms, which the measure does not count: that excess is
+  `rewound_beyond_threshold`. Without `--net` the output is the B2 tool's, byte for byte.
 """
 from __future__ import annotations
 
@@ -32,6 +37,7 @@ from pathlib import Path
 
 THRESHOLD_S = 0.25
 EPISODE_JOIN_S = 0.5
+NET_ASSIGN_S = 30.0     # B4: a rewind row belongs to an episode that ended at most this long before it
 
 
 def ts(t: str) -> float:
@@ -95,6 +101,18 @@ def paused_spans(logs: Path, a: float, b: float) -> list[tuple[float, float]]:
     return out
 
 
+def rewound_rows(logs: Path, a: float, b: float) -> list[tuple[float, float]]:
+    """B4: (time, rewound_frames) of the recovery log's input_release rows in [a, b + NET_ASSIGN_S]."""
+    rows = {}
+    for r in jl(sorted(glob.glob(str(logs / "native_stream_recovery.log*")))
+                + sorted(glob.glob(str(logs / "stream_log_archive" / "native_stream_recovery*")))):
+        if r.get("event") == "input_release" and r.get("at_utc") and isinstance(r.get("rewound_frames"), (int, float)):
+            t = ts(r["at_utc"])
+            if a <= t <= b + NET_ASSIGN_S:
+                rows[r["at_utc"]] = (t, float(r["rewound_frames"]))
+    return sorted(rows.values())
+
+
 def running_frames_in(frames: dict, s: float, e: float, paused: list[tuple[float, float]]) -> float:
     """Frames in [s, e] outside the paused spans."""
     n, cur = 0.0, s
@@ -131,7 +149,7 @@ def episodes(gaps):
     return out
 
 
-def measure(logs: Path, a: float, b: float, windows=(), holds=(250, 500, 1000)) -> dict:
+def measure(logs: Path, a: float, b: float, windows=(), holds=(250, 500, 1000), net: bool = False) -> dict:
     gaps, frames = load(logs, a, b)
     paused = paused_spans(logs, a, b)
     stream_s = sum(1 for t, f in frames.items() if a <= t < b and f > 0)
@@ -161,6 +179,8 @@ def measure(logs: Path, a: float, b: float, windows=(), holds=(250, 500, 1000)) 
                              "unattended_frames_core_running": ep["unattended_frames_core_running"]}
                             for ep in sorted(eps, key=lambda x: -x["unattended_frames"])[:10]],
            "windows": {}}
+    if net:
+        add_net(res, eps, rewound_rows(logs, a, b), per10)
     for name, wa, wb in windows:
         n = sum(frames_in(frames, max(s + THRESHOLD_S, wa), min(e, wb)) for s, e in gaps if e - s >= THRESHOLD_S)
         nr = sum(running_frames_in(frames, max(s + THRESHOLD_S, wa), min(e, wb), paused)
@@ -171,6 +191,35 @@ def measure(logs: Path, a: float, b: float, windows=(), holds=(250, 500, 1000)) 
     return res
 
 
+def add_net(res: dict, eps: list, rewinds: list, per10) -> None:
+    """B4 --net: per episode, core running minus its rewound frames (floored at 0)."""
+    unassigned = 0.0
+    for ep in eps:
+        ep["rewound_frames"] = 0.0
+    for t, n in rewinds:
+        owner = [ep for ep in eps if ep["start"] <= t <= ep["end"] + NET_ASSIGN_S]
+        if owner:
+            owner[-1]["rewound_frames"] += n
+        else:
+            unassigned += n
+    for ep in eps:
+        run = ep["unattended_frames_core_running"]
+        ep["unattended_frames_core_running_net"] = round(max(0.0, run - ep["rewound_frames"]), 1)
+        ep["rewound_beyond_threshold"] = round(max(0.0, ep["rewound_frames"] - run), 1)
+    total = sum(ep["unattended_frames_core_running_net"] for ep in eps)
+    res["net"] = {"unattended_frames_core_running_net": round(total, 1),
+                  "unattended_frames_core_running_net_per_10min": per10(total),
+                  "rewound_frames": round(sum(n for _, n in rewinds), 1),
+                  "rewound_unassigned": round(unassigned, 1),
+                  "rewinds": len(rewinds),
+                  "episodes": [{"start": utc(ep["start"]), "end": utc(ep["end"]),
+                                "unattended_frames_core_running": ep["unattended_frames_core_running"],
+                                "rewound_frames": round(ep["rewound_frames"], 1),
+                                "unattended_frames_core_running_net": ep["unattended_frames_core_running_net"],
+                                "rewound_beyond_threshold": ep["rewound_beyond_threshold"]}
+                               for ep in eps if ep["unattended_frames_core_running"] > 0 or ep["rewound_frames"] > 0]}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--logs", required=True, type=Path)
@@ -178,9 +227,10 @@ def main() -> int:
     ap.add_argument("--window", nargs=3, action="append", default=[])
     ap.add_argument("--hold-ms", default="250,500,1000")
     ap.add_argument("--json", type=Path)
+    ap.add_argument("--net", action="store_true", help="B4: minus the hold's rewound_frames per episode")
     a = ap.parse_args()
     res = measure(a.logs, ts(a.span[0]), ts(a.span[1]), [(n, ts(x), ts(y)) for n, x, y in a.window],
-                  tuple(int(x) for x in a.hold_ms.split(",")))
+                  tuple(int(x) for x in a.hold_ms.split(",")), net=a.net)
     print(json.dumps(res, indent=1))
     if a.json:
         a.json.write_text(json.dumps(res, indent=1) + "\n")

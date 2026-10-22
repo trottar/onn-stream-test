@@ -1,0 +1,21 @@
+91afed624da63f87378de35c0ad4605becc8c8b90ac66fadac0e5e18c63aa3d7  predecessor (HEAD), no flag
+91afed624da63f87378de35c0ad4605becc8c8b90ac66fadac0e5e18c63aa3d7  B4, no flag
+91afed624da63f87378de35c0ad4605becc8c8b90ac66fadac0e5e18c63aa3d7  B4, PRIVYHUB_INPUT_HOLD=250 only
+91afed624da63f87378de35c0ad4605becc8c8b90ac66fadac0e5e18c63aa3d7  B4, HOLD=250 + REWIND=yes (ignored)
+91afed624da63f87378de35c0ad4605becc8c8b90ac66fadac0e5e18c63aa3d7  B4, REWIND=1 without HOLD
+91afed624da63f87378de35c0ad4605becc8c8b90ac66fadac0e5e18c63aa3d7  B4, HOLD=0 (invalid) + REWIND=1
+3cc93a8c51af3518183c000e90c1accef2b05dc4a83bd4317a8aff3c25da1b21  B4, flag on, snes9x_libretro.so  [+5 lines; rewind_buffer_size = "27262976"]
+e0ef1a149f5db7d45499b7a64a0a982068ed92649b3abd26187d88d43e0ac19f  B4, flag on, bsnes_libretro.so  [+5 lines; rewind_buffer_size = "9437184"]
+050aab6316dd69629741243bd15a55c5c5361998812338821bcd85aa679ab978  B4, flag on, mednafen_psx_hw_libretro.so  [+5 lines; rewind_buffer_size = "537919488"]
+b33e11c7ab81639ae77ef1e40ec7f1315c4ebf20b55525653771e42127f9d7a4  B4, flag on, fceumm_libretro.so  [+5 lines; rewind_buffer_size = "20971520"]
+c960dc18cdfcac832a5383c06292717b664465dbf89b6c966285fa1f73009505  B4, flag on, CAP=10, mednafen_psx_hw_libretro.so  [+5 lines; rewind_buffer_size = "202375168"]
+
+The block appended with the flag on (snes9x, cap 30):
+
+
+# PrivyHub B4 input-hold rewind (PRIVYHUB_INPUT_HOLD_REWIND=1)
+rewind_enable = "true"
+rewind_granularity = "1"
+rewind_buffer_size = "27262976"
+audio_rewind_mute = "true"
+

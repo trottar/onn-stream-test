@@ -1632,6 +1632,8 @@ class NativeControllerBridge:
 
     # B2: the fast input hold's detector (set_input_hold; only PRIVYHUB_INPUT_HOLD wires it). None = today.
     _input_hold: Any = None
+    # B4: the hold's rewind masks the player's input while it runs (set_input_mask; only PRIVYHUB_INPUT_HOLD_REWIND=1).
+    _input_mask: Any = None
 
     LINUX_VENDOR_ID = 0x1209
     LINUX_PRODUCT_ID = 0x5048
@@ -1951,6 +1953,10 @@ class NativeControllerBridge:
     def set_input_hold(self, detector: Any) -> None:
         """B2: the input-hold detector's on_quiet / on_packet, called from the receive loop (never blocking)."""
         self._input_hold = detector
+
+    def set_input_mask(self, mask: Any) -> None:
+        """B4: the rewind's mask (`masked()`); while it reads True no report is applied (the pads stay neutral)."""
+        self._input_mask = mask
 
     def set_client_silence_callback(
         self,
@@ -2631,6 +2637,10 @@ class NativeControllerBridge:
             # B2: the first packet back releases an input hold
             if self._input_hold is not None:
                 self._input_hold.on_packet(now_packet)
+
+            # B4: no input reaches the core while the hold's rewind runs
+            if self._input_mask is not None and self._input_mask.masked():
+                continue
 
             try:
                 self._apply_report(

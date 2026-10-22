@@ -1,0 +1,167 @@
+== tests/input_hold_rewind
+----------------------------------------------------------------------
+Ran 22 tests in 10.437s
+
+OK
+rc=0
+
+== tests/input_hold
+----------------------------------------------------------------------
+Ran 19 tests in 3.359s
+
+OK
+rc=0
+
+== tests/impairment
+----------------------------------------------------------------------
+Ran 29 tests in 16.270s
+
+OK
+rc=0
+
+== tests/recovery_ext
+----------------------------------------------------------------------
+Ran 17 tests in 0.006s
+
+OK
+rc=0
+
+== tests/overlay
+----------------------------------------------------------------------
+Ran 17 tests in 0.045s
+
+OK
+rc=0
+
+== tests/session_identity
+----------------------------------------------------------------------
+Ran 88 tests in 0.167s
+
+OK
+rc=0
+
+== tests/audio_codec
+----------------------------------------------------------------------
+Ran 20 tests in 0.231s
+
+OK
+rc=0
+
+== tests/encoder_rc
+----------------------------------------------------------------------
+Ran 16 tests in 0.151s
+
+OK
+rc=0
+
+== tests/wan_adaptation
+----------------------------------------------------------------------
+Ran 23 tests in 0.105s
+
+OK
+rc=0
+
+== tests/wan_telemetry
+----------------------------------------------------------------------
+Ran 18 tests in 0.098s
+
+OK
+rc=0
+
+== tests/remote_ladder
+----------------------------------------------------------------------
+Ran 26 tests in 0.449s
+
+OK
+rc=0
+
+== tests/remote_cap
+----------------------------------------------------------------------
+Ran 16 tests in 0.371s
+
+OK
+rc=0
+
+== tests/start_rung
+----------------------------------------------------------------------
+Ran 17 tests in 0.201s
+
+OK
+rc=0
+
+== tests/lan_loss_rule
+----------------------------------------------------------------------
+Ran 21 tests in 0.041s
+
+OK
+rc=0
+
+== tests/link_report
+----------------------------------------------------------------------
+Ran 9 tests in 0.339s
+
+OK
+rc=0
+
+== tools/test_c3_f1_recovery_restart.py
+----------------------------------------------------------------------
+Ran 8 tests in 0.002s
+
+FAILED (errors=1)
+rc=1
+
+== tools/test_adaptive_bitrate_live.py
+----------------------------------------------------------------------
+Ran 126 tests in 0.732s
+
+FAILED (errors=1)
+rc=1
+
+== tools/test_adaptive_bitrate_shadow.py
+----------------------------------------------------------------------
+Ran 21 tests in 0.031s
+
+OK
+rc=0
+
+== tools/test_native_source_contract.py
+----------------------------------------------------------------------
+Ran 7 tests in 0.047s
+
+OK
+rc=0
+
+== tools/test_c5_m1_profile_selector.py
+----------------------------------------------------------------------
+Ran 14 tests in 0.004s
+
+OK
+rc=0
+
+== tools/test_ps1_look.py
+----------------------------------------------------------------------
+Ran 13 tests in 0.029s
+
+OK
+rc=0
+
+== tools/test_ps1_look_helper.py
+----------------------------------------------------------------------
+Ran 11 tests in 3.936s
+
+OK
+rc=0
+
+
+== tools/test_adaptive_bitrate_live.py, from the tree (read-only, -B), B4 installed
+Ran 126 tests -- OK
+
+== notes (B4)
+- Run in /tmp/b_b4 (a copy of companion/, tools/, tests/), B4 in place (before the install; the tree's files are the
+  copy's byte for byte, after_sha256.txt). tests/recovery_ext = E3-R2's recovery suite (from /tmp/b_q22, already
+  pointed at its copy's companion/ via REPO), placed in the copy only: 17 OK.
+- tools/test_c3_f1_recovery_restart.py: 1 error, PRE-EXISTING (the same `substring not found` as B1's / B2's records).
+- tools/test_adaptive_bitrate_live.py: 1 error in the copy = the golden fixture under docs/ the copy does not hold (as
+  in B1 / B2); run from the tree, read-only: 126 OK.
+- Added to B2's set because B4 touches emulator_manager.py: tools/test_ps1_look.py 13 OK, test_ps1_look_helper.py 11 OK;
+  and B3's tests/link_report 9 OK.

@@ -102,6 +102,9 @@ class HoldDispatcher:
             threading.Thread(target=self._run, name="PrivyHub-Input-Hold", daemon=True).start()
 
     def put(self, event: tuple) -> None:
+        # B4: a hold's detection time, for the rewind's onset (PRIVYHUB_INPUT_HOLD_REWIND only)
+        if getattr(self.recovery, "_input_hold_rewind", None) is not None:
+            self.recovery._input_hold_rewind.stamp(event, self._clock())
         self._q.put(event)
 
     def _run(self) -> None:
@@ -113,6 +116,9 @@ class HoldDispatcher:
                 pass                                  # the hold must never take the worker down
 
     def handle(self, event: tuple) -> None:
+        # B4: one stamp popped per hold event, on every path (PRIVYHUB_INPUT_HOLD_REWIND only)
+        if getattr(self.recovery, "_input_hold_rewind", None) is not None:
+            self.recovery._input_hold_rewind.on_handle(event)
         kind, ms = event
         if kind == "hold":
             try:
@@ -128,6 +134,9 @@ class HoldDispatcher:
             self._skipped_reported = False
             self._ours = bool(self.recovery.note_input_hold(ms))
             self._paused_at = self._clock() if self._ours else None
+            # B4: the pending hold: onset and confirmed pause (PRIVYHUB_INPUT_HOLD_REWIND only)
+            if getattr(self.recovery, "_input_hold_rewind", None) is not None:
+                self.recovery._input_hold_rewind.note_paused(self._ours, self._paused_at, self.recovery)
         elif kind == "release":
             if not self._ours:
                 return
