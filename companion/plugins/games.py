@@ -26,6 +26,24 @@ from native_stream import NativeStreamError, NativeStreamManager
 import adaptive_bitrate_live
 from adaptive_bitrate_live import get_controller as adaptive_bitrate_controller
 
+# B3: the client's Wi-Fi link fields in the heartbeat, only with PRIVYHUB_LINK_REPORT=1. Absent = today.
+_LINK_FIELDS = None
+if (os.environ.get("PRIVYHUB_LINK_REPORT") or "").strip() == "1":
+    from games.native_stream_heartbeat import LINK_FIELDS as _LINK_FIELDS
+
+# B2: the fast input hold, only with PRIVYHUB_INPUT_HOLD set. Absent = today: nothing imported.
+_input_hold = None
+if (os.environ.get("PRIVYHUB_INPUT_HOLD") or "").strip():
+    import input_hold as _input_hold
+
+# B1: the impairment shim's uplink blackout, only with PRIVYHUB_IMPAIRMENT set
+# (a gate only for `blackout-<D>s@both`). Absent = today: nothing imported.
+_impairment_uplink = None
+if (os.environ.get("PRIVYHUB_IMPAIRMENT") or "").strip():
+    import impairment as _impairment
+
+    _impairment_uplink = _impairment.uplink_gate_from_environ(os.environ)
+
 
 class GamesPlugin:
     """Trusted-local, catalog-only Games plugin for PrivyHub."""
@@ -127,6 +145,10 @@ class GamesPlugin:
         # output is fresh (link_drop_recovery), and the silence-gap log runs (also alone: PRIVYHUB_RECOVERY_GAP_LOG=1;
         # logs/games/native_stream_ctrl_gaps.log, beside the recovery log). Absent = neither.
         self._recovery.enable_controller_exit(trigger_v2)
+        # B2: the fast input hold -- a second, faster trigger inside the same recovery state machine
+        if _input_hold is not None:
+            _input_hold.wire(self._recovery, self._native_stream._session_io.controller,
+                             lambda: bool(getattr(self._emulator, "_paused", False)), os.environ)
         if trigger_v2 or os.environ.get("PRIVYHUB_RECOVERY_GAP_LOG") == "1":
             self._native_stream._session_io.controller.set_gap_log(
                 self.PROJECT_ROOT / "logs" / "games" / "native_stream_ctrl_gaps.log"
@@ -3551,6 +3573,9 @@ class GamesPlugin:
         # acts on it here — automatic recovery is a separate item and is not
         # authorized. Unknown query keys are ignored, not recorded.
         if action == "native-stream-heartbeat":
+            # B1: the shim's uplink blackout -- this heartbeat never arrived
+            if _impairment_uplink is not None and _impairment_uplink.drop("heartbeat"):
+                return {"plugin": self.PLUGIN_ID, "ok": False, "impairment": "uplink_blackout"}
             values = {}
 
             for field in (
@@ -3629,6 +3654,12 @@ class GamesPlugin:
 
             if thermal_zones:
                 values["thermal_zones_c"] = thermal_zones[:512]
+
+            # B3: the client's Wi-Fi link fields (ints), when the flag is set
+            if _LINK_FIELDS is not None:
+                for field in _LINK_FIELDS:
+                    if field in query:
+                        values[field] = self._parse_int(self._first(query, field), -1)
 
             if not values:
                 raise ValueError(

@@ -27,6 +27,24 @@ is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.m
   - It does not address last night's death (UX-R3: 04:54:55-04:54:59Z, a 4-s bidirectional drop). No 2 × 10-s run
     reached ≥ 4 there, so it made no ask.
 - **Next (session A):** the shim's loss-1 / loss-5 / burst at 7000 with the flag on vs absent, then the user's room.
+- **Now built against it and UX-R3's death (2026-10-22, session B queue B1-B3; none adopted, no live run):**
+  - **B1, the bench reproduces the death:** `PRIVYHUB_IMPAIRMENT=blackout-4s@both,every=120s` darkens the downlink
+    (`@post-fec`) *and* the uplink (controller packets, heartbeat, client-health at the host's receive points) for
+    4 s every 120 s on one clock. `@down` is the downlink only.
+    - In process: 4.0-s dark spans; the real controller loop went silent and recovery's silence callback fired once
+      per blackout; both directions within 14 ms.
+    - Record: `docs/memory/evidence/B1_SHIM_BLACKOUT_BOTH_2026-10-22.md`.
+  - **B2, the game freezes with the player:** `PRIVYHUB_INPUT_HOLD=250` pauses the core after 250 ms of controller
+    silence, through recovery v2's own pause (reason `input_hold`, one pause row; v2's 5.35-s path takes over a
+    longer one). The first packet back resumes it.
+    - The client sends ~430 packets/s regardless of input, so a silence is the link.
+    - Baseline unattended frames (the core running) per 10 min: Sunday 684, last night 142; the death 84.
+    - Record: `docs/memory/evidence/B2_INPUT_HOLD_2026-10-22.md`.
+  - **B3, the link beside the loss:** the client reports RSSI / link speed / band (`debug.privyhub.link_report=1`),
+    and the host records `link.*` (`PRIVYHUB_LINK_REPORT=1`). APK `e4d02354…` pinned, not installed.
+    - Record: `docs/memory/evidence/B3_CLIENT_LINK_REPORT_2026-10-22.md`.
+  - **Next (session A):** BENCH-R1 (the blackout cells, the hold on / off, the loss cells with the LAN loss rule),
+    then CL-B8 (install B3's APK, one LAN window).
 
 ## 2026-10-20 UX-R1, the user's extended evening (2026-10-20 04:19-05:22Z) was bad and got worse — OPEN; the files agree; link vs onn not separable from them; UX-R2: the second evening mostly clean, the damage not repeated (one event so far, untested past play-minute 44); H5 closed (not new); UX-R3: one of last night's two "deaths" found (04:54:55-59Z, a 4-s drop in both directions); the second not distinguishable
 

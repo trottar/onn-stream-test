@@ -1,0 +1,186 @@
+{
+ "A": {
+  "blackout": {
+   "spec": "blackout-4s@down,every=20s,first=10s",
+   "t0": 2487833.325733235,
+   "sent": 43200,
+   "got": 34560,
+   "spans": [
+    [
+     9.983885394,
+     4.0084224729999995
+    ],
+    [
+     29.984060881,
+     4.008218562999996
+    ],
+    [
+     49.983868856,
+     4.007659922000002
+    ]
+   ],
+   "dropped_share_pct": 20.0,
+   "counters": {
+    "packets_in": 43200,
+    "packets_out": 34560,
+    "bytes_in": 51840000,
+    "bytes_out": 41472000,
+    "dropped_loss": 0,
+    "dropped_burst": 0,
+    "dropped_queue": 0,
+    "delayed": 0,
+    "reordered": 0,
+    "dropped_blackout": 8640,
+    "uplink_dropped": 0,
+    "queue_max": 12,
+    "send_errors": 0,
+    "cpu_s": 1.153044679
+   }
+  },
+  "default_both": {
+   "spec": "blackout-4s@both",
+   "t0": 2487894.325045772,
+   "sent": 43200,
+   "got": 43200,
+   "spans": [],
+   "dropped_share_pct": 0.0,
+   "counters": {
+    "packets_in": 43200,
+    "packets_out": 43200,
+    "bytes_in": 51840000,
+    "bytes_out": 51840000,
+    "dropped_loss": 0,
+    "dropped_burst": 0,
+    "dropped_queue": 0,
+    "delayed": 0,
+    "reordered": 0,
+    "dropped_blackout": 0,
+    "uplink_dropped": 0,
+    "queue_max": 12,
+    "send_errors": 0,
+    "cpu_s": 1.2663443950000002
+   }
+  }
+ },
+ "B": {
+  "sent": 25800,
+  "applied": 20640,
+  "spans": [
+   [
+    9.998,
+    4.003
+   ],
+   [
+    29.998,
+    4.002
+   ],
+   [
+    49.998,
+    4.002
+   ]
+  ],
+  "silences": [
+   [
+    11.0,
+    1000
+   ],
+   [
+    31.0,
+    1000
+   ],
+   [
+    51.0,
+    1002
+   ]
+  ],
+  "neutralized_at": [
+   10.25,
+   30.25,
+   50.25,
+   60.26,
+   60.26
+  ],
+  "uplink_dropped": {
+   "controller": 5160,
+   "heartbeat": 0,
+   "client_health": 0
+  },
+  "expected_dropped": 5160
+ },
+ "C": {
+  "down_starts": [
+   9.985,
+   29.985,
+   49.985
+  ],
+  "up_starts": [
+   9.999,
+   29.999,
+   49.999
+  ],
+  "diff_ms": [
+   14,
+   14,
+   14
+  ]
+ },
+ "D": {
+  "seen": [
+   [
+    5.0,
+    false,
+    false
+   ],
+   [
+    10.5,
+    true,
+    true
+   ],
+   [
+    13.9,
+    true,
+    true
+   ],
+   [
+    14.1,
+    false,
+    false
+   ],
+   [
+    31.0,
+    true,
+    true
+   ]
+  ],
+  "dropped": {
+   "controller": 0,
+   "heartbeat": 3,
+   "client_health": 3
+  }
+ },
+ "E": {
+  "functions": [
+   [
+    "companion/native_session_io.py",
+    "_receive_loop",
+    true
+   ],
+   [
+    "companion/plugins/games.py",
+    "handle_post_request",
+    true
+   ],
+   [
+    "companion/privyhub_service.py",
+    "do_POST",
+    true
+   ]
+  ],
+  "fresh_process": "False None"
+ },
+ "F": {
+  "gate_ns_per_call": 122.3,
+  "controller_packets_per_s": 430,
+  "gate_core_pct_at_430": 0.0053
+ }
+}

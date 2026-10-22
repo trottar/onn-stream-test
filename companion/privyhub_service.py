@@ -1860,6 +1860,15 @@ if SESSION_IDENTITY is not None and (os.environ.get("PRIVYHUB_AUDIO_CODEC") or "
 
 # G5-S1: WAN telemetry classification, only with PRIVYHUB_WAN_TELEMETRY=1.
 # Absent = today: nothing imported, constructed or called; no field.
+# B1: the impairment shim's uplink blackout, only with PRIVYHUB_IMPAIRMENT set
+# (a gate only for `blackout-<D>s@both`). Absent = today: nothing imported.
+_impairment_uplink = None
+
+if os.environ.get("PRIVYHUB_IMPAIRMENT", "").strip():
+    import impairment as _impairment
+
+    _impairment_uplink = _impairment.uplink_gate_from_environ(os.environ)
+
 WAN_TELEMETRY = None
 
 if os.environ.get("PRIVYHUB_WAN_TELEMETRY", "").strip():
@@ -2260,6 +2269,11 @@ class PrivyHubRequestHandler(
                     payload, payload_bytes = self._read_json_body(
                         max_bytes=8_192
                     )
+                    # B1: the shim's uplink blackout -- this report never arrived (looked up so the handler also
+                    # runs where it is executed outside this module, as G5-S1's flag-absent test does)
+                    if (_gate := globals().get("_impairment_uplink")) is not None and _gate.drop("client_health"):
+                        self._send_json(503, {"ok": False, "impairment": "uplink_blackout"})
+                        return
                     accepted = CLIENT_HEALTH_STORE.accept(
                         payload,
                         payload_bytes=payload_bytes,

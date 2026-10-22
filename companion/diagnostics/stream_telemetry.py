@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import math
+import os
 import threading
 import time
 
@@ -10,6 +11,19 @@ from typing import Any
 
 STREAM_TELEMETRY_SCHEMA = "privyhub_stream_telemetry_v1"
 DEFAULT_MAX_AGE_MS = 6_000
+
+# B3: the client's link quality into the ladder's telemetry (link.*), only with PRIVYHUB_LINK_REPORT=1. The ladder
+# reads nothing new. Absent = today.
+_LINK_REPORT = (os.environ.get("PRIVYHUB_LINK_REPORT") or "").strip() == "1"
+
+
+def _link_telemetry(link: dict[str, Any]) -> dict[str, Any]:
+    f = link.get("frequency_mhz")
+    band = None
+    if isinstance(f, int):
+        band = "2.4" if 2400 <= f < 2500 else "5" if 4900 <= f < 5925 else "6" if 5925 <= f < 7200 else None
+    return {"rssi": link.get("rssi_dbm"), "tx_mbps": link.get("tx_mbps"), "rx_mbps": link.get("rx_mbps"),
+            "frequency_mhz": f, "band": band, "wifi_standard": link.get("wifi_standard")}
 
 
 def _dict(value: Any) -> dict[str, Any]:
@@ -253,6 +267,10 @@ class StreamTelemetryStore:
                 ),
             },
         }
+
+        # B3: link.* from the client's report (the ladder reads nothing new)
+        if _LINK_REPORT and isinstance(report.get("link"), dict):
+            payload["link"] = _link_telemetry(report["link"])
 
         now_ms = int(time.time() * 1000.0)
         with self._lock:

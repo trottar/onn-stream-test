@@ -1,0 +1,172 @@
+== tests/input_hold
+..................
+----------------------------------------------------------------------
+Ran 18 tests in 3.366s
+
+OK
+rc=0
+== tests/impairment
+.............................
+----------------------------------------------------------------------
+Ran 29 tests in 16.284s
+
+OK
+rc=0
+== tests/recovery_ext
+.................
+----------------------------------------------------------------------
+Ran 17 tests in 0.006s
+
+OK
+rc=0
+== tests/overlay
+.................
+----------------------------------------------------------------------
+Ran 17 tests in 0.045s
+
+OK
+rc=0
+== tests/session_identity
+........................................................................................
+----------------------------------------------------------------------
+Ran 88 tests in 0.173s
+
+OK
+rc=0
+== tests/audio_codec
+....................
+----------------------------------------------------------------------
+Ran 20 tests in 0.267s
+
+OK
+rc=0
+== tests/encoder_rc
+....../tmp/b_q22/tests/start_rung/stub_manager.py:62: ResourceWarning: unclosed file <_io.FileIO name='/dev/null' mode='wb' closefd=True>
+  m._host_telemetry = types.SimpleNamespace(stop=Recorder(calls, "host_telemetry.stop"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+..........
+----------------------------------------------------------------------
+Ran 16 tests in 0.185s
+
+OK
+rc=0
+== tests/wan_adaptation
+.......................
+----------------------------------------------------------------------
+Ran 23 tests in 0.107s
+
+OK
+rc=0
+== tests/wan_telemetry
+..................
+----------------------------------------------------------------------
+Ran 18 tests in 0.096s
+
+OK
+rc=0
+== tests/remote_ladder
+.........<frozen importlib._bootstrap>:488: ResourceWarning: unclosed file <_io.FileIO name='/dev/null' mode='wb' closefd=True>
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.................
+----------------------------------------------------------------------
+Ran 26 tests in 0.540s
+
+OK
+rc=0
+== tests/remote_cap
+................
+----------------------------------------------------------------------
+Ran 16 tests in 0.402s
+
+OK
+rc=0
+== tests/start_rung
+.................
+----------------------------------------------------------------------
+Ran 17 tests in 0.253s
+
+OK
+rc=0
+== tests/lan_loss_rule
+.....................
+----------------------------------------------------------------------
+Ran 21 tests in 0.062s
+
+OK
+rc=0
+== tools/test_c3_f1_recovery_restart.py
+..E/tmp/b_q22/companion/diagnostics/c3_linux_actuator_probe.py:941: ResourceWarning: unclosed file <_io.FileIO name='/dev/null' mode='wb' closefd=True>
+  def run_c3_linux_recovery_restart(
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.....
+======================================================================
+ERROR: test_recovery_is_wired_to_the_new_primitive (__main__.RecoveryRestartTests.test_recovery_is_wired_to_the_new_primitive)
+Rule: link-drop recovery's restart_encoder is recovery_restart_encoder.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/b_q22/tools/test_c3_f1_recovery_restart.py", line 210, in test_recovery_is_wired_to_the_new_primitive
+    i = src.index("restart_encoder=(")
+ValueError: substring not found
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.006s
+
+FAILED (errors=1)
+rc=1
+== tools/test_adaptive_bitrate_live.py
+....................E.........................................................................................................
+======================================================================
+ERROR: test_rung_argv_is_the_c3_arm_golden_and_720p_unchanged (__main__.C5M5Actuator.test_rung_argv_is_the_c3_arm_golden_and_720p_unchanged)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/b_q22/tools/test_adaptive_bitrate_live.py", line 1703, in test_rung_argv_is_the_c3_arm_golden_and_720p_unchanged
+    golden("golden_after_native_game_1080p60_c3_80pct_cap90.txt"))
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/b_q22/tools/test_adaptive_bitrate_live.py", line 1701, in golden
+    return [x for x in (ev / name).read_text().splitlines() if x.startswith("argv:")][0]
+                       ~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/pathlib/_local.py", line 548, in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/pathlib/_abc.py", line 632, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/pathlib/_local.py", line 539, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/b_q22/docs/memory/evidence/c5_m2_2026-09-29/golden_after_native_game_1080p60_c3_80pct_cap90.txt'
+
+----------------------------------------------------------------------
+Ran 126 tests in 0.756s
+
+FAILED (errors=1)
+rc=1
+== tools/test_adaptive_bitrate_shadow.py
+.....................
+----------------------------------------------------------------------
+Ran 21 tests in 0.032s
+
+OK
+rc=0
+== tools/test_native_source_contract.py
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.046s
+
+OK
+rc=0
+== tools/test_c5_m1_profile_selector.py
+..............
+----------------------------------------------------------------------
+Ran 14 tests in 0.003s
+
+OK
+rc=0
+
+== notes (B2)
+- Run in /tmp/b_q22 (a copy of companion/, tools/, tests/), B1 and B2 both in place. tests/recovery_ext = E3-R2's
+  recovery suite (docs/memory/evidence/e3_r2_2026-10-08/test_e3_r2.py) pointed at the copy: 17 OK.
+- tools/test_c3_f1_recovery_restart.py: 1 error, PRE-EXISTING (see B1's tests_regression.txt).
+- tools/test_adaptive_bitrate_live.py: 1 error = the golden fixture under docs/ the copy does not hold; run alone from
+  the tree read-only during B1: OK (B2 touches no file it reads).
+- tests/input_hold re-run after tools/unattended_frames.py gained the core-running count and its test: 19 OK (tests_input_hold.txt).

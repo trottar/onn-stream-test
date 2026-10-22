@@ -16,6 +16,7 @@ time.
 from __future__ import annotations
 
 import json
+import os
 
 from datetime import datetime, timezone
 from pathlib import Path
@@ -73,6 +74,17 @@ THERMAL_FIELDS = (
     "thermal_headroom",
     "thermal_zones_c",
 )
+
+# B3: the client's Wi-Fi link fields, only with PRIVYHUB_LINK_REPORT=1. Absent = today: None, nothing recorded.
+LINK_FIELDS = None
+if (os.environ.get("PRIVYHUB_LINK_REPORT") or "").strip() == "1":
+    LINK_FIELDS = (
+        "link_rssi_dbm",
+        "link_tx_mbps",
+        "link_rx_mbps",
+        "link_frequency_mhz",
+        "link_wifi_standard",
+    )
 
 # D-BASE-R5: the receiver's own cumulative counters, the same ones the
 # end-of-session report reads. Passed through unchanged — nothing here
@@ -153,6 +165,12 @@ def append_native_stream_heartbeat(
     for field in THERMAL_FIELDS:
         if field in values:
             record[field] = values[field]
+
+    # B3: the link fields, when the flag set them up
+    if LINK_FIELDS is not None:
+        for field in LINK_FIELDS:
+            if field in values:
+                record[field] = values[field]
 
     path = heartbeat_log_path(
         project_root

@@ -67,6 +67,9 @@ STATE_ENDED = "ENDED"
 
 SCHEMA = "privyhub_native_stream_recovery_v1"
 
+# B2: the fast input hold's reason (set only by note_input_hold, which only PRIVYHUB_INPUT_HOLD wires).
+INPUT_HOLD = "input_hold"
+
 
 def _now_utc_text() -> str:
     return (
@@ -240,6 +243,78 @@ class LinkDropRecovery:
             age_ms=float(age_ms),
         )
 
+    def note_input_hold(
+        self,
+        age_ms: float,
+    ) -> bool:
+        """B2: a controller silence >= H ms -- the same pause as controller_silence, reason input_hold.
+
+        True when this paused the game (the state was PLAYING)."""
+        with self._lock:
+            if self._state != STATE_PLAYING:
+                return False
+
+        self._enter_recovery(
+            trigger=INPUT_HOLD,
+            age_ms=float(age_ms),
+        )
+
+        with self._lock:
+            return self._state == STATE_PAUSED_RECOVERING and self._last_desync_reason == INPUT_HOLD
+
+    def note_input_release(
+        self,
+        held_ms: float,
+    ) -> bool:
+        """B2: the first controller packet back resumes an input_hold pause that is still the hold's own.
+
+        A hold handed over (v2's controller_silence, the client's desync) or already resumed is left alone. A
+        failed resume hands over to controller_silence, so v2's controller-return exit applies."""
+        with self._lock:
+            if self._state != STATE_PAUSED_RECOVERING or self._last_desync_reason != INPUT_HOLD:
+                return False
+
+        error = ""
+
+        try:
+            self._resume_game()
+        except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"
+
+        with self._lock:
+            if self._state != STATE_PAUSED_RECOVERING or self._last_desync_reason != INPUT_HOLD:
+                return False
+
+            if error:
+                self._last_desync_reason = "controller_silence"
+                self._exit_ok_since = None
+                self._exit_packets_back_at = None
+                self._log(
+                    "input_release_failed",
+                    held_ms=round(float(held_ms), 1),
+                    resume_error=error,
+                    handed_to="controller_silence",
+                )
+                return False
+
+            recovering_ms = int(
+                (time.monotonic() - self._state_since) * 1000.0
+            )
+            self._state = STATE_PLAYING
+            self._state_since = time.monotonic()
+            self._restart_backoff_ms = RESTART_BACKOFF_MS
+            self._last_restart_at = None
+            self._client_present_since = time.monotonic()
+            self._log(
+                "resumed",
+                from_state=STATE_PAUSED_RECOVERING,
+                recovering_ms=recovering_ms,
+                restarts=self._restarts,
+                via="input_release",
+                held_ms=round(float(held_ms), 1),
+            )
+            return True
+
     def note_client_desync(
         self,
         reason: str,
@@ -345,6 +420,16 @@ class LinkDropRecovery:
         age_ms: float,
     ) -> None:
         with self._lock:
+            # B2: another trigger during an input_hold pause takes it over -- one paused state, one pause row.
+            if (self._state == STATE_PAUSED_RECOVERING and self._last_desync_reason == INPUT_HOLD
+                    and trigger != INPUT_HOLD):
+                self._last_desync_reason = trigger
+                self._exit_ok_since = None
+                self._exit_packets_back_at = None
+                self._log("input_hold_handover", trigger=trigger, age_ms=round(float(age_ms), 1),
+                          held_ms=int((time.monotonic() - self._state_since) * 1000.0))
+                return
+
             if self._state != STATE_PLAYING:
                 return
 

@@ -1,0 +1,532 @@
+diff --git a/companion/diagnostics/client_feedback.py b/companion/diagnostics/client_feedback.py
+index 445f216..f7904d3 100644
+--- a/companion/diagnostics/client_feedback.py
++++ b/companion/diagnostics/client_feedback.py
+@@ -2,6 +2,7 @@ from __future__ import annotations
+ 
+ import copy
+ import math
++import os
+ import threading
+ import time
+ 
+@@ -12,6 +13,24 @@ CLIENT_HEALTH_STORE_SCHEMA = "privyhub_client_health_store_v1"
+ 
+ DEFAULT_MAX_AGE_MS = 6_000
+ 
++# B3: the client's Wi-Fi link object, only with PRIVYHUB_LINK_REPORT=1. Absent = today: the key is ignored as any
++# unknown key is.
++_LINK_REPORT = (os.environ.get("PRIVYHUB_LINK_REPORT") or "").strip() == "1"
++_LINK_RANGES = {"rssi_dbm": (-126, -1), "tx_mbps": (1, 100_000), "rx_mbps": (1, 100_000),
++                "frequency_mhz": (1, 100_000), "wifi_standard": (1, 32)}
++
++
++def _normalize_link(value: Any) -> dict[str, int]:
++    """B3: the link object's known keys, each an int in its range; anything else dropped. Never raises."""
++    out: dict[str, int] = {}
++    if not isinstance(value, dict):
++        return out
++    for key, (lo, hi) in _LINK_RANGES.items():
++        v = value.get(key)
++        if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(float(v)) and lo <= v <= hi:
++            out[key] = int(v)
++    return out
++
+ _VIDEO_COUNTERS = (
+     "packets",
+     "lost_packets",
+@@ -143,6 +162,10 @@ def normalize_client_health(payload: Any) -> dict[str, Any]:
+             name="control_round_trip_ms",
+         )
+ 
++    # B3: the link object, tolerant (a bad one never rejects the report)
++    if _LINK_REPORT and isinstance(root.get("link"), dict):
++        normalized["link"] = _normalize_link(root.get("link"))
++
+     return normalized
+ 
+ 
+diff --git a/companion/diagnostics/stream_telemetry.py b/companion/diagnostics/stream_telemetry.py
+index b328d0f..cc15c00 100644
+--- a/companion/diagnostics/stream_telemetry.py
++++ b/companion/diagnostics/stream_telemetry.py
+@@ -2,6 +2,7 @@ from __future__ import annotations
+ 
+ import copy
+ import math
++import os
+ import threading
+ import time
+ 
+@@ -11,6 +12,19 @@ from typing import Any
+ STREAM_TELEMETRY_SCHEMA = "privyhub_stream_telemetry_v1"
+ DEFAULT_MAX_AGE_MS = 6_000
+ 
++# B3: the client's link quality into the ladder's telemetry (link.*), only with PRIVYHUB_LINK_REPORT=1. The ladder
++# reads nothing new. Absent = today.
++_LINK_REPORT = (os.environ.get("PRIVYHUB_LINK_REPORT") or "").strip() == "1"
++
++
++def _link_telemetry(link: dict[str, Any]) -> dict[str, Any]:
++    f = link.get("frequency_mhz")
++    band = None
++    if isinstance(f, int):
++        band = "2.4" if 2400 <= f < 2500 else "5" if 4900 <= f < 5925 else "6" if 5925 <= f < 7200 else None
++    return {"rssi": link.get("rssi_dbm"), "tx_mbps": link.get("tx_mbps"), "rx_mbps": link.get("rx_mbps"),
++            "frequency_mhz": f, "band": band, "wifi_standard": link.get("wifi_standard")}
++
+ 
+ def _dict(value: Any) -> dict[str, Any]:
+     return value if isinstance(value, dict) else {}
+@@ -254,6 +268,10 @@ class StreamTelemetryStore:
+             },
+         }
+ 
++        # B3: link.* from the client's report (the ladder reads nothing new)
++        if _LINK_REPORT and isinstance(report.get("link"), dict):
++            payload["link"] = _link_telemetry(report["link"])
++
+         now_ms = int(time.time() * 1000.0)
+         with self._lock:
+             self._snapshot = payload
+diff --git a/companion/games/native_stream_heartbeat.py b/companion/games/native_stream_heartbeat.py
+index 0da7d8b..dd6f498 100644
+--- a/companion/games/native_stream_heartbeat.py
++++ b/companion/games/native_stream_heartbeat.py
+@@ -16,6 +16,7 @@ time.
+ from __future__ import annotations
+ 
+ import json
++import os
+ 
+ from datetime import datetime, timezone
+ from pathlib import Path
+@@ -74,6 +75,17 @@ THERMAL_FIELDS = (
+     "thermal_zones_c",
+ )
+ 
++# B3: the client's Wi-Fi link fields, only with PRIVYHUB_LINK_REPORT=1. Absent = today: None, nothing recorded.
++LINK_FIELDS = None
++if (os.environ.get("PRIVYHUB_LINK_REPORT") or "").strip() == "1":
++    LINK_FIELDS = (
++        "link_rssi_dbm",
++        "link_tx_mbps",
++        "link_rx_mbps",
++        "link_frequency_mhz",
++        "link_wifi_standard",
++    )
++
+ # D-BASE-R5: the receiver's own cumulative counters, the same ones the
+ # end-of-session report reads. Passed through unchanged — nothing here
+ # derives, smooths or resets them, so a delta between any two heartbeats of
+@@ -154,6 +166,12 @@ def append_native_stream_heartbeat(
+         if field in values:
+             record[field] = values[field]
+ 
++    # B3: the link fields, when the flag set them up
++    if LINK_FIELDS is not None:
++        for field in LINK_FIELDS:
++            if field in values:
++                record[field] = values[field]
++
+     path = heartbeat_log_path(
+         project_root
+     )
+diff --git a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+index 9efe74d..84a2caa 100644
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -2231,6 +2231,11 @@ class NativeStreamActivity :
+     // D-BASE-T1. Three fields, URL-encoded, omitted individually when the
+     // device does not report them — an absent field is the finding, and a
+     // substitute number would not be.
++    // B3: the Wi-Fi link sampler, only with debug.privyhub.link_report=1 (read on first use, on a report thread).
++    private val linkSampler: LinkSampler? by lazy {
++        if (LinkReportFlag.fromSystem()) LinkSampler({ readWifi(applicationContext) }) else null
++    }
++
+     private fun thermalQuery(): String {
+         val sampler =
+             thermalSampler
+@@ -2445,8 +2450,9 @@ class NativeStreamActivity :
+             )
+ 
+             try {
++                // B3: the Wi-Fi link fields (null sampler = today: no key)
+                 httpPost(
+-                    address,
++                    address + (linkSampler?.current()?.query() ?: ""),
+                     readTimeoutMs = 1_500
+                 )
+             } catch (_: Exception) {
+@@ -2632,6 +2638,10 @@ class NativeStreamActivity :
+             )
+ 
+             try {
++                // B3: the Wi-Fi link object (null sampler = today: no key)
++                linkSampler?.current()?.let { link ->
++                    payload.put("link", JSONObject().apply { link.fields().forEach { (k, v) -> put(k, v) } })
++                }
+                 httpPostJson(
+                     "http://$host:$CONTROL_PORT" +
+                         "/diagnostics/client-health",
+--- docs/memory/evidence/b3_2026-10-22/predecessors/companion_plugins_games.py
++++ companion/plugins/games.py
+@@ -26,6 +26,11 @@
+ import adaptive_bitrate_live
+ from adaptive_bitrate_live import get_controller as adaptive_bitrate_controller
+ 
++# B3: the client's Wi-Fi link fields in the heartbeat, only with PRIVYHUB_LINK_REPORT=1. Absent = today.
++_LINK_FIELDS = None
++if (os.environ.get("PRIVYHUB_LINK_REPORT") or "").strip() == "1":
++    from games.native_stream_heartbeat import LINK_FIELDS as _LINK_FIELDS
++
+ # B2: the fast input hold, only with PRIVYHUB_INPUT_HOLD set. Absent = today: nothing imported.
+ _input_hold = None
+ if (os.environ.get("PRIVYHUB_INPUT_HOLD") or "").strip():
+@@ -3650,6 +3655,12 @@
+             if thermal_zones:
+                 values["thermal_zones_c"] = thermal_zones[:512]
+ 
++            # B3: the client's Wi-Fi link fields (ints), when the flag is set
++            if _LINK_FIELDS is not None:
++                for field in _LINK_FIELDS:
++                    if field in query:
++                        values[field] = self._parse_int(self._first(query, field), -1)
++
+             if not values:
+                 raise ValueError(
+                     "Missing native stream heartbeat fields"
+diff --git a/PrivyHub/app/src/main/java/streaming/LinkReport.kt b/PrivyHub/app/src/main/java/streaming/LinkReport.kt
+new file mode 100644
+index 0000000..49a77e3
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/LinkReport.kt
+@@ -0,0 +1,105 @@
++package com.safeiot.privyhub.streaming
++
++import android.content.Context
++import android.net.wifi.WifiManager
++import android.os.Build
++
++/**
++ * B3: the client's Wi-Fi link quality in its 2-s reports, behind the system
++ * property `debug.privyhub.link_report=1` (CL-B7P's convention; a reboot
++ * clears it). Absent = today: no Wi-Fi read, no new key.
++ *
++ * Read with ACCESS_WIFI_STATE (already declared; a normal permission, no
++ * prompt): RSSI, tx / rx link speed, frequency, Wi-Fi standard. No SSID,
++ * BSSID, MAC or address is read or sent. At most one read a second
++ * ([LinkSampler]), on the two report threads, never on the receive path.
++ */
++object LinkReportFlag {
++    const val PROPERTY = "debug.privyhub.link_report"
++
++    fun parse(value: String?): Boolean = value?.trim() == "1"
++
++    /** The property, read through reflection; any failure is off. */
++    fun fromSystem(): Boolean =
++        try {
++            val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
++            parse(get.invoke(null, PROPERTY) as? String)
++        } catch (_: Throwable) {
++            false
++        }
++}
++
++/** One reading; each field null when the platform gave nothing valid. */
++data class LinkSample(
++    val rssiDbm: Int?,
++    val txMbps: Int?,
++    val rxMbps: Int?,
++    val frequencyMhz: Int?,
++    val wifiStandard: Int?,
++) {
++    /** The valid fields, in a fixed order, as (heartbeat key suffix, value). */
++    fun fields(): List<Pair<String, Int>> =
++        listOfNotNull(
++            rssiDbm?.let { "rssi_dbm" to it },
++            txMbps?.let { "tx_mbps" to it },
++            rxMbps?.let { "rx_mbps" to it },
++            frequencyMhz?.let { "frequency_mhz" to it },
++            wifiStandard?.let { "wifi_standard" to it },
++        )
++
++    /** The heartbeat's query keys (`&link_<name>=<value>`), the valid fields only. */
++    fun query(): String = fields().joinToString("") { (k, v) -> "&link_$k=$v" }
++
++    companion object {
++        private const val INVALID_RSSI = -127
++
++        /** The platform's raw values, each kept only when valid. */
++        fun of(rssi: Int, txMbps: Int, rxMbps: Int, frequencyMhz: Int, wifiStandard: Int): LinkSample =
++            LinkSample(
++                rssiDbm = rssi.takeIf { it in (INVALID_RSSI + 1)..-1 },
++                txMbps = txMbps.takeIf { it > 0 },
++                rxMbps = rxMbps.takeIf { it > 0 },
++                frequencyMhz = frequencyMhz.takeIf { it > 0 },
++                wifiStandard = wifiStandard.takeIf { it > 0 },
++            )
++    }
++}
++
++/** At most one [read] per [minIntervalNs], whoever asks; the last reading in between. */
++class LinkSampler(
++    private val read: () -> LinkSample?,
++    private val clock: () -> Long = System::nanoTime,
++    private val minIntervalNs: Long = 1_000_000_000L,
++) {
++    private var lastReadNs: Long? = null
++    private var last: LinkSample? = null
++    var reads = 0L
++        private set
++
++    @Synchronized
++    fun current(): LinkSample? {
++        val now = clock()
++        val prev = lastReadNs
++        if (prev == null || now - prev >= minIntervalNs) {
++            lastReadNs = now
++            reads += 1
++            last = try {
++                read()
++            } catch (_: Throwable) {
++                null
++            }
++        }
++        return last
++    }
++}
++
++/** The platform read: WifiManager.getConnectionInfo() (deprecated from API 31, still answered). */
++@Suppress("DEPRECATION")
++fun readWifi(context: Context): LinkSample? {
++    val manager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return null
++    val info = manager.connectionInfo ?: return null
++    val tx = if (Build.VERSION.SDK_INT >= 29) info.txLinkSpeedMbps else info.linkSpeed
++    val rx = if (Build.VERSION.SDK_INT >= 29) info.rxLinkSpeedMbps else -1
++    val standard = if (Build.VERSION.SDK_INT >= 30) info.wifiStandard else 0
++    return LinkSample.of(info.rssi, tx, rx, info.frequency, standard)
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/LinkReportTest.kt b/PrivyHub/app/src/test/java/streaming/LinkReportTest.kt
+new file mode 100644
+index 0000000..f60c932
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/LinkReportTest.kt
+@@ -0,0 +1,72 @@
++package com.safeiot.privyhub.streaming
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * B3: the Wi-Fi link report. The flag (absent = off), the validity rules, the
++ * heartbeat's query keys, and the sampler's once-a-second read (fake clock).
++ */
++class LinkReportTest {
++
++    @Test
++    fun flagTable() {
++        assertFalse(LinkReportFlag.parse(null))
++        assertFalse(LinkReportFlag.parse(""))
++        assertFalse(LinkReportFlag.parse("0"))
++        assertFalse(LinkReportFlag.parse("true"))
++        assertTrue(LinkReportFlag.parse("1"))
++        assertTrue(LinkReportFlag.parse(" 1 "))
++    }
++
++    @Test
++    fun noAndroidPropertyIsOff() {
++        assertFalse(LinkReportFlag.fromSystem())
++    }
++
++    @Test
++    fun validity() {
++        val s = LinkSample.of(rssi = -55, txMbps = 866, rxMbps = 780, frequencyMhz = 5180, wifiStandard = 5)
++        assertEquals(LinkSample(-55, 866, 780, 5180, 5), s)
++        val bad = LinkSample.of(rssi = -127, txMbps = -1, rxMbps = 0, frequencyMhz = -1, wifiStandard = 0)
++        assertEquals(LinkSample(null, null, null, null, null), bad)
++        assertNull(LinkSample.of(0, 1, 1, 1, 1).rssiDbm)
++    }
++
++    @Test
++    fun queryKeysValidOnly() {
++        assertEquals(
++            "&link_rssi_dbm=-61&link_tx_mbps=433&link_frequency_mhz=5745",
++            LinkSample(-61, 433, null, 5745, null).query()
++        )
++        assertEquals("", LinkSample(null, null, null, null, null).query())
++        assertEquals(
++            listOf("rssi_dbm" to -61, "rx_mbps" to 390, "wifi_standard" to 6),
++            LinkSample(-61, null, 390, null, 6).fields()
++        )
++    }
++
++    @Test
++    fun samplerReadsAtMostOncePerSecond() {
++        var now = 0L
++        var n = 0
++        val sampler = LinkSampler({ n += 1; LinkSample(-50 - n, null, null, null, null) }, { now })
++        assertEquals(-51, sampler.current()?.rssiDbm)
++        now = 400_000_000L
++        assertEquals(-51, sampler.current()?.rssiDbm)
++        now = 999_999_999L
++        assertEquals(-51, sampler.current()?.rssiDbm)
++        now = 1_000_000_000L
++        assertEquals(-52, sampler.current()?.rssiDbm)
++        assertEquals(2L, sampler.reads)
++    }
++
++    @Test
++    fun aFailingReadIsNoSample() {
++        val sampler = LinkSampler({ throw IllegalStateException("no wifi") }, { 0L })
++        assertNull(sampler.current())
++    }
++}
+diff --git a/tests/link_report/test_link_report.py b/tests/link_report/test_link_report.py
+new file mode 100644
+index 0000000..44c1038
+--- /dev/null
++++ b/tests/link_report/test_link_report.py
+@@ -0,0 +1,138 @@
++#!/usr/bin/env python3
++"""B3: the host side of the client's Wi-Fi link report (PRIVYHUB_LINK_REPORT=1).
++
++    python3 -m unittest discover -s tests/link_report -v
++
++client_feedback's parser, the ladder telemetry's link.*, the heartbeat log's fields; flag absent = the parsers as
++today. No stream, no companion. The flagged modules are re-imported in a fresh process with the flag set.
++"""
++
++from __future__ import annotations
++
++import ast
++import json
++import os
++import subprocess
++import sys
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++FLAG = "PRIVYHUB_LINK_REPORT"
++
++PAYLOAD = {
++    "schema": "privyhub_client_health_v1", "sequence": 7, "interval_ms": 2000, "session_elapsed_ms": 60_000,
++    "video": {"packets": 1000, "lost_packets": 3, "dropped_frames": 0, "fec_recovered_packets": 1,
++              "fec_unrecoverable_groups": 0, "late_or_reordered_packets": 0, "forward_gap_events": 0,
++              "recent_fps": 59.9, "recent_mbps": 7.1, "waiting_for_idr": False},
++    "decoder": {"queued_frames": 120, "rendered_frames": 119, "dropped_frames": 0, "queue_overflow_drops": 0,
++                "stale_output_drops": 0, "queue_depth": 0, "latest_rx_to_decode_ms": 9, "latest_output_gap_ms": 16,
++                "hardware_accelerated": True, "vendor_codec": True, "low_latency_enabled": True},
++}
++LINK = {"rssi_dbm": -58, "tx_mbps": 866, "rx_mbps": 780, "frequency_mhz": 5180, "wifi_standard": 5}
++
++
++def run(code: str, flag: bool) -> str:
++    env = {k: v for k, v in os.environ.items() if k != FLAG}
++    if flag:
++        env[FLAG] = "1"
++    out = subprocess.run([sys.executable, "-B", "-c", "import sys, json; sys.path.insert(0, 'companion'); " + code],
++                         cwd=ROOT, env=env, capture_output=True, text=True, timeout=120)
++    if out.returncode:
++        raise AssertionError(out.stderr[-1500:])
++    return out.stdout.strip()
++
++
++class ClientFeedback(unittest.TestCase):
++    def norm(self, payload, flag):
++        code = ("from diagnostics.client_feedback import normalize_client_health as n; "
++                f"print(json.dumps(n(json.loads({json.dumps(json.dumps(payload))})), sort_keys=True))")
++        return json.loads(run(code, flag))
++
++    def test_absent_link_ignored_as_today(self):
++        a = self.norm(PAYLOAD, False)
++        b = self.norm(dict(PAYLOAD, link=LINK), False)
++        self.assertEqual(a, b)
++        self.assertNotIn("link", b)
++
++    def test_on_link_normalized(self):
++        b = self.norm(dict(PAYLOAD, link=LINK), True)
++        self.assertEqual(b["link"], LINK)
++        a = self.norm(PAYLOAD, True)
++        self.assertNotIn("link", a)                     # an old client: nothing new
++
++    def test_on_bad_link_never_rejects_the_report(self):
++        bad = {"rssi_dbm": -127, "tx_mbps": "fast", "rx_mbps": True, "frequency_mhz": 5180.0, "ssid": "x",
++               "wifi_standard": 99}
++        b = self.norm(dict(PAYLOAD, link=bad), True)
++        self.assertEqual(b["link"], {"frequency_mhz": 5180})
++        self.assertEqual(b["sequence"], 7)
++        c = self.norm(dict(PAYLOAD, link=[1, 2]), True)
++        self.assertNotIn("link", c)
++
++
++class Telemetry(unittest.TestCase):
++    def tel(self, link, flag):
++        report = dict(PAYLOAD, **({"link": link} if link is not None else {}))
++        code = ("from diagnostics.stream_telemetry import StreamTelemetryStore as S; "
++                f"r = json.loads({json.dumps(json.dumps(report))}); "
++                "t = S().accept(client_health_feedback={'available': True, 'fresh': True, 'report': r, "
++                "'delta_available': False, 'delta': {}}, native_stream_status={}); "
++                "print(json.dumps(t.get('link'), sort_keys=True))")
++        return json.loads(run(code, flag))
++
++    def test_on_link_star(self):
++        self.assertEqual(self.tel(LINK, True), {"rssi": -58, "tx_mbps": 866, "rx_mbps": 780, "frequency_mhz": 5180,
++                                                "band": "5", "wifi_standard": 5})
++        self.assertEqual(self.tel({"frequency_mhz": 2437}, True)["band"], "2.4")
++        self.assertEqual(self.tel({"frequency_mhz": 5955}, True)["band"], "6")
++
++    def test_absent_no_link(self):
++        self.assertIsNone(self.tel(LINK, False))
++        self.assertIsNone(self.tel(None, True))
++
++    def test_the_ladder_reads_nothing_new(self):
++        src = (ROOT / "companion" / "adaptive_bitrate.py").read_text()
++        fn = next(n for n in ast.walk(ast.parse(src)) if isinstance(n, ast.FunctionDef) and n.name == "_sample")
++        self.assertNotIn("link", ast.unparse(fn))
++
++
++class HeartbeatLog(unittest.TestCase):
++    def rec(self, flag):
++        code = ("import tempfile, pathlib; from games.native_stream_heartbeat import append_native_stream_heartbeat "
++                "as a, LINK_FIELDS; root = pathlib.Path(tempfile.mkdtemp(prefix='b3_hb_')); "
++                "a(root, {'sequence': 1, 'link_rssi_dbm': -60, 'link_tx_mbps': 400}); "
++                "p = next(root.rglob('native_stream_heartbeat.log')); "
++                "print(json.dumps([LINK_FIELDS, json.loads(p.read_text().splitlines()[-1])]))")
++        return json.loads(run(code, flag))
++
++    def test_absent_not_recorded(self):
++        fields, row = self.rec(False)
++        self.assertIsNone(fields)
++        self.assertNotIn("link_rssi_dbm", row)
++
++    def test_on_recorded(self):
++        fields, row = self.rec(True)
++        self.assertEqual(len(fields), 5)
++        self.assertEqual((row["link_rssi_dbm"], row["link_tx_mbps"]), (-60, 400))
++
++
++class Shapes(unittest.TestCase):
++    def test_guards(self):
++        g = ast.parse((ROOT / "companion" / "plugins" / "games.py").read_text())
++        guarded = [n for n in g.body if isinstance(n, ast.If) and "LINK_FIELDS" in ast.unparse(n)]
++        self.assertEqual(len(guarded), 1)
++        self.assertIn(FLAG, ast.unparse(guarded[0].test))
++        hooks = [n for n in ast.walk(g) if isinstance(n, ast.If) and ast.unparse(n.test) == "_LINK_FIELDS is not None"]
++        self.assertEqual(len(hooks), 1)
++        for rel, test in (("diagnostics/client_feedback.py", "_LINK_REPORT and isinstance(root.get('link'), dict)"),
++                          ("diagnostics/stream_telemetry.py", "_LINK_REPORT and isinstance(report.get('link'), dict)"),
++                          ("games/native_stream_heartbeat.py", "LINK_FIELDS is not None")):
++            t = ast.parse((ROOT / "companion" / rel).read_text())
++            self.assertEqual(sum(1 for n in ast.walk(t) if isinstance(n, ast.If) and ast.unparse(n.test) == test), 1,
++                             rel)
++
++
++if __name__ == "__main__":
++    unittest.main()

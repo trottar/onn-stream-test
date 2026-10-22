@@ -1,0 +1,843 @@
+diff --git a/companion/games/link_drop_recovery.py b/companion/games/link_drop_recovery.py
+index 6e76a80..0d2e14c 100644
+--- a/companion/games/link_drop_recovery.py
++++ b/companion/games/link_drop_recovery.py
+@@ -67,6 +67,9 @@ STATE_ENDED = "ENDED"
+ 
+ SCHEMA = "privyhub_native_stream_recovery_v1"
+ 
++# B2: the fast input hold's reason (set only by note_input_hold, which only PRIVYHUB_INPUT_HOLD wires).
++INPUT_HOLD = "input_hold"
++
+ 
+ def _now_utc_text() -> str:
+     return (
+@@ -240,6 +243,78 @@ class LinkDropRecovery:
+             age_ms=float(age_ms),
+         )
+ 
++    def note_input_hold(
++        self,
++        age_ms: float,
++    ) -> bool:
++        """B2: a controller silence >= H ms -- the same pause as controller_silence, reason input_hold.
++
++        True when this paused the game (the state was PLAYING)."""
++        with self._lock:
++            if self._state != STATE_PLAYING:
++                return False
++
++        self._enter_recovery(
++            trigger=INPUT_HOLD,
++            age_ms=float(age_ms),
++        )
++
++        with self._lock:
++            return self._state == STATE_PAUSED_RECOVERING and self._last_desync_reason == INPUT_HOLD
++
++    def note_input_release(
++        self,
++        held_ms: float,
++    ) -> bool:
++        """B2: the first controller packet back resumes an input_hold pause that is still the hold's own.
++
++        A hold handed over (v2's controller_silence, the client's desync) or already resumed is left alone. A
++        failed resume hands over to controller_silence, so v2's controller-return exit applies."""
++        with self._lock:
++            if self._state != STATE_PAUSED_RECOVERING or self._last_desync_reason != INPUT_HOLD:
++                return False
++
++        error = ""
++
++        try:
++            self._resume_game()
++        except Exception as exc:
++            error = f"{type(exc).__name__}: {exc}"
++
++        with self._lock:
++            if self._state != STATE_PAUSED_RECOVERING or self._last_desync_reason != INPUT_HOLD:
++                return False
++
++            if error:
++                self._last_desync_reason = "controller_silence"
++                self._exit_ok_since = None
++                self._exit_packets_back_at = None
++                self._log(
++                    "input_release_failed",
++                    held_ms=round(float(held_ms), 1),
++                    resume_error=error,
++                    handed_to="controller_silence",
++                )
++                return False
++
++            recovering_ms = int(
++                (time.monotonic() - self._state_since) * 1000.0
++            )
++            self._state = STATE_PLAYING
++            self._state_since = time.monotonic()
++            self._restart_backoff_ms = RESTART_BACKOFF_MS
++            self._last_restart_at = None
++            self._client_present_since = time.monotonic()
++            self._log(
++                "resumed",
++                from_state=STATE_PAUSED_RECOVERING,
++                recovering_ms=recovering_ms,
++                restarts=self._restarts,
++                via="input_release",
++                held_ms=round(float(held_ms), 1),
++            )
++            return True
++
+     def note_client_desync(
+         self,
+         reason: str,
+@@ -345,6 +420,16 @@ class LinkDropRecovery:
+         age_ms: float,
+     ) -> None:
+         with self._lock:
++            # B2: another trigger during an input_hold pause takes it over -- one paused state, one pause row.
++            if (self._state == STATE_PAUSED_RECOVERING and self._last_desync_reason == INPUT_HOLD
++                    and trigger != INPUT_HOLD):
++                self._last_desync_reason = trigger
++                self._exit_ok_since = None
++                self._exit_packets_back_at = None
++                self._log("input_hold_handover", trigger=trigger, age_ms=round(float(age_ms), 1),
++                          held_ms=int((time.monotonic() - self._state_since) * 1000.0))
++                return
++
+             if self._state != STATE_PLAYING:
+                 return
+ 
+--- docs/memory/evidence/b2_2026-10-22/predecessors/companion_native_session_io.py
++++ companion/native_session_io.py
+@@ -1630,6 +1630,9 @@
+         "<4sBBHIQIhhhhHH"
+     )
+ 
++    # B2: the fast input hold's detector (set_input_hold; only PRIVYHUB_INPUT_HOLD wires it). None = today.
++    _input_hold: Any = None
++
+     LINUX_VENDOR_ID = 0x1209
+     LINUX_PRODUCT_ID = 0x5048
+     LINUX_VERSION_ID = 1
+@@ -1945,6 +1948,10 @@
+     # PrivyHub Phase A3 persistent game-session controller
+     # D-BASE-R3 accessors. The callback fires once per silence episode, from
+     # the receive loop, and is re-armed by the next packet.
++    def set_input_hold(self, detector: Any) -> None:
++        """B2: the input-hold detector's on_quiet / on_packet, called from the receive loop (never blocking)."""
++        self._input_hold = detector
++
+     def set_client_silence_callback(
+         self,
+         callback: "Callable[[float], None] | None",
+@@ -2522,6 +2529,10 @@
+                             player
+                         )
+ 
++                # B2: the fast input hold (a silence >= H ms), handed to its own worker
++                if self._input_hold is not None:
++                    self._input_hold.on_quiet(now, self._last_any_packet_at)
++
+                 # D-BASE-R3: the client sends ~430 packets/s even with no
+                 # input, so this silence means the client or the link is
+                 # gone. Reported once per episode; the callback must not
+@@ -2617,6 +2628,10 @@
+             )
+             self._silence_reported = False
+ 
++            # B2: the first packet back releases an input hold
++            if self._input_hold is not None:
++                self._input_hold.on_packet(now_packet)
++
+             try:
+                 self._apply_report(
+                     player=player,
+--- docs/memory/evidence/b2_2026-10-22/predecessors/companion_plugins_games.py
++++ docs/memory/evidence/b3_2026-10-22/predecessors/companion_plugins_games.py
+@@ -26,6 +26,11 @@
+ import adaptive_bitrate_live
+ from adaptive_bitrate_live import get_controller as adaptive_bitrate_controller
+ 
++# B2: the fast input hold, only with PRIVYHUB_INPUT_HOLD set. Absent = today: nothing imported.
++_input_hold = None
++if (os.environ.get("PRIVYHUB_INPUT_HOLD") or "").strip():
++    import input_hold as _input_hold
++
+ # B1: the impairment shim's uplink blackout, only with PRIVYHUB_IMPAIRMENT set
+ # (a gate only for `blackout-<D>s@both`). Absent = today: nothing imported.
+ _impairment_uplink = None
+@@ -135,6 +140,10 @@
+         # output is fresh (link_drop_recovery), and the silence-gap log runs (also alone: PRIVYHUB_RECOVERY_GAP_LOG=1;
+         # logs/games/native_stream_ctrl_gaps.log, beside the recovery log). Absent = neither.
+         self._recovery.enable_controller_exit(trigger_v2)
++        # B2: the fast input hold -- a second, faster trigger inside the same recovery state machine
++        if _input_hold is not None:
++            _input_hold.wire(self._recovery, self._native_stream._session_io.controller,
++                             lambda: bool(getattr(self._emulator, "_paused", False)), os.environ)
+         if trigger_v2 or os.environ.get("PRIVYHUB_RECOVERY_GAP_LOG") == "1":
+             self._native_stream._session_io.controller.set_gap_log(
+                 self.PROJECT_ROOT / "logs" / "games" / "native_stream_ctrl_gaps.log"
+diff --git a/companion/input_hold.py b/companion/input_hold.py
+new file mode 100644
+index 0000000..a4c5437
+--- /dev/null
++++ b/companion/input_hold.py
+@@ -0,0 +1,157 @@
++"""B2: the fast input hold -- a controller silence >= H ms pauses the core, the first packet back resumes it.
++
++`PRIVYHUB_INPUT_HOLD=<H ms>` (100-4000; `1` / `on` = 250). **Absent = today**:
++nothing imports this module. Design:
++`docs/memory/evidence/b2_2026-10-22/design_written_before_code.md` (hashed
++before this code).
++
++The client sends its whole controller state ~430 times a second whether or not
++the player moves (`NativeControllerSender.sendLoop`), so a silence is the link,
++not a still player. One owner: recovery v2's `LinkDropRecovery` (a second,
++faster trigger, reason `input_hold`, through its own pause / resume). This
++module only detects (in the controller receive loop, never blocking it) and
++hands the two events, in order, to one worker thread.
++"""
++
++from __future__ import annotations
++
++import queue
++import threading
++import time
++from collections import deque
++from typing import Any, Callable, Mapping
++
++FLAG_ENV = "PRIVYHUB_INPUT_HOLD"
++DEFAULT_MS = 250
++MIN_MS, MAX_MS = 100, 4000
++MIN_HOLD_MS = 50            # a release waits until the pause has stood this long (>= 2 frames at 60 fps)
++CAP_HOLDS = 6               # at most this many holds ...
++CAP_WINDOW_S = 60.0         # ... in any rolling 60 s; past it v2's 5.35-s trigger still protects
++REASON = "input_hold"
++
++
++def parse(raw: Any) -> tuple[int | None, str | None]:
++    """(H ms, None) when valid; (None, why) when set but ignored; (None, None) when absent."""
++    if raw is None or str(raw).strip() == "":
++        return None, None
++    v = str(raw).strip().lower()
++    if v in ("1", "on"):
++        return DEFAULT_MS, None
++    if v.isdigit() and MIN_MS <= int(v) <= MAX_MS:
++        return int(v), None
++    return None, f"ignored: {str(raw).strip()[:32]!r} is not 1 / on / {MIN_MS}-{MAX_MS}"
++
++
++class InputHoldDetector:
++    """Pure, driven by the controller receive loop. Emits ("hold", age_ms) / ("release", held_ms) to `emit`."""
++
++    def __init__(self, hold_ms: int, emit: Callable[[tuple], None], clock: Callable[[], float] = time.monotonic):
++        self.hold_s = hold_ms / 1000.0
++        self._emit = emit
++        self._clock = clock
++        self.held = False
++        self._silence_start = 0.0
++        self._starts: deque[float] = deque()
++        self._cap_reported_until = 0.0
++        self.holds = 0
++        self.releases = 0
++        self.capped = 0
++
++    def on_quiet(self, now: float, last_any_packet_at: float) -> None:
++        if self.held or last_any_packet_at <= 0.0 or now - last_any_packet_at < self.hold_s:
++            return
++        while self._starts and now - self._starts[0] >= CAP_WINDOW_S:
++            self._starts.popleft()
++        if last_any_packet_at <= self._silence_start:
++            return                                    # this silence was already counted (capped)
++        self._silence_start = last_any_packet_at
++        if len(self._starts) >= CAP_HOLDS:
++            self.capped += 1
++            if now >= self._cap_reported_until:
++                self._cap_reported_until = self._starts[0] + CAP_WINDOW_S
++                self._emit(("cap", round((now - last_any_packet_at) * 1000.0, 1)))
++            return
++        self._starts.append(now)
++        self.held = True
++        self.holds += 1
++        self._emit(("hold", round((now - last_any_packet_at) * 1000.0, 1)))
++
++    def on_packet(self, now: float) -> None:
++        if not self.held:
++            return
++        self.held = False
++        self.releases += 1
++        self._emit(("release", round((now - self._silence_start) * 1000.0, 1)))
++
++
++class HoldDispatcher:
++    """One worker: the recovery calls, in order, off the receive loop. `run_sync` for tests (no thread)."""
++
++    def __init__(self, recovery: Any, game_paused: Callable[[], bool],
++                 clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep,
++                 threaded: bool = True) -> None:
++        self.recovery = recovery
++        self.game_paused = game_paused
++        self._clock = clock
++        self._sleep = sleep
++        self._q: "queue.SimpleQueue[tuple]" = queue.SimpleQueue()
++        self._paused_at: float | None = None      # when OUR hold's pause returned
++        self._ours = False
++        self._skipped_reported = False
++        if threaded:
++            threading.Thread(target=self._run, name="PrivyHub-Input-Hold", daemon=True).start()
++
++    def put(self, event: tuple) -> None:
++        self._q.put(event)
++
++    def _run(self) -> None:
++        while True:
++            event = self._q.get()
++            try:
++                self.handle(event)
++            except Exception:
++                pass                                  # the hold must never take the worker down
++
++    def handle(self, event: tuple) -> None:
++        kind, ms = event
++        if kind == "hold":
++            try:
++                paused = bool(self.game_paused())
++            except Exception:
++                paused = False
++            if paused:
++                self._ours = False
++                if not self._skipped_reported:
++                    self._skipped_reported = True
++                    self.recovery._log("input_hold_skipped_paused", age_ms=ms)
++                return
++            self._skipped_reported = False
++            self._ours = bool(self.recovery.note_input_hold(ms))
++            self._paused_at = self._clock() if self._ours else None
++        elif kind == "release":
++            if not self._ours:
++                return
++            self._ours = False
++            if self._paused_at is not None:
++                wait = MIN_HOLD_MS / 1000.0 - (self._clock() - self._paused_at)
++                if wait > 0:
++                    self._sleep(wait)
++            self.recovery.note_input_release(ms)
++        elif kind == "cap":
++            self.recovery._log("input_hold_cap", age_ms=ms, cap_holds=CAP_HOLDS, cap_window_s=CAP_WINDOW_S)
++
++
++def wire(recovery: Any, controller: Any, game_paused: Callable[[], bool],
++         environ: Mapping[str, str]) -> InputHoldDetector | None:
++    """The plugin's one call: parse, log an ignored value once, build and hand the detector to the bridge."""
++    hold_ms, why = parse(environ.get(FLAG_ENV))
++    if hold_ms is None:
++        if why:
++            recovery._log("input_hold_config", ignored=True, reason=why)
++        return None
++    dispatcher = HoldDispatcher(recovery, game_paused)
++    detector = InputHoldDetector(hold_ms, dispatcher.put)
++    controller.set_input_hold(detector)
++    recovery._log("input_hold_config", ignored=False, hold_ms=hold_ms, min_hold_ms=MIN_HOLD_MS,
++                  cap_holds=CAP_HOLDS, cap_window_s=CAP_WINDOW_S)
++    return detector
+diff --git a/tests/input_hold/test_input_hold.py b/tests/input_hold/test_input_hold.py
+new file mode 100644
+index 0000000..1f44f75
+--- /dev/null
++++ b/tests/input_hold/test_input_hold.py
+@@ -0,0 +1,297 @@
++#!/usr/bin/env python3
++"""B2: the fast input hold.
++
++    python3 -m unittest discover -s tests/input_hold -v
++
++The detector with a fake clock; the dispatcher synchronous; the recovery state machine (`LinkDropRecovery`) with fake
++callbacks (no emulator, no stream): one owner, one pause row, the handover to v2, the rate limits, the user's pause;
++the flag; the hooks' shape; and the real controller receive loop with B1's uplink blackout.
++"""
++
++from __future__ import annotations
++
++import ast
++import json
++import os
++import subprocess
++import sys
++import tempfile
++import time
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(ROOT / "tests" / "impairment"))
++
++import impairment as imp  # noqa: E402
++import input_hold as ih  # noqa: E402
++from games import link_drop_recovery as ldr  # noqa: E402
++
++
++class Clock:
++    def __init__(self, t=1000.0):
++        self.t = t
++
++    def __call__(self):
++        return self.t
++
++
++def detector(ms=250):
++    out, clock = [], Clock()
++    return ih.InputHoldDetector(ms, out.append, clock), out, clock
++
++
++class Flag(unittest.TestCase):
++    def test_parse(self):
++        self.assertEqual(ih.parse(None), (None, None))
++        self.assertEqual(ih.parse(""), (None, None))
++        self.assertEqual(ih.parse("1"), (250, None))
++        self.assertEqual(ih.parse("on"), (250, None))
++        self.assertEqual(ih.parse("250"), (250, None))
++        self.assertEqual(ih.parse(" 1000 "), (1000, None))
++        for bad in ("0", "99", "4001", "fast", "-250", "250ms"):
++            hold, why = ih.parse(bad)
++            self.assertIsNone(hold, bad)
++            self.assertTrue(why and why.startswith("ignored"), bad)
++
++
++class Detector(unittest.TestCase):
++    def test_short_silence_nothing(self):
++        d, out, _ = detector()
++        d.on_quiet(100.249, 100.0)
++        self.assertEqual(out, [])
++
++    def test_one_hold_then_one_release(self):
++        d, out, _ = detector()
++        d.on_quiet(100.25, 100.0)
++        d.on_quiet(100.30, 100.0)
++        d.on_quiet(103.00, 100.0)
++        self.assertEqual(out, [("hold", 250.0)])
++        d.on_packet(104.0)
++        d.on_packet(104.01)
++        self.assertEqual(out, [("hold", 250.0), ("release", 4000.0)])
++
++    def test_never_before_a_first_packet(self):
++        d, out, _ = detector()
++        d.on_quiet(5.0, 0.0)
++        self.assertEqual(out, [])
++
++    def test_cap_six_in_sixty_seconds_logged_once(self):
++        d, out, _ = detector()
++        t = 100.0
++        for _ in range(8):
++            d.on_quiet(t + 0.3, t)
++            d.on_packet(t + 0.4)
++            t += 5.0
++        kinds = [k for k, _ in out]
++        self.assertEqual(kinds.count("hold"), 6)
++        self.assertEqual(kinds.count("cap"), 1)
++        self.assertEqual(d.capped, 2)
++        # after the window rolls, holds again
++        t = 100.0 + 61.0
++        d.on_quiet(t + 0.3, t)
++        self.assertEqual([k for k, _ in out].count("hold"), 7)
++
++
++class FakeRecovery:
++    """LinkDropRecovery's real state machine with fake callbacks and a temp log."""
++
++    def __init__(self, resume_raises=False):
++        self.calls = []
++        self.root = Path(tempfile.mkdtemp(prefix="b2_rec_"))
++
++        def resume():
++            self.calls.append("resume")
++            if resume_raises:
++                raise RuntimeError("resume failed")
++
++        self.rec = ldr.LinkDropRecovery(
++            self.root, pause_game=lambda: self.calls.append("pause"), resume_game=resume,
++            save_recovery_state=lambda: {}, restart_encoder=lambda: {}, full_start_encoder=lambda: {},
++            stream_active=lambda: True, end_session=lambda: None, client_packet_age_ms=lambda: 10.0,
++            recovery_save_detail=lambda: {})
++        self.rec._state = ldr.STATE_PLAYING          # a live session, no monitor thread
++        self.rec._state_since = time.monotonic()
++
++    def rows(self):
++        p = self.rec.log_path()
++        return [json.loads(x) for x in p.read_text().splitlines()] if p.exists() else []
++
++    def events(self):
++        return [(r["event"], r.get("trigger") or r.get("via")) for r in self.rows()]
++
++
++class Recovery(unittest.TestCase):
++    def test_hold_then_release(self):
++        f = FakeRecovery()
++        self.assertTrue(f.rec.note_input_hold(260.0))
++        self.assertEqual(f.rec.current_state(), ldr.STATE_PAUSED_RECOVERING)
++        self.assertTrue(f.rec.note_input_release(3900.0))
++        self.assertEqual(f.rec.current_state(), ldr.STATE_PLAYING)
++        self.assertEqual(f.calls, ["pause", "resume"])
++        self.assertEqual(f.events(), [("desync_pause", "input_hold"), ("resumed", "input_release")])
++        self.assertEqual(f.rows()[-1]["held_ms"], 3900.0)
++
++    def test_v2_threshold_hands_over_one_pause_row(self):
++        f = FakeRecovery()
++        f.rec.note_input_hold(255.0)
++        f.rec.note_client_silence(5350.0)                    # v2's controller_silence, while held
++        self.assertEqual(f.calls, ["pause"])                 # no second pause
++        self.assertFalse(f.rec.note_input_release(5600.0))   # the hold no longer owns it
++        self.assertEqual(f.calls, ["pause"])
++        ev = f.events()
++        self.assertEqual([e for e in ev if e[0] == "desync_pause"], [("desync_pause", "input_hold")])
++        self.assertIn(("input_hold_handover", "controller_silence"), ev)
++        # v2's own controller-return exit resumes it, once
++        f.rec.enable_controller_exit(True)
++        now = time.monotonic()
++        self.assertFalse(f.rec._maybe_exit_controller_pause(now, 20.0))
++        self.assertFalse(f.rec._maybe_exit_controller_pause(now + 0.3, 20.0))
++        f.rec._heartbeat_history = [(now + 0.4, 30)]
++        self.assertTrue(f.rec._maybe_exit_controller_pause(now + 0.5, 20.0))
++        self.assertEqual(f.calls, ["pause", "resume"])
++        self.assertEqual(f.events()[-1], ("resumed", "controller_return"))
++
++    def test_client_desync_hands_over(self):
++        f = FakeRecovery()
++        f.rec.note_input_hold(255.0)
++        f.rec.note_client_desync("output_silence", 1300.0)
++        self.assertEqual(f.calls, ["pause"])
++        self.assertIn(("input_hold_handover", "client_output_silence"), f.events())
++        self.assertFalse(f.rec.note_input_release(1500.0))
++
++    def test_client_ready_gate_resumes_a_hold(self):
++        f = FakeRecovery()
++        f.rec.note_input_hold(255.0)
++        self.assertTrue(f.rec.note_stream_ready())
++        self.assertFalse(f.rec.note_input_release(900.0))    # already PLAYING: nothing
++        self.assertEqual(f.calls, ["pause"])                 # the gate's resume is the plugin's, not this callback
++
++    def test_resume_failure_hands_to_controller_silence(self):
++        f = FakeRecovery(resume_raises=True)
++        f.rec.note_input_hold(255.0)
++        self.assertFalse(f.rec.note_input_release(800.0))
++        self.assertEqual(f.rec.current_state(), ldr.STATE_PAUSED_RECOVERING)
++        self.assertEqual(f.rec._last_desync_reason, "controller_silence")
++        self.assertEqual(f.events()[-1][0], "input_release_failed")
++
++    def test_no_hold_unless_playing(self):
++        f = FakeRecovery()
++        f.rec.note_client_silence(5350.0)                    # v2 paused first
++        self.assertFalse(f.rec.note_input_hold(255.0))
++        self.assertEqual(f.calls, ["pause"])
++        self.assertNotIn("input_hold_handover", [e[0] for e in f.events()])
++
++    def test_without_the_hold_today_unchanged(self):
++        f = FakeRecovery()
++        f.rec.note_client_silence(5350.0)
++        f.rec.note_client_desync("output_silence", 1000.0)  # already paused: ignored, as today
++        self.assertEqual(f.calls, ["pause"])
++        self.assertEqual(f.events(), [("desync_pause", "controller_silence")])
++
++
++class Dispatcher(unittest.TestCase):
++    def _d(self, paused=False, resume_raises=False):
++        f = FakeRecovery(resume_raises)
++        clock, slept = Clock(50.0), []
++        d = ih.HoldDispatcher(f.rec, lambda: paused, clock=clock,
++                              sleep=lambda s: (slept.append(round(s, 3)), setattr(clock, "t", clock.t + s)),
++                              threaded=False)
++        return f, d, clock, slept
++
++    def test_min_hold(self):
++        f, d, clock, slept = self._d()
++        d.handle(("hold", 255.0))
++        clock.t += 0.01                                   # the packets came back 10 ms after the pause returned
++        d.handle(("release", 265.0))
++        self.assertEqual(slept, [0.04])
++        self.assertEqual(f.calls, ["pause", "resume"])
++
++    def test_the_users_pause_wins(self):
++        f, d, _, _ = self._d(paused=True)
++        d.handle(("hold", 255.0))
++        d.handle(("release", 400.0))
++        d.handle(("hold", 255.0))
++        self.assertEqual(f.calls, [])
++        self.assertEqual([e[0] for e in f.events()], ["input_hold_skipped_paused"])
++
++    def test_cap_row(self):
++        f, d, _, _ = self._d()
++        d.handle(("cap", 300.0))
++        self.assertEqual(f.events(), [("input_hold_cap", None)])
++
++
++class Hooks(unittest.TestCase):
++    def _hooks(self, rel, test_text):
++        tree = ast.parse((ROOT / "companion" / rel).read_text())
++        return [n for n in ast.walk(tree) if isinstance(n, ast.If) and ast.unparse(n.test) == test_text]
++
++    def test_shapes(self):
++        self.assertEqual(len(self._hooks("native_session_io.py", "self._input_hold is not None")), 2)
++        self.assertEqual(len(self._hooks("plugins/games.py", "_input_hold is not None")), 1)
++        tree = ast.parse((ROOT / "companion" / "plugins" / "games.py").read_text())
++        guarded = [n for n in tree.body if isinstance(n, ast.If) and "import input_hold" in ast.unparse(n)]
++        self.assertEqual(len(guarded), 1)
++        self.assertIn("PRIVYHUB_INPUT_HOLD", ast.unparse(guarded[0].test))
++        top = [n for n in tree.body if isinstance(n, (ast.Import, ast.ImportFrom))]
++        self.assertFalse(any("input_hold" in ast.unparse(n) for n in top))
++
++    def test_flag_absent_not_imported(self):
++        env = {k: v for k, v in os.environ.items() if k not in (ih.FLAG_ENV, imp.FLAG_ENV)}
++        code = ("import sys; sys.path.insert(0, 'companion'); import native_session_io as n; "
++                "print('input_hold' in sys.modules, n.NativeControllerBridge._input_hold)")
++        out = subprocess.run([sys.executable, "-B", "-c", code], cwd=ROOT, env=env, capture_output=True,
++                             text=True, timeout=120)
++        self.assertEqual(out.stdout.strip(), "False None", out.stderr[-500:])
++
++
++class TheReceiveLoop(unittest.TestCase):
++    def test_a_one_second_uplink_blackout_holds_once_and_releases(self):
++        import test_blackout as TB
++        f = FakeRecovery()
++        d = ih.HoldDispatcher(f.rec, lambda: False, threaded=False)
++        det = ih.InputHoldDetector(250, d.handle)
++        import native_session_io as nsio
++        nsio.NativeControllerBridge._input_hold = det        # as set_input_hold, for every bridge the helper makes
++        try:
++            epoch = time.monotonic()
++            gate = imp.UplinkGate(imp.Blackout(1.0, 10.0, 1.0, epoch=epoch))
++            TB.run_bridge(3.0, gate, silence_ms=5000.0)
++        finally:
++            nsio.NativeControllerBridge._input_hold = None
++        self.assertIn(det.holds, (1, 2))                      # the blackout (and maybe the sender's end at 3 s)
++        rows = f.rows()
++        first = [r for r in rows if r["event"] == "desync_pause"][0]
++        self.assertEqual(first["trigger"], "input_hold")
++        self.assertGreaterEqual(first["age_ms"], 250.0)
++        self.assertLessEqual(first["age_ms"], 320.0)
++        resumed = [r for r in rows if r["event"] == "resumed"][0]
++        self.assertAlmostEqual(resumed["held_ms"], 1000.0, delta=80.0)
++
++
++class UnattendedFramesReader(unittest.TestCase):
++    """tools/unattended_frames.py on synthetic logs: the raw count and the core-running count."""
++
++    def test_counts(self):
++        sys.path.insert(0, str(ROOT / "tools"))
++        import unattended_frames as uf
++        d = Path(tempfile.mkdtemp(prefix="b2_uf_"))
++        (d / "native_frame_sizes.jsonl").write_text("".join(
++            json.dumps({"at_utc": f"2026-10-22T00:00:{s:02d}.000Z", "frames": 60}) + "\n" for s in range(0, 40)))
++        (d / "native_stream_ctrl_gaps.log").write_text("".join(json.dumps(r) + "\n" for r in (
++            {"start_utc": "2026-10-22T00:00:10.000Z", "end_utc": "2026-10-22T00:00:14.000Z", "gap_ms": 4000},
++            {"start_utc": "2026-10-22T00:00:14.300Z", "end_utc": "2026-10-22T00:00:14.600Z", "gap_ms": 300},
++            {"start_utc": "2026-10-22T00:00:30.000Z", "end_utc": "2026-10-22T00:00:31.000Z", "gap_ms": 1000})))
++        (d / "native_stream_recovery.log").write_text("".join(json.dumps(r) + "\n" for r in (
++            {"at_utc": "2026-10-22T00:00:10.300Z", "event": "desync_pause", "trigger": "input_hold"},
++            {"at_utc": "2026-10-22T00:00:14.000Z", "event": "resumed", "via": "input_release"})))
++        r = uf.measure(d, uf.ts("2026-10-22T00:00:00"), uf.ts("2026-10-22T00:00:40"))
++        self.assertEqual(r["episodes"], 2)                         # 10-14.6 s joined (< 500 ms apart), and 30-31 s
++        self.assertAlmostEqual(r["unattended_frames"], (3.75 + 0.05 + 0.75) * 60, delta=0.5)
++        self.assertAlmostEqual(r["unattended_frames_core_running"], (0.05 + 0.05 + 0.75) * 60, delta=0.5)
++        self.assertEqual(r["held_episodes"], {"250": 2, "500": 2, "1000": 2})
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tools/unattended_frames.py b/tools/unattended_frames.py
+new file mode 100644
+index 0000000..52526d6
+--- /dev/null
++++ b/tools/unattended_frames.py
+@@ -0,0 +1,191 @@
++#!/usr/bin/env python3
++"""B2: "unattended frames" -- host frames emitted while no controller packet had arrived for >= 250 ms.
++
++The number the fast input hold (PRIVYHUB_INPUT_HOLD) exists to cut. Defined in
++`docs/memory/evidence/b2_2026-10-22/design_written_before_code.md` §7. Read-only; it reads only the directory given.
++
++    python3 tools/unattended_frames.py --logs <dir with native_stream_ctrl_gaps.log and native_frame_sizes.jsonl>
++        --span 2026-10-21T04:42:00 2026-10-21T05:27:00 [--window death 2026-10-21T04:54:50 2026-10-21T04:55:05]
++        [--hold-ms 250,500,1000] [--json out.json]
++
++- The control-gap log (E3-R2) holds every controller gap > 250 ms (start / end). A gap's unattended span is
++  [start + 250 ms, end]; its frames are the frame-size log's per-second `frames`, prorated by the overlap.
++- Episodes ("per blackout"): gaps less than 500 ms apart (the gap log's own burst rule) are one episode.
++- Per 10 min: unattended frames / streaming seconds (seconds with frames > 0 in the span) x 600.
++- Held episodes per H: the episodes with at least one single gap >= H, per 10 min (what an input hold of H would
++  pause, the false holds of a clean link included).
++- **Two counts.** `unattended_frames` is the queue's definition as written (every host frame in those spans). But the
++  encoder keeps emitting the frozen picture at the full rate while the core is paused (measured: Sunday's recovery
++  pause 05:10:03-05:10:08Z, 60 frames/s), so that count cannot show a pause. **`unattended_frames_core_running`**
++  also subtracts the spans in which recovery had the core paused (`native_stream_recovery.log`: a `desync_pause` to
++  the next `resumed` / `session_ended` / `session_started`): the frames the game advanced without the player. This
++  is the number the input hold exists to cut.
++"""
++from __future__ import annotations
++
++import argparse
++import glob
++import json
++import math
++from datetime import datetime, timezone
++from pathlib import Path
++
++THRESHOLD_S = 0.25
++EPISODE_JOIN_S = 0.5
++
++
++def ts(t: str) -> float:
++    t = t.rstrip("Z")
++    fmt = "%Y-%m-%dT%H:%M:%S.%f" if "." in t else "%Y-%m-%dT%H:%M:%S"
++    return datetime.strptime(t, fmt).replace(tzinfo=timezone.utc).timestamp()
++
++
++def utc(t: float) -> str:
++    return datetime.fromtimestamp(t, timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
++
++
++def jl(paths):
++    for p in paths:
++        try:
++            lines = Path(p).read_text(errors="replace").splitlines()
++        except OSError:
++            continue
++        for line in lines:
++            try:
++                yield json.loads(line)
++            except Exception:
++                pass
++
++
++def load(logs: Path, a: float, b: float):
++    gaps = {}
++    for r in jl(sorted(glob.glob(str(logs / "native_stream_ctrl_gaps.log*")))
++                + sorted(glob.glob(str(logs / "stream_log_archive" / "native_stream_ctrl_gaps.log*")))):
++        if r.get("start_utc") and r.get("end_utc"):
++            s, e = ts(r["start_utc"]), ts(r["end_utc"])
++            if e > a and s < b:
++                gaps[(r["start_utc"], r["end_utc"])] = (s, e)
++    frames = {}
++    for r in jl(sorted(glob.glob(str(logs / "native_frame_sizes.jsonl*")))
++                + sorted(glob.glob(str(logs / "stream_log_archive" / "native_frame_sizes.jsonl*")))):
++        if r.get("at_utc") and isinstance(r.get("frames"), (int, float)):
++            t = math.floor(ts(r["at_utc"]))
++            if a - 1 <= t < b:
++                frames[t] = int(r["frames"])
++    return sorted(gaps.values()), frames
++
++
++def paused_spans(logs: Path, a: float, b: float) -> list[tuple[float, float]]:
++    """Recovery's paused spans: a desync_pause to the next resumed / session_ended / session_started."""
++    rows = {}
++    for r in jl(sorted(glob.glob(str(logs / "native_stream_recovery.log*")))
++                + sorted(glob.glob(str(logs / "stream_log_archive" / "native_stream_recovery*")))):
++        if r.get("at_utc") and r.get("event"):
++            rows[(r["at_utc"], r["event"])] = (ts(r["at_utc"]), r["event"])
++    out, start = [], None
++    for t, ev in sorted(rows.values()):
++        if ev == "desync_pause" and start is None:
++            start = t
++        elif ev in ("resumed", "session_ended", "session_started") and start is not None:
++            if t > a and start < b:
++                out.append((start, t))
++            start = None
++    if start is not None and start < b:
++        out.append((start, b))
++    return out
++
++
++def running_frames_in(frames: dict, s: float, e: float, paused: list[tuple[float, float]]) -> float:
++    """Frames in [s, e] outside the paused spans."""
++    n, cur = 0.0, s
++    for ps, pe in sorted(paused):
++        if pe <= cur or ps >= e:
++            continue
++        if ps > cur:
++            n += frames_in(frames, cur, ps)
++        cur = max(cur, pe)
++    if cur < e:
++        n += frames_in(frames, cur, e)
++    return n
++
++
++def frames_in(frames: dict, s: float, e: float) -> float:
++    n = 0.0
++    sec = math.floor(s)
++    while sec < e:
++        lo, hi = max(s, sec), min(e, sec + 1)
++        if hi > lo:
++            n += frames.get(sec, 0) * (hi - lo)
++        sec += 1
++    return n
++
++
++def episodes(gaps):
++    out = []
++    for s, e in gaps:
++        if out and s - out[-1]["end"] < EPISODE_JOIN_S:
++            out[-1]["end"] = max(out[-1]["end"], e)
++            out[-1]["gaps"].append((s, e))
++        else:
++            out.append({"start": s, "end": e, "gaps": [(s, e)]})
++    return out
++
++
++def measure(logs: Path, a: float, b: float, windows=(), holds=(250, 500, 1000)) -> dict:
++    gaps, frames = load(logs, a, b)
++    paused = paused_spans(logs, a, b)
++    stream_s = sum(1 for t, f in frames.items() if a <= t < b and f > 0)
++    eps = episodes(gaps)
++    for ep in eps:
++        ep["unattended_frames"] = round(sum(frames_in(frames, max(s + THRESHOLD_S, a), min(e, b))
++                                            for s, e in ep["gaps"] if e - s >= THRESHOLD_S), 1)
++        ep["unattended_frames_core_running"] = round(sum(
++            running_frames_in(frames, max(s + THRESHOLD_S, a), min(e, b), paused)
++            for s, e in ep["gaps"] if e - s >= THRESHOLD_S), 1)
++        ep["longest_gap_ms"] = round(max(e - s for s, e in ep["gaps"]) * 1000.0)
++        ep["silent_ms"] = round(sum(e - s for s, e in ep["gaps"]) * 1000.0)
++    total = sum(ep["unattended_frames"] for ep in eps)
++    running = sum(ep["unattended_frames_core_running"] for ep in eps)
++    per10 = (lambda x: round(x * 600.0 / stream_s, 2) if stream_s else None)
++    res = {"span": [utc(a), utc(b)], "streaming_s": stream_s, "gaps": len(gaps), "episodes": len(eps),
++           "unattended_frames": round(total, 1), "unattended_frames_per_10min": per10(total),
++           "unattended_frames_core_running": round(running, 1),
++           "unattended_frames_core_running_per_10min": per10(running),
++           "recovery_paused_spans": [[utc(x), round(y - x, 2)] for x, y in paused],
++           "episodes_per_10min": per10(len(eps)),
++           "held_episodes_per_10min": {str(h): per10(sum(1 for ep in eps if ep["longest_gap_ms"] >= h)) for h in holds},
++           "held_episodes": {str(h): sum(1 for ep in eps if ep["longest_gap_ms"] >= h) for h in holds},
++           "top_episodes": [{"start": utc(ep["start"]), "end": utc(ep["end"]), "gaps": len(ep["gaps"]),
++                             "silent_ms": ep["silent_ms"], "longest_gap_ms": ep["longest_gap_ms"],
++                             "unattended_frames": ep["unattended_frames"],
++                             "unattended_frames_core_running": ep["unattended_frames_core_running"]}
++                            for ep in sorted(eps, key=lambda x: -x["unattended_frames"])[:10]],
++           "windows": {}}
++    for name, wa, wb in windows:
++        n = sum(frames_in(frames, max(s + THRESHOLD_S, wa), min(e, wb)) for s, e in gaps if e - s >= THRESHOLD_S)
++        nr = sum(running_frames_in(frames, max(s + THRESHOLD_S, wa), min(e, wb), paused)
++                 for s, e in gaps if e - s >= THRESHOLD_S)
++        res["windows"][name] = {"span": [utc(wa), utc(wb)], "unattended_frames": round(n, 1),
++                                "unattended_frames_core_running": round(nr, 1),
++                                "gaps": [[utc(s), round((e - s) * 1000)] for s, e in gaps if e > wa and s < wb]}
++    return res
++
++
++def main() -> int:
++    ap = argparse.ArgumentParser()
++    ap.add_argument("--logs", required=True, type=Path)
++    ap.add_argument("--span", nargs=2, required=True)
++    ap.add_argument("--window", nargs=3, action="append", default=[])
++    ap.add_argument("--hold-ms", default="250,500,1000")
++    ap.add_argument("--json", type=Path)
++    a = ap.parse_args()
++    res = measure(a.logs, ts(a.span[0]), ts(a.span[1]), [(n, ts(x), ts(y)) for n, x, y in a.window],
++                  tuple(int(x) for x in a.hold_ms.split(",")))
++    print(json.dumps(res, indent=1))
++    if a.json:
++        a.json.write_text(json.dumps(res, indent=1) + "\n")
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())

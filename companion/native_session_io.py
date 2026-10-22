@@ -26,6 +26,14 @@ if (os.environ.get("PRIVYHUB_AUDIO_CODEC") or "").strip():
 
     AUDIO_CODEC = _audio_codec.shared_from_environ(os.environ)
 
+# B1: the impairment shim's uplink blackout, only with PRIVYHUB_IMPAIRMENT set
+# (a gate only for `blackout-<D>s@both`). Absent = today: nothing imported.
+_impairment_uplink = None
+if (os.environ.get("PRIVYHUB_IMPAIRMENT") or "").strip():
+    import impairment as _impairment
+
+    _impairment_uplink = _impairment.uplink_gate_from_environ(os.environ)
+
 
 class NativeSessionIOError(RuntimeError):
     pass
@@ -1622,6 +1630,9 @@ class NativeControllerBridge:
         "<4sBBHIQIhhhhHH"
     )
 
+    # B2: the fast input hold's detector (set_input_hold; only PRIVYHUB_INPUT_HOLD wires it). None = today.
+    _input_hold: Any = None
+
     LINUX_VENDOR_ID = 0x1209
     LINUX_PRODUCT_ID = 0x5048
     LINUX_VERSION_ID = 1
@@ -1937,6 +1948,10 @@ class NativeControllerBridge:
     # PrivyHub Phase A3 persistent game-session controller
     # D-BASE-R3 accessors. The callback fires once per silence episode, from
     # the receive loop, and is re-armed by the next packet.
+    def set_input_hold(self, detector: Any) -> None:
+        """B2: the input-hold detector's on_quiet / on_packet, called from the receive loop (never blocking)."""
+        self._input_hold = detector
+
     def set_client_silence_callback(
         self,
         callback: "Callable[[float], None] | None",
@@ -2490,6 +2505,9 @@ class NativeControllerBridge:
                 data, source = sock.recvfrom(
                     256
                 )
+                # B1: the shim's uplink blackout -- this datagram never arrived
+                if _impairment_uplink is not None and _impairment_uplink.drop("controller"):
+                    raise socket.timeout
             except socket.timeout:
                 now = time.monotonic()
 
@@ -2510,6 +2528,10 @@ class NativeControllerBridge:
                         self._neutralize(
                             player
                         )
+
+                # B2: the fast input hold (a silence >= H ms), handed to its own worker
+                if self._input_hold is not None:
+                    self._input_hold.on_quiet(now, self._last_any_packet_at)
 
                 # D-BASE-R3: the client sends ~430 packets/s even with no
                 # input, so this silence means the client or the link is
@@ -2605,6 +2627,10 @@ class NativeControllerBridge:
                 self._last_packet_at[player]
             )
             self._silence_reported = False
+
+            # B2: the first packet back releases an input hold
+            if self._input_hold is not None:
+                self._input_hold.on_packet(now_packet)
 
             try:
                 self._apply_report(

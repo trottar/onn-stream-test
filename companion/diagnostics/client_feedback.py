@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import math
+import os
 import threading
 import time
 
@@ -11,6 +12,24 @@ CLIENT_HEALTH_SCHEMA = "privyhub_client_health_v1"
 CLIENT_HEALTH_STORE_SCHEMA = "privyhub_client_health_store_v1"
 
 DEFAULT_MAX_AGE_MS = 6_000
+
+# B3: the client's Wi-Fi link object, only with PRIVYHUB_LINK_REPORT=1. Absent = today: the key is ignored as any
+# unknown key is.
+_LINK_REPORT = (os.environ.get("PRIVYHUB_LINK_REPORT") or "").strip() == "1"
+_LINK_RANGES = {"rssi_dbm": (-126, -1), "tx_mbps": (1, 100_000), "rx_mbps": (1, 100_000),
+                "frequency_mhz": (1, 100_000), "wifi_standard": (1, 32)}
+
+
+def _normalize_link(value: Any) -> dict[str, int]:
+    """B3: the link object's known keys, each an int in its range; anything else dropped. Never raises."""
+    out: dict[str, int] = {}
+    if not isinstance(value, dict):
+        return out
+    for key, (lo, hi) in _LINK_RANGES.items():
+        v = value.get(key)
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(float(v)) and lo <= v <= hi:
+            out[key] = int(v)
+    return out
 
 _VIDEO_COUNTERS = (
     "packets",
@@ -142,6 +161,10 @@ def normalize_client_health(payload: Any) -> dict[str, Any]:
             root.get("control_round_trip_ms"),
             name="control_round_trip_ms",
         )
+
+    # B3: the link object, tolerant (a bad one never rejects the report)
+    if _LINK_REPORT and isinstance(root.get("link"), dict):
+        normalized["link"] = _normalize_link(root.get("link"))
 
     return normalized
 

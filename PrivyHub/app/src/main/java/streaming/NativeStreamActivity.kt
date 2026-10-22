@@ -2231,6 +2231,11 @@ class NativeStreamActivity :
     // D-BASE-T1. Three fields, URL-encoded, omitted individually when the
     // device does not report them — an absent field is the finding, and a
     // substitute number would not be.
+    // B3: the Wi-Fi link sampler, only with debug.privyhub.link_report=1 (read on first use, on a report thread).
+    private val linkSampler: LinkSampler? by lazy {
+        if (LinkReportFlag.fromSystem()) LinkSampler({ readWifi(applicationContext) }) else null
+    }
+
     private fun thermalQuery(): String {
         val sampler =
             thermalSampler
@@ -2445,8 +2450,9 @@ class NativeStreamActivity :
             )
 
             try {
+                // B3: the Wi-Fi link fields (null sampler = today: no key)
                 httpPost(
-                    address,
+                    address + (linkSampler?.current()?.query() ?: ""),
                     readTimeoutMs = 1_500
                 )
             } catch (_: Exception) {
@@ -2632,6 +2638,10 @@ class NativeStreamActivity :
             )
 
             try {
+                // B3: the Wi-Fi link object (null sampler = today: no key)
+                linkSampler?.current()?.let { link ->
+                    payload.put("link", JSONObject().apply { link.fields().forEach { (k, v) -> put(k, v) } })
+                }
                 httpPostJson(
                     "http://$host:$CONTROL_PORT" +
                         "/diagnostics/client-health",

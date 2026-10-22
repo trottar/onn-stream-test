@@ -1847,6 +1847,16 @@ test pending.** The adopted ladder needs an fps term to step down, so Sunday's 5
 rule steps one rung on 2 × 10 s of ≥ 4 FEC-unrecoverable groups, through every gate, floor 5000. Replayed: Sunday
 6000 at 05:03Z; 0 asks in the clean windows. Not adopted. Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.md`.
 
+**B1 (2026-10-22): the shim's blackout on both directions, built behind `PRIVYHUB_IMPAIRMENT=blackout-<D>s@both|@down`;
+bench run pending (BENCH-R1).** Record: `docs/memory/evidence/B1_SHIM_BLACKOUT_BOTH_2026-10-22.md`.
+
+**B2 (2026-10-22): the fast input hold, built behind `PRIVYHUB_INPUT_HOLD=<H ms>` inside recovery v2; bench run
+pending (BENCH-R1).** Record: `docs/memory/evidence/B2_INPUT_HOLD_2026-10-22.md`.
+
+**B3 (2026-10-22): the client's Wi-Fi link quality in its reports, built behind `debug.privyhub.link_report=1` /
+`PRIVYHUB_LINK_REPORT=1`; APK pinned, not installed (CL-B8 pending).** Record:
+`docs/memory/evidence/B3_CLIENT_LINK_REPORT_2026-10-22.md`.
+
 ## G9 — Remote foundation checkpoint
 
 Acceptance:
