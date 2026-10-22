@@ -86,6 +86,10 @@ class NativeControllerSender(
     private val motionEvents =
         AtomicLong(0)
 
+    // B7: the stall signal's tick (StallMonitor via the activity; null = today)
+    @Volatile
+    var stallTick: ((Long) -> ByteArray?)? = null
+
     @Volatile
     private var running =
         false
@@ -675,6 +679,11 @@ class NativeControllerSender(
                     }
 
                     sequence += 1
+                }
+
+                // B7: a stall / stall_end datagram when one is due (null = today)
+                stallTick?.invoke(System.nanoTime() / 1_000_000L)?.let { d ->
+                    try { socket.send(DatagramPacket(d, d.size)) } catch (_: Exception) { sendErrors.incrementAndGet() }
                 }
 
                 try {

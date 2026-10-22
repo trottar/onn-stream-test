@@ -1,0 +1,8 @@
+ML-R1 §0 setup check, 2026-10-22T05:25:44Z, /usr/bin/python3 3.13.5
+  numpy: ABSENT
+  sklearn: ABSENT
+  scipy: ABSENT
+  pandas: ABSENT
+  pyarrow: ABSENT
+  /usr/lib/python3/dist-packages: no numpy / sklearn; dpkg: no python3-numpy / python3-sklearn; no other python3 interpreter (/usr/bin/python3, python3.13 only); no site-packages numpy under /home, /opt, /usr/local
+  -> the task's rule (§0): numpy absent = stop and write it; the user installs by hand. Nothing fetched, no unit launched, no pre-registration written.

@@ -527,6 +527,17 @@ class NativeStreamActivity :
         sessionStarted = false
     }
 
+    // B5: the lock follows the foreground (low-latency mode works only there); null = today.
+    override fun onPause() {
+        super.onPause()
+        streamWifiLock?.release()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (sessionStarted) streamWifiLock?.acquire()
+    }
+
     override fun onDestroy() {
         uiHandler.removeCallbacks(
             metricsTick
@@ -560,6 +571,8 @@ class NativeStreamActivity :
         sessionStarted = true
         stopping = false
         cachedSessionReport = null
+        // B5: the Wi-Fi lock for the session (null = today)
+        streamWifiLock?.acquire()
         pausedFrameCaptureStatus =
             "not_requested"
         pausedFrameBytes =
@@ -644,6 +657,8 @@ class NativeStreamActivity :
             ).also {
                 it.start()
             }
+        // B7: the stall signal on the controller socket (null = today)
+        stallMonitor?.let { m -> controllerSender?.stallTick = { now -> m.tick(now, stallInputs()) } }
 
         receiver =
             RtpH264Receiver(
@@ -972,6 +987,9 @@ class NativeStreamActivity :
     }
 
     private fun stopLocalPipeline() {
+        // B5: the Wi-Fi lock never outlives the session (null = today)
+        streamWifiLock?.release()
+
         controllerSender?.stop()
         controllerSender = null
 
@@ -2217,6 +2235,19 @@ class NativeStreamActivity :
             )
         }
 
+        // B7: the stall signal's threshold and counts (null = today: no key)
+        stallMonitor?.let { m ->
+            root.put("stall_signal_ms", m.thresholdMs)
+            root.put("stall_signal_stalls_sent", m.stallsSent)
+            root.put("stall_signal_ends_sent", m.endsSent)
+        }
+
+        // B5: the lock asked and whether the platform held it (null = today: no key)
+        streamWifiLock?.let { lock ->
+            root.put("wifi_lock_mode", lock.mode.wire)
+            root.put("wifi_lock_held", lock.heldAtFirstAcquire ?: false)
+        }
+
         return root.toString()
     }
 
@@ -2231,6 +2262,21 @@ class NativeStreamActivity :
     // D-BASE-T1. Three fields, URL-encoded, omitted individually when the
     // device does not report them — an absent field is the finding, and a
     // substitute number would not be.
+    // B7: the stall signal's monitor, only with debug.privyhub.stall_signal=<1|ms> (null = today).
+    private val stallMonitor: StallMonitor? by lazy { StallSignalFlag.fromSystem()?.let { StallMonitor(it) } }
+
+    // B7: what the player sees: the output's age, the frame id, the recovery gate (read by the controller thread).
+    private fun stallInputs(): StallInputs =
+        StallInputs(
+            outputAgeMs = decoder?.lastOutputAgeMs() ?: -1L,
+            renderedFrames = decoder?.renderedFrameCount() ?: 0L,
+            inGate = recoveryActive && !gameplayReleased,
+            released = gameplayReleased || recoveryActive,
+        )
+
+    // B5: the stream's Wi-Fi lock, only with debug.privyhub.wifi_lock=<low_latency|high_perf> (null = today).
+    private val streamWifiLock: StreamWifiLock? by lazy { StreamWifiLock.fromSystem(this) }
+
     // B3: the Wi-Fi link sampler, only with debug.privyhub.link_report=1 (read on first use, on a report thread).
     private val linkSampler: LinkSampler? by lazy {
         if (LinkReportFlag.fromSystem()) LinkSampler({ readWifi(applicationContext) }) else null

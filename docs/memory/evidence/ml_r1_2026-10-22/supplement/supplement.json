@@ -1,0 +1,1140 @@
+{
+ "note": "POST-HOC, not pre-registered; the frozen run's scores; nothing refit",
+ "k": {
+  "1": {
+   "silence_250": {
+    "heldout_evenings": {
+     "recall": 0.5818181818181818,
+     "hitch_seconds": 275,
+     "onset_recall": 0.1559633027522936,
+     "onsets": "109",
+     "lead_median": 5.0,
+     "alarm_s_per_10min": 29.00369003690037,
+     "fa_seconds_per_10min_heldout_clean": 3.537,
+     "fa_episodes_per_10min_heldout_clean": 2.721
+    },
+    "heldout_bench5": {
+     "recall": 0.4673913043478261,
+     "hitch_seconds": 184,
+     "onset_recall": 0.14772727272727273,
+     "onsets": "88",
+     "lead_median": 4.0,
+     "alarm_s_per_10min": 146.9208211143695
+    },
+    "heldout_ux_r1": {
+     "recall": 0.6265560165975104,
+     "hitch_seconds": 241,
+     "onset_recall": 0.18823529411764706,
+     "onsets": "85",
+     "lead_median": 5.5,
+     "alarm_s_per_10min": 45.6687898089172
+    },
+    "heldout_ux_r2": {
+     "recall": 0.2647058823529412,
+     "hitch_seconds": 34,
+     "onset_recall": 0.041666666666666664,
+     "onsets": "24",
+     "lead_median": 4.0,
+     "alarm_s_per_10min": 6.052631578947369,
+     "fa_seconds_per_10min_heldout_clean": 3.537,
+     "fa_episodes_per_10min_heldout_clean": 2.721
+    },
+    "train_oof": {
+     "recall": 0.22538699690402478,
+     "hitch_seconds": 4845,
+     "onset_recall": 0.046975924838520255,
+     "onsets": "3406",
+     "lead_median": 2.0,
+     "alarm_s_per_10min": 35.06627292081588,
+     "fa_seconds_per_10min_train_clean": 36.311,
+     "fa_episodes_per_10min_train_clean": 25.374
+    },
+    "moments": {
+     "sunday_0506_burst": {
+      "E": "2026-10-20T05:06:00",
+      "fires_ge2s_before": true,
+      "first_alarm_s_before": 3,
+      "alarm_s_before_in_30s": [
+       3,
+       2,
+       1,
+       0
+      ]
+     },
+     "death_045455": {
+      "E": "2026-10-21T04:54:55",
+      "fires_ge2s_before": false,
+      "first_alarm_s_before": null,
+      "alarm_s_before_in_30s": [
+       0
+      ]
+     }
+    }
+   },
+   "logreg_strict": {
+    "threshold": 0.5837045170186596,
+    "heldout_evenings": {
+     "recall": 0.3927272727272727,
+     "hitch_seconds": 275,
+     "onset_recall": 0.11009174311926606,
+     "onsets": "109",
+     "lead_median": 2.5,
+     "alarm_s_per_10min": 15.276752767527675,
+     "fa_seconds_per_10min_heldout_clean": 1.088,
+     "fa_episodes_per_10min_heldout_clean": 0.544
+    },
+    "heldout_bench5": {
+     "recall": 0.27717391304347827,
+     "hitch_seconds": 184,
+     "onset_recall": 0.09090909090909091,
+     "onsets": "88",
+     "lead_median": 1.0,
+     "alarm_s_per_10min": 63.34310850439883
+    },
+    "heldout_ux_r1": {
+     "recall": 0.43568464730290457,
+     "hitch_seconds": 241,
+     "onset_recall": 0.12941176470588237,
+     "onsets": "85",
+     "lead_median": 2.0,
+     "alarm_s_per_10min": 24.840764331210192
+    },
+    "heldout_ux_r2": {
+     "recall": 0.08823529411764706,
+     "hitch_seconds": 34,
+     "onset_recall": 0.041666666666666664,
+     "onsets": "24",
+     "lead_median": 4.0,
+     "alarm_s_per_10min": 2.1052631578947367,
+     "fa_seconds_per_10min_heldout_clean": 1.088,
+     "fa_episodes_per_10min_heldout_clean": 0.544
+    },
+    "train_oof": {
+     "recall": 0.3562435500515996,
+     "hitch_seconds": 4845,
+     "onset_recall": 0.3317674691720493,
+     "onsets": "3406",
+     "lead_median": 1.0,
+     "alarm_s_per_10min": 30.066616303825285,
+     "fa_seconds_per_10min_train_clean": 0.875,
+     "fa_episodes_per_10min_train_clean": 0.109
+    },
+    "moments": {
+     "sunday_0506_burst": {
+      "E": "2026-10-20T05:06:00",
+      "fires_ge2s_before": false,
+      "first_alarm_s_before": null,
+      "alarm_s_before_in_30s": [
+       1,
+       0
+      ]
+     },
+     "death_045455": {
+      "E": "2026-10-21T04:54:55",
+      "fires_ge2s_before": false,
+      "first_alarm_s_before": null,
+      "alarm_s_before_in_30s": []
+     }
+    }
+   },
+   "logreg_duty_matched": {
+    "threshold": 0.15574020069785913,
+    "rule_duty_s_per_10min_train_clean": 42.22,
+    "heldout_evenings": {
+     "recall": 0.6836363636363636,
+     "hitch_seconds": 275,
+     "onset_recall": 0.3669724770642202,
+     "onsets": "109",
+     "lead_median": 4.0,
+     "alarm_s_per_10min": 36.974169741697416,
+     "fa_seconds_per_10min_heldout_clean": 6.531,
+     "fa_episodes_per_10min_heldout_clean": 3.537
+    },
+    "heldout_bench5": {
+     "recall": 0.6902173913043478,
+     "hitch_seconds": 184,
+     "onset_recall": 0.5,
+     "onsets": "88",
+     "lead_median": 2.0,
+     "alarm_s_per_10min": 272.7272727272727
+    },
+    "heldout_ux_r1": {
+     "recall": 0.7261410788381742,
+     "hitch_seconds": 241,
+     "onset_recall": 0.43529411764705883,
+     "onsets": "85",
+     "lead_median": 6.0,
+     "alarm_s_per_10min": 56.560509554140125
+    },
+    "heldout_ux_r2": {
+     "recall": 0.38235294117647056,
+     "hitch_seconds": 34,
+     "onset_recall": 0.125,
+     "onsets": "24",
+     "lead_median": 3.0,
+     "alarm_s_per_10min": 10.0,
+     "fa_seconds_per_10min_heldout_clean": 6.531,
+     "fa_episodes_per_10min_heldout_clean": 3.537
+    },
+    "train_oof": {
+     "recall": 0.6792569659442724,
+     "hitch_seconds": 4845,
+     "onset_recall": 0.635936582501468,
+     "onsets": "3406",
+     "lead_median": 1.0,
+     "alarm_s_per_10min": 92.69967721997115,
+     "fa_seconds_per_10min_train_clean": 32.92,
+     "fa_episodes_per_10min_train_clean": 23.952
+    },
+    "moments": {
+     "sunday_0506_burst": {
+      "E": "2026-10-20T05:06:00",
+      "fires_ge2s_before": true,
+      "first_alarm_s_before": 3,
+      "alarm_s_before_in_30s": [
+       3,
+       2,
+       1,
+       0
+      ]
+     },
+     "death_045455": {
+      "E": "2026-10-21T04:54:55",
+      "fires_ge2s_before": false,
+      "first_alarm_s_before": null,
+      "alarm_s_before_in_30s": [
+       0
+      ]
+     }
+    }
+   },
+   "hgb_strict": {
+    "threshold": 0.6772739809485275,
+    "heldout_evenings": {
+     "recall": 0.24,
+     "hitch_seconds": 275,
+     "onset_recall": 0.09174311926605505,
+     "onsets": "109",
+     "lead_median": 1.5,
+     "alarm_s_per_10min": 8.966789667896679,
+     "fa_seconds_per_10min_heldout_clean": 0.544,
+     "fa_episodes_per_10min_heldout_clean": 0.272
+    },
+    "heldout_bench5": {
+     "recall": 0.15760869565217392,
+     "hitch_seconds": 184,
+     "onset_recall": 0.056818181818181816,
+     "onsets": "88",
+     "lead_median": 1.0,
+     "alarm_s_per_10min": 31.671554252199414
+    },
+    "heldout_ux_r1": {
+     "recall": 0.26141078838174275,
+     "hitch_seconds": 241,
+     "onset_recall": 0.10588235294117647,
+     "onsets": "85",
+     "lead_median": 1.0,
+     "alarm_s_per_10min": 14.522292993630574
+    },
+    "heldout_ux_r2": {
+     "recall": 0.08823529411764706,
+     "hitch_seconds": 34,
+     "onset_recall": 0.041666666666666664,
+     "onsets": "24",
+     "lead_median": 3.0,
+     "alarm_s_per_10min": 1.3157894736842106,
+     "fa_seconds_per_10min_heldout_clean": 0.544,
+     "fa_episodes_per_10min_heldout_clean": 0.272
+    },
+    "train_oof": {
+     "recall": 0.3624355005159959,
+     "hitch_seconds": 4845,
+     "onset_recall": 0.38813857897827364,
+     "onsets": "3406",
+     "lead_median": 1.0,
+     "alarm_s_per_10min": 27.264610947050336,
+     "fa_seconds_per_10min_train_clean": 0.875,
+     "fa_episodes_per_10min_train_clean": 0.0
+    },
+    "moments": {
+     "sunday_0506_burst": {
+      "E": "2026-10-20T05:06:00",
+      "fires_ge2s_before": false,
+      "first_alarm_s_before": null,
+      "alarm_s_before_in_30s": [
+       1
+      ]
+     },
+     "death_045455": {
+      "E": "2026-10-21T04:54:55",
+      "fires_ge2s_before": false,
+      "first_alarm_s_before": null,
+      "alarm_s_before_in_30s": []
+     }
+    }
+   },
+   "hgb_duty_matched": {
+    "threshold": 0.1730190545819119,
+    "rule_duty_s_per_10min_train_clean": 42.22,
+    "heldout_evenings": {
+     "recall": 0.7272727272727273,
+     "hitch_seconds": 275,
+     "onset_recall": 0.41284403669724773,
+     "onsets": "109",
+     "lead_median": 9.0,
+     "alarm_s_per_10min": 42.398523985239855,
+     "fa_seconds_per_10min_heldout_clean": 6.803,
+     "fa_episodes_per_10min_heldout_clean": 4.082
+    },
+    "heldout_bench5": {
+     "recall": 0.7663043478260869,
+     "hitch_seconds": 184,
+     "onset_recall": 0.6136363636363636,
+     "onsets": "88",
+     "lead_median": 3.0,
+     "alarm_s_per_10min": 301.75953079178885
+    },
+    "heldout_ux_r1": {
+     "recall": 0.7759336099585062,
+     "hitch_seconds": 241,
+     "onset_recall": 0.49411764705882355,
+     "onsets": "85",
+     "lead_median": 11.5,
+     "alarm_s_per_10min": 64.5859872611465
+    },
+    "heldout_ux_r2": {
+     "recall": 0.38235294117647056,
+     "hitch_seconds": 34,
+     "onset_recall": 0.125,
+     "onsets": "24",
+     "lead_median": 3.0,
+     "alarm_s_per_10min": 11.842105263157896,
+     "fa_seconds_per_10min_heldout_clean": 6.803,
+     "fa_episodes_per_10min_heldout_clean": 4.082
+    },
+    "train_oof": {
+     "recall": 0.7147574819401444,
+     "hitch_seconds": 4845,
+     "onset_recall": 0.6705813270698767,
+     "onsets": "3406",
+     "lead_median": 1.0,
+     "alarm_s_per_10min": 89.73284801868003,
+     "fa_seconds_per_10min_train_clean": 31.717,
+     "fa_episodes_per_10min_train_clean": 17.499
+    },
+    "moments": {
+     "sunday_0506_burst": {
+      "E": "2026-10-20T05:06:00",
+      "fires_ge2s_before": true,
+      "first_alarm_s_before": 3,
+      "alarm_s_before_in_30s": [
+       3,
+       2,
+       1,
+       0
+      ]
+     },
+     "death_045455": {
+      "E": "2026-10-21T04:54:55",
+      "fires_ge2s_before": true,
+      "first_alarm_s_before": 3,
+      "alarm_s_before_in_30s": [
+       3,
+       0
+      ]
+     }
+    }
+   }
+  },
+  "2": {
+   "silence_250": {
+    "heldout_evenings": {
+     "recall": 0.6836363636363636,
+     "hitch_seconds": 275,
+     "onset_recall": 0.30275229357798167,
+     "onsets": "109",
+     "lead_median": 4.0,
+     "alarm_s_per_10min": 29.00369003690037,
+     "fa_seconds_per_10min_heldout_clean": 2.993,
+     "fa_episodes_per_10min_heldout_clean": 2.449
+    },
+    "heldout_bench5": {
+     "recall": 0.5760869565217391,
+     "hitch_seconds": 184,
+     "onset_recall": 0.25,
+     "onsets": "88",
+     "lead_median": 2.5,
+     "alarm_s_per_10min": 146.9208211143695
+    },
+    "heldout_ux_r1": {
+     "recall": 0.7385892116182573,
+     "hitch_seconds": 241,
+     "onset_recall": 0.36470588235294116,
+     "onsets": "85",
+     "lead_median": 4.0,
+     "alarm_s_per_10min": 45.6687898089172
+    },
+    "heldout_ux_r2": {
+     "recall": 0.29411764705882354,
+     "hitch_seconds": 34,
+     "onset_recall": 0.08333333333333333,
+     "onsets": "24",
+     "lead_median": 3.0,
+     "alarm_s_per_10min": 6.052631578947369,
+     "fa_seconds_per_10min_heldout_clean": 2.993,
+     "fa_episodes_per_10min_heldout_clean": 2.449
+    },
+    "train_oof": {
+     "recall": 0.2912280701754386,
+     "hitch_seconds": 4845,
+     "onset_recall": 0.1086318261890781,
+     "onsets": "3406",
+     "lead_median": 2.0,
+     "alarm_s_per_10min": 35.06627292081588,
+     "fa_seconds_per_10min_train_clean": 33.929,
+     "fa_episodes_per_10min_train_clean": 23.969
+    },
+    "moments": {
+     "sunday_0506_burst": {
+      "E": "2026-10-20T05:06:00",
+      "fires_ge2s_before": true,
+      "first_alarm_s_before": 3,
+      "alarm_s_before_in_30s": [
+       3,
+       2,
+       1,
+       0
+      ]
+     },
+     "death_045455": {
+      "E": "2026-10-21T04:54:55",
+      "fires_ge2s_before": false,
+      "first_alarm_s_before": null,
+      "alarm_s_before_in_30s": [
+       0
+      ]
+     }
+    }
+   },
+   "logreg_strict": {
+    "threshold": 0.7147778699817052,
+    "heldout_evenings": {
+     "recall": 0.5236363636363637,
+     "hitch_seconds": 275,
+     "onset_recall": 0.23853211009174313,
+     "onsets": "109",
+     "lead_median": 7.0,
+     "alarm_s_per_10min": 19.04059040590406,
+     "fa_seconds_per_10min_heldout_clean": 0.816,
+     "fa_episodes_per_10min_heldout_clean": 0.0
+    },
+    "heldout_bench5": {
+     "recall": 0.45652173913043476,
+     "hitch_seconds": 184,
+     "onset_recall": 0.19318181818181818,
+     "onsets": "88",
+     "lead_median": 5.0,
+     "alarm_s_per_10min": 107.33137829912023
+    },
+    "heldout_ux_r1": {
+     "recall": 0.5767634854771784,
+     "hitch_seconds": 241,
+     "onset_recall": 0.29411764705882354,
+     "onsets": "85",
+     "lead_median": 8.0,
+     "alarm_s_per_10min": 31.146496815286625
+    },
+    "heldout_ux_r2": {
+     "recall": 0.14705882352941177,
+     "hitch_seconds": 34,
+     "onset_recall": 0.041666666666666664,
+     "onsets": "24",
+     "lead_median": 4.0,
+     "alarm_s_per_10min": 2.368421052631579,
+     "fa_seconds_per_10min_heldout_clean": 0.816,
+     "fa_episodes_per_10min_heldout_clean": 0.0
+    },
+    "train_oof": {
+     "recall": 0.46109391124871,
+     "hitch_seconds": 4845,
+     "onset_recall": 0.40017615971814446,
+     "onsets": "3406",
+     "lead_median": 17.0,
+     "alarm_s_per_10min": 52.56507108028294,
+     "fa_seconds_per_10min_train_clean": 0.985,
+     "fa_episodes_per_10min_train_clean": 0.547
+    },
+    "moments": {
+     "sunday_0506_burst": {
+      "E": "2026-10-20T05:06:00",
+      "fires_ge2s_before": false,
+      "first_alarm_s_before": null,
+      "alarm_s_before_in_30s": [
+       1
+      ]
+     },
+     "death_045455": {
+      "E": "2026-10-21T04:54:55",
+      "fires_ge2s_before": false,
+      "first_alarm_s_before": null,
+      "alarm_s_before_in_30s": []
+     }
+    }
+   },
+   "logreg_duty_matched": {
+    "threshold": 0.27430592842989254,
+    "rule_duty_s_per_10min_train_clean": 42.25,
+    "heldout_evenings": {
+     "recall": 0.7127272727272728,
+     "hitch_seconds": 275,
+     "onset_recall": 0.3944954128440367,
+     "onsets": "109",
+     "lead_median": 9.0,
+     "alarm_s_per_10min": 39.6309963099631,
+     "fa_seconds_per_10min_heldout_clean": 5.442,
+     "fa_episodes_per_10min_heldout_clean": 0.544
+    },
+    "heldout_bench5": {
+     "recall": 0.7717391304347826,
+     "hitch_seconds": 184,
+     "onset_recall": 0.6136363636363636,
+     "onsets": "88",
+     "lead_median": 8.5,
+     "alarm_s_per_10min": 302.63929618768327
+    },
+    "heldout_ux_r1": {
+     "recall": 0.7593360995850622,
+     "hitch_seconds": 241,
+     "onset_recall": 0.4588235294117647,
+     "onsets": "85",
+     "lead_median": 12.0,
+     "alarm_s_per_10min": 61.146496815286625
+    },
+    "heldout_ux_r2": {
+     "recall": 0.38235294117647056,
+     "hitch_seconds": 34,
+     "onset_recall": 0.16666666666666666,
+     "onsets": "24",
+     "lead_median": 2.5,
+     "alarm_s_per_10min": 10.0,
+     "fa_seconds_per_10min_heldout_clean": 5.442,
+     "fa_episodes_per_10min_heldout_clean": 0.544
+    },
+    "train_oof": {
+     "recall": 0.7106295149638803,
+     "hitch_seconds": 4845,
+     "onset_recall": 0.6426893716970052,
+     "onsets": "3406",
+     "lead_median": 19.0,
+     "alarm_s_per_10min": 115.55525032621385,
+     "fa_seconds_per_10min_train_clean": 26.377,
+     "fa_episodes_per_10min_train_clean": 12.149
+    },
+    "moments": {
+     "sunday_0506_burst": {
+      "E": "2026-10-20T05:06:00",
+      "fires_ge2s_before": true,
+      "first_alarm_s_before": 3,
+      "alarm_s_before_in_30s": [
+       3,
+       2,
+       1,
+       0
+      ]
+     },
+     "death_045455": {
+      "E": "2026-10-21T04:54:55",
+      "fires_ge2s_before": false,
+      "first_alarm_s_before": null,
+      "alarm_s_before_in_30s": []
+     }
+    }
+   },
+   "hgb_strict": {
+    "threshold": 0.6691980841525432,
+    "heldout_evenings": {
+     "recall": 0.5272727272727272,
+     "hitch_seconds": 275,
+     "onset_recall": 0.1834862385321101,
+     "onsets": "109",
+     "lead_median": 5.0,
+     "alarm_s_per_10min": 18.376383763837637,
+     "fa_seconds_per_10min_heldout_clean": 1.088,
+     "fa_episodes_per_10min_heldout_clean": 0.0
+    },
+    "heldout_bench5": {
+     "recall": 0.44565217391304346,
+     "hitch_seconds": 184,
+     "onset_recall": 0.20454545454545456,
+     "onsets": "88",
+     "lead_median": 3.5,
+     "alarm_s_per_10min": 94.1348973607038
+    },
+    "heldout_ux_r1": {
+     "recall": 0.5726141078838174,
+     "hitch_seconds": 241,
+     "onset_recall": 0.2235294117647059,
+     "onsets": "85",
+     "lead_median": 5.0,
+     "alarm_s_per_10min": 29.426751592356688
+    },
+    "heldout_ux_r2": {
+     "recall": 0.20588235294117646,
+     "hitch_seconds": 34,
+     "onset_recall": 0.041666666666666664,
+     "onsets": "24",
+     "lead_median": 4.0,
+     "alarm_s_per_10min": 3.1578947368421053,
+     "fa_seconds_per_10min_heldout_clean": 1.088,
+     "fa_episodes_per_10min_heldout_clean": 0.0
+    },
+    "train_oof": {
+     "recall": 0.5296181630546956,
+     "hitch_seconds": 4845,
+     "onset_recall": 0.47886083382266587,
+     "onsets": "3406",
+     "lead_median": 11.0,
+     "alarm_s_per_10min": 60.174438568779614,
+     "fa_seconds_per_10min_train_clean": 0.985,
+     "fa_episodes_per_10min_train_clean": 0.328
+    },
+    "moments": {
+     "sunday_0506_burst": {
+      "E": "2026-10-20T05:06:00",
+      "fires_ge2s_before": true,
+      "first_alarm_s_before": 2,
+      "alarm_s_before_in_30s": [
+       2,
+       1
+      ]
+     },
+     "death_045455": {
+      "E": "2026-10-21T04:54:55",
+      "fires_ge2s_before": false,
+      "first_alarm_s_before": null,
+      "alarm_s_before_in_30s": []
+     }
+    }
+   },
+   "hgb_duty_matched": {
+    "threshold": 0.30317213306898444,
+    "rule_duty_s_per_10min_train_clean": 42.25,
+    "heldout_evenings": {
+     "recall": 0.7090909090909091,
+     "hitch_seconds": 275,
+     "onset_recall": 0.3853211009174312,
+     "onsets": "109",
+     "lead_median": 13.5,
+     "alarm_s_per_10min": 36.752767527675275,
+     "fa_seconds_per_10min_heldout_clean": 3.265,
+     "fa_episodes_per_10min_heldout_clean": 0.544
+    },
+    "heldout_bench5": {
+     "recall": 0.6902173913043478,
+     "hitch_seconds": 184,
+     "onset_recall": 0.4772727272727273,
+     "onsets": "88",
+     "lead_median": 4.0,
+     "alarm_s_per_10min": 241.93548387096774
+    },
+    "heldout_ux_r1": {
+     "recall": 0.7593360995850622,
+     "hitch_seconds": 241,
+     "onset_recall": 0.47058823529411764,
+     "onsets": "85",
+     "lead_median": 14.0,
+     "alarm_s_per_10min": 57.89808917197452
+    },
+    "heldout_ux_r2": {
+     "recall": 0.35294117647058826,
+     "hitch_seconds": 34,
+     "onset_recall": 0.08333333333333333,
+     "onsets": "24",
+     "lead_median": 3.0,
+     "alarm_s_per_10min": 7.631578947368421,
+     "fa_seconds_per_10min_heldout_clean": 3.265,
+     "fa_episodes_per_10min_heldout_clean": 0.544
+    },
+    "train_oof": {
+     "recall": 0.7401444788441692,
+     "hitch_seconds": 4845,
+     "onset_recall": 0.687903699354081,
+     "onsets": "3406",
+     "lead_median": 22.0,
+     "alarm_s_per_10min": 115.5415150058375,
+     "fa_seconds_per_10min_train_clean": 25.392,
+     "fa_episodes_per_10min_train_clean": 9.632
+    },
+    "moments": {
+     "sunday_0506_burst": {
+      "E": "2026-10-20T05:06:00",
+      "fires_ge2s_before": true,
+      "first_alarm_s_before": 3,
+      "alarm_s_before_in_30s": [
+       3,
+       2,
+       1,
+       0
+      ]
+     },
+     "death_045455": {
+      "E": "2026-10-21T04:54:55",
+      "fires_ge2s_before": false,
+      "first_alarm_s_before": null,
+      "alarm_s_before_in_30s": [
+       0
+      ]
+     }
+    }
+   }
+  },
+  "3": {
+   "silence_250": {
+    "heldout_evenings": {
+     "recall": 0.7127272727272728,
+     "hitch_seconds": 275,
+     "onset_recall": 0.3669724770642202,
+     "onsets": "109",
+     "lead_median": 3.0,
+     "alarm_s_per_10min": 29.00369003690037,
+     "fa_seconds_per_10min_heldout_clean": 2.993,
+     "fa_episodes_per_10min_heldout_clean": 2.449
+    },
+    "heldout_bench5": {
+     "recall": 0.657608695652174,
+     "hitch_seconds": 184,
+     "onset_recall": 0.38636363636363635,
+     "onsets": "88",
+     "lead_median": 3.5,
+     "alarm_s_per_10min": 146.9208211143695
+    },
+    "heldout_ux_r1": {
+     "recall": 0.7717842323651453,
+     "hitch_seconds": 241,
+     "onset_recall": 0.4470588235294118,
+     "onsets": "85",
+     "lead_median": 3.0,
+     "alarm_s_per_10min": 45.6687898089172
+    },
+    "heldout_ux_r2": {
+     "recall": 0.29411764705882354,
+     "hitch_seconds": 34,
+     "onset_recall": 0.08333333333333333,
+     "onsets": "24",
+     "lead_median": 3.0,
+     "alarm_s_per_10min": 6.052631578947369,
+     "fa_seconds_per_10min_heldout_clean": 2.993,
+     "fa_episodes_per_10min_heldout_clean": 2.449
+    },
+    "train_oof": {
+     "recall": 0.33725490196078434,
+     "hitch_seconds": 4845,
+     "onset_recall": 0.16001174398120963,
+     "onsets": "3406",
+     "lead_median": 3.0,
+     "alarm_s_per_10min": 35.06627292081588,
+     "fa_seconds_per_10min_train_clean": 31.902,
+     "fa_episodes_per_10min_train_clean": 22.693
+    },
+    "moments": {
+     "sunday_0506_burst": {
+      "E": "2026-10-20T05:06:00",
+      "fires_ge2s_before": true,
+      "first_alarm_s_before": 3,
+      "alarm_s_before_in_30s": [
+       3,
+       2,
+       1,
+       0
+      ]
+     },
+     "death_045455": {
+      "E": "2026-10-21T04:54:55",
+      "fires_ge2s_before": false,
+      "first_alarm_s_before": null,
+      "alarm_s_before_in_30s": [
+       0
+      ]
+     }
+    }
+   },
+   "logreg_strict": {
+    "threshold": 0.806280561247617,
+    "heldout_evenings": {
+     "recall": 0.56,
+     "hitch_seconds": 275,
+     "onset_recall": 0.28440366972477066,
+     "onsets": "109",
+     "lead_median": 6.0,
+     "alarm_s_per_10min": 20.14760147601476,
+     "fa_seconds_per_10min_heldout_clean": 0.816,
+     "fa_episodes_per_10min_heldout_clean": 0.0
+    },
+    "heldout_bench5": {
+     "recall": 0.5163043478260869,
+     "hitch_seconds": 184,
+     "onset_recall": 0.2840909090909091,
+     "onsets": "88",
+     "lead_median": 4.0,
+     "alarm_s_per_10min": 122.28739002932551
+    },
+    "heldout_ux_r1": {
+     "recall": 0.6182572614107884,
+     "hitch_seconds": 241,
+     "onset_recall": 0.35294117647058826,
+     "onsets": "85",
+     "lead_median": 6.0,
+     "alarm_s_per_10min": 32.86624203821656
+    },
+    "heldout_ux_r2": {
+     "recall": 0.14705882352941177,
+     "hitch_seconds": 34,
+     "onset_recall": 0.041666666666666664,
+     "onsets": "24",
+     "lead_median": 4.0,
+     "alarm_s_per_10min": 2.6315789473684212,
+     "fa_seconds_per_10min_heldout_clean": 0.816,
+     "fa_episodes_per_10min_heldout_clean": 0.0
+    },
+    "train_oof": {
+     "recall": 0.5087719298245614,
+     "hitch_seconds": 4845,
+     "onset_recall": 0.4521432765707575,
+     "onsets": "3406",
+     "lead_median": 14.5,
+     "alarm_s_per_10min": 58.12787583270379,
+     "fa_seconds_per_10min_train_clean": 0.987,
+     "fa_episodes_per_10min_train_clean": 0.767
+    },
+    "moments": {
+     "sunday_0506_burst": {
+      "E": "2026-10-20T05:06:00",
+      "fires_ge2s_before": false,
+      "first_alarm_s_before": null,
+      "alarm_s_before_in_30s": [
+       1
+      ]
+     },
+     "death_045455": {
+      "E": "2026-10-21T04:54:55",
+      "fires_ge2s_before": false,
+      "first_alarm_s_before": null,
+      "alarm_s_before_in_30s": []
+     }
+    }
+   },
+   "logreg_duty_matched": {
+    "threshold": 0.3810360645102506,
+    "rule_duty_s_per_10min_train_clean": 42.32,
+    "heldout_evenings": {
+     "recall": 0.7381818181818182,
+     "hitch_seconds": 275,
+     "onset_recall": 0.45871559633027525,
+     "onsets": "109",
+     "lead_median": 7.5,
+     "alarm_s_per_10min": 38.08118081180812,
+     "fa_seconds_per_10min_heldout_clean": 3.81,
+     "fa_episodes_per_10min_heldout_clean": 0.544
+    },
+    "heldout_bench5": {
+     "recall": 0.8260869565217391,
+     "hitch_seconds": 184,
+     "onset_recall": 0.7045454545454546,
+     "onsets": "88",
+     "lead_median": 6.0,
+     "alarm_s_per_10min": 307.0381231671554
+    },
+    "heldout_ux_r1": {
+     "recall": 0.7883817427385892,
+     "hitch_seconds": 241,
+     "onset_recall": 0.5294117647058824,
+     "onsets": "85",
+     "lead_median": 9.0,
+     "alarm_s_per_10min": 59.617834394904456
+    },
+    "heldout_ux_r2": {
+     "recall": 0.38235294117647056,
+     "hitch_seconds": 34,
+     "onset_recall": 0.20833333333333334,
+     "onsets": "24",
+     "lead_median": 3.0,
+     "alarm_s_per_10min": 8.421052631578947,
+     "fa_seconds_per_10min_heldout_clean": 3.81,
+     "fa_episodes_per_10min_heldout_clean": 0.544
+    },
+    "train_oof": {
+     "recall": 0.7380804953560371,
+     "hitch_seconds": 4845,
+     "onset_recall": 0.6846741045214327,
+     "onsets": "3406",
+     "lead_median": 18.0,
+     "alarm_s_per_10min": 138.1361170249296,
+     "fa_seconds_per_10min_train_clean": 22.474,
+     "fa_episodes_per_10min_train_clean": 9.428
+    },
+    "moments": {
+     "sunday_0506_burst": {
+      "E": "2026-10-20T05:06:00",
+      "fires_ge2s_before": true,
+      "first_alarm_s_before": 3,
+      "alarm_s_before_in_30s": [
+       3,
+       2,
+       1,
+       0
+      ]
+     },
+     "death_045455": {
+      "E": "2026-10-21T04:54:55",
+      "fires_ge2s_before": false,
+      "first_alarm_s_before": null,
+      "alarm_s_before_in_30s": []
+     }
+    }
+   },
+   "hgb_strict": {
+    "threshold": 0.7493499277568615,
+    "heldout_evenings": {
+     "recall": 0.52,
+     "hitch_seconds": 275,
+     "onset_recall": 0.22018348623853212,
+     "onsets": "109",
+     "lead_median": 4.0,
+     "alarm_s_per_10min": 16.605166051660518,
+     "fa_seconds_per_10min_heldout_clean": 0.816,
+     "fa_episodes_per_10min_heldout_clean": 0.272
+    },
+    "heldout_bench5": {
+     "recall": 0.44565217391304346,
+     "hitch_seconds": 184,
+     "onset_recall": 0.20454545454545456,
+     "onsets": "88",
+     "lead_median": 4.0,
+     "alarm_s_per_10min": 82.69794721407624
+    },
+    "heldout_ux_r1": {
+     "recall": 0.5643153526970954,
+     "hitch_seconds": 241,
+     "onset_recall": 0.27058823529411763,
+     "onsets": "85",
+     "lead_median": 4.0,
+     "alarm_s_per_10min": 26.560509554140125
+    },
+    "heldout_ux_r2": {
+     "recall": 0.20588235294117646,
+     "hitch_seconds": 34,
+     "onset_recall": 0.041666666666666664,
+     "onsets": "24",
+     "lead_median": 4.0,
+     "alarm_s_per_10min": 2.8947368421052633,
+     "fa_seconds_per_10min_heldout_clean": 0.816,
+     "fa_episodes_per_10min_heldout_clean": 0.272
+    },
+    "train_oof": {
+     "recall": 0.5785345717234263,
+     "hitch_seconds": 4845,
+     "onset_recall": 0.5290663534938345,
+     "onsets": "3406",
+     "lead_median": 13.0,
+     "alarm_s_per_10min": 63.20994437195247,
+     "fa_seconds_per_10min_train_clean": 0.987,
+     "fa_episodes_per_10min_train_clean": 0.658
+    },
+    "moments": {
+     "sunday_0506_burst": {
+      "E": "2026-10-20T05:06:00",
+      "fires_ge2s_before": false,
+      "first_alarm_s_before": null,
+      "alarm_s_before_in_30s": [
+       1
+      ]
+     },
+     "death_045455": {
+      "E": "2026-10-21T04:54:55",
+      "fires_ge2s_before": false,
+      "first_alarm_s_before": null,
+      "alarm_s_before_in_30s": []
+     }
+    }
+   },
+   "hgb_duty_matched": {
+    "threshold": 0.4322074855125674,
+    "rule_duty_s_per_10min_train_clean": 42.32,
+    "heldout_evenings": {
+     "recall": 0.6836363636363636,
+     "hitch_seconds": 275,
+     "onset_recall": 0.3853211009174312,
+     "onsets": "109",
+     "lead_median": 9.5,
+     "alarm_s_per_10min": 31.43911439114391,
+     "fa_seconds_per_10min_heldout_clean": 1.905,
+     "fa_episodes_per_10min_heldout_clean": 0.0
+    },
+    "heldout_bench5": {
+     "recall": 0.7065217391304348,
+     "hitch_seconds": 184,
+     "onset_recall": 0.5227272727272727,
+     "onsets": "88",
+     "lead_median": 4.0,
+     "alarm_s_per_10min": 210.26392961876832
+    },
+    "heldout_ux_r1": {
+     "recall": 0.7344398340248963,
+     "hitch_seconds": 241,
+     "onset_recall": 0.4588235294117647,
+     "onsets": "85",
+     "lead_median": 11.0,
+     "alarm_s_per_10min": 49.87261146496815
+    },
+    "heldout_ux_r2": {
+     "recall": 0.3235294117647059,
+     "hitch_seconds": 34,
+     "onset_recall": 0.125,
+     "onsets": "24",
+     "lead_median": 4.0,
+     "alarm_s_per_10min": 6.052631578947369,
+     "fa_seconds_per_10min_heldout_clean": 1.905,
+     "fa_episodes_per_10min_heldout_clean": 0.0
+    },
+    "train_oof": {
+     "recall": 0.752734778121775,
+     "hitch_seconds": 4845,
+     "onset_recall": 0.7087492660011744,
+     "onsets": "3406",
+     "lead_median": 19.0,
+     "alarm_s_per_10min": 109.71773916626604,
+     "fa_seconds_per_10min_train_clean": 20.062,
+     "fa_episodes_per_10min_train_clean": 7.784
+    },
+    "moments": {
+     "sunday_0506_burst": {
+      "E": "2026-10-20T05:06:00",
+      "fires_ge2s_before": true,
+      "first_alarm_s_before": 3,
+      "alarm_s_before_in_30s": [
+       3,
+       2,
+       1,
+       0
+      ]
+     },
+     "death_045455": {
+      "E": "2026-10-21T04:54:55",
+      "fires_ge2s_before": false,
+      "first_alarm_s_before": null,
+      "alarm_s_before_in_30s": []
+     }
+    }
+   }
+  }
+ },
+ "cell8_frozen": {
+  "session_start": "2026-10-22T04:14:59.771Z",
+  "rows": 685,
+  "hitch_seconds": 29,
+  "k": {
+   "1": {
+    "logreg_hashed": {
+     "alarm_s_per_10min": 600.0,
+     "fa_seconds_per_10min": 574.56
+    },
+    "logreg_strict": {
+     "alarm_s_per_10min": 1.75,
+     "fa_seconds_per_10min": 1.75
+    },
+    "logreg_duty_matched": {
+     "alarm_s_per_10min": 15.77,
+     "fa_seconds_per_10min": 14.04
+    },
+    "hgb_hashed": {
+     "alarm_s_per_10min": 600.0,
+     "fa_seconds_per_10min": 574.56
+    },
+    "hgb_strict": {
+     "alarm_s_per_10min": 3.5,
+     "fa_seconds_per_10min": 2.63
+    },
+    "hgb_duty_matched": {
+     "alarm_s_per_10min": 19.27,
+     "fa_seconds_per_10min": 16.67
+    },
+    "silence_250": {
+     "alarm_s_per_10min": 15.77,
+     "fa_seconds_per_10min": 14.04
+    },
+    "silence_950": {
+     "alarm_s_per_10min": 1.75,
+     "fa_seconds_per_10min": 0.88
+    }
+   },
+   "2": {
+    "logreg_hashed": {
+     "alarm_s_per_10min": 600.0,
+     "fa_seconds_per_10min": 551.68
+    },
+    "logreg_strict": {
+     "alarm_s_per_10min": 1.75,
+     "fa_seconds_per_10min": 1.76
+    },
+    "logreg_duty_matched": {
+     "alarm_s_per_10min": 14.89,
+     "fa_seconds_per_10min": 11.42
+    },
+    "hgb_hashed": {
+     "alarm_s_per_10min": 600.0,
+     "fa_seconds_per_10min": 551.68
+    },
+    "hgb_strict": {
+     "alarm_s_per_10min": 3.5,
+     "fa_seconds_per_10min": 1.76
+    },
+    "hgb_duty_matched": {
+     "alarm_s_per_10min": 11.39,
+     "fa_seconds_per_10min": 7.91
+    },
+    "silence_250": {
+     "alarm_s_per_10min": 15.77,
+     "fa_seconds_per_10min": 12.3
+    },
+    "silence_950": {
+     "alarm_s_per_10min": 1.75,
+     "fa_seconds_per_10min": 0.88
+    }
+   },
+   "3": {
+    "logreg_hashed": {
+     "alarm_s_per_10min": 600.0,
+     "fa_seconds_per_10min": 529.62
+    },
+    "logreg_strict": {
+     "alarm_s_per_10min": 1.75,
+     "fa_seconds_per_10min": 1.76
+    },
+    "logreg_duty_matched": {
+     "alarm_s_per_10min": 12.26,
+     "fa_seconds_per_10min": 8.8
+    },
+    "hgb_hashed": {
+     "alarm_s_per_10min": 600.0,
+     "fa_seconds_per_10min": 529.62
+    },
+    "hgb_strict": {
+     "alarm_s_per_10min": 3.5,
+     "fa_seconds_per_10min": 1.76
+    },
+    "hgb_duty_matched": {
+     "alarm_s_per_10min": 7.01,
+     "fa_seconds_per_10min": 4.4
+    },
+    "silence_250": {
+     "alarm_s_per_10min": 15.77,
+     "fa_seconds_per_10min": 11.44
+    },
+    "silence_950": {
+     "alarm_s_per_10min": 1.75,
+     "fa_seconds_per_10min": 0.88
+    }
+   }
+  }
+ }
+}

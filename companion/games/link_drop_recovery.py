@@ -89,6 +89,10 @@ class LinkDropRecovery:
 
     # B4: the hold's rewind (hold_rewind.Rewinder; only PRIVYHUB_INPUT_HOLD_REWIND=1 wires it). None = B2.
     _input_hold_rewind: Any = None
+    # B6: the hold's tuning (hold_tuning.Tuning; only PRIVYHUB_INPUT_HOLD_B6=1 wires it). None = B2 + B4.
+    _input_hold_b6: Any = None
+    # B7: the client's stall signal (stall_signal.StallSignal; only PRIVYHUB_STALL_SIGNAL wires it). None = today.
+    _client_stall: Any = None
 
     def __init__(
         self,
@@ -262,6 +266,10 @@ class LinkDropRecovery:
             age_ms=float(age_ms),
         )
 
+        # B6: the episode began as a hold
+        if self._input_hold_b6 is not None:
+            self._input_hold_b6.note_hold(self)
+
         with self._lock:
             return self._state == STATE_PAUSED_RECOVERING and self._last_desync_reason == INPUT_HOLD
 
@@ -273,6 +281,14 @@ class LinkDropRecovery:
 
         A hold handed over (v2's controller_silence, the client's desync) or already resumed is left alone. A
         failed resume hands over to controller_silence, so v2's controller-return exit applies."""
+        # B7: the first packet back can beat the client's stall; a stall within 60 ms takes the hold over
+        if self._client_stall is not None and self._client_stall.defer_release(self):
+            return False
+
+        # B6: a true release counts for the cap; a hold v2 took over arms its prompt resume
+        if self._input_hold_b6 is not None:
+            self._input_hold_b6.note_release(self)
+
         with self._lock:
             if self._state != STATE_PAUSED_RECOVERING or self._last_desync_reason != INPUT_HOLD:
                 return False
@@ -370,6 +386,14 @@ class LinkDropRecovery:
         One entry point for both uses of the gate: the startup release and
         the recovery release. Returns what happened so a caller can log it.
         """
+        # B7: a late client ready after a stall resume ends that recovery, not a new session
+        if self._client_stall is not None and self._client_stall.ready_after_stall(self):
+            return {"recovered": True, "from_state": "stall_resumed"}
+
+        # B6: a late client ready after a hold-originated resume ends that recovery, not a new session
+        if self._input_hold_b6 is not None and self._input_hold_b6.ready_after_hold(self):
+            return {"recovered": True, "from_state": "hold_resumed"}
+
         with self._lock:
             state = self._state
 
@@ -756,6 +780,10 @@ class LinkDropRecovery:
         if state == STATE_PAUSED_RECOVERING:
             if state_ms >= GIVE_UP_MS:
                 self._give_up_and_save()
+                return
+
+            # B6: a hold v2 took over resumes at the first fresh heartbeat after the link's return
+            if self._input_hold_b6 is not None and self._input_hold_b6.maybe_resume(self, now):
                 return
 
             if self._controller_exit and self._maybe_exit_controller_pause(

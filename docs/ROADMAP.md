@@ -1860,6 +1860,29 @@ pending (BENCH-R1).** Record: `docs/memory/evidence/B2_INPUT_HOLD_2026-10-22.md`
 **B4 (2026-10-22): rewind on the hold's release, built behind `PRIVYHUB_INPUT_HOLD_REWIND=1` (with the hold); bench run
 pending (BENCH-R2: net unattended ≈ 0, rewind's CPU per core, PSX HW).** Record: `docs/memory/evidence/B4_INPUT_HOLD_REWIND_2026-10-22.md`.
 
+**BENCH-R1 (2026-10-22): the loss and blackout cells — MEASURED, 8/8 valid; nothing adopted.** The death reproduced
+(`blackout-4s@both`, 85 unattended frames per blackout against 84). The hold is not a candidate until its trigger is
+fixed (18 false holds on a clean link; −73 % per blackout, not ≥ 90 %). The LAN loss rule is back to B: it stepped at
+0.9-1.5 min, not 3-4. Record: `docs/memory/evidence/BENCH_R1_BLACKOUT_AND_LOSS_CELLS_2026-10-22.md`.
+
+**ML-R1 (2026-10-22): a hitch early-warning detector — MEASURED offline; not built into the companion; no flag.** It ranks better than the hand rules (AUPRC 0.67 against 0.40), but at a usable operating point it is about the 250-ms silence rule. Record: `docs/memory/evidence/ML_R1_HITCH_EARLY_WARNING_2026-10-23.md`.
+
+**B5 (2026-10-22): the client's Wi-Fi lock (none was held), built behind `debug.privyhub.wifi_lock`; APK pinned, not
+installed.** Record: `docs/memory/evidence/B5_CLIENT_WIFI_LOCK_2026-10-22.md`.
+
+**B6 (2026-10-22): the hold's trigger from the data, H = 950 behind `PRIVYHUB_INPUT_HOLD_B6=1`, with the cap, the
+rewind cap and the resume.** Record: `docs/memory/evidence/B6_INPUT_HOLD_TRIGGER_2026-10-22.md`.
+
+**B7 (2026-10-22): the client's stall signal (a picture-only drop pauses the game), built behind
+`debug.privyhub.stall_signal` / `PRIVYHUB_STALL_SIGNAL`; APK (B5 + B7) pinned.** Record:
+`docs/memory/evidence/B7_CLIENT_STALL_SIGNAL_2026-10-22.md`.
+
+**B1b (2026-10-22): `@both` drops the client's desync too.** Record: `docs/memory/evidence/B1B_SHIM_GATE_2026-10-22.md`.
+
+**LAN-R2 (2026-10-22): the loss rule renamed to its purpose, `PRIVYHUB_LAN_LOSS_RULE=bidir` (step down when both
+directions are bad); replayed 0 false asks with cells 1-4 added.** Record:
+`docs/memory/evidence/LAN_R2_LOSS_RULE_RETHOUGHT_2026-10-22.md`.
+
 ## G9 — Remote foundation checkpoint
 
 Acceptance:

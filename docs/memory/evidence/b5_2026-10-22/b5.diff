@@ -1,0 +1,295 @@
+diff --git a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+index 84a2caa..df21757 100644
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -527,6 +527,17 @@ class NativeStreamActivity :
+         sessionStarted = false
+     }
+ 
++    // B5: the lock follows the foreground (low-latency mode works only there); null = today.
++    override fun onPause() {
++        super.onPause()
++        streamWifiLock?.release()
++    }
++
++    override fun onResume() {
++        super.onResume()
++        if (sessionStarted) streamWifiLock?.acquire()
++    }
++
+     override fun onDestroy() {
+         uiHandler.removeCallbacks(
+             metricsTick
+@@ -560,6 +571,8 @@ class NativeStreamActivity :
+         sessionStarted = true
+         stopping = false
+         cachedSessionReport = null
++        // B5: the Wi-Fi lock for the session (null = today)
++        streamWifiLock?.acquire()
+         pausedFrameCaptureStatus =
+             "not_requested"
+         pausedFrameBytes =
+@@ -972,6 +985,9 @@ class NativeStreamActivity :
+     }
+ 
+     private fun stopLocalPipeline() {
++        // B5: the Wi-Fi lock never outlives the session (null = today)
++        streamWifiLock?.release()
++
+         controllerSender?.stop()
+         controllerSender = null
+ 
+@@ -2217,6 +2233,12 @@ class NativeStreamActivity :
+             )
+         }
+ 
++        // B5: the lock asked and whether the platform held it (null = today: no key)
++        streamWifiLock?.let { lock ->
++            root.put("wifi_lock_mode", lock.mode.wire)
++            root.put("wifi_lock_held", lock.heldAtFirstAcquire ?: false)
++        }
++
+         return root.toString()
+     }
+ 
+@@ -2231,6 +2253,9 @@ class NativeStreamActivity :
+     // D-BASE-T1. Three fields, URL-encoded, omitted individually when the
+     // device does not report them — an absent field is the finding, and a
+     // substitute number would not be.
++    // B5: the stream's Wi-Fi lock, only with debug.privyhub.wifi_lock=<low_latency|high_perf> (null = today).
++    private val streamWifiLock: StreamWifiLock? by lazy { StreamWifiLock.fromSystem(this) }
++
+     // B3: the Wi-Fi link sampler, only with debug.privyhub.link_report=1 (read on first use, on a report thread).
+     private val linkSampler: LinkSampler? by lazy {
+         if (LinkReportFlag.fromSystem()) LinkSampler({ readWifi(applicationContext) }) else null
+diff --git a/PrivyHub/app/src/main/java/streaming/StreamWifiLock.kt b/PrivyHub/app/src/main/java/streaming/StreamWifiLock.kt
+new file mode 100644
+index 0000000..eaa45fe
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/StreamWifiLock.kt
+@@ -0,0 +1,107 @@
++package com.safeiot.privyhub.streaming
++
++import android.content.Context
++import android.net.wifi.WifiManager
++import android.os.Build
++
++/**
++ * B5: a Wi-Fi lock for the stream, behind the system property
++ * `debug.privyhub.wifi_lock=<low_latency|high_perf>` (CL-B7P's convention; a
++ * reboot clears it). Absent = today: no WifiManager call, no lock object.
++ *
++ * `low_latency` = WIFI_MODE_FULL_LOW_LATENCY (API 29+; active only while
++ * connected, screen on, app in the foreground — the platform's own terms),
++ * else WIFI_MODE_FULL_HIGH_PERF; `high_perf` = WIFI_MODE_FULL_HIGH_PERF (the
++ * host's API-37 docs: deprecated, now replaced by the low-latency lock).
++ * Needs WAKE_LOCK, already declared. One non-reference-counted lock per
++ * activity: acquire is idempotent, one release frees it, so sessions never
++ * stack. No call may fail or delay a stream.
++ */
++object StreamWifiLockFlag {
++    const val PROPERTY = "debug.privyhub.wifi_lock"
++    const val TAG = "PrivyHubStreamWifi"
++
++    enum class Mode(val wire: String) { LOW_LATENCY("low_latency"), HIGH_PERF("high_perf") }
++
++    fun parse(value: String?): Mode? =
++        when (value?.trim()?.lowercase()) {
++            "low_latency" -> Mode.LOW_LATENCY
++            "high_perf" -> Mode.HIGH_PERF
++            else -> null
++        }
++
++    /** The property, read through reflection; any failure is off. */
++    fun fromSystem(): Mode? =
++        try {
++            val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
++            parse(get.invoke(null, PROPERTY) as? String)
++        } catch (_: Throwable) {
++            null
++        }
++
++    @Suppress("DEPRECATION")
++    fun lockType(mode: Mode, sdkInt: Int): Int =
++        if (mode == Mode.LOW_LATENCY && sdkInt >= 29) WifiManager.WIFI_MODE_FULL_LOW_LATENCY
++        else WifiManager.WIFI_MODE_FULL_HIGH_PERF
++}
++
++/** The platform lock's three calls, so the JVM tests can use a fake. */
++interface WifiLockHandle {
++    fun setReferenceCounted(counted: Boolean)
++    fun acquire()
++    fun release()
++    fun isHeld(): Boolean
++}
++
++class StreamWifiLock(val mode: StreamWifiLockFlag.Mode, private val create: () -> WifiLockHandle?) {
++    private var handle: WifiLockHandle? = null
++
++    /** Whether the platform reported the lock held at the first acquire (null before it). */
++    @Volatile var heldAtFirstAcquire: Boolean? = null
++        private set
++
++    val held: Boolean
++        get() = try { handle?.isHeld() == true } catch (_: Throwable) { false }
++
++    @Synchronized
++    fun acquire() {
++        try {
++            val h = handle ?: create()?.also {
++                it.setReferenceCounted(false)
++                handle = it
++            } ?: return
++            if (!h.isHeld()) h.acquire()
++            if (heldAtFirstAcquire == null) heldAtFirstAcquire = h.isHeld()
++        } catch (_: Throwable) {
++            if (heldAtFirstAcquire == null) heldAtFirstAcquire = false
++        }
++    }
++
++    @Synchronized
++    fun release() {
++        try {
++            val h = handle ?: return
++            if (h.isHeld()) h.release()
++        } catch (_: Throwable) {
++        }
++    }
++
++    companion object {
++        /** The activity's lock, or null (the property absent = today). */
++        fun fromSystem(context: Context): StreamWifiLock? {
++            val mode = StreamWifiLockFlag.fromSystem() ?: return null
++            val app = context.applicationContext
++            return StreamWifiLock(mode) {
++                val manager = app.getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return@StreamWifiLock null
++                val lock = manager.createWifiLock(StreamWifiLockFlag.lockType(mode, Build.VERSION.SDK_INT),
++                    StreamWifiLockFlag.TAG)
++                object : WifiLockHandle {
++                    override fun setReferenceCounted(counted: Boolean) = lock.setReferenceCounted(counted)
++                    override fun acquire() = lock.acquire()
++                    override fun release() = lock.release()
++                    override fun isHeld(): Boolean = lock.isHeld
++                }
++            }
++        }
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/StreamWifiLockTest.kt b/PrivyHub/app/src/test/java/streaming/StreamWifiLockTest.kt
+new file mode 100644
+index 0000000..903ff9b
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/StreamWifiLockTest.kt
+@@ -0,0 +1,112 @@
++package com.safeiot.privyhub.streaming
++
++import android.net.wifi.WifiManager
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * B5: the stream's Wi-Fi lock. The flag (absent = off), the lock type per
++ * platform level, and the lock's lifecycle on a fake handle: one
++ * non-reference-counted lock, idempotent acquire, one release frees it,
++ * repeated sessions never stack, a failing platform call never escapes.
++ */
++class StreamWifiLockTest {
++
++    private class Fake(val throwOnAcquire: Boolean = false) : WifiLockHandle {
++        var counted: Boolean? = null
++        var acquires = 0
++        var releases = 0
++        var heldNow = false
++        override fun setReferenceCounted(counted: Boolean) { this.counted = counted }
++        override fun acquire() {
++            if (throwOnAcquire) throw SecurityException("no WAKE_LOCK")
++            acquires++; heldNow = true
++        }
++        override fun release() { releases++; heldNow = false }
++        override fun isHeld(): Boolean = heldNow
++    }
++
++    @Test
++    fun flagTable() {
++        assertEquals(StreamWifiLockFlag.Mode.LOW_LATENCY, StreamWifiLockFlag.parse("low_latency"))
++        assertEquals(StreamWifiLockFlag.Mode.LOW_LATENCY, StreamWifiLockFlag.parse(" LOW_LATENCY "))
++        assertEquals(StreamWifiLockFlag.Mode.HIGH_PERF, StreamWifiLockFlag.parse("high_perf"))
++        for (bad in listOf(null, "", "1", "on", "lowlatency", "full")) {
++            assertNull(bad, StreamWifiLockFlag.parse(bad))
++        }
++    }
++
++    @Test
++    fun noAndroidPropertyIsOff() {
++        assertNull(StreamWifiLockFlag.fromSystem())
++    }
++
++    @Suppress("DEPRECATION")
++    @Test
++    fun lockTypePerPlatform() {
++        val ll = StreamWifiLockFlag.Mode.LOW_LATENCY
++        assertEquals(WifiManager.WIFI_MODE_FULL_HIGH_PERF, StreamWifiLockFlag.lockType(ll, 28))
++        assertEquals(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, StreamWifiLockFlag.lockType(ll, 29))
++        assertEquals(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, StreamWifiLockFlag.lockType(ll, 34))
++        assertEquals(WifiManager.WIFI_MODE_FULL_HIGH_PERF,
++            StreamWifiLockFlag.lockType(StreamWifiLockFlag.Mode.HIGH_PERF, 34))
++    }
++
++    @Test
++    fun oneLockNotCountedIdempotentAndReleasedOnce() {
++        var created = 0
++        val fake = Fake()
++        val lock = StreamWifiLock(StreamWifiLockFlag.Mode.LOW_LATENCY) { created++; fake }
++        lock.acquire()
++        lock.acquire()                                   // onResume during a session: no second reference
++        assertEquals(1, created)
++        assertEquals(false, fake.counted)
++        assertEquals(1, fake.acquires)
++        assertTrue(lock.held)
++        assertEquals(true, lock.heldAtFirstAcquire)
++        lock.release()
++        lock.release()                                   // onPause then the session's end: one platform release
++        assertEquals(1, fake.releases)
++        assertFalse(lock.held)
++    }
++
++    @Test
++    fun repeatedSessionsNeverStack() {
++        val fake = Fake()
++        val lock = StreamWifiLock(StreamWifiLockFlag.Mode.HIGH_PERF) { fake }
++        repeat(5) {
++            lock.acquire()
++            assertTrue(lock.held)
++            lock.release()
++            assertFalse(lock.held)
++        }
++        assertEquals(5, fake.acquires)
++        assertEquals(5, fake.releases)
++    }
++
++    @Test
++    fun releaseBeforeAnyAcquireIsNothing() {
++        var created = 0
++        val lock = StreamWifiLock(StreamWifiLockFlag.Mode.LOW_LATENCY) { created++; Fake() }
++        lock.release()
++        assertEquals(0, created)
++        assertFalse(lock.held)
++        assertNull(lock.heldAtFirstAcquire)
++    }
++
++    @Test
++    fun aFailingPlatformNeverEscapes() {
++        val lock = StreamWifiLock(StreamWifiLockFlag.Mode.LOW_LATENCY) { Fake(throwOnAcquire = true) }
++        lock.acquire()
++        lock.release()
++        assertFalse(lock.held)
++        assertEquals(false, lock.heldAtFirstAcquire)
++        val none = StreamWifiLock(StreamWifiLockFlag.Mode.LOW_LATENCY) { null }   // no WifiManager
++        none.acquire()
++        none.release()
++        assertFalse(none.held)
++    }
++}

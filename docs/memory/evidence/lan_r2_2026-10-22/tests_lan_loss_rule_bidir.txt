@@ -1,0 +1,33 @@
+== from the tree, -B
+== tests/lan_loss_rule_bidir
+test_both_terms_in_each_window_fires_labelled_lan_bidir (test_lan_loss_rule_bidir.Condition.test_both_terms_in_each_window_fires_labelled_lan_bidir) ... ok
+test_the_boundaries (test_lan_loss_rule_bidir.Condition.test_the_boundaries) ... ok
+test_unrec_alone_is_not_enough (test_lan_loss_rule_bidir.Condition.test_unrec_alone_is_not_enough) ... ok
+test_uplink_alone_is_not_enough (test_lan_loss_rule_bidir.Condition.test_uplink_alone_is_not_enough) ... ok
+test_values (test_lan_loss_rule_bidir.Flag.test_values) ... ok
+test_hook_shapes (test_lan_loss_rule_bidir.TheLadder.test_hook_shapes) ... ok
+test_the_plugin_sets_the_ladders_rule_only_for_bidir (test_lan_loss_rule_bidir.TheLadder.test_the_plugin_sets_the_ladders_rule_only_for_bidir) ... ok
+test_through_the_real_controller_and_its_actuator (test_lan_loss_rule_bidir.TheLadder.test_through_the_real_controller_and_its_actuator) ... ok
+test_end_attribution_and_bound (test_lan_loss_rule_bidir.Uplink.test_end_attribution_and_bound) ... ok
+test_the_real_receive_loop_notes_a_silence (test_lan_loss_rule_bidir.Uplink.test_the_real_receive_loop_notes_a_silence) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 2.014s
+
+OK
+== tests/lan_loss_rule
+test_flag_on_steps_through_the_existing_actuator (test_lan_loss_rule.TheControllerHook.test_flag_on_steps_through_the_existing_actuator) ... ok
+test_blackout_rearm_clears (test_lan_loss_rule.Windows.test_blackout_rearm_clears) ... ok
+test_exactly_t_on_both_windows_fires (test_lan_loss_rule.Windows.test_exactly_t_on_both_windows_fires) ... ok
+test_missing_fec_counts_zero (test_lan_loss_rule.Windows.test_missing_fec_counts_zero) ... ok
+test_one_window_is_not_enough (test_lan_loss_rule.Windows.test_one_window_is_not_enough) ... ok
+test_only_evaluated_reports_count (test_lan_loss_rule.Windows.test_only_evaluated_reports_count) ... ok
+test_session_reset_clears (test_lan_loss_rule.Windows.test_session_reset_clears) ... ok
+test_t_minus_one_on_either_window_does_not (test_lan_loss_rule.Windows.test_t_minus_one_on_either_window_does_not) ... ok
+test_rule_with_no_signal_is_the_plain_ladder (test_lan_loss_rule.WithoutTheRule.test_rule_with_no_signal_is_the_plain_ladder) ... ok
+test_the_plain_ladder_ignores_unrecoverable_groups (test_lan_loss_rule.WithoutTheRule.test_the_plain_ladder_ignores_unrecoverable_groups) ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 0.042s
+
+OK

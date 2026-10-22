@@ -1,0 +1,99 @@
+ML-R1 PRE-REGISTRATION -- the hitch early-warning detector (session A, 2026-10-22)
+Task: docs/memory/handoffs/ML-R1_HITCH_EARLY_WARNING_TASK.md. Baseline HEAD 144e5c7 (session B's B5-B7 and BENCH-R1's record
+uncommitted beside it). Written and hashed before the pipeline is written and before any model sees the data. Libraries:
+/usr/bin/python3 3.13.5, numpy 2.2.4, scikit-learn 1.4.2, scipy 1.15.3 (installed by the user after the first §0 stop).
+
+PLANNED LAUNCH: 2026-10-22T14:30:00Z (approximate; the unit's start is recorded in launched_at.txt)
+CAP_UTC: 2026-10-22T20:30:00Z
+(the cap = launch + 6 h; the pipeline checks it between stages and inside the long loops, and stops at it)
+
+THE DATA
+- Sources: every copy on disk of the six logs the label and the features need -- native_stream_heartbeat.log,
+  native_stream_ctrl_gaps.log, native_stream_recovery.log, native_frame_sizes.jsonl, adaptive_bitrate_shadow.jsonl -- in
+  logs/games/, logs/games/stream_log_archive/ and every directory under docs/memory/evidence/ (the evening and bench copies,
+  every runs/**/logs_run1/, LAN-R1's inputs), and the client reports (logs/games/decoder_sessions/ and the evidence copies).
+  Each is copied first into ml_r1_2026-10-22/inputs/ (gzip, addresses / long hex masked, a manifest with both hashes); the
+  pipeline reads only the copies, merges them (identical rows de-duplicated) into a work directory outside the repo, and
+  never writes under logs/games/.
+- A session = one client session: the heartbeats between two sequence resets (UX-R3's own split), also split at a
+  heartbeat silence > 60 s. Its start = the first heartbeat's arrival less its elapsed_ms.
+- Eligible = the session lies inside the control-gap log's coverage (the first to the last row of the gap-log copies,
+  2026-10-10T10:25:59Z .. 2026-10-22T04:26:25Z) -- the C criterion needs it. Every session with a heartbeat copy outside
+  it is listed and excluded. Rows: every UTC second from the session's start + 15 s to its last heartbeat.
+
+THE LABEL
+- hitch(s): UX-R3's definition, computed by ux_r3_seconds.py's own `evening` (exec'd unedited from the file, sha256
+  e9b2b3f7...59b4 checked) over the merged copies: R (the heartbeat interval ending in s rendered < 50 fps), C (a host
+  control gap >= 250 ms starts in s), G (an output gap >= 200 ms in s: a client-report row placed by the elapsed map, or the
+  ladder sample's output_gap_ms), L (the interval ending in s lost >= 30 after FEC). The user's own pauses are excluded by
+  the script (a control gap containing a session_ended scores no C).
+- hitch_next_k(t), k = 1, 2, 3: any of t+1 .. t+k is a hitch second. A row whose t+k passes the session's last second has
+  no label for that k. The first 15 s of each session are excluded from rows and from labels.
+
+THE FEATURES (as known at the end of second t; nothing later)
+- heartbeat (credited to its arrival second): arrivals; the interval's rendered fps, post-FEC lost, FEC-recovered,
+  unrecoverable groups, underruns, concealed, prolonged starvation (deltas); audio arrival gap max, output age (levels,
+  carried forward); seconds since the last heartbeat.
+- control gaps: the silence age at the end of t (shown only once >= 250 ms, as the host would know it); the longest silence
+  reached within t (as known by its end); gaps that became >= 250 ms within t.
+- frame sizes (1 s): frames, packets, kbytes, max packets, frames >= 40.
+- the ladder's sample (carried forward): fps, queue depth, output gap, loss delta, rung, state (one-hot); seconds since
+  the last sample.
+- rolling over the previous 2, 5, 10, 30 s (t included): sums of the count columns, maxima of the gap / age / size
+  columns, minima of the fps / frames columns.
+- seconds since the session's start; the system (snes / ps1 / other) one-hot; presence flags per source. Missing = NaN.
+- CONTEXT ONLY, EXCLUDED FROM THE INPUTS: the shim's profile (the model may not see the impairment; the shim's per-second
+  lines carry no UTC, so its per-session profile is kept); the session id; the clock time of day; the title; and the client
+  report's per-event columns (output gap, decode queue / wait). Disclosed against the task's list: the report reaches the
+  host only at the session's end, so at second t the host does not have it; it is a label source (G), not a feature.
+
+THE SPLITS (by session, never by row)
+- held-out evenings: UX-R1 (sessions overlapping 2026-10-20T04:19-05:23Z) and UX-R2 (2026-10-21T04:42-05:27Z).
+- held-out bench: BENCH-R1 cells 5 (blackout@both, plain) and 8 (none + hold), their client sessions.
+- training: every other eligible session. 5-fold GroupKFold by session over training for the hyperparameters and the
+  out-of-fold scores; then one fit on all of training.
+- the clean references (false alarms): training side -- BENCH-R1 cell 1's session and the CL-B5 / CL-B6 / CL-B7 suite
+  windows (their summary.json window spans, 8 windows); held-out side -- BENCH-R1 cell 8's session and UX-R2's clean
+  minutes (B6's definition: 04:42-05:27Z less the death 04:54:50-04:55:05, the user's pauses 05:08:58-05:09:21 and
+  05:22:54-05:23:06, and 10 s at each session's end).
+
+THE MODELS
+- logistic regression: L2, standardized inputs (NaN -> 0 with the presence flags), C in {0.01, 0.1, 1, 10}.
+- gradient-boosted trees: sklearn HistGradientBoostingClassifier, max_depth in {2, 4}, learning_rate in {0.05, 0.1}, at
+  most 300 rounds, the rounds chosen by early stopping on one grouped fold (staged predictions, AUPRC).
+- selection per k by the mean AUPRC over the 5 grouped folds. THE DETECTOR (for the bar) = whichever of the two has the
+  higher mean CV AUPRC at k = 2 on training, decided before any held-out score is computed. Both are reported.
+- the hand rules, scored on the same rows and labels, no tuning:
+  LAN-R1 T 4 / K 2 -- the unrecoverable groups in the heartbeats arriving in (t-10, t] >= 4 AND in (t-20, t-10] >= 4 (the
+  heartbeat's ~2-s counters standing in for the client-health reports' 5-report windows; disclosed);
+  silence H -- the longest silence reached within t >= H, for H = 250 ms (B2) and H = 950 ms (B6's H, landed).
+
+THE METRICS, per held-out set (UX-R1, UX-R2, the two evenings pooled; cell 5; cell 8; and training out-of-fold) and per k
+- AUPRC (average precision) on the labelled rows.
+- The alarm threshold: per model and k, the lowest score threshold whose false-alarm rate on the TRAINING clean references
+  (out-of-fold scores) is <= 1 per 10 min. An alarm episode = a run of consecutive alarm seconds; a false alarm = an
+  episode with no hitch_next_k = 1 row in it; the rate = false episodes per 10 min of clean-reference rows. The held-out
+  clean references' rate is reported at that threshold, not used to choose it.
+- Recall at that threshold on hitch seconds: a hitch second h (h - 1 a row of the same session) is caught at k if some row
+  t in [h-k, h-1] alarms. Also on onsets (hitch seconds whose previous second is not a hitch).
+- Lead time per caught onset: h minus the first second of the alarm run holding the latest alarm in [h-k, h-1]; a
+  histogram (1, 2, 3, 4-5, 6-10, 11-30, > 30 s).
+- Importance: logistic coefficients (standardized); the trees' split gain summed per feature (from the fitted trees) and
+  the permutation importance (AUPRC) on one grouped validation fold.
+- The two named moments, k = 2, the detector at its threshold and each rule: Sunday's 05:06 burst (its first hitch second
+  in 2026-10-20T05:06:00-05:06:59Z, UX-R1) and the death (2026-10-21T04:54:55Z, UX-R2): "fires >= 2 s before" = an alarm
+  in [E-10, E-2].
+
+THE ACCEPTANCE BAR (the task's, verbatim in substance)
+The detector is worth a flag if, at <= 1 false alarm / 10 min on the clean references (the threshold chosen on training),
+its hitch-second recall on the held-out evenings (pooled) at k = 2 exceeds the best hand rule's by >= 20 points absolute
+(the best of the three rules on the same rows, whatever that rule's own false-alarm rate, which is reported beside it --
+the stricter comparison), AND it fires >= 2 s before Sunday's 05:06 burst and before the death's 04:54:55 (or the record
+says plainly which it misses). Otherwise: recorded as measured, no flag proposed.
+
+NOT ALLOWED TO LEARN FROM: the shim's columns (profile), the session id, the clock time of day, the title, the client
+report's per-event columns. Exclusions: sessions outside the gap log's coverage; each session's first 15 s; rows past the
+session's end for their k.
+
+Measurement only. Nothing under companion/ edited, no companion restart, no stream, no adb, nothing fetched, nothing
+deleted, nothing adopted, nothing committed. The pipeline never writes under logs/games/.

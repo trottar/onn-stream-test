@@ -57,7 +57,13 @@ class InputHoldDetector:
         self.releases = 0
         self.capped = 0
 
+    # B6: the trigger's tuning (hold_tuning.Tuning; only PRIVYHUB_INPUT_HOLD_B6=1 sets it). None = B2.
+    tuning: Any = None
+
     def on_quiet(self, now: float, last_any_packet_at: float) -> None:
+        # B6: B2's logic with B6's cap rule (PRIVYHUB_INPUT_HOLD_B6 only)
+        if self.tuning is not None:
+            return self.tuning.on_quiet(self, now, last_any_packet_at)
         if self.held or last_any_packet_at <= 0.0 or now - last_any_packet_at < self.hold_s:
             return
         while self._starts and now - self._starts[0] >= CAP_WINDOW_S:

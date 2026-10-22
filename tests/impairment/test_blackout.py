@@ -35,7 +35,8 @@ def is_hook(node) -> bool:
             or t.startswith("(_gate := globals().get('_impairment_uplink')) is not None and"))
 
 
-HOOKED = {"native_session_io.py": "controller", "plugins/games.py": "heartbeat", "privyhub_service.py": "client_health"}
+HOOKED = {"native_session_io.py": ("controller",), "plugins/games.py": ("heartbeat", "desync"),  # B1b: + desync
+          "privyhub_service.py": ("client_health",)}
 
 
 class Grammar(unittest.TestCase):
@@ -143,8 +144,9 @@ class Hooks(unittest.TestCase):
             self.assertEqual(len(guarded), 1, rel)
             self.assertIn("PRIVYHUB_IMPAIRMENT", ast.unparse(guarded[0].test))
             hooks = [n for n in ast.walk(tree) if isinstance(n, ast.If) and is_hook(n)]
-            self.assertEqual(len(hooks), 1, rel)
-            self.assertIn(f"drop('{kind}')", ast.unparse(hooks[0].test))
+            self.assertEqual(len(hooks), len(kind), rel)
+            for k in kind:
+                self.assertTrue(any(f"drop('{k}')" in ast.unparse(h.test) for h in hooks), (rel, k))
 
     def test_flag_absent_not_imported(self):
         env = {k: v for k, v in os.environ.items() if k != imp.FLAG_ENV}

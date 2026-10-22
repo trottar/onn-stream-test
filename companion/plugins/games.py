@@ -41,6 +41,23 @@ _hold_rewind = None
 if _input_hold is not None and (os.environ.get("PRIVYHUB_INPUT_HOLD_REWIND") or "").strip():
     import hold_rewind as _hold_rewind
 
+# B6: the hold's trigger, cap rule and resume from BENCH-R1's data, only with PRIVYHUB_INPUT_HOLD_B6 set. Absent = B2/B4.
+_hold_tuning = None
+if _input_hold is not None and (os.environ.get("PRIVYHUB_INPUT_HOLD_B6") or "").strip():
+    import hold_tuning as _hold_tuning
+
+# B7: the client's stall signal (a picture-only drop pauses the game), only with PRIVYHUB_STALL_SIGNAL set. Absent = today.
+_stall_signal = None
+if (os.environ.get("PRIVYHUB_STALL_SIGNAL") or "").strip():
+    import stall_signal as _stall_signal
+
+# LAN-R2: PRIVYHUB_LAN_LOSS_RULE=bidir -- the ladder's rule steps down when the link is bad in both directions (its
+# own uplink silences). The ladder's module global is set here, so adaptive_bitrate_live is untouched. Absent = today.
+_lan_bidir = None
+if (os.environ.get("PRIVYHUB_LAN_LOSS_RULE") or "").strip() == "bidir":
+    import lan_loss_rule as _lan_bidir
+    adaptive_bitrate_live.LAN_LOSS_RULE = _lan_bidir.from_environ(os.environ)
+
 # B1: the impairment shim's uplink blackout, only with PRIVYHUB_IMPAIRMENT set
 # (a gate only for `blackout-<D>s@both`). Absent = today: nothing imported.
 _impairment_uplink = None
@@ -158,6 +175,15 @@ class GamesPlugin:
         if _hold_rewind is not None:
             _hold_rewind.wire(self._recovery, self._native_stream._session_io.controller, self._emulator,
                               os.environ, self.PROJECT_ROOT)
+        # B6: after B2's and B4's wires (H, the cap rule, the resume, B4's cap default)
+        if _hold_tuning is not None:
+            _hold_tuning.wire(self._recovery, self._native_stream._session_io.controller, os.environ)
+        # B7: after the hold's wires (it uses B4's rewinder when present)
+        if _stall_signal is not None:
+            _stall_signal.wire(self._recovery, self._native_stream._session_io.controller, os.environ)
+        # LAN-R2: the controller bridge feeds the rule's uplink term
+        if _lan_bidir is not None:
+            self._native_stream._session_io.controller.set_uplink_silences(_lan_bidir.UPLINK)
         if trigger_v2 or os.environ.get("PRIVYHUB_RECOVERY_GAP_LOG") == "1":
             self._native_stream._session_io.controller.set_gap_log(
                 self.PROJECT_ROOT / "logs" / "games" / "native_stream_ctrl_gaps.log"
@@ -3695,6 +3721,9 @@ class GamesPlugin:
         # one-shot per episode by design; the host treats it exactly like
         # controller silence.
         if action == "native-stream-desync":
+            # B1b: the shim's uplink blackout -- this desync never arrived (the client does not retry it)
+            if _impairment_uplink is not None and _impairment_uplink.drop("desync"):
+                return {"plugin": self.PLUGIN_ID, "ok": False, "impairment": "uplink_blackout"}
             reason = self._first(
                 query,
                 "reason",

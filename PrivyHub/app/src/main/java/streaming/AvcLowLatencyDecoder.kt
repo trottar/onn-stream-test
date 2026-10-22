@@ -362,6 +362,9 @@ class AvcLowLatencyDecoder(
 
     // D-BASE-R2: age of the newest decoder output, for the host-side
     // heartbeat. -1 while nothing has been output yet.
+    // B7: the rendered-frame count, cheap (the stall signal's frame id)
+    fun renderedFrameCount(): Long = renderedFrames.get()
+
     fun lastOutputAgeMs(): Long {
         val lastUs = lastOutputAtUs
 

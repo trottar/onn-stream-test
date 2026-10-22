@@ -1634,6 +1634,10 @@ class NativeControllerBridge:
     _input_hold: Any = None
     # B4: the hold's rewind masks the player's input while it runs (set_input_mask; only PRIVYHUB_INPUT_HOLD_REWIND=1).
     _input_mask: Any = None
+    # B7: the client's stall signal (set_stall_signal; only PRIVYHUB_STALL_SIGNAL wires it). None = today.
+    _stall_signal: Any = None
+    # LAN-R2: the uplink's own silences for the bidirectional loss rule (only PRIVYHUB_LAN_LOSS_RULE=bidir). None = today.
+    _uplink_silences: Any = None
 
     LINUX_VENDOR_ID = 0x1209
     LINUX_PRODUCT_ID = 0x5048
@@ -1957,6 +1961,14 @@ class NativeControllerBridge:
     def set_input_mask(self, mask: Any) -> None:
         """B4: the rewind's mask (`masked()`); while it reads True no report is applied (the pads stay neutral)."""
         self._input_mask = mask
+
+    def set_uplink_silences(self, sink: Any) -> None:
+        """LAN-R2: every controller silence >= 250 ms, noted (start, end) at the first packet after it."""
+        self._uplink_silences = sink
+
+    def set_stall_signal(self, signal: Any) -> None:
+        """B7: the stall datagram's parser (`on_datagram`), before the controller packet's size check."""
+        self._stall_signal = signal
 
     def set_client_silence_callback(
         self,
@@ -2573,6 +2585,10 @@ class NativeControllerBridge:
                 self._rejected_packets += 1
                 continue
 
+            # B7: the client's stall datagram (24 bytes, PHS1), parsed and queued, never a controller packet
+            if self._stall_signal is not None and self._stall_signal.on_datagram(data, time.monotonic()):
+                continue
+
             if len(data) != self.PACKET.size:
                 self._bad_packets += 1
                 continue
@@ -2624,6 +2640,11 @@ class NativeControllerBridge:
             self._last_sequence = sequence
             self._packets += 1
             now_packet = time.monotonic()
+
+            # LAN-R2: an uplink silence >= 250 ms ends here (the bidirectional loss rule's second term)
+            if (self._uplink_silences is not None and self._last_any_packet_at > 0.0
+                    and now_packet - self._last_any_packet_at >= 0.25):
+                self._uplink_silences.note(self._last_any_packet_at, now_packet)
 
             if self._gap_queue is not None:
                 self._gap_note_packet(now_packet)

@@ -1,0 +1,165 @@
+== tests/input_hold_b6
+----------------------------------------------------------------------
+Ran 16 tests in 0.143s
+
+OK
+rc=0
+
+== tests/input_hold
+----------------------------------------------------------------------
+Ran 19 tests in 3.380s
+
+OK
+rc=0
+
+== tests/input_hold_rewind
+----------------------------------------------------------------------
+Ran 22 tests in 10.871s
+
+OK
+rc=0
+
+== tests/impairment
+----------------------------------------------------------------------
+Ran 29 tests in 16.282s
+
+OK
+rc=0
+
+== tests/recovery_ext
+----------------------------------------------------------------------
+Ran 17 tests in 0.006s
+
+OK
+rc=0
+
+== tests/overlay
+----------------------------------------------------------------------
+Ran 17 tests in 0.045s
+
+OK
+rc=0
+
+== tests/session_identity
+----------------------------------------------------------------------
+Ran 88 tests in 0.167s
+
+OK
+rc=0
+
+== tests/audio_codec
+----------------------------------------------------------------------
+Ran 20 tests in 0.246s
+
+OK
+rc=0
+
+== tests/encoder_rc
+----------------------------------------------------------------------
+Ran 16 tests in 0.167s
+
+OK
+rc=0
+
+== tests/wan_adaptation
+----------------------------------------------------------------------
+Ran 23 tests in 0.105s
+
+OK
+rc=0
+
+== tests/wan_telemetry
+----------------------------------------------------------------------
+Ran 18 tests in 0.097s
+
+OK
+rc=0
+
+== tests/remote_ladder
+----------------------------------------------------------------------
+Ran 26 tests in 0.493s
+
+OK
+rc=0
+
+== tests/remote_cap
+----------------------------------------------------------------------
+Ran 16 tests in 0.371s
+
+OK
+rc=0
+
+== tests/start_rung
+----------------------------------------------------------------------
+Ran 17 tests in 0.217s
+
+OK
+rc=0
+
+== tests/lan_loss_rule
+----------------------------------------------------------------------
+Ran 21 tests in 0.041s
+
+OK
+rc=0
+
+== tests/link_report
+----------------------------------------------------------------------
+Ran 9 tests in 0.336s
+
+OK
+rc=0
+
+== tools/test_c3_f1_recovery_restart.py
+----------------------------------------------------------------------
+Ran 8 tests in 0.006s
+
+FAILED (errors=1)
+rc=1
+
+== tools/test_adaptive_bitrate_live.py
+----------------------------------------------------------------------
+Ran 126 tests in 0.744s
+
+FAILED (errors=1)
+rc=1
+
+== tools/test_adaptive_bitrate_shadow.py
+----------------------------------------------------------------------
+Ran 21 tests in 0.031s
+
+OK
+rc=0
+
+== tools/test_native_source_contract.py
+----------------------------------------------------------------------
+Ran 7 tests in 0.046s
+
+OK
+rc=0
+
+== tools/test_c5_m1_profile_selector.py
+----------------------------------------------------------------------
+Ran 14 tests in 0.004s
+
+OK
+rc=0
+
+== tools/test_ps1_look.py
+----------------------------------------------------------------------
+Ran 13 tests in 0.064s
+
+OK
+rc=0
+
+== tools/test_ps1_look_helper.py
+----------------------------------------------------------------------
+Ran 11 tests in 3.917s
+
+OK
+rc=0
+
+
+== notes (B6)
+- Run in /tmp/b_q22c (companion/, tools/, tests/, PrivyHub/), B6 in place before the install (the tree is the copy byte for byte, after_sha256.txt). tests/recovery_ext = E3-R2's suite (from /tmp/b_b4), in the copy only: 17 OK.
+- C3-F1 1 error and adaptive_bitrate_live 1 error (the golden fixture the copy lacks) as in B1-B4: pre-existing / copy-only.

@@ -1,0 +1,627 @@
+diff --git a/companion/games/link_drop_recovery.py b/companion/games/link_drop_recovery.py
+index f8fb4fa..78290cb 100644
+--- a/companion/games/link_drop_recovery.py
++++ b/companion/games/link_drop_recovery.py
+@@ -89,6 +89,8 @@ class LinkDropRecovery:
+ 
+     # B4: the hold's rewind (hold_rewind.Rewinder; only PRIVYHUB_INPUT_HOLD_REWIND=1 wires it). None = B2.
+     _input_hold_rewind: Any = None
++    # B6: the hold's tuning (hold_tuning.Tuning; only PRIVYHUB_INPUT_HOLD_B6=1 wires it). None = B2 + B4.
++    _input_hold_b6: Any = None
+ 
+     def __init__(
+         self,
+@@ -262,6 +264,10 @@ class LinkDropRecovery:
+             age_ms=float(age_ms),
+         )
+ 
++        # B6: the episode began as a hold
++        if self._input_hold_b6 is not None:
++            self._input_hold_b6.note_hold(self)
++
+         with self._lock:
+             return self._state == STATE_PAUSED_RECOVERING and self._last_desync_reason == INPUT_HOLD
+ 
+@@ -273,6 +279,10 @@ class LinkDropRecovery:
+ 
+         A hold handed over (v2's controller_silence, the client's desync) or already resumed is left alone. A
+         failed resume hands over to controller_silence, so v2's controller-return exit applies."""
++        # B6: a true release counts for the cap; a hold v2 took over arms its prompt resume
++        if self._input_hold_b6 is not None:
++            self._input_hold_b6.note_release(self)
++
+         with self._lock:
+             if self._state != STATE_PAUSED_RECOVERING or self._last_desync_reason != INPUT_HOLD:
+                 return False
+@@ -370,6 +380,10 @@ class LinkDropRecovery:
+         One entry point for both uses of the gate: the startup release and
+         the recovery release. Returns what happened so a caller can log it.
+         """
++        # B6: a late client ready after a hold-originated resume ends that recovery, not a new session
++        if self._input_hold_b6 is not None and self._input_hold_b6.ready_after_hold(self):
++            return {"recovered": True, "from_state": "hold_resumed"}
++
+         with self._lock:
+             state = self._state
+ 
+@@ -758,6 +772,10 @@ class LinkDropRecovery:
+                 self._give_up_and_save()
+                 return
+ 
++            # B6: a hold v2 took over resumes at the first fresh heartbeat after the link's return
++            if self._input_hold_b6 is not None and self._input_hold_b6.maybe_resume(self, now):
++                return
++
+             if self._controller_exit and self._maybe_exit_controller_pause(
+                 now,
+                 age_ms,
+diff --git a/companion/hold_rewind.py b/companion/hold_rewind.py
+index c5e234b..f1be520 100644
+--- a/companion/hold_rewind.py
++++ b/companion/hold_rewind.py
+@@ -85,6 +85,10 @@ def buffer_bytes(core_name: str, cap: int) -> int:
+ 
+ def config_block(core_name: str, environ: Mapping[str, str]) -> str:
+     cap, _ = parse_cap(environ.get(CAP_ENV))
++    # B6: the buffer for B6's cap default (PRIVYHUB_INPUT_HOLD_B6=1, no _CAP given)
++    if (environ.get("PRIVYHUB_INPUT_HOLD_B6") or "").strip():
++        import hold_tuning
++        cap = hold_tuning.rewind_cap_default(environ) or cap
+     return ("\n\n# PrivyHub B4 input-hold rewind (PRIVYHUB_INPUT_HOLD_REWIND=1)\n"
+             'rewind_enable = "true"\n'
+             'rewind_granularity = "1"\n'
+diff --git a/companion/input_hold.py b/companion/input_hold.py
+index 1c8cf5b..59a95f2 100644
+--- a/companion/input_hold.py
++++ b/companion/input_hold.py
+@@ -57,7 +57,13 @@ class InputHoldDetector:
+         self.releases = 0
+         self.capped = 0
+ 
++    # B6: the trigger's tuning (hold_tuning.Tuning; only PRIVYHUB_INPUT_HOLD_B6=1 sets it). None = B2.
++    tuning: Any = None
++
+     def on_quiet(self, now: float, last_any_packet_at: float) -> None:
++        # B6: B2's logic with B6's cap rule (PRIVYHUB_INPUT_HOLD_B6 only)
++        if self.tuning is not None:
++            return self.tuning.on_quiet(self, now, last_any_packet_at)
+         if self.held or last_any_packet_at <= 0.0 or now - last_any_packet_at < self.hold_s:
+             return
+         while self._starts and now - self._starts[0] >= CAP_WINDOW_S:
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index 15903fd..4839598 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -41,6 +41,11 @@ _hold_rewind = None
+ if _input_hold is not None and (os.environ.get("PRIVYHUB_INPUT_HOLD_REWIND") or "").strip():
+     import hold_rewind as _hold_rewind
+ 
++# B6: the hold's trigger, cap rule and resume from BENCH-R1's data, only with PRIVYHUB_INPUT_HOLD_B6 set. Absent = B2/B4.
++_hold_tuning = None
++if _input_hold is not None and (os.environ.get("PRIVYHUB_INPUT_HOLD_B6") or "").strip():
++    import hold_tuning as _hold_tuning
++
+ # B1: the impairment shim's uplink blackout, only with PRIVYHUB_IMPAIRMENT set
+ # (a gate only for `blackout-<D>s@both`). Absent = today: nothing imported.
+ _impairment_uplink = None
+@@ -158,6 +163,9 @@ class GamesPlugin:
+         if _hold_rewind is not None:
+             _hold_rewind.wire(self._recovery, self._native_stream._session_io.controller, self._emulator,
+                               os.environ, self.PROJECT_ROOT)
++        # B6: after B2's and B4's wires (H, the cap rule, the resume, B4's cap default)
++        if _hold_tuning is not None:
++            _hold_tuning.wire(self._recovery, self._native_stream._session_io.controller, os.environ)
+         if trigger_v2 or os.environ.get("PRIVYHUB_RECOVERY_GAP_LOG") == "1":
+             self._native_stream._session_io.controller.set_gap_log(
+                 self.PROJECT_ROOT / "logs" / "games" / "native_stream_ctrl_gaps.log"
+diff --git a/companion/hold_tuning.py b/companion/hold_tuning.py
+new file mode 100644
+index 0000000..442826f
+--- /dev/null
++++ b/companion/hold_tuning.py
+@@ -0,0 +1,201 @@
++"""B6: the input hold's trigger, cap rule and resume, from BENCH-R1's data.
++
++`PRIVYHUB_INPUT_HOLD_B6=1`, read only when `PRIVYHUB_INPUT_HOLD` is set and valid (B2). **Absent = B2 + B4 byte for
++byte**: nothing imports this module. Design: `docs/memory/evidence/b6_2026-10-22/design_written_before_code.md`
++(hashed before this code); the data: `gap_distribution.md`.
++
++- `1` / `on` mean H = 950 ms (the smallest H with <= 1 gap >= H per 10 min on each clean session on file); numbers
++  stay numbers.
++- B4's rewind cap default (no `_CAP` given): max(30, round(H / 16.7) + 5), <= 120 (62 at 950).
++- The cap counts only holds released by input; 6 in 60 s disarm the hold for 10 s.
++- The resume: a hold that v2's `controller_silence` took over resumes at the first heartbeat after the link's
++  return that shows the client's output fresh (`hold_return`); a hold a client trigger took over is left to the
++  client's gate (its full-screen black overlay); a client `ready` within 20 s of a hold-originated resume ends that
++  recovery instead of starting a session. One owner: the recovery calls these from its own methods.
++"""
++
++from __future__ import annotations
++
++import time
++from collections import deque
++from typing import Any, Callable, Mapping
++
++FLAG_ENV = "PRIVYHUB_INPUT_HOLD_B6"
++HOLD_ENV = "PRIVYHUB_INPUT_HOLD"
++REWIND_CAP_ENV = "PRIVYHUB_INPUT_HOLD_REWIND_CAP"
++H_DEFAULT_MS = 950
++CAP_RELEASED = 6            # released holds ...
++CAP_WINDOW_S = 60.0         # ... in a rolling 60 s ...
++DISARM_S = 10.0             # ... disarm the hold this long
++READY_AFTER_HOLD_S = 20.0   # the client's gate times out at 15 s
++OUTPUT_FRESH_MS = 300       # v2's EXIT_OUTPUT_AGE_MS
++FRAME_MS = 16.7
++
++
++def enabled(environ: Mapping[str, str]) -> tuple[bool, str | None]:
++    raw = (environ.get(FLAG_ENV) or "").strip()
++    if not raw:
++        return False, None
++    if raw != "1":
++        return False, f"ignored: {raw[:32]!r} is not 1"
++    import input_hold
++    if input_hold.parse(environ.get(HOLD_ENV))[0] is None:
++        return False, "ignored: the hold is not active (PRIVYHUB_INPUT_HOLD absent or invalid)"
++    return True, None
++
++
++def hold_ms(environ: Mapping[str, str]) -> int | None:
++    """The H in effect with B6 on: `1` / `on` = 950, a number = itself."""
++    import input_hold
++    raw = (environ.get(HOLD_ENV) or "").strip().lower()
++    ms, _ = input_hold.parse(raw)
++    if ms is None:
++        return None
++    return H_DEFAULT_MS if raw in ("1", "on") else ms
++
++
++def rewind_cap_default(environ: Mapping[str, str]) -> int | None:
++    """B4's cap when B6 is on and no `_CAP` is given; None = leave B4's own."""
++    if not enabled(environ)[0] or (environ.get(REWIND_CAP_ENV) or "").strip():
++        return None
++    h = hold_ms(environ) or H_DEFAULT_MS
++    return min(120, max(30, int(round(h / FRAME_MS)) + 5))
++
++
++class Tuning:
++    def __init__(self, hold_ms_value: int, clock: Callable[[], float] = time.monotonic):
++        self.hold_ms = hold_ms_value
++        self._clock = clock
++        self._released: deque[float] = deque()
++        self._disarmed_until = 0.0
++        self._hold_key: float | None = None
++        self._return_at: float | None = None
++        self._ready_window_until = 0.0
++        self.disarms = 0
++
++    # --- the detector (InputHoldDetector.on_quiet, B2's logic with B6's cap) -----------------------------------
++
++    def on_quiet(self, det: Any, now: float, last_any_packet_at: float) -> None:
++        if det.held or last_any_packet_at <= 0.0 or now - last_any_packet_at < det.hold_s:
++            return
++        if last_any_packet_at <= det._silence_start:
++            return                                    # this silence was already counted (held or disarmed)
++        det._silence_start = last_any_packet_at
++        if now < self._disarmed_until:
++            det.capped += 1
++            return
++        det.held = True
++        det.holds += 1
++        det._emit(("hold", round((now - last_any_packet_at) * 1000.0, 1)))
++
++    def _count_release(self, recovery: Any, now: float) -> None:
++        while self._released and now - self._released[0] >= CAP_WINDOW_S:
++            self._released.popleft()
++        self._released.append(now)
++        if len(self._released) >= CAP_RELEASED:
++            self._disarmed_until = now + DISARM_S
++            self._released.clear()
++            self.disarms += 1
++            recovery._log("input_hold_cap", rule="b6", released_holds=CAP_RELEASED, cap_window_s=CAP_WINDOW_S,
++                          disarm_s=DISARM_S)
++
++    # --- the recovery's own methods -------------------------------------------------------------------------------
++
++    def note_hold(self, recovery: Any) -> None:
++        """After note_input_hold's pause: the episode key, when the pause stands as the hold's."""
++        with recovery._lock:
++            if recovery._state == "PAUSED_RECOVERING" and recovery._last_desync_reason == "input_hold":
++                self._hold_key = recovery._state_since
++                self._return_at = None
++
++    def note_release(self, recovery: Any) -> None:
++        """At note_input_release's top (the first controller packet back after a hold)."""
++        now = self._clock()
++        with recovery._lock:
++            state, reason, key = recovery._state, recovery._last_desync_reason, recovery._state_since
++        if state != "PAUSED_RECOVERING" or key != self._hold_key:
++            return
++        if reason == "input_hold":
++            self._count_release(recovery, now)          # a true hold, released by input
++            self._ready_window_until = now + READY_AFTER_HOLD_S
++        elif reason == "controller_silence":
++            self._return_at = now                       # R1 armed: resume at the first fresh heartbeat after this
++            recovery._log("hold_return_armed", via="input_release")
++
++    def maybe_resume(self, recovery: Any, now: float) -> bool:
++        """R1, from the recovery's monitor: True when this resumed the game."""
++        with recovery._lock:
++            if (recovery._state != "PAUSED_RECOVERING" or recovery._last_desync_reason != "controller_silence"
++                    or self._return_at is None or recovery._state_since != self._hold_key):
++                return False
++            back = self._return_at
++            if not recovery._heartbeat_history:
++                return False
++            hb_at, hb_age = recovery._heartbeat_history[-1]
++            if hb_at <= back or not 0 <= hb_age <= OUTPUT_FRESH_MS:
++                return False
++            self._return_at = None
++        rw = getattr(recovery, "_input_hold_rewind", None)
++        if rw is not None:
++            rw.rewind(recovery, "hold_return")
++        error = ""
++        try:
++            recovery._resume_game()
++        except Exception as exc:
++            error = f"{type(exc).__name__}: {exc}"
++        with recovery._lock:
++            if recovery._state != "PAUSED_RECOVERING":
++                return False
++            if error:
++                recovery._log("hold_return_failed", resume_error=error)
++                return False                            # v2's exit (or the give-up) still applies
++            recovering_ms = int((now - recovery._state_since) * 1000.0)
++            recovery._state = "PLAYING"
++            recovery._state_since = time.monotonic()
++            from games.link_drop_recovery import RESTART_BACKOFF_MS
++            recovery._restart_backoff_ms = RESTART_BACKOFF_MS
++            recovery._last_restart_at = None
++            recovery._client_present_since = time.monotonic()
++            recovery._exit_ok_since = None
++            recovery._exit_packets_back_at = None
++            self._ready_window_until = self._clock() + READY_AFTER_HOLD_S
++            recovery._log("resumed", from_state="PAUSED_RECOVERING", recovering_ms=recovering_ms,
++                          restarts=recovery._restarts, via="hold_return", output_age_ms=hb_age,
++                          packets_back_to_resume_ms=int((now - back) * 1000.0))
++            return True
++
++    def ready_after_hold(self, recovery: Any) -> bool:
++        """R3, at note_gameplay_released's top: a late client ready after a hold-originated resume."""
++        now = self._clock()
++        with recovery._lock:
++            if recovery._state != "PLAYING" or now >= self._ready_window_until:
++                return False
++            self._ready_window_until = 0.0
++            recovery._log("client_ready_after_hold", within_s=READY_AFTER_HOLD_S)
++            return True
++
++
++def wire(recovery: Any, controller: Any, environ: Mapping[str, str]) -> Tuning | None:
++    """The plugin's one call, after B2's and B4's wires: H, the detector's cap, the recovery's hooks, B4's cap."""
++    on, why = enabled(environ)
++    if not on:
++        if why:
++            recovery._log("input_hold_b6_config", ignored=True, reason=why)
++        return None
++    det = getattr(controller, "_input_hold", None)
++    if det is None:
++        recovery._log("input_hold_b6_config", ignored=True, reason="ignored: no hold detector")
++        return None
++    h = hold_ms(environ) or H_DEFAULT_MS
++    det.hold_s = h / 1000.0
++    t = Tuning(h)
++    det.tuning = t
++    recovery._input_hold_b6 = t
++    rcap = rewind_cap_default(environ)
++    rw = getattr(recovery, "_input_hold_rewind", None)
++    if rw is not None and rcap is not None:
++        rw.cap = rcap
++    recovery._log("input_hold_b6_config", ignored=False, hold_ms=h, cap_released=CAP_RELEASED,
++                  cap_window_s=CAP_WINDOW_S, disarm_s=DISARM_S, rewind_cap=(rw.cap if rw is not None else None),
++                  ready_after_hold_s=READY_AFTER_HOLD_S)
++    return t
+diff --git a/tests/input_hold_b6/test_input_hold_b6.py b/tests/input_hold_b6/test_input_hold_b6.py
+new file mode 100644
+index 0000000..0db98e4
+--- /dev/null
++++ b/tests/input_hold_b6/test_input_hold_b6.py
+@@ -0,0 +1,298 @@
++#!/usr/bin/env python3
++"""B6: the hold's trigger (H = 950 for `1` / `on`), B4's rewind cap default, the cap rule (released holds only, a
++10-s disarm), and the resume (R1 hold_return after a controller_silence handover, R2 a client handover left to the
++client's gate, R3 a late client ready after a hold resume). B2's and B4's tests are untouched.
++
++    python3 -m unittest discover -s tests/input_hold_b6 -v
++"""
++
++from __future__ import annotations
++
++import json
++import os
++import subprocess
++import sys
++import tempfile
++import time
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++
++import hold_rewind as hr  # noqa: E402
++import hold_tuning as ht  # noqa: E402
++import input_hold as ih  # noqa: E402
++from games import link_drop_recovery as ldr  # noqa: E402
++
++ON = {"PRIVYHUB_INPUT_HOLD": "1", "PRIVYHUB_INPUT_HOLD_B6": "1"}
++
++
++class Clock:
++    def __init__(self, t=1000.0):
++        self.t = t
++
++    def __call__(self):
++        return self.t
++
++
++class Rec:
++    """The real LinkDropRecovery, fake callbacks, B6's tuning on it (a fake clock for the tuning)."""
++
++    def __init__(self, b6=True, clock=None, rewind=None):
++        self.calls = []
++        self.root = Path(tempfile.mkdtemp(prefix="b6_rec_"))
++        self.rec = ldr.LinkDropRecovery(
++            self.root, pause_game=lambda: self.calls.append("pause"), resume_game=lambda: self.calls.append("resume"),
++            save_recovery_state=lambda: {}, restart_encoder=lambda: {}, full_start_encoder=lambda: {},
++            stream_active=lambda: True, end_session=lambda: None, client_packet_age_ms=lambda: 10.0,
++            recovery_save_detail=lambda: {})
++        self.rec._state = ldr.STATE_PLAYING
++        self.rec._state_since = time.monotonic()
++        self.clock = clock or Clock()
++        self.t = ht.Tuning(950, clock=self.clock) if b6 else None
++        if b6:
++            self.rec._input_hold_b6 = self.t
++        if rewind is not None:
++            self.rec._input_hold_rewind = rewind
++
++    def rows(self):
++        p = self.rec.log_path()
++        return [json.loads(x) for x in p.read_text().splitlines()] if p.exists() else []
++
++    def events(self):
++        return [(r["event"], r.get("trigger") or r.get("via")) for r in self.rows()]
++
++
++class FakeRewind:
++    def __init__(self, calls):
++        self.calls = calls
++        self.cap = 30
++
++    def rewind(self, rec, via):
++        self.calls.append(f"rewind:{via}")
++
++
++class TheFlag(unittest.TestCase):
++    def test_enabled_and_h(self):
++        self.assertEqual(ht.enabled({}), (False, None))
++        self.assertEqual(ht.enabled(ON), (True, None))
++        for env in ({"PRIVYHUB_INPUT_HOLD_B6": "1"}, {"PRIVYHUB_INPUT_HOLD": "0", "PRIVYHUB_INPUT_HOLD_B6": "1"},
++                    {"PRIVYHUB_INPUT_HOLD": "1", "PRIVYHUB_INPUT_HOLD_B6": "yes"}):
++            on, why = ht.enabled(env)
++            self.assertFalse(on, env)
++            self.assertTrue(why.startswith("ignored"), env)
++        self.assertEqual(ht.hold_ms({"PRIVYHUB_INPUT_HOLD": "1"}), 950)
++        self.assertEqual(ht.hold_ms({"PRIVYHUB_INPUT_HOLD": "on"}), 950)
++        self.assertEqual(ht.hold_ms({"PRIVYHUB_INPUT_HOLD": "250"}), 250)
++        self.assertEqual(ht.hold_ms({"PRIVYHUB_INPUT_HOLD": "1200"}), 1200)
++        self.assertEqual(ih.parse("1"), (250, None))         # B2's grammar and meaning, untouched
++
++    def test_wire_sets_h_cap_and_logs(self):
++        r = Rec(b6=False, rewind=FakeRewind([]))
++        det = ih.InputHoldDetector(250, lambda e: None)
++        ctrl = type("C", (), {"_input_hold": det})()
++        t = ht.wire(r.rec, ctrl, ON)
++        self.assertIs(det.tuning, t)
++        self.assertIs(r.rec._input_hold_b6, t)
++        self.assertAlmostEqual(det.hold_s, 0.95)
++        self.assertEqual(r.rec._input_hold_rewind.cap, 62)
++        row = [x for x in r.rows() if x["event"] == "input_hold_b6_config"][-1]
++        self.assertFalse(row["ignored"])
++        self.assertEqual(row["hold_ms"], 950)
++        r2 = Rec(b6=False)
++        self.assertIsNone(ht.wire(r2.rec, ctrl, {"PRIVYHUB_INPUT_HOLD": "1", "PRIVYHUB_INPUT_HOLD_B6": "2"}))
++        self.assertEqual([x["ignored"] for x in r2.rows()], [True])
++        self.assertIsNone(ht.wire(r2.rec, ctrl, {"PRIVYHUB_INPUT_HOLD": "1"}))   # absent: nothing, no row
++        self.assertEqual(len(r2.rows()), 1)
++
++
++class TheRewindCap(unittest.TestCase):
++    def test_default(self):
++        self.assertEqual(ht.rewind_cap_default(ON), 62)                          # round(950 / 16.7) + 5
++        self.assertEqual(ht.rewind_cap_default(dict(ON, PRIVYHUB_INPUT_HOLD="250")), 30)
++        self.assertEqual(ht.rewind_cap_default(dict(ON, PRIVYHUB_INPUT_HOLD="4000")), 120)
++        self.assertIsNone(ht.rewind_cap_default(dict(ON, PRIVYHUB_INPUT_HOLD_REWIND_CAP="40")))  # explicit wins
++        self.assertIsNone(ht.rewind_cap_default({"PRIVYHUB_INPUT_HOLD": "1"}))  # B6 absent
++
++    def test_config_block_buffer(self):
++        env = dict(ON, PRIVYHUB_INPUT_HOLD_REWIND="1")
++        self.assertIn(f'rewind_buffer_size = "{51 * 1024 * 1024}"', hr.config_block("snes9x_libretro.so", env))
++        self.assertIn(f'rewind_buffer_size = "{1025 * 1024 * 1024}"',
++                      hr.config_block("mednafen_psx_hw_libretro.so", env))
++        b4 = {"PRIVYHUB_INPUT_HOLD": "1", "PRIVYHUB_INPUT_HOLD_REWIND": "1"}
++        self.assertIn('rewind_buffer_size = "27262976"', hr.config_block("snes9x_libretro.so", b4))   # B4's bytes
++
++
++class TheDetector(unittest.TestCase):
++    def test_950_threshold(self):
++        out, clock = [], Clock()
++        d = ih.InputHoldDetector(950, out.append, clock)
++        d.tuning = ht.Tuning(950, clock)
++        d.on_quiet(100.90, 100.0)
++        self.assertEqual(out, [])
++        d.on_quiet(100.96, 100.0)
++        self.assertEqual(out, [("hold", 960.0)])
++        d.on_packet(101.5)
++        self.assertEqual(out[-1], ("release", 1500.0))
++
++
++class TheCap(unittest.TestCase):
++    def test_six_released_disarm_ten_seconds(self):
++        clock = Clock(50.0)
++        r = Rec(clock=clock)
++        out = []
++        d = ih.InputHoldDetector(950, out.append, clock)
++        d.tuning = r.t
++        t = 100.0
++        for i in range(6):                                  # six true holds, each released by input
++            d.on_quiet(t + 1.0, t)
++            r.rec._state = ldr.STATE_PLAYING
++            self.assertTrue(r.rec.note_input_hold(1000.0))
++            clock.t = t + 1.5
++            d.on_packet(t + 1.5)
++            r.rec.note_input_release(500.0)
++            t += 5.0
++        self.assertEqual(r.t.disarms, 1)
++        caps = [x for x in r.rows() if x["event"] == "input_hold_cap"]
++        self.assertEqual(len(caps), 1)
++        self.assertEqual(caps[0]["rule"], "b6")
++        holds = d.holds
++        clock.t = t                                         # within 10 s of the sixth release: disarmed
++        d.on_quiet(t + 1.0, t)
++        self.assertEqual(d.holds, holds)
++        self.assertEqual(d.capped, 1)
++        clock.t = t + 11.0                                  # after 10 s: armed again
++        d.on_quiet(t + 12.0, t + 11.0)
++        self.assertEqual(d.holds, holds + 1)
++
++    def test_handed_over_holds_never_count(self):
++        clock = Clock(50.0)
++        r = Rec(clock=clock)
++        for i in range(8):
++            r.rec._state = ldr.STATE_PLAYING
++            r.rec.note_input_hold(1000.0)
++            r.rec.note_client_desync("output_silence", 1200.0)     # the client took it over
++            r.rec.note_input_release(4000.0)
++            clock.t += 3.0
++        self.assertEqual(r.t.disarms, 0)
++        self.assertEqual(len(r.t._released), 0)
++
++
++class TheResume(unittest.TestCase):
++    def _handover_to_v2(self, rewind=False):
++        clock = Clock(500.0)
++        r = Rec(clock=clock)
++        if rewind:
++            r.rec._input_hold_rewind = FakeRewind(r.calls)
++        r.rec.note_input_hold(960.0)
++        r.rec.note_client_silence(5350.0)                   # v2's controller_silence takes the hold over
++        return r, clock
++
++    def test_r1_resume_at_the_first_fresh_heartbeat_after_the_return(self):
++        r, clock = self._handover_to_v2(rewind=True)
++        self.assertFalse(r.rec.note_input_release(6000.0))  # B2: not the hold's any more ...
++        self.assertIn(("hold_return_armed", "input_release"), r.events())   # ... but B6 armed R1
++        back = r.t._return_at
++        now = time.monotonic()
++        self.assertFalse(r.t.maybe_resume(r.rec, now))      # no heartbeat after the return yet
++        r.rec._heartbeat_history = [(back - 1.0, 20)]       # a stale one (before the return)
++        self.assertFalse(r.t.maybe_resume(r.rec, now))
++        r.rec._heartbeat_history = [(back + 0.5, 900)]      # after, but the output not fresh
++        self.assertFalse(r.t.maybe_resume(r.rec, now))
++        r.rec._heartbeat_history = [(back + 0.9, 40)]       # after, fresh
++        r.rec._tick()                                       # the monitor's own path
++        self.assertEqual(r.rec.current_state(), ldr.STATE_PLAYING)
++        self.assertEqual(r.calls, ["pause", "rewind:hold_return", "resume"])
++        last = r.rows()[-1]
++        self.assertEqual((last["event"], last["via"]), ("resumed", "hold_return"))
++        self.assertEqual(last["output_age_ms"], 40)
++
++    def test_v2_exit_still_works_first(self):
++        r, clock = self._handover_to_v2()
++        r.rec.enable_controller_exit(True)
++        now = time.monotonic()
++        self.assertFalse(r.rec._maybe_exit_controller_pause(now, 20.0))
++        self.assertFalse(r.rec._maybe_exit_controller_pause(now + 0.3, 20.0))
++        r.rec._heartbeat_history = [(now + 0.4, 30)]
++        self.assertTrue(r.rec._maybe_exit_controller_pause(now + 0.5, 20.0))
++        self.assertFalse(r.t.maybe_resume(r.rec, now + 0.6))   # already playing: nothing
++        self.assertEqual(r.calls, ["pause", "resume"])
++
++    def test_a_v2_pause_never_a_hold_is_not_resumed_by_b6(self):
++        r = Rec()
++        r.rec.note_client_silence(5350.0)
++        r.rec.note_input_release(6000.0)
++        r.rec._heartbeat_history = [(time.monotonic() + 5.0, 10)]
++        self.assertFalse(r.t.maybe_resume(r.rec, time.monotonic()))
++        self.assertEqual(r.calls, ["pause"])
++
++    def test_r2_client_handover_left_to_the_clients_gate(self):
++        r = Rec()
++        r.rec.note_input_hold(960.0)
++        r.rec.note_client_desync("output_silence", 1200.0)
++        self.assertFalse(r.rec.note_input_release(4000.0))
++        self.assertIsNone(r.t._return_at)
++        r.rec._heartbeat_history = [(time.monotonic() + 5.0, 10)]
++        self.assertFalse(r.t.maybe_resume(r.rec, time.monotonic()))
++        self.assertEqual(r.rec.note_gameplay_released(), {"recovered": True, "from_state": "PAUSED_RECOVERING"})
++
++    def test_r3_a_late_ready_after_a_hold_release_is_not_a_new_session(self):
++        clock = Clock(800.0)
++        r = Rec(clock=clock)
++        r.rec.note_input_hold(960.0)
++        self.assertTrue(r.rec.note_input_release(3000.0))   # resumed via input_release
++        clock.t += 2.5                                      # the client's gate passes later
++        self.assertEqual(r.rec.note_gameplay_released(), {"recovered": True, "from_state": "hold_resumed"})
++        ev = [e for e, _ in r.events()]
++        self.assertIn("client_ready_after_hold", ev)
++        self.assertNotIn("session_started", ev)
++        self.assertEqual(r.rec.note_gameplay_released()["recovered"], False)   # once only: the next is today's
++
++    def test_r3_window_expires(self):
++        clock = Clock(800.0)
++        r = Rec(clock=clock)
++        r.rec.note_input_hold(960.0)
++        r.rec.note_input_release(3000.0)
++        clock.t += 21.0
++        self.assertEqual(r.rec.note_gameplay_released()["recovered"], False)
++        self.assertIn("session_started", [e for e, _ in r.events()])
++
++    def test_without_b6_b2_exactly(self):
++        r = Rec(b6=False)
++        r.rec.note_input_hold(960.0)
++        self.assertTrue(r.rec.note_input_release(3000.0))
++        self.assertEqual(r.rec.note_gameplay_released()["recovered"], False)   # today: a session start
++        self.assertEqual([e for e, _ in r.events()], ["desync_pause", "resumed", "session_started"])
++
++
++class FlagAbsent(unittest.TestCase):
++    def _imports(self, extra):
++        env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++        env.update(extra)
++        code = ("import sys; sys.path.insert(0, 'companion'); import input_hold, hold_rewind; "
++                "from games import link_drop_recovery as l; "
++                "print('hold_tuning' in sys.modules, l.LinkDropRecovery._input_hold_b6, input_hold.InputHoldDetector.tuning)")
++        out = subprocess.run([sys.executable, "-B", "-c", code], cwd=ROOT, env=env, capture_output=True, text=True,
++                             timeout=120)
++        return out.stdout.strip(), out.stderr[-400:]
++
++    def test_not_imported(self):
++        for extra in ({}, {"PRIVYHUB_INPUT_HOLD": "1"}, {"PRIVYHUB_INPUT_HOLD": "1", "PRIVYHUB_INPUT_HOLD_REWIND": "1"}):
++            out, err = self._imports(extra)
++            self.assertEqual(out, "False None None", (extra, err))
++
++    def test_hooks_shape(self):
++        import ast
++
++        def ifs(rel, text):
++            tree = ast.parse((ROOT / "companion" / rel).read_text())
++            return [n for n in ast.walk(tree) if isinstance(n, ast.If) and ast.unparse(n.test).startswith(text)]
++        self.assertEqual(len(ifs("input_hold.py", "self.tuning is not None")), 1)
++        self.assertEqual(len(ifs("games/link_drop_recovery.py", "self._input_hold_b6 is not None")), 4)
++        self.assertEqual(len(ifs("plugins/games.py", "_hold_tuning is not None")), 1)
++        self.assertEqual(len(ifs("hold_rewind.py", "(environ.get('PRIVYHUB_INPUT_HOLD_B6')")), 1)
++
++
++if __name__ == "__main__":
++    unittest.main()

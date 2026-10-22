@@ -1,0 +1,38 @@
+--- docs/memory/evidence/b1b_2026-10-22/predecessors/companion/plugins/games.py	2026-10-22 01:55:36.329942574 -0400
++++ companion/plugins/games.py	2026-10-22 02:01:38.845840145 -0400
+@@ -3711,6 +3711,9 @@
+         # one-shot per episode by design; the host treats it exactly like
+         # controller silence.
+         if action == "native-stream-desync":
++            # B1b: the shim's uplink blackout -- this desync never arrived (the client does not retry it)
++            if _impairment_uplink is not None and _impairment_uplink.drop("desync"):
++                return {"plugin": self.PLUGIN_ID, "ok": False, "impairment": "uplink_blackout"}
+             reason = self._first(
+                 query,
+                 "reason",
+diff --git a/tests/impairment/test_blackout.py b/tests/impairment/test_blackout.py
+index 5f5d23a..bc879d3 100644
+--- a/tests/impairment/test_blackout.py
++++ b/tests/impairment/test_blackout.py
+@@ -35,7 +35,8 @@ def is_hook(node) -> bool:
+             or t.startswith("(_gate := globals().get('_impairment_uplink')) is not None and"))
+ 
+ 
+-HOOKED = {"native_session_io.py": "controller", "plugins/games.py": "heartbeat", "privyhub_service.py": "client_health"}
++HOOKED = {"native_session_io.py": ("controller",), "plugins/games.py": ("heartbeat", "desync"),  # B1b: + desync
++          "privyhub_service.py": ("client_health",)}
+ 
+ 
+ class Grammar(unittest.TestCase):
+@@ -143,8 +144,9 @@ class Hooks(unittest.TestCase):
+             self.assertEqual(len(guarded), 1, rel)
+             self.assertIn("PRIVYHUB_IMPAIRMENT", ast.unparse(guarded[0].test))
+             hooks = [n for n in ast.walk(tree) if isinstance(n, ast.If) and is_hook(n)]
+-            self.assertEqual(len(hooks), 1, rel)
+-            self.assertIn(f"drop('{kind}')", ast.unparse(hooks[0].test))
++            self.assertEqual(len(hooks), len(kind), rel)
++            for k in kind:
++                self.assertTrue(any(f"drop('{k}')" in ast.unparse(h.test) for h in hooks), (rel, k))
+ 
+     def test_flag_absent_not_imported(self):
+         env = {k: v for k, v in os.environ.items() if k != imp.FLAG_ENV}

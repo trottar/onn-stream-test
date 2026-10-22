@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-10-21
-baseline_commit: d3a8ee3 (CL-B7 uncommitted beside it; the user commits)
+as_of: 2026-10-22
+baseline_commit: 144e5c7 (BENCH-R1's record uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -209,6 +209,68 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
+
+**ML-R1: the hitch early-warning detector — MEASURED offline, NO FLAG PROPOSED**
+(`evidence/ML_R1_HITCH_EARLY_WARNING_2026-10-23.md`; run 13:24:47-13:28:48Z, 4 min; nothing adopted).
+- **The data:** 128 client sessions, 10-10 to 10-22 (the control-gap log starts 10-10), 49,785 labelled seconds,
+  132 host-side inputs. Held out: the two evenings (UX-R1, UX-R2) and BENCH-R1 cell 5.
+- **As hashed, the bar reads "met".** That is an artefact of my pre-registration's false-alarm definition: the
+  chosen thresholds alarm on every second, and an always-on alarm forms one episode per session, which always holds a
+  hitch. Stated, not re-scored.
+- **What it really shows:**
+  - The detector ranks better than every hand rule (AUPRC 0.666 against 0.398 for silence 250 ms, k = 2).
+  - At a matched alarm duty it adds only +2.5 points of recall over the 250-ms silence rule (70.9 against 68.4 %;
+    post hoc, labelled).
+  - It mostly reads "already hitching".
+  - Nothing fires ≥ 2 s before the death at any usable operating point.
+- **Also disclosed:** BENCH-R1 cell 8 fell out of the run by the pre-registration's coverage-end rule (14 s past the
+  gap log's last row). It was scored post hoc with the frozen models.
+
+1. **The user's commit:** `ml_r1_2026-10-22/` (the inputs are 12 MB), the record, `tools/hitch_predictor.py`,
+   `KNOWN_ISSUES.md`, `ROADMAP.md`, this file (`logs/ml_r1_git_status.txt`). BENCH-R1's record is still uncommitted too.
+2. **The detector's next step: none proposed.** The fix for the death is the hold / rewind making an outage cost
+   nothing, not predicting it.
+   - An ML-R2 only for the user's say: a seconds-based false-alarm rule, onsets as the target, and B3's link features
+     after CL-B8.
+3. **BENCH-R2 after session B's queue (`QUEUE_2026-10-22C`)**, as `SESSION_B_DONE_2026-10-22B.md` §8 sketches it,
+   with B5 (the Wi-Fi lock) and B6 (H = 950) folded in as B's records state.
+
+**BENCH-R1: the loss and blackout cells — MEASURED, 8 / 8 valid** (`evidence/BENCH_R1_BLACKOUT_AND_LOSS_CELLS_2026-10-22.md`;
+run 02:31:50-04:26:59Z on `b909735`, read 2026-10-22; nothing adopted).
+- **The death is reproduced on the bench:** `blackout-4s@both,every=120s`, all four shape terms in 5 / 5 blackouts,
+  85.0 unattended frames (core running) per blackout against the death's 83.8.
+  - B1 lets the client's desync through, so v2 pauses ~1.5 s into a bench blackout. A real drop runs up to ~234 frames
+    unheld.
+- **The input hold (`PRIVYHUB_INPUT_HOLD=250`) is NOT a candidate until its trigger is fixed** (the hashed reading).
+  - 18 holds in 11.5 min on a clean link (cell 8): the room's own ≥ 250-ms uplink silences.
+  - −73 % per blackout, not ≥ 90 %: one blackout skipped by the cap, and v2 took every other hold over ~1 s in.
+- **The LAN loss rule goes back to B** (the hashed reading): first step 0.9-1.5 min into the stream, not 3-4; in cell
+  4, ~2 min before G8-S1's `capacity_mild` point.
+  - Disclosed: on LAN-R1's own clock (from the driver's cell start), cell 2 matches. The hashed wording was applied.
+- Host gates met in all eight. Cell 1 (loss-1, rule off) held 7000, with one 27.7-s recovery.
+
+1. **The user's commit:** BENCH-R1's record, `bench_r1_2026-10-22/` (with `logs_bench/` and `record/`),
+   each cell's client report under `runs/<cell>/logs_run1/decoder_sessions/`, `KNOWN_ISSUES.md`, `ROADMAP.md`, this
+   file (`logs/bench_r1_git_status.txt`).
+2. **Adoption questions: none.** The reading gives none: the hold is not a candidate, and the rule is back with B.
+   The user may weigh the disclosed clock difference for the rule (record §6). Nothing changes unless they say so.
+3. **For session B (the user's call what B takes):**
+   - the hold's trigger: the false holds on an idle LAN (15-16 per 10 min at 250 ms), the 6-per-60-s cap spent by
+     a flapping minute, and v2's `client_output_silence` handover (no release; the core resumes ~2 s after the link);
+   - the rule's timing, which did not transfer from the replay;
+   - B1: gate the client's desync request on `@both` too.
+4. **Then CL-B8** (install B3's APK `e4d02354…`, one LAN window), **then BENCH-R2** as B sketched it
+   (`SESSION_B_DONE_2026-10-22B.md` §8):
+   - (a) `blackout-4s@both,every=120s,seed=1` + `PRIVYHUB_INPUT_HOLD=250` + `PRIVYHUB_INPUT_HOLD_REWIND=1` on snes9x.
+     Expected: net unattended ≈ 0 per blackout, `rewound_frames` ≈ `requested_frames` (~17-20), no `rewind_failed`,
+     the post-rewind frame = the onset's.
+   - (b) plain E1 rows per core (snes9x, Beetle PSX HW), rewind on vs off, for the CPU and RetroArch's RSS.
+   - (c) whether Beetle PSX HW's hardware renderer rewinds at all (if not, the flag is SNES-only).
+   - (d) whether REWIND is honoured while paused.
+   - Note: BENCH-R2 rides on the hold, which this reading says is not a candidate yet. Rewind's own questions (b-d)
+     stand either way; (a)'s net count is only as good as the hold's trigger.
+5. **The night queue `QUEUE_2026-10-19N.md` is still HELD until the user says.** The instrumented evening in the
+   user's room stays the next run for their say-so.
 
 **UX-R3: find the deaths** (`evidence/UX_R3_FIND_THE_DEATHS_2026-10-21.md`; read-only from the copies; no run, no
 adb).

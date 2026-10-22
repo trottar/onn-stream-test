@@ -85,6 +85,10 @@ def buffer_bytes(core_name: str, cap: int) -> int:
 
 def config_block(core_name: str, environ: Mapping[str, str]) -> str:
     cap, _ = parse_cap(environ.get(CAP_ENV))
+    # B6: the buffer for B6's cap default (PRIVYHUB_INPUT_HOLD_B6=1, no _CAP given)
+    if (environ.get("PRIVYHUB_INPUT_HOLD_B6") or "").strip():
+        import hold_tuning
+        cap = hold_tuning.rewind_cap_default(environ) or cap
     return ("\n\n# PrivyHub B4 input-hold rewind (PRIVYHUB_INPUT_HOLD_REWIND=1)\n"
             'rewind_enable = "true"\n'
             'rewind_granularity = "1"\n'
@@ -197,6 +201,11 @@ class Rewinder:
             self._onset = None
 
     # --- the recovery's two resumes ----------------------------------------------------------------------------
+
+    def set_pending(self, onset: float, paused_at: float, recovery: Any) -> None:
+        """B7: a client stall's pending rewind (the onset = the client's last displayed frame on this clock)."""
+        with self._lock:
+            self._pending = {"onset": onset, "paused_at": paused_at, "key": getattr(recovery, "_state_since", None)}
 
     def counter_before(self, pending: Mapping[str, float]) -> int:
         """Frames the core ran since the onset (0 at the onset), at the confirmed pause less its measured lag."""

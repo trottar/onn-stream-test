@@ -1,0 +1,2882 @@
+{
+ "tools": {
+  "ux_r3_seconds.py": "e9b2b3f79286bdd320a9bf530d76c0381ca6d89ded6f1adfe3c4d3f3ba8b59b4",
+  "unattended_frames_at_b909735.py": "c18e455460f70cceed104d3e9a271176032f6c65144a63b5c0e2a822851726bb"
+ },
+ "death_ux_r3": {
+  "uplink_gaps": "5 gaps, 2.65 s silent of 4 s, longest 967 ms",
+  "output_gaps_ms": "410 / 307",
+  "heartbeat_hold": "~1.5 s",
+  "post_fec_lost": 61,
+  "unattended_core_running": 83.8
+ },
+ "window_s": [
+  -1.0,
+  10.0
+ ],
+ "cells": {
+  "01_loss-1_plain": {
+   "session": [
+    "2026-10-22T02:34:21.733Z",
+    "2026-10-22T02:45:53.218Z"
+   ],
+   "session_min": 11.52,
+   "window": {
+    "from": "2026-10-22T02:35:51.783Z",
+    "to": "2026-10-22T02:45:51.784Z"
+   },
+   "reports": [
+    "native_decoder_20261022_024553_192.json"
+   ],
+   "playing_attempt": 1,
+   "s_to_playing": 10.2,
+   "transitions": [],
+   "lan_loss_rule": [],
+   "hitch": {
+    "hitch_seconds": 56,
+    "play_min": 11.5,
+    "per_10_min": 48.6,
+    "longest_run_s": 6,
+    "by_criterion": {
+     "G": 14,
+     "R": 26,
+     "L": 24,
+     "C": 11
+    }
+   },
+   "hitch_window": {
+    "hitch_seconds": 30,
+    "play_min": 10.0,
+    "per_10_min": 30.0,
+    "longest_run_s": 6,
+    "by_criterion": {
+     "C": 9,
+     "R": 14,
+     "L": 12,
+     "G": 7
+    }
+   },
+   "hitch_report_coverage": [
+    {
+     "report": "native_decoder_20261022_024553_192.json",
+     "slow_events_from": "2026-10-22T02:35:00",
+     "session_from": "2026-10-22T02:34:08",
+     "session_to": "2026-10-22T02:45:53",
+     "max_output_gap_ms": 11370
+    }
+   ],
+   "hold_rows": [],
+   "holds": 0,
+   "releases": 0,
+   "held_ms_total": 0,
+   "held_ms_median": null,
+   "recovery_rows": [
+    {
+     "at_utc": "2026-10-22T02:35:01.580Z",
+     "event": "desync_pause",
+     "trigger": "client_output_silence",
+     "age_ms": 1228.0
+    },
+    {
+     "at_utc": "2026-10-22T02:35:06.037Z",
+     "event": "resumed",
+     "recovering_ms": 4553
+    },
+    {
+     "at_utc": "2026-10-22T02:38:35.649Z",
+     "event": "desync_pause",
+     "trigger": "client_output_silence",
+     "age_ms": 1245.0
+    },
+    {
+     "at_utc": "2026-10-22T02:38:49.897Z",
+     "event": "encoder_restart"
+    },
+    {
+     "at_utc": "2026-10-22T02:39:03.250Z",
+     "event": "resumed",
+     "recovering_ms": 27702
+    }
+   ],
+   "unattended": {
+    "streaming_s": 692,
+    "gaps": 11,
+    "episodes": 11,
+    "unattended_frames": 75.3,
+    "unattended_frames_per_10min": 65.29,
+    "unattended_frames_core_running": 66.6,
+    "unattended_frames_core_running_per_10min": 57.75,
+    "held_episodes": {
+     "250": 11,
+     "500": 1,
+     "1000": 0
+    },
+    "held_episodes_per_10min": {
+     "250": 9.54,
+     "500": 0.87,
+     "1000": 0.0
+    },
+    "recovery_paused_spans": [
+     [
+      "2026-10-22T02:35:01.580Z",
+      4.46
+     ],
+     [
+      "2026-10-22T02:38:35.649Z",
+      27.6
+     ]
+    ]
+   }
+  },
+  "02_loss-1_lan_rule": {
+   "session": [
+    "2026-10-22T02:48:47.797Z",
+    "2026-10-22T03:00:20.319Z"
+   ],
+   "session_min": 11.54,
+   "window": {
+    "from": "2026-10-22T02:50:18.629Z",
+    "to": "2026-10-22T03:00:18.630Z"
+   },
+   "reports": [
+    "native_decoder_20261022_030020_277.json"
+   ],
+   "playing_attempt": 1,
+   "s_to_playing": 4.1,
+   "transitions": [
+    {
+     "at": "02:50:17",
+     "min_in": 1.49,
+     "from": 7000,
+     "to": 6000,
+     "reason": "lan_loss",
+     "class": "ROUTINE"
+    },
+    {
+     "at": "02:53:30",
+     "min_in": 4.71,
+     "from": 6000,
+     "to": 5500,
+     "reason": "lan_loss",
+     "class": "ROUTINE"
+    },
+    {
+     "at": "02:56:59",
+     "min_in": 8.19,
+     "from": 5500,
+     "to": 5000,
+     "reason": "lan_loss",
+     "class": "ROUTINE"
+    }
+   ],
+   "lan_loss_rule": [
+    {
+     "at": "02:49:37",
+     "s_in": 49.2,
+     "session_elapsed_s": 55.6,
+     "level": 7000,
+     "unrec_windows": [
+      4,
+      4
+     ],
+     "ladder_result": "refused:guard"
+    },
+    {
+     "at": "02:50:17",
+     "s_in": 89.6,
+     "session_elapsed_s": 95.8,
+     "level": 7000,
+     "unrec_windows": [
+      8,
+      5
+     ],
+     "ladder_result": "transition"
+    },
+    {
+     "at": "02:50:43",
+     "s_in": 115.6,
+     "session_elapsed_s": 122.0,
+     "level": 6000,
+     "unrec_windows": [
+      5,
+      10
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "02:51:49",
+     "s_in": 182.0,
+     "session_elapsed_s": 188.3,
+     "level": 6000,
+     "unrec_windows": [
+      5,
+      4
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "02:53:30",
+     "s_in": 282.5,
+     "session_elapsed_s": 288.8,
+     "level": 6000,
+     "unrec_windows": [
+      4,
+      5
+     ],
+     "ladder_result": "transition"
+    },
+    {
+     "at": "02:56:59",
+     "s_in": 491.5,
+     "session_elapsed_s": 497.8,
+     "level": 5500,
+     "unrec_windows": [
+      6,
+      4
+     ],
+     "ladder_result": "transition"
+    }
+   ],
+   "hitch": {
+    "hitch_seconds": 22,
+    "play_min": 11.5,
+    "per_10_min": 19.1,
+    "longest_run_s": 3,
+    "by_criterion": {
+     "C": 21,
+     "R": 1,
+     "L": 2,
+     "G": 2
+    }
+   },
+   "hitch_window": {
+    "hitch_seconds": 16,
+    "play_min": 10.0,
+    "per_10_min": 16.0,
+    "longest_run_s": 3,
+    "by_criterion": {
+     "C": 15,
+     "R": 1,
+     "L": 2,
+     "G": 2
+    }
+   },
+   "hitch_report_coverage": [
+    {
+     "report": "native_decoder_20261022_030020_277.json",
+     "slow_events_from": "2026-10-22T02:50:17",
+     "session_from": "2026-10-22T02:48:41",
+     "session_to": "2026-10-22T03:00:20",
+     "max_output_gap_ms": 272
+    }
+   ],
+   "hold_rows": [],
+   "holds": 0,
+   "releases": 0,
+   "held_ms_total": 0,
+   "held_ms_median": null,
+   "recovery_rows": [],
+   "unattended": {
+    "streaming_s": 693,
+    "gaps": 22,
+    "episodes": 20,
+    "unattended_frames": 166.1,
+    "unattended_frames_per_10min": 143.81,
+    "unattended_frames_core_running": 166.1,
+    "unattended_frames_core_running_per_10min": 143.81,
+    "held_episodes": {
+     "250": 20,
+     "500": 3,
+     "1000": 0
+    },
+    "held_episodes_per_10min": {
+     "250": 17.32,
+     "500": 2.6,
+     "1000": 0.0
+    },
+    "recovery_paused_spans": []
+   }
+  },
+  "03_loss-5_lan_rule": {
+   "session": [
+    "2026-10-22T03:03:15.263Z",
+    "2026-10-22T03:14:47.727Z"
+   ],
+   "session_min": 11.54,
+   "window": {
+    "from": "2026-10-22T03:04:46.094Z",
+    "to": "2026-10-22T03:14:46.094Z"
+   },
+   "reports": [
+    "native_decoder_20261022_031447_704.json"
+   ],
+   "playing_attempt": 1,
+   "s_to_playing": 4.1,
+   "transitions": [
+    {
+     "at": "03:04:10",
+     "min_in": 0.92,
+     "from": 7000,
+     "to": 6000,
+     "reason": "lan_loss",
+     "class": "ROUTINE"
+    },
+    {
+     "at": "03:06:17",
+     "min_in": 3.03,
+     "from": 6000,
+     "to": 5500,
+     "reason": "lan_loss",
+     "class": "ROUTINE"
+    },
+    {
+     "at": "03:08:24",
+     "min_in": 5.15,
+     "from": 5500,
+     "to": 5000,
+     "reason": "lan_loss",
+     "class": "ROUTINE"
+    }
+   ],
+   "lan_loss_rule": [
+    {
+     "at": "03:03:30",
+     "s_in": 15.0,
+     "session_elapsed_s": 21.3,
+     "level": 7000,
+     "unrec_windows": [
+      57,
+      65
+     ],
+     "ladder_result": "refused:guard"
+    },
+    {
+     "at": "03:03:50",
+     "s_in": 35.2,
+     "session_elapsed_s": 41.5,
+     "level": 7000,
+     "unrec_windows": [
+      66,
+      61
+     ],
+     "ladder_result": "refused:guard"
+    },
+    {
+     "at": "03:04:10",
+     "s_in": 55.4,
+     "session_elapsed_s": 61.6,
+     "level": 7000,
+     "unrec_windows": [
+      42,
+      48
+     ],
+     "ladder_result": "transition"
+    },
+    {
+     "at": "03:04:36",
+     "s_in": 81.5,
+     "session_elapsed_s": 87.8,
+     "level": 6000,
+     "unrec_windows": [
+      37,
+      41
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "03:04:56",
+     "s_in": 101.6,
+     "session_elapsed_s": 107.9,
+     "level": 6000,
+     "unrec_windows": [
+      36,
+      38
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "03:05:17",
+     "s_in": 121.8,
+     "session_elapsed_s": 128.0,
+     "level": 6000,
+     "unrec_windows": [
+      48,
+      40
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "03:05:37",
+     "s_in": 141.8,
+     "session_elapsed_s": 148.1,
+     "level": 6000,
+     "unrec_windows": [
+      44,
+      59
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "03:05:57",
+     "s_in": 162.0,
+     "session_elapsed_s": 168.2,
+     "level": 6000,
+     "unrec_windows": [
+      48,
+      45
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "03:06:17",
+     "s_in": 182.1,
+     "session_elapsed_s": 188.4,
+     "level": 6000,
+     "unrec_windows": [
+      44,
+      43
+     ],
+     "ladder_result": "transition"
+    },
+    {
+     "at": "03:06:43",
+     "s_in": 208.2,
+     "session_elapsed_s": 214.5,
+     "level": 5500,
+     "unrec_windows": [
+      41,
+      44
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "03:07:03",
+     "s_in": 228.3,
+     "session_elapsed_s": 234.6,
+     "level": 5500,
+     "unrec_windows": [
+      45,
+      54
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "03:07:23",
+     "s_in": 248.5,
+     "session_elapsed_s": 254.7,
+     "level": 5500,
+     "unrec_windows": [
+      48,
+      53
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "03:07:43",
+     "s_in": 268.6,
+     "session_elapsed_s": 274.8,
+     "level": 5500,
+     "unrec_windows": [
+      49,
+      54
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "03:08:03",
+     "s_in": 288.7,
+     "session_elapsed_s": 294.9,
+     "level": 5500,
+     "unrec_windows": [
+      44,
+      52
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "03:08:24",
+     "s_in": 308.8,
+     "session_elapsed_s": 315.1,
+     "level": 5500,
+     "unrec_windows": [
+      47,
+      44
+     ],
+     "ladder_result": "transition"
+    }
+   ],
+   "hitch": {
+    "hitch_seconds": 207,
+    "play_min": 11.5,
+    "per_10_min": 179.6,
+    "longest_run_s": 5,
+    "by_criterion": {
+     "R": 82,
+     "L": 159,
+     "C": 44,
+     "G": 27
+    }
+   },
+   "hitch_window": {
+    "hitch_seconds": 183,
+    "play_min": 10.0,
+    "per_10_min": 183.0,
+    "longest_run_s": 5,
+    "by_criterion": {
+     "L": 137,
+     "R": 74,
+     "C": 41,
+     "G": 27
+    }
+   },
+   "hitch_report_coverage": [
+    {
+     "report": "native_decoder_20261022_031447_704.json",
+     "slow_events_from": "2026-10-22T03:04:11",
+     "session_from": "2026-10-22T03:03:09",
+     "session_to": "2026-10-22T03:14:47",
+     "max_output_gap_ms": 451
+    }
+   ],
+   "hold_rows": [],
+   "holds": 0,
+   "releases": 0,
+   "held_ms_total": 0,
+   "held_ms_median": null,
+   "recovery_rows": [],
+   "unattended": {
+    "streaming_s": 692,
+    "gaps": 47,
+    "episodes": 40,
+    "unattended_frames": 322.9,
+    "unattended_frames_per_10min": 279.97,
+    "unattended_frames_core_running": 322.9,
+    "unattended_frames_core_running_per_10min": 279.97,
+    "held_episodes": {
+     "250": 40,
+     "500": 7,
+     "1000": 0
+    },
+    "held_episodes_per_10min": {
+     "250": 34.68,
+     "500": 6.07,
+     "1000": 0.0
+    },
+    "recovery_paused_spans": []
+   }
+  },
+  "04_burst-50x20_lan_rule": {
+   "session": [
+    "2026-10-22T03:17:41.882Z",
+    "2026-10-22T03:29:14.334Z"
+   ],
+   "session_min": 11.54,
+   "window": {
+    "from": "2026-10-22T03:19:12.674Z",
+    "to": "2026-10-22T03:29:12.674Z"
+   },
+   "reports": [
+    "native_decoder_20261022_032914_111.json"
+   ],
+   "playing_attempt": 1,
+   "s_to_playing": 5.1,
+   "transitions": [
+    {
+     "at": "03:18:36",
+     "min_in": 0.9,
+     "from": 7000,
+     "to": 6000,
+     "reason": "lan_loss",
+     "class": "ROUTINE"
+    },
+    {
+     "at": "03:20:46",
+     "min_in": 3.08,
+     "from": 6000,
+     "to": 5500,
+     "reason": "lan_loss",
+     "class": "ROUTINE"
+    },
+    {
+     "at": "03:22:57",
+     "min_in": 5.26,
+     "from": 5500,
+     "to": 5000,
+     "reason": "lan_loss",
+     "class": "ROUTINE"
+    }
+   ],
+   "lan_loss_rule": [
+    {
+     "at": "03:17:55",
+     "s_in": 13.9,
+     "session_elapsed_s": 21.3,
+     "level": 7000,
+     "unrec_windows": [
+      25,
+      12
+     ],
+     "ladder_result": "refused:guard"
+    },
+    {
+     "at": "03:18:16",
+     "s_in": 34.2,
+     "session_elapsed_s": 41.5,
+     "level": 7000,
+     "unrec_windows": [
+      9,
+      21
+     ],
+     "ladder_result": "refused:guard"
+    },
+    {
+     "at": "03:18:36",
+     "s_in": 54.3,
+     "session_elapsed_s": 61.7,
+     "level": 7000,
+     "unrec_windows": [
+      4,
+      19
+     ],
+     "ladder_result": "transition"
+    },
+    {
+     "at": "03:19:02",
+     "s_in": 80.4,
+     "session_elapsed_s": 87.8,
+     "level": 6000,
+     "unrec_windows": [
+      17,
+      16
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "03:19:22",
+     "s_in": 100.4,
+     "session_elapsed_s": 107.9,
+     "level": 6000,
+     "unrec_windows": [
+      8,
+      21
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "03:19:42",
+     "s_in": 120.5,
+     "session_elapsed_s": 128.0,
+     "level": 6000,
+     "unrec_windows": [
+      11,
+      7
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "03:20:06",
+     "s_in": 145.0,
+     "session_elapsed_s": 152.2,
+     "level": 6000,
+     "unrec_windows": [
+      6,
+      6
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "03:20:27",
+     "s_in": 165.2,
+     "session_elapsed_s": 172.3,
+     "level": 6000,
+     "unrec_windows": [
+      18,
+      8
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "03:20:46",
+     "s_in": 184.9,
+     "session_elapsed_s": 192.4,
+     "level": 6000,
+     "unrec_windows": [
+      5,
+      12
+     ],
+     "ladder_result": "transition"
+    },
+    {
+     "at": "03:21:14",
+     "s_in": 213.0,
+     "session_elapsed_s": 220.5,
+     "level": 5500,
+     "unrec_windows": [
+      21,
+      5
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "03:21:35",
+     "s_in": 233.2,
+     "session_elapsed_s": 240.6,
+     "level": 5500,
+     "unrec_windows": [
+      5,
+      10
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "03:21:57",
+     "s_in": 255.2,
+     "session_elapsed_s": 262.7,
+     "level": 5500,
+     "unrec_windows": [
+      5,
+      8
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "03:22:17",
+     "s_in": 275.4,
+     "session_elapsed_s": 282.8,
+     "level": 5500,
+     "unrec_windows": [
+      18,
+      13
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "03:22:37",
+     "s_in": 295.4,
+     "session_elapsed_s": 302.9,
+     "level": 5500,
+     "unrec_windows": [
+      6,
+      18
+     ],
+     "ladder_result": "refused:hold_down"
+    },
+    {
+     "at": "03:22:57",
+     "s_in": 315.5,
+     "session_elapsed_s": 323.0,
+     "level": 5500,
+     "unrec_windows": [
+      6,
+      4
+     ],
+     "ladder_result": "transition"
+    }
+   ],
+   "hitch": {
+    "hitch_seconds": 147,
+    "play_min": 11.5,
+    "per_10_min": 127.4,
+    "longest_run_s": 6,
+    "by_criterion": {
+     "L": 68,
+     "C": 72,
+     "G": 31,
+     "R": 8
+    }
+   },
+   "hitch_window": {
+    "hitch_seconds": 118,
+    "play_min": 10.0,
+    "per_10_min": 118.0,
+    "longest_run_s": 4,
+    "by_criterion": {
+     "L": 56,
+     "C": 54,
+     "G": 29,
+     "R": 8
+    }
+   },
+   "hitch_report_coverage": [
+    {
+     "report": "native_decoder_20261022_032914_111.json",
+     "slow_events_from": "2026-10-22T03:18:36",
+     "session_from": "2026-10-22T03:17:34",
+     "session_to": "2026-10-22T03:29:14",
+     "max_output_gap_ms": 606
+    }
+   ],
+   "hold_rows": [],
+   "holds": 0,
+   "releases": 0,
+   "held_ms_total": 0,
+   "held_ms_median": null,
+   "recovery_rows": [],
+   "unattended": {
+    "streaming_s": 693,
+    "gaps": 81,
+    "episodes": 64,
+    "unattended_frames": 707.5,
+    "unattended_frames_per_10min": 612.55,
+    "unattended_frames_core_running": 707.5,
+    "unattended_frames_core_running_per_10min": 612.55,
+    "held_episodes": {
+     "250": 64,
+     "500": 11,
+     "1000": 2
+    },
+    "held_episodes_per_10min": {
+     "250": 55.41,
+     "500": 9.52,
+     "1000": 1.73
+    },
+    "recovery_paused_spans": []
+   }
+  },
+  "05_blackout-both_plain": {
+   "session": [
+    "2026-10-22T03:31:57.700Z",
+    "2026-10-22T03:43:29.707Z"
+   ],
+   "session_min": 11.53,
+   "window": {
+    "from": "2026-10-22T03:33:28.330Z",
+    "to": "2026-10-22T03:43:28.330Z"
+   },
+   "reports": [
+    "native_decoder_20261022_034329_676.json"
+   ],
+   "playing_attempt": 1,
+   "s_to_playing": 4.1,
+   "transitions": [],
+   "lan_loss_rule": [],
+   "hitch": {
+    "hitch_seconds": 190,
+    "play_min": 11.5,
+    "per_10_min": 164.7,
+    "longest_run_s": 14,
+    "by_criterion": {
+     "C": 134,
+     "R": 23,
+     "L": 57,
+     "G": 29
+    }
+   },
+   "hitch_window": {
+    "hitch_seconds": 168,
+    "play_min": 10.0,
+    "per_10_min": 168.0,
+    "longest_run_s": 14,
+    "by_criterion": {
+     "C": 118,
+     "L": 48,
+     "G": 28,
+     "R": 21
+    }
+   },
+   "hitch_report_coverage": [
+    {
+     "report": "native_decoder_20261022_034329_676.json",
+     "slow_events_from": "2026-10-22T03:33:39",
+     "session_from": "2026-10-22T03:31:51",
+     "session_to": "2026-10-22T03:43:29",
+     "max_output_gap_ms": 4643
+    }
+   ],
+   "hold_rows": [],
+   "holds": 0,
+   "releases": 0,
+   "held_ms_total": 0,
+   "held_ms_median": null,
+   "recovery_rows": [
+    {
+     "at_utc": "2026-10-22T03:33:36.968Z",
+     "event": "desync_pause",
+     "trigger": "client_output_silence",
+     "age_ms": 1470.0
+    },
+    {
+     "at_utc": "2026-10-22T03:33:41.689Z",
+     "event": "resumed",
+     "recovering_ms": 4819
+    },
+    {
+     "at_utc": "2026-10-22T03:35:36.738Z",
+     "event": "desync_pause",
+     "trigger": "client_output_silence",
+     "age_ms": 1258.0
+    },
+    {
+     "at_utc": "2026-10-22T03:35:42.556Z",
+     "event": "resumed",
+     "recovering_ms": 5906
+    },
+    {
+     "at_utc": "2026-10-22T03:37:36.960Z",
+     "event": "desync_pause",
+     "trigger": "client_output_silence",
+     "age_ms": 1463.0
+    },
+    {
+     "at_utc": "2026-10-22T03:37:42.608Z",
+     "event": "resumed",
+     "recovering_ms": 5746
+    },
+    {
+     "at_utc": "2026-10-22T03:39:36.693Z",
+     "event": "desync_pause",
+     "trigger": "client_output_silence",
+     "age_ms": 1233.0
+    },
+    {
+     "at_utc": "2026-10-22T03:39:43.314Z",
+     "event": "resumed",
+     "recovering_ms": 6721
+    },
+    {
+     "at_utc": "2026-10-22T03:41:36.896Z",
+     "event": "desync_pause",
+     "trigger": "client_output_silence",
+     "age_ms": 1376.0
+    },
+    {
+     "at_utc": "2026-10-22T03:41:41.612Z",
+     "event": "resumed",
+     "recovering_ms": 4819
+    }
+   ],
+   "unattended": {
+    "streaming_s": 692,
+    "gaps": 154,
+    "episodes": 104,
+    "unattended_frames": 2714.5,
+    "unattended_frames_per_10min": 2353.61,
+    "unattended_frames_core_running": 1967.2,
+    "unattended_frames_core_running_per_10min": 1705.66,
+    "held_episodes": {
+     "250": 104,
+     "500": 28,
+     "1000": 10
+    },
+    "held_episodes_per_10min": {
+     "250": 90.17,
+     "500": 24.28,
+     "1000": 8.67
+    },
+    "recovery_paused_spans": [
+     [
+      "2026-10-22T03:33:36.968Z",
+      4.72
+     ],
+     [
+      "2026-10-22T03:35:36.738Z",
+      5.82
+     ],
+     [
+      "2026-10-22T03:37:36.960Z",
+      5.65
+     ],
+     [
+      "2026-10-22T03:39:36.693Z",
+      6.62
+     ],
+     [
+      "2026-10-22T03:41:36.896Z",
+      4.72
+     ]
+    ]
+   },
+   "blackouts": [
+    {
+     "blackout": "b1",
+     "start_utc": "03:33:35.257",
+     "s_into_session": 97.6,
+     "uplink_gaps_n": 5,
+     "uplink_gap_longest_ms": 4063.5,
+     "uplink_silent_ms": 5217.7,
+     "output_gap_report_max_ms": 4204,
+     "output_gap_ladder_max_ms": 18,
+     "heartbeat_max_interarrival_s": 6.13,
+     "post_fec_lost": 3392,
+     "fec_unrec_groups": 6,
+     "hitch_seconds": 7,
+     "unattended_frames": 238.0,
+     "unattended_frames_core_running": 96.4,
+     "holds": 0,
+     "releases": 0,
+     "recovery_rows": [
+      "03:33:36.968 desync_pause:client_output_silence",
+      "03:33:41.689 resumed"
+     ]
+    },
+    {
+     "blackout": "b2",
+     "start_utc": "03:35:35.277",
+     "s_into_session": 217.6,
+     "uplink_gaps_n": 2,
+     "uplink_gap_longest_ms": 4042.5,
+     "uplink_silent_ms": 4297.9,
+     "output_gap_report_max_ms": 4205,
+     "output_gap_ladder_max_ms": 5,
+     "heartbeat_max_interarrival_s": 6.49,
+     "post_fec_lost": 3281,
+     "fec_unrec_groups": 8,
+     "hitch_seconds": 4,
+     "unattended_frames": 227.9,
+     "unattended_frames_core_running": 72.7,
+     "holds": 0,
+     "releases": 0,
+     "recovery_rows": [
+      "03:35:36.738 desync_pause:client_output_silence",
+      "03:35:42.556 resumed"
+     ]
+    },
+    {
+     "blackout": "b3",
+     "start_utc": "03:37:35.312",
+     "s_into_session": 337.6,
+     "uplink_gaps_n": 3,
+     "uplink_gap_longest_ms": 4001.2,
+     "uplink_silent_ms": 4621.5,
+     "output_gap_report_max_ms": 4643,
+     "output_gap_ladder_max_ms": 67,
+     "heartbeat_max_interarrival_s": 5.79,
+     "post_fec_lost": 3276,
+     "fec_unrec_groups": 12,
+     "hitch_seconds": 5,
+     "unattended_frames": 232.3,
+     "unattended_frames_core_running": 87.5,
+     "holds": 0,
+     "releases": 0,
+     "recovery_rows": [
+      "03:37:36.960 desync_pause:client_output_silence",
+      "03:37:42.608 resumed"
+     ]
+    },
+    {
+     "blackout": "b4",
+     "start_utc": "03:39:35.313",
+     "s_into_session": 457.6,
+     "uplink_gaps_n": 4,
+     "uplink_gap_longest_ms": 4051.1,
+     "uplink_silent_ms": 5051.6,
+     "output_gap_report_max_ms": 4171,
+     "output_gap_ladder_max_ms": 17,
+     "heartbeat_max_interarrival_s": 6.02,
+     "post_fec_lost": 3247,
+     "fec_unrec_groups": 9,
+     "hitch_seconds": 6,
+     "unattended_frames": 243.2,
+     "unattended_frames_core_running": 82.9,
+     "holds": 0,
+     "releases": 0,
+     "recovery_rows": [
+      "03:39:36.693 desync_pause:client_output_silence",
+      "03:39:43.314 resumed"
+     ]
+    },
+    {
+     "blackout": "b5",
+     "start_utc": "03:41:35.250",
+     "s_into_session": 577.5,
+     "uplink_gaps_n": 2,
+     "uplink_gap_longest_ms": 4067.9,
+     "uplink_silent_ms": 4350.6,
+     "output_gap_report_max_ms": 4098,
+     "output_gap_ladder_max_ms": 193,
+     "heartbeat_max_interarrival_s": 6.25,
+     "post_fec_lost": 3449,
+     "fec_unrec_groups": 11,
+     "hitch_seconds": 5,
+     "unattended_frames": 231.0,
+     "unattended_frames_core_running": 85.7,
+     "holds": 0,
+     "releases": 0,
+     "recovery_rows": [
+      "03:41:36.896 desync_pause:client_output_silence",
+      "03:41:41.612 resumed"
+     ]
+    }
+   ],
+   "unattended_core_running_in_blackouts": 425.2,
+   "unattended_core_running_per_blackout": 85.0,
+   "unattended_core_running_outside_blackouts": 1542.0
+  },
+  "06_blackout-both_hold": {
+   "session": [
+    "2026-10-22T03:46:17.419Z",
+    "2026-10-22T03:57:49.895Z"
+   ],
+   "session_min": 11.54,
+   "window": {
+    "from": "2026-10-22T03:47:48.274Z",
+    "to": "2026-10-22T03:57:48.274Z"
+   },
+   "reports": [
+    "native_decoder_20261022_035749_857.json"
+   ],
+   "playing_attempt": 1,
+   "s_to_playing": 4.1,
+   "transitions": [],
+   "lan_loss_rule": [],
+   "hitch": {
+    "hitch_seconds": 54,
+    "play_min": 11.5,
+    "per_10_min": 46.8,
+    "longest_run_s": 5,
+    "by_criterion": {
+     "G": 15,
+     "C": 33,
+     "L": 14,
+     "R": 7
+    }
+   },
+   "hitch_window": {
+    "hitch_seconds": 49,
+    "play_min": 10.0,
+    "per_10_min": 49.0,
+    "longest_run_s": 5,
+    "by_criterion": {
+     "C": 32,
+     "G": 12,
+     "R": 7,
+     "L": 13
+    }
+   },
+   "hitch_report_coverage": [
+    {
+     "report": "native_decoder_20261022_035749_857.json",
+     "slow_events_from": "2026-10-22T03:47:58",
+     "session_from": "2026-10-22T03:46:11",
+     "session_to": "2026-10-22T03:57:49",
+     "max_output_gap_ms": 4148
+    }
+   ],
+   "hold_rows": [
+    {
+     "at_utc": "2026-10-22T03:43:54.549Z",
+     "event": "input_hold_config"
+    },
+    {
+     "at_utc": "2026-10-22T03:47:03.585Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.9
+    },
+    {
+     "at_utc": "2026-10-22T03:47:03.722Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 366.0
+    },
+    {
+     "at_utc": "2026-10-22T03:47:54.853Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 252.5
+    },
+    {
+     "at_utc": "2026-10-22T03:47:56.083Z",
+     "event": "input_hold_handover",
+     "trigger": "client_output_silence",
+     "age_ms": 1468.0,
+     "held_ms": 1314
+    },
+    {
+     "at_utc": "2026-10-22T03:48:02.920Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T03:48:03.057Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 277.6
+    },
+    {
+     "at_utc": "2026-10-22T03:49:54.873Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 253.8
+    },
+    {
+     "at_utc": "2026-10-22T03:49:55.790Z",
+     "event": "input_hold_handover",
+     "trigger": "client_output_silence",
+     "age_ms": 1172.0,
+     "held_ms": 1005
+    },
+    {
+     "at_utc": "2026-10-22T03:51:11.858Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.4
+    },
+    {
+     "at_utc": "2026-10-22T03:51:12.058Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 459.9
+    },
+    {
+     "at_utc": "2026-10-22T03:51:12.375Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 251.7
+    },
+    {
+     "at_utc": "2026-10-22T03:51:12.659Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 538.4
+    },
+    {
+     "at_utc": "2026-10-22T03:51:13.144Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 251.3
+    },
+    {
+     "at_utc": "2026-10-22T03:51:13.292Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 399.9
+    },
+    {
+     "at_utc": "2026-10-22T03:51:14.899Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.8
+    },
+    {
+     "at_utc": "2026-10-22T03:51:15.076Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 437.3
+    },
+    {
+     "at_utc": "2026-10-22T03:51:15.959Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.6
+    },
+    {
+     "at_utc": "2026-10-22T03:51:16.274Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 573.3
+    },
+    {
+     "at_utc": "2026-10-22T03:51:16.525Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T03:51:16.675Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 348.8
+    },
+    {
+     "at_utc": "2026-10-22T03:51:17.107Z",
+     "event": "input_hold_cap",
+     "age_ms": 250.4
+    },
+    {
+     "at_utc": "2026-10-22T03:53:22.643Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.9
+    },
+    {
+     "at_utc": "2026-10-22T03:53:22.781Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 283.9
+    },
+    {
+     "at_utc": "2026-10-22T03:53:54.894Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 253.8
+    },
+    {
+     "at_utc": "2026-10-22T03:53:55.649Z",
+     "event": "input_hold_handover",
+     "trigger": "client_output_silence",
+     "age_ms": 1062.0,
+     "held_ms": 855
+    },
+    {
+     "at_utc": "2026-10-22T03:54:13.028Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.8
+    },
+    {
+     "at_utc": "2026-10-22T03:54:13.383Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 609.5
+    },
+    {
+     "at_utc": "2026-10-22T03:54:13.645Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.8
+    },
+    {
+     "at_utc": "2026-10-22T03:54:13.890Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 501.3
+    },
+    {
+     "at_utc": "2026-10-22T03:55:45.180Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.8
+    },
+    {
+     "at_utc": "2026-10-22T03:55:45.533Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 602.5
+    },
+    {
+     "at_utc": "2026-10-22T03:55:54.884Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.7
+    },
+    {
+     "at_utc": "2026-10-22T03:55:55.781Z",
+     "event": "input_hold_handover",
+     "trigger": "client_output_silence",
+     "age_ms": 1190.0,
+     "held_ms": 989
+    },
+    {
+     "at_utc": "2026-10-22T03:56:55.365Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.9
+    },
+    {
+     "at_utc": "2026-10-22T03:56:55.637Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 531.0
+    },
+    {
+     "at_utc": "2026-10-22T03:56:56.137Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T03:56:56.282Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 325.5
+    },
+    {
+     "at_utc": "2026-10-22T03:57:42.566Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T03:57:42.767Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 457.4
+    },
+    {
+     "at_utc": "2026-10-22T03:57:43.017Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.8
+    },
+    {
+     "at_utc": "2026-10-22T03:57:43.284Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 505.8
+    },
+    {
+     "at_utc": "2026-10-22T03:57:49.868Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 251.0
+    }
+   ],
+   "holds": 21,
+   "releases": 16,
+   "held_ms_total": 7218.1,
+   "held_ms_median": 458.6,
+   "recovery_rows": [
+    {
+     "at_utc": "2026-10-22T03:43:54.549Z",
+     "event": "input_hold_config"
+    },
+    {
+     "at_utc": "2026-10-22T03:47:03.585Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.9
+    },
+    {
+     "at_utc": "2026-10-22T03:47:03.722Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 366.0,
+     "recovering_ms": 225
+    },
+    {
+     "at_utc": "2026-10-22T03:47:54.853Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 252.5
+    },
+    {
+     "at_utc": "2026-10-22T03:47:56.083Z",
+     "event": "input_hold_handover",
+     "trigger": "client_output_silence",
+     "age_ms": 1468.0,
+     "held_ms": 1314
+    },
+    {
+     "at_utc": "2026-10-22T03:48:00.791Z",
+     "event": "resumed",
+     "recovering_ms": 6023
+    },
+    {
+     "at_utc": "2026-10-22T03:48:02.920Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T03:48:03.057Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 277.6,
+     "recovering_ms": 230
+    },
+    {
+     "at_utc": "2026-10-22T03:49:54.873Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 253.8
+    },
+    {
+     "at_utc": "2026-10-22T03:49:55.790Z",
+     "event": "input_hold_handover",
+     "trigger": "client_output_silence",
+     "age_ms": 1172.0,
+     "held_ms": 1005
+    },
+    {
+     "at_utc": "2026-10-22T03:50:00.508Z",
+     "event": "resumed",
+     "recovering_ms": 5723
+    },
+    {
+     "at_utc": "2026-10-22T03:51:11.858Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.4
+    },
+    {
+     "at_utc": "2026-10-22T03:51:12.058Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 459.9,
+     "recovering_ms": 299
+    },
+    {
+     "at_utc": "2026-10-22T03:51:12.375Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 251.7
+    },
+    {
+     "at_utc": "2026-10-22T03:51:12.659Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 538.4,
+     "recovering_ms": 386
+    },
+    {
+     "at_utc": "2026-10-22T03:51:13.144Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 251.3
+    },
+    {
+     "at_utc": "2026-10-22T03:51:13.292Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 399.9,
+     "recovering_ms": 238
+    },
+    {
+     "at_utc": "2026-10-22T03:51:14.899Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.8
+    },
+    {
+     "at_utc": "2026-10-22T03:51:15.076Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 437.3,
+     "recovering_ms": 284
+    },
+    {
+     "at_utc": "2026-10-22T03:51:15.959Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.6
+    },
+    {
+     "at_utc": "2026-10-22T03:51:16.274Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 573.3,
+     "recovering_ms": 418
+    },
+    {
+     "at_utc": "2026-10-22T03:51:16.525Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T03:51:16.675Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 348.8,
+     "recovering_ms": 246
+    },
+    {
+     "at_utc": "2026-10-22T03:51:17.107Z",
+     "event": "input_hold_cap",
+     "age_ms": 250.4
+    },
+    {
+     "at_utc": "2026-10-22T03:51:56.110Z",
+     "event": "desync_pause",
+     "trigger": "client_output_silence",
+     "age_ms": 1413.0
+    },
+    {
+     "at_utc": "2026-10-22T03:52:00.242Z",
+     "event": "resumed",
+     "recovering_ms": 4226
+    },
+    {
+     "at_utc": "2026-10-22T03:53:22.643Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.9
+    },
+    {
+     "at_utc": "2026-10-22T03:53:22.781Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 283.9,
+     "recovering_ms": 230
+    },
+    {
+     "at_utc": "2026-10-22T03:53:54.894Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 253.8
+    },
+    {
+     "at_utc": "2026-10-22T03:53:55.649Z",
+     "event": "input_hold_handover",
+     "trigger": "client_output_silence",
+     "age_ms": 1062.0,
+     "held_ms": 855
+    },
+    {
+     "at_utc": "2026-10-22T03:54:00.867Z",
+     "event": "resumed",
+     "recovering_ms": 6072
+    },
+    {
+     "at_utc": "2026-10-22T03:54:13.028Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.8
+    },
+    {
+     "at_utc": "2026-10-22T03:54:13.383Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 609.5,
+     "recovering_ms": 447
+    },
+    {
+     "at_utc": "2026-10-22T03:54:13.645Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.8
+    },
+    {
+     "at_utc": "2026-10-22T03:54:13.890Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 501.3,
+     "recovering_ms": 337
+    },
+    {
+     "at_utc": "2026-10-22T03:55:45.180Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.8
+    },
+    {
+     "at_utc": "2026-10-22T03:55:45.533Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 602.5,
+     "recovering_ms": 444
+    },
+    {
+     "at_utc": "2026-10-22T03:55:54.884Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.7
+    },
+    {
+     "at_utc": "2026-10-22T03:55:55.781Z",
+     "event": "input_hold_handover",
+     "trigger": "client_output_silence",
+     "age_ms": 1190.0,
+     "held_ms": 989
+    },
+    {
+     "at_utc": "2026-10-22T03:56:00.517Z",
+     "event": "resumed",
+     "recovering_ms": 5726
+    },
+    {
+     "at_utc": "2026-10-22T03:56:55.365Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.9
+    },
+    {
+     "at_utc": "2026-10-22T03:56:55.637Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 531.0,
+     "recovering_ms": 361
+    },
+    {
+     "at_utc": "2026-10-22T03:56:56.137Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T03:56:56.282Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 325.5,
+     "recovering_ms": 252
+    },
+    {
+     "at_utc": "2026-10-22T03:57:42.566Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T03:57:42.767Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 457.4,
+     "recovering_ms": 299
+    },
+    {
+     "at_utc": "2026-10-22T03:57:43.017Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.8
+    },
+    {
+     "at_utc": "2026-10-22T03:57:43.284Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 505.8,
+     "recovering_ms": 355
+    },
+    {
+     "at_utc": "2026-10-22T03:57:49.868Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 251.0
+    }
+   ],
+   "unattended": {
+    "streaming_s": 692,
+    "gaps": 41,
+    "episodes": 27,
+    "unattended_frames": 1473.5,
+    "unattended_frames_per_10min": 1277.6,
+    "unattended_frames_core_running": 335.6,
+    "unattended_frames_core_running_per_10min": 290.98,
+    "held_episodes": {
+     "250": 27,
+     "500": 14,
+     "1000": 5
+    },
+    "held_episodes_per_10min": {
+     "250": 23.41,
+     "500": 12.14,
+     "1000": 4.34
+    },
+    "recovery_paused_spans": [
+     [
+      "2026-10-22T03:47:03.585Z",
+      0.14
+     ],
+     [
+      "2026-10-22T03:47:54.853Z",
+      5.94
+     ],
+     [
+      "2026-10-22T03:48:02.920Z",
+      0.14
+     ],
+     [
+      "2026-10-22T03:49:54.873Z",
+      5.63
+     ],
+     [
+      "2026-10-22T03:51:11.858Z",
+      0.2
+     ],
+     [
+      "2026-10-22T03:51:12.375Z",
+      0.28
+     ],
+     [
+      "2026-10-22T03:51:13.144Z",
+      0.15
+     ],
+     [
+      "2026-10-22T03:51:14.899Z",
+      0.18
+     ],
+     [
+      "2026-10-22T03:51:15.959Z",
+      0.31
+     ],
+     [
+      "2026-10-22T03:51:16.525Z",
+      0.15
+     ],
+     [
+      "2026-10-22T03:51:56.110Z",
+      4.13
+     ],
+     [
+      "2026-10-22T03:53:22.643Z",
+      0.14
+     ],
+     [
+      "2026-10-22T03:53:54.894Z",
+      5.97
+     ],
+     [
+      "2026-10-22T03:54:13.028Z",
+      0.35
+     ],
+     [
+      "2026-10-22T03:54:13.645Z",
+      0.25
+     ],
+     [
+      "2026-10-22T03:55:45.180Z",
+      0.35
+     ],
+     [
+      "2026-10-22T03:55:54.884Z",
+      5.63
+     ],
+     [
+      "2026-10-22T03:56:55.365Z",
+      0.27
+     ],
+     [
+      "2026-10-22T03:56:56.137Z",
+      0.14
+     ],
+     [
+      "2026-10-22T03:57:42.566Z",
+      0.2
+     ],
+     [
+      "2026-10-22T03:57:43.017Z",
+      0.27
+     ],
+     [
+      "2026-10-22T03:57:49.868Z",
+      0.03
+     ]
+    ]
+   },
+   "blackouts": [
+    {
+     "blackout": "b1",
+     "start_utc": "03:47:54.514",
+     "s_into_session": 97.1,
+     "uplink_gaps_n": 2,
+     "uplink_gap_longest_ms": 4045.0,
+     "uplink_silent_ms": 4322.6,
+     "output_gap_report_max_ms": 4148,
+     "output_gap_ladder_max_ms": 18,
+     "heartbeat_max_interarrival_s": 6.16,
+     "post_fec_lost": 3179,
+     "fec_unrec_groups": 1,
+     "hitch_seconds": 4,
+     "unattended_frames": 229.4,
+     "unattended_frames_core_running": 7.0,
+     "holds": 2,
+     "releases": 1,
+     "recovery_rows": [
+      "03:47:54.853 desync_pause:input_hold",
+      "03:47:56.083 input_hold_handover:client_output_silence held 1314",
+      "03:48:00.791 resumed",
+      "03:48:02.920 desync_pause:input_hold",
+      "03:48:03.057 resumed:input_release held 277.6"
+     ]
+    },
+    {
+     "blackout": "b2",
+     "start_utc": "03:49:54.530",
+     "s_into_session": 217.1,
+     "uplink_gaps_n": 1,
+     "uplink_gap_longest_ms": 4016.2,
+     "uplink_silent_ms": 4016.2,
+     "output_gap_report_max_ms": 4114,
+     "output_gap_ladder_max_ms": 19,
+     "heartbeat_max_interarrival_s": 6.16,
+     "post_fec_lost": 3235,
+     "fec_unrec_groups": 0,
+     "hitch_seconds": 3,
+     "unattended_frames": 226.0,
+     "unattended_frames_core_running": 5.6,
+     "holds": 1,
+     "releases": 0,
+     "recovery_rows": [
+      "03:49:54.873 desync_pause:input_hold",
+      "03:49:55.790 input_hold_handover:client_output_silence held 1005",
+      "03:50:00.508 resumed"
+     ]
+    },
+    {
+     "blackout": "b3",
+     "start_utc": "03:51:54.538",
+     "s_into_session": 337.1,
+     "uplink_gaps_n": 3,
+     "uplink_gap_longest_ms": 4017.5,
+     "uplink_silent_ms": 4673.1,
+     "output_gap_report_max_ms": 4146,
+     "output_gap_ladder_max_ms": 22,
+     "heartbeat_max_interarrival_s": 6.12,
+     "post_fec_lost": 3412,
+     "fec_unrec_groups": 1,
+     "hitch_seconds": 5,
+     "unattended_frames": 235.4,
+     "unattended_frames_core_running": 88.7,
+     "holds": 0,
+     "releases": 0,
+     "recovery_rows": [
+      "03:51:56.110 desync_pause:client_output_silence",
+      "03:52:00.242 resumed"
+     ]
+    },
+    {
+     "blackout": "b4",
+     "start_utc": "03:53:54.540",
+     "s_into_session": 457.1,
+     "uplink_gaps_n": 1,
+     "uplink_gap_longest_ms": 4007.5,
+     "uplink_silent_ms": 4007.5,
+     "output_gap_report_max_ms": 4137,
+     "output_gap_ladder_max_ms": 14,
+     "heartbeat_max_interarrival_s": 5.95,
+     "post_fec_lost": 3236,
+     "fec_unrec_groups": 0,
+     "hitch_seconds": 3,
+     "unattended_frames": 225.4,
+     "unattended_frames_core_running": 6.2,
+     "holds": 1,
+     "releases": 0,
+     "recovery_rows": [
+      "03:53:54.894 desync_pause:input_hold",
+      "03:53:55.649 input_hold_handover:client_output_silence held 855",
+      "03:54:00.867 resumed"
+     ]
+    },
+    {
+     "blackout": "b5",
+     "start_utc": "03:55:54.539",
+     "s_into_session": 577.1,
+     "uplink_gaps_n": 1,
+     "uplink_gap_longest_ms": 4008.2,
+     "uplink_silent_ms": 4008.2,
+     "output_gap_report_max_ms": 4107,
+     "output_gap_ladder_max_ms": 16,
+     "heartbeat_max_interarrival_s": 6.17,
+     "post_fec_lost": 3239,
+     "fec_unrec_groups": 1,
+     "hitch_seconds": 3,
+     "unattended_frames": 225.5,
+     "unattended_frames_core_running": 5.7,
+     "holds": 1,
+     "releases": 0,
+     "recovery_rows": [
+      "03:55:54.884 desync_pause:input_hold",
+      "03:55:55.781 input_hold_handover:client_output_silence held 989",
+      "03:56:00.517 resumed"
+     ]
+    }
+   ],
+   "unattended_core_running_in_blackouts": 113.2,
+   "unattended_core_running_per_blackout": 22.6,
+   "unattended_core_running_outside_blackouts": 222.4
+  },
+  "07_blackout-down_plain": {
+   "session": [
+    "2026-10-22T04:00:41.855Z",
+    "2026-10-22T04:12:14.261Z"
+   ],
+   "session_min": 11.54,
+   "window": {
+    "from": "2026-10-22T04:02:12.807Z",
+    "to": "2026-10-22T04:12:12.807Z"
+   },
+   "reports": [
+    "native_decoder_20261022_041214_226.json"
+   ],
+   "playing_attempt": 1,
+   "s_to_playing": 4.1,
+   "transitions": [
+    {
+     "at": "04:08:47",
+     "min_in": 8.1,
+     "from": 7000,
+     "to": 5000,
+     "reason": "recovery_escalation",
+     "class": "FALLBACK"
+    }
+   ],
+   "lan_loss_rule": [],
+   "hitch": {
+    "hitch_seconds": 31,
+    "play_min": 11.5,
+    "per_10_min": 26.9,
+    "longest_run_s": 3,
+    "by_criterion": {
+     "G": 9,
+     "L": 10,
+     "R": 15,
+     "C": 6
+    }
+   },
+   "hitch_window": {
+    "hitch_seconds": 29,
+    "play_min": 10.0,
+    "per_10_min": 29.0,
+    "longest_run_s": 3,
+    "by_criterion": {
+     "R": 15,
+     "G": 8,
+     "L": 9,
+     "C": 6
+    }
+   },
+   "hitch_report_coverage": [
+    {
+     "report": "native_decoder_20261022_041214_226.json",
+     "slow_events_from": "2026-10-22T04:01:00",
+     "session_from": "2026-10-22T04:00:35",
+     "session_to": "2026-10-22T04:12:14",
+     "max_output_gap_ms": 4247
+    }
+   ],
+   "hold_rows": [],
+   "holds": 0,
+   "releases": 0,
+   "held_ms_total": 0,
+   "held_ms_median": null,
+   "recovery_rows": [
+    {
+     "at_utc": "2026-10-22T04:02:37.189Z",
+     "event": "desync_pause",
+     "trigger": "client_output_silence",
+     "age_ms": 1359.0
+    },
+    {
+     "at_utc": "2026-10-22T04:02:40.800Z",
+     "event": "encoder_restart"
+    },
+    {
+     "at_utc": "2026-10-22T04:02:41.823Z",
+     "event": "resumed",
+     "recovering_ms": 4731
+    },
+    {
+     "at_utc": "2026-10-22T04:04:36.908Z",
+     "event": "desync_pause",
+     "trigger": "client_output_silence",
+     "age_ms": 1090.0
+    },
+    {
+     "at_utc": "2026-10-22T04:04:42.012Z",
+     "event": "resumed",
+     "recovering_ms": 5201
+    },
+    {
+     "at_utc": "2026-10-22T04:06:37.161Z",
+     "event": "desync_pause",
+     "trigger": "client_output_silence",
+     "age_ms": 1317.0
+    },
+    {
+     "at_utc": "2026-10-22T04:06:40.544Z",
+     "event": "encoder_restart"
+    },
+    {
+     "at_utc": "2026-10-22T04:06:41.730Z",
+     "event": "resumed",
+     "recovering_ms": 4671
+    },
+    {
+     "at_utc": "2026-10-22T04:08:37.269Z",
+     "event": "desync_pause",
+     "trigger": "client_output_silence",
+     "age_ms": 1440.0
+    },
+    {
+     "at_utc": "2026-10-22T04:08:41.249Z",
+     "event": "encoder_restart"
+    },
+    {
+     "at_utc": "2026-10-22T04:08:42.403Z",
+     "event": "resumed",
+     "recovering_ms": 5234
+    },
+    {
+     "at_utc": "2026-10-22T04:10:36.917Z",
+     "event": "desync_pause",
+     "trigger": "client_output_silence",
+     "age_ms": 1104.0
+    },
+    {
+     "at_utc": "2026-10-22T04:10:42.034Z",
+     "event": "resumed",
+     "recovering_ms": 5209
+    }
+   ],
+   "unattended": {
+    "streaming_s": 693,
+    "gaps": 6,
+    "episodes": 6,
+    "unattended_frames": 30.2,
+    "unattended_frames_per_10min": 26.15,
+    "unattended_frames_core_running": 30.2,
+    "unattended_frames_core_running_per_10min": 26.15,
+    "held_episodes": {
+     "250": 6,
+     "500": 0,
+     "1000": 0
+    },
+    "held_episodes_per_10min": {
+     "250": 5.19,
+     "500": 0.0,
+     "1000": 0.0
+    },
+    "recovery_paused_spans": [
+     [
+      "2026-10-22T04:02:37.189Z",
+      4.63
+     ],
+     [
+      "2026-10-22T04:04:36.908Z",
+      5.1
+     ],
+     [
+      "2026-10-22T04:06:37.161Z",
+      4.57
+     ],
+     [
+      "2026-10-22T04:08:37.269Z",
+      5.13
+     ],
+     [
+      "2026-10-22T04:10:36.917Z",
+      5.12
+     ]
+    ]
+   },
+   "blackouts": [
+    {
+     "blackout": "b1",
+     "start_utc": "04:02:34.709",
+     "s_into_session": 112.9,
+     "uplink_gaps_n": 0,
+     "uplink_gap_longest_ms": 0,
+     "uplink_silent_ms": 0,
+     "output_gap_report_max_ms": 4167,
+     "output_gap_ladder_max_ms": 18,
+     "heartbeat_max_interarrival_s": 2.07,
+     "post_fec_lost": 3326,
+     "fec_unrec_groups": 0,
+     "hitch_seconds": 4,
+     "unattended_frames": 0.0,
+     "unattended_frames_core_running": 0.0,
+     "holds": 0,
+     "releases": 0,
+     "recovery_rows": [
+      "04:02:37.189 desync_pause:client_output_silence",
+      "04:02:40.800 encoder_restart",
+      "04:02:41.823 resumed"
+     ]
+    },
+    {
+     "blackout": "b2",
+     "start_utc": "04:04:34.712",
+     "s_into_session": 232.9,
+     "uplink_gaps_n": 0,
+     "uplink_gap_longest_ms": 0,
+     "uplink_silent_ms": 0,
+     "output_gap_report_max_ms": 4161,
+     "output_gap_ladder_max_ms": 34,
+     "heartbeat_max_interarrival_s": 2.08,
+     "post_fec_lost": 3224,
+     "fec_unrec_groups": 1,
+     "hitch_seconds": 4,
+     "unattended_frames": 0.0,
+     "unattended_frames_core_running": 0.0,
+     "holds": 0,
+     "releases": 0,
+     "recovery_rows": [
+      "04:04:36.908 desync_pause:client_output_silence",
+      "04:04:42.012 resumed"
+     ]
+    },
+    {
+     "blackout": "b3",
+     "start_utc": "04:06:34.714",
+     "s_into_session": 352.9,
+     "uplink_gaps_n": 0,
+     "uplink_gap_longest_ms": 0,
+     "uplink_silent_ms": 0,
+     "output_gap_report_max_ms": 4130,
+     "output_gap_ladder_max_ms": 19,
+     "heartbeat_max_interarrival_s": 2.15,
+     "post_fec_lost": 11,
+     "fec_unrec_groups": 0,
+     "hitch_seconds": 3,
+     "unattended_frames": 0.0,
+     "unattended_frames_core_running": 0.0,
+     "holds": 0,
+     "releases": 0,
+     "recovery_rows": [
+      "04:06:37.161 desync_pause:client_output_silence",
+      "04:06:40.544 encoder_restart",
+      "04:06:41.730 resumed"
+     ]
+    },
+    {
+     "blackout": "b4",
+     "start_utc": "04:08:34.706",
+     "s_into_session": 472.9,
+     "uplink_gaps_n": 0,
+     "uplink_gap_longest_ms": 0,
+     "uplink_silent_ms": 0,
+     "output_gap_report_max_ms": 4170,
+     "output_gap_ladder_max_ms": 23,
+     "heartbeat_max_interarrival_s": 2.16,
+     "post_fec_lost": 3198,
+     "fec_unrec_groups": 0,
+     "hitch_seconds": 2,
+     "unattended_frames": 0.0,
+     "unattended_frames_core_running": 0.0,
+     "holds": 0,
+     "releases": 0,
+     "recovery_rows": [
+      "04:08:37.269 desync_pause:client_output_silence",
+      "04:08:41.249 encoder_restart",
+      "04:08:42.403 resumed"
+     ]
+    },
+    {
+     "blackout": "b5",
+     "start_utc": "04:10:34.704",
+     "s_into_session": 592.8,
+     "uplink_gaps_n": 0,
+     "uplink_gap_longest_ms": 0,
+     "uplink_silent_ms": 0,
+     "output_gap_report_max_ms": 4247,
+     "output_gap_ladder_max_ms": 23,
+     "heartbeat_max_interarrival_s": 3.07,
+     "post_fec_lost": 2395,
+     "fec_unrec_groups": 3,
+     "hitch_seconds": 3,
+     "unattended_frames": 0.0,
+     "unattended_frames_core_running": 0.0,
+     "holds": 0,
+     "releases": 0,
+     "recovery_rows": [
+      "04:10:36.917 desync_pause:client_output_silence",
+      "04:10:42.034 resumed"
+     ]
+    }
+   ],
+   "unattended_core_running_in_blackouts": 0.0,
+   "unattended_core_running_per_blackout": 0.0,
+   "unattended_core_running_outside_blackouts": 30.2
+  },
+  "08_none_hold": {
+   "session": [
+    "2026-10-22T04:15:08.555Z",
+    "2026-10-22T04:26:40.212Z"
+   ],
+   "session_min": 11.53,
+   "window": {
+    "from": "2026-10-22T04:16:38.841Z",
+    "to": "2026-10-22T04:26:38.842Z"
+   },
+   "reports": [
+    "native_decoder_20261022_042640_179.json"
+   ],
+   "playing_attempt": 1,
+   "s_to_playing": 6.1,
+   "transitions": [],
+   "lan_loss_rule": [],
+   "hitch": {
+    "hitch_seconds": 30,
+    "play_min": 11.5,
+    "per_10_min": 26.0,
+    "longest_run_s": 2,
+    "by_criterion": {
+     "C": 18,
+     "L": 12,
+     "G": 4,
+     "R": 1
+    }
+   },
+   "hitch_window": {
+    "hitch_seconds": 26,
+    "play_min": 10.0,
+    "per_10_min": 26.0,
+    "longest_run_s": 2,
+    "by_criterion": {
+     "L": 11,
+     "C": 15,
+     "G": 4,
+     "R": 1
+    }
+   },
+   "hitch_report_coverage": [
+    {
+     "report": "native_decoder_20261022_042640_179.json",
+     "slow_events_from": "2026-10-22T04:21:02",
+     "session_from": "2026-10-22T04:15:00",
+     "session_to": "2026-10-22T04:26:40",
+     "max_output_gap_ms": 395
+    }
+   ],
+   "hold_rows": [
+    {
+     "at_utc": "2026-10-22T04:12:44.846Z",
+     "event": "input_hold_config"
+    },
+    {
+     "at_utc": "2026-10-22T04:15:26.439Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T04:15:26.576Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 270.4
+    },
+    {
+     "at_utc": "2026-10-22T04:15:50.806Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.9
+    },
+    {
+     "at_utc": "2026-10-22T04:15:50.943Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 306.5
+    },
+    {
+     "at_utc": "2026-10-22T04:15:53.672Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 252.8
+    },
+    {
+     "at_utc": "2026-10-22T04:15:53.812Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 270.1
+    },
+    {
+     "at_utc": "2026-10-22T04:18:03.842Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T04:18:03.992Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 265.4
+    },
+    {
+     "at_utc": "2026-10-22T04:18:09.692Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.4
+    },
+    {
+     "at_utc": "2026-10-22T04:18:09.909Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 463.5
+    },
+    {
+     "at_utc": "2026-10-22T04:18:34.859Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.4
+    },
+    {
+     "at_utc": "2026-10-22T04:18:35.011Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 265.5
+    },
+    {
+     "at_utc": "2026-10-22T04:20:20.261Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.9
+    },
+    {
+     "at_utc": "2026-10-22T04:20:20.400Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 324.1
+    },
+    {
+     "at_utc": "2026-10-22T04:20:58.728Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T04:20:58.915Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 457.3
+    },
+    {
+     "at_utc": "2026-10-22T04:21:40.430Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T04:21:40.566Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 350.9
+    },
+    {
+     "at_utc": "2026-10-22T04:23:08.931Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.4
+    },
+    {
+     "at_utc": "2026-10-22T04:23:09.090Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 398.2
+    },
+    {
+     "at_utc": "2026-10-22T04:23:43.166Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.8
+    },
+    {
+     "at_utc": "2026-10-22T04:23:43.316Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 263.1
+    },
+    {
+     "at_utc": "2026-10-22T04:24:12.149Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T04:24:12.818Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 938.7
+    },
+    {
+     "at_utc": "2026-10-22T04:24:13.133Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.4
+    },
+    {
+     "at_utc": "2026-10-22T04:24:14.217Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 1335.4
+    },
+    {
+     "at_utc": "2026-10-22T04:24:58.369Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.6
+    },
+    {
+     "at_utc": "2026-10-22T04:24:58.518Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 309.0
+    },
+    {
+     "at_utc": "2026-10-22T04:25:21.117Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.4
+    },
+    {
+     "at_utc": "2026-10-22T04:25:21.688Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 807.7
+    },
+    {
+     "at_utc": "2026-10-22T04:25:21.951Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T04:25:22.101Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 315.3
+    },
+    {
+     "at_utc": "2026-10-22T04:25:59.018Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T04:25:59.174Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 283.6
+    },
+    {
+     "at_utc": "2026-10-22T04:26:25.871Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.8
+    },
+    {
+     "at_utc": "2026-10-22T04:26:26.008Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 256.2
+    },
+    {
+     "at_utc": "2026-10-22T04:26:40.327Z",
+     "event": "input_hold_skipped_paused",
+     "age_ms": 251.1
+    }
+   ],
+   "holds": 18,
+   "releases": 18,
+   "held_ms_total": 7880.9,
+   "held_ms_median": 312.1,
+   "recovery_rows": [
+    {
+     "at_utc": "2026-10-22T04:12:44.846Z",
+     "event": "input_hold_config"
+    },
+    {
+     "at_utc": "2026-10-22T04:15:26.439Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T04:15:26.576Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 270.4,
+     "recovering_ms": 224
+    },
+    {
+     "at_utc": "2026-10-22T04:15:50.806Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.9
+    },
+    {
+     "at_utc": "2026-10-22T04:15:50.943Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 306.5,
+     "recovering_ms": 238
+    },
+    {
+     "at_utc": "2026-10-22T04:15:53.672Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 252.8
+    },
+    {
+     "at_utc": "2026-10-22T04:15:53.812Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 270.1,
+     "recovering_ms": 227
+    },
+    {
+     "at_utc": "2026-10-22T04:18:03.842Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T04:18:03.992Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 265.4,
+     "recovering_ms": 249
+    },
+    {
+     "at_utc": "2026-10-22T04:18:09.692Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.4
+    },
+    {
+     "at_utc": "2026-10-22T04:18:09.909Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 463.5,
+     "recovering_ms": 314
+    },
+    {
+     "at_utc": "2026-10-22T04:18:34.859Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.4
+    },
+    {
+     "at_utc": "2026-10-22T04:18:35.011Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 265.5,
+     "recovering_ms": 241
+    },
+    {
+     "at_utc": "2026-10-22T04:20:20.261Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.9
+    },
+    {
+     "at_utc": "2026-10-22T04:20:20.400Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 324.1,
+     "recovering_ms": 225
+    },
+    {
+     "at_utc": "2026-10-22T04:20:58.728Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T04:20:58.915Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 457.3,
+     "recovering_ms": 288
+    },
+    {
+     "at_utc": "2026-10-22T04:21:40.430Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T04:21:40.566Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 350.9,
+     "recovering_ms": 236
+    },
+    {
+     "at_utc": "2026-10-22T04:23:08.931Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.4
+    },
+    {
+     "at_utc": "2026-10-22T04:23:09.090Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 398.2,
+     "recovering_ms": 259
+    },
+    {
+     "at_utc": "2026-10-22T04:23:43.166Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.8
+    },
+    {
+     "at_utc": "2026-10-22T04:23:43.316Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 263.1,
+     "recovering_ms": 245
+    },
+    {
+     "at_utc": "2026-10-22T04:24:12.149Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T04:24:12.818Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 938.7,
+     "recovering_ms": 771
+    },
+    {
+     "at_utc": "2026-10-22T04:24:13.133Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.4
+    },
+    {
+     "at_utc": "2026-10-22T04:24:14.217Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 1335.4,
+     "recovering_ms": 1183
+    },
+    {
+     "at_utc": "2026-10-22T04:24:58.369Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.6
+    },
+    {
+     "at_utc": "2026-10-22T04:24:58.518Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 309.0,
+     "recovering_ms": 248
+    },
+    {
+     "at_utc": "2026-10-22T04:25:21.117Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.4
+    },
+    {
+     "at_utc": "2026-10-22T04:25:21.688Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 807.7,
+     "recovering_ms": 659
+    },
+    {
+     "at_utc": "2026-10-22T04:25:21.951Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T04:25:22.101Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 315.3,
+     "recovering_ms": 245
+    },
+    {
+     "at_utc": "2026-10-22T04:25:59.018Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.5
+    },
+    {
+     "at_utc": "2026-10-22T04:25:59.174Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 283.6,
+     "recovering_ms": 253
+    },
+    {
+     "at_utc": "2026-10-22T04:26:25.871Z",
+     "event": "desync_pause",
+     "trigger": "input_hold",
+     "age_ms": 250.8
+    },
+    {
+     "at_utc": "2026-10-22T04:26:26.008Z",
+     "event": "resumed",
+     "via": "input_release",
+     "held_ms": 256.2,
+     "recovering_ms": 232
+    },
+    {
+     "at_utc": "2026-10-22T04:26:40.327Z",
+     "event": "input_hold_skipped_paused",
+     "age_ms": 251.1
+    }
+   ],
+   "unattended": {
+    "streaming_s": 692,
+    "gaps": 18,
+    "episodes": 16,
+    "unattended_frames": 202.9,
+    "unattended_frames_per_10min": 175.92,
+    "unattended_frames_core_running": 64.5,
+    "unattended_frames_core_running_per_10min": 55.92,
+    "held_episodes": {
+     "250": 16,
+     "500": 2,
+     "1000": 1
+    },
+    "held_episodes_per_10min": {
+     "250": 13.87,
+     "500": 1.73,
+     "1000": 0.87
+    },
+    "recovery_paused_spans": [
+     [
+      "2026-10-22T04:15:26.439Z",
+      0.14
+     ],
+     [
+      "2026-10-22T04:15:50.806Z",
+      0.14
+     ],
+     [
+      "2026-10-22T04:15:53.672Z",
+      0.14
+     ],
+     [
+      "2026-10-22T04:18:03.842Z",
+      0.15
+     ],
+     [
+      "2026-10-22T04:18:09.692Z",
+      0.22
+     ],
+     [
+      "2026-10-22T04:18:34.859Z",
+      0.15
+     ],
+     [
+      "2026-10-22T04:20:20.261Z",
+      0.14
+     ],
+     [
+      "2026-10-22T04:20:58.728Z",
+      0.19
+     ],
+     [
+      "2026-10-22T04:21:40.430Z",
+      0.14
+     ],
+     [
+      "2026-10-22T04:23:08.931Z",
+      0.16
+     ],
+     [
+      "2026-10-22T04:23:43.166Z",
+      0.15
+     ],
+     [
+      "2026-10-22T04:24:12.149Z",
+      0.67
+     ],
+     [
+      "2026-10-22T04:24:13.133Z",
+      1.08
+     ],
+     [
+      "2026-10-22T04:24:58.369Z",
+      0.15
+     ],
+     [
+      "2026-10-22T04:25:21.117Z",
+      0.57
+     ],
+     [
+      "2026-10-22T04:25:21.951Z",
+      0.15
+     ],
+     [
+      "2026-10-22T04:25:59.018Z",
+      0.16
+     ],
+     [
+      "2026-10-22T04:26:25.871Z",
+      0.14
+     ]
+    ]
+   }
+  }
+ },
+ "shim_offset_s": {
+  "median": -7.151,
+  "range": [
+   -7.463,
+   -6.889
+  ],
+  "n": 10,
+  "meaning": "control-gap start minus (session_started + the shim's first dark t_s), cells 5-6"
+ }
+}

@@ -1,0 +1,122 @@
+Extract: the host's Android SDK, platforms/android-37.0/android-stubs-src.jar, android/net/wifi/WifiManager.java (Javadoc; read-only)
+
+=== WIFI_MODE_FULL_HIGH_PERF
+/**
+In this Wi-Fi lock mode, Wi-Fi will not go to power save.
+This results in operating with low packet latency.
+The lock is only active when the device is connected to an access point.
+The lock is active even when the device screen is off or the acquiring application is
+running in the background.
+This mode will consume more power and hence should be used only
+when there is a need for this tradeoff.
+<p>
+An example use case is when a voice connection needs to be
+kept active even after the device screen goes off.
+Holding a {@link #WIFI_MODE_FULL_HIGH_PERF} lock for the
+duration of the voice call may improve the call quality.
+<p>
+When there is no support from the hardware, the {@link #WIFI_MODE_FULL_HIGH_PERF}
+lock will have no impact.
+
+@deprecated The {@code WIFI_MODE_FULL_HIGH_PERF} is deprecated and is automatically replaced
+with {@link #WIFI_MODE_FULL_LOW_LATENCY} with all the restrictions documented on that lock.
+I.e. any request to the {@code WIFI_MODE_FULL_HIGH_PERF} will now obtain a
+{@link #WIFI_MODE_FULL_LOW_LATENCY} lock instead.
+Deprecation is due to the impact of {@code WIFI_MODE_FULL_HIGH_PERF} on power dissipation.
+The {@link #WIFI_MODE_FULL_LOW_LATENCY} provides much of the same desired functionality with
+less impact on power dissipation.
+/
+@Deprecated
+
+=== WIFI_MODE_FULL_LOW_LATENCY
+/**
+In this Wi-Fi lock mode, Wi-Fi will operate with a priority to achieve low latency.
+{@link #WIFI_MODE_FULL_LOW_LATENCY} lock has the following limitations:
+<ol>
+<li>The lock is only active when the device is connected to an access point.</li>
+<li>The lock is only active when the screen is on.</li>
+<li>The lock is only active when the acquiring app is running in the foreground.</li>
+</ol>
+Low latency mode optimizes for reduced packet latency,
+and as a result other performance measures may suffer when there are trade-offs to make:
+<ol>
+<li>Battery life may be reduced.</li>
+<li>Throughput may be reduced.</li>
+<li>Frequency of Wi-Fi scanning may be reduced. This may result in: </li>
+<ul>
+<li>The device may not roam or switch to the AP with highest signal quality.</li>
+<li>Location accuracy may be reduced.</li>
+</ul>
+</ol>
+<p>
+Example use cases are real time gaming or virtual reality applications where
+low latency is a key factor for user experience.
+<p>
+Note: For an app which acquires both {@link #WIFI_MODE_FULL_LOW_LATENCY} and
+{@link #WIFI_MODE_FULL_HIGH_PERF} locks, {@link #WIFI_MODE_FULL_LOW_LATENCY}
+lock will be effective when app is running in foreground and screen is on,
+while the {@link #WIFI_MODE_FULL_HIGH_PERF} lock will take effect otherwise.
+/
+
+=== WifiLock
+/**
+Allows an application to keep the Wi-Fi radio awake.
+Normally the Wi-Fi radio may turn off when the user has not used the device in a while.
+Acquiring a WifiLock will keep the radio on until the lock is released.  Multiple
+applications may hold WifiLocks, and the radio will only be allowed to turn off when no
+WifiLocks are held in any application.
+<p>
+Before using a WifiLock, consider carefully if your application requires Wi-Fi access, or
+could function over a mobile network, if available.  A program that needs to download large
+files should hold a WifiLock to ensure that the download will complete, but a program whose
+network usage is occasional or low-bandwidth should not hold a WifiLock to avoid adversely
+affecting battery life.
+<p>
+Note that WifiLocks cannot override the user-level "Wi-Fi Enabled" setting, nor Airplane
+Mode.  They simply keep the radio from turning off when Wi-Fi is already on but the device
+is idle.
+<p>
+Any application using a WifiLock must request the {@code android.permission.WAKE_LOCK}
+permission in an {@code <uses-permission>} element of the application's manifest.
+/
+@SuppressWarnings({"unchecked", "deprecation", "all"})
+
+=== WifiLock.acquire()
+/**
+Locks the Wi-Fi radio on until {@link #release} is called.
+
+If this WifiLock is reference-counted, each call to {@code acquire} will increment the
+reference count, and the radio will remain locked as long as the reference count is
+above zero.
+
+If this WifiLock is not reference-counted, the first call to {@code acquire} will lock
+the radio, but subsequent calls will be ignored.  Only one call to {@link #release}
+will be required, regardless of the number of times that {@code acquire} is called.
+/
+
+=== WifiLock.release()
+/**
+Unlocks the Wi-Fi radio, allowing it to turn off when the device is idle.
+
+If this WifiLock is reference-counted, each call to {@code release} will decrement the
+reference count, and the radio will be unlocked only when the reference count reaches
+zero.  If the reference count goes below zero (that is, if {@code release} is called
+a greater number of times than {@link #acquire}), an exception is thrown.
+
+If this WifiLock is not reference-counted, the first call to {@code release} (after
+the radio was locked using {@link #acquire}) will unlock the radio, and subsequent
+calls will be ignored.
+/
+
+=== WifiLock.setReferenceCounted(
+/**
+Controls whether this is a reference-counted or non-reference-counted WifiLock.
+
+Reference-counted WifiLocks keep track of the number of calls to {@link #acquire} and
+{@link #release}, and only allow the radio to sleep when every call to {@link #acquire}
+has been balanced with a call to {@link #release}.  Non-reference-counted WifiLocks
+lock the radio whenever {@link #acquire} is called and it is unlocked, and unlock the
+radio whenever {@link #release} is called and it is locked.
+@param refCounted true if this WifiLock should keep a reference count
+/
+

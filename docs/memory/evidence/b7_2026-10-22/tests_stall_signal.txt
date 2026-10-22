@@ -1,0 +1,124 @@
+== tests/stall_signal (from the tree, -B)
+test_no_stall_b2s_release_after_the_short_wait (test_stall_signal.Both.test_no_stall_b2s_release_after_the_short_wait) ... ok
+test_the_hold_hands_over_to_the_stall_and_resumes_at_stall_end (test_stall_signal.Both.test_the_hold_hands_over_to_the_stall_and_resumes_at_stall_end) ... ok
+test_a_lost_stall_end_resumes_after_300_ms_quiet (test_stall_signal.Down.test_a_lost_stall_end_resumes_after_300_ms_quiet) ... ok
+test_below_the_hosts_threshold_nothing (test_stall_signal.Down.test_below_the_hosts_threshold_nothing) ... ok
+test_stall_pauses_stall_end_resumes_with_the_rewind (test_stall_signal.Down.test_stall_pauses_stall_end_resumes_with_the_rewind) ... ok
+test_hook_shapes (test_stall_signal.FlagAbsent.test_hook_shapes) ... ok
+test_not_imported_and_a_stall_datagram_is_a_bad_packet_as_today (test_stall_signal.FlagAbsent.test_not_imported_and_a_stall_datagram_is_a_bad_packet_as_today) ... ok
+test_flag_and_decode (test_stall_signal.Parse.test_flag_and_decode) ... ok
+test_a_client_desync_during_a_stall_pause_is_ignored (test_stall_signal.ReadyAndOrder.test_a_client_desync_during_a_stall_pause_is_ignored) ... ok
+test_a_ready_after_a_stall_resume_is_not_a_new_session (test_stall_signal.ReadyAndOrder.test_a_ready_after_a_stall_resume_is_not_a_new_session) ... ok
+test_b4_set_pending (test_stall_signal.ReadyAndOrder.test_b4_set_pending) ... ok
+test_the_ready_first_then_stall_end_one_resume (test_stall_signal.ReadyAndOrder.test_the_ready_first_then_stall_end_one_resume) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 15.969s
+
+OK
+== tests/input_hold_b6 (from the tree, -B)
+test_hooks_shape (test_input_hold_b6.FlagAbsent.test_hooks_shape) ... ok
+test_not_imported (test_input_hold_b6.FlagAbsent.test_not_imported) ... ok
+test_handed_over_holds_never_count (test_input_hold_b6.TheCap.test_handed_over_holds_never_count) ... ok
+test_six_released_disarm_ten_seconds (test_input_hold_b6.TheCap.test_six_released_disarm_ten_seconds) ... ok
+test_950_threshold (test_input_hold_b6.TheDetector.test_950_threshold) ... ok
+test_enabled_and_h (test_input_hold_b6.TheFlag.test_enabled_and_h) ... ok
+test_wire_sets_h_cap_and_logs (test_input_hold_b6.TheFlag.test_wire_sets_h_cap_and_logs) ... ok
+test_a_v2_pause_never_a_hold_is_not_resumed_by_b6 (test_input_hold_b6.TheResume.test_a_v2_pause_never_a_hold_is_not_resumed_by_b6) ... ok
+test_r1_resume_at_the_first_fresh_heartbeat_after_the_return (test_input_hold_b6.TheResume.test_r1_resume_at_the_first_fresh_heartbeat_after_the_return) ... ok
+test_r2_client_handover_left_to_the_clients_gate (test_input_hold_b6.TheResume.test_r2_client_handover_left_to_the_clients_gate) ... ok
+test_r3_a_late_ready_after_a_hold_release_is_not_a_new_session (test_input_hold_b6.TheResume.test_r3_a_late_ready_after_a_hold_release_is_not_a_new_session) ... ok
+test_r3_window_expires (test_input_hold_b6.TheResume.test_r3_window_expires) ... ok
+test_v2_exit_still_works_first (test_input_hold_b6.TheResume.test_v2_exit_still_works_first) ... ok
+test_without_b6_b2_exactly (test_input_hold_b6.TheResume.test_without_b6_b2_exactly) ... ok
+test_config_block_buffer (test_input_hold_b6.TheRewindCap.test_config_block_buffer) ... ok
+test_default (test_input_hold_b6.TheRewindCap.test_default) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 0.144s
+
+OK
+== tests/input_hold (from the tree, -B)
+test_cap_six_in_sixty_seconds_logged_once (test_input_hold.Detector.test_cap_six_in_sixty_seconds_logged_once) ... ok
+test_never_before_a_first_packet (test_input_hold.Detector.test_never_before_a_first_packet) ... ok
+test_one_hold_then_one_release (test_input_hold.Detector.test_one_hold_then_one_release) ... ok
+test_short_silence_nothing (test_input_hold.Detector.test_short_silence_nothing) ... ok
+test_cap_row (test_input_hold.Dispatcher.test_cap_row) ... ok
+test_min_hold (test_input_hold.Dispatcher.test_min_hold) ... ok
+test_the_users_pause_wins (test_input_hold.Dispatcher.test_the_users_pause_wins) ... ok
+test_parse (test_input_hold.Flag.test_parse) ... ok
+test_flag_absent_not_imported (test_input_hold.Hooks.test_flag_absent_not_imported) ... ok
+test_shapes (test_input_hold.Hooks.test_shapes) ... ok
+test_client_desync_hands_over (test_input_hold.Recovery.test_client_desync_hands_over) ... ok
+test_client_ready_gate_resumes_a_hold (test_input_hold.Recovery.test_client_ready_gate_resumes_a_hold) ... ok
+test_hold_then_release (test_input_hold.Recovery.test_hold_then_release) ... ok
+test_no_hold_unless_playing (test_input_hold.Recovery.test_no_hold_unless_playing) ... ok
+test_resume_failure_hands_to_controller_silence (test_input_hold.Recovery.test_resume_failure_hands_to_controller_silence) ... ok
+test_v2_threshold_hands_over_one_pause_row (test_input_hold.Recovery.test_v2_threshold_hands_over_one_pause_row) ... ok
+test_without_the_hold_today_unchanged (test_input_hold.Recovery.test_without_the_hold_today_unchanged) ... ok
+test_a_one_second_uplink_blackout_holds_once_and_releases (test_input_hold.TheReceiveLoop.test_a_one_second_uplink_blackout_holds_once_and_releases) ... ok
+test_counts (test_input_hold.UnattendedFramesReader.test_counts) ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 3.378s
+
+OK
+== tests/input_hold_rewind (from the tree, -B)
+test_fresh_process_both_flags_imports_it (test_hold_rewind.FlagAbsent.test_fresh_process_both_flags_imports_it) ... ok
+test_fresh_process_hold_only_imports_nothing (test_hold_rewind.FlagAbsent.test_fresh_process_hold_only_imports_nothing) ... ok
+test_no_rewinder_b2_exactly (test_hold_rewind.FlagAbsent.test_no_rewinder_b2_exactly) ... ok
+test_parse_and_wire (test_hold_rewind.FlagAbsent.test_parse_and_wire) ... ok
+test_no_port (test_hold_rewind.RewindFailed.test_no_port) ... ok
+test_session_config_without_rewind (test_hold_rewind.RewindFailed.test_session_config_without_rewind) ... ok
+test_status_not_answered_within_two_frames (test_hold_rewind.RewindFailed.test_status_not_answered_within_two_frames) ... ok
+test_the_transport_raises (test_hold_rewind.RewindFailed.test_the_transport_raises) ... ok
+test_parse_cap (test_hold_rewind.TheCap.test_parse_cap) ... ok
+test_requested_is_capped (test_hold_rewind.TheCap.test_requested_is_capped) ... ok
+test_a_base_with_a_rewind_key_is_left_alone (test_hold_rewind.TheConfig.test_a_base_with_a_rewind_key_is_left_alone) ... ok
+test_masked_hash_flag_absent_is_the_predecessor (test_hold_rewind.TheConfig.test_masked_hash_flag_absent_is_the_predecessor) ... ok
+test_the_keys_once_and_the_bytes_per_core (test_hold_rewind.TheConfig.test_the_keys_once_and_the_bytes_per_core) ... ok
+test_counter_from_the_two_stamps (test_hold_rewind.TheCount.test_counter_from_the_two_stamps) ... ok
+test_fifo_stays_aligned_across_a_skipped_hold (test_hold_rewind.TheCount.test_fifo_stays_aligned_across_a_skipped_hold) ... ok
+test_a_stale_pending_hold_is_not_used_by_a_later_pause (test_hold_rewind.TheHandover.test_a_stale_pending_hold_is_not_used_by_a_later_pause) ... ok
+test_a_v2_pause_without_a_hold_is_not_rewound (test_hold_rewind.TheHandover.test_a_v2_pause_without_a_hold_is_not_rewound) ... ok
+test_v2_takes_the_hold_over_and_its_exit_rewinds_once (test_hold_rewind.TheHandover.test_v2_takes_the_hold_over_and_its_exit_rewinds_once) ... ok
+test_shapes (test_hold_rewind.TheHooks.test_shapes) ... ok
+test_requested_on_release_confirmed_back_to_the_onset (test_hold_rewind.TheRewind.test_requested_on_release_confirmed_back_to_the_onset) ... ok
+test_net (test_hold_rewind.UnattendedNet.test_net) ... ok
+test_without_net_the_cli_output_is_the_predecessors (test_hold_rewind.UnattendedNet.test_without_net_the_cli_output_is_the_predecessors) ... ok
+
+----------------------------------------------------------------------
+Ran 22 tests in 10.892s
+
+OK
+== tests/impairment (from the tree, -B)
+test_errors (test_blackout.Grammar.test_errors) ... ok
+test_todays_specs_unchanged (test_blackout.Grammar.test_todays_specs_unchanged) ... ok
+test_downlink_profile_leaves_the_loop_ungated (test_blackout.Hooks.test_downlink_profile_leaves_the_loop_ungated) ... ok
+test_flag_absent_not_imported (test_blackout.Hooks.test_flag_absent_not_imported) ... ok
+test_guarded_imports_and_hook_shape (test_blackout.Hooks.test_guarded_imports_and_hook_shape) ... ok
+test_active_spans (test_blackout.Scheduler.test_active_spans) ... ok
+test_gate_only_for_both (test_blackout.Scheduler.test_gate_only_for_both) ... ok
+test_shared_is_one_object (test_blackout.Scheduler.test_shared_is_one_object) ... ok
+test_counters_have_the_new_fields (test_blackout.Uplink.test_counters_have_the_new_fields) ... ok
+test_gate_counts_by_kind (test_blackout.Uplink.test_gate_counts_by_kind) ... ok
+test_not_imported_and_inert (test_impairment.FlagAbsent.test_not_imported_and_inert) ... ok
+test_same_port_same_target_no_thread (test_impairment.FlagAbsent.test_same_port_same_target_no_thread) ... ok
+test_none_through_the_flag (test_impairment.Parse.test_none_through_the_flag)
+G8-S1: `none` is selectable through the flag -- the shim in the path, every stage off. ... ok
+test_specs (test_impairment.Parse.test_specs) ... ok
+test_post_fec_parity_is_impaired_too (test_impairment.Placements.test_post_fec_parity_is_impaired_too) ... ok
+test_pre_fec_the_shim_takes_the_port (test_impairment.Placements.test_pre_fec_the_shim_takes_the_port) ... ok
+test_stop_releases_the_port (test_impairment.Placements.test_stop_releases_the_port) ... ok
+test_bursts (test_impairment.Stages.test_bursts) ... ok
+test_cap_bounded_queue (test_impairment.Stages.test_cap_bounded_queue) ... ok
+test_delay_and_jitter (test_impairment.Stages.test_delay_and_jitter) ... ok
+test_none_passes_everything_in_order (test_impairment.Stages.test_none_passes_everything_in_order) ... ok
+test_random_loss (test_impairment.Stages.test_random_loss) ... ok
+test_reorder (test_impairment.Stages.test_reorder) ... ok
+test_seeded (test_impairment.Stages.test_seeded) ... ok
+
+----------------------------------------------------------------------
+Ran 29 tests in 16.312s
+
+OK

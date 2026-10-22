@@ -1,0 +1,991 @@
+diff --git a/PrivyHub/app/src/main/java/streaming/AvcLowLatencyDecoder.kt b/PrivyHub/app/src/main/java/streaming/AvcLowLatencyDecoder.kt
+index 54952fe..e8f6357 100644
+--- a/PrivyHub/app/src/main/java/streaming/AvcLowLatencyDecoder.kt
++++ b/PrivyHub/app/src/main/java/streaming/AvcLowLatencyDecoder.kt
+@@ -362,6 +362,9 @@ class AvcLowLatencyDecoder(
+ 
+     // D-BASE-R2: age of the newest decoder output, for the host-side
+     // heartbeat. -1 while nothing has been output yet.
++    // B7: the rendered-frame count, cheap (the stall signal's frame id)
++    fun renderedFrameCount(): Long = renderedFrames.get()
++
+     fun lastOutputAgeMs(): Long {
+         val lastUs = lastOutputAtUs
+ 
+diff --git a/PrivyHub/app/src/main/java/streaming/NativeControllerSender.kt b/PrivyHub/app/src/main/java/streaming/NativeControllerSender.kt
+index 1d387b9..680258e 100644
+--- a/PrivyHub/app/src/main/java/streaming/NativeControllerSender.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeControllerSender.kt
+@@ -86,6 +86,10 @@ class NativeControllerSender(
+     private val motionEvents =
+         AtomicLong(0)
+ 
++    // B7: the stall signal's tick (StallMonitor via the activity; null = today)
++    @Volatile
++    var stallTick: ((Long) -> ByteArray?)? = null
++
+     @Volatile
+     private var running =
+         false
+@@ -677,6 +681,11 @@ class NativeControllerSender(
+                     sequence += 1
+                 }
+ 
++                // B7: a stall / stall_end datagram when one is due (null = today)
++                stallTick?.invoke(System.nanoTime() / 1_000_000L)?.let { d ->
++                    try { socket.send(DatagramPacket(d, d.size)) } catch (_: Exception) { sendErrors.incrementAndGet() }
++                }
++
+                 try {
+                     Thread.sleep(8)
+                 } catch (_: InterruptedException) {
+diff --git a/companion/games/link_drop_recovery.py b/companion/games/link_drop_recovery.py
+index f8fb4fa..59a40d6 100644
+--- a/companion/games/link_drop_recovery.py
++++ b/companion/games/link_drop_recovery.py
+@@ -89,6 +89,10 @@ class LinkDropRecovery:
+ 
+     # B4: the hold's rewind (hold_rewind.Rewinder; only PRIVYHUB_INPUT_HOLD_REWIND=1 wires it). None = B2.
+     _input_hold_rewind: Any = None
++    # B6: the hold's tuning (hold_tuning.Tuning; only PRIVYHUB_INPUT_HOLD_B6=1 wires it). None = B2 + B4.
++    _input_hold_b6: Any = None
++    # B7: the client's stall signal (stall_signal.StallSignal; only PRIVYHUB_STALL_SIGNAL wires it). None = today.
++    _client_stall: Any = None
+ 
+     def __init__(
+         self,
+@@ -262,6 +266,10 @@ class LinkDropRecovery:
+             age_ms=float(age_ms),
+         )
+ 
++        # B6: the episode began as a hold
++        if self._input_hold_b6 is not None:
++            self._input_hold_b6.note_hold(self)
++
+         with self._lock:
+             return self._state == STATE_PAUSED_RECOVERING and self._last_desync_reason == INPUT_HOLD
+ 
+@@ -273,6 +281,14 @@ class LinkDropRecovery:
+ 
+         A hold handed over (v2's controller_silence, the client's desync) or already resumed is left alone. A
+         failed resume hands over to controller_silence, so v2's controller-return exit applies."""
++        # B7: the first packet back can beat the client's stall; a stall within 60 ms takes the hold over
++        if self._client_stall is not None and self._client_stall.defer_release(self):
++            return False
++
++        # B6: a true release counts for the cap; a hold v2 took over arms its prompt resume
++        if self._input_hold_b6 is not None:
++            self._input_hold_b6.note_release(self)
++
+         with self._lock:
+             if self._state != STATE_PAUSED_RECOVERING or self._last_desync_reason != INPUT_HOLD:
+                 return False
+@@ -370,6 +386,14 @@ class LinkDropRecovery:
+         One entry point for both uses of the gate: the startup release and
+         the recovery release. Returns what happened so a caller can log it.
+         """
++        # B7: a late client ready after a stall resume ends that recovery, not a new session
++        if self._client_stall is not None and self._client_stall.ready_after_stall(self):
++            return {"recovered": True, "from_state": "stall_resumed"}
++
++        # B6: a late client ready after a hold-originated resume ends that recovery, not a new session
++        if self._input_hold_b6 is not None and self._input_hold_b6.ready_after_hold(self):
++            return {"recovered": True, "from_state": "hold_resumed"}
++
+         with self._lock:
+             state = self._state
+ 
+@@ -758,6 +782,10 @@ class LinkDropRecovery:
+                 self._give_up_and_save()
+                 return
+ 
++            # B6: a hold v2 took over resumes at the first fresh heartbeat after the link's return
++            if self._input_hold_b6 is not None and self._input_hold_b6.maybe_resume(self, now):
++                return
++
+             if self._controller_exit and self._maybe_exit_controller_pause(
+                 now,
+                 age_ms,
+diff --git a/companion/hold_rewind.py b/companion/hold_rewind.py
+index c5e234b..3c09e54 100644
+--- a/companion/hold_rewind.py
++++ b/companion/hold_rewind.py
+@@ -85,6 +85,10 @@ def buffer_bytes(core_name: str, cap: int) -> int:
+ 
+ def config_block(core_name: str, environ: Mapping[str, str]) -> str:
+     cap, _ = parse_cap(environ.get(CAP_ENV))
++    # B6: the buffer for B6's cap default (PRIVYHUB_INPUT_HOLD_B6=1, no _CAP given)
++    if (environ.get("PRIVYHUB_INPUT_HOLD_B6") or "").strip():
++        import hold_tuning
++        cap = hold_tuning.rewind_cap_default(environ) or cap
+     return ("\n\n# PrivyHub B4 input-hold rewind (PRIVYHUB_INPUT_HOLD_REWIND=1)\n"
+             'rewind_enable = "true"\n'
+             'rewind_granularity = "1"\n'
+@@ -198,6 +202,11 @@ class Rewinder:
+ 
+     # --- the recovery's two resumes ----------------------------------------------------------------------------
+ 
++    def set_pending(self, onset: float, paused_at: float, recovery: Any) -> None:
++        """B7: a client stall's pending rewind (the onset = the client's last displayed frame on this clock)."""
++        with self._lock:
++            self._pending = {"onset": onset, "paused_at": paused_at, "key": getattr(recovery, "_state_since", None)}
++
+     def counter_before(self, pending: Mapping[str, float]) -> int:
+         """Frames the core ran since the onset (0 at the onset), at the confirmed pause less its measured lag."""
+         raw = int(round((pending["paused_at"] - pending["onset"]) * self.fps))
+diff --git a/companion/native_session_io.py b/companion/native_session_io.py
+index e9b058d..d2bf11e 100644
+--- a/companion/native_session_io.py
++++ b/companion/native_session_io.py
+@@ -1634,6 +1634,8 @@ class NativeControllerBridge:
+     _input_hold: Any = None
+     # B4: the hold's rewind masks the player's input while it runs (set_input_mask; only PRIVYHUB_INPUT_HOLD_REWIND=1).
+     _input_mask: Any = None
++    # B7: the client's stall signal (set_stall_signal; only PRIVYHUB_STALL_SIGNAL wires it). None = today.
++    _stall_signal: Any = None
+ 
+     LINUX_VENDOR_ID = 0x1209
+     LINUX_PRODUCT_ID = 0x5048
+@@ -1958,6 +1960,10 @@ class NativeControllerBridge:
+         """B4: the rewind's mask (`masked()`); while it reads True no report is applied (the pads stay neutral)."""
+         self._input_mask = mask
+ 
++    def set_stall_signal(self, signal: Any) -> None:
++        """B7: the stall datagram's parser (`on_datagram`), before the controller packet's size check."""
++        self._stall_signal = signal
++
+     def set_client_silence_callback(
+         self,
+         callback: "Callable[[float], None] | None",
+@@ -2573,6 +2579,10 @@ class NativeControllerBridge:
+                 self._rejected_packets += 1
+                 continue
+ 
++            # B7: the client's stall datagram (24 bytes, PHS1), parsed and queued, never a controller packet
++            if self._stall_signal is not None and self._stall_signal.on_datagram(data, time.monotonic()):
++                continue
++
+             if len(data) != self.PACKET.size:
+                 self._bad_packets += 1
+                 continue
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index 15903fd..972fc0f 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -41,6 +41,16 @@ _hold_rewind = None
+ if _input_hold is not None and (os.environ.get("PRIVYHUB_INPUT_HOLD_REWIND") or "").strip():
+     import hold_rewind as _hold_rewind
+ 
++# B6: the hold's trigger, cap rule and resume from BENCH-R1's data, only with PRIVYHUB_INPUT_HOLD_B6 set. Absent = B2/B4.
++_hold_tuning = None
++if _input_hold is not None and (os.environ.get("PRIVYHUB_INPUT_HOLD_B6") or "").strip():
++    import hold_tuning as _hold_tuning
++
++# B7: the client's stall signal (a picture-only drop pauses the game), only with PRIVYHUB_STALL_SIGNAL set. Absent = today.
++_stall_signal = None
++if (os.environ.get("PRIVYHUB_STALL_SIGNAL") or "").strip():
++    import stall_signal as _stall_signal
++
+ # B1: the impairment shim's uplink blackout, only with PRIVYHUB_IMPAIRMENT set
+ # (a gate only for `blackout-<D>s@both`). Absent = today: nothing imported.
+ _impairment_uplink = None
+@@ -158,6 +168,12 @@ class GamesPlugin:
+         if _hold_rewind is not None:
+             _hold_rewind.wire(self._recovery, self._native_stream._session_io.controller, self._emulator,
+                               os.environ, self.PROJECT_ROOT)
++        # B6: after B2's and B4's wires (H, the cap rule, the resume, B4's cap default)
++        if _hold_tuning is not None:
++            _hold_tuning.wire(self._recovery, self._native_stream._session_io.controller, os.environ)
++        # B7: after the hold's wires (it uses B4's rewinder when present)
++        if _stall_signal is not None:
++            _stall_signal.wire(self._recovery, self._native_stream._session_io.controller, os.environ)
+         if trigger_v2 or os.environ.get("PRIVYHUB_RECOVERY_GAP_LOG") == "1":
+             self._native_stream._session_io.controller.set_gap_log(
+                 self.PROJECT_ROOT / "logs" / "games" / "native_stream_ctrl_gaps.log"
+--- docs/memory/evidence/b7_2026-10-22/predecessors/PrivyHub/NativeStreamActivity.kt	2026-10-22 01:28:33.144599899 -0400
++++ PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt	2026-10-22 01:55:36.333942661 -0400
+@@ -657,6 +657,8 @@
+             ).also {
+                 it.start()
+             }
++        // B7: the stall signal on the controller socket (null = today)
++        stallMonitor?.let { m -> controllerSender?.stallTick = { now -> m.tick(now, stallInputs()) } }
+ 
+         receiver =
+             RtpH264Receiver(
+@@ -2233,6 +2235,13 @@
+             )
+         }
+ 
++        // B7: the stall signal's threshold and counts (null = today: no key)
++        stallMonitor?.let { m ->
++            root.put("stall_signal_ms", m.thresholdMs)
++            root.put("stall_signal_stalls_sent", m.stallsSent)
++            root.put("stall_signal_ends_sent", m.endsSent)
++        }
++
+         // B5: the lock asked and whether the platform held it (null = today: no key)
+         streamWifiLock?.let { lock ->
+             root.put("wifi_lock_mode", lock.mode.wire)
+@@ -2253,6 +2262,18 @@
+     // D-BASE-T1. Three fields, URL-encoded, omitted individually when the
+     // device does not report them — an absent field is the finding, and a
+     // substitute number would not be.
++    // B7: the stall signal's monitor, only with debug.privyhub.stall_signal=<1|ms> (null = today).
++    private val stallMonitor: StallMonitor? by lazy { StallSignalFlag.fromSystem()?.let { StallMonitor(it) } }
++
++    // B7: what the player sees: the output's age, the frame id, the recovery gate (read by the controller thread).
++    private fun stallInputs(): StallInputs =
++        StallInputs(
++            outputAgeMs = decoder?.lastOutputAgeMs() ?: -1L,
++            renderedFrames = decoder?.renderedFrameCount() ?: 0L,
++            inGate = recoveryActive && !gameplayReleased,
++            released = gameplayReleased || recoveryActive,
++        )
++
+     // B5: the stream's Wi-Fi lock, only with debug.privyhub.wifi_lock=<low_latency|high_perf> (null = today).
+     private val streamWifiLock: StreamWifiLock? by lazy { StreamWifiLock.fromSystem(this) }
+ 
+diff --git a/companion/stall_signal.py b/companion/stall_signal.py
+new file mode 100644
+index 0000000..bda3951
+--- /dev/null
++++ b/companion/stall_signal.py
+@@ -0,0 +1,209 @@
++"""B7: the client's stall signal -- a picture-only drop pauses the game, and it resumes when the player can see again.
++
++`PRIVYHUB_STALL_SIGNAL=1` (act at an output age of 150 ms) or `=<ms>` (150-2000). **Absent = today**: nothing imports
++this module, and a stall datagram is a bad packet (it fails the 36-byte size check) exactly as any unknown datagram
++is today. Design: `docs/memory/evidence/b7_2026-10-22/design_written_before_code.md` (hashed before this code).
++
++The client (`debug.privyhub.stall_signal`) sends a 24-byte `PHS1` datagram on the controller socket every 50 ms while
++its output is older than S or its recovery gate (the full-screen "Reconnecting" overlay) stands, then one
++`stall_end` when gameplay is shown again. Here, one owner -- recovery v2's state machine:
++- a stall (age >= T, or the gate bit) while PLAYING: `_enter_recovery(trigger="client_stall")`, B4's pending onset =
++  the client's last displayed frame on this clock (receive time - age; the LAN's one-way delay taken as 0);
++- a stall while a hold stands: B2's own handover (`input_hold_handover`, trigger client_stall); B4's onset stays;
++- the hold's release waits <= 60 ms for a stall first (the first controller packet back beats the next stall);
++- `stall_end`, or 300 ms with no stall: B4's rewind, then the resume (`resumed via stall_end` / `stall_quiet`);
++- a client ready within 20 s of that resume ends the recovery, not a session.
++The receive loop only parses and queues; one worker does the rest.
++"""
++
++from __future__ import annotations
++
++import queue
++import struct
++import threading
++import time
++from typing import Any, Callable, Mapping
++
++FLAG_ENV = "PRIVYHUB_STALL_SIGNAL"
++DEFAULT_MS = 150
++MIN_MS, MAX_MS = 150, 2000
++MAGIC = b"PHS1"
++PACKET = struct.Struct("<4sBBHIqI")         # 24 bytes
++KIND_STALL, KIND_END = 1, 2
++FLAG_IN_GATE = 1
++REASON = "client_stall"
++QUIET_S = 0.30              # no stall for this long while the stall owns the pause = stall_end lost
++DEFER_S = 0.06              # the hold's release waits this long for a stall (> one 50-ms stall interval)
++READY_AFTER_S = 20.0
++
++
++def parse(raw: Any) -> tuple[int | None, str | None]:
++    if raw is None or str(raw).strip() == "":
++        return None, None
++    v = str(raw).strip()
++    if v == "1":
++        return DEFAULT_MS, None
++    if v.isdigit() and MIN_MS <= int(v) <= MAX_MS:
++        return int(v), None
++    return None, f"ignored: {v[:32]!r} is not 1 / {MIN_MS}-{MAX_MS}"
++
++
++def decode(data: bytes) -> tuple[int, bool, int, int, int] | None:
++    """(kind, in_gate, seq, client frame, output age ms) or None."""
++    if len(data) != PACKET.size or data[:4] != MAGIC:
++        return None
++    _m, kind, flags, _r, seq, frames, age = PACKET.unpack(data)
++    if kind not in (KIND_STALL, KIND_END):
++        return None
++    return kind, bool(flags & FLAG_IN_GATE), seq, frames, age
++
++
++class StallSignal:
++    def __init__(self, recovery: Any, threshold_ms: int, clock: Callable[[], float] = time.monotonic,
++                 sleep: Callable[[float], None] = time.sleep, threaded: bool = True):
++        self.recovery = recovery
++        self.threshold_ms = int(threshold_ms)
++        self._clock = clock
++        self._sleep = sleep
++        self._q: "queue.SimpleQueue[tuple]" = queue.SimpleQueue()
++        self.last_stall_rx = 0.0
++        self.stalls = 0
++        self.ends = 0
++        self._ready_until = 0.0
++        self._acted = False                       # this stall episode paused the game or took a hold over
++        if threaded:
++            threading.Thread(target=self._run, name="PrivyHub-Stall-Signal", daemon=True).start()
++
++    # --- the receive loop (never blocks) -------------------------------------------------------------------------
++
++    def on_datagram(self, data: bytes, now: float) -> bool:
++        ev = decode(data)
++        if ev is None:
++            return False
++        if ev[0] == KIND_STALL:
++            self.last_stall_rx = now
++        self._q.put((ev, now))
++        return True
++
++    # --- the worker -----------------------------------------------------------------------------------------------
++
++    def _run(self) -> None:
++        while True:
++            try:
++                item = self._q.get(timeout=0.05)
++            except queue.Empty:
++                item = None
++            try:
++                if item is not None:
++                    self.handle(*item)
++                self.check_quiet(self._clock())
++            except Exception:
++                pass                                  # the signal must never take the worker down
++
++    def _state(self) -> tuple[str, str | None, float]:
++        r = self.recovery
++        with r._lock:
++            return r._state, r._last_desync_reason, r._state_since
++
++    def handle(self, ev: tuple, rx: float) -> None:
++        kind, gate, seq, frame, age = ev
++        state, reason, _key = self._state()
++        if kind == KIND_STALL:
++            self.stalls += 1
++            if age < self.threshold_ms and not gate:
++                return
++            if state == "PLAYING":
++                self.recovery._enter_recovery(trigger=REASON, age_ms=float(age))
++                st, rs, key = self._state()
++                if st == "PAUSED_RECOVERING" and rs == REASON:
++                    self._acted = True
++                    paused_at = self._clock()
++                    self.recovery._log("client_stall", client_frame=frame, age_ms=age, in_gate=gate, seq=seq)
++                    rw = getattr(self.recovery, "_input_hold_rewind", None)
++                    if rw is not None:
++                        rw.set_pending(rx - age / 1000.0, paused_at, self.recovery)
++            elif state == "PAUSED_RECOVERING" and reason == "input_hold":
++                self.recovery._enter_recovery(trigger=REASON, age_ms=float(age))   # B2's own handover
++                self._acted = True
++            return
++        self.ends += 1
++        acted, self._acted = self._acted, False
++        if state == "PAUSED_RECOVERING" and reason == REASON:
++            self.resume("stall_end", frame)
++        elif acted and state == "PLAYING":
++            self.recovery._log("stall_end_after_gate", client_frame=frame)     # the client's gate resumed it first
++
++    def check_quiet(self, now: float) -> None:
++        state, reason, _key = self._state()
++        if state == "PAUSED_RECOVERING" and reason == REASON and now - self.last_stall_rx >= QUIET_S:
++            self.resume("stall_quiet", None)
++
++    def resume(self, via: str, frame: int | None) -> bool:
++        r = self.recovery
++        rw = getattr(r, "_input_hold_rewind", None)
++        if rw is not None:
++            rw.rewind(r, via)
++        error = ""
++        try:
++            r._resume_game()
++        except Exception as exc:
++            error = f"{type(exc).__name__}: {exc}"
++        from games.link_drop_recovery import RESTART_BACKOFF_MS
++        with r._lock:
++            if r._state != "PAUSED_RECOVERING" or r._last_desync_reason != REASON:
++                return False
++            if error:
++                r._log("stall_resume_failed", resume_error=error, via=via)
++                return False                          # the client's gate or the give-up still apply
++            recovering_ms = int((time.monotonic() - r._state_since) * 1000.0)
++            r._state = "PLAYING"
++            r._state_since = time.monotonic()
++            r._restart_backoff_ms = RESTART_BACKOFF_MS
++            r._last_restart_at = None
++            r._client_present_since = time.monotonic()
++            self._ready_until = self._clock() + READY_AFTER_S
++            r._log("resumed", from_state="PAUSED_RECOVERING", recovering_ms=recovering_ms, restarts=r._restarts,
++                   via=via, client_frame=frame)
++            return True
++
++    # --- the recovery's own methods --------------------------------------------------------------------------------
++
++    def defer_release(self, recovery: Any) -> bool:
++        """At note_input_release's top: wait <= 60 ms for a stall; True = the hold was handed to the stall."""
++        state, reason, _key = self._state()
++        if state != "PAUSED_RECOVERING" or reason != "input_hold":
++            return False
++        t0 = self._clock()
++        while True:
++            if self.last_stall_rx >= t0 - DEFER_S:
++                recovery._enter_recovery(trigger=REASON, age_ms=0.0)     # B2's own handover
++                st, rs, _k = self._state()
++                self._acted = self._acted or rs == REASON
++                return rs == REASON
++            if self._clock() - t0 >= DEFER_S:
++                return False
++            self._sleep(0.005)
++
++    def ready_after_stall(self, recovery: Any) -> bool:
++        now = self._clock()
++        with recovery._lock:
++            if recovery._state != "PLAYING" or now >= self._ready_until:
++                return False
++            self._ready_until = 0.0
++            recovery._log("client_ready_after_stall", within_s=READY_AFTER_S)
++            return True
++
++
++def wire(recovery: Any, controller: Any, environ: Mapping[str, str]) -> StallSignal | None:
++    """The plugin's one call (after B2 / B4 / B6's): parse, one config row, the signal on the bridge and the recovery."""
++    t, why = parse(environ.get(FLAG_ENV))
++    if t is None:
++        if why:
++            recovery._log("stall_signal_config", ignored=True, reason=why)
++        return None
++    s = StallSignal(recovery, t)
++    recovery._client_stall = s
++    controller.set_stall_signal(s)
++    recovery._log("stall_signal_config", ignored=False, threshold_ms=t, quiet_s=QUIET_S, defer_s=DEFER_S,
++                  ready_after_s=READY_AFTER_S)
++    return s
+diff --git a/tests/stall_signal/test_stall_signal.py b/tests/stall_signal/test_stall_signal.py
+new file mode 100644
+index 0000000..a108342
+--- /dev/null
++++ b/tests/stall_signal/test_stall_signal.py
+@@ -0,0 +1,313 @@
++#!/usr/bin/env python3
++"""B7: the client's stall signal, host side, with a fake client through the real receive loop.
++
++    python3 -m unittest discover -s tests/stall_signal -v
++
++The fake client sends controller packets at ~430/s and PHS1 stall datagrams on the same socket on a schedule; B1's
++uplink gate makes a @both blackout. The real NativeControllerBridge loop, the real LinkDropRecovery (fake pause /
++resume), B2's real detector + dispatcher, a fake B4 rewinder. B2 / B4 / B6's tests are untouched.
++"""
++
++from __future__ import annotations
++
++import ast
++import json
++import os
++import socket
++import struct
++import subprocess
++import sys
++import tempfile
++import threading
++import time
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++
++import hold_rewind as hr  # noqa: E402
++import impairment as imp  # noqa: E402
++import input_hold as ih  # noqa: E402
++import stall_signal as ss  # noqa: E402
++from games import link_drop_recovery as ldr  # noqa: E402
++
++LOOP = "127.0.0.1"
++
++
++class FakeRewind:
++    def __init__(self, calls):
++        self.calls = calls
++        self.pending = None
++        self.cap = 30
++
++    def set_pending(self, onset, paused_at, rec):
++        self.pending = (onset, paused_at)
++
++    def rewind(self, rec, via):
++        self.calls.append(f"rewind:{via}")
++
++    # B4's dispatcher hooks (the hold's own pending onset)
++    def stamp(self, event, now):
++        pass
++
++    def on_handle(self, event):
++        pass
++
++    def note_paused(self, ours, paused_at, rec):
++        self.pending = ("hold", paused_at) if ours else self.pending
++
++
++class Rig:
++    def __init__(self, threshold=150, hold_ms=None, rewind=True):
++        self.calls = []
++        self.root = Path(tempfile.mkdtemp(prefix="b7_rec_"))
++        self.rec = ldr.LinkDropRecovery(
++            self.root, pause_game=lambda: self.calls.append("pause"), resume_game=lambda: self.calls.append("resume"),
++            save_recovery_state=lambda: {}, restart_encoder=lambda: {}, full_start_encoder=lambda: {},
++            stream_active=lambda: True, end_session=lambda: None, client_packet_age_ms=lambda: 10.0,
++            recovery_save_detail=lambda: {})
++        self.rec._state = ldr.STATE_PLAYING
++        self.rec._state_since = time.monotonic()
++        self.rw = FakeRewind(self.calls) if rewind else None
++        if rewind:
++            self.rec._input_hold_rewind = self.rw
++        self.sig = ss.StallSignal(self.rec, threshold)
++        self.rec._client_stall = self.sig
++        self.det = None
++        if hold_ms:
++            self.disp = ih.HoldDispatcher(self.rec, lambda: False)
++            self.det = ih.InputHoldDetector(hold_ms, self.disp.put)
++
++    def rows(self):
++        p = self.rec.log_path()
++        return [json.loads(x) for x in p.read_text().splitlines()] if p.exists() else []
++
++    def events(self, until=None):
++        """until: the wall time the fake client stopped sending (its silence after that is the harness's own)."""
++        from datetime import datetime
++        keep = (lambda r: until is None or datetime.fromisoformat(r["at_utc"].replace("Z", "+00:00")).timestamp() < until)
++        return [(r["event"], r.get("trigger") or r.get("via")) for r in self.rows() if keep(r)]
++
++
++def stall(kind, gate, seq, frame, age):
++    return ss.PACKET.pack(ss.MAGIC, kind, 1 if gate else 0, 0, seq, frame, int(age))
++
++
++def run(rig, seconds, schedule, gate=None, rate=430):
++    """schedule(t) -> (send_controller, stall datagram or None); the stall datagram at most every 50 ms."""
++    import native_session_io as nsio
++    nsio._impairment_uplink = gate
++    try:
++        br = nsio.NativeControllerBridge(Path(tempfile.mkdtemp(prefix="b7_bridge_")))
++        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++        sock.bind((LOOP, 0))
++        sock.settimeout(0.05)
++        br._socket, br._client_ip = sock, LOOP
++        br._apply_report = lambda **kw: br._neutralized.__setitem__(kw["player"], False)
++        br._neutralize = lambda player=None: None
++        if rig.det is not None:
++            br.set_input_hold(rig.det)
++        if rig.sig is not None:
++            br.set_stall_signal(rig.sig)
++        br._running.set()
++        th = threading.Thread(target=br._receive_loop, daemon=True)
++        th.start()
++        tx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++        port = sock.getsockname()[1]
++        t0 = time.monotonic()
++        n, last_stall, ended = 0, -1.0, False
++        while (t := time.monotonic() - t0) < seconds:
++            due = n / rate
++            if due > t:
++                time.sleep(min(due - t, 0.002))
++                continue
++            ctrl, st = schedule(t)
++            if ctrl:
++                tx.sendto(nsio.NativeControllerBridge.PACKET.pack(nsio.NativeControllerBridge.MAGIC, 1, 0, 0,
++                                                                  n & 0xFFFFFFFF, 0, 0, 0, 0, 0, 0, 0, 0), (LOOP, port))
++            if st is not None and ((st[0] == ss.KIND_END and not ended) or (st[0] == ss.KIND_STALL and t - last_stall >= 0.05)):
++                kind, gate_bit, age = st
++                ended = ended or kind == ss.KIND_END
++                tx.sendto(stall(kind, gate_bit, n, 1000 + n, age), (LOOP, port))
++                if kind == ss.KIND_STALL:
++                    last_stall = t
++            n += 1
++        end_wall = time.time()
++        time.sleep(0.4)
++        br._running.clear()
++        th.join(timeout=2)
++        tx.close()
++        sock.close()
++        return {"t0": t0, "bad": br._bad_packets, "end_wall": end_wall}
++    finally:
++        nsio._impairment_uplink = None
++
++
++class Parse(unittest.TestCase):
++    def test_flag_and_decode(self):
++        self.assertEqual(ss.parse(None), (None, None))
++        self.assertEqual(ss.parse("1"), (150, None))
++        self.assertEqual(ss.parse("400"), (400, None))
++        for bad in ("0", "149", "2001", "on", "x"):
++            t, why = ss.parse(bad)
++            self.assertIsNone(t, bad)
++            self.assertTrue(why.startswith("ignored"))
++        self.assertEqual(ss.PACKET.size, 24)
++        self.assertEqual(ss.decode(stall(1, True, 7, 12345, 431)), (1, True, 7, 12345, 431))
++        self.assertIsNone(ss.decode(b"PHS1" + b"\0" * 19))
++        self.assertIsNone(ss.decode(b"PHI1" + b"\0" * 20))
++        self.assertIsNone(ss.decode(stall(9, False, 1, 1, 1)))
++
++
++class Down(unittest.TestCase):
++    """@down: the uplink alive; the client's frames stop at 0.85 s and return at 2.0 s."""
++
++    def _sched(self, end=True, ages_from=0.85, stop=2.0):
++        def s(t):
++            if ages_from + 0.15 <= t < stop:
++                return True, (ss.KIND_STALL, False, (t - ages_from) * 1000.0)
++            if end and stop <= t < stop + 0.01:
++                return True, (ss.KIND_END, False, 10)
++            return True, None
++        return s
++
++    def test_stall_pauses_stall_end_resumes_with_the_rewind(self):
++        rig = Rig()
++        r = run(rig, 2.6, self._sched())
++        ev = rig.events()
++        self.assertEqual(ev[0], ("desync_pause", "client_stall"), ev)
++        self.assertIn(("client_stall", None), ev)
++        self.assertEqual(ev[-1], ("resumed", "stall_end"))
++        self.assertEqual(rig.calls, ["pause", "rewind:stall_end", "resume"])
++        onset, paused_at = rig.rw.pending
++        self.assertAlmostEqual(onset - r["t0"], 0.85, delta=0.03)          # the client's last frame, host clock
++        pause_row = [x for x in rig.rows() if x["event"] == "desync_pause"][0]
++        self.assertGreaterEqual(pause_row["age_ms"], 150)
++        self.assertLessEqual(pause_row["age_ms"], 230)
++        self.assertEqual(rig.sig.ends, 1)
++
++    def test_below_the_hosts_threshold_nothing(self):
++        rig = Rig(threshold=400)
++        run(rig, 1.6, self._sched(stop=1.2))                               # ages 150-350 ms
++        self.assertEqual(rig.events(), [])
++        self.assertEqual(rig.calls, [])
++
++    def test_a_lost_stall_end_resumes_after_300_ms_quiet(self):
++        rig = Rig()
++        run(rig, 2.8, self._sched(end=False))
++        ev = rig.events()
++        self.assertEqual(ev[-1], ("resumed", "stall_quiet"), ev)
++        self.assertEqual(rig.calls, ["pause", "rewind:stall_quiet", "resume"])
++
++
++class Both(unittest.TestCase):
++    """@both: the uplink dark 1.0-2.0 s (B1's gate); the client stalled from 1.15 s and in its gate until 2.6 s."""
++
++    def _gate(self):
++        return imp.UplinkGate(imp.Blackout(1.0, 100.0, 1.0, epoch=time.monotonic()))
++
++    def test_the_hold_hands_over_to_the_stall_and_resumes_at_stall_end(self):
++        rig = Rig(hold_ms=250)
++
++        def s(t):
++            if 1.15 <= t < 2.6:
++                return True, (ss.KIND_STALL, t >= 2.1, 900 if t < 2.1 else 20)   # frames back at 2.1, gate until 2.6
++            if 2.6 <= t < 2.61:
++                return True, (ss.KIND_END, False, 15)
++            return True, None
++        r = run(rig, 3.1, s, gate=self._gate())
++        ev = rig.events(until=r["end_wall"])
++        self.assertEqual([e for e in ev if e[0] == "desync_pause"], [("desync_pause", "input_hold")], ev)
++        self.assertIn(("input_hold_handover", "client_stall"), ev)
++        self.assertNotIn(("resumed", "input_release"), ev)                 # not resumed behind the overlay
++        self.assertEqual(ev[-1], ("resumed", "stall_end"))
++        self.assertEqual(rig.calls[:3], ["pause", "rewind:stall_end", "resume"])   # (a 4th = the harness's own end)
++        resumed = [x for x in rig.rows() if x["event"] == "resumed"][0]
++        handover = [x for x in rig.rows() if x["event"] == "input_hold_handover"][0]
++        self.assertGreaterEqual(resumed["recovering_ms"], 1200)            # the pause stood to ~2.6 s
++
++    def test_no_stall_b2s_release_after_the_short_wait(self):
++        rig = Rig(hold_ms=250)
++        r = run(rig, 2.6, lambda t: (True, None), gate=self._gate())
++        ev = rig.events(until=r["end_wall"])
++        self.assertEqual(ev, [("desync_pause", "input_hold"), ("resumed", "input_release")], ev)
++        held = [x for x in rig.rows() if x["event"] == "resumed"][0]["held_ms"]
++        self.assertAlmostEqual(held, 1000.0, delta=120.0)
++
++
++class ReadyAndOrder(unittest.TestCase):
++    def _unit(self):
++        rig = Rig()
++        rig.sig = ss.StallSignal(rig.rec, 150, threaded=False)
++        rig.rec._client_stall = rig.sig
++        return rig
++
++    def test_a_ready_after_a_stall_resume_is_not_a_new_session(self):
++        rig = self._unit()
++        now = time.monotonic()
++        rig.sig.last_stall_rx = now
++        rig.sig.handle((ss.KIND_STALL, False, 1, 500, 300), now)
++        rig.sig.handle((ss.KIND_END, False, 2, 501, 10), now + 1.0)
++        self.assertEqual(rig.rec.note_gameplay_released(), {"recovered": True, "from_state": "stall_resumed"})
++        ev = [e for e, _ in rig.events()]
++        self.assertIn("client_ready_after_stall", ev)
++        self.assertNotIn("session_started", ev)
++
++    def test_the_ready_first_then_stall_end_one_resume(self):
++        rig = self._unit()
++        now = time.monotonic()
++        rig.sig.last_stall_rx = now
++        rig.sig.handle((ss.KIND_STALL, True, 1, 500, 1200), now)
++        self.assertEqual(rig.rec.note_gameplay_released()["from_state"], "PAUSED_RECOVERING")   # the gate's path
++        rig.sig.handle((ss.KIND_END, False, 2, 501, 10), now + 0.01)
++        self.assertEqual(rig.calls, ["pause"])                             # the gate's resume is the plugin's
++        self.assertIn(("stall_end_after_gate", None), rig.events())
++        self.assertEqual([e for e, v in rig.events() if e == "resumed"], ["resumed"])
++
++    def test_a_client_desync_during_a_stall_pause_is_ignored(self):
++        rig = self._unit()
++        now = time.monotonic()
++        rig.sig.handle((ss.KIND_STALL, False, 1, 500, 300), now)
++        rig.rec.note_client_desync("output_silence", 1000.0)
++        self.assertEqual(rig.rec._last_desync_reason, "client_stall")
++        self.assertEqual(rig.calls, ["pause"])
++
++    def test_b4_set_pending(self):
++        class E:
++            lock = threading.RLock()
++            _network_cmd_port = None
++        rw = hr.Rewinder(E(), type("C", (), {"_neutralize": lambda self, p=None: None})(), 30)
++        rec = type("R", (), {"_state_since": 5.0, "_log": lambda self, e, **k: None})()
++        rw.set_pending(10.0, 10.0 + 20 / 60.0, rec)
++        self.assertEqual(rw.counter_before(rw._pending), 16)               # 20 - B4's 4-frame lag
++        self.assertEqual(rw._pending["key"], 5.0)
++
++
++class FlagAbsent(unittest.TestCase):
++    def test_not_imported_and_a_stall_datagram_is_a_bad_packet_as_today(self):
++        env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++        code = ("import sys; sys.path.insert(0, 'companion'); import native_session_io as n; "
++                "from games import link_drop_recovery as l; "
++                "print('stall_signal' in sys.modules, n.NativeControllerBridge._stall_signal, l.LinkDropRecovery._client_stall)")
++        out = subprocess.run([sys.executable, "-B", "-c", code], cwd=ROOT, env=env, capture_output=True, text=True,
++                             timeout=120)
++        self.assertEqual(out.stdout.strip(), "False None None", out.stderr[-400:])
++        rig = Rig()
++        rig.sig = None
++        rig.rec._client_stall = None
++        r = run(rig, 0.6, lambda t: (True, (ss.KIND_STALL, False, 500) if 0.2 <= t < 0.4 else None))
++        self.assertGreaterEqual(r["bad"], 3)                               # counted, ignored, as any unknown datagram
++        self.assertEqual(rig.events(), [])
++
++    def test_hook_shapes(self):
++        def ifs(rel, text):
++            tree = ast.parse((ROOT / "companion" / rel).read_text())
++            return [n for n in ast.walk(tree) if isinstance(n, ast.If) and ast.unparse(n.test).startswith(text)]
++        self.assertEqual(len(ifs("native_session_io.py", "self._stall_signal is not None")), 1)
++        self.assertEqual(len(ifs("games/link_drop_recovery.py", "self._client_stall is not None")), 2)
++        self.assertEqual(len(ifs("plugins/games.py", "_stall_signal is not None")), 1)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/PrivyHub/app/src/main/java/streaming/StallSignal.kt b/PrivyHub/app/src/main/java/streaming/StallSignal.kt
+new file mode 100644
+index 0000000..cc01d45
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/StallSignal.kt
+@@ -0,0 +1,102 @@
++package com.safeiot.privyhub.streaming
++
++import java.nio.ByteBuffer
++import java.nio.ByteOrder
++
++/**
++ * B7: the client's stall signal, behind the system property
++ * `debug.privyhub.stall_signal=<1|ms>` (CL-B7P's convention; a reboot clears
++ * it). Absent = today: no monitor, no datagram, the controller loop as is.
++ *
++ * While the player cannot see the game — the output older than S ms (`1` =
++ * 150, the floor above the gate's 120-ms clean bound; or 121-2000), or the
++ * client inside its recovery gate (the full-screen "Reconnecting" overlay) —
++ * the controller sender's loop sends a 24-byte `PHS1` stall datagram on the
++ * controller socket every 50 ms (20/s), then one `stall_end` when gameplay is
++ * shown again. The host decides whether to act (PRIVYHUB_STALL_SIGNAL).
++ * Only after the session passed its startup gate.
++ */
++object StallSignalFlag {
++    const val PROPERTY = "debug.privyhub.stall_signal"
++    const val DEFAULT_MS = 150L
++    const val MIN_MS = 121L
++    const val MAX_MS = 2_000L
++
++    fun parse(value: String?): Long? {
++        val v = value?.trim() ?: return null
++        if (v == "1") return DEFAULT_MS
++        val n = v.toLongOrNull() ?: return null
++        return if (n in MIN_MS..MAX_MS) n else null
++    }
++
++    /** The property, read through reflection; any failure is off. */
++    fun fromSystem(): Long? =
++        try {
++            val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
++            parse(get.invoke(null, PROPERTY) as? String)
++        } catch (_: Throwable) {
++            null
++        }
++}
++
++object StallPacket {
++    const val SIZE = 24
++    const val KIND_STALL = 1
++    const val KIND_END = 2
++    const val FLAG_IN_GATE = 1
++
++    /** "PHS1" | kind u8 | flags u8 | u16 0 | seq u32 | rendered frames i64 | output age ms u32 (little-endian). */
++    fun encode(kind: Int, inGate: Boolean, seq: Int, renderedFrames: Long, outputAgeMs: Long): ByteArray =
++        ByteBuffer.allocate(SIZE).order(ByteOrder.LITTLE_ENDIAN).apply {
++            put(byteArrayOf('P'.code.toByte(), 'H'.code.toByte(), 'S'.code.toByte(), '1'.code.toByte()))
++            put(kind.toByte())
++            put((if (inGate) FLAG_IN_GATE else 0).toByte())
++            putShort(0)
++            putInt(seq)
++            putLong(renderedFrames)
++            putInt(outputAgeMs.coerceIn(0L, 0xFFFF_FFFFL).toInt())
++        }.array()
++}
++
++/** What the monitor reads each loop: the output's age (-1 before the first frame), the frame count, the gate. */
++data class StallInputs(
++    val outputAgeMs: Long,
++    val renderedFrames: Long,
++    val inGate: Boolean,
++    val released: Boolean,
++)
++
++/** Pure: called from the controller loop (~every 8 ms); returns a datagram when one is due. */
++class StallMonitor(val thresholdMs: Long, private val intervalMs: Long = 50L) {
++    private var stalled = false
++    private var lastSentMs = 0L
++    private var seq = 0
++    var stallsSent = 0L
++        private set
++    var endsSent = 0L
++        private set
++
++    fun tick(nowMs: Long, inp: StallInputs): ByteArray? {
++        if (!stalled && (!inp.released || inp.outputAgeMs < 0L)) {
++            return null
++        }
++        val stallNow = inp.outputAgeMs >= thresholdMs || inp.inGate
++        if (stallNow) {
++            if (stalled && nowMs - lastSentMs < intervalMs) {
++                return null
++            }
++            stalled = true
++            lastSentMs = nowMs
++            stallsSent++
++            return StallPacket.encode(StallPacket.KIND_STALL, inp.inGate, seq++, inp.renderedFrames,
++                inp.outputAgeMs.coerceAtLeast(0L))
++        }
++        if (stalled) {
++            stalled = false
++            endsSent++
++            return StallPacket.encode(StallPacket.KIND_END, false, seq++, inp.renderedFrames,
++                inp.outputAgeMs.coerceAtLeast(0L))
++        }
++        return null
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/StallSignalTest.kt b/PrivyHub/app/src/test/java/streaming/StallSignalTest.kt
+new file mode 100644
+index 0000000..7a1016b
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/StallSignalTest.kt
+@@ -0,0 +1,95 @@
++package com.safeiot.privyhub.streaming
++
++import java.nio.ByteBuffer
++import java.nio.ByteOrder
++import org.junit.Assert.assertArrayEquals
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertNotNull
++import org.junit.Assert.assertNull
++import org.junit.Test
++
++/**
++ * B7: the client's stall signal. The flag (absent = off), the 24-byte
++ * datagram, and the monitor on a fake clock: nothing before the first frame
++ * or the startup gate, a stall every 50 ms (not every 8-ms loop) while the
++ * output is old or the recovery gate stands, exactly one stall_end.
++ */
++class StallSignalTest {
++
++    private fun inp(age: Long, frames: Long = 100L, gate: Boolean = false, released: Boolean = true) =
++        StallInputs(age, frames, gate, released)
++
++    private fun kind(d: ByteArray) = d[4].toInt()
++
++    @Test
++    fun flagTable() {
++        assertEquals(150L, StallSignalFlag.parse("1"))
++        assertEquals(400L, StallSignalFlag.parse(" 400 "))
++        assertEquals(121L, StallSignalFlag.parse("121"))
++        assertEquals(2000L, StallSignalFlag.parse("2000"))
++        for (bad in listOf(null, "", "0", "120", "2001", "on", "-5", "150ms")) {
++            assertNull(bad, StallSignalFlag.parse(bad))
++        }
++    }
++
++    @Test
++    fun noAndroidPropertyIsOff() {
++        assertNull(StallSignalFlag.fromSystem())
++    }
++
++    @Test
++    fun encoding() {
++        val d = StallPacket.encode(StallPacket.KIND_STALL, true, 7, 123_456_789_012L, 431L)
++        assertEquals(24, d.size)
++        val b = ByteBuffer.wrap(d).order(ByteOrder.LITTLE_ENDIAN)
++        val magic = ByteArray(4).also { b.get(it) }
++        assertArrayEquals("PHS1".toByteArray(), magic)
++        assertEquals(1, b.get().toInt())
++        assertEquals(1, b.get().toInt())
++        assertEquals(0, b.short.toInt())
++        assertEquals(7, b.int)
++        assertEquals(123_456_789_012L, b.long)
++        assertEquals(431, b.int)
++    }
++
++    @Test
++    fun nothingBeforeTheFirstFrameOrTheStartupGate() {
++        val m = StallMonitor(150L)
++        assertNull(m.tick(0L, inp(-1L)))                       // no frame yet
++        assertNull(m.tick(10L, inp(5_000L, released = false)))  // still in the startup gate
++        assertEquals(0L, m.stallsSent)
++    }
++
++    @Test
++    fun stallEvery50msThenOneEnd() {
++        val m = StallMonitor(150L)
++        assertNull(m.tick(0L, inp(20L)))
++        val sent = mutableListOf<Int>()
++        var t = 0L
++        var age = 150L
++        while (t < 500L) {                                     // the 8-ms loop, 500 ms stalled
++            m.tick(t, inp(age))?.let { sent.add(kind(it)) }
++            t += 8L; age += 8L
++        }
++        assertEquals(9, sent.size)                             // ~20 / s (t = 0, then every >= 50 ms), not 62
++        assertEquals(setOf(StallPacket.KIND_STALL), sent.toSet())
++        val end = m.tick(t, inp(10L))
++        assertNotNull(end)
++        assertEquals(StallPacket.KIND_END, kind(end!!))
++        assertNull(m.tick(t + 8L, inp(12L)))                   // exactly one
++        assertEquals(1L, m.endsSent)
++        assertNotNull(m.tick(t + 100L, inp(200L)))             // a new episode
++    }
++
++    @Test
++    fun theRecoveryGateKeepsTheStallThoughFramesAreFresh() {
++        val m = StallMonitor(150L)
++        val first = m.tick(0L, inp(1_200L))!!
++        assertEquals(StallPacket.KIND_STALL, kind(first))
++        val gated = m.tick(60L, inp(15L, gate = true))!!      // frames back, the overlay still up
++        assertEquals(StallPacket.KIND_STALL, kind(gated))
++        assertEquals(1, gated[5].toInt())                      // the gate bit
++        assertNull(m.tick(70L, inp(15L, gate = true)))
++        assertEquals(StallPacket.KIND_END, kind(m.tick(120L, inp(16L, gate = false))!!))
++    }
++}

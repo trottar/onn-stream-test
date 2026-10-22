@@ -1,6 +1,6 @@
 # Known issues and deferred work
 
-## 2026-10-21 LAN-R1: the ladder does not step down on loss on the LAN — OPEN; a rule BUILT behind `PRIVYHUB_LAN_LOSS_RULE=1`, NOT ADOPTED, live test pending
+## 2026-10-21 LAN-R1: the ladder does not step down on loss on the LAN — OPEN; a rule BUILT behind `PRIVYHUB_LAN_LOSS_RULE=1`, NOT ADOPTED; BENCH-R1 (2026-10-22): the rule back to B, the input hold not a candidate until its trigger is fixed, the death reproduced on the bench
 
 **The standard (the user, 2026-10-21):** "This product needs to work at any house especially lan as long as the Internet
 is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.md`.
@@ -51,8 +51,59 @@ is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.m
     - Fake-core tests: back at the onset ± 1; a failed rewind still resumes. Flag absent = B2 (AST, config hash).
     - Open (A, BENCH-R2): the CPU per core with rewind on; whether Beetle PSX HW's hardware renderer rewinds at all.
     - Record: `docs/memory/evidence/B4_INPUT_HOLD_REWIND_2026-10-22.md`.
-  - **Next (session A):** BENCH-R1 (the blackout cells, the hold on / off, the loss cells with the LAN loss rule),
-    then CL-B8 (install B3's APK, one LAN window), then BENCH-R2 (the hold + rewind; rewind's CPU per core).
+- **ML-R1 (2026-10-22, offline): a learned hitch early-warning detector does not beat the 250-ms silence rule at a usable operating point** (+2.5 points at matched duty). Its hashed bar read "met" only because my false-alarm definition let an always-on alarm pass. No flag; nothing on the host side precedes the death. Record: `docs/memory/evidence/ML_R1_HITCH_EARLY_WARNING_2026-10-23.md`.
+- **BENCH-R1, measured (2026-10-22, session A; 8 / 8 cells valid, host gates met in all; nothing adopted):**
+  - **The death reproduced** (`blackout-4s@both,every=120s`): all four shape terms in all 5 blackouts, harsher than
+    the death (4.0 s dark, ~4.2-s output gaps, ~3,300 lost after FEC). It ran 85.0 unattended frames (core running)
+    per blackout, against the death's 83.8.
+    - Disclosed: B1 lets the client's desync POST through, so v2 paused the core ~1.5 s into each bench blackout. A
+      real drop runs unheld up to ~234 frames.
+  - **The hold (`PRIVYHUB_INPUT_HOLD=250`): NOT a candidate until its trigger is fixed (the hashed reading).**
+    - **Cell 8, a clean link: 18 holds in 11.5 min.** These are the room's own ≥ 250-ms uplink silences; the shim
+      dropped nothing.
+    - **Cell 6: −73 % per blackout, against the ≥ 90 % bar.** In the four held blackouts, 6 frames (−93 %).
+    - The fifth was skipped by the 6-holds-per-60-s cap, spent a minute earlier on the room's flapping uplink.
+    - v2's `client_output_silence` took every blackout hold over ~1 s in. No blackout ended in a release, and the core
+      resumed 6 s after a 4-s blackout began.
+  - **The LAN loss rule: back to B (the hashed reading).**
+    - Cells 2-4 stepped 0.9-1.5 min into the stream (predicted 3-4) and reached 5000 at 5.2-8.2 min (predicted
+      8-11).
+    - Cell 4 stepped ~2 min before G8-S1's `capacity_mild` point (predicted 2 s before).
+    - Disclosed: on LAN-R1's own clock (from the driver's cell start), cell 2 matches.
+  - **Downlink-only (`@down`):** 0 unattended frames. The game ran ~2.2-2.6 s without a picture before v2 paused it,
+    and the 4th recovery escalated 7000→5000.
+  - Record: `docs/memory/evidence/BENCH_R1_BLACKOUT_AND_LOSS_CELLS_2026-10-22.md`.
+  - **Next (for the user):** commit; B takes the hold's trigger (false holds, the cap, the v2 handover) and the rule's
+    timing; B1's desync gate on `@both`. Then CL-B8 (B3's APK), then BENCH-R2 (the hold + rewind), as sketched by B.
+- **Built against BENCH-R1's findings (2026-10-22, session B queue C: B5, B6, B7, B1b, LAN-R2; none adopted, no live
+  run, nothing committed):**
+  - **B5, the Wi-Fi lock:** the client held **no Wi-Fi lock and no wake lock** during a stream (settled from the
+    code). It is now built behind `debug.privyhub.wifi_lock=<low_latency|high_perf>`, acquired at the session's
+    start and released at its end and on pause.
+    - The idle LAN's 250-ms silences (cell 8: 15.6 / 10 min) are its A/B question.
+    - Record: `docs/memory/evidence/B5_CLIENT_WIFI_LOCK_2026-10-22.md`.
+  - **B6, the hold's trigger from the data:** **H = 950 ms** under `PRIVYHUB_INPUT_HOLD_B6=1` (`1` / `on`). That is
+    the smallest H with ≤ 1 silence per 10 min on each clean session.
+    - **The idle room makes 800-1,336-ms silences, so length alone cannot catch the death's 342-967-ms gaps** (950
+      catches 1 of 5).
+    - The rewind cap is 62. The cap counts released holds only, with a 10-s disarm.
+    - A hold v2 took over resumes at the first fresh heartbeat after the return.
+    - A late client ready after a hold resume is no longer a new session (it reset the ladder).
+    - Record: `docs/memory/evidence/B6_INPUT_HOLD_TRIGGER_2026-10-22.md`.
+  - **B7, the stall signal:** with `debug.privyhub.stall_signal=1` / `PRIVYHUB_STALL_SIGNAL=1`, the client sends a
+    stall datagram while it cannot show the game: an old output, or its black "Reconnecting" overlay.
+    - The host pauses (`client_stall`) and resumes with B4's rewind when the client shows gameplay again.
+    - That is cell 7's fix, and it closes the hold's release behind the client's black overlay.
+    - The APK (B5 + B7) `cb0935c8…1080` is pinned, not installed.
+    - Record: `docs/memory/evidence/B7_CLIENT_STALL_SIGNAL_2026-10-22.md`.
+  - **B1b:** `@both` now also drops the client's desync while dark (start / stop / ready pass; why stated).
+    Record: `docs/memory/evidence/B1B_SHIM_GATE_2026-10-22.md`.
+  - **LAN-R2:** **no host signal on file tells Sunday's pre-burst loss from 1 % random loss.**
+    - The rule is renamed to its purpose: `PRIVYHUB_LAN_LOSS_RULE=bidir` steps down when the link is bad in both
+      directions (unrec AND ≥ 2 uplink silences ≥ 400 ms in each window).
+    - Replayed: 0 asks in BENCH-R1 cells 1-4, every clean window and last night; Sunday 05:06:09Z.
+    - Record: `docs/memory/evidence/LAN_R2_LOSS_RULE_RETHOUGHT_2026-10-22.md`.
+  - **Next (session A):** BENCH-R2, as in `handoffs/SESSION_B_DONE_2026-10-22C.md`.
 
 ## 2026-10-20 UX-R1, the user's extended evening (2026-10-20 04:19-05:22Z) was bad and got worse — OPEN; the files agree; link vs onn not separable from them; UX-R2: the second evening mostly clean, the damage not repeated (one event so far, untested past play-minute 44); H5 closed (not new); UX-R3: one of last night's two "deaths" found (04:54:55-59Z, a 4-s drop in both directions); the second not distinguishable
 
