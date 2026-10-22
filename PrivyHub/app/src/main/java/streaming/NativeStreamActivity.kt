@@ -659,6 +659,8 @@ class NativeStreamActivity :
             }
         // B7: the stall signal on the controller socket (null = today)
         stallMonitor?.let { m -> controllerSender?.stallTick = { now -> m.tick(now, stallInputs()) } }
+        // B10: the loss guard's keyframe request on the controller socket (null = today)
+        lossGuard?.let { g -> controllerSender?.keyframeTick = { g.takeRequest() } }
 
         receiver =
             RtpH264Receiver(
@@ -717,6 +719,8 @@ class NativeStreamActivity :
             ).also {
                 it.start()
             }
+        // B10: the loss guard on the receiver (null = today)
+        receiver?.lossGuard = lossGuard
 
         streamState =
             "Starting host stream..."
@@ -2242,6 +2246,17 @@ class NativeStreamActivity :
             root.put("stall_signal_ends_sent", m.endsSent)
         }
 
+        // B10: the loss guard's mode and counters (null = today: no key)
+        lossGuard?.let { g ->
+            root.put("loss_guard_mode", g.mode.wire)
+            root.put("frames_after_dropped_reference", g.framesAfterDroppedReference.get())
+            root.put("loss_guard_episodes", g.episodes.get())
+            root.put("loss_guard_frames_held", g.framesHeld.get())
+            root.put("loss_guard_timeouts", g.timeouts.get())
+            root.put("loss_guard_max_wait_ms", g.maxWaitObservedMs.get())
+            root.put("keyframe_requests_sent", g.requestsSent.get())
+        }
+
         // B5: the lock asked and whether the platform held it (null = today: no key)
         streamWifiLock?.let { lock ->
             root.put("wifi_lock_mode", lock.mode.wire)
@@ -2273,6 +2288,9 @@ class NativeStreamActivity :
             inGate = recoveryActive && !gameplayReleased,
             released = gameplayReleased || recoveryActive,
         )
+
+    // B10: the loss guard, only with debug.privyhub.loss_guard=<1|count> (null = today).
+    private val lossGuard: LossGuard? by lazy { LossGuardFlag.fromSystem()?.let { LossGuard(it) } }
 
     // B5: the stream's Wi-Fi lock, only with debug.privyhub.wifi_lock=<low_latency|high_perf> (null = today).
     private val streamWifiLock: StreamWifiLock? by lazy { StreamWifiLock.fromSystem(this) }
@@ -2472,6 +2490,8 @@ class NativeStreamActivity :
                 // is the whole-session one. Nothing new is sampled — the
                 // gap is one max() already taken on the receive path.
                 audioQuery(aud, audWindowGapMs) +
+                // B10: the loss guard's counters (null = today: nothing)
+                (lossGuard?.query() ?: "") +
                 // D-BASE-T1: the onn's own thermal state travels with the
                 // heartbeat, so a session that never posts a report still
                 // leaves a temperature trace on the host.

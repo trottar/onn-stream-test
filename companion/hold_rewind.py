@@ -66,6 +66,9 @@ def parse(environ: Mapping[str, str]) -> tuple[bool, str | None]:
     raw = (environ.get(FLAG_ENV) or "").strip()
     if not raw:
         return False, None
+    # B9: `all` (B4's behaviour, every core) and `state` (the scratch savestate, rewind_cores) are on, as `1`
+    if raw in ("all", "state"):
+        raw = "1"
     if raw != "1":
         return False, f"ignored: {raw[:32]!r} is not 1"
     import input_hold
@@ -89,6 +92,10 @@ def config_block(core_name: str, environ: Mapping[str, str]) -> str:
     if (environ.get("PRIVYHUB_INPUT_HOLD_B6") or "").strip():
         import hold_tuning
         cap = hold_tuning.rewind_cap_default(environ) or cap
+    # B8: the buffer for B8's cap default (PRIVYHUB_INPUT_HOLD_B8=1, no _CAP given)
+    if (environ.get("PRIVYHUB_INPUT_HOLD_B8") or "").strip():
+        import hold_ownership
+        cap = hold_ownership.rewind_cap(environ, cap)
     return ("\n\n# PrivyHub B4 input-hold rewind (PRIVYHUB_INPUT_HOLD_REWIND=1)\n"
             'rewind_enable = "true"\n'
             'rewind_granularity = "1"\n'
@@ -102,6 +109,11 @@ def apply_session_config(session_text: str, core_name: str, environ: Mapping[str
     on, _ = parse(environ)
     if not on:
         return session_text
+    # B9: the rewind keys only for a core the mode allows (`1`: the allow-list; `state`: none; `all`: every core)
+    if (environ.get(FLAG_ENV) or "").strip() in ("1", "state"):
+        import rewind_cores
+        if not rewind_cores.config_allowed(core_name, environ):
+            return session_text
     for line in session_text.splitlines():
         if line.strip().split("=", 1)[0].strip() in KEYS:
             return session_text
@@ -158,6 +170,9 @@ class Nci:
 
 class Rewinder:
     """Stamps (loop thread), the pending hold (worker), the rewind (the recovery's resumes)."""
+
+    # B9: the per-core release (rewind_cores.Cores; only PRIVYHUB_INPUT_HOLD_REWIND=1 / state wires it). None = B4.
+    b9: Any = None
 
     def __init__(self, emulator: Any, controller: Any, cap: int, *, fps: float = FPS,
                  clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep,
@@ -226,6 +241,12 @@ class Rewinder:
                           counter_after=before,
                           onset_to_pause_ms=round((pending["paused_at"] - pending["onset"]) * 1000.0, 1),
                           pause_confirm_lag_frames=PAUSE_CONFIRM_LAG_FRAMES)
+            # B8: the carried hold's split (pre-hold frames + the stall's own), only B8 writes it
+            if "b8" in pending:
+                fields.update(pending["b8"])
+            # B9: a core off the allow-list is skipped; `state` loads the scratch savestate instead of rewinding
+            if self.b9 is not None and self.b9.handles(pending):
+                return self.b9.release(self, recovery, fields, pending)
             if requested <= 0:
                 return self._row(recovery, "input_release", fields, rewind_ms=0.0)
             why = self._precondition()
@@ -314,6 +335,10 @@ def wire(recovery: Any, controller: Any, emulator: Any, environ: Mapping[str, st
     cfg = None if project_root is None else Path(project_root) / "data/games/retroarch/config/privyhub-session.cfg"
     rw = Rewinder(emulator, controller, cap, session_config=cfg)
     recovery._input_hold_rewind = rw
+    # B9: `1` = the allow-list, `state` = the scratch savestate (rewind_cores); `all` = B4's
+    if (environ.get(FLAG_ENV) or "").strip() in ("1", "state"):
+        import rewind_cores
+        rewind_cores.wire(rw, recovery, controller, emulator, environ)
     controller.set_input_mask(rw.mask)
     recovery._log("input_hold_rewind_config", ignored=False, cap=cap, cap_note=cap_why, fps=FPS, method=METHOD,
                   mask_input=MASK_INPUT, confirm_frames=CONFIRM_FRAMES)

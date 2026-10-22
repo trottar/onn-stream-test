@@ -484,8 +484,9 @@ class TheConfig(unittest.TestCase):
         new = ROOT / "companion" / "games" / "emulator_manager.py"
         want = {"snes9x_libretro.so": 27_262_976, "bsnes_libretro.so": 9_437_184,
                 "mednafen_psx_hw_libretro.so": 537_919_488, "fceumm_libretro.so": 20_971_520}
+        on_all = dict(self.ON, PRIVYHUB_INPUT_HOLD_REWIND="all")   # B9: `all` = B4's behaviour for every core
         for core, size in want.items():
-            text = generate(new, self.ON, core)["text"]
+            text = generate(new, on_all, core)["text"]
             for key in hr.KEYS:
                 self.assertEqual(len(re.findall(rf"(?m)^{key} = ", text)), 1, (core, key))
             self.assertIn(f'rewind_buffer_size = "{size}"', text, core)
@@ -493,7 +494,7 @@ class TheConfig(unittest.TestCase):
             self.assertIn('rewind_granularity = "1"', text)
             self.assertIn('audio_rewind_mute = "true"', text)
         self.assertEqual(hr.buffer_bytes("snes9x_libretro.so", 10), 10 * 1024 * 1024)   # 823,536 x 12 = 9.42 MiB -> 10
-        text = generate(new, dict(self.ON, PRIVYHUB_INPUT_HOLD_REWIND_CAP="10"), "mednafen_psx_hw_libretro.so")["text"]
+        text = generate(new, dict(on_all, PRIVYHUB_INPUT_HOLD_REWIND_CAP="10"), "mednafen_psx_hw_libretro.so")["text"]
         self.assertIn(f'rewind_buffer_size = "{hr.buffer_bytes("mednafen_psx_hw_libretro.so", 10)}"', text)
 
     def test_a_base_with_a_rewind_key_is_left_alone(self):

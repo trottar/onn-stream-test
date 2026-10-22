@@ -147,7 +147,7 @@ def run(rig, seconds, schedule, gate=None, rate=430):
 class Parse(unittest.TestCase):
     def test_flag_and_decode(self):
         self.assertEqual(ss.parse(None), (None, None))
-        self.assertEqual(ss.parse("1"), (150, None))
+        self.assertEqual(ss.parse("1"), (400, None))   # B9: `1` = 400 (was 150; 150 stays reachable by number)
         self.assertEqual(ss.parse("400"), (400, None))
         for bad in ("0", "149", "2001", "on", "x"):
             t, why = ss.parse(bad)

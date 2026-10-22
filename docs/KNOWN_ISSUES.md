@@ -1,6 +1,6 @@
 # Known issues and deferred work
 
-## 2026-10-21 LAN-R1: the ladder does not step down on loss on the LAN — OPEN; a rule BUILT behind `PRIVYHUB_LAN_LOSS_RULE=1`, NOT ADOPTED; BENCH-R1 (2026-10-22): the rule back to B, the input hold not a candidate until its trigger is fixed, the death reproduced on the bench; BENCH-R2 (2026-10-22): the Wi-Fi lock not the cause, the hold + rewind + stall stack not a candidate, APK cb0935c8 CONFIRMED
+## 2026-10-21 LAN-R1: the ladder does not step down on loss on the LAN — OPEN; a rule BUILT behind `PRIVYHUB_LAN_LOSS_RULE=1`, NOT ADOPTED; BENCH-R1 (2026-10-22): the rule back to B, the input hold not a candidate until its trigger is fixed, the death reproduced on the bench; BENCH-R2 (2026-10-22): the Wi-Fi lock not the cause, the hold + rewind + stall stack not a candidate, APK cb0935c8 CONFIRMED; queue D (2026-10-22): the ownership at the return, the stall threshold 400 + rewind SNES-only, the client's loss guard BUILT, NOT ADOPTED (BENCH-R3 next)
 
 **The standard (the user, 2026-10-21):** "This product needs to work at any house especially lan as long as the Internet
 is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.md`.
@@ -129,6 +129,28 @@ is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.m
       mechanism shows with the previous APK. A B question: freeze to the next IDR, or count it.
   - **APK `cb0935c8…` CONFIRMED** and pinned (`e1_suite` `EXPECT_APK`, `c3_l4_nft_night`); `93d29b4a…` preserved.
   - Record: `docs/memory/evidence/BENCH_R2_LOCK_HOLD_STALL_CELLS_2026-10-23.md`.
+- **Built against BENCH-R2's findings (2026-10-22, session B queue D: B8, B9, B10; none adopted, no live run):**
+  - **B8, the ownership at the return** (`PRIVYHUB_INPUT_HOLD_B8=1`, with the hold + B6 + the stall signal): BENCH-R2
+    b1's rows show the client's gate `ready` resumed the stall-owned pause without the rewind, and a gate-bit stall
+    then paused again. Now the handover carries the hold's rewind (pre-hold + the client's frames before the silence),
+    the first fresh heartbeat after the return resumes (`hold_return_stall`), gate stalls over fresh output are
+    ignored, the late `stall_end` is a logged no-op; B4's cap 72. 14 tests; B2 / B4 / B6 / B7 unchanged and green.
+    Record: `docs/memory/evidence/B8_HOLD_STALL_OWNERSHIP_2026-10-22.md`.
+  - **B9:** `PRIVYHUB_STALL_SIGNAL=1` now acts at **400 ms** (150 by number). `PRIVYHUB_INPUT_HOLD_REWIND=1` rewinds
+    **snes9x / bsnes only** (Beetle PSX HW: no buffer, `rewind_skipped`); `all` = B4; `state` = a scratch
+    `SAVE_STATE_SLOT 9` at a 400-ms silence loaded into a running core at the release (D-BASE-R3C's paused-load
+    caveat), the PS1 path for A to measure. 13 tests. Record:
+    `docs/memory/evidence/B9_STALL_THRESHOLD_AND_REWIND_CORES_2026-10-22.md`.
+  - **B10, the corrupted pictures:** settled — after a dropped access unit the client queues the next P-frames,
+    decoded from a lost reference until the next IDR (every 15 frames), and nothing counts them; **the host cannot
+    force an IDR on demand** (ffmpeg's GOP is fixed at launch; the only path is a restart, 287-318 ms, longer than the
+    ≤ 250-ms wait). Built: `debug.privyhub.loss_guard=1` holds non-IDR frames until the next IDR (the last good frame
+    stays, cap 600 ms) and sends one `keyframe_request`; `=count` counts only; `frames_after_dropped_reference` in the
+    report and the heartbeat; `PRIVYHUB_LOSS_GUARD=1` counts / rate-limits the requests (today they force nothing).
+    JVM 99 / 99, host 10. APK (B5 + B7 + B10) `bf5114a2…cf73` pinned, NOT installed. Record:
+    `docs/memory/evidence/B10_CLIENT_LOSS_GUARD_2026-10-22.md`.
+  - **Next (session A):** BENCH-R3 on snes9x with the link report on, then CL-B9 (the loss guard, the user
+    watching), as in `handoffs/SESSION_B_DONE_2026-10-22D.md`.
 ## 2026-10-20 UX-R1, the user's extended evening (2026-10-20 04:19-05:22Z) was bad and got worse — OPEN; the files agree; link vs onn not separable from them; UX-R2: the second evening mostly clean, the damage not repeated (one event so far, untested past play-minute 44); H5 closed (not new); UX-R3: one of last night's two "deaths" found (04:54:55-59Z, a 4-s drop in both directions); the second not distinguishable
 
 **The user's standard, verbatim (2026-10-21): "This product needs to work at any house especially lan as long as the Internet is over 50mb/s."**

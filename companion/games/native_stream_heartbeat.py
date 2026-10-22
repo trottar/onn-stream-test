@@ -86,6 +86,15 @@ if (os.environ.get("PRIVYHUB_LINK_REPORT") or "").strip() == "1":
         "link_wifi_standard",
     )
 
+# B10: the client's loss-guard counters, only with PRIVYHUB_LOSS_GUARD set. Absent = today: None, nothing recorded.
+LOSS_GUARD_FIELDS = None
+if (os.environ.get("PRIVYHUB_LOSS_GUARD") or "").strip():
+    LOSS_GUARD_FIELDS = (
+        "frames_after_dropped_reference",
+        "loss_guard_episodes",
+        "loss_guard_frames_held",
+    )
+
 # D-BASE-R5: the receiver's own cumulative counters, the same ones the
 # end-of-session report reads. Passed through unchanged — nothing here
 # derives, smooths or resets them, so a delta between any two heartbeats of
@@ -169,6 +178,12 @@ def append_native_stream_heartbeat(
     # B3: the link fields, when the flag set them up
     if LINK_FIELDS is not None:
         for field in LINK_FIELDS:
+            if field in values:
+                record[field] = values[field]
+
+    # B10: the loss-guard counters, when the flag set them up
+    if LOSS_GUARD_FIELDS is not None:
+        for field in LOSS_GUARD_FIELDS:
             if field in values:
                 record[field] = values[field]
 

@@ -1,0 +1,21 @@
+test_hook_shapes (test_keyframe_request.FlagAbsent.test_hook_shapes) ... ok
+test_not_imported_and_no_fields (test_keyframe_request.FlagAbsent.test_not_imported_and_no_fields) ... ok
+test_parse_and_decode (test_keyframe_request.TheFlagAndThePacket.test_parse_and_decode) ... ok
+test_fields_only_with_the_flag (test_keyframe_request.TheHeartbeat.test_fields_only_with_the_flag) ... ok
+test_absent_a_request_is_a_bad_packet_as_today (test_keyframe_request.TheRequestPath.test_absent_a_request_is_a_bad_packet_as_today) ... /tmp/b_q22d/tests/keyframe_request/test_keyframe_request.py:142: ResourceWarning: unclosed <socket.socket fd=3, family=2, type=2, proto=0, laddr=('127.0.0.1', 49635)>
+  bad = through_the_loop(None, [request(1), request(2)])
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_one_request_one_forced_idr (test_keyframe_request.TheRequestPath.test_one_request_one_forced_idr) ... ok
+test_the_rate_limit_one_per_500_ms (test_keyframe_request.TheRequestPath.test_the_rate_limit_one_per_500_ms) ... ok
+test_through_the_receive_loop (test_keyframe_request.TheRequestPath.test_through_the_receive_loop) ... /tmp/b_q22d/tests/keyframe_request/test_keyframe_request.py:136: ResourceWarning: unclosed <socket.socket fd=3, family=2, type=2, proto=0, laddr=('127.0.0.1', 44975)>
+  bad = through_the_loop(k, [request(1), request(2), b"PHK1" + b"\x00" * 30], spacing=0.01)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_today_no_runtime_idr_forces_nothing_and_says_why (test_keyframe_request.TheRequestPath.test_today_no_runtime_idr_forces_nothing_and_says_why) ... ok
+test_wire (test_keyframe_request.TheRequestPath.test_wire) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.821s
+
+OK

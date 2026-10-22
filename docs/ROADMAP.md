@@ -1885,6 +1885,18 @@ rewind cap and the resume.** Record: `docs/memory/evidence/B6_INPUT_HOLD_TRIGGER
 directions are bad); replayed 0 false asks with cells 1-4 added.** Record:
 `docs/memory/evidence/LAN_R2_LOSS_RULE_RETHOUGHT_2026-10-22.md`.
 
+**B8 (2026-10-22): the hold / stall ownership at the return, built behind `PRIVYHUB_INPUT_HOLD_B8=1` (the pre-hold
+frames carried through the stall's handover; the resume at the first fresh heartbeat after the return).** Record:
+`docs/memory/evidence/B8_HOLD_STALL_OWNERSHIP_2026-10-22.md`.
+
+**B9 (2026-10-22): `PRIVYHUB_STALL_SIGNAL=1` = 400 ms; `PRIVYHUB_INPUT_HOLD_REWIND=1` rewinds snes9x / bsnes only, `all`
+= B4, `state` = a scratch savestate for PS1 (A measures).** Record:
+`docs/memory/evidence/B9_STALL_THRESHOLD_AND_REWIND_CORES_2026-10-22.md`.
+
+**B10 (2026-10-22): the client's loss guard (freeze to the next IDR, one keyframe request, the corrupted-frame counter),
+built behind `debug.privyhub.loss_guard` / `PRIVYHUB_LOSS_GUARD`; the host cannot force an IDR today; APK (B5 + B7 +
+B10) pinned, not installed.** Record: `docs/memory/evidence/B10_CLIENT_LOSS_GUARD_2026-10-22.md`.
+
 ## G9 — Remote foundation checkpoint
 
 Acceptance:

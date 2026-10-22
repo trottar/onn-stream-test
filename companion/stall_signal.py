@@ -1,6 +1,6 @@
 """B7: the client's stall signal -- a picture-only drop pauses the game, and it resumes when the player can see again.
 
-`PRIVYHUB_STALL_SIGNAL=1` (act at an output age of 150 ms) or `=<ms>` (150-2000). **Absent = today**: nothing imports
+`PRIVYHUB_STALL_SIGNAL=1` (act at an output age of 400 ms, B9; B7's 150 by number) or `=<ms>` (150-2000). **Absent = today**: nothing imports
 this module, and a stall datagram is a bad packet (it fails the 36-byte size check) exactly as any unknown datagram
 is today. Design: `docs/memory/evidence/b7_2026-10-22/design_written_before_code.md` (hashed before this code).
 
@@ -25,7 +25,7 @@ import time
 from typing import Any, Callable, Mapping
 
 FLAG_ENV = "PRIVYHUB_STALL_SIGNAL"
-DEFAULT_MS = 150
+DEFAULT_MS = 400            # B9: `1` acts at 400 (BENCH-R2 d1: 2.6 pauses / 10 min at 150 on a clean hour, d2: 0 at 400)
 MIN_MS, MAX_MS = 150, 2000
 MAGIC = b"PHS1"
 PACKET = struct.Struct("<4sBBHIqI")         # 24 bytes
@@ -110,6 +110,10 @@ class StallSignal:
         state, reason, _key = self._state()
         if kind == KIND_STALL:
             self.stalls += 1
+            # B8: after a hold episode's resume, the client's gate over fresh output is not a drop
+            if (getattr(self.recovery, "_input_hold_b8", None) is not None
+                    and self.recovery._input_hold_b8.ignore_stall(self.recovery, gate, age, self.threshold_ms, frame)):
+                return
             if age < self.threshold_ms and not gate:
                 return
             if state == "PLAYING":
@@ -125,9 +129,16 @@ class StallSignal:
             elif state == "PAUSED_RECOVERING" and reason == "input_hold":
                 self.recovery._enter_recovery(trigger=REASON, age_ms=float(age))   # B2's own handover
                 self._acted = True
+            # B8: the handover carries the hold's pending rewind (onset = the client's last frame when earlier)
+            if getattr(self.recovery, "_input_hold_b8", None) is not None:
+                self.recovery._input_hold_b8.note_stall(self.recovery, rx, age, frame)
             return
         self.ends += 1
         acted, self._acted = self._acted, False
+        # B8: a stall_end on a core the hold episode already resumed is a logged no-op
+        if (getattr(self.recovery, "_input_hold_b8", None) is not None
+                and self.recovery._input_hold_b8.late_stall_end(self.recovery, state, reason, frame)):
+            return
         if state == "PAUSED_RECOVERING" and reason == REASON:
             self.resume("stall_end", frame)
         elif acted and state == "PLAYING":

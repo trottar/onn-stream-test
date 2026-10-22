@@ -59,8 +59,13 @@ class InputHoldDetector:
 
     # B6: the trigger's tuning (hold_tuning.Tuning; only PRIVYHUB_INPUT_HOLD_B6=1 sets it). None = B2.
     tuning: Any = None
+    # B9: the scratch savestate's mark (rewind_cores.StateMark; only PRIVYHUB_INPUT_HOLD_REWIND=state). None = B2.
+    state_mark: Any = None
 
     def on_quiet(self, now: float, last_any_packet_at: float) -> None:
+        # B9: the scratch save inside the silence, before the hold (PRIVYHUB_INPUT_HOLD_REWIND=state only)
+        if self.state_mark is not None:
+            self.state_mark.on_quiet(now, last_any_packet_at)
         # B6: B2's logic with B6's cap rule (PRIVYHUB_INPUT_HOLD_B6 only)
         if self.tuning is not None:
             return self.tuning.on_quiet(self, now, last_any_packet_at)

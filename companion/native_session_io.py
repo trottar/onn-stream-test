@@ -1638,6 +1638,8 @@ class NativeControllerBridge:
     _stall_signal: Any = None
     # LAN-R2: the uplink's own silences for the bidirectional loss rule (only PRIVYHUB_LAN_LOSS_RULE=bidir). None = today.
     _uplink_silences: Any = None
+    # B10: the client's keyframe request (set_keyframe_request; only PRIVYHUB_LOSS_GUARD=1 wires it). None = today.
+    _keyframe_request: Any = None
 
     LINUX_VENDOR_ID = 0x1209
     LINUX_PRODUCT_ID = 0x5048
@@ -1969,6 +1971,10 @@ class NativeControllerBridge:
     def set_stall_signal(self, signal: Any) -> None:
         """B7: the stall datagram's parser (`on_datagram`), before the controller packet's size check."""
         self._stall_signal = signal
+
+    def set_keyframe_request(self, requests: Any) -> None:
+        """B10: the keyframe request's parser (`on_datagram`), before the controller packet's size check."""
+        self._keyframe_request = requests
 
     def set_client_silence_callback(
         self,
@@ -2587,6 +2593,10 @@ class NativeControllerBridge:
 
             # B7: the client's stall datagram (24 bytes, PHS1), parsed and queued, never a controller packet
             if self._stall_signal is not None and self._stall_signal.on_datagram(data, time.monotonic()):
+                continue
+
+            # B10: the client's keyframe request (24 bytes, PHK1), parsed and queued, never a controller packet
+            if self._keyframe_request is not None and self._keyframe_request.on_datagram(data, time.monotonic()):
                 continue
 
             if len(data) != self.PACKET.size:

@@ -93,6 +93,8 @@ class LinkDropRecovery:
     _input_hold_b6: Any = None
     # B7: the client's stall signal (stall_signal.StallSignal; only PRIVYHUB_STALL_SIGNAL wires it). None = today.
     _client_stall: Any = None
+    # B8: the hold / stall ownership at the return (hold_ownership.Ownership; only PRIVYHUB_INPUT_HOLD_B8=1). None = B7.
+    _input_hold_b8: Any = None
 
     def __init__(
         self,
@@ -270,6 +272,10 @@ class LinkDropRecovery:
         if self._input_hold_b6 is not None:
             self._input_hold_b6.note_hold(self)
 
+        # B8: the episode began as a hold (its pending rewind is carried through a stall's handover)
+        if self._input_hold_b8 is not None:
+            self._input_hold_b8.note_hold(self)
+
         with self._lock:
             return self._state == STATE_PAUSED_RECOVERING and self._last_desync_reason == INPUT_HOLD
 
@@ -281,6 +287,10 @@ class LinkDropRecovery:
 
         A hold handed over (v2's controller_silence, the client's desync) or already resumed is left alone. A
         failed resume hands over to controller_silence, so v2's controller-return exit applies."""
+        # B8: the first controller packet back is the hold episode's return (before B7's wait)
+        if self._input_hold_b8 is not None:
+            self._input_hold_b8.note_return(self)
+
         # B7: the first packet back can beat the client's stall; a stall within 60 ms takes the hold over
         if self._client_stall is not None and self._client_stall.defer_release(self):
             return False
@@ -784,6 +794,10 @@ class LinkDropRecovery:
 
             # B6: a hold v2 took over resumes at the first fresh heartbeat after the link's return
             if self._input_hold_b6 is not None and self._input_hold_b6.maybe_resume(self, now):
+                return
+
+            # B8: a hold the client's stall took over resumes at the first fresh heartbeat after the return
+            if self._input_hold_b8 is not None and self._input_hold_b8.maybe_resume(self, now):
                 return
 
             if self._controller_exit and self._maybe_exit_controller_pause(

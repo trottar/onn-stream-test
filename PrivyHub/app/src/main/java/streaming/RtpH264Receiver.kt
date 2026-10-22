@@ -410,6 +410,10 @@ class RtpH264Receiver(
         ByteArray? =
         null
 
+    // B10: the loss guard (LossGuard; only debug.privyhub.loss_guard sets it). null = today.
+    @Volatile
+    var lossGuard: LossGuard? = null
+
     fun start() {
         if (running) {
             return
@@ -2272,6 +2276,9 @@ class RtpH264Receiver(
                 if (currentSequenceGap) {
                     sequenceGapAccessUnitDrops.incrementAndGet()
                 }
+
+                // B10: a dropped access unit (null = today)
+                if (!waitingForIdr) lossGuard?.onDrop()
             }
 
             currentTimestamp = timestamp
@@ -2356,6 +2363,8 @@ class RtpH264Receiver(
 
                     episodeDroppedNonIdrAus +=
                         1L
+                } else if (lossGuard?.deliver(isIdr) == false) {
+                    // B10: held, not queued -- the surface keeps the last complete frame until the next IDR
                 } else {
                     if (
                         waitingForIdr &&
@@ -2427,6 +2436,9 @@ class RtpH264Receiver(
                 if (currentSequenceGap) {
                     sequenceGapAccessUnitDrops.incrementAndGet()
                 }
+
+                // B10: a dropped access unit (null = today)
+                if (currentCorrupt && !waitingForIdr) lossGuard?.onDrop()
             }
 
             accessUnit.reset()

@@ -1,0 +1,925 @@
+--- a/companion/native_session_io.py
++++ b/companion/native_session_io.py
+@@ -1638,6 +1638,8 @@
+     _stall_signal: Any = None
+     # LAN-R2: the uplink's own silences for the bidirectional loss rule (only PRIVYHUB_LAN_LOSS_RULE=bidir). None = today.
+     _uplink_silences: Any = None
++    # B10: the client's keyframe request (set_keyframe_request; only PRIVYHUB_LOSS_GUARD=1 wires it). None = today.
++    _keyframe_request: Any = None
+ 
+     LINUX_VENDOR_ID = 0x1209
+     LINUX_PRODUCT_ID = 0x5048
+@@ -1970,6 +1972,10 @@
+         """B7: the stall datagram's parser (`on_datagram`), before the controller packet's size check."""
+         self._stall_signal = signal
+ 
++    def set_keyframe_request(self, requests: Any) -> None:
++        """B10: the keyframe request's parser (`on_datagram`), before the controller packet's size check."""
++        self._keyframe_request = requests
++
+     def set_client_silence_callback(
+         self,
+         callback: "Callable[[float], None] | None",
+@@ -2589,6 +2595,10 @@
+             if self._stall_signal is not None and self._stall_signal.on_datagram(data, time.monotonic()):
+                 continue
+ 
++            # B10: the client's keyframe request (24 bytes, PHK1), parsed and queued, never a controller packet
++            if self._keyframe_request is not None and self._keyframe_request.on_datagram(data, time.monotonic()):
++                continue
++
+             if len(data) != self.PACKET.size:
+                 self._bad_packets += 1
+                 continue
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -31,6 +31,13 @@
+ if (os.environ.get("PRIVYHUB_LINK_REPORT") or "").strip() == "1":
+     from games.native_stream_heartbeat import LINK_FIELDS as _LINK_FIELDS
+ 
++# B10: the client's keyframe request and the heartbeat's loss-guard counters, only with PRIVYHUB_LOSS_GUARD set.
++_keyframe_request = None
++_LOSS_GUARD_FIELDS = None
++if (os.environ.get("PRIVYHUB_LOSS_GUARD") or "").strip():
++    import keyframe_request as _keyframe_request
++    from games.native_stream_heartbeat import LOSS_GUARD_FIELDS as _LOSS_GUARD_FIELDS
++
+ # B2: the fast input hold, only with PRIVYHUB_INPUT_HOLD set. Absent = today: nothing imported.
+ _input_hold = None
+ if (os.environ.get("PRIVYHUB_INPUT_HOLD") or "").strip():
+@@ -189,6 +196,9 @@
+         # B8: after B6's and B7's wires (it needs both)
+         if _hold_ownership is not None:
+             _hold_ownership.wire(self._recovery, self._native_stream._session_io.controller, os.environ)
++        # B10: the client's keyframe request on the controller socket (today's encoder control forces nothing)
++        if _keyframe_request is not None:
++            _keyframe_request.wire(self._recovery, self._native_stream._session_io.controller, os.environ)
+         # LAN-R2: the controller bridge feeds the rule's uplink term
+         if _lan_bidir is not None:
+             self._native_stream._session_io.controller.set_uplink_silences(_lan_bidir.UPLINK)
+@@ -3704,6 +3714,12 @@
+                     if field in query:
+                         values[field] = self._parse_int(self._first(query, field), -1)
+ 
++            # B10: the client's loss-guard counters (ints), when the flag is set
++            if _LOSS_GUARD_FIELDS is not None:
++                for field in _LOSS_GUARD_FIELDS:
++                    if field in query:
++                        values[field] = self._parse_int(self._first(query, field), -1)
++
+             if not values:
+                 raise ValueError(
+                     "Missing native stream heartbeat fields"
+--- a/companion/games/native_stream_heartbeat.py
++++ b/companion/games/native_stream_heartbeat.py
+@@ -86,6 +86,15 @@
+         "link_wifi_standard",
+     )
+ 
++# B10: the client's loss-guard counters, only with PRIVYHUB_LOSS_GUARD set. Absent = today: None, nothing recorded.
++LOSS_GUARD_FIELDS = None
++if (os.environ.get("PRIVYHUB_LOSS_GUARD") or "").strip():
++    LOSS_GUARD_FIELDS = (
++        "frames_after_dropped_reference",
++        "loss_guard_episodes",
++        "loss_guard_frames_held",
++    )
++
+ # D-BASE-R5: the receiver's own cumulative counters, the same ones the
+ # end-of-session report reads. Passed through unchanged — nothing here
+ # derives, smooths or resets them, so a delta between any two heartbeats of
+@@ -172,6 +181,12 @@
+             if field in values:
+                 record[field] = values[field]
+ 
++    # B10: the loss-guard counters, when the flag set them up
++    if LOSS_GUARD_FIELDS is not None:
++        for field in LOSS_GUARD_FIELDS:
++            if field in values:
++                record[field] = values[field]
++
+     path = heartbeat_log_path(
+         project_root
+     )
+--- a/PrivyHub/app/src/main/java/streaming/RtpH264Receiver.kt
++++ b/PrivyHub/app/src/main/java/streaming/RtpH264Receiver.kt
+@@ -410,6 +410,10 @@
+         ByteArray? =
+         null
+ 
++    // B10: the loss guard (LossGuard; only debug.privyhub.loss_guard sets it). null = today.
++    @Volatile
++    var lossGuard: LossGuard? = null
++
+     fun start() {
+         if (running) {
+             return
+@@ -2272,6 +2276,9 @@
+                 if (currentSequenceGap) {
+                     sequenceGapAccessUnitDrops.incrementAndGet()
+                 }
++
++                // B10: a dropped access unit (null = today)
++                if (!waitingForIdr) lossGuard?.onDrop()
+             }
+ 
+             currentTimestamp = timestamp
+@@ -2356,6 +2363,8 @@
+ 
+                     episodeDroppedNonIdrAus +=
+                         1L
++                } else if (lossGuard?.deliver(isIdr) == false) {
++                    // B10: held, not queued -- the surface keeps the last complete frame until the next IDR
+                 } else {
+                     if (
+                         waitingForIdr &&
+@@ -2427,6 +2436,9 @@
+                 if (currentSequenceGap) {
+                     sequenceGapAccessUnitDrops.incrementAndGet()
+                 }
++
++                // B10: a dropped access unit (null = today)
++                if (currentCorrupt && !waitingForIdr) lossGuard?.onDrop()
+             }
+ 
+             accessUnit.reset()
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -659,6 +659,8 @@
+             }
+         // B7: the stall signal on the controller socket (null = today)
+         stallMonitor?.let { m -> controllerSender?.stallTick = { now -> m.tick(now, stallInputs()) } }
++        // B10: the loss guard's keyframe request on the controller socket (null = today)
++        lossGuard?.let { g -> controllerSender?.keyframeTick = { g.takeRequest() } }
+ 
+         receiver =
+             RtpH264Receiver(
+@@ -717,6 +719,8 @@
+             ).also {
+                 it.start()
+             }
++        // B10: the loss guard on the receiver (null = today)
++        receiver?.lossGuard = lossGuard
+ 
+         streamState =
+             "Starting host stream..."
+@@ -2242,6 +2246,17 @@
+             root.put("stall_signal_ends_sent", m.endsSent)
+         }
+ 
++        // B10: the loss guard's mode and counters (null = today: no key)
++        lossGuard?.let { g ->
++            root.put("loss_guard_mode", g.mode.wire)
++            root.put("frames_after_dropped_reference", g.framesAfterDroppedReference.get())
++            root.put("loss_guard_episodes", g.episodes.get())
++            root.put("loss_guard_frames_held", g.framesHeld.get())
++            root.put("loss_guard_timeouts", g.timeouts.get())
++            root.put("loss_guard_max_wait_ms", g.maxWaitObservedMs.get())
++            root.put("keyframe_requests_sent", g.requestsSent.get())
++        }
++
+         // B5: the lock asked and whether the platform held it (null = today: no key)
+         streamWifiLock?.let { lock ->
+             root.put("wifi_lock_mode", lock.mode.wire)
+@@ -2274,6 +2289,9 @@
+             released = gameplayReleased || recoveryActive,
+         )
+ 
++    // B10: the loss guard, only with debug.privyhub.loss_guard=<1|count> (null = today).
++    private val lossGuard: LossGuard? by lazy { LossGuardFlag.fromSystem()?.let { LossGuard(it) } }
++
+     // B5: the stream's Wi-Fi lock, only with debug.privyhub.wifi_lock=<low_latency|high_perf> (null = today).
+     private val streamWifiLock: StreamWifiLock? by lazy { StreamWifiLock.fromSystem(this) }
+ 
+@@ -2472,6 +2490,8 @@
+                 // is the whole-session one. Nothing new is sampled — the
+                 // gap is one max() already taken on the receive path.
+                 audioQuery(aud, audWindowGapMs) +
++                // B10: the loss guard's counters (null = today: nothing)
++                (lossGuard?.query() ?: "") +
+                 // D-BASE-T1: the onn's own thermal state travels with the
+                 // heartbeat, so a session that never posts a report still
+                 // leaves a temperature trace on the host.
+--- a/PrivyHub/app/src/main/java/streaming/NativeControllerSender.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeControllerSender.kt
+@@ -90,6 +90,10 @@
+     @Volatile
+     var stallTick: ((Long) -> ByteArray?)? = null
+ 
++    // B10: the loss guard's keyframe request (LossGuard.takeRequest via the activity; null = today)
++    @Volatile
++    var keyframeTick: (() -> ByteArray?)? = null
++
+     @Volatile
+     private var running =
+         false
+@@ -686,6 +690,11 @@
+                     try { socket.send(DatagramPacket(d, d.size)) } catch (_: Exception) { sendErrors.incrementAndGet() }
+                 }
+ 
++                // B10: the loss guard's one keyframe_request per episode (null = today)
++                keyframeTick?.invoke()?.let { d ->
++                    try { socket.send(DatagramPacket(d, d.size)) } catch (_: Exception) { sendErrors.incrementAndGet() }
++                }
++
+                 try {
+                     Thread.sleep(8)
+                 } catch (_: InterruptedException) {
+--- /dev/null
++++ b/companion/keyframe_request.py
+@@ -0,0 +1,154 @@
++"""B10: the client's keyframe request under loss -- the host's side.
++
++`PRIVYHUB_LOSS_GUARD=1`. **Absent = today**: nothing imports this module, and a `PHK1` datagram is a bad packet (it
++fails the 36-byte size check) exactly as any unknown datagram is today. Design:
++`docs/memory/evidence/b10_2026-10-22/design_written_before_code.md` (hashed before this code).
++
++The client (`debug.privyhub.loss_guard=1`) holds non-IDR frames after a dropped access unit until the next IDR and
++sends one 24-byte `PHK1` request per episode on the controller socket. Here the receive loop only parses and queues;
++one worker counts every request and acts on at most one per 500 ms through an encoder-control seam,
++`control.force_idr() -> {"forced": bool, ...}`.
++
++**Settled from the code (design §0.3):** the running encoder (an `ffmpeg h264_vaapi` process, `-g 15`) has no
++runtime keyframe command; the only path to a fresh IDR is the actuator's encoder restart, whose 287-318-ms output gap
++is longer than the <= 250-ms wait for the next natural IDR. So today's control, `NoRuntimeIdr`, forces nothing and
++says why; a forced IDR (a control that can) is logged `keyframe_forced`. The heartbeat's loss-guard fields are
++recorded with this flag (games/native_stream_heartbeat.py).
++"""
++
++from __future__ import annotations
++
++import queue
++import struct
++import threading
++import time
++from typing import Any, Callable, Mapping
++
++FLAG_ENV = "PRIVYHUB_LOSS_GUARD"
++MAGIC = b"PHK1"
++PACKET = struct.Struct("<4sBBHIqI")         # 24 bytes, B7's layout
++KIND_REQUEST = 1
++MIN_INTERVAL_S = 0.5        # at most one request acted on per 500 ms
++SUMMARY_S = 60.0
++NO_RUNTIME_IDR = ("no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is fixed at launch; the only path is "
++                  "an encoder restart, whose 287-318-ms output gap exceeds the <= 250-ms wait for the next IDR")
++
++
++def parse(raw: Any) -> tuple[bool, str | None]:
++    if raw is None or str(raw).strip() == "":
++        return False, None
++    v = str(raw).strip()
++    if v == "1":
++        return True, None
++    return False, f"ignored: {v[:32]!r} is not 1"
++
++
++def decode(data: bytes) -> tuple[int, int, int] | None:
++    """(seq, the client's delivered access units, drops) or None."""
++    if len(data) != PACKET.size or data[:4] != MAGIC:
++        return None
++    _m, kind, _flags, _r, seq, delivered, drops = PACKET.unpack(data)
++    if kind != KIND_REQUEST:
++        return None
++    return seq, delivered, drops
++
++
++class NoRuntimeIdr:
++    """Today's encoder control: it cannot force an IDR without a restart, and a restart costs more than it saves."""
++
++    def force_idr(self) -> dict[str, Any]:
++        return {"forced": False, "reason": NO_RUNTIME_IDR}
++
++
++class KeyframeRequests:
++    def __init__(self, recovery: Any, control: Any = None, clock: Callable[[], float] = time.monotonic,
++                 threaded: bool = True):
++        self.recovery = recovery
++        self.control = control if control is not None else NoRuntimeIdr()
++        self._clock = clock
++        self._q: "queue.SimpleQueue[tuple]" = queue.SimpleQueue()
++        self.received = 0
++        self.acted = 0
++        self.rate_limited = 0
++        self.forced = 0
++        self.unforced = 0
++        self._last_acted: float | None = None
++        self._last_summary = clock()
++        self._summarized = (0, 0, 0, 0, 0)
++        self._reason: str | None = None
++        if threaded:
++            threading.Thread(target=self._run, name="PrivyHub-Keyframe-Request", daemon=True).start()
++
++    # --- the receive loop (never blocks) -------------------------------------------------------------------------
++
++    def on_datagram(self, data: bytes, now: float) -> bool:
++        ev = decode(data)
++        if ev is None:
++            return False
++        self._q.put((ev, now))
++        return True
++
++    # --- the worker -----------------------------------------------------------------------------------------------
++
++    def _run(self) -> None:
++        while True:
++            try:
++                item = self._q.get(timeout=1.0)
++            except queue.Empty:
++                item = None
++            try:
++                if item is not None:
++                    self.handle(*item)
++                self.maybe_summary(self._clock())
++            except Exception:
++                pass                                   # the request must never take the worker down
++
++    def handle(self, ev: tuple[int, int, int], rx: float) -> None:
++        seq, delivered, drops = ev
++        self.received += 1
++        if self._last_acted is not None and rx - self._last_acted < MIN_INTERVAL_S:
++            self.rate_limited += 1
++            return
++        self._last_acted = rx
++        self.acted += 1
++        try:
++            result = self.control.force_idr() or {}
++        except Exception as exc:
++            result = {"forced": False, "reason": f"{type(exc).__name__}: {exc}"}
++        if result.get("forced"):
++            self.forced += 1
++            self.recovery._log("keyframe_forced", client_seq=seq, client_delivered_aus=delivered, client_drops=drops,
++                               request_to_forced_ms=round((self._clock() - rx) * 1000.0, 1),
++                               via=result.get("via"))
++        else:
++            self.unforced += 1
++            self._reason = str(result.get("reason") or "")[:240] or None
++
++    def counts(self) -> tuple[int, int, int, int, int]:
++        return self.received, self.acted, self.rate_limited, self.forced, self.unforced
++
++    def maybe_summary(self, now: float) -> None:
++        if now - self._last_summary < SUMMARY_S:
++            return
++        self._last_summary = now
++        c = self.counts()
++        if c == self._summarized:
++            return
++        self._summarized = c
++        self.recovery._log("keyframe_requests", received=c[0], acted=c[1], rate_limited=c[2], forced=c[3],
++                           unforced=c[4], min_interval_ms=int(MIN_INTERVAL_S * 1000), reason=self._reason)
++
++
++def wire(recovery: Any, controller: Any, environ: Mapping[str, str], control: Any = None) -> KeyframeRequests | None:
++    """The plugin's one call: parse, one config row, the requests on the bridge."""
++    on, why = parse(environ.get(FLAG_ENV))
++    if not on:
++        if why:
++            recovery._log("loss_guard_config", ignored=True, reason=why)
++        return None
++    k = KeyframeRequests(recovery, control)
++    controller.set_keyframe_request(k)
++    recovery._log("loss_guard_config", ignored=False, min_interval_ms=int(MIN_INTERVAL_S * 1000),
++                  control=type(k.control).__name__, reason=(NO_RUNTIME_IDR if isinstance(k.control, NoRuntimeIdr)
++                                                            else None))
++    return k
+--- /dev/null
++++ b/tests/keyframe_request/test_keyframe_request.py
+@@ -0,0 +1,204 @@
++#!/usr/bin/env python3
++"""B10 (host): the client's keyframe request, through the real controller receive loop; a fake encoder control.
++
++    python3 -m unittest discover -s tests/keyframe_request -v
++"""
++
++from __future__ import annotations
++
++import ast
++import json
++import os
++import socket
++import subprocess
++import sys
++import tempfile
++import threading
++import time
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++
++import keyframe_request as kr  # noqa: E402
++from games import link_drop_recovery as ldr  # noqa: E402
++from games import native_stream_heartbeat as nsh  # noqa: E402
++
++LOOP = "127.0.0.1"
++
++
++def recovery():
++    rec = ldr.LinkDropRecovery(
++        Path(tempfile.mkdtemp(prefix="b10_rec_")), pause_game=lambda: None, resume_game=lambda: None,
++        save_recovery_state=lambda: {}, restart_encoder=lambda: {}, full_start_encoder=lambda: {},
++        stream_active=lambda: True, end_session=lambda: None, client_packet_age_ms=lambda: 10.0,
++        recovery_save_detail=lambda: {})
++    return rec
++
++
++def rows(rec):
++    p = rec.log_path()
++    return [json.loads(x) for x in p.read_text().splitlines()] if p.exists() else []
++
++
++class FakeControl:
++    def __init__(self):
++        self.calls = 0
++
++    def force_idr(self):
++        self.calls += 1
++        return {"forced": True, "via": "fake_encoder"}
++
++
++def request(seq, delivered=1000, drops=1):
++    return kr.PACKET.pack(kr.MAGIC, kr.KIND_REQUEST, 0, 0, seq, delivered, drops)
++
++
++def through_the_loop(requests_obj, datagrams, spacing=0.0):
++    """The real NativeControllerBridge receive loop; returns its bad-packet count."""
++    import native_session_io as nsio
++    br = nsio.NativeControllerBridge(Path(tempfile.mkdtemp(prefix="b10_bridge_")))
++    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++    sock.bind((LOOP, 0))
++    sock.settimeout(0.05)
++    br._socket, br._client_ip = sock, LOOP
++    br._neutralize = lambda player=None: None
++    if requests_obj is not None:
++        br.set_keyframe_request(requests_obj)
++    br._running.set()
++    th = threading.Thread(target=br._receive_loop, daemon=True)
++    th.start()
++    tx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++    for d in datagrams:
++        tx.sendto(d, (LOOP, sock.getsockname()[1]))
++        if spacing:
++            time.sleep(spacing)
++    time.sleep(0.3)
++    br._running.clear()
++    th.join(timeout=2)
++    tx.close()
++    return br._bad_packets
++
++
++class TheFlagAndThePacket(unittest.TestCase):
++    def test_parse_and_decode(self):
++        self.assertEqual(kr.parse(None), (False, None))
++        self.assertEqual(kr.parse("1"), (True, None))
++        self.assertFalse(kr.parse("yes")[0])
++        self.assertEqual(kr.decode(request(5, 77, 2)), (5, 77, 2))
++        self.assertIsNone(kr.decode(request(5)[:23]))
++        self.assertIsNone(kr.decode(b"PHS1" + request(5)[4:]))               # B7's stall is not a request
++        self.assertEqual(kr.PACKET.size, 24)
++
++
++class TheRequestPath(unittest.TestCase):
++    def test_one_request_one_forced_idr(self):
++        rec, ctl = recovery(), FakeControl()
++        k = kr.KeyframeRequests(rec, ctl, threaded=False)
++        k.handle((1, 1000, 1), time.monotonic())
++        self.assertEqual(ctl.calls, 1)
++        r = [x for x in rows(rec) if x["event"] == "keyframe_forced"]
++        self.assertEqual(len(r), 1)
++        self.assertEqual((r[0]["client_seq"], r[0]["via"]), (1, "fake_encoder"))
++
++    def test_the_rate_limit_one_per_500_ms(self):
++        rec, ctl = recovery(), FakeControl()
++        k = kr.KeyframeRequests(rec, ctl, threaded=False)
++        t0 = 1000.0
++        for i in range(10):
++            k.handle((i, 1000 + i, 1), t0 + i * 0.04)                          # 10 in 360 ms
++        self.assertEqual(ctl.calls, 1)
++        self.assertEqual(k.counts(), (10, 1, 9, 1, 0))
++        k.handle((10, 2000, 1), t0 + 0.55)                                     # 550 ms after the acted one
++        self.assertEqual(ctl.calls, 2)
++
++    def test_today_no_runtime_idr_forces_nothing_and_says_why(self):
++        rec = recovery()
++        k = kr.KeyframeRequests(rec, threaded=False)
++        t = [0.0]
++        k._clock = lambda: t[0]
++        k._last_summary = 0.0
++        k.handle((1, 10, 1), 1.0)
++        k.handle((2, 20, 1), 1.1)
++        t[0] = 61.0
++        k.maybe_summary(61.0)
++        self.assertEqual([x["event"] for x in rows(rec)], ["keyframe_requests"])
++        s = rows(rec)[0]
++        self.assertEqual((s["received"], s["acted"], s["rate_limited"], s["forced"], s["unforced"]), (2, 1, 1, 0, 1))
++        self.assertIn("no runtime IDR path", s["reason"])
++        k.maybe_summary(125.0)                                                 # nothing new: no row
++        self.assertEqual(len(rows(rec)), 1)
++
++    def test_through_the_receive_loop(self):
++        rec, ctl = recovery(), FakeControl()
++        k = kr.KeyframeRequests(rec, ctl, threaded=True)
++        bad = through_the_loop(k, [request(1), request(2), b"PHK1" + b"\x00" * 30], spacing=0.01)
++        self.assertEqual(k.received, 2)
++        self.assertEqual(ctl.calls, 1)
++        self.assertEqual(bad, 1)                                               # a 34-byte datagram: bad, as today
++
++    def test_absent_a_request_is_a_bad_packet_as_today(self):
++        bad = through_the_loop(None, [request(1), request(2)])
++        self.assertEqual(bad, 2)
++
++    def test_wire(self):
++        rec = recovery()
++
++        class Ctrl:
++            k = None
++
++            def set_keyframe_request(self, k):
++                self.k = k
++        c = Ctrl()
++        self.assertIsNone(kr.wire(rec, c, {}))
++        self.assertIsNone(kr.wire(rec, c, {"PRIVYHUB_LOSS_GUARD": "on"}))
++        self.assertIsNotNone(kr.wire(rec, c, {"PRIVYHUB_LOSS_GUARD": "1"}))
++        self.assertIsInstance(c.k.control, kr.NoRuntimeIdr)
++        cfg = [x for x in rows(rec) if x["event"] == "loss_guard_config"]
++        self.assertEqual([x["ignored"] for x in cfg], [True, False])
++        self.assertEqual(cfg[1]["control"], "NoRuntimeIdr")
++
++
++class TheHeartbeat(unittest.TestCase):
++    def test_fields_only_with_the_flag(self):
++        root = Path(tempfile.mkdtemp(prefix="b10_hb_"))
++        values = {"sequence": 1, "frames_after_dropped_reference": 42, "loss_guard_episodes": 6,
++                  "loss_guard_frames_held": 40}
++        saved = nsh.LOSS_GUARD_FIELDS
++        try:
++            nsh.LOSS_GUARD_FIELDS = None
++            nsh.append_native_stream_heartbeat(root, values)
++            nsh.LOSS_GUARD_FIELDS = ("frames_after_dropped_reference", "loss_guard_episodes", "loss_guard_frames_held")
++            nsh.append_native_stream_heartbeat(root, values)
++        finally:
++            nsh.LOSS_GUARD_FIELDS = saved
++        lines = [json.loads(x) for x in nsh.heartbeat_log_path(root).read_text().splitlines()]
++        self.assertNotIn("frames_after_dropped_reference", lines[0])
++        self.assertEqual(lines[1]["frames_after_dropped_reference"], 42)
++        self.assertEqual(lines[1]["loss_guard_frames_held"], 40)
++
++
++class FlagAbsent(unittest.TestCase):
++    def test_not_imported_and_no_fields(self):
++        env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++        code = ("import sys; sys.path.insert(0, 'companion'); import native_session_io as n; "
++                "from games import native_stream_heartbeat as h; "
++                "print('keyframe_request' in sys.modules, n.NativeControllerBridge._keyframe_request, "
++                "h.LOSS_GUARD_FIELDS)")
++        out = subprocess.run([sys.executable, "-B", "-c", code], cwd=ROOT, env=env, capture_output=True, text=True,
++                             timeout=120)
++        self.assertEqual(out.stdout.strip(), "False None None", out.stderr[-400:])
++
++    def test_hook_shapes(self):
++        def ifs(rel, text):
++            tree = ast.parse((ROOT / "companion" / rel).read_text())
++            return [n for n in ast.walk(tree) if isinstance(n, ast.If) and ast.unparse(n.test).startswith(text)]
++        self.assertEqual(len(ifs("native_session_io.py", "self._keyframe_request is not None")), 1)
++        self.assertEqual(len(ifs("plugins/games.py", "_keyframe_request is not None")), 1)
++        self.assertEqual(len(ifs("plugins/games.py", "_LOSS_GUARD_FIELDS is not None")), 1)
++        self.assertEqual(len(ifs("games/native_stream_heartbeat.py", "LOSS_GUARD_FIELDS is not None")), 1)
++
++
++if __name__ == "__main__":
++    unittest.main()
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/LossGuard.kt
+@@ -0,0 +1,151 @@
++package com.safeiot.privyhub.streaming
++
++import java.nio.ByteBuffer
++import java.nio.ByteOrder
++import java.util.concurrent.atomic.AtomicLong
++import java.util.concurrent.atomic.AtomicReference
++
++/**
++ * B10: the client under loss, behind the system property
++ * `debug.privyhub.loss_guard=<1|count>` (CL-B7P's convention; a reboot clears
++ * it). Absent = today: no object, no datagram, no report or heartbeat key.
++ *
++ * Today a dropped access unit is simply skipped and the next P-frame goes to
++ * MediaCodec, which decodes it against a reference it never received; every
++ * frame up to the next IDR (every 15 frames) is drawn from the wrong picture
++ * and no counter moves. Here:
++ * - `1`: after a drop, non-IDR frames are not queued (the surface keeps the
++ *   last complete frame) until the next complete IDR, capped at 600 ms (then
++ *   frames pass as today, so the client's own 1-s output-silence recovery is
++ *   never tripped by the guard); one `keyframe_request` datagram per episode
++ *   on the controller socket;
++ * - `count`: nothing held or sent, only the counter;
++ * - both: `frames_after_dropped_reference` = the non-IDR frames between a drop
++ *   and the next IDR (queued = drawn corrupted; held = would have been).
++ */
++enum class LossGuardMode(val wire: String) {
++    GUARD("guard"),
++    COUNT("count"),
++}
++
++object LossGuardFlag {
++    const val PROPERTY = "debug.privyhub.loss_guard"
++
++    fun parse(value: String?): LossGuardMode? =
++        when (value?.trim()) {
++            "1" -> LossGuardMode.GUARD
++            "count" -> LossGuardMode.COUNT
++            else -> null
++        }
++
++    /** The property, read through reflection; any failure is off. */
++    fun fromSystem(): LossGuardMode? =
++        try {
++            val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
++            parse(get.invoke(null, PROPERTY) as? String)
++        } catch (_: Throwable) {
++            null
++        }
++}
++
++object KeyframeRequestPacket {
++    const val SIZE = 24
++    const val KIND_REQUEST = 1
++
++    /** "PHK1" | kind u8 | flags u8 0 | u16 0 | seq u32 | delivered AUs i64 | drops this episode u32 (little-endian). */
++    fun encode(seq: Int, deliveredAus: Long, drops: Long): ByteArray =
++        ByteBuffer.allocate(SIZE).order(ByteOrder.LITTLE_ENDIAN).apply {
++            put(byteArrayOf('P'.code.toByte(), 'H'.code.toByte(), 'K'.code.toByte(), '1'.code.toByte()))
++            put(KIND_REQUEST.toByte())
++            put(0.toByte())
++            putShort(0)
++            putInt(seq)
++            putLong(deliveredAus)
++            putInt(drops.coerceIn(0L, 0xFFFF_FFFFL).toInt())
++        }.array()
++}
++
++/**
++ * Called from the RTP receive thread (`onDrop`, `deliver`) and the controller
++ * sender's loop (`takeRequest`); the report / heartbeat read the counters.
++ */
++class LossGuard(
++    val mode: LossGuardMode,
++    private val maxWaitMs: Long = MAX_WAIT_MS,
++    private val clockMs: () -> Long = { System.nanoTime() / 1_000_000L },
++) {
++    companion object {
++        const val MAX_WAIT_MS = 600L
++    }
++
++    @Volatile
++    private var waiting = false
++
++    @Volatile
++    private var holding = false
++    private var waitStartMs = 0L
++    private var episodeDrops = 0L
++    private var seq = 0
++    private val delivered = AtomicLong(0)
++    private val pending = AtomicReference<ByteArray?>(null)
++
++    val framesAfterDroppedReference = AtomicLong(0)
++    val framesHeld = AtomicLong(0)
++    val episodes = AtomicLong(0)
++    val timeouts = AtomicLong(0)
++    val requestsSent = AtomicLong(0)
++    val maxWaitObservedMs = AtomicLong(0)
++
++    /** A dropped access unit (outside a resync's own IDR wait). */
++    fun onDrop() {
++        if (!waiting) {
++            waiting = true
++            holding = mode == LossGuardMode.GUARD
++            waitStartMs = clockMs()
++            episodeDrops = 0L
++            episodes.incrementAndGet()
++            if (mode == LossGuardMode.GUARD) {
++                pending.set(KeyframeRequestPacket.encode(seq++, delivered.get(), 1L))
++            }
++        }
++        episodeDrops++
++    }
++
++    /** A complete access unit about to be queued: true = queue it (today), false = hold it (the freeze). */
++    fun deliver(isIdr: Boolean): Boolean {
++        if (!waiting) {
++            delivered.incrementAndGet()
++            return true
++        }
++        val waited = clockMs() - waitStartMs
++        if (isIdr) {
++            waiting = false
++            holding = false
++            maxWaitObservedMs.accumulateAndGet(waited) { a, b -> maxOf(a, b) }
++            delivered.incrementAndGet()
++            return true
++        }
++        framesAfterDroppedReference.incrementAndGet()
++        if (holding && waited >= maxWaitMs) {
++            holding = false
++            timeouts.incrementAndGet()
++            maxWaitObservedMs.accumulateAndGet(waited) { a, b -> maxOf(a, b) }
++        }
++        if (holding) {
++            framesHeld.incrementAndGet()
++            return false
++        }
++        delivered.incrementAndGet()
++        return true
++    }
++
++    /** The controller sender's tick: the episode's one request, once. */
++    fun takeRequest(): ByteArray? =
++        pending.getAndSet(null)?.also { requestsSent.incrementAndGet() }
++
++    /** The heartbeat's query fragment. */
++    fun query(): String =
++        "&frames_after_dropped_reference=${framesAfterDroppedReference.get()}" +
++            "&loss_guard_episodes=${episodes.get()}" +
++            "&loss_guard_frames_held=${framesHeld.get()}"
++}
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/LossGuardTest.kt
+@@ -0,0 +1,177 @@
++package com.safeiot.privyhub.streaming
++
++import java.net.DatagramPacket
++import java.net.DatagramSocket
++import java.net.InetAddress
++import java.nio.ByteBuffer
++import java.nio.ByteOrder
++import java.util.Collections
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertNotNull
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * B10: the loss guard. The flag (absent = off), the 24-byte keyframe request,
++ * the guard on a fake clock, and the real RtpH264Receiver on loopback with a
++ * fake decoder (the list of access units it was asked to queue): a dropped
++ * access unit -> no non-IDR queued -> the IDR queued -> resumed; `count`
++ * queues everything and counts the same frames; null = today.
++ */
++class LossGuardTest {
++
++    @Test
++    fun flagTable() {
++        assertEquals(LossGuardMode.GUARD, LossGuardFlag.parse("1"))
++        assertEquals(LossGuardMode.COUNT, LossGuardFlag.parse(" count "))
++        for (bad in listOf(null, "", "0", "on", "guard", "2")) {
++            assertNull(bad, LossGuardFlag.parse(bad))
++        }
++        assertNull(LossGuardFlag.fromSystem())
++    }
++
++    @Test
++    fun requestEncoding() {
++        val d = KeyframeRequestPacket.encode(7, 1234L, 1L)
++        assertEquals(24, d.size)
++        val b = ByteBuffer.wrap(d).order(ByteOrder.LITTLE_ENDIAN)
++        assertEquals("PHK1", String(d, 0, 4))
++        assertEquals(1, d[4].toInt())
++        assertEquals(7, b.getInt(8))
++        assertEquals(1234L, b.getLong(12))
++        assertEquals(1, b.getInt(20))
++    }
++
++    @Test
++    fun guardHoldsUntilTheIdrAndAsksOnce() {
++        var now = 1_000L
++        val g = LossGuard(LossGuardMode.GUARD, clockMs = { now })
++        assertTrue(g.deliver(true))
++        assertTrue(g.deliver(false))
++        g.onDrop()
++        g.onDrop()                                   // the same episode
++        assertNotNull(g.takeRequest())
++        assertNull(g.takeRequest())                  // one per episode
++        repeat(5) { now += 16; assertEquals(false, g.deliver(false)) }
++        now += 16
++        assertTrue(g.deliver(true))                  // the IDR ends it
++        assertTrue(g.deliver(false))
++        assertEquals(5L, g.framesAfterDroppedReference.get())
++        assertEquals(5L, g.framesHeld.get())
++        assertEquals(1L, g.episodes.get())
++        assertEquals(1L, g.requestsSent.get())
++        assertEquals(96L, g.maxWaitObservedMs.get())
++        assertEquals(
++            "&frames_after_dropped_reference=5&loss_guard_episodes=1&loss_guard_frames_held=5",
++            g.query()
++        )
++        g.onDrop()
++        assertNotNull(g.takeRequest())               // a new episode asks again
++    }
++
++    @Test
++    fun countHoldsNothingAndSendsNothing() {
++        val g = LossGuard(LossGuardMode.COUNT)
++        g.onDrop()
++        repeat(7) { assertTrue(g.deliver(false)) }
++        assertTrue(g.deliver(true))
++        assertEquals(7L, g.framesAfterDroppedReference.get())
++        assertEquals(0L, g.framesHeld.get())
++        assertNull(g.takeRequest())
++    }
++
++    @Test
++    fun theFreezeIsCappedAt600Ms() {
++        var now = 0L
++        val g = LossGuard(LossGuardMode.GUARD, clockMs = { now })
++        g.onDrop()
++        now = 584
++        assertEquals(false, g.deliver(false))
++        now = 600
++        assertTrue(g.deliver(false))                 // the IDRs were lost too: frames pass as today
++        assertTrue(g.deliver(false))
++        assertEquals(3L, g.framesAfterDroppedReference.get())
++        assertEquals(1L, g.framesHeld.get())
++        assertEquals(1L, g.timeouts.get())
++        now = 640
++        assertTrue(g.deliver(true))
++        assertEquals(640L, g.maxWaitObservedMs.get())
++    }
++
++    // --- the real receiver on loopback, a fake decoder ---------------------------------------------------------
++
++    private class Wire(val port: Int) {
++        private val tx = DatagramSocket()
++        private var seq = 100
++        private var ts = 90_000L
++
++        /** One access unit = one RTP packet (a single NAL, marker set). `skip` = the packet is lost. */
++        fun au(idr: Boolean, skip: Boolean = false) {
++            val nal = byteArrayOf(if (idr) 0x65 else 0x41, 0x11, 0x22, 0x33, 0x44)
++            val p = ByteBuffer.allocate(12 + nal.size)
++            p.put(0x80.toByte()).put((0x80 or 96).toByte()).putShort(seq.toShort()).putInt(ts.toInt()).putInt(0x1234)
++            p.put(nal)
++            seq = (seq + 1) and 0xffff
++            ts += 1500L
++            if (!skip) {
++                tx.send(DatagramPacket(p.array(), p.capacity(), InetAddress.getLoopbackAddress(), port))
++            }
++            Thread.sleep(3)
++        }
++
++        fun close() = tx.close()
++    }
++
++    private fun freePort(): Int = DatagramSocket(0).use { it.localPort }
++
++    /** I P P [lost] P P P P I P: returns the kinds the fake decoder was asked to queue ('I' / 'P'). */
++    private fun run(guard: LossGuard?): List<Char> {
++        val queued = Collections.synchronizedList(mutableListOf<Char>())
++        val port = freePort()
++        val rx = RtpH264Receiver(
++            port = port,
++            onParameterSets = { _, _ -> },
++            onAccessUnit = { au, _ -> queued.add(if (au.any { it == 0x65.toByte() }) 'I' else 'P') },
++        )
++        rx.start()
++        rx.lossGuard = guard
++        Thread.sleep(150)
++        val w = Wire(port)
++        try {
++            w.au(true); w.au(false); w.au(false)
++            w.au(false, skip = true)
++            repeat(4) { w.au(false) }
++            w.au(true); w.au(false)
++            Thread.sleep(200)
++        } finally {
++            w.close()
++            rx.stop()
++        }
++        return queued.toList()
++    }
++
++    @Test
++    fun receiverWithoutAGuardIsToday() {
++        // the AU after the loss carries the gap and is dropped; the 3 after it are queued (decoded from a lost reference)
++        assertEquals(listOf('I', 'P', 'P', 'P', 'P', 'P', 'I', 'P'), run(null))
++    }
++
++    @Test
++    fun receiverWithTheGuardQueuesNothingUntilTheIdr() {
++        val g = LossGuard(LossGuardMode.GUARD)
++        assertEquals(listOf('I', 'P', 'P', 'I', 'P'), run(g))
++        assertEquals(3L, g.framesAfterDroppedReference.get())
++        assertEquals(3L, g.framesHeld.get())
++        assertEquals(1L, g.episodes.get())
++        assertNotNull(g.takeRequest())
++    }
++
++    @Test
++    fun receiverCountingIsTodayWithTheNumber() {
++        val g = LossGuard(LossGuardMode.COUNT)
++        assertEquals(listOf('I', 'P', 'P', 'P', 'P', 'P', 'I', 'P'), run(g))
++        assertEquals(3L, g.framesAfterDroppedReference.get())
++        assertNull(g.takeRequest())
++    }
++}

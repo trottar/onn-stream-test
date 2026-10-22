@@ -90,6 +90,10 @@ class NativeControllerSender(
     @Volatile
     var stallTick: ((Long) -> ByteArray?)? = null
 
+    // B10: the loss guard's keyframe request (LossGuard.takeRequest via the activity; null = today)
+    @Volatile
+    var keyframeTick: (() -> ByteArray?)? = null
+
     @Volatile
     private var running =
         false
@@ -683,6 +687,11 @@ class NativeControllerSender(
 
                 // B7: a stall / stall_end datagram when one is due (null = today)
                 stallTick?.invoke(System.nanoTime() / 1_000_000L)?.let { d ->
+                    try { socket.send(DatagramPacket(d, d.size)) } catch (_: Exception) { sendErrors.incrementAndGet() }
+                }
+
+                // B10: the loss guard's one keyframe_request per episode (null = today)
+                keyframeTick?.invoke()?.let { d ->
                     try { socket.send(DatagramPacket(d, d.size)) } catch (_: Exception) { sendErrors.incrementAndGet() }
                 }
 
