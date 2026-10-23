@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-10-22
-baseline_commit: 9fd73c7 (queue D; BENCH-R3's launch, record and pin patch uncommitted beside it; the user commits)
+as_of: 2026-10-23
+baseline_commit: 00c7c40 (BENCH-R3 committed; UX-R4's record uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -209,6 +209,32 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
+
+**UX-R4: the lag the user marked with a Save State — FOUND, read-only**
+(`evidence/UX_R4_SAVED_AT_THE_LAG_2026-10-23.md`; play 2026-10-23 04:54-05:07Z, Zelda on snes9x; nothing changed).
+- **In force:** APK `bf5114a2…` (by the files), the eight adopted lines only, every property empty. So **no RSSI and no
+  corrupted-frame counter** for this session.
+- **The mark is the 05:01:30Z save.** It came after a 41-s storm, 05:00:40.9-05:01:20Z:
+  - 19 uplink silences ≥ 250 ms (9.5 s silent, the longest 1.4 s);
+  - the downlink's loss ×9 (284 per minute), 43-44 fps in two intervals, audio concealment ×25;
+  - the host steady at 7000, 60 frames per second.
+  - Shape: **both directions, uplink-dominant**. ~4.8 s of game ran without the player.
+- **47 s after the resume:** a 4.9-s two-way drop (05:03:39.8Z). The client restarted its stream by itself, its audio
+  then underran, and the user loaded the save.
+- **Clock:** the same quarter-hour after 00:50 EDT as UX-R2's step and UX-R3's death (a coincidence in time).
+- **By the records,** the hold (3 fires), the stall signal (none), the loss guard (freezes) and the bidirectional rule
+  (one rung down at 05:01:00Z) would not have addressed a storm of mostly sub-second uplink silences.
+
+1. **The user's commit:** `UX_R4_SAVED_AT_THE_LAG_2026-10-23.md`, `ux_r4_2026-10-23/` (36 MB, mostly the log
+   copies), `KNOWN_ISSUES.md`, this file (`logs/ux_r4_git_status.txt`).
+2. **For the user's say-so (nothing done):**
+   - **The 2.4-GHz finding is the user's hand change.** BENCH-R3 measured the onn on 2.4 GHz channel 1 (802.11n,
+     −68 dBm); O1 found it on the Opal's 5 GHz. Moving it back, on the Opal or on the onn, is the user's setting. An
+     evening like tonight's would show whether it helps.
+   - **The link report on during play.** `PRIVYHUB_LINK_REPORT=1` as a **ninth adopted line**, diagnostics only (it
+     adds the RSSI / tx / rx / band to each heartbeat, no behaviour), plus `adb shell setprop debug.privyhub.link_report
+     1` after each onn boot. Then the next lag the user marks carries its link.
+3. **Then the BENCH-R3 items below** (the loss-guard question, the Opal's `wlan0` read, B's items).
 
 **BENCH-R3: the stack on SNES, the loss guard, the link — MEASURED, 6 / 6 valid, host gates met in all**
 (`evidence/BENCH_R3_SNES_STACK_AND_LOSS_GUARD_2026-10-23.md`; run 20:22:11-21:52:17Z on `9fd73c7`; nothing adopted).

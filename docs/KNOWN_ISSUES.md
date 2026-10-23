@@ -182,6 +182,12 @@ is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.m
   - Record: `docs/memory/evidence/BENCH_R3_SNES_STACK_AND_LOSS_GUARD_2026-10-23.md`.
   - **Next:** the user's call on the loss guard; the Opal's `wlan0` read beside a stream (is the onn on the Opal?); B
     on the hold-path rewind's after-check and `@down`'s ownership.
+- **UX-R4 (2026-10-23, the user's "severe lag … I saved at the spot", Zelda on snes9x, the eight lines, APK
+  `bf5114a2…`, no link report):** the mark is the 05:01:30Z save, after a 41-s storm (05:00:40.9-05:01:20Z) of 19
+  uplink silences ≥ 250 ms (9.5 s silent, the longest 1.4 s), with downlink loss ×9 beside it and the host steady
+  (both directions, uplink-dominant). 47 s after the resume came a 4.9-s two-way drop (05:03:39.8Z) the client restarted
+  its stream from. It was the same quarter-hour after 00:50 EDT as UX-R2's step and UX-R3's death. Record:
+  `docs/memory/evidence/UX_R4_SAVED_AT_THE_LAG_2026-10-23.md`.
 ## 2026-10-20 UX-R1, the user's extended evening (2026-10-20 04:19-05:22Z) was bad and got worse — OPEN; the files agree; link vs onn not separable from them; UX-R2: the second evening mostly clean, the damage not repeated (one event so far, untested past play-minute 44); H5 closed (not new); UX-R3: one of last night's two "deaths" found (04:54:55-59Z, a 4-s drop in both directions); the second not distinguishable
 
 **The user's standard, verbatim (2026-10-21): "This product needs to work at any house especially lan as long as the Internet is over 50mb/s."**
