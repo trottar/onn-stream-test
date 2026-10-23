@@ -1,0 +1,63 @@
+LINK-N1 — the nightly watch on the 1-am quarter-hour: pre-registration (written and hashed before the launch; session A,
+2026-10-23). Task: docs/memory/handoffs/LINK-R1_5GHZ_CHECK_AND_NIGHTLY_WATCH_TASK.md, Part 2.
+
+CAP_UTC: 2026-10-31T06:00:00Z
+
+0. Why
+- UX-R4 §1.4: four nights with an event in the same quarter-hour after 00:50 EDT (01:04-01:21, 00:52-00:56 and
+  00:54:55, 01:00:40 and 01:03:39). The user (2026-10-23): "Nothing planned that I know of on wifi. I swapped to 5G."
+- The onn is on 5 GHz since 2026-10-23 (LINK-R1 Part 1: 5180 MHz, channel 36, 802.11ac).
+
+1. The unit
+- systemd --user transient unit privyhub-link-n1 (systemd-run --user --unit=privyhub-link-n1 --collect,
+  WorkingDirectory = the repo), running link_n1_watch.py (its sha256 in tools_at_preregistration_sha256.txt).
+- Status: ~/privyhub_link_n1/status.txt (rewritten at every transition and every 5 min). Log: ~/privyhub_link_n1/watch.log
+  and the journal. Stop: touch ~/privyhub_link_n1/STOP (checked every <= 30 s; the watch never removes it).
+- The runner refuses to start unless this file matches its .sha256.
+- Linger is off for the user: the unit lives as long as the user's login session (like the companion's unit); a logout
+  or reboot ends it. Restart (it skips nights already done, from watch_state.json):
+  systemd-run --user --unit=privyhub-link-n1 --collect -p WorkingDirectory=/home/privyhub/Projects/onn-stream-test /usr/bin/python3 /home/privyhub/Projects/onn-stream-test/docs/memory/evidence/link_n1_2026-10-23/link_n1_watch.py
+
+2. The schedule
+- Each night: sleep until 00:30 America/New_York, sample until 01:30 local, sleep again. The UTC target is computed with
+  zoneinfo: 04:30Z-05:30Z while EDT (UTC-4) holds, which covers every window before the cap (EDT ends 2026-11-01).
+- The first target is tonight, 2026-10-24T04:30:00Z (local date 2026-10-24, 00:30 EDT).
+- The cap admits 8 windows (local dates 2026-10-24 .. 2026-10-31; the last ends 05:30Z, before the 06:00Z cap). The task
+  names 7 nights; the cap as written governs, and the 8th window, if it runs, is reported like the others (disclosed).
+- No stream, no companion restart, no game. If a stream is active (the user playing), the watch samples anyway (reads
+  only) and every row carries stream_active true.
+
+3. Per night, read-only (one file: nights/<local date>.jsonl)
+- ping: the hub -> the onn, `ping -D -O -n -i 1 -W 2` (unprivileged, ICMP datagram socket, no sudo), once a second for
+  the hour; 1-s rows {kind: ping, t, gen, seq, rtt_ms | null, lost}; a reply after ping's 1-s "no answer yet" but
+  within -W 2 is a separate {kind: ping_late} row and is counted as answered in the summary.
+  THE ADDRESS: the task says "from the companion's paired-device store"; that store holds no address (device id, name,
+  HMAC key, permissions -- G3-S1 by design). The address is therefore read from adb's device list (as E4-S4D did),
+  into memory only, NEVER written to any file; rows carry RTT and loss only. (Disclosed deviation.)
+- onn, every 30 s over adb (state reads only): `dumpsys wifi | grep -m1 '^mWifiInfo'` -> frequency, band, channel,
+  standard, RSSI, link / tx / rx speed (SSID, BSSID, MAC, IP never parsed into a row); /proc/net/udp6 drops for the
+  stream ports 48100 / 48101 if such a socket exists (port role and drops only); /proc/uptime. No adb connect, no
+  setprop, no write.
+- opal, every 60 s: LINK-R1's copy of B's o1_opal_sample.sh on wlan1 (read-only; every byte through o1_redact.py, then
+  o1_parse.py) -> the parsed round as {kind: opal}: the channel, utilization, noise, every station's signal / rates /
+  retries / failed / connected time (labels only). The onn's station is marked per round (onn_station_index,
+  onn_match): by connected-time continuity from the last identification (seeded from LINK-R1's window, where it was
+  told by behaviour -- the station carrying the stream's bytes); else by the closest tx / rx rate and signal to the
+  onn's own adb read. The raw sampler output stays outside the repo in ~/privyhub_link_n1/.
+- host, every 30 s: /proc/loadavg (and the hub's clock in every row).
+
+4. The summary row (summary.md, one per night)
+ping sent, loss %, RTT p50 / p95 / max, the longest run of lost pings and when, RSSI min / median, the tx-rate minimum
+and when, the bands seen, the Opal's rounds (and those with the onn marked), the onn station's retry rate over the
+hour (tx retries / tx packets), any stream_active span.
+
+5. The reading, written beforehand
+- If ping loss / RTT spikes, an RSSI dip, a tx-rate collapse or an Opal retry rise recur in the same minutes on >= 2
+  of the nights, the hour has a cause on the air or the onn and its minute is known -- the next task is to name the
+  device (the user's hand; the Opal's client list at that minute, read-only).
+- If nothing recurs with no stream, the 1-am pattern needed a stream to show (then the watch becomes "the link report
+  on during every play session", already in force after LINK-R1 Part 1) or was the 2.4-GHz band (Part 1 decides).
+- The nights' record is a later one-line task: "read LINK-N1's nights".
+
+No sudo, no nft, the Opal read-only, adb for state reads only, no addresses or identifiers in any kept file; nothing
+fetched, nothing deleted; nothing adopted; nothing committed.

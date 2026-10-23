@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-10-23
-baseline_commit: 00c7c40 (BENCH-R3 committed; UX-R4's record uncommitted beside it; the user commits)
+baseline_commit: c47073d (UX-R4 committed; LINK-R1 and the LINK-N1 launch uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -209,6 +209,47 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
+
+**LINK-R1: the 5-GHz check — MEASURED, valid; 0 uplink silences ≥ 250 ms and 0 hitch seconds in 10 min**
+(`evidence/LINK_R1_5GHZ_CHECK_2026-10-23.md`; one E1-SNES-STREAM 15:52-16:04Z, drop-in `PRIVYHUB_LINK_REPORT=1` only,
+nine lines read back; nothing adopted). The user moved the onn to 5 GHz by hand ("I swapped to 5G").
+- **The onn is on 5 GHz:** 5180 MHz, channel 36, 802.11ac in 346 / 346 heartbeats. RSSI −68 (as on 2.4 GHz); tx 195 /
+  rx 117 Mbps median; no tx heartbeat ≤ 54 Mbps.
+- **Silences 0.0 / 10 min** (BENCH-R3 C 22.4, BENCH-R1 cell 8 15.6). **Hitch seconds 0.0** (C 19.9). Post-FEC loss
+  4.9 / min (C 33). Rendered 59.98, max output gap 120 ms, host gates met.
+- **The Opal's 5 GHz radio lists the onn's station:** signal −76, retries 8.0 %, the AP's tx rate swinging 30-433 Mbps.
+- **The pre-registered reading:** E2 met, so the band was most of the room-independent flapping. **Caveats:** one
+  daytime window, a different drop-in from C (no stack), and 0 silences means there is no 5-GHz distribution yet to
+  re-derive H from.
+- **State:** eight lines, no `e3_flag.conf`, `--check` ok, APK `bf5114a2…` CONFIRMED.
+  - **`debug.privyhub.link_report` LEFT at 1** on the onn (the user's say-so; diagnostics only). It clears on the
+    onn's reboot; to set it again: `adb shell setprop debug.privyhub.link_report 1`.
+
+**LINK-N1: the nightly watch is RUNNING** (`evidence/LINK_N1_LAUNCH_2026-10-23.md`). The unit `privyhub-link-n1`
+(launched 16:10:56Z) samples 00:30-01:30 EDT = 04:30-05:30Z each night, with no stream, read-only:
+- ping to the onn every 1 s;
+- the onn's Wi-Fi over adb every 30 s;
+- the Opal's `wlan1` every 60 s, redacted;
+- the hub's loadavg.
+
+It runs to the cap 2026-10-31T06:00:00Z (8 windows; the task named 7). The first is tonight, 04:30Z.
+- Status: `cat ~/privyhub_link_n1/status.txt`. Stop: `touch ~/privyhub_link_n1/STOP`.
+- Linger is off, so a logout or reboot ends it; the restart command is in the launch record.
+
+1. **The user's commit:** `LINK_R1_5GHZ_CHECK_2026-10-23.md`, `link_r1_2026-10-23/`, `LINK_N1_LAUNCH_2026-10-23.md`,
+   `link_n1_2026-10-23/` (the watch keeps appending to `nights/` and `summary.md` until 10-31), the task file,
+   `_cowork_prompt.txt`, this file (`logs/link_r1_git_status.txt`, `logs/link_n1_launch_git_status.txt`).
+2. **After 10-31 (or any morning, for a partial read): "read LINK-N1's nights."** The reading is pre-registered: a
+   minute that recurs on ≥ 2 nights → name the device (the user's hand; the Opal's client list then, read-only).
+   Nothing recurring → the 1-am pattern needed a stream, or was the 2.4-GHz band.
+3. **The user's adoption question:** a **ninth adopted line `PRIVYHUB_LINK_REPORT=1`** (host; diagnostics only). The
+   client side is already on. Without it, the host keeps no link keys outside a run's drop-in. With it, the next lag
+   the user marks carries its band / RSSI / rates.
+4. **The B queue:**
+   - re-derive the stack's H from 5-GHz sessions, once they show silences;
+   - the savestate path for snes9x (its rewind reads PAUSED, BENCH-R3);
+   - the client's self-restart after a two-way drop: the lost session and the audio-underrun storm (UX-R4 §1.3);
+   - the link report on by default in the client (no property).
 
 **UX-R4: the lag the user marked with a Save State — FOUND, read-only**
 (`evidence/UX_R4_SAVED_AT_THE_LAG_2026-10-23.md`; play 2026-10-23 04:54-05:07Z, Zelda on snes9x; nothing changed).

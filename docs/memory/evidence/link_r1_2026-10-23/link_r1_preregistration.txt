@@ -1,0 +1,58 @@
+LINK-R1 Part 1 — the 5-GHz check: pre-registration (written and hashed before the window; session A, 2026-10-23)
+
+Task: docs/memory/handoffs/LINK-R1_5GHZ_CHECK_AND_NIGHTLY_WATCH_TASK.md, Part 1.
+The user (2026-10-23): "Nothing planned that I know of on wifi. I swapped to 5G."
+
+0. State before (read, not set, by this session)
+- tools/e3_state.py: ok — eight adopted lines, no e3_flag.conf, no e4_constraint.conf, no game / RetroArch / encoder,
+  APK bf5114a2…cf73 CONFIRMED (check_before.json). adb was reconnected by hand first (the band change had dropped it;
+  the listener on 5555 was found from the hub's neighbour table; the endpoint never printed).
+- One device paired, no active session (session_status_before.json).
+- The onn over adb (dumpsys wifi, the mWifiInfo line): 5180 MHz (5 GHz, channel 36), Wi-Fi standard 5 (802.11ac),
+  RSSI -68 dBm, tx 130 / rx 117 Mbps (adb_reads/wifi_before_window.json). THE BAND READS 5 GHz: the run goes ahead.
+- debug.privyhub.link_report: "" -> setprop 1 -> "1" (adb_reads/link_report_property.txt).
+
+1. The window
+- One E1-SNES-STREAM (snes9x, adopted line 3), tools/e1_suite.py run_suite unedited through link_r1_suite_call.py
+  (BENCH-R3's wrapper, only the pre-registration name changed): runs 1, window 600 s, gap 120 s, e2 on.
+- The per-run drop-in e3_flag.conf = PRIVYHUB_LINK_REPORT=1 ONLY. Expected environ at stream: nine lines (the eight
+  + PRIVYHUB_LINK_REPORT=1). Removed at the suite's teardown; flags_absent true after.
+- Disclosed: BENCH-R3 C's drop-in also carried PRIVYHUB_WAN_TELEMETRY=1, PRIVYHUB_IMPAIRMENT=none and the hold /
+  stall stack. This run carries the link report only, so C and BENCH-R1 cell 8 are comparisons across configs and
+  days, not a paired A/B.
+- The Opal: o1_opal_sample.sh (B's copy from BENCH-R3, byte for byte with o1_redact.py and o1_parse.py), wlan1
+  (5 GHz), every 60 s from before the suite starts to after it ends. Read-only; every byte through o1_redact.py.
+
+2. Validity
+- Valid = the suite's status OK (playing), the environ read nine lines with PRIVYHUB_LINK_REPORT=1 during the run,
+  flags_absent true at the end. Host gates (RetroArch ~60 fps, capture ~60, dup+drop ~0, encoder 7000k) reported
+  as BENCH-R3 reports them.
+
+3. Reported
+- The link report per heartbeat (frequency / band, standard, RSSI, tx / rx Mbps) as a per-minute table and its
+  distribution.
+- The uplink silences >= 250 ms per 10 min and B6's distribution (gap_distribution.py `measure`, exec'd unedited)
+  against BENCH-R3 C (22.4) and BENCH-R1 cell 8 (15.6).
+- Hitch seconds per 10 min (UX-R3's `evening` / `counts`, exec'd unedited) against C (19.9).
+- Post-FEC loss per minute, rendered fps, the host gates.
+- The Opal's 5-GHz station row for the onn per minute (signal, tx / rx rate, retries). The onn's station is told
+  from others by behaviour, not identifier: the station whose AP->station tx bytes rise by the stream's ~7 Mbit/s
+  while the stream runs (O1's method), followed between rounds by connected-time continuity.
+
+4. Expectations, written beforehand (met / not met; not gated)
+- E1: the band is 5 GHz in every heartbeat that carries the link keys.
+- E2: the uplink silences >= 250 ms per 10 min <= one third of the 2.4-GHz baselines, i.e. <= 7.
+- E3: RSSI and the tx rate are stated as measured (no bar).
+
+5. The reading, written beforehand
+- If the silences fall by two thirds or more (E2 met), the band was most of the room-independent flapping, and the
+  stack's H can be re-derived from the 5-GHz distribution (a B task).
+- If they do not fall, the band is not it, and the nightly watch (Part 2) is what is left.
+
+6. At the end
+- The drop-in removed, eight lines, --check (tools/e3_state.py) ok.
+- debug.privyhub.link_report LEFT at 1 (the user's say-so, 2026-10-23): diagnostics only; it clears on the onn's
+  next reboot; to set it again: adb shell setprop debug.privyhub.link_report 1
+
+No sudo, no nft, the Opal read-only, adb for the setprop above and state reads only, no addresses or identifiers in
+any kept file; nothing fetched, nothing deleted; nothing adopted; nothing committed.
