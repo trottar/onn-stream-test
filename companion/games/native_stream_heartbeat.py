@@ -181,6 +181,10 @@ def append_native_stream_heartbeat(
             if field in values:
                 record[field] = values[field]
 
+    # B14: the client's link notice beside the link fields (a client without the notice sends no key)
+    if "link_notice" in values and LINK_FIELDS is not None:
+        record["link_notice"] = values["link_notice"]
+
     # B10: the loss-guard counters, when the flag set them up
     if LOSS_GUARD_FIELDS is not None:
         for field in LOSS_GUARD_FIELDS:

@@ -7,24 +7,26 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * B3: the Wi-Fi link report. The flag (absent = off), the validity rules, the
+ * B3: the Wi-Fi link report. The flag (B13: absent = on, `0` = off), the validity rules, the
  * heartbeat's query keys, and the sampler's once-a-second read (fake clock).
  */
 class LinkReportTest {
 
     @Test
     fun flagTable() {
-        assertFalse(LinkReportFlag.parse(null))
-        assertFalse(LinkReportFlag.parse(""))
+        // B13: on by default; only `0` turns it off
+        assertTrue(LinkReportFlag.parse(null))
+        assertTrue(LinkReportFlag.parse(""))
         assertFalse(LinkReportFlag.parse("0"))
-        assertFalse(LinkReportFlag.parse("true"))
+        assertFalse(LinkReportFlag.parse(" 0 "))
+        assertTrue(LinkReportFlag.parse("true"))
         assertTrue(LinkReportFlag.parse("1"))
         assertTrue(LinkReportFlag.parse(" 1 "))
     }
 
     @Test
-    fun noAndroidPropertyIsOff() {
-        assertFalse(LinkReportFlag.fromSystem())
+    fun noAndroidPropertyIsOn() {
+        assertTrue(LinkReportFlag.fromSystem())                   // B13: a failed read is absent, so on
     }
 
     @Test

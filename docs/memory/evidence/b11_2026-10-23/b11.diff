@@ -1,0 +1,391 @@
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -523,6 +523,16 @@
+             cacheSessionReport()
+         }
+ 
++        // B11: the guard keeps the cached report and the cause for the next start (null = today)
++        if (sessionStarted) {
++            restartGuard?.onSurfaceLost(
++                cachedSessionReport,
++                decoder?.lastOutputAgeMs() ?: -1L,
++                if (lastRtpAdvanceAtNs > 0L) (System.nanoTime() - lastRtpAdvanceAtNs) / 1_000_000L else -1L,
++                recoveryActive
++            )
++        }
++
+         stopLocalPipeline()
+         sessionStarted = false
+     }
+@@ -531,6 +541,8 @@
+     override fun onPause() {
+         super.onPause()
+         streamWifiLock?.release()
++        // B11: when the activity last paused, for a self-restart's cause (null = today)
++        restartGuard?.notePause()
+     }
+ 
+     override fun onResume() {
+@@ -733,6 +745,10 @@
+             name = "PrivyHub-Native-Session"
+         ) {
+             try {
++                // B11: a self-restart first ends the old session: its report, then native-stream-stop (null = today)
++                val restart = restartGuard?.takePending()
++                restart?.let { p -> restartGuard?.flush(p, { r -> postRestartReport(host, r) }, { postRestartStop(host) }) }
++
+                 val response =
+                     httpPost(
+                         "http://$host:$CONTROL_PORT" +
+@@ -776,6 +792,12 @@
+                         10_000L
+                     )
+ 
++                // B11: the host restarted its audio at sequence 0: a fresh receiver, its start-up hold re-armed
++                if (restart != null) {
++                    audioReceiver?.stop()
++                    audioReceiver = NativeAudioReceiver(port = AUDIO_PORT)
++                }
++
+                 // D-BASE-P9: the companion's declared audio cushion (its
+                 // profile, or an environment override). Absent means the
+                 // receiver's client defaults (3 / 8) stay in force.
+@@ -815,6 +837,9 @@
+                     )
+                 }
+ 
++                // B11: the rebuilt receiver starts with the host's cushion and redundancy already in force
++                if (restart != null) audioReceiver?.start()
++
+                 if (
+                     hostAlphaVersion !=
+                     EXPECTED_HOST_ALPHA
+@@ -1014,6 +1039,9 @@
+ 
+         stopping = true
+ 
++        // B11: the activity ends; today's stop path posts the cached report and the stop (null = today)
++        restartGuard?.onSessionStopped()
++
+         val report =
+             cacheSessionReport()
+ 
+@@ -2246,6 +2274,9 @@
+             root.put("stall_signal_ends_sent", m.endsSent)
+         }
+ 
++        // B11: the self-restart's cause (null = today: no key)
++        restartGuard?.lastCause?.let { c -> root.put("restart_cause", JSONObject(c)) }
++
+         // B10: the loss guard's mode and counters (null = today: no key)
+         lossGuard?.let { g ->
+             root.put("loss_guard_mode", g.mode.wire)
+@@ -2289,6 +2320,19 @@
+             released = gameplayReleased || recoveryActive,
+         )
+ 
++    // B11: the self-restart guard, only with debug.privyhub.restart_guard=1 (null = today).
++    private val restartGuard: RestartGuard? by lazy { if (RestartGuardFlag.fromSystem()) RestartGuard() else null }
++
++    // B11: the old session's report and stop, posted at a self-restart (the guard's transport)
++    private fun postRestartReport(host: String, report: String) {
++        httpPostBody("http://$host:$CONTROL_PORT" + DecoderReportUpload.PATH, DecoderReportUpload.encode(report),
++            DecoderReportUpload.CONTENT_TYPE)
++    }
++
++    private fun postRestartStop(host: String) {
++        httpPost("http://$host:$CONTROL_PORT" + "/plugins/games/native-stream-stop")
++    }
++
+     // B10: the loss guard, only with debug.privyhub.loss_guard=<1|count> (null = today).
+     private val lossGuard: LossGuard? by lazy { LossGuardFlag.fromSystem()?.let { LossGuard(it) } }
+ 
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/RestartGuard.kt
+@@ -0,0 +1,114 @@
++package com.safeiot.privyhub.streaming
++
++/**
++ * B11: the client's self-restart, behind the system property
++ * `debug.privyhub.restart_guard=1` (CL-B7P's convention). Absent = today.
++ *
++ * A session starts only from `surfaceCreated`; when the surface is lost
++ * (`surfaceDestroyed`) the pipeline stops and the report is cached but never
++ * posted, and the next `startSession` discards it and posts a new
++ * `native-stream-start` with no stop (UX-R4 event 2). The host's start restarts
++ * its audio at sequence 0 while the new receiver had locked onto the old
++ * stream, so every new frame read as late (the underrun storm). Here:
++ * - the surface's loss keeps the report and the cause;
++ * - the next start first posts the old report, then `native-stream-stop`;
++ * - the audio receiver is rebuilt after the host's start response;
++ * - the cause goes in the new session's report (`restart_cause`).
++ */
++object RestartGuardFlag {
++    const val PROPERTY = "debug.privyhub.restart_guard"
++
++    fun parse(value: String?): Boolean = value?.trim() == "1"
++
++    fun fromSystem(): Boolean =
++        try {
++            val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
++            parse(get.invoke(null, PROPERTY) as? String)
++        } catch (_: Throwable) {
++            false
++        }
++}
++
++/** What the guard flushes at a self-restart. */
++data class PendingRestart(
++    val report: String?,
++    val lostAtMs: Long,
++    val lastFrameAgeMs: Long,
++    val rtpSilenceMs: Long,
++    val recoveryActive: Boolean,
++    val pausedBeforeLossMs: Long,
++)
++
++class RestartGuard(private val clockMs: () -> Long = { System.nanoTime() / 1_000_000L }) {
++    @Volatile
++    private var pending: PendingRestart? = null
++
++    @Volatile
++    private var lastPauseAtMs = -1L
++
++    /** The last self-restart's cause (the new session's report), null for a normal start. */
++    @Volatile
++    var lastCause: Map<String, Any>? = null
++        private set
++
++    var restarts = 0L
++        private set
++
++    fun notePause() {
++        lastPauseAtMs = clockMs()
++    }
++
++    /** `surfaceDestroyed`, before the pipeline stops (a session was started). */
++    fun onSurfaceLost(report: String?, lastFrameAgeMs: Long, rtpSilenceMs: Long, recoveryActive: Boolean) {
++        val now = clockMs()
++        pending = PendingRestart(
++            report = report,
++            lostAtMs = now,
++            lastFrameAgeMs = lastFrameAgeMs,
++            rtpSilenceMs = rtpSilenceMs,
++            recoveryActive = recoveryActive,
++            pausedBeforeLossMs = if (lastPauseAtMs >= 0L) now - lastPauseAtMs else -1L,
++        )
++    }
++
++    /** `stopSession`: the activity ends; today's stop path posts the cached report and the stop. */
++    fun onSessionStopped() {
++        pending = null
++    }
++
++    /** The session thread, before `native-stream-start`: the pending restart (once), or null for a normal start. */
++    fun takePending(): PendingRestart? {
++        val p = pending
++        pending = null
++        if (p == null) {
++            lastCause = null
++        }
++        return p
++    }
++
++    /**
++     * Ends the old session in order — its report, then the stop — and records the cause. The transport is the
++     * activity's (the tests' fake); a failed post is recorded, never thrown.
++     */
++    fun flush(p: PendingRestart, postReport: (String) -> Unit, postStop: () -> Unit): Map<String, Any> {
++        var reportPosted = false
++        var stopPosted = false
++        if (!p.report.isNullOrBlank()) {
++            reportPosted = try { postReport(p.report); true } catch (_: Exception) { false }
++        }
++        stopPosted = try { postStop(); true } catch (_: Exception) { false }
++        restarts++
++        val cause = linkedMapOf<String, Any>(
++            "away_ms" to (clockMs() - p.lostAtMs).coerceAtLeast(0L),
++            "last_frame_age_ms" to p.lastFrameAgeMs,
++            "rtp_silence_ms" to p.rtpSilenceMs,
++            "recovery_active" to p.recoveryActive,
++            "paused_before_loss_ms" to p.pausedBeforeLossMs,
++            "old_report_posted" to reportPosted,
++            "stop_posted" to stopPosted,
++            "restarts" to restarts,
++        )
++        lastCause = cause
++        return cause
++    }
++}
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/RestartGuardTest.kt
+@@ -0,0 +1,169 @@
++package com.safeiot.privyhub.streaming
++
++import java.net.DatagramPacket
++import java.net.DatagramSocket
++import java.net.InetAddress
++import java.nio.ByteBuffer
++import java.util.Collections
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotNull
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * B11: the self-restart guard. A simulated 5-s two-way drop the client
++ * restarts from (UX-R4 event 2): session A's real RtpH264Receiver on loopback
++ * torn down at the surface's loss, session B's built on the same port at the
++ * restart, a fake decoder each, a fake host transport. With the guard: the old
++ * report, the stop, then the start; absent: the start only (today). The audio:
++ * the receiver's sequence state (the real OpusReorder) locked onto the old
++ * stream before the host restarts its audio at sequence 0.
++ */
++class RestartGuardTest {
++
++    @Test
++    fun flagTable() {
++        assertTrue(RestartGuardFlag.parse("1"))
++        for (bad in listOf(null, "", "0", "on", "2")) {
++            assertFalse(bad, RestartGuardFlag.parse(bad))
++        }
++        assertFalse(RestartGuardFlag.fromSystem())
++    }
++
++    private fun freePort(): Int = DatagramSocket(0).use { it.localPort }
++
++    private class Wire(val port: Int, var seq: Int = 100) {
++        private val tx = DatagramSocket()
++        private var ts = 90_000L
++
++        fun au(idr: Boolean) {
++            val nal = byteArrayOf(if (idr) 0x65 else 0x41, 0x11, 0x22, 0x33, 0x44)
++            val p = ByteBuffer.allocate(12 + nal.size)
++            p.put(0x80.toByte()).put((0x80 or 96).toByte()).putShort(seq.toShort()).putInt(ts.toInt()).putInt(0x1234)
++            p.put(nal)
++            seq = (seq + 1) and 0xffff
++            ts += 1500L
++            tx.send(DatagramPacket(p.array(), p.capacity(), InetAddress.getLoopbackAddress(), port))
++            Thread.sleep(3)
++        }
++
++        fun close() = tx.close()
++    }
++
++    private fun receiver(port: Int, queued: MutableList<Int>): RtpH264Receiver =
++        RtpH264Receiver(
++            port = port,
++            onParameterSets = { _, _ -> },
++            onAccessUnit = { _, _ -> queued.add(1) },
++        ).also { it.start(); Thread.sleep(150) }
++
++    /** The activity's sequence around a lost surface, with or without the guard; returns the host's requests. */
++    private fun twoWayDrop(guard: RestartGuard?, clock: LongArray): Pair<List<String>, List<Int>> {
++        val posts = Collections.synchronizedList(mutableListOf<String>())
++        val port = freePort()
++        posts.add("start")                                       // session A's native-stream-start
++        val a = mutableListOf<Int>()
++        val rxA = receiver(port, a)
++        val w = Wire(port)
++        repeat(5) { w.au(it == 0) }
++        Thread.sleep(100)
++        // surfaceDestroyed: the report cached, the guard told, the pipeline stopped (no post today)
++        val cached = "{\"session\":\"A\",\"rendered\":${a.size}}"
++        guard?.onSurfaceLost(cached, 166L, 120L, false)
++        rxA.stop()
++        clock[0] += 5_000L                                       // the 5-s drop
++        // surfaceCreated -> startSession: today's cachedSessionReport = null; the session thread
++        val restart = guard?.takePending()
++        restart?.let { p -> guard.flush(p, { r -> posts.add("report:$r") }, { posts.add("stop") }) }
++        posts.add("start")                                       // session B's native-stream-start
++        val b = mutableListOf<Int>()
++        val rxB = receiver(port, b)
++        repeat(5) { w.au(it == 0) }
++        Thread.sleep(100)
++        rxB.stop()
++        w.close()
++        return posts.toList() to listOf(a.size, b.size)
++    }
++
++    @Test
++    fun withTheGuardTheOldSessionEndsFirst() {
++        val clock = longArrayOf(1_000L)
++        val g = RestartGuard { clock[0] }
++        val (posts, frames) = twoWayDrop(g, clock)
++        assertEquals(listOf("start", "report:{\"session\":\"A\",\"rendered\":5}", "stop", "start"), posts)
++        assertEquals(listOf(5, 5), frames)                        // A received, then B on the same port
++        val c = g.lastCause
++        assertNotNull(c)
++        assertEquals(5_000L, c!!["away_ms"])
++        assertEquals(166L, c["last_frame_age_ms"])
++        assertEquals(true, c["old_report_posted"])
++        assertEquals(true, c["stop_posted"])
++        assertEquals(1L, g.restarts)
++    }
++
++    @Test
++    fun withoutTheGuardItIsToday() {
++        val (posts, frames) = twoWayDrop(null, longArrayOf(0L))
++        assertEquals(listOf("start", "start"), posts)              // no stop, the report lost
++        assertEquals(listOf(5, 5), frames)
++    }
++
++    @Test
++    fun anEndedActivityIsTodaysStopNotASecondOne() {
++        val g = RestartGuard { 0L }
++        g.onSurfaceLost("r", 1L, 1L, false)
++        g.onSessionStopped()
++        assertNull(g.takePending())
++        assertNull(g.lastCause)
++    }
++
++    @Test
++    fun aNormalStartClearsTheCauseAndFailedPostsAreRecorded() {
++        val g = RestartGuard { 0L }
++        g.onSurfaceLost("r", 1L, 1L, true)
++        val c = g.flush(g.takePending()!!, { throw IllegalStateException("down") }, { throw IllegalStateException("down") })
++        assertEquals(false, c["old_report_posted"])
++        assertEquals(false, c["stop_posted"])
++        assertEquals(true, c["recovery_active"])
++        assertNull(g.takePending())                               // the next, normal start
++        assertNull(g.lastCause)
++    }
++
++    @Test
++    fun thePauseBeforeTheLossIsMeasured() {
++        val clock = longArrayOf(0L)
++        val g = RestartGuard { clock[0] }
++        g.notePause()
++        clock[0] = 40L
++        g.onSurfaceLost(null, 1L, 1L, false)
++        assertEquals(40L, g.takePending()!!.pausedBeforeLossMs)
++    }
++
++    // --- the audio: the host restarts its sender at sequence 0 --------------------------------------------------
++
++    private fun feed(r: OpusReorder, seqs: IntRange, sink: MutableList<Int>) {
++        for (s in seqs) {
++            r.offer(s and 0xffff, byteArrayOf(1), 0, { n, p -> if (p != null) sink.add(n) })
++        }
++    }
++
++    @Test
++    fun aReceiverLockedOnTheOldStreamDropsTheRestartedOne() {
++        val today = OpusReorder()
++        val sink = mutableListOf<Int>()
++        feed(today, 5_800..5_899, sink)                           // the old stream, ~58 s in (10-ms frames)
++        sink.clear()
++        feed(today, 0..299, sink)                                 // the host's restart: 3 s of audio
++        assertEquals(0, sink.size)                                // every frame LATE: the underrun storm
++    }
++
++    @Test
++    fun aRebuiltReceiverPlaysTheRestartedStream() {
++        val sink = mutableListOf<Int>()
++        val rebuilt = OpusReorder()                               // B11: a fresh receiver after the start response
++        feed(rebuilt, 0..299, sink)
++        assertEquals((0..299).toList(), sink)
++    }
++}

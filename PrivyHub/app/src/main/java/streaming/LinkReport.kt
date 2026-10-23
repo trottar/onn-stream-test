@@ -6,8 +6,8 @@ import android.os.Build
 
 /**
  * B3: the client's Wi-Fi link quality in its 2-s reports, behind the system
- * property `debug.privyhub.link_report=1` (CL-B7P's convention; a reboot
- * clears it). Absent = today: no Wi-Fi read, no new key.
+ * property `debug.privyhub.link_report` (CL-B7P's convention; a reboot
+ * clears it). B13: absent (or anything but `0`) = ON; `0` turns it off.
  *
  * Read with ACCESS_WIFI_STATE (already declared; a normal permission, no
  * prompt): RSSI, tx / rx link speed, frequency, Wi-Fi standard. No SSID,
@@ -17,15 +17,15 @@ import android.os.Build
 object LinkReportFlag {
     const val PROPERTY = "debug.privyhub.link_report"
 
-    fun parse(value: String?): Boolean = value?.trim() == "1"
+    fun parse(value: String?): Boolean = value?.trim() != "0"   // B13: on unless `0`
 
-    /** The property, read through reflection; any failure is off. */
+    /** The property, read through reflection; a failed read is absent, so on (B13). */
     fun fromSystem(): Boolean =
         try {
             val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
             parse(get.invoke(null, PROPERTY) as? String)
         } catch (_: Throwable) {
-            false
+            parse(null)
         }
 }
 

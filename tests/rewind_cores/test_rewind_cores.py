@@ -184,7 +184,7 @@ class TheConfig(unittest.TestCase):
     BASE = 'video_vsync = "true"\n'
 
     def test_allow_list_all_and_state(self):
-        one = {"PRIVYHUB_INPUT_HOLD": "1", "PRIVYHUB_INPUT_HOLD_REWIND": "1"}
+        one = {"PRIVYHUB_INPUT_HOLD": "1", "PRIVYHUB_INPUT_HOLD_REWIND": "rewind"}   # B12: B9's `1` is now `rewind`
         for core in (SNES, "bsnes_libretro.so"):
             self.assertEqual(hr.apply_session_config(self.BASE, core, one), self.BASE + hr.config_block(core, one))
         self.assertEqual(hr.apply_session_config(self.BASE, PSX, one), self.BASE)            # no 1-GB buffer
@@ -208,7 +208,7 @@ class TheConfig(unittest.TestCase):
 
 class AllowList(unittest.TestCase):
     def test_psx_under_one_is_skipped_with_nothing_sent(self):
-        rig = Rig("1", PSX)
+        rig = Rig("rewind", PSX)                                 # B12: B9's `1` is now `rewind`
         try:
             now = time.monotonic()
             rig.pause_for_hold(now - 1.05, now)
@@ -222,7 +222,7 @@ class AllowList(unittest.TestCase):
             rig.stop()
 
     def test_snes_under_one_is_b4s_rewind(self):
-        rig = Rig("1", SNES)
+        rig = Rig("rewind", SNES)                                # B12: B9's `1` is now `rewind`
         try:
             now = time.monotonic()
             rig.pause_for_hold(now - 0.5, now)

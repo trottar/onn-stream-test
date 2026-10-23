@@ -1,8 +1,9 @@
 """B9: the hold's rewind per core -- RetroArch's rewind for an allow-list, a scratch savestate as the PS1 path.
 
 `PRIVYHUB_INPUT_HOLD_REWIND` (B4's flag, read only with the hold active):
-- `1`: RetroArch's rewind **only for the allow-list** (snes9x, bsnes). Another core gets no rewind keys in its launch
-  config (Beetle PSX HW: no 1-GB buffer, no +16.6 points) and a `rewind_skipped` row at the release;
+- `1` (B12): `state` for every core (BENCH-R3: the rewind method read PAUSED after on snes9x and PS1; `state` played);
+- `rewind` (B9's `1`): RetroArch's rewind **only for the allow-list** (snes9x, bsnes). Another core gets no rewind keys
+  in its launch config (Beetle PSX HW: no 1-GB buffer, no +16.6 points) and a `rewind_skipped` row at the release;
 - `all`: B4's behaviour for every core (nothing here is wired);
 - `state`: no rewind keys; a scratch `SAVE_STATE_SLOT 9` at a controller silence of 400 ms
   (`PRIVYHUB_INPUT_HOLD_STATE_AT_MS`), loaded at the release into a running core (D-BASE-R3C: a mid-FMV state loaded
@@ -29,13 +30,14 @@ SLOT = 9                    # not 0 (the recovery's staging slot), not 1-3 (the 
 SAVE_ACK_S = 0.10
 LOAD_CONFIRM_S = 0.15       # a 16-MB state; B4's 2-frame window is for REWIND
 MATCH_S = 0.005             # the pending's onset and the saved silence's onset are the same packet time
+STALL_MATCH_S = 0.10        # B12: a stall save and the stall pause estimate the same client frame (receive - age)
 FILE_SLACK_S = 1.0
 PAUSE_CONFIRM_LAG_FRAMES = 4   # B4's
 
 
 def mode(environ: Mapping[str, str]) -> str | None:
     raw = (environ.get(FLAG_ENV) or "").strip()
-    return {"1": "allow", "all": "all", "state": "state"}.get(raw)
+    return {"1": "state", "rewind": "allow", "all": "all", "state": "state"}.get(raw)   # B12: `1` = state
 
 
 def config_allowed(core_name: str, environ: Mapping[str, str]) -> bool:
@@ -117,8 +119,8 @@ class Cores:
 
     # --- the scratch save (B2's detector -> this worker) -----------------------------------------------------------
 
-    def request_save(self, silence_start: float, now: float) -> None:
-        self._q.put((silence_start, now))
+    def request_save(self, silence_start: float, now: float, kind: str = "silence") -> None:
+        self._q.put((silence_start, now, kind))
 
     def _run(self) -> None:
         while True:
@@ -128,7 +130,7 @@ class Cores:
             except Exception:
                 pass                                   # the save must never take the worker down
 
-    def save(self, silence_start: float, mark_at: float) -> None:
+    def save(self, silence_start: float, mark_at: float, kind: str = "silence") -> None:
         if getattr(self.emulator, "_paused", False):
             self.saves_skipped_paused += 1
             return
@@ -148,9 +150,10 @@ class Cores:
                 nci.close()
         ok = bool(ack) and ack.upper().startswith(f"SAVE_STATE_SLOT {SLOT}")
         with self._lock:
-            self.last_save = {"onset": silence_start, "sent_at": sent_at, "wall": wall, "ack": ack, "ok": ok}
+            self.last_save = {"onset": silence_start, "sent_at": sent_at, "wall": wall, "ack": ack, "ok": ok,
+                              "kind": kind}
             self.saves += 1
-        self.recovery._log("state_saved" if ok else "state_save_failed", slot=SLOT, core=self.core(),
+        self.recovery._log("state_saved" if ok else "state_save_failed", slot=SLOT, core=self.core(), kind=kind,
                            silence_ms=round((mark_at - silence_start) * 1000.0, 1),
                            save_after_onset_ms=round((sent_at - silence_start) * 1000.0, 1),
                            ack=(ack or "")[:40] or None)
@@ -169,6 +172,9 @@ class Cores:
         onset = pending.get("b8_hold_onset", pending["onset"])
         with self._lock:
             s = self.last_save
+        # B12: a save taken at the client's stall matches the stall pause's own onset within 100 ms
+        if s is not None and s.get("kind") == "stall" and abs(s["onset"] - onset) <= STALL_MATCH_S:
+            onset = s["onset"]
         if s is None or not s.get("ok") or abs(s["onset"] - onset) > MATCH_S:
             return rw._row(recovery, "rewind_skipped", fields, reason="no scratch state for this pause")
         why = self._file_problem(s)
@@ -250,7 +256,7 @@ def wire(rw: Any, recovery: Any, controller: Any, emulator: Any, environ: Mappin
             import hold_tuning
             hold_ms = hold_tuning.hold_ms(environ) or hold_ms
         at_ms, why = parse_state_at(environ, hold_ms)
-        if det is not None:
+        if det is not None and hasattr(det, "on_quiet"):
             det.state_mark = StateMark(c, at_ms)
     recovery._log("input_hold_rewind_cores_config", mode=m, allow=sorted(ALLOW), slot=(SLOT if m == "state" else None),
                   state_at_ms=at_ms, state_at_note=why)

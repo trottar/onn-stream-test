@@ -69,6 +69,9 @@ def parse(environ: Mapping[str, str]) -> tuple[bool, str | None]:
     # B9: `all` (B4's behaviour, every core) and `state` (the scratch savestate, rewind_cores) are on, as `1`
     if raw in ("all", "state"):
         raw = "1"
+    # B12: `rewind` (B9's allow-list rewind; `1` now means `state`, rewind_cores) is on, as `1`
+    if raw == "rewind":
+        raw = "1"
     if raw != "1":
         return False, f"ignored: {raw[:32]!r} is not 1"
     import input_hold
@@ -110,7 +113,7 @@ def apply_session_config(session_text: str, core_name: str, environ: Mapping[str
     if not on:
         return session_text
     # B9: the rewind keys only for a core the mode allows (`1`: the allow-list; `state`: none; `all`: every core)
-    if (environ.get(FLAG_ENV) or "").strip() in ("1", "state"):
+    if (environ.get(FLAG_ENV) or "").strip() in ("1", "state", "rewind"):
         import rewind_cores
         if not rewind_cores.config_allowed(core_name, environ):
             return session_text
@@ -336,7 +339,7 @@ def wire(recovery: Any, controller: Any, emulator: Any, environ: Mapping[str, st
     rw = Rewinder(emulator, controller, cap, session_config=cfg)
     recovery._input_hold_rewind = rw
     # B9: `1` = the allow-list, `state` = the scratch savestate (rewind_cores); `all` = B4's
-    if (environ.get(FLAG_ENV) or "").strip() in ("1", "state"):
+    if (environ.get(FLAG_ENV) or "").strip() in ("1", "state", "rewind"):
         import rewind_cores
         rewind_cores.wire(rw, recovery, controller, emulator, environ)
     controller.set_input_mask(rw.mask)

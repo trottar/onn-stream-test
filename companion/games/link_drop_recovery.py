@@ -95,6 +95,8 @@ class LinkDropRecovery:
     _client_stall: Any = None
     # B8: the hold / stall ownership at the return (hold_ownership.Ownership; only PRIVYHUB_INPUT_HOLD_B8=1). None = B7.
     _input_hold_b8: Any = None
+    # B12: the stall's resume owner (stall_owner.StallOwner; only PRIVYHUB_STALL_RESUME=1 wires it). None = today.
+    _stall_owner: Any = None
 
     def __init__(
         self,
@@ -798,6 +800,10 @@ class LinkDropRecovery:
 
             # B8: a hold the client's stall took over resumes at the first fresh heartbeat after the return
             if self._input_hold_b8 is not None and self._input_hold_b8.maybe_resume(self, now):
+                return
+
+            # B12: v2 holds off a young stall-owned pause (no encoder restart); past 5 s it owns it, once
+            if self._stall_owner is not None and self._stall_owner.holds_v2(self, now):
                 return
 
             if self._controller_exit and self._maybe_exit_controller_pause(

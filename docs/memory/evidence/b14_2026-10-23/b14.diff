@@ -1,0 +1,622 @@
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -339,6 +339,8 @@
+         object : Runnable {
+             override fun run() {
+                 updateMetrics()
++                // B14: the link notice from the client's own link reading (null = today)
++                linkNotice?.let { tickLinkNotice(it) }
+                 uiHandler.postDelayed(
+                     this,
+                     500
+@@ -461,6 +463,21 @@
+             )
+         )
+ 
++        // B14: the link notice's line, bottom-left over the picture (null = today: no view)
++        if (linkNotice != null) {
++            val notice = TextView(this).apply {
++                setTextColor(Color.WHITE)
++                setBackgroundColor(0xCC000000.toInt())
++                textSize = 15f
++                setPadding(20, 12, 20, 12)
++                visibility = View.GONE
++            }
++            noticeView = notice
++            root.addView(notice, FrameLayout.LayoutParams(
++                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT
++            ).apply { gravity = Gravity.BOTTOM or Gravity.START; setMargins(24, 24, 24, 24) })
++        }
++
+         setContentView(
+             root
+         )
+@@ -585,6 +602,9 @@
+         cachedSessionReport = null
+         // B5: the Wi-Fi lock for the session (null = today)
+         streamWifiLock?.acquire()
++        // B14: a new session re-arms the link notice (null = today)
++        linkNotice?.onSessionStart()
++        noticeView?.visibility = View.GONE
+         pausedFrameCaptureStatus =
+             "not_requested"
+         pausedFrameBytes =
+@@ -2274,6 +2294,12 @@
+             root.put("stall_signal_ends_sent", m.endsSent)
+         }
+ 
++        // B14: the link notice's count and last reasons (null = today: no key)
++        linkNotice?.let { n ->
++            root.put("link_notice_shown", n.shownCount)
++            root.put("link_notice_last_reasons", n.lastReasons)
++        }
++
+         // B11: the self-restart's cause (null = today: no key)
+         restartGuard?.lastCause?.let { c -> root.put("restart_cause", JSONObject(c)) }
+ 
+@@ -2320,6 +2346,33 @@
+             released = gameplayReleased || recoveryActive,
+         )
+ 
++    // B14: the link notice, only with debug.privyhub.link_notice=1 (null = today); its own sampler if link_report=0.
++    private val linkNotice: LinkNotice? by lazy { if (LinkNoticeFlag.fromSystem()) LinkNotice() else null }
++    private val noticeSampler: LinkSampler? by lazy {
++        if (linkNotice != null && linkSampler == null) LinkSampler({ readWifi(applicationContext) }) else null
++    }
++    private var noticeView: TextView? = null
++
++    // B14: one evaluation per UI tick; the view and the diagnostics page's line follow the transitions
++    private fun tickLinkNotice(n: LinkNotice) {
++        if (!sessionStarted) return
++        val s = (linkSampler ?: noticeSampler)?.current()
++        when (val ev = n.update(s, System.nanoTime() / 1_000_000L)) {
++            is LinkNotice.Event.Shown -> {
++                noticeView?.text = ev.text
++                noticeView?.visibility = View.VISIBLE
++                LinkNoticeStatus.lastText = ev.text
++                LinkNoticeStatus.lastShownAtMs = System.currentTimeMillis()
++                LinkNoticeStatus.showing = true
++            }
++            LinkNotice.Event.Cleared -> {
++                noticeView?.visibility = View.GONE
++                LinkNoticeStatus.showing = false
++            }
++            null -> {}
++        }
++    }
++
+     // B11: the self-restart guard, only with debug.privyhub.restart_guard=1 (null = today).
+     private val restartGuard: RestartGuard? by lazy { if (RestartGuardFlag.fromSystem()) RestartGuard() else null }
+ 
+@@ -2536,6 +2589,8 @@
+                 audioQuery(aud, audWindowGapMs) +
+                 // B10: the loss guard's counters (null = today: nothing)
+                 (lossGuard?.query() ?: "") +
++                // B14: the link notice's state (null = today: nothing)
++                (linkNotice?.query() ?: "") +
+                 // D-BASE-T1: the onn's own thermal state travels with the
+                 // heartbeat, so a session that never posts a report still
+                 // leaves a temperature trace on the host.
+--- a/PrivyHub/app/src/main/java/diagnostics/DiagnosticsActivity.kt
++++ b/PrivyHub/app/src/main/java/diagnostics/DiagnosticsActivity.kt
+@@ -14,6 +14,9 @@
+ 
+ import androidx.appcompat.app.AppCompatActivity
+ import com.safeiot.privyhub.identity.PrivyHubIdentity
++// B14: the link notice's last line (only with debug.privyhub.link_notice=1)
++import com.safeiot.privyhub.streaming.LinkNoticeFlag
++import com.safeiot.privyhub.streaming.LinkNoticeStatus
+ 
+ import org.json.JSONArray
+ import org.json.JSONObject
+@@ -284,6 +287,18 @@
+             )
+         )
+ 
++        // B14: the last link notice, while the app runs (absent = today: no view)
++        if (LinkNoticeFlag.fromSystem()) {
++            content.addView(
++                TextView(this).apply {
++                    text = LinkNoticeStatus.lastText?.let { "Last link notice:\n$it" } ?: "Link notice: none shown"
++                    textSize = 15f
++                    setTextColor(Color.WHITE)
++                },
++                ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
++            )
++        }
++
+         content.addView(
+             statusView,
+             ViewGroup.LayoutParams(
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -31,6 +31,11 @@
+ if (os.environ.get("PRIVYHUB_LINK_REPORT") or "").strip() == "1":
+     from games.native_stream_heartbeat import LINK_FIELDS as _LINK_FIELDS
+ 
++# B14: the client's link notice in the heartbeat (rides on B3's PRIVYHUB_LINK_REPORT=1). Absent = today: nothing imported.
++_link_notice = None
++if (os.environ.get("PRIVYHUB_LINK_REPORT") or "").strip() == "1":
++    import link_notice as _link_notice
++
+ # B10: the client's keyframe request and the heartbeat's loss-guard counters, only with PRIVYHUB_LOSS_GUARD set.
+ _keyframe_request = None
+ _LOSS_GUARD_FIELDS = None
+@@ -204,6 +209,9 @@
+         # B12: after B7's (and B8's) wires
+         if _stall_owner is not None:
+             _stall_owner.wire(self._recovery, self._native_stream._session_io.controller, os.environ)
++        # B14: the link notice's transitions, one per plugin (the recovery log)
++        if _link_notice is not None:
++            self._link_notice_log = _link_notice.NoticeLog()
+         # B10: the client's keyframe request on the controller socket (today's encoder control forces nothing)
+         if _keyframe_request is not None:
+             _keyframe_request.wire(self._recovery, self._native_stream._session_io.controller, os.environ)
+@@ -3722,6 +3730,10 @@
+                     if field in query:
+                         values[field] = self._parse_int(self._first(query, field), -1)
+ 
++            # B14: the client's link notice (bits), with the link report's flag
++            if _link_notice is not None and "link_notice" in query:
++                values["link_notice"] = self._parse_int(self._first(query, "link_notice"), 0)
++
+             # B10: the client's loss-guard counters (ints), when the flag is set
+             if _LOSS_GUARD_FIELDS is not None:
+                 for field in _LOSS_GUARD_FIELDS:
+@@ -3738,6 +3750,10 @@
+                 values,
+             )
+ 
++            # B14: a transition of the client's link notice, in the recovery log (the user was told)
++            if _link_notice is not None and "link_notice" in values:
++                self._link_notice_log.note(self._recovery, values["link_notice"], values)
++
+             # D-BASE-R3 reads it; D-BASE-R2 only recorded it.
+             heartbeat = result.get("heartbeat")
+ 
+--- a/companion/games/native_stream_heartbeat.py
++++ b/companion/games/native_stream_heartbeat.py
+@@ -181,6 +181,10 @@
+             if field in values:
+                 record[field] = values[field]
+ 
++    # B14: the client's link notice beside the link fields (a client without the notice sends no key)
++    if "link_notice" in values and LINK_FIELDS is not None:
++        record["link_notice"] = values["link_notice"]
++
+     # B10: the loss-guard counters, when the flag set them up
+     if LOSS_GUARD_FIELDS is not None:
+         for field in LOSS_GUARD_FIELDS:
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/LinkNotice.kt
+@@ -0,0 +1,161 @@
++package com.safeiot.privyhub.streaming
++
++/**
++ * B14: the "any house" link notice, behind the system property
++ * `debug.privyhub.link_notice=1` (CL-B7P's convention). Absent = today: no
++ * object, no view, no key.
++ *
++ * LINK-R1: on 5 GHz 0 uplink silences and 0 hitch seconds per 10 min; on
++ * 2.4 GHz 16-22 and 20 in every room. The onn sat on 2.4 GHz for a month and
++ * nothing told anyone. From the client's own link reading (B3's LinkSample;
++ * no network call), a small plain notice: what it sees and the one thing to
++ * do. Shown on 2.4 GHz at once, or RSSI <= -72 dBm / tx <= 54 Mbps held 10 s;
++ * cleared after 30 s good; at most once a session unless the band changes.
++ * Nothing about the stream changes.
++ */
++object LinkNoticeFlag {
++    const val PROPERTY = "debug.privyhub.link_notice"
++
++    fun parse(value: String?): Boolean = value?.trim() == "1"
++
++    fun fromSystem(): Boolean =
++        try {
++            val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
++            parse(get.invoke(null, PROPERTY) as? String)
++        } catch (_: Throwable) {
++            false
++        }
++}
++
++/** What the notice says; the wording is the user's to edit (the record lists it). */
++object LinkNoticeText {
++    const val ACTION_BAND = "Use your router's 5 GHz Wi-Fi for this box."
++    const val ACTION_WEAK = "Move this box or the router closer, or use a wired connection."
++    const val ACTION_SLOW = "Use the 5 GHz network or move closer to the router."
++
++    fun of(reasons: Int, s: LinkSample?): String {
++        val seen = mutableListOf<String>()
++        if (reasons and LinkNotice.BAND_24 != 0) seen.add("2.4 GHz")
++        if (reasons and LinkNotice.WEAK != 0) seen.add("weak signal (${s?.rssiDbm ?: "?"} dBm)")
++        if (reasons and LinkNotice.SLOW != 0) seen.add("slow link (${s?.txMbps ?: "?"} Mbps)")
++        val action = when {
++            reasons and LinkNotice.BAND_24 != 0 -> ACTION_BAND
++            reasons and LinkNotice.WEAK != 0 -> ACTION_WEAK
++            else -> ACTION_SLOW
++        }
++        return "Wi-Fi: ${seen.joinToString(", ")}\n$action"
++    }
++}
++
++/** The last notice, for the diagnostics page (this process only). */
++object LinkNoticeStatus {
++    @Volatile
++    var lastText: String? = null
++
++    @Volatile
++    var lastShownAtMs: Long = 0L
++
++    @Volatile
++    var showing: Boolean = false
++}
++
++class LinkNotice(
++    private val rssiThresholdDbm: Int = -72,
++    private val txThresholdMbps: Int = 54,
++    private val sustainMs: Long = 10_000L,
++    private val clearMs: Long = 30_000L,
++) {
++    companion object {
++        const val BAND_24 = 1
++        const val WEAK = 2
++        const val SLOW = 4
++
++        /** 24 / 5 / 6 GHz from the frequency, null when unknown. */
++        fun band(frequencyMhz: Int?): Int? =
++            when (frequencyMhz) {
++                null -> null
++                in 2_400..2_500 -> 24
++                in 4_900..5_900 -> 5
++                in 5_925..7_125 -> 6
++                else -> null
++            }
++    }
++
++    sealed class Event {
++        data class Shown(val reasons: Int, val text: String) : Event()
++        object Cleared : Event()
++    }
++
++    var shown = false
++        private set
++    var reasons = 0
++        private set
++    var shownCount = 0L
++        private set
++    var lastReasons = 0
++        private set
++
++    private var shownThisSession = false
++    private var lastBand: Int? = null
++    private var weakSinceMs: Long? = null
++    private var slowSinceMs: Long? = null
++    private var goodSinceMs: Long? = null
++
++    /** A new session re-arms it (the notice itself is cleared). */
++    fun onSessionStart() {
++        shown = false
++        reasons = 0
++        shownThisSession = false
++        lastBand = null
++        weakSinceMs = null
++        slowSinceMs = null
++        goodSinceMs = null
++    }
++
++    /** One reading (null = nothing new); returns the transition, if any. */
++    fun update(s: LinkSample?, nowMs: Long): Event? {
++        if (s == null) return null
++        val band = band(s.frequencyMhz)
++        if (band != null && lastBand != null && band != lastBand) {
++            shownThisSession = false                    // the band changed: the notice may be shown again
++        }
++        if (band != null) lastBand = band
++        val is24 = band == 24
++        val weakNow = s.rssiDbm != null && s.rssiDbm <= rssiThresholdDbm
++        val slowNow = s.txMbps != null && s.txMbps <= txThresholdMbps
++        weakSinceMs = if (weakNow) (weakSinceMs ?: nowMs) else null
++        slowSinceMs = if (slowNow) (slowSinceMs ?: nowMs) else null
++        var bits = 0
++        if (is24) bits = bits or BAND_24
++        if (weakSinceMs != null && nowMs - weakSinceMs!! >= sustainMs) bits = bits or WEAK
++        if (slowSinceMs != null && nowMs - slowSinceMs!! >= sustainMs) bits = bits or SLOW
++        val goodNow = !is24 && !weakNow && !slowNow
++        if (!shown) {
++            if (bits != 0 && !shownThisSession) {
++                shown = true
++                shownThisSession = true
++                reasons = bits
++                lastReasons = bits
++                shownCount++
++                goodSinceMs = null
++                return Event.Shown(bits, LinkNoticeText.of(bits, s))
++            }
++            return null
++        }
++        if (!goodNow) {
++            goodSinceMs = null
++            return null
++        }
++        val since = goodSinceMs ?: nowMs.also { goodSinceMs = it }
++        if (nowMs - since >= clearMs) {
++            shown = false
++            reasons = 0
++            goodSinceMs = null
++            return Event.Cleared
++        }
++        return null
++    }
++
++    /** The heartbeat's fragment: the reasons while shown, else 0. */
++    fun query(): String = "&link_notice=${if (shown) reasons else 0}"
++}
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/LinkNoticeTest.kt
+@@ -0,0 +1,119 @@
++package com.safeiot.privyhub.streaming
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * B14: the link notice on a fake WifiInfo feed (LinkSample readings every
++ * 500 ms on a fake clock, as the activity's UI tick): 2.4 GHz shown at once
++ * and once; 5 GHz good for 30 s cleared; RSSI <= -72 or tx <= 54 for 10 s
++ * shown; once per session unless the band changes; the flag absent = off.
++ */
++class LinkNoticeTest {
++
++    private fun s(mhz: Int?, rssi: Int?, tx: Int?) = LinkSample(rssi, tx, 100, mhz, 4)
++
++    private val g24 = s(2412, -68, 121)      // BENCH-R3: the onn all month
++    private val g5 = s(5180, -68, 195)       // LINK-R1: 5 GHz, good
++
++    /** Feed one reading every 500 ms from t0 for `seconds`; the events with their times. */
++    private fun feed(n: LinkNotice, r: LinkSample, t0: Long, seconds: Double): List<Pair<Long, LinkNotice.Event>> {
++        val out = mutableListOf<Pair<Long, LinkNotice.Event>>()
++        var t = t0
++        while (t < t0 + (seconds * 1000).toLong()) {
++            n.update(r, t)?.let { out.add(t to it) }
++            t += 500
++        }
++        return out
++    }
++
++    @Test
++    fun flagTable() {
++        assertTrue(LinkNoticeFlag.parse("1"))
++        for (bad in listOf(null, "", "0", "on", "true")) assertFalse(bad, LinkNoticeFlag.parse(bad))
++        assertFalse(LinkNoticeFlag.fromSystem())                  // off-device: off (absent = today)
++    }
++
++    @Test
++    fun twoPointFourIsShownAtOnceAndOnce() {
++        val n = LinkNotice()
++        val ev = feed(n, g24, 0, 60.0)
++        assertEquals(1, ev.size)
++        assertEquals(0L, ev[0].first)
++        val shown = ev[0].second as LinkNotice.Event.Shown
++        assertEquals(LinkNotice.BAND_24, shown.reasons)
++        assertEquals("Wi-Fi: 2.4 GHz\nUse your router's 5 GHz Wi-Fi for this box.", shown.text)
++        assertEquals("&link_notice=1", n.query())
++    }
++
++    @Test
++    fun fiveGhzGoodForThirtySecondsClears() {
++        val n = LinkNotice()
++        feed(n, g24, 0, 5.0)
++        assertTrue(n.shown)
++        val ev = feed(n, g5, 5_000, 40.0)
++        assertEquals(1, ev.size)
++        assertEquals(LinkNotice.Event.Cleared, ev[0].second)
++        assertEquals(35_000L, ev[0].first)                        // 30 s after the first good reading, not before
++        assertEquals("&link_notice=0", n.query())
++    }
++
++    @Test
++    fun onceASessionUnlessTheBandChanges() {
++        val n = LinkNotice()
++        feed(n, g24, 0, 5.0)
++        feed(n, g5, 5_000, 31.0)                                  // cleared on 5 GHz
++        assertFalse(n.shown)
++        val back = feed(n, g24, 36_000, 5.0)                      // the band changed: shown again
++        assertEquals(1, back.size)
++        val m = LinkNotice()
++        feed(m, s(5180, -75, 195), 0, 12.0)                       // weak on 5 GHz: shown
++        assertTrue(m.shown)
++        feed(m, g5, 12_000, 31.0)                                 // cleared
++        val again = feed(m, s(5180, -75, 195), 43_000, 20.0)      // weak again, the same band: not shown
++        assertTrue(again.isEmpty())
++        m.onSessionStart()                                        // a new session re-arms it
++        assertEquals(1, feed(m, s(5180, -75, 195), 70_000, 12.0).size)
++        assertEquals(2L, m.shownCount)
++    }
++
++    @Test
++    fun weakForTenSecondsIsShownNotBefore() {
++        val n = LinkNotice()
++        val ev = feed(n, s(5180, -72, 195), 0, 15.0)
++        assertEquals(1, ev.size)
++        assertEquals(10_000L, ev[0].first)
++        val shown = ev[0].second as LinkNotice.Event.Shown
++        assertEquals(LinkNotice.WEAK, shown.reasons)
++        assertEquals("Wi-Fi: weak signal (-72 dBm)\nMove this box or the router closer, or use a wired connection.",
++            shown.text)
++        assertTrue(feed(LinkNotice(), s(5180, -71, 195), 0, 60.0).isEmpty())   // -71 never
++    }
++
++    @Test
++    fun slowForTenSecondsIsShownAndADipResets() {
++        val n = LinkNotice()
++        assertTrue(feed(n, s(5180, -68, 54), 0, 9.5).isEmpty())
++        n.update(g5, 9_500)                                       // one good reading resets the 10 s
++        val ev = feed(n, s(5180, -68, 48), 10_000, 12.0)
++        assertEquals(20_000L, ev[0].first)
++        assertEquals("Wi-Fi: slow link (48 Mbps)\nUse the 5 GHz network or move closer to the router.",
++            (ev[0].second as LinkNotice.Event.Shown).text)
++    }
++
++    @Test
++    fun badLinkKeepsItUpAndNullReadingsChangeNothing() {
++        val n = LinkNotice()
++        feed(n, g24, 0, 1.0)
++        assertNull(n.update(null, 100_000))
++        assertTrue(n.shown)
++        assertTrue(feed(n, s(5180, -68, 40), 1_000, 60.0).isEmpty())   // 5 GHz but slow: never good, stays
++        assertTrue(n.shown)
++        assertEquals(24, LinkNotice.band(2462))
++        assertEquals(5, LinkNotice.band(5745))
++        assertNull(LinkNotice.band(null))
++    }
++}
+--- /dev/null
++++ b/companion/link_notice.py
+@@ -0,0 +1,40 @@
++"""B14: the client's link notice, as the host sees it -- so a record can say the user was told.
++
++Rides on `PRIVYHUB_LINK_REPORT=1` (B3's flag; the line G-A3 would adopt). **Absent = today**: nothing imports this
++module. With the flag and a client without `debug.privyhub.link_notice=1` (no `link_notice` key): nothing new. Design:
++`docs/memory/evidence/b14_2026-10-23/design_written_before_code.md` (hashed before this code).
++
++The client's heartbeat carries `link_notice=<bits>` (0 = not shown; 1 the band is 2.4 GHz, 2 RSSI <= -72 dBm for 10 s,
++4 tx <= 54 Mbps for 10 s). The heartbeat row records it beside the link fields; a transition writes one row in the
++recovery log: `link_notice_shown` (0 -> non-zero) or `link_notice_cleared` (non-zero -> 0).
++"""
++
++from __future__ import annotations
++
++from typing import Any
++
++FIELD = "link_notice"
++NAMES = ((1, "band_2_4_ghz"), (2, "rssi_weak"), (4, "tx_slow"))
++
++
++def names(bits: int) -> list[str]:
++    return [n for b, n in NAMES if bits & b]
++
++
++class NoticeLog:
++    def __init__(self) -> None:
++        self.last = 0
++
++    def note(self, recovery: Any, bits: int, values: dict[str, Any]) -> str | None:
++        """One heartbeat's value; the row written, if any."""
++        bits = int(bits) if isinstance(bits, int) and bits >= 0 else 0
++        prev, self.last = self.last, bits
++        if prev == 0 and bits != 0:
++            recovery._log("link_notice_shown", reasons=bits, reason_names=names(bits),
++                          link_frequency_mhz=values.get("link_frequency_mhz"), link_rssi_dbm=values.get("link_rssi_dbm"),
++                          link_tx_mbps=values.get("link_tx_mbps"), heartbeat_sequence=values.get("sequence"))
++            return "link_notice_shown"
++        if prev != 0 and bits == 0:
++            recovery._log("link_notice_cleared", previous_reasons=prev, heartbeat_sequence=values.get("sequence"))
++            return "link_notice_cleared"
++        return None
+--- /dev/null
++++ b/tests/link_notice/test_link_notice.py
+@@ -0,0 +1,101 @@
++#!/usr/bin/env python3
++"""B14 (host): the client's link notice from the heartbeat -- recorded beside the link fields and its transitions
++logged, only with PRIVYHUB_LINK_REPORT=1. B3's tests keep their own file.
++
++    python3 -m unittest discover -s tests/link_notice -v
++"""
++
++from __future__ import annotations
++
++import ast
++import json
++import os
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++
++import link_notice as ln  # noqa: E402
++from games import link_drop_recovery as ldr  # noqa: E402
++from games import native_stream_heartbeat as nsh  # noqa: E402
++
++
++def recovery():
++    return ldr.LinkDropRecovery(
++        Path(tempfile.mkdtemp(prefix="b14_rec_")), pause_game=lambda: None, resume_game=lambda: None,
++        save_recovery_state=lambda: {}, restart_encoder=lambda: {}, full_start_encoder=lambda: {},
++        stream_active=lambda: True, end_session=lambda: None, client_packet_age_ms=lambda: 10.0,
++        recovery_save_detail=lambda: {})
++
++
++def rows(rec):
++    p = rec.log_path()
++    return [json.loads(x) for x in p.read_text().splitlines()] if p.exists() else []
++
++
++class Transitions(unittest.TestCase):
++    def test_shown_once_cleared_once(self):
++        rec, log = recovery(), ln.NoticeLog()
++        seq = [0, 0, 1, 1, 1, 3, 0, 0, 2, 0]
++        out = [log.note(rec, b, {"sequence": i, "link_frequency_mhz": 2412, "link_rssi_dbm": -68, "link_tx_mbps": 121})
++               for i, b in enumerate(seq)]
++        self.assertEqual(out, [None, None, "link_notice_shown", None, None, None, "link_notice_cleared", None,
++                               "link_notice_shown", "link_notice_cleared"])
++        r = rows(rec)
++        self.assertEqual([x["event"] for x in r], ["link_notice_shown", "link_notice_cleared", "link_notice_shown",
++                                                   "link_notice_cleared"])
++        self.assertEqual((r[0]["reasons"], r[0]["reason_names"], r[0]["link_frequency_mhz"]), (1, ["band_2_4_ghz"], 2412))
++        self.assertEqual(r[2]["reason_names"], ["rssi_weak"])
++        self.assertEqual(ln.names(7), ["band_2_4_ghz", "rssi_weak", "tx_slow"])
++
++
++class TheHeartbeat(unittest.TestCase):
++    def test_recorded_only_with_the_link_report(self):
++        root = Path(tempfile.mkdtemp(prefix="b14_hb_"))
++        values = {"sequence": 1, "link_notice": 1}
++        saved = nsh.LINK_FIELDS
++        try:
++            nsh.LINK_FIELDS = None
++            nsh.append_native_stream_heartbeat(root, values)
++            nsh.LINK_FIELDS = ("link_rssi_dbm",)
++            nsh.append_native_stream_heartbeat(root, values)
++            nsh.append_native_stream_heartbeat(root, {"sequence": 2})       # an older client: no key, nothing new
++        finally:
++            nsh.LINK_FIELDS = saved
++        lines = [json.loads(x) for x in nsh.heartbeat_log_path(root).read_text().splitlines()]
++        self.assertNotIn("link_notice", lines[0])
++        self.assertEqual(lines[1]["link_notice"], 1)
++        self.assertNotIn("link_notice", lines[2])
++
++
++class FlagAbsent(unittest.TestCase):
++    def _run(self, extra):
++        env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++        env.update(extra)
++        code = ("import sys, ast, pathlib; sys.path.insert(0, 'companion'); "
++                "src = pathlib.Path('companion/plugins/games.py').read_text(); t = ast.parse(src); "
++                "g = [n for n in t.body if isinstance(n, ast.If) and 'import link_notice' in ast.unparse(n)]; "
++                "ns = {'os': __import__('os')}; exec(compile(ast.Module(body=g, type_ignores=[]), 'g', 'exec'), ns); "
++                "print('link_notice' in sys.modules)")
++        out = subprocess.run([sys.executable, "-B", "-c", code], cwd=ROOT, env=env, capture_output=True, text=True,
++                             timeout=120)
++        return out.stdout.strip(), out.stderr[-400:]
++
++    def test_the_import_follows_the_link_report_flag(self):
++        self.assertEqual(self._run({})[0], "False")
++        self.assertEqual(self._run({"PRIVYHUB_LINK_REPORT": "1"})[0], "True")
++
++    def test_hook_shapes(self):
++        def ifs(rel, text):
++            tree = ast.parse((ROOT / "companion" / rel).read_text())
++            return [n for n in ast.walk(tree) if isinstance(n, ast.If) and ast.unparse(n.test).startswith(text)]
++        self.assertEqual(len(ifs("plugins/games.py", "_link_notice is not None")), 3)
++        self.assertEqual(len(ifs("games/native_stream_heartbeat.py", "'link_notice' in values")), 1)
++
++
++if __name__ == "__main__":
++    unittest.main()

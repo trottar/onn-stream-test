@@ -31,6 +31,11 @@ _LINK_FIELDS = None
 if (os.environ.get("PRIVYHUB_LINK_REPORT") or "").strip() == "1":
     from games.native_stream_heartbeat import LINK_FIELDS as _LINK_FIELDS
 
+# B14: the client's link notice in the heartbeat (rides on B3's PRIVYHUB_LINK_REPORT=1). Absent = today: nothing imported.
+_link_notice = None
+if (os.environ.get("PRIVYHUB_LINK_REPORT") or "").strip() == "1":
+    import link_notice as _link_notice
+
 # B10: the client's keyframe request and the heartbeat's loss-guard counters, only with PRIVYHUB_LOSS_GUARD set.
 _keyframe_request = None
 _LOSS_GUARD_FIELDS = None
@@ -62,6 +67,11 @@ if (os.environ.get("PRIVYHUB_STALL_SIGNAL") or "").strip():
 _hold_ownership = None
 if _input_hold is not None and (os.environ.get("PRIVYHUB_INPUT_HOLD_B8") or "").strip():
     import hold_ownership as _hold_ownership
+
+# B12: the stall's resume inside the one owner, only with PRIVYHUB_STALL_RESUME set (and the stall signal). Absent = today.
+_stall_owner = None
+if (os.environ.get("PRIVYHUB_STALL_RESUME") or "").strip() and _stall_signal is not None:
+    import stall_owner as _stall_owner
 
 # LAN-R2: PRIVYHUB_LAN_LOSS_RULE=bidir -- the ladder's rule steps down when the link is bad in both directions (its
 # own uplink silences). The ladder's module global is set here, so adaptive_bitrate_live is untouched. Absent = today.
@@ -196,6 +206,12 @@ class GamesPlugin:
         # B8: after B6's and B7's wires (it needs both)
         if _hold_ownership is not None:
             _hold_ownership.wire(self._recovery, self._native_stream._session_io.controller, os.environ)
+        # B12: after B7's (and B8's) wires
+        if _stall_owner is not None:
+            _stall_owner.wire(self._recovery, self._native_stream._session_io.controller, os.environ)
+        # B14: the link notice's transitions, one per plugin (the recovery log)
+        if _link_notice is not None:
+            self._link_notice_log = _link_notice.NoticeLog()
         # B10: the client's keyframe request on the controller socket (today's encoder control forces nothing)
         if _keyframe_request is not None:
             _keyframe_request.wire(self._recovery, self._native_stream._session_io.controller, os.environ)
@@ -3714,6 +3730,10 @@ class GamesPlugin:
                     if field in query:
                         values[field] = self._parse_int(self._first(query, field), -1)
 
+            # B14: the client's link notice (bits), with the link report's flag
+            if _link_notice is not None and "link_notice" in query:
+                values["link_notice"] = self._parse_int(self._first(query, "link_notice"), 0)
+
             # B10: the client's loss-guard counters (ints), when the flag is set
             if _LOSS_GUARD_FIELDS is not None:
                 for field in _LOSS_GUARD_FIELDS:
@@ -3729,6 +3749,10 @@ class GamesPlugin:
                 self.PROJECT_ROOT,
                 values,
             )
+
+            # B14: a transition of the client's link notice, in the recovery log (the user was told)
+            if _link_notice is not None and "link_notice" in values:
+                self._link_notice_log.note(self._recovery, values["link_notice"], values)
 
             # D-BASE-R3 reads it; D-BASE-R2 only recorded it.
             heartbeat = result.get("heartbeat")
@@ -3867,6 +3891,9 @@ class GamesPlugin:
             # B8: a ready while a hold's stall-owned pause stands: the hold's rewind and resume first (the core paused)
             if _hold_ownership is not None and self._recovery._input_hold_b8 is not None:
                 self._recovery._input_hold_b8.ready_resume(self._recovery)
+            # B12: a ready while a stall-owned pause stands: the stall's load and resume first (the core paused)
+            if _stall_owner is not None and self._recovery._stall_owner is not None:
+                self._recovery._stall_owner.ready_resume(self._recovery)
 
             game_status = self._emulator.status()
             if not game_status.get("active", False):

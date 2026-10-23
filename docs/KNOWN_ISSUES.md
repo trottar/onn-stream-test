@@ -1,6 +1,6 @@
 # Known issues and deferred work
 
-## 2026-10-21 LAN-R1: the ladder does not step down on loss on the LAN — OPEN; a rule BUILT behind `PRIVYHUB_LAN_LOSS_RULE=1`, NOT ADOPTED; BENCH-R1 (2026-10-22): the rule back to B, the input hold not a candidate until its trigger is fixed, the death reproduced on the bench; BENCH-R2 (2026-10-22): the Wi-Fi lock not the cause, the hold + rewind + stall stack not a candidate, APK cb0935c8 CONFIRMED; queue D (2026-10-22): the ownership at the return, the stall threshold 400 + rewind SNES-only, the client's loss guard BUILT, NOT ADOPTED; BENCH-R3 (2026-10-22): the stack not a candidate on SNES (snes9x's hold-path rewind reads PAUSED), the PS1 state path works, the loss guard a candidate (the user's call), the onn on 2.4 GHz where the Opal sampler did not look, APK bf5114a2 CONFIRMED
+## 2026-10-21 LAN-R1: the ladder does not step down on loss on the LAN — OPEN; a rule BUILT behind `PRIVYHUB_LAN_LOSS_RULE=1`, NOT ADOPTED; BENCH-R1 (2026-10-22): the rule back to B, the input hold not a candidate until its trigger is fixed, the death reproduced on the bench; BENCH-R2 (2026-10-22): the Wi-Fi lock not the cause, the hold + rewind + stall stack not a candidate, APK cb0935c8 CONFIRMED; queue D (2026-10-22): the ownership at the return, the stall threshold 400 + rewind SNES-only, the client's loss guard BUILT, NOT ADOPTED; BENCH-R3 (2026-10-22): the stack not a candidate on SNES (snes9x's hold-path rewind reads PAUSED), the PS1 state path works, the loss guard a candidate (the user's call), the onn on 2.4 GHz where the Opal sampler did not look, APK bf5114a2 CONFIRMED; LINK-R1 (2026-10-23): on 5 GHz 0 uplink silences / 0 hitch s per 10 min — the band was most of the flapping; queue E (2026-10-23): the self-restart guard, `state` for every core + the stall resume, the link report on by default + G-A3 prepared, the link notice BUILT, NOT ADOPTED
 
 **The standard (the user, 2026-10-21):** "This product needs to work at any house especially lan as long as the Internet
 is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.md`.
@@ -188,6 +188,30 @@ is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.m
   (both directions, uplink-dominant). 47 s after the resume came a 4.9-s two-way drop (05:03:39.8Z) the client restarted
   its stream from. It was the same quarter-hour after 00:50 EDT as UX-R2's step and UX-R3's death. Record:
   `docs/memory/evidence/UX_R4_SAVED_AT_THE_LAG_2026-10-23.md`.
+- **The band (LINK-R1, 2026-10-23):** on 5 GHz (ch 36, −68 dBm) **0 uplink silences ≥ 250 ms and 0 hitch seconds per
+  10 min**; on 2.4 GHz 16-22 and 20 in every room (BENCH-R1 cell 8, BENCH-R3 C). The onn had been on 2.4 GHz at
+  −68 dBm all month and nothing told anyone; the link report was off on every night that mattered. Record:
+  `docs/memory/evidence/LINK_R1_5GHZ_CHECK_2026-10-23.md`.
+- **Built against it (2026-10-23, session B queue E: B11-B14; none adopted, no live run, APK `da09e154…6cf` pinned, not
+  installed):**
+  - **B11, the self-restart:** settled — the client starts a stream only from `surfaceCreated`; a lost surface caches
+    the report (never posted), stops the whole pipeline including the controller sender (so UX-R4's 4.9-s "uplink
+    silence" is at least partly the client's own), and the next start posts no stop; the host's start restarts its
+    audio at sequence 0 while the new receiver had locked onto the old stream, so every frame read LATE (the underrun
+    storm). `debug.privyhub.restart_guard=1`: the old report and `native-stream-stop` before the start, the audio
+    rebuilt after the host's start, `restart_cause`. Record: `docs/memory/evidence/B11_CLIENT_RESTART_GUARD_2026-10-23.md`.
+  - **B12:** `PRIVYHUB_INPUT_HOLD_REWIND=1` now means `state` for every core (`rewind` = B9's allow-list);
+    `PRIVYHUB_STALL_RESUME=1`: a save at the stall, one resume with that load (at `stall_end` or the client's gate
+    `ready`), v2's encoder restart held off until 5 s, then v2 once. Record:
+    `docs/memory/evidence/B12_STATE_FOR_ALL_AND_STALL_RESUME_2026-10-23.md`.
+  - **B13:** `debug.privyhub.link_report` absent now means ON in the client; the ninth adopted line
+    (`PRIVYHUB_LINK_REPORT=1`) PREPARED only: `docs/memory/patches/G-A3_LINK_REPORT_ADOPTION_PREPARED.md`. Record:
+    `docs/memory/evidence/B13_LINK_REPORT_DEFAULT_ON_2026-10-23.md`.
+  - **B14, the "any house" notice** (`debug.privyhub.link_notice=1`): on 2.4 GHz, or RSSI ≤ −72 dBm / tx ≤ 54 Mbps for
+    10 s, "Wi-Fi: 2.4 GHz — Use your router's 5 GHz Wi-Fi for this box." on the stream and the diagnostics page; the
+    host logs `link_notice_shown` / `_cleared`. Record: `docs/memory/evidence/B14_LINK_NOTICE_2026-10-23.md`.
+  - **Next:** G-A3 (the user's say-so); CL-B10 (session A), as in `handoffs/SESSION_B_DONE_2026-10-23E.md`; the
+    user's own play on 5 GHz.
 ## 2026-10-20 UX-R1, the user's extended evening (2026-10-20 04:19-05:22Z) was bad and got worse — OPEN; the files agree; link vs onn not separable from them; UX-R2: the second evening mostly clean, the damage not repeated (one event so far, untested past play-minute 44); H5 closed (not new); UX-R3: one of last night's two "deaths" found (04:54:55-59Z, a 4-s drop in both directions); the second not distinguishable
 
 **The user's standard, verbatim (2026-10-21): "This product needs to work at any house especially lan as long as the Internet is over 50mb/s."**

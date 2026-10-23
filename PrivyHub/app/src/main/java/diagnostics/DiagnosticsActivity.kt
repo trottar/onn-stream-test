@@ -14,6 +14,9 @@ import android.widget.TextView
 
 import androidx.appcompat.app.AppCompatActivity
 import com.safeiot.privyhub.identity.PrivyHubIdentity
+// B14: the link notice's last line (only with debug.privyhub.link_notice=1)
+import com.safeiot.privyhub.streaming.LinkNoticeFlag
+import com.safeiot.privyhub.streaming.LinkNoticeStatus
 
 import org.json.JSONArray
 import org.json.JSONObject
@@ -283,6 +286,18 @@ class DiagnosticsActivity : AppCompatActivity() {
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
         )
+
+        // B14: the last link notice, while the app runs (absent = today: no view)
+        if (LinkNoticeFlag.fromSystem()) {
+            content.addView(
+                TextView(this).apply {
+                    text = LinkNoticeStatus.lastText?.let { "Last link notice:\n$it" } ?: "Link notice: none shown"
+                    textSize = 15f
+                    setTextColor(Color.WHITE)
+                },
+                ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            )
+        }
 
         content.addView(
             statusView,

@@ -339,6 +339,8 @@ class NativeStreamActivity :
         object : Runnable {
             override fun run() {
                 updateMetrics()
+                // B14: the link notice from the client's own link reading (null = today)
+                linkNotice?.let { tickLinkNotice(it) }
                 uiHandler.postDelayed(
                     this,
                     500
@@ -461,6 +463,21 @@ class NativeStreamActivity :
             )
         )
 
+        // B14: the link notice's line, bottom-left over the picture (null = today: no view)
+        if (linkNotice != null) {
+            val notice = TextView(this).apply {
+                setTextColor(Color.WHITE)
+                setBackgroundColor(0xCC000000.toInt())
+                textSize = 15f
+                setPadding(20, 12, 20, 12)
+                visibility = View.GONE
+            }
+            noticeView = notice
+            root.addView(notice, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply { gravity = Gravity.BOTTOM or Gravity.START; setMargins(24, 24, 24, 24) })
+        }
+
         setContentView(
             root
         )
@@ -523,6 +540,16 @@ class NativeStreamActivity :
             cacheSessionReport()
         }
 
+        // B11: the guard keeps the cached report and the cause for the next start (null = today)
+        if (sessionStarted) {
+            restartGuard?.onSurfaceLost(
+                cachedSessionReport,
+                decoder?.lastOutputAgeMs() ?: -1L,
+                if (lastRtpAdvanceAtNs > 0L) (System.nanoTime() - lastRtpAdvanceAtNs) / 1_000_000L else -1L,
+                recoveryActive
+            )
+        }
+
         stopLocalPipeline()
         sessionStarted = false
     }
@@ -531,6 +558,8 @@ class NativeStreamActivity :
     override fun onPause() {
         super.onPause()
         streamWifiLock?.release()
+        // B11: when the activity last paused, for a self-restart's cause (null = today)
+        restartGuard?.notePause()
     }
 
     override fun onResume() {
@@ -573,6 +602,9 @@ class NativeStreamActivity :
         cachedSessionReport = null
         // B5: the Wi-Fi lock for the session (null = today)
         streamWifiLock?.acquire()
+        // B14: a new session re-arms the link notice (null = today)
+        linkNotice?.onSessionStart()
+        noticeView?.visibility = View.GONE
         pausedFrameCaptureStatus =
             "not_requested"
         pausedFrameBytes =
@@ -733,6 +765,10 @@ class NativeStreamActivity :
             name = "PrivyHub-Native-Session"
         ) {
             try {
+                // B11: a self-restart first ends the old session: its report, then native-stream-stop (null = today)
+                val restart = restartGuard?.takePending()
+                restart?.let { p -> restartGuard?.flush(p, { r -> postRestartReport(host, r) }, { postRestartStop(host) }) }
+
                 val response =
                     httpPost(
                         "http://$host:$CONTROL_PORT" +
@@ -776,6 +812,12 @@ class NativeStreamActivity :
                         10_000L
                     )
 
+                // B11: the host restarted its audio at sequence 0: a fresh receiver, its start-up hold re-armed
+                if (restart != null) {
+                    audioReceiver?.stop()
+                    audioReceiver = NativeAudioReceiver(port = AUDIO_PORT)
+                }
+
                 // D-BASE-P9: the companion's declared audio cushion (its
                 // profile, or an environment override). Absent means the
                 // receiver's client defaults (3 / 8) stay in force.
@@ -814,6 +856,9 @@ class NativeStreamActivity :
                             )
                     )
                 }
+
+                // B11: the rebuilt receiver starts with the host's cushion and redundancy already in force
+                if (restart != null) audioReceiver?.start()
 
                 if (
                     hostAlphaVersion !=
@@ -1013,6 +1058,9 @@ class NativeStreamActivity :
         }
 
         stopping = true
+
+        // B11: the activity ends; today's stop path posts the cached report and the stop (null = today)
+        restartGuard?.onSessionStopped()
 
         val report =
             cacheSessionReport()
@@ -2246,6 +2294,15 @@ class NativeStreamActivity :
             root.put("stall_signal_ends_sent", m.endsSent)
         }
 
+        // B14: the link notice's count and last reasons (null = today: no key)
+        linkNotice?.let { n ->
+            root.put("link_notice_shown", n.shownCount)
+            root.put("link_notice_last_reasons", n.lastReasons)
+        }
+
+        // B11: the self-restart's cause (null = today: no key)
+        restartGuard?.lastCause?.let { c -> root.put("restart_cause", JSONObject(c)) }
+
         // B10: the loss guard's mode and counters (null = today: no key)
         lossGuard?.let { g ->
             root.put("loss_guard_mode", g.mode.wire)
@@ -2288,6 +2345,46 @@ class NativeStreamActivity :
             inGate = recoveryActive && !gameplayReleased,
             released = gameplayReleased || recoveryActive,
         )
+
+    // B14: the link notice, only with debug.privyhub.link_notice=1 (null = today); its own sampler if link_report=0.
+    private val linkNotice: LinkNotice? by lazy { if (LinkNoticeFlag.fromSystem()) LinkNotice() else null }
+    private val noticeSampler: LinkSampler? by lazy {
+        if (linkNotice != null && linkSampler == null) LinkSampler({ readWifi(applicationContext) }) else null
+    }
+    private var noticeView: TextView? = null
+
+    // B14: one evaluation per UI tick; the view and the diagnostics page's line follow the transitions
+    private fun tickLinkNotice(n: LinkNotice) {
+        if (!sessionStarted) return
+        val s = (linkSampler ?: noticeSampler)?.current()
+        when (val ev = n.update(s, System.nanoTime() / 1_000_000L)) {
+            is LinkNotice.Event.Shown -> {
+                noticeView?.text = ev.text
+                noticeView?.visibility = View.VISIBLE
+                LinkNoticeStatus.lastText = ev.text
+                LinkNoticeStatus.lastShownAtMs = System.currentTimeMillis()
+                LinkNoticeStatus.showing = true
+            }
+            LinkNotice.Event.Cleared -> {
+                noticeView?.visibility = View.GONE
+                LinkNoticeStatus.showing = false
+            }
+            null -> {}
+        }
+    }
+
+    // B11: the self-restart guard, only with debug.privyhub.restart_guard=1 (null = today).
+    private val restartGuard: RestartGuard? by lazy { if (RestartGuardFlag.fromSystem()) RestartGuard() else null }
+
+    // B11: the old session's report and stop, posted at a self-restart (the guard's transport)
+    private fun postRestartReport(host: String, report: String) {
+        httpPostBody("http://$host:$CONTROL_PORT" + DecoderReportUpload.PATH, DecoderReportUpload.encode(report),
+            DecoderReportUpload.CONTENT_TYPE)
+    }
+
+    private fun postRestartStop(host: String) {
+        httpPost("http://$host:$CONTROL_PORT" + "/plugins/games/native-stream-stop")
+    }
 
     // B10: the loss guard, only with debug.privyhub.loss_guard=<1|count> (null = today).
     private val lossGuard: LossGuard? by lazy { LossGuardFlag.fromSystem()?.let { LossGuard(it) } }
@@ -2492,6 +2589,8 @@ class NativeStreamActivity :
                 audioQuery(aud, audWindowGapMs) +
                 // B10: the loss guard's counters (null = today: nothing)
                 (lossGuard?.query() ?: "") +
+                // B14: the link notice's state (null = today: nothing)
+                (linkNotice?.query() ?: "") +
                 // D-BASE-T1: the onn's own thermal state travels with the
                 // heartbeat, so a session that never posts a report still
                 // leaves a temperature trace on the host.

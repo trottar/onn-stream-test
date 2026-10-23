@@ -1652,6 +1652,12 @@ outbound per session for planning once video, 8+1 parity, PCM16 stereo audio and
 packet/tunnel overhead are considered. Measure the real envelope rather than
 turning this estimate into a hard requirement.
 
+**The "any house" diagnostic (2026-10-23, B13 / B14, built, not adopted):** the client's own Wi-Fi link (band, RSSI,
+tx / rx rate) is reported by default (B13) and recorded on the host with `PRIVYHUB_LINK_REPORT=1` (G-A3 prepared, the
+ninth line, the user's say-so); a plain on-screen notice tells the user when the box is on 2.4 GHz or weak and the one
+thing to do (B14, `debug.privyhub.link_notice=1`). LINK-R1: 5 GHz 0 / 0 against 2.4 GHz 16-22 / 20 silences / hitch s
+per 10 min. Records: `B13_LINK_REPORT_DEFAULT_ON_2026-10-23.md`, `B14_LINK_NOTICE_2026-10-23.md`.
+
 ## G5 — WAN-aware telemetry and adaptation
 
 **Status (2026-10-16, G5-S1): CLASSIFICATION BUILT behind `PRIVYHUB_WAN_TELEMETRY=1`
@@ -1907,6 +1913,20 @@ The PS1 savestate fallback works (5 / 5 loads played, net 24 frames per blackout
 user's call: it held exactly the counted frames, with 0 timeouts, freezes up to 0.5 s, and more hitch seconds. The onn
 streamed on 2.4 GHz, where the Opal sampler did not look; one tx-rate fall coincided with a cluster of uplink silences.
 Record: `docs/memory/evidence/BENCH_R3_SNES_STACK_AND_LOSS_GUARD_2026-10-23.md`.
+
+**B11 (2026-10-23): the client's self-restart guard, built behind `debug.privyhub.restart_guard=1` (the old session's
+report and stop before a self-restart; the audio rebuilt after the host's start).** Record:
+`docs/memory/evidence/B11_CLIENT_RESTART_GUARD_2026-10-23.md`.
+
+**B12 (2026-10-23): `PRIVYHUB_INPUT_HOLD_REWIND=1` = `state` for every core; the stall's resume inside the one owner
+behind `PRIVYHUB_STALL_RESUME=1` (no encoder restart under a young stall pause).** Record:
+`docs/memory/evidence/B12_STATE_FOR_ALL_AND_STALL_RESUME_2026-10-23.md`.
+
+**B13 (2026-10-23): the client's link report on by default; the ninth adopted line prepared (G-A3, not applied).**
+Record: `docs/memory/evidence/B13_LINK_REPORT_DEFAULT_ON_2026-10-23.md`.
+
+**B14 (2026-10-23): the "any house" link notice, built behind `debug.privyhub.link_notice=1`; APK (B5 + B7 + B10 + B11 +
+B13 + B14) `da09e154…` pinned, not installed.** Record: `docs/memory/evidence/B14_LINK_NOTICE_2026-10-23.md`.
 
 ## G9 — Remote foundation checkpoint
 

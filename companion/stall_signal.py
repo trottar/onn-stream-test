@@ -114,6 +114,10 @@ class StallSignal:
             if (getattr(self.recovery, "_input_hold_b8", None) is not None
                     and self.recovery._input_hold_b8.ignore_stall(self.recovery, gate, age, self.threshold_ms, frame)):
                 return
+            # B12: the stall's save (state) and, after the owner's resume, the client's gate is not a drop
+            if (getattr(self.recovery, "_stall_owner", None) is not None
+                    and self.recovery._stall_owner.on_stall(self.recovery, rx, age, gate, self.threshold_ms, frame)):
+                return
             if age < self.threshold_ms and not gate:
                 return
             if state == "PLAYING":
@@ -138,6 +142,10 @@ class StallSignal:
         # B8: a stall_end on a core the hold episode already resumed is a logged no-op
         if (getattr(self.recovery, "_input_hold_b8", None) is not None
                 and self.recovery._input_hold_b8.late_stall_end(self.recovery, state, reason, frame)):
+            return
+        # B12: a stall_end on a core the stall's owner already resumed is a logged no-op
+        if (getattr(self.recovery, "_stall_owner", None) is not None
+                and self.recovery._stall_owner.late_stall_end(self.recovery, state, frame)):
             return
         if state == "PAUSED_RECOVERING" and reason == REASON:
             self.resume("stall_end", frame)
