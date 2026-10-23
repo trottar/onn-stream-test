@@ -1,0 +1,21 @@
+cell A (A_snes_blackout_both_stack) confirmed at 20:25:40Z (read-only):
+  the properties set as pre-registered and read back: stall_signal=1, link_report=1; wifi_lock and loss_guard empty (driver.log)
+  the suite passed its preflight (it refuses otherwise; "suite start" 20:22:12Z), wrote the drop-in, restarted, and reached
+  PLAYING on suite attempt 2 in 4.1 s at 20:24:46Z (runs/A_snes_blackout_both_stack/suite.log; attempt 1's file is
+  written by the suite at the run's end and read by the record)
+  the companion's environ: 16 lines = the eight adopted, all present (PRIVYHUB_SNES_CORE=snes9x among them), + the eight
+  of A: PRIVYHUB_WAN_TELEMETRY=1, PRIVYHUB_IMPAIRMENT=blackout-4s@both,every=120s,seed=1, PRIVYHUB_INPUT_HOLD=1, _B6=1,
+  _B8=1, _REWIND=1, PRIVYHUB_STALL_SIGNAL=1, PRIVYHUB_LINK_REPORT=1
+  encoder command read back 20:24:45Z: -b:v 7000k -maxrate 7000k -bufsize 7000k, no -rc_mode (masked sha256 76bc41b84b4a...)
+  stream poll 20:25:33Z: active, 1280x720, bitrate_kbps 7000 (the 7000 start)
+  the shim live: profile blackout-4s, post-fec, seed 1; at t_s 58: 967 packets in the second; no dark span yet (the first
+  is due at ~120 s), 0 dropped of any kind
+  THE LINK REPORT'S KEYS ARE PRESENT: all 21 heartbeats from 20:24:40Z to 20:25:11Z carry the five link_* keys
+  (link_rssi_dbm, link_tx_mbps, link_rx_mbps, link_frequency_mhz, link_wifi_standard); first rows: RSSI -66 / -67 dBm,
+  tx 108-162 Mbps, rx 108-216 Mbps, frequency 2412 MHz (2.4 GHz, channel 1), Wi-Fi standard 4 (802.11n); no loss-guard
+  keys (PRIVYHUB_LOSS_GUARD absent in A, as pre-registered)
+  the Opal sampler: running (read-only), round 0 at 20:22Z; wlan1 (5 GHz, channel 36) lists NO associated station (also
+  in the dry run's three rounds): the onn's link is on 2412 MHz, the band of the Opal's wlan0 (channel 1), which the
+  pre-registered sampler (wlan1) does not read. So the Opal's station rows for the onn will be empty in this run;
+  the pre-registered interface is kept, disclosed.
+  the unit privyhub-bench-r3: active (running) (unit_status_after_launch.txt)

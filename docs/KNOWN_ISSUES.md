@@ -1,6 +1,6 @@
 # Known issues and deferred work
 
-## 2026-10-21 LAN-R1: the ladder does not step down on loss on the LAN — OPEN; a rule BUILT behind `PRIVYHUB_LAN_LOSS_RULE=1`, NOT ADOPTED; BENCH-R1 (2026-10-22): the rule back to B, the input hold not a candidate until its trigger is fixed, the death reproduced on the bench; BENCH-R2 (2026-10-22): the Wi-Fi lock not the cause, the hold + rewind + stall stack not a candidate, APK cb0935c8 CONFIRMED; queue D (2026-10-22): the ownership at the return, the stall threshold 400 + rewind SNES-only, the client's loss guard BUILT, NOT ADOPTED (BENCH-R3 next)
+## 2026-10-21 LAN-R1: the ladder does not step down on loss on the LAN — OPEN; a rule BUILT behind `PRIVYHUB_LAN_LOSS_RULE=1`, NOT ADOPTED; BENCH-R1 (2026-10-22): the rule back to B, the input hold not a candidate until its trigger is fixed, the death reproduced on the bench; BENCH-R2 (2026-10-22): the Wi-Fi lock not the cause, the hold + rewind + stall stack not a candidate, APK cb0935c8 CONFIRMED; queue D (2026-10-22): the ownership at the return, the stall threshold 400 + rewind SNES-only, the client's loss guard BUILT, NOT ADOPTED; BENCH-R3 (2026-10-22): the stack not a candidate on SNES (snes9x's hold-path rewind reads PAUSED), the PS1 state path works, the loss guard a candidate (the user's call), the onn on 2.4 GHz where the Opal sampler did not look, APK bf5114a2 CONFIRMED
 
 **The standard (the user, 2026-10-21):** "This product needs to work at any house especially lan as long as the Internet
 is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.md`.
@@ -151,6 +151,37 @@ is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.m
     `docs/memory/evidence/B10_CLIENT_LOSS_GUARD_2026-10-22.md`.
   - **Next (session A):** BENCH-R3 on snes9x with the link report on, then CL-B9 (the loss guard, the user
     watching), as in `handoffs/SESSION_B_DONE_2026-10-22D.md`.
+- **BENCH-R3, measured (2026-10-22, session A; 6 / 6 cells valid, host gates met in all; nothing adopted):**
+  - **The stack is not a candidate on SNES.**
+    - `@both` (A): one hold per blackout at 0.95-0.97 s, but all 7 hold-path rewinds (59-60 frames, ~1 s each) failed
+      B4's after-check (snes9x read PAUSED).
+      - So 47.5-48.7 unattended frames per blackout (bar ≤ 5), as BENCH-R2's b1 / b2.
+      - The resume came 2.06-3.13 s after the return, via the gate's ready in 4 of 5.
+    - B's 2-3-frame `stall_end` rewinds on the same core passed 4 / 5. So the hold path's method or after-check is the
+      suspect, not the core.
+    - `@down` (B): the pause 420-428 ms after the client's last frame in 4 of 5 blackouts, 484 in one (bar 0.40-0.46).
+      Recovery v2 resumed each blackout's pause (an encoder restart in 3 / 5, one ladder step 7000→5000); only a second,
+      in-gate pause got a rewind. Stall pauses outside the blackouts 0 (BENCH-R2 c1: 77 / 10 min at 150).
+    - Clean (C): 0 false holds, 0 stall pauses (met).
+  - **The PS1 savestate fallback works (D):** a save 403-408 ms into each blackout, the load played in 5 / 5, 34-36
+    frames restored, net 24 per blackout, B8's resume in every one. It joins nothing: the stack is not a candidate.
+  - **The loss guard is a candidate (the user's call):** E-on held 3,010 frames = its counter's 3,010, 0 timeouts, max
+    wait 501 ms; the requests force nothing.
+    - Costs: freezes up to ~0.5 s instead of corrupted frames; 125.7 hitch s / 10 min against 68.8 off (104.3 outside
+      a house cluster); 55.2 against 57.8 fps.
+    - E-off's counter read 462 / min (expected ~300), part of it the house's loss.
+    - No watch.
+  - **The link:** the onn streamed on 2.4 GHz channel 1 (802.11n, RSSI −67…−69, tx 108-135 / rx 81-162 typical).
+    - The Opal's 5 GHz `wlan1`, which the O1 sampler reads, had no station in 18 rounds; channel 1 is the Opal's
+      `wlan0`.
+    - E-on's cluster of 42 uplink silences (21:42:20-21:43:25Z) coincided with the onn's tx rate falling to 27-81 Mbps.
+    - The downlink loss bursts (D 21:14 / 21:16 / 21:19Z; E-off 21:27Z, two heartbeats 20-68 s late) coincided with no
+      RSSI change beyond 1 dB.
+    - Coincidence in time, not cause.
+  - **APK `bf5114a2…cf73` CONFIRMED** and pinned; `cb0935c8…` preserved.
+  - Record: `docs/memory/evidence/BENCH_R3_SNES_STACK_AND_LOSS_GUARD_2026-10-23.md`.
+  - **Next:** the user's call on the loss guard; the Opal's `wlan0` read beside a stream (is the onn on the Opal?); B
+    on the hold-path rewind's after-check and `@down`'s ownership.
 ## 2026-10-20 UX-R1, the user's extended evening (2026-10-20 04:19-05:22Z) was bad and got worse — OPEN; the files agree; link vs onn not separable from them; UX-R2: the second evening mostly clean, the damage not repeated (one event so far, untested past play-minute 44); H5 closed (not new); UX-R3: one of last night's two "deaths" found (04:54:55-59Z, a 4-s drop in both directions); the second not distinguishable
 
 **The user's standard, verbatim (2026-10-21): "This product needs to work at any house especially lan as long as the Internet is over 50mb/s."**

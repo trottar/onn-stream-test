@@ -1,0 +1,115 @@
+BENCH-R3 — the stack on SNES, the loss guard, and the link measured: PRE-REGISTRATION
+Task: handoffs/BENCH-R3_SNES_STACK_AND_LOSS_GUARD_TASK.md (session A, the install and the launch, §2).
+Baseline: HEAD 9fd73c7 (queue D: B8, B9, B10, committed by the user). Session B's strings: SESSION_B_DONE_2026-10-22D.md
+items 5-9; B8_ / B9_ / B10_ records. Measurement only; nothing adopted; nothing committed.
+
+CAP_UTC: 2026-10-22T23:35:00Z
+(the cap = the planned launch 20:35Z + 3 h; no cell starts after it; if the real launch differs it is disclosed in the
+launch record. Six cells take ~1 h 30 min, so the cap does not bind.)
+
+1. THE INSTALL (after this file is hashed)
+- Candidate: bf5114a2d257f1246374b05e3d79b24f0382afe1c66b2c6acb3a37fa6e58cf73 (B5 + B7 + B10), 9,615,746 B, B's copy
+  /tmp/b_q22d_scratch/b10_apk/app-debug.apk, its sha256 checked against B's pin (rebuilt offline with
+  --no-configuration-cache in a fresh copy only if the /tmp copy is gone); the signer checked against the CONFIRMED APK's
+  (certificate digests compared, not printed); pinned and disclosed.
+- The CONFIRMED cb0935c8cadd5ee65a3f52f390d0994899de27ebaa5c207b547e57185e761080 preserved (copied, nothing deleted).
+- adb install -r; the device's APK hash and the paired line read back with CL-B4's reader (booleans, counts, key names
+  only). "not paired" = stop and tell the user.
+- Every property read empty before the first cell: debug.privyhub.wifi_lock, stall_signal, link_report, loss_guard
+  (and opus_decode, read only).
+
+2. IN EVERY CELL
+- Host: PRIVYHUB_LINK_REPORT=1 in e3_flag.conf; client: setprop debug.privyhub.link_report 1, read back.
+- debug.privyhub.wifi_lock empty (never set; read back each way).
+- The Opal's station view: B's copy (e4_s4d_2026-10-15) of o1_opal_sample.sh + o1_redact.py + o1_parse.py, copied byte
+  for byte into bench_r3_2026-10-22/, every 300 s on wlan1, started before cell A and stopped after E-on (its own .stop
+  file). Read-only on the Opal: every command in it is a read; the Opal's settings untouched; every byte through
+  o1_redact.py inside the script before it is written.
+- The link report's RSSI / tx / rx Mbps / frequency / standard per heartbeat (link_* in the heartbeat log, every 2 s),
+  kept beside every cell (the heartbeat log copied per cell).
+- The silence count >= 250 ms per 10 min in every cell, with B6's gap_distribution.py bins (250, 300, 400, 500, 600,
+  800, 1000, 1500) and its 10-s edge rule.
+- Each cell: E1 --e2 --window 600, a 7000 start, the suite launching the title, a 120-s gap, the drop-in read back under
+  load and removed at teardown; the properties set before and cleared after each cell and read back each way.
+- PRIVYHUB_SNES_CORE=snes9x is adopted line 3 (snes-core.conf): in every environ, not repeated in the drop-in.
+- PRIVYHUB_WAN_TELEMETRY=1 stays as the base line of every drop-in (BENCH-R1 / BENCH-R2's scaffolding; telemetry only),
+  so the cells compare with BENCH-R2's rows. Disclosed.
+- The suite's apk field reads MISMATCH while the candidate is on the onn (EXPECT_APK is cb0935c8…). Expected; the pin
+  moves only by the CONFIRMED rule.
+
+3. THE CELLS (in this order; the fixtures: SNES = E1-SNES-STREAM on snes9x, PS1 = E1-PS1-STREAM on Beetle PSX HW)
+STACK = PRIVYHUB_INPUT_HOLD=1 PRIVYHUB_INPUT_HOLD_B6=1 PRIVYHUB_INPUT_HOLD_B8=1 PRIVYHUB_INPUT_HOLD_REWIND=1
+        PRIVYHUB_STALL_SIGNAL=1 (= 400) PRIVYHUB_LINK_REPORT=1
+A     SNES  PRIVYHUB_IMPAIRMENT=blackout-4s@both,every=120s,seed=1   STACK
+      props stall_signal=1 link_report=1
+B     SNES  PRIVYHUB_IMPAIRMENT=blackout-4s@down,every=120s,seed=1   STACK
+      props stall_signal=1 link_report=1
+C     SNES  PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1                 STACK
+      props stall_signal=1 link_report=1
+D     PS1   PRIVYHUB_IMPAIRMENT=blackout-4s@both,every=120s,seed=1   STACK with PRIVYHUB_INPUT_HOLD_REWIND=state
+      (PRIVYHUB_INPUT_HOLD_STATE_AT_MS absent = default 400)          props stall_signal=1 link_report=1
+E-off PS1   PRIVYHUB_IMPAIRMENT=loss-1@post-fec,seed=1                PRIVYHUB_LOSS_GUARD=1 PRIVYHUB_LINK_REPORT=1
+      (the hold flags absent)                                          props loss_guard=count link_report=1
+E-on  PS1   the same                                                   PRIVYHUB_LOSS_GUARD=1 PRIVYHUB_LINK_REPORT=1
+                                                                       props loss_guard=1 link_report=1
+The user at the TV for E-off / E-on: their one line on each (corrupted picture vs stutter) recorded verbatim; else
+"no watch".
+
+4. THE EXPECTED ROWS (session B's)
+A (item 6, B8 §2): per blackout one hold ~0.95-1.05 s; input_hold_handover → client_stall; one input_hold_carry
+  (pre ≈ 57-60, stall ≈ 4); ONE "resumed via hold_return_stall" ≤ 1 heartbeat after the return (≤ ~2.3 s; b2's 1.1 s the
+  target); one rewind row requested = pre + stall ≤ 72 with the after-check PLAYING (snes9x's rewind confirmed);
+  stall_end_late; client_ready_after_hold; no second desync_pause; no session_started; tools/unattended_frames.py --net
+  ≤ 5 per blackout.
+B (item 7): desync_pause client_stall ~0.40-0.46 s after the client's last frame, its own rewind on snes9x,
+  "resumed via stall_end"; stall pauses outside the blackouts per 10 min (c1: 77 at 150).
+C (item 7): false holds ≤ 1 / 10 min, stall pauses 0 (d2: 0 at 400).
+D (item 8, B9 §5): per blackout one state_saved ~0.40-0.45 s in; one input_release method state (frames_restored
+  ≈ 33-36, net_unattended_frames ≈ 24-27); RetroArch's "Loaded state from slot #9" or a failure; whether the picture
+  plays after the load; no rewind buffer in RetroArch's log; the saves' hitch cost (hitches per 10 min outside the
+  blackouts).
+E-off (item 9): frames_after_dropped_reference per minute (today's corrupted frames, ~300 / min expected), the AU-drop
+  counters, hitch seconds.
+E-on (item 9): loss_guard_frames_held ≈ the counter, timeouts ≈ 0, max wait ≤ 600 ms, keyframe_requests rows with
+  forced 0 and the reason; hitch seconds against E-off.
+
+5. VALIDITY (as BENCH-R2)
+The shim's counters read on the run's own telemetry: none = no drop of any kind; loss-1 = 0.7-1.3 % with no other drop;
+blackout-4s = ≥ 1 dark span, each 3-6 s, starts 120 ± 3 s apart, no other drop, uplink_dropped > 0 on @both and 0 on
+@down. flags_absent after; the properties read back empty at teardown (else the driver ends: the state stop). A no_play
+cell is an outcome. A profile-not-applied cell that played is repeated once.
+
+6. GATES (host, the four as always): RetroArch ≥ 59.9 fps; capture 60 ± 0.1; dup + drop ≤ 0.2 / min; flags_absent.
+
+7. REPORTED PER CELL
+Every hold / carry / release / handover / stall / stall_end / rewind / state row with timing; the per-blackout table
+(A, B, D) against BENCH-R2 b1 / b2 / c1; unattended frames core-running and --net; the silence count and distribution;
+the link report's RSSI / tx / rx per heartbeat as a per-minute table and beside every silence ≥ 500 ms and every
+blackout; the Opal's station rows (retries / signal / rate for the onn's station, redacted) per 5 min; hitch seconds per
+10 min; the loss-guard counters (E); RetroArch's CPU / RSS (A-D); host gates, host CPU, the encoder's.
+
+8. WRITTEN BEFOREHAND (met / not met, not gated)
+A: net ≤ 5 per blackout, one hold, one resume ≤ 1 heartbeat after the return, the rewind's after-check PLAYING in every
+   blackout.
+B: the pause 0.40-0.46 s after the client's last frame in every blackout.
+C: false holds ≤ 1 / 10 min and stall pauses 0.
+D: the state load plays in every blackout and net ≤ 30.
+E: the counter reads ~300 / min off and the held count ≈ it on, timeouts ≈ 0.
+The link: whether a silence ≥ 500 ms or a house-flap stretch (post-FEC loss > 500 / min with no shim drop) coincides
+   with an RSSI dip, a link-rate drop or a retry rise on the Opal's side — stated as coincidence in time, not cause.
+
+9. THE READING (written beforehand)
+If A, B and C meet their bars, the stack is a candidate for the user's adoption call on SNES, with its costs stated
+(the frozen picture during a hold; up to ~1 s of unattended game at H 950 before the hold, rewound; snes9x's rewind
+buffer ~53 MB). PS1 joins only if D's state load plays and its hitch cost is acceptable to the user (stated). If E-on
+holds the counter's frames with timeouts ≈ 0, the loss guard is a candidate (the cost: ≤ 250-ms freezes instead of
+corrupted frames). The link findings are reported for the next task, not read here.
+
+10. THE CONFIRMED APK
+If every cell is valid and the property-empty behaviours (E-off's guard at count only) read as today, bf5114a2… stays
+and becomes CONFIRMED (CL-B7's rule); else cb0935c8… (preserved) is reinstalled and the user is told which is on the onn.
+
+11. BOUNDS
+No sudo, no nft; the Opal read-only; adb for the install, the pre-registered setprops and state reads only; no
+addresses or identifiers anywhere; nothing fetched, deleted, adopted or committed; the eight lines only, no
+e3_flag.conf and the properties empty when the driver closes.

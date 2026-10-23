@@ -1897,6 +1897,17 @@ frames carried through the stall's handover; the resume at the first fresh heart
 built behind `debug.privyhub.loss_guard` / `PRIVYHUB_LOSS_GUARD`; the host cannot force an IDR today; APK (B5 + B7 +
 B10) pinned, not installed.** Record: `docs/memory/evidence/B10_CLIENT_LOSS_GUARD_2026-10-22.md`.
 
+**BENCH-R3 (2026-10-22): the stack on SNES, the loss guard, the link — MEASURED, 6/6 valid; nothing adopted; APK
+bf5114a2 CONFIRMED.** The stack is not a candidate on SNES:
+- snes9x's hold-path rewind read PAUSED after 7 of 7 rewinds, leaving ~48 unattended frames per blackout;
+- the resume came 2-3 s after the return;
+- `@down`'s pause was resumed by recovery v2, not by `stall_end`.
+
+The PS1 savestate fallback works (5 / 5 loads played, net 24 frames per blackout). The loss guard is a candidate for the
+user's call: it held exactly the counted frames, with 0 timeouts, freezes up to 0.5 s, and more hitch seconds. The onn
+streamed on 2.4 GHz, where the Opal sampler did not look; one tx-rate fall coincided with a cluster of uplink silences.
+Record: `docs/memory/evidence/BENCH_R3_SNES_STACK_AND_LOSS_GUARD_2026-10-23.md`.
+
 ## G9 — Remote foundation checkpoint
 
 Acceptance:

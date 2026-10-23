@@ -105,7 +105,9 @@ PKG = "com.safeiot.privyhub"
 # (kept at PrivyHub/app/build/cl_b7_preserved/app-debug.apk).
 # BENCH-R2 (installed 2026-10-22): the Wi-Fi lock + stall signal APK replaced CL-B7's 93d29b4a38d224fddbcf261dab72b40f1290f009b7dc506d60eb3104071e1624
 # (kept at PrivyHub/app/build/bench_r2_preserved/app-debug.apk).
-ADOPTED_APK_SHA256 = "cb0935c8cadd5ee65a3f52f390d0994899de27ebaa5c207b547e57185e761080"
+# BENCH-R3 (installed 2026-10-22): the loss-guard APK replaced BENCH-R2's cb0935c8cadd5ee65a3f52f390d0994899de27ebaa5c207b547e57185e761080
+# (kept at PrivyHub/app/build/bench_r3_preserved/app-debug.apk).
+ADOPTED_APK_SHA256 = "bf5114a2d257f1246374b05e3d79b24f0382afe1c66b2c6acb3a37fa6e58cf73"
 REFERENCE_PROFILE = "native_game_720p60_reference"
 MODE_ENV = "PRIVYHUB_ADAPTIVE_BITRATE_MODE"
 # C3-L4-D1 (2026-10-01): live is the companion's default through the systemd drop-in

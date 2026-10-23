@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-10-22
-baseline_commit: 43a8df6 (BENCH-R2's record and its pin patch uncommitted beside it; the user commits)
+baseline_commit: 9fd73c7 (queue D; BENCH-R3's launch, record and pin patch uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -209,6 +209,60 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
+
+**BENCH-R3: the stack on SNES, the loss guard, the link — MEASURED, 6 / 6 valid, host gates met in all**
+(`evidence/BENCH_R3_SNES_STACK_AND_LOSS_GUARD_2026-10-23.md`; run 20:22:11-21:52:17Z on `9fd73c7`; nothing adopted).
+- **The hold / rewind / stall stack is NOT a candidate on SNES** (A and B missed; C met):
+  - `@both`: one hold per blackout at 0.95-0.97 s, but snes9x's hold-path rewind read PAUSED after 7 / 7 rewinds.
+    That leaves 47.5-48.7 unattended frames per blackout (bar ≤ 5). The resume came 2.06-3.13 s after the return,
+    via the gate's ready in 4 / 5.
+  - `@down`: the pause 420-428 ms after the client's last frame in 4 / 5 blackouts, 484 in one (bar 0.40-0.46).
+    Recovery v2 resumed each blackout's pause (3 encoder restarts, one step 7000→5000). 0 stall pauses outside the
+    blackouts.
+  - Clean: 0 false holds, 0 stall pauses.
+- **PS1's savestate fallback works:** 5 / 5 loads played, net 24 frames per blackout. It joins nothing while the stack
+  is not a candidate.
+- **The loss guard IS a candidate:** held 3,010 = its counter's 3,010, 0 timeouts, max wait 501 ms. No watch.
+- **The link:** the onn is on 2.4 GHz channel 1 (802.11n, RSSI −67…−69). The Opal sampler read the 5 GHz `wlan1`,
+  which had no station in 18 rounds.
+  - One coincidence in time: E-on's cluster of 42 uplink silences coincided with the onn's tx rate falling to 27-81
+    Mbps.
+  - The downlink loss bursts coincided with no RSSI change beyond 1 dB.
+- **APK `bf5114a2…cf73` CONFIRMED (the pre-registered rule) and pinned;** `cb0935c8…` preserved. At the record:
+  `--check` ok on the eight lines, APK CONFIRMED, no `e3_flag.conf`, the properties empty.
+
+1. **The user's commit:**
+   - BENCH-R3's record, `bench_r3_2026-10-22/` (`record/`, `opal/`, `runs/`, the launch files);
+   - `BENCH_R3_LAUNCH_2026-10-22.md`, the task file, `_cowork_prompt.txt`;
+   - the pin: `tools/e1_suite.py`, `tools/c3_l4_nft_night.py`, `tools/test_c3_l4_nft_night.py`;
+   - `KNOWN_ISSUES.md`, `ROADMAP.md`, this file (`logs/bench_r3_git_status.txt`).
+2. **Adoption question (the reading gives one): the loss guard** (`debug.privyhub.loss_guard=1` on the onn +
+   `PRIVYHUB_LOSS_GUARD=1` on the host). It freezes the last good frame until the next IDR instead of showing
+   corrupted ones. Its costs:
+   - freezes of up to ~0.5 s (501 ms here; B10 expected ≤ 250);
+   - 125.7 hitch seconds per 10 min against 68.8 without it (104.3 outside a house cluster in the cell);
+   - rendered 55.2 against 57.8 fps;
+   - the keyframe requests force nothing (no runtime IDR path);
+   - the property resets on a reboot, so making it the default is a B task;
+   - nobody has watched it yet. **A look at the TV with it on and off is the cheapest next evidence**, if the user
+     wants it before deciding.
+   - **No question on the stack or PS1:** the reading gives none. The stack's costs, for when B returns it: the frozen
+     picture during a hold; ~1 s of unattended game at H 950; snes9x's 61-MB rewind buffer; a ~1-s rewind before every
+     resume.
+3. **The link finding's next task (session A, read-only, ~20 min).** The onn is on the band where the Opal's `wlan0` is,
+   and the sampler read `wlan1`.
+   - One `iw dev wlan0 station dump` through `o1_redact.py` (is the onn on the Opal?).
+   - If it is, O1's sampler on `wlan0` beside one clean stream: the onn's retries / signal / rate per 5 min next to the
+     link report.
+   - Then the user's call whether to try the onn on 5 GHz as a cell.
+4. **For session B (the user's call which):**
+   - the hold path's rewind after-check (PAUSED after 59-frame rewinds on snes9x 7 / 7; 2-3-frame `stall_end` rewinds
+     pass 4 / 5);
+   - the ~1-s per-frame rewind before the resume;
+   - `@down`'s ownership (recovery v2 resumes the blackout's pause);
+   - whether the PS1 `state` path should serve SNES too.
+5. **Then the user plays,** wherever they like. The onn has the CONFIRMED `bf5114a2…`, with every flag and property
+   absent: today's stream (the loss guard on only if adopted).
 
 **BENCH-R2: the lock, the hold, the stall signal — MEASURED, 15 / 15 valid, host gates met in all**
 (`evidence/BENCH_R2_LOCK_HOLD_STALL_CELLS_2026-10-23.md`; run 14:09:00-17:45:11Z on `43a8df6`; nothing adopted).
