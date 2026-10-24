@@ -216,6 +216,54 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
+**CL-B11: MEASURED, 3 / 3 cells valid; APK `e2db0aa0…6b33` (B15 + B16) CONFIRMED and pinned**
+(`evidence/CL_B11_GUARD_AND_FAST_READY_2026-10-24.md`; cells 2-3 2026-10-24 10:33-11:02Z, cell 1 attended
+15:19-15:34Z, all on 5 GHz).
+- **Cells 2 / 3 (B16's fast ready): back to B with one row.** In all 10 blackouts the resume came via the client's
+  ready **133-458 ms after the return** (CL-B10 427-2,130 ms), with no `encoder_restart` and no v2 handover. The stall
+  save came at 429-433 ms, before the pause, and net was 24 / 26. The picture was held 4.13-4.47 s per 4-s drop.
+  - **The miss:** one silence save at each session's end (~205 ms before `session_ended`), against "zero outside the
+    blackouts" (CL-B10: 4).
+- **Cell 1 (B15's guard): back to B with one row.** The Home press and a return through PrivyHub's menu created a new
+  stream activity in the live process; the events read confirms it.
+  - The old report and the stop came before the new start, with `restart_cause.trigger` `recreate` and `away_ms`
+    21,356. Then 52 underruns in 441 s (CL-B10: 2,418 in 28 s).
+  - **The miss:** one 2-s interval of 221 underruns before the guard's restart.
+  - The user: "I had to click into the game but seemed to be at same spot".
+  - Not exercised: the process-death path (CL-B10's) and the same-instance surface path.
+- **On 5 GHz, cell 1:** 4.4-5.6 silences and 6.9-12.9 hitch s per 10 min (CL-B10 cell 1: 0 / 0).
+- **CONFIRMED by CL-B7 §6** (all three valid). Disclosed: no cell ran with the properties empty; that path is B's
+  by-construction proof.
+- **State:** the properties cleared and read back empty (including `link_report`), nine lines, `--check` ok, APK
+  CONFIRMED, paired. `da09e154…` is kept at `PrivyHub/app/build/cl_b10_installed/`.
+
+1. **The user's commit:**
+   - the two records (`CL_B11_LAUNCH_2026-10-24.md`, `CL_B11_GUARD_AND_FAST_READY_2026-10-24.md`) and
+     `cl_b11_2026-10-24/`;
+   - the pin (`tools/e1_suite.py`, `tools/c3_l4_nft_night.py`, its test);
+   - `KNOWN_ISSUES.md`, `ROADMAP.md`, this file;
+   - git status: `logs/cl_b11_git_status.txt`.
+2. **To B:** the two rows (the session-end save; the pre-restart underrun interval), with the record's tables.
+3. **The adoption questions, for the user, each with its cost:**
+   - **The hold / state / stall stack on SNES** (`PRIVYHUB_INPUT_HOLD=1 _B6=1 _B8=1 _REWIND=1 PRIVYHUB_STALL_SIGNAL=1
+     PRIVYHUB_STALL_RESUME=1` + `stall_signal=1`). Back to B on one row. The measured cost:
+     - 24-26 frames per drop, restored to the save;
+     - a save per real stall plus one at each session's end;
+     - the picture frozen 4.1-4.5 s per 4-s drop, ≤ 0.46 s past its end.
+   - **The restart guard** (`restart_guard=1`). Back to B on one row. The cost:
+     - a report and a stop posted at each return, and the audio rebuilt;
+     - one file in `noBackupFilesDir`;
+     - ~3 s more before the picture is back, with one burst of late audio before the rebuild.
+   - **The loss guard** (`PRIVYHUB_LOSS_GUARD=1` + `loss_guard=1`, BENCH-R3 a candidate). The cost:
+     - freezes up to ~0.5 s in place of corrupted frames;
+     - hitch s 125.7 against 68.8 per 10 min under 1 % loss, and rendered 55.2 against 57.8 fps;
+     - no runtime IDR.
+   - **The notice as a client default** (`link_notice` on without the property; shown, the user's word "I saw that
+     box"). The cost: an on-screen line on any 2.4-GHz or weak link. The 30-s clear path is not yet exercised.
+4. **"Read LINK-N1's nights"**: nights done 1, the next 2026-10-25 04:30Z.
+5. **The user's own play on 5 GHz** with everything in force (nine lines, `e2db0aa0…`, the properties empty). It is the
+   first live read of the property-empty path, and the next marked lag will carry the link.
+
 **CL-B10: MEASURED, 4 / 4 cells valid; APK `da09e154…6cf` CONFIRMED and pinned**
 (`evidence/CL_B10_RESTART_GUARD_STATE_STALL_NOTICE_2026-10-23.md`; cells 2-3 2026-10-23 18:42-19:11Z, cells 1 and 4
 attended 2026-10-24 03:32-04:09Z).

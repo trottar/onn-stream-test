@@ -1,0 +1,109 @@
+CL-B11 — the restart guard on every start path (B15) and the fast ready (B16): pre-registration (session A,
+2026-10-24; hashed BEFORE the install; covers PART 1's cells 2 and 3 and PART 2's cell 1)
+
+Task: docs/memory/handoffs/CL-B11_GUARD_AND_FAST_READY_TASK.md. Session B's exact strings: SESSION_B_DONE_2026-10-24F.md
+items 4-9; B15 §0 (cell 1's start ran in a new activity instance; the process died at Home); B16 §3-§4 (fast_ready, the
+save at >= 400, v2_newest_s 0.3). The rows this replaces: CL_B10_RESTART_GUARD_STATE_STALL_NOTICE_2026-10-23.md. The
+CONFIRMED rule: CL_B7 §6. The watch: LINK_N1_LAUNCH_2026-10-23.md.
+
+CAP: each detached launch + 2 h (no new cell after it; a cell in flight finishes with its own teardown). The cap is
+computed by the driver at its launch (cl_b11_driver.py: CAP = LAUNCH + 2 h) and shown in its status line.
+
+0. State at the hash (PART 1, ~10:30Z)
+- HEAD e878d68 (queue F committed); the tree clean (git_status_at_start.txt shows only this directory).
+- Nine adopted lines; tools/e3_state.py --check ok, APK da09e154… CONFIRMED (check_at_start.json); no e3_flag.conf; no
+  game; one device; units: privyhub-companion and privyhub-link-n1 only.
+- The band, read first: 5180 MHz, 5 GHz, Wi-Fi standard 5, RSSI -67 (adb_reads/wifi_before_install.json).
+- Properties restart_guard, stall_signal, link_notice, link_report, wifi_lock, loss_guard, opus_decode all empty.
+
+1. The install (after this file is hashed)
+- da09e154… stays preserved at PrivyHub/app/build/cl_b10_installed/app-debug.apk (nothing deleted).
+- The candidate /tmp/b_q24f_scratch/apk/app-debug.apk must read sha256
+  e2db0aa0f09d8eab26783e2c4a757ccc83c12da34ca750c8a182c4d762816b33 (B's pin, 9,631,698 B) and carry the same signer as
+  da09e154… (apksigner certificate digests compared, not printed); else nothing is installed.
+  Copied to PrivyHub/app/build/cl_b11_installed/app-debug.apk (gitignored).
+- adb install -r; the device APK read back = e2db0aa0…; paired (CL-B4's reader: identity v2, the device secret present,
+  the client's id in the hub's store, 1 device). "Not paired" = stop and tell the user.
+- Properties set and read back: debug.privyhub.restart_guard 1, debug.privyhub.stall_signal 1. link_notice left
+  EMPTY (the user's call later); link_report EMPTY (empty = on with this APK). NOT cleared at PART 1's end or at
+  PART 2's launch: stage 3 clears them and reads them back empty.
+- --check after the install is expected ok False ONLY because the APK reads MISMATCH (EXPECT_APK is da09e154…; the pin
+  moves only by the CONFIRMED rule); the preflight itself ok (nine lines, no e3_flag.conf, no game).
+
+2. The driver
+- cl_b11_driver.py (from cl_b10_p2_driver.py; the diff is cl_b11_driver_vs_cl_b10_p2.diff); cl_b11_suite_call.py
+  (CL-B10's wrapper, only the pre-registration name changed). Status ~/privyhub_cl_b11/status.txt, STOP
+  ~/privyhub_cl_b11/STOP (the status text and log tag name it).
+- PART 1: unit privyhub-cl-b11 (systemd-run --user --collect), no --cell: cells 2 then 3 in one launch.
+  PART 2: unit privyhub-cl-b11-p2, --cell 1, launched only on the user's "Stage 2".
+- Every cell: E1-SNES-STREAM (PRIVYHUB_SNES_CORE=snes9x is among the nine, line 3), window 600, gap 120, e2. The
+  drop-in e3_flag.conf read back at the stream and under load (cells 2 / 3: 9 + 7 = 16 lines; cell 1: 9 + 1 = 10),
+  removed at the teardown; flags_absent true after; nine lines.
+- The properties set (restart_guard / stall_signal 1) and read back before each cell (link_notice / link_report
+  empty); read back after each cell and at the close (still 1 / 1 / empty / empty); NOT cleared.
+- The band read every 10 s through each cell into runs/<cell>/band.jsonl (frequency / band / standard / RSSI / tx / rx
+  only).
+- No cell starts in 04:15-05:30Z, and a cell that could still run at 04:30Z is refused (no companion restart
+  04:30-05:30Z: the nightly watch). No Opal sampler.
+
+3. Cell 2 — blackout-4s@both,every=120s,seed=1 + PRIVYHUB_INPUT_HOLD=1 PRIVYHUB_INPUT_HOLD_B6=1
+   PRIVYHUB_INPUT_HOLD_B8=1 PRIVYHUB_INPUT_HOLD_REWIND=1 PRIVYHUB_STALL_SIGNAL=1 PRIVYHUB_STALL_RESUME=1, window 600.
+   Rows (B item 7):
+- stall_resume_config shows fast_ready true, save_from_signal true, v2_newest_s 0.3.
+- Per blackout: state_saved kind silence ~0.40 s in; the hold's pause ~950 ms; RESUMED VIA client_ready_hold <= 1.0 s
+  AFTER THE PACKETS RETURN (not hold_return_stall) — the return read from packets_back_to_resume_ms / the first
+  controller packet after the shim's dark span; input_release method state; net ≈ 24; no second pause.
+- ZERO state_saved OUTSIDE THE BLACKOUTS (any state_saved more than the span's end + 2 s from every dark span counts).
+
+4. Cell 3 — blackout-4s@down,every=120s,seed=1 + the same six flags, window 600. Rows (B item 8):
+- Per blackout: one state_saved kind stall with save_after_onset_ms ≈ 400 (not 150), BEFORE the desync_pause (the
+  pause 400-460 ms after the client's last frame).
+- RESUMED VIA client_ready_stall <= 1.0 s AFTER THE DOWNLINK RETURNS (the shim's dark span's end).
+- NO encoder_restart, NO stall_handover_v2, no recovery_escalation.
+- net ≈ 24; client_ready_after_stall; no second pause.
+- The client report's fast_ready_releases = 5 (one per blackout in the window; the count of blackouts seen states it).
+- Zero saves outside the blackouts.
+
+5. Cell 1 (PART 2) — none@post-fec,seed=1, window 600, 5 GHz, the Home press
+- The user is told, in the task's exact words with the times filled in: at PLAYING + 4 min press Home on the onn
+  remote, wait about 5 seconds, open the game again the normal way; keep playing to PLAYING + 10 min.
+- Rows (B item 6): before the new native-stream-start, the old report (decoder-session-log) and native-stream-stop
+  (session_ended in the recovery log); the new report's restart_cause.trigger (process if the activity was re-created,
+  surface if not; recreate also a B15 value) and away_ms ≈ the time away; the new session's audio underruns ≈ the
+  other sessions' (0-13 per 2-s interval, not ~85 / s); ONE read of adb logcat -b events -d around the press
+  (am_kill / am_proc_died / am_proc_start, wm_on_create_called / wm_on_destroy_called) names the path — process names
+  and pids only, no identifiers kept.
+- Reported: silences >= 250 ms and hitch s / 10 min on 5 GHz against CL-B10 cell 1 (0 / 0); the user's one line,
+  verbatim.
+
+6. Validity (per cell)
+- Playing; the shim's profile applied (blackout: >= 1 dark span, each 3-6 s, starts 120 ± 3 s apart, uplink_dropped
+  > 0 on @both and 0 on @down; none: 0 drops); the flags read back at the stream; flags_absent true after; nine lines;
+  the properties as set before and after. Host gates: RetroArch >= 59.9, capture 60 ± 0.1, dup+drop <= 0.2 / min.
+- Cell 1 is not invalidated by the Home press or the new client session it causes. A no_play, flags_absent false, or
+  the properties not as set is invalid. profile-not-applied while playing is repeated once.
+
+7. The CONFIRMED rule (CL_B7 §6, as CL-B10 applied it)
+- At the close (stage 3): the properties cleared (restart_guard, stall_signal, link_notice, link_report set empty)
+  and read back empty; nine lines; no e3_flag.conf; flags_absent.
+- All three cells (2, 3, 1) valid, and the property-empty / flag-absent behaviours as today (B15 / B16's proofs: the
+  guard only behind restart_guard; fast_ready only in the host's start response with B12's owner) -> e2db0aa0…
+  CONFIRMED and the pin moved (tools/e1_suite.py EXPECT_APK, tools/c3_l4_nft_night.py ADOPTED_APK_SHA256 and its
+  test; the tests green); --check ok on nine with no MISMATCH.
+- Else da09e154… reinstalled from PrivyHub/app/build/cl_b10_installed/, read back, paired, --check ok, and the user
+  told which cell failed and why.
+- CONFIRMED is about the APK's validity and today's behaviours, not the rows: a row not met does not block it.
+
+8. The reading, written beforehand
+- If cells 2 and 3 meet every row: the hold / state / stall stack is a CANDIDATE for the user's adoption call on SNES,
+  costs stated: ~24 frames per drop (restored to the save), a save per real stall, the frozen picture while held —
+  now <= ~1.3 s past the drop's end.
+- If cell 1 meets its rows: the restart guard is a CANDIDATE (cost: a report and a stop posted at each return, the
+  audio rebuilt, one file in noBackupFilesDir).
+- Else back to B with the rows.
+- Against CL-B10: resume 427-2,130 ms after the return -> ?; held 5.3-7.2 s -> ?; saves outside the blackouts 4 -> ?;
+  the guard's three rows (old report / session_ended before the new start, restart_cause, underruns) -> ?.
+
+No sudo, no nft, the Opal read-only, adb for the install, the setprops named, the one logcat -b events -d read, the
+reinstall if the rule says so, and state reads only; no addresses or identifiers anywhere; nothing fetched, nothing
+deleted; nine lines and no e3_flag.conf at every teardown; nothing adopted; nothing committed.

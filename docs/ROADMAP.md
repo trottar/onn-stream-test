@@ -1956,6 +1956,15 @@ every start flushes it, with `restart_cause.trigger`. Record: `docs/memory/evide
 `PRIVYHUB_STALL_RESUME=1`; APK (B5 + B7 + B10 + B11 + B13 + B14 + B15 + B16) `e2db0aa0…` pinned, not installed.**
 Record: `docs/memory/evidence/B16_STALL_RESUME_SPEED_2026-10-24.md`.
 
+**CL-B11 (2026-10-24): B15 + B16 on the onn, 3 / 3 cells valid, APK `e2db0aa0…6b33` CONFIRMED and pinned.**
+- **B16's fast ready on snes9x: back to B, one row.** The resume came 133-458 ms after the return (CL-B10 427-2,130),
+  with 0 restarts and 0 v2 handovers, and the saves at ≥ 400 ms. The miss is one silence save at each session's end.
+- **B15's guard: back to B, one row.** On a new-instance return, the old report and the stop came before the start,
+  with `restart_cause` `recreate` and `away_ms` 21,356. The miss is one 2-s interval of 221 underruns before the restart.
+- Cell 1 on 5 GHz: 4.4-5.6 silences / 6.9-12.9 hitch s per 10 min.
+
+Record: `docs/memory/evidence/CL_B11_GUARD_AND_FAST_READY_2026-10-24.md`.
+
 ## G9 — Remote foundation checkpoint
 
 Acceptance:

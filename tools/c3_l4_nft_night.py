@@ -109,7 +109,9 @@ PKG = "com.safeiot.privyhub"
 # (kept at PrivyHub/app/build/bench_r3_preserved/app-debug.apk).
 # CL-B10 (installed 2026-10-23): the restart-guard + link-report-default + notice APK replaced BENCH-R3's bf5114a2d257f1246374b05e3d79b24f0382afe1c66b2c6acb3a37fa6e58cf73
 # (kept at PrivyHub/app/build/cl_b10_preserved/app-debug.apk).
-ADOPTED_APK_SHA256 = "da09e154bdaf1b159fc90d787333b1090e4723b110cf82ef25b9acd7702ee6cf"
+# CL-B11 (installed 2026-10-24): the guard-on-every-path + fast-ready APK replaced CL-B10's da09e154bdaf1b159fc90d787333b1090e4723b110cf82ef25b9acd7702ee6cf
+# (kept at PrivyHub/app/build/cl_b10_installed/app-debug.apk).
+ADOPTED_APK_SHA256 = "e2db0aa0f09d8eab26783e2c4a757ccc83c12da34ca750c8a182c4d762816b33"
 REFERENCE_PROFILE = "native_game_720p60_reference"
 MODE_ENV = "PRIVYHUB_ADAPTIVE_BITRATE_MODE"
 # C3-L4-D1 (2026-10-01): live is the companion's default through the systemd drop-in

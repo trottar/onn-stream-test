@@ -1,0 +1,152 @@
+2,16c2,22
+< """CL-B10 PART 2 -- the attended cells, ONE CELL PER LAUNCH (--cell 1 | --cell 4), as pre-registered
+< (cl_b10_p2_preregistration.txt), DETACHED (systemd --user unit privyhub-cl-b10-p2). From cl_b10_driver.py (PART 1's
+< driver; the diff is cl_b10_p2_driver_vs_cl_b10.diff). Changed:
+<   - the cells: 1 (5 GHz, the user presses Home ~4 min in) and 4 (2.4 GHz for the notice, the user switches back to
+<     5 GHz ~10 min in), both E1-SNES-STREAM (snes9x) with the drop-in PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 only;
+<     cell 1 window 600, cell 4 window 780; gap 120;
+<   - one cell per launch; its own state file cl_b10_p2_state.json; rows appended to cells.jsonl beside cells 2 and 3;
+<   - the cap: the launch + 40 min (the pre-registration's rule);
+<   - the band read from the onn every 10 s through the cell into runs/<cell>/band.jsonl (dumpsys wifi's mWifiInfo
+<     line parsed in memory: frequency, band, standard, RSSI, tx / rx only; nothing else kept);
+<   - the watch rule: a cell is refused at launch if it could not end before 04:30Z or would start before 05:30Z
+<     (the nightly watch's hour; no companion restart in it);
+<   - the status text and the log tag name this driver and its stop file (~/privyhub_cl_b10/STOP);
+<   - the properties restart_guard / stall_signal / link_notice set to 1 and read back before, read back after, NOT
+<     cleared (stage 3 clears them)."""
+---
+> """CL-B11 -- the restart guard on every start path (B15) and the fast ready (B16), with the client APK e2db0aa0...
+> (B5 + B7 + B10 + B11 + B13 + B14 + B15 + B16) and the properties restart_guard / stall_signal = 1, as pre-registered
+> (cl_b11_preregistration.txt), DETACHED. From cl_b10_p2_driver.py (CL-B10 PART 2's driver; the diff is
+> cl_b11_driver_vs_cl_b10_p2.diff). Two launches:
+>   - PART 1, no --cell: cells 2 and 3 in one launch, unit privyhub-cl-b11 -- E1-SNES-STREAM (snes9x, adopted line 3),
+>     window 600, gap 120, the drop-in PRIVYHUB_IMPAIRMENT=<spec> + PRIVYHUB_INPUT_HOLD=1 _B6=1 _B8=1 _REWIND=1
+>     PRIVYHUB_STALL_SIGNAL=1 PRIVYHUB_STALL_RESUME=1 (9 + 7 = 16 lines at the stream): cell 2
+>     blackout-4s@both,every=120s,seed=1, cell 3 blackout-4s@down,every=120s,seed=1 (session B's exact strings,
+>     SESSION_B_DONE_2026-10-24F.md items 7-8);
+>   - PART 2, --cell 1: cell 1 alone, unit privyhub-cl-b11-p2 -- the drop-in PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1
+>     only (10 lines), window 600; the user presses Home at PLAYING + 4 min (B item 6); its own state / history / log.
+> Changed from cl_b10_p2_driver.py:
+>   - the cells table (above); rows appended to this task's cells.jsonl;
+>   - the cap: each launch + 2 h (the pre-registration's rule);
+>   - the properties: restart_guard / stall_signal set to 1 and read back before each cell; link_notice and link_report
+>     NOT set (link_notice is the user's call later; link_report empty = on with this APK) and read back empty; all four
+>     read back after each cell and at the close (expected 1 / 1 / empty / empty) -- NOT cleared (stage 3 clears them);
+>   - no cell starts in 04:15-05:30Z, and a cell that could still run at 04:30Z is refused (the nightly watch);
+>   - the status text, the log tag and the stop file name this task (~/privyhub_cl_b11/STOP).
+> Kept: the band every 10 s into runs/<cell>/band.jsonl, the heartbeat / history / STOP / busy skip / the suite call / the
+> readings beside a run / the applied check / the per-run log copies / --net / the link and silence readings / --dry."""
+33c39
+< CALL = HERE / "cl_b10_p2_suite_call.py"
+---
+> CALL = HERE / "cl_b11_suite_call.py"
+35,36c41,42
+< PRE = HERE / "cl_b10_p2_preregistration.txt"
+< WATCH = Path.home() / "privyhub_cl_b10"
+---
+> PRE = HERE / "cl_b11_preregistration.txt"
+> WATCH = Path.home() / "privyhub_cl_b11"
+53c59
+< CAP = LAUNCH + 40 * 60
+---
+> CAP = LAUNCH + 2 * 3600
+58,59c64,68
+< STATUS_P, HIST_P, WLOG_P = OUTD / "status.txt", OUTD / "history_p2.csv", OUTD / "driver_p2.log"
+< STATE_P = (HERE / "dry_run" if DRY else HERE) / "cl_b10_p2_state.json"
+---
+> P2 = "--cell" in sys.argv          # PART 2 (cell 1) has its own state / history / log
+> TAG = "cl_b11_p2" if P2 else "cl_b11"
+> STATUS_P, HIST_P, WLOG_P = (OUTD / "status.txt", OUTD / ("history_p2.csv" if P2 else "history.csv"),
+>                             OUTD / ("driver_p2.log" if P2 else "driver.log"))
+> STATE_P = (HERE / "dry_run" if DRY else HERE) / f"{TAG}_state.json"
+70,72c79,80
+< NCELLS = 1
+< PROPS = ("restart_guard", "stall_signal", "link_notice")
+< P1 = {"restart_guard": "1", "stall_signal": "1", "link_notice": "1"}
+---
+> PROPS = ("restart_guard", "stall_signal", "link_notice", "link_report")
+> P1 = {"restart_guard": "1", "stall_signal": "1"}       # link_notice / link_report not set: expected to read empty
+75a84
+> BOTH, DOWN = "blackout-4s@both,every=120s,seed=1", "blackout-4s@down,every=120s,seed=1"
+77,78c86,87
+< # the task's exact strings (G-A3_AND_CL-B10_TASK.md PART 2; CL-B10_PART2_ATTENDED_TASK.md): the drop-in is the impairment
+< # line only; snes9x (line 3) and the link report (line 9) are adopted
+---
+> # session B's exact strings (SESSION_B_DONE_2026-10-24F.md items 6-8); a blackout spec takes NO @post-fec;
+> # PRIVYHUB_SNES_CORE=snes9x (line 3) and PRIVYHUB_LINK_REPORT=1 (line 9) are adopted, in every environ, not repeated
+80,81c89,91
+<     {"n": 1, "cell": "1_snes_5ghz_restart_guard", "spec": NONE, "profile": "none", "extra": [], "props": P1, "wid": SNES, "arm": "5 GHz, Home ~4 min", "window": 600},
+<     {"n": 4, "cell": "4_snes_24ghz_notice", "spec": NONE, "profile": "none", "extra": [], "props": P1, "wid": SNES, "arm": "2.4 GHz notice, back to 5 GHz ~10 min", "window": 780},
+---
+>     {"n": 2, "cell": "2_snes_blackout_both_fast_ready", "spec": BOTH, "profile": "blackout-4s", "uplink": True, "extra": STACK, "props": P1, "wid": SNES, "arm": "hold+state+stall_resume+fast_ready", "window": 600},
+>     {"n": 3, "cell": "3_snes_blackout_down_fast_ready", "spec": DOWN, "profile": "blackout-4s", "uplink": False, "extra": STACK, "props": P1, "wid": SNES, "arm": "hold+state+stall_resume+fast_ready", "window": 600},
+>     {"n": 1, "cell": "1_snes_5ghz_restart_guard_all_paths", "spec": NONE, "profile": "none", "extra": [], "props": P1, "wid": SNES, "arm": "5 GHz, Home at PLAYING + 4 min", "window": 600},
+84c94,95
+< CELLS = [c for c in ALL_CELLS if c["n"] == _N]
+---
+> CELLS = [c for c in ALL_CELLS if c["n"] == 1] if _N == 1 else [] if _N is not None else [c for c in ALL_CELLS if c["n"] in (2, 3)]
+> NCELLS = len(CELLS)
+116c127
+<     """The three client properties, read back (getprop; values only, no device detail kept)."""
+---
+>     """The four client properties, read back (getprop; values only, no device detail kept)."""
+121c132,133
+<     """The cell's pre-registered properties (setprop), then all three read back."""
+---
+>     """The cell's pre-registered properties (setprop: restart_guard, stall_signal), then all four read back
+>     (link_notice / link_report expected empty)."""
+129c141,142
+<     """CL-B10: the properties are NOT cleared (PART 2 uses and clears them); read back, True when all still read 1."""
+---
+>     """CL-B11: the properties are NOT cleared (stage 3 clears them); read back, True when all read as set
+>     (restart_guard / stall_signal 1, link_notice / link_report empty)."""
+131c144
+<     return got, all(got[pp] == "1" for pp in PROPS)
+---
+>     return got, all(got[pp] == P1.get(pp, "") for pp in PROPS)
+179c192
+<     """All three properties set empty, read back; True when all read empty."""
+---
+>     """All four properties set empty, read back; True when all read empty."""
+191c204
+<     line = f"[cl_b10_p2 {time.strftime('%m-%d %H:%M:%SZ', time.gmtime())}] " + " ".join(str(x) for x in a)
+---
+>     line = f"[{TAG} {time.strftime('%m-%d %H:%M:%SZ', time.gmtime())}] " + " ".join(str(x) for x in a)
+239,240c252,253
+<         line = (f"{utc()} heartbeat | cell {s['cell']} (one per launch) | last: {s['last']} (at {s['last_at']}) | doing: {s['doing']} | "
+<                 f"next: {s['next']} | state: {s['state']} | cap {CAP_UTC} | stop: touch ~/privyhub_cl_b10/STOP\n")
+---
+>         line = (f"{utc()} heartbeat | {TAG} cell {s['cell']} of {[c['n'] for c in CELLS]} | last: {s['last']} (at {s['last_at']}) | doing: {s['doing']} | "
+>                 f"next: {s['next']} | state: {s['state']} | cap {CAP_UTC} | stop: touch ~/privyhub_cl_b11/STOP\n")
+858c871
+<     log(f"cell {cell['n']}: properties after (not cleared) {pr_end} still 1 {pr_end_ok}")
+---
+>     log(f"cell {cell['n']}: properties after (not cleared) {pr_end} as set {pr_end_ok}")
+885c898
+<         validity = "invalid (the properties did not read back 1 after the cell)"
+---
+>         validity = "invalid (the properties did not read back as set after the cell)"
+944c957
+<     cell = CELLS[0]                  # cell 2: blackout@both on SNES + the stack with state and stall resume; the three properties
+---
+>     cell = CELLS[0]                  # PART 1: cell 2 (blackout@both on SNES + the stack); the two properties set
+969c982
+<     log("dry: properties read back (not cleared)", rec["props_after"], "still 1", rec["props_after_still_1"])
+---
+>     log("dry: properties read back (not cleared)", rec["props_after"], "as set", rec["props_after_still_1"])
+987,988c1000,1001
+<     if len(CELLS) != 1:
+<         print("refusing: --cell 1 or --cell 4")
+---
+>     if not CELLS:
+>         print("refusing: no --cell (cells 2 and 3) or --cell 1")
+1012,1013c1025,1026
+<         if watch_overlap(time.time(), cell):
+<             why = "refused: the cell would overlap the nightly watch's 04:30-05:30Z; launch it after 05:30Z"
+---
+>         if in_quiet() or watch_overlap(time.time(), cell):
+>             why = "refused: no cell starts in 04:15-05:30Z or could still run at 04:30Z (the nightly watch); launch after 05:30Z"
+1061c1074
+<     log("close: properties (left for PART 2)", st["props_at_close"], "still 1", st["props_at_close_still_1"])
+---
+>     log("close: properties (not cleared; stage 3 clears them)", st["props_at_close"], "as set", st["props_at_close_still_1"])
