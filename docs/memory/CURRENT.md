@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-10-23
-baseline_commit: efa4240 (G-A3 and CL-B10 PART 1 committed; CL-B10 PART 2 and the record uncommitted beside it; the user commits)
+as_of: 2026-10-24
+baseline_commit: 8ea9f09 (CL-B12 committed; G-A4 uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -11,20 +11,20 @@ Headings are fixed by `tools/check_memory_health.py`; do not rename.
 
 **Phase E ACTIVE; the G track (remote) under way. G-A1 ADOPTED (2026-10-16, the user's): the overlay provider and
 session identity v2 run on the host, and `identity_v2` is on in the client. **G-A2 ADOPTED (2026-10-19, the user's):
-the Opus audio path. **G-A3 ADOPTED (2026-10-23, the user's): the client's link report. The adopted environ is NINE
-lines.**
+the Opus audio path. **G-A3 ADOPTED (2026-10-23, the user's): the client's link report. **G-A4 ADOPTED (2026-10-24, the
+user's): the link-recovery stack. The adopted environ is TEN lines.**
 CL-B3 is OPEN on two G5-S1 smoke gates (NOT MET; the user decides). Everything else passed: G3-S3's hardened APK
 `59f736d2…` is installed and CONFIRMED, the signed LAN path passed, and the VOD play through the range server
 passed.** E1 FROZEN; E2
 MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `af3ed73`.
 
-**State (2026-10-24 04:10Z, after CL-B10): the NINE adopted lines; `--check` ok; APK `da09e154…6cf` CONFIRMED**
-(CL-B10; `bf5114a2…` preserved).
-- Every client property is empty. `link_report` empty means on with this APK.
+**State (2026-10-24 18:30Z, after G-A4): the TEN adopted lines; `--check` ok on ten; APK `20e3e339…563d` CONFIRMED**
+(CL-B12). `e3_state.py`'s `link_recovery.stack`: all six `implied 1`.
+- Every client property is empty (the client's defaults: the stall signal, the restart guard and the link report on).
 - No `e3_flag.conf`, no stream. One device paired; `identity_v2` on.
-- Running: `privyhub-link-n1` (nightly) only.
+- Running: `privyhub-companion` and `privyhub-link-n1` (nightly) only.
 
-The nine lines:
+The ten lines:
 1. `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live` (`adaptive.conf`);
 2. `PRIVYHUB_EPG_GUIDE_INDEX=cached` (`epg-index.conf`);
 3. `PRIVYHUB_SNES_CORE=snes9x` (`snes-core.conf`);
@@ -33,7 +33,9 @@ The nine lines:
 6. `PRIVYHUB_OVERLAY_PROVIDER=tailscale` (`overlay.conf`);
 7. `PRIVYHUB_SESSION_IDENTITY=v2` (`session-identity.conf`);
 8. `PRIVYHUB_AUDIO_CODEC=opus` (`audio-codec.conf`, G-A2);
-9. **`PRIVYHUB_LINK_REPORT=1` (`link-report.conf`, G-A3; diagnostics only)**.
+9. `PRIVYHUB_LINK_REPORT=1` (`link-report.conf`, G-A3; diagnostics only);
+10. **`PRIVYHUB_LINK_RECOVERY=1` (`link-recovery.conf`, G-A4; implies the input hold, B6, B8, the `state` path, the
+    stall signal, the stall resume)**.
 
 **G-A2** (`evidence/G_A2_OPUS_ADOPTION_2026-10-19.md`): the confirmation run, Opus by the drop-in alone, was VALID
 with host gates held (`sig_v` 3 / opus, 8,994 kbit/s and 1,177 pkt/s at 7000, net audio loss 10 ms). **But underruns
@@ -216,6 +218,24 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
+**G-A4: `PRIVYHUB_LINK_RECOVERY=1` ADOPTED, the tenth line; the confirmation window VALID, every row met**
+(`evidence/G_A4_LINK_RECOVERY_ADOPTION_2026-10-24.md`; the companion restarted 18:13:02Z; the window 18:17-18:29Z on
+5 GHz, no flag file, no client property).
+- B20's diff applied (+ the date placeholder filled); self-test, 21, 33 and `tests/link_recovery` 7 green from the tree.
+- The environ TEN lines in 58 / 58 reads; `--check` ok on ten before and after; the stack all `implied 1`.
+- The umbrella's and the six modules' config rows by the drop-in alone; 0 saves, 0 holds (no stall); silences 0 and
+  hitch seconds 0 per 10 min; the teardown's bye → `state_save_skipped` `client_bye`.
+- `link_recovery_config` still logs the six as `explicit`: B's log defect, not fixed here.
+- **Off:** delete `link-recovery.conf`, `systemctl --user daemon-reload`, `systemctl --user restart
+  privyhub-companion`; the client halves off with `debug.privyhub.stall_signal 0` / `restart_guard 0`.
+
+1. **The user's commit:** the record and `g_a4_2026-10-24/`; the four tools (`tools/e1_suite.py`, `tools/e3_state.py`,
+   `tools/e1_remote.py`, `tools/test_e1_remote.py`); `docs/ROADMAP.md`, `docs/REMOTE_TRUST.md`, this file
+   (`logs/g_a4_git_status.txt`).
+2. **G4-S4, off-site** (a separate prompt), on the ten lines.
+3. Items 3-6 below stand (the loss guard; the notice as a default; to B, now including the config log row; LINK-N1's
+   nights).
+
 **CL-B12: MEASURED, 3 / 3 cells valid; APK `20e3e339…563d` (B17 + B18 + B19) CONFIRMED and pinned, every client property
 EMPTY** (`evidence/CL_B12_DEFAULTS_AND_UMBRELLA_2026-10-24.md`; cells 2-3 2026-10-24 16:39-17:09Z, cell 1 attended
 17:09-17:24Z, all on 5 GHz; the host drop-in `PRIVYHUB_LINK_RECOVERY=1` alone).
@@ -241,7 +261,7 @@ EMPTY** (`evidence/CL_B12_DEFAULTS_AND_UMBRELLA_2026-10-24.md`; cells 2-3 2026-1
    - the pin (`tools/e1_suite.py`, `tools/c3_l4_nft_night.py`, its test);
    - `KNOWN_ISSUES.md`, `ROADMAP.md`, this file;
    - git status: `logs/cl_b12_git_status.txt`.
-2. **G-A4, the user's adoption question: the tenth line `PRIVYHUB_LINK_RECOVERY=1`.**
+2. **G-A4, the user's adoption question: the tenth line `PRIVYHUB_LINK_RECOVERY=1`. DONE 2026-10-24 (above).**
    - **What it does:** when the Wi-Fi drops for a few seconds, the host freezes the game the moment it notices, about
      a second in, and saves a snapshot about 0.4 s in. When the link comes back, it loads that snapshot and resumes
      within about a third of a second, so you don't die to lag you couldn't see.
@@ -264,8 +284,8 @@ EMPTY** (`evidence/CL_B12_DEFAULTS_AND_UMBRELLA_2026-10-24.md`; cells 2-3 2026-1
 5. **To B:** the two rows, the press-1 ready 8.8 s after its start (press 2: 4.2 s), and the teardown race (the suite's
    `games/stop` before the client's stop → 503; the skip read `state_ended`).
 6. **"Read LINK-N1's nights"**: nights done 1, the next 2026-10-25 04:30Z.
-7. **The user's own play on 5 GHz** with everything as it is now (nine lines, `20e3e339…`, the properties empty: the
-   client's defaults on, the host's stack off until G-A4).
+7. **The user's own play on 5 GHz** with everything as it is now (since G-A4 ten lines, `20e3e339…`, the properties
+   empty: the client's defaults on, the host's stack on).
 
 **CL-B11: MEASURED, 3 / 3 cells valid; APK `e2db0aa0…6b33` (B15 + B16) CONFIRMED and pinned**
 (`evidence/CL_B11_GUARD_AND_FAST_READY_2026-10-24.md`; cells 2-3 2026-10-24 10:33-11:02Z, cell 1 attended

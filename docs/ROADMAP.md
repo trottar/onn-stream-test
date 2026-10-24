@@ -1610,6 +1610,17 @@ The tools (e1_suite, e3_state, e1_remote) read nine lines. The confirmation wind
 - silences 0.0 and hitch seconds 0.9 per 10 min (LINK-R1: 0 / 0).
 
 Off: delete the drop-in, restart. Record: `docs/memory/evidence/G_A3_LINK_REPORT_ADOPTION_2026-10-23.md`.
+**G-A4 (2026-10-24): `PRIVYHUB_LINK_RECOVERY=1` ADOPTED (the user's decision, after CL-B12): the tenth adopted line**
+(`link-recovery.conf`; the umbrella implies the six: the input hold, B6, B8, the `state` path, the stall signal, the
+stall resume). The tools (e1_suite, e3_state, e1_remote) read ten lines. The confirmation window (no flag file, no client
+property, the ten lines alone, 5 GHz) was VALID, with host gates met and every row met:
+- the umbrella's and the six modules' config rows by the drop-in alone, the stack all `implied 1`;
+- 0 saves and 0 holds (no stall); silences 0 and hitch seconds 0 per 10 min;
+- the teardown's bye, then `state_save_skipped` `client_bye`.
+
+`link_recovery_config` still logs the six as `explicit` (B's log defect). Off: delete the drop-in, restart; the client
+halves off with `debug.privyhub.stall_signal 0` / `restart_guard 0`. Record:
+`docs/memory/evidence/G_A4_LINK_RECOVERY_ADOPTION_2026-10-24.md`.
 **G4-S3 (2026-10-19): off-site at 4000 with Opus (adopted) — VALID, 1 of 1, host gates met (the RetroArch counter
 read: 59.999).** Over the overlay on the phone hotspot (direct throughout): **the tailnet wire rate 5,299 kbit/s
 median**, against the pre-registered ~5,370 ±10 % (met) and G4-S2's 8,243 with PCM (−35.7 %): ~40 MB/min, ~2.4 GB/h;

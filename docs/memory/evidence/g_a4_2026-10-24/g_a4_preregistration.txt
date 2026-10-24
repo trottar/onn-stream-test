@@ -1,0 +1,35 @@
+G-A4 — the confirmation window for the tenth adopted line: pre-registration (session A, 2026-10-24, hashed before the run)
+
+Task: docs/memory/handoffs/G-A4_LINK_RECOVERY_ADOPTION_TASK.md. The user's decision 2026-10-24 ("Adopt"): adopt
+PRIVYHUB_LINK_RECOVERY=1 as the tenth line, after CL-B12 (every behaviour row met; the link_recovery_config log defect
+is B's and is not fixed here).
+
+State before the window: the prepared diff applied (patches/G-A4_LINK_RECOVERY_ADOPTION_PREPARED.md; e1_suite ADOPTED
+ten; the <date> placeholder filled with 2026-10-24); e1_suite --self-test OK, test_e1_remote 21 OK,
+test_c3_l4_nft_night 33 OK, tests/link_recovery 7 OK from the tree; link-recovery.conf written (file tool);
+daemon-reload and the companion restarted 18:13:02Z (outside 04:30-05:30Z); the environ read back TEN lines;
+tools/e3_state.py ok on ten, link_recovery.stack all six "implied 1"; APK 20e3e339…563d CONFIRMED; the seven client
+properties (restart_guard, stall_signal, link_notice, link_report, loss_guard, wifi_lock, opus_decode) all EMPTY; the
+band 5 GHz; no e3_flag.conf.
+
+The window: one E1-SNES-STREAM (snes9x), tools/e1_suite.py run --only E1-SNES-STREAM --runs 1 --window 600 --gap 120
+--e2, NO --plan, NO e3_flag.conf, NO setprop: the ten adopted lines alone. The pad is not touched.
+
+Expected (met / not met):
+- Y1 (config, by the drop-in alone): at the stream's start the recovery log carries link_recovery_config (umbrella
+  true) and the six module config rows input_hold_config, input_hold_b6_config, input_hold_b8_config,
+  input_hold_rewind_config (+ input_hold_rewind_cores_config mode state), stall_signal_config (threshold 400),
+  stall_resume_config (fast_ready true, save_from_signal true), none "ignored". link_recovery_config's
+  implied / explicit is expected to read as CL-B12 read it (implied [] / explicit the six: B's logging defect, not
+  fixed here, not counted against Y1); "by the drop-in alone" is shown by the environ (ten lines, no individual stack
+  line) and e3_state's link_recovery.stack "implied 1" read mid-window.
+- Y2 (host gates): RetroArch ~60 fps, capture ~60, dup+drop ~0, the ladder at 7000; the environ ten lines in every
+  15-s read through the run.
+- Y3 (no action without a stall): 0 state_saved and 0 holds (input_hold_carry / input_hold_handover / input_release /
+  desync_pause / client_ready_after_hold) outside a real stall. With the pad untouched and 5 GHz, none expected; any that
+  appear are reported with the silence they belong to.
+- Y4 (the link on 5 GHz): silences >= 250 ms and hitch seconds per 10 min, stated against G-A3's 0.0 / 0.9 and
+  CL-B12's 0 silences (no bar); the band read every 30 s.
+- Y5 (teardown): session_end_bye, then state_save_skipped reason client_bye, and no hold at the end; after the run
+  flags_absent true, ten lines, tools/e3_state.py ok; the seven properties still empty.
+The adoption stands on the user's decision, not on this window; a failed row is reported to the user, not repaired.

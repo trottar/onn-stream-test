@@ -91,7 +91,12 @@ AUDIO_CODEC = "PRIVYHUB_AUDIO_CODEC=opus"
 # G-A3 (adopted 2026-10-23, the user): the client's Wi-Fi link fields recorded in the heartbeat (B3; diagnostics only, no
 # behaviour) through its own drop-in (link-report.conf); the adopted environ is exactly these nine names
 LINK_REPORT = "PRIVYHUB_LINK_REPORT=1"
-ADOPTED = sorted([LIVE, INDEX, SNES_CORE, RECOVERY, SNES_CAPTURE, OVERLAY, IDENTITY, AUDIO_CODEC, LINK_REPORT])
+# G-A4 (adopted 2026-10-24, the user): the link-recovery stack -- PRIVYHUB_LINK_RECOVERY=1 implies its six lines (B20: the
+# input hold, B6, B8, the state path, the stall signal, the stall resume) -- through its own drop-in
+# (link-recovery.conf); the adopted environ is exactly these ten names
+LINK_RECOVERY = "PRIVYHUB_LINK_RECOVERY=1"
+ADOPTED = sorted([LIVE, INDEX, SNES_CORE, RECOVERY, SNES_CAPTURE, OVERLAY, IDENTITY, AUDIO_CODEC, LINK_REPORT,
+                  LINK_RECOVERY])
 FLAG_NAMES = ["PRIVYHUB_ADAPTIVE_BITRATE_INJECT", "PRIVYHUB_ADAPTIVE_BITRATE_TOP", "PRIVYHUB_PS1_LOOK",
               "PRIVYHUB_NATIVE_PROFILE_ID", "PRIVYHUB_FEC_SCHEME"]
 RA_CFG = Path.home() / ".config/retroarch/config"
@@ -992,10 +997,12 @@ def preflight() -> dict:
          "drop_in_identity": f"Environment={IDENTITY}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_audio_codec": f"Environment={AUDIO_CODEC}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_link_report": f"Environment={LINK_REPORT}" in sh(["systemctl", "--user", "cat", UNIT]),
+         "drop_in_link_recovery": f"Environment={LINK_RECOVERY}" in sh(["systemctl", "--user", "cat", UNIT]),
          "e3_dropin_absent": not DROPIN.exists(), "e4_constraint_absent": not E4_DROPIN.exists()}
     d["ok"] = (d["manager"] == [] and d["environ"] == ADOPTED and d["adb"] and d["drop_in_live"] and d["drop_in_index"]
                and d["drop_in_snes_core"] and d["drop_in_recovery"] and d["drop_in_snes_capture"] and d["drop_in_overlay"]
                and d["drop_in_identity"] and d["drop_in_audio_codec"] and d["drop_in_link_report"]
+               and d["drop_in_link_recovery"]
                and d["e3_dropin_absent"] and d["e4_constraint_absent"])
     return d
 

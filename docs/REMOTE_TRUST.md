@@ -222,3 +222,26 @@ Every point below is a **[G3-S3 proposal]**.
   3. Take `LINK_REPORT` out of `tools/e1_suite.py` `ADOPTED`.
 
   The host then ignores the fields. The client may still send them.
+
+## 11. The link-recovery stack (adopted G-A4, 2026-10-24)
+
+- **Adopted:** `PRIVYHUB_LINK_RECOVERY=1` through the drop-in
+  `~/.config/systemd/user/privyhub-companion.service.d/link-recovery.conf`, the **tenth adopted line**.
+  - One line implies six (B20): `PRIVYHUB_INPUT_HOLD`, `_B6`, `_B8`, `PRIVYHUB_INPUT_HOLD_REWIND`,
+    `PRIVYHUB_STALL_SIGNAL`, `PRIVYHUB_STALL_RESUME`, each `=1`. An explicit individual line still wins (`…=0` turns
+    one part off).
+  - **What it does:** on a real stall the host holds the game's input, saves a state ~0.4 s in, and at the return loads
+    it and resumes on the client's ready (CL-B12: 108-349 ms after the return). One save per real stall, none at a
+    session's end (the client's bye).
+- **What leaves the onn:** the client's stall signal and its ready after a hold (B7 / B16), on the stream it already
+  runs. No address or identifier.
+- **The client side:** `20e3e339…` (B19) has the stall signal and the restart guard on by default.
+  `adb shell setprop debug.privyhub.stall_signal 0` / `adb shell setprop debug.privyhub.restart_guard 0` turn them off.
+  A reboot clears the properties.
+- **Turning it off (host):**
+  1. Delete `link-recovery.conf`.
+  2. Run `systemctl --user daemon-reload && systemctl --user restart privyhub-companion`.
+  3. Take `LINK_RECOVERY` out of `tools/e1_suite.py` `ADOPTED` (reverse
+     `docs/memory/evidence/g_a4_2026-10-24/g_a4_applied.diff`).
+
+  The host then holds and saves nothing on a stall. The client may still send its signal; no host module acts on it.

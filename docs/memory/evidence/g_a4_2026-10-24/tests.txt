@@ -1,0 +1,45 @@
+## python3 -B tools/e1_suite.py --self-test
+E1_SUITE_SELF_TEST_OK
+rc=0
+## python3 -B -m unittest tools/test_e1_remote.py (from tools/)
+...../home/privyhub/Projects/onn-stream-test/tools/e1_remote.py:289: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmp8zu1w5d7/out/E1-PS1-STREAM-REMOTE/run1/sampler.log' mode='w' encoding='UTF-8'>
+  samp = subprocess.Popen([sys.executable, str(E.REPO / "tools/e1_sampler.py"), "run", str(rd), "--telemetry",
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./home/privyhub/Projects/onn-stream-test/tools/e1_remote.py:289: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmp4faf4257/out/E1-PS1-STREAM-REMOTE/run1/sampler.log' mode='w' encoding='UTF-8'>
+  samp = subprocess.Popen([sys.executable, str(E.REPO / "tools/e1_sampler.py"), "run", str(rd), "--telemetry",
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+../home/privyhub/Projects/onn-stream-test/docs/memory/evidence/e4_s5d_2026-10-15/e4_s5d_analysis.py:27: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmp75mj94xt/run1/encoder.jsonl' mode='r' encoding='UTF-8'>
+  for l in open(p, errors="replace"):
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+../home/privyhub/Projects/onn-stream-test/tools/e1_remote.py:289: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmp3l_ngvgt/out/E1-PS1-STREAM-REMOTE/run1/sampler.log' mode='w' encoding='UTF-8'>
+  samp = subprocess.Popen([sys.executable, str(E.REPO / "tools/e1_sampler.py"), "run", str(rd), "--telemetry",
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./home/privyhub/Projects/onn-stream-test/tools/e1_remote.py:289: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpfyxv9k7k/out/E1-PS1-STREAM-REMOTE/run1/sampler.log' mode='w' encoding='UTF-8'>
+  samp = subprocess.Popen([sys.executable, str(E.REPO / "tools/e1_sampler.py"), "run", str(rd), "--telemetry",
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+......../home/privyhub/Projects/onn-stream-test/tools/e1_remote.py:289: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpt37cv66p/out/E1-PS1-STREAM-REMOTE/run1/sampler.log' mode='w' encoding='UTF-8'>
+  samp = subprocess.Popen([sys.executable, str(E.REPO / "tools/e1_sampler.py"), "run", str(rd), "--telemetry",
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./home/privyhub/Projects/onn-stream-test/tools/e1_remote.py:289: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmppek5ny4y/out/E1-PS1-STREAM-REMOTE/run1/sampler.log' mode='w' encoding='UTF-8'>
+  samp = subprocess.Popen([sys.executable, str(E.REPO / "tools/e1_sampler.py"), "run", str(rd), "--telemetry",
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+.
+----------------------------------------------------------------------
+Ran 21 tests in 0.032s
+
+OK
+rc=0
+## test_c3_l4_nft_night
+.................................
+----------------------------------------------------------------------
+Ran 33 tests in 0.959s
+
+OK
+rc=0
+## python3 -B tests/link_recovery/test_link_recovery.py
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.410s
+
+OK
+rc=0
