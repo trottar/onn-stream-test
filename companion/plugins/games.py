@@ -3871,6 +3871,10 @@ class GamesPlugin:
                 payload["heartbeat_interval_ms"] = (
                     self._diagnostic_heartbeat_interval_ms()
                 )
+                # B16: the client's ready as soon as it has a decodable frame, only with B12's owner wired (absent:
+                # no key)
+                if getattr(self._recovery, "_stall_owner", None) is not None:
+                    payload["stall_resume"] = self._recovery._stall_owner.client_hint()
                 return payload
             except NativeStreamError as exc:
                 raise RuntimeError(str(exc)) from exc

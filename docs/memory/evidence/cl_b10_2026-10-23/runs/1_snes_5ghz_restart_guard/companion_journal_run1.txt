@@ -1,0 +1,52 @@
+2026-10-23T23:32:36-04:00 Stopping privyhub-companion.service - PrivyHub companion (control API :8765, native game stream)...
+2026-10-23T23:32:36-04:00 Stopping PrivyHub companion service...
+2026-10-23T23:32:36-04:00 overlay: provider=tailscale available=True connected=True path=no-peer peer_ready=False mtu=1280 reason=running endpoint=present
+2026-10-23T23:32:36-04:00 PrivyHub companion service stopped.
+2026-10-23T23:32:36-04:00 Stopped privyhub-companion.service - PrivyHub companion (control API :8765, native game stream).
+2026-10-23T23:32:36-04:00 privyhub-companion.service: Consumed 10.516s CPU time, 53M memory peak.
+2026-10-23T23:32:36-04:00 Starting privyhub-companion.service - PrivyHub companion (control API :8765, native game stream)...
+2026-10-23T23:32:36-04:00 Started privyhub-companion.service - PrivyHub companion (control API :8765, native game stream).
+2026-10-23T23:32:36-04:00   GET  /status
+2026-10-23T23:32:36-04:00   GET  /diagnostics/health
+2026-10-23T23:32:36-04:00   GET  /sources
+2026-10-23T23:32:36-04:00   GET  /plugins/<plugin>/<action>
+2026-10-23T23:32:36-04:00 PrivyHub game metadata startup reconciliation: SKIPPED_CURRENT
+2026-10-23T23:34:41-04:00 <addr> - 23/Oct/2026 23:34:41 - "POST /plugins/games/launch?id=game_snes_<id> HTTP/1.1" 200 -
+2026-10-23T23:34:44-04:00 <addr> - 23/Oct/2026 23:34:44 - "POST /session/nonce HTTP/1.1" 200 -
+2026-10-23T23:34:44-04:00 <addr> - 23/Oct/2026 23:34:44 - "POST /session/setup HTTP/1.1" 200 -
+2026-10-23T23:34:52-04:00 PrivyHub audio codec (PRIVYHUB_AUDIO_CODEC): opus 128 kbit/s, 10-ms frames, libopus libopus 1.5.2
+2026-10-23T23:34:54-04:00 <addr> - 23/Oct/2026 23:34:54 - "POST /plugins/games/native-stream-start?port=48100 HTTP/1.1" 200 -
+2026-10-23T23:35:03-04:00 <addr> - 23/Oct/2026 23:35:03 - "POST /plugins/games/native-stream-ready HTTP/1.1" 200 -
+  session 2026-10-23T23:34:54-04:00: heartbeats 110; first rendered_frames=0 queued_frames=1 rx_packets=1 lost_packets=0 stream_resyncs=0 fec_recovered_packets=0 fec_unrecoverable_groups=0 last_output_age_ms=-1 elapsed_ms=1179 forward_gap_events=0 max_forward_gap_packets=0
+    last  rendered_frames=13245 queued_frames=13317 rx_packets=183008 lost_packets=436 stream_resyncs=1 fec_recovered_packets=11 fec_unrecoverable_groups=12 last_output_age_ms=19 elapsed_ms=223026 forward_gap_events=18 max_forward_gap_packets=82
+2026-10-23T23:38:45-04:00 <addr> - 23/Oct/2026 23:38:45 - "POST /plugins/games/native-stream-start?port=48100 HTTP/1.1" 200 -
+2026-10-23T23:38:50-04:00 <addr> - 23/Oct/2026 23:38:50 - "POST /plugins/games/native-stream-ready HTTP/1.1" 200 -
+2026-10-23T23:39:12-04:00 decoder-session-log received as body: report_chars=13685
+2026-10-23T23:39:12-04:00 Native decoder session log: logs/games/decoder_sessions/native_decoder_20261024_033912_129.json
+2026-10-23T23:39:12-04:00 <addr> - 23/Oct/2026 23:39:12 - "POST /plugins/games/decoder-session-log HTTP/1.1" 200 -
+  session 2026-10-23T23:38:44-04:00: heartbeats 14; first rendered_frames=0 queued_frames=0 rx_packets=1 lost_packets=0 stream_resyncs=0 fec_recovered_packets=0 fec_unrecoverable_groups=0 last_output_age_ms=-1 elapsed_ms=473 forward_gap_events=0 max_forward_gap_packets=0
+    last  rendered_frames=1522 queued_frames=1569 rx_packets=21453 lost_packets=0 stream_resyncs=2 fec_recovered_packets=0 fec_unrecoverable_groups=0 last_output_age_ms=36 elapsed_ms=26738 forward_gap_events=0 max_forward_gap_packets=0
+2026-10-23T23:39:12-04:00 <addr> - 23/Oct/2026 23:39:12 - "POST /plugins/games/native-stream-stop HTTP/1.1" 200 -
+2026-10-23T23:41:45-04:00 <addr> - 23/Oct/2026 23:41:45 - "POST /plugins/games/native-stream-start?port=48100 HTTP/1.1" 200 -
+2026-10-23T23:41:48-04:00 <addr> - 23/Oct/2026 23:41:48 - "POST /plugins/games/native-stream-ready HTTP/1.1" 200 -
+2026-10-23T23:42:21-04:00 decoder-session-log received as body: report_chars=15728
+2026-10-23T23:42:21-04:00 Native decoder session log: logs/games/decoder_sessions/native_decoder_20261024_034221_063.json
+2026-10-23T23:42:21-04:00 <addr> - 23/Oct/2026 23:42:21 - "POST /plugins/games/decoder-session-log HTTP/1.1" 200 -
+  session 2026-10-23T23:41:45-04:00: heartbeats 18; first rendered_frames=0 queued_frames=0 rx_packets=1 lost_packets=0 stream_resyncs=0 fec_recovered_packets=0 fec_unrecoverable_groups=0 last_output_age_ms=-1 elapsed_ms=549 forward_gap_events=0 max_forward_gap_packets=0
+    last  rendered_frames=2072 queued_frames=2105 rx_packets=28755 lost_packets=2 stream_resyncs=0 fec_recovered_packets=0 fec_unrecoverable_groups=1 last_output_age_ms=7 elapsed_ms=35310 forward_gap_events=1 max_forward_gap_packets=2
+2026-10-23T23:42:21-04:00 <addr> - 23/Oct/2026 23:42:21 - "POST /plugins/games/native-stream-stop HTTP/1.1" 200 -
+2026-10-23T23:42:26-04:00 <addr> - 23/Oct/2026 23:42:26 - "POST /plugins/games/stop HTTP/1.1" 200 -
+2026-10-23T23:46:34-04:00 <addr> - 23/Oct/2026 23:46:34 - "POST /plugins/games/stop HTTP/1.1" 200 -
+2026-10-23T23:46:45-04:00 Stopping privyhub-companion.service - PrivyHub companion (control API :8765, native game stream)...
+2026-10-23T23:46:45-04:00 Stopping PrivyHub companion service...
+2026-10-23T23:46:45-04:00 overlay: provider=tailscale available=True connected=True path=no-peer peer_ready=False mtu=1280 reason=running endpoint=present
+2026-10-23T23:46:45-04:00 PrivyHub companion service stopped.
+2026-10-23T23:46:45-04:00 Stopped privyhub-companion.service - PrivyHub companion (control API :8765, native game stream).
+2026-10-23T23:46:45-04:00 privyhub-companion.service: Consumed 3min 5.234s CPU time, 207.4M memory peak.
+2026-10-23T23:46:45-04:00 Starting privyhub-companion.service - PrivyHub companion (control API :8765, native game stream)...
+2026-10-23T23:46:45-04:00 Started privyhub-companion.service - PrivyHub companion (control API :8765, native game stream).
+2026-10-23T23:46:46-04:00   GET  /status
+2026-10-23T23:46:46-04:00   GET  /diagnostics/health
+2026-10-23T23:46:46-04:00   GET  /sources
+2026-10-23T23:46:46-04:00   GET  /plugins/<plugin>/<action>
+2026-10-23T23:46:46-04:00 PrivyHub game metadata startup reconciliation: SKIPPED_CURRENT

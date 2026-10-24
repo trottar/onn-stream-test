@@ -486,6 +486,11 @@ class NativeStreamActivity :
             this
         )
 
+        // B15: the guard's pending kept beyond this object (a private file), and this instance's place in its process
+        // (null = today)
+        restartGuard?.attach(FilePendingStore(File(noBackupFilesDir, RestartGuard.STORE_FILE)),
+            RestartGuardProcess.nextInstance(), RestartGuardProcess.mark)
+
         uiHandler.post(
             metricsTick
         )
@@ -600,6 +605,9 @@ class NativeStreamActivity :
         sessionStarted = true
         stopping = false
         cachedSessionReport = null
+        // B16: a new session waits for its own host's fast ready (null = today)
+        fastReady?.let { uiHandler.removeCallbacks(fastReadyTick) }
+        fastReady = null
         // B5: the Wi-Fi lock for the session (null = today)
         streamWifiLock?.acquire()
         // B14: a new session re-arms the link notice (null = today)
@@ -811,6 +819,11 @@ class NativeStreamActivity :
                         1_000L,
                         10_000L
                     )
+
+                // B16: the host's fast ready, only with PRIVYHUB_STALL_RESUME=1 (absent key = today's gate)
+                if (json.optJSONObject(FastReadyHint.KEY)?.optBoolean(FastReadyHint.FIELD, false) == true) {
+                    fastReady = FastReady()
+                }
 
                 // B11: the host restarted its audio at sequence 0: a fresh receiver, its start-up hold re-armed
                 if (restart != null) {
@@ -1058,6 +1071,15 @@ class NativeStreamActivity :
         }
 
         stopping = true
+
+        // B15: a recreation hands the open session to the next instance's start (report, stop, start in order); a
+        // pending another instance already flushed is not posted twice (null = today)
+        if (restartGuard?.handOver(isChangingConfigurations, sessionStarted) { cacheSessionReport() } == true) {
+            thermalSampler?.stop()
+            sessionStarted = false
+            stopLocalPipeline()
+            return
+        }
 
         // B11: the activity ends; today's stop path posts the cached report and the stop (null = today)
         restartGuard?.onSessionStopped()
@@ -2303,6 +2325,12 @@ class NativeStreamActivity :
         // B11: the self-restart's cause (null = today: no key)
         restartGuard?.lastCause?.let { c -> root.put("restart_cause", JSONObject(c)) }
 
+        // B16: the fast ready's releases (null = today: no key)
+        fastReady?.let { f ->
+            root.put("fast_ready_releases", f.releases)
+            root.put("fast_ready_frame_to_post_ms", f.lastFrameToPostMs)
+        }
+
         // B10: the loss guard's mode and counters (null = today: no key)
         lossGuard?.let { g ->
             root.put("loss_guard_mode", g.mode.wire)
@@ -2372,6 +2400,35 @@ class NativeStreamActivity :
             null -> {}
         }
     }
+
+    // B16: the recovery gate's ready at the first decodable frame, only with the host's fast ready (null = today).
+    @Volatile
+    private var fastReady: FastReady? = null
+
+    private val fastReadyTick: Runnable by lazy {
+        object : Runnable {
+            override fun run() {
+                val f = fastReady ?: return
+                if (!sessionStarted || stopping || !recoveryActive || gameplayReleased) return
+                if (f.tick(fastReadyInputs())) {
+                    requestGameplayRelease()
+                    return
+                }
+                uiHandler.postDelayed(this, 50L)
+            }
+        }
+    }
+
+    private fun fastReadyInputs(): FastReadyInputs =
+        FastReadyInputs(
+            recoveryActive = recoveryActive,
+            released = gameplayReleased,
+            requestInFlight = releaseRequestInFlight,
+            hostMetadataComplete = hostMetadataComplete,
+            waitingForIdr = receiver?.snapshot()?.waitingForIdr ?: true,
+            renderedFrames = decoder?.renderedFrameCount() ?: 0L,
+            outputAgeMs = decoder?.lastOutputAgeMs() ?: -1L,
+        )
 
     // B11: the self-restart guard, only with debug.privyhub.restart_guard=1 (null = today).
     private val restartGuard: RestartGuard? by lazy { if (RestartGuardFlag.fromSystem()) RestartGuard() else null }
@@ -3204,6 +3261,13 @@ class NativeStreamActivity :
             "Reconnecting"
         streamState =
             "Reconnecting"
+
+        // B16: the recovery's 50-ms fast-ready tick (null = today)
+        fastReady?.let { f ->
+            f.onRecoveryEntered(decoder?.renderedFrameCount() ?: 0L)
+            uiHandler.removeCallbacks(fastReadyTick)
+            uiHandler.postDelayed(fastReadyTick, 50L)
+        }
 
         publishStreamStatus()
         updateStabilizationOverlay()

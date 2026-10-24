@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-10-23
-baseline_commit: a55d73d (queue E committed; G-A3 and the CL-B10 launch uncommitted beside it; the user commits)
+baseline_commit: efa4240 (G-A3 and CL-B10 PART 1 committed; CL-B10 PART 2 and the record uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -18,13 +18,11 @@ CL-B3 is OPEN on two G5-S1 smoke gates (NOT MET; the user decides). Everything e
 passed.** E1 FROZEN; E2
 MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `af3ed73`.
 
-**State (2026-10-23 18:45Z, after G-A3 and CL-B10's launch): the NINE adopted lines.**
-- `--check` read ok on nine at G-A3's window end.
-- CL-B10 then installed **`da09e154…`** (not yet CONFIRMED; `bf5114a2…` is preserved and is the CONFIRMED one).
-  `--check` now reads `MISMATCH` on the APK alone, by the pin rule.
-- Running: `privyhub-cl-b10` (two bench cells) and `privyhub-link-n1` (nightly).
-- Properties `restart_guard` / `stall_signal` / `link_notice` / `link_report` = 1. One device paired; `identity_v2`
-  on.
+**State (2026-10-24 04:10Z, after CL-B10): the NINE adopted lines; `--check` ok; APK `da09e154…6cf` CONFIRMED**
+(CL-B10; `bf5114a2…` preserved).
+- Every client property is empty. `link_report` empty means on with this APK.
+- No `e3_flag.conf`, no stream. One device paired; `identity_v2` on.
+- Running: `privyhub-link-n1` (nightly) only.
 
 The nine lines:
 1. `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live` (`adaptive.conf`);
@@ -217,6 +215,49 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
+
+**CL-B10: MEASURED, 4 / 4 cells valid; APK `da09e154…6cf` CONFIRMED and pinned**
+(`evidence/CL_B10_RESTART_GUARD_STATE_STALL_NOTICE_2026-10-23.md`; cells 2-3 2026-10-23 18:42-19:11Z, cells 1 and 4
+attended 2026-10-24 03:32-04:09Z).
+- **The band, in one hour:** 2.4 GHz gave **168 silences and 149 hitch s per 10 min**; 5 GHz gave **0 and 0-9**.
+  - The user, on 2.4 GHz: "It's running like absolute shit right now".
+  - After the switch: "Switched to 5 with no issues and plays significantly better".
+- **Cells 2 / 3 (B12's stack): back to B.** Each met every row but one, in one blackout:
+  - `@both`: the resume 2.13 s after the return;
+  - `@down`: one `encoder_restart`.
+- **Cell 1 (B11's guard): back to B.**
+  - The Home press was found, and the client restarted itself in ~6 s ("it never paused from what I can see").
+  - But there was no old report, no `session_ended` before the new start, and `restart_cause` null.
+  - The new session had 2,418 underruns in 28 s.
+- **Cell 4 (B14's notice):** raised on 2.4 GHz at the first heartbeat (reason 1) and cleared on 5 GHz at the new
+  session's first heartbeat. **"Shown" on screen awaits the user's word** (their stage-3 message carried none).
+- **CONFIRMED by CL-B7 §6** (all four valid). Disclosed: no cell ran with the properties empty, so the property-empty
+  path (and the link keys with `link_report` empty) is B's by-construction proof. The user's next play is the first
+  live read.
+
+1. **The user's commit:**
+   - the record, `cl_b10_2026-10-23/` (PART 2's files), the pin (`tools/e1_suite.py`, `tools/c3_l4_nft_night.py`, its
+     test);
+   - `KNOWN_ISSUES.md`, `ROADMAP.md`, this file, the PART 2 task file;
+   - git status: `logs/cl_b10_git_status.txt`.
+2. **The user's word on the notice** (one line: seen or not, the words, a photo): it closes cell 4's gate.
+3. **To B:** the guard's rows (cell 1) and the stack's two misses (cells 2 / 3), with the record's tables.
+4. **The three adoption questions, for the user, each with its cost:**
+   - **The hold / state / stall stack on SNES** (`PRIVYHUB_INPUT_HOLD=1 _B6=1 _B8=1 _REWIND=1 PRIVYHUB_STALL_SIGNAL=1
+     PRIVYHUB_STALL_RESUME=1` + `stall_signal=1`).
+     - Not a candidate yet: back to B on two misses.
+     - When it is, the cost: 24 frames per two-way drop (restored to the save at 0.40 s), a save per stall including
+       150-ms gate stalls, and the picture frozen 3.5-7.2 s per 4-s drop.
+   - **The loss guard** (`PRIVYHUB_LOSS_GUARD=1` + `loss_guard=1`, BENCH-R3 a candidate). The cost:
+     - freezes up to ~0.5 s in place of corrupted frames;
+     - hitch s 125.7 against 68.8 per 10 min under 1 % loss, and rendered 55.2 against 57.8 fps;
+     - no runtime IDR.
+   - **The notice as a client default** (`link_notice` on without the property). The cost: an on-screen line on any
+     2.4-GHz or weak link. It is raised at once and cleared on a good link; the 30-s clear path is not yet exercised.
+     Pending the user's word that it shows as built.
+5. **"Read LINK-N1's nights"** after a few nights. The watch is sampling tonight.
+6. **The user's own play on 5 GHz** with everything in force (nine lines, `da09e154…`, the properties empty). The next
+   marked lag will carry the link.
 
 **G-A3: `PRIVYHUB_LINK_REPORT=1` ADOPTED, the ninth line** (`evidence/G_A3_LINK_REPORT_ADOPTION_2026-10-23.md`; the
 user's decision, "Yes to both"; `patches/G-A3_LINK_REPORT_ADOPTED.md`). **The adopted environ is NINE lines:**

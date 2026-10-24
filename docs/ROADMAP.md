@@ -1933,8 +1933,28 @@ behind `PRIVYHUB_STALL_RESUME=1` (no encoder restart under a young stall pause).
 **B13 (2026-10-23): the client's link report on by default; the ninth adopted line prepared (G-A3, not applied).**
 Record: `docs/memory/evidence/B13_LINK_REPORT_DEFAULT_ON_2026-10-23.md`.
 
+**CL-B10 (2026-10-23/24): B11-B14 on the onn, 4 / 4 cells valid, APK `da09e154…6cf` CONFIRMED and pinned.**
+- **B12's state path / stall resume on snes9x: back to B, one row each.**
+  - `@both`: net 24 per blackout, the resume 2.13 s after the return in 1 of 5.
+  - `@down`: net 9, one `encoder_restart` in 1 of 5.
+- **B11's guard: back to B.** No old report or `session_ended` before the new start, `restart_cause` null, 2,418
+  underruns in 28 s.
+- **B14's notice:** raised on 2.4 GHz at once and cleared on 5 GHz; "shown" awaits the user's word.
+- **Same-hour band A/B:** 2.4 GHz 168 silences / 149 hitch s per 10 min; 5 GHz 0 / 0-9.
+
+Record: `docs/memory/evidence/CL_B10_RESTART_GUARD_STATE_STALL_NOTICE_2026-10-23.md`.
+
 **B14 (2026-10-23): the "any house" link notice, built behind `debug.privyhub.link_notice=1`; APK (B5 + B7 + B10 + B11 +
 B13 + B14) `da09e154…` pinned, not installed.** Record: `docs/memory/evidence/B14_LINK_NOTICE_2026-10-23.md`.
+The notice was shown: the user's word, 2026-10-24, "I saw that box" (CL-B10's gate MET).
+
+**B15 (2026-10-24): the restart guard on every path, behind the same `debug.privyhub.restart_guard=1`.** CL-B10's Home
+press started in a new activity instance (the old process gone); the guard's pending now lives in a private file, so
+every start flushes it, with `restart_cause.trigger`. Record: `docs/memory/evidence/B15_RESTART_GUARD_ALL_PATHS_2026-10-24.md`.
+
+**B16 (2026-10-24): the stall resume at the client's first decodable frame and the saves from a signal ≥ 400 ms, inside
+`PRIVYHUB_STALL_RESUME=1`; APK (B5 + B7 + B10 + B11 + B13 + B14 + B15 + B16) `e2db0aa0…` pinned, not installed.**
+Record: `docs/memory/evidence/B16_STALL_RESUME_SPEED_2026-10-24.md`.
 
 ## G9 — Remote foundation checkpoint
 

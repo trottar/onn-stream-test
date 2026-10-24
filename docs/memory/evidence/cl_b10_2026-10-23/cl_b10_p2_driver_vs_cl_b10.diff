@@ -1,0 +1,157 @@
+2,24c2,16
+< """CL-B10 PART 1 -- the bench cells for B12's state path and stall resume on snes9x, under the bench blackout, with
+< the client APK da09e154... (B11 + B13 + B14) and the properties restart_guard / stall_signal / link_notice = 1: two cells
+< run as pre-registered (cl_b10_preregistration.txt), DETACHED (systemd --user unit privyhub-cl-b10), the cap read from the
+< pre-registration's `CAP_UTC:` line (launch + 2 h); resumable from cl_b10_state.json.
+< 
+< Built from bench_r3_driver.py (everything kept: the status line / heartbeat / history / STOP / busy skip / cap / the
+< suite call / the crash handler / --dry / the readings beside a run / the encoder read-back / the applied check / the
+< per-run log copies / B2's reader with --net / no_play as an outcome / the profile-not-applied repeat / the state stop /
+< the link and silence readings). Changed:
+<   - the cells table: two, in the pre-registered order (task G-A3_AND_CL-B10_TASK.md; session B's exact strings,
+<     SESSION_B_DONE_2026-10-23E.md item 8): cell 2 blackout-4s@both,every=120s,seed=1 and cell 3
+<     blackout-4s@down,every=120s,seed=1, both E1-SNES-STREAM (snes9x, adopted line 3) with PRIVYHUB_INPUT_HOLD=1,
+<     _B6=1, _B8=1, _REWIND=1, PRIVYHUB_STALL_SIGNAL=1, PRIVYHUB_STALL_RESUME=1. The drop-in is the impairment line and
+<     those six flags only: PRIVYHUB_LINK_REPORT=1 is adopted line 9 (G-A3) and PRIVYHUB_WAN_TELEMETRY=1 (BENCH-R1..R3's
+<     base line) is not carried (disclosed);
+<   - the properties: three (restart_guard, stall_signal, link_notice), set to 1 before each cell and read back, read
+<     back (expected still 1) after each cell and at the close -- NOT cleared: PART 2's cells use them and PART 2 clears
+<     them (the task). link_report is not touched (absent = on with da09e154...; LINK-R1 left it at 1);
+<   - no Opal sampler (not in the task);
+<   - no cell starts inside 04:15-05:30Z (the nightly watch samples 04:30-05:30Z; a cell runs ~15 min).
+< --dry: about 2 min, no stream: the preflight, cell 2's drop-in written, the companion restarted, its environ read back,
+< the properties set and read back, 30 s held, the drop-in removed, restarted, flags_absent read, the properties read back
+< (still 1); then exit."""
+---
+> """CL-B10 PART 2 -- the attended cells, ONE CELL PER LAUNCH (--cell 1 | --cell 4), as pre-registered
+> (cl_b10_p2_preregistration.txt), DETACHED (systemd --user unit privyhub-cl-b10-p2). From cl_b10_driver.py (PART 1's
+> driver; the diff is cl_b10_p2_driver_vs_cl_b10.diff). Changed:
+>   - the cells: 1 (5 GHz, the user presses Home ~4 min in) and 4 (2.4 GHz for the notice, the user switches back to
+>     5 GHz ~10 min in), both E1-SNES-STREAM (snes9x) with the drop-in PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 only;
+>     cell 1 window 600, cell 4 window 780; gap 120;
+>   - one cell per launch; its own state file cl_b10_p2_state.json; rows appended to cells.jsonl beside cells 2 and 3;
+>   - the cap: the launch + 40 min (the pre-registration's rule);
+>   - the band read from the onn every 10 s through the cell into runs/<cell>/band.jsonl (dumpsys wifi's mWifiInfo
+>     line parsed in memory: frequency, band, standard, RSSI, tx / rx only; nothing else kept);
+>   - the watch rule: a cell is refused at launch if it could not end before 04:30Z or would start before 05:30Z
+>     (the nightly watch's hour; no companion restart in it);
+>   - the status text and the log tag name this driver and its stop file (~/privyhub_cl_b10/STOP);
+>   - the properties restart_guard / stall_signal / link_notice set to 1 and read back before, read back after, NOT
+>     cleared (stage 3 clears them)."""
+41c33
+< CALL = HERE / "cl_b10_suite_call.py"
+---
+> CALL = HERE / "cl_b10_p2_suite_call.py"
+43c35
+< PRE = HERE / "cl_b10_preregistration.txt"
+---
+> PRE = HERE / "cl_b10_p2_preregistration.txt"
+60c52,54
+< CAP_UTC, CAP = _cap_from_pre()
+---
+> LAUNCH = time.time()
+> CAP = LAUNCH + 40 * 60
+> CAP_UTC = datetime.fromtimestamp(CAP, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+64,65c58,59
+< STATUS_P, HIST_P, WLOG_P = OUTD / "status.txt", OUTD / "history.csv", OUTD / "driver.log"
+< STATE_P = (HERE / "dry_run" if DRY else HERE) / "cl_b10_state.json"
+---
+> STATUS_P, HIST_P, WLOG_P = OUTD / "status.txt", OUTD / "history_p2.csv", OUTD / "driver_p2.log"
+> STATE_P = (HERE / "dry_run" if DRY else HERE) / "cl_b10_p2_state.json"
+76c70
+< NCELLS = 2
+---
+> NCELLS = 1
+81c75
+< BOTH, DOWN = "blackout-4s@both,every=120s,seed=1", "blackout-4s@down,every=120s,seed=1"
+---
+> NONE = "none@post-fec,seed=1"
+83,87c77,81
+< # session B's exact strings (SESSION_B_DONE_2026-10-23E.md item 8); a blackout spec takes NO @post-fec;
+< # PRIVYHUB_SNES_CORE=snes9x (line 3) and PRIVYHUB_LINK_REPORT=1 (line 9) are adopted, in every environ, not repeated
+< CELLS = [
+<     {"n": 2, "cell": "2_snes_blackout_both_state_stall", "spec": BOTH, "profile": "blackout-4s", "uplink": True, "extra": STACK, "props": P1, "wid": SNES, "arm": "hold+state+stall_resume"},
+<     {"n": 3, "cell": "3_snes_blackout_down_state_stall", "spec": DOWN, "profile": "blackout-4s", "uplink": False, "extra": STACK, "props": P1, "wid": SNES, "arm": "hold+state+stall_resume"},
+---
+> # the task's exact strings (G-A3_AND_CL-B10_TASK.md PART 2; CL-B10_PART2_ATTENDED_TASK.md): the drop-in is the impairment
+> # line only; snes9x (line 3) and the link report (line 9) are adopted
+> ALL_CELLS = [
+>     {"n": 1, "cell": "1_snes_5ghz_restart_guard", "spec": NONE, "profile": "none", "extra": [], "props": P1, "wid": SNES, "arm": "5 GHz, Home ~4 min", "window": 600},
+>     {"n": 4, "cell": "4_snes_24ghz_notice", "spec": NONE, "profile": "none", "extra": [], "props": P1, "wid": SNES, "arm": "2.4 GHz notice, back to 5 GHz ~10 min", "window": 780},
+88a83,84
+> _N = int(sys.argv[sys.argv.index("--cell") + 1]) if "--cell" in sys.argv else None
+> CELLS = [c for c in ALL_CELLS if c["n"] == _N]
+137a134,171
+> WIFI_KEYS = {"Wi-Fi standard": "standard", "RSSI": "rssi_dbm", "Tx Link speed": "tx_mbps", "Rx Link speed": "rx_mbps",
+>              "Frequency": "freq_mhz"}
+> 
+> 
+> def band_read():
+>     """The onn's mWifiInfo line, parsed in memory; only frequency / band / standard / RSSI / tx / rx are kept."""
+>     try:
+>         line = subprocess.run(["adb", "shell", "dumpsys wifi | grep -m1 '^mWifiInfo'"], capture_output=True, text=True,
+>                               timeout=20).stdout
+>     except (OSError, subprocess.SubprocessError):
+>         line = ""
+>     r = {"at_utc": utc()}
+>     for k_, name in WIFI_KEYS.items():
+>         m_ = re.search(r"(?:^|, )" + re.escape(k_) + r": (-?\d+)", line)
+>         r[name] = int(m_.group(1)) if m_ else None
+>     f_ = r.get("freq_mhz")
+>     r["band"] = None if f_ is None else "5" if 4900 <= f_ < 5900 else "2.4" if 2400 <= f_ < 2500 else "6" if f_ >= 5925 else "?"
+>     return r
+> 
+> 
+> def band_thread(cdir, out):
+>     while not out.get("done") and not STOP.is_set():
+>         append(cdir / "band.jsonl", band_read())
+>         time.sleep(10)
+> 
+> 
+> def cell_span_s(cell):
+>     return GAP + 90 + cell.get("window", WINDOW) + 120       # gap, warmup, window, teardown margin
+> 
+> 
+> def watch_overlap(t, cell):
+>     """True when a cell started at t could still be running at 04:30Z, or would start before 05:30Z, on that day."""
+>     d = datetime.fromtimestamp(t, timezone.utc)
+>     a = d.replace(hour=4, minute=30, second=0, microsecond=0).timestamp()
+>     b = d.replace(hour=5, minute=30, second=0, microsecond=0).timestamp()
+>     return t < b and t + cell_span_s(cell) > a
+> 
+> 
+157c191
+<     line = f"[benchr3 {time.strftime('%m-%d %H:%M:%SZ', time.gmtime())}] " + " ".join(str(x) for x in a)
+---
+>     line = f"[cl_b10_p2 {time.strftime('%m-%d %H:%M:%SZ', time.gmtime())}] " + " ".join(str(x) for x in a)
+205,206c239,240
+<         line = (f"{utc()} heartbeat | cell {s['cell']}/{NCELLS} | last: {s['last']} (at {s['last_at']}) | doing: {s['doing']} | "
+<                 f"next: {s['next']} | state: {s['state']} | cap {CAP_UTC} | stop: touch ~/privyhub_bench_r3/STOP\n")
+---
+>         line = (f"{utc()} heartbeat | cell {s['cell']} (one per launch) | last: {s['last']} (at {s['last_at']}) | doing: {s['doing']} | "
+>                 f"next: {s['next']} | state: {s['state']} | cap {CAP_UTC} | stop: touch ~/privyhub_cl_b10/STOP\n")
+478c512
+<         p = subprocess.Popen([sys.executable, str(CALL), str(out), str(WINDOW), str(GAP), cell["wid"], *kvs(cell)], stdout=fh,
+---
+>         p = subprocess.Popen([sys.executable, str(CALL), str(out), str(cell.get("window", WINDOW)), str(GAP), cell["wid"], *kvs(cell)], stdout=fh,
+811c845
+<     write_status(cell=cell["n"], doing=f"cell {cell['n']}/{NCELLS} {cell['spec']} {cell['arm']} (attempt {attempt}, "
+---
+>     write_status(cell=cell["n"], doing=f"cell {cell['n']} {cell['spec']} {cell['arm']} (attempt {attempt}, "
+815a850
+>     threading.Thread(target=band_thread, args=(cdir, beside), daemon=True).start()
+951a987,989
+>     if len(CELLS) != 1:
+>         print("refusing: --cell 1 or --cell 4")
+>         return 2
+974,979c1012,1014
+<         while in_quiet() and time.time() < CAP and not stop_requested():
+<             write_status(cell=cell["n"], doing="waiting: no cell starts in 04:15-05:30Z (the nightly watch)",
+<                          next=f"cell {cell['n']} after 05:30Z")
+<             time.sleep(30)
+<         if stop_requested() or time.time() >= CAP:
+<             why = "the stop file" if stop_requested() else "the cap"
+---
+>         if watch_overlap(time.time(), cell):
+>             why = "refused: the cell would overlap the nightly watch's 04:30-05:30Z; launch it after 05:30Z"
+>             log(f"cell {cell['n']}: {why}")

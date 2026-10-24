@@ -1,0 +1,551 @@
+diff --git a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+index 230d1f6..6a74f51 100644
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -486,6 +486,11 @@ class NativeStreamActivity :
+             this
+         )
+ 
++        // B15: the guard's pending kept beyond this object (a private file), and this instance's place in its process
++        // (null = today)
++        restartGuard?.attach(FilePendingStore(File(noBackupFilesDir, RestartGuard.STORE_FILE)),
++            RestartGuardProcess.nextInstance(), RestartGuardProcess.mark)
++
+         uiHandler.post(
+             metricsTick
+         )
+@@ -1059,6 +1064,15 @@ class NativeStreamActivity :
+ 
+         stopping = true
+ 
++        // B15: a recreation hands the open session to the next instance's start (report, stop, start in order); a
++        // pending another instance already flushed is not posted twice (null = today)
++        if (restartGuard?.handOver(isChangingConfigurations, sessionStarted) { cacheSessionReport() } == true) {
++            thermalSampler?.stop()
++            sessionStarted = false
++            stopLocalPipeline()
++            return
++        }
++
+         // B11: the activity ends; today's stop path posts the cached report and the stop (null = today)
+         restartGuard?.onSessionStopped()
+ 
+diff --git a/PrivyHub/app/src/main/java/streaming/RestartGuard.kt b/PrivyHub/app/src/main/java/streaming/RestartGuard.kt
+index 68fa42e..51cdf31 100644
+--- a/PrivyHub/app/src/main/java/streaming/RestartGuard.kt
++++ b/PrivyHub/app/src/main/java/streaming/RestartGuard.kt
+@@ -1,5 +1,9 @@
+ package com.safeiot.privyhub.streaming
+ 
++import java.io.File
++import java.util.Properties
++import java.util.concurrent.atomic.AtomicLong
++
+ /**
+  * B11: the client's self-restart, behind the system property
+  * `debug.privyhub.restart_guard=1` (CL-B7P's convention). Absent = today.
+@@ -14,6 +18,12 @@ package com.safeiot.privyhub.streaming
+  * - the next start first posts the old report, then `native-stream-stop`;
+  * - the audio receiver is rebuilt after the host's start response;
+  * - the cause goes in the new session's report (`restart_cause`).
++ *
++ * B15 (the same property): the pending is also kept beyond the activity object, in a private file, so a start in
++ * another instance -- a recreation, or a new process after the old one died with the session open (CL-B10 cell 1's
++ * Home press) -- flushes it too; `restart_cause.trigger` names the path (`surface` / `recreate` / `process`). A
++ * recreation hands the session over instead of racing its own stop against the next start, and a pending another
++ * instance already flushed is not posted twice.
+  */
+ object RestartGuardFlag {
+     const val PROPERTY = "debug.privyhub.restart_guard"
+@@ -37,12 +47,95 @@ data class PendingRestart(
+     val rtpSilenceMs: Long,
+     val recoveryActive: Boolean,
+     val pausedBeforeLossMs: Long,
++    // B15: who wrote it (this process's instance number, the process's mark) and the path it was taken on
++    val instance: Long = 0L,
++    val processMark: Long = 0L,
++    val trigger: String = "surface",
+ )
+ 
++/** B15: this process's mark (the monotonic time the guard first loaded here) and its activity instances' numbers. */
++object RestartGuardProcess {
++    val mark: Long = System.nanoTime() / 1_000_000L
++    private val instances = AtomicLong(0L)
++
++    fun nextInstance(): Long = instances.incrementAndGet()
++}
++
++/** B15: where the pending lives beyond the activity object. Failures are reported, never thrown. */
++interface PendingStore {
++    fun save(p: PendingRestart): Boolean
++    fun load(): PendingRestart?
++    fun clear()
++}
++
++/** B15: a private file (`java.util.Properties`); cleared by truncation. No address, no identifier in it. */
++class FilePendingStore(private val file: File) : PendingStore {
++    override fun save(p: PendingRestart): Boolean =
++        try {
++            val props = Properties()
++            p.report?.let { props.setProperty("report", it) }
++            props.setProperty("lost_at_ms", p.lostAtMs.toString())
++            props.setProperty("last_frame_age_ms", p.lastFrameAgeMs.toString())
++            props.setProperty("rtp_silence_ms", p.rtpSilenceMs.toString())
++            props.setProperty("recovery_active", p.recoveryActive.toString())
++            props.setProperty("paused_before_loss_ms", p.pausedBeforeLossMs.toString())
++            props.setProperty("instance", p.instance.toString())
++            props.setProperty("process_mark", p.processMark.toString())
++            file.outputStream().use { props.store(it, null) }
++            true
++        } catch (_: Exception) {
++            false
++        }
++
++    override fun load(): PendingRestart? =
++        try {
++            if (!file.isFile || file.length() == 0L) {
++                null
++            } else {
++                val props = Properties()
++                file.inputStream().use { props.load(it) }
++                PendingRestart(
++                    report = props.getProperty("report"),
++                    lostAtMs = props.getProperty("lost_at_ms").toLong(),
++                    lastFrameAgeMs = props.getProperty("last_frame_age_ms").toLong(),
++                    rtpSilenceMs = props.getProperty("rtp_silence_ms").toLong(),
++                    recoveryActive = props.getProperty("recovery_active").toBoolean(),
++                    pausedBeforeLossMs = props.getProperty("paused_before_loss_ms").toLong(),
++                    instance = props.getProperty("instance").toLong(),
++                    processMark = props.getProperty("process_mark").toLong(),
++                )
++            }
++        } catch (_: Exception) {
++            null
++        }
++
++    override fun clear() {
++        try {
++            file.outputStream().use { }
++        } catch (_: Exception) {
++        }
++    }
++}
++
+ class RestartGuard(private val clockMs: () -> Long = { System.nanoTime() / 1_000_000L }) {
++    companion object {
++        /** B15: the store's file name in the app's no-backup directory. */
++        const val STORE_FILE = "restart_guard_pending.properties"
++    }
++
+     @Volatile
+     private var pending: PendingRestart? = null
+ 
++    // B15: the store (null = B11's memory only), this instance's number and its process's mark
++    @Volatile
++    private var store: PendingStore? = null
++    private var instance = 0L
++    private var processMark = 0L
++
++    /** B15: this instance's pending reached the store. */
++    @Volatile
++    private var persisted = false
++
+     @Volatile
+     private var lastPauseAtMs = -1L
+ 
+@@ -58,6 +151,13 @@ class RestartGuard(private val clockMs: () -> Long = { System.nanoTime() / 1_000
+         lastPauseAtMs = clockMs()
+     }
+ 
++    /** B15: `onCreate`: the store, this instance's number in its process, the process's mark. */
++    fun attach(store: PendingStore, instance: Long, processMark: Long) {
++        this.store = store
++        this.instance = instance
++        this.processMark = processMark
++    }
++
+     /** `surfaceDestroyed`, before the pipeline stops (a session was started). */
+     fun onSurfaceLost(report: String?, lastFrameAgeMs: Long, rtpSilenceMs: Long, recoveryActive: Boolean) {
+         val now = clockMs()
+@@ -68,18 +168,71 @@ class RestartGuard(private val clockMs: () -> Long = { System.nanoTime() / 1_000
+             rtpSilenceMs = rtpSilenceMs,
+             recoveryActive = recoveryActive,
+             pausedBeforeLossMs = if (lastPauseAtMs >= 0L) now - lastPauseAtMs else -1L,
++            instance = instance,
++            processMark = processMark,
+         )
++        // B15: kept beyond this object (memory still serves this instance if the write fails)
++        val p = pending
++        persisted = p != null && (store?.save(p) ?: false)
++    }
++
++    private fun mine(s: PendingRestart?): Boolean =
++        s != null && s.instance == instance && s.processMark == processMark
++
++    /**
++     * B15, `stopSession` before today's posts. True = skip them:
++     * - this instance's pending was already flushed by another instance's start (its report and stop were sent; a
++     *   second stop would end the new stream);
++     * - the activity is being recreated: the open session is kept in the store for the next instance's start, which
++     *   flushes it in order (report, stop, start) instead of this stop racing that start.
++     */
++    fun handOver(changingConfigurations: Boolean, sessionLive: Boolean, report: () -> String?): Boolean {
++        val st = store ?: return false
++        val p = pending
++        if (p != null && persisted && !mine(st.load())) {
++            pending = null
++            persisted = false
++            return true
++        }
++        if (!changingConfigurations || (p == null && !sessionLive)) {
++            return false
++        }
++        if (p == null) {
++            onSurfaceLost(report(), -1L, -1L, false)
++        }
++        return persisted
+     }
+ 
+     /** `stopSession`: the activity ends; today's stop path posts the cached report and the stop. */
+     fun onSessionStopped() {
+         pending = null
++        // B15: this instance's own pending leaves the store too (never another instance's)
++        store?.let { st -> if (persisted && mine(st.load())) st.clear() }
++        persisted = false
+     }
+ 
+     /** The session thread, before `native-stream-start`: the pending restart (once), or null for a normal start. */
+     fun takePending(): PendingRestart? {
+-        val p = pending
++        var p = pending
+         pending = null
++        // B15: the store first: this instance's own (`surface`), another instance's (`recreate`), another process's
++        // (`process`); this instance's persisted pending gone from the store was flushed by another instance already
++        val st = store
++        if (st != null) {
++            val s = st.load()
++            if (s != null) {
++                st.clear()
++                val trigger = when {
++                    s.processMark != processMark -> "process"
++                    s.instance != instance -> "recreate"
++                    else -> "surface"
++                }
++                p = s.copy(trigger = trigger)
++            } else if (persisted) {
++                p = null
++            }
++            persisted = false
++        }
+         if (p == null) {
+             lastCause = null
+         }
+@@ -98,8 +251,10 @@ class RestartGuard(private val clockMs: () -> Long = { System.nanoTime() / 1_000
+         }
+         stopPosted = try { postStop(); true } catch (_: Exception) { false }
+         restarts++
++        val away = clockMs() - p.lostAtMs
+         val cause = linkedMapOf<String, Any>(
+-            "away_ms" to (clockMs() - p.lostAtMs).coerceAtLeast(0L),
++            // B15: -1 when the clock reads backwards across processes (a reboot)
++            "away_ms" to (if (away >= 0L || store == null) away.coerceAtLeast(0L) else -1L),
+             "last_frame_age_ms" to p.lastFrameAgeMs,
+             "rtp_silence_ms" to p.rtpSilenceMs,
+             "recovery_active" to p.recoveryActive,
+@@ -107,6 +262,8 @@ class RestartGuard(private val clockMs: () -> Long = { System.nanoTime() / 1_000
+             "old_report_posted" to reportPosted,
+             "stop_posted" to stopPosted,
+             "restarts" to restarts,
++            // B15: the path (`surface` / `recreate` / `process`)
++            "trigger" to p.trigger,
+         )
+         lastCause = cause
+         return cause
+diff --git a/PrivyHub/app/src/test/java/streaming/RestartGuardAllPathsTest.kt b/PrivyHub/app/src/test/java/streaming/RestartGuardAllPathsTest.kt
+new file mode 100644
+index 0000000..43012c3
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/RestartGuardAllPathsTest.kt
+@@ -0,0 +1,282 @@
++package com.safeiot.privyhub.streaming
++
++import java.io.File
++import java.net.DatagramPacket
++import java.net.DatagramSocket
++import java.net.InetAddress
++import java.nio.ByteBuffer
++import java.nio.file.Files
++import java.util.Collections
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotNull
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * B15: the restart guard on every path. B11's guard kept its pending in the activity object, so a start in another
++ * instance -- CL-B10 cell 1's Home press: the old process gone, the activity re-created in a new one -- found nothing
++ * (no report, no stop, `restart_cause` null, the audio storm). Here the pending is kept in a store (a temp file) and
++ * each path is modelled as the activity calls the guard (B11's `twoWayDrop` shape): the surface's loss, the start's
++ * take + flush, `stopSession`'s hand-over. The real RtpH264Receiver on loopback with a fake decoder; the real
++ * OpusReorder as the audio's sequence state; a fake host transport.
++ */
++class RestartGuardAllPathsTest {
++
++    private val dir: File = Files.createTempDirectory("b15_store_").toFile()
++    private var n = 0
++
++    private fun storeFile(): File = File(dir, "pending_${n++}.properties")
++
++    private fun guard(clock: LongArray, file: File?, instance: Long, mark: Long): RestartGuard =
++        RestartGuard { clock[0] }.also { g -> file?.let { g.attach(FilePendingStore(it), instance, mark) } }
++
++    private fun freePort(): Int = DatagramSocket(0).use { it.localPort }
++
++    private class Wire(val port: Int, var seq: Int = 100) {
++        private val tx = DatagramSocket()
++        private var ts = 90_000L
++
++        fun au(idr: Boolean) {
++            val nal = byteArrayOf(if (idr) 0x65 else 0x41, 0x11, 0x22, 0x33, 0x44)
++            val p = ByteBuffer.allocate(12 + nal.size)
++            p.put(0x80.toByte()).put((0x80 or 96).toByte()).putShort(seq.toShort()).putInt(ts.toInt()).putInt(0x1234)
++            p.put(nal)
++            seq = (seq + 1) and 0xffff
++            ts += 1500L
++            tx.send(DatagramPacket(p.array(), p.capacity(), InetAddress.getLoopbackAddress(), port))
++            Thread.sleep(3)
++        }
++
++        fun close() = tx.close()
++    }
++
++    private fun receiver(port: Int, queued: MutableList<Int>): RtpH264Receiver =
++        RtpH264Receiver(
++            port = port,
++            onParameterSets = { _, _ -> },
++            onAccessUnit = { _, _ -> queued.add(1) },
++        ).also { it.start(); Thread.sleep(150) }
++
++    private fun feed(r: OpusReorder, seqs: IntRange, sink: MutableList<Int>) {
++        for (s in seqs) {
++            r.offer(s and 0xffff, byteArrayOf(1), 0, { n, p -> if (p != null) sink.add(n) })
++        }
++    }
++
++    /** The activity's start: the take, the flush (report, stop), the start; the audio rebuilt when it restarted. */
++    private class Host {
++        val posts: MutableList<String> = Collections.synchronizedList(mutableListOf<String>())
++
++        fun start(g: RestartGuard?, carriedAudio: OpusReorder): OpusReorder {
++            val restart = g?.takePending()
++            restart?.let { p -> g.flush(p, { r -> posts.add("report:$r") }, { posts.add("stop") }) }
++            posts.add("start")
++            return if (restart != null) OpusReorder() else carriedAudio
++        }
++
++        /** `stopSession`: B15's hand-over first, then B11's clear and today's posts. */
++        fun stopSession(g: RestartGuard?, changing: Boolean, live: Boolean, report: String?) {
++            if (g?.handOver(changing, live) { report } == true) {
++                return
++            }
++            g?.onSessionStopped()
++            report?.let { posts.add("report:$it") }
++            posts.add("stop")
++        }
++    }
++
++    /** A session of 5 frames on the real receiver, its surface then lost (the report cached, the guard told). */
++    private fun sessionThenLoss(g: RestartGuard?, port: Int, w: Wire, name: String): Int {
++        val got = mutableListOf<Int>()
++        val rx = receiver(port, got)
++        repeat(5) { w.au(it == 0) }
++        Thread.sleep(100)
++        g?.onSurfaceLost("{\"session\":\"$name\",\"rendered\":${got.size}}", 166L, 120L, false)
++        rx.stop()
++        return got.size
++    }
++
++    private fun sessionFrames(port: Int, w: Wire): Int {
++        val got = mutableListOf<Int>()
++        val rx = receiver(port, got)
++        repeat(5) { w.au(it == 0) }
++        Thread.sleep(100)
++        rx.stop()
++        return got.size
++    }
++
++    /** The host's audio restarted at sequence 0 into [audio]; [lockedOnOld] first plays the old stream ~58 s in. */
++    private fun framesAfterHostRestart(audio: OpusReorder, lockedOnOld: Boolean): Int {
++        if (lockedOnOld) {
++            feed(audio, 5_800..5_899, mutableListOf())
++        }
++        val sink = mutableListOf<Int>()
++        feed(audio, 0..299, sink)
++        return sink.size
++    }
++
++    @Test
++    fun aFiveSecondSurfaceLossInTheSameInstance() {
++        val clock = longArrayOf(10_000L)
++        val g = guard(clock, storeFile(), 1L, 100L)
++        val host = Host()
++        val port = freePort()
++        val w = Wire(port)
++        val carried = OpusReorder()
++        host.start(g, carried)
++        assertEquals(5, sessionThenLoss(g, port, w, "A"))
++        clock[0] += 5_000L                                       // Home for 5 s, then back
++        val audio = host.start(g, carried)
++        assertEquals(5, sessionFrames(port, w))
++        w.close()
++        assertEquals(listOf("start", "report:{\"session\":\"A\",\"rendered\":5}", "stop", "start"), host.posts)
++        val c = g.lastCause!!
++        assertEquals("surface", c["trigger"])
++        assertEquals(5_000L, c["away_ms"])
++        assertEquals(true, c["old_report_posted"])
++        assertEquals(true, c["stop_posted"])
++        assertTrue(audio !== carried)                             // rebuilt after the host's start
++        assertEquals(300, framesAfterHostRestart(audio, lockedOnOld = false))    // the restarted stream plays
++        assertEquals(0, framesAfterHostRestart(carried, lockedOnOld = true))     // carried: every frame late (the storm)
++    }
++
++    @Test
++    fun theProcessPathCellOnesHomePress() {
++        val clock = longArrayOf(50_000L)
++        val f = storeFile()
++        val a = guard(clock, f, 1L, 100L)                         // the first process
++        val host = Host()
++        val port = freePort()
++        val w = Wire(port)
++        host.start(a, OpusReorder())
++        sessionThenLoss(a, port, w, "A")
++        assertTrue(f.length() > 0L)
++        clock[0] += 6_100L                                       // the process dies; the activity is re-created in a new one
++        val b = guard(clock, f, 1L, 7_000L)                       // instance 1 of another process
++        val carried = OpusReorder()
++        val audio = host.start(b, carried)
++        assertEquals(5, sessionFrames(port, w))
++        w.close()
++        assertEquals(listOf("start", "report:{\"session\":\"A\",\"rendered\":5}", "stop", "start"), host.posts)
++        assertEquals("process", b.lastCause!!["trigger"])
++        assertEquals(6_100L, b.lastCause!!["away_ms"])
++        assertTrue(audio !== carried)                             // the audio rebuilt with its hold re-armed
++        assertEquals(0L, f.length())                              // taken once
++        // B11's memory-only guard in the new process: a normal start (cell 1's rows)
++        val f2 = storeFile()
++        val a2 = guard(clock, f2, 1L, 100L)
++        a2.onSurfaceLost("{\"session\":\"A2\"}", 1L, 1L, false)
++        val b11 = RestartGuard { clock[0] }
++        val today = Host()
++        today.start(b11, OpusReorder())
++        assertEquals(listOf("start"), today.posts)
++        assertNull(b11.lastCause)
++    }
++
++    @Test
++    fun aRecreationHandsOverInsteadOfRacing() {
++        val clock = longArrayOf(0L)
++        val f = storeFile()
++        val a = guard(clock, f, 1L, 100L)
++        val host = Host()
++        host.start(a, OpusReorder())
++        a.onSurfaceLost("{\"session\":\"A\"}", 20L, 20L, false)
++        host.stopSession(a, changing = true, live = false, report = "{\"session\":\"A\"}")   // onDestroy, recreated
++        assertEquals(listOf("start"), host.posts)                // no stop raced against the next start
++        clock[0] += 900L
++        val b = guard(clock, f, 2L, 100L)                         // the next instance, the same process
++        host.start(b, OpusReorder())
++        assertEquals(listOf("start", "report:{\"session\":\"A\"}", "stop", "start"), host.posts)
++        assertEquals("recreate", b.lastCause!!["trigger"])
++        assertEquals(900L, b.lastCause!!["away_ms"])
++        // the surface not lost before the destroy: the hand-over makes the pending from the cached report
++        val f2 = storeFile()
++        val c = guard(clock, f2, 3L, 100L)
++        assertTrue(c.handOver(true, true) { "{\"session\":\"C\"}" })
++        val d = guard(clock, f2, 4L, 100L)
++        val p = d.takePending()
++        assertNotNull(p)
++        assertEquals("{\"session\":\"C\"}", p!!.report)
++        assertEquals("recreate", p.trigger)
++        // nothing open: no hand-over (today's stop path)
++        assertFalse(guard(clock, storeFile(), 5L, 100L).handOver(true, false) { null })
++    }
++
++    @Test
++    fun anOldInstanceDestroyedAfterAnotherTookItsPendingPostsNothing() {
++        val clock = longArrayOf(0L)
++        val f = storeFile()
++        val a = guard(clock, f, 1L, 100L)
++        val host = Host()
++        host.start(a, OpusReorder())
++        a.onSurfaceLost("{\"session\":\"A\"}", 1L, 1L, false)
++        val b = guard(clock, f, 2L, 100L)                         // a second launch while A stays stopped
++        host.start(b, OpusReorder())
++        host.stopSession(a, changing = false, live = false, report = "{\"session\":\"A\"}")   // A destroyed later
++        assertEquals(listOf("start", "report:{\"session\":\"A\"}", "stop", "start"), host.posts)   // one stop
++        assertNull(a.takePending())                                // A's surface back: a normal start, no re-flush
++    }
++
++    @Test
++    fun aNormalEndClearsOnlyItsOwnPending() {
++        val clock = longArrayOf(0L)
++        val f = storeFile()
++        val a = guard(clock, f, 1L, 100L)
++        a.onSurfaceLost("{\"session\":\"A\"}", 1L, 1L, false)
++        val host = Host()
++        host.stopSession(a, changing = false, live = false, report = "{\"session\":\"A\"}")   // the back-out
++        assertEquals(listOf("report:{\"session\":\"A\"}", "stop"), host.posts)              // today's path
++        assertEquals(0L, f.length())
++        assertNull(guard(clock, f, 1L, 999L).takePending())                                 // the next start: normal
++        // another instance's normal end leaves this one's pending in the store
++        val g = guard(clock, f, 2L, 100L)
++        g.onSurfaceLost("{\"session\":\"G\"}", 1L, 1L, false)
++        val other = guard(clock, f, 3L, 100L)
++        Host().stopSession(other, changing = false, live = true, report = "{\"session\":\"O\"}")
++        assertEquals("{\"session\":\"G\"}", FilePendingStore(f).load()!!.report)
++    }
++
++    @Test
++    fun aCorruptOrMissingStoreIsANormalStartAndAFailedWriteFallsBackToMemory() {
++        val clock = longArrayOf(0L)
++        val bad = storeFile().also { it.writeText("lost_at_ms=abc\n") }
++        assertNull(FilePendingStore(bad).load())
++        assertNull(guard(clock, bad, 1L, 100L).takePending())
++        assertNull(FilePendingStore(File(dir, "missing.properties")).load())
++        val unwritable = Files.createTempDirectory(dir.toPath(), "a_dir_").toFile()       // a directory: the write fails
++        val g = guard(clock, unwritable, 1L, 100L)
++        g.onSurfaceLost("{\"session\":\"M\"}", 1L, 1L, false)
++        val p = g.takePending()
++        assertEquals("{\"session\":\"M\"}", p!!.report)
++        assertEquals("surface", p.trigger)
++    }
++
++    @Test
++    fun theStoreKeepsTheFieldsAndNoAddress() {
++        val f = storeFile()
++        val p = PendingRestart("{\"r\":1}", 1234L, 166L, 120L, true, 40L, instance = 2L, processMark = 77L)
++        assertTrue(FilePendingStore(f).save(p))
++        assertEquals(p, FilePendingStore(f).load())
++        val keys = f.readLines().filter { !it.startsWith("#") }.map { it.substringBefore('=') }.sorted()
++        assertEquals(listOf("instance", "last_frame_age_ms", "lost_at_ms", "paused_before_loss_ms", "process_mark",
++            "recovery_active", "report", "rtp_silence_ms"), keys)
++    }
++
++    @Test
++    fun theFlagAbsentIsToday() {
++        val host = Host()
++        val port = freePort()
++        val w = Wire(port)
++        val carried = OpusReorder()
++        host.start(null, carried)
++        sessionThenLoss(null, port, w, "A")
++        val audio = host.start(null, carried)
++        assertEquals(5, sessionFrames(port, w))
++        w.close()
++        assertEquals(listOf("start", "start"), host.posts)        // no stop, the report lost
++        assertTrue(audio === carried)                             // the receiver carried over (the storm's state)
++        assertFalse(RestartGuardFlag.fromSystem())
++    }
++}

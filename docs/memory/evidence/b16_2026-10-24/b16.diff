@@ -1,0 +1,659 @@
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index d474c40..c5709f8 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -3871,6 +3871,10 @@ class GamesPlugin:
+                 payload["heartbeat_interval_ms"] = (
+                     self._diagnostic_heartbeat_interval_ms()
+                 )
++                # B16: the client's ready as soon as it has a decodable frame, only with B12's owner wired (absent:
++                # no key)
++                if getattr(self._recovery, "_stall_owner", None) is not None:
++                    payload["stall_resume"] = self._recovery._stall_owner.client_hint()
+                 return payload
+             except NativeStreamError as exc:
+                 raise RuntimeError(str(exc)) from exc
+diff --git a/companion/stall_owner.py b/companion/stall_owner.py
+index e09583b..65b9319 100644
+--- a/companion/stall_owner.py
++++ b/companion/stall_owner.py
+@@ -15,6 +15,17 @@ again. Here, for a pause the stall owns (reason `client_stall`, not B8's hold ep
+   the late `stall_end` is `stall_end_late`;
+ - v2's encoder restart is held off until the pause is 5,000 ms old (v2's own trigger); then v2 owns it, once
+   (`stall_handover_v2`).
++
++B16 (the same flag; design `docs/memory/evidence/b16_2026-10-24/design_written_before_code.md`, hashed before this
++code). CL-B10 cell 3: the client's gate held the picture 1.3-3.2 s after the downlink's return (four 500-ms gate ticks),
++v2's hold expired first in all 5, and blackout 5's restart acted on a heartbeat built before the return; cell 2 saved
++state at four 150-ms client stalls. Here:
++- the start response tells the client to send its ready as soon as it has a decodable frame (`client_hint`); the host
++  resumes on it through the owners above (B12's `client_ready_stall`, B8's `client_ready_hold`);
++- the stall's save comes only from the stall signal (age >= its threshold, 400 with `1`), synchronously before B7's
++  pause (B9 skips a paused core): no save under the 400-ms signal;
++- v2 takes a stall-owned pause past 5 s only while the newest stall datagram (<= 300 ms old) shows the client still
++  stalled.
+ """
+ 
+ from __future__ import annotations
+@@ -26,6 +37,7 @@ FLAG_ENV = "PRIVYHUB_STALL_RESUME"
+ V2_MS = 5_000               # E3-R1's controller-silence trigger: past it, v2 owns the pause
+ EPISODE_S = 20.0            # an episode's resumed phase never outlives this (the client's gate times out at 15 s)
+ REASON = "client_stall"
++NEWEST_S = 0.30             # B16: the newest stall datagram describes the client now (B7's quiet rule: 300 ms)
+ 
+ 
+ def enabled(environ: Mapping[str, str]) -> tuple[bool, str | None]:
+@@ -48,6 +60,8 @@ class StallOwner:
+         self._ignored = 0
+         self._handed_key: float | None = None   # the pause v2 took over (once)
+         self._last_rx = 0.0
++        self._newest: tuple[float, int] = (0.0, 0)   # B16: the newest stall datagram (receive time, output age)
++        self._threshold_ms = 400                 # B16: the stall signal's threshold (B7's, set per datagram)
+ 
+     @staticmethod
+     def _state(recovery: Any) -> tuple[str, str | None, float]:
+@@ -68,6 +82,8 @@ class StallOwner:
+         if rx - self._last_rx > 0.3:
+             self._saved_episode = False         # a new client episode (B7's quiet gap)
+         self._last_rx = rx
++        self._newest = (rx, int(age))           # B16: what the client says now (v2's rule)
++        self._threshold_ms = int(threshold_ms)
+         if self._resumed_at is not None:
+             if self._clock() - self._resumed_at > EPISODE_S:
+                 self._end()
+@@ -76,12 +92,16 @@ class StallOwner:
+                 if self._ignored == 1:
+                     recovery._log("stall_gate_after_resume", client_frame=frame, age_ms=age)
+                 return True
+-        if state == "PLAYING" and not self._saved_episode and not gate:
++        # B16: the save only from the stall signal (age >= its threshold), taken now, before B7's pause below
++        if state == "PLAYING" and not self._saved_episode and not gate and age >= threshold_ms:
+             rw = getattr(recovery, "_input_hold_rewind", None)
+             cores = getattr(rw, "b9", None) if rw is not None else None
+             if cores is not None and getattr(cores, "mode", None) == "state":
+                 self._saved_episode = True
+-                cores.request_save(rx - float(age) / 1000.0, rx, "stall")
++                try:
++                    cores.save(rx - float(age) / 1000.0, rx, "stall")
++                except Exception:
++                    pass                        # the pause must never wait on a failed save
+         return False
+ 
+     def late_stall_end(self, recovery: Any, state: str, frame: int) -> bool:
+@@ -139,6 +159,11 @@ class StallOwner:
+                           restarts=recovery._restarts, via="client_ready_stall")
+             return True
+ 
++    @staticmethod
++    def client_hint() -> dict[str, Any]:
++        """B16: the start response's `stall_resume`: the client's ready as soon as it has a decodable frame."""
++        return {"fast_ready": True}
++
+     def holds_v2(self, recovery: Any, now: float) -> bool:
+         """From the monitor, before v2's encoder restart: True = skip v2 this tick (a young stall-owned pause)."""
+         with recovery._lock:
+@@ -150,6 +175,11 @@ class StallOwner:
+             return False
+         if age_ms < V2_MS:
+             return True
++        # B16: v2 takes it only while the newest stall datagram shows the client still stalled (never on a heartbeat
++        # read before the return; a client with frames sends its ready within ~0.55 s)
++        rx, last_age = self._newest
++        if not (now - rx <= NEWEST_S and last_age >= self._threshold_ms):
++            return True
+         self._handed_key = key
+         recovery._log("stall_handover_v2", held_ms=int(age_ms), v2_ms=V2_MS)
+         return False
+@@ -168,5 +198,6 @@ def wire(recovery: Any, controller: Any, environ: Mapping[str, str]) -> StallOwn
+     recovery._stall_owner = o
+     rw = getattr(recovery, "_input_hold_rewind", None)
+     recovery._log("stall_resume_config", ignored=False, v2_ms=V2_MS,
+-                  state_save=bool(getattr(getattr(rw, "b9", None), "mode", None) == "state"))
++                  state_save=bool(getattr(getattr(rw, "b9", None), "mode", None) == "state"),
++                  fast_ready=True, save_from_signal=True, v2_newest_s=NEWEST_S)
+     return o
+diff --git a/tests/stall_owner/test_stall_owner.py b/tests/stall_owner/test_stall_owner.py
+index 96a7987..3a779a1 100644
+--- a/tests/stall_owner/test_stall_owner.py
++++ b/tests/stall_owner/test_stall_owner.py
+@@ -163,7 +163,7 @@ class StallResume(unittest.TestCase):
+             self.assertEqual(out, {"recovered": True, "from_state": "stall_resumed"})
+             rel = [r for r in b9.rows(d.rec) if r["event"] == "input_release"]
+             self.assertEqual((len(rel), rel[0]["method"], rel[0]["via"]), (1, "state", "client_ready_stall"))
+-            self.assertTrue(8 <= rel[0]["net_unattended_frames"] <= 14, rel[0])       # ~150 ms after the last frame
++            self.assertTrue(20 <= rel[0]["net_unattended_frames"] <= 30, rel[0])      # B16: the save at the 400-ms signal
+             self.assertEqual(d.rig.core.loads, [True])                               # into a running core
+             for i in range(6):
+                 d.stall(20, gate=True)                             # the gate over fresh output
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -605,6 +605,9 @@
+         sessionStarted = true
+         stopping = false
+         cachedSessionReport = null
++        // B16: a new session waits for its own host's fast ready (null = today)
++        fastReady?.let { uiHandler.removeCallbacks(fastReadyTick) }
++        fastReady = null
+         // B5: the Wi-Fi lock for the session (null = today)
+         streamWifiLock?.acquire()
+         // B14: a new session re-arms the link notice (null = today)
+@@ -817,6 +820,11 @@
+                         10_000L
+                     )
+ 
++                // B16: the host's fast ready, only with PRIVYHUB_STALL_RESUME=1 (absent key = today's gate)
++                if (json.optJSONObject(FastReadyHint.KEY)?.optBoolean(FastReadyHint.FIELD, false) == true) {
++                    fastReady = FastReady()
++                }
++
+                 // B11: the host restarted its audio at sequence 0: a fresh receiver, its start-up hold re-armed
+                 if (restart != null) {
+                     audioReceiver?.stop()
+@@ -2317,6 +2325,12 @@
+         // B11: the self-restart's cause (null = today: no key)
+         restartGuard?.lastCause?.let { c -> root.put("restart_cause", JSONObject(c)) }
+ 
++        // B16: the fast ready's releases (null = today: no key)
++        fastReady?.let { f ->
++            root.put("fast_ready_releases", f.releases)
++            root.put("fast_ready_frame_to_post_ms", f.lastFrameToPostMs)
++        }
++
+         // B10: the loss guard's mode and counters (null = today: no key)
+         lossGuard?.let { g ->
+             root.put("loss_guard_mode", g.mode.wire)
+@@ -2387,6 +2401,35 @@
+         }
+     }
+ 
++    // B16: the recovery gate's ready at the first decodable frame, only with the host's fast ready (null = today).
++    @Volatile
++    private var fastReady: FastReady? = null
++
++    private val fastReadyTick: Runnable by lazy {
++        object : Runnable {
++            override fun run() {
++                val f = fastReady ?: return
++                if (!sessionStarted || stopping || !recoveryActive || gameplayReleased) return
++                if (f.tick(fastReadyInputs())) {
++                    requestGameplayRelease()
++                    return
++                }
++                uiHandler.postDelayed(this, 50L)
++            }
++        }
++    }
++
++    private fun fastReadyInputs(): FastReadyInputs =
++        FastReadyInputs(
++            recoveryActive = recoveryActive,
++            released = gameplayReleased,
++            requestInFlight = releaseRequestInFlight,
++            hostMetadataComplete = hostMetadataComplete,
++            waitingForIdr = receiver?.snapshot()?.waitingForIdr ?: true,
++            renderedFrames = decoder?.renderedFrameCount() ?: 0L,
++            outputAgeMs = decoder?.lastOutputAgeMs() ?: -1L,
++        )
++
+     // B11: the self-restart guard, only with debug.privyhub.restart_guard=1 (null = today).
+     private val restartGuard: RestartGuard? by lazy { if (RestartGuardFlag.fromSystem()) RestartGuard() else null }
+ 
+@@ -3219,6 +3262,13 @@
+         streamState =
+             "Reconnecting"
+ 
++        // B16: the recovery's 50-ms fast-ready tick (null = today)
++        fastReady?.let { f ->
++            f.onRecoveryEntered(decoder?.renderedFrameCount() ?: 0L)
++            uiHandler.removeCallbacks(fastReadyTick)
++            uiHandler.postDelayed(fastReadyTick, 50L)
++        }
++
+         publishStreamStatus()
+         updateStabilizationOverlay()
+ 
+diff --git a/PrivyHub/app/src/main/java/streaming/FastReady.kt b/PrivyHub/app/src/main/java/streaming/FastReady.kt
+new file mode 100644
+index 0000000..a4099b2
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/FastReady.kt
+@@ -0,0 +1,66 @@
++package com.safeiot.privyhub.streaming
++
++/**
++ * B16: the recovery gate's ready as soon as a decodable frame is in hand, armed only by the host's
++ * `native-stream-start` response (`"stall_resume": {"fast_ready": true}`, sent with `PRIVYHUB_STALL_RESUME=1`).
++ * Absent = today: no object, the gate's baseline tick + 3 clean 500-ms ticks.
++ *
++ * CL-B10 cell 3: after a 4-s `@down` drop the frames were flowing again ~2.6 s before the gate's ready (blackout 1),
++ * the picture held behind the "Reconnecting" overlay, and v2's 5-s hold expired first in all 5. Here a 50-ms tick
++ * during a recovery releases at the first tick that sees a frame rendered since the recovery began, the receiver not
++ * waiting for an IDR, the last output <= [freshMs] old and the host's metadata complete. The startup gate is unchanged.
++ */
++object FastReadyHint {
++    const val KEY = "stall_resume"
++    const val FIELD = "fast_ready"
++}
++
++/** What the tick reads: the gate's state, the receiver's IDR wait, the decoder's frame count and output age. */
++data class FastReadyInputs(
++    val recoveryActive: Boolean,
++    val released: Boolean,
++    val requestInFlight: Boolean,
++    val hostMetadataComplete: Boolean,
++    val waitingForIdr: Boolean,
++    val renderedFrames: Long,
++    val outputAgeMs: Long,
++)
++
++class FastReady(val freshMs: Long = 100L, private val clockMs: () -> Long = { System.nanoTime() / 1_000_000L }) {
++    private var baseline = -1L
++    private var firstFrameAtMs = -1L
++
++    var releases = 0L
++        private set
++
++    /** The first frame since the recovery began → the release's POST, the last release (-1 before one). */
++    var lastFrameToPostMs = -1L
++        private set
++
++    /** The recovery's entry: the frame count to beat. */
++    fun onRecoveryEntered(renderedFrames: Long) {
++        baseline = renderedFrames
++        firstFrameAtMs = -1L
++    }
++
++    /** One 50-ms tick: true = release now (once per recovery). */
++    fun tick(inp: FastReadyInputs): Boolean {
++        if (!inp.recoveryActive || inp.released || inp.requestInFlight || baseline < 0L) {
++            return false
++        }
++        if (inp.renderedFrames <= baseline) {
++            return false
++        }
++        val now = clockMs()
++        if (firstFrameAtMs < 0L) {
++            firstFrameAtMs = now
++        }
++        if (!inp.hostMetadataComplete || inp.waitingForIdr || inp.outputAgeMs < 0L || inp.outputAgeMs > freshMs) {
++            return false
++        }
++        releases++
++        lastFrameToPostMs = now - firstFrameAtMs
++        baseline = -1L
++        return true
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/FastReadyTest.kt b/PrivyHub/app/src/test/java/streaming/FastReadyTest.kt
+new file mode 100644
+index 0000000..8e2f2c0
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/FastReadyTest.kt
+@@ -0,0 +1,119 @@
++package com.safeiot.privyhub.streaming
++
++import java.net.DatagramPacket
++import java.net.DatagramSocket
++import java.net.InetAddress
++import java.nio.ByteBuffer
++import java.util.concurrent.atomic.AtomicLong
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * B16: the recovery gate's ready at the first decodable frame. The decision table, then the real RtpH264Receiver on
++ * loopback across a 4-s `@down` gap (a forward sequence jump: the resync, the P-frames after it rejected while the
++ * receiver waits for an IDR, then the IDR) with a fake decoder (its frame count and last output time) and the
++ * activity's 50-ms tick.
++ */
++class FastReadyTest {
++
++    private fun inputs(
++        recovery: Boolean = true, released: Boolean = false, inFlight: Boolean = false, meta: Boolean = true,
++        waitingForIdr: Boolean = false, frames: Long = 11L, age: Long = 10L,
++    ) = FastReadyInputs(recovery, released, inFlight, meta, waitingForIdr, frames, age)
++
++    @Test
++    fun theDecisionTable() {
++        val f = FastReady()
++        assertFalse(f.tick(inputs()))                             // no recovery entered yet
++        f.onRecoveryEntered(10L)
++        assertFalse(f.tick(inputs(recovery = false)))             // the startup gate: never
++        assertFalse(f.tick(inputs(released = true)))
++        assertFalse(f.tick(inputs(inFlight = true)))
++        assertFalse(f.tick(inputs(frames = 10L)))                 // nothing rendered since the recovery began
++        assertFalse(f.tick(inputs(waitingForIdr = true)))
++        assertFalse(f.tick(inputs(age = 101L)))
++        assertFalse(f.tick(inputs(age = -1L)))
++        assertFalse(f.tick(inputs(meta = false)))
++        assertTrue(f.tick(inputs(age = 100L)))
++        assertEquals(1L, f.releases)
++        assertFalse(f.tick(inputs()))                             // once per recovery
++        f.onRecoveryEntered(20L)
++        assertTrue(f.tick(inputs(frames = 21L)))
++        assertEquals(2L, f.releases)
++    }
++
++    @Test
++    fun theHintKeyIsTheHostsField() {
++        assertEquals("stall_resume", FastReadyHint.KEY)
++        assertEquals("fast_ready", FastReadyHint.FIELD)
++    }
++
++    private fun freePort(): Int = DatagramSocket(0).use { it.localPort }
++
++    private class Wire(val port: Int, var seq: Int = 100) {
++        private val tx = DatagramSocket()
++        private var ts = 90_000L
++
++        fun au(idr: Boolean) {
++            val nal = byteArrayOf(if (idr) 0x65 else 0x41, 0x11, 0x22, 0x33, 0x44)
++            val p = ByteBuffer.allocate(12 + nal.size)
++            p.put(0x80.toByte()).put((0x80 or 96).toByte()).putShort(seq.toShort()).putInt(ts.toInt()).putInt(0x1234)
++            p.put(nal)
++            seq = (seq + 1) and 0xffff
++            ts += 1500L
++            tx.send(DatagramPacket(p.array(), p.capacity(), InetAddress.getLoopbackAddress(), port))
++            Thread.sleep(3)
++        }
++
++        /** The 4-s dark span: the packets the downlink lost (~1,000 a second at 7 Mbps). */
++        fun darkFor(packets: Int) {
++            seq = (seq + packets) and 0xffff
++            ts += 90L * 4_000L
++        }
++
++        fun close() = tx.close()
++    }
++
++    @Test
++    fun aFourSecondDownGapReleasesAtTheFirstTickAfterTheIdrsFrame() {
++        val frames = AtomicLong(0L)
++        val lastOutAt = AtomicLong(-1L)
++        val port = freePort()
++        val rx = RtpH264Receiver(
++            port = port,
++            onParameterSets = { _, _ -> },
++            onAccessUnit = { _, _ -> frames.incrementAndGet(); lastOutAt.set(System.nanoTime() / 1_000_000L) },
++        ).also { it.start(); Thread.sleep(150) }
++        val w = Wire(port)
++        repeat(4) { w.au(it == 0) }                                // playing
++        Thread.sleep(80)
++        assertEquals(4L, frames.get())
++        val f = FastReady()
++        f.onRecoveryEntered(frames.get())                          // the client's gate at 1 s of output silence
++        fun tick(): Boolean {
++            val now = System.nanoTime() / 1_000_000L
++            val age = lastOutAt.get().let { if (it < 0L) -1L else now - it }
++            return f.tick(inputs(waitingForIdr = rx.snapshot().waitingForIdr, frames = frames.get(), age = age))
++        }
++        w.darkFor(4_000)                                           // the downlink returns after 4 s
++        repeat(3) { w.au(false) }                                  // P-frames: no reference, rejected
++        val ticksBefore = mutableListOf<Boolean>()
++        repeat(5) { Thread.sleep(50); ticksBefore.add(tick()) }   // up to one GOP (250 ms) before the IDR
++        assertEquals(4L, frames.get())
++        assertTrue(rx.snapshot().waitingForIdr)
++        assertEquals(listOf(false, false, false, false, false), ticksBefore)
++        w.au(true)                                                 // the IDR
++        w.au(false)
++        Thread.sleep(50)
++        assertTrue(frames.get() > 4L)
++        assertFalse(rx.snapshot().waitingForIdr)
++        assertTrue(tick())                                         // the first tick after the IDR's frame: the ready
++        assertEquals(1L, f.releases)
++        assertTrue(f.lastFrameToPostMs in 0L..50L)
++        assertFalse(tick())
++        rx.stop()
++        w.close()
++    }
++}
+diff --git a/tests/stall_resume_speed/test_stall_resume_speed.py b/tests/stall_resume_speed/test_stall_resume_speed.py
+new file mode 100644
+index 0000000..47beee4
+--- /dev/null
++++ b/tests/stall_resume_speed/test_stall_resume_speed.py
+@@ -0,0 +1,242 @@
++#!/usr/bin/env python3
++"""B16: the stall resume's speed, and the saves -- inside `PRIVYHUB_STALL_RESUME=1` (+ `PRIVYHUB_INPUT_HOLD_REWIND=1`).
++
++    python3 -m unittest discover -s tests/stall_resume_speed -v
++
++B9's loopback fake core (SAVE / LOAD_STATE_SLOT, GET_STATUS, PAUSE_TOGGLE), the real recovery, B4's real Rewinder with
++B9's Cores, B7's real StallSignal (its worker driven by hand), B6's Tuning, B8's Ownership, B12/B16's StallOwner, in
++real time. A fake client: stall datagrams every 50 ms (from its own 150 ms; the gate bit from 1 s); after the return
++its first frame one GOP (250 ms) later and its fast ready one 50-ms tick after that (the client side: FastReadyTest);
++the ready delivered in the plugin's order (B8's, B12's, then today's note). The target rows are the design's
++(`docs/memory/evidence/b16_2026-10-24/design_written_before_code.md`, hashed before this code).
++"""
++
++from __future__ import annotations
++
++import ast
++import sys
++import time
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(ROOT / "tests" / "rewind_cores"))
++sys.path.insert(0, str(ROOT / "tests" / "stall_owner"))
++
++import hold_ownership as ho  # noqa: E402
++import hold_tuning as ht  # noqa: E402
++import stall_owner as so  # noqa: E402
++import stall_signal as ss  # noqa: E402
++import test_rewind_cores as b9  # noqa: E402
++import test_stall_owner as b12  # noqa: E402
++
++SNES = b9.SNES
++GOP_S = 0.25            # GOP 15 at 60 fps: the client's first frame after the return
++TICK_S = 0.05           # the client's fast-ready tick
++BLACKOUT_5 = [1942, 3980]   # CL-B10 cell 3's stale heartbeat pair (the newer built before the return)
++
++
++def ready(rec):
++    """The plugin's ready action, in its order: B8's, B12's, then today's note."""
++    if rec._input_hold_b8 is not None:
++        rec._input_hold_b8.ready_resume(rec)
++    if rec._stall_owner is not None:
++        rec._stall_owner.ready_resume(rec)
++    return rec.note_gameplay_released()
++
++
++def sleep_until(t):
++    wait = t - time.monotonic()
++    if wait > 0:
++        time.sleep(wait)
++
++
++def events(rec):
++    """The recovery log's events, the config rows left out."""
++    return [r["event"] for r in b9.rows(rec) if not r["event"].endswith("_config")]
++
++
++class DownR1(unittest.TestCase):
++    def test_a_4s_down_drop_resumes_within_1s_of_the_return_no_restart_no_handover(self):
++        d = b12.Down()
++        try:
++            onset = time.monotonic()
++            d.t0 = onset
++            age = 150
++            while d.rec._state == "PLAYING" and age <= 800:          # the client's stalls from 150, in real time
++                d.stall(age, real=True)
++                age += 50
++            self.assertEqual(age - 50, 400)
++            self.assertEqual(events(d.rec)[:3], ["state_saved", "desync_pause", "client_stall"])   # the save, then the pause
++            self.assertEqual(d.rig.rw.b9.saves, 1)
++            ticks = {2.5: False, 3.5: False}
++            while time.monotonic() < onset + 4.0:                    # the dark: the client still stalled, the gate up
++                a = (time.monotonic() - onset) * 1000.0
++                d.stall(a, gate=a >= 1000)
++                paused_s = time.monotonic() - d.rec._state_since
++                for at in ticks:
++                    if not ticks[at] and paused_s >= at:
++                        ticks[at] = True
++                        with d.rec._lock:                           # v2's conditions met, blackout 5's heartbeats
++                            d.rec._client_present_since = d.rec._state_since
++                            now = time.monotonic()
++                            d.rec._heartbeat_history = [(now - 2.0, BLACKOUT_5[0]), (now - 0.01, BLACKOUT_5[1])]
++                        d.rec._tick()
++                time.sleep(0.05)
++            back = time.monotonic()                                  # the downlink returns
++            sleep_until(back + GOP_S)
++            d.stall(10, gate=True)                                   # the first frame: a fresh gate datagram
++            sleep_until(back + GOP_S + TICK_S)
++            out = ready(d.rec)                                       # the client's fast ready
++            resumed_at = time.monotonic()
++            self.assertEqual(out, {"recovered": True, "from_state": "stall_resumed"})
++            self.assertLessEqual(resumed_at - back, 1.0)             # R1
++            with d.rec._lock:                                        # a v2 tick after: blackout 5's stale pair again
++                now = time.monotonic()
++                d.rec._heartbeat_history = [(now - 2.0, BLACKOUT_5[0]), (now - 0.01, BLACKOUT_5[1])]
++            d.rec._tick()
++            evs = [e[0] for e in d.events()]
++            self.assertNotIn("encoder_restart", evs)
++            self.assertNotIn("stall_handover_v2", evs)
++            self.assertEqual(d.restarts, 0)
++            res = [e for e in d.events() if e[0] == "resumed"]
++            self.assertEqual(res, [("resumed", "client_ready_stall")])
++            rel = [r for r in b9.rows(d.rec) if r["event"] == "input_release"]
++            self.assertEqual((len(rel), rel[0]["method"]), (1, "state"))
++            self.assertTrue(20 <= rel[0]["net_unattended_frames"] <= 30, rel[0])
++            self.assertEqual(d.rig.core.loads, [True])
++            print(f"\n[R1] @down 4 s: return -> resume {int((resumed_at - back) * 1000)} ms (one GOP + one tick "
++                  f"simulated, the host's ready -> resume with the load measured); net {rel[0]['net_unattended_frames']}; "
++                  f"restarts 0, handovers 0")
++        finally:
++            d.stop()
++
++
++class BothR2(unittest.TestCase):
++    def test_a_4s_both_drop_resumes_within_1s_of_the_packets(self):
++        rig = b9.Rig("1", SNES)
++        try:
++            rec = rig.rec
++
++            def pause():
++                rec.calls.append("pause")
++                rig.core.playing = False
++                rig.emu._paused = True
++
++            def resume():
++                rec.calls.append("resume")
++                rig.core.playing = True
++                rig.emu._paused = False
++            rec._pause_game, rec._resume_game = pause, resume
++            rec._input_hold_b6 = ht.Tuning(950)
++            sig = ss.StallSignal(rec, ss.parse("1")[0], threaded=False)
++            rec._client_stall = sig
++            rec._input_hold_b8 = ho.Ownership()
++            rec._stall_owner = so.StallOwner()
++            onset = time.monotonic()                                 # the last controller packet and frame
++            sleep_until(onset + 0.405)
++            rig.det.on_quiet(onset + 0.405, onset)                   # B9's silence save at 400 ms (a signal >= 400)
++            self.assertEqual(rig.wait_saves(1), 1)
++            sleep_until(onset + 0.95)
++            self.assertTrue(rec.note_input_hold(950))                # B2 / B6's hold at 950 ms
++            rig.rw.set_pending(onset, time.monotonic(), rec)
++            sleep_until(onset + 4.0)
++            back = time.monotonic()                                  # the packets return, both ways
++            sig.handle((ss.KIND_STALL, True, 1, 7000, 4000), back)   # the client's gate datagram: the handover
++            rec.note_input_release(4000.0)                           # the first controller packet: B8's return
++            sleep_until(back + GOP_S)
++            sig.handle((ss.KIND_STALL, True, 2, 7001, 10), time.monotonic())
++            sleep_until(back + GOP_S + TICK_S)
++            ready(rec)                                               # the client's fast ready
++            resumed_at = time.monotonic()
++            self.assertLessEqual(resumed_at - back, 1.0)             # R2
++            res = [(r["event"], r.get("via")) for r in b9.rows(rec) if r["event"] == "resumed"]
++            self.assertEqual(res, [("resumed", "client_ready_hold")])
++            rel = [r for r in b9.rows(rec) if r["event"] == "input_release"]
++            self.assertEqual((len(rel), rel[0]["method"]), (1, "state"))
++            self.assertTrue(20 <= rel[0]["net_unattended_frames"] <= 30, rel[0])
++            self.assertEqual(rig.core.loads, [True])
++            saves = [r for r in b9.rows(rec) if r["event"] == "state_saved"]
++            self.assertEqual([s["kind"] for s in saves], ["silence"])
++            print(f"\n[R2] @both 4 s: packets back -> resume {int((resumed_at - back) * 1000)} ms via client_ready_hold "
++                  f"(today: the next fresh heartbeat, 427-2,130 ms in CL-B10 cell 2); net {rel[0]['net_unattended_frames']}")
++        finally:
++            rig.stop()
++
++
++class SavesR3(unittest.TestCase):
++    def test_no_save_under_the_400_ms_signal_and_one_at_it(self):
++        d = b12.Down()
++        try:
++            for _episode in range(4):                                # four sub-400 client stalls (cell 2's 150-163)
++                d.t0 = time.monotonic()
++                for a in (150, 200, 250, 300, 350):
++                    d.stall(a, real=True)
++                d.stall(20, kind=ss.KIND_END)
++                time.sleep(0.35)                                     # B7's quiet gap: the next is a new episode
++            self.assertEqual(d.rig.rw.b9.saves, 0)
++            self.assertEqual([r for r in b9.rows(d.rec) if r["event"] == "state_saved"], [])
++            self.assertEqual(d.rec.calls, [])                        # no pause either
++            self.assertEqual(d.until_paused(), 400)                  # a real stall: one save, then the pause
++            self.assertEqual(d.rig.rw.b9.saves, 1)
++            self.assertEqual(d.rig.rw.b9.saves_skipped_paused, 0)
++            self.assertEqual(events(d.rec)[:2], ["state_saved", "desync_pause"])
++        finally:
++            d.stop()
++
++
++class V2Rule(unittest.TestCase):
++    def _paused(self):
++        d = b12.Down()
++        d.until_paused()
++        return d
++
++    def test_v2_takes_a_long_stall_only_while_the_newest_datagram_says_stalled(self):
++        d = self._paused()
++        try:
++            d.stall(5200)                                            # the client still dark, just now
++            d.v2_eligible(5.5)
++            self.assertEqual([e[0] for e in d.events()].count("stall_handover_v2"), 1)
++            self.assertEqual(d.restarts, 1)
++        finally:
++            d.stop()
++
++    def test_no_v2_when_the_newest_datagram_is_fresh_or_old(self):
++        d = self._paused()
++        try:
++            d.stall(12, gate=True)                                   # the client has frames: its ready follows
++            d.v2_eligible(5.5)
++            d.stall(5400)
++            time.sleep(0.35)                                         # the newest datagram older than 300 ms
++            d.v2_eligible(5.8)
++            self.assertNotIn("stall_handover_v2", [e[0] for e in d.events()])
++            self.assertEqual(d.restarts, 0)
++        finally:
++            d.stop()
++
++
++class TheHint(unittest.TestCase):
++    def test_the_start_response_key_only_with_the_owner(self):
++        self.assertEqual(so.StallOwner.client_hint(), {"fast_ready": True})
++        tree = ast.parse((ROOT / "companion" / "plugins" / "games.py").read_text())
++        hooks = [n for n in ast.walk(tree) if isinstance(n, ast.If)
++                 and ast.unparse(n.test) == "getattr(self._recovery, '_stall_owner', None) is not None"]
++        self.assertEqual(len(hooks), 1)
++        self.assertEqual(ast.unparse(hooks[0].body[0]),
++                         "payload['stall_resume'] = self._recovery._stall_owner.client_hint()")
++        from games import link_drop_recovery as ldr
++        self.assertIsNone(ldr.LinkDropRecovery._stall_owner)          # without the flag: no key
++
++    def test_the_config_row_names_b16(self):
++        rec = b9.recovery()
++        rec._client_stall = object()
++        o = so.wire(rec, None, {"PRIVYHUB_STALL_RESUME": "1", "PRIVYHUB_STALL_SIGNAL": "1"})
++        self.assertIsNotNone(o)
++        row = b9.rows(rec)[-1]
++        self.assertEqual((row["event"], row["fast_ready"], row["save_from_signal"], row["v2_newest_s"]),
++                         ("stall_resume_config", True, True, so.NEWEST_S))
++
++
++if __name__ == "__main__":
++    unittest.main()

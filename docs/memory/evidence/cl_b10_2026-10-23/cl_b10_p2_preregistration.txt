@@ -1,0 +1,66 @@
+CL-B10 PART 2 — the attended cells 1 and 4: pre-registration (session A, 2026-10-24 UTC; hashed BEFORE cell 1's launch)
+
+Tasks: docs/memory/handoffs/CL-B10_PART2_ATTENDED_TASK.md (the staging) and G-A3_AND_CL-B10_TASK.md PART 2 (the
+cells). Session B's rows: SESSION_B_DONE_2026-10-23E.md items 7 and 9, B11 (the restart guard), B13 (link report on by
+default), B14 (the notice). The CONFIRMED rule: CL_B7 §6.
+
+0. State at the hash (stage 1, 03:31Z)
+- Nine adopted lines; tools/e3_state.py preflight ok, the APK reading MISMATCH by the pin rule only (da09e154… on the
+  onn, paired: identity v2, the device secret, the client's id in the hub's store); no e3_flag.conf; no game.
+- privyhub-cl-b10 closed "all 2 cells done" (19:11:04Z; cells 2 and 3 "playing valid").
+- Properties restart_guard / stall_signal / link_notice / link_report = 1. The onn on 5 GHz (5180 MHz, 802.11ac,
+  RSSI -68). HEAD efa4240 (G-A3 and PART 1 committed).
+
+1. The driver and the cap
+- cl_b10_p2_driver.py (from cl_b10_driver.py; the diff is cl_b10_p2_driver_vs_cl_b10.diff), one cell per launch,
+  unit privyhub-cl-b10-p2, status ~/privyhub_cl_b10/status.txt, STOP ~/privyhub_cl_b10/STOP (the status text and log
+  tag name it). cl_b10_p2_suite_call.py = PART 1's wrapper with only the pre-registration name changed.
+- THE CAP: each launch + 40 min (no new cell after it; a cell in flight finishes with its own teardown).
+- The watch rule: a cell is refused at launch if it could still run at 04:30Z or would start before 05:30Z.
+- Each cell: E1-SNES-STREAM (snes9x, adopted line 3), gap 120, e2; drop-in e3_flag.conf =
+  PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 ONLY (the nine lines + one = ten expected at the stream); removed at the
+  teardown; flags_absent true after; nine lines.
+- The properties restart_guard / stall_signal / link_notice set to 1 and read back before each cell, read back after
+  (still 1), NOT cleared until stage 3.
+- The band read every 10 s through each cell into runs/<cell>/band.jsonl (frequency / band / standard / RSSI / tx /
+  rx only).
+
+2. Cell 1 — the restart guard, 5 GHz, window 600
+- The user plays from PLAYING; at PLAYING + 4 min presses Home, waits ~5 s, returns to the game, plays to the end.
+- Expected (B item 7 / B11): the Home press found as a surface loss; the old report posted and session_ended BEFORE
+  the new start; the new report's restart_cause.away_ms ≈ 5,000; the new session's audio underruns ≈ the others'
+  (not ~170 / s); 0 notices (link_notice=0 in every heartbeat, no link_notice_shown row) on 5 GHz.
+- Reported: silences >= 250 ms and hitch seconds per 10 min, against LINK-R1 (0 / 0) and G-A3 (0 / 0.9); the user's
+  one line on what the Home-and-back felt like (verbatim, stage 3).
+
+3. Cell 4 — the notice, 2.4 GHz, window 780
+- The user switches the onn to 2.4 GHz by hand before the launch (stage 2: the band must read 2.4 GHz, else stop).
+- Expected (B item 9 / B14): the notice bottom-left within the first seconds of PLAYING ("Wi-Fi: 2.4 GHz" / "Use your
+  router's 5 GHz Wi-Fi for this box."); link_notice=1 in the heartbeats; one link_notice_shown row with reason 1.
+  THE USER'S WORD (or a phone photo they report) IS THE GATE ON "SHOWN"; the row alone is not.
+- At PLAYING + 10 min the user switches the onn back to 5 GHz with the game running. Whatever that does (a drop, the
+  client's self-restart under the guard, a new session) is recorded as it comes. link_notice_cleared is looked for in
+  whichever session runs from ~30 s after the band reads 5 GHz to the window's end; its delay is stated.
+- Reported: ~10 min of 2.4 GHz — silences >= 250 ms and hitch seconds per 10 min AGAINST CELL 1's ON 5 GHZ IN THE
+  SAME HOUR (the A/B LINK-R1 could not make); the band per 10 s; the switch-back as it came.
+
+4. Validity (per cell)
+- Playing; the profile none applied (the shim's lines, 0 drops); ten lines at the stream; flags_absent true after,
+  nine lines; the properties 1 before and after. Host gates: RetroArch >= 59.9, capture 60 ± 0.1, dup+drop <= 0.2 / min.
+- Cell 1 is not invalidated by the Home press or by a new client session it causes; cell 4 is not invalidated by the
+  band switch or the session it causes. A no_play, a flags_absent false, or the properties not 1 is invalid.
+
+5. Stage 3 and the CONFIRMED rule
+- The properties cleared (restart_guard, stall_signal, link_notice AND link_report set empty) and read back empty;
+  nine lines; no e3_flag.conf; flags_absent.
+- The rule as CL_B7 §6 applies it: all four cells (2, 3, 1, 4) valid, and the property-empty / flag-absent behaviours
+  as today, with B13's one intended difference (the link keys present in the heartbeats with link_report empty)
+  -> da09e154… CONFIRMED, the pin moved where §6 moves it, --check ok on nine with no MISMATCH.
+  Else bf5114a2… reinstalled from PrivyHub/app/build/cl_b10_preserved/, read back, paired, --check ok, and the user
+  told which cell failed and why.
+
+6. The reading (from PART 1's pre-registration, unchanged, and the task)
+- Cells 2 and 3 meeting their rows -> the hold / state / stall stack is a candidate for the user's adoption call on
+  SNES (costs: ~24 frames per two-way drop, a save per stall, the frozen picture while held); else back to B.
+- Cell 1: the guard's rows met or not; cell 4: the notice shown (the user's word) and cleared, or not.
+Nothing adopted; nothing committed.

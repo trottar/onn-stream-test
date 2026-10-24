@@ -1,6 +1,6 @@
 # Known issues and deferred work
 
-## 2026-10-21 LAN-R1: the ladder does not step down on loss on the LAN — OPEN; a rule BUILT behind `PRIVYHUB_LAN_LOSS_RULE=1`, NOT ADOPTED; BENCH-R1 (2026-10-22): the rule back to B, the input hold not a candidate until its trigger is fixed, the death reproduced on the bench; BENCH-R2 (2026-10-22): the Wi-Fi lock not the cause, the hold + rewind + stall stack not a candidate, APK cb0935c8 CONFIRMED; queue D (2026-10-22): the ownership at the return, the stall threshold 400 + rewind SNES-only, the client's loss guard BUILT, NOT ADOPTED; BENCH-R3 (2026-10-22): the stack not a candidate on SNES (snes9x's hold-path rewind reads PAUSED), the PS1 state path works, the loss guard a candidate (the user's call), the onn on 2.4 GHz where the Opal sampler did not look, APK bf5114a2 CONFIRMED; LINK-R1 (2026-10-23): on 5 GHz 0 uplink silences / 0 hitch s per 10 min — the band was most of the flapping; queue E (2026-10-23): the self-restart guard, `state` for every core + the stall resume, the link report on by default + G-A3 prepared, the link notice BUILT, NOT ADOPTED
+## 2026-10-21 LAN-R1: the ladder does not step down on loss on the LAN — OPEN; a rule BUILT behind `PRIVYHUB_LAN_LOSS_RULE=1`, NOT ADOPTED; BENCH-R1 (2026-10-22): the rule back to B, the input hold not a candidate until its trigger is fixed, the death reproduced on the bench; BENCH-R2 (2026-10-22): the Wi-Fi lock not the cause, the hold + rewind + stall stack not a candidate, APK cb0935c8 CONFIRMED; queue D (2026-10-22): the ownership at the return, the stall threshold 400 + rewind SNES-only, the client's loss guard BUILT, NOT ADOPTED; BENCH-R3 (2026-10-22): the stack not a candidate on SNES (snes9x's hold-path rewind reads PAUSED), the PS1 state path works, the loss guard a candidate (the user's call), the onn on 2.4 GHz where the Opal sampler did not look, APK bf5114a2 CONFIRMED; LINK-R1 (2026-10-23): on 5 GHz 0 uplink silences / 0 hitch s per 10 min — the band was most of the flapping; queue E (2026-10-23): the self-restart guard, `state` for every core + the stall resume, the link report on by default + G-A3 prepared, the link notice BUILT, NOT ADOPTED; CL-B10 (2026-10-24): the band settled (2.4 GHz the flapping), the notice shown (the user's word); queue F (2026-10-24): the guard on every path and the stall resume at the client's first frame BUILT, NOT ADOPTED — both OPEN until CL-B11
 
 **The standard (the user, 2026-10-21):** "This product needs to work at any house especially lan as long as the Internet
 is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.md`.
@@ -210,8 +210,43 @@ is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.m
   - **B14, the "any house" notice** (`debug.privyhub.link_notice=1`): on 2.4 GHz, or RSSI ≤ −72 dBm / tx ≤ 54 Mbps for
     10 s, "Wi-Fi: 2.4 GHz — Use your router's 5 GHz Wi-Fi for this box." on the stream and the diagnostics page; the
     host logs `link_notice_shown` / `_cleared`. Record: `docs/memory/evidence/B14_LINK_NOTICE_2026-10-23.md`.
-  - **Next:** G-A3 (the user's say-so); CL-B10 (session A), as in `handoffs/SESSION_B_DONE_2026-10-23E.md`; the
-    user's own play on 5 GHz.
+  - **G-A3 (2026-10-23): `PRIVYHUB_LINK_REPORT=1` ADOPTED, the ninth line.**
+  - **CL-B10 (2026-10-23/24, 4 / 4 cells valid; APK `da09e154…` CONFIRMED):**
+    - **The band, settled in one hour:** 2.4 GHz gave 168 silences ≥ 250 ms and 149 hitch s per 10 min; 5 GHz minutes
+      apart gave 0 and 0-9. The user, on 2.4 GHz: "It's running like absolute shit right now".
+    - **B12's stack: back to B,** one row missed in each cell.
+      - `@both`: the resume 2.13 s after the return in 1 of 5.
+      - `@down`: one `encoder_restart` in 1 of 5.
+      - Costs: net 24 frames per two-way drop, a save per stall, the picture frozen 3.5-7.2 s per 4-s drop.
+    - **B11's guard: back to B.** A Home press gave no old report and no `session_ended` before the new start, and a
+      null `restart_cause`. Then 2,418 underruns in 28 s.
+    - **B14's notice:** raised on 2.4 GHz at the first heartbeat (reason 1) and cleared on 5 GHz. "Shown" on screen
+      awaits the user's word.
+    - Record: `docs/memory/evidence/CL_B10_RESTART_GUARD_STATE_STALL_NOTICE_2026-10-23.md`.
+  - **The notice: shown.** The user's word (2026-10-24, verbatim): "I saw that box". CL-B10's gate is MET, and B14 works
+    as built. Whether it becomes a client default is the user's call.
+  - **Queue F (2026-10-24, session B; nothing adopted, no live run):**
+    - **The guard: still OPEN, rebuilt (B15, the same `debug.privyhub.restart_guard=1`).**
+      - Why it missed: cell 1's start ran in a **new activity instance**. The old process was gone after Home, and the
+        activity was re-created on the return. B11 kept its pending in the activity object only, so the new guard was
+        empty. The property read 1.
+      - Now: the pending is kept in a private file. Every start flushes it (report, stop, start; audio rebuilt), and
+        `restart_cause.trigger` reads `surface` / `recreate` / `process`. A recreation hands over instead of racing its
+        stop.
+      - JVM 122 / 122 (125 / 125 with B16). Record: `docs/memory/evidence/B15_RESTART_GUARD_ALL_PATHS_2026-10-24.md`.
+    - **The resume: still OPEN, rebuilt (B16, inside `PRIVYHUB_STALL_RESUME=1` / `PRIVYHUB_INPUT_HOLD_REWIND=1`).**
+      - Why it was slow: `@down`'s ready waited on the client's 500-ms gate (~2-3 s after the frames return); v2's 5-s
+        hold expired first, and blackout 5's restart acted on a pre-return heartbeat. `@both` waited on the 2-s
+        heartbeat. B12 saved at every 150-ms client stall.
+      - Now: the host's start response arms the client's ready at its first decodable frame. The stall save comes only
+        at ≥ 400 ms. v2 acts only while the newest stall datagram says stalled.
+      - Tests: 301 ms after the return in both, no restart, no handover, 0 saves under 400 ms; net 9 → 24 on `@down`
+        (stated).
+      - Record: `docs/memory/evidence/B16_STALL_RESUME_SPEED_2026-10-24.md`.
+    - **APK (B5 + B7 + B10 + B11 + B13 + B14 + B15 + B16) `e2db0aa0…6b33`, pinned, NOT installed;** `da09e154…` stays
+      CONFIRMED.
+  - **Next:** CL-B11 (session A): the install, the Home press (the guard, all paths), and `@down` / `@both` with the new
+    rows (`handoffs/SESSION_B_DONE_2026-10-24F.md`). Then the user's own play on 5 GHz.
 ## 2026-10-20 UX-R1, the user's extended evening (2026-10-20 04:19-05:22Z) was bad and got worse — OPEN; the files agree; link vs onn not separable from them; UX-R2: the second evening mostly clean, the damage not repeated (one event so far, untested past play-minute 44); H5 closed (not new); UX-R3: one of last night's two "deaths" found (04:54:55-59Z, a 4-s drop in both directions); the second not distinguishable
 
 **The user's standard, verbatim (2026-10-21): "This product needs to work at any house especially lan as long as the Internet is over 50mb/s."**

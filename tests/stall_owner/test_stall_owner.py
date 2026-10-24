@@ -163,7 +163,7 @@ class StallResume(unittest.TestCase):
             self.assertEqual(out, {"recovered": True, "from_state": "stall_resumed"})
             rel = [r for r in b9.rows(d.rec) if r["event"] == "input_release"]
             self.assertEqual((len(rel), rel[0]["method"], rel[0]["via"]), (1, "state", "client_ready_stall"))
-            self.assertTrue(8 <= rel[0]["net_unattended_frames"] <= 14, rel[0])       # ~150 ms after the last frame
+            self.assertTrue(20 <= rel[0]["net_unattended_frames"] <= 30, rel[0])      # B16: the save at the 400-ms signal
             self.assertEqual(d.rig.core.loads, [True])                               # into a running core
             for i in range(6):
                 d.stall(20, gate=True)                             # the gate over fresh output

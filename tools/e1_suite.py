@@ -59,7 +59,9 @@ PKG = "com.safeiot.privyhub"
 # CL-B7's client); the previous CONFIRMED APK was 93d29b4a... (CL-B7)
 # BENCH-R3 (installed 2026-10-22): B5 + B7 + B10 loss-guard APK (debug.privyhub.loss_guard; absent = BENCH-R2's
 # client); the previous CONFIRMED APK was cb0935c8... (BENCH-R2)
-EXPECT_APK = "bf5114a2d257f1246374b05e3d79b24f0382afe1c66b2c6acb3a37fa6e58cf73"
+# CL-B10 (installed 2026-10-23, CONFIRMED 2026-10-24): B5 + B7 + B10 + B11 + B13 + B14 APK (debug.privyhub.restart_guard /
+# link_notice; link_report absent = on; absent otherwise = BENCH-R3's client); the previous CONFIRMED APK was bf5114a2... (BENCH-R3)
+EXPECT_APK = "da09e154bdaf1b159fc90d787333b1090e4723b110cf82ef25b9acd7702ee6cf"
 LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
 # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
 # is exactly these two names, at every precondition and teardown

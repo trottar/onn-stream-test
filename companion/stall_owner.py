@@ -15,6 +15,17 @@ again. Here, for a pause the stall owns (reason `client_stall`, not B8's hold ep
   the late `stall_end` is `stall_end_late`;
 - v2's encoder restart is held off until the pause is 5,000 ms old (v2's own trigger); then v2 owns it, once
   (`stall_handover_v2`).
+
+B16 (the same flag; design `docs/memory/evidence/b16_2026-10-24/design_written_before_code.md`, hashed before this
+code). CL-B10 cell 3: the client's gate held the picture 1.3-3.2 s after the downlink's return (four 500-ms gate ticks),
+v2's hold expired first in all 5, and blackout 5's restart acted on a heartbeat built before the return; cell 2 saved
+state at four 150-ms client stalls. Here:
+- the start response tells the client to send its ready as soon as it has a decodable frame (`client_hint`); the host
+  resumes on it through the owners above (B12's `client_ready_stall`, B8's `client_ready_hold`);
+- the stall's save comes only from the stall signal (age >= its threshold, 400 with `1`), synchronously before B7's
+  pause (B9 skips a paused core): no save under the 400-ms signal;
+- v2 takes a stall-owned pause past 5 s only while the newest stall datagram (<= 300 ms old) shows the client still
+  stalled.
 """
 
 from __future__ import annotations
@@ -26,6 +37,7 @@ FLAG_ENV = "PRIVYHUB_STALL_RESUME"
 V2_MS = 5_000               # E3-R1's controller-silence trigger: past it, v2 owns the pause
 EPISODE_S = 20.0            # an episode's resumed phase never outlives this (the client's gate times out at 15 s)
 REASON = "client_stall"
+NEWEST_S = 0.30             # B16: the newest stall datagram describes the client now (B7's quiet rule: 300 ms)
 
 
 def enabled(environ: Mapping[str, str]) -> tuple[bool, str | None]:
@@ -48,6 +60,8 @@ class StallOwner:
         self._ignored = 0
         self._handed_key: float | None = None   # the pause v2 took over (once)
         self._last_rx = 0.0
+        self._newest: tuple[float, int] = (0.0, 0)   # B16: the newest stall datagram (receive time, output age)
+        self._threshold_ms = 400                 # B16: the stall signal's threshold (B7's, set per datagram)
 
     @staticmethod
     def _state(recovery: Any) -> tuple[str, str | None, float]:
@@ -68,6 +82,8 @@ class StallOwner:
         if rx - self._last_rx > 0.3:
             self._saved_episode = False         # a new client episode (B7's quiet gap)
         self._last_rx = rx
+        self._newest = (rx, int(age))           # B16: what the client says now (v2's rule)
+        self._threshold_ms = int(threshold_ms)
         if self._resumed_at is not None:
             if self._clock() - self._resumed_at > EPISODE_S:
                 self._end()
@@ -76,12 +92,16 @@ class StallOwner:
                 if self._ignored == 1:
                     recovery._log("stall_gate_after_resume", client_frame=frame, age_ms=age)
                 return True
-        if state == "PLAYING" and not self._saved_episode and not gate:
+        # B16: the save only from the stall signal (age >= its threshold), taken now, before B7's pause below
+        if state == "PLAYING" and not self._saved_episode and not gate and age >= threshold_ms:
             rw = getattr(recovery, "_input_hold_rewind", None)
             cores = getattr(rw, "b9", None) if rw is not None else None
             if cores is not None and getattr(cores, "mode", None) == "state":
                 self._saved_episode = True
-                cores.request_save(rx - float(age) / 1000.0, rx, "stall")
+                try:
+                    cores.save(rx - float(age) / 1000.0, rx, "stall")
+                except Exception:
+                    pass                        # the pause must never wait on a failed save
         return False
 
     def late_stall_end(self, recovery: Any, state: str, frame: int) -> bool:
@@ -139,6 +159,11 @@ class StallOwner:
                           restarts=recovery._restarts, via="client_ready_stall")
             return True
 
+    @staticmethod
+    def client_hint() -> dict[str, Any]:
+        """B16: the start response's `stall_resume`: the client's ready as soon as it has a decodable frame."""
+        return {"fast_ready": True}
+
     def holds_v2(self, recovery: Any, now: float) -> bool:
         """From the monitor, before v2's encoder restart: True = skip v2 this tick (a young stall-owned pause)."""
         with recovery._lock:
@@ -149,6 +174,11 @@ class StallOwner:
         if self._hold_episode(recovery, key) or self._handed_key == key:
             return False
         if age_ms < V2_MS:
+            return True
+        # B16: v2 takes it only while the newest stall datagram shows the client still stalled (never on a heartbeat
+        # read before the return; a client with frames sends its ready within ~0.55 s)
+        rx, last_age = self._newest
+        if not (now - rx <= NEWEST_S and last_age >= self._threshold_ms):
             return True
         self._handed_key = key
         recovery._log("stall_handover_v2", held_ms=int(age_ms), v2_ms=V2_MS)
@@ -168,5 +198,6 @@ def wire(recovery: Any, controller: Any, environ: Mapping[str, str]) -> StallOwn
     recovery._stall_owner = o
     rw = getattr(recovery, "_input_hold_rewind", None)
     recovery._log("stall_resume_config", ignored=False, v2_ms=V2_MS,
-                  state_save=bool(getattr(getattr(rw, "b9", None), "mode", None) == "state"))
+                  state_save=bool(getattr(getattr(rw, "b9", None), "mode", None) == "state"),
+                  fast_ready=True, save_from_signal=True, v2_newest_s=NEWEST_S)
     return o
