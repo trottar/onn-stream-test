@@ -202,3 +202,23 @@ Every point below is a **[G3-S3 proposal]**.
   3. Take `AUDIO_CODEC` out of `tools/e1_suite.py` `ADOPTED`.
 
   An Opus-capable client then gets PCM, as before.
+
+## 10. The client's link report (adopted G-A3, 2026-10-23)
+
+- **Adopted:** `PRIVYHUB_LINK_REPORT=1` through the drop-in
+  `~/.config/systemd/user/privyhub-companion.service.d/link-report.conf`, the **ninth adopted line**.
+  - The host records the client's Wi-Fi link fields in each heartbeat row: RSSI, tx / rx link Mbps, frequency,
+    Wi-Fi standard (B3).
+  - **Diagnostics only:** no stream, recovery or ladder behaviour reads them.
+- **What leaves the onn:** five numbers per heartbeat, as extra query keys of the heartbeat it already sends. No SSID,
+  BSSID, MAC or address. The client reads `WifiManager.getConnectionInfo()` at most once a second, and no permission was
+  added.
+- **The client side:**
+  - `da09e154…` (B13) sends the fields by default, and `debug.privyhub.link_report=0` turns that off.
+  - Earlier APKs send them only with the property set to `1`. A reboot clears the property.
+- **Turning it off:**
+  1. Delete `link-report.conf`.
+  2. Run `systemctl --user daemon-reload && systemctl --user restart privyhub-companion`.
+  3. Take `LINK_REPORT` out of `tools/e1_suite.py` `ADOPTED`.
+
+  The host then ignores the fields. The client may still send them.

@@ -1602,6 +1602,14 @@ Opus by the drop-in alone) was VALID, host gates held: `sig_v` 3 / opus, 8,994 k
 decoder spikes 138, two > 1-s ctrl gaps; not located (the onn's thermal status 0). No listen. An old client is
 refused at start with the reason. Off: delete the drop-in, restart. Record:
 `docs/memory/evidence/G_A2_OPUS_ADOPTION_2026-10-19.md`.
+**G-A3 (2026-10-23): `PRIVYHUB_LINK_REPORT=1` ADOPTED (the user's decision): the ninth adopted line**
+(`link-report.conf`; diagnostics only: the client's RSSI, tx / rx Mbps, frequency and standard in each heartbeat row).
+The tools (e1_suite, e3_state, e1_remote) read nine lines. The confirmation window (no flag file, the nine lines alone,
+5 GHz) was VALID, with host gates met:
+- 346 / 346 heartbeats with all five keys (the property path on `bf5114a2…`);
+- silences 0.0 and hitch seconds 0.9 per 10 min (LINK-R1: 0 / 0).
+
+Off: delete the drop-in, restart. Record: `docs/memory/evidence/G_A3_LINK_REPORT_ADOPTION_2026-10-23.md`.
 **G4-S3 (2026-10-19): off-site at 4000 with Opus (adopted) — VALID, 1 of 1, host gates met (the RetroArch counter
 read: 59.999).** Over the overlay on the phone hotspot (direct throughout): **the tailnet wire rate 5,299 kbit/s
 median**, against the pre-registered ~5,370 ±10 % (met) and G4-S2's 8,243 with PCM (−35.7 %): ~40 MB/min, ~2.4 GB/h;

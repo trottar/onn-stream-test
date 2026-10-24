@@ -1,0 +1,180 @@
+2,24c2,24
+< """BENCH-R3 -- the hold / rewind / stall stack on snes9x (blackout @both, @down, clean), the PS1 savestate fallback, and
+< the loss guard off / on under 1 % loss, with the link report ON and the Opal's station view read every 300 s: six cells
+< run as pre-registered (bench_r3_preregistration.txt), DETACHED (systemd --user unit privyhub-bench-r3), the cap read from
+< the pre-registration's `CAP_UTC:` line (launch + 3 h); resumable from bench_r3_state.json.
+< 
+< Built from bench_r2_driver.py's scaffolding (everything kept: the status line / heartbeat / history / STOP / busy skip /
+< cap / the suite call / the crash handler / --dry / the readings beside a run / the encoder read-back / the applied check /
+< the per-run log copies / B2's reader with --net / no_play as an outcome / the profile-not-applied repeat / the state
+< stop / the properties set before, cleared after, read back each way). Changed:
+<   - the cells table (six, in the pre-registered order A B C D E-off E-on; session B's exact strings,
+<     SESSION_B_DONE_2026-10-22D.md items 5-9): A-C E1-SNES-STREAM (snes9x, adopted line 3) with the whole stack
+<     (hold + B6 + B8 + rewind + stall signal) and the link report; D E1-PS1-STREAM (Beetle PSX HW) with the stack and
+<     INPUT_HOLD_REWIND=state; E-off / E-on E1-PS1-STREAM with LOSS_GUARD=1 + LINK_REPORT=1, the hold flags absent;
+<   - the properties: four (wifi_lock read only and always empty; stall_signal, link_report, loss_guard per cell);
+<   - the Opal's O1 station view (o1_opal_sample.sh, B's copy byte for byte, with o1_redact.py / o1_parse.py: read-only on
+<     the Opal; every byte through o1_redact.py inside the script before it is written) started before cell A, every 300 s,
+<     stopped after E-on (its own .stop file; waited out);
+<   - added to each row: the link report's per-heartbeat keys (rows with them, RSSI / tx / rx summaries), the loss-guard
+<     heartbeat counters (E), the silences >= 250 ms binned with B6's gap_distribution.py bins and edge rule per 10 min, the
+<     Opal rounds inside the cell, RetroArch's own log lines on state / slot / rewind (scrubbed; D's "Loaded state").
+< --dry: about 2 min, no stream: the preflight, cell A's drop-in written, the companion restarted, its environ read back,
+< A's properties set and read back, the Opal sampler for two 10-s rounds into dry_run/, 30 s held, the drop-in removed,
+< restarted, flags_absent read, the properties cleared and read back empty; then exit."""
+---
+> """CL-B10 PART 1 -- the bench cells for B12's state path and stall resume on snes9x, under the bench blackout, with
+> the client APK da09e154... (B11 + B13 + B14) and the properties restart_guard / stall_signal / link_notice = 1: two cells
+> run as pre-registered (cl_b10_preregistration.txt), DETACHED (systemd --user unit privyhub-cl-b10), the cap read from the
+> pre-registration's `CAP_UTC:` line (launch + 2 h); resumable from cl_b10_state.json.
+> 
+> Built from bench_r3_driver.py (everything kept: the status line / heartbeat / history / STOP / busy skip / cap / the
+> suite call / the crash handler / --dry / the readings beside a run / the encoder read-back / the applied check / the
+> per-run log copies / B2's reader with --net / no_play as an outcome / the profile-not-applied repeat / the state stop /
+> the link and silence readings). Changed:
+>   - the cells table: two, in the pre-registered order (task G-A3_AND_CL-B10_TASK.md; session B's exact strings,
+>     SESSION_B_DONE_2026-10-23E.md item 8): cell 2 blackout-4s@both,every=120s,seed=1 and cell 3
+>     blackout-4s@down,every=120s,seed=1, both E1-SNES-STREAM (snes9x, adopted line 3) with PRIVYHUB_INPUT_HOLD=1,
+>     _B6=1, _B8=1, _REWIND=1, PRIVYHUB_STALL_SIGNAL=1, PRIVYHUB_STALL_RESUME=1. The drop-in is the impairment line and
+>     those six flags only: PRIVYHUB_LINK_REPORT=1 is adopted line 9 (G-A3) and PRIVYHUB_WAN_TELEMETRY=1 (BENCH-R1..R3's
+>     base line) is not carried (disclosed);
+>   - the properties: three (restart_guard, stall_signal, link_notice), set to 1 before each cell and read back, read
+>     back (expected still 1) after each cell and at the close -- NOT cleared: PART 2's cells use them and PART 2 clears
+>     them (the task). link_report is not touched (absent = on with da09e154...; LINK-R1 left it at 1);
+>   - no Opal sampler (not in the task);
+>   - no cell starts inside 04:15-05:30Z (the nightly watch samples 04:30-05:30Z; a cell runs ~15 min).
+> --dry: about 2 min, no stream: the preflight, cell 2's drop-in written, the companion restarted, its environ read back,
+> the properties set and read back, 30 s held, the drop-in removed, restarted, flags_absent read, the properties read back
+> (still 1); then exit."""
+41c41
+< CALL = HERE / "bench_r3_suite_call.py"
+---
+> CALL = HERE / "cl_b10_suite_call.py"
+43,44c43,44
+< PRE = HERE / "bench_r3_preregistration.txt"
+< WATCH = Path.home() / "privyhub_bench_r3"
+---
+> PRE = HERE / "cl_b10_preregistration.txt"
+> WATCH = Path.home() / "privyhub_cl_b10"
+65c65
+< STATE_P = (HERE / "dry_run" if DRY else HERE) / "bench_r3_state.json"
+---
+> STATE_P = (HERE / "dry_run" if DRY else HERE) / "cl_b10_state.json"
+76,78c76,78
+< NCELLS = 6
+< PROPS = ("wifi_lock", "stall_signal", "link_report", "loss_guard")
+< LINK = "PRIVYHUB_LINK_REPORT=1"
+---
+> NCELLS = 2
+> PROPS = ("restart_guard", "stall_signal", "link_notice")
+> P1 = {"restart_guard": "1", "stall_signal": "1", "link_notice": "1"}
+80,89c80,84
+<          "PRIVYHUB_STALL_SIGNAL=1", LINK]
+< STACK_STATE = ["PRIVYHUB_INPUT_HOLD=1", "PRIVYHUB_INPUT_HOLD_B6=1", "PRIVYHUB_INPUT_HOLD_B8=1",
+<                "PRIVYHUB_INPUT_HOLD_REWIND=state", "PRIVYHUB_STALL_SIGNAL=1", LINK]
+< GUARD = ["PRIVYHUB_LOSS_GUARD=1", LINK]
+< NONE, BOTH, DOWN = "none@post-fec,seed=1", "blackout-4s@both,every=120s,seed=1", "blackout-4s@down,every=120s,seed=1"
+< LOSS1 = "loss-1@post-fec,seed=1"
+< SL = {"stall_signal": "1", "link_report": "1"}
+< PS1, SNES = "E1-PS1-STREAM", "E1-SNES-STREAM"
+< # session B's exact strings (SESSION_B_DONE_2026-10-22D.md items 5-9); a blackout spec takes NO @post-fec;
+< # PRIVYHUB_SNES_CORE=snes9x is adopted line 3 (snes-core.conf), so it is in every environ and not repeated in the drop-in
+---
+>          "PRIVYHUB_STALL_SIGNAL=1", "PRIVYHUB_STALL_RESUME=1"]
+> BOTH, DOWN = "blackout-4s@both,every=120s,seed=1", "blackout-4s@down,every=120s,seed=1"
+> SNES = "E1-SNES-STREAM"
+> # session B's exact strings (SESSION_B_DONE_2026-10-23E.md item 8); a blackout spec takes NO @post-fec;
+> # PRIVYHUB_SNES_CORE=snes9x (line 3) and PRIVYHUB_LINK_REPORT=1 (line 9) are adopted, in every environ, not repeated
+91,96c86,87
+<     {"n": 1, "cell": "A_snes_blackout_both_stack", "spec": BOTH, "profile": "blackout-4s", "uplink": True, "extra": STACK, "props": SL, "wid": SNES, "arm": "stack"},
+<     {"n": 2, "cell": "B_snes_blackout_down_stack", "spec": DOWN, "profile": "blackout-4s", "uplink": False, "extra": STACK, "props": SL, "wid": SNES, "arm": "stack"},
+<     {"n": 3, "cell": "C_snes_clean_stack", "spec": NONE, "profile": "none", "extra": STACK, "props": SL, "wid": SNES, "arm": "stack"},
+<     {"n": 4, "cell": "D_ps1_blackout_both_state", "spec": BOTH, "profile": "blackout-4s", "uplink": True, "extra": STACK_STATE, "props": SL, "wid": PS1, "arm": "stack, rewind=state"},
+<     {"n": 5, "cell": "E-off_ps1_loss-1_guard_count", "spec": LOSS1, "profile": "loss-1", "extra": GUARD, "props": {"loss_guard": "count", "link_report": "1"}, "wid": PS1, "arm": "loss_guard=count"},
+<     {"n": 6, "cell": "E-on_ps1_loss-1_guard_on", "spec": LOSS1, "profile": "loss-1", "extra": GUARD, "props": {"loss_guard": "1", "link_report": "1"}, "wid": PS1, "arm": "loss_guard=1"},
+---
+>     {"n": 2, "cell": "2_snes_blackout_both_state_stall", "spec": BOTH, "profile": "blackout-4s", "uplink": True, "extra": STACK, "props": P1, "wid": SNES, "arm": "hold+state+stall_resume"},
+>     {"n": 3, "cell": "3_snes_blackout_down_state_stall", "spec": DOWN, "profile": "blackout-4s", "uplink": False, "extra": STACK, "props": P1, "wid": SNES, "arm": "hold+state+stall_resume"},
+97a89
+> QUIET = ((4, 15), (5, 30))      # no cell starts in [04:15, 05:30) UTC: the nightly watch samples 04:30-05:30Z
+124c116
+<     return ["PRIVYHUB_WAN_TELEMETRY=1", f"PRIVYHUB_IMPAIRMENT={cell['spec']}"] + list(cell["extra"])
+---
+>     return [f"PRIVYHUB_IMPAIRMENT={cell['spec']}"] + list(cell["extra"])
+139a132,143
+> def props_after():
+>     """CL-B10: the properties are NOT cleared (PART 2 uses and clears them); read back, True when all still read 1."""
+>     got = props_read()
+>     return got, all(got[pp] == "1" for pp in PROPS)
+> 
+> 
+> def in_quiet(t=None):
+>     d = datetime.fromtimestamp(time.time() if t is None else t, timezone.utc)
+>     m = d.hour * 60 + d.minute
+>     return QUIET[0][0] * 60 + QUIET[0][1] <= m < QUIET[1][0] * 60 + QUIET[1][1]
+> 
+> 
+229c233
+<     """The eight-line adopted state (G-A2), read back: the suite's own preflight."""
+---
+>     """The nine-line adopted state (G-A3), read back: the suite's own preflight."""
+234c238
+<     return p, ("adopted8 ok" if p.get("ok") else f"NOT ok (environ {len(p.get('environ') or [])} lines, game {p.get('game_active')})")
+---
+>     return p, ("adopted9 ok" if p.get("ok") else f"NOT ok (environ {len(p.get('environ') or [])} lines, game {p.get('game_active')})")
+818,819c822,823
+<     pr_end, pr_end_ok = props_clear()
+<     log(f"cell {cell['n']}: properties cleared {pr_end} empty {pr_end_ok}")
+---
+>     pr_end, pr_end_ok = props_after()
+>     log(f"cell {cell['n']}: properties after (not cleared) {pr_end} still 1 {pr_end_ok}")
+846c850
+<         validity = "invalid (the properties did not read back empty)"
+---
+>         validity = "invalid (the properties did not read back 1 after the cell)"
+880c884
+<            "props_set": pr_set, "props_set_ok": pr_set_ok, "props_after": pr_end, "props_after_empty": pr_end_ok,
+---
+>            "props_set": pr_set, "props_set_ok": pr_set_ok, "props_after": pr_end, "props_after_still_1": pr_end_ok,
+905c909
+<     cell = CELLS[0]                  # A: blackout@both on SNES + the whole stack and the link report, its two properties
+---
+>     cell = CELLS[0]                  # cell 2: blackout@both on SNES + the stack with state and stall resume; the three properties
+923,924d926
+<     op = opal_start()
+<     log("dry: the Opal sampler started (read-only), every", OPAL_INTERVAL, "s")
+928,930d929
+<     rec["opal_stop"] = opal_stop(op, 40)
+<     rec["opal_rounds"] = len(jl(OPAL_DIR / "air.jsonl"))
+<     log("dry: the Opal sampler", rec["opal_stop"], "rounds", rec["opal_rounds"])
+934,935c933,934
+<     rec["props_after"], rec["props_after_empty"] = props_clear()
+<     log("dry: properties cleared", rec["props_after"], "empty", rec["props_after_empty"])
+---
+>     rec["props_after"], rec["props_after_still_1"] = props_after()
+>     log("dry: properties read back (not cleared)", rec["props_after"], "still 1", rec["props_after_still_1"])
+947,948c946
+<     return 0 if (rec["environ_has_all"] and td.get("flags_absent") and rec["props_set_ok"] and rec["props_after_empty"]
+<                  and rec["opal_rounds"] >= 1) else 1
+---
+>     return 0 if (rec["environ_has_all"] and td.get("flags_absent") and rec["props_set_ok"] and rec["props_after_still_1"]) else 1
+965,969d962
+<     if any(c["cell"] not in st["done"] for c in CELLS) and not stop_requested() and time.time() < CAP:
+<         op = opal_start()
+<         st.setdefault("opal_started_utc", []).append(utc())
+<         jdump(STATE_P, st)
+<         log("the Opal sampler started (read-only), every", OPAL_INTERVAL, "s")
+980a974,980
+>         while in_quiet() and time.time() < CAP and not stop_requested():
+>             write_status(cell=cell["n"], doing="waiting: no cell starts in 04:15-05:30Z (the nightly watch)",
+>                          next=f"cell {cell['n']} after 05:30Z")
+>             time.sleep(30)
+>         if stop_requested() or time.time() >= CAP:
+>             why = "the stop file" if stop_requested() else "the cap"
+>             break
+1025,1026c1025,1026
+<     st["props_at_close"], st["props_at_close_empty"] = props_clear()
+<     log("close: properties", st["props_at_close"], "empty", st["props_at_close_empty"])
+---
+>     st["props_at_close"], st["props_at_close_still_1"] = props_after()
+>     log("close: properties (left for PART 2)", st["props_at_close"], "still 1", st["props_at_close_still_1"])

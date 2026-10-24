@@ -1,0 +1,47 @@
+diff --git a/docs/REMOTE_TRUST.md b/docs/REMOTE_TRUST.md
+index 3506068..2e9e44d 100644
+--- a/docs/REMOTE_TRUST.md
++++ b/docs/REMOTE_TRUST.md
+@@ -202,3 +202,23 @@ Every point below is a **[G3-S3 proposal]**.
+   3. Take `AUDIO_CODEC` out of `tools/e1_suite.py` `ADOPTED`.
+ 
+   An Opus-capable client then gets PCM, as before.
++
++## 10. The client's link report (adopted G-A3, 2026-10-23)
++
++- **Adopted:** `PRIVYHUB_LINK_REPORT=1` through the drop-in
++  `~/.config/systemd/user/privyhub-companion.service.d/link-report.conf`, the **ninth adopted line**.
++  - The host records the client's Wi-Fi link fields in each heartbeat row: RSSI, tx / rx link Mbps, frequency,
++    Wi-Fi standard (B3).
++  - **Diagnostics only:** no stream, recovery or ladder behaviour reads them.
++- **What leaves the onn:** five numbers per heartbeat, as extra query keys of the heartbeat it already sends. No SSID,
++  BSSID, MAC or address. The client reads `WifiManager.getConnectionInfo()` at most once a second, and no permission was
++  added.
++- **The client side:**
++  - `da09e154…` (B13) sends the fields by default, and `debug.privyhub.link_report=0` turns that off.
++  - Earlier APKs send them only with the property set to `1`. A reboot clears the property.
++- **Turning it off:**
++  1. Delete `link-report.conf`.
++  2. Run `systemctl --user daemon-reload && systemctl --user restart privyhub-companion`.
++  3. Take `LINK_REPORT` out of `tools/e1_suite.py` `ADOPTED`.
++
++  The host then ignores the fields. The client may still send them.
+diff --git a/docs/ROADMAP.md b/docs/ROADMAP.md
+index 433483f..31da7bb 100644
+--- a/docs/ROADMAP.md
++++ b/docs/ROADMAP.md
+@@ -1602,6 +1602,14 @@ Opus by the drop-in alone) was VALID, host gates held: `sig_v` 3 / opus, 8,994 k
+ decoder spikes 138, two > 1-s ctrl gaps; not located (the onn's thermal status 0). No listen. An old client is
+ refused at start with the reason. Off: delete the drop-in, restart. Record:
+ `docs/memory/evidence/G_A2_OPUS_ADOPTION_2026-10-19.md`.
++**G-A3 (2026-10-23): `PRIVYHUB_LINK_REPORT=1` ADOPTED (the user's decision): the ninth adopted line**
++(`link-report.conf`; diagnostics only: the client's RSSI, tx / rx Mbps, frequency and standard in each heartbeat row).
++The tools (e1_suite, e3_state, e1_remote) read nine lines. The confirmation window (no flag file, the nine lines alone,
++5 GHz) was VALID, with host gates met:
++- 346 / 346 heartbeats with all five keys (the property path on `bf5114a2…`);
++- silences 0.0 and hitch seconds 0.9 per 10 min (LINK-R1: 0 / 0).
++
++Off: delete the drop-in, restart. Record: `docs/memory/evidence/G_A3_LINK_REPORT_ADOPTION_2026-10-23.md`.
+ **G4-S3 (2026-10-19): off-site at 4000 with Opus (adopted) — VALID, 1 of 1, host gates met (the RetroArch counter
+ read: 59.999).** Over the overlay on the phone hotspot (direct throughout): **the tailnet wire rate 5,299 kbit/s
+ median**, against the pre-registered ~5,370 ±10 % (met) and G4-S2's 8,243 with PCM (−35.7 %): ~40 MB/min, ~2.4 GB/h;

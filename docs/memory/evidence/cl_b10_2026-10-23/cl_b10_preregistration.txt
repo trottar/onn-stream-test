@@ -1,0 +1,70 @@
+CL-B10 PART 1 — the install and the two bench cells: pre-registration (session A, 2026-10-23; hashed BEFORE the install)
+
+Task: docs/memory/handoffs/G-A3_AND_CL-B10_TASK.md PART 1 §2. Session B's exact strings: SESSION_B_DONE_2026-10-23E.md
+items 6-9 (the APK, the flags, the properties, the rows); B12 §4, B11, B13, B14.
+
+CAP_UTC: 2026-10-23T21:00:00Z
+(The planned launch ~19:00Z + 2 h. If the real launch differs, the record states the real launch and that the cap is
+this line; two cells take ~35 min, so the cap does not bind.)
+
+0. State before
+- G-A3 done: the NINE adopted lines (the eight + PRIVYHUB_LINK_REPORT=1, link-report.conf), --check ok on nine.
+- The onn: APK bf5114a2…cf73 (CONFIRMED) at the hash; debug.privyhub.link_report = 1 (LINK-R1).
+
+1. The install (after this file is hashed)
+- Preserve bf5114a2…cf73 -> PrivyHub/app/build/cl_b10_preserved/app-debug.apk (gitignored; nothing deleted).
+- The candidate /tmp/b_q23e_scratch/b14_apk/app-debug.apk must read sha256
+  da09e154bdaf1b159fc90d787333b1090e4723b110cf82ef25b9acd7702ee6cf (B's pin, 9,704,533 B) and the same signer as
+  bf5114a2… (apksigner certificate digests compared, not printed); else nothing is installed.
+  Copied to PrivyHub/app/build/cl_b10_installed/app-debug.apk.
+- adb install -r; the device APK read back = da09e154…; the paired line (CL-B4's reader: identity v2, device secret
+  present, the client's id in the hub's store, 1 device). "Not paired" = stop and tell the user.
+- The band read first (dumpsys wifi, mWifiInfo): 5 GHz expected; else stop and tell the user.
+- Properties set and read back: debug.privyhub.restart_guard 1, debug.privyhub.stall_signal 1,
+  debug.privyhub.link_notice 1. link_report: nothing (absent = on with da09e154…; it reads 1 from LINK-R1 and is left).
+  They are NOT cleared at PART 1's end: PART 2's cells use them; PART 2 clears them and reads them back.
+
+2. The driver
+- cl_b10_driver.py (from bench_r3_driver.py; the diff is cl_b10_driver_vs_bench_r3.diff), unit privyhub-cl-b10
+  (systemd-run --user --collect), cl_b10_suite_call.py (BENCH-R3's wrapper; only the pre-registration name changed).
+- The nine adopted lines in force (PRIVYHUB_SNES_CORE=snes9x is line 3, PRIVYHUB_LINK_REPORT=1 line 9). Each cell's
+  e3_flag.conf = PRIVYHUB_IMPAIRMENT=<spec> + the six flags below; expected environ 9 + 7 = 16; read back at the stream
+  and under load; removed at teardown; flags_absent true after (nine lines, no e3_flag.conf).
+- Disclosed: PRIVYHUB_WAN_TELEMETRY=1 (BENCH-R1..R3's base line) is not carried — B's strings do not list it.
+- No cell starts inside 04:15-05:30Z (the nightly watch samples 04:30-05:30Z). No Opal sampler.
+- Validity (per cell): playing; the shim's profile applied (the dark spans seen); flags_absent true; the properties
+  read 1 before and after. Host gates: RetroArch >= 59.9, capture 60 ± 0.1, dup+drop <= 0.2 / min, flags_absent.
+
+3. The cells, in this order, E1-SNES-STREAM (snes9x), window 600, gap 120, e2:
+  flags (both): PRIVYHUB_INPUT_HOLD=1 PRIVYHUB_INPUT_HOLD_B6=1 PRIVYHUB_INPUT_HOLD_B8=1 PRIVYHUB_INPUT_HOLD_REWIND=1
+                PRIVYHUB_STALL_SIGNAL=1 PRIVYHUB_STALL_RESUME=1
+- CELL 2: PRIVYHUB_IMPAIRMENT=blackout-4s@both,every=120s,seed=1. Expected per blackout:
+  - one state_saved (kind silence) ~0.40 s in;
+  - one input_release method state at the resume; playing after (the picture advancing);
+  - unattended_frames.py --net ≈ 24 per blackout (B's stated number for the state path: it restores to the save,
+    0.40 s after the onset — NOT ≈ 0). As in BENCH-R3, the --net reader credits only releases carrying
+    rewound_frames, so the net is also read from B9's own row and by subtraction; both stated;
+  - the resume <= 1 heartbeat after the return;
+  - no second desync_pause, no session_started.
+- CELL 3: PRIVYHUB_IMPAIRMENT=blackout-4s@down,every=120s,seed=1. Expected per blackout:
+  - one state_saved (kind stall);
+  - the pause 400-460 ms after the client's last frame;
+  - NO encoder_restart, NO recovery_escalation;
+  - one resumed via client_ready_stall (or stall_end) with the load (input_release method state), net ≈ 9-12;
+  - client_ready_after_stall, stall_end_late; no second pause.
+
+4. Also reported per cell: silences >= 250 ms and hitch seconds per 10 min (outside the blackouts too), the link
+   report per heartbeat (band, RSSI, rates), link_notice bits in the heartbeat (expected 0 on 5 GHz), restart_cause
+   rows if any, post-FEC loss, rendered, the host gates, RetroArch's state lines.
+
+5. The reading, written beforehand
+- If both cells meet their rows, THE HOLD / STATE / STALL STACK IS A CANDIDATE for the user's adoption call on SNES,
+  with its costs stated: ~24 frames per two-way drop (restored to the save), a save per stall, the frozen picture
+  while held.
+- If not, back to B with the rows.
+- The record is a later one-line task, together with PART 2's (cells 1 and 4); the CONFIRMED rule for da09e154… is
+  applied there (CL-B7 §6: all cells valid, the property-empty / flag-absent behaviours as today).
+
+No sudo, no nft, the Opal read-only, adb for the install, the setprops named and state reads only, no addresses or
+identifiers anywhere; nothing fetched, nothing deleted; the nine lines only and no e3_flag.conf at every teardown;
+nothing but the ninth line adopted; nothing committed.

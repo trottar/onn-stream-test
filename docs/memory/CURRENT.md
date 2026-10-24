@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-10-23
-baseline_commit: c47073d (UX-R4 committed; LINK-R1 and the LINK-N1 launch uncommitted beside it; the user commits)
+baseline_commit: a55d73d (queue E committed; G-A3 and the CL-B10 launch uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -11,15 +11,22 @@ Headings are fixed by `tools/check_memory_health.py`; do not rename.
 
 **Phase E ACTIVE; the G track (remote) under way. G-A1 ADOPTED (2026-10-16, the user's): the overlay provider and
 session identity v2 run on the host, and `identity_v2` is on in the client. **G-A2 ADOPTED (2026-10-19, the user's):
-the Opus audio path. The adopted environ is EIGHT lines.**
+the Opus audio path. **G-A3 ADOPTED (2026-10-23, the user's): the client's link report. The adopted environ is NINE
+lines.**
 CL-B3 is OPEN on two G5-S1 smoke gates (NOT MET; the user decides). Everything else passed: G3-S3's hardened APK
 `59f736d2…` is installed and CONFIRMED, the signed LAN path passed, and the VOD play through the range server
 passed.** E1 FROZEN; E2
 MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `af3ed73`.
 
-**State (2026-10-19 17:48Z, after CL-B7): the EIGHT adopted lines; nothing running; `--check` ok on eight** (adb
-connected, **APK `93d29b4a…1624` CONFIRMED** (CL-B7; `debug.privyhub.opus_decode` empty = CL-B5's drain)). No `e3_flag.conf`, no stream, no game; one device paired, `identity_v2`
-on. The eight lines:
+**State (2026-10-23 18:45Z, after G-A3 and CL-B10's launch): the NINE adopted lines.**
+- `--check` read ok on nine at G-A3's window end.
+- CL-B10 then installed **`da09e154…`** (not yet CONFIRMED; `bf5114a2…` is preserved and is the CONFIRMED one).
+  `--check` now reads `MISMATCH` on the APK alone, by the pin rule.
+- Running: `privyhub-cl-b10` (two bench cells) and `privyhub-link-n1` (nightly).
+- Properties `restart_guard` / `stall_signal` / `link_notice` / `link_report` = 1. One device paired; `identity_v2`
+  on.
+
+The nine lines:
 1. `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live` (`adaptive.conf`);
 2. `PRIVYHUB_EPG_GUIDE_INDEX=cached` (`epg-index.conf`);
 3. `PRIVYHUB_SNES_CORE=snes9x` (`snes-core.conf`);
@@ -27,7 +34,8 @@ on. The eight lines:
 5. `PRIVYHUB_SNES_CAPTURE_FIX=output_rate` (`snes-capture.conf`);
 6. `PRIVYHUB_OVERLAY_PROVIDER=tailscale` (`overlay.conf`);
 7. `PRIVYHUB_SESSION_IDENTITY=v2` (`session-identity.conf`);
-8. **`PRIVYHUB_AUDIO_CODEC=opus` (`audio-codec.conf`, G-A2)**.
+8. `PRIVYHUB_AUDIO_CODEC=opus` (`audio-codec.conf`, G-A2);
+9. **`PRIVYHUB_LINK_REPORT=1` (`link-report.conf`, G-A3; diagnostics only)**.
 
 **G-A2** (`evidence/G_A2_OPUS_ADOPTION_2026-10-19.md`): the confirmation run, Opus by the drop-in alone, was VALID
 with host gates held (`sig_v` 3 / opus, 8,994 kbit/s and 1,177 pkt/s at 7000, net audio loss 10 ms). **But underruns
@@ -209,6 +217,52 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
+
+**G-A3: `PRIVYHUB_LINK_REPORT=1` ADOPTED, the ninth line** (`evidence/G_A3_LINK_REPORT_ADOPTION_2026-10-23.md`; the
+user's decision, "Yes to both"; `patches/G-A3_LINK_REPORT_ADOPTED.md`). **The adopted environ is NINE lines:**
+1. `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live` (`adaptive.conf`);
+2. `PRIVYHUB_EPG_GUIDE_INDEX=cached` (`epg-index.conf`);
+3. `PRIVYHUB_SNES_CORE=snes9x` (`snes-core.conf`);
+4. `PRIVYHUB_RECOVERY_TRIGGER=v2` (`recovery.conf`);
+5. `PRIVYHUB_SNES_CAPTURE_FIX=output_rate` (`snes-capture.conf`);
+6. `PRIVYHUB_OVERLAY_PROVIDER=tailscale` (`overlay.conf`);
+7. `PRIVYHUB_SESSION_IDENTITY=v2` (`session-identity.conf`);
+8. `PRIVYHUB_AUDIO_CODEC=opus` (`audio-codec.conf`);
+9. **`PRIVYHUB_LINK_REPORT=1` (`link-report.conf`; diagnostics only)**.
+
+- **The adoption:** B's prepared diff was applied, and the tools read nine (self-test OK, `test_e1_remote` 21,
+  `test_c3_l4_nft_night` 33). The drop-in was written, and the companion restarted at 18:24Z. `--check` ok on nine.
+- **The confirmation window** (no flag file, 5 GHz) was VALID, host gates met:
+  - 346 / 346 heartbeats with all five `link_*` keys, via the property path on `bf5114a2…`;
+  - silences 0.0 and hitch seconds 0.9 per 10 min (LINK-R1: 0 / 0).
+- **Off:** delete `link-report.conf`, then daemon-reload + restart (`REMOTE_TRUST.md` §10).
+
+**CL-B10 PART 1: `da09e154…` INSTALLED, two bench cells RUNNING** (`evidence/CL_B10_LAUNCH_2026-10-23.md`; the unit
+`privyhub-cl-b10`, launched 18:42Z, closes itself ~19:17Z).
+- **The install:** sha256 = B's pin, same signer, paired. `bf5114a2…` is preserved in
+  `PrivyHub/app/build/cl_b10_preserved/`.
+- **The onn:** 5 GHz. Properties `restart_guard` / `stall_signal` / `link_notice` = 1, **left for PART 2**.
+- **The cells:**
+  - cell 2 `blackout-4s@both`, then cell 3 `@down`;
+  - both with `INPUT_HOLD=1 _B6=1 _B8=1 _REWIND=1 STALL_SIGNAL=1 STALL_RESUME=1`;
+  - cell 2 was PLAYING at 18:44:35Z with 16 lines.
+- **Status:** `cat ~/privyhub_cl_b10/status.txt`. **Stop: `touch ~/privyhub_cl_b10/STOP`.** The status line's own
+  text names `~/privyhub_bench_r3/STOP`, a stale string, and that path does nothing.
+- `--check` reads `MISMATCH` on the APK alone until the CONFIRMED rule.
+
+1. **The user's commit:**
+   - G-A3: the record, `g_a3_2026-10-23/`, the patch file, the four tools, `REMOTE_TRUST.md`, `ROADMAP.md`;
+   - CL-B10: the launch record, `cl_b10_2026-10-23/` (the driver keeps writing `runs/` until it closes);
+   - the task file, `_cowork_prompt.txt`, this file;
+   - git status: `logs/g_a3_git_status.txt`, `logs/cl_b10_launch_git_status.txt`.
+2. **CL-B10 PART 2 (attended, a later prompt):**
+   - cell 1: the restart guard, Home ~5 s and back;
+   - cell 4: the notice on 2.4 GHz, then back to 5 GHz (the user's hand);
+   - then the properties cleared, `--check` on nine;
+   - the record for all four cells, and the CONFIRMED rule for `da09e154…` (else `bf5114a2…` reinstalled).
+   - The reading for cells 2 / 3 is pre-registered: both rows met → the hold / state / stall stack is a candidate on
+     SNES, at ~24 frames per two-way drop, a save per stall, and the frozen picture while held.
+3. **LINK-N1 keeps running** to 10-31 (first night tonight, 04:30Z): "read LINK-N1's nights".
 
 **LINK-R1: the 5-GHz check — MEASURED, valid; 0 uplink silences ≥ 250 ms and 0 hitch seconds in 10 min**
 (`evidence/LINK_R1_5GHZ_CHECK_2026-10-23.md`; one E1-SNES-STREAM 15:52-16:04Z, drop-in `PRIVYHUB_LINK_REPORT=1` only,

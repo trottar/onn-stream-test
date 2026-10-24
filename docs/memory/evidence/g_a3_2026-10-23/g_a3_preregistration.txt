@@ -1,0 +1,22 @@
+G-A3 — the confirmation window for the ninth adopted line: pre-registration (session A, 2026-10-23, hashed before the run)
+
+Task: docs/memory/handoffs/G-A3_AND_CL-B10_TASK.md PART 1 §1. The user's decision 2026-10-23 ("Yes to both"): adopt
+PRIVYHUB_LINK_REPORT=1 as the ninth line, diagnostics only.
+
+State before the window: the prepared diff applied (patches/G-A3_LINK_REPORT_ADOPTION_PREPARED.md; e1_suite ADOPTED
+nine); e1_suite --self-test OK, test_e1_remote 21 OK, test_c3_l4_nft_night 33 OK from the tree; link-report.conf
+written; daemon-reload; the companion restarted 18:24:02Z (outside 04:30-05:30Z); the environ read back NINE lines;
+tools/e3_state.py ok on nine; APK bf5114a2…cf73 CONFIRMED on the onn; debug.privyhub.link_report reads "1" (left by
+LINK-R1).
+
+The window: one E1-SNES-STREAM (snes9x), tools/e1_suite.py run --only E1-SNES-STREAM --runs 1 --window 600 --gap 120
+--e2, NO --plan and NO e3_flag.conf: the nine adopted lines alone.
+
+Expected (met / not met):
+- X1: every in-session heartbeat row carries the five link_* keys, by the drop-in alone on the host. The client side:
+  APK bf5114a2… sends them because the property debug.privyhub.link_report=1 (left by LINK-R1) is set; the B13 APK
+  (da09e154…, not yet installed) would send them by default. Stated as which APK and which path.
+- X2: the host gates as before (RetroArch ~60 fps, capture ~60, dup+drop ~0, the ladder at 7000), the environ nine
+  lines through the run, flags_absent true and nine lines after.
+- X3: silences >= 250 ms and hitch seconds per 10 min on 5 GHz, stated against LINK-R1's 0 / 0 (no bar).
+The adoption stands on the user's decision, not on this window; a failed X1 or X2 is reported to the user.
