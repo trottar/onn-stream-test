@@ -1965,6 +1965,19 @@ Record: `docs/memory/evidence/B16_STALL_RESUME_SPEED_2026-10-24.md`.
 
 Record: `docs/memory/evidence/CL_B11_GUARD_AND_FAST_READY_2026-10-24.md`.
 
+**B17 (2026-10-24): the guard holds the audio until its start is answered, and the old session's end rides in the start
+(`guard_end=1`; no separate stop), behind `debug.privyhub.restart_guard`.** Record:
+`docs/memory/evidence/B17_GUARD_AUDIO_ORDER_2026-10-24.md`.
+
+**B18 (2026-10-24): no save and no hold at a session's end (the client's `bye`), inside `PRIVYHUB_INPUT_HOLD_REWIND=1`.**
+Record: `docs/memory/evidence/B18_NO_SAVE_AT_SESSION_END_2026-10-24.md`.
+
+**B19 (2026-10-24): the client's `stall_signal` and `restart_guard` on by default (`0` off); APK (B5 … B19)
+`20e3e339…` pinned, not installed.** Record: `docs/memory/evidence/B19_CLIENT_DEFAULTS_ON_2026-10-24.md`.
+
+**B20 (2026-10-24): `PRIVYHUB_LINK_RECOVERY=1`, the stack's six lines as one; G-A4 (the tenth adopted line) prepared,
+not applied.** Record: `docs/memory/evidence/B20_LINK_RECOVERY_UMBRELLA_2026-10-24.md`.
+
 ## G9 — Remote foundation checkpoint
 
 Acceptance:

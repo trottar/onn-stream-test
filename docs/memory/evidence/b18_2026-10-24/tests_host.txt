@@ -1,0 +1,39 @@
+B18 host suites, 2026-10-24T16:02:47Z, from /tmp/b_q24g; units: privyhub-companion.service privyhub-link-n1.service 
+-- tests/session_end
+test_a_blackout_without_a_bye_saves_as_today (test_session_end.NormalTeardown.test_a_blackout_without_a_bye_saves_as_today) ... ok
+test_a_new_session_after_a_bye_saves_again (test_session_end.NormalTeardown.test_a_new_session_after_a_bye_saves_again) ... ok
+test_the_bye_then_the_silence_no_save_no_hold_zero_state_saved (test_session_end.NormalTeardown.test_the_bye_then_the_silence_no_save_no_hold_zero_state_saved) ... ok
+test_the_session_ended_saves_nothing (test_session_end.NormalTeardown.test_the_session_ended_saves_nothing) ... ok
+test_the_stream_no_longer_produced_saves_nothing (test_session_end.NormalTeardown.test_the_stream_no_longer_produced_saves_nothing) ... ok
+test_b7_decodes_the_bye_and_ignores_it_without_b9 (test_session_end.TheWiring.test_b7_decodes_the_bye_and_ignores_it_without_b9) ... ok
+test_flag_absent_nothing_imported (test_session_end.TheWiring.test_flag_absent_nothing_imported) ... ok
+test_only_the_state_path_wires_it (test_session_end.TheWiring.test_only_the_state_path_wires_it) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 1.447s
+
+OK
+-- tests/input_hold_b8
+Ran 14 tests in 0.085s
+OK
+-- tests/rewind_cores
+Ran 13 tests in 2.678s
+OK
+-- tests/stall_owner
+Ran 10 tests in 2.390s
+OK
+-- tests/stall_resume_speed
+Ran 7 tests in 13.213s
+OK
+-- tests/stall_signal
+Ran 12 tests in 15.922s
+OK
+-- tests/input_hold
+Ran 19 tests in 3.382s
+OK
+-- tests/input_hold_b6
+Ran 16 tests in 0.147s
+OK
+-- tests/input_hold_rewind
+Ran 22 tests in 10.426s
+OK (skipped=2)

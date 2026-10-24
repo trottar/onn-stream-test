@@ -545,6 +545,17 @@ class NativeStreamActivity :
             cacheSessionReport()
         }
 
+        // B18: a finishing activity tells the host its session is ending, before the sender stops (null = today)
+        if (isFinishing) {
+            stallMonitor?.let { m ->
+                m.requestBye()
+                val until = System.nanoTime() + 60_000_000L
+                while (m.byesSent == 0L && System.nanoTime() < until) {
+                    Thread.sleep(5L)
+                }
+            }
+        }
+
         // B11: the guard keeps the cached report and the cause for the next start (null = today)
         if (sessionStarted) {
             restartGuard?.onSurfaceLost(
@@ -683,11 +694,14 @@ class NativeStreamActivity :
         clientHealthControlRoundTripMs =
             null
 
+        // B17: a taken pending holds the audio until the guard's start response is in (null = today)
+        val guardHoldsAudio = restartGuard?.prepareStart() == true
+
         audioReceiver =
             NativeAudioReceiver(
                 port = AUDIO_PORT
             ).also {
-                it.start()
+                if (!guardHoldsAudio) it.start()
             }
 
         controllerSender =
@@ -775,13 +789,14 @@ class NativeStreamActivity :
             try {
                 // B11: a self-restart first ends the old session: its report, then native-stream-stop (null = today)
                 val restart = restartGuard?.takePending()
-                restart?.let { p -> restartGuard?.flush(p, { r -> postRestartReport(host, r) }, { postRestartStop(host) }) }
+                // B17: the old session's end rides in the start (guard_end=1); the report follows it
+                restart?.let { p -> restartGuard?.beginViaStart(p) }
 
                 val response =
                     httpPost(
                         "http://$host:$CONTROL_PORT" +
                             "/plugins/games/native-stream-start" +
-                            "?port=$VIDEO_PORT",
+                            "?port=$VIDEO_PORT" + (if (restart != null) "&guard_end=1" else ""),
                         readTimeoutMs =
                             30_000
                     )
@@ -790,6 +805,14 @@ class NativeStreamActivity :
                     JSONObject(
                         response
                     )
+
+                // B17: the host's acknowledgement, then the old report on its own thread (null = today)
+                restart?.let { p ->
+                    restartGuard?.noteStartResponse(json.optBoolean("guard_end", false))
+                    thread(start = true, isDaemon = true, name = "PrivyHub-Guard-Report") {
+                        restartGuard?.reportAfterStart(p) { r -> postRestartReport(host, r) }
+                    }
+                }
 
                 if (
                     !json.optBoolean(

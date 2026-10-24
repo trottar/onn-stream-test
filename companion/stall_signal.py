@@ -30,6 +30,7 @@ MIN_MS, MAX_MS = 150, 2000
 MAGIC = b"PHS1"
 PACKET = struct.Struct("<4sBBHIqI")         # 24 bytes
 KIND_STALL, KIND_END = 1, 2
+KIND_BYE = 3                # B18: the client's session is ending (a finishing activity, before its sender stops)
 FLAG_IN_GATE = 1
 REASON = "client_stall"
 QUIET_S = 0.30              # no stall for this long while the stall owns the pause = stall_end lost
@@ -53,7 +54,7 @@ def decode(data: bytes) -> tuple[int, bool, int, int, int] | None:
     if len(data) != PACKET.size or data[:4] != MAGIC:
         return None
     _m, kind, flags, _r, seq, frames, age = PACKET.unpack(data)
-    if kind not in (KIND_STALL, KIND_END):
+    if kind not in (KIND_STALL, KIND_END, KIND_BYE):
         return None
     return kind, bool(flags & FLAG_IN_GATE), seq, frames, age
 
@@ -107,6 +108,12 @@ class StallSignal:
 
     def handle(self, ev: tuple, rx: float) -> None:
         kind, gate, seq, frame, age = ev
+        # B18: the client's bye goes to the session's end (B9's state path); without it, ignored
+        if kind == KIND_BYE:
+            se = getattr(self.recovery, "_session_end", None)
+            if se is not None:
+                se.note_bye(rx, frame)
+            return
         state, reason, _key = self._state()
         if kind == KIND_STALL:
             self.stalls += 1

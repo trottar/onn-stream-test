@@ -17,6 +17,11 @@ from typing import Any, Callable
 
 from games import ps1_look  # C5-M5B
 
+# B20: PRIVYHUB_LINK_RECOVERY=1 implies the six stack lines (an explicit one wins), before B4's read below. Absent = today.
+if (os.environ.get("PRIVYHUB_LINK_RECOVERY") or "").strip():
+    import link_recovery as _link_recovery
+    _link_recovery.apply(os.environ)
+
 # B4: RetroArch's rewind in the launch config, only with PRIVYHUB_INPUT_HOLD and PRIVYHUB_INPUT_HOLD_REWIND set.
 # Absent = today's config byte for byte: nothing imported.
 _hold_rewind = None

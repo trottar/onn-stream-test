@@ -1,0 +1,458 @@
+diff --git a/PrivyHub/app/src/main/java/streaming/StallSignal.kt b/PrivyHub/app/src/main/java/streaming/StallSignal.kt
+index cc01d45..4d973b8 100644
+--- a/PrivyHub/app/src/main/java/streaming/StallSignal.kt
++++ b/PrivyHub/app/src/main/java/streaming/StallSignal.kt
+@@ -43,6 +43,8 @@ object StallPacket {
+     const val SIZE = 24
+     const val KIND_STALL = 1
+     const val KIND_END = 2
++    // B18: the session is ending (a finishing activity, before its sender stops)
++    const val KIND_BYE = 3
+     const val FLAG_IN_GATE = 1
+ 
+     /** "PHS1" | kind u8 | flags u8 | u16 0 | seq u32 | rendered frames i64 | output age ms u32 (little-endian). */
+@@ -68,6 +70,10 @@ data class StallInputs(
+ 
+ /** Pure: called from the controller loop (~every 8 ms); returns a datagram when one is due. */
+ class StallMonitor(val thresholdMs: Long, private val intervalMs: Long = 50L) {
++    companion object {
++        const val BYE_COUNT = 3
++    }
++
+     private var stalled = false
+     private var lastSentMs = 0L
+     private var seq = 0
+@@ -76,7 +82,25 @@ class StallMonitor(val thresholdMs: Long, private val intervalMs: Long = 50L) {
+     var endsSent = 0L
+         private set
+ 
++    // B18: the bye, sent on the next BYE_COUNT ticks whatever the stall state
++    @Volatile
++    private var byesDue = 0
++
++    @Volatile
++    var byesSent = 0L
++        private set
++
++    /** B18: a finishing activity, before its sender stops. */
++    fun requestBye() {
++        byesDue = BYE_COUNT
++    }
++
+     fun tick(nowMs: Long, inp: StallInputs): ByteArray? {
++        if (byesDue > 0) {
++            byesDue--
++            byesSent++
++            return StallPacket.encode(StallPacket.KIND_BYE, false, seq++, inp.renderedFrames, inp.outputAgeMs.coerceAtLeast(0L))
++        }
+         if (!stalled && (!inp.released || inp.outputAgeMs < 0L)) {
+             return null
+         }
+diff --git a/companion/games/link_drop_recovery.py b/companion/games/link_drop_recovery.py
+index d77eaac..f8155ce 100644
+--- a/companion/games/link_drop_recovery.py
++++ b/companion/games/link_drop_recovery.py
+@@ -97,6 +97,8 @@ class LinkDropRecovery:
+     _input_hold_b8: Any = None
+     # B12: the stall's resume owner (stall_owner.StallOwner; only PRIVYHUB_STALL_RESUME=1 wires it). None = today.
+     _stall_owner: Any = None
++    # B18: the session's end as the owner knows it (rewind_cores.SessionEnd; only PRIVYHUB_INPUT_HOLD_REWIND=state)
++    _session_end: Any = None
+ 
+     def __init__(
+         self,
+@@ -261,6 +263,10 @@ class LinkDropRecovery:
+         """B2: a controller silence >= H ms -- the same pause as controller_silence, reason input_hold.
+ 
+         True when this paused the game (the state was PLAYING)."""
++        # B18: the client said its session is ending: no hold
++        if self._session_end is not None and self._session_end.blocks_hold(self):
++            return False
++
+         with self._lock:
+             if self._state != STATE_PLAYING:
+                 return False
+diff --git a/companion/rewind_cores.py b/companion/rewind_cores.py
+index fa6aea2..41573b9 100644
+--- a/companion/rewind_cores.py
++++ b/companion/rewind_cores.py
+@@ -80,6 +80,75 @@ def _read(nci: Any, timeout: float, prefix: str) -> str | None:
+             return text
+ 
+ 
++BYE_S = 30.0                # B18: a client's bye holds for this long (the same PLAYING period only)
++PRODUCED_MS = 250           # B18: the stream is produced if its sender's packet count moved this recently
++
++
++class SessionEnd:
++    """B18: the session's end as the owner knows it -- no save and no hold once it is known.
++
++    CL-B11 cells 2 / 3: at each window's end the client's sender stopped at `surfaceDestroyed`, B9's silence save fired at
++    400 ms, and the client's report (+154-181 ms) and stop (+205-207 ms) came after it. Here the end is known from:
++    - the client's `bye` (PHS1 kind 3, sent by a finishing activity before its sender stops; B7's worker hands it over),
++      for the same PLAYING period (keyed to `_state_since`) and <= BYE_S;
++    - any state but PLAYING (the stop request, `native-stream-stop`, B17's `guard_end`: ENDED);
++    - the stream no longer produced: its sender's packet count (session_io's, one packet per 10 ms) has not moved for
++      PRODUCED_MS (the game's exit, the stream stopped).
++    """
++
++    def __init__(self, recovery: Any, clock: Callable[[], float] = time.monotonic):
++        self.recovery = recovery
++        self._clock = clock
++        self._bye: tuple[float, float] | None = None     # (receive time, the PLAYING period's key)
++        self.packets: Callable[[], int] | None = None     # the plugin's: the stream sender's packets sent
++        self._last_count: int | None = None
++        self._moved_at = 0.0
++        self.saves_skipped = 0
++        self.holds_skipped = 0
++
++    def sample(self, now: float) -> None:
++        f = self.packets
++        if f is None:
++            return
++        try:
++            c = int(f())
++        except Exception:
++            return
++        if self._last_count is None or c != self._last_count:
++            self._last_count = c
++            self._moved_at = now
++
++    def note_bye(self, rx: float, frame: int) -> None:
++        r = self.recovery
++        with r._lock:
++            key = r._state_since
++        first = self._bye is None or self._bye[1] != key
++        self._bye = (rx, key)
++        if first:
++            r._log("session_end_bye", client_frame=frame)
++
++    def ending(self, now: float) -> str | None:
++        r = self.recovery
++        with r._lock:
++            state, key = r._state, r._state_since
++        if state != "PLAYING":
++            return f"state_{str(state).lower()}"
++        b = self._bye
++        if b is not None and b[1] == key and now - b[0] <= BYE_S:
++            return "client_bye"
++        if self.packets is not None and self._last_count is not None and (now - self._moved_at) * 1000.0 > PRODUCED_MS:
++            return "stream_stopped"
++        return None
++
++    def blocks_hold(self, recovery: Any) -> bool:
++        """The recovery's `note_input_hold`, first: True = no hold (the client's bye)."""
++        if self.ending(self._clock()) != "client_bye":
++            return False
++        self.holds_skipped += 1
++        recovery._log("input_hold_skipped_ending", reason="client_bye")
++        return True
++
++
+ class StateMark:
+     """On B2's detector: once per silence, at STATE_AT ms, asks for the scratch save. Never blocks the loop."""
+ 
+@@ -88,10 +157,23 @@ class StateMark:
+         self.at_s = at_ms / 1000.0
+         self._marked = 0.0
+ 
++    # B18: the session's end (SessionEnd); None = B9
++    end: Any = None
++
+     def on_quiet(self, now: float, last_any_packet_at: float) -> None:
++        if self.end is not None:
++            self.end.sample(now)
+         if last_any_packet_at <= 0.0 or now - last_any_packet_at < self.at_s or last_any_packet_at == self._marked:
+             return
+         self._marked = last_any_packet_at
++        # B18: no save once the session's end is known
++        if self.end is not None:
++            why = self.end.ending(now)
++            if why:
++                self.end.saves_skipped += 1
++                self.cores.recovery._log("state_save_skipped", reason=why,
++                                         silence_ms=round((now - last_any_packet_at) * 1000.0, 1))
++                return
+         self.cores.request_save(last_any_packet_at, now)
+ 
+ 
+@@ -258,6 +340,10 @@ def wire(rw: Any, recovery: Any, controller: Any, emulator: Any, environ: Mappin
+         at_ms, why = parse_state_at(environ, hold_ms)
+         if det is not None and hasattr(det, "on_quiet"):
+             det.state_mark = StateMark(c, at_ms)
++            # B18: the session's end, on the mark and the recovery (no save, no hold once it is known)
++            se = SessionEnd(recovery)
++            det.state_mark.end = se
++            recovery._session_end = se
+     recovery._log("input_hold_rewind_cores_config", mode=m, allow=sorted(ALLOW), slot=(SLOT if m == "state" else None),
+                   state_at_ms=at_ms, state_at_note=why)
+     return c
+diff --git a/companion/stall_signal.py b/companion/stall_signal.py
+index 5828b3c..858ce19 100644
+--- a/companion/stall_signal.py
++++ b/companion/stall_signal.py
+@@ -30,6 +30,7 @@ MIN_MS, MAX_MS = 150, 2000
+ MAGIC = b"PHS1"
+ PACKET = struct.Struct("<4sBBHIqI")         # 24 bytes
+ KIND_STALL, KIND_END = 1, 2
++KIND_BYE = 3                # B18: the client's session is ending (a finishing activity, before its sender stops)
+ FLAG_IN_GATE = 1
+ REASON = "client_stall"
+ QUIET_S = 0.30              # no stall for this long while the stall owns the pause = stall_end lost
+@@ -53,7 +54,7 @@ def decode(data: bytes) -> tuple[int, bool, int, int, int] | None:
+     if len(data) != PACKET.size or data[:4] != MAGIC:
+         return None
+     _m, kind, flags, _r, seq, frames, age = PACKET.unpack(data)
+-    if kind not in (KIND_STALL, KIND_END):
++    if kind not in (KIND_STALL, KIND_END, KIND_BYE):
+         return None
+     return kind, bool(flags & FLAG_IN_GATE), seq, frames, age
+ 
+@@ -107,6 +108,12 @@ class StallSignal:
+ 
+     def handle(self, ev: tuple, rx: float) -> None:
+         kind, gate, seq, frame, age = ev
++        # B18: the client's bye goes to the session's end (B9's state path); without it, ignored
++        if kind == KIND_BYE:
++            se = getattr(self.recovery, "_session_end", None)
++            if se is not None:
++                se.note_bye(rx, frame)
++            return
+         state, reason, _key = self._state()
+         if kind == KIND_STALL:
+             self.stalls += 1
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -197,6 +197,9 @@
+         if _hold_rewind is not None:
+             _hold_rewind.wire(self._recovery, self._native_stream._session_io.controller, self._emulator,
+                               os.environ, self.PROJECT_ROOT)
++        # B18: the session's end reads the stream sender's packet count (B9's state path only)
++        if getattr(self._recovery, "_session_end", None) is not None:
++            self._recovery._session_end.packets = lambda: self._native_stream._session_io._linux_packets_sent
+         # B6: after B2's and B4's wires (H, the cap rule, the resume, B4's cap default)
+         if _hold_tuning is not None:
+             _hold_tuning.wire(self._recovery, self._native_stream._session_io.controller, os.environ)
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -545,6 +545,17 @@
+             cacheSessionReport()
+         }
+ 
++        // B18: a finishing activity tells the host its session is ending, before the sender stops (null = today)
++        if (isFinishing) {
++            stallMonitor?.let { m ->
++                m.requestBye()
++                val until = System.nanoTime() + 60_000_000L
++                while (m.byesSent == 0L && System.nanoTime() < until) {
++                    Thread.sleep(5L)
++                }
++            }
++        }
++
+         // B11: the guard keeps the cached report and the cause for the next start (null = today)
+         if (sessionStarted) {
+             restartGuard?.onSurfaceLost(
+diff --git a/PrivyHub/app/src/test/java/streaming/StallByeTest.kt b/PrivyHub/app/src/test/java/streaming/StallByeTest.kt
+new file mode 100644
+index 0000000..54edf2a
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/StallByeTest.kt
+@@ -0,0 +1,36 @@
++package com.safeiot.privyhub.streaming
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertNull
++import org.junit.Test
++
++/**
++ * B18: the stall monitor's bye -- a finishing activity, before its sender stops, sends PHS1 kind 3 on the next three
++ * controller ticks whatever the stall state (the host's B9 state path then saves nothing and holds nothing for the
++ * silence that follows); then today's ticks.
++ */
++class StallByeTest {
++    private fun kind(d: ByteArray) = d[4].toInt()
++    private fun inp(age: Long, released: Boolean = true) = StallInputs(age, 1_000L, false, released)
++
++    @Test
++    fun aRequestedByeGoesOutThreeTimesWhateverTheState() {
++        val m = StallMonitor(150L)
++        assertNull(m.tick(0L, inp(10L)))                           // playing: nothing today
++        m.requestBye()
++        val sent = (1..3).map { m.tick(it * 8L, inp(10L, released = false))!! }
++        assertEquals(listOf(3, 3, 3), sent.map { kind(it) })
++        assertEquals(StallPacket.SIZE, sent[0].size)
++        assertEquals(3L, m.byesSent)
++        assertNull(m.tick(40L, inp(10L)))                          // then today's tick
++        assertEquals(0L, m.stallsSent)
++    }
++
++    @Test
++    fun withoutARequestNoBye() {
++        val m = StallMonitor(150L)
++        repeat(10) { m.tick(it * 8L, inp(10L)) }
++        assertEquals(0L, m.byesSent)
++        assertEquals(3, StallPacket.KIND_BYE)
++    }
++}
+diff --git a/tests/session_end/test_session_end.py b/tests/session_end/test_session_end.py
+new file mode 100644
+index 0000000..55819f0
+--- /dev/null
++++ b/tests/session_end/test_session_end.py
+@@ -0,0 +1,155 @@
++#!/usr/bin/env python3
++"""B18: no save and no hold once the session's end is known (inside `PRIVYHUB_INPUT_HOLD_REWIND=1`, `state`).
++
++    python3 -m unittest discover -s tests/session_end -v
++
++B9's loopback fake core and rig (the real recovery, B4's Rewinder with B9's Cores, B2's detector with B9's mark), B7's
++real StallSignal (its worker by hand), B18's SessionEnd wired by B9's own `wire`. CL-B11 cells 2 / 3: at each window's
++end the controller went silent, B9's save fired at 400 ms, then the client's report (+154-181 ms) and stop (+205-207).
++The design: `docs/memory/evidence/b18_2026-10-24/design_written_before_code.md` (hashed before this code).
++"""
++
++from __future__ import annotations
++
++import os
++import subprocess
++import sys
++import time
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(ROOT / "tests" / "rewind_cores"))
++
++import rewind_cores as rc  # noqa: E402
++import stall_signal as ss  # noqa: E402
++import test_rewind_cores as b9  # noqa: E402
++from games import link_drop_recovery as ldr  # noqa: E402
++
++SNES = b9.SNES
++
++
++class Teardown:
++    def __init__(self):
++        self.rig = b9.Rig("1", SNES)
++        self.rec = self.rig.rec
++        self.se = self.rec._session_end
++        self.sig = ss.StallSignal(self.rec, ss.parse("1")[0], threaded=False)
++        self.rec._client_stall = self.sig
++        self.packets = 0
++        self.se.packets = lambda: self.packets
++
++    def quiet(self, onset, upto_s, step=0.01, produce=True):
++        """The controller loop's timeouts after the last packet at `onset`: B2's detector (B9's mark first)."""
++        t = onset
++        while t <= onset + upto_s:
++            if produce:
++                self.packets += 1                                      # the stream's sender, every 10 ms
++            self.rig.det.on_quiet(t, onset)
++            t += step
++
++    def events(self):
++        return [r["event"] for r in b9.rows(self.rec) if not r["event"].endswith("_config")]
++
++    def stop(self):
++        self.rig.stop()
++
++
++class NormalTeardown(unittest.TestCase):
++    def test_the_bye_then_the_silence_no_save_no_hold_zero_state_saved(self):
++        t = Teardown()
++        try:
++            self.assertIsNotNone(t.se)
++            onset = time.monotonic()
++            t.sig.handle((ss.KIND_BYE, False, 1, 40_000, 8), onset)      # the client's bye, then its sender stops
++            t.quiet(onset, 0.62)                                         # the 400-ms mark passes; the stop at ~0.61 s
++            self.assertFalse(t.rec.note_input_hold(955.0))               # B2's hold at ~950 ms: skipped
++            t.rec.session_ended()                                        # the client's native-stream-stop
++            self.assertEqual(t.rig.wait_saves(1, timeout=0.5), 0)
++            ev = t.events()
++            self.assertEqual(ev.count("state_saved"), 0)
++            self.assertIn("session_end_bye", ev)
++            skipped = [r for r in b9.rows(t.rec) if r["event"] == "state_save_skipped"]
++            self.assertEqual([(s["reason"]) for s in skipped], ["client_bye"])
++            self.assertIn("input_hold_skipped_ending", ev)
++            self.assertNotIn("desync_pause", ev)
++            self.assertEqual(t.rec.calls, [])
++        finally:
++            t.stop()
++
++    def test_a_blackout_without_a_bye_saves_as_today(self):
++        t = Teardown()
++        try:
++            onset = time.monotonic()
++            t.quiet(onset, 0.45)
++            self.assertEqual(t.rig.wait_saves(1), 1)
++            self.assertEqual(t.events().count("state_saved"), 1)
++        finally:
++            t.stop()
++
++    def test_the_stream_no_longer_produced_saves_nothing(self):
++        t = Teardown()
++        try:
++            onset = time.monotonic()
++            t.quiet(onset, 0.45, produce=False)                          # the sender's count flat
++            self.assertEqual(t.rig.wait_saves(1, timeout=0.3), 0)
++            skipped = [r for r in b9.rows(t.rec) if r["event"] == "state_save_skipped"]
++            self.assertEqual([s["reason"] for s in skipped], ["stream_stopped"])
++        finally:
++            t.stop()
++
++    def test_the_session_ended_saves_nothing(self):
++        t = Teardown()
++        try:
++            t.rec.session_ended()
++            onset = time.monotonic()
++            t.quiet(onset, 0.45)
++            self.assertEqual(t.rig.wait_saves(1, timeout=0.3), 0)
++            self.assertEqual([r["reason"] for r in b9.rows(t.rec) if r["event"] == "state_save_skipped"],
++                             ["state_ended"])
++        finally:
++            t.stop()
++
++    def test_a_new_session_after_a_bye_saves_again(self):
++        t = Teardown()
++        try:
++            t.sig.handle((ss.KIND_BYE, False, 1, 40_000, 8), time.monotonic())
++            t.rec.session_ended()
++            t.rec.session_started()                                      # the next session: a new PLAYING period
++            onset = time.monotonic()
++            t.quiet(onset, 0.45)
++            self.assertEqual(t.rig.wait_saves(1), 1)
++        finally:
++            t.stop()
++
++
++class TheWiring(unittest.TestCase):
++    def test_b7_decodes_the_bye_and_ignores_it_without_b9(self):
++        pkt = ss.PACKET.pack(ss.MAGIC, ss.KIND_BYE, 0, 0, 1, 2, 3)
++        self.assertEqual(ss.decode(pkt), (3, False, 1, 2, 3))
++        rec = b9.recovery()
++        sig = ss.StallSignal(rec, 400, threaded=False)
++        sig.handle((ss.KIND_BYE, False, 1, 2, 3), time.monotonic())
++        self.assertEqual([r["event"] for r in b9.rows(rec)], [])
++        self.assertEqual((sig.stalls, sig.ends), (0, 0))
++
++    def test_only_the_state_path_wires_it(self):
++        rig = b9.Rig("rewind", SNES)
++        try:
++            self.assertIsNone(rig.rec._session_end)
++        finally:
++            rig.stop()
++        self.assertIsNone(ldr.LinkDropRecovery._session_end)
++
++    def test_flag_absent_nothing_imported(self):
++        env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++        code = ("import sys; sys.path.insert(0, 'companion'); from games import link_drop_recovery as l; "
++                "print('rewind_cores' in sys.modules, l.LinkDropRecovery._session_end)")
++        out = subprocess.run([sys.executable, "-B", "-c", code], cwd=ROOT, env=env, capture_output=True, text=True,
++                             timeout=120)
++        self.assertEqual(out.stdout.strip(), "False None", out.stderr[-400:])
++
++
++if __name__ == "__main__":
++    unittest.main()

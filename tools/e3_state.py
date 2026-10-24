@@ -5,4 +5,7 @@ spec=importlib.util.spec_from_file_location('s','/home/privyhub/Projects/onn-str
 mp=m.mainpid()
 d={"at_utc":m.utc(),"preflight":m.preflight(),"ps1_files_identical":m.ps1_files_identical(),"apk":"CONFIRMED" if m.apk_hash()==m.EXPECT_APK else "MISMATCH","retroarch":len(m.retroarch_pids()),"encoder":len(m.encoder_pids()),"mainpid_serves_8765":mp==m.serving_pid()}
 d["ok"]=d["preflight"]["ok"] and d["ps1_files_identical"] and d["apk"]=="CONFIRMED" and not d["preflight"]["game_active"] and d["retroarch"]==0 and d["encoder"]==0
+# B20: the six PRIVYHUB_LINK_RECOVERY implies, as they will act -- only when the service's environ carries it (absent: no key)
+if any(x.startswith("PRIVYHUB_LINK_RECOVERY=") for x in d["preflight"]["environ"]):
+    sys.path.insert(0,'/home/privyhub/Projects/onn-stream-test/companion'); import link_recovery; d["link_recovery"]=link_recovery.describe(d["preflight"]["environ"])
 print(json.dumps(d))

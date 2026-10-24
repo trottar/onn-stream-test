@@ -277,6 +277,6 @@ class RestartGuardAllPathsTest {
         w.close()
         assertEquals(listOf("start", "start"), host.posts)        // no stop, the report lost
         assertTrue(audio === carried)                             // the receiver carried over (the storm's state)
-        assertFalse(RestartGuardFlag.fromSystem())
+        assertFalse(RestartGuardFlag.parse("0"))                 // B19: `0` is today's off
     }
 }

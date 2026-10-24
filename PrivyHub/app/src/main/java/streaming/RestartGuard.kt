@@ -2,6 +2,7 @@ package com.safeiot.privyhub.streaming
 
 import java.io.File
 import java.util.Properties
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -24,18 +25,27 @@ import java.util.concurrent.atomic.AtomicLong
  * Home press) -- flushes it too; `restart_cause.trigger` names the path (`surface` / `recreate` / `process`). A
  * recreation hands the session over instead of racing its own stop against the next start, and a pending another
  * instance already flushed is not posted twice.
+ *
+ * B17 (the same property): CL-B11's new instance started its audio on the host's old stream and starved for ~3.4 s
+ * while B15's flush waited on the host's stop (~2.3 s of encoder teardown). Here the pending is taken before the audio
+ * (`prepareStart`), the audio waits for the start response, and the old session's end rides in the start
+ * (`native-stream-start?…&guard_end=1`, which runs the stop's bookkeeping first; its own `_stop_locked()` ends the
+ * stream); the old report follows the start. No separate stop: one that is not waited on could reach the host's lock
+ * after the start and end the new stream.
  */
 object RestartGuardFlag {
     const val PROPERTY = "debug.privyhub.restart_guard"
 
-    fun parse(value: String?): Boolean = value?.trim() == "1"
+    // B19: on unless `0` (as B13's link_report): a reboot clears debug properties, and the guard must survive it
+    fun parse(value: String?): Boolean = value?.trim() != "0"
 
+    /** The property, read through reflection; a failed read is absent, so on (B19). */
     fun fromSystem(): Boolean =
         try {
             val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
             parse(get.invoke(null, PROPERTY) as? String)
         } catch (_: Throwable) {
-            false
+            parse(null)
         }
 }
 
@@ -136,6 +146,16 @@ class RestartGuard(private val clockMs: () -> Long = { System.nanoTime() / 1_000
     @Volatile
     private var persisted = false
 
+    // B17: this instance's creation, the pending taken before the audio (once), the live cause the start updates
+    @Volatile
+    private var createdAtMs = -1L
+
+    @Volatile
+    private var prepared: PendingRestart? = null
+
+    @Volatile
+    private var preparedSet = false
+
     @Volatile
     private var lastPauseAtMs = -1L
 
@@ -156,6 +176,14 @@ class RestartGuard(private val clockMs: () -> Long = { System.nanoTime() / 1_000
         this.store = store
         this.instance = instance
         this.processMark = processMark
+        createdAtMs = clockMs()
+    }
+
+    /** B17, `startSession` before the audio receiver: take the pending now; true = a restart (the audio waits). */
+    fun prepareStart(): Boolean {
+        prepared = takeNow()
+        preparedSet = true
+        return prepared != null
     }
 
     /** `surfaceDestroyed`, before the pipeline stops (a session was started). */
@@ -213,6 +241,20 @@ class RestartGuard(private val clockMs: () -> Long = { System.nanoTime() / 1_000
 
     /** The session thread, before `native-stream-start`: the pending restart (once), or null for a normal start. */
     fun takePending(): PendingRestart? {
+        // B17: the one `prepareStart` took already
+        if (preparedSet) {
+            preparedSet = false
+            val p = prepared
+            prepared = null
+            if (p == null) {
+                lastCause = null
+            }
+            return p
+        }
+        return takeNow()
+    }
+
+    private fun takeNow(): PendingRestart? {
         var p = pending
         pending = null
         // B15: the store first: this instance's own (`surface`), another instance's (`recreate`), another process's
@@ -237,6 +279,43 @@ class RestartGuard(private val clockMs: () -> Long = { System.nanoTime() / 1_000
             lastCause = null
         }
         return p
+    }
+
+    /**
+     * B17, the session thread before `native-stream-start?…&guard_end=1`: the cause, nothing posted yet (the start
+     * carries the old session's end; the report follows it).
+     */
+    fun beginViaStart(p: PendingRestart): Map<String, Any> {
+        restarts++
+        val now = clockMs()
+        val away = now - p.lostAtMs
+        val cause = ConcurrentHashMap<String, Any>()
+        cause["away_ms"] = if (away >= 0L || store == null) away.coerceAtLeast(0L) else -1L
+        cause["last_frame_age_ms"] = p.lastFrameAgeMs
+        cause["rtp_silence_ms"] = p.rtpSilenceMs
+        cause["recovery_active"] = p.recoveryActive
+        cause["paused_before_loss_ms"] = p.pausedBeforeLossMs
+        cause["old_report_posted"] = false
+        cause["stop_posted"] = false
+        cause["restarts"] = restarts
+        cause["trigger"] = p.trigger
+        cause["flush"] = "via_start"
+        cause["create_to_start_ms"] = if (createdAtMs >= 0L) (now - createdAtMs).coerceAtLeast(0L) else -1L
+        cause["host_ended_session"] = false
+        lastCause = cause
+        return cause
+    }
+
+    /** B17: the start's response: the host ran the stop's bookkeeping (`"guard_end": true`). */
+    fun noteStartResponse(hostEndedSession: Boolean) {
+        (lastCause as? MutableMap<String, Any>)?.put("host_ended_session", hostEndedSession)
+    }
+
+    /** B17, its own thread after the start's response: the old report; a failed post is recorded, never thrown. */
+    fun reportAfterStart(p: PendingRestart, postReport: (String) -> Unit): Boolean {
+        val ok = !p.report.isNullOrBlank() && try { postReport(p.report); true } catch (_: Exception) { false }
+        (lastCause as? MutableMap<String, Any>)?.put("old_report_posted", ok)
+        return ok
     }
 
     /**

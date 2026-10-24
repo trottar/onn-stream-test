@@ -1,0 +1,441 @@
+diff --git a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+index a27aa82..cf6b04b 100644
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -683,11 +683,14 @@ class NativeStreamActivity :
+         clientHealthControlRoundTripMs =
+             null
+ 
++        // B17: a taken pending holds the audio until the guard's start response is in (null = today)
++        val guardHoldsAudio = restartGuard?.prepareStart() == true
++
+         audioReceiver =
+             NativeAudioReceiver(
+                 port = AUDIO_PORT
+             ).also {
+-                it.start()
++                if (!guardHoldsAudio) it.start()
+             }
+ 
+         controllerSender =
+@@ -775,13 +778,14 @@ class NativeStreamActivity :
+             try {
+                 // B11: a self-restart first ends the old session: its report, then native-stream-stop (null = today)
+                 val restart = restartGuard?.takePending()
+-                restart?.let { p -> restartGuard?.flush(p, { r -> postRestartReport(host, r) }, { postRestartStop(host) }) }
++                // B17: the old session's end rides in the start (guard_end=1); the report follows it
++                restart?.let { p -> restartGuard?.beginViaStart(p) }
+ 
+                 val response =
+                     httpPost(
+                         "http://$host:$CONTROL_PORT" +
+                             "/plugins/games/native-stream-start" +
+-                            "?port=$VIDEO_PORT",
++                            "?port=$VIDEO_PORT" + (if (restart != null) "&guard_end=1" else ""),
+                         readTimeoutMs =
+                             30_000
+                     )
+@@ -791,6 +795,14 @@ class NativeStreamActivity :
+                         response
+                     )
+ 
++                // B17: the host's acknowledgement, then the old report on its own thread (null = today)
++                restart?.let { p ->
++                    restartGuard?.noteStartResponse(json.optBoolean("guard_end", false))
++                    thread(start = true, isDaemon = true, name = "PrivyHub-Guard-Report") {
++                        restartGuard?.reportAfterStart(p) { r -> postRestartReport(host, r) }
++                    }
++                }
++
+                 if (
+                     !json.optBoolean(
+                         "active",
+diff --git a/PrivyHub/app/src/main/java/streaming/RestartGuard.kt b/PrivyHub/app/src/main/java/streaming/RestartGuard.kt
+index 51cdf31..153e0c8 100644
+--- a/PrivyHub/app/src/main/java/streaming/RestartGuard.kt
++++ b/PrivyHub/app/src/main/java/streaming/RestartGuard.kt
+@@ -2,6 +2,7 @@ package com.safeiot.privyhub.streaming
+ 
+ import java.io.File
+ import java.util.Properties
++import java.util.concurrent.ConcurrentHashMap
+ import java.util.concurrent.atomic.AtomicLong
+ 
+ /**
+@@ -24,6 +25,13 @@ import java.util.concurrent.atomic.AtomicLong
+  * Home press) -- flushes it too; `restart_cause.trigger` names the path (`surface` / `recreate` / `process`). A
+  * recreation hands the session over instead of racing its own stop against the next start, and a pending another
+  * instance already flushed is not posted twice.
++ *
++ * B17 (the same property): CL-B11's new instance started its audio on the host's old stream and starved for ~3.4 s
++ * while B15's flush waited on the host's stop (~2.3 s of encoder teardown). Here the pending is taken before the audio
++ * (`prepareStart`), the audio waits for the start response, and the old session's end rides in the start
++ * (`native-stream-start?…&guard_end=1`, which runs the stop's bookkeeping first; its own `_stop_locked()` ends the
++ * stream); the old report follows the start. No separate stop: one that is not waited on could reach the host's lock
++ * after the start and end the new stream.
+  */
+ object RestartGuardFlag {
+     const val PROPERTY = "debug.privyhub.restart_guard"
+@@ -136,6 +144,16 @@ class RestartGuard(private val clockMs: () -> Long = { System.nanoTime() / 1_000
+     @Volatile
+     private var persisted = false
+ 
++    // B17: this instance's creation, the pending taken before the audio (once), the live cause the start updates
++    @Volatile
++    private var createdAtMs = -1L
++
++    @Volatile
++    private var prepared: PendingRestart? = null
++
++    @Volatile
++    private var preparedSet = false
++
+     @Volatile
+     private var lastPauseAtMs = -1L
+ 
+@@ -156,6 +174,14 @@ class RestartGuard(private val clockMs: () -> Long = { System.nanoTime() / 1_000
+         this.store = store
+         this.instance = instance
+         this.processMark = processMark
++        createdAtMs = clockMs()
++    }
++
++    /** B17, `startSession` before the audio receiver: take the pending now; true = a restart (the audio waits). */
++    fun prepareStart(): Boolean {
++        prepared = takeNow()
++        preparedSet = true
++        return prepared != null
+     }
+ 
+     /** `surfaceDestroyed`, before the pipeline stops (a session was started). */
+@@ -213,6 +239,20 @@ class RestartGuard(private val clockMs: () -> Long = { System.nanoTime() / 1_000
+ 
+     /** The session thread, before `native-stream-start`: the pending restart (once), or null for a normal start. */
+     fun takePending(): PendingRestart? {
++        // B17: the one `prepareStart` took already
++        if (preparedSet) {
++            preparedSet = false
++            val p = prepared
++            prepared = null
++            if (p == null) {
++                lastCause = null
++            }
++            return p
++        }
++        return takeNow()
++    }
++
++    private fun takeNow(): PendingRestart? {
+         var p = pending
+         pending = null
+         // B15: the store first: this instance's own (`surface`), another instance's (`recreate`), another process's
+@@ -239,6 +279,43 @@ class RestartGuard(private val clockMs: () -> Long = { System.nanoTime() / 1_000
+         return p
+     }
+ 
++    /**
++     * B17, the session thread before `native-stream-start?…&guard_end=1`: the cause, nothing posted yet (the start
++     * carries the old session's end; the report follows it).
++     */
++    fun beginViaStart(p: PendingRestart): Map<String, Any> {
++        restarts++
++        val now = clockMs()
++        val away = now - p.lostAtMs
++        val cause = ConcurrentHashMap<String, Any>()
++        cause["away_ms"] = if (away >= 0L || store == null) away.coerceAtLeast(0L) else -1L
++        cause["last_frame_age_ms"] = p.lastFrameAgeMs
++        cause["rtp_silence_ms"] = p.rtpSilenceMs
++        cause["recovery_active"] = p.recoveryActive
++        cause["paused_before_loss_ms"] = p.pausedBeforeLossMs
++        cause["old_report_posted"] = false
++        cause["stop_posted"] = false
++        cause["restarts"] = restarts
++        cause["trigger"] = p.trigger
++        cause["flush"] = "via_start"
++        cause["create_to_start_ms"] = if (createdAtMs >= 0L) (now - createdAtMs).coerceAtLeast(0L) else -1L
++        cause["host_ended_session"] = false
++        lastCause = cause
++        return cause
++    }
++
++    /** B17: the start's response: the host ran the stop's bookkeeping (`"guard_end": true`). */
++    fun noteStartResponse(hostEndedSession: Boolean) {
++        (lastCause as? MutableMap<String, Any>)?.put("host_ended_session", hostEndedSession)
++    }
++
++    /** B17, its own thread after the start's response: the old report; a failed post is recorded, never thrown. */
++    fun reportAfterStart(p: PendingRestart, postReport: (String) -> Unit): Boolean {
++        val ok = !p.report.isNullOrBlank() && try { postReport(p.report); true } catch (_: Exception) { false }
++        (lastCause as? MutableMap<String, Any>)?.put("old_report_posted", ok)
++        return ok
++    }
++
+     /**
+      * Ends the old session in order — its report, then the stop — and records the cause. The transport is the
+      * activity's (the tests' fake); a failed post is recorded, never thrown.
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index c5709f8..948fedc 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -3825,6 +3825,12 @@ class GamesPlugin:
+             }
+ 
+         if action == "native-stream-start":
++            # B17: a guarded client restart ends the old session here, in the same request, before the new start (the
++            # stop's bookkeeping; the start's own _stop_locked() ends the stream). Absent: today.
++            guard_end = self._first(query, "guard_end") == "1"
++            if guard_end:
++                self._recovery.session_ended()
++                self._adaptive_bitrate_session_ended()
+             game_status = self._emulator.status()
+             if not game_status.get("active", False):
+                 raise RuntimeError("Launch a game before starting Native Video Alpha.")
+@@ -3875,6 +3881,9 @@ class GamesPlugin:
+                 # no key)
+                 if getattr(self._recovery, "_stall_owner", None) is not None:
+                     payload["stall_resume"] = self._recovery._stall_owner.client_hint()
++                # B17: the guarded client's end acknowledged (absent: no key)
++                if guard_end:
++                    payload["guard_end"] = True
+                 return payload
+             except NativeStreamError as exc:
+                 raise RuntimeError(str(exc)) from exc
+diff --git a/PrivyHub/app/src/test/java/streaming/RestartGuardAudioOrderTest.kt b/PrivyHub/app/src/test/java/streaming/RestartGuardAudioOrderTest.kt
+new file mode 100644
+index 0000000..e5ce4f6
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/RestartGuardAudioOrderTest.kt
+@@ -0,0 +1,158 @@
++package com.safeiot.privyhub.streaming
++
++import java.io.File
++import java.nio.file.Files
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * B17: the audio waits for the guard's start, and the old session's end rides in the start. B15's harness (a temp
++ * file as the store, an injected clock, the activity's calls modelled in order) with a slow fake host: 300 ms per post,
++ * on the clock. CL-B11 cell 1: the new instance's `startSession` ran 0.67 s after its creation; B15's two posts before
++ * the start (report, stop) then held the start back while the new receiver played the host's old stream and starved
++ * (221 underruns). The audio's sequence state is the real OpusReorder.
++ */
++class RestartGuardAudioOrderTest {
++
++    private val dir: File = Files.createTempDirectory("b17_store_").toFile()
++    private var n = 0
++    private fun storeFile(): File = File(dir, "pending_${n++}.properties")
++
++    private val surfaceMs = 670L                                   // CL-B11: creation -> startSession
++
++    private class Audio(val clock: LongArray) {
++        var startedAtMs = -1L
++        val reorder = OpusReorder()
++        fun start() { startedAtMs = clock[0] }
++    }
++
++    /** 300 ms per post on the clock; the start answers `guard_end` only when [acks]. */
++    private class SlowHost(val clock: LongArray, val acks: Boolean = true) {
++        val posts = mutableListOf<Pair<String, Long>>()
++        fun post(what: String): Boolean {
++            posts.add(what to clock[0])
++            clock[0] += 300L
++            return acks && what.endsWith("&guard_end=1")
++        }
++        fun names() = posts.map { it.first }
++        fun at(prefix: String) = posts.first { it.first.startsWith(prefix) }.second
++    }
++
++    private class Run(val audioAtStart: Audio, val audioAfter: Audio, val startResponseAt: Long)
++
++    /** The activity, B17: the surface, `startSession` (prepare, the receiver held or started), the session thread. */
++    private fun startB17(g: RestartGuard?, host: SlowHost, clock: LongArray): Run {
++        clock[0] += surfaceMs
++        val holds = g?.prepareStart() == true
++        val audio = Audio(clock).also { if (!holds) it.start() }
++        val restart = g?.takePending()
++        restart?.let { p -> g.beginViaStart(p) }
++        val acked = host.post("start?port=48100" + (if (restart != null) "&guard_end=1" else ""))
++        val responseAt = clock[0]
++        var after = audio
++        if (restart != null) {
++            g.noteStartResponse(acked)
++            after = Audio(clock).also { it.start() }                 // B11's rebuild after the response
++            g.reportAfterStart(restart) { r -> host.post("report:$r") }   // its own thread in the app
++        }
++        return Run(audio, after, responseAt)
++    }
++
++    /** The old instance: a session, then its surface lost (the pending written). */
++    private fun lose(g: RestartGuard, clock: LongArray, name: String) {
++        g.onSurfaceLost("{\"session\":\"$name\"}", 15L, 10L, false)
++        clock[0] += 19_500L                                         // away (CL-B11: ~19.5 s to the new instance)
++    }
++
++    @Test
++    fun theRecreatePathWithASlowHost() {
++        val clock = longArrayOf(1_000L)
++        val f = storeFile()
++        val a = RestartGuard { clock[0] }.also { it.attach(FilePendingStore(f), 1L, 100L) }
++        lose(a, clock, "A")
++        val created = clock[0]
++        val b = RestartGuard { clock[0] }.also { it.attach(FilePendingStore(f), 2L, 100L) }   // a new instance
++        val host = SlowHost(clock)
++        val r = startB17(b, host, clock)
++        assertEquals(listOf("start?port=48100&guard_end=1", "report:{\"session\":\"A\"}"), host.names())
++        assertEquals(0, host.names().count { it.startsWith("stop") })                  // no separate stop
++        val createToStart = host.at("start") - created
++        assertTrue(createToStart <= 1_000L)                                            // R2
++        assertEquals(surfaceMs, createToStart)
++        assertEquals(-1L, r.audioAtStart.startedAtMs)                                  // held: never started
++        assertTrue(r.audioAfter.startedAtMs >= r.startResponseAt)                      // after the start's response
++        val c = b.lastCause!!
++        assertEquals("recreate", c["trigger"])
++        assertEquals("via_start", c["flush"])
++        assertEquals(createToStart, c["create_to_start_ms"])
++        assertEquals(true, c["host_ended_session"])
++        assertEquals(true, c["old_report_posted"])
++        assertEquals(false, c["stop_posted"])
++        assertEquals(19_500L + surfaceMs, c["away_ms"])
++        // the rebuilt audio plays the host's restarted stream from sequence 0
++        val sink = mutableListOf<Int>()
++        for (s in 0..299) r.audioAfter.reorder.offer(s, byteArrayOf(1), 0, { k, p -> if (p != null) sink.add(k) })
++        assertEquals(300, sink.size)
++        // B15's order with the same host: report, stop, then the start at 1.27 s (and the host's ~2.3-s stop besides)
++        val clock2 = longArrayOf(0L)
++        val old = SlowHost(clock2)
++        clock2[0] += surfaceMs
++        old.post("report"); old.post("stop"); old.post("start")
++        assertEquals(1_270L, old.at("start"))
++    }
++
++    @Test
++    fun theSurfaceAndProcessPathsTheSameWay() {
++        for ((mark, trigger) in listOf(100L to "surface", 7_000L to "process")) {
++            val clock = longArrayOf(5_000L)
++            val f = storeFile()
++            val a = RestartGuard { clock[0] }.also { it.attach(FilePendingStore(f), 1L, 100L) }
++            lose(a, clock, "A")
++            val g = if (trigger == "surface") a else RestartGuard { clock[0] }.also { it.attach(FilePendingStore(f), 1L, mark) }
++            val host = SlowHost(clock)
++            val r = startB17(g, host, clock)
++            assertEquals(trigger, listOf("start?port=48100&guard_end=1", "report:{\"session\":\"A\"}"), host.names())
++            assertEquals(trigger, g.lastCause!!["trigger"])
++            assertEquals(-1L, r.audioAtStart.startedAtMs)
++            assertTrue(r.audioAfter.startedAtMs >= r.startResponseAt)
++        }
++    }
++
++    @Test
++    fun aHostWithoutGuardEndIsRecordedNotWorkedAround() {
++        val clock = longArrayOf(0L)
++        val f = storeFile()
++        val a = RestartGuard { clock[0] }.also { it.attach(FilePendingStore(f), 1L, 100L) }
++        lose(a, clock, "A")
++        val b = RestartGuard { clock[0] }.also { it.attach(FilePendingStore(f), 2L, 100L) }
++        val host = SlowHost(clock, acks = false)
++        startB17(b, host, clock)
++        assertEquals(1, host.names().count { it.startsWith("start") })
++        assertEquals(false, b.lastCause!!["host_ended_session"])
++        assertEquals(0, host.names().count { it.startsWith("stop") })                  // never a stop after a start
++    }
++
++    @Test
++    fun aNormalStartAfterPrepareIsANormalStart() {
++        val clock = longArrayOf(0L)
++        val g = RestartGuard { clock[0] }.also { it.attach(FilePendingStore(storeFile()), 1L, 100L) }
++        val host = SlowHost(clock)
++        val r = startB17(g, host, clock)
++        assertEquals(listOf("start?port=48100"), host.names())
++        assertTrue(r.audioAtStart.startedAtMs >= 0L)                                    // started at once, as today
++        assertNull(g.lastCause)
++    }
++
++    @Test
++    fun theFlagAbsentIsToday() {
++        val clock = longArrayOf(0L)
++        val host = SlowHost(clock)
++        val r = startB17(null, host, clock)
++        assertEquals(listOf("start?port=48100"), host.names())
++        assertEquals(surfaceMs, r.audioAtStart.startedAtMs)                             // the receiver at once
++        assertFalse(RestartGuardFlag.parse(null))
++    }
++}
+diff --git a/tests/guard_end/test_guard_end.py b/tests/guard_end/test_guard_end.py
+new file mode 100644
+index 0000000..4cf71b0
+--- /dev/null
++++ b/tests/guard_end/test_guard_end.py
+@@ -0,0 +1,69 @@
++#!/usr/bin/env python3
++"""B17: `native-stream-start?…&guard_end=1` -- a guarded client restart ends the old session in the start request
++itself (the stop action's bookkeeping, at the action's entry), then today's start; the response acknowledges it.
++Without the parameter the action is today's (the AST proof in evidence/b17_2026-10-24/).
++
++    python3 -m unittest discover -s tests/guard_end -v
++
++`plugins/games.py` loaded alone (tests/remote_ladder's way: constructs nothing), a fake emulator, recovery, stream.
++"""
++
++from __future__ import annotations
++
++import importlib.util
++import sys
++import types
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++
++
++def load_games_plugin():
++    spec = importlib.util.spec_from_file_location("b17_games_plugin", ROOT / "companion" / "plugins" / "games.py")
++    mod = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(mod)
++    return mod
++
++
++G = load_games_plugin()
++
++
++def plugin(calls):
++    class Emu:
++        def status(self):
++            calls.append("emulator_status")
++            return {"active": True, "paused": True, "pid": 1}
++
++    p = object.__new__(G.GamesPlugin)
++    p._emulator = Emu()
++    p._recovery = types.SimpleNamespace(note_stream_start=lambda: calls.append("note_stream_start"),
++                                        session_ended=lambda: calls.append("session_ended"), _stall_owner=None)
++    p._native_stream = types.SimpleNamespace(start=lambda **kw: calls.append("stream_start") or {"active": True})
++    p._diagnostic_heartbeat_interval_ms = lambda: 2000
++    p._adaptive_bitrate_session_ended = lambda: calls.append("ladder_session_end")
++    return p
++
++
++class GuardEnd(unittest.TestCase):
++    def test_guard_end_ends_the_old_session_first_in_the_same_request(self):
++        calls = []
++        out = plugin(calls).handle_post_request("native-stream-start", "port=48100&guard_end=1", "127.0.0.1")
++        self.assertEqual(calls, ["session_ended", "ladder_session_end", "emulator_status", "note_stream_start",
++                                 "stream_start"])
++        self.assertIs(out.get("guard_end"), True)
++
++    def test_without_it_today(self):
++        calls = []
++        out = plugin(calls).handle_post_request("native-stream-start", "port=48100", "127.0.0.1")
++        self.assertEqual(calls, ["emulator_status", "note_stream_start", "stream_start"])
++        self.assertNotIn("guard_end", out)
++        calls = []
++        out = plugin(calls).handle_post_request("native-stream-start", "port=48100&guard_end=0", "127.0.0.1")
++        self.assertEqual(calls, ["emulator_status", "note_stream_start", "stream_start"])
++        self.assertNotIn("guard_end", out)
++
++
++if __name__ == "__main__":
++    unittest.main()

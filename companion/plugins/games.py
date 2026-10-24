@@ -26,6 +26,13 @@ from native_stream import NativeStreamError, NativeStreamManager
 import adaptive_bitrate_live
 from adaptive_bitrate_live import get_controller as adaptive_bitrate_controller
 
+# B20: PRIVYHUB_LINK_RECOVERY=1 implies the six stack lines below (an explicit one wins), before any of them is read.
+# Absent = today: nothing imported.
+_link_recovery = None
+if (os.environ.get("PRIVYHUB_LINK_RECOVERY") or "").strip():
+    import link_recovery as _link_recovery
+    _link_recovery.apply(os.environ)
+
 # B3: the client's Wi-Fi link fields in the heartbeat, only with PRIVYHUB_LINK_REPORT=1. Absent = today.
 _LINK_FIELDS = None
 if (os.environ.get("PRIVYHUB_LINK_REPORT") or "").strip() == "1":
@@ -189,6 +196,9 @@ class GamesPlugin:
         # output is fresh (link_drop_recovery), and the silence-gap log runs (also alone: PRIVYHUB_RECOVERY_GAP_LOG=1;
         # logs/games/native_stream_ctrl_gaps.log, beside the recovery log). Absent = neither.
         self._recovery.enable_controller_exit(trigger_v2)
+        # B20: the umbrella's read-back, beside each module's own config row
+        if _link_recovery is not None:
+            self._recovery._log("link_recovery_config", **_link_recovery.apply(os.environ))
         # B2: the fast input hold -- a second, faster trigger inside the same recovery state machine
         if _input_hold is not None:
             _input_hold.wire(self._recovery, self._native_stream._session_io.controller,
@@ -197,6 +207,9 @@ class GamesPlugin:
         if _hold_rewind is not None:
             _hold_rewind.wire(self._recovery, self._native_stream._session_io.controller, self._emulator,
                               os.environ, self.PROJECT_ROOT)
+        # B18: the session's end reads the stream sender's packet count (B9's state path only)
+        if getattr(self._recovery, "_session_end", None) is not None:
+            self._recovery._session_end.packets = lambda: self._native_stream._session_io._linux_packets_sent
         # B6: after B2's and B4's wires (H, the cap rule, the resume, B4's cap default)
         if _hold_tuning is not None:
             _hold_tuning.wire(self._recovery, self._native_stream._session_io.controller, os.environ)
@@ -3825,6 +3838,12 @@ class GamesPlugin:
             }
 
         if action == "native-stream-start":
+            # B17: a guarded client restart ends the old session here, in the same request, before the new start (the
+            # stop's bookkeeping; the start's own _stop_locked() ends the stream). Absent: today.
+            guard_end = self._first(query, "guard_end") == "1"
+            if guard_end:
+                self._recovery.session_ended()
+                self._adaptive_bitrate_session_ended()
             game_status = self._emulator.status()
             if not game_status.get("active", False):
                 raise RuntimeError("Launch a game before starting Native Video Alpha.")
@@ -3875,6 +3894,9 @@ class GamesPlugin:
                 # no key)
                 if getattr(self._recovery, "_stall_owner", None) is not None:
                     payload["stall_resume"] = self._recovery._stall_owner.client_hint()
+                # B17: the guarded client's end acknowledged (absent: no key)
+                if guard_end:
+                    payload["guard_end"] = True
                 return payload
             except NativeStreamError as exc:
                 raise RuntimeError(str(exc)) from exc

@@ -15,6 +15,10 @@ import java.nio.ByteOrder
  * controller socket every 50 ms (20/s), then one `stall_end` when gameplay is
  * shown again. The host decides whether to act (PRIVYHUB_STALL_SIGNAL).
  * Only after the session passed its startup gate.
+ *
+ * B19: absent (or empty, or any value but a valid one) = ON at 150 ms; `0` = off. Without PRIVYHUB_STALL_SIGNAL the host
+ * counts the 24-byte datagram as a bad controller packet and nothing else (its silence clock moves only on a valid
+ * one), so on today's host this changes nothing.
  */
 object StallSignalFlag {
     const val PROPERTY = "debug.privyhub.stall_signal"
@@ -23,19 +27,20 @@ object StallSignalFlag {
     const val MAX_MS = 2_000L
 
     fun parse(value: String?): Long? {
-        val v = value?.trim() ?: return null
+        val v = value?.trim() ?: return DEFAULT_MS              // B19: absent = on
+        if (v == "0") return null                               // B19: `0` = off
         if (v == "1") return DEFAULT_MS
-        val n = v.toLongOrNull() ?: return null
-        return if (n in MIN_MS..MAX_MS) n else null
+        val n = v.toLongOrNull() ?: return DEFAULT_MS           // B19: empty / junk = on
+        return if (n in MIN_MS..MAX_MS) n else DEFAULT_MS
     }
 
-    /** The property, read through reflection; any failure is off. */
+    /** The property, read through reflection; a failed read is absent, so on (B19). */
     fun fromSystem(): Long? =
         try {
             val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
             parse(get.invoke(null, PROPERTY) as? String)
         } catch (_: Throwable) {
-            null
+            parse(null)
         }
 }
 
@@ -43,6 +48,8 @@ object StallPacket {
     const val SIZE = 24
     const val KIND_STALL = 1
     const val KIND_END = 2
+    // B18: the session is ending (a finishing activity, before its sender stops)
+    const val KIND_BYE = 3
     const val FLAG_IN_GATE = 1
 
     /** "PHS1" | kind u8 | flags u8 | u16 0 | seq u32 | rendered frames i64 | output age ms u32 (little-endian). */
@@ -68,6 +75,10 @@ data class StallInputs(
 
 /** Pure: called from the controller loop (~every 8 ms); returns a datagram when one is due. */
 class StallMonitor(val thresholdMs: Long, private val intervalMs: Long = 50L) {
+    companion object {
+        const val BYE_COUNT = 3
+    }
+
     private var stalled = false
     private var lastSentMs = 0L
     private var seq = 0
@@ -76,7 +87,25 @@ class StallMonitor(val thresholdMs: Long, private val intervalMs: Long = 50L) {
     var endsSent = 0L
         private set
 
+    // B18: the bye, sent on the next BYE_COUNT ticks whatever the stall state
+    @Volatile
+    private var byesDue = 0
+
+    @Volatile
+    var byesSent = 0L
+        private set
+
+    /** B18: a finishing activity, before its sender stops. */
+    fun requestBye() {
+        byesDue = BYE_COUNT
+    }
+
     fun tick(nowMs: Long, inp: StallInputs): ByteArray? {
+        if (byesDue > 0) {
+            byesDue--
+            byesSent++
+            return StallPacket.encode(StallPacket.KIND_BYE, false, seq++, inp.renderedFrames, inp.outputAgeMs.coerceAtLeast(0L))
+        }
         if (!stalled && (!inp.released || inp.outputAgeMs < 0L)) {
             return null
         }

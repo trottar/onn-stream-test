@@ -97,6 +97,8 @@ class LinkDropRecovery:
     _input_hold_b8: Any = None
     # B12: the stall's resume owner (stall_owner.StallOwner; only PRIVYHUB_STALL_RESUME=1 wires it). None = today.
     _stall_owner: Any = None
+    # B18: the session's end as the owner knows it (rewind_cores.SessionEnd; only PRIVYHUB_INPUT_HOLD_REWIND=state)
+    _session_end: Any = None
 
     def __init__(
         self,
@@ -261,6 +263,10 @@ class LinkDropRecovery:
         """B2: a controller silence >= H ms -- the same pause as controller_silence, reason input_hold.
 
         True when this paused the game (the state was PLAYING)."""
+        # B18: the client said its session is ending: no hold
+        if self._session_end is not None and self._session_end.blocks_hold(self):
+            return False
+
         with self._lock:
             if self._state != STATE_PLAYING:
                 return False

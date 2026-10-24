@@ -80,6 +80,75 @@ def _read(nci: Any, timeout: float, prefix: str) -> str | None:
             return text
 
 
+BYE_S = 30.0                # B18: a client's bye holds for this long (the same PLAYING period only)
+PRODUCED_MS = 250           # B18: the stream is produced if its sender's packet count moved this recently
+
+
+class SessionEnd:
+    """B18: the session's end as the owner knows it -- no save and no hold once it is known.
+
+    CL-B11 cells 2 / 3: at each window's end the client's sender stopped at `surfaceDestroyed`, B9's silence save fired at
+    400 ms, and the client's report (+154-181 ms) and stop (+205-207 ms) came after it. Here the end is known from:
+    - the client's `bye` (PHS1 kind 3, sent by a finishing activity before its sender stops; B7's worker hands it over),
+      for the same PLAYING period (keyed to `_state_since`) and <= BYE_S;
+    - any state but PLAYING (the stop request, `native-stream-stop`, B17's `guard_end`: ENDED);
+    - the stream no longer produced: its sender's packet count (session_io's, one packet per 10 ms) has not moved for
+      PRODUCED_MS (the game's exit, the stream stopped).
+    """
+
+    def __init__(self, recovery: Any, clock: Callable[[], float] = time.monotonic):
+        self.recovery = recovery
+        self._clock = clock
+        self._bye: tuple[float, float] | None = None     # (receive time, the PLAYING period's key)
+        self.packets: Callable[[], int] | None = None     # the plugin's: the stream sender's packets sent
+        self._last_count: int | None = None
+        self._moved_at = 0.0
+        self.saves_skipped = 0
+        self.holds_skipped = 0
+
+    def sample(self, now: float) -> None:
+        f = self.packets
+        if f is None:
+            return
+        try:
+            c = int(f())
+        except Exception:
+            return
+        if self._last_count is None or c != self._last_count:
+            self._last_count = c
+            self._moved_at = now
+
+    def note_bye(self, rx: float, frame: int) -> None:
+        r = self.recovery
+        with r._lock:
+            key = r._state_since
+        first = self._bye is None or self._bye[1] != key
+        self._bye = (rx, key)
+        if first:
+            r._log("session_end_bye", client_frame=frame)
+
+    def ending(self, now: float) -> str | None:
+        r = self.recovery
+        with r._lock:
+            state, key = r._state, r._state_since
+        if state != "PLAYING":
+            return f"state_{str(state).lower()}"
+        b = self._bye
+        if b is not None and b[1] == key and now - b[0] <= BYE_S:
+            return "client_bye"
+        if self.packets is not None and self._last_count is not None and (now - self._moved_at) * 1000.0 > PRODUCED_MS:
+            return "stream_stopped"
+        return None
+
+    def blocks_hold(self, recovery: Any) -> bool:
+        """The recovery's `note_input_hold`, first: True = no hold (the client's bye)."""
+        if self.ending(self._clock()) != "client_bye":
+            return False
+        self.holds_skipped += 1
+        recovery._log("input_hold_skipped_ending", reason="client_bye")
+        return True
+
+
 class StateMark:
     """On B2's detector: once per silence, at STATE_AT ms, asks for the scratch save. Never blocks the loop."""
 
@@ -88,10 +157,23 @@ class StateMark:
         self.at_s = at_ms / 1000.0
         self._marked = 0.0
 
+    # B18: the session's end (SessionEnd); None = B9
+    end: Any = None
+
     def on_quiet(self, now: float, last_any_packet_at: float) -> None:
+        if self.end is not None:
+            self.end.sample(now)
         if last_any_packet_at <= 0.0 or now - last_any_packet_at < self.at_s or last_any_packet_at == self._marked:
             return
         self._marked = last_any_packet_at
+        # B18: no save once the session's end is known
+        if self.end is not None:
+            why = self.end.ending(now)
+            if why:
+                self.end.saves_skipped += 1
+                self.cores.recovery._log("state_save_skipped", reason=why,
+                                         silence_ms=round((now - last_any_packet_at) * 1000.0, 1))
+                return
         self.cores.request_save(last_any_packet_at, now)
 
 
@@ -258,6 +340,10 @@ def wire(rw: Any, recovery: Any, controller: Any, emulator: Any, environ: Mappin
         at_ms, why = parse_state_at(environ, hold_ms)
         if det is not None and hasattr(det, "on_quiet"):
             det.state_mark = StateMark(c, at_ms)
+            # B18: the session's end, on the mark and the recovery (no save, no hold once it is known)
+            se = SessionEnd(recovery)
+            det.state_mark.end = se
+            recovery._session_end = se
     recovery._log("input_hold_rewind_cores_config", mode=m, allow=sorted(ALLOW), slot=(SLOT if m == "state" else None),
                   state_at_ms=at_ms, state_at_note=why)
     return c

@@ -27,14 +27,17 @@ class StallSignalTest {
         assertEquals(400L, StallSignalFlag.parse(" 400 "))
         assertEquals(121L, StallSignalFlag.parse("121"))
         assertEquals(2000L, StallSignalFlag.parse("2000"))
-        for (bad in listOf(null, "", "0", "120", "2001", "on", "-5", "150ms")) {
-            assertNull(bad, StallSignalFlag.parse(bad))
+        // B19: absent / empty / junk = on at 150; only `0` turns it off
+        for (on in listOf(null, "", "120", "2001", "on", "-5", "150ms")) {
+            assertEquals(on, 150L, StallSignalFlag.parse(on))
         }
+        assertNull(StallSignalFlag.parse("0"))
+        assertNull(StallSignalFlag.parse(" 0 "))
     }
 
     @Test
-    fun noAndroidPropertyIsOff() {
-        assertNull(StallSignalFlag.fromSystem())
+    fun noAndroidPropertyIsOn() {
+        assertEquals(150L, StallSignalFlag.fromSystem())        // B19: a failed read is absent, so on
     }
 
     @Test

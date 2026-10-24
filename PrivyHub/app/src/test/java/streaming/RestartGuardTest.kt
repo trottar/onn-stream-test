@@ -26,10 +26,12 @@ class RestartGuardTest {
     @Test
     fun flagTable() {
         assertTrue(RestartGuardFlag.parse("1"))
-        for (bad in listOf(null, "", "0", "on", "2")) {
-            assertFalse(bad, RestartGuardFlag.parse(bad))
+        // B19: on unless `0`
+        for (on in listOf(null, "", "on", "2")) {
+            assertTrue(on, RestartGuardFlag.parse(on))
         }
-        assertFalse(RestartGuardFlag.fromSystem())
+        assertFalse(RestartGuardFlag.parse("0"))
+        assertTrue(RestartGuardFlag.fromSystem())
     }
 
     private fun freePort(): Int = DatagramSocket(0).use { it.localPort }
