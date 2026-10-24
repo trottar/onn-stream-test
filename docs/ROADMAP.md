@@ -1978,6 +1978,17 @@ Record: `docs/memory/evidence/B18_NO_SAVE_AT_SESSION_END_2026-10-24.md`.
 **B20 (2026-10-24): `PRIVYHUB_LINK_RECOVERY=1`, the stack's six lines as one; G-A4 (the tenth adopted line) prepared,
 not applied.** Record: `docs/memory/evidence/B20_LINK_RECOVERY_UMBRELLA_2026-10-24.md`.
 
+**CL-B12 (2026-10-24): B17-B20 on the onn with every client property empty, 3 / 3 cells valid, APK `20e3e339…563d`
+CONFIRMED and pinned.**
+- **The umbrella alone:** every behaviour row of the stack met. The resume came 108-349 ms after the return, with 0
+  saves outside the blackouts and the bye at each teardown.
+- **B17's order:** both Home returns went through the start (`create_to_start_ms` 280 / 96, no separate stop), with 0
+  underruns after each new start.
+- **Back to B on two narrow rows:** the `link_recovery_config` log line, and one 30-underrun interval at a Home press.
+  G-A4 is the user's call.
+
+Record: `docs/memory/evidence/CL_B12_DEFAULTS_AND_UMBRELLA_2026-10-24.md`.
+
 ## G9 — Remote foundation checkpoint
 
 Acceptance:

@@ -1,0 +1,50 @@
+diff --git a/tools/c3_l4_nft_night.py b/tools/c3_l4_nft_night.py
+index cf763e8..7692705 100644
+--- a/tools/c3_l4_nft_night.py
++++ b/tools/c3_l4_nft_night.py
+@@ -111,7 +111,9 @@ PKG = "com.safeiot.privyhub"
+ # (kept at PrivyHub/app/build/cl_b10_preserved/app-debug.apk).
+ # CL-B11 (installed 2026-10-24): the guard-on-every-path + fast-ready APK replaced CL-B10's da09e154bdaf1b159fc90d787333b1090e4723b110cf82ef25b9acd7702ee6cf
+ # (kept at PrivyHub/app/build/cl_b10_installed/app-debug.apk).
+-ADOPTED_APK_SHA256 = "e2db0aa0f09d8eab26783e2c4a757ccc83c12da34ca750c8a182c4d762816b33"
++# CL-B12 (installed 2026-10-24): the client-defaults + guard-order + bye APK replaced CL-B11's e2db0aa0f09d8eab26783e2c4a757ccc83c12da34ca750c8a182c4d762816b33
++# (kept at PrivyHub/app/build/cl_b11_installed/app-debug.apk).
++ADOPTED_APK_SHA256 = "20e3e3392b3853a598ecee651b291f4654fa6aa46d63157e649f9c07d6b5563d"
+ REFERENCE_PROFILE = "native_game_720p60_reference"
+ MODE_ENV = "PRIVYHUB_ADAPTIVE_BITRATE_MODE"
+ # C3-L4-D1 (2026-10-01): live is the companion's default through the systemd drop-in
+diff --git a/tools/e1_suite.py b/tools/e1_suite.py
+index e61396c..61a84d3 100644
+--- a/tools/e1_suite.py
++++ b/tools/e1_suite.py
+@@ -64,7 +64,10 @@ PKG = "com.safeiot.privyhub"
+ # CL-B11 (installed 2026-10-24, CONFIRMED 2026-10-24): B5 + B7 + B10 + B11 + B13 + B14 + B15 + B16 APK (the restart guard on
+ # every start path behind debug.privyhub.restart_guard; the fast ready only with the host's stall_resume key; absent
+ # otherwise = CL-B10's client); the previous CONFIRMED APK was da09e154... (CL-B10)
+-EXPECT_APK = "e2db0aa0f09d8eab26783e2c4a757ccc83c12da34ca750c8a182c4d762816b33"
++# CL-B12 (installed 2026-10-24, CONFIRMED 2026-10-24): + B17 + B18 + B19 APK (the guard's end rides in the start; the
++# bye at a finishing activity; stall_signal / restart_guard ON when the property is absent, `0` = off); the previous
++# CONFIRMED APK was e2db0aa0... (CL-B11)
++EXPECT_APK = "20e3e3392b3853a598ecee651b291f4654fa6aa46d63157e649f9c07d6b5563d"
+ LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
+ # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
+ # is exactly these two names, at every precondition and teardown
+diff --git a/tools/test_c3_l4_nft_night.py b/tools/test_c3_l4_nft_night.py
+index 228ce50..c1270f3 100644
+--- a/tools/test_c3_l4_nft_night.py
++++ b/tools/test_c3_l4_nft_night.py
+@@ -264,11 +264,11 @@ class OnlySubset(unittest.TestCase):
+ 
+ 
+ class AdoptedApk(unittest.TestCase):
+-    """CL-B11 (2026-10-24; CL-B10, BENCH-R3, BENCH-R2, CL-B7, CL-B5, CL-B4, CL-B3, CL-B2 and CL-B1 before it): the preflight checks the CONFIRMED APK."""
++    """CL-B12 (2026-10-24; CL-B11, CL-B10, BENCH-R3, BENCH-R2, CL-B7, CL-B5, CL-B4, CL-B3, CL-B2 and CL-B1 before it): the preflight checks the CONFIRMED APK."""
+ 
+-    def test_the_preflight_expects_the_cl_b11_apk(self):
++    def test_the_preflight_expects_the_cl_b12_apk(self):
+         self.assertEqual(h.ADOPTED_APK_SHA256,
+-                         "e2db0aa0f09d8eab26783e2c4a757ccc83c12da34ca750c8a182c4d762816b33")
++                         "20e3e3392b3853a598ecee651b291f4654fa6aa46d63157e649f9c07d6b5563d")
+ 
+ 
+ 

@@ -1,6 +1,6 @@
 # Known issues and deferred work
 
-## 2026-10-21 LAN-R1: the ladder does not step down on loss on the LAN — OPEN; a rule BUILT behind `PRIVYHUB_LAN_LOSS_RULE=1`, NOT ADOPTED; BENCH-R1 (2026-10-22): the rule back to B, the input hold not a candidate until its trigger is fixed, the death reproduced on the bench; BENCH-R2 (2026-10-22): the Wi-Fi lock not the cause, the hold + rewind + stall stack not a candidate, APK cb0935c8 CONFIRMED; queue D (2026-10-22): the ownership at the return, the stall threshold 400 + rewind SNES-only, the client's loss guard BUILT, NOT ADOPTED; BENCH-R3 (2026-10-22): the stack not a candidate on SNES (snes9x's hold-path rewind reads PAUSED), the PS1 state path works, the loss guard a candidate (the user's call), the onn on 2.4 GHz where the Opal sampler did not look, APK bf5114a2 CONFIRMED; LINK-R1 (2026-10-23): on 5 GHz 0 uplink silences / 0 hitch s per 10 min — the band was most of the flapping; queue E (2026-10-23): the self-restart guard, `state` for every core + the stall resume, the link report on by default + G-A3 prepared, the link notice BUILT, NOT ADOPTED; CL-B10 (2026-10-24): the band settled (2.4 GHz the flapping), the notice shown (the user's word); queue F (2026-10-24): the guard on every path and the stall resume at the client's first frame BUILT, NOT ADOPTED; CL-B11 (2026-10-24): APK e2db0aa0 CONFIRMED, the fast ready resumes 133-458 ms after the return and the guard carries a new-instance return — each back to B with one row; queue G (2026-10-24): both rows answered, the client defaults on, the stack as one line (`PRIVYHUB_LINK_RECOVERY=1`) and G-A4 PREPARED — BUILT, NOT ADOPTED, CL-B12 next
+## 2026-10-21 LAN-R1: the ladder does not step down on loss on the LAN — OPEN; a rule BUILT behind `PRIVYHUB_LAN_LOSS_RULE=1`, NOT ADOPTED; BENCH-R1 (2026-10-22): the rule back to B, the input hold not a candidate until its trigger is fixed, the death reproduced on the bench; BENCH-R2 (2026-10-22): the Wi-Fi lock not the cause, the hold + rewind + stall stack not a candidate, APK cb0935c8 CONFIRMED; queue D (2026-10-22): the ownership at the return, the stall threshold 400 + rewind SNES-only, the client's loss guard BUILT, NOT ADOPTED; BENCH-R3 (2026-10-22): the stack not a candidate on SNES (snes9x's hold-path rewind reads PAUSED), the PS1 state path works, the loss guard a candidate (the user's call), the onn on 2.4 GHz where the Opal sampler did not look, APK bf5114a2 CONFIRMED; LINK-R1 (2026-10-23): on 5 GHz 0 uplink silences / 0 hitch s per 10 min — the band was most of the flapping; queue E (2026-10-23): the self-restart guard, `state` for every core + the stall resume, the link report on by default + G-A3 prepared, the link notice BUILT, NOT ADOPTED; CL-B10 (2026-10-24): the band settled (2.4 GHz the flapping), the notice shown (the user's word); queue F (2026-10-24): the guard on every path and the stall resume at the client's first frame BUILT, NOT ADOPTED; CL-B11 (2026-10-24): APK e2db0aa0 CONFIRMED, the fast ready resumes 133-458 ms after the return and the guard carries a new-instance return — each back to B with one row; queue G (2026-10-24): both rows answered, the client defaults on, the stack as one line (`PRIVYHUB_LINK_RECOVERY=1`) and G-A4 PREPARED — BUILT, NOT ADOPTED; CL-B12 (2026-10-24): APK 20e3e339 CONFIRMED with every client property empty, the umbrella alone gives every behaviour row (resume 108-349 ms, 0 saves outside, the bye), both Home returns via the start (create→start 96-280 ms, 0 underruns after) — back to B on two narrow rows (a config log line; one 30-underrun interval at a Home press); G-A4 the user's call
 
 **The standard (the user, 2026-10-21):** "This product needs to work at any house especially lan as long as the Internet
 is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.md`.
@@ -279,9 +279,26 @@ is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.m
     - **B20, one line for the stack.** `PRIVYHUB_LINK_RECOVERY=1` means exactly the six lines (an explicit one wins).
       - **G-A4 (the tenth adopted line) is PREPARED only:** `docs/memory/patches/G-A4_LINK_RECOVERY_ADOPTION_PREPARED.md`.
       - Record: `docs/memory/evidence/B20_LINK_RECOVERY_UMBRELLA_2026-10-24.md`.
-  - **Next:** CL-B12 (session A): the APK with every client property empty, the host with `PRIVYHUB_LINK_RECOVERY=1`
-    alone, `@both` / `@down` / the Home press on both return paths (`handoffs/SESSION_B_DONE_2026-10-24G.md`). Then G-A4
-    on the user's say-so, and the user's own play on 5 GHz.
+  - **CL-B12 (2026-10-24, 3 / 3 cells valid; APK `20e3e339…` CONFIRMED and pinned; every client property EMPTY):**
+    - **The stack via `PRIVYHUB_LINK_RECOVERY=1` alone, the client's defaults:** in 11 / 11 blackouts the resume came
+      **108-349 ms after the return**, with 0 restarts, 0 v2 handovers and net 24 / 26. The picture was held 4.11-4.35
+      s. **0 saves outside the blackouts;** at each teardown the bye, then `state_save_skipped` `client_bye`.
+      `stall_signal_ms` 150 with no property.
+    - **The guard's order (B17), two Home presses:**
+      - no separate stop; `session_ended` logged by the start; the old report 56-70 ms after the start's response;
+      - `restart_cause` `via_start`, `create_to_start_ms` 280 / 96;
+      - 0 underruns in the first interval after each new start.
+      - Both returns (the menu and "direct") were new instances in the live process (`recreate`); the surface and
+        process paths were not exercised.
+      - The user: "Each home and return behaved as expected and ran well".
+    - **Back to B on two narrow rows:**
+      - `link_recovery_config` logs the six as `explicit` (a second `apply()` in `plugins/games.py:201`; the behaviour
+        is the umbrella's);
+      - one 30-underrun interval at press 2's Home (the activity pausing), against "no interval above 15".
+    - On 5 GHz: 0 silences / 10 min in every span.
+    - Record: `docs/memory/evidence/CL_B12_DEFAULTS_AND_UMBRELLA_2026-10-24.md`.
+  - **Next:** G-A4 (the tenth line) on the user's say-so (`docs/memory/CURRENT.md`); B on the two rows; the user's own
+    play on 5 GHz.
 ## 2026-10-20 UX-R1, the user's extended evening (2026-10-20 04:19-05:22Z) was bad and got worse — OPEN; the files agree; link vs onn not separable from them; UX-R2: the second evening mostly clean, the damage not repeated (one event so far, untested past play-minute 44); H5 closed (not new); UX-R3: one of last night's two "deaths" found (04:54:55-59Z, a 4-s drop in both directions); the second not distinguishable
 
 **The user's standard, verbatim (2026-10-21): "This product needs to work at any house especially lan as long as the Internet is over 50mb/s."**

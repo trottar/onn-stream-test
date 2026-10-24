@@ -1,0 +1,158 @@
+2,22c2,21
+< """CL-B11 -- the restart guard on every start path (B15) and the fast ready (B16), with the client APK e2db0aa0...
+< (B5 + B7 + B10 + B11 + B13 + B14 + B15 + B16) and the properties restart_guard / stall_signal = 1, as pre-registered
+< (cl_b11_preregistration.txt), DETACHED. From cl_b10_p2_driver.py (CL-B10 PART 2's driver; the diff is
+< cl_b11_driver_vs_cl_b10_p2.diff). Two launches:
+<   - PART 1, no --cell: cells 2 and 3 in one launch, unit privyhub-cl-b11 -- E1-SNES-STREAM (snes9x, adopted line 3),
+<     window 600, gap 120, the drop-in PRIVYHUB_IMPAIRMENT=<spec> + PRIVYHUB_INPUT_HOLD=1 _B6=1 _B8=1 _REWIND=1
+<     PRIVYHUB_STALL_SIGNAL=1 PRIVYHUB_STALL_RESUME=1 (9 + 7 = 16 lines at the stream): cell 2
+<     blackout-4s@both,every=120s,seed=1, cell 3 blackout-4s@down,every=120s,seed=1 (session B's exact strings,
+<     SESSION_B_DONE_2026-10-24F.md items 7-8);
+<   - PART 2, --cell 1: cell 1 alone, unit privyhub-cl-b11-p2 -- the drop-in PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1
+<     only (10 lines), window 600; the user presses Home at PLAYING + 4 min (B item 6); its own state / history / log.
+< Changed from cl_b10_p2_driver.py:
+<   - the cells table (above); rows appended to this task's cells.jsonl;
+<   - the cap: each launch + 2 h (the pre-registration's rule);
+<   - the properties: restart_guard / stall_signal set to 1 and read back before each cell; link_notice and link_report
+<     NOT set (link_notice is the user's call later; link_report empty = on with this APK) and read back empty; all four
+<     read back after each cell and at the close (expected 1 / 1 / empty / empty) -- NOT cleared (stage 3 clears them);
+<   - no cell starts in 04:15-05:30Z, and a cell that could still run at 04:30Z is refused (the nightly watch);
+<   - the status text, the log tag and the stop file name this task (~/privyhub_cl_b11/STOP).
+< Kept: the band every 10 s into runs/<cell>/band.jsonl, the heartbeat / history / STOP / busy skip / the suite call / the
+< readings beside a run / the applied check / the per-run log copies / --net / the link and silence readings / --dry."""
+---
+> """CL-B12 -- the client defaults (B19: absent = on), the guard's order (B17), no save at the session's end (B18) and the
+> host umbrella PRIVYHUB_LINK_RECOVERY=1 (B20), with the client APK 20e3e339... and EVERY client property EMPTY (no
+> setprop anywhere: the defaults are the test), as pre-registered (cl_b12_preregistration.txt), DETACHED. From
+> cl_b11_driver.py (CL-B11's driver; the diff is cl_b12_driver_vs_cl_b11.diff). Two launches:
+>   - PART 1, no --cell: cells 2 and 3 in one launch, unit privyhub-cl-b12 -- E1-SNES-STREAM (snes9x, adopted line 3),
+>     window 600, gap 120, the drop-in PRIVYHUB_IMPAIRMENT=<spec> + PRIVYHUB_LINK_RECOVERY=1 ONLY (9 + 2 = 11 lines at the
+>     stream): cell 2 blackout-4s@both,every=120s,seed=1, cell 3 blackout-4s@down,every=120s,seed=1 (session B's exact
+>     strings, SESSION_B_DONE_2026-10-24G.md items 6-7);
+>   - PART 2, --cell 1: cell 1 alone, unit privyhub-cl-b12-p2 -- PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 +
+>     PRIVYHUB_LINK_RECOVERY=1, window 600; the user presses Home twice (B item 8); its own state / history / log.
+> Changed from cl_b11_driver.py:
+>   - the cells table (above); the drop-in carries the umbrella, not the six stack lines;
+>   - the properties: SEVEN read back (restart_guard, stall_signal, link_notice, link_report, loss_guard, wifi_lock,
+>     opus_decode), expected EMPTY before and after each cell and at the close; none is set (props_set / props_clear and
+>     every setprop path removed);
+>   - tools/e3_state.py run once mid-cell (with the under-load read-back), kept as e3_state_midcell_run<n>.json, for
+>     link_recovery.stack (expected all `implied 1`);
+>   - the status text, the log tag and the stop file name this task (~/privyhub_cl_b12/STOP).
+> Kept: the cap (each launch + 2 h), no cell in 04:15-05:30Z or one that could still run at 04:30Z, the band every 10 s,
+> the heartbeat / history / STOP / busy skip / the suite call / the readings beside a run / --net / --dry."""
+39c38
+< CALL = HERE / "cl_b11_suite_call.py"
+---
+> CALL = HERE / "cl_b12_suite_call.py"
+41,42c40,41
+< PRE = HERE / "cl_b11_preregistration.txt"
+< WATCH = Path.home() / "privyhub_cl_b11"
+---
+> PRE = HERE / "cl_b12_preregistration.txt"
+> WATCH = Path.home() / "privyhub_cl_b12"
+65c64
+< TAG = "cl_b11_p2" if P2 else "cl_b11"
+---
+> TAG = "cl_b12_p2" if P2 else "cl_b12"
+79,80c78,80
+< PROPS = ("restart_guard", "stall_signal", "link_notice", "link_report")
+< P1 = {"restart_guard": "1", "stall_signal": "1"}       # link_notice / link_report not set: expected to read empty
+---
+> PROPS = ("restart_guard", "stall_signal", "link_notice", "link_report", "loss_guard", "wifi_lock", "opus_decode")
+> P1 = {}                 # CL-B12: no property is set; all seven are expected EMPTY (the client defaults are the test)
+> UMB = ["PRIVYHUB_LINK_RECOVERY=1"]      # B20's umbrella: the six stack flags implied
+86c86
+< # session B's exact strings (SESSION_B_DONE_2026-10-24F.md items 6-8); a blackout spec takes NO @post-fec;
+---
+> # session B's exact strings (SESSION_B_DONE_2026-10-24G.md items 6-8); a blackout spec takes NO @post-fec;
+89,91c89,91
+<     {"n": 2, "cell": "2_snes_blackout_both_fast_ready", "spec": BOTH, "profile": "blackout-4s", "uplink": True, "extra": STACK, "props": P1, "wid": SNES, "arm": "hold+state+stall_resume+fast_ready", "window": 600},
+<     {"n": 3, "cell": "3_snes_blackout_down_fast_ready", "spec": DOWN, "profile": "blackout-4s", "uplink": False, "extra": STACK, "props": P1, "wid": SNES, "arm": "hold+state+stall_resume+fast_ready", "window": 600},
+<     {"n": 1, "cell": "1_snes_5ghz_restart_guard_all_paths", "spec": NONE, "profile": "none", "extra": [], "props": P1, "wid": SNES, "arm": "5 GHz, Home at PLAYING + 4 min", "window": 600},
+---
+>     {"n": 2, "cell": "2_snes_blackout_both_umbrella", "spec": BOTH, "profile": "blackout-4s", "uplink": True, "extra": UMB, "props": P1, "wid": SNES, "arm": "link_recovery umbrella, defaults", "window": 600},
+>     {"n": 3, "cell": "3_snes_blackout_down_umbrella", "spec": DOWN, "profile": "blackout-4s", "uplink": False, "extra": UMB, "props": P1, "wid": SNES, "arm": "link_recovery umbrella, defaults", "window": 600},
+>     {"n": 1, "cell": "1_snes_5ghz_two_home_presses", "spec": NONE, "profile": "none", "extra": UMB, "props": P1, "wid": SNES, "arm": "5 GHz, Home at PLAYING + 3 (menu) and + 6 min (direct)", "window": 600},
+127c127
+<     """The four client properties, read back (getprop; values only, no device detail kept)."""
+---
+>     """The seven client properties, read back (getprop; values only, no device detail kept)."""
+132,135c132
+<     """The cell's pre-registered properties (setprop: restart_guard, stall_signal), then all four read back
+<     (link_notice / link_report expected empty)."""
+<     for pp, v in cell["props"].items():
+<         E1.adb("shell", "setprop", f"debug.privyhub.{pp}", v)
+---
+>     """CL-B12: NOTHING is set (no setprop in this task); all seven read back, True when all read empty."""
+137c134
+<     return got, all(got[pp] == cell["props"].get(pp, "") for pp in PROPS)
+---
+>     return got, all(got[pp] == "" for pp in PROPS)
+141,142c138
+<     """CL-B11: the properties are NOT cleared (stage 3 clears them); read back, True when all read as set
+<     (restart_guard / stall_signal 1, link_notice / link_report empty)."""
+---
+>     """CL-B12: the seven read back after; True when all read empty (none is ever set)."""
+144c140
+<     return got, all(got[pp] == P1.get(pp, "") for pp in PROPS)
+---
+>     return got, all(got[pp] == "" for pp in PROPS)
+191,198d186
+< def props_clear():
+<     """All four properties set empty, read back; True when all read empty."""
+<     for pp in PROPS:
+<         E1.adb("shell", "setprop", f"debug.privyhub.{pp}", "''")
+<     got = props_read()
+<     return got, all(v == "" for v in got.values())
+< 
+< 
+253c241
+<                 f"next: {s['next']} | state: {s['state']} | cap {CAP_UTC} | stop: touch ~/privyhub_cl_b11/STOP\n")
+---
+>                 f"next: {s['next']} | state: {s['state']} | cap {CAP_UTC} | stop: touch ~/privyhub_cl_b12/STOP\n")
+433a422,431
+>             try:        # B20: tools/e3_state.py once mid-cell, for link_recovery.stack (the umbrella's six as they act)
+>                 r_ = subprocess.run([sys.executable, str(REPO / "tools/e3_state.py")], capture_output=True, text=True,
+>                                     timeout=120, cwd=str(REPO))
+>                 d_ = json.loads(r_.stdout.strip().splitlines()[-1])
+>                 e3_ = {"at_utc": utc(), "link_recovery": d_.get("link_recovery"),
+>                        "environ_count": len(k(d_, "preflight", "environ") or []), "game_active": k(d_, "preflight", "game_active")}
+>             except (OSError, subprocess.SubprocessError, ValueError, IndexError) as e:
+>                 e3_ = {"at_utc": utc(), "error": repr(e)[:160]}
+>             jdump(cdir / f"e3_state_midcell_run{attempt}.json", scrub(e3_)[0])
+>             out["e3_mid"] = e3_
+865c863
+<     log(f"cell {cell['n']}: properties set {pr_set} ok {pr_set_ok}")
+---
+>     log(f"cell {cell['n']}: properties read (none set) {pr_set} all empty {pr_set_ok}")
+871c869
+<     log(f"cell {cell['n']}: properties after (not cleared) {pr_end} as set {pr_end_ok}")
+---
+>     log(f"cell {cell['n']}: properties after {pr_end} all empty {pr_end_ok}")
+898c896
+<         validity = "invalid (the properties did not read back as set after the cell)"
+---
+>         validity = "invalid (the properties did not read back empty after the cell)"
+900c898
+<         validity = "properties-not-set"
+---
+>         validity = "invalid (the properties did not read back empty before the cell)"
+932a931
+>            "props_before_empty": pr_set_ok, "props_after_empty": pr_end_ok, "e3_mid": beside.get("e3_mid"),
+957c956
+<     cell = CELLS[0]                  # PART 1: cell 2 (blackout@both on SNES + the stack); the two properties set
+---
+>     cell = CELLS[0]                  # PART 1: cell 2 (blackout@both on SNES + the umbrella); no property set
+974c973
+<     log("dry: properties set", rec["props_set"], "ok", rec["props_set_ok"])
+---
+>     log("dry: properties read (none set)", rec["props_set"], "all empty", rec["props_set_ok"])
+982c981
+<     log("dry: properties read back (not cleared)", rec["props_after"], "as set", rec["props_after_still_1"])
+---
+>     log("dry: properties read back", rec["props_after"], "all empty", rec["props_after_still_1"])
+1074c1073
+<     log("close: properties (not cleared; stage 3 clears them)", st["props_at_close"], "as set", st["props_at_close_still_1"])
+---
+>     log("close: properties", st["props_at_close"], "all empty", st["props_at_close_still_1"])

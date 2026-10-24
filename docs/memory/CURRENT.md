@@ -216,6 +216,57 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
+**CL-B12: MEASURED, 3 / 3 cells valid; APK `20e3e339…563d` (B17 + B18 + B19) CONFIRMED and pinned, every client property
+EMPTY** (`evidence/CL_B12_DEFAULTS_AND_UMBRELLA_2026-10-24.md`; cells 2-3 2026-10-24 16:39-17:09Z, cell 1 attended
+17:09-17:24Z, all on 5 GHz; the host drop-in `PRIVYHUB_LINK_RECOVERY=1` alone).
+- **The stack via the umbrella, with the client's defaults:** in 11 / 11 blackouts the resume came **108-349 ms after
+  the return**, with 0 restarts, 0 v2 handovers and net 24 / 26. The picture was held 4.11-4.35 s per 4-s drop.
+  **0 saves outside the blackouts;** the bye at each teardown.
+- **The guard, two Home presses:** no separate stop, the end logged by the start, the start sent 96-280 ms after the
+  new activity, 0 underruns after each new start.
+  - Both returns took the new-instance path (`recreate`); the surface and process paths were not exercised.
+  - The user: "Each home and return behaved as expected and ran well".
+- **Back to B on two narrow rows:**
+  - the `link_recovery_config` log line (the six logged as `explicit`; `plugins/games.py:201` logs a second
+    `apply()`);
+  - one 30-underrun interval at the second Home press (the activity pausing, not a return).
+- **On 5 GHz:** 0 silences / 10 min in every span.
+- **State:** the seven properties empty (no `setprop` in CL-B12), nine lines, `--check` ok, APK CONFIRMED, paired.
+  `e2db0aa0…` is kept at `PrivyHub/app/build/cl_b11_installed/`. B's `ga4_tools.diff` passes `git apply --check` on the
+  pinned tree.
+
+1. **The user's commit:**
+   - the two records (`CL_B12_LAUNCH_2026-10-24.md`, `CL_B12_DEFAULTS_AND_UMBRELLA_2026-10-24.md`) and
+     `cl_b12_2026-10-24/`;
+   - the pin (`tools/e1_suite.py`, `tools/c3_l4_nft_night.py`, its test);
+   - `KNOWN_ISSUES.md`, `ROADMAP.md`, this file;
+   - git status: `logs/cl_b12_git_status.txt`.
+2. **G-A4, the user's adoption question: the tenth line `PRIVYHUB_LINK_RECOVERY=1`.**
+   - **What it does:** when the Wi-Fi drops for a few seconds, the host freezes the game the moment it notices, about
+     a second in, and saves a snapshot about 0.4 s in. When the link comes back, it loads that snapshot and resumes
+     within about a third of a second, so you don't die to lag you couldn't see.
+   - **What it costs:**
+     - you replay about 0.4 s (24-26 frames) of game from before each drop;
+     - the picture stays frozen for the drop plus ≤ 0.35 s;
+     - one save is written per real stall, and none when you quit.
+     - The onn's half (the stall signal, the restart guard) is already on with this APK.
+   - **How to turn it off:** delete `~/.config/systemd/user/privyhub-companion.service.d/link-recovery.conf`, then
+     `systemctl --user daemon-reload` and `systemctl --user restart privyhub-companion`. The onn's halves go off with
+     `debug.privyhub.stall_signal 0` / `debug.privyhub.restart_guard 0`.
+   - **The two rows still with B** (a log line; one interval at a Home press) do not change what it does. Applying it
+     is a separate prompt (B20's `patches/G-A4_LINK_RECOVERY_ADOPTION_PREPARED.md`).
+3. **The loss guard** (`PRIVYHUB_LOSS_GUARD=1` + `loss_guard=1`, BENCH-R3 a candidate). The cost:
+   - freezes up to ~0.5 s in place of corrupted frames;
+   - hitch s 125.7 against 68.8 per 10 min under 1 % loss, and rendered 55.2 against 57.8 fps;
+   - no runtime IDR.
+4. **The notice as a client default** (`link_notice` on without the property; shown, "I saw that box"). The cost: an
+   on-screen line on any 2.4-GHz or weak link. The 30-s clear path is not yet exercised.
+5. **To B:** the two rows, the press-1 ready 8.8 s after its start (press 2: 4.2 s), and the teardown race (the suite's
+   `games/stop` before the client's stop → 503; the skip read `state_ended`).
+6. **"Read LINK-N1's nights"**: nights done 1, the next 2026-10-25 04:30Z.
+7. **The user's own play on 5 GHz** with everything as it is now (nine lines, `20e3e339…`, the properties empty: the
+   client's defaults on, the host's stack off until G-A4).
+
 **CL-B11: MEASURED, 3 / 3 cells valid; APK `e2db0aa0…6b33` (B15 + B16) CONFIRMED and pinned**
 (`evidence/CL_B11_GUARD_AND_FAST_READY_2026-10-24.md`; cells 2-3 2026-10-24 10:33-11:02Z, cell 1 attended
 15:19-15:34Z, all on 5 GHz).

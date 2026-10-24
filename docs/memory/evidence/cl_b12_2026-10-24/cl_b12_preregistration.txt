@@ -1,0 +1,107 @@
+CL-B12 — the client defaults (B19), the guard's order (B17), no save at the session's end (B18), the umbrella (B20):
+pre-registration (session A, 2026-10-24; hashed BEFORE the install; covers PART 1's cells 2 and 3 and PART 2's cell 1)
+
+Task: docs/memory/handoffs/CL-B12_DEFAULTS_AND_UMBRELLA_TASK.md. Session B's exact strings: SESSION_B_DONE_2026-10-24G.md
+items 4-9; B17 §0-§1 (guard_end=1 on the start; no separate stop; the audio after the start response), B18 (the bye,
+state_save_skipped reason client_bye), B19 (absent = on; 0 = off), B20 (link_recovery_config implied / explicit;
+e3_state.py's link_recovery.stack). The rows this repeats: CL_B11_GUARD_AND_FAST_READY_2026-10-24.md. The CONFIRMED
+rule: CL_B7 §6. The watch: LINK_N1_LAUNCH_2026-10-23.md.
+
+CAP: each detached launch + 2 h (no new cell after it; a cell in flight finishes with its own teardown), computed by the
+driver at its launch and shown in its status line.
+
+0. State at the hash (PART 1, ~16:40Z)
+- HEAD de3c9d0 (queue G committed); the tree clean (git_status_at_start.txt empty).
+- Nine adopted lines; tools/e3_state.py --check ok, APK e2db0aa0… CONFIRMED; no e3_flag.conf; no game; one device,
+  paired; units privyhub-companion and privyhub-link-n1 only.
+- The band, read first: 5180 MHz, 5 GHz, standard 5, RSSI -68.
+- The seven client properties restart_guard, stall_signal, link_notice, link_report, loss_guard, wifi_lock, opus_decode
+  all EMPTY.
+
+1. The install (after this file is hashed)
+- e2db0aa0… stays preserved at PrivyHub/app/build/cl_b11_installed/app-debug.apk (nothing deleted).
+- The candidate /tmp/b_q24g_scratch/apk/app-debug.apk must read sha256
+  20e3e3392b3853a598ecee651b291f4654fa6aa46d63157e649f9c07d6b5563d (B's pin, 9,633,230 B) and carry the same signer as
+  e2db0aa0… (apksigner certificate digests compared, not printed); else nothing is installed. Copied to
+  PrivyHub/app/build/cl_b12_installed/app-debug.apk (gitignored).
+- adb install -r; the device APK read back = 20e3e339…; paired (CL-B4's reader). "Not paired" = stop and tell the user.
+- NO setprop anywhere in this task. The seven properties read back EMPTY before and after each cell and at the close.
+  The defaults are the test (B19: stall_signal absent = on at 150; restart_guard on unless 0; link_report absent = on;
+  link_notice opt-in, so off).
+- --check after the install is expected ok False ONLY because the APK reads MISMATCH (the pin moves only by the
+  CONFIRMED rule); the preflight itself ok.
+
+2. The driver
+- cl_b12_driver.py (from cl_b11_driver.py; the diff is cl_b12_driver_vs_cl_b11.diff); cl_b12_suite_call.py (CL-B11's
+  wrapper, only the pre-registration name changed). Status ~/privyhub_cl_b12/status.txt, STOP ~/privyhub_cl_b12/STOP.
+- PART 1: unit privyhub-cl-b12, cells 2 then 3 in one launch. PART 2: unit privyhub-cl-b12-p2, --cell 1, on the user's
+  "Stage 2" only.
+- Every cell: E1-SNES-STREAM (snes9x, among the nine), window 600, gap 120, e2. The drop-in e3_flag.conf =
+  PRIVYHUB_IMPAIRMENT=<spec> + PRIVYHUB_LINK_RECOVERY=1 ONLY (no individual stack line): 9 + 2 = 11 lines at the stream
+  and under load; removed at the teardown; flags_absent true after; nine lines.
+- tools/e3_state.py once mid-cell (with the under-load read-back): link_recovery.stack expected all `implied 1`.
+- The band every 10 s into runs/<cell>/band.jsonl. No cell starts in 04:15-05:30Z or could still run at 04:30Z. No
+  Opal sampler.
+
+3. Cell 2 — PRIVYHUB_IMPAIRMENT=blackout-4s@both,every=120s,seed=1 + PRIVYHUB_LINK_RECOVERY=1, window 600.
+   Rows (B items 6-7):
+- link_recovery_config: implied = the six (PRIVYHUB_INPUT_HOLD, _B6, _B8, _REWIND, PRIVYHUB_STALL_SIGNAL,
+  PRIVYHUB_STALL_RESUME), explicit {}; then each module's own config row: stall_signal_config 400,
+  input_hold_rewind_cores_config mode state, stall_resume_config fast_ready / save_from_signal true.
+- Per blackout: the silence save ~0.40 s; the hold ~950 ms; RESUMED VIA client_ready_hold <= 1.0 s AFTER THE PACKETS
+  RETURN (the end of the >= 3-s controller gap); state, net 24; no second pause.
+- ZERO state_saved OUTSIDE THE BLACKOUTS ([onset - 0.1 s, return + 2 s]). At the teardown: one session_end_bye, then
+  state_save_skipped reason client_bye (~400 ms), no hold (input_hold_skipped_ending, no pause).
+- The client report: stall_signal_ms 150 and fast_ready_releases 5, with no property set.
+
+4. Cell 3 — PRIVYHUB_IMPAIRMENT=blackout-4s@down,every=120s,seed=1 + PRIVYHUB_LINK_RECOVERY=1, window 600. Rows:
+- The same config rows.
+- Per blackout: the stall save at ~430 ms, BEFORE the pause; RESUMED VIA client_ready_stall <= 1.0 s AFTER THE DOWNLINK
+  RETURNS (the client's last frame + 4,000 ms, CL-B11's reading); 0 encoder_restart, 0 stall_handover_v2;
+  net 24-26; no second pause.
+- Zero saves outside the blackouts; the bye at the teardown (as cell 2).
+- The client report stall_signal_ms 150 and fast_ready_releases 5, no property set.
+
+5. Cell 1 (PART 2) — PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 + PRIVYHUB_LINK_RECOVERY=1, window 600, 5 GHz.
+- The user is told, in the task's exact words with the times filled in: first press at PLAYING + 3 min (Home, ~5 s,
+  open PrivyHub from the home screen and choose the game); second press at PLAYING + 6 min (Home, ~5 s, straight back
+  via the PrivyHub tile or recents); keep playing to PLAYING + 10 min.
+- Rows at EACH press (B item 8): the hold's pause (~950 ms) with a silence save (expected; not a teardown). At the
+  return: NO separate native-stream-stop; the session_ended row logged by the start request itself (guard_end); the
+  old report within ~1 s after; restart_cause flush via_start, host_ended_session true, CREATE_TO_START_MS <= 1,000,
+  trigger recreate (the menu) / surface or process (direct); THE FIRST 2-S INTERVAL AFTER THE NEW session_started
+  <= 15 UNDERRUNS and no interval of the new client session above 15; the game resumes from the hold's pause (a new
+  session loads no state).
+- ONE adb logcat -b events -d read per press (process names, pids, activity classes only) names the path.
+- Reported: silences >= 250 ms and hitch s / 10 min on 5 GHz against CL-B11 cell 1 (5.6 / 12.9 and 4.4 / 6.9) and
+  CL-B10 (0 / 0); the user's one line, verbatim.
+
+6. Validity (per cell)
+- Playing; the shim's profile applied (blackout: >= 1 dark span, each 3-6 s, starts 120 ± 3 s apart, uplink_dropped
+  > 0 on @both and 0 on @down; none: 0 drops); 11 lines at the stream; flags_absent true after; nine lines; the seven
+  properties empty before and after. Host gates: RetroArch >= 59.9, capture 60 ± 0.1, dup+drop <= 0.2 / min.
+- Cell 1 is not invalidated by the Home presses or the client sessions they cause. A no_play, flags_absent false, or a
+  property not empty is invalid. profile-not-applied while playing is repeated once.
+
+7. The CONFIRMED rule (CL_B7 §6, as CL-B10 / CL-B11 applied it)
+- At the close: the properties read back empty, the drop-in removed, nine lines, no e3_flag.conf, flags_absent.
+- All three cells valid and the behaviours as today -> 20e3e339… CONFIRMED and the pin moved (tools/e1_suite.py
+  EXPECT_APK, tools/c3_l4_nft_night.py ADOPTED_APK_SHA256 and its test; the tests green); --check ok on nine.
+  Disclosed beforehand: every cell's host side carries the umbrella, so the flag-absent host behaviour rests on B20's
+  proof (AST: absent = nothing read). The property-empty client IS exercised here (every cell).
+- Else e2db0aa0… reinstalled from PrivyHub/app/build/cl_b11_installed/, read back, paired, --check ok, and the user told
+  which cell failed and why.
+- CONFIRMED is about validity and today's behaviours, not the rows: a row not met does not block it.
+
+8. The reading, written beforehand
+- Every row met in cells 2, 3 and 1 -> the stack (via the umbrella) and the guard are CANDIDATES FOR G-A4, the user's
+  say-so (the tenth line PRIVYHUB_LINK_RECOVERY=1). Costs: ~24-26 frames restored per drop, a save per real stall, the
+  picture held <= ~4.5 s per 4-s drop; at a Home return a report and the start's bookkeeping, <= 1 s to the start.
+- Else back to B with the rows.
+- Against CL-B11: resume after the return 133-458 ms; held 4.13-4.47 s; saves outside 1 per cell (the session end);
+  the guard: the 221-underrun interval before the restart, the separate stop (+2.3 s).
+- G-A4 is NOT applied in this task (a later prompt).
+
+No sudo, no nft, the Opal read-only, adb for the install, state reads, the two logcat -b events -d reads and the
+reinstall if the rule says so; NO setprop; no addresses or identifiers anywhere; nothing fetched, nothing deleted; nine
+lines and no e3_flag.conf at every teardown; nothing adopted; nothing committed.
