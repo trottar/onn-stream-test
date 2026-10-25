@@ -1,0 +1,65 @@
+G4-S4 — off-site free play at a friend's house. Pre-registration (session A, 2026-10-24). Written and hashed before
+the launch. Baseline HEAD 9f56052; the tree clean at the start (git_status_at_start.txt: only this task's dir).
+
+0. Precondition (19:23-19:26Z):
+   - the TEN adopted lines (G-A4: the link-recovery stack adopted; this is its first WAN exposure, disclosed); the
+     host fields of --check ok (check_start.json: all ten drop-ins, manager empty, no e3_flag.conf, no
+     e4_constraint.conf, no RetroArch, no encoder, the main PID serving 8765, the PS1 files identical; the umbrella's
+     six implied);
+   - the client fields not ok (adb off-LAN: adb false, APK MISMATCH; disclosed, not a stop, as G4-S1 §1);
+   - one device paired; no privyhub-* unit but the companion and privyhub-link-n1 (units_before.txt);
+   - the overlay: connected true, path DIRECT, peer_ready true, 2 devices online (count only);
+   - A GAME BECAME ACTIVE at ~19:24:16Z (class ps1), started on the onn before the launch, after --check had read
+     no game. The launch does not go over it: the driver waits (below) until the onn is idle before its restart.
+   - The user's words with the launch line, verbatim: "Say stop" / "First test is with vod since this is the
+     simplest". No unit was running, so "stop" had nothing to close; the read line is taken as Part 1 (stated in the
+     reply). VOD is not a game: it is served by the companion's range server (a child of the companion) and is
+     recorded by the session sampler as its own class (below). The game-side numbers apply to game sessions only.
+
+1. The driver: g4_s4_driver.py as the systemd --user transient unit privyhub-g4-s4; status ~/privyhub_g4_s4/status.txt;
+   STOP = touch ~/privyhub_g4_s4/STOP; RUNS NO SUITE.
+   - Idle wait: before writing the drop-in, the driver waits until no game is active and no connection is open on
+     the range server's port, read twice 15 s apart (the restart would end either). The wait ends at STOP or the cap.
+     A choice, disclosed: the task's precondition is "no game"; waiting is the same rule as G4-S3's "the launch did
+     not go over it".
+   - e3_flag.conf = exactly PRIVYHUB_REMOTE_LADDER=1, PRIVYHUB_START_RUNG=floor, PRIVYHUB_REMOTE_RUNG_CAP=7000,
+     PRIVYHUB_WAN_TELEMETRY=1. The environ reads back FOURTEEN lines (10 + 4), else the drop-in is removed at once and
+     the driver exits (nothing played under it).
+   - Samplers: every 10 s the tailnet interface's tx/rx bytes (the interface name not written) + the native stream's
+     status (active, bitrate, ladder level/state, the encoder's -b:v); every 60 s the overlay state (connected, path,
+     peer_ready, mtu, reason; RTT if offered) and the WAN telemetry block (scrubbed); every 60 s the session state
+     (game active / paused, the system class only, elapsed; the native stream active; VOD = the count of established
+     connections on the range server's port, a count only); every 5 min the rotating logs (logs/games/*: the ladder
+     log, heartbeat, recovery, ctrl gaps, frame sizes, host samples, pulseaudio, video log; the archive's .1 read when
+     a log rotated under it; new decoder_sessions/ and audio_timing/ files) and the companion's journal copied into
+     ~/privyhub_g4_s4/ (outside the repo: raw logs may carry endpoints; Part 2 writes only redacted readings).
+   - The cap: the driver's start + 2 h 30 min (9000 s), the absolute time written at the start to cap_utc.txt and the
+     status line. On STOP or the cap: a last copy, the drop-in removed, restart, flags_absent read, the ten lines
+     read, a copy after the restart. The restart at the end ends any running stream: the user says "stop" only when
+     done.
+
+2. What is reported (Part 2), for the whole play, per 10 min and per game session (and per VOD session where it
+   applies: the tailnet rate and the data only):
+   - the rung history and the clamps (remote_cap); goodput and the wire rate; RTT; the overlay path (direct /
+     relayed) and its changes; post-/pre-FEC loss; rendered, stale, resyncs, pauses;
+   - THE STACK'S ROWS: every input_hold / state_saved / input_release / stall pause, each tagged a REAL DROP (the
+     control gap >= 3 s or a dark span) or a FALSE HOLD (the link alive on both sides), the count per 10 min, and
+     what each cost the player (held s, frames restored). H 950 was derived on the LAN; on a WAN path a >= 950-ms
+     uplink silence that is not a drop fires a false hold: COUNTED;
+   - hitch s / 10 min and silences >= 250 ms / 10 min (UX-R3 §1's reader / B6), audio underruns, decoder spikes
+     (>= 20 / >= 50 ms per min), state loads, the data per hour (MB/h on the tailnet interface).
+   - Comparisons: G4-S1 run 1 (7000, PCM, the tailnet), G4-S3 (4000, Opus, hotspot), the 5-GHz LAN (CL-B12).
+
+3. The reading:
+   - PLAYABLE OR NOT IS THE USER'S WORD, verbatim, in its own subsection. Nothing perceptual is a gate; no number is
+     a gate.
+   - The numbers: hitch s / 10 min, silences >= 250 ms / 10 min, false holds (holds fired outside drops), state
+     loads, the rung history, RTT, the overlay path and its changes, post-FEC loss, the tailnet tx rate.
+   - No headline prediction: a free play has no fixed title, window or rung; the four lines' cap is 7000 (the
+     friend's broadband, not a hotspot), the start rung the floor.
+
+4. The user's cues: start any game from the onn within 15 min of the drop-in; play as long as they like;
+   Pause/Resume and Save/Load once each at some point; say "stop" when done, before leaving.
+
+Nothing adopted; nothing committed. No sudo, no nft, the Opal read-only, no adb (off-LAN), no addresses or
+identifiers in the repo (the tailnet name, the friend's network and every endpoint as placeholders).
