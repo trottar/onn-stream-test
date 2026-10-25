@@ -32,13 +32,36 @@ def implied(environ: Mapping[str, str]) -> dict[str, str]:
     return {k: "1" for k in STACK if k not in environ}
 
 
+# B21: the process's first apply() -- what the umbrella did at import (the first import site's call, whichever it is).
+_FIRST: dict[str, Any] | None = None
+
+
 def apply(environ: MutableMapping[str, str]) -> dict[str, Any]:
     """Puts the implied lines into `environ` (setdefault; idempotent). Returns what it did."""
+    global _FIRST
     add = implied(environ)
     explicit = {k: environ[k] for k in STACK if k in environ and k not in add}
     for k, v in add.items():
         environ.setdefault(k, v)
-    return {"umbrella": on(environ), "implied": sorted(add), "explicit": explicit}
+    done = {"umbrella": on(environ), "implied": sorted(add), "explicit": explicit}
+    if _FIRST is None:
+        _FIRST = {"umbrella": done["umbrella"], "implied": list(done["implied"]), "explicit": dict(explicit)}
+    return done
+
+
+def config_row(environ: Mapping[str, str]) -> dict[str, Any]:
+    """B21: the `link_recovery_config` row, with no apply (nothing written): the import-time apply's result (`at`
+    `import`) and `reapply`, the keys a re-application would add now ([] = nothing new). With no apply in the process
+    (`at` `none`), the fields are what a first apply would report for `environ`."""
+    if _FIRST is not None:
+        row = {"umbrella": _FIRST["umbrella"], "implied": list(_FIRST["implied"]),
+               "explicit": dict(_FIRST["explicit"]), "at": "import"}
+    else:
+        add = implied(environ)
+        row = {"umbrella": on(environ), "implied": sorted(add),
+               "explicit": {k: environ[k] for k in STACK if k in environ and k not in add}, "at": "none"}
+    row["reapply"] = sorted(implied(environ))
+    return row
 
 
 def describe(lines: Iterable[str]) -> dict[str, Any] | None:

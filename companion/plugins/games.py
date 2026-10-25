@@ -33,6 +33,18 @@ if (os.environ.get("PRIVYHUB_LINK_RECOVERY") or "").strip():
     import link_recovery as _link_recovery
     _link_recovery.apply(os.environ)
 
+# B22: a guarded client restart's start answered before the old teardown, only with PRIVYHUB_RESTART_FAST=1.
+# Absent = today: nothing imported.
+_restart_fast = None
+if (os.environ.get("PRIVYHUB_RESTART_FAST") or "").strip() == "1":
+    import restart_fast as _restart_fast
+
+# B23: the hold's H and the stall's threshold per path class (WAN-R1), only with PRIVYHUB_LINK_RECOVERY_WAN=1.
+# Absent = today: nothing imported.
+_link_recovery_wan = None
+if (os.environ.get("PRIVYHUB_LINK_RECOVERY_WAN") or "").strip() == "1":
+    import link_recovery_wan as _link_recovery_wan
+
 # B3: the client's Wi-Fi link fields in the heartbeat, only with PRIVYHUB_LINK_REPORT=1. Absent = today.
 _LINK_FIELDS = None
 if (os.environ.get("PRIVYHUB_LINK_REPORT") or "").strip() == "1":
@@ -197,8 +209,13 @@ class GamesPlugin:
         # logs/games/native_stream_ctrl_gaps.log, beside the recovery log). Absent = neither.
         self._recovery.enable_controller_exit(trigger_v2)
         # B20: the umbrella's read-back, beside each module's own config row
+        # B21: the import-time apply's result (no second apply here); `reapply` [] = nothing new since
         if _link_recovery is not None:
-            self._recovery._log("link_recovery_config", **_link_recovery.apply(os.environ))
+            self._recovery._log("link_recovery_config", **_link_recovery.config_row(os.environ))
+        # B22: the fast restart (its config row beside the others)
+        if _restart_fast is not None:
+            self._restart_fast = _restart_fast.RestartFast(self._recovery._log)
+            self._recovery._log("restart_fast_config", **self._restart_fast.config())
         # B2: the fast input hold -- a second, faster trigger inside the same recovery state machine
         if _input_hold is not None:
             _input_hold.wire(self._recovery, self._native_stream._session_io.controller,
@@ -222,6 +239,11 @@ class GamesPlugin:
         # B12: after B7's (and B8's) wires
         if _stall_owner is not None:
             _stall_owner.wire(self._recovery, self._native_stream._session_io.controller, os.environ)
+        # B23: after every threshold's own wire (B2 / B6 / B7 / B8 / B12): the per-path-class sets
+        if _link_recovery_wan is not None:
+            self._link_recovery_wan = _link_recovery_wan.wire(
+                self._recovery, self._native_stream._session_io.controller, os.environ,
+                config_row=(lambda: _link_recovery.config_row(os.environ)) if _link_recovery is not None else None)
         # B14: the link notice's transitions, one per plugin (the recovery log)
         if _link_notice is not None:
             self._link_notice_log = _link_notice.NoticeLog()
@@ -3853,6 +3875,9 @@ class GamesPlugin:
             # state, so the pause below is skipped and the gate below still
             # owns the resume.
             self._recovery.note_stream_start()
+            # B23: this session's thresholds by its path class (absent: today's)
+            if _link_recovery_wan is not None and getattr(self, "_link_recovery_wan", None) is not None:
+                self._link_recovery_wan.note_stream_start(client_ip)
             try:
                 if not game_status.get("paused", False):
                     try:
@@ -3867,11 +3892,20 @@ class GamesPlugin:
                             "Game did not remain paused for stream stabilization."
                         )
 
-                payload = self._native_stream.start(
-                    client_ip=client_ip,
-                    port=port,
-                    managed_process_id=game_status.get("pid"),
-                )
+                # B22: a guarded restart on a running stream answers before the old teardown (absent: today's start)
+                if _restart_fast is not None and guard_end and _restart_fast.RestartFast.eligible(self._native_stream):
+                    payload = self._restart_fast.start(
+                        self._native_stream,
+                        client_ip=client_ip,
+                        port=port,
+                        managed_process_id=game_status.get("pid"),
+                    )
+                else:
+                    payload = self._native_stream.start(
+                        client_ip=client_ip,
+                        port=port,
+                        managed_process_id=game_status.get("pid"),
+                    )
                 self._recovery_start_args = {
                     "client_ip": client_ip,
                     "port": port,

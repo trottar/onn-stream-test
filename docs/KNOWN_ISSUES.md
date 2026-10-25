@@ -1,5 +1,30 @@
 # Known issues and deferred work
 
+## 2026-10-24 G4-S4, off-site free play: Home auto-resumes (no pause screen, the rung back at the floor); the onn left the tailnet for ~8 min once; underruns 8-20 / min — OPEN (to B / a watch item)
+
+(`docs/memory/evidence/G4_S4_OFFSITE_FREE_PLAY_2026-10-24.md` §6, §8, §10)
+
+- **The stack on a WAN path held: 0 false holds and 0 uplink silences ≥ 250 ms** in 100.1 min of play.
+  - That is direct only, one evening. The bound is < ~0.3 false holds / 10 min (95 %).
+  - The relayed path in play is unmeasured; WAN-R1 reads the earlier sessions.
+- **Home (the user: "it didn't pause … I'm use to at home where the pause screen shows up"):**
+  - the hold fires ~1.06 s after the Home (save at +0.40 s), the game unattended until then;
+  - the return is a new client session: the hold releases and the game resumes with no pause screen and no rewind;
+  - the ladder restarts at the floor (7000 → 4000, ~14.5 min back to 7000 under the four lines).
+  - Likely G-A4's design, not the WAN; to be confirmed on the LAN. **To B:** should Home pause and wait (the old
+    pause screen), and should a Home return keep the rung?
+  - **Queue H (2026-10-25):** B22 shortens the return itself (the start answered before the teardown, the
+    release at the new stream's first fresh frame; NOT ADOPTED). Pausing at Home and keeping the rung were not in queue
+    H: they stay the user's question.
+- **The onn left the tailnet once:**
+  - no-peer 19:38:33-19:45:50Z, ~1 min after it went idle and ~26 s after a companion restart;
+  - a second restart was followed by a brief relayed reading only.
+  - The cause is not in the hub's files. **Open.**
+- **Underruns, in play:** 8.0 / min under the four lines, 20.2 on the ten-line afternoon sessions at 7000 (G4-S3 3.4).
+  Audio packets lost 38 / 30 / 11 in three sessions. A watch item, with the Opus underrun item below.
+- **Also:** the client sat "reconnecting" for 21 min after the closing restart (session 12's report is that tail).
+  Known, as G4-S3 §5.
+
 ## 2026-10-21 LAN-R1: the ladder does not step down on loss on the LAN — OPEN; a rule BUILT behind `PRIVYHUB_LAN_LOSS_RULE=1`, NOT ADOPTED; BENCH-R1 (2026-10-22): the rule back to B, the input hold not a candidate until its trigger is fixed, the death reproduced on the bench; BENCH-R2 (2026-10-22): the Wi-Fi lock not the cause, the hold + rewind + stall stack not a candidate, APK cb0935c8 CONFIRMED; queue D (2026-10-22): the ownership at the return, the stall threshold 400 + rewind SNES-only, the client's loss guard BUILT, NOT ADOPTED; BENCH-R3 (2026-10-22): the stack not a candidate on SNES (snes9x's hold-path rewind reads PAUSED), the PS1 state path works, the loss guard a candidate (the user's call), the onn on 2.4 GHz where the Opal sampler did not look, APK bf5114a2 CONFIRMED; LINK-R1 (2026-10-23): on 5 GHz 0 uplink silences / 0 hitch s per 10 min — the band was most of the flapping; queue E (2026-10-23): the self-restart guard, `state` for every core + the stall resume, the link report on by default + G-A3 prepared, the link notice BUILT, NOT ADOPTED; CL-B10 (2026-10-24): the band settled (2.4 GHz the flapping), the notice shown (the user's word); queue F (2026-10-24): the guard on every path and the stall resume at the client's first frame BUILT, NOT ADOPTED; CL-B11 (2026-10-24): APK e2db0aa0 CONFIRMED, the fast ready resumes 133-458 ms after the return and the guard carries a new-instance return — each back to B with one row; queue G (2026-10-24): both rows answered, the client defaults on, the stack as one line (`PRIVYHUB_LINK_RECOVERY=1`) and G-A4 PREPARED — BUILT, NOT ADOPTED; CL-B12 (2026-10-24): APK 20e3e339 CONFIRMED with every client property empty, the umbrella alone gives every behaviour row (resume 108-349 ms, 0 saves outside, the bye), both Home returns via the start (create→start 96-280 ms, 0 underruns after) — back to B on two narrow rows (a config log line; one 30-underrun interval at a Home press); G-A4 the user's call
 
 **The standard (the user, 2026-10-21):** "This product needs to work at any house especially lan as long as the Internet
@@ -297,6 +322,31 @@ is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.m
       - one 30-underrun interval at press 2's Home (the activity pausing), against "no interval above 15".
     - On 5 GHz: 0 silences / 10 min in every span.
     - Record: `docs/memory/evidence/CL_B12_DEFAULTS_AND_UMBRELLA_2026-10-24.md`.
+  - **Queue H (2026-10-24, session B; nothing adopted, no live run; inserted 2026-10-25):**
+    - **B21, the config row.** `link_recovery_config` now reports the import-time `apply()` (the process's first:
+      `emulator_manager`'s, imported before `plugins/games.py`'s block). With the umbrella alone it reads `implied` the
+      six, `explicit` {}, `at` `import`, `reapply` []. The wire's second `apply` is removed. It takes effect after the
+      next companion restart. Record: `docs/memory/evidence/B21_LINK_RECOVERY_CONFIG_LOG_2026-10-24.md`.
+    - **B22, the picture after a Home return.**
+      - **Settled:** the host's 2.0-2.2-s start = the old audio's teardown before the encoder's kill (~0.78 s) + the
+        new encoder (~0.45 s) + a fixed 0.75-s check and the new audio (~0.85 s).
+      - The client's 8.8 / 4.2 s = the start-up gate's baseline + 6 clean 500-ms ticks (press 1 reset at least once);
+        the picture itself was back ~1.3-2.0 s after `startSession`.
+      - **Built:** `PRIVYHUB_RESTART_FAST=1` answers a guarded start before the teardown (the old encoder killed first,
+        the old audio stopped beside the new encoder; the ready waits on the lock). The client (inside
+        `restart_guard`, armed by the host's key) releases at the new stream's first fresh frame, with the audio at
+        the ready's return.
+      - **APK (B5 … B19 + B22) `6bddafc0…a927`, pinned, NOT installed.** Expected new activity → `session_started`
+        ≈ 1.5-2.6 s (target ≤ 3 s), measured only by CL-B13.
+      - Record: `docs/memory/evidence/B22_RESTART_FAST_2026-10-24.md`.
+    - **B23, the thresholds on a WAN path (from WAN-R1).** `PRIVYHUB_LINK_RECOVERY_WAN=1`: on the overlay's direct
+      path H 450 / the stall 200; the LAN, relayed and unknown paths as wired (950 / 400).
+      - The path is re-read every 10 s; a guard reverts a direct session at its first non-drop hold.
+      - G4-S4's replay: 0 false holds at 950 and 450. G4-S1 run 2 (direct → no-peer): 18 at a fixed 450, 2 with the
+        guard.
+      - Record: `docs/memory/evidence/B23_LINK_RECOVERY_WAN_THRESHOLDS_2026-10-24.md`.
+    - **Still open:** CL-B12's 30-underrun interval at press 2's Home (the activity pausing, not a return) was not in
+      this queue.
   - **Next:** G-A4 (the tenth line) on the user's say-so (`docs/memory/CURRENT.md`); B on the two rows; the user's own
     play on 5 GHz.
 ## 2026-10-20 UX-R1, the user's extended evening (2026-10-20 04:19-05:22Z) was bad and got worse — OPEN; the files agree; link vs onn not separable from them; UX-R2: the second evening mostly clean, the damage not repeated (one event so far, untested past play-minute 44); H5 closed (not new); UX-R3: one of last night's two "deaths" found (04:54:55-59Z, a 4-s drop in both directions); the second not distinguishable
@@ -424,6 +474,13 @@ felt: **no report yet.**
 **G4-S3 (2026-10-19, off-site at 4000):** underruns **34** in the window, across three client starts (Pause/Resume
 and a relaunch). Net audio loss 0. Decoder spikes ~45 / min (≥ 50 ms ~4.7). Spikes are lower at 4000 than at 7000 on
 the LAN; there is no PCM arm in the run. Underruns stay a watch item.
+
+**G4-S4 (2026-10-24, off-site free play, 100 min; `docs/memory/evidence/G4_S4_OFFSITE_FREE_PLAY_2026-10-24.md` §8):**
+- **Underruns in play:** 8.0 / min under the four lines, 20.2 on the ten-line sessions at 7000 from the start. The onn
+  ran all afternoon.
+- **Audio packets lost:** 38 / 30 / 11 in three of 13 sessions.
+- **Spikes ≥ 20 ms:** 85 / min in the 41-min session at 7000 (the LAN at 7000: 105-163).
+- Underruns stay a watch item.
 
 **CL-B6 (2026-10-19, the A/B repeated after an onn power-cycle; `docs/memory/evidence/CL_B6_AB_REPEAT_AFTER_RESTART_2026-10-19.md`):**
 - **Underruns: G-A2's 78 not repeated.** On a fresh onn (uptime ~7-17 min in the window), Opus read **22 / 13**

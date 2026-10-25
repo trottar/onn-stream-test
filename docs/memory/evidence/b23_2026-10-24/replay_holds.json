@@ -1,0 +1,335 @@
+[
+ {
+  "label": "G4-S4 (friend's broadband)",
+  "class": "direct",
+  "log": "g4_s4_2026-10-24/copies/logs/games/native_stream_ctrl_gaps.log",
+  "silences": 3,
+  "drops_ge_3s": 3,
+  "h950": {
+   "real": 3,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  },
+  "h450": {
+   "real": 3,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  },
+  "h450_guard": {
+   "real": 3,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  }
+ },
+ {
+  "label": "G4-S1 run 1 (hotspot)",
+  "class": "direct",
+  "log": "wan_r1_2026-10-24/copies/s1r1/native_stream_ctrl_gaps.log",
+  "silences": 2,
+  "drops_ge_3s": 1,
+  "h950": {
+   "real": 1,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  },
+  "h450": {
+   "real": 1,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  },
+  "h450_guard": {
+   "real": 1,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  }
+ },
+ {
+  "label": "G4-S1 run 2 (hotspot; incl. the no-peer span after the toggle)",
+  "class": "direct + no-peer",
+  "log": "wan_r1_2026-10-24/copies/s1r2/native_stream_ctrl_gaps.log",
+  "silences": 54,
+  "drops_ge_3s": 0,
+  "h950": {
+   "real": 0,
+   "false": 1,
+   "false_gap_ms": [
+    1894
+   ],
+   "capped": 0
+  },
+  "h450": {
+   "real": 0,
+   "false": 18,
+   "false_gap_ms": [
+    516,
+    484,
+    525,
+    794,
+    1894,
+    632,
+    548,
+    780,
+    553,
+    486,
+    640,
+    467
+   ],
+   "capped": 0
+  },
+  "h450_guard": {
+   "real": 0,
+   "false": 2,
+   "false_gap_ms": [
+    516,
+    1894
+   ],
+   "capped": 0
+  }
+ },
+ {
+  "label": "G4-S2 run 1 (hotspot)",
+  "class": "direct",
+  "log": "wan_r1_2026-10-24/copies/s2r1/native_stream_ctrl_gaps.log",
+  "silences": 2,
+  "drops_ge_3s": 2,
+  "h950": {
+   "real": 2,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  },
+  "h450": {
+   "real": 2,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  },
+  "h450_guard": {
+   "real": 2,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  }
+ },
+ {
+  "label": "G4-S3 (hotspot)",
+  "class": "direct",
+  "log": "wan_r1_2026-10-24/copies/s3r1/native_stream_ctrl_gaps.log",
+  "silences": 1,
+  "drops_ge_3s": 1,
+  "h950": {
+   "real": 1,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  },
+  "h450": {
+   "real": 1,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  },
+  "h450_guard": {
+   "real": 1,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  }
+ },
+ {
+  "label": "LINK-R1 (5 GHz)",
+  "class": "lan",
+  "log": "link_r1_2026-10-23/runs/logs_run1/native_stream_ctrl_gaps.log",
+  "silences": 0,
+  "drops_ge_3s": 0,
+  "h950": {
+   "real": 0,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  },
+  "h450": {
+   "real": 0,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  },
+  "h450_guard": {
+   "real": 0,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  }
+ },
+ {
+  "label": "G-A3 (5 GHz)",
+  "class": "lan",
+  "log": "g_a3_2026-10-23/runs/logs_run1/native_stream_ctrl_gaps.log",
+  "silences": 0,
+  "drops_ge_3s": 0,
+  "h950": {
+   "real": 0,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  },
+  "h450": {
+   "real": 0,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  },
+  "h450_guard": {
+   "real": 0,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  }
+ },
+ {
+  "label": "CL-B10 cell 1 (5 GHz)",
+  "class": "lan",
+  "log": "cl_b10_2026-10-23/runs/1_snes_5ghz_restart_guard/logs_run1/native_stream_ctrl_gaps.log",
+  "silences": 2,
+  "drops_ge_3s": 2,
+  "h950": {
+   "real": 2,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  },
+  "h450": {
+   "real": 2,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  },
+  "h450_guard": {
+   "real": 2,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  }
+ },
+ {
+  "label": "CL-B11 cell 1 (5 GHz)",
+  "class": "lan",
+  "log": "cl_b11_2026-10-24/runs/1_snes_5ghz_restart_guard_all_paths/logs_run1/native_stream_ctrl_gaps.log",
+  "silences": 7,
+  "drops_ge_3s": 1,
+  "h950": {
+   "real": 1,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  },
+  "h450": {
+   "real": 1,
+   "false": 2,
+   "false_gap_ms": [
+    540,
+    564
+   ],
+   "capped": 0
+  },
+  "h450_guard": {
+   "real": 1,
+   "false": 1,
+   "false_gap_ms": [
+    540
+   ],
+   "capped": 0
+  }
+ },
+ {
+  "label": "CL-B12 cell 1 (5 GHz)",
+  "class": "lan",
+  "log": "cl_b12_2026-10-24/runs/1_snes_5ghz_two_home_presses/logs_run1/native_stream_ctrl_gaps.log",
+  "silences": 2,
+  "drops_ge_3s": 2,
+  "h950": {
+   "real": 2,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  },
+  "h450": {
+   "real": 2,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  },
+  "h450_guard": {
+   "real": 2,
+   "false": 0,
+   "false_gap_ms": [],
+   "capped": 0
+  }
+ },
+ {
+  "label": "CL-B10 cell 4 (2.4 GHz; reference, not a WAN-R1 window)",
+  "class": "lan 2.4",
+  "log": "cl_b10_2026-10-23/runs/4_snes_24ghz_notice/logs_run1/native_stream_ctrl_gaps.log",
+  "silences": 221,
+  "drops_ge_3s": 2,
+  "h950": {
+   "real": 2,
+   "false": 10,
+   "false_gap_ms": [
+    1536,
+    1054,
+    952,
+    1162,
+    1045,
+    1127,
+    1040,
+    2512,
+    1042,
+    1170
+   ],
+   "capped": 0
+  },
+  "h450": {
+   "real": 2,
+   "false": 59,
+   "false_gap_ms": [
+    1536,
+    612,
+    478,
+    513,
+    499,
+    1054,
+    711,
+    927,
+    540,
+    952,
+    787,
+    1162
+   ],
+   "capped": 0
+  },
+  "h450_guard": {
+   "real": 2,
+   "false": 10,
+   "false_gap_ms": [
+    1536,
+    1054,
+    952,
+    1162,
+    1045,
+    1127,
+    1040,
+    2512,
+    1042,
+    1170
+   ],
+   "capped": 0
+  }
+ }
+]

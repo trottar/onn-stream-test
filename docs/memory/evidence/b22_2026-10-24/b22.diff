@@ -1,0 +1,1359 @@
+--- a/companion/plugins/games.py (13ccff5 + B21)
++++ b/companion/plugins/games.py
+@@ -33,6 +33,12 @@
+     import link_recovery as _link_recovery
+     _link_recovery.apply(os.environ)
+ 
++# B22: a guarded client restart's start answered before the old teardown, only with PRIVYHUB_RESTART_FAST=1.
++# Absent = today: nothing imported.
++_restart_fast = None
++if (os.environ.get("PRIVYHUB_RESTART_FAST") or "").strip() == "1":
++    import restart_fast as _restart_fast
++
+ # B3: the client's Wi-Fi link fields in the heartbeat, only with PRIVYHUB_LINK_REPORT=1. Absent = today.
+ _LINK_FIELDS = None
+ if (os.environ.get("PRIVYHUB_LINK_REPORT") or "").strip() == "1":
+@@ -200,6 +206,10 @@
+         # B21: the import-time apply's result (no second apply here); `reapply` [] = nothing new since
+         if _link_recovery is not None:
+             self._recovery._log("link_recovery_config", **_link_recovery.config_row(os.environ))
++        # B22: the fast restart (its config row beside the others)
++        if _restart_fast is not None:
++            self._restart_fast = _restart_fast.RestartFast(self._recovery._log)
++            self._recovery._log("restart_fast_config", **self._restart_fast.config())
+         # B2: the fast input hold -- a second, faster trigger inside the same recovery state machine
+         if _input_hold is not None:
+             _input_hold.wire(self._recovery, self._native_stream._session_io.controller,
+@@ -3868,11 +3878,20 @@
+                             "Game did not remain paused for stream stabilization."
+                         )
+ 
+-                payload = self._native_stream.start(
+-                    client_ip=client_ip,
+-                    port=port,
+-                    managed_process_id=game_status.get("pid"),
+-                )
++                # B22: a guarded restart on a running stream answers before the old teardown (absent: today's start)
++                if _restart_fast is not None and guard_end and _restart_fast.RestartFast.eligible(self._native_stream):
++                    payload = self._restart_fast.start(
++                        self._native_stream,
++                        client_ip=client_ip,
++                        port=port,
++                        managed_process_id=game_status.get("pid"),
++                    )
++                else:
++                    payload = self._native_stream.start(
++                        client_ip=client_ip,
++                        port=port,
++                        managed_process_id=game_status.get("pid"),
++                    )
+                 self._recovery_start_args = {
+                     "client_ip": client_ip,
+                     "port": port,
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt (13ccff5)
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -619,6 +619,9 @@
+         // B16: a new session waits for its own host's fast ready (null = today)
+         fastReady?.let { uiHandler.removeCallbacks(fastReadyTick) }
+         fastReady = null
++        // B22: a new session's fast restart is armed only by its own start's response (null = today)
++        restartFast?.let { uiHandler.removeCallbacks(restartFastTick) }
++        restartFast = null
+         // B5: the Wi-Fi lock for the session (null = today)
+         streamWifiLock?.acquire()
+         // B14: a new session re-arms the link notice (null = today)
+@@ -791,6 +794,8 @@
+                 val restart = restartGuard?.takePending()
+                 // B17: the old session's end rides in the start (guard_end=1); the report follows it
+                 restart?.let { p -> restartGuard?.beginViaStart(p) }
++                // B22: the receiver's SSRC changes at the guarded start's POST (a read; used only with the host's key)
++                val ssrcAtStart = restart?.let { receiver?.snapshot()?.ssrcChanges } ?: 0L
+ 
+                 val response =
+                     httpPost(
+@@ -806,11 +811,23 @@
+                         response
+                     )
+ 
++                // B22: the host's fast restart, armed only by its key at a guarded start (null = today)
++                if (restart != null) {
++                    json.optJSONObject(RestartFastHint.KEY)?.let { k ->
++                        if (k.optBoolean(RestartFastHint.ARMED, false)) {
++                            restartFast = RestartFast(ssrcAtStart, k.optBoolean(RestartFastHint.OLD_STREAM, true))
++                                .also { it.onResponse() }
++                        }
++                    }
++                }
++
+                 // B17: the host's acknowledgement, then the old report on its own thread (null = today)
+                 restart?.let { p ->
+                     restartGuard?.noteStartResponse(json.optBoolean("guard_end", false))
+                     thread(start = true, isDaemon = true, name = "PrivyHub-Guard-Report") {
+                         restartGuard?.reportAfterStart(p) { r -> postRestartReport(host, r) }
++                        // B22: the release waits for this (null = today)
++                        restartFast?.reportDone = true
+                     }
+                 }
+ 
+@@ -894,7 +911,8 @@
+                 }
+ 
+                 // B11: the rebuilt receiver starts with the host's cushion and redundancy already in force
+-                if (restart != null) audioReceiver?.start()
++                // B22: with the host's fast restart, at the ready's return instead (restartFast null = today)
++                if (restart != null && restartFast == null) audioReceiver?.start()
+ 
+                 if (
+                     hostAlphaVersion !=
+@@ -1047,6 +1065,12 @@
+                     }
+ 
+                     updateMetrics()
++
++                    // B22: the fast restart's 50-ms release tick (null = today)
++                    restartFast?.let {
++                        uiHandler.removeCallbacks(restartFastTick)
++                        uiHandler.postDelayed(restartFastTick, 50L)
++                    }
+                 }
+ 
+             } catch (error: Exception) {
+@@ -2354,6 +2378,17 @@
+             root.put("fast_ready_frame_to_post_ms", f.lastFrameToPostMs)
+         }
+ 
++        // B22: the fast restart's release (null = today: no key)
++        restartFast?.let { r ->
++            root.put("restart_fast_released_by", r.releasedBy)
++            root.put("restart_fast_response_to_switch_ms", r.responseToSwitchMs)
++            root.put("restart_fast_switch_to_release_ms", r.switchToReleaseMs)
++            root.put("restart_fast_response_to_release_ms", r.responseToReleaseMs)
++            root.put("restart_fast_report_wait_ms", r.reportWaitMs)
++            root.put("restart_fast_gate_resets", r.gateResets)
++            root.put("restart_fast_gate_last_reset", r.gateLastReset)
++        }
++
+         // B10: the loss guard's mode and counters (null = today: no key)
+         lossGuard?.let { g ->
+             root.put("loss_guard_mode", g.mode.wire)
+@@ -2442,6 +2477,38 @@
+         }
+     }
+ 
++    // B22: a guarded restart's release at the new stream's first fresh frame, only with the host's key (null = today).
++    @Volatile
++    private var restartFast: RestartFast? = null
++
++    private val restartFastTick: Runnable by lazy {
++        object : Runnable {
++            override fun run() {
++                val r = restartFast ?: return
++                if (!sessionStarted || stopping || gameplayReleased) return
++                if (r.tick(restartFastInputs(r))) {
++                    requestGameplayRelease()
++                    return
++                }
++                if (r.releasedBy == "none") uiHandler.postDelayed(this, 50L)
++            }
++        }
++    }
++
++    private fun restartFastInputs(r: RestartFast): RestartFastInputs {
++        val rtp = receiver?.snapshot()
++        return RestartFastInputs(
++            released = gameplayReleased,
++            requestInFlight = releaseRequestInFlight,
++            hostMetadataComplete = hostMetadataComplete,
++            ssrcChanges = rtp?.ssrcChanges ?: 0L,
++            waitingForIdr = rtp?.waitingForIdr ?: true,
++            renderedFrames = decoder?.renderedFrameCount() ?: 0L,
++            outputAgeMs = decoder?.lastOutputAgeMs() ?: -1L,
++            reportDone = r.reportDone,
++        )
++    }
++
+     private fun fastReadyInputs(): FastReadyInputs =
+         FastReadyInputs(
+             recoveryActive = recoveryActive,
+@@ -3112,6 +3179,8 @@
+             true
+         stabilizationPhase =
+             "Ready"
++        // B22: who released (a release the fast tick did not make is the gate's; null = today)
++        restartFast?.noteRelease()
+         publishStreamStatus()
+         updateStabilizationOverlay()
+ 
+@@ -3145,6 +3214,9 @@
+                     )
+                 }
+ 
++                // B22: the host's new audio is up once the ready returns: the rebuilt receiver now (null = today)
++                if (restartFast?.takeAudio() == true) audioReceiver?.start()
++
+                 runOnUiThread {
+                     releaseRequestInFlight =
+                         false
+@@ -3165,6 +3237,9 @@
+                 }
+ 
+             } catch (_: Exception) {
++                // B22: a refused ready starts the held receiver too (null = today)
++                if (restartFast?.takeAudio() == true) audioReceiver?.start()
++
+                 runOnUiThread {
+                     failStabilization(
+                         "Release failed — game remains paused"
+@@ -3516,6 +3591,23 @@
+                 dec.latestReceiveToDecodeMs <=
+                     STABILIZATION_MAX_RX_DECODE_MS
+ 
++        // B22: the gate's resets while a fast restart is armed, with the failed condition (null = today)
++        restartFast?.let { r ->
++            if (!clean) {
++                r.noteGateReset(
++                    when {
++                        currentRendered <= stabilizationLastRendered -> "no_new_frame"
++                        currentDropped != stabilizationLastDropped -> "dropped"
++                        currentOverflow != stabilizationLastOverflow -> "overflow"
++                        dec.queueDepth != 0 -> "queue"
++                        recentVideoFps < STABILIZATION_MIN_FPS -> "fps"
++                        dec.latestOutputGapMs > STABILIZATION_MAX_OUTPUT_GAP_MS -> "gap"
++                        else -> "rx_decode"
++                    }
++                )
++            }
++        }
++
+         stabilizationLastRendered =
+             currentRendered
+         stabilizationLastDropped =
+diff --git a/companion/restart_fast.py b/companion/restart_fast.py
+new file mode 100644
+index 0000000..0ac2bb8
+--- /dev/null
++++ b/companion/restart_fast.py
+@@ -0,0 +1,224 @@
++"""B22: `PRIVYHUB_RESTART_FAST=1` -- a guarded client restart's start answered before the old session's teardown.
++
++CL-B12 cell 1: the host's `native-stream-start?…&guard_end=1` ran 2.0-2.2 s from its entry to its response. Inside
++it, `_stop_locked()` tore down the old audio (~0.7 s: joins, the capture's wait, two `pactl` calls) *before* it touched
++the encoder; then the encoder's exit, the relay, xdotool and the new `Popen` (~0.45 s); then a fixed 0.75-s startup
++check and the new audio. Here, for an eligible start (`guard_end=1`, Linux, an old encoder running):
++- the request answers with a `status()` snapshot of the running session (the same profile, window and client) and
++  `"restart_fast": {"armed": true, "old_stream_active": true}` -- after a worker thread holds the manager's lock;
++- the worker kills the old encoder first (on Linux the encoder is the capture: x11grab in the same ffmpeg), stops the
++  old audio beside the new encoder, starts the new encoder as today's start does, runs today's 0.75-s check (at least
++  once), then `AUDIO_CODEC.prepare` and the new audio;
++- the ready's `status()` waits on the same lock, so nothing resumes before the new encoder and audio are up.
++Absent = today: nothing imports this module. Design: `docs/memory/evidence/b22_2026-10-24/design_written_before_code.md`
++(hashed before this code).
++"""
++
++from __future__ import annotations
++
++import subprocess
++import threading
++import time
++from typing import Any, Callable, Mapping
++
++FLAG_ENV = "PRIVYHUB_RESTART_FAST"
++STARTUP_CHECK_S = 0.75   # today's startup check (`_start_linux_locked`), unchanged
++LOCK_WAIT_S = 2.0
++
++
++def enabled(environ: Mapping[str, str]) -> bool:
++    return (environ.get(FLAG_ENV) or "").strip() == "1"
++
++
++def _ns():
++    import native_stream   # the companion's module (already imported by the plugin)
++    return native_stream
++
++
++class RestartFast:
++    def __init__(self, log: Callable[..., Any], clock: Callable[[], float] = time.monotonic) -> None:
++        self._log = log
++        self._clock = clock
++        self.last: dict[str, Any] | None = None
++        self._worker: threading.Thread | None = None
++
++    def config(self) -> dict[str, Any]:
++        return {"startup_check_s": STARTUP_CHECK_S, "lock_wait_s": LOCK_WAIT_S}
++
++    @staticmethod
++    def eligible(manager: Any) -> bool:
++        """Linux and an old encoder running (with `guard_end=1`, checked by the caller); else today's start."""
++        if not manager._linux_host():
++            return False
++        with manager._lock:
++            p = manager._process
++            return p is not None and p.poll() is None
++
++    def start(self, manager: Any, client_ip: str, port: int, managed_process_id: int | None) -> dict[str, Any]:
++        ns = _ns()
++        t0 = self._clock()
++        client_ip = manager._validated_ipv4(client_ip)
++        port = manager._validated_port(int(port))
++        try:
++            ns.host_resource_sampling.start(manager.project_root)
++        except Exception:
++            pass
++        ffmpeg, process_id = self._preflight(manager, ns, client_ip, managed_process_id)
++        snapshot = manager.status()
++        timings: dict[str, Any] = {}
++        locked = threading.Event()
++        self._worker = threading.Thread(
++            target=self._run, name="PrivyHub-Restart-Fast", daemon=True,
++            args=(manager, ns, ffmpeg, client_ip, port, process_id, t0, timings, locked))
++        self._worker.start()
++        if not locked.wait(LOCK_WAIT_S):
++            self._log("restart_fast_lock_wait", waited_s=LOCK_WAIT_S)
++            locked.wait()
++        payload = dict(snapshot)
++        payload["restart_fast"] = {"armed": True, "old_stream_active": True}
++        response_ms = round((self._clock() - t0) * 1000.0, 1)
++        self._log("restart_fast", response_ms=response_ms, lock_ms=timings.get("lock_ms"))
++        return payload
++
++    @staticmethod
++    def _preflight(manager: Any, ns: Any, client_ip: str, managed_process_id: Any) -> tuple[Any, int]:
++        """Today's checks, read only (the audio codec's refusal without `prepare`); raise before anything changes."""
++        err = ns.NativeStreamError
++        try:
++            process_id = int(managed_process_id)
++        except (TypeError, ValueError) as exc:
++            raise err("Linux native video requires the managed RetroArch process ID.") from exc
++        from pathlib import Path
++        if process_id <= 0 or not Path(f"/proc/{process_id}").is_dir():
++            raise err("The managed RetroArch process is no longer active.")
++        ffmpeg = manager._find_ffmpeg()
++        if ffmpeg is None:
++            raise err("FFmpeg was not found on the Linux host.")
++        if manager._linux_display() is None:
++            raise err("Linux native video requires an active X11 DISPLAY.")
++        if manager._linux_xdotool() is None:
++            raise err("Linux native video requires xdotool for fail-closed managed-window discovery.")
++        if manager._linux_vaapi_device() is None:
++            raise err("Linux native video requires exactly one accessible DRM render node.")
++        codec = ns.AUDIO_CODEC
++        if codec is not None and codec.active and ns._audio_codec.CODEC_OPUS not in codec.declared(client_ip):
++            raise err(ns._audio_codec.REFUSAL)
++        return ffmpeg, process_id
++
++    def _ms(self, t0: float) -> float:
++        return round((self._clock() - t0) * 1000.0, 1)
++
++    def _run(self, manager: Any, ns: Any, ffmpeg: Any, client_ip: str, port: int, process_id: int, t0: float,
++             timings: dict[str, Any], locked: threading.Event) -> None:
++        with manager._lock:
++            timings["lock_ms"] = self._ms(t0)
++            locked.set()
++            try:
++                self._restart_locked(manager, ns, ffmpeg, client_ip, port, process_id, t0, timings)
++                self.last = dict(timings, ok=True)
++                self._log("restart_fast_done", **timings)
++            except Exception as exc:
++                try:
++                    manager._stop_locked()
++                except Exception:
++                    pass
++                timings["failed_ms"] = self._ms(t0)
++                self.last = dict(timings, ok=False)
++                self._log("restart_fast_failed", error=f"{type(exc).__name__}: {str(exc)[:200]}", **timings)
++
++    def _restart_locked(self, manager: Any, ns: Any, ffmpeg: Any, client_ip: str, port: int, process_id: int,
++                        t0: float, timings: dict[str, Any]) -> None:
++        m = manager
++        # today's _stop_locked order for the telemetry (a no-op on Linux), then the encoder first: the capture's release
++        m._host_telemetry.stop()
++        m._kill_managed_process(m._process)
++        m._kill_managed_process(m._capture_process)
++        timings["released_ms"] = self._ms(t0)
++        # the rest of the old teardown beside the new encoder: the old audio
++        audio_stop = threading.Thread(target=m._session_io.stop_stream, name="PrivyHub-Restart-Fast-Audio",
++                                      daemon=True)
++        audio_stop.start()
++        # today's _stop_locked field resets (the relay stopped)
++        m._fec_relay.stop()
++        m._process = None
++        m._capture_process = None
++        m._encoder_command = None
++        m._client_port = None
++        m._active_bitrate_kbps = m.BITRATE_KBPS
++        m._active_width = m.WIDTH
++        m._active_height = m.HEIGHT
++        if m._capture_target is not None:
++            m._last_capture_target = m._capture_target
++        m._capture_target = None
++        if m._log_handle is not None:
++            try:
++                m._log_handle.close()
++            except Exception:
++                pass
++            m._log_handle = None
++        try:
++            self._spawn_locked(m, ns, ffmpeg, client_ip, port, process_id)
++            timings["spawned_ms"] = self._ms(t0)
++            spawned_at = self._clock()
++        finally:
++            audio_stop.join()
++            timings["audio_stopped_ms"] = self._ms(t0)
++        m._client_port = port
++        # today's prepare (now after the old audio stopped); a refusal fails the restart
++        if ns.AUDIO_CODEC is not None and (refusal := ns.AUDIO_CODEC.prepare(m._session_io.audio, client_ip)):
++            raise ns.NativeStreamError(refusal)
++        # today's startup check, 0.75 s from the Popen; at least one check
++        deadline = spawned_at + STARTUP_CHECK_S
++        while True:
++            if m._process is None or m._process.poll() is not None or not m._fec_relay.running:
++                log_tail = m._tail_log()
++                raise ns.NativeStreamError("Linux native video exited during startup."
++                                           + (f"\n\nFFmpeg log:\n{log_tail}" if log_tail else ""))
++            if self._clock() >= deadline:
++                break
++            time.sleep(0.05)
++        timings["checked_ms"] = self._ms(t0)
++        redundancy = m.audio_redundancy()
++        m._session_io.audio.set_redundancy(copies=redundancy["copies"], offset_packets=redundancy["offset_packets"])
++        m._session_io.start(ffmpeg=ffmpeg, client_ip=client_ip, audio_port=m.AUDIO_PORT, input_port=m.INPUT_PORT,
++                            process_id=process_id)
++        timings["done_ms"] = self._ms(t0)
++
++    @staticmethod
++    def _spawn_locked(m: Any, ns: Any, ffmpeg: Any, client_ip: str, port: int, process_id: int) -> None:
++        """Today's `_start_linux_locked` from the capture target to the `Popen`, unchanged in content."""
++        capture_target = m._select_capture_target(managed_process_id=process_id)
++        capture_target = dict(capture_target)
++        capture_target["backend"] = "x11grab_window"
++        m._capture_target = capture_target
++        m.data_dir.mkdir(parents=True, exist_ok=True)
++        m.log_dir.mkdir(parents=True, exist_ok=True)
++        m._log_handle = open(m.log_path, "a", encoding="utf-8", errors="replace", buffering=1)
++        m._log_handle.write("\n" + "=" * 72 + "\n")
++        m._log_handle.write(f"Starting PrivyHub Linux native-video backend v{m.ALPHA_VERSION}\n")
++        m._log_handle.write(f"Profile: {m.PROFILE.id} {m.WIDTH}x{m.HEIGHT}@{m.FPS}, "
++                            f"{m.BITRATE_KBPS}/{m.MAX_BITRATE_KBPS} kbps "
++                            f"H.264 VAAPI, GOP={m.GOP_FRAMES}, BF={m.BFRAMES}\n")
++        m._log_handle.write("Capture backend: exact X11 window via x11grab\n")
++        m._log_handle.write("Capture: managed RetroArch window "
++                            f"(pid={process_id}, window_id={capture_target['_window_id']}, "
++                            f"discovered={capture_target['width']}x{capture_target['height']})\n")
++        m._log_handle.write(f"Window title: {capture_target.get('title', '')}\n")
++        m._log_handle.write(f"Video FEC: XOR {m.FEC_GROUP_SIZE}+1; FFmpeg RTP -> loopback relay -> onn; "
++                            f"encoder={m.BITRATE_KBPS} kbps\n")
++        m._log_handle.write("=" * 72 + "\n")
++        m._log_handle.flush()
++        try:
++            m._fec_relay.start(client_ip=client_ip, client_port=port)
++            start_kw: dict[str, Any] = {}
++            if ns.START_RUNG is not None:   # G8-S2: the session's first target
++                start_kw = ns.START_RUNG.encoder_kwargs(client_ip)
++                m._active_bitrate_kbps = int(start_kw.get("bitrate_kbps", m.BITRATE_KBPS))
++            linux_command = m._build_linux_ffmpeg_command(ffmpeg=ffmpeg, capture_target=capture_target, **start_kw)
++            m._encoder_command = list(linux_command)
++            m._log_handle.write("encoder argv: " + " ".join(linux_command) + "\n")
++            m._log_handle.flush()
++            m._process = subprocess.Popen(linux_command, cwd=str(m.project_root), stdin=subprocess.DEVNULL,
++                                          stdout=m._log_handle, stderr=subprocess.STDOUT)
++        except Exception as exc:
++            raise ns.NativeStreamError(f"Unable to start Linux native video: {exc}") from exc
+diff --git a/tests/restart_fast/test_restart_fast.py b/tests/restart_fast/test_restart_fast.py
+new file mode 100644
+index 0000000..4114226
+--- /dev/null
++++ b/tests/restart_fast/test_restart_fast.py
+@@ -0,0 +1,444 @@
++#!/usr/bin/env python3
++"""B22: `PRIVYHUB_RESTART_FAST=1` -- a guarded restart's start answered before the old teardown; the old encoder killed
++first, the new one spawned only after it exited, the old audio stopped beside it, today's 0.75-s check, then the new
++audio; the ready's `status()` waits on the lock. Absent / not eligible = today's start.
++
++    python3 -m unittest discover -s tests/restart_fast -v
++
++A real `NativeStreamManager` on a temp root (constructing nothing live): fake encoder processes on a registry per
++window (terminate -> exit after a delay), a fake FEC relay, a fake session I/O (the old audio's stop 0.7 s), the capture
++target and the encoder's `Popen` patched. `plugins/games.py` loaded alone (B17's `tests/guard_end` harness) with the
++flag in the environment at its import. Timings are wall-clock (real threads), with margins stated per assertion.
++"""
++
++from __future__ import annotations
++
++import importlib.util
++import os
++import sys
++import tempfile
++import threading
++import time
++import types
++import unittest
++from pathlib import Path
++from unittest import mock
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++
++import native_stream  # noqa: E402
++import restart_fast as rf  # noqa: E402
++
++
++def load_games_plugin(env):
++    with mock.patch.dict(os.environ, env):
++        spec = importlib.util.spec_from_file_location(f"b22_games_{len(env)}_{id(env)}",
++                                                      ROOT / "companion" / "plugins" / "games.py")
++        mod = importlib.util.module_from_spec(spec)
++        spec.loader.exec_module(mod)
++    return mod
++
++
++G_FAST = load_games_plugin({"PRIVYHUB_RESTART_FAST": "1"})
++G_TODAY = load_games_plugin({})
++
++T0 = time.monotonic()
++
++
++def now():
++    return time.monotonic() - T0
++
++
++class Events:
++    def __init__(self):
++        self.rows = []
++        self._lock = threading.Lock()
++
++    def add(self, name, **kw):
++        with self._lock:
++            self.rows.append((now(), name, kw))
++
++    def names(self):
++        return [r[1] for r in self.rows]
++
++    def at(self, name):
++        return next(r[0] for r in self.rows if r[1] == name)
++
++
++class Registry:
++    """The live encoders per capture window: two at once on one window is the failure."""
++
++    def __init__(self):
++        self.live = {}
++        self.max_live = {}
++        self._lock = threading.Lock()
++
++    def up(self, window):
++        with self._lock:
++            self.live[window] = self.live.get(window, 0) + 1
++            self.max_live[window] = max(self.max_live.get(window, 0), self.live[window])
++
++    def down(self, window):
++        with self._lock:
++            self.live[window] -= 1
++
++
++class FakeProc:
++    _n = 1000
++
++    def __init__(self, registry, window, exit_delay_s, events, name):
++        FakeProc._n += 1
++        self.pid = FakeProc._n
++        self.registry, self.window, self.exit_delay_s, self.events, self.name = registry, window, exit_delay_s, events, name
++        self._exit_at = None
++        self._done = False
++        registry.up(window)
++
++    def poll(self):
++        if self._exit_at is not None and time.monotonic() >= self._exit_at and not self._done:
++            self._done = True
++            self.registry.down(self.window)
++            self.events.add(f"{self.name}_exited")
++        return 0 if self._done else None
++
++    def terminate(self):
++        self.events.add(f"{self.name}_terminated")
++        self._exit_at = time.monotonic() + self.exit_delay_s
++
++    def kill(self):
++        self._exit_at = time.monotonic()
++
++    def wait(self, timeout=None):
++        while self.poll() is None:
++            time.sleep(0.005)
++        return 0
++
++
++class FakeRelay:
++    def __init__(self, events):
++        self.running = True
++        self.events = events
++
++    def start(self, client_ip, client_port):
++        self.running = True
++        self.events.add("relay_start")
++
++    def stop(self):
++        self.running = False
++        self.events.add("relay_stop")
++
++    def status(self):
++        return {"running": self.running}
++
++    def pacing_status(self):
++        return {}
++
++
++class FakeAudio:
++    def __init__(self, events):
++        self.events = events
++
++    def set_redundancy(self, copies, offset_packets):
++        pass
++
++
++class FakeSessionIO:
++    def __init__(self, events, stop_s=0.7):
++        self.events, self.stop_s = events, stop_s
++        self.audio = FakeAudio(events)
++        self.controller = types.SimpleNamespace(last_client_packet_age_ms=lambda: 0)
++
++    def stop_stream(self):
++        self.events.add("old_audio_stop_begin")
++        time.sleep(self.stop_s)
++        self.events.add("old_audio_stopped")
++
++    def start(self, **kw):
++        self.events.add("new_audio_started")
++        return self.status()
++
++    def status(self):
++        return {"audio": {"active": True}, "controller": {"active": True}}
++
++
++class Codec:
++    """AUDIO_CODEC's surface: `prepare` must come after the old audio stopped."""
++
++    active = True
++
++    def __init__(self, events, declared=("opus",)):
++        self.events, self._declared = events, declared
++
++    def declared(self, host):
++        return self._declared
++
++    def prepare(self, streamer, client_ip):
++        self.events.add("codec_prepare")
++        return None
++
++
++def manager(events, registry, tmp, old_exit_s=1.0, spawn_s=0.3, audio_stop_s=0.7, old=True):
++    m = native_stream.NativeStreamManager(Path(tmp))
++    m._session_io = FakeSessionIO(events, audio_stop_s)
++    m._fec_relay = FakeRelay(events)
++    m._linux_host = lambda: True
++    m._find_ffmpeg = lambda: Path("/usr/bin/ffmpeg")
++    m._linux_display = lambda: ":0"
++    m._linux_xdotool = lambda: "/usr/bin/xdotool"
++    m._linux_vaapi_device = lambda: Path("/dev/dri/renderD128")
++    m._host_thermal_c = lambda: None
++    m._select_capture_target = lambda managed_process_id: {"type": "window", "_window_id": "w1", "width": 1280,
++                                                            "height": 720, "title": "RetroArch"}
++    m._build_linux_ffmpeg_command = lambda ffmpeg, capture_target, **kw: ["ffmpeg", "-window_id",
++                                                                          capture_target["_window_id"]]
++
++    def popen(cmd, **kw):
++        time.sleep(spawn_s)
++        events.add("new_encoder_spawned")
++        return FakeProc(registry, cmd[-1], 0.05, events, "new_encoder")
++
++    m._popen = popen
++    if old:
++        m._process = FakeProc(registry, "w1", old_exit_s, events, "old_encoder")
++        m._capture_target = {"type": "window", "_window_id": "w1", "width": 1280, "height": 720, "title": "RetroArch"}
++        m._client_port = 48100
++    return m
++
++
++def plugin(G, m, events):
++    class Emu:
++        def status(self):
++            return {"active": True, "paused": True, "pid": os.getpid()}
++
++    p = object.__new__(G.GamesPlugin)
++    p._emulator = Emu()
++    p._recovery = types.SimpleNamespace(note_stream_start=lambda: events.add("note_stream_start"),
++                                        session_ended=lambda: events.add("session_ended"), _stall_owner=None,
++                                        _log=lambda event, **kw: events.add(event, **kw))
++    p._native_stream = m
++    p._diagnostic_heartbeat_interval_ms = lambda: 2000
++    p._adaptive_bitrate_session_ended = lambda: events.add("ladder_session_end")
++    if G._restart_fast is not None:
++        p._restart_fast = G._restart_fast.RestartFast(p._recovery._log)
++    return p
++
++
++class Patched(unittest.TestCase):
++    def setUp(self):
++        self.tmp = tempfile.mkdtemp(prefix="b22_")
++        self.events = Events()
++        self.registry = Registry()
++        self.codec = Codec(self.events)
++        self.patches = [mock.patch.object(native_stream.host_resource_sampling, "start", lambda *a, **k: None),
++                        mock.patch.object(native_stream.host_resource_sampling, "status", lambda *a, **k: {}),
++                        mock.patch.object(native_stream, "AUDIO_CODEC", self.codec),
++                        mock.patch.object(native_stream, "_audio_codec",
++                                          types.SimpleNamespace(CODEC_OPUS="opus", REFUSAL="refused"), create=True),
++                        # restart_fast's own subprocess reference only (never the global module): no real process
++                        mock.patch.object(rf, "subprocess", types.SimpleNamespace(
++                            Popen=lambda cmd, **kw: self.popen(cmd, **kw), DEVNULL=-3, STDOUT=-2)),
++                        mock.patch.object(native_stream, "subprocess", types.SimpleNamespace(
++                            Popen=lambda cmd, **kw: self.popen(cmd, **kw), DEVNULL=-3, STDOUT=-2,
++                            TimeoutExpired=__import__("subprocess").TimeoutExpired, run=None))]
++        self.popen = None
++        self.plugins = []
++        for p in self.patches:
++            p.start()
++
++    def tearDown(self):
++        for p in self.plugins:
++            w = getattr(getattr(p, "_restart_fast", None), "_worker", None)
++            if w is not None:
++                w.join(10)
++        for p in self.patches:
++            p.stop()
++
++    def start_fast(self, m, query="port=48100&guard_end=1", G=None):
++        p = plugin(G or G_FAST, m, self.events)
++        self.plugins.append(p)
++        self.popen = m._popen
++        t = time.monotonic()
++        out = p.handle_post_request("native-stream-start", query, "127.0.0.1")
++        response_s = time.monotonic() - t
++        self.events.add("response")
++        return p, out, response_s
++
++
++class TheFastRestart(Patched):
++    def test_response_before_the_teardown_and_the_ready_waits_for_the_worker(self):
++        m = manager(self.events, self.registry, self.tmp)
++        p, out, response_s = self.start_fast(m)
++        # the response: <= 300 ms with a 1.0-s encoder exit, a 0.7-s audio stop and a 0.3-s spawn behind it
++        self.assertLess(response_s, 0.300, response_s)
++        self.assertEqual(out["restart_fast"], {"armed": True, "old_stream_active": True})
++        self.assertIs(out.get("guard_end"), True)
++        for key in ("game_session", "paused", "stabilization_required", "heartbeat_interval_ms", "active", "audio",
++                    "controller", "alpha_version", "fec_enabled", "gop_frames"):
++            self.assertIn(key, out)
++        self.assertTrue(out["active"])
++        # the client: the old report 70 ms after the response, then the ready (its first act is status())
++        time.sleep(0.070)
++        self.events.add("old_report_received")
++        st = m.status()
++        self.events.add("session_started")
++        self.assertTrue(st["active"])
++        p._restart_fast._worker.join(5)
++        # no two encoders on one capture (first: the clearest failure)
++        self.assertEqual(self.registry.max_live, {"w1": 1})
++        names = self.events.names()
++        # bookkeeping first, then the response, the report, the worker's end, the ready
++        for a, b in (("session_ended", "restart_fast"), ("restart_fast", "response"),
++                     ("response", "old_report_received"), ("old_report_received", "restart_fast_done"),
++                     ("restart_fast_done", "session_started"), ("old_encoder_terminated", "old_encoder_exited"),
++                     ("old_encoder_exited", "new_encoder_spawned"), ("old_audio_stop_begin", "new_encoder_spawned"),
++                     ("new_encoder_spawned", "old_audio_stopped"), ("old_audio_stopped", "codec_prepare"),
++                     ("codec_prepare", "new_audio_started"), ("new_audio_started", "restart_fast_done")):
++            self.assertLess(names.index(a), names.index(b), (a, b, names))
++        self.assertGreaterEqual(self.events.at("session_started"), self.events.at("restart_fast_done"))
++        # the ready waited for the worker: ~1.0 (exit) + 0.3 (spawn) + 0.75 (check) after the start
++        self.assertGreater(self.events.at("session_started") - self.events.at("response"), 1.5)
++        done = next(r[2] for r in self.events.rows if r[1] == "restart_fast_done")
++        self.assertLessEqual(done["released_ms"], done["spawned_ms"])
++        self.assertGreaterEqual(done["checked_ms"] - done["spawned_ms"], 700.0)   # today's 0.75-s check (+-50)
++        self.assertLessEqual(done["checked_ms"], done["done_ms"])
++        # the old audio overlapped the spawn: it began before, ended after
++        self.assertLess(self.events.at("old_audio_stop_begin"), self.events.at("new_encoder_spawned"))
++        fast = next(r[2] for r in self.events.rows if r[1] == "restart_fast")
++        self.assertLess(fast["response_ms"], 300.0)
++        self.assertTrue(m._running_locked())
++        self.assertEqual(m._capture_target["_window_id"], "w1")
++        self.assertEqual(m._client_port, 48100)
++        # the record's timeline (only when asked: B22_TIMELINE=<file>)
++        if os.environ.get("B22_TIMELINE"):
++            t_entry = self.events.at("session_ended")
++            with open(os.environ["B22_TIMELINE"], "w") as f:
++                f.write(f"handler response_s {response_s:.3f}\n")
++                for t, name, kw in self.events.rows:
++                    f.write(f"{(t - t_entry) * 1000:8.1f} ms  {name}  {kw if kw else ''}\n")
++
++    def test_the_check_runs_once_even_past_its_deadline(self):
++        m = manager(self.events, self.registry, self.tmp, old_exit_s=0.05, audio_stop_s=1.2, spawn_s=0.0)
++        p, out, _ = self.start_fast(m)
++        p._restart_fast._worker.join(5)
++        done = next(r[2] for r in self.events.rows if r[1] == "restart_fast_done")
++        self.assertGreater(done["audio_stopped_ms"] - done["spawned_ms"], 750.0)
++        self.assertIn("checked_ms", done)
++
++    def test_a_dead_new_encoder_fails_closed(self):
++        m = manager(self.events, self.registry, self.tmp, old_exit_s=0.05, spawn_s=0.0)
++        inner = m._popen
++
++        def dying(cmd, **kw):
++            proc = inner(cmd, **kw)
++            proc.terminate()   # exits 50 ms later, inside the check
++            return proc
++
++        m._popen = dying
++        p, out, _ = self.start_fast(m)
++        p._restart_fast._worker.join(5)
++        self.assertIn("restart_fast_failed", self.events.names())
++        self.assertNotIn("restart_fast_done", self.events.names())
++        self.assertFalse(m.status()["active"])
++        self.assertIsNone(m._process)
++
++    def test_a_failure_in_the_worker_ends_the_stream_and_is_logged(self):
++        m = manager(self.events, self.registry, self.tmp, old_exit_s=0.05, spawn_s=0.0)
++
++        def gone(managed_process_id):
++            raise native_stream.NativeStreamError("The managed RetroArch window is gone.")
++
++        m._select_capture_target = gone
++        p, out, _ = self.start_fast(m)
++        p._restart_fast._worker.join(5)
++        failed = next(r[2] for r in self.events.rows if r[1] == "restart_fast_failed")
++        self.assertIn("NativeStreamError", failed["error"])
++        self.assertNotIn("new_encoder_spawned", self.events.names())
++        self.assertIn("old_audio_stopped", self.events.names())     # the old audio still stopped
++        st = m.status()
++        self.assertFalse(st["active"])
++
++    def test_a_codec_refusal_is_refused_before_anything_changes(self):
++        m = manager(self.events, self.registry, self.tmp)
++        self.codec._declared = ()
++        p = plugin(G_FAST, m, self.events)
++        self.plugins.append(p)
++        self.popen = m._popen
++        with self.assertRaises(RuntimeError) as cm:
++            p.handle_post_request("native-stream-start", "port=48100&guard_end=1", "127.0.0.1")
++        self.assertIn("refused", str(cm.exception))
++        self.assertNotIn("old_encoder_terminated", self.events.names())
++        self.assertIsNone(p._restart_fast._worker)
++        self.assertNotIn("codec_prepare", self.events.names())
++
++    def test_a_status_poll_during_the_worker_waits_on_the_lock(self):
++        m = manager(self.events, self.registry, self.tmp)
++        p, out, _ = self.start_fast(m)
++        t = time.monotonic()
++        m.status()
++        waited = time.monotonic() - t
++        p._restart_fast._worker.join(5)
++        self.assertGreater(waited, 1.0)
++
++
++class NotEligibleIsToday(Patched):
++    def today_start_calls(self, m, query, G):
++        calls = []
++        m.start = lambda **kw: calls.append(kw) or {"active": True}
++        p = plugin(G, m, self.events)
++        self.plugins.append(p)
++        self.popen = m._popen
++        out = p.handle_post_request("native-stream-start", query, "127.0.0.1")
++        return calls, out
++
++    def test_without_guard_end(self):
++        m = manager(self.events, self.registry, self.tmp)
++        calls, out = self.today_start_calls(m, "port=48100", G_FAST)
++        self.assertEqual(len(calls), 1)
++        self.assertNotIn("restart_fast", out)
++        self.assertNotIn("old_encoder_terminated", self.events.names())
++
++    def test_without_a_running_encoder(self):
++        m = manager(self.events, self.registry, self.tmp, old=False)
++        calls, out = self.today_start_calls(m, "port=48100&guard_end=1", G_FAST)
++        self.assertEqual(len(calls), 1)
++        self.assertNotIn("restart_fast", out)
++
++    def test_flag_absent(self):
++        self.assertIsNone(G_TODAY._restart_fast)
++        m = manager(self.events, self.registry, self.tmp)
++        calls, out = self.today_start_calls(m, "port=48100&guard_end=1", G_TODAY)
++        self.assertEqual(len(calls), 1)
++        self.assertNotIn("restart_fast", out)
++        self.assertIs(out.get("guard_end"), True)
++
++    def test_flag_not_one(self):
++        for v in ("0", "yes", "", " 2 "):
++            self.assertFalse(rf.enabled({rf.FLAG_ENV: v}), v)
++        self.assertTrue(rf.enabled({rf.FLAG_ENV: " 1 "}))
++        self.assertIsNone(load_games_plugin({"PRIVYHUB_RESTART_FAST": "0"})._restart_fast)
++
++    def test_not_linux(self):
++        m = manager(self.events, self.registry, self.tmp)
++        m._linux_host = lambda: False
++        self.assertFalse(rf.RestartFast.eligible(m))
++
++
++class Absent(unittest.TestCase):
++    def test_nothing_imported(self):
++        import subprocess
++        env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++        code = ("import sys, importlib.util; sys.path.insert(0, 'companion');"
++                "s = importlib.util.spec_from_file_location('g', 'companion/plugins/games.py');"
++                "m = importlib.util.module_from_spec(s); s.loader.exec_module(m);"
++                "print('restart_fast' in sys.modules, m._restart_fast is None)")
++        out = subprocess.run([sys.executable, "-B", "-c", code], cwd=ROOT, env=env, capture_output=True, text=True,
++                             timeout=300)
++        self.assertEqual(out.stdout.strip().splitlines()[-1], "False True", out.stderr[-500:])
++
++    def test_config_row(self):
++        self.assertEqual(rf.RestartFast(lambda *a, **k: None).config(), {"startup_check_s": 0.75, "lock_wait_s": 2.0})
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/PrivyHub/app/src/main/java/streaming/RestartFast.kt b/PrivyHub/app/src/main/java/streaming/RestartFast.kt
+new file mode 100644
+index 0000000..8500c8f
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/RestartFast.kt
+@@ -0,0 +1,153 @@
++package com.safeiot.privyhub.streaming
++
++/**
++ * B22: a guarded restart's release at the new stream's first fresh frame, armed only by the host's `native-stream-start`
++ * response (`"restart_fast": {"armed": true, "old_stream_active": true}`, sent with `PRIVYHUB_RESTART_FAST=1` on an
++ * eligible `guard_end=1` start). Lives inside the existing `restart_guard` (B11 … B19): no guarded start, or no key,
++ * = today (no object).
++ *
++ * CL-B12 cell 1: the new stream's frames were decoded 0.3-0.5 s before the host's start response, and the start-up gate
++ * then needed a baseline tick + 6 clean 500-ms ticks (≥ ~3.5-4 s; press 1 8.8 s with a reset). With the host's fast
++ * restart the response comes before its teardown, so the old encoder's frames can still arrive after it: the release
++ * waits for the switch (the receiver's `ssrcChanges` above its value at the start's POST), a frame rendered after it,
++ * no IDR wait, the output <= [freshMs] old, and the old report's post finished (or [reportWaitCapMs] since the
++ * response), so the host logs ended → report → started. Today's gate keeps running beside it; if this never fires the
++ * gate's release still comes. The rebuilt audio receiver waits for the release ([takeAudio]): the host's new audio is
++ * up once the ready returns (its `status()` waits for the host's restart), and the old one is gone.
++ */
++object RestartFastHint {
++    const val KEY = "restart_fast"
++    const val ARMED = "armed"
++    const val OLD_STREAM = "old_stream_active"
++}
++
++/** What the 50-ms tick reads. */
++data class RestartFastInputs(
++    val released: Boolean,
++    val requestInFlight: Boolean,
++    val hostMetadataComplete: Boolean,
++    val ssrcChanges: Long,
++    val waitingForIdr: Boolean,
++    val renderedFrames: Long,
++    val outputAgeMs: Long,
++    val reportDone: Boolean,
++)
++
++class RestartFast(
++    val ssrcAtStart: Long,
++    val needSwitch: Boolean,
++    val freshMs: Long = 100L,
++    val reportWaitCapMs: Long = 1_000L,
++    private val clockMs: () -> Long = { System.nanoTime() / 1_000_000L },
++) {
++    @Volatile
++    private var armedAtMs = -1L
++
++    @Volatile
++    private var switchAtMs = -1L
++
++    @Volatile
++    private var renderedAtSwitch = -1L
++
++    @Volatile
++    private var freshAtMs = -1L
++
++    @Volatile
++    private var audioPending = true
++
++    /** The old report's post finished (posted or failed): the guard's report thread. */
++    @Volatile
++    var reportDone = false
++
++    /** `fast` (this tick), `gate` (today's 6-tick release first), `none`. */
++    @Volatile
++    var releasedBy = "none"
++        private set
++
++    @Volatile
++    var responseToSwitchMs = -1L
++        private set
++
++    @Volatile
++    var switchToReleaseMs = -1L
++        private set
++
++    @Volatile
++    var responseToReleaseMs = -1L
++        private set
++
++    /** How long a release that was otherwise ready waited on the old report. */
++    @Volatile
++    var reportWaitMs = -1L
++        private set
++
++    /** Today's gate's resets while armed, and the last failed condition (CL-B12 press 1's unlogged reason). */
++    @Volatile
++    var gateResets = 0L
++        private set
++
++    @Volatile
++    var gateLastReset = ""
++        private set
++
++    /** The start's response: the arm. */
++    fun onResponse() {
++        armedAtMs = clockMs()
++    }
++
++    /** One 50-ms tick: true = release now (once). */
++    fun tick(inp: RestartFastInputs): Boolean {
++        if (armedAtMs < 0L || releasedBy != "none" || inp.released || inp.requestInFlight || !inp.hostMetadataComplete) {
++            return false
++        }
++        if (needSwitch && inp.ssrcChanges <= ssrcAtStart) {
++            return false
++        }
++        val now = clockMs()
++        if (renderedAtSwitch < 0L) {
++            renderedAtSwitch = inp.renderedFrames
++            switchAtMs = now
++            responseToSwitchMs = now - armedAtMs
++        }
++        if (inp.renderedFrames <= renderedAtSwitch || inp.waitingForIdr || inp.outputAgeMs < 0L ||
++            inp.outputAgeMs > freshMs
++        ) {
++            return false
++        }
++        if (freshAtMs < 0L) {
++            freshAtMs = now
++        }
++        if (!inp.reportDone && now - armedAtMs < reportWaitCapMs) {
++            return false
++        }
++        reportWaitMs = now - freshAtMs
++        releasedBy = "fast"
++        switchToReleaseMs = now - switchAtMs
++        responseToReleaseMs = now - armedAtMs
++        return true
++    }
++
++    /** `requestGameplayRelease`: a release this tick did not make is today's gate's. */
++    fun noteRelease() {
++        if (releasedBy == "none") {
++            releasedBy = "gate"
++            if (armedAtMs >= 0L) {
++                responseToReleaseMs = clockMs() - armedAtMs
++            }
++        }
++    }
++
++    fun noteGateReset(reason: String) {
++        gateResets++
++        gateLastReset = reason
++    }
++
++    /** The ready's return (released or not): true once = start the rebuilt audio receiver now. */
++    fun takeAudio(): Boolean {
++        if (!audioPending) {
++            return false
++        }
++        audioPending = false
++        return true
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/RestartFastTest.kt b/PrivyHub/app/src/test/java/streaming/RestartFastTest.kt
+new file mode 100644
+index 0000000..bad55b9
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/RestartFastTest.kt
+@@ -0,0 +1,284 @@
++package com.safeiot.privyhub.streaming
++
++import java.io.File
++import java.net.DatagramPacket
++import java.net.DatagramSocket
++import java.net.InetAddress
++import java.nio.ByteBuffer
++import java.nio.file.Files
++import java.util.concurrent.atomic.AtomicLong
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * B22: a guarded restart's release at the new stream's first fresh frame, armed only by the host's `restart_fast` key.
++ * The decision table on an injected clock; then the real RtpH264Receiver on loopback across an encoder switch (SSRC
++ * A's frames, the host's response, SSRC B's P-frames rejected, B's IDR) with B16's fake decoder and the activity's
++ * 50-ms tick; then B17's harness (a temp-file store, a slow fake host: 300 ms per post) with the key: the start, the
++ * report, the ready; the rebuilt audio receiver started at the ready's return, not at the response. CL-B12 cell 1 press
++ * 2's rows: the switch ~0.5 s after the start's entry, the IDR 14 ms after it.
++ */
++class RestartFastTest {
++
++    private fun inputs(
++        released: Boolean = false, inFlight: Boolean = false, meta: Boolean = true, ssrc: Long = 1L,
++        waitingForIdr: Boolean = false, frames: Long = 11L, age: Long = 10L, report: Boolean = true,
++    ) = RestartFastInputs(released, inFlight, meta, ssrc, waitingForIdr, frames, age, report)
++
++    @Test
++    fun theDecisionTable() {
++        val clock = longArrayOf(1_000L)
++        val r = RestartFast(ssrcAtStart = 0L, needSwitch = true) { clock[0] }
++        assertFalse(r.tick(inputs()))                               // not armed before the response
++        r.onResponse()
++        assertFalse(r.tick(inputs(meta = false)))
++        assertFalse(r.tick(inputs(released = true)))
++        assertFalse(r.tick(inputs(inFlight = true)))
++        assertFalse(r.tick(inputs(ssrc = 0L, frames = 50L)))       // the old encoder's frames: no switch yet
++        clock[0] += 400L
++        assertFalse(r.tick(inputs(ssrc = 1L, frames = 50L)))       // the switch seen: its frame count is the baseline
++        assertEquals(400L, r.responseToSwitchMs)
++        assertFalse(r.tick(inputs(frames = 50L)))                  // nothing rendered after the switch
++        assertFalse(r.tick(inputs(frames = 51L, waitingForIdr = true)))
++        assertFalse(r.tick(inputs(frames = 51L, age = 101L)))      // stale (press 1's 854-ms stall is waited out)
++        assertFalse(r.tick(inputs(frames = 51L, age = -1L)))
++        clock[0] += 120L
++        assertTrue(r.tick(inputs(frames = 51L, age = 100L)))
++        assertEquals("fast", r.releasedBy)
++        assertEquals(120L, r.switchToReleaseMs)
++        assertEquals(520L, r.responseToReleaseMs)
++        assertEquals(0L, r.reportWaitMs)
++        assertFalse(r.tick(inputs(frames = 60L)))                   // once
++        r.noteRelease()
++        assertEquals("fast", r.releasedBy)
++    }
++
++    @Test
++    fun noSwitchNeededWhenTheHostSaysNoOldStream() {
++        val r = RestartFast(ssrcAtStart = 0L, needSwitch = false) { 0L }
++        r.onResponse()
++        assertFalse(r.tick(inputs(ssrc = 0L, frames = 0L)))         // baseline 0
++        assertTrue(r.tick(inputs(ssrc = 0L, frames = 1L)))
++    }
++
++    @Test
++    fun theReleaseWaitsForTheOldReportCappedAtOneSecond() {
++        val clock = longArrayOf(0L)
++        val r = RestartFast(0L, true) { clock[0] }
++        r.onResponse()
++        assertFalse(r.tick(inputs(frames = 5L, report = false)))   // the switch's baseline
++        clock[0] += 300L
++        assertFalse(r.tick(inputs(frames = 6L, report = false)))   // fresh, but the report is still in flight
++        clock[0] += 50L
++        assertTrue(r.tick(inputs(frames = 7L, report = true)))      // the report done: the release
++        assertEquals(50L, r.reportWaitMs)
++
++        val c2 = longArrayOf(0L)
++        val s = RestartFast(0L, true) { c2[0] }
++        s.onResponse()
++        assertFalse(s.tick(inputs(frames = 5L, report = false)))
++        c2[0] += 300L
++        assertFalse(s.tick(inputs(frames = 6L, report = false)))
++        c2[0] += 699L
++        assertFalse(s.tick(inputs(frames = 7L, report = false)))
++        c2[0] += 1L
++        assertTrue(s.tick(inputs(frames = 8L, report = false)))     // 1,000 ms after the response: a slow report
++        assertEquals(700L, s.reportWaitMs)                          // never holds the game
++    }
++
++    @Test
++    fun theGatesReleaseIsNamedAndItsResetsCounted() {
++        val clock = longArrayOf(0L)
++        val r = RestartFast(0L, true) { clock[0] }
++        r.onResponse()
++        r.noteGateReset("queue")
++        r.noteGateReset("dropped")
++        clock[0] += 3_900L
++        r.noteRelease()
++        assertEquals("gate", r.releasedBy)
++        assertEquals(3_900L, r.responseToReleaseMs)
++        assertEquals(2L, r.gateResets)
++        assertEquals("dropped", r.gateLastReset)
++        assertFalse(r.tick(inputs(frames = 99L)))
++    }
++
++    @Test
++    fun theAudioIsTakenOnce() {
++        val r = RestartFast(0L, true)
++        assertTrue(r.takeAudio())
++        assertFalse(r.takeAudio())
++    }
++
++    @Test
++    fun theHintKeysAreTheHostsFields() {
++        assertEquals("restart_fast", RestartFastHint.KEY)
++        assertEquals("armed", RestartFastHint.ARMED)
++        assertEquals("old_stream_active", RestartFastHint.OLD_STREAM)
++    }
++
++    // --- the real receiver across an encoder switch (B16's loopback form) ---
++
++    private fun freePort(): Int = DatagramSocket(0).use { it.localPort }
++
++    private class Wire(val port: Int, val ssrc: Int, var seq: Int) {
++        private val tx = DatagramSocket()
++        private var ts = 90_000L
++
++        fun au(idr: Boolean) {
++            val nal = byteArrayOf(if (idr) 0x65 else 0x41, 0x11, 0x22, 0x33, 0x44)
++            val p = ByteBuffer.allocate(12 + nal.size)
++            p.put(0x80.toByte()).put((0x80 or 96).toByte()).putShort(seq.toShort()).putInt(ts.toInt()).putInt(ssrc)
++            p.put(nal)
++            seq = (seq + 1) and 0xffff
++            ts += 1500L
++            tx.send(DatagramPacket(p.array(), p.capacity(), InetAddress.getLoopbackAddress(), port))
++            Thread.sleep(3)
++        }
++
++        fun close() = tx.close()
++    }
++
++    @Test
++    fun theOldEncodersFramesNeverReleaseTheNewStreamsFirstFrameDoes() {
++        val frames = AtomicLong(0L)
++        val lastOutAt = AtomicLong(-1L)
++        val port = freePort()
++        val rx = RtpH264Receiver(
++            port = port,
++            onParameterSets = { _, _ -> },
++            onAccessUnit = { _, _ -> frames.incrementAndGet(); lastOutAt.set(System.nanoTime() / 1_000_000L) },
++        ).also { it.start(); Thread.sleep(150) }
++        val old = Wire(port, 0x1111, 100)
++        repeat(4) { old.au(it == 0) }                              // the old encoder, heard by the new instance
++        Thread.sleep(60)
++        val ssrcAtStart = rx.snapshot().ssrcChanges                // the start's POST
++        assertEquals(0L, ssrcAtStart)
++        val r = RestartFast(ssrcAtStart, needSwitch = true)
++        r.onResponse()                                              // the fast response, before the host's teardown
++        fun tick(): Boolean {
++            val now = System.nanoTime() / 1_000_000L
++            val age = lastOutAt.get().let { if (it < 0L) -1L else now - it }
++            val s = rx.snapshot()
++            return r.tick(inputs(ssrc = s.ssrcChanges, waitingForIdr = s.waitingForIdr, frames = frames.get(), age = age))
++        }
++        repeat(3) { old.au(false) }                                // still the old encoder after the response
++        Thread.sleep(20)
++        assertFalse(tick())
++        assertFalse(tick())
++        val new = Wire(port, 0x2222, 7)
++        repeat(3) { new.au(false) }                                // the new encoder's P-frames: rejected, IDR wait
++        Thread.sleep(50)
++        assertEquals(1L, rx.snapshot().ssrcChanges)
++        assertTrue(rx.snapshot().waitingForIdr)
++        assertFalse(tick())                                        // the switch's baseline taken here
++        assertFalse(tick())
++        val beforeIdr = frames.get()
++        new.au(true)                                               // the new encoder's IDR
++        new.au(false)
++        Thread.sleep(50)
++        assertTrue(frames.get() > beforeIdr)
++        assertFalse(rx.snapshot().waitingForIdr)
++        assertTrue(tick())                                         // the first tick after the IDR's frame
++        assertEquals("fast", r.releasedBy)
++        assertTrue(r.switchToReleaseMs in 0L..200L)
++        rx.stop()
++        old.close()
++        new.close()
++    }
++
++    // --- B17's harness with the key: the order, the audio ---
++
++    private val dir: File = Files.createTempDirectory("b22_store_").toFile()
++    private var n = 0
++    private fun storeFile(): File = File(dir, "pending_${n++}.properties")
++
++    private class Audio(val clock: LongArray) {
++        var startedAtMs = -1L
++        fun start() { startedAtMs = clock[0] }
++    }
++
++    /** 300 ms per post on the clock; the start answers `guard_end` and, when [fast], the `restart_fast` key. */
++    private class SlowHost(val clock: LongArray, val fast: Boolean) {
++        val posts = mutableListOf<Pair<String, Long>>()
++        fun post(what: String): Pair<Boolean, Boolean> {
++            posts.add(what to clock[0])
++            clock[0] += 300L
++            val guarded = what.endsWith("&guard_end=1")
++            return guarded to (guarded && fast)
++        }
++        fun names() = posts.map { it.first }
++    }
++
++    private class Run(val audioAfter: Audio, val responseAt: Long, val fast: RestartFast?)
++
++    /** The activity, B17 + B22: the held receiver, the start, the key, the report thread, the rebuilt receiver. */
++    private fun startB22(g: RestartGuard, host: SlowHost, clock: LongArray): Run {
++        clock[0] += 670L                                           // CL-B11: creation -> startSession
++        val holds = g.prepareStart()
++        assertTrue(holds)
++        val restart = g.takePending()!!
++        g.beginViaStart(restart)
++        val ssrcAtStart = 0L
++        val (acked, key) = host.post("start?port=48100&guard_end=1")
++        val responseAt = clock[0]
++        val fast = if (key) RestartFast(ssrcAtStart, true) { clock[0] }.also { it.onResponse() } else null
++        g.noteStartResponse(acked)
++        val after = Audio(clock)
++        if (fast == null) after.start()                            // B11's rebuild at the response: today
++        g.reportAfterStart(restart) { r -> host.post("report:$r") }   // its own thread in the app
++        fast?.reportDone = true
++        return Run(after, responseAt, fast)
++    }
++
++    private fun lose(g: RestartGuard, clock: LongArray) {
++        g.onSurfaceLost("{\"session\":\"A\"}", 15L, 10L, false)
++        clock[0] += 19_500L
++    }
++
++    @Test
++    fun withTheKeyTheAudioWaitsForTheReadyAndTheOrderHolds() {
++        val clock = longArrayOf(1_000L)
++        val f = storeFile()
++        val a = RestartGuard { clock[0] }.also { it.attach(FilePendingStore(f), 1L, 100L) }
++        lose(a, clock)
++        val b = RestartGuard { clock[0] }.also { it.attach(FilePendingStore(f), 2L, 100L) }
++        val host = SlowHost(clock, fast = true)
++        val run = startB22(b, host, clock)
++        val fast = run.fast!!
++        assertEquals(-1L, run.audioAfter.startedAtMs)              // not at the response
++        clock[0] += 400L                                           // the switch, then the new stream's first frame
++        assertFalse(fast.tick(inputs(ssrc = 1L, frames = 10L)))
++        clock[0] += 50L
++        assertTrue(fast.tick(inputs(ssrc = 1L, frames = 11L)))
++        host.post("ready")
++        if (fast.takeAudio()) run.audioAfter.start()               // the ready's return
++        assertEquals(listOf("start?port=48100&guard_end=1", "report:{\"session\":\"A\"}", "ready"), host.names())
++        assertTrue(run.audioAfter.startedAtMs > host.posts.last().second)
++        assertEquals(true, b.lastCause!!["host_ended_session"])
++        assertEquals(true, b.lastCause!!["old_report_posted"])
++        assertEquals("via_start", b.lastCause!!["flush"])
++    }
++
++    @Test
++    fun withoutTheKeyB17sOrderAndTheAudioAtTheResponse() {
++        val clock = longArrayOf(1_000L)
++        val f = storeFile()
++        val a = RestartGuard { clock[0] }.also { it.attach(FilePendingStore(f), 1L, 100L) }
++        lose(a, clock)
++        val b = RestartGuard { clock[0] }.also { it.attach(FilePendingStore(f), 2L, 100L) }
++        val host = SlowHost(clock, fast = false)
++        val run = startB22(b, host, clock)
++        assertNull(run.fast)
++        assertEquals(run.responseAt, run.audioAfter.startedAtMs)          // at the response, as B17's
++        assertEquals(listOf("start?port=48100&guard_end=1", "report:{\"session\":\"A\"}"), host.names())
++    }
++
++    @Test
++    fun theGuardOffMeansNoGuardedStartSoNoKeyIsRead() {
++        assertFalse(RestartGuardFlag.parse("0"))
++        assertTrue(RestartGuardFlag.parse(null))                   // B19: absent = on
++    }
++}

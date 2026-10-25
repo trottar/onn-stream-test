@@ -619,6 +619,9 @@ class NativeStreamActivity :
         // B16: a new session waits for its own host's fast ready (null = today)
         fastReady?.let { uiHandler.removeCallbacks(fastReadyTick) }
         fastReady = null
+        // B22: a new session's fast restart is armed only by its own start's response (null = today)
+        restartFast?.let { uiHandler.removeCallbacks(restartFastTick) }
+        restartFast = null
         // B5: the Wi-Fi lock for the session (null = today)
         streamWifiLock?.acquire()
         // B14: a new session re-arms the link notice (null = today)
@@ -791,6 +794,8 @@ class NativeStreamActivity :
                 val restart = restartGuard?.takePending()
                 // B17: the old session's end rides in the start (guard_end=1); the report follows it
                 restart?.let { p -> restartGuard?.beginViaStart(p) }
+                // B22: the receiver's SSRC changes at the guarded start's POST (a read; used only with the host's key)
+                val ssrcAtStart = restart?.let { receiver?.snapshot()?.ssrcChanges } ?: 0L
 
                 val response =
                     httpPost(
@@ -806,11 +811,23 @@ class NativeStreamActivity :
                         response
                     )
 
+                // B22: the host's fast restart, armed only by its key at a guarded start (null = today)
+                if (restart != null) {
+                    json.optJSONObject(RestartFastHint.KEY)?.let { k ->
+                        if (k.optBoolean(RestartFastHint.ARMED, false)) {
+                            restartFast = RestartFast(ssrcAtStart, k.optBoolean(RestartFastHint.OLD_STREAM, true))
+                                .also { it.onResponse() }
+                        }
+                    }
+                }
+
                 // B17: the host's acknowledgement, then the old report on its own thread (null = today)
                 restart?.let { p ->
                     restartGuard?.noteStartResponse(json.optBoolean("guard_end", false))
                     thread(start = true, isDaemon = true, name = "PrivyHub-Guard-Report") {
                         restartGuard?.reportAfterStart(p) { r -> postRestartReport(host, r) }
+                        // B22: the release waits for this (null = today)
+                        restartFast?.reportDone = true
                     }
                 }
 
@@ -894,7 +911,8 @@ class NativeStreamActivity :
                 }
 
                 // B11: the rebuilt receiver starts with the host's cushion and redundancy already in force
-                if (restart != null) audioReceiver?.start()
+                // B22: with the host's fast restart, at the ready's return instead (restartFast null = today)
+                if (restart != null && restartFast == null) audioReceiver?.start()
 
                 if (
                     hostAlphaVersion !=
@@ -1047,6 +1065,12 @@ class NativeStreamActivity :
                     }
 
                     updateMetrics()
+
+                    // B22: the fast restart's 50-ms release tick (null = today)
+                    restartFast?.let {
+                        uiHandler.removeCallbacks(restartFastTick)
+                        uiHandler.postDelayed(restartFastTick, 50L)
+                    }
                 }
 
             } catch (error: Exception) {
@@ -2354,6 +2378,17 @@ class NativeStreamActivity :
             root.put("fast_ready_frame_to_post_ms", f.lastFrameToPostMs)
         }
 
+        // B22: the fast restart's release (null = today: no key)
+        restartFast?.let { r ->
+            root.put("restart_fast_released_by", r.releasedBy)
+            root.put("restart_fast_response_to_switch_ms", r.responseToSwitchMs)
+            root.put("restart_fast_switch_to_release_ms", r.switchToReleaseMs)
+            root.put("restart_fast_response_to_release_ms", r.responseToReleaseMs)
+            root.put("restart_fast_report_wait_ms", r.reportWaitMs)
+            root.put("restart_fast_gate_resets", r.gateResets)
+            root.put("restart_fast_gate_last_reset", r.gateLastReset)
+        }
+
         // B10: the loss guard's mode and counters (null = today: no key)
         lossGuard?.let { g ->
             root.put("loss_guard_mode", g.mode.wire)
@@ -2440,6 +2475,38 @@ class NativeStreamActivity :
                 uiHandler.postDelayed(this, 50L)
             }
         }
+    }
+
+    // B22: a guarded restart's release at the new stream's first fresh frame, only with the host's key (null = today).
+    @Volatile
+    private var restartFast: RestartFast? = null
+
+    private val restartFastTick: Runnable by lazy {
+        object : Runnable {
+            override fun run() {
+                val r = restartFast ?: return
+                if (!sessionStarted || stopping || gameplayReleased) return
+                if (r.tick(restartFastInputs(r))) {
+                    requestGameplayRelease()
+                    return
+                }
+                if (r.releasedBy == "none") uiHandler.postDelayed(this, 50L)
+            }
+        }
+    }
+
+    private fun restartFastInputs(r: RestartFast): RestartFastInputs {
+        val rtp = receiver?.snapshot()
+        return RestartFastInputs(
+            released = gameplayReleased,
+            requestInFlight = releaseRequestInFlight,
+            hostMetadataComplete = hostMetadataComplete,
+            ssrcChanges = rtp?.ssrcChanges ?: 0L,
+            waitingForIdr = rtp?.waitingForIdr ?: true,
+            renderedFrames = decoder?.renderedFrameCount() ?: 0L,
+            outputAgeMs = decoder?.lastOutputAgeMs() ?: -1L,
+            reportDone = r.reportDone,
+        )
     }
 
     private fun fastReadyInputs(): FastReadyInputs =
@@ -3112,6 +3179,8 @@ class NativeStreamActivity :
             true
         stabilizationPhase =
             "Ready"
+        // B22: who released (a release the fast tick did not make is the gate's; null = today)
+        restartFast?.noteRelease()
         publishStreamStatus()
         updateStabilizationOverlay()
 
@@ -3145,6 +3214,9 @@ class NativeStreamActivity :
                     )
                 }
 
+                // B22: the host's new audio is up once the ready returns: the rebuilt receiver now (null = today)
+                if (restartFast?.takeAudio() == true) audioReceiver?.start()
+
                 runOnUiThread {
                     releaseRequestInFlight =
                         false
@@ -3165,6 +3237,9 @@ class NativeStreamActivity :
                 }
 
             } catch (_: Exception) {
+                // B22: a refused ready starts the held receiver too (null = today)
+                if (restartFast?.takeAudio() == true) audioReceiver?.start()
+
                 runOnUiThread {
                     failStabilization(
                         "Release failed — game remains paused"
@@ -3515,6 +3590,23 @@ class NativeStreamActivity :
                     STABILIZATION_MAX_OUTPUT_GAP_MS &&
                 dec.latestReceiveToDecodeMs <=
                     STABILIZATION_MAX_RX_DECODE_MS
+
+        // B22: the gate's resets while a fast restart is armed, with the failed condition (null = today)
+        restartFast?.let { r ->
+            if (!clean) {
+                r.noteGateReset(
+                    when {
+                        currentRendered <= stabilizationLastRendered -> "no_new_frame"
+                        currentDropped != stabilizationLastDropped -> "dropped"
+                        currentOverflow != stabilizationLastOverflow -> "overflow"
+                        dec.queueDepth != 0 -> "queue"
+                        recentVideoFps < STABILIZATION_MIN_FPS -> "fps"
+                        dec.latestOutputGapMs > STABILIZATION_MAX_OUTPUT_GAP_MS -> "gap"
+                        else -> "rx_decode"
+                    }
+                )
+            }
+        }
 
         stabilizationLastRendered =
             currentRendered

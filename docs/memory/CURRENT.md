@@ -218,6 +218,44 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
+**G4-S4: off-site free play MEASURED; WAN-R1 READ** (`evidence/G4_S4_OFFSITE_FREE_PLAY_2026-10-24.md`,
+`evidence/WAN_R1_OFFSITE_GAP_DISTRIBUTION_2026-10-24.md`; the user at a friend's house, their 5-GHz Wi-Fi, 2026-10-24).
+- **100.1 min of play over the tailnet in 13 client sessions,** 71.1 min under the four WAN lines (start `floor`, cap
+  7000).
+  - **The stack's first WAN exposure: 0 false holds,** 0 uplink silences ≥ 250 ms in play. 2 holds, both at the
+    user's Home presses.
+  - Hitch seconds 2.2 / 10 min (1.8 under the four lines; the 5-GHz LAN 3.9-9.9).
+  - The ladder climbed 4000 → 7000 in ~12.5 min in every long session, with no step-down and 0 clamps.
+  - 8,849 kbit/s at 7000 on the tailnet (~4.0 GB/h); RTT p50 ~62 ms.
+  - The user: "pretty damn good … maybe better than lan".
+- **The path:** direct in all sampled play, in all four off-site sessions. Relayed only when idle or ending (0.5 min of
+  streaming on the relay in total).
+- **WAN-R1:** direct 113 min, 0 non-drop silences ≥ 250 ms, 0 output gaps ≥ 400 ms. Any H ≥ 250 / stall ≥ 200 keeps
+  ≤ 1 false fire / 10 min there; the 5-GHz LAN binds first (H 550 each / 300 pooled; stall 350).
+- **What failed** (G4_S4 §10):
+  - I closed attempt 1 on a misread "home";
+  - the idle wait kept the four lines out of the first 44 min;
+  - the onn left the tailnet ~8 min once;
+  - the evening session and the night's VOD ran with no driver;
+  - VOD is unmeasured.
+- **State:** ten lines, no `e3_flag.conf`, `--check` ok, APK CONFIRMED, the onn home on 5 GHz (5180 MHz).
+
+1. **The user's commit:**
+   - the two records and their dirs (`g4_s4_2026-10-24/` incl. `copies/`, `wan_r1_2026-10-24/`);
+   - `docs/ROADMAP.md`, `docs/KNOWN_ISSUES.md`, this file (`logs/g4_s4_git_status.txt`, `logs/wan_r1_git_status.txt`).
+2. **To B, the first WAN question: the false-hold count.**
+   - It is 0 / 10 min on direct (bound < ~0.3), so H 950 and the 400-ms stall need no WAN change for direct.
+   - **Relayed is unanswered:** a session held on the relay is needed before H or the stall can be set per path
+     class.
+3. **To B, from G4-S4's Home:**
+   - Home now auto-resumes, with no pause screen (the user: "I'm use to at home where the pause screen shows up");
+   - the game runs ~1.06 s unattended before the hold;
+   - a Home return restarts the ladder at the floor.
+   - Confirm on the LAN first that this is G-A4's behaviour.
+4. **Still pending:** the reconnect-over-overlay test (a network change mid-play, over the tailnet), and a measured VOD
+   off-site. The onn's ~8-min tailnet drop (cause unread) goes with it.
+5. Items 2-3 of G-A4's list below stand. G4-S4 is done.
+
 **G-A4: `PRIVYHUB_LINK_RECOVERY=1` ADOPTED, the tenth line; the confirmation window VALID, every row met**
 (`evidence/G_A4_LINK_RECOVERY_ADOPTION_2026-10-24.md`; the companion restarted 18:13:02Z; the window 18:17-18:29Z on
 5 GHz, no flag file, no client property).

@@ -1627,6 +1627,20 @@ median**, against the pre-registered ~5,370 ±10 % (met) and G4-S2's 8,243 with 
 the whole run 443 MB. Loss 0.21/min, rendered 59.95, 70 `remote_cap` refusals, no transitions. Underruns 34 in the
 window (three client starts), net audio loss 0, spikes ~45/min. The user: "Audio and visual looked good, consistent
 with lan". Record: `docs/memory/evidence/G4_S3_OFFSITE_4000_OPUS_2026-10-19.md`.
+**G4-S4 (2026-10-24): off-site FREE PLAY at a friend's house (their 5-GHz Wi-Fi, broadband) — MEASURED.** 100.1 min of
+play in 13 client sessions over the tailnet. 71.1 min were under the four WAN lines (remote ladder, start `floor`,
+cap 7000, WAN telemetry); the rest was on the ten adopted lines.
+- **The link-recovery stack's first WAN exposure: 0 false holds.** 2 holds, both at the user's Home presses.
+- **0 uplink silences ≥ 250 ms in play.** Hitch seconds **2.2 / 10 min** (1.8 under the four lines; the 5-GHz LAN
+  3.9-9.9).
+- The path was **direct** throughout the sampled play; relayed only around idle spans.
+- The ladder climbed 4000 → 7000 in ~12.5 min in every long session, with no step-down and 0 clamps.
+- Tailnet tx 5,322 kbit/s at 4000 and **8,849 at 7000** (G4-S1 with PCM 11,698), ~4.0 GB/h at 7000.
+- Post-FEC 7.8 / min under the four lines; RTT p50 ~62 ms, p95 ~335 ms; rendered 59.9.
+- Underruns 8-20 / min (a watch item).
+
+The user: "Performance has been pretty damn good … maybe better than lan". Home now auto-resumes, with no pause
+screen and the rung back at the floor: to B. Record: `docs/memory/evidence/G4_S4_OFFSITE_FREE_PLAY_2026-10-24.md`.
 
 **G4-P2 (2026-10-17): the remote row records gate 3 from G4-S2** — `tools/e1_remote.py`
 writes the home row's per-run RetroArch counter override (for the PS1-STREAM fixture),
@@ -1999,6 +2013,17 @@ CONFIRMED and pinned.**
   G-A4 is the user's call.
 
 Record: `docs/memory/evidence/CL_B12_DEFAULTS_AND_UMBRELLA_2026-10-24.md`.
+
+**B21 (2026-10-24): `link_recovery_config` reports the import-time `apply()` (`implied` the six / `explicit` {} under
+the umbrella alone).** Record: `docs/memory/evidence/B21_LINK_RECOVERY_CONFIG_LOG_2026-10-24.md`.
+
+**B22 (2026-10-24): `PRIVYHUB_RESTART_FAST=1`, a guarded restart's start answered before the old teardown. The
+client's release at the new stream's first fresh frame (inside `restart_guard`, armed by the host's key). APK (B5 …
+B19 + B22) `6bddafc0…` pinned, not installed.** Record: `docs/memory/evidence/B22_RESTART_FAST_2026-10-24.md`.
+
+**B23 (2026-10-24): `PRIVYHUB_LINK_RECOVERY_WAN=1`, the hold's H and the stall's threshold per path class from WAN-R1
+(direct 450 / 200; the LAN, relayed and unknown as wired).** Record:
+`docs/memory/evidence/B23_LINK_RECOVERY_WAN_THRESHOLDS_2026-10-24.md`.
 
 ## G9 — Remote foundation checkpoint
 

@@ -1,0 +1,658 @@
+--- a/companion/plugins/games.py (13ccff5 + B21 + B22)
++++ b/companion/plugins/games.py
+@@ -39,6 +39,12 @@
+ if (os.environ.get("PRIVYHUB_RESTART_FAST") or "").strip() == "1":
+     import restart_fast as _restart_fast
+ 
++# B23: the hold's H and the stall's threshold per path class (WAN-R1), only with PRIVYHUB_LINK_RECOVERY_WAN=1.
++# Absent = today: nothing imported.
++_link_recovery_wan = None
++if (os.environ.get("PRIVYHUB_LINK_RECOVERY_WAN") or "").strip() == "1":
++    import link_recovery_wan as _link_recovery_wan
++
+ # B3: the client's Wi-Fi link fields in the heartbeat, only with PRIVYHUB_LINK_REPORT=1. Absent = today.
+ _LINK_FIELDS = None
+ if (os.environ.get("PRIVYHUB_LINK_REPORT") or "").strip() == "1":
+@@ -233,6 +239,11 @@
+         # B12: after B7's (and B8's) wires
+         if _stall_owner is not None:
+             _stall_owner.wire(self._recovery, self._native_stream._session_io.controller, os.environ)
++        # B23: after every threshold's own wire (B2 / B6 / B7 / B8 / B12): the per-path-class sets
++        if _link_recovery_wan is not None:
++            self._link_recovery_wan = _link_recovery_wan.wire(
++                self._recovery, self._native_stream._session_io.controller, os.environ,
++                config_row=(lambda: _link_recovery.config_row(os.environ)) if _link_recovery is not None else None)
+         # B14: the link notice's transitions, one per plugin (the recovery log)
+         if _link_notice is not None:
+             self._link_notice_log = _link_notice.NoticeLog()
+@@ -3864,6 +3875,9 @@
+             # state, so the pause below is skipped and the gate below still
+             # owns the resume.
+             self._recovery.note_stream_start()
++            # B23: this session's thresholds by its path class (absent: today's)
++            if _link_recovery_wan is not None and getattr(self, "_link_recovery_wan", None) is not None:
++                self._link_recovery_wan.note_stream_start(client_ip)
+             try:
+                 if not game_status.get("paused", False):
+                     try:
+diff --git a/companion/link_recovery_wan.py b/companion/link_recovery_wan.py
+new file mode 100644
+index 0000000..e8c8eb6
+--- /dev/null
++++ b/companion/link_recovery_wan.py
+@@ -0,0 +1,206 @@
++"""B23: `PRIVYHUB_LINK_RECOVERY_WAN=1` -- the stack's hold H and stall threshold per path class, from WAN-R1's numbers.
++
++WAN-R1 (`docs/memory/evidence/WAN_R1_OFFSITE_GAP_DISTRIBUTION_2026-10-24.md` §3): on the overlay's direct path, 113 min
++of off-site play held 0 non-drop uplink silences >= 250 ms and 0 output gaps >= 400 ms. Any H >= 250 and any stall
++>= 200 keep <= 1 false fire / 10 min. The relayed path had 0.5 min (not answerable). So, per session at the stream's
++start:
++- `lan` (the client's address is not the overlay's): the values as wired (H 950 with B6, the stall 400 with B9);
++- `remote-direct` (an overlay address, the overlay provider's path `direct`): **H 450, stall 200**. H is WAN-R1's 250
++  clamped to 450 so B9 / B12's silence save stays at 400 (`rewind_cores.parse_state_at`: min(400, H - 50)), 50 ms
++  before the hold, as benched;
++- `remote-relayed` / `remote-unknown` (relayed, no-peer, none, the provider absent or not yet read): as wired.
++The path class: G5-S3's `remote_ladder.routing_evidence_of` (G3's overlay address test; only the class is kept) and
++the overlay provider's `state().path`, read on a daemon thread (it spawns `tailscale status`), never in the request.
++Applied to B2's detector (`hold_s`, B6's `Tuning.hold_ms`) and B7's `StallSignal.threshold_ms`, whichever is wired.
++Addendum 1 (`design_addendum_1.md`, after the first replay: G4-S1 run 2 went direct -> no-peer inside one session, 18
++false holds at 450): the path is re-read every 10 s during a remote session, and on `remote-direct` the first hold
++whose silence ends in < 3 s reverts the session to the wired values (not re-applied in that session).
++**Absent = today**: nothing imports this module. Design: `docs/memory/evidence/b23_2026-10-24/design_written_before_code.md`
++(hashed before this code).
++"""
++
++from __future__ import annotations
++
++import os
++import threading
++import time
++from typing import Any, Callable, Mapping
++
++FLAG_ENV = "PRIVYHUB_LINK_RECOVERY_WAN"
++
++SET_LAN, SET_DIRECT, SET_RELAYED, SET_UNKNOWN = "lan", "remote-direct", "remote-relayed", "remote-unknown"
++DIRECT_HOLD_MS = 450        # WAN-R1 direct: 250 (the grid's floor), clamped: the silence save at 400 stays 50 ms before
++DIRECT_STALL_MS = 200       # WAN-R1 direct: 200 (output gaps >= 200 at 0-0.1 / min)
++REREAD_S = 10.0             # addendum 1: the path re-read during a remote session (the provider caches 10 s)
++REAL_DROP_MS = 3000.0       # WAN-R1's rule: a silence >= 3 s is a real drop
++WHY_GUARD = ("a non-drop silence >= 450 ms on the direct path: not WAN-R1's direct; as wired for the rest of the "
++             "session")
++WHY = {
++    SET_LAN: "the LAN's, unchanged",
++    SET_DIRECT: ("WAN-R1 direct (113 min: H >= 250 / stall >= 200 for <= 1 false fire / 10 min); H clamped to 450 so "
++                 "the silence save stays at 400, 50 ms before the hold"),
++    SET_RELAYED: "WAN-R1: relayed not answerable (0.5 min); as wired",
++    SET_UNKNOWN: "no WAN-R1 class for this path (no-peer is the flapping regime) or the path not known; as wired",
++}
++
++
++def enabled(environ: Mapping[str, str]) -> bool:
++    return (environ.get(FLAG_ENV) or "").strip() == "1"
++
++
++def _default_is_overlay(client_ip: Any) -> bool:
++    import remote_ladder
++    return remote_ladder.routing_evidence_of(client_ip) == remote_ladder.EVIDENCE_OVERLAY
++
++
++def _default_overlay_path() -> str:
++    """The overlay provider's path (`direct` / `relayed` / `no-peer` / `none`); `unread` without a provider."""
++    import overlay
++    provider = overlay.select_provider(os.environ)
++    if provider is None:
++        return "unread"
++    return str(provider.state().path)
++
++
++class WanThresholds:
++    def __init__(self, recovery: Any, detector: Any, stall: Any,
++                 is_overlay: Callable[[Any], bool] = _default_is_overlay,
++                 overlay_path: Callable[[], str] = _default_overlay_path,
++                 config_row: Callable[[], dict[str, Any]] | None = None,
++                 threaded: bool = True, sleep: Callable[[float], None] = time.sleep) -> None:
++        self.recovery = recovery
++        self.detector = detector
++        self.stall = stall
++        self.lan_hold_ms = round(detector.hold_s * 1000.0) if detector is not None else None
++        self.lan_stall_ms = int(stall.threshold_ms) if stall is not None else None
++        self._is_overlay = is_overlay
++        self._overlay_path = overlay_path
++        self._config_row = config_row
++        self._threaded = threaded
++        self._sleep = sleep
++        self._lock = threading.Lock()
++        self._session = 0
++        self._guard_session = 0                         # addendum 1: the session the guard reverted
++        self.guard_trips = 0
++        # addendum 1: B2's detector's own events, the original emit first and unchanged
++        if detector is not None:
++            orig = detector._emit
++
++            def emit(ev: tuple) -> None:
++                orig(ev)
++                try:
++                    self._on_detector_event(ev)
++                except Exception:
++                    pass
++
++            detector._emit = emit
++        self.in_force: dict[str, Any] = {"set": SET_LAN, "path_class": "lan", "path": "none", "why": "no session yet"}
++
++    def values(self, which: str) -> tuple[int | None, int | None]:
++        if which == SET_DIRECT:
++            return (DIRECT_HOLD_MS if self.detector is not None else None,
++                    DIRECT_STALL_MS if self.stall is not None else None)
++        return self.lan_hold_ms, self.lan_stall_ms
++
++    def sets(self) -> dict[str, Any]:
++        return {s: {"hold_ms": self.values(s)[0], "stall_ms": self.values(s)[1], "why": WHY[s]}
++                for s in (SET_LAN, SET_DIRECT, SET_RELAYED, SET_UNKNOWN)}
++
++    def config(self) -> dict[str, Any]:
++        return {"flag": f"{FLAG_ENV}=1", "lan_hold_ms": self.lan_hold_ms, "lan_stall_ms": self.lan_stall_ms,
++                "sets": self.sets()}
++
++    def _apply(self, which: str, path_class: str, path: str, session: int, why: str | None = None) -> None:
++        with self._lock:
++            if session != self._session:
++                return                                  # a late answer for an older session
++            if which == SET_DIRECT and self._guard_session == session:
++                return                                  # addendum 1: the guard reverted this session
++            if why is None and self.in_force.get("set") == which and self.in_force.get("path") == path \
++                    and self.in_force.get("session") == session:
++                return                                  # a re-read with nothing new: no row
++            hold, stall = self.values(which)
++            if self.detector is not None and hold is not None:
++                self.detector.hold_s = hold / 1000.0
++                tuning = getattr(self.detector, "tuning", None)
++                if tuning is not None:
++                    tuning.hold_ms = hold
++            if self.stall is not None and stall is not None:
++                self.stall.threshold_ms = int(stall)
++            self.in_force = {"set": which, "path_class": path_class, "path": path, "hold_ms": hold,
++                             "stall_ms": stall, "why": why or WHY[which], "session": session}
++            row: dict[str, Any] = dict(self._config_row()) if self._config_row is not None else {}
++            row["at"] = "session"
++            row["wan"] = {k: v for k, v in self.in_force.items() if k != "session"}
++        self.recovery._log("link_recovery_config", **row)
++
++    def note_stream_start(self, client_ip: Any) -> str:
++        """At every `native-stream-start`; never raises. Returns the set applied now."""
++        try:
++            with self._lock:
++                self._session += 1
++                session = self._session
++            if not self._is_overlay(client_ip):
++                self._apply(SET_LAN, "lan", "none", session)
++                return SET_LAN
++            self._apply(SET_UNKNOWN, "remote", "pending", session)
++            if self._threaded:
++                threading.Thread(target=self._read_path, args=(session,), name="PrivyHub-Wan-Path",
++                                 daemon=True).start()
++            else:
++                self._read_path(session)
++            return SET_UNKNOWN
++        except Exception:
++            return SET_UNKNOWN
++
++    def _read_path(self, session: int) -> None:
++        """The path now, then (threaded) every REREAD_S while this session is current (addendum 1)."""
++        while True:
++            self.reread_once(session)
++            if not self._threaded:
++                return
++            self._sleep(REREAD_S)
++            with self._lock:
++                if session != self._session:
++                    return
++
++    def reread_once(self, session: int) -> None:
++        try:
++            path = self._overlay_path()
++        except Exception:
++            path = "unread"
++        which = SET_DIRECT if path == "direct" else SET_RELAYED if path == "relayed" else SET_UNKNOWN
++        try:
++            self._apply(which, "remote", path, session)
++        except Exception:
++            pass
++
++    def _on_detector_event(self, ev: tuple) -> None:
++        """Addendum 1: on `remote-direct`, a hold released within 3 s reverts the session to the wired values."""
++        if not ev or ev[0] != "release" or float(ev[1]) >= REAL_DROP_MS:
++            return
++        with self._lock:
++            if self.in_force.get("set") != SET_DIRECT:
++                return
++            session = self._session
++            self._guard_session = session
++            self.guard_trips += 1
++            path = str(self.in_force.get("path"))
++        if self._threaded:   # off the controller's receive loop
++            threading.Thread(target=self._apply, args=(SET_UNKNOWN, "remote", path, session, WHY_GUARD),
++                             name="PrivyHub-Wan-Guard", daemon=True).start()
++        else:
++            self._apply(SET_UNKNOWN, "remote", path, session, WHY_GUARD)
++
++
++def wire(recovery: Any, controller: Any, environ: Mapping[str, str],
++         config_row: Callable[[], dict[str, Any]] | None = None) -> WanThresholds | None:
++    """The plugin's one call, after every threshold's own wire (B2 / B6 / B7 / B8 / B12)."""
++    detector = getattr(controller, "_input_hold", None)
++    stall = getattr(recovery, "_client_stall", None)
++    if detector is None and stall is None:
++        recovery._log("link_recovery_wan_config", ignored=True, reason="ignored: neither the hold nor the stall signal is wired")
++        return None
++    w = WanThresholds(recovery, detector, stall, config_row=config_row)
++    recovery._log("link_recovery_wan_config", ignored=False, **w.config())
++    return w
+diff --git a/tests/link_recovery_wan/test_link_recovery_wan.py b/tests/link_recovery_wan/test_link_recovery_wan.py
+new file mode 100644
+index 0000000..11124e1
+--- /dev/null
++++ b/tests/link_recovery_wan/test_link_recovery_wan.py
+@@ -0,0 +1,403 @@
++#!/usr/bin/env python3
++"""B23: `PRIVYHUB_LINK_RECOVERY_WAN=1` -- the hold's H and the stall's threshold per path class (WAN-R1): lan as wired
++(950 / 400), remote-direct 450 / 200, remote-relayed / -unknown as wired; `link_recovery_config` per set applied.
++
++    python3 -m unittest discover -s tests/link_recovery_wan -v
++
++The fake path class: the address test and the overlay's path injected. The real B2 detector (with B6's `Tuning` as its
++wire attaches it) and the real B7 `StallSignal` (unthreaded) with a fake recovery. The replay: G4-S4's control-gap log
++(its 3 rows inline; no address in them) through the real detector at H 950 and 450 (LAN-R1's form: the real code in
++process, fed from the recorded rows); the evidence script `b23_2026-10-24/replay_holds.py` runs every log WAN-R1 read.
++"""
++
++from __future__ import annotations
++
++import json
++import os
++import subprocess
++import sys
++import threading
++import types
++import unittest
++from datetime import datetime
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++
++import hold_tuning  # noqa: E402
++import input_hold  # noqa: E402
++import link_recovery_wan as wan  # noqa: E402
++import stall_signal  # noqa: E402
++
++# G4-S4's control-gap log (docs/memory/evidence/g4_s4_2026-10-24/copies/logs/games/native_stream_ctrl_gaps.log)
++G4_S4_GAPS = [
++    {"start_utc": "2026-10-24T19:25:22.875Z", "end_utc": "2026-10-24T19:25:30.782Z", "gap_ms": 7907.1},
++    {"start_utc": "2026-10-24T21:02:36.267Z", "end_utc": "2026-10-24T21:02:46.079Z", "gap_ms": 9811.4},
++    {"start_utc": "2026-10-24T21:04:33.935Z", "end_utc": "2026-10-24T21:04:46.452Z", "gap_ms": 12516.8},
++]
++REAL_DROP_MS = 3000.0       # WAN-R1's rule (G4-S4's): a gap >= 3 s is a real drop
++
++
++class Recovery:
++    def __init__(self):
++        self.rows = []
++        self._lock = threading.Lock()
++        self._state, self._last_desync_reason, self._state_since = "PLAYING", None, 0.0
++        self.entered = []
++
++    def _log(self, event, **kw):
++        self.rows.append({"event": event, **kw})
++
++    def _enter_recovery(self, trigger, age_ms):
++        self.entered.append((trigger, age_ms))
++        self._state, self._last_desync_reason = "PAUSED_RECOVERING", trigger
++
++
++def stack(hold=True, stall=True, b6=True):
++    """The objects as B2 / B6 / B7's wires leave them: H 950 (B6's `1`), the stall 400 (B9's `1`)."""
++    rec = Recovery()
++    emitted = []
++    det = None
++    if hold:
++        det = input_hold.InputHoldDetector(250, emitted.append)      # B2's own default ...
++        if b6:
++            det.hold_s = hold_tuning.H_DEFAULT_MS / 1000.0             # ... then B6's wire: 950
++            det.tuning = hold_tuning.Tuning(hold_tuning.H_DEFAULT_MS)
++    st = None
++    if stall:
++        st = stall_signal.StallSignal(rec, stall_signal.DEFAULT_MS, threaded=False)
++        rec._client_stall = st
++    controller = types.SimpleNamespace(_input_hold=det)
++    return rec, controller, det, st, emitted
++
++
++def wan_for(rec, det, st, overlay, path, config_row=None):
++    return wan.WanThresholds(rec, det, st, is_overlay=lambda ip: overlay, overlay_path=lambda: path,
++                             config_row=config_row, threaded=False)
++
++
++class TheSets(unittest.TestCase):
++    def test_lan_is_as_wired(self):
++        rec, _c, det, st, _e = stack()
++        w = wan_for(rec, det, st, overlay=False, path="direct")
++        self.assertEqual(w.note_stream_start("lan-client"), wan.SET_LAN)
++        self.assertEqual((round(det.hold_s * 1000), st.threshold_ms, det.tuning.hold_ms), (950, 400, 950))
++        row = rec.rows[-1]
++        self.assertEqual(row["event"], "link_recovery_config")
++        self.assertEqual(row["wan"]["set"], "lan")
++        self.assertEqual((row["wan"]["hold_ms"], row["wan"]["stall_ms"]), (950, 400))
++
++    def test_remote_direct_takes_wan_r1s_values(self):
++        rec, _c, det, st, _e = stack()
++        w = wan_for(rec, det, st, overlay=True, path="direct")
++        w.note_stream_start("overlay-client")
++        self.assertEqual((round(det.hold_s * 1000), st.threshold_ms, det.tuning.hold_ms), (450, 200, 450))
++        sets = [r["wan"]["set"] for r in rec.rows if r["event"] == "link_recovery_config"]
++        self.assertEqual(sets, ["remote-unknown", "remote-direct"])        # pending, then the overlay's answer
++        last = rec.rows[-1]["wan"]
++        self.assertEqual((last["path_class"], last["path"], last["hold_ms"], last["stall_ms"]),
++                         ("remote", "direct", 450, 200))
++        self.assertIn("WAN-R1 direct", last["why"])
++
++    def test_remote_relayed_and_unknown_are_as_wired(self):
++        for path, want in (("relayed", "remote-relayed"), ("no-peer", "remote-unknown"), ("none", "remote-unknown"),
++                           ("unread", "remote-unknown")):
++            rec, _c, det, st, _e = stack()
++            w = wan_for(rec, det, st, overlay=True, path=path)
++            w.note_stream_start("overlay-client")
++            self.assertEqual((round(det.hold_s * 1000), st.threshold_ms), (950, 400), path)
++            self.assertEqual(rec.rows[-1]["wan"]["set"], want, path)
++        rec, _c, det, st, _e = stack()
++
++        def boom():
++            raise RuntimeError("tailscale not running")
++
++        w = wan.WanThresholds(rec, det, st, is_overlay=lambda ip: True, overlay_path=boom, threaded=False)
++        w.note_stream_start("overlay-client")
++        self.assertEqual((round(det.hold_s * 1000), st.threshold_ms), (950, 400))
++        self.assertEqual((rec.rows[-1]["wan"]["set"], rec.rows[-1]["wan"]["path"]), ("remote-unknown", "unread"))
++
++    def test_sessions_in_turn_restore_the_lan(self):
++        rec, _c, det, st, _e = stack()
++        overlay = {"v": False}
++        w = wan.WanThresholds(rec, det, st, is_overlay=lambda ip: overlay["v"], overlay_path=lambda: "direct",
++                              threaded=False)
++        seen = []
++        for v in (False, True, False, True):
++            overlay["v"] = v
++            w.note_stream_start("client")
++            seen.append((round(det.hold_s * 1000), st.threshold_ms))
++        self.assertEqual(seen, [(950, 400), (450, 200), (950, 400), (450, 200)])
++
++    def test_a_late_overlay_answer_for_an_older_session_is_ignored(self):
++        rec, _c, det, st, _e = stack()
++        gate = threading.Event()
++        answered = threading.Event()
++
++        def slow_path():
++            gate.wait(5)
++            return "direct"
++
++        overlay = {"v": True}
++        w = wan.WanThresholds(rec, det, st, is_overlay=lambda ip: overlay["v"], overlay_path=slow_path, threaded=True)
++        w.note_stream_start("overlay-client")                   # session 1: remote, its path read pending
++        overlay["v"] = False
++        w.note_stream_start("lan-client")                       # session 2: lan
++        orig = w._apply
++
++        def spy(*a):
++            orig(*a)
++            answered.set()
++
++        w._apply = spy
++        gate.set()
++        answered.wait(5)
++        self.assertEqual((round(det.hold_s * 1000), st.threshold_ms), (950, 400))
++        self.assertEqual(w.in_force["set"], "lan")
++
++    def test_only_what_is_wired_is_set(self):
++        rec, _c, det, st, _e = stack(hold=False)
++        w = wan_for(rec, det, st, overlay=True, path="direct")
++        w.note_stream_start("c")
++        self.assertEqual(st.threshold_ms, 200)
++        self.assertIsNone(rec.rows[-1]["wan"]["hold_ms"])
++        rec, c, det, st, _e = stack(hold=False, stall=False)
++        self.assertIsNone(wan.wire(rec, c, {wan.FLAG_ENV: "1"}))
++        self.assertEqual(rec.rows[-1]["event"], "link_recovery_wan_config")
++        self.assertTrue(rec.rows[-1]["ignored"])
++
++    def test_the_rows_with_the_umbrella(self):
++        rec, c, det, st, _e = stack()
++        umbrella = {"umbrella": True, "implied": ["PRIVYHUB_INPUT_HOLD"], "explicit": {}, "at": "import", "reapply": []}
++        w = wan.wire(rec, c, {wan.FLAG_ENV: "1"}, config_row=lambda: dict(umbrella))
++        cfg = rec.rows[-1]
++        self.assertEqual(cfg["event"], "link_recovery_wan_config")
++        self.assertEqual((cfg["lan_hold_ms"], cfg["lan_stall_ms"]), (950, 400))
++        self.assertEqual(cfg["sets"]["remote-direct"]["hold_ms"], 450)
++        self.assertEqual(cfg["sets"]["remote-direct"]["stall_ms"], 200)
++        w._is_overlay = lambda ip: False
++        w.note_stream_start("c")
++        row = rec.rows[-1]
++        self.assertEqual(row["event"], "link_recovery_config")
++        self.assertEqual(row["at"], "session")                   # B21's `import` overwritten by the session's
++        self.assertEqual((row["umbrella"], row["implied"], row["reapply"]), (True, ["PRIVYHUB_INPUT_HOLD"], []))
++        self.assertEqual(row["wan"]["set"], "lan")
++
++    def test_the_default_path_class_readers(self):
++        self.assertFalse(wan._default_is_overlay("not-an-address"))
++        env = {k: v for k, v in os.environ.items() if k != "PRIVYHUB_OVERLAY_PROVIDER"}
++        code = ("import sys; sys.path.insert(0, 'companion'); import link_recovery_wan as w; "
++                "print(w._default_overlay_path())")
++        out = subprocess.run([sys.executable, "-B", "-c", code], cwd=ROOT, env=env, capture_output=True, text=True,
++                             timeout=120)
++        self.assertEqual(out.stdout.strip(), "unread", out.stderr[-300:])   # no provider: unread, nothing spawned
++
++
++class TheThresholdsAct(unittest.TestCase):
++    def test_a_250_ms_stall_pauses_on_direct_not_on_the_lan(self):
++        for overlay, want in ((False, []), (True, [("client_stall", 250.0)])):
++            rec, _c, det, st, _e = stack()
++            wan_for(rec, det, st, overlay=overlay, path="direct").note_stream_start("c")
++            st.handle((stall_signal.KIND_STALL, False, 1, 100, 250), 10.0)
++            self.assertEqual(rec.entered, want, overlay)
++
++    def test_a_600_ms_silence_holds_on_direct_not_on_the_lan(self):
++        for overlay, want in ((False, 0), (True, 1)):
++            rec, _c, det, st, emitted = stack()
++            wan_for(rec, det, st, overlay=overlay, path="direct").note_stream_start("c")
++            det.on_packet(100.0)
++            for i in range(1, 61):                              # 600 ms of quiet checks, 10 ms apart
++                det.on_quiet(100.0 + i / 100.0, 100.0)
++            self.assertEqual(sum(1 for e in emitted if e[0] == "hold"), want, overlay)
++
++
++def _t(s):
++    return datetime.strptime(s, "%Y-%m-%dT%H:%M:%S.%fZ").timestamp()
++
++
++def replay(gaps, hold_ms):
++    """The silences through the real B2 detector (B6's tuning attached), 10-ms quiet checks; (real, false) holds."""
++    emitted = []
++    det = input_hold.InputHoldDetector(250, emitted.append)
++    det.hold_s = hold_ms / 1000.0
++    det.tuning = hold_tuning.Tuning(hold_ms)
++    real = false = 0
++    for g in gaps:
++        start, end = _t(g["start_utc"]), _t(g["end_utc"])
++        det.on_packet(start)
++        before = sum(1 for e in emitted if e[0] == "hold")
++        t = start
++        while t < end:
++            t += 0.010
++            det.on_quiet(min(t, end), start)
++        det.on_packet(end)
++        if sum(1 for e in emitted if e[0] == "hold") > before:
++            if float(g["gap_ms"]) >= REAL_DROP_MS:
++                real += 1
++            else:
++                false += 1
++    return real, false
++
++
++class TheReplay(unittest.TestCase):
++    def test_g4_s4_at_the_old_and_the_new_h(self):
++        self.assertEqual(replay(G4_S4_GAPS, 950), (3, 0))
++        self.assertEqual(replay(G4_S4_GAPS, 450), (3, 0))
++
++    def test_the_inline_rows_are_the_logs(self):
++        log = ROOT / "docs/memory/evidence/g4_s4_2026-10-24/copies/logs/games/native_stream_ctrl_gaps.log"
++        if not log.is_file():
++            self.skipTest("the evidence copy is not in this tree (the /tmp copy holds companion/ tools/ tests/ only)")
++        rows = [json.loads(x) for x in log.read_text().splitlines() if x.strip()]
++        self.assertEqual([{k: r[k] for k in ("start_utc", "end_utc", "gap_ms")} for r in rows], G4_S4_GAPS)
++
++    def test_a_lan_silence_between_the_two_hs(self):
++        lan = [{"start_utc": "2026-10-24T15:20:00.000Z", "end_utc": "2026-10-24T15:20:00.564Z", "gap_ms": 564.0}]
++        self.assertEqual(replay(lan, 950), (0, 0))
++        self.assertEqual(replay(lan, 450), (0, 1))              # why the LAN keeps 950 (CL-B11 cell 1's 564 ms)
++
++
++class Addendum1(unittest.TestCase):
++    """The path re-read during a remote session, and the guard on remote-direct (design_addendum_1.md)."""
++
++    def test_the_reread_follows_the_path(self):
++        rec, _c, det, st, _e = stack()
++        path = {"v": "direct"}
++        w = wan.WanThresholds(rec, det, st, is_overlay=lambda ip: True, overlay_path=lambda: path["v"], threaded=False)
++        w.note_stream_start("overlay-client")
++        self.assertEqual((round(det.hold_s * 1000), st.threshold_ms), (450, 200))
++        n = len(rec.rows)
++        w.reread_once(w._session)                               # nothing new: no row
++        self.assertEqual(len(rec.rows), n)
++        path["v"] = "no-peer"                                   # the hotspot toggle
++        w.reread_once(w._session)
++        self.assertEqual((round(det.hold_s * 1000), st.threshold_ms), (950, 400))
++        self.assertEqual(rec.rows[-1]["wan"]["set"], "remote-unknown")
++        path["v"] = "direct"
++        w.reread_once(w._session)
++        self.assertEqual((round(det.hold_s * 1000), st.threshold_ms), (450, 200))
++
++    def test_the_reread_loop_stops_with_its_session(self):
++        rec, _c, det, st, _e = stack()
++        overlay = {"v": True}
++        sleeps = []
++        w = wan.WanThresholds(rec, det, st, is_overlay=lambda ip: overlay["v"], overlay_path=lambda: "direct",
++                              threaded=True)
++        done = threading.Event()
++
++        def sleep(s):
++            sleeps.append(s)
++            if len(sleeps) == 2:
++                overlay["v"] = False
++                w.note_stream_start("lan-client")               # a new session: the old loop must end
++            if len(sleeps) > 5:
++                done.set()
++                raise SystemExit
++        w._sleep = sleep
++        w._threaded = False
++        w.note_stream_start("overlay-client")                   # session 1 applied synchronously
++        w._threaded = True
++        w._read_path(1)                                         # the loop, run here
++        self.assertEqual(sleeps, [10.0, 10.0])
++        self.assertEqual(w.in_force["set"], "lan")
++
++    def test_a_non_drop_hold_on_direct_reverts_the_session(self):
++        rec, _c, det, st, emitted = stack()
++        w = wan_for(rec, det, st, overlay=True, path="direct")
++        w.note_stream_start("overlay-client")
++        det.on_packet(100.0)
++        for i in range(1, 61):                                   # a 600-ms silence: a hold at 450 ...
++            det.on_quiet(100.0 + i / 100.0, 100.0)
++        det.on_packet(100.6)                                     # ... released at 600 ms: not a drop
++        self.assertEqual([e[0] for e in emitted], ["hold", "release"])   # the original emit, unchanged
++        self.assertEqual((round(det.hold_s * 1000), st.threshold_ms), (950, 400))
++        self.assertEqual(w.guard_trips, 1)
++        last = rec.rows[-1]["wan"]
++        self.assertEqual((last["set"], last["why"]), ("remote-unknown", wan.WHY_GUARD))
++        w.reread_once(w._session)                                # the re-read does not bring 450 back
++        self.assertEqual((round(det.hold_s * 1000), st.threshold_ms), (950, 400))
++        w.note_stream_start("overlay-client")                    # a new session: direct again
++        self.assertEqual((round(det.hold_s * 1000), st.threshold_ms), (450, 200))
++
++    def test_a_real_drop_does_not_trip_the_guard(self):
++        rec, _c, det, st, emitted = stack()
++        w = wan_for(rec, det, st, overlay=True, path="direct")
++        w.note_stream_start("overlay-client")
++        det.on_packet(100.0)
++        for i in range(1, 501):                                  # a 5-s drop
++            det.on_quiet(100.0 + i / 100.0, 100.0)
++        det.on_packet(105.0)
++        self.assertEqual(w.guard_trips, 0)
++        self.assertEqual((round(det.hold_s * 1000), st.threshold_ms), (450, 200))
++
++    def test_the_guard_only_on_direct(self):
++        rec, _c, det, st, emitted = stack()
++        w = wan_for(rec, det, st, overlay=False, path="direct")
++        w.note_stream_start("lan-client")
++        det.on_packet(100.0)
++        for i in range(1, 121):                                  # a 1.2-s silence on the LAN: a hold at 950
++            det.on_quiet(100.0 + i / 100.0, 100.0)
++        det.on_packet(101.2)
++        self.assertEqual(w.guard_trips, 0)
++        self.assertEqual(w.in_force["set"], "lan")
++
++
++def replay_guarded(gaps):
++    """H 450 from the session's start; the first non-drop hold reverts to 950 for the rest (addendum 1)."""
++    emitted = []
++    det = input_hold.InputHoldDetector(250, emitted.append)
++    det.hold_s, det.tuning = 0.450, hold_tuning.Tuning(450)
++    real = false = 0
++    for g in gaps:
++        start, end = _t(g["start_utc"]), _t(g["end_utc"])
++        det.on_packet(start)
++        before = sum(1 for e in emitted if e[0] == "hold")
++        t = start
++        while t < end:
++            t += 0.010
++            det.on_quiet(min(t, end), start)
++        det.on_packet(end)
++        if sum(1 for e in emitted if e[0] == "hold") > before:
++            if float(g["gap_ms"]) >= REAL_DROP_MS:
++                real += 1
++            else:
++                false += 1
++                det.hold_s, det.tuning.hold_ms = 0.950, 950
++    return real, false
++
++
++class TheGuardedReplay(unittest.TestCase):
++    def test_g4_s4_guarded(self):
++        self.assertEqual(replay_guarded(G4_S4_GAPS), (3, 0))
++
++    def test_g4_s1_run_2_the_toggle(self):
++        log = ROOT / "docs/memory/evidence/wan_r1_2026-10-24/copies/s1r2/native_stream_ctrl_gaps.log"
++        if not log.is_file():
++            self.skipTest("the evidence copy is not in this tree")
++        gaps = [json.loads(x) for x in log.read_text().splitlines() if x.strip()]
++        self.assertEqual(replay(gaps, 950), (0, 1))
++        self.assertEqual(replay(gaps, 450), (0, 18))
++        self.assertEqual(replay_guarded(gaps), (0, 2))          # the trip, then 950's one
++
++
++class Absent(unittest.TestCase):
++    def test_nothing_imported(self):
++        env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++        code = ("import sys, importlib.util; sys.path.insert(0, 'companion');"
++                "s = importlib.util.spec_from_file_location('g', 'companion/plugins/games.py');"
++                "m = importlib.util.module_from_spec(s); s.loader.exec_module(m);"
++                "print('link_recovery_wan' in sys.modules, m._link_recovery_wan is None)")
++        out = subprocess.run([sys.executable, "-B", "-c", code], cwd=ROOT, env=env, capture_output=True, text=True,
++                             timeout=300)
++        self.assertEqual(out.stdout.strip().splitlines()[-1], "False True", out.stderr[-500:])
++
++    def test_the_flag_reads_exactly_one(self):
++        for v in ("0", "yes", "", " 2 "):
++            self.assertFalse(wan.enabled({wan.FLAG_ENV: v}), v)
++        self.assertTrue(wan.enabled({wan.FLAG_ENV: " 1 "}))
++        self.assertFalse(wan.enabled({}))
++
++
++if __name__ == "__main__":
++    unittest.main()
