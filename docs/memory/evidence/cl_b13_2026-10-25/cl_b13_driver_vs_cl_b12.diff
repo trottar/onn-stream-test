@@ -1,0 +1,219 @@
+--- ../cl_b12_2026-10-24/cl_b12_driver.py	2026-10-24 12:36:50.965502343 -0400
++++ cl_b13_driver.py	2026-10-25 17:56:31.392656892 -0400
+@@ -1,24 +1,26 @@
+ #!/usr/bin/env python3
+-"""CL-B12 -- the client defaults (B19: absent = on), the guard's order (B17), no save at the session's end (B18) and the
+-host umbrella PRIVYHUB_LINK_RECOVERY=1 (B20), with the client APK 20e3e339... and EVERY client property EMPTY (no
+-setprop anywhere: the defaults are the test), as pre-registered (cl_b12_preregistration.txt), DETACHED. From
+-cl_b11_driver.py (CL-B11's driver; the diff is cl_b12_driver_vs_cl_b11.diff). Two launches:
+-  - PART 1, no --cell: cells 2 and 3 in one launch, unit privyhub-cl-b12 -- E1-SNES-STREAM (snes9x, adopted line 3),
+-    window 600, gap 120, the drop-in PRIVYHUB_IMPAIRMENT=<spec> + PRIVYHUB_LINK_RECOVERY=1 ONLY (9 + 2 = 11 lines at the
+-    stream): cell 2 blackout-4s@both,every=120s,seed=1, cell 3 blackout-4s@down,every=120s,seed=1 (session B's exact
+-    strings, SESSION_B_DONE_2026-10-24G.md items 6-7);
+-  - PART 2, --cell 1: cell 1 alone, unit privyhub-cl-b12-p2 -- PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 +
+-    PRIVYHUB_LINK_RECOVERY=1, window 600; the user presses Home twice (B item 8); its own state / history / log.
+-Changed from cl_b11_driver.py:
+-  - the cells table (above); the drop-in carries the umbrella, not the six stack lines;
+-  - the properties: SEVEN read back (restart_guard, stall_signal, link_notice, link_report, loss_guard, wifi_lock,
+-    opus_decode), expected EMPTY before and after each cell and at the close; none is set (props_set / props_clear and
+-    every setprop path removed);
+-  - tools/e3_state.py run once mid-cell (with the under-load read-back), kept as e3_state_midcell_run<n>.json, for
+-    link_recovery.stack (expected all `implied 1`);
+-  - the status text, the log tag and the stop file name this task (~/privyhub_cl_b12/STOP).
+-Kept: the cap (each launch + 2 h), no cell in 04:15-05:30Z or one that could still run at 04:30Z, the band every 10 s,
+-the heartbeat / history / STOP / busy skip / the suite call / the readings beside a run / --net / --dry."""
++"""CL-B13 -- B22's fast restart (PRIVYHUB_RESTART_FAST=1) at two Home returns, the same returns without it, and B23's
++remote class (PRIVYHUB_LINK_RECOVERY_WAN=1) under the shim's blackouts over the overlay, with the client APK
++6bddafc0... and EVERY client property EMPTY (no setprop anywhere), as pre-registered (cl_b13_preregistration.txt),
++DETACHED. From cl_b12_driver.py (CL-B12's driver; the diff is cl_b13_driver_vs_cl_b12.diff). Three launches:
++  - --cell 1: cell 1 alone, unit privyhub-cl-b13-c1 -- PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 + PRIVYHUB_RESTART_FAST=1
++    (10 + 2 = 12 lines at the stream), window 600; the user presses Home twice (B item 7);
++  - --cell 2: cell 2 alone, unit privyhub-cl-b13-c2 -- PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 only (11 lines), window
++    600; the same two presses (B item 8);
++  - no --cell: cells 3a and 3b in one launch, unit privyhub-cl-b13 -- PRIVYHUB_LINK_RECOVERY_WAN=1 +
++    PRIVYHUB_IMPAIRMENT=blackout-4s@both,every=120s,seed=1 (3a) / blackout-4s@down,every=120s,seed=1 (3b) (12 lines),
++    window 600 each (B item 9), the onn on the overlay.
++  E1-SNES-STREAM (snes9x, adopted), gap 120; session B's exact strings (SESSION_B_DONE_2026-10-24H.md items 4-9).
++Changed from cl_b12_driver.py:
++  - the cells table (above); the umbrella is now adopted (G-A4: ten lines), so a drop-in carries only the impairment
++    line and the cell's flag;
++  - the client's routing class (routing_evidence of the newest token_issued in logs/session_audit.jsonl; the class only)
++    read at each stream start (with the at-stream read-back), kept as routing_at_stream;
++  - the status text, the log tag, the state / history / log names and the stop file this task's
++    (~/privyhub_cl_b13/STOP); "adopted10".
++Kept: the seven properties read back EMPTY before and after each cell and at the close (none is set), tools/e3_state.py
++once mid-cell, the cap (each launch + 2 h), no cell in 04:15-05:30Z or one that could still run at 04:30Z, the band
++every 10 s, the heartbeat / history / STOP / busy skip / the suite call / the readings beside a run / --dry."""
+ import hashlib
+ import importlib.util
+ import json
+@@ -35,10 +37,11 @@
+ HERE = Path(__file__).resolve().parent
+ REPO = HERE.parents[3]
+ SUITE = REPO / "tools/e1_suite.py"
+-CALL = HERE / "cl_b12_suite_call.py"
++CALL = HERE / "cl_b13_suite_call.py"
+ JREAD = HERE.parent / "g8_s1_2026-10-16/g8_s1_cap_log_read.py"
+-PRE = HERE / "cl_b12_preregistration.txt"
+-WATCH = Path.home() / "privyhub_cl_b12"
++PRE = HERE / "cl_b13_preregistration.txt"
++WATCH = Path.home() / "privyhub_cl_b13"
++AUDIT = REPO / "logs/session_audit.jsonl"
+ RUNS = HERE / "runs"
+ 
+ 
+@@ -60,10 +63,10 @@
+ DRY = "--dry" in sys.argv
+ STOPFILE = WATCH / "STOP"
+ OUTD = HERE / "dry_run" if DRY else WATCH
+-P2 = "--cell" in sys.argv          # PART 2 (cell 1) has its own state / history / log
+-TAG = "cl_b12_p2" if P2 else "cl_b12"
+-STATUS_P, HIST_P, WLOG_P = (OUTD / "status.txt", OUTD / ("history_p2.csv" if P2 else "history.csv"),
+-                            OUTD / ("driver_p2.log" if P2 else "driver.log"))
++_N = int(sys.argv[sys.argv.index("--cell") + 1]) if "--cell" in sys.argv else None
++SUF = f"_c{_N}" if _N is not None else ""      # cells 1 and 2 each have their own state / history / log / status
++TAG = "cl_b13" + SUF
++STATUS_P, HIST_P, WLOG_P = (OUTD / f"status{SUF}.txt", OUTD / f"history{SUF}.csv", OUTD / f"driver{SUF}.log")
+ STATE_P = (HERE / "dry_run" if DRY else HERE) / f"{TAG}_state.json"
+ CELLS_P = (HERE / "dry_run" if DRY else HERE) / "cells.jsonl"
+ IMP_LOG = REPO / "logs/impairment.jsonl"
+@@ -76,22 +79,22 @@
+ BUSY_WAIT, BUSY_TRIES = 600, 3
+ SUITE_TIMEOUT = 2 * 3600
+ PROPS = ("restart_guard", "stall_signal", "link_notice", "link_report", "loss_guard", "wifi_lock", "opus_decode")
+-P1 = {}                 # CL-B12: no property is set; all seven are expected EMPTY (the client defaults are the test)
+-UMB = ["PRIVYHUB_LINK_RECOVERY=1"]      # B20's umbrella: the six stack flags implied
+-STACK = ["PRIVYHUB_INPUT_HOLD=1", "PRIVYHUB_INPUT_HOLD_B6=1", "PRIVYHUB_INPUT_HOLD_B8=1", "PRIVYHUB_INPUT_HOLD_REWIND=1",
+-         "PRIVYHUB_STALL_SIGNAL=1", "PRIVYHUB_STALL_RESUME=1"]
++P1 = {}                 # no property is set; all seven are expected EMPTY (the client defaults are the test)
++RF = ["PRIVYHUB_RESTART_FAST=1"]        # B22 (host); the client half is armed by the response key only
++WAN = ["PRIVYHUB_LINK_RECOVERY_WAN=1"]  # B23 (host); the umbrella PRIVYHUB_LINK_RECOVERY=1 is adopted (G-A4)
+ NONE = "none@post-fec,seed=1"
+ BOTH, DOWN = "blackout-4s@both,every=120s,seed=1", "blackout-4s@down,every=120s,seed=1"
+ SNES = "E1-SNES-STREAM"
+-# session B's exact strings (SESSION_B_DONE_2026-10-24G.md items 6-8); a blackout spec takes NO @post-fec;
+-# PRIVYHUB_SNES_CORE=snes9x (line 3) and PRIVYHUB_LINK_REPORT=1 (line 9) are adopted, in every environ, not repeated
++# session B's exact strings (SESSION_B_DONE_2026-10-24H.md items 6-9); a blackout spec takes NO @post-fec;
++# PRIVYHUB_SNES_CORE=snes9x and PRIVYHUB_LINK_RECOVERY=1 are adopted, in every environ, not repeated
++HOME = "5 GHz, Home at PLAYING + 3 (menu) and + 6 min (recents / tile)"
+ ALL_CELLS = [
+-    {"n": 2, "cell": "2_snes_blackout_both_umbrella", "spec": BOTH, "profile": "blackout-4s", "uplink": True, "extra": UMB, "props": P1, "wid": SNES, "arm": "link_recovery umbrella, defaults", "window": 600},
+-    {"n": 3, "cell": "3_snes_blackout_down_umbrella", "spec": DOWN, "profile": "blackout-4s", "uplink": False, "extra": UMB, "props": P1, "wid": SNES, "arm": "link_recovery umbrella, defaults", "window": 600},
+-    {"n": 1, "cell": "1_snes_5ghz_two_home_presses", "spec": NONE, "profile": "none", "extra": UMB, "props": P1, "wid": SNES, "arm": "5 GHz, Home at PLAYING + 3 (menu) and + 6 min (direct)", "window": 600},
++    {"n": 1, "cell": "1_snes_home_presses_restart_fast", "spec": NONE, "profile": "none", "extra": RF, "props": P1, "wid": SNES, "arm": HOME + ", PRIVYHUB_RESTART_FAST=1", "window": 600},
++    {"n": 2, "cell": "2_snes_home_presses_no_flag", "spec": NONE, "profile": "none", "extra": [], "props": P1, "wid": SNES, "arm": HOME + ", no flag", "window": 600},
++    {"n": 3, "cell": "3a_snes_blackout_both_wan", "spec": BOTH, "profile": "blackout-4s", "uplink": True, "extra": WAN, "props": P1, "wid": SNES, "arm": "3a: PRIVYHUB_LINK_RECOVERY_WAN=1, the overlay", "window": 600},
++    {"n": 4, "cell": "3b_snes_blackout_down_wan", "spec": DOWN, "profile": "blackout-4s", "uplink": False, "extra": WAN, "props": P1, "wid": SNES, "arm": "3b: PRIVYHUB_LINK_RECOVERY_WAN=1, the overlay", "window": 600},
+ ]
+-_N = int(sys.argv[sys.argv.index("--cell") + 1]) if "--cell" in sys.argv else None
+-CELLS = [c for c in ALL_CELLS if c["n"] == 1] if _N == 1 else [] if _N is not None else [c for c in ALL_CELLS if c["n"] in (2, 3)]
++CELLS = [c for c in ALL_CELLS if c["n"] == _N] if _N in (1, 2) else [] if _N is not None else [c for c in ALL_CELLS if c["n"] in (3, 4)]
+ NCELLS = len(CELLS)
+ QUIET = ((4, 15), (5, 30))      # no cell starts in [04:15, 05:30) UTC: the nightly watch samples 04:30-05:30Z
+ OPAL_SH = HERE / "o1_opal_sample.sh"
+@@ -129,13 +132,13 @@
+ 
+ 
+ def props_set(cell):
+-    """CL-B12: NOTHING is set (no setprop in this task); all seven read back, True when all read empty."""
++    """NOTHING is set (no setprop in this task); all seven read back, True when all read empty."""
+     got = props_read()
+     return got, all(got[pp] == "" for pp in PROPS)
+ 
+ 
+ def props_after():
+-    """CL-B12: the seven read back after; True when all read empty (none is ever set)."""
++    """The seven read back after; True when all read empty (none is ever set)."""
+     got = props_read()
+     return got, all(got[pp] == "" for pp in PROPS)
+ 
+@@ -238,7 +241,7 @@
+         STATUS.update(kw)
+         s = STATUS
+         line = (f"{utc()} heartbeat | {TAG} cell {s['cell']} of {[c['n'] for c in CELLS]} | last: {s['last']} (at {s['last_at']}) | doing: {s['doing']} | "
+-                f"next: {s['next']} | state: {s['state']} | cap {CAP_UTC} | stop: touch ~/privyhub_cl_b12/STOP\n")
++                f"next: {s['next']} | state: {s['state']} | cap {CAP_UTC} | stop: touch ~/privyhub_cl_b13/STOP\n")
+         STATUS_P.parent.mkdir(parents=True, exist_ok=True)
+         tmp = STATUS_P.with_suffix(".tmp")
+         tmp.write_text(line)
+@@ -265,12 +268,12 @@
+ 
+ 
+ def adopted_state():
+-    """The nine-line adopted state (G-A3), read back: the suite's own preflight."""
++    """The ten-line adopted state (G-A4), read back: the suite's own preflight."""
+     try:
+         p = E1.preflight()
+     except Exception as e:      # noqa: BLE001 -- a read failure is reported, not fatal
+         return {"ok": False, "error": repr(e)[:200]}, "read failed"
+-    return p, ("adopted9 ok" if p.get("ok") else f"NOT ok (environ {len(p.get('environ') or [])} lines, game {p.get('game_active')})")
++    return p, ("adopted10 ok" if p.get("ok") else f"NOT ok (environ {len(p.get('environ') or [])} lines, game {p.get('game_active')})")
+ 
+ 
+ # ---------------------------------------------------------------- the readings beside a run
+@@ -374,6 +377,21 @@
+             "b_v": val("-b:v"), "maxrate": val("-maxrate"), "bufsize": val("-bufsize"), "rc_mode": val("-rc_mode")}
+ 
+ 
++def routing_class():
++    """The client's routing class at the stream: routing_evidence of the newest token_issued (the class and its time
++    only; no id or address is read out)."""
++    last = None
++    try:
++        for l in open(AUDIT):
++            if '"token_issued"' in l:
++                last = l
++        d = json.loads(last) if last else {}
++    except (OSError, ValueError):
++        d = {}
++    return {"read_utc": utc(), "token_issued_t": d.get("t"), "routing_evidence": d.get("routing_evidence"),
++            "overlay_declared": d.get("overlay_declared")}
++
++
+ def flags_check(cell):
+     env = E1.environ_flags(E1.mainpid())
+     want = kvs(cell)
+@@ -415,6 +433,7 @@
+         if t_enc is not None and now - t_enc >= 20 and "flags_at_stream" not in out:
+             out["flags_at_stream"], out["environ_at_stream_count"] = flags_check(cell)
+             out["flags_at_stream_utc"] = utc()
++            out["routing_at_stream"] = routing_class()
+         if t_window is not None and now - t_window >= 150 and "flags_under_load" not in out:
+             out["flags_under_load"], out["environ_under_load_count"] = flags_check(cell)
+             lines = imp_read(imp_start)
+@@ -907,7 +926,8 @@
+     row = {**cell, "start_utc": utc(t), "end_utc": utc(t_end), "busy_tries": busy_tries, "attempt": attempt, "outcome": outcome,
+            "validity": validity, "profile_applied": ok, "shim": m, "suite_attempts": len(fails) + (1 if outcome == "playing" else 0),
+            "failed_attempts": fails, "flags_at_stream": beside.get("flags_at_stream"),
+-           "environ_at_stream_count": beside.get("environ_at_stream_count"), "flags_under_load": beside.get("flags_under_load"),
++           "environ_at_stream_count": beside.get("environ_at_stream_count"),
++           "routing_at_stream": beside.get("routing_at_stream"), "flags_under_load": beside.get("flags_under_load"),
+            "environ_under_load_count": beside.get("environ_under_load_count"), "shim_live_under_load": beside.get("shim_live_under_load"),
+            "run_dir": str(rd.relative_to(HERE)) if rd else None, **{x: v for x, v in f.items()},
+            "start_rung_kbps": st0.get("kbps"), "start_rung_source": st0.get("source"), "start_rung_first_row": st0 or None,
+@@ -941,6 +961,7 @@
+         f"start {st0.get('kbps')} ({st0.get('source')}) wire {bits} enc {bv} path {lad['rung_path']} "
+         f"loss {f['loss_per_min']} rendered {f['rendered_fps']} class {wc} enc_rc {row['encoder_rc_seen']} frames {nframes} "
+         f"shim in {m.get('steady_in_kbps_median')} drop {m.get('steady_drop_frac')} gates {row['host_gates_met']} "
++        f"routing {(beside.get('routing_at_stream') or {}).get('routing_evidence')} "
+         f"flags_at_stream {beside.get('flags_at_stream')} flags_under_load {beside.get('flags_under_load')} "
+         f"flags_absent {f['flags_absent_after']}/{final.get('flags_absent')} link_rows {lr['link_rows']}/{lr['heartbeat_rows']} "
+         f"rssi {lr['rssi_median']} tx {lr['tx_mbps_median']} silences/10min {sil.get('ge250_per_10min')} "
+@@ -953,7 +974,7 @@
+     (HERE / "dry_run").mkdir(exist_ok=True)
+     p, sline = adopted_state()
+     log("dry: start; preflight", json.dumps(p), "| busy", bool(p.get("game_active")), "| stop file present", stop_requested())
+-    cell = CELLS[0]                  # PART 1: cell 2 (blackout@both on SNES + the umbrella); no property set
++    cell = CELLS[0]                  # the first cell of this launch's table; no property is set
+     write_status(cell=cell["n"], doing="dry run (no stream): the drop-in written", state=sline,
+                  next=f"exit at {utc(time.time() + 120)[11:16]}Z")
+     threading.Thread(target=heartbeat_thread, daemon=True).start()
+@@ -997,7 +1018,7 @@
+     if DRY:
+         return dry()
+     if not CELLS:
+-        print("refusing: no --cell (cells 2 and 3) or --cell 1")
++        print("refusing: --cell 1, --cell 2, or no --cell (cells 3a and 3b)")
+         return 2
+     WATCH.mkdir(parents=True, exist_ok=True)
+     st = json.loads(STATE_P.read_text()) if STATE_P.exists() else {"done": {}, "started_utc": utc()}

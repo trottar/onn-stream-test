@@ -113,7 +113,9 @@ PKG = "com.safeiot.privyhub"
 # (kept at PrivyHub/app/build/cl_b10_installed/app-debug.apk).
 # CL-B12 (installed 2026-10-24): the client-defaults + guard-order + bye APK replaced CL-B11's e2db0aa0f09d8eab26783e2c4a757ccc83c12da34ca750c8a182c4d762816b33
 # (kept at PrivyHub/app/build/cl_b11_installed/app-debug.apk).
-ADOPTED_APK_SHA256 = "20e3e3392b3853a598ecee651b291f4654fa6aa46d63157e649f9c07d6b5563d"
+# CL-B13 (installed 2026-10-25): the fast-restart (B22) APK replaced CL-B12's 20e3e3392b3853a598ecee651b291f4654fa6aa46d63157e649f9c07d6b5563d
+# (kept at PrivyHub/app/build/cl_b12_installed/app-debug.apk).
+ADOPTED_APK_SHA256 = "6bddafc0ac58999e200842ff482349408aefed87fa61f0a88f4f7fa19218a927"
 REFERENCE_PROFILE = "native_game_720p60_reference"
 MODE_ENV = "PRIVYHUB_ADAPTIVE_BITRATE_MODE"
 # C3-L4-D1 (2026-10-01): live is the companion's default through the systemd drop-in

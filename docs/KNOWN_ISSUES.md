@@ -1,5 +1,17 @@
 # Known issues and deferred work
 
+## 2026-10-25 CL-B13: the WAN class reads the onn on the home Wi-Fi through the overlay as `remote-direct`, and 450 then holds falsely once — OPEN (to B)
+
+(`docs/memory/evidence/CL_B13_RESTART_FAST_AND_WAN_CLASS_2026-10-25.md` §4-§5)
+
+- With `PRIVYHUB_LINK_RECOVERY_WAN=1` and the onn on the tailnet at home (direct), 3a had one false hold at 451 ms
+  (23:18:07Z, no drop). The guard reverted the session to 950 / 400 (`WHY_GUARD`). There was also one false stall
+  pause at 207 ms.
+- 3b (`@down`) met every row: the stall pauses at 208-214 ms, resumed 41-212 ms after the return.
+- The class tells overlay from LAN by address and path, not by the radio underneath. Off-site G4-S4 had 0 at 450; the
+  home Wi-Fi does not. **To B:** whether direct-on-the-LAN needs telling apart, or whether H 450 waits for more
+  off-site minutes. G-A6 is not a candidate as read.
+
 ## 2026-10-24 G4-S4, off-site free play: Home auto-resumes (no pause screen, the rung back at the floor); the onn left the tailnet for ~8 min once; underruns 8-20 / min — OPEN (to B / a watch item)
 
 (`docs/memory/evidence/G4_S4_OFFSITE_FREE_PLAY_2026-10-24.md` §6, §8, §10)
@@ -16,6 +28,10 @@
   - **Queue H (2026-10-25):** B22 shortens the return itself (the start answered before the teardown, the
     release at the new stream's first fresh frame; NOT ADOPTED). Pausing at Home and keeping the rung were not in queue
     H: they stay the user's question.
+  - **CL-B13 (2026-10-25):** on the LAN, with B22's `PRIVYHUB_RESTART_FAST=1`, the picture was back 1.7-2.0 s after
+    the new activity at three of four returns (6.7-7.5 s without it). Return 1 took 3.12 s (the old audio's stop, 2.2
+    s, inside the worker's lock). Back to B with that row and the old encoder's +0.35 / +0.39 s at two returns. Pausing
+    at Home is still the user's question.
 - **The onn left the tailnet once:**
   - no-peer 19:38:33-19:45:50Z, ~1 min after it went idle and ~26 s after a companion restart;
   - a second restart was followed by a brief relayed reading only.

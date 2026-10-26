@@ -1,0 +1,130 @@
+CL-B13 — the fast restart (B22) at two Home returns, the same returns without it, and the remote class (B23) on the
+bench: pre-registration (session A, 2026-10-25; hashed BEFORE the install; covers cells 1, 2, 3a and 3b)
+
+Task: docs/memory/handoffs/CL-B13_RESTART_FAST_AND_WAN_CLASS_TASK.md. Session B's exact strings:
+SESSION_B_DONE_2026-10-24H.md items 4-10; B21 (the config row), B22 (the host worker, the client's 50-ms tick, the report
+keys), B23 (the class by the overlay address and path; 450 / 200 on remote-direct; the guard; WHY_GUARD). The rows this
+repeats: CL_B12_DEFAULTS_AND_UMBRELLA_2026-10-24.md §4 (cell 1 there). The overlay check: G4_S4_LAUNCH_2026-10-24.md §1.
+The CONFIRMED rule: CL_B7 §6. The watch: LINK_N1_LAUNCH_2026-10-23.md.
+
+CAP: each detached launch + 2 h (no new cell after it; a cell in flight finishes with its own teardown), computed by the
+driver at its launch and shown in its status line.
+
+The stage is the user's message: the read line = stage 1 (the install, cell 1); "Stage 2" = cell 2; "Stage 3" = the
+overlay hand step told, then exit; "Stage 3 go" = cell 3 (3a, 3b); "Stage 4" = the close, the rule, the record.
+
+0. State at the hash (~21:58Z)
+- HEAD 7a1e0de (queue H committed; "CL-B13 handoff"); the tree clean but this task's new evidence dir.
+- Ten adopted lines (G-A4: PRIVYHUB_LINK_RECOVERY=1 among them); tools/e3_state.py ok, APK 20e3e339… CONFIRMED; no
+  e3_flag.conf; no game; one device, paired; units privyhub-companion and privyhub-link-n1 only.
+- The clock outside 04:15-05:30Z.
+- The band, read first: 5180 MHz, 5 GHz, standard 5, RSSI -68.
+- The client on the LAN: the newest token_issued reads routing_evidence lan (17:42:40Z).
+- The seven client properties restart_guard, stall_signal, link_notice, link_report, loss_guard, wifi_lock, opus_decode
+  all EMPTY.
+
+1. The install (after this file is hashed)
+- 20e3e339… stays preserved at PrivyHub/app/build/cl_b12_installed/app-debug.apk (nothing deleted).
+- The candidate /tmp/b_q24h_scratch/apk/app-debug.apk must read sha256
+  6bddafc0ac58999e200842ff482349408aefed87fa61f0a88f4f7fa19218a927 (B's pin, 9,638,278 B) and carry the same signer as
+  20e3e339… (apksigner certificate digests compared, not printed); else nothing is installed. Copied to
+  PrivyHub/app/build/cl_b13_installed/app-debug.apk (gitignored).
+- adb install -r; the device APK read back = 6bddafc0…; paired (CL-B4's reader). "Not paired" = stop and tell the user.
+- NO setprop anywhere in this task. The seven properties read back EMPTY before and after each cell and at the close.
+- tools/e3_state.py after the install is expected ok False ONLY because the APK reads MISMATCH (the pin moves only by the
+  CONFIRMED rule); the preflight itself ok.
+
+2. The driver
+- cl_b13_driver.py (from cl_b12_driver.py; the diff is cl_b13_driver_vs_cl_b12.diff); cl_b13_suite_call.py (CL-B12's
+  wrapper, only the pre-registration name changed). STOP ~/privyhub_cl_b13/STOP; status ~/privyhub_cl_b13/status*.txt.
+- Cell 1: unit privyhub-cl-b13-c1 (--cell 1). Cell 2: unit privyhub-cl-b13-c2 (--cell 2), on the user's "Stage 2" only.
+  Cell 3: unit privyhub-cl-b13 (3a then 3b in one launch), on the user's "Stage 3 go" only.
+- Every cell: E1-SNES-STREAM (snes9x, adopted), window 600, gap 120. The drop-in e3_flag.conf = the impairment line plus
+  the cell's flag: cell 1 PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 + PRIVYHUB_RESTART_FAST=1 (12 lines); cell 2
+  PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 only (11 lines); 3a / 3b PRIVYHUB_LINK_RECOVERY_WAN=1 +
+  PRIVYHUB_IMPAIRMENT=blackout-4s@both,every=120s,seed=1 / blackout-4s@down,every=120s,seed=1 (12 lines). Read back at
+  the stream and under load; removed at the teardown; flags_absent true after; ten lines.
+- tools/e3_state.py once mid-cell. The band every 10 s into runs/<cell>/band.jsonl. The client's routing class
+  (routing_evidence of the newest token_issued) read at each stream start. No cell starts in 04:15-05:30Z or could still
+  run at 04:30Z; no companion restart 04:30-05:30Z. No Opal sampler.
+- After cell 1's restart: link_recovery_config implied = the six / explicit {} / at import / reapply [] (B21);
+  restart_fast_config startup_check_s 0.75, lock_wait_s 2.0.
+
+3. Cell 1 — none@post-fec,seed=1 + PRIVYHUB_RESTART_FAST=1, window 600, 5 GHz, two Home presses (B item 7)
+- The user is told, in the task's exact words with the times filled in: first press at PLAYING + 3 min (Home, ~5 s, open
+  PrivyHub from the home screen and choose the game); second at PLAYING + 6 min (Home, ~5 s, back through recents or the
+  PrivyHub tile); the game moving again within ~3 s of the stream reopening; play to PLAYING + 10 min.
+- Rows per return:
+  (a) restart_fast with response_ms <= 300, and its at_utc <= 300 ms after the start's session_ended;
+  (b) restart_fast_done (released_ms, spawned_ms, checked_ms, done_ms); the journal's start response before the old
+      report;
+  (c) the relay's frame log: the old encoder's last frame <= entry + 0.3 s;
+  (d) the report: restart_fast_released_by fast, restart_fast_response_to_release_ms, restart_fast_gate_resets;
+      restart_cause via_start;
+  (e) THE PICTURE BACK: new activity -> session_started <= 3.0 s, on one clock: startSession (heartbeat 1 less its
+      elapsed_ms) less create_to_start_ms (host clock); the events read (the onn's clock, ~0.5 s behind) disclosed beside;
+  (f) the first 2-s interval after session_started <= 15 underruns;
+  (g) no restart_fast_failed;
+  (h) the path named by one adb logcat -b events -d read (recreate; surface / process recorded as not produced if the
+      tile / recents again goes through MainActivity, as CL-B12).
+- Reported: silences >= 250 ms and hitch s / 10 min on 5 GHz against CL-B12 cell 1 (0 / 3.9-9.9); the user's line.
+
+4. Cell 2 — none@post-fec,seed=1 only (no PRIVYHUB_RESTART_FAST), window 600, 5 GHz, the same presses (B item 8)
+- CL-B12's cell-1 rows again: no separate native-stream-stop; session_ended logged by the start (guard_end=1); the old
+  report within ~1 s after; restart_cause flush via_start, host_ended_session true, create_to_start_ms <= 1,000, trigger
+  recreate; the first 2-s interval after the new session_started <= 15 underruns.
+- NO restart_fast* row and NO restart_fast* report key (the APK's absent-key path).
+- session_started ~4-12 s after the new activity (as CL-B12: 12.0 / 6.8 s, ≈ 11.5 / 6.3 on one clock).
+- One adb logcat -b events -d read. Silences / hitch s as cell 1; the user's line.
+
+5. Cell 3 — the remote class on the bench (B item 9); the onn on the overlay (the user's hand step), the home 5 GHz Wi-Fi
+- Before the launch, the overlay check (G4-S4 §1): connected true, the path DIRECT, two devices online (count only). If
+  relayed, it is stated, and the rows then read remote-relayed as wired — that is the row.
+- 3a — PRIVYHUB_LINK_RECOVERY_WAN=1 + blackout-4s@both,every=120s,seed=1, window 600:
+  - link_recovery_wan_config at the wire;
+  - at the stream's start, link_recovery_config wan.set remote-unknown (pending), then REMOTE-DIRECT hold_ms 450 /
+    stall_ms 200, with path_class / path / why;
+  - per blackout: the silence save ~400 ms after onset, then desync_pause input_hold at age_ms ≈ 450; resumed via
+    client_ready_hold <= 1.0 s after the packets return; state, net ≈ 24;
+- 3b — PRIVYHUB_LINK_RECOVERY_WAN=1 + blackout-4s@down,every=120s,seed=1, window 600:
+  - the same config rows;
+  - per blackout: the stall pause from ~200 ms after the client's last frame, with the stall save before it; resumed via
+    client_ready_stall <= 1.0 s after the downlink returns; 0 encoder_restart, 0 stall_handover_v2;
+- both: 0 false holds outside the blackouts and NO WHY_GUARD row; the teardown's bye and state_save_skipped.
+- If the class reads lan (the onn not on the overlay), the rows read lan / 950 / 400: the LAN unchanged, recorded as
+  such; the remote rows then not exercised.
+
+6. Validity (per cell)
+- Playing; the shim's profile applied (blackout: >= 1 dark span, each 3-6 s, starts 120 ± 3 s apart, uplink_dropped > 0
+  on @both and 0 on @down; none: 0 drops); the drop-in's lines at the stream (12 / 11 / 12 / 12); flags_absent true
+  after; ten lines; the seven properties empty before and after. Host gates: RetroArch >= 59.9, capture 60 ± 0.1,
+  dup+drop <= 0.2 / min.
+- Cells 1 and 2 are not invalidated by the Home presses or the client sessions they cause. A no_play, flags_absent false,
+  or a property not empty is invalid. profile-not-applied while playing is repeated once.
+
+7. The CONFIRMED rule (CL_B7 §6, as CL-B10 / CL-B11 / CL-B12 applied it)
+- At the close: the properties read back empty, the drop-in removed, ten lines, no e3_flag.conf, flags_absent; the client
+  back on the LAN.
+- Cells 1, 2, 3a, 3b valid and the behaviours as today where no flag was set (cell 2: no restart_fast key, CL-B12's
+  order) -> 6bddafc0… CONFIRMED and the pin moved (tools/e1_suite.py EXPECT_APK, tools/c3_l4_nft_night.py
+  ADOPTED_APK_SHA256 and its test; the tests green); e3_state ok on ten.
+- Else 20e3e339… reinstalled from PrivyHub/app/build/cl_b12_installed/, read back, paired, e3_state ok, and the user told
+  which cell failed and why.
+- CONFIRMED is about validity and today's behaviours, not the rows: a row not met does not block it.
+
+8. The reading, written beforehand
+- Cell 1's rows met (a-h at both returns) -> PRIVYHUB_RESTART_FAST=1 a CANDIDATE for the user's say-so (G-A5). Cost on
+  the host: a worker thread per guarded restart, the ready's status() waiting on the manager's lock (<= 2.0 s), the old
+  audio stopped beside the new encoder. Else back to B with the rows.
+- Cell 3's rows met (3a and 3b, on remote-direct) -> PRIVYHUB_LINK_RECOVERY_WAN=1 a CANDIDATE (G-A6). Cost: a daemon
+  thread re-reading the overlay path every 10 s per remote session; the guard reverting a direct session at its first
+  non-drop hold. Else back to B with the rows. A relayed or lan class leaves G-A6 not read here (stated).
+- Cell 2 is the absent-key check for the APK (it feeds the CONFIRMED rule, not a candidate).
+- Against CL-B12 cell 1: the picture back 12.0 / 6.8 s (≈ 11.5 / 6.3 one clock); first intervals 0 / 0; silences 0;
+  hitch 3.9-9.9 / 10 min. Against CL-B12 cells 2 / 3 (LAN 950 / 400): the hold at 952-959 ms, resume 259-349 ms after
+  the return (@both); the stall save 425-440 ms, resume 108-182 ms (@down). Against G4-S4: 0 false holds at 950 and 450.
+- G-A5 and G-A6 are NOT applied in this task.
+
+No sudo, no nft, the Opal read-only, adb for the install, state reads, the two logcat -b events -d reads and the
+reinstall if the rule says so; NO setprop; the overlay hand steps are the user's; no addresses or identifiers anywhere;
+nothing fetched, nothing deleted; ten lines and no e3_flag.conf at every teardown; nothing adopted; nothing committed.

@@ -67,7 +67,9 @@ PKG = "com.safeiot.privyhub"
 # CL-B12 (installed 2026-10-24, CONFIRMED 2026-10-24): + B17 + B18 + B19 APK (the guard's end rides in the start; the
 # bye at a finishing activity; stall_signal / restart_guard ON when the property is absent, `0` = off); the previous
 # CONFIRMED APK was e2db0aa0... (CL-B11)
-EXPECT_APK = "20e3e3392b3853a598ecee651b291f4654fa6aa46d63157e649f9c07d6b5563d"
+# CL-B13 (installed 2026-10-25, CONFIRMED 2026-10-25): + B22 APK (the fast restart's client half, armed only by the
+# host's restart_fast response key; absent = CL-B12's client); the previous CONFIRMED APK was 20e3e339... (CL-B12)
+EXPECT_APK = "6bddafc0ac58999e200842ff482349408aefed87fa61f0a88f4f7fa19218a927"
 LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
 # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
 # is exactly these two names, at every precondition and teardown

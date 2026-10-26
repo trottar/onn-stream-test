@@ -2025,6 +2025,17 @@ B19 + B22) `6bddafc0…` pinned, not installed.** Record: `docs/memory/evidence/
 (direct 450 / 200; the LAN, relayed and unknown as wired).** Record:
 `docs/memory/evidence/B23_LINK_RECOVERY_WAN_THRESHOLDS_2026-10-24.md`.
 
+**CL-B13 (2026-10-25): B22 and B23 on the onn, every client property empty, 4 / 4 cells valid, APK `6bddafc0…a927`
+CONFIRMED and pinned.**
+- **The fast restart** (`PRIVYHUB_RESTART_FAST=1`, four Home returns): the start answered in 6.6-8.6 ms, and the
+  picture was back 1.74-2.00 s at three returns. Without the flag it was 7.52 / 6.73 s. Back to B on three rows:
+  return 1 at 3.12 s (the old audio's stop in the worker), and the old encoder at +0.35 / +0.39 s at two returns.
+- **The WAN class** (`PRIVYHUB_LINK_RECOVERY_WAN=1`, the onn on the overlay at home, direct): the class rows met, and
+  3b met every row. 3a had one false hold at 450, and the guard reverted it. Back to B.
+- G-A5 and G-A6 are the user's questions; neither is a candidate as read.
+
+Record: `docs/memory/evidence/CL_B13_RESTART_FAST_AND_WAN_CLASS_2026-10-25.md`.
+
 ## G9 — Remote foundation checkpoint
 
 Acceptance:

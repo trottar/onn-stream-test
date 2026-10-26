@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-10-24
-baseline_commit: 8ea9f09 (CL-B12 committed; G-A4 uncommitted beside it; the user commits)
+as_of: 2026-10-25
+baseline_commit: 7a1e0de (queue H committed; CL-B13 uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -217,6 +217,45 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
+
+**CL-B13: MEASURED, 4 / 4 cells valid; APK `6bddafc0…a927` (+ B22) CONFIRMED and pinned, every client property EMPTY**
+(`evidence/CL_B13_RESTART_FAST_AND_WAN_CLASS_2026-10-25.md`, launch `evidence/CL_B13_LAUNCH_2026-10-25.md`; cells 1-2
+attended on the LAN 22:37-23:06Z, cell 3 on the overlay at home 23:10-23:39Z, all on 5 GHz).
+- **Cell 1, the fast restart, four Home returns:** the start answered in 6.6-8.6 ms; the picture back 1.74-2.00 s at
+  three returns (cell 2 without it: 7.52 / 6.73 s). **Not met:** return 1 at 3.12 s (the old audio's 2.2-s stop inside
+  the worker's lock), and the old encoder's last frame at +0.35 / +0.39 s at returns 3-4. The user: "It returned
+  fine".
+- **Cell 2, no flag:** every row met (CL-B12's order, no `restart_fast` key). The user: "Returned fine".
+- **Cell 3, the WAN class on the overlay (direct):** the class rows met (`remote-unknown` → `remote-direct` 450 / 200);
+  3b met every row. **3a: one false hold at 451 ms and the guard's `WHY_GUARD` revert**, plus one false 207-ms stall
+  pause. The home Wi-Fi reads `remote-direct` through the overlay.
+- **State:** ten lines, no `e3_flag.conf`, `e3_state` ok, APK CONFIRMED; the onn back on the LAN (Hub host empty,
+  Tailscale off), 5180 MHz, paired; `20e3e339…` kept at `PrivyHub/app/build/cl_b12_installed/`.
+
+1. **The user's commit:**
+   - the two records and `cl_b13_2026-10-25/`;
+   - the pin (`tools/e1_suite.py`, `tools/c3_l4_nft_night.py`, `tools/test_c3_l4_nft_night.py`);
+   - `docs/KNOWN_ISSUES.md`, `docs/ROADMAP.md`, this file (`logs/cl_b13_git_status.txt`).
+2. **G-A5, the user's question: turn on the fast restart (`PRIVYHUB_RESTART_FAST=1`)?** When you press Home and come
+   back to a game, the hub answers the restart before it finishes tearing down the old stream. The game was back about
+   2 seconds after the stream reopened at three of four returns, instead of about 7. One return took 3.1 seconds, and
+   that row and one other go back to B first, so it is not a candidate as measured. The cost on the hub: one short
+   worker thread per return, holding the stream's lock for 1.6-2.4 s. To turn it off, remove the line (the drop-in) and
+   restart the companion; the onn's app then behaves exactly as before.
+3. **G-A6, the user's question: turn on the WAN thresholds (`PRIVYHUB_LINK_RECOVERY_WAN=1`)?** When the onn connects
+   over Tailscale on a direct path, the hub would pause on a dropout after 0.45 s instead of 0.95 s, and on a stalled
+   picture after 0.2 s instead of 0.4 s. On the bench the faster pause worked for every real dropout. But on the home
+   Wi-Fi through Tailscale it paused once when nothing had dropped, then fell back to the slow values as designed. So it
+   goes back to B, and it is not a candidate as measured. The cost: a background check of the Tailscale path every 10 s
+   during a remote game, and at most one false pause per session before it falls back. To turn it off, remove the line
+   and restart the companion; every path then uses the LAN's 0.95 / 0.4 s.
+4. **The user's open question, Home:** should Home pause and wait (the old pause screen), and should a Home return keep
+   the rung? (G4-S4; not in B22.)
+5. **To B:** CL-B13's rows (return 1's 3.12 s and the lock on the old audio; the old encoder at +0.35 / +0.39 s; 3a's
+   false hold on direct-at-home and the 207-ms stall pause).
+6. **The loss guard and the notice as a default** stand as items 3-4 under CL-B12 below.
+7. **"Read LINK-N1's nights":** nights done 2; its status line reads the 2026-10-25 night as loss 100.0 % (not read
+   here). The watch ends 10-31.
 
 **G4-S4: off-site free play MEASURED; WAN-R1 READ** (`evidence/G4_S4_OFFSITE_FREE_PLAY_2026-10-24.md`,
 `evidence/WAN_R1_OFFSITE_GAP_DISTRIBUTION_2026-10-24.md`; the user at a friend's house, their 5-GHz Wi-Fi, 2026-10-24).
