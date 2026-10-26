@@ -245,3 +245,24 @@ Every point below is a **[G3-S3 proposal]**.
      `docs/memory/evidence/g_a4_2026-10-24/g_a4_applied.diff`).
 
   The host then holds and saves nothing on a stall. The client may still send its signal; no host module acts on it.
+
+## 12. The fast restart (adopted G-A5, 2026-10-26)
+
+- **Adopted:** `PRIVYHUB_RESTART_FAST=1` through the drop-in
+  `~/.config/systemd/user/privyhub-companion.service.d/restart-fast.conf`, the **eleventh adopted line**.
+  - **What it does (B22):** at a guarded restart (a Home return, `guard_end=1`) the host answers the start at once and
+    tears the old stream down on a worker. The client releases at the new stream's first fresh frame. CL-B13: the
+    picture back 1.7-2.0 s at three Home returns of four (3.1 s at one), against 6.7-7.5 s without.
+  - It acts on no other start.
+- **What leaves the onn:** nothing new. The response carries a `restart_fast` key; the client's report carries
+  `restart_fast_*` timings. No address or identifier.
+- **The client side:** `6bddafc0…` arms its half only on the host's key, inside `restart_guard`
+  (`adb shell setprop debug.privyhub.restart_guard 0` turns both off).
+- **Turning it off (host):**
+  1. Delete `restart-fast.conf`.
+  2. Run `systemctl --user daemon-reload && systemctl --user restart privyhub-companion`.
+  3. Take `RESTART_FAST` out of `tools/e1_suite.py` `ADOPTED` (reverse
+     `docs/memory/evidence/g_a5_2026-10-26/g_a5_applied.diff`).
+
+  The APK then behaves as CL-B13 cell 2 (the start answered after the old teardown).
+- **Not adopted:** `PRIVYHUB_LINK_RECOVERY_WAN` (G-A6, shelved 2026-10-26; built, off).

@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-10-25
-baseline_commit: 7a1e0de (queue H committed; CL-B13 uncommitted beside it; the user commits)
+as_of: 2026-10-26
+baseline_commit: 06c565e (CL-B13 committed; G-A5 uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -12,19 +12,20 @@ Headings are fixed by `tools/check_memory_health.py`; do not rename.
 **Phase E ACTIVE; the G track (remote) under way. G-A1 ADOPTED (2026-10-16, the user's): the overlay provider and
 session identity v2 run on the host, and `identity_v2` is on in the client. **G-A2 ADOPTED (2026-10-19, the user's):
 the Opus audio path. **G-A3 ADOPTED (2026-10-23, the user's): the client's link report. **G-A4 ADOPTED (2026-10-24, the
-user's): the link-recovery stack. The adopted environ is TEN lines.**
+user's): the link-recovery stack. **G-A5 ADOPTED (2026-10-26, the user's): the fast restart. G-A6 SHELVED (built, off).
+The adopted environ is ELEVEN lines.**
 CL-B3 is OPEN on two G5-S1 smoke gates (NOT MET; the user decides). Everything else passed: G3-S3's hardened APK
 `59f736d2…` is installed and CONFIRMED, the signed LAN path passed, and the VOD play through the range server
 passed.** E1 FROZEN; E2
 MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `af3ed73`.
 
-**State (2026-10-24 18:30Z, after G-A4): the TEN adopted lines; `--check` ok on ten; APK `20e3e339…563d` CONFIRMED**
-(CL-B12). `e3_state.py`'s `link_recovery.stack`: all six `implied 1`.
+**State (2026-10-26 03:23Z, after G-A5): the ELEVEN adopted lines; `--check` ok on eleven; APK `6bddafc0…a927`
+CONFIRMED** (CL-B13). `e3_state.py`'s `link_recovery.stack`: all six `implied 1`.
 - Every client property is empty (the client's defaults: the stall signal, the restart guard and the link report on).
 - No `e3_flag.conf`, no stream. One device paired; `identity_v2` on.
 - Running: `privyhub-companion` and `privyhub-link-n1` (nightly) only.
 
-The ten lines:
+The eleven lines:
 1. `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live` (`adaptive.conf`);
 2. `PRIVYHUB_EPG_GUIDE_INDEX=cached` (`epg-index.conf`);
 3. `PRIVYHUB_SNES_CORE=snes9x` (`snes-core.conf`);
@@ -35,7 +36,9 @@ The ten lines:
 8. `PRIVYHUB_AUDIO_CODEC=opus` (`audio-codec.conf`, G-A2);
 9. `PRIVYHUB_LINK_REPORT=1` (`link-report.conf`, G-A3; diagnostics only);
 10. **`PRIVYHUB_LINK_RECOVERY=1` (`link-recovery.conf`, G-A4; implies the input hold, B6, B8, the `state` path, the
-    stall signal, the stall resume)**.
+    stall signal, the stall resume)**;
+11. **`PRIVYHUB_RESTART_FAST=1` (`restart-fast.conf`, G-A5; B22: a guarded restart's start answered before the old
+    teardown, the client released at the new stream's first fresh frame)**.
 
 **G-A2** (`evidence/G_A2_OPUS_ADOPTION_2026-10-19.md`): the confirmation run, Opus by the drop-in alone, was VALID
 with host gates held (`sig_v` 3 / opus, 8,994 kbit/s and 1,177 pkt/s at 7000, net audio loss 10 ms). **But underruns
@@ -217,6 +220,29 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
+
+**G-A5: `PRIVYHUB_RESTART_FAST=1` ADOPTED, the eleventh line; the confirmation window VALID, every row met; G-A6 SHELVED**
+(`evidence/G_A5_RESTART_FAST_ADOPTION_2026-10-26.md`; the diff `patches/G-A5_RESTART_FAST_ADOPTION.md`, written by A in
+G-A4's form; the companion restarted 03:07:29Z; the window 03:10-03:22Z on 5 GHz, no flag file, no client property).
+- The first precondition read found the onn on 2.4 GHz (02:59Z). The user moved it, and it read 5180 MHz at 03:06Z.
+- The diff applied (4 files, +10 / −5); self-test, 21, 33, `tests/restart_fast` 13, `tests/link_recovery` 9 + 7 green
+  from the tree.
+- The environ ELEVEN lines in 57 / 57 reads; `--check` ok on eleven before and after; the stack all `implied 1`.
+- `restart_fast_config` 0.75 / 2.0 and B21's `link_recovery_config` by the drop-ins alone. No `restart_fast` row (no
+  Home press, as expected). 0 saves, 0 holds; silences 0.89 and hitch seconds 6.1 per 10 min; the bye →
+  `client_bye`.
+- **Off:** delete `restart-fast.conf`, `systemctl --user daemon-reload`, `systemctl --user restart
+  privyhub-companion`. The APK then behaves as CL-B13 cell 2.
+- **G-A6 shelved:** `PRIVYHUB_LINK_RECOVERY_WAN` stays built and off. It reopens with a way to tell a remote path from
+  the home radio, or off-site relayed data (§6 of the record).
+
+1. **The user's commit:** the record and `g_a5_2026-10-26/`; the patch file; the four tools (`tools/e1_suite.py`,
+   `tools/e3_state.py`, `tools/e1_remote.py`, `tools/test_e1_remote.py`); `docs/ROADMAP.md`, `docs/REMOTE_TRUST.md`,
+   `docs/KNOWN_ISSUES.md`, this file (`logs/g_a5_git_status.txt`).
+2. **Session B, queue I** (its own prompt; this record now exists): the slow return (3.12 s once, the old audio's stop
+   inside the lock; the old encoder at +0.35 / +0.39 s).
+3. Items 4, 6 and 7 under CL-B13 below stand (Home's pause, the loss guard and the notice, LINK-N1's nights). Items 2,
+   3 and 5 are answered by this task and queue I.
 
 **CL-B13: MEASURED, 4 / 4 cells valid; APK `6bddafc0…a927` (+ B22) CONFIRMED and pinned, every client property EMPTY**
 (`evidence/CL_B13_RESTART_FAST_AND_WAN_CLASS_2026-10-25.md`, launch `evidence/CL_B13_LAUNCH_2026-10-25.md`; cells 1-2

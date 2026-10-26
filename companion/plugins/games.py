@@ -39,6 +39,12 @@ _restart_fast = None
 if (os.environ.get("PRIVYHUB_RESTART_FAST") or "").strip() == "1":
     import restart_fast as _restart_fast
 
+# B24: inside the adopted fast restart, the ready at the new encoder's check (the old audio after it, outside the lock),
+# only with PRIVYHUB_RESTART_FAST_UNLOCK=1 as well. Absent = the adopted G-A5 worker: nothing imported.
+_restart_fast_unlock = None
+if _restart_fast is not None and (os.environ.get("PRIVYHUB_RESTART_FAST_UNLOCK") or "").strip() == "1":
+    import restart_fast_unlock as _restart_fast_unlock
+
 # B23: the hold's H and the stall's threshold per path class (WAN-R1), only with PRIVYHUB_LINK_RECOVERY_WAN=1.
 # Absent = today: nothing imported.
 _link_recovery_wan = None
@@ -216,6 +222,10 @@ class GamesPlugin:
         if _restart_fast is not None:
             self._restart_fast = _restart_fast.RestartFast(self._recovery._log)
             self._recovery._log("restart_fast_config", **self._restart_fast.config())
+        # B24: the unlocked worker in place of the adopted one (its config row beside G-A5's)
+        if _restart_fast_unlock is not None:
+            self._restart_fast = _restart_fast_unlock.RestartFastUnlock(self._recovery._log)
+            self._recovery._log("restart_fast_unlock_config", **self._restart_fast.config())
         # B2: the fast input hold -- a second, faster trigger inside the same recovery state machine
         if _input_hold is not None:
             _input_hold.wire(self._recovery, self._native_stream._session_io.controller,

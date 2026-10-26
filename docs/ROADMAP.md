@@ -1621,6 +1621,18 @@ property, the ten lines alone, 5 GHz) was VALID, with host gates met and every r
 `link_recovery_config` still logs the six as `explicit` (B's log defect). Off: delete the drop-in, restart; the client
 halves off with `debug.privyhub.stall_signal 0` / `restart_guard 0`. Record:
 `docs/memory/evidence/G_A4_LINK_RECOVERY_ADOPTION_2026-10-24.md`.
+**G-A5 (2026-10-26): `PRIVYHUB_RESTART_FAST=1` ADOPTED (the user's decision, "Go", after CL-B13): the eleventh
+adopted line** (`restart-fast.conf`; B22, the guarded restart answered before the old teardown). The tools (e1_suite,
+e3_state, e1_remote) read eleven lines. The confirmation window (no flag file, no client property, the eleven lines
+alone, 5 GHz) was VALID, with host gates met and every row met:
+- `restart_fast_config` and B21's `link_recovery_config` by the drop-ins alone;
+- no `restart_fast` row (no Home press);
+- 0 saves and 0 holds; silences 0.89 and hitch seconds 6.1 per 10 min;
+- the bye, then `client_bye`.
+
+The slow return (3.12 s once, the old audio's stop inside the lock) is open for B. **G-A6 (`PRIVYHUB_LINK_RECOVERY_WAN`)
+SHELVED** (built, off): the class cannot tell the home radio through the overlay from a remote direct path. Off:
+delete `restart-fast.conf`, restart. Record: `docs/memory/evidence/G_A5_RESTART_FAST_ADOPTION_2026-10-26.md`.
 **G4-S3 (2026-10-19): off-site at 4000 with Opus (adopted) — VALID, 1 of 1, host gates met (the RetroArch counter
 read: 59.999).** Over the overlay on the phone hotspot (direct throughout): **the tailnet wire rate 5,299 kbit/s
 median**, against the pre-registered ~5,370 ±10 % (met) and G4-S2's 8,243 with PCM (−35.7 %): ~40 MB/min, ~2.4 GB/h;
@@ -2035,6 +2047,10 @@ CONFIRMED and pinned.**
 - G-A5 and G-A6 are the user's questions; neither is a candidate as read.
 
 Record: `docs/memory/evidence/CL_B13_RESTART_FAST_AND_WAN_CLASS_2026-10-25.md`.
+
+**B24 (2026-10-26): `PRIVYHUB_RESTART_FAST_UNLOCK=1` (inside the adopted fast restart): the ready at the new encoder's
+check, the old audio's stop after it outside the lock (bounded, logged), the relay stopped before the old encoder's
+kill. No client change.** Record: `docs/memory/evidence/B24_RESTART_FAST_UNLOCK_2026-10-26.md`.
 
 ## G9 — Remote foundation checkpoint
 

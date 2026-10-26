@@ -1,0 +1,641 @@
+--- a/companion/plugins/games.py (06c565e)
++++ b/companion/plugins/games.py
+@@ -39,6 +39,12 @@
+ if (os.environ.get("PRIVYHUB_RESTART_FAST") or "").strip() == "1":
+     import restart_fast as _restart_fast
+ 
++# B24: inside the adopted fast restart, the ready at the new encoder's check (the old audio after it, outside the lock),
++# only with PRIVYHUB_RESTART_FAST_UNLOCK=1 as well. Absent = the adopted G-A5 worker: nothing imported.
++_restart_fast_unlock = None
++if _restart_fast is not None and (os.environ.get("PRIVYHUB_RESTART_FAST_UNLOCK") or "").strip() == "1":
++    import restart_fast_unlock as _restart_fast_unlock
++
+ # B23: the hold's H and the stall's threshold per path class (WAN-R1), only with PRIVYHUB_LINK_RECOVERY_WAN=1.
+ # Absent = today: nothing imported.
+ _link_recovery_wan = None
+@@ -216,6 +222,10 @@
+         if _restart_fast is not None:
+             self._restart_fast = _restart_fast.RestartFast(self._recovery._log)
+             self._recovery._log("restart_fast_config", **self._restart_fast.config())
++        # B24: the unlocked worker in place of the adopted one (its config row beside G-A5's)
++        if _restart_fast_unlock is not None:
++            self._restart_fast = _restart_fast_unlock.RestartFastUnlock(self._recovery._log)
++            self._recovery._log("restart_fast_unlock_config", **self._restart_fast.config())
+         # B2: the fast input hold -- a second, faster trigger inside the same recovery state machine
+         if _input_hold is not None:
+             _input_hold.wire(self._recovery, self._native_stream._session_io.controller,
+diff --git a/companion/restart_fast_unlock.py b/companion/restart_fast_unlock.py
+new file mode 100644
+index 0000000..9822e99
+--- /dev/null
++++ b/companion/restart_fast_unlock.py
+@@ -0,0 +1,244 @@
++"""B24: `PRIVYHUB_RESTART_FAST_UNLOCK=1`, inside the adopted `PRIVYHUB_RESTART_FAST=1` (G-A5) -- the ready answers at the
++new encoder's check, the old audio's stop runs after it outside the lock, the old encoder's frames stop at the kill.
++
++CL-B13 cell 1: return 1's picture came back at 3.12 s because the old audio's stop ran 2,088 ms in the worker (the old
++capture's SIGTERM `wait(timeout=2)` expiring; 203-352 ms otherwise) while the ready's `status()` waited on the lock
++until `done`; at returns 3-4 the old encoder's flushed frames were forwarded to +0.35 / +0.39 s because the relay was
++stopped only after its 471 / 421-ms exit. Here (`RestartFastUnlock`, the adopted class with its worker replaced; the
++request half inherited unchanged):
++- under the lock: the old audio's stop started first (its first act silences the old sender), **the relay stopped**,
++  the old encoder SIGTERMed, the capture target selected meanwhile, SIGKILL after a 100-ms grace, the new encoder
++  spawned as G-A5's `_spawn_locked` does it, `prepare`, today's 0.75-s check (>= once) -> **the lock released**;
++- beside it (a watchdog thread): the old capture SIGKILLed if alive 300 ms after the stop began;
++- after the lock: the old audio's stop joined (cap 10 s) and logged (`restart_fast_audio_stop`), then the new audio
++  (the session checked under the lock before and after).
++Absent = the adopted G-A5 worker: nothing imports this module. Design:
++`docs/memory/evidence/b24_2026-10-26/design_written_before_code.md` (hashed before this code).
++"""
++
++from __future__ import annotations
++
++import subprocess
++import threading
++import time
++from typing import Any
++
++from restart_fast import RestartFast, STARTUP_CHECK_S
++
++FLAG_ENV = "PRIVYHUB_RESTART_FAST_UNLOCK"
++KILL_GRACE_S = 0.10         # the old encoder's SIGTERM grace before SIGKILL (its frames go nowhere: the relay is closed)
++CAPTURE_BOUND_S = 0.30      # the old audio capture SIGKILLed if alive this long after the stop began (not 2 s)
++AUDIO_JOIN_CAP_S = 10.0     # the old audio's stop joined at most this long (the code's own bounds sum to ~10 s)
++
++
++def enabled(environ: Any) -> bool:
++    return (environ.get(FLAG_ENV) or "").strip() == "1"
++
++
++class RestartFastUnlock(RestartFast):
++    def config(self) -> dict[str, Any]:
++        return {"kill_grace_s": KILL_GRACE_S, "capture_bound_s": CAPTURE_BOUND_S, "audio_join_cap_s": AUDIO_JOIN_CAP_S,
++                "startup_check_s": STARTUP_CHECK_S}
++
++    def _run(self, manager: Any, ns: Any, ffmpeg: Any, client_ip: str, port: int, process_id: int, t0: float,
++             timings: dict[str, Any], locked: threading.Event) -> None:
++        m = manager
++        tail: dict[str, Any] = {}
++        m._lock.acquire()
++        try:
++            timings["lock_ms"] = self._ms(t0)
++            locked.set()
++            try:
++                self._restart_unlock_locked(m, ns, ffmpeg, client_ip, port, process_id, t0, timings, tail)
++                ok = True
++            except Exception as exc:
++                try:
++                    m._stop_locked()
++                except Exception:
++                    pass
++                timings["failed_ms"] = self._ms(t0)
++                ok = False
++                error = f"{type(exc).__name__}: {str(exc)[:200]}"
++            timings["unlocked_ms"] = self._ms(t0)
++        finally:
++            m._lock.release()
++        self.last = dict(timings, ok=ok)
++        if ok:
++            self._log("restart_fast_done", **timings)
++        else:
++            self._log("restart_fast_failed", error=error, **timings)
++        self._tail(m, ns, ffmpeg, client_ip, process_id, t0, tail, ok)
++
++    def _restart_unlock_locked(self, m: Any, ns: Any, ffmpeg: Any, client_ip: str, port: int, process_id: int,
++                               t0: float, timings: dict[str, Any], tail: dict[str, Any]) -> None:
++        # the old audio first: its stop's first act silences the old sender; the capture noted for its bound
++        capture = getattr(m._session_io.audio, "_process", None)
++        stop_at = self._clock()
++        ended: dict[str, float] = {}
++
++        def stop_old_audio() -> None:
++            try:
++                m._session_io.stop_stream()
++            finally:
++                ended["at"] = self._clock()
++
++        audio_stop = threading.Thread(target=stop_old_audio, name="PrivyHub-Restart-Fast-Audio", daemon=True)
++        audio_stop.start()
++        killed = threading.Event()
++        tail.update(audio_stop=audio_stop, capture=capture, stop_at=stop_at, killed=killed, ended=ended)
++        threading.Thread(target=self._capture_watchdog, args=(audio_stop, capture, stop_at, killed),
++                         name="PrivyHub-Restart-Fast-Capture", daemon=True).start()
++        m._host_telemetry.stop()
++        # the relay first: the old encoder's frames stop being forwarded here, whatever it still flushes
++        m._fec_relay.stop()
++        timings["relay_stopped_ms"] = self._ms(t0)
++        # the old encoder: SIGTERM, the next capture target meanwhile, SIGKILL after the grace
++        old, old_capture = m._process, m._capture_process
++        for p in (old, old_capture):
++            if p is not None and p.poll() is None:
++                try:
++                    p.terminate()
++                except Exception:
++                    pass
++        target_error: Exception | None = None
++        try:
++            target = m._select_capture_target(managed_process_id=process_id)
++        except Exception as exc:   # raised after the old encoder's end, as G-A5's spawn would
++            target, target_error = None, exc
++        deadline = self._clock() + KILL_GRACE_S
++        for p in (old, old_capture):
++            if p is None:
++                continue
++            while p.poll() is None and self._clock() < deadline:
++                time.sleep(0.005)
++            if p.poll() is None:
++                try:
++                    p.kill()
++                except Exception:
++                    pass
++            try:
++                p.wait(timeout=5)
++            except Exception:
++                pass
++        timings["released_ms"] = self._ms(t0)
++        # today's other field resets (G-A5's worker)
++        m._process = None
++        m._capture_process = None
++        m._encoder_command = None
++        m._client_port = None
++        m._active_bitrate_kbps = m.BITRATE_KBPS
++        m._active_width = m.WIDTH
++        m._active_height = m.HEIGHT
++        if m._capture_target is not None:
++            m._last_capture_target = m._capture_target
++        m._capture_target = None
++        if m._log_handle is not None:
++            try:
++                m._log_handle.close()
++            except Exception:
++                pass
++            m._log_handle = None
++        if target_error is not None:
++            raise ns.NativeStreamError(f"Unable to start Linux native video: {target_error}") from target_error
++        self._spawn_with_target_locked(m, ns, ffmpeg, client_ip, port, process_id, target)
++        timings["spawned_ms"] = self._ms(t0)
++        spawned_at = self._clock()
++        m._client_port = port
++        if ns.AUDIO_CODEC is not None and (refusal := ns.AUDIO_CODEC.prepare(m._session_io.audio, client_ip)):
++            raise ns.NativeStreamError(refusal)
++        check_deadline = spawned_at + STARTUP_CHECK_S
++        while True:
++            if m._process is None or m._process.poll() is not None or not m._fec_relay.running:
++                log_tail = m._tail_log()
++                raise ns.NativeStreamError("Linux native video exited during startup."
++                                           + (f"\n\nFFmpeg log:\n{log_tail}" if log_tail else ""))
++            if self._clock() >= check_deadline:
++                break
++            time.sleep(0.05)
++        timings["checked_ms"] = self._ms(t0)
++        tail["proc"] = m._process
++
++    @staticmethod
++    def _spawn_with_target_locked(m: Any, ns: Any, ffmpeg: Any, client_ip: str, port: int, process_id: int,
++                                  target: Any) -> None:
++        """G-A5's `_spawn_locked` from the capture target on, unchanged in content (the target selected earlier)."""
++        capture_target = dict(target)
++        capture_target["backend"] = "x11grab_window"
++        m._capture_target = capture_target
++        m.data_dir.mkdir(parents=True, exist_ok=True)
++        m.log_dir.mkdir(parents=True, exist_ok=True)
++        m._log_handle = open(m.log_path, "a", encoding="utf-8", errors="replace", buffering=1)
++        m._log_handle.write("\n" + "=" * 72 + "\n")
++        m._log_handle.write(f"Starting PrivyHub Linux native-video backend v{m.ALPHA_VERSION}\n")
++        m._log_handle.write(f"Profile: {m.PROFILE.id} {m.WIDTH}x{m.HEIGHT}@{m.FPS}, "
++                            f"{m.BITRATE_KBPS}/{m.MAX_BITRATE_KBPS} kbps "
++                            f"H.264 VAAPI, GOP={m.GOP_FRAMES}, BF={m.BFRAMES}\n")
++        m._log_handle.write("Capture backend: exact X11 window via x11grab\n")
++        m._log_handle.write("Capture: managed RetroArch window "
++                            f"(pid={process_id}, window_id={capture_target['_window_id']}, "
++                            f"discovered={capture_target['width']}x{capture_target['height']})\n")
++        m._log_handle.write(f"Window title: {capture_target.get('title', '')}\n")
++        m._log_handle.write(f"Video FEC: XOR {m.FEC_GROUP_SIZE}+1; FFmpeg RTP -> loopback relay -> onn; "
++                            f"encoder={m.BITRATE_KBPS} kbps\n")
++        m._log_handle.write("=" * 72 + "\n")
++        m._log_handle.flush()
++        try:
++            m._fec_relay.start(client_ip=client_ip, client_port=port)
++            start_kw: dict[str, Any] = {}
++            if ns.START_RUNG is not None:   # G8-S2: the session's first target
++                start_kw = ns.START_RUNG.encoder_kwargs(client_ip)
++                m._active_bitrate_kbps = int(start_kw.get("bitrate_kbps", m.BITRATE_KBPS))
++            linux_command = m._build_linux_ffmpeg_command(ffmpeg=ffmpeg, capture_target=capture_target, **start_kw)
++            m._encoder_command = list(linux_command)
++            m._log_handle.write("encoder argv: " + " ".join(linux_command) + "\n")
++            m._log_handle.flush()
++            m._process = subprocess.Popen(linux_command, cwd=str(m.project_root), stdin=subprocess.DEVNULL,
++                                          stdout=m._log_handle, stderr=subprocess.STDOUT)
++        except Exception as exc:
++            raise ns.NativeStreamError(f"Unable to start Linux native video: {exc}") from exc
++
++    def _capture_watchdog(self, audio_stop: threading.Thread, capture: Any, stop_at: float,
++                          killed: threading.Event) -> None:
++        """The old capture SIGKILLed if it still lives CAPTURE_BOUND_S after the stop began (its SIGTERM wait is 2 s)."""
++        while audio_stop.is_alive() and self._clock() - stop_at < CAPTURE_BOUND_S:
++            audio_stop.join(0.01)
++        if audio_stop.is_alive() and capture is not None and capture.poll() is None:
++            try:
++                capture.kill()
++                killed.set()
++            except Exception:
++                pass
++
++    def _tail(self, m: Any, ns: Any, ffmpeg: Any, client_ip: str, process_id: int, t0: float, tail: dict[str, Any],
++              ok: bool) -> None:
++        """After the lock: the old capture bounded, the old audio's stop joined and logged, then the new audio."""
++        audio_stop = tail.get("audio_stop")
++        if audio_stop is None:
++            return
++        capture, stop_at = tail.get("capture"), tail.get("stop_at", self._clock())
++        audio_stop.join(max(0.0, AUDIO_JOIN_CAP_S - (self._clock() - stop_at)))
++        joined = not audio_stop.is_alive()
++        end = tail["ended"].get("at", self._clock())
++        self._log("restart_fast_audio_stop", restart_fast_audio_stop_ms=round((end - stop_at) * 1000.0, 1),
++                  restart_fast_audio_stop_end_ms=round((end - t0) * 1000.0, 1),
++                  capture_returncode=(capture.poll() if capture is not None else None),
++                  capture_killed_at_bound=tail["killed"].is_set(), joined=joined)
++        if not ok:
++            self._log("restart_fast_audio", started=False, why="the restart failed")
++            return
++        proc = tail.get("proc")
++        with m._lock:
++            current = proc is not None and m._process is proc and proc.poll() is None
++        if not current:
++            self._log("restart_fast_audio", started=False, why="the session changed before the new audio")
++            return
++        redundancy = m.audio_redundancy()
++        m._session_io.audio.set_redundancy(copies=redundancy["copies"], offset_packets=redundancy["offset_packets"])
++        m._session_io.start(ffmpeg=ffmpeg, client_ip=client_ip, audio_port=m.AUDIO_PORT, input_port=m.INPUT_PORT,
++                            process_id=process_id)
++        with m._lock:
++            still = m._process is proc and proc.poll() is None
++            if not still:
++                m._session_io.stop_stream()
++        self._log("restart_fast_audio", started=still, new_audio_ms=self._ms(t0),
++                  why=None if still else "the session changed during the new audio's start: stopped again")
+diff --git a/tests/restart_fast_unlock/test_restart_fast_unlock.py b/tests/restart_fast_unlock/test_restart_fast_unlock.py
+new file mode 100644
+index 0000000..1ada07e
+--- /dev/null
++++ b/tests/restart_fast_unlock/test_restart_fast_unlock.py
+@@ -0,0 +1,359 @@
++#!/usr/bin/env python3
++"""B24: `PRIVYHUB_RESTART_FAST_UNLOCK=1` inside the adopted `PRIVYHUB_RESTART_FAST=1` -- the ready at the new encoder's
++check, the old audio's stop after it outside the lock (the capture bounded at 300 ms, logged), the relay stopped before
++the old encoder's kill (SIGKILL after a 100-ms grace). Absent = the adopted G-A5 worker.
++
++    python3 -m unittest discover -s tests/restart_fast_unlock -v
++
++B22's harness (`tests/restart_fast/test_restart_fast.py`, imported as a module, unedited): a real `NativeStreamManager`
++on a temp root, fake encoders on a per-window registry, a fake relay and session I/O, `plugins/games.py` loaded alone.
++Added here: a tracing lock (holder, acquire / release times), a frame generator (every 16 ms each live encoder's frame
++is forwarded if the relay runs: a dying encoder forwards into any running relay), and a fake old audio whose capture
++exits 2.0 s after SIGTERM (CL-B13 return 1's 2,088-ms stop) or whose stop stalls 2.2 s with no capture to kill.
++"""
++
++from __future__ import annotations
++
++import os
++import subprocess
++import sys
++import threading
++import time
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(ROOT / "tests" / "restart_fast"))
++
++import test_restart_fast as h  # noqa: E402  (B22's harness, unedited; imported as a module, its tests not collected)
++import restart_fast_unlock as rfu  # noqa: E402
++
++G_UNLOCK = h.load_games_plugin({"PRIVYHUB_RESTART_FAST": "1", "PRIVYHUB_RESTART_FAST_UNLOCK": "1"})
++G_UNLOCK_ALONE = h.load_games_plugin({"PRIVYHUB_RESTART_FAST_UNLOCK": "1"})
++
++
++class TracingLock:
++    """The manager's RLock, traced: every outermost hold (thread name, acquired, released)."""
++
++    def __init__(self):
++        self._l = threading.RLock()
++        self._depth = threading.local()
++        self.holds = []
++        self._open = {}
++
++    def acquire(self, *a, **k):
++        got = self._l.acquire(*a, **k)
++        if got:
++            d = getattr(self._depth, "n", 0)
++            self._depth.n = d + 1
++            if d == 0:
++                self._open[threading.get_ident()] = (threading.current_thread().name, h.now())
++        return got
++
++    def release(self):
++        d = self._depth.n - 1
++        self._depth.n = d
++        if d == 0:
++            name, t = self._open.pop(threading.get_ident())
++            self.holds.append((name, t, h.now()))
++        self._l.release()
++
++    __enter__ = acquire
++
++    def __exit__(self, *exc):
++        self.release()
++
++
++class CaptureAudio(h.FakeAudio):
++    def __init__(self, events, capture):
++        super().__init__(events)
++        self._process = capture
++
++
++class SlowAudioIO(h.FakeSessionIO):
++    """The real stop's order: the sender silenced, the capture SIGTERMed and waited <= 2 s (then SIGKILL), ~88 ms of
++    joins / pactl; or (no capture) a 2.2-s stall nothing can shorten."""
++
++    def __init__(self, events, registry, capture_exit_s=2.0, stall_s=None):
++        super().__init__(events, 0.0)
++        self.stall_s = stall_s
++        capture = None if stall_s is not None else h.FakeProc(registry, "audio", capture_exit_s, events, "old_capture")
++        self.audio = CaptureAudio(events, capture)
++
++    def stop_stream(self):
++        self.events.add("old_audio_stop_begin")
++        if self.stall_s is not None:
++            time.sleep(self.stall_s)
++        else:
++            p = self.audio._process
++            self.audio._process = None
++            if p is not None and p.poll() is None:
++                p.terminate()
++                t = time.monotonic()
++                while p.poll() is None and time.monotonic() - t < 2.0:
++                    time.sleep(0.005)
++                if p.poll() is None:
++                    p.kill()
++                    p.wait()
++            time.sleep(0.088)
++        self.events.add("old_audio_stopped")
++
++
++class Frames:
++    """Every 16 ms, each live encoder's frame is forwarded if the relay runs."""
++
++    def __init__(self, m, procs):
++        self.m, self.procs, self.rows = m, procs, []
++        self._stop = threading.Event()
++        threading.Thread(target=self._run, daemon=True).start()
++
++    def _run(self):
++        while not self._stop.is_set():
++            for p in list(self.procs):
++                if p.name.endswith("encoder") and p._exit_at is None or (p._exit_at is not None and time.monotonic() < p._exit_at):
++                    if self.m._fec_relay.running:
++                        self.rows.append((h.now(), p.name))
++            time.sleep(0.016)
++
++    def stop(self):
++        self._stop.set()
++
++
++class Unlocked(h.Patched):
++    def setUp(self):
++        super().setUp()
++        self.procs = []
++        # restart_fast_unlock's own subprocess reference too (never the global module): no real process
++        patch = h.mock.patch.object(rfu, "subprocess", h.types.SimpleNamespace(
++            Popen=lambda cmd, **kw: self.popen(cmd, **kw), DEVNULL=-3, STDOUT=-2))
++        patch.start()
++        self.patches.append(patch)
++
++    def tearDown(self):
++        for f in getattr(self, "frames", []):
++            f.stop()
++        super().tearDown()
++
++    def mgr(self, old_exit_s=1.0, spawn_s=0.3, audio=None):
++        m = h.manager(self.events, self.registry, self.tmp, old_exit_s=old_exit_s, spawn_s=spawn_s)
++        m._lock = TracingLock()
++        if audio is not None:
++            m._session_io = audio
++        self.procs.append(m._process)
++        inner = m._popen
++
++        def popen(cmd, **kw):
++            p = inner(cmd, **kw)
++            self.procs.append(p)
++            return p
++
++        m._popen = popen
++        return m
++
++    def start(self, m, G=None):
++        G = G or G_UNLOCK
++        p = h.plugin(G, m, self.events)
++        p._restart_fast = G._restart_fast_unlock.RestartFastUnlock(p._recovery._log)
++        self.plugins.append(p)
++        self.popen = m._popen
++        self.frames = [Frames(m, self.procs)]
++        t = time.monotonic()
++        out = p.handle_post_request("native-stream-start", "port=48100&guard_end=1", "127.0.0.1")
++        response_s = time.monotonic() - t
++        self.events.add("response")
++        return p, out, response_s
++
++    def ready(self, m):
++        """The client: the old report 70 ms after the response, then the ready (its first act is status())."""
++        time.sleep(0.070)
++        self.events.add("old_report_received")
++        st = m.status()
++        self.events.add("session_started")
++        return st
++
++    def dump(self, tag, extra=""):
++        """The record's timeline (only when asked: B24_TIMELINE=<dir>)."""
++        d = os.environ.get("B24_TIMELINE")
++        if not d:
++            return
++        entry = self.events.at("session_ended")
++        with open(os.path.join(d, f"host_fake_timeline_{tag}.txt"), "w") as f:
++            f.write(extra)
++            for t, name, kw in self.events.rows:
++                f.write(f"{(t - entry) * 1000:8.1f} ms  {name}  {kw if kw else ''}\n")
++
++    def row(self, name):
++        return next(r[2] for r in self.events.rows if r[1] == name)
++
++    def wait_for(self, name, s=10.0):
++        t = time.monotonic()
++        while name not in self.events.names() and time.monotonic() - t < s:
++            time.sleep(0.01)
++        self.assertIn(name, self.events.names())
++
++
++class TheSlowAudioStop(Unlocked):
++    def test_a_2_s_capture_the_ready_at_the_check_the_stop_after_it(self):
++        m = self.mgr(old_exit_s=0.12, audio=SlowAudioIO(self.events, self.registry, capture_exit_s=2.0))
++        p, out, response_s = self.start(m)
++        self.assertLess(response_s, 0.300)
++        self.assertEqual(out["restart_fast"], {"armed": True, "old_stream_active": True})
++        st = self.ready(m)
++        self.assertTrue(st["active"])
++        self.wait_for("restart_fast_audio")
++        done = self.row("restart_fast_done")
++        entry = self.events.at("session_ended")
++        ready_ms = (self.events.at("session_started") - entry) * 1000.0
++        # R1 / R3: the ready at the check's end, the lock released there
++        self.assertLessEqual(done["unlocked_ms"] - done["checked_ms"], 20.0)
++        self.assertLessEqual(ready_ms, done["checked_ms"] + 50.0)
++        self.assertLess(ready_ms, 1_500.0)                     # the G-A5 worker would wait ~2.2 s here
++        # the capture bounded at 300 ms, logged after the ready
++        stop = self.row("restart_fast_audio_stop")
++        self.assertTrue(stop["capture_killed_at_bound"])
++        self.assertEqual(stop["capture_returncode"], 0)        # the fake's poll() code (the real one reads -9)
++        self.assertLess(stop["restart_fast_audio_stop_ms"], 600.0)
++        self.assertTrue(stop["joined"])
++        # bounded, the stop ended inside the check's window: its row comes at the lock's release, beside the ready
++        # (after the ready only when a stop outlasts the check: test_a_2_2_s_stall_nothing_shortens)
++        self.assertLessEqual(stop["restart_fast_audio_stop_end_ms"], done["unlocked_ms"])
++        names = self.events.names()
++        for a, b in (("session_ended", "restart_fast"), ("restart_fast", "response"), ("response", "old_report_received"),
++                     ("old_report_received", "restart_fast_done"), ("restart_fast_done", "session_started"),
++                     ("restart_fast_done", "restart_fast_audio_stop"), ("old_audio_stopped", "new_audio_started"),
++                     ("restart_fast_audio_stop", "restart_fast_audio")):
++            self.assertLess(names.index(a), names.index(b), (a, b, names))
++        self.assertTrue(self.row("restart_fast_audio")["started"])
++        self.dump("slow_capture", f"the ready (session_started) after entry: {ready_ms:.1f} ms\n")
++
++    def test_a_2_2_s_stall_nothing_shortens(self):
++        m = self.mgr(old_exit_s=0.12, audio=SlowAudioIO(self.events, self.registry, stall_s=2.2))
++        p, out, _ = self.start(m)
++        self.ready(m)
++        self.wait_for("restart_fast_audio", 15.0)
++        done = self.row("restart_fast_done")
++        entry = self.events.at("session_ended")
++        self.assertLessEqual((self.events.at("session_started") - entry) * 1000.0, done["checked_ms"] + 50.0)
++        stop = self.row("restart_fast_audio_stop")
++        self.assertGreater(stop["restart_fast_audio_stop_ms"], 2_100.0)
++        self.assertFalse(stop["capture_killed_at_bound"])
++        self.assertGreater(self.events.at("restart_fast_audio_stop"), self.events.at("session_started") + 0.5)
++        self.assertLess(self.events.names().index("session_started"), self.events.names().index("new_audio_started"))
++
++
++class TheOldEncodersFrames(Unlocked):
++    def test_a_450_ms_exit_forwards_nothing_after_the_kill(self):
++        m = self.mgr(old_exit_s=0.45)
++        p, out, _ = self.start(m)
++        self.ready(m)
++        p._restart_fast._worker.join(10)
++        self.frames[0].stop()
++        entry = self.events.at("session_ended")
++        done = self.row("restart_fast_done")
++        kill = self.events.at("old_encoder_terminated")
++        old = [t for t, n in self.frames[0].rows if n == "old_encoder"]
++        new = [t for t, n in self.frames[0].rows if n == "new_encoder"]
++        self.assertTrue(old and new)
++        # R2: the old encoder's last frame forwarded <= entry + 0.3 s (the relay stopped before its kill)
++        self.assertLessEqual(max(old) - entry, 0.300)
++        self.assertLess(self.events.at("relay_stop"), kill)
++        self.assertEqual([t for t in old if t > kill], [])
++        # R4: no second after the kill with both encoders' frames
++        both = {int(t) for t in old if t > kill} & {int(t) for t in new}
++        self.assertEqual(both, set())
++        # the SIGKILL at the 100-ms grace, not the 450-ms exit
++        self.assertLess(done["released_ms"], 250.0)
++        self.assertLessEqual(done["relay_stopped_ms"], 50.0)
++        self.assertEqual(self.registry.max_live, {"w1": 1})
++        self.assertLess(self.events.at("old_encoder_exited"), self.events.at("new_encoder_spawned"))
++        self.dump("slow_encoder_exit", f"old frames forwarded: {len(old)}, the last after entry: "
++                                       f"{(max(old) - entry) * 1000:.1f} ms; new frames: {len(new)}\n")
++
++
++class TheLock(Unlocked):
++    def test_the_worker_holds_it_to_the_checks_end_only(self):
++        m = self.mgr(old_exit_s=0.12, audio=SlowAudioIO(self.events, self.registry, capture_exit_s=2.0))
++        p, out, _ = self.start(m)
++        self.ready(m)
++        self.wait_for("restart_fast_audio")
++        done = self.row("restart_fast_done")
++        entry = self.events.at("session_ended")
++        worker = [x for x in m._lock.holds if x[0] == "PrivyHub-Restart-Fast"]
++        main = max(worker, key=lambda x: x[2] - x[1])
++        self.assertLess(main[1], self.events.at("response"))                    # held before the response
++        self.assertLessEqual((main[2] - entry) * 1000.0, done["checked_ms"] + 20.0)
++        # the tail's other holds: the two short session checks only
++        others = [x for x in worker if x is not main]
++        self.assertEqual(len(others), 2)
++        self.assertTrue(all(x[2] - x[1] < 0.05 for x in others), others)
++
++
++class TheTail(Unlocked):
++    def test_a_stop_during_the_tail_skips_the_new_audio(self):
++        m = self.mgr(old_exit_s=0.05, audio=SlowAudioIO(self.events, self.registry, stall_s=1.5))
++        p, out, _ = self.start(m)
++        self.ready(m)
++        self.wait_for("restart_fast_done")
++        with m._lock:
++            m._stop_locked()                                     # a native-stream-stop while the old audio stalls
++        self.wait_for("restart_fast_audio", 10.0)
++        row = self.row("restart_fast_audio")
++        self.assertFalse(row["started"])
++        self.assertNotIn("new_audio_started", self.events.names())
++
++    def test_a_failure_releases_the_lock(self):
++        m = self.mgr(old_exit_s=0.05, spawn_s=0.0)
++
++        def gone(managed_process_id):
++            raise h.native_stream.NativeStreamError("The managed RetroArch window is gone.")
++
++        m._select_capture_target = gone
++        p, out, _ = self.start(m)
++        p._restart_fast._worker.join(10)
++        self.assertIn("restart_fast_failed", self.events.names())
++        self.assertFalse(m.status()["active"])
++        self.assertNotIn("new_encoder_spawned", self.events.names())
++        self.assertEqual(self.row("restart_fast_audio")["started"], False)
++
++
++class Absent(unittest.TestCase):
++    def test_the_adopted_worker_without_the_flag(self):
++        self.assertIsNone(h.G_FAST._restart_fast_unlock)
++        self.assertIsNotNone(h.G_FAST._restart_fast)
++        self.assertIsNone(G_UNLOCK_ALONE._restart_fast_unlock)   # the unlock flag alone: nothing
++        self.assertIsNone(G_UNLOCK_ALONE._restart_fast)
++        self.assertIs(G_UNLOCK._restart_fast_unlock.RestartFastUnlock.__mro__[1], G_UNLOCK._restart_fast.RestartFast)
++
++    def test_nothing_imported(self):
++        for extra in ({}, {"PRIVYHUB_RESTART_FAST": "1"}, {"PRIVYHUB_RESTART_FAST_UNLOCK": "1"},
++                      {"PRIVYHUB_RESTART_FAST": "1", "PRIVYHUB_RESTART_FAST_UNLOCK": "0"}):
++            env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++            env.update(extra)
++            code = ("import sys, importlib.util; sys.path.insert(0, 'companion');"
++                    "s = importlib.util.spec_from_file_location('g', 'companion/plugins/games.py');"
++                    "m = importlib.util.module_from_spec(s); s.loader.exec_module(m);"
++                    "print('restart_fast_unlock' in sys.modules, m._restart_fast_unlock is None)")
++            out = subprocess.run([sys.executable, "-B", "-c", code], cwd=ROOT, env=env, capture_output=True,
++                                 text=True, timeout=300)
++            self.assertEqual(out.stdout.strip().splitlines()[-1], "False True", (extra, out.stderr[-400:]))
++
++    def test_the_flag_and_the_config(self):
++        for v in ("0", "yes", "", " 2 "):
++            self.assertFalse(rfu.enabled({rfu.FLAG_ENV: v}), v)
++        self.assertTrue(rfu.enabled({rfu.FLAG_ENV: " 1 "}))
++        self.assertEqual(rfu.RestartFastUnlock(lambda *a, **k: None).config(),
++                         {"kill_grace_s": 0.1, "capture_bound_s": 0.3, "audio_join_cap_s": 10.0,
++                          "startup_check_s": 0.75})
++
++    def test_the_adopted_module_is_unchanged(self):
++        import hashlib
++        pred = ROOT / "docs/memory/evidence/b24_2026-10-26/predecessors/restart_fast.py"
++        if not pred.is_file():
++            self.skipTest("the evidence copy is not in this tree")
++        self.assertEqual(hashlib.sha256((ROOT / "companion/restart_fast.py").read_bytes()).hexdigest(),
++                         hashlib.sha256(pred.read_bytes()).hexdigest())
++
++
++if __name__ == "__main__":
++    unittest.main()

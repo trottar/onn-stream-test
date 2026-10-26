@@ -1,0 +1,35 @@
+tests/restart_fast_unlock and tests/restart_fast (B22's 13, unedited) from the tree, 2026-10-26T03:38:53Z, PRIVYHUB_* in this process: 0
+test_nothing_imported (test_restart_fast_unlock.Absent.test_nothing_imported) ... ok
+test_the_adopted_module_is_unchanged (test_restart_fast_unlock.Absent.test_the_adopted_module_is_unchanged) ... ok
+test_the_adopted_worker_without_the_flag (test_restart_fast_unlock.Absent.test_the_adopted_worker_without_the_flag) ... ok
+test_the_flag_and_the_config (test_restart_fast_unlock.Absent.test_the_flag_and_the_config) ... ok
+test_the_worker_holds_it_to_the_checks_end_only (test_restart_fast_unlock.TheLock.test_the_worker_holds_it_to_the_checks_end_only) ... ok
+test_a_450_ms_exit_forwards_nothing_after_the_kill (test_restart_fast_unlock.TheOldEncodersFrames.test_a_450_ms_exit_forwards_nothing_after_the_kill) ... ok
+test_a_2_2_s_stall_nothing_shortens (test_restart_fast_unlock.TheSlowAudioStop.test_a_2_2_s_stall_nothing_shortens) ... ok
+test_a_2_s_capture_the_ready_at_the_check_the_stop_after_it (test_restart_fast_unlock.TheSlowAudioStop.test_a_2_s_capture_the_ready_at_the_check_the_stop_after_it) ... ok
+test_a_failure_releases_the_lock (test_restart_fast_unlock.TheTail.test_a_failure_releases_the_lock) ... ok
+test_a_stop_during_the_tail_skips_the_new_audio (test_restart_fast_unlock.TheTail.test_a_stop_during_the_tail_skips_the_new_audio) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 9.721s
+
+OK
+
+test_config_row (test_restart_fast.Absent.test_config_row) ... ok
+test_nothing_imported (test_restart_fast.Absent.test_nothing_imported) ... ok
+test_flag_absent (test_restart_fast.NotEligibleIsToday.test_flag_absent) ... ok
+test_flag_not_one (test_restart_fast.NotEligibleIsToday.test_flag_not_one) ... ok
+test_not_linux (test_restart_fast.NotEligibleIsToday.test_not_linux) ... ok
+test_without_a_running_encoder (test_restart_fast.NotEligibleIsToday.test_without_a_running_encoder) ... ok
+test_without_guard_end (test_restart_fast.NotEligibleIsToday.test_without_guard_end) ... ok
+test_a_codec_refusal_is_refused_before_anything_changes (test_restart_fast.TheFastRestart.test_a_codec_refusal_is_refused_before_anything_changes) ... ok
+test_a_dead_new_encoder_fails_closed (test_restart_fast.TheFastRestart.test_a_dead_new_encoder_fails_closed) ... ok
+test_a_failure_in_the_worker_ends_the_stream_and_is_logged (test_restart_fast.TheFastRestart.test_a_failure_in_the_worker_ends_the_stream_and_is_logged) ... ok
+test_a_status_poll_during_the_worker_waits_on_the_lock (test_restart_fast.TheFastRestart.test_a_status_poll_during_the_worker_waits_on_the_lock) ... ok
+test_response_before_the_teardown_and_the_ready_waits_for_the_worker (test_restart_fast.TheFastRestart.test_response_before_the_teardown_and_the_ready_waits_for_the_worker) ... ok
+test_the_check_runs_once_even_past_its_deadline (test_restart_fast.TheFastRestart.test_the_check_runs_once_even_past_its_deadline) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 8.428s
+
+OK

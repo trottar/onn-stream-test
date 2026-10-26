@@ -1,6 +1,6 @@
 # Known issues and deferred work
 
-## 2026-10-25 CL-B13: the WAN class reads the onn on the home Wi-Fi through the overlay as `remote-direct`, and 450 then holds falsely once — OPEN (to B)
+## 2026-10-25 CL-B13: the WAN class reads the onn on the home Wi-Fi through the overlay as `remote-direct`, and 450 then holds falsely once — G-A6 SHELVED (2026-10-26, the user)
 
 (`docs/memory/evidence/CL_B13_RESTART_FAST_AND_WAN_CLASS_2026-10-25.md` §4-§5)
 
@@ -11,6 +11,9 @@
 - The class tells overlay from LAN by address and path, not by the radio underneath. Off-site G4-S4 had 0 at 450; the
   home Wi-Fi does not. **To B:** whether direct-on-the-LAN needs telling apart, or whether H 450 waits for more
   off-site minutes. G-A6 is not a candidate as read.
+- **G-A6 SHELVED (2026-10-26, the user's decision):** `PRIVYHUB_LINK_RECOVERY_WAN` stays built and off. It gains at
+  most ~0.5 s per real drop. It would reopen with a way to tell a remote path from the home radio, and with off-site
+  data on a relayed path. (`G_A5_RESTART_FAST_ADOPTION_2026-10-26.md` §6)
 
 ## 2026-10-24 G4-S4, off-site free play: Home auto-resumes (no pause screen, the rung back at the floor); the onn left the tailnet for ~8 min once; underruns 8-20 / min — OPEN (to B / a watch item)
 
@@ -32,6 +35,20 @@
     the new activity at three of four returns (6.7-7.5 s without it). Return 1 took 3.12 s (the old audio's stop, 2.2
     s, inside the worker's lock). Back to B with that row and the old encoder's +0.35 / +0.39 s at two returns. Pausing
     at Home is still the user's question.
+  - **G-A5 (2026-10-26):** `PRIVYHUB_RESTART_FAST=1` ADOPTED (the eleventh line). The slow return stays OPEN for B:
+    3.12 s once (the old audio's 2.2-s stop inside the worker's lock), and the old encoder at +0.35 / +0.39 s at two
+    returns.
+  - **Queue I, B24 (2026-10-26; BUILT behind `PRIVYHUB_RESTART_FAST_UNLOCK=1`, NOT ADOPTED, no live run):**
+    - **Settled:** return 1's old-audio stop ran 2,088 ms because the audio capture's 2-s SIGTERM wait expired (then
+      SIGKILL); the other three ran 203-352 ms.
+    - The new ready needs only the new encoder's check and `prepare`. The old encoder's flushed frames were forwarded
+      because the relay was stopped after its exit.
+    - **Built:** the ready answers at the check's end. The old audio's stop runs after it outside the lock (the capture
+      killed at 300 ms; `restart_fast_audio_stop`). The relay stops before the old encoder's SIGTERM (SIGKILL after
+      100 ms).
+    - CL-B13's returns re-timed predict the picture back ~1.2-1.98 s (return 1 tight against the 2.0-s row).
+    - No client change: `6bddafc0…` stays. Next: CL-B14 (`docs/memory/handoffs/SESSION_B_DONE_2026-10-26I.md`).
+      Record: `docs/memory/evidence/B24_RESTART_FAST_UNLOCK_2026-10-26.md`.
 - **The onn left the tailnet once:**
   - no-peer 19:38:33-19:45:50Z, ~1 min after it went idle and ~26 s after a companion restart;
   - a second restart was followed by a brief relayed reading only.

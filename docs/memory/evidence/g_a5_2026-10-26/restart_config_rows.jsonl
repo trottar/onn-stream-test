@@ -1,0 +1,7 @@
+{"at_utc": "2026-10-26T03:07:30.208Z", "event": "link_recovery_config", "state": "ENDED", "umbrella": true, "implied": ["PRIVYHUB_INPUT_HOLD", "PRIVYHUB_INPUT_HOLD_B6", "PRIVYHUB_INPUT_HOLD_B8", "PRIVYHUB_INPUT_HOLD_REWIND", "PRIVYHUB_STALL_RESUME", "PRIVYHUB_STALL_SIGNAL"], "explicit": {}, "at": "import", "reapply": []}
+{"at_utc": "2026-10-26T03:07:30.208Z", "event": "restart_fast_config", "state": "ENDED", "startup_check_s": 0.75, "lock_wait_s": 2.0}
+{"at_utc": "2026-10-26T03:07:30.209Z", "event": "input_hold_config", "state": "ENDED", "ignored": false, "hold_ms": 250, "min_hold_ms": 50, "cap_holds": 6, "cap_window_s": 60.0}
+{"at_utc": "2026-10-26T03:07:30.209Z", "event": "input_hold_rewind_cores_config", "state": "ENDED", "mode": "state", "allow": ["bsnes_libretro.so", "snes9x_libretro.so"], "slot": 9, "state_at_ms": 400, "state_at_note": null}
+{"at_utc": "2026-10-26T03:07:30.209Z", "event": "input_hold_rewind_config", "state": "ENDED", "ignored": false, "cap": 30, "cap_note": null, "fps": 60.0, "method": "unpaused_per_frame", "mask_input": true, "confirm_frames": 2}
+{"at_utc": "2026-10-26T03:07:30.210Z", "event": "stall_signal_config", "state": "ENDED", "ignored": false, "threshold_ms": 400, "quiet_s": 0.3, "defer_s": 0.06, "ready_after_s": 20.0}
+{"at_utc": "2026-10-26T03:07:30.210Z", "event": "stall_resume_config", "state": "ENDED", "ignored": false, "v2_ms": 5000, "state_save": true, "fast_ready": true, "save_from_signal": true, "v2_newest_s": 0.3}

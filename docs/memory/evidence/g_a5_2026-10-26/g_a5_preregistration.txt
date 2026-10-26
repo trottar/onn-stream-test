@@ -1,0 +1,38 @@
+G-A5 — the confirmation window for the eleventh adopted line: pre-registration (session A, 2026-10-26, hashed before the run)
+
+Task: docs/memory/handoffs/G-A5_RESTART_FAST_ADOPTION_TASK.md. The user's decision 2026-10-26 ("Go"): adopt
+PRIVYHUB_RESTART_FAST=1 as the eleventh line, after CL-B13 (the picture back 1.74-2.00 s at three Home returns of four,
+3.12 s at one, against 6.73-7.52 s without; the misses accepted and sent to B). G-A6 (PRIVYHUB_LINK_RECOVERY_WAN)
+shelved by the same decision; not touched.
+
+State before the window: the diff applied (patches/G-A5_RESTART_FAST_ADOPTION.md, written by A in G-A4's applied form;
+e1_suite ADOPTED eleven, drop_in_restart_fast in the preflight's ok); git diff --check clean; e1_suite --self-test OK,
+test_e1_remote 21 OK, test_c3_l4_nft_night 33 OK, tests/restart_fast 13 OK, tests/link_recovery 9 + 7 OK from the
+tree; restart-fast.conf written (file tool); daemon-reload and the companion restarted 03:07:29Z (outside
+04:30-05:30Z); the environ read back ELEVEN lines; tools/e3_state.py ok on eleven (drop_in_restart_fast true;
+link_recovery.stack all six "implied 1"); APK 6bddafc0…a927 CONFIRMED; the seven client properties (restart_guard,
+stall_signal, link_notice, link_report, loss_guard, wifi_lock, opus_decode) all EMPTY; the band 5 GHz (5180 MHz; it read
+2.4 GHz at 02:59Z, the user moved it, 5180 MHz at 03:06Z); the client on the LAN; no e3_flag.conf.
+
+The window: one E1-SNES-STREAM (snes9x), tools/e1_suite.py run --only E1-SNES-STREAM --runs 1 --window 600 --gap 120
+--e2, NO --plan, NO e3_flag.conf, NO setprop: the eleven adopted lines alone. The pad is not touched; no Home press.
+Run by g_a5_window.py (G-A4's runner for eleven lines) as the transient unit privyhub-g-a5-window (--collect). It must
+end before 04:15Z.
+
+Expected (met / not met):
+- Z1 (config, by the drop-ins alone): at the restart / the stream's start the recovery log carries restart_fast_config
+  (startup_check_s 0.75, lock_wait_s 2.0) and B21's link_recovery_config (umbrella true, implied the six, explicit {},
+  at import, reapply []), and the six module config rows, none "ignored". "By the drop-ins alone" is shown by the
+  environ (eleven lines, no e3_flag.conf) and e3_state read mid-window.
+- Z2 (host gates): RetroArch >= 59.9, capture 60 ± 0.1, dup+drop <= 0.2 / min; the environ eleven lines in every 15-s
+  read through the run.
+- Z3 (no Home press): NO restart_fast row (the flag acts only on a guarded start; expected and not a miss — the
+  behaviour is CL-B13 cell 1's); no restart_fast_failed.
+- Z4 (no action without a stall): 0 state_saved and 0 holds outside a real stall; any that appear are reported with the
+  silence they belong to.
+- Z5 (the link on 5 GHz): silences >= 250 ms and hitch seconds per 10 min, stated against G-A4's 0 / 0 and CL-B13's
+  cells 1-2 (0-3.2 / 0-17.5); the band read every 30 s.
+- Z6 (teardown): session_end_bye, then state_save_skipped (client_bye, or state_ended if the suite's stop lands first,
+  as CL-B12 / CL-B13 cell 1 read), no hold at the end; after the run flags_absent true, eleven lines, tools/e3_state.py
+  ok; the seven properties still empty.
+The adoption stands on the user's decision, not on this window; a failed row is reported to the user, not repaired.

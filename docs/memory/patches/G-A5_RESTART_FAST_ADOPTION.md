@@ -1,0 +1,102 @@
+---
+memory_schema: 1
+as_of: 2026-10-26
+status: APPLIED (session A, G-A5; the user's decision 2026-10-26 "Go", after CL-B13). Written by A in G-A4's applied form (no patch was prepared by B)
+---
+
+# G-A5 — `PRIVYHUB_RESTART_FAST=1`, the eleventh adopted line
+
+Task: `handoffs/G-A5_RESTART_FAST_ADOPTION_TASK.md`. Measured in `evidence/CL_B13_RESTART_FAST_AND_WAN_CLASS_2026-10-25.md`
+(cell 1: the picture back 1.74-2.00 s at three Home returns of four, 3.12 s at one; cell 2 without it 6.73-7.52 s).
+Record: `evidence/G_A5_RESTART_FAST_ADOPTION_2026-10-26.md`.
+
+**What it changes:** `tools/e1_suite.py` defines `RESTART_FAST` and puts it in `ADOPTED` (eleven); the preflight reads
+`drop_in_restart_fast` and requires it in `ok`. `tools/e3_state.py`, `tools/e1_remote.py`, `tools/test_e1_remote.py`:
+wording only. `ADOPTED_E3` (`tools/d7_regression.py`, `tools/c3_l4_nft_night.py`) is left as it is, as at G-A2..G-A4.
+
+**The drop-in** (written separately, not by this diff):
+`~/.config/systemd/user/privyhub-companion.service.d/restart-fast.conf`
+
+```
+[Service]
+Environment=PRIVYHUB_RESTART_FAST=1
+```
+
+**Off:** delete `restart-fast.conf`, `systemctl --user daemon-reload`, `systemctl --user restart privyhub-companion`,
+and reverse this diff (`e3_state.py` then reads ok on ten). With the flag off the APK `6bddafc0…` behaves as CL-B13 cell
+2 (B17's order, no `restart_fast` key).
+
+**Predecessor sha256 (HEAD 06c565e):**
+
+```
+ea3b2db007bdd31c75336b9dec1bc06f624785691513d52df1b248b4a6e604a4  tools/e1_remote.py
+6e7e6de0e33638f31b081cddde4d4332275dcdde4db78db0b090b38a109f72fd  tools/e1_suite.py
+3b7f547c5fa9005981d54752dd538822a38cb69f271a8085aa5b717a21cbe7f3  tools/e3_state.py
+0ee8e33d5bf6610caa02a9255b84f6497605684796199174ca49bc4335b22005  tools/test_e1_remote.py
+```
+
+**The diff** (`git apply -p1`):
+
+```diff
+--- a/tools/e1_remote.py
++++ b/tools/e1_remote.py
+@@ -165,7 +165,7 @@
+ 
+ def preflight_remote(environ_has: Callable[[str], bool], adb_devices: Callable[[], str],
+                      adopted: tuple[str, ...] | list[str] = ()) -> dict[str, Any]:
+-    # G-A2: the callers pass the home row's adopted set (e1_suite.ADOPTED, ten lines since G-A4); each must be read back too
++    # G-A2: the callers pass the home row's adopted set (e1_suite.ADOPTED, eleven lines since G-A5); each must be read back too
+     need = list(REQUIRED_FLAGS) + [kv for kv in adopted if kv not in REQUIRED_FLAGS]
+     d = {
+         "flags": {kv: environ_has(kv) for kv in need},
+--- a/tools/e1_suite.py
++++ b/tools/e1_suite.py
+@@ -97,8 +97,12 @@
+ # input hold, B6, B8, the state path, the stall signal, the stall resume) -- through its own drop-in
+ # (link-recovery.conf); the adopted environ is exactly these ten names
+ LINK_RECOVERY = "PRIVYHUB_LINK_RECOVERY=1"
++# G-A5 (adopted 2026-10-26, the user): the fast restart -- a guarded restart's start answered before the old teardown,
++# the client released at the new stream's first fresh frame (B22; acts only on a guarded start) -- through its own
++# drop-in (restart-fast.conf); the adopted environ is exactly these eleven names
++RESTART_FAST = "PRIVYHUB_RESTART_FAST=1"
+ ADOPTED = sorted([LIVE, INDEX, SNES_CORE, RECOVERY, SNES_CAPTURE, OVERLAY, IDENTITY, AUDIO_CODEC, LINK_REPORT,
+-                  LINK_RECOVERY])
++                  LINK_RECOVERY, RESTART_FAST])
+ FLAG_NAMES = ["PRIVYHUB_ADAPTIVE_BITRATE_INJECT", "PRIVYHUB_ADAPTIVE_BITRATE_TOP", "PRIVYHUB_PS1_LOOK",
+               "PRIVYHUB_NATIVE_PROFILE_ID", "PRIVYHUB_FEC_SCHEME"]
+ RA_CFG = Path.home() / ".config/retroarch/config"
+@@ -1000,11 +1004,12 @@
+          "drop_in_audio_codec": f"Environment={AUDIO_CODEC}" in sh(["systemctl", "--user", "cat", UNIT]),
+          "drop_in_link_report": f"Environment={LINK_REPORT}" in sh(["systemctl", "--user", "cat", UNIT]),
+          "drop_in_link_recovery": f"Environment={LINK_RECOVERY}" in sh(["systemctl", "--user", "cat", UNIT]),
++         "drop_in_restart_fast": f"Environment={RESTART_FAST}" in sh(["systemctl", "--user", "cat", UNIT]),
+          "e3_dropin_absent": not DROPIN.exists(), "e4_constraint_absent": not E4_DROPIN.exists()}
+     d["ok"] = (d["manager"] == [] and d["environ"] == ADOPTED and d["adb"] and d["drop_in_live"] and d["drop_in_index"]
+                and d["drop_in_snes_core"] and d["drop_in_recovery"] and d["drop_in_snes_capture"] and d["drop_in_overlay"]
+                and d["drop_in_identity"] and d["drop_in_audio_codec"] and d["drop_in_link_report"]
+-               and d["drop_in_link_recovery"]
++               and d["drop_in_link_recovery"] and d["drop_in_restart_fast"]
+                and d["e3_dropin_absent"] and d["e4_constraint_absent"])
+     return d
+ 
+--- a/tools/e3_state.py
++++ b/tools/e3_state.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""E3: the adopted state (since G-A4, ten: live, the guide index, Snes9x, recovery v2, the SNES capture fix output_rate, the overlay provider, session identity v2, the Opus audio path, the client's link report, the link-recovery stack; the list and the drop-in checks are e1_suite's ADOPTED / preflight) as one JSON line (preflight -- since E4-S2 also no e4_constraint.conf --, PS1 files, APK, no game / RetroArch / encoder). Read-only."""
++"""E3: the adopted state (since G-A5, eleven: live, the guide index, Snes9x, recovery v2, the SNES capture fix output_rate, the overlay provider, session identity v2, the Opus audio path, the client's link report, the link-recovery stack, the fast restart; the list and the drop-in checks are e1_suite's ADOPTED / preflight) as one JSON line (preflight -- since E4-S2 also no e4_constraint.conf --, PS1 files, APK, no game / RetroArch / encoder). Read-only."""
+ import sys, json, importlib.util
+ spec=importlib.util.spec_from_file_location('s','/home/privyhub/Projects/onn-stream-test/tools/e1_suite.py'); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+ mp=m.mainpid()
+--- a/tools/test_e1_remote.py
++++ b/tools/test_e1_remote.py
+@@ -133,7 +133,7 @@
+         self.assertTrue(pf["adb_device"])
+ 
+     def test_the_adopted_set_is_required_too(self):
+-        # G-A2: the callers pass e1_suite.ADOPTED (ten lines since G-A4); one missing refuses, naming it
++        # G-A2: the callers pass e1_suite.ADOPTED (eleven lines since G-A5); one missing refuses, naming it
+         adopted = ("PRIVYHUB_AUDIO_CODEC=opus", R.REQUIRED_FLAGS[0])
+         pf = R.preflight_remote(lambda kv: kv in R.REQUIRED_FLAGS, lambda: "", adopted)
+         self.assertFalse(pf["ok"])
+```
