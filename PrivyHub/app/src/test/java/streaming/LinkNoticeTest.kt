@@ -33,8 +33,9 @@ class LinkNoticeTest {
     @Test
     fun flagTable() {
         assertTrue(LinkNoticeFlag.parse("1"))
-        for (bad in listOf(null, "", "0", "on", "true")) assertFalse(bad, LinkNoticeFlag.parse(bad))
-        assertFalse(LinkNoticeFlag.fromSystem())                  // off-device: off (absent = today)
+        for (on in listOf(null, "", "on", "true")) assertTrue("$on", LinkNoticeFlag.parse(on))   // B25: on unless `0` (moved)
+        assertFalse(LinkNoticeFlag.parse("0"))
+        assertTrue(LinkNoticeFlag.fromSystem())                   // off-device: a failed read = on (B25, moved)
     }
 
     @Test

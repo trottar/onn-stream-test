@@ -54,7 +54,8 @@ class ClientDefaultsTest {
         assertEquals(true, RestartGuardFlag.parse(null))
         assertEquals(true, RestartGuardFlag.parse(""))
         assertEquals(false, RestartGuardFlag.parse("0"))
-        assertEquals(false, LinkNoticeFlag.parse(null))           // link_notice stays opt-in
+        assertEquals(true, LinkNoticeFlag.parse(null))            // B25: link_notice on unless `0` (moved)
+        assertEquals(false, LinkNoticeFlag.parse("0"))
         assertEquals(true, LinkReportFlag.parse(null))            // B13's, unchanged
     }
 

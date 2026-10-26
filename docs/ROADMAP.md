@@ -2052,6 +2052,10 @@ Record: `docs/memory/evidence/CL_B13_RESTART_FAST_AND_WAN_CLASS_2026-10-25.md`.
 check, the old audio's stop after it outside the lock (bounded, logged), the relay stopped before the old encoder's
 kill. No client change.** Record: `docs/memory/evidence/B24_RESTART_FAST_UNLOCK_2026-10-26.md`.
 
+**B25 (2026-10-26): the 2.4-GHz link notice on by default in the client (`debug.privyhub.link_notice`: `0` off); the
+replay since G-A3 shows it in 3 / 3 sessions on 2.4 GHz and 0 / 42 on 5 GHz; APK (B5 … B19 + B22 + B25) `fcd924c2…`
+pinned, not installed.** Record: `docs/memory/evidence/B25_LINK_NOTICE_DEFAULT_ON_2026-10-26.md`.
+
 ## G9 — Remote foundation checkpoint
 
 Acceptance:

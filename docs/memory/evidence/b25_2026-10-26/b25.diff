@@ -1,0 +1,154 @@
+diff --git a/PrivyHub/app/src/main/java/streaming/LinkNotice.kt b/PrivyHub/app/src/main/java/streaming/LinkNotice.kt
+index 465f246..be7335a 100644
+--- a/PrivyHub/app/src/main/java/streaming/LinkNotice.kt
++++ b/PrivyHub/app/src/main/java/streaming/LinkNotice.kt
+@@ -2,8 +2,9 @@ package com.safeiot.privyhub.streaming
+ 
+ /**
+  * B14: the "any house" link notice, behind the system property
+- * `debug.privyhub.link_notice=1` (CL-B7P's convention). Absent = today: no
+- * object, no view, no key.
++ * `debug.privyhub.link_notice` (CL-B7P's convention). B25: on unless `0`
++ * (as B13's link_report, B19's stall_signal / restart_guard); `0` = B14's
++ * absent: no object, no view, no key.
+  *
+  * LINK-R1: on 5 GHz 0 uplink silences and 0 hitch seconds per 10 min; on
+  * 2.4 GHz 16-22 and 20 in every room. The onn sat on 2.4 GHz for a month and
+@@ -16,14 +17,16 @@ package com.safeiot.privyhub.streaming
+ object LinkNoticeFlag {
+     const val PROPERTY = "debug.privyhub.link_notice"
+ 
+-    fun parse(value: String?): Boolean = value?.trim() == "1"
++    // B25: on unless `0` (the user's "Yes", 2026-10-26: the onn fell back to 2.4 GHz on its own and nothing told anyone)
++    fun parse(value: String?): Boolean = value?.trim() != "0"
+ 
++    /** The property, read through reflection; a failed read is absent, so on (B25). */
+     fun fromSystem(): Boolean =
+         try {
+             val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
+             parse(get.invoke(null, PROPERTY) as? String)
+         } catch (_: Throwable) {
+-            false
++            parse(null)
+         }
+ }
+ 
+diff --git a/PrivyHub/app/src/test/java/streaming/ClientDefaultsTest.kt b/PrivyHub/app/src/test/java/streaming/ClientDefaultsTest.kt
+index b2f0b87..d9b03dc 100644
+--- a/PrivyHub/app/src/test/java/streaming/ClientDefaultsTest.kt
++++ b/PrivyHub/app/src/test/java/streaming/ClientDefaultsTest.kt
+@@ -54,7 +54,8 @@ class ClientDefaultsTest {
+         assertEquals(true, RestartGuardFlag.parse(null))
+         assertEquals(true, RestartGuardFlag.parse(""))
+         assertEquals(false, RestartGuardFlag.parse("0"))
+-        assertEquals(false, LinkNoticeFlag.parse(null))           // link_notice stays opt-in
++        assertEquals(true, LinkNoticeFlag.parse(null))            // B25: link_notice on unless `0` (moved)
++        assertEquals(false, LinkNoticeFlag.parse("0"))
+         assertEquals(true, LinkReportFlag.parse(null))            // B13's, unchanged
+     }
+ 
+diff --git a/PrivyHub/app/src/test/java/streaming/LinkNoticeTest.kt b/PrivyHub/app/src/test/java/streaming/LinkNoticeTest.kt
+index 979b79d..4988253 100644
+--- a/PrivyHub/app/src/test/java/streaming/LinkNoticeTest.kt
++++ b/PrivyHub/app/src/test/java/streaming/LinkNoticeTest.kt
+@@ -33,8 +33,9 @@ class LinkNoticeTest {
+     @Test
+     fun flagTable() {
+         assertTrue(LinkNoticeFlag.parse("1"))
+-        for (bad in listOf(null, "", "0", "on", "true")) assertFalse(bad, LinkNoticeFlag.parse(bad))
+-        assertFalse(LinkNoticeFlag.fromSystem())                  // off-device: off (absent = today)
++        for (on in listOf(null, "", "on", "true")) assertTrue("$on", LinkNoticeFlag.parse(on))   // B25: on unless `0` (moved)
++        assertFalse(LinkNoticeFlag.parse("0"))
++        assertTrue(LinkNoticeFlag.fromSystem())                   // off-device: a failed read = on (B25, moved)
+     }
+ 
+     @Test
+diff --git a/PrivyHub/app/src/test/java/streaming/LinkNoticeDefaultOnTest.kt b/PrivyHub/app/src/test/java/streaming/LinkNoticeDefaultOnTest.kt
+new file mode 100644
+index 0000000..576c4a7
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/LinkNoticeDefaultOnTest.kt
+@@ -0,0 +1,83 @@
++package com.safeiot.privyhub.streaming
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * B25: debug.privyhub.link_notice absent / empty / junk = ON, `0` = off (B14's
++ * absent: no object, no key). The notice object is built as the activity's lazy
++ * builds it; readings every 500 ms on a fake clock, as LinkNoticeTest.
++ */
++class LinkNoticeDefaultOnTest {
++
++    private fun s(mhz: Int?, rssi: Int?, tx: Int?) = LinkSample(rssi, tx, 100, mhz, 4)
++
++    private val g24 = s(2412, -68, 121)      // G-A5's precondition read: the onn back on 2.4 GHz
++    private val g5 = s(5180, -68, 195)       // 5 GHz, good
++
++    /** As NativeStreamActivity's `linkNotice` lazy, from a property value. */
++    private fun built(property: String?): LinkNotice? = if (LinkNoticeFlag.parse(property)) LinkNotice() else null
++
++    /** B14's parse, kept here only for the comparison. */
++    private fun b14Parse(value: String?): Boolean = value?.trim() == "1"
++
++    /** As the heartbeat's fragment: `linkNotice?.query() ?: ""`. */
++    private fun fragment(n: LinkNotice?): String = n?.query() ?: ""
++
++    private fun feed(n: LinkNotice, r: LinkSample, t0: Long, seconds: Double): List<Pair<Long, LinkNotice.Event>> {
++        val out = mutableListOf<Pair<Long, LinkNotice.Event>>()
++        var t = t0
++        while (t < t0 + (seconds * 1000).toLong()) {
++            n.update(r, t)?.let { out.add(t to it) }
++            t += 500
++        }
++        return out
++    }
++
++    @Test
++    fun theTable() {
++        for (on in listOf(null, "", " ", "1", " 1 ", "on", "true", "2", "yes")) assertTrue("[$on]", LinkNoticeFlag.parse(on))
++        for (off in listOf("0", " 0 ", "0\n")) assertFalse("[$off]", LinkNoticeFlag.parse(off))
++        assertTrue(LinkNoticeFlag.fromSystem())                   // off-device the read fails: a failed read = on
++    }
++
++    @Test
++    fun absentIsOnTwoPointFourShownOnce() {
++        val n = built(null)!!
++        n.onSessionStart()
++        val ev = feed(n, g24, 0, 60.0)
++        assertEquals(1, ev.size)
++        assertEquals(0L, ev[0].first)
++        val shown = ev[0].second as LinkNotice.Event.Shown
++        assertEquals(LinkNotice.BAND_24, shown.reasons)
++        assertEquals("Wi-Fi: 2.4 GHz\nUse your router's 5 GHz Wi-Fi for this box.", shown.text)   // B14's wording
++        assertEquals("&link_notice=1", fragment(n))
++        assertEquals(1L, n.shownCount)
++    }
++
++    @Test
++    fun absentIsOnFiveGhzGoodIsQuietWithTheKeyPresent() {
++        for (p in listOf(null, "", "junk")) {
++            val n = built(p)!!
++            n.onSessionStart()
++            assertTrue(feed(n, g5, 0, 60.0).isEmpty())
++            assertFalse(n.shown)
++            assertEquals("&link_notice=0", fragment(n))            // armed, not shown: CL-B14's heartbeat key
++        }
++        // the home 5-GHz reads (-66..-70 dBm; G-A5's -70 for minutes) stay quiet; -72 held 10 s still shows (B14)
++        val n = built(null)!!
++        assertTrue(feed(n, s(5180, -70, 195), 0, 120.0).isEmpty())
++        assertEquals(1, feed(n, s(5180, -72, 195), 120_000, 12.0).size)
++    }
++
++    @Test
++    fun zeroIsTodaysAbsent() {
++        assertNull(built("0"))
++        assertEquals("", fragment(built("0")))                     // no key, as B14's absent
++        assertEquals(b14Parse(null), LinkNoticeFlag.parse("0"))   // `0` now = B14's absent
++        assertEquals(b14Parse("1"), LinkNoticeFlag.parse("1"))    // `1` unchanged
++    }
++}

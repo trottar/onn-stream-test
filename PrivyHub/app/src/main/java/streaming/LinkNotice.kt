@@ -2,8 +2,9 @@ package com.safeiot.privyhub.streaming
 
 /**
  * B14: the "any house" link notice, behind the system property
- * `debug.privyhub.link_notice=1` (CL-B7P's convention). Absent = today: no
- * object, no view, no key.
+ * `debug.privyhub.link_notice` (CL-B7P's convention). B25: on unless `0`
+ * (as B13's link_report, B19's stall_signal / restart_guard); `0` = B14's
+ * absent: no object, no view, no key.
  *
  * LINK-R1: on 5 GHz 0 uplink silences and 0 hitch seconds per 10 min; on
  * 2.4 GHz 16-22 and 20 in every room. The onn sat on 2.4 GHz for a month and
@@ -16,14 +17,16 @@ package com.safeiot.privyhub.streaming
 object LinkNoticeFlag {
     const val PROPERTY = "debug.privyhub.link_notice"
 
-    fun parse(value: String?): Boolean = value?.trim() == "1"
+    // B25: on unless `0` (the user's "Yes", 2026-10-26: the onn fell back to 2.4 GHz on its own and nothing told anyone)
+    fun parse(value: String?): Boolean = value?.trim() != "0"
 
+    /** The property, read through reflection; a failed read is absent, so on (B25). */
     fun fromSystem(): Boolean =
         try {
             val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
             parse(get.invoke(null, PROPERTY) as? String)
         } catch (_: Throwable) {
-            false
+            parse(null)
         }
 }
 

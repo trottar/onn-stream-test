@@ -382,6 +382,21 @@ is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.m
       this queue.
   - **Next:** G-A4 (the tenth line) on the user's say-so (`docs/memory/CURRENT.md`); B on the two rows; the user's own
     play on 5 GHz.
+  - **The band again (inserted 2026-10-26):** G-A5's precondition read at 02:59Z found the onn back on **2.4 GHz**
+    (2412 MHz), although CL-B13 had closed on 5 GHz at ~00:05Z. Nobody had touched the band, and nothing told anyone:
+    B14's notice was opt-in. G-A5's session (03:10Z) ran on 5 GHz.
+  - **Queue I, B25 (2026-10-26; the user's "Yes"; BUILT, NOT ADOPTED, no live run):** `debug.privyhub.link_notice`
+    absent / empty / junk = **ON** (`0` off), as B13 / B19 did. B14's conditions, wording, once-a-session rule and
+    30-s clear are unchanged.
+    - **The replay first** (B14's rule over every heartbeat with the link keys since G-A3, 45 sessions): **3 / 3
+      sessions on 2.4 GHz show it, 0 / 42 on 5 GHz.** The port matches the real client's bits in CL-B10 (0
+      disagreements).
+    - **The 5-GHz margin, for the user (not changed):** the lowest RSSI any 5-GHz session held 10 s is −70 dBm (G-A4,
+      CL-B12 c1, G-A5), 2 dB above B14's −72. −71 is the loosest threshold that keeps them all quiet; at −70 three
+      would show. The lowest tx held 10 s on 5 GHz is 130 Mbps (threshold 54).
+    - JVM 150 / 150. **APK (B5 … B19 + B22 + B25) `fcd924c2…9b96`, pinned, NOT installed;** `6bddafc0…` stays
+      CONFIRMED until CL-B14.
+    - Record: `docs/memory/evidence/B25_LINK_NOTICE_DEFAULT_ON_2026-10-26.md`.
 ## 2026-10-20 UX-R1, the user's extended evening (2026-10-20 04:19-05:22Z) was bad and got worse — OPEN; the files agree; link vs onn not separable from them; UX-R2: the second evening mostly clean, the damage not repeated (one event so far, untested past play-minute 44); H5 closed (not new); UX-R3: one of last night's two "deaths" found (04:54:55-59Z, a 4-s drop in both directions); the second not distinguishable
 
 **The user's standard, verbatim (2026-10-21): "This product needs to work at any house especially lan as long as the Internet is over 50mb/s."**
