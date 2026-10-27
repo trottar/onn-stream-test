@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-10-26
-baseline_commit: 06c565e (CL-B13 committed; G-A5 uncommitted beside it; the user commits)
+as_of: 2026-10-27
+baseline_commit: 44558c9 (queue I committed; CL-B14 uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -19,8 +19,8 @@ CL-B3 is OPEN on two G5-S1 smoke gates (NOT MET; the user decides). Everything e
 passed.** E1 FROZEN; E2
 MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `af3ed73`.
 
-**State (2026-10-26 03:23Z, after G-A5): the ELEVEN adopted lines; `--check` ok on eleven; APK `6bddafc0…a927`
-CONFIRMED** (CL-B13). `e3_state.py`'s `link_recovery.stack`: all six `implied 1`.
+**State (2026-10-27 18:05Z, after CL-B14): the ELEVEN adopted lines; `--check` ok on eleven; APK `fcd924c2…9b96`
+CONFIRMED** (CL-B14; B25's link notice on by default, `0` off). `e3_state.py`'s `link_recovery.stack`: all six `implied 1`.
 - Every client property is empty (the client's defaults: the stall signal, the restart guard and the link report on).
 - No `e3_flag.conf`, no stream. One device paired; `identity_v2` on.
 - Running: `privyhub-companion` and `privyhub-link-n1` (nightly) only.
@@ -220,6 +220,42 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
+
+**CL-B14: MEASURED, the cell valid, every row R1-R7 met at four Home returns; APK `fcd924c2…9b96` (+ B25) CONFIRMED and
+pinned, every client property EMPTY** (`evidence/CL_B14_RESTART_UNLOCK_AND_NOTICE_DEFAULT_2026-10-26.md`; the install
+2026-10-26 15:24Z; attempt 1 had no Home press and was relaunched on the user's "Go"; the cell 2026-10-27 17:50-18:04Z on
+the LAN, 5180 MHz).
+- **`PRIVYHUB_RESTART_FAST_UNLOCK=1` on the eleven lines:**
+  - the picture back **1.86 / 1.60 / 1.15 / 1.27 s** after the new activity (one clock; ≤ 2.0). CL-B13 with G-A5
+    alone: 3.12 / 1.74 / 2.00 / 1.76;
+  - the lock released at the check (`unlocked_ms` − `checked_ms` 0.0 ×4);
+  - the old encoder's picture frames ended at the entry (−0.011 to +0.005 s; bound ≤ +0.22 s);
+  - the old audio stopped after the ready, 150-405 ms (the capture SIGKILLed at the 300-ms bound at returns 3-4);
+  - first intervals 0 / 1 / 0 / 0; `fast`, `via_start`, `recreate` ×4, no `restart_fast_failed`.
+  - The onn's events clock read +0.65 to +0.79 s behind the one clock (recorded per return).
+- **The notice, on by default now:** `link_notice` 0 in every heartbeat on 5 GHz (663 / 663 over both attempts); no
+  `link_notice_shown`. Off: `setprop debug.privyhub.link_notice 0`.
+- **On 5 GHz:** 0 silences ≥ 250 ms and 0 hitch seconds in all five client sessions.
+- **State:** eleven lines, no `e3_flag.conf`, `--check` ok, APK CONFIRMED; the onn paired, on the LAN, 5180 MHz;
+  `6bddafc0…` kept at `PrivyHub/app/build/cl_b13_installed/`. The user: "The returns ran as expected".
+
+1. **The user's commit:** the record and `cl_b14_2026-10-26/`; the pin (`tools/e1_suite.py`, `tools/c3_l4_nft_night.py`,
+   `tools/test_c3_l4_nft_night.py`); `docs/KNOWN_ISSUES.md`, `docs/ROADMAP.md`, this file
+   (`logs/cl_b14_git_status.txt`).
+2. **G-A7, the user's question, in B's words: "Adopt `PRIVYHUB_RESTART_FAST_UNLOCK=1` as the twelfth line? It lets the
+   game resume at the new picture's check, ~1.2-2.0 s after a Home return, without waiting for the old session's audio
+   teardown."**
+   - Measured here: 1.15-1.86 s at four of four returns.
+   - The cost: the old audio capture is SIGKILLed if still alive 300 ms after its stop begins (two of four returns
+     here), and the old encoder 100 ms after its SIGTERM; the new audio starts just after the ready.
+   - Off: remove the line (the drop-in) and restart the companion. The restart is then G-A5's (CL-B13 cell 1).
+   - B prepared no patch; A writes it in G-A5's applied form on the user's say-so.
+3. **To B (not blocking, as pre-registered):** at every return the relay logged one 8-byte, single-packet, unmarked
+   frame at the old encoder's exit, 100-140 ms after the relay's stop (not in CL-B13). And `relay_stopped_ms` read 500
+   once (50-214 at the others).
+4. **The remaining adoption question: the loss guard** (items 3-4 under CL-B12 below); and Home's pause / the rung
+   (item 4 under CL-B13).
+5. **"Read LINK-N1's nights"** after 2026-10-31 (the watch ends 06:00Z).
 
 **G-A5: `PRIVYHUB_RESTART_FAST=1` ADOPTED, the eleventh line; the confirmation window VALID, every row met; G-A6 SHELVED**
 (`evidence/G_A5_RESTART_FAST_ADOPTION_2026-10-26.md`; the diff `patches/G-A5_RESTART_FAST_ADOPTION.md`, written by A in

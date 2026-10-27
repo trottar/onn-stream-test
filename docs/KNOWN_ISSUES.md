@@ -49,6 +49,13 @@
     - CL-B13's returns re-timed predict the picture back ~1.2-1.98 s (return 1 tight against the 2.0-s row).
     - No client change: `6bddafc0…` stays. Next: CL-B14 (`docs/memory/handoffs/SESSION_B_DONE_2026-10-26I.md`).
       Record: `docs/memory/evidence/B24_RESTART_FAST_UNLOCK_2026-10-26.md`.
+  - **CL-B14 (2026-10-27; `PRIVYHUB_RESTART_FAST_UNLOCK=1`, the onn on 5 GHz, every client property empty):** every
+    row met at four returns. The picture was back 1.15-1.86 s after the new activity (one clock), the lock released at
+    the check (`unlocked_ms` − `checked_ms` 0), and the old encoder's picture frames ended at the entry. At two returns
+    the old audio capture was SIGKILLed at the 300-ms bound. **G-A7 is the user's question.** For B: one 8-byte,
+    single-packet frame logged by the relay at the old encoder's exit at every return, and `relay_stopped_ms` 500 once.
+    Pausing at Home is still the user's question. Record:
+    `docs/memory/evidence/CL_B14_RESTART_UNLOCK_AND_NOTICE_DEFAULT_2026-10-26.md`.
 - **The onn left the tailnet once:**
   - no-peer 19:38:33-19:45:50Z, ~1 min after it went idle and ~26 s after a companion restart;
   - a second restart was followed by a brief relayed reading only.
@@ -397,6 +404,10 @@ is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.m
     - JVM 150 / 150. **APK (B5 … B19 + B22 + B25) `fcd924c2…9b96`, pinned, NOT installed;** `6bddafc0…` stays
       CONFIRMED until CL-B14.
     - Record: `docs/memory/evidence/B25_LINK_NOTICE_DEFAULT_ON_2026-10-26.md`.
+  - **CL-B14 (2026-10-27): `fcd924c2…9b96` CONFIRMED and pinned; the notice is now on by default on the onn.** On 5
+    GHz with no property: `link_notice` 0 in 663 / 663 heartbeats (two attempts), no `link_notice_shown` row, the
+    reports 0. The shown path (2.4 GHz) was not exercised. Off: `setprop debug.privyhub.link_notice 0`. Record:
+    `docs/memory/evidence/CL_B14_RESTART_UNLOCK_AND_NOTICE_DEFAULT_2026-10-26.md`.
 ## 2026-10-20 UX-R1, the user's extended evening (2026-10-20 04:19-05:22Z) was bad and got worse — OPEN; the files agree; link vs onn not separable from them; UX-R2: the second evening mostly clean, the damage not repeated (one event so far, untested past play-minute 44); H5 closed (not new); UX-R3: one of last night's two "deaths" found (04:54:55-59Z, a 4-s drop in both directions); the second not distinguishable
 
 **The user's standard, verbatim (2026-10-21): "This product needs to work at any house especially lan as long as the Internet is over 50mb/s."**

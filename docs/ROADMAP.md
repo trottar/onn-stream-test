@@ -2056,6 +2056,17 @@ kill. No client change.** Record: `docs/memory/evidence/B24_RESTART_FAST_UNLOCK_
 replay since G-A3 shows it in 3 / 3 sessions on 2.4 GHz and 0 / 42 on 5 GHz; APK (B5 … B19 + B22 + B25) `fcd924c2…`
 pinned, not installed.** Record: `docs/memory/evidence/B25_LINK_NOTICE_DEFAULT_ON_2026-10-26.md`.
 
+**CL-B14 (2026-10-27): B24's unlocked fast restart at four Home returns, with B25's APK, every client property empty:
+valid, every row met; APK `fcd924c2…9b96` CONFIRMED and pinned.**
+- The picture back 1.15-1.86 s after the new activity (CL-B13 with G-A5 alone: 1.74-3.12). The lock released at the
+  new encoder's check. The old encoder's picture frames ended at the entry. The old audio stopped after the ready (the
+  capture SIGKILLed at 300 ms at two returns).
+- The notice on by default: 0 in every heartbeat on 5 GHz; never shown.
+- G-A7 (`PRIVYHUB_RESTART_FAST_UNLOCK=1` as the twelfth line) is the user's question. For B: an 8-byte relay frame at
+  the old encoder's exit.
+
+Record: `docs/memory/evidence/CL_B14_RESTART_UNLOCK_AND_NOTICE_DEFAULT_2026-10-26.md`.
+
 ## G9 — Remote foundation checkpoint
 
 Acceptance:

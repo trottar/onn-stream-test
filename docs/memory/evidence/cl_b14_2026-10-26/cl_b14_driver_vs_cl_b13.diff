@@ -1,0 +1,142 @@
+2,18c2,13
+< """CL-B13 -- B22's fast restart (PRIVYHUB_RESTART_FAST=1) at two Home returns, the same returns without it, and B23's
+< remote class (PRIVYHUB_LINK_RECOVERY_WAN=1) under the shim's blackouts over the overlay, with the client APK
+< 6bddafc0... and EVERY client property EMPTY (no setprop anywhere), as pre-registered (cl_b13_preregistration.txt),
+< DETACHED. From cl_b12_driver.py (CL-B12's driver; the diff is cl_b13_driver_vs_cl_b12.diff). Three launches:
+<   - --cell 1: cell 1 alone, unit privyhub-cl-b13-c1 -- PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 + PRIVYHUB_RESTART_FAST=1
+<     (10 + 2 = 12 lines at the stream), window 600; the user presses Home twice (B item 7);
+<   - --cell 2: cell 2 alone, unit privyhub-cl-b13-c2 -- PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 only (11 lines), window
+<     600; the same two presses (B item 8);
+<   - no --cell: cells 3a and 3b in one launch, unit privyhub-cl-b13 -- PRIVYHUB_LINK_RECOVERY_WAN=1 +
+<     PRIVYHUB_IMPAIRMENT=blackout-4s@both,every=120s,seed=1 (3a) / blackout-4s@down,every=120s,seed=1 (3b) (12 lines),
+<     window 600 each (B item 9), the onn on the overlay.
+<   E1-SNES-STREAM (snes9x, adopted), gap 120; session B's exact strings (SESSION_B_DONE_2026-10-24H.md items 4-9).
+< Changed from cl_b12_driver.py:
+<   - the cells table (above); the umbrella is now adopted (G-A4: ten lines), so a drop-in carries only the impairment
+<     line and the cell's flag;
+<   - the client's routing class (routing_evidence of the newest token_issued in logs/session_audit.jsonl; the class only)
+<     read at each stream start (with the at-stream read-back), kept as routing_at_stream;
+---
+> """CL-B14 -- B24's unlocked fast restart (PRIVYHUB_RESTART_FAST_UNLOCK=1, inside the adopted PRIVYHUB_RESTART_FAST=1)
+> at four Home returns, with B25's client APK fcd924c2... (the 2.4-GHz link notice on by default) and EVERY client property
+> EMPTY (no setprop anywhere), as pre-registered (cl_b14_preregistration.txt), DETACHED. From cl_b13_driver.py (CL-B13's
+> driver; the diff is cl_b14_driver_vs_cl_b13.diff). One launch, unit privyhub-cl-b14:
+>   - the cell: PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 + PRIVYHUB_RESTART_FAST_UNLOCK=1 (11 + 2 = 13 lines at the
+>     stream), window 600; the user presses Home four times (two through the PrivyHub menu, two through recents / the tile).
+>   E1-SNES-STREAM (snes9x, adopted), gap 120; session B's exact strings (SESSION_B_DONE_2026-10-26I.md items 2-5).
+> Changed from cl_b13_driver.py:
+>   - the cells table (one cell, above); no --cell (the one cell is the launch); eleven adopted lines (G-A5), so the
+>     drop-in carries the impairment line and the cell's flag;
+>   - restart_fast_config and restart_fast_unlock_config read from the recovery log after the cell's restart (and the dry
+>     run's), kept as config_rows;
+20,23c15,19
+<     (~/privyhub_cl_b13/STOP); "adopted10".
+< Kept: the seven properties read back EMPTY before and after each cell and at the close (none is set), tools/e3_state.py
+< once mid-cell, the cap (each launch + 2 h), no cell in 04:15-05:30Z or one that could still run at 04:30Z, the band
+< every 10 s, the heartbeat / history / STOP / busy skip / the suite call / the readings beside a run / --dry."""
+---
+>     (~/privyhub_cl_b14/STOP); "adopted11".
+> Kept: the seven properties read back EMPTY before and after the cell and at the close (none is set), tools/e3_state.py
+> once mid-cell, the cap (the launch + 2 h), no cell in 04:15-05:30Z or one that could still run at 04:30Z, the band
+> every 10 s, the routing class at the stream, the heartbeat / history / STOP / busy skip / the suite call / the readings
+> beside a run / --dry."""
+40c36
+< CALL = HERE / "cl_b13_suite_call.py"
+---
+> CALL = HERE / "cl_b14_suite_call.py"
+42,43c38,39
+< PRE = HERE / "cl_b13_preregistration.txt"
+< WATCH = Path.home() / "privyhub_cl_b13"
+---
+> PRE = HERE / "cl_b14_preregistration.txt"
+> WATCH = Path.home() / "privyhub_cl_b14"
+68c64
+< TAG = "cl_b13" + SUF
+---
+> TAG = "cl_b14" + SUF
+83,84c79
+< RF = ["PRIVYHUB_RESTART_FAST=1"]        # B22 (host); the client half is armed by the response key only
+< WAN = ["PRIVYHUB_LINK_RECOVERY_WAN=1"]  # B23 (host); the umbrella PRIVYHUB_LINK_RECOVERY=1 is adopted (G-A4)
+---
+> UNLOCK = ["PRIVYHUB_RESTART_FAST_UNLOCK=1"]   # B24 (host), inside the adopted PRIVYHUB_RESTART_FAST=1 (G-A5)
+86d80
+< BOTH, DOWN = "blackout-4s@both,every=120s,seed=1", "blackout-4s@down,every=120s,seed=1"
+88,90c82,84
+< # session B's exact strings (SESSION_B_DONE_2026-10-24H.md items 6-9); a blackout spec takes NO @post-fec;
+< # PRIVYHUB_SNES_CORE=snes9x and PRIVYHUB_LINK_RECOVERY=1 are adopted, in every environ, not repeated
+< HOME = "5 GHz, Home at PLAYING + 3 (menu) and + 6 min (recents / tile)"
+---
+> # session B's exact strings (SESSION_B_DONE_2026-10-26I.md items 2-5); PRIVYHUB_SNES_CORE=snes9x, PRIVYHUB_LINK_RECOVERY=1
+> # and PRIVYHUB_RESTART_FAST=1 are adopted, in every environ, not repeated
+> HOME = "5 GHz, Home at PLAYING + 2 (menu), + 4 (recents / tile), + 6 (menu), + 8 min (recents / tile)"
+92,95c86
+<     {"n": 1, "cell": "1_snes_home_presses_restart_fast", "spec": NONE, "profile": "none", "extra": RF, "props": P1, "wid": SNES, "arm": HOME + ", PRIVYHUB_RESTART_FAST=1", "window": 600},
+<     {"n": 2, "cell": "2_snes_home_presses_no_flag", "spec": NONE, "profile": "none", "extra": [], "props": P1, "wid": SNES, "arm": HOME + ", no flag", "window": 600},
+<     {"n": 3, "cell": "3a_snes_blackout_both_wan", "spec": BOTH, "profile": "blackout-4s", "uplink": True, "extra": WAN, "props": P1, "wid": SNES, "arm": "3a: PRIVYHUB_LINK_RECOVERY_WAN=1, the overlay", "window": 600},
+<     {"n": 4, "cell": "3b_snes_blackout_down_wan", "spec": DOWN, "profile": "blackout-4s", "uplink": False, "extra": WAN, "props": P1, "wid": SNES, "arm": "3b: PRIVYHUB_LINK_RECOVERY_WAN=1, the overlay", "window": 600},
+---
+>     {"n": 1, "cell": "1_snes_home_returns_restart_fast_unlock", "spec": NONE, "profile": "none", "extra": UNLOCK, "props": P1, "wid": SNES, "arm": HOME + ", PRIVYHUB_RESTART_FAST_UNLOCK=1", "window": 600},
+97c88
+< CELLS = [c for c in ALL_CELLS if c["n"] == _N] if _N in (1, 2) else [] if _N is not None else [c for c in ALL_CELLS if c["n"] in (3, 4)]
+---
+> CELLS = ALL_CELLS if _N is None else []
+244c235
+<                 f"next: {s['next']} | state: {s['state']} | cap {CAP_UTC} | stop: touch ~/privyhub_cl_b13/STOP\n")
+---
+>                 f"next: {s['next']} | state: {s['state']} | cap {CAP_UTC} | stop: touch ~/privyhub_cl_b14/STOP\n")
+271c262
+<     """The ten-line adopted state (G-A4), read back: the suite's own preflight."""
+---
+>     """The eleven-line adopted state (G-A5), read back: the suite's own preflight."""
+276c267
+<     return p, ("adopted10 ok" if p.get("ok") else f"NOT ok (environ {len(p.get('environ') or [])} lines, game {p.get('game_active')})")
+---
+>     return p, ("adopted11 ok" if p.get("ok") else f"NOT ok (environ {len(p.get('environ') or [])} lines, game {p.get('game_active')})")
+401a393,416
+> RECOVERY_LOG = REPO / "logs/games/native_stream_recovery.log"
+> CONFIG_EVENTS = ("restart_fast_config", "restart_fast_unlock_config")
+> 
+> 
+> def config_rows(t0):
+>     """restart_fast_config and restart_fast_unlock_config written to the recovery log since t0 (the cell's or the dry
+>     run's start; the restart is after it): the rows' own keys, no address or id in them."""
+>     rows = []
+>     try:
+>         for l in open(RECOVERY_LOG):
+>             if not any(f'"{e}"' in l for e in CONFIG_EVENTS):
+>                 continue
+>             try:
+>                 d = json.loads(l)
+>             except ValueError:
+>                 continue
+>             at = ts_utc(d.get("at_utc"))
+>             if d.get("event") in CONFIG_EVENTS and at is not None and at >= t0:
+>                 rows.append(d)
+>     except OSError:
+>         pass
+>     return rows
+> 
+> 
+407a423
+>     cell_t0 = out.get("t0", time.time())
+436a453
+>             out["config_rows"] = config_rows(cell_t0)
+877c894
+<     beside = {}
+---
+>     beside = {"t0": t}
+930c947,948
+<            "routing_at_stream": beside.get("routing_at_stream"), "flags_under_load": beside.get("flags_under_load"),
+---
+>            "routing_at_stream": beside.get("routing_at_stream"), "config_rows": beside.get("config_rows"),
+>            "flags_under_load": beside.get("flags_under_load"),
+986a1005
+>     t_dry = time.time()
+992a1012,1014
+>     time.sleep(3)
+>     rec["config_rows"] = config_rows(t_dry)
+>     log("dry: config rows after the restart", json.dumps(rec["config_rows"]))
+1021c1043
+<         print("refusing: --cell 1, --cell 2, or no --cell (cells 3a and 3b)")
+---
+>         print("refusing: no --cell in CL-B14 (the one cell is the launch)")

@@ -1,0 +1,117 @@
+CL-B14 — the unlocked fast restart (B24) at four Home returns, with B25's APK (the 2.4-GHz notice on by default):
+pre-registration (session A, 2026-10-26; hashed BEFORE the install; covers the one attended cell)
+
+Task: docs/memory/handoffs/CL-B14_RESTART_UNLOCK_AND_NOTICE_DEFAULT_TASK.md. Session B's exact strings:
+SESSION_B_DONE_2026-10-26I.md items 2-5 (the APK hash, the flags, the strings, rows R1-R7); B24 (the unlocked worker,
+its rows and keys), B25 (the notice's default, the replay: 3 / 3 on 2.4 GHz show it, 0 / 42 on 5 GHz). The methods:
+CL_B13_RESTART_FAST_AND_WAN_CLASS_2026-10-25.md §2 (the one clock for the picture back, the relay's per-second rows for
+the old encoder's last frame). The adoption it builds on: G_A5_RESTART_FAST_ADOPTION_2026-10-26.md (eleven lines). The
+CONFIRMED rule: CL_B7 §6. The watch: LINK_N1_LAUNCH_2026-10-23.md (no cell that could still run at 04:30Z; no companion
+restart 04:30-05:30Z; the watch ends 2026-10-31T06:00Z).
+
+CAP: the detached launch + 2 h (no cell starts after it; a cell in flight finishes with its own teardown), computed by
+the driver at its launch and shown in its status line.
+
+The stage is the user's message: the read line = stage 1 (the install, the attended Home cell); "Stage 2" with the
+user's line = the read, the close, the CONFIRMED rule, the record.
+
+0. State at the hash (~15:25Z)
+- HEAD 44558c9 (queue I committed; "Queue I done (B24, B25); CL-B14 handoff"); the tree clean but this task's new
+  evidence dir.
+- Eleven adopted lines (G-A5: PRIVYHUB_RESTART_FAST=1 among them); tools/e3_state.py --check ok, APK 6bddafc0…
+  CONFIRMED; no e3_flag.conf; no game; one device, paired; units privyhub-companion and privyhub-link-n1 only.
+- The clock 15:2xZ, outside 04:15-05:30Z.
+- The band, read first: 5180 MHz, 5 GHz, standard 5, RSSI -69.
+- The client on the LAN: the newest token_issued reads routing_evidence lan (03:10:28Z).
+- The seven client properties restart_guard, stall_signal, link_notice, link_report, loss_guard, wifi_lock, opus_decode
+  all EMPTY.
+
+1. The install checks (after this file is hashed)
+- 6bddafc0… stays preserved at PrivyHub/app/build/cl_b13_installed/app-debug.apk (nothing deleted).
+- The candidate is B25's copy /tmp/b_q26i25_scratch/apk/app-debug.apk (named in b25_2026-10-26/apk_sha256.txt). It
+  must read sha256 fcd924c28cbf70a85bb9a886caabcb07873eee2d028b6538284fce5a7ae39b96 (B's pin, 9,638,234 B) and carry the
+  same signer as 6bddafc0… (apksigner certificate digests compared, not printed); else nothing is installed. Copied to
+  PrivyHub/app/build/cl_b14_installed/app-debug.apk (gitignored).
+- adb install -r; the device APK read back = fcd924c2…; paired (CL-B4's reader). "Not paired" = stop and tell the user.
+- NO setprop anywhere in this task. The seven properties read back EMPTY before and after the install, before and after
+  the cell, and at the close.
+- tools/e3_state.py after the install is expected ok False ONLY because the APK reads MISMATCH (the pin moves only by the
+  CONFIRMED rule); the preflight itself ok.
+
+2. The driver
+- cl_b14_driver.py (from cl_b13_driver.py; the diff is cl_b14_driver_vs_cl_b13.diff); cl_b14_suite_call.py (CL-B13's
+  wrapper, only the pre-registration name changed). Unit privyhub-cl-b14. STOP ~/privyhub_cl_b14/STOP; status
+  ~/privyhub_cl_b14/status.txt; the log tag [cl_b14 …].
+- The cell: E1-SNES-STREAM (snes9x, adopted), window 600, gap 120. The drop-in e3_flag.conf =
+  PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 + PRIVYHUB_RESTART_FAST_UNLOCK=1 (11 + 2 = 13 lines at the stream). Read back
+  at the stream and under load; removed at the teardown; flags_absent true after; eleven lines after.
+- tools/e3_state.py once mid-cell. The band every 10 s into runs/<cell>/band.jsonl. The client's routing class
+  (routing_evidence of the newest token_issued) read at the stream start. No cell starts in 04:15-05:30Z or could still
+  run at 04:30Z; no companion restart 04:30-05:30Z. No Opal sampler.
+- After the cell's restart (and the dry run's): restart_fast_config (startup_check_s 0.75, lock_wait_s 2.0) and
+  restart_fast_unlock_config (kill_grace_s 0.1, capture_bound_s 0.3, audio_join_cap_s 10, startup_check_s 0.75), read
+  from the recovery log.
+
+3. The cell — none@post-fec,seed=1 + PRIVYHUB_RESTART_FAST_UNLOCK=1, window 600, 5 GHz, four Home returns
+- The user is told, in the task's exact words with the times filled in: Home at PLAYING + 2 min (back through the
+  PrivyHub menu), + 4 (recents or the PrivyHub tile), + 6 (the menu), + 8 (recents or the tile), about 5 s each; the
+  game moving again within ~2 s of the stream reopening; play to PLAYING + 10 min.
+- Rows per return (B item 4, B's numbers):
+  R1 the picture back: the new activity -> session_started <= 2.0 s, on one clock: startSession (heartbeat 1's arrival
+     less its elapsed_ms) less create_to_start_ms (host clock). The events read (the onn's clock) beside it, and the
+     offset (one clock - the onn's) recorded per return. (B's note: a ~0.55-s new activity -> entry leaves ~0.02 s of
+     margin.)
+  R2 the old encoder's last frame forwarded <= entry + 0.3 s (entry = the start's session_ended), from the relay's
+     per-second rows (the old encoder's row for the entry's second at 60 fps from the second's start, as CL-B13).
+  R3 restart_fast_done unlocked_ms - checked_ms <= 20, with relay_stopped_ms, released_ms (≈ 100-150), spawned_ms,
+     checked_ms recorded.
+  R4 no second after the kill with both encoders' frames (one relay row per second beyond the switch).
+  R5 the order session_ended -> the old report -> session_started.
+  R6 restart_fast_audio_stop (restart_fast_audio_stop_ms, capture_returncode, capture_killed_at_bound; true / -9 = a
+     capture that would have taken the 2-s wait) and restart_fast_audio started true; the first 2-s interval after
+     session_started <= 15 underruns; and, as CL-B13: restart_fast_released_by fast, restart_cause via_start, no
+     restart_fast_failed.
+  R7 (B25), with no property: every heartbeat carries link_notice and it reads 0 on 5 GHz (armed, not shown); no
+     link_notice_shown row; the report's link_notice_shown 0; the diagnostics page's "Link notice: none shown" if
+     readable without a setprop. If the onn is found on 2.4 GHz: the notice at the first tick plus one
+     link_notice_shown (reasons 1) is the row there; it is recorded, and the band is not switched without the user.
+- The path per return from ONE adb logcat -b events -d read after the cell (process names, pids, activity classes
+  only): recreate, or surface / process if produced.
+- Reported: silences >= 250 ms and hitch s / 10 min on 5 GHz (B6's edge rule, UX-R3's reader) against CL-B13 cell 1
+  (0.0 / 0.0-5.4) and G-A5 (0.89 / 6.1); R7 across the whole cell; the user's line verbatim.
+
+4. Validity
+- Playing; the shim's profile none applied (0 drops); the drop-in's 13 lines at the stream; flags_absent true after;
+  eleven lines; the seven properties empty before and after; the band 5 GHz. Host gates: RetroArch >= 59.9, capture
+  60 ± 0.1, dup+drop <= 0.2 / min. As CL-B13 §1: the cell is not invalidated by the Home presses or the client sessions
+  they cause (the capture's per-second pairs spanning an old encoder's kill are disclosed, read with them left out).
+- A no_play, flags_absent false, or a property not empty is invalid. profile-not-applied while playing is repeated once.
+- Fewer than four returns made: the returns made are read; the cell stays valid; the reading names the count.
+
+5. The CONFIRMED rule (CL_B7 §6, as CL-B10 … CL-B13 applied it)
+- At the close: the properties read back empty, the drop-in removed, eleven lines, no e3_flag.conf, flags_absent; the
+  client on the LAN; the band read.
+- The cell valid and the behaviours as today where no flag was set (the client's flags: no property set; the notice's
+  only intended difference is armed by default, 0 on 5 GHz) -> fcd924c2… CONFIRMED and the pin moved
+  (tools/e1_suite.py EXPECT_APK, tools/c3_l4_nft_night.py ADOPTED_APK_SHA256 and its test; the tests green);
+  e3_state ok on eleven.
+- Else 6bddafc0… reinstalled from PrivyHub/app/build/cl_b13_installed/, read back, paired, e3_state --check ok, and the
+  user told why.
+- CONFIRMED is about validity and today's behaviours, not the rows: a row R1-R6 not met does not block it. A notice
+  shown on 5 GHz (R7 not met) is a behaviour not as intended and blocks it.
+
+6. The reading, written beforehand
+- Every row R1-R7 met at every return -> G-A7 the user's question, in B's words: "Adopt
+  PRIVYHUB_RESTART_FAST_UNLOCK=1 as the twelfth line? It lets the game resume at the new picture's check, ~1.2-2.0 s
+  after a Home return, without waiting for the old session's audio teardown." The cost: the old audio capture
+  SIGKILLed at 300 ms, the old encoder at 100 ms after SIGTERM; the new audio after the ready. The off switch: remove
+  the line (the G-A5 worker then, as CL-B13 cell 1).
+- Else back to B with the rows.
+- Against CL-B13 cell 1 (PRIVYHUB_RESTART_FAST=1 alone): the picture back 3.12 / 1.74 / 2.00 / 1.76 s; the old
+  encoder's last frame +0.075 / +0.168 / +0.351 / +0.388 s; released_ms 123 / 221 / 471 / 421; first intervals
+  0 / 0 / 1 / 0.
+- G-A7 is NOT applied in this task.
+
+No sudo, no nft, the Opal read-only, adb for the install, state reads, the one logcat -b events -d read and the
+reinstall if the rule says so; NO setprop; no addresses or identifiers anywhere; nothing fetched, nothing deleted;
+eleven lines and no e3_flag.conf at every teardown; nothing adopted; nothing committed.
