@@ -1,0 +1,41 @@
+G-A7 — the confirmation window for the twelfth adopted line: pre-registration (session A, 2026-10-27, hashed before the run)
+
+Task: docs/memory/handoffs/G-A7_RESTART_FAST_UNLOCK_ADOPTION_TASK.md. The user's decision 2026-10-27 ("Go"): adopt
+PRIVYHUB_RESTART_FAST_UNLOCK=1 as the twelfth line, after CL-B14 (every row R1-R7 met at four Home returns; the picture
+back 1.15-1.86 s against CL-B13's 1.74-3.12 s with G-A5 alone; the old audio capture SIGKILLed at the 300-ms bound at
+two returns). The stray 8-byte relay frame at the old encoder's exit stays B's open item; not touched here.
+
+State before the window: the diff applied (patches/G-A7_RESTART_FAST_UNLOCK_ADOPTION.md, written by A in G-A5's applied
+form; e1_suite ADOPTED twelve, drop_in_restart_fast_unlock in the preflight's ok); git diff --check clean; e1_suite
+--self-test OK, test_e1_remote 21 OK, test_c3_l4_nft_night 33 OK, tests/restart_fast 13 OK, tests/restart_fast_unlock
+10 OK, tests/link_recovery 9 + 7 OK from the tree; restart-fast-unlock.conf written (file tool); daemon-reload and the
+companion restarted 21:03:45Z (outside 04:30-05:30Z); the environ read back TWELVE lines; tools/e3_state.py --check ok on
+twelve (drop_in_restart_fast_unlock true; link_recovery.stack all six "implied 1"); APK fcd924c2…9b96 CONFIRMED; the
+seven client properties (restart_guard, stall_signal, link_notice, link_report, loss_guard, wifi_lock, opus_decode) all
+EMPTY; the band 5 GHz (5180 MHz at 21:01Z); the client on the LAN; no e3_flag.conf. At the restart the recovery log
+carried link_recovery_config, restart_fast_config (0.75 / 2.0) and restart_fast_unlock_config (kill_grace_s 0.1,
+capture_bound_s 0.3, audio_join_cap_s 10, startup_check_s 0.75).
+
+The window: one E1-SNES-STREAM (snes9x), tools/e1_suite.py run --only E1-SNES-STREAM --runs 1 --window 600 --gap 120
+--e2, NO --plan, NO e3_flag.conf, NO setprop: the twelve adopted lines alone. The pad is not touched; no Home press.
+Run by g_a7_window.py (G-A5's runner for twelve lines) as the transient unit privyhub-g-a7-window (--collect). It must
+end before 04:15Z (it starts ~21:06Z).
+
+Expected (met / not met):
+- Z1 (config, by the drop-ins alone): at the restart / the stream's start the recovery log carries restart_fast_config
+  (startup_check_s 0.75, lock_wait_s 2.0), restart_fast_unlock_config (kill_grace_s 0.1, capture_bound_s 0.3,
+  audio_join_cap_s 10) and B21's link_recovery_config (umbrella true, implied the six, explicit {}, at import, reapply
+  []), and the six module config rows, none "ignored". "By the drop-ins alone" is shown by the environ (twelve lines,
+  no e3_flag.conf) and e3_state read mid-window.
+- Z2 (host gates): RetroArch >= 59.9, capture 60 ± 0.1, dup+drop <= 0.2 / min; the environ twelve lines in every 15-s
+  read through the run.
+- Z3 (no Home press): NO restart_fast row of any kind beyond the config rows (no restart_fast / _done / _audio_stop /
+  _audio / _failed; the flags act only on a guarded start; expected and not a miss — the behaviour is CL-B14's).
+- Z4 (no action without a stall): 0 state_saved and 0 holds outside a real stall; any that appear are reported with the
+  silence they belong to.
+- Z5 (the link on 5 GHz): silences >= 250 ms and hitch seconds per 10 min, stated against G-A5's 0.89 / 6.1 and CL-B14's
+  sessions (0 / 0); the band read every 30 s; link_notice 0 in every heartbeat (B25's default, no property).
+- Z6 (teardown): session_end_bye, then state_save_skipped (client_bye, or state_ended if the suite's stop lands first),
+  no hold at the end; after the run flags_absent true, twelve lines, tools/e3_state.py --check ok; the seven properties
+  still empty.
+The adoption stands on the user's decision, not on this window; a failed row is reported to the user, not repaired.

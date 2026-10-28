@@ -1,0 +1,66 @@
+B26 mutation (the fix removed: self._stop_relay(m._fec_relay) -> m._fec_relay.stop(), B24 as adopted), 2026-10-27T21:59:07Z
+== run 1
+FAIL: test_cl_b14s_window_on_the_onns_path_nothing_forwarded (test_restart_fast_unlock_relay.TheStrayPacket.test_cl_b14s_window_on_the_onns_path_nothing_forwarded)
+AssertionError: Lists differ: [(7.3799893776886165, 'rtp', 2694881440, 121500, 8)] != []
+Ran 5 tests in 9.342s
+FAILED (failures=1)
+  [fake_shim_window] old data packets at the onn > 10 ms after the call (ms after it, payload B): 1 [(50.6, 8)]|old parity at the onn > 10 ms after the call, before the new stream: 0|1-packet unmarked frame rows in the frame log: [{'schema': 'privyhub_native_frame_sizes_v1', 'at_utc': '2026-10-27T21:59:15.000Z', 't': 1793138355, 'frames': 1, 'packets': 1, 'max_packets': 1, 'max_at|
+  [real_shim] old data packets at the onn > 10 ms after the call (ms after it, payload B): 0 []|old parity at the onn > 10 ms after the call, before the new stream: 0|1-packet unmarked frame rows in the frame log: []|
+== run 2
+FAIL: test_cl_b14s_window_on_the_onns_path_nothing_forwarded (test_restart_fast_unlock_relay.TheStrayPacket.test_cl_b14s_window_on_the_onns_path_nothing_forwarded)
+AssertionError: Lists differ: [(7.324534634128213, 'parity', None, None, 1211)] != []
+Ran 5 tests in 9.232s
+FAILED (failures=1)
+  [fake_shim_window] old data packets at the onn > 10 ms after the call (ms after it, payload B): 0 []|old parity at the onn > 10 ms after the call, before the new stream: 1|1-packet unmarked frame rows in the frame log: []|
+  [real_shim] old data packets at the onn > 10 ms after the call (ms after it, payload B): 0 []|old parity at the onn > 10 ms after the call, before the new stream: 0|1-packet unmarked frame rows in the frame log: []|
+== run 3
+Ran 5 tests in 9.241s
+OK
+  [fake_shim_window] old data packets at the onn > 10 ms after the call (ms after it, payload B): 0 []|old parity at the onn > 10 ms after the call, before the new stream: 0|1-packet unmarked frame rows in the frame log: []|
+  [real_shim] old data packets at the onn > 10 ms after the call (ms after it, payload B): 0 []|old parity at the onn > 10 ms after the call, before the new stream: 0|1-packet unmarked frame rows in the frame log: []|
+B26 mutation, second batch after the 6-ms trigger offset (the fix removed, B24 as adopted), 2026-10-27T21:59:58Z
+== run 1
+FAIL: test_cl_b14_reproduced_with_the_real_post_fec_shim (test_restart_fast_unlock_relay.TheStrayPacket.test_cl_b14_reproduced_with_the_real_post_fec_shim)
+AssertionError: Lists differ: [{'schema': 'privyhub_native_frame_sizes_v[345 chars]: 8}] != []
+FAIL: test_cl_b14s_window_on_the_onns_path_nothing_forwarded (test_restart_fast_unlock_relay.TheStrayPacket.test_cl_b14s_window_on_the_onns_path_nothing_forwarded)
+AssertionError: Lists differ: [(7.33939146483317, 'rtp', 2694881440, 121500, 8)] != []
+Ran 5 tests in 9.241s
+FAILED (failures=2)
+  [fake_shim_window] old data packets at the onn > 10 ms after the call (ms after it, payload B): 1 [(50.7, 8)]|old parity at the onn > 10 ms after the call, before the new stream: 0|1-packet unmarked frame rows in the frame log: [{'schema': 'privyhub_native_frame_sizes_v1', 'at_utc': '2026-10-27T22:00:06.000Z', 't': 1793138406, 'frames': 1, 'packets'|
+  [real_shim] old data packets at the onn > 10 ms after the call (ms after it, payload B): 0 []|old parity at the onn > 10 ms after the call, before the new stream: 0|1-packet unmarked frame rows in the frame log: [{'schema': 'privyhub_native_frame_sizes_v1', 'at_utc': '2026-10-27T22:00:04.000Z', 't': 1793138404, 'frames': 1, 'packets'|
+== run 2
+FAIL: test_cl_b14_reproduced_with_the_real_post_fec_shim (test_restart_fast_unlock_relay.TheStrayPacket.test_cl_b14_reproduced_with_the_real_post_fec_shim)
+AssertionError: Lists differ: [{'schema': 'privyhub_native_frame_sizes_v[345 chars]: 8}] != []
+FAIL: test_cl_b14s_window_on_the_onns_path_nothing_forwarded (test_restart_fast_unlock_relay.TheStrayPacket.test_cl_b14s_window_on_the_onns_path_nothing_forwarded)
+AssertionError: Lists differ: [(7.343760160263628, 'rtp', 2694881440, 121500, 8)] != []
+Ran 5 tests in 9.247s
+FAILED (failures=2)
+  [fake_shim_window] old data packets at the onn > 10 ms after the call (ms after it, payload B): 1 [(50.7, 8)]|old parity at the onn > 10 ms after the call, before the new stream: 0|1-packet unmarked frame rows in the frame log: [{'schema': 'privyhub_native_frame_sizes_v1', 'at_utc': '2026-10-27T22:00:15.000Z', 't': 1793138415, 'frames': 1, 'packets'|
+  [real_shim] old data packets at the onn > 10 ms after the call (ms after it, payload B): 0 []|old parity at the onn > 10 ms after the call, before the new stream: 0|1-packet unmarked frame rows in the frame log: [{'schema': 'privyhub_native_frame_sizes_v1', 'at_utc': '2026-10-27T22:00:13.000Z', 't': 1793138413, 'frames': 1, 'packets'|
+== run 3
+FAIL: test_cl_b14_reproduced_with_the_real_post_fec_shim (test_restart_fast_unlock_relay.TheStrayPacket.test_cl_b14_reproduced_with_the_real_post_fec_shim)
+AssertionError: Lists differ: [{'schema': 'privyhub_native_frame_sizes_v[345 chars]: 8}] != []
+FAIL: test_cl_b14s_window_on_the_onns_path_nothing_forwarded (test_restart_fast_unlock_relay.TheStrayPacket.test_cl_b14s_window_on_the_onns_path_nothing_forwarded)
+AssertionError: Lists differ: [(7.388007532805204, 'rtp', 2694881440, 121500, 8)] != []
+Ran 5 tests in 9.294s
+FAILED (failures=2)
+  [fake_shim_window] old data packets at the onn > 10 ms after the call (ms after it, payload B): 1 [(50.5, 8)]|old parity at the onn > 10 ms after the call, before the new stream: 0|1-packet unmarked frame rows in the frame log: [{'schema': 'privyhub_native_frame_sizes_v1', 'at_utc': '2026-10-27T22:00:25.000Z', 't': 1793138425, 'frames': 1, 'packets'|
+  [real_shim] old data packets at the onn > 10 ms after the call (ms after it, payload B): 0 []|old parity at the onn > 10 ms after the call, before the new stream: 0|1-packet unmarked frame rows in the frame log: [{'schema': 'privyhub_native_frame_sizes_v1', 'at_utc': '2026-10-27T22:00:23.000Z', 't': 1793138423, 'frames': 1, 'packets'|
+== run 4
+FAIL: test_cl_b14_reproduced_with_the_real_post_fec_shim (test_restart_fast_unlock_relay.TheStrayPacket.test_cl_b14_reproduced_with_the_real_post_fec_shim)
+AssertionError: Lists differ: [{'schema': 'privyhub_native_frame_sizes_v[345 chars]: 8}] != []
+FAIL: test_cl_b14s_window_on_the_onns_path_nothing_forwarded (test_restart_fast_unlock_relay.TheStrayPacket.test_cl_b14s_window_on_the_onns_path_nothing_forwarded)
+AssertionError: Lists differ: [(7.334283516276628, 'rtp', 2694881440, 121500, 8)] != []
+Ran 5 tests in 9.241s
+FAILED (failures=2)
+  [fake_shim_window] old data packets at the onn > 10 ms after the call (ms after it, payload B): 1 [(50.8, 8)]|old parity at the onn > 10 ms after the call, before the new stream: 0|1-packet unmarked frame rows in the frame log: [{'schema': 'privyhub_native_frame_sizes_v1', 'at_utc': '2026-10-27T22:00:35.000Z', 't': 1793138435, 'frames': 1, 'packets'|
+  [real_shim] old data packets at the onn > 10 ms after the call (ms after it, payload B): 0 []|old parity at the onn > 10 ms after the call, before the new stream: 0|1-packet unmarked frame rows in the frame log: [{'schema': 'privyhub_native_frame_sizes_v1', 'at_utc': '2026-10-27T22:00:32.000Z', 't': 1793138432, 'frames': 1, 'packets'|
+== run 5
+FAIL: test_cl_b14_reproduced_with_the_real_post_fec_shim (test_restart_fast_unlock_relay.TheStrayPacket.test_cl_b14_reproduced_with_the_real_post_fec_shim)
+AssertionError: Lists differ: [{'schema': 'privyhub_native_frame_sizes_v[345 chars]: 8}] != []
+FAIL: test_cl_b14s_window_on_the_onns_path_nothing_forwarded (test_restart_fast_unlock_relay.TheStrayPacket.test_cl_b14s_window_on_the_onns_path_nothing_forwarded)
+AssertionError: Lists differ: [(7.390811857301742, 'rtp', 2694881440, 121500, 8)] != []
+Ran 5 tests in 9.298s
+FAILED (failures=2)
+  [fake_shim_window] old data packets at the onn > 10 ms after the call (ms after it, payload B): 1 [(50.7, 8)]|old parity at the onn > 10 ms after the call, before the new stream: 0|1-packet unmarked frame rows in the frame log: [{'schema': 'privyhub_native_frame_sizes_v1', 'at_utc': '2026-10-27T22:00:44.000Z', 't': 1793138444, 'frames': 1, 'packets'|
+  [real_shim] old data packets at the onn > 10 ms after the call (ms after it, payload B): 0 []|old parity at the onn > 10 ms after the call, before the new stream: 0|1-packet unmarked frame rows in the frame log: [{'schema': 'privyhub_native_frame_sizes_v1', 'at_utc': '2026-10-27T22:00:42.000Z', 't': 1793138442, 'frames': 1, 'packets'|

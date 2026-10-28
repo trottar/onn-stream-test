@@ -90,7 +90,7 @@ class RestartFastUnlock(RestartFast):
                          name="PrivyHub-Restart-Fast-Capture", daemon=True).start()
         m._host_telemetry.stop()
         # the relay first: the old encoder's frames stop being forwarded here, whatever it still flushes
-        m._fec_relay.stop()
+        self._stop_relay(m._fec_relay)
         timings["relay_stopped_ms"] = self._ms(t0)
         # the old encoder: SIGTERM, the next capture target meanwhile, SIGKILL after the grace
         old, old_capture = m._process, m._capture_process
@@ -157,6 +157,26 @@ class RestartFastUnlock(RestartFast):
             time.sleep(0.05)
         timings["checked_ms"] = self._ms(t0)
         tail["proc"] = m._process
+
+    @staticmethod
+    def _stop_relay(relay: Any) -> None:
+        """B26: the relay's stop with nothing more forwarded. CL-B14: the receive thread held one old packet (a frame's
+        first, 8 B) read before the socket closed, noted and sent it once `stop()` released the lock, and the new
+        `start()` closed it as a 1-packet frame. Here `_client` is cleared first (so `_send` sends nothing more, parity
+        included) and, after the join, what was noted after the close is dropped. Otherwise `stop()` as adopted.
+        Design: `docs/memory/evidence/b26_2026-10-27/design_written_before_code.md`."""
+        lock = getattr(relay, "_lock", None)
+        if lock is None:   # not the FEC relay (a test's fake): its stop as is
+            relay.stop()
+            return
+        with lock:
+            relay._client = None
+        relay.stop()
+        with lock:
+            relay._frame_packets = 0
+            relay._frame_payload_bytes = 0
+            relay._frame_timestamp = None
+            relay._frame_bucket = None
 
     @staticmethod
     def _spawn_with_target_locked(m: Any, ns: Any, ffmpeg: Any, client_ip: str, port: int, process_id: int,

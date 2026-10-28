@@ -1633,6 +1633,18 @@ alone, 5 GHz) was VALID, with host gates met and every row met:
 The slow return (3.12 s once, the old audio's stop inside the lock) is open for B. **G-A6 (`PRIVYHUB_LINK_RECOVERY_WAN`)
 SHELVED** (built, off): the class cannot tell the home radio through the overlay from a remote direct path. Off:
 delete `restart-fast.conf`, restart. Record: `docs/memory/evidence/G_A5_RESTART_FAST_ADOPTION_2026-10-26.md`.
+**G-A7 (2026-10-27): `PRIVYHUB_RESTART_FAST_UNLOCK=1` ADOPTED (the user's decision, "Go", after CL-B14): the twelfth
+adopted line** (`restart-fast-unlock.conf`; B24, the ready at the new encoder's check, the old audio's stop after it
+outside the lock). The tools (e1_suite, e3_state, e1_remote) read twelve lines. The confirmation window (no flag file,
+no client property, the twelve lines alone, 5 GHz) was VALID, with host gates met and every row met:
+- `restart_fast_config`, `restart_fast_unlock_config` and B21's `link_recovery_config` by the drop-ins alone;
+- no `restart_fast` row (no Home press);
+- 0 saves and 0 holds; silences 0.0 and hitch seconds 2.6 per 10 min; `link_notice` 0 in every heartbeat;
+- the bye, then `client_bye`.
+
+The slow return is closed (CL-B14: 1.15-1.86 s at four Home returns). The stray 8-byte relay frame at the old encoder's
+exit is B's. Off: delete `restart-fast-unlock.conf`, restart; the host then runs G-A5's worker. Record:
+`docs/memory/evidence/G_A7_RESTART_FAST_UNLOCK_ADOPTION_2026-10-27.md`.
 **G4-S3 (2026-10-19): off-site at 4000 with Opus (adopted) — VALID, 1 of 1, host gates met (the RetroArch counter
 read: 59.999).** Over the overlay on the phone hotspot (direct throughout): **the tailnet wire rate 5,299 kbit/s
 median**, against the pre-registered ~5,370 ±10 % (met) and G4-S2's 8,243 with PCM (−35.7 %): ~40 MB/min, ~2.4 GB/h;
@@ -2066,6 +2078,16 @@ valid, every row met; APK `fcd924c2…9b96` CONFIRMED and pinned.**
   the old encoder's exit.
 
 Record: `docs/memory/evidence/CL_B14_RESTART_UNLOCK_AND_NOTICE_DEFAULT_2026-10-26.md`.
+
+**B26 (2026-10-27): the stray 8-byte relay frame settled and fixed inside the adopted `PRIVYHUB_RESTART_FAST_UNLOCK=1`
+(no new flag).** It was the old encoder's next frame's first packet, held by the relay's receive thread across its
+stop, not an exit packet. In CL-B14 it never reached the onn. Now nothing from the old encoder is forwarded after the
+stop's call. Record: `docs/memory/evidence/B26_RELAY_STOP_STRAY_PACKET_2026-10-27.md`.
+
+**B27 (2026-10-27): the client's loss guard on by default (`debug.privyhub.loss_guard`: `0` off); the replay since
+CL-B10 (~32 frames held a minute on the LAN, a > 0.5-s hold possible in 10 / 47 sessions, capped at 0.6 s); APK
+(B5 … B25 + B27) `8b0fbb74…` pinned, not installed; G-A8 (`PRIVYHUB_LOSS_GUARD=1`, the thirteenth line) prepared, not
+applied.** Next: CL-B15. Record: `docs/memory/evidence/B27_LOSS_GUARD_DEFAULT_ON_2026-10-27.md`.
 
 ## G9 — Remote foundation checkpoint
 

@@ -266,3 +266,24 @@ Every point below is a **[G3-S3 proposal]**.
 
   The APK then behaves as CL-B13 cell 2 (the start answered after the old teardown).
 - **Not adopted:** `PRIVYHUB_LINK_RECOVERY_WAN` (G-A6, shelved 2026-10-26; built, off).
+
+## 13. The fast restart unlocked (adopted G-A7, 2026-10-27)
+
+- **Adopted:** `PRIVYHUB_RESTART_FAST_UNLOCK=1` through the drop-in
+  `~/.config/systemd/user/privyhub-companion.service.d/restart-fast-unlock.conf`, the **twelfth adopted line**.
+  - **What it does (B24):** inside the fast restart (§12), at a guarded restart the old audio's stop starts first, the
+    relay stops, and the old encoder is SIGTERMed (SIGKILL after 100 ms). The new encoder is checked, and the lock is
+    released there: the ready answers. The old audio's stop finishes after it, outside the lock (its capture SIGKILLed
+    if still alive at 300 ms), and then the new audio starts. CL-B14: the picture back 1.15-1.86 s at four Home returns,
+    against 1.74-3.12 s with §12 alone.
+  - It acts only where §12 acts (a guarded start), and only with `PRIVYHUB_RESTART_FAST=1` also set.
+- **What leaves the onn:** nothing new. The recovery log carries `restart_fast_unlock_config`,
+  `restart_fast_audio_stop` and `restart_fast_audio` (timings and return codes). No address or identifier.
+- **The client side:** no change (the APK `fcd924c2…` is the same with or without it).
+- **Turning it off (host):**
+  1. Delete `restart-fast-unlock.conf`.
+  2. Run `systemctl --user daemon-reload && systemctl --user restart privyhub-companion`.
+  3. Take `RESTART_FAST_UNLOCK` out of `tools/e1_suite.py` `ADOPTED` (reverse
+     `docs/memory/evidence/g_a7_2026-10-27/g_a7_applied.diff`).
+
+  The host then runs §12's worker (CL-B13 cell 1: the ready waits on the old audio's stop inside the lock).

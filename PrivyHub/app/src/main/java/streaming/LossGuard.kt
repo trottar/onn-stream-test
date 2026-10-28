@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicReference
  * B10: the client under loss, behind the system property
  * `debug.privyhub.loss_guard=<1|count>` (CL-B7P's convention; a reboot clears
  * it). Absent = today: no object, no datagram, no report or heartbeat key.
+ * B27: on by default -- absent / empty / junk read as `1`; `0` is that old absent.
  *
  * Today a dropped access unit is simply skipped and the next P-frame goes to
  * MediaCodec, which decodes it against a reference it never received; every
@@ -31,20 +32,21 @@ enum class LossGuardMode(val wire: String) {
 object LossGuardFlag {
     const val PROPERTY = "debug.privyhub.loss_guard"
 
+    // B27: on unless `0` (the user's "Also adopt", 2026-10-27); `count` as before
     fun parse(value: String?): LossGuardMode? =
         when (value?.trim()) {
-            "1" -> LossGuardMode.GUARD
+            "0" -> null
             "count" -> LossGuardMode.COUNT
-            else -> null
+            else -> LossGuardMode.GUARD
         }
 
-    /** The property, read through reflection; any failure is off. */
+    /** The property, read through reflection; a failed read is absent, so on (B27). */
     fun fromSystem(): LossGuardMode? =
         try {
             val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
             parse(get.invoke(null, PROPERTY) as? String)
         } catch (_: Throwable) {
-            null
+            parse(null)
         }
 }
 

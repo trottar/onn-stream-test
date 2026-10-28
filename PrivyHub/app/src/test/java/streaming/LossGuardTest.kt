@@ -25,10 +25,12 @@ class LossGuardTest {
     fun flagTable() {
         assertEquals(LossGuardMode.GUARD, LossGuardFlag.parse("1"))
         assertEquals(LossGuardMode.COUNT, LossGuardFlag.parse(" count "))
-        for (bad in listOf(null, "", "0", "on", "guard", "2")) {
-            assertNull(bad, LossGuardFlag.parse(bad))
+        // B27: absent / empty / junk are on, `0` off; off-device the read fails, so on
+        for (absent in listOf(null, "", "on", "guard", "2")) {
+            assertEquals(absent, LossGuardMode.GUARD, LossGuardFlag.parse(absent))
         }
-        assertNull(LossGuardFlag.fromSystem())
+        assertNull(LossGuardFlag.parse("0"))
+        assertEquals(LossGuardMode.GUARD, LossGuardFlag.fromSystem())
     }
 
     @Test

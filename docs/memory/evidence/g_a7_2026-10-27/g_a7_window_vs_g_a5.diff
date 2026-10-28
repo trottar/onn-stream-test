@@ -1,0 +1,38 @@
+2c2
+< """G-A5: the confirmation window (G-A4's g_a4_window.py, for eleven lines; the flag PRIVYHUB_RESTART_FAST=1). Runs one E1-SNES-STREAM through the suite's
+---
+> """G-A7: the confirmation window (G-A5's g_a5_window.py, itself G-A4's g_a4_window.py, for twelve lines; the flag PRIVYHUB_RESTART_FAST_UNLOCK=1). Runs one E1-SNES-STREAM through the suite's
+4c4
+< every 15 s (the eleven adopted lines expected throughout), the onn's band every 30 s (g_a5_state.py's parse: frequency /
+---
+> every 15 s (the twelve adopted lines expected throughout), the onn's band every 30 s (g_a7_state.py's parse: frequency /
+6,7c6,7
+< five logs over its span (BENCH-R3's driver's logs_copy, addresses masked). No setprop. The reading is g_a5_read.py's.
+<     python3 -B g_a5_window.py
+---
+> five logs over its span (BENCH-R3's driver's logs_copy, addresses masked). No setprop. The reading is g_a7_read.py's.
+>     python3 -B g_a7_window.py
+47c47
+< FLAG = "PRIVYHUB_RESTART_FAST=1"
+---
+> FLAG = "PRIVYHUB_RESTART_FAST_UNLOCK=1"
+50c50
+< ENV = {"reads": 0, "max_lines": 0, "eleven_with_flag": 0, "lines_at_eleven": None}
+---
+> ENV = {"reads": 0, "max_lines": 0, "twelve_with_flag": 0, "lines_at_twelve": None}
+68,70c68,70
+<         if len(env) == 11 and FLAG in env and sorted(env) == E1.ADOPTED:
+<             ENV["eleven_with_flag"] += 1
+<             ENV["lines_at_eleven"] = ENV["lines_at_eleven"] or sorted(env)
+---
+>         if len(env) == 12 and FLAG in env and sorted(env) == E1.ADOPTED:
+>             ENV["twelve_with_flag"] += 1
+>             ENV["lines_at_twelve"] = ENV["lines_at_twelve"] or sorted(env)
+76c76
+<         return json.loads(subprocess.run([sys.executable, "-B", str(HERE / "g_a5_state.py")], capture_output=True, text=True,
+---
+>         return json.loads(subprocess.run([sys.executable, "-B", str(HERE / "g_a7_state.py")], capture_output=True, text=True,
+110c110
+<                              str(HERE / "g_a5_preregistration.txt"), "--only", "E1-SNES-STREAM", "--runs", "1", "--window",
+---
+>                              str(HERE / "g_a7_preregistration.txt"), "--only", "E1-SNES-STREAM", "--runs", "1", "--window",

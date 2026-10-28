@@ -1,0 +1,22 @@
+2026-10-27T22:07:00Z
+mutation: LossGuard.kt = HEAD's (B10's parse), the B27 tests kept
+LossGuardDefaultOnTest > absentIsTheGuard FAILED
+LossGuardDefaultOnTest > theTable FAILED
+LossGuardTest > flagTable FAILED
+12 tests completed, 3 failed
+> Task :app:testDebugUnitTest FAILED
+BUILD FAILED in 11s
+com.safeiot.privyhub.streaming.LossGuardDefaultOnTest 4 tests 2 failures 0 errors
+   FAIL absentIsTheGuard
+   FAIL theTable
+   ok   countIsAsBefore
+   ok   zeroIsTodaysAbsent
+com.safeiot.privyhub.streaming.LossGuardTest 8 tests 1 failures 0 errors
+   FAIL flagTable
+   ok   receiverCountingIsTodayWithTheNumber
+   ok   theFreezeIsCappedAt600Ms
+   ok   receiverWithoutAGuardIsToday
+   ok   receiverWithTheGuardQueuesNothingUntilTheIdr
+   ok   guardHoldsUntilTheIdrAndAsksOnce
+   ok   requestEncoding
+   ok   countHoldsNothingAndSendsNothing

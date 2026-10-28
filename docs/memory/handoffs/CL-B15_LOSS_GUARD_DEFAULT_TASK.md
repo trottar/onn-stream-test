@@ -1,0 +1,30 @@
+---
+memory_schema: 1
+as_of: 2026-10-27
+status: TASK HANDOFF — CL-B15 (session A, hardware, two detached bench cells, no attended step, ~45 min; the onn on and idle). Install B's APK `8b0fbb74…` (B27: the loss guard on by default), every client property EMPTY; cell L = BENCH-R3 E's 1 % loss cell with `PRIVYHUB_LOSS_GUARD=1` on the twelve lines; cell C = clean, no flag (the absent-key path). Then the close, the CONFIRMED rule, the record, and G-A8 as the user's question if L1-L5 are met. The companion restart also loads B26 (the stray-packet fix inside the adopted unlock line) — disclosed. Measurement only; nothing adopted; nothing committed
+---
+
+# CL-B15 — the loss guard by default, on the bench
+
+Read first: `SESSION_B_DONE_2026-10-27J.md` items 3-6 (**the exact APK hash, strings and rows L0-L6 / C1-C3 — use theirs; the impairment string is `loss-1@post-fec,seed=1`, E1-PS1-STREAM**), `B27_LOSS_GUARD_DEFAULT_ON_2026-10-27.md` (the replay: ~32 frames held per LAN minute; the > 0.5-s holds listed), `B26_RELAY_STOP_STRAY_PACKET_2026-10-27.md` (live at this restart), `B10_CLIENT_LOSS_GUARD_2026-10-22.md`, `BENCH_R3_SNES_STACK_AND_LOSS_GUARD_2026-10-23.md` §3 E (the rows this repeats; its cell E driver), `CL_B14_…` (`cl_b14_driver.py` is the driver to copy), `CL_B7_…` §6, `LINK_N1_LAUNCH_2026-10-23.md` (no cell that could still run at 04:30Z; no companion restart 04:30-05:30Z).
+
+**The stage is the user's message.** The read line alone = Part 1 (install, launch, exit). "Code is done" after the unit closes = Part 2 (the record).
+
+## Part 1 — the install and the launch
+
+- Precondition: twelve lines, `--check` ok (APK `fcd924c2…` CONFIRMED), no `e3_flag.conf`, no game, one device paired, the client on the LAN, no `privyhub-*` unit but the companion and `privyhub-link-n1`, HEAD named (queue J committed), the tree clean but the prompt and this file, the clock such that both cells end before 04:15Z. **The band read first:** 5 GHz, else stop and tell the user. The seven client properties empty.
+- **Pre-registration hashed before the install:** the install checks; L0-L6 and C1-C3 as B item 5 states them (L3: `loss_guard_max_wait_ms` ≤ 600, 0.5 s the expectation, the value recorded); the validity rule; the CONFIRMED rule; the reading — L1-L5 met → G-A8 the user's question (B's words, item 6); else back to B with the rows. Cap launch + 2 h.
+- **The install:** preserve `fcd924c2…` (`PrivyHub/app/build/cl_b14_installed/`); B27's copy to `PrivyHub/app/build/cl_b15_installed/` (gitignored), sha256 = **`8b0fbb74d110ad89b6c1f9e69355abc3b5713b69055d3e8fa02b898108ee3f4e`**, the signer the same; `adb install -r`; read back; paired ("not paired" = stop). **No `setprop`**; the seven properties read back empty before each cell.
+- **The driver** `cl_b15_2026-10-27/cl_b15_driver.py` from `cl_b14_driver.py` (unit `privyhub-cl-b15`, STOP `~/privyhub_cl_b15/STOP`, the text and tag this task's), two cells in one launch, E1-PS1-STREAM (the fixture title; the RetroArch counter override as BENCH-R3 E), window 600, gap 120; each drop-in read back at the stream and removed at teardown, `flags_absent`, twelve lines after; the band every 10 s; the properties read back empty after each cell:
+  - **cell L:** `PRIVYHUB_IMPAIRMENT=loss-1@post-fec,seed=1` + `PRIVYHUB_LOSS_GUARD=1` (14 lines);
+  - **cell C:** `PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1` only (13 lines).
+- Launch, confirm cell L's preflight and PLAYING (and `loss_guard_config` `ignored` false, `control` `NoRuntimeIdr` after the restart), write `evidence/CL_B15_LAUNCH_2026-10-27.md` + `logs/cl_b15_launch_git_status.txt`, the redactor, **exit.** The reply must give the APK read back, the band, the properties empty, the unit, cell L's PLAYING time and the expected close (~25 min), and the sentence **"nothing for you to do; leave the onn alone until it closes"**.
+
+## Part 2 — the record ("Code is done")
+
+- The unit closed ("all 2 cells done"); the properties empty; the drop-ins gone; twelve lines; `flags_absent`; no `e3_flag.conf`.
+- **Cell L, L0-L6; cell C, C1-C3** as B item 5, with BENCH-R3 E-on's numbers beside them (held 3,010 / 3,010, timeouts 0, max wait 501; hitch 125.7 / silences 55.2 / max gap 597 ms on 2.4 GHz) and G-A7's window for cell C (2.6 hitch s / 10 min, 0 silences). The per-minute tables: `frames_after_dropped_reference`, `loss_guard_frames_held`, `loss_guard_timeouts`, `loss_guard_max_wait_ms`, `keyframe_requests` received / `forced` 0 / the reason, the controller's `bad_packets`. **The cost, plain:** how many freezes per minute and how long, from the report, so the user can weigh it.
+- **The CONFIRMED rule as CL-B7 §6:** both cells valid and the behaviours as today where no flag was set (the guard's intended difference aside: `loss_guard_mode` `guard` with no property) → `8b0fbb74…` CONFIRMED and the pin moved (`e1_suite` `EXPECT_APK`, `c3_l4_nft_night` `ADOPTED_APK_SHA256`, its test; tests green); else `fcd924c2…` reinstalled from `cl_b14_installed/`, read back, paired, `--check` ok, the user told why.
+- **The record `evidence/CL_B15_LOSS_GUARD_DEFAULT_2026-10-27.md` + `cl_b15_2026-10-27/`:** the tables, every row met / not met, the cost stated, the CONFIRMED decision, the APK on the onn named, B26 noted as live from this restart; `KNOWN_ISSUES.md`, ROADMAP lines, `logs/cl_b15_git_status.txt`, the redactor; `CURRENT.md` Next Action: the user's commit; **G-A8 as the user's question in B's words** ("Adopt `PRIVYHUB_LOSS_GUARD=1` as the thirteenth line? It forces nothing. It lets the host count the onn's keyframe requests and log the loss guard's numbers. The guard itself is already on in the onn's app." — the off switch for the guard itself: `setprop debug.privyhub.loss_guard 0`, or the previous APK); then the remote umbrella (queue K) as the next B item.
+
+No sudo, no nft, the Opal read-only, adb for the install, state reads and the reinstall if the rule says so, **no `setprop`**; no addresses or identifiers anywhere; nothing fetched, nothing deleted; twelve lines and no `e3_flag.conf` at every teardown; nothing adopted; nothing committed.

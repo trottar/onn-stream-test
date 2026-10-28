@@ -1,0 +1,21 @@
+2c2,3
+< """G-A5's reader (G-A4's g_a4_read.py, plus restart_fast_config and the restart_fast* rows; read-only over g_a5_2026-10-26/;
+---
+> """G-A7's reader (G-A5's g_a5_read.py, itself G-A4's g_a4_read.py plus restart_fast_config and the restart_fast* rows;
+> G-A7 adds restart_fast_unlock_config and the heartbeats' link_notice; read-only over g_a7_2026-10-27/;
+117c118
+< g = GDNS["measure"]("G-A5 eleven lines", LD, s0, s1)
+---
+> g = GDNS["measure"]("G-A7 twelve lines", LD, s0, s1)
+124c125
+< CFG = ("restart_fast_config", "link_recovery_config", "input_hold_config", "input_hold_b6_config", "input_hold_b8_config", "input_hold_rewind_config",
+---
+> CFG = ("restart_fast_config", "restart_fast_unlock_config", "link_recovery_config", "input_hold_config", "input_hold_b6_config", "input_hold_b8_config", "input_hold_rewind_config",
+137c138,140
+<                           r.get("event") != "restart_fast_config"]
+---
+>                           r.get("event") not in ("restart_fast_config", "restart_fast_unlock_config")]
+> res["link_notice"] = {"heartbeats": len(ins), "values": dict(collections.Counter(h.get("link_notice", "<absent>") for h in ins)),
+>                       "rows": [strip(r) for r in span if r.get("event") in ("link_notice_shown", "link_notice_cleared")]}
+147a151
+> print("link_notice", json.dumps(res["link_notice"]))

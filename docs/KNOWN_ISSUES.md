@@ -56,6 +56,25 @@
     single-packet frame logged by the relay at the old encoder's exit at every return, and `relay_stopped_ms` 500 once.
     Pausing at Home is still the user's question. Record:
     `docs/memory/evidence/CL_B14_RESTART_UNLOCK_AND_NOTICE_DEFAULT_2026-10-26.md`.
+  - **G-A7 (2026-10-27): `PRIVYHUB_RESTART_FAST_UNLOCK=1` ADOPTED (the twelfth line). The slow return is CLOSED:** the
+    picture back 1.15-1.86 s at four of four Home returns (CL-B14), the ready no longer waiting on the old audio's
+    stop. The confirmation window (no Home press) met every row. Record:
+    `docs/memory/evidence/G_A7_RESTART_FAST_UNLOCK_ADOPTION_2026-10-27.md`.
+  - **Still OPEN (to B): the stray 8-byte packet.** At each CL-B14 return the relay logged one 1-packet, 8-byte,
+    unmarked "frame" within 1 ms of the old encoder's exit, 100-140 ms after the relay's stop (not in CL-B13). It is
+    not a picture frame; whether it reached the onn is not in the rows. Also for B: `relay_stopped_ms` read 500 once
+    (50-214 at the others). Pausing at Home and keeping the rung stay the user's question.
+  - **Queue J, B26 (2026-10-27; SETTLED + BUILT inside the adopted `PRIVYHUB_RESTART_FAST_UNLOCK=1`, no new flag,
+    no live run): the stray 8-byte packet is not an exit packet.**
+    - It is the old encoder's next frame's first packet. The receive thread read it while the relay's `stop()` held
+      its lock for the post-fec shim's ≤ 50-ms join, then sent it once the lock was released.
+    - The row's time is the new `start()` closing that open frame; `relay_stopped_ms` is mostly the frame-log
+      thread's 0.5-s sleep.
+    - **In CL-B14 it never reached the onn** (it was sent to the stopped shim's closed port). Without a shim it would
+      reach the onn, where it counts only in `packets` / `bytes`.
+    - **Fixed:** the relay's send target is cleared before its stop, and what was noted after the close is dropped.
+      The mutation is caught 5 / 5 with the real relay on loopback. It takes effect at the next companion restart.
+    - Record: `docs/memory/evidence/B26_RELAY_STOP_STRAY_PACKET_2026-10-27.md`.
 - **The onn left the tailnet once:**
   - no-peer 19:38:33-19:45:50Z, ~1 min after it went idle and ~26 s after a companion restart;
   - a second restart was followed by a brief relayed reading only.
@@ -247,6 +266,18 @@ is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.m
   - Record: `docs/memory/evidence/BENCH_R3_SNES_STACK_AND_LOSS_GUARD_2026-10-23.md`.
   - **Next:** the user's call on the loss guard; the Opal's `wlan0` read beside a stream (is the onn on the Opal?); B
     on the hold-path rewind's after-check and `@down`'s ownership.
+  - **Queue J, B27 (2026-10-27; the user's "Also adopt"; BUILT, NOT ADOPTED, no live run): the loss guard on by
+    default in the client** (`debug.privyhub.loss_guard`: absent / empty / junk = on, `0` off, `count` as before).
+    - **The replay first** (B10's rule as a bound over 47 reports since CL-B10): the LAN ~6,830 frames held in 212
+      min (~32 / min, about one ≤ 0.25-s freeze every 15-30 s); G4-S4 ~1,860 in 122 min. A hold > 0.5 s (two IDRs
+      lost in a row; the 600-ms cap) is possible in 9 LAN sessions and 1 off-site.
+    - **The cost:** the same with or without the host's `PRIVYHUB_LOSS_GUARD=1`, which forces no keyframe (no
+      runtime IDR); without it each freeze's 24-B request is one host `bad_packets`.
+    - JVM 154 / 154. **APK (B5 … B25 + B27) `8b0fbb74…3f4e` pinned, NOT installed;** `fcd924c2…` stays CONFIRMED.
+    - **G-A8 (`PRIVYHUB_LOSS_GUARD=1`, thirteen lines) PREPARED, not applied:**
+      `docs/memory/patches/G-A8_LOSS_GUARD_ADOPTION_PREPARED.md`.
+    - Next: CL-B15 (`docs/memory/handoffs/SESSION_B_DONE_2026-10-27J.md`). Record:
+      `docs/memory/evidence/B27_LOSS_GUARD_DEFAULT_ON_2026-10-27.md`.
 - **UX-R4 (2026-10-23, the user's "severe lag … I saved at the spot", Zelda on snes9x, the eight lines, APK
   `bf5114a2…`, no link report):** the mark is the 05:01:30Z save, after a 41-s storm (05:00:40.9-05:01:20Z) of 19
   uplink silences ≥ 250 ms (9.5 s silent, the longest 1.4 s), with downlink loss ×9 beside it and the host steady

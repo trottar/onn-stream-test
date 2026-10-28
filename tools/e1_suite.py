@@ -103,8 +103,13 @@ LINK_RECOVERY = "PRIVYHUB_LINK_RECOVERY=1"
 # the client released at the new stream's first fresh frame (B22; acts only on a guarded start) -- through its own
 # drop-in (restart-fast.conf); the adopted environ is exactly these eleven names
 RESTART_FAST = "PRIVYHUB_RESTART_FAST=1"
+# G-A7 (adopted 2026-10-27, the user): the fast restart unlocked -- the ready at the new encoder's check, the old audio's
+# stop after it outside the lock (the capture SIGKILLed at 300 ms), the relay stopped before the old encoder's kill
+# (B24; acts only on a guarded start, inside RESTART_FAST) -- through its own drop-in (restart-fast-unlock.conf); the
+# adopted environ is exactly these twelve names
+RESTART_FAST_UNLOCK = "PRIVYHUB_RESTART_FAST_UNLOCK=1"
 ADOPTED = sorted([LIVE, INDEX, SNES_CORE, RECOVERY, SNES_CAPTURE, OVERLAY, IDENTITY, AUDIO_CODEC, LINK_REPORT,
-                  LINK_RECOVERY, RESTART_FAST])
+                  LINK_RECOVERY, RESTART_FAST, RESTART_FAST_UNLOCK])
 FLAG_NAMES = ["PRIVYHUB_ADAPTIVE_BITRATE_INJECT", "PRIVYHUB_ADAPTIVE_BITRATE_TOP", "PRIVYHUB_PS1_LOOK",
               "PRIVYHUB_NATIVE_PROFILE_ID", "PRIVYHUB_FEC_SCHEME"]
 RA_CFG = Path.home() / ".config/retroarch/config"
@@ -1007,11 +1012,12 @@ def preflight() -> dict:
          "drop_in_link_report": f"Environment={LINK_REPORT}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_link_recovery": f"Environment={LINK_RECOVERY}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_restart_fast": f"Environment={RESTART_FAST}" in sh(["systemctl", "--user", "cat", UNIT]),
+         "drop_in_restart_fast_unlock": f"Environment={RESTART_FAST_UNLOCK}" in sh(["systemctl", "--user", "cat", UNIT]),
          "e3_dropin_absent": not DROPIN.exists(), "e4_constraint_absent": not E4_DROPIN.exists()}
     d["ok"] = (d["manager"] == [] and d["environ"] == ADOPTED and d["adb"] and d["drop_in_live"] and d["drop_in_index"]
                and d["drop_in_snes_core"] and d["drop_in_recovery"] and d["drop_in_snes_capture"] and d["drop_in_overlay"]
                and d["drop_in_identity"] and d["drop_in_audio_codec"] and d["drop_in_link_report"]
-               and d["drop_in_link_recovery"] and d["drop_in_restart_fast"]
+               and d["drop_in_link_recovery"] and d["drop_in_restart_fast"] and d["drop_in_restart_fast_unlock"]
                and d["e3_dropin_absent"] and d["e4_constraint_absent"])
     return d
 
