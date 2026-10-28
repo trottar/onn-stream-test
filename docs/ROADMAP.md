@@ -2089,6 +2089,15 @@ CL-B10 (~32 frames held a minute on the LAN, a > 0.5-s hold possible in 10 / 47 
 (B5 … B25 + B27) `8b0fbb74…` pinned, not installed; G-A8 (`PRIVYHUB_LOSS_GUARD=1`, the thirteenth line) prepared, not
 applied.** Next: CL-B15. Record: `docs/memory/evidence/B27_LOSS_GUARD_DEFAULT_ON_2026-10-27.md`.
 
+**CL-B15 (2026-10-28): B27's loss guard on by default, on the bench, every client property empty: 2 / 2 cells valid;
+APK `8b0fbb74…3f4e` CONFIRMED and pinned; back to B on L1-L3.**
+- **1 % loss + the host flag:** 27.7 freezes a minute (~0.13 s each). One hold ran 685 ms past the 600-ms cap (a
+  timeout, 7 frames shown). 9 long holds tripped the adopted stall stack. The host forced nothing (`NoRuntimeIdr`).
+- **Clean, no flag:** 3.3 freezes a minute (≤ 0.27 s), 0 timeouts, today's behaviours otherwise.
+- G-A8 (`PRIVYHUB_LOSS_GUARD=1`) is not a candidate as read. The controller's `bad_packets` was not read.
+
+Record: `docs/memory/evidence/CL_B15_LOSS_GUARD_DEFAULT_2026-10-27.md`.
+
 ## G9 — Remote foundation checkpoint
 
 Acceptance:

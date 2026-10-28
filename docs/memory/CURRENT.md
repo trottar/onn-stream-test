@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-10-27
-baseline_commit: 2cd392c (CL-B14 committed; G-A7 uncommitted beside it; the user commits)
+as_of: 2026-10-28
+baseline_commit: 4a78783 (G-A7 and queue J committed; CL-B15 uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -19,8 +19,8 @@ CL-B3 is OPEN on two G5-S1 smoke gates (NOT MET; the user decides). Everything e
 passed.** E1 FROZEN; E2
 MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `af3ed73`.
 
-**State (2026-10-27 21:19Z, after G-A7): the TWELVE adopted lines; `--check` ok on twelve; APK `fcd924c2…9b96`
-CONFIRMED** (CL-B14; B25's link notice on by default, `0` off). `e3_state.py`'s `link_recovery.stack`: all six `implied 1`.
+**State (2026-10-28 02:20Z, after CL-B15): the TWELVE adopted lines; `--check` ok on twelve; APK `8b0fbb74…3f4e`
+CONFIRMED** (CL-B15; B25's link notice and B27's loss guard on by default, `0` off for each). `e3_state.py`'s `link_recovery.stack`: all six `implied 1`.
 - Every client property is empty (the client's defaults: the stall signal, the restart guard and the link report on).
 - No `e3_flag.conf`, no stream. One device paired; `identity_v2` on.
 - Running: `privyhub-companion` and `privyhub-link-n1` (nightly) only.
@@ -222,6 +222,40 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
+
+**CL-B15: MEASURED, 2 / 2 cells valid; APK `8b0fbb74…3f4e` (+ B27, the loss guard on by default) CONFIRMED and pinned,
+every client property EMPTY; L1-L3 NOT MET → back to B** (`evidence/CL_B15_LOSS_GUARD_DEFAULT_2026-10-27.md`, launch
+`evidence/CL_B15_LAUNCH_2026-10-27.md`; the unit `privyhub-cl-b15` 2026-10-28 01:32-02:01Z, detached, 5 GHz,
+E1-PS1-STREAM).
+- **Cell L, 1 % loss + `PRIVYHUB_LOSS_GUARD=1`:**
+  - the guard on with no property; the host as built (`NoRuntimeIdr`, forced 0, received 319 of 320 sent);
+  - **one hold ran 685 ms past the 600-ms cap: a timeout, 7 corrupted frames shown** (held 2,478 / 2,485);
+  - **9 holds of ≥ ~0.4 s tripped the adopted stall stack** (save, pause, 2-3 frames restored, resume 49-184 ms later);
+  - the cost: **27.7 freezes a minute, ~0.13 s each**, the longest 0.69 s; hitch 37.2 s / 10 min, silences 0, rendered
+    55.75 fps (BENCH-R3 E-on on 2.4 GHz: 125.7 / 54.5 / 55.19).
+- **Cell C, clean, no flag:** the guard held 295 = 295 in **3.3 freezes a minute (~0.13 s, the longest 0.27 s)**, 0
+  timeouts; no host guard row, no save, hold or stall; one 258-ms silence; hitch 3.5 s / 10 min (G-A7 0 / 2.6).
+- **Not read:** the controller's `bad_packets` (L5's clause, C2). It was not sampled.
+- **B26 is live** (the relay-stop fix inside the adopted unlock line, from this task's first restart).
+- **State:** twelve lines, no `e3_flag.conf`, `--check` ok, APK CONFIRMED; the onn paired, on the LAN, 5180 MHz;
+  `fcd924c2…` kept at `PrivyHub/app/build/cl_b14_installed/`.
+- **The guard is on by default on the onn now.** Off: `adb shell setprop debug.privyhub.loss_guard 0`, or reinstall
+  `fcd924c2…`.
+
+1. **The user's commit:** the two records and `cl_b15_2026-10-27/`; the pin (`tools/e1_suite.py`,
+   `tools/c3_l4_nft_night.py`, `tools/test_c3_l4_nft_night.py`); `docs/KNOWN_ISSUES.md`, `docs/ROADMAP.md`, this file
+   (`logs/cl_b15_launch_git_status.txt`, `logs/cl_b15_git_status.txt`).
+2. **G-A8, the user's question in B's words — not a candidate as read (L1-L3 back to B first):** "Adopt
+   `PRIVYHUB_LOSS_GUARD=1` as the thirteenth line? It forces nothing. It lets the host count the onn's keyframe requests
+   and log the loss guard's numbers. The guard itself is already on in the onn's app."
+   - The guard's own off switch: `setprop debug.privyhub.loss_guard 0`, or the previous APK.
+   - B's prepared patch `patches/G-A8_LOSS_GUARD_ADOPTION_PREPARED.md` stays unapplied.
+3. **To B:**
+   - the 685-ms hold past the 600-ms cap (the timeout and its 7 frames);
+   - the guard's long holds tripping the stall stack (9 in 11.5 min at 1 % loss);
+   - a driver that samples the controller's `bad_packets`, for L5 / C2.
+4. **Then the remote umbrella (queue K)** is the next B item.
+5. Still open: Home's pause and the rung; "read LINK-N1's nights" after 2026-10-31.
 
 **G-A7: `PRIVYHUB_RESTART_FAST_UNLOCK=1` ADOPTED, the twelfth line; the confirmation window VALID, every row met**
 (`evidence/G_A7_RESTART_FAST_UNLOCK_ADOPTION_2026-10-27.md`; the diff `patches/G-A7_RESTART_FAST_UNLOCK_ADOPTION.md`,

@@ -1,0 +1,112 @@
+CL-B15 — the loss guard on by default (B27), on the bench: pre-registration (session A, 2026-10-28 UTC; hashed BEFORE
+the install; covers cells L and C in one detached launch)
+
+Task: docs/memory/handoffs/CL-B15_LOSS_GUARD_DEFAULT_TASK.md. Session B's exact strings: SESSION_B_DONE_2026-10-27J.md
+items 3-6 (the APK hash, the rows L0-L6 / C1-C3, the impairment string loss-1@post-fec,seed=1 — B: "loss-1pct" does not
+parse — on E1-PS1-STREAM); B27 (the replay: ~32 frames held per LAN minute; holds > 0.5 s possible in 9 LAN sessions);
+B26 (the stray-packet fix inside the adopted PRIVYHUB_RESTART_FAST_UNLOCK=1, live from this task's first companion
+restart); B10 (the guard); BENCH_R3 §1 / §5 (cell E, the rows this repeats). The CONFIRMED rule: CL_B7 §6. The watch:
+LINK_N1_LAUNCH_2026-10-23.md.
+
+CAP: the detached launch + 2 h (no cell starts after it; a cell in flight finishes with its own teardown), computed by
+the driver at its launch and shown in its status line. Both cells end before 04:15Z (the launch ~01:35Z, ~32 min).
+
+The stage is the user's message: the read line = Part 1 (the install, the detached launch, exit); "Code is done" after
+the unit closes = Part 2 (the record).
+
+0. State at the hash (~01:33Z)
+- HEAD 4a78783 (queue J committed; "G-A7 adopted; queue J done; CL-B15 handoff"); the tree clean but this task's new
+  evidence dir.
+- Twelve adopted lines (G-A7: PRIVYHUB_RESTART_FAST_UNLOCK=1 among them); tools/e3_state.py --check ok, APK
+  fcd924c2…9b96 CONFIRMED; no e3_flag.conf; no game; one device, paired; units privyhub-companion and privyhub-link-n1
+  only. /session/status read active_sessions 1 with no game (the onn's app idle on the hub), disclosed.
+- The clock 01:29Z, outside 04:15-05:30Z.
+- The band, read first: 5180 MHz, 5 GHz, standard 5, RSSI -69.
+- The client on the LAN: the newest token_issued reads routing_evidence lan.
+- The seven client properties restart_guard, stall_signal, link_notice, link_report, loss_guard, wifi_lock, opus_decode
+  all EMPTY.
+
+1. The install checks (after this file is hashed)
+- fcd924c2… stays preserved at PrivyHub/app/build/cl_b14_installed/app-debug.apk (nothing deleted).
+- The candidate is B27's copy /tmp/b_q27j27_scratch/apk/app-debug.apk. It must read sha256
+  8b0fbb74d110ad89b6c1f9e69355abc3b5713b69055d3e8fa02b898108ee3f4e (B's pin, 9,638,182 B) and carry the same signer as
+  fcd924c2… (apksigner certificate digests compared, not printed); else nothing is installed. Copied to
+  PrivyHub/app/build/cl_b15_installed/app-debug.apk (gitignored).
+- adb install -r; the device APK read back = 8b0fbb74…; paired (CL-B4's reader). "Not paired" = stop and tell the user.
+- NO setprop anywhere in this task. The seven properties read back EMPTY after the install, before and after each cell,
+  and at the close.
+- tools/e3_state.py after the install is expected ok False ONLY because the APK reads MISMATCH (the pin moves only by the
+  CONFIRMED rule); the preflight itself ok.
+
+2. The driver
+- cl_b15_driver.py (from cl_b14_driver.py; the diff is cl_b15_driver_vs_cl_b14.diff); cl_b15_suite_call.py (CL-B14's
+  wrapper, only the pre-registration name changed). Unit privyhub-cl-b15, both cells in one launch. STOP
+  ~/privyhub_cl_b15/STOP; status ~/privyhub_cl_b15/status.txt; the log tag [cl_b15 …].
+- Every cell: E1-PS1-STREAM (the fixture; the suite's own RetroArch counter override, as BENCH-R3 E), window 600, gap 120.
+  Each drop-in e3_flag.conf read back at the stream and under load, removed at the teardown; flags_absent true after;
+  twelve lines after.
+  - cell L: PRIVYHUB_IMPAIRMENT=loss-1@post-fec,seed=1 + PRIVYHUB_LOSS_GUARD=1 (14 lines);
+  - cell C: PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 only (13 lines).
+- tools/e3_state.py once mid-cell. The band every 10 s into runs/<cell>/band.jsonl. The routing class at the stream. No
+  cell starts in 04:15-05:30Z or could still run at 04:30Z; no companion restart 04:30-05:30Z. No Opal sampler.
+- After cell L's restart: loss_guard_config ignored false, control NoRuntimeIdr (min_interval_ms 500), and the adopted
+  restart_fast_config / restart_fast_unlock_config, read from the recovery log. A --dry of cell L may run first (no
+  stream; the drop-in written, the restart, the rows read, the drop-in removed).
+- The companion restarts in this task load B26 (the relay-stop fix inside the adopted unlock line); disclosed, not a row.
+
+3. Cell L — loss-1 + PRIVYHUB_LOSS_GUARD=1, no property (B item 5)
+  L0 the default is on: the report reads loss_guard_mode guard with no property set.
+  L1 every corrupted frame held: loss_guard_frames_held = frames_after_dropped_reference in the report, and in every
+     minute's heartbeat deltas.
+  L2 loss_guard_timeouts 0.
+  L3 loss_guard_max_wait_ms <= 600 (the cap); 0.5 s the expectation (BENCH-R3 read 501); the value recorded.
+  L4 frames_after_dropped_reference per minute stated, as BENCH-R3 E-on (151-357); the client's dropped_frames /
+     sequence_gap_au_drops / incomplete_au_drops stated.
+  L5 the host side: loss_guard_config ignored false, control NoRuntimeIdr; the per-minute keyframe_requests rows with
+     forced 0 and the reason; received <= the client's keyframe_requests_sent (uplink loss aside); the controller's
+     bad_packets not rising with the requests.
+  L6 the cost, stated: hitch seconds and silences per 10 min, rendered fps, the max output gap, against BENCH-R3 E-on
+     (125.7 / 55.2 / 597 ms, on 2.4 GHz); and plainly, from the report and the heartbeats, how many freezes (episodes
+     held) per minute and how long (frames held per episode; the max wait).
+- Per-minute tables: frames_after_dropped_reference, loss_guard_frames_held, loss_guard_timeouts,
+  loss_guard_max_wait_ms, keyframe_requests received / forced / reason, the controller's bad_packets.
+
+4. Cell C — clean, no flag, no property
+  C1 the absent-key path: the report reads loss_guard_mode guard, held = counter, timeouts 0; no loss_guard_config /
+     keyframe_requests row (the host flag absent).
+  C2 the requests without the host flag: the host's controller bad_packets rise <= the client's keyframe_requests_sent
+     (one per episode), nothing else.
+  C3 today's behaviours: silences 0 and hitch seconds as G-A7's window (0.0 / 2.6 per 10 min) on 5 GHz; link_notice 0;
+     the rest as CL-B14 where no flag acts (0 state_saved / holds without a stall; the teardown's bye and
+     state_save_skipped).
+
+5. Validity (per cell)
+- Playing; the shim's profile applied (loss-1: 0.7-1.3 % dropped, no other drop; none: 0 drops); the drop-in's lines at
+  the stream (14 / 13); flags_absent true after; twelve lines; the seven properties empty before and after; the band
+  5 GHz. Host gates: RetroArch >= 59.9, capture 60 ± 0.1, dup+drop <= 0.2 / min.
+- A no_play, flags_absent false, or a property not empty is invalid. profile-not-applied while playing is repeated once.
+
+6. The CONFIRMED rule (CL_B7 §6, as CL-B10 … CL-B14 applied it)
+- At the close: the properties read back empty, the drop-in removed, twelve lines, no e3_flag.conf, flags_absent; the
+  client on the LAN; the band read.
+- Cells L and C valid and the behaviours as today where no flag was set (the guard's intended difference aside:
+  loss_guard_mode guard with no property) -> 8b0fbb74… CONFIRMED and the pin moved (tools/e1_suite.py EXPECT_APK,
+  tools/c3_l4_nft_night.py ADOPTED_APK_SHA256 and its test; the tests green); e3_state --check ok on twelve.
+- Else fcd924c2… reinstalled from PrivyHub/app/build/cl_b14_installed/, read back, paired, --check ok, and the user told
+  which cell failed and why.
+- CONFIRMED is about validity and today's behaviours, not the rows: an L row not met does not block it.
+
+7. The reading, written beforehand
+- L1-L5 met -> G-A8 the user's question, in B's words: "Adopt PRIVYHUB_LOSS_GUARD=1 as the thirteenth line? It forces
+  nothing. It lets the host count the onn's keyframe requests and log the loss guard's numbers. The guard itself is
+  already on in the onn's app." The guard's own off switch: setprop debug.privyhub.loss_guard 0, or the previous APK.
+  B's prepared patch (patches/G-A8_LOSS_GUARD_ADOPTION_PREPARED.md) is NOT applied in this task.
+- Else back to B with the rows.
+- Against BENCH-R3 E-on (2.4 GHz, loss_guard=1 by property): held 3,010 = counter 3,010; timeouts 0; max wait 501;
+  episodes 394; keyframe requests received 376, forced 0; hitch 125.7 / silences 54.5 per 10 min; rendered 55.19; max
+  output gap 597 ms.
+- Then the remote umbrella (queue K) is the next B item.
+
+No sudo, no nft, the Opal read-only, adb for the install, state reads and the reinstall if the rule says so; NO setprop;
+no addresses or identifiers anywhere; nothing fetched, nothing deleted; twelve lines and no e3_flag.conf at every
+teardown; nothing adopted; nothing committed.

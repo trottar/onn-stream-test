@@ -278,6 +278,18 @@ is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.m
       `docs/memory/patches/G-A8_LOSS_GUARD_ADOPTION_PREPARED.md`.
     - Next: CL-B15 (`docs/memory/handoffs/SESSION_B_DONE_2026-10-27J.md`). Record:
       `docs/memory/evidence/B27_LOSS_GUARD_DEFAULT_ON_2026-10-27.md`.
+  - **CL-B15 (2026-10-28; `8b0fbb74…` CONFIRMED and pinned, the guard now ON by default on the onn; every client
+    property empty, 5 GHz, E1-PS1-STREAM): back to B on three rows — OPEN.**
+    - **1 % loss + `PRIVYHUB_LOSS_GUARD=1`:** 320 freezes in 11.55 min (27.7 a minute, ~0.13 s each). **One hold ran
+      685 ms, past the 600-ms cap: it timed out and showed 7 corrupted frames** (held 2,478 of 2,485).
+    - **9 holds of ≥ ~0.4 s tripped the adopted stall stack** (save, pause, 2-3 frames restored, resume). This is new
+      under the twelve lines; BENCH-R3 E ran without the stack.
+    - The host side as built: `NoRuntimeIdr`, forced 0, received 319 of 320.
+    - **Clean LAN, no flag:** 38 freezes (3.3 a minute, ~0.13 s, the longest 0.27 s); 0 timeouts; no stall pause.
+    - **Not read:** the controller's `bad_packets` (not sampled).
+    - **For B:** why the cap fired 85 ms late; whether the guard's hold and the stall signal should know of each other.
+      G-A8 is not a candidate as read. Off on the onn: `setprop debug.privyhub.loss_guard 0`, or `fcd924c2…` back.
+      Record: `docs/memory/evidence/CL_B15_LOSS_GUARD_DEFAULT_2026-10-27.md`.
 - **UX-R4 (2026-10-23, the user's "severe lag … I saved at the spot", Zelda on snes9x, the eight lines, APK
   `bf5114a2…`, no link report):** the mark is the 05:01:30Z save, after a 41-s storm (05:00:40.9-05:01:20Z) of 19
   uplink silences ≥ 250 ms (9.5 s silent, the longest 1.4 s), with downlink loss ×9 beside it and the host steady

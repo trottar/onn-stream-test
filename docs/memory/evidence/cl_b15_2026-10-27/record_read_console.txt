@@ -1,0 +1,39 @@
+== cell L native_decoder_20261028_014630_675.json ['2026-10-28T01:34:57.766Z', '2026-10-28T01:46:30.711Z'] 11.55 min
+ report {"loss_guard_mode": "guard", "frames_after_dropped_reference": 2485, "loss_guard_episodes": 320, "loss_guard_frames_held": 2478, "loss_guard_timeouts": 1, "loss_guard_max_wait_ms": 685, "keyframe_requests_sent": 320, "link_notice_shown": 0, "duration_ms": 704713, "video": {"lost_packets": 1036, "lost_packets_in_resyncs": 158, "dropped_frames": 404, "sequence_gap_au_drops": 379, "incomplete_au_drops": 27, "non_idr_aus_dropped_waiting_for_idr": 11}, "decoder": {"rendered_frames": 39289, "dropped_frames": 7, "max_output_gap_ms": 659}}
+ cost {"episodes_per_min": 27.7, "held_per_min": 214.6, "frames_per_episode": 7.74, "ms_per_episode_at_60fps": 129, "full_minute_episodes": [32, 34, 39, 28, 16, 30, 29, 26, 21, 21, 23], "full_minute_counter": [215, 256, 253, 208, 165, 272, 238, 220, 170, 185, 188]}
+ events {'state_saved': 9, 'keyframe_requests': 12, 'loss_guard_config': 1, 'session_started': 1, 'session_ended': 1, 'session_end_bye': 1, 'state_save_skipped': 1} holds 18 stall rows 0 teardown [{'at': '01:46:29.776', 'event': 'session_end_bye'}, {'at': '01:46:30.571', 'event': 'state_save_skipped', 'reason': 'client_bye', 'silence_ms': 401.3}, {'at': '01:46:30.711', 'event': 'session_ended'}]
+ config [('restart_fast_unlock_config', {}), ('restart_fast_config', {}), ('loss_guard_config', {'control': 'NoRuntimeIdr', 'ignored': False, 'min_interval_ms': 500}), ('restart_fast_unlock_config', {}), ('restart_fast_config', {})]
+ silences {"streaming_s": 673, "silences": 0, "silences_per10": 0.0, "bins": {"250-300": 0, "300-400": 0, "400-500": 0, "500-600": 0, "600-800": 0, "800-1000": 0, "1000-1500": 0, "1500-inf": 0}, "max_ms": 0} | hitch {"hitch_seconds": 43, "play_min": 11.5, "per_10_min": 37.2, "longest_run_s": 2, "by_criterion": {"R": 43, "L": 2}} | freq {5180: 342} | notice {0: 342}
+ minute | hb | counter | held | unheld | episodes | lost | rendered
+  | 01:34 | 2 | 5 | 5 | 0 | 1 | 1 | 240
+  | 01:35 | 30 | 215 | 215 | 0 | 32 | 67 | 3389
+  | 01:36 | 30 | 256 | 256 | 0 | 34 | 95 | 3337
+  | 01:37 | 29 | 253 | 253 | 0 | 39 | 90 | 3229
+  | 01:38 | 30 | 208 | 208 | 0 | 28 | 68 | 3407
+  | 01:39 | 29 | 165 | 165 | 0 | 16 | 34 | 3348
+  | 01:40 | 29 | 272 | 272 | 0 | 30 | 84 | 3216
+  | 01:41 | 30 | 238 | 231 | 7 | 29 | 76 | 3375
+  | 01:42 | 30 | 220 | 220 | 0 | 26 | 53 | 3395
+  | 01:43 | 30 | 170 | 170 | 0 | 21 | 71 | 3445
+  | 01:44 | 29 | 185 | 185 | 0 | 21 | 41 | 3295
+  | 01:45 | 30 | 188 | 188 | 0 | 23 | 70 | 3430
+  | 01:46 | 15 | 65 | 65 | 0 | 12 | 24 | 1752
+  kf {"at": "01:35:29", "received": 27, "acted": 25, "rate_limited": 2, "forced": 0, "received_total": 27, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "01:36:30", "received": 34, "acted": 31, "rate_limited": 3, "forced": 0, "received_total": 61, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "01:37:30", "received": 40, "acted": 31, "rate_limited": 9, "forced": 0, "received_total": 101, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "01:38:30", "received": 26, "acted": 24, "rate_limited": 2, "forced": 0, "received_total": 127, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "01:39:31", "received": 22, "acted": 18, "rate_limited": 4, "forced": 0, "received_total": 149, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "01:40:31", "received": 28, "acted": 23, "rate_limited": 5, "forced": 0, "received_total": 177, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "01:41:32", "received": 24, "acted": 24, "rate_limited": 0, "forced": 0, "received_total": 201, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "01:42:33", "received": 30, "acted": 27, "rate_limited": 3, "forced": 0, "received_total": 231, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "01:43:33", "received": 22, "acted": 20, "rate_limited": 2, "forced": 0, "received_total": 253, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "01:44:33", "received": 24, "acted": 17, "rate_limited": 7, "forced": 0, "received_total": 277, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "01:45:34", "received": 17, "acted": 15, "rate_limited": 2, "forced": 0, "received_total": 294, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "01:46:34", "received": 25, "acted": 23, "rate_limited": 2, "forced": 0, "received_total": 319, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+== cell C native_decoder_20261028_020047_786.json ['2026-10-28T01:49:14.452Z', '2026-10-28T02:00:47.819Z'] 11.56 min
+ report {"loss_guard_mode": "guard", "frames_after_dropped_reference": 295, "loss_guard_episodes": 38, "loss_guard_frames_held": 295, "loss_guard_timeouts": 0, "loss_guard_max_wait_ms": 268, "keyframe_requests_sent": 38, "link_notice_shown": 0, "duration_ms": 698491, "video": {"lost_packets": 157, "lost_packets_in_resyncs": 0, "dropped_frames": 46, "sequence_gap_au_drops": 43, "incomplete_au_drops": 4, "non_idr_aus_dropped_waiting_for_idr": 0}, "decoder": {"rendered_frames": 41515, "dropped_frames": 12, "max_output_gap_ms": 351}}
+ cost {"episodes_per_min": 3.3, "held_per_min": 25.5, "frames_per_episode": 7.76, "ms_per_episode_at_60fps": 129, "full_minute_episodes": [], "full_minute_counter": []}
+ events {'session_started': 1, 'session_ended': 1, 'session_end_bye': 1, 'state_save_skipped': 1} holds 0 stall rows 0 teardown [{'at': '02:00:46.854', 'event': 'session_end_bye'}, {'at': '02:00:47.555', 'event': 'state_save_skipped', 'reason': 'client_bye', 'silence_ms': 401.0}, {'at': '02:00:47.819', 'event': 'session_ended'}]
+ config [('restart_fast_unlock_config', {}), ('restart_fast_config', {}), ('restart_fast_unlock_config', {}), ('restart_fast_config', {})]
+ silences {"streaming_s": 674, "silences": 1, "silences_per10": 0.89, "bins": {"250-300": 1, "300-400": 0, "400-500": 0, "500-600": 0, "600-800": 0, "800-1000": 0, "1000-1500": 0, "1500-inf": 0}, "max_ms": 258} | hitch {"hitch_seconds": 4, "play_min": 11.5, "per_10_min": 3.5, "longest_run_s": 1, "by_criterion": {"R": 3, "C": 1}} | freq {5180: 341} | notice {0: 341}
+ minute | hb | counter | held | unheld | episodes | lost | rendered

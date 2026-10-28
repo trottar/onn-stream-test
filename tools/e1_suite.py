@@ -71,7 +71,9 @@ PKG = "com.safeiot.privyhub"
 # host's restart_fast response key; absent = CL-B12's client); the previous CONFIRMED APK was 20e3e339... (CL-B12)
 # CL-B14 (installed 2026-10-26, CONFIRMED 2026-10-27): + B25 APK (the 2.4-GHz link notice ON when
 # debug.privyhub.link_notice is absent, `0` = off; armed, 0 on 5 GHz); the previous CONFIRMED APK was 6bddafc0... (CL-B13)
-EXPECT_APK = "fcd924c28cbf70a85bb9a886caabcb07873eee2d028b6538284fce5a7ae39b96"
+# CL-B15 (installed 2026-10-28, CONFIRMED 2026-10-28): + B27 APK (the loss guard ON when
+# debug.privyhub.loss_guard is absent, `0` = off, `count` as before); the previous CONFIRMED APK was fcd924c2... (CL-B14)
+EXPECT_APK = "8b0fbb74d110ad89b6c1f9e69355abc3b5713b69055d3e8fa02b898108ee3f4e"
 LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
 # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
 # is exactly these two names, at every precondition and teardown

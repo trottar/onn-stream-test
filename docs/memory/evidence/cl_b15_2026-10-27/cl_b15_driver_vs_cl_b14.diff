@@ -1,0 +1,83 @@
+2,13c2,11
+< """CL-B14 -- B24's unlocked fast restart (PRIVYHUB_RESTART_FAST_UNLOCK=1, inside the adopted PRIVYHUB_RESTART_FAST=1)
+< at four Home returns, with B25's client APK fcd924c2... (the 2.4-GHz link notice on by default) and EVERY client property
+< EMPTY (no setprop anywhere), as pre-registered (cl_b14_preregistration.txt), DETACHED. From cl_b13_driver.py (CL-B13's
+< driver; the diff is cl_b14_driver_vs_cl_b13.diff). One launch, unit privyhub-cl-b14:
+<   - the cell: PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 + PRIVYHUB_RESTART_FAST_UNLOCK=1 (11 + 2 = 13 lines at the
+<     stream), window 600; the user presses Home four times (two through the PrivyHub menu, two through recents / the tile).
+<   E1-SNES-STREAM (snes9x, adopted), gap 120; session B's exact strings (SESSION_B_DONE_2026-10-26I.md items 2-5).
+< Changed from cl_b13_driver.py:
+<   - the cells table (one cell, above); no --cell (the one cell is the launch); eleven adopted lines (G-A5), so the
+<     drop-in carries the impairment line and the cell's flag;
+<   - restart_fast_config and restart_fast_unlock_config read from the recovery log after the cell's restart (and the dry
+<     run's), kept as config_rows;
+---
+> """CL-B15 -- B27's loss guard on by default in the client (APK 8b0fbb74...), every client property EMPTY (no setprop
+> anywhere), two detached bench cells in one launch, as pre-registered (cl_b15_preregistration.txt). From cl_b14_driver.py
+> (CL-B14's driver; the diff is cl_b15_driver_vs_cl_b14.diff). Unit privyhub-cl-b15:
+>   - cell L: PRIVYHUB_IMPAIRMENT=loss-1@post-fec,seed=1 + PRIVYHUB_LOSS_GUARD=1 (12 + 2 = 14 lines at the stream);
+>   - cell C: PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 only (13 lines; the client's absent-key path, the host as adopted).
+>   E1-PS1-STREAM (the fixture; the suite's own counter override), window 600, gap 120; session B's exact strings
+>   (SESSION_B_DONE_2026-10-27J.md items 3-6; BENCH-R3 E's impairment line).
+> Changed from cl_b14_driver.py:
+>   - the cells table (two cells, above); twelve adopted lines (G-A7);
+>   - config_rows() also reads loss_guard_config;
+15,16c13,14
+<     (~/privyhub_cl_b14/STOP); "adopted11".
+< Kept: the seven properties read back EMPTY before and after the cell and at the close (none is set), tools/e3_state.py
+---
+>     (~/privyhub_cl_b15/STOP); "adopted12".
+> Kept: the seven properties read back EMPTY before and after each cell and at the close (none is set), tools/e3_state.py
+36c34
+< CALL = HERE / "cl_b14_suite_call.py"
+---
+> CALL = HERE / "cl_b15_suite_call.py"
+38,39c36,37
+< PRE = HERE / "cl_b14_preregistration.txt"
+< WATCH = Path.home() / "privyhub_cl_b14"
+---
+> PRE = HERE / "cl_b15_preregistration.txt"
+> WATCH = Path.home() / "privyhub_cl_b15"
+64c62
+< TAG = "cl_b14" + SUF
+---
+> TAG = "cl_b15" + SUF
+79c77
+< UNLOCK = ["PRIVYHUB_RESTART_FAST_UNLOCK=1"]   # B24 (host), inside the adopted PRIVYHUB_RESTART_FAST=1 (G-A5)
+---
+> GUARD = ["PRIVYHUB_LOSS_GUARD=1"]      # B10 (host): the keyframe-request counter and the loss_guard_config row
+81,84c79,82
+< SNES = "E1-SNES-STREAM"
+< # session B's exact strings (SESSION_B_DONE_2026-10-26I.md items 2-5); PRIVYHUB_SNES_CORE=snes9x, PRIVYHUB_LINK_RECOVERY=1
+< # and PRIVYHUB_RESTART_FAST=1 are adopted, in every environ, not repeated
+< HOME = "5 GHz, Home at PLAYING + 2 (menu), + 4 (recents / tile), + 6 (menu), + 8 min (recents / tile)"
+---
+> LOSS1 = "loss-1@post-fec,seed=1"      # BENCH-R3 E's line (B: "loss-1pct" does not parse)
+> PS1 = "E1-PS1-STREAM"
+> # session B's exact strings (SESSION_B_DONE_2026-10-27J.md items 4-5); the twelve adopted lines are in every environ,
+> # not repeated
+86c84,85
+<     {"n": 1, "cell": "1_snes_home_returns_restart_fast_unlock", "spec": NONE, "profile": "none", "extra": UNLOCK, "props": P1, "wid": SNES, "arm": HOME + ", PRIVYHUB_RESTART_FAST_UNLOCK=1", "window": 600},
+---
+>     {"n": 1, "cell": "L_ps1_loss-1_guard_flag", "spec": LOSS1, "profile": "loss-1", "extra": GUARD, "props": P1, "wid": PS1, "arm": "L: loss-1 + PRIVYHUB_LOSS_GUARD=1, no property", "window": 600},
+>     {"n": 2, "cell": "C_ps1_clean_no_flag", "spec": NONE, "profile": "none", "extra": [], "props": P1, "wid": PS1, "arm": "C: clean, no flag, no property", "window": 600},
+235c234
+<                 f"next: {s['next']} | state: {s['state']} | cap {CAP_UTC} | stop: touch ~/privyhub_cl_b14/STOP\n")
+---
+>                 f"next: {s['next']} | state: {s['state']} | cap {CAP_UTC} | stop: touch ~/privyhub_cl_b15/STOP\n")
+262c261
+<     """The eleven-line adopted state (G-A5), read back: the suite's own preflight."""
+---
+>     """The twelve-line adopted state (G-A7), read back: the suite's own preflight."""
+267c266
+<     return p, ("adopted11 ok" if p.get("ok") else f"NOT ok (environ {len(p.get('environ') or [])} lines, game {p.get('game_active')})")
+---
+>     return p, ("adopted12 ok" if p.get("ok") else f"NOT ok (environ {len(p.get('environ') or [])} lines, game {p.get('game_active')})")
+394c393
+< CONFIG_EVENTS = ("restart_fast_config", "restart_fast_unlock_config")
+---
+> CONFIG_EVENTS = ("restart_fast_config", "restart_fast_unlock_config", "loss_guard_config")
+398c397
+<     """restart_fast_config and restart_fast_unlock_config written to the recovery log since t0 (the cell's or the dry
+---
+>     """restart_fast_config, restart_fast_unlock_config and loss_guard_config written to the recovery log since t0 (the cell's or the dry
