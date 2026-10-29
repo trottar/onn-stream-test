@@ -73,7 +73,10 @@ PKG = "com.safeiot.privyhub"
 # debug.privyhub.link_notice is absent, `0` = off; armed, 0 on 5 GHz); the previous CONFIRMED APK was 6bddafc0... (CL-B13)
 # CL-B15 (installed 2026-10-28, CONFIRMED 2026-10-28): + B27 APK (the loss guard ON when
 # debug.privyhub.loss_guard is absent, `0` = off, `count` as before); the previous CONFIRMED APK was fcd924c2... (CL-B14)
-EXPECT_APK = "8b0fbb74d110ad89b6c1f9e69355abc3b5713b69055d3e8fa02b898108ee3f4e"
+# CL-B16 (installed 2026-10-29, CONFIRMED 2026-10-29): + B29 APK (a loss-guard hold is not a stall: the stall monitor
+# decides on the time since the last frame received while a hold is open; the cap on the hold's own clock); the previous
+# CONFIRMED APK was 8b0fbb74... (CL-B15)
+EXPECT_APK = "9719ea822ed5f7d13799ff7e02ba814cd0a2abe79b8a2e3d631d0aecb13c0110"
 LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
 # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
 # is exactly these two names, at every precondition and teardown

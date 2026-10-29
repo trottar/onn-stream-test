@@ -1,0 +1,3688 @@
+{
+ "1": {
+  "report_file": "native_decoder_20261029_205354_131.json",
+  "report": {
+   "loss_guard_mode": "guard",
+   "frames_after_dropped_reference": 848,
+   "loss_guard_episodes": 86,
+   "loss_guard_frames_held": 846,
+   "loss_guard_timeouts": 2,
+   "loss_guard_max_wait_ms": 656,
+   "loss_guard_max_hold_ms": 604,
+   "keyframe_requests_sent": 86,
+   "link_notice_shown": 0,
+   "duration_ms": 698310,
+   "stall_signal_ms": 150,
+   "stall_signal_stalls_sent": 64,
+   "stall_signal_ends_sent": 62,
+   "video": {
+    "lost_packets": 497,
+    "lost_packets_in_resyncs": 0,
+    "dropped_frames": 126,
+    "sequence_gap_au_drops": 117,
+    "incomplete_au_drops": 14,
+    "non_idr_aus_dropped_waiting_for_idr": 0
+   },
+   "decoder": {
+    "rendered_frames": 40866,
+    "dropped_frames": 15,
+    "max_output_gap_ms": 692
+   }
+  },
+  "session": [
+   "2026-10-29T20:42:21.075Z",
+   "2026-10-29T20:53:54.160Z"
+  ],
+  "session_min": 11.55,
+  "per_minute": {},
+  "keyframe_requests": [],
+  "config_rows": [
+   {
+    "at_utc": "2026-10-29T20:39:58.793Z",
+    "audio_join_cap_s": 10.0,
+    "capture_bound_s": 0.3,
+    "event": "restart_fast_unlock_config",
+    "kill_grace_s": 0.1,
+    "startup_check_s": 0.75,
+    "state": "ENDED"
+   },
+   {
+    "at_utc": "2026-10-29T20:39:58.793Z",
+    "event": "restart_fast_config",
+    "lock_wait_s": 2.0,
+    "startup_check_s": 0.75,
+    "state": "ENDED"
+   },
+   {
+    "at_utc": "2026-10-29T20:54:08.594Z",
+    "audio_join_cap_s": 10.0,
+    "capture_bound_s": 0.3,
+    "event": "restart_fast_unlock_config",
+    "kill_grace_s": 0.1,
+    "startup_check_s": 0.75,
+    "state": "ENDED"
+   },
+   {
+    "at_utc": "2026-10-29T20:54:08.594Z",
+    "event": "restart_fast_config",
+    "lock_wait_s": 2.0,
+    "startup_check_s": 0.75,
+    "state": "ENDED"
+   }
+  ],
+  "events": {
+   "state_saved": 9,
+   "session_started": 1,
+   "session_ended": 1,
+   "session_end_bye": 1,
+   "state_save_skipped": 1
+  },
+  "holds": 16,
+  "stall_rows": 0,
+  "teardown": [
+   {
+    "at": "20:53:53.229",
+    "event": "session_end_bye"
+   },
+   {
+    "at": "20:53:53.947",
+    "event": "state_save_skipped",
+    "reason": "client_bye",
+    "silence_ms": 401.2
+   },
+   {
+    "at": "20:53:54.160",
+    "event": "session_ended"
+   }
+  ],
+  "silences": {
+   "streaming_s": 673,
+   "silences": 5,
+   "silences_per10": 4.46,
+   "bins": {
+    "250-300": 2,
+    "300-400": 2,
+    "400-500": 1,
+    "500-600": 0,
+    "600-800": 0,
+    "800-1000": 0,
+    "1000-1500": 0,
+    "1500-inf": 0
+   },
+   "max_ms": 402
+  },
+  "hitch": {
+   "hitch_seconds": 18,
+   "play_min": 11.5,
+   "per_10_min": 15.6,
+   "longest_run_s": 3,
+   "by_criterion": {
+    "R": 15,
+    "C": 5,
+    "L": 2
+   }
+  },
+  "freq": {
+   "5180": 341
+  },
+  "notice": {
+   "0": 341
+  },
+  "heartbeats": 341,
+  "cost": {
+   "episodes_per_min": 7.4,
+   "held_per_min": 73.2,
+   "frames_per_episode": 9.84,
+   "ms_per_episode_at_60fps": 164,
+   "full_minute_episodes": [],
+   "full_minute_counter": []
+  },
+  "stall_rows_detail": [
+   {
+    "at": "20:42:37.443",
+    "event": "client_stall",
+    "age_ms": 578,
+    "trigger": null,
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "20:42:37.443",
+    "event": "desync_pause",
+    "age_ms": 578.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "20:43:08.626",
+    "event": "client_stall",
+    "age_ms": 554,
+    "trigger": null,
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "20:43:08.626",
+    "event": "desync_pause",
+    "age_ms": 554.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "20:43:28.944",
+    "event": "client_stall",
+    "age_ms": 604,
+    "trigger": null,
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": [
+     319.7
+    ]
+   },
+   {
+    "at": "20:43:28.944",
+    "event": "desync_pause",
+    "age_ms": 604.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": [
+     319.7
+    ]
+   },
+   {
+    "at": "20:43:29.794",
+    "event": "client_stall",
+    "age_ms": 682,
+    "trigger": null,
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": [
+     319.7
+    ]
+   },
+   {
+    "at": "20:43:29.794",
+    "event": "desync_pause",
+    "age_ms": 682.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": [
+     319.7
+    ]
+   },
+   {
+    "at": "20:44:24.611",
+    "event": "client_stall",
+    "age_ms": 535,
+    "trigger": null,
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "20:44:24.611",
+    "event": "desync_pause",
+    "age_ms": 535.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "20:46:44.980",
+    "event": "client_stall",
+    "age_ms": 406,
+    "trigger": null,
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": [
+     280.3
+    ]
+   },
+   {
+    "at": "20:46:44.980",
+    "event": "desync_pause",
+    "age_ms": 406.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": [
+     280.3
+    ]
+   },
+   {
+    "at": "20:46:45.929",
+    "event": "client_stall",
+    "age_ms": 618,
+    "trigger": null,
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": [
+     280.3
+    ]
+   },
+   {
+    "at": "20:46:45.929",
+    "event": "desync_pause",
+    "age_ms": 618.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": [
+     280.3
+    ]
+   },
+   {
+    "at": "20:53:49.105",
+    "event": "client_stall",
+    "age_ms": 489,
+    "trigger": null,
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "20:53:49.105",
+    "event": "desync_pause",
+    "age_ms": 489.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": []
+   }
+  ],
+  "ladder_states": {
+   "7000 PRESSURE pressure_sample": 50,
+   "7000 REFERENCE clean": 254,
+   "7000 REFERENCE no_evidence": 40
+  },
+  "ladder_events": [
+   {
+    "at_utc": "2026-10-29T20:39:58.519Z",
+    "event": "session_ended_reset",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:39:58.794Z",
+    "event": "controller_start",
+    "level_kbps": null,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:42:17.130Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:42:20.509Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:42:21.076Z",
+    "event": "session_ended_reset",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:42:24.509Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:42:26.559Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:42:38.682Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:42:40.714Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:42:42.768Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:42:46.806Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:42:52.836Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:42:54.847Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:42:56.895Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:42:58.877Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:43:08.965Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:43:11.006Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:43:19.072Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:43:21.078Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:43:29.468Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:43:31.177Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:43:43.627Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:43:45.283Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:43:51.313Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:43:53.329Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:44:11.469Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:44:13.478Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:44:17.516Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:44:19.527Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:44:41.755Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:44:43.915Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:45:04.202Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:45:06.236Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:45:16.275Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:45:18.322Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:45:20.319Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:45:22.320Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:45:42.580Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:45:44.682Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:45:58.808Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:46:00.815Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:46:07.013Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:46:11.030Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:46:43.386Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:46:49.574Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:46:53.601Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:46:55.668Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:46:57.679Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:46:59.706Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:47:32.226Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:47:34.229Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:48:00.646Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:48:02.679Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:48:10.801Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:48:12.806Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:48:18.872Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:48:20.868Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:48:35.167Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:48:39.205Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:48:43.225Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:48:45.232Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:49:17.729Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:49:19.733Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:50:00.267Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:50:02.276Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:50:20.554Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:50:22.545Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:50:36.707Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:50:38.819Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:50:55.055Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:50:57.111Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "no_evidence",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:51:07.144Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:51:09.242Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:51:17.341Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:51:19.297Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:51:33.434Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:51:37.468Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "no_evidence",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:52:14.067Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:52:16.086Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "no_evidence",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:52:46.369Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:52:48.385Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:53:28.918Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:53:33.024Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:53:43.511Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:53:45.181Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:53:49.225Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:53:51.303Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "no_evidence",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:53:54.160Z",
+    "event": "session_ended_reset",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:53:54.252Z",
+    "event": "session_ended_reset",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:54:08.042Z",
+    "event": "session_ended_reset",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T20:54:08.595Z",
+    "event": "controller_start",
+    "level_kbps": null,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": null
+   }
+  ]
+ },
+ "2": {
+  "report_file": "native_decoder_20261029_212822_303.json",
+  "report": {
+   "loss_guard_mode": "guard",
+   "frames_after_dropped_reference": 619,
+   "loss_guard_episodes": 61,
+   "loss_guard_frames_held": 619,
+   "loss_guard_timeouts": 0,
+   "loss_guard_max_wait_ms": 527,
+   "loss_guard_max_hold_ms": 527,
+   "keyframe_requests_sent": 61,
+   "link_notice_shown": 0,
+   "duration_ms": 817758,
+   "stall_signal_ms": 150,
+   "stall_signal_stalls_sent": 56,
+   "stall_signal_ends_sent": 49,
+   "video": {
+    "lost_packets": 299,
+    "lost_packets_in_resyncs": 0,
+    "dropped_frames": 99,
+    "sequence_gap_au_drops": 77,
+    "incomplete_au_drops": 10,
+    "non_idr_aus_dropped_waiting_for_idr": 14
+   },
+   "decoder": {
+    "rendered_frames": 48233,
+    "dropped_frames": 39,
+    "max_output_gap_ms": 547
+   }
+  },
+  "session": [
+   "2026-10-29T21:14:49.396Z",
+   "2026-10-29T21:28:22.366Z"
+  ],
+  "session_min": 13.55,
+  "per_minute": {},
+  "keyframe_requests": [],
+  "config_rows": [
+   {
+    "at_utc": "2026-10-29T21:12:27.144Z",
+    "audio_join_cap_s": 10.0,
+    "capture_bound_s": 0.3,
+    "event": "restart_fast_unlock_config",
+    "kill_grace_s": 0.1,
+    "startup_check_s": 0.75,
+    "state": "ENDED"
+   },
+   {
+    "at_utc": "2026-10-29T21:12:27.144Z",
+    "event": "restart_fast_config",
+    "lock_wait_s": 2.0,
+    "startup_check_s": 0.75,
+    "state": "ENDED"
+   },
+   {
+    "at_utc": "2026-10-29T21:28:34.940Z",
+    "audio_join_cap_s": 10.0,
+    "capture_bound_s": 0.3,
+    "event": "restart_fast_unlock_config",
+    "kill_grace_s": 0.1,
+    "startup_check_s": 0.75,
+    "state": "ENDED"
+   },
+   {
+    "at_utc": "2026-10-29T21:28:34.940Z",
+    "event": "restart_fast_config",
+    "lock_wait_s": 2.0,
+    "startup_check_s": 0.75,
+    "state": "ENDED"
+   }
+  ],
+  "events": {
+   "state_saved": 5,
+   "session_started": 1,
+   "session_ended": 1,
+   "session_end_bye": 1,
+   "state_save_skipped": 1
+  },
+  "holds": 10,
+  "stall_rows": 0,
+  "teardown": [
+   {
+    "at": "21:28:20.973",
+    "event": "session_end_bye"
+   },
+   {
+    "at": "21:28:21.758",
+    "event": "state_save_skipped",
+    "reason": "client_bye",
+    "silence_ms": 400.9
+   },
+   {
+    "at": "21:28:22.366",
+    "event": "session_ended"
+   }
+  ],
+  "silences": {
+   "streaming_s": 793,
+   "silences": 2,
+   "silences_per10": 1.51,
+   "bins": {
+    "250-300": 1,
+    "300-400": 1,
+    "400-500": 0,
+    "500-600": 0,
+    "600-800": 0,
+    "800-1000": 0,
+    "1000-1500": 0,
+    "1500-inf": 0
+   },
+   "max_ms": 334
+  },
+  "hitch": {
+   "hitch_seconds": 11,
+   "play_min": 13.5,
+   "per_10_min": 8.1,
+   "longest_run_s": 1,
+   "by_criterion": {
+    "C": 2,
+    "R": 9,
+    "L": 1
+   }
+  },
+  "freq": {
+   "5180": 399
+  },
+  "notice": {
+   "0": 399
+  },
+  "heartbeats": 399,
+  "cost": {
+   "episodes_per_min": 4.5,
+   "held_per_min": 45.7,
+   "frames_per_episode": 10.15,
+   "ms_per_episode_at_60fps": 169,
+   "full_minute_episodes": [],
+   "full_minute_counter": []
+  },
+  "stall_rows_detail": [
+   {
+    "at": "21:18:36.766",
+    "event": "client_stall",
+    "age_ms": 540,
+    "trigger": null,
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": [
+     333.4
+    ]
+   },
+   {
+    "at": "21:18:36.766",
+    "event": "desync_pause",
+    "age_ms": 540.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": [
+     333.4
+    ]
+   },
+   {
+    "at": "21:23:49.657",
+    "event": "desync_pause",
+    "age_ms": 433.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:23:49.658",
+    "event": "client_stall",
+    "age_ms": 433,
+    "trigger": null,
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:24:03.141",
+    "event": "client_stall",
+    "age_ms": 450,
+    "trigger": null,
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:24:03.141",
+    "event": "desync_pause",
+    "age_ms": 450.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:25:16.443",
+    "event": "client_stall",
+    "age_ms": 539,
+    "trigger": null,
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:25:16.443",
+    "event": "desync_pause",
+    "age_ms": 539.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:25:23.193",
+    "event": "client_stall",
+    "age_ms": 510,
+    "trigger": null,
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:25:23.193",
+    "event": "desync_pause",
+    "age_ms": 510.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": null,
+    "guard_episodes_delta_around": null,
+    "uplink_silence_ge250_within_2s": []
+   }
+  ],
+  "ladder_states": {
+   "4000 RECOVERY_PROBATION counting_clean_reports": 95,
+   "5000 HOLD_DOWN increase_increase": 1,
+   "5000 HOLD_DOWN blackout": 3,
+   "5000 RECOVERY_PROBATION counting_clean_reports": 169,
+   "5500 HOLD_DOWN increase_increase": 1,
+   "5500 HOLD_DOWN blackout": 3,
+   "5500 RECOVERY_PROBATION counting_clean_reports": 130
+  },
+  "ladder_events": [
+   {
+    "at_utc": "2026-10-29T21:12:26.886Z",
+    "event": "session_ended_reset",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:12:27.146Z",
+    "event": "controller_start",
+    "level_kbps": null,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:14:43.078Z",
+    "event": "remote_cap_config",
+    "level_kbps": null,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": "lan"
+   },
+   {
+    "at_utc": "2026-10-29T21:14:45.297Z",
+    "event": "level_sync",
+    "level_kbps": 4000,
+    "from_kbps": 7000,
+    "to_kbps": 4000,
+    "reason": null,
+    "path_class": "remote"
+   },
+   {
+    "at_utc": "2026-10-29T21:14:45.297Z",
+    "event": "state",
+    "level_kbps": 4000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "counting_clean_reports",
+    "path_class": "remote"
+   },
+   {
+    "at_utc": "2026-10-29T21:14:49.396Z",
+    "event": "session_ended_reset",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": "remote"
+   },
+   {
+    "at_utc": "2026-10-29T21:14:50.323Z",
+    "event": "level_sync",
+    "level_kbps": 4000,
+    "from_kbps": 7000,
+    "to_kbps": 4000,
+    "reason": null,
+    "path_class": "remote"
+   },
+   {
+    "at_utc": "2026-10-29T21:14:50.323Z",
+    "event": "state",
+    "level_kbps": 4000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "counting_clean_reports",
+    "path_class": "remote"
+   },
+   {
+    "at_utc": "2026-10-29T21:17:57.313Z",
+    "event": "transition",
+    "level_kbps": 5000,
+    "from_kbps": 4000,
+    "to_kbps": 5000,
+    "reason": "increase_increase",
+    "path_class": "remote"
+   },
+   {
+    "at_utc": "2026-10-29T21:17:58.283Z",
+    "event": "transition_done",
+    "level_kbps": 5000,
+    "from_kbps": 4000,
+    "to_kbps": 5000,
+    "reason": null,
+    "path_class": "remote"
+   },
+   {
+    "at_utc": "2026-10-29T21:18:05.552Z",
+    "event": "state",
+    "level_kbps": 5000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "counting_clean_reports",
+    "path_class": "remote"
+   },
+   {
+    "at_utc": "2026-10-29T21:23:48.904Z",
+    "event": "transition",
+    "level_kbps": 5500,
+    "from_kbps": 5000,
+    "to_kbps": 5500,
+    "reason": "increase_increase",
+    "path_class": "remote"
+   },
+   {
+    "at_utc": "2026-10-29T21:23:50.060Z",
+    "event": "transition_done",
+    "level_kbps": 5500,
+    "from_kbps": 5000,
+    "to_kbps": 5500,
+    "reason": null,
+    "path_class": "remote"
+   },
+   {
+    "at_utc": "2026-10-29T21:23:56.926Z",
+    "event": "state",
+    "level_kbps": 5500,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "counting_clean_reports",
+    "path_class": "remote"
+   },
+   {
+    "at_utc": "2026-10-29T21:28:22.367Z",
+    "event": "session_ended_reset",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": "remote"
+   },
+   {
+    "at_utc": "2026-10-29T21:28:22.863Z",
+    "event": "session_ended_reset",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": "remote"
+   },
+   {
+    "at_utc": "2026-10-29T21:28:34.654Z",
+    "event": "session_ended_reset",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": "remote"
+   },
+   {
+    "at_utc": "2026-10-29T21:28:34.942Z",
+    "event": "controller_start",
+    "level_kbps": null,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": null
+   }
+  ]
+ },
+ "3": {
+  "report_file": "native_decoder_20261029_214723_933.json",
+  "report": {
+   "loss_guard_mode": "guard",
+   "frames_after_dropped_reference": 3290,
+   "loss_guard_episodes": 411,
+   "loss_guard_frames_held": 3290,
+   "loss_guard_timeouts": 0,
+   "loss_guard_max_wait_ms": 469,
+   "loss_guard_max_hold_ms": 469,
+   "keyframe_requests_sent": 411,
+   "link_notice_shown": 0,
+   "duration_ms": 698120,
+   "stall_signal_ms": 150,
+   "stall_signal_stalls_sent": 220,
+   "stall_signal_ends_sent": 219,
+   "video": {
+    "lost_packets": 1442,
+    "lost_packets_in_resyncs": 128,
+    "dropped_frames": 504,
+    "sequence_gap_au_drops": 481,
+    "incomplete_au_drops": 29,
+    "non_idr_aus_dropped_waiting_for_idr": 9
+   },
+   "decoder": {
+    "rendered_frames": 37993,
+    "dropped_frames": 7,
+    "max_output_gap_ms": 605
+   }
+  },
+  "session": [
+   "2026-10-29T21:35:50.909Z",
+   "2026-10-29T21:47:23.972Z"
+  ],
+  "session_min": 11.55,
+  "per_minute": {
+   "21:35": {
+    "hb": 6,
+    "counter": 93,
+    "held": 93,
+    "episodes": 11,
+    "lost": 125,
+    "rendered": 702,
+    "unheld": 0
+   },
+   "21:36": {
+    "hb": 29,
+    "counter": 260,
+    "held": 260,
+    "episodes": 39,
+    "lost": 296,
+    "rendered": 3201,
+    "unheld": 0
+   },
+   "21:37": {
+    "hb": 30,
+    "counter": 273,
+    "held": 273,
+    "episodes": 35,
+    "lost": 190,
+    "rendered": 3320,
+    "unheld": 0
+   },
+   "21:38": {
+    "hb": 29,
+    "counter": 259,
+    "held": 259,
+    "episodes": 31,
+    "lost": 52,
+    "rendered": 3227,
+    "unheld": 0
+   },
+   "21:39": {
+    "hb": 30,
+    "counter": 328,
+    "held": 328,
+    "episodes": 40,
+    "lost": 99,
+    "rendered": 3263,
+    "unheld": 0
+   },
+   "21:40": {
+    "hb": 30,
+    "counter": 349,
+    "held": 349,
+    "episodes": 36,
+    "lost": 125,
+    "rendered": 3240,
+    "unheld": 0
+   },
+   "21:41": {
+    "hb": 29,
+    "counter": 190,
+    "held": 190,
+    "episodes": 24,
+    "lost": 41,
+    "rendered": 3308,
+    "unheld": 0
+   },
+   "21:42": {
+    "hb": 30,
+    "counter": 312,
+    "held": 312,
+    "episodes": 40,
+    "lost": 87,
+    "rendered": 3287,
+    "unheld": 0
+   },
+   "21:43": {
+    "hb": 29,
+    "counter": 291,
+    "held": 291,
+    "episodes": 35,
+    "lost": 74,
+    "rendered": 3197,
+    "unheld": 0
+   },
+   "21:44": {
+    "hb": 30,
+    "counter": 259,
+    "held": 259,
+    "episodes": 32,
+    "lost": 70,
+    "rendered": 3356,
+    "unheld": 0
+   },
+   "21:45": {
+    "hb": 30,
+    "counter": 241,
+    "held": 241,
+    "episodes": 33,
+    "lost": 62,
+    "rendered": 3366,
+    "unheld": 0
+   },
+   "21:46": {
+    "hb": 29,
+    "counter": 353,
+    "held": 353,
+    "episodes": 46,
+    "lost": 203,
+    "rendered": 3102,
+    "unheld": 0
+   },
+   "21:47": {
+    "hb": 11,
+    "counter": 82,
+    "held": 82,
+    "episodes": 9,
+    "lost": 18,
+    "rendered": 1244,
+    "unheld": 0
+   }
+  },
+  "keyframe_requests": [
+   {
+    "at": "21:36:29",
+    "received": 35,
+    "acted": 25,
+    "rate_limited": 10,
+    "forced": 0,
+    "received_total": 35,
+    "forced_total": 0,
+    "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"
+   },
+   {
+    "at": "21:37:30",
+    "received": 34,
+    "acted": 29,
+    "rate_limited": 5,
+    "forced": 0,
+    "received_total": 69,
+    "forced_total": 0,
+    "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"
+   },
+   {
+    "at": "21:38:30",
+    "received": 37,
+    "acted": 29,
+    "rate_limited": 8,
+    "forced": 0,
+    "received_total": 106,
+    "forced_total": 0,
+    "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"
+   },
+   {
+    "at": "21:39:31",
+    "received": 36,
+    "acted": 31,
+    "rate_limited": 5,
+    "forced": 0,
+    "received_total": 142,
+    "forced_total": 0,
+    "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"
+   },
+   {
+    "at": "21:40:32",
+    "received": 36,
+    "acted": 28,
+    "rate_limited": 8,
+    "forced": 0,
+    "received_total": 178,
+    "forced_total": 0,
+    "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"
+   },
+   {
+    "at": "21:41:32",
+    "received": 29,
+    "acted": 26,
+    "rate_limited": 3,
+    "forced": 0,
+    "received_total": 207,
+    "forced_total": 0,
+    "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"
+   },
+   {
+    "at": "21:42:33",
+    "received": 35,
+    "acted": 30,
+    "rate_limited": 5,
+    "forced": 0,
+    "received_total": 242,
+    "forced_total": 0,
+    "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"
+   },
+   {
+    "at": "21:43:33",
+    "received": 37,
+    "acted": 33,
+    "rate_limited": 4,
+    "forced": 0,
+    "received_total": 279,
+    "forced_total": 0,
+    "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"
+   },
+   {
+    "at": "21:44:33",
+    "received": 33,
+    "acted": 28,
+    "rate_limited": 5,
+    "forced": 0,
+    "received_total": 312,
+    "forced_total": 0,
+    "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"
+   },
+   {
+    "at": "21:45:34",
+    "received": 34,
+    "acted": 28,
+    "rate_limited": 6,
+    "forced": 0,
+    "received_total": 346,
+    "forced_total": 0,
+    "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"
+   },
+   {
+    "at": "21:46:34",
+    "received": 36,
+    "acted": 30,
+    "rate_limited": 6,
+    "forced": 0,
+    "received_total": 382,
+    "forced_total": 0,
+    "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"
+   },
+   {
+    "at": "21:47:35",
+    "received": 29,
+    "acted": 20,
+    "rate_limited": 9,
+    "forced": 0,
+    "received_total": 411,
+    "forced_total": 0,
+    "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"
+   }
+  ],
+  "config_rows": [
+   {
+    "at_utc": "2026-10-29T21:33:28.865Z",
+    "audio_join_cap_s": 10.0,
+    "capture_bound_s": 0.3,
+    "event": "restart_fast_unlock_config",
+    "kill_grace_s": 0.1,
+    "startup_check_s": 0.75,
+    "state": "ENDED"
+   },
+   {
+    "at_utc": "2026-10-29T21:33:28.865Z",
+    "event": "restart_fast_config",
+    "lock_wait_s": 2.0,
+    "startup_check_s": 0.75,
+    "state": "ENDED"
+   },
+   {
+    "at_utc": "2026-10-29T21:33:28.867Z",
+    "control": "NoRuntimeIdr",
+    "event": "loss_guard_config",
+    "ignored": false,
+    "min_interval_ms": 500,
+    "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is fixed at launch; the only path is an encoder restart, whose 287-318-ms output gap exceeds the <= 250-ms wait for the next IDR",
+    "state": "ENDED"
+   },
+   {
+    "at_utc": "2026-10-29T21:47:47.216Z",
+    "audio_join_cap_s": 10.0,
+    "capture_bound_s": 0.3,
+    "event": "restart_fast_unlock_config",
+    "kill_grace_s": 0.1,
+    "startup_check_s": 0.75,
+    "state": "ENDED"
+   },
+   {
+    "at_utc": "2026-10-29T21:47:47.216Z",
+    "event": "restart_fast_config",
+    "lock_wait_s": 2.0,
+    "startup_check_s": 0.75,
+    "state": "ENDED"
+   }
+  ],
+  "events": {
+   "state_saved": 12,
+   "keyframe_requests": 12,
+   "loss_guard_config": 1,
+   "session_started": 1,
+   "session_ended": 1,
+   "session_end_bye": 1,
+   "state_save_skipped": 1
+  },
+  "holds": 24,
+  "stall_rows": 0,
+  "teardown": [
+   {
+    "at": "21:47:22.908",
+    "event": "session_end_bye"
+   },
+   {
+    "at": "21:47:23.704",
+    "event": "state_save_skipped",
+    "reason": "client_bye",
+    "silence_ms": 402.9
+   },
+   {
+    "at": "21:47:23.972",
+    "event": "session_ended"
+   }
+  ],
+  "silences": {
+   "streaming_s": 673,
+   "silences": 0,
+   "silences_per10": 0.0,
+   "bins": {
+    "250-300": 0,
+    "300-400": 0,
+    "400-500": 0,
+    "500-600": 0,
+    "600-800": 0,
+    "800-1000": 0,
+    "1000-1500": 0,
+    "1500-inf": 0
+   },
+   "max_ms": 0
+  },
+  "hitch": {
+   "hitch_seconds": 64,
+   "play_min": 11.5,
+   "per_10_min": 55.6,
+   "longest_run_s": 1,
+   "by_criterion": {
+    "R": 61,
+    "L": 6,
+    "G": 1
+   }
+  },
+  "freq": {
+   "5180": 341
+  },
+  "notice": {
+   "0": 341
+  },
+  "heartbeats": 341,
+  "cost": {
+   "episodes_per_min": 35.6,
+   "held_per_min": 284.8,
+   "frames_per_episode": 8.0,
+   "ms_per_episode_at_60fps": 133,
+   "full_minute_episodes": [
+    39,
+    35,
+    31,
+    40,
+    36,
+    24,
+    40,
+    35,
+    32,
+    33,
+    46
+   ],
+   "full_minute_counter": [
+    260,
+    273,
+    259,
+    328,
+    349,
+    190,
+    312,
+    291,
+    259,
+    241,
+    353
+   ]
+  },
+  "stall_rows_detail": [
+   {
+    "at": "21:39:49.176",
+    "event": "client_stall",
+    "age_ms": 415,
+    "trigger": null,
+    "guard_held_delta_around": 40,
+    "guard_episodes_delta_around": 3,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:39:49.176",
+    "event": "desync_pause",
+    "age_ms": 415.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": 40,
+    "guard_episodes_delta_around": 3,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:39:54.911",
+    "event": "client_stall",
+    "age_ms": 525,
+    "trigger": null,
+    "guard_held_delta_around": 0,
+    "guard_episodes_delta_around": 0,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:39:54.911",
+    "event": "desync_pause",
+    "age_ms": 525.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": 0,
+    "guard_episodes_delta_around": 0,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:40:01.165",
+    "event": "client_stall",
+    "age_ms": 476,
+    "trigger": null,
+    "guard_held_delta_around": 33,
+    "guard_episodes_delta_around": 2,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:40:01.165",
+    "event": "desync_pause",
+    "age_ms": 476.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": 33,
+    "guard_episodes_delta_around": 2,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:40:04.479",
+    "event": "desync_pause",
+    "age_ms": 597.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": 36,
+    "guard_episodes_delta_around": 3,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:40:04.480",
+    "event": "client_stall",
+    "age_ms": 597,
+    "trigger": null,
+    "guard_held_delta_around": 36,
+    "guard_episodes_delta_around": 3,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:40:11.911",
+    "event": "desync_pause",
+    "age_ms": 482.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": 37,
+    "guard_episodes_delta_around": 3,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:40:11.912",
+    "event": "client_stall",
+    "age_ms": 482,
+    "trigger": null,
+    "guard_held_delta_around": 37,
+    "guard_episodes_delta_around": 3,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:40:18.647",
+    "event": "client_stall",
+    "age_ms": 402,
+    "trigger": null,
+    "guard_held_delta_around": 37,
+    "guard_episodes_delta_around": 2,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:40:18.647",
+    "event": "desync_pause",
+    "age_ms": 402.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": 37,
+    "guard_episodes_delta_around": 2,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:40:31.897",
+    "event": "client_stall",
+    "age_ms": 421,
+    "trigger": null,
+    "guard_held_delta_around": 32,
+    "guard_episodes_delta_around": 2,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:40:31.897",
+    "event": "desync_pause",
+    "age_ms": 421.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": 32,
+    "guard_episodes_delta_around": 2,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:42:26.001",
+    "event": "client_stall",
+    "age_ms": 435,
+    "trigger": null,
+    "guard_held_delta_around": 47,
+    "guard_episodes_delta_around": 2,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:42:26.001",
+    "event": "desync_pause",
+    "age_ms": 435.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": 47,
+    "guard_episodes_delta_around": 2,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:42:26.664",
+    "event": "client_stall",
+    "age_ms": 469,
+    "trigger": null,
+    "guard_held_delta_around": 47,
+    "guard_episodes_delta_around": 2,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:42:26.664",
+    "event": "desync_pause",
+    "age_ms": 469.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": 47,
+    "guard_episodes_delta_around": 2,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:42:51.129",
+    "event": "desync_pause",
+    "age_ms": 447.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": 3,
+    "guard_episodes_delta_around": 1,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:42:51.130",
+    "event": "client_stall",
+    "age_ms": 447,
+    "trigger": null,
+    "guard_held_delta_around": 3,
+    "guard_episodes_delta_around": 1,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:43:53.881",
+    "event": "client_stall",
+    "age_ms": 519,
+    "trigger": null,
+    "guard_held_delta_around": 28,
+    "guard_episodes_delta_around": 1,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:43:53.881",
+    "event": "desync_pause",
+    "age_ms": 519.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": 28,
+    "guard_episodes_delta_around": 1,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:44:00.884",
+    "event": "client_stall",
+    "age_ms": 489,
+    "trigger": null,
+    "guard_held_delta_around": 36,
+    "guard_episodes_delta_around": 2,
+    "uplink_silence_ge250_within_2s": []
+   },
+   {
+    "at": "21:44:00.884",
+    "event": "desync_pause",
+    "age_ms": 489.0,
+    "trigger": "client_stall",
+    "guard_held_delta_around": 36,
+    "guard_episodes_delta_around": 2,
+    "uplink_silence_ge250_within_2s": []
+   }
+  ],
+  "ladder_states": {
+   "7000 REFERENCE resync_ignored": 1,
+   "7000 PRESSURE pressure_sample": 118,
+   "7000 REFERENCE clean": 183,
+   "7000 REFERENCE no_evidence": 42
+  },
+  "ladder_events": [
+   {
+    "at_utc": "2026-10-29T21:33:28.579Z",
+    "event": "session_ended_reset",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:33:28.867Z",
+    "event": "controller_start",
+    "level_kbps": null,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:35:47.680Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:35:49.764Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:35:50.909Z",
+    "event": "session_ended_reset",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:35:51.847Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:35:53.879Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "no_evidence",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:35:55.897Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:36:06.110Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "no_evidence",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:36:16.223Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:36:20.262Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:36:22.291Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:36:24.309Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "no_evidence",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:36:28.415Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:36:30.396Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:36:34.639Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:36:36.500Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:36:42.537Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:36:44.534Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:36:48.592Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:36:52.617Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:36:54.628Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:36:56.650Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:37:00.673Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:37:04.824Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:37:08.857Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:37:12.908Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:37:25.103Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:37:27.117Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:37:37.194Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:37:41.254Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:37:47.340Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:37:49.360Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:37:57.420Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:38:01.456Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:38:05.587Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:38:15.651Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:38:27.844Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:38:31.911Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:38:37.939Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:38:39.938Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:38:41.950Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:38:44.013Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:38:56.128Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:39:00.179Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:39:02.166Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:39:04.298Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:39:12.364Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:39:14.386Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:39:22.434Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:39:26.530Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "no_evidence",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:39:28.529Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:39:30.558Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:39:32.557Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:39:34.581Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:39:48.903Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:39:56.811Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:40:00.956Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:40:02.853Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:40:07.034Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:40:09.024Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:40:11.051Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:40:13.069Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:40:17.168Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:40:21.224Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:40:35.363Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:40:39.389Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:40:45.498Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:40:47.531Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:40:59.609Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:41:01.617Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:41:03.644Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:41:07.781Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:41:09.842Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:41:11.829Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:41:21.958Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:41:23.927Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:41:30.041Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:41:32.062Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:41:34.070Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:41:36.088Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:41:38.101Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:41:40.130Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:41:56.317Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:41:58.318Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:42:00.335Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:42:02.350Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "no_evidence",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:42:06.486Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:42:14.531Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:42:26.858Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:42:28.852Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:42:51.134Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:42:53.119Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:42:59.170Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:43:01.232Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:43:03.191Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:43:07.326Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:43:09.342Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:43:11.387Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:43:13.376Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:43:15.376Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:43:27.618Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:43:31.643Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:43:33.653Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:43:35.688Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:43:37.890Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:43:39.920Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:43:41.912Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:43:43.934Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:43:52.010Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:43:56.039Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:44:04.091Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:44:08.269Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:44:10.266Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:44:12.277Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "no_evidence",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:44:14.302Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:44:16.298Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:44:18.326Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:44:20.338Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:44:22.376Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:44:24.377Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:44:28.643Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:44:30.658Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:44:32.666Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:44:34.686Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:44:38.760Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:44:40.985Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:44:45.003Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:44:46.791Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:44:48.838Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:44:50.847Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:45:17.272Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:45:19.270Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:45:21.305Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:45:25.355Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:45:37.388Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:45:39.409Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "no_evidence",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:45:43.431Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:45:45.490Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:45:53.645Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:46:01.677Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:46:09.830Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:46:11.843Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:46:13.854Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:46:17.888Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:46:21.954Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:46:25.988Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:46:28.004Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:46:30.063Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "no_evidence",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:46:40.196Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:46:42.221Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "no_evidence",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:46:46.474Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:46:48.276Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:46:50.397Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:46:52.424Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:46:54.423Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:46:56.438Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "clean",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:47:02.477Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:47:04.496Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "no_evidence",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:47:06.726Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:47:10.722Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "no_evidence",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:47:16.761Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:47:18.780Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "no_evidence",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:47:20.782Z",
+    "event": "state",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": "pressure_sample",
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:47:23.972Z",
+    "event": "session_ended_reset",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:47:24.915Z",
+    "event": "session_ended_reset",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:47:46.939Z",
+    "event": "session_ended_reset",
+    "level_kbps": 7000,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": null
+   },
+   {
+    "at_utc": "2026-10-29T21:47:47.217Z",
+    "event": "controller_start",
+    "level_kbps": null,
+    "from_kbps": null,
+    "to_kbps": null,
+    "reason": null,
+    "path_class": null
+   }
+  ]
+ }
+}

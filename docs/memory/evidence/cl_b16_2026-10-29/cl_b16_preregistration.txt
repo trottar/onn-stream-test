@@ -1,0 +1,132 @@
+CL-B16 — the remote umbrella at home (B28), and the quiet guard (B29), on the bench: pre-registration (session A,
+2026-10-29 UTC; hashed BEFORE the install; covers cells 1, 2 and 3, one detached launch each)
+
+Task: docs/memory/handoffs/CL-B16_REMOTE_UMBRELLA_AND_QUIET_GUARD_TASK.md. Session B's exact strings:
+SESSION_B_DONE_2026-10-28K.md items 5-7 (the APK hash, the drop-ins, the rows U1-U4 / R1-R6 / S1-S5); B28 (the four as
+written start a LAN session at 5000 — the umbrella's point); B29 (a guard hold is not a stall); CL-B15 (cell L's rows
+and numbers; cell C's clean-LAN numbers; cl_b15_driver.py the driver copied); CL-B13 stage 3 (the overlay hand step and
+the overlay check); G4-S4 §3 (the start rung and the climb); the CONFIRMED rule: CL_B7 §6. The watch:
+LINK_N1_LAUNCH_2026-10-23.md.
+
+CAP: each detached launch + 2 h (no cell starts after it; a cell in flight finishes with its own teardown), computed by
+the driver at its launch and shown in its status line. Every cell ends before 04:15Z; no cell could still run at 04:30Z;
+no companion restart 04:30-05:30Z.
+
+The stage is the user's message: the read line = stage 1 (the install, cell 1 launched, exit); "Stage 2" = cell 2 (the
+user has put the onn on the overlay: Tailscale Connect, Hub host = the hub's tailnet name); "Stage 3" = cell 3 (the
+user has put the onn back), then the close, the CONFIRMED rule, the record.
+
+0. State at the hash (~20:4xZ, 2026-10-29)
+- HEAD 4b89d5b (queue K committed; "Queue K done; CL-B16 handoff"); the tree clean but this task's new evidence dir.
+- Twelve adopted lines (G-A7); tools/e3_state.py --check ok, APK 8b0fbb74…3f4e CONFIRMED; no e3_flag.conf; no game;
+  one device, paired; units privyhub-companion and privyhub-link-n1 only.
+- The clock 20:3xZ, outside 04:15-05:30Z.
+- The band, read first: 5180 MHz, 5 GHz, standard 5, RSSI -66.
+- The client on the LAN: the newest token_issued reads routing_evidence lan; Hub host not set.
+- The seven client properties restart_guard, stall_signal, link_notice, link_report, loss_guard, wifi_lock, opus_decode
+  all EMPTY.
+
+1. The install checks (after this file is hashed)
+- 8b0fbb74… stays preserved at PrivyHub/app/build/cl_b15_installed/app-debug.apk (nothing deleted).
+- The candidate is B29's copy /tmp/b_q28k29_scratch/apk/app-debug.apk. It must read sha256
+  9719ea822ed5f7d13799ff7e02ba814cd0a2abe79b8a2e3d631d0aecb13c0110 (B's pin, 9,639,374 B) and carry the same signer as
+  8b0fbb74… (apksigner certificate digests compared, not printed); else nothing is installed. Copied to
+  PrivyHub/app/build/cl_b16_installed/app-debug.apk (gitignored).
+- adb install -r; the device APK read back = 9719ea82…; paired (CL-B4's reader). "Not paired" = stop and tell the user.
+- NO setprop anywhere in this task. The seven properties read back EMPTY after the install, before and after each cell,
+  and at the close.
+- tools/e3_state.py after the install is expected ok False ONLY because the APK reads MISMATCH (the pin moves only by the
+  CONFIRMED rule); the preflight itself ok.
+
+2. The driver
+- cl_b16_driver.py (from cl_b15_driver.py; the diff is cl_b16_driver_vs_cl_b15.diff); cl_b16_suite_call.py (CL-B15's
+  wrapper, only the pre-registration name changed). One cell per launch: `--cell N`, unit privyhub-cl-b16-c<N>. STOP
+  ~/privyhub_cl_b16/STOP; status ~/privyhub_cl_b16/status_c<N>.txt; the log tag [cl_b16_c<N> …].
+- Every cell: gap 120; each drop-in e3_flag.conf read back at the stream and under load, removed at the teardown;
+  flags_absent true after; twelve lines after. tools/e3_state.py once mid-cell. The band every 10 s into
+  runs/<cell>/band.jsonl. The routing class at the stream (the newest token_issued). The encoder's argv per pid
+  (masked; the first one's -b:v kept); the first ladder `sample` row's start_rung; the ladder rows carrying path_class /
+  start_rung / remote_cap; remote_cap_config rows; the recovery log's remote_umbrella_config / remote_config rows (at
+  the stream and at the cell's end); logs/wan_sessions.jsonl line count at the cell's start and end, the new rows kept;
+  /status and /diagnostics/stream-telemetry every 30 s for `wan`. No Opal sampler.
+  - cell 1: PRIVYHUB_REMOTE=1 + PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 (14 lines), E1-SNES-STREAM, window 600, the LAN;
+  - cell 2: PRIVYHUB_REMOTE=1 only (13 lines), E1-SNES-STREAM, window 720, the overlay at home (the user's hand step);
+  - cell 3: PRIVYHUB_IMPAIRMENT=loss-1@post-fec,seed=1 + PRIVYHUB_LOSS_GUARD=1 (14 lines; CL-B15 cell L's),
+    E1-PS1-STREAM (the suite's own RetroArch counter override), window 600, the LAN.
+- A --dry of cell 1 may run first (no stream; the drop-in written, the restart, the rows read — remote_umbrella_config
+  expected — the drop-in removed).
+- Each cell's drop-in restart loads the tree's B28 (it acts only with the line).
+
+3. Cell 1 — the LAN with the umbrella (B item 5, rows as B wrote them)
+  U1 remote_umbrella_config at the start: the four `implied`; the cap's config active, 7000; it applies only on a
+     remote path.
+  U2 one remote_config per client session, class lan, all four in_force false.
+  U3 the LAN unchanged: the encoder's first argv at 7000 (-b:v 7000k); no start_rung and no path_class in any ladder
+     row; no remote_cap_config row; no new logs/wan_sessions.jsonl row; no `wan` in /status.
+  U4 silences, hitch seconds and the guard's freezes as G-A7's window / CL-B15 cell C (the clean LAN with the guard on
+     by default): ~3 freezes a minute (C: 3.3), 0 stall pauses; silences >= 250 ms 0.0-0.89 / 10 min, hitch 2.6-3.5 s /
+     10 min stated beside.
+
+4. Cell 2 — the overlay at home (as CL-B13 stage 3)
+- Before it: privyhub-cl-b16-c1 closed; the overlay check (connected true, the path stated — direct expected — and the
+  devices online by count, two expected); the properties empty; twelve lines.
+  R1 remote_config class remote-direct (recorded as read if remote-relayed / remote-unknown), all four in_force true;
+     the newest token_issued overlay.
+  R2 the first sample row's start_rung = {"kbps": 4000, "source": "floor", "active_list": [4000, 5000, 5500, 6000,
+     7000], "path_class": "remote"}; the encoder's first argv -b:v 4000k.
+  R3 the ladder climbing: transition 4000 -> 5000 ~3 min 07 s in (G4-S4), >= 3 steps in 12 min, no decrease;
+     path_class remote on the ladder rows.
+  R4 remote_cap_config once in the ladder log (active, cap_kbps 7000); 0 remote_cap clamps.
+  R5 `wan` in /status while streaming. The session's logs/wan_sessions.jsonl row: B says it is written at the next
+     session's start, so cell 3's start flushes it; it is read after cell 3's start. DISCLOSED BEFOREHAND: the row is
+     written by the umbrella's telemetry object in the companion process (a new remote session, or the switch to a LAN
+     session, in the same process); cell 2's teardown restarts the companion (the drop-in removed) and cell 3 runs
+     without PRIVYHUB_REMOTE, so the row may never be written. The two parts are recorded separately: R5 /status (the
+     row's test) met or not; the wan_sessions row present or not, with the line counts across cells 2 and 3. A missing
+     row is a finding for B, not a validity failure.
+  R6 the stack's WAN exposure as G4-S4: 0 false holds (a hold / stall pause with no silence >= 250 ms behind it, no
+     Home press).
+- Cell 2 is valid for the R rows only if the routing class at the stream is overlay; else recorded and stated.
+
+5. Cell 3 — the 1 % loss cell with the B29 client
+- Before it: privyhub-cl-b16-c2 closed; the client back on the LAN (the newest token_issued lan, Hub host empty — else the
+  user is told the two steps and the cell waits); the properties empty; twelve lines.
+  S1 0 client_stall / desync_pause rows drawn by guard holds (CL-B15: 9). Any client_stall: its age and whether a hold
+     was open.
+  S2 loss_guard_timeouts (0 expected where no two IDRs in a row are lost; each one's frames stated).
+  S3 loss_guard_frames_held = frames_after_dropped_reference but the frames after a timeout.
+  S4 loss_guard_max_hold_ms <= 616 (the cap + two loops); loss_guard_max_wait_ms stated (the episode).
+  S5 the cost (freezes a minute, hitch seconds, rendered fps) against CL-B15 cell L (27.7 / 37.2 / 55.75).
+
+6. Validity (per cell)
+- Playing; the profile applied (cell 1 none: 0 drops; cell 2: no impairment line, no impairment row written; cell 3
+  loss-1: 0.7-1.3 % dropped, no other drop); the drop-in's lines at the stream (14 / 13 / 14); flags_absent true after;
+  twelve lines; the seven properties empty before and after; the band 5 GHz; the routing class as the cell's (lan / overlay
+  / lan). Host gates: RetroArch >= 59.9, capture 60 ± 0.1, dup+drop <= 0.2 / min.
+- A no_play, flags_absent false, or a property not empty is invalid. profile-not-applied while playing is repeated once.
+
+7. The CONFIRMED rule (CL_B7 §6, as CL-B10 … CL-B15 applied it)
+- At the close: the properties read back empty, the drop-ins removed, twelve lines, no e3_flag.conf, flags_absent; the
+  client on the LAN (Hub host empty, the newest token_issued lan); the band read.
+- The three cells valid and the client's behaviours as today where no flag was set (B29's intended difference aside: the
+  stall monitor quiet while a guard hold is open, the cap on the hold's own clock, the loss_guard_max_hold_ms key) —
+  link_notice 0, no state_saved / hold without a stall, the teardown's bye and state_save_skipped -> 9719ea82…
+  CONFIRMED and the pin moved (tools/e1_suite.py EXPECT_APK, tools/c3_l4_nft_night.py ADOPTED_APK_SHA256 and its test;
+  the tests green); e3_state --check ok on twelve.
+- Else 8b0fbb74… reinstalled from PrivyHub/app/build/cl_b15_installed/, read back, paired, --check ok, and the user told
+  which cell failed and why.
+- CONFIRMED is about validity and today's behaviours, not the rows: a U / R / S row not met does not block it.
+
+8. The reading, written beforehand
+- U1-U3 and R1-R4 met -> G-A9 the user's question, in B's words: "Adopt PRIVYHUB_REMOTE=1 as the thirteenth line? Away
+  from home it turns on the four settings G4-S4 used — start at 4000 and climb, the remote ladder, the 7000 cap, the WAN
+  telemetry — by itself; at home nothing changes." The cost away: each new session (a Home return too) starts at 4000
+  and takes ~12-15 min to reach 7000. The off switch: remove the drop-in remote.conf (or the line) and restart the
+  companion. B's prepared patch (patches/G-A9_REMOTE_ADOPTION_PREPARED.md) is NOT applied in this task.
+- Else back to B with the rows.
+- S1-S4 met -> the quiet guard stands; else back to B with the rows.
+- Then Thursday evening's three: G-A9, the log-keeper (cap 2026-11-01T23:59Z), the trip check (B item 7).
+
+No sudo, no nft, the Opal read-only, adb for the install, state reads and the reinstall if the rule says so; NO setprop;
+the overlay hand steps are the user's; no addresses or identifiers anywhere (the tailnet name as a placeholder); nothing
+fetched, nothing deleted; twelve lines and no e3_flag.conf at every teardown; nothing adopted; nothing committed.

@@ -1,0 +1,193 @@
+2,11c2,20
+< """CL-B15 -- B27's loss guard on by default in the client (APK 8b0fbb74...), every client property EMPTY (no setprop
+< anywhere), two detached bench cells in one launch, as pre-registered (cl_b15_preregistration.txt). From cl_b14_driver.py
+< (CL-B14's driver; the diff is cl_b15_driver_vs_cl_b14.diff). Unit privyhub-cl-b15:
+<   - cell L: PRIVYHUB_IMPAIRMENT=loss-1@post-fec,seed=1 + PRIVYHUB_LOSS_GUARD=1 (12 + 2 = 14 lines at the stream);
+<   - cell C: PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 only (13 lines; the client's absent-key path, the host as adopted).
+<   E1-PS1-STREAM (the fixture; the suite's own counter override), window 600, gap 120; session B's exact strings
+<   (SESSION_B_DONE_2026-10-27J.md items 3-6; BENCH-R3 E's impairment line).
+< Changed from cl_b14_driver.py:
+<   - the cells table (two cells, above); twelve adopted lines (G-A7);
+<   - config_rows() also reads loss_guard_config;
+---
+> """CL-B16 -- B28's remote umbrella (PRIVYHUB_REMOTE=1) at home on the LAN and over the overlay, and B29's quiet guard
+> (APK 9719ea82...) on the 1 % loss cell; every client property EMPTY (no setprop anywhere); ONE cell per launch, as
+> pre-registered (cl_b16_preregistration.txt). From cl_b15_driver.py (CL-B15's driver; the diff is
+> cl_b16_driver_vs_cl_b15.diff). `--cell N` is required; unit privyhub-cl-b16-c<N>:
+>   - cell 1: PRIVYHUB_REMOTE=1 + PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 (12 + 2 = 14 lines), E1-SNES-STREAM, window
+>     600, the onn on the LAN (rows U1-U4);
+>   - cell 2: PRIVYHUB_REMOTE=1 only (13 lines; no impairment line, so no shim), E1-SNES-STREAM, window 720, the onn on
+>     the overlay at home by the user's hand (rows R1-R6);
+>   - cell 3: PRIVYHUB_IMPAIRMENT=loss-1@post-fec,seed=1 + PRIVYHUB_LOSS_GUARD=1 (14 lines; CL-B15 cell L's),
+>     E1-PS1-STREAM, window 600, the LAN (rows S1-S5).
+>   Session B's exact strings: SESSION_B_DONE_2026-10-28K.md items 5-7.
+> Changed from cl_b15_driver.py:
+>   - the cells table (three, one per launch; `--cell N` required); a cell with no impairment line (cell 2) has no shim:
+>     its profile check is "no impairment row written during the cell";
+>   - config_rows() also reads remote_umbrella_config and remote_config, at the stream and again at the cell's end;
+>   - the ladder reading also counts the rows carrying path_class / start_rung / remote_cap (the clamps), the
+>     remote_cap_config rows, and keeps the first sample row's start_rung and the first encoder argv's -b:v;
+>   - logs/wan_sessions.jsonl: its line count at the cell's start and end, the new rows kept (scrubbed);
+>   - /status polled every 30 s beside stream-telemetry: whether it carries `wan` (the `wan` value scrubbed);
+13c22
+<     (~/privyhub_cl_b15/STOP); "adopted12".
+---
+>     (~/privyhub_cl_b16/STOP).
+16,17c25,26
+< every 10 s, the routing class at the stream, the heartbeat / history / STOP / busy skip / the suite call / the readings
+< beside a run / --dry."""
+---
+> every 10 s, the routing class at the stream, the encoder argv per pid (masked), the heartbeat / history / STOP / busy
+> skip / the suite call / the readings beside a run / --dry; "adopted12"."""
+34c43
+< CALL = HERE / "cl_b15_suite_call.py"
+---
+> CALL = HERE / "cl_b16_suite_call.py"
+36,37c45,47
+< PRE = HERE / "cl_b15_preregistration.txt"
+< WATCH = Path.home() / "privyhub_cl_b15"
+---
+> PRE = HERE / "cl_b16_preregistration.txt"
+> WATCH = Path.home() / "privyhub_cl_b16"
+> WAN_SESSIONS = REPO / "logs/wan_sessions.jsonl"
+61,62c71,72
+< SUF = f"_c{_N}" if _N is not None else ""      # cells 1 and 2 each have their own state / history / log / status
+< TAG = "cl_b15" + SUF
+---
+> SUF = f"_c{_N}" if _N is not None else ""      # each cell has its own state / history / log / status
+> TAG = "cl_b16" + SUF
+81,82c91,94
+< # session B's exact strings (SESSION_B_DONE_2026-10-27J.md items 4-5); the twelve adopted lines are in every environ,
+< # not repeated
+---
+> SNES = "E1-SNES-STREAM"
+> REMOTE = ["PRIVYHUB_REMOTE=1"]          # B28: the four WAN lines in one, acting only on a remote-class session
+> # session B's exact strings (SESSION_B_DONE_2026-10-28K.md item 5); the twelve adopted lines are in every environ,
+> # not repeated. spec None = no PRIVYHUB_IMPAIRMENT line at all (no shim).
+84,85c96,98
+<     {"n": 1, "cell": "L_ps1_loss-1_guard_flag", "spec": LOSS1, "profile": "loss-1", "extra": GUARD, "props": P1, "wid": PS1, "arm": "L: loss-1 + PRIVYHUB_LOSS_GUARD=1, no property", "window": 600},
+<     {"n": 2, "cell": "C_ps1_clean_no_flag", "spec": NONE, "profile": "none", "extra": [], "props": P1, "wid": PS1, "arm": "C: clean, no flag, no property", "window": 600},
+---
+>     {"n": 1, "cell": "1_snes_lan_remote_umbrella", "spec": NONE, "profile": "none", "extra": REMOTE, "props": P1, "wid": SNES, "arm": "1: the LAN with PRIVYHUB_REMOTE=1 (U1-U4), no property", "window": 600},
+>     {"n": 2, "cell": "2_snes_overlay_remote_umbrella", "spec": None, "profile": None, "extra": REMOTE, "props": P1, "wid": SNES, "arm": "2: the overlay at home with PRIVYHUB_REMOTE=1 only (R1-R6), no property", "window": 720},
+>     {"n": 3, "cell": "3_ps1_loss-1_guard_flag_b29", "spec": LOSS1, "profile": "loss-1", "extra": GUARD, "props": P1, "wid": PS1, "arm": "3: loss-1 + PRIVYHUB_LOSS_GUARD=1, the B29 client (S1-S5), no property", "window": 600},
+87c100
+< CELLS = ALL_CELLS if _N is None else []
+---
+> CELLS = [c for c in ALL_CELLS if c["n"] == _N]
+116c129
+<     return [f"PRIVYHUB_IMPAIRMENT={cell['spec']}"] + list(cell["extra"])
+---
+>     return ([f"PRIVYHUB_IMPAIRMENT={cell['spec']}"] if cell["spec"] else []) + list(cell["extra"])
+234c247
+<                 f"next: {s['next']} | state: {s['state']} | cap {CAP_UTC} | stop: touch ~/privyhub_cl_b15/STOP\n")
+---
+>                 f"next: {s['next']} | state: {s['state']} | cap {CAP_UTC} | stop: touch ~/privyhub_cl_b16/STOP\n")
+393c406,407
+< CONFIG_EVENTS = ("restart_fast_config", "restart_fast_unlock_config", "loss_guard_config")
+---
+> CONFIG_EVENTS = ("restart_fast_config", "restart_fast_unlock_config", "loss_guard_config", "remote_umbrella_config",
+>                  "remote_config")
+397c411
+<     """restart_fast_config, restart_fast_unlock_config and loss_guard_config written to the recovery log since t0 (the cell's or the dry
+---
+>     """CONFIG_EVENTS (the restart / unlock / loss-guard / remote-umbrella / remote_config rows) written to the recovery log since t0 (the cell's or the dry
+470a485,486
+>             ss = E1.http("GET", "/status", 10)[1] or {}
+>             sw, sn = scrub(ss.get("wan") if isinstance(ss, dict) else None)
+472c488,490
+<                                                          "has_wan": isinstance(st, dict) and "wan" in st, "wan": w, "redacted_matches": n})
+---
+>                                                          "has_wan": isinstance(st, dict) and "wan" in st, "wan": w, "redacted_matches": n,
+>                                                          "status_has_wan": isinstance(ss, dict) and "wan" in ss, "status_wan": sw,
+>                                                          "status_redacted_matches": sn})
+511a530,531
+>     if profile is None:          # no impairment line: no shim; the check is that no impairment row was written
+>         return len(rows) == 0, {"lines": len(rows), "no_impairment_line": True}
+664c684,693
+<     return {"lan_loss_rule_rows": len(lan), "lan_loss_rule_first_utc": lan[0].get("at_utc") if lan else None,
+---
+>     samples = [r for r in rows if r.get("event") == "sample"]
+>     return {"rows_with_path_class": sum(1 for r in rows if "path_class" in r),
+>             "path_classes": sorted({str(r.get("path_class")) for r in rows if "path_class" in r}),
+>             "rows_with_start_rung": sum(1 for r in rows if "start_rung" in r),
+>             "remote_cap_config_rows": [r for r in rows if r.get("event") == "remote_cap_config"],
+>             "remote_cap_clamp_rows": sum(1 for r in rows if "remote_cap" in r),
+>             "first_sample_start_rung": (samples[0].get("start_rung") if samples else None),
+>             "first_sample_at_utc": (samples[0].get("at_utc") if samples else None),
+>             "decreases": sum(1 for t in trans if (t.get("to_kbps") or 0) < (t.get("from_kbps") or 0)),
+>             "lan_loss_rule_rows": len(lan), "lan_loss_rule_first_utc": lan[0].get("at_utc") if lan else None,
+870a900,937
+> def wan_lines():
+>     try:
+>         with open(WAN_SESSIONS) as fh:
+>             return sum(1 for _ in fh)
+>     except OSError:
+>         return 0
+> 
+> 
+> def wan_rows_from(n0):
+>     out = []
+>     try:
+>         with open(WAN_SESSIONS) as fh:
+>             for i, l in enumerate(fh):
+>                 if i >= n0:
+>                     try:
+>                         out.append(json.loads(l))
+>                     except ValueError:
+>                         pass
+>     except OSError:
+>         pass
+>     return out
+> 
+> 
+> def wan_polls(cdir, attempt):
+>     """How many of the 30-s polls during a game had `wan` in /status, and in stream-telemetry, of how many."""
+>     n = st = tel = 0
+>     try:
+>         for l in open(cdir / f"wan_poll_run{attempt}.jsonl"):
+>             r = json.loads(l)
+>             if r.get("game_active"):
+>                 n += 1
+>                 st += 1 if r.get("status_has_wan") else 0
+>                 tel += 1 if r.get("has_wan") else 0
+>     except (OSError, ValueError):
+>         pass
+>     return {"polls_in_game": n, "status_has_wan": st, "telemetry_has_wan": tel}
+> 
+> 
+889a957
+>     wan_n0 = wan_lines()
+902a971
+>     cmds = beside.get("encoder_cmds") or []
+908a978,982
+>     wan_new = wan_rows_from(wan_n0)
+>     with open(cdir / f"wan_sessions_new_run{attempt}.jsonl", "w") as fh:
+>         for r in wan_new:
+>             fh.write(json.dumps(scrub(r)[0], sort_keys=True) + "\n")
+>     cfg_end = config_rows(t)
+924d997
+<     cmds = beside.get("encoder_cmds") or []
+946a1020,1023
+>            "config_rows_end": scrub(cfg_end)[0], "wan_sessions_lines_start": wan_n0, "wan_sessions_lines_end": wan_lines(),
+>            "wan_sessions_new_rows": len(wan_new),
+>            "encoder_first_bv": (cmds[0]["b_v"] if cmds else None),
+>            "status_has_wan_polls": wan_polls(cdir, attempt),
+985c1062,1065
+<         f"guard {lr['frames_after_dropped_reference_max']}/{lr['loss_guard_frames_held_max']} slot9 {ra['loaded_state_slot9']} opal {opr}")
+---
+>         f"guard {lr['frames_after_dropped_reference_max']}/{lr['loss_guard_frames_held_max']} slot9 {ra['loaded_state_slot9']} opal {opr} "
+>         f"enc_first {row['encoder_first_bv']} first_start_rung {lad['first_sample_start_rung']} path_class_rows {lad['rows_with_path_class']} "
+>         f"cap_config {len(lad['remote_cap_config_rows'])} clamps {lad['remote_cap_clamp_rows']} wan_sessions +{len(wan_new)} "
+>         f"wan_polls {row['status_has_wan_polls']}")
+994c1074,1077
+<     cell = CELLS[0]                  # the first cell of this launch's table; no property is set
+---
+>     if not CELLS:
+>         print("refusing: --dry needs --cell 1, 2 or 3")
+>         return 2
+>     cell = CELLS[0]                  # this launch's cell; no property is set
+1042c1125
+<         print("refusing: no --cell in CL-B14 (the one cell is the launch)")
+---
+>         print("refusing: --cell 1, --cell 2 or --cell 3 (one cell per launch)")

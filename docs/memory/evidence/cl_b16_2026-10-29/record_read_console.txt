@@ -1,0 +1,99 @@
+== cell 1 native_decoder_20261029_205354_131.json ['2026-10-29T20:42:21.075Z', '2026-10-29T20:53:54.160Z'] 11.55 min
+ report {"loss_guard_mode": "guard", "frames_after_dropped_reference": 848, "loss_guard_episodes": 86, "loss_guard_frames_held": 846, "loss_guard_timeouts": 2, "loss_guard_max_wait_ms": 656, "loss_guard_max_hold_ms": 604, "keyframe_requests_sent": 86, "link_notice_shown": 0, "duration_ms": 698310, "stall_signal_ms": 150, "stall_signal_stalls_sent": 64, "stall_signal_ends_sent": 62, "video": {"lost_packets": 497, "lost_packets_in_resyncs": 0, "dropped_frames": 126, "sequence_gap_au_drops": 117, "incomplete_au_drops": 14, "non_idr_aus_dropped_waiting_for_idr": 0}, "decoder": {"rendered_frames": 40866, "dropped_frames": 15, "max_output_gap_ms": 692}}
+ cost {"episodes_per_min": 7.4, "held_per_min": 73.2, "frames_per_episode": 9.84, "ms_per_episode_at_60fps": 164, "full_minute_episodes": [], "full_minute_counter": []}
+ events {'state_saved': 9, 'session_started': 1, 'session_ended': 1, 'session_end_bye': 1, 'state_save_skipped': 1} holds 16 stall rows 0 teardown [{'at': '20:53:53.229', 'event': 'session_end_bye'}, {'at': '20:53:53.947', 'event': 'state_save_skipped', 'reason': 'client_bye', 'silence_ms': 401.2}, {'at': '20:53:54.160', 'event': 'session_ended'}]
+ config [('restart_fast_unlock_config', {}), ('restart_fast_config', {}), ('restart_fast_unlock_config', {}), ('restart_fast_config', {})]
+ silences {"streaming_s": 673, "silences": 5, "silences_per10": 4.46, "bins": {"250-300": 2, "300-400": 2, "400-500": 1, "500-600": 0, "600-800": 0, "800-1000": 0, "1000-1500": 0, "1500-inf": 0}, "max_ms": 402} | hitch {"hitch_seconds": 18, "play_min": 11.5, "per_10_min": 15.6, "longest_run_s": 3, "by_criterion": {"R": 15, "C": 5, "L": 2}} | freq {5180: 341} | notice {0: 341}
+ minute | hb | counter | held | unheld | episodes | lost | rendered
+  stall {"at": "20:42:37.443", "event": "client_stall", "age_ms": 578, "trigger": null, "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "20:42:37.443", "event": "desync_pause", "age_ms": 578.0, "trigger": "client_stall", "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "20:43:08.626", "event": "client_stall", "age_ms": 554, "trigger": null, "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "20:43:08.626", "event": "desync_pause", "age_ms": 554.0, "trigger": "client_stall", "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "20:43:28.944", "event": "client_stall", "age_ms": 604, "trigger": null, "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": [319.7]}
+  stall {"at": "20:43:28.944", "event": "desync_pause", "age_ms": 604.0, "trigger": "client_stall", "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": [319.7]}
+  stall {"at": "20:43:29.794", "event": "client_stall", "age_ms": 682, "trigger": null, "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": [319.7]}
+  stall {"at": "20:43:29.794", "event": "desync_pause", "age_ms": 682.0, "trigger": "client_stall", "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": [319.7]}
+  stall {"at": "20:44:24.611", "event": "client_stall", "age_ms": 535, "trigger": null, "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "20:44:24.611", "event": "desync_pause", "age_ms": 535.0, "trigger": "client_stall", "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "20:46:44.980", "event": "client_stall", "age_ms": 406, "trigger": null, "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": [280.3]}
+  stall {"at": "20:46:44.980", "event": "desync_pause", "age_ms": 406.0, "trigger": "client_stall", "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": [280.3]}
+  stall {"at": "20:46:45.929", "event": "client_stall", "age_ms": 618, "trigger": null, "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": [280.3]}
+  stall {"at": "20:46:45.929", "event": "desync_pause", "age_ms": 618.0, "trigger": "client_stall", "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": [280.3]}
+  stall {"at": "20:53:49.105", "event": "client_stall", "age_ms": 489, "trigger": null, "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "20:53:49.105", "event": "desync_pause", "age_ms": 489.0, "trigger": "client_stall", "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": []}
+ ladder states {"7000 PRESSURE pressure_sample": 50, "7000 REFERENCE clean": 254, "7000 REFERENCE no_evidence": 40}
+== cell 2 native_decoder_20261029_212822_303.json ['2026-10-29T21:14:49.396Z', '2026-10-29T21:28:22.366Z'] 13.55 min
+ report {"loss_guard_mode": "guard", "frames_after_dropped_reference": 619, "loss_guard_episodes": 61, "loss_guard_frames_held": 619, "loss_guard_timeouts": 0, "loss_guard_max_wait_ms": 527, "loss_guard_max_hold_ms": 527, "keyframe_requests_sent": 61, "link_notice_shown": 0, "duration_ms": 817758, "stall_signal_ms": 150, "stall_signal_stalls_sent": 56, "stall_signal_ends_sent": 49, "video": {"lost_packets": 299, "lost_packets_in_resyncs": 0, "dropped_frames": 99, "sequence_gap_au_drops": 77, "incomplete_au_drops": 10, "non_idr_aus_dropped_waiting_for_idr": 14}, "decoder": {"rendered_frames": 48233, "dropped_frames": 39, "max_output_gap_ms": 547}}
+ cost {"episodes_per_min": 4.5, "held_per_min": 45.7, "frames_per_episode": 10.15, "ms_per_episode_at_60fps": 169, "full_minute_episodes": [], "full_minute_counter": []}
+ events {'state_saved': 5, 'session_started': 1, 'session_ended': 1, 'session_end_bye': 1, 'state_save_skipped': 1} holds 10 stall rows 0 teardown [{'at': '21:28:20.973', 'event': 'session_end_bye'}, {'at': '21:28:21.758', 'event': 'state_save_skipped', 'reason': 'client_bye', 'silence_ms': 400.9}, {'at': '21:28:22.366', 'event': 'session_ended'}]
+ config [('restart_fast_unlock_config', {}), ('restart_fast_config', {}), ('restart_fast_unlock_config', {}), ('restart_fast_config', {})]
+ silences {"streaming_s": 793, "silences": 2, "silences_per10": 1.51, "bins": {"250-300": 1, "300-400": 1, "400-500": 0, "500-600": 0, "600-800": 0, "800-1000": 0, "1000-1500": 0, "1500-inf": 0}, "max_ms": 334} | hitch {"hitch_seconds": 11, "play_min": 13.5, "per_10_min": 8.1, "longest_run_s": 1, "by_criterion": {"C": 2, "R": 9, "L": 1}} | freq {5180: 399} | notice {0: 399}
+ minute | hb | counter | held | unheld | episodes | lost | rendered
+  stall {"at": "21:18:36.766", "event": "client_stall", "age_ms": 540, "trigger": null, "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": [333.4]}
+  stall {"at": "21:18:36.766", "event": "desync_pause", "age_ms": 540.0, "trigger": "client_stall", "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": [333.4]}
+  stall {"at": "21:23:49.657", "event": "desync_pause", "age_ms": 433.0, "trigger": "client_stall", "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:23:49.658", "event": "client_stall", "age_ms": 433, "trigger": null, "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:24:03.141", "event": "client_stall", "age_ms": 450, "trigger": null, "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:24:03.141", "event": "desync_pause", "age_ms": 450.0, "trigger": "client_stall", "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:25:16.443", "event": "client_stall", "age_ms": 539, "trigger": null, "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:25:16.443", "event": "desync_pause", "age_ms": 539.0, "trigger": "client_stall", "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:25:23.193", "event": "client_stall", "age_ms": 510, "trigger": null, "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:25:23.193", "event": "desync_pause", "age_ms": 510.0, "trigger": "client_stall", "guard_held_delta_around": null, "guard_episodes_delta_around": null, "uplink_silence_ge250_within_2s": []}
+ ladder states {"4000 RECOVERY_PROBATION counting_clean_reports": 95, "5000 HOLD_DOWN increase_increase": 1, "5000 HOLD_DOWN blackout": 3, "5000 RECOVERY_PROBATION counting_clean_reports": 169, "5500 HOLD_DOWN increase_increase": 1, "5500 HOLD_DOWN blackout": 3, "5500 RECOVERY_PROBATION counting_clean_reports": 130}
+== cell 3 native_decoder_20261029_214723_933.json ['2026-10-29T21:35:50.909Z', '2026-10-29T21:47:23.972Z'] 11.55 min
+ report {"loss_guard_mode": "guard", "frames_after_dropped_reference": 3290, "loss_guard_episodes": 411, "loss_guard_frames_held": 3290, "loss_guard_timeouts": 0, "loss_guard_max_wait_ms": 469, "loss_guard_max_hold_ms": 469, "keyframe_requests_sent": 411, "link_notice_shown": 0, "duration_ms": 698120, "stall_signal_ms": 150, "stall_signal_stalls_sent": 220, "stall_signal_ends_sent": 219, "video": {"lost_packets": 1442, "lost_packets_in_resyncs": 128, "dropped_frames": 504, "sequence_gap_au_drops": 481, "incomplete_au_drops": 29, "non_idr_aus_dropped_waiting_for_idr": 9}, "decoder": {"rendered_frames": 37993, "dropped_frames": 7, "max_output_gap_ms": 605}}
+ cost {"episodes_per_min": 35.6, "held_per_min": 284.8, "frames_per_episode": 8.0, "ms_per_episode_at_60fps": 133, "full_minute_episodes": [39, 35, 31, 40, 36, 24, 40, 35, 32, 33, 46], "full_minute_counter": [260, 273, 259, 328, 349, 190, 312, 291, 259, 241, 353]}
+ events {'state_saved': 12, 'keyframe_requests': 12, 'loss_guard_config': 1, 'session_started': 1, 'session_ended': 1, 'session_end_bye': 1, 'state_save_skipped': 1} holds 24 stall rows 0 teardown [{'at': '21:47:22.908', 'event': 'session_end_bye'}, {'at': '21:47:23.704', 'event': 'state_save_skipped', 'reason': 'client_bye', 'silence_ms': 402.9}, {'at': '21:47:23.972', 'event': 'session_ended'}]
+ config [('restart_fast_unlock_config', {}), ('restart_fast_config', {}), ('loss_guard_config', {'control': 'NoRuntimeIdr', 'ignored': False, 'min_interval_ms': 500}), ('restart_fast_unlock_config', {}), ('restart_fast_config', {})]
+ silences {"streaming_s": 673, "silences": 0, "silences_per10": 0.0, "bins": {"250-300": 0, "300-400": 0, "400-500": 0, "500-600": 0, "600-800": 0, "800-1000": 0, "1000-1500": 0, "1500-inf": 0}, "max_ms": 0} | hitch {"hitch_seconds": 64, "play_min": 11.5, "per_10_min": 55.6, "longest_run_s": 1, "by_criterion": {"R": 61, "L": 6, "G": 1}} | freq {5180: 341} | notice {0: 341}
+ minute | hb | counter | held | unheld | episodes | lost | rendered
+  | 21:35 | 6 | 93 | 93 | 0 | 11 | 125 | 702
+  | 21:36 | 29 | 260 | 260 | 0 | 39 | 296 | 3201
+  | 21:37 | 30 | 273 | 273 | 0 | 35 | 190 | 3320
+  | 21:38 | 29 | 259 | 259 | 0 | 31 | 52 | 3227
+  | 21:39 | 30 | 328 | 328 | 0 | 40 | 99 | 3263
+  | 21:40 | 30 | 349 | 349 | 0 | 36 | 125 | 3240
+  | 21:41 | 29 | 190 | 190 | 0 | 24 | 41 | 3308
+  | 21:42 | 30 | 312 | 312 | 0 | 40 | 87 | 3287
+  | 21:43 | 29 | 291 | 291 | 0 | 35 | 74 | 3197
+  | 21:44 | 30 | 259 | 259 | 0 | 32 | 70 | 3356
+  | 21:45 | 30 | 241 | 241 | 0 | 33 | 62 | 3366
+  | 21:46 | 29 | 353 | 353 | 0 | 46 | 203 | 3102
+  | 21:47 | 11 | 82 | 82 | 0 | 9 | 18 | 1244
+  kf {"at": "21:36:29", "received": 35, "acted": 25, "rate_limited": 10, "forced": 0, "received_total": 35, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "21:37:30", "received": 34, "acted": 29, "rate_limited": 5, "forced": 0, "received_total": 69, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "21:38:30", "received": 37, "acted": 29, "rate_limited": 8, "forced": 0, "received_total": 106, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "21:39:31", "received": 36, "acted": 31, "rate_limited": 5, "forced": 0, "received_total": 142, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "21:40:32", "received": 36, "acted": 28, "rate_limited": 8, "forced": 0, "received_total": 178, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "21:41:32", "received": 29, "acted": 26, "rate_limited": 3, "forced": 0, "received_total": 207, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "21:42:33", "received": 35, "acted": 30, "rate_limited": 5, "forced": 0, "received_total": 242, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "21:43:33", "received": 37, "acted": 33, "rate_limited": 4, "forced": 0, "received_total": 279, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "21:44:33", "received": 33, "acted": 28, "rate_limited": 5, "forced": 0, "received_total": 312, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "21:45:34", "received": 34, "acted": 28, "rate_limited": 6, "forced": 0, "received_total": 346, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "21:46:34", "received": 36, "acted": 30, "rate_limited": 6, "forced": 0, "received_total": 382, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  kf {"at": "21:47:35", "received": 29, "acted": 20, "rate_limited": 9, "forced": 0, "received_total": 411, "forced_total": 0, "reason": "no runtime IDR path: the ffmpeg encoder's GOP (15 frames) is"}
+  stall {"at": "21:39:49.176", "event": "client_stall", "age_ms": 415, "trigger": null, "guard_held_delta_around": 40, "guard_episodes_delta_around": 3, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:39:49.176", "event": "desync_pause", "age_ms": 415.0, "trigger": "client_stall", "guard_held_delta_around": 40, "guard_episodes_delta_around": 3, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:39:54.911", "event": "client_stall", "age_ms": 525, "trigger": null, "guard_held_delta_around": 0, "guard_episodes_delta_around": 0, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:39:54.911", "event": "desync_pause", "age_ms": 525.0, "trigger": "client_stall", "guard_held_delta_around": 0, "guard_episodes_delta_around": 0, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:40:01.165", "event": "client_stall", "age_ms": 476, "trigger": null, "guard_held_delta_around": 33, "guard_episodes_delta_around": 2, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:40:01.165", "event": "desync_pause", "age_ms": 476.0, "trigger": "client_stall", "guard_held_delta_around": 33, "guard_episodes_delta_around": 2, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:40:04.479", "event": "desync_pause", "age_ms": 597.0, "trigger": "client_stall", "guard_held_delta_around": 36, "guard_episodes_delta_around": 3, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:40:04.480", "event": "client_stall", "age_ms": 597, "trigger": null, "guard_held_delta_around": 36, "guard_episodes_delta_around": 3, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:40:11.911", "event": "desync_pause", "age_ms": 482.0, "trigger": "client_stall", "guard_held_delta_around": 37, "guard_episodes_delta_around": 3, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:40:11.912", "event": "client_stall", "age_ms": 482, "trigger": null, "guard_held_delta_around": 37, "guard_episodes_delta_around": 3, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:40:18.647", "event": "client_stall", "age_ms": 402, "trigger": null, "guard_held_delta_around": 37, "guard_episodes_delta_around": 2, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:40:18.647", "event": "desync_pause", "age_ms": 402.0, "trigger": "client_stall", "guard_held_delta_around": 37, "guard_episodes_delta_around": 2, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:40:31.897", "event": "client_stall", "age_ms": 421, "trigger": null, "guard_held_delta_around": 32, "guard_episodes_delta_around": 2, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:40:31.897", "event": "desync_pause", "age_ms": 421.0, "trigger": "client_stall", "guard_held_delta_around": 32, "guard_episodes_delta_around": 2, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:42:26.001", "event": "client_stall", "age_ms": 435, "trigger": null, "guard_held_delta_around": 47, "guard_episodes_delta_around": 2, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:42:26.001", "event": "desync_pause", "age_ms": 435.0, "trigger": "client_stall", "guard_held_delta_around": 47, "guard_episodes_delta_around": 2, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:42:26.664", "event": "client_stall", "age_ms": 469, "trigger": null, "guard_held_delta_around": 47, "guard_episodes_delta_around": 2, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:42:26.664", "event": "desync_pause", "age_ms": 469.0, "trigger": "client_stall", "guard_held_delta_around": 47, "guard_episodes_delta_around": 2, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:42:51.129", "event": "desync_pause", "age_ms": 447.0, "trigger": "client_stall", "guard_held_delta_around": 3, "guard_episodes_delta_around": 1, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:42:51.130", "event": "client_stall", "age_ms": 447, "trigger": null, "guard_held_delta_around": 3, "guard_episodes_delta_around": 1, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:43:53.881", "event": "client_stall", "age_ms": 519, "trigger": null, "guard_held_delta_around": 28, "guard_episodes_delta_around": 1, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:43:53.881", "event": "desync_pause", "age_ms": 519.0, "trigger": "client_stall", "guard_held_delta_around": 28, "guard_episodes_delta_around": 1, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:44:00.884", "event": "client_stall", "age_ms": 489, "trigger": null, "guard_held_delta_around": 36, "guard_episodes_delta_around": 2, "uplink_silence_ge250_within_2s": []}
+  stall {"at": "21:44:00.884", "event": "desync_pause", "age_ms": 489.0, "trigger": "client_stall", "guard_held_delta_around": 36, "guard_episodes_delta_around": 2, "uplink_silence_ge250_within_2s": []}
+ ladder states {"7000 REFERENCE resync_ignored": 1, "7000 PRESSURE pressure_sample": 118, "7000 REFERENCE clean": 183, "7000 REFERENCE no_evidence": 42}

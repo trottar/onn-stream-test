@@ -2110,6 +2110,19 @@ Record: `docs/memory/evidence/CL_B15_LOSS_GUARD_DEFAULT_2026-10-27.md`.
 - Next: CL-B16 (Wednesday), then Thursday's G-A9, the log-keeper and the trip check
   (`docs/memory/handoffs/SESSION_B_DONE_2026-10-28K.md`).
 
+**CL-B16 (2026-10-29): the remote umbrella at home and the quiet guard, every client property empty, 5 GHz: 3 / 3 cells
+valid; APK `9719ea82…0110` CONFIRMED and pinned; back to B on R3 and S1.**
+- **The LAN with `PRIVYHUB_REMOTE=1`:** today's (7000, no remote rows), U1-U3 met. The evening's LAN was ~3× lossier
+  than CL-B15 cell C's: 8 stall pauses (U4 not met).
+- **The overlay at home:** `remote-direct`, the four in force, 4000 `floor`, the 7000 cap, 0 clamps, `wan` in `/status`.
+  The climb was 2 steps in 13.6 min, held down after a real link stall (R3 not met). The `wan_sessions` row was never
+  written.
+- **1 % loss, the B29 client:** 0 timeouts, held = counter, max hold 469 ms. But 12 stall pauses with no silence behind
+  them (S1 not met); 35.6 freezes a minute.
+- G-A9 goes back to B as read (R3); the user may decide it before B.
+
+Record: `docs/memory/evidence/CL_B16_REMOTE_UMBRELLA_AND_QUIET_GUARD_2026-10-29.md`.
+
 ## G9 — Remote foundation checkpoint
 
 Acceptance:

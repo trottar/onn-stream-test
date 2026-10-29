@@ -38,6 +38,15 @@
     - **The floor start per new session (a Home return too) stays:** ~12-15 min below 7000 away from home.
     - G-A9 (the thirteenth line) PREPARED, not applied: `docs/memory/patches/G-A9_REMOTE_ADOPTION_PREPARED.md`.
     - Record: `docs/memory/evidence/B28_REMOTE_UMBRELLA_2026-10-28.md`.
+    - **CL-B16 (2026-10-29; at home, the onn on 5 GHz, APK `9719ea82…`): back to B on R3 — OPEN.**
+      - On the LAN the umbrella is today's: 7000, no remote rows (U1-U3 met).
+      - Over the overlay (direct): `remote-direct`, the four in force, the 4000 floor, the 7000 cap once with 0 clamps,
+        `wan` in `/status`.
+      - **The climb was 2 steps in 13.6 min (4000 → 5500), not ≥ 3:** a client stall with a 333-ms uplink silence put
+        the ladder in `HOLD_DOWN` and restarted its count.
+      - **The session's `wan_sessions` row was never written:** the companion restarted before a next session in the
+        same process.
+      - G-A9 is back to B as read. Record: `docs/memory/evidence/CL_B16_REMOTE_UMBRELLA_AND_QUIET_GUARD_2026-10-29.md`.
   - **Queue H (2026-10-25):** B22 shortens the return itself (the start answered before the teardown, the
     release at the new stream's first fresh frame; NOT ADOPTED). Pausing at Home and keeping the rung were not in queue
     H: they stay the user's question.
@@ -314,6 +323,15 @@ is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.m
     - A hold whose next good IDR is > 600 ms away still times out by design.
     - Next: CL-B16 (`docs/memory/handoffs/SESSION_B_DONE_2026-10-28K.md`). Record:
       `docs/memory/evidence/B29_GUARD_QUIET_STALL_2026-10-28.md`.
+    - **CL-B16 (2026-10-29; `9719ea82…` CONFIRMED and pinned by the validity rule): S1 NOT MET — OPEN.**
+      - At 1 % loss: 0 timeouts, held = counter (3,290), max hold 469 ms (S2-S4 met).
+      - **But 12 stall pauses** (CL-B15: 9), none with an uplink silence behind it, clustered among guard holds.
+      - On this evening's LAN with no impairment: 8 and 5 stall pauses (CL-B15 cell C: 0; that LAN lost a third as
+        many packets).
+      - Cost at 1 %: 35.6 freezes a minute, hitch 55.6 s / 10 min, rendered 54.48.
+      - **For B:** what "the last frame received" counts during a hold, and why ages reach 597 ms with no silence.
+      - `8b0fbb74…` is kept at `PrivyHub/app/build/cl_b15_installed/`. Record:
+        `docs/memory/evidence/CL_B16_REMOTE_UMBRELLA_AND_QUIET_GUARD_2026-10-29.md`.
 - **UX-R4 (2026-10-23, the user's "severe lag … I saved at the spot", Zelda on snes9x, the eight lines, APK
   `bf5114a2…`, no link report):** the mark is the 05:01:30Z save, after a 41-s storm (05:00:40.9-05:01:20Z) of 19
   uplink silences ≥ 250 ms (9.5 s silent, the longest 1.4 s), with downlink loss ×9 beside it and the host steady

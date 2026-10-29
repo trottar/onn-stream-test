@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-10-28
-baseline_commit: 4a78783 (G-A7 and queue J committed; CL-B15 uncommitted beside it; the user commits)
+as_of: 2026-10-29
+baseline_commit: 4b89d5b (queue K committed; CL-B16 uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -19,8 +19,8 @@ CL-B3 is OPEN on two G5-S1 smoke gates (NOT MET; the user decides). Everything e
 passed.** E1 FROZEN; E2
 MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `af3ed73`.
 
-**State (2026-10-28 02:20Z, after CL-B15): the TWELVE adopted lines; `--check` ok on twelve; APK `8b0fbb74…3f4e`
-CONFIRMED** (CL-B15; B25's link notice and B27's loss guard on by default, `0` off for each). `e3_state.py`'s `link_recovery.stack`: all six `implied 1`.
+**State (2026-10-29 21:50Z, after CL-B16): the TWELVE adopted lines; `--check` ok on twelve; APK `9719ea82…0110`
+CONFIRMED** (CL-B16; B25's link notice and B27's loss guard on by default, `0` off for each; B29's quiet guard). `e3_state.py`'s `link_recovery.stack`: all six `implied 1`.
 - Every client property is empty (the client's defaults: the stall signal, the restart guard and the link report on).
 - No `e3_flag.conf`, no stream. One device paired; `identity_v2` on.
 - Running: `privyhub-companion` and `privyhub-link-n1` (nightly) only.
@@ -223,39 +223,60 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
-**CL-B15: MEASURED, 2 / 2 cells valid; APK `8b0fbb74…3f4e` (+ B27, the loss guard on by default) CONFIRMED and pinned,
-every client property EMPTY; L1-L3 NOT MET → back to B** (`evidence/CL_B15_LOSS_GUARD_DEFAULT_2026-10-27.md`, launch
-`evidence/CL_B15_LAUNCH_2026-10-27.md`; the unit `privyhub-cl-b15` 2026-10-28 01:32-02:01Z, detached, 5 GHz,
-E1-PS1-STREAM).
-- **Cell L, 1 % loss + `PRIVYHUB_LOSS_GUARD=1`:**
-  - the guard on with no property; the host as built (`NoRuntimeIdr`, forced 0, received 319 of 320 sent);
-  - **one hold ran 685 ms past the 600-ms cap: a timeout, 7 corrupted frames shown** (held 2,478 / 2,485);
-  - **9 holds of ≥ ~0.4 s tripped the adopted stall stack** (save, pause, 2-3 frames restored, resume 49-184 ms later);
-  - the cost: **27.7 freezes a minute, ~0.13 s each**, the longest 0.69 s; hitch 37.2 s / 10 min, silences 0, rendered
-    55.75 fps (BENCH-R3 E-on on 2.4 GHz: 125.7 / 54.5 / 55.19).
-- **Cell C, clean, no flag:** the guard held 295 = 295 in **3.3 freezes a minute (~0.13 s, the longest 0.27 s)**, 0
-  timeouts; no host guard row, no save, hold or stall; one 258-ms silence; hitch 3.5 s / 10 min (G-A7 0 / 2.6).
-- **Not read:** the controller's `bad_packets` (L5's clause, C2). It was not sampled.
-- **B26 is live** (the relay-stop fix inside the adopted unlock line, from this task's first restart).
-- **State:** twelve lines, no `e3_flag.conf`, `--check` ok, APK CONFIRMED; the onn paired, on the LAN, 5180 MHz;
-  `fcd924c2…` kept at `PrivyHub/app/build/cl_b14_installed/`.
-- **The guard is on by default on the onn now.** Off: `adb shell setprop debug.privyhub.loss_guard 0`, or reinstall
-  `fcd924c2…`.
+**CL-B16: MEASURED, 3 / 3 cells valid; APK `9719ea82…0110` (+ B29, the quiet guard) CONFIRMED and pinned, every
+client property EMPTY; R3 and S1 NOT MET → back to B** (`evidence/CL_B16_REMOTE_UMBRELLA_AND_QUIET_GUARD_2026-10-29.md`,
+launch `evidence/CL_B16_LAUNCH_2026-10-29.md`; the units `privyhub-cl-b16-c1/-c2/-c3` 2026-10-29 20:39-21:48Z, one cell
+per launch, 5 GHz).
+- **Cell 1, the LAN with `PRIVYHUB_REMOTE=1` (E1-SNES):**
+  - U1-U3 met: the four `implied`; `remote_config` `lan`, all four off; `-b:v 7000k`; no remote rows; no `wan`.
+  - U4 not met: the evening's LAN was ~3× lossier than CL-B15 C's (497 / 157 lost): 7.4 freezes a minute, 8 stall
+    pauses, silences 4.46, hitch 15.6 s / 10 min.
+- **Cell 2, the overlay at home (the user's hand step; path direct):**
+  - R1 / R2 / R4 / R6 and R5's `/status` met: `remote-direct`, the four in force; 4000 `floor` with the remote list
+    (plus a `requested` key) and `-b:v 4000k`; `remote_cap_config` once, 0 clamps; `wan` in 27 / 27 polls; 0 false
+    holds.
+  - **R3 not met:** 4000 → 5000 at 3 min 12 s, → 5500 at 9 min 03 s; 2 steps in 13.6 min, held down (`blackout`)
+    after a real link stall.
+  - **The `wan_sessions` row was never written** (the companion restarted first; disclosed beforehand).
+- **Cell 3, 1 % loss + `PRIVYHUB_LOSS_GUARD=1` (E1-PS1):**
+  - S2-S4 met: 0 timeouts, held = counter 3,290, max hold 469 ms.
+  - **S1 not met:** 12 stall pauses, none with an uplink silence (CL-B15 L: 9).
+  - S5: 35.6 freezes a minute, hitch 55.6, rendered 54.48 (CL-B15 L 27.7 / 37.2 / 55.75; 40 % more loss tonight).
+- **The CONFIRMED rule (validity and today's behaviours, not the rows):** met. `8b0fbb74…` is kept at
+  `PrivyHub/app/build/cl_b15_installed/` if the user wants it back.
+- **State:** twelve lines, no `e3_flag.conf`, `--check` ok, APK CONFIRMED; the onn paired, on the LAN (Hub host
+  empty, Tailscale off), 5180 MHz.
 
-1. **The user's commit:** the two records and `cl_b15_2026-10-27/`; the pin (`tools/e1_suite.py`,
-   `tools/c3_l4_nft_night.py`, `tools/test_c3_l4_nft_night.py`); `docs/KNOWN_ISSUES.md`, `docs/ROADMAP.md`, this file
-   (`logs/cl_b15_launch_git_status.txt`, `logs/cl_b15_git_status.txt`).
-2. **G-A8, the user's question in B's words — not a candidate as read (L1-L3 back to B first):** "Adopt
-   `PRIVYHUB_LOSS_GUARD=1` as the thirteenth line? It forces nothing. It lets the host count the onn's keyframe requests
-   and log the loss guard's numbers. The guard itself is already on in the onn's app."
-   - The guard's own off switch: `setprop debug.privyhub.loss_guard 0`, or the previous APK.
-   - B's prepared patch `patches/G-A8_LOSS_GUARD_ADOPTION_PREPARED.md` stays unapplied.
-3. **To B:**
-   - the 685-ms hold past the 600-ms cap (the timeout and its 7 frames);
-   - the guard's long holds tripping the stall stack (9 in 11.5 min at 1 % loss);
-   - a driver that samples the controller's `bad_packets`, for L5 / C2.
-4. **Then the remote umbrella (queue K)** is the next B item.
+1. **The user's commit:**
+   - the two records and `cl_b16_2026-10-29/`;
+   - the pin (`tools/e1_suite.py`, `tools/c3_l4_nft_night.py`, `tools/test_c3_l4_nft_night.py`);
+   - `docs/KNOWN_ISSUES.md`, `docs/ROADMAP.md`, this file (`logs/cl_b16_launch_git_status.txt`,
+     `logs/cl_b16_git_status.txt`).
+2. **G-A9, the user's question in B's words — as read, back to B first (R3):** "Adopt `PRIVYHUB_REMOTE=1` as the
+   thirteenth line? Away from home it turns on the four settings G4-S4 used — start at 4000 and climb, the remote
+   ladder, the 7000 cap, the WAN telemetry — by itself; at home nothing changes."
+   - The cost away: every new session (a Home return too) starts at 4000 and needs ~12-15 min to reach 7000, longer
+     when the link stalls.
+   - The off switch: remove the drop-in `remote.conf`, `daemon-reload`, restart outside 04:30-05:30Z.
+   - B's patch `patches/G-A9_REMOTE_ADOPTION_PREPARED.md` is not applied. The user may decide before B (the trip
+     leaves 2026-10-30).
+3. **Thursday evening's three (B item 7):**
+   - **G-A9 on the user's yes:** the patch, `daemon-reload`, the restart outside 04:30-05:30Z, `--check` ok on
+     thirteen.
+   - **The log-keeper:** `systemd-run --user --unit privyhub-trip-log …` `tools/trip_log_keeper.py --out
+     docs/memory/evidence/trip_2026-10-30 --cap 2026-11-01T23:59Z`. **The cap is Sunday 2026-11-01T23:59Z**; early
+     stop: `touch docs/memory/evidence/trip_2026-10-30/STOP`.
+   - **The trip check:** `python3 tools/trip_check.py`, its six lines into the record; then the runbook
+     `handoffs/TRIP_RUNBOOK_2026-10-30.md` checked against what was adopted.
+4. **To B:**
+   - R3: the climb under a link stall (`HOLD_DOWN` `blackout` restarting the count);
+   - the `wan_sessions` row lost at a companion restart;
+   - S1: the B29 client's 12 stall pauses at 1 % loss with no silence: what "the last frame received" counts during a
+     hold.
 5. Still open: Home's pause and the rung; "read LINK-N1's nights" after 2026-10-31.
+
+**CL-B15 (2026-10-28):** 2 / 2 valid, `8b0fbb74…` CONFIRMED then; the loss guard measured; G-A8 held
+(`evidence/CL_B15_LOSS_GUARD_DEFAULT_2026-10-27.md`).
 
 **G-A7: `PRIVYHUB_RESTART_FAST_UNLOCK=1` ADOPTED, the twelfth line; the confirmation window VALID, every row met**
 (`evidence/G_A7_RESTART_FAST_UNLOCK_ADOPTION_2026-10-27.md`; the diff `patches/G-A7_RESTART_FAST_UNLOCK_ADOPTION.md`,

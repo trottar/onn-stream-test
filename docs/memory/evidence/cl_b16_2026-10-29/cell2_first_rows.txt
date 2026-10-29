@@ -1,0 +1,9 @@
+CL-B16 cell 2 — the first rows, read at PLAYING (stage 2; the record reads them in full)
+- the overlay check before the launch (21:12Z): connected true, path direct, peer_ready true (overlay_state_before_cell2.json); 2 devices online, 1 direct peer, 0 relayed (tailnet_count_before_cell2.json, counts only)
+- the client before: 9719ea82… read back, paired, Hub host set (client_before_cell2.json); the band 5180 MHz, RSSI -67; the seven properties empty; twelve lines, --check ok but the APK (MISMATCH, the candidate)
+- remote_umbrella_config at the restart 21:12:27.1Z: the four implied
+- R1: remote_config 21:14:43.4Z class remote-direct, all four in_force true; the newest token_issued 21:14:34Z overlay
+- R2: the first sample row 21:14:45.3Z start_rung {"kbps": 4000, "source": "floor", "requested": "floor", "active_list": [4000, 5000, 5500, 6000, 7000], "path_class": "remote"} (B's string plus a "requested" key); the encoder's first argv -b:v 4000k (-maxrate 4000k) at 21:14:48.5Z
+- R4 (first read): remote_cap_config 21:14:43.1Z active, cap_kbps 7000; that row itself carries path_class "lan" (written before the ladder's class is set for the session) — noted for the record
+- R5 (first read): `wan` in /status and in stream-telemetry from the first in-game poll (21:14:58Z)
+- noted for the record: a session_ended_reset at 21:14:49.4Z and a second level_sync to 4000 at 21:14:50.3Z (a second stream start within the launch); read in full at the close
