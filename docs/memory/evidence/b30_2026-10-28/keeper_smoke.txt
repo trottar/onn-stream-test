@@ -1,0 +1,25 @@
+smoke: 2026-10-28T03:25:12Z, cap 2026-10-28T03:40Z, --once, out /tmp/b_q28k_scratch/keeper_smoke (read-only on the hub; no adb)
+trip log-keeper: done (once); 1 copies, 1 samples; /tmp/b_q28k_scratch/keeper_smoke
+exit 0
+--- status.txt
+2026-10-28T03:25:12Z | done (once) | copies 1, last 2026-10-28T03:25:12Z (17 B in 1 files) | samples 1, last 2026-10-28T03:25:12Z (no-peer, idle) | cap 2026-10-28T03:40:00Z | stop: touch <smoke-dir>/STOP
+--- files
+cap_utc.txt
+manifest.sha256
+raw/companion_journal/000000_20261028T032512Z.txt
+samples/copies.jsonl
+samples/overlay.jsonl
+samples/session.jsonl
+status.txt
+--- the overlay and session samples
+{"at_utc": "2026-10-28T03:25:12Z", "connected": true, "mtu": 1280, "path": "no-peer", "peer_ready": false, "peers_online": 0, "reason": "running"}
+{"at_utc": "2026-10-28T03:25:12Z", "game_active": false, "native_stream_active": false, "paused": false, "state": "idle", "system": null}
+--- the copy row (bytes, redaction counts)
+OK cap_utc.txt
+OK manifest.sha256
+OK raw/companion_journal/000000_20261028T032512Z.txt
+OK samples/copies.jsonl
+OK samples/overlay.jsonl
+OK samples/session.jsonl
+OK status.txt
+--- the redact check over the smoke output (the keeper's own redactor with the real secrets): LEFT 0

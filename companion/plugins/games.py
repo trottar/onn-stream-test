@@ -51,6 +51,12 @@ _link_recovery_wan = None
 if (os.environ.get("PRIVYHUB_LINK_RECOVERY_WAN") or "").strip() == "1":
     import link_recovery_wan as _link_recovery_wan
 
+# B28: PRIVYHUB_REMOTE=1 -- the four WAN lines, each acting only on a remote-class session (the LAN as today).
+# Absent = today: nothing imported.
+_remote_umbrella = None
+if (os.environ.get("PRIVYHUB_REMOTE") or "").strip() == "1":
+    import remote_umbrella as _remote_umbrella
+
 # B3: the client's Wi-Fi link fields in the heartbeat, only with PRIVYHUB_LINK_REPORT=1. Absent = today.
 _LINK_FIELDS = None
 if (os.environ.get("PRIVYHUB_LINK_REPORT") or "").strip() == "1":
@@ -292,6 +298,9 @@ class GamesPlugin:
                 serial_lock=self._native_stream._lock,
                 recovery_state=self._recovery.current_state,
             )
+        # B28: the four WAN lines per session's path class (after the live controller exists)
+        if _remote_umbrella is not None:
+            self._remote_umbrella = _remote_umbrella.wire(self._recovery, os.environ, controller=self._adaptive_bitrate)
 
         self._metadata_reconcile_thread = threading.Thread(
             target=run_startup_metadata_reconcile,
@@ -3888,6 +3897,9 @@ class GamesPlugin:
             # B23: this session's thresholds by its path class (absent: today's)
             if _link_recovery_wan is not None and getattr(self, "_link_recovery_wan", None) is not None:
                 self._link_recovery_wan.note_stream_start(client_ip)
+            # B28: this session's WAN lines by its path class, before the start (absent: today's)
+            if _remote_umbrella is not None and getattr(self, "_remote_umbrella", None) is not None:
+                self._remote_umbrella.note_stream_start(client_ip)
             try:
                 if not game_status.get("paused", False):
                     try:

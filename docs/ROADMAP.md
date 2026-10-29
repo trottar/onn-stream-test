@@ -2098,6 +2098,18 @@ APK `8b0fbb74…3f4e` CONFIRMED and pinned; back to B on L1-L3.**
 
 Record: `docs/memory/evidence/CL_B15_LOSS_GUARD_DEFAULT_2026-10-27.md`.
 
+**Queue K (2026-10-28), for the trip (leaving 2026-10-30): B28-B31 built, nothing adopted, no live run.**
+- **B28:** `PRIVYHUB_REMOTE=1`, G4-S4's four WAN lines in one, each acting only on a remote-class session; the LAN
+  today's byte for byte (as written, `START_RUNG=floor` would start the LAN at 5000). G-A9 (the thirteenth line)
+  prepared. Record: `docs/memory/evidence/B28_REMOTE_UMBRELLA_2026-10-28.md`.
+- **B29:** a loss-guard hold is no longer a stall to the client's stall signal; the cap runs on the hold's own clock.
+  APK (B5 … B27 + B29) `9719ea82…` pinned, not installed. Record: `docs/memory/evidence/B29_GUARD_QUIET_STALL_2026-10-28.md`.
+- **B30:** `tools/trip_log_keeper.py` (the trip's redacted, never-overwritten log copies) and `tools/trip_check.py`
+  (six plain lines). Record: `docs/memory/evidence/B30_TRIP_LOG_KEEPER_2026-10-28.md`.
+- **B31:** the user's trip runbook, `docs/memory/handoffs/TRIP_RUNBOOK_2026-10-30.md`.
+- Next: CL-B16 (Wednesday), then Thursday's G-A9, the log-keeper and the trip check
+  (`docs/memory/handoffs/SESSION_B_DONE_2026-10-28K.md`).
+
 ## G9 — Remote foundation checkpoint
 
 Acceptance:

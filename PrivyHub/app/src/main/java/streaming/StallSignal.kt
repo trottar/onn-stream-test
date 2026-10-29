@@ -71,6 +71,8 @@ data class StallInputs(
     val renderedFrames: Long,
     val inGate: Boolean,
     val released: Boolean,
+    // B29: the loss guard's hold, frames still arriving: the time since the last one (-1 = not holding, today)
+    val holdingAgeMs: Long = -1L,
 )
 
 /** Pure: called from the controller loop (~every 8 ms); returns a datagram when one is due. */
@@ -109,7 +111,9 @@ class StallMonitor(val thresholdMs: Long, private val intervalMs: Long = 50L) {
         if (!stalled && (!inp.released || inp.outputAgeMs < 0L)) {
             return null
         }
-        val stallNow = inp.outputAgeMs >= thresholdMs || inp.inGate
+        // B29: a guard hold with frames still arriving is not a stall: decide on the time since the last frame
+        val age = if (inp.holdingAgeMs >= 0L) minOf(inp.outputAgeMs, inp.holdingAgeMs) else inp.outputAgeMs
+        val stallNow = age >= thresholdMs || inp.inGate
         if (stallNow) {
             if (stalled && nowMs - lastSentMs < intervalMs) {
                 return null
@@ -118,13 +122,13 @@ class StallMonitor(val thresholdMs: Long, private val intervalMs: Long = 50L) {
             lastSentMs = nowMs
             stallsSent++
             return StallPacket.encode(StallPacket.KIND_STALL, inp.inGate, seq++, inp.renderedFrames,
-                inp.outputAgeMs.coerceAtLeast(0L))
+                age.coerceAtLeast(0L))
         }
         if (stalled) {
             stalled = false
             endsSent++
             return StallPacket.encode(StallPacket.KIND_END, false, seq++, inp.renderedFrames,
-                inp.outputAgeMs.coerceAtLeast(0L))
+                age.coerceAtLeast(0L))
         }
         return null
     }

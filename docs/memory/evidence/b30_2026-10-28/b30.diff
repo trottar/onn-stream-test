@@ -1,0 +1,1005 @@
+diff --git a/tools/trip_log_keeper.py b/tools/trip_log_keeper.py
+new file mode 100644
+index 0000000..6e29807
+--- /dev/null
++++ b/tools/trip_log_keeper.py
+@@ -0,0 +1,471 @@
++#!/usr/bin/env python3
++"""B30: the trip's log-keeper -- read-only; it copies the hub's rotating logs for a date range, redacted.
++
++    python3 tools/trip_log_keeper.py --out docs/memory/evidence/trip_2026-10-30 --cap 2026-11-01T23:59Z
++        [--start <UTC>] [--copy-s 300] [--sample-s 60] [--once]
++
++From --start (default now) until the cap (written to <out>/cap_utc.txt at launch) or <out>/STOP:
++- every --copy-s: the new bytes of G4-S4's logs (the ladder, heartbeat, recovery, control-gap, frame-size,
++  host-sampler, audio and video logs in logs/games/; the hub's wan_sessions, session_audit and impairment rows; each
++  game log; the companion's journal) into a NEW chunk file raw/<log>/<NNNNNN>_<UTC><ext> (never a reused name, never
++  an existing file opened for writing), following rotation by inode into stream_log_archive/<log>.1..3; the new files
++  in decoder_sessions/ and audio_timing/ once each; one sha256sum line per kept file appended to manifest.sha256;
++- every --sample-s: the overlay state (connected, path, peer_ready, mtu, reason; online peers by count) and the
++  session state (active, paused, the system's class, the stream) into samples/*.jsonl;
++- the redactor on everything kept: the tailnet's names, the nodes' names, addresses and endpoints (re-read every copy),
++  the host's addresses, the paired devices' ids and keys, and any IPv4 / IPv6 / MAC / client id / long hex literal ->
++  placeholders, counted per kind; no value is printed;
++- status.txt (one line), and a last copy at the end. It holds no file open between steps, so a companion restart is
++  just a rotation or a gap. No stream, no restart, no adb, no game; nothing deleted.
++Design: docs/memory/evidence/b30_2026-10-28/design_written_before_code.md (hashed before this code).
++"""
++
++from __future__ import annotations
++
++import argparse
++import hashlib
++import ipaddress
++import json
++import os
++import re
++import subprocess
++import sys
++import time
++import urllib.request
++from datetime import datetime, timezone
++from pathlib import Path
++from typing import Any, Callable, Iterable
++
++REPO = Path(__file__).resolve().parents[1]
++GAMES_TAILS = ["adaptive_bitrate_shadow.jsonl", "native_stream_heartbeat.log", "native_stream_recovery.log",
++               "native_stream_ctrl_gaps.log", "native_frame_sizes.jsonl", "host_resource_samples.jsonl",
++               "native_pulseaudio.log", "native_video_alpha.log"]
++TOP_TAILS = ["wan_sessions.jsonl", "session_audit.jsonl", "impairment.jsonl"]
++NEWDIRS = ["decoder_sessions", "audio_timing"]
++GAME_LOG = re.compile(r"^\d{8}-\d{6}-game_[a-z0-9]+_[0-9a-f]+\.log$")
++UNIT = "privyhub-companion"
++STATUS_URL = "http://127.0.0.1:8765/plugins/games/status"
++QUIET_S = 10.0
++SKIP_NAMES = {"privyhub", "localhost"}
++
++# ---------------------------------------------------------------- time
++
++
++def utc(t: float | None = None) -> str:
++    return datetime.fromtimestamp(time.time() if t is None else t, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
++
++
++def stamp(t: float) -> str:
++    return datetime.fromtimestamp(t, timezone.utc).strftime("%Y%m%dT%H%M%SZ")
++
++
++def parse_utc(s: str, now: float) -> float:
++    s = s.strip()
++    if s.lower() == "now":
++        return now
++    for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%MZ", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M"):
++        try:
++            return datetime.strptime(s, fmt).replace(tzinfo=timezone.utc).timestamp()
++        except ValueError:
++            continue
++    raise ValueError(f"not a UTC time: {s!r}")
++
++# ---------------------------------------------------------------- the redactor
++
++IPV4 = re.compile(r"(?<![\w.])(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?![\w.])")
++IPV6 = re.compile(r"(?<![\w:.])((?:[0-9A-Fa-f]{0,4}:){2,7}[0-9A-Fa-f]{0,4})(?![\w:])")
++MAC = re.compile(r"\b[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}\b")
++CLIENT = re.compile(r"\bdev-[0-9a-f]{8,}\b")
++HEX = re.compile(r"\b[0-9a-fA-F]{32,}\b")
++
++
++def load_secrets() -> list[tuple[str, str]]:
++    """(value, placeholder) pairs, read in process, never printed."""
++    out: list[tuple[str, str]] = []
++    try:
++        ts = json.loads(subprocess.run(["tailscale", "status", "--json"], capture_output=True, text=True,
++                                       timeout=20).stdout or "{}")
++    except (OSError, subprocess.SubprocessError, ValueError):
++        ts = {}
++    tn = ts.get("CurrentTailnet") or {}
++    out += [(tn.get("Name"), "<tailnet>"), (tn.get("MagicDNSSuffix"), "<tailnet>"), (ts.get("MagicDNSSuffix"), "<tailnet>")]
++    for n in [ts.get("Self") or {}] + list((ts.get("Peer") or {}).values()):
++        out += [((n.get("DNSName") or "").rstrip("."), "<node-name>"), (n.get("HostName"), "<node-name>")]
++        out += [(a, "<tailnet-address>") for a in n.get("TailscaleIPs") or []]
++        for ep in [n.get("CurAddr")] + list(n.get("Addrs") or []):
++            if ep:
++                out += [(ep, "<endpoint>"), (ep.rsplit(":", 1)[0].strip("[]"), "<endpoint-host>")]
++    try:
++        text = subprocess.run(["ip", "-4", "addr"], capture_output=True, text=True, timeout=10).stdout
++        out += [(a, "<host-address>") for a in re.findall(r"inet (\d+\.\d+\.\d+\.\d+)", text)
++                if not a.startswith("127.")]
++    except (OSError, subprocess.SubprocessError):
++        pass
++    try:
++        store = json.loads((Path.home() / ".config/privyhub/paired_devices.json").read_text())
++        for d in store.get("devices", []):
++            out += [(d.get("device_id"), "<device-id>"), (d.get("key_hex"), "<key>")]
++    except (OSError, ValueError, AttributeError):
++        pass
++    return out
++
++
++def online_peers() -> int | None:
++    """Online peers, by count only."""
++    try:
++        ts = json.loads(subprocess.run(["tailscale", "status", "--json"], capture_output=True, text=True,
++                                       timeout=20).stdout or "{}")
++    except (OSError, subprocess.SubprocessError, ValueError):
++        return None
++    return sum(1 for p in (ts.get("Peer") or {}).values() if p.get("Online"))
++
++
++class Redactor:
++    def __init__(self, source: Callable[[], Iterable[tuple[Any, str]]] = load_secrets) -> None:
++        self._source = source
++        self._pairs: list[tuple[re.Pattern[str], str]] = []
++        self.refresh()
++
++    def refresh(self) -> None:
++        try:
++            pairs = list(self._source())
++        except Exception:
++            pairs = []
++        keep = {}
++        for value, ph in pairs:
++            v = str(value or "").strip()
++            if len(v) >= 4 and v.lower() not in SKIP_NAMES:
++                keep[v] = ph
++        self._pairs = [(re.compile(r"(?<![\w.-])" + re.escape(v) + r"(?![\w-])"), ph)
++                       for v, ph in sorted(keep.items(), key=lambda kv: -len(kv[0]))]
++
++    def apply(self, text: str) -> tuple[str, dict[str, int]]:
++        counts: dict[str, int] = {}
++
++        def count(ph: str, n: int = 1) -> None:
++            if n:
++                counts[ph] = counts.get(ph, 0) + n
++
++        for rx, ph in self._pairs:
++            text, n = rx.subn(ph, text)
++            count(ph, n)
++        text, n = CLIENT.subn("<client-id>", text)
++        count("<client-id>", n)
++        text, n = MAC.subn("<mac>", text)
++        count("<mac>", n)
++
++        def v4(m: re.Match[str]) -> str:
++            try:
++                ip = ipaddress.ip_address(m.group(1))
++            except ValueError:
++                return m.group(0)
++            if ip.is_loopback or str(ip) == "0.0.0.0":
++                return m.group(0)
++            count("<ipv4>")
++            return "<ipv4>"
++
++        def v6(m: re.Match[str]) -> str:
++            try:
++                ip = ipaddress.ip_address(m.group(1))
++            except ValueError:
++                return m.group(0)
++            if ip.is_loopback or ip.is_unspecified:
++                return m.group(0)
++            count("<ipv6>")
++            return "<ipv6>"
++
++        text = IPV4.sub(v4, text)
++        text = IPV6.sub(v6, text)
++        text, n = HEX.subn("<hex>", text)
++        count("<hex>", n)
++        return text, counts
++
++    def bytes(self, data: bytes) -> tuple[bytes, dict[str, int]]:
++        text, counts = self.apply(data.decode("utf-8", errors="surrogateescape"))
++        return text.encode("utf-8", errors="surrogateescape"), counts
++
++# ---------------------------------------------------------------- the sources
++
++
++def read_from(p: Path, off: int) -> bytes:
++    with open(p, "rb") as fh:
++        fh.seek(off)
++        return fh.read()
++
++
++class Tail:
++    """One log by path: its new bytes since the last step, following rotation by inode (G4-S4's)."""
++
++    def __init__(self, live: Path, archive: Path | None, from_start: bool = False) -> None:
++        self.live, self.archive = live, archive
++        try:
++            st = live.stat()
++            self.ino, self.off = st.st_ino, (0 if from_start else st.st_size)
++        except OSError:
++            self.ino, self.off = None, 0
++
++    def step(self) -> tuple[bytes, bool]:
++        out, rotated = b"", False
++        try:
++            st = self.live.stat()
++        except OSError:
++            return b"", False                                   # gone for now (a restart); followed when back
++        if self.ino is not None and st.st_ino != self.ino:
++            rotated = True
++            if self.archive is not None:
++                for i in (1, 2, 3):
++                    a = self.archive / f"{self.live.name}.{i}"
++                    try:
++                        if a.stat().st_ino == self.ino:
++                            out += read_from(a, self.off)
++                            break
++                    except OSError:
++                        continue
++            self.off = 0
++        self.ino = st.st_ino
++        if st.st_size < self.off:
++            self.off, rotated = 0, True                         # truncated
++        got = read_from(self.live, self.off)
++        self.off += len(got)
++        return out + got, rotated
++
++
++class Keeper:
++    def __init__(self, out: Path, cap: float, start: float, logs_root: Path = REPO / "logs",
++                 redactor: Redactor | None = None, overlay: Callable[[], dict[str, Any]] | None = None,
++                 session: Callable[[], dict[str, Any]] | None = None, journal: Callable[[int, int], bytes] | None = None,
++                 peers: Callable[[], int | None] = online_peers, clock: Callable[[], float] = time.time,
++                 sleep: Callable[[float], None] = time.sleep, copy_s: float = 300.0, sample_s: float = 60.0) -> None:
++        self.out, self.cap, self.start = Path(out), cap, start
++        self.logs = Path(logs_root)
++        self.games = self.logs / "games"
++        self.arch = self.games / "stream_log_archive"
++        self.raw, self.samples = self.out / "raw", self.out / "samples"
++        self.redactor = redactor if redactor is not None else Redactor()
++        self._overlay = overlay if overlay is not None else overlay_state
++        self._session = session if session is not None else session_state
++        self._journal = journal if journal is not None else read_journal
++        self._peers = peers
++        self.clock, self.sleep = clock, sleep
++        self.copy_s, self.sample_s = copy_s, sample_s
++        self.tails: dict[str, Tail] = {}
++        self.seen: dict[str, set[str]] = {}
++        self.jsince: int | None = None
++        self.copies = self.samples_n = 0
++        self.last_copy = "-"
++        self.last_sample = "-"
++        self.phase = "starting"
++
++    # -- the files ------------------------------------------------------------------------------------------------
++    def stop_file(self) -> Path:
++        return self.out / "STOP"
++
++    def why_end(self) -> str | None:
++        if self.stop_file().exists():
++            return "STOP"
++        if self.clock() >= self.cap:
++            return "the cap"
++        return None
++
++    def _keep(self, sub: str, name_tail: str, data: bytes) -> dict[str, Any]:
++        """A new kept file: redacted, created exclusively (never an existing name), its hash appended."""
++        red, counts = self.redactor.bytes(data)
++        d = self.raw / sub
++        d.mkdir(parents=True, exist_ok=True)
++        n = len([x for x in d.iterdir()])
++        while True:
++            p = d / f"{n:06d}_{name_tail}"
++            try:
++                with open(p, "xb") as fh:
++                    fh.write(red)
++                break
++            except FileExistsError:
++                n += 1
++        with open(self.out / "manifest.sha256", "a") as fh:
++            fh.write(f"{hashlib.sha256(red).hexdigest()}  {p.relative_to(self.out).as_posix()}\n")
++        return {"file": p.relative_to(self.out).as_posix(), "bytes": len(red), "redacted": counts}
++
++    def _status(self) -> None:
++        line = (f"{utc(self.clock())} | {self.phase} | copies {self.copies}, last {self.last_copy} | samples "
++                f"{self.samples_n}, last {self.last_sample} | cap {utc(self.cap)} | stop: touch {self.stop_file()}\n")
++        tmp = self.out / "status.txt.new"
++        tmp.write_text(line)
++        tmp.replace(self.out / "status.txt")
++
++    def _row(self, name: str, row: dict[str, Any]) -> None:
++        self.samples.mkdir(parents=True, exist_ok=True)
++        text, _ = self.redactor.apply(json.dumps(row, sort_keys=True, default=str))
++        with open(self.samples / name, "a") as fh:
++            fh.write(text + "\n")
++
++    # -- the copy ---------------------------------------------------------------------------------------------------
++    def begin(self) -> None:
++        """At the start: every source's position now (only what comes after is kept)."""
++        for n in GAMES_TAILS:
++            self.tails[f"games/{n}"] = Tail(self.games / n, self.arch)
++        for n in TOP_TAILS:
++            self.tails[n] = Tail(self.logs / n, None)
++        for sub in NEWDIRS:
++            d = self.games / sub
++            self.seen[sub] = set(os.listdir(d)) if d.is_dir() else set()
++        self.seen["game_logs"] = {f for f in (os.listdir(self.games) if self.games.is_dir() else []) if GAME_LOG.match(f)}
++        self.jsince = int(self.clock())
++
++    def copy(self, final: bool = False) -> dict[str, Any]:
++        now = self.clock()
++        self.redactor.refresh()
++        row: dict[str, Any] = {"at_utc": utc(now), "final": final, "kept": []}
++        # new game logs become tails from their first byte
++        if self.games.is_dir():
++            for f in sorted(os.listdir(self.games)):
++                if GAME_LOG.match(f) and f not in self.seen["game_logs"]:
++                    self.seen["game_logs"].add(f)
++                    self.tails[f"games/{f}"] = Tail(self.games / f, None, from_start=True)
++        for key, t in self.tails.items():
++            try:
++                data, rotated = t.step()
++            except OSError as exc:
++                row.setdefault("errors", {})[key] = type(exc).__name__
++                continue
++            if data:
++                ext = "".join(Path(key).suffixes) or ".txt"
++                kept = self._keep(key.replace("/", "__"), f"{stamp(now)}{ext}", data)
++                kept["rotated"] = rotated
++                row["kept"].append(kept)
++        for sub in NEWDIRS:
++            d = self.games / sub
++            if not d.is_dir():
++                continue
++            for f in sorted(os.listdir(d)):
++                if f in self.seen[sub]:
++                    continue
++                p = d / f
++                try:
++                    if not final and now - p.stat().st_mtime < QUIET_S:
++                        continue
++                    data = p.read_bytes()
++                except OSError:
++                    continue
++                self.seen[sub].add(f)
++                row["kept"].append(self._keep(f"games__{sub}", f, data))
++        until = int(now)
++        try:
++            j = self._journal(self.jsince or until, until)
++            self.jsince = until
++            if j:
++                row["kept"].append(self._keep("companion_journal", f"{stamp(now)}.txt", j))
++        except Exception as exc:
++            row.setdefault("errors", {})["journal"] = type(exc).__name__
++        self.copies += 1
++        self.last_copy = f"{utc(now)} ({sum(k['bytes'] for k in row['kept'])} B in {len(row['kept'])} files)"
++        self.samples.mkdir(parents=True, exist_ok=True)
++        with open(self.samples / "copies.jsonl", "a") as fh:
++            fh.write(json.dumps(row, sort_keys=True) + "\n")
++        return row
++
++    def sample(self) -> None:
++        now = self.clock()
++        try:
++            ov = dict(self._overlay())
++        except Exception as exc:
++            ov = {"error": type(exc).__name__}
++        try:
++            ov["peers_online"] = self._peers()
++        except Exception:
++            ov["peers_online"] = None
++        self._row("overlay.jsonl", {"at_utc": utc(now), **ov})
++        try:
++            ss = dict(self._session())
++        except Exception as exc:
++            ss = {"error": type(exc).__name__}
++        self._row("session.jsonl", {"at_utc": utc(now), **ss})
++        self.samples_n += 1
++        self.last_sample = f"{utc(now)} ({ov.get('path', '?')}, {ss.get('state', '?')})"
++
++    # -- the run ----------------------------------------------------------------------------------------------------
++    def run(self, once: bool = False) -> str:
++        self.out.mkdir(parents=True, exist_ok=True)
++        cap_p = self.out / "cap_utc.txt"
++        if cap_p.exists() and cap_p.read_text().strip() != utc(self.cap):
++            raise SystemExit(f"{cap_p} holds another cap; not overwritten")
++        if not cap_p.exists():
++            cap_p.write_text(utc(self.cap) + "\n")
++        self.phase = f"waiting for the start {utc(self.start)}"
++        self._status()
++        while self.clock() < self.start:
++            if self.why_end():
++                break
++            self.sleep(min(30.0, max(0.5, self.start - self.clock())))
++        self.begin()
++        self.phase = "running"
++        next_copy, next_sample = self.clock() + self.copy_s, self.clock()
++        why = None
++        while True:
++            why = self.why_end()
++            if why:
++                break
++            now = self.clock()
++            if now >= next_sample:
++                self.sample()
++                next_sample = now + self.sample_s
++            if now >= next_copy:
++                self.copy()
++                next_copy = now + self.copy_s
++            self._status()
++            if once:
++                why = "once"
++                break
++            self.sleep(max(0.5, min(next_copy, next_sample, self.cap) - self.clock()))
++        self.copy(final=True)
++        self.phase = f"done ({why})"
++        self._status()
++        return why
++
++# ---------------------------------------------------------------- the real readers
++
++
++def overlay_state() -> dict[str, Any]:
++    r = subprocess.run([sys.executable, "-m", "companion.overlay", "--state", "--provider", "tailscale"],
++                       capture_output=True, text=True, timeout=30, cwd=str(REPO))
++    st = (json.loads(r.stdout) or {}).get("state") or {}
++    return {k: st.get(k) for k in ("connected", "path", "peer_ready", "mtu", "reason")}
++
++
++def session_state() -> dict[str, Any]:
++    with urllib.request.urlopen(STATUS_URL, timeout=10) as resp:
++        g = json.loads(resp.read().decode() or "{}")
++    game = g.get("game") if isinstance(g.get("game"), dict) else {}
++    ns = g.get("native_stream") if isinstance(g.get("native_stream"), dict) else {}
++    active, paused, streaming = bool(g.get("active")), g.get("paused"), bool(ns.get("active"))
++    state = "PLAYING" if active and streaming and not paused else ("paused" if active and paused else
++                                                                   ("game, no stream" if active else "idle"))
++    return {"state": state, "game_active": active, "paused": paused, "system": game.get("system"),
++            "native_stream_active": streaming}
++
++
++def read_journal(since: int, until: int) -> bytes:
++    return subprocess.run(["journalctl", "--user", "-u", UNIT, "-o", "short-iso-precise", "--no-pager",
++                           "--since", f"@{since}", "--until", f"@{until}"], capture_output=True, timeout=120).stdout
++
++
++def main(argv: list[str] | None = None) -> int:
++    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
++    ap.add_argument("--out", required=True, type=Path)
++    ap.add_argument("--cap", required=True, help="the end, UTC (e.g. 2026-11-01T23:59Z)")
++    ap.add_argument("--start", default="now", help="UTC, or now")
++    ap.add_argument("--copy-s", type=float, default=300.0)
++    ap.add_argument("--sample-s", type=float, default=60.0)
++    ap.add_argument("--once", action="store_true", help="one sample and one copy, then stop (a check)")
++    a = ap.parse_args(argv)
++    now = time.time()
++    cap, start = parse_utc(a.cap, now), parse_utc(a.start, now)
++    if cap <= start:
++        ap.error("the cap is not after the start")
++    k = Keeper(a.out, cap, start, copy_s=a.copy_s, sample_s=a.sample_s)
++    why = k.run(once=a.once)
++    print(f"trip log-keeper: done ({why}); {k.copies} copies, {k.samples_n} samples; {a.out}")
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/tools/trip_check.py b/tools/trip_check.py
+new file mode 100644
+index 0000000..31b8d64
+--- /dev/null
++++ b/tools/trip_check.py
+@@ -0,0 +1,179 @@
++#!/usr/bin/env python3
++"""B30: the trip check -- six plain lines, read-only, no identifiers.
++
++    python3 tools/trip_check.py [--trip-dir docs/memory/evidence/trip_2026-10-30]
++
++1. adopted: the adopted line count and e1_suite's host check (`manager`, `environ` == ADOPTED, every drop-in, no
++   e3_flag.conf, no e4 file), the failing fields by name;
++2. apk: on the pin or not (adb), or the pin with "not read (adb off-LAN)";
++3. overlay: connected, the path (direct / relayed / no-peer / none), online peers by count;
++4. routing: the newest `token_issued`'s routing class and time (logs/session_audit.jsonl);
++5. band: 5 GHz / 2.4 GHz with the frequency if adb reaches the onn, else "adb off-LAN";
++6. log-keeper: its status line (the trip dir's status.txt) and whether its unit is active.
++Every line goes through the log-keeper's redactor before it prints; a failing reader prints `unknown (<why>)`.
++Reads files, `adb` (devices, the APK's hash, `dumpsys wifi`), `tailscale status`, `systemctl --user is-active` and the
++local control API through e1_suite; changes nothing. Design: docs/memory/evidence/b30_2026-10-28/design_written_before_code.md.
++"""
++
++from __future__ import annotations
++
++import argparse
++import importlib.util
++import json
++import re
++import subprocess
++import sys
++from pathlib import Path
++from typing import Any, Callable
++
++REPO = Path(__file__).resolve().parents[1]
++sys.path.insert(0, str(REPO / "tools"))
++import trip_log_keeper as tlk  # noqa: E402
++
++TRIP_DIR = REPO / "docs/memory/evidence/trip_2026-10-30"
++AUDIT = REPO / "logs/session_audit.jsonl"
++UNIT = "privyhub-trip-log"
++HOST_FIELDS = ("drop_in_", "e3_dropin_absent", "e4_constraint_absent")
++
++
++def e1_suite() -> Any:
++    spec = importlib.util.spec_from_file_location("e1_suite_trip", REPO / "tools/e1_suite.py")
++    m = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(m)
++    return m
++
++
++# ---------------------------------------------------------------- the six readers (each takes its source)
++
++def line_adopted(preflight: dict[str, Any], adopted: list[str]) -> str:
++    bad = []
++    if preflight.get("manager") != []:
++        bad.append("manager flags")
++    env = list(preflight.get("environ") or [])
++    if env != sorted(adopted):
++        missing = [kv.split("=", 1)[0] for kv in adopted if kv not in env]
++        extra = [kv.split("=", 1)[0] for kv in env if kv not in adopted]
++        bad.append("environ" + (f" missing {', '.join(missing)}" if missing else "")
++                   + (f" extra {', '.join(extra)}" if extra else ""))
++    bad += [k for k, v in preflight.items() if k.startswith(HOST_FIELDS) and v is not True]
++    return f"adopted: {len(adopted)} lines; host check " + ("ok" if not bad else f"NOT ok ({'; '.join(bad)})")
++
++
++def line_apk(pin: str, installed: str | None, adb_up: bool) -> str:
++    short = pin[:8] + "…"
++    if not adb_up or installed is None:
++        return f"apk: pin {short}, not read (adb off-LAN)"
++    return f"apk: on the pin {short}" if installed == pin else f"apk: NOT on the pin (the pin {short})"
++
++
++def line_overlay(state: dict[str, Any], peers: int | None) -> str:
++    conn = "yes" if state.get("connected") else "no"
++    return f"overlay: connected {conn}, path {state.get('path') or 'none'}, peers {peers if peers is not None else '?'}"
++
++
++def line_routing(audit_tail: list[str]) -> str:
++    for line in reversed(audit_tail):
++        try:
++            r = json.loads(line)
++        except ValueError:
++            continue
++        if r.get("event") == "token_issued":
++            return f"routing: newest token_issued {r.get('routing_evidence') or '?'} at {r.get('t') or r.get('at_utc') or '?'}"
++    return "routing: no token_issued in the audit log"
++
++
++def line_band(wifi_line: str | None) -> str:
++    if not wifi_line:
++        return "band: adb off-LAN"
++    m = re.search(r"(?:^|, )Frequency: (\d+)", wifi_line)
++    if not m:
++        return "band: unknown (no frequency in the Wi-Fi read)"
++    f = int(m.group(1))
++    band = "5 GHz" if 4900 <= f < 5900 else "2.4 GHz" if 2400 <= f < 2500 else "6 GHz" if f >= 5925 else "?"
++    return f"band: {band} ({f} MHz)"
++
++
++def line_keeper(status: str | None, unit_active: str | None) -> str:
++    unit = f"unit {unit_active}" if unit_active else "unit ?"
++    if not status:
++        return f"log-keeper: not running (no status); {unit}"
++    return f"log-keeper: {status.strip()}; {unit}"
++
++
++# ---------------------------------------------------------------- the real sources
++
++def tail_lines(p: Path, n_bytes: int = 256_000) -> list[str]:
++    with open(p, "rb") as fh:
++        fh.seek(0, 2)
++        size = fh.tell()
++        fh.seek(max(0, size - n_bytes))
++        return fh.read().decode("utf-8", errors="replace").splitlines()
++
++
++def wifi_line() -> str | None:
++    try:
++        out = subprocess.run(["adb", "shell", "dumpsys wifi | grep -m1 '^mWifiInfo'"], capture_output=True, text=True,
++                             timeout=20).stdout
++    except (OSError, subprocess.SubprocessError):
++        return None
++    return out.strip() or None
++
++
++def unit_state() -> str | None:
++    try:
++        return subprocess.run(["systemctl", "--user", "is-active", UNIT], capture_output=True, text=True,
++                              timeout=10).stdout.strip() or None
++    except (OSError, subprocess.SubprocessError):
++        return None
++
++
++def safe(fn: Callable[[], str], name: str) -> str:
++    try:
++        return fn()
++    except Exception as exc:
++        return f"{name}: unknown ({type(exc).__name__})"
++
++
++def lines(trip_dir: Path = TRIP_DIR) -> list[str]:
++    e1: Any = None
++    pf: dict[str, Any] = {}
++
++    def adopted() -> str:
++        nonlocal e1, pf
++        e1 = e1_suite()
++        pf = e1.preflight()
++        return line_adopted(pf, list(e1.ADOPTED))
++
++    def apk() -> str:
++        up = bool(pf.get("adb"))
++        return line_apk(e1.EXPECT_APK, e1.apk_hash() if up else None, up)
++
++    def overlay() -> str:
++        return line_overlay(tlk.overlay_state(), tlk.online_peers())
++
++    def routing() -> str:
++        return line_routing(tail_lines(AUDIT))
++
++    def band() -> str:
++        return line_band(wifi_line() if pf.get("adb") else None)
++
++    def keeper() -> str:
++        p = trip_dir / "status.txt"
++        return line_keeper(p.read_text() if p.is_file() else None, unit_state())
++
++    return [safe(adopted, "adopted"), safe(apk, "apk"), safe(overlay, "overlay"), safe(routing, "routing"),
++            safe(band, "band"), safe(keeper, "log-keeper")]
++
++
++def main(argv: list[str] | None = None) -> int:
++    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
++    ap.add_argument("--trip-dir", type=Path, default=TRIP_DIR)
++    a = ap.parse_args(argv)
++    red = tlk.Redactor()
++    for ln in lines(a.trip_dir):
++        print(red.apply(ln)[0])
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/tests/trip_log_keeper/test_trip_log_keeper.py b/tests/trip_log_keeper/test_trip_log_keeper.py
+new file mode 100644
+index 0000000..754c7da
+--- /dev/null
++++ b/tests/trip_log_keeper/test_trip_log_keeper.py
+@@ -0,0 +1,228 @@
++#!/usr/bin/env python3
++"""B30: the trip's log-keeper on a fake log dir that rotates (temp dirs only; no stream, no network, no companion).
++
++    python3 -m unittest discover -s tests/trip_log_keeper -v
++
++The secrets and the literals are built from integers; the samplers, the journal and the peer count are fakes; the
++clock is fake (the run's sleep advances it).
++"""
++
++from __future__ import annotations
++
++import hashlib
++import ipaddress
++import json
++import os
++import sys
++import tempfile
++import time
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "tools"))
++import trip_log_keeper as tlk  # noqa: E402
++
++V4 = str(ipaddress.ip_address(0xC6336414))                      # a documentation-range address
++V6 = str(ipaddress.ip_address((0xFD7A115CA1E0 << 80) + 0x1234))   # an overlay-range address
++EP = f"{ipaddress.ip_address(0xCB007105)}:{41641}"
++TAILNET = "".join(chr(c) for c in (116, 97, 105, 108, 45, 102, 97, 107, 101)) + ".example"
++CLIENT = "dev-" + "".join("0123456789abcdef"[(i * 7) % 16] for i in range(16))
++MACS = ":".join(f"{b:02x}" for b in (0x02, 0x11, 0x22, 0x33, 0x44, 0x55))
++
++
++class Clock:
++    def __init__(self, t):
++        self.t = t
++        self.hooks = []
++
++    def __call__(self):
++        return self.t
++
++    def sleep(self, s):
++        self.t += max(s, 0.5)
++        for h in list(self.hooks):
++            h(self.t)
++
++
++class Base(unittest.TestCase):
++    def setUp(self):
++        self.tmp = Path(tempfile.mkdtemp(prefix="b30_"))
++        self.logs = self.tmp / "logs"
++        self.games = self.logs / "games"
++        (self.games / "stream_log_archive").mkdir(parents=True)
++        (self.games / "decoder_sessions").mkdir()
++        self.out = self.tmp / "trip"
++        self.clock = Clock(1_793_500_000.0)
++        self.journal = []
++
++    def keeper(self, cap_s=3600.0, start_s=0.0, secrets=(), overlay=None, session=None, copy_s=300.0, sample_s=60.0):
++        return tlk.Keeper(self.out, self.clock() + cap_s, self.clock() + start_s, logs_root=self.logs,
++                          redactor=tlk.Redactor(lambda: list(secrets)),
++                          overlay=overlay or (lambda: {"connected": True, "path": "direct"}),
++                          session=session or (lambda: {"state": "idle"}),
++                          journal=lambda s, u: self.journal.pop(0) if self.journal else b"",
++                          peers=lambda: 1, clock=self.clock, sleep=self.clock.sleep, copy_s=copy_s, sample_s=sample_s)
++
++    def write(self, name, text, mode="a"):
++        with open(self.games / name, mode) as fh:
++            fh.write(text)
++
++    def chunks(self, key):
++        d = self.out / "raw" / key
++        return sorted(d.iterdir()) if d.is_dir() else []
++
++    def kept(self):
++        return sorted(p for p in (self.out / "raw").rglob("*") if p.is_file())
++
++
++class TheCopy(Base):
++    def test_chunks_concatenate_across_a_rotation_and_a_truncation(self):
++        self.write("native_stream_heartbeat.log", "before launch\n")
++        k = self.keeper()
++        k.begin()
++        self.write("native_stream_heartbeat.log", "A1\nA2\n")
++        k.copy()
++        self.write("native_stream_heartbeat.log", "B1\n")
++        os.rename(self.games / "native_stream_heartbeat.log",
++                  self.games / "stream_log_archive" / "native_stream_heartbeat.log.1")   # the rotation
++        self.write("native_stream_heartbeat.log", "C1\nC2 longer line\n")
++        row = k.copy()
++        self.assertTrue(any(x.get("rotated") for x in row["kept"]))
++        self.write("native_stream_heartbeat.log", "D\n", mode="w")                     # truncated
++        k.copy()
++        got = b"".join(p.read_bytes() for p in self.chunks("games__native_stream_heartbeat.log"))
++        self.assertEqual(got, b"A1\nA2\nB1\nC1\nC2 longer line\nD\n")                # nothing from before the launch
++
++    def test_nothing_rewritten_and_the_manifest_grows_and_verifies(self):
++        k = self.keeper()
++        k.begin()
++        first = {}
++        for i in range(4):
++            self.write("adaptive_bitrate_shadow.jsonl", json.dumps({"i": i}) + "\n")
++            self.journal.append(f"journal line {i}\n".encode())
++            k.copy()
++            for p in self.kept():
++                h = hashlib.sha256(p.read_bytes()).hexdigest()
++                self.assertEqual(first.setdefault(p, h), h, p)                      # never rewritten
++        lines = (self.out / "manifest.sha256").read_text().splitlines()
++        self.assertEqual(len(lines), len(self.kept()))
++        self.assertEqual(len(lines), 8)
++        for ln in lines:
++            h, rel = ln.split("  ", 1)
++            self.assertEqual(hashlib.sha256((self.out / rel).read_bytes()).hexdigest(), h)
++
++    def test_the_redactor_replaces_and_counts(self):
++        k = self.keeper(secrets=[(TAILNET, "<tailnet>"), (EP, "<endpoint>")])
++        k.begin()
++        self.write("native_stream_recovery.log",
++                   f"peer {TAILNET} via {EP} client {CLIENT} at {V4} v6 {V6} mac {MACS} loop 127.0.0.1 t 21:02:46\n")
++        row = k.copy()
++        text = self.chunks("games__native_stream_recovery.log")[0].read_text()
++        for secret in (TAILNET, EP, CLIENT, V4, V6, MACS):
++            self.assertNotIn(secret, text)
++        for ph in ("<tailnet>", "<endpoint>", "<client-id>", "<ipv4>", "<ipv6>", "<mac>"):
++            self.assertIn(ph, text)
++        self.assertIn("127.0.0.1", text)                                           # loopback kept
++        self.assertIn("21:02:46", text)                                            # a time is not an address
++        counts = row["kept"][0]["redacted"]
++        self.assertEqual(counts["<endpoint>"], 1)
++        self.assertEqual(counts["<ipv4>"], 1)
++
++    def test_new_decoder_reports_once_each_after_quiet(self):
++        k = self.keeper()
++        k.begin()
++        old = self.games / "decoder_sessions" / "native_decoder_a.json"
++        old.write_text('{"a": 1}')
++        os.utime(old, (self.clock() - 60, self.clock() - 60))
++        fresh = self.games / "decoder_sessions" / "native_decoder_b.json"
++        fresh.write_text('{"b": 2}')
++        os.utime(fresh, (self.clock(), self.clock()))
++        k.copy()
++        names = [p.name for p in self.chunks("games__decoder_sessions")]
++        self.assertEqual(len(names), 1)
++        self.assertTrue(names[0].endswith("native_decoder_a.json"))
++        k.copy()
++        self.assertEqual(len(self.chunks("games__decoder_sessions")), 1)
++        k.copy(final=True)                                                         # the last copy takes the fresh one
++        self.assertEqual(len(self.chunks("games__decoder_sessions")), 2)
++
++    def test_a_new_game_log_from_its_first_byte(self):
++        k = self.keeper()
++        k.begin()
++        name = "20261030-201500-game_snes_0123456789abcdef.log"
++        self.write(name, "launch\n")
++        k.copy()
++        self.write(name, "stop\n")
++        k.copy()
++        got = b"".join(p.read_bytes() for p in self.chunks(f"games__{name}"))
++        self.assertEqual(got, b"launch\nstop\n")
++
++    def test_a_restart_that_replaces_the_file_is_followed(self):
++        self.write("native_frame_sizes.jsonl", "x\n")
++        k = self.keeper()
++        k.begin()
++        self.write("native_frame_sizes.jsonl", "y\n")
++        os.rename(self.games / "native_frame_sizes.jsonl", self.tmp / "moved_away.jsonl")   # gone (a restart)
++        row = k.copy()
++        self.assertFalse(row.get("errors"))
++        self.write("native_frame_sizes.jsonl", "z\n")                                       # back, a new inode
++        k.copy()
++        got = b"".join(p.read_bytes() for p in self.chunks("games__native_frame_sizes.jsonl"))
++        self.assertEqual(got, b"z\n")    # "y" left with the moved file (not in the archive): the gap is a row, not a crash
++
++
++class TheRun(Base):
++    def test_the_cap_ends_it_with_a_last_copy(self):
++        k = self.keeper(cap_s=700.0)
++        self.clock.hooks.append(lambda t: self.write("native_stream_heartbeat.log", f"{t}\n"))
++        self.assertEqual(k.run(), "the cap")
++        self.assertIn("done (the cap)", (self.out / "status.txt").read_text())
++        rows = [json.loads(x) for x in (self.out / "samples" / "copies.jsonl").read_text().splitlines()]
++        self.assertEqual([r["final"] for r in rows], [False, False, True])
++        self.assertGreaterEqual(len((self.out / "samples" / "overlay.jsonl").read_text().splitlines()), 11)
++        self.assertEqual((self.out / "cap_utc.txt").read_text().strip(), tlk.utc(self.clock.t - (self.clock.t - k.cap)))
++
++    def test_stop_ends_it(self):
++        k = self.keeper()
++        self.clock.hooks.append(lambda t: (self.out / "STOP").touch() if t > self.clock_start + 130 else None)
++        self.clock_start = self.clock()
++        self.assertEqual(k.run(), "STOP")
++        self.assertIn("done (STOP)", (self.out / "status.txt").read_text())
++
++    def test_a_start_in_the_future_waits(self):
++        k = self.keeper(start_s=100.0, cap_s=200.0)
++        t0 = self.clock()
++        k.run()
++        first = json.loads((self.out / "samples" / "overlay.jsonl").read_text().splitlines()[0])
++        self.assertGreaterEqual(tlk.parse_utc(first["at_utc"], 0), t0 + 100 - 1)
++
++    def test_another_cap_is_not_overwritten(self):
++        self.out.mkdir(parents=True)
++        (self.out / "cap_utc.txt").write_text("2026-11-01T23:59:00Z\n")
++        with self.assertRaises(SystemExit):
++            self.keeper(cap_s=10.0).run()
++        self.assertEqual((self.out / "cap_utc.txt").read_text(), "2026-11-01T23:59:00Z\n")
++
++    def test_the_samples_hold_no_address(self):
++        k = self.keeper(cap_s=130.0, secrets=[(EP, "<endpoint>")],
++                        overlay=lambda: {"connected": True, "path": "relayed", "endpoint": EP, "note": V4},
++                        session=lambda: {"state": "PLAYING", "system": "snes", "client": CLIENT})
++        k.run()
++        text = (self.out / "samples" / "overlay.jsonl").read_text() + (self.out / "samples" / "session.jsonl").read_text()
++        for secret in (EP, V4, CLIENT):
++            self.assertNotIn(secret, text)
++        self.assertIn('"path": "relayed"', text)
++        self.assertIn('"peers_online": 1', text)
++
++
++class TheTimes(unittest.TestCase):
++    def test_parse(self):
++        self.assertEqual(tlk.utc(tlk.parse_utc("2026-11-01T23:59Z", 0)), "2026-11-01T23:59:00Z")
++        self.assertEqual(tlk.parse_utc("now", 5.0), 5.0)
++        with self.assertRaises(ValueError):
++            tlk.parse_utc("Sunday", 0)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/trip_check/test_trip_check.py b/tests/trip_check/test_trip_check.py
+new file mode 100644
+index 0000000..05c0373
+--- /dev/null
++++ b/tests/trip_check/test_trip_check.py
+@@ -0,0 +1,103 @@
++#!/usr/bin/env python3
++"""B30: the trip check's six lines from fakes (no adb, no network, no companion).
++
++    python3 -m unittest discover -s tests/trip_check -v
++"""
++
++from __future__ import annotations
++
++import io
++import ipaddress
++import json
++import sys
++import unittest
++from contextlib import redirect_stdout
++from pathlib import Path
++from unittest import mock
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "tools"))
++import trip_check as tc  # noqa: E402
++
++ADOPTED = sorted(["PRIVYHUB_A=1", "PRIVYHUB_B=1", "PRIVYHUB_REMOTE=1"])
++PIN = "9719ea822ed5f7d13799ff7e02ba814cd0a2abe79b8a2e3d631d0aecb13c0110"
++V4 = str(ipaddress.ip_address(0xC6336414))
++
++
++def preflight(**over):
++    d = {"manager": [], "environ": list(ADOPTED), "adb": True, "drop_in_a": True, "drop_in_remote": True,
++         "e3_dropin_absent": True, "e4_constraint_absent": True, "game_active": False}
++    d.update(over)
++    return d
++
++
++class TheLines(unittest.TestCase):
++    def test_adopted(self):
++        self.assertEqual(tc.line_adopted(preflight(), ADOPTED), "adopted: 3 lines; host check ok")
++        bad = tc.line_adopted(preflight(environ=ADOPTED[:2], drop_in_remote=False), ADOPTED)
++        self.assertEqual(bad, "adopted: 3 lines; host check NOT ok (environ missing PRIVYHUB_REMOTE; drop_in_remote)")
++        self.assertIn("host check ok", tc.line_adopted(preflight(adb=False), ADOPTED))       # adb is not a host field
++
++    def test_apk(self):
++        self.assertEqual(tc.line_apk(PIN, PIN, True), "apk: on the pin 9719ea82…")
++        self.assertEqual(tc.line_apk(PIN, "0" * 64, True), "apk: NOT on the pin (the pin 9719ea82…)")
++        self.assertEqual(tc.line_apk(PIN, None, False), "apk: pin 9719ea82…, not read (adb off-LAN)")
++
++    def test_overlay(self):
++        self.assertEqual(tc.line_overlay({"connected": True, "path": "direct", "endpoint": V4}, 2),
++                         "overlay: connected yes, path direct, peers 2")
++        self.assertEqual(tc.line_overlay({"connected": False, "path": None}, None), "overlay: connected no, path none, peers ?")
++
++    def test_routing(self):
++        tail = [json.dumps({"event": "token_issued", "routing_evidence": "lan", "t": "2026-10-27T21:00:00Z",
++                            "client_id": "dev-0123456789abcdef"}),
++                "not json",
++                json.dumps({"event": "token_issued", "routing_evidence": "overlay", "t": "2026-10-30T20:15:00Z",
++                            "client_id": "dev-0123456789abcdef"}),
++                json.dumps({"event": "media_check"})]
++        line = tc.line_routing(tail)
++        self.assertEqual(line, "routing: newest token_issued overlay at 2026-10-30T20:15:00Z")
++        self.assertNotIn("dev-", line)
++        self.assertEqual(tc.line_routing([]), "routing: no token_issued in the audit log")
++
++    def test_band(self):
++        self.assertEqual(tc.line_band("mWifiInfo SSID: <x>, RSSI: -60, Frequency: 5180, Tx Link speed: 433"),
++                         "band: 5 GHz (5180 MHz)")
++        self.assertEqual(tc.line_band("mWifiInfo RSSI: -60, Frequency: 2412"), "band: 2.4 GHz (2412 MHz)")
++        self.assertEqual(tc.line_band(None), "band: adb off-LAN")
++
++    def test_keeper(self):
++        self.assertEqual(tc.line_keeper("2026-10-30T20:00:00Z | running | copies 3\n", "active"),
++                         "log-keeper: 2026-10-30T20:00:00Z | running | copies 3; unit active")
++        self.assertEqual(tc.line_keeper(None, "inactive"), "log-keeper: not running (no status); unit inactive")
++
++
++class TheOutput(unittest.TestCase):
++    def test_six_lines_redacted_and_a_failing_reader_still_prints(self):
++        fake = ["adopted: 13 lines; host check ok", f"apk: odd {V4}", "overlay: connected yes, path direct, peers 1",
++                "routing: newest token_issued overlay at x", "band: adb off-LAN", "log-keeper: running; unit active"]
++        with mock.patch.object(tc, "lines", lambda trip_dir: fake), \
++                mock.patch.object(tc.tlk, "load_secrets", lambda: []):
++            buf = io.StringIO()
++            with redirect_stdout(buf):
++                tc.main([])
++        out = buf.getvalue().splitlines()
++        self.assertEqual(len(out), 6)
++        self.assertNotIn(V4, "\n".join(out))
++        self.assertEqual(out[1], "apk: odd <ipv4>")
++        self.assertEqual(tc.safe(lambda: 1 / 0, "band"), "band: unknown (ZeroDivisionError)")
++
++    def test_lines_with_every_source_down(self):
++        with mock.patch.object(tc, "e1_suite", side_effect=OSError("no suite")), \
++                mock.patch.object(tc.tlk, "overlay_state", side_effect=OSError("no provider")), \
++                mock.patch.object(tc, "tail_lines", side_effect=OSError("no audit")), \
++                mock.patch.object(tc, "unit_state", return_value=None):
++            got = tc.lines(Path("/nonexistent-trip-dir"))
++        self.assertEqual(len(got), 6)
++        self.assertEqual([g.split(":")[0] for g in got], ["adopted", "apk", "overlay", "routing", "band", "log-keeper"])
++        self.assertTrue(got[0].startswith("adopted: unknown"))
++        self.assertEqual(got[4], "band: adb off-LAN")
++
++
++if __name__ == "__main__":
++    unittest.main()

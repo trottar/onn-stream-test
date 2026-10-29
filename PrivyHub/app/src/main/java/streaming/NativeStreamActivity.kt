@@ -717,7 +717,7 @@ class NativeStreamActivity :
         // B7: the stall signal on the controller socket (null = today)
         stallMonitor?.let { m -> controllerSender?.stallTick = { now -> m.tick(now, stallInputs()) } }
         // B10: the loss guard's keyframe request on the controller socket (null = today)
-        lossGuard?.let { g -> controllerSender?.keyframeTick = { g.takeRequest() } }
+        lossGuard?.let { g -> controllerSender?.keyframeTick = { g.tick() } }   // B29: the cap's own clock, then the request
 
         receiver =
             RtpH264Receiver(
@@ -2397,6 +2397,7 @@ class NativeStreamActivity :
             root.put("loss_guard_frames_held", g.framesHeld.get())
             root.put("loss_guard_timeouts", g.timeouts.get())
             root.put("loss_guard_max_wait_ms", g.maxWaitObservedMs.get())
+            root.put("loss_guard_max_hold_ms", g.maxHoldObservedMs.get())   // B29: the hold's own length
             root.put("keyframe_requests_sent", g.requestsSent.get())
         }
 
@@ -2430,6 +2431,7 @@ class NativeStreamActivity :
             renderedFrames = decoder?.renderedFrameCount() ?: 0L,
             inGate = recoveryActive && !gameplayReleased,
             released = gameplayReleased || recoveryActive,
+            holdingAgeMs = lossGuard?.holdingAgeMs() ?: -1L,   // B29: a guard hold is not a stall (null guard = today)
         )
 
     // B14: the link notice, only with debug.privyhub.link_notice=1 (null = today); its own sampler if link_report=0.

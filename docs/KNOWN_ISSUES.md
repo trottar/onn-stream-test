@@ -28,6 +28,16 @@
   - the ladder restarts at the floor (7000 → 4000, ~14.5 min back to 7000 under the four lines).
   - Likely G-A4's design, not the WAN; to be confirmed on the LAN. **To B:** should Home pause and wait (the old
     pause screen), and should a Home return keep the rung?
+  - **Queue K, B28 (2026-10-28; BUILT behind `PRIVYHUB_REMOTE=1`, NOT ADOPTED, no live run): one line for the
+    four WAN lines, each acting only on a remote-class session.**
+    - **Settled:** as written the four are not LAN-neutral. `PRIVYHUB_START_RUNG=floor` starts a LAN session at
+      **5000** (the LAN list's floor), and the other three add rows and fields on the LAN.
+    - Under the umbrella a LAN session is today's byte for byte. On an overlay address (direct / relayed / unknown) the
+      four are G4-S4's, with one `remote_config` row per session.
+    - The replay: G4-S4 13 / 13 the same; the home LAN 16 / 16 today's 7000.
+    - **The floor start per new session (a Home return too) stays:** ~12-15 min below 7000 away from home.
+    - G-A9 (the thirteenth line) PREPARED, not applied: `docs/memory/patches/G-A9_REMOTE_ADOPTION_PREPARED.md`.
+    - Record: `docs/memory/evidence/B28_REMOTE_UMBRELLA_2026-10-28.md`.
   - **Queue H (2026-10-25):** B22 shortens the return itself (the start answered before the teardown, the
     release at the new stream's first fresh frame; NOT ADOPTED). Pausing at Home and keeping the rung were not in queue
     H: they stay the user's question.
@@ -290,6 +300,20 @@ is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.m
     - **For B:** why the cap fired 85 ms late; whether the guard's hold and the stall signal should know of each other.
       G-A8 is not a candidate as read. Off on the onn: `setprop debug.privyhub.loss_guard 0`, or `fcd924c2…` back.
       Record: `docs/memory/evidence/CL_B15_LOSS_GUARD_DEFAULT_2026-10-27.md`.
+  - **Queue K, B29 (2026-10-28; BUILT in the client, NOT ADOPTED, no live run): a guard hold is not a stall; the cap
+    on the hold's own clock.**
+    - **Settled:**
+      - a hold ages the decoder's output exactly as a link stall does, so the monitor sent stalls and the host acted
+        at 400;
+      - **the "685 ms" was the episode's drop-to-IDR span** (`loss_guard_max_wait_ms`), not a late cap. The hold
+        ended at the cap and 7 frames passed before the IDR.
+    - **Built:** while the guard holds, the stall monitor decides on the time since the last frame received
+      (suppressed; a real stall still goes out). The cap runs on the controller loop's ~8-ms tick; a new key,
+      `loss_guard_max_hold_ms`.
+    - JVM 161 / 161. **APK (B5 … B27 + B29) `9719ea82…0110` pinned, NOT installed;** `8b0fbb74…` stays CONFIRMED.
+    - A hold whose next good IDR is > 600 ms away still times out by design.
+    - Next: CL-B16 (`docs/memory/handoffs/SESSION_B_DONE_2026-10-28K.md`). Record:
+      `docs/memory/evidence/B29_GUARD_QUIET_STALL_2026-10-28.md`.
 - **UX-R4 (2026-10-23, the user's "severe lag … I saved at the spot", Zelda on snes9x, the eight lines, APK
   `bf5114a2…`, no link report):** the mark is the 05:01:30Z save, after a 41-s storm (05:00:40.9-05:01:20Z) of 19
   uplink silences ≥ 250 ms (9.5 s silent, the longest 1.4 s), with downlink loss ×9 beside it and the host steady

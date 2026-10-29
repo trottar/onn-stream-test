@@ -10,6 +10,8 @@ import java.util.concurrent.atomic.AtomicReference
  * `debug.privyhub.loss_guard=<1|count>` (CL-B7P's convention; a reboot clears
  * it). Absent = today: no object, no datagram, no report or heartbeat key.
  * B27: on by default -- absent / empty / junk read as `1`; `0` is that old absent.
+ * B29: the cap on the hold's own clock (`tick`, the controller loop's ~8 ms) and `holdingAgeMs` for the stall
+ * signal (a hold with frames still arriving is not a stall); `loss_guard_max_hold_ms` beside the episode's max wait.
  *
  * Today a dropped access unit is simply skipped and the next P-frame goes to
  * MediaCodec, which decodes it against a reference it never received; every
@@ -98,7 +100,14 @@ class LossGuard(
     val requestsSent = AtomicLong(0)
     val maxWaitObservedMs = AtomicLong(0)
 
+    // B29: the hold's own length (<= the cap + one controller loop), and the last access unit seen while waiting
+    val maxHoldObservedMs = AtomicLong(0)
+
+    @Volatile
+    private var lastArrivalMs = -1L
+
     /** A dropped access unit (outside a resync's own IDR wait). */
+    @Synchronized
     fun onDrop() {
         if (!waiting) {
             waiting = true
@@ -111,9 +120,11 @@ class LossGuard(
             }
         }
         episodeDrops++
+        lastArrivalMs = clockMs()                    // B29: the link still delivers
     }
 
     /** A complete access unit about to be queued: true = queue it (today), false = hold it (the freeze). */
+    @Synchronized
     fun deliver(isIdr: Boolean): Boolean {
         if (!waiting) {
             delivered.incrementAndGet()
@@ -121,6 +132,7 @@ class LossGuard(
         }
         val waited = clockMs() - waitStartMs
         if (isIdr) {
+            if (holding) maxHoldObservedMs.accumulateAndGet(waited) { a, b -> maxOf(a, b) }   // B29
             waiting = false
             holding = false
             maxWaitObservedMs.accumulateAndGet(waited) { a, b -> maxOf(a, b) }
@@ -132,9 +144,11 @@ class LossGuard(
             holding = false
             timeouts.incrementAndGet()
             maxWaitObservedMs.accumulateAndGet(waited) { a, b -> maxOf(a, b) }
+            maxHoldObservedMs.accumulateAndGet(waited) { a, b -> maxOf(a, b) }   // B29
         }
         if (holding) {
             framesHeld.incrementAndGet()
+            lastArrivalMs = clockMs()                // B29: a held frame: the link still delivers
             return false
         }
         delivered.incrementAndGet()
@@ -144,6 +158,29 @@ class LossGuard(
     /** The controller sender's tick: the episode's one request, once. */
     fun takeRequest(): ByteArray? =
         pending.getAndSet(null)?.also { requestsSent.incrementAndGet() }
+
+    /** B29: the controller loop's tick: the cap on the hold's own clock (no frame needed), then the request. */
+    fun tick(): ByteArray? {
+        synchronized(this) {
+            if (holding) {
+                val waited = clockMs() - waitStartMs
+                if (waited >= maxWaitMs) {
+                    holding = false
+                    timeouts.incrementAndGet()
+                    maxWaitObservedMs.accumulateAndGet(waited) { a, b -> maxOf(a, b) }
+                    maxHoldObservedMs.accumulateAndGet(waited) { a, b -> maxOf(a, b) }
+                }
+            }
+        }
+        return takeRequest()
+    }
+
+    /** B29: while holding, the time since the last access unit seen (held or dropped); -1 when not holding. */
+    fun holdingAgeMs(): Long {
+        if (!holding) return -1L
+        val last = lastArrivalMs
+        return if (last < 0L) -1L else (clockMs() - last).coerceAtLeast(0L)
+    }
 
     /** The heartbeat's query fragment. */
     fun query(): String =
