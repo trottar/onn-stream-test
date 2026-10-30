@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-10-29
-baseline_commit: 4b89d5b (queue K committed; CL-B16 uncommitted beside it; the user commits)
+baseline_commit: 646f8ed (CL-B16 committed; TRIP-PREP uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -13,19 +13,21 @@ Headings are fixed by `tools/check_memory_health.py`; do not rename.
 session identity v2 run on the host, and `identity_v2` is on in the client. **G-A2 ADOPTED (2026-10-19, the user's):
 the Opus audio path. **G-A3 ADOPTED (2026-10-23, the user's): the client's link report. **G-A4 ADOPTED (2026-10-24, the
 user's): the link-recovery stack. **G-A5 ADOPTED (2026-10-26, the user's): the fast restart. G-A6 SHELVED (built, off).
-**G-A7 ADOPTED (2026-10-27, the user's): the fast restart unlocked. The adopted environ is TWELVE lines.**
+**G-A7 ADOPTED (2026-10-27, the user's): the fast restart unlocked. **G-A9 ADOPTED (2026-10-29, the user's): the WAN
+lines on a remote session. The adopted environ is THIRTEEN lines.**
 CL-B3 is OPEN on two G5-S1 smoke gates (NOT MET; the user decides). Everything else passed: G3-S3's hardened APK
 `59f736d2…` is installed and CONFIRMED, the signed LAN path passed, and the VOD play through the range server
 passed.** E1 FROZEN; E2
 MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `af3ed73`.
 
-**State (2026-10-29 21:50Z, after CL-B16): the TWELVE adopted lines; `--check` ok on twelve; APK `9719ea82…0110`
-CONFIRMED** (CL-B16; B25's link notice and B27's loss guard on by default, `0` off for each; B29's quiet guard). `e3_state.py`'s `link_recovery.stack`: all six `implied 1`.
+**State (2026-10-30 00:14Z, after TRIP-PREP): the THIRTEEN adopted lines; `--check` ok on thirteen; APK
+`fcd924c2…9b96` CONFIRMED** (CL-B14's, reinstalled for the trip: the loss guard OUT; B25's link notice on by default). `e3_state.py`'s `link_recovery.stack`: all six `implied 1`.
 - Every client property is empty (the client's defaults: the stall signal, the restart guard and the link report on).
 - No `e3_flag.conf`, no stream. One device paired; `identity_v2` on.
-- Running: `privyhub-companion` and `privyhub-link-n1` (nightly) only.
+- Running: `privyhub-companion`, `privyhub-link-n1` (nightly, to 2026-10-31T06:00Z) and **`privyhub-trip-log`** (the
+  trip's log-keeper, to 2026-11-01T23:59Z).
 
-The twelve lines:
+The thirteen lines:
 1. `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live` (`adaptive.conf`);
 2. `PRIVYHUB_EPG_GUIDE_INDEX=cached` (`epg-index.conf`);
 3. `PRIVYHUB_SNES_CORE=snes9x` (`snes-core.conf`);
@@ -41,6 +43,8 @@ The twelve lines:
     teardown, the client released at the new stream's first fresh frame)**;
 12. **`PRIVYHUB_RESTART_FAST_UNLOCK=1` (`restart-fast-unlock.conf`, G-A7; B24: the ready at the new encoder's check, the
     old audio's stop after it outside the lock, the relay stopped before the old encoder's kill)**.
+13. **`PRIVYHUB_REMOTE=1` (`remote.conf`, G-A9; B28: G4-S4's four WAN lines, each acting only on a remote-class
+    session — the 4000 floor start and the climb, the remote ladder, the 7000 cap, the WAN telemetry; the LAN as today)**.
 
 **G-A2** (`evidence/G_A2_OPUS_ADOPTION_2026-10-19.md`): the confirmation run, Opus by the drop-in alone, was VALID
 with host gates held (`sig_v` 3 / opus, 8,994 kbit/s and 1,177 pkt/s at 7000, net audio loss 10 ms). **But underruns
@@ -222,6 +226,28 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
+
+**TRIP-PREP (2026-10-29/30, the user's "Yes to both"): G-A9 ADOPTED (the THIRTEENTH line); the loss guard OUT
+(`fcd924c2…` back); the window VALID; the log-keeper running; the runbook final**
+(`evidence/TRIP_PREP_2026-10-29.md`).
+- **G-A9:** the prepared diff applied (`<date>` → 2026-10-29); `remote.conf`; the restart 23:55:50Z; thirteen lines;
+  `--check` ok on thirteen.
+- **The APK `fcd924c2…`** (CL-B14's) reinstalled, paired, the pin moved back. It has the link report, the 2.4-GHz
+  notice, the stall signal, the restart guard and the fast-restart client. It lacks the guard default (B27) and the
+  quiet guard (B29), so the loss guard is OFF with no property. `9719ea82…` is kept at `cl_b16_installed/`.
+- **The window** (E1-SNES-STREAM 600 s, no flag, no property): every row met. `remote_config` `lan` (all four off);
+  `-b:v 7000k`; no remote row; no `wan`; `loss_guard_mode` absent; 0 stall pauses; silences 0.0, hitch 0.9 s / 10 min.
+- **The log-keeper** `privyhub-trip-log`: running, **to Sunday 2026-11-01T23:59Z**; early stop `touch
+  docs/memory/evidence/trip_2026-10-30/STOP`.
+- **The trip check:** adopted 13, ok; apk `fcd924c2`; overlay no-peer; routing lan; 5 GHz; the keeper running.
+
+1. **The user's commit**, then the trip (the runbook `handoffs/TRIP_RUNBOOK_2026-10-30.md`).
+2. **The next A task, after the user is home: "read the trip"** (the keeper's copies in `evidence/trip_2026-10-30/`).
+3. **To B:** the guard / stall interaction (CL-B16 S1; the guard's return after the trip); the `wan_sessions.jsonl` row
+   lost at a restart; the climb under a link stall (CL-B16 R3).
+
+**CL-B16 (2026-10-29):** 3 / 3 valid; `9719ea82…` CONFIRMED then; R3 and S1 back to B
+(`evidence/CL_B16_REMOTE_UMBRELLA_AND_QUIET_GUARD_2026-10-29.md`). Its items below are superseded by TRIP-PREP's.
 
 **CL-B16: MEASURED, 3 / 3 cells valid; APK `9719ea82…0110` (+ B29, the quiet guard) CONFIRMED and pinned, every
 client property EMPTY; R3 and S1 NOT MET → back to B** (`evidence/CL_B16_REMOTE_UMBRELLA_AND_QUIET_GUARD_2026-10-29.md`,

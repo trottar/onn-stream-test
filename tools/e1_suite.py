@@ -76,7 +76,10 @@ PKG = "com.safeiot.privyhub"
 # CL-B16 (installed 2026-10-29, CONFIRMED 2026-10-29): + B29 APK (a loss-guard hold is not a stall: the stall monitor
 # decides on the time since the last frame received while a hold is open; the cap on the hold's own clock); the previous
 # CONFIRMED APK was 8b0fbb74... (CL-B15)
-EXPECT_APK = "9719ea822ed5f7d13799ff7e02ba814cd0a2abe79b8a2e3d631d0aecb13c0110"
+# TRIP-PREP (2026-10-29, the user's "Yes to both"): the loss guard OUT for the trip -- CL-B14's CONFIRMED fcd924c2...
+# reinstalled (B5 ... B25: the link report, the 2.4-GHz notice, the stall signal and the restart guard on by default, the
+# fast-restart client; no guard default (B27), no quiet guard (B29)); 9719ea82... (CL-B16) kept at cl_b16_installed/
+EXPECT_APK = "fcd924c28cbf70a85bb9a886caabcb07873eee2d028b6538284fce5a7ae39b96"
 LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
 # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
 # is exactly these two names, at every precondition and teardown
@@ -113,8 +116,13 @@ RESTART_FAST = "PRIVYHUB_RESTART_FAST=1"
 # (B24; acts only on a guarded start, inside RESTART_FAST) -- through its own drop-in (restart-fast-unlock.conf); the
 # adopted environ is exactly these twelve names
 RESTART_FAST_UNLOCK = "PRIVYHUB_RESTART_FAST_UNLOCK=1"
+# G-A9 (adopted 2026-10-29, the user): the WAN lines for a trip -- PRIVYHUB_REMOTE=1 implies G4-S4's four (the remote ladder,
+# the start rung floor, the remote cap 7000, the WAN telemetry), each acting only on a remote-class session (an overlay
+# address); a LAN session as today, byte for byte (B28) -- through its own drop-in (remote.conf); the adopted environ is
+# exactly these thirteen names
+REMOTE = "PRIVYHUB_REMOTE=1"
 ADOPTED = sorted([LIVE, INDEX, SNES_CORE, RECOVERY, SNES_CAPTURE, OVERLAY, IDENTITY, AUDIO_CODEC, LINK_REPORT,
-                  LINK_RECOVERY, RESTART_FAST, RESTART_FAST_UNLOCK])
+                  LINK_RECOVERY, RESTART_FAST, RESTART_FAST_UNLOCK, REMOTE])
 FLAG_NAMES = ["PRIVYHUB_ADAPTIVE_BITRATE_INJECT", "PRIVYHUB_ADAPTIVE_BITRATE_TOP", "PRIVYHUB_PS1_LOOK",
               "PRIVYHUB_NATIVE_PROFILE_ID", "PRIVYHUB_FEC_SCHEME"]
 RA_CFG = Path.home() / ".config/retroarch/config"
@@ -1018,11 +1026,13 @@ def preflight() -> dict:
          "drop_in_link_recovery": f"Environment={LINK_RECOVERY}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_restart_fast": f"Environment={RESTART_FAST}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_restart_fast_unlock": f"Environment={RESTART_FAST_UNLOCK}" in sh(["systemctl", "--user", "cat", UNIT]),
+         "drop_in_remote": f"Environment={REMOTE}" in sh(["systemctl", "--user", "cat", UNIT]),
          "e3_dropin_absent": not DROPIN.exists(), "e4_constraint_absent": not E4_DROPIN.exists()}
     d["ok"] = (d["manager"] == [] and d["environ"] == ADOPTED and d["adb"] and d["drop_in_live"] and d["drop_in_index"]
                and d["drop_in_snes_core"] and d["drop_in_recovery"] and d["drop_in_snes_capture"] and d["drop_in_overlay"]
                and d["drop_in_identity"] and d["drop_in_audio_codec"] and d["drop_in_link_report"]
                and d["drop_in_link_recovery"] and d["drop_in_restart_fast"] and d["drop_in_restart_fast_unlock"]
+               and d["drop_in_remote"]
                and d["e3_dropin_absent"] and d["e4_constraint_absent"])
     return d
 

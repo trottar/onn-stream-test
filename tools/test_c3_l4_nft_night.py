@@ -264,11 +264,11 @@ class OnlySubset(unittest.TestCase):
 
 
 class AdoptedApk(unittest.TestCase):
-    """CL-B16 (2026-10-29; CL-B15, CL-B14, CL-B13, CL-B12, CL-B11, CL-B10, BENCH-R3, BENCH-R2, CL-B7, CL-B5, CL-B4, CL-B3, CL-B2 and CL-B1 before it): the preflight checks the CONFIRMED APK."""
+    """TRIP-PREP (2026-10-29: CL-B14's APK back, the loss guard out; CL-B16, CL-B15, CL-B14, CL-B13, CL-B12, CL-B11, CL-B10, BENCH-R3, BENCH-R2, CL-B7, CL-B5, CL-B4, CL-B3, CL-B2 and CL-B1 before it): the preflight checks the CONFIRMED APK."""
 
-    def test_the_preflight_expects_the_cl_b16_apk(self):
+    def test_the_preflight_expects_the_cl_b14_apk_back_for_the_trip(self):
         self.assertEqual(h.ADOPTED_APK_SHA256,
-                         "9719ea822ed5f7d13799ff7e02ba814cd0a2abe79b8a2e3d631d0aecb13c0110")
+                         "fcd924c28cbf70a85bb9a886caabcb07873eee2d028b6538284fce5a7ae39b96")
 
 
 

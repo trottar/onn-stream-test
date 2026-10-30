@@ -133,7 +133,7 @@ class Preflight(unittest.TestCase):
         self.assertTrue(pf["adb_device"])
 
     def test_the_adopted_set_is_required_too(self):
-        # G-A2: the callers pass e1_suite.ADOPTED (twelve lines since G-A7); one missing refuses, naming it
+        # G-A2: the callers pass e1_suite.ADOPTED (thirteen lines since G-A9); one missing refuses, naming it
         adopted = ("PRIVYHUB_AUDIO_CODEC=opus", R.REQUIRED_FLAGS[0])
         pf = R.preflight_remote(lambda kv: kv in R.REQUIRED_FLAGS, lambda: "", adopted)
         self.assertFalse(pf["ok"])

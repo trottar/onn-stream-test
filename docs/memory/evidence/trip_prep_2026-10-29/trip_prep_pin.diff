@@ -1,0 +1,44 @@
+--- a/tools/e1_suite.py
++++ b/tools/e1_suite.py
+@@ -76,7 +76,10 @@
+ # CL-B16 (installed 2026-10-29, CONFIRMED 2026-10-29): + B29 APK (a loss-guard hold is not a stall: the stall monitor
+ # decides on the time since the last frame received while a hold is open; the cap on the hold's own clock); the previous
+ # CONFIRMED APK was 8b0fbb74... (CL-B15)
+-EXPECT_APK = "9719ea822ed5f7d13799ff7e02ba814cd0a2abe79b8a2e3d631d0aecb13c0110"
++# TRIP-PREP (2026-10-29, the user's "Yes to both"): the loss guard OUT for the trip -- CL-B14's CONFIRMED fcd924c2...
++# reinstalled (B5 ... B25: the link report, the 2.4-GHz notice, the stall signal and the restart guard on by default, the
++# fast-restart client; no guard default (B27), no quiet guard (B29)); 9719ea82... (CL-B16) kept at cl_b16_installed/
++EXPECT_APK = "fcd924c28cbf70a85bb9a886caabcb07873eee2d028b6538284fce5a7ae39b96"
+ LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
+ # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
+ # is exactly these two names, at every precondition and teardown
+--- a/tools/c3_l4_nft_night.py
++++ b/tools/c3_l4_nft_night.py
+@@ -121,7 +121,9 @@
+ # (kept at PrivyHub/app/build/cl_b14_installed/app-debug.apk).
+ # CL-B16 (installed 2026-10-29): the guard-quiet-stall (B29) APK replaced CL-B15's 8b0fbb74d110ad89b6c1f9e69355abc3b5713b69055d3e8fa02b898108ee3f4e
+ # (kept at PrivyHub/app/build/cl_b15_installed/app-debug.apk).
+-ADOPTED_APK_SHA256 = "9719ea822ed5f7d13799ff7e02ba814cd0a2abe79b8a2e3d631d0aecb13c0110"
++# TRIP-PREP (reinstalled 2026-10-29): CL-B14's fcd924c2... back for the trip (the loss guard out); CL-B16's
++# 9719ea822ed5f7d13799ff7e02ba814cd0a2abe79b8a2e3d631d0aecb13c0110 kept at PrivyHub/app/build/cl_b16_installed/app-debug.apk.
++ADOPTED_APK_SHA256 = "fcd924c28cbf70a85bb9a886caabcb07873eee2d028b6538284fce5a7ae39b96"
+ REFERENCE_PROFILE = "native_game_720p60_reference"
+ MODE_ENV = "PRIVYHUB_ADAPTIVE_BITRATE_MODE"
+ # C3-L4-D1 (2026-10-01): live is the companion's default through the systemd drop-in
+--- a/tools/test_c3_l4_nft_night.py
++++ b/tools/test_c3_l4_nft_night.py
+@@ -264,11 +264,11 @@
+ 
+ 
+ class AdoptedApk(unittest.TestCase):
+-    """CL-B16 (2026-10-29; CL-B15, CL-B14, CL-B13, CL-B12, CL-B11, CL-B10, BENCH-R3, BENCH-R2, CL-B7, CL-B5, CL-B4, CL-B3, CL-B2 and CL-B1 before it): the preflight checks the CONFIRMED APK."""
++    """TRIP-PREP (2026-10-29: CL-B14's APK back, the loss guard out; CL-B16, CL-B15, CL-B14, CL-B13, CL-B12, CL-B11, CL-B10, BENCH-R3, BENCH-R2, CL-B7, CL-B5, CL-B4, CL-B3, CL-B2 and CL-B1 before it): the preflight checks the CONFIRMED APK."""
+ 
+-    def test_the_preflight_expects_the_cl_b16_apk(self):
++    def test_the_preflight_expects_the_cl_b14_apk_back_for_the_trip(self):
+         self.assertEqual(h.ADOPTED_APK_SHA256,
+-                         "9719ea822ed5f7d13799ff7e02ba814cd0a2abe79b8a2e3d631d0aecb13c0110")
++                         "fcd924c28cbf70a85bb9a886caabcb07873eee2d028b6538284fce5a7ae39b96")
+ 
+ 
+ 

@@ -287,3 +287,32 @@ Every point below is a **[G3-S3 proposal]**.
      `docs/memory/evidence/g_a7_2026-10-27/g_a7_applied.diff`).
 
   The host then runs §12's worker (CL-B13 cell 1: the ready waits on the old audio's stop inside the lock).
+
+## 14. The WAN lines on a remote session (adopted G-A9, 2026-10-29)
+
+- **Adopted:** `PRIVYHUB_REMOTE=1` through the drop-in
+  `~/.config/systemd/user/privyhub-companion.service.d/remote.conf`, the **thirteenth adopted line** (the user's "Yes",
+  2026-10-29, after CL-B16).
+  - **What it does (B28):** at each stream start the host reads the session's class from the onn's address (G3's overlay
+    test), then the overlay's path. On an overlay address (direct / relayed / unknown) it turns on G4-S4's four:
+    - the remote ladder;
+    - the start rung `floor` (4000);
+    - the remote cap 7000;
+    - the WAN telemetry.
+  - **On the LAN none of the four acts:** today's code path, 7000 from the start (CL-B16 cell 1, TRIP-PREP's window).
+  - **The cost away:** every new session, a Home return too, starts at 4000 and climbs ~3 min a rung, ~12-15 min to
+    7000, longer after a link stall (CL-B16 cell 2: 5500 after 13.6 min).
+- **What leaves the onn:** nothing new. The host's recovery log carries `remote_umbrella_config` and one `remote_config`
+  per session (the class and the four lines in force); on a remote session the ladder rows carry `path_class`,
+  `logs/wan_sessions.jsonl` gets rows and `/status` a `wan` object. No address or identifier.
+- **The client side:** no change.
+- **Turning it off (host):**
+  1. Delete `remote.conf`.
+  2. Run `systemctl --user daemon-reload && systemctl --user restart privyhub-companion` (outside 04:30-05:30Z while
+     `privyhub-link-n1` runs).
+  3. Take `REMOTE` out of `tools/e1_suite.py` `ADOPTED` (reverse
+     `docs/memory/evidence/trip_prep_2026-10-29/g_a9_applied.diff`).
+
+  Remote sessions then start at 7000 with no remote ladder, as on the twelve lines.
+- **The loss guard for the trip:** out. The onn runs CL-B14's `fcd924c2…`, which has no guard default. The guard's
+  return after the trip is a B item (CL-B16 S1: its holds still draw stall pauses).

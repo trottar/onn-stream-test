@@ -1,0 +1,154 @@
+{
+ "t0": "2026-10-29T23:58:26.710Z",
+ "t1": "2026-10-30T00:12:57.692Z",
+ "suite_rc": 0,
+ "run_dir": "run1",
+ "environ_watch": {
+  "reads": 59,
+  "max_lines": 13,
+  "thirteen_with_flag": 59,
+  "lines_at_thirteen": [
+   "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+   "PRIVYHUB_AUDIO_CODEC=opus",
+   "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+   "PRIVYHUB_LINK_RECOVERY=1",
+   "PRIVYHUB_LINK_REPORT=1",
+   "PRIVYHUB_OVERLAY_PROVIDER=tailscale",
+   "PRIVYHUB_RECOVERY_TRIGGER=v2",
+   "PRIVYHUB_REMOTE=1",
+   "PRIVYHUB_RESTART_FAST=1",
+   "PRIVYHUB_RESTART_FAST_UNLOCK=1",
+   "PRIVYHUB_SESSION_IDENTITY=v2",
+   "PRIVYHUB_SNES_CAPTURE_FIX=output_rate",
+   "PRIVYHUB_SNES_CORE=snes9x"
+  ]
+ },
+ "encoder": {
+  "first": {
+   "at_utc": "2026-10-30T00:00:55.176Z",
+   "pid_n": 1,
+   "b_v": "7000k",
+   "maxrate": "7000k"
+  },
+  "seen": [
+   {
+    "at_utc": "2026-10-30T00:00:55.176Z",
+    "pid_n": 1,
+    "b_v": "7000k",
+    "maxrate": "7000k"
+   }
+  ]
+ },
+ "wan_polls": {
+  "polls": 29,
+  "in_game": 23,
+  "status_has_wan": 0
+ },
+ "wan_sessions_lines": [
+  33,
+  33
+ ],
+ "logs_copied": {
+  "native_stream_heartbeat.log": 345,
+  "native_stream_ctrl_gaps.log": 0,
+  "native_stream_recovery.log": 17,
+  "native_frame_sizes.jsonl": 701,
+  "adaptive_bitrate_shadow.jsonl": 398
+ },
+ "final_flags_absent": true,
+ "final_environ_lines": 13,
+ "figures": {
+  "status": "OK",
+  "window": {
+   "from": "2026-10-30T00:02:29.793Z",
+   "to": "2026-10-30T00:12:29.793Z"
+  },
+  "loss_per_min": 16.73,
+  "rendered_fps": 59.906,
+  "resyncs": 0,
+  "stale_per_min": 0.774,
+  "spikes20_per_min": 73.55,
+  "client_pauses": 0,
+  "retroarch_fps": 59.999,
+  "host_cpu": 6.769,
+  "companion_cpu": 21.843,
+  "encoder_cpu": 27.318,
+  "retroarch_cpu": 8.523,
+  "retroarch_rss_kb": 147207.913,
+  "retroarch_rss_kb_max": 147208,
+  "mem_available_mb": 10784.568,
+  "mem_available_mb_min": 10706,
+  "max_output_gap_ms": 165,
+  "audio_underruns": 14,
+  "audio_underruns_heartbeat": 12,
+  "audio_lost_packets": 9,
+  "spikes50": 23,
+  "spikes80": 7,
+  "rung_min": 7000,
+  "rung_max": 7000,
+  "playing_attempt": 2,
+  "s_to_playing": 3.0,
+  "preflight_ok": true,
+  "flags_absent_after": true,
+  "apk": "CONFIRMED",
+  "capture_fps": 59.996,
+  "dupdrop_per_min": 0.1
+ },
+ "post_check": {
+  "at_utc": "2026-10-30T00:12:58.254Z",
+  "preflight": {
+   "manager": [],
+   "environ": [
+    "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live",
+    "PRIVYHUB_AUDIO_CODEC=opus",
+    "PRIVYHUB_EPG_GUIDE_INDEX=cached",
+    "PRIVYHUB_LINK_RECOVERY=1",
+    "PRIVYHUB_LINK_REPORT=1",
+    "PRIVYHUB_OVERLAY_PROVIDER=tailscale",
+    "PRIVYHUB_RECOVERY_TRIGGER=v2",
+    "PRIVYHUB_REMOTE=1",
+    "PRIVYHUB_RESTART_FAST=1",
+    "PRIVYHUB_RESTART_FAST_UNLOCK=1",
+    "PRIVYHUB_SESSION_IDENTITY=v2",
+    "PRIVYHUB_SNES_CAPTURE_FIX=output_rate",
+    "PRIVYHUB_SNES_CORE=snes9x"
+   ],
+   "game_active": false,
+   "adb": true,
+   "drop_in_live": true,
+   "drop_in_index": true,
+   "drop_in_snes_core": true,
+   "drop_in_recovery": true,
+   "drop_in_snes_capture": true,
+   "drop_in_overlay": true,
+   "drop_in_identity": true,
+   "drop_in_audio_codec": true,
+   "drop_in_link_report": true,
+   "drop_in_link_recovery": true,
+   "drop_in_restart_fast": true,
+   "drop_in_restart_fast_unlock": true,
+   "drop_in_remote": true,
+   "e3_dropin_absent": true,
+   "e4_constraint_absent": true,
+   "ok": true
+  },
+  "ps1_files_identical": true,
+  "apk": "CONFIRMED",
+  "retroarch": 0,
+  "encoder": 0,
+  "mainpid_serves_8765": true,
+  "ok": true,
+  "link_recovery": {
+   "umbrella": "1",
+   "on": true,
+   "stack": {
+    "PRIVYHUB_INPUT_HOLD": "implied 1",
+    "PRIVYHUB_INPUT_HOLD_B6": "implied 1",
+    "PRIVYHUB_INPUT_HOLD_B8": "implied 1",
+    "PRIVYHUB_INPUT_HOLD_REWIND": "implied 1",
+    "PRIVYHUB_STALL_SIGNAL": "implied 1",
+    "PRIVYHUB_STALL_RESUME": "implied 1"
+   }
+  }
+ }
+}

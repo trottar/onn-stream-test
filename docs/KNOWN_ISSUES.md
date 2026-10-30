@@ -47,6 +47,11 @@
       - **The session's `wan_sessions` row was never written:** the companion restarted before a next session in the
         same process.
       - G-A9 is back to B as read. Record: `docs/memory/evidence/CL_B16_REMOTE_UMBRELLA_AND_QUIET_GUARD_2026-10-29.md`.
+      - **G-A9 ADOPTED anyway (2026-10-29, the user's "Yes", TRIP-PREP):** the thirteenth line. Its LAN window was
+        valid: today's 7000, no remote row.
+      - **Still open for B:** `logs/wan_sessions.jsonl` loses the last remote session's row at a companion restart
+        (written only when a next session starts in the same process). During the trip, read the keeper's copies and
+        `wan` in `/status`. Record: `docs/memory/evidence/TRIP_PREP_2026-10-29.md`.
   - **Queue H (2026-10-25):** B22 shortens the return itself (the start answered before the teardown, the
     release at the new stream's first fresh frame; NOT ADOPTED). Pausing at Home and keeping the rung were not in queue
     H: they stay the user's question.
@@ -332,6 +337,10 @@ is over 50mb/s." Record: `docs/memory/evidence/LAN_R1_LOSS_STEPDOWN_2026-10-21.m
       - **For B:** what "the last frame received" counts during a hold, and why ages reach 597 ms with no silence.
       - `8b0fbb74…` is kept at `PrivyHub/app/build/cl_b15_installed/`. Record:
         `docs/memory/evidence/CL_B16_REMOTE_UMBRELLA_AND_QUIET_GUARD_2026-10-29.md`.
+      - **TRIP-PREP (2026-10-29, the user's "Yes"): the loss guard OUT for the trip.** CL-B14's `fcd924c2…`
+        (no guard default) is reinstalled and the pin moved back. `9719ea82…` is kept at `cl_b16_installed/`.
+      - **The guard / stall interaction stays open for B:** the guard's holds draw stall pauses with 3-frame rewinds,
+        and B29's fix did not take. The guard's return after the trip is a B item.
 - **UX-R4 (2026-10-23, the user's "severe lag … I saved at the spot", Zelda on snes9x, the eight lines, APK
   `bf5114a2…`, no link report):** the mark is the 05:01:30Z save, after a 41-s storm (05:00:40.9-05:01:20Z) of 19
   uplink silences ≥ 250 ms (9.5 s silent, the longest 1.4 s), with downlink loss ×9 beside it and the host steady

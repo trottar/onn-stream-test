@@ -1715,6 +1715,14 @@ ninth line, the user's say-so); a plain on-screen notice tells the user when the
 thing to do (B14, `debug.privyhub.link_notice=1`). LINK-R1: 5 GHz 0 / 0 against 2.4 GHz 16-22 / 20 silences / hitch s
 per 10 min. Records: `B13_LINK_REPORT_DEFAULT_ON_2026-10-23.md`, `B14_LINK_NOTICE_2026-10-23.md`.
 
+**G-A9 ADOPTED (2026-10-29, the user's "Yes", TRIP-PREP): `PRIVYHUB_REMOTE=1`, the thirteenth line (`remote.conf`).**
+G4-S4's four (the remote ladder, the 4000 floor start, the 7000 cap, the WAN telemetry) act by themselves on an
+overlay session; the LAN is today's (CL-B16 cell 1; TRIP-PREP's window).
+- **Off:** delete `remote.conf`, `daemon-reload`, restart (outside 04:30-05:30Z), reverse
+  `trip_prep_2026-10-29/g_a9_applied.diff`.
+- **For the trip the onn runs `fcd924c2…`** (the loss guard out); the guard's return is a B item after the trip.
+- The log-keeper `privyhub-trip-log` runs to 2026-11-01T23:59Z. Record: `docs/memory/evidence/TRIP_PREP_2026-10-29.md`.
+
 ## G5 — WAN-aware telemetry and adaptation
 
 **Status (2026-10-16, G5-S1): CLASSIFICATION BUILT behind `PRIVYHUB_WAN_TELEMETRY=1`

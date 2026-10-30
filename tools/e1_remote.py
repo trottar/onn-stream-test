@@ -165,7 +165,7 @@ def read_control_peers() -> dict[str, Any]:
 
 def preflight_remote(environ_has: Callable[[str], bool], adb_devices: Callable[[], str],
                      adopted: tuple[str, ...] | list[str] = ()) -> dict[str, Any]:
-    # G-A2: the callers pass the home row's adopted set (e1_suite.ADOPTED, twelve lines since G-A7); each must be read back too
+    # G-A2: the callers pass the home row's adopted set (e1_suite.ADOPTED, thirteen lines since G-A9); each must be read back too
     need = list(REQUIRED_FLAGS) + [kv for kv in adopted if kv not in REQUIRED_FLAGS]
     d = {
         "flags": {kv: environ_has(kv) for kv in need},

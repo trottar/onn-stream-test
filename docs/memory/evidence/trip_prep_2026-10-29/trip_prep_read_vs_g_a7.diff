@@ -1,0 +1,49 @@
+2c2,5
+< """G-A7's reader (G-A5's g_a5_read.py, itself G-A4's g_a4_read.py plus restart_fast_config and the restart_fast* rows;
+---
+> """TRIP-PREP's reader: G-A7's g_a7_read.py plus G-A9's rows (remote_umbrella_config / remote_config; the ladder rows
+> carrying path_class / start_rung, remote_cap_config, the clamps; window_result.json's encoder argv / `wan` polls /
+> wan_sessions count) and the client's end-of-session report (loss_guard_mode, the stall signal's counters) from
+> logs/games/decoder_sessions/. Below, G-A7's: G-A7's reader (G-A5's g_a5_read.py, itself G-A4's g_a4_read.py plus restart_fast_config and the restart_fast* rows;
+118c121
+< g = GDNS["measure"]("G-A7 twelve lines", LD, s0, s1)
+---
+> g = GDNS["measure"]("TRIP-PREP thirteen lines", LD, s0, s1)
+125c128
+< CFG = ("restart_fast_config", "restart_fast_unlock_config", "link_recovery_config", "input_hold_config", "input_hold_b6_config", "input_hold_b8_config", "input_hold_rewind_config",
+---
+> CFG = ("remote_umbrella_config", "remote_config", "restart_fast_config", "restart_fast_unlock_config", "link_recovery_config", "input_hold_config", "input_hold_b6_config", "input_hold_b8_config", "input_hold_rewind_config",
+143a147,172
+> # ---- G-A9's rows and the client's report (TRIP-PREP)
+> lad = jl(LD / "adaptive_bitrate_shadow.jsonl")
+> res["ladder"] = {"rows": len(lad), "with_path_class": sum(1 for r in lad if "path_class" in r),
+>                  "with_start_rung": sum(1 for r in lad if "start_rung" in r),
+>                  "remote_cap_config": sum(1 for r in lad if r.get("event") == "remote_cap_config"),
+>                  "remote_cap_clamps": sum(1 for r in lad if "remote_cap" in r),
+>                  "transitions": [{k: r.get(k) for k in ("at_utc", "from_kbps", "to_kbps", "reason")} for r in lad
+>                                  if r.get("event") == "transition"],
+>                  "levels": sorted({r.get("level_kbps") for r in lad if isinstance(r.get("level_kbps"), int)})}
+> res["stall_pauses"] = [{k: r.get(k) for k in ("at_utc", "event", "age_ms", "trigger", "kind", "silence_ms")} for r in span
+>                        if r.get("event") in ("client_stall", "desync_pause") and s0 - 5 <= ts(r["at_utc"]) <= s1 + 5]
+> REPD = HERE.parents[3] / "logs/games/decoder_sessions"
+> cands = sorted(p_ for p_ in REPD.glob("native_decoder_*.json")
+>                if s0 < datetime.strptime(p_.name[15:34], "%Y%m%d_%H%M%S_%f").replace(tzinfo=timezone.utc).timestamp() <= s1 + 30)
+> rp = json.loads(cands[-1].read_text())["report"] if cands else {}
+> res["client_report"] = {"file": cands[-1].name if cands else None, **{k: rp.get(k, "<absent>") for k in (
+>     "loss_guard_mode", "frames_after_dropped_reference", "loss_guard_episodes", "loss_guard_frames_held", "loss_guard_timeouts",
+>     "loss_guard_max_hold_ms", "keyframe_requests_sent", "stall_signal_ms", "stall_signal_stalls_sent", "stall_signal_ends_sent",
+>     "link_notice_shown", "duration_ms")}, "video_lost_packets": (rp.get("video") or {}).get("lost_packets")}
+> wr = json.loads((HERE / "window_result.json").read_text()) if (HERE / "window_result.json").exists() else {}
+> res["window_result"] = {k: wr.get(k) for k in ("encoder", "wan_polls", "wan_sessions_lines", "environ_watch", "final_flags_absent",
+>                                                "final_environ_lines", "suite_rc")}
+> res["window_figures"] = {k: (wr.get("figures") or {}).get(k) for k in ("retroarch_fps", "capture_fps", "dupdrop_per_min", "rendered_fps",
+>                                                                         "loss_per_min", "max_output_gap_ms", "status", "playing_attempt",
+>                                                                         "s_to_playing", "client_pauses")}
+> 
+150a180,185
+> print("remote rows", json.dumps(res["config_rows"]["remote_umbrella_config"] + res["config_rows"]["remote_config"]))
+> print("ladder", json.dumps(res["ladder"]))
+> print("stall pauses", json.dumps(res["stall_pauses"]))
+> print("client report", json.dumps(res["client_report"]))
+> print("window result", json.dumps(res["window_result"]))
+> print("window figures", json.dumps(res["window_figures"]))

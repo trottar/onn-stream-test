@@ -1,0 +1,70 @@
+diff --git a/tools/e1_remote.py b/tools/e1_remote.py
+index 4237d37..e2fab83 100644
+--- a/tools/e1_remote.py
++++ b/tools/e1_remote.py
+@@ -165,7 +165,7 @@ def read_control_peers() -> dict[str, Any]:
+ 
+ def preflight_remote(environ_has: Callable[[str], bool], adb_devices: Callable[[], str],
+                      adopted: tuple[str, ...] | list[str] = ()) -> dict[str, Any]:
+-    # G-A2: the callers pass the home row's adopted set (e1_suite.ADOPTED, twelve lines since G-A7); each must be read back too
++    # G-A2: the callers pass the home row's adopted set (e1_suite.ADOPTED, thirteen lines since G-A9); each must be read back too
+     need = list(REQUIRED_FLAGS) + [kv for kv in adopted if kv not in REQUIRED_FLAGS]
+     d = {
+         "flags": {kv: environ_has(kv) for kv in need},
+diff --git a/tools/e1_suite.py b/tools/e1_suite.py
+index b067b48..da1f6bb 100644
+--- a/tools/e1_suite.py
++++ b/tools/e1_suite.py
+@@ -113,8 +113,13 @@ RESTART_FAST = "PRIVYHUB_RESTART_FAST=1"
+ # (B24; acts only on a guarded start, inside RESTART_FAST) -- through its own drop-in (restart-fast-unlock.conf); the
+ # adopted environ is exactly these twelve names
+ RESTART_FAST_UNLOCK = "PRIVYHUB_RESTART_FAST_UNLOCK=1"
++# G-A9 (adopted 2026-10-29, the user): the WAN lines for a trip -- PRIVYHUB_REMOTE=1 implies G4-S4's four (the remote ladder,
++# the start rung floor, the remote cap 7000, the WAN telemetry), each acting only on a remote-class session (an overlay
++# address); a LAN session as today, byte for byte (B28) -- through its own drop-in (remote.conf); the adopted environ is
++# exactly these thirteen names
++REMOTE = "PRIVYHUB_REMOTE=1"
+ ADOPTED = sorted([LIVE, INDEX, SNES_CORE, RECOVERY, SNES_CAPTURE, OVERLAY, IDENTITY, AUDIO_CODEC, LINK_REPORT,
+-                  LINK_RECOVERY, RESTART_FAST, RESTART_FAST_UNLOCK])
++                  LINK_RECOVERY, RESTART_FAST, RESTART_FAST_UNLOCK, REMOTE])
+ FLAG_NAMES = ["PRIVYHUB_ADAPTIVE_BITRATE_INJECT", "PRIVYHUB_ADAPTIVE_BITRATE_TOP", "PRIVYHUB_PS1_LOOK",
+               "PRIVYHUB_NATIVE_PROFILE_ID", "PRIVYHUB_FEC_SCHEME"]
+ RA_CFG = Path.home() / ".config/retroarch/config"
+@@ -1018,11 +1023,13 @@ def preflight() -> dict:
+          "drop_in_link_recovery": f"Environment={LINK_RECOVERY}" in sh(["systemctl", "--user", "cat", UNIT]),
+          "drop_in_restart_fast": f"Environment={RESTART_FAST}" in sh(["systemctl", "--user", "cat", UNIT]),
+          "drop_in_restart_fast_unlock": f"Environment={RESTART_FAST_UNLOCK}" in sh(["systemctl", "--user", "cat", UNIT]),
++         "drop_in_remote": f"Environment={REMOTE}" in sh(["systemctl", "--user", "cat", UNIT]),
+          "e3_dropin_absent": not DROPIN.exists(), "e4_constraint_absent": not E4_DROPIN.exists()}
+     d["ok"] = (d["manager"] == [] and d["environ"] == ADOPTED and d["adb"] and d["drop_in_live"] and d["drop_in_index"]
+                and d["drop_in_snes_core"] and d["drop_in_recovery"] and d["drop_in_snes_capture"] and d["drop_in_overlay"]
+                and d["drop_in_identity"] and d["drop_in_audio_codec"] and d["drop_in_link_report"]
+                and d["drop_in_link_recovery"] and d["drop_in_restart_fast"] and d["drop_in_restart_fast_unlock"]
++               and d["drop_in_remote"]
+                and d["e3_dropin_absent"] and d["e4_constraint_absent"])
+     return d
+ 
+diff --git a/tools/e3_state.py b/tools/e3_state.py
+index 7ce9878..d4212fa 100644
+--- a/tools/e3_state.py
++++ b/tools/e3_state.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""E3: the adopted state (since G-A7, twelve: live, the guide index, Snes9x, recovery v2, the SNES capture fix output_rate, the overlay provider, session identity v2, the Opus audio path, the client's link report, the link-recovery stack, the fast restart, the fast restart unlocked; the list and the drop-in checks are e1_suite's ADOPTED / preflight) as one JSON line (preflight -- since E4-S2 also no e4_constraint.conf --, PS1 files, APK, no game / RetroArch / encoder). Read-only."""
++"""E3: the adopted state (since G-A9, thirteen: live, the guide index, Snes9x, recovery v2, the SNES capture fix output_rate, the overlay provider, session identity v2, the Opus audio path, the client's link report, the link-recovery stack, the fast restart, the fast restart unlocked, the WAN lines on a remote session; the list and the drop-in checks are e1_suite's ADOPTED / preflight) as one JSON line (preflight -- since E4-S2 also no e4_constraint.conf --, PS1 files, APK, no game / RetroArch / encoder). Read-only."""
+ import sys, json, importlib.util
+ spec=importlib.util.spec_from_file_location('s','/home/privyhub/Projects/onn-stream-test/tools/e1_suite.py'); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+ mp=m.mainpid()
+diff --git a/tools/test_e1_remote.py b/tools/test_e1_remote.py
+index 5e09fd0..5b3700a 100644
+--- a/tools/test_e1_remote.py
++++ b/tools/test_e1_remote.py
+@@ -133,7 +133,7 @@ class Preflight(unittest.TestCase):
+         self.assertTrue(pf["adb_device"])
+ 
+     def test_the_adopted_set_is_required_too(self):
+-        # G-A2: the callers pass e1_suite.ADOPTED (twelve lines since G-A7); one missing refuses, naming it
++        # G-A2: the callers pass e1_suite.ADOPTED (thirteen lines since G-A9); one missing refuses, naming it
+         adopted = ("PRIVYHUB_AUDIO_CODEC=opus", R.REQUIRED_FLAGS[0])
+         pf = R.preflight_remote(lambda kv: kv in R.REQUIRED_FLAGS, lambda: "", adopted)
+         self.assertFalse(pf["ok"])

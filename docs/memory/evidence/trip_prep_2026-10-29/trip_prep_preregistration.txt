@@ -1,0 +1,48 @@
+TRIP-PREP — G-A9's confirmation window: pre-registration (session A, 2026-10-29 ~23:58Z; hashed BEFORE the run)
+
+Task: docs/memory/handoffs/TRIP-PREP_2026-10-29_TASK.md step 4. The user's decisions (2026-10-29, "Yes to both"):
+PRIVYHUB_REMOTE=1 adopted as the thirteenth line; the loss guard out for the trip (fcd924c2… back on the onn).
+
+0. State at the hash
+- HEAD 646f8ed ("Trip prep handoff"; CL-B16 committed 1672626). G-A9's diff applied to the four tools; remote.conf
+  written; the companion restarted 23:55:50Z; the environ THIRTEEN lines; --check ok on thirteen (drop_in_remote true).
+- The APK fcd924c2…9b96 reinstalled from PrivyHub/app/build/cl_b14_installed/, read back, paired; the pin moved back;
+  --check reads it CONFIRMED. 9719ea82… kept at cl_b16_installed/.
+- The band 5180 MHz, 5 GHz; the client on the LAN (Hub host empty, the newest token_issued lan); the seven properties
+  empty; no e3_flag.conf; units: the companion and privyhub-link-n1 only.
+- The clock ~23:58Z: the window (~15 min) ends long before 04:15Z.
+
+1. The run
+- trip_prep_window.py (G-A7's g_a7_window.py for thirteen lines; the diff trip_prep_window_vs_g_a7.diff) as a
+  transient unit privyhub-trip-prep-window (--collect): tools/e1_suite.py run --only E1-SNES-STREAM --runs 1 --window
+  600 --gap 120 --e2 --prereg <this file>. No --plan, no e3_flag.conf, no setprop, the pad untouched.
+- Beside it: the environ every 15 s (thirteen expected); the band every 30 s; the encoder's argv (-b:v / -maxrate of
+  each new pid only); /status every 30 s (`wan` presence); logs/wan_sessions.jsonl line count before and after; the
+  state once mid-window. The reader: trip_prep_read.py (G-A7's + G-A9's rows + the client's report).
+
+2. The rows
+  T1 remote_umbrella_config at the run's restart: the four `implied` (1 / floor / 7000 / 1).
+  T2 remote_config, one per client session: class lan, all four in_force false.
+  T3 the LAN as today: the encoder's first argv -b:v 7000k; no ladder row with path_class or start_rung; no
+     remote_cap_config row, 0 clamps; no `wan` in /status in any poll; no new logs/wan_sessions.jsonl row.
+  T4 the host gates: RetroArch >= 59.9, capture 60 ± 0.1, dup+drop <= 0.2 / min; thirteen lines in every environ read.
+  T5 the guard off: the client's report loss_guard_mode NOT `guard` (the fcd924c2… client with no property).
+  T6 stall pauses (client_stall / desync_pause) recorded with their ages: 0 expected on a clean link; the number
+     stated, with the uplink silences around each.
+  T7 silences >= 250 ms and hitch seconds per 10 min (B6 / UX-R3, pinned), stated beside G-A7's window (0.0 / 2.6)
+     and CL-B16 cell 1 (4.46 / 15.6, the 9719ea82… client).
+  T8 after: flags_absent true; thirteen lines; --check ok; the seven properties empty.
+
+3. Validity
+- PLAYING; the host gates (T4); flags_absent (T8); thirteen lines throughout; no property; the band 5 GHz; the routing
+  class at the stream lan. Valid or not, with the rows.
+
+4. The stop rule (the task's)
+- If the umbrella shows ANY remote row on this LAN session (remote_config not lan, any in_force true, a path_class /
+  start_rung / remote_cap_config row, -b:v not 7000k, `wan` in /status, a new wan_sessions row): stop; remove
+  remote.conf; daemon-reload and restart the companion (outside 04:30-05:30Z); tell the user — the trip then runs on
+  twelve lines and the per-run driver as G4-S4.
+- T6 / T7 not as expected is recorded, not a stop: they are the link and the client, not the umbrella.
+
+No sudo, no nft, the Opal read-only, adb for state reads only, no setprop; no addresses or identifiers anywhere;
+nothing fetched, nothing deleted; nothing but the thirteenth line adopted; nothing committed.
