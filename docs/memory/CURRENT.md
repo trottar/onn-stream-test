@@ -14,20 +14,23 @@ session identity v2 run on the host, and `identity_v2` is on in the client. **G-
 the Opus audio path. **G-A3 ADOPTED (2026-10-23, the user's): the client's link report. **G-A4 ADOPTED (2026-10-24, the
 user's): the link-recovery stack. **G-A5 ADOPTED (2026-10-26, the user's): the fast restart. G-A6 SHELVED (built, off).
 **G-A7 ADOPTED (2026-10-27, the user's): the fast restart unlocked. **G-A9 ADOPTED (2026-10-29, the user's): the WAN
-lines on a remote session. The adopted environ is THIRTEEN lines.**
+lines on a remote session. **G-A10 ADOPTED (2026-11-02, the user's "Adopt"): the step in place. The adopted environ
+is FOURTEEN lines.**
 CL-B3 is OPEN on two G5-S1 smoke gates (NOT MET; the user decides). Everything else passed: G3-S3's hardened APK
 `59f736d2…` is installed and CONFIRMED, the signed LAN path passed, and the VOD play through the range server
 passed.** E1 FROZEN; E2
 MEASURED; E3 CLOSED; E4 CLOSED (host side). Nothing committed since `af3ed73`.
 
-**State (2026-10-30 00:14Z, after TRIP-PREP): the THIRTEEN adopted lines; `--check` ok on thirteen; APK
-`fcd924c2…9b96` CONFIRMED** (CL-B14's, reinstalled for the trip: the loss guard OUT; B25's link notice on by default). `e3_state.py`'s `link_recovery.stack`: all six `implied 1`.
-- Every client property is empty (the client's defaults: the stall signal, the restart guard and the link report on).
-- No `e3_flag.conf`, no stream. One device paired; `identity_v2` on.
-- Running: `privyhub-companion`, `privyhub-link-n1` (nightly, to 2026-10-31T06:00Z) and **`privyhub-trip-log`** (the
-  trip's log-keeper, to 2026-11-01T23:59Z).
+**State (2026-11-03 02:50Z, after G-A10): the FOURTEEN adopted lines; `--check` ok on fourteen; APK
+`fcd924c2…9b96` CONFIRMED** (CL-B14's; HOME-1's `554ccf61…` not confirmed). `e3_state.py`'s `link_recovery.stack`: all
+six `implied 1`; B33 live inside it.
+- All ten client properties are empty (the client's defaults: the stall signal, the restart guard and the link report
+  on).
+- No `e3_flag.conf`, no stream. One device paired; `identity_v2` on; the onn on the LAN, 5 GHz.
+- Running: `privyhub-companion` and **`privyhub-diag`** (B36, enabled 2026-11-03). The nightly watch and the trip
+  keeper are over.
 
-The thirteen lines:
+The fourteen lines:
 1. `PRIVYHUB_ADAPTIVE_BITRATE_MODE=live` (`adaptive.conf`);
 2. `PRIVYHUB_EPG_GUIDE_INDEX=cached` (`epg-index.conf`);
 3. `PRIVYHUB_SNES_CORE=snes9x` (`snes-core.conf`);
@@ -45,6 +48,8 @@ The thirteen lines:
     old audio's stop after it outside the lock, the relay stopped before the old encoder's kill)**.
 13. **`PRIVYHUB_REMOTE=1` (`remote.conf`, G-A9; B28: G4-S4's four WAN lines, each acting only on a remote-class
     session — the 4000 floor start and the climb, the remote ladder, the 7000 cap, the WAN telemetry; the LAN as today)**.
+14. **`PRIVYHUB_STEP_IN_PLACE=1` (`step-in-place.conf`, G-A10; B32's host half: each ladder step spliced onto the same
+    stream at one IDR, no SSRC change; a 2-s fallback to today's restart)**.
 
 **G-A2** (`evidence/G_A2_OPUS_ADOPTION_2026-10-19.md`): the confirmation run, Opus by the drop-in alone, was VALID
 with host gates held (`sig_v` 3 / opus, 8,994 kbit/s and 1,177 pkt/s at 7000, net audio loss 10 ms). **But underruns
@@ -226,6 +231,26 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
   (`TOOLS.md`); after a host reboot `adb connect <onn-address>:5555`.
 
 ## Next Action
+
+**G-A10 (2026-11-03 02:26-02:50Z, session A): `PRIVYHUB_STEP_IN_PLACE=1` ADOPTED, the FOURTEENTH line**
+(`evidence/G_A10_STEP_IN_PLACE_ADOPTION_2026-11-02.md`, `evidence/g_a10_2026-11-02/`).
+- **The diff and tests:** `patches/G-A10_STEP_IN_PLACE_ADOPTION.md`, in G-A7's form, applied. The tests are green
+  from the tree. `step-in-place.conf` written, the companion restarted at 02:28:03Z, fourteen lines read back,
+  `--check` ok on fourteen.
+- **The window** (E1-PS1-STREAM 600 s, the LAN, no property): valid; the host gates met; fourteen lines throughout.
+  - **No ladder step in it** (the rung 7000 throughout). The behaviour's proof is HOME-1 C2 and `tests/step_in_place`.
+  - Two real stalls with loss: B33 rewound as built.
+  - The onn at −67…−69 dBm tonight.
+  - `privyhub-diag`'s session row was written 155 s after the end, 5 s past the 150-s bound.
+- **Units:** only the companion and `privyhub-diag` are active.
+
+1. **The user's commit:**
+   - the record and `g_a10_2026-11-02/`;
+   - the patch and the four tools;
+   - REMOTE_TRUST §15, ROADMAP, KNOWN_ISSUES, this file;
+   - B's status line (02:27Z, B's own) and the task file (`logs/g_a10_git_status.txt`).
+2. **Session B's queue M** may now run (its precondition: this record exists).
+3. **B's open items** (KNOWN_ISSUES top): the virtual-remote slot, the hold counter, the VOD drop test.
 
 **HOME-1 (2026-11-02 EST / 2026-11-03 00:38-02:05Z, session A): the trip closed; queue L's cells run; C2 / C3 MET,
 C1 / C4 NOT MET, C5 INVALID; `554ccf61…` NOT CONFIRMED → `fcd924c2…` back on the onn**

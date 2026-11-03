@@ -398,6 +398,21 @@ if os.environ.get("PRIVYHUB_VOD_LOG", "").strip() == "1":
     )
     VOD_LOG.install(RangeRequestHandler)
 
+# B40: a hub-side VOD drop for the bench, only with PRIVYHUB_VOD_DROP_TEST=1 (per-run, never adopted; the
+# companion's environment is inherited). Absent = today: nothing imported, the class above not touched, no thread.
+VOD_DROP_TEST = None
+
+if os.environ.get("PRIVYHUB_VOD_DROP_TEST", "").strip() == "1":
+    from vod_drop_test import drop_test_from_environ as _drop_test_from_environ
+
+    VOD_DROP_TEST = _drop_test_from_environ(
+        os.environ,
+        Path(__file__).resolve().parents[1],
+        VOD_LOG,
+    )
+    VOD_DROP_TEST.install(RangeRequestHandler)
+    VOD_DROP_TEST.start()
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(

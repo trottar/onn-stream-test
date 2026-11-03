@@ -1,0 +1,46 @@
+G-A10 — the confirmation window for the fourteenth adopted line: pre-registration (session A, 2026-11-03 ~02:30Z = 2026-11-02 EST, hashed before the run)
+
+Task: docs/memory/handoffs/G-A10_STEP_IN_PLACE_ADOPTION_TASK.md. The user's decision 2026-11-02 ("Adopt"): adopt
+PRIVYHUB_STEP_IN_PLACE=1 as the fourteenth line, after HOME-1 C2 (both steps in_place true, ssrc_unchanged true, splice
+0.9 / 6.1 ms, no SSRC change and no client_stall; today's restart of the same steps 235 / 428-ms gaps, C3).
+
+State before the window:
+- the diff applied (patches/G-A10_STEP_IN_PLACE_ADOPTION.md, written by A in G-A7's applied form: e1_suite ADOPTED
+  fourteen, drop_in_step_in_place in the preflight's ok); git diff --check clean;
+- the tests green from the tree: e1_suite --self-test OK, test_e1_remote 21 OK, test_c3_l4_nft_night 33 OK,
+  tests/step_in_place 15 OK, tests/remote_umbrella 10 OK, tests/link_recovery 9 + 7 OK;
+- step-in-place.conf written with the file tool; daemon-reload and the companion restarted ~02:27Z;
+- the environ read back FOURTEEN lines; tools/e3_state.py --check ok on fourteen (drop_in_step_in_place true;
+  link_recovery.stack all six "implied 1"); APK fcd924c2…9b96 CONFIRMED;
+- the seven client properties all EMPTY (the three queue-L ones too); the band 5 GHz (5180 MHz); the client on the
+  LAN; no e3_flag.conf; privyhub-diag active.
+- Note: B32's code writes NO `step_in_place_config` row (none anywhere in companion/; the module is imported at
+  native_stream.py:76 when the line is set). "By the drop-in alone" is therefore shown by the environ (fourteen lines,
+  no e3_flag.conf), e3_state mid-window, and the `in_place` keys a step carries.
+
+The window: one E1-PS1-STREAM, tools/e1_suite.py run --only E1-PS1-STREAM --runs 1 --window 600 --gap 120 --e2, NO
+--plan, NO e3_flag.conf, NO setprop: the fourteen adopted lines alone, ON THE LAN (the live ladder's LAN steps). Run by
+g_a10_window.py (G-A7's runner for fourteen lines and the PS1 workload; g_a10_window_vs_g_a7.diff) as the transient
+unit privyhub-g-a10-window (--collect). No Home press; the pad not touched.
+
+Expected (met / not met):
+- W1 (the flag by the drop-in alone): the environ fourteen lines with PRIVYHUB_STEP_IN_PLACE=1 in every 15-s read; no
+  e3_flag.conf; e3_state mid-window ok-shaped (fourteen, drop_in_step_in_place true).
+- W2 (the steps): EVERY `transition_done` in the window's span reads in_place: true, ssrc_unchanged: true,
+  splice_gap_ms < 40, and no in_place_fallback / in_place: false; each step's encoder log line "B32 in-place step: …
+  active on the same stream"; no SSRC change at a step in the client report; no client_stall within 2 s of a step.
+  A LAN session starts at 7000 (the top), so a step happens only after a pressure step-down: IF THE WINDOW HAS NO
+  `transition` AT ALL, W2 reads "none: no step in the window" — not met, not failed — and the proof of the behaviour
+  is tests/step_in_place (15 OK from the tree) and HOME-1 C2 (over the overlay, two steps).
+- W3 (host gates): RetroArch >= 59.9, capture 60 ± 0.1, dup+drop <= 0.2 / min (the suite's E2 gates).
+- W4: 0 stall pauses (`desync_pause` trigger client_stall) outside a real stall (a stall with packet loss or an
+  output gap the client reports); silences (uplink gaps >= 250 ms not the user's) and hitch seconds per 10 min
+  (UX-R3's definition) reported, 5 GHz throughout.
+- W5 (the teardown): the suite's bye at the window's end; flags_absent; fourteen lines after; --check ok on fourteen.
+- W6 (privyhub-diag): active through the restart; a chunk copied after the restart; one ~/privyhub_diag/sessions.jsonl
+  row for the window's session within 150 s of its end.
+
+Validity: the window ran to its end (600 s PLAYING), 5 GHz, the environ fourteen lines throughout, no property set.
+An invalid window is repeated once. The adoption stands on the user's decision; the window confirms the adopted state
+runs as today with the line in force (no fallback, gates met). A W2 fallback or a gate not met is reported to the user
+with the off switch (delete step-in-place.conf, daemon-reload, restart, reverse the diff).

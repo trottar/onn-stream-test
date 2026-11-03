@@ -204,7 +204,8 @@ class AbsentTest(unittest.TestCase):
         self.assertEqual(cls(ROOT / "companion" / "range_server.py"), cls(BASE / "range_server.py"))
         new = ast.parse((ROOT / "companion" / "range_server.py").read_text())
         old = ast.parse((BASE / "range_server.py").read_text())
-        added = [ast.unparse(n) for n in new.body if ast.dump(n) not in {ast.dump(o) for o in old.body}]
+        added = [ast.unparse(n) for n in new.body if ast.dump(n) not in {ast.dump(o) for o in old.body}
+                 and "VOD_DROP_TEST" not in ast.unparse(n)]      # B40's own two nodes (its suite checks them)
         self.assertEqual(len(added), 2, added)          # VOD_LOG = None, and the guarded block
         self.assertTrue(added[1].startswith("if os.environ.get('PRIVYHUB_VOD_LOG', '').strip() == '1':"))
 

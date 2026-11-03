@@ -1,0 +1,16 @@
+- base:605 [onDestroy's `surfaceHold?.let { h -> … }`] surfaceHold?.let { h -> uiHandler.removeCallbacks(holdExpiry); h.onEndedInHold(); unregisterHoldDeviceListener() }
++ new:605 [onDestroy's `surfaceHold?.let { h -> … }`] surfaceHold?.let { h ->
++ new:606 [onDestroy's `surfaceHold?.let { h -> … }`] uiHandler.removeCallbacks(holdExpiry); h.onEndedInHold(); unregisterHoldDeviceListener()
++ new:607 [onDestroy's `surfaceHold?.let { h -> … }`] // B39: a report cached at the loss carries the ended_in_hold count
++ new:608 [onDestroy's `surfaceHold?.let { h -> … }`] cachedSessionReport = h.refreshReport(cachedSessionReport)
++ new:609 [onDestroy's `surfaceHold?.let { h -> … }`] }
++ new:4242 [holdExpiry (after `val h = surfaceHold ?: return@Runnable`)] // B39: the cached report's surface_hold object with the outcome (restarted)
++ new:4243 [holdExpiry (after `val h = surfaceHold ?: return@Runnable`)] cachedSessionReport = h.refreshReport(cachedSessionReport)
+- base:4252 [private fun beginSurfaceHold] cacheSessionReport()
++ new:4264 [private fun beginSurfaceHold] // B39: the snapshot after the loss is counted (its outcome is refreshed in when it is decided)
++ new:4265 [private fun beginSurfaceHold] cacheSessionReport()
++ new:4289 [private fun endSurfaceHold] // B39: the session continues, so the report cached at the loss is obsolete (the next loss or stop builds one)
++ new:4290 [private fun endSurfaceHold] cachedSessionReport = null
+callers: ['if (surfaceHold?.let { endSurfaceHold(it, holder.surface) } == true) return', 'if (sessionStarted && !isFinishing && surfaceHold?.let { beginSurfaceHold(it) } == true) return', 'uiHandler.postDelayed(holdExpiry, 100L)', 'uiHandler.postDelayed(holdExpiry, h.boundMs)']
+changed lines 13, outside a hold-only context 0; callers guarded: True
+PROVEN

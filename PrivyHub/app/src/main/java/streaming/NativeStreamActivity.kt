@@ -602,7 +602,11 @@ class NativeStreamActivity :
         )
 
         // B32: a hold open at the end: today's stop path follows (null = today)
-        surfaceHold?.let { h -> uiHandler.removeCallbacks(holdExpiry); h.onEndedInHold(); unregisterHoldDeviceListener() }
+        surfaceHold?.let { h ->
+            uiHandler.removeCallbacks(holdExpiry); h.onEndedInHold(); unregisterHoldDeviceListener()
+            // B39: a report cached at the loss carries the ended_in_hold count
+            cachedSessionReport = h.refreshReport(cachedSessionReport)
+        }
 
         stopSession()
 
@@ -4235,6 +4239,8 @@ class NativeStreamActivity :
             }
             val ageMs = h.stallAgeMs(System.nanoTime() / 1_000_000L, 0L) ?: -1L
             h.onExpired()
+            // B39: the cached report's surface_hold object with the outcome (restarted)
+            cachedSessionReport = h.refreshReport(cachedSessionReport)
             // today's surface-loss path, deferred to the bound (the report cached at the loss)
             restartGuard?.onSurfaceLost(
                 cachedSessionReport,
@@ -4249,13 +4255,14 @@ class NativeStreamActivity :
 
     /** B32, `surfaceDestroyed`: the decoder goes (it cannot outlive its surface); the rest keeps running. */
     private fun beginSurfaceHold(h: SurfaceHold): Boolean {
-        cacheSessionReport()
         val interactive = try {
             (getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager)?.isInteractive
         } catch (_: Exception) {
             null
         }
         h.onSurfaceLost(decoder?.lastOutputAgeMs() ?: -1L, interactive)
+        // B39: the snapshot after the loss is counted (its outcome is refreshed in when it is decided)
+        cacheSessionReport()
         controllerSender?.neutralize()
         synchronized(heldDecoderLock) {
             heldSurface = null
@@ -4279,6 +4286,8 @@ class NativeStreamActivity :
     private fun endSurfaceHold(h: SurfaceHold, surface: Surface): Boolean {
         if (!sessionStarted || !h.onSurfaceBack()) return false
         uiHandler.removeCallbacks(holdExpiry)
+        // B39: the session continues, so the report cached at the loss is obsolete (the next loss or stop builds one)
+        cachedSessionReport = null
         synchronized(heldDecoderLock) { heldSurface = surface }
         return true
     }

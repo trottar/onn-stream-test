@@ -1,0 +1,14 @@
+== M1 (client): the axes term removed from eligible(), /tmp/b_q02m_b38_scratch/mut1
+com.safeiot.privyhub.streaming.PadSlotsTest: 7 tests, 0 failures, 0 errors
+com.safeiot.privyhub.streaming.VirtualRemoteNoSlotTest: 5 tests, 3 failures, 0 errors
+   FAIL theVirtualRemoteAsC4DescribedItTakesNoSlot java.lang.AssertionError
+   FAIL twoPadsInEitherOrderAreSlotsZeroAndOneAndARestartKeepsThem java.lang.AssertionError: expected:<[1, 0]> but was:<[2, 1]>
+   FAIL aVirtualDeviceAPadWithoutFaceButtonsAndAKeyOnlyGamepadAreExcluded java.lang.AssertionError
+TOTAL 12, failures+errors 3
+== M2 (host): report != previous replaced by True, /tmp/b_q02m_b38_scratch/mut2
+FAIL: test_an_axis_move_counts_and_a_held_state_does_not (test_pad_slots_changes.Bridge.test_an_axis_move_counts_and_a_held_state_does_not)
+FAIL: test_enable_is_idempotent_and_a_missing_bridge_is_refused (test_pad_slots_changes.Bridge.test_enable_is_idempotent_and_a_missing_bridge_is_refused)
+FAIL: test_only_the_pressed_slot_counts_a_change (test_pad_slots_changes.Bridge.test_only_the_pressed_slot_counts_a_change)
+FAIL: test_a_stable_slot_client_gets_changes_on_the_heartbeat_row (test_pad_slots_changes.Rows.test_a_stable_slot_client_gets_changes_on_the_heartbeat_row)
+Ran 7 tests in 0.092s
+FAILED (failures=4)

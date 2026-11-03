@@ -1,0 +1,15 @@
+== mutation m1 (no baseline: a stale trigger fires)
+FAIL: test_a_trigger_left_from_before_the_start_never_fires (test_vod_drop_test.TheDrop.test_a_trigger_left_from_before_the_start_never_fires)
+Ran 14 tests in 6.972s
+FAILED (failures=1)
+== mutation m2 (a shutdown instead of the RST)
+FAIL: test_a_player_mid_stream_gets_one_reset_at_the_trigger (test_vod_drop_test.TheDrop.test_a_player_mid_stream_gets_one_reset_at_the_trigger)
+FAIL: test_the_thread_polls_by_itself (test_vod_drop_test.TheDrop.test_the_thread_polls_by_itself)
+FAIL: test_two_appends_two_drops_one_each (test_vod_drop_test.TheDrop.test_two_appends_two_drops_one_each)
+FAIL: test_the_injection_the_reset_and_the_reconnect_in_one_file (test_vod_drop_test.WithTheRangeLog.test_the_injection_the_reset_and_the_reconnect_in_one_file)
+Ran 14 tests in 6.967s
+FAILED (failures=4)
+== mutation m3 (every path dropped, not only /vod/)
+FAIL: test_a_path_outside_vod_is_never_dropped (test_vod_drop_test.TheDrop.test_a_path_outside_vod_is_never_dropped)
+Ran 14 tests in 7.001s
+FAILED (failures=1)

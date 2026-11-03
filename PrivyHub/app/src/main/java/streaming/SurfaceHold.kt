@@ -47,6 +47,9 @@ class SurfaceHold(val boundMs: Long, private val clockMs: () -> Long = { System.
         const val MAX_DEVICES = 4
         const val MAX_ROW_CHARS = 1_024
 
+        // B39: the report's flat `surface_hold` object (JSONObject's text: no spaces, numbers only)
+        private val SURFACE_HOLD_OBJECT = Regex("\"surface_hold\"\\s*:\\s*\\{[^{}]*\\}")
+
         // android.view.KeyEvent / InputDevice constants (inlined values, so the JVM tests need no framework)
         const val KEYCODE_HOME = 3
         const val KEYCODE_MENU = 82
@@ -122,7 +125,9 @@ class SurfaceHold(val boundMs: Long, private val clockMs: () -> Long = { System.
     fun onKey(keyCode: Int, keyDown: Boolean, sources: Int): Boolean {
         val cls = sourceClass(sources)
         val system = keyCode in SYSTEM_KEYS
-        val consume = system && cls == "pad"
+        // B39: the onn's input policy turns a pad's guide key into Home before any app sees it (HOME-1 C1), so the
+        // consume half of B32 is dropped: every key is noted for the rows and passed on as today
+        val consume = false
         synchronized(lock) {
             if (keyDown) {
                 keys.addLast(KeySeen(clockMs(), keyCode, cls, consume))
@@ -311,6 +316,17 @@ class SurfaceHold(val boundMs: Long, private val clockMs: () -> Long = { System.
         "rows_sent" to rowsSent,
         "rows_dropped" to rowsDropped,
     )
+
+    /**
+     * B39: [report] with its `"surface_hold":{…}` object replaced by the current [reportFields] (the outcome decided
+     * after the snapshot was cached). The object is flat (numbers only); a report without it, or null, is unchanged.
+     */
+    fun refreshReport(report: String?): String? {
+        if (report == null) return null
+        val m = SURFACE_HOLD_OBJECT.find(report) ?: return report
+        val fields = reportFields().entries.joinToString(",", "{", "}") { (k, v) -> "\"$k\":$v" }
+        return report.replaceRange(m.range, "\"surface_hold\":" + fields)
+    }
 
     /** Compact JSON of numbers, booleans, null, fixed words and lists of fixed words; capped at [MAX_ROW_CHARS]. */
     internal fun encode(row: Map<String, Any?>): String {

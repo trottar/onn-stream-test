@@ -2,6 +2,7 @@ package com.safeiot.privyhub.streaming
 
 import android.view.InputDevice
 import android.view.KeyEvent
+import android.view.MotionEvent
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.MessageDigest
@@ -18,6 +19,10 @@ import java.security.MessageDigest
  * controller-number order, so the slots do not depend on which pad presses first; a later pad takes the lowest free
  * slot; a pad that leaves keeps its slot (reused only when all four are held and that pad is gone).
  * Design: `docs/memory/evidence/b34_2026-10-31/design_written_before_code.md` (hashed before this code).
+ * B38: a real gamepad only -- also a face button (A / B / X / Y) and stick or hat axes. The onn's own input devices
+ * (its "virtual-remote", which declares GAMEPAD and took slot 0 in HOME-1 C4; its remote keyboard; gpio-keys) are
+ * key-only, so they never take a slot; no vendor, product or name is compared.
+ * Design: `docs/memory/evidence/b38_2026-11-02/design_written_before_code.md` (hashed before this code).
  */
 object PadSlotsFlag {
     const val PROPERTY = "debug.privyhub.pad_slots"
@@ -43,6 +48,10 @@ interface PadDevice {
     val controllerNumber: Int
     val hasGamepadButton: Boolean
     val isVirtual: Boolean
+    /** B38: A / B / X / Y present (defaults keep B34's fakes as they were). */
+    val hasFaceButton: Boolean get() = hasGamepadButton
+    /** B38: a joystick motion range for the stick or the hat (a remote-class device has none). */
+    val hasStickOrHat: Boolean get() = (sources and 0x01000010) == 0x01000010
 }
 
 class AndroidPadDevice(private val d: InputDevice) : PadDevice {
@@ -53,8 +62,18 @@ class AndroidPadDevice(private val d: InputDevice) : PadDevice {
     override val controllerNumber: Int get() = d.controllerNumber
     override val hasGamepadButton: Boolean get() = d.hasKeys(*BUTTONS).any { it }
     override val isVirtual: Boolean get() = d.isVirtual
+    override val hasFaceButton: Boolean get() = d.hasKeys(*FACE).any { it }
+    override val hasStickOrHat: Boolean
+        get() = AXES.any { d.getMotionRange(it, InputDevice.SOURCE_JOYSTICK) != null }
 
     companion object {
+        /** B38: the face buttons (the PS buttons map to these codes). */
+        val FACE = intArrayOf(
+            KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_X, KeyEvent.KEYCODE_BUTTON_Y,
+        )
+        /** B38: the stick and the hat. */
+        val AXES = intArrayOf(MotionEvent.AXIS_X, MotionEvent.AXIS_Y, MotionEvent.AXIS_HAT_X, MotionEvent.AXIS_HAT_Y)
+
         val BUTTONS = intArrayOf(
             KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_X,
             KeyEvent.KEYCODE_BUTTON_Y, KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_R1,
@@ -128,7 +147,9 @@ class PadSlots(private val count: Int = 4) {
         fun eligible(d: PadDevice): Boolean =
             !d.isVirtual &&
                 ((d.sources and GAMEPAD) == GAMEPAD || (d.sources and JOYSTICK) == JOYSTICK) &&
-                d.hasGamepadButton
+                d.hasGamepadButton &&
+                // B38: a real gamepad -- a face button and stick / hat axes (the onn's key-only devices have none)
+                d.hasFaceButton && d.hasStickOrHat
 
         fun key(d: PadDevice): String {
             val h = MessageDigest.getInstance("SHA-256")

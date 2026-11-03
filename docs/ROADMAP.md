@@ -1723,6 +1723,13 @@ overlay session; the LAN is today's (CL-B16 cell 1; TRIP-PREP's window).
 - **For the trip the onn runs `fcd924c2…`** (the loss guard out); the guard's return is a B item after the trip.
 - The log-keeper `privyhub-trip-log` runs to 2026-11-01T23:59Z. Record: `docs/memory/evidence/TRIP_PREP_2026-10-29.md`.
 
+**G-A10 ADOPTED (2026-11-02, the user's "Adopt", after HOME-1 C2): `PRIVYHUB_STEP_IN_PLACE=1`, the fourteenth line
+(`step-in-place.conf`).** Each ladder step keeps the same stream: one IDR, no SSRC change; C2 measured 0.9 / 6.1 ms
+against today's 235 / 428-ms gaps. The confirmation window (E1-PS1-STREAM, the LAN) ran with fourteen lines and the host
+gates met, but saw no step (the LAN starts at the top).
+- **Off:** delete `step-in-place.conf`, `daemon-reload`, restart, reverse `g_a10_2026-11-02/g_a10_applied.diff`.
+- Record: `docs/memory/evidence/G_A10_STEP_IN_PLACE_ADOPTION_2026-11-02.md`.
+
 ## G5 — WAN-aware telemetry and adaptation
 
 **Status (2026-10-16, G5-S1): CLASSIFICATION BUILT behind `PRIVYHUB_WAN_TELEMETRY=1`
@@ -2155,6 +2162,17 @@ APK (B5 … B25 + B32 + B34 + B35; B27 / B29 out) `554ccf61…9902` pinned, NOT 
   - **C5 invalid:** the Settings route released the player.
   - `554ccf61…` not confirmed; `fcd924c2…` back. C1 / C4 / C5 go back to B
     (`evidence/HOME_1_TRIP_CLOSE_AND_QUEUE_L_CELLS_2026-11-02.md`).
+
+**Queue M (2026-11-02), from HOME-1's C1 / C4 / C5: B38-B40 built, nothing adopted, no live run; APK (B5 … B25 + B32 +
+B34 + B35 + B38 + B39; B27 / B29 out) `0132b944…e24f` pinned, NOT installed.**
+- **B38:** the onn's virtual remote takes no slot (a face button and stick / hat axes needed, inside
+  `debug.privyhub.pad_slots=stable`); the host counts the pad that moved (`updates_by_player` changed-only on the
+  heartbeat row, `packets_by_player` the old count).
+- **B39:** the hold's report counter fixed (a stale cached report); the guide-key consume dropped as impossible on
+  the onn.
+- **B40:** a hub-side VOD drop for the bench (`PRIVYHUB_VOD_DROP_TEST=1`, a file trigger, an RST), never to be
+  adopted; it makes C5 valid.
+- Next: HOME-2 (`docs/memory/handoffs/SESSION_B_DONE_2026-11-02M.md`).
 
 ## G9 — Remote foundation checkpoint
 

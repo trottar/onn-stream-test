@@ -1,0 +1,8 @@
+companion/native_session_io.py: insertions only, the rest = base bytes: True (13 lines added)
+companion/plugins/games.py: insertions only, the rest = base bytes: True (2 lines added)
+native_stream_heartbeat.py changed lines: ["-    for field in (\"pad_slots\", \"updates_by_player\", \"pad_slots_bad\"):", "+    # B38: packets_by_player beside the changed-only updates_by_player (a stable-slot client only)", "+    for field in (\"pad_slots\", \"updates_by_player\", \"packets_by_player\", \"pad_slots_bad\"):"]
+behaviour, no key: base and new identical: True
+  status keys: ['active', 'backend', 'bad_packets', 'lost_packets', 'packets_received', 'players', 'poc_version', 'port', 'rejected_packets', 'sink', 'transport', 'updates', 'updates_by_player', 'vigem_updates', 'vigem_updates_by_player']
+  updates_by_player: [120, 120, 120, 120] | heartbeat rows: 1 | recovery rows: 0 | pad_slots imported: False
+client main files changed: ['PadSlots.kt']
+PROVEN

@@ -1,0 +1,19 @@
+== m1
+   FAIL cOnesSequenceHeldThenAnOverBoundLossReportsBoth java.lang.AssertionError: expected:<54699> but was:<16270>
+   FAIL aHeldLossThenAStopReportsHeldOne java.lang.AssertionError: expected:<1> but was:<0>
+TOTAL 190, failures+errors 2
+== m2
+   FAIL cOnesSequenceHeldThenAnOverBoundLossReportsBoth java.lang.AssertionError: expected:<1> but was:<0>
+TOTAL 190, failures+errors 1
+== m3
+TOTAL 190, failures+errors 0
+== m4 (the refresh a no-op: SurfaceHold.refreshReport returns the report unchanged)
+   FAIL cOnesSequenceHeldThenAnOverBoundLossReportsBoth java.lang.AssertionError: expected:<1> but was:<0>
+   FAIL anActivityEndingInsideAHoldReportsEndedInHold java.lang.AssertionError: expected:<1> but was:<0>
+   FAIL theRefreshReplacesOnlyTheSurfaceHoldObject java.lang.AssertionError: {"duration_ms":5,"surface_hold":{"bound_ms":12000,"losses":0,"held":0},"pad_slots_mode":"stable","pad_slots":[{"slot":0}]}
+TOTAL 190, failures+errors 3
+-- m1: the clear at a held re-attach removed (activity + model); m2: the refresh at the expiry removed (activity + model); m3: today's order at the loss (snapshot, then count) in the model: NOT caught -- an equivalent mutation: every path that posts a snapshot taken inside a hold (the expiry, the end inside a hold) refreshes its surface_hold object, and a held re-attach clears it, so the order is masked (record §3); m4 replaces it.
+m1 sources byte-equal to the copy outside the mutated file: 2 file(s) differ
+m2 sources byte-equal to the copy outside the mutated file: 2 file(s) differ
+m3 sources byte-equal to the copy outside the mutated file: 1 file(s) differ
+m4 sources byte-equal to the copy outside the mutated file: 1 file(s) differ

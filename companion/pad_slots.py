@@ -10,6 +10,11 @@ Rows: at each start one recovery-log row `pad_slots` (`when: "start"`); on a hea
 `pad_slots` (the list) and `updates_by_player` (the controller bridge's per-slot counters), and a recovery-log row
 `pad_slots` (`when: "change"`) when the map differs from the last one written. A malformed value is dropped
 (`pad_slots_bad: true` on the row), never written raw.
+
+B38: such a client also turns on the controller bridge's changed-only counter (`enable_changes`); its heartbeat row's
+`updates_by_player` is then the per-slot count of reports whose state changed (a press, a stick or trigger move), and
+`packets_by_player` today's per-packet count -- the sender sends all four players every tick (CTRL-L1), so only the
+changes say which pad was used. Design: `docs/memory/evidence/b38_2026-11-02/design_written_before_code.md`.
 """
 
 from __future__ import annotations
@@ -70,16 +75,36 @@ class SlotsLog:
             values["pad_slots_bad"] = True
             return
         values[FIELD] = slots
-        if isinstance(updates_by_player, (list, tuple)):
+        if isinstance(updates_by_player, dict):
+            # B38: changes as updates_by_player, today's per-packet counts beside them
+            if isinstance(updates_by_player.get("changes"), (list, tuple)):
+                values["updates_by_player"] = [int(x) for x in updates_by_player["changes"]]
+            if isinstance(updates_by_player.get("packets"), (list, tuple)):
+                values["packets_by_player"] = [int(x) for x in updates_by_player["packets"]]
+        elif isinstance(updates_by_player, (list, tuple)):
             values["updates_by_player"] = [int(x) for x in updates_by_player]
         if slots != self.last:
             self._row(recovery, "change", slots, heartbeat_sequence=values.get("sequence"))
             self.last = slots
 
 
-def updates_by_player(controller: Any) -> Any:
-    """The controller bridge's per-slot update counters (already kept), or None."""
+def enable_changes(controller: Any) -> bool:
+    """B38: turn on the bridge's changed-only counter (idempotent); False when there is no bridge to turn it on in."""
     try:
-        return controller.status().get("updates_by_player")
+        if getattr(controller, "_changes_by_player", None) is None:
+            controller._changes_by_player = [0 for _ in range(int(controller.MAX_PLAYERS))]
+        return True
+    except Exception:
+        return False
+
+
+def updates_by_player(controller: Any) -> Any:
+    """B38: {"changes": the changed-only counts, "packets": the per-packet counts}; B34's list when the counter is off."""
+    try:
+        enable_changes(controller)
+        status = controller.status()
+        if "changes_by_player" in status:
+            return {"changes": status.get("changes_by_player"), "packets": status.get("updates_by_player")}
+        return status.get("updates_by_player")
     except Exception:
         return None

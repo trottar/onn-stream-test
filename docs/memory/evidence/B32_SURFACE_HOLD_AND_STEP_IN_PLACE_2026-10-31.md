@@ -314,3 +314,13 @@ the same outcomes, plus `tests/step_in_place` OK. The four `tools/` tests fail i
   - `privyhub-trip-log` and `trip_2026-10-30/` untouched;
   - nothing of A's touched; nothing fetched, deleted, adopted or committed;
   - the tree's code untouched: the coordinator applies.
+
+## Note, 2026-11-02 (queue M, B39)
+
+HOME-1 C1 found two things in the client half above:
+- **The report's `surface_hold` read 0 after a held loss:** the report snapshot was cached at the first loss and never
+  replaced. Fixed in B39.
+- **The pad's guide key never reaches the activity on the onn:** the system turns it into Home. §1's "consumed in the
+  stream activity" is dropped in B39; the hold covers a guide press as a Home press.
+
+See `B39_HOLD_COUNTER_2026-11-02.md`.

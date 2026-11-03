@@ -1,0 +1,66 @@
+--- ../g_a7_2026-10-27/g_a7_window.py	2026-10-27 17:04:23.746677148 -0400
++++ g_a10_window.py	2026-11-02 21:29:02.913822087 -0500
+@@ -1,10 +1,10 @@
+ #!/usr/bin/env python3
+-"""G-A7: the confirmation window (G-A5's g_a5_window.py, itself G-A4's g_a4_window.py, for twelve lines; the flag PRIVYHUB_RESTART_FAST_UNLOCK=1). Runs one E1-SNES-STREAM through the suite's
+-own CLI (run --only E1-SNES-STREAM --runs 1 --window 600 --gap 120 --e2 --prereg <this dir's>), reads the environ back
+-every 15 s (the twelve adopted lines expected throughout), the onn's band every 30 s (g_a7_state.py's parse: frequency /
++"""G-A10: the confirmation window (G-A7's g_a7_window.py, itself G-A5's, for fourteen lines; the flag PRIVYHUB_STEP_IN_PLACE=1). Runs one E1-PS1-STREAM through the suite's
++own CLI (run --only E1-PS1-STREAM --runs 1 --window 600 --gap 120 --e2 --prereg <this dir's>), reads the environ back
++every 15 s (the fourteen adopted lines expected throughout), the onn's band every 30 s (g_a10_state.py's parse: frequency /
+ band / standard / RSSI / tx / rx only) and tools/e3_state.py once mid-window (link_recovery.stack), and copies the run's
+-five logs over its span (BENCH-R3's driver's logs_copy, addresses masked). No setprop. The reading is g_a7_read.py's.
+-    python3 -B g_a7_window.py
++five logs over its span (BENCH-R3's driver's logs_copy, addresses masked). No setprop. The reading is in the record.
++    python3 -B g_a10_window.py
+ """
+ import importlib.util
+ import json
+@@ -44,10 +44,10 @@
+ 
+ 
+ SB = _Band()
+-FLAG = "PRIVYHUB_RESTART_FAST_UNLOCK=1"
++FLAG = "PRIVYHUB_STEP_IN_PLACE=1"
+ OUT = HERE / "runs"
+ STOP = threading.Event()
+-ENV = {"reads": 0, "max_lines": 0, "twelve_with_flag": 0, "lines_at_twelve": None}
++ENV = {"reads": 0, "max_lines": 0, "fourteen_with_flag": 0, "lines_at_fourteen": None}
+ 
+ 
+ def log(*a):
+@@ -65,15 +65,15 @@
+             env = []
+         ENV["reads"] += 1
+         ENV["max_lines"] = max(ENV["max_lines"], len(env))
+-        if len(env) == 12 and FLAG in env and sorted(env) == E1.ADOPTED:
+-            ENV["twelve_with_flag"] += 1
+-            ENV["lines_at_twelve"] = ENV["lines_at_twelve"] or sorted(env)
++        if len(env) == 14 and FLAG in env and sorted(env) == E1.ADOPTED:
++            ENV["fourteen_with_flag"] += 1
++            ENV["lines_at_fourteen"] = ENV["lines_at_fourteen"] or sorted(env)
+         STOP.wait(15)
+ 
+ 
+ def state_read():
+     try:
+-        return json.loads(subprocess.run([sys.executable, "-B", str(HERE / "g_a7_state.py")], capture_output=True, text=True,
++        return json.loads(subprocess.run([sys.executable, "-B", str(HERE / "g_a10_state.py")], capture_output=True, text=True,
+                                          timeout=180).stdout or "{}")
+     except (ValueError, subprocess.SubprocessError):
+         return {}
+@@ -107,12 +107,12 @@
+     threading.Thread(target=band_watch, args=(t0,), daemon=True).start()
+     with open(OUT / "suite_console.log", "a") as fh:
+         rc = subprocess.run([sys.executable, str(REPO / "tools/e1_suite.py"), "run", "--out", str(OUT), "--prereg",
+-                             str(HERE / "g_a7_preregistration.txt"), "--only", "E1-SNES-STREAM", "--runs", "1", "--window",
++                             str(HERE / "g_a10_preregistration.txt"), "--only", "E1-PS1-STREAM", "--runs", "1", "--window",
+                              "600", "--gap", "120", "--e2"], stdout=fh, stderr=subprocess.STDOUT, cwd=str(REPO)).returncode
+     t1 = time.time()
+     STOP.set()
+     log("the suite exited", rc)
+-    rd = D.latest_run(OUT / "E1-SNES-STREAM")
++    rd = D.latest_run(OUT / "E1-PS1-STREAM")
+     s = D.load_json(rd / "summary.json") if rd else None
+     f = D.figures(s, rd) if s else {}
+     copied = D.logs_copy(t0, t1, OUT / "logs_run1")

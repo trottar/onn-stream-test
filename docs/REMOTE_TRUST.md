@@ -316,3 +316,27 @@ Every point below is a **[G3-S3 proposal]**.
   Remote sessions then start at 7000 with no remote ladder, as on the twelve lines.
 - **The loss guard for the trip:** out. The onn runs CL-B14's `fcd924c2…`, which has no guard default. The guard's
   return after the trip is a B item (CL-B16 S1: its holds still draw stall pauses).
+
+## 15. The step in place (adopted G-A10, 2026-11-02)
+
+- **Adopted:** `PRIVYHUB_STEP_IN_PLACE=1` through the drop-in
+  `~/.config/systemd/user/privyhub-companion.service.d/step-in-place.conf`, the **fourteenth adopted line** (the user's
+  "Adopt", 2026-11-02, after HOME-1 C2).
+  - **What it does (B32's host half):** a ladder step still needs a new encoder process (`h264_vaapi` has no runtime
+    rate control). The new encoder starts at the target beside the old one. From the new encoder's first frame (an
+    IDR) the relay rewrites its packets onto the old stream (its SSRC, the next sequence number, the timestamp plus one
+    frame), and drops the old encoder's. The onn sees one IDR and no SSRC change: no resync,
+    no ~0.2-0.4-s gap. If no splice happens within 2 s, the new encoder is killed and today's restart runs
+    (`in_place: false`).
+  - **Measured:** HOME-1 C2, two steps over the overlay at 0.9 / 6.1 ms, against 235 / 428-ms gaps for the same steps
+    without it (C3). G-A10's LAN window had no step (the LAN starts at the top).
+- **What leaves the onn:** nothing new. The ladder's `transition_done` carries `in_place`, `ssrc_unchanged` and
+  `splice_gap_ms`; the encoder log reads `B32 in-place step: …`. No address or identifier.
+- **The client side:** no change.
+- **Turning it off (host):**
+  1. Delete `step-in-place.conf`.
+  2. Run `systemctl --user daemon-reload && systemctl --user restart privyhub-companion`.
+  3. Take `STEP_IN_PLACE` out of `tools/e1_suite.py` `ADOPTED` (reverse
+     `docs/memory/evidence/g_a10_2026-11-02/g_a10_applied.diff`).
+
+  Each ladder step then restarts the encoder as before: a new SSRC and a ~0.2-0.4-s gap.

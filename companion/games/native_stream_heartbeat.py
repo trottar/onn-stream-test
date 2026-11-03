@@ -192,7 +192,8 @@ def append_native_stream_heartbeat(
                 record[field] = values[field]
 
     # B34: the client's slot map and the per-slot counters (a client without pad_slots=stable sends no key)
-    for field in ("pad_slots", "updates_by_player", "pad_slots_bad"):
+    # B38: packets_by_player beside the changed-only updates_by_player (a stable-slot client only)
+    for field in ("pad_slots", "updates_by_player", "packets_by_player", "pad_slots_bad"):
         if field in values:
             record[field] = values[field]
 

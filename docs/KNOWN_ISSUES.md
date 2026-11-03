@@ -1,5 +1,46 @@
 # Known issues and deferred work
 
+## 2026-11-02 Queue M (B38-B40): HOME-1's C1 / C4 / C5 answered in code; APK `0132b944…` built, not installed — OPEN (HOME-2)
+
+(`docs/memory/handoffs/SESSION_B_DONE_2026-11-02M.md`; the records `docs/memory/evidence/B38_…`, `B39_…`, `B40_…_2026-11-02.md`)
+
+- **C4, the onn's "virtual-remote":** KEYBOARD | DPAD | GAMEPAD, controller number 1, **not `isVirtual()`** (that is
+  true only for the built-in virtual keyboard) and it answers the gamepad buttons as present, so B34's button test
+  passed it. B38 (inside `debug.privyhub.pad_slots=stable`) also needs a face button **and** stick or hat axes. The
+  onn's own devices are key-only, so they are excluded by class. **A pad in keyboard-emulation mode (no axes) gets no
+  slot either.**
+- **`updates_by_player` counted packets, not pads:** the sender sends players 0-3 every ~8-ms tick (CTRL-L1).
+  - For a stable-slot client (B38), the heartbeat row's `updates_by_player` is the changed-only count, the old count
+    moves to `packets_by_player`, and `/status` gains `changes_by_player`.
+  - `/status`'s own `updates_by_player` stays per-packet: the `tools/` probes read it that way.
+- **C1, the hold's report counter (B39):** under `surface_hold`, every report after a held loss was the first loss's
+  cached snapshot (counters 0, `duration_ms` cut at the loss). Fixed in `0132b944…`; reports from `554ccf61…` with a
+  held loss are truncated.
+- **The pad's guide key cannot be kept from the onn's system:** its input policy turns it into Home before any app sees
+  it. B32's "consume" half is dropped (B39); the hold covers a guide press like a Home press within 12 s.
+- **C5 needs the drop from the hub:** B40 builds it behind `PRIVYHUB_VOD_DROP_TEST=1` (bench only, per run, **never to be
+  adopted**). A line appended to `runtime/vod_drop_test.trigger` resets the playing movie's connection once (a real
+  RST). Its row goes into `logs/vod_drop_test.jsonl`, which is not in B36's keeper list; with `PRIVYHUB_VOD_LOG=1` the
+  row is also in `vod_range.jsonl`.
+
+## 2026-11-02 G-A10: the step-up gap closed (`PRIVYHUB_STEP_IN_PLACE=1`, the fourteenth line); B's open items from HOME-1 — OPEN (to B)
+
+(`docs/memory/evidence/G_A10_STEP_IN_PLACE_ADOPTION_2026-11-02.md`)
+
+- **CLOSED: every ladder step restarted the encoder with a new SSRC** (TRIP-R2 E1's ~430-ms gaps, B32).
+  - Adopted 2026-11-02: each step is spliced onto the same stream; HOME-1 C2 measured 0.9 / 6.1 ms.
+  - The fallback (no splice in 2 s → today's restart, `in_place: false`) has not been seen.
+  - G-A10's LAN window had no step to read.
+- **Open for B (HOME-1):**
+  - **(1) The virtual-remote slot:** the onn's "virtual-remote" declares GAMEPAD and takes player slot 0 under
+    `pad_slots=stable`; `updates_by_player` rises on all four.
+  - **(2) The hold counter:** the report's `surface_hold.held` reads 0 after a held loss. The onn takes a pad's guide
+    key as Home before any app sees it.
+  - **(3) The VOD drop test:** it needs the drop with the player in front (the hub-side shim or the router), not the
+    onn's Wi-Fi Settings, which release the player first.
+- **Seen in G-A10's window, not the line's:** the onn at −67…−69 dBm on 5180 MHz this evening (−51…−56 on the trip).
+  Two real stalls with loss (B33 rewound, `why: loss` / `uplink_loss`); hitch 27.7 s / 10 min.
+
 ## 2026-11-02 HOME-1: queue L's cells: C2 / C3 met; C1 / C4 not met, C5 invalid; `554ccf61…` not confirmed — OPEN (to B)
 
 (`docs/memory/evidence/HOME_1_TRIP_CLOSE_AND_QUEUE_L_CELLS_2026-11-02.md`)

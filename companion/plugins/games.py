@@ -3919,6 +3919,8 @@ class GamesPlugin:
                 if getattr(self, "_pad_slots_log", None) is None:
                     self._pad_slots_log = _pad_slots.SlotsLog()
                 self._pad_slots_log.start(self._recovery, self._first(query, "pad_slots"))
+                # B38: count only the slots whose state changes (a stable-slot client's key turns it on)
+                _pad_slots.enable_changes(getattr(getattr(self._native_stream, "_session_io", None), "controller", None))
             try:
                 if not game_status.get("paused", False):
                     try:

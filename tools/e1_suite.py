@@ -121,8 +121,13 @@ RESTART_FAST_UNLOCK = "PRIVYHUB_RESTART_FAST_UNLOCK=1"
 # address); a LAN session as today, byte for byte (B28) -- through its own drop-in (remote.conf); the adopted environ is
 # exactly these thirteen names
 REMOTE = "PRIVYHUB_REMOTE=1"
+# G-A10 (adopted 2026-11-02, the user): the step in place -- each ladder step keeps the same stream (the new encoder
+# spliced onto the old one's RTP sequence and SSRC at one IDR; no new SSRC, no ~0.4-s gap), with a 2-s fallback to
+# today's encoder restart (B32's host half; HOME-1 C2) -- through its own drop-in (step-in-place.conf); the adopted
+# environ is exactly these fourteen names
+STEP_IN_PLACE = "PRIVYHUB_STEP_IN_PLACE=1"
 ADOPTED = sorted([LIVE, INDEX, SNES_CORE, RECOVERY, SNES_CAPTURE, OVERLAY, IDENTITY, AUDIO_CODEC, LINK_REPORT,
-                  LINK_RECOVERY, RESTART_FAST, RESTART_FAST_UNLOCK, REMOTE])
+                  LINK_RECOVERY, RESTART_FAST, RESTART_FAST_UNLOCK, REMOTE, STEP_IN_PLACE])
 FLAG_NAMES = ["PRIVYHUB_ADAPTIVE_BITRATE_INJECT", "PRIVYHUB_ADAPTIVE_BITRATE_TOP", "PRIVYHUB_PS1_LOOK",
               "PRIVYHUB_NATIVE_PROFILE_ID", "PRIVYHUB_FEC_SCHEME"]
 RA_CFG = Path.home() / ".config/retroarch/config"
@@ -1027,12 +1032,13 @@ def preflight() -> dict:
          "drop_in_restart_fast": f"Environment={RESTART_FAST}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_restart_fast_unlock": f"Environment={RESTART_FAST_UNLOCK}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_remote": f"Environment={REMOTE}" in sh(["systemctl", "--user", "cat", UNIT]),
+         "drop_in_step_in_place": f"Environment={STEP_IN_PLACE}" in sh(["systemctl", "--user", "cat", UNIT]),
          "e3_dropin_absent": not DROPIN.exists(), "e4_constraint_absent": not E4_DROPIN.exists()}
     d["ok"] = (d["manager"] == [] and d["environ"] == ADOPTED and d["adb"] and d["drop_in_live"] and d["drop_in_index"]
                and d["drop_in_snes_core"] and d["drop_in_recovery"] and d["drop_in_snes_capture"] and d["drop_in_overlay"]
                and d["drop_in_identity"] and d["drop_in_audio_codec"] and d["drop_in_link_report"]
                and d["drop_in_link_recovery"] and d["drop_in_restart_fast"] and d["drop_in_restart_fast_unlock"]
-               and d["drop_in_remote"]
+               and d["drop_in_remote"] and d["drop_in_step_in_place"]
                and d["e3_dropin_absent"] and d["e4_constraint_absent"])
     return d
 

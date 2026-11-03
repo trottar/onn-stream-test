@@ -307,19 +307,19 @@ class SurfaceHoldTest {
     // --- the keys --------------------------------------------------------------------------------------------------
 
     @Test
-    fun aPadSystemKeyIsConsumedTheRemotesIsNot() {
+    fun noKeyIsConsumedEveryKeyIsNoted() {    // B39: B32's consume half dropped (the onn's policy takes the guide key)
         val clock = longArrayOf(1_000L)
         val h = SurfaceHold(12_000L) { clock[0] }
         val pad = SurfaceHold.SOURCE_GAMEPAD or SurfaceHold.SOURCE_JOYSTICK
         val remote = SurfaceHold.SOURCE_KEYBOARD or SurfaceHold.SOURCE_DPAD
-        assertTrue(h.onKey(SurfaceHold.KEYCODE_BUTTON_MODE, true, pad))
-        assertTrue(h.onKey(SurfaceHold.KEYCODE_BUTTON_MODE, false, pad))
+        assertFalse(h.onKey(SurfaceHold.KEYCODE_BUTTON_MODE, true, pad))
+        assertFalse(h.onKey(SurfaceHold.KEYCODE_BUTTON_MODE, false, pad))
         assertFalse(h.onKey(SurfaceHold.KEYCODE_BUTTON_MODE, true, remote))
         assertFalse(h.onKey(SurfaceHold.KEYCODE_HOME, true, remote))
         assertFalse(h.onKey(96 /* BUTTON_A */, true, pad))
         assertFalse(h.onKey(4 /* BACK */, true, pad))
-        assertEquals(1L, h.reportFields()["pad_system_keys_consumed"])
-        assertEquals(2L, h.reportFields()["system_keys_passed"])
+        assertEquals(0L, h.reportFields()["pad_system_keys_consumed"])
+        assertEquals(3L, h.reportFields()["system_keys_passed"])
         clock[0] += 500L
         h.onSurfaceLost(20L, true)
         clock[0] += 1_000L
@@ -327,7 +327,7 @@ class SurfaceHoldTest {
         h.stallAgeMs(clock[0], 1L)
         val row = decodeRow(h.query())
         assertTrue(row, row.contains("\"reason\":\"pad_system_key\""))
-        assertTrue(row, row.contains("\"keys\":[\"110:pad:c\",\"110:remote:p\",\"3:remote:p\",\"96:pad:p\",\"4:pad:p\"]"))
+        assertTrue(row, row.contains("\"keys\":[\"110:pad:p\",\"110:remote:p\",\"3:remote:p\",\"96:pad:p\",\"4:pad:p\"]"))
     }
 
     @Test

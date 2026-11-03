@@ -1661,6 +1661,10 @@ class NativeControllerBridge:
     XUSB_X = 0x4000
     XUSB_Y = 0x8000
 
+    # B38: per-slot counts of reports whose state changed (None = today: not counted; set by pad_slots.enable_changes
+    # for a client with debug.privyhub.pad_slots=stable)
+    _changes_by_player: list[int] | None = None
+
     def __init__(
         self,
         project_root: Path,
@@ -2133,6 +2137,9 @@ class NativeControllerBridge:
         self._updates_by_player = [
             0 for _ in range(self.MAX_PLAYERS)
         ]
+        # B38: zeroed at each start once a stable-slot client enabled it
+        if self._changes_by_player is not None:
+            self._changes_by_player = [0 for _ in range(self.MAX_PLAYERS)]
         self._last_sequence = None
         self._last_packet_at = [
             0.0 for _ in range(self.MAX_PLAYERS)
@@ -2342,6 +2349,9 @@ class NativeControllerBridge:
                 "lt": self._clamp_trigger(lt),
                 "rt": self._clamp_trigger(rt),
             }
+            # B38: a slot whose state changed in this tick (None = today: nothing counted)
+            if self._changes_by_player is not None and report != self._last_reports[player]:
+                self._changes_by_player[player] += 1
             self._last_reports[player] = report
 
             if self._controller_backend == "windows_vigem":
@@ -2725,6 +2735,9 @@ class NativeControllerBridge:
             "vigem_updates_by_player": list(
                 self._updates_by_player
             ),
+            # B38: only once a stable-slot client enabled it (absent: no key)
+            **({"changes_by_player": list(self._changes_by_player)}
+               if self._changes_by_player is not None else {}),
         }
 
     def stop(
