@@ -1,0 +1,11 @@
+B32-host mutations, 2026-10-31T17:43:59Z (copies under /tmp/b_q31l_b32h_scratch)
+== mut1: the splice writes the new encoder's own SSRC (in_ssrc) instead of the stream's (out_ssrc)
+FAIL: test_two_steps_in_place_one_ssrc_one_idr_each (test_step_in_place.TheLanLadder.test_two_steps_in_place_one_ssrc_one_idr_each)
+FAIL: test_4000_to_5000_in_place_on_a_remote_path (test_step_in_place.TheRemoteLadder.test_4000_to_5000_in_place_on_a_remote_path)
+FAIL: test_the_splice_waits_for_the_old_frame_end_and_wraps (test_step_in_place.TheSplice.test_the_splice_waits_for_the_old_frame_end_and_wraps)
+Ran 15 tests in 9.138s
+FAILED (failures=3)
+== mut2: the explicit cap built on no ladder (today's inactive object)
+FAIL: test_an_explicit_4000_holds_the_umbrellas_ladder_at_4000 (test_step_in_place.TheCapBesideTheUmbrella.test_an_explicit_4000_holds_the_umbrellas_ladder_at_4000)
+Ran 15 tests in 8.977s
+FAILED (failures=1)

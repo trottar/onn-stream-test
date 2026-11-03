@@ -384,6 +384,20 @@ class RangeRequestHandler(SimpleHTTPRequestHandler):
             remaining -= len(chunk)
 
 
+# B35: the per-request range log, only with PRIVYHUB_VOD_LOG=1 (the companion's
+# environment is inherited). Absent = today: nothing imported, the class above
+# not touched, nothing written.
+VOD_LOG = None
+
+if os.environ.get("PRIVYHUB_VOD_LOG", "").strip() == "1":
+    from vod_log import range_log_from_environ as _range_log_from_environ
+
+    VOD_LOG = _range_log_from_environ(
+        os.environ,
+        Path(__file__).resolve().parents[1],
+    )
+    VOD_LOG.install(RangeRequestHandler)
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(

@@ -3,6 +3,9 @@ package com.safeiot.privyhub
 import android.content.Intent
 import com.safeiot.privyhub.identity.PrivyHubIdentity
 import com.safeiot.privyhub.identity.hubMediaDataSourceFactory
+import com.safeiot.privyhub.vod.VodRetryAndroid
+import com.safeiot.privyhub.vod.VodRetryController
+import com.safeiot.privyhub.vod.VodRetryFlag
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
@@ -64,6 +67,9 @@ import java.util.concurrent.Executors
 class MainActivity : AppCompatActivity() {
 
     private var player: ExoPlayer? = null
+
+    // B35: the movie player's retry, only with debug.privyhub.vod_retry=1 and VOD (never live). null = today.
+    private var vodRetry: VodRetryAndroid? = null
 
     private lateinit var playerView: PlayerView
     private lateinit var previewPlayerHost: ViewGroup
@@ -15435,6 +15441,20 @@ private fun requestGameStateAction(
             playback.type ==
                 "live"
 
+        // B35: null unless the flag reads 1 (and not live): every vodRetry?. below is then a no-op.
+        vodRetry =
+            if (VodRetryController.wanted(VodRetryFlag.read(), isLive)) {
+                VodRetryAndroid(
+                    this,
+                    playerView,
+                    sourceId,
+                    { "http://${getCompanionHost()}:$CONTROL_PORT/diagnostics/vod-client" },
+                    { player }
+                )
+            } else {
+                null
+            }
+
 
         val loadControl =
             if (isLive) {
@@ -15576,6 +15596,12 @@ private fun requestGameStateAction(
                                 saveCurrentProgress()
 
 
+                                // B35: a retryable VOD load / IO error retries (null = today)
+                                if (vodRetry?.onError(error, exoPlayer.currentPosition) == true) {
+                                    return
+                                }
+
+
                                 if (
                                     !playback.url.isNullOrBlank()
                                 ) {
@@ -15610,6 +15636,10 @@ private fun requestGameStateAction(
                                     statusText.text =
                                         "Playback error"
                                 }
+
+
+                                // B35: past the bound, Retry offered (null = today)
+                                vodRetry?.afterTodaysError()
                             }
 
 
@@ -15644,6 +15674,12 @@ private fun requestGameStateAction(
                                     TAG,
                                     "Playback state = $stateName"
                                 )
+
+
+                                // B35: a retry episode closes on READY (null = today)
+                                if (playbackState == Player.STATE_READY) {
+                                    vodRetry?.onReady()
+                                }
 
 
                                 Log.d(
@@ -15800,6 +15836,10 @@ private fun requestGameStateAction(
     private fun releasePlayer(
         preserveFullscreen: Boolean = false
     ) {
+
+        // B35: a pending retry dropped (null = today)
+        vodRetry?.cancel()
+        vodRetry = null
 
         saveCurrentProgress()
 

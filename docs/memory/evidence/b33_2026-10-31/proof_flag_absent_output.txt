@@ -1,0 +1,5 @@
+EQUAL  no umbrella, no line: base {} vs new {}; cases ['stall_450', 'silence_2.0', 'silence_0.93']; rows [7, 4, 4]; loads [[True], [True], [True]]
+EQUAL  the umbrella + PRIVYHUB_REWIND_NEEDS_LOSS=0: base {"PRIVYHUB_LINK_RECOVERY": "1"} vs new {"PRIVYHUB_LINK_RECOVERY": "1", "PRIVYHUB_REWIND_NEEDS_LOSS": "0"}; cases ['stall_450', 'silence_2.0', 'silence_0.93']; rows [7, 4, 4]; loads [[True], [True], [True]]
+EQUAL  a junk line alone: base {} vs new {"PRIVYHUB_REWIND_NEEDS_LOSS": "yes"}; cases ['stall_450', 'silence_2.0', 'silence_0.93']; rows [7, 4, 4]; loads [[True], [True], [True]]
+for contrast, the new with the umbrella alone: stall_450: [('input_release', 'state', 'no_heartbeat')] loads [True]; silence_2.0: [('input_release', 'state', 'long')] loads [True]; silence_0.93: [('input_release', 'state', 'no_heartbeat')] loads [True]
+PROVEN

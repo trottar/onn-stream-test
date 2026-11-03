@@ -1,0 +1,177 @@
+removed lines: ['if (decoder == null) {']
+  344 blank / comment                                         // B32: the re-attached decoder's first frame closes the held row (null = today)
+  345 guarded                                                 surfaceHold?.stallAgeMs(System.nanoTime() / 1_000_000L, decoder?.renderedFrameCount() ?: 0L)
+  496 blank / comment                                         // B32: input-device events for the surface_lost rows (null = today: no listener)
+  497 guarded                                                 surfaceHold?.let { registerHoldDeviceListener() }
+  498 blank / comment                                         
+  519 blank / comment                                         
+  520 blank / comment                                         // B32: within the hold's bound the same session continues on the new surface (null = today)
+  521 guarded                                                 if (surfaceHold?.let { endSurfaceHold(it, holder.surface) } == true) return
+  551 blank / comment                                         
+  552 blank / comment                                         // B32: a brief loss of the screen keeps the session (null = today)
+  553 guarded                                                 if (sessionStarted && !isFinishing && surfaceHold?.let { beginSurfaceHold(it) } == true) return
+  590 blank / comment                                         // B32: the pause for the rows; no input reaches a paused activity, so nothing stays held (null = to
+  591 guarded                                                 surfaceHold?.let { it.onPause(); controllerSender?.neutralize() }
+  603 blank / comment                                         
+  604 blank / comment                                         // B32: a hold open at the end: today's stop path follows (null = today)
+  605 guarded                                                 surfaceHold?.let { h -> uiHandler.removeCallbacks(holdExpiry); h.onEndedInHold(); unregisterHoldDevi
+  635 blank / comment                                         // B32: the surface the held decoder is built on (null = today: the closure's surface)
+  636 guarded                                                 if (surfaceHold != null) heldSurface = surface
+  744 blank / comment                                         // B32: with the hold, a decoder only on a live surface (null = today's branch)
+  745 guarded                                                 if (surfaceHold != null) {
+  746 inside a guarded branch (the line above)                buildHeldDecoder(sps, pps)
+  747 inside a guarded branch (the line above)                } else if (decoder == null) {
+ 2395 blank / comment                                         // B32: the hold's counters (null = today: no key)
+ 2396 guarded                                                 surfaceHold?.let { h -> root.put("surface_hold", JSONObject(h.reportFields())) }
+ 2766 blank / comment                                         // B32: one queued surface_lost row (null = today: nothing)
+ 2767 guarded                                                 (surfaceHold?.query() ?: "") +
+ 4203 block (declarations; called only from guarded lines)    // B32: the hold, only with debug.privyhub.surface_hold=<1|ms> (null = today).
+ 4204 block (declarations; called only from guarded lines)    private val surfaceHold: SurfaceHold? by lazy { SurfaceHoldFlag.fromSystem()?.let { SurfaceHold(it) 
+ 4205 block (declarations; called only from guarded lines)    
+ 4206 block (declarations; called only from guarded lines)    @Volatile
+ 4207 block (declarations; called only from guarded lines)    private var heldSurface: Surface? = null
+ 4208 block (declarations; called only from guarded lines)    
+ 4209 block (declarations; called only from guarded lines)    private val heldDecoderLock = Any()
+ 4210 block (declarations; called only from guarded lines)    
+ 4211 block (declarations; called only from guarded lines)    private var holdDeviceListener: android.hardware.input.InputManager.InputDeviceListener? = null
+ 4212 block (declarations; called only from guarded lines)    
+ 4213 block (declarations; called only from guarded lines)    private val holdExpiry: Runnable by lazy {
+ 4214 block (declarations; called only from guarded lines)    Runnable {
+ 4215 block (declarations; called only from guarded lines)    val h = surfaceHold ?: return@Runnable
+ 4216 block (declarations; called only from guarded lines)    if (!h.holding) return@Runnable
+ 4217 block (declarations; called only from guarded lines)    if (!h.expired()) {
+ 4218 block (declarations; called only from guarded lines)    uiHandler.postDelayed(holdExpiry, 100L)
+ 4219 block (declarations; called only from guarded lines)    return@Runnable
+ 4220 block (declarations; called only from guarded lines)    }
+ 4221 block (declarations; called only from guarded lines)    val ageMs = h.stallAgeMs(System.nanoTime() / 1_000_000L, 0L) ?: -1L
+ 4222 block (declarations; called only from guarded lines)    h.onExpired()
+ 4223 block (declarations; called only from guarded lines)    // today's surface-loss path, deferred to the bound (the report cached at the loss)
+ 4224 block (declarations; called only from guarded lines)    restartGuard?.onSurfaceLost(
+ 4225 block (declarations; called only from guarded lines)    cachedSessionReport,
+ 4226 block (declarations; called only from guarded lines)    ageMs,
+ 4227 block (declarations; called only from guarded lines)    if (lastRtpAdvanceAtNs > 0L) (System.nanoTime() - lastRtpAdvanceAtNs) / 1_000_000L else -1L,
+ 4228 block (declarations; called only from guarded lines)    recoveryActive
+ 4229 block (declarations; called only from guarded lines)    )
+ 4230 block (declarations; called only from guarded lines)    stopLocalPipeline()
+ 4231 block (declarations; called only from guarded lines)    sessionStarted = false
+ 4232 block (declarations; called only from guarded lines)    }
+ 4233 block (declarations; called only from guarded lines)    }
+ 4234 block (declarations; called only from guarded lines)    
+ 4235 block (declarations; called only from guarded lines)    /** B32, `surfaceDestroyed`: the decoder goes (it cannot outlive its surface); the rest keeps runnin
+ 4236 block (declarations; called only from guarded lines)    private fun beginSurfaceHold(h: SurfaceHold): Boolean {
+ 4237 block (declarations; called only from guarded lines)    cacheSessionReport()
+ 4238 block (declarations; called only from guarded lines)    val interactive = try {
+ 4239 block (declarations; called only from guarded lines)    (getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager)?.isInteractive
+ 4240 block (declarations; called only from guarded lines)    } catch (_: Exception) {
+ 4241 block (declarations; called only from guarded lines)    null
+ 4242 block (declarations; called only from guarded lines)    }
+ 4243 block (declarations; called only from guarded lines)    h.onSurfaceLost(decoder?.lastOutputAgeMs() ?: -1L, interactive)
+ 4244 block (declarations; called only from guarded lines)    controllerSender?.neutralize()
+ 4245 block (declarations; called only from guarded lines)    synchronized(heldDecoderLock) {
+ 4246 block (declarations; called only from guarded lines)    heldSurface = null
+ 4247 block (declarations; called only from guarded lines)    val d = decoder
+ 4248 block (declarations; called only from guarded lines)    decoder = null
+ 4249 block (declarations; called only from guarded lines)    d?.let { h.onDecoderClosed(it.renderedFrameCount()); it.close() }
+ 4250 block (declarations; called only from guarded lines)    }
+ 4251 block (declarations; called only from guarded lines)    // the stall signal reads the held age (the game pauses on the host as at a link stall)
+ 4252 block (declarations; called only from guarded lines)    stallMonitor?.let { m ->
+ 4253 block (declarations; called only from guarded lines)    controllerSender?.stallTick = { now ->
+ 4254 block (declarations; called only from guarded lines)    val i = stallInputs()
+ 4255 block (declarations; called only from guarded lines)    m.tick(now, h.stallAgeMs(now, i.renderedFrames)?.let { a -> i.copy(outputAgeMs = a) } ?: i)
+ 4256 block (declarations; called only from guarded lines)    }
+ 4257 block (declarations; called only from guarded lines)    }
+ 4258 block (declarations; called only from guarded lines)    uiHandler.removeCallbacks(holdExpiry)
+ 4259 block (declarations; called only from guarded lines)    uiHandler.postDelayed(holdExpiry, h.boundMs)
+ 4260 block (declarations; called only from guarded lines)    return true
+ 4261 block (declarations; called only from guarded lines)    }
+ 4262 block (declarations; called only from guarded lines)    
+ 4263 block (declarations; called only from guarded lines)    /** B32, `surfaceCreated`: within the bound, the next SPS/PPS builds the decoder on this surface. */
+ 4264 block (declarations; called only from guarded lines)    private fun endSurfaceHold(h: SurfaceHold, surface: Surface): Boolean {
+ 4265 block (declarations; called only from guarded lines)    if (!sessionStarted || !h.onSurfaceBack()) return false
+ 4266 block (declarations; called only from guarded lines)    uiHandler.removeCallbacks(holdExpiry)
+ 4267 block (declarations; called only from guarded lines)    synchronized(heldDecoderLock) { heldSurface = surface }
+ 4268 block (declarations; called only from guarded lines)    return true
+ 4269 block (declarations; called only from guarded lines)    }
+ 4270 block (declarations; called only from guarded lines)    
+ 4271 block (declarations; called only from guarded lines)    /** B32: the receiver's parameter sets, with the hold: a decoder only on a live surface. */
+ 4272 block (declarations; called only from guarded lines)    private fun buildHeldDecoder(sps: ByteArray, pps: ByteArray) {
+ 4273 block (declarations; called only from guarded lines)    synchronized(heldDecoderLock) {
+ 4274 block (declarations; called only from guarded lines)    if (decoder != null) return
+ 4275 block (declarations; called only from guarded lines)    val target = heldSurface ?: return
+ 4276 block (declarations; called only from guarded lines)    try {
+ 4277 block (declarations; called only from guarded lines)    decoder =
+ 4278 block (declarations; called only from guarded lines)    AvcLowLatencyDecoder(
+ 4279 block (declarations; called only from guarded lines)    surface = target,
+ 4280 block (declarations; called only from guarded lines)    width = VIDEO_WIDTH,
+ 4281 block (declarations; called only from guarded lines)    height = VIDEO_HEIGHT,
+ 4282 block (declarations; called only from guarded lines)    fps = VIDEO_FPS,
+ 4283 block (declarations; called only from guarded lines)    sps = sps,
+ 4284 block (declarations; called only from guarded lines)    pps = pps,
+ 4285 block (declarations; called only from guarded lines)    staleOutputMs =
+ 4286 block (declarations; called only from guarded lines)    requestedStaleOutputMs()
+ 4287 block (declarations; called only from guarded lines)    )
+ 4288 block (declarations; called only from guarded lines)    surfaceHold?.onDecoderBuilt()
+ 4289 block (declarations; called only from guarded lines)    } catch (error: Exception) {
+ 4290 block (declarations; called only from guarded lines)    runOnUiThread {
+ 4291 block (declarations; called only from guarded lines)    statusView.text =
+ 4292 block (declarations; called only from guarded lines)    "MediaCodec setup failed\n" + (error.message ?: "Unknown error")
+ 4293 block (declarations; called only from guarded lines)    }
+ 4294 block (declarations; called only from guarded lines)    return
+ 4295 block (declarations; called only from guarded lines)    }
+ 4296 block (declarations; called only from guarded lines)    }
+ 4297 block (declarations; called only from guarded lines)    runOnUiThread {
+ 4298 block (declarations; called only from guarded lines)    streamState =
+ 4299 block (declarations; called only from guarded lines)    "Decoder active"
+ 4300 block (declarations; called only from guarded lines)    
+ 4301 block (declarations; called only from guarded lines)    updateMetrics()
+ 4302 block (declarations; called only from guarded lines)    }
+ 4303 block (declarations; called only from guarded lines)    }
+ 4304 block (declarations; called only from guarded lines)    
+ 4305 block (declarations; called only from guarded lines)    private fun registerHoldDeviceListener() {
+ 4306 block (declarations; called only from guarded lines)    val im = getSystemService(android.content.Context.INPUT_SERVICE) as? android.hardware.input.InputMan
+ 4307 block (declarations; called only from guarded lines)    fun sourcesOf(id: Int): Int = try { android.view.InputDevice.getDevice(id)?.sources ?: 0 } catch (_:
+ 4308 block (declarations; called only from guarded lines)    val l = object : android.hardware.input.InputManager.InputDeviceListener {
+ 4309 block (declarations; called only from guarded lines)    override fun onInputDeviceAdded(deviceId: Int) { surfaceHold?.onDevice("added", sourcesOf(deviceId))
+ 4310 block (declarations; called only from guarded lines)    override fun onInputDeviceRemoved(deviceId: Int) { surfaceHold?.onDevice("removed", 0) }
+ 4311 block (declarations; called only from guarded lines)    override fun onInputDeviceChanged(deviceId: Int) { surfaceHold?.onDevice("changed", sourcesOf(device
+ 4312 block (declarations; called only from guarded lines)    }
+ 4313 block (declarations; called only from guarded lines)    try {
+ 4314 block (declarations; called only from guarded lines)    im.registerInputDeviceListener(l, uiHandler)
+ 4315 block (declarations; called only from guarded lines)    holdDeviceListener = l
+ 4316 block (declarations; called only from guarded lines)    } catch (_: Exception) {
+ 4317 block (declarations; called only from guarded lines)    }
+ 4318 block (declarations; called only from guarded lines)    }
+ 4319 block (declarations; called only from guarded lines)    
+ 4320 block (declarations; called only from guarded lines)    private fun unregisterHoldDeviceListener() {
+ 4321 block (declarations; called only from guarded lines)    val l = holdDeviceListener ?: return
+ 4322 block (declarations; called only from guarded lines)    holdDeviceListener = null
+ 4323 block (declarations; called only from guarded lines)    try {
+ 4324 block (declarations; called only from guarded lines)    (getSystemService(android.content.Context.INPUT_SERVICE) as? android.hardware.input.InputManager)
+ 4325 block (declarations; called only from guarded lines)    ?.unregisterInputDeviceListener(l)
+ 4326 block (declarations; called only from guarded lines)    } catch (_: Exception) {
+ 4327 block (declarations; called only from guarded lines)    }
+ 4328 block (declarations; called only from guarded lines)    }
+ 4329 block (declarations; called only from guarded lines)    
+ 4330 block (declarations; called only from guarded lines)    // B32: the foreground's events for the surface_lost rows (null = today: nothing)
+ 4331 block (declarations; called only from guarded lines)    override fun onWindowFocusChanged(hasFocus: Boolean) {
+ 4332 block (declarations; called only from guarded lines)    super.onWindowFocusChanged(hasFocus)
+ 4333 block (declarations; called only from guarded lines)    surfaceHold?.onFocus(hasFocus)
+ 4334 block (declarations; called only from guarded lines)    }
+ 4335 block (declarations; called only from guarded lines)    
+ 4336 block (declarations; called only from guarded lines)    override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
+ 4337 block (declarations; called only from guarded lines)    super.onTopResumedActivityChanged(isTopResumedActivity)
+ 4338 block (declarations; called only from guarded lines)    surfaceHold?.onTopResumed(isTopResumedActivity)
+ 4339 block (declarations; called only from guarded lines)    }
+ 4340 block (declarations; called only from guarded lines)    
+ 4341 block (declarations; called only from guarded lines)    override fun onUserLeaveHint() {
+ 4342 block (declarations; called only from guarded lines)    super.onUserLeaveHint()
+ 4343 block (declarations; called only from guarded lines)    surfaceHold?.onUserLeave()
+ 4344 block (declarations; called only from guarded lines)    }
+ 4345 block (declarations; called only from guarded lines)    
+ 4349 blank / comment                                         // B32: every key noted; a guide / Home-class key from a pad consumed here (null = today)
+ 4350 guarded                                                 if (surfaceHold?.onKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.source) == true) {
+ 4351 inside a guarded branch (the line above)                return true
+ 4352 inside a guarded branch (the line above)                }
+neutralize() call sites: ['surfaceHold?.let { it.onPause(); controllerSender?.neutralize() }', 'controllerSender?.neutralize()']
+sender: only appended: True
+FAILS 0

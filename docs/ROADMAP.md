@@ -2131,6 +2131,23 @@ valid; APK `9719ea82…0110` CONFIRMED and pinned; back to B on R3 and S1.**
 
 Record: `docs/memory/evidence/CL_B16_REMOTE_UMBRELLA_AND_QUIET_GUARD_2026-10-29.md`.
 
+**Queue L (2026-10-31), from TRIP-R2 (Friday's off-site play): B32-B37 built / read, nothing adopted, no live run;
+APK (B5 … B25 + B32 + B34 + B35; B27 / B29 out) `554ccf61…9902` pinned, NOT installed.**
+- **B32:** the client keeps the session through a screen loss ≤ 12 s (`debug.privyhub.surface_hold=1`), logs each
+  foreground loss (`surface_lost`) and keeps a pad's guide keys; the host steps the ladder on the same stream (one IDR,
+  no SSRC change; `PRIVYHUB_STEP_IN_PLACE=1`); the explicit cap beside the umbrella now acts.
+- **B33:** no rewind on a sub-second stall with no loss behind it (inside `PRIVYHUB_LINK_RECOVERY=1`; off
+  `PRIVYHUB_REWIND_NEEDS_LOSS=0`); 4 of Friday's 5 state loads would have resumed. "Live again" mark: for the user.
+- **B34:** stable player slots, gamepads only (`debug.privyhub.pad_slots=stable`); the PS1 config settled, no change.
+- **B35:** the movie player retries for 150 s and resumes at the position (`debug.privyhub.vod_retry=1`); the range log
+  (`PRIVYHUB_VOD_LOG=1`).
+- **B36:** `privyhub-diag` (`tools/diag_keeper.py`, `~/privyhub_diag/`, 30-day retention, `sessions.jsonl`),
+  `tools/diag_read.py <range>`, `tools/diag_check.py`; the dry run reproduces TRIP-R2 §1 (47 / 48 cells, one label).
+- **B37 (read):** the "control echo" is the health POST's HTTP round trip; the path's RTT ≈ 28-47 ms Friday. Next
+  measures: D3 (uplink one-way delay from the packet timestamps, host only), then D1 (a true echo), then D4 (send on
+  the input event). Input → photon needs a bench cell.
+- Next: HOME-1 when the user is home (`docs/memory/handoffs/SESSION_B_DONE_2026-10-31L.md`).
+
 ## G9 — Remote foundation checkpoint
 
 Acceptance:

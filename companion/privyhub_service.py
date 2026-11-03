@@ -1884,6 +1884,15 @@ if os.environ.get("PRIVYHUB_WAN_TELEMETRY", "").strip():
         ),
     )
 
+# B35: the movie player's retry rows (POST /diagnostics/vod-client), only with
+# PRIVYHUB_VOD_LOG=1. Absent = today: nothing imported, no route.
+VOD_CLIENT_LOG = None
+
+if os.environ.get("PRIVYHUB_VOD_LOG", "").strip() == "1":
+    from vod_log import client_log_from_environ as _vod_client_log_from_environ
+
+    VOD_CLIENT_LOG = _vod_client_log_from_environ(os.environ, PROJECT_ROOT)
+
 CONTROLLER = PrivyHubController()
 
 # G5-S1: /status gains the wan object while a stream reports, only with the
@@ -2262,6 +2271,21 @@ class PrivyHubRequestHandler(
                     200,
                     result,
                 )
+                return
+
+            # B35: the movie player's retry rows, only with PRIVYHUB_VOD_LOG=1 (looked up, as B1's gate, so the
+            # handler also runs where it is executed outside this module, as G5-S1's flag-absent test does)
+            if (
+                (_vod_client_log := globals().get("VOD_CLIENT_LOG")) is not None
+                and request_path == "/diagnostics/vod-client"
+            ):
+                try:
+                    payload, _ = self._read_json_body(max_bytes=2_048)
+                    result = _vod_client_log.accept(payload)
+                except ValueError as exc:
+                    self._send_json(400, {"ok": False, "error": str(exc)})
+                    return
+                self._send_json(200, result)
                 return
 
             if request_path == "/diagnostics/client-health":

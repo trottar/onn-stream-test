@@ -180,6 +180,9 @@ class StateMark:
 class Cores:
     """B4's Rewinder's B9 object (`1` and `state` only)."""
 
+    # B33: no rewind without loss (rewind_needs_loss.Rule; the umbrella or PRIVYHUB_REWIND_NEEDS_LOSS=1). None = B9.
+    no_loss: Any = None
+
     def __init__(self, mode_value: str, emulator: Any, recovery: Any, *, clock: Callable[[], float] = time.monotonic,
                  wall: Callable[[], float] = time.time, threaded: bool = True):
         self.mode = mode_value
@@ -252,6 +255,18 @@ class Cores:
                            reason="the core is not on the rewind allow-list (PRIVYHUB_INPUT_HOLD_REWIND=1)")
         fields.update(method="state", slot=SLOT, core=self.core())
         onset = pending.get("b8_hold_onset", pending["onset"])
+        # B33: under 1 s with no loss behind it: resume, no load (the save stays); else today's load, with its why
+        if self.no_loss is not None:
+            resume, why, terms = self.no_loss.decide(onset)
+            if resume:
+                with self._lock:
+                    self.last_save = None                         # one release per save
+                self.no_loss.resumes += 1
+                fields.update(method="resume", why=why, **terms)
+                fields.pop("slot", None)
+                return rw._row(recovery, "input_release", fields)
+            self.no_loss.loads += 1
+            fields.update(why=why, **terms)
         with self._lock:
             s = self.last_save
         # B12: a save taken at the client's stall matches the stall pause's own onset within 100 ms
@@ -346,4 +361,10 @@ def wire(rw: Any, recovery: Any, controller: Any, emulator: Any, environ: Mappin
             recovery._session_end = se
     recovery._log("input_hold_rewind_cores_config", mode=m, allow=sorted(ALLOW), slot=(SLOT if m == "state" else None),
                   state_at_ms=at_ms, state_at_note=why)
+    # B33: no rewind without loss, inside the umbrella (or PRIVYHUB_REWIND_NEEDS_LOSS=1); absent = nothing imported
+    if m == "state" and ((environ.get("PRIVYHUB_REWIND_NEEDS_LOSS") or "").strip() == "1"
+                         or ((environ.get("PRIVYHUB_LINK_RECOVERY") or "").strip() == "1"
+                             and (environ.get("PRIVYHUB_REWIND_NEEDS_LOSS") or "").strip() != "0")):
+        import rewind_needs_loss
+        rewind_needs_loss.wire(c, recovery, controller, environ)
     return c

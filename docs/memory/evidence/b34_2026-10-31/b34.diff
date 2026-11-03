@@ -1,0 +1,664 @@
+diff --git a/companion/games/native_stream_heartbeat.py b/companion/games/native_stream_heartbeat.py
+index a70a9b8dcd68a70f7314390cdf0b15203a2c5f12..f2e9735f6e90413220946132fc650acb0f2fc182 100644
+--- a/companion/games/native_stream_heartbeat.py
++++ b/companion/games/native_stream_heartbeat.py
+@@ -191,6 +191,11 @@ def append_native_stream_heartbeat(
+             if field in values:
+                 record[field] = values[field]
+ 
++    # B34: the client's slot map and the per-slot counters (a client without pad_slots=stable sends no key)
++    for field in ("pad_slots", "updates_by_player", "pad_slots_bad"):
++        if field in values:
++            record[field] = values[field]
++
+     path = heartbeat_log_path(
+         project_root
+     )
+diff --git a/companion/pad_slots.py b/companion/pad_slots.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..25f891d6e9838fe4e21e9caa3346edb70b9d6f83
+--- /dev/null
++++ b/companion/pad_slots.py
+@@ -0,0 +1,85 @@
++"""B34: the client's stable player-slot map, as the host sees it -- so a record can say which pad was which.
++
++No host flag: the client's key is the switch. A client with `debug.privyhub.pad_slots=stable` sends
++`pad_slots=<slot:pad:class,...>` on its `native-stream-start` and on every heartbeat (`pad` is 6 hex of a hash of the
++device's vendor / product / descriptor; `class` a vendor class; no names). **An old or flag-absent client sends no
++key: nothing imports this module and every row is today's.** Design:
++`docs/memory/evidence/b34_2026-10-31/design_written_before_code.md` (hashed before this code).
++
++Rows: at each start one recovery-log row `pad_slots` (`when: "start"`); on a heartbeat the heartbeat row gets
++`pad_slots` (the list) and `updates_by_player` (the controller bridge's per-slot counters), and a recovery-log row
++`pad_slots` (`when: "change"`) when the map differs from the last one written. A malformed value is dropped
++(`pad_slots_bad: true` on the row), never written raw.
++"""
++
++from __future__ import annotations
++
++import re
++from typing import Any
++
++FIELD = "pad_slots"
++_ENTRY = re.compile(r"^([0-3]):([0-9a-f]{6}):([a-z0-9]{2,12})$")
++
++
++def parse(raw: str) -> list[dict[str, Any]] | None:
++    """The map as a list of {slot, pad, class}; [] for an empty map; None when malformed."""
++    raw = (raw or "").strip()
++    if not raw:
++        return []
++    parts = raw.split(",")
++    if len(parts) > 4:
++        return None
++    out: list[dict[str, Any]] = []
++    for p in parts:
++        m = _ENTRY.match(p)
++        if not m:
++            return None
++        out.append({"slot": int(m.group(1)), "pad": m.group(2), "class": m.group(3)})
++    if len({e["slot"] for e in out}) != len(out):
++        return None
++    return out
++
++
++class SlotsLog:
++    """One per plugin: the last map written to the recovery log."""
++
++    def __init__(self) -> None:
++        self.last: list[dict[str, Any]] | None = None
++
++    def _row(self, recovery: Any, when: str, slots: list[dict[str, Any]] | None, **extra: Any) -> None:
++        fields: dict[str, Any] = {"when": when}
++        if slots is None:
++            fields["pad_slots_bad"] = True
++        else:
++            fields["slots"] = slots
++            fields["count"] = len(slots)
++        fields.update(extra)
++        recovery._log("pad_slots", **fields)
++
++    def start(self, recovery: Any, raw: str) -> list[dict[str, Any]] | None:
++        slots = parse(raw)
++        self._row(recovery, "start", slots)
++        if slots is not None:
++            self.last = slots
++        return slots
++
++    def heartbeat(self, recovery: Any, raw: str, values: dict[str, Any], updates_by_player: Any = None) -> None:
++        """One heartbeat's key: the row's fields, and a change row when the map moved."""
++        slots = parse(raw)
++        if slots is None:
++            values["pad_slots_bad"] = True
++            return
++        values[FIELD] = slots
++        if isinstance(updates_by_player, (list, tuple)):
++            values["updates_by_player"] = [int(x) for x in updates_by_player]
++        if slots != self.last:
++            self._row(recovery, "change", slots, heartbeat_sequence=values.get("sequence"))
++            self.last = slots
++
++
++def updates_by_player(controller: Any) -> Any:
++    """The controller bridge's per-slot update counters (already kept), or None."""
++    try:
++        return controller.status().get("updates_by_player")
++    except Exception:
++        return None
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index 4e76bde5c11d6e537cba1fcca514d550f49b6004..653d0e54da60eafa2271d47a9d0ebb0acb79b67f 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -3794,6 +3794,14 @@ class GamesPlugin:
+                     if field in query:
+                         values[field] = self._parse_int(self._first(query, field), -1)
+ 
++            # B34: the client's stable slot map (only a client with debug.privyhub.pad_slots=stable sends it)
++            if "pad_slots" in query:
++                import pad_slots as _pad_slots
++                if getattr(self, "_pad_slots_log", None) is None:
++                    self._pad_slots_log = _pad_slots.SlotsLog()
++                self._pad_slots_log.heartbeat(self._recovery, self._first(query, "pad_slots"), values,
++                                              _pad_slots.updates_by_player(self._native_stream._session_io.controller))
++
+             if not values:
+                 raise ValueError(
+                     "Missing native stream heartbeat fields"
+@@ -3900,6 +3908,12 @@ class GamesPlugin:
+             # B28: this session's WAN lines by its path class, before the start (absent: today's)
+             if _remote_umbrella is not None and getattr(self, "_remote_umbrella", None) is not None:
+                 self._remote_umbrella.note_stream_start(client_ip)
++            # B34: the client's stable slot map at this start (only a client with pad_slots=stable sends it)
++            if "pad_slots" in query:
++                import pad_slots as _pad_slots
++                if getattr(self, "_pad_slots_log", None) is None:
++                    self._pad_slots_log = _pad_slots.SlotsLog()
++                self._pad_slots_log.start(self._recovery, self._first(query, "pad_slots"))
+             try:
+                 if not game_status.get("paused", False):
+                     try:
+diff --git a/PrivyHub/app/src/main/java/streaming/NativeControllerSender.kt b/PrivyHub/app/src/main/java/streaming/NativeControllerSender.kt
+index 222ce9196a80630cfeabbb2f1c40ef9440b7d4c2..da803ccbda5ece03c50527fb7f5476d893a76bc4 100644
+--- a/PrivyHub/app/src/main/java/streaming/NativeControllerSender.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeControllerSender.kt
+@@ -94,6 +94,11 @@ class NativeControllerSender(
+     @Volatile
+     var keyframeTick: (() -> ByteArray?)? = null
+ 
++    // B34: stable slots, gamepads only (debug.privyhub.pad_slots=stable via the activity; null = today)
++    @Volatile
++    var padSlots: PadSlots? = null
++    var connectedPads: () -> List<PadDevice> = { emptyList() }
++
+     @Volatile
+     private var running =
+         false
+@@ -115,6 +120,9 @@ class NativeControllerSender(
+             }
+         }
+ 
++        // B34: the connected pads keep or take their slots (null = today)
++        padSlots?.beginStart(connectedPads())
++
+         running = true
+ 
+         worker =
+@@ -447,6 +455,9 @@ class NativeControllerSender(
+     private fun playerForDevice(
+         device: InputDevice
+     ): Int? {
++        // B34: by the device's key, eligible pads only (null = today's first-input order)
++        padSlots?.let { return it.slotFor(AndroidPadDevice(device), connectedPads) }
++
+         val descriptor =
+             device.descriptor
+                 ?.takeIf {
+diff --git a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+index 7cab458d792c87c04212a432ca2ba5c1f3e4d3c5..0b56453a937fe54b716872aadf81a6cd045c6cc4 100644
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -712,6 +712,8 @@ class NativeStreamActivity :
+                 host = host,
+                 port = INPUT_PORT
+             ).also {
++                // B34: stable slots, gamepads only (null = today)
++                padSlots?.let { s -> it.padSlots = s; it.connectedPads = { AndroidPadDevice.connected() } }
+                 it.start()
+             }
+         // B7: the stall signal on the controller socket (null = today)
+@@ -801,7 +803,7 @@ class NativeStreamActivity :
+                     httpPost(
+                         "http://$host:$CONTROL_PORT" +
+                             "/plugins/games/native-stream-start" +
+-                            "?port=$VIDEO_PORT" + (if (restart != null) "&guard_end=1" else ""),
++                            "?port=$VIDEO_PORT" + (if (restart != null) "&guard_end=1" else "") + padSlotsQuery(),
+                         readTimeoutMs =
+                             30_000
+                     )
+@@ -2372,6 +2374,12 @@ class NativeStreamActivity :
+         // B11: the self-restart's cause (null = today: no key)
+         restartGuard?.lastCause?.let { c -> root.put("restart_cause", JSONObject(c)) }
+ 
++        // B34: the slot map (null = today: no key)
++        padSlots?.let { s ->
++            root.put("pad_slots_mode", "stable")
++            root.put("pad_slots", s.toJson())
++        }
++
+         // B16: the fast ready's releases (null = today: no key)
+         fastReady?.let { f ->
+             root.put("fast_ready_releases", f.releases)
+@@ -2525,6 +2533,11 @@ class NativeStreamActivity :
+     // B11: the self-restart guard, only with debug.privyhub.restart_guard=1 (null = today).
+     private val restartGuard: RestartGuard? by lazy { if (RestartGuardFlag.fromSystem()) RestartGuard() else null }
+ 
++    // B34: stable player slots, gamepads only, with debug.privyhub.pad_slots=stable (null = today); one per process
++    private val padSlots: PadSlots? by lazy { if (PadSlotsFlag.fromSystem()) PadSlotsProcess.slots else null }
++    private fun padSlotsQuery(): String =
++        padSlots?.let { "&pad_slots=" + URLEncoder.encode(it.mapString(), "UTF-8") } ?: ""
++
+     // B11: the old session's report and stop, posted at a self-restart (the guard's transport)
+     private fun postRestartReport(host: String, report: String) {
+         httpPostBody("http://$host:$CONTROL_PORT" + DecoderReportUpload.PATH, DecoderReportUpload.encode(report),
+@@ -2740,6 +2753,8 @@ class NativeStreamActivity :
+                 (lossGuard?.query() ?: "") +
+                 // B14: the link notice's state (null = today: nothing)
+                 (linkNotice?.query() ?: "") +
++                // B34: the slot map (null = today: nothing)
++                padSlotsQuery() +
+                 // D-BASE-T1: the onn's own thermal state travels with the
+                 // heartbeat, so a session that never posts a report still
+                 // leaves a temperature trace on the host.
+diff --git a/PrivyHub/app/src/main/java/streaming/PadSlots.kt b/PrivyHub/app/src/main/java/streaming/PadSlots.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..05a285cd753dedcb604cc20e18ced003ec8a1a3f
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/PadSlots.kt
+@@ -0,0 +1,156 @@
++package com.safeiot.privyhub.streaming
++
++import android.view.InputDevice
++import android.view.KeyEvent
++import org.json.JSONArray
++import org.json.JSONObject
++import java.security.MessageDigest
++
++/**
++ * B34: stable player slots, gamepads only, behind the system property `debug.privyhub.pad_slots=stable`
++ * (CL-B7P's convention). Absent / empty / any other value = today: no object; the sender hands out slots in
++ * first-input order, clears them at every start and stop, and takes any device with stick or hat axes (TRIP-R2 §3).
++ *
++ * With it: slots by the device's key (sha256 of vendor:product:descriptor, 6 hex -- the descriptor never leaves this
++ * file), kept in one object per process across starts and self-restarts (a new process starts empty); only a device
++ * with SOURCE_GAMEPAD / SOURCE_JOYSTICK and at least one gamepad button is eligible (a remote or an air mouse with
++ * axes is not); at each start the connected pads without a slot take the lowest free slots in the system's
++ * controller-number order, so the slots do not depend on which pad presses first; a later pad takes the lowest free
++ * slot; a pad that leaves keeps its slot (reused only when all four are held and that pad is gone).
++ * Design: `docs/memory/evidence/b34_2026-10-31/design_written_before_code.md` (hashed before this code).
++ */
++object PadSlotsFlag {
++    const val PROPERTY = "debug.privyhub.pad_slots"
++
++    fun parse(value: String?): Boolean = value?.trim() == "stable"
++
++    /** The property, read through reflection; a failed read is absent (today). */
++    fun fromSystem(): Boolean =
++        try {
++            val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
++            parse(get.invoke(null, PROPERTY) as? String)
++        } catch (_: Throwable) {
++            false
++        }
++}
++
++/** What the slots read from a device (fakes on the JVM; [AndroidPadDevice] on the onn). */
++interface PadDevice {
++    val descriptor: String
++    val vendorId: Int
++    val productId: Int
++    val sources: Int
++    val controllerNumber: Int
++    val hasGamepadButton: Boolean
++    val isVirtual: Boolean
++}
++
++class AndroidPadDevice(private val d: InputDevice) : PadDevice {
++    override val descriptor: String get() = d.descriptor?.takeIf { it.isNotBlank() } ?: "id:${d.id}"
++    override val vendorId: Int get() = d.vendorId
++    override val productId: Int get() = d.productId
++    override val sources: Int get() = d.sources
++    override val controllerNumber: Int get() = d.controllerNumber
++    override val hasGamepadButton: Boolean get() = d.hasKeys(*BUTTONS).any { it }
++    override val isVirtual: Boolean get() = d.isVirtual
++
++    companion object {
++        val BUTTONS = intArrayOf(
++            KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_X,
++            KeyEvent.KEYCODE_BUTTON_Y, KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_R1,
++            KeyEvent.KEYCODE_BUTTON_START, KeyEvent.KEYCODE_BUTTON_SELECT,
++        )
++
++        /** Every connected input device, through the system's own list. */
++        fun connected(): List<PadDevice> =
++            InputDevice.getDeviceIds().toList().mapNotNull { id -> InputDevice.getDevice(id)?.let { d -> AndroidPadDevice(d) } }
++    }
++}
++
++class PadSlots(private val count: Int = 4) {
++    data class Slot(val slot: Int, val pad: String, val cls: String)
++
++    private val byKey = HashMap<String, Int>()
++    private val classOf = HashMap<String, String>()
++    private val lock = Any()
++
++    /** At each stream start: the connected pads without a slot take the lowest free ones, by controller number. */
++    fun beginStart(connected: List<PadDevice>) {
++        synchronized(lock) {
++            connected.filter { eligible(it) }
++                .map { it to key(it) }
++                .distinctBy { it.second }
++                .filter { it.second !in byKey }
++                .sortedWith(compareBy({ order(it.first.controllerNumber) }, { it.second }))
++                .forEach { (d, k) -> assign(d, k, connected) }
++        }
++    }
++
++    /** The slot for an event's device: kept if it has one; else the lowest free (or a gone pad's); null if none. */
++    fun slotFor(device: PadDevice, connected: () -> List<PadDevice>): Int? {
++        if (!eligible(device)) return null
++        val k = key(device)
++        synchronized(lock) {
++            byKey[k]?.let { return it }
++            return assign(device, k, connected())
++        }
++    }
++
++    fun map(): List<Slot> = synchronized(lock) {
++        byKey.entries.sortedBy { it.value }.map { Slot(it.value, it.key, classOf[it.key] ?: "gamepad") }
++    }
++
++    /** `slot:pad:class` joined by `,` in slot order (the heartbeat's and the start's `pad_slots`). */
++    fun mapString(): String = map().joinToString(",") { "${it.slot}:${it.pad}:${it.cls}" }
++
++    fun toJson(): JSONArray = JSONArray().apply {
++        map().forEach { s -> put(JSONObject().put("slot", s.slot).put("pad", s.pad).put("class", s.cls)) }
++    }
++
++    private fun assign(d: PadDevice, k: String, connected: List<PadDevice>): Int? {
++        val free = (0 until count).firstOrNull { it !in byKey.values }
++        val slot = free ?: run {
++            val present = connected.filter { eligible(it) }.map { key(it) }.toSet()
++            byKey.entries.filter { it.key !in present }.minByOrNull { it.value }?.also {
++                byKey.remove(it.key)
++                classOf.remove(it.key)
++            }?.value
++        } ?: return null
++        byKey[k] = slot
++        classOf[k] = vendorClass(d.vendorId)
++        return slot
++    }
++
++    companion object {
++        private const val GAMEPAD = 0x00000401   // InputDevice.SOURCE_GAMEPAD
++        private const val JOYSTICK = 0x01000010  // InputDevice.SOURCE_JOYSTICK
++
++        fun eligible(d: PadDevice): Boolean =
++            !d.isVirtual &&
++                ((d.sources and GAMEPAD) == GAMEPAD || (d.sources and JOYSTICK) == JOYSTICK) &&
++                d.hasGamepadButton
++
++        fun key(d: PadDevice): String {
++            val h = MessageDigest.getInstance("SHA-256")
++                .digest("${d.vendorId}:${d.productId}:${d.descriptor}".toByteArray())
++            return h.take(3).joinToString("") { "%02x".format(it) }
++        }
++
++        private fun order(controllerNumber: Int): Int = if (controllerNumber > 0) controllerNumber else Int.MAX_VALUE
++
++        fun vendorClass(vendorId: Int): String = when (vendorId) {
++            0x054c -> "sony"
++            0x045e -> "microsoft"
++            0x057e -> "nintendo"
++            0x2dc8 -> "8bitdo"
++            0x046d -> "logitech"
++            0x18d1 -> "google"
++            else -> "gamepad"
++        }
++    }
++}
++
++/** One per process: the slots outlive the activity (a self-restart, a recreation); a new process starts empty. */
++object PadSlotsProcess {
++    val slots: PadSlots = PadSlots()
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/PadSlotsTest.kt b/PrivyHub/app/src/test/java/streaming/PadSlotsTest.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..71e108e04258e96e5e8015fe111fe394eaab7368
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/PadSlotsTest.kt
+@@ -0,0 +1,129 @@
++package com.safeiot.privyhub.streaming
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * B34: stable player slots, gamepads only (debug.privyhub.pad_slots=stable). Fake devices; one PadSlots object plays
++ * the process-wide holder (PadSlotsProcess.slots) across starts and self-restarts.
++ */
++class PadSlotsTest {
++
++    private data class Fake(
++        override val descriptor: String,
++        override val controllerNumber: Int,
++        override val vendorId: Int = 0x054c,
++        override val productId: Int = 0x0268,
++        override val sources: Int = GAMEPAD or JOYSTICK,
++        override val hasGamepadButton: Boolean = true,
++        override val isVirtual: Boolean = false,
++    ) : PadDevice
++
++    companion object {
++        const val GAMEPAD = 0x00000401
++        const val JOYSTICK = 0x01000010
++        const val KEYBOARD = 0x00000101
++        const val DPAD = 0x00000201
++        const val MOUSE = 0x00002002
++    }
++
++    private val padA = Fake("descriptor-of-pad-a-0123456789", controllerNumber = 1)
++    private val padB = Fake("descriptor-of-pad-b-9876543210", controllerNumber = 2)
++    private val padC = Fake("descriptor-of-pad-c", controllerNumber = 3, vendorId = 0x045e)
++    // the onn's remote: keyboard + dpad, no gamepad source, no gamepad button
++    private val remote = Fake("remote", 0, vendorId = 0x0957, sources = KEYBOARD or DPAD, hasGamepadButton = false)
++    // an air mouse / a pad's motion device: joystick axes, no gamepad button
++    private val airMouse = Fake("air-mouse", 0, vendorId = 0x1d5a, sources = JOYSTICK or MOUSE, hasGamepadButton = false)
++
++    private fun slotsAfter(connected: List<PadDevice>, pressOrder: List<PadDevice>): List<Int?> {
++        val s = PadSlots()
++        s.beginStart(connected)
++        return pressOrder.map { s.slotFor(it) { connected } }
++    }
++
++    @Test
++    fun twoPadsGetTheSameSlotsWhicheverIsListedOrPressedFirst() {
++        val want = listOf(0, 1)   // A (controller 1) -> P1, B (controller 2) -> P2
++        for (listed in listOf(listOf(padA, padB), listOf(padB, padA))) {
++            assertEquals(want, slotsAfter(listed, listOf(padA, padB)))
++            assertEquals(want.reversed(), slotsAfter(listed, listOf(padB, padA)))
++        }
++    }
++
++    @Test
++    fun aRestartKeepsTheSlots() {
++        val s = PadSlots()
++        val both = listOf<PadDevice>(padA, padB)
++        s.beginStart(both)
++        assertEquals(1, s.slotFor(padB) { both })
++        val before = s.mapString()
++        // the self-restart: the same process object, a new start, B presses first this time
++        s.beginStart(listOf(padB, padA))
++        assertEquals(1, s.slotFor(padB) { both })
++        assertEquals(0, s.slotFor(padA) { both })
++        assertEquals(before, s.mapString())
++    }
++
++    @Test
++    fun aStickAxisRemoteAndAnAirMouseAreExcluded() {
++        val all = listOf(remote, airMouse, padB)
++        val s = PadSlots()
++        s.beginStart(all)
++        assertNull(s.slotFor(remote) { all })
++        assertNull(s.slotFor(airMouse) { all })
++        assertEquals(0, s.slotFor(padB) { all })   // the real pad is P1, not pushed to P2 / P3
++        assertEquals(1, s.map().size)
++        assertFalse(PadSlots.eligible(remote))
++        assertFalse(PadSlots.eligible(airMouse))
++        assertFalse(PadSlots.eligible(padA.copy(isVirtual = true)))
++        assertTrue(PadSlots.eligible(padA))
++    }
++
++    @Test
++    fun aLaterPadTakesTheLowestFreeSlotAndALeavingPadKeepsItsSlot() {
++        val s = PadSlots()
++        s.beginStart(listOf(padA, padB))
++        // A leaves; C joins: C takes slot 2 (the lowest free), A keeps 0
++        val now = listOf<PadDevice>(padB, padC)
++        assertEquals(2, s.slotFor(padC) { now })
++        s.beginStart(now)
++        assertEquals(listOf(0, 1, 2), s.map().map { it.slot })
++        // A comes back: still P1
++        assertEquals(0, s.slotFor(padA) { listOf(padA, padB, padC) })
++    }
++
++    @Test
++    fun aFifthPadGetsAGonePadsSlotOrNone() {
++        val pads = (1..5).map { Fake("pad-$it", it) }
++        val s = PadSlots()
++        s.beginStart(pads.take(4))
++        assertNull(s.slotFor(pads[4]) { pads })                         // all four connected: none, as today
++        val withoutSecond = pads.filter { it != pads[1] }
++        assertEquals(1, s.slotFor(pads[4]) { withoutSecond })            // the gone pad's slot
++        assertNull(s.map().firstOrNull { it.pad == PadSlots.key(pads[1]) })
++    }
++
++    @Test
++    fun theMapCarriesNoDescriptorOrName() {
++        val s = PadSlots()
++        s.beginStart(listOf(padA, padC))
++        val m = s.mapString()
++        assertTrue(m, Regex("^[0-3]:[0-9a-f]{6}:[a-z0-9]{2,12}(,[0-3]:[0-9a-f]{6}:[a-z0-9]{2,12}){0,3}$").matches(m))
++        assertFalse(m.contains("descriptor"))
++        assertEquals(listOf("sony", "microsoft"), s.map().map { it.cls })
++        assertEquals(6, PadSlots.key(padA).length)
++        assertEquals("", PadSlots().mapString())
++    }
++
++    @Test
++    fun theFlagIsStableOnly() {
++        assertTrue(PadSlotsFlag.parse("stable"))
++        assertTrue(PadSlotsFlag.parse(" stable "))
++        for (v in listOf(null, "", "1", "0", "Stable", "junk")) assertFalse(v.toString(), PadSlotsFlag.parse(v))
++        // off the device the property cannot be read: absent, today
++        assertFalse(PadSlotsFlag.fromSystem())
++    }
++}
+diff --git a/tests/pad_slots/test_pad_slots.py b/tests/pad_slots/test_pad_slots.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..1f2ef7d448a08b87221d3a5326c25642ee7c1395
+--- /dev/null
++++ b/tests/pad_slots/test_pad_slots.py
+@@ -0,0 +1,130 @@
++#!/usr/bin/env python3
++"""B34 (host): the client's stable slot map -- a `pad_slots` recovery row at each start, the map and the per-slot
++counters on the heartbeat row, a change row when it moves; no key = today (nothing imported, rows byte for byte).
++
++    python3 -m unittest discover -s tests/pad_slots -v
++
++`plugins/games.py` loaded alone (tests/guard_end's way), a real LinkDropRecovery on a temp dir, a fake controller.
++"""
++
++from __future__ import annotations
++
++import importlib.util
++import json
++import subprocess
++import sys
++import tempfile
++import types
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++
++from games import link_drop_recovery as ldr  # noqa: E402
++
++spec = importlib.util.spec_from_file_location("b34_games_plugin", ROOT / "companion" / "plugins" / "games.py")
++G = importlib.util.module_from_spec(spec)
++spec.loader.exec_module(G)
++
++TWO = "0:a1b2c3:sony,1:d4e5f6:sony"
++
++
++def plugin():
++    root = Path(tempfile.mkdtemp(prefix="b34_root_"))
++    rec = ldr.LinkDropRecovery(
++        root, pause_game=lambda: None, resume_game=lambda: None, save_recovery_state=lambda: {},
++        restart_encoder=lambda: {}, full_start_encoder=lambda: {}, stream_active=lambda: True,
++        end_session=lambda: None, client_packet_age_ms=lambda: 10.0, recovery_save_detail=lambda: {})
++
++    class Emu:
++        def status(self):
++            return {"active": True, "paused": True, "pid": 1}
++
++    class Ctl:
++        def status(self):
++            return {"updates_by_player": [120, 80, 0, 0]}
++
++    p = object.__new__(G.GamesPlugin)
++    p.PROJECT_ROOT = root
++    p._emulator = Emu()
++    p._recovery = rec
++    p._native_stream = types.SimpleNamespace(start=lambda **kw: {"active": True},
++                                             _session_io=types.SimpleNamespace(controller=Ctl()))
++    p._diagnostic_heartbeat_interval_ms = lambda: 2000
++    p._adaptive_bitrate_session_ended = lambda: None
++    return p, root, rec
++
++
++def rec_rows(rec):
++    path = rec.log_path()
++    return [json.loads(x) for x in path.read_text().splitlines()] if path.exists() else []
++
++
++def hb_rows(root):
++    path = root / "logs" / "games" / "native_stream_heartbeat.log"
++    return [json.loads(x) for x in path.read_text().splitlines()] if path.exists() else []
++
++
++HB = "sequence={}&interval_ms=2000&last_output_age_ms=16&rendered_frames=600&queued_frames=0&rx_packets=900&elapsed_ms=10000"
++
++
++class PadSlotsHost(unittest.TestCase):
++    def test_the_start_key_writes_one_row(self):
++        p, root, rec = plugin()
++        p.handle_post_request("native-stream-start", "port=48100&pad_slots=" + TWO, "127.0.0.1")
++        rows = [r for r in rec_rows(rec) if r["event"] == "pad_slots"]
++        self.assertEqual(len(rows), 1)
++        self.assertEqual(rows[0]["when"], "start")
++        self.assertEqual(rows[0]["count"], 2)
++        self.assertEqual(rows[0]["slots"], [{"slot": 0, "pad": "a1b2c3", "class": "sony"},
++                                            {"slot": 1, "pad": "d4e5f6", "class": "sony"}])
++
++    def test_the_heartbeat_key_goes_on_the_row_and_a_change_row_only_on_change(self):
++        p, root, rec = plugin()
++        p.handle_post_request("native-stream-start", "port=48100&pad_slots=0:a1b2c3:sony", "127.0.0.1")
++        p.handle_post_request("native-stream-heartbeat", HB.format(1) + "&pad_slots=0:a1b2c3:sony", "127.0.0.1")
++        p.handle_post_request("native-stream-heartbeat", HB.format(2) + "&pad_slots=" + TWO, "127.0.0.1")
++        p.handle_post_request("native-stream-heartbeat", HB.format(3) + "&pad_slots=" + TWO, "127.0.0.1")
++        hb = hb_rows(root)
++        self.assertEqual([len(r["pad_slots"]) for r in hb], [1, 2, 2])
++        self.assertEqual(hb[0]["updates_by_player"], [120, 80, 0, 0])
++        rows = [r for r in rec_rows(rec) if r["event"] == "pad_slots"]
++        self.assertEqual([r["when"] for r in rows], ["start", "change"])
++        self.assertEqual(rows[1]["heartbeat_sequence"], 2)
++
++    def test_a_bad_value_is_dropped_never_written(self):
++        p, root, rec = plugin()
++        bad = "0:SECRETNAME:sony"
++        p.handle_post_request("native-stream-heartbeat", HB.format(1) + "&pad_slots=" + bad, "127.0.0.1")
++        p.handle_post_request("native-stream-start", "port=48100&pad_slots=" + bad, "127.0.0.1")
++        for r in hb_rows(root) + rec_rows(rec):
++            self.assertNotIn("SECRETNAME", json.dumps(r))
++        self.assertTrue(hb_rows(root)[0]["pad_slots_bad"])
++        self.assertNotIn("pad_slots", hb_rows(root)[0])
++        for bad2 in ("0:a1b2c3:sony,0:d4e5f6:sony", "4:a1b2c3:sony", ",".join(["0:a1b2c3:x1"] * 5)):
++            self.assertIsNone(__import__("pad_slots").parse(bad2))
++        self.assertEqual(__import__("pad_slots").parse(""), [])
++
++    def test_no_key_is_today(self):
++        p, root, rec = plugin()
++        p.handle_post_request("native-stream-start", "port=48100", "127.0.0.1")
++        p.handle_post_request("native-stream-heartbeat", HB.format(1), "127.0.0.1")
++        self.assertEqual([r for r in rec_rows(rec) if r["event"] == "pad_slots"], [])
++        row = hb_rows(root)[0]
++        for k in ("pad_slots", "updates_by_player", "pad_slots_bad"):
++            self.assertNotIn(k, row)
++        self.assertIsNone(getattr(p, "_pad_slots_log", None))
++
++    def test_a_fresh_process_without_the_key_imports_nothing(self):
++        code = ("import sys, importlib.util; sys.path.insert(0, 'companion');"
++                "s = importlib.util.spec_from_file_location('g', 'companion/plugins/games.py');"
++                "m = importlib.util.module_from_spec(s); s.loader.exec_module(m);"
++                "print('pad_slots' in sys.modules)")
++        out = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True,
++                             env={"PATH": "/usr/bin:/bin"})
++        self.assertEqual(out.stdout.strip(), "False", out.stderr[-500:])
++
++
++if __name__ == "__main__":
++    unittest.main()

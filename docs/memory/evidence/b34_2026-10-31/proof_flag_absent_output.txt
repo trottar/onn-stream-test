@@ -1,0 +1,37 @@
+PrivyHub/app/src/main/java/streaming/NativeControllerSender.kt: added 11 lines, changed 0 hunk(s); without them == base: True
+   + @Volatile
+   + var padSlots: PadSlots? = null
+   + var connectedPads: () -> List<PadDevice> = { emptyList() }
+   + padSlots?.beginStart(connectedPads())
+   + padSlots?.let { return it.slotFor(AndroidPadDevice(device), connectedPads) }
+PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt: added 15 lines, changed 1 hunk(s); without them == base: True
+   changed: "?port=$VIDEO_PORT" + (if (restart != null) "&guard_end=1" else ""), 
+        -> "?port=$VIDEO_PORT" + (if (restart != null) "&guard_end=1" else "") + padSlotsQuery(),
+   + padSlots?.let { s -> it.padSlots = s; it.connectedPads = { AndroidPadDevice.connected() } }
+   + padSlots?.let { s ->
+   + root.put("pad_slots_mode", "stable")
+   + root.put("pad_slots", s.toJson())
+   + }
+   + private val padSlots: PadSlots? by lazy { if (PadSlotsFlag.fromSystem()) PadSlotsProcess.slots else null }
+   + private fun padSlotsQuery(): String =
+   + padSlots?.let { "&pad_slots=" + URLEncoder.encode(it.mapString(), "UTF-8") } ?: ""
+   + padSlotsQuery() +
+companion/plugins/games.py: added 14 lines, changed 0 hunk(s); without them == base: True
+   + if "pad_slots" in query:
+   + import pad_slots as _pad_slots
+   + if getattr(self, "_pad_slots_log", None) is None:
+   + self._pad_slots_log = _pad_slots.SlotsLog()
+   + self._pad_slots_log.heartbeat(self._recovery, self._first(query, "pad_slots"), values,
+   + _pad_slots.updates_by_player(self._native_stream._session_io.controller))
+   + if "pad_slots" in query:
+   + import pad_slots as _pad_slots
+   + if getattr(self, "_pad_slots_log", None) is None:
+   + self._pad_slots_log = _pad_slots.SlotsLog()
+   + self._pad_slots_log.start(self._recovery, self._first(query, "pad_slots"))
+companion/games/native_stream_heartbeat.py: added 5 lines, changed 0 hunk(s); without them == base: True
+   + for field in ("pad_slots", "updates_by_player", "pad_slots_bad"):
+   + if field in values:
+   + record[field] = values[field]
+== the host's no-key tests
+OK
+ABSENT = TODAY: PROVEN

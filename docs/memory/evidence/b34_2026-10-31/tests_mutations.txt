@@ -1,0 +1,16 @@
+B34 mutations, 2026-10-31T17:40:38Z, in /tmp/b_q31l_b34_scratch/mut (a copy of the item's copy)
+M1 (beginStart a no-op: slots by first input) gradle exit 1
+com.safeiot.privyhub.streaming.PadSlotsTest: 7 tests, 5 failures, 0 errors
+   FAIL theMapCarriesNoDescriptorOrName java.lang.AssertionError: 
+   FAIL twoPadsGetTheSameSlotsWhicheverIsListedOrPressedFirst java.lang.AssertionError: expected:<[1, 0]> but was:<[0, 1]>
+   FAIL aRestartKeepsTheSlots java.lang.AssertionError: expected:<1> but was:<0>
+   FAIL aFifthPadGetsAGonePadsSlotOrNone java.lang.AssertionError: expected null, but was:<0>
+   FAIL aLaterPadTakesTheLowestFreeSlotAndALeavingPadKeepsItsSlot java.lang.AssertionError: expected:<2> but was:<0>
+1
+M2 (no gamepad-button test) gradle exit 1
+com.safeiot.privyhub.streaming.PadSlotsTest: 7 tests, 1 failures, 0 errors
+   FAIL aStickAxisRemoteAndAnAirMouseAreExcluded java.lang.AssertionError: expected null, but was:<1>
+1
+M3 (a change row on every heartbeat): FAIL: test_the_heartbeat_key_goes_on_the_row_and_a_change_row_only_on_change (test_pad_slots.PadSlotsHost.test_the_heartbeat_key_goes_on_the_row_and_a_change_row_only_on_change)
+M3 (a change row on every heartbeat): Ran 5 tests in 0.144s
+M3 (a change row on every heartbeat): FAILED (failures=1)

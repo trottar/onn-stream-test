@@ -80,6 +80,12 @@ class RemoteUmbrella:
         self.ladder = rl.RemoteLadder() if LADDER in self.implied else None
         cap_ladder = self.ladder if LADDER in self.implied else getattr(self.live, "REMOTE_LADDER", None)
         self.cap = rc.RemoteCap(LINES[CAP], cap_ladder) if CAP in self.implied else None
+        # B32 (TRIP-R2 §5): an explicit cap beside the umbrella's own ladder acts on that ladder; with an explicit
+        # ladder line (or no explicit cap) B28's, unchanged. On a LAN session the import-time object is put back.
+        self.cap_on_umbrella_ladder = CAP in self.explicit and self.ladder is not None
+        self._cap_import_obj = getattr(self.live, "REMOTE_CAP", None)
+        if self.cap_on_umbrella_ladder:
+            self.cap = rc.RemoteCap(self.explicit[CAP], self.ladder)
         self.start = sr.StartRung(LINES[START]) if START in self.implied else None
         self.telemetry: Any = None
         self.telemetry_note = "not built yet (the first remote session builds it)"
@@ -100,6 +106,10 @@ class RemoteUmbrella:
     def _in_force(self, remote: bool) -> dict[str, Any]:
         out: dict[str, Any] = {}
         for k in LINES:
+            if k == CAP and self.cap_on_umbrella_ladder:
+                out[k] = {"in_force": bool(remote and self.cap is not None and self.cap.active),
+                          "how": f"explicit {self.explicit[k][:32]} on the umbrella's ladder"}
+                continue
             if k in self.explicit:
                 mod_obj = {LADDER: getattr(self.live, "REMOTE_LADDER", None), START: getattr(self.native, "START_RUNG", None),
                            CAP: getattr(self.live, "REMOTE_CAP", None),
@@ -209,7 +219,7 @@ class RemoteUmbrella:
             if policy is not None and rl.REMOTE_RUNG_KBPS in tuple(getattr(policy, "ladder", ())):
                 policy.ladder = tuple(k for k in policy.ladder if k != rl.REMOTE_RUNG_KBPS)
         if self.cap is not None and live.REMOTE_CAP is self.cap:
-            live.REMOTE_CAP = None
+            live.REMOTE_CAP = self._cap_import_obj if self.cap_on_umbrella_ladder else None
         if self.start is not None:
             if live.START_RUNG is self.start:
                 live.START_RUNG = None

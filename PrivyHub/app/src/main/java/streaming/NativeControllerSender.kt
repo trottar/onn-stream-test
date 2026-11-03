@@ -94,6 +94,11 @@ class NativeControllerSender(
     @Volatile
     var keyframeTick: (() -> ByteArray?)? = null
 
+    // B34: stable slots, gamepads only (debug.privyhub.pad_slots=stable via the activity; null = today)
+    @Volatile
+    var padSlots: PadSlots? = null
+    var connectedPads: () -> List<PadDevice> = { emptyList() }
+
     @Volatile
     private var running =
         false
@@ -114,6 +119,9 @@ class NativeControllerSender(
                 resetState(state)
             }
         }
+
+        // B34: the connected pads keep or take their slots (null = today)
+        padSlots?.beginStart(connectedPads())
 
         running = true
 
@@ -447,6 +455,9 @@ class NativeControllerSender(
     private fun playerForDevice(
         device: InputDevice
     ): Int? {
+        // B34: by the device's key, eligible pads only (null = today's first-input order)
+        padSlots?.let { return it.slotFor(AndroidPadDevice(device), connectedPads) }
+
         val descriptor =
             device.descriptor
                 ?.takeIf {
@@ -706,6 +717,15 @@ class NativeControllerSender(
             try {
                 socket.close()
             } catch (_: Exception) {
+            }
+        }
+    }
+
+    /** B32: every player's state neutral (no button held, sticks centred); the device map and the loop are kept. */
+    fun neutralize() {
+        synchronized(lock) {
+            for (state in states) {
+                resetState(state)
             }
         }
     }

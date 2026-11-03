@@ -1,0 +1,1922 @@
+diff --git a/tests/diag_check/test_diag_check.py b/tests/diag_check/test_diag_check.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..7d500de8739fe131cf3172331d422b7b171acb96
+--- /dev/null
++++ b/tests/diag_check/test_diag_check.py
+@@ -0,0 +1,63 @@
++#!/usr/bin/env python3
++"""B36: the diag check -- trip_check's six lines, the sixth now `privyhub-diag` (fakes only; no adb, no network).
++
++    python3 -m unittest discover -s tests/diag_check -v
++"""
++
++from __future__ import annotations
++
++import io
++import ipaddress
++import sys
++import unittest
++from contextlib import redirect_stdout
++from pathlib import Path
++from unittest import mock
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "tools"))
++import diag_check as dc  # noqa: E402
++import trip_check as tc  # noqa: E402
++
++V4 = str(ipaddress.ip_address(0xC6336414))
++
++
++class TheLines(unittest.TestCase):
++    def test_the_sixth_line_is_the_diag_keeper(self):
++        self.assertEqual(dc.UNIT, "privyhub-diag")
++        self.assertEqual(dc.line_keeper("2026-11-02T20:00:00Z | running | copies 3\n", "active"),
++                         "diag-keeper: 2026-11-02T20:00:00Z | running | copies 3; unit privyhub-diag active")
++        self.assertEqual(dc.line_keeper(None, "inactive"), "diag-keeper: not running (no status); unit privyhub-diag inactive")
++
++    def test_lines_one_to_five_are_trip_checks(self):
++        pf = {"manager": [], "environ": ["A=1"], "drop_in_x": True}
++        self.assertEqual(dc.line_adopted(pf, ["A=1"]), tc.line_adopted(pf, ["A=1"]))
++        self.assertEqual(dc.line_apk("ab" * 32, None, False), tc.line_apk("ab" * 32, None, False))
++        self.assertEqual(dc.line_overlay({"connected": True, "path": "direct"}, 2),
++                         tc.line_overlay({"connected": True, "path": "direct"}, 2))
++        self.assertEqual(dc.line_routing(['{"event": "token_issued", "routing_evidence": "lan"}']),
++                         tc.line_routing(['{"event": "token_issued", "routing_evidence": "lan"}']))
++        self.assertEqual(dc.line_band("Frequency: 5785, x"), tc.line_band("Frequency: 5785, x"))
++
++    def test_lines_with_every_source_down_read_the_root(self):
++        with mock.patch.object(dc, "e1_suite", side_effect=OSError("no suite")), \
++                mock.patch.object(dc.tlk, "overlay_state", side_effect=OSError("no provider")), \
++                mock.patch.object(dc, "tail_lines", side_effect=OSError("no audit")), \
++                mock.patch.object(dc, "unit_state", return_value=None):
++            got = dc.lines(Path("/nonexistent-diag-root"))
++        self.assertEqual([g.split(":")[0] for g in got], ["adopted", "apk", "overlay", "routing", "band", "diag-keeper"])
++        self.assertEqual(got[5], "diag-keeper: not running (no status); unit privyhub-diag ?")
++
++    def test_main_redacts(self):
++        fake = ["a", f"apk: odd {V4}", "c", "d", "e", "diag-keeper: running; unit privyhub-diag active"]
++        with mock.patch.object(dc, "lines", lambda root: fake), mock.patch.object(dc.tlk, "load_secrets", lambda: []):
++            buf = io.StringIO()
++            with redirect_stdout(buf):
++                dc.main([])
++        out = buf.getvalue().splitlines()
++        self.assertEqual(len(out), 6)
++        self.assertEqual(out[1], "apk: odd <ipv4>")
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/diag_keeper/test_diag_keeper.py b/tests/diag_keeper/test_diag_keeper.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..bb37c6c6637c318b4e6bd5720d4b7b6009efab64
+--- /dev/null
++++ b/tests/diag_keeper/test_diag_keeper.py
+@@ -0,0 +1,293 @@
++#!/usr/bin/env python3
++"""B36: the diagnostics keeper on a fake log dir that rotates (temp dirs under /tmp only; no stream, no network, no
++companion; the samplers, the journal and the peer count are fakes; the clock is fake -- the run's sleep advances it).
++The only deletions are the retention rule's, inside the tests' own /tmp roots.
++
++    python3 -m unittest discover -s tests/diag_keeper -v
++"""
++
++from __future__ import annotations
++
++import ipaddress
++import json
++import os
++import sys
++import tempfile
++import unittest
++from datetime import datetime, timezone
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path.insert(0, str(ROOT / "tools"))
++sys.path.insert(0, str(ROOT / "tests" / "diag_read"))
++import diag_keeper as dk  # noqa: E402
++import trip_log_keeper as tlk  # noqa: E402
++import diag_fixture as fx  # noqa: E402
++
++V4 = str(ipaddress.ip_address(0xC6336414))                       # a documentation-range address
++
++
++def unix(y, mo, d, h=0, mi=0, s=0):
++    return datetime(y, mo, d, h, mi, s, tzinfo=timezone.utc).timestamp()
++
++
++class Clock:
++    def __init__(self, t):
++        self.t = t
++        self.hooks = []
++
++    def __call__(self):
++        return self.t
++
++    def sleep(self, s):
++        self.t += max(s, 0.5)
++        for h in list(self.hooks):
++            h(self.t)
++
++
++class Base(unittest.TestCase):
++    def setUp(self):
++        self.tmp = Path(tempfile.mkdtemp(prefix="b36_keeper_"))
++        self.logs = self.tmp / "logs"
++        self.games = self.logs / "games"
++        (self.games / "stream_log_archive").mkdir(parents=True)
++        (self.games / "decoder_sessions").mkdir()
++        self.root = self.tmp / "privyhub_diag"
++        self.clock = Clock(unix(2026, 10, 30, 23, 50))
++        self.summaries = []
++
++    def keeper(self, summary="fake", copy_s=300.0, sample_s=60.0):
++        def fake(end):
++            self.summaries.append((self.clock(), end))
++            return {"end_utc": end, "players": 2, "note": f"from {V4}"}
++        return dk.DiagKeeper(self.root, logs_root=self.logs, summary=fake if summary == "fake" else summary,
++                             redactor=tlk.Redactor(lambda: []), overlay=lambda: {"connected": True, "path": "direct"},
++                             session=lambda: {"state": "idle"}, journal=lambda s, u: b"", peers=lambda: 1,
++                             clock=self.clock, sleep=self.clock.sleep, copy_s=copy_s, sample_s=sample_s)
++
++    def write(self, rel, text, mode="a"):
++        p = self.logs / rel
++        p.parent.mkdir(parents=True, exist_ok=True)
++        with open(p, mode) as fh:
++            fh.write(text)
++
++    def stop_at(self, t):
++        self.clock.hooks.append(lambda now: (self.root / "STOP").touch() if now >= t else None)
++
++    def joined(self, key):
++        out = b""
++        for day in sorted(os.listdir(self.root)):
++            d = self.root / day / "raw" / key
++            if dk.DAY.match(day) and d.is_dir():
++                for f in sorted(os.listdir(d)):
++                    out += (d / f).read_bytes()
++        return out
++
++
++class TheCopy(Base):
++    def test_day_dirs_roll_at_utc_midnight_without_losing_a_byte(self):
++        k = self.keeper()
++        written = []
++
++        def feed(now):
++            line = f'{{"at_utc": "{tlk.utc(now)}", "event": "x", "n": {len(written)}}}\n'
++            written.append(line)
++            self.write("games/native_stream_recovery.log", line)
++        self.write("games/native_stream_recovery.log", "before the start\n")
++        self.clock.hooks.append(feed)
++        self.stop_at(unix(2026, 10, 31, 0, 20))
++        self.assertEqual(k.run(), "STOP")
++        days = sorted(d for d in os.listdir(self.root) if dk.DAY.match(d))
++        self.assertEqual(days, ["2026-10-30", "2026-10-31"])
++        self.assertEqual(self.joined("games__native_stream_recovery.log").decode(), "".join(written))
++        self.assertTrue((self.root / "2026-10-30" / "manifest.sha256").read_text())
++        self.assertTrue((self.root / "2026-10-31" / "samples" / "overlay.jsonl").is_file())
++        self.assertIn("done (STOP)", (self.root / "status.txt").read_text())
++
++    def test_the_vod_logs_are_copied_and_redacted(self):
++        k = self.keeper()
++        self.stop_at(self.clock() + 400)
++        self.clock.hooks.append(lambda now: self.write("vod_range.jsonl", f'{{"peer": "{V4}", "bytes": 1}}\n')
++                                if not (self.logs / "vod_range.jsonl").exists() else None)
++        self.write("vod_client.jsonl", "")
++        self.clock.hooks.append(lambda now: self.write("vod_client.jsonl", '{"event": "vod_retry"}\n')
++                                if (self.logs / "vod_client.jsonl").stat().st_size == 0 else None)
++        k.run()
++        self.assertEqual(self.joined("vod_client.jsonl"), b'{"event": "vod_retry"}\n')
++        got = self.joined("vod_range.jsonl").decode()
++        self.assertNotIn(V4, got)
++        self.assertIn("<ipv4>", got)
++
++    def test_a_restart_of_the_unit_resumes_at_the_saved_offset(self):
++        self.write("games/native_stream_heartbeat.log", "old\n")
++        k = self.keeper()
++        self.write("games/native_stream_heartbeat.log", "")
++        self.clock.hooks.append(lambda now: self.write("games/native_stream_heartbeat.log", "a\n") if now < self.clock.t0 + 100 else None)
++        self.clock.t0 = self.clock()
++        self.stop_at(self.clock() + 200)
++        k.run()
++        first = self.joined("games__native_stream_heartbeat.log")
++        (self.root / "STOP").rename(self.tmp / "STOP.used")              # A's step to run again (a rename, not a deletion)
++        self.write("games/native_stream_heartbeat.log", "while down\n")   # written while the unit was stopped
++        self.clock.hooks = []
++        k2 = self.keeper()
++        self.stop_at(self.clock() + 400)
++        k2.run()
++        self.assertEqual(self.joined("games__native_stream_heartbeat.log"), first + b"while down\n")
++        self.assertNotIn(b"old", self.joined("games__native_stream_heartbeat.log"))
++
++    def test_a_new_file_after_the_restart_is_read_from_its_end(self):
++        self.write("games/native_stream_heartbeat.log", "a\n")
++        k = self.keeper()
++        self.stop_at(self.clock() + 100)
++        k.run()
++        (self.root / "STOP").rename(self.tmp / "STOP.used")
++        os.replace(self.games / "native_stream_heartbeat.log", self.games / "stream_log_archive" / "native_stream_heartbeat.log.1")
++        self.write("games/native_stream_heartbeat.log", "new file, before the second start\n")
++        self.clock.hooks = []
++        k2 = self.keeper()
++        self.clock.hooks.append(lambda now: self.write("games/native_stream_heartbeat.log", "after\n")
++                                if b"after" not in (self.games / "native_stream_heartbeat.log").read_bytes() else None)
++        self.stop_at(self.clock() + 400)
++        k2.run()
++        self.assertEqual(self.joined("games__native_stream_heartbeat.log"), b"after\n")
++
++    def test_a_sigterm_ends_with_a_final_copy_and_leaves_no_stop_file(self):
++        k = self.keeper()
++        self.clock.hooks.append(lambda now: self.write("games/native_stream_recovery.log", "x\n"))
++        self.clock.hooks.append(lambda now: setattr(k, "term", True) if now > self.clock.t0 + 30 else None)
++        self.clock.t0 = self.clock()
++        self.assertEqual(k.run(), "SIGTERM")
++        self.assertFalse((self.root / "STOP").exists())
++        self.assertTrue(self.joined("games__native_stream_recovery.log"))
++
++    def test_the_root_may_not_be_inside_the_repo(self):
++        with self.assertRaises(SystemExit):
++            dk.DiagKeeper(dk.REPO / "docs" / "privyhub_diag_test_never_created", logs_root=self.logs,
++                          redactor=tlk.Redactor(lambda: []))
++        self.assertFalse((dk.REPO / "docs" / "privyhub_diag_test_never_created").exists())
++
++
++class TheSummary(Base):
++    def test_a_session_ended_writes_one_row_90_s_later(self):
++        self.write("games/native_stream_recovery.log", "")
++        k = self.keeper()
++        ended = {}
++
++        def end(now):
++            if not ended and now > self.clock.t0 + 120:
++                ended["at"] = now
++                self.write("games/native_stream_recovery.log",
++                           json.dumps({"at_utc": tlk.utc(now), "event": "session_ended"}) + "\n")
++        self.clock.t0 = self.clock()
++        self.clock.hooks.append(end)
++        self.stop_at(self.clock() + 400)
++        k.run()
++        self.assertEqual(len(self.summaries), 1)
++        at, _ = self.summaries[0]
++        self.assertGreaterEqual(at - ended["at"], dk.SUMMARY_DELAY_S)
++        self.assertLess(at - ended["at"], dk.SUMMARY_DELAY_S + 2 * 60 + 1)
++        rows = [json.loads(x) for x in (self.root / "sessions.jsonl").read_text().splitlines()]
++        self.assertEqual(len(rows), 1)
++        self.assertEqual(rows[0]["players"], 2)
++        self.assertNotIn(V4, rows[0]["note"])
++
++    def test_not_written_before_the_delay(self):
++        self.write("games/native_stream_recovery.log", "")
++        k = self.keeper()
++        self.clock.hooks.append(lambda now: self.write("games/native_stream_recovery.log",
++                                                       json.dumps({"at_utc": tlk.utc(now), "event": "session_ended"}) + "\n")
++                                if not (self.games / "native_stream_recovery.log").stat().st_size else None)
++        self.stop_at(self.clock() + 61)
++        k.run()
++        self.assertEqual(self.summaries, [])
++        self.assertEqual(len(k.pending), 1)
++
++    def test_the_real_summary_from_the_live_logs(self):
++        fx.write_live(self.logs)
++        row = dk.live_summary(self.logs, self.root, fx.iso(fx.at(300)))
++        self.assertEqual((row["players"], row["slot_map"]), (2, {"0": "pad-a", "1": "pad-b"}))
++        # at session 1's summary the next session still runs: its report (the client's cause) has not come yet;
++        # B32's surface_lost row is there; session 2's own row carries the cause from its report
++        self.assertIsNone(row["restarts"][0]["trigger"])
++        self.assertEqual(row["restarts"][0]["surface_lost"][0]["reason"], "pause")
++        row2 = dk.live_summary(self.logs, self.root, fx.iso(fx.at(480)))
++        self.assertEqual(row2["restart_cause"]["trigger"], "surface")
++        self.assertIsNone(row["restart_cause"])
++        self.assertEqual(row["rewinds"], ["10:02:00 resume (no_loss)"])
++        self.assertEqual(row["rung_history"], ["10:03:00 4000->5000 in place"])
++        for col in ("start_utc", "length_s", "core", "title", "players", "slot_map", "path_class", "rung_history",
++                    "lost_post_fec", "rtt_p50_ms", "rtt_p95_ms", "rendered_fps_med", "resyncs", "pauses", "holds",
++                    "stalls", "restarts", "hitch_s", "hitch_s_per_10min", "silences_per_10min", "underruns"):
++            self.assertIn(col, row)
++        self.assertEqual(dk.live_summary(self.logs, self.root, "2026-10-30T12:00:00.000Z")["error"], "session not found")
++
++    def test_a_failing_summary_writes_its_error_and_the_keeper_goes_on(self):
++        self.write("games/native_stream_recovery.log", "")
++
++        def boom(end):
++            raise KeyError("x")
++        k = self.keeper(summary=boom)
++        self.clock.hooks.append(lambda now: self.write("games/native_stream_recovery.log",
++                                                       json.dumps({"at_utc": tlk.utc(now), "event": "session_ended"}) + "\n")
++                                if not (self.games / "native_stream_recovery.log").stat().st_size else None)
++        self.stop_at(self.clock() + 400)
++        self.assertEqual(k.run(), "STOP")
++        rows = [json.loads(x) for x in (self.root / "sessions.jsonl").read_text().splitlines()]
++        self.assertEqual(rows[0]["error"], "KeyError")
++
++
++class TheRetention(unittest.TestCase):
++    def test_only_whole_day_dirs_older_than_30_days(self):
++        root = Path(tempfile.mkdtemp(prefix="b36_retention_"))         # the only deletions: inside this /tmp root
++        outside = Path(tempfile.mkdtemp(prefix="b36_retention_target_"))
++        (outside / "keep.txt").write_text("k")
++        for name in ("2026-10-31", "2026-10-01", "2026-09-30", "2025-01-01"):
++            (root / name / "raw").mkdir(parents=True)
++            (root / name / "raw" / "f.txt").write_text("x")
++        (root / "notadate").mkdir()
++        (root / "2026-13-45").mkdir()                                   # date-shaped, not a date
++        (root / "2020-01-01").write_text("a file named like a date")
++        os.symlink(outside, root / "2020-01-02")                        # a symlink named like a date
++        (root / "nested").mkdir()
++        (root / "nested" / "2020-01-03").mkdir()
++        (root / "sessions.jsonl").write_text("{}\n")
++        removed = dk.retention(root, unix(2026, 10, 31, 12))
++        self.assertEqual(sorted(r["removed"] for r in removed), ["2025-01-01", "2026-09-30"])
++        self.assertEqual(sorted(os.listdir(root)), ["2020-01-01", "2020-01-02", "2026-10-01", "2026-10-31", "2026-13-45",
++                                                    "nested", "notadate", "retention.jsonl", "sessions.jsonl"])
++        self.assertTrue((outside / "keep.txt").is_file())
++        self.assertTrue((root / "nested" / "2020-01-03").is_dir())
++        rows = [json.loads(x) for x in (root / "retention.jsonl").read_text().splitlines()]
++        self.assertEqual({r["removed"]: r["files"] for r in rows}, {"2025-01-01": 1, "2026-09-30": 1})
++
++    def test_the_run_applies_it_at_the_start_and_at_the_date_change(self):
++        tmp = Path(tempfile.mkdtemp(prefix="b36_retention_run_"))
++        logs = tmp / "logs"
++        (logs / "games").mkdir(parents=True)
++        root = tmp / "diag"
++        for name in ("2026-09-29", "2026-09-30", "2026-10-01"):
++            (root / name).mkdir(parents=True)
++        clock = Clock(unix(2026, 10, 30, 23, 55))
++        k = dk.DiagKeeper(root, logs_root=logs, summary=lambda e: {}, redactor=tlk.Redactor(lambda: []),
++                          overlay=lambda: {}, session=lambda: {}, journal=lambda s, u: b"", peers=lambda: 0,
++                          clock=clock, sleep=clock.sleep)
++        self.assertTrue((root / "2026-09-30").is_dir())
++        clock.hooks.append(lambda now: (root / "STOP").touch() if now > unix(2026, 10, 31, 0, 10) else None)
++        k.run()
++        self.assertFalse((root / "2026-09-29").exists())                 # at the start (10-30: older than 30 days)
++        self.assertFalse((root / "2026-09-30").exists())                 # at the date change (10-31)
++        self.assertTrue((root / "2026-10-01").is_dir())
++        self.assertEqual(k.removed, 2)
++
++
++class TheUnit(unittest.TestCase):
++    def test_the_unit_text_is_the_file_in_tools(self):
++        self.assertEqual((ROOT / "tools" / "privyhub-diag.service").read_text(), dk.UNIT_TEXT)
++        self.assertIn("ExecStart=/usr/bin/python3 -B %h/Projects/onn-stream-test/tools/diag_keeper.py", dk.UNIT_TEXT)
++        self.assertIn("WantedBy=default.target", dk.UNIT_TEXT)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/diag_read/diag_fixture.py b/tests/diag_read/diag_fixture.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..83a7d6b754c7f276c82dd35637ed88a2ae762e72
+--- /dev/null
++++ b/tests/diag_read/diag_fixture.py
+@@ -0,0 +1,120 @@
++"""B36: a fake evening for diag_read / diag_keeper tests (temp dirs only; times UTC; no address, no title).
++
++Two client sessions of a PS1 golf-class title (game id 33df…): session 1 10:00:00-10:05:00 on remote-direct with a
++pad_slots row (two pads), a 300-ms uplink silence at 10:01:00, a 420-ms stall at 10:02:00 paused and released by
++`resume` (B33's why `no_loss`), an in-place step 4000 -> 5000 at 10:03:00 (B32), a surface_lost at 10:04:58 (B32), then
++the client's restart 10:05:00.5; session 2 10:05:01-10:08:00 at 4000, ended by the user (bye inside a control gap);
++the WAN row (RTT 120 / 400) closed after session 1; the next report carries the restart's cause (surface, 1500 / 2000);
++VOD client and range rows.
++"""
++
++from __future__ import annotations
++
++import json
++from datetime import datetime, timedelta
++from pathlib import Path
++
++DAY = "2026-10-30"
++T = datetime(2026, 10, 30, 10, 0, 0)
++GAME_LOG = "20261030-055900-game_ps1_33df0000aaaa1111.log"     # local EDT 05:59:00 = 09:59:00Z
++
++
++def iso(t: datetime) -> str:
++    return t.strftime("%Y-%m-%dT%H:%M:%S.") + f"{t.microsecond // 1000:03d}Z"
++
++
++def at(s: float) -> datetime:
++    return T + timedelta(seconds=s)
++
++
++def rec(s: float, event: str, **kw) -> str:
++    return json.dumps({"schema": "privyhub_native_stream_recovery_v1", "at_utc": iso(at(s)), "event": event,
++                       "state": kw.pop("state", "PLAYING"), **kw})
++
++
++def logs() -> dict[str, str]:
++    """log name -> its text (JSON lines)."""
++    r = [rec(-2, "remote_config", **{"class": "remote-direct"}), rec(0, "session_started"),
++         rec(1, "pad_slots", slots={"0": "pad-a", "1": "pad-b"}),
++         rec(120, "client_stall", age_ms=420.0), rec(120.1, "desync_pause", trigger="client_stall", age_ms=420.0),
++         rec(120.5, "input_release", via="stall_end", method="resume", why="no_loss"),
++         rec(298, "surface_lost", reason="pause", keys=["BUTTON_MODE"], bound_ms=10000, outcome="restart"),
++         rec(300, "session_ended"), rec(300.5, "restart_fast"), rec(301, "session_started"),
++         rec(479.9, "session_end_bye"), rec(480, "session_ended")]
++    lad, hb = [], []
++    for i in range(0, 481, 2):
++        kb = 4000 if i < 180 or i > 300 else 5000
++        lad.append(json.dumps({"at_utc": iso(at(i)), "event": "sample", "stream_kbps": kb, "state": "HOLD",
++                               "output_gap_ms": 250 if i == 200 else 10, "waiting_for_idr": False}))
++        if i == 180:
++            lad.append(json.dumps({"at_utc": iso(at(180)), "event": "transition", "from_kbps": 4000, "to_kbps": 5000,
++                                   "in_place": True, "path_class": "remote"}))
++    seq, base = 0, 0
++    for i in range(0, 481, 2):
++        if i == 302:
++            seq, base = 0, i
++        seq += 1
++        e = (i - base) * 1000
++        hb.append(json.dumps({"received_at_utc": iso(at(i)), "sequence": seq, "elapsed_ms": e,
++                              "rendered_frames": e * 60 // 1000 - (40 if i >= 100 and base == 0 else 0),
++                              "lost_packets": 40 if (i >= 150 and base == 0) else 0, "stream_resyncs": 0,
++                              "audio_underruns": 1 if i >= 10 else 0, "audio_prolonged_starvation_events": 0,
++                              "last_output_age_ms": 10, "link_rssi_dbm": -55,
++                              **({"pad_slots": {"0": "pad-a", "1": "pad-b"}} if base == 0 else {})}))
++    gaps = [json.dumps({"start_utc": iso(at(60)), "end_utc": iso(at(60.3)), "gap_ms": 300.0}),
++            json.dumps({"start_utc": iso(at(479.5)), "end_utc": iso(at(481)), "gap_ms": 1500.0})]
++    end1 = (at(300) - datetime(1970, 1, 1)).total_seconds()
++    wan = [json.dumps({"class": "clean", "closed_unix_s": end1 + 3, "measures": {"rtt_ms": {"value": {"p50": 120.0, "p95": 400.0}}}})]
++    vod_c = [json.dumps({"at_utc": iso(at(600)), "event": "vod_error", "error": "IO", "position_ms": 6000000}),
++             json.dumps({"at_utc": iso(at(602)), "event": "vod_retry", "attempt": 1}),
++             json.dumps({"at_utc": iso(at(604)), "event": "vod_resumed", "position_ms": 6000000})]
++    vod_r = [json.dumps({"at_utc": iso(at(590)), "range": "bytes=0-", "bytes": 1000, "duration_ms": 10, "closed": "reset"}),
++             json.dumps({"at_utc": iso(at(603)), "range": "bytes=500-", "bytes": 500, "duration_ms": 5, "closed": "eof"})]
++    return {"native_stream_recovery.log": "\n".join(r) + "\n", "adaptive_bitrate_shadow.jsonl": "\n".join(lad) + "\n",
++            "native_stream_heartbeat.log": "\n".join(hb) + "\n", "native_stream_ctrl_gaps.log": "\n".join(gaps) + "\n",
++            "wan_sessions.jsonl": "\n".join(wan) + "\n", "vod_client.jsonl": "\n".join(vod_c) + "\n",
++            "vod_range.jsonl": "\n".join(vod_r) + "\n"}
++
++
++def report() -> dict:
++    return {"schema": "x", "received_at_utc": iso(at(480.5)),
++            "report": {"restart_cause": {"trigger": "surface", "paused_before_loss_ms": 1500, "away_ms": 2000},
++                       "slow_events_top_gap": [], "stream_discontinuities": []}}
++
++
++TOP = ("wan_sessions.jsonl", "vod_client.jsonl", "vod_range.jsonl")
++
++
++def write_keeper_dir(d: Path, split: bool = True) -> Path:
++    """B30's layout: raw/<key>/<NNNNNN>_<UTC><ext>; each log in two chunks split mid-line when `split`."""
++    for name, text in logs().items():
++        key = name if name in TOP else f"games__{name}"
++        p = Path(d) / "raw" / key
++        p.mkdir(parents=True, exist_ok=True)
++        ext = "".join(Path(name).suffixes)
++        cut = len(text) // 2 + 7 if split else len(text)
++        (p / f"000000_20261030T100500Z{ext}").write_text(text[:cut])
++        (p / f"000001_20261030T101000Z{ext}").write_text(text[cut:])
++    rp = Path(d) / "raw" / "games__decoder_sessions"
++    rp.mkdir(parents=True, exist_ok=True)
++    (rp / "000000_native_decoder_20261030_100800_500.json").write_text(json.dumps(report()))
++    gp = Path(d) / "raw" / f"games__{GAME_LOG}"
++    gp.mkdir(parents=True, exist_ok=True)
++    (gp / "000000_20261030T100000Z.log").write_text("[INFO] fake\n")
++    sp = Path(d) / "samples"
++    sp.mkdir(parents=True, exist_ok=True)
++    (sp / "overlay.jsonl").write_text("".join(json.dumps({"at_utc": iso(at(m * 60)), "path": "direct", "connected": True}) + "\n"
++                                              for m in range(-1, 12)))
++    return Path(d)
++
++
++def write_live(logs_root: Path) -> Path:
++    """The live layout: logs/games/<log>, logs/<top>, decoder_sessions/, the game log."""
++    g = Path(logs_root) / "games"
++    (g / "decoder_sessions").mkdir(parents=True, exist_ok=True)
++    (g / "stream_log_archive").mkdir(exist_ok=True)
++    for name, text in logs().items():
++        (Path(logs_root) / name if name in TOP else g / name).write_text(text)
++    (g / "decoder_sessions" / "native_decoder_20261030_100800_500.json").write_text(json.dumps(report()))
++    (g / GAME_LOG).write_text("[INFO] fake\n")
++    return Path(logs_root)
+diff --git a/tests/diag_read/test_diag_read.py b/tests/diag_read/test_diag_read.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..497d6c80ecbe3a4e875e110ae3514e9672e932d2
+--- /dev/null
++++ b/tests/diag_read/test_diag_read.py
+@@ -0,0 +1,160 @@
++#!/usr/bin/env python3
++"""B36: diag_read on a fake keeper dir (temp dirs only; read-only on its sources; no live log, no network).
++
++    python3 -m unittest discover -s tests/diag_read -v
++"""
++
++from __future__ import annotations
++
++import hashlib
++import io
++import os
++import sys
++import tempfile
++import unittest
++from contextlib import redirect_stdout
++from datetime import datetime
++from pathlib import Path
++from zoneinfo import ZoneInfo
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path.insert(0, str(ROOT / "tools"))
++sys.path.insert(0, str(HERE))
++import diag_read as dr  # noqa: E402
++import diag_fixture as fx  # noqa: E402
++
++NY = ZoneInfo("America/New_York")
++
++
++def tree_hash(d: Path) -> str:
++    h = hashlib.sha256()
++    for p in sorted(Path(d).rglob("*")):
++        if p.is_file():
++            h.update(str(p.relative_to(d)).encode() + p.read_bytes())
++    return h.hexdigest()
++
++
++class TheRange(unittest.TestCase):
++    NOW = datetime(2026, 10, 31, 15, 0, 0)          # 11:00 EDT
++
++    def test_last_night_is_yesterday_17_to_today_08_local(self):
++        lab, a, b = dr.parse_range("last night", self.NOW, NY)
++        self.assertEqual((lab, a, b), ("last-night", datetime(2026, 10, 30, 21, 0), datetime(2026, 10, 31, 12, 0)))
++
++    def test_last_night_across_the_dst_change(self):
++        lab, a, b = dr.parse_range("Last  Night", datetime(2026, 11, 1, 18, 0), NY)   # Sunday 13:00 EST
++        self.assertEqual((a, b), (datetime(2026, 10, 31, 21, 0), datetime(2026, 11, 1, 13, 0)))
++
++    def test_today_is_local_midnight_to_now(self):
++        self.assertEqual(dr.parse_range("today", self.NOW, NY), ("today", datetime(2026, 10, 31, 4, 0), self.NOW))
++
++    def test_utc_ranges(self):
++        self.assertEqual(dr.parse_range("2026-10-30 21:00..05:00", self.NOW, NY)[1:],
++                         (datetime(2026, 10, 30, 21, 0), datetime(2026, 10, 31, 5, 0)))
++        self.assertEqual(dr.parse_range("2026-10-30 21:00..23:30", self.NOW, NY)[1:],
++                         (datetime(2026, 10, 30, 21, 0), datetime(2026, 10, 30, 23, 30)))
++        self.assertEqual(dr.parse_range("2026-10-30 21:00..2026-10-31 06:10", self.NOW, NY)[1:],
++                         (datetime(2026, 10, 30, 21, 0), datetime(2026, 10, 31, 6, 10)))
++        self.assertEqual(dr.parse_range("trip", self.NOW, NY), ("trip", None, None))
++        for bad in ("yesterday", "2026-10-30 21:00", "2026-10-31 05:00..2026-10-30 21:00"):
++            with self.assertRaises(ValueError):
++                dr.parse_range(bad, self.NOW, NY)
++
++
++class TheRead(unittest.TestCase):
++    def setUp(self):
++        self.tmp = Path(tempfile.mkdtemp(prefix="b36_read_"))
++        self.kd = fx.write_keeper_dir(self.tmp / fx.DAY)
++        self.before = tree_hash(self.kd)
++        logs = dr.Logs()
++        logs.add_keeper_dir(self.kd)
++        self.an = dr.Analysis(logs, datetime(2026, 10, 30, 9, 0), datetime(2026, 10, 30, 11, 0), NY)
++
++    def test_chunks_join_across_a_split_line_and_equal_the_live_layout(self):
++        live = dr.Logs()
++        live.add_live(fx.write_live(self.tmp / "logs"))
++        k = dr.Logs()
++        k.add_keeper_dir(self.kd)
++        for name in dr.LOGS.values():
++            self.assertEqual(k.data.get(name, b""), live.data.get(name, b""), name)
++        self.assertEqual(len(k.reports), 1)
++        self.assertEqual(k.game_logs, [fx.GAME_LOG])
++
++    def test_two_sessions_their_columns(self):
++        self.assertEqual(len(self.an.sessions), 2)
++        r1, r2 = (self.an.session_row(s) for s in self.an.sessions)
++        self.assertEqual((r1["title"], r1["core"], r1["path_class"]), ("PS1 golf", "beetle-psx-hw", "remote-direct"))
++        self.assertEqual((r1["players"], r1["slot_map"]), (2, {"0": "pad-a", "1": "pad-b"}))
++        self.assertEqual(r1["length_s"], 300)
++        self.assertEqual(r1["rung_history"], ["10:03:00 4000->5000 in place"])
++        self.assertEqual((r1["rtt_p50_ms"], r1["rtt_p95_ms"]), (120.0, 400.0))
++        self.assertEqual(r1["hitch_s"], 4)
++        self.assertEqual(r1["hitch_by"], {"R": 1, "C": 1, "G": 1, "L": 1})
++        self.assertEqual(r1["hitch_s_per_10min"], 8.0)
++        self.assertEqual((r1["silences"], r1["silences_user"]), (1, 0))
++        self.assertEqual(r1["stalls"], ["10:02:00 420.0ms"])
++        self.assertEqual(r1["pauses"], ["10:02:00 client_stall"])
++        self.assertEqual(r1["rewinds"], ["10:02:00 resume (no_loss)"])
++        self.assertEqual(r1["lost_post_fec"], 40)
++        self.assertEqual(r1["underruns"], 1)
++        self.assertEqual(r1["end_kind"], "client restart (restart_fast)")
++        self.assertEqual(r1["surface_lost"][0]["reason"], "pause")
++        self.assertEqual(len(r1["restarts"]), 1)
++        self.assertEqual((r2["end_kind"], r2["silences"], r2["silences_user"], r2["players"]), ("user exit (bye)", 0, 1, None))
++        self.assertEqual((r2["rtt_p50_ms"], r2["start_rung"]), (None, 4000))
++        self.assertEqual(r2["restart_cause"]["away_ms"], 2000)
++
++    def test_the_restart_and_its_cause(self):
++        d = self.an.restart_detail(self.an.restarts[0])
++        self.assertEqual((d["session"], d["title"], d["rung_before"], d["rung_after"]), (1, "PS1 golf", 5000, 4000))
++        self.assertEqual((d["last_stepup_dt_s"], d["last_stepup_in_session"]), (120, True))
++        self.assertEqual((d["trigger"], d["paused_ms"], d["away_ms"]), ("surface", 1500, 2000))
++        self.assertEqual(d["surface_lost"][0]["keys"], ["BUTTON_MODE"])
++
++    def test_the_markdown(self):
++        text = dr.render(self.an, "test", [datetime(2026, 10, 30, 10, 2, 0)], around_saves=True)
++        for h in ("## Sessions", "## Per 10 min", "## Every client restart, with its cause",
++                  "## Every rewind, pause, hold and stall", "## Ladder transitions", "## Pad slots (B34)", "## VOD (B35)",
++                  "## Per-second views (±60 s)", "### ±60 s around restart 2026-10-30T10:05:00Z",
++                  "### ±60 s around stall 2026-10-30T10:02:00Z", "### ±60 s around the time 2026-10-30T10:02:00Z"):
++            self.assertIn(h, text)
++        self.assertIn("via stall_end, method resume, why no_loss", text)
++        self.assertIn("| 10:03:00 | 4000 → 5000 | yes | remote |", text)
++        self.assertIn("vod_error", text)
++        self.assertIn("Range log: 2 requests, 1500 bytes; closes: eof 1, reset 1.", text)
++        self.assertEqual(tree_hash(self.kd), self.before)                # the source untouched
++
++    def test_main_writes_once_and_never_overwrites(self):
++        out = self.tmp / "reads" / "r.md"
++        with redirect_stdout(io.StringIO()):
++            self.assertEqual(dr.main(["2026-10-30", "09:00..11:00", "--source", str(self.kd), "--out", str(out)]), 0)
++        first = out.read_bytes()
++        self.assertIn(b"## Sessions", first)
++        with self.assertRaises(SystemExit), redirect_stdout(io.StringIO()), \
++                open(os.devnull, "w") as dn, unittest.mock.patch("sys.stderr", dn):
++            dr.main(["2026-10-30 09:00..11:00", "--source", str(self.kd), "--out", str(out)])
++        self.assertEqual(out.read_bytes(), first)
++        p1 = dr.new_path(self.tmp / "reads", "x")
++        p1.write_text("a")
++        self.assertNotEqual(dr.new_path(self.tmp / "reads", "x"), p1)
++
++    def test_trip_reads_the_trip_dir_span(self):
++        lab, an = dr.build("trip", datetime(2026, 10, 31), trip_dir=self.kd, tz=NY)
++        self.assertEqual(lab, "trip")
++        self.assertEqual((an.t0, an.t1), (datetime(2026, 10, 30, 9, 59), datetime(2026, 10, 30, 10, 12)))
++        self.assertEqual(len(an.sessions), 2)
++
++    def test_default_sources_are_the_day_dirs_that_overlap(self):
++        (self.tmp / "2026-09-01").mkdir()
++        (self.tmp / "notes").mkdir()
++        got = dr.keeper_dirs_for(self.tmp, datetime(2026, 10, 30, 9), datetime(2026, 10, 30, 11))
++        self.assertEqual(got, [self.kd])
++        lab, an = dr.build("2026-10-30 09:00..11:00", datetime(2026, 10, 31), root=self.tmp, tz=NY)
++        self.assertEqual(len(an.sessions), 2)
++
++
++import unittest.mock  # noqa: E402
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tools/diag_check.py b/tools/diag_check.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..8be67519c3fa3b062ec2a0a5bab746889e84f4d8
+--- /dev/null
++++ b/tools/diag_check.py
+@@ -0,0 +1,180 @@
++#!/usr/bin/env python3
++"""B36: the diag check -- B30's trip check, its sixth line now the permanent diagnostics keeper (`privyhub-diag`).
++
++    python3 tools/diag_check.py [--root ~/privyhub_diag]
++
++1. adopted: the adopted line count and e1_suite's host check (`manager`, `environ` == ADOPTED, every drop-in, no
++   e3_flag.conf, no e4 file), the failing fields by name;
++2. apk: on the pin or not (adb), or the pin with "not read (adb off-LAN)";
++3. overlay: connected, the path (direct / relayed / no-peer / none), online peers by count;
++4. routing: the newest `token_issued`'s routing class and time (logs/session_audit.jsonl);
++5. band: 5 GHz / 2.4 GHz with the frequency if adb reaches the onn, else "adb off-LAN";
++6. diag-keeper: its status line (<root>/status.txt) and whether its unit `privyhub-diag` is active.
++Every line goes through the log-keeper's redactor before it prints; a failing reader prints `unknown (<why>)`.
++Reads files, `adb` (devices, the APK's hash, `dumpsys wifi`), `tailscale status`, `systemctl --user is-active` and the
++local control API through e1_suite; changes nothing. Lines 1-5 are trip_check.py's, unchanged (tools/trip_check.py stays).
++Design: docs/memory/evidence/b36_2026-10-31/design_written_before_code.md (B30's: b30_2026-10-28/).
++"""
++
++from __future__ import annotations
++
++import argparse
++import importlib.util
++import json
++import re
++import subprocess
++import sys
++from pathlib import Path
++from typing import Any, Callable
++
++REPO = Path(__file__).resolve().parents[1]
++sys.path.insert(0, str(REPO / "tools"))
++import trip_log_keeper as tlk  # noqa: E402
++
++DIAG_ROOT = Path.home() / "privyhub_diag"
++AUDIT = REPO / "logs/session_audit.jsonl"
++UNIT = "privyhub-diag"
++HOST_FIELDS = ("drop_in_", "e3_dropin_absent", "e4_constraint_absent")
++
++
++def e1_suite() -> Any:
++    spec = importlib.util.spec_from_file_location("e1_suite_trip", REPO / "tools/e1_suite.py")
++    m = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(m)
++    return m
++
++
++# ---------------------------------------------------------------- the six readers (each takes its source)
++
++def line_adopted(preflight: dict[str, Any], adopted: list[str]) -> str:
++    bad = []
++    if preflight.get("manager") != []:
++        bad.append("manager flags")
++    env = list(preflight.get("environ") or [])
++    if env != sorted(adopted):
++        missing = [kv.split("=", 1)[0] for kv in adopted if kv not in env]
++        extra = [kv.split("=", 1)[0] for kv in env if kv not in adopted]
++        bad.append("environ" + (f" missing {', '.join(missing)}" if missing else "")
++                   + (f" extra {', '.join(extra)}" if extra else ""))
++    bad += [k for k, v in preflight.items() if k.startswith(HOST_FIELDS) and v is not True]
++    return f"adopted: {len(adopted)} lines; host check " + ("ok" if not bad else f"NOT ok ({'; '.join(bad)})")
++
++
++def line_apk(pin: str, installed: str | None, adb_up: bool) -> str:
++    short = pin[:8] + "…"
++    if not adb_up or installed is None:
++        return f"apk: pin {short}, not read (adb off-LAN)"
++    return f"apk: on the pin {short}" if installed == pin else f"apk: NOT on the pin (the pin {short})"
++
++
++def line_overlay(state: dict[str, Any], peers: int | None) -> str:
++    conn = "yes" if state.get("connected") else "no"
++    return f"overlay: connected {conn}, path {state.get('path') or 'none'}, peers {peers if peers is not None else '?'}"
++
++
++def line_routing(audit_tail: list[str]) -> str:
++    for line in reversed(audit_tail):
++        try:
++            r = json.loads(line)
++        except ValueError:
++            continue
++        if r.get("event") == "token_issued":
++            return f"routing: newest token_issued {r.get('routing_evidence') or '?'} at {r.get('t') or r.get('at_utc') or '?'}"
++    return "routing: no token_issued in the audit log"
++
++
++def line_band(wifi_line: str | None) -> str:
++    if not wifi_line:
++        return "band: adb off-LAN"
++    m = re.search(r"(?:^|, )Frequency: (\d+)", wifi_line)
++    if not m:
++        return "band: unknown (no frequency in the Wi-Fi read)"
++    f = int(m.group(1))
++    band = "5 GHz" if 4900 <= f < 5900 else "2.4 GHz" if 2400 <= f < 2500 else "6 GHz" if f >= 5925 else "?"
++    return f"band: {band} ({f} MHz)"
++
++
++def line_keeper(status: str | None, unit_active: str | None) -> str:
++    unit = f"unit {UNIT} {unit_active}" if unit_active else f"unit {UNIT} ?"
++    if not status:
++        return f"diag-keeper: not running (no status); {unit}"
++    return f"diag-keeper: {status.strip()}; {unit}"
++
++
++# ---------------------------------------------------------------- the real sources
++
++def tail_lines(p: Path, n_bytes: int = 256_000) -> list[str]:
++    with open(p, "rb") as fh:
++        fh.seek(0, 2)
++        size = fh.tell()
++        fh.seek(max(0, size - n_bytes))
++        return fh.read().decode("utf-8", errors="replace").splitlines()
++
++
++def wifi_line() -> str | None:
++    try:
++        out = subprocess.run(["adb", "shell", "dumpsys wifi | grep -m1 '^mWifiInfo'"], capture_output=True, text=True,
++                             timeout=20).stdout
++    except (OSError, subprocess.SubprocessError):
++        return None
++    return out.strip() or None
++
++
++def unit_state() -> str | None:
++    try:
++        return subprocess.run(["systemctl", "--user", "is-active", UNIT], capture_output=True, text=True,
++                              timeout=10).stdout.strip() or None
++    except (OSError, subprocess.SubprocessError):
++        return None
++
++
++def safe(fn: Callable[[], str], name: str) -> str:
++    try:
++        return fn()
++    except Exception as exc:
++        return f"{name}: unknown ({type(exc).__name__})"
++
++
++def lines(root: Path = DIAG_ROOT) -> list[str]:
++    e1: Any = None
++    pf: dict[str, Any] = {}
++
++    def adopted() -> str:
++        nonlocal e1, pf
++        e1 = e1_suite()
++        pf = e1.preflight()
++        return line_adopted(pf, list(e1.ADOPTED))
++
++    def apk() -> str:
++        up = bool(pf.get("adb"))
++        return line_apk(e1.EXPECT_APK, e1.apk_hash() if up else None, up)
++
++    def overlay() -> str:
++        return line_overlay(tlk.overlay_state(), tlk.online_peers())
++
++    def routing() -> str:
++        return line_routing(tail_lines(AUDIT))
++
++    def band() -> str:
++        return line_band(wifi_line() if pf.get("adb") else None)
++
++    def keeper() -> str:
++        p = Path(root).expanduser() / "status.txt"
++        return line_keeper(p.read_text() if p.is_file() else None, unit_state())
++
++    return [safe(adopted, "adopted"), safe(apk, "apk"), safe(overlay, "overlay"), safe(routing, "routing"),
++            safe(band, "band"), safe(keeper, "diag-keeper")]
++
++
++def main(argv: list[str] | None = None) -> int:
++    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
++    ap.add_argument("--root", type=Path, default=DIAG_ROOT)
++    a = ap.parse_args(argv)
++    red = tlk.Redactor()
++    for ln in lines(a.root):
++        print(red.apply(ln)[0])
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/tools/diag_keeper.py b/tools/diag_keeper.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..936c4c8fb237e57c899c3f8b9ecfeeaf5207d08b
+--- /dev/null
++++ b/tools/diag_keeper.py
+@@ -0,0 +1,288 @@
++#!/usr/bin/env python3
++"""B36: the always-on diagnostics keeper (`privyhub-diag`) -- B30's trip log-keeper made permanent, read-only on the hub.
++
++    python3 tools/diag_keeper.py [--root ~/privyhub_diag] [--copy-s 300] [--sample-s 60] [--once]
++
++- every --copy-s: B30's copies (G4-S4's logs in logs/games/ following rotation, the hub's wan_sessions /
++  session_audit / impairment rows, B35's vod_client / vod_range rows, each game log, the new decoder reports and audio
++  timing files, the companion's journal), redacted, into the UTC day's dir <root>/<YYYY-MM-DD>/raw/<log>/<NNNNNN>_<UTC><ext>
++  (never an existing name), with <day>/manifest.sha256 growing;
++- every --sample-s: the overlay and session samples into <day>/samples/*.jsonl, and the recovery log's new rows: each
++  `session_ended` schedules that session's summary row 90 s later into <root>/sessions.jsonl (diag_read's reader over
++  the live logs; G4-S4's columns, the slot map, the restarts and their triggers);
++- retention, the ONE deletion this tool makes: at the start and at each UTC date change, a dir directly under the
++  root named YYYY-MM-DD (a real dir, not a symlink) whose date is more than 30 days before today is removed whole;
++  one row per removal in <root>/retention.jsonl. Nothing else is deleted;
++- <root>/status.txt (one line), <root>/STOP (touch to end), <root>/state.json (the tails' positions, so a restart of
++  this unit resumes). No cap: it runs until STOP or the unit stops. No stream, no restart, no adb, no game; it holds
++  no file open between steps. The root may not be inside the repo.
++Reuses B30's redactor, tails and readers (tools/trip_log_keeper.py must stay in the tree).
++Design: docs/memory/evidence/b36_2026-10-31/design_written_before_code.md (hashed before this code).
++"""
++
++from __future__ import annotations
++
++import argparse
++import json
++import os
++import re
++import shutil
++import signal
++import sys
++import time
++from datetime import datetime, timedelta, timezone
++from pathlib import Path
++from typing import Any, Callable
++
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import trip_log_keeper as tlk  # noqa: E402
++import diag_read  # noqa: E402
++
++REPO = tlk.REPO
++DIAG_ROOT = Path.home() / "privyhub_diag"
++EXTRA_TOP_TAILS = ["vod_client.jsonl", "vod_range.jsonl"]       # B35's rows
++RETAIN_DAYS = 30
++SUMMARY_DELAY_S = 90.0
++SUMMARY_LOOKBACK_H = 6
++DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
++
++
++def day_of(t: float) -> str:
++    return datetime.fromtimestamp(t, timezone.utc).strftime("%Y-%m-%d")
++
++
++def retention(root: Path, now: float, days: int = RETAIN_DAYS) -> list[dict[str, Any]]:
++    """Remove whole day-dirs older than `days` directly under root. Returns one row per removal."""
++    root = Path(root)
++    today = datetime.fromtimestamp(now, timezone.utc).date()
++    out = []
++    if not root.is_dir():
++        return out
++    for name in sorted(os.listdir(root)):
++        p = root / name
++        if not DAY.match(name) or p.is_symlink() or not p.is_dir():
++            continue
++        try:
++            d = datetime.strptime(name, "%Y-%m-%d").date()
++        except ValueError:
++            continue
++        if d < today - timedelta(days=days):
++            n = sum(1 for x in p.rglob("*") if x.is_file())
++            shutil.rmtree(p)
++            out.append({"at_utc": tlk.utc(now), "removed": name, "files": n, "rule": f"older than {days} days"})
++    if out:
++        with open(root / "retention.jsonl", "a") as fh:
++            for r in out:
++                fh.write(json.dumps(r, sort_keys=True) + "\n")
++    return out
++
++
++def live_summary(logs_root: Path, root: Path, end_utc: str) -> dict[str, Any]:
++    """The sessions.jsonl row for the session whose end is `end_utc`, from the live logs (read-only)."""
++    end = diag_read.ts(end_utc)
++    logs = diag_read.Logs()
++    logs.add_live(logs_root, root)
++    an = diag_read.Analysis(logs, end - timedelta(hours=SUMMARY_LOOKBACK_H), end + timedelta(seconds=SUMMARY_DELAY_S + 60))
++    for s in an.sessions:
++        if s["end"] is not None and abs((s["end"] - end).total_seconds()) < 1.0:
++            return an.session_row(s)
++    return {"end_utc": end_utc, "error": "session not found"}
++
++
++class DiagKeeper(tlk.Keeper):
++    def __init__(self, root: Path, logs_root: Path = REPO / "logs", summary: Callable[[str], dict[str, Any]] | None = None,
++                 **kw: Any) -> None:
++        self.root = Path(root).expanduser().resolve()
++        if self.root == REPO or REPO in self.root.parents:
++            raise SystemExit(f"the diag root may not be inside the repo: {self.root}")
++        self.root.mkdir(parents=True, exist_ok=True)
++        super().__init__(self.root, float("inf"), 0.0, logs_root=logs_root, **kw)
++        self._summary = summary if summary is not None else (lambda end: live_summary(self.logs, self.root, end))
++        self.day = ""
++        self._roll(self.clock())
++        self.rec_tail: tlk.Tail | None = None
++        self.pending: list[tuple[float, str]] = []
++        self.summaries = 0
++        self.removed = 0
++        self.term = False                                       # SIGTERM (the unit stopping): end with a final copy
++
++    # -- the day-dir -----------------------------------------------------------------------------------------------
++    def _roll(self, now: float) -> bool:
++        d = day_of(now)
++        if d == self.day:
++            return False
++        self.day = d
++        self.out = self.root / d
++        self.raw, self.samples = self.out / "raw", self.out / "samples"
++        self.out.mkdir(parents=True, exist_ok=True)
++        return True
++
++    def stop_file(self) -> Path:
++        return self.root / "STOP"
++
++    def why_end(self) -> str | None:
++        if self.term:
++            return "SIGTERM"
++        return "STOP" if self.stop_file().exists() else None
++
++    def _status(self) -> None:
++        line = (f"{tlk.utc(self.clock())} | {self.phase} | copies {self.copies}, last {self.last_copy} | samples "
++                f"{self.samples_n}, last {self.last_sample} | sessions {self.summaries} | day {self.day} | "
++                f"retention {RETAIN_DAYS} d, removed {self.removed} | stop: touch {self.stop_file()}\n")
++        tmp = self.root / "status.txt.new"
++        tmp.write_text(line)
++        tmp.replace(self.root / "status.txt")
++
++    # -- the positions across a restart of this unit ------------------------------------------------------------------
++    def _save_state(self) -> None:
++        st = {"tails": {k: {"ino": t.ino, "off": t.off} for k, t in self.tails.items()},
++              "seen": {k: sorted(v) for k, v in self.seen.items()}, "jsince": self.jsince,
++              "pending": self.pending,
++              "rec": {"ino": self.rec_tail.ino, "off": self.rec_tail.off} if self.rec_tail else None}
++        tmp = self.root / "state.json.new"
++        tmp.write_text(json.dumps(st, sort_keys=True))
++        tmp.replace(self.root / "state.json")
++
++    def begin(self) -> None:
++        super().begin()
++        for n in EXTRA_TOP_TAILS:
++            self.tails[n] = tlk.Tail(self.logs / n, None)
++        self.rec_tail = tlk.Tail(self.games / "native_stream_recovery.log", self.arch)
++        try:
++            st = json.loads((self.root / "state.json").read_text())
++        except (OSError, ValueError):
++            return
++        for k, v in (st.get("tails") or {}).items():
++            t = self.tails.get(k)
++            if t is None and k.startswith("games/") and tlk.GAME_LOG.match(k[len("games/"):]):
++                t = self.tails[k] = tlk.Tail(self.games / k[len("games/"):], None)
++            if t is not None and v.get("ino") is not None and t.ino == v["ino"] and v.get("off", 0) <= self._size(t):
++                t.off = v["off"]                               # the same file: resume where the last run stopped
++        for k, v in (st.get("seen") or {}).items():
++            self.seen.setdefault(k, set()).update(v)
++        if st.get("jsince"):
++            self.jsince = min(int(st["jsince"]), self.jsince or int(st["jsince"]))
++        r = st.get("rec") or {}
++        if r.get("ino") is not None and self.rec_tail.ino == r["ino"] and r.get("off", 0) <= self._size(self.rec_tail):
++            self.rec_tail.off = r["off"]
++        self.pending = [tuple(x) for x in st.get("pending") or []]
++
++    @staticmethod
++    def _size(t: tlk.Tail) -> int:
++        try:
++            return t.live.stat().st_size
++        except OSError:
++            return 0
++
++    # -- the steps ------------------------------------------------------------------------------------------------------
++    def copy(self, final: bool = False) -> dict[str, Any]:
++        row = super().copy(final)
++        self._save_state()
++        return row
++
++    def sample(self) -> None:
++        super().sample()
++        self.watch()
++
++    def watch(self) -> None:
++        """New recovery rows: each session_ended schedules its summary; due summaries are written."""
++        now = self.clock()
++        if self.rec_tail is not None:
++            try:
++                data, _ = self.rec_tail.step()
++            except OSError:
++                data = b""
++            for r in diag_read.rows(data):
++                if r.get("event") == "session_ended" and r.get("at_utc"):
++                    self.pending.append((now + SUMMARY_DELAY_S, r["at_utc"]))
++        due = [p for p in self.pending if p[0] <= now]
++        self.pending = [p for p in self.pending if p[0] > now]
++        for _, end in due:
++            try:
++                row = dict(self._summary(end))
++            except Exception as exc:
++                row = {"end_utc": end, "error": type(exc).__name__}
++            row = {"written_at_utc": tlk.utc(now), **row}
++            text, _ = self.redactor.apply(json.dumps(row, sort_keys=True, default=str))
++            with open(self.root / "sessions.jsonl", "a") as fh:
++                fh.write(text + "\n")
++            self.summaries += 1
++        if due:
++            self._save_state()
++
++    def run(self, once: bool = False) -> str:
++        self.removed += len(retention(self.root, self.clock()))
++        self.begin()
++        self.phase = "running"
++        next_copy, next_sample = self.clock() + self.copy_s, self.clock()
++        why = None
++        while True:
++            why = self.why_end()
++            if why:
++                break
++            now = self.clock()
++            if self._roll(now):
++                self.removed += len(retention(self.root, now))
++            if now >= next_sample:
++                self.sample()
++                next_sample = now + self.sample_s
++            if now >= next_copy:
++                self.copy()
++                next_copy = now + self.copy_s
++            self._status()
++            if once:
++                why = "once"
++                break
++            self.sleep(max(0.5, min(next_copy, next_sample) - self.clock()))
++        self._roll(self.clock())
++        self.copy(final=True)
++        self.phase = f"done ({why})"
++        self._status()
++        return why
++
++
++UNIT_TEXT = """[Unit]
++Description=PrivyHub diagnostics keeper (B36; read-only copies of the hub's logs into ~/privyhub_diag, 30-day retention)
++After=privyhub-companion.service
++
++[Service]
++Type=simple
++WorkingDirectory=%h/Projects/onn-stream-test
++ExecStart=/usr/bin/python3 -B %h/Projects/onn-stream-test/tools/diag_keeper.py
++Restart=on-failure
++RestartSec=30
++Nice=10
++
++[Install]
++WantedBy=default.target
++"""
++
++
++def main(argv: list[str] | None = None) -> int:
++    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
++    ap.add_argument("--root", type=Path, default=DIAG_ROOT)
++    ap.add_argument("--copy-s", type=float, default=300.0)
++    ap.add_argument("--sample-s", type=float, default=60.0)
++    ap.add_argument("--once", action="store_true", help="one sample and one copy, then stop (a check)")
++    ap.add_argument("--unit", action="store_true", help="print the user unit's text and exit")
++    a = ap.parse_args(argv)
++    if a.unit:
++        print(UNIT_TEXT, end="")
++        return 0
++    holder: list[DiagKeeper] = []
++
++    def nap(s: float) -> None:                                   # sleeps in 1-s pieces so a SIGTERM ends it promptly
++        end = time.time() + s
++        while time.time() < end and not (holder and holder[0].term):
++            time.sleep(min(1.0, max(0.0, end - time.time())))
++
++    k = DiagKeeper(a.root, copy_s=a.copy_s, sample_s=a.sample_s, sleep=nap)
++    holder.append(k)
++    signal.signal(signal.SIGTERM, lambda *_: setattr(k, "term", True))
++    why = k.run(once=a.once)
++    print(f"diag keeper: done ({why}); {k.copies} copies, {k.samples_n} samples, {k.summaries} sessions; {k.root}")
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/tools/diag_read.py b/tools/diag_read.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..0c977c482fb70f2fd4073c2bdd70c445bb6a367d
+--- /dev/null
++++ b/tools/diag_read.py
+@@ -0,0 +1,756 @@
++#!/usr/bin/env python3
++"""B36: the one-line read -- per-session and per-10-min tables, every restart / rewind / pause with its cause, and the
+++-60-s per-second view, from the diagnostics keeper's copies (read-only).
++
++    python3 tools/diag_read.py "last night"
++    python3 tools/diag_read.py today
++    python3 tools/diag_read.py "2026-10-30 21:00..05:00"            (UTC; an end not after the start is the next day)
++    python3 tools/diag_read.py "2026-10-30 21:00..2026-10-31 06:10"
++    python3 tools/diag_read.py trip                                 (the trip keeper's dir, its whole span)
++        [--source DIR ...] [--live] [--root ~/privyhub_diag] [--around HH:MM:SS ...] [--around-saves] [--out FILE]
++
++Writes one Markdown file under docs/memory/evidence/reads/ (never an existing name) and prints its path.
++The logic is TRIP-R2's trip_r2_read.py (docs/memory/evidence/trip_r2_2026-10-31/scripts/), copied and parameterised:
++UX-R3's hitch definition, unchanged -- a UTC second is a hitch second if
++  R  the heartbeat interval ending in it rendered < 50 fps;
++  C  a host control gap >= 250 ms starts in it (not the user's own exit);
++  G  an output gap >= 200 ms is recorded in it (the ladder sample's output_gap_ms, or a client-report top-16 gap
++     placed by the client's elapsed clock);
++  L  the heartbeat interval ending in it lost >= 30 packets after FEC.
++Sources are opened for reading only. Titles appear as class + short tag only.
++Design: docs/memory/evidence/b36_2026-10-31/design_written_before_code.md (hashed before this code).
++"""
++
++from __future__ import annotations
++
++import argparse
++import glob
++import json
++import os
++import re
++import statistics
++import time
++from collections import defaultdict
++from datetime import datetime, timedelta, timezone, tzinfo
++from pathlib import Path
++from typing import Any, Iterable
++
++REPO = Path(__file__).resolve().parents[1]
++TRIP_DIR = REPO / "docs/memory/evidence/trip_2026-10-30"
++READS = REPO / "docs/memory/evidence/reads"
++DIAG_ROOT = Path.home() / "privyhub_diag"
++EPOCH = datetime(1970, 1, 1)
++DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
++GAME_LOG = re.compile(r"^(\d{8})-(\d{6})-game_([a-z0-9]+)_([0-9a-f]{4})[0-9a-f]*\.log$")
++
++# the trip's known titles (game id prefix -> class + tag); others read "<SYSTEM> <4-hex>"
++TAGS = {"04ff": "PS1 platformer", "ee3b": "SNES action-adventure", "2ef9": "PS1 first-person RPG",
++        "3699": "PS1 football (Blitz)", "7bf5": "PS1 brawler", "6d53": "PS1 kart racer", "33df": "PS1 golf",
++        "9f2b": "PS1 hockey A", "e2cd": "PS1 hockey B"}
++CORES = {"snes": "snes9x", "ps1": "beetle-psx-hw"}
++
++# the log names (as in logs/games/ or logs/) the reader uses
++LOGS = {"rec": "native_stream_recovery.log", "lad": "adaptive_bitrate_shadow.jsonl", "hb": "native_stream_heartbeat.log",
++        "gaps": "native_stream_ctrl_gaps.log", "fsz": "native_frame_sizes.jsonl", "host": "host_resource_samples.jsonl",
++        "wan": "wan_sessions.jsonl", "vod_client": "vod_client.jsonl", "vod_range": "vod_range.jsonl"}
++
++# ---------------------------------------------------------------- time
++
++
++def ts(s: str) -> datetime:
++    return datetime.fromisoformat(str(s).replace("Z", "+00:00")).replace(tzinfo=None)
++
++
++def sec(t: datetime) -> str:
++    return t.strftime("%Y-%m-%dT%H:%M:%S")
++
++
++def hms(t: datetime) -> str:
++    return t.strftime("%H:%M:%S")
++
++
++def unix(t: datetime) -> float:
++    return (t - EPOCH).total_seconds()
++
++
++def local_to_utc(naive: datetime, tz: tzinfo | None) -> datetime:
++    """A naive local time -> naive UTC (tz None: the hub's own zone, with its DST rules for that date)."""
++    aware = naive.astimezone(timezone.utc) if tz is None else naive.replace(tzinfo=tz).astimezone(timezone.utc)
++    return aware.replace(tzinfo=None)
++
++
++def utc_to_local(t: datetime, tz: tzinfo | None) -> datetime:
++    aware = t.replace(tzinfo=timezone.utc)
++    return (aware.astimezone() if tz is None else aware.astimezone(tz)).replace(tzinfo=None)
++
++
++def parse_range(text: str, now: datetime, tz: tzinfo | None = None) -> tuple[str, datetime | None, datetime | None]:
++    """(label, start UTC, end UTC); `trip` gives (trip, None, None): the span comes from the trip dir."""
++    s = " ".join(text.strip().lower().split())
++    if s == "trip":
++        return "trip", None, None
++    if s == "today":
++        loc = utc_to_local(now, tz)
++        return "today", local_to_utc(loc.replace(hour=0, minute=0, second=0, microsecond=0), tz), now
++    if s == "last night":
++        loc = utc_to_local(now, tz).replace(hour=0, minute=0, second=0, microsecond=0)
++        return ("last-night", local_to_utc(loc - timedelta(days=1) + timedelta(hours=17), tz),
++                local_to_utc(loc + timedelta(hours=8), tz))
++    m = re.fullmatch(r"(\d{4}-\d{2}-\d{2})[ t](\d{1,2}:\d{2}(?::\d{2})?)\s*\.\.\s*(?:(\d{4}-\d{2}-\d{2})[ t])?(\d{1,2}:\d{2}(?::\d{2})?)", s)
++    if not m:
++        raise ValueError(f"not a range: {text!r} (last night | today | trip | YYYY-MM-DD HH:MM..[YYYY-MM-DD ]HH:MM)")
++
++    def at(d: str, hm: str) -> datetime:
++        return datetime.strptime(f"{d} {hm}" + (":00" if hm.count(":") == 1 else ""), "%Y-%m-%d %H:%M:%S")
++
++    a = at(m.group(1), m.group(2))
++    b = at(m.group(3) or m.group(1), m.group(4))
++    if not m.group(3) and b <= a:
++        b += timedelta(days=1)
++    if b <= a:
++        raise ValueError("the end is not after the start")
++    return f"{a.strftime('%Y%m%dT%H%M')}-{b.strftime('%Y%m%dT%H%M')}", a, b
++
++# ---------------------------------------------------------------- the sources (read-only)
++
++
++def rows(data: bytes) -> list[dict[str, Any]]:
++    out = []
++    for line in data.decode("utf-8", errors="replace").splitlines():
++        line = line.strip()
++        if line.startswith("{"):
++            try:
++                r = json.loads(line)
++            except ValueError:
++                continue
++            if isinstance(r, dict):
++                out.append(r)
++    return out
++
++
++class Logs:
++    """Every log's text joined in order, from keeper-shaped dirs, TRIP-R2's copies/ shape, or the live logs/."""
++
++    def __init__(self) -> None:
++        self.data: dict[str, bytes] = defaultdict(bytes)
++        self.reports: list[dict[str, Any]] = []
++        self.game_logs: list[str] = []          # game log file names (they carry the launch time and the title)
++        self.overlay: list[dict[str, Any]] = []
++        self.sources: list[str] = []
++
++    # -- a keeper dir (B30's trip dir, or one of diag_keeper's day-dirs): raw/<key>/<NNNNNN>_<UTC><ext>
++    def add_keeper_dir(self, d: Path) -> None:
++        d = Path(d)
++        raw = d / "raw"
++        self.sources.append(f"keeper dir {d.name}")
++        names = {v: k for k, v in LOGS.items()}
++        if raw.is_dir():
++            for sub in sorted(os.listdir(raw)):
++                p = raw / sub
++                if not p.is_dir():
++                    continue
++                base = sub[len("games__"):] if sub.startswith("games__") else sub
++                files = sorted(f for f in os.listdir(p) if (p / f).is_file())
++                if base == "decoder_sessions":
++                    for f in files:
++                        self._report((p / f).read_bytes())
++                elif GAME_LOG.match(base):
++                    if base not in self.game_logs:
++                        self.game_logs.append(base)
++                elif base in names:
++                    for f in files:
++                        self.data[base] += (p / f).read_bytes()
++        ov = d / "samples" / "overlay.jsonl"
++        if ov.is_file():
++            self.overlay += rows(ov.read_bytes())
++
++    # -- TRIP-R2's copies/ shape (the joined logs; game_logs/; decoder_sessions/)
++    def add_copies_dir(self, d: Path) -> None:
++        d = Path(d)
++        self.sources.append(f"copies dir {d.name}")
++        for name in LOGS.values():
++            if (d / name).is_file():
++                self.data[name] += (d / name).read_bytes()
++        for f in sorted(glob.glob(str(d / "decoder_sessions" / "*.json"))):
++            self._report(Path(f).read_bytes())
++        for f in sorted(os.listdir(d / "game_logs")) if (d / "game_logs").is_dir() else []:
++            if GAME_LOG.match(f) and f not in self.game_logs:
++                self.game_logs.append(f)
++        if (d / "overlay.jsonl").is_file():
++            self.overlay += rows((d / "overlay.jsonl").read_bytes())
++
++    # -- the live logs (what the keeper's per-session summary reads)
++    def add_live(self, logs_root: Path, diag_root: Path | None = None) -> None:
++        logs_root = Path(logs_root)
++        games, arch = logs_root / "games", logs_root / "games" / "stream_log_archive"
++        self.sources.append("live logs")
++        for name in LOGS.values():
++            top = name in ("wan_sessions.jsonl", "vod_client.jsonl", "vod_range.jsonl")
++            for p in ([] if top else [arch / f"{name}.{i}" for i in (3, 2, 1)]) + [(logs_root if top else games) / name]:
++                try:
++                    self.data[name] += p.read_bytes()
++                except OSError:
++                    continue
++        d = games / "decoder_sessions"
++        for f in sorted(os.listdir(d)) if d.is_dir() else []:
++            try:
++                self._report((d / f).read_bytes())
++            except OSError:
++                continue
++        for f in sorted(os.listdir(games)) if games.is_dir() else []:
++            if GAME_LOG.match(f) and f not in self.game_logs:
++                self.game_logs.append(f)
++        if diag_root is not None and Path(diag_root).is_dir():
++            for day in sorted(os.listdir(diag_root)):
++                ov = Path(diag_root) / day / "samples" / "overlay.jsonl"
++                if DAY.match(day) and ov.is_file():
++                    self.overlay += rows(ov.read_bytes())
++
++    def _report(self, data: bytes) -> None:
++        try:
++            d = json.loads(data.decode("utf-8", errors="replace"))
++        except ValueError:
++            return
++        if isinstance(d, dict) and d.get("received_at_utc") and isinstance(d.get("report"), dict):
++            self.reports.append(d)
++
++    def get(self, key: str) -> list[dict[str, Any]]:
++        return rows(self.data.get(LOGS[key], b""))
++
++
++def keeper_dirs_for(root: Path, a: datetime, b: datetime) -> list[Path]:
++    """The diag root's day-dirs that overlap [a, b] (+-1 day: a chunk is named by its copy time)."""
++    out = []
++    if Path(root).is_dir():
++        for day in sorted(os.listdir(root)):
++            if not DAY.match(day) or not (Path(root) / day).is_dir():
++                continue
++            d = datetime.strptime(day, "%Y-%m-%d")
++            if a - timedelta(days=1) <= d <= b + timedelta(days=1):
++                out.append(Path(root) / day)
++    return out
++
++# ---------------------------------------------------------------- the analysis (TRIP-R2's, parameterised)
++
++
++class Analysis:
++    def __init__(self, logs: Logs, t0: datetime, t1: datetime, tz: tzinfo | None = None,
++                 tags: dict[str, str] | None = None) -> None:
++        self.t0, self.t1, self.tz = t0, t1, tz
++        self.tags = TAGS if tags is None else tags
++        w = self.inwin
++        self.rec = [r for r in logs.get("rec") if r.get("at_utc") and w(ts(r["at_utc"]))]
++        self.lad = [r for r in logs.get("lad") if r.get("at_utc") and w(ts(r["at_utc"]))]
++        self.hb = [r for r in logs.get("hb") if r.get("received_at_utc") and w(ts(r["received_at_utc"]))]
++        self.gaps = [r for r in logs.get("gaps") if r.get("start_utc") and w(ts(r["start_utc"]))]
++        self.fsz = {r["at_utc"][:19]: r for r in logs.get("fsz") if r.get("at_utc") and w(ts(r["at_utc"]))}
++        self.ovl = [r for r in logs.overlay if r.get("at_utc") and w(ts(r["at_utc"]))]
++        self.wan = logs.get("wan")
++        self.vod_client = [r for r in logs.get("vod_client") if self._t(r) and w(self._t(r))]
++        self.vod_range = [r for r in logs.get("vod_range") if self._t(r) and w(self._t(r))]
++        self.reports = sorted((d for d in logs.reports if w(ts(d["received_at_utc"]))),
++                              key=lambda d: d["received_at_utc"])
++        self.launches = []
++        for f in sorted(logs.game_logs):
++            m = GAME_LOG.match(f)
++            t = local_to_utc(datetime.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M%S"), tz)
++            tag = self.tags.get(m.group(4), f"{m.group(3).upper()} {m.group(4)}")
++            self.launches.append((t, tag, CORES.get(m.group(3), m.group(3))))
++        self.sources = list(logs.sources)
++        self._sessions()
++        self._seconds()
++
++    @staticmethod
++    def _t(r: dict[str, Any]) -> datetime | None:
++        for k in ("at_utc", "received_at_utc", "start_utc"):
++            if r.get(k):
++                try:
++                    return ts(r[k])
++                except ValueError:
++                    return None
++        return None
++
++    def inwin(self, t: datetime) -> bool:
++        return self.t0 <= t < self.t1
++
++    def title_at(self, t: datetime) -> tuple[str, str]:
++        cur = None
++        for lt, tag, core in self.launches:
++            if lt <= t + timedelta(seconds=60):
++                cur = (tag, core)
++        return cur or ("?", "?")
++
++    # -- client sessions (the recovery log)
++    def _sessions(self) -> None:
++        self.sessions: list[dict[str, Any]] = []
++        cur = None
++        last_cfg = None
++        for r in self.rec:
++            t, ev = ts(r["at_utc"]), r.get("event")
++            if ev == "remote_config":
++                last_cfg = r
++            elif ev == "session_started":
++                cur = {"start": t, "class": (last_cfg or {}).get("class"), "events": [], "end": None, "end_kind": None}
++                self.sessions.append(cur)
++            elif cur is not None:
++                cur["events"].append(r)
++                if ev == "session_end_bye":
++                    cur["bye"] = True
++                if ev == "session_ended" and cur["end"] is None:
++                    cur["end"] = t
++                if ev == "restart_fast" and cur.get("end_kind") is None and cur["end"] and (t - cur["end"]).total_seconds() < 2:
++                    cur["end_kind"] = "client restart (restart_fast)"
++                if ev == "gave_up_saved":
++                    cur["end_kind"] = "link loss: gave up, saved"
++                    cur["end"] = cur["end"] or t
++                if ev == "ended_after_link_loss":
++                    cur["end"] = cur["end"] or t
++        for s in self.sessions:
++            if s["end_kind"] is None:
++                s["end_kind"] = "user exit (bye)" if s.get("bye") else ("open" if s["end"] is None else "?")
++            s["tag"], s["core"] = self.title_at(s["start"])
++        self.restarts = [r for r in self.rec if r.get("event") == "restart_fast"]
++        self.transitions = [r for r in self.lad if r.get("event") == "transition"]
++        self.stalls = [r for r in self.rec if r.get("event") == "client_stall"]
++        self.segs: list[list[dict[str, Any]]] = []
++        for r in self.hb:
++            if "sequence" not in r or "elapsed_ms" not in r:
++                continue
++            if not self.segs or r["sequence"] <= self.segs[-1][-1]["sequence"]:
++                self.segs.append([])
++            self.segs[-1].append(r)
++
++    def seg_for(self, s: dict[str, Any]) -> list[dict[str, Any]]:
++        best = None
++        for g in self.segs:
++            a, b = ts(g[0]["received_at_utc"]), ts(g[-1]["received_at_utc"])
++            if a <= (s["end"] or a) and b >= s["start"] - timedelta(seconds=10):
++                ov = (min(b, s["end"] or b) - max(a, s["start"])).total_seconds()
++                if best is None or ov > best[0]:
++                    best = (ov, g)
++        return best[1] if best else []
++
++    @staticmethod
++    def offset(g: list[dict[str, Any]]) -> float | None:
++        """UTC - client elapsed, the median over the segment."""
++        return statistics.median([unix(ts(r["received_at_utc"])) - r["elapsed_ms"] / 1000 for r in g]) if g else None
++
++    def report_for(self, s: dict[str, Any]) -> dict[str, Any] | None:
++        best = None
++        for d in self.reports:
++            rt = ts(d["received_at_utc"])
++            if s["end"] and abs((rt - s["end"]).total_seconds()) < 5:
++                best = d
++        return best
++
++    def rtt_for(self, s: dict[str, Any]) -> tuple[Any, Any]:
++        """The WAN row closed between this session's end and the next session's start (G5-S1's close)."""
++        if not s["end"]:
++            return None, None
++        i = self.sessions.index(s)
++        a = unix(s["end"]) - 30
++        nxt = self.sessions[i + 1]["start"] if i + 1 < len(self.sessions) else s["end"] + timedelta(hours=2)
++        b = unix(nxt) + 5
++        for r in self.wan:
++            if a <= (r.get("closed_unix_s") or 0) <= b:
++                v = ((r.get("measures") or {}).get("rtt_ms") or {}).get("value") or {}
++                return v.get("p50"), v.get("p95")
++        return None, None
++
++    # -- per-second evidence
++    def _seconds(self) -> None:
++        hitch: dict[str, set[str]] = defaultdict(set)
++        row: dict[str, dict[str, Any]] = defaultdict(dict)
++        for g in self.segs:
++            prev = None
++            for r in g:
++                k = sec(ts(r["received_at_utc"]))
++                if prev is not None:
++                    dt = (r["elapsed_ms"] - prev["elapsed_ms"]) / 1000
++                    if dt > 0:
++                        def d(f: str) -> int:
++                            return (r.get(f) or 0) - (prev.get(f) or 0)
++                        fps = d("rendered_frames") / dt
++                        lost = d("lost_packets")
++                        row[k].update(fps=round(fps, 1), lost=lost, rssi=r.get("link_rssi_dbm"),
++                                      underruns=d("audio_underruns"), starv=d("audio_prolonged_starvation_events"),
++                                      resync=d("stream_resyncs"), out_age=r.get("last_output_age_ms"))
++                        if r.get("pad_slots"):
++                            row[k]["pad_slots"] = r["pad_slots"]
++                        if fps < 50:
++                            hitch[k].add("R")
++                        if lost >= 30:
++                            hitch[k].add("L")
++                prev = r
++        self.bye_times = [ts(r["at_utc"]) for r in self.rec if r.get("event") == "session_end_bye"]
++        for gp in self.gaps:
++            a, b = ts(gp["start_utc"]), ts(gp.get("end_utc") or gp["start_utc"])
++            user = any(a - timedelta(seconds=1) <= bt <= b for bt in self.bye_times)
++            k = sec(a)
++            row[k]["ctrl_gap_ms"] = max(row[k].get("ctrl_gap_ms", 0), gp.get("gap_ms") or 0)
++            row[k]["ctrl_gap_user"] = user
++            if not user:
++                hitch[k].add("C")
++        for r in self.lad:
++            k = r["at_utc"][:19]
++            if r.get("event") == "sample":
++                row[k].update(rung=r.get("stream_kbps"), lstate=r.get("state"), ogap=r.get("output_gap_ms"),
++                              wfi=r.get("waiting_for_idr"))
++                if (r.get("output_gap_ms") or 0) >= 200:
++                    hitch[k].add("G")
++            elif r.get("event") in ("transition", "session_ended_reset"):
++                row[k].setdefault("ladder_ev", []).append(
++                    r["event"] + (f" {r.get('from_kbps')}->{r.get('to_kbps')}" + (" in place" if r.get("in_place") else "")
++                                  if r["event"] == "transition" else ""))
++        for r in self.rec:
++            k = r["at_utc"][:19]
++            row[k].setdefault("rec", []).append(r.get("event", "?") + (f"({r.get('trigger')})" if r.get("trigger") else "")
++                                                + (f"[{r.get('why')}]" if r.get("why") else ""))
++        self.report_gaps: list[tuple[datetime, Any, dict[str, Any]]] = []
++        self.report_disc: list[tuple[datetime, Any, dict[str, Any]]] = []
++        for s in self.sessions:
++            d = self.report_for(s)
++            off = self.offset(self.seg_for(s))
++            if not d or off is None:
++                continue
++            rp = d["report"]
++            for x in rp.get("slow_events_top_gap", []) or []:
++                t = EPOCH + timedelta(seconds=off + x[0] / 1000)
++                self.report_gaps.append((t, x[6], s))
++                if x[6] >= 200:
++                    hitch[sec(t)].add("G")
++                    row[sec(t)]["report_gap_ms"] = max(row[sec(t)].get("report_gap_ms", 0), x[6])
++            for x in rp.get("stream_discontinuities", []) or []:
++                t = EPOCH + timedelta(seconds=off + x["elapsed_ms"] / 1000)
++                self.report_disc.append((t, x.get("type"), s))
++                row[sec(t)]["disc"] = x.get("type")
++        self.hitch, self.row = hitch, row
++
++    # -- counts for [a, b)
++    def summarize(self, a: datetime, b: datetime) -> dict[str, Any]:
++        hitch, row = self.hitch, self.row
++        out: dict[str, Any] = {}
++        hs = [k for k in hitch if a <= ts(k) < b]
++        out["hitch_s"] = len(hs)
++        out["hitch_by"] = {c: sum(1 for k in hs if c in hitch[k]) for c in "RCGL"}
++        gs = [g for g in self.gaps if a <= ts(g["start_utc"]) < b]
++        out["silences"] = sum(1 for g in gs if not any(ts(g["start_utc"]) - timedelta(seconds=1) <= bt <= ts(g.get("end_utc") or g["start_utc"])
++                                                       for bt in self.bye_times))
++        out["silences_user"] = len(gs) - out["silences"]
++        out["max_silence_ms"] = max([g.get("gap_ms") or 0 for g in gs], default=0)
++        lost = und = starv = res = 0
++        fpsl: list[float] = []
++        rssi: list[int] = []
++        for k, v in row.items():
++            if a <= ts(k) < b and "fps" in v:
++                lost += v["lost"]; und += v["underruns"]; starv += v["starv"]; res += v["resync"]
++                fpsl.append(v["fps"])
++                if v.get("rssi") is not None:
++                    rssi.append(v["rssi"])
++        out.update(lost=lost, underruns=und, starvation=starv, resyncs=res,
++                   fps_med=round(statistics.median(fpsl), 1) if fpsl else None,
++                   fps_min=round(min(fpsl), 1) if fpsl else None,
++                   rssi=f"{min(rssi)}..{max(rssi)}" if rssi else "")
++        out["stream_s"] = len({k for k, v in row.items() if a <= ts(k) < b and "fps" in v}) * 2
++        trs = [r for r in self.transitions if a <= ts(r["at_utc"]) < b]
++        out["transitions"] = [f"{hms(ts(r['at_utc']))} {r.get('from_kbps')}->{r.get('to_kbps')}" + (" in place" if r.get("in_place") else "")
++                              for r in trs]
++        out["stalls"] = [f"{hms(ts(r['at_utc']))} {r.get('age_ms')}ms" for r in self.stalls if a <= ts(r["at_utc"]) < b]
++        out["restarts"] = [hms(ts(r["at_utc"])) for r in self.restarts if a <= ts(r["at_utc"]) < b]
++        ev = [r for r in self.rec if a <= ts(r["at_utc"]) < b]
++        out["pauses"] = [f"{hms(ts(r['at_utc']))} {r.get('trigger')}" for r in ev if r.get("event") == "desync_pause"]
++        out["holds"] = sum(1 for r in ev if str(r.get("event", "")).startswith("input_hold"))
++        out["rewinds"] = [f"{hms(ts(r['at_utc']))} {r.get('method')}" + (f" ({r['why']})" if r.get("why") else "")
++                          for r in ev if r.get("event") == "input_release"]
++        out["surface_lost"] = [r for r in ev if r.get("event") == "surface_lost"]
++        out["pad_slots"] = [r for r in ev if r.get("event") == "pad_slots"]
++        out["byes"] = sum(1 for r in ev if r.get("event") == "session_end_bye")
++        out["resets"] = sum(1 for r in self.lad if r.get("event") == "session_ended_reset" and a <= ts(r["at_utc"]) < b)
++        rungs = sorted({v["rung"] for k, v in row.items() if a <= ts(k) < b and v.get("rung")})
++        out["rungs"] = "/".join(map(str, rungs))
++        return out
++
++    # -- one session as a sessions.jsonl row (G4-S4's columns + B34's slots + the restarts and their triggers)
++    def session_row(self, s: dict[str, Any]) -> dict[str, Any]:
++        end = s["end"] or s["start"]
++        m = self.summarize(s["start"], end + timedelta(seconds=1))
++        L = (end - s["start"]).total_seconds()
++        p50, p95 = self.rtt_for(s)
++        slot_map = None
++        for r in reversed(m["pad_slots"]):
++            slot_map = r.get("slots") or r.get("map") or r.get("pad_slots")
++            break
++        if slot_map is None:
++            for k in sorted(self.row, reverse=True):
++                if s["start"] <= ts(k) <= end and self.row[k].get("pad_slots"):
++                    slot_map = self.row[k]["pad_slots"]
++                    break
++        players = (len(slot_map) if isinstance(slot_map, (dict, list)) else None) if slot_map is not None else None
++        samples = [r for r in self.lad if r.get("event") == "sample" and s["start"] <= ts(r["at_utc"]) <= end]
++        per10 = (L / 600.0) if L > 0 else None
++        restarts = [self.restart_detail(r) for r in self.restarts
++                    if s["start"] <= ts(r["at_utc"]) <= end + timedelta(seconds=2)]
++        return {
++            "start_utc": sec(s["start"]) + "Z", "end_utc": (sec(s["end"]) + "Z") if s["end"] else None,
++            "length_s": int(L), "core": s["core"], "title": s["tag"], "players": players, "slot_map": slot_map,
++            "path_class": s["class"], "rung_history": m["transitions"], "rungs": m["rungs"],
++            "start_rung": samples[0].get("stream_kbps") if samples else None,
++            "lost_post_fec": m["lost"], "rtt_p50_ms": p50, "rtt_p95_ms": p95,
++            "rendered_fps_med": m["fps_med"], "rendered_fps_min": m["fps_min"], "resyncs": m["resyncs"],
++            "pauses": m["pauses"], "holds": m["holds"], "stalls": m["stalls"], "rewinds": m["rewinds"],
++            "restarts": restarts,
++            # the client reports the cause of the restart that STARTED a session in that session's own report
++            "restart_cause": (self.report_for(s) or {}).get("report", {}).get("restart_cause"),
++            "surface_lost": [{k: v for k, v in r.items() if k != "schema"} for r in m["surface_lost"]],
++            "end_kind": s["end_kind"], "resets": m["resets"],
++            "hitch_s": m["hitch_s"], "hitch_by": m["hitch_by"],
++            "hitch_s_per_10min": round(m["hitch_s"] / per10, 1) if per10 else None,
++            "silences": m["silences"], "silences_user": m["silences_user"],
++            "silences_per_10min": round(m["silences"] / per10, 1) if per10 else None,
++            "max_silence_ms": round(m["max_silence_ms"]), "underruns": m["underruns"], "starvation": m["starvation"],
++            "rssi": m["rssi"],
++        }
++
++    # -- a client restart and its cause
++    def restart_detail(self, r: dict[str, Any]) -> dict[str, Any]:
++        tt = ts(r["at_utc"])
++        sess = next((i for i, s in enumerate(self.sessions, 1)
++                     if s["end"] and 0 <= (tt - s["end"]).total_seconds() < 2), None)
++        if sess is None:
++            sess = next((i for i, s in enumerate(self.sessions, 1) if s["start"] <= tt <= (s["end"] or tt)), None)
++        before = [x for x in self.lad if x.get("event") == "sample" and x.get("stream_kbps") and ts(x["at_utc"]) < tt]
++        after = [x for x in self.lad if x.get("event") == "sample" and x.get("stream_kbps") and ts(x["at_utc"]) > tt]
++        ups = [x for x in self.transitions if ts(x["at_utc"]) <= tt and (x.get("to_kbps") or 0) > (x.get("from_kbps") or 0)]
++        last_up = ups[-1] if ups else None
++        in_sess = None
++        if last_up is not None and sess is not None:
++            in_sess = ts(last_up["at_utc"]) >= self.sessions[sess - 1]["start"]
++        # the client reports a restart's cause in the report of the session it started (posted at that session's end)
++        nxt_s = next((s for s in self.sessions if s["start"] >= tt - timedelta(seconds=1)), None)
++        rep = self.report_for(nxt_s) if nxt_s is not None else None
++        cause = rep["report"].get("restart_cause") if rep else None
++        lost = [x for x in self.rec if x.get("event") == "surface_lost"
++                and -15 <= (ts(x["at_utc"]) - tt).total_seconds() <= 5]
++        sil = [g for g in self.gaps if -20 <= (ts(g["start_utc"]) - tt).total_seconds() <= 0
++               and not any(ts(g["start_utc"]) - timedelta(seconds=1) <= bt <= ts(g.get("end_utc") or g["start_utc"]) for bt in self.bye_times)]
++        st = [x for x in self.stalls if -20 <= (ts(x["at_utc"]) - tt).total_seconds() <= 0]
++        title = self.sessions[sess - 1]["tag"] if sess else self.title_at(tt)[0]
++        return {
++            "at_utc": sec(tt) + "Z", "session": sess, "title": title,
++            "rung_before": before[-1]["stream_kbps"] if before else None,
++            "rung_after": after[0]["stream_kbps"] if after else None,
++            "last_stepup_dt_s": round((tt - ts(last_up["at_utc"])).total_seconds()) if last_up else None,
++            "last_stepup_in_session": in_sess,
++            "trigger": (cause or {}).get("trigger"), "paused_ms": (cause or {}).get("paused_before_loss_ms"),
++            "away_ms": (cause or {}).get("away_ms"), "create_to_start_ms": (cause or {}).get("create_to_start_ms"),
++            "surface_lost": [{k: v for k, v in x.items() if k not in ("schema", "at_utc")} for x in lost],
++            "silences_before_ms": [round(g.get("gap_ms") or 0) for g in sil],
++            "stalls_before_ms": [x.get("age_ms") for x in st],
++        }
++
++# ---------------------------------------------------------------- the Markdown
++
++
++def md_table(head: list[str], body: Iterable[list[Any]]) -> list[str]:
++    out = ["| " + " | ".join(head) + " |", "| " + " | ".join("---" for _ in head) + " |"]
++    for r in body:
++        out.append("| " + " | ".join("" if x is None else str(x).replace("|", "/") for x in r) + " |")
++    return out
++
++
++def seconds_view(an: Analysis, center: datetime, label: str) -> list[str]:
++    out = [f"### ±60 s around {label} {sec(center)}Z", ""]
++    body = []
++    for k in sorted(an.row):
++        kt = ts(k)
++        if center - timedelta(seconds=60) <= kt <= center + timedelta(seconds=60):
++            v = an.row[k]
++            f = an.fsz.get(k, {})
++            if not any(x in v for x in ("rec", "ladder_ev", "ctrl_gap_ms", "fps", "disc", "report_gap_ms", "rung")):
++                continue
++            body.append([hms(kt), "".join(sorted(an.hitch.get(k, ()))), v.get("fps", ""), v.get("lost", ""),
++                         v.get("out_age", ""), round(v["ctrl_gap_ms"]) if "ctrl_gap_ms" in v else "",
++                         "user" if v.get("ctrl_gap_user") else "", v.get("rung", ""), v.get("ogap", ""),
++                         v.get("report_gap_ms", ""), v.get("disc", ""), f.get("frames", ""),
++                         "; ".join(v.get("ladder_ev", [])), ", ".join(v.get("rec", []))])
++    out += md_table(["UTC", "hitch", "fps", "lost", "out age ms", "ctrl gap ms", "", "rung", "output gap ms",
++                     "report gap ms", "disc", "tx frames", "ladder", "recovery"], body) if body else ["(no rows)"]
++    return out + [""]
++
++
++def render(an: Analysis, label: str, around: list[datetime], around_saves: bool) -> str:
++    L = [f"# diag read — {label}", "",
++         f"Range (UTC): {sec(an.t0)}Z → {sec(an.t1)}Z. Sources: {'; '.join(an.sources) or 'none'}. "
++         f"Generated by tools/diag_read.py (read-only). Hitch: UX-R3's (R/C/G/L). Titles as class + tag.", ""]
++    L += ["## Sessions", ""]
++    body = []
++    for i, s in enumerate(an.sessions, 1):
++        r = an.session_row(s)
++        body.append([i, hms(s["start"]), hms(s["end"] or s["start"]), f"{r['length_s'] // 60}:{r['length_s'] % 60:02d}",
++                     r["title"], r["core"], (r["path_class"] or "").replace("remote-", ""),
++                     r["players"] if r["players"] is not None else "—",
++                     json.dumps(r["slot_map"], sort_keys=True) if r["slot_map"] is not None else "—",
++                     ", ".join(r["rung_history"]) or "—", r["end_kind"],
++                     ", ".join(f"{hms(ts(x['at_utc']))} {x['trigger'] or '?'}" for x in r["restarts"]) or "—",
++                     r["lost_post_fec"], f"{r['rendered_fps_med']} ({r['rendered_fps_min']})", r["resyncs"],
++                     ", ".join(r["stalls"]) or "—", ", ".join(r["pauses"]) or "—", r["holds"], ", ".join(r["rewinds"]) or "—",
++                     f"{r['hitch_s']} ({'/'.join(str(r['hitch_by'][c]) for c in 'RCGL')})", r["hitch_s_per_10min"],
++                     f"{r['silences']} ({r['silences_user']})", r["silences_per_10min"], r["underruns"], r["starvation"],
++                     r["rssi"], f"{r['rtt_p50_ms']}/{r['rtt_p95_ms']}" if r["rtt_p50_ms"] is not None else ""])
++    L += md_table(["#", "start", "end", "length", "title", "core", "path", "players", "slot map", "rungs (transitions)",
++                   "end", "restarts (trigger)", "loss post-FEC", "fps med (min)", "resyncs", "stalls", "pauses", "holds",
++                   "rewinds (method, why)", "hitch s (R/C/G/L)", "hitch s / 10 min", "silences (user)",
++                   "silences / 10 min", "underruns", "starvation", "RSSI", "RTT p50/p95"], body) if body else ["(no sessions)"]
++    L += ["", "## Per 10 min", ""]
++    body = []
++    t = an.t0.replace(minute=an.t0.minute - an.t0.minute % 10, second=0, microsecond=0)
++    while t < an.t1:
++        b = t + timedelta(minutes=10)
++        m = an.summarize(t, b)
++        started = sum(1 for s in an.sessions if t <= s["start"] < b)
++        if m["stream_s"] or started or m["restarts"]:
++            body.append([t.strftime("%m-%d %H:%M"), f"~{m['stream_s']}", started, len(m["restarts"]), m["byes"],
++                         len(m["transitions"]), len(m["stalls"]), len(m["pauses"]), len(m["rewinds"]),
++                         f"{m['hitch_s']} ({'/'.join(str(m['hitch_by'][c]) for c in 'RCGL')})", m["silences"],
++                         round(m["max_silence_ms"]), m["lost"], f"{m['fps_med']} ({m['fps_min']})", m["underruns"],
++                         m["starvation"], m["rungs"], m["rssi"]])
++        t = b
++    L += md_table(["10 min from", "stream s", "sessions started", "client restarts", "user exits", "transitions",
++                   "stalls", "pauses", "rewinds", "hitch s (R/C/G/L)", "silences", "max silence ms", "loss",
++                   "fps med (min)", "underruns", "starvation", "rungs", "RSSI"], body) if body else ["(no stream)"]
++    L += ["", "## Every client restart, with its cause", ""]
++    body = []
++    for r in an.restarts:
++        d = an.restart_detail(r)
++        body.append([hms(ts(d["at_utc"])), d["session"] if d["session"] else "(none PLAYING)", d["title"],
++                     f"{d['rung_before']} → {d['rung_after']}",
++                     (f"{d['last_stepup_dt_s']} s" + ("" if d["last_stepup_in_session"] else " (earlier session)"))
++                     if d["last_stepup_dt_s"] is not None else "—",
++                     d["trigger"] or "(no report)", d["paused_ms"], d["away_ms"],
++                     ", ".join(str(x) for x in d["silences_before_ms"]) or "—",
++                     ", ".join(str(x) for x in d["stalls_before_ms"]) or "—",
++                     "; ".join(json.dumps(x, sort_keys=True) for x in d["surface_lost"]) or "—"])
++    L += md_table(["restart", "session", "title", "rung before → after", "last step-up Δt", "client's trigger",
++                   "paused ms", "away ms", "uplink silences in the 20 s before (ms)", "stalls in the 20 s before (ms)",
++                   "surface_lost (B32)"], body) if body else ["(none)"]
++    L += ["", "## Every rewind, pause, hold and stall", ""]
++    body = []
++    for r in an.rec:
++        ev = r.get("event")
++        if ev in ("input_release", "desync_pause", "client_stall", "state_saved", "resumed", "gave_up_saved") or \
++                str(ev).startswith("input_hold"):
++            cause = {"input_release": f"via {r.get('via')}, method {r.get('method')}" + (f", why {r.get('why')}" if r.get("why") else "")
++                                      + (f", net {r.get('net_unattended_frames')} frames" if r.get("net_unattended_frames") is not None else ""),
++                     "desync_pause": f"trigger {r.get('trigger')}, age {r.get('age_ms')} ms",
++                     "client_stall": f"age {r.get('age_ms')} ms",
++                     "state_saved": f"kind {r.get('kind')}, slot {r.get('slot')}"}.get(ev, r.get("trigger") or r.get("via") or "")
++            body.append([hms(ts(r["at_utc"])), ev, cause])
++    L += md_table(["UTC", "event", "cause"], body) if body else ["(none)"]
++    L += ["", "## Ladder transitions", ""]
++    L += md_table(["UTC", "from → to", "in place (B32)", "path class"],
++                  [[hms(ts(r["at_utc"])), f"{r.get('from_kbps')} → {r.get('to_kbps')}", "yes" if r.get("in_place") else "no",
++                    r.get("path_class", "")] for r in an.transitions]) if an.transitions else ["(none)"]
++    pads = [r for r in an.rec if r.get("event") == "pad_slots"]
++    L += ["", "## Pad slots (B34)", ""]
++    L += md_table(["UTC", "slot map"], [[hms(ts(r["at_utc"])), json.dumps(r.get("slots") or r.get("map") or r.get("pad_slots"), sort_keys=True)]
++                                        for r in pads]) if pads else ["(no pad_slots rows: the client sent none)"]
++    L += ["", "## VOD (B35)", ""]
++    if an.vod_client:
++        L += md_table(["UTC", "event", "detail"], [[hms(Analysis._t(r)), r.get("event"),
++                                                    json.dumps({k: v for k, v in r.items() if k not in ("event", "at_utc", "schema")}, sort_keys=True)]
++                                                   for r in an.vod_client])
++    else:
++        L += ["(no VOD client rows)"]
++    if an.vod_range:
++        closes: dict[str, int] = defaultdict(int)
++        for r in an.vod_range:
++            closes[str(r.get("closed") or r.get("close") or r.get("how") or "?")] += 1
++        L += ["", f"Range log: {len(an.vod_range)} requests, {sum(int(r.get('bytes') or 0) for r in an.vod_range)} bytes; "
++                  f"closes: {', '.join(f'{k} {v}' for k, v in sorted(closes.items()))}."]
++    L += ["", "## Per-second views (±60 s)", ""]
++    centers = [(ts(r["at_utc"]), "restart") for r in an.restarts] + [(ts(r["at_utc"]), "stall") for r in an.stalls]
++    if around_saves:
++        centers += [(ts(r["at_utc"]), "state_saved") for r in an.rec if r.get("event") == "state_saved"]
++    centers += [(t, "the time") for t in around]
++    for c, lab in sorted(centers):
++        L += seconds_view(an, c, lab)
++    return "\n".join(L) + "\n"
++
++# ---------------------------------------------------------------- main
++
++
++def trip_span(trip_dir: Path) -> tuple[datetime, datetime]:
++    ts_all = [ts(r["at_utc"]) for r in rows((trip_dir / "samples" / "overlay.jsonl").read_bytes()) if r.get("at_utc")]
++    return min(ts_all), max(ts_all) + timedelta(seconds=60)
++
++
++def build(range_text: str, now: datetime, sources: list[Path] | None = None, live: bool = False,
++          root: Path = DIAG_ROOT, tz: tzinfo | None = None, logs_root: Path = REPO / "logs",
++          trip_dir: Path = TRIP_DIR) -> tuple[str, Analysis]:
++    label, a, b = parse_range(range_text, now, tz)
++    logs = Logs()
++    if label == "trip":
++        a, b = trip_span(trip_dir)
++        if not sources:
++            sources = [trip_dir]
++    for s in sources or []:
++        s = Path(s)
++        if (s / "raw").is_dir() or (s / "samples").is_dir():
++            logs.add_keeper_dir(s)
++        else:
++            logs.add_copies_dir(s)
++    if live:
++        logs.add_live(logs_root, root)
++    if not sources and not live:
++        for d in keeper_dirs_for(root, a, b):
++            logs.add_keeper_dir(d)
++    return label, Analysis(logs, a, b, tz)
++
++
++def parse_at(s: str, an: Analysis) -> datetime:
++    s = s.strip().replace("Z", "")
++    if "T" in s or " " in s:
++        return ts(s.replace(" ", "T"))
++    t = datetime.strptime(s if s.count(":") == 2 else s + ":00", "%H:%M:%S").time()
++    d = datetime.combine(an.t0.date(), t)
++    return d if d >= an.t0 else d + timedelta(days=1)
++
++
++def new_path(d: Path, stem: str) -> Path:
++    d.mkdir(parents=True, exist_ok=True)
++    p, n = d / f"{stem}.md", 1
++    while p.exists():
++        p, n = d / f"{stem}_{n}.md", n + 1
++    return p
++
++
++def main(argv: list[str] | None = None) -> int:
++    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
++    ap.add_argument("range", nargs="+", help='last night | today | trip | "YYYY-MM-DD HH:MM..HH:MM" (UTC)')
++    ap.add_argument("--source", action="append", type=Path, default=[], help="a keeper dir or a copies/ dir (repeatable)")
++    ap.add_argument("--live", action="store_true", help="read logs/ directly")
++    ap.add_argument("--root", type=Path, default=DIAG_ROOT)
++    ap.add_argument("--trip-dir", type=Path, default=TRIP_DIR, help="the trip keeper's dir (for `trip`)")
++    ap.add_argument("--around", action="append", default=[], help="HH:MM:SS or YYYY-MM-DDTHH:MM:SS (UTC), repeatable")
++    ap.add_argument("--around-saves", action="store_true", help="a per-second view around every state_saved row")
++    ap.add_argument("--out", type=Path, help="the Markdown file (never overwritten)")
++    a = ap.parse_args(argv)
++    now = datetime.now(timezone.utc).replace(tzinfo=None)
++    label, an = build(" ".join(a.range), now, a.source, a.live, a.root, trip_dir=a.trip_dir)
++    around = [parse_at(x, an) for x in a.around]
++    text = render(an, label, around, a.around_saves)
++    if a.out:
++        if a.out.exists():
++            ap.error(f"{a.out} exists; not overwritten")
++        a.out.parent.mkdir(parents=True, exist_ok=True)
++        out = a.out
++    else:
++        out = new_path(READS, f"diag_{label}_{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}")
++    with open(out, "x") as fh:
++        fh.write(text)
++    print(f"diag read: {len(an.sessions)} sessions, {len(an.restarts)} restarts, {len(an.stalls)} stalls -> {out}")
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/tools/privyhub-diag.service b/tools/privyhub-diag.service
+new file mode 100644
+index 0000000000000000000000000000000000000000..ecfd7dc6bb055e7850f29b0b83783115a2867e55
+--- /dev/null
++++ b/tools/privyhub-diag.service
+@@ -0,0 +1,14 @@
++[Unit]
++Description=PrivyHub diagnostics keeper (B36; read-only copies of the hub's logs into ~/privyhub_diag, 30-day retention)
++After=privyhub-companion.service
++
++[Service]
++Type=simple
++WorkingDirectory=%h/Projects/onn-stream-test
++ExecStart=/usr/bin/python3 -B %h/Projects/onn-stream-test/tools/diag_keeper.py
++Restart=on-failure
++RestartSec=30
++Nice=10
++
++[Install]
++WantedBy=default.target

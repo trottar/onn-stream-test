@@ -1,0 +1,29 @@
+== H1 range log: a reset / broken pipe recorded as complete
+FAIL: test_a_drop_mid_body_is_a_reset_or_broken_pipe_with_the_bytes_so_far (test_vod_log.RangeLogTest.test_a_drop_mid_body_is_a_reset_or_broken_pipe_with_the_bytes_so_far)
+Ran 9 tests in 2.627s
+FAILED (failures=1)
+== C1 client: the scheduled reconnect seeks to 0 instead of the drop's position
+gradle exit 1
+com.safeiot.privyhub.vod.VodRetryTest: 8 tests, 2 failures, 0 errors
+   FAIL aDropAtABytePositionResumesThereWithinTheBound java.lang.AssertionError: expected:<6600000> but was:<0>
+   FAIL theServerDownGivesTodaysErrorAfterTheBoundThenRetry java.lang.AssertionError
+== C2 client: past the bound the error is still swallowed (today's error never shown)
+gradle exit 1
+com.safeiot.privyhub.vod.VodRetryTest: 8 tests, 1 failures, 0 errors
+   FAIL theServerDownGivesTodaysErrorAfterTheBoundThenRetry java.lang.AssertionError: expected:<1> but was:<0>
+== H2 service: the route's guard reads the module global directly (not looked up), as first written
+-- tests/vod_log
+FAIL: test_the_service_blocks_are_guarded (test_vod_log.AbsentTest.test_the_service_blocks_are_guarded)
+Ran 9 tests in 2.559s
+FAILED (failures=1)
+-- tests/session_identity
+FAIL: test_flag_absent_and_legacy (test_handler_replay.HandlerReplay.test_flag_absent_and_legacy)
+FAIL: test_g3_s3_tv_epg_diagnostics_over_the_overlay (test_handler_replay.HandlerReplay.test_g3_s3_tv_epg_diagnostics_over_the_overlay)
+FAIL: test_v2_refusals_and_declared_target (test_handler_replay.HandlerReplay.test_v2_refusals_and_declared_target)
+Ran 88 tests in 0.178s
+FAILED (failures=3)
+-- tests/wan_telemetry
+FAIL: test_handler_requests (test_wan_telemetry.FlagAbsentByteForByte.test_handler_requests)
+FAIL: test_handler_with_flag (test_wan_telemetry.FlagAbsentByteForByte.test_handler_with_flag)
+Ran 18 tests in 0.110s
+FAILED (failures=2)

@@ -99,6 +99,8 @@ class LinkDropRecovery:
     _stall_owner: Any = None
     # B18: the session's end as the owner knows it (rewind_cores.SessionEnd; only PRIVYHUB_INPUT_HOLD_REWIND=state)
     _session_end: Any = None
+    # B33: no rewind without loss (rewind_needs_loss.Rule; the umbrella or PRIVYHUB_REWIND_NEEDS_LOSS=1). None = today.
+    _rewind_needs_loss: Any = None
 
     def __init__(
         self,
@@ -379,6 +381,10 @@ class LinkDropRecovery:
             )
         except (TypeError, ValueError):
             age_ms = -1
+
+        # B33: the heartbeat's loss counters, for the release's no-loss rule
+        if self._rewind_needs_loss is not None:
+            self._rewind_needs_loss.note_heartbeat(record)
 
         with self._lock:
             self._last_heartbeat = dict(record)

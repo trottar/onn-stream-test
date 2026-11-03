@@ -1,0 +1,35 @@
+
+========================================================================
+Starting PrivyHub Linux native-video backend v0.7
+Profile: native_game_720p60_reference 1280x720@60, 7000/7000 kbps H.264 VAAPI, GOP=15, BF=0
+Capture backend: exact X11 window via x11grab
+Capture: managed RetroArch window (pid=1564620, window_id=60817410, discovered=1920x1080)
+Window title: RetroArch Beetle PSX HW <ipv4> 82d8e05
+Video FEC: XOR 8+1; FFmpeg RTP -> loopback relay -> onn; encoder=7000 kbps
+========================================================================
+encoder argv: /usr/bin/ffmpeg -hide_banner -loglevel info -nostdin -vaapi_device /dev/dri/renderD128 -f x11grab -framerate 60 -window_id 60817410 -i :0 -vf scale=1280:720:force_original_aspect_ratio=decrease:flags=fast_bilinear,pad=1280:720:(ow-iw)/2:(oh-ih)/2:black,format=nv12,hwupload -r 60 -an -c:v h264_vaapi -profile:v high -b:v 4000k -maxrate 4000k -bufsize 4000k -max_frame_size 90000 -g 15 -bf 0 -payload_type 96 -f rtp rtp://127.0.0.1:48110?pkt_size=1200
+[x11grab @ 0x560c68ab8cc0] Stream #0: not enough frames to estimate rate; consider increasing probesize
+Input #0, x11grab, from ':0':
+  Duration: N/A, start: 1793400800.478052, bitrate: 3981312 kb/s
+  Stream #0:0: Video: rawvideo (BGR[0] / 0x524742), bgr0, 1920x1080, 3981312 kb/s, 60 fps, 1000k tbr, 1000k tbn
+Stream mapping:
+  Stream #0:0 -> #0:0 (rawvideo (native) -> h264 (h264_vaapi))
+Output #0, rtp, to 'rtp://127.0.0.1:48110?pkt_size=1200':
+  Metadata:
+    encoder         : Lavf61.7.103
+  Stream #0:0: Video: h264 (High), vaapi(tv, progressive), 1280x720, q=2-31, 4000 kb/s, 60 fps, 90k tbn
+      Metadata:
+        encoder         : Lavc61.19.101 h264_vaapi
+SDP:
+v=0
+o=- 0 0 IN IP4 127.0.0.1
+s=No Name
+c=IN IP4 127.0.0.1
+t=0 0
+a=tool:libavformat 61.7.103
+m=video 48110 RTP/AVP 96
+b=AS:4000
+a=rtpmap:96 H264/90000
+a=fmtp:96 packetization-mode=1
+
+frame=   30 fps=0.0 q=-0.0 size=     116KiB time=00:00:00.50 bitrate=1903.9kbits/s speed=   1x    frame=   60 fps= 60 q=-0.0 size=     364KiB time=00:00:01.00 bitrate=2981.6kbits/s speed=   1x    frame=   90 fps= 60 q=-0.0 size=     612KiB time=00:00:01.50 bitrate=3340.4kbits/s speed=   1x    frame=  120 fps= 60 q=-0.0 size=     859KiB time=00:00:02.00 bitrate=3520.0kbits/s speed=   1x    frame=  150 fps= 60 q=-0.0 size=    1107KiB time=00:00:02.50 bitrate=3627.4kbits/s speed=   1x    frame=  180 fps= 60 q=-0.0 size=    1355KiB time=00:00:03.00 bitrate=3699.0kbits/s speed=   1x    frame=  210 fps= 60 q=-0.0 size=    1602KiB time=00:00:03.50 bitrate=3750.6kbits/s speed=   1x    frame=  240 fps= 60 q=-0.0 size=    1850KiB time=00:00:04.00 bitrate=3789.2kbits/s speed=   1x    frame=  270 fps= 60 q=-0.0 size=    2098KiB time=00:00:04.50 bitrate=3819.3kbits/s speed=   1x    frame=  300 fps= 60 q=-0.0 size=    2346KiB time=00:00:05.00 bitrate=3843.3kbits/s speed=   1x    frame=  330 fps= 60 q=-0.0 size=    2593KiB time=00:00:05.50 bitrate=3862.9kbits/s speed=   1x    frame=  360 fps= 60 q=-0.0 size=    2899KiB time=00:00:06.00 bitrate=3958.7kbits/s speed=   1x    frame=  390 fps= 60 q=-0.0 size=    3161KiB time=00:00:06.50 bitrate=3983.5kbits/s speed=   1x    frame=  420 fps= 60 q=-0.0 size=    3463KiB time=00:00:07.00 bitrate=4052.1kbits/s speed=   1x    frame=  450 fps= 60 q=-0.0 size=    3648KiB time=00:00:07.50 bitrate=3984.3kbits/s speed=   1x    frame=  480 fps= 60 q=-0.0 size=    3911KiB time=00:00:08.00 bitrate=4004.5kbits/s speed=   1x    frame=  510 fps= 60 q=-0.0 size=    4155KiB time=00:00:08.50 bitrate=4004.5kbits/s speed=   1x    frame=  540 fps= 60 q=-0.0 size=    4511KiB time=00:00:09.00 bitrate=4106.3kbits/s speed=   1x    frame=  570 fps= 60 q=-0.0 size=    4662KiB time=00:00:09.50 bitrate=4019.9kbits/s speed=   1x    frame=  600 fps= 60 q=-0.0 size=    4958KiB time=00:00:10.00 bitrate=4061.6kbits/s speed=   1x    frame=  630 fps= 60 q=-0.0 size=    5168KiB time=00:00:10.50 bitrate=4032.3kbits/s speed=   1x    frame=  660 fps= 60 q=-0.0 size=    5439KiB time=00:00:11.00 bitrate=4050.6kbits/s speed=   1x    frame=  690 fps= 60 q=-0.0 size=    5658KiB time=00:00:11.50 bitrate=4030.4kbits/s speed=   1x    frame=  720 fps= 60 q=-0.0 size=    5938KiB time=00:00:12.00 bitrate=4053.7kbits/s speed=   1x    frame=  750 fps= 60 q=-0.0 size=    6156KiB time=00:00:12.50 bitrate=4034.4kbits/s speed=   1x    

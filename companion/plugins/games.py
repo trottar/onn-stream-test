@@ -3794,6 +3794,14 @@ class GamesPlugin:
                     if field in query:
                         values[field] = self._parse_int(self._first(query, field), -1)
 
+            # B34: the client's stable slot map (only a client with debug.privyhub.pad_slots=stable sends it)
+            if "pad_slots" in query:
+                import pad_slots as _pad_slots
+                if getattr(self, "_pad_slots_log", None) is None:
+                    self._pad_slots_log = _pad_slots.SlotsLog()
+                self._pad_slots_log.heartbeat(self._recovery, self._first(query, "pad_slots"), values,
+                                              _pad_slots.updates_by_player(self._native_stream._session_io.controller))
+
             if not values:
                 raise ValueError(
                     "Missing native stream heartbeat fields"
@@ -3807,6 +3815,11 @@ class GamesPlugin:
             # B14: a transition of the client's link notice, in the recovery log (the user was told)
             if _link_notice is not None and "link_notice" in values:
                 self._link_notice_log.note(self._recovery, values["link_notice"], values)
+
+            # B32: the client's surface_lost row (only a debug.privyhub.surface_hold client sends it; no key = today)
+            if "surface_lost" in query:
+                import surface_lost_row as _surface_lost_row
+                _surface_lost_row.note(self._recovery, self._first(query, "surface_lost"), values.get("sequence"))
 
             # D-BASE-R3 reads it; D-BASE-R2 only recorded it.
             heartbeat = result.get("heartbeat")
@@ -3900,6 +3913,12 @@ class GamesPlugin:
             # B28: this session's WAN lines by its path class, before the start (absent: today's)
             if _remote_umbrella is not None and getattr(self, "_remote_umbrella", None) is not None:
                 self._remote_umbrella.note_stream_start(client_ip)
+            # B34: the client's stable slot map at this start (only a client with pad_slots=stable sends it)
+            if "pad_slots" in query:
+                import pad_slots as _pad_slots
+                if getattr(self, "_pad_slots_log", None) is None:
+                    self._pad_slots_log = _pad_slots.SlotsLog()
+                self._pad_slots_log.start(self._recovery, self._first(query, "pad_slots"))
             try:
                 if not game_status.get("paused", False):
                     try:

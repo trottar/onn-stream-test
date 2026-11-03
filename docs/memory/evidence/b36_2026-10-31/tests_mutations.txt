@@ -1,0 +1,6 @@
+mutation retention_off_by_one (tools/diag_keeper.py: 'if d < today - timedelta(days=days):' -> 'if d <= today - timedelta(days=days):'), suite tests/diag_keeper: Ran 13 tests in 0.059s FAILED (failures=2) 
+mutation summary_delay_ignored (tools/diag_keeper.py: 'SUMMARY_DELAY_S = 90.0' -> 'SUMMARY_DELAY_S = 0.0'), suite tests/diag_keeper: Ran 13 tests in 0.060s FAILED (failures=1) 
+mutation symlink_followed (tools/diag_keeper.py: 'if not DAY.match(name) or p.is_symlink() or not p.is_dir():' -> 'if not DAY.match(name) or not p.is_dir():'), suite tests/diag_keeper: Ran 13 tests in 0.059s FAILED (errors=1) 
+mutation in_place_dropped (tools/diag_read.py: '+ (" in place" if r.get("in_place") else "")
+                              for r in trs]' -> 'for r in trs]'), suite tests/diag_read: Ran 11 tests in 0.108s FAILED (failures=1) 
+mutation cause_from_first_report (tools/diag_read.py: 'rep = self.report_for(nxt_s) if nxt_s is not None else None' -> 'rep = None'), suite tests/diag_read: Ran 11 tests in 0.109s FAILED (failures=1) 

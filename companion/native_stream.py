@@ -70,6 +70,12 @@ if (os.environ.get("PRIVYHUB_ENCODER_RC") or "").strip():
 
     ENCODER_RC = _encoder_rc.shared_from_environ(os.environ)
 
+# B32: PRIVYHUB_STEP_IN_PLACE=1 -> a ladder step is a new encoder spliced onto the same stream by the relay (no SSRC
+# change, one IDR; h264_vaapi has no runtime rate control). Absent = today: nothing imported; the step restarts.
+STEP_IN_PLACE = None
+if (os.environ.get("PRIVYHUB_STEP_IN_PLACE") or "").strip() == "1":
+    import step_in_place as STEP_IN_PLACE
+
 
 class NativeStreamError(RuntimeError):
     pass
@@ -2618,6 +2624,16 @@ class NativeStreamManager:
                 or int(self._active_bitrate_kbps) in LINUX_RUNG_LEVELS
             )
             if not sized:
+                if STEP_IN_PLACE is not None and self._linux_host():   # B32: the same stream
+                    try:
+                        return STEP_IN_PLACE.run_in_place_transition(self, target)
+                    except NativeStreamError:
+                        raise
+                    except Exception as exc:
+                        raise NativeStreamError(
+                            "B32 in-place level transition failed: "
+                            + type(exc).__name__ + ": " + str(exc)
+                        ) from exc
                 return self.diagnostic_c3_validated_bitrate_transition(
                     target
                 )

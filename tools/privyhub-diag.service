@@ -1,0 +1,14 @@
+[Unit]
+Description=PrivyHub diagnostics keeper (B36; read-only copies of the hub's logs into ~/privyhub_diag, 30-day retention)
+After=privyhub-companion.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Projects/onn-stream-test
+ExecStart=/usr/bin/python3 -B %h/Projects/onn-stream-test/tools/diag_keeper.py
+Restart=on-failure
+RestartSec=30
+Nice=10
+
+[Install]
+WantedBy=default.target

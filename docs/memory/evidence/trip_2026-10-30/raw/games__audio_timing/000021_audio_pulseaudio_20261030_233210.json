@@ -1,0 +1,38 @@
+{
+  "schema": "privyhub_linux_pulseaudio_timing_v1",
+  "probe_version": "pulse_monitor_thread_rt_pacer_v0.2",
+  "final": true,
+  "target_pid": 1589997,
+  "format": {
+    "sample_rate": 48000,
+    "channels": 2,
+    "network_sample_format": "pcm_s16le",
+    "frames_per_packet": 240,
+    "packet_ms": 5,
+    "payload_bytes": 960
+  },
+  "capture_backend": "pulseaudio_managed_sink_monitor",
+  "scheduler": {
+    "native_tid": 1590103,
+    "ready": true,
+    "policy": "SCHED_RR",
+    "priority": 1,
+    "required_policy": "SCHED_RR",
+    "required_priority": 1,
+    "error": ""
+  },
+  "packets_sent": 9143,
+  "send_errors": 0,
+  "sender_underflows": 11,
+  "reader_bytes": 17547400,
+  "max_buffer_bytes": 13960,
+  "send_intervals": {
+    "count": 4096,
+    "avg_ms": 10.0,
+    "p95_ms": 10.1502,
+    "max_ms": 11.0332,
+    "under_2ms": 0,
+    "ge_8ms": 4096
+  },
+  "restore_errors": 1
+}

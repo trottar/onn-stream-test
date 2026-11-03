@@ -1,0 +1,31 @@
+# TRIP-R2 redact check: every file this session wrote, scanned for addresses, ids and titles.
+# Allowed: the hub's loopback 127.0.0.1 (none expected); version strings such as 0.12.3; 'Blitz' as the user's tag.
+ok  docs/memory/evidence/TRIP_R2_FRIDAY_GAMEPLAY_2026-10-31.md 
+ok  docs/KNOWN_ISSUES.md 
+ok  docs/memory/CURRENT.md 
+ok  docs/memory/evidence/trip_r2_2026-10-31/tables/counts.json 
+ok  docs/memory/evidence/trip_r2_2026-10-31/tables/stepups.md 
+ok  docs/memory/evidence/trip_r2_2026-10-31/tables/sessions.tsv 
+ok  docs/memory/evidence/trip_r2_2026-10-31/tables/per_hour.md 
+ok  docs/memory/evidence/trip_r2_2026-10-31/tables/restarts_5s.md 
+ok  docs/memory/evidence/trip_r2_2026-10-31/tables/per_10min.md 
+ok  docs/memory/evidence/trip_r2_2026-10-31/tables/sessions.md 
+ok  docs/memory/evidence/trip_r2_2026-10-31/seconds/restart_043441_pm60.tsv 
+ok  docs/memory/evidence/trip_r2_2026-10-31/seconds/restart_043012_pm60.tsv 
+ok  docs/memory/evidence/trip_r2_2026-10-31/seconds/restart_032605_pm60.tsv 
+ok  docs/memory/evidence/trip_r2_2026-10-31/seconds/stall_052838_pm60.tsv 
+ok  docs/memory/evidence/trip_r2_2026-10-31/seconds/restart_051935_pm60.tsv 
+ok  docs/memory/evidence/trip_r2_2026-10-31/seconds/restart_012044_pm60.tsv 
+ok  docs/memory/evidence/trip_r2_2026-10-31/seconds/stall_041918_pm60.tsv 
+ok  docs/memory/evidence/trip_r2_2026-10-31/seconds/restart_041921_pm60.tsv 
+ok  docs/memory/evidence/trip_r2_2026-10-31/seconds/stall_043743_pm60.tsv 
+ok  docs/memory/evidence/trip_r2_2026-10-31/seconds/golf_041300_044700.tsv 
+ok  docs/memory/evidence/trip_r2_2026-10-31/seconds/stall_043010_pm60.tsv 
+ok  docs/memory/evidence/trip_r2_2026-10-31/seconds/stall_050717_pm60.tsv 
+ok  docs/memory/evidence/trip_r2_2026-10-31/vod/range_requests_utc.txt 
+ok  docs/memory/evidence/trip_r2_2026-10-31/scripts/trip_r2_read.py 
+total hits: 0
+# copies/: byte copies of the keeper's raw/ chunks (the keeper's redactor applied: addresses, endpoints,
+# node / tailnet names, device ids, long hex -> placeholders). They keep what the keeper kept: game titles in the
+# game logs and journal, the library's game ids in file names, and VOD paths in session_audit / the journal --
+# exactly as in evidence/trip_2026-10-30/raw/. logs/server.log (unredacted) was read in place and NOT copied.

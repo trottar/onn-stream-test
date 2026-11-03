@@ -1,0 +1,32 @@
+# VOD, 2026-10-30 21:00Z -> 2026-10-31 10:00Z: the range server's requests (logs/server.log, live, read-only)
+# and the companion's start / stop calls (the journal copy). Redacted: no address, no path, no title;
+# movie A = kids class (21:18Z), movie B = feature class (06:04Z). The server logs no Range header, bytes or
+# duration. A traceback has no timestamp: it is shown on the request line it follows (its time: any time until
+# the next line in the file).
+2026-10-30T21:18:57Z  companion     POST start movie A
+2026-10-30T21:18:58Z  range server  GET movie A  200   then BrokenPipeError (client side; time unknown)
+2026-10-30T21:18:58Z  range server  GET movie A  206
+2026-10-30T21:19:03Z  range server  GET movie A  206   then BrokenPipeError (client side; time unknown)
+2026-10-30T21:19:03Z  range server  GET movie A  206   then BrokenPipeError (client side; time unknown)
+2026-10-30T21:20:07Z  range server  GET movie A  206   then ConnectionResetError (client side; time unknown)
+2026-10-30T21:20:10Z  companion     POST /stop
+2026-10-31T06:04:10Z  companion     POST start movie B
+2026-10-31T06:04:11Z  range server  GET movie B  200   then BrokenPipeError (client side; time unknown)
+2026-10-31T06:04:11Z  range server  GET movie B  206   then BrokenPipeError (client side; time unknown)
+2026-10-31T06:04:13Z  range server  GET movie B  206
+2026-10-31T06:04:41Z  range server  GET movie B  206   then BrokenPipeError (client side; time unknown)
+2026-10-31T06:04:41Z  range server  GET movie B  206   then BrokenPipeError (client side; time unknown)
+2026-10-31T06:13:42Z  companion     POST start movie B
+2026-10-31T06:13:45Z  range server  GET movie B  200   then ConnectionResetError (client side; time unknown)
+2026-10-31T06:13:45Z  range server  GET movie B  206   then BrokenPipeError (client side; time unknown)
+2026-10-31T06:13:46Z  range server  GET movie B  206
+2026-10-31T06:13:59Z  range server  GET movie B  206   then BrokenPipeError (client side; time unknown)
+2026-10-31T06:13:59Z  range server  GET movie B  206   then ConnectionResetError (client side; time unknown)
+2026-10-31T09:53:51Z  companion     POST /stop
+2026-10-31T09:53:56Z  companion     POST start movie B
+2026-10-31T09:54:01Z  range server  GET movie B  200   then BrokenPipeError (client side; time unknown)
+2026-10-31T09:54:01Z  range server  GET movie B  206   then BrokenPipeError (client side; time unknown)
+2026-10-31T09:54:02Z  range server  GET movie B  206
+2026-10-31T09:54:16Z  range server  GET movie B  206   then BrokenPipeError (client side; time unknown)
+2026-10-31T09:54:16Z  range server  GET movie B  206   then ConnectionResetError (client side; time unknown)
+2026-10-31T09:54:36Z  companion     POST /stop

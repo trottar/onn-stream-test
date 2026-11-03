@@ -1,0 +1,15 @@
+== mutation 1: the surface back never continues the session (onSurfaceBack always false: every loss is today's restart)
+com.safeiot.privyhub.streaming.SurfaceHoldTest: 8 tests, 2 failures, 0 errors
+   FAIL aThreeSecondLossIsOneSessionTheSenderNeverStops java.lang.AssertionError
+   FAIL aPadSystemKeyIsConsumedTheRemotesIsNot java.lang.AssertionError
+TOTAL 8, failures+errors 2
+== mutation 2: the consume ignores the source (the remote's system keys consumed too)
+com.safeiot.privyhub.streaming.SurfaceHoldTest: 8 tests, 2 failures, 0 errors
+   FAIL theRowIsBoundedAndHoldsNoFreeText java.lang.AssertionError: expected:<8> but was:<0>
+   FAIL aPadSystemKeyIsConsumedTheRemotesIsNot java.lang.AssertionError
+TOTAL 8, failures+errors 2
+== mutation 3: the host keeps any reason text
+FAIL: test_unknown_keys_text_and_bad_values_dropped (test_surface_lost.Parse.test_unknown_keys_text_and_bad_values_dropped)
+Ran 9 tests in 0.327s
+FAILED (failures=1)
+all restored byte-equal (cmp), JVM 169/169 after (tests_jvm.txt)

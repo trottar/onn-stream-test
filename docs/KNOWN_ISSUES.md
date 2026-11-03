@@ -1,5 +1,48 @@
 # Known issues and deferred work
 
+## 2026-10-31 TRIP-R2, Friday off-site play: four episodes — OPEN (to B, queue L)
+
+(`docs/memory/evidence/TRIP_R2_FRIDAY_GAMEPLAY_2026-10-31.md` §5)
+
+- **E1, the self-restarts:** 6 in the evening (3 in golf). Each time the onn took the stream activity out of the
+  foreground for 1-9 s (`restart_cause.trigger` surface), not because of a stall or the ladder. Every ladder step also
+  restarts the encoder (a new SSRC; 3 of 32 gave a ~430 ms gap and a stall pause). → B32.
+- **E2, golf inputs:** no minutes-long delay is in the rows. Presses went into the restarts (≤ 5.3 s), into 3 stall
+  rewinds (~0.45 s dropped each), and a 125 / 410 ms control echo. → B33.
+- **E3, two-player football:** the link and host were flat. The cause is the pad setup and the client's slot order
+  (first input wins, reset at every start). Inferred: no row is per player. → B34.
+- **E4, the movie:** the feature's connection ended from the client side at about 1 h 50 min (~07:54Z), and the
+  player stopped without retrying. The hub was healthy. → B35.
+
+## 2026-10-31 Queue L (B32-B37): what was built for TRIP-R2's four episodes, and what stays open — OPEN (HOME-1)
+
+(`docs/memory/handoffs/SESSION_B_DONE_2026-10-31L.md`; the records `docs/memory/evidence/B32_…` … `B37_…_2026-10-31.md`)
+
+- **B32, the surface hold:** built behind `debug.privyhub.surface_hold=1` (in APK `554ccf61…`, not installed): a screen
+  loss ≤ 12 s keeps the session; each foreground loss is a `surface_lost` row in the recovery log. The cause of
+  Friday's six is not knowable from the code; the rows will name it. `KEYCODE_HOME` / `APP_SWITCH` never reach the
+  activity (the system takes them): a pad whose Home maps to `KEYCODE_HOME` still leaves (row `user_leave`, no key).
+  After a re-attach the heartbeat's `rendered_frames` drops back once (the report keeps `rendered_before_reattach`).
+- **B32, every ladder step restarts the encoder with a new SSRC** (32 of 32 on Friday; a ~430-ms gap in 3).
+  `h264_vaapi` has no runtime rate control; a same-stream splice is built behind `PRIVYHUB_STEP_IN_PLACE=1` (not
+  adopted). Two encoders run at once for ~0.2-0.4 s per step; the onn's handling of an in-stream IDR with no SSRC change
+  is untested. **An explicit `PRIVYHUB_REMOTE_RUNG_CAP` beside `PRIVYHUB_REMOTE=1` was inactive;** fixed in the tree
+  (live at the next companion restart; no such line is set today).
+- **B33, no rewind without loss:** inside the adopted `PRIVYHUB_LINK_RECOVERY=1`, so **live at the next companion
+  restart** (off: `PRIVYHUB_REWIND_NEEDS_LOSS=0`). Loss inside the stall's own ~0.5 s shows only in the next heartbeat,
+  which the rule cannot wait for; a session's first heartbeats have no predecessor and load as today. The host's
+  controller-sequence loss counter is in `/status` only, never in a log.
+- **B34, player slots:** first-input order, reset at every start, any stick-axis device eligible, until
+  `debug.privyhub.pad_slots=stable` (built, in the APK, not installed). Stable slots last for the app process's life.
+- **B35, the movie player:** no retry today; `debug.privyhub.vod_retry=1` (client, 150 s) and `PRIVYHUB_VOD_LOG=1`
+  (the per-request range log) built, neither live.
+- **B36, the diagnostics keeper:** `privyhub-diag` built, not installed; it imports `tools/trip_log_keeper.py` (keep it).
+  A restart's client cause reaches `sessions.jsonl` only in the next session's row (`restart_cause`), or in the same
+  session from B32's `surface_lost`.
+- **B37, "the control echo" is not a control echo:** `control_round_trip_ms` (the `wan` block's `rtt_ms`) is the 2-s
+  health POST's HTTP round trip (a new TCP connection + the hub's synchronous handler), ~4-5× a press's real delay
+  off-site. The off-site p95 tail (+~280 ms over p50) is unexplained. Input → photon is measured nowhere.
+
 ## 2026-10-25 CL-B13: the WAN class reads the onn on the home Wi-Fi through the overlay as `remote-direct`, and 450 then holds falsely once — G-A6 SHELVED (2026-10-26, the user)
 
 (`docs/memory/evidence/CL_B13_RESTART_FAST_AND_WAN_CLASS_2026-10-25.md` §4-§5)

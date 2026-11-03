@@ -1,0 +1,449 @@
+diff --git a/companion/games/link_drop_recovery.py b/companion/games/link_drop_recovery.py
+index f8155ce042ba49c6bd8621eb9b152b5b9aea5eb3..b66b5c68207d4050fba29e361a7dd19231da1ae0 100644
+--- a/companion/games/link_drop_recovery.py
++++ b/companion/games/link_drop_recovery.py
+@@ -99,6 +99,8 @@ class LinkDropRecovery:
+     _stall_owner: Any = None
+     # B18: the session's end as the owner knows it (rewind_cores.SessionEnd; only PRIVYHUB_INPUT_HOLD_REWIND=state)
+     _session_end: Any = None
++    # B33: no rewind without loss (rewind_needs_loss.Rule; the umbrella or PRIVYHUB_REWIND_NEEDS_LOSS=1). None = today.
++    _rewind_needs_loss: Any = None
+ 
+     def __init__(
+         self,
+@@ -380,6 +382,10 @@ class LinkDropRecovery:
+         except (TypeError, ValueError):
+             age_ms = -1
+ 
++        # B33: the heartbeat's loss counters, for the release's no-loss rule
++        if self._rewind_needs_loss is not None:
++            self._rewind_needs_loss.note_heartbeat(record)
++
+         with self._lock:
+             self._last_heartbeat = dict(record)
+             self._last_heartbeat_at = now
+diff --git a/companion/rewind_cores.py b/companion/rewind_cores.py
+index 41573b90a313e9658a67d51f8eb84c031840f2a3..72615349ce9c7a8508c3f7c47d79f64ecaf2e115 100644
+--- a/companion/rewind_cores.py
++++ b/companion/rewind_cores.py
+@@ -180,6 +180,9 @@ class StateMark:
+ class Cores:
+     """B4's Rewinder's B9 object (`1` and `state` only)."""
+ 
++    # B33: no rewind without loss (rewind_needs_loss.Rule; the umbrella or PRIVYHUB_REWIND_NEEDS_LOSS=1). None = B9.
++    no_loss: Any = None
++
+     def __init__(self, mode_value: str, emulator: Any, recovery: Any, *, clock: Callable[[], float] = time.monotonic,
+                  wall: Callable[[], float] = time.time, threaded: bool = True):
+         self.mode = mode_value
+@@ -252,6 +255,18 @@ class Cores:
+                            reason="the core is not on the rewind allow-list (PRIVYHUB_INPUT_HOLD_REWIND=1)")
+         fields.update(method="state", slot=SLOT, core=self.core())
+         onset = pending.get("b8_hold_onset", pending["onset"])
++        # B33: under 1 s with no loss behind it: resume, no load (the save stays); else today's load, with its why
++        if self.no_loss is not None:
++            resume, why, terms = self.no_loss.decide(onset)
++            if resume:
++                with self._lock:
++                    self.last_save = None                         # one release per save
++                self.no_loss.resumes += 1
++                fields.update(method="resume", why=why, **terms)
++                fields.pop("slot", None)
++                return rw._row(recovery, "input_release", fields)
++            self.no_loss.loads += 1
++            fields.update(why=why, **terms)
+         with self._lock:
+             s = self.last_save
+         # B12: a save taken at the client's stall matches the stall pause's own onset within 100 ms
+@@ -346,4 +361,10 @@ def wire(rw: Any, recovery: Any, controller: Any, emulator: Any, environ: Mappin
+             recovery._session_end = se
+     recovery._log("input_hold_rewind_cores_config", mode=m, allow=sorted(ALLOW), slot=(SLOT if m == "state" else None),
+                   state_at_ms=at_ms, state_at_note=why)
++    # B33: no rewind without loss, inside the umbrella (or PRIVYHUB_REWIND_NEEDS_LOSS=1); absent = nothing imported
++    if m == "state" and ((environ.get("PRIVYHUB_REWIND_NEEDS_LOSS") or "").strip() == "1"
++                         or ((environ.get("PRIVYHUB_LINK_RECOVERY") or "").strip() == "1"
++                             and (environ.get("PRIVYHUB_REWIND_NEEDS_LOSS") or "").strip() != "0")):
++        import rewind_needs_loss
++        rewind_needs_loss.wire(c, recovery, controller, environ)
+     return c
+diff --git a/companion/rewind_needs_loss.py b/companion/rewind_needs_loss.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..3acbdbfa2f086870bee0311533e79c20f77e2a7b
+--- /dev/null
++++ b/companion/rewind_needs_loss.py
+@@ -0,0 +1,137 @@
++"""B33: no rewind without loss -- a stall or silence under 1 s with no loss behind it releases with `resume`, not `state`.
++
++Inside the adopted `PRIVYHUB_LINK_RECOVERY=1` (no new adoption line, B26's convention); `PRIVYHUB_REWIND_NEEDS_LOSS=0`
++turns it off (today byte for byte), `=1` turns it on without the umbrella. **Absent with no umbrella = today**:
++nothing imports this module. Design: `docs/memory/evidence/b33_2026-10-31/design_written_before_code.md` (hashed
++before this code).
++
++TRIP-R2 §2: five stall pauses all evening (three in golf) each loaded B9's slot 9 at `stall_end`, ~0.45 s of play and
++the presses in it undone. Here, at the release (B9's `Cores.release`, the one place a load happens), the episode
++resumes without the load when all hold:
++- short: release - onset < 1,000 ms (a silence or stall >= 1 s loads as today);
++- evidence: a client heartbeat received in [onset - 2.5 s, release], with a predecessor;
++- post-FEC loss 0: no heartbeat in that window shows a rise in `lost_packets` or `fec_unrecoverable_groups`;
++- no dark span: no heartbeat in that window shows `audio_max_arrival_gap_ms` >= 250 (audio rides the same downlink);
++- the uplink alive: the host's controller-sequence loss counter unchanged from the onset's sample to the release.
++The decision cannot wait for the heartbeat that covers the stall itself (up to 2 s after the release): the rule is
++"no loss known behind it at the release". The save still happens (B9 / B16, untouched); the pause still happened.
++"""
++
++from __future__ import annotations
++
++import threading
++import time
++from collections import deque
++from typing import Any, Callable, Mapping
++
++FLAG_ENV = "PRIVYHUB_REWIND_NEEDS_LOSS"
++UMBRELLA_ENV = "PRIVYHUB_LINK_RECOVERY"
++SHORT_MS = 1000.0           # "a stall or silence under 1 s"
++LOOKBACK_S = 2.5            # the client's heartbeat interval (2 s) + margin
++DARK_MS = 250               # an audio arrival gap this long = the downlink delivered nothing
++RESUME_WHY = "no_loss_under_1s"
++KEEP = 8                    # heartbeats kept (16 s at 2 s)
++
++
++def mode(environ: Mapping[str, str]) -> tuple[bool, str | None]:
++    """(on, how). Absent: on iff the umbrella is `1`; `0` off; `1` on; another value as absent, noted."""
++    raw = (environ.get(FLAG_ENV) or "").strip()
++    umbrella = (environ.get(UMBRELLA_ENV) or "").strip() == "1"
++    if raw == "0":
++        return False, "explicit 0"
++    if raw == "1":
++        return True, "explicit 1"
++    note = f"; {raw[:32]!r} ignored (not 0 / 1)" if raw else ""
++    if umbrella:
++        return True, "implied by PRIVYHUB_LINK_RECOVERY=1" + note
++    return False, (note[2:] if note else None)
++
++
++def _int(v: Any) -> int | None:
++    try:
++        return None if v is None else int(v)
++    except (TypeError, ValueError):
++        return None
++
++
++class Rule:
++    def __init__(self, controller: Any = None, clock: Callable[[], float] = time.monotonic):
++        self.controller = controller
++        self._clock = clock
++        self._lock = threading.Lock()
++        self._hb: deque[dict[str, Any]] = deque(maxlen=KEEP)
++        self.resumes = 0
++        self.loads = 0
++
++    def _uplink(self) -> int | None:
++        v = _int(getattr(self.controller, "_lost_packets", None))
++        return v if v is not None and v >= 0 else None
++
++    def note_heartbeat(self, record: Mapping[str, Any], now: float | None = None) -> None:
++        """The recovery's note_heartbeat: one sample per heartbeat (its receive time on this clock)."""
++        s = {"rx": self._clock() if now is None else now,
++             "lost": _int(record.get("lost_packets")),
++             "unrec": _int(record.get("fec_unrecoverable_groups")),
++             "audio_gap": _int(record.get("audio_max_arrival_gap_ms")),
++             "uplink": self._uplink()}
++        with self._lock:
++            self._hb.append(s)
++
++    def decide(self, onset: float, now: float | None = None) -> tuple[bool, str, dict[str, Any]]:
++        """(resume, why, the terms read). `why` is the first failing term, or `no_loss_under_1s`."""
++        now = self._clock() if now is None else now
++        held_ms = round((now - onset) * 1000.0, 1)
++        d: dict[str, Any] = {"held_ms": held_ms}
++        if held_ms >= SHORT_MS:
++            return False, "long", d
++        with self._lock:
++            hb = list(self._hb)
++        idx = [i for i, h in enumerate(hb) if onset - LOOKBACK_S <= h["rx"] <= now]
++        d["heartbeats_in_window"] = len(idx)
++        if not idx or idx[0] == 0:
++            return False, "no_heartbeat", d
++        lost = unrec = 0
++        gap = 0
++        for i in idx:
++            h, p = hb[i], hb[i - 1]
++            for key in ("lost", "unrec"):
++                if h[key] is None or p[key] is None:
++                    if key == "lost":
++                        return False, "no_heartbeat", d
++                    continue                                   # an older client: no FEC counter
++                delta = h[key] - p[key]
++                if delta < 0:
++                    return False, "counter_reset", d
++                if key == "lost":
++                    lost += delta
++                else:
++                    unrec += delta
++            if h["audio_gap"] is not None:
++                gap = max(gap, h["audio_gap"])
++        d.update(window_lost_packets=lost, window_unrecoverable_groups=unrec, window_audio_max_gap_ms=gap)
++        if lost > 0 or unrec > 0:
++            return False, "loss", d
++        if gap >= DARK_MS:
++            return False, "dark_span", d
++        base = [h for h in hb if h["rx"] <= onset]
++        b = (base[-1] if base else hb[idx[0]])["uplink"]
++        cur = self._uplink()
++        if b is None or cur is None or cur < b:
++            return False, "uplink_unknown", d
++        d["uplink_lost_packets"] = cur - b
++        if cur > b:
++            return False, "uplink_loss", d
++        return True, RESUME_WHY, d
++
++
++def wire(cores: Any, recovery: Any, controller: Any, environ: Mapping[str, str]) -> Rule | None:
++    """rewind_cores.wire's one call (mode `state`): the rule on B9's Cores and on the recovery's heartbeat."""
++    on, how = mode(environ)
++    if not on:
++        return None
++    rule = Rule(controller)
++    cores.no_loss = rule
++    recovery._rewind_needs_loss = rule
++    recovery._log("rewind_needs_loss_config", how=how, short_ms=SHORT_MS, lookback_s=LOOKBACK_S, dark_ms=DARK_MS,
++                  uplink_counter=rule._uplink() is not None)
++    return rule
+diff --git a/tests/rewind_needs_loss/test_rewind_needs_loss.py b/tests/rewind_needs_loss/test_rewind_needs_loss.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b96c3613c0cc076e41b78eea61d8815cdb85a85b
+--- /dev/null
++++ b/tests/rewind_needs_loss/test_rewind_needs_loss.py
+@@ -0,0 +1,232 @@
++#!/usr/bin/env python3
++"""B33: no rewind without loss -- a stall or silence under 1 s with no loss behind it releases with `resume`, not
++`state` (inside the adopted `PRIVYHUB_LINK_RECOVERY=1`; `PRIVYHUB_REWIND_NEEDS_LOSS=0` off, `=1` on alone).
++
++    python3 -m unittest discover -s tests/rewind_needs_loss -v
++
++B9's loopback fake core, the real recovery, B4's Rewinder with B9's Cores, B7's StallSignal and B12's StallOwner
++(B12's `Down` client), the rule wired as `rewind_cores.wire` wires it. Heartbeats are fed to the rule with their
++receive times on its clock; the controller's uplink loss counter is the fake controller's `_lost_packets`.
++"""
++
++from __future__ import annotations
++
++import ast
++import os
++import subprocess
++import sys
++import time
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(ROOT / "tests" / "rewind_cores"))
++sys.path.insert(0, str(ROOT / "tests" / "stall_owner"))
++
++import hold_rewind as hr  # noqa: E402
++import rewind_cores as rc  # noqa: E402
++import rewind_needs_loss as rnl  # noqa: E402
++import stall_signal as ss  # noqa: E402
++import test_rewind_cores as b9  # noqa: E402
++import test_stall_owner as b12  # noqa: E402
++
++PSX = b9.PSX
++ON = {"PRIVYHUB_REWIND_NEEDS_LOSS": "1"}
++
++
++def hb(lost=0, unrec=0, gap=40):
++    return {"lost_packets": lost, "fec_unrecoverable_groups": unrec, "audio_max_arrival_gap_ms": gap}
++
++
++def wire_rule(rig):
++    rig.ctrl._lost_packets = 0
++    return rnl.wire(rig.rw.b9, rig.rec, rig.ctrl, ON)
++
++
++def releases(rec):
++    return [r for r in b9.rows(rec) if r["event"] in ("input_release", "rewind_skipped", "rewind_failed")]
++
++
++class Stall(unittest.TestCase):
++    """A 450-ms picture stall (B12's Down: stalls every 50 ms from 150, the pause at 400, stall_end at 450)."""
++
++    def run_stall(self, beats, uplink_lost_during=0):
++        d = b12.Down(core=PSX)
++        rule = wire_rule(d.rig)
++        t = time.monotonic()
++        for dt, rec in beats:                                     # the heartbeats the host has, by receive time
++            rule.note_heartbeat(rec, now=t + dt)
++        d.until_paused()
++        d.rig.wait_saves(1)
++        d.rig.ctrl._lost_packets += uplink_lost_during
++        d.stall(450, real=True)
++        d.stall(10, kind=ss.KIND_END)
++        return d, rule
++
++    def test_450_ms_no_loss_pauses_then_resumes_with_no_load(self):
++        d, rule = self.run_stall([(-4.0, hb(5, 1)), (-1.0, hb(5, 1))])
++        try:
++            self.assertEqual(d.rec.calls, ["pause", "resume"])
++            saved = [r for r in b9.rows(d.rec) if r["event"] == "state_saved"]
++            self.assertEqual((len(saved), saved[0]["kind"]), (1, "stall"))          # the save still happens
++            rel = releases(d.rec)
++            self.assertEqual(len(rel), 1)
++            r = rel[0]
++            self.assertEqual((r["event"], r["method"], r["why"], r["via"]),
++                             ("input_release", "resume", "no_loss_under_1s", "stall_end"))
++            self.assertTrue(400 <= r["held_ms"] < 1000, r)
++            self.assertEqual((r["window_lost_packets"], r["window_unrecoverable_groups"], r["uplink_lost_packets"]),
++                             (0, 0, 0))
++            self.assertNotIn("slot", r)
++            time.sleep(0.05)
++            self.assertEqual(d.rig.core.loads, [])                                  # no LOAD at the core
++            self.assertNotIn("PAUSE_TOGGLE", d.rig.core.log)
++            self.assertIsNone(d.rig.rw.b9.last_save)
++            self.assertEqual([e for e in d.events() if e[0] == "resumed"], [("resumed", "stall_end")])
++            self.assertEqual((rule.resumes, rule.loads), (1, 0))
++        finally:
++            d.stop()
++
++    def test_the_same_with_loss_loads_as_today(self):
++        d, rule = self.run_stall([(-4.0, hb(5, 1)), (-1.0, hb(8, 1))])
++        try:
++            r = releases(d.rec)[0]
++            self.assertEqual((r["event"], r["method"], r["why"], r["slot"]), ("input_release", "state", "loss", 9))
++            self.assertEqual(r["window_lost_packets"], 3)
++            self.assertEqual(d.rig.core.loads, [True])
++            self.assertEqual(d.rec.calls, ["pause", "resume"])
++        finally:
++            d.stop()
++
++    def test_unrecoverable_groups_alone_are_loss(self):
++        d, _ = self.run_stall([(-4.0, hb(5, 1)), (-1.0, hb(5, 2))])
++        try:
++            self.assertEqual(releases(d.rec)[0]["why"], "loss")
++            self.assertEqual(d.rig.core.loads, [True])
++        finally:
++            d.stop()
++
++    def test_a_dark_span_loads(self):
++        d, _ = self.run_stall([(-4.0, hb()), (-1.0, hb(gap=300))])
++        try:
++            self.assertEqual((releases(d.rec)[0]["method"], releases(d.rec)[0]["why"]), ("state", "dark_span"))
++            self.assertEqual(d.rig.core.loads, [True])
++        finally:
++            d.stop()
++
++    def test_uplink_loss_loads(self):
++        d, _ = self.run_stall([(-4.0, hb()), (-1.0, hb())], uplink_lost_during=2)
++        try:
++            r = releases(d.rec)[0]
++            self.assertEqual((r["method"], r["why"], r["uplink_lost_packets"]), ("state", "uplink_loss", 2))
++        finally:
++            d.stop()
++
++    def test_no_heartbeat_in_the_window_loads(self):
++        d, _ = self.run_stall([(-9.0, hb()), (-7.0, hb())])
++        try:
++            self.assertEqual((releases(d.rec)[0]["method"], releases(d.rec)[0]["why"]), ("state", "no_heartbeat"))
++        finally:
++            d.stop()
++
++    def test_a_counter_reset_loads(self):
++        d, _ = self.run_stall([(-4.0, hb(9)), (-1.0, hb(0))])
++        try:
++            self.assertEqual(releases(d.rec)[0]["why"], "counter_reset")
++        finally:
++            d.stop()
++
++
++class Silence(unittest.TestCase):
++    """B2's hold: the save at 400 ms of silence (B9's mark), the release at the first packet back."""
++
++    def run_silence(self, silence_s):
++        rig = b9.Rig("1", PSX)
++        rule = wire_rule(rig)
++        last = time.monotonic() - silence_s
++        rule.note_heartbeat(hb(), now=last - 3.0)
++        rule.note_heartbeat(hb(), now=last - 0.5)
++        rig.det.on_quiet(last + 0.41, last)
++        rig.wait_saves(1)
++        rig.pause_for_hold(last, last + 0.95)
++        row = rig.rw.rewind(rig.rec, "input_release")
++        return rig, row
++
++    def test_a_2_s_silence_loads(self):
++        rig, row = self.run_silence(2.0)
++        try:
++            self.assertEqual((row["method"], row["why"], row["slot"]), ("state", "long", 9))
++            self.assertGreaterEqual(row["held_ms"], 2000)
++            self.assertEqual(b9.rows(rig.rec)[-1]["event"], "input_release")
++            self.assertEqual(rig.core.loads, [True])
++        finally:
++            rig.stop()
++
++    def test_a_sub_second_silence_with_no_loss_resumes(self):
++        rig, row = self.run_silence(0.93)
++        try:
++            self.assertEqual((row["method"], row["why"]), ("resume", "no_loss_under_1s"))
++            self.assertTrue(930 <= row["held_ms"] < 1000, row)
++            time.sleep(0.05)
++            self.assertEqual(rig.core.loads, [])
++        finally:
++            rig.stop()
++
++
++class TheSwitch(unittest.TestCase):
++    def test_mode(self):
++        self.assertEqual(rnl.mode({}), (False, None))
++        self.assertEqual(rnl.mode({"PRIVYHUB_LINK_RECOVERY": "1"}), (True, "implied by PRIVYHUB_LINK_RECOVERY=1"))
++        self.assertEqual(rnl.mode({"PRIVYHUB_LINK_RECOVERY": "1", rnl.FLAG_ENV: "0"}), (False, "explicit 0"))
++        self.assertEqual(rnl.mode({rnl.FLAG_ENV: "1"}), (True, "explicit 1"))
++        on, how = rnl.mode({"PRIVYHUB_LINK_RECOVERY": "1", rnl.FLAG_ENV: "yes"})
++        self.assertTrue(on)
++        self.assertIn("ignored", how)
++        self.assertFalse(rnl.mode({rnl.FLAG_ENV: "yes"})[0])
++        self.assertFalse(rnl.mode({"PRIVYHUB_LINK_RECOVERY": "0"})[0])
++
++    def _wired(self, env):
++        rig = b9.Rig("1", PSX)
++        try:
++            base = dict(rig.env, **env)
++            rec2 = b9.recovery()
++            rw = hr.wire(rec2, rig.ctrl, rig.emu, base)
++            return rw.b9.no_loss, rec2
++        finally:
++            rig.stop()
++
++    def test_the_umbrella_wires_it_through_rewind_cores(self):
++        rule, rec = self._wired({"PRIVYHUB_LINK_RECOVERY": "1"})
++        self.assertIsNotNone(rule)
++        self.assertIs(rec._rewind_needs_loss, rule)
++        cfg = [r for r in b9.rows(rec) if r["event"] == "rewind_needs_loss_config"]
++        self.assertEqual((len(cfg), cfg[0]["how"], cfg[0]["short_ms"]), (1, "implied by PRIVYHUB_LINK_RECOVERY=1", 1000.0))
++        rec.note_heartbeat(dict(hb(), last_output_age_ms=10))                    # the recovery feeds it
++        self.assertEqual(len(rule._hb), 1)
++
++    def test_zero_absent_and_junk_alone_wire_nothing(self):
++        for env in ({"PRIVYHUB_LINK_RECOVERY": "1", rnl.FLAG_ENV: "0"}, {}, {rnl.FLAG_ENV: "yes"}):
++            rule, rec = self._wired(env)
++            self.assertIsNone(rule, env)
++            self.assertIsNone(rec._rewind_needs_loss)
++            self.assertNotIn("rewind_needs_loss_config", [r["event"] for r in b9.rows(rec)])
++
++    def test_not_imported_without_it(self):
++        code = ("import sys; sys.path.insert(0, 'companion'); sys.path.insert(0, 'tests/rewind_cores');"
++                "import test_rewind_cores as b9; r = b9.Rig('1', b9.PSX); r.stop();"
++                "print('rewind_needs_loss' in sys.modules)")
++        env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++        out = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True, env=env)
++        self.assertEqual(out.stdout.strip(), "False", out.stderr)
++
++    def test_hook_shapes(self):
++        src = (ROOT / "companion" / "rewind_cores.py").read_text()
++        tree = ast.parse(src)
++        imports = [n for n in ast.walk(tree) if isinstance(n, ast.Import)
++                   and any(a.name == "rewind_needs_loss" for a in n.names)]
++        self.assertEqual(len(imports), 1)                                          # one guarded import, in wire()
++
++
++if __name__ == "__main__":
++    unittest.main()

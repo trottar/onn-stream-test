@@ -1,0 +1,12 @@
+APK (B5 ... B25 + B32 + B34 + B35; B27 / B29 reversed out), built 2026-10-31T17:50:35Z in /tmp/b_q31l_apk/PrivyHub; NOT installed
+554ccf61a87ad061320740adfa830b6fe726e794dfccbe544873bd621b939902  /tmp/b_q31l_scratch/apk/app-debug.apk
+size 9675856 B
+build: :app:testDebugUnitTest :app:assembleDebug --rerun-tasks --offline --no-configuration-cache (JVM 173/173: the 184 of the integrated tree less B27's LossGuardDefaultOnTest 4 and B29's GuardQuietStallTest 7)
+rebuild (--rerun-tasks :app:assembleDebug) sha256 the same: yes
+the base: the tree at 1904fe8 with evidence/b29_2026-10-28/b29.diff then evidence/b27_2026-10-27/b27.diff reversed (LossGuard.kt = B27's predecessor ec4c4bb9…, NativeStreamActivity.kt e20f30e8… / StallSignal.kt ee5484a8… = B29's predecessors), then queue L's combined diff
+the CONFIRMED one on the onn: fcd924c28cbf70a85bb9a886caabcb07873eee2d028b6538284fce5a7ae39b96 (9638234 B)
+apksigner verify (new): OK
+signer certificate digest lines equal to fcd924c2's (compared, not printed): yes
+entries: new 945 CONFIRMED 944 ; only in new ['classes8.dex'] ; only in CONFIRMED []
+entries that differ (outside META-INF): [('classes3.dex', 389056, 443712), ('classes5.dex', 616480, 26908), ('classes6.dex', 129360, 618428), ('classes7.dex', 6289164, 129360)] (R8-less debug dex split: classes shift between dex files)
+pinned copy (ignored build dir, never installed): PrivyHub/app/build/queue_l_built/app-debug.apk, sha256 554ccf61a87ad061320740adfa830b6fe726e794dfccbe544873bd621b939902

@@ -227,6 +227,35 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
+**TRIP-R2 (2026-10-31, session A, read-only, the user away): Friday's play READ; the four episodes placed**
+(`evidence/TRIP_R2_FRIDAY_GAMEPLAY_2026-10-31.md`, `evidence/trip_r2_2026-10-31/`; KNOWN_ISSUES top). Nothing was
+changed: no restart, no drop-in, no adb, no run. The keeper is still running. Thirteen lines.
+- **E1:** 6 client self-restarts, not 12. `session_ended_reset` is written at every start and end. All 6 are
+  `trigger: surface`: something on the onn took the activity out of the foreground for 1-9 s.
+- **Step-ups** restart the encoder (a new SSRC each time). 3 of 32 made a ~430 ms gap; the 2 that paused resumed.
+- **E2:** no minutes-long input delay. The restarts, 3 stall rewinds and a 125 / 410 ms echo.
+- **E3:** pad setup and slot order (inferred).
+- **E4:** the feature's client-side stop at ~1 h 50 min, with no retry.
+- **The 4000 pin** (`_cowork_prompt_cap.txt`) would not help E1. As written it is inactive under the umbrella (an
+  explicit cap with no explicit ladder: `remote_ladder_flag_absent`).
+
+1. **The user's commit when home:** `TRIP_R2_FRIDAY_GAMEPLAY_2026-10-31.md`, `trip_r2_2026-10-31/`, KNOWN_ISSUES,
+   this file and the task file (`logs/trip_r2_git_status.txt`), together with TRIP-PREP's and the keeper's files.
+2. **Queue L for B:**
+   - **B32:** the foreground-loss restart. Log why the activity left and which pad keys reached the system, write
+     `restart_cause` in a host row at the restart, and consume the guide / Home-class pad keys in the stream activity.
+     Also step-ups in place, with no encoder respawn and no new SSRC.
+   - **B33:** inputs across a pause or restart. No state rewind on a sub-second stall with no loss, a "live again" cue
+     after a resume or restart, and input-to-photon measured on the WAN.
+   - **B34:** stable player slots by device across restarts, non-gamepad devices excluded, the slot map in the report
+     and host rows, and a per-title multitap / DualShock check.
+   - **B35:** VOD auto-retry and resume on a load error, a timestamped per-request range log (Range, bytes, duration,
+     how it closed), and the player's error in a row.
+   - **B36:** the permanent diagnostics keeper: a trimmed B30, always on, adding the client's foreground and
+     input-device events, the range log and per-player controller counts.
+3. With adb on the LAN (home): the onn's `logcat -b events` around a reproduced restart would name what takes the
+   foreground.
+
 **TRIP-PREP (2026-10-29/30, the user's "Yes to both"): G-A9 ADOPTED (the THIRTEENTH line); the loss guard OUT
 (`fcd924c2…` back); the window VALID; the log-keeper running; the runbook final**
 (`evidence/TRIP_PREP_2026-10-29.md`).

@@ -341,6 +341,8 @@ class NativeStreamActivity :
                 updateMetrics()
                 // B14: the link notice from the client's own link reading (null = today)
                 linkNotice?.let { tickLinkNotice(it) }
+                // B32: the re-attached decoder's first frame closes the held row (null = today)
+                surfaceHold?.stallAgeMs(System.nanoTime() / 1_000_000L, decoder?.renderedFrameCount() ?: 0L)
                 uiHandler.postDelayed(
                     this,
                     500
@@ -491,6 +493,9 @@ class NativeStreamActivity :
         restartGuard?.attach(FilePendingStore(File(noBackupFilesDir, RestartGuard.STORE_FILE)),
             RestartGuardProcess.nextInstance(), RestartGuardProcess.mark)
 
+        // B32: input-device events for the surface_lost rows (null = today: no listener)
+        surfaceHold?.let { registerHoldDeviceListener() }
+
         uiHandler.post(
             metricsTick
         )
@@ -511,6 +516,9 @@ class NativeStreamActivity :
             } catch (_: Exception) {
             }
         }
+
+        // B32: within the hold's bound the same session continues on the new surface (null = today)
+        if (surfaceHold?.let { endSurfaceHold(it, holder.surface) } == true) return
 
         startSession(
             holder.surface
@@ -540,6 +548,9 @@ class NativeStreamActivity :
             } catch (_: Exception) {
             }
         }
+
+        // B32: a brief loss of the screen keeps the session (null = today)
+        if (sessionStarted && !isFinishing && surfaceHold?.let { beginSurfaceHold(it) } == true) return
 
         if (sessionStarted) {
             cacheSessionReport()
@@ -576,6 +587,8 @@ class NativeStreamActivity :
         streamWifiLock?.release()
         // B11: when the activity last paused, for a self-restart's cause (null = today)
         restartGuard?.notePause()
+        // B32: the pause for the rows; no input reaches a paused activity, so nothing stays held (null = today)
+        surfaceHold?.let { it.onPause(); controllerSender?.neutralize() }
     }
 
     override fun onResume() {
@@ -587,6 +600,9 @@ class NativeStreamActivity :
         uiHandler.removeCallbacks(
             metricsTick
         )
+
+        // B32: a hold open at the end: today's stop path follows (null = today)
+        surfaceHold?.let { h -> uiHandler.removeCallbacks(holdExpiry); h.onEndedInHold(); unregisterHoldDeviceListener() }
 
         stopSession()
 
@@ -616,6 +632,8 @@ class NativeStreamActivity :
         sessionStarted = true
         stopping = false
         cachedSessionReport = null
+        // B32: the surface the held decoder is built on (null = today: the closure's surface)
+        if (surfaceHold != null) heldSurface = surface
         // B16: a new session waits for its own host's fast ready (null = today)
         fastReady?.let { uiHandler.removeCallbacks(fastReadyTick) }
         fastReady = null
@@ -712,6 +730,8 @@ class NativeStreamActivity :
                 host = host,
                 port = INPUT_PORT
             ).also {
+                // B34: stable slots, gamepads only (null = today)
+                padSlots?.let { s -> it.padSlots = s; it.connectedPads = { AndroidPadDevice.connected() } }
                 it.start()
             }
         // B7: the stall signal on the controller socket (null = today)
@@ -723,7 +743,10 @@ class NativeStreamActivity :
             RtpH264Receiver(
                 port = VIDEO_PORT,
                 onParameterSets = { sps, pps ->
-                    if (decoder == null) {
+                    // B32: with the hold, a decoder only on a live surface (null = today's branch)
+                    if (surfaceHold != null) {
+                        buildHeldDecoder(sps, pps)
+                    } else if (decoder == null) {
                         try {
                             decoder =
                                 AvcLowLatencyDecoder(
@@ -801,7 +824,7 @@ class NativeStreamActivity :
                     httpPost(
                         "http://$host:$CONTROL_PORT" +
                             "/plugins/games/native-stream-start" +
-                            "?port=$VIDEO_PORT" + (if (restart != null) "&guard_end=1" else ""),
+                            "?port=$VIDEO_PORT" + (if (restart != null) "&guard_end=1" else "") + padSlotsQuery(),
                         readTimeoutMs =
                             30_000
                     )
@@ -2371,6 +2394,14 @@ class NativeStreamActivity :
 
         // B11: the self-restart's cause (null = today: no key)
         restartGuard?.lastCause?.let { c -> root.put("restart_cause", JSONObject(c)) }
+        // B32: the hold's counters (null = today: no key)
+        surfaceHold?.let { h -> root.put("surface_hold", JSONObject(h.reportFields())) }
+
+        // B34: the slot map (null = today: no key)
+        padSlots?.let { s ->
+            root.put("pad_slots_mode", "stable")
+            root.put("pad_slots", s.toJson())
+        }
 
         // B16: the fast ready's releases (null = today: no key)
         fastReady?.let { f ->
@@ -2524,6 +2555,11 @@ class NativeStreamActivity :
 
     // B11: the self-restart guard, only with debug.privyhub.restart_guard=1 (null = today).
     private val restartGuard: RestartGuard? by lazy { if (RestartGuardFlag.fromSystem()) RestartGuard() else null }
+
+    // B34: stable player slots, gamepads only, with debug.privyhub.pad_slots=stable (null = today); one per process
+    private val padSlots: PadSlots? by lazy { if (PadSlotsFlag.fromSystem()) PadSlotsProcess.slots else null }
+    private fun padSlotsQuery(): String =
+        padSlots?.let { "&pad_slots=" + URLEncoder.encode(it.mapString(), "UTF-8") } ?: ""
 
     // B11: the old session's report and stop, posted at a self-restart (the guard's transport)
     private fun postRestartReport(host: String, report: String) {
@@ -2740,6 +2776,10 @@ class NativeStreamActivity :
                 (lossGuard?.query() ?: "") +
                 // B14: the link notice's state (null = today: nothing)
                 (linkNotice?.query() ?: "") +
+                // B32: one queued surface_lost row (null = today: nothing)
+                (surfaceHold?.query() ?: "") +
+                // B34: the slot map (null = today: nothing)
+                padSlotsQuery() +
                 // D-BASE-T1: the onn's own thermal state travels with the
                 // heartbeat, so a session that never posts a report still
                 // leaves a temperature trace on the host.
@@ -4175,9 +4215,156 @@ class NativeStreamActivity :
     }
 
 
+    // B32: the hold, only with debug.privyhub.surface_hold=<1|ms> (null = today).
+    private val surfaceHold: SurfaceHold? by lazy { SurfaceHoldFlag.fromSystem()?.let { SurfaceHold(it) } }
+
+    @Volatile
+    private var heldSurface: Surface? = null
+
+    private val heldDecoderLock = Any()
+
+    private var holdDeviceListener: android.hardware.input.InputManager.InputDeviceListener? = null
+
+    private val holdExpiry: Runnable by lazy {
+        Runnable {
+            val h = surfaceHold ?: return@Runnable
+            if (!h.holding) return@Runnable
+            if (!h.expired()) {
+                uiHandler.postDelayed(holdExpiry, 100L)
+                return@Runnable
+            }
+            val ageMs = h.stallAgeMs(System.nanoTime() / 1_000_000L, 0L) ?: -1L
+            h.onExpired()
+            // today's surface-loss path, deferred to the bound (the report cached at the loss)
+            restartGuard?.onSurfaceLost(
+                cachedSessionReport,
+                ageMs,
+                if (lastRtpAdvanceAtNs > 0L) (System.nanoTime() - lastRtpAdvanceAtNs) / 1_000_000L else -1L,
+                recoveryActive
+            )
+            stopLocalPipeline()
+            sessionStarted = false
+        }
+    }
+
+    /** B32, `surfaceDestroyed`: the decoder goes (it cannot outlive its surface); the rest keeps running. */
+    private fun beginSurfaceHold(h: SurfaceHold): Boolean {
+        cacheSessionReport()
+        val interactive = try {
+            (getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager)?.isInteractive
+        } catch (_: Exception) {
+            null
+        }
+        h.onSurfaceLost(decoder?.lastOutputAgeMs() ?: -1L, interactive)
+        controllerSender?.neutralize()
+        synchronized(heldDecoderLock) {
+            heldSurface = null
+            val d = decoder
+            decoder = null
+            d?.let { h.onDecoderClosed(it.renderedFrameCount()); it.close() }
+        }
+        // the stall signal reads the held age (the game pauses on the host as at a link stall)
+        stallMonitor?.let { m ->
+            controllerSender?.stallTick = { now ->
+                val i = stallInputs()
+                m.tick(now, h.stallAgeMs(now, i.renderedFrames)?.let { a -> i.copy(outputAgeMs = a) } ?: i)
+            }
+        }
+        uiHandler.removeCallbacks(holdExpiry)
+        uiHandler.postDelayed(holdExpiry, h.boundMs)
+        return true
+    }
+
+    /** B32, `surfaceCreated`: within the bound, the next SPS/PPS builds the decoder on this surface. */
+    private fun endSurfaceHold(h: SurfaceHold, surface: Surface): Boolean {
+        if (!sessionStarted || !h.onSurfaceBack()) return false
+        uiHandler.removeCallbacks(holdExpiry)
+        synchronized(heldDecoderLock) { heldSurface = surface }
+        return true
+    }
+
+    /** B32: the receiver's parameter sets, with the hold: a decoder only on a live surface. */
+    private fun buildHeldDecoder(sps: ByteArray, pps: ByteArray) {
+        synchronized(heldDecoderLock) {
+            if (decoder != null) return
+            val target = heldSurface ?: return
+            try {
+                decoder =
+                    AvcLowLatencyDecoder(
+                        surface = target,
+                        width = VIDEO_WIDTH,
+                        height = VIDEO_HEIGHT,
+                        fps = VIDEO_FPS,
+                        sps = sps,
+                        pps = pps,
+                        staleOutputMs =
+                            requestedStaleOutputMs()
+                    )
+                surfaceHold?.onDecoderBuilt()
+            } catch (error: Exception) {
+                runOnUiThread {
+                    statusView.text =
+                        "MediaCodec setup failed\n" + (error.message ?: "Unknown error")
+                }
+                return
+            }
+        }
+        runOnUiThread {
+            streamState =
+                "Decoder active"
+
+            updateMetrics()
+        }
+    }
+
+    private fun registerHoldDeviceListener() {
+        val im = getSystemService(android.content.Context.INPUT_SERVICE) as? android.hardware.input.InputManager ?: return
+        fun sourcesOf(id: Int): Int = try { android.view.InputDevice.getDevice(id)?.sources ?: 0 } catch (_: Exception) { 0 }
+        val l = object : android.hardware.input.InputManager.InputDeviceListener {
+            override fun onInputDeviceAdded(deviceId: Int) { surfaceHold?.onDevice("added", sourcesOf(deviceId)) }
+            override fun onInputDeviceRemoved(deviceId: Int) { surfaceHold?.onDevice("removed", 0) }
+            override fun onInputDeviceChanged(deviceId: Int) { surfaceHold?.onDevice("changed", sourcesOf(deviceId)) }
+        }
+        try {
+            im.registerInputDeviceListener(l, uiHandler)
+            holdDeviceListener = l
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun unregisterHoldDeviceListener() {
+        val l = holdDeviceListener ?: return
+        holdDeviceListener = null
+        try {
+            (getSystemService(android.content.Context.INPUT_SERVICE) as? android.hardware.input.InputManager)
+                ?.unregisterInputDeviceListener(l)
+        } catch (_: Exception) {
+        }
+    }
+
+    // B32: the foreground's events for the surface_lost rows (null = today: nothing)
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        surfaceHold?.onFocus(hasFocus)
+    }
+
+    override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
+        super.onTopResumedActivityChanged(isTopResumedActivity)
+        surfaceHold?.onTopResumed(isTopResumedActivity)
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        surfaceHold?.onUserLeave()
+    }
+
     override fun dispatchKeyEvent(
         event: KeyEvent
     ): Boolean {
+        // B32: every key noted; a guide / Home-class key from a pad consumed here (null = today)
+        if (surfaceHold?.onKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.source) == true) {
+            return true
+        }
 
         if (
             event.keyCode ==

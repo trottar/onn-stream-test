@@ -1,0 +1,23 @@
+diff a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt	(rejected hunks)
+@@ -2372,6 +2374,12 @@ class NativeStreamActivity :
+         // B11: the self-restart's cause (null = today: no key)
+         restartGuard?.lastCause?.let { c -> root.put("restart_cause", JSONObject(c)) }
+ 
++        // B34: the slot map (null = today: no key)
++        padSlots?.let { s ->
++            root.put("pad_slots_mode", "stable")
++            root.put("pad_slots", s.toJson())
++        }
++
+         // B16: the fast ready's releases (null = today: no key)
+         fastReady?.let { f ->
+             root.put("fast_ready_releases", f.releases)
+@@ -2740,6 +2753,8 @@ class NativeStreamActivity :
+                 (lossGuard?.query() ?: "") +
+                 // B14: the link notice's state (null = today: nothing)
+                 (linkNotice?.query() ?: "") +
++                // B34: the slot map (null = today: nothing)
++                padSlotsQuery() +
+                 // D-BASE-T1: the onn's own thermal state travels with the
+                 // heartbeat, so a session that never posts a report still
+                 // leaves a temperature trace on the host.

@@ -1041,6 +1041,9 @@ class LiveController:
                          "cycle": ({k: video.get(k) for k in ("first_rtp_resume_ms", "ffmpeg_spawn_ms",
                                                                "rtp_silence_after_spawn_ms", "host_verified_ms")}
                                    if isinstance(video, dict) else None),
+                         # B32: an in-place step says so (today's actuator never carries `in_place`: no keys)
+                         **({k: video[k] for k in ("in_place", "ssrc_unchanged", "splice_gap_ms", "in_place_fallback")
+                             if k in video} if isinstance(video, dict) and "in_place" in video else {}),
                          "blackout_reports": self._policy.blackout_remaining})
             if self._policy.last_action is not None:
                 self._policy.last_action.update({"actuation_ms": took_ms, "at_utc": _now_utc(),

@@ -1,0 +1,1231 @@
+diff --git a/companion/privyhub_service.py b/companion/privyhub_service.py
+index 296e6c03a9596aa12ab90e1b2e0d2a5941fd1025..b33b65a9a8bd9fd1cbea7ba8eb786f1b97381c17 100644
+--- a/companion/privyhub_service.py
++++ b/companion/privyhub_service.py
+@@ -1884,6 +1884,15 @@ if os.environ.get("PRIVYHUB_WAN_TELEMETRY", "").strip():
+         ),
+     )
+ 
++# B35: the movie player's retry rows (POST /diagnostics/vod-client), only with
++# PRIVYHUB_VOD_LOG=1. Absent = today: nothing imported, no route.
++VOD_CLIENT_LOG = None
++
++if os.environ.get("PRIVYHUB_VOD_LOG", "").strip() == "1":
++    from vod_log import client_log_from_environ as _vod_client_log_from_environ
++
++    VOD_CLIENT_LOG = _vod_client_log_from_environ(os.environ, PROJECT_ROOT)
++
+ CONTROLLER = PrivyHubController()
+ 
+ # G5-S1: /status gains the wan object while a stream reports, only with the
+@@ -2264,6 +2273,21 @@ class PrivyHubRequestHandler(
+                 )
+                 return
+ 
++            # B35: the movie player's retry rows, only with PRIVYHUB_VOD_LOG=1 (looked up, as B1's gate, so the
++            # handler also runs where it is executed outside this module, as G5-S1's flag-absent test does)
++            if (
++                (_vod_client_log := globals().get("VOD_CLIENT_LOG")) is not None
++                and request_path == "/diagnostics/vod-client"
++            ):
++                try:
++                    payload, _ = self._read_json_body(max_bytes=2_048)
++                    result = _vod_client_log.accept(payload)
++                except ValueError as exc:
++                    self._send_json(400, {"ok": False, "error": str(exc)})
++                    return
++                self._send_json(200, result)
++                return
++
+             if request_path == "/diagnostics/client-health":
+                 try:
+                     payload, payload_bytes = self._read_json_body(
+diff --git a/companion/range_server.py b/companion/range_server.py
+index c8c1337eb1f20bfe1ccbfd6cdcb90fee4252171c..a5326c39b359ab62bf8ffebf95249cbbe01465d5 100644
+--- a/companion/range_server.py
++++ b/companion/range_server.py
+@@ -384,6 +384,20 @@ class RangeRequestHandler(SimpleHTTPRequestHandler):
+             remaining -= len(chunk)
+ 
+ 
++# B35: the per-request range log, only with PRIVYHUB_VOD_LOG=1 (the companion's
++# environment is inherited). Absent = today: nothing imported, the class above
++# not touched, nothing written.
++VOD_LOG = None
++
++if os.environ.get("PRIVYHUB_VOD_LOG", "").strip() == "1":
++    from vod_log import range_log_from_environ as _range_log_from_environ
++
++    VOD_LOG = _range_log_from_environ(
++        os.environ,
++        Path(__file__).resolve().parents[1],
++    )
++    VOD_LOG.install(RangeRequestHandler)
++
+ def parse_args() -> argparse.Namespace:
+     parser = argparse.ArgumentParser(
+         description=(
+diff --git a/companion/vod_log.py b/companion/vod_log.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..8ced819ab108b4caaedaa00e38a81f85b2ad786a
+--- /dev/null
++++ b/companion/vod_log.py
+@@ -0,0 +1,232 @@
++"""B35: the VOD range server's per-request log and the movie player's retry rows.
++
++Only with `PRIVYHUB_VOD_LOG=1` in the service's environment (the range server inherits it). Absent = today:
++this module is never imported, the range server's handler class is not touched, the service has no new route.
++
++- `RangeLog.install(handler_class)` wraps the range server's handler on the class: one row per request into
++  `logs/vod_range.jsonl` -- when it started and ended, the Range header, the status, the length, the bytes actually
++  written, the duration, and how it closed (complete / short / client_reset / broken_pipe / error / no_body). An
++  exception is re-raised, so today's traceback still reaches the range server's log.
++- `ClientLog.accept(payload)` -- the client's `vod_error` / `vod_retry` / `vod_resumed` / `vod_gave_up` rows
++  (`POST /diagnostics/vod-client`), field by field, into `logs/vod_client.jsonl`.
++
++Redacted by construction: no address, no file path, no title, no URL, no query (the media token) in any row; the
++media is an opaque 12-hex id.
++"""
++from __future__ import annotations
++
++import hashlib
++import json
++import re
++import threading
++import time
++from datetime import datetime, timezone
++from pathlib import Path
++from typing import Any, Mapping
++from urllib.parse import unquote, urlsplit
++
++from games.log_rotation import append_line
++
++FLAG_ENV = "PRIVYHUB_VOD_LOG"
++RANGE_LOG_NAME = "vod_range.jsonl"
++CLIENT_LOG_NAME = "vod_client.jsonl"
++MAX_BYTES = 5 * 1024 * 1024
++KEEP = 3
++_RANGE_SHAPE = re.compile(r"^bytes=\d{0,19}-\d{0,19}$")
++CLIENT_EVENTS = ("vod_error", "vod_retry", "vod_resumed", "vod_gave_up")
++CLIENT_INT_FIELDS = ("attempt", "position_ms", "error_code", "delay_ms", "elapsed_ms", "bound_ms", "attempts")
++_HEX12 = re.compile(r"^[0-9a-f]{12}$")
++_CODE_NAME = re.compile(r"^[A-Z0-9_]{1,64}$")
++
++
++def enabled(environ: Mapping[str, str]) -> bool:
++    return (environ.get(FLAG_ENV) or "").strip() == "1"
++
++
++def utc_ms(t: float) -> str:
++    return datetime.fromtimestamp(t, timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
++
++
++def opaque_id(request_path: str) -> str:
++    """12 hex over the URL path only (the query -- the media token -- dropped first)."""
++    path = unquote(urlsplit(request_path).path)
++    return hashlib.sha256(("privyhub-vod:" + path).encode("utf-8", "replace")).hexdigest()[:12]
++
++
++def _kind(request_path: str) -> str:
++    parts = [p for p in unquote(urlsplit(request_path).path).split("/") if p]
++    return "vod" if parts[:1] == ["vod"] else "media"
++
++
++class _Writer:
++    """Appends JSON rows to one rotating log under logs/; one lock per file."""
++
++    def __init__(self, project_root: Path, name: str) -> None:
++        self.path = Path(project_root) / "logs" / name
++        self._lock = threading.Lock()
++
++    def write(self, row: Mapping[str, Any]) -> None:
++        line = json.dumps(row, sort_keys=False)
++        with self._lock:
++            append_line(self.path, line, max_bytes=MAX_BYTES, keep=KEEP)
++
++
++class _Counting:
++    """The socket file, counting what was written to it."""
++
++    def __init__(self, raw: Any, box: dict) -> None:
++        self._raw = raw
++        self._box = box
++
++    def write(self, data: Any) -> Any:
++        n = self._raw.write(data)
++        self._box["bytes"] += len(data) if n is None else n
++        return n
++
++    def __getattr__(self, name: str) -> Any:
++        return getattr(self._raw, name)
++
++
++class RangeLog:
++    def __init__(self, project_root: Path, clock=time.time, mono=time.monotonic) -> None:
++        self._out = _Writer(project_root, RANGE_LOG_NAME)
++        self._clock = clock
++        self._mono = mono
++
++    def install(self, handler_class: type) -> type:
++        log = self
++        orig_send_response = handler_class.send_response
++        orig_send_header = handler_class.send_header
++        orig_copyfile = handler_class.copyfile
++
++        def send_response(self, code, message=None):
++            box = getattr(self, "_b35_box", None)
++            if box is not None and box["status"] is None:
++                box["status"] = int(code)
++            return orig_send_response(self, code, message)
++
++        def send_header(self, keyword, value):
++            box = getattr(self, "_b35_box", None)
++            if box is not None and str(keyword).lower() == "content-length":
++                try:
++                    box["length"] = int(value)
++                except (TypeError, ValueError):
++                    pass
++            return orig_send_header(self, keyword, value)
++
++        def copyfile(self, source, outputfile):
++            box = getattr(self, "_b35_box", None)
++            if box is None:
++                return orig_copyfile(self, source, outputfile)
++            box["body"] = True
++            return orig_copyfile(self, source, _Counting(outputfile, box))
++
++        def wrap(method_name: str):
++            orig = getattr(handler_class, method_name)
++
++            def logged(self):
++                box = {"status": None, "length": None, "bytes": 0, "body": False}
++                self._b35_box = box
++                t0, m0 = log._clock(), log._mono()
++                closed, error = None, None
++                try:
++                    return orig(self)
++                except BrokenPipeError:
++                    closed = "broken_pipe"
++                    raise
++                except ConnectionResetError:
++                    closed = "client_reset"
++                    raise
++                except Exception as exc:
++                    closed, error = "error", type(exc).__name__
++                    raise
++                finally:
++                    self._b35_box = None
++                    try:
++                        log._row(self, method_name[3:], box, t0, m0, closed, error)
++                    except Exception:
++                        pass  # the log must never disturb a request
++
++            logged.__name__ = method_name
++            return logged
++
++        handler_class.send_response = send_response
++        handler_class.send_header = send_header
++        handler_class.copyfile = copyfile
++        handler_class.do_GET = wrap("do_GET")
++        handler_class.do_HEAD = wrap("do_HEAD")
++        return handler_class
++
++    def _row(self, handler: Any, method: str, box: dict, t0: float, m0: float, closed, error) -> None:
++        if closed is None:
++            if not box["body"]:
++                closed = "no_body"
++            elif box["length"] is not None and box["bytes"] < box["length"]:
++                closed = "short"
++            else:
++                closed = "complete"
++        rng = None
++        try:
++            raw = handler.headers.get("Range")
++        except Exception:
++            raw = None
++        if raw is not None:
++            rng = raw.strip() if _RANGE_SHAPE.match(raw.strip()) else "invalid"
++        row = {
++            "at_utc": utc_ms(t0),
++            "end_utc": utc_ms(self._clock()),
++            "event": "vod_range",
++            "method": method,
++            "id": opaque_id(getattr(handler, "path", "") or ""),
++            "kind": _kind(getattr(handler, "path", "") or ""),
++            "range": rng,
++            "status": box["status"],
++            "length": box["length"],
++            "bytes": box["bytes"],
++            "duration_ms": int(round((self._mono() - m0) * 1000)),
++            "closed": closed,
++        }
++        if error:
++            row["error"] = error
++        self._out.write(row)
++
++
++class ClientLog:
++    def __init__(self, project_root: Path, clock=time.time) -> None:
++        self._out = _Writer(project_root, CLIENT_LOG_NAME)
++        self._clock = clock
++
++    def accept(self, payload: Any) -> dict:
++        if not isinstance(payload, dict):
++            raise ValueError("vod-client: an object expected")
++        event = payload.get("event")
++        if event not in CLIENT_EVENTS:
++            raise ValueError("vod-client: unknown event")
++        row: dict[str, Any] = {"at_utc": utc_ms(self._clock()), "event": event}
++        for key, value in payload.items():
++            if key == "event":
++                continue
++            if key in CLIENT_INT_FIELDS:
++                if isinstance(value, bool) or not isinstance(value, int):
++                    raise ValueError(f"vod-client: {key} not an int")
++                row[key] = value
++            elif key == "media":
++                if not isinstance(value, str) or not _HEX12.match(value):
++                    raise ValueError("vod-client: media not an opaque id")
++                row[key] = value
++            elif key == "error_name":
++                if not isinstance(value, str) or not _CODE_NAME.match(value):
++                    raise ValueError("vod-client: error_name not a code name")
++                row[key] = value
++            else:
++                raise ValueError("vod-client: unknown field")
++        self._out.write(row)
++        return {"ok": True, "recorded": event}
++
++
++def range_log_from_environ(environ: Mapping[str, str], project_root: Path) -> RangeLog | None:
++    return RangeLog(project_root) if enabled(environ) else None
++
++
++def client_log_from_environ(environ: Mapping[str, str], project_root: Path) -> ClientLog | None:
++    return ClientLog(project_root) if enabled(environ) else None
+diff --git a/PrivyHub/app/src/main/java/MainActivity.kt b/PrivyHub/app/src/main/java/MainActivity.kt
+index 7f19a41468fbce54c3742b9a1ed58d3266e2ffda..ec952a6bd09df510e24d96686ea5577604e11ab5 100644
+--- a/PrivyHub/app/src/main/java/MainActivity.kt
++++ b/PrivyHub/app/src/main/java/MainActivity.kt
+@@ -3,6 +3,9 @@ package com.safeiot.privyhub
+ import android.content.Intent
+ import com.safeiot.privyhub.identity.PrivyHubIdentity
+ import com.safeiot.privyhub.identity.hubMediaDataSourceFactory
++import com.safeiot.privyhub.vod.VodRetryAndroid
++import com.safeiot.privyhub.vod.VodRetryController
++import com.safeiot.privyhub.vod.VodRetryFlag
+ import android.graphics.Bitmap
+ import android.graphics.BitmapFactory
+ import android.graphics.drawable.BitmapDrawable
+@@ -65,6 +68,9 @@ class MainActivity : AppCompatActivity() {
+ 
+     private var player: ExoPlayer? = null
+ 
++    // B35: the movie player's retry, only with debug.privyhub.vod_retry=1 and VOD (never live). null = today.
++    private var vodRetry: VodRetryAndroid? = null
++
+     private lateinit var playerView: PlayerView
+     private lateinit var previewPlayerHost: ViewGroup
+     private lateinit var fullscreenPlayerHost: ViewGroup
+@@ -15435,6 +15441,20 @@ private fun requestGameStateAction(
+             playback.type ==
+                 "live"
+ 
++        // B35: null unless the flag reads 1 (and not live): every vodRetry?. below is then a no-op.
++        vodRetry =
++            if (VodRetryController.wanted(VodRetryFlag.read(), isLive)) {
++                VodRetryAndroid(
++                    this,
++                    playerView,
++                    sourceId,
++                    { "http://${getCompanionHost()}:$CONTROL_PORT/diagnostics/vod-client" },
++                    { player }
++                )
++            } else {
++                null
++            }
++
+ 
+         val loadControl =
+             if (isLive) {
+@@ -15576,6 +15596,12 @@ private fun requestGameStateAction(
+                                 saveCurrentProgress()
+ 
+ 
++                                // B35: a retryable VOD load / IO error retries (null = today)
++                                if (vodRetry?.onError(error, exoPlayer.currentPosition) == true) {
++                                    return
++                                }
++
++
+                                 if (
+                                     !playback.url.isNullOrBlank()
+                                 ) {
+@@ -15610,6 +15636,10 @@ private fun requestGameStateAction(
+                                     statusText.text =
+                                         "Playback error"
+                                 }
++
++
++                                // B35: past the bound, Retry offered (null = today)
++                                vodRetry?.afterTodaysError()
+                             }
+ 
+ 
+@@ -15646,6 +15676,12 @@ private fun requestGameStateAction(
+                                 )
+ 
+ 
++                                // B35: a retry episode closes on READY (null = today)
++                                if (playbackState == Player.STATE_READY) {
++                                    vodRetry?.onReady()
++                                }
++
++
+                                 Log.d(
+                                     TAG,
+                                     "Buffered position = " +
+@@ -15801,6 +15837,10 @@ private fun requestGameStateAction(
+         preserveFullscreen: Boolean = false
+     ) {
+ 
++        // B35: a pending retry dropped (null = today)
++        vodRetry?.cancel()
++        vodRetry = null
++
+         saveCurrentProgress()
+ 
+         stopPlaybackUiTicker()
+diff --git a/PrivyHub/app/src/main/java/vod/VodRetryAndroid.kt b/PrivyHub/app/src/main/java/vod/VodRetryAndroid.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..c8c4f24011b78cb6c856c1cd6d25dcdf42f04734
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/vod/VodRetryAndroid.kt
+@@ -0,0 +1,149 @@
++package com.safeiot.privyhub.vod
++
++import android.app.Activity
++import android.graphics.Color
++import android.os.Handler
++import android.os.Looper
++import android.os.SystemClock
++import android.view.Gravity
++import android.widget.FrameLayout
++import android.widget.TextView
++import androidx.appcompat.app.AlertDialog
++import androidx.media3.common.PlaybackException
++import androidx.media3.exoplayer.ExoPlayer
++import androidx.media3.ui.PlayerView
++import com.safeiot.privyhub.identity.PrivyHubIdentity
++import org.json.JSONObject
++import java.net.HttpURLConnection
++import java.net.URL
++import kotlin.concurrent.thread
++
++/**
++ * B35: the Android side of [VodRetryController] -- the main-thread scheduler, the "reconnecting…" mark on the
++ * player's overlay, the Retry dialog, and the rows posted to the hub (`POST /diagnostics/vod-client`, JSON, the
++ * session header as every control call; every failure ignored). Built by MainActivity only when
++ * `debug.privyhub.vod_retry=1` and the playback is not live.
++ */
++class VodRetryAndroid(
++    private val activity: Activity,
++    private val playerView: PlayerView,
++    sourceId: String,
++    private val rowsUrl: () -> String,
++    private val currentPlayer: () -> ExoPlayer?,
++) {
++    private val handler = Handler(Looper.getMainLooper())
++    private var pending: Runnable? = null
++    private var mark: TextView? = null
++
++    private val controller = VodRetryController(
++        policy = VodRetryPolicy(),
++        player = object : VodRetryController.Player {
++            override fun retryAt(positionMs: Long) {
++                val p = currentPlayer() ?: return
++                p.seekTo(positionMs)
++                p.prepare()
++                p.playWhenReady = true
++            }
++        },
++        scheduler = object : VodRetryController.Scheduler {
++            override fun schedule(delayMs: Long, task: () -> Unit) {
++                val r = Runnable {
++                    pending = null
++                    task()
++                }
++                pending = r
++                handler.postDelayed(r, delayMs)
++            }
++
++            override fun cancel() {
++                pending?.let { handler.removeCallbacks(it) }
++                pending = null
++            }
++        },
++        clock = { SystemClock.elapsedRealtime() },
++        rows = { post(it) },
++        ui = object : VodRetryController.Ui {
++            override fun showMark(attempt: Int) = show()
++            override fun hideMark() = hide()
++            override fun offerRetry() = dialog()
++        },
++        sourceId = sourceId,
++    )
++
++    fun onError(error: PlaybackException, positionMs: Long): Boolean =
++        controller.onError(error.errorCode, error.errorCodeName, positionMs)
++
++    fun afterTodaysError() = controller.afterTodaysError()
++
++    fun onReady() = controller.onReady()
++
++    fun cancel() = controller.cancel()
++
++    private fun show() {
++        if (mark != null) {
++            return
++        }
++        val frame = playerView.overlayFrameLayout ?: return
++        val view = TextView(activity).apply {
++            text = "reconnecting…"
++            textSize = 14f
++            setTextColor(Color.WHITE)
++            setBackgroundColor(Color.argb(140, 0, 0, 0))
++            setPadding(16, 8, 16, 8)
++        }
++        frame.addView(
++            view,
++            FrameLayout.LayoutParams(
++                FrameLayout.LayoutParams.WRAP_CONTENT,
++                FrameLayout.LayoutParams.WRAP_CONTENT,
++                Gravity.TOP or Gravity.END
++            ).apply { setMargins(0, 24, 24, 0) }
++        )
++        mark = view
++    }
++
++    private fun hide() {
++        val view = mark ?: return
++        (view.parent as? FrameLayout)?.removeView(view)
++        mark = null
++    }
++
++    private fun dialog() {
++        if (activity.isFinishing) {
++            return
++        }
++        AlertDialog.Builder(activity)
++            .setTitle("Playback error")
++            .setMessage("The connection to the hub was lost.")
++            .setPositiveButton("Retry") { _, _ -> controller.manualRetry() }
++            .setNegativeButton("Close", null)
++            .show()
++    }
++
++    private fun post(row: Map<String, Any>) {
++        val url = try {
++            rowsUrl()
++        } catch (_: Exception) {
++            return
++        }
++        val body = JSONObject(row).toString().toByteArray(Charsets.UTF_8)
++        thread(start = true, isDaemon = true, name = "PrivyHub-VodRetry-Row") {
++            try {
++                val c = (URL(url).openConnection() as HttpURLConnection).apply {
++                    requestMethod = "POST"
++                    connectTimeout = 1_500
++                    readTimeout = 1_500
++                    doOutput = true
++                    setRequestProperty("Content-Type", "application/json")
++                    setFixedLengthStreamingMode(body.size)
++                }
++                PrivyHubIdentity.decorate(activity, c, url)
++                c.outputStream.use { it.write(body) }
++                c.responseCode
++                c.disconnect()
++            } catch (_: Exception) {
++                // a diagnostic row must never disturb playback
++            }
++        }
++    }
++}
+diff --git a/PrivyHub/app/src/main/java/vod/VodRetry.kt b/PrivyHub/app/src/main/java/vod/VodRetry.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..11a4cdf2dad0984bd1b924e3664cf3e11b35dc05
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/vod/VodRetry.kt
+@@ -0,0 +1,176 @@
++package com.safeiot.privyhub.vod
++
++import java.security.MessageDigest
++
++/**
++ * B35: the movie player retries by itself. Behind `debug.privyhub.vod_retry=1` (CL-B7P's convention; a reboot
++ * clears it). Absent / empty / `0` / junk = today: no controller, so MainActivity's `vodRetry?.` calls are no-ops and
++ * a load / IO error shows today's "Playback error" at once.
++ *
++ * With the flag, on a retryable load / IO error during VOD (not live) playback: reconnect, seek to the position of
++ * the episode's first error, resume -- backoff [BACKOFF_MS] then 15 s each, for up to [BOUND_MS] from the first
++ * error; a small "reconnecting…" mark meanwhile; past the bound today's error plus a Retry button. Each step is a row
++ * to the host (`vod_error` / `vod_retry` / `vod_resumed` / `vod_gave_up`); no title, path or URL in any row.
++ *
++ * Pure Kotlin (no Android type) so the JVM tests drive it with a fake clock, scheduler and player.
++ */
++object VodRetryFlag {
++    const val PROPERTY = "debug.privyhub.vod_retry"
++
++    fun parse(raw: String?): Boolean = raw?.trim() == "1"
++
++    fun read(): Boolean =
++        try {
++            val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
++            parse(get.invoke(null, PROPERTY) as? String)
++        } catch (_: Throwable) {
++            false
++        }
++}
++
++class VodRetryPolicy(
++    val backoffMs: LongArray = BACKOFF_MS,
++    val boundMs: Long = BOUND_MS,
++) {
++    /** The delay before attempt [attempt] (1-based): 1, 2, 4, 8, 15 s, then 15 s each. */
++    fun delayBefore(attempt: Int): Long = backoffMs[(attempt - 1).coerceIn(0, backoffMs.size - 1)]
++
++    companion object {
++        val BACKOFF_MS = longArrayOf(1_000L, 2_000L, 4_000L, 8_000L, 15_000L)
++        const val BOUND_MS = 150_000L
++
++        /** Media3 codes: TIMEOUT 1003; IO 2000 unspecified, 2001 connection failed, 2002 timeout, 2004 bad status. */
++        val RETRYABLE = setOf(1003, 2000, 2001, 2002, 2004)
++
++        fun isRetryable(code: Int): Boolean = code in RETRYABLE
++    }
++}
++
++class VodRetryController(
++    private val policy: VodRetryPolicy,
++    private val player: Player,
++    private val scheduler: Scheduler,
++    private val clock: () -> Long,
++    private val rows: (Map<String, Any>) -> Unit,
++    private val ui: Ui,
++    sourceId: String,
++) {
++    interface Player {
++        /** Reconnect and resume at [positionMs] (Media3: seekTo, prepare, playWhenReady). */
++        fun retryAt(positionMs: Long)
++    }
++
++    interface Scheduler {
++        fun schedule(delayMs: Long, task: () -> Unit)
++        fun cancel()
++    }
++
++    interface Ui {
++        fun showMark(attempt: Int)
++        fun hideMark()
++        fun offerRetry()
++    }
++
++    val media: String = opaqueId(sourceId)
++
++    private var firstErrorAtMs = -1L
++    private var positionMs = 0L
++    private var attempts = 0
++    private var lastCode = 0
++    private var lastName = ""
++    private var gaveUp = false
++    private var cancelled = false
++
++    val retrying: Boolean get() = firstErrorAtMs >= 0 && !gaveUp
++
++    /** True = handled (an attempt is scheduled); false = today's error path runs now. */
++    fun onError(code: Int, codeName: String, currentPositionMs: Long): Boolean {
++        if (cancelled || !VodRetryPolicy.isRetryable(code)) {
++            return false
++        }
++        val now = clock()
++        lastCode = code
++        lastName = codeName
++        if (firstErrorAtMs < 0 || gaveUp) {
++            firstErrorAtMs = now
++            positionMs = currentPositionMs.coerceAtLeast(0L)
++            attempts = 0
++            gaveUp = false
++            rows(row("vod_error") + mapOf("error_code" to code, "error_name" to codeName))
++        }
++        val next = attempts + 1
++        val delay = policy.delayBefore(next)
++        val elapsed = now - firstErrorAtMs
++        if (elapsed + delay > policy.boundMs) {
++            gaveUp = true
++            scheduler.cancel()
++            ui.hideMark()
++            rows(row("vod_gave_up") + mapOf("attempts" to attempts, "elapsed_ms" to elapsed,
++                "error_code" to code, "error_name" to codeName))
++            return false
++        }
++        attempts = next
++        rows(row("vod_retry") + mapOf("attempt" to next, "delay_ms" to delay, "elapsed_ms" to elapsed,
++            "error_code" to code, "error_name" to codeName))
++        ui.showMark(next)
++        scheduler.cancel()
++        scheduler.schedule(delay) {
++            if (!cancelled && retrying) {
++                player.retryAt(positionMs)
++            }
++        }
++        return true
++    }
++
++    /** After today's error branch ran: past the bound, offer Retry (new, flag only). */
++    fun afterTodaysError() {
++        if (gaveUp && !cancelled) {
++            ui.offerRetry()
++        }
++    }
++
++    /** The player is READY: an open episode closes. */
++    fun onReady() {
++        if (firstErrorAtMs < 0 || gaveUp || cancelled) {
++            return
++        }
++        rows(row("vod_resumed") + mapOf("attempts" to attempts, "elapsed_ms" to (clock() - firstErrorAtMs)))
++        ui.hideMark()
++        firstErrorAtMs = -1L
++        attempts = 0
++    }
++
++    /** The Retry button: a new episode at the saved position, the first attempt at once. */
++    fun manualRetry() {
++        if (cancelled) {
++            return
++        }
++        firstErrorAtMs = clock()
++        attempts = 1
++        gaveUp = false
++        rows(row("vod_retry") + mapOf("attempt" to 1, "delay_ms" to 0L, "elapsed_ms" to 0L,
++            "error_code" to lastCode, "error_name" to lastName))
++        ui.showMark(1)
++        player.retryAt(positionMs)
++    }
++
++    fun cancel() {
++        cancelled = true
++        scheduler.cancel()
++        ui.hideMark()
++    }
++
++    private fun row(event: String): Map<String, Any> =
++        mapOf("event" to event, "media" to media, "position_ms" to positionMs, "bound_ms" to policy.boundMs)
++
++    companion object {
++        fun opaqueId(sourceId: String): String =
++            MessageDigest.getInstance("SHA-256")
++                .digest(("privyhub-vod-source:" + sourceId).toByteArray(Charsets.UTF_8))
++                .take(6)
++                .joinToString("") { "%02x".format(it) }
++
++        /** As MainActivity builds it: only with the flag, only for VOD (never live). */
++        fun wanted(flag: Boolean, isLive: Boolean): Boolean = flag && !isLive
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/vod/VodRetryTest.kt b/PrivyHub/app/src/test/java/vod/VodRetryTest.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..e5677695c4e6849c511e750ff8e027a81b620335
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/vod/VodRetryTest.kt
+@@ -0,0 +1,223 @@
++package com.safeiot.privyhub.vod
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * B35: the movie player's retry on a fake clock, scheduler, player and server. The fake server serves a movie at
++ * a fixed byte rate and drops the connection at a byte position (TRIP-R2 §4: ~1 h 50 min in); it comes back after a
++ * while, or never. The fake player plays from it, raises Media3's 2001 at the drop, and reconnects with a Range from
++ * the position it is asked to seek to.
++ */
++class VodRetryTest {
++
++    private class Clock { var now = 0L }
++
++    private class FakeScheduler(private val clock: Clock) : VodRetryController.Scheduler {
++        var task: Pair<Long, () -> Unit>? = null
++        override fun schedule(delayMs: Long, task: () -> Unit) { this.task = (clock.now + delayMs) to task }
++        override fun cancel() { task = null }
++
++        /** Runs the pending task when due, until [until]; each run may schedule the next. */
++        fun runUntil(until: Long) {
++            while (true) {
++                val t = task ?: break
++                if (t.first > until) break
++                clock.now = t.first
++                task = null
++                t.second()
++            }
++            if (clock.now < until) clock.now = until
++        }
++    }
++
++    /** A movie at [bytesPerMs]; the connection drops at [dropAtByte]; the server is back at [upAtMs] (or never). */
++    private class FakeServer(val bytesPerMs: Long, val dropAtByte: Long, var upAtMs: Long?) {
++        val rangeStarts = mutableListOf<Long>()
++        fun open(nowMs: Long, fromByte: Long): Boolean {
++            rangeStarts.add(fromByte)
++            val up = upAtMs
++            return up != null && nowMs >= up
++        }
++    }
++
++    private class FakeUi : VodRetryController.Ui {
++        var markShown = false
++        var marks = 0
++        var retryOffered = 0
++        override fun showMark(attempt: Int) { markShown = true; marks++ }
++        override fun hideMark() { markShown = false }
++        override fun offerRetry() { retryOffered++ }
++    }
++
++    private inner class Rig(upAtMs: Long?, private val flag: Boolean = true) {
++        val clock = Clock()
++        val scheduler = FakeScheduler(clock)
++        val ui = FakeUi()
++        val rows = mutableListOf<Map<String, Any>>()
++        val server = FakeServer(bytesPerMs = 500L, dropAtByte = 6_600_000L * 500L, upAtMs = upAtMs)
++        var positionMs = 0L
++        var ready = false
++        var todaysErrorShown = 0
++        lateinit var controller: VodRetryController
++
++        val player = object : VodRetryController.Player {
++            override fun retryAt(positionMs: Long) {
++                this@Rig.positionMs = positionMs
++                if (server.open(clock.now, positionMs * server.bytesPerMs)) {
++                    ready = true
++                    controller.onReady()
++                } else {
++                    error()          // Media3 reports the failed open as a fresh 2001
++                }
++            }
++        }
++
++        /** As MainActivity: built only with the flag and not live. */
++        val built: VodRetryController? =
++            if (VodRetryController.wanted(flag, isLive = false)) {
++                VodRetryController(VodRetryPolicy(), player, scheduler, { clock.now }, { rows.add(it) }, ui,
++                    "vod:/library/A Long Feature (2026).mkv").also { controller = it }
++            } else null
++
++        /** MainActivity's onPlayerError: today's branch runs unless the controller handled the error. */
++        fun error(code: Int = 2001, name: String = "ERROR_CODE_IO_NETWORK_CONNECTION_FAILED") {
++            ready = false
++            if (built?.onError(code, name, positionMs) == true) return
++            todaysErrorShown++
++            built?.afterTodaysError()
++        }
++
++        /** Plays from the start at 1x until the server drops the connection at its byte position. */
++        fun playToTheDrop() {
++            server.open(0L, 0L)
++            ready = true
++            val dropMs = server.dropAtByte / server.bytesPerMs
++            clock.now = dropMs
++            positionMs = dropMs
++            error()
++        }
++
++        fun events() = rows.map { it["event"] }
++    }
++
++    @Test
++    fun theFlag() {
++        assertTrue(VodRetryFlag.parse("1"))
++        assertTrue(VodRetryFlag.parse(" 1 "))
++        for (v in listOf(null, "", "0", "true", "yes", "2", "junk")) assertFalse(v.toString(), VodRetryFlag.parse(v))
++        assertFalse(VodRetryFlag.read())          // no SystemProperties on the JVM: off
++        assertTrue(VodRetryController.wanted(true, isLive = false))
++        assertFalse(VodRetryController.wanted(true, isLive = true))
++        assertFalse(VodRetryController.wanted(false, isLive = false))
++    }
++
++    @Test
++    fun theBackoffAndTheBound() {
++        val p = VodRetryPolicy()
++        assertEquals(listOf(1_000L, 2_000L, 4_000L, 8_000L, 15_000L, 15_000L, 15_000L), (1..7).map { p.delayBefore(it) })
++        assertTrue(p.boundMs >= 120_000L)
++        assertEquals(150_000L, p.boundMs)
++        assertTrue(VodRetryPolicy.isRetryable(2001))
++        assertFalse(VodRetryPolicy.isRetryable(2005))
++        assertFalse(VodRetryPolicy.isRetryable(4001))
++    }
++
++    @Test
++    fun aDropAtABytePositionResumesThereWithinTheBound() {
++        val r = Rig(upAtMs = null)
++        r.playToTheDrop()
++        val dropMs = 6_600_000L
++        val dropByte = r.server.dropAtByte
++        assertTrue(r.ui.markShown)
++        assertEquals(0, r.todaysErrorShown)
++        r.server.upAtMs = dropMs + 10_000L                    // the link heals 10 s after the drop
++        r.scheduler.runUntil(dropMs + VodRetryPolicy.BOUND_MS)
++        assertTrue(r.ready)
++        assertEquals(dropMs, r.positionMs)
++        assertEquals(dropByte, r.server.rangeStarts.last())   // the reconnect's Range starts at the drop's byte
++        assertEquals(listOf(0L, dropByte, dropByte, dropByte, dropByte), r.server.rangeStarts)
++        assertEquals(listOf("vod_error", "vod_retry", "vod_retry", "vod_retry", "vod_retry", "vod_resumed"), r.events())
++        val resumed = r.rows.last()
++        assertEquals(4, resumed["attempts"])
++        assertEquals(15_000L, resumed["elapsed_ms"])          // attempts at +1, +3, +7, +15 s
++        assertTrue((resumed["elapsed_ms"] as Long) <= VodRetryPolicy.BOUND_MS)
++        assertEquals(dropMs, resumed["position_ms"])
++        assertFalse(r.ui.markShown)
++        assertEquals(0, r.todaysErrorShown)
++        assertEquals(0, r.ui.retryOffered)
++        assertNull(r.scheduler.task)
++    }
++
++    @Test
++    fun theServerDownGivesTodaysErrorAfterTheBoundThenRetry() {
++        val r = Rig(upAtMs = null)
++        r.playToTheDrop()
++        val dropMs = r.clock.now
++        r.scheduler.runUntil(dropMs + 10 * 60_000L)
++        assertFalse(r.ready)
++        assertEquals(1, r.todaysErrorShown)                   // today's "Playback error", once
++        assertEquals(1, r.ui.retryOffered)
++        assertFalse(r.ui.markShown)
++        val gaveUp = r.rows.last()
++        assertEquals("vod_gave_up", gaveUp["event"])
++        val elapsed = gaveUp["elapsed_ms"] as Long
++        assertTrue("elapsed $elapsed", elapsed in 120_000L..VodRetryPolicy.BOUND_MS)
++        assertEquals(13, gaveUp["attempts"])                  // +1 +3 +7 +15 +30 … +150 s (the bound inclusive)
++        assertEquals(dropMs, gaveUp["position_ms"])
++        assertTrue(r.server.rangeStarts.drop(1).all { it == r.server.dropAtByte })
++        // the Retry button: the server is back now
++        r.server.upAtMs = r.clock.now
++        r.controller.manualRetry()
++        assertTrue(r.ready)
++        assertEquals(dropMs, r.positionMs)
++        assertEquals("vod_resumed", r.rows.last()["event"])
++    }
++
++    @Test
++    fun aNonRetryableErrorIsTodaysAtOnce() {
++        val r = Rig(upAtMs = null)
++        r.error(code = 2005, name = "ERROR_CODE_IO_FILE_NOT_FOUND")
++        assertEquals(1, r.todaysErrorShown)
++        assertTrue(r.rows.isEmpty())
++        assertEquals(0, r.ui.retryOffered)
++        assertNull(r.scheduler.task)
++    }
++
++    @Test
++    fun cancelDropsThePendingAttempt() {
++        val r = Rig(upAtMs = 0L)
++        r.playToTheDrop()
++        r.controller.cancel()
++        r.scheduler.runUntil(r.clock.now + 60_000L)
++        assertFalse(r.ready)
++        assertEquals(listOf("vod_error", "vod_retry"), r.events())
++        assertFalse(r.ui.markShown)
++    }
++
++    @Test
++    fun noTitleOrPathInAnyRow() {
++        val r = Rig(upAtMs = null)
++        r.playToTheDrop()
++        r.scheduler.runUntil(r.clock.now + 10 * 60_000L)
++        val text = r.rows.joinToString { it.toString() }
++        for (bad in listOf("Long", "Feature", "mkv", "library", "/")) assertFalse(bad, text.contains(bad))
++        assertTrue(r.rows.all { (it["media"] as String).matches(Regex("^[0-9a-f]{12}$")) })
++    }
++
++    @Test
++    fun absentIsToday() {
++        val r = Rig(upAtMs = 0L, flag = false)
++        assertNull(r.built)
++        r.positionMs = 6_600_000L
++        r.error()
++        assertEquals(1, r.todaysErrorShown)                   // "Playback error" at once, no retry
++        assertTrue(r.rows.isEmpty())
++        assertNull(r.scheduler.task)
++        assertEquals(0, r.ui.marks)
++        assertTrue(r.server.rangeStarts.isEmpty())
++    }
++}
+diff --git a/tests/vod_log/test_vod_log.py b/tests/vod_log/test_vod_log.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..4eb8a0e256dc140da617e7f4dcb29b428198d234
+--- /dev/null
++++ b/tests/vod_log/test_vod_log.py
+@@ -0,0 +1,261 @@
++"""B35: the range server's per-request log and the movie player's retry rows, behind PRIVYHUB_VOD_LOG=1.
++
++Loopback only. A real RangeRequestHandler (a subclass, so the module's own class is never touched) with the log
++installed, over a temp root with a 16 MiB file under vod/. Absent = today: the module imports nothing new, the class
++is the base file's AST, and the same request gets the same bytes from the base and the new server.
++"""
++from __future__ import annotations
++
++import ast
++import ipaddress
++import json
++import os
++import socket
++import struct
++import subprocess
++import sys
++import tempfile
++import threading
++import time
++import unittest
++from functools import partial
++from http.server import ThreadingHTTPServer
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++BASE = Path(os.environ.get("B35_BASE_COMPANION", "/tmp/b_q31l_base/companion"))
++
++import range_server  # noqa: E402
++import vod_log  # noqa: E402
++
++LOOP = str(ipaddress.ip_address(0x7F000001))
++SIZE = 16 * 1024 * 1024     # more than loopback's socket buffers hold, so a reset lands mid-body
++TITLE = "A Long Feature (2026).mkv"
++
++
++def _payload() -> bytes:
++    return (bytes(range(251)) * (SIZE // 251 + 1))[:SIZE]
++
++
++class _Server:
++    def __init__(self, root: Path, handler_cls: type) -> None:
++        handler = partial(handler_cls, directory=str(root), vod_directory=str(root / "vod"))
++        self.httpd = ThreadingHTTPServer((LOOP, 0), handler)
++        self.httpd.daemon_threads = True
++        self.port = self.httpd.server_address[1]
++        self.httpd.handle_error = lambda *a: None      # the test's own resets: no traceback noise
++        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
++
++    def close(self) -> None:
++        self.httpd.shutdown()
++        self.httpd.server_close()
++
++
++def _raw(port: int, request: bytes, read_limit: int | None = None, reset: bool = False) -> bytes:
++    s = socket.create_connection((LOOP, port), timeout=5)
++    s.sendall(request)
++    got = b""
++    try:
++        while True:
++            chunk = s.recv(65536)
++            if not chunk:
++                break
++            got += chunk
++            if read_limit is not None and len(got) >= read_limit:
++                break
++    finally:
++        if reset:
++            s.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
++        s.close()
++    return got
++
++
++def _get(path: str, rng: str | None = None, method: str = "GET") -> bytes:
++    lines = [f"{method} {path} HTTP/1.1", "Host: hub", "Connection: close"]
++    if rng:
++        lines.append(f"Range: {rng}")
++    return ("\r\n".join(lines) + "\r\n\r\n").encode()
++
++
++class RangeLogTest(unittest.TestCase):
++    def setUp(self) -> None:
++        self.tmp = tempfile.TemporaryDirectory()
++        self.root = Path(self.tmp.name) / "media"
++        (self.root / "vod").mkdir(parents=True)
++        (self.root / "vod" / TITLE).write_bytes(_payload())
++        self.project = Path(self.tmp.name) / "project"
++        cls = type("Logged", (range_server.RangeRequestHandler,), {})
++        cls.log_message = lambda *a, **k: None
++        vod_log.RangeLog(self.project).install(cls)
++        self.server = _Server(self.root, cls)
++        self.path = "/vod/" + TITLE.replace(" ", "%20").replace("(", "%28").replace(")", "%29") + "?media_token=secret"
++
++    def tearDown(self) -> None:
++        self.server.close()
++        self.tmp.cleanup()
++
++    def rows(self, n: int, timeout: float = 5.0) -> list[dict]:
++        p = self.project / "logs" / "vod_range.jsonl"
++        end = time.time() + timeout
++        while time.time() < end:
++            if p.exists():
++                rows = [json.loads(x) for x in p.read_text().splitlines() if x.strip()]
++                if len(rows) >= n:
++                    return rows
++            time.sleep(0.02)
++        self.fail(f"fewer than {n} rows")
++
++    def assert_redacted(self, row: dict) -> None:
++        text = json.dumps(row)
++        for bad in ("Long", "Feature", "mkv", "vod/", "secret", "media_token", LOOP):
++            self.assertNotIn(bad, text)
++        self.assertRegex(row["id"], r"^[0-9a-f]{12}$")
++
++    def test_a_drop_mid_body_is_a_reset_or_broken_pipe_with_the_bytes_so_far(self) -> None:
++        _raw(self.server.port, _get(self.path, "bytes=0-"), read_limit=100 * 1024, reset=True)
++        row = self.rows(1)[0]
++        self.assertEqual(row["event"], "vod_range")
++        self.assertEqual(row["method"], "GET")
++        self.assertEqual(row["kind"], "vod")
++        self.assertEqual(row["range"], "bytes=0-")
++        self.assertEqual(row["status"], 206)
++        self.assertEqual(row["length"], SIZE)
++        self.assertIn(row["closed"], ("client_reset", "broken_pipe"))
++        self.assertLess(row["bytes"], SIZE)
++        self.assertGreaterEqual(row["duration_ms"], 0)
++        self.assertRegex(row["at_utc"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$")
++        self.assert_redacted(row)
++
++    def test_a_full_read_and_a_resume_at_a_position_are_complete(self) -> None:
++        body = _raw(self.server.port, _get(self.path, "bytes=0-"))
++        self.assertTrue(body.endswith(_payload()))
++        pos = 654_321
++        body = _raw(self.server.port, _get(self.path, f"bytes={pos}-"))
++        self.assertTrue(body.endswith(_payload()[pos:]))
++        a, b = self.rows(2)
++        self.assertEqual((a["closed"], a["bytes"], a["status"]), ("complete", SIZE, 206))
++        self.assertEqual((b["closed"], b["bytes"], b["range"]), ("complete", SIZE - pos, f"bytes={pos}-"))
++        self.assertEqual(a["id"], b["id"])      # the same media, the same opaque id
++        self.assert_redacted(a)
++
++    def test_missing_head_and_no_range(self) -> None:
++        _raw(self.server.port, _get("/vod/nothing-here.mkv"))
++        _raw(self.server.port, _get(self.path, method="HEAD"))
++        _raw(self.server.port, _get(self.path))
++        _raw(self.server.port, _get(self.path, "bytes=x-"))
++        r = self.rows(4)
++        self.assertEqual((r[0]["status"], r[0]["closed"]), (404, "no_body"))
++        self.assertEqual((r[1]["method"], r[1]["closed"], r[1]["bytes"]), ("HEAD", "no_body", 0))
++        self.assertEqual((r[2]["status"], r[2]["closed"], r[2]["bytes"], r[2]["range"]), (200, "complete", SIZE, None))
++        self.assertEqual((r[3]["status"], r[3]["range"]), (416, "invalid"))
++        for row in r:
++            self.assert_redacted(row)
++
++
++class ClientLogTest(unittest.TestCase):
++    def test_the_four_rows_and_nothing_else(self) -> None:
++        with tempfile.TemporaryDirectory() as d:
++            log = vod_log.ClientLog(Path(d))
++            for ev in vod_log.CLIENT_EVENTS:
++                log.accept({"event": ev, "media": "0123456789ab", "attempt": 2, "position_ms": 6_600_000,
++                            "error_code": 2001, "error_name": "ERROR_CODE_IO_NETWORK_CONNECTION_FAILED",
++                            "delay_ms": 2000, "elapsed_ms": 3000, "bound_ms": 150000})
++            for bad in ({"event": "other"}, [], {"event": "vod_error", "url": "http://x/y"},
++                        {"event": "vod_error", "media": "Long Feature"}, {"event": "vod_error", "attempt": "2"},
++                        {"event": "vod_error", "error_name": "failed: http://host/vod/x.mkv"},
++                        {"event": "vod_error", "attempt": True}):
++                with self.assertRaises(ValueError):
++                    log.accept(bad)
++            rows = [json.loads(x) for x in (Path(d) / "logs" / "vod_client.jsonl").read_text().splitlines()]
++            self.assertEqual([r["event"] for r in rows], list(vod_log.CLIENT_EVENTS))
++            self.assertEqual(rows[0]["position_ms"], 6_600_000)
++            self.assertIn("at_utc", rows[0])
++
++
++class AbsentTest(unittest.TestCase):
++    def test_flag_parse(self) -> None:
++        for v, on in (("1", True), (" 1 ", True), ("", False), ("0", False), ("yes", False), (None, False)):
++            env = {} if v is None else {"PRIVYHUB_VOD_LOG": v}
++            self.assertEqual(vod_log.enabled(env), on, v)
++            self.assertEqual(vod_log.range_log_from_environ(env, Path("/nonexistent")) is not None, on)
++
++    def test_absent_imports_nothing_and_leaves_the_class_alone(self) -> None:
++        env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++        code = ("import sys, range_server; print(range_server.VOD_LOG is None, 'vod_log' in sys.modules, "
++                "range_server.RangeRequestHandler.do_GET.__qualname__, "
++                "range_server.RangeRequestHandler.copyfile.__qualname__)")
++        out = subprocess.run([sys.executable, "-c", code], cwd=ROOT / "companion", env=env,
++                             capture_output=True, text=True, check=True).stdout.split()
++        self.assertEqual(out, ["True", "False", "RangeRequestHandler.do_GET", "RangeRequestHandler.copyfile"])
++        env["PRIVYHUB_VOD_LOG"] = "0"
++        out = subprocess.run([sys.executable, "-c", code], cwd=ROOT / "companion", env=env,
++                             capture_output=True, text=True, check=True).stdout.split()
++        self.assertEqual(out[:2], ["True", "False"])
++
++    def test_the_class_ast_is_the_base_files(self) -> None:
++        if not (BASE / "range_server.py").exists():
++            self.skipTest("no base copy")
++
++        def cls(p: Path) -> str:
++            tree = ast.parse(p.read_text())
++            return ast.dump(next(n for n in tree.body if isinstance(n, ast.ClassDef)))
++
++        self.assertEqual(cls(ROOT / "companion" / "range_server.py"), cls(BASE / "range_server.py"))
++        new = ast.parse((ROOT / "companion" / "range_server.py").read_text())
++        old = ast.parse((BASE / "range_server.py").read_text())
++        added = [ast.unparse(n) for n in new.body if ast.dump(n) not in {ast.dump(o) for o in old.body}]
++        self.assertEqual(len(added), 2, added)          # VOD_LOG = None, and the guarded block
++        self.assertTrue(added[1].startswith("if os.environ.get('PRIVYHUB_VOD_LOG', '').strip() == '1':"))
++
++    def test_the_same_bytes_from_the_base_and_the_new_server(self) -> None:
++        if not (BASE / "range_server.py").exists():
++            self.skipTest("no base copy")
++        env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++        with tempfile.TemporaryDirectory() as d:
++            root = Path(d)
++            (root / "vod").mkdir()
++            (root / "vod" / "f.bin").write_bytes(_payload()[:200_000])
++            outs = []
++            for comp in (BASE, ROOT / "companion"):
++                s = socket.socket()
++                s.bind((LOOP, 0))
++                port = s.getsockname()[1]
++                s.close()
++                p = subprocess.Popen([sys.executable, str(comp / "range_server.py"), "--root", str(root),
++                                      "--vod-root", str(root / "vod"), "--host", LOOP, "--port", str(port)],
++                                     cwd=d, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
++                try:
++                    for _ in range(100):
++                        try:
++                            socket.create_connection((LOOP, port), timeout=0.2).close()
++                            break
++                        except OSError:
++                            time.sleep(0.05)
++                    got = []
++                    for req in (_get("/vod/f.bin", "bytes=1000-"), _get("/vod/f.bin"), _get("/vod/none"),
++                                _get("/vod/f.bin", method="HEAD"), _get("/vod/f.bin", "bytes=999999-")):
++                        raw = _raw(port, req)
++                        got.append(b"\r\n".join(x for x in raw.split(b"\r\n") if not x.startswith(b"Date:")))
++                    outs.append(got)
++                finally:
++                    p.terminate()
++                    p.wait(5)
++            self.assertEqual(outs[0], outs[1])
++            self.assertFalse((root / "logs").exists())
++
++    def test_the_service_blocks_are_guarded(self) -> None:
++        tree = ast.parse((ROOT / "companion" / "privyhub_service.py").read_text())
++        top = [ast.unparse(n) for n in tree.body if isinstance(n, (ast.Import, ast.ImportFrom))]
++        self.assertFalse(any("vod_log" in t for t in top))
++        guarded = [n for n in tree.body if isinstance(n, ast.If) and "vod_log" in ast.unparse(n)]
++        self.assertEqual(len(guarded), 1)
++        self.assertIn("os.environ.get('PRIVYHUB_VOD_LOG', '').strip() == '1'", ast.unparse(guarded[0].test))
++        uses = [n for n in ast.walk(tree) if isinstance(n, ast.If) and "/diagnostics/vod-client" in ast.unparse(n.test)]
++        self.assertEqual(len(uses), 1)
++        self.assertTrue(ast.unparse(uses[0].test).startswith(
++            "(_vod_client_log := globals().get('VOD_CLIENT_LOG')) is not None and"))
++
++
++if __name__ == "__main__":
++    unittest.main()

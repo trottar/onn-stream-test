@@ -1,0 +1,874 @@
+diff --git a/companion/adaptive_bitrate_live.py b/companion/adaptive_bitrate_live.py
+index 27c0b861f3ba6452abeac48fec01d430323fc23a..eb14d5cfc4d6d069a66b842c0bba4e4990c9149f 100644
+--- a/companion/adaptive_bitrate_live.py
++++ b/companion/adaptive_bitrate_live.py
+@@ -1041,6 +1041,9 @@ class LiveController:
+                          "cycle": ({k: video.get(k) for k in ("first_rtp_resume_ms", "ffmpeg_spawn_ms",
+                                                                "rtp_silence_after_spawn_ms", "host_verified_ms")}
+                                    if isinstance(video, dict) else None),
++                         # B32: an in-place step says so (today's actuator never carries `in_place`: no keys)
++                         **({k: video[k] for k in ("in_place", "ssrc_unchanged", "splice_gap_ms", "in_place_fallback")
++                             if k in video} if isinstance(video, dict) and "in_place" in video else {}),
+                          "blackout_reports": self._policy.blackout_remaining})
+             if self._policy.last_action is not None:
+                 self._policy.last_action.update({"actuation_ms": took_ms, "at_utc": _now_utc(),
+diff --git a/companion/native_stream.py b/companion/native_stream.py
+index e13aac50fedbfa357e52aa27e81a6fd1bb4789fc..ca249f17c3b4b3165a63d10e5653ca47f1c22f03 100644
+--- a/companion/native_stream.py
++++ b/companion/native_stream.py
+@@ -70,6 +70,12 @@ if (os.environ.get("PRIVYHUB_ENCODER_RC") or "").strip():
+ 
+     ENCODER_RC = _encoder_rc.shared_from_environ(os.environ)
+ 
++# B32: PRIVYHUB_STEP_IN_PLACE=1 -> a ladder step is a new encoder spliced onto the same stream by the relay (no SSRC
++# change, one IDR; h264_vaapi has no runtime rate control). Absent = today: nothing imported; the step restarts.
++STEP_IN_PLACE = None
++if (os.environ.get("PRIVYHUB_STEP_IN_PLACE") or "").strip() == "1":
++    import step_in_place as STEP_IN_PLACE
++
+ 
+ class NativeStreamError(RuntimeError):
+     pass
+@@ -2618,6 +2624,16 @@ class NativeStreamManager:
+                 or int(self._active_bitrate_kbps) in LINUX_RUNG_LEVELS
+             )
+             if not sized:
++                if STEP_IN_PLACE is not None and self._linux_host():   # B32: the same stream
++                    try:
++                        return STEP_IN_PLACE.run_in_place_transition(self, target)
++                    except NativeStreamError:
++                        raise
++                    except Exception as exc:
++                        raise NativeStreamError(
++                            "B32 in-place level transition failed: "
++                            + type(exc).__name__ + ": " + str(exc)
++                        ) from exc
+                 return self.diagnostic_c3_validated_bitrate_transition(
+                     target
+                 )
+diff --git a/companion/remote_umbrella.py b/companion/remote_umbrella.py
+index 3c50fb031137647d914bda83430180ad0e047bd9..2841566a4887142bdf053abfc5d7cec9a0f4dfa0 100644
+--- a/companion/remote_umbrella.py
++++ b/companion/remote_umbrella.py
+@@ -80,6 +80,12 @@ class RemoteUmbrella:
+         self.ladder = rl.RemoteLadder() if LADDER in self.implied else None
+         cap_ladder = self.ladder if LADDER in self.implied else getattr(self.live, "REMOTE_LADDER", None)
+         self.cap = rc.RemoteCap(LINES[CAP], cap_ladder) if CAP in self.implied else None
++        # B32 (TRIP-R2 §5): an explicit cap beside the umbrella's own ladder acts on that ladder; with an explicit
++        # ladder line (or no explicit cap) B28's, unchanged. On a LAN session the import-time object is put back.
++        self.cap_on_umbrella_ladder = CAP in self.explicit and self.ladder is not None
++        self._cap_import_obj = getattr(self.live, "REMOTE_CAP", None)
++        if self.cap_on_umbrella_ladder:
++            self.cap = rc.RemoteCap(self.explicit[CAP], self.ladder)
+         self.start = sr.StartRung(LINES[START]) if START in self.implied else None
+         self.telemetry: Any = None
+         self.telemetry_note = "not built yet (the first remote session builds it)"
+@@ -100,6 +106,10 @@ class RemoteUmbrella:
+     def _in_force(self, remote: bool) -> dict[str, Any]:
+         out: dict[str, Any] = {}
+         for k in LINES:
++            if k == CAP and self.cap_on_umbrella_ladder:
++                out[k] = {"in_force": bool(remote and self.cap is not None and self.cap.active),
++                          "how": f"explicit {self.explicit[k][:32]} on the umbrella's ladder"}
++                continue
+             if k in self.explicit:
+                 mod_obj = {LADDER: getattr(self.live, "REMOTE_LADDER", None), START: getattr(self.native, "START_RUNG", None),
+                            CAP: getattr(self.live, "REMOTE_CAP", None),
+@@ -209,7 +219,7 @@ class RemoteUmbrella:
+             if policy is not None and rl.REMOTE_RUNG_KBPS in tuple(getattr(policy, "ladder", ())):
+                 policy.ladder = tuple(k for k in policy.ladder if k != rl.REMOTE_RUNG_KBPS)
+         if self.cap is not None and live.REMOTE_CAP is self.cap:
+-            live.REMOTE_CAP = None
++            live.REMOTE_CAP = self._cap_import_obj if self.cap_on_umbrella_ladder else None
+         if self.start is not None:
+             if live.START_RUNG is self.start:
+                 live.START_RUNG = None
+diff --git a/companion/step_in_place.py b/companion/step_in_place.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..815349b25cc8a4ad6322885148f20b2d3f4cac01
+--- /dev/null
++++ b/companion/step_in_place.py
+@@ -0,0 +1,332 @@
++"""B32: `PRIVYHUB_STEP_IN_PLACE=1` -- a ladder step changes the bitrate on the same stream: no SSRC change, one IDR.
++
++Settled (`docs/memory/evidence/b32_2026-10-31/host/design_written_before_code.md`, hashed before this code):
++ffmpeg 7.1's `h264_vaapi` takes its rate control at init only (no runtime `-b:v`; `zmq` / `sendcmd` reach filters,
++not encoders; the argv runs `-nostdin`), so a new encoder process is unavoidable. A new SSRC is not: the RTP muxer
++takes `-ssrc`, and the relay keeps the stream's identity.
++
++- **`RtpSplice`**, installed on the relay *instance* (its `_handle_rtp` wrapped; `native_fec_relay.py` not edited),
++  idle = pass-through byte for byte. Armed with the new encoder's SSRC, it buffers the new encoder's packets while the
++  old encoder's still pass; at the old encoder's next frame end (the RTP marker) -- or after `SPLICE_BOUND_S` -- it
++  forwards the buffered packets rewritten onto the old stream (its SSRC, the sequence +1, the timestamp + one frame)
++  and from then on drops the old encoder's packets and rewrites the new one's. The new encoder's first frame is its
++  IDR: the onn gets one IDR and no SSRC change, no sequence gap. Any other SSRC (a full or recovery restart) drops the
++  mapping: pass-through, today's SSRC change.
++- **`run_in_place_transition`** (under the stream lock, from `NativeStreamManager.adaptive_level_transition`): the
++  new encoder spawned at the target before the old one is killed, the splice awaited (<= 2 s), the old killed, today's
++  0.75 s stability window. No splice in 2 s: the new one killed, today's restart (`in_place: false`).
++
++Absent = today: nothing imports this module.
++"""
++
++from __future__ import annotations
++
++import random
++import subprocess
++import threading
++import time
++from typing import Any, Callable
++
++FLAG_ENV = "PRIVYHUB_STEP_IN_PLACE"
++MODE = "validated_ladder_in_place"
++SPLICE_BOUND_S = 0.120          # the longest the new encoder's first frame waits for the old one's frame end
++SPLICE_WAIT_S = 2.0             # today's wait for the replacement's first RTP
++STABLE_S = 0.75                 # today's stability window
++RTP_CLOCK_HZ = 90000
++
++
++def enabled(environ: Any) -> bool:
++    return (environ.get(FLAG_ENV) or "").strip() == "1"
++
++
++class RtpSplice:
++    def __init__(self, fps: int = 60, clock: Callable[[], float] = time.monotonic) -> None:
++        self.frame_ticks = max(1, RTP_CLOCK_HZ // max(1, int(fps)))
++        self._clock = clock
++        self._lock = threading.Lock()
++        self._splice_event = threading.Event()
++        # the stream now being forwarded: its input SSRC and the rewrite onto the output identity
++        self.in_ssrc: int | None = None
++        self.out_ssrc: int | None = None
++        self.seq_off = 0
++        self.ts_off = 0
++        self.last_out_seq: int | None = None
++        self.last_out_ts: int | None = None
++        self.last_marker = True
++        self.last_forward_at: float | None = None
++        # a pending splice
++        self.pending: int | None = None
++        self.buffer: list[bytes] = []
++        self.first_pending_at: float | None = None
++        self.retired: set[int] = set()
++        # counters
++        self.splices = 0
++        self.rewritten = 0
++        self.dropped_old = 0
++        self.identity_resets = 0
++        self.last_splice: dict[str, Any] | None = None
++
++    # -- the transition's side ----------------------------------------------------------------------------------------
++    def arm(self, new_ssrc: int) -> None:
++        with self._lock:
++            self.pending = int(new_ssrc) & 0xFFFFFFFF
++            self.buffer = []
++            self.first_pending_at = None
++            self._splice_event.clear()
++
++    def disarm(self) -> None:
++        with self._lock:
++            if self.pending is not None:
++                self.retired.add(self.pending)   # the failed encoder's late packets never reach the onn
++            self.pending = None
++            self.buffer = []
++            self.first_pending_at = None
++
++    def wait(self, timeout: float) -> bool:
++        return self._splice_event.wait(timeout)
++
++    def spliced(self) -> bool:
++        return self._splice_event.is_set()
++
++    def current_input_ssrc(self) -> int | None:
++        with self._lock:
++            return self.in_ssrc
++
++    def status(self) -> dict[str, Any]:
++        with self._lock:
++            return {"splices": self.splices, "rewritten": self.rewritten, "dropped_old": self.dropped_old,
++                    "identity_resets": self.identity_resets, "armed": self.pending is not None,
++                    "mapped": bool(self.in_ssrc is not None and self.out_ssrc != self.in_ssrc),
++                    "last_splice": dict(self.last_splice) if self.last_splice else None}
++
++    # -- the relay's side (its receive thread) ------------------------------------------------------------------------
++    def process(self, packet: bytes) -> list[bytes]:
++        if len(packet) < 12 or (packet[0] >> 6) != 2:
++            return [packet]
++        ssrc = int.from_bytes(packet[8:12], "big")
++        marker = bool(packet[1] & 0x80)
++        with self._lock:
++            now = self._clock()
++            if self.pending is not None and ssrc == self.pending:
++                if self.in_ssrc is None:                     # nothing forwarded yet: it simply is the stream
++                    self.pending = None
++                    self._adopt_locked(ssrc)
++                    self._splice_event.set()
++                    return [self._forward_locked(packet, marker, now)]
++                if self.first_pending_at is None:
++                    self.first_pending_at = now
++                self.buffer.append(packet)
++                if self.last_marker or now - self.first_pending_at >= SPLICE_BOUND_S:
++                    return self._splice_locked(now)
++                return []
++            if ssrc == self.in_ssrc:
++                out = [self._forward_locked(packet, marker, now)]
++                if self.pending is not None and self.buffer and marker:
++                    out += self._splice_locked(now)
++                return out
++            if ssrc in self.retired:
++                self.dropped_old += 1
++                return []
++            # an SSRC this splice never saw: a full or recovery restart -- today's pass-through, today's SSRC change
++            if self.in_ssrc is not None:
++                self.identity_resets += 1
++            self._adopt_locked(ssrc)
++            return [self._forward_locked(packet, marker, now)]
++
++    def _adopt_locked(self, ssrc: int) -> None:
++        self.in_ssrc = self.out_ssrc = ssrc
++        self.seq_off = self.ts_off = 0
++        self.retired = set()
++
++    def _forward_locked(self, packet: bytes, marker: bool, now: float) -> bytes:
++        seq = int.from_bytes(packet[2:4], "big")
++        ts = int.from_bytes(packet[4:8], "big")
++        if self.seq_off or self.ts_off or self.out_ssrc != self.in_ssrc:
++            seq = (seq + self.seq_off) & 0xFFFF
++            ts = (ts + self.ts_off) & 0xFFFFFFFF
++            b = bytearray(packet)
++            b[2:4] = seq.to_bytes(2, "big")
++            b[4:8] = ts.to_bytes(4, "big")
++            b[8:12] = int(self.out_ssrc or 0).to_bytes(4, "big")
++            packet = bytes(b)
++            self.rewritten += 1
++        self.last_out_seq, self.last_out_ts = seq, ts
++        self.last_marker = marker
++        self.last_forward_at = now
++        return packet
++
++    def _splice_locked(self, now: float) -> list[bytes]:
++        first = self.buffer[0]
++        first_seq = int.from_bytes(first[2:4], "big")
++        first_ts = int.from_bytes(first[4:8], "big")
++        old = self.in_ssrc
++        gap_ms = None if self.last_forward_at is None else round((now - self.last_forward_at) * 1000.0, 1)
++        waited_ms = None if self.first_pending_at is None else round((now - self.first_pending_at) * 1000.0, 1)
++        at_frame_end = bool(self.last_marker)
++        next_seq = ((self.last_out_seq if self.last_out_seq is not None else first_seq - 1) + 1) & 0xFFFF
++        next_ts = ((self.last_out_ts if self.last_out_ts is not None else first_ts - self.frame_ticks)
++                   + self.frame_ticks) & 0xFFFFFFFF
++        self.in_ssrc = self.pending
++        self.seq_off = (next_seq - first_seq) & 0xFFFF
++        self.ts_off = (next_ts - first_ts) & 0xFFFFFFFF
++        if old is not None:
++            self.retired.add(old)
++        self.pending = None
++        self.first_pending_at = None
++        buffered, self.buffer = self.buffer, []
++        out = [self._forward_locked(p, bool(p[1] & 0x80), now) for p in buffered]
++        self.splices += 1
++        self.last_splice = {"gap_ms": gap_ms, "new_waited_ms": waited_ms, "at_old_frame_end": at_frame_end,
++                            "buffered_packets": len(buffered)}
++        self._splice_event.set()
++        return out
++
++
++def install(relay: Any, fps: int = 60) -> RtpSplice:
++    """The relay instance's splice (installed once per relay object; idle it forwards every packet unchanged)."""
++    splice = getattr(relay, "_b32_splice", None)
++    if isinstance(splice, RtpSplice):
++        return splice
++    splice = RtpSplice(fps=fps)
++    orig = type(relay)._handle_rtp.__get__(relay)
++
++    def handle_rtp_spliced(packet: bytes) -> None:
++        for p in splice.process(packet):
++            orig(p)
++
++    relay._handle_rtp = handle_rtp_spliced
++    relay._b32_splice = splice
++    return splice
++
++
++def _with_ssrc(command: list[str], ssrc: int) -> list[str]:
++    """The encoder argv with `-ssrc` before its `-f rtp` output (an output option of the RTP muxer)."""
++    out = list(command)
++    at = max(i for i in range(len(out) - 1) if out[i] == "-f" and out[i + 1] == "rtp")
++    out[at:at] = ["-ssrc", str(int(ssrc))]
++    return out
++
++
++def _fresh_ssrc(avoid: set[int], rng: Callable[[], int]) -> int:
++    while True:
++        v = rng() & 0xFFFFFFFF
++        if v and v not in avoid:
++            return v
++
++
++def run_in_place_transition(manager: Any, target_bitrate_kbps: int, *,
++                            popen_factory: Callable[..., Any] = subprocess.Popen,
++                            probe: Any = None,
++                            rng: Callable[[], int] = lambda: random.getrandbits(32),
++                            monotonic: Callable[[], float] = time.monotonic,
++                            perf_counter_ns: Callable[[], int] = time.perf_counter_ns,
++                            sleep: Callable[[float], None] = time.sleep) -> dict[str, Any]:
++    """Under the stream lock. A precondition today's path would refuse -> today's path (its own error)."""
++    if probe is None:
++        from diagnostics import c3_linux_actuator_probe as probe
++    target = int(target_bitrate_kbps)
++    today = manager.diagnostic_c3_validated_bitrate_transition
++
++    def fallback(why: str) -> dict[str, Any]:
++        result = today(target)
++        if isinstance(result, dict) and isinstance(result.get("video"), dict):
++            result["video"]["in_place"] = False
++            result["video"]["in_place_fallback"] = why
++        return result
++
++    validated = tuple(probe.LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS)
++    if getattr(probe, "REMOTE_LADDER", None) is not None:   # G5-S3's + 4000, on a remote path only (as today)
++        validated = validated + tuple(probe.REMOTE_LADDER.actuator_levels())
++    manager._reap_locked()
++    current = int(getattr(manager, "_active_bitrate_kbps", probe.REFERENCE_BITRATE_KBPS))
++    relay = getattr(manager, "_fec_relay", None)
++    old = getattr(manager, "_process", None)
++    if (target not in validated or current not in validated or target == current
++            or not manager._linux_host() or not manager._running_locked()
++            or int(manager.BITRATE_KBPS) != probe.REFERENCE_BITRATE_KBPS
++            or int(manager.MAX_BITRATE_KBPS) != probe.REFERENCE_BITRATE_KBPS
++            or relay is None or not relay.running or old is None or old.poll() is not None
++            or getattr(manager, "_log_handle", None) is None):
++        return today(target)                                    # today's refusal or today's restart, unchanged
++    ffmpeg = manager._find_ffmpeg()
++    capture_target = dict(getattr(manager, "_capture_target", None) or {})
++    if ffmpeg is None or int(capture_target.get("_window_id", 0) or 0) <= 0:
++        return today(target)
++
++    splice = install(relay, fps=int(getattr(manager, "FPS", 60) or 60))
++    avoid = {x for x in (splice.current_input_ssrc(), splice.out_ssrc) if x is not None}
++    new_ssrc = _fresh_ssrc(avoid, rng)
++    command = _with_ssrc(manager._build_linux_ffmpeg_command(
++        ffmpeg=ffmpeg, capture_target=capture_target, bitrate_kbps=target, max_bitrate_kbps=target), new_ssrc)
++    _log(manager, f"B32 in-place step: {current} -> {target} kbps, a new encoder on the same stream begin")
++    started_ns = perf_counter_ns()
++    splice.arm(new_ssrc)
++    try:
++        new = popen_factory(command, cwd=str(manager.project_root), stdin=subprocess.DEVNULL,
++                            stdout=manager._log_handle, stderr=subprocess.STDOUT)
++    except Exception:
++        splice.disarm()
++        raise
++    spawn_ms = (perf_counter_ns() - started_ns) / 1e6
++    deadline = monotonic() + SPLICE_WAIT_S
++    why = None
++    while not splice.spliced():
++        if new.poll() is not None:
++            why = "replacement_ffmpeg_exited"
++            break
++        if monotonic() >= deadline:
++            why = "replacement_rtp_did_not_splice"
++            break
++        sleep(0.01)
++    if why is not None:
++        splice.disarm()
++        manager._kill_managed_process(new)
++        _log(manager, f"B32 in-place step: {why}; today's restart")
++        return fallback(why)
++    resume_ms = (perf_counter_ns() - started_ns) / 1e6
++    overlap_ms = resume_ms
++    try:
++        manager._process = new
++        manager._kill_managed_process(old)
++        stable = monotonic() + STABLE_S
++        while monotonic() < stable:
++            if new.poll() is not None:
++                raise RuntimeError("replacement_ffmpeg_unstable")
++            sleep(0.05)
++        manager._active_bitrate_kbps = target
++    except Exception:
++        manager._kill_managed_process(new)
++        manager._process = None
++        manager._active_bitrate_kbps = current
++        _log(manager, f"B32 in-place step: {current} -> {target} kbps failed")
++        raise
++    st = splice.status()
++    last = st.get("last_splice") or {}
++    payload = {
++        "schema": probe.BIDIRECTIONAL_SCHEMA, "ok": True, "mode": MODE, "platform": "linux",
++        "capture_backend": probe.CAPTURE_BACKEND, "encoder_backend": probe.ENCODER_BACKEND,
++        "reference_bitrate_kbps": probe.REFERENCE_BITRATE_KBPS, "from_bitrate_kbps": current,
++        "target_bitrate_kbps": target, "profile_id": str(getattr(getattr(manager, "PROFILE", None), "id", "")),
++        "video": {"capture_restarted": False, "encoder_restarted": True, "in_place": True, "ssrc_unchanged": True,
++                  "idr_frames": 1, "ffmpeg_spawn_ms": round(spawn_ms, 3), "first_rtp_resume_ms": round(resume_ms, 3),
++                  "rtp_silence_after_spawn_ms": 0.0, "splice_gap_ms": last.get("gap_ms"),
++                  "splice_at_old_frame_end": last.get("at_old_frame_end"), "overlap_ms": round(overlap_ms, 3),
++                  "host_verified_ms": round((perf_counter_ns() - started_ns) / 1e6, 3)},
++        "fec": {"restarted": False, "running_after": bool(relay.running)},
++        "splice": {k: st[k] for k in ("splices", "rewritten", "dropped_old", "identity_resets")},
++    }
++    _log(manager, f"B32 in-place step: {target} kbps active on the same stream; splice gap "
++                  f"{payload['video']['splice_gap_ms']} ms")
++    return payload
++
++
++def _log(manager: Any, message: str) -> None:
++    """Into the encoder's log, as the actuator probe's `_safe_log` writes."""
++    handle = getattr(manager, "_log_handle", None)
++    if handle is None:
++        return
++    try:
++        handle.write(message.rstrip("\n") + "\n")
++        handle.flush()
++    except Exception:
++        pass
+diff --git a/tests/step_in_place/test_step_in_place.py b/tests/step_in_place/test_step_in_place.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..a9c6357c798420162739e1bc0bfb669ea1a4e574
+--- /dev/null
++++ b/tests/step_in_place/test_step_in_place.py
+@@ -0,0 +1,445 @@
++#!/usr/bin/env python3
++"""B32 (host): `PRIVYHUB_STEP_IN_PLACE=1` -- a ladder step on the same stream; the explicit cap beside the umbrella.
++
++    python3 -m unittest discover -s tests/step_in_place -v
++
++No stream, no companion, no ffmpeg. The REAL `NativeVideoFecRelay` on loopback, a fake onn (a UDP socket recording
++every RTP packet the relay sends: SSRC, sequence, timestamp, the first payload byte), fake encoders (threads sending
++60-fps frames of 4 packets to the relay's port: the first frame an IDR (NAL 5), the rest P (NAL 1); the SSRC from the
++argv's `-ssrc` when present, else random, as ffmpeg's RTP muxer; a random sequence and timestamp base always), and a
++fake stream manager whose `diagnostic_c3_validated_bitrate_transition` is today's restart (the old encoder killed, a
++new one with a random SSRC). The cap: B28's harness (`tests/remote_umbrella`, imported, unedited).
++"""
++
++from __future__ import annotations
++
++import io
++import json
++import os
++import random
++import socket
++import subprocess
++import sys
++import tempfile
++import threading
++import time
++import types
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(ROOT / "tests" / "start_rung"))
++sys.path.insert(0, str(ROOT / "tests" / "remote_umbrella"))
++
++import adaptive_bitrate_live as live  # noqa: E402
++import native_fec_relay as nfr  # noqa: E402
++import native_stream as ns  # noqa: E402
++import remote_cap as rc  # noqa: E402
++import remote_ladder as rl  # noqa: E402
++import remote_umbrella as ru  # noqa: E402
++import step_in_place as sip  # noqa: E402
++import stub_manager as stub  # noqa: E402
++import test_remote_umbrella as b28  # noqa: E402  (B28's harness, unedited; its tests not collected here)
++from diagnostics import c3_linux_actuator_probe as probe  # noqa: E402
++
++LOOP = "127.0.0.1"
++IDR, P = 0x65, 0x41
++OVERLAY = b28.OVERLAY
++
++
++def free_port():
++    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++    s.bind((LOOP, 0))
++    port = s.getsockname()[1]
++    s.close()
++    return port
++
++
++class FakeOnn:
++    def __init__(self):
++        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++        self.sock.bind((LOOP, 0))
++        self.sock.settimeout(0.05)
++        self.port = self.sock.getsockname()[1]
++        self.rtp = []          # (ssrc, seq, ts, first payload byte, marker, bytes)
++        self._stop = threading.Event()
++        self._t = threading.Thread(target=self._run, daemon=True)
++        self._t.start()
++
++    def _run(self):
++        while not self._stop.is_set():
++            try:
++                d = self.sock.recv(65535)
++            except socket.timeout:
++                continue
++            except OSError:
++                return
++            if d[:4] == nfr.FEC_MAGIC:
++                continue
++            self.rtp.append((int.from_bytes(d[8:12], "big"), int.from_bytes(d[2:4], "big"),
++                             int.from_bytes(d[4:8], "big"), d[12], bool(d[1] & 0x80), d))
++
++    def close(self):
++        self._stop.set()
++        self._t.join(1)
++        self.sock.close()
++
++
++class FakeEncoder:
++    """Popen-like: sends 60-fps RTP frames to the relay until terminated."""
++    instances: list["FakeEncoder"] = []
++
++    def __init__(self, argv, port, silent=False):
++        self.argv = list(argv)
++        self.ssrc = int(argv[argv.index("-ssrc") + 1]) if "-ssrc" in argv else random.getrandbits(32) | 1
++        self.kbps = argv[argv.index("-b:v") + 1] if "-b:v" in argv else None
++        self.port, self.silent = port, silent
++        self.sent = []
++        self._stop = threading.Event()
++        self.returncode = None
++        self.terminated = False
++        self._t = threading.Thread(target=self._run, daemon=True)
++        self._t.start()
++        FakeEncoder.instances.append(self)
++
++    def _run(self):
++        if self.silent:
++            return
++        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++        seq, ts, frame = random.getrandbits(16), random.getrandbits(32), 0
++        nxt = time.monotonic()
++        while not self._stop.is_set():
++            for i in range(4):
++                nal = (IDR if frame == 0 else P) if i == 0 else 0x00
++                pkt = (bytes([0x80, (0x80 if i == 3 else 0) | 96]) + (seq & 0xFFFF).to_bytes(2, "big")
++                       + (ts & 0xFFFFFFFF).to_bytes(4, "big") + self.ssrc.to_bytes(4, "big") + bytes([nal]) + b"x" * 300)
++                s.sendto(pkt, (LOOP, self.port))
++                self.sent.append(pkt)
++                seq += 1
++            ts += 1500
++            frame += 1
++            nxt += 1 / 60
++            time.sleep(max(0.0, nxt - time.monotonic()))
++        s.close()
++
++    def poll(self):
++        return self.returncode
++
++    def terminate(self):
++        self.terminated = True
++        self._stop.set()
++        self._t.join(1)
++        self.returncode = -15
++
++    kill = terminate
++
++    def wait(self, timeout=None):
++        return self.returncode
++
++
++class FakeManager:
++    """The stream manager's surface the step reads; `diagnostic_c3_validated_bitrate_transition` is today's restart."""
++    BITRATE_KBPS = MAX_BITRATE_KBPS = 7000
++    FPS = 60
++    PROFILE = types.SimpleNamespace(id="native-game-720p60-reference")
++
++    def __init__(self, relay, start_kbps, silent_next=False):
++        self._fec_relay = relay
++        self._active_bitrate_kbps = start_kbps
++        self._log_handle = io.StringIO()
++        self.project_root = ROOT
++        self._capture_target = {"_window_id": 5}
++        self.today_calls = []
++        self.silent_next = silent_next
++        self._lock = threading.RLock()
++        self._process = self.spawn(self.argv(start_kbps))
++
++    def argv(self, kbps):
++        return ["ffmpeg", "-b:v", f"{kbps}k", "-maxrate", f"{kbps}k", "-payload_type", "96", "-f", "rtp",
++                f"rtp://127.0.0.1:{self._fec_relay.local_port}?pkt_size=1200"]
++
++    def spawn(self, argv, silent=False):
++        return FakeEncoder(argv, self._fec_relay.local_port, silent=silent)
++
++    def popen(self, argv, **kw):
++        silent, self.silent_next = self.silent_next, False
++        return self.spawn(argv, silent=silent)
++
++    # the surface
++    def _reap_locked(self): pass
++    def _linux_host(self): return True
++    def _running_locked(self): return True
++    def _find_ffmpeg(self): return "ffmpeg"
++
++    def _build_linux_ffmpeg_command(self, ffmpeg, capture_target, bitrate_kbps, max_bitrate_kbps):
++        return self.argv(bitrate_kbps)
++
++    @staticmethod
++    def _kill_managed_process(p):
++        if p is not None and p.poll() is None:
++            p.terminate()
++
++    def diagnostic_c3_validated_bitrate_transition(self, target):
++        """Today's restart: kill, a new process (a random SSRC), the new level."""
++        self.today_calls.append(target)
++        validated = probe.LINUX_VALIDATED_ADAPTIVE_BITRATES_KBPS + (
++            probe.REMOTE_LADDER.actuator_levels() if probe.REMOTE_LADDER is not None else ())
++        if target not in validated or self._active_bitrate_kbps not in validated:
++            raise RuntimeError("unsupported_validated_bitrate")
++        self._kill_managed_process(self._process)
++        self._process = self.spawn(self.argv(target))
++        frm, self._active_bitrate_kbps = self._active_bitrate_kbps, target
++        return {"ok": True, "mode": probe.BIDIRECTIONAL_MODE, "from_bitrate_kbps": frm,
++                "target_bitrate_kbps": target, "video": {"encoder_restarted": True, "first_rtp_resume_ms": 200.0}}
++
++
++class StreamCase(unittest.TestCase):
++    def setUp(self):
++        self.saved_remote = probe.REMOTE_LADDER
++        FakeEncoder.instances = []
++        self.onn = FakeOnn()
++        self.relay = nfr.NativeVideoFecRelay(local_port=free_port(), pacing_us=0)
++        self.relay.start(LOOP, self.onn.port)
++
++    def tearDown(self):
++        for e in FakeEncoder.instances:
++            e.terminate()
++        self.relay.stop()
++        self.onn.close()
++        probe.REMOTE_LADDER = self.saved_remote
++
++    def step(self, m, target):
++        return sip.run_in_place_transition(m, target, popen_factory=m.popen, probe=probe)
++
++    def assert_one_stream(self, rtp):
++        self.assertEqual(len({r[0] for r in rtp}), 1, "the onn saw an SSRC change")
++        for a, b in zip(rtp, rtp[1:]):
++            self.assertEqual((b[1] - a[1]) & 0xFFFF, 1, "a sequence gap or jump")
++            self.assertIn((b[2] - a[2]) & 0xFFFFFFFF, (0, 1500), "a timestamp jump")
++
++    @staticmethod
++    def idrs(rtp):
++        return sum(1 for r in rtp if r[3] == IDR)
++
++
++class TheLanLadder(StreamCase):
++    def test_two_steps_in_place_one_ssrc_one_idr_each(self):
++        m = FakeManager(self.relay, 7000)
++        old = m._process
++        time.sleep(0.25)
++        r1 = self.step(m, 6000)
++        time.sleep(0.2)
++        r2 = self.step(m, 5000)
++        time.sleep(0.2)
++        rtp = list(self.onn.rtp)
++        self.assert_one_stream(rtp)
++        self.assertEqual(rtp[0][0], old.ssrc)                       # the first encoder's identity, kept throughout
++        self.assertEqual(self.idrs(rtp), 3)                         # the start's IDR + one per step
++        for r, frm, to in ((r1, 7000, 6000), (r2, 6000, 5000)):
++            self.assertEqual((r["mode"], r["from_bitrate_kbps"], r["target_bitrate_kbps"]), (sip.MODE, frm, to))
++            v = r["video"]
++            self.assertEqual((v["in_place"], v["ssrc_unchanged"], v["idr_frames"]), (True, True, 1))
++            self.assertLess(v["splice_gap_ms"], sip.SPLICE_BOUND_S * 1000 + 50)
++        self.assertEqual(m._active_bitrate_kbps, 5000)
++        self.assertEqual(m.today_calls, [])                         # never today's restart
++        procs = FakeEncoder.instances
++        self.assertEqual([p.kbps for p in procs], ["7000k", "6000k", "5000k"])
++        self.assertTrue(procs[0].terminated and procs[1].terminated and not procs[2].terminated)
++        self.assertIs(m._process, procs[2])
++        self.assertIn("-ssrc", procs[1].argv)
++        self.assertLess(procs[1].argv.index("-ssrc"), procs[1].argv.index("rtp"))
++        st = self.relay._b32_splice.status()
++        self.assertEqual(st["splices"], 2)
++        self.assertGreater(st["rewritten"], 0)
++        self.assertIn("B32 in-place step", m._log_handle.getvalue())
++
++    def test_a_later_full_restart_passes_through_as_today(self):
++        m = FakeManager(self.relay, 7000)
++        time.sleep(0.15)
++        self.step(m, 6000)
++        time.sleep(0.1)
++        mark = len(self.onn.rtp)
++        m._kill_managed_process(m._process)                         # recovery's restart: a random SSRC
++        new = m.spawn(m.argv(6000))
++        time.sleep(0.2)
++        after = self.onn.rtp[mark:]
++        self.assertEqual({r[0] for r in after[-10:]}, {new.ssrc})   # today's SSRC change
++        sent = set(new.sent)
++        self.assertTrue(all(r[5] in sent for r in after if r[0] == new.ssrc))   # byte for byte, not rewritten
++        self.assertEqual(self.relay._b32_splice.status()["identity_resets"], 1)
++
++
++class TheRemoteLadder(StreamCase):
++    def test_4000_to_5000_in_place_on_a_remote_path(self):
++        ladder = rl.RemoteLadder()
++        ladder.note_stream_start(OVERLAY)
++        self.assertEqual(ladder.actuator_levels(), (4000,))
++        probe.REMOTE_LADDER = ladder
++        m = FakeManager(self.relay, 4000)
++        time.sleep(0.2)
++        r = self.step(m, 5000)
++        time.sleep(0.2)
++        self.assert_one_stream(list(self.onn.rtp))
++        self.assertEqual(self.idrs(self.onn.rtp), 2)
++        self.assertEqual((r["video"]["in_place"], r["from_bitrate_kbps"], m._active_bitrate_kbps), (True, 4000, 5000))
++        self.assertEqual(m.today_calls, [])
++
++    def test_4000_without_the_remote_ladder_is_todays_refusal(self):
++        probe.REMOTE_LADDER = None
++        m = FakeManager(self.relay, 4000)
++        with self.assertRaises(RuntimeError):
++            self.step(m, 5000)
++        self.assertEqual(m.today_calls, [5000])                     # today's path decided, as today
++        self.assertEqual(len(FakeEncoder.instances), 1)             # no second encoder spawned
++
++
++class TheFallback(StreamCase):
++    def test_a_new_encoder_that_never_sends_falls_back_to_todays_restart(self):
++        m = FakeManager(self.relay, 7000, silent_next=True)
++        time.sleep(0.15)
++        r = self.step(m, 6000)
++        time.sleep(0.2)
++        self.assertEqual(m.today_calls, [6000])
++        self.assertEqual((r["video"]["in_place"], r["video"]["in_place_fallback"]),
++                         (False, "replacement_rtp_did_not_splice"))
++        silent = FakeEncoder.instances[1]
++        self.assertTrue(silent.terminated)
++        ssrcs = [r[0] for r in self.onn.rtp]
++        self.assertEqual(len(set(ssrcs)), 2)                        # today's SSRC change
++        self.assertEqual(ssrcs[-1], m._process.ssrc)
++
++
++class TheSplice(unittest.TestCase):
++    @staticmethod
++    def pkt(ssrc, seq, ts, marker=False, nal=P):
++        return (bytes([0x80, (0x80 if marker else 0) | 96]) + (seq & 0xFFFF).to_bytes(2, "big")
++                + (ts & 0xFFFFFFFF).to_bytes(4, "big") + ssrc.to_bytes(4, "big") + bytes([nal, 1, 2]))
++
++    def test_idle_is_pass_through_byte_for_byte(self):
++        s = sip.RtpSplice()
++        stream = [self.pkt(7, 65530 + i, 4294967000 + 1500 * (i // 3), marker=i % 3 == 2) for i in range(12)]
++        self.assertEqual([p for x in stream for p in s.process(x)], stream)
++        self.assertEqual(s.status()["rewritten"], 0)
++
++    def test_the_splice_waits_for_the_old_frame_end_and_wraps(self):
++        t = {"now": 0.0}
++        s = sip.RtpSplice(clock=lambda: t["now"])
++        out = s.process(self.pkt(1, 65535, 4294967000))           # old, mid-frame (no marker)
++        s.arm(2)
++        self.assertEqual(s.process(self.pkt(2, 100, 9, nal=IDR)), [])        # held: the old frame not ended
++        out += s.process(self.pkt(1, 0, 4294967000, marker=True))            # the old frame ends -> the splice
++        out += s.process(self.pkt(1, 1, 4294968500))                          # the old encoder: dropped
++        out += s.process(self.pkt(2, 101, 9, marker=True))
++        got = [(int.from_bytes(p[8:12], "big"), int.from_bytes(p[2:4], "big"), int.from_bytes(p[4:8], "big"), p[12])
++               for p in out]
++        self.assertEqual(got, [(1, 65535, 4294967000, P), (1, 0, 4294967000, P), (1, 1, (4294967000 + 1500) % 2**32, IDR),
++                               (1, 2, (4294967000 + 1500) % 2**32, P)])
++        self.assertEqual(s.status()["dropped_old"], 1)
++
++    def test_the_bound_splices_without_the_old_frame_end(self):
++        t = {"now": 0.0}
++        s = sip.RtpSplice(clock=lambda: t["now"])
++        s.process(self.pkt(1, 5, 50))
++        s.arm(2)
++        self.assertEqual(s.process(self.pkt(2, 9, 90, nal=IDR)), [])
++        t["now"] = sip.SPLICE_BOUND_S + 0.001
++        out = s.process(self.pkt(2, 10, 90))
++        self.assertEqual([int.from_bytes(p[2:4], "big") for p in out], [6, 7])
++        self.assertFalse(s.status()["last_splice"]["at_old_frame_end"])
++
++    def test_the_ssrc_goes_before_the_rtp_output_in_the_real_argv(self):
++        argv = stub.run_start(ns, b28.LAN)["argv"]
++        out = sip._with_ssrc(argv, 1234)
++        i = out.index("-ssrc")
++        self.assertEqual(out[i:i + 4], ["-ssrc", "1234", "-f", "rtp"])
++        self.assertEqual([x for j, x in enumerate(out) if j not in (i, i + 1)], argv)
++
++
++class TheLadderRow(unittest.TestCase):
++    KEYS_TODAY = ["schema", "mode", "acted", "event", "class", "from_kbps", "to_kbps", "injected", "decision_sequence", "actuation_ms",
++                  "recovery_state_at_restart", "error", "level_kbps", "state", "effective_mode", "cycle",
++                  "blackout_reports"]
++
++    def row_for(self, result):
++        tmp = tempfile.mkdtemp(prefix="b32h_")
++        c = live.LiveController(Path(tmp), environ={})
++        c.bind(actuator=lambda k: result, context=lambda: {}, serial_lock=None, recovery_state=lambda: "PLAYING")
++        c._actuate({"to_kbps": 6000, "from_kbps": 7000, "class": "routine", "decision_sequence": 1})
++        rows = [json.loads(x) for x in c.log_path.read_text().splitlines()]
++        return [r for r in rows if r.get("event") == "transition_done"][-1]
++
++    def test_todays_payload_gives_todays_row(self):
++        r = self.row_for({"ok": True, "target_bitrate_kbps": 6000, "video": {"first_rtp_resume_ms": 210.0}})
++        self.assertEqual([k for k in r if k not in ("at_utc", "clock_ms")], self.KEYS_TODAY)
++
++    def test_an_in_place_step_says_so(self):
++        r = self.row_for({"ok": True, "target_bitrate_kbps": 6000,
++                          "video": {"first_rtp_resume_ms": 30.0, "in_place": True, "ssrc_unchanged": True,
++                                    "splice_gap_ms": 12.5}})
++        self.assertEqual((r["in_place"], r["ssrc_unchanged"], r["splice_gap_ms"], r["to_kbps"]), (True, True, 12.5, 6000))
++        self.assertNotIn("in_place_fallback", r)
++
++
++class TheFlag(unittest.TestCase):
++    def fresh(self, value):
++        env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++        if value is not None:
++            env[sip.FLAG_ENV] = value
++        code = ("import sys; import native_stream as n; "
++                "print(n.STEP_IN_PLACE is not None, 'step_in_place' in sys.modules)")
++        out = subprocess.run([sys.executable, "-c", code], cwd=ROOT / "companion", env=env, capture_output=True,
++                             text=True, timeout=60)
++        return out.stdout.split()
++
++    def test_nothing_imported_without_the_line(self):
++        for v in (None, "", "0", "yes", "true"):
++            self.assertEqual(self.fresh(v), ["False", "False"], v)
++        self.assertEqual(self.fresh("1"), ["True", "True"])
++
++    def test_the_actuator_entry_absent_is_todays_and_present_is_the_step(self):
++        calls = []
++        fake = types.SimpleNamespace(_lock=threading.RLock(), _active_bitrate_kbps=7000, _linux_host=lambda: True,
++                                     diagnostic_c3_validated_bitrate_transition=lambda k: calls.append(("today", k)) or {})
++        saved = ns.STEP_IN_PLACE
++        try:
++            ns.STEP_IN_PLACE = None
++            ns.NativeStreamManager.adaptive_level_transition(fake, 6000)
++            ns.STEP_IN_PLACE = types.SimpleNamespace(run_in_place_transition=lambda m, k: calls.append(("step", k)) or {})
++            ns.NativeStreamManager.adaptive_level_transition(fake, 5500)
++        finally:
++            ns.STEP_IN_PLACE = saved
++        self.assertEqual(calls, [("today", 6000), ("step", 5500)])
++
++
++class TheCapBesideTheUmbrella(b28.Base):
++    def test_an_explicit_4000_holds_the_umbrellas_ladder_at_4000(self):
++        live.REMOTE_CAP = rc.from_environ({ru.CAP: "4000"}, None)            # today's import-time object: inactive
++        import_obj = live.REMOTE_CAP
++        self.assertEqual(import_obj.reason, "remote_ladder_flag_absent")
++        u = self.umbrella({ru.CAP: "4000"})
++        self.assertTrue(u.cap.active)
++        self.assertIs(u.cap.ladder, u.ladder)
++        out, rows = self.session(u, OVERLAY, 160)
++        self.assertEqual(b28.rate(out["argv"]), ("4000k", "4000k", "4000k"))
++        self.assertIs(live.REMOTE_CAP, u.cap)
++        self.assertFalse([r for r in rows if r.get("event") == "transition" and r.get("to_kbps", 0) > 4000])
++        self.assertTrue([r for r in rows if r.get("source") == rc.SOURCE or r.get("reason") == rc.SOURCE])
++        caps = [r for r in self.rows() if r.get("event") == "remote_cap_config"]
++        self.assertEqual([(r["active"], r["cap_kbps"]) for r in caps], [(True, 4000)])
++        line = self.rec.rows[-1]["lines"][ru.CAP]
++        self.assertEqual(line, {"in_force": True, "how": "explicit 4000 on the umbrella's ladder"})
++        out, rows = self.session(u, b28.LAN, 20)                            # a LAN session: today's
++        self.assertEqual(b28.rate(out["argv"]), ("7000k", "7000k", "7000k"))
++        self.assertIs(live.REMOTE_CAP, import_obj)
++        self.assertEqual(self.rec.rows[-1]["lines"][ru.CAP]["in_force"], False)
++
++    def test_without_the_explicit_line_b28s_7000(self):
++        u = self.umbrella()
++        self.assertFalse(u.cap_on_umbrella_ladder)
++        self.assertEqual((u.cap.active, u.cap.cap_kbps), (True, 7000))
++
++
++if __name__ == "__main__":
++    unittest.main()

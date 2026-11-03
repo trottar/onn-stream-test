@@ -1,0 +1,2738 @@
+#!/usr/bin/env python3
+"""
+PrivyHub companion control service.
+
+Directory-independent layout:
+
+    project_root/
+    ├── companion/
+    │   ├── privyhub_service.py
+    │   ├── range_server.py
+    │   └── config/
+    │       └── sources.json
+    ├── scripts/
+    ├── media/
+    │   ├── vod/
+    │   └── live/
+    └── logs/
+
+Public API:
+    GET  /status
+    GET  /diagnostics/health
+    GET  /diagnostics/stream-telemetry
+    POST /diagnostics/self-test
+    POST /diagnostics/bundle
+    POST /diagnostics/client-health
+    GET  /sources
+    POST /sources/<source_id>/start
+    POST /stop
+
+The source catalog supports both:
+    - explicitly configured sources/categories
+    - dynamic media-directory categories
+
+Dynamic VOD directories are rescanned whenever /sources is requested and
+whenever a generated source is started. Adding/removing/renaming media files
+therefore requires no companion restart.
+
+Windows prototype using only the Python standard library.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+import threading
+import time
+import urllib.error
+import urllib.request
+
+from dataclasses import dataclass
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any, Optional
+from urllib.parse import parse_qs, quote, unquote, urlparse, urlsplit
+
+from storage_presence import (
+    configured_local_backing_present,
+    lexical_absolute_path,
+)
+
+from plugins import (
+    PLUGINS,
+    shutdown_plugins,
+)
+
+from diagnostics.runtime_health import (
+    build_live_health_snapshot,
+)
+
+from diagnostics.client_feedback import (
+    ClientHealthStore,
+)
+
+from adaptive_bitrate_live import get_controller as adaptive_bitrate_controller
+from adaptive_bitrate_live import handle_route as adaptive_bitrate_route
+from adaptive_bitrate_live import is_live as adaptive_bitrate_is_live
+from games.decoder_report_http import (
+    access_log_path,
+    body_length as decoder_report_body_length,
+    report_from_body as decoder_report_from_body,
+)
+from diagnostics.stream_telemetry import (
+    StreamTelemetryStore,
+)
+
+from diagnostics.self_test import (
+    run_diagnostics_self_test,
+)
+
+from diagnostics.support_bundle import (
+    SupportBundleError,
+    create_sanitized_support_bundle,
+)
+
+
+COMPANION_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = COMPANION_DIR.parent
+
+MEDIA_ROOT = PROJECT_ROOT / "media"
+LIVE_DIR = MEDIA_ROOT / "live"
+LOG_DIR = PROJECT_ROOT / "logs"
+
+# PRIVYHUB_D096_CONFIGURABLE_VOD_STORAGE_V1
+# Machine-specific storage selection lives under ignored data/, not in
+# tracked source/config.  The default remains the project-local media/vod.
+STORAGE_CONFIG_FILE = (
+    PROJECT_ROOT / "data" / "storage.json"
+)
+
+CATALOG_FILE = COMPANION_DIR / "config" / "sources.json"
+SERVER_SCRIPT = PROJECT_ROOT / "scripts" / "start_server.ps1"
+# PRIVYHUB_D078_LINUX_MEDIA_SERVER_STARTUP_V1
+RANGE_SERVER = COMPANION_DIR / "range_server.py"
+
+CONTROL_HOST = "0.0.0.0"
+CONTROL_PORT = 8765
+
+MEDIA_HOST_FOR_HEALTH = "127.0.0.1"
+MEDIA_SERVER_HOST = "0.0.0.0"
+DEFAULT_MEDIA_PORT = 8000
+
+POWERSHELL = "powershell.exe"
+
+HEALTH_POLL_SECONDS = 0.75
+HTTP_HEALTH_TIMEOUT_SECONDS = 2.0
+
+DEFAULT_MEDIA_EXTENSIONS = {
+    ".mp4",
+    ".m4v",
+    ".mkv",
+    ".webm",
+    ".mov",
+    ".ts",
+    ".m2ts",
+}
+
+
+@dataclass(frozen=True)
+class StorageConfig:
+    vod_root: Path
+    configured: bool
+
+
+def _load_storage_config(
+) -> StorageConfig:
+    default_vod_root = (
+        MEDIA_ROOT / "vod"
+    ).resolve(
+        strict=False
+    )
+
+    if not STORAGE_CONFIG_FILE.exists():
+        return StorageConfig(
+            vod_root=default_vod_root,
+            configured=False,
+        )
+
+    try:
+        with STORAGE_CONFIG_FILE.open(
+            "r",
+            encoding="utf-8",
+        ) as handle:
+            raw = json.load(handle)
+    except (
+        OSError,
+        json.JSONDecodeError,
+    ) as exc:
+        raise RuntimeError(
+            "Could not read PrivyHub storage config: "
+            f"{STORAGE_CONFIG_FILE}"
+        ) from exc
+
+    if not isinstance(raw, dict):
+        raise RuntimeError(
+            "PrivyHub storage config must be a JSON object"
+        )
+
+    version = raw.get(
+        "version",
+        1,
+    )
+
+    if version != 1:
+        raise RuntimeError(
+            f"Unsupported PrivyHub storage config version: {version}"
+        )
+
+    raw_vod_root = raw.get(
+        "vod_root"
+    )
+
+    if (
+        not isinstance(
+            raw_vod_root,
+            str,
+        )
+        or not raw_vod_root.strip()
+    ):
+        raise RuntimeError(
+            "Configured vod_root must be a non-empty absolute path"
+        )
+
+    vod_root = Path(
+        raw_vod_root
+    ).expanduser()
+
+    if not vod_root.is_absolute():
+        raise RuntimeError(
+            "Configured vod_root must be absolute"
+        )
+
+    return StorageConfig(
+        vod_root=lexical_absolute_path(
+            vod_root
+        ),
+        configured=True,
+    )
+
+
+STORAGE_CONFIG = _load_storage_config()
+VOD_ROOT = STORAGE_CONFIG.vod_root
+
+
+@dataclass
+class ManagedProcess:
+    name: str
+    process: subprocess.Popen
+    log_handle: Any
+    log_path: Path
+
+
+class CatalogError(Exception):
+    pass
+
+
+class SourceStartError(Exception):
+    pass
+
+
+class SourceCatalog:
+    def __init__(
+        self,
+        catalog_path: Path,
+        media_root: Path,
+        vod_root: Path,
+    ) -> None:
+        self.catalog_path = catalog_path
+        self.media_root = media_root.resolve()
+        self.vod_root = lexical_absolute_path(
+            vod_root
+        )
+
+        self.lock = threading.RLock()
+
+        self.raw: dict[str, Any] = {}
+        self.static_sources: dict[str, dict[str, Any]] = {}
+        self.dynamic_sources: dict[str, dict[str, Any]] = {}
+
+        self.load()
+
+    def load(self) -> None:
+        if not self.catalog_path.exists():
+            raise CatalogError(
+                f"Source catalog not found: {self.catalog_path}"
+            )
+
+        with self.catalog_path.open("r", encoding="utf-8") as handle:
+            raw = json.load(handle)
+
+        if not isinstance(raw, dict):
+            raise CatalogError("Source catalog root must be an object")
+
+        root = raw.get("root")
+
+        if not isinstance(root, list):
+            raise CatalogError("Source catalog must contain a root array")
+
+        static_source_index: dict[str, dict[str, Any]] = {}
+        seen_ids: set[str] = set()
+
+        def walk(node: dict[str, Any]) -> None:
+            node_id = node.get("id")
+            node_type = node.get("node_type")
+
+            if not isinstance(node_id, str) or not node_id:
+                raise CatalogError(
+                    "Every catalog node needs a non-empty id"
+                )
+
+            if node_id in seen_ids:
+                raise CatalogError(
+                    f"Duplicate catalog id: {node_id}"
+                )
+
+            seen_ids.add(node_id)
+
+            if node_type == "category":
+                children = node.get("children", [])
+                dynamic = node.get("dynamic")
+                lazy_path = node.get("lazy_path")
+
+                if not isinstance(children, list):
+                    raise CatalogError(
+                        f"Category {node_id} must have a children array"
+                    )
+
+                if dynamic is not None:
+                    self._validate_dynamic_config(
+                        node_id,
+                        dynamic,
+                    )
+
+                if lazy_path is not None:
+                    if (
+                        not isinstance(lazy_path, str)
+                        or not lazy_path.startswith("/plugins/")
+                    ):
+                        raise CatalogError(
+                            f"Category {node_id} has invalid lazy_path"
+                        )
+
+                if (
+                    not children
+                    and dynamic is None
+                    and lazy_path is None
+                ):
+                    raise CatalogError(
+                        f"Category {node_id} needs children, dynamic config, "
+                        "or lazy_path"
+                    )
+
+                for child in children:
+                    if not isinstance(child, dict):
+                        raise CatalogError(
+                            f"Category {node_id} contains a non-object child"
+                        )
+
+                    walk(child)
+
+                return
+
+            if node_type == "source":
+                playback = node.get("playback")
+
+                if not isinstance(playback, dict):
+                    raise CatalogError(
+                        f"Source {node_id} needs a playback object"
+                    )
+
+                playback_type = playback.get("type")
+
+                if playback_type not in {"live", "vod"}:
+                    raise CatalogError(
+                        f"Source {node_id} has unsupported playback type"
+                    )
+
+                media_path = playback.get("path")
+
+                if (
+                    not isinstance(media_path, str)
+                    or not media_path.startswith("/")
+                ):
+                    raise CatalogError(
+                        f"Source {node_id} needs an absolute media path"
+                    )
+
+                static_source_index[node_id] = node
+                return
+
+            raise CatalogError(
+                f"Node {node_id} has unsupported node_type: {node_type}"
+            )
+
+        for item in root:
+            if not isinstance(item, dict):
+                raise CatalogError(
+                    "Root catalog entries must be objects"
+                )
+
+            walk(item)
+
+        with self.lock:
+            self.raw = raw
+            self.static_sources = static_source_index
+            self.dynamic_sources = {}
+
+    def _validate_dynamic_config(
+        self,
+        node_id: str,
+        dynamic: Any,
+    ) -> None:
+        if not isinstance(dynamic, dict):
+            raise CatalogError(
+                f"Category {node_id} dynamic config must be an object"
+            )
+
+        dynamic_type = dynamic.get("type")
+
+        if dynamic_type != "media_directory":
+            raise CatalogError(
+                f"Category {node_id} has unsupported dynamic type: "
+                f"{dynamic_type}"
+            )
+
+        relative_path = dynamic.get("path")
+
+        if not isinstance(relative_path, str) or not relative_path.strip():
+            raise CatalogError(
+                f"Category {node_id} dynamic path is required"
+            )
+
+        path = Path(relative_path)
+
+        if path.is_absolute() or ".." in path.parts:
+            raise CatalogError(
+                f"Category {node_id} dynamic path must stay under media/"
+            )
+
+        extensions = dynamic.get("extensions")
+
+        if extensions is not None:
+            if not isinstance(extensions, list):
+                raise CatalogError(
+                    f"Category {node_id} extensions must be an array"
+                )
+
+            for extension in extensions:
+                if (
+                    not isinstance(extension, str)
+                    or not extension.startswith(".")
+                ):
+                    raise CatalogError(
+                        f"Category {node_id} has invalid extension: "
+                        f"{extension!r}"
+                    )
+
+    def _physical_media_path(
+        self,
+        relative_path: str,
+    ) -> Path:
+        logical_path = Path(
+            relative_path
+        )
+
+        if (
+            logical_path.is_absolute()
+            or ".." in logical_path.parts
+        ):
+            raise CatalogError(
+                f"Media path escapes logical root: {relative_path}"
+            )
+
+        parts = logical_path.parts
+
+        if (
+            parts
+            and parts[0].casefold() == "vod"
+        ):
+            suffix = Path(
+                *parts[1:]
+            )
+
+            return lexical_absolute_path(
+                self.vod_root / suffix
+            )
+
+        return (
+            self.media_root / logical_path
+        ).resolve(
+            strict=False
+        )
+
+    def _safe_media_directory(
+        self,
+        relative_path: str,
+    ) -> Path:
+        return self._physical_media_path(
+            relative_path
+        )
+
+    def resolve_playback_path(
+        self,
+        playback_path: str,
+    ) -> Path:
+        logical_path = unquote(
+            urlparse(
+                playback_path
+            ).path
+        ).lstrip("/")
+
+        return self._physical_media_path(
+            logical_path
+        )
+
+    def vod_backing_device_present(
+        self,
+    ) -> Optional[bool]:
+        if not STORAGE_CONFIG.configured:
+            return None
+
+        return configured_local_backing_present(
+            self.vod_root
+        )
+
+    def vod_storage_status(
+        self,
+    ) -> dict[str, Any]:
+        backing_present = (
+            self.vod_backing_device_present()
+        )
+
+        if backing_present is False:
+            available = False
+        else:
+            try:
+                available = (
+                    self.vod_root.exists()
+                    and self.vod_root.is_dir()
+                )
+            except OSError:
+                available = False
+
+        return {
+            "configured": (
+                STORAGE_CONFIG.configured
+            ),
+            "mode": (
+                "configured"
+                if STORAGE_CONFIG.configured
+                else "project_default"
+            ),
+            "available": available,
+        }
+
+    @staticmethod
+    def _slug(
+        text: str,
+    ) -> str:
+        slug = re.sub(
+            r"[^a-z0-9]+",
+            "_",
+            text.casefold(),
+        ).strip("_")
+
+        if not slug:
+            slug = "media"
+
+        return slug[:48]
+
+    @classmethod
+    def _generated_id(
+        cls,
+        prefix: str,
+        relative_path: str,
+    ) -> str:
+        normalized = (
+            relative_path
+            .replace("\\", "/")
+            .casefold()
+        )
+
+        digest = hashlib.sha1(
+            normalized.encode("utf-8")
+        ).hexdigest()[:10]
+
+        readable = cls._slug(
+            Path(relative_path).stem
+        )
+
+        return (
+            f"{prefix}_{readable}_{digest}"
+        )
+
+    @staticmethod
+    def _clean_display_name(
+        raw_name: str,
+    ) -> str:
+        """
+        Apply only conservative filename cleanup.
+
+        - underscores become spaces
+        - repeated whitespace is collapsed
+        - obviously machine-style all-lowercase/all-uppercase names get
+          title casing
+        - deliberately mixed-case names are otherwise preserved
+
+        This intentionally avoids metadata guessing.
+        """
+        cleaned = re.sub(
+            r"\s+",
+            " ",
+            raw_name.replace("_", " "),
+        ).strip()
+
+        if not cleaned:
+            return raw_name
+
+        letters = [
+            character
+            for character in cleaned
+            if character.isalpha()
+        ]
+
+        if letters:
+            all_lower = all(
+                character.islower()
+                for character in letters
+            )
+
+            all_upper = all(
+                character.isupper()
+                for character in letters
+            )
+
+            if all_lower or all_upper:
+                cleaned = cleaned.title()
+
+        return cleaned
+
+    @classmethod
+    def _display_file_name(
+        cls,
+        file_path: Path,
+    ) -> str:
+        name = file_path.stem.strip()
+
+        if not name:
+            return file_path.name
+
+        return cls._clean_display_name(
+            name
+        )
+
+    @classmethod
+    def _display_directory_name(
+        cls,
+        directory: Path,
+    ) -> str:
+        name = directory.name.strip()
+
+        if not name:
+            return directory.name
+
+        return cls._clean_display_name(
+            name
+        )
+
+    @staticmethod
+    def _extensions_from_config(
+        dynamic: dict[str, Any],
+    ) -> set[str]:
+        configured = dynamic.get("extensions")
+
+        if configured is None:
+            return set(DEFAULT_MEDIA_EXTENSIONS)
+
+        return {
+            str(extension).casefold()
+            for extension in configured
+        }
+
+    def _scan_media_directory(
+        self,
+        category_id: str,
+        dynamic: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        relative_root = Path(
+            dynamic["path"]
+        )
+
+        disk_root = self._safe_media_directory(
+            relative_root.as_posix()
+        )
+
+        if (
+            relative_root.parts
+            and relative_root.parts[0].casefold() == "vod"
+            and self.vod_backing_device_present() is False
+        ):
+            return []
+
+        # PRIVYHUB_D098_ABSENT_VOD_CATALOG_RESILIENCE_V1
+        # Removable/bulk storage can disappear while the companion remains
+        # online. Linux automount/device states may raise ENODEV/EIO from
+        # stat() instead of making Path.exists() simply return False.
+        # Treat those filesystem errors as unavailable dynamic storage.
+        try:
+            if not disk_root.exists():
+                return []
+
+            if not disk_root.is_dir():
+                raise CatalogError(
+                    f"Dynamic media path is not a directory: {disk_root}"
+                )
+        except OSError:
+            return []
+
+        extensions = self._extensions_from_config(
+            dynamic
+        )
+
+        dynamic_source_index: dict[str, dict[str, Any]] = {}
+
+        def scan_directory(
+            disk_directory: Path,
+            relative_directory: Path,
+        ) -> list[dict[str, Any]]:
+            children: list[dict[str, Any]] = []
+
+            directories = sorted(
+                (
+                    item
+                    for item in disk_directory.iterdir()
+                    if item.is_dir()
+                    and not item.name.startswith(".")
+                ),
+                key=lambda item: item.name.casefold(),
+            )
+
+            files = sorted(
+                (
+                    item
+                    for item in disk_directory.iterdir()
+                    if item.is_file()
+                    and not item.name.startswith(".")
+                    and item.suffix.casefold() in extensions
+                ),
+                key=lambda item: item.name.casefold(),
+            )
+
+            for directory in directories:
+                relative_child = (
+                    relative_directory
+                    / directory.name
+                )
+
+                child_nodes = scan_directory(
+                    directory,
+                    relative_child,
+                )
+
+                # Empty folders are implementation detail, not useful
+                # navigation.  A directory is shown only when it contains
+                # at least one supported media file somewhere below it.
+                if not child_nodes:
+                    continue
+
+                directory_id = self._generated_id(
+                    f"{category_id}_dir",
+                    relative_child.as_posix(),
+                )
+
+                children.append(
+                    {
+                        "id": directory_id,
+                        "name": self._display_directory_name(
+                            directory
+                        ),
+                        "node_type": "category",
+                        "children": child_nodes,
+                    }
+                )
+
+            for media_file in files:
+                relative_file = (
+                    relative_directory
+                    / media_file.name
+                )
+
+                source_id = self._generated_id(
+                    f"{category_id}_file",
+                    relative_file.as_posix(),
+                )
+
+                media_url_path = (
+                    "/"
+                    + quote(
+                        relative_file.as_posix(),
+                        safe="/",
+                    )
+                )
+
+                source = {
+                    "id": source_id,
+                    "name": self._display_file_name(
+                        media_file
+                    ),
+                    "node_type": "source",
+                    "playback": {
+                        "type": "vod",
+                        "port": DEFAULT_MEDIA_PORT,
+                        "path": media_url_path,
+                    },
+                    "health": {
+                        "type": "file",
+                    },
+                    "_filesystem_path": str(
+                        media_file.resolve()
+                    ),
+                    "_dynamic": True,
+                }
+
+                dynamic_source_index[
+                    source_id
+                ] = source
+
+                children.append(source)
+
+            return children
+
+        # The removable device can also disappear after the initial root
+        # check. Any filesystem OSError during recursive enumeration,
+        # file stat, or path resolution aborts this scan cleanly. Do not
+        # publish a partial dynamic index from a torn scan.
+        try:
+            nodes = scan_directory(
+                disk_root,
+                relative_root,
+            )
+        except OSError:
+            return []
+
+        self.dynamic_sources.update(
+            dynamic_source_index
+        )
+
+        return nodes
+
+    def _public_node(
+        self,
+        node: dict[str, Any],
+    ) -> dict[str, Any]:
+        node_type = node["node_type"]
+
+        if node_type == "category":
+            children = [
+                self._public_node(child)
+                for child in node.get("children", [])
+            ]
+
+            dynamic = node.get("dynamic")
+
+            if dynamic is not None:
+                dynamic_children = (
+                    self._scan_media_directory(
+                        node["id"],
+                        dynamic,
+                    )
+                )
+
+                children.extend(
+                    self._public_node(child)
+                    for child in dynamic_children
+                )
+
+            public_node = {
+                "id": node["id"],
+                "name": node.get(
+                    "name",
+                    node["id"],
+                ),
+                "node_type": "category",
+                "children": children,
+            }
+
+            lazy_path = node.get("lazy_path")
+
+            if lazy_path is not None:
+                public_node["lazy_path"] = lazy_path
+
+            return public_node
+
+        playback = node["playback"]
+
+        return {
+            "id": node["id"],
+            "name": node.get(
+                "name",
+                node["id"],
+            ),
+            "node_type": "source",
+            "playback": {
+                "type": playback["type"],
+                "port": int(
+                    playback.get(
+                        "port",
+                        DEFAULT_MEDIA_PORT,
+                    )
+                ),
+                "path": playback["path"],
+            },
+        }
+
+    def _refresh_dynamic_sources(
+        self,
+    ) -> None:
+        self.dynamic_sources = {}
+
+        def walk(
+            node: dict[str, Any],
+        ) -> None:
+            if node["node_type"] != "category":
+                return
+
+            dynamic = node.get("dynamic")
+
+            if dynamic is not None:
+                self._scan_media_directory(
+                    node["id"],
+                    dynamic,
+                )
+
+            for child in node.get(
+                "children",
+                [],
+            ):
+                walk(child)
+
+        for item in self.raw["root"]:
+            walk(item)
+
+    def get_source(
+        self,
+        source_id: str,
+    ) -> dict[str, Any]:
+        with self.lock:
+            static_source = (
+                self.static_sources.get(
+                    source_id
+                )
+            )
+
+            if static_source is not None:
+                return static_source
+
+            self._refresh_dynamic_sources()
+
+            dynamic_source = (
+                self.dynamic_sources.get(
+                    source_id
+                )
+            )
+
+            if dynamic_source is not None:
+                return dynamic_source
+
+        raise CatalogError(
+            f"Unknown source: {source_id}"
+        )
+
+    def public_catalog(
+        self,
+    ) -> dict[str, Any]:
+        with self.lock:
+            self.dynamic_sources = {}
+
+            return {
+                "version": self.raw.get(
+                    "version",
+                    1,
+                ),
+                "storage": {
+                    "vod": (
+                        self.vod_storage_status()
+                    ),
+                },
+                "root": [
+                    self._public_node(item)
+                    for item in self.raw["root"]
+                ],
+            }
+
+
+class PrivyHubController:
+    def __init__(self) -> None:
+        self.lock = threading.RLock()
+
+        MEDIA_ROOT.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        LIVE_DIR.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        LOG_DIR.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        if os.name == "nt":
+            if not SERVER_SCRIPT.exists():
+                raise FileNotFoundError(
+                    f"Required server script not found: {SERVER_SCRIPT}"
+                )
+        elif not RANGE_SERVER.exists():
+            raise FileNotFoundError(
+                f"Required range server not found: {RANGE_SERVER}"
+            )
+
+        self.catalog = SourceCatalog(
+            CATALOG_FILE,
+            MEDIA_ROOT,
+            VOD_ROOT,
+        )
+
+        self.server: Optional[ManagedProcess] = None
+        self.source_process: Optional[ManagedProcess] = None
+        self.active_source_id: Optional[str] = None
+
+    @staticmethod
+    def _running(
+        item: Optional[ManagedProcess],
+    ) -> bool:
+        return (
+            item is not None
+            and item.process.poll() is None
+        )
+
+    @staticmethod
+    def _close_log(
+        item: Optional[ManagedProcess],
+    ) -> None:
+        if item is None:
+            return
+
+        try:
+            item.log_handle.close()
+        except Exception:
+            pass
+
+    def _launch_powershell(
+        self,
+        name: str,
+        script: Path,
+    ) -> ManagedProcess:
+        script = script.resolve()
+
+        if not script.exists():
+            raise FileNotFoundError(
+                f"PowerShell script not found: {script}"
+            )
+
+        log_path = (
+            LOG_DIR / f"{name}.log"
+        )
+
+        log_handle = open(
+            log_path,
+            "a",
+            encoding="utf-8",
+            buffering=1,
+        )
+
+        log_handle.write("\n")
+        log_handle.write("=" * 72 + "\n")
+        log_handle.write(
+            f"Starting PrivyHub process: {name}\n"
+        )
+        log_handle.write(
+            f"Script: {script}\n"
+        )
+        log_handle.write("=" * 72 + "\n")
+        log_handle.flush()
+
+        creationflags = 0
+
+        if os.name == "nt":
+            creationflags = (
+                subprocess.CREATE_NEW_PROCESS_GROUP
+            )
+
+        try:
+            process = subprocess.Popen(
+                [
+                    POWERSHELL,
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-File",
+                    str(script),
+                ],
+                cwd=str(PROJECT_ROOT),
+                stdin=subprocess.DEVNULL,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                creationflags=creationflags,
+            )
+        except Exception:
+            log_handle.close()
+            raise
+
+        return ManagedProcess(
+            name=name,
+            process=process,
+            log_handle=log_handle,
+            log_path=log_path,
+        )
+
+    def _launch_python_media_server(
+        self,
+        name: str,
+    ) -> ManagedProcess:
+        range_server = RANGE_SERVER.resolve()
+
+        if not range_server.exists():
+            raise FileNotFoundError(
+                f"Range server not found: {range_server}"
+            )
+
+        log_path = (
+            LOG_DIR / f"{name}.log"
+        )
+
+        log_handle = open(
+            log_path,
+            "a",
+            encoding="utf-8",
+            buffering=1,
+        )
+
+        log_handle.write("\n")
+        log_handle.write("=" * 72 + "\n")
+        log_handle.write(
+            f"Starting PrivyHub process: {name}\n"
+        )
+        log_handle.write(
+            "Launcher: Python range_server.py\n"
+        )
+        log_handle.write("=" * 72 + "\n")
+        log_handle.flush()
+
+        try:
+            process = subprocess.Popen(
+                [
+                    sys.executable,
+                    str(range_server),
+                    "--root",
+                    str(MEDIA_ROOT),
+                    "--vod-root",
+                    str(VOD_ROOT),
+                    "--host",
+                    MEDIA_SERVER_HOST,
+                    "--port",
+                    str(DEFAULT_MEDIA_PORT),
+                ],
+                cwd=str(PROJECT_ROOT),
+                stdin=subprocess.DEVNULL,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+            )
+        except Exception:
+            log_handle.close()
+            raise
+
+        return ManagedProcess(
+            name=name,
+            process=process,
+            log_handle=log_handle,
+            log_path=log_path,
+        )
+
+    @staticmethod
+    def _kill_process_tree(
+        item: ManagedProcess,
+    ) -> None:
+        if item.process.poll() is not None:
+            return
+
+        if os.name == "nt":
+            subprocess.run(
+                [
+                    "taskkill",
+                    "/PID",
+                    str(item.process.pid),
+                    "/T",
+                    "/F",
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+        else:
+            item.process.terminate()
+
+        try:
+            item.process.wait(
+                timeout=5
+            )
+        except subprocess.TimeoutExpired:
+            try:
+                item.process.kill()
+            except Exception:
+                pass
+
+    def start_server(
+        self,
+    ) -> None:
+        with self.lock:
+            if self._running(
+                self.server
+            ):
+                return
+
+            if self.server is not None:
+                self._close_log(
+                    self.server
+                )
+                self.server = None
+
+            if os.name == "nt":
+                self.server = (
+                    self._launch_powershell(
+                        "server",
+                        SERVER_SCRIPT,
+                    )
+                )
+            else:
+                self.server = (
+                    self._launch_python_media_server(
+                        "server"
+                    )
+                )
+
+    def stop_server(
+        self,
+    ) -> None:
+        with self.lock:
+            if self.server is not None:
+                self._kill_process_tree(
+                    self.server
+                )
+                self._close_log(
+                    self.server
+                )
+                self.server = None
+
+    def stop_source(
+        self,
+    ) -> dict[str, Any]:
+        with self.lock:
+            if self.source_process is not None:
+                self._kill_process_tree(
+                    self.source_process
+                )
+                self._close_log(
+                    self.source_process
+                )
+
+            self.source_process = None
+            self.active_source_id = None
+
+            return self.status()
+
+    def _public_source(
+        self,
+        source: dict[str, Any],
+    ) -> dict[str, Any]:
+        playback = source["playback"]
+
+        return {
+            "id": source["id"],
+            "name": source.get(
+                "name",
+                source["id"],
+            ),
+            "playback": {
+                "type": playback["type"],
+                "port": int(
+                    playback.get(
+                        "port",
+                        DEFAULT_MEDIA_PORT,
+                    )
+                ),
+                "path": playback["path"],
+            },
+        }
+
+    def _vod_is_healthy(
+        self,
+        source: dict[str, Any],
+    ) -> bool:
+        if (
+            self.catalog.vod_backing_device_present()
+            is False
+        ):
+            return False
+
+        try:
+            media_file = (
+                self.catalog.resolve_playback_path(
+                    source["playback"]["path"]
+                )
+            )
+        except (
+            CatalogError,
+            OSError,
+        ):
+            return False
+
+        explicit_path = source.get(
+            "_filesystem_path"
+        )
+
+        # D-092 established exact scanner-recorded target validation for
+        # dynamic VOD. D-096 preserves that invariant while moving the
+        # physical /vod namespace behind the configured VOD root.
+        if explicit_path:
+            try:
+                if (
+                    media_file.resolve(
+                        strict=False
+                    )
+                    != Path(
+                        explicit_path
+                    ).resolve(
+                        strict=False
+                    )
+                ):
+                    return False
+            except OSError:
+                return False
+
+        try:
+            return (
+                media_file.exists()
+                and media_file.is_file()
+                and media_file.stat().st_size > 0
+            )
+        except OSError:
+            return False
+
+    def _hls_is_healthy(
+        self,
+        source: dict[str, Any],
+    ) -> bool:
+        playback = source["playback"]
+        health = source.get(
+            "health",
+            {},
+        )
+
+        media_port = int(
+            playback.get(
+                "port",
+                DEFAULT_MEDIA_PORT,
+            )
+        )
+
+        media_path = playback["path"]
+
+        playlist_url = (
+            f"http://{MEDIA_HOST_FOR_HEALTH}:"
+            f"{media_port}{media_path}"
+        )
+
+        request = urllib.request.Request(
+            playlist_url,
+            headers={
+                "Cache-Control": "no-cache",
+            },
+            method="GET",
+        )
+
+        try:
+            with urllib.request.urlopen(
+                request,
+                timeout=HTTP_HEALTH_TIMEOUT_SECONDS,
+            ) as response:
+                if response.status != 200:
+                    return False
+
+                playlist = (
+                    response
+                    .read()
+                    .decode(
+                        "utf-8",
+                        errors="replace",
+                    )
+                )
+        except (
+            urllib.error.URLError,
+            TimeoutError,
+            ConnectionError,
+        ):
+            return False
+
+        if "#EXTM3U" not in playlist:
+            return False
+
+        if "#EXTINF:" not in playlist:
+            return False
+
+        segments = [
+            line.strip()
+            for line in playlist.splitlines()
+            if line.strip().lower().endswith(
+                ".ts"
+            )
+        ]
+
+        min_segments = int(
+            health.get(
+                "min_segments",
+                2,
+            )
+        )
+
+        if len(segments) < min_segments:
+            return False
+
+        playlist_path = Path(
+            urlparse(
+                unquote(media_path)
+            ).path
+        )
+
+        playlist_directory = (
+            MEDIA_ROOT
+            / playlist_path.parent
+                .as_posix()
+                .lstrip("/")
+        ).resolve()
+
+        try:
+            playlist_directory.relative_to(
+                MEDIA_ROOT.resolve()
+            )
+        except ValueError:
+            return False
+
+        for segment in segments[
+            -min_segments:
+        ]:
+            segment_name = Path(
+                urlparse(segment).path
+            ).name
+
+            segment_file = (
+                playlist_directory
+                / segment_name
+            )
+
+            if not segment_file.exists():
+                return False
+
+            if segment_file.stat().st_size <= 0:
+                return False
+
+        return True
+
+    def _source_is_healthy(
+        self,
+        source: dict[str, Any],
+    ) -> bool:
+        playback_type = (
+            source["playback"]["type"]
+        )
+
+        if playback_type == "vod":
+            return self._vod_is_healthy(
+                source
+            )
+
+        health_type = (
+            source
+            .get("health", {})
+            .get(
+                "type",
+                "hls_local",
+            )
+        )
+
+        if health_type == "hls_local":
+            return self._hls_is_healthy(
+                source
+            )
+
+        raise SourceStartError(
+            f"Unsupported health check type: {health_type}"
+        )
+
+    def _wait_for_source(
+        self,
+        source: dict[str, Any],
+        timeout_seconds: float,
+    ) -> bool:
+        deadline = (
+            time.monotonic()
+            + timeout_seconds
+        )
+
+        consecutive_ready = 0
+
+        while time.monotonic() < deadline:
+            with self.lock:
+                source_process = (
+                    self.source_process
+                )
+
+                if (
+                    source_process is not None
+                    and source_process.process.poll()
+                    is not None
+                ):
+                    return False
+
+            if self._source_is_healthy(
+                source
+            ):
+                consecutive_ready += 1
+
+                if consecutive_ready >= 2:
+                    return True
+            else:
+                consecutive_ready = 0
+
+            time.sleep(
+                HEALTH_POLL_SECONDS
+            )
+
+        return False
+
+    def _launch_source_process(
+        self,
+        source: dict[str, Any],
+    ) -> None:
+        runner = source.get(
+            "runner"
+        )
+
+        if not isinstance(
+            runner,
+            dict,
+        ):
+            raise SourceStartError(
+                f"Source {source['id']} has no runner"
+            )
+
+        runner_type = runner.get(
+            "type"
+        )
+
+        if runner_type != "powershell":
+            raise SourceStartError(
+                f"Unsupported runner type: {runner_type}"
+            )
+
+        script_name = runner.get(
+            "script"
+        )
+
+        if (
+            not isinstance(
+                script_name,
+                str,
+            )
+            or not script_name
+        ):
+            raise SourceStartError(
+                f"Source {source['id']} has no runner script"
+            )
+
+        script_path = (
+            PROJECT_ROOT
+            / script_name
+        ).resolve()
+
+        try:
+            script_path.relative_to(
+                PROJECT_ROOT.resolve()
+            )
+        except ValueError as exc:
+            raise SourceStartError(
+                f"Runner path escapes project root: {script_name}"
+            ) from exc
+
+        self.source_process = (
+            self._launch_powershell(
+                source["id"],
+                script_path,
+            )
+        )
+
+        self.active_source_id = (
+            source["id"]
+        )
+
+    def start_source(
+        self,
+        source_id: str,
+    ) -> dict[str, Any]:
+        source = (
+            self.catalog.get_source(
+                source_id
+            )
+        )
+
+        playback_type = (
+            source["playback"]["type"]
+        )
+
+        with self.lock:
+            self.start_server()
+            self.stop_source()
+
+        if playback_type == "vod":
+            if not self._source_is_healthy(
+                source
+            ):
+                raise SourceStartError(
+                    f"VOD source is unavailable: {source_id}"
+                )
+
+            with self.lock:
+                self.active_source_id = (
+                    source_id
+                )
+
+            return {
+                "ok": True,
+                "ready": True,
+                "attempts": 0,
+                "source": self._public_source(
+                    source
+                ),
+                "status": self.status(),
+            }
+
+        health = source.get(
+            "health",
+            {},
+        )
+
+        max_attempts = int(
+            health.get(
+                "max_attempts",
+                2,
+            )
+        )
+
+        first_timeout = float(
+            health.get(
+                "first_attempt_timeout_seconds",
+                15,
+            )
+        )
+
+        second_timeout = float(
+            health.get(
+                "second_attempt_timeout_seconds",
+                30,
+            )
+        )
+
+        last_reason = (
+            "source did not become healthy"
+        )
+
+        for attempt in range(
+            1,
+            max_attempts + 1,
+        ):
+            with self.lock:
+                self.stop_source()
+                self._launch_source_process(
+                    source
+                )
+
+            timeout_seconds = (
+                first_timeout
+                if attempt == 1
+                else second_timeout
+            )
+
+            ready = self._wait_for_source(
+                source,
+                timeout_seconds,
+            )
+
+            if ready:
+                return {
+                    "ok": True,
+                    "ready": True,
+                    "attempts": attempt,
+                    "source": self._public_source(
+                        source
+                    ),
+                    "status": self.status(),
+                }
+
+            with self.lock:
+                if (
+                    self.source_process
+                    is not None
+                    and self.source_process
+                        .process
+                        .poll()
+                    is not None
+                ):
+                    last_reason = (
+                        "source process exited during startup"
+                    )
+                else:
+                    last_reason = (
+                        "source health check timed out"
+                    )
+
+                self.stop_source()
+
+            if attempt < max_attempts:
+                time.sleep(0.5)
+
+        raise SourceStartError(
+            f"Failed to start {source_id}: {last_reason}"
+        )
+
+    def shutdown(
+        self,
+    ) -> None:
+        with self.lock:
+            self.stop_source()
+            self.stop_server()
+
+    def status(
+        self,
+    ) -> dict[str, Any]:
+        with self.lock:
+            if (
+                self.server is not None
+                and not self._running(
+                    self.server
+                )
+            ):
+                self._close_log(
+                    self.server
+                )
+                self.server = None
+
+            if (
+                self.source_process
+                is not None
+                and not self._running(
+                    self.source_process
+                )
+            ):
+                self._close_log(
+                    self.source_process
+                )
+                self.source_process = None
+
+                if (
+                    self.active_source_id
+                    is not None
+                ):
+                    active = (
+                        self.catalog.get_source(
+                            self.active_source_id
+                        )
+                    )
+
+                    if (
+                        active["playback"]["type"]
+                        != "vod"
+                    ):
+                        self.active_source_id = None
+
+            payload = {
+                "service": "PrivyHub",
+                "api_version": 4,
+                "project_root": str(
+                    PROJECT_ROOT
+                ),
+                "media_root": str(
+                    MEDIA_ROOT
+                ),
+                "storage": {
+                    "vod": (
+                        self.catalog.vod_storage_status()
+                    ),
+                },
+                "control_port": CONTROL_PORT,
+                "server": {
+                    "running": self._running(
+                        self.server
+                    ),
+                    "pid": (
+                        self.server.process.pid
+                        if self._running(
+                            self.server
+                        )
+                        else None
+                    ),
+                    "log": (
+                        str(
+                            self.server.log_path
+                        )
+                        if self.server
+                        else None
+                    ),
+                },
+                "active_source": {
+                    "id": self.active_source_id,
+                    "runner_running": self._running(
+                        self.source_process
+                    ),
+                    "pid": (
+                        self.source_process.process.pid
+                        if self._running(
+                            self.source_process
+                        )
+                        else None
+                    ),
+                    "log": (
+                        str(
+                            self.source_process.log_path
+                        )
+                        if self.source_process
+                        else None
+                    ),
+                },
+            }
+
+        # G1-S1: the overlay object, outside the lock, only with the flag set.
+        if OVERLAY_STATUS is not None:
+            payload["overlay"] = OVERLAY_STATUS.status_field()
+
+        return payload
+
+
+# G1-S1: the overlay provider, only with PRIVYHUB_OVERLAY_PROVIDER set. Absent
+# = today: nothing imported, constructed or called; no status field.
+OVERLAY_STATUS = None
+
+if os.environ.get("PRIVYHUB_OVERLAY_PROVIDER", "").strip():
+    from overlay import reporter_from_environ as _overlay_reporter_from_environ
+
+    OVERLAY_STATUS = _overlay_reporter_from_environ(os.environ)
+
+# G3-S1: session identity, only with PRIVYHUB_SESSION_IDENTITY set. Absent =
+# today: nothing imported or constructed; no store read, no audit, no header.
+SESSION_IDENTITY = None
+
+if os.environ.get("PRIVYHUB_SESSION_IDENTITY", "").strip():
+    from session_identity import gate_from_environ as _session_gate_from_environ
+
+    SESSION_IDENTITY = _session_gate_from_environ(os.environ, PROJECT_ROOT)
+
+# G4-W2: with PRIVYHUB_AUDIO_CODEC set, record each setup's declared audio codecs
+# (the gate's `_setup` wrapped from outside). Absent = today: nothing imported.
+if SESSION_IDENTITY is not None and (os.environ.get("PRIVYHUB_AUDIO_CODEC") or "").strip():
+    import audio_codec as _audio_codec
+
+    _audio_codec.shared_from_environ(os.environ).install_setup_capture(SESSION_IDENTITY)
+
+# G5-S1: WAN telemetry classification, only with PRIVYHUB_WAN_TELEMETRY=1.
+# Absent = today: nothing imported, constructed or called; no field.
+# B1: the impairment shim's uplink blackout, only with PRIVYHUB_IMPAIRMENT set
+# (a gate only for `blackout-<D>s@both`). Absent = today: nothing imported.
+_impairment_uplink = None
+
+if os.environ.get("PRIVYHUB_IMPAIRMENT", "").strip():
+    import impairment as _impairment
+
+    _impairment_uplink = _impairment.uplink_gate_from_environ(os.environ)
+
+WAN_TELEMETRY = None
+
+if os.environ.get("PRIVYHUB_WAN_TELEMETRY", "").strip():
+    from wan_telemetry import from_environ as _wan_from_environ
+
+    WAN_TELEMETRY = _wan_from_environ(
+        os.environ,
+        PROJECT_ROOT,
+        overlay_state=(
+            OVERLAY_STATUS.status_field
+            if OVERLAY_STATUS is not None
+            else None
+        ),
+    )
+
+CONTROLLER = PrivyHubController()
+
+# G5-S1: /status gains the wan object while a stream reports, only with the
+# flag set (the status method itself is unchanged).
+if WAN_TELEMETRY is not None:
+    _controller_status_without_wan = CONTROLLER.status
+
+    def _controller_status_with_wan() -> dict[str, Any]:
+        payload = _controller_status_without_wan()
+        wan = WAN_TELEMETRY.status_field()
+        if wan is not None:
+            payload["wan"] = wan
+        return payload
+
+    CONTROLLER.status = _controller_status_with_wan
+CLIENT_HEALTH_STORE = ClientHealthStore()
+STREAM_TELEMETRY_STORE = StreamTelemetryStore()
+
+
+class PrivyHubRequestHandler(
+    BaseHTTPRequestHandler
+):
+    server_version = "PrivyHubControl/0.6"
+
+    def log_message(
+        self,
+        format: str,
+        *args: Any,
+    ) -> None:
+        # PRIVYHUB_B1_CLIENT_HEALTH_ENDPOINT_V1
+        # PRIVYHUB_B1_B2_COMPLETION_API_V1
+        # CL-B1: `self.path` does not exist yet on http.server's 414 path.
+        if (
+            access_log_path(self).startswith(
+                "/diagnostics/"
+            )
+        ):
+            return
+
+        print(
+            f"{self.client_address[0]} - "
+            f"{self.log_date_time_string()} - "
+            f"{format % args}"
+        )
+
+    def _send_json(
+        self,
+        status_code: int,
+        payload: dict[str, Any],
+    ) -> None:
+        body = json.dumps(
+            payload,
+            indent=2,
+        ).encode("utf-8")
+
+        self.send_response(
+            status_code
+        )
+
+        self.send_header(
+            "Content-Type",
+            "application/json; charset=utf-8",
+        )
+
+        self.send_header(
+            "Content-Length",
+            str(len(body)),
+        )
+
+        self.send_header(
+            "Cache-Control",
+            "no-store",
+        )
+
+        # G3-S1: a session token header, only under the flag.
+        if SESSION_IDENTITY is not None:
+            for name, value in getattr(self, "_session_headers", ()):
+                self.send_header(name, value)
+
+        self.end_headers()
+
+        self.wfile.write(
+            body
+        )
+
+    def _read_json_body(
+        self,
+        *,
+        max_bytes: int,
+    ) -> tuple[
+        dict[str, Any],
+        int,
+    ]:
+        raw_length = self.headers.get(
+            "Content-Length"
+        )
+
+        if raw_length is None:
+            raise ValueError(
+                "Content-Length is required"
+            )
+
+        try:
+            length = int(raw_length)
+        except ValueError as exc:
+            raise ValueError(
+                "Invalid Content-Length"
+            ) from exc
+
+        if length <= 0 or length > max_bytes:
+            raise ValueError(
+                "Client health payload size is invalid"
+            )
+
+        body = self.rfile.read(length)
+
+        try:
+            payload = json.loads(
+                body.decode("utf-8")
+            )
+        except (
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+        ) as exc:
+            raise ValueError(
+                "Client health payload is not valid JSON"
+            ) from exc
+
+        if not isinstance(payload, dict):
+            raise ValueError(
+                "Client health payload must be an object"
+            )
+
+        return payload, length
+
+    def _current_health_snapshot(
+        self,
+    ) -> dict[str, Any]:
+        return build_live_health_snapshot(
+            project_root=(
+                PROJECT_ROOT
+            ),
+            companion_status=(
+                CONTROLLER.status()
+            ),
+            games_plugin=(
+                PLUGINS.get(
+                    "games"
+                )
+            ),
+            client_health_feedback=(
+                CLIENT_HEALTH_STORE.snapshot()
+            ),
+        )
+
+    def _native_stream_status(
+        self,
+    ) -> dict[str, Any]:
+        games = PLUGINS.get(
+            "games"
+        )
+        if games is None:
+            return {}
+
+        try:
+            payload = games.handle(
+                "native-stream-status",
+                "",
+            )
+        except Exception:
+            return {}
+
+        return (
+            payload
+            if isinstance(payload, dict)
+            else {}
+        )
+
+    def do_GET(
+        self,
+    ) -> None:
+        parsed = urlsplit(self.path)
+        request_path = parsed.path
+
+        # G3-S1: identity and authorization, only under the flag.
+        if SESSION_IDENTITY is not None and SESSION_IDENTITY.intercept(self, "GET", parsed):
+            return
+
+        if request_path == "/status":
+            self._send_json(
+                200,
+                CONTROLLER.status(),
+            )
+            return
+
+        # PRIVYHUB_B1_HEALTH_ENDPOINT_V1
+        if request_path == "/diagnostics/health":
+            self._send_json(
+                200,
+                self._current_health_snapshot(),
+            )
+            return
+
+        if request_path == "/diagnostics/stream-telemetry":
+            self._send_json(
+                200,
+                STREAM_TELEMETRY_STORE.snapshot()
+                # G5-S1: the session's wan object, only with the flag set.
+                if WAN_TELEMETRY is None
+                else {
+                    **STREAM_TELEMETRY_STORE.snapshot(),
+                    "wan": WAN_TELEMETRY.status_field(),
+                },
+            )
+            return
+
+        if request_path == "/sources":
+            self._send_json(
+                200,
+                CONTROLLER.catalog.public_catalog(),
+            )
+            return
+
+        parts = [
+            part
+            for part in request_path.split("/")
+            if part
+        ]
+
+        if (
+            len(parts) == 3
+            and parts[0] == "plugins"
+        ):
+            plugin_id = parts[1]
+            action = parts[2]
+            plugin = PLUGINS.get(plugin_id)
+
+            if plugin is None:
+                self._send_json(
+                    404,
+                    {
+                        "ok": False,
+                        "error": f"Unknown plugin: {plugin_id}",
+                    },
+                )
+                return
+
+            try:
+                payload = plugin.handle(
+                    action,
+                    parsed.query,
+                )
+            except ValueError as exc:
+                self._send_json(
+                    400,
+                    {
+                        "ok": False,
+                        "error": str(exc),
+                    },
+                )
+                return
+            except RuntimeError as exc:
+                self._send_json(
+                    502,
+                    {
+                        "ok": False,
+                        "error": str(exc),
+                    },
+                )
+                return
+
+            self._send_json(
+                200,
+                payload,
+            )
+            return
+
+        self._send_json(
+            404,
+            {
+                "ok": False,
+                "error": "Not found",
+            },
+        )
+
+    def do_POST(
+        self,
+    ) -> None:
+        try:
+            parsed = urlsplit(self.path)
+            request_path = parsed.path
+
+            # G3-S1: identity and authorization, only under the flag.
+            if SESSION_IDENTITY is not None and SESSION_IDENTITY.intercept(self, "POST", parsed):
+                return
+
+            if request_path == "/diagnostics/self-test":
+                try:
+                    result = run_diagnostics_self_test(
+                        project_root=(
+                            PROJECT_ROOT
+                        ),
+                        health_snapshot=(
+                            self._current_health_snapshot()
+                        ),
+                    )
+                except Exception as exc:
+                    self._send_json(
+                        500,
+                        {
+                            "ok": False,
+                            "error": "Diagnostics self-test failed.",
+                            "error_class": type(exc).__name__,
+                        },
+                    )
+                    return
+
+                self._send_json(
+                    200,
+                    result,
+                )
+                return
+
+            if request_path == "/diagnostics/bundle":
+                companion_status = CONTROLLER.status()
+
+                try:
+                    result = create_sanitized_support_bundle(
+                        project_root=(
+                            PROJECT_ROOT
+                        ),
+                        health_snapshot=(
+                            build_live_health_snapshot(
+                                project_root=(
+                                    PROJECT_ROOT
+                                ),
+                                companion_status=(
+                                    companion_status
+                                ),
+                                games_plugin=(
+                                    PLUGINS.get(
+                                        "games"
+                                    )
+                                ),
+                                client_health_feedback=(
+                                    CLIENT_HEALTH_STORE.snapshot()
+                                ),
+                            )
+                        ),
+                        companion_status=(
+                            companion_status
+                        ),
+                    )
+                except SupportBundleError as exc:
+                    self._send_json(
+                        500,
+                        {
+                            "ok": False,
+                            "error": "Sanitized diagnostics bundle creation failed.",
+                            "error_code": exc.code,
+                        },
+                    )
+                    return
+                except Exception as exc:
+                    self._send_json(
+                        500,
+                        {
+                            "ok": False,
+                            "error": "Sanitized diagnostics bundle creation failed.",
+                            "error_class": type(exc).__name__,
+                        },
+                    )
+                    return
+
+                self._send_json(
+                    200,
+                    result,
+                )
+                return
+
+            if request_path == "/diagnostics/client-health":
+                try:
+                    payload, payload_bytes = self._read_json_body(
+                        max_bytes=8_192
+                    )
+                    # B1: the shim's uplink blackout -- this report never arrived (looked up so the handler also
+                    # runs where it is executed outside this module, as G5-S1's flag-absent test does)
+                    if (_gate := globals().get("_impairment_uplink")) is not None and _gate.drop("client_health"):
+                        self._send_json(503, {"ok": False, "impairment": "uplink_blackout"})
+                        return
+                    accepted = CLIENT_HEALTH_STORE.accept(
+                        payload,
+                        payload_bytes=payload_bytes,
+                    )
+
+                    try:
+                        native_status = self._native_stream_status()
+                        telemetry = STREAM_TELEMETRY_STORE.accept(
+                            client_health_feedback=(
+                                CLIENT_HEALTH_STORE.snapshot()
+                            ),
+                            native_stream_status=native_status,
+                        )
+                        # C3-L4-S1: the shadow controller reads the snapshot
+                        # just built and writes down what it would do. It
+                        # never acts; with the flag off it returns at once.
+                        # C3-L4-L1: in live mode the same call decides with
+                        # the stream status as its guard inputs; a transition
+                        # runs on the controller's own worker, never here.
+                        abr_controller = adaptive_bitrate_controller(
+                            PROJECT_ROOT
+                        )
+                        if adaptive_bitrate_is_live(abr_controller):
+                            abr_controller.observe(
+                                telemetry,
+                                stream_bitrate_kbps=native_status.get(
+                                    "bitrate_kbps"
+                                ),
+                                native_status=native_status,
+                            )
+                        else:
+                            abr_controller.observe(
+                                telemetry,
+                                stream_bitrate_kbps=native_status.get(
+                                    "bitrate_kbps"
+                                ),
+                            )
+                        # G5-S1: classification only; it never acts.
+                        if WAN_TELEMETRY is not None:
+                            WAN_TELEMETRY.observe(
+                                telemetry,
+                                native_status,
+                            )
+                    except Exception:
+                        # Telemetry must never disturb client health/gameplay.
+                        pass
+                except ValueError as exc:
+                    self._send_json(
+                        400,
+                        {
+                            "ok": False,
+                            "error": str(exc),
+                        },
+                    )
+                    return
+
+                self._send_json(
+                    200,
+                    accepted,
+                )
+                return
+
+            parts = [
+                part
+                for part in request_path.split("/")
+                if part
+            ]
+
+            # C3-L4-L1: POST /plugins/games/adaptive-bitrate/disable (any
+            # caller, idempotent, switches live to shadow for the session) and
+            # .../inject?class=FALLBACK|ROUTINE (test-only: loopback, the
+            # inject flag and live mode, else 403). No enable route.
+            if (
+                len(parts) == 4
+                and parts[0] == "plugins"
+                and parts[1] == "games"
+                and parts[2] == "adaptive-bitrate"
+            ):
+                code, payload = adaptive_bitrate_route(
+                    PROJECT_ROOT,
+                    parts[3],
+                    parsed.query,
+                    self.client_address[0],
+                )
+                self._send_json(
+                    code,
+                    payload,
+                )
+                return
+
+            if (
+                len(parts) == 3
+                and parts[0] == "plugins"
+            ):
+                plugin_id = parts[1]
+                action = parts[2]
+                plugin = PLUGINS.get(plugin_id)
+
+                if plugin is None:
+                    self._send_json(
+                        404,
+                        {
+                            "ok": False,
+                            "error": f"Unknown plugin: {plugin_id}",
+                        },
+                    )
+                    return
+
+                # CL-B1: the decoder report as a POST body. The target form
+                # (`?report=`, no body) falls through to the plugin as before.
+                if (
+                    plugin_id == "games"
+                    and action == "decoder-session-log"
+                    and hasattr(plugin, "handle_decoder_session_log")
+                    and self.headers.get("Content-Length") not in (None, "", "0")
+                ):
+                    report = None
+                    try:
+                        length = decoder_report_body_length(self.headers)
+                        report = decoder_report_from_body(
+                            self.rfile.read(length),
+                            self.headers.get("Content-Type"),
+                        )
+                        print(
+                            "decoder-session-log received as body: "
+                            f"report_chars={len(report)}"
+                        )
+                        payload = plugin.handle_decoder_session_log(report)
+                    except (ValueError, UnicodeDecodeError) as exc:
+                        self.close_connection = True
+                        print(
+                            "WARNING decoder-session-log rejected (400): "
+                            f"{exc}; report_chars="
+                            + (
+                                str(len(report))
+                                if report is not None
+                                else f"body_bytes={self.headers.get('Content-Length')}"
+                            )
+                        )
+                        self._send_json(
+                            400,
+                            {
+                                "ok": False,
+                                "error": str(exc),
+                            },
+                        )
+                        return
+
+                    self._send_json(
+                        200,
+                        payload,
+                    )
+                    return
+
+                json_request_handler = getattr(
+                    plugin,
+                    "handle_post_json_request",
+                    None,
+                )
+
+                request_handler = getattr(
+                    plugin,
+                    "handle_post_request",
+                    None,
+                )
+
+                handler = (
+                    json_request_handler
+                    or request_handler
+                    or getattr(
+                        plugin,
+                        "handle_post",
+                        None,
+                    )
+                )
+
+                if handler is None:
+                    self._send_json(
+                        405,
+                        {
+                            "ok": False,
+                            "error": f"Plugin does not support POST: {plugin_id}",
+                        },
+                    )
+                    return
+
+                try:
+                    if json_request_handler is not None:
+                        request_payload, _ = self._read_json_body(
+                            max_bytes=4_194_304
+                        )
+                        payload = json_request_handler(
+                            action,
+                            parsed.query,
+                            request_payload,
+                            # G3-S1: a session's declared endpoint; else the source (today).
+                            SESSION_IDENTITY.client_target(self)
+                            if SESSION_IDENTITY is not None
+                            else self.client_address[0],
+                        )
+                    elif request_handler is not None:
+                        payload = request_handler(
+                            action,
+                            parsed.query,
+                            # G3-S1: a session's declared endpoint; else the source (today).
+                            SESSION_IDENTITY.client_target(self)
+                            if SESSION_IDENTITY is not None
+                            else self.client_address[0],
+                        )
+                    else:
+                        payload = handler(
+                            action,
+                            parsed.query,
+                        )
+                except ValueError as exc:
+                    # C3-L3A-R2B: a refused decoder report was invisible in
+                    # the journal (the reason went only to the client, which
+                    # discards it). One line, reason and length, no content.
+                    if action == "decoder-session-log":
+                        report_chars = len(
+                            parse_qs(parsed.query)
+                            .get("report", [""])[0]
+                            .strip()
+                        )
+                        print(
+                            "WARNING decoder-session-log rejected (400): "
+                            f"{exc}; report_chars={report_chars}"
+                        )
+
+                    self._send_json(
+                        400,
+                        {
+                            "ok": False,
+                            "error": str(exc),
+                        },
+                    )
+                    return
+                except RuntimeError as exc:
+                    self._send_json(
+                        503,
+                        {
+                            "ok": False,
+                            "error": str(exc),
+                        },
+                    )
+                    return
+
+                self._send_json(
+                    200,
+                    payload,
+                )
+                return
+
+            if self.path == "/stop":
+                status = (
+                    CONTROLLER.stop_source()
+                )
+
+                self._send_json(
+                    200,
+                    {
+                        "ok": True,
+                        "action": "stop",
+                        "status": status,
+                    },
+                )
+                return
+
+            prefix = "/sources/"
+            suffix = "/start"
+
+            if (
+                self.path.startswith(
+                    prefix
+                )
+                and self.path.endswith(
+                    suffix
+                )
+            ):
+                source_id = (
+                    self.path[
+                        len(prefix):
+                        -len(suffix)
+                    ]
+                    .strip("/")
+                )
+
+                if not source_id:
+                    raise CatalogError(
+                        "Missing source id"
+                    )
+
+                result = (
+                    CONTROLLER.start_source(
+                        source_id
+                    )
+                )
+
+                self._send_json(
+                    200,
+                    result,
+                )
+                return
+
+            self._send_json(
+                404,
+                {
+                    "ok": False,
+                    "error": "Not found",
+                },
+            )
+
+        except CatalogError as exc:
+            self._send_json(
+                404,
+                {
+                    "ok": False,
+                    "error": str(exc),
+                },
+            )
+
+        except SourceStartError as exc:
+            self._send_json(
+                503,
+                {
+                    "ok": False,
+                    "error": str(exc),
+                    "status": CONTROLLER.status(),
+                },
+            )
+
+        except Exception as exc:
+            self._send_json(
+                500,
+                {
+                    "ok": False,
+                    "error": str(exc),
+                    "status": CONTROLLER.status(),
+                },
+            )
+
+
+def main(
+) -> None:
+    print(
+        "PrivyHub companion service"
+    )
+
+    print(
+        f"Project root: {PROJECT_ROOT}"
+    )
+
+    print(
+        f"Media root:   {MEDIA_ROOT}"
+    )
+
+    print(
+        f"VOD root:     {VOD_ROOT}"
+    )
+
+    print(
+        "VOD storage:  "
+        + (
+            "configured"
+            if STORAGE_CONFIG.configured
+            else "project default"
+        )
+    )
+
+    print(
+        f"Catalog:      {CATALOG_FILE}"
+    )
+
+    print(
+        f"Control API:  "
+        f"http://127.0.0.1:{CONTROL_PORT}"
+    )
+
+    print("")
+
+    print(
+        "Dynamic media directories are "
+        "rescanned on GET /sources."
+    )
+
+    print("")
+
+    print("Endpoints:")
+    print("  GET  /status")
+    print("  GET  /diagnostics/health")
+    print("  POST /diagnostics/self-test")
+    print("  POST /diagnostics/bundle")
+    print("  POST /diagnostics/client-health")
+    print("  GET  /sources")
+    print("  GET  /plugins/<plugin>/<action>")
+    print("  POST /sources/<id>/start")
+    print("  POST /stop")
+
+    print("")
+
+    print(
+        f"Logs: {LOG_DIR}"
+    )
+
+    print("")
+
+    print(
+        "Starting the PrivyHub media server..."
+    )
+
+    CONTROLLER.start_server()
+
+    httpd = ThreadingHTTPServer(
+        (
+            CONTROL_HOST,
+            CONTROL_PORT,
+        ),
+        PrivyHubRequestHandler,
+    )
+
+    print(
+        f"Listening on "
+        f"{CONTROL_HOST}:{CONTROL_PORT}"
+    )
+
+    print(
+        "Stop with Ctrl+C."
+    )
+
+    print("")
+
+    try:
+        httpd.serve_forever()
+
+    except KeyboardInterrupt:
+        print(
+            "\nStopping PrivyHub companion service..."
+        )
+
+    finally:
+        httpd.server_close()
+
+        # PRIVYHUB_A4_PLUGIN_LIFECYCLE_SHUTDOWN_V1
+        # Plugin-owned child processes must be stopped before the companion
+        # process exits. Games reuses its validated POST stop lifecycle.
+        plugin_shutdown_errors = shutdown_plugins()
+
+        for plugin_error in plugin_shutdown_errors:
+            print(
+                "Plugin shutdown warning: "
+                + plugin_error
+            )
+
+        CONTROLLER.shutdown()
+
+        print(
+            "PrivyHub companion service stopped."
+        )
+
+
+if __name__ == "__main__":
+    main()
