@@ -2147,6 +2147,14 @@ APK (B5 … B25 + B32 + B34 + B35; B27 / B29 out) `554ccf61…9902` pinned, NOT 
   measures: D3 (uplink one-way delay from the packet timestamps, host only), then D1 (a true echo), then D4 (send on
   the input event). Input → photon needs a bench cell.
 - Next: HOME-1 when the user is home (`docs/memory/handoffs/SESSION_B_DONE_2026-10-31L.md`).
+- **HOME-1 (2026-11-02):** the trip closed and read (`reads/diag_trip_20261103T004048Z.md`); `privyhub-diag` running;
+  B33 live (C3 met: a resume, not a rewind).
+  - **C2 met** (in place, 0.9 / 6.1 ms) → G-A10 to the user.
+  - **C1 not met:** the report's count; the onn takes the guide key as Home.
+  - **C4 not met:** the virtual-remote takes slot 0.
+  - **C5 invalid:** the Settings route released the player.
+  - `554ccf61…` not confirmed; `fcd924c2…` back. C1 / C4 / C5 go back to B
+    (`evidence/HOME_1_TRIP_CLOSE_AND_QUEUE_L_CELLS_2026-11-02.md`).
 
 ## G9 — Remote foundation checkpoint
 

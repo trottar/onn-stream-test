@@ -1,5 +1,21 @@
 # Known issues and deferred work
 
+## 2026-11-02 HOME-1: queue L's cells: C2 / C3 met; C1 / C4 not met, C5 invalid; `554ccf61…` not confirmed — OPEN (to B)
+
+(`docs/memory/evidence/HOME_1_TRIP_CLOSE_AND_QUEUE_L_CELLS_2026-11-02.md`)
+
+- **C1, B32's screen-loss hold:** works for the remote's Home (held, 4.4 s, the same session).
+  - The client report's `surface_hold.held` reads 0 after a held loss.
+  - **The onn's system turns a pad's guide / PS button into Home before any app sees it** ("dropped because the
+    policy consumed it"), so B32's key consumption cannot act there.
+- **C4, B34's stable slots:** the map is stable across the press order, but the onn's "virtual-remote" input device
+  (it declares GAMEPAD) takes slot 0. Two pads then become players 2 and 3, and port 3 is not read on a PS1 without
+  multitap. `updates_by_player` still rises on all four players.
+- **C5, B35's movie retry: invalid.** Turning the onn's Wi-Fi off from its Settings leaves the app, which releases the
+  player before the drop. The cell needs the drop with the player in front (the hub-side shim or the router).
+- **`554ccf61…` NOT CONFIRMED** (C5 invalid); `fcd924c2…` is back on the onn. G-A10 (step in place, C2 met) is the
+  user's question.
+
 ## 2026-10-31 TRIP-R2, Friday off-site play: four episodes — OPEN (to B, queue L)
 
 (`docs/memory/evidence/TRIP_R2_FRIDAY_GAMEPLAY_2026-10-31.md` §5)

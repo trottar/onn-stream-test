@@ -227,6 +227,33 @@ one gap, median 186.5 ms (128-225); a sized (rung) switch costs 287-649 ms
 
 ## Next Action
 
+**HOME-1 (2026-11-02 EST / 2026-11-03 00:38-02:05Z, session A): the trip closed; queue L's cells run; C2 / C3 MET,
+C1 / C4 NOT MET, C5 INVALID; `554ccf61…` NOT CONFIRMED → `fcd924c2…` back on the onn**
+(`evidence/HOME_1_TRIP_CLOSE_AND_QUEUE_L_CELLS_2026-11-02.md`, `evidence/home1_2026-11-02/`).
+- **State:**
+  - thirteen lines; `--check` ok; APK `fcd924c2…` CONFIRMED; no `e3_flag.conf`; the ten properties empty;
+  - the onn on the LAN, paired, Hub host empty; 5 GHz;
+  - running: the companion and **`privyhub-diag`** (B36, enabled by the user);
+  - the trip keeper stopped by its cap; **B33 live**;
+  - `_cowork_prompt_cap.txt` removed (`git rm`, staged).
+- **The trip read** reproduces TRIP-R2 §1's six restarts. The rest of the weekend had no games, only VOD.
+
+1. **The user's commit:** this record and `home1_2026-11-02/`, `reads/`, the keeper's final files, KNOWN_ISSUES,
+   ROADMAP, this file and the task file (`logs/home1_git_status.txt`).
+2. **The user's question, G-A10 (C2 met):** "Adopt `PRIVYHUB_STEP_IN_PLACE=1` as the fourteenth line? Each bitrate
+   step then keeps the same stream (no new SSRC, no ~0.4-s gap)." C2 spliced both steps on the same stream in 0.9 and
+   6.1 ms; today's restart of the same steps gave 235 / 428-ms gaps, and one caused a stall pause. It is a host line,
+   with no APK needed.
+3. **Not asked; back to B with the rows:**
+   - **G-A11 / B32 (C1):** the report's `surface_hold.held` reads 0 after a held loss. The onn's input policy takes
+     the pad's guide key as Home before the app.
+   - **G-A12 / B34 (C4):** the onn's "virtual-remote" (declares GAMEPAD) takes slot 0. `updates_by_player` still
+     rises on all four.
+   - **G-A13 / B35 (C5, invalid):** re-run with the drop while the player is in front (the hub-side shim or the
+     router), not the onn's Settings.
+   - Then a new APK and a new confirmation.
+4. B33 is not a question (its off switch is `PRIVYHUB_REWIND_NEEDS_LOSS=0`). The guard's return is a later item.
+
 **TRIP-R2 (2026-10-31, session A, read-only, the user away): Friday's play READ; the four episodes placed**
 (`evidence/TRIP_R2_FRIDAY_GAMEPLAY_2026-10-31.md`, `evidence/trip_r2_2026-10-31/`; KNOWN_ISSUES top). Nothing was
 changed: no restart, no drop-in, no adb, no run. The keeper is still running. Thirteen lines.

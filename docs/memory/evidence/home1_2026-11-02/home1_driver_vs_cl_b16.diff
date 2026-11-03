@@ -1,0 +1,100 @@
+--- cl_b16_2026-10-29/cl_b16_driver.py	2026-10-29 16:36:02.475433954 -0400
++++ home1_2026-11-02/home1_driver.py	2026-11-02 20:09:27.584188931 -0500
+@@ -1,29 +1,15 @@
+ #!/usr/bin/env python3
+-"""CL-B16 -- B28's remote umbrella (PRIVYHUB_REMOTE=1) at home on the LAN and over the overlay, and B29's quiet guard
+-(APK 9719ea82...) on the 1 % loss cell; every client property EMPTY (no setprop anywhere); ONE cell per launch, as
+-pre-registered (cl_b16_preregistration.txt). From cl_b15_driver.py (CL-B15's driver; the diff is
+-cl_b16_driver_vs_cl_b15.diff). `--cell N` is required; unit privyhub-cl-b16-c<N>:
+-  - cell 1: PRIVYHUB_REMOTE=1 + PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 (12 + 2 = 14 lines), E1-SNES-STREAM, window
+-    600, the onn on the LAN (rows U1-U4);
+-  - cell 2: PRIVYHUB_REMOTE=1 only (13 lines; no impairment line, so no shim), E1-SNES-STREAM, window 720, the onn on
+-    the overlay at home by the user's hand (rows R1-R6);
+-  - cell 3: PRIVYHUB_IMPAIRMENT=loss-1@post-fec,seed=1 + PRIVYHUB_LOSS_GUARD=1 (14 lines; CL-B15 cell L's),
+-    E1-PS1-STREAM, window 600, the LAN (rows S1-S5).
+-  Session B's exact strings: SESSION_B_DONE_2026-10-28K.md items 5-7.
+-Changed from cl_b15_driver.py:
+-  - the cells table (three, one per launch; `--cell N` required); a cell with no impairment line (cell 2) has no shim:
+-    its profile check is "no impairment row written during the cell";
+-  - config_rows() also reads remote_umbrella_config and remote_config, at the stream and again at the cell's end;
+-  - the ladder reading also counts the rows carrying path_class / start_rung / remote_cap (the clamps), the
+-    remote_cap_config rows, and keeps the first sample row's start_rung and the first encoder argv's -b:v;
+-  - logs/wan_sessions.jsonl: its line count at the cell's start and end, the new rows kept (scrubbed);
+-  - /status polled every 30 s beside stream-telemetry: whether it carries `wan` (the `wan` value scrubbed);
+-  - the status text, the log tag, the state / history / log names and the stop file this task's
+-    (~/privyhub_cl_b16/STOP).
+-Kept: the seven properties read back EMPTY before and after each cell and at the close (none is set), tools/e3_state.py
+-once mid-cell, the cap (the launch + 2 h), no cell in 04:15-05:30Z or one that could still run at 04:30Z, the band
+-every 10 s, the routing class at the stream, the encoder argv per pid (masked), the heartbeat / history / STOP / busy
+-skip / the suite call / the readings beside a run / --dry; "adopted12"."""
++"""HOME-1 -- queue L's host cells C3 then C2, in ONE launch, the onn on the overlay at home by the user's hand; B's APK
++554ccf61... with all ten client properties EMPTY (no setprop in this launch). From cl_b16_driver.py (CL-B16's; the
++diff is home1_driver_vs_cl_b16.diff). Unit privyhub-home1; STOP ~/privyhub_home1/STOP; cap: the launch + 2 h.
++  - C3: PRIVYHUB_IMPAIRMENT=none@post-fec,seed=1 only (13 + 1 = 14 lines), E1-PS1-STREAM, window 720: a remote session
++    climbing from 4000 with today's encoder restart at each step; B33 live (no PRIVYHUB_REWIND_NEEDS_LOSS line);
++  - C2: PRIVYHUB_STEP_IN_PLACE=1 + the none line (15 lines), E1-PS1-STREAM, window 720.
++  The pass rows: preregistration.md (hashed before the install); session B's strings: SESSION_B_DONE_2026-10-31L.md
++  item 5.
++Changed from cl_b16_driver.py: the docstring; the cells table (two, both run in this launch, no --cell); the ten
++properties (B32 / B34 / B35's three added; all read back EMPTY); CONFIG_EVENTS adds rewind_needs_loss_config; the
++pre-registration file; the names (TAG, WATCH, CALL). Everything else as CL-B16's."""
+ import hashlib
+ import importlib.util
+ import json
+@@ -40,10 +26,10 @@
+ HERE = Path(__file__).resolve().parent
+ REPO = HERE.parents[3]
+ SUITE = REPO / "tools/e1_suite.py"
+-CALL = HERE / "cl_b16_suite_call.py"
++CALL = HERE / "home1_suite_call.py"
+ JREAD = HERE.parent / "g8_s1_2026-10-16/g8_s1_cap_log_read.py"
+-PRE = HERE / "cl_b16_preregistration.txt"
+-WATCH = Path.home() / "privyhub_cl_b16"
++PRE = HERE / "preregistration.md"
++WATCH = Path.home() / "privyhub_home1"
+ WAN_SESSIONS = REPO / "logs/wan_sessions.jsonl"
+ AUDIT = REPO / "logs/session_audit.jsonl"
+ RUNS = HERE / "runs"
+@@ -69,7 +55,7 @@
+ OUTD = HERE / "dry_run" if DRY else WATCH
+ _N = int(sys.argv[sys.argv.index("--cell") + 1]) if "--cell" in sys.argv else None
+ SUF = f"_c{_N}" if _N is not None else ""      # each cell has its own state / history / log / status
+-TAG = "cl_b16" + SUF
++TAG = "home1" + SUF
+ STATUS_P, HIST_P, WLOG_P = (OUTD / f"status{SUF}.txt", OUTD / f"history{SUF}.csv", OUTD / f"driver{SUF}.log")
+ STATE_P = (HERE / "dry_run" if DRY else HERE) / f"{TAG}_state.json"
+ CELLS_P = (HERE / "dry_run" if DRY else HERE) / "cells.jsonl"
+@@ -82,7 +68,8 @@
+ WINDOW, GAP = 600, 120
+ BUSY_WAIT, BUSY_TRIES = 600, 3
+ SUITE_TIMEOUT = 2 * 3600
+-PROPS = ("restart_guard", "stall_signal", "link_notice", "link_report", "loss_guard", "wifi_lock", "opus_decode")
++PROPS = ("restart_guard", "stall_signal", "link_notice", "link_report", "loss_guard", "wifi_lock", "opus_decode",
++         "surface_hold", "pad_slots", "vod_retry")
+ P1 = {}                 # no property is set; all seven are expected EMPTY (the client defaults are the test)
+ GUARD = ["PRIVYHUB_LOSS_GUARD=1"]      # B10 (host): the keyframe-request counter and the loss_guard_config row
+ NONE = "none@post-fec,seed=1"
+@@ -93,11 +80,10 @@
+ # session B's exact strings (SESSION_B_DONE_2026-10-28K.md item 5); the twelve adopted lines are in every environ,
+ # not repeated. spec None = no PRIVYHUB_IMPAIRMENT line at all (no shim).
+ ALL_CELLS = [
+-    {"n": 1, "cell": "1_snes_lan_remote_umbrella", "spec": NONE, "profile": "none", "extra": REMOTE, "props": P1, "wid": SNES, "arm": "1: the LAN with PRIVYHUB_REMOTE=1 (U1-U4), no property", "window": 600},
+-    {"n": 2, "cell": "2_snes_overlay_remote_umbrella", "spec": None, "profile": None, "extra": REMOTE, "props": P1, "wid": SNES, "arm": "2: the overlay at home with PRIVYHUB_REMOTE=1 only (R1-R6), no property", "window": 720},
+-    {"n": 3, "cell": "3_ps1_loss-1_guard_flag_b29", "spec": LOSS1, "profile": "loss-1", "extra": GUARD, "props": P1, "wid": PS1, "arm": "3: loss-1 + PRIVYHUB_LOSS_GUARD=1, the B29 client (S1-S5), no property", "window": 600},
++    {"n": 3, "cell": "C3_ps1_overlay_none_b33", "spec": NONE, "profile": "none", "extra": [], "props": P1, "wid": PS1, "arm": "C3: the overlay, the none line only (14 lines), B33 live, no property", "window": 720},
++    {"n": 2, "cell": "C2_ps1_overlay_none_step_in_place", "spec": NONE, "profile": "none", "extra": ["PRIVYHUB_STEP_IN_PLACE=1"], "props": P1, "wid": PS1, "arm": "C2: the overlay, the none line + PRIVYHUB_STEP_IN_PLACE=1 (15 lines), no property", "window": 720},
+ ]
+-CELLS = [c for c in ALL_CELLS if c["n"] == _N]
++CELLS = list(ALL_CELLS)          # both cells, C3 then C2, in this one launch
+ NCELLS = len(CELLS)
+ QUIET = ((4, 15), (5, 30))      # no cell starts in [04:15, 05:30) UTC: the nightly watch samples 04:30-05:30Z
+ OPAL_SH = HERE / "o1_opal_sample.sh"
+@@ -404,7 +390,7 @@
+ 
+ RECOVERY_LOG = REPO / "logs/games/native_stream_recovery.log"
+ CONFIG_EVENTS = ("restart_fast_config", "restart_fast_unlock_config", "loss_guard_config", "remote_umbrella_config",
+-                 "remote_config")
++                 "remote_config", "rewind_needs_loss_config")
+ 
+ 
+ def config_rows(t0):
