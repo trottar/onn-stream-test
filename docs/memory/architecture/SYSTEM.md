@@ -6,17 +6,21 @@ baseline_commit: 0c31c100ec721d687aff6aedbd79bc0cf9343810
 
 # System Architecture
 
+> **Status (2026-11-03):** the role boundaries, security layering and evolution rule are current. The Linux hub
+> (the `privyhub-companion` user unit) has replaced the Windows companion, and the remote overlay is adopted
+> (G-A1); the Phase C/G wording below is history. Current source: `docs/memory/CURRENT.md`, `docs/REMOTE_TRUST.md`.
+
 PrivyHub is intentionally modular, local-first, and capability-driven.
 
 ## Core roles
 
-Current/future role boundaries:
+Role boundaries:
 
 - Android TV / portable clients: UI, media presentation, native video/audio
   receive, controller capture/transmit.
-- Companion / future Linux hub: control API, source/provider orchestration,
+- Companion / the Linux hub: control API, source/provider orchestration,
   emulator lifecycle, native capture/encode/audio/input bridge, diagnostics,
-  session policy and future remote-overlay integration.
+  session policy and remote-overlay integration.
 - Home Opal: PrivyHub network/trust boundary.
 - Ordinary household network: upstream connectivity only; not the PrivyHub
   trust domain.

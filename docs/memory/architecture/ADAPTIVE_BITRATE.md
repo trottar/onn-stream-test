@@ -6,11 +6,18 @@ baseline_commit: 6abe47d2f7adf1eae847d3b23b12b760586f6d41
 
 # Adaptive Bitrate Architecture
 
+> **Status (2026-11-03):** the C3 design, the Linux actuator sections and the C3.L4 live controller below are current
+> history; the live mode is IN PRODUCTION as adopted line 1 (`PRIVYHUB_ADAPTIVE_BITRATE_MODE=live`, C3-L4, on by
+> default since 2026-10-01, `../decisions/C3-L4_LIVE_DEFAULT_2026-10-01.md`). Not covered here: the remote ladder
+> (4000 floor start, 7000 cap, line 13, G-A9) and the step in place (line 14, G-A10) — see `docs/REMOTE_TRUST.md`
+> §14-§15, `docs/WAN_ADAPTATION_RULES.md` and `docs/memory/CURRENT.md`. The Windows-era sections are superseded.
+
 ## Status
 
 **C3.1 SOURCE/POLICY AUDIT: COMPLETE**
 
-**Production adaptive bitrate: NOT IMPLEMENTED**
+**Production adaptive bitrate:** ~~NOT IMPLEMENTED~~ **IN PRODUCTION since 2026-10-01** (the live mode,
+adopted line 1; corrected 2026-11-03, see the status block above).
 
 **Linux actuator capability:** `video_only_restart`, classified by `C3.L2`.
 Authorized for start-time, manual, fallback and characterization use; not

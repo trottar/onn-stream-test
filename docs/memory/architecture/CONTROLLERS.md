@@ -6,6 +6,11 @@ baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
 
 # Controller Architecture
 
+> **Status (2026-11-03):** the PHI1 v1 packet and the preflight / A8 rules are current; the Windows ViGEm receiver
+> below is superseded. On the Linux hub `NativeControllerBridge` (`companion/native_session_io.py`) takes PHI1 for
+> four players (`MAX_PLAYERS = 4`) into four `uinput` gamepads (python3-evdev); Linux parity: `docs/ROADMAP.md` D4
+> (2026-09-16), `../investigations/CLOSED.md`. Current state: `docs/memory/CURRENT.md`.
+
 ## Validated two-player path
 
 `Android InputDevice -> NativeControllerSender -> PHI1 UDP full-state packets -> NativeControllerBridge -> ViGEm VX360Gamepad devices -> RetroArch input`.

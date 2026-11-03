@@ -1,7 +1,7 @@
 # PrivyHub documentation
 
-This directory contains project architecture, operations, diagnostics, roadmap,
-and durable development memory.
+This directory holds the project's architecture, operations, diagnostics, roadmap and durable development memory.
+What PrivyHub is, and how to run it, is in the repository [`README.md`](../README.md).
 
 ## Current authority
 
@@ -14,6 +14,9 @@ Use this order:
 5. dated/patch history;
 6. superseded `memory/history/` reference.
 
+When an older document conflicts with newer validated state, prefer the newer source or evidence and the current
+repository memory.
+
 ## Startup
 
 Substantial work starts with:
@@ -24,60 +27,52 @@ Substantial work starts with:
 
 Do not eagerly load all historical memory.
 
-## Memory architecture
+## The docs map
 
-- `memory/CURRENT.md` — one active objective and one next action.
-- `memory/MEMORY.md` — long-lived rules and validated facts.
-- `memory/MAINTENANCE.md` — memory health/cleanup policy.
-- `memory/handoffs/` — compact handoff notes, plus **task handoffs**: a
-  self-contained brief written by the user's assistant, run start-to-finish
-  by Claude Code, and recorded in `memory/evidence/` with its own harness
-  directory and SHA-256s.
-- `memory/evidence/` — runtime proof, one record per investigation item.
-- `memory/investigations/` — investigation detail.
-- `memory/decisions/` — decision records.
-- `memory/architecture/` — subsystem architecture.
-- `memory/patches/` — patch/checkpoint history.
-- `memory/roadmap/` — current roadmap state.
-- dated files / `memory/history/` — chronology and superseded reference.
+| Page | What it holds |
+|---|---|
+| [`ROADMAP.md`](ROADMAP.md) | the roadmap (Linux-first, with the remote foundation): the phases, their gates and status |
+| [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) | open and deferred issues and debt, with an open-items index |
+| [`REMOTE_TRUST.md`](REMOTE_TRUST.md) | the remote trust model (G0): the topologies, the threat model, the overlay boundary, session identity, and one section per adopted G line with its off switch |
+| [`CAPABILITY_MODEL.md`](CAPABILITY_MODEL.md) | the capability model (E5): the capability classes and their thresholds |
+| [`WAN_ADAPTATION_RULES.md`](WAN_ADAPTATION_RULES.md) | the WAN adaptation rules R1-R5 (G5); `PRIVYHUB_WAN_ADAPTATION` itself is not adopted |
+| [`DIAGNOSTICS.md`](DIAGNOSTICS.md) | the diagnostics today: the `privyhub-diag` keeper, `diag_read.py` / `diag_check.py`, the companion's self-test and support bundle, then the UDP transport probes and their acceptance tests |
+| [`A8_INPUT_PROFILES.md`](A8_INPUT_PROFILES.md) | the named controller input profiles (A8) |
+| [`RUNBOOK.md`](RUNBOOK.md) | the user's steps: at home, away from home, if it breaks, going home, the one-line reads |
+| [`investigations/`](investigations/) | `2026-09-07-udp-transport.md`, the Windows-era synthetic-UDP study (the issue is still paused) |
+| [`memory/`](memory/) | the durable memory: the state, the rules, the records ([`memory/README.md`](memory/README.md)) |
 
-## Main project documents
+## Memory in brief
 
-- `ROADMAP.md`
-- `PROJECT_STATUS.md`
-- `KNOWN_ISSUES.md`
-- `DIAGNOSTICS.md`
-- `A4_AUDIO_RECOVERY.md`
-- `A8_INPUT_PROFILES.md`
+- `memory/CURRENT.md`: the active objective and the next action.
+- `memory/MEMORY.md`: long-lived rules and validated facts.
+- `memory/evidence/`: runtime proof, one record per item, with its harness directory. Records are never moved.
+- `memory/handoffs/`: task handoffs. `memory/handoffs/README.md` gives the status of every one.
+- `memory/patches/`: patch notes, indexed by `memory/patches/PATCH_INDEX.md`.
+- `memory/archive/`: what was archived on 2026-11-03, indexed by `memory/archive/INDEX.md`.
+- `memory/history/`: superseded snapshots and moved sections (reference only).
 
-## Newest evidence records (2026-09-20 to 2026-09-22)
+## Archived pages (2026-11-03)
 
-The `D-BASE` baseline-stream-health chain, newest first. Each is one file
-under `memory/evidence/` with its harness beside it:
+These five pages moved, unchanged, to `memory/archive/docs/`:
 
-- `D_BASE_S3_CAP_SOAK_2026-09-22.md` — three hours on the adopted frame
-  cap; the residual loss correlates with nothing.
-- `D_BASE_P7_STARVATION_COUNTER_2026-09-22.md` — what
-  `prolonged_starvation_events` counts: audio arrival jitter, not loss.
-- `D_BASE_P6A_CAP_ADOPTED_2026-09-22.md` — the 90 KB frame cap becomes a
-  profile default.
-- `H2_PREP_HOST_DISPLAY_INVENTORY_2026-09-22.md` — the host's display,
-  session and boot path, read before the monitor is removed.
-- `D_BASE_P6_FRAME_TAIL_CONTROL_2026-09-21.md` — the intervention that
-  established the cause.
-- `D_BASE_P5_WHICH_QUEUE_2026-09-21.md` — which queue drops the burst.
-- `O1_OPAL_AIR_VIEW_2026-09-21.md` — the router's read-only view of the
-  air.
-- `D_BASE_S2_*`, `D_BASE_S1_*`, `D_BASE_T1_*`, `B2_HOST_ON_OPAL_*`,
-  `D_BASE_P4_*`, `D_BASE_P3_*`, `D_BASE_R5_*` — soaks, thermals, topology
-  and instruments.
-- `GROUP_A_*_2026-09-20.md`, `D_BASE_R2/R3/R3A/R4_*`, `D_BASE_P1/P2/P2A_*`
-  — the host-side causes, recovery and the earlier instruments.
+- `A4_AUDIO_RECOVERY.md` → [`memory/archive/docs/A4_AUDIO_RECOVERY.md`](memory/archive/docs/A4_AUDIO_RECOVERY.md):
+  the Windows A4 audio lifecycle fix (WASAPI); done.
+- `DEBUGGING_HARNESS.md` → [`memory/archive/docs/DEBUGGING_HARNESS.md`](memory/archive/docs/DEBUGGING_HARNESS.md):
+  the one-command PowerShell harness (the script no longer exists). Today's equivalents are the `privyhub-diag` keeper,
+  `tools/diag_read.py` / `tools/diag_check.py` and the support bundle; see [`DIAGNOSTICS.md`](DIAGNOSTICS.md).
+- `DEBUGGING_MEMORY.md` → [`memory/archive/docs/DEBUGGING_MEMORY.md`](memory/archive/docs/DEBUGGING_MEMORY.md): the
+  Windows-era durable rules; the current rules are in `memory/MEMORY.md`.
+- `PROJECT_STATUS.md` → [`memory/archive/docs/PROJECT_STATUS.md`](memory/archive/docs/PROJECT_STATUS.md): the status
+  as of 2026-09-28. The current state is `memory/CURRENT.md` and `ROADMAP.md` §0.
+- `REPOSITORY_AUDIT_2026-09-07.md` →
+  [`memory/archive/docs/REPOSITORY_AUDIT_2026-09-07.md`](memory/archive/docs/REPOSITORY_AUDIT_2026-09-07.md): the
+  pre-push repository audit; done.
 
-Classification for each is in `memory/evidence/RUNTIME_VALIDATION.md`.
+The closed sections of `KNOWN_ISSUES.md` moved verbatim to `memory/archive/docs/KNOWN_ISSUES_CLOSED_2026-11-02.md`.
+The full list of moves is `memory/archive/INDEX.md`.
 
-When any older top-level document conflicts with newer validated state, prefer
-the newer source/evidence and current repository memory.
+## Sharing rule
 
-Do not place private network addresses, credentials, device identifiers, or
-user media/content identifiers in shareable documentation.
+Do not place private network addresses, credentials, device identifiers, or user media/content identifiers in
+shareable documentation. Use placeholders.

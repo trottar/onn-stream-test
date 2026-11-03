@@ -1,0 +1,136 @@
+ .gitignore                                         |    4 +-
+ PrivyHub/README.md                                 |   79 +
+ README.md                                          |  309 ++-
+ companion/README.md                                |  126 ++
+ docs/A8_INPUT_PROFILES.md                          |   10 +-
+ docs/CAPABILITY_MODEL.md                           |    8 +-
+ docs/DIAGNOSTICS.md                                |  250 ++-
+ docs/KNOWN_ISSUES.md                               | 1190 +-----------
+ docs/README.md                                     |  113 +-
+ docs/REMOTE_TRUST.md                               |   34 +
+ docs/ROADMAP.md                                    |   89 +-
+ docs/RUNBOOK.md                                    |  114 ++
+ docs/WAN_ADAPTATION_RULES.md                       |    4 +
+ docs/memory/AGENTS.md                              |   50 +-
+ docs/memory/COMMUNICATION.md                       |   60 +-
+ docs/memory/CURRENT.md                             | 1363 +------------
+ docs/memory/MAINTENANCE.md                         |   23 +
+ docs/memory/MEMORY.md                              |  312 +--
+ docs/memory/README.md                              |   97 +-
+ docs/memory/TOOLS.md                               | 2010 ++------------------
+ docs/memory/USER.md                                |    4 +-
+ docs/memory/architecture/ADAPTIVE_BITRATE.md       |    9 +-
+ docs/memory/architecture/CONTROLLERS.md            |    5 +
+ docs/memory/architecture/DIAGNOSTICS.md            |    5 +
+ docs/memory/architecture/GAMES.md                  |   27 +-
+ docs/memory/architecture/NETWORK.md                |   39 +-
+ docs/memory/architecture/REMOTE_ACCESS.md          |   57 +-
+ docs/memory/architecture/STREAMING.md              |   67 +-
+ docs/memory/architecture/STREAM_TELEMETRY.md       |    5 +
+ docs/memory/architecture/SYSTEM.md                 |   10 +-
+ docs/memory/archive/INDEX.md                       |  117 ++
+ .../archive/current/CURRENT_HISTORY_2026-11-02.md  | 1294 +++++++++++++
+ .../{ => memory/archive/docs}/A4_AUDIO_RECOVERY.md |    0
+ .../{ => memory/archive/docs}/DEBUGGING_HARNESS.md |    0
+ docs/{ => memory/archive/docs}/DEBUGGING_MEMORY.md |    0
+ .../archive/docs/KNOWN_ISSUES_CLOSED_2026-11-02.md | 1160 +++++++++++
+ docs/{ => memory/archive/docs}/PROJECT_STATUS.md   |    0
+ .../archive/docs}/REPOSITORY_AUDIT_2026-09-07.md   |    0
+ .../memory}/CHECKPOINT_PROPOSAL_2026-09-22.md      |    0
+ .../memory/{ => archive/memory}/PHASE_C_CONTEXT.md |    0
+ .../archive/memory/TOOLS_HISTORY_2026-11-02.md     | 1839 ++++++++++++++++++
+ .../{ => archive/memory}/chats/CHAT_INDEX.md       |    0
+ .../{ => archive/memory/daily}/2026-09-10.md       |    0
+ .../{ => archive/memory/daily}/2026-09-11.md       |    0
+ .../{ => archive/memory/daily}/2026-09-14.md       |    0
+ .../{ => archive/memory/daily}/2026-09-15.md       |    0
+ .../{ => archive/memory/daily}/2026-09-16.md       |    0
+ .../{ => archive/memory/daily}/2026-09-17.md       |    0
+ .../{ => archive/memory/daily}/2026-09-18.md       |    0
+ .../{ => archive/memory/daily}/2026-09-19.md       |    0
+ .../{ => archive/memory/daily}/2026-09-20.md       |    0
+ .../{ => archive/memory/daily}/2026-09-21.md       |    0
+ .../{ => archive/memory/daily}/2026-09-22.md       |    0
+ .../{ => archive/memory/daily}/2026-09-23.md       |    0
+ .../{ => archive/memory/daily}/2026-09-24.md       |    0
+ .../{ => archive/memory/daily}/2026-09-28.md       |    0
+ .../{ => archive/memory/daily}/2026-09-29.md       |    0
+ .../{ => archive/memory/daily}/2026-09-30.md       |    0
+ .../{ => archive/memory/daily}/2026-10-01.md       |    0
+ .../{ => archive/memory/daily}/2026-10-02.md       |    0
+ .../{ => archive/memory/daily}/2026-10-03.md       |    0
+ .../{ => archive/memory/daily}/2026-10-05.md       |    0
+ .../{ => archive/memory/daily}/2026-10-06.md       |    0
+ .../{ => archive/memory/daily}/2026-10-07.md       |    0
+ .../{ => archive/memory/daily}/2026-10-08.md       |    0
+ .../{ => archive/memory/daily}/2026-10-09.md       |    0
+ .../{ => archive/memory/daily}/2026-10-10.md       |    0
+ .../ADB_STALE_CACHE_NATIVE_ERROR_2026-09-14.md     |    0
+ .../investigations/B1_DIAGNOSTICS_INVENTORY.md     |    0
+ .../investigations/C3_BIDIRECTIONAL_ACTUATOR.md    |    0
+ .../memory}/investigations/C3_BITRATE_ACTUATOR.md  |    0
+ .../C3_FIXED_BITRATE_CHARACTERIZATION.md           |    0
+ .../investigations/C3_LINUX_ACTUATOR_BOUNDARY.md   |    0
+ .../investigations/C3_STARTUP_STABILIZATION.md     |    0
+ .../investigations/D103_D5_EPG_INGESTION_PROBE.md  |    0
+ .../D105_D5_EPG_LOCAL_SOURCE_VIABILITY.md          |    0
+ .../D106_D5_EPG_PROVIDER_IDENTITY.md               |    0
+ .../investigations/D107_D5_EPG_FEED_IDENTITY.md    |    0
+ .../D108_D5_EPG_LOCAL_GRABBER_VIABILITY.md         |    0
+ .../D109_D5_EPG_PORTABLE_NODE_GRABBER.md           |    0
+ .../D110_D5_LINUX_EPG_SERVICE_SEAM.md              |    0
+ .../D111_D5_ANDROID_COMPANION_EPG_INTEGRATION.md   |    0
+ .../D113_D5_STREAM_IDENTITY_INTEGRITY.md           |    0
+ .../D115_D5_LINUX_TV_STATE_AUTHORITY.md            |    0
+ .../D116_D5_ANDROID_TV_STATE_SYNC.md               |    0
+ .../D117_D5_LINUX_AUTHORITY_PULL_VALIDATION.md     |    0
+ .../D119_D5_TV_ENTRY_SYNC_TRIGGER.md               |    0
+ .../D120_D5_TV_STATE_SYNC_DIAGNOSTICS.md           |    0
+ .../D121_D5_TV_STATE_CONFLICT_DIAGNOSTICS.md       |    0
+ .../D122_D5_TV_MEDIA_REGRESSION_GATE.md            |    0
+ .../D123_TV_EPG_PERFORMANCE_AND_GUIDE_UX.md        |    0
+ .../investigations/D124_TV_EPG_LATENCY_PROBE.md    |    0
+ .../D125_EPG_NONBLOCKING_BACKGROUND_WARMER.md      |    0
+ .../D126_ANDROID_EPG_PREFETCH_INTEGRATION.md       |    0
+ .../investigations/D127_INCORRECT_GUIDE_INTENT.md  |    0
+ .../D128_GUIDE_STYLE_CATEGORY_PRESENTATION.md      |    0
+ .../investigations/D129_SINGLE_COLUMN_TV_GUIDE.md  |    0
+ .../investigations/D130_TV_ENTRY_LATENCY.md        |    0
+ .../D131_NONBLOCKING_TV_ENTRY_STATE_SYNC.md        |    0
+ .../investigations/D132_FAVORITES_EPG_COVERAGE.md  |    0
+ .../investigations/D133_EPG_STATUS_ACCURACY.md     |    0
+ .../investigations/D134_FAVORITES_LOAD_LATENCY.md  |    0
+ .../D135_TV_STATE_EXECUTOR_ISOLATION.md            |    0
+ .../D136_FOCUSED_TV_MEDIA_REGRESSION.md            |    0
+ .../D137_TV_STATE_PROBE_V2_PROJECTION.md           |    0
+ .../D4_PS1_MULTITAP_LINUX_2026-09-16.md            |    0
+ docs/memory/{ => archive/memory}/manifest.json     |    0
+ .../memory}/repository/AUDIT_2026-09-10.md         |    0
+ .../memory}/roadmap/D5_MEDIA_SERVER_SUBSTEPS.md    |    0
+ docs/memory/{ => archive/memory}/roadmap/STATUS.md |    0
+ .../{ => archive/memory}/templates/SESSION_LOG.md  |    0
+ .../archive/prompts/_cowork_prompt_offsite.txt     |    0
+ STOP => docs/memory/archive/scratch/STOP           |    0
+ .../windows-scripts}/setup_retroarch_portable.ps1  |    0
+ .../archive/windows-scripts}/start_browser.ps1     |    0
+ .../archive/windows-scripts}/start_camera.ps1      |    0
+ .../archive/windows-scripts}/start_server.ps1      |    0
+ .../D083_NETDEV_DIAGNOSTIC_CLOSEOUT_2026-09-15.md  |    2 +-
+ docs/memory/decisions/DECISION_LOG.md              |    6 +
+ .../MEMORY_MAINTENANCE_REPORT_2026-11-03.md        |  108 ++
+ .../evidence/docs_apply_2026-11-03/after.txt       |   23 +
+ .../evidence/docs_apply_2026-11-03/before.txt      |   23 +
+ docs/memory/handoffs/CURRENT_HANDOFF.md            |  234 +--
+ docs/memory/handoffs/README.md                     |  300 +++
+ .../ACTIVE_INVESTIGATIONS_THROUGH_2026-10-15.md    | 1805 ++++++++++++++++++
+ .../history/HANDOFF_SECTIONS_THROUGH_2026-10-16.md |  232 +++
+ .../history/MEMORY_SECTIONS_MOVED_2026-11-03.md    |  230 +++
+ docs/memory/history/README.md                      |   46 +-
+ docs/memory/investigations/ACTIVE.md               | 1836 +-----------------
+ docs/memory/patches/PATCH_INDEX.md                 |  462 +++--
+ docs/memory/repository/CODE_MAP.md                 |  102 +-
+ docs/memory/repository/DEBT.md                     |   35 +-
+ docs/memory/templates/MEMORY_UPDATE.md             |    6 +-
+ tests/README.md                                    |   82 +
+ tools/README.md                                    |  117 ++
+ 135 files changed, 9465 insertions(+), 7067 deletions(-)

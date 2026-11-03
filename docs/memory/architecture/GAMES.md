@@ -6,7 +6,32 @@ baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
 
 # Games Architecture
 
-RetroArch is the managed emulator frontend with project-owned config/save/state/system storage. Current systems use FCEUmm, bsnes, BlastEm, and Beetle PSX HW.
+> **Status (2026-11-03):** the Games subsystem rules below are current; the core list and the capture behaviour are
+> updated in "Cores and capture on the Linux hub" just below (Snes9x adopted for SNES, line 3; the capture fix,
+> line 5; the PS1 4x source). The 2026-09 sections after it are history. Current state: `docs/memory/CURRENT.md`.
+
+RetroArch is the managed emulator frontend with project-owned config/save/state/system storage. Current systems use FCEUmm (NES), Snes9x (SNES; adopted line 3, replacing bsnes), BlastEm (Genesis), and Beetle PSX HW (PS1).
+
+## Cores and capture on the Linux hub (2026-11-03)
+
+- **The configured cores** (`companion/games/config/emulators.json`, `platforms.linux`): NES `fceumm_libretro.so`,
+  SNES `bsnes_libretro.so`, Genesis `blastem_libretro.so`, PS1 `mednafen_psx_hw_libretro.so` (Beetle PSX HW), under
+  RetroArch 1.22.2 (Linux AppImage).
+- **SNES runs Snes9x:** `PRIVYHUB_SNES_CORE=snes9x` (`snes-core.conf`, adopted line 3, E3-A2, 2026-10-07/08) makes
+  `companion/games/emulator_manager.py` load `snes9x_libretro.so` from the same cores directory instead of the
+  configured bsnes. E3-A2's SNES-STREAM run: RetroArch 8.9 % of a core, host 8.05 %, 60.0 fps
+  (`../evidence/E3_A2_FRAME_SPIN_AND_SNES9X_ADOPTION_2026-10-07.md`). Without the line the configured bsnes runs.
+- **The capture fix:** `PRIVYHUB_SNES_CAPTURE_FIX=output_rate` (`snes-capture.conf`, adopted line 5, E4-S5D,
+  2026-10-15) sets the encoder's output rate to the profile's 60 fps (`-r 60`) instead of x11grab's probed input rate.
+  A small capture window (the SNES core's 897x672) was sometimes probed at 59 or 59.94, and the encoder then dropped
+  a frame per second (or per ~16 s) for the whole session (`companion/native_stream.py`;
+  `../evidence/E4_S5D_SNES_CAPTURE_FIX_ADOPTION_2026-10-15.md`). The flag acts on every stream's encoder command.
+- **The PS1 source** renders at internal resolution 4x into a 1920x1080 window on the headless display (C5-M4A,
+  2026-10-01, `../decisions/C5-M4_PS1_4X_SOURCE_ADOPTION_2026-10-01.md`), through today's 720p stream.
+- **Fixtures:** the NES and Genesis libraries are empty (`tools/e1_suite.py` `ABSENT`), so those two cores have no
+  current workload row.
+- The companion now runs as the `privyhub-companion` user unit; the restart rule below still applies (restart the
+  unit after Python changes).
 
 The Games subsystem now includes controller/analog support, Save/Load slots and integrity checks, pause/resume with frozen preview, host coexistence, direct launch, metadata/art, cheat profiles, deterministic mod profiles, and named input profiles.
 

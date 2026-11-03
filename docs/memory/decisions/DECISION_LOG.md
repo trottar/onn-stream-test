@@ -6,6 +6,12 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Decision Log
 
+> **Status (2026-11-03):** this log stops at 2026-09-16 (its last entry is D-102); it is history, and its entries
+> are unchanged. Later decisions are in their own files in `docs/memory/decisions/*.md` (D-BASE, C3-L2, C3-L4, C4,
+> C5, C5-M4, CL-B1 and the D1xx files) and in the adoption records in `docs/memory/evidence/`: `E3_S6A_…`,
+> `E3_A2_…`, `E3_A3_…` / `E3_A3B_…`, `E4_S5D_…`, `G_A1_…`, `G_A2_…`, `G_A3_…`, `G_A4_…`, `G_A5_…`, `G_A7_…`,
+> `TRIP_PREP_2026-10-29.md` (G-A9) and `G_A10_…`. The current adopted state is `docs/memory/CURRENT.md`.
+
 ## 2026-09-11 decision-ID normalization
 
 The original log reused several D-### identifiers for unrelated later decisions.

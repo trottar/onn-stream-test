@@ -6,6 +6,11 @@ baseline_commit: 45ef51f9e583b459752dd5ea83163f54171e68c7
 
 # Stream Telemetry Architecture
 
+> **Status (2026-11-03):** the C2 contract `privyhub_stream_telemetry_v1` below is current and feeds the live
+> ladder (line 1). Not covered: the client's Wi-Fi link report in each heartbeat (line 9, G-A3, diagnostics only) and
+> the WAN telemetry of a remote session (line 13, G-A9: `logs/wan_sessions.jsonl`, `/status` `wan`). See
+> `docs/REMOTE_TRUST.md` §7, §10, §14 and `docs/memory/CURRENT.md`.
+
 ## Status
 
 **C2.1 inventory: COMPLETE**

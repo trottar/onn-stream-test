@@ -1,7 +1,7 @@
 # Decision: close D083 branch without further router debugging
 
 Date: 2026-09-15
-Status: **Active**
+Status: **Closed** — CLOSED AS INVALID DIAGNOSTIC BRANCH (`../investigations/CLOSED.md`, "D083 router netdev-counter branch"); the UDP root cause it paused was reopened for D6-R1 and closed for the old signature, 2026-09-24 (`../investigations/DEFERRED.md`)
 
 ## Decision
 

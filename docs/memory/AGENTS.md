@@ -1,14 +1,13 @@
 ---
-memory_schema: 2
-as_of: 2026-09-18
-baseline_commit: 0206017cfd8f0fc57decb7a5e9e8632e6a4f6cdd
+memory_schema: 1
+as_of: 2026-11-03
 ---
 
 # Agent Operating Rules
 
 ## Authority
 
-Treat `/home/privyhub/Projects/onn-stream-test` as authoritative between
+Treat `~/Projects/onn-stream-test` as authoritative between
 checkpoints. GitHub is reference/history unless a clean synchronized checkpoint
 has been validated.
 
@@ -86,20 +85,22 @@ memory. Read the repository.
 
 - `CURRENT.md` — single active objective, current state, exact next action.
 - `MEMORY.md` — long-lived rules and validated facts, not chronology.
-- `YYYY-MM-DD.md` — detailed dated history, one file per date at the
-  memory root.
+- `evidence/` — the session chronology, one record per task. (The dated
+  `YYYY-MM-DD.md` logs ended 2026-10-10 and are archived under
+  `archive/memory/daily/`.)
 - `handoffs/CURRENT_HANDOFF.md` — small transfer note only.
 - `architecture/` — subsystem architecture.
 - `decisions/` — decisions and status.
-- `evidence/` — runtime/E2E proof.
+- `evidence/` — runtime/E2E proof; never moved or edited after the fact.
 - `investigations/` — active/closed/deferred investigation detail.
 - `patches/` — patch/install history.
-- `roadmap/` — current development position.
-- `history/` — superseded deep-memory reference.
+- `docs/ROADMAP.md` — current development position.
+- `history/` — superseded deep-memory reference; `archive/` — retired files
+  (`archive/INDEX.md`).
 - `MAINTENANCE.md` — memory lifecycle and health policy.
 
-Every meaningful patch ZIP must include the relevant durable-memory changes and
-set `durable_memory_updated: true`.
+Every meaningful change carries its durable-memory updates in the same work, in
+the working tree, for the user's commit.
 
 ## Stable subsystem boundary
 
@@ -116,26 +117,35 @@ shareable diagnostics or durable memory.
 
 ## Commands
 
-Current Linux companion launch:
+The companion runs as the systemd user unit `privyhub-companion` (since `H3`,
+2026-09-23), not a hand launch. Restart it through systemd and confirm the
+unit's MainPID owns 8765 (`TOOLS.md`):
 
-`python3 ./companion/privyhub_service.py`
+`systemctl --user restart privyhub-companion`
+
+Its configuration is the adopted drop-ins under
+`~/.config/systemd/user/privyhub-companion.service.d/` (`TOOLS.md`, the table).
 
 Keep commands narrow and copy/paste friendly. Every response that asks the
 user to run something includes the exact command(s), inline, every time —
 not a description of what to run.
 
-**Patches are delivered as ZIP installers the user runs.** The ZIP is written
-into the repository root and the response carries one complete copy/paste
-block: SHA-256 verification, extraction, install, gates, commit, push, return
-to the repo root. This is a deliberate control boundary the user has stated
-twice — the user runs the zip, the install and the push. Do not replace it
-with direct file-bridge writes and do not describe the step away.
+**Changes land as git commits, and the commits are the user's.** A session
+edits the working tree, records what it changed (the patch note in `patches/`,
+the evidence record, the applied diff and sha256 where code changed) and writes
+its `git status` to `logs/<task>_git_status.txt`; it commits and pushes
+nothing. The user reviews and commits. (The ZIP installers of September 2026
+are history.)
 
 Diagnostic and probe output that a script already persists to a file (e.g. `logs/`, `docs/memory/evidence/`) is read directly from the repository through the session's file bridge, not requested as a paste. Ask for a paste only when no such file exists.
 
 ## Patch discipline
 
-Follow `patches/PATCH_PROTOCOL.md`.
+Follow `patches/PATCH_PROTOCOL.md`. Today a code change is a diff: predecessor
+and after sha256 recorded, `git apply --check`, applied, the tree diff equal to
+the applied diff, `git diff --check` clean (e.g. `evidence/G_A10_STEP_IN_PLACE_ADOPTION_2026-11-02.md`
+§2). The installer wording below is from the ZIP era and still describes the
+gates.
 
 Before modification:
 

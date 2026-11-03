@@ -6,6 +6,11 @@ baseline_commit: 6b7c74f417e2ef14e252b9ea19afc16bdefaa50a
 
 # Unified Diagnostics Architecture
 
+> **Status (2026-11-03):** the Phase B (B1-B4) diagnostics design below is history; its health model
+> (`companion/diagnostics/health_model.py`) is still in the tree. It predates the always-on keeper `privyhub-diag`
+> (B36: `tools/diag_keeper.py`, read with `tools/diag_read.py` and `tools/diag_check.py`; running), the link report
+> (line 9) and the WAN telemetry (line 13). Current source: `docs/DIAGNOSTICS.md`, `docs/memory/CURRENT.md`.
+
 ## B1 foundation
 
 The B1.1 inventory established that PrivyHub already has substantial telemetry,

@@ -188,6 +188,29 @@ Rules:
 Patch result classes remain `INSTALLED SUCCESSFULLY`,
 `FAILED BEFORE MODIFICATION` and `ROLLED BACK`. Whichever occurred is recorded.
 
+## Front matter (memory_schema)
+
+A memory file, record, handoff or patch note opens with YAML front matter:
+
+```yaml
+---
+memory_schema: 1
+as_of: YYYY-MM-DD
+status: <optional one line>
+baseline_commit: <optional>
+---
+```
+
+- `memory_schema: 1` is the only current value.
+- `as_of` is required: the date the content is true for, not the date of the
+  last edit. A rewrite that changes what is true moves it.
+- `status` and `baseline_commit` are optional.
+- Files still saying `memory_schema: 2` (from the 2026-09-17 ZIP era) are
+  legacy (no record defines a difference). They are normalized to `1` when
+  they are rewritten anyway.
+- Records under `evidence/` are not retrofitted.
+- `tools/check_memory_health.py` does not read front matter.
+
 ## Generated indexes
 
 Where the source of truth for a memory file is a directory, prefer generating

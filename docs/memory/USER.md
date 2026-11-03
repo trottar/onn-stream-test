@@ -1,6 +1,6 @@
 ---
 memory_schema: 1
-as_of: 2026-09-10
+as_of: 2026-11-03
 baseline_commit: 25e9a1492a684dbaeebede90ea7ca4abd3eab1fb
 ---
 
@@ -15,6 +15,6 @@ This file records project-working preferences, not personal biography.
 - Preserve stable subsystems unless evidence specifically points to them.
 - Explain terminology precisely. In controller work, distinguish `Player 1 / Player 2` from `BUTTON A / BUTTON B` and from internal RetroPad controls.
 - Use Xbox-style names in the user-facing input editor; internal libretro terminology should stay internal unless technically necessary.
-- Deliver patch ZIPs with exact hashes, validation, rollback behavior, and a single complete install/test procedure.
+- Leave changes in the working tree with exact hashes, validation and the reverse step recorded; the user reviews and commits (sessions commit and push nothing).
 - Do not continue polishing a feature after the user has declared it done unless a real regression appears.
 - Keep status communication concise but explicit: what is proven, what is only source-audited, what remains, and the exact next step.

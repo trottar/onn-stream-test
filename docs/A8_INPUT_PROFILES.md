@@ -2,10 +2,16 @@
 
 ## Status
 
+As the records stand on 2026-11-03:
+
 - A8.1 schema / CRUD / assignment backend: **runtime validated**
 - A8.2 RetroArch session adapter: **COMPLETE / runtime validated**
-- A8.3 Android profile editor: **development patch; runtime UI validation required**
-- A8.4 per-game UI / diagnostics polish: pending
+- A8.3 Android profile editor: **partly runtime validated.** The user confirmed v6's Current/Change
+  editor works (2026-09-09; §A8.3 v7). A runtime UI check of v7 (Xbox-only labels, player sync) and v8 (conflicts red
+  before selection): **not recorded.**
+- Linux (D-084 + D-085): **runtime validated** — three games with three profiles played correctly (2026-09-16;
+  §Linux runtime acceptance).
+- A8.4 per-game UI / diagnostics polish: **pending** (no record of work on it).
 
 ## Architecture
 

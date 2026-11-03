@@ -1,12 +1,43 @@
 # PrivyHub / Safe IoT Roadmap — Linux-First + Remote-Foundation Revision
 
-**Revision date:** 2026-09-14 (position marker updated 2026-09-22, 2026-10-05)
+**Revision date:** 2026-09-14 (position marker updated 2026-09-22, 2026-10-05, 2026-11-03)
 **Predecessor synchronized checkpoint:** C1.1 + native-status privacy checkpoint `0c31c100ec721d687aff6aedbd79bc0cf9343810`
 **Roadmap status:** Accepted project plan, **still authoritative and unchanged in structure**. Future secure remote access remains promoted to Phase G after Linux optimization.
 
 ---
 
-## 0. Where the work actually is — 2026-09-22 (marker moved 2026-10-05)
+## 0. Where the work actually is — 2026-11-03 (marker moved; earlier 2026-09-22, 2026-10-05)
+
+**The roadmap below is not restructured; only this marker moves.** Authority for the current position is
+`docs/memory/CURRENT.md` (the fourteen-line table, the APK, the units, the live work); the records are in
+`docs/memory/evidence/`.
+
+- **Phase E is ACTIVE:** E1 frozen, E2 measured (2026-10-06), E3 closed (2026-10-09), E4 closed on the host side
+  (2026-10-15, `docs/memory/evidence/E4_CLOSEOUT_2026-10-15.md`).
+- **Closed:** Phases A-C (C on 2026-10-05), D-BASE and the D series (the C7 / D8 checkpoint,
+  `docs/memory/evidence/C7_D8_CHECKPOINT_2026-09-30.md`). **Phase F has not started.**
+- **The G track (remote play) is under way** since G1-S1 (2026-10-15), ahead of Phase F. Its adoptions G-A1 … G-A10
+  are in §G4 (G-A6 shelved; G-A8 prepared, never applied).
+- **Fourteen adopted lines** (`tools/e1_suite.py` `ADOPTED`), each from its own drop-in under the companion unit:
+  live adaptive (C3-L4), the cached guide index (E3-S6A), Snes9x (E3-A2), recovery v2 (E3-A3B), the SNES capture fix
+  (E4-S5D), the overlay provider and session identity v2 (G-A1), Opus (G-A2), the link report (G-A3), link recovery
+  (G-A4), the fast restart (G-A5) and its unlock (G-A7), `PRIVYHUB_REMOTE=1` (G-A9; acts only on a remote-class
+  session), the step in place (G-A10, 2026-11-02). **The one off switch for any line:** delete its drop-in,
+  `daemon-reload`, restart the companion.
+- **The client:** APK `fcd924c2…` is CONFIRMED on the onn (CL-B14's build: the loss guard out, the link notice on by
+  default). `554ccf61…` is NOT CONFIRMED (HOME-1). `0132b944…` (queue M) is pinned, NOT installed. B27 and B29 are not
+  in the confirmed APK.
+- **Units:** `privyhub-companion` and `privyhub-diag` (B36, the diagnostics keeper; `docs/DIAGNOSTICS.md`) run.
+  `privyhub-link-n1` ended 2026-10-31; `privyhub-trip-log` ended 2026-11-01.
+- **Live, not a line of its own:** B33 inside line 10 (off: `PRIVYHUB_REWIND_NEEDS_LOSS=0`).
+- **Done lately:** HOME-1 (2026-11-02: C2 and C3 met, C1 and C4 not met, C5 invalid;
+  `docs/memory/evidence/HOME_1_TRIP_CLOSE_AND_QUEUE_L_CELLS_2026-11-02.md`); queue M (B38-B40 built, nothing adopted).
+- **Next:** HOME-2, session A's task in `docs/memory/handoffs/SESSION_B_DONE_2026-11-02M.md` §A; not yet run.
+
+#### Superseded text (kept): the §0 marker as of 2026-10-05
+
+> **Superseded (2026-11-03):** the text below is the 2026-10-05 position (Phase D "ACTIVE", "E3 next"); today's is
+> above — see docs/memory/CURRENT.md.
 
 **The roadmap below is not restructured; only this marker moves.**
 Authority for the current position is `docs/memory/CURRENT.md`.
@@ -44,15 +75,17 @@ Authority for the current position is `docs/memory/CURRENT.md`.
 
 ## 1. Current project position
 
+As of 2026-11-03; the detail is in `docs/memory/CURRENT.md` and §0.
+
 | Phase | Purpose | Status |
 |---|---|---|
 | **A — Emulator Subsystem** | Finish Games/emulation as a normal-use subsystem | **COMPLETE / PUSHED** |
 | **B — Diagnostics & Clean Native Baseline** | Make PrivyHub self-diagnosing and remove active Sunshine/Moonlight legacy | **COMPLETE / PUSHED** |
-| **C — Adaptive Streaming Architecture** | Portable profile/telemetry/readiness foundation complete enough for Windows; automatic adaptation continues on Linux | **CLOSED 2026-10-05** (C5-CLOSE; resumed 2026-09-23 at C3 after `D-BASE`) |
-| **D — Linux Migration / Native Linux Baseline** | Move the core server to the HP EliteDesk Linux prototype and restore normal-use parity | **ACTIVE** |
-| **E — Linux Core Resource Characterization & Optimization** | Optimize and measure the Linux core with PS1-and-below only; select Prototype 2 from evidence | **ACTIVE** — E1 FROZEN (E1-S1, VOD added); E2 MEASURED 2026-10-06 (E2-S1); E3 next (the user's pick) |
-| **F — Media Library, VOD & Live TV UX** | Finish local media polish plus substantial Live TV/channel/guide work on Linux | **PLANNED AFTER E** |
-| **G — Secure Remote Access / Portable Client Foundation** | Establish overlay/provider abstraction, portable trusted-LAN access, WAN session identity/auth, and off-site PS1-and-below validation | **FUTURE AFTER F** |
+| **C — Adaptive Streaming Architecture** | Portable profile/telemetry/readiness foundation; automatic adaptation on Linux | **CLOSED 2026-10-05** (C5-CLOSE) |
+| **D — Linux Migration / Native Linux Baseline** | Move the core server to the Linux prototype and restore normal-use parity | **DONE** — D5-D7 complete; the D8 checkpoint `C7_D8_CHECKPOINT_2026-09-30.md` |
+| **E — Linux Core Resource Characterization & Optimization** | Optimize and measure the Linux core with PS1-and-below only; select Prototype 2 from evidence | **ACTIVE** — E1 FROZEN; E2 MEASURED; E3 CLOSED (2026-10-09); E4 CLOSED, host side (2026-10-15) |
+| **F — Media Library, VOD & Live TV UX** | Finish local media polish plus substantial Live TV/channel/guide work on Linux | **PLANNED AFTER E** (not started) |
+| **G — Secure Remote Access / Portable Client Foundation** | Overlay/provider abstraction, portable trusted-LAN access, WAN session identity/auth, off-site PS1-and-below validation | **UNDER WAY** since 2026-10-15 (G1-S1), ahead of F; G-A1 … G-A10 in §G4; the G9 checkpoint not reached |
 | **H — Extended Emulation & User-Content Import** | Build safe user-content ingestion, then characterize N64, GameCube, and PS2 on the established local/remote foundation | **FUTURE AFTER G** |
 | **I — Home Infrastructure / Broader Plugin Expansion** | Home Assistant/devices, cameras/microphones, storage, broader clients and provider expansion | **FUTURE** |
 | **J — Local Intelligence / Voice / Privacy-Aware AI** | Deterministic local automation, small local models, optional user-supplied cloud AI providers, bounded adaptive optimization | **FUTURE** |
@@ -645,6 +678,8 @@ waits for the user
 
 # Phase D — Linux Migration / Native Linux Baseline
 
+> **Superseded (2026-11-03):** Phase D is done: D5 closed 2026-09-17, D6-R1 replayed 2026-09-24, D7 complete 2026-09-28, D8 checkpointed in `docs/memory/evidence/C7_D8_CHECKPOINT_2026-09-30.md`; Phase E is active — see docs/memory/CURRENT.md.
+
 **Status: ACTIVE — D5 complete/runtime accepted; D7 native Linux regression next; D6 remains deferred unless new evidence reopens it**
 
 Prototype 1 Linux server:
@@ -935,6 +970,8 @@ Architectural statement:
 ---
 
 # Phase E — Linux Core Resource Characterization & Optimization
+
+> **Superseded (2026-11-03):** E4 is CLOSED, host side (2026-10-15, `docs/memory/evidence/E4_CLOSEOUT_2026-10-15.md`), not ACTIVE; Phase E stays active with E1 frozen, E2 measured, E3 and E4 closed — see docs/memory/CURRENT.md.
 
 **Status: ACTIVE (started 2026-10-05, the user's "let's start E1") — E1
 FROZEN (E1-S1; VOD added 2026-10-05); E2 MEASURED (E2-S1, 2026-10-06); E3
@@ -1370,6 +1407,8 @@ Acceptance:
 
 # Phase G — Secure Remote Access / Portable Client Foundation
 
+> **Superseded (2026-11-03):** not "FUTURE AFTER F": the G track has been under way since G1-S1 (2026-10-15) while Phase F has not started; its adoptions G-A1 … G-A10 are in §G4 — see docs/memory/CURRENT.md.
+
 > **Data waiting for Phase G (C5-M3, 2026-09-30):** three low rungs
 > screened on the home link behind the profile selector, never on the live
 > ladder. 720p/4000 passed transport at 5.0 Mbit/s on the wire; 720p/3000
@@ -1438,6 +1477,8 @@ Remote access must never flatten or expose the ordinary household LAN.
 
 ## G1 — Overlay provider abstraction
 
+> **Superseded (2026-11-03):** ADOPTED, not "NOT ADOPTED": `PRIVYHUB_OVERLAY_PROVIDER=tailscale` (`overlay.conf`) is adopted line 6 since G-A1 (2026-10-16) — see docs/memory/evidence/G_A1_OVERLAY_AND_IDENTITY_ADOPTION_2026-10-16.md.
+
 **Status (2026-10-15, G1-S1): BUILT behind `PRIVYHUB_OVERLAY_PROVIDER=none|tailscale`
 (absent = today, byte for byte), NOT ADOPTED** — `companion/overlay/`
 (contract, `none`, read-only `tailscale`), 17 tests OK; Tailscale not
@@ -1487,6 +1528,8 @@ Required behavior:
   services to the visited LAN.
 
 ## G3 — WAN session identity and application authorization
+
+> **Superseded (2026-11-03):** ADOPTED, not "NOT ADOPTED / NOT INSTALLED": `PRIVYHUB_SESSION_IDENTITY=v2` (`session-identity.conf`) is adopted line 7 since G-A1 (2026-10-16) and the client's `identity_v2` is on (CL-B3); G3-S3's `59f736d2…` was installed and confirmed in CL-B3 and has since been replaced — the onn runs `fcd924c2…` — see docs/memory/evidence/G_A1_OVERLAY_AND_IDENTITY_ADOPTION_2026-10-16.md and docs/memory/CURRENT.md.
 
 **Status (2026-10-15, G3-S1): HOST SIDE BUILT behind `PRIVYHUB_SESSION_IDENTITY=v2`
 (absent = today, byte for byte), NOT ADOPTED** — `companion/session_identity.py`:
@@ -1556,6 +1599,8 @@ Add explicit application authentication/authorization with fail-closed session
 setup and auditable permissions.
 
 ## G4 — PS1-and-below off-site remote baseline
+
+> **Superseded (2026-11-03):** the line counts below ("the eighth" … "the thirteenth line", "the tools read N lines") and the APK pins are each as of its entry's date; the adopted environ is fourteen lines since G-A10 (2026-11-02, the last entry) and the onn runs `fcd924c2…` — see docs/memory/CURRENT.md.
 
 **Status (2026-10-16, G4-S1): first off-site session measured: 2 of 3 valid; see the record**
 (`docs/memory/evidence/G4_S1_OFFSITE_FIRST_SESSION_2026-10-16.md`). Runs 1 and 2 reached PLAYING over the overlay (a
@@ -1682,6 +1727,8 @@ reported); the user's runbook `handoffs/G4_RUNBOOK_HOTSPOT.md`. **Blockers:** CL
 the overlay flag on the companion, the Tailscale app on the onn (unverified). Record:
 `docs/memory/evidence/G4_P1_OFFSITE_TEST_PREP_2026-10-16.md`.
 
+> **Superseded (2026-11-03):** G4-P1's per-run flags are adopted lines now: the two host flags it read back per run are lines 6 and 7 (G-A1), and the WAN lines later set per run in `e3_flag.conf` are line 13, `PRIVYHUB_REMOTE=1` (G-A9), acting on every remote-class session — see docs/memory/evidence/TRIP_PREP_2026-10-29.md.
+
 Use the mature Core workload first:
 
 ```text
@@ -1715,6 +1762,8 @@ ninth line, the user's say-so); a plain on-screen notice tells the user when the
 thing to do (B14, `debug.privyhub.link_notice=1`). LINK-R1: 5 GHz 0 / 0 against 2.4 GHz 16-22 / 20 silences / hitch s
 per 10 min. Records: `B13_LINK_REPORT_DEFAULT_ON_2026-10-23.md`, `B14_LINK_NOTICE_2026-10-23.md`.
 
+> **Superseded (2026-11-03):** adopted: `PRIVYHUB_LINK_REPORT=1` is line 9 (G-A3, 2026-10-23), and the link notice is on by default in the confirmed `fcd924c2…` (CL-B14) — see docs/memory/evidence/G_A3_LINK_REPORT_ADOPTION_2026-10-23.md.
+
 **G-A9 ADOPTED (2026-10-29, the user's "Yes", TRIP-PREP): `PRIVYHUB_REMOTE=1`, the thirteenth line (`remote.conf`).**
 G4-S4's four (the remote ladder, the 4000 floor start, the 7000 cap, the WAN telemetry) act by themselves on an
 overlay session; the LAN is today's (CL-B16 cell 1; TRIP-PREP's window).
@@ -1722,6 +1771,8 @@ overlay session; the LAN is today's (CL-B16 cell 1; TRIP-PREP's window).
   `trip_prep_2026-10-29/g_a9_applied.diff`.
 - **For the trip the onn runs `fcd924c2…`** (the loss guard out); the guard's return is a B item after the trip.
 - The log-keeper `privyhub-trip-log` runs to 2026-11-01T23:59Z. Record: `docs/memory/evidence/TRIP_PREP_2026-10-29.md`.
+
+> **Superseded (2026-11-03):** the trip is over: `privyhub-trip-log` stopped at its cap (2026-11-01T23:59Z) and was read in HOME-1, and `privyhub-diag` (B36) keeps the logs now; the onn still runs `fcd924c2…`, and the guard's return (G-A8) was never applied — see docs/memory/evidence/HOME_1_TRIP_CLOSE_AND_QUEUE_L_CELLS_2026-11-02.md.
 
 **G-A10 ADOPTED (2026-11-02, the user's "Adopt", after HOME-1 C2): `PRIVYHUB_STEP_IN_PLACE=1`, the fourteenth line
 (`step-in-place.conf`).** Each ladder step keeps the same stream: one IDR, no SSRC change; C2 measured 0.9 / 6.1 ms
@@ -1731,6 +1782,8 @@ gates met, but saw no step (the LAN starts at the top).
 - Record: `docs/memory/evidence/G_A10_STEP_IN_PLACE_ADOPTION_2026-11-02.md`.
 
 ## G5 — WAN-aware telemetry and adaptation
+
+> **Superseded (2026-11-03):** G5-S1's WAN telemetry and the remote ladder, start floor and 7000 cap act on every remote-class session through adopted line 13, `PRIVYHUB_REMOTE=1` (G-A9); `PRIVYHUB_WAN_ADAPTATION` itself is not adopted — see docs/WAN_ADAPTATION_RULES.md.
 
 **Status (2026-10-16, G5-S1): CLASSIFICATION BUILT behind `PRIVYHUB_WAN_TELEMETRY=1`
 (absent = today, byte for byte), NOT ADOPTED** — `companion/wan_telemetry.py`: the
@@ -1846,6 +1899,8 @@ streaming better than routing media through the Linux hub, while preserving the
 same PrivyHub authorization/session boundary.
 
 ## G8 — Adverse-network characterization
+
+> **Superseded (2026-11-03):** the envelope was measured after this status (G8-S1, 18 of 22 valid, 2026-10-17); the line counts ("the ninth" … "the thirteenth line") and APK pins in the entries below are each as of its date — fourteen lines today, `fcd924c2…` confirmed — see docs/memory/CURRENT.md.
 
 **Status (2026-10-16, G8-P1): HARNESS BUILT; ENVELOPE NOT MEASURED.** A
 user-space impairment shim (`companion/impairment.py`) on the loopback video
@@ -2104,6 +2159,8 @@ CL-B10 (~32 frames held a minute on the LAN, a > 0.5-s hold possible in 10 / 47 
 (B5 … B25 + B27) `8b0fbb74…` pinned, not installed; G-A8 (`PRIVYHUB_LOSS_GUARD=1`, the thirteenth line) prepared, not
 applied.** Next: CL-B15. Record: `docs/memory/evidence/B27_LOSS_GUARD_DEFAULT_ON_2026-10-27.md`.
 
+> **Superseded (2026-11-03):** B27 (the loss guard on by default) is not in the confirmed APK, and G-A8 was prepared and never applied; the thirteenth line is G-A9's `PRIVYHUB_REMOTE=1` — see docs/memory/evidence/TRIP_PREP_2026-10-29.md.
+
 **CL-B15 (2026-10-28): B27's loss guard on by default, on the bench, every client property empty: 2 / 2 cells valid;
 APK `8b0fbb74…3f4e` CONFIRMED and pinned; back to B on L1-L3.**
 - **1 % loss + the host flag:** 27.7 freezes a minute (~0.13 s each). One hold ran 685 ms past the 600-ms cap (a
@@ -2112,6 +2169,8 @@ APK `8b0fbb74…3f4e` CONFIRMED and pinned; back to B on L1-L3.**
 - G-A8 (`PRIVYHUB_LOSS_GUARD=1`) is not a candidate as read. The controller's `bad_packets` was not read.
 
 Record: `docs/memory/evidence/CL_B15_LOSS_GUARD_DEFAULT_2026-10-27.md`.
+
+> **Superseded (2026-11-03):** `8b0fbb74…3f4e` is no longer on the onn: `9719ea82…` replaced it (CL-B16), then `fcd924c2…` (TRIP-PREP, the guard out) — see docs/memory/evidence/TRIP_PREP_2026-10-29.md.
 
 **Queue K (2026-10-28), for the trip (leaving 2026-10-30): B28-B31 built, nothing adopted, no live run.**
 - **B28:** `PRIVYHUB_REMOTE=1`, G4-S4's four WAN lines in one, each acting only on a remote-class session; the LAN
@@ -2125,6 +2184,8 @@ Record: `docs/memory/evidence/CL_B15_LOSS_GUARD_DEFAULT_2026-10-27.md`.
 - Next: CL-B16 (Wednesday), then Thursday's G-A9, the log-keeper and the trip check
   (`docs/memory/handoffs/SESSION_B_DONE_2026-10-28K.md`).
 
+> **Superseded (2026-11-03):** G-A9 was adopted (TRIP-PREP, 2026-10-29); B29's `9719ea82…` was confirmed in CL-B16 and then replaced by `fcd924c2…`; B30's trip keeper ended 2026-11-01 and B36's `privyhub-diag` succeeds it — see docs/memory/evidence/TRIP_PREP_2026-10-29.md and docs/memory/evidence/HOME_1_TRIP_CLOSE_AND_QUEUE_L_CELLS_2026-11-02.md.
+
 **CL-B16 (2026-10-29): the remote umbrella at home and the quiet guard, every client property empty, 5 GHz: 3 / 3 cells
 valid; APK `9719ea82…0110` CONFIRMED and pinned; back to B on R3 and S1.**
 - **The LAN with `PRIVYHUB_REMOTE=1`:** today's (7000, no remote rows), U1-U3 met. The evening's LAN was ~3× lossier
@@ -2137,6 +2198,8 @@ valid; APK `9719ea82…0110` CONFIRMED and pinned; back to B on R3 and S1.**
 - G-A9 goes back to B as read (R3); the user may decide it before B.
 
 Record: `docs/memory/evidence/CL_B16_REMOTE_UMBRELLA_AND_QUIET_GUARD_2026-10-29.md`.
+
+> **Superseded (2026-11-03):** `9719ea82…0110` was replaced on the onn by `fcd924c2…` in TRIP-PREP (2026-10-29), where G-A9 was adopted — see docs/memory/evidence/TRIP_PREP_2026-10-29.md.
 
 **Queue L (2026-10-31), from TRIP-R2 (Friday's off-site play): B32-B37 built / read, nothing adopted, no live run;
 APK (B5 … B25 + B32 + B34 + B35; B27 / B29 out) `554ccf61…9902` pinned, NOT installed.**
@@ -2710,6 +2773,8 @@ At every meaningful milestone:
 
 ## Gate 1 — Phase C telemetry
 
+> **Superseded (2026-11-03):** passed: the C2 telemetry came first, and live adaptive bitrate is adopted line 1 (C3-L4); Phase C closed 2026-10-05 — see docs/memory/evidence/C7_D8_CHECKPOINT_2026-09-30.md.
+
 Do not implement adaptive bitrate until the telemetry can distinguish:
 
 - healthy path;
@@ -2720,6 +2785,8 @@ Do not implement adaptive bitrate until the telemetry can distinguish:
 
 ## Gate 2 — Phase D Live TV data model
 
+> **Superseded (2026-11-03):** Phase D is done (the D5 TV / media closeout, 2026-09-17); the channel-identity work this gate guards is F4 / F5, and no Phase F record exists yet, so the rule now stands for Phase F — see docs/memory/CURRENT.md.
+
 Do not polish the guide UI around unreliable channel/EPG identity.
 
 First establish canonical channels, normalization, matching, refresh, and
@@ -2727,11 +2794,15 @@ diagnostics.
 
 ## Gate 3 — Linux backend selection
 
+> **Superseded (2026-11-03):** passed: the Linux backends were set in Phase D, and Phase E has been active since 2026-10-05 — see docs/memory/evidence/C7_D8_CHECKPOINT_2026-09-30.md.
+
 Before Phase E implementation, define the Linux equivalents for capture,
 hardware encoding, source audio, input injection, service lifecycle, and
 diagnostics while preserving stable behavioral contracts.
 
 ## Gate 4 — Linux acceptance
+
+> **Superseded (2026-11-03):** passed: the Linux system was accepted at the D8 checkpoint (D7 complete 2026-09-28) before Phase E — see docs/memory/evidence/C7_D8_CHECKPOINT_2026-09-30.md.
 
 Do not start hardware shrinking until the Linux system is functionally correct
 and runtime validated.
@@ -2788,6 +2859,8 @@ evidence that justifies it.
 ---
 
 # Immediate sequence
+
+> **Superseded (2026-11-03):** this diagram's letters predate the phase table (it names D "Media", E "Linux Migration", F "Optimization"); the work ran A, B, C, D-BASE, the rest of C on Linux, then E, with the G track under way since 2026-10-15 and Phase F not started — see §0 and docs/memory/CURRENT.md.
 
 ```text
 A COMPLETE / PUSHED
@@ -2905,6 +2978,8 @@ Prototype 2 should be selected only after Phase F produces evidence for a
 cheaper, appropriately sized alpha appliance.
 
 ## D-072 execution sequencing clarification
+
+> **Superseded (2026-11-03):** done as written: C resumed on Linux (2026-09-23) and closed 2026-10-05, then Phase E; the G track then started ahead of F (G1-S1, 2026-10-15) — see §0.
 
 Phase C is **paused at the Windows boundary, not complete**.
 

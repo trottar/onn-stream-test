@@ -1,5 +1,7 @@
 # WAN adaptation rules (G5) — written (G5-S1); implemented behind a flag (G5-S2)
 
+> **Superseded (2026-11-03):** the remote ladder (G5-S3), the start floor (720p/4000), the 7000 cap (G5-S4) and the WAN telemetry (G5-S1) are no longer "NOT ADOPTED, off-site pending": they act on every remote-class session through adopted line 13, `PRIVYHUB_REMOTE=1` (G-A9, 2026-10-29), after the off-site runs G4-S2 and G4-S4; on the LAN none of them acts. `PRIVYHUB_WAN_ADAPTATION` itself (G5-S2, these rules' implementation) is still NOT adopted, and its live smoke (G5-S2-L) never ran — see docs/memory/evidence/TRIP_PREP_2026-10-29.md and docs/memory/evidence/B28_REMOTE_UMBRELLA_2026-10-28.md.
+
 **Status: DRAFT (G5-S1, 2026-10-16).** **G5-S2 (2026-10-16): IMPLEMENTED behind
 `PRIVYHUB_WAN_ADAPTATION=1` (`companion/wan_adaptation.py`), proved by replay,
 NOT ADOPTED; the live smoke is pending on the stream** (record:
@@ -48,6 +50,8 @@ ROADMAP §G5's priority order, as rules:
 - **G5-S2:** `latency-limited` or `starved` on 2 consecutive 5-report windows → `step_down` one rung, through the ladder's own gates; no queue added.
 
 ## 3. Reduce bitrate when capacity tightens (`capacity-limited`)
+
+> **Superseded (2026-11-03):** the G5-S3 and G5-S4 lines below ("unvalidated live", "off-site pending") are past: on a remote-class session `PRIVYHUB_REMOTE=1` (line 13, G-A9) turns on the remote ladder with 720p/4000 as its floor, starts the stream at 4000 and caps it at 7000 (G4-S4: the climb 4000 → 7000 in ~12.5 min, 0 clamps); `PRIVYHUB_WAN_ADAPTATION`'s own suggestions (the G5-S2 lines) are still not adopted — see docs/memory/evidence/TRIP_PREP_2026-10-29.md.
 
 - **R3.1** `capacity-limited` (C3-L4-N1 / N2's rules) gives today's live
   actions: FALLBACK to 5000 (`capacity`) or one rung down (`capacity_mild`),

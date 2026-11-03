@@ -1,5 +1,7 @@
 # PrivyHub remote trust (G0)
 
+> **Superseded (2026-11-03):** the status below is G0's (2026-10-15). Since then G-A1 … G-A10 adopted the remote parts: the adopted environ is fourteen lines (`tools/e1_suite.py` `ADOPTED`), §4-§6 and §8 are in force, and §8a-§15 record each adoption with its off switch (G-A6 shelved, G-A8 never applied) — see docs/memory/CURRENT.md.
+
 **Status: G0 written 2026-10-15 (G1-S1).** Every statement is either
 quoted from `docs/ROADMAP.md` (marked **[ROADMAP §…]**) or marked
 **[G1-S1 proposal]**; proposals become rules only when the user accepts
@@ -62,6 +64,8 @@ remote uplink → travel GL-iNet-class router (portable trusted client LAN)
 
 ## 4. The overlay provider boundary (G1)
 
+> **Superseded (2026-11-03):** the provider is no longer `none` by default on the hub: `PRIVYHUB_OVERLAY_PROVIDER=tailscale` (`overlay.conf`) is adopted line 6 since G-A1 (2026-10-16), §8a — see docs/memory/evidence/G_A1_OVERLAY_AND_IDENTITY_ADOPTION_2026-10-16.md.
+
 *"Use a provider boundary instead of hard-coding one overlay product into
 the PrivyHub session architecture."* *"Tailscale is the preferred first
 implementation candidate, not the permanent architecture contract."*
@@ -73,6 +77,8 @@ diagnostics kept inside the provider. Providers: `none` (the default) and
 is installed; never installs, never runs `tailscale up`) [G1-S1].
 
 ## 5. The identity model (G3)
+
+> **Superseded (2026-11-03):** adopted, not "built … not adopted": `PRIVYHUB_SESSION_IDENTITY=v2` (`session-identity.conf`) is adopted line 7 since G-A1 (2026-10-16), §8a; the points below are the rules in force, no longer proposals — see docs/memory/evidence/G_A1_OVERLAY_AND_IDENTITY_ADOPTION_2026-10-16.md.
 
 *"Phase G must separate: client identity, session identity, reachable
 video/audio/controller endpoints, overlay/path state,
@@ -108,6 +114,8 @@ Everything below is a **[G3-S1 proposal]**.
   an address, a key or a token.
 
 ## 6. The client's part of the identity model (G3-S2)
+
+> **Superseded (2026-11-03):** installed and adopted, not "not installed, not adopted": the user turned `identity_v2` on on the onn in CL-B3 (2026-10-16), the third G-A1 adoption, beside the host's v2 (line 7); it is on in today's confirmed APK `fcd924c2…` — see docs/memory/evidence/CL_B3_HARDENED_APK_LAN_2026-10-16.md and docs/memory/CURRENT.md.
 
 Built behind the client setting `identity_v2`, **default off = today's
 requests, byte for byte**; not installed, not adopted (record:
@@ -147,6 +155,8 @@ endpoints.
 
 ## 8. Hardening: the media token and the permission set (G3-S3)
 
+> **Superseded (2026-11-03):** in force, not "not installed, not adopted": the host has run G3-S3's `session_identity.py` under line 7 since G-A1's restart (2026-10-16), and CL-B3 installed and confirmed G3-S3's APK `59f736d2…` with `identity_v2` on (the signed LAN path and the VOD play through the range server passed); the onn now runs `fcd924c2…` — see docs/memory/evidence/G_A1_OVERLAY_AND_IDENTITY_ADOPTION_2026-10-16.md and docs/memory/evidence/CL_B3_HARDENED_APK_LAN_2026-10-16.md.
+
 Built behind the same flags (the host's `PRIVYHUB_SESSION_IDENTITY=v2`, the
 client's `identity_v2`; absent / off = today), not installed, not adopted
 (record: `docs/memory/evidence/G3_S3_HARDENING_AND_HUB_HOST_2026-10-16.md`).
@@ -184,6 +194,28 @@ Every point below is a **[G3-S3 proposal]**.
 - **The hub host.** Off-site the client reaches the hub by a name the user
   types ("Hub host", e.g. the hub's tailnet name), overriding the companion
   host while `identity_v2` is on; the client never logs it (a hash if needed).
+
+## 8a. The overlay provider and session identity v2 (adopted G-A1, 2026-10-16)
+
+- **Adopted** (the user's "yes to all three", 2026-10-16): two drop-ins beside the five earlier lines, written by the
+  user by hand, then `daemon-reload` and a companion restart; the environ read seven lines.
+  - `PRIVYHUB_OVERLAY_PROVIDER=tailscale` through
+    `~/.config/systemd/user/privyhub-companion.service.d/overlay.conf`, the **sixth adopted line** (§4).
+  - `PRIVYHUB_SESSION_IDENTITY=v2` through
+    `~/.config/systemd/user/privyhub-companion.service.d/session-identity.conf`, the **seventh adopted line** (§5, §8).
+  - **The third adoption, the client's `identity_v2` on,** was made on the onn in CL-B3 (§6).
+- **What the status documents showed** at the adoption: `/status` gained the `overlay` object (provider tailscale,
+  connected, path `no-peer`; the endpoint only as a hash); `/session/status` read mode v2 with one paired device and
+  the permission set of §8.
+- **What leaves the onn:** what §5, §6 and §8 describe: the pairing request once on the home LAN, then the signed
+  setup and the token on each call; no address, secret or token in any log.
+- **Turning it off (host)** (the record's reverts, written, not applied):
+  1. The overlay provider: delete `overlay.conf`, `systemctl --user daemon-reload`, restart the companion, and take
+     `OVERLAY` out of `tools/e1_suite.py` `ADOPTED` (and `drop_in_overlay` out of the preflight).
+  2. Session identity: delete `session-identity.conf`, the same reload and restart, and the same edits for `IDENTITY`
+     / `drop_in_identity`. A client with `identity_v2` on then falls back to today's requests; the paired store stays
+     on disk, unread.
+- Record: `docs/memory/evidence/G_A1_OVERLAY_AND_IDENTITY_ADOPTION_2026-10-16.md` (§4: the reverts).
 
 ## 9. The audio codec (G4-W2; adopted G-A2, 2026-10-19)
 
@@ -289,6 +321,8 @@ Every point below is a **[G3-S3 proposal]**.
   The host then runs §12's worker (CL-B13 cell 1: the ready waits on the old audio's stop inside the lock).
 
 ## 14. The WAN lines on a remote session (adopted G-A9, 2026-10-29)
+
+> **Superseded (2026-11-03):** two notes below are past: `privyhub-link-n1` ended 2026-10-31, so the restart's "outside 04:30-05:30Z" window no longer applies; and the trip is over — the onn still runs `fcd924c2…` with the guard out, and G-A8 (the guard) was prepared and never applied. With G-A10's line, turning this line off leaves thirteen lines, not twelve — see docs/memory/evidence/HOME_1_TRIP_CLOSE_AND_QUEUE_L_CELLS_2026-11-02.md and docs/memory/CURRENT.md.
 
 - **Adopted:** `PRIVYHUB_REMOTE=1` through the drop-in
   `~/.config/systemd/user/privyhub-companion.service.d/remote.conf`, the **thirteenth adopted line** (the user's "Yes",
