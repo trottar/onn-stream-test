@@ -3800,7 +3800,9 @@ class GamesPlugin:
                 if getattr(self, "_pad_slots_log", None) is None:
                     self._pad_slots_log = _pad_slots.SlotsLog()
                 self._pad_slots_log.heartbeat(self._recovery, self._first(query, "pad_slots"), values,
-                                              _pad_slots.updates_by_player(self._native_stream._session_io.controller))
+                                              _pad_slots.updates_by_player(self._native_stream._session_io.controller),
+                                              # B41: the prompt's claims (only a client with player_prompt=1 sends them)
+                                              claims=self._first(query, "pad_claims") if "pad_claims" in query else None)
 
             if not values:
                 raise ValueError(
@@ -3918,7 +3920,9 @@ class GamesPlugin:
                 import pad_slots as _pad_slots
                 if getattr(self, "_pad_slots_log", None) is None:
                     self._pad_slots_log = _pad_slots.SlotsLog()
-                self._pad_slots_log.start(self._recovery, self._first(query, "pad_slots"))
+                self._pad_slots_log.start(self._recovery, self._first(query, "pad_slots"),
+                                          # B41: the prompt's claims (only a client with player_prompt=1 sends them)
+                                          claims=self._first(query, "pad_claims") if "pad_claims" in query else None)
                 # B38: count only the slots whose state changes (a stable-slot client's key turns it on)
                 _pad_slots.enable_changes(getattr(getattr(self._native_stream, "_session_io", None), "controller", None))
             try:
@@ -3974,6 +3978,10 @@ class GamesPlugin:
                 # B17: the guarded client's end acknowledged (absent: no key)
                 if guard_end:
                     payload["guard_end"] = True
+                # B41: the title's player count for the client's prompt (only a client with player_prompt=1 asks)
+                if self._first(query, "player_prompt") == "1":
+                    import player_count as _player_count
+                    payload.update(_player_count.for_start(self, game_status))
                 return payload
             except NativeStreamError as exc:
                 raise RuntimeError(str(exc)) from exc

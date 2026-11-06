@@ -89,10 +89,12 @@ class VirtualRemoteNoSlotTest {
 
     @Test
     fun absentIsToday() {
-        // absent / empty / other: no PadSlots object, so the sender's first-input order (B34's absent) applies
-        assertFalse(PadSlotsFlag.parse(null))
-        assertFalse(PadSlotsFlag.parse(""))
-        assertFalse(PadSlotsFlag.parse("1"))
+        // B42 (disclosed): absent / empty / other moved to stable; `off` / `0` give no PadSlots object, so the
+        // sender's first-input order (B34's absent) applies
+        assertTrue(PadSlotsFlag.parse(null))
+        assertTrue(PadSlotsFlag.parse(""))
+        assertTrue(PadSlotsFlag.parse("1"))
+        assertFalse(PadSlotsFlag.parse("off"))
         assertTrue(PadSlotsFlag.parse("stable"))
     }
 }

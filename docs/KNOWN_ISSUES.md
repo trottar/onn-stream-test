@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-06 — Queue N (B41-B45): the prompt, the two defaults, the movie retry made real, the G9 draft, the H0 design; APK built, not installed — OPEN (HOME-3) — `## 2026-11-06 Queue N` below; `docs/memory/handoffs/SESSION_B_DONE_2026-11-06N.md`
 - 2026-11-06 — HOME-2: C1' / C4' met; C5' not met (valid: B40's reset absorbed by the player, B35 never reached); `0132b944…` CONFIRMED, every property empty — OPEN (G-A11 / G-A12 the user's; G-A13 to B) — `## 2026-11-06 HOME-2` below; `docs/memory/evidence/HOME_2_HOLD_PADS_VOD_2026-11-03.md`
 - 2026-11-02 — Queue M (B38-B40), HOME-1's C1 / C4 / C5 answered in code; APK `0132b944…` CONFIRMED in HOME-2 (2026-11-06) — OPEN (C5' to B) — `## 2026-11-02 Queue M` below; `docs/memory/handoffs/SESSION_B_DONE_2026-11-02M.md`
 - 2026-11-02 — G-A10, `PRIVYHUB_STEP_IN_PLACE=1` ADOPTED (the fourteenth line); B's open items from HOME-1 — OPEN (to B) — `## 2026-11-02 G-A10` below; `docs/memory/evidence/G_A10_STEP_IN_PLACE_ADOPTION_2026-11-02.md`
@@ -46,6 +47,30 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-06 Queue N (B41-B45): the player prompt, the hold and stable slots on by default, the movie retry made real, the G9 draft, the H0 design — OPEN (HOME-3)
+
+(`docs/memory/handoffs/SESSION_B_DONE_2026-11-06N.md`; the records `docs/memory/evidence/B41_…`, `B42_…`, `B43_…_2026-11-06.md`)
+
+- **B42 (G-A11 / G-A12, the user's yes):** in queue N's APK the hold and stable slots are **on with no property**;
+  `0` / `off` turns each off. Every session then sends `pad_slots`, so the heartbeat row's `updates_by_player` is the
+  changed-only count and the old per-packet count is `packets_by_player`: a comparison across this APK must read
+  `packets_by_player`. `NativeStreamActivity`'s comments for the two lazies still say "(null = today)", which now
+  means `0` / `off`.
+- **B41, the player prompt** (`debug.privyhub.player_prompt=1`, opt-in): it implies stable slots and claims by first
+  press. An unclaimed pad's sticks and non-claim keys are dropped until it presses a face button or Start; the claim
+  press and Select+Start both reach the game. The player count comes from `player_mode` / `max_players` / the PS1
+  multitap: unknown = 2, and with no SNES multitap path a 4-player SNES title reads 2.
+- **B43, the movie retry:** under `vod_retry=1`, a 401 / 403 now refetches the media token (a companion restart no
+  longer strands the movie), and "connection to hub lost" shows only after 150 s with no answer. Media3's own reconnect
+  hides any outage its 15-30 s buffer covers, so B35 / B43 act only beyond ~35 s; the bench uses `drop 45`. Rows
+  posted while the hub is down are lost (posted once).
+- **B44, the G9 draft:** 9 met / 3 deferred / 2 open. Open: the local check with the hub's own overlay down (the G4
+  runbook's step 18, never scored) and the clean checkpoint. The household-LAN boundary is met by design and never
+  probed; relayed-path WAN play is unmeasured.
+- **B45, H0 (found while designing):** PS1 `.iso` is listed by the scanner (`games.py` `SYSTEMS`) but refused at launch
+  (`emulators.json` has no `.iso`). The PS1 BIOS directory is empty (RetroArch logs the missing firmware at every
+  start; the core runs its built-in OpenBIOS, inferred); a real BIOS is the user's decision (save-state compatibility).
 
 ## 2026-11-06 HOME-2: C1' / C4' met; C5' not met (valid); `0132b944…` CONFIRMED — OPEN (G-A11 / G-A12 the user's; G-A13 to B)
 

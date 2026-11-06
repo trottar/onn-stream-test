@@ -1,0 +1,207 @@
+Compiled from "DefaultLoadErrorHandlingPolicy.java"
+public class androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy implements androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy {
+  public static final int DEFAULT_MIN_LOADABLE_RETRY_COUNT = 3;
+
+  public static final int DEFAULT_MIN_LOADABLE_RETRY_COUNT_PROGRESSIVE_LIVE = 6;
+
+  public static final long DEFAULT_TRACK_EXCLUSION_MS = 60000l;
+
+  public static final long DEFAULT_TRACK_BLACKLIST_MS = 60000l;
+
+  public static final long DEFAULT_LOCATION_EXCLUSION_MS = 300000l;
+
+  private static final int DEFAULT_BEHAVIOR_MIN_LOADABLE_RETRY_COUNT = -1;
+
+  private final int minimumLoadableRetryCount;
+
+  public androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy();
+    Code:
+       0: aload_0
+       1: iconst_m1
+       2: invokespecial #3                  // Method "<init>":(I)V
+       5: return
+
+  public androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy(int);
+    Code:
+       0: aload_0
+       1: invokespecial #7                  // Method java/lang/Object."<init>":()V
+       4: aload_0
+       5: iload_1
+       6: putfield      #12                 // Field minimumLoadableRetryCount:I
+       9: return
+
+  public androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy$FallbackSelection getFallbackSelectionFor(androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy$FallbackOptions, androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy$LoadErrorInfo);
+    Code:
+       0: aload_0
+       1: aload_2
+       2: getfield      #16                 // Field androidx/media3/exoplayer/upstream/LoadErrorHandlingPolicy$LoadErrorInfo.exception:Ljava/io/IOException;
+       5: invokevirtual #22                 // Method isEligibleForFallback:(Ljava/io/IOException;)Z
+       8: ifne          13
+      11: aconst_null
+      12: areturn
+      13: aload_1
+      14: getfield      #26                 // Field androidx/media3/exoplayer/upstream/LoadErrorHandlingPolicy$FallbackOptions.locationSteeringActive:Z
+      17: ifne          60
+      20: aload_1
+      21: iconst_1
+      22: invokevirtual #34                 // Method androidx/media3/exoplayer/upstream/LoadErrorHandlingPolicy$FallbackOptions.isFallbackAvailable:(I)Z
+      25: ifeq          40
+      28: new           #38                 // class androidx/media3/exoplayer/upstream/LoadErrorHandlingPolicy$FallbackSelection
+      31: dup
+      32: iconst_1
+      33: ldc2_w        #40                 // long 300000l
+      36: invokespecial #42                 // Method androidx/media3/exoplayer/upstream/LoadErrorHandlingPolicy$FallbackSelection."<init>":(IJ)V
+      39: areturn
+      40: aload_1
+      41: iconst_2
+      42: invokevirtual #34                 // Method androidx/media3/exoplayer/upstream/LoadErrorHandlingPolicy$FallbackOptions.isFallbackAvailable:(I)Z
+      45: ifeq          100
+      48: new           #38                 // class androidx/media3/exoplayer/upstream/LoadErrorHandlingPolicy$FallbackSelection
+      51: dup
+      52: iconst_2
+      53: ldc2_w        #45                 // long 60000l
+      56: invokespecial #42                 // Method androidx/media3/exoplayer/upstream/LoadErrorHandlingPolicy$FallbackSelection."<init>":(IJ)V
+      59: areturn
+      60: aload_1
+      61: iconst_2
+      62: invokevirtual #34                 // Method androidx/media3/exoplayer/upstream/LoadErrorHandlingPolicy$FallbackOptions.isFallbackAvailable:(I)Z
+      65: ifeq          80
+      68: new           #38                 // class androidx/media3/exoplayer/upstream/LoadErrorHandlingPolicy$FallbackSelection
+      71: dup
+      72: iconst_2
+      73: ldc2_w        #45                 // long 60000l
+      76: invokespecial #42                 // Method androidx/media3/exoplayer/upstream/LoadErrorHandlingPolicy$FallbackSelection."<init>":(IJ)V
+      79: areturn
+      80: aload_1
+      81: iconst_1
+      82: invokevirtual #34                 // Method androidx/media3/exoplayer/upstream/LoadErrorHandlingPolicy$FallbackOptions.isFallbackAvailable:(I)Z
+      85: ifeq          100
+      88: new           #38                 // class androidx/media3/exoplayer/upstream/LoadErrorHandlingPolicy$FallbackSelection
+      91: dup
+      92: iconst_1
+      93: ldc2_w        #40                 // long 300000l
+      96: invokespecial #42                 // Method androidx/media3/exoplayer/upstream/LoadErrorHandlingPolicy$FallbackSelection."<init>":(IJ)V
+      99: areturn
+     100: aconst_null
+     101: areturn
+
+  public long getRetryDelayMsFor(androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy$LoadErrorInfo);
+    Code:
+       0: aload_0
+       1: aload_1
+       2: getfield      #16                 // Field androidx/media3/exoplayer/upstream/LoadErrorHandlingPolicy$LoadErrorInfo.exception:Ljava/io/IOException;
+       5: invokespecial #47                 // Method isAnyCauseNonRetriable:(Ljava/lang/Throwable;)Z
+       8: ifeq          17
+      11: ldc2_w        #53                 // long -9223372036854775807l
+      14: goto          34
+      17: aload_1
+      18: getfield      #55                 // Field androidx/media3/exoplayer/upstream/LoadErrorHandlingPolicy$LoadErrorInfo.errorCount:I
+      21: iconst_1
+      22: isub
+      23: sipush        1000
+      26: imul
+      27: sipush        5000
+      30: invokestatic  #58                 // Method java/lang/Math.min:(II)I
+      33: i2l
+      34: lreturn
+
+  public int getMinimumLoadableRetryCount(int);
+    Code:
+       0: aload_0
+       1: getfield      #12                 // Field minimumLoadableRetryCount:I
+       4: iconst_m1
+       5: if_icmpne     21
+       8: iload_1
+       9: bipush        7
+      11: if_icmpne     19
+      14: bipush        6
+      16: goto          20
+      19: iconst_3
+      20: ireturn
+      21: aload_0
+      22: getfield      #12                 // Field minimumLoadableRetryCount:I
+      25: ireturn
+
+  protected boolean isEligibleForFallback(java.io.IOException);
+    Code:
+       0: aload_1
+       1: instanceof    #64                 // class androidx/media3/datasource/HttpDataSource$InvalidResponseCodeException
+       4: ifne          9
+       7: iconst_0
+       8: ireturn
+       9: aload_1
+      10: checkcast     #64                 // class androidx/media3/datasource/HttpDataSource$InvalidResponseCodeException
+      13: astore_2
+      14: aload_2
+      15: getfield      #66                 // Field androidx/media3/datasource/HttpDataSource$InvalidResponseCodeException.responseCode:I
+      18: sipush        403
+      21: if_icmpeq     74
+      24: aload_2
+      25: getfield      #66                 // Field androidx/media3/datasource/HttpDataSource$InvalidResponseCodeException.responseCode:I
+      28: sipush        404
+      31: if_icmpeq     74
+      34: aload_2
+      35: getfield      #66                 // Field androidx/media3/datasource/HttpDataSource$InvalidResponseCodeException.responseCode:I
+      38: sipush        410
+      41: if_icmpeq     74
+      44: aload_2
+      45: getfield      #66                 // Field androidx/media3/datasource/HttpDataSource$InvalidResponseCodeException.responseCode:I
+      48: sipush        416
+      51: if_icmpeq     74
+      54: aload_2
+      55: getfield      #66                 // Field androidx/media3/datasource/HttpDataSource$InvalidResponseCodeException.responseCode:I
+      58: sipush        500
+      61: if_icmpeq     74
+      64: aload_2
+      65: getfield      #66                 // Field androidx/media3/datasource/HttpDataSource$InvalidResponseCodeException.responseCode:I
+      68: sipush        503
+      71: if_icmpne     78
+      74: iconst_1
+      75: goto          79
+      78: iconst_0
+      79: ireturn
+
+  private boolean isAnyCauseNonRetriable(java.lang.Throwable);
+    Code:
+       0: aload_1
+       1: ifnull        22
+       4: aload_0
+       5: aload_1
+       6: invokespecial #69                 // Method isNonRetriableException:(Ljava/lang/Throwable;)Z
+       9: ifeq          14
+      12: iconst_1
+      13: ireturn
+      14: aload_1
+      15: invokevirtual #72                 // Method java/lang/Throwable.getCause:()Ljava/lang/Throwable;
+      18: astore_1
+      19: goto          0
+      22: iconst_0
+      23: ireturn
+
+  private boolean isNonRetriableException(java.lang.Throwable);
+    Code:
+       0: aload_1
+       1: instanceof    #78                 // class androidx/media3/common/ParserException
+       4: ifne          48
+       7: aload_1
+       8: instanceof    #80                 // class java/io/FileNotFoundException
+      11: ifne          48
+      14: aload_1
+      15: instanceof    #82                 // class androidx/media3/datasource/HttpDataSource$CleartextNotPermittedException
+      18: ifne          48
+      21: aload_1
+      22: instanceof    #84                 // class androidx/media3/exoplayer/upstream/Loader$UnexpectedLoaderException
+      25: ifne          48
+      28: aload_1
+      29: instanceof    #86                 // class androidx/media3/datasource/DataSourceException
+      32: ifeq          52
+      35: aload_1
+      36: checkcast     #86                 // class androidx/media3/datasource/DataSourceException
+      39: getfield      #88                 // Field androidx/media3/datasource/DataSourceException.reason:I
+      42: sipush        2008
+      45: if_icmpne     52
+      48: iconst_1
+      49: goto          53
+      52: iconst_0
+      53: ireturn
+}

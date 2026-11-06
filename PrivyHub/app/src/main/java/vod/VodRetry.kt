@@ -13,6 +13,12 @@ import java.security.MessageDigest
  * to the host (`vod_error` / `vod_retry` / `vod_resumed` / `vod_gave_up`); no title, path or URL in any row.
  *
  * Pure Kotlin (no Android type) so the JVM tests drive it with a fake clock, scheduler and player.
+ *
+ * B43 (inside the same flag): each error carries a `reason` (`reset` / `refused` / `timeout` / `401` / `403`). A
+ * refusal (401 / 403) is not a lost hub: the media token is refetched ([VodRetryController.Token]) before the attempt
+ * (a companion restart ends the hub's sessions; the onn's cached token is then refused), and three refusals in a row,
+ * each after a refetch, end the episode as `refused` -- never "connection lost". The Retry button refetches too.
+ * Design: `docs/memory/evidence/b43_2026-11-06/design_written_before_code.md`.
  */
 object VodRetryFlag {
     const val PROPERTY = "debug.privyhub.vod_retry"
@@ -43,6 +49,26 @@ class VodRetryPolicy(
         val RETRYABLE = setOf(1003, 2000, 2001, 2002, 2004)
 
         fun isRetryable(code: Int): Boolean = code in RETRYABLE
+
+        // B43: the reasons, and three refusals in a row (each after a refetch) end an episode as `refused`
+        const val REASON_RESET = "reset"
+        const val REASON_REFUSED = "refused"
+        const val REASON_TIMEOUT = "timeout"
+        const val REASON_401 = "401"
+        const val REASON_403 = "403"
+        const val REFUSALS_MAX = 3
+
+        /** B43: the reason from what the Android side read in the error's cause chain. */
+        fun reasonOf(code: Int, httpStatus: Int?, connectRefused: Boolean, timedOut: Boolean): String =
+            when {
+                httpStatus == 401 -> REASON_401
+                httpStatus == 403 -> REASON_403
+                timedOut || code == 1003 || code == 2002 -> REASON_TIMEOUT
+                connectRefused -> REASON_REFUSED
+                else -> REASON_RESET
+            }
+
+        fun isRefusal(reason: String): Boolean = reason == REASON_401 || reason == REASON_403
     }
 }
 
@@ -54,6 +80,8 @@ class VodRetryController(
     private val rows: (Map<String, Any>) -> Unit,
     private val ui: Ui,
     sourceId: String,
+    // B43: the media token's refetch (null = B35's behaviour: a refusal retried like a reset)
+    private val token: Token? = null,
 ) {
     interface Player {
         /** Reconnect and resume at [positionMs] (Media3: seekTo, prepare, playWhenReady). */
@@ -69,6 +97,14 @@ class VodRetryController(
         fun showMark(attempt: Int)
         fun hideMark()
         fun offerRetry()
+
+        /** B43: the give-up's kind (`lost` / `refused`) for the message; B35's Ui keeps its one method. */
+        fun offerRetry(kind: String) = offerRetry()
+    }
+
+    /** B43: drop the cached media token and set up afresh (off the main thread); [done] on the main thread. */
+    interface Token {
+        fun refresh(done: (Boolean) -> Unit)
     }
 
     val media: String = opaqueId(sourceId)
@@ -80,52 +116,104 @@ class VodRetryController(
     private var lastName = ""
     private var gaveUp = false
     private var cancelled = false
+    private var lastReason = VodRetryPolicy.REASON_RESET
+    private var refetched = false
+    private var refusalsAfterRefetch = 0
+    private var gaveUpKind = KIND_LOST
 
     val retrying: Boolean get() = firstErrorAtMs >= 0 && !gaveUp
 
     /** True = handled (an attempt is scheduled); false = today's error path runs now. */
-    fun onError(code: Int, codeName: String, currentPositionMs: Long): Boolean {
+    fun onError(code: Int, codeName: String, currentPositionMs: Long): Boolean =
+        onError(code, codeName, currentPositionMs, VodRetryPolicy.REASON_RESET)
+
+    /** B43: [reason] from [VodRetryPolicy.reasonOf]; a refusal refetches the token before its attempt. */
+    fun onError(code: Int, codeName: String, currentPositionMs: Long, reason: String): Boolean {
         if (cancelled || !VodRetryPolicy.isRetryable(code)) {
             return false
         }
         val now = clock()
         lastCode = code
         lastName = codeName
+        lastReason = reason
         if (firstErrorAtMs < 0 || gaveUp) {
             firstErrorAtMs = now
             positionMs = currentPositionMs.coerceAtLeast(0L)
             attempts = 0
             gaveUp = false
-            rows(row("vod_error") + mapOf("error_code" to code, "error_name" to codeName))
+            refetched = false
+            refusalsAfterRefetch = 0
+            rows(row("vod_error") + mapOf("error_code" to code, "error_name" to codeName) + why(reason))
+        }
+        val refusal = token != null && VodRetryPolicy.isRefusal(reason)
+        if (refusal && refetched) {
+            refusalsAfterRefetch++
+        } else if (!VodRetryPolicy.isRefusal(reason)) {
+            refusalsAfterRefetch = 0
         }
         val next = attempts + 1
         val delay = policy.delayBefore(next)
         val elapsed = now - firstErrorAtMs
+        if (refusal && refusalsAfterRefetch >= VodRetryPolicy.REFUSALS_MAX) {
+            return giveUp(code, codeName, elapsed, reason, KIND_REFUSED)
+        }
         if (elapsed + delay > policy.boundMs) {
-            gaveUp = true
-            scheduler.cancel()
-            ui.hideMark()
-            rows(row("vod_gave_up") + mapOf("attempts" to attempts, "elapsed_ms" to elapsed,
-                "error_code" to code, "error_name" to codeName))
-            return false
+            return giveUp(code, codeName, elapsed, reason,
+                if (VodRetryPolicy.isRefusal(reason)) KIND_REFUSED else KIND_LOST)
         }
         attempts = next
-        rows(row("vod_retry") + mapOf("attempt" to next, "delay_ms" to delay, "elapsed_ms" to elapsed,
-            "error_code" to code, "error_name" to codeName))
         ui.showMark(next)
         scheduler.cancel()
-        scheduler.schedule(delay) {
-            if (!cancelled && retrying) {
-                player.retryAt(positionMs)
+        val base = row("vod_retry") + mapOf("attempt" to next, "delay_ms" to delay, "elapsed_ms" to elapsed,
+            "error_code" to code, "error_name" to codeName) + why(reason)
+        if (!refusal) {
+            rows(base)
+            scheduler.schedule(delay) {
+                if (!cancelled && retrying) {
+                    player.retryAt(positionMs)
+                }
+            }
+            return true
+        }
+        // B43: a refusal -- the token refetched first, the row says whether it worked, then the attempt
+        val episode = firstErrorAtMs
+        token!!.refresh { ok ->
+            if (cancelled || !retrying || firstErrorAtMs != episode) {
+                return@refresh
+            }
+            refetched = true
+            // a fresh token fixes the cause: the attempt at once; a failed refetch (the hub still down) keeps the backoff
+            val wait = if (ok) 0L else delay
+            rows(base + mapOf("delay_ms" to wait, "token_refetched" to ok))
+            scheduler.cancel()
+            scheduler.schedule(wait) {
+                if (!cancelled && retrying) {
+                    player.retryAt(positionMs)
+                }
             }
         }
         return true
     }
 
+    private fun giveUp(code: Int, codeName: String, elapsed: Long, reason: String, kind: String): Boolean {
+        gaveUp = true
+        gaveUpKind = kind
+        scheduler.cancel()
+        ui.hideMark()
+        rows(row("vod_gave_up") + mapOf("attempts" to attempts, "elapsed_ms" to elapsed,
+            "error_code" to code, "error_name" to codeName) + why(reason) +
+            (if (token != null) mapOf("kind" to kind) else emptyMap()))
+        return false
+    }
+
+    /** B43: the reason key, only with the token port (B35's rows as built without it). */
+    private fun why(reason: String): Map<String, Any> =
+        if (token != null) mapOf("reason" to reason) else emptyMap()
+
     /** After today's error branch ran: past the bound, offer Retry (new, flag only). */
     fun afterTodaysError() {
         if (gaveUp && !cancelled) {
-            ui.offerRetry()
+            if (token != null) ui.offerRetry(gaveUpKind) else ui.offerRetry()
         }
     }
 
@@ -138,6 +226,8 @@ class VodRetryController(
         ui.hideMark()
         firstErrorAtMs = -1L
         attempts = 0
+        refetched = false
+        refusalsAfterRefetch = 0
     }
 
     /** The Retry button: a new episode at the saved position, the first attempt at once. */
@@ -148,10 +238,26 @@ class VodRetryController(
         firstErrorAtMs = clock()
         attempts = 1
         gaveUp = false
-        rows(row("vod_retry") + mapOf("attempt" to 1, "delay_ms" to 0L, "elapsed_ms" to 0L,
-            "error_code" to lastCode, "error_name" to lastName))
+        refusalsAfterRefetch = 0
+        val base = row("vod_retry") + mapOf("attempt" to 1, "delay_ms" to 0L, "elapsed_ms" to 0L,
+            "error_code" to lastCode, "error_name" to lastName) + why(lastReason)
         ui.showMark(1)
-        player.retryAt(positionMs)
+        val t = token
+        if (t == null) {
+            rows(base)
+            player.retryAt(positionMs)
+            return
+        }
+        // B43: the Retry button refetches the token first (HOME-2: it reused the dead one)
+        val episode = firstErrorAtMs
+        t.refresh { ok ->
+            if (cancelled || firstErrorAtMs != episode) {
+                return@refresh
+            }
+            refetched = true
+            rows(base + mapOf("token_refetched" to ok))
+            player.retryAt(positionMs)
+        }
     }
 
     fun cancel() {
@@ -164,6 +270,9 @@ class VodRetryController(
         mapOf("event" to event, "media" to media, "position_ms" to positionMs, "bound_ms" to policy.boundMs)
 
     companion object {
+        const val KIND_LOST = "lost"
+        const val KIND_REFUSED = "refused"
+
         fun opaqueId(sourceId: String): String =
             MessageDigest.getInstance("SHA-256")
                 .digest(("privyhub-vod-source:" + sourceId).toByteArray(Charsets.UTF_8))

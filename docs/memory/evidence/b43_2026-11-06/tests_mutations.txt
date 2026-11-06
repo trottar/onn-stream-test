@@ -1,0 +1,21 @@
+B43 mutations, 2026-11-06T18:04:57Z, each in its own copy under /tmp/b_q06n_b43_scratch (the B43 copy untouched)
+== H1: the refusal window never refuses (changed lines: 1)
+FAIL: test_a_loader_retrying_through_the_window_is_reset_every_time_then_served (test_vod_drop_refuse.Refusal.test_a_loader_retrying_through_the_window_is_reset_every_time_then_served)
+FAIL: test_drop_seconds_resets_the_stream_then_refuses_new_vod_requests_for_the_window (test_vod_drop_refuse.Refusal.test_drop_seconds_resets_the_stream_then_refuses_new_vod_requests_for_the_window)
+Ran 21 tests in 10.245s
+FAILED (failures=2)
+== H2: the whole file read, its drop lines only (an old drop line applies)
+FAIL: test_refuse_seconds (test_vod_drop_refuse.Parse.test_refuse_seconds)
+FAIL: test_a_new_trigger_inside_a_window_closes_it_first (test_vod_drop_refuse.Refusal.test_a_new_trigger_inside_a_window_closes_it_first)
+FAIL: test_only_the_appended_bytes_are_read_an_old_drop_line_never_applies (test_vod_drop_refuse.Refusal.test_only_the_appended_bytes_are_read_an_old_drop_line_never_applies)
+Ran 21 tests in 12.147s
+FAILED (failures=3)
+== C1: a refusal retried like a reset (no refetch) (changed lines: 1)
+gradle exit 1
+   FAIL aRefusalThatPersistsAfterTheRefetchIsRefusedNeverLost java.lang.AssertionError
+   FAIL aCompanionRestartWithTheMovieOpenTheTokenRefetchedThenResumedAtThePosition org.junit.ComparisonFailure: expected:<vod_[resumed]> but was:<vod_[gave_up]>
+TOTAL 203, failures+errors 2
+== C2: every give-up named lost (changed lines: 2)
+gradle exit 1
+   FAIL aRefusalThatPersistsAfterTheRefetchIsRefusedNeverLost org.junit.ComparisonFailure: expected:<[refused]> but was:<[lost]>
+TOTAL 203, failures+errors 1

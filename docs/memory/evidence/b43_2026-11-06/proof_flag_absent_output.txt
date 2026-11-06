@@ -1,0 +1,15 @@
+OK   companion/range_server.py byte-equal to the base
+OK   PrivyHub/app/src/main/java/identity/IdentitySession.kt byte-equal to the base
+OK   PrivyHub/app/src/main/java/identity/AndroidIdentity.kt byte-equal to the base
+OK   PrivyHub/app/src/main/java/identity/MediaDataSource.kt byte-equal to the base
+OK   MainActivity: one change -- `{ player }` gains a comma, two lines follow it; nothing else
+     old: ['{ player }']  new: ['{ player },', '// B43: the host the media token is refetched for', '{ getCompanionHost() }']
+OK   MainActivity: the insertion sits inside `if (VodRetryController.wanted(VodRetryFlag.read(), isLive)) { … }`
+OK   VodRetryFlag (the property's parse) unchanged
+OK   VodRetryController.wanted unchanged (no controller without the flag)
+OK   vod_log: the only new / changed top-level nodes are CLIENT_REASONS, CLIENT_KINDS and class ClientLog
+OK   fresh process (no line): vod_drop_test not imported, VOD_DROP_TEST None
+OK   fresh process {'PRIVYHUB_VOD_DROP_TEST': ''}: vod_drop_test not imported, VOD_DROP_TEST None
+OK   fresh process {'PRIVYHUB_VOD_DROP_TEST': '0'}: vod_drop_test not imported, VOD_DROP_TEST None
+OK   fresh process {'PRIVYHUB_VOD_DROP_TEST': 'yes'}: vod_drop_test not imported, VOD_DROP_TEST None
+PROVEN

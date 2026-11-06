@@ -480,6 +480,27 @@ class NativeStreamActivity :
             ).apply { gravity = Gravity.BOTTOM or Gravity.START; setMargins(24, 24, 24, 24) })
         }
 
+        // B41: the prompt line and the badge above it, bottom-centre over the picture (null = today: no views)
+        if (playerPrompt != null) {
+            fun line(size: Float) = TextView(this).apply {
+                setTextColor(Color.WHITE)
+                setBackgroundColor(0xCC000000.toInt())
+                textSize = size
+                setPadding(24, 12, 24, 12)
+                visibility = View.GONE
+            }
+            promptView = line(18f).also { v ->
+                root.addView(v, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT
+                ).apply { gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL; setMargins(24, 24, 24, 48) })
+            }
+            promptBadgeView = line(22f).also { v ->
+                root.addView(v, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT
+                ).apply { gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL; setMargins(24, 24, 24, 130) })
+            }
+        }
+
         setContentView(
             root
         )
@@ -499,6 +520,8 @@ class NativeStreamActivity :
         uiHandler.post(
             metricsTick
         )
+        // B41: the prompt's tick (null = today: none)
+        if (playerPrompt != null) uiHandler.post(promptTick)
     }
 
     override fun surfaceCreated(
@@ -600,6 +623,8 @@ class NativeStreamActivity :
         uiHandler.removeCallbacks(
             metricsTick
         )
+        // B41: the prompt's tick (null = today)
+        if (playerPrompt != null) uiHandler.removeCallbacks(promptTick)
 
         // B32: a hold open at the end: today's stop path follows (null = today)
         surfaceHold?.let { h ->
@@ -736,6 +761,8 @@ class NativeStreamActivity :
             ).also {
                 // B34: stable slots, gamepads only (null = today)
                 padSlots?.let { s -> it.padSlots = s; it.connectedPads = { AndroidPadDevice.connected() } }
+                // B41: the prompt over the slots (null = today)
+                playerPrompt?.let { p -> it.playerPrompt = p }
                 it.start()
             }
         // B7: the stall signal on the controller socket (null = today)
@@ -828,7 +855,9 @@ class NativeStreamActivity :
                     httpPost(
                         "http://$host:$CONTROL_PORT" +
                             "/plugins/games/native-stream-start" +
-                            "?port=$VIDEO_PORT" + (if (restart != null) "&guard_end=1" else "") + padSlotsQuery(),
+                            "?port=$VIDEO_PORT" + (if (restart != null) "&guard_end=1" else "") + padSlotsQuery() +
+                            // B41: the prompt asks for the title's players and sends its claims (null = today: nothing)
+                            (if (playerPrompt != null) "&player_prompt=1" + promptClaimsQuery() else ""),
                         readTimeoutMs =
                             30_000
                     )
@@ -886,6 +915,9 @@ class NativeStreamActivity :
                         1_000L,
                         10_000L
                     )
+
+                // B41: the title's player count (an old host: no key, 2) (null = today)
+                playerPrompt?.setPlayers(json.optInt("players", PlayerPrompt.DEFAULT_PLAYERS), AndroidPadDevice.connected())
 
                 // B16: the host's fast ready, only with PRIVYHUB_STALL_RESUME=1 (absent key = today's gate)
                 if (json.optJSONObject(FastReadyHint.KEY)?.optBoolean(FastReadyHint.FIELD, false) == true) {
@@ -2406,6 +2438,11 @@ class NativeStreamActivity :
             root.put("pad_slots_mode", "stable")
             root.put("pad_slots", s.toJson())
         }
+        // B41: the prompt's claims and the title's players (null = today: no key)
+        playerPrompt?.let { p ->
+            root.put("players", p.players)
+            root.put("pad_claims", p.claimsJson())
+        }
 
         // B16: the fast ready's releases (null = today: no key)
         fastReady?.let { f ->
@@ -2561,9 +2598,33 @@ class NativeStreamActivity :
     private val restartGuard: RestartGuard? by lazy { if (RestartGuardFlag.fromSystem()) RestartGuard() else null }
 
     // B34: stable player slots, gamepads only, with debug.privyhub.pad_slots=stable (null = today); one per process
-    private val padSlots: PadSlots? by lazy { if (PadSlotsFlag.fromSystem()) PadSlotsProcess.slots else null }
+    // B41: the player prompt implies stable slots under it
+    private val padSlots: PadSlots? by lazy {
+        if (PadSlotsFlag.fromSystem() || PlayerPromptFlag.fromSystem()) PadSlotsProcess.slots else null
+    }
     private fun padSlotsQuery(): String =
         padSlots?.let { "&pad_slots=" + URLEncoder.encode(it.mapString(), "UTF-8") } ?: ""
+
+    // B41: the player prompt, with debug.privyhub.player_prompt=1 (null = today)
+    private val playerPrompt: PlayerPrompt? by lazy {
+        if (PlayerPromptFlag.fromSystem()) padSlots?.let { PlayerPrompt(it) } else null
+    }
+    private var promptView: TextView? = null
+    private var promptBadgeView: TextView? = null
+    private fun promptClaimsQuery(): String =
+        playerPrompt?.let { "&pad_claims=" + URLEncoder.encode(it.claimsString(), "UTF-8") } ?: ""
+    private val promptTick = object : Runnable {
+        override fun run() {
+            playerPrompt?.let { p ->
+                val now = System.nanoTime() / 1_000_000L
+                p.tick(now)
+                val v = p.view(now, AndroidPadDevice.connected())
+                promptView?.let { t -> t.text = v.prompt ?: ""; t.visibility = if (v.prompt != null) View.VISIBLE else View.GONE }
+                promptBadgeView?.let { t -> t.text = v.badge ?: ""; t.visibility = if (v.badge != null) View.VISIBLE else View.GONE }
+                uiHandler.postDelayed(this, 200)
+            }
+        }
+    }
 
     // B11: the old session's report and stop, posted at a self-restart (the guard's transport)
     private fun postRestartReport(host: String, report: String) {
@@ -2784,6 +2845,8 @@ class NativeStreamActivity :
                 (surfaceHold?.query() ?: "") +
                 // B34: the slot map (null = today: nothing)
                 padSlotsQuery() +
+                // B41: the prompt's claims (null = today: nothing)
+                promptClaimsQuery() +
                 // D-BASE-T1: the onn's own thermal state travels with the
                 // heartbeat, so a session that never posts a report still
                 // leaves a temperature trace on the host.

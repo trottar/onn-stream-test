@@ -15,6 +15,11 @@ B38: such a client also turns on the controller bridge's changed-only counter (`
 `updates_by_player` is then the per-slot count of reports whose state changed (a press, a stick or trigger move), and
 `packets_by_player` today's per-packet count -- the sender sends all four players every tick (CTRL-L1), so only the
 changes say which pad was used. Design: `docs/memory/evidence/b38_2026-11-02/design_written_before_code.md`.
+
+B41: a client with `debug.privyhub.player_prompt=1` also sends `pad_claims=<slot:p|s,...>` (p = claimed at the prompt,
+s = kept from the stable map); each slot entry of the rows then carries `claimed_by` (`prompt` / `stable`). No key
+(`claims=None`) = the rows above byte for byte; a malformed value adds nothing. Design:
+`docs/memory/evidence/b41_2026-11-06/design_written_before_code.md`.
 """
 
 from __future__ import annotations
@@ -24,6 +29,31 @@ from typing import Any
 
 FIELD = "pad_slots"
 _ENTRY = re.compile(r"^([0-3]):([0-9a-f]{6}):([a-z0-9]{2,12})$")
+_CLAIM = re.compile(r"^([0-3]):([ps])$")
+
+
+def parse_claims(raw: str) -> dict[int, str] | None:
+    """B41: {slot: "prompt" | "stable"}; {} for an empty value; None when malformed."""
+    raw = (raw or "").strip()
+    if not raw:
+        return {}
+    out: dict[int, str] = {}
+    for p in raw.split(",")[:5]:
+        m = _CLAIM.match(p)
+        if not m:
+            return None
+        out[int(m.group(1))] = "prompt" if m.group(2) == "p" else "stable"
+    return out
+
+
+def with_claims(slots: list[dict[str, Any]] | None, claims: str | None) -> list[dict[str, Any]] | None:
+    """B41: the entries with `claimed_by` from the client's claims; unchanged with no key or a malformed one."""
+    if slots is None or claims is None:
+        return slots
+    parsed = parse_claims(claims)
+    if parsed is None:
+        return slots
+    return [({**e, "claimed_by": parsed[e["slot"]]} if e["slot"] in parsed else e) for e in slots]
 
 
 def parse(raw: str) -> list[dict[str, Any]] | None:
@@ -61,16 +91,17 @@ class SlotsLog:
         fields.update(extra)
         recovery._log("pad_slots", **fields)
 
-    def start(self, recovery: Any, raw: str) -> list[dict[str, Any]] | None:
-        slots = parse(raw)
+    def start(self, recovery: Any, raw: str, claims: str | None = None) -> list[dict[str, Any]] | None:
+        slots = with_claims(parse(raw), claims)
         self._row(recovery, "start", slots)
         if slots is not None:
             self.last = slots
         return slots
 
-    def heartbeat(self, recovery: Any, raw: str, values: dict[str, Any], updates_by_player: Any = None) -> None:
+    def heartbeat(self, recovery: Any, raw: str, values: dict[str, Any], updates_by_player: Any = None,
+                  claims: str | None = None) -> None:
         """One heartbeat's key: the row's fields, and a change row when the map moved."""
-        slots = parse(raw)
+        slots = with_claims(parse(raw), claims)
         if slots is None:
             values["pad_slots_bad"] = True
             return

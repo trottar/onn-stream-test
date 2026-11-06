@@ -1,0 +1,12 @@
+APK (B5 ... B25 + B32 + B34 + B35 + B38 + B39 + B41 + B42 + B43; B27 / B29 reversed out), built 2026-11-06T18:32:38Z in /tmp/b_q06n_apk/PrivyHub; NOT installed
+8ba4d996a96c14d01b1e368c20e656f767062d34b17b9308d984b8c43834605f  /tmp/b_q06n_scratch/apk/app-debug.apk
+size 9689568 B
+build: :app:testDebugUnitTest :app:assembleDebug --rerun-tasks --offline --no-configuration-cache (JVM 208/208: the merged tree's 219 less B27's 4 and B29's 7)
+rebuild (--rerun-tasks :app:assembleDebug) sha256 the same: yes
+the base: the tree at 795d80d4 with b29.diff then b27.diff reversed (client sources byte-equal to 0132b944's build copy), then queue N's combined diff
+the CONFIRMED one on the onn (PrivyHub/app/build/home2_installed/app-debug.apk): 0132b94430d40e4e5ae78d2679fbee085f4f44273a804bc0ce8dcd040bdae24f
+apksigner verify (new): OK
+signer certificate digest lines equal to the CONFIRMED one's (compared, not printed): yes
+against the CONFIRMED: entries new 945 old 945 ; only in new [] ; only in old []
+entries that differ (outside META-INF): [('classes3.dex', 446684, 469100), ('classes5.dex', 26908, 35896), ('classes6.dex', 618428, 618860)]
+pinned copy (ignored build dir, never installed): PrivyHub/app/build/queue_n_built/app-debug.apk, sha256 8ba4d996a96c14d01b1e368c20e656f767062d34b17b9308d984b8c43834605f

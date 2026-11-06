@@ -5,6 +5,7 @@ import java.net.URLEncoder
 /**
  * B32: the stream survives a brief loss of the screen, behind the system property `debug.privyhub.surface_hold`
  * (CL-B7P's convention; a reboot clears it). **Absent / empty / `0` / junk = today: no object.**
+ * B42 (G-A11, 2026-11-06): **on by default** -- absent / empty / junk = the 12-s bound; `0` / `off` = B32's absent.
  *
  * TRIP-R2 §1: six self-restarts in an evening, each `trigger: surface` -- Android took the stream activity out of the
  * foreground for 1-9 s, the surface went, the same instance came back and started a new stream (a new host session,
@@ -21,21 +22,22 @@ object SurfaceHoldFlag {
     const val MIN_BOUND_MS = 10_000L
     const val MAX_BOUND_MS = 30_000L
 
-    /** `1` = the default bound; an integer in range = that bound; anything else (absent included) = off (null). */
+    // B42: on unless `0` / `off` (the user's G-A11 "yes", 2026-11-06, after HOME-2 C1'): absent / empty / junk = the
+    // default bound; an integer in range = that bound; `0` / `off` = off (null), B32's absent.
     fun parse(value: String?): Long? {
-        val v = value?.trim() ?: return null
-        if (v == "1") return DEFAULT_BOUND_MS
-        val n = v.toLongOrNull() ?: return null
-        return if (n in MIN_BOUND_MS..MAX_BOUND_MS) n else null
+        val v = value?.trim() ?: return DEFAULT_BOUND_MS
+        if (v == "0" || v == "off") return null
+        val n = v.toLongOrNull() ?: return DEFAULT_BOUND_MS
+        return if (n in MIN_BOUND_MS..MAX_BOUND_MS) n else DEFAULT_BOUND_MS
     }
 
-    /** The property, read through reflection; a failed read is absent, so off. */
+    /** The property, read through reflection; a failed read is absent, so on (B42). */
     fun fromSystem(): Long? =
         try {
             val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
             parse(get.invoke(null, PROPERTY) as? String)
         } catch (_: Throwable) {
-            null
+            parse(null)
         }
 }
 

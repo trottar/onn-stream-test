@@ -15449,7 +15449,9 @@ private fun requestGameStateAction(
                     playerView,
                     sourceId,
                     { "http://${getCompanionHost()}:$CONTROL_PORT/diagnostics/vod-client" },
-                    { player }
+                    { player },
+                    // B43: the host the media token is refetched for
+                    { getCompanionHost() }
                 )
             } else {
                 null

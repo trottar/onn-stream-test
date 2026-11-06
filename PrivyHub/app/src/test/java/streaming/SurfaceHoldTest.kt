@@ -177,16 +177,17 @@ class SurfaceHoldTest {
 
     @Test
     fun theFlagIsOffUnlessOneOrABoundInRange() {
-        assertNull(SurfaceHoldFlag.parse(null))
-        assertNull(SurfaceHoldFlag.parse(""))
+        // B42 (disclosed): absent / empty / junk moved to ON (the default bound); `0` off as before
+        assertEquals(12_000L, SurfaceHoldFlag.parse(null))
+        assertEquals(12_000L, SurfaceHoldFlag.parse(""))
         assertNull(SurfaceHoldFlag.parse("0"))
-        assertNull(SurfaceHoldFlag.parse("yes"))
-        assertNull(SurfaceHoldFlag.parse("9999"))
-        assertNull(SurfaceHoldFlag.parse("30001"))
+        assertEquals(12_000L, SurfaceHoldFlag.parse("yes"))
+        assertEquals(12_000L, SurfaceHoldFlag.parse("9999"))
+        assertEquals(12_000L, SurfaceHoldFlag.parse("30001"))
         assertEquals(12_000L, SurfaceHoldFlag.parse("1"))
         assertEquals(12_000L, SurfaceHoldFlag.parse(" 1 "))
         assertEquals(20_000L, SurfaceHoldFlag.parse("20000"))
-        assertNull(SurfaceHoldFlag.fromSystem())   // no SystemProperties on the JVM: off
+        assertEquals(12_000L, SurfaceHoldFlag.fromSystem())   // B42: no SystemProperties on the JVM: absent, so on
     }
 
     // --- the 3-s loss: one session -----------------------------------------------------------------------------------

@@ -2245,6 +2245,21 @@ moved, every property empty; nothing adopted** (`docs/memory/evidence/HOME_2_HOL
 - C5': B40's reset (`dropped: 1`, twice) absorbed by the player's own reconnect; B35 never reached.
 - Next: the user's G-A11 / G-A12; C5' to B before G-A13.
 
+**Queue N (2026-11-06), the user's decisions (G-A11 yes, G-A12 yes, the player prompt, H0 next): B41-B45 built /
+written, nothing adopted, no live run; APK (B5 … B25 + B32 + B34 + B35 + B38 + B39 + B41 + B42 + B43; B27 / B29 out)
+pinned, NOT installed** (`docs/memory/handoffs/SESSION_B_DONE_2026-11-06N.md`).
+- **B41:** "Player N — press any button" up to the title's count (`debug.privyhub.player_prompt=1`, opt-in); the host's
+  `players` in the start response; `claimed_by` on the slot rows.
+- **B42:** G-A11 / G-A12 as client defaults (`surface_hold` / `pad_slots` absent = on; `0` / `off` off).
+- **B43:** the movie retry refetches the token on a refusal and survives a companion restart; B40's `drop <seconds>`
+  refusal window for the bench.
+- **B44:** the G9 checkpoint draft, `docs/memory/handoffs/G9_CHECKPOINT_DRAFT_2026-11-06.md` (9 met / 3 deferred / 2
+  open), for A to apply after HOME-3.
+- **B45:** the H0 import contract designed, `docs/memory/architecture/H0_IMPORT_CONTRACT_DESIGN_2026-11-06.md`; slice 1a
+  (PS1 dry run and manifest) is the next queue's.
+- Next: HOME-3 (C1'' / C4'' with no property, C6 the prompt, C5'' `drop 45` and the restart), then G-A13 and the
+  prompt's default, then the G9 checkpoint.
+
 ## G9 — Remote foundation checkpoint
 
 Acceptance:

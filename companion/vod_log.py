@@ -37,6 +37,9 @@ CLIENT_EVENTS = ("vod_error", "vod_retry", "vod_resumed", "vod_gave_up")
 CLIENT_INT_FIELDS = ("attempt", "position_ms", "error_code", "delay_ms", "elapsed_ms", "bound_ms", "attempts")
 _HEX12 = re.compile(r"^[0-9a-f]{12}$")
 _CODE_NAME = re.compile(r"^[A-Z0-9_]{1,64}$")
+# B43: the retry's reason / give-up kind / token refetch (a B35 client sends none of them: its rows as today)
+CLIENT_REASONS = ("reset", "refused", "timeout", "401", "403")
+CLIENT_KINDS = ("lost", "refused")
 
 
 def enabled(environ: Mapping[str, str]) -> bool:
@@ -217,6 +220,18 @@ class ClientLog:
             elif key == "error_name":
                 if not isinstance(value, str) or not _CODE_NAME.match(value):
                     raise ValueError("vod-client: error_name not a code name")
+                row[key] = value
+            elif key == "reason":
+                if value not in CLIENT_REASONS:
+                    raise ValueError("vod-client: reason unknown")
+                row[key] = value
+            elif key == "kind":
+                if value not in CLIENT_KINDS:
+                    raise ValueError("vod-client: kind unknown")
+                row[key] = value
+            elif key == "token_refetched":
+                if not isinstance(value, bool):
+                    raise ValueError("vod-client: token_refetched not a bool")
                 row[key] = value
             else:
                 raise ValueError("vod-client: unknown field")

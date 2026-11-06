@@ -99,6 +99,10 @@ class NativeControllerSender(
     var padSlots: PadSlots? = null
     var connectedPads: () -> List<PadDevice> = { emptyList() }
 
+    // B41: the player prompt over the stable slots (debug.privyhub.player_prompt=1 via the activity; null = today)
+    @Volatile
+    var playerPrompt: PlayerPrompt? = null
+
     @Volatile
     private var running =
         false
@@ -121,7 +125,9 @@ class NativeControllerSender(
         }
 
         // B34: the connected pads keep or take their slots (null = today)
-        padSlots?.beginStart(connectedPads())
+        // B41: with the prompt, no pre-assignment: the first press claims (null = B34's line)
+        val prompt = playerPrompt
+        if (prompt != null) prompt.beginStart(connectedPads()) else padSlots?.beginStart(connectedPads())
 
         running = true
 
@@ -213,8 +219,13 @@ class NativeControllerSender(
             return false
         }
 
+        // B41: the prompt claims on a face button / Start (null = today's line)
+        val prompt = playerPrompt
         val player =
-            playerForDevice(device)
+            (if (prompt != null) prompt.slotForKey(
+                AndroidPadDevice(device), event.keyCode, event.action == KeyEvent.ACTION_DOWN,
+                System.nanoTime() / 1_000_000L, connectedPads
+            ) else playerForDevice(device))
                 ?: return false
 
         synchronized(lock) {
@@ -287,8 +298,10 @@ class NativeControllerSender(
             return false
         }
 
+        // B41: a stick never claims (null = today's line)
+        val prompt = playerPrompt
         val player =
-            playerForDevice(device)
+            (if (prompt != null) prompt.slotForMotion(AndroidPadDevice(device), connectedPads) else playerForDevice(device))
                 ?: return false
 
         val lx =

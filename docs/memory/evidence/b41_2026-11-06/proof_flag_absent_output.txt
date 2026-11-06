@@ -1,0 +1,23 @@
+== PrivyHub/app/src/main/java/streaming/PadSlots.kt: pure insertion: five methods no B34 / B38 path calls
+   added hunks: 1, lines: 28, removed lines: 0
+== PrivyHub/app/src/main/java/streaming/NativeControllerSender.kt: the prompt's field; two lookups and the start line take today's branch when playerPrompt is null
+   removed OK: padSlots?.beginStart(connectedPads())  ->  if (prompt != null) prompt.beginStart(...) else padSlots?.beginStart(connectedPads())  -- prompt null: today's
+   removed OK: playerForDevice(device)  ->  (if (prompt != null) prompt.slotFor...(...) else playerForDevice(device))  -- prompt null: today's (key and motion)
+   removed OK: playerForDevice(device)  ->  (if (prompt != null) prompt.slotFor...(...) else playerForDevice(device))  -- prompt null: today's (key and motion)
+   added hunks: 6, lines: 16, removed lines: 3
+== PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt: every hunk guarded by playerPrompt (null without the property); the slot object's line ORs a false flag
+   removed OK: "?port=$VIDEO_PORT" + (if (restart != null) "&guard_end=1" else "") + padSlotsQuery(),  ->  the same + (if (playerPrompt != null) ... else "")  -- "" without the property: today's
+   removed OK: private val padSlots: PadSlots? by lazy { if (PadSlotsFlag.fromSystem()) PadSlotsProcess.s  ->  PadSlotsFlag.fromSystem() || PlayerPromptFlag.fromSystem()  -- the second false without the property: today's
+   added hunks: 10, lines: 65, removed lines: 2
+== companion/plugins/games.py: the players block under player_prompt=1; the claims kwarg None without pad_claims
+   removed OK: _pad_slots.updates_by_player(self._native_stream._session_io.controller))  ->  the same + claims=(None without pad_claims)  -- today's row
+   removed OK: self._pad_slots_log.start(self._recovery, self._first(query, "pad_slots"))  ->  the same + claims=(None without pad_claims)  -- with_claims(x, None) is x: today's row
+   added hunks: 3, lines: 10, removed lines: 2
+== companion/pad_slots.py: with_claims(slots, None) returns slots unchanged; claims defaults to None
+   removed OK: def start(self, recovery: Any, raw: str) -> list[dict[str, Any]] | None:  ->  + claims: str | None = None  -- default None
+   removed OK: slots = parse(raw)  ->  with_claims(parse(raw), claims)  -- claims None: parse(raw) itself
+   removed OK: def heartbeat(self, recovery: Any, raw: str, values: dict[str, Any], updates_by_player: An  ->  + claims: str | None = None  -- default None
+   removed OK: slots = parse(raw)  ->  with_claims(parse(raw), claims)  -- claims None: parse(raw) itself
+   added hunks: 5, lines: 35, removed lines: 4
+UNSTATED / UNGUARDED: 0
+PROVEN

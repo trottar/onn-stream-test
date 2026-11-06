@@ -1,0 +1,6 @@
+SurfaceHold.kt: changed new-lines 11; inside object SurfaceHoldFlag (lines 19-42): 10; in the header comment above it: 1; elsewhere: 0
+PadSlots.kt: changed new-lines 5; inside object PadSlotsFlag (lines 28-42): 4; in the header comment above it: 1; elsewhere: 0
+consumers (unchanged by B42; each builds its object only from a non-null bound / true):
+   NativeStreamActivity.kt:2564: private val padSlots: PadSlots? by lazy { if (PadSlotsFlag.fromSystem()) PadSlotsProcess.slots else null }
+   NativeStreamActivity.kt:4223: private val surfaceHold: SurfaceHold? by lazy { SurfaceHoldFlag.fromSystem()?.let { SurfaceHold(it) } }
+PROVEN

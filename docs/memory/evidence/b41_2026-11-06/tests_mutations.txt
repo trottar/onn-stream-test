@@ -1,0 +1,18 @@
+== m1 (PlayerPrompt.beginStart pre-assigns by controller number again)
+   FAIL theVirtualRemoteNeverClaims java.lang.AssertionError
+   FAIL aPadAlreadyInTheMapKeepsItsSlotAndShowsItsBadgeOnItsFirstPress java.lang.AssertionError: expected:<1> but was:<0>
+   FAIL aStickNeverClaimsAndANonClaimKeyIsDropped java.lang.AssertionError: expected null, but was:<0>
+   FAIL padBPressesFirstAndIsPlayerOneThenPadAIsPlayerTwo java.lang.AssertionError: expected:<Player 1 — press any button> but was:<null>
+TOTAL 205, failures+errors 4
+== m2 (RELEASE_MS 0)
+   FAIL selectStartHeldTwoSecondsReleasesAndAnotherPadReclaims java.lang.AssertionError: expected:<0> but was:<null>
+TOTAL 205, failures+errors 1
+== m3 (player_count: players always 2)
+FAIL: test_ps1_with_the_multitap_is_four_and_without_it_two (test_player_prompt.Players.test_ps1_with_the_multitap_is_four_and_without_it_two)
+FAIL: test_single_is_one (test_player_prompt.Players.test_single_is_one)
+Ran 11 tests in 0.143s
+FAILED (failures=2)
+== m2 again, with the strengthened short-hold test
+   FAIL aShortHoldReleasesNothing java.lang.AssertionError: expected:<0> but was:<null>
+   FAIL selectStartHeldTwoSecondsReleasesAndAnotherPadReclaims java.lang.AssertionError: expected:<0> but was:<null>
+TOTAL 205, failures+errors 2

@@ -122,8 +122,10 @@ class PadSlotsTest {
     fun theFlagIsStableOnly() {
         assertTrue(PadSlotsFlag.parse("stable"))
         assertTrue(PadSlotsFlag.parse(" stable "))
-        for (v in listOf(null, "", "1", "0", "Stable", "junk")) assertFalse(v.toString(), PadSlotsFlag.parse(v))
-        // off the device the property cannot be read: absent, today
-        assertFalse(PadSlotsFlag.fromSystem())
+        // B42 (disclosed): absent / empty / junk moved to stable; `0` (and `off`) off as before
+        for (v in listOf(null, "", "1", "Stable", "junk")) assertTrue(v.toString(), PadSlotsFlag.parse(v))
+        assertFalse(PadSlotsFlag.parse("0"))
+        // off the device the property cannot be read: absent, so stable (B42)
+        assertTrue(PadSlotsFlag.fromSystem())
     }
 }

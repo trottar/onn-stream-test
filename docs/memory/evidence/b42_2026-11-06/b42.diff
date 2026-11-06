@@ -1,0 +1,224 @@
+diff --git a/PrivyHub/app/src/main/java/streaming/PadSlots.kt b/PrivyHub/app/src/main/java/streaming/PadSlots.kt
+index bbc27a0248ad4e29e910e8c6ad25c443a390f9d9..31b2d2b6e80c71b484282dec6e01b0a50b999522 100644
+--- a/PrivyHub/app/src/main/java/streaming/PadSlots.kt
++++ b/PrivyHub/app/src/main/java/streaming/PadSlots.kt
+@@ -23,19 +23,21 @@ import java.security.MessageDigest
+  * (its "virtual-remote", which declares GAMEPAD and took slot 0 in HOME-1 C4; its remote keyboard; gpio-keys) are
+  * key-only, so they never take a slot; no vendor, product or name is compared.
+  * Design: `docs/memory/evidence/b38_2026-11-02/design_written_before_code.md` (hashed before this code).
++ * B42 (G-A12, 2026-11-06): **on by default** -- absent / empty / junk = stable; `off` / `0` = today's first-input order.
+  */
+ object PadSlotsFlag {
+     const val PROPERTY = "debug.privyhub.pad_slots"
+ 
+-    fun parse(value: String?): Boolean = value?.trim() == "stable"
++    // B42: stable unless `off` / `0` (the user's G-A12 "yes", 2026-11-06, after HOME-2 C4'); `0` as B27's convention
++    fun parse(value: String?): Boolean = value?.trim().let { it != "off" && it != "0" }
+ 
+-    /** The property, read through reflection; a failed read is absent (today). */
++    /** The property, read through reflection; a failed read is absent, so stable (B42). */
+     fun fromSystem(): Boolean =
+         try {
+             val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
+             parse(get.invoke(null, PROPERTY) as? String)
+         } catch (_: Throwable) {
+-            false
++            parse(null)
+         }
+ }
+ 
+diff --git a/PrivyHub/app/src/main/java/streaming/SurfaceHold.kt b/PrivyHub/app/src/main/java/streaming/SurfaceHold.kt
+index 3f37ab12c9d543e288e40fffb1fcfca65c286a35..119547188cc47f05d9d737f125e187bb24632da0 100644
+--- a/PrivyHub/app/src/main/java/streaming/SurfaceHold.kt
++++ b/PrivyHub/app/src/main/java/streaming/SurfaceHold.kt
+@@ -5,6 +5,7 @@ import java.net.URLEncoder
+ /**
+  * B32: the stream survives a brief loss of the screen, behind the system property `debug.privyhub.surface_hold`
+  * (CL-B7P's convention; a reboot clears it). **Absent / empty / `0` / junk = today: no object.**
++ * B42 (G-A11, 2026-11-06): **on by default** -- absent / empty / junk = the 12-s bound; `0` / `off` = B32's absent.
+  *
+  * TRIP-R2 §1: six self-restarts in an evening, each `trigger: surface` -- Android took the stream activity out of the
+  * foreground for 1-9 s, the surface went, the same instance came back and started a new stream (a new host session,
+@@ -21,21 +22,22 @@ object SurfaceHoldFlag {
+     const val MIN_BOUND_MS = 10_000L
+     const val MAX_BOUND_MS = 30_000L
+ 
+-    /** `1` = the default bound; an integer in range = that bound; anything else (absent included) = off (null). */
++    // B42: on unless `0` / `off` (the user's G-A11 "yes", 2026-11-06, after HOME-2 C1'): absent / empty / junk = the
++    // default bound; an integer in range = that bound; `0` / `off` = off (null), B32's absent.
+     fun parse(value: String?): Long? {
+-        val v = value?.trim() ?: return null
+-        if (v == "1") return DEFAULT_BOUND_MS
+-        val n = v.toLongOrNull() ?: return null
+-        return if (n in MIN_BOUND_MS..MAX_BOUND_MS) n else null
++        val v = value?.trim() ?: return DEFAULT_BOUND_MS
++        if (v == "0" || v == "off") return null
++        val n = v.toLongOrNull() ?: return DEFAULT_BOUND_MS
++        return if (n in MIN_BOUND_MS..MAX_BOUND_MS) n else DEFAULT_BOUND_MS
+     }
+ 
+-    /** The property, read through reflection; a failed read is absent, so off. */
++    /** The property, read through reflection; a failed read is absent, so on (B42). */
+     fun fromSystem(): Long? =
+         try {
+             val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
+             parse(get.invoke(null, PROPERTY) as? String)
+         } catch (_: Throwable) {
+-            null
++            parse(null)
+         }
+ }
+ 
+diff --git a/PrivyHub/app/src/test/java/streaming/HoldAndSlotsDefaultOnTest.kt b/PrivyHub/app/src/test/java/streaming/HoldAndSlotsDefaultOnTest.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..deebd58265d75243c3b32ace2d61da8208410abc
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/HoldAndSlotsDefaultOnTest.kt
+@@ -0,0 +1,80 @@
++package com.safeiot.privyhub.streaming
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * B42: the screen-loss hold (G-A11) and stable slots (G-A12) on by default; `0` / `off` = `0132b944…`'s absent.
++ * Design: `docs/memory/evidence/b42_2026-11-06/design_written_before_code.md` (hashed before this code).
++ */
++class HoldAndSlotsDefaultOnTest {
++
++    private val junk = listOf("yes", "true", "ON", "OFF", "Off", "Stable", "2", "-5", "9999", "30001", "1.5", "junk")
++
++    // `0132b944…`'s parses, verbatim (B32 / B34), for the off-path comparison
++    private fun holdToday(value: String?): Long? {
++        val v = value?.trim() ?: return null
++        if (v == "1") return SurfaceHoldFlag.DEFAULT_BOUND_MS
++        val n = v.toLongOrNull() ?: return null
++        return if (n in SurfaceHoldFlag.MIN_BOUND_MS..SurfaceHoldFlag.MAX_BOUND_MS) n else null
++    }
++
++    private fun slotsToday(value: String?): Boolean = value?.trim() == "stable"
++
++    @Test
++    fun theHoldIsOnWhenAbsentEmptyOrJunk() {
++        assertEquals(12_000L, SurfaceHoldFlag.parse(null))
++        assertEquals(12_000L, SurfaceHoldFlag.parse(""))
++        assertEquals(12_000L, SurfaceHoldFlag.parse("   "))
++        for (v in junk) assertEquals(v, 12_000L, SurfaceHoldFlag.parse(v))
++        assertEquals(12_000L, SurfaceHoldFlag.fromSystem())  // the JVM has no SystemProperties: a failed read = absent
++    }
++
++    @Test
++    fun theHoldKeepsItsValues() {
++        assertEquals(12_000L, SurfaceHoldFlag.parse("1"))
++        assertEquals(10_000L, SurfaceHoldFlag.parse("10000"))
++        assertEquals(20_000L, SurfaceHoldFlag.parse(" 20000 "))
++        assertEquals(30_000L, SurfaceHoldFlag.parse("30000"))
++    }
++
++    @Test
++    fun theHoldIsOffOnlyForZeroOrOff() {
++        assertNull(SurfaceHoldFlag.parse("0"))
++        assertNull(SurfaceHoldFlag.parse(" 0 "))
++        assertNull(SurfaceHoldFlag.parse("off"))
++        assertNull(SurfaceHoldFlag.parse(" off "))
++    }
++
++    @Test
++    fun theSlotsAreStableWhenAbsentEmptyOrJunk() {
++        assertTrue(PadSlotsFlag.parse(null))
++        assertTrue(PadSlotsFlag.parse(""))
++        assertTrue(PadSlotsFlag.parse("stable"))
++        for (v in junk) assertTrue(v, PadSlotsFlag.parse(v))
++        assertTrue(PadSlotsFlag.fromSystem())
++    }
++
++    @Test
++    fun theSlotsAreOffOnlyForOffOrZero() {
++        assertFalse(PadSlotsFlag.parse("off"))
++        assertFalse(PadSlotsFlag.parse(" off "))
++        assertFalse(PadSlotsFlag.parse("0"))
++    }
++
++    @Test
++    fun theOffWordsGiveTodaysAbsent() {
++        // the consumers build an object only from a non-null bound / true: `0` / `off` now give exactly what the
++        // CONFIRMED build gave with no property, so no SurfaceHold and no PadSlots -- today's path
++        for (off in listOf("0", "off")) {
++            assertEquals(holdToday(null), SurfaceHoldFlag.parse(off))
++            assertEquals(slotsToday(null), PadSlotsFlag.parse(off))
++        }
++        // and every value the old parse turned on still gives the same value
++        for (v in listOf("1", "10000", "20000", "30000")) assertEquals(v, holdToday(v), SurfaceHoldFlag.parse(v))
++        assertEquals(slotsToday("stable"), PadSlotsFlag.parse("stable"))
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/PadSlotsTest.kt b/PrivyHub/app/src/test/java/streaming/PadSlotsTest.kt
+index 71e108e04258e96e5e8015fe111fe394eaab7368..71dcd52bcc54c892fdc300d608952f0edca2317a 100644
+--- a/PrivyHub/app/src/test/java/streaming/PadSlotsTest.kt
++++ b/PrivyHub/app/src/test/java/streaming/PadSlotsTest.kt
+@@ -122,8 +122,10 @@ class PadSlotsTest {
+     fun theFlagIsStableOnly() {
+         assertTrue(PadSlotsFlag.parse("stable"))
+         assertTrue(PadSlotsFlag.parse(" stable "))
+-        for (v in listOf(null, "", "1", "0", "Stable", "junk")) assertFalse(v.toString(), PadSlotsFlag.parse(v))
+-        // off the device the property cannot be read: absent, today
+-        assertFalse(PadSlotsFlag.fromSystem())
++        // B42 (disclosed): absent / empty / junk moved to stable; `0` (and `off`) off as before
++        for (v in listOf(null, "", "1", "Stable", "junk")) assertTrue(v.toString(), PadSlotsFlag.parse(v))
++        assertFalse(PadSlotsFlag.parse("0"))
++        // off the device the property cannot be read: absent, so stable (B42)
++        assertTrue(PadSlotsFlag.fromSystem())
+     }
+ }
+diff --git a/PrivyHub/app/src/test/java/streaming/SurfaceHoldTest.kt b/PrivyHub/app/src/test/java/streaming/SurfaceHoldTest.kt
+index 15f97fbc90fa9913d0fa029593f8c70cf8445922..156e2b9f0d46c3727fb2287941dcd3c90d9b6dc8 100644
+--- a/PrivyHub/app/src/test/java/streaming/SurfaceHoldTest.kt
++++ b/PrivyHub/app/src/test/java/streaming/SurfaceHoldTest.kt
+@@ -177,16 +177,17 @@ class SurfaceHoldTest {
+ 
+     @Test
+     fun theFlagIsOffUnlessOneOrABoundInRange() {
+-        assertNull(SurfaceHoldFlag.parse(null))
+-        assertNull(SurfaceHoldFlag.parse(""))
++        // B42 (disclosed): absent / empty / junk moved to ON (the default bound); `0` off as before
++        assertEquals(12_000L, SurfaceHoldFlag.parse(null))
++        assertEquals(12_000L, SurfaceHoldFlag.parse(""))
+         assertNull(SurfaceHoldFlag.parse("0"))
+-        assertNull(SurfaceHoldFlag.parse("yes"))
+-        assertNull(SurfaceHoldFlag.parse("9999"))
+-        assertNull(SurfaceHoldFlag.parse("30001"))
++        assertEquals(12_000L, SurfaceHoldFlag.parse("yes"))
++        assertEquals(12_000L, SurfaceHoldFlag.parse("9999"))
++        assertEquals(12_000L, SurfaceHoldFlag.parse("30001"))
+         assertEquals(12_000L, SurfaceHoldFlag.parse("1"))
+         assertEquals(12_000L, SurfaceHoldFlag.parse(" 1 "))
+         assertEquals(20_000L, SurfaceHoldFlag.parse("20000"))
+-        assertNull(SurfaceHoldFlag.fromSystem())   // no SystemProperties on the JVM: off
++        assertEquals(12_000L, SurfaceHoldFlag.fromSystem())   // B42: no SystemProperties on the JVM: absent, so on
+     }
+ 
+     // --- the 3-s loss: one session -----------------------------------------------------------------------------------
+diff --git a/PrivyHub/app/src/test/java/streaming/VirtualRemoteNoSlotTest.kt b/PrivyHub/app/src/test/java/streaming/VirtualRemoteNoSlotTest.kt
+index def4fbb62be914063e985855e0d1454a2372b283..14a7ddd3ccb7667a8c71510f89076d8c8e957659 100644
+--- a/PrivyHub/app/src/test/java/streaming/VirtualRemoteNoSlotTest.kt
++++ b/PrivyHub/app/src/test/java/streaming/VirtualRemoteNoSlotTest.kt
+@@ -89,10 +89,12 @@ class VirtualRemoteNoSlotTest {
+ 
+     @Test
+     fun absentIsToday() {
+-        // absent / empty / other: no PadSlots object, so the sender's first-input order (B34's absent) applies
+-        assertFalse(PadSlotsFlag.parse(null))
+-        assertFalse(PadSlotsFlag.parse(""))
+-        assertFalse(PadSlotsFlag.parse("1"))
++        // B42 (disclosed): absent / empty / other moved to stable; `off` / `0` give no PadSlots object, so the
++        // sender's first-input order (B34's absent) applies
++        assertTrue(PadSlotsFlag.parse(null))
++        assertTrue(PadSlotsFlag.parse(""))
++        assertTrue(PadSlotsFlag.parse("1"))
++        assertFalse(PadSlotsFlag.parse("off"))
+         assertTrue(PadSlotsFlag.parse("stable"))
+     }
+ }

@@ -1,0 +1,1089 @@
+diff --git a/companion/vod_drop_test.py b/companion/vod_drop_test.py
+index 910680b27bbd85bee1f87ef4fe8a7e27ca8f1ea0..806a29d960191c488ee81ccb1739b75fb96618d3 100644
+--- a/companion/vod_drop_test.py
++++ b/companion/vod_drop_test.py
+@@ -13,10 +13,18 @@ Absent = today: this module is never imported, the range server's handler class
+   when that log is on. Redacted by construction: opaque ids only.
+ 
+ Design: `docs/memory/evidence/b40_2026-11-02/design_written_before_code.md`.
++
++B43: the appended line may say `drop <seconds>` (0-600): after the one reset, every new `/vod/` request is answered by
++an immediate RST and no HTTP response for that long (a dead link, as the player sees it: its own reconnect then runs out
++of buffer and gives up, so B35's retry runs). Only the appended bytes are read (opened read-only from the last seen
++size; the file is still never written or removed). Any other line, or `drop 0`, is B40 as built, its row byte for
++byte. `vod_drop_injected` gains `refuse_s` (only when > 0); a `vod_refuse_ended` row (`vod_refused`, the count) closes
++each window. Design: `docs/memory/evidence/b43_2026-11-06/design_written_before_code.md`.
+ """
+ from __future__ import annotations
+ 
+ import ctypes
++import re
+ import socket
+ import struct
+ import threading
+@@ -30,6 +38,19 @@ FLAG_ENV = "PRIVYHUB_VOD_DROP_TEST"
+ TRIGGER = Path("runtime") / "vod_drop_test.trigger"
+ LOG_NAME = "vod_drop_test.jsonl"
+ INTERVAL_S = 0.25
++# B43: the refusal window's line, its cap, and how much of an append is read
++_DROP_LINE = re.compile(r"^\s*drop\s+(\d{1,6}(?:\.\d{1,3})?)\s*$")
++REFUSE_MAX_S = 600.0
++READ_MAX = 4096
++
++
++def refuse_seconds(appended: bytes) -> float:
++    """B43: the last non-empty line `drop <seconds>` → seconds (capped); anything else → 0 (B40's one-shot)."""
++    lines = [ln for ln in appended.decode("utf-8", "replace").splitlines() if ln.strip()]
++    if not lines:
++        return 0.0
++    m = _DROP_LINE.match(lines[-1])
++    return min(float(m.group(1)), REFUSE_MAX_S) if m else 0.0
+ 
+ 
+ def enabled(environ: Mapping[str, str]) -> bool:
+@@ -75,6 +96,11 @@ class DropTest:
+         self._live: dict[int, tuple[socket.socket, str]] = {}
+         self._last = self._signature()
+         self.triggers = 0
++        # B43: the refusal window (none = B40 as built)
++        self._refuse_until: float | None = None
++        self._refuse_s = 0.0
++        self._refuse_trigger = 0
++        self.refused = 0
+         self._thread: threading.Thread | None = None
+ 
+     def _signature(self):
+@@ -102,16 +128,86 @@ class DropTest:
+                     test._live.pop(key, None)
+ 
+         handler_class.copyfile = copyfile
++
++        # B43: inside a refusal window a /vod/ request is reset before anything else runs (no gate, no file, no log)
++        for name in ("do_GET", "do_HEAD"):
++            orig = getattr(handler_class, name)
++
++            def refusing(self, _orig=orig):
++                path = getattr(self, "path", "") or ""
++                if _kind(path) == "vod" and test._refusing():
++                    test._refuse(self)
++                    return None
++                return _orig(self)
++
++            setattr(handler_class, name, refusing)
+         return handler_class
+ 
++    def _refusing(self) -> bool:
++        with self._lock:
++            return self._refuse_until is not None and self._clock() < self._refuse_until
++
++    def _refuse(self, handler: Any) -> None:
++        handler.close_connection = True
++        try:
++            reset(handler.connection, self._connect)
++        except OSError:
++            pass
++        with self._lock:
++            self.refused += 1
++
+     def poll_once(self) -> dict | None:
+         sig = self._signature()
+         if sig is None or sig == self._last:
+             return None
++        before = self._last
+         self._last = sig
+-        return self.drop_now()
++        return self.drop_now(self._appended_refuse_s(before, sig))
++
++    def _appended_refuse_s(self, before, sig) -> float:
++        """B43: only the bytes appended since the last signature (read-only); a shrunk / new file → 0."""
++        old_size = before[1] if before is not None else 0
++        new_size = sig[1]
++        if new_size <= old_size:
++            return 0.0
++        try:
++            with open(self.trigger, "rb") as fh:
++                fh.seek(old_size)
++                data = fh.read(min(new_size - old_size, READ_MAX))
++        except OSError:
++            return 0.0
++        return refuse_seconds(data)
++
++    def tick(self) -> dict | None:
++        """B43: a window past its end closes with its row (the polling thread calls this)."""
++        with self._lock:
++            if self._refuse_until is None or self._clock() < self._refuse_until:
++                return None
++        return self._end_window()
+ 
+-    def drop_now(self) -> dict:
++    def _end_window(self) -> dict | None:
++        with self._lock:
++            if self._refuse_until is None:
++                return None
++            row = {"at_utc": utc_ms(self._clock()), "event": "vod_refuse_ended", "trigger": self._refuse_trigger,
++                   "refuse_s": self._refuse_s, "vod_refused": self.refused}
++            self._refuse_until = None
++            self._refuse_s = 0.0
++            self.refused = 0
++        self._write(row)
++        return row
++
++    def _write(self, row: dict) -> None:
++        for out in (self._out, self._range_out):
++            if out is not None:
++                try:
++                    out.write(row)
++                except Exception:
++                    pass  # a row must never disturb the server
++
++    def drop_now(self, refuse_s: float = 0.0) -> dict:
++        if self._refuse_until is not None:
++            self._end_window()   # B43: a new trigger closes the open window first
+         self.triggers += 1
+         t = self._clock()   # before the resets: the row's time falls inside the reset request's span
+         with self._lock:
+@@ -128,12 +224,15 @@ class DropTest:
+                "how": "/".join(sorted(hows)) if hows else "none"}
+         if errors:
+             row["errors"] = errors
+-        for out in (self._out, self._range_out):
+-            if out is not None:
+-                try:
+-                    out.write(row)
+-                except Exception:
+-                    pass  # a row must never disturb the server
++        if refuse_s > 0:
++            # B43: the refusal window starts with the reset (row key only when > 0: B40's row as built otherwise)
++            row["refuse_s"] = refuse_s
++            with self._lock:
++                self._refuse_until = t + refuse_s
++                self._refuse_s = refuse_s
++                self._refuse_trigger = self.triggers
++                self.refused = 0
++        self._write(row)
+         return row
+ 
+     def _run(self) -> None:
+@@ -141,6 +240,7 @@ class DropTest:
+             time.sleep(self._interval)
+             try:
+                 self.poll_once()
++                self.tick()
+             except Exception:
+                 pass
+ 
+diff --git a/companion/vod_log.py b/companion/vod_log.py
+index 8ced819ab108b4caaedaa00e38a81f85b2ad786a..d4307525db772e56159b070501a9b4a7fc58cce2 100644
+--- a/companion/vod_log.py
++++ b/companion/vod_log.py
+@@ -37,6 +37,9 @@ CLIENT_EVENTS = ("vod_error", "vod_retry", "vod_resumed", "vod_gave_up")
+ CLIENT_INT_FIELDS = ("attempt", "position_ms", "error_code", "delay_ms", "elapsed_ms", "bound_ms", "attempts")
+ _HEX12 = re.compile(r"^[0-9a-f]{12}$")
+ _CODE_NAME = re.compile(r"^[A-Z0-9_]{1,64}$")
++# B43: the retry's reason / give-up kind / token refetch (a B35 client sends none of them: its rows as today)
++CLIENT_REASONS = ("reset", "refused", "timeout", "401", "403")
++CLIENT_KINDS = ("lost", "refused")
+ 
+ 
+ def enabled(environ: Mapping[str, str]) -> bool:
+@@ -218,6 +221,18 @@ class ClientLog:
+                 if not isinstance(value, str) or not _CODE_NAME.match(value):
+                     raise ValueError("vod-client: error_name not a code name")
+                 row[key] = value
++            elif key == "reason":
++                if value not in CLIENT_REASONS:
++                    raise ValueError("vod-client: reason unknown")
++                row[key] = value
++            elif key == "kind":
++                if value not in CLIENT_KINDS:
++                    raise ValueError("vod-client: kind unknown")
++                row[key] = value
++            elif key == "token_refetched":
++                if not isinstance(value, bool):
++                    raise ValueError("vod-client: token_refetched not a bool")
++                row[key] = value
+             else:
+                 raise ValueError("vod-client: unknown field")
+         self._out.write(row)
+diff --git a/PrivyHub/app/src/main/java/MainActivity.kt b/PrivyHub/app/src/main/java/MainActivity.kt
+index ec952a6bd09df510e24d96686ea5577604e11ab5..d0dff3afa4cbc41bdd0f5d86c0f351f40525ecee 100644
+--- a/PrivyHub/app/src/main/java/MainActivity.kt
++++ b/PrivyHub/app/src/main/java/MainActivity.kt
+@@ -15449,7 +15449,9 @@ private fun requestGameStateAction(
+                     playerView,
+                     sourceId,
+                     { "http://${getCompanionHost()}:$CONTROL_PORT/diagnostics/vod-client" },
+-                    { player }
++                    { player },
++                    // B43: the host the media token is refetched for
++                    { getCompanionHost() }
+                 )
+             } else {
+                 null
+diff --git a/PrivyHub/app/src/main/java/vod/VodRetryAndroid.kt b/PrivyHub/app/src/main/java/vod/VodRetryAndroid.kt
+index c8c4f24011b78cb6c856c1cd6d25dcdf42f04734..20ba90a10cd5103889a63e6a068740932889e7c8 100644
+--- a/PrivyHub/app/src/main/java/vod/VodRetryAndroid.kt
++++ b/PrivyHub/app/src/main/java/vod/VodRetryAndroid.kt
+@@ -10,11 +10,14 @@ import android.widget.FrameLayout
+ import android.widget.TextView
+ import androidx.appcompat.app.AlertDialog
+ import androidx.media3.common.PlaybackException
++import androidx.media3.datasource.HttpDataSource
+ import androidx.media3.exoplayer.ExoPlayer
+ import androidx.media3.ui.PlayerView
+ import com.safeiot.privyhub.identity.PrivyHubIdentity
+ import org.json.JSONObject
++import java.net.ConnectException
+ import java.net.HttpURLConnection
++import java.net.SocketTimeoutException
+ import java.net.URL
+ import kotlin.concurrent.thread
+ 
+@@ -23,6 +26,10 @@ import kotlin.concurrent.thread
+  * player's overlay, the Retry dialog, and the rows posted to the hub (`POST /diagnostics/vod-client`, JSON, the
+  * session header as every control call; every failure ignored). Built by MainActivity only when
+  * `debug.privyhub.vod_retry=1` and the playback is not live.
++ *
++ * B43: the error's reason read from its cause chain; the media token refetched through the identity session (drop
++ * the cached token, set up afresh -- the path a playback's first media request takes) off the main thread; the
++ * give-up dialog's message by its kind (`lost` only when the hub gave no answer).
+  */
+ class VodRetryAndroid(
+     private val activity: Activity,
+@@ -30,6 +37,8 @@ class VodRetryAndroid(
+     sourceId: String,
+     private val rowsUrl: () -> String,
+     private val currentPlayer: () -> ExoPlayer?,
++    // B43: the hub host the media token is for (MainActivity's getCompanionHost)
++    private val hubHost: () -> String,
+ ) {
+     private val handler = Handler(Looper.getMainLooper())
+     private var pending: Runnable? = null
+@@ -65,13 +74,51 @@ class VodRetryAndroid(
+         ui = object : VodRetryController.Ui {
+             override fun showMark(attempt: Int) = show()
+             override fun hideMark() = hide()
+-            override fun offerRetry() = dialog()
++            override fun offerRetry() = dialog(VodRetryController.KIND_LOST)
++            override fun offerRetry(kind: String) = dialog(kind)
+         },
+         sourceId = sourceId,
++        token = object : VodRetryController.Token {
++            override fun refresh(done: (Boolean) -> Unit) {
++                thread(start = true, isDaemon = true, name = "PrivyHub-VodRetry-Token") {
++                    val ok = try {
++                        if (!PrivyHubIdentity.isEnabled(activity)) {
++                            false
++                        } else {
++                            val session = PrivyHubIdentity.get(activity)
++                            session.endSessionLocally()
++                            session.mediaHeaderFor(hubHost().trim()) != null
++                        }
++                    } catch (_: Throwable) {
++                        false
++                    }
++                    handler.post { done(ok) }
++                }
++            }
++        },
+     )
+ 
+     fun onError(error: PlaybackException, positionMs: Long): Boolean =
+-        controller.onError(error.errorCode, error.errorCodeName, positionMs)
++        controller.onError(error.errorCode, error.errorCodeName, positionMs, reasonOf(error))
++
++    /** B43: 401 / 403 from the HTTP status; `refused` / `timeout` from the cause chain; else `reset`. */
++    private fun reasonOf(error: PlaybackException): String {
++        var status: Int? = null
++        var refused = false
++        var timedOut = false
++        var t: Throwable? = error
++        var depth = 0
++        while (t != null && depth < 12) {
++            when (t) {
++                is HttpDataSource.InvalidResponseCodeException -> status = status ?: t.responseCode
++                is ConnectException -> refused = true
++                is SocketTimeoutException -> timedOut = true
++            }
++            t = t.cause
++            depth++
++        }
++        return VodRetryPolicy.reasonOf(error.errorCode, status, refused, timedOut)
++    }
+ 
+     fun afterTodaysError() = controller.afterTodaysError()
+ 
+@@ -108,13 +155,19 @@ class VodRetryAndroid(
+         mark = null
+     }
+ 
+-    private fun dialog() {
++    private fun dialog(kind: String) {
+         if (activity.isFinishing) {
+             return
+         }
+         AlertDialog.Builder(activity)
+             .setTitle("Playback error")
+-            .setMessage("The connection to the hub was lost.")
++            .setMessage(
++                if (kind == VodRetryController.KIND_REFUSED) {
++                    "The hub refused this playback. Press Retry or start the movie again."
++                } else {
++                    "The connection to the hub was lost."
++                }
++            )
+             .setPositiveButton("Retry") { _, _ -> controller.manualRetry() }
+             .setNegativeButton("Close", null)
+             .show()
+diff --git a/PrivyHub/app/src/main/java/vod/VodRetry.kt b/PrivyHub/app/src/main/java/vod/VodRetry.kt
+index 11a4cdf2dad0984bd1b924e3664cf3e11b35dc05..54a3e59aed71c8bde7557447f04b589714be35fe 100644
+--- a/PrivyHub/app/src/main/java/vod/VodRetry.kt
++++ b/PrivyHub/app/src/main/java/vod/VodRetry.kt
+@@ -13,6 +13,12 @@ import java.security.MessageDigest
+  * to the host (`vod_error` / `vod_retry` / `vod_resumed` / `vod_gave_up`); no title, path or URL in any row.
+  *
+  * Pure Kotlin (no Android type) so the JVM tests drive it with a fake clock, scheduler and player.
++ *
++ * B43 (inside the same flag): each error carries a `reason` (`reset` / `refused` / `timeout` / `401` / `403`). A
++ * refusal (401 / 403) is not a lost hub: the media token is refetched ([VodRetryController.Token]) before the attempt
++ * (a companion restart ends the hub's sessions; the onn's cached token is then refused), and three refusals in a row,
++ * each after a refetch, end the episode as `refused` -- never "connection lost". The Retry button refetches too.
++ * Design: `docs/memory/evidence/b43_2026-11-06/design_written_before_code.md`.
+  */
+ object VodRetryFlag {
+     const val PROPERTY = "debug.privyhub.vod_retry"
+@@ -43,6 +49,26 @@ class VodRetryPolicy(
+         val RETRYABLE = setOf(1003, 2000, 2001, 2002, 2004)
+ 
+         fun isRetryable(code: Int): Boolean = code in RETRYABLE
++
++        // B43: the reasons, and three refusals in a row (each after a refetch) end an episode as `refused`
++        const val REASON_RESET = "reset"
++        const val REASON_REFUSED = "refused"
++        const val REASON_TIMEOUT = "timeout"
++        const val REASON_401 = "401"
++        const val REASON_403 = "403"
++        const val REFUSALS_MAX = 3
++
++        /** B43: the reason from what the Android side read in the error's cause chain. */
++        fun reasonOf(code: Int, httpStatus: Int?, connectRefused: Boolean, timedOut: Boolean): String =
++            when {
++                httpStatus == 401 -> REASON_401
++                httpStatus == 403 -> REASON_403
++                timedOut || code == 1003 || code == 2002 -> REASON_TIMEOUT
++                connectRefused -> REASON_REFUSED
++                else -> REASON_RESET
++            }
++
++        fun isRefusal(reason: String): Boolean = reason == REASON_401 || reason == REASON_403
+     }
+ }
+ 
+@@ -54,6 +80,8 @@ class VodRetryController(
+     private val rows: (Map<String, Any>) -> Unit,
+     private val ui: Ui,
+     sourceId: String,
++    // B43: the media token's refetch (null = B35's behaviour: a refusal retried like a reset)
++    private val token: Token? = null,
+ ) {
+     interface Player {
+         /** Reconnect and resume at [positionMs] (Media3: seekTo, prepare, playWhenReady). */
+@@ -69,6 +97,14 @@ class VodRetryController(
+         fun showMark(attempt: Int)
+         fun hideMark()
+         fun offerRetry()
++
++        /** B43: the give-up's kind (`lost` / `refused`) for the message; B35's Ui keeps its one method. */
++        fun offerRetry(kind: String) = offerRetry()
++    }
++
++    /** B43: drop the cached media token and set up afresh (off the main thread); [done] on the main thread. */
++    interface Token {
++        fun refresh(done: (Boolean) -> Unit)
+     }
+ 
+     val media: String = opaqueId(sourceId)
+@@ -80,52 +116,104 @@ class VodRetryController(
+     private var lastName = ""
+     private var gaveUp = false
+     private var cancelled = false
++    private var lastReason = VodRetryPolicy.REASON_RESET
++    private var refetched = false
++    private var refusalsAfterRefetch = 0
++    private var gaveUpKind = KIND_LOST
+ 
+     val retrying: Boolean get() = firstErrorAtMs >= 0 && !gaveUp
+ 
+     /** True = handled (an attempt is scheduled); false = today's error path runs now. */
+-    fun onError(code: Int, codeName: String, currentPositionMs: Long): Boolean {
++    fun onError(code: Int, codeName: String, currentPositionMs: Long): Boolean =
++        onError(code, codeName, currentPositionMs, VodRetryPolicy.REASON_RESET)
++
++    /** B43: [reason] from [VodRetryPolicy.reasonOf]; a refusal refetches the token before its attempt. */
++    fun onError(code: Int, codeName: String, currentPositionMs: Long, reason: String): Boolean {
+         if (cancelled || !VodRetryPolicy.isRetryable(code)) {
+             return false
+         }
+         val now = clock()
+         lastCode = code
+         lastName = codeName
++        lastReason = reason
+         if (firstErrorAtMs < 0 || gaveUp) {
+             firstErrorAtMs = now
+             positionMs = currentPositionMs.coerceAtLeast(0L)
+             attempts = 0
+             gaveUp = false
+-            rows(row("vod_error") + mapOf("error_code" to code, "error_name" to codeName))
++            refetched = false
++            refusalsAfterRefetch = 0
++            rows(row("vod_error") + mapOf("error_code" to code, "error_name" to codeName) + why(reason))
++        }
++        val refusal = token != null && VodRetryPolicy.isRefusal(reason)
++        if (refusal && refetched) {
++            refusalsAfterRefetch++
++        } else if (!VodRetryPolicy.isRefusal(reason)) {
++            refusalsAfterRefetch = 0
+         }
+         val next = attempts + 1
+         val delay = policy.delayBefore(next)
+         val elapsed = now - firstErrorAtMs
++        if (refusal && refusalsAfterRefetch >= VodRetryPolicy.REFUSALS_MAX) {
++            return giveUp(code, codeName, elapsed, reason, KIND_REFUSED)
++        }
+         if (elapsed + delay > policy.boundMs) {
+-            gaveUp = true
+-            scheduler.cancel()
+-            ui.hideMark()
+-            rows(row("vod_gave_up") + mapOf("attempts" to attempts, "elapsed_ms" to elapsed,
+-                "error_code" to code, "error_name" to codeName))
+-            return false
++            return giveUp(code, codeName, elapsed, reason,
++                if (VodRetryPolicy.isRefusal(reason)) KIND_REFUSED else KIND_LOST)
+         }
+         attempts = next
+-        rows(row("vod_retry") + mapOf("attempt" to next, "delay_ms" to delay, "elapsed_ms" to elapsed,
+-            "error_code" to code, "error_name" to codeName))
+         ui.showMark(next)
+         scheduler.cancel()
+-        scheduler.schedule(delay) {
+-            if (!cancelled && retrying) {
+-                player.retryAt(positionMs)
++        val base = row("vod_retry") + mapOf("attempt" to next, "delay_ms" to delay, "elapsed_ms" to elapsed,
++            "error_code" to code, "error_name" to codeName) + why(reason)
++        if (!refusal) {
++            rows(base)
++            scheduler.schedule(delay) {
++                if (!cancelled && retrying) {
++                    player.retryAt(positionMs)
++                }
++            }
++            return true
++        }
++        // B43: a refusal -- the token refetched first, the row says whether it worked, then the attempt
++        val episode = firstErrorAtMs
++        token!!.refresh { ok ->
++            if (cancelled || !retrying || firstErrorAtMs != episode) {
++                return@refresh
++            }
++            refetched = true
++            // a fresh token fixes the cause: the attempt at once; a failed refetch (the hub still down) keeps the backoff
++            val wait = if (ok) 0L else delay
++            rows(base + mapOf("delay_ms" to wait, "token_refetched" to ok))
++            scheduler.cancel()
++            scheduler.schedule(wait) {
++                if (!cancelled && retrying) {
++                    player.retryAt(positionMs)
++                }
+             }
+         }
+         return true
+     }
+ 
++    private fun giveUp(code: Int, codeName: String, elapsed: Long, reason: String, kind: String): Boolean {
++        gaveUp = true
++        gaveUpKind = kind
++        scheduler.cancel()
++        ui.hideMark()
++        rows(row("vod_gave_up") + mapOf("attempts" to attempts, "elapsed_ms" to elapsed,
++            "error_code" to code, "error_name" to codeName) + why(reason) +
++            (if (token != null) mapOf("kind" to kind) else emptyMap()))
++        return false
++    }
++
++    /** B43: the reason key, only with the token port (B35's rows as built without it). */
++    private fun why(reason: String): Map<String, Any> =
++        if (token != null) mapOf("reason" to reason) else emptyMap()
++
+     /** After today's error branch ran: past the bound, offer Retry (new, flag only). */
+     fun afterTodaysError() {
+         if (gaveUp && !cancelled) {
+-            ui.offerRetry()
++            if (token != null) ui.offerRetry(gaveUpKind) else ui.offerRetry()
+         }
+     }
+ 
+@@ -138,6 +226,8 @@ class VodRetryController(
+         ui.hideMark()
+         firstErrorAtMs = -1L
+         attempts = 0
++        refetched = false
++        refusalsAfterRefetch = 0
+     }
+ 
+     /** The Retry button: a new episode at the saved position, the first attempt at once. */
+@@ -148,10 +238,26 @@ class VodRetryController(
+         firstErrorAtMs = clock()
+         attempts = 1
+         gaveUp = false
+-        rows(row("vod_retry") + mapOf("attempt" to 1, "delay_ms" to 0L, "elapsed_ms" to 0L,
+-            "error_code" to lastCode, "error_name" to lastName))
++        refusalsAfterRefetch = 0
++        val base = row("vod_retry") + mapOf("attempt" to 1, "delay_ms" to 0L, "elapsed_ms" to 0L,
++            "error_code" to lastCode, "error_name" to lastName) + why(lastReason)
+         ui.showMark(1)
+-        player.retryAt(positionMs)
++        val t = token
++        if (t == null) {
++            rows(base)
++            player.retryAt(positionMs)
++            return
++        }
++        // B43: the Retry button refetches the token first (HOME-2: it reused the dead one)
++        val episode = firstErrorAtMs
++        t.refresh { ok ->
++            if (cancelled || firstErrorAtMs != episode) {
++                return@refresh
++            }
++            refetched = true
++            rows(base + mapOf("token_refetched" to ok))
++            player.retryAt(positionMs)
++        }
+     }
+ 
+     fun cancel() {
+@@ -164,6 +270,9 @@ class VodRetryController(
+         mapOf("event" to event, "media" to media, "position_ms" to positionMs, "bound_ms" to policy.boundMs)
+ 
+     companion object {
++        const val KIND_LOST = "lost"
++        const val KIND_REFUSED = "refused"
++
+         fun opaqueId(sourceId: String): String =
+             MessageDigest.getInstance("SHA-256")
+                 .digest(("privyhub-vod-source:" + sourceId).toByteArray(Charsets.UTF_8))
+diff --git a/PrivyHub/app/src/test/java/vod/VodRetryTokenTest.kt b/PrivyHub/app/src/test/java/vod/VodRetryTokenTest.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..165ffc0dad8daf955f27e5e235223aacc6bb2dbb
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/vod/VodRetryTokenTest.kt
+@@ -0,0 +1,298 @@
++package com.safeiot.privyhub.vod
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * B43: the movie retry made real, on a discrete-time simulation (ms):
++ *  - a fake hub: down (no answer: a reset), refusing every new request for a window (B40's `drop <seconds>`: a
++ *    reset), or up; a companion restart ends its sessions, so the onn's cached token is refused (401) until refetched;
++ *  - a fake Media3 progressive loader with B43's settled policy (DefaultLoadErrorHandlingPolicy 1.11.0: retry after
++ *    min((n-1) x 1000, 5000) ms; the error surfaces only when the buffer is spent and errorCount > 3; progress resets
++ *    the count), playing from a 30-s buffer (the VOD load control's maximum);
++ *  - the controller's own scheduler, and a fake token port (the identity session's drop + fresh setup).
++ * B35's VodRetryTest stays unedited and green beside this.
++ */
++class VodRetryTokenTest {
++
++    private class Sim {
++        var now = 0L
++        private val events = mutableListOf<Triple<Long, Int, () -> Unit>>()
++        private var seq = 0
++        fun at(t: Long, tag: Int = 0, task: () -> Unit) { events.add(Triple(t, tag + (seq++ shl 4), task)) }
++        fun cancelTag(tag: Int) { events.removeAll { (it.second and 0xF) == tag } }
++        fun runUntil(t: Long) {
++            while (true) {
++                val next = events.filter { it.first <= t }.minWithOrNull(compareBy({ it.first }, { it.second shr 4 })) ?: break
++                events.remove(next)
++                now = next.first
++                next.third()
++            }
++            now = t
++        }
++    }
++
++    private class Hub(val sim: Sim) {
++        var downUntil = -1L          // no answer before this
++        var refuseUntil = -1L        // B40's window: every new request reset before this
++        var sessionEpoch = 0         // a companion restart ends every session
++        var refuseForever = false    // the token always refused (a revoked pairing)
++        fun restart(downMs: Long) { downUntil = sim.now + downMs; sessionEpoch++ }
++        /** null = served; else (Media3 code, reason) of the failure. */
++        fun request(tokenEpoch: Int): Pair<Int, String>? = when {
++            sim.now < downUntil -> 2001 to VodRetryPolicy.REASON_RESET
++            sim.now < refuseUntil -> 2001 to VodRetryPolicy.REASON_RESET
++            refuseForever || tokenEpoch != sessionEpoch -> 2004 to VodRetryPolicy.REASON_401
++            else -> null
++        }
++        fun up(): Boolean = sim.now >= downUntil
++    }
++
++    private class Rig(sim: Sim, val hub: Hub, withToken: Boolean = true) {
++        val sim = sim
++        val rows = mutableListOf<Map<String, Any>>()
++        var tokenEpoch = 0
++        var refreshes = 0
++        var offered = mutableListOf<String>()
++        var position = 0L
++        var playing = true
++        var bufferedToMs = 30_000L     // the media position the buffer reaches
++        var loaderErrors = 0
++        var surfaced = 0
++        var retriesAt = mutableListOf<Long>()
++        lateinit var c: VodRetryController
++
++        init {
++            val scheduler = object : VodRetryController.Scheduler {
++                override fun schedule(delayMs: Long, task: () -> Unit) = sim.at(sim.now + delayMs, 1, task)
++                override fun cancel() = sim.cancelTag(1)
++            }
++            val ui = object : VodRetryController.Ui {
++                override fun showMark(attempt: Int) {}
++                override fun hideMark() {}
++                override fun offerRetry() { offered.add("b35") }
++                override fun offerRetry(kind: String) { offered.add(kind) }
++            }
++            val player = object : VodRetryController.Player {
++                override fun retryAt(positionMs: Long) {
++                    retriesAt.add(positionMs)
++                    position = positionMs
++                    sim.at(sim.now + 100) { attemptOnce() }
++                }
++            }
++            val token = object : VodRetryController.Token {
++                override fun refresh(done: (Boolean) -> Unit) {
++                    refreshes++
++                    sim.at(sim.now + 50) {
++                        val ok = hub.up()
++                        if (ok) tokenEpoch = hub.sessionEpoch
++                        done(ok)
++                    }
++                }
++            }
++            c = VodRetryController(VodRetryPolicy(), player, scheduler, { sim.now }, { rows.add(it) }, ui,
++                "movie-b", if (withToken) token else null)
++        }
++
++        /** B35's retry: one load; READY or the error back to the controller. */
++        private fun attemptOnce() {
++            val fail = hub.request(tokenEpoch)
++            if (fail == null) {
++                playing = true
++                bufferedToMs = position + 30_000L
++                c.onReady()
++            } else {
++                c.onError(fail.first, if (fail.first == 2004) "ERROR_CODE_IO_BAD_HTTP_STATUS"
++                    else "ERROR_CODE_IO_NETWORK_CONNECTION_FAILED", position, fail.second)
++            }
++        }
++
++        /** The movie plays in real time; Media3's own loader refills the buffer and retries by its policy. */
++        fun playFrom(t0: Long, positionAtT0: Long) {
++            position = positionAtT0
++            bufferedToMs = positionAtT0 + 30_000L
++            tick(t0)
++        }
++
++        private fun tick(t: Long) {
++            sim.at(t) {
++                if (playing) {
++                    position += 1_000L
++                    if (position >= bufferedToMs) {
++                        // the buffer is spent: the loader's error surfaces only past the minimum retry count
++                        if (loaderErrors > 3) {
++                            playing = false
++                            surfaced++
++                            val fail = hub.request(tokenEpoch) ?: (2001 to VodRetryPolicy.REASON_RESET)
++                            c.onError(fail.first, "ERROR_CODE_IO_NETWORK_CONNECTION_FAILED", position, fail.second)
++                            return@at
++                        }
++                        position -= 1_000L   // stalled (buffering)
++                    }
++                    tick(t + 1_000L)
++                }
++            }
++        }
++
++        /** The loader: a connection attempt; served = the buffer refilled and the count reset (progress). */
++        fun loader(t: Long) {
++            sim.at(t) {
++                if (!playing) return@at
++                if (hub.request(tokenEpoch) == null) {
++                    loaderErrors = 0
++                    bufferedToMs = position + 30_000L
++                    loader(sim.now + 10_000L)       // keeps the buffer topped up
++                } else {
++                    loaderErrors++
++                    loader(sim.now + minOf((loaderErrors - 1) * 1_000L, 5_000L))
++                }
++            }
++        }
++
++        fun events(): List<String> = rows.map { it["event"] as String }
++    }
++
++    @Test
++    fun aCompanionRestartWithTheMovieOpenTheTokenRefetchedThenResumedAtThePosition() {
++        val sim = Sim()
++        val hub = Hub(sim)
++        val r = Rig(sim, hub)
++        // the movie playing at 1 h 50 min; at t=0 the companion restarts: 12 s with no answer, then the old token 401
++        hub.restart(12_000L)
++        r.c.onError(2001, "ERROR_CODE_IO_NETWORK_CONNECTION_FAILED", 6_600_000L, VodRetryPolicy.REASON_RESET)
++        sim.runUntil(200_000L)
++        val ev = r.events()
++        assertEquals("vod_error", ev.first())
++        assertEquals("vod_resumed", ev.last())
++        val refused = r.rows.filter { it["reason"] == VodRetryPolicy.REASON_401 }
++        assertEquals(1, refused.size)
++        assertEquals(true, refused[0]["token_refetched"])
++        assertEquals(1, r.refreshes)
++        assertTrue(r.retriesAt.all { it == 6_600_000L })
++        assertEquals(r.rows.first()["position_ms"], 6_600_000L)
++        assertTrue(r.offered.isEmpty())
++        assertFalse(r.c.retrying)
++        assertTrue((r.rows.last()["elapsed_ms"] as Long) < 30_000L)
++    }
++
++    @Test
++    fun a45sRefusalThePlayersOwnReconnectGivesUpFirstThenB35RetriesAndResumes() {
++        val sim = Sim()
++        val hub = Hub(sim)
++        val r = Rig(sim, hub)
++        r.playFrom(0L, 6_600_000L)
++        r.loader(0L)
++        sim.runUntil(60_000L)                      // a minute of play, no fault: no rows
++        assertTrue(r.rows.isEmpty())
++        hub.refuseUntil = sim.now + 45_000L        // `drop 45` at t = 60 s
++        sim.runUntil(400_000L)
++        assertEquals(1, r.surfaced)                // the player's own reconnect gave up once, after its buffer
++        val ev = r.events()
++        assertEquals("vod_error", ev.first())
++        assertEquals("vod_resumed", ev.last())
++        assertTrue(ev.subList(1, ev.size - 1).all { it == "vod_retry" })
++        assertTrue(ev.count { it == "vod_retry" } >= 2)
++        assertTrue(r.rows.all { it["reason"] == null || it["reason"] == VodRetryPolicy.REASON_RESET })
++        val errorAt = r.rows.first()["position_ms"] as Long
++        assertTrue(r.retriesAt.all { it == errorAt })
++        assertEquals(0, r.refreshes)               // no refusal: no refetch
++    }
++
++    @Test
++    fun a12sDropTheBufferCoversItNoRowsAsHome2Saw() {
++        val sim = Sim()
++        val hub = Hub(sim)
++        val r = Rig(sim, hub)
++        r.playFrom(0L, 1_000_000L)
++        r.loader(0L)
++        sim.runUntil(60_000L)
++        hub.refuseUntil = sim.now + 12_000L
++        sim.runUntil(200_000L)
++        assertEquals(0, r.surfaced)
++        assertTrue(r.rows.isEmpty())
++    }
++
++    @Test
++    fun theHubDownLostOnlyAfterTheBound() {
++        val sim = Sim()
++        val hub = Hub(sim)
++        val r = Rig(sim, hub)
++        hub.restart(10_000_000L)                   // never back within the test
++        r.c.onError(2001, "ERROR_CODE_IO_NETWORK_CONNECTION_FAILED", 42_000L, VodRetryPolicy.REASON_RESET)
++        sim.runUntil(400_000L)
++        val gave = r.rows.last()
++        assertEquals("vod_gave_up", gave["event"])
++        assertEquals(VodRetryController.KIND_LOST, gave["kind"])
++        assertTrue((gave["elapsed_ms"] as Long) > 120_000L)
++        r.c.afterTodaysError()
++        assertEquals(listOf(VodRetryController.KIND_LOST), r.offered)
++    }
++
++    @Test
++    fun aRefusalThatPersistsAfterTheRefetchIsRefusedNeverLost() {
++        val sim = Sim()
++        val hub = Hub(sim)
++        hub.refuseForever = true
++        val r = Rig(sim, hub)
++        r.c.onError(2004, "ERROR_CODE_IO_BAD_HTTP_STATUS", 42_000L, VodRetryPolicy.REASON_401)
++        sim.runUntil(400_000L)
++        val gave = r.rows.last()
++        assertEquals("vod_gave_up", gave["event"])
++        assertEquals(VodRetryController.KIND_REFUSED, gave["kind"])
++        assertTrue((gave["elapsed_ms"] as Long) < 30_000L)     // not 150 s of futile attempts
++        assertEquals(VodRetryPolicy.REFUSALS_MAX, r.refreshes)
++        assertTrue(r.rows.filter { it["event"] == "vod_retry" }.all { it["token_refetched"] == true })
++        r.c.afterTodaysError()
++        assertEquals(listOf(VodRetryController.KIND_REFUSED), r.offered)
++    }
++
++    @Test
++    fun theRetryButtonRefetchesTheTokenFirst() {
++        val sim = Sim()
++        val hub = Hub(sim)
++        hub.refuseForever = true
++        val r = Rig(sim, hub)
++        r.c.onError(2004, "ERROR_CODE_IO_BAD_HTTP_STATUS", 42_000L, VodRetryPolicy.REASON_401)
++        sim.runUntil(400_000L)
++        val before = r.refreshes
++        hub.refuseForever = false
++        hub.sessionEpoch++                          // the user's Retry after a restart: the old token is dead
++        r.c.manualRetry()
++        sim.runUntil(500_000L)
++        assertEquals(before + 1, r.refreshes)
++        assertEquals("vod_resumed", r.events().last())
++        val manual = r.rows[r.rows.size - 2]
++        assertEquals(1, manual["attempt"])
++        assertEquals(true, manual["token_refetched"])
++    }
++
++    @Test
++    fun withoutTheTokenPortTheRowsAreB35sAsBuilt() {
++        val sim = Sim()
++        val hub = Hub(sim)
++        hub.restart(10_000_000L)
++        val r = Rig(sim, hub, withToken = false)
++        r.c.onError(2001, "ERROR_CODE_IO_NETWORK_CONNECTION_FAILED", 1L, VodRetryPolicy.REASON_RESET)
++        sim.runUntil(400_000L)
++        assertTrue(r.rows.none { it.containsKey("reason") || it.containsKey("kind") || it.containsKey("token_refetched") })
++        r.c.afterTodaysError()
++        assertEquals(listOf("b35"), r.offered)
++        // absent: no controller at all (MainActivity builds none without the flag)
++        assertFalse(VodRetryController.wanted(false, false))
++    }
++
++    @Test
++    fun theReasonFromTheCauseChain() {
++        assertEquals("401", VodRetryPolicy.reasonOf(2004, 401, false, false))
++        assertEquals("403", VodRetryPolicy.reasonOf(2004, 403, false, false))
++        assertEquals("reset", VodRetryPolicy.reasonOf(2004, 500, false, false))
++        assertEquals("timeout", VodRetryPolicy.reasonOf(2002, null, false, false))
++        assertEquals("timeout", VodRetryPolicy.reasonOf(1003, null, false, false))
++        assertEquals("timeout", VodRetryPolicy.reasonOf(2001, null, false, true))
++        assertEquals("refused", VodRetryPolicy.reasonOf(2001, null, true, false))
++        assertEquals("reset", VodRetryPolicy.reasonOf(2001, null, false, false))
++        assertEquals("reset", VodRetryPolicy.reasonOf(2000, null, false, false))
++    }
++}
+diff --git a/tests/vod_drop_test/test_vod_drop_refuse.py b/tests/vod_drop_test/test_vod_drop_refuse.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..9c215e28b5fbe2363d56531fb9005f68a45926f1
+--- /dev/null
++++ b/tests/vod_drop_test/test_vod_drop_refuse.py
+@@ -0,0 +1,144 @@
++"""B43: B40's drop gains a refusal window -- `drop <seconds>` appended to the trigger file keeps every new /vod/ request
++reset (an RST, no HTTP response) for that long, after the one reset of the streams in flight. A plain line or `drop 0`
++is B40 as built (its row byte for byte). Only the appended bytes are read. Loopback only; B40's harness reused (its own
++suite unedited); the windows are scaled down (`drop 0.8`) so the suite stays quick -- the code path is the 45-s one.
++"""
++from __future__ import annotations
++
++import socket
++import time
++import unittest
++
++import test_vod_drop_test as b40  # B40's harness (same directory); its TestCases are not re-exported here
++import vod_drop_test
++
++DropTestCase = b40.DropTestCase
++
++
++def _raw(port: int, path: str, rng: str | None = None) -> tuple[str, bytes]:
++    """One request; (`eof` / the error's name, every byte received)."""
++    s = socket.create_connection((b40.LOOP, port), timeout=5)
++    got = b""
++    try:
++        s.sendall(b40._get(path, rng))
++        while True:
++            chunk = s.recv(1 << 20)
++            if not chunk:
++                return "eof", got
++            got += chunk
++    except OSError as exc:
++        return type(exc).__name__, got
++    finally:
++        s.close()
++
++
++class Refusal(DropTestCase):
++    def append(self, line: str) -> None:
++        with open(self.project / vod_drop_test.TRIGGER, "a") as fh:
++            fh.write(line + "\n")
++
++    def test_drop_seconds_resets_the_stream_then_refuses_new_vod_requests_for_the_window(self) -> None:
++        player = b40._Player(self.server.port, self.path)
++        b40._wait_streaming(self.test)
++        self.append("drop 0.8")
++        injected = self.test.poll_once()
++        self.assertEqual(player.read_rest(), "ConnectionResetError")
++        self.assertEqual((injected["dropped"], injected["how"], injected["refuse_s"]), (1, "rst", 0.8))
++        # inside the window: a /vod/ request gets an RST and not one byte of HTTP; another path is served
++        how, got = _raw(self.server.port, self.path, "bytes=1000-")
++        self.assertNotIn(b"HTTP/", got)
++        self.assertIn(how, ("ConnectionResetError", "eof"))
++        how2, got2 = _raw(self.server.port, self.path, "bytes=2000-")
++        self.assertNotIn(b"HTTP/", got2)
++        live_how, live = _raw(self.server.port, "/live/channel.ts", "bytes=0-99")
++        self.assertIn(b"206 Partial Content", live.split(b"\r\n", 1)[0])
++        self.assertIsNone(self.test.tick())                      # the window still open
++        time.sleep(0.9)
++        ended = self.test.tick()
++        self.assertEqual((ended["event"], ended["trigger"], ended["refuse_s"], ended["vod_refused"]),
++                         ("vod_refuse_ended", 1, 0.8, 2))
++        # after the window: served again (the resume)
++        pos = 4_321_000
++        resumed = b40._Player(self.server.port, self.path, rng=f"bytes={pos}-", first=0)
++        self.assertEqual(resumed.read_rest(), "eof")
++        self.assertEqual(resumed.body(), b40._payload()[pos:])
++        self.assertEqual([r["event"] for r in self.rows(n=2)], ["vod_drop_injected", "vod_refuse_ended"])
++        for r in self.rows():
++            self.assert_redacted(r)
++
++    def test_a_plain_line_is_b40_as_built_its_row_byte_for_byte(self) -> None:
++        player = b40._Player(self.server.port, self.path)
++        b40._wait_streaming(self.test)
++        self.touch()                                              # B40's own command: a date line
++        injected = self.test.poll_once()
++        self.assertEqual(player.read_rest(), "ConnectionResetError")
++        self.assertEqual(sorted(injected), ["at_utc", "dropped", "event", "how", "ids", "trigger"])
++        again = b40._Player(self.server.port, self.path, rng="bytes=5-", first=0)
++        self.assertEqual(again.read_rest(), "eof")               # no window: served at once
++        self.assertIsNone(self.test.tick())
++        self.assertEqual(self.test.refused, 0)
++
++    def test_drop_0_is_a_plain_line(self) -> None:
++        self.append("drop 0")
++        row = self.test.poll_once()
++        self.assertNotIn("refuse_s", row)
++        self.assertFalse(self.test._refusing())
++
++    def test_only_the_appended_bytes_are_read_an_old_drop_line_never_applies(self) -> None:
++        self.append("drop 30")                                    # before this DropTest's start: the baseline
++        fresh = self.make_test()
++        self.touch()                                              # a plain line appended after the start
++        row = fresh.poll_once()
++        self.assertNotIn("refuse_s", row)
++        self.append("drop 0.5")
++        self.assertEqual(fresh.poll_once()["refuse_s"], 0.5)
++        self.assertTrue((self.project / vod_drop_test.TRIGGER).exists())   # never removed
++
++    def test_a_new_trigger_inside_a_window_closes_it_first(self) -> None:
++        self.append("drop 5")
++        first = self.test.poll_once()
++        self.append("x")
++        second = self.test.poll_once()
++        rows = self.rows(n=3)
++        self.assertEqual([r["event"] for r in rows], ["vod_drop_injected", "vod_refuse_ended", "vod_drop_injected"])
++        self.assertEqual((rows[1]["trigger"], rows[1]["refuse_s"], rows[1]["vod_refused"]), (1, 5.0, 0))
++        self.assertEqual((first["trigger"], second["trigger"]), (1, 2))
++        self.assertNotIn("refuse_s", second)
++        self.assertFalse(self.test._refusing())
++
++    def test_a_loader_retrying_through_the_window_is_reset_every_time_then_served(self) -> None:
++        # Media3's progressive loader, scaled 1:10 (0, 0.1, 0.2, 0.3, 0.4, 0.5 s ...): every attempt inside the
++        # window gets a reset; the first one after it gets the body
++        self.append("drop 0.8")
++        self.test.poll_once()
++        outcomes, n, start = [], 0, time.time()
++        while True:
++            time.sleep(min(max(n - 1, 0) * 0.1, 0.5))
++            how, got = _raw(self.server.port, self.path, "bytes=100-199")
++            n += 1
++            ok = b"206 Partial Content" in got.split(b"\r\n", 1)[0]
++            outcomes.append((round(time.time() - start, 2), ok))
++            if ok:
++                break
++            self.assertLess(time.time() - start, 3.0)
++        self.assertGreaterEqual(len(outcomes), 3)
++        self.assertTrue(all(not ok for _, ok in outcomes[:-1]))
++        self.assertGreaterEqual(outcomes[-1][0], 0.8)
++        self.assertEqual(self.test.refused, len(outcomes) - 1)
++
++
++class Parse(unittest.TestCase):
++    def test_refuse_seconds(self) -> None:
++        f = vod_drop_test.refuse_seconds
++        self.assertEqual(f(b"drop 45\n"), 45.0)
++        self.assertEqual(f(b"drop 45"), 45.0)
++        self.assertEqual(f(b"  drop   2.5  \n\n"), 2.5)
++        self.assertEqual(f(b"drop 9999\n"), vod_drop_test.REFUSE_MAX_S)
++        self.assertEqual(f(b"drop 45\n2026-11-06T18:00:00Z\n"), 0.0)   # the last line wins
++        self.assertEqual(f(b"2026-11-06T18:00:00Z\ndrop 3\n"), 3.0)
++        for junk in (b"", b"\n", b"drop", b"drop -3", b"drop abc", b"DROP 5", b"drop 5 s", b"\xff\xfe"):
++            self.assertEqual(f(junk), 0.0, junk)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/vod_log/test_vod_log_b43.py b/tests/vod_log/test_vod_log_b43.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..a8407431613d41a523e2312f9fda97938c576cea
+--- /dev/null
++++ b/tests/vod_log/test_vod_log_b43.py
+@@ -0,0 +1,56 @@
++"""B43: the client log's whitelist gains `reason` / `kind` / `token_refetched` (a B43 client inside vod_retry=1); a
++B35 client's rows (none of the three) are written as before, field for field."""
++from __future__ import annotations
++
++import json
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++
++import vod_log  # noqa: E402
++
++
++def _rows(d: str) -> list[dict]:
++    p = Path(d) / "logs" / vod_log.CLIENT_LOG_NAME
++    return [json.loads(x) for x in p.read_text().splitlines()] if p.exists() else []
++
++
++class B43Fields(unittest.TestCase):
++    base = {"event": "vod_retry", "media": "0123456789ab", "attempt": 2, "position_ms": 6_600_000,
++            "delay_ms": 2000, "elapsed_ms": 1003, "bound_ms": 150_000, "error_code": 2004,
++            "error_name": "ERROR_CODE_IO_BAD_HTTP_STATUS"}
++
++    def test_the_new_fields_written_when_valid(self) -> None:
++        with tempfile.TemporaryDirectory() as d:
++            log = vod_log.ClientLog(Path(d), clock=lambda: 0.0)
++            log.accept(dict(self.base, reason="401", token_refetched=True))
++            for r in ("reset", "refused", "timeout", "403"):
++                log.accept({"event": "vod_error", "media": "0123456789ab", "reason": r})
++            for k in ("lost", "refused"):
++                log.accept({"event": "vod_gave_up", "media": "0123456789ab", "attempts": 3, "reason": "401", "kind": k})
++            rows = _rows(d)
++            self.assertEqual((rows[0]["reason"], rows[0]["token_refetched"]), ("401", True))
++            self.assertEqual([r["reason"] for r in rows[1:5]], ["reset", "refused", "timeout", "403"])
++            self.assertEqual([r["kind"] for r in rows[5:]], ["lost", "refused"])
++
++    def test_junk_refused_and_nothing_written(self) -> None:
++        with tempfile.TemporaryDirectory() as d:
++            log = vod_log.ClientLog(Path(d), clock=lambda: 0.0)
++            for bad in ({"reason": "500"}, {"reason": 401}, {"reason": "x" * 80}, {"kind": "gone"},
++                        {"token_refetched": 1}, {"token_refetched": "true"}):
++                with self.assertRaises(ValueError):
++                    log.accept(dict(self.base, **bad))
++            self.assertEqual(_rows(d), [])
++
++    def test_a_b35_row_is_written_as_before(self) -> None:
++        with tempfile.TemporaryDirectory() as d:
++            vod_log.ClientLog(Path(d), clock=lambda: 0.0).accept(dict(self.base))
++            self.assertEqual(_rows(d), [dict({"at_utc": vod_log.utc_ms(0.0)}, **self.base)])
++
++
++if __name__ == "__main__":
++    unittest.main()

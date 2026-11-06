@@ -23,19 +23,21 @@ import java.security.MessageDigest
  * (its "virtual-remote", which declares GAMEPAD and took slot 0 in HOME-1 C4; its remote keyboard; gpio-keys) are
  * key-only, so they never take a slot; no vendor, product or name is compared.
  * Design: `docs/memory/evidence/b38_2026-11-02/design_written_before_code.md` (hashed before this code).
+ * B42 (G-A12, 2026-11-06): **on by default** -- absent / empty / junk = stable; `off` / `0` = today's first-input order.
  */
 object PadSlotsFlag {
     const val PROPERTY = "debug.privyhub.pad_slots"
 
-    fun parse(value: String?): Boolean = value?.trim() == "stable"
+    // B42: stable unless `off` / `0` (the user's G-A12 "yes", 2026-11-06, after HOME-2 C4'); `0` as B27's convention
+    fun parse(value: String?): Boolean = value?.trim().let { it != "off" && it != "0" }
 
-    /** The property, read through reflection; a failed read is absent (today). */
+    /** The property, read through reflection; a failed read is absent, so stable (B42). */
     fun fromSystem(): Boolean =
         try {
             val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
             parse(get.invoke(null, PROPERTY) as? String)
         } catch (_: Throwable) {
-            false
+            parse(null)
         }
 }
 
@@ -124,6 +126,34 @@ class PadSlots(private val count: Int = 4) {
 
     fun toJson(): JSONArray = JSONArray().apply {
         map().forEach { s -> put(JSONObject().put("slot", s.slot).put("pad", s.pad).put("class", s.cls)) }
+    }
+
+    // B41: the player prompt's reads and writes (additive; B34 / B38's paths above do not call them)
+
+    /** The slot an eligible device holds now, or null; never assigns. */
+    fun slotOf(d: PadDevice): Int? = if (!eligible(d)) null else slotOfKey(key(d))
+
+    fun slotOfKey(k: String): Int? = synchronized(lock) { byKey[k] }
+
+    /** The key holding a slot, or null. */
+    fun holderOf(slot: Int): String? = synchronized(lock) { byKey.entries.firstOrNull { it.value == slot }?.key }
+
+    /** The device takes this slot (its old slot, and the slot's old holder, let go). */
+    fun claim(d: PadDevice, slot: Int) {
+        val k = key(d)
+        synchronized(lock) {
+            byKey.entries.removeAll { it.value == slot || it.key == k }
+            byKey[k] = slot
+            classOf[k] = vendorClass(d.vendorId)
+        }
+    }
+
+    /** The slot's holder lets go; its key, or null when the slot was free. */
+    fun release(slot: Int): String? = synchronized(lock) {
+        val k = byKey.entries.firstOrNull { it.value == slot }?.key ?: return null
+        byKey.remove(k)
+        classOf.remove(k)
+        k
     }
 
     private fun assign(d: PadDevice, k: String, connected: List<PadDevice>): Int? {
