@@ -123,7 +123,9 @@ PKG = "com.safeiot.privyhub"
 # (kept at PrivyHub/app/build/cl_b15_installed/app-debug.apk).
 # TRIP-PREP (reinstalled 2026-10-29): CL-B14's fcd924c2... back for the trip (the loss guard out); CL-B16's
 # 9719ea822ed5f7d13799ff7e02ba814cd0a2abe79b8a2e3d631d0aecb13c0110 kept at PrivyHub/app/build/cl_b16_installed/app-debug.apk.
-ADOPTED_APK_SHA256 = "fcd924c28cbf70a85bb9a886caabcb07873eee2d028b6538284fce5a7ae39b96"
+# HOME-2 (installed 2026-11-06): queue M's APK replaced CL-B14's fcd924c28cbf70a85bb9a886caabcb07873eee2d028b6538284fce5a7ae39b96
+# (kept at PrivyHub/app/build/cl_b14_installed/app-debug.apk).
+ADOPTED_APK_SHA256 = "0132b94430d40e4e5ae78d2679fbee085f4f44273a804bc0ce8dcd040bdae24f"
 REFERENCE_PROFILE = "native_game_720p60_reference"
 MODE_ENV = "PRIVYHUB_ADAPTIVE_BITRATE_MODE"
 # C3-L4-D1 (2026-10-01): live is the companion's default through the systemd drop-in

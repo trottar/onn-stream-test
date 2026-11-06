@@ -1,6 +1,6 @@
 # Known issues and deferred work
 
-as_of: 2026-11-03. Open items only. The closed and superseded sections were moved verbatim on 2026-11-03 to
+as_of: 2026-11-06. Open items only. The closed and superseded sections were moved verbatim on 2026-11-03 to
 `docs/memory/archive/docs/KNOWN_ISSUES_CLOSED_2026-11-02.md` (with the B-queue / CL-B chronology that had grown under LAN-R1); their text is unchanged there.
 Sections below keep their text unchanged and their order.
 
@@ -9,7 +9,8 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
-- 2026-11-02 — Queue M (B38-B40), HOME-1's C1 / C4 / C5 answered in code; APK `0132b944…` pinned, NOT installed — OPEN (HOME-2) — `## 2026-11-02 Queue M` below; `docs/memory/handoffs/SESSION_B_DONE_2026-11-02M.md`
+- 2026-11-06 — HOME-2: C1' / C4' met; C5' not met (valid: B40's reset absorbed by the player, B35 never reached); `0132b944…` CONFIRMED, every property empty — OPEN (G-A11 / G-A12 the user's; G-A13 to B) — `## 2026-11-06 HOME-2` below; `docs/memory/evidence/HOME_2_HOLD_PADS_VOD_2026-11-03.md`
+- 2026-11-02 — Queue M (B38-B40), HOME-1's C1 / C4 / C5 answered in code; APK `0132b944…` CONFIRMED in HOME-2 (2026-11-06) — OPEN (C5' to B) — `## 2026-11-02 Queue M` below; `docs/memory/handoffs/SESSION_B_DONE_2026-11-02M.md`
 - 2026-11-02 — G-A10, `PRIVYHUB_STEP_IN_PLACE=1` ADOPTED (the fourteenth line); B's open items from HOME-1 — OPEN (to B) — `## 2026-11-02 G-A10` below; `docs/memory/evidence/G_A10_STEP_IN_PLACE_ADOPTION_2026-11-02.md`
 - 2026-11-02 — HOME-1: C2 / C3 met; C1 / C4 not met; C5 invalid; `554ccf61…` NOT CONFIRMED — OPEN (to B) — `## 2026-11-02 HOME-1` below
 - 2026-10-31 — TRIP-R2, off-site play, four episodes — OPEN (to B, queue L) — `## 2026-10-31 TRIP-R2` below
@@ -38,13 +39,28 @@ One line per open item: date — item — status — where it lives.
 
 **Carried out (no section of their own here):**
 - 2026-10-27..29 — the loss guard / stall interaction (the guard's holds draw stall pauses; B29's fix did not take); G-A8 (`PRIVYHUB_LOSS_GUARD=1`) PREPARED, never applied; the guard out since TRIP-PREP (`fcd924c2…` CONFIRMED, no guard default) — OPEN (a B item) — the moved LAN-R1 chronology (B27, CL-B15, B29, CL-B16, TRIP-PREP) in the closed file; `docs/memory/patches/G-A8_LOSS_GUARD_ADOPTION_PREPARED.md`
-- 2026-11-02 — HOME-1 C1, the hold's report counter — NOT MET; B39 built in `0132b944…`, not installed — pending HOME-2 — `docs/memory/handoffs/SESSION_B_DONE_2026-11-02M.md`
-- 2026-11-02 — HOME-1 C4, the onn's virtual remote takes a pad slot — NOT MET; B38 built (no slot for it), not installed — pending HOME-2 — same handoff
-- 2026-11-02 — HOME-1 C5, the VOD drop — INVALID; B40's drop test built behind `PRIVYHUB_VOD_DROP_TEST=1` (bench only, never to be adopted), not installed — pending HOME-2 — same handoff
+- 2026-11-02 — HOME-1 C1, the hold's report counter — MET in HOME-2 C1' (B39; `held` 1, `losses` 1, `restarted` 0) — G-A11 the user's question — `docs/memory/evidence/HOME_2_HOLD_PADS_VOD_2026-11-03.md`
+- 2026-11-02 — HOME-1 C4, the onn's virtual remote takes a pad slot — MET in HOME-2 C4' (B38; `count` 2, no `google` entry) — G-A12 the user's question — same record
+- 2026-11-02 — HOME-1 C5, the VOD drop — INVALID; HOME-2 C5' valid, NOT MET: B40's single reset (`dropped: 1`, `rst`, twice) was absorbed by the player's own reconnect (`bytes=<P>-` 206), no player error, so B35's retry never ran — OPEN (to B: a drop that outlasts the player's own retries) — same record
 - 2026-10-19 — G8-S6, three paired cap-6000 cells, control vs `PRIVYHUB_ENCODER_RC=tight` (does `tight` keep a capped stream from going silent?) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §1 (its preconditions are stale)
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-06 HOME-2: C1' / C4' met; C5' not met (valid); `0132b944…` CONFIRMED — OPEN (G-A11 / G-A12 the user's; G-A13 to B)
+
+(`docs/memory/evidence/HOME_2_HOLD_PADS_VOD_2026-11-03.md`)
+
+- **C1' MET:** a 3.5-s Home press kept the session (`held`); the report reads `held` 1, `losses` 1, `restarted` 0 over
+  the whole session. G-A11 is the user's question.
+- **C4' MET:** two pads in slots 0 / 1 both starts, the onn's virtual remote in none; `updates_by_player` and `/status`
+  `changes_by_player` count only the pad that moved. G-A12 is the user's question.
+- **C5' NOT MET (valid):** B40's reset hit the streaming movie twice (`dropped: 1`, `how: rst`); the player's own loader
+  reopened at `bytes=<P>-` (206) and played on; no player error, no `vod_client.jsonl`, no "reconnecting…". Then the
+  close's companion restart, mid-movie, ended its media token: B35 showed "reconnecting…", retried ~2.5 min against
+  401s with the hub up, and gave up with "connection to hub lost". **To B:** a drop that outlasts the player's own
+  retries; B35 to re-fetch the session / token on retry; a 401 is not a lost hub.
+- `0132b944…` CONFIRMED; the pin moved; every property empty on the onn.
 
 ## 2026-11-02 Queue M (B38-B40): HOME-1's C1 / C4 / C5 answered in code; APK `0132b944…` built, not installed — OPEN (HOME-2)
 

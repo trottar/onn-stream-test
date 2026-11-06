@@ -79,7 +79,10 @@ PKG = "com.safeiot.privyhub"
 # TRIP-PREP (2026-10-29, the user's "Yes to both"): the loss guard OUT for the trip -- CL-B14's CONFIRMED fcd924c2...
 # reinstalled (B5 ... B25: the link report, the 2.4-GHz notice, the stall signal and the restart guard on by default, the
 # fast-restart client; no guard default (B27), no quiet guard (B29)); 9719ea82... (CL-B16) kept at cl_b16_installed/
-EXPECT_APK = "fcd924c28cbf70a85bb9a886caabcb07873eee2d028b6538284fce5a7ae39b96"
+# HOME-2 (installed 2026-11-06, CONFIRMED 2026-11-06): queue M's APK (B5 ... B25 + B32 + B34 + B35 + B38 + B39; B27 / B29
+# out; the hold, stable slots and the movie retry behind their properties, all empty); the previous CONFIRMED APK was
+# fcd924c2... (CL-B14), kept at cl_b14_installed/
+EXPECT_APK = "0132b94430d40e4e5ae78d2679fbee085f4f44273a804bc0ce8dcd040bdae24f"
 LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
 # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
 # is exactly these two names, at every precondition and teardown

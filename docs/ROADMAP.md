@@ -24,15 +24,16 @@
   (G-A4), the fast restart (G-A5) and its unlock (G-A7), `PRIVYHUB_REMOTE=1` (G-A9; acts only on a remote-class
   session), the step in place (G-A10, 2026-11-02). **The one off switch for any line:** delete its drop-in,
   `daemon-reload`, restart the companion.
-- **The client:** APK `fcd924c2…` is CONFIRMED on the onn (CL-B14's build: the loss guard out, the link notice on by
-  default). `554ccf61…` is NOT CONFIRMED (HOME-1). `0132b944…` (queue M) is pinned, NOT installed. B27 and B29 are not
-  in the confirmed APK.
+- **The client:** APK `0132b944…` (queue M) is CONFIRMED on the onn (HOME-2, 2026-11-06), every property empty: the
+  hold, stable slots and the movie retry are built in and off. `fcd924c2…` (CL-B14) is the previous CONFIRMED one, kept;
+  `554ccf61…` is NOT CONFIRMED (HOME-1). B27 and B29 are not in the confirmed APK.
 - **Units:** `privyhub-companion` and `privyhub-diag` (B36, the diagnostics keeper; `docs/DIAGNOSTICS.md`) run.
   `privyhub-link-n1` ended 2026-10-31; `privyhub-trip-log` ended 2026-11-01.
 - **Live, not a line of its own:** B33 inside line 10 (off: `PRIVYHUB_REWIND_NEEDS_LOSS=0`).
-- **Done lately:** HOME-1 (2026-11-02: C2 and C3 met, C1 and C4 not met, C5 invalid;
-  `docs/memory/evidence/HOME_1_TRIP_CLOSE_AND_QUEUE_L_CELLS_2026-11-02.md`); queue M (B38-B40 built, nothing adopted).
-- **Next:** HOME-2, session A's task in `docs/memory/handoffs/SESSION_B_DONE_2026-11-02M.md` §A; not yet run.
+- **Done lately:** HOME-2 (2026-11-06: C1' and C4' met, C5' not met (valid); `0132b944…` CONFIRMED;
+  `docs/memory/evidence/HOME_2_HOLD_PADS_VOD_2026-11-03.md`); HOME-1 (2026-11-02); queue M (B38-B40).
+- **Next:** the user's G-A11 (the hold on by default) and G-A12 (stable slots on by default); C5' back to B (a drop
+  that outlasts the player's own retries) before G-A13.
 
 #### Superseded text (kept): the §0 marker as of 2026-10-05
 
@@ -2236,6 +2237,13 @@ B34 + B35 + B38 + B39; B27 / B29 out) `0132b944…e24f` pinned, NOT installed.**
 - **B40:** a hub-side VOD drop for the bench (`PRIVYHUB_VOD_DROP_TEST=1`, a file trigger, an RST), never to be
   adopted; it makes C5 valid.
 - Next: HOME-2 (`docs/memory/handoffs/SESSION_B_DONE_2026-11-02M.md`).
+
+**HOME-2 (2026-11-06): queue M on the onn; C1' MET, C4' MET, C5' NOT MET (valid); `0132b944…e24f` CONFIRMED, the pin
+moved, every property empty; nothing adopted** (`docs/memory/evidence/HOME_2_HOLD_PADS_VOD_2026-11-03.md`).
+- C1': a 3.5-s Home kept the session; the report `held` 1, `losses` 1, `restarted` 0, the whole session's duration.
+- C4': two pads in slots 0 / 1, the virtual remote in none; only the moved pad counts.
+- C5': B40's reset (`dropped: 1`, twice) absorbed by the player's own reconnect; B35 never reached.
+- Next: the user's G-A11 / G-A12; C5' to B before G-A13.
 
 ## G9 — Remote foundation checkpoint
 

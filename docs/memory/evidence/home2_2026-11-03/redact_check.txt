@@ -1,0 +1,66 @@
+# HOME-2 redact check (tools/e3_redact_check.sh), every file this session wrote under home2_2026-11-03/, the record and the patch note; docs edits checked below.
+# Not identifiers: the APK hashes; sha256 manifest / pre-registration lines; the debug signer's digest prefix (public); opaque 6-hex pad-slot keys are not written (labels only).
+E3 redactor check (h2_prep_redact.py --check, stdin per file), 2026-11-06T16:56:33Z
+OK   docs/memory/evidence/home2_2026-11-03/c1/C1.md
+OK   docs/memory/evidence/home2_2026-11-03/c1/heartbeat_seq.txt
+OK   docs/memory/evidence/home2_2026-11-03/c1/property_cleared.txt
+OK   docs/memory/evidence/home2_2026-11-03/c1/property_set.txt
+OK   docs/memory/evidence/home2_2026-11-03/c1/recovery_rows.jsonl
+OK   docs/memory/evidence/home2_2026-11-03/c1/report_163430_no_hold.json
+OK   docs/memory/evidence/home2_2026-11-03/c1/report_163524_surface_hold.json
+OK   docs/memory/evidence/home2_2026-11-03/c4/C4.md
+OK   docs/memory/evidence/home2_2026-11-03/c4/controller_numbers.txt
+OK   docs/memory/evidence/home2_2026-11-03/c4/heartbeat_counters.txt
+OK   docs/memory/evidence/home2_2026-11-03/c4/off_check.txt
+OK   docs/memory/evidence/home2_2026-11-03/c4/property_cleared.txt
+OK   docs/memory/evidence/home2_2026-11-03/c4/property_set.txt
+OK   docs/memory/evidence/home2_2026-11-03/c4/recovery_rows.jsonl
+OK   docs/memory/evidence/home2_2026-11-03/c4/status_read.txt
+OK   docs/memory/evidence/home2_2026-11-03/c5/C5.md
+OK   docs/memory/evidence/home2_2026-11-03/c5/companion_restart.txt
+OK   docs/memory/evidence/home2_2026-11-03/c5/no_game.txt
+OK   docs/memory/evidence/home2_2026-11-03/c5/onn_logcat_extract.txt
+OK   docs/memory/evidence/home2_2026-11-03/c5/property_set.txt
+OK   docs/memory/evidence/home2_2026-11-03/c5/trigger.txt
+OK   docs/memory/evidence/home2_2026-11-03/c5/user_line.txt
+OK   docs/memory/evidence/home2_2026-11-03/c5/vod_drop_test_redacted.jsonl
+OK   docs/memory/evidence/home2_2026-11-03/c5/vod_range_redacted.jsonl
+OK   docs/memory/evidence/home2_2026-11-03/close/check_close.json
+OK   docs/memory/evidence/home2_2026-11-03/close/check_end.json
+OK   docs/memory/evidence/home2_2026-11-03/close/client_end.json
+OK   docs/memory/evidence/home2_2026-11-03/close/close.txt
+OK   docs/memory/evidence/home2_2026-11-03/close/diag_check_end.txt
+OK   docs/memory/evidence/home2_2026-11-03/close/dropins_end.txt
+OK   docs/memory/evidence/home2_2026-11-03/close/flags_absent.json
+OK   docs/memory/evidence/home2_2026-11-03/close/properties_close.txt
+OK   docs/memory/evidence/home2_2026-11-03/close/units_end.txt
+OK   docs/memory/evidence/home2_2026-11-03/pin/after_sha256.txt
+OK   docs/memory/evidence/home2_2026-11-03/pin/home2_pin.diff
+OK   docs/memory/evidence/home2_2026-11-03/pin/predecessors/c3_l4_nft_night.py
+HIT  docs/memory/evidence/home2_2026-11-03/pin/predecessors/e1_suite.py
+OK   docs/memory/evidence/home2_2026-11-03/pin/predecessor_sha256.txt
+OK   docs/memory/evidence/home2_2026-11-03/pin/predecessors/test_c3_l4_nft_night.py
+OK   docs/memory/evidence/home2_2026-11-03/pin/tests.txt
+OK   docs/memory/evidence/home2_2026-11-03/preregistration.md
+OK   docs/memory/evidence/home2_2026-11-03/preregistration.sha256
+OK   docs/memory/evidence/home2_2026-11-03/stage1/apk_sha256.txt
+OK   docs/memory/evidence/home2_2026-11-03/stage1/check_after_restart.json
+OK   docs/memory/evidence/home2_2026-11-03/stage1/client_after_install.json
+OK   docs/memory/evidence/home2_2026-11-03/stage1/client_before.json
+OK   docs/memory/evidence/home2_2026-11-03/stage1/companion_restart.txt
+OK   docs/memory/evidence/home2_2026-11-03/stage1/install_at.txt
+OK   docs/memory/evidence/home2_2026-11-03/stage1/install.log
+OK   docs/memory/evidence/home2_2026-11-03/stage1/preconditions.txt
+OK   docs/memory/evidence/home2_2026-11-03/stage1/properties_after_install.txt
+OK   docs/memory/evidence/home2_2026-11-03/stage1/properties_before.txt
+OK   docs/memory/evidence/home2_2026-11-03/stage1/signer.txt
+OK   docs/memory/evidence/home2_2026-11-03/stage1/STAGE1.md
+OK   docs/memory/evidence/HOME_2_HOLD_PADS_VOD_2026-11-03.md
+OK   docs/memory/patches/HOME-2_APK_PIN.md
+OK   docs/KNOWN_ISSUES.md
+OK   docs/ROADMAP.md
+OK   docs/memory/CURRENT.md
+OK   docs/memory/patches/PATCH_INDEX.md
+
+Re-check of the HIT per the FLAG rule (as CL-B7): benign only if OK with 127.0.0.1, 0.0.0.0 and the core's version string removed:
+OK (benign)  docs/memory/evidence/home2_2026-11-03/pin/predecessors/e1_suite.py (the tree's own tools/e1_suite.py, the same match)

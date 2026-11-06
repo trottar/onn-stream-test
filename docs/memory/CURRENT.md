@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-11-03
-baseline_commit: b20729b8 (G-A10 adopted, queue M done, the docs audit; DOCS-APPLY uncommitted beside it; the user commits)
+as_of: 2026-11-06
+baseline_commit: 1f7a6fd8 (the docs pass; HOME-2 uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -14,17 +14,13 @@ Headings are fixed by `tools/check_memory_health.py`; do not rename. The history
 **Phase E ACTIVE** (E1 FROZEN, E2 MEASURED, E3 CLOSED, E4 CLOSED host side); **the G track (remote play) is under way.**
 The adopted environ is **FOURTEEN lines**. The fourteenth is G-A10, `PRIVYHUB_STEP_IN_PLACE=1`, adopted on the user's
 "Adopt" of 2026-11-02 (`evidence/G_A10_STEP_IN_PLACE_ADOPTION_2026-11-02.md`). HOME-1 closed the trip on 2026-11-02:
-C2 and C3 MET, C1 and C4 NOT MET, C5 INVALID (`evidence/HOME_1_TRIP_CLOSE_AND_QUEUE_L_CELLS_2026-11-02.md`). Queue M
-(B38–B40) was built for those three cells (`handoffs/SESSION_B_DONE_2026-11-02M.md`). The next step is HOME-2, which
-puts them on the onn.
+C2 and C3 MET. Queue M (B38–B40) answered its C1 / C4 / C5. **HOME-2 (2026-11-06) put queue M's APK on the onn: C1'
+and C4' MET, C5' NOT MET (valid); `0132b944…` CONFIRMED** (`evidence/HOME_2_HOLD_PADS_VOD_2026-11-03.md`).
 
 ## Current Work Item
 
-- **DOCS-APPLY** (session C, docs only; `handoffs/DOCS-APPLY_2026-11-03_TASK.md`, the audit's option (b)): uncommitted;
-  report `evidence/MEMORY_MAINTENANCE_REPORT_2026-11-03.md`.
-- **Next for session A: HOME-2.** Its sketch is §A of `handoffs/SESSION_B_DONE_2026-11-02M.md`. It installs
-  `0132b944…` with every property empty, then runs C1' (the hold), C4' (two pads) and C5' (the movie with the
-  hub-side drop), then applies the CONFIRMED rule and asks G-A11..13 as the user's questions. It has not run yet.
+- **HOME-2 is done, uncommitted** (session A, 2026-11-06). The user commits, then answers G-A11 and G-A12 (Next
+  Action). G-A13 is not asked: C5' goes back to B.
 
 ## Verified State
 
@@ -56,11 +52,11 @@ telemetry; the LAN as before); line 14 splices each ladder step onto the same st
 the name out of `tools/e1_suite.py` `ADOPTED`. Each record names its exceptions; `docs/REMOTE_TRUST.md` has the G lines.
 
 **The client.**
-- APK **`fcd924c2…` is CONFIRMED** on the onn. It is CL-B14's build: the client loss guard is out and the link notice
-  is on by default.
-- `554ccf61…` is NOT CONFIRMED (HOME-1; C5 invalid) and is kept in `PrivyHub/app/build/home1_installed/`.
-- Queue M's `0132b944…` (B5..B25 + B32 + B34 + B35 + B38 + B39; B27 / B29 out) is pinned and NOT installed.
-- The client properties are empty. One device is paired, with `identity_v2` on.
+- APK **`0132b944…` is CONFIRMED** on the onn (HOME-2; queue M: B5..B25 + B32 + B34 + B35 + B38 + B39, B27 / B29
+  out; `home2_installed/`), pinned in the three places. The hold, stable slots and the movie retry are in it, off.
+- `fcd924c2…` (CL-B14, the previous CONFIRMED) is kept in `cl_b14_installed/`; `554ccf61…` (NOT CONFIRMED) in
+  `home1_installed/`.
+- The ten client properties are empty. One device is paired, with `identity_v2` on.
 
 **Units.** `privyhub-companion` and `privyhub-diag` are running. `privyhub-diag` is the B36 keeper:
 `tools/diag_keeper.py`, read with `tools/diag_read.py` and `tools/diag_check.py`. The nightly watch
@@ -73,7 +69,8 @@ the save is still made. Off: `PRIVYHUB_REWIND_NEEDS_LOSS=0` (`evidence/B33_NO_RE
 - G-A6 SHELVED (B23's WAN thresholds).
 - G-A8 (`PRIVYHUB_LOSS_GUARD=1`): PREPARED and never applied. The guard is out, and B27 / B29 are not in the confirmed
   APK.
-- Client flags `debug.privyhub.surface_hold` (B32 / B39), `pad_slots=stable` (B34 / B38) and `vod_retry` (B35).
+- Client flags `debug.privyhub.surface_hold` (B32 / B39; C1' met), `pad_slots=stable` (B34 / B38; C4' met) and
+  `vod_retry` (B35; C5' not reached: B40's reset is absorbed by the player's own reconnect).
 - Host per-run flags `PRIVYHUB_VOD_LOG` (B35) and `PRIVYHUB_VOD_DROP_TEST` (B40, never adopted).
 - `PRIVYHUB_WAN_ADAPTATION` (G5-S2; its live smoke G5-S2-L never ran) and `PRIVYHUB_ENCODER_RC` (G8-S4).
 - The 1080p rung (`PRIVYHUB_ADAPTIVE_BITRATE_TOP`) and `PRIVYHUB_PS1_LOOK` (C5).
@@ -87,14 +84,15 @@ redundancy 2/4 (`P10`); the live ladder's top 7000; the PS1 source 1920×1080 at
 
 ## Next Action
 
-1. **The user's commit** of DOCS-APPLY (`git diff --stat` in `evidence/docs_apply_2026-11-03/`).
-2. **HOME-2** (session A, the user at the TV), as sketched in `handoffs/SESSION_B_DONE_2026-11-02M.md` §A:
-   - install `0132b944…` with every property empty;
-   - run C1' (`surface_hold.held` 1 in the report), C4' (two pads in slots 0 / 1, the virtual remote taking no slot,
-     `updates_by_player` on the pressed pad only) and C5' (the movie with the hub-side drop, B35's retry rows);
-   - apply the CONFIRMED rule;
-   - then ask G-A11 / G-A12 / G-A13 as the user's questions.
-3. **Later:** the loss guard's return (G-A8 is the prepared candidate); the G9 checkpoint draft (QUEUE_2026-10-19B's
+1. **The user's commit** of HOME-2 (`logs/home2_git_status.txt`).
+2. **The user's questions** (HOME-2's cells met; nothing adopted until answered):
+   - **G-A11 (C1'):** "Turn the screen-loss hold on by default in the next APK (`debug.privyhub.surface_hold`)? A Home
+     press, a guide press or a system panel of up to 12 s then keeps the session."
+   - **G-A12 (C4'):** "Turn stable player slots on by default (`debug.privyhub.pad_slots=stable`)? Real pads keep
+     their player number across launches; the onn's remote never takes one."
+3. **To B:** C5' (a drop that keeps the movie unreachable past the player's own retries; B35 keeps a dead media token
+   after a companion restart and calls a 401 "connection to hub lost"), then G-A13.
+4. **Later:** the loss guard's return (G-A8 is the prepared candidate); the G9 checkpoint draft (QUEUE_2026-10-19B's
    G9-D1, as its own task).
 
 **Open, not blocking** — the full list is `docs/KNOWN_ISSUES.md`'s open index: G8-S6 and G5-S2-L (`handoffs/QUEUE_2026-10-19N.md`,
@@ -148,7 +146,7 @@ CONFIRMED only by its pre-registered rule (CL-B7 §6); otherwise `fcd924c2…` g
 
 - G adoptions: `evidence/G_A1_…`, `G_A2_…`, `G_A3_…`, `G_A4_…`, `G_A5_…`, `G_A7_…`, `TRIP_PREP_2026-10-29.md` (G-A9),
   `G_A10_…_2026-11-02.md`; `docs/REMOTE_TRUST.md`. Client / trip: `CL_B14_…` (`fcd924c2…`), `CL_B16_…`, `TRIP_R2_…`,
-  `HOME_1_…`, queue M's `B38_…` / `B39_…` / `B40_…` and `handoffs/SESSION_B_DONE_2026-11-02M.md`.
+  `HOME_1_…`, `HOME_2_…`, queue M's `B38_…` / `B39_…` / `B40_…` and `handoffs/SESSION_B_DONE_2026-11-02M.md`.
 - Closers: `evidence/E4_CLOSEOUT_2026-10-15.md`, `E2_S1_…`, `E1_S1_…`, `C5_CLOSE_2026-10-05.md`,
   `D_BASE_CLOSEOUT_2026-09-23.md`; `architecture/E1_WORKLOAD_SUITE.md`.
 - Indexes: `handoffs/README.md`, `patches/PATCH_INDEX.md`, `archive/INDEX.md`; `docs/ROADMAP.md`, `docs/KNOWN_ISSUES.md`,
