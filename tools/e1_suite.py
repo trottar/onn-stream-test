@@ -82,7 +82,10 @@ PKG = "com.safeiot.privyhub"
 # HOME-2 (installed 2026-11-06, CONFIRMED 2026-11-06): queue M's APK (B5 ... B25 + B32 + B34 + B35 + B38 + B39; B27 / B29
 # out; the hold, stable slots and the movie retry behind their properties, all empty); the previous CONFIRMED APK was
 # fcd924c2... (CL-B14), kept at cl_b14_installed/
-EXPECT_APK = "0132b94430d40e4e5ae78d2679fbee085f4f44273a804bc0ce8dcd040bdae24f"
+# HOME-3 (installed 2026-11-06, CONFIRMED 2026-11-07): queue N's APK (queue M + B41 + B42 + B43; the hold and stable
+# slots on by default, the prompt and the movie retry behind their properties, all empty); the previous CONFIRMED APK
+# was 0132b944... (HOME-2), kept at home2_installed/
+EXPECT_APK = "8ba4d996a96c14d01b1e368c20e656f767062d34b17b9308d984b8c43834605f"
 LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
 # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
 # is exactly these two names, at every precondition and teardown

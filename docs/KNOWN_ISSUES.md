@@ -1,6 +1,6 @@
 # Known issues and deferred work
 
-as_of: 2026-11-06. Open items only. The closed and superseded sections were moved verbatim on 2026-11-03 to
+as_of: 2026-11-07. Open items only. The closed and superseded sections were moved verbatim on 2026-11-03 to
 `docs/memory/archive/docs/KNOWN_ISSUES_CLOSED_2026-11-02.md` (with the B-queue / CL-B chronology that had grown under LAN-R1); their text is unchanged there.
 Sections below keep their text unchanged and their order.
 
@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-07 — HOME-3: C1'' / C4'' met with no property; C6 the prompt NOT MET (valid; the user's requirement: the prompt at every start and unpause); C5'' (b) met, (a) met on behaviour with two rows short; `8ba4d996…` CONFIRMED — OPEN (G-A13 the user's; C6 and two VOD items to B) — `## 2026-11-07 HOME-3` below; `docs/memory/evidence/HOME_3_DEFAULTS_PROMPT_VOD_2026-11-06.md`
 - 2026-11-06 — Queue N (B41-B45): the prompt, the two defaults, the movie retry made real, the G9 draft, the H0 design; APK built, not installed — OPEN (HOME-3) — `## 2026-11-06 Queue N` below; `docs/memory/handoffs/SESSION_B_DONE_2026-11-06N.md`
 - 2026-11-06 — HOME-2: C1' / C4' met; C5' not met (valid: B40's reset absorbed by the player, B35 never reached); `0132b944…` CONFIRMED, every property empty — OPEN (G-A11 / G-A12 the user's; G-A13 to B) — `## 2026-11-06 HOME-2` below; `docs/memory/evidence/HOME_2_HOLD_PADS_VOD_2026-11-03.md`
 - 2026-11-02 — Queue M (B38-B40), HOME-1's C1 / C4 / C5 answered in code; APK `0132b944…` CONFIRMED in HOME-2 (2026-11-06) — OPEN (C5' to B) — `## 2026-11-02 Queue M` below; `docs/memory/handoffs/SESSION_B_DONE_2026-11-02M.md`
@@ -47,6 +48,23 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-07 HOME-3: C1'' / C4'' met; C6 not met (valid); C5'' (b) met, (a) two rows short; `8ba4d996…` CONFIRMED — OPEN (G-A13 the user's; C6 to B)
+
+(`docs/memory/evidence/HOME_3_DEFAULTS_PROMPT_VOD_2026-11-06.md`)
+
+- **C1'' / C4'' MET with every property empty** (B42's defaults): a 2.6-s Home held; two pads in slots 0 / 1 both
+  starts, only the moved pad counted; `0` / `off` give the old restart and no slot rows.
+- **C6 NOT MET (valid), to B:**
+  - the user's requirement (verbatim): "It should pop up every time a game is active or unpaused. It's like the
+    connection diagnostics, it's to assure consistency and reliability each play session". As built, no prompt shows
+    at a start while pads hold slots from earlier in the app's process;
+  - a release (Select+Start 2 s) with Start held last re-takes the slot at once (no key-repeat filter on the claim;
+    Start first, Select last works);
+  - then the user's question: a 1-player title, prompt or none.
+- **C5'' to B:** "reconnecting…" stayed on screen after the `drop 45` resume (the movie played); the resumed range
+  row was lost at a companion restart (rows are written on close). (b), the restart, MET.
+- `8ba4d996…` CONFIRMED; the pin moved; every property empty on the onn.
 
 ## 2026-11-06 Queue N (B41-B45): the player prompt, the hold and stable slots on by default, the movie retry made real, the G9 draft, the H0 design — OPEN (HOME-3)
 

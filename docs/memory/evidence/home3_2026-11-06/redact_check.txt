@@ -1,0 +1,92 @@
+# HOME-3 redact check (tools/e3_redact_check.sh), every file this session wrote under home3_2026-11-06/, the record and the patch note; then the docs / tools edits' added lines.
+# Pad hashes and the movie id were replaced by labels before the check (LABELS.txt). Not identifiers: the APK hashes; sha256 lines; the debug signer's digest prefix.
+# The HITs are false positives: the core's version string '0.9.44.1' read as an IPv4 (every copied report), and the loopback in e1_suite.py's predecessor copy (as in HOME-2). The redactor's own substitutions:
+# diff:      11 >     "capture_description": "Capture: RetroArch window  1920x1080\nRetroArch Beetle PSX HW <ipv4> 82d8e05",
+# diff:       1 >         s.sendto(cmd.encode(), ("<ipv4>", int(m.group(1))))
+E3 redactor check (h2_prep_redact.py --check, stdin per file), 2026-11-07T17:16:39Z
+OK   docs/memory/evidence/home3_2026-11-06/c1/C1.md
+OK   docs/memory/evidence/home3_2026-11-06/c1/heartbeat_seq.txt
+OK   docs/memory/evidence/home3_2026-11-06/c1/note_first_stage3.txt
+OK   docs/memory/evidence/home3_2026-11-06/c1/offcheck_property_set.txt
+HIT  docs/memory/evidence/home3_2026-11-06/c1/offcheck_report_164613_402.json
+HIT  docs/memory/evidence/home3_2026-11-06/c1/offcheck_report_164623_407.json
+OK   docs/memory/evidence/home3_2026-11-06/c1/offcheck_rows.jsonl
+OK   docs/memory/evidence/home3_2026-11-06/c1/property_cleared.txt
+OK   docs/memory/evidence/home3_2026-11-06/c1/property_read.txt
+OK   docs/memory/evidence/home3_2026-11-06/c1/recovery_rows.jsonl
+HIT  docs/memory/evidence/home3_2026-11-06/c1/report_164447.json
+OK   docs/memory/evidence/home3_2026-11-06/c4/C4.md
+OK   docs/memory/evidence/home3_2026-11-06/c4/heartbeat_by_player.txt
+OK   docs/memory/evidence/home3_2026-11-06/c4/offcheck_heartbeat.txt
+OK   docs/memory/evidence/home3_2026-11-06/c4/offcheck_property_set.txt
+HIT  docs/memory/evidence/home3_2026-11-06/c4/offcheck_report_165108.json
+OK   docs/memory/evidence/home3_2026-11-06/c4/offcheck_rows.jsonl
+OK   docs/memory/evidence/home3_2026-11-06/c4/property_cleared.txt
+OK   docs/memory/evidence/home3_2026-11-06/c4/recovery_rows.jsonl
+HIT  docs/memory/evidence/home3_2026-11-06/c4/report_164809_699.json
+HIT  docs/memory/evidence/home3_2026-11-06/c4/report_164855_656.json
+OK   docs/memory/evidence/home3_2026-11-06/c5/a_vod_client.jsonl
+OK   docs/memory/evidence/home3_2026-11-06/c5/a_vod_drop_test.jsonl
+OK   docs/memory/evidence/home3_2026-11-06/c5/a_vod_range.jsonl
+OK   docs/memory/evidence/home3_2026-11-06/c5/b_restart.txt
+OK   docs/memory/evidence/home3_2026-11-06/c5/b_resume_range_row.jsonl
+OK   docs/memory/evidence/home3_2026-11-06/c5/b_vod_client.jsonl
+OK   docs/memory/evidence/home3_2026-11-06/c5/b_vod_range.jsonl
+OK   docs/memory/evidence/home3_2026-11-06/c5/C5.md
+OK   docs/memory/evidence/home3_2026-11-06/c5/drop1_at.txt
+OK   docs/memory/evidence/home3_2026-11-06/c5/setup.txt
+OK   docs/memory/evidence/home3_2026-11-06/c5/user_lines.txt
+OK   docs/memory/evidence/home3_2026-11-06/c6/C6.md
+OK   docs/memory/evidence/home3_2026-11-06/c6/note_no_prompt_at_start.txt
+OK   docs/memory/evidence/home3_2026-11-06/c6/property_cleared.txt
+OK   docs/memory/evidence/home3_2026-11-06/c6/property_set.txt
+OK   docs/memory/evidence/home3_2026-11-06/c6/recovery_rows_step4.jsonl
+OK   docs/memory/evidence/home3_2026-11-06/c6/recovery_rows_try1.jsonl
+OK   docs/memory/evidence/home3_2026-11-06/c6/recovery_rows_try2.jsonl
+HIT  docs/memory/evidence/home3_2026-11-06/c6/report_165310_try0.json
+HIT  docs/memory/evidence/home3_2026-11-06/c6/report_165600_try1.json
+HIT  docs/memory/evidence/home3_2026-11-06/c6/report_165849_try2.json
+HIT  docs/memory/evidence/home3_2026-11-06/c6/report_170024_crash_bash.json
+HIT  docs/memory/evidence/home3_2026-11-06/c6/report_170121_one_player.json
+OK   docs/memory/evidence/home3_2026-11-06/close/check_close.json
+OK   docs/memory/evidence/home3_2026-11-06/close/check_end.json
+OK   docs/memory/evidence/home3_2026-11-06/close/client_close.json
+OK   docs/memory/evidence/home3_2026-11-06/close/close.txt
+OK   docs/memory/evidence/home3_2026-11-06/close/diag_check_end.txt
+OK   docs/memory/evidence/home3_2026-11-06/close/dropins_end.txt
+OK   docs/memory/evidence/home3_2026-11-06/close/flags_absent.json
+OK   docs/memory/evidence/home3_2026-11-06/close/properties_close.txt
+OK   docs/memory/evidence/home3_2026-11-06/close/units_end.txt
+OK   docs/memory/evidence/home3_2026-11-06/LABELS.txt
+OK   docs/memory/evidence/home3_2026-11-06/pin/after_sha256.txt
+OK   docs/memory/evidence/home3_2026-11-06/pin/home3_pin.diff
+OK   docs/memory/evidence/home3_2026-11-06/pin/predecessors/c3_l4_nft_night.py
+HIT  docs/memory/evidence/home3_2026-11-06/pin/predecessors/e1_suite.py
+OK   docs/memory/evidence/home3_2026-11-06/pin/predecessor_sha256.txt
+OK   docs/memory/evidence/home3_2026-11-06/pin/predecessors/test_c3_l4_nft_night.py
+OK   docs/memory/evidence/home3_2026-11-06/pin/tests.txt
+OK   docs/memory/evidence/home3_2026-11-06/preregistration.md
+OK   docs/memory/evidence/home3_2026-11-06/preregistration.sha256
+OK   docs/memory/evidence/home3_2026-11-06/stage1/apk_sha256.txt
+OK   docs/memory/evidence/home3_2026-11-06/stage1/check_after_restart.json
+OK   docs/memory/evidence/home3_2026-11-06/stage1/check_before.json
+OK   docs/memory/evidence/home3_2026-11-06/stage1/client_after_install.json
+OK   docs/memory/evidence/home3_2026-11-06/stage1/client_before.json
+OK   docs/memory/evidence/home3_2026-11-06/stage1/companion_restart.txt
+OK   docs/memory/evidence/home3_2026-11-06/stage1/diag_check_before.txt
+OK   docs/memory/evidence/home3_2026-11-06/stage1/install_at.txt
+OK   docs/memory/evidence/home3_2026-11-06/stage1/install.log
+OK   docs/memory/evidence/home3_2026-11-06/stage1/preconditions.txt
+OK   docs/memory/evidence/home3_2026-11-06/stage1/properties_after_install.txt
+OK   docs/memory/evidence/home3_2026-11-06/stage1/properties_before.txt
+OK   docs/memory/evidence/home3_2026-11-06/stage1/signer.txt
+OK   docs/memory/evidence/home3_2026-11-06/stage1/STAGE1.md
+OK   docs/memory/evidence/HOME_3_DEFAULTS_PROMPT_VOD_2026-11-06.md
+OK   docs/memory/patches/HOME-3_APK_PIN.md
+OK   (added lines) docs/KNOWN_ISSUES.md
+OK   (added lines) docs/ROADMAP.md
+OK   (added lines) docs/memory/CURRENT.md
+OK   (added lines) docs/memory/patches/PATCH_INDEX.md
+OK   (added lines) tools/e1_suite.py
+OK   (added lines) tools/c3_l4_nft_night.py
+OK   (added lines) tools/test_c3_l4_nft_night.py

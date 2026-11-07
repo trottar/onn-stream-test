@@ -24,16 +24,18 @@
   (G-A4), the fast restart (G-A5) and its unlock (G-A7), `PRIVYHUB_REMOTE=1` (G-A9; acts only on a remote-class
   session), the step in place (G-A10, 2026-11-02). **The one off switch for any line:** delete its drop-in,
   `daemon-reload`, restart the companion.
-- **The client:** APK `0132b944…` (queue M) is CONFIRMED on the onn (HOME-2, 2026-11-06), every property empty: the
-  hold, stable slots and the movie retry are built in and off. `fcd924c2…` (CL-B14) is the previous CONFIRMED one, kept;
-  `554ccf61…` is NOT CONFIRMED (HOME-1). B27 and B29 are not in the confirmed APK.
+- **The client:** APK `8ba4d996…` (queue N) is CONFIRMED on the onn (HOME-3, 2026-11-07), every property empty: the
+  hold and stable slots on by default (G-A11 / G-A12, B42); the player prompt and the movie retry built in and off.
+  `0132b944…` (queue M, HOME-2) is the previous CONFIRMED one, kept; `fcd924c2…` (CL-B14) kept; `554ccf61…` is NOT
+  CONFIRMED (HOME-1). B27 and B29 are not in the confirmed APK.
 - **Units:** `privyhub-companion` and `privyhub-diag` (B36, the diagnostics keeper; `docs/DIAGNOSTICS.md`) run.
   `privyhub-link-n1` ended 2026-10-31; `privyhub-trip-log` ended 2026-11-01.
 - **Live, not a line of its own:** B33 inside line 10 (off: `PRIVYHUB_REWIND_NEEDS_LOSS=0`).
-- **Done lately:** HOME-2 (2026-11-06: C1' and C4' met, C5' not met (valid); `0132b944…` CONFIRMED;
-  `docs/memory/evidence/HOME_2_HOLD_PADS_VOD_2026-11-03.md`); HOME-1 (2026-11-02); queue M (B38-B40).
-- **Next:** the user's G-A11 (the hold on by default) and G-A12 (stable slots on by default); C5' back to B (a drop
-  that outlasts the player's own retries) before G-A13.
+- **Done lately:** HOME-3 (2026-11-07: C1'' / C4'' met by default, C6 not met, C5'' (b) met and (a) two rows short;
+  `8ba4d996…` CONFIRMED; `docs/memory/evidence/HOME_3_DEFAULTS_PROMPT_VOD_2026-11-06.md`); queue N (B41-B45); HOME-2
+  (2026-11-06); HOME-1 (2026-11-02).
+- **Next:** the user's G-A13 (the movie retry on by default); the G9 checkpoint (A, the draft applied); H0 slice 1a
+  (B, after B45's four questions); C6's requirement (the prompt at every start and unpause) to B.
 
 #### Superseded text (kept): the §0 marker as of 2026-10-05
 
@@ -2259,6 +2261,16 @@ pinned, NOT installed** (`docs/memory/handoffs/SESSION_B_DONE_2026-11-06N.md`).
   (PS1 dry run and manifest) is the next queue's.
 - Next: HOME-3 (C1'' / C4'' with no property, C6 the prompt, C5'' `drop 45` and the restart), then G-A13 and the
   prompt's default, then the G9 checkpoint.
+
+**HOME-3 (2026-11-07): queue N on the onn; C1'' MET, C4'' MET (no property; off checks met), C6 NOT MET (valid), C5''
+(b) MET and (a) met on behaviour with two rows short; `8ba4d996…605f` CONFIRMED, the pin moved, every property empty;
+nothing adopted** (`docs/memory/evidence/HOME_3_DEFAULTS_PROMPT_VOD_2026-11-06.md`).
+- C1'' / C4'': G-A11 / G-A12 work by default; `0` / `off` give the old behaviour.
+- C6: no prompt at a start while pads hold slots; a held-Start release re-claims. The user's requirement: the prompt at
+  every start and every unpause. To B; the prompt's default not asked.
+- C5'': `drop 45` → `vod_error` → retries → resumed at the position (first row 23 s, not ~30-35; the range row
+  unwritten; "reconnecting…" left on screen); a companion restart → 401 → token refetched → resumed in 3.6 s.
+- Next: the user's G-A13; the G9 checkpoint (A); H0 slice 1a (B, B45's four questions first).
 
 ## G9 — Remote foundation checkpoint
 

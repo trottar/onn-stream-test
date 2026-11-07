@@ -101,6 +101,7 @@ note feeds, or its gate / flag, where the records say; "—" where none applies.
 | CL-B7P_OPUS_DRAIN_LEAN_FLAG.md | cl-b | APPLIED | client `opus_decode` `lean` mode |
 | CL-B7_LEAN_APK_HASH.md | cl-b | APPLIED | APK pin, since replaced |
 | HOME-2_APK_PIN.md | cl-b | APPLIED | APK pin `0132b944…` (queue M), CONFIRMED 2026-11-06 |
+| HOME-3_APK_PIN.md | cl-b | APPLIED | APK pin `8ba4d996…` (queue N), CONFIRMED 2026-11-07 |
 | D-BASE-C5A_IDR_REJECTION_COUNTERS.md | d-base | APPLIED | D-BASE (closed) |
 | D-BASE-P10_AUDIO_REDUNDANCY.md | d-base | APPLIED | D-BASE (closed) |
 | D-BASE-P1_STALE_THRESHOLD_PROBE_KNOB.md | d-base | APPLIED | D-BASE (closed) |
@@ -292,6 +293,6 @@ note feeds, or its gate / flag, where the records say; "—" where none applies.
 | E4-S4_GRAB_DEFERRAL_FLAG.md | phase-e | APPLIED | `PRIVYHUB_EPG_DEFER_WHILE_STREAMING=1`, rejected, dormant |
 | E4-S5_SNES_CAPTURE_OUTPUT_RATE_FLAG.md | phase-e | APPLIED (its note: "REJECTED; dormant") | line 5, via E4-S5D |
 
-**Count:** 242 rows = `git ls-files docs/memory/patches | wc -l` (242 once HOME-2 is committed): APPLIED 231, PREPARED-UNAPPLIED 1, SUPERSEDED 8,
-INDEX 1, PROTOCOL 1. By family: adb 5, b-series 39, cl-b 8, d-base 22, d-series 70, g-track 25, index 2, memory 3,
+**Count:** 243 rows; `git ls-files docs/memory/patches | wc -l` is 246 once HOME-3 is committed (queue N's three patch notes, `B41_…` / `B42_…` / `B43_…`, have no row yet): APPLIED 232, PREPARED-UNAPPLIED 1, SUPERSEDED 8,
+INDEX 1, PROTOCOL 1. By family: adb 5, b-series 39, cl-b 9, d-base 22, d-series 70, g-track 25, index 2, memory 3,
 misc 5, phase-c 39, phase-e 24.
