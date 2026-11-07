@@ -132,8 +132,14 @@ REMOTE = "PRIVYHUB_REMOTE=1"
 # today's encoder restart (B32's host half; HOME-1 C2) -- through its own drop-in (step-in-place.conf); the adopted
 # environ is exactly these fourteen names
 STEP_IN_PLACE = "PRIVYHUB_STEP_IN_PLACE=1"
+# G-A13 (adopted 2026-11-07, the user): the movie range log -- one redacted JSON row per VOD range request to
+# logs/vod_range.jsonl (status, bytes, duration, how it closed; the path hashed, the token dropped; 5 MB x 3), and the
+# client's movie-retry rows to logs/vod_client.jsonl when a client posts them (B35 / B43; HOME-3 C5'') -- the host half
+# of "Reconnect by default yes"; PRIVYHUB_VOD_DROP_TEST is never a line -- through its own drop-in (vod-log.conf); the
+# adopted environ is exactly these fifteen names
+VOD_LOG = "PRIVYHUB_VOD_LOG=1"
 ADOPTED = sorted([LIVE, INDEX, SNES_CORE, RECOVERY, SNES_CAPTURE, OVERLAY, IDENTITY, AUDIO_CODEC, LINK_REPORT,
-                  LINK_RECOVERY, RESTART_FAST, RESTART_FAST_UNLOCK, REMOTE, STEP_IN_PLACE])
+                  LINK_RECOVERY, RESTART_FAST, RESTART_FAST_UNLOCK, REMOTE, STEP_IN_PLACE, VOD_LOG])
 FLAG_NAMES = ["PRIVYHUB_ADAPTIVE_BITRATE_INJECT", "PRIVYHUB_ADAPTIVE_BITRATE_TOP", "PRIVYHUB_PS1_LOOK",
               "PRIVYHUB_NATIVE_PROFILE_ID", "PRIVYHUB_FEC_SCHEME"]
 RA_CFG = Path.home() / ".config/retroarch/config"
@@ -1039,12 +1045,13 @@ def preflight() -> dict:
          "drop_in_restart_fast_unlock": f"Environment={RESTART_FAST_UNLOCK}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_remote": f"Environment={REMOTE}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_step_in_place": f"Environment={STEP_IN_PLACE}" in sh(["systemctl", "--user", "cat", UNIT]),
+         "drop_in_vod_log": f"Environment={VOD_LOG}" in sh(["systemctl", "--user", "cat", UNIT]),
          "e3_dropin_absent": not DROPIN.exists(), "e4_constraint_absent": not E4_DROPIN.exists()}
     d["ok"] = (d["manager"] == [] and d["environ"] == ADOPTED and d["adb"] and d["drop_in_live"] and d["drop_in_index"]
                and d["drop_in_snes_core"] and d["drop_in_recovery"] and d["drop_in_snes_capture"] and d["drop_in_overlay"]
                and d["drop_in_identity"] and d["drop_in_audio_codec"] and d["drop_in_link_report"]
                and d["drop_in_link_recovery"] and d["drop_in_restart_fast"] and d["drop_in_restart_fast_unlock"]
-               and d["drop_in_remote"] and d["drop_in_step_in_place"]
+               and d["drop_in_remote"] and d["drop_in_step_in_place"] and d["drop_in_vod_log"]
                and d["e3_dropin_absent"] and d["e4_constraint_absent"])
     return d
 

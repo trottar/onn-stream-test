@@ -60,9 +60,21 @@ remote-class session. Adopted line 13 gives it:
 
 A LAN session is unchanged. The user's steps are in [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
 
-## The fourteen adopted lines
+**What away-from-home play is today** (the G9 checkpoint, 2026-11-07). PrivyHub can be played away from home. Take the
+onn, its remote and your controllers. Join the place's Wi-Fi (5 GHz if it has it) and turn on Tailscale on the onn.
+Then set PrivyHub's Hub host to the hub's name. Your hub at home does all the work and streams to the onn over an
+encrypted link that only your devices can join, and the onn still has to pair with the hub before it gets anything.
+Away from home the stream starts a little softer and sharpens over the first few minutes. The hub turns down the
+picture before it lets the game lag. A brief drop pauses the game and picks it up again by itself. Two more
+protections are now on by default in the confirmed app: the screen-loss hold, which keeps the session through a Home
+press, and stable player slots, which keep each pad on its player number. On the October trip three hours of PS1 and
+SNES play ran at a full 60 frames per second. Expect a press to reach the game a little later than at home: about
+15-25 ms on that trip. There is no travel router yet, so the onn joins each place's Wi-Fi itself. At home nothing
+changes: the remote features stay out of the way on the home network.
 
-The adopted state is fourteen environment lines, listed in `tools/e1_suite.py` `ADOPTED`. Each line comes from its own
+## The fifteen adopted lines
+
+The adopted state is fifteen environment lines, listed in `tools/e1_suite.py` `ADOPTED`. Each line comes from its own
 drop-in under `~/.config/systemd/user/privyhub-companion.service.d/`.
 
 | # | Line | Drop-in | What it does |
@@ -81,6 +93,7 @@ drop-in under `~/.config/systemd/user/privyhub-companion.service.d/`.
 | 12 | `PRIVYHUB_RESTART_FAST_UNLOCK=1` | `restart-fast-unlock.conf` | the fast restart, unlocked |
 | 13 | `PRIVYHUB_REMOTE=1` | `remote.conf` | on a remote-class session only: the remote ladder, the floor start, the 7000 cap, the WAN telemetry; the LAN unchanged |
 | 14 | `PRIVYHUB_STEP_IN_PLACE=1` | `step-in-place.conf` | each ladder step on the same stream (one IDR, no new SSRC) |
+| 15 | `PRIVYHUB_VOD_LOG=1` | `vod-log.conf` | the movie range log: one redacted row per movie range request, and a retrying client's rows (G-A13 host) |
 
 **B33 is live inside line 10.** A short drop with no loss behind it resumes without a state load. Its own off switch is
 `PRIVYHUB_REWIND_NEEDS_LOSS=0`.

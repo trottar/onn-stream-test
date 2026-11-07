@@ -1,41 +1,48 @@
 # PrivyHub / Safe IoT Roadmap — Linux-First + Remote-Foundation Revision
 
-**Revision date:** 2026-09-14 (position marker updated 2026-09-22, 2026-10-05, 2026-11-03)
+**Revision date:** 2026-09-14 (position marker updated 2026-09-22, 2026-10-05, 2026-11-03, 2026-11-07)
 **Predecessor synchronized checkpoint:** C1.1 + native-status privacy checkpoint `0c31c100ec721d687aff6aedbd79bc0cf9343810`
 **Roadmap status:** Accepted project plan, **still authoritative and unchanged in structure**. Future secure remote access remains promoted to Phase G after Linux optimization.
 
 ---
 
-## 0. Where the work actually is — 2026-11-03 (marker moved; earlier 2026-09-22, 2026-10-05)
+## 0. Where the work actually is — 2026-11-07 (marker moved; earlier 2026-09-22, 2026-10-05, 2026-11-03)
 
 **The roadmap below is not restructured; only this marker moves.** Authority for the current position is
-`docs/memory/CURRENT.md` (the fourteen-line table, the APK, the units, the live work); the records are in
+`docs/memory/CURRENT.md` (the fifteen-line table, the APK, the units, the live work); the records are in
 `docs/memory/evidence/`.
 
 - **Phase E is ACTIVE:** E1 frozen, E2 measured (2026-10-06), E3 closed (2026-10-09), E4 closed on the host side
   (2026-10-15, `docs/memory/evidence/E4_CLOSEOUT_2026-10-15.md`).
 - **Closed:** Phases A-C (C on 2026-10-05), D-BASE and the D series (the C7 / D8 checkpoint,
   `docs/memory/evidence/C7_D8_CHECKPOINT_2026-09-30.md`). **Phase F has not started.**
-- **The G track (remote play) is under way** since G1-S1 (2026-10-15), ahead of Phase F. Its adoptions G-A1 … G-A10
-  are in §G4 (G-A6 shelved; G-A8 prepared, never applied).
-- **Fourteen adopted lines** (`tools/e1_suite.py` `ADOPTED`), each from its own drop-in under the companion unit:
+- **The G track CLOSED at its checkpoint 2026-11-07** (§G9: 9 met, 3 deferred with their reasons and contracts — the
+  travel router, the handheld, Steam — and 2 open: the hub-overlay-down local check, the user's optional hand step, and
+  the checkpoint commit, the user's). Its adoptions G-A1 … G-A10 and G-A13 (host) are in §G4 (G-A6 shelved; G-A8
+  prepared, never applied). What it leaves open is §G9's list.
+- **Phase H OPEN (2026-11-07) — H3 (PS2) first by the user's decision, then H0 (import), then H1 / H2.** Phase F has
+  not started; Phase E stays ACTIVE as below.
+- **Fifteen adopted lines** (`tools/e1_suite.py` `ADOPTED`), each from its own drop-in under the companion unit:
   live adaptive (C3-L4), the cached guide index (E3-S6A), Snes9x (E3-A2), recovery v2 (E3-A3B), the SNES capture fix
   (E4-S5D), the overlay provider and session identity v2 (G-A1), Opus (G-A2), the link report (G-A3), link recovery
   (G-A4), the fast restart (G-A5) and its unlock (G-A7), `PRIVYHUB_REMOTE=1` (G-A9; acts only on a remote-class
-  session), the step in place (G-A10, 2026-11-02). **The one off switch for any line:** delete its drop-in,
+  session), the step in place (G-A10, 2026-11-02), the movie range log `PRIVYHUB_VOD_LOG=1` (G-A13 host,
+  2026-11-07). **The one off switch for any line:** delete its drop-in,
   `daemon-reload`, restart the companion.
 - **The client:** APK `8ba4d996…` (queue N) is CONFIRMED on the onn (HOME-3, 2026-11-07), every property empty: the
-  hold and stable slots on by default (G-A11 / G-A12, B42); the player prompt and the movie retry built in and off.
+  hold and stable slots on by default (G-A11 / G-A12, B42); the player prompt and the movie retry built in and off
+  (the retry's client default comes with queue O's APK).
   `0132b944…` (queue M, HOME-2) is the previous CONFIRMED one, kept; `fcd924c2…` (CL-B14) kept; `554ccf61…` is NOT
   CONFIRMED (HOME-1). B27 and B29 are not in the confirmed APK.
 - **Units:** `privyhub-companion` and `privyhub-diag` (B36, the diagnostics keeper; `docs/DIAGNOSTICS.md`) run.
   `privyhub-link-n1` ended 2026-10-31; `privyhub-trip-log` ended 2026-11-01.
 - **Live, not a line of its own:** B33 inside line 10 (off: `PRIVYHUB_REWIND_NEEDS_LOSS=0`).
-- **Done lately:** HOME-3 (2026-11-07: C1'' / C4'' met by default, C6 not met, C5'' (b) met and (a) two rows short;
-  `8ba4d996…` CONFIRMED; `docs/memory/evidence/HOME_3_DEFAULTS_PROMPT_VOD_2026-11-06.md`); queue N (B41-B45); HOME-2
-  (2026-11-06); HOME-1 (2026-11-02).
-- **Next:** the user's G-A13 (the movie retry on by default); the G9 checkpoint (A, the draft applied); H0 slice 1a
-  (B, after B45's four questions); C6's requirement (the prompt at every start and unpause) to B.
+- **Done lately:** the G9 checkpoint (2026-11-07, `docs/memory/evidence/G9_CHECKPOINT_2026-11-07.md`); G-A13 host
+  (2026-11-07, the fifteenth line, `docs/memory/evidence/G_A13_VOD_LOG_ADOPTION_2026-11-07.md`); HOME-3 (2026-11-07:
+  `8ba4d996…` CONFIRMED); queue N (B41-B45).
+- **Next:** B's queue O (the player prompt per the user's requirement — 1 player / 2 players / multitap chosen at every
+  game start and unpause; the movie retry's client default; HOME-3's two VOD cosmetics; the PS2 probe design H3-P1),
+  then A's H3-P1 run (the BIOS and a game on the external drive, the user's hand).
 
 #### Superseded text (kept): the §0 marker as of 2026-10-05
 
@@ -88,8 +95,8 @@ As of 2026-11-03; the detail is in `docs/memory/CURRENT.md` and §0.
 | **D — Linux Migration / Native Linux Baseline** | Move the core server to the Linux prototype and restore normal-use parity | **DONE** — D5-D7 complete; the D8 checkpoint `C7_D8_CHECKPOINT_2026-09-30.md` |
 | **E — Linux Core Resource Characterization & Optimization** | Optimize and measure the Linux core with PS1-and-below only; select Prototype 2 from evidence | **ACTIVE** — E1 FROZEN; E2 MEASURED; E3 CLOSED (2026-10-09); E4 CLOSED, host side (2026-10-15) |
 | **F — Media Library, VOD & Live TV UX** | Finish local media polish plus substantial Live TV/channel/guide work on Linux | **PLANNED AFTER E** (not started) |
-| **G — Secure Remote Access / Portable Client Foundation** | Overlay/provider abstraction, portable trusted-LAN access, WAN session identity/auth, off-site PS1-and-below validation | **UNDER WAY** since 2026-10-15 (G1-S1), ahead of F; G-A1 … G-A10 in §G4; the G9 checkpoint not reached |
-| **H — Extended Emulation & User-Content Import** | Build safe user-content ingestion, then characterize N64, GameCube, and PS2 on the established local/remote foundation | **FUTURE AFTER G** |
+| **G — Secure Remote Access / Portable Client Foundation** | Overlay/provider abstraction, portable trusted-LAN access, WAN session identity/auth, off-site PS1-and-below validation | **CLOSED at its checkpoint 2026-11-07** (§G9: 9 met / 3 deferred / 2 open); G-A1 … G-A10 and G-A13 (host) in §G4 |
+| **H — Extended Emulation & User-Content Import** | Build safe user-content ingestion, then characterize N64, GameCube, and PS2 on the established local/remote foundation | **OPEN 2026-11-07** — H3 (PS2) first by the user's decision, then H0, then H1 / H2 |
 | **I — Home Infrastructure / Broader Plugin Expansion** | Home Assistant/devices, cameras/microphones, storage, broader clients and provider expansion | **FUTURE** |
 | **J — Local Intelligence / Voice / Privacy-Aware AI** | Deterministic local automation, small local models, optional user-supplied cloud AI providers, bounded adaptive optimization | **FUTURE** |
 
@@ -1410,7 +1417,7 @@ Acceptance:
 
 # Phase G — Secure Remote Access / Portable Client Foundation
 
-> **Superseded (2026-11-03):** not "FUTURE AFTER F": the G track has been under way since G1-S1 (2026-10-15) while Phase F has not started; its adoptions G-A1 … G-A10 are in §G4 — see docs/memory/CURRENT.md.
+> **Superseded (2026-11-03):** not "FUTURE AFTER F": the G track has been under way since G1-S1 (2026-10-15) while Phase F has not started; its adoptions G-A1 … G-A10 are in §G4 — see docs/memory/CURRENT.md. The track CLOSED at its checkpoint on 2026-11-07 (§G9; G-A13's host half the fifteenth line).
 
 > **Data waiting for Phase G (C5-M3, 2026-09-30):** three low rungs
 > screened on the home link behind the profile selector, never on the live
@@ -1603,7 +1610,7 @@ setup and auditable permissions.
 
 ## G4 — PS1-and-below off-site remote baseline
 
-> **Superseded (2026-11-03):** the line counts below ("the eighth" … "the thirteenth line", "the tools read N lines") and the APK pins are each as of its entry's date; the adopted environ is fourteen lines since G-A10 (2026-11-02, the last entry) and the onn runs `fcd924c2…` — see docs/memory/CURRENT.md.
+> **Superseded (2026-11-03):** the line counts below ("the eighth" … "the thirteenth line", "the tools read N lines") and the APK pins are each as of its entry's date; the adopted environ is fourteen lines since G-A10 (2026-11-02, the last entry) and the onn runs `fcd924c2…` — see docs/memory/CURRENT.md. Since G-A13's host half (2026-11-07) the environ is fifteen lines and the onn runs `8ba4d996…`.
 
 **Status (2026-10-16, G4-S1): first off-site session measured: 2 of 3 valid; see the record**
 (`docs/memory/evidence/G4_S1_OFFSITE_FIRST_SESSION_2026-10-16.md`). Runs 1 and 2 reached PLAYING over the overlay (a
@@ -1783,6 +1790,13 @@ against today's 235 / 428-ms gaps. The confirmation window (E1-PS1-STREAM, the L
 gates met, but saw no step (the LAN starts at the top).
 - **Off:** delete `step-in-place.conf`, `daemon-reload`, restart, reverse `g_a10_2026-11-02/g_a10_applied.diff`.
 - Record: `docs/memory/evidence/G_A10_STEP_IN_PLACE_ADOPTION_2026-11-02.md`.
+
+**G-A13 (host) ADOPTED (2026-11-07, the user's "Reconnect by default yes" of 2026-11-06): `PRIVYHUB_VOD_LOG=1`, the
+fifteenth line (`vod-log.conf`).** One redacted row per movie range request (`logs/vod_range.jsonl`) and a retrying
+client's rows (`logs/vod_client.jsonl`); HOME-3 C5'' read from them. `--check` ok on fifteen; one local range request
+wrote one row. The client's retry default comes with queue O's APK.
+- **Off:** delete `vod-log.conf`, `daemon-reload`, restart, reverse `g_a13_2026-11-07/g_a13_applied.diff`.
+- Record: `docs/memory/evidence/G_A13_VOD_LOG_ADOPTION_2026-11-07.md`.
 
 ## G5 — WAN-aware telemetry and adaptation
 
@@ -2293,9 +2307,48 @@ Acceptance:
 - local operation remains functional without remote connectivity;
 - clean checkpoint/push.
 
+### CHECKPOINT 2026-11-07 — the G track CLOSED (9 met · 3 deferred · 2 open)
+
+Applied from `docs/memory/handoffs/G9_CHECKPOINT_DRAFT_2026-11-06.md` (B44; every record opened there); the
+checkpoint's record is `docs/memory/evidence/G9_CHECKPOINT_2026-11-07.md`. Records under `docs/memory/evidence/`.
+
+| # | item | state | the evidence |
+| --- | --- | --- | --- |
+| 1 | corrected trust topology documented | **MET** | `docs/REMOTE_TRUST.md` §1-§3 (G1-S1; kept current by each adoption, §8a-§16); D-059 |
+| 2 | overlay provider abstraction established | **MET** | `companion/overlay/` (G1-S1); line 6 adopted (`G_A1_…_2026-10-16.md`); Tailscale the first provider, not the contract |
+| 3 | first provider path validated | **MET** | `G1_S2_…_2026-10-16.md` (live smoke); `G4_S1_…_2026-10-16.md` (first play); G4-S2..S4 and the trip (`TRIP_R2_…_2026-10-31.md`, every session `direct`) |
+| 4 | travel-router trusted-LAN baseline validated | **DEFERRED** | no router bought or needed: the onn's own Tailscale stood in (hotspot, a friend's Wi-Fi, the trip); D-059 "do not choose a permanent travel-router model yet"; §G2 and REMOTE_TRUST §1 / §2 preserved; the cost: the onn joins each visited network itself |
+| 5 | source address separated from durable client/session identity | **MET** | `g1_s1_2026-10-15/source_address_audit.md`; G3-S1 / S2 / S3; line 7 (G-A1) and the client's `identity_v2` (CL-B3); G4-S1's `token_issued` over the overlay |
+| 6 | application authentication/authorization validated | **MET** | G3-S3 (media token, the gated range server, permissions, fail-closed); G-A1 + CL-B3; live on the LAN (`CL_B3_…`) and over the overlay (G4-S1 on) |
+| 7 | real off-site onn PS1-and-below session validated | **MET** | `G4_S3_…_2026-10-19.md` (the first fully valid run); `G4_S4_…_2026-10-24.md` (100 min); `TRIP_R2_…` (36 sessions, ~3 h, 59.7-60.1 fps); the fixes through HOME-2 / HOME-3 |
+| 8 | Phase C telemetry/adaptation reused under WAN conditions | **MET** | G5-S1, G5-S3, G5-S4, G8-S2, adopted together as line 13 (G-A9, `TRIP_PREP_2026-10-29.md`); line 14 (G-A10). Not adopted: G5-S2's rules (G5-S2-L never ran) |
+| 9 | adverse-network envelope documented | **MET** (two questions open, below) | `G8_S1_…_2026-10-17.md`; G8-S2 / S3 / S4 / S5; `WAN_R1_…_2026-10-24.md`; `B37_…_2026-10-31.md`; `docs/CAPABILITY_MODEL.md` §7 |
+| 10 | handheld validated if available, otherwise explicitly pending | **DEFERRED — explicitly pending** | no representative handheld in the project; §G6: its absence must not block G; the contract: the same client, REMOTE_TRUST §5-§6, the lost-device row |
+| 11 | Steam/external-compute provider integrated or explicitly deferred with a preserved provider contract | **DEFERRED — with the contract** | not built; §G7's contract (PrivyHub owns discovery, readiness, library, permissions, session UX; a direct media path under the same authorization boundary); G3's identity and permissions are that boundary |
+| 12 | ordinary household LAN remains outside the PrivyHub trust domain | **MET by design; not probed** | D-059; REMOTE_TRUST §1 / §2; the hub wired into the Opal (`B2_HOST_ON_OPAL_2026-09-21.md`); the overlay ends on the hub. No record probes it from the household side (the Opal is read-only) |
+| 13 | local operation remains functional without remote connectivity | **OPEN — half shown** | shown: LAN play with the onn off the overlay, every remote line adopted (`CL_B16_…_2026-10-29.md` cell 3; HOME-1 / HOME-2 / HOME-3's LAN cells). Not scored: the hub's own overlay down. **The user's optional hand step:** one LAN game with the hub's Tailscale turned off by the user, then back on (`handoffs/G4_RUNBOOK_HOTSPOT.md` step 18) |
+| 14 | clean checkpoint/push | **OPEN — the user's commit** | this work (G-A13 host, this block, the README paragraph, CURRENT) committed by the user is the checkpoint commit; the push is the user's |
+
+**What the G track leaves open (none blocks items 1-12):**
+- the loss guard's return: G-A8 (`PRIVYHUB_LOSS_GUARD=1`) PREPARED, never applied; the guard / stall interaction
+  unsolved (`CL_B16_…` S1);
+- G-A6 shelved (B23's WAN thresholds built and off; reopen only on a remote-path misfire signal);
+- the WAN thresholds on a relayed path: every measured off-site play was `direct`;
+- the envelope's two questions: G8-S6 (`tight` under a cap) QUEUED, never run; G5-S2-L never run;
+- reconnect over the overlay: candidate evidence (G-A4, G4-S4, the trip) to read;
+- the CONC row: the guide grabs under a live stream measured on the LAN only;
+- E5-S2 / E6, the user's calls (the probe on a second machine; Prototype-2 / friend-alpha hardware);
+- from HOME-3, to B (queue O): the player prompt per the user's requirement (C6), and the movie retry's client default
+  with its two cosmetics ("reconnecting…" left on screen; a range row lost at a restart). Product behaviour, not G9
+  items.
+
 ---
 
 # Phase H — Extended Emulation & User-Content Import
+
+> **Superseded (2026-11-07):** Phase H is OPEN since the G9 checkpoint (2026-11-07). By the user's decision H3 (PS2)
+> runs first, then H0 (import), then H1 / H2; the PS2 probe H3-P1 is designed in B's queue O and run by A with the BIOS
+> and a game the user puts on the external drive — see docs/memory/CURRENT.md.
 
 **Status: FUTURE AFTER G**
 

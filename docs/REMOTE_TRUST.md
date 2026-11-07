@@ -1,6 +1,6 @@
 # PrivyHub remote trust (G0)
 
-> **Superseded (2026-11-03):** the status below is G0's (2026-10-15). Since then G-A1 … G-A10 adopted the remote parts: the adopted environ is fourteen lines (`tools/e1_suite.py` `ADOPTED`), §4-§6 and §8 are in force, and §8a-§15 record each adoption with its off switch (G-A6 shelved, G-A8 never applied) — see docs/memory/CURRENT.md.
+> **Superseded (2026-11-03):** the status below is G0's (2026-10-15). Since then G-A1 … G-A10 and G-A13 (host) adopted the remote parts: the adopted environ is fifteen lines (`tools/e1_suite.py` `ADOPTED`), §4-§6 and §8 are in force, and §8a-§16 record each adoption with its off switch (G-A6 shelved, G-A8 never applied) — see docs/memory/CURRENT.md.
 
 **Status: G0 written 2026-10-15 (G1-S1).** Every statement is either
 quoted from `docs/ROADMAP.md` (marked **[ROADMAP §…]**) or marked
@@ -374,3 +374,27 @@ Every point below is a **[G3-S3 proposal]**.
      `docs/memory/evidence/g_a10_2026-11-02/g_a10_applied.diff`).
 
   Each ladder step then restarts the encoder as before: a new SSRC and a ~0.2-0.4-s gap.
+
+## 16. The movie range log (adopted G-A13 host half, 2026-11-07)
+
+- **Adopted:** `PRIVYHUB_VOD_LOG=1` through the drop-in
+  `~/.config/systemd/user/privyhub-companion.service.d/vod-log.conf`, the **fifteenth adopted line** (the user's
+  "Reconnect by default yes", 2026-11-06; the host half now, the client's retry default in the next APK).
+  - **What it does (B35 / B43):** the range server writes one JSON row per movie range request to
+    `logs/vod_range.jsonl` (status, length, bytes written, duration, how it closed; rotating 5 MB × 3); the hub accepts
+    a retrying client's rows at `/diagnostics/vod-client` (whitelisted fields only, else 400) into
+    `logs/vod_client.jsonl`.
+  - **Measured:** HOME-3 C5'' (`evidence/HOME_3_DEFAULTS_PROMPT_VOD_2026-11-06.md`), where these rows were the evidence
+    of the drop and the restart-with-the-movie-open.
+- **What leaves the onn:** only when the client's retry is on (`debug.privyhub.vod_retry`): its retry rows (error
+  code and name, `reason`, `kind`, `token_refetched`, a 12-hex media hash, positions and timings). No title, path,
+  token, address or identifier in any row; the URL path is hashed and the media token dropped before hashing.
+  `PRIVYHUB_VOD_DROP_TEST` is a bench switch and never a line.
+- **Turning it off (host):**
+  1. Delete `vod-log.conf`.
+  2. Run `systemctl --user daemon-reload && systemctl --user restart privyhub-companion`.
+  3. Take `VOD_LOG` out of `tools/e1_suite.py` `ADOPTED` (reverse
+     `docs/memory/evidence/g_a13_2026-11-07/g_a13_applied.diff`).
+
+  The range server then writes no rows and `/diagnostics/vod-client` is not served; a retrying client's posts are
+  refused, and its retry itself is unchanged.

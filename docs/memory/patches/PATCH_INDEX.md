@@ -195,6 +195,7 @@ note feeds, or its gate / flag, where the records say; "—" where none applies.
 | D4_LINUX_GAME_HANDOFF_FIX_01_2026-09-15.md | d-series | APPLIED | D4 |
 | D4_MEMORY_RECONCILIATION_2026-09-16.md | d-series | APPLIED | memory reconcile |
 | G-A10_STEP_IN_PLACE_ADOPTION.md | g-track | APPLIED | line 14 (`evidence/G_A10_STEP_IN_PLACE_ADOPTION_2026-11-02.md`) |
+| G-A13_VOD_LOG_ADOPTION.md | g-track | APPLIED | line 15, `PRIVYHUB_VOD_LOG=1` (G-A13 host, 2026-11-07) |
 | G-A1_OVERLAY_AND_IDENTITY_ADOPTED.md | g-track | APPLIED | lines 6 and 7 |
 | G-A2_OPUS_ADOPTED.md | g-track | APPLIED | line 8 |
 | G-A3_LINK_REPORT_ADOPTED.md | g-track | APPLIED | line 9 |
@@ -293,6 +294,6 @@ note feeds, or its gate / flag, where the records say; "—" where none applies.
 | E4-S4_GRAB_DEFERRAL_FLAG.md | phase-e | APPLIED | `PRIVYHUB_EPG_DEFER_WHILE_STREAMING=1`, rejected, dormant |
 | E4-S5_SNES_CAPTURE_OUTPUT_RATE_FLAG.md | phase-e | APPLIED (its note: "REJECTED; dormant") | line 5, via E4-S5D |
 
-**Count:** 243 rows; `git ls-files docs/memory/patches | wc -l` is 246 once HOME-3 is committed (queue N's three patch notes, `B41_…` / `B42_…` / `B43_…`, have no row yet): APPLIED 232, PREPARED-UNAPPLIED 1, SUPERSEDED 8,
-INDEX 1, PROTOCOL 1. By family: adb 5, b-series 39, cl-b 9, d-base 22, d-series 70, g-track 25, index 2, memory 3,
+**Count:** 244 rows; `git ls-files docs/memory/patches | wc -l` is 247 once G-A13 is committed (queue N's three patch notes, `B41_…` / `B42_…` / `B43_…`, have no row yet): APPLIED 233, PREPARED-UNAPPLIED 1, SUPERSEDED 8,
+INDEX 1, PROTOCOL 1. By family: adb 5, b-series 39, cl-b 9, d-base 22, d-series 70, g-track 26, index 2, memory 3,
 misc 5, phase-c 39, phase-e 24.

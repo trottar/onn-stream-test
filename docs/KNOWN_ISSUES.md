@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-07 — G-A13 (host), `PRIVYHUB_VOD_LOG=1` ADOPTED (the fifteenth line); the client's retry default to B (queue O) — OPEN (to B) — `## 2026-11-07 G-A13` below; `docs/memory/evidence/G_A13_VOD_LOG_ADOPTION_2026-11-07.md`
 - 2026-11-07 — HOME-3: C1'' / C4'' met with no property; C6 the prompt NOT MET (valid; the user's requirement: the prompt at every start and unpause); C5'' (b) met, (a) met on behaviour with two rows short; `8ba4d996…` CONFIRMED — OPEN (G-A13 the user's; C6 and two VOD items to B) — `## 2026-11-07 HOME-3` below; `docs/memory/evidence/HOME_3_DEFAULTS_PROMPT_VOD_2026-11-06.md`
 - 2026-11-06 — Queue N (B41-B45): the prompt, the two defaults, the movie retry made real, the G9 draft, the H0 design; APK built, not installed — OPEN (HOME-3) — `## 2026-11-06 Queue N` below; `docs/memory/handoffs/SESSION_B_DONE_2026-11-06N.md`
 - 2026-11-06 — HOME-2: C1' / C4' met; C5' not met (valid: B40's reset absorbed by the player, B35 never reached); `0132b944…` CONFIRMED, every property empty — OPEN (G-A11 / G-A12 the user's; G-A13 to B) — `## 2026-11-06 HOME-2` below; `docs/memory/evidence/HOME_2_HOLD_PADS_VOD_2026-11-03.md`
@@ -48,6 +49,16 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-07 G-A13 (host): the movie range log, the fifteenth line — OPEN (the client default to B)
+
+(`docs/memory/evidence/G_A13_VOD_LOG_ADOPTION_2026-11-07.md`)
+
+- `PRIVYHUB_VOD_LOG=1` adopted through `vod-log.conf` on the user's "Reconnect by default yes"; `--check` ok on
+  fifteen; one local range request wrote one row (206, `complete`).
+- **Open (to B, queue O):** the client's movie retry on by default (`debug.privyhub.vod_retry`), and HOME-3's two VOD
+  cosmetics ("reconnecting…" left on screen after a resume; a range row lost at a companion restart). A bench drop
+  test's drop-in now carries only `PRIVYHUB_VOD_DROP_TEST=1`.
 
 ## 2026-11-07 HOME-3: C1'' / C4'' met; C6 not met (valid); C5'' (b) met, (a) two rows short; `8ba4d996…` CONFIRMED — OPEN (G-A13 the user's; C6 to B)
 
