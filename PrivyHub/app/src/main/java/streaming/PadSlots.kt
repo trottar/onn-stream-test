@@ -156,6 +156,14 @@ class PadSlots(private val count: Int = 4) {
         k
     }
 
+    /** B46: the chooser's opening empties the map (the claims re-form it); not called by B34 / B38 / B41's paths. */
+    fun clearAll() {
+        synchronized(lock) {
+            byKey.clear()
+            classOf.clear()
+        }
+    }
+
     private fun assign(d: PadDevice, k: String, connected: List<PadDevice>): Int? {
         val free = (0 until count).firstOrNull { it !in byKey.values }
         val slot = free ?: run {

@@ -12,6 +12,9 @@ this module is never imported, the range server's handler class is not touched, 
 
 Redacted by construction: no address, no file path, no title, no URL, no query (the media token) in any row; the
 media is an opaque 12-hex id.
+B47: the requests still open are kept; `RangeLog.flush_open()` writes each as `closed: "shutdown"` (the range server
+calls it on SIGTERM, a companion restart), and a request finishing afterwards writes no second row. Design:
+`docs/memory/evidence/b47_2026-11-07/design_written_before_code.md`.
 """
 from __future__ import annotations
 
@@ -95,6 +98,25 @@ class RangeLog:
         self._out = _Writer(project_root, RANGE_LOG_NAME)
         self._clock = clock
         self._mono = mono
+        # B47: the open requests (id(box) -> (handler, method, box, t0, m0)) for flush_open
+        self._open: dict[int, tuple] = {}
+        self._open_lock = threading.Lock()
+
+    def flush_open(self, closed: str = "shutdown") -> int:
+        """B47: one row per request still open, `closed` as given; each then writes nothing more. Never raises."""
+        with self._open_lock:
+            items = list(self._open.values())
+            self._open.clear()
+            for _, _, box, _, _ in items:
+                box["flushed"] = True
+        n = 0
+        for handler, method, box, t0, m0 in items:
+            try:
+                self._row(handler, method, box, t0, m0, closed, None)
+                n += 1
+            except Exception:
+                pass
+        return n
 
     def install(self, handler_class: type) -> type:
         log = self
@@ -132,6 +154,8 @@ class RangeLog:
                 self._b35_box = box
                 t0, m0 = log._clock(), log._mono()
                 closed, error = None, None
+                with log._open_lock:
+                    log._open[id(box)] = (self, method_name[3:], box, t0, m0)
                 try:
                     return orig(self)
                 except BrokenPipeError:
@@ -145,8 +169,12 @@ class RangeLog:
                     raise
                 finally:
                     self._b35_box = None
+                    with log._open_lock:
+                        log._open.pop(id(box), None)
+                        flushed = box.get("flushed", False)
                     try:
-                        log._row(self, method_name[3:], box, t0, m0, closed, error)
+                        if not flushed:   # B47: a shutdown row was written for it already
+                            log._row(self, method_name[3:], box, t0, m0, closed, error)
                     except Exception:
                         pass  # the log must never disturb a request
 

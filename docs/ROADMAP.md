@@ -2341,6 +2341,10 @@ checkpoint's record is `docs/memory/evidence/G9_CHECKPOINT_2026-11-07.md`. Recor
 - from HOME-3, to B (queue O): the player prompt per the user's requirement (C6), and the movie retry's client default
   with its two cosmetics ("reconnecting…" left on screen; a range row lost at a restart). Product behaviour, not G9
   items.
+  - **Built in queue O (2026-11-07), not installed:**
+    - B46, the chooser at every start / unpause (`evidence/B46_PLAYER_CHOOSER_2026-11-07.md`);
+    - B47, the movie retry on by default and the two cosmetics (`evidence/B47_VOD_RETRY_DEFAULT_ON_2026-11-07.md`);
+    - APK `cfe0211c…a65f`. A's HOME-4 confirms them (`handoffs/SESSION_B_DONE_2026-11-07O.md`).
 
 ---
 
@@ -2441,6 +2445,15 @@ Evaluate representative easy/moderate/heavy titles:
 - sustained thermal behavior.
 
 User-supplied PS2 BIOS should enter only through the G0 import boundary.
+
+> **H3-P1 (2026-11-07, designed in B48):** `docs/memory/architecture/H3_P1_PS2_PROBE_DESIGN_2026-11-07.md` — the
+> feasibility probe with standalone PCSX2. BIOS and one or two games are on the movies drive at the user's folders
+> (placeholders `<MOVIES_DRIVE>/PrivyHub/ps2/bios/` and `<MOVIES_DRIVE>/PrivyHub/ps2/games/`), and memory cards / saves
+> are on the hub disk. **The line above is DEFERRED by the user's decision** ("PS2 setup first before user control
+> import … see if these things work first"): for H3-P1 the BIOS is read in place on the drive, and H0's import later
+> moves the files, when the boundary applies. The metrics and pass rows P0-P7 are pre-registered there. The run is A's,
+> unattended then attended, and PCSX2 is fetched only with the user's go. The stream over PCSX2 is B49 (the launch,
+> pause and keep-awake need code).
 
 ## H4 — Extended-emulation tiers
 

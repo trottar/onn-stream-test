@@ -398,6 +398,21 @@ if os.environ.get("PRIVYHUB_VOD_LOG", "").strip() == "1":
     )
     VOD_LOG.install(RangeRequestHandler)
 
+    # B47: a companion restart (SIGTERM to the cgroup) writes the open requests' rows as `closed: shutdown` before the
+    # exit; without the line no handler is installed (Python's default action, today)
+    import signal as _signal
+
+    def _b47_on_sigterm(signum, frame):
+        try:
+            VOD_LOG.flush_open("shutdown")
+        finally:
+            raise SystemExit(0)
+
+    try:
+        _signal.signal(_signal.SIGTERM, _b47_on_sigterm)
+    except ValueError:
+        pass  # not the main thread (an import from a test): no handler
+
 # B40: a hub-side VOD drop for the bench, only with PRIVYHUB_VOD_DROP_TEST=1 (per-run, never adopted; the
 # companion's environment is inherited). Absent = today: nothing imported, the class above not touched, no thread.
 VOD_DROP_TEST = None

@@ -301,11 +301,17 @@ class Absent(unittest.TestCase):
         old = ast.parse((BASE / "range_server.py").read_text())
         old_dumps = [ast.dump(o) for o in old.body]
         added = [n for n in new.body if ast.dump(n) not in old_dumps]
-        self.assertEqual([ast.unparse(n) for n in added][0], "VOD_DROP_TEST = None")
-        self.assertEqual(len(added), 2)
-        self.assertTrue(ast.unparse(added[1]).startswith(
+        # B47 (disclosed): the PRIVYHUB_VOD_LOG block gained the SIGTERM row; B40's two nodes are checked as before
+        log_guard = "if os.environ.get('PRIVYHUB_VOD_LOG', '').strip() == '1':"
+        b47 = [n for n in added if ast.unparse(n).startswith(log_guard)]
+        self.assertLessEqual(len(b47), 1)
+        drop = [n for n in added if n not in b47]
+        self.assertEqual([ast.unparse(n) for n in drop][0], "VOD_DROP_TEST = None")
+        self.assertEqual(len(drop), 2)
+        self.assertTrue(ast.unparse(drop[1]).startswith(
             "if os.environ.get('PRIVYHUB_VOD_DROP_TEST', '').strip() == '1':"))
-        self.assertEqual([ast.dump(n) for n in new.body if n not in added], old_dumps)
+        old_rest = [d for o, d in zip(old.body, old_dumps) if not (b47 and ast.unparse(o).startswith(log_guard))]
+        self.assertEqual([ast.dump(n) for n in new.body if n not in added], old_rest)
 
     def test_the_same_bytes_from_the_base_and_the_new_server(self) -> None:
         if not (BASE / "range_server.py").exists():

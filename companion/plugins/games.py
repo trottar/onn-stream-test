@@ -3802,7 +3802,10 @@ class GamesPlugin:
                 self._pad_slots_log.heartbeat(self._recovery, self._first(query, "pad_slots"), values,
                                               _pad_slots.updates_by_player(self._native_stream._session_io.controller),
                                               # B41: the prompt's claims (only a client with player_prompt=1 sends them)
-                                              claims=self._first(query, "pad_claims") if "pad_claims" in query else None)
+                                              claims=self._first(query, "pad_claims") if "pad_claims" in query else None,
+                                              # B46: the chooser's pick (only a client that picked sends it)
+                                              **({"players_chosen": _pad_slots.parse_chosen(self._first(query, "players_chosen"))}
+                                                 if "players_chosen" in query else {}))
 
             if not values:
                 raise ValueError(
@@ -3922,7 +3925,10 @@ class GamesPlugin:
                     self._pad_slots_log = _pad_slots.SlotsLog()
                 self._pad_slots_log.start(self._recovery, self._first(query, "pad_slots"),
                                           # B41: the prompt's claims (only a client with player_prompt=1 sends them)
-                                          claims=self._first(query, "pad_claims") if "pad_claims" in query else None)
+                                          claims=self._first(query, "pad_claims") if "pad_claims" in query else None,
+                                          # B46: the chooser's pick (only a client that picked sends it)
+                                          **({"players_chosen": _pad_slots.parse_chosen(self._first(query, "players_chosen"))}
+                                             if "players_chosen" in query else {}))
                 # B38: count only the slots whose state changes (a stable-slot client's key turns it on)
                 _pad_slots.enable_changes(getattr(getattr(self._native_stream, "_session_io", None), "controller", None))
             try:
@@ -3982,6 +3988,9 @@ class GamesPlugin:
                 if self._first(query, "player_prompt") == "1":
                     import player_count as _player_count
                     payload.update(_player_count.for_start(self, game_status))
+                    # B46: the session's ports as the launch set them (the chooser caps its claims by them)
+                    import players_session as _players_session
+                    payload.update(_players_session.ports_set(self._emulator, game_status))
                 return payload
             except NativeStreamError as exc:
                 raise RuntimeError(str(exc)) from exc
@@ -4505,11 +4514,19 @@ class GamesPlugin:
                         raise ValueError("mod_index must be a non-negative integer") from exc
                     if mod_index < 0:
                         raise ValueError("mod_index must be a non-negative integer")
+                # B46: the chooser's last pick for this title sets the session's ports (no key = today's call)
+                launch_extra: dict[str, Any] = {}
+                if "players_chosen" in query:
+                    import players_session as _players_session
+                    chosen = _players_session.parse(self._first(query, "players_chosen"))
+                    if chosen is not None:   # a malformed value: today's launch
+                        launch_extra["players_chosen"] = chosen
                 payload = self._emulator.launch(
                     game,
                     cheat_source_index=cheat_source_index,
                     cheat_enabled_indexes=cheat_enabled_indexes,
                     mod_index=mod_index,
+                    **launch_extra,
                 )
 
                 return payload

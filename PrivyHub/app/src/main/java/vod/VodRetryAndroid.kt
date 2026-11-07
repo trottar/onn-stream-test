@@ -131,7 +131,10 @@ class VodRetryAndroid(
             return
         }
         val frame = playerView.overlayFrameLayout ?: return
+        // B47: no stale mark left from an earlier episode
+        sweep(frame)
         val view = TextView(activity).apply {
+            tag = MARK_TAG
             text = "reconnecting…"
             textSize = 14f
             setTextColor(Color.WHITE)
@@ -150,9 +153,21 @@ class VodRetryAndroid(
     }
 
     private fun hide() {
-        val view = mark ?: return
-        (view.parent as? FrameLayout)?.removeView(view)
+        val view = mark
         mark = null
+        (view?.parent as? FrameLayout)?.removeView(view)
+        // B47: every tagged mark in the overlay, now and on the next main-loop turn (HOME-3 C5'' (a))
+        playerView.overlayFrameLayout?.let { frame ->
+            sweep(frame)
+            handler.post { if (mark == null) sweep(frame) }
+        }
+    }
+
+    private fun sweep(frame: FrameLayout) {
+        for (i in frame.childCount - 1 downTo 0) {
+            val child = frame.getChildAt(i)
+            if (child?.tag == MARK_TAG) frame.removeViewAt(i)
+        }
     }
 
     private fun dialog(kind: String) {
@@ -171,6 +186,11 @@ class VodRetryAndroid(
             .setPositiveButton("Retry") { _, _ -> controller.manualRetry() }
             .setNegativeButton("Close", null)
             .show()
+    }
+
+    companion object {
+        /** B47: the tag on the "reconnecting…" view, for the sweep. */
+        const val MARK_TAG = "privyhub_vod_reconnecting_mark"
     }
 
     private fun post(row: Map<String, Any>) {

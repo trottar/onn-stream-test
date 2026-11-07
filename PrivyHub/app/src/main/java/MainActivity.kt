@@ -9104,6 +9104,21 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    // B46: `&players_chosen=N` from the title's last pick, only with the prompt on (debug.privyhub.player_prompt)
+    private fun playersChosenLaunchSuffix(gameId: String): String =
+        try {
+            if (!com.safeiot.privyhub.streaming.PlayerPromptFlag.fromSystem()) {
+                ""
+            } else {
+                com.safeiot.privyhub.streaming.PlayerPrompt.gameKey(gameId)
+                    ?.let { com.safeiot.privyhub.streaming.PrefsPlayerChoiceStore(this).get(it) }
+                    ?.let { "&players_chosen=$it" }
+                    ?: ""
+            }
+        } catch (_: Exception) {
+            ""
+        }
+
     private fun openNativeGameStream() {
 
         val host =
@@ -12280,7 +12295,9 @@ class MainActivity : AppCompatActivity() {
                 val response =
                     httpPost(
                         "http://$host:$CONTROL_PORT" +
-                            "/plugins/games/launch?id=$gameId$cheatQuerySuffix$modQuerySuffix"
+                            "/plugins/games/launch?id=$gameId$cheatQuerySuffix$modQuerySuffix" +
+                            // B46: the title's last chooser pick sets the session's ports (no pick, or the prompt off: today)
+                            playersChosenLaunchSuffix(gameId)
                     )
 
                 val json =

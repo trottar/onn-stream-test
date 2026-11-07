@@ -20,6 +20,9 @@ B41: a client with `debug.privyhub.player_prompt=1` also sends `pad_claims=<slot
 s = kept from the stable map); each slot entry of the rows then carries `claimed_by` (`prompt` / `stable`). No key
 (`claims=None`) = the rows above byte for byte; a malformed value adds nothing. Design:
 `docs/memory/evidence/b41_2026-11-06/design_written_before_code.md`.
+B46: a client whose chooser picked also sends `players_chosen=<1|2|4>`; the rows then carry `players_chosen` and each
+entry a `label` (`P1`-`P4`), and a changed pick is a change row. No key = B41's rows byte for byte. Design:
+`docs/memory/evidence/b46_2026-11-07/design_written_before_code.md`.
 """
 
 from __future__ import annotations
@@ -56,6 +59,22 @@ def with_claims(slots: list[dict[str, Any]] | None, claims: str | None) -> list[
     return [({**e, "claimed_by": parsed[e["slot"]]} if e["slot"] in parsed else e) for e in slots]
 
 
+def with_chosen(slots: list[dict[str, Any]] | None, players_chosen: int | None) -> list[dict[str, Any]] | None:
+    """B46: each entry's `label` (`P1`-`P4`) once the chooser picked; unchanged without the key."""
+    if slots is None or players_chosen is None:
+        return slots
+    return [{**e, "label": "P%d" % (int(e["slot"]) + 1)} for e in slots]
+
+
+def parse_chosen(raw: str | None) -> int | None:
+    """B46: the client's `players_chosen` (1 / 2 / 4); None when absent or malformed."""
+    try:
+        n = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return None
+    return n if n in (1, 2, 4) else None
+
+
 def parse(raw: str) -> list[dict[str, Any]] | None:
     """The map as a list of {slot, pad, class}; [] for an empty map; None when malformed."""
     raw = (raw or "").strip()
@@ -80,6 +99,7 @@ class SlotsLog:
 
     def __init__(self) -> None:
         self.last: list[dict[str, Any]] | None = None
+        self.last_chosen: int | None = None
 
     def _row(self, recovery: Any, when: str, slots: list[dict[str, Any]] | None, **extra: Any) -> None:
         fields: dict[str, Any] = {"when": when}
@@ -91,21 +111,29 @@ class SlotsLog:
         fields.update(extra)
         recovery._log("pad_slots", **fields)
 
-    def start(self, recovery: Any, raw: str, claims: str | None = None) -> list[dict[str, Any]] | None:
-        slots = with_claims(parse(raw), claims)
-        self._row(recovery, "start", slots)
+    def start(self, recovery: Any, raw: str, claims: str | None = None,
+              players_chosen: int | None = None) -> list[dict[str, Any]] | None:
+        slots = with_chosen(with_claims(parse(raw), claims), players_chosen)
+        # B46: the chooser's pick, only when the client sent one
+        self._row(recovery, "start", slots, **({"players_chosen": players_chosen} if players_chosen is not None else {}))
         if slots is not None:
             self.last = slots
+        self.last_chosen = players_chosen
         return slots
 
     def heartbeat(self, recovery: Any, raw: str, values: dict[str, Any], updates_by_player: Any = None,
-                  claims: str | None = None) -> None:
+                  claims: str | None = None, players_chosen: int | None = None) -> None:
         """One heartbeat's key: the row's fields, and a change row when the map moved."""
-        slots = with_claims(parse(raw), claims)
+        slots = with_chosen(with_claims(parse(raw), claims), players_chosen)
         if slots is None:
             values["pad_slots_bad"] = True
             return
         values[FIELD] = slots
+        # B46: the chooser's pick (only a client that picked sends it)
+        extra: dict[str, Any] = {}
+        if players_chosen is not None:
+            values["players_chosen"] = players_chosen
+            extra["players_chosen"] = players_chosen
         if isinstance(updates_by_player, dict):
             # B38: changes as updates_by_player, today's per-packet counts beside them
             if isinstance(updates_by_player.get("changes"), (list, tuple)):
@@ -114,9 +142,10 @@ class SlotsLog:
                 values["packets_by_player"] = [int(x) for x in updates_by_player["packets"]]
         elif isinstance(updates_by_player, (list, tuple)):
             values["updates_by_player"] = [int(x) for x in updates_by_player]
-        if slots != self.last:
-            self._row(recovery, "change", slots, heartbeat_sequence=values.get("sequence"))
+        if slots != self.last or players_chosen != self.last_chosen:
+            self._row(recovery, "change", slots, heartbeat_sequence=values.get("sequence"), **extra)
             self.last = slots
+            self.last_chosen = players_chosen
 
 
 def enable_changes(controller: Any) -> bool:

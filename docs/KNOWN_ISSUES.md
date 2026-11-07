@@ -50,6 +50,32 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
 
+## 2026-11-07 Queue O (B46-B48): the player chooser at every start and unpause, the movie retry on by default, the PS2 probe designed — OPEN (HOME-4, then H3-P1)
+
+(`docs/memory/handoffs/SESSION_B_DONE_2026-11-07O.md`; APK `cfe0211c…a65f` built and pinned, NOT installed;
+`8ba4d996…` stays CONFIRMED)
+
+- **B46, built** (`docs/memory/evidence/B46_PLAYER_CHOOSER_2026-11-07.md`).
+  - `debug.privyhub.player_prompt` absent = the chooser `Players:  1  /  2  /  multitap (3-4)` at every start and
+    every unpause (Resume), then `Player N — press any button` up to the pick; `0` / `off` = none.
+  - Claims need a fresh press: HOME-3 C6's held-Start re-claim is fixed in code, not yet on the onn.
+- **Open, B46: the ports are set only at launch.** `players_chosen` on the launch sets the PS1 port-1 multitap / the
+  `--device` ports / SNES's port-2 multitap. RetroArch cannot change them mid-session, so a pick that needs other ports
+  applies at the title's next launch, and the prompt says so.
+  - SNES's multitap device id (257) is recalled from the cores' sources and not yet seen working on this hub.
+  - A relaunch at the start is not built (the user's call).
+- **B47, built** (`docs/memory/evidence/B47_VOD_RETRY_DEFAULT_ON_2026-11-07.md`).
+  - `debug.privyhub.vod_retry` absent = on.
+  - "reconnecting…" is cleared at every READY. The cause of HOME-3 (a)'s leftover mark was **not found**; the fix makes
+    the clear unconditional.
+  - A range request open at a companion restart now gets a `closed: shutdown` row (inside the adopted fifteenth line).
+- **B48, designed** (`docs/memory/architecture/H3_P1_PS2_PROBE_DESIGN_2026-11-07.md`): standalone PCSX2.
+  - The capture is emulator-agnostic (x11grab by PID). The audio is a per-app sink by PID.
+  - The input needs no bridge (the same four uinput pads; an SDL mapping only).
+  - Pause / exit and the launch need code (B49).
+  - BIOS and games go on the movies drive at the user's folders; the G0 import boundary is deferred by the user.
+  - Nothing fetched.
+
 ## 2026-11-07 G-A13 (host): the movie range log, the fifteenth line — OPEN (the client default to B)
 
 (`docs/memory/evidence/G_A13_VOD_LOG_ADOPTION_2026-11-07.md`)

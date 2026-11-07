@@ -857,7 +857,9 @@ class NativeStreamActivity :
                             "/plugins/games/native-stream-start" +
                             "?port=$VIDEO_PORT" + (if (restart != null) "&guard_end=1" else "") + padSlotsQuery() +
                             // B41: the prompt asks for the title's players and sends its claims (null = today: nothing)
-                            (if (playerPrompt != null) "&player_prompt=1" + promptClaimsQuery() else ""),
+                            (if (playerPrompt != null) "&player_prompt=1" + promptClaimsQuery() else "") +
+                            // B46: a self-restart carries the session's choice (null = today: nothing)
+                            (if (playerPrompt != null && restart != null) promptChosenQuery(PlayerPromptProcess.lastChoice) else ""),
                         readTimeoutMs =
                             30_000
                     )
@@ -917,7 +919,14 @@ class NativeStreamActivity :
                     )
 
                 // B41: the title's player count (an old host: no key, 2) (null = today)
-                playerPrompt?.setPlayers(json.optInt("players", PlayerPrompt.DEFAULT_PLAYERS), AndroidPadDevice.connected())
+                // B46: the chooser opens at every start but a self-restart; the session's ports from the host's echo
+                playerPrompt?.onStartResponse(
+                    restart != null,
+                    json.optInt("players", PlayerPrompt.DEFAULT_PLAYERS),
+                    PortsSet.parse(json.optJSONObject("ports_set")),
+                    PlayerPrompt.gameKey(json.optJSONObject("game_session")?.optJSONObject("game")?.optString("id")),
+                    AndroidPadDevice.connected()
+                )
 
                 // B16: the host's fast ready, only with PRIVYHUB_STALL_RESUME=1 (absent key = today's gate)
                 if (json.optJSONObject(FastReadyHint.KEY)?.optBoolean(FastReadyHint.FIELD, false) == true) {
@@ -2442,6 +2451,9 @@ class NativeStreamActivity :
         playerPrompt?.let { p ->
             root.put("players", p.players)
             root.put("pad_claims", p.claimsJson())
+            // B46: the pick and the session's ports
+            root.put("players_chosen", p.chosen ?: JSONObject.NULL)
+            root.put("ports_set", p.ports.toJson())
         }
 
         // B16: the fast ready's releases (null = today: no key)
@@ -2607,12 +2619,14 @@ class NativeStreamActivity :
 
     // B41: the player prompt, with debug.privyhub.player_prompt=1 (null = today)
     private val playerPrompt: PlayerPrompt? by lazy {
-        if (PlayerPromptFlag.fromSystem()) padSlots?.let { PlayerPrompt(it) } else null
+        if (PlayerPromptFlag.fromSystem()) padSlots?.let { PlayerPrompt(it, PrefsPlayerChoiceStore(this)) } else null
     }
     private var promptView: TextView? = null
     private var promptBadgeView: TextView? = null
     private fun promptClaimsQuery(): String =
         playerPrompt?.let { "&pad_claims=" + URLEncoder.encode(it.claimsString(), "UTF-8") } ?: ""
+    // B46: the chooser's pick for the host (absent until picked)
+    private fun promptChosenQuery(n: Int? = playerPrompt?.chosen): String = n?.let { "&players_chosen=$it" } ?: ""
     private val promptTick = object : Runnable {
         override fun run() {
             playerPrompt?.let { p ->
@@ -2846,7 +2860,7 @@ class NativeStreamActivity :
                 // B34: the slot map (null = today: nothing)
                 padSlotsQuery() +
                 // B41: the prompt's claims (null = today: nothing)
-                promptClaimsQuery() +
+                promptClaimsQuery() + promptChosenQuery() +
                 // D-BASE-T1: the onn's own thermal state travels with the
                 // heartbeat, so a session that never posts a report still
                 // leaves a temperature trace on the host.
@@ -4452,6 +4466,14 @@ class NativeStreamActivity :
             return true
         }
 
+        // B46: the chooser's left / right / pick from any pad or the remote (null = today)
+        playerPrompt?.let { p ->
+            if (p.onChooserKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.repeatCount,
+                    event.device?.let { AndroidPadDevice(it) }, System.nanoTime() / 1_000_000L)) {
+                return true
+            }
+        }
+
         if (
             !gameplayReleased
         ) {
@@ -4475,6 +4497,14 @@ class NativeStreamActivity :
     override fun dispatchGenericMotionEvent(
         event: MotionEvent
     ): Boolean {
+        // B46: a pad's hat moves the chooser (null = today)
+        playerPrompt?.let { p ->
+            val d = event.device
+            if (d != null && event.action == MotionEvent.ACTION_MOVE &&
+                p.onChooserHat(AndroidPadDevice(d), event.getAxisValue(MotionEvent.AXIS_HAT_X))) {
+                return true
+            }
+        }
         if (
             !gameplayReleased
         ) {

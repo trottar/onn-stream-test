@@ -1,0 +1,1689 @@
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -79,6 +79,9 @@
+         # Companion commands are sent only to IPv4 loopback.
+         self._network_cmd_port: int | None = None
+ 
++        # B46: the session's ports from the chooser's pick (`players_chosen` on the launch); None = today's
++        self._players_session: dict[str, Any] | None = None
++
+         # PrivyHub A7.3: optional per-launch deterministic cheat profile.
+         # A non-null session always uses isolated save/state storage, and any
+         # requested enabled indexes are applied and verified before launch returns.
+@@ -168,6 +171,7 @@
+         self._host_window_policy = None
+         self._network_cmd_port = None
+         self._active_cheat_session = None
++        self._players_session = None
+ 
+         if cheat_runtime_cleanup:
+             self._cleanup_cheat_runtime()
+@@ -2480,11 +2484,43 @@
+         )
+         return info
+ 
++    # B46: the content stems (hashed) whose PS1 .opt a chooser pick wrote; nothing here runs without a pick ever made
++    PLAYERS_SESSION_OPTS = "data/games/retroarch/players_session_opts.json"
++
++    def _players_session_opt_listed(
++        self,
++        content_path: Path,
++        *,
++        add: bool = False,
++        remove: bool = False,
++    ) -> bool:
++        path = self._project_path(self.PLAYERS_SESSION_OPTS)
++        key = hashlib.sha256(
++            ("privyhub-opt:" + content_path.stem).encode("utf-8")
++        ).hexdigest()[:16]
++        try:
++            stems = set(json.loads(path.read_text(encoding="utf-8")).get("stems", []))
++        except (OSError, ValueError, AttributeError):
++            if not add:
++                return False
++            stems = set()
++        listed = key in stems
++        if add and not listed:
++            stems.add(key)
++        elif remove and listed:
++            stems.discard(key)
++        else:
++            return listed
++        path.parent.mkdir(parents=True, exist_ok=True)
++        path.write_text(json.dumps({"stems": sorted(stems)}) + "\n", encoding="utf-8")
++        return listed
++
+     def _prepare_ps1_multitap_options(
+         self,
+         game: dict[str, Any],
+         runtime: dict[str, Any],
+         content_path: Path,
++        session_mode: str | None = None,
+     ) -> dict[str, Any]:
+         game_id = self._input_profile_game_id(
+             game
+@@ -2508,6 +2544,18 @@
+                 )
+             ).strip().casefold()
+ 
++        # B46: a pick's mode replaces the metadata's for this launch (the metadata is not written)
++        metadata_mode = mode
++        if session_mode is not None:
++            mode = str(session_mode).strip().casefold()
++        elif (
++            not mode
++            and str(game.get("system", "")).strip().casefold() == "ps1"
++            and self._players_session_opt_listed(content_path)
++        ):
++            # B46's stale guard: a .opt a pick wrote, now launched with no pick and no metadata value -> both off
++            mode = "off"
++
+         if not mode:
+             return {
+                 "managed": False,
+@@ -2711,6 +2759,12 @@
+                 "Installed PS1 game core options failed byte verification"
+             )
+ 
++        # B46: a pick's .opt is listed (by a hash of the content stem); the guard's rewrite unlists it
++        if session_mode is not None:
++            self._players_session_opt_listed(content_path, add=True)
++        elif not metadata_mode:
++            self._players_session_opt_listed(content_path, remove=True)   # the guard's rewrite done
++
+         return {
+             "managed": True,
+             "enabled": bool(
+@@ -3006,6 +3060,42 @@
+         return lines
+ 
+ 
++    def _device_args(
++        self,
++        input_profile: dict[str, Any],
++        ps1_multitap: dict[str, Any],
++        players_plan: dict[str, Any] | None = None,
++    ) -> list[str]:
++        """The `--device` arguments. B46: a pick's plan replaces today's loop; None = today's list exactly."""
++        if players_plan is not None:
++            return list(players_plan["device_args"])
++        args: list[str] = []
++        libretro_device = input_profile.get(
++            "libretro_device"
++        )
++
++        if isinstance(
++            libretro_device,
++            int,
++        ):
++            explicit_device_players = (
++                len(self.INPUT_PROFILE_PLAYERS)
++                if bool(
++                    ps1_multitap.get(
++                        "enabled"
++                    )
++                )
++                else 2
++            )
++            for player_index in range(
++                1,
++                explicit_device_players + 1,
++            ):
++                args.append(
++                    f"--device={player_index}:{libretro_device}"
++                )
++        return args
++
+     def _prepare_input_override(
+         self,
+         game: dict[str, Any],
+@@ -5364,6 +5454,7 @@
+         cheat_source_index: int | None = None,
+         cheat_enabled_indexes: list[int] | tuple[int, ...] | None = None,
+         mod_index: int | None = None,
++        players_chosen: int | None = None,
+     ) -> dict[str, Any]:
+         with self.lock:
+             self._refresh_process()
+@@ -5373,6 +5464,13 @@
+                     "A PrivyHub game session is already running"
+                 )
+ 
++            # B46: the chooser's pick for this launch (None = today: the metadata alone)
++            players_plan: dict[str, Any] | None = None
++            if players_chosen is not None:
++                import players_session as _players_session
++                if _players_session.parse(players_chosen) is None:
++                    raise EmulatorError("players_chosen must be 1, 2 or 4")
++
+             runtime = self._runtime_details()
+             executable = runtime["executable"]
+             retroarch_config = runtime["retroarch_config"]
+@@ -5394,10 +5492,22 @@
+                 runtime,
+             )
+ 
++            # B46: with a pick, the PS1 multitap for this launch from the pick (None = today's metadata read)
++            if players_chosen is not None:
++                players_plan = _players_session.plan(
++                    str(game.get("system", "")),
++                    int(players_chosen),
++                    self.controller_profile(game).get("libretro_device"),
++                )
+             ps1_multitap = self._prepare_ps1_multitap_options(
+                 game,
+                 runtime,
+                 content_path,
++                session_mode=(
++                    players_plan["ps1_mode"]
++                    if players_plan is not None
++                    else None
++                ),
+             )
+ 
+             # C5-M5B: the PS1 look for this launch only (PRIVYHUB_PS1_LOOK;
+@@ -5482,30 +5592,23 @@
+                 str(session_config),
+             ]
+ 
+-            libretro_device = input_profile.get(
+-                "libretro_device"
++            command.extend(
++                self._device_args(
++                    input_profile,
++                    ps1_multitap,
++                    players_plan,
++                )
+             )
+-
+-            if isinstance(
+-                libretro_device,
+-                int,
+-            ):
+-                explicit_device_players = (
+-                    len(self.INPUT_PROFILE_PLAYERS)
+-                    if bool(
+-                        ps1_multitap.get(
+-                            "enabled"
+-                        )
+-                    )
+-                    else 2
++            # B46: the session's ports, read back from what was written (None = today: no key)
++            if players_plan is not None:
++                players_plan["device_args"] = [
++                    a for a in command if a.startswith("--device=")
++                ]
++                players_plan["ps1_opt_multitap"] = (
++                    bool(ps1_multitap.get("port1"))
++                    if bool(ps1_multitap.get("managed"))
++                    else None
+                 )
+-                for player_index in range(
+-                    1,
+-                    explicit_device_players + 1,
+-                ):
+-                    command.append(
+-                        f"--device={player_index}:{libretro_device}"
+-                    )
+ 
+             if entry_slot is not None:
+                 try:
+@@ -5637,6 +5740,8 @@
+             self.process = process
+             self.log_handle = log_handle
+             self.active_game = dict(game)
++            # B46: the session's ports from the pick (None = today)
++            self._players_session = players_plan
+             self.started_at = time.monotonic()
+             self._paused = False
+             isolated_session = cheat_session if cheat_session is not None else mod_session
+@@ -5732,6 +5837,9 @@
+                 )
+                 else None
+             )
++            # B46: the pick's ports, only for a launch that carried one (no key = today's payload)
++            if players_plan is not None:
++                payload["players_session"] = dict(players_plan)
+             payload["ps1_look"] = (
+                 {k: v for k, v in ps1_look_session.items() if k != "cfg_text"}
+                 if ps1_look_session["preset"] or ps1_look_session["ignored_value"]
+@@ -8656,6 +8764,7 @@
+             self._paused = False
+             self._network_cmd_port = None
+             self._active_cheat_session = None
++            self._players_session = None
+ 
+             if cheat_runtime_cleanup:
+                 cleanup_error = self._cleanup_cheat_runtime()
+--- a/companion/games/native_stream_heartbeat.py
++++ b/companion/games/native_stream_heartbeat.py
+@@ -193,7 +193,8 @@
+ 
+     # B34: the client's slot map and the per-slot counters (a client without pad_slots=stable sends no key)
+     # B38: packets_by_player beside the changed-only updates_by_player (a stable-slot client only)
+-    for field in ("pad_slots", "updates_by_player", "packets_by_player", "pad_slots_bad"):
++    # B46: the chooser's pick (only a client that picked sends it)
++    for field in ("pad_slots", "updates_by_player", "packets_by_player", "pad_slots_bad", "players_chosen"):
+         if field in values:
+             record[field] = values[field]
+ 
+--- a/companion/pad_slots.py
++++ b/companion/pad_slots.py
+@@ -20,6 +20,9 @@
+ s = kept from the stable map); each slot entry of the rows then carries `claimed_by` (`prompt` / `stable`). No key
+ (`claims=None`) = the rows above byte for byte; a malformed value adds nothing. Design:
+ `docs/memory/evidence/b41_2026-11-06/design_written_before_code.md`.
++B46: a client whose chooser picked also sends `players_chosen=<1|2|4>`; the rows then carry `players_chosen` and each
++entry a `label` (`P1`-`P4`), and a changed pick is a change row. No key = B41's rows byte for byte. Design:
++`docs/memory/evidence/b46_2026-11-07/design_written_before_code.md`.
+ """
+ 
+ from __future__ import annotations
+@@ -56,6 +59,22 @@
+     return [({**e, "claimed_by": parsed[e["slot"]]} if e["slot"] in parsed else e) for e in slots]
+ 
+ 
++def with_chosen(slots: list[dict[str, Any]] | None, players_chosen: int | None) -> list[dict[str, Any]] | None:
++    """B46: each entry's `label` (`P1`-`P4`) once the chooser picked; unchanged without the key."""
++    if slots is None or players_chosen is None:
++        return slots
++    return [{**e, "label": "P%d" % (int(e["slot"]) + 1)} for e in slots]
++
++
++def parse_chosen(raw: str | None) -> int | None:
++    """B46: the client's `players_chosen` (1 / 2 / 4); None when absent or malformed."""
++    try:
++        n = int(str(raw).strip())
++    except (TypeError, ValueError):
++        return None
++    return n if n in (1, 2, 4) else None
++
++
+ def parse(raw: str) -> list[dict[str, Any]] | None:
+     """The map as a list of {slot, pad, class}; [] for an empty map; None when malformed."""
+     raw = (raw or "").strip()
+@@ -80,6 +99,7 @@
+ 
+     def __init__(self) -> None:
+         self.last: list[dict[str, Any]] | None = None
++        self.last_chosen: int | None = None
+ 
+     def _row(self, recovery: Any, when: str, slots: list[dict[str, Any]] | None, **extra: Any) -> None:
+         fields: dict[str, Any] = {"when": when}
+@@ -91,21 +111,29 @@
+         fields.update(extra)
+         recovery._log("pad_slots", **fields)
+ 
+-    def start(self, recovery: Any, raw: str, claims: str | None = None) -> list[dict[str, Any]] | None:
+-        slots = with_claims(parse(raw), claims)
+-        self._row(recovery, "start", slots)
++    def start(self, recovery: Any, raw: str, claims: str | None = None,
++              players_chosen: int | None = None) -> list[dict[str, Any]] | None:
++        slots = with_chosen(with_claims(parse(raw), claims), players_chosen)
++        # B46: the chooser's pick, only when the client sent one
++        self._row(recovery, "start", slots, **({"players_chosen": players_chosen} if players_chosen is not None else {}))
+         if slots is not None:
+             self.last = slots
++        self.last_chosen = players_chosen
+         return slots
+ 
+     def heartbeat(self, recovery: Any, raw: str, values: dict[str, Any], updates_by_player: Any = None,
+-                  claims: str | None = None) -> None:
++                  claims: str | None = None, players_chosen: int | None = None) -> None:
+         """One heartbeat's key: the row's fields, and a change row when the map moved."""
+-        slots = with_claims(parse(raw), claims)
++        slots = with_chosen(with_claims(parse(raw), claims), players_chosen)
+         if slots is None:
+             values["pad_slots_bad"] = True
+             return
+         values[FIELD] = slots
++        # B46: the chooser's pick (only a client that picked sends it)
++        extra: dict[str, Any] = {}
++        if players_chosen is not None:
++            values["players_chosen"] = players_chosen
++            extra["players_chosen"] = players_chosen
+         if isinstance(updates_by_player, dict):
+             # B38: changes as updates_by_player, today's per-packet counts beside them
+             if isinstance(updates_by_player.get("changes"), (list, tuple)):
+@@ -114,9 +142,10 @@
+                 values["packets_by_player"] = [int(x) for x in updates_by_player["packets"]]
+         elif isinstance(updates_by_player, (list, tuple)):
+             values["updates_by_player"] = [int(x) for x in updates_by_player]
+-        if slots != self.last:
+-            self._row(recovery, "change", slots, heartbeat_sequence=values.get("sequence"))
++        if slots != self.last or players_chosen != self.last_chosen:
++            self._row(recovery, "change", slots, heartbeat_sequence=values.get("sequence"), **extra)
+             self.last = slots
++            self.last_chosen = players_chosen
+ 
+ 
+ def enable_changes(controller: Any) -> bool:
+--- /dev/null
++++ b/companion/players_session.py
+@@ -0,0 +1,79 @@
++"""B46: the session's ports from the player chooser's pick (`players_chosen`), set at the launch.
++
++The client (`debug.privyhub.player_prompt`, on by default) sends `players_chosen=<1|2|4>` on a `launch` when the onn
++holds the title's last pick; **without the key nothing here runs and the launch is today's byte for byte**. With it:
++- PS1: the per-content Beetle `.opt` is written for this launch with the port-1 multitap on (4) or off (1 / 2) -- the
++  same write D087's metadata path does, fed from the pick instead of `controller_overrides.json`, which is not touched;
++  the `--device` arguments are the pick's ports (1 -> port 2 None);
++- SNES: 1 -> `--device=2:0`; 4 -> port 2 the core's multitap device (257: bsnes "Super Multitap", snes9x "Multitap");
++- other systems: 1 -> `--device=2:0`; no multitap (2 ports).
++RetroArch cannot change a core option or a port device mid-session (no network command does), so a pick made at the
++chooser after the launch applies at the next launch (the client says so). Design:
++`docs/memory/evidence/b46_2026-11-07/design_written_before_code.md` (hashed before this code). Never raises.
++"""
++
++from __future__ import annotations
++
++from typing import Any
++
++CHOICES = (1, 2, 4)
++SNES_MULTITAP_DEVICE = 257   # RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_JOYPAD, 0) in both SNES cores' libretro sources
++NONE_DEVICE = 0              # RETRO_DEVICE_NONE
++MULTITAP_SYSTEMS = ("ps1", "snes")
++
++
++def parse(raw: Any) -> int | None:
++    """1 / 2 / 4, else None (multitap is sent as 4)."""
++    try:
++        n = int(str(raw).strip())
++    except (TypeError, ValueError):
++        return None
++    return n if n in CHOICES else None
++
++
++def plan(system: str, players_chosen: int, libretro_device: int | None) -> dict[str, Any]:
++    """The launch's ports for the pick: the `.opt` mode (PS1), the `--device` arguments, the ports read."""
++    system = str(system or "").strip().casefold()
++    n = int(players_chosen)
++    available = system in MULTITAP_SYSTEMS
++    multitap = n == 4 and available
++    args: list[str] = []
++    if system == "ps1" and isinstance(libretro_device, int) and not isinstance(libretro_device, bool):
++        ports = 4 if multitap else 2
++        for player in range(1, ports + 1):
++            args.append(f"--device={player}:{libretro_device}" if (n > 1 or player == 1) else f"--device=2:{NONE_DEVICE}")
++    elif system == "snes" and multitap:
++        args.append(f"--device=2:{SNES_MULTITAP_DEVICE}")
++    elif n == 1:
++        args.append(f"--device=2:{NONE_DEVICE}")
++    return {
++        "players_chosen": n,
++        "ports": 4 if multitap else (1 if n == 1 else 2),
++        "multitap": multitap,
++        "multitap_available": available,
++        "ps1_mode": ("port1" if multitap else "off") if system == "ps1" else None,
++        "device_args": args,
++        "source": "launch",
++    }
++
++
++def ports_set(emulator: Any, game_status: dict[str, Any] | None) -> dict[str, Any]:
++    """The start response's echo: the launch's plan, else the metadata's ports (4 with the PS1 multitap on, else 2)."""
++    try:
++        session = getattr(emulator, "_players_session", None)
++        if isinstance(session, dict) and session.get("source") == "launch":
++            return {"ports_set": {k: session[k] for k in ("players_chosen", "ports", "multitap", "multitap_available",
++                                                          "source")} | {"players": int(session["ports"])}}
++        game = getattr(emulator, "active_game", None) or (game_status or {}).get("game") or {}
++        system = str(game.get("system", "")).strip().casefold()
++        multitap = False
++        if system == "ps1":
++            try:
++                multitap = bool(emulator.ps1_multitap(game).get("enabled", False))
++            except Exception:
++                multitap = False
++        return {"ports_set": {"players": 4 if multitap else 2, "ports": 4 if multitap else 2, "multitap": multitap,
++                              "multitap_available": system in MULTITAP_SYSTEMS, "source": "metadata"}}
++    except Exception:
++        return {"ports_set": {"players": 2, "ports": 2, "multitap": False, "multitap_available": False,
++                              "source": "default"}}
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -3802,7 +3802,10 @@
+                 self._pad_slots_log.heartbeat(self._recovery, self._first(query, "pad_slots"), values,
+                                               _pad_slots.updates_by_player(self._native_stream._session_io.controller),
+                                               # B41: the prompt's claims (only a client with player_prompt=1 sends them)
+-                                              claims=self._first(query, "pad_claims") if "pad_claims" in query else None)
++                                              claims=self._first(query, "pad_claims") if "pad_claims" in query else None,
++                                              # B46: the chooser's pick (only a client that picked sends it)
++                                              **({"players_chosen": _pad_slots.parse_chosen(self._first(query, "players_chosen"))}
++                                                 if "players_chosen" in query else {}))
+ 
+             if not values:
+                 raise ValueError(
+@@ -3922,7 +3925,10 @@
+                     self._pad_slots_log = _pad_slots.SlotsLog()
+                 self._pad_slots_log.start(self._recovery, self._first(query, "pad_slots"),
+                                           # B41: the prompt's claims (only a client with player_prompt=1 sends them)
+-                                          claims=self._first(query, "pad_claims") if "pad_claims" in query else None)
++                                          claims=self._first(query, "pad_claims") if "pad_claims" in query else None,
++                                          # B46: the chooser's pick (only a client that picked sends it)
++                                          **({"players_chosen": _pad_slots.parse_chosen(self._first(query, "players_chosen"))}
++                                             if "players_chosen" in query else {}))
+                 # B38: count only the slots whose state changes (a stable-slot client's key turns it on)
+                 _pad_slots.enable_changes(getattr(getattr(self._native_stream, "_session_io", None), "controller", None))
+             try:
+@@ -3982,6 +3988,9 @@
+                 if self._first(query, "player_prompt") == "1":
+                     import player_count as _player_count
+                     payload.update(_player_count.for_start(self, game_status))
++                    # B46: the session's ports as the launch set them (the chooser caps its claims by them)
++                    import players_session as _players_session
++                    payload.update(_players_session.ports_set(self._emulator, game_status))
+                 return payload
+             except NativeStreamError as exc:
+                 raise RuntimeError(str(exc)) from exc
+@@ -4505,11 +4514,19 @@
+                         raise ValueError("mod_index must be a non-negative integer") from exc
+                     if mod_index < 0:
+                         raise ValueError("mod_index must be a non-negative integer")
++                # B46: the chooser's last pick for this title sets the session's ports (no key = today's call)
++                launch_extra: dict[str, Any] = {}
++                if "players_chosen" in query:
++                    import players_session as _players_session
++                    chosen = _players_session.parse(self._first(query, "players_chosen"))
++                    if chosen is not None:   # a malformed value: today's launch
++                        launch_extra["players_chosen"] = chosen
+                 payload = self._emulator.launch(
+                     game,
+                     cheat_source_index=cheat_source_index,
+                     cheat_enabled_indexes=cheat_enabled_indexes,
+                     mod_index=mod_index,
++                    **launch_extra,
+                 )
+ 
+                 return payload
+--- a/PrivyHub/app/src/main/java/MainActivity.kt
++++ b/PrivyHub/app/src/main/java/MainActivity.kt
+@@ -9104,6 +9104,21 @@
+     }
+ 
+ 
++    // B46: `&players_chosen=N` from the title's last pick, only with the prompt on (debug.privyhub.player_prompt)
++    private fun playersChosenLaunchSuffix(gameId: String): String =
++        try {
++            if (!com.safeiot.privyhub.streaming.PlayerPromptFlag.fromSystem()) {
++                ""
++            } else {
++                com.safeiot.privyhub.streaming.PlayerPrompt.gameKey(gameId)
++                    ?.let { com.safeiot.privyhub.streaming.PrefsPlayerChoiceStore(this).get(it) }
++                    ?.let { "&players_chosen=$it" }
++                    ?: ""
++            }
++        } catch (_: Exception) {
++            ""
++        }
++
+     private fun openNativeGameStream() {
+ 
+         val host =
+@@ -12280,7 +12295,9 @@
+                 val response =
+                     httpPost(
+                         "http://$host:$CONTROL_PORT" +
+-                            "/plugins/games/launch?id=$gameId$cheatQuerySuffix$modQuerySuffix"
++                            "/plugins/games/launch?id=$gameId$cheatQuerySuffix$modQuerySuffix" +
++                            // B46: the title's last chooser pick sets the session's ports (no pick, or the prompt off: today)
++                            playersChosenLaunchSuffix(gameId)
+                     )
+ 
+                 val json =
+--- a/PrivyHub/app/src/main/java/streaming/NativeControllerSender.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeControllerSender.kt
+@@ -224,7 +224,9 @@
+         val player =
+             (if (prompt != null) prompt.slotForKey(
+                 AndroidPadDevice(device), event.keyCode, event.action == KeyEvent.ACTION_DOWN,
+-                System.nanoTime() / 1_000_000L, connectedPads
++                System.nanoTime() / 1_000_000L, connectedPads,
++                // B46: a repeat never claims
++                repeat = event.repeatCount
+             ) else playerForDevice(device))
+                 ?: return false
+ 
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -857,7 +857,9 @@
+                             "/plugins/games/native-stream-start" +
+                             "?port=$VIDEO_PORT" + (if (restart != null) "&guard_end=1" else "") + padSlotsQuery() +
+                             // B41: the prompt asks for the title's players and sends its claims (null = today: nothing)
+-                            (if (playerPrompt != null) "&player_prompt=1" + promptClaimsQuery() else ""),
++                            (if (playerPrompt != null) "&player_prompt=1" + promptClaimsQuery() else "") +
++                            // B46: a self-restart carries the session's choice (null = today: nothing)
++                            (if (playerPrompt != null && restart != null) promptChosenQuery(PlayerPromptProcess.lastChoice) else ""),
+                         readTimeoutMs =
+                             30_000
+                     )
+@@ -917,7 +919,14 @@
+                     )
+ 
+                 // B41: the title's player count (an old host: no key, 2) (null = today)
+-                playerPrompt?.setPlayers(json.optInt("players", PlayerPrompt.DEFAULT_PLAYERS), AndroidPadDevice.connected())
++                // B46: the chooser opens at every start but a self-restart; the session's ports from the host's echo
++                playerPrompt?.onStartResponse(
++                    restart != null,
++                    json.optInt("players", PlayerPrompt.DEFAULT_PLAYERS),
++                    PortsSet.parse(json.optJSONObject("ports_set")),
++                    PlayerPrompt.gameKey(json.optJSONObject("game_session")?.optJSONObject("game")?.optString("id")),
++                    AndroidPadDevice.connected()
++                )
+ 
+                 // B16: the host's fast ready, only with PRIVYHUB_STALL_RESUME=1 (absent key = today's gate)
+                 if (json.optJSONObject(FastReadyHint.KEY)?.optBoolean(FastReadyHint.FIELD, false) == true) {
+@@ -2442,6 +2451,9 @@
+         playerPrompt?.let { p ->
+             root.put("players", p.players)
+             root.put("pad_claims", p.claimsJson())
++            // B46: the pick and the session's ports
++            root.put("players_chosen", p.chosen ?: JSONObject.NULL)
++            root.put("ports_set", p.ports.toJson())
+         }
+ 
+         // B16: the fast ready's releases (null = today: no key)
+@@ -2607,12 +2619,14 @@
+ 
+     // B41: the player prompt, with debug.privyhub.player_prompt=1 (null = today)
+     private val playerPrompt: PlayerPrompt? by lazy {
+-        if (PlayerPromptFlag.fromSystem()) padSlots?.let { PlayerPrompt(it) } else null
++        if (PlayerPromptFlag.fromSystem()) padSlots?.let { PlayerPrompt(it, PrefsPlayerChoiceStore(this)) } else null
+     }
+     private var promptView: TextView? = null
+     private var promptBadgeView: TextView? = null
+     private fun promptClaimsQuery(): String =
+         playerPrompt?.let { "&pad_claims=" + URLEncoder.encode(it.claimsString(), "UTF-8") } ?: ""
++    // B46: the chooser's pick for the host (absent until picked)
++    private fun promptChosenQuery(n: Int? = playerPrompt?.chosen): String = n?.let { "&players_chosen=$it" } ?: ""
+     private val promptTick = object : Runnable {
+         override fun run() {
+             playerPrompt?.let { p ->
+@@ -2846,7 +2860,7 @@
+                 // B34: the slot map (null = today: nothing)
+                 padSlotsQuery() +
+                 // B41: the prompt's claims (null = today: nothing)
+-                promptClaimsQuery() +
++                promptClaimsQuery() + promptChosenQuery() +
+                 // D-BASE-T1: the onn's own thermal state travels with the
+                 // heartbeat, so a session that never posts a report still
+                 // leaves a temperature trace on the host.
+@@ -4452,6 +4466,14 @@
+             return true
+         }
+ 
++        // B46: the chooser's left / right / pick from any pad or the remote (null = today)
++        playerPrompt?.let { p ->
++            if (p.onChooserKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.repeatCount,
++                    event.device?.let { AndroidPadDevice(it) }, System.nanoTime() / 1_000_000L)) {
++                return true
++            }
++        }
++
+         if (
+             !gameplayReleased
+         ) {
+@@ -4475,6 +4497,14 @@
+     override fun dispatchGenericMotionEvent(
+         event: MotionEvent
+     ): Boolean {
++        // B46: a pad's hat moves the chooser (null = today)
++        playerPrompt?.let { p ->
++            val d = event.device
++            if (d != null && event.action == MotionEvent.ACTION_MOVE &&
++                p.onChooserHat(AndroidPadDevice(d), event.getAxisValue(MotionEvent.AXIS_HAT_X))) {
++                return true
++            }
++        }
+         if (
+             !gameplayReleased
+         ) {
+--- a/PrivyHub/app/src/main/java/streaming/PadSlots.kt
++++ b/PrivyHub/app/src/main/java/streaming/PadSlots.kt
+@@ -156,6 +156,14 @@
+         k
+     }
+ 
++    /** B46: the chooser's opening empties the map (the claims re-form it); not called by B34 / B38 / B41's paths. */
++    fun clearAll() {
++        synchronized(lock) {
++            byKey.clear()
++            classOf.clear()
++        }
++    }
++
+     private fun assign(d: PadDevice, k: String, connected: List<PadDevice>): Int? {
+         val free = (0 until count).firstOrNull { it !in byKey.values }
+         val slot = free ?: run {
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/PlayerChoiceStoreAndroid.kt
+@@ -0,0 +1,29 @@
++package com.safeiot.privyhub.streaming
++
++import android.content.Context
++
++/**
++ * B46: the title's last chooser pick on the onn, a private preference keyed by [PlayerPrompt.gameKey] (sha256 of the
++ * host's game id, 12 hex; no title or id stored). Built only with the prompt on; a failed read is no choice.
++ */
++class PrefsPlayerChoiceStore(context: Context) : PlayerChoiceStore {
++    private val prefs = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
++
++    override fun get(key: String): Int? =
++        try {
++            prefs.getInt(key, 0).takeIf { it in PlayerPrompt.OPTIONS }
++        } catch (_: Exception) {
++            null
++        }
++
++    override fun put(key: String, players: Int) {
++        try {
++            prefs.edit().putInt(key, players).apply()
++        } catch (_: Exception) {
++        }
++    }
++
++    companion object {
++        const val FILE = "privyhub_players_chosen"
++    }
++}
+--- a/PrivyHub/app/src/main/java/streaming/PlayerPrompt.kt
++++ b/PrivyHub/app/src/main/java/streaming/PlayerPrompt.kt
+@@ -2,102 +2,228 @@
+ 
+ import org.json.JSONArray
+ import org.json.JSONObject
++import java.security.MessageDigest
+ 
+ /**
+- * B41: the player prompt, behind the system property `debug.privyhub.player_prompt=1` (CL-B7P's convention).
+- * Absent / empty / any other value = today: no object, no view, no query or report key.
++ * B41: the player prompt, behind the system property `debug.privyhub.player_prompt` (CL-B7P's convention).
++ * B46 (the user, 2026-11-07: "Player one press any button by default also"; "I want every game to have that 1 player,
++ * 2 player, and multitap"; "It should pop up every time a game is active or unpaused"): **on by default** --
++ * absent / empty / junk / `1` = the chooser; `0` / `off` = no prompt at all (no object, no view, no query or report
++ * key: `8ba4d996…`'s absent).
+  *
+- * On top of B34 / B38's stable slots (the prompt implies them): at a game's start and when a new eligible pad
+- * appears, "Player N — press any button" bottom-centre; the first unclaimed eligible pad to press a face button or
+- * Start claims the lowest open slot below the title's player count (the host's `players`, 2 when absent) and shows
+- * "PN" for 2 s; the press also reaches the game (never blocking input). A pad already in the map keeps its slot and
+- * shows its badge on its first press. Select + Start held 2 s releases a slot ("PN released"). A 1-player title:
+- * no prompt, B34's assignment. Design: `docs/memory/evidence/b41_2026-11-06/design_written_before_code.md`
+- * (hashed before this code).
++ * At every session start that is not a self-restart (a game's start, and every unpause: the Resume tile's new start),
++ * the slot map is cleared and a bottom-centre chooser reads "Players:  1  /  2  /  multitap (3-4)"; left / right (a
++ * pad's d-pad or hat, or the remote) moves, a face button (or the remote's centre) picks; the default is the title's
++ * last choice, else 2 (1 when the host's `players` is 1). Then "Player N — press any button" up to the chosen count
++ * (capped by the session's ports, `ports_set`); the first fresh face-button / Start press of an unclaimed pad takes the
++ * lowest open slot with a 2-s "PN" badge; the press reaches the game. Key repeats never claim, and a key held through
++ * a pick or a release must be lifted first (HOME-3 C6's held-Start re-claim). A pad beyond the count gets no slot.
++ * Select + Start held 2 s releases a slot. The game is never paused.
++ * Design: `docs/memory/evidence/b46_2026-11-07/design_written_before_code.md` (hashed before this code).
+  */
+ object PlayerPromptFlag {
+     const val PROPERTY = "debug.privyhub.player_prompt"
+ 
+-    fun parse(value: String?): Boolean = value?.trim() == "1"
++    // B46: on unless `0` / `off` (the user's "by default also", 2026-11-07); `off` as B42's pad_slots
++    fun parse(value: String?): Boolean = value?.trim().let { it != "0" && it != "off" }
+ 
+-    /** The property, read through reflection; a failed read is absent (today). */
++    /** The property, read through reflection; a failed read is absent, so on (B46). */
+     fun fromSystem(): Boolean =
+         try {
+             val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
+             parse(get.invoke(null, PROPERTY) as? String)
+         } catch (_: Throwable) {
+-            false
++            parse(null)
+         }
+ }
+ 
+-class PlayerPrompt(private val slots: PadSlots) {
++/** B46: the title's last choice, keyed by [PlayerPrompt.gameKey] (a private preference on the onn; fakes on the JVM). */
++interface PlayerChoiceStore {
++    fun get(key: String): Int?
++    fun put(key: String, players: Int)
++}
++
++class MemoryPlayerChoiceStore : PlayerChoiceStore {
++    private val m = HashMap<String, Int>()
++    override fun get(key: String): Int? = m[key]
++    override fun put(key: String, players: Int) { m[key] = players }
++}
++
++/** B46: the session's ports as the host set them at the launch (`ports_set`); an old host's absent key = 2 ports. */
++data class PortsSet(val players: Int, val multitap: Boolean, val multitapAvailable: Boolean, val source: String) {
++    fun toJson(): JSONObject = JSONObject().put("players", players).put("multitap", multitap)
++        .put("multitap_available", multitapAvailable).put("source", source)
++
++    companion object {
++        val UNKNOWN = PortsSet(2, multitap = false, multitapAvailable = false, source = "absent")
++
++        fun parse(o: JSONObject?): PortsSet =
++            if (o == null) UNKNOWN else of(
++                o.optInt("players", 2),
++                o.optBoolean("multitap", false),
++                o.optBoolean("multitap_available", false),
++                o.optString("source", "host"),
++            )
++
++        /** The echo's fields (the JVM tests' path: org.json is a stub there). */
++        fun of(players: Int, multitap: Boolean, multitapAvailable: Boolean, source: String): PortsSet =
++            PortsSet(players.coerceIn(1, 4), multitap, multitapAvailable, source)
++    }
++}
++
++/** B46: the session's choice across a self-restart (a new activity in the same process). */
++object PlayerPromptProcess {
++    @Volatile
++    var lastChoice: Int? = null
++}
++
++class PlayerPrompt(private val slots: PadSlots, private val store: PlayerChoiceStore = MemoryPlayerChoiceStore()) {
+     data class View(val prompt: String?, val badge: String?)
+ 
++    enum class Phase { NONE, CHOOSING, CLAIMING, DONE }
++
++    /** The host's B41 `players` (the default's input and the report's `players`). */
+     @Volatile
+     var players: Int = DEFAULT_PLAYERS
+         private set
+ 
++    @Volatile
++    var phase: Phase = Phase.NONE
++        private set
++
++    /** 1 / 2 / 4 once picked (the queries' and the report's `players_chosen`). */
++    @Volatile
++    var chosen: Int? = null
++        private set
++
++    @Volatile
++    var ports: PortsSet = PortsSet.UNKNOWN
++        private set
++
+     private val lock = Any()
+     private val claimedBy = HashMap<Int, String>()      // slot -> prompt | stable
+     private val badgeShown = HashSet<String>()           // pad keys badged this session
+     private val holdBits = HashMap<String, Int>()        // pad key -> Select (1) / Start (2) held
+     private val holdSince = HashMap<String, Long>()      // pad key -> both held since
++    private val needsUp = HashSet<Pair<String, Int>>()   // (pad key, key code) held through a pick / release
++    private val hatX = HashMap<String, Int>()            // pad key -> the hat's last side (-1 / 0 / 1)
++    private var highlight = 1                            // index into OPTIONS
++    private var gameKey: String? = null
+     private var badgeText: String? = null
+     private var badgeUntilMs = 0L
++    private var noteText: String? = null
++    private var noteUntilMs = 0L
+ 
+-    val active: Boolean get() = players >= 2
++    /** The claims' target: the choice capped by the session's ports. */
++    val count: Int get() = chosen?.let { capped(it) } ?: 0
+ 
+-    /** The sender's start, in place of [PadSlots.beginStart]: no pre-assignment; the map's pads keep their slots. */
++    /** The sender's start: no pre-assignment; the opening waits for the start response. */
+     fun beginStart(connected: List<PadDevice>) {
+         synchronized(lock) {
+             badgeShown.clear()
+             holdBits.clear()
+             holdSince.clear()
++            needsUp.clear()
++            hatX.clear()
+             badgeText = null
+-            if (!active) slots.beginStart(connected)
+-            markStable()
+         }
+     }
+ 
+-    /** After the start response: the title's player count; 1 = B34's assignment, no prompt. */
+-    fun setPlayers(n: Int, connected: List<PadDevice>) {
++    /**
++     * After the start response: [selfRestart] keeps the map and the session's choice (no chooser); any other start
++     * (a game's start, an unpause) clears the map and opens the chooser.
++     */
++    fun onStartResponse(selfRestart: Boolean, hostPlayers: Int, portsSet: PortsSet, key: String?, connected: List<PadDevice>) {
+         synchronized(lock) {
+-            players = n.coerceIn(1, 4)
+-            if (!active) {
+-                slots.beginStart(connected)
++            players = hostPlayers.coerceIn(1, 4)
++            ports = portsSet
++            gameKey = key
++            if (selfRestart) {
++                chosen = PlayerPromptProcess.lastChoice ?: key?.let { store.get(it) } ?: defaultChoice()
+                 markStable()
++                phase = Phase.DONE
++                return
++            }
++            slots.clearAll()
++            claimedBy.clear()
++            chosen = null
++            noteText = null
++            highlight = OPTIONS.indexOf((key?.let { store.get(it) }) ?: defaultChoice()).coerceAtLeast(0)
++            phase = Phase.CHOOSING
++        }
++    }
++
++    /** A key from any device while the chooser is open: true = consumed (left / right / pick). */
++    fun onChooserKey(keyCode: Int, down: Boolean, repeat: Int, pad: PadDevice?, nowMs: Long): Boolean {
++        synchronized(lock) {
++            if (phase != Phase.CHOOSING) return false
++            val k = pad?.takeIf { PadSlots.eligible(it) }?.let { PadSlots.key(it) }
++            when (keyCode) {
++                KEYCODE_DPAD_LEFT, KEYCODE_DPAD_RIGHT -> {
++                    if (down && repeat == 0) move(if (keyCode == KEYCODE_DPAD_LEFT) -1 else 1)
++                    return true
++                }
++                in PICK_KEYS -> {
++                    if (down && repeat == 0) {
++                        k?.let { needsUp.add(it to keyCode) }
++                        pick(OPTIONS[highlight], nowMs)
++                    }
++                    return true
++                }
++                else -> return false
+             }
+         }
+     }
+ 
+-    /** A key event's slot: null = no player (an unclaimed pad's non-claim key, or not a gamepad). */
+-    fun slotForKey(d: PadDevice, keyCode: Int, down: Boolean, nowMs: Long, connected: () -> List<PadDevice>): Int? {
+-        if (!active) return slots.slotFor(d, connected)
++    /** A pad's hat while the chooser is open: a crossing of ±0.5 moves once; true = consumed. */
++    fun onChooserHat(pad: PadDevice, x: Float): Boolean {
++        synchronized(lock) {
++            if (phase != Phase.CHOOSING || !PadSlots.eligible(pad)) return false
++            val k = PadSlots.key(pad)
++            val side = if (x <= -0.5f) -1 else if (x >= 0.5f) 1 else 0
++            if (side != 0 && hatX[k] != side) move(side)
++            hatX[k] = side
++            return true
++        }
++    }
++
++    /** A key event's slot: null = no player (the chooser is open, an unclaimed pad's non-claim key, not a gamepad). */
++    fun slotForKey(
++        d: PadDevice,
++        keyCode: Int,
++        down: Boolean,
++        nowMs: Long,
++        connected: () -> List<PadDevice>,
++        repeat: Int = 0,
++    ): Int? {
+         if (!PadSlots.eligible(d)) return null
+         val k = PadSlots.key(d)
+         synchronized(lock) {
++            if (!down) needsUp.remove(k to keyCode)
++            if (phase == Phase.CHOOSING) return null
+             slots.slotOfKey(k)?.let { s ->
+                 trackHold(k, keyCode, down, nowMs)
+                 if (down && badgeShown.add(k)) badge("P${s + 1}", nowMs)
+                 return s
+             }
+-            if (!down || keyCode !in CLAIM_KEYS) return null
+-            val s = openSlot(connected())?.also { slots.claim(d, it) }
+-                ?: slots.slotFor(d, connected)
+-                ?: return null
++            // a fresh press only: no repeat, and not a key held through a pick or a release
++            if (!down || repeat > 0 || keyCode !in CLAIM_KEYS || (k to keyCode) in needsUp) return null
++            val s = openSlot(connected()) ?: return null
++            slots.claim(d, s)
+             claimedBy[s] = PROMPT
+             holdBits.remove(k)
+             badgeShown.add(k)
+             badge("P${s + 1}", nowMs)
++            if ((0 until count).all { slots.holderOf(it) != null }) phase = Phase.DONE
+             return s
+         }
+     }
+ 
+     /** A motion event's slot: a stick never claims. */
+     fun slotForMotion(d: PadDevice, connected: () -> List<PadDevice>): Int? =
+-        if (!active) slots.slotFor(d, connected) else slots.slotOf(d)
++        if (phase == Phase.CHOOSING) null else slots.slotOf(d)
+ 
+-    /** The UI tick: a Select + Start hold of [RELEASE_MS] frees the pad's slot. */
++    /** The UI tick: a Select + Start hold of [RELEASE_MS] frees the pad's slot; both keys must be lifted first. */
+     fun tick(nowMs: Long) {
+         synchronized(lock) {
+             val due = holdSince.filter { nowMs - it.value >= RELEASE_MS }.keys.toList()
+@@ -108,17 +234,23 @@
+                 slots.release(s)
+                 claimedBy.remove(s)
+                 badgeShown.remove(k)
++                needsUp.add(k to KEYCODE_BUTTON_SELECT)
++                needsUp.add(k to KEYCODE_BUTTON_START)
+                 badge("P${s + 1} released", nowMs)
++                if (phase == Phase.DONE) phase = Phase.CLAIMING
+             }
+         }
+     }
+ 
+     fun view(nowMs: Long, connected: List<PadDevice>): View = synchronized(lock) {
+-        val prompt = if (!active) null else {
++        val badgeNow = badgeText?.takeIf { nowMs < badgeUntilMs }
++        if (phase == Phase.CHOOSING) return@synchronized View(chooserLine(), badgeNow)
++        val note = noteText?.takeIf { phase == Phase.CLAIMING || nowMs < noteUntilMs }
++        val ask = if (phase == Phase.CLAIMING || phase == Phase.DONE) {
+             val unclaimed = connected.any { PadSlots.eligible(it) && slots.slotOf(it) == null }
+             openSlot(connected)?.takeIf { unclaimed }?.let { "Player ${it + 1} — press any button" }
+-        }
+-        View(prompt, badgeText?.takeIf { nowMs < badgeUntilMs })
++        } else null
++        View(listOfNotNull(ask, note).joinToString("\n").ifEmpty { null }, badgeNow)
+     }
+ 
+     /** `slot:p|s` for each claimed or kept slot (the start's and the heartbeat's `pad_claims`). */
+@@ -134,10 +266,47 @@
+ 
+     fun claimedBy(slot: Int): String? = synchronized(lock) { claimedBy[slot] }
+ 
+-    /** The lowest slot below [players] with no holder, or whose holder is not connected. */
++    /** The chooser's line, the highlighted option in brackets. */
++    fun chooserLine(): String = synchronized(lock) {
++        "Players:  " + OPTIONS.indices.joinToString("  /  ") { i ->
++            val label = LABELS[i]
++            if (i == highlight) "[$label]" else label
++        }
++    }
++
++    private fun defaultChoice(): Int = if (players == 1) 1 else 2
++
++    private fun move(step: Int) {
++        highlight = (highlight + step).coerceIn(0, OPTIONS.size - 1)
++    }
++
++    private fun pick(n: Int, nowMs: Long) {
++        chosen = n
++        PlayerPromptProcess.lastChoice = n
++        gameKey?.let { store.put(it, n) }
++        noteText = noteFor(n)
++        noteUntilMs = nowMs + NOTE_MS
++        phase = Phase.CLAIMING
++    }
++
++    /** The choice capped by the session's ports (the host cannot change them mid-session, B46 S2). */
++    private fun capped(n: Int): Int = when (n) {
++        4 -> if (ports.multitap && ports.players >= 4) 4 else minOf(2, ports.players)
++        else -> minOf(n, ports.players)
++    }
++
++    private fun noteFor(n: Int): String? = when {
++        n == 4 && !ports.multitapAvailable && !ports.multitap -> "No multitap on this system — 2 players"
++        n == 4 && !(ports.multitap && ports.players >= 4) -> "Multitap from the next start"
++        n < 4 && ports.multitap -> "Multitap off from the next start"
++        n == 2 && ports.players < 2 -> "2 players from the next start"
++        else -> null
++    }
++
++    /** The lowest slot below [count] with no holder, or whose holder is not connected. */
+     private fun openSlot(connected: List<PadDevice>): Int? {
+         val present = connected.filter { PadSlots.eligible(it) }.map { PadSlots.key(it) }.toSet()
+-        return (0 until players).firstOrNull { s -> slots.holderOf(s)?.let { it !in present } ?: true }
++        return (0 until count).firstOrNull { s -> slots.holderOf(s)?.let { it !in present } ?: true }
+     }
+ 
+     private fun markStable() {
+@@ -165,10 +334,19 @@
+         const val DEFAULT_PLAYERS = 2
+         const val BADGE_MS = 2_000L
+         const val RELEASE_MS = 2_000L
++        const val NOTE_MS = 5_000L
+         const val PROMPT = "prompt"
+         const val STABLE = "stable"
+ 
++        /** The chooser's options: 1, 2, multitap (sent as 4). */
++        val OPTIONS = listOf(1, 2, 4)
++        val LABELS = listOf("1", "2", "multitap (3-4)")
++
+         // android.view.KeyEvent's codes, inlined so the JVM tests need no Android stub
++        const val KEYCODE_DPAD_LEFT = 21
++        const val KEYCODE_DPAD_RIGHT = 22
++        const val KEYCODE_DPAD_CENTER = 23
++        const val KEYCODE_ENTER = 66
+         const val KEYCODE_BUTTON_A = 96
+         const val KEYCODE_BUTTON_B = 97
+         const val KEYCODE_BUTTON_X = 99
+@@ -178,5 +356,16 @@
+ 
+         /** A face button or Start claims a slot. */
+         val CLAIM_KEYS = setOf(KEYCODE_BUTTON_A, KEYCODE_BUTTON_B, KEYCODE_BUTTON_X, KEYCODE_BUTTON_Y, KEYCODE_BUTTON_START)
++
++        /** A face button, or the remote's centre / Enter, picks in the chooser. */
++        val PICK_KEYS = setOf(KEYCODE_BUTTON_A, KEYCODE_BUTTON_B, KEYCODE_BUTTON_X, KEYCODE_BUTTON_Y,
++            KEYCODE_DPAD_CENTER, KEYCODE_ENTER)
++
++        /** The title's preference key: sha256 of the host's game id, 12 hex (no id or title stored). */
++        fun gameKey(id: String?): String? =
++            id?.trim()?.takeIf { it.isNotEmpty() }?.let { s ->
++                MessageDigest.getInstance("SHA-256").digest(("privyhub-players:" + s).toByteArray(Charsets.UTF_8))
++                    .take(6).joinToString("") { "%02x".format(it) }
++            }
+     }
+ }
+--- a/PrivyHub/app/src/test/java/streaming/PlayerPromptTest.kt
++++ b/PrivyHub/app/src/test/java/streaming/PlayerPromptTest.kt
+@@ -4,11 +4,13 @@
+ import org.junit.Assert.assertFalse
+ import org.junit.Assert.assertNull
+ import org.junit.Assert.assertTrue
++import org.junit.Before
+ import org.junit.Test
+ 
+ /**
+- * B41: the player prompt over the stable slots (debug.privyhub.player_prompt=1). Fake devices as B38's test: the onn's
+- * virtual remote (C4), two real pads with controller numbers 2 and 3.
++ * B46: the player chooser over the stable slots (debug.privyhub.player_prompt, on by default). Fake devices as B38 /
++ * B41's tests: the onn's virtual remote (C4), real pads with controller numbers 2-5. B41's cases moved to B46's
++ * meaning (disclosed, as B42): the prompt no longer skips a start whose pads hold slots, nor a 1-player title.
+  */
+ class PlayerPromptTest {
+ 
+@@ -33,90 +35,189 @@
+         const val X = PlayerPrompt.KEYCODE_BUTTON_X
+         const val START = PlayerPrompt.KEYCODE_BUTTON_START
+         const val SELECT = PlayerPrompt.KEYCODE_BUTTON_SELECT
++        const val LEFT = PlayerPrompt.KEYCODE_DPAD_LEFT
++        const val RIGHT = PlayerPrompt.KEYCODE_DPAD_RIGHT
++        const val CENTER = PlayerPrompt.KEYCODE_DPAD_CENTER
+         const val L1 = 102
++        val TWO = PortsSet(2, multitap = false, multitapAvailable = true, source = "launch")
++        val FOUR = PortsSet(4, multitap = true, multitapAvailable = true, source = "launch")
++        const val GAME = "ps1-two-player-title"
+     }
+ 
+     private val virtualRemote = Dev("virtual-remote-desc", 1, 0x18d1, 0x0001, KEYBOARD or DPAD or GAMEPAD,
+         hasGamepadButton = true, isVirtual = false, hasFaceButton = true, hasStickOrHat = false)
+-    private val padA = Dev("pad-a-desc", 2, 0x054c, 0x09cc, GAMEPAD or JOYSTICK or KEYBOARD,
+-        hasGamepadButton = true, isVirtual = false, hasFaceButton = true, hasStickOrHat = true)
+-    private val padB = Dev("pad-b-desc", 3, 0x054c, 0x09cc, GAMEPAD or JOYSTICK or KEYBOARD,
++    private fun pad(n: Int) = Dev("pad-$n-desc", n + 1, 0x054c, 0x09cc, GAMEPAD or JOYSTICK or KEYBOARD,
+         hasGamepadButton = true, isVirtual = false, hasFaceButton = true, hasStickOrHat = true)
++    private val padA = pad(1)
++    private val padB = pad(2)
+     private val onn = listOf(virtualRemote, padA, padB)
+     private val conn = { onn }
+ 
+-    private fun fresh(players: Int = 2): Pair<PadSlots, PlayerPrompt> {
++    @Before
++    fun clearProcess() {
++        PlayerPromptProcess.lastChoice = null
++    }
++
++    private fun open(p: PlayerPrompt, devs: List<PadDevice> = onn, ports: PortsSet = TWO, hostPlayers: Int = 2,
++                     self: Boolean = false) {
++        p.beginStart(devs)
++        p.onStartResponse(self, hostPlayers, ports, PlayerPrompt.gameKey(GAME), devs)
++    }
++
++    private fun fresh(ports: PortsSet = TWO, devs: List<PadDevice> = onn, hostPlayers: Int = 2,
++                      store: PlayerChoiceStore = MemoryPlayerChoiceStore()): Pair<PadSlots, PlayerPrompt> {
+         val s = PadSlots()
+-        val p = PlayerPrompt(s)
+-        p.beginStart(onn)
+-        p.setPlayers(players, onn)
++        val p = PlayerPrompt(s, store)
++        open(p, devs, ports, hostPlayers)
+         return s to p
+     }
+ 
+-    private fun press(p: PlayerPrompt, d: PadDevice, key: Int, now: Long): Int? {
+-        val slot = p.slotForKey(d, key, true, now, conn)
+-        p.slotForKey(d, key, false, now + 50, conn)
++    private fun press(p: PlayerPrompt, d: PadDevice, key: Int, now: Long, devs: List<PadDevice> = onn): Int? {
++        val slot = p.slotForKey(d, key, true, now, { devs })
++        p.slotForKey(d, key, false, now + 50, { devs })
+         return slot
+     }
+ 
++    /** A pick from a pad: the chooser consumes the down; the up reaches the sender as on the onn. */
++    private fun pick(p: PlayerPrompt, d: PadDevice, now: Long) {
++        assertTrue(p.onChooserKey(A, true, 0, d, now))
++        assertFalse(p.onChooserKey(A, false, 0, d, now + 40))
++        p.slotForKey(d, A, false, now + 40, conn)
++    }
++
+     @Test
+-    fun padBPressesFirstAndIsPlayerOneThenPadAIsPlayerTwo() {
++    fun atTheStartTheChooserThenTwoThenBIsPlayerOneAndAIsPlayerTwo() {
+         val (s, p) = fresh()
+-        assertEquals("Player 1 — press any button", p.view(0, onn).prompt)
+-        assertTrue(s.map().isEmpty())                       // no pre-assignment by controller number
+-        assertEquals(0, press(p, padB, A, 100))
+-        assertEquals("P1", p.view(200, onn).badge)
+-        assertEquals("Player 2 — press any button", p.view(200, onn).prompt)
++        assertEquals(PlayerPrompt.Phase.CHOOSING, p.phase)
++        assertEquals("Players:  1  /  [2]  /  multitap (3-4)", p.view(0, onn).prompt)
++        assertTrue(s.map().isEmpty())
++        assertNull(p.slotForKey(padA, A, true, 10, conn))           // no pad holds a slot while choosing
++        pick(p, padB, 100)
++        assertEquals(2, p.chosen); assertEquals(2, p.count)
++        assertEquals("Player 1 — press any button", p.view(120, onn).prompt)
++        assertTrue(s.map().isEmpty())                                 // the pick's own up claimed nothing
++        assertEquals(0, press(p, padB, A, 150))                       // B's fresh press takes P1
++        assertEquals("P1", p.view(250, onn).badge)
++        assertEquals("Player 2 — press any button", p.view(250, onn).prompt)
+         assertEquals(1, press(p, padA, START, 300))
+         assertEquals("P2", p.view(400, onn).badge)
+-        assertNull(p.view(400, onn).prompt)                 // up to the title's count, then gone
+-        assertNull(p.view(2_400, onn).badge)                // the badge for 2 s
+-        assertEquals(0, s.slotOf(padB)); assertEquals(1, s.slotOf(padA))
++        assertEquals(PlayerPrompt.Phase.DONE, p.phase)
++        assertNull(p.view(400, onn).prompt)                          // no further prompt
++        assertNull(p.view(2_400, onn).badge)
+         assertEquals("0:p,1:p", p.claimsString())
+-        assertEquals(0, p.slotForKey(padB, L1, true, 500, conn))  // claimed: every key goes to its slot
++        assertEquals(0, p.slotForKey(padB, L1, true, 500, conn))     // claimed: every key goes to its slot
++    }
++
++    @Test
++    fun thePickItselfNeverClaims() {
++        val (s, p) = fresh()
++        assertTrue(p.onChooserKey(A, true, 0, padB, 0))
++        // a repeat of the held pick key, then a down without an up: no claim
++        assertNull(p.slotForKey(padB, A, true, 30, conn, repeat = 1))
++        assertNull(p.slotForKey(padB, A, true, 60, conn))
++        assertTrue(s.map().isEmpty())
++        p.slotForKey(padB, A, false, 90, conn)
++        assertEquals(0, press(p, padB, A, 120))
+     }
+ 
+     @Test
+-    fun aOnePlayerTitleShowsNoPromptAndKeepsB34sAssignment() {
+-        val (s, p) = fresh(players = 1)
+-        assertFalse(p.active)
+-        assertNull(p.view(0, onn).prompt)
+-        assertEquals(0, s.slotOf(padA)); assertEquals(1, s.slotOf(padB))   // B34: controller-number order
+-        assertEquals(1, press(p, padB, A, 100))
+-        assertNull(p.view(200, onn).badge)
+-        assertEquals("0:s,1:s", p.claimsString())
++    fun anUnpauseOpensTheChooserAgainWithTheLastChoice() {
++        val store = MemoryPlayerChoiceStore()
++        val (s, p) = fresh(store = store)
++        assertTrue(p.onChooserKey(LEFT, true, 0, virtualRemote, 0))   // the remote moves to 1
++        assertTrue(p.onChooserKey(CENTER, true, 0, virtualRemote, 10))
++        assertEquals(1, p.chosen)
++        assertEquals(0, press(p, padA, A, 100))
++        // Back, then Resume: a new start of the running game (not a self-restart)
++        open(p)
++        assertEquals(PlayerPrompt.Phase.CHOOSING, p.phase)
++        assertTrue(s.map().isEmpty())                                 // the map cleared for the prompt
++        assertEquals("Players:  [1]  /  2  /  multitap (3-4)", p.view(1_000, onn).prompt)
++        assertNull(p.chosen)
++        // a fresh PlayerPrompt (a new activity) reads the same store
++        val p2 = PlayerPrompt(s, store); open(p2)
++        assertEquals("Players:  [1]  /  2  /  multitap (3-4)", p2.view(0, onn).prompt)
+     }
+ 
+     @Test
+-    fun selectStartHeldTwoSecondsReleasesAndAnotherPadReclaims() {
++    fun multitapOnAFourPortSessionTakesFourClaims() {
++        val four = listOf(virtualRemote, pad(1), pad(2), pad(3), pad(4))
++        val (s, p) = fresh(ports = FOUR, devs = four)
++        assertTrue(p.onChooserKey(RIGHT, true, 0, pad(1), 0))
++        assertTrue(p.onChooserKey(RIGHT, true, 0, pad(1), 10))        // stops at the last option
++        assertEquals("Players:  1  /  2  /  [multitap (3-4)]", p.view(20, four).prompt)
++        assertTrue(p.onChooserKey(X, true, 0, pad(1), 30)); p.slotForKey(pad(1), X, false, 60, { four })
++        assertEquals(4, p.chosen); assertEquals(4, p.count)
++        assertEquals(0, press(p, pad(3), A, 100, four))
++        assertEquals(1, press(p, pad(1), A, 200, four))
++        assertEquals("Player 3 — press any button", p.view(250, four).prompt)
++        assertEquals(2, press(p, pad(4), A, 300, four))
++        assertEquals(3, press(p, pad(2), A, 400, four))
++        assertEquals("0:p,1:p,2:p,3:p", p.claimsString())
++        assertEquals(PlayerPrompt.Phase.DONE, p.phase)
++        assertEquals(4, s.map().size)
++    }
++
++    @Test
++    fun multitapOnATwoPortSessionStopsAtTwoAndSaysSo() {
++        val three = onn + pad(3)
++        val (s, p) = fresh(ports = TWO, devs = three)
++        p.onChooserKey(RIGHT, true, 0, padA, 0)
++        p.onChooserKey(A, true, 0, padA, 10); p.slotForKey(padA, A, false, 20, { three })
++        assertEquals(4, p.chosen); assertEquals(2, p.count)
++        assertEquals("Player 1 — press any button\nMultitap from the next start", p.view(30, three).prompt)
++        press(p, padA, A, 100, three); press(p, padB, A, 200, three)
++        assertNull(press(p, pad(3), A, 300, three))                   // beyond the ports: no slot
++        assertEquals(2, s.map().size)
++        // a system with no multitap
++        val (_, q) = fresh(ports = PortsSet(2, false, false, "metadata"))
++        q.onChooserKey(RIGHT, true, 0, padA, 0); q.onChooserKey(A, true, 0, padA, 10)
++        assertEquals("Player 1 — press any button\nNo multitap on this system — 2 players", q.view(20, onn).prompt)
++    }
++
++    @Test
++    fun oneTakesOneClaimAndTheOtherPadGetsNoSlot() {
+         val (s, p) = fresh()
+-        press(p, padA, A, 0); press(p, padB, A, 100)
+-        assertEquals(0, s.slotOf(padA))
++        p.onChooserKey(LEFT, true, 0, padA, 0)
++        p.onChooserKey(A, true, 0, padA, 10); p.slotForKey(padA, A, false, 20, conn)
++        assertEquals(1, p.chosen); assertEquals(1, p.count)
++        assertEquals(0, press(p, padB, A, 100))
++        assertEquals(PlayerPrompt.Phase.DONE, p.phase)
++        assertNull(press(p, padA, A, 200))                            // the other pad: no slot, no input
++        assertNull(p.view(300, onn).prompt)
++        assertEquals("0:p", p.claimsString())
++        assertEquals(1, s.map().size)
++    }
++
++    @Test
++    fun theHeldStartReleaseReclaimsOnlyAfterAFreshPress() {
++        val (s, p) = fresh()
++        pick(p, padA, 0)
++        press(p, padA, A, 100); press(p, padB, A, 200)
++        // HOME-3 C6 try 1: Select first, Start last and still held when the release fires
+         p.slotForKey(padA, SELECT, true, 1_000, conn)
+         p.slotForKey(padA, START, true, 1_050, conn)
+-        p.tick(2_000); assertEquals(0, s.slotOf(padA))       // under 2 s: nothing
+         p.tick(3_060)
+         assertNull(s.slotOf(padA))
+         assertEquals("P1 released", p.view(3_100, onn).badge)
+         assertEquals("Player 1 — press any button", p.view(3_100, onn).prompt)
+-        p.slotForKey(padA, SELECT, false, 3_200, conn)
+-        p.slotForKey(padA, START, false, 3_210, conn)
+-        // swap: B releases too, then A presses first and is P1
+-        p.slotForKey(padB, SELECT, true, 4_000, conn); p.slotForKey(padB, START, true, 4_000, conn)
+-        p.tick(6_100)
+-        assertNull(s.slotOf(padB))
+-        p.slotForKey(padB, SELECT, false, 6_200, conn); p.slotForKey(padB, START, false, 6_200, conn)
+-        assertEquals(0, press(p, padA, X, 7_000))
+-        assertEquals(1, press(p, padB, A, 7_100))
++        // Android repeats the held Start: no claim; Select lifted, Start still held: no claim
++        assertNull(p.slotForKey(padA, START, true, 3_100, conn, repeat = 20))
++        p.slotForKey(padA, SELECT, false, 3_150, conn)
++        assertNull(p.slotForKey(padA, START, true, 3_200, conn, repeat = 21))
++        assertNull(s.slotOf(padA))
++        // Start lifted, then a fresh press: claimed
++        p.slotForKey(padA, START, false, 3_300, conn)
++        assertEquals(0, press(p, padA, START, 3_400))
+         assertEquals("0:p,1:p", p.claimsString())
+     }
+ 
+     @Test
+     fun aShortHoldReleasesNothing() {
+         val (s, p) = fresh()
+-        press(p, padA, A, 0)
++        pick(p, padA, 0); press(p, padA, A, 100)
+         p.slotForKey(padA, SELECT, true, 1_000, conn); p.slotForKey(padA, START, true, 1_000, conn)
+-        p.tick(2_400)                                         // 1.4 s held: not yet
++        p.tick(2_400)
+         assertEquals(0, s.slotOf(padA))
+         p.slotForKey(padA, START, false, 2_500, conn)
+         p.tick(4_000)
+@@ -124,67 +225,82 @@
+     }
+ 
+     @Test
+-    fun aPadAlreadyInTheMapKeepsItsSlotAndShowsItsBadgeOnItsFirstPress() {
+-        val s = PadSlots()
+-        val p = PlayerPrompt(s)
+-        p.beginStart(onn); p.setPlayers(2, onn)
+-        press(p, padB, A, 0); press(p, padA, A, 10)
+-        // a second start in the same process (a relaunch or a self-restart)
+-        p.beginStart(onn); p.setPlayers(2, onn)
+-        assertEquals("0:s,1:s", p.claimsString())
+-        assertNull(p.view(100, onn).prompt)                  // both pads hold slots: nothing to ask
+-        assertNull(p.view(100, onn).badge)
+-        assertEquals(1, p.slotForKey(padA, L1, true, 200, conn))
+-        assertEquals("P2", p.view(300, onn).badge)          // its badge on its first press
++    fun aSelfRestartKeepsTheMapAndTheChoiceWithNoChooser() {
++        val (s, p) = fresh()
++        pick(p, padB, 0); press(p, padB, A, 100); press(p, padA, A, 200)
++        val p2 = PlayerPrompt(s)                                      // the guard's new activity, same process
++        open(p2, self = true)
++        assertEquals(PlayerPrompt.Phase.DONE, p2.phase)
++        assertEquals(2, p2.chosen)
++        assertEquals("0:s,1:s", p2.claimsString())
++        assertNull(p2.view(0, onn).prompt)
++        assertEquals(0, s.slotOf(padB)); assertEquals(1, s.slotOf(padA))
+     }
+ 
+     @Test
+-    fun aStickNeverClaimsAndANonClaimKeyIsDropped() {
++    fun theDefaultIsTheLastChoiceElseTwoElseOneForASinglePlayerTitle() {
++        val (_, p) = fresh(hostPlayers = 1)
++        assertEquals("Players:  [1]  /  2  /  multitap (3-4)", p.view(0, onn).prompt)
++        val store = MemoryPlayerChoiceStore()
++        store.put(PlayerPrompt.gameKey(GAME)!!, 4)
++        val (_, q) = fresh(hostPlayers = 1, store = store)
++        assertEquals("Players:  1  /  2  /  [multitap (3-4)]", q.view(0, onn).prompt)
++        assertEquals(12, PlayerPrompt.gameKey(GAME)!!.length)
++        assertNull(PlayerPrompt.gameKey(" "))
++    }
++
++    @Test
++    fun theRemoteAndTheHatMoveTheChooserAndTheRemoteNeverClaims() {
+         val (s, p) = fresh()
+-        assertNull(p.slotForMotion(padA, conn))
+-        assertNull(p.slotForKey(padA, L1, true, 0, conn))
++        assertTrue(p.onChooserHat(padA, -1f))
++        assertTrue(p.onChooserHat(padA, -1f))                         // held: one move
++        assertEquals("Players:  [1]  /  2  /  multitap (3-4)", p.view(0, onn).prompt)
++        assertTrue(p.onChooserHat(padA, 0f)); assertTrue(p.onChooserHat(padA, 1f))
++        assertEquals("Players:  1  /  [2]  /  multitap (3-4)", p.view(0, onn).prompt)
++        assertFalse(p.onChooserHat(virtualRemote, 1f))                // not a pad
++        assertFalse(p.onChooserKey(L1, true, 0, padA, 0))             // not a chooser key: passed on
++        p.onChooserKey(CENTER, true, 0, virtualRemote, 10)
++        assertNull(press(p, virtualRemote, A, 100))
+         assertTrue(s.map().isEmpty())
+-        press(p, padA, A, 100)
+-        assertEquals(0, p.slotForMotion(padA, conn))
++        assertFalse(p.onChooserKey(RIGHT, true, 0, virtualRemote, 200))  // closed: the remote's keys pass on
+     }
+ 
+     @Test
+-    fun theVirtualRemoteNeverClaims() {
++    fun aStickNeverClaims() {
+         val (s, p) = fresh()
+-        assertNull(press(p, virtualRemote, A, 0))
+-        assertNull(press(p, virtualRemote, START, 10))
++        assertNull(p.slotForMotion(padA, conn))
++        pick(p, padA, 0)
++        assertNull(p.slotForMotion(padA, conn))
++        assertNull(p.slotForKey(padA, L1, true, 10, conn))
+         assertTrue(s.map().isEmpty())
+-        assertNull(p.view(100, listOf(virtualRemote)).prompt)  // no eligible pad: no prompt
++        press(p, padA, A, 100)
++        assertEquals(0, p.slotForMotion(padA, conn))
+     }
+ 
+     @Test
+-    fun aThirdPadOnATwoPlayerTitleStillGetsAPlayerAsB34Would() {
+-        val padC = padA.copy(descriptor = "pad-c-desc", controllerNumber = 4)
+-        val all = onn + padC
+-        val s = PadSlots(); val p = PlayerPrompt(s)
+-        p.beginStart(all); p.setPlayers(2, all)
+-        assertEquals(0, p.slotForKey(padA, A, true, 0, { all }))
+-        assertEquals(1, p.slotForKey(padB, A, true, 10, { all }))
+-        assertNull(p.view(20, all).prompt)                   // the count reached: no prompt for the third
+-        assertEquals(2, p.slotForKey(padC, A, true, 30, { all }))
+-        assertEquals("P3", p.view(40, all).badge)
++    fun thePortsEchoParses() {
++        assertEquals(PortsSet.UNKNOWN, PortsSet.parse(null))          // an old host: no key, 2 ports
++        assertEquals(2, PortsSet.UNKNOWN.players)
++        assertEquals(FOUR, PortsSet.of(4, true, true, "launch"))
++        assertEquals(4, PortsSet.of(9, true, true, "launch").players)  // clamped
++        assertEquals(1, PortsSet.of(0, false, false, "launch").players)
+     }
+ 
+     @Test
+-    fun theFlagIsOptIn() {
+-        assertFalse(PlayerPromptFlag.parse(null))
+-        assertFalse(PlayerPromptFlag.parse(""))
+-        assertFalse(PlayerPromptFlag.parse("0"))
+-        assertFalse(PlayerPromptFlag.parse("true"))
+-        assertFalse(PlayerPromptFlag.parse("yes"))
++    fun theFlagIsOnUnlessZeroOrOff() {
++        assertTrue(PlayerPromptFlag.parse(null))
++        assertTrue(PlayerPromptFlag.parse(""))
++        assertTrue(PlayerPromptFlag.parse("junk"))
+         assertTrue(PlayerPromptFlag.parse("1"))
+-        assertTrue(PlayerPromptFlag.parse(" 1 "))
+-        assertFalse(PlayerPromptFlag.fromSystem())           // no Android on the JVM: absent
++        assertFalse(PlayerPromptFlag.parse("0"))
++        assertFalse(PlayerPromptFlag.parse(" 0 "))
++        assertFalse(PlayerPromptFlag.parse("off"))
++        assertTrue(PlayerPromptFlag.fromSystem())                     // no Android on the JVM: absent = on
+     }
+ 
+     @Test
+-    fun absentThePadSlotsAloneAreB34AndB38sAsBuilt() {
+-        // with no prompt the sender's path is PadSlots alone: the start pre-assigns by controller number
++    fun offThePadSlotsAloneAreB34AndB38sAsBuilt() {
++        // `0`: the activity builds no PlayerPrompt; the sender's path is PadSlots alone (8ba4d996…'s absent)
+         val s = PadSlots()
+         s.beginStart(onn)
+         assertEquals(0, s.slotFor(padA) { onn }); assertEquals(1, s.slotFor(padB) { onn })
+--- /dev/null
++++ b/tests/players_session/test_players_session.py
+@@ -0,0 +1,246 @@
++#!/usr/bin/env python3
++"""B46 (host): the chooser's pick (`players_chosen`) sets the session's ports at the launch -- the PS1 multitap `.opt`
++and the `--device` arguments -- read back from what was written; the start response's `ports_set`; the `pad_slots`
++rows' `players_chosen` / `label`. Without the key: today (the launch call, the `.opt` path, the arguments, the rows).
++
++    python3 -m unittest discover -s tests/players_session -v
++"""
++
++from __future__ import annotations
++
++import importlib.util
++import json
++import sys
++import tempfile
++import types
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++
++from games import emulator_manager as em  # noqa: E402
++from games import link_drop_recovery as ldr  # noqa: E402
++import pad_slots  # noqa: E402
++import players_session as ps  # noqa: E402
++
++spec = importlib.util.spec_from_file_location("b46_games_plugin", ROOT / "companion" / "plugins" / "games.py")
++G = importlib.util.module_from_spec(spec)
++spec.loader.exec_module(G)
++
++BASE_OPT = 'beetle_psx_hw_renderer = "hardware"\nbeetle_psx_hw_enable_multitap_port1 = "disabled"\n'
++TWO = "0:a1b2c3:sony,1:d4e5f6:sony"
++HB = "sequence={}&interval_ms=2000&last_output_age_ms=16&rendered_frames=600&queued_frames=0&rx_packets=900&elapsed_ms=10000"
++
++
++def manager(overrides=None):
++    """A bare EmulatorManager on a temp project and a temp RetroArch config tree (no RetroArch, no launch)."""
++    root = Path(tempfile.mkdtemp(prefix="b46_root_"))
++    cfg = root / "ra_config"
++    (cfg / "Beetle PSX HW").mkdir(parents=True)
++    (cfg / "Beetle PSX HW" / "Beetle PSX HW.opt").write_text(BASE_OPT)
++    m = object.__new__(em.EmulatorManager)
++    m.project_root = root.resolve()
++    m._players_session = None
++    m._load_controller_overrides = lambda: {"games": dict(overrides or {})}
++    m._retroarch_config_directory = lambda runtime: cfg.resolve()
++    m._retroarch_options_metadata_path = lambda target, config_directory, platform: target.name
++    return m, root, cfg
++
++
++GAME = {"id": "ps1-title-1", "system": "ps1"}
++CONTENT = Path("/nowhere/content-one.chd")
++RUNTIME = {"runtime_platform": "linux"}
++
++
++def opt_text(cfg):
++    p = cfg / "Beetle PSX HW" / "content-one.opt"
++    return p.read_text() if p.exists() else None
++
++
++class Plan(unittest.TestCase):
++    def test_parse(self):
++        self.assertEqual([ps.parse(x) for x in ("1", "2", "4", " 4 ")], [1, 2, 4, 4])
++        for bad in ("3", "0", "", "x", None, "5"):
++            self.assertIsNone(ps.parse(bad))
++
++    def test_ps1(self):
++        self.assertEqual(ps.plan("ps1", 1, 1)["device_args"], ["--device=1:1", "--device=2:0"])
++        self.assertEqual(ps.plan("ps1", 2, 517)["device_args"], ["--device=1:517", "--device=2:517"])
++        p4 = ps.plan("ps1", 4, 1)
++        self.assertEqual(p4["device_args"], ["--device=%d:1" % i for i in range(1, 5)])
++        self.assertEqual((p4["ps1_mode"], p4["ports"], p4["multitap"]), ("port1", 4, True))
++        self.assertEqual(ps.plan("ps1", 2, 1)["ps1_mode"], "off")
++
++    def test_snes_and_others(self):
++        self.assertEqual(ps.plan("snes", 4, None)["device_args"], ["--device=2:257"])
++        self.assertEqual(ps.plan("snes", 2, None)["device_args"], [])
++        self.assertEqual(ps.plan("snes", 1, None)["device_args"], ["--device=2:0"])
++        n4 = ps.plan("nes", 4, None)
++        self.assertEqual((n4["device_args"], n4["ports"], n4["multitap"], n4["multitap_available"]), ([], 2, False, False))
++        self.assertEqual(ps.plan("genesis", 1, None)["device_args"], ["--device=2:0"])
++
++
++class DeviceArgs(unittest.TestCase):
++    def test_no_pick_is_todays_list(self):
++        m, _, _ = manager()
++        m.INPUT_PROFILE_PLAYERS = em.EmulatorManager.INPUT_PROFILE_PLAYERS
++        self.assertEqual(m._device_args({"libretro_device": 1}, {"enabled": False}), ["--device=1:1", "--device=2:1"])
++        self.assertEqual(m._device_args({"libretro_device": 517}, {"enabled": True}),
++                         ["--device=%d:517" % i for i in range(1, 5)])
++        self.assertEqual(m._device_args({"libretro_device": None}, {"enabled": False}), [])
++
++    def test_a_pick_replaces_the_list(self):
++        m, _, _ = manager()
++        self.assertEqual(m._device_args({"libretro_device": 1}, {"enabled": False}, ps.plan("ps1", 1, 1)),
++                         ["--device=1:1", "--device=2:0"])
++        self.assertEqual(m._device_args({"libretro_device": None}, {"enabled": False}, ps.plan("snes", 4, None)),
++                         ["--device=2:257"])
++
++
++class Opt(unittest.TestCase):
++    def test_no_pick_and_no_metadata_writes_nothing(self):
++        m, root, cfg = manager()
++        r = m._prepare_ps1_multitap_options(GAME, RUNTIME, CONTENT)
++        self.assertFalse(r["managed"])
++        self.assertIsNone(opt_text(cfg))
++        self.assertFalse((root / ps_opts()).exists())
++
++    def test_a_pick_of_multitap_writes_port1_and_reads_back(self):
++        m, root, cfg = manager()
++        r = m._prepare_ps1_multitap_options(GAME, RUNTIME, CONTENT, session_mode="port1")
++        self.assertTrue(r["managed"] and r["enabled"] and r["port1"])
++        self.assertIn('beetle_psx_hw_enable_multitap_port1 = "enabled"', opt_text(cfg))
++        self.assertIn('beetle_psx_hw_enable_multitap_port2 = "disabled"', opt_text(cfg))
++        self.assertEqual(len(json.loads((root / ps_opts()).read_text())["stems"]), 1)   # listed, by hash
++        self.assertNotIn("content-one", (root / ps_opts()).read_text())
++
++    def test_a_pick_of_two_overrides_a_metadata_multitap_without_writing_it(self):
++        over = {"ps1-title-1": {"ps1_multitap": "port1"}}
++        m, root, cfg = manager(over)
++        r = m._prepare_ps1_multitap_options(GAME, RUNTIME, CONTENT, session_mode="off")
++        self.assertFalse(r["enabled"])
++        self.assertIn('beetle_psx_hw_enable_multitap_port1 = "disabled"', opt_text(cfg))
++        self.assertEqual(over, {"ps1-title-1": {"ps1_multitap": "port1"}})        # the metadata untouched
++
++    def test_the_stale_guard(self):
++        m, root, cfg = manager()
++        m._prepare_ps1_multitap_options(GAME, RUNTIME, CONTENT, session_mode="port1")
++        # the same title launched later with no pick and no metadata value: rewritten off, unlisted
++        r = m._prepare_ps1_multitap_options(GAME, RUNTIME, CONTENT)
++        self.assertTrue(r["managed"]); self.assertFalse(r["enabled"])
++        self.assertIn('beetle_psx_hw_enable_multitap_port1 = "disabled"', opt_text(cfg))
++        self.assertEqual(json.loads((root / ps_opts()).read_text())["stems"], [])
++        # and then today's path: nothing managed
++        self.assertFalse(m._prepare_ps1_multitap_options(GAME, RUNTIME, CONTENT)["managed"])
++        # a title never picked is untouched even with the list present
++        other = Path("/nowhere/content-two.chd")
++        self.assertFalse(m._prepare_ps1_multitap_options({"id": "ps1-title-2", "system": "ps1"}, RUNTIME, other)["managed"])
++        # a non-PS1 title is never guarded
++        m._prepare_ps1_multitap_options(GAME, RUNTIME, CONTENT, session_mode="port1")
++        self.assertFalse(m._prepare_ps1_multitap_options({"id": "snes-1", "system": "snes"}, RUNTIME, CONTENT)["managed"])
++
++
++def ps_opts():
++    return em.EmulatorManager.PLAYERS_SESSION_OPTS
++
++
++def plugin(launched=None, system="ps1", multitap=False):
++    root = Path(tempfile.mkdtemp(prefix="b46_plug_"))
++    rec = ldr.LinkDropRecovery(
++        root, pause_game=lambda: None, resume_game=lambda: None, save_recovery_state=lambda: {},
++        restart_encoder=lambda: {}, full_start_encoder=lambda: {}, stream_active=lambda: True,
++        end_session=lambda: None, client_packet_age_ms=lambda: 10.0, recovery_save_detail=lambda: {})
++    calls = []
++
++    class Emu:
++        active_game = {"id": "g1", "system": system, "title": "t"}
++        _players_session = launched
++
++        def status(self):
++            return {"active": True, "paused": True, "pid": 1}
++
++        def ps1_multitap(self, g):
++            return {"enabled": multitap}
++
++        def launch(self, game, **kw):
++            calls.append(kw)
++            return {"active": True}
++
++    class Ctl:
++        def status(self):
++            return {"updates_by_player": [1, 0, 0, 0]}
++
++    p = object.__new__(G.GamesPlugin)
++    p.PROJECT_ROOT = root
++    p._emulator = Emu()
++    p._recovery = rec
++    p._native_stream = types.SimpleNamespace(start=lambda **kw: {"active": True},
++                                             _session_io=types.SimpleNamespace(controller=Ctl()))
++    p._diagnostic_heartbeat_interval_ms = lambda: 2000
++    p._adaptive_bitrate_session_ended = lambda: None
++    p._read_library_state = lambda: {"games": {}}
++    p._decorate_game = lambda g, lib, st, md: {**g, "player_mode": "", "player_mode_source": "", "max_players": 0}
++    p._find_game_by_id = lambda gid: {"id": gid, "system": system}
++    p._parse_cheat_launch_request = lambda q: (None, None)
++    return p, root, rec, calls
++
++
++class Handler(unittest.TestCase):
++    def test_the_launch_passes_the_pick_only_when_present(self):
++        p, _, _, calls = plugin()
++        p.handle_post("launch", "id=g1")
++        p.handle_post("launch", "id=g1&players_chosen=4")
++        p.handle_post("launch", "id=g1&players_chosen=3")          # malformed: today's call
++        self.assertEqual(calls, [{"cheat_source_index": None, "cheat_enabled_indexes": None, "mod_index": None},
++                                 {"cheat_source_index": None, "cheat_enabled_indexes": None, "mod_index": None,
++                                  "players_chosen": 4},
++                                 {"cheat_source_index": None, "cheat_enabled_indexes": None, "mod_index": None}])
++
++    def test_ports_set_echoes_the_launch_else_the_metadata(self):
++        p, _, _, _ = plugin(launched=ps.plan("ps1", 4, 1))
++        r = p.handle_post_request("native-stream-start", "port=48100&player_prompt=1", "127.0.0.1")
++        self.assertEqual(r["ports_set"], {"players_chosen": 4, "ports": 4, "players": 4, "multitap": True,
++                                          "multitap_available": True, "source": "launch"})
++        p2, _, _, _ = plugin(multitap=True)
++        self.assertEqual(p2.handle_post_request("native-stream-start", "port=48100&player_prompt=1",
++                                                "127.0.0.1")["ports_set"]["source"], "metadata")
++        self.assertEqual(p2.handle_post_request("native-stream-start", "port=48100&player_prompt=1",
++                                                "127.0.0.1")["ports_set"]["players"], 4)
++        p3, _, _, _ = plugin(system="nes")
++        self.assertFalse(p3.handle_post_request("native-stream-start", "port=48100&player_prompt=1",
++                                                "127.0.0.1")["ports_set"]["multitap_available"])
++        # no prompt key: no ports_set (today)
++        self.assertNotIn("ports_set", p.handle_post_request("native-stream-start", "port=48100", "127.0.0.1"))
++
++    def test_the_rows_carry_the_pick_and_the_labels(self):
++        p, root, rec, _ = plugin()
++        p.handle_post_request("native-stream-start", "port=48100&player_prompt=1&pad_slots=" + TWO + "&pad_claims=0:s,1:s", "127.0.0.1")
++        p.handle_post_request("native-stream-heartbeat",
++                              HB.format(1) + "&pad_slots=" + TWO + "&pad_claims=0:p,1:p&players_chosen=2", "127.0.0.1")
++        p.handle_post_request("native-stream-heartbeat",
++                              HB.format(2) + "&pad_slots=" + TWO + "&pad_claims=0:p,1:p&players_chosen=2", "127.0.0.1")
++        rows = [json.loads(x) for x in rec.log_path().read_text().splitlines()]
++        rows = [r for r in rows if r["event"] == "pad_slots"]
++        self.assertEqual([r["when"] for r in rows], ["start", "change"])
++        self.assertNotIn("players_chosen", rows[0])
++        self.assertEqual(rows[1]["players_chosen"], 2)
++        self.assertEqual([(e["label"], e["claimed_by"]) for e in rows[1]["slots"]], [("P1", "prompt"), ("P2", "prompt")])
++        hb = [json.loads(x) for x in (root / "logs" / "games" / "native_stream_heartbeat.log").read_text().splitlines()]
++        self.assertEqual(hb[-1]["players_chosen"], 2)
++
++    def test_without_the_pick_the_rows_are_b41s(self):
++        rows_a, rows_b = [], []
++        a, b = pad_slots.SlotsLog(), pad_slots.SlotsLog()
++        fa = types.SimpleNamespace(_log=lambda ev, **f: rows_a.append({"event": ev, **f}))
++        fb = types.SimpleNamespace(_log=lambda ev, **f: rows_b.append({"event": ev, **f}))
++        a.start(fa, TWO, claims="0:p,1:s"); b.start(fb, TWO, claims="0:p,1:s", players_chosen=None)
++        va, vb = {"sequence": 1}, {"sequence": 1}
++        a.heartbeat(fa, TWO, va, claims="0:p,1:p"); b.heartbeat(fb, TWO, vb, claims="0:p,1:p", players_chosen=None)
++        self.assertEqual(rows_a, rows_b); self.assertEqual(va, vb)
++        self.assertNotIn("label", json.dumps(rows_a)); self.assertNotIn("players_chosen", json.dumps(rows_a))
++        self.assertIsNone(pad_slots.parse_chosen("3")); self.assertEqual(pad_slots.parse_chosen("4"), 4)
++
++
++if __name__ == "__main__":
++    unittest.main()

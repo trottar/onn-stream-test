@@ -106,10 +106,12 @@ class VodRetryTest {
 
     @Test
     fun theFlag() {
+        // B47 (disclosed, as B42): absent / empty / junk / 1 = on; only 0 / off = today's absent
         assertTrue(VodRetryFlag.parse("1"))
         assertTrue(VodRetryFlag.parse(" 1 "))
-        for (v in listOf(null, "", "0", "true", "yes", "2", "junk")) assertFalse(v.toString(), VodRetryFlag.parse(v))
-        assertFalse(VodRetryFlag.read())          // no SystemProperties on the JVM: off
+        for (v in listOf(null, "", "true", "yes", "2", "junk")) assertTrue(v.toString(), VodRetryFlag.parse(v))
+        for (v in listOf("0", " 0 ", "off")) assertFalse(v, VodRetryFlag.parse(v))
+        assertTrue(VodRetryFlag.read())           // no SystemProperties on the JVM: absent = on
         assertTrue(VodRetryController.wanted(true, isLive = false))
         assertFalse(VodRetryController.wanted(true, isLive = true))
         assertFalse(VodRetryController.wanted(false, isLive = false))

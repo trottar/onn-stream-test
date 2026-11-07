@@ -224,7 +224,9 @@ class NativeControllerSender(
         val player =
             (if (prompt != null) prompt.slotForKey(
                 AndroidPadDevice(device), event.keyCode, event.action == KeyEvent.ACTION_DOWN,
-                System.nanoTime() / 1_000_000L, connectedPads
+                System.nanoTime() / 1_000_000L, connectedPads,
+                // B46: a repeat never claims
+                repeat = event.repeatCount
             ) else playerForDevice(device))
                 ?: return false
 

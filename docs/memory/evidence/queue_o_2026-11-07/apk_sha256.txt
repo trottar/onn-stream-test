@@ -1,0 +1,10 @@
+APK (B5 ... B25 + B32 + B34 + B35 + B38 + B39 + B41 + B42 + B43 + B46 + B47; B27 / B29 reversed out), built 2026-11-07T18:41:47Z in /tmp/b_q07o_apk/PrivyHub; NOT installed
+cfe0211ca36071901a8be3ea9f77855109cd957c3950903669997d6a0b10a65f  PrivyHub/app/build/queue_o_built/app-debug.apk
+size 9699504 B
+build: :app:testDebugUnitTest :app:assembleDebug --rerun-tasks --offline --no-configuration-cache (JVM 217/217: the merged tree's 228 less B27's 4 and B29's 7)
+rebuild (--rerun-tasks :app:assembleDebug) sha256 the same: yes
+the base: the tree at ea40a93f with queue O applied, then b29.diff and b27.diff reversed; its client sources minus queue O's diff are byte-equal to 8ba4d996's build copy (/tmp/b_q06n_apk/PrivyHub/app/src, diff -rq clean; app/build.gradle.kts the same)
+the CONFIRMED one on the onn (PrivyHub/app/build/home3_installed/app-debug.apk): 8ba4d996a96c14d01b1e368c20e656f767062d34b17b9308d984b8c43834605f
+apksigner verify (new): OK
+signer certificate digest lines equal to the CONFIRMED one's (compared, not printed): yes
+against the CONFIRMED: entries new 945 old 945 ; only in new [] ; only in old [] ; differ: classes3.dex, classes5.dex, classes6.dex

@@ -19,18 +19,25 @@ import java.security.MessageDigest
  * (a companion restart ends the hub's sessions; the onn's cached token is then refused), and three refusals in a row,
  * each after a refetch, end the episode as `refused` -- never "connection lost". The Retry button refetches too.
  * Design: `docs/memory/evidence/b43_2026-11-06/design_written_before_code.md`.
+ *
+ * B47 (the user's "Reconnect by default yes", 2026-11-06; G-A13's client half): **on by default** -- absent / empty /
+ * junk / `1` = the retry; `0` / `off` = today's absent (no controller). At READY the mark is always cleared and any
+ * scheduled attempt dropped (HOME-3 C5'' (a): "reconnecting…" left on screen after a `reset` resume).
+ * Design: `docs/memory/evidence/b47_2026-11-07/design_written_before_code.md`.
  */
 object VodRetryFlag {
     const val PROPERTY = "debug.privyhub.vod_retry"
 
-    fun parse(raw: String?): Boolean = raw?.trim() == "1"
+    // B47: on unless `0` / `off` (as B42's flags)
+    fun parse(raw: String?): Boolean = raw?.trim().let { it != "0" && it != "off" }
 
+    /** The property, read through reflection; a failed read is absent, so on (B47). */
     fun read(): Boolean =
         try {
             val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
             parse(get.invoke(null, PROPERTY) as? String)
         } catch (_: Throwable) {
-            false
+            parse(null)
         }
 }
 
@@ -162,7 +169,8 @@ class VodRetryController(
                 if (VodRetryPolicy.isRefusal(reason)) KIND_REFUSED else KIND_LOST)
         }
         attempts = next
-        ui.showMark(next)
+        // B47: the mark only while the episode is open (it is: firstErrorAtMs set above)
+        if (retrying) ui.showMark(next)
         scheduler.cancel()
         val base = row("vod_retry") + mapOf("attempt" to next, "delay_ms" to delay, "elapsed_ms" to elapsed,
             "error_code" to code, "error_name" to codeName) + why(reason)
@@ -217,13 +225,16 @@ class VodRetryController(
         }
     }
 
-    /** The player is READY: an open episode closes. */
+    /** The player is READY: an open episode closes. B47: the mark cleared and any scheduled attempt dropped, always. */
     fun onReady() {
+        if (!cancelled) {
+            scheduler.cancel()
+            ui.hideMark()
+        }
         if (firstErrorAtMs < 0 || gaveUp || cancelled) {
             return
         }
         rows(row("vod_resumed") + mapOf("attempts" to attempts, "elapsed_ms" to (clock() - firstErrorAtMs)))
-        ui.hideMark()
         firstErrorAtMs = -1L
         attempts = 0
         refetched = false

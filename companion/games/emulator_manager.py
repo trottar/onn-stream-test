@@ -79,6 +79,9 @@ class EmulatorManager:
         # Companion commands are sent only to IPv4 loopback.
         self._network_cmd_port: int | None = None
 
+        # B46: the session's ports from the chooser's pick (`players_chosen` on the launch); None = today's
+        self._players_session: dict[str, Any] | None = None
+
         # PrivyHub A7.3: optional per-launch deterministic cheat profile.
         # A non-null session always uses isolated save/state storage, and any
         # requested enabled indexes are applied and verified before launch returns.
@@ -168,6 +171,7 @@ class EmulatorManager:
         self._host_window_policy = None
         self._network_cmd_port = None
         self._active_cheat_session = None
+        self._players_session = None
 
         if cheat_runtime_cleanup:
             self._cleanup_cheat_runtime()
@@ -2480,11 +2484,43 @@ class EmulatorManager:
         )
         return info
 
+    # B46: the content stems (hashed) whose PS1 .opt a chooser pick wrote; nothing here runs without a pick ever made
+    PLAYERS_SESSION_OPTS = "data/games/retroarch/players_session_opts.json"
+
+    def _players_session_opt_listed(
+        self,
+        content_path: Path,
+        *,
+        add: bool = False,
+        remove: bool = False,
+    ) -> bool:
+        path = self._project_path(self.PLAYERS_SESSION_OPTS)
+        key = hashlib.sha256(
+            ("privyhub-opt:" + content_path.stem).encode("utf-8")
+        ).hexdigest()[:16]
+        try:
+            stems = set(json.loads(path.read_text(encoding="utf-8")).get("stems", []))
+        except (OSError, ValueError, AttributeError):
+            if not add:
+                return False
+            stems = set()
+        listed = key in stems
+        if add and not listed:
+            stems.add(key)
+        elif remove and listed:
+            stems.discard(key)
+        else:
+            return listed
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"stems": sorted(stems)}) + "\n", encoding="utf-8")
+        return listed
+
     def _prepare_ps1_multitap_options(
         self,
         game: dict[str, Any],
         runtime: dict[str, Any],
         content_path: Path,
+        session_mode: str | None = None,
     ) -> dict[str, Any]:
         game_id = self._input_profile_game_id(
             game
@@ -2507,6 +2543,18 @@ class EmulatorManager:
                     "",
                 )
             ).strip().casefold()
+
+        # B46: a pick's mode replaces the metadata's for this launch (the metadata is not written)
+        metadata_mode = mode
+        if session_mode is not None:
+            mode = str(session_mode).strip().casefold()
+        elif (
+            not mode
+            and str(game.get("system", "")).strip().casefold() == "ps1"
+            and self._players_session_opt_listed(content_path)
+        ):
+            # B46's stale guard: a .opt a pick wrote, now launched with no pick and no metadata value -> both off
+            mode = "off"
 
         if not mode:
             return {
@@ -2710,6 +2758,12 @@ class EmulatorManager:
             raise EmulatorError(
                 "Installed PS1 game core options failed byte verification"
             )
+
+        # B46: a pick's .opt is listed (by a hash of the content stem); the guard's rewrite unlists it
+        if session_mode is not None:
+            self._players_session_opt_listed(content_path, add=True)
+        elif not metadata_mode:
+            self._players_session_opt_listed(content_path, remove=True)   # the guard's rewrite done
 
         return {
             "managed": True,
@@ -3005,6 +3059,42 @@ class EmulatorManager:
 
         return lines
 
+
+    def _device_args(
+        self,
+        input_profile: dict[str, Any],
+        ps1_multitap: dict[str, Any],
+        players_plan: dict[str, Any] | None = None,
+    ) -> list[str]:
+        """The `--device` arguments. B46: a pick's plan replaces today's loop; None = today's list exactly."""
+        if players_plan is not None:
+            return list(players_plan["device_args"])
+        args: list[str] = []
+        libretro_device = input_profile.get(
+            "libretro_device"
+        )
+
+        if isinstance(
+            libretro_device,
+            int,
+        ):
+            explicit_device_players = (
+                len(self.INPUT_PROFILE_PLAYERS)
+                if bool(
+                    ps1_multitap.get(
+                        "enabled"
+                    )
+                )
+                else 2
+            )
+            for player_index in range(
+                1,
+                explicit_device_players + 1,
+            ):
+                args.append(
+                    f"--device={player_index}:{libretro_device}"
+                )
+        return args
 
     def _prepare_input_override(
         self,
@@ -5364,6 +5454,7 @@ class EmulatorManager:
         cheat_source_index: int | None = None,
         cheat_enabled_indexes: list[int] | tuple[int, ...] | None = None,
         mod_index: int | None = None,
+        players_chosen: int | None = None,
     ) -> dict[str, Any]:
         with self.lock:
             self._refresh_process()
@@ -5372,6 +5463,13 @@ class EmulatorManager:
                 raise EmulatorError(
                     "A PrivyHub game session is already running"
                 )
+
+            # B46: the chooser's pick for this launch (None = today: the metadata alone)
+            players_plan: dict[str, Any] | None = None
+            if players_chosen is not None:
+                import players_session as _players_session
+                if _players_session.parse(players_chosen) is None:
+                    raise EmulatorError("players_chosen must be 1, 2 or 4")
 
             runtime = self._runtime_details()
             executable = runtime["executable"]
@@ -5394,10 +5492,22 @@ class EmulatorManager:
                 runtime,
             )
 
+            # B46: with a pick, the PS1 multitap for this launch from the pick (None = today's metadata read)
+            if players_chosen is not None:
+                players_plan = _players_session.plan(
+                    str(game.get("system", "")),
+                    int(players_chosen),
+                    self.controller_profile(game).get("libretro_device"),
+                )
             ps1_multitap = self._prepare_ps1_multitap_options(
                 game,
                 runtime,
                 content_path,
+                session_mode=(
+                    players_plan["ps1_mode"]
+                    if players_plan is not None
+                    else None
+                ),
             )
 
             # C5-M5B: the PS1 look for this launch only (PRIVYHUB_PS1_LOOK;
@@ -5482,30 +5592,23 @@ class EmulatorManager:
                 str(session_config),
             ]
 
-            libretro_device = input_profile.get(
-                "libretro_device"
-            )
-
-            if isinstance(
-                libretro_device,
-                int,
-            ):
-                explicit_device_players = (
-                    len(self.INPUT_PROFILE_PLAYERS)
-                    if bool(
-                        ps1_multitap.get(
-                            "enabled"
-                        )
-                    )
-                    else 2
+            command.extend(
+                self._device_args(
+                    input_profile,
+                    ps1_multitap,
+                    players_plan,
                 )
-                for player_index in range(
-                    1,
-                    explicit_device_players + 1,
-                ):
-                    command.append(
-                        f"--device={player_index}:{libretro_device}"
-                    )
+            )
+            # B46: the session's ports, read back from what was written (None = today: no key)
+            if players_plan is not None:
+                players_plan["device_args"] = [
+                    a for a in command if a.startswith("--device=")
+                ]
+                players_plan["ps1_opt_multitap"] = (
+                    bool(ps1_multitap.get("port1"))
+                    if bool(ps1_multitap.get("managed"))
+                    else None
+                )
 
             if entry_slot is not None:
                 try:
@@ -5637,6 +5740,8 @@ class EmulatorManager:
             self.process = process
             self.log_handle = log_handle
             self.active_game = dict(game)
+            # B46: the session's ports from the pick (None = today)
+            self._players_session = players_plan
             self.started_at = time.monotonic()
             self._paused = False
             isolated_session = cheat_session if cheat_session is not None else mod_session
@@ -5732,6 +5837,9 @@ class EmulatorManager:
                 )
                 else None
             )
+            # B46: the pick's ports, only for a launch that carried one (no key = today's payload)
+            if players_plan is not None:
+                payload["players_session"] = dict(players_plan)
             payload["ps1_look"] = (
                 {k: v for k, v in ps1_look_session.items() if k != "cfg_text"}
                 if ps1_look_session["preset"] or ps1_look_session["ignored_value"]
@@ -8656,6 +8764,7 @@ class EmulatorManager:
             self._paused = False
             self._network_cmd_port = None
             self._active_cheat_session = None
+            self._players_session = None
 
             if cheat_runtime_cleanup:
                 cleanup_error = self._cleanup_cheat_runtime()

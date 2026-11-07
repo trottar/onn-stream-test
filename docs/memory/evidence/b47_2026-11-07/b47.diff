@@ -1,0 +1,529 @@
+--- a/companion/range_server.py
++++ b/companion/range_server.py
+@@ -398,6 +398,21 @@
+     )
+     VOD_LOG.install(RangeRequestHandler)
+ 
++    # B47: a companion restart (SIGTERM to the cgroup) writes the open requests' rows as `closed: shutdown` before the
++    # exit; without the line no handler is installed (Python's default action, today)
++    import signal as _signal
++
++    def _b47_on_sigterm(signum, frame):
++        try:
++            VOD_LOG.flush_open("shutdown")
++        finally:
++            raise SystemExit(0)
++
++    try:
++        _signal.signal(_signal.SIGTERM, _b47_on_sigterm)
++    except ValueError:
++        pass  # not the main thread (an import from a test): no handler
++
+ # B40: a hub-side VOD drop for the bench, only with PRIVYHUB_VOD_DROP_TEST=1 (per-run, never adopted; the
+ # companion's environment is inherited). Absent = today: nothing imported, the class above not touched, no thread.
+ VOD_DROP_TEST = None
+--- a/companion/vod_log.py
++++ b/companion/vod_log.py
+@@ -12,6 +12,9 @@
+ 
+ Redacted by construction: no address, no file path, no title, no URL, no query (the media token) in any row; the
+ media is an opaque 12-hex id.
++B47: the requests still open are kept; `RangeLog.flush_open()` writes each as `closed: "shutdown"` (the range server
++calls it on SIGTERM, a companion restart), and a request finishing afterwards writes no second row. Design:
++`docs/memory/evidence/b47_2026-11-07/design_written_before_code.md`.
+ """
+ from __future__ import annotations
+ 
+@@ -95,6 +98,25 @@
+         self._out = _Writer(project_root, RANGE_LOG_NAME)
+         self._clock = clock
+         self._mono = mono
++        # B47: the open requests (id(box) -> (handler, method, box, t0, m0)) for flush_open
++        self._open: dict[int, tuple] = {}
++        self._open_lock = threading.Lock()
++
++    def flush_open(self, closed: str = "shutdown") -> int:
++        """B47: one row per request still open, `closed` as given; each then writes nothing more. Never raises."""
++        with self._open_lock:
++            items = list(self._open.values())
++            self._open.clear()
++            for _, _, box, _, _ in items:
++                box["flushed"] = True
++        n = 0
++        for handler, method, box, t0, m0 in items:
++            try:
++                self._row(handler, method, box, t0, m0, closed, None)
++                n += 1
++            except Exception:
++                pass
++        return n
+ 
+     def install(self, handler_class: type) -> type:
+         log = self
+@@ -132,6 +154,8 @@
+                 self._b35_box = box
+                 t0, m0 = log._clock(), log._mono()
+                 closed, error = None, None
++                with log._open_lock:
++                    log._open[id(box)] = (self, method_name[3:], box, t0, m0)
+                 try:
+                     return orig(self)
+                 except BrokenPipeError:
+@@ -145,8 +169,12 @@
+                     raise
+                 finally:
+                     self._b35_box = None
++                    with log._open_lock:
++                        log._open.pop(id(box), None)
++                        flushed = box.get("flushed", False)
+                     try:
+-                        log._row(self, method_name[3:], box, t0, m0, closed, error)
++                        if not flushed:   # B47: a shutdown row was written for it already
++                            log._row(self, method_name[3:], box, t0, m0, closed, error)
+                     except Exception:
+                         pass  # the log must never disturb a request
+ 
+--- a/PrivyHub/app/src/main/java/vod/VodRetryAndroid.kt
++++ b/PrivyHub/app/src/main/java/vod/VodRetryAndroid.kt
+@@ -131,7 +131,10 @@
+             return
+         }
+         val frame = playerView.overlayFrameLayout ?: return
++        // B47: no stale mark left from an earlier episode
++        sweep(frame)
+         val view = TextView(activity).apply {
++            tag = MARK_TAG
+             text = "reconnecting…"
+             textSize = 14f
+             setTextColor(Color.WHITE)
+@@ -150,9 +153,21 @@
+     }
+ 
+     private fun hide() {
+-        val view = mark ?: return
+-        (view.parent as? FrameLayout)?.removeView(view)
++        val view = mark
+         mark = null
++        (view?.parent as? FrameLayout)?.removeView(view)
++        // B47: every tagged mark in the overlay, now and on the next main-loop turn (HOME-3 C5'' (a))
++        playerView.overlayFrameLayout?.let { frame ->
++            sweep(frame)
++            handler.post { if (mark == null) sweep(frame) }
++        }
++    }
++
++    private fun sweep(frame: FrameLayout) {
++        for (i in frame.childCount - 1 downTo 0) {
++            val child = frame.getChildAt(i)
++            if (child?.tag == MARK_TAG) frame.removeViewAt(i)
++        }
+     }
+ 
+     private fun dialog(kind: String) {
+@@ -173,6 +188,11 @@
+             .show()
+     }
+ 
++    companion object {
++        /** B47: the tag on the "reconnecting…" view, for the sweep. */
++        const val MARK_TAG = "privyhub_vod_reconnecting_mark"
++    }
++
+     private fun post(row: Map<String, Any>) {
+         val url = try {
+             rowsUrl()
+--- a/PrivyHub/app/src/main/java/vod/VodRetry.kt
++++ b/PrivyHub/app/src/main/java/vod/VodRetry.kt
+@@ -19,18 +19,25 @@
+  * (a companion restart ends the hub's sessions; the onn's cached token is then refused), and three refusals in a row,
+  * each after a refetch, end the episode as `refused` -- never "connection lost". The Retry button refetches too.
+  * Design: `docs/memory/evidence/b43_2026-11-06/design_written_before_code.md`.
++ *
++ * B47 (the user's "Reconnect by default yes", 2026-11-06; G-A13's client half): **on by default** -- absent / empty /
++ * junk / `1` = the retry; `0` / `off` = today's absent (no controller). At READY the mark is always cleared and any
++ * scheduled attempt dropped (HOME-3 C5'' (a): "reconnecting…" left on screen after a `reset` resume).
++ * Design: `docs/memory/evidence/b47_2026-11-07/design_written_before_code.md`.
+  */
+ object VodRetryFlag {
+     const val PROPERTY = "debug.privyhub.vod_retry"
+ 
+-    fun parse(raw: String?): Boolean = raw?.trim() == "1"
++    // B47: on unless `0` / `off` (as B42's flags)
++    fun parse(raw: String?): Boolean = raw?.trim().let { it != "0" && it != "off" }
+ 
++    /** The property, read through reflection; a failed read is absent, so on (B47). */
+     fun read(): Boolean =
+         try {
+             val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
+             parse(get.invoke(null, PROPERTY) as? String)
+         } catch (_: Throwable) {
+-            false
++            parse(null)
+         }
+ }
+ 
+@@ -162,7 +169,8 @@
+                 if (VodRetryPolicy.isRefusal(reason)) KIND_REFUSED else KIND_LOST)
+         }
+         attempts = next
+-        ui.showMark(next)
++        // B47: the mark only while the episode is open (it is: firstErrorAtMs set above)
++        if (retrying) ui.showMark(next)
+         scheduler.cancel()
+         val base = row("vod_retry") + mapOf("attempt" to next, "delay_ms" to delay, "elapsed_ms" to elapsed,
+             "error_code" to code, "error_name" to codeName) + why(reason)
+@@ -217,13 +225,16 @@
+         }
+     }
+ 
+-    /** The player is READY: an open episode closes. */
++    /** The player is READY: an open episode closes. B47: the mark cleared and any scheduled attempt dropped, always. */
+     fun onReady() {
++        if (!cancelled) {
++            scheduler.cancel()
++            ui.hideMark()
++        }
+         if (firstErrorAtMs < 0 || gaveUp || cancelled) {
+             return
+         }
+         rows(row("vod_resumed") + mapOf("attempts" to attempts, "elapsed_ms" to (clock() - firstErrorAtMs)))
+-        ui.hideMark()
+         firstErrorAtMs = -1L
+         attempts = 0
+         refetched = false
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/vod/VodRetryDefaultOnTest.kt
+@@ -0,0 +1,99 @@
++package com.safeiot.privyhub.vod
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * B47: the movie retry on by default (`debug.privyhub.vod_retry` absent = on, `0` / `off` = today), and the mark
++ * cleared at every READY with no attempt left scheduled (HOME-3 C5'' (a): "reconnecting…" stayed after a `reset`
++ * resume). A fake clock, scheduler and player, as B35's test.
++ */
++class VodRetryDefaultOnTest {
++
++    private class Sched : VodRetryController.Scheduler {
++        var task: (() -> Unit)? = null
++        var delay = -1L
++        override fun schedule(delayMs: Long, task: () -> Unit) { this.task = task; delay = delayMs }
++        override fun cancel() { task = null }
++        fun run() { val t = task; task = null; t?.invoke() }
++    }
++
++    private class Ui : VodRetryController.Ui {
++        var shown = false
++        var shows = 0
++        var hides = 0
++        override fun showMark(attempt: Int) { shown = true; shows++ }
++        override fun hideMark() { shown = false; hides++ }
++        override fun offerRetry() {}
++    }
++
++    private class Rig {
++        var now = 0L
++        val sched = Sched()
++        val ui = Ui()
++        val rows = mutableListOf<Map<String, Any>>()
++        val seeks = mutableListOf<Long>()
++        val c = VodRetryController(VodRetryPolicy(), object : VodRetryController.Player {
++            override fun retryAt(positionMs: Long) { seeks.add(positionMs) }
++        }, sched, { now }, { rows.add(it) }, ui, "vod:/x")
++        fun events() = rows.map { it["event"] }
++    }
++
++    @Test
++    fun absentIsOnAndZeroOrOffIsTodaysNoController() {
++        assertTrue(VodRetryController.wanted(VodRetryFlag.parse(null), isLive = false))
++        assertTrue(VodRetryController.wanted(VodRetryFlag.parse(""), isLive = false))
++        assertTrue(VodRetryController.wanted(VodRetryFlag.parse("junk"), isLive = false))
++        assertFalse(VodRetryController.wanted(VodRetryFlag.parse("0"), isLive = false))
++        assertFalse(VodRetryController.wanted(VodRetryFlag.parse("off"), isLive = false))
++        assertFalse(VodRetryController.wanted(VodRetryFlag.parse(null), isLive = true))   // live TV never
++    }
++
++    @Test
++    fun aResetEpisodeResumesWithTheMarkGoneAndNothingScheduled() {
++        val r = Rig()
++        r.now = 1_000
++        assertTrue(r.c.onError(2001, "ERROR_CODE_IO_NETWORK_CONNECTION_FAILED", 92_369, VodRetryPolicy.REASON_RESET))
++        assertTrue(r.ui.shown)
++        repeat(3) {
++            r.now += 4_000; r.sched.run()   // the attempt fails
++            r.c.onError(2001, "ERROR_CODE_IO_NETWORK_CONNECTION_FAILED", 92_369, VodRetryPolicy.REASON_RESET)
++        }
++        assertEquals(listOf("vod_error", "vod_retry", "vod_retry", "vod_retry", "vod_retry"), r.events())
++        // HOME-3 (a): the player's own reconnect reaches READY while attempt 4 is still scheduled
++        r.now += 3_000
++        r.c.onReady()
++        assertFalse(r.ui.shown)
++        assertNull(r.sched.task)                                       // the late attempt dropped
++        assertEquals("vod_resumed", r.events().last())
++        val seeks = r.seeks.size
++        r.sched.run()
++        assertEquals(seeks, r.seeks.size)                              // no seek back after the resume
++        // a later READY (a seek, a buffer) hides again, idempotent, and writes no row
++        val n = r.rows.size; val hides = r.ui.hides
++        r.c.onReady()
++        assertEquals(n, r.rows.size); assertEquals(hides + 1, r.ui.hides); assertFalse(r.ui.shown)
++    }
++
++    @Test
++    fun aReadyWithNoEpisodeWritesNoRow() {
++        val r = Rig()
++        r.c.onReady()
++        assertTrue(r.rows.isEmpty())
++        assertEquals(1, r.ui.hides)
++    }
++
++    @Test
++    fun afterACancelNothingIsShownOrHidden() {
++        val r = Rig()
++        r.c.cancel()
++        val hides = r.ui.hides
++        r.c.onReady()
++        assertEquals(hides, r.ui.hides)
++        assertFalse(r.c.onError(2001, "X", 0))
++        assertEquals(0, r.ui.shows)
++    }
++}
+--- a/PrivyHub/app/src/test/java/vod/VodRetryTest.kt
++++ b/PrivyHub/app/src/test/java/vod/VodRetryTest.kt
+@@ -106,10 +106,12 @@
+ 
+     @Test
+     fun theFlag() {
++        // B47 (disclosed, as B42): absent / empty / junk / 1 = on; only 0 / off = today's absent
+         assertTrue(VodRetryFlag.parse("1"))
+         assertTrue(VodRetryFlag.parse(" 1 "))
+-        for (v in listOf(null, "", "0", "true", "yes", "2", "junk")) assertFalse(v.toString(), VodRetryFlag.parse(v))
+-        assertFalse(VodRetryFlag.read())          // no SystemProperties on the JVM: off
++        for (v in listOf(null, "", "true", "yes", "2", "junk")) assertTrue(v.toString(), VodRetryFlag.parse(v))
++        for (v in listOf("0", " 0 ", "off")) assertFalse(v, VodRetryFlag.parse(v))
++        assertTrue(VodRetryFlag.read())           // no SystemProperties on the JVM: absent = on
+         assertTrue(VodRetryController.wanted(true, isLive = false))
+         assertFalse(VodRetryController.wanted(true, isLive = true))
+         assertFalse(VodRetryController.wanted(false, isLive = false))
+--- a/tests/vod_drop_test/test_vod_drop_test.py
++++ b/tests/vod_drop_test/test_vod_drop_test.py
+@@ -301,11 +301,17 @@
+         old = ast.parse((BASE / "range_server.py").read_text())
+         old_dumps = [ast.dump(o) for o in old.body]
+         added = [n for n in new.body if ast.dump(n) not in old_dumps]
+-        self.assertEqual([ast.unparse(n) for n in added][0], "VOD_DROP_TEST = None")
+-        self.assertEqual(len(added), 2)
+-        self.assertTrue(ast.unparse(added[1]).startswith(
++        # B47 (disclosed): the PRIVYHUB_VOD_LOG block gained the SIGTERM row; B40's two nodes are checked as before
++        log_guard = "if os.environ.get('PRIVYHUB_VOD_LOG', '').strip() == '1':"
++        b47 = [n for n in added if ast.unparse(n).startswith(log_guard)]
++        self.assertLessEqual(len(b47), 1)
++        drop = [n for n in added if n not in b47]
++        self.assertEqual([ast.unparse(n) for n in drop][0], "VOD_DROP_TEST = None")
++        self.assertEqual(len(drop), 2)
++        self.assertTrue(ast.unparse(drop[1]).startswith(
+             "if os.environ.get('PRIVYHUB_VOD_DROP_TEST', '').strip() == '1':"))
+-        self.assertEqual([ast.dump(n) for n in new.body if n not in added], old_dumps)
++        old_rest = [d for o, d in zip(old.body, old_dumps) if not (b47 and ast.unparse(o).startswith(log_guard))]
++        self.assertEqual([ast.dump(n) for n in new.body if n not in added], old_rest)
+ 
+     def test_the_same_bytes_from_the_base_and_the_new_server(self) -> None:
+         if not (BASE / "range_server.py").exists():
+--- /dev/null
++++ b/tests/vod_log/test_vod_log_b47.py
+@@ -0,0 +1,190 @@
++#!/usr/bin/env python3
++"""B47 (host): a range request still open when the range server stops (a companion restart: SIGTERM to the cgroup)
++gets its row, `closed: "shutdown"`; a request finishing after the flush writes no second row. Without
++PRIVYHUB_VOD_LOG=1 no handler is installed (today). Loopback only; the process test runs a copy of the range server
++in a temp tree, so its log is the temp tree's, never the hub's.
++
++    python3 -m unittest discover -s tests/vod_log -p 'test_vod_log_b47.py' -v
++"""
++
++from __future__ import annotations
++
++import ipaddress
++import json
++import os
++import shutil
++import signal
++import socket
++import struct
++import subprocess
++import sys
++import tempfile
++import threading
++import time
++import unittest
++from functools import partial
++from http.server import ThreadingHTTPServer
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++
++import range_server  # noqa: E402
++import vod_log  # noqa: E402
++
++LOOP = str(ipaddress.ip_address(0x7F000001))
++SIZE = 16 * 1024 * 1024
++NAME = "feature-b47.mkv"
++
++
++def _payload() -> bytes:
++    return (bytes(range(251)) * (SIZE // 251 + 1))[:SIZE]
++
++
++def _open_slow(port: int, rng: str) -> socket.socket:
++    """A GET whose client reads a little and then holds the socket (the server blocks once the buffers fill)."""
++    s = socket.create_connection((LOOP, port), timeout=5)
++    s.sendall(f"GET /vod/{NAME} HTTP/1.1\r\nHost: hub\r\nRange: {rng}\r\nConnection: close\r\n\r\n".encode())
++    got = 0
++    while got < 200_000:
++        got += len(s.recv(65536))
++    return s
++
++
++def _reset(s: socket.socket) -> None:
++    s.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
++    s.close()
++
++
++def _rows(path: Path) -> list[dict]:
++    return [json.loads(x) for x in path.read_text().splitlines() if x.strip()] if path.exists() else []
++
++
++def _wait(cond, timeout=5.0) -> bool:
++    end = time.time() + timeout
++    while time.time() < end:
++        if cond():
++            return True
++        time.sleep(0.02)
++    return False
++
++
++class FlushOpen(unittest.TestCase):
++    def setUp(self) -> None:
++        self.tmp = tempfile.TemporaryDirectory()
++        media = Path(self.tmp.name) / "media"
++        (media / "vod").mkdir(parents=True)
++        (media / "vod" / NAME).write_bytes(_payload())
++        self.project = Path(self.tmp.name) / "project"
++        cls = type("Logged", (range_server.RangeRequestHandler,), {})
++        cls.log_message = lambda *a, **k: None
++        self.log = vod_log.RangeLog(self.project)
++        self.log.install(cls)
++        handler = partial(cls, directory=str(media), vod_directory=str(media / "vod"))
++        self.httpd = ThreadingHTTPServer((LOOP, 0), handler)
++        self.httpd.daemon_threads = True
++        self.httpd.handle_error = lambda *a: None
++        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
++        self.port = self.httpd.server_address[1]
++        self.path = self.project / "logs" / "vod_range.jsonl"
++
++    def tearDown(self) -> None:
++        self.httpd.shutdown()
++        self.httpd.server_close()
++        self.tmp.cleanup()
++
++    def test_an_open_request_gets_a_shutdown_row_and_no_second_row(self) -> None:
++        s = _open_slow(self.port, "bytes=1048576-")
++        self.assertTrue(_wait(lambda: len(self.log._open) == 1))
++        self.assertEqual(self.log.flush_open(), 1)
++        rows = _rows(self.path)
++        self.assertEqual(len(rows), 1)
++        r = rows[0]
++        self.assertEqual((r["closed"], r["status"], r["range"]), ("shutdown", 206, "bytes=1048576-"))
++        self.assertGreater(r["bytes"], 0)
++        self.assertLess(r["bytes"], r["length"])
++        self.assertNotIn(NAME, json.dumps(r))
++        _reset(s)                                   # the request now ends (reset): no second row
++        time.sleep(0.5)
++        self.assertEqual(len(_rows(self.path)), 1)
++        self.assertEqual(self.log._open, {})
++
++    def test_nothing_open_writes_nothing_and_a_closed_request_is_today(self) -> None:
++        self.assertEqual(self.log.flush_open(), 0)
++        self.assertFalse(self.path.exists())
++        s = socket.create_connection((LOOP, self.port), timeout=5)
++        s.sendall(f"GET /vod/{NAME} HTTP/1.1\r\nHost: hub\r\nRange: bytes=0-1023\r\nConnection: close\r\n\r\n".encode())
++        while s.recv(65536):
++            pass
++        s.close()
++        self.assertTrue(_wait(lambda: len(_rows(self.path)) == 1))
++        self.assertEqual(_rows(self.path)[0]["closed"], "complete")
++        self.assertEqual(self.log.flush_open(), 0)
++
++
++class Process(unittest.TestCase):
++    """The range server as the companion runs it, from a copy in a temp tree, then SIGTERM."""
++
++    def run_server(self, with_line: bool):
++        tmp = Path(tempfile.mkdtemp(prefix="b47_rs_"))
++        comp = tmp / "companion"
++        (comp / "games").mkdir(parents=True)
++        for f in ("range_server.py", "vod_log.py", "storage_presence.py"):
++            shutil.copy(ROOT / "companion" / f, comp / f)
++        shutil.copy(ROOT / "companion" / "games" / "log_rotation.py", comp / "games" / "log_rotation.py")
++        (comp / "games" / "__init__.py").write_text("")
++        media = tmp / "media"
++        (media / "vod").mkdir(parents=True)
++        (media / "vod" / NAME).write_bytes(_payload())
++        with socket.socket() as probe:
++            probe.bind((LOOP, 0))
++            port = probe.getsockname()[1]
++        env = {"PATH": "/usr/bin:/bin", "PYTHONPATH": str(comp)}
++        if with_line:
++            env["PRIVYHUB_VOD_LOG"] = "1"
++        p = subprocess.Popen([sys.executable, str(comp / "range_server.py"), "--root", str(media), "--host", LOOP,
++                              "--port", str(port)], cwd=str(tmp), env=env, stdout=subprocess.DEVNULL,
++                             stderr=subprocess.PIPE)
++        self.assertTrue(_wait(lambda: _connectable(port), 10), "the range server did not listen")
++        return tmp, p, port
++
++    def test_sigterm_with_the_line_writes_the_open_row_and_exits_0(self) -> None:
++        tmp, p, port = self.run_server(True)
++        try:
++            s = _open_slow(port, "bytes=2097152-")
++            time.sleep(0.3)
++            p.send_signal(signal.SIGTERM)
++            self.assertEqual(p.wait(10), 0)
++            rows = _rows(tmp / "logs" / "vod_range.jsonl")
++            self.assertEqual([r["closed"] for r in rows], ["shutdown"])
++            self.assertEqual(rows[0]["range"], "bytes=2097152-")
++            _reset(s)
++        finally:
++            if p.poll() is None:
++                p.kill()
++            shutil.rmtree(tmp, ignore_errors=True)
++
++    def test_sigterm_without_the_line_is_todays_default_action(self) -> None:
++        tmp, p, port = self.run_server(False)
++        try:
++            s = _open_slow(port, "bytes=0-")
++            p.send_signal(signal.SIGTERM)
++            self.assertEqual(p.wait(10), -signal.SIGTERM)
++            self.assertFalse((tmp / "logs").exists())
++            _reset(s)
++        finally:
++            if p.poll() is None:
++                p.kill()
++            shutil.rmtree(tmp, ignore_errors=True)
++
++
++def _connectable(port: int) -> bool:
++    try:
++        with socket.create_connection((LOOP, port), timeout=0.2):
++            return True
++    except OSError:
++        return False
++
++
++if __name__ == "__main__":
++    unittest.main()
