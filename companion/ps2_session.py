@@ -58,6 +58,16 @@ PINE_OK, PINE_FAIL = 0x00, 0xFF
 SAVE_BOUND_S = 10.0            # no write time measurable by B (PCSX2 not run); ~1 s expected; HOME-5 logs the real one
 LOAD_CONFIRM_S = 3.0
 STATE_POLL_S = 0.25
+# B52: the load runs the game from the state: after the game's ELF (PCSX2's own `ELF Loading:` line), then a picture
+# check on the PID's window (3 distinct frames, not the pre-load picture, not black, PINE running, no `TLB Miss`)
+ELF_LINE = "ELF Loading:"
+ELF_WAIT_S = 30.0
+PICTURE_BOUND_S = 5.0
+PICTURE_STEP_S = 0.2
+PICTURE_DISTINCT = 3
+PICTURE_BLACK_MEAN = 20
+TLB_MISS = "TLB Miss"
+GRAB_W, GRAB_H = 64, 36
 PINE_RUNNING, PINE_PAUSED = 0, 1
 
 # The save-state behaviours a PS2 session turns off (B49 S3), in the rows' words
@@ -356,6 +366,8 @@ def settings_for(project_root: Path, bios_name: str, adapter: str | None, player
         "EmuCore/GS": gs,
         "AutoUpdater": {"CheckAtStartup": "false"},
         "InputSources": {"SDL": "true", "Keyboard": "true", "Mouse": "false"},
+        # B52: MTVU off -- PCSX2: "MTVU speedhack is enabled, saved states may not be stable" (HOME-5's black load)
+        "EmuCore/Speedhacks": {"vuThread": "false"},
         "Hotkeys": {"TogglePause": "Keyboard/Space"},
         # B50: both slots on the hub's formatted cards
         "MemoryCards": {"Slot1_Enable": "true", "Slot1_Filename": MEMCARDS[0], "Slot2_Enable": "true",
@@ -374,9 +386,45 @@ def ini_path(project_root: Path) -> Path:
     return Path(project_root) / DATA_DIR / "config" / "PCSX2" / "inis" / "PCSX2.ini"
 
 
-def command(appimage: Path, project_root: Path, content: Path) -> list[str]:
+def command(appimage: Path, project_root: Path, content: Path, logfile: Path | None = None) -> list[str]:
     datapath = (Path(project_root) / DATA_DIR / "config").resolve()
-    return [str(appimage), "-datapath", str(datapath), "-nogui", "-fullscreen", "--", str(content)]
+    # B53: PCSX2's own log per launch (2.8.2: "-logfile <path>: Writes the application log to path instead of emulog.txt")
+    log = ["-logfile", str(logfile)] if logfile is not None else []
+    return [str(appimage), "-datapath", str(datapath), "-nogui", "-fullscreen", *log, "--", str(content)]
+
+
+# B53: PCSX2's log per launch, named by the UTC launch time only, kept 30 days under data/games/ps2/logs/
+PCSX2_LOG_RE = re.compile(r"^(\d{8}T\d{6}Z)-pcsx2\.log$")
+LOG_RETAIN_DAYS = 30
+
+
+def pcsx2_log_for_launch(project_root: Path, launched_at: float) -> Path:
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(launched_at))
+    return (Path(project_root) / DATA_DIR / "logs" / f"{stamp}-pcsx2.log").resolve()
+
+
+def prune_pcsx2_logs(folder: Path, now: float, days: int = LOG_RETAIN_DAYS) -> list[str]:
+    """B53: remove this folder's per-launch PCSX2 logs whose name is older than `days` (others untouched)."""
+    removed = []
+    try:
+        names = sorted(os.listdir(folder))
+    except OSError:
+        return removed
+    for name in names:
+        m = PCSX2_LOG_RE.match(name)
+        if not m:
+            continue
+        try:
+            t = time.mktime(time.strptime(m.group(1), "%Y%m%dT%H%M%SZ")) - time.timezone
+        except ValueError:
+            continue
+        if now - t > days * 86400:
+            try:
+                (Path(folder) / name).unlink()
+                removed.append(name)
+            except OSError:
+                pass
+    return removed
 
 
 def launch_env(base: Mapping[str, str]) -> dict[str, str]:
@@ -431,6 +479,17 @@ def ensure_memcards(project_root: Path) -> dict[str, str]:
     """B50: the hub's two cards formatted when absent or all 0xFF (never a card holding data)."""
     import ps2_memcard
     return ps2_memcard.ensure_cards(Path(project_root) / DATA_DIR / "memcards", list(MEMCARDS))
+
+
+def grab_window(window: str) -> bytes | None:
+    """B52: one frame of an X11 window, 64x36 gray (ffmpeg x11grab, the display of the companion's environment)."""
+    display = os.environ.get("DISPLAY", "")
+    if not display:
+        return None
+    r = subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "x11grab", "-window_id", str(window), "-i", display,
+                        "-frames:v", "1", "-vf", f"scale={GRAB_W}:{GRAB_H},format=gray", "-f", "rawvideo", "-"],
+                       capture_output=True, timeout=5, check=False)
+    return r.stdout if r.returncode == 0 and len(r.stdout) == GRAB_W * GRAB_H else None
 
 
 def pine_socket_path(environ: Mapping[str, str] | None = None) -> Path:
@@ -507,12 +566,16 @@ class Session:
     def __init__(self, pid: int, log: Callable[[str], None], *, run: Callable[..., Any] = _run,
                  status: Callable[[], int | None] | None = None, kill: Callable[[int, int], None] = os.kill,
                  sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic,
-                 pine_path: Path | None = None) -> None:
+                 pine_path: Path | None = None, grab: Callable[[str], bytes | None] | None = None,
+                 log_path: Path | None = None) -> None:
         self.pid = int(pid)
         self.log = log
         self.run = run
         # B51: one PINE socket for the status and the state messages (a test points both at its double)
         self.pine_path = pine_path or pine_socket_path()
+        # B52: one window frame (64x36 gray bytes) and PCSX2's own log for this launch (B53 points it per launch)
+        self.grab = grab or grab_window
+        self.log_path = log_path
         self.status = status or (lambda: pine_status(self.pine_path))
         self.kill = kill
         self.sleep = sleep
@@ -634,6 +697,69 @@ class Session:
             if self.clock() - t0 >= bound:
                 return None
             self.sleep(STATE_POLL_S)
+
+    def _log_text(self, offset: int = 0) -> str:
+        if self.log_path is None:
+            return ""
+        try:
+            with open(self.log_path, "rb") as fh:
+                fh.seek(offset)
+                return fh.read().decode("utf-8", "replace")
+        except OSError:
+            return ""
+
+    def log_size(self) -> int:
+        try:
+            return Path(self.log_path).stat().st_size if self.log_path is not None else 0
+        except OSError:
+            return 0
+
+    def elf_started(self) -> bool:
+        """B52: this launch's game has booted (PCSX2's `ELF Loading:` line in its log)."""
+        return ELF_LINE in self._log_text()
+
+    def wait_elf(self, bound: float = ELF_WAIT_S) -> bool:
+        t0 = self.clock()
+        while not self.elf_started():
+            if self.clock() - t0 >= bound:
+                return False
+            self.sleep(STATE_POLL_S)
+        return True
+
+    def picture(self) -> tuple[str, float] | None:
+        """B52: (hash, mean) of one frame of the PID's window, or None."""
+        w = find_window(self.pid, self.run)
+        if not w:
+            return None
+        try:
+            data = self.grab(w)
+        except Exception:
+            data = None
+        if not data:
+            return None
+        import hashlib
+        return hashlib.sha256(data).hexdigest()[:16], sum(data) / len(data)
+
+    def check_picture(self, pre: str | None, log_offset: int, bound: float = PICTURE_BOUND_S) -> tuple[str, float]:
+        """B52: after the resume -- `ok` (the game runs: 3 distinct frames, not the pre-load one, not all black, PINE
+        running, no TLB Miss), `fault` (a TLB Miss since the load) or `static`; with the seconds it took."""
+        t0 = self.clock()
+        seen: dict[str, float] = {}
+        running = False
+        while True:
+            if TLB_MISS in self._log_text(log_offset):
+                return "fault", self.clock() - t0
+            if self.status() == PINE_RUNNING:
+                running = True
+            p = self.picture()
+            if p is not None and p[0] != pre:
+                seen[p[0]] = p[1]
+            if (running and len(seen) >= PICTURE_DISTINCT
+                    and any(mean > PICTURE_BLACK_MEAN for mean in seen.values())):
+                return "ok", self.clock() - t0
+            if self.clock() - t0 >= bound:
+                return "static", self.clock() - t0
+            self.sleep(PICTURE_STEP_S)
 
     def wait_log_line(self, path: Path, offset: int, text: str, bound: float = LOAD_CONFIRM_S) -> bool:
         """B51: PCSX2's own log line (e.g. `Loaded state from slot N.`) written after `offset`, within the bound."""

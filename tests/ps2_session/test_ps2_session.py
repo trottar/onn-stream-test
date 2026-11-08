@@ -22,6 +22,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "companion"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _tmp_cleanup  # noqa: E402,F401  (B53: this run's temp dirs removed at exit)
 sys.path.insert(0, str(ROOT / "tools"))
 
 import ps2_session as ps2  # noqa: E402
@@ -387,7 +389,7 @@ out = {"em_ps2": em._ps2 is not None}
 if em._ps2 is not None:
     P = em._ps2
     class FakeSession(P.Session):
-        def __init__(self, pid, log):
+        def __init__(self, pid, log, **kw):     # B52: the launch passes log_path
             clock = [0.0]
             def run(cmd, **kw):
                 if "search" in cmd:
@@ -399,7 +401,7 @@ if em._ps2 is not None:
                 return types.SimpleNamespace(stdout="")
             super().__init__(pid, log, run=run, status=lambda: None, kill=lambda pid, sig: calls["kill"].append(int(sig)),
                              sleep=lambda d: clock.__setitem__(0, clock[0] + d), clock=lambda: clock[0],
-                             pine_path=proj / "no-pine.sock")
+                             pine_path=proj / "no-pine.sock", **kw)
     P.Session = FakeSession
     P.default_runner = lambda cmd: "deviceName = AMD Fake (RADV FAKE)\n"
 m = em.EmulatorManager(proj, config_path=Path("companion/games/config/emulators.json").resolve())
@@ -454,7 +456,10 @@ class Launch(unittest.TestCase):
         cmd = out["calls"]["popen"][0]["cmd"]
         self.assertEqual(cmd[1:5], ["-datapath", str((self.proj / "data/games/ps2/config").resolve()), "-nogui",
                                     "-fullscreen"])
-        self.assertEqual(cmd[5:], ["--", str((self.games / "one.chd").resolve())])
+        # B53 (disclosed): PCSX2's per-launch log before the title
+        self.assertEqual(cmd[5], "-logfile")
+        self.assertRegex(cmd[6], r"/data/games/ps2/logs/\d{8}T\d{6}Z-pcsx2\.log$")
+        self.assertEqual(cmd[7:], ["--", str((self.games / "one.chd").resolve())])
         self.assertTrue(out["calls"]["popen"][0]["new_session"])
         self.assertEqual(out["calls"]["popen"][0]["env_sdl"], ps2.SDL_MAPPING[:40])
         text = self.ini.read_text()

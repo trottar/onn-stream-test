@@ -23,6 +23,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "companion"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _tmp_cleanup  # noqa: E402,F401  (B53: this run's temp dirs removed at exit)
 
 import ps2_session as ps2  # noqa: E402
 from games import emulator_manager as em  # noqa: E402
@@ -50,7 +52,8 @@ class PineDouble:
         self.emulog = ps2.pcsx2_log_path(root)
         self.sstates.mkdir(parents=True, exist_ok=True)
         self.emulog.parent.mkdir(parents=True, exist_ok=True)
-        self.emulog.write_text("[    0.1] PCSX2 log start\n")
+        # B52: the game booted in this launch (PCSX2's ELF line), so a load goes straight on
+        self.emulog.write_text("[    0.1] PCSX2 log start\n[    3.2] ELF Loading: <elf>, Game CRC = 00000000, EntryPoint = 0x00100008\n")
         self.srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.srv.bind(str(self.path))
         self.srv.listen(4)
@@ -97,17 +100,43 @@ class FakeProc:
         return None
 
 
+class FakePcsx2:
+    """B52: the hotkey toggles the pause (PINE reads it); the window's picture moves only while running."""
+
+    def __init__(self, status=ps2.PINE_PAUSED):
+        self.paused = status != ps2.PINE_RUNNING
+        self.fixed = status            # None = PINE silent
+        self.frame = 0
+
+    def run(self, cmd, **kw):
+        if cmd[:2] == ["xdotool", "key"]:
+            self.paused = not self.paused
+        return types.SimpleNamespace(stdout="77\n" if "search" in cmd else "")
+
+    def status(self):
+        if self.fixed is None:
+            return None
+        return ps2.PINE_PAUSED if self.paused else ps2.PINE_RUNNING
+
+    def grab(self, window):
+        if not self.paused:
+            self.frame += 1
+        return bytes([(self.frame * 37 + i) % 200 + 40 for i in range(ps2.GRAB_W * ps2.GRAB_H)])
+
+
 def session_manager(pine: PineDouble, paused_by="hotkey", status=ps2.PINE_PAUSED):
     m = em.EmulatorManager(pine.root, config_path=(ROOT / "companion/games/config/emulators.json"))
     lines, kills, clock = [], [], [0.0]
+    fake = FakePcsx2(status)
     m.process = FakeProc()
     m.active_game = {"id": "game_ps2_fake", "system": "ps2", "title": "made-up", "relative_path": "ps2/one.chd"}
     m._launch_kind = "pcsx2"
     m._paused = True
-    m._ps2 = ps2.Session(4242, lines.append, run=lambda cmd, **kw: types.SimpleNamespace(stdout="77\n"),
-                         status=lambda: status, kill=lambda pid, sig: kills.append(int(sig)),
+    m._ps2 = ps2.Session(4242, lines.append, run=fake.run, status=fake.status,
+                         kill=lambda pid, sig: kills.append(int(sig)),
                          sleep=lambda d: clock.__setitem__(0, clock[0] + d), clock=lambda: clock[0],
-                         pine_path=pine.path)
+                         pine_path=pine.path, grab=fake.grab, log_path=pine.emulog)
+    m._fake = fake
     m._ps2.paused_by = paused_by
     return m, lines, kills
 
@@ -195,18 +224,21 @@ class Load(Base):
         m.save_state(3)
         r = m.load_state(3)
         self.assertEqual(d.requests[-1], struct.pack("<IBB", 6, 0x0A, 3))
+        # B52 (disclosed): "confirmed" is the picture moving after the resume, not PCSX2's log line
         for k, v in (("action", "load_state"), ("slot", 3), ("accepted", True), ("confirmed", True),
-                     ("verification", "pcsx2_log"), ("paused", True)):
+                     ("verification", "picture"), ("paused", True)):
             self.assertEqual(r[k], v, k)
         self.assertTrue(r["slot_detail"]["exists"])
-        self.assertIn("PS2 load: slot 3 pine 0x0a ok; confirmed", lines)
+        self.assertTrue(any(l.startswith("PS2 load: slot 3 pine 0x0a ok; picture ok") for l in lines))
+        self.assertTrue(m._fake.paused)                     # left paused, as PS1's load
 
-    def test_no_log_line_is_visual_required_as_ps1(self):
+    def test_without_pcsx2s_log_line_the_picture_still_decides(self):
+        # B52 (disclosed): B51 read `visual_required` here; the picture check now decides
         d = self.double(log_line=False)
         m, _, _ = session_manager(d)
         m.save_state(1)
         r = m.load_state(1)
-        self.assertEqual((r["confirmed"], r["verification"]), (False, "visual_required"))
+        self.assertEqual((r["confirmed"], r["verification"]), (True, "picture"))
 
     def test_ps1s_messages_for_an_empty_slot_not_paused_and_a_pine_failure(self):
         d = self.double()

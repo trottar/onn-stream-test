@@ -1,0 +1,914 @@
+diff --git a/companion/games/emulator_manager.py b/companion/games/emulator_manager.py
+index 7663091..f929aac 100644
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -6854,9 +6854,15 @@ class EmulatorManager:
+         )
+         log_handle.flush()
+ 
++        # B53: PCSX2's own log for this launch, kept 30 days (the name: the UTC launch time only)
++        launched_at = time.time()
++        pcsx2_log = _ps2.pcsx2_log_for_launch(root, launched_at)
++        pcsx2_log.parent.mkdir(parents=True, exist_ok=True)
++        _ps2.prune_pcsx2_logs(pcsx2_log.parent, launched_at)
++        log_handle.write(f"{utc_ms()} PS2 pcsx2-log: {pcsx2_log.name}\n")
+         try:
+             process = subprocess.Popen(
+-                _ps2.command(appimage, root, content),
++                _ps2.command(appimage, root, content, logfile=pcsx2_log),
+                 cwd=str(root),
+                 stdin=subprocess.DEVNULL,
+                 stdout=log_handle,
+@@ -6886,7 +6892,8 @@ class EmulatorManager:
+         self._players_session = plan if chosen is not None else None
+         self._hold_rewind_core = None
+         self._launch_kind = "pcsx2"
+-        self._ps2 = _ps2.Session(process.pid, log_line)
++        # B52: the session reads PCSX2's own log (the ELF line, the TLB check)
++        self._ps2 = _ps2.Session(process.pid, log_line, log_path=pcsx2_log)
+ 
+         if self._ps2.wait_window(alive=lambda: process.poll() is None) is None:
+             try:
+@@ -6963,24 +6970,48 @@ class EmulatorManager:
+                 raise EmulatorError(f"Slot {normalized} contains an invalid 0-byte savestate; create a new save")
+             if not detail.get("exists"):
+                 raise EmulatorError(f"No save state exists in Slot {normalized}")
++            sess = self._ps2
++            if sess.log_path is None:
++                sess.log_path = _ps2.pcsx2_log_path(self.project_root)
+             try:
+-                self._ps2.ensure_pine_pause()
++                sess.ensure_pine_pause()
++                # B52: hold the load until this launch's game has booted (PCSX2's `ELF Loading:` line); at the relaunch's
++                # paused start that means letting PCSX2 run to it, then pausing again
++                if not sess.elf_started():
++                    sess.resume()
++                    booted = sess.wait_elf()
++                    sess.pause()
++                    if not booted:
++                        sess.log(f"PS2 load: slot {normalized} held; the game's ELF not up in {_ps2.ELF_WAIT_S:.0f}s")
++                        raise EmulatorError("The game is still starting; play a moment, then load again")
+             except _ps2.PS2Error as exc:
+                 raise EmulatorError(str(exc)) from exc
+-            emulog = _ps2.pcsx2_log_path(self.project_root)
+-            offset = emulog.stat().st_size if emulog.is_file() else 0
+-            result = self._ps2.state_message(_ps2.MSG_LOAD_STATE, normalized)
++            pre = sess.picture()
++            offset = sess.log_size()
++            result = sess.state_message(_ps2.MSG_LOAD_STATE, normalized)
+             if result != _ps2.PINE_OK:
+-                self._ps2.log(f"PS2 load: slot {normalized} pine 0x0a {'no answer' if result is None else 'fail'}")
++                sess.log(f"PS2 load: slot {normalized} pine 0x0a {'no answer' if result is None else 'fail'}")
+                 raise EmulatorError("PCSX2 did not acknowledge the load state")
+-            confirmed = self._ps2.wait_log_line(emulog, offset, f"Loaded state from slot {normalized}.")
+-            self._ps2.log(f"PS2 load: slot {normalized} pine 0x0a ok; {'confirmed' if confirmed else 'visual'}")
++            sess.wait_log_line(sess.log_path, offset, f"Loaded state from slot {normalized}.")
++            # B52: "confirmed" = the game runs from the state -- resume, check the window's picture, pause again
++            try:
++                sess.resume()
++                verdict, seconds = sess.check_picture(pre[0] if pre else None, offset)
++            except _ps2.PS2Error:
++                verdict, seconds = "static", 0.0
++            try:
++                sess.pause()
++            except _ps2.PS2Error:
++                pass
++            sess.log(f"PS2 load: slot {normalized} pine 0x0a ok; picture {verdict} {seconds:.1f}s")
++            if verdict != "ok":
++                raise EmulatorError("The game did not resume from the save")
+             payload = self.status()
+             payload["action"] = "load_state"
+             payload["slot"] = normalized
+             payload["accepted"] = True
+-            payload["confirmed"] = bool(confirmed)
+-            payload["verification"] = "pcsx2_log" if confirmed else "visual_required"
++            payload["confirmed"] = True
++            payload["verification"] = "picture"
+             payload["paused"] = True
+             payload["control"] = "pcsx2_pine_load_state"
+             payload["pine_response"] = "ok"
+diff --git a/companion/ps2_session.py b/companion/ps2_session.py
+index e70654d..732c27a 100644
+--- a/companion/ps2_session.py
++++ b/companion/ps2_session.py
+@@ -58,6 +58,16 @@ PINE_OK, PINE_FAIL = 0x00, 0xFF
+ SAVE_BOUND_S = 10.0            # no write time measurable by B (PCSX2 not run); ~1 s expected; HOME-5 logs the real one
+ LOAD_CONFIRM_S = 3.0
+ STATE_POLL_S = 0.25
++# B52: the load runs the game from the state: after the game's ELF (PCSX2's own `ELF Loading:` line), then a picture
++# check on the PID's window (3 distinct frames, not the pre-load picture, not black, PINE running, no `TLB Miss`)
++ELF_LINE = "ELF Loading:"
++ELF_WAIT_S = 30.0
++PICTURE_BOUND_S = 5.0
++PICTURE_STEP_S = 0.2
++PICTURE_DISTINCT = 3
++PICTURE_BLACK_MEAN = 20
++TLB_MISS = "TLB Miss"
++GRAB_W, GRAB_H = 64, 36
+ PINE_RUNNING, PINE_PAUSED = 0, 1
+ 
+ # The save-state behaviours a PS2 session turns off (B49 S3), in the rows' words
+@@ -356,6 +366,8 @@ def settings_for(project_root: Path, bios_name: str, adapter: str | None, player
+         "EmuCore/GS": gs,
+         "AutoUpdater": {"CheckAtStartup": "false"},
+         "InputSources": {"SDL": "true", "Keyboard": "true", "Mouse": "false"},
++        # B52: MTVU off -- PCSX2: "MTVU speedhack is enabled, saved states may not be stable" (HOME-5's black load)
++        "EmuCore/Speedhacks": {"vuThread": "false"},
+         "Hotkeys": {"TogglePause": "Keyboard/Space"},
+         # B50: both slots on the hub's formatted cards
+         "MemoryCards": {"Slot1_Enable": "true", "Slot1_Filename": MEMCARDS[0], "Slot2_Enable": "true",
+@@ -374,9 +386,45 @@ def ini_path(project_root: Path) -> Path:
+     return Path(project_root) / DATA_DIR / "config" / "PCSX2" / "inis" / "PCSX2.ini"
+ 
+ 
+-def command(appimage: Path, project_root: Path, content: Path) -> list[str]:
++def command(appimage: Path, project_root: Path, content: Path, logfile: Path | None = None) -> list[str]:
+     datapath = (Path(project_root) / DATA_DIR / "config").resolve()
+-    return [str(appimage), "-datapath", str(datapath), "-nogui", "-fullscreen", "--", str(content)]
++    # B53: PCSX2's own log per launch (2.8.2: "-logfile <path>: Writes the application log to path instead of emulog.txt")
++    log = ["-logfile", str(logfile)] if logfile is not None else []
++    return [str(appimage), "-datapath", str(datapath), "-nogui", "-fullscreen", *log, "--", str(content)]
++
++
++# B53: PCSX2's log per launch, named by the UTC launch time only, kept 30 days under data/games/ps2/logs/
++PCSX2_LOG_RE = re.compile(r"^(\d{8}T\d{6}Z)-pcsx2\.log$")
++LOG_RETAIN_DAYS = 30
++
++
++def pcsx2_log_for_launch(project_root: Path, launched_at: float) -> Path:
++    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(launched_at))
++    return (Path(project_root) / DATA_DIR / "logs" / f"{stamp}-pcsx2.log").resolve()
++
++
++def prune_pcsx2_logs(folder: Path, now: float, days: int = LOG_RETAIN_DAYS) -> list[str]:
++    """B53: remove this folder's per-launch PCSX2 logs whose name is older than `days` (others untouched)."""
++    removed = []
++    try:
++        names = sorted(os.listdir(folder))
++    except OSError:
++        return removed
++    for name in names:
++        m = PCSX2_LOG_RE.match(name)
++        if not m:
++            continue
++        try:
++            t = time.mktime(time.strptime(m.group(1), "%Y%m%dT%H%M%SZ")) - time.timezone
++        except ValueError:
++            continue
++        if now - t > days * 86400:
++            try:
++                (Path(folder) / name).unlink()
++                removed.append(name)
++            except OSError:
++                pass
++    return removed
+ 
+ 
+ def launch_env(base: Mapping[str, str]) -> dict[str, str]:
+@@ -433,6 +481,17 @@ def ensure_memcards(project_root: Path) -> dict[str, str]:
+     return ps2_memcard.ensure_cards(Path(project_root) / DATA_DIR / "memcards", list(MEMCARDS))
+ 
+ 
++def grab_window(window: str) -> bytes | None:
++    """B52: one frame of an X11 window, 64x36 gray (ffmpeg x11grab, the display of the companion's environment)."""
++    display = os.environ.get("DISPLAY", "")
++    if not display:
++        return None
++    r = subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "x11grab", "-window_id", str(window), "-i", display,
++                        "-frames:v", "1", "-vf", f"scale={GRAB_W}:{GRAB_H},format=gray", "-f", "rawvideo", "-"],
++                       capture_output=True, timeout=5, check=False)
++    return r.stdout if r.returncode == 0 and len(r.stdout) == GRAB_W * GRAB_H else None
++
++
+ def pine_socket_path(environ: Mapping[str, str] | None = None) -> Path:
+     env = os.environ if environ is None else environ
+     base = env.get("XDG_RUNTIME_DIR") or "/tmp"
+@@ -507,12 +566,16 @@ class Session:
+     def __init__(self, pid: int, log: Callable[[str], None], *, run: Callable[..., Any] = _run,
+                  status: Callable[[], int | None] | None = None, kill: Callable[[int, int], None] = os.kill,
+                  sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic,
+-                 pine_path: Path | None = None) -> None:
++                 pine_path: Path | None = None, grab: Callable[[str], bytes | None] | None = None,
++                 log_path: Path | None = None) -> None:
+         self.pid = int(pid)
+         self.log = log
+         self.run = run
+         # B51: one PINE socket for the status and the state messages (a test points both at its double)
+         self.pine_path = pine_path or pine_socket_path()
++        # B52: one window frame (64x36 gray bytes) and PCSX2's own log for this launch (B53 points it per launch)
++        self.grab = grab or grab_window
++        self.log_path = log_path
+         self.status = status or (lambda: pine_status(self.pine_path))
+         self.kill = kill
+         self.sleep = sleep
+@@ -635,6 +698,69 @@ class Session:
+                 return None
+             self.sleep(STATE_POLL_S)
+ 
++    def _log_text(self, offset: int = 0) -> str:
++        if self.log_path is None:
++            return ""
++        try:
++            with open(self.log_path, "rb") as fh:
++                fh.seek(offset)
++                return fh.read().decode("utf-8", "replace")
++        except OSError:
++            return ""
++
++    def log_size(self) -> int:
++        try:
++            return Path(self.log_path).stat().st_size if self.log_path is not None else 0
++        except OSError:
++            return 0
++
++    def elf_started(self) -> bool:
++        """B52: this launch's game has booted (PCSX2's `ELF Loading:` line in its log)."""
++        return ELF_LINE in self._log_text()
++
++    def wait_elf(self, bound: float = ELF_WAIT_S) -> bool:
++        t0 = self.clock()
++        while not self.elf_started():
++            if self.clock() - t0 >= bound:
++                return False
++            self.sleep(STATE_POLL_S)
++        return True
++
++    def picture(self) -> tuple[str, float] | None:
++        """B52: (hash, mean) of one frame of the PID's window, or None."""
++        w = find_window(self.pid, self.run)
++        if not w:
++            return None
++        try:
++            data = self.grab(w)
++        except Exception:
++            data = None
++        if not data:
++            return None
++        import hashlib
++        return hashlib.sha256(data).hexdigest()[:16], sum(data) / len(data)
++
++    def check_picture(self, pre: str | None, log_offset: int, bound: float = PICTURE_BOUND_S) -> tuple[str, float]:
++        """B52: after the resume -- `ok` (the game runs: 3 distinct frames, not the pre-load one, not all black, PINE
++        running, no TLB Miss), `fault` (a TLB Miss since the load) or `static`; with the seconds it took."""
++        t0 = self.clock()
++        seen: dict[str, float] = {}
++        running = False
++        while True:
++            if TLB_MISS in self._log_text(log_offset):
++                return "fault", self.clock() - t0
++            if self.status() == PINE_RUNNING:
++                running = True
++            p = self.picture()
++            if p is not None and p[0] != pre:
++                seen[p[0]] = p[1]
++            if (running and len(seen) >= PICTURE_DISTINCT
++                    and any(mean > PICTURE_BLACK_MEAN for mean in seen.values())):
++                return "ok", self.clock() - t0
++            if self.clock() - t0 >= bound:
++                return "static", self.clock() - t0
++            self.sleep(PICTURE_STEP_S)
++
+     def wait_log_line(self, path: Path, offset: int, text: str, bound: float = LOAD_CONFIRM_S) -> bool:
+         """B51: PCSX2's own log line (e.g. `Loaded state from slot N.`) written after `offset`, within the bound."""
+         t0 = self.clock()
+diff --git a/tests/ps2_session/test_b50.py b/tests/ps2_session/test_b50.py
+index 940a430..4eb693c 100644
+--- a/tests/ps2_session/test_b50.py
++++ b/tests/ps2_session/test_b50.py
+@@ -21,6 +21,8 @@ from zoneinfo import ZoneInfo
+ 
+ ROOT = Path(__file__).resolve().parents[2]
+ sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401  (B53: this run's temp dirs removed at exit)
+ sys.path.insert(0, str(ROOT / "tools"))
+ 
+ import ps2_session as ps2  # noqa: E402
+diff --git a/tests/ps2_session/test_b51.py b/tests/ps2_session/test_b51.py
+index eb79898..48eece5 100644
+--- a/tests/ps2_session/test_b51.py
++++ b/tests/ps2_session/test_b51.py
+@@ -23,6 +23,8 @@ from pathlib import Path
+ 
+ ROOT = Path(__file__).resolve().parents[2]
+ sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401  (B53: this run's temp dirs removed at exit)
+ 
+ import ps2_session as ps2  # noqa: E402
+ from games import emulator_manager as em  # noqa: E402
+@@ -50,7 +52,8 @@ class PineDouble:
+         self.emulog = ps2.pcsx2_log_path(root)
+         self.sstates.mkdir(parents=True, exist_ok=True)
+         self.emulog.parent.mkdir(parents=True, exist_ok=True)
+-        self.emulog.write_text("[    0.1] PCSX2 log start\n")
++        # B52: the game booted in this launch (PCSX2's ELF line), so a load goes straight on
++        self.emulog.write_text("[    0.1] PCSX2 log start\n[    3.2] ELF Loading: <elf>, Game CRC = 00000000, EntryPoint = 0x00100008\n")
+         self.srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+         self.srv.bind(str(self.path))
+         self.srv.listen(4)
+@@ -97,17 +100,43 @@ class FakeProc:
+         return None
+ 
+ 
++class FakePcsx2:
++    """B52: the hotkey toggles the pause (PINE reads it); the window's picture moves only while running."""
++
++    def __init__(self, status=ps2.PINE_PAUSED):
++        self.paused = status != ps2.PINE_RUNNING
++        self.fixed = status            # None = PINE silent
++        self.frame = 0
++
++    def run(self, cmd, **kw):
++        if cmd[:2] == ["xdotool", "key"]:
++            self.paused = not self.paused
++        return types.SimpleNamespace(stdout="77\n" if "search" in cmd else "")
++
++    def status(self):
++        if self.fixed is None:
++            return None
++        return ps2.PINE_PAUSED if self.paused else ps2.PINE_RUNNING
++
++    def grab(self, window):
++        if not self.paused:
++            self.frame += 1
++        return bytes([(self.frame * 37 + i) % 200 + 40 for i in range(ps2.GRAB_W * ps2.GRAB_H)])
++
++
+ def session_manager(pine: PineDouble, paused_by="hotkey", status=ps2.PINE_PAUSED):
+     m = em.EmulatorManager(pine.root, config_path=(ROOT / "companion/games/config/emulators.json"))
+     lines, kills, clock = [], [], [0.0]
++    fake = FakePcsx2(status)
+     m.process = FakeProc()
+     m.active_game = {"id": "game_ps2_fake", "system": "ps2", "title": "made-up", "relative_path": "ps2/one.chd"}
+     m._launch_kind = "pcsx2"
+     m._paused = True
+-    m._ps2 = ps2.Session(4242, lines.append, run=lambda cmd, **kw: types.SimpleNamespace(stdout="77\n"),
+-                         status=lambda: status, kill=lambda pid, sig: kills.append(int(sig)),
++    m._ps2 = ps2.Session(4242, lines.append, run=fake.run, status=fake.status,
++                         kill=lambda pid, sig: kills.append(int(sig)),
+                          sleep=lambda d: clock.__setitem__(0, clock[0] + d), clock=lambda: clock[0],
+-                         pine_path=pine.path)
++                         pine_path=pine.path, grab=fake.grab, log_path=pine.emulog)
++    m._fake = fake
+     m._ps2.paused_by = paused_by
+     return m, lines, kills
+ 
+@@ -195,18 +224,21 @@ class Load(Base):
+         m.save_state(3)
+         r = m.load_state(3)
+         self.assertEqual(d.requests[-1], struct.pack("<IBB", 6, 0x0A, 3))
++        # B52 (disclosed): "confirmed" is the picture moving after the resume, not PCSX2's log line
+         for k, v in (("action", "load_state"), ("slot", 3), ("accepted", True), ("confirmed", True),
+-                     ("verification", "pcsx2_log"), ("paused", True)):
++                     ("verification", "picture"), ("paused", True)):
+             self.assertEqual(r[k], v, k)
+         self.assertTrue(r["slot_detail"]["exists"])
+-        self.assertIn("PS2 load: slot 3 pine 0x0a ok; confirmed", lines)
++        self.assertTrue(any(l.startswith("PS2 load: slot 3 pine 0x0a ok; picture ok") for l in lines))
++        self.assertTrue(m._fake.paused)                     # left paused, as PS1's load
+ 
+-    def test_no_log_line_is_visual_required_as_ps1(self):
++    def test_without_pcsx2s_log_line_the_picture_still_decides(self):
++        # B52 (disclosed): B51 read `visual_required` here; the picture check now decides
+         d = self.double(log_line=False)
+         m, _, _ = session_manager(d)
+         m.save_state(1)
+         r = m.load_state(1)
+-        self.assertEqual((r["confirmed"], r["verification"]), (False, "visual_required"))
++        self.assertEqual((r["confirmed"], r["verification"]), (True, "picture"))
+ 
+     def test_ps1s_messages_for_an_empty_slot_not_paused_and_a_pine_failure(self):
+         d = self.double()
+diff --git a/b_q11s_b53/tests/ps2_session/test_b52.py b/tests/ps2_session/test_b52.py
+new file mode 100644
+index 0000000..125910f
+--- /dev/null
++++ b/tests/ps2_session/test_b52.py
+@@ -0,0 +1,124 @@
++#!/usr/bin/env python3
++"""B52 (host): the PS2 load runs the game from the state -- MTVU off in the ini; the load held until the game's ELF
++is up; "confirmed" = the window's picture moving after the resume, PINE running and no `TLB Miss`; otherwise PS1's
++error shape ("The game did not resume from the save") with the game left paused. Everything faked (B51's PINE socket
++double, a fake PCSX2 window and log); no PCSX2, no BIOS, no title.
++
++    python3 -m unittest discover -s tests/ps2_session -v
++"""
++
++from __future__ import annotations
++
++import struct
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401  (B53: this run's temp dirs removed at exit)
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++
++import ps2_session as ps2  # noqa: E402
++from games import emulator_manager as em  # noqa: E402
++import test_b51 as b51  # noqa: E402
++
++ELF = "[    3.2] ELF Loading: <elf>, Game CRC = 00000000, EntryPoint = 0x00100008\n"
++
++
++class Base(b51.Base):
++    def manager(self, picture="moving", tlb=False, elf=True, elf_on_resume=False):
++        d = self.double()
++        if not elf:
++            d.emulog.write_text("[    0.1] PCSX2 log start\n")
++        m, lines, kills = b51.session_manager(d)
++        fake = m._fake
++        orig_grab, orig_run = fake.grab, fake.run
++
++        def grab(w):
++            if picture == "moving":
++                return orig_grab(w)
++            if picture == "black":
++                fake.frame += 1
++                return bytes([fake.frame % 256] + [0] * (ps2.GRAB_W * ps2.GRAB_H - 1))   # distinct, all near-black
++            return bytes([90] * (ps2.GRAB_W * ps2.GRAB_H))          # static: one picture
++
++        def run(cmd, **kw):
++            r = orig_run(cmd, **kw)
++            if cmd[:2] == ["xdotool", "key"] and not fake.paused:
++                with open(d.emulog, "a") as fh:
++                    if elf_on_resume and ELF not in d.emulog.read_text():
++                        fh.write(ELF)
++                    if tlb and "Loaded state" in d.emulog.read_text():
++                        fh.write("[   15.3] TLB Miss, pc=0x0 addr=0x0 [store]\n")
++            return r
++        fake.grab, fake.run = grab, run
++        m._ps2.grab, m._ps2.run = grab, run
++        m.save_state(1)
++        return m, d, lines
++
++
++class Picture(Base):
++    def test_a_moving_picture_is_confirmed(self):
++        m, d, lines = self.manager()
++        r = m.load_state(1)
++        self.assertEqual((r["confirmed"], r["verification"], r["paused"]), (True, "picture", True))
++        self.assertEqual(d.requests[-1], struct.pack("<IBB", 6, 0x0A, 1))
++        self.assertTrue(any(l.startswith("PS2 load: slot 1 pine 0x0a ok; picture ok") for l in lines))
++        self.assertTrue(m._fake.paused)                           # paused again after the check
++
++    def test_a_static_picture_is_ps1s_error_and_the_game_left_paused(self):
++        m, _, lines = self.manager(picture="static")
++        with self.assertRaises(em.EmulatorError) as cm:
++            m.load_state(1)
++        self.assertEqual(str(cm.exception), "The game did not resume from the save")
++        self.assertTrue(m._fake.paused)
++        self.assertTrue(m._paused)
++        self.assertTrue(any("picture static 5.0s" in l for l in lines))
++
++    def test_a_black_picture_is_static(self):
++        m, _, lines = self.manager(picture="black")
++        with self.assertRaises(em.EmulatorError):
++            m.load_state(1)
++        self.assertTrue(any("picture static" in l for l in lines))
++
++    def test_a_tlb_miss_is_a_fault(self):
++        m, _, lines = self.manager(tlb=True)
++        with self.assertRaises(em.EmulatorError) as cm:
++            m.load_state(1)
++        self.assertEqual(str(cm.exception), "The game did not resume from the save")
++        self.assertTrue(any("picture fault" in l for l in lines))
++        self.assertTrue(m._fake.paused)
++
++
++class ElfHold(Base):
++    def test_a_load_before_the_elf_runs_pcsx2_to_it_then_loads(self):
++        m, d, lines = self.manager(elf=False, elf_on_resume=True)
++        r = m.load_state(1)
++        self.assertTrue(r["confirmed"])
++        self.assertIn(ELF.strip(), d.emulog.read_text())
++        self.assertTrue(any("picture ok" in l for l in lines))
++
++    def test_no_elf_within_the_bound_is_the_starting_error(self):
++        m, d, lines = self.manager(elf=False, elf_on_resume=False)
++        n = len(d.requests)
++        with self.assertRaises(em.EmulatorError) as cm:
++            m.load_state(1)
++        self.assertEqual(str(cm.exception), "The game is still starting; play a moment, then load again")
++        self.assertEqual(len(d.requests), n)                       # no load sent
++        self.assertTrue(m._fake.paused)
++
++
++class Ini(unittest.TestCase):
++    def test_mtvu_off(self):
++        s = ps2.settings_for(Path("/proj"), "image.bin", None, 2, False)
++        self.assertEqual(s["EmuCore/Speedhacks"], {"vuThread": "false"})
++        out = ps2.ini_merge("[EmuCore/Speedhacks]\nvuThread = true\nfastCDVD = false\n", s)
++        self.assertEqual(ps2.ini_get(out, "EmuCore/Speedhacks", "vuThread"), "false")
++        self.assertEqual(ps2.ini_get(out, "EmuCore/Speedhacks", "fastCDVD"), "false")   # PCSX2's own keys kept
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/b_q11s_b53/tests/ps2_session/test_b53.py b/tests/ps2_session/test_b53.py
+new file mode 100644
+index 0000000..7539c65
+--- /dev/null
++++ b/tests/ps2_session/test_b53.py
+@@ -0,0 +1,130 @@
++#!/usr/bin/env python3
++"""B53 (host): PCSX2's own log per launch -- `-logfile data/games/ps2/logs/<UTC launch>-pcsx2.log`, 30-day retention,
++copied by the keeper (raw/ps2logs__<name>/), counted per PS2 session by diag_read. Fake trees only; the temp dirs are
++removed at the run's end (_tmp_cleanup).
++
++    python3 -m unittest discover -s tests/ps2_session -v
++"""
++
++from __future__ import annotations
++
++import calendar
++import json
++import sys
++import tempfile
++import time
++import types
++import unittest
++from datetime import datetime
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++sys.path.insert(0, str(ROOT / "tools"))
++import _tmp_cleanup  # noqa: E402,F401
++
++import ps2_session as ps2  # noqa: E402
++import trip_log_keeper as tlk  # noqa: E402
++import diag_read as dr  # noqa: E402
++
++T0 = calendar.timegm((2026, 11, 8, 8, 0, 0))          # 2026-11-08T08:00:00Z
++
++
++class Name(unittest.TestCase):
++    def test_the_name_is_the_utc_launch_time(self):
++        p = ps2.pcsx2_log_for_launch(Path("/proj"), T0)
++        self.assertEqual(p, Path("/proj/data/games/ps2/logs/20261108T080000Z-pcsx2.log"))
++
++    def test_the_command_carries_it_before_the_title(self):
++        log = Path("/proj/data/games/ps2/logs/20261108T080000Z-pcsx2.log")
++        cmd = ps2.command(Path("/a.AppImage"), Path("/proj"), Path("/g/one.chd"), logfile=log)
++        self.assertEqual(cmd[5:], ["-logfile", str(log), "--", "/g/one.chd"])
++        self.assertNotIn("-logfile", ps2.command(Path("/a.AppImage"), Path("/proj"), Path("/g/one.chd")))
++
++    def test_the_30_day_retention(self):
++        d = Path(tempfile.mkdtemp(prefix="b53_"))
++        old = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(T0 - 31 * 86400)) + "-pcsx2.log"
++        young = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(T0 - 29 * 86400)) + "-pcsx2.log"
++        for n in (old, young, "notes.txt", "emulog.txt"):
++            (d / n).write_text("x")
++        self.assertEqual(ps2.prune_pcsx2_logs(d, T0), [old])
++        self.assertEqual(sorted(p.name for p in d.iterdir()), sorted([young, "notes.txt", "emulog.txt"]))
++
++
++class KeeperCopy(unittest.TestCase):
++    def test_a_new_pcsx2_log_is_copied_and_one_present_at_the_start_is_not(self):
++        root = Path(tempfile.mkdtemp(prefix="b53_"))
++        (root / "logs" / "games").mkdir(parents=True)
++        ps2logs = root / "data" / "games" / "ps2" / "logs"
++        ps2logs.mkdir(parents=True)
++        (ps2logs / "20261108T070000Z-pcsx2.log").write_text("[    0.1] before the keeper\n")
++        out = root / "diag"
++        k = tlk.Keeper(out, float("inf"), 0.0, logs_root=root / "logs", overlay=lambda: {}, session=lambda: {},
++                       journal=lambda a, b: b"", peers=lambda: 0, clock=lambda: T0)
++        k.begin()
++        (ps2logs / "20261108T080000Z-pcsx2.log").write_text("[    3.2] ELF Loading: <elf>\n[    9.0] Read Abort\n")
++        k.copy()
++        kept = sorted(p.relative_to(out / "raw").parts[0] for p in (out / "raw").rglob("*") if p.is_file())
++        self.assertEqual(kept, ["ps2logs__20261108T080000Z-pcsx2.log"])
++        text = next((out / "raw" / "ps2logs__20261108T080000Z-pcsx2.log").iterdir()).read_text()
++        self.assertIn("Read Abort", text)
++
++    def test_no_pcsx2_folder_is_todays_keeper(self):
++        root = Path(tempfile.mkdtemp(prefix="b53_"))
++        (root / "logs" / "games").mkdir(parents=True)
++        k = tlk.Keeper(root / "diag", float("inf"), 0.0, logs_root=root / "logs", overlay=lambda: {},
++                       session=lambda: {}, journal=lambda a, b: b"", peers=lambda: 0, clock=lambda: T0)
++        k.begin()
++        k.copy()
++        self.assertFalse(any(k_.startswith("ps2logs/") for k_ in k.tails))
++        self.assertEqual(k.seen["ps2_logs"], set())
++
++
++class Counts(unittest.TestCase):
++    def tree(self, with_log=True, ps2=True):
++        root = Path(tempfile.mkdtemp(prefix="b53_"))
++        games = root / "logs" / "games"
++        games.mkdir(parents=True)
++        rows = [{"at_utc": "2026-11-08T08:00:01.000Z", "event": "remote_config", "class": "lan"}]
++        if ps2:
++            rows.append({"at_utc": "2026-11-08T08:00:04.000Z", "event": "ps2_session", "ps2_mode": True})
++        rows += [{"at_utc": "2026-11-08T08:00:05.000Z", "event": "session_started"},
++                 {"at_utc": "2026-11-08T08:10:00.000Z", "event": "session_ended"}]
++        (games / "native_stream_recovery.log").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
++        if with_log:
++            logs = root / "data" / "games" / "ps2" / "logs"
++            logs.mkdir(parents=True)
++            (logs / "20261108T080000Z-pcsx2.log").write_text(
++                "[    1.4] McdSlot 0 [File]: Mcd001.ps2 [8 MB, Formatted]\n"
++                "[    1.5] McdSlot 1 [File]: Mcd002.ps2 [8 MB, Formatted]\n"
++                "[    3.2] ELF Loading: <elf>, Game CRC = 00000000, EntryPoint = 0x00100008\n"
++                "[  300.0] Read Abort\n"
++                "[  301.0] CDVD read err, retrying... (attempt 1 of 3)\n"
++                "[  400.0] OSD [SaveStateToSlot]: Saved state to slot 1.\n"
++                "[  450.0] OSD [LoadStateFromSlot]: Loaded state from slot 1.\n"
++                "[  450.5] TLB Miss, pc=0x0 addr=0x0 [load]\n"
++                "[ 9000.0] Read Abort\n")                     # after the session: not counted
++        lg = dr.Logs()
++        lg.add_live(root / "logs")
++        return dr.Analysis(lg, datetime(2026, 11, 8, 7, 0), datetime(2026, 11, 8, 9, 0))
++
++    def test_the_counts_per_session(self):
++        an = self.tree()
++        r = an.session_row(an.sessions[0])
++        self.assertEqual(r["system"], "ps2")
++        self.assertEqual(r["pcsx2_log"], {"read_errors": 2, "invalid_binding": 0, "card_formatted": 2,
++                                          "card_unformatted": 0, "tlb_miss": 1, "state_saved": 1, "state_loaded": 1,
++                                          "elf": 1})
++        self.assertIn("## PCSX2 logs (B53)", dr.render(an, "t", [], False))
++
++    def test_no_log_or_a_ps1_session_has_no_key(self):
++        an = self.tree(with_log=False)
++        self.assertNotIn("pcsx2_log", an.session_row(an.sessions[0]))
++        an2 = self.tree(ps2=False)
++        self.assertNotIn("pcsx2_log", an2.session_row(an2.sessions[0]))
++        self.assertNotIn("## PCSX2 logs (B53)", dr.render(an, "t", [], False))     # no log: today's report
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/ps2_session/test_ps2_session.py b/tests/ps2_session/test_ps2_session.py
+index 1fe8fa7..35720fb 100644
+--- a/tests/ps2_session/test_ps2_session.py
++++ b/tests/ps2_session/test_ps2_session.py
+@@ -22,6 +22,8 @@ from pathlib import Path
+ 
+ ROOT = Path(__file__).resolve().parents[2]
+ sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401  (B53: this run's temp dirs removed at exit)
+ sys.path.insert(0, str(ROOT / "tools"))
+ 
+ import ps2_session as ps2  # noqa: E402
+@@ -387,7 +389,7 @@ out = {"em_ps2": em._ps2 is not None}
+ if em._ps2 is not None:
+     P = em._ps2
+     class FakeSession(P.Session):
+-        def __init__(self, pid, log):
++        def __init__(self, pid, log, **kw):     # B52: the launch passes log_path
+             clock = [0.0]
+             def run(cmd, **kw):
+                 if "search" in cmd:
+@@ -399,7 +401,7 @@ if em._ps2 is not None:
+                 return types.SimpleNamespace(stdout="")
+             super().__init__(pid, log, run=run, status=lambda: None, kill=lambda pid, sig: calls["kill"].append(int(sig)),
+                              sleep=lambda d: clock.__setitem__(0, clock[0] + d), clock=lambda: clock[0],
+-                             pine_path=proj / "no-pine.sock")
++                             pine_path=proj / "no-pine.sock", **kw)
+     P.Session = FakeSession
+     P.default_runner = lambda cmd: "deviceName = AMD Fake (RADV FAKE)\n"
+ m = em.EmulatorManager(proj, config_path=Path("companion/games/config/emulators.json").resolve())
+@@ -454,7 +456,10 @@ class Launch(unittest.TestCase):
+         cmd = out["calls"]["popen"][0]["cmd"]
+         self.assertEqual(cmd[1:5], ["-datapath", str((self.proj / "data/games/ps2/config").resolve()), "-nogui",
+                                     "-fullscreen"])
+-        self.assertEqual(cmd[5:], ["--", str((self.games / "one.chd").resolve())])
++        # B53 (disclosed): PCSX2's per-launch log before the title
++        self.assertEqual(cmd[5], "-logfile")
++        self.assertRegex(cmd[6], r"/data/games/ps2/logs/\d{8}T\d{6}Z-pcsx2\.log$")
++        self.assertEqual(cmd[7:], ["--", str((self.games / "one.chd").resolve())])
+         self.assertTrue(out["calls"]["popen"][0]["new_session"])
+         self.assertEqual(out["calls"]["popen"][0]["env_sdl"], ps2.SDL_MAPPING[:40])
+         text = self.ini.read_text()
+diff --git a/b_q11s_b53/tests/ps2_session/_tmp_cleanup.py b/tests/ps2_session/_tmp_cleanup.py
+new file mode 100644
+index 0000000..252d180
+--- /dev/null
++++ b/tests/ps2_session/_tmp_cleanup.py
+@@ -0,0 +1,25 @@
++"""B53 (test hygiene): every temporary directory a tests/ps2_session run creates is removed when that run ends.
++
++HOME-6 prep found ~6.9 GiB of these suites' fixture trees (formatted 8-MB cards, fake game trees) left in the hub's /tmp
++tmpfs by B49-B52's runs, which never removed their mkdtemp() dirs. Imported by each test module; it tracks only the
++dirs made in this process and removes them at exit (never anything else)."""
++
++from __future__ import annotations
++
++import atexit
++import shutil
++import tempfile
++
++_made: list[str] = []
++_mkdtemp = tempfile.mkdtemp
++
++
++def _tracked(*args, **kwargs):
++    d = _mkdtemp(*args, **kwargs)
++    _made.append(d)
++    return d
++
++
++if getattr(tempfile.mkdtemp, "__name__", "") != "_tracked":
++    tempfile.mkdtemp = _tracked
++    atexit.register(lambda: [shutil.rmtree(d, ignore_errors=True) for d in _made])
+diff --git a/tools/diag_keeper.py b/tools/diag_keeper.py
+index 936c4c8..b91dff6 100644
+--- a/tools/diag_keeper.py
++++ b/tools/diag_keeper.py
+@@ -156,6 +156,9 @@ class DiagKeeper(tlk.Keeper):
+             t = self.tails.get(k)
+             if t is None and k.startswith("games/") and tlk.GAME_LOG.match(k[len("games/"):]):
+                 t = self.tails[k] = tlk.Tail(self.games / k[len("games/"):], None)
++            # B53: a PCSX2 per-launch log tail from the last run
++            if t is None and k.startswith("ps2logs/") and tlk.PCSX2_LOG.match(k[len("ps2logs/"):]):
++                t = self.tails[k] = tlk.Tail(self.ps2logs / k[len("ps2logs/"):], None)
+             if t is not None and v.get("ino") is not None and t.ino == v["ino"] and v.get("off", 0) <= self._size(t):
+                 t.off = v["off"]                               # the same file: resume where the last run stopped
+         for k, v in (st.get("seen") or {}).items():
+diff --git a/tools/diag_read.py b/tools/diag_read.py
+index b6af589..72b4ef0 100644
+--- a/tools/diag_read.py
++++ b/tools/diag_read.py
+@@ -50,6 +50,38 @@ PS2_CORE = "pcsx2"
+ def is_game_log(name: str) -> bool:
+     return bool(GAME_LOG.match(name) or PS2_LOG.match(name))
+ 
++
++# B53: PCSX2's own log per launch (`<UTC launch>-pcsx2.log`, live under data/games/ps2/logs/, the keeper's raw/ps2logs__*)
++PCSX2_LOG = re.compile(r"^(\d{8}T\d{6}Z)-pcsx2\.log$")
++PCSX2_LINE = re.compile(r"^\[\s*(\d+(?:\.\d+)?)\]\s?(.*)$")
++PCSX2_COUNTS = {
++    "read_errors": re.compile(r"Read Abort|CDVD read err|READ ERROR|Read Bad Parameter|Read when CD Error"),
++    "invalid_binding": re.compile(r"Invalid binding:"),
++    "card_formatted": re.compile(r"McdSlot \d+ \[File\].*\[8 MB, Formatted\]"),
++    "card_unformatted": re.compile(r"McdSlot \d+ \[File\].*UNFORMATTED"),
++    "tlb_miss": re.compile(r"TLB Miss"),
++    "state_saved": re.compile(r"Saved state to slot \d+"),
++    "state_loaded": re.compile(r"Loaded state from slot \d+"),
++    "elf": re.compile(r"ELF Loading:"),
++}
++
++
++def pcsx2_events(name: str, data: bytes) -> list[tuple[datetime, str]]:
++    """(UTC, kind) for each counted line of one per-launch PCSX2 log (the name's time + the line's seconds)."""
++    m = PCSX2_LOG.match(name)
++    if not m:
++        return []
++    t0 = datetime.strptime(m.group(1), "%Y%m%dT%H%M%SZ")
++    out = []
++    for line in data.decode("utf-8", "replace").splitlines():
++        lm = PCSX2_LINE.match(line)
++        if not lm:
++            continue
++        for kind, rx in PCSX2_COUNTS.items():
++            if rx.search(lm.group(2)):
++                out.append((t0 + timedelta(seconds=float(lm.group(1))), kind))
++    return out
++
+ # the trip's known titles (game id prefix -> class + tag); others read "<SYSTEM> <4-hex>"
+ TAGS = {"04ff": "PS1 platformer", "ee3b": "SNES action-adventure", "2ef9": "PS1 first-person RPG",
+         "3699": "PS1 football (Blitz)", "7bf5": "PS1 brawler", "6d53": "PS1 kart racer", "33df": "PS1 golf",
+@@ -142,6 +174,7 @@ class Logs:
+         self.data: dict[str, bytes] = defaultdict(bytes)
+         self.reports: list[dict[str, Any]] = []
+         self.game_logs: list[str] = []          # game log file names (they carry the launch time and the title)
++        self.pcsx2_logs: dict[str, bytes] = defaultdict(bytes)   # B53: per-launch PCSX2 logs, by file name
+         self.overlay: list[dict[str, Any]] = []
+         self.sources: list[str] = []
+ 
+@@ -158,6 +191,11 @@ class Logs:
+                     continue
+                 base = sub[len("games__"):] if sub.startswith("games__") else sub
+                 files = sorted(f for f in os.listdir(p) if (p / f).is_file())
++                # B53: the keeper's copies of PCSX2's per-launch logs
++                if sub.startswith("ps2logs__") and PCSX2_LOG.match(sub[len("ps2logs__"):]):
++                    for f in files:
++                        self.pcsx2_logs[sub[len("ps2logs__"):]] += (p / f).read_bytes()
++                    continue
+                 if base == "decoder_sessions":
+                     for f in files:
+                         self._report((p / f).read_bytes())
+@@ -198,6 +236,14 @@ class Logs:
+                     self.data[name] += p.read_bytes()
+                 except OSError:
+                     continue
++        # B53: PCSX2's per-launch logs beside the repo's logs (data/games/ps2/logs/)
++        p2 = logs_root.parent / "data" / "games" / "ps2" / "logs"
++        for f in sorted(os.listdir(p2)) if p2.is_dir() else []:
++            if PCSX2_LOG.match(f):
++                try:
++                    self.pcsx2_logs[f] = (p2 / f).read_bytes()
++                except OSError:
++                    continue
+         d = games / "decoder_sessions"
+         for f in sorted(os.listdir(d)) if d.is_dir() else []:
+             try:
+@@ -271,6 +317,10 @@ class Analysis:
+             tag = self.tags.get(m.group(4), f"{m.group(3).upper()} {m.group(4)}")
+             self.launches.append((t, tag, CORES.get(m.group(3), m.group(3))))
+         self.sources = list(logs.sources)
++        # B53: PCSX2's per-launch logs: the launch times and every counted line (UTC)
++        self.pcsx2_launches = sorted(datetime.strptime(PCSX2_LOG.match(n).group(1), "%Y%m%dT%H%M%SZ")
++                                     for n in logs.pcsx2_logs)
++        self.pcsx2 = sorted(ev for n, data in logs.pcsx2_logs.items() for ev in pcsx2_events(n, data))
+         self._sessions()
+         self._seconds()
+ 
+@@ -502,6 +552,21 @@ class Analysis:
+         return out
+ 
+     # -- one session as a sessions.jsonl row (G4-S4's columns + B34's slots + the restarts and their triggers)
++    def pcsx2_counts(self, s: dict[str, Any]) -> dict[str, int] | None:
++        """B53: the counted PCSX2 lines from the previous session's end (or this launch) to this session's end."""
++        launches = [t for t in self.pcsx2_launches if t <= s["start"] and s["start"] - t <= timedelta(hours=6)]
++        if not launches:
++            return None
++        launch = launches[-1]
++        ends = [x["end"] for x in self.sessions if x["end"] is not None and launch <= x["end"] < s["start"]]
++        lo = max(ends) if ends else launch
++        hi = (s["end"] or s["start"]) + timedelta(seconds=5)
++        out = {k: 0 for k in PCSX2_COUNTS}
++        for t, kind in self.pcsx2:
++            if lo <= t < hi:
++                out[kind] += 1
++        return out
++
+     @staticmethod
+     def ps1_reference(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+         """B50: the PS1 sessions a comparison may use as its reference (a PS2 session never)."""
+@@ -543,6 +608,8 @@ class Analysis:
+             "hitch_s_per_10min": round(m["hitch_s"] / per10, 1) if per10 else None,
+             # B50: a PS2 session says its system (other sessions' rows as before)
+             **({"system": "ps2"} if s["core"] == PS2_CORE else {}),
++            # B53: PCSX2's own log lines for this session, when its launch's log exists (no key otherwise)
++            **({"pcsx2_log": c} if s["core"] == PS2_CORE and (c := self.pcsx2_counts(s)) is not None else {}),
+             "silences": m["silences"], "silences_user": m["silences_user"],
+             "silences_per_10min": round(m["silences"] / per10, 1) if per10 else None,
+             "max_silence_ms": round(m["max_silence_ms"]), "underruns": m["underruns"], "starvation": m["starvation"],
+@@ -692,6 +759,13 @@ def render(an: Analysis, label: str, around: list[datetime], around_saves: bool)
+     L += ["", "## Pad slots (B34)", ""]
+     L += md_table(["UTC", "slot map"], [[hms(ts(r["at_utc"])), json.dumps(r.get("slots") or r.get("map") or r.get("pad_slots"), sort_keys=True)]
+                                         for r in pads]) if pads else ["(no pad_slots rows: the client sent none)"]
++    # B53: PCSX2's own log per PS2 session (only when one exists)
++    p2 = [(s, an.session_row(s)) for s in an.sessions if s["core"] == PS2_CORE]
++    p2 = [(s, r) for s, r in p2 if "pcsx2_log" in r]
++    if p2:
++        L += ["", "## PCSX2 logs (B53)", ""]
++        L += md_table(["start", "end"] + list(PCSX2_COUNTS), [[hms(s["start"]), hms(s["end"] or s["start"])]
++                                                            + [r["pcsx2_log"][k] for k in PCSX2_COUNTS] for s, r in p2])
+     L += ["", "## VOD (B35)", ""]
+     if an.vod_client:
+         L += md_table(["UTC", "event", "detail"], [[hms(Analysis._t(r)), r.get("event"),
+diff --git a/tools/trip_log_keeper.py b/tools/trip_log_keeper.py
+index f23b473..39d5b46 100644
+--- a/tools/trip_log_keeper.py
++++ b/tools/trip_log_keeper.py
+@@ -44,6 +44,8 @@ TOP_TAILS = ["wan_sessions.jsonl", "session_audit.jsonl", "impairment.jsonl"]
+ NEWDIRS = ["decoder_sessions", "audio_timing"]
+ # B50: a PS2 session's game log (`<date>-<time>-ps2.log`, no id or title by B49's design) is a game log too
+ GAME_LOG = re.compile(r"^\d{8}-\d{6}-(?:game_[a-z0-9]+_[0-9a-f]+|ps2)\.log$")
++# B53: PCSX2's own per-launch logs (data/games/ps2/logs/<UTC launch>-pcsx2.log), copied like the game logs
++PCSX2_LOG = re.compile(r"^\d{8}T\d{6}Z-pcsx2\.log$")
+ UNIT = "privyhub-companion"
+ STATUS_URL = "http://127.0.0.1:8765/plugins/games/status"
+ QUIET_S = 10.0
+@@ -241,6 +243,7 @@ class Keeper:
+         self.logs = Path(logs_root)
+         self.games = self.logs / "games"
+         self.arch = self.games / "stream_log_archive"
++        self.ps2logs = self.logs.parent / "data" / "games" / "ps2" / "logs"      # B53
+         self.raw, self.samples = self.out / "raw", self.out / "samples"
+         self.redactor = redactor if redactor is not None else Redactor()
+         self._overlay = overlay if overlay is not None else overlay_state
+@@ -310,6 +313,8 @@ class Keeper:
+             d = self.games / sub
+             self.seen[sub] = set(os.listdir(d)) if d.is_dir() else set()
+         self.seen["game_logs"] = {f for f in (os.listdir(self.games) if self.games.is_dir() else []) if GAME_LOG.match(f)}
++        self.seen["ps2_logs"] = {f for f in (os.listdir(self.ps2logs) if self.ps2logs.is_dir() else [])
++                                 if PCSX2_LOG.match(f)}
+         self.jsince = int(self.clock())
+ 
+     def copy(self, final: bool = False) -> dict[str, Any]:
+@@ -322,6 +327,13 @@ class Keeper:
+                 if GAME_LOG.match(f) and f not in self.seen["game_logs"]:
+                     self.seen["game_logs"].add(f)
+                     self.tails[f"games/{f}"] = Tail(self.games / f, None, from_start=True)
++        # B53: new PCSX2 per-launch logs too (kept as raw/ps2logs__<name>/)
++        if self.ps2logs.is_dir():
++            seen = self.seen.setdefault("ps2_logs", set())
++            for f in sorted(os.listdir(self.ps2logs)):
++                if PCSX2_LOG.match(f) and f not in seen:
++                    seen.add(f)
++                    self.tails[f"ps2logs/{f}"] = Tail(self.ps2logs / f, None, from_start=True)
+         for key, t in self.tails.items():
+             try:
+                 data, rotated = t.step()

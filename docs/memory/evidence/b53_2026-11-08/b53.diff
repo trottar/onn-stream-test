@@ -1,0 +1,505 @@
+diff --git a/companion/games/emulator_manager.py b/companion/games/emulator_manager.py
+index c27ddae..f929aac 100644
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -6854,9 +6854,15 @@ class EmulatorManager:
+         )
+         log_handle.flush()
+ 
++        # B53: PCSX2's own log for this launch, kept 30 days (the name: the UTC launch time only)
++        launched_at = time.time()
++        pcsx2_log = _ps2.pcsx2_log_for_launch(root, launched_at)
++        pcsx2_log.parent.mkdir(parents=True, exist_ok=True)
++        _ps2.prune_pcsx2_logs(pcsx2_log.parent, launched_at)
++        log_handle.write(f"{utc_ms()} PS2 pcsx2-log: {pcsx2_log.name}\n")
+         try:
+             process = subprocess.Popen(
+-                _ps2.command(appimage, root, content),
++                _ps2.command(appimage, root, content, logfile=pcsx2_log),
+                 cwd=str(root),
+                 stdin=subprocess.DEVNULL,
+                 stdout=log_handle,
+@@ -6887,7 +6893,7 @@ class EmulatorManager:
+         self._hold_rewind_core = None
+         self._launch_kind = "pcsx2"
+         # B52: the session reads PCSX2's own log (the ELF line, the TLB check)
+-        self._ps2 = _ps2.Session(process.pid, log_line, log_path=_ps2.pcsx2_log_path(root))
++        self._ps2 = _ps2.Session(process.pid, log_line, log_path=pcsx2_log)
+ 
+         if self._ps2.wait_window(alive=lambda: process.poll() is None) is None:
+             try:
+diff --git a/companion/ps2_session.py b/companion/ps2_session.py
+index ed7e486..732c27a 100644
+--- a/companion/ps2_session.py
++++ b/companion/ps2_session.py
+@@ -386,9 +386,45 @@ def ini_path(project_root: Path) -> Path:
+     return Path(project_root) / DATA_DIR / "config" / "PCSX2" / "inis" / "PCSX2.ini"
+ 
+ 
+-def command(appimage: Path, project_root: Path, content: Path) -> list[str]:
++def command(appimage: Path, project_root: Path, content: Path, logfile: Path | None = None) -> list[str]:
+     datapath = (Path(project_root) / DATA_DIR / "config").resolve()
+-    return [str(appimage), "-datapath", str(datapath), "-nogui", "-fullscreen", "--", str(content)]
++    # B53: PCSX2's own log per launch (2.8.2: "-logfile <path>: Writes the application log to path instead of emulog.txt")
++    log = ["-logfile", str(logfile)] if logfile is not None else []
++    return [str(appimage), "-datapath", str(datapath), "-nogui", "-fullscreen", *log, "--", str(content)]
++
++
++# B53: PCSX2's log per launch, named by the UTC launch time only, kept 30 days under data/games/ps2/logs/
++PCSX2_LOG_RE = re.compile(r"^(\d{8}T\d{6}Z)-pcsx2\.log$")
++LOG_RETAIN_DAYS = 30
++
++
++def pcsx2_log_for_launch(project_root: Path, launched_at: float) -> Path:
++    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(launched_at))
++    return (Path(project_root) / DATA_DIR / "logs" / f"{stamp}-pcsx2.log").resolve()
++
++
++def prune_pcsx2_logs(folder: Path, now: float, days: int = LOG_RETAIN_DAYS) -> list[str]:
++    """B53: remove this folder's per-launch PCSX2 logs whose name is older than `days` (others untouched)."""
++    removed = []
++    try:
++        names = sorted(os.listdir(folder))
++    except OSError:
++        return removed
++    for name in names:
++        m = PCSX2_LOG_RE.match(name)
++        if not m:
++            continue
++        try:
++            t = time.mktime(time.strptime(m.group(1), "%Y%m%dT%H%M%SZ")) - time.timezone
++        except ValueError:
++            continue
++        if now - t > days * 86400:
++            try:
++                (Path(folder) / name).unlink()
++                removed.append(name)
++            except OSError:
++                pass
++    return removed
+ 
+ 
+ def launch_env(base: Mapping[str, str]) -> dict[str, str]:
+diff --git a/tests/ps2_session/test_b50.py b/tests/ps2_session/test_b50.py
+index 940a430..4eb693c 100644
+--- a/tests/ps2_session/test_b50.py
++++ b/tests/ps2_session/test_b50.py
+@@ -21,6 +21,8 @@ from zoneinfo import ZoneInfo
+ 
+ ROOT = Path(__file__).resolve().parents[2]
+ sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401  (B53: this run's temp dirs removed at exit)
+ sys.path.insert(0, str(ROOT / "tools"))
+ 
+ import ps2_session as ps2  # noqa: E402
+diff --git a/tests/ps2_session/test_b51.py b/tests/ps2_session/test_b51.py
+index 3a0f4a5..48eece5 100644
+--- a/tests/ps2_session/test_b51.py
++++ b/tests/ps2_session/test_b51.py
+@@ -23,6 +23,8 @@ from pathlib import Path
+ 
+ ROOT = Path(__file__).resolve().parents[2]
+ sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401  (B53: this run's temp dirs removed at exit)
+ 
+ import ps2_session as ps2  # noqa: E402
+ from games import emulator_manager as em  # noqa: E402
+diff --git a/tests/ps2_session/test_b52.py b/tests/ps2_session/test_b52.py
+index dbaa6a9..125910f 100644
+--- a/tests/ps2_session/test_b52.py
++++ b/tests/ps2_session/test_b52.py
+@@ -18,6 +18,8 @@ from pathlib import Path
+ ROOT = Path(__file__).resolve().parents[2]
+ sys.path.insert(0, str(ROOT / "companion"))
+ sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401  (B53: this run's temp dirs removed at exit)
++sys.path.insert(0, str(Path(__file__).resolve().parent))
+ 
+ import ps2_session as ps2  # noqa: E402
+ from games import emulator_manager as em  # noqa: E402
+diff --git a/b_q11s_b53/tests/ps2_session/test_b53.py b/tests/ps2_session/test_b53.py
+new file mode 100644
+index 0000000..7539c65
+--- /dev/null
++++ b/tests/ps2_session/test_b53.py
+@@ -0,0 +1,130 @@
++#!/usr/bin/env python3
++"""B53 (host): PCSX2's own log per launch -- `-logfile data/games/ps2/logs/<UTC launch>-pcsx2.log`, 30-day retention,
++copied by the keeper (raw/ps2logs__<name>/), counted per PS2 session by diag_read. Fake trees only; the temp dirs are
++removed at the run's end (_tmp_cleanup).
++
++    python3 -m unittest discover -s tests/ps2_session -v
++"""
++
++from __future__ import annotations
++
++import calendar
++import json
++import sys
++import tempfile
++import time
++import types
++import unittest
++from datetime import datetime
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++sys.path.insert(0, str(ROOT / "tools"))
++import _tmp_cleanup  # noqa: E402,F401
++
++import ps2_session as ps2  # noqa: E402
++import trip_log_keeper as tlk  # noqa: E402
++import diag_read as dr  # noqa: E402
++
++T0 = calendar.timegm((2026, 11, 8, 8, 0, 0))          # 2026-11-08T08:00:00Z
++
++
++class Name(unittest.TestCase):
++    def test_the_name_is_the_utc_launch_time(self):
++        p = ps2.pcsx2_log_for_launch(Path("/proj"), T0)
++        self.assertEqual(p, Path("/proj/data/games/ps2/logs/20261108T080000Z-pcsx2.log"))
++
++    def test_the_command_carries_it_before_the_title(self):
++        log = Path("/proj/data/games/ps2/logs/20261108T080000Z-pcsx2.log")
++        cmd = ps2.command(Path("/a.AppImage"), Path("/proj"), Path("/g/one.chd"), logfile=log)
++        self.assertEqual(cmd[5:], ["-logfile", str(log), "--", "/g/one.chd"])
++        self.assertNotIn("-logfile", ps2.command(Path("/a.AppImage"), Path("/proj"), Path("/g/one.chd")))
++
++    def test_the_30_day_retention(self):
++        d = Path(tempfile.mkdtemp(prefix="b53_"))
++        old = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(T0 - 31 * 86400)) + "-pcsx2.log"
++        young = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(T0 - 29 * 86400)) + "-pcsx2.log"
++        for n in (old, young, "notes.txt", "emulog.txt"):
++            (d / n).write_text("x")
++        self.assertEqual(ps2.prune_pcsx2_logs(d, T0), [old])
++        self.assertEqual(sorted(p.name for p in d.iterdir()), sorted([young, "notes.txt", "emulog.txt"]))
++
++
++class KeeperCopy(unittest.TestCase):
++    def test_a_new_pcsx2_log_is_copied_and_one_present_at_the_start_is_not(self):
++        root = Path(tempfile.mkdtemp(prefix="b53_"))
++        (root / "logs" / "games").mkdir(parents=True)
++        ps2logs = root / "data" / "games" / "ps2" / "logs"
++        ps2logs.mkdir(parents=True)
++        (ps2logs / "20261108T070000Z-pcsx2.log").write_text("[    0.1] before the keeper\n")
++        out = root / "diag"
++        k = tlk.Keeper(out, float("inf"), 0.0, logs_root=root / "logs", overlay=lambda: {}, session=lambda: {},
++                       journal=lambda a, b: b"", peers=lambda: 0, clock=lambda: T0)
++        k.begin()
++        (ps2logs / "20261108T080000Z-pcsx2.log").write_text("[    3.2] ELF Loading: <elf>\n[    9.0] Read Abort\n")
++        k.copy()
++        kept = sorted(p.relative_to(out / "raw").parts[0] for p in (out / "raw").rglob("*") if p.is_file())
++        self.assertEqual(kept, ["ps2logs__20261108T080000Z-pcsx2.log"])
++        text = next((out / "raw" / "ps2logs__20261108T080000Z-pcsx2.log").iterdir()).read_text()
++        self.assertIn("Read Abort", text)
++
++    def test_no_pcsx2_folder_is_todays_keeper(self):
++        root = Path(tempfile.mkdtemp(prefix="b53_"))
++        (root / "logs" / "games").mkdir(parents=True)
++        k = tlk.Keeper(root / "diag", float("inf"), 0.0, logs_root=root / "logs", overlay=lambda: {},
++                       session=lambda: {}, journal=lambda a, b: b"", peers=lambda: 0, clock=lambda: T0)
++        k.begin()
++        k.copy()
++        self.assertFalse(any(k_.startswith("ps2logs/") for k_ in k.tails))
++        self.assertEqual(k.seen["ps2_logs"], set())
++
++
++class Counts(unittest.TestCase):
++    def tree(self, with_log=True, ps2=True):
++        root = Path(tempfile.mkdtemp(prefix="b53_"))
++        games = root / "logs" / "games"
++        games.mkdir(parents=True)
++        rows = [{"at_utc": "2026-11-08T08:00:01.000Z", "event": "remote_config", "class": "lan"}]
++        if ps2:
++            rows.append({"at_utc": "2026-11-08T08:00:04.000Z", "event": "ps2_session", "ps2_mode": True})
++        rows += [{"at_utc": "2026-11-08T08:00:05.000Z", "event": "session_started"},
++                 {"at_utc": "2026-11-08T08:10:00.000Z", "event": "session_ended"}]
++        (games / "native_stream_recovery.log").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
++        if with_log:
++            logs = root / "data" / "games" / "ps2" / "logs"
++            logs.mkdir(parents=True)
++            (logs / "20261108T080000Z-pcsx2.log").write_text(
++                "[    1.4] McdSlot 0 [File]: Mcd001.ps2 [8 MB, Formatted]\n"
++                "[    1.5] McdSlot 1 [File]: Mcd002.ps2 [8 MB, Formatted]\n"
++                "[    3.2] ELF Loading: <elf>, Game CRC = 00000000, EntryPoint = 0x00100008\n"
++                "[  300.0] Read Abort\n"
++                "[  301.0] CDVD read err, retrying... (attempt 1 of 3)\n"
++                "[  400.0] OSD [SaveStateToSlot]: Saved state to slot 1.\n"
++                "[  450.0] OSD [LoadStateFromSlot]: Loaded state from slot 1.\n"
++                "[  450.5] TLB Miss, pc=0x0 addr=0x0 [load]\n"
++                "[ 9000.0] Read Abort\n")                     # after the session: not counted
++        lg = dr.Logs()
++        lg.add_live(root / "logs")
++        return dr.Analysis(lg, datetime(2026, 11, 8, 7, 0), datetime(2026, 11, 8, 9, 0))
++
++    def test_the_counts_per_session(self):
++        an = self.tree()
++        r = an.session_row(an.sessions[0])
++        self.assertEqual(r["system"], "ps2")
++        self.assertEqual(r["pcsx2_log"], {"read_errors": 2, "invalid_binding": 0, "card_formatted": 2,
++                                          "card_unformatted": 0, "tlb_miss": 1, "state_saved": 1, "state_loaded": 1,
++                                          "elf": 1})
++        self.assertIn("## PCSX2 logs (B53)", dr.render(an, "t", [], False))
++
++    def test_no_log_or_a_ps1_session_has_no_key(self):
++        an = self.tree(with_log=False)
++        self.assertNotIn("pcsx2_log", an.session_row(an.sessions[0]))
++        an2 = self.tree(ps2=False)
++        self.assertNotIn("pcsx2_log", an2.session_row(an2.sessions[0]))
++        self.assertNotIn("## PCSX2 logs (B53)", dr.render(an, "t", [], False))     # no log: today's report
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/ps2_session/test_ps2_session.py b/tests/ps2_session/test_ps2_session.py
+index e01faa6..35720fb 100644
+--- a/tests/ps2_session/test_ps2_session.py
++++ b/tests/ps2_session/test_ps2_session.py
+@@ -22,6 +22,8 @@ from pathlib import Path
+ 
+ ROOT = Path(__file__).resolve().parents[2]
+ sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401  (B53: this run's temp dirs removed at exit)
+ sys.path.insert(0, str(ROOT / "tools"))
+ 
+ import ps2_session as ps2  # noqa: E402
+@@ -454,7 +456,10 @@ class Launch(unittest.TestCase):
+         cmd = out["calls"]["popen"][0]["cmd"]
+         self.assertEqual(cmd[1:5], ["-datapath", str((self.proj / "data/games/ps2/config").resolve()), "-nogui",
+                                     "-fullscreen"])
+-        self.assertEqual(cmd[5:], ["--", str((self.games / "one.chd").resolve())])
++        # B53 (disclosed): PCSX2's per-launch log before the title
++        self.assertEqual(cmd[5], "-logfile")
++        self.assertRegex(cmd[6], r"/data/games/ps2/logs/\d{8}T\d{6}Z-pcsx2\.log$")
++        self.assertEqual(cmd[7:], ["--", str((self.games / "one.chd").resolve())])
+         self.assertTrue(out["calls"]["popen"][0]["new_session"])
+         self.assertEqual(out["calls"]["popen"][0]["env_sdl"], ps2.SDL_MAPPING[:40])
+         text = self.ini.read_text()
+diff --git a/b_q11s_b53/tests/ps2_session/_tmp_cleanup.py b/tests/ps2_session/_tmp_cleanup.py
+new file mode 100644
+index 0000000..252d180
+--- /dev/null
++++ b/tests/ps2_session/_tmp_cleanup.py
+@@ -0,0 +1,25 @@
++"""B53 (test hygiene): every temporary directory a tests/ps2_session run creates is removed when that run ends.
++
++HOME-6 prep found ~6.9 GiB of these suites' fixture trees (formatted 8-MB cards, fake game trees) left in the hub's /tmp
++tmpfs by B49-B52's runs, which never removed their mkdtemp() dirs. Imported by each test module; it tracks only the
++dirs made in this process and removes them at exit (never anything else)."""
++
++from __future__ import annotations
++
++import atexit
++import shutil
++import tempfile
++
++_made: list[str] = []
++_mkdtemp = tempfile.mkdtemp
++
++
++def _tracked(*args, **kwargs):
++    d = _mkdtemp(*args, **kwargs)
++    _made.append(d)
++    return d
++
++
++if getattr(tempfile.mkdtemp, "__name__", "") != "_tracked":
++    tempfile.mkdtemp = _tracked
++    atexit.register(lambda: [shutil.rmtree(d, ignore_errors=True) for d in _made])
+diff --git a/tools/diag_keeper.py b/tools/diag_keeper.py
+index 936c4c8..b91dff6 100644
+--- a/tools/diag_keeper.py
++++ b/tools/diag_keeper.py
+@@ -156,6 +156,9 @@ class DiagKeeper(tlk.Keeper):
+             t = self.tails.get(k)
+             if t is None and k.startswith("games/") and tlk.GAME_LOG.match(k[len("games/"):]):
+                 t = self.tails[k] = tlk.Tail(self.games / k[len("games/"):], None)
++            # B53: a PCSX2 per-launch log tail from the last run
++            if t is None and k.startswith("ps2logs/") and tlk.PCSX2_LOG.match(k[len("ps2logs/"):]):
++                t = self.tails[k] = tlk.Tail(self.ps2logs / k[len("ps2logs/"):], None)
+             if t is not None and v.get("ino") is not None and t.ino == v["ino"] and v.get("off", 0) <= self._size(t):
+                 t.off = v["off"]                               # the same file: resume where the last run stopped
+         for k, v in (st.get("seen") or {}).items():
+diff --git a/tools/diag_read.py b/tools/diag_read.py
+index b6af589..72b4ef0 100644
+--- a/tools/diag_read.py
++++ b/tools/diag_read.py
+@@ -50,6 +50,38 @@ PS2_CORE = "pcsx2"
+ def is_game_log(name: str) -> bool:
+     return bool(GAME_LOG.match(name) or PS2_LOG.match(name))
+ 
++
++# B53: PCSX2's own log per launch (`<UTC launch>-pcsx2.log`, live under data/games/ps2/logs/, the keeper's raw/ps2logs__*)
++PCSX2_LOG = re.compile(r"^(\d{8}T\d{6}Z)-pcsx2\.log$")
++PCSX2_LINE = re.compile(r"^\[\s*(\d+(?:\.\d+)?)\]\s?(.*)$")
++PCSX2_COUNTS = {
++    "read_errors": re.compile(r"Read Abort|CDVD read err|READ ERROR|Read Bad Parameter|Read when CD Error"),
++    "invalid_binding": re.compile(r"Invalid binding:"),
++    "card_formatted": re.compile(r"McdSlot \d+ \[File\].*\[8 MB, Formatted\]"),
++    "card_unformatted": re.compile(r"McdSlot \d+ \[File\].*UNFORMATTED"),
++    "tlb_miss": re.compile(r"TLB Miss"),
++    "state_saved": re.compile(r"Saved state to slot \d+"),
++    "state_loaded": re.compile(r"Loaded state from slot \d+"),
++    "elf": re.compile(r"ELF Loading:"),
++}
++
++
++def pcsx2_events(name: str, data: bytes) -> list[tuple[datetime, str]]:
++    """(UTC, kind) for each counted line of one per-launch PCSX2 log (the name's time + the line's seconds)."""
++    m = PCSX2_LOG.match(name)
++    if not m:
++        return []
++    t0 = datetime.strptime(m.group(1), "%Y%m%dT%H%M%SZ")
++    out = []
++    for line in data.decode("utf-8", "replace").splitlines():
++        lm = PCSX2_LINE.match(line)
++        if not lm:
++            continue
++        for kind, rx in PCSX2_COUNTS.items():
++            if rx.search(lm.group(2)):
++                out.append((t0 + timedelta(seconds=float(lm.group(1))), kind))
++    return out
++
+ # the trip's known titles (game id prefix -> class + tag); others read "<SYSTEM> <4-hex>"
+ TAGS = {"04ff": "PS1 platformer", "ee3b": "SNES action-adventure", "2ef9": "PS1 first-person RPG",
+         "3699": "PS1 football (Blitz)", "7bf5": "PS1 brawler", "6d53": "PS1 kart racer", "33df": "PS1 golf",
+@@ -142,6 +174,7 @@ class Logs:
+         self.data: dict[str, bytes] = defaultdict(bytes)
+         self.reports: list[dict[str, Any]] = []
+         self.game_logs: list[str] = []          # game log file names (they carry the launch time and the title)
++        self.pcsx2_logs: dict[str, bytes] = defaultdict(bytes)   # B53: per-launch PCSX2 logs, by file name
+         self.overlay: list[dict[str, Any]] = []
+         self.sources: list[str] = []
+ 
+@@ -158,6 +191,11 @@ class Logs:
+                     continue
+                 base = sub[len("games__"):] if sub.startswith("games__") else sub
+                 files = sorted(f for f in os.listdir(p) if (p / f).is_file())
++                # B53: the keeper's copies of PCSX2's per-launch logs
++                if sub.startswith("ps2logs__") and PCSX2_LOG.match(sub[len("ps2logs__"):]):
++                    for f in files:
++                        self.pcsx2_logs[sub[len("ps2logs__"):]] += (p / f).read_bytes()
++                    continue
+                 if base == "decoder_sessions":
+                     for f in files:
+                         self._report((p / f).read_bytes())
+@@ -198,6 +236,14 @@ class Logs:
+                     self.data[name] += p.read_bytes()
+                 except OSError:
+                     continue
++        # B53: PCSX2's per-launch logs beside the repo's logs (data/games/ps2/logs/)
++        p2 = logs_root.parent / "data" / "games" / "ps2" / "logs"
++        for f in sorted(os.listdir(p2)) if p2.is_dir() else []:
++            if PCSX2_LOG.match(f):
++                try:
++                    self.pcsx2_logs[f] = (p2 / f).read_bytes()
++                except OSError:
++                    continue
+         d = games / "decoder_sessions"
+         for f in sorted(os.listdir(d)) if d.is_dir() else []:
+             try:
+@@ -271,6 +317,10 @@ class Analysis:
+             tag = self.tags.get(m.group(4), f"{m.group(3).upper()} {m.group(4)}")
+             self.launches.append((t, tag, CORES.get(m.group(3), m.group(3))))
+         self.sources = list(logs.sources)
++        # B53: PCSX2's per-launch logs: the launch times and every counted line (UTC)
++        self.pcsx2_launches = sorted(datetime.strptime(PCSX2_LOG.match(n).group(1), "%Y%m%dT%H%M%SZ")
++                                     for n in logs.pcsx2_logs)
++        self.pcsx2 = sorted(ev for n, data in logs.pcsx2_logs.items() for ev in pcsx2_events(n, data))
+         self._sessions()
+         self._seconds()
+ 
+@@ -502,6 +552,21 @@ class Analysis:
+         return out
+ 
+     # -- one session as a sessions.jsonl row (G4-S4's columns + B34's slots + the restarts and their triggers)
++    def pcsx2_counts(self, s: dict[str, Any]) -> dict[str, int] | None:
++        """B53: the counted PCSX2 lines from the previous session's end (or this launch) to this session's end."""
++        launches = [t for t in self.pcsx2_launches if t <= s["start"] and s["start"] - t <= timedelta(hours=6)]
++        if not launches:
++            return None
++        launch = launches[-1]
++        ends = [x["end"] for x in self.sessions if x["end"] is not None and launch <= x["end"] < s["start"]]
++        lo = max(ends) if ends else launch
++        hi = (s["end"] or s["start"]) + timedelta(seconds=5)
++        out = {k: 0 for k in PCSX2_COUNTS}
++        for t, kind in self.pcsx2:
++            if lo <= t < hi:
++                out[kind] += 1
++        return out
++
+     @staticmethod
+     def ps1_reference(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+         """B50: the PS1 sessions a comparison may use as its reference (a PS2 session never)."""
+@@ -543,6 +608,8 @@ class Analysis:
+             "hitch_s_per_10min": round(m["hitch_s"] / per10, 1) if per10 else None,
+             # B50: a PS2 session says its system (other sessions' rows as before)
+             **({"system": "ps2"} if s["core"] == PS2_CORE else {}),
++            # B53: PCSX2's own log lines for this session, when its launch's log exists (no key otherwise)
++            **({"pcsx2_log": c} if s["core"] == PS2_CORE and (c := self.pcsx2_counts(s)) is not None else {}),
+             "silences": m["silences"], "silences_user": m["silences_user"],
+             "silences_per_10min": round(m["silences"] / per10, 1) if per10 else None,
+             "max_silence_ms": round(m["max_silence_ms"]), "underruns": m["underruns"], "starvation": m["starvation"],
+@@ -692,6 +759,13 @@ def render(an: Analysis, label: str, around: list[datetime], around_saves: bool)
+     L += ["", "## Pad slots (B34)", ""]
+     L += md_table(["UTC", "slot map"], [[hms(ts(r["at_utc"])), json.dumps(r.get("slots") or r.get("map") or r.get("pad_slots"), sort_keys=True)]
+                                         for r in pads]) if pads else ["(no pad_slots rows: the client sent none)"]
++    # B53: PCSX2's own log per PS2 session (only when one exists)
++    p2 = [(s, an.session_row(s)) for s in an.sessions if s["core"] == PS2_CORE]
++    p2 = [(s, r) for s, r in p2 if "pcsx2_log" in r]
++    if p2:
++        L += ["", "## PCSX2 logs (B53)", ""]
++        L += md_table(["start", "end"] + list(PCSX2_COUNTS), [[hms(s["start"]), hms(s["end"] or s["start"])]
++                                                            + [r["pcsx2_log"][k] for k in PCSX2_COUNTS] for s, r in p2])
+     L += ["", "## VOD (B35)", ""]
+     if an.vod_client:
+         L += md_table(["UTC", "event", "detail"], [[hms(Analysis._t(r)), r.get("event"),
+diff --git a/tools/trip_log_keeper.py b/tools/trip_log_keeper.py
+index f23b473..39d5b46 100644
+--- a/tools/trip_log_keeper.py
++++ b/tools/trip_log_keeper.py
+@@ -44,6 +44,8 @@ TOP_TAILS = ["wan_sessions.jsonl", "session_audit.jsonl", "impairment.jsonl"]
+ NEWDIRS = ["decoder_sessions", "audio_timing"]
+ # B50: a PS2 session's game log (`<date>-<time>-ps2.log`, no id or title by B49's design) is a game log too
+ GAME_LOG = re.compile(r"^\d{8}-\d{6}-(?:game_[a-z0-9]+_[0-9a-f]+|ps2)\.log$")
++# B53: PCSX2's own per-launch logs (data/games/ps2/logs/<UTC launch>-pcsx2.log), copied like the game logs
++PCSX2_LOG = re.compile(r"^\d{8}T\d{6}Z-pcsx2\.log$")
+ UNIT = "privyhub-companion"
+ STATUS_URL = "http://127.0.0.1:8765/plugins/games/status"
+ QUIET_S = 10.0
+@@ -241,6 +243,7 @@ class Keeper:
+         self.logs = Path(logs_root)
+         self.games = self.logs / "games"
+         self.arch = self.games / "stream_log_archive"
++        self.ps2logs = self.logs.parent / "data" / "games" / "ps2" / "logs"      # B53
+         self.raw, self.samples = self.out / "raw", self.out / "samples"
+         self.redactor = redactor if redactor is not None else Redactor()
+         self._overlay = overlay if overlay is not None else overlay_state
+@@ -310,6 +313,8 @@ class Keeper:
+             d = self.games / sub
+             self.seen[sub] = set(os.listdir(d)) if d.is_dir() else set()
+         self.seen["game_logs"] = {f for f in (os.listdir(self.games) if self.games.is_dir() else []) if GAME_LOG.match(f)}
++        self.seen["ps2_logs"] = {f for f in (os.listdir(self.ps2logs) if self.ps2logs.is_dir() else [])
++                                 if PCSX2_LOG.match(f)}
+         self.jsince = int(self.clock())
+ 
+     def copy(self, final: bool = False) -> dict[str, Any]:
+@@ -322,6 +327,13 @@ class Keeper:
+                 if GAME_LOG.match(f) and f not in self.seen["game_logs"]:
+                     self.seen["game_logs"].add(f)
+                     self.tails[f"games/{f}"] = Tail(self.games / f, None, from_start=True)
++        # B53: new PCSX2 per-launch logs too (kept as raw/ps2logs__<name>/)
++        if self.ps2logs.is_dir():
++            seen = self.seen.setdefault("ps2_logs", set())
++            for f in sorted(os.listdir(self.ps2logs)):
++                if PCSX2_LOG.match(f) and f not in seen:
++                    seen.add(f)
++                    self.tails[f"ps2logs/{f}"] = Tail(self.ps2logs / f, None, from_start=True)
+         for key, t in self.tails.items():
+             try:
+                 data, rotated = t.step()

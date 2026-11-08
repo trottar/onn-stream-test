@@ -50,6 +50,38 @@ PS2_CORE = "pcsx2"
 def is_game_log(name: str) -> bool:
     return bool(GAME_LOG.match(name) or PS2_LOG.match(name))
 
+
+# B53: PCSX2's own log per launch (`<UTC launch>-pcsx2.log`, live under data/games/ps2/logs/, the keeper's raw/ps2logs__*)
+PCSX2_LOG = re.compile(r"^(\d{8}T\d{6}Z)-pcsx2\.log$")
+PCSX2_LINE = re.compile(r"^\[\s*(\d+(?:\.\d+)?)\]\s?(.*)$")
+PCSX2_COUNTS = {
+    "read_errors": re.compile(r"Read Abort|CDVD read err|READ ERROR|Read Bad Parameter|Read when CD Error"),
+    "invalid_binding": re.compile(r"Invalid binding:"),
+    "card_formatted": re.compile(r"McdSlot \d+ \[File\].*\[8 MB, Formatted\]"),
+    "card_unformatted": re.compile(r"McdSlot \d+ \[File\].*UNFORMATTED"),
+    "tlb_miss": re.compile(r"TLB Miss"),
+    "state_saved": re.compile(r"Saved state to slot \d+"),
+    "state_loaded": re.compile(r"Loaded state from slot \d+"),
+    "elf": re.compile(r"ELF Loading:"),
+}
+
+
+def pcsx2_events(name: str, data: bytes) -> list[tuple[datetime, str]]:
+    """(UTC, kind) for each counted line of one per-launch PCSX2 log (the name's time + the line's seconds)."""
+    m = PCSX2_LOG.match(name)
+    if not m:
+        return []
+    t0 = datetime.strptime(m.group(1), "%Y%m%dT%H%M%SZ")
+    out = []
+    for line in data.decode("utf-8", "replace").splitlines():
+        lm = PCSX2_LINE.match(line)
+        if not lm:
+            continue
+        for kind, rx in PCSX2_COUNTS.items():
+            if rx.search(lm.group(2)):
+                out.append((t0 + timedelta(seconds=float(lm.group(1))), kind))
+    return out
+
 # the trip's known titles (game id prefix -> class + tag); others read "<SYSTEM> <4-hex>"
 TAGS = {"04ff": "PS1 platformer", "ee3b": "SNES action-adventure", "2ef9": "PS1 first-person RPG",
         "3699": "PS1 football (Blitz)", "7bf5": "PS1 brawler", "6d53": "PS1 kart racer", "33df": "PS1 golf",
@@ -142,6 +174,7 @@ class Logs:
         self.data: dict[str, bytes] = defaultdict(bytes)
         self.reports: list[dict[str, Any]] = []
         self.game_logs: list[str] = []          # game log file names (they carry the launch time and the title)
+        self.pcsx2_logs: dict[str, bytes] = defaultdict(bytes)   # B53: per-launch PCSX2 logs, by file name
         self.overlay: list[dict[str, Any]] = []
         self.sources: list[str] = []
 
@@ -158,6 +191,11 @@ class Logs:
                     continue
                 base = sub[len("games__"):] if sub.startswith("games__") else sub
                 files = sorted(f for f in os.listdir(p) if (p / f).is_file())
+                # B53: the keeper's copies of PCSX2's per-launch logs
+                if sub.startswith("ps2logs__") and PCSX2_LOG.match(sub[len("ps2logs__"):]):
+                    for f in files:
+                        self.pcsx2_logs[sub[len("ps2logs__"):]] += (p / f).read_bytes()
+                    continue
                 if base == "decoder_sessions":
                     for f in files:
                         self._report((p / f).read_bytes())
@@ -196,6 +234,14 @@ class Logs:
             for p in ([] if top else [arch / f"{name}.{i}" for i in (3, 2, 1)]) + [(logs_root if top else games) / name]:
                 try:
                     self.data[name] += p.read_bytes()
+                except OSError:
+                    continue
+        # B53: PCSX2's per-launch logs beside the repo's logs (data/games/ps2/logs/)
+        p2 = logs_root.parent / "data" / "games" / "ps2" / "logs"
+        for f in sorted(os.listdir(p2)) if p2.is_dir() else []:
+            if PCSX2_LOG.match(f):
+                try:
+                    self.pcsx2_logs[f] = (p2 / f).read_bytes()
                 except OSError:
                     continue
         d = games / "decoder_sessions"
@@ -271,6 +317,10 @@ class Analysis:
             tag = self.tags.get(m.group(4), f"{m.group(3).upper()} {m.group(4)}")
             self.launches.append((t, tag, CORES.get(m.group(3), m.group(3))))
         self.sources = list(logs.sources)
+        # B53: PCSX2's per-launch logs: the launch times and every counted line (UTC)
+        self.pcsx2_launches = sorted(datetime.strptime(PCSX2_LOG.match(n).group(1), "%Y%m%dT%H%M%SZ")
+                                     for n in logs.pcsx2_logs)
+        self.pcsx2 = sorted(ev for n, data in logs.pcsx2_logs.items() for ev in pcsx2_events(n, data))
         self._sessions()
         self._seconds()
 
@@ -502,6 +552,21 @@ class Analysis:
         return out
 
     # -- one session as a sessions.jsonl row (G4-S4's columns + B34's slots + the restarts and their triggers)
+    def pcsx2_counts(self, s: dict[str, Any]) -> dict[str, int] | None:
+        """B53: the counted PCSX2 lines from the previous session's end (or this launch) to this session's end."""
+        launches = [t for t in self.pcsx2_launches if t <= s["start"] and s["start"] - t <= timedelta(hours=6)]
+        if not launches:
+            return None
+        launch = launches[-1]
+        ends = [x["end"] for x in self.sessions if x["end"] is not None and launch <= x["end"] < s["start"]]
+        lo = max(ends) if ends else launch
+        hi = (s["end"] or s["start"]) + timedelta(seconds=5)
+        out = {k: 0 for k in PCSX2_COUNTS}
+        for t, kind in self.pcsx2:
+            if lo <= t < hi:
+                out[kind] += 1
+        return out
+
     @staticmethod
     def ps1_reference(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """B50: the PS1 sessions a comparison may use as its reference (a PS2 session never)."""
@@ -543,6 +608,8 @@ class Analysis:
             "hitch_s_per_10min": round(m["hitch_s"] / per10, 1) if per10 else None,
             # B50: a PS2 session says its system (other sessions' rows as before)
             **({"system": "ps2"} if s["core"] == PS2_CORE else {}),
+            # B53: PCSX2's own log lines for this session, when its launch's log exists (no key otherwise)
+            **({"pcsx2_log": c} if s["core"] == PS2_CORE and (c := self.pcsx2_counts(s)) is not None else {}),
             "silences": m["silences"], "silences_user": m["silences_user"],
             "silences_per_10min": round(m["silences"] / per10, 1) if per10 else None,
             "max_silence_ms": round(m["max_silence_ms"]), "underruns": m["underruns"], "starvation": m["starvation"],
@@ -692,6 +759,13 @@ def render(an: Analysis, label: str, around: list[datetime], around_saves: bool)
     L += ["", "## Pad slots (B34)", ""]
     L += md_table(["UTC", "slot map"], [[hms(ts(r["at_utc"])), json.dumps(r.get("slots") or r.get("map") or r.get("pad_slots"), sort_keys=True)]
                                         for r in pads]) if pads else ["(no pad_slots rows: the client sent none)"]
+    # B53: PCSX2's own log per PS2 session (only when one exists)
+    p2 = [(s, an.session_row(s)) for s in an.sessions if s["core"] == PS2_CORE]
+    p2 = [(s, r) for s, r in p2 if "pcsx2_log" in r]
+    if p2:
+        L += ["", "## PCSX2 logs (B53)", ""]
+        L += md_table(["start", "end"] + list(PCSX2_COUNTS), [[hms(s["start"]), hms(s["end"] or s["start"])]
+                                                            + [r["pcsx2_log"][k] for k in PCSX2_COUNTS] for s, r in p2])
     L += ["", "## VOD (B35)", ""]
     if an.vod_client:
         L += md_table(["UTC", "event", "detail"], [[hms(Analysis._t(r)), r.get("event"),

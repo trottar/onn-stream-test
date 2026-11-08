@@ -21,6 +21,8 @@ from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "companion"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _tmp_cleanup  # noqa: E402,F401  (B53: this run's temp dirs removed at exit)
 sys.path.insert(0, str(ROOT / "tools"))
 
 import ps2_session as ps2  # noqa: E402

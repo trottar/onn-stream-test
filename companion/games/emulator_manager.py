@@ -6854,9 +6854,15 @@ class EmulatorManager:
         )
         log_handle.flush()
 
+        # B53: PCSX2's own log for this launch, kept 30 days (the name: the UTC launch time only)
+        launched_at = time.time()
+        pcsx2_log = _ps2.pcsx2_log_for_launch(root, launched_at)
+        pcsx2_log.parent.mkdir(parents=True, exist_ok=True)
+        _ps2.prune_pcsx2_logs(pcsx2_log.parent, launched_at)
+        log_handle.write(f"{utc_ms()} PS2 pcsx2-log: {pcsx2_log.name}\n")
         try:
             process = subprocess.Popen(
-                _ps2.command(appimage, root, content),
+                _ps2.command(appimage, root, content, logfile=pcsx2_log),
                 cwd=str(root),
                 stdin=subprocess.DEVNULL,
                 stdout=log_handle,
@@ -6886,7 +6892,8 @@ class EmulatorManager:
         self._players_session = plan if chosen is not None else None
         self._hold_rewind_core = None
         self._launch_kind = "pcsx2"
-        self._ps2 = _ps2.Session(process.pid, log_line)
+        # B52: the session reads PCSX2's own log (the ELF line, the TLB check)
+        self._ps2 = _ps2.Session(process.pid, log_line, log_path=pcsx2_log)
 
         if self._ps2.wait_window(alive=lambda: process.poll() is None) is None:
             try:
@@ -6963,24 +6970,48 @@ class EmulatorManager:
                 raise EmulatorError(f"Slot {normalized} contains an invalid 0-byte savestate; create a new save")
             if not detail.get("exists"):
                 raise EmulatorError(f"No save state exists in Slot {normalized}")
+            sess = self._ps2
+            if sess.log_path is None:
+                sess.log_path = _ps2.pcsx2_log_path(self.project_root)
             try:
-                self._ps2.ensure_pine_pause()
+                sess.ensure_pine_pause()
+                # B52: hold the load until this launch's game has booted (PCSX2's `ELF Loading:` line); at the relaunch's
+                # paused start that means letting PCSX2 run to it, then pausing again
+                if not sess.elf_started():
+                    sess.resume()
+                    booted = sess.wait_elf()
+                    sess.pause()
+                    if not booted:
+                        sess.log(f"PS2 load: slot {normalized} held; the game's ELF not up in {_ps2.ELF_WAIT_S:.0f}s")
+                        raise EmulatorError("The game is still starting; play a moment, then load again")
             except _ps2.PS2Error as exc:
                 raise EmulatorError(str(exc)) from exc
-            emulog = _ps2.pcsx2_log_path(self.project_root)
-            offset = emulog.stat().st_size if emulog.is_file() else 0
-            result = self._ps2.state_message(_ps2.MSG_LOAD_STATE, normalized)
+            pre = sess.picture()
+            offset = sess.log_size()
+            result = sess.state_message(_ps2.MSG_LOAD_STATE, normalized)
             if result != _ps2.PINE_OK:
-                self._ps2.log(f"PS2 load: slot {normalized} pine 0x0a {'no answer' if result is None else 'fail'}")
+                sess.log(f"PS2 load: slot {normalized} pine 0x0a {'no answer' if result is None else 'fail'}")
                 raise EmulatorError("PCSX2 did not acknowledge the load state")
-            confirmed = self._ps2.wait_log_line(emulog, offset, f"Loaded state from slot {normalized}.")
-            self._ps2.log(f"PS2 load: slot {normalized} pine 0x0a ok; {'confirmed' if confirmed else 'visual'}")
+            sess.wait_log_line(sess.log_path, offset, f"Loaded state from slot {normalized}.")
+            # B52: "confirmed" = the game runs from the state -- resume, check the window's picture, pause again
+            try:
+                sess.resume()
+                verdict, seconds = sess.check_picture(pre[0] if pre else None, offset)
+            except _ps2.PS2Error:
+                verdict, seconds = "static", 0.0
+            try:
+                sess.pause()
+            except _ps2.PS2Error:
+                pass
+            sess.log(f"PS2 load: slot {normalized} pine 0x0a ok; picture {verdict} {seconds:.1f}s")
+            if verdict != "ok":
+                raise EmulatorError("The game did not resume from the save")
             payload = self.status()
             payload["action"] = "load_state"
             payload["slot"] = normalized
             payload["accepted"] = True
-            payload["confirmed"] = bool(confirmed)
-            payload["verification"] = "pcsx2_log" if confirmed else "visual_required"
+            payload["confirmed"] = True
+            payload["verification"] = "picture"
             payload["paused"] = True
             payload["control"] = "pcsx2_pine_load_state"
             payload["pine_response"] = "ok"

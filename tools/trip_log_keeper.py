@@ -44,6 +44,8 @@ TOP_TAILS = ["wan_sessions.jsonl", "session_audit.jsonl", "impairment.jsonl"]
 NEWDIRS = ["decoder_sessions", "audio_timing"]
 # B50: a PS2 session's game log (`<date>-<time>-ps2.log`, no id or title by B49's design) is a game log too
 GAME_LOG = re.compile(r"^\d{8}-\d{6}-(?:game_[a-z0-9]+_[0-9a-f]+|ps2)\.log$")
+# B53: PCSX2's own per-launch logs (data/games/ps2/logs/<UTC launch>-pcsx2.log), copied like the game logs
+PCSX2_LOG = re.compile(r"^\d{8}T\d{6}Z-pcsx2\.log$")
 UNIT = "privyhub-companion"
 STATUS_URL = "http://127.0.0.1:8765/plugins/games/status"
 QUIET_S = 10.0
@@ -241,6 +243,7 @@ class Keeper:
         self.logs = Path(logs_root)
         self.games = self.logs / "games"
         self.arch = self.games / "stream_log_archive"
+        self.ps2logs = self.logs.parent / "data" / "games" / "ps2" / "logs"      # B53
         self.raw, self.samples = self.out / "raw", self.out / "samples"
         self.redactor = redactor if redactor is not None else Redactor()
         self._overlay = overlay if overlay is not None else overlay_state
@@ -310,6 +313,8 @@ class Keeper:
             d = self.games / sub
             self.seen[sub] = set(os.listdir(d)) if d.is_dir() else set()
         self.seen["game_logs"] = {f for f in (os.listdir(self.games) if self.games.is_dir() else []) if GAME_LOG.match(f)}
+        self.seen["ps2_logs"] = {f for f in (os.listdir(self.ps2logs) if self.ps2logs.is_dir() else [])
+                                 if PCSX2_LOG.match(f)}
         self.jsince = int(self.clock())
 
     def copy(self, final: bool = False) -> dict[str, Any]:
@@ -322,6 +327,13 @@ class Keeper:
                 if GAME_LOG.match(f) and f not in self.seen["game_logs"]:
                     self.seen["game_logs"].add(f)
                     self.tails[f"games/{f}"] = Tail(self.games / f, None, from_start=True)
+        # B53: new PCSX2 per-launch logs too (kept as raw/ps2logs__<name>/)
+        if self.ps2logs.is_dir():
+            seen = self.seen.setdefault("ps2_logs", set())
+            for f in sorted(os.listdir(self.ps2logs)):
+                if PCSX2_LOG.match(f) and f not in seen:
+                    seen.add(f)
+                    self.tails[f"ps2logs/{f}"] = Tail(self.ps2logs / f, None, from_start=True)
         for key, t in self.tails.items():
             try:
                 data, rotated = t.step()

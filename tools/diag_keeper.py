@@ -156,6 +156,9 @@ class DiagKeeper(tlk.Keeper):
             t = self.tails.get(k)
             if t is None and k.startswith("games/") and tlk.GAME_LOG.match(k[len("games/"):]):
                 t = self.tails[k] = tlk.Tail(self.games / k[len("games/"):], None)
+            # B53: a PCSX2 per-launch log tail from the last run
+            if t is None and k.startswith("ps2logs/") and tlk.PCSX2_LOG.match(k[len("ps2logs/"):]):
+                t = self.tails[k] = tlk.Tail(self.ps2logs / k[len("ps2logs/"):], None)
             if t is not None and v.get("ino") is not None and t.ino == v["ino"] and v.get("off", 0) <= self._size(t):
                 t.off = v["off"]                               # the same file: resume where the last run stopped
         for k, v in (st.get("seen") or {}).items():

@@ -2483,6 +2483,13 @@ User-supplied PS2 BIOS should enter only through the G0 import boundary.
 > with PrivyHub's button works like PS1 (C12'a, the write 0.5 s; C12'b the list; C12'd the files); **LOAD not met**
 > (C12'c: the PINE load answers OK, then PCSX2's guest faults — `TLB Miss` — and the picture is black). **G-A14 not
 > adopted;** H3 feasibility stays OPEN. The user's bench flag `b49-ps2.conf` stays on (PS2 playable, the load to B).
+>
+> **B52 / B53 (2026-11-08, `docs/memory/evidence/B52_PS2_LOAD_2026-11-08.md`, `…/B53_PCSX2_LOG_PER_LAUNCH_2026-11-08.md`):**
+> - **B52, the load:** MTVU off; a load held until the game's ELF is up; "confirmed" = the window's picture moving with
+>   PINE running and no `TLB Miss`, else PS1's error with the game paused.
+> - **B53:** PCSX2's log per launch (`-logfile`), 30 days, copied by the keeper and counted per session by `diag_read`.
+> - **Next:** A's **HOME-6** (a new save, Stop, relaunch, LOAD; the in-game LOAD), then **G-A14** if both are met
+>   (`docs/memory/handoffs/SESSION_B_DONE_2026-11-08S.md`).
 
 > **H3-P1 RUN (2026-11-07 / 08, A):** `docs/memory/evidence/H3_P1_PS2_PROBE_2026-11-07.md`. PCSX2 v2.8.2 (the
 > user's "Yes"), Vulkan on RADV at 1x: T1 (light) and T2 (heavy, menu only) at full speed — P0a-P0c, P1, P3, P4 met;

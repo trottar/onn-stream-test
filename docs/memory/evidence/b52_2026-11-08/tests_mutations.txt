@@ -1,0 +1,8 @@
+B52 mutations, /tmp/b_q11s_scratch/mut52b (each reverted after its run; tests/ps2_session, 72 tests)
+M1 MTVU left on (vuThread true): 1 failure (test_mtvu_off)
+M2 the picture check skipped (always ok): 3 failures (static, black, TLB Miss)
+M3 TLB Miss ignored: 1 failure
+M4 no ELF hold: 1 failure (the starting error)
+M5 not paused again after the check: 4 failures (the game must be left paused)
+M6 near-black counted as moving: first run 0 failures (survived: the test's fake black cycled 3 patterns, one equal to
+   the pre-load frame, so it read static for the wrong reason) -> the fake made distinct near-black frames; rerun 1 failure

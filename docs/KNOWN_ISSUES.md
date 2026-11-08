@@ -54,6 +54,31 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
 
+## 2026-11-08 Queue S (B52-B53): the PS2 load fixed in code, PCSX2's log kept per launch — OPEN (A's HOME-6)
+
+(`docs/memory/evidence/B52_PS2_LOAD_2026-11-08.md`, `docs/memory/evidence/B53_PCSX2_LOG_PER_LAUNCH_2026-11-08.md`)
+
+- **B52:**
+  - MTVU off (`vuThread = false`; PCSX2 warned its states may not be stable);
+  - a load is held until the game's ELF is up (HOME-5's loads went into a VM whose game had never booted);
+  - "confirmed" means the game runs from the state: the window's picture moving, PINE running, no `TLB Miss`; else
+    "The game did not resume from the save", paused.
+- **B53:** PCSX2's log per launch (`-logfile …/<UTC>-pcsx2.log`, 30 days), copied by the keeper, and counted per PS2
+  session by `diag_read` (drive read errors, bindings, cards, TLB misses, saves / loads).
+- **Open:**
+  - **Not yet on the hub:** a LOAD continuing from a save made with MTVU off (HOME-6), and MTVU off's CPU cost (an EE
+    thread peak toward ~85-100 % of a core is expected in a heavy title).
+  - **HOME-5's save is unusable** (made with MTVU on); the user makes a new one.
+  - PCSX2 logs no slow-read line, so a drive count is errors and retries only.
+- **Open, for the user — `/tmp` full:** the hub's `/tmp` tmpfs (7.5 GB, RAM) filled during queue S with **B's own test
+  leftovers**.
+  - About 6.9 GiB in 3,905 directories, left by `tests/ps2_session` (B49-B52) never removing its fixture trees
+    (`evidence/b52_2026-11-08/tmp_test_leftovers.txt`).
+  - B removed its old `/tmp/b_q*` work copies with the user's go. The auto-mode classifier refused the removal of the
+    3,905 leftover dirs, so they remain.
+  - **The fix is in:** B53's `_tmp_cleanup` makes every run remove its own temp dirs.
+  - **The user (or a reboot, which empties the tmpfs) frees the rest.** `/tmp` read 40 MB free at the queue's end.
+
 ## 2026-11-08 HOME-5: PS2 SAVE met, LOAD not met; G-A14 not adopted; the bench flag stays — OPEN (to B: the PS2 load)
 
 (`docs/memory/evidence/HOME_5_PS2_SAVE_2026-11-08.md`)
