@@ -141,8 +141,13 @@ STEP_IN_PLACE = "PRIVYHUB_STEP_IN_PLACE=1"
 # of "Reconnect by default yes"; PRIVYHUB_VOD_DROP_TEST is never a line -- through its own drop-in (vod-log.conf); the
 # adopted environ is exactly these fifteen names
 VOD_LOG = "PRIVYHUB_VOD_LOG=1"
+# G-A14 (adopted 2026-11-08, the user): the PS2 launch kind -- PCSX2 from the onn with the pads, the chooser, the hub's
+# memory cards, and PrivyHub's SAVE / LOAD through PINE (B49-B53; H3-P2, HOME-4+ C11, HOME-6 C12'' / C14), the "PlayStation
+# 2" entry in the games list -- the user's "PS2 always on -- yes" -- through its own drop-in (ps2.conf); the adopted
+# environ is exactly these sixteen names
+PS2 = "PRIVYHUB_PS2=1"
 ADOPTED = sorted([LIVE, INDEX, SNES_CORE, RECOVERY, SNES_CAPTURE, OVERLAY, IDENTITY, AUDIO_CODEC, LINK_REPORT,
-                  LINK_RECOVERY, RESTART_FAST, RESTART_FAST_UNLOCK, REMOTE, STEP_IN_PLACE, VOD_LOG])
+                  LINK_RECOVERY, RESTART_FAST, RESTART_FAST_UNLOCK, REMOTE, STEP_IN_PLACE, VOD_LOG, PS2])
 FLAG_NAMES = ["PRIVYHUB_ADAPTIVE_BITRATE_INJECT", "PRIVYHUB_ADAPTIVE_BITRATE_TOP", "PRIVYHUB_PS1_LOOK",
               "PRIVYHUB_NATIVE_PROFILE_ID", "PRIVYHUB_FEC_SCHEME"]
 RA_CFG = Path.home() / ".config/retroarch/config"
@@ -1049,12 +1054,13 @@ def preflight() -> dict:
          "drop_in_remote": f"Environment={REMOTE}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_step_in_place": f"Environment={STEP_IN_PLACE}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_vod_log": f"Environment={VOD_LOG}" in sh(["systemctl", "--user", "cat", UNIT]),
+         "drop_in_ps2": f"Environment={PS2}" in sh(["systemctl", "--user", "cat", UNIT]),
          "e3_dropin_absent": not DROPIN.exists(), "e4_constraint_absent": not E4_DROPIN.exists()}
     d["ok"] = (d["manager"] == [] and d["environ"] == ADOPTED and d["adb"] and d["drop_in_live"] and d["drop_in_index"]
                and d["drop_in_snes_core"] and d["drop_in_recovery"] and d["drop_in_snes_capture"] and d["drop_in_overlay"]
                and d["drop_in_identity"] and d["drop_in_audio_codec"] and d["drop_in_link_report"]
                and d["drop_in_link_recovery"] and d["drop_in_restart_fast"] and d["drop_in_restart_fast_unlock"]
-               and d["drop_in_remote"] and d["drop_in_step_in_place"] and d["drop_in_vod_log"]
+               and d["drop_in_remote"] and d["drop_in_step_in_place"] and d["drop_in_vod_log"] and d["drop_in_ps2"]
                and d["e3_dropin_absent"] and d["e4_constraint_absent"])
     return d
 

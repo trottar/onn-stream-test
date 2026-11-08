@@ -1800,6 +1800,12 @@ wrote one row. The client's retry default comes with queue O's APK.
 - **Off:** delete `vod-log.conf`, `daemon-reload`, restart, reverse `g_a13_2026-11-07/g_a13_applied.diff`.
 - Record: `docs/memory/evidence/G_A13_VOD_LOG_ADOPTION_2026-11-07.md`.
 
+**G-A14 ADOPTED (2026-11-08, the user's "PS2 always on — yes"): `PRIVYHUB_PS2=1`, the sixteenth line (`ps2.conf`).**
+The PS2 launch kind (PCSX2 from the onn with the pads, the chooser, the hub's cards, SAVE / LOAD through PINE; B49-B53),
+on HOME-6's C12'' and C14 met. `--check` ok on sixteen, `flags_absent` true.
+- **Off:** delete `ps2.conf`, `daemon-reload`, restart, reverse `home6_2026-11-08/ga14/g_a14_applied.diff`.
+- Record: `docs/memory/evidence/HOME_6_PS2_LOAD_2026-11-08.md`; patch `docs/memory/patches/G-A14_PS2_ADOPTION.md`.
+
 ## G5 — WAN-aware telemetry and adaptation
 
 > **Superseded (2026-11-03):** G5-S1's WAN telemetry and the remote ladder, start floor and 7000 cap act on every remote-class session through adopted line 13, `PRIVYHUB_REMOTE=1` (G-A9); `PRIVYHUB_WAN_ADAPTATION` itself is not adopted — see docs/WAN_ADAPTATION_RULES.md.
@@ -2483,6 +2489,13 @@ User-supplied PS2 BIOS should enter only through the G0 import boundary.
 > with PrivyHub's button works like PS1 (C12'a, the write 0.5 s; C12'b the list; C12'd the files); **LOAD not met**
 > (C12'c: the PINE load answers OK, then PCSX2's guest faults — `TLB Miss` — and the picture is black). **G-A14 not
 > adopted;** H3 feasibility stays OPEN. The user's bench flag `b49-ps2.conf` stays on (PS2 playable, the load to B).
+
+> **HOME-6 (2026-11-08, A, the user at the TV) — H3 feasibility CLOSED:** `docs/memory/evidence/HOME_6_PS2_LOAD_2026-11-08.md`.
+> After B52 (MTVU off, the load after the boot, the picture check) PS2 plays, pauses, saves and loads from the onn with
+> PrivyHub's buttons, as PS1: C12'' (SAVE 0.5 s, Stop, relaunch, LOAD `picture ok 0.9s`, 0 TLB Miss) and C14 met.
+> **G-A14 ADOPTED:** `PRIVYHUB_PS2=1` the sixteenth line (`ps2.conf`). The CPU with MTVU off: EE mean 42 % / max 49 %
+> of a core (T1). Still open: the hold / stall through PINE states (the user's question), the drive read-ahead, a heavy
+> title's long play.
 >
 > **B52 / B53 (2026-11-08, `docs/memory/evidence/B52_PS2_LOAD_2026-11-08.md`, `…/B53_PCSX2_LOG_PER_LAUNCH_2026-11-08.md`):**
 > - **B52, the load:** MTVU off; a load held until the game's ELF is up; "confirmed" = the window's picture moving with

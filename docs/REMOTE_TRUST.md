@@ -1,6 +1,6 @@
 # PrivyHub remote trust (G0)
 
-> **Superseded (2026-11-03):** the status below is G0's (2026-10-15). Since then G-A1 … G-A10 and G-A13 (host) adopted the remote parts: the adopted environ is fifteen lines (`tools/e1_suite.py` `ADOPTED`), §4-§6 and §8 are in force, and §8a-§16 record each adoption with its off switch (G-A6 shelved, G-A8 never applied) — see docs/memory/CURRENT.md.
+> **Superseded (2026-11-03):** the status below is G0's (2026-10-15). Since then G-A1 … G-A10, G-A13 (host) and G-A14 (PS2, 2026-11-08) adopted lines: the adopted environ is sixteen lines (fifteen until G-A14) (`tools/e1_suite.py` `ADOPTED`), §4-§6 and §8 are in force, and §8a-§17 record each adoption with its off switch (G-A6 shelved, G-A8 never applied) — see docs/memory/CURRENT.md.
 
 **Status: G0 written 2026-10-15 (G1-S1).** Every statement is either
 quoted from `docs/ROADMAP.md` (marked **[ROADMAP §…]**) or marked
@@ -398,3 +398,23 @@ Every point below is a **[G3-S3 proposal]**.
 
   The range server then writes no rows and `/diagnostics/vod-client` is not served; a retrying client's posts are
   refused, and its retry itself is unchanged.
+
+## 17. PS2 (adopted G-A14, 2026-11-08)
+
+- **Adopted:** `PRIVYHUB_PS2=1` through the drop-in
+  `~/.config/systemd/user/privyhub-companion.service.d/ps2.conf`, the **sixteenth adopted line** (the user's "PS2
+  always on — yes", 2026-11-08, on HOME-6's C12'' and C14 met).
+  - **What it does (B49-B53):** the games list offers "PlayStation 2"; a launch runs PCSX2 on the hub with the onn's
+    pads (through the same controller channel as every game), the hub's memory cards, and PrivyHub's SAVE / LOAD
+    through PCSX2's local PINE socket. The stream to the onn is the same native stream as every game.
+  - **Measured:** H3-P2, HOME-4+ C11, HOME-6 C12'' / C14 (`evidence/HOME_6_PS2_LOAD_2026-11-08.md`).
+- **What leaves the onn / the hub:** nothing new. PINE listens on the hub only; the drive is read in place, never
+  written; PCSX2's logs and save states stay under `data/games/ps2/` on the hub. A remote session's PS2 game travels
+  the existing authenticated stream like any other game.
+- **Turning it off (host):**
+  1. Delete `ps2.conf`.
+  2. Run `systemctl --user daemon-reload && systemctl --user restart privyhub-companion`.
+  3. Take `PS2` out of `tools/e1_suite.py` `ADOPTED` (reverse
+     `docs/memory/evidence/home6_2026-11-08/ga14/g_a14_applied.diff`).
+
+  The games list then has no "PlayStation 2" entry; the other systems are unchanged.

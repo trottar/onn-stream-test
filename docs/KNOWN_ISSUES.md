@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-08 — HOME-6: PS2 LOAD fixed on the onn (C12'' / C14 MET, `picture ok 0.9s`, 0 TLB Miss); **G-A14 ADOPTED, `PRIVYHUB_PS2=1` the sixteenth line** (`ps2.conf`; the bench flag and HOME-5's load note CLOSED); open: the hold / stall through PINE states (the user's question), the drive read-ahead, a heavy title's long play, the 1-player chooser's extra press — OPEN (the user's questions) — `## 2026-11-08 HOME-6` below; `docs/memory/evidence/HOME_6_PS2_LOAD_2026-11-08.md`
 - 2026-11-08 — HOME-5: PS2 SAVE like PS1 MET (C12'a / b / d; the write 0.5 s); LOAD NOT MET (C12'c: black screen, PCSX2 `TLB Miss` after the PINE load); G-A14 not adopted; the user's bench flag `b49-ps2.conf` stays on — OPEN (to B: the PS2 load) — `## 2026-11-08 HOME-5` below; `docs/memory/evidence/HOME_5_PS2_SAVE_2026-11-08.md`
 - 2026-11-08 — HOME-4+: queue O's `cfe0211c…` CONFIRMED (C7 / C9 / C8 / C10 met, the off checks met); C11 PS2 two-player MET; C12 PS2 save NOT MET (not run: the user's requirement, PS2 saving like PS1's SAVE button); G-A14 not adopted, fifteen lines — OPEN (to B) — `## 2026-11-08 HOME-4+` below; `docs/memory/evidence/HOME_4_PLUS_2026-11-08.md`
 - 2026-11-08 — H3-P2, PS2 streamed to the onn (bench drop-in): T1 / T2 launched, paused / resumed and played (hitch 0.0 / 6.2 per 10 min); the first launch needed A's audio-wait change (uncommitted); P7f / T2's drive second / player 2 open — OPEN (to B49b) — `## 2026-11-08 H3-P2` below; `docs/memory/evidence/H3_P2_PS2_STREAMED_2026-11-08.md`
@@ -78,6 +79,21 @@ One line per open item: date — item — status — where it lives.
     3,905 leftover dirs, so they remain.
   - **The fix is in:** B53's `_tmp_cleanup` makes every run remove its own temp dirs.
   - **The user (or a reboot, which empties the tmpfs) frees the rest.** `/tmp` read 40 MB free at the queue's end.
+
+## 2026-11-08 HOME-6: PS2 LOAD met; G-A14 ADOPTED (the sixteenth line) — OPEN (the user's questions)
+
+(`docs/memory/evidence/HOME_6_PS2_LOAD_2026-11-08.md`)
+
+- **Met:** C12'' (SAVE 0.5 s, Stop, relaunch, LOAD `picture ok 0.9s`, `ELF Loading:` before the load, 0 `TLB Miss`;
+  "game loaded without issue") and C14 (the in-game load, `picture ok 0.9s`; "Yes, back at the save").
+- **CLOSED here:** HOME-5's C12'c (the black screen after a load — B52: MTVU off, the load after the boot, the picture
+  check) and the bench-flag note (HOME-4+): `b49-ps2.conf` replaced by `ps2.conf`, **G-A14 adopted**, sixteen lines,
+  `--check` ok on sixteen.
+- **The CPU with MTVU off** (T1, a minute of play): the EE thread mean 42.3 %, max 49 % of a core (H3-P2 with MTVU on:
+  28-31 % / 62 %); a heavy title's peak still to be read.
+- **Open:** the hold / stall through PINE states (the user's question; a save takes ~0.5 s); the drive read-ahead; a
+  heavy title's long play; on a 1-player launch the chooser's pick then claim takes 2.5-4.5 s ("it's a bit awkward"
+  — the user's question (2)).
 
 ## 2026-11-08 HOME-5: PS2 SAVE met, LOAD not met; G-A14 not adopted; the bench flag stays — OPEN (to B: the PS2 load)
 

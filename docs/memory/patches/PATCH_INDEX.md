@@ -197,6 +197,7 @@ note feeds, or its gate / flag, where the records say; "—" where none applies.
 | D4_MEMORY_RECONCILIATION_2026-09-16.md | d-series | APPLIED | memory reconcile |
 | G-A10_STEP_IN_PLACE_ADOPTION.md | g-track | APPLIED | line 14 (`evidence/G_A10_STEP_IN_PLACE_ADOPTION_2026-11-02.md`) |
 | G-A13_VOD_LOG_ADOPTION.md | g-track | APPLIED | line 15, `PRIVYHUB_VOD_LOG=1` (G-A13 host, 2026-11-07) |
+| G-A14_PS2_ADOPTION.md | g-track | APPLIED | line 16, `PRIVYHUB_PS2=1` (G-A14, 2026-11-08) |
 | G-A1_OVERLAY_AND_IDENTITY_ADOPTED.md | g-track | APPLIED | lines 6 and 7 |
 | G-A2_OPUS_ADOPTED.md | g-track | APPLIED | line 8 |
 | G-A3_LINK_REPORT_ADOPTED.md | g-track | APPLIED | line 9 |

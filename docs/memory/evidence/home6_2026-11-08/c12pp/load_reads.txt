@@ -1,0 +1,14 @@
+C12'' LOAD reads (2026-11-08 17:31-17:35Z; T1)
+Stop after launch 1; launch 2 17:32:20.569Z (players=1); "PS2 pcsx2-log: 20261108T173220Z-pcsx2.log"
+the load: POST load-state slot 1 17:32:26 -> HTTP 200; game log 17:32:26.848Z "PS2 load: slot 1 pine 0x0a ok; picture ok 0.9s"
+  (before it B52's hold ran PCSX2 to the game's boot: resume 17:32:25.142 / pause 25.427 / resume 25.858 / pause 26.848)
+the per-launch PCSX2 log (443 lines, read in place): "ELF Loading:" at t 4.676 (line 237) BEFORE "Loaded state from slot 1." at t 4.995 (line 288); "TLB Miss": 0 in the whole log
+the Resume: 17:32:31.126Z "PS2 resume: hotkey"; no pause since (to 17:35:12Z)
+the encoder after the Resume (native_frame_sizes.jsonl, 17:32:31-17:33:31): 61 seconds, payload 825508-929897 B/s, 61 distinct values, the largest frame 37840-86583 B per second — varying (before the Resume, 17:32:00-31: 14 seconds, 204613-925699 B/s)
+the CPU with MTVU off (pidstat -t on PCSX2, 1 s x 60, 17:34:12-17:35:12Z, the game unpaused ~2 min after the Resume; pidstat_retake.txt):
+  EE ("CPU Thread") mean 42.3 %, max 49.0 %, p95 47.0 % of a core (moving between two cores); GS mean 7.0 % / max 10.0 %; the "MTVU" thread idle (below the top 7)
+  beside H3-P2 (MTVU on): EE mean 28-31 %, max 62 %. B's expectation for a heavy title: toward ~85-100 %. T1 is a 1-player launch of the title the user picked.
+  the busiest core (mpstat, the first minute after the Resume, 17:32:31-17:33:31): core 8 mean 22.1 % busy, max 62.4 % (core 6 21.1 % / 62.4 %); the 12-core total ~11 % busy
+  (the first per-thread sample in that first minute was lost: pidstat's output buffered and cut by its timeout; mpstat's survived; the retake is the next minute)
+the drive: equal to stage 1
+the user's line: "Stage 2 done, game loaded without issue"
