@@ -1,0 +1,585 @@
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -6910,6 +6910,84 @@
+             payload["players_session"] = dict(plan)
+         return payload
+ 
++    # B51: PrivyHub's SAVE / LOAD buttons for a PS2 session, through PINE (MsgSaveState 0x09 / MsgLoadState 0x0A)
++    def _pcsx2_save_state(self, slot: int, replace: bool = False) -> dict[str, Any]:
++        with self.lock:
++            normalized = self._normalize_save_state_slot(slot)
++            self._refresh_process()
++            if self.process is None or self.active_game is None or self._ps2 is None:
++                raise EmulatorError("No PrivyHub game session is running")
++            existing = self._save_state_slot_detail(normalized)
++            replacing = bool(existing.get("exists") or existing.get("invalid"))
++            try:
++                self._ps2.ensure_pine_pause()
++            except _ps2.PS2Error as exc:
++                raise EmulatorError(str(exc)) from exc
++            folder = self._project_path(_ps2.DATA_DIR) / "sstates"
++            folder.mkdir(parents=True, exist_ok=True)
++            before = _ps2.state_files(folder)
++            result = self._ps2.state_message(_ps2.MSG_SAVE_STATE, normalized)
++            if result != _ps2.PINE_OK:
++                self._ps2.log(f"PS2 save: slot {normalized} pine 0x09 {'no answer' if result is None else 'fail'}")
++                raise EmulatorError("PCSX2 did not acknowledge the save state")
++            got = self._ps2.wait_state_file(folder, normalized, before)
++            if got is None:
++                self._ps2.log(f"PS2 save: slot {normalized} pine 0x09 ok; file not complete in {_ps2.SAVE_BOUND_S:.1f}s")
++                raise EmulatorError("PrivyHub could not verify the saved PS2 state")
++            path, seconds = got
++            self._record_state_slot_index(normalized, path)
++            self._ps2.log(f"PS2 save: slot {normalized} pine 0x09 ok; file complete {seconds:.1f}s")
++            payload = self.status()
++            payload["action"] = "save_state"
++            payload["slot"] = normalized
++            payload["accepted"] = True
++            payload["confirmed"] = True
++            payload["replaced_existing"] = replacing
++            payload["overwrite_requires_confirmation"] = False
++            payload["control"] = "pcsx2_pine_save_state"
++            payload["pine_response"] = "ok"
++            payload["slot_detail"] = self._save_state_slot_detail(normalized)
++            payload["state_file"] = str(path.relative_to(self.project_root)).replace("\\", "/")
++            return payload
++
++    def _pcsx2_load_state(self, slot: int) -> dict[str, Any]:
++        with self.lock:
++            normalized = self._normalize_save_state_slot(slot)
++            self._refresh_process()
++            if self.process is None or self.active_game is None or self._ps2 is None:
++                raise EmulatorError("No active game session is available to load")
++            if not self._paused:
++                raise EmulatorError("Load State requires the game to be paused")
++            detail = self._save_state_slot_detail(normalized)
++            if detail.get("invalid_reason") == "zero_byte_state":
++                raise EmulatorError(f"Slot {normalized} contains an invalid 0-byte savestate; create a new save")
++            if not detail.get("exists"):
++                raise EmulatorError(f"No save state exists in Slot {normalized}")
++            try:
++                self._ps2.ensure_pine_pause()
++            except _ps2.PS2Error as exc:
++                raise EmulatorError(str(exc)) from exc
++            emulog = _ps2.pcsx2_log_path(self.project_root)
++            offset = emulog.stat().st_size if emulog.is_file() else 0
++            result = self._ps2.state_message(_ps2.MSG_LOAD_STATE, normalized)
++            if result != _ps2.PINE_OK:
++                self._ps2.log(f"PS2 load: slot {normalized} pine 0x0a {'no answer' if result is None else 'fail'}")
++                raise EmulatorError("PCSX2 did not acknowledge the load state")
++            confirmed = self._ps2.wait_log_line(emulog, offset, f"Loaded state from slot {normalized}.")
++            self._ps2.log(f"PS2 load: slot {normalized} pine 0x0a ok; {'confirmed' if confirmed else 'visual'}")
++            payload = self.status()
++            payload["action"] = "load_state"
++            payload["slot"] = normalized
++            payload["accepted"] = True
++            payload["confirmed"] = bool(confirmed)
++            payload["verification"] = "pcsx2_log" if confirmed else "visual_required"
++            payload["paused"] = True
++            payload["control"] = "pcsx2_pine_load_state"
++            payload["pine_response"] = "ok"
++            payload["slot_detail"] = self._save_state_slot_detail(normalized)
++            payload["state_file"] = detail.get("state_file")
++            return payload
++
+     def _pcsx2_pause_resume(self, action: str) -> dict[str, Any]:
+         try:
+             how = self._ps2.pause() if action == "pause" else self._ps2.resume()
+@@ -7864,9 +7942,9 @@
+         *,
+         replace: bool = False,
+     ) -> dict[str, Any]:
+-        # B49: refused in a PS2 session
++        # B51: a PS2 session saves through PINE, answering exactly as the PS1 path (B49's refusal gone for the button)
+         if self._launch_kind == "pcsx2":
+-            raise EmulatorError(PS2_NO_STATES)
++            return self._pcsx2_save_state(slot, replace)
+         with self.lock:
+             normalized = self._normalize_save_state_slot(
+                 slot
+@@ -8017,9 +8095,9 @@
+         self,
+         slot: int,
+     ) -> dict[str, Any]:
+-        # B49: refused in a PS2 session
++        # B51: a PS2 session loads through PINE, answering exactly as the PS1 path
+         if self._launch_kind == "pcsx2":
+-            raise EmulatorError(PS2_NO_STATES)
++            return self._pcsx2_load_state(slot)
+         with self.lock:
+             normalized = (
+                 self._normalize_save_state_slot(
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -4008,7 +4008,8 @@
+                 # B49: a PS2 session: no save states (the four behaviours off), said in the response and a row
+                 if _ps2_session is not None and _ps2_session.active(self._emulator):
+                     payload["ps2_mode"] = True
+-                    self._recovery._log("ps2_session", ps2_mode=True, save_states="off",
++                    # B51: SAVE / LOAD go through PINE now; `off` keeps the four automatic save-state behaviours
++                    self._recovery._log("ps2_session", ps2_mode=True, savestates="pine",
+                                         off=list(_ps2_session.OFF_BEHAVIOURS))
+                 # B41: the title's player count for the client's prompt (only a client with player_prompt=1 asks)
+                 if self._first(query, "player_prompt") == "1":
+--- a/companion/ps2_session.py
++++ b/companion/ps2_session.py
+@@ -48,6 +48,16 @@
+ KILL_WAIT_S = 2.0
+ PINE_SLOT = 28011
+ PINE_STATUS_OPCODE = 0x0F
++# B51: PINE's state messages on PCSX2 2.8.2, read from its binary's dispatch table (evidence/b51_2026-11-08/
++# pine_opcodes.txt): request [u32 size = 6][u8 opcode][u8 slot]; reply [u32 5][u8 0x00 OK | 0xFF fail]. The OK means
++# queued (the save is zipped on a thread afterwards), so a save is confirmed by its file, a load by PCSX2's log.
++MSG_SAVE_STATE = 0x09
++MSG_LOAD_STATE = 0x0A
++MSG_STATUS = PINE_STATUS_OPCODE
++PINE_OK, PINE_FAIL = 0x00, 0xFF
++SAVE_BOUND_S = 10.0            # no write time measurable by B (PCSX2 not run); ~1 s expected; HOME-5 logs the real one
++LOAD_CONFIRM_S = 3.0
++STATE_POLL_S = 0.25
+ PINE_RUNNING, PINE_PAUSED = 0, 1
+ 
+ # The save-state behaviours a PS2 session turns off (B49 S3), in the rows' words
+@@ -355,6 +365,11 @@
+     return s
+ 
+ 
++def pcsx2_log_path(project_root: Path) -> Path:
++    """B51: PCSX2's own log under its data path (read for the load's confirmation; never copied into a record)."""
++    return Path(project_root) / DATA_DIR / "config" / "PCSX2" / "logs" / "emulog.txt"
++
++
+ def ini_path(project_root: Path) -> Path:
+     return Path(project_root) / DATA_DIR / "config" / "PCSX2" / "inis" / "PCSX2.ini"
+ 
+@@ -424,6 +439,47 @@
+     return Path(base) / ("pcsx2.sock" if PINE_SLOT == 28011 else f"pcsx2.sock.{PINE_SLOT}")
+ 
+ 
++def pine_call(path: Path, opcode: int, payload: bytes = b"", timeout: float = 2.0) -> int | None:
++    """B51: one PINE message with no reply body (the state messages): the result byte, or None with no answer."""
++    try:
++        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
++            s.settimeout(timeout)
++            s.connect(str(path))
++            s.sendall(struct.pack("<IB", 5 + len(payload), opcode) + payload)
++            data = b""
++            while len(data) < 5:
++                chunk = s.recv(5 - len(data))
++                if not chunk:
++                    break
++                data += chunk
++    except OSError:
++        return None
++    if len(data) < 5:
++        return None
++    return data[4]
++
++
++def state_files(folder: Path) -> dict[str, tuple[int, int, int]]:
++    """B51: PCSX2's state files (name -> mtime ns, size, inode: PCSX2 keeps the old one as .p2s.backup and writes a new
++    file); never the drive (the hub's sstates folder only)."""
++    out: dict[str, tuple[int, int, int]] = {}
++    try:
++        for p in Path(folder).glob("*.p2s"):
++            st = p.stat()
++            out[p.name] = (st.st_mtime_ns, st.st_size, st.st_ino)
++    except OSError:
++        pass
++    return out
++
++
++def _complete_zip(p: Path) -> bool:
++    import zipfile
++    try:
++        return zipfile.is_zipfile(p)
++    except OSError:
++        return False
++
++
+ def pine_status(path: Path, timeout: float = 0.5) -> int | None:
+     """PINE MsgStatus: 0 running, 1 paused, 2 shutdown; None when the socket does not answer."""
+     try:
+@@ -450,11 +506,14 @@
+ 
+     def __init__(self, pid: int, log: Callable[[str], None], *, run: Callable[..., Any] = _run,
+                  status: Callable[[], int | None] | None = None, kill: Callable[[int, int], None] = os.kill,
+-                 sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic) -> None:
++                 sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic,
++                 pine_path: Path | None = None) -> None:
+         self.pid = int(pid)
+         self.log = log
+         self.run = run
+-        self.status = status or (lambda: pine_status(pine_socket_path()))
++        # B51: one PINE socket for the status and the state messages (a test points both at its double)
++        self.pine_path = pine_path or pine_socket_path()
++        self.status = status or (lambda: pine_status(self.pine_path))
+         self.kill = kill
+         self.sleep = sleep
+         self.clock = clock
+@@ -534,6 +593,63 @@
+         self.log(f"PS2 resume: {done}")
+         return done
+ 
++    def ensure_pine_pause(self) -> None:
++        """B51: a SIGSTOP-paused PCSX2 cannot answer PINE: SIGCONT, then its own pause hotkey confirmed by PINE."""
++        if self.paused_by != "sigstop":
++            return
++        self.kill(self.pid, signal.SIGCONT)
++        self.paused_by = None
++        end = self.clock() + PINE_LATE_S
++        st = self.status()
++        while st is None and self.clock() < end:
++            self.sleep(0.1)
++            st = self.status()
++        if st == PINE_PAUSED or (st == PINE_RUNNING and self._hotkey() and self._await(PINE_PAUSED)):
++            self.paused_by = "hotkey"
++            self.log("PS2 pause: hotkey (for a state message)")
++            return
++        self.kill(self.pid, signal.SIGSTOP)
++        self.paused_by = "sigstop"
++        raise PS2Error("PCSX2 did not answer PINE, so the state message cannot be sent")
++
++    def state_message(self, opcode: int, slot: int) -> int | None:
++        """B51: MsgSaveState / MsgLoadState with the slot byte; the result byte or None."""
++        return pine_call(self.pine_path, opcode, bytes((int(slot) & 0xFF,)))
++
++    def wait_state_file(self, folder: Path, slot: int, before: dict[str, tuple[int, int, int]],
++                        bound: float = SAVE_BOUND_S) -> tuple[Path, float] | None:
++        """B51: the slot's .p2s that is new or changed since `before`, its size steady over two polls and a whole zip;
++        (path, seconds) or None at the bound."""
++        suffix = f".{int(slot):02d}.p2s"
++        t0 = self.clock()
++        last: dict[str, int] = {}
++        while True:
++            now = state_files(folder)
++            for name, (mtime, size, ino) in now.items():
++                if not name.endswith(suffix) or before.get(name) == (mtime, size, ino) or size <= 0:
++                    continue
++                if last.get(name) == size and _complete_zip(Path(folder) / name):
++                    return Path(folder) / name, self.clock() - t0
++                last[name] = size
++            if self.clock() - t0 >= bound:
++                return None
++            self.sleep(STATE_POLL_S)
++
++    def wait_log_line(self, path: Path, offset: int, text: str, bound: float = LOAD_CONFIRM_S) -> bool:
++        """B51: PCSX2's own log line (e.g. `Loaded state from slot N.`) written after `offset`, within the bound."""
++        t0 = self.clock()
++        while True:
++            try:
++                with open(path, "rb") as fh:
++                    fh.seek(offset)
++                    if text.encode() in fh.read():
++                        return True
++            except OSError:
++                pass
++            if self.clock() - t0 >= bound:
++                return False
++            self.sleep(STATE_POLL_S)
++
+     def stop(self, process: Any) -> str:
+         """SIGCONT if stopped, SIGTERM, ≤ 5 s, else SIGKILL (≤ 2 s). Returns how it ended."""
+         t0 = self.clock()
+--- /dev/null
++++ b/tests/ps2_session/test_b51.py
+@@ -0,0 +1,253 @@
++#!/usr/bin/env python3
++"""B51 (host): PrivyHub's SAVE / LOAD buttons for a PS2 session through PINE (MsgSaveState 0x09 / MsgLoadState 0x0A,
++read from PCSX2 2.8.2's binary), answering exactly as the PS1 path. A PINE socket double (a real Unix socket thread)
++records every request and writes the state file as PCSX2 does. No PCSX2, no BIOS, no title, no real folder.
++
++    python3 -m unittest discover -s tests/ps2_session -v
++"""
++
++from __future__ import annotations
++
++import io
++import json
++import signal
++import socket
++import struct
++import sys
++import tempfile
++import threading
++import types
++import unittest
++import zipfile
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++
++import ps2_session as ps2  # noqa: E402
++from games import emulator_manager as em  # noqa: E402
++
++FAKE_STEM = "FAKE-00000 (0BADF00D)"
++
++
++def zip_bytes(n: int = 4096) -> bytes:
++    buf = io.BytesIO()
++    with zipfile.ZipFile(buf, "w") as z:
++        z.writestr("eeMemory.bin", b"\x00" * n)
++    return buf.getvalue()
++
++
++class PineDouble:
++    """A Unix-socket PINE server: answers each message with [u32 5][u8 result]; on a save it writes the slot's .p2s
++    (as PCSX2's zip thread would), on a load it appends PCSX2's log line -- each only when told to."""
++
++    def __init__(self, root: Path, result=ps2.PINE_OK, write_file=True, log_line=True, answer=True):
++        self.root = root
++        self.path = root / "pcsx2.sock"
++        self.result, self.write_file, self.log_line, self.answer = result, write_file, log_line, answer
++        self.requests: list[bytes] = []
++        self.sstates = root / "data/games/ps2/sstates"
++        self.emulog = ps2.pcsx2_log_path(root)
++        self.sstates.mkdir(parents=True, exist_ok=True)
++        self.emulog.parent.mkdir(parents=True, exist_ok=True)
++        self.emulog.write_text("[    0.1] PCSX2 log start\n")
++        self.srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
++        self.srv.bind(str(self.path))
++        self.srv.listen(4)
++        self.t = threading.Thread(target=self.serve, daemon=True)
++        self.t.start()
++
++    def serve(self):
++        while True:
++            try:
++                c, _ = self.srv.accept()
++            except OSError:
++                return
++            with c:
++                head = c.recv(4)
++                if len(head) < 4:
++                    continue
++                size = struct.unpack("<I", head)[0]
++                body = b""
++                while len(body) < size - 4:
++                    body += c.recv(size - 4 - len(body))
++                self.requests.append(head + body)
++                op, slot = body[0], (body[1] if len(body) > 1 else None)
++                if op == ps2.MSG_SAVE_STATE and self.result == ps2.PINE_OK and self.write_file:
++                    f = self.sstates / f"{FAKE_STEM}.{slot:02d}.p2s"
++                    if f.exists():                    # PCSX2's BackupSavestate: the old one kept, a new file written
++                        f.replace(f.with_name(f.name + ".backup"))
++                    f.write_bytes(zip_bytes())
++                if op == ps2.MSG_LOAD_STATE and self.result == ps2.PINE_OK and self.log_line:
++                    with open(self.emulog, "a") as fh:
++                        fh.write(f"[   12.0] Loaded state from slot {slot}.\n")
++                if self.answer:
++                    c.sendall(struct.pack("<IB", 5, self.result))
++
++    def close(self):
++        self.srv.close()
++
++
++class FakeProc:
++    pid = 4242
++    returncode = None
++    stdin = None
++
++    def poll(self):
++        return None
++
++
++def session_manager(pine: PineDouble, paused_by="hotkey", status=ps2.PINE_PAUSED):
++    m = em.EmulatorManager(pine.root, config_path=(ROOT / "companion/games/config/emulators.json"))
++    lines, kills, clock = [], [], [0.0]
++    m.process = FakeProc()
++    m.active_game = {"id": "game_ps2_fake", "system": "ps2", "title": "made-up", "relative_path": "ps2/one.chd"}
++    m._launch_kind = "pcsx2"
++    m._paused = True
++    m._ps2 = ps2.Session(4242, lines.append, run=lambda cmd, **kw: types.SimpleNamespace(stdout="77\n"),
++                         status=lambda: status, kill=lambda pid, sig: kills.append(int(sig)),
++                         sleep=lambda d: clock.__setitem__(0, clock[0] + d), clock=lambda: clock[0],
++                         pine_path=pine.path)
++    m._ps2.paused_by = paused_by
++    return m, lines, kills
++
++
++class Base(unittest.TestCase):
++    def setUp(self):
++        self.old = em._ps2
++        em._ps2 = ps2                         # what PRIVYHUB_PS2=1 sets at import
++        self.root = Path(tempfile.mkdtemp(prefix="b51_"))
++
++    def tearDown(self):
++        em._ps2 = self.old
++
++    def double(self, **kw):
++        d = PineDouble(self.root, **kw)
++        self.addCleanup(d.close)
++        return d
++
++
++class Codes(unittest.TestCase):
++    def test_the_message_codes_are_the_binarys(self):
++        # PCSX2 2.8.2, PINEServer::MainLoop's jump table (evidence/b51_2026-11-08/pine_opcodes.txt):
++        # 0x09 -> VMManager::SaveStateToSlot, 0x0a -> VMManager::LoadStateFromSlot, 0x0f -> the status
++        self.assertEqual((ps2.MSG_SAVE_STATE, ps2.MSG_LOAD_STATE, ps2.MSG_STATUS), (0x09, 0x0A, 0x0F))
++        self.assertEqual((ps2.PINE_OK, ps2.PINE_FAIL), (0x00, 0xFF))
++
++
++class Save(Base):
++    def test_save_sends_0x09_and_the_slot_and_answers_as_ps1(self):
++        d = self.double()
++        m, lines, _ = session_manager(d)
++        r = m.save_state(2)
++        self.assertEqual(d.requests, [struct.pack("<IBB", 6, 0x09, 2)])
++        for k, v in (("action", "save_state"), ("slot", 2), ("accepted", True), ("confirmed", True),
++                     ("replaced_existing", False), ("overwrite_requires_confirmation", False)):
++            self.assertEqual(r[k], v, k)
++        self.assertEqual(r["state_file"], f"data/games/ps2/sstates/{FAKE_STEM}.02.p2s")
++        self.assertTrue(r["slot_detail"]["exists"])
++        self.assertEqual(r["slot_detail"]["source"], "privyhub_game_slot_index")      # PS1's own index
++        self.assertGreater(r["slot_detail"]["size_bytes"], 0)
++        self.assertIn("modified_unix_ms", r["slot_detail"])
++        self.assertTrue(any(l.startswith("PS2 save: slot 2 pine 0x09 ok; file complete") for l in lines))
++        # the Game State list (status) shows it like a PS1 slot; slots 1 / 3 empty
++        details = {x["slot"]: x["exists"] for x in m.status()["save_state_slot_details"]}
++        self.assertEqual(details, {1: False, 2: True, 3: False})
++        # a second save of the slot replaces it, said as PS1 says it
++        self.assertTrue(m.save_state(2)["replaced_existing"])
++
++    def test_a_pine_failure_is_ps1s_error_never_the_refusal(self):
++        for kw, text in (({"result": ps2.PINE_FAIL}, "PCSX2 did not acknowledge the save state"),
++                         ({"answer": False}, "PCSX2 did not acknowledge the save state"),
++                         ({"write_file": False}, "PrivyHub could not verify the saved PS2 state")):
++            root = Path(tempfile.mkdtemp(prefix="b51_"))
++            d = PineDouble(root, **kw)
++            self.addCleanup(d.close)
++            m, lines, _ = session_manager(d)
++            with self.assertRaises(em.EmulatorError) as cm:
++                m.save_state(1)
++            self.assertEqual(str(cm.exception), text)
++            self.assertNotIn("not available", str(cm.exception))
++
++    def test_a_sigstop_pause_is_turned_into_the_hotkey_pause_first(self):
++        d = self.double()
++        seq = [ps2.PINE_RUNNING, ps2.PINE_PAUSED]
++        m, lines, kills = session_manager(d, paused_by="sigstop", status=None)
++        m._ps2.status = lambda: seq.pop(0) if len(seq) > 1 else seq[0]
++        m.save_state(1)
++        self.assertEqual(kills, [int(signal.SIGCONT)])
++        self.assertEqual(m._ps2.paused_by, "hotkey")
++        self.assertIn("PS2 pause: hotkey (for a state message)", lines)
++
++    def test_no_pine_after_sigcont_refuses_and_freezes_again(self):
++        d = self.double()
++        m, lines, kills = session_manager(d, paused_by="sigstop", status=None)
++        with self.assertRaises(em.EmulatorError):
++            m.save_state(1)
++        self.assertEqual(kills, [int(signal.SIGCONT), int(signal.SIGSTOP)])
++        self.assertEqual(d.requests, [])
++
++
++class Load(Base):
++    def test_load_sends_0x0a_and_answers_as_ps1(self):
++        d = self.double()
++        m, lines, _ = session_manager(d)
++        m.save_state(3)
++        r = m.load_state(3)
++        self.assertEqual(d.requests[-1], struct.pack("<IBB", 6, 0x0A, 3))
++        for k, v in (("action", "load_state"), ("slot", 3), ("accepted", True), ("confirmed", True),
++                     ("verification", "pcsx2_log"), ("paused", True)):
++            self.assertEqual(r[k], v, k)
++        self.assertTrue(r["slot_detail"]["exists"])
++        self.assertIn("PS2 load: slot 3 pine 0x0a ok; confirmed", lines)
++
++    def test_no_log_line_is_visual_required_as_ps1(self):
++        d = self.double(log_line=False)
++        m, _, _ = session_manager(d)
++        m.save_state(1)
++        r = m.load_state(1)
++        self.assertEqual((r["confirmed"], r["verification"]), (False, "visual_required"))
++
++    def test_ps1s_messages_for_an_empty_slot_not_paused_and_a_pine_failure(self):
++        d = self.double()
++        m, _, _ = session_manager(d)
++        with self.assertRaises(em.EmulatorError) as cm:
++            m.load_state(2)
++        self.assertEqual(str(cm.exception), "No save state exists in Slot 2")
++        m._paused = False
++        with self.assertRaises(em.EmulatorError) as cm:
++            m.load_state(2)
++        self.assertEqual(str(cm.exception), "Load State requires the game to be paused")
++        m._paused = True
++        m.save_state(2)
++        d.result = ps2.PINE_FAIL
++        with self.assertRaises(em.EmulatorError) as cm:
++            m.load_state(2)
++        self.assertEqual(str(cm.exception), "PCSX2 did not acknowledge the load state")
++
++    def test_after_a_stop_and_relaunch_the_slot_is_still_listed(self):
++        d = self.double()
++        m, _, _ = session_manager(d)
++        m.save_state(1)
++        m2, _, _ = session_manager(d)          # a new session of the same title (the index on the hub)
++        self.assertTrue(m2._save_state_slot_detail(1)["exists"])
++        self.assertTrue(m2.load_state(1)["confirmed"])
++
++
++class Ps1Untouched(Base):
++    def test_a_retroarch_session_never_takes_the_pine_branch(self):
++        m = em.EmulatorManager(self.root, config_path=(ROOT / "companion/games/config/emulators.json"))
++        called = []
++        m._pcsx2_save_state = lambda *a, **k: called.append("save")
++        m._pcsx2_load_state = lambda *a, **k: called.append("load")
++        for call in (lambda: m.save_state(1), lambda: m.load_state(1)):
++            try:
++                call()
++            except Exception:
++                pass                            # no RetroArch running here: today's own error
++        self.assertEqual(called, [])
++        self.assertIsNone(m._launch_kind)
++
++
++if __name__ == "__main__":
++    unittest.main()
+--- a/tests/ps2_session/test_ps2_session.py
++++ b/tests/ps2_session/test_ps2_session.py
+@@ -398,7 +398,8 @@
+                     return types.SimpleNamespace(stdout=f'application.process.id = "{pid}"\n')
+                 return types.SimpleNamespace(stdout="")
+             super().__init__(pid, log, run=run, status=lambda: None, kill=lambda pid, sig: calls["kill"].append(int(sig)),
+-                             sleep=lambda d: clock.__setitem__(0, clock[0] + d), clock=lambda: clock[0])
++                             sleep=lambda d: clock.__setitem__(0, clock[0] + d), clock=lambda: clock[0],
++                             pine_path=proj / "no-pine.sock")
+     P.Session = FakeSession
+     P.default_runner = lambda cmd: "deviceName = AMD Fake (RADV FAKE)\n"
+ m = em.EmulatorManager(proj, config_path=Path("companion/games/config/emulators.json").resolve())
+@@ -463,7 +464,8 @@
+         self.assertEqual(ps2.ini_get(text, "Filenames", "BIOS"), "image.bin")
+         self.assertEqual(sorted(p.name for p in (self.proj / "data/games/ps2/bios").iterdir()), ["image.bin", "image.nvm"])
+         self.assertEqual((out["pause"], out["paused"], out["resume"]), ("sigstop", True, "sigcont"))
+-        self.assertEqual(out["save_state"], "Save states are not available for a PS2 session")
++        # B51 (disclosed): no refusal any more; with no PINE answer it is a real failure, in PS1's error shape
++        self.assertEqual(out["save_state"], "PCSX2 did not acknowledge the save state")
+         self.assertTrue(out["stop"].startswith("sigterm"))
+         self.assertIsNone(out["kind_after"])
+         self.assertEqual(out["calls"]["kill"], [int(signal.SIGSTOP), int(signal.SIGCONT), int(signal.SIGTERM)])
+@@ -536,8 +538,10 @@
+         out = run_rows("1", "pcsx2")
+         self.assertTrue(out["start_ps2_mode"])
+         self.assertEqual(len(out["ps2_rows"]), 1)
+-        self.assertEqual((out["ps2_rows"][0]["save_states"], out["ps2_rows"][0]["off"]),
+-                         ("off", list(ps2.OFF_BEHAVIOURS)))
++        # B51 (disclosed): SAVE / LOAD through PINE; the four automatic behaviours still off
++        self.assertEqual((out["ps2_rows"][0]["savestates"], out["ps2_rows"][0]["off"]),
++                         ("pine", list(ps2.OFF_BEHAVIOURS)))
++        self.assertNotIn("save_states", out["ps2_rows"][0])
+         self.assertTrue(out["hb_ps2_mode"])
+ 
+     def test_a_retroarch_session_and_the_flag_absent_are_today(self):
+@@ -578,8 +582,8 @@
+         m = object.__new__(em.EmulatorManager)
+         m._launch_kind = "pcsx2"
+         self.assertEqual(m.save_recovery_state(), {"skipped": "ps2_mode", "ps2_mode": True, "state_file": None})
+-        for call in (lambda: m.save_state(1), lambda: m.load_state(1), m.load_recovery_state,
+-                     m.load_recovery_state_running, lambda: m.copy_recovery_state_to_slot(1)):
++        # B51 (disclosed): the SAVE / LOAD buttons go through PINE now (test_b51); the recovery paths stay refused
++        for call in (m.load_recovery_state, m.load_recovery_state_running, lambda: m.copy_recovery_state_to_slot(1)):
+             with self.assertRaises(em.EmulatorError):
+                 call()
+ 

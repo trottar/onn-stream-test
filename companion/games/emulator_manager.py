@@ -6910,6 +6910,84 @@ class EmulatorManager:
             payload["players_session"] = dict(plan)
         return payload
 
+    # B51: PrivyHub's SAVE / LOAD buttons for a PS2 session, through PINE (MsgSaveState 0x09 / MsgLoadState 0x0A)
+    def _pcsx2_save_state(self, slot: int, replace: bool = False) -> dict[str, Any]:
+        with self.lock:
+            normalized = self._normalize_save_state_slot(slot)
+            self._refresh_process()
+            if self.process is None or self.active_game is None or self._ps2 is None:
+                raise EmulatorError("No PrivyHub game session is running")
+            existing = self._save_state_slot_detail(normalized)
+            replacing = bool(existing.get("exists") or existing.get("invalid"))
+            try:
+                self._ps2.ensure_pine_pause()
+            except _ps2.PS2Error as exc:
+                raise EmulatorError(str(exc)) from exc
+            folder = self._project_path(_ps2.DATA_DIR) / "sstates"
+            folder.mkdir(parents=True, exist_ok=True)
+            before = _ps2.state_files(folder)
+            result = self._ps2.state_message(_ps2.MSG_SAVE_STATE, normalized)
+            if result != _ps2.PINE_OK:
+                self._ps2.log(f"PS2 save: slot {normalized} pine 0x09 {'no answer' if result is None else 'fail'}")
+                raise EmulatorError("PCSX2 did not acknowledge the save state")
+            got = self._ps2.wait_state_file(folder, normalized, before)
+            if got is None:
+                self._ps2.log(f"PS2 save: slot {normalized} pine 0x09 ok; file not complete in {_ps2.SAVE_BOUND_S:.1f}s")
+                raise EmulatorError("PrivyHub could not verify the saved PS2 state")
+            path, seconds = got
+            self._record_state_slot_index(normalized, path)
+            self._ps2.log(f"PS2 save: slot {normalized} pine 0x09 ok; file complete {seconds:.1f}s")
+            payload = self.status()
+            payload["action"] = "save_state"
+            payload["slot"] = normalized
+            payload["accepted"] = True
+            payload["confirmed"] = True
+            payload["replaced_existing"] = replacing
+            payload["overwrite_requires_confirmation"] = False
+            payload["control"] = "pcsx2_pine_save_state"
+            payload["pine_response"] = "ok"
+            payload["slot_detail"] = self._save_state_slot_detail(normalized)
+            payload["state_file"] = str(path.relative_to(self.project_root)).replace("\\", "/")
+            return payload
+
+    def _pcsx2_load_state(self, slot: int) -> dict[str, Any]:
+        with self.lock:
+            normalized = self._normalize_save_state_slot(slot)
+            self._refresh_process()
+            if self.process is None or self.active_game is None or self._ps2 is None:
+                raise EmulatorError("No active game session is available to load")
+            if not self._paused:
+                raise EmulatorError("Load State requires the game to be paused")
+            detail = self._save_state_slot_detail(normalized)
+            if detail.get("invalid_reason") == "zero_byte_state":
+                raise EmulatorError(f"Slot {normalized} contains an invalid 0-byte savestate; create a new save")
+            if not detail.get("exists"):
+                raise EmulatorError(f"No save state exists in Slot {normalized}")
+            try:
+                self._ps2.ensure_pine_pause()
+            except _ps2.PS2Error as exc:
+                raise EmulatorError(str(exc)) from exc
+            emulog = _ps2.pcsx2_log_path(self.project_root)
+            offset = emulog.stat().st_size if emulog.is_file() else 0
+            result = self._ps2.state_message(_ps2.MSG_LOAD_STATE, normalized)
+            if result != _ps2.PINE_OK:
+                self._ps2.log(f"PS2 load: slot {normalized} pine 0x0a {'no answer' if result is None else 'fail'}")
+                raise EmulatorError("PCSX2 did not acknowledge the load state")
+            confirmed = self._ps2.wait_log_line(emulog, offset, f"Loaded state from slot {normalized}.")
+            self._ps2.log(f"PS2 load: slot {normalized} pine 0x0a ok; {'confirmed' if confirmed else 'visual'}")
+            payload = self.status()
+            payload["action"] = "load_state"
+            payload["slot"] = normalized
+            payload["accepted"] = True
+            payload["confirmed"] = bool(confirmed)
+            payload["verification"] = "pcsx2_log" if confirmed else "visual_required"
+            payload["paused"] = True
+            payload["control"] = "pcsx2_pine_load_state"
+            payload["pine_response"] = "ok"
+            payload["slot_detail"] = self._save_state_slot_detail(normalized)
+            payload["state_file"] = detail.get("state_file")
+            return payload
+
     def _pcsx2_pause_resume(self, action: str) -> dict[str, Any]:
         try:
             how = self._ps2.pause() if action == "pause" else self._ps2.resume()
@@ -7864,9 +7942,9 @@ class EmulatorManager:
         *,
         replace: bool = False,
     ) -> dict[str, Any]:
-        # B49: refused in a PS2 session
+        # B51: a PS2 session saves through PINE, answering exactly as the PS1 path (B49's refusal gone for the button)
         if self._launch_kind == "pcsx2":
-            raise EmulatorError(PS2_NO_STATES)
+            return self._pcsx2_save_state(slot, replace)
         with self.lock:
             normalized = self._normalize_save_state_slot(
                 slot
@@ -8017,9 +8095,9 @@ class EmulatorManager:
         self,
         slot: int,
     ) -> dict[str, Any]:
-        # B49: refused in a PS2 session
+        # B51: a PS2 session loads through PINE, answering exactly as the PS1 path
         if self._launch_kind == "pcsx2":
-            raise EmulatorError(PS2_NO_STATES)
+            return self._pcsx2_load_state(slot)
         with self.lock:
             normalized = (
                 self._normalize_save_state_slot(

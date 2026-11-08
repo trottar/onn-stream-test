@@ -1,0 +1,34 @@
+---
+memory_schema: 1
+as_of: 2026-11-08
+status: TASK HANDOFF — HOME-5 (session A, hardware, attended ~20 min; ONE short sitting at the TV, the user with the onn and two pads paired to the onn over Bluetooth as always; nothing asked on the hub; the stages move on the user's "Stage N"; every reply begins "YOU, now:"). C12' — PrivyHub's SAVE button on a PS2 game, Stop, relaunch, LOAD → the game continues from the save (the user's line is the gate); then **G-A14: `PRIVYHUB_PS2=1` adopted as the SIXTEENTH line if C12' is met** (the user's "PS2 always on — yes", 2026-11-08) — else the bench flag stays as the user set it and the user is told which row failed. The hold / stall through PINE: not here (B51 kept them off; the user's question after). Nothing else adopted; nothing committed
+---
+
+# HOME-5 — PS2 save with the SAVE button, then PS2 on for good
+
+Read first: `SESSION_B_DONE_2026-11-08R.md` §A (**the stages, strings, hub reads and the rows C12'a-d are B's — use them exactly**), `B51_PS2_SAVESTATES_PINE_2026-11-08.md` (PINE 0x09 / 0x0A, the file check, the "queued" OK, the failure shape), `HOME_4_PLUS_2026-11-08.md` (C12 and the user's lines), `G_A13_VOD_LOG_ADOPTION_2026-11-07.md` (the adoption form), `docs/memory/CURRENT.md`.
+
+**The user's standing decisions:** PS2 always on → G-A14 here, on C12' met; the bench flag `b49-ps2.conf` is **on now at the user's decision** (set after HOME-4+) — if C12' is NOT met it **stays on** (not removed: the user chose PS2 available with the save imperfect) and the reply says which row failed and that PS2 stays bench-only. PS2 hold / stall through PINE: the user's question after this run, with the measured save time.
+
+**The stages by the user's message:** the read line = stage 1 (unattended); "Stage 2" = SAVE; "Stage 3" = LOAD after the relaunch; "Stage 4" = the close. **Every reply begins "YOU, now:" and says in the user's terms what to press and what the TV will show** (B's "You should see" lines — the same `Saved Slot 1 - <date> - <size>` as PS1).
+
+## Stage 1 — unattended (~8 min; no game, no movie; outside 04:30-05:30Z)
+
+B §A stage 1 items 1-5: fifteen adopted lines, `--check` ok, `cfe0211c…` CONFIRMED, the eleven properties empty, `privyhub-diag` active, only the two units, HEAD named — **B51 committed; if B51's files are uncommitted, stop: "YOU, now: commit B51 first, then send the read line again"**; `b49-ps2.conf` present (written if absent, disclosed); `daemon-reload`, restart; **sixteen** `PRIVYHUB_` lines read back, the journal clean, B51's host code live; `data/games/ps2/sstates/` and the drive's folders listed before (counts and mtimes; no names); the pre-registration hashed (C12'a-d as B's table; the validity rule: the save made with PrivyHub's SAVE button, not an in-game save; G-A14's condition: C12'a-d all met, the continuation by the user's line). Exit: "YOU, now: open Games → PlayStation 2, start a PS2 game you like, play about a minute, then send 'Stage 2'."
+
+## Stage 2 — C12'a, SAVE (attended)
+
+Reply first: "YOU, now: press Back, open Game State → Save → Slot 1 — the same as on PS1. You should see 'Saving state slot 1…' then 'Saved Slot 1 - date - size', and no error box. Then send 'Stage 2 done' with one line on what it showed." On "Stage 2 done": B's hub reads (the game log `PS2 save: slot 1 pine 0x09 ok; file complete <s>s` — **record the seconds**, note for B if over 5; the new `.01.p2s` on the hub with the save's time; PCSX2's log `Saved state to slot 1.`; the PS1 index holding the slot; `savestates: "pine"`; the drive unchanged). Reply: "YOU, now: Back, Stop the game, start the same PS2 game again from the list, and send 'Stage 3' once it is on screen."
+
+## Stage 3 — C12'b / c, the list and LOAD (attended)
+
+Reply first: "YOU, now: press Back, open Game State — Slot 1 should be listed with the same date and size. Pick Load → Slot 1: 'Loading state slot 1…' then 'Loaded Slot 1 - …'. Press Resume — the game should continue from exactly where you saved. Then send 'Stage 3 done' with one line: did it continue from the save?" On "Stage 3 done": B's reads (`PS2 load: slot 1 pine 0x0a ok; confirmed` or `visual`, the user's line deciding; PCSX2's `Loaded state from slot 1.`; the drive unchanged); C12'd. Reply: "YOU, now: Back and Stop the game, and send 'Stage 4' — that is all."
+
+## Stage 4 — the close, G-A14, the record (unattended)
+
+- Every property empty; nothing of PCSX2 running; the drive before = after; the state file on the hub only.
+- **G-A14, if C12'a-d are all met:** `PRIVYHUB_PS2=1` the **sixteenth** line in G-A13's applied form, as B §A stage 4 writes it (`PS2` in `ADOPTED` with the comment `G-A14 (adopted 2026-11-08, the user)`, `drop_in_ps2` required in `ok`, the wording files, `ADOPTED_E3` as it is; `patches/G-A14_PS2_ADOPTION.md`, `git apply --check`, applied, `git diff --check` clean; `e1_suite --self-test`, `test_e1_remote`, `test_c3_l4_nft_night`, `tests/ps2_session` green); `ps2.conf` written, `b49-ps2.conf` removed, `daemon-reload`, restart (no game, no movie); **sixteen** lines read back; `--check` ok on sixteen; `flags_absent`; the off switch stated (delete `ps2.conf`, `daemon-reload`, restart; reverse the diff). **Else:** `b49-ps2.conf` left as the user set it; fifteen adopted lines; `--check`'s result stated honestly (the extra drop-in named as the user's bench flag); the reply names the row that failed.
+- **The record** `evidence/HOME_5_PS2_SAVE_2026-11-08.md` + dir (the rows, the user's lines verbatim, the save's write time, the decision; no title, serial or path; `redact_check`); `KNOWN_ISSUES.md` (insertions only; the bench-flag note closed if adopted); ROADMAP (§G4 G-A14's entry; §H3 — H3 feasibility CLOSED: PS2 plays, saves and pauses from the onn, when adopted); `REMOTE_TRUST.md` (the sixteenth line and its off switch); `logs/home5_git_status.txt`; `CURRENT.md` (headings kept, under its limit, `check_memory_health` after): Verified State sixteen lines (or fifteen + the bench flag); Next Action — **H0 import slice 1a** (B45's design; the four questions for the user) and the open items (PS2 hold / stall through PINE with the measured save time; the two chooser questions; the drive read-ahead).
+- The reply: "YOU, now: commit, then answer: (1) PS2 hold / stall through saved states — yes / no (the save took <s> s); (2) a 1-player game — chooser or skip; (3) multitap pick — relaunch at once or next start" plus C12'a-d met / not met in one line each, and the line count (sixteen with PS2 always on, or fifteen + the bench flag and why).
+
+No sudo, no nft, the Opal read-only, adb for state reads only, no `setprop`; no addresses, titles, serials or paths anywhere; nothing written to the drive; nothing fetched, nothing deleted; no `e3_flag.conf`; nothing but G-A14 adopted, and only on its condition; nothing committed.

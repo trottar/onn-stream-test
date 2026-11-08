@@ -153,3 +153,9 @@ baseline copy (queue N wrote "four"; this run counts six with the same runner).
 - `redact_check.txt`, `manifest.sha256`.
 
 Patch note: `patches/B46_PLAYER_CHOOSER.md`.
+
+## Errata (2026-11-08, from HOME-4+; an insertion)
+
+- **C9's row named slot 0 (pad B as P1).** The release rule is **per pad, on whichever slot the pad holds**: slot 0
+  or slot 1. HOME-4+ met it on slot 1 (P2's pad): no claim for 30 s while Start was held, then the claim at the fresh
+  press (`evidence/HOME_4_PLUS_2026-11-08.md`).

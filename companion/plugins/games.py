@@ -4008,7 +4008,8 @@ class GamesPlugin:
                 # B49: a PS2 session: no save states (the four behaviours off), said in the response and a row
                 if _ps2_session is not None and _ps2_session.active(self._emulator):
                     payload["ps2_mode"] = True
-                    self._recovery._log("ps2_session", ps2_mode=True, save_states="off",
+                    # B51: SAVE / LOAD go through PINE now; `off` keeps the four automatic save-state behaviours
+                    self._recovery._log("ps2_session", ps2_mode=True, savestates="pine",
                                         off=list(_ps2_session.OFF_BEHAVIOURS))
                 # B41: the title's player count for the client's prompt (only a client with player_prompt=1 asks)
                 if self._first(query, "player_prompt") == "1":

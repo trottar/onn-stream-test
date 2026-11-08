@@ -48,6 +48,16 @@ TERM_WAIT_S = 5.0
 KILL_WAIT_S = 2.0
 PINE_SLOT = 28011
 PINE_STATUS_OPCODE = 0x0F
+# B51: PINE's state messages on PCSX2 2.8.2, read from its binary's dispatch table (evidence/b51_2026-11-08/
+# pine_opcodes.txt): request [u32 size = 6][u8 opcode][u8 slot]; reply [u32 5][u8 0x00 OK | 0xFF fail]. The OK means
+# queued (the save is zipped on a thread afterwards), so a save is confirmed by its file, a load by PCSX2's log.
+MSG_SAVE_STATE = 0x09
+MSG_LOAD_STATE = 0x0A
+MSG_STATUS = PINE_STATUS_OPCODE
+PINE_OK, PINE_FAIL = 0x00, 0xFF
+SAVE_BOUND_S = 10.0            # no write time measurable by B (PCSX2 not run); ~1 s expected; HOME-5 logs the real one
+LOAD_CONFIRM_S = 3.0
+STATE_POLL_S = 0.25
 PINE_RUNNING, PINE_PAUSED = 0, 1
 
 # The save-state behaviours a PS2 session turns off (B49 S3), in the rows' words
@@ -355,6 +365,11 @@ def settings_for(project_root: Path, bios_name: str, adapter: str | None, player
     return s
 
 
+def pcsx2_log_path(project_root: Path) -> Path:
+    """B51: PCSX2's own log under its data path (read for the load's confirmation; never copied into a record)."""
+    return Path(project_root) / DATA_DIR / "config" / "PCSX2" / "logs" / "emulog.txt"
+
+
 def ini_path(project_root: Path) -> Path:
     return Path(project_root) / DATA_DIR / "config" / "PCSX2" / "inis" / "PCSX2.ini"
 
@@ -424,6 +439,47 @@ def pine_socket_path(environ: Mapping[str, str] | None = None) -> Path:
     return Path(base) / ("pcsx2.sock" if PINE_SLOT == 28011 else f"pcsx2.sock.{PINE_SLOT}")
 
 
+def pine_call(path: Path, opcode: int, payload: bytes = b"", timeout: float = 2.0) -> int | None:
+    """B51: one PINE message with no reply body (the state messages): the result byte, or None with no answer."""
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            s.settimeout(timeout)
+            s.connect(str(path))
+            s.sendall(struct.pack("<IB", 5 + len(payload), opcode) + payload)
+            data = b""
+            while len(data) < 5:
+                chunk = s.recv(5 - len(data))
+                if not chunk:
+                    break
+                data += chunk
+    except OSError:
+        return None
+    if len(data) < 5:
+        return None
+    return data[4]
+
+
+def state_files(folder: Path) -> dict[str, tuple[int, int, int]]:
+    """B51: PCSX2's state files (name -> mtime ns, size, inode: PCSX2 keeps the old one as .p2s.backup and writes a new
+    file); never the drive (the hub's sstates folder only)."""
+    out: dict[str, tuple[int, int, int]] = {}
+    try:
+        for p in Path(folder).glob("*.p2s"):
+            st = p.stat()
+            out[p.name] = (st.st_mtime_ns, st.st_size, st.st_ino)
+    except OSError:
+        pass
+    return out
+
+
+def _complete_zip(p: Path) -> bool:
+    import zipfile
+    try:
+        return zipfile.is_zipfile(p)
+    except OSError:
+        return False
+
+
 def pine_status(path: Path, timeout: float = 0.5) -> int | None:
     """PINE MsgStatus: 0 running, 1 paused, 2 shutdown; None when the socket does not answer."""
     try:
@@ -450,11 +506,14 @@ class Session:
 
     def __init__(self, pid: int, log: Callable[[str], None], *, run: Callable[..., Any] = _run,
                  status: Callable[[], int | None] | None = None, kill: Callable[[int, int], None] = os.kill,
-                 sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic) -> None:
+                 sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic,
+                 pine_path: Path | None = None) -> None:
         self.pid = int(pid)
         self.log = log
         self.run = run
-        self.status = status or (lambda: pine_status(pine_socket_path()))
+        # B51: one PINE socket for the status and the state messages (a test points both at its double)
+        self.pine_path = pine_path or pine_socket_path()
+        self.status = status or (lambda: pine_status(self.pine_path))
         self.kill = kill
         self.sleep = sleep
         self.clock = clock
@@ -533,6 +592,63 @@ class Session:
         self.paused_by = None
         self.log(f"PS2 resume: {done}")
         return done
+
+    def ensure_pine_pause(self) -> None:
+        """B51: a SIGSTOP-paused PCSX2 cannot answer PINE: SIGCONT, then its own pause hotkey confirmed by PINE."""
+        if self.paused_by != "sigstop":
+            return
+        self.kill(self.pid, signal.SIGCONT)
+        self.paused_by = None
+        end = self.clock() + PINE_LATE_S
+        st = self.status()
+        while st is None and self.clock() < end:
+            self.sleep(0.1)
+            st = self.status()
+        if st == PINE_PAUSED or (st == PINE_RUNNING and self._hotkey() and self._await(PINE_PAUSED)):
+            self.paused_by = "hotkey"
+            self.log("PS2 pause: hotkey (for a state message)")
+            return
+        self.kill(self.pid, signal.SIGSTOP)
+        self.paused_by = "sigstop"
+        raise PS2Error("PCSX2 did not answer PINE, so the state message cannot be sent")
+
+    def state_message(self, opcode: int, slot: int) -> int | None:
+        """B51: MsgSaveState / MsgLoadState with the slot byte; the result byte or None."""
+        return pine_call(self.pine_path, opcode, bytes((int(slot) & 0xFF,)))
+
+    def wait_state_file(self, folder: Path, slot: int, before: dict[str, tuple[int, int, int]],
+                        bound: float = SAVE_BOUND_S) -> tuple[Path, float] | None:
+        """B51: the slot's .p2s that is new or changed since `before`, its size steady over two polls and a whole zip;
+        (path, seconds) or None at the bound."""
+        suffix = f".{int(slot):02d}.p2s"
+        t0 = self.clock()
+        last: dict[str, int] = {}
+        while True:
+            now = state_files(folder)
+            for name, (mtime, size, ino) in now.items():
+                if not name.endswith(suffix) or before.get(name) == (mtime, size, ino) or size <= 0:
+                    continue
+                if last.get(name) == size and _complete_zip(Path(folder) / name):
+                    return Path(folder) / name, self.clock() - t0
+                last[name] = size
+            if self.clock() - t0 >= bound:
+                return None
+            self.sleep(STATE_POLL_S)
+
+    def wait_log_line(self, path: Path, offset: int, text: str, bound: float = LOAD_CONFIRM_S) -> bool:
+        """B51: PCSX2's own log line (e.g. `Loaded state from slot N.`) written after `offset`, within the bound."""
+        t0 = self.clock()
+        while True:
+            try:
+                with open(path, "rb") as fh:
+                    fh.seek(offset)
+                    if text.encode() in fh.read():
+                        return True
+            except OSError:
+                pass
+            if self.clock() - t0 >= bound:
+                return False
+            self.sleep(STATE_POLL_S)
 
     def stop(self, process: Any) -> str:
         """SIGCONT if stopped, SIGTERM, ≤ 5 s, else SIGKILL (≤ 2 s). Returns how it ended."""

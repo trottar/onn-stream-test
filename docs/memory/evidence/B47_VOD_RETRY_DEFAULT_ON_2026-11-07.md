@@ -86,3 +86,13 @@ code**.
 - `redact_check.txt`, `manifest.sha256`.
 
 Patch note: `patches/B47_VOD_RETRY_DEFAULT_ON.md`.
+
+## Errata (2026-11-08, from HOME-4+; an insertion)
+
+- **C10's off check, as written for A, was wrong on screen.**
+  - B wrote that with `debug.privyhub.vod_retry 0` a drop "shows today's 'Playback error' at once".
+  - In fact, in full screen the player shows only the paused picture, with no text.
+  - Today's error path then writes its status line "Playback error - marked recently failed" *behind* the full-screen
+    player, about **32 s** after the drop (the app's `Playback failed`).
+  - The rows (no `vod_*` client rows) were right; the on-screen description is corrected here
+    (`evidence/HOME_4_PLUS_2026-11-08.md`).

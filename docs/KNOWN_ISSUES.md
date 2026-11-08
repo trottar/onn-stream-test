@@ -76,6 +76,31 @@ One line per open item: date — item — status — where it lives.
   `--check` reads not ok on the environ (16 ≠ the adopted 15) while it stands, the APK CONFIRMED. **PrivyHub's SAVE /
   LOAD answer an error on PS2 until B51.** Off: delete `b49-ps2.conf`, `daemon-reload`, restart.
 
+## 2026-11-08 B51: PS2 SAVE / LOAD through PINE, answering as PS1 (inside `PRIVYHUB_PS2=1`) — OPEN (A's HOME-5: C12')
+
+(`docs/memory/evidence/B51_PS2_SAVESTATES_PINE_2026-11-08.md`)
+
+- **Built:**
+  - PrivyHub's SAVE / LOAD buttons for a PS2 session send PCSX2 2.8.2's PINE `MsgSaveState` (0x09) / `MsgLoadState`
+    (0x0A), read from its binary;
+  - a save is confirmed by the state file completing in `data/games/ps2/sstates/` (PINE's OK only means queued);
+  - a load is confirmed by PCSX2's own log line;
+  - the PS1 slot index is written, so "Saved Slot N - date - size", the Game State list and "Saved States" look as
+    they do for PS1;
+  - B49's "not available" refusal is gone for the buttons.
+- **Open:**
+  - **Not yet seen on the hub:** a SAVE, Stop, relaunch and LOAD on the TV (C12'). The save's real write time (the
+    10-s bound is named from an expected ~1 s; B cannot run PCSX2).
+  - **For the user:** a failure answers in PS1's error shape, which over this API is **HTTP 503 `{"ok": false,
+    "error": …}` for PS1 too**. So "never 503" and "the PS1 shape" cannot both hold, and B kept the PS1 shape (never
+    the refusal).
+  - **Still off for PS2, disclosed:** the hold's rewind / state load, the slot-9 save, the stall resume's load (not
+    measurable here), the rewind (none in PCSX2), and the link give-up save.
+- **Errata from HOME-4+ (descriptions only):**
+  - C10's off check: with `vod_retry` `0` the full-screen player shows only the paused picture, and "Playback error -
+    marked recently failed" is behind it, ~32 s later;
+  - C9's release rule is per pad, slot 0 or 1.
+
 ## 2026-11-08 B50: H3-P2's PS2 fixes built (inside `PRIVYHUB_PS2=1`) — OPEN (A's HOME-4+: C11 two pads, C12 a save)
 
 (`docs/memory/evidence/B50_PS2_FIXES_2026-11-08.md`)

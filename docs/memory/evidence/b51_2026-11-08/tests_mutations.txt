@@ -1,0 +1,7 @@
+B51 mutations, /tmp/b_q10r_scratch/mut (each reverted after its run; tests/ps2_session, 65 tests)
+M1 the save sends the load opcode (0x0A): 6 errors (every save -> the double writes no file)
+M2 the save trusts PINE's OK, no file wait: 1 failure + 6 errors (a missing file passes; the index points nowhere)
+M3 the load without PS1's "requires the game to be paused" rule: 1 failure
+M4 no SIGCONT / hotkey hand-over before a state message: 2 failures
+M5 the PS1 slot index not written at a PS2 save: 3 failures + 2 errors (the slot list, the reload after a relaunch)
+M6 the slot byte dropped from the message: 6 errors

@@ -398,7 +398,8 @@ if em._ps2 is not None:
                     return types.SimpleNamespace(stdout=f'application.process.id = "{pid}"\n')
                 return types.SimpleNamespace(stdout="")
             super().__init__(pid, log, run=run, status=lambda: None, kill=lambda pid, sig: calls["kill"].append(int(sig)),
-                             sleep=lambda d: clock.__setitem__(0, clock[0] + d), clock=lambda: clock[0])
+                             sleep=lambda d: clock.__setitem__(0, clock[0] + d), clock=lambda: clock[0],
+                             pine_path=proj / "no-pine.sock")
     P.Session = FakeSession
     P.default_runner = lambda cmd: "deviceName = AMD Fake (RADV FAKE)\n"
 m = em.EmulatorManager(proj, config_path=Path("companion/games/config/emulators.json").resolve())
@@ -463,7 +464,8 @@ class Launch(unittest.TestCase):
         self.assertEqual(ps2.ini_get(text, "Filenames", "BIOS"), "image.bin")
         self.assertEqual(sorted(p.name for p in (self.proj / "data/games/ps2/bios").iterdir()), ["image.bin", "image.nvm"])
         self.assertEqual((out["pause"], out["paused"], out["resume"]), ("sigstop", True, "sigcont"))
-        self.assertEqual(out["save_state"], "Save states are not available for a PS2 session")
+        # B51 (disclosed): no refusal any more; with no PINE answer it is a real failure, in PS1's error shape
+        self.assertEqual(out["save_state"], "PCSX2 did not acknowledge the save state")
         self.assertTrue(out["stop"].startswith("sigterm"))
         self.assertIsNone(out["kind_after"])
         self.assertEqual(out["calls"]["kill"], [int(signal.SIGSTOP), int(signal.SIGCONT), int(signal.SIGTERM)])
@@ -536,8 +538,10 @@ class Rows(unittest.TestCase):
         out = run_rows("1", "pcsx2")
         self.assertTrue(out["start_ps2_mode"])
         self.assertEqual(len(out["ps2_rows"]), 1)
-        self.assertEqual((out["ps2_rows"][0]["save_states"], out["ps2_rows"][0]["off"]),
-                         ("off", list(ps2.OFF_BEHAVIOURS)))
+        # B51 (disclosed): SAVE / LOAD through PINE; the four automatic behaviours still off
+        self.assertEqual((out["ps2_rows"][0]["savestates"], out["ps2_rows"][0]["off"]),
+                         ("pine", list(ps2.OFF_BEHAVIOURS)))
+        self.assertNotIn("save_states", out["ps2_rows"][0])
         self.assertTrue(out["hb_ps2_mode"])
 
     def test_a_retroarch_session_and_the_flag_absent_are_today(self):
@@ -578,8 +582,8 @@ class SaveStatesOff(unittest.TestCase):
         m = object.__new__(em.EmulatorManager)
         m._launch_kind = "pcsx2"
         self.assertEqual(m.save_recovery_state(), {"skipped": "ps2_mode", "ps2_mode": True, "state_file": None})
-        for call in (lambda: m.save_state(1), lambda: m.load_state(1), m.load_recovery_state,
-                     m.load_recovery_state_running, lambda: m.copy_recovery_state_to_slot(1)):
+        # B51 (disclosed): the SAVE / LOAD buttons go through PINE now (test_b51); the recovery paths stay refused
+        for call in (m.load_recovery_state, m.load_recovery_state_running, lambda: m.copy_recovery_state_to_slot(1)):
             with self.assertRaises(em.EmulatorError):
                 call()
 
