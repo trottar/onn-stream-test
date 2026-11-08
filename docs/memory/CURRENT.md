@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-08
-baseline_commit: b665a9c7 (B49; H3-P2 and A's audio-wait change uncommitted beside it; the user commits)
+baseline_commit: 9682a38e (B50; HOME-4+ uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -15,14 +15,13 @@ Headings are fixed by `tools/check_memory_health.py`; do not rename. The history
 CLOSED at its checkpoint 2026-11-07** (ROADMAP §G9: 9 met, 3 deferred, 2 open; `evidence/G9_CHECKPOINT_2026-11-07.md`).
 Phase E stays ACTIVE (E1 FROZEN, E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **FIFTEEN lines**; the fifteenth
 is G-A13's host half, `PRIVYHUB_VOD_LOG=1`, on the user's "Reconnect by default yes"
-(`evidence/G_A13_VOD_LOG_ADOPTION_2026-11-07.md`). APK `8ba4d996…` CONFIRMED (HOME-3).
+(`evidence/G_A13_VOD_LOG_ADOPTION_2026-11-07.md`). APK `cfe0211c…` CONFIRMED (HOME-4+).
 
 ## Current Work Item
 
-- **H3-P2 done, uncommitted** (`evidence/H3_P2_PS2_STREAMED_2026-11-08.md`; PS2 to the onn, bench drop-in removed;
-  A's launch change waiting for PCSX2's audio, uncommitted, inert without `PRIVYHUB_PS2=1`):
-  - **T1:** launch 9.4 s, pause / resume < 0.2 s, hitch 0.0 / 10 min, P7g met; P7f 54 < 55 (first capture second).
-  - **T2:** launch 6.2 s, pause / resume < 0.2 s, hitch 6.2 / 10 min; one 643-ms drive read (P7g); P7f not measured.
+- **HOME-4+ done, uncommitted** (`evidence/HOME_4_PLUS_2026-11-08.md`): queue O's APK `cfe0211c…` CONFIRMED (C7 /
+  C9 / C8 / C10 met, off checks met); PS2 C11 met, **C12 not met** (not run: PrivyHub's SAVE button answers 503 for
+  PS2; the user wants PS2 saving to work like PS1's); **G-A14 not adopted**, PS2 bench-only, fifteen lines.
 
 ## Verified State
 
@@ -56,10 +55,10 @@ line 15 writes one redacted row per movie range request and a retrying client's 
 the name out of `tools/e1_suite.py` `ADOPTED`. Each record names its exceptions; `docs/REMOTE_TRUST.md` has the G lines.
 
 **The client.**
-- APK **`8ba4d996…` is CONFIRMED** on the onn (HOME-3; queue N: queue M + B41 + B42 + B43, B27 / B29 out;
-  `home3_installed/`), pinned in the three places. The hold and stable slots are on by default (G-A11 / G-A12; `0` /
-  `off` turn them off); the player prompt and the movie retry are in it, off (the retry's default: queue O).
-- `0132b944…` (HOME-2, the previous CONFIRMED) is kept in `home2_installed/`; `fcd924c2…` in `cl_b14_installed/`.
+- APK **`cfe0211c…` is CONFIRMED** on the onn (HOME-4+; queue O: queue N + B46 + B47; `home4_installed/`), pinned in
+  the three places. On by default: the hold and stable slots (G-A11 / G-A12), the player chooser (B46) and the movie
+  retry (B47); `0` / `off` give the old behaviour.
+- `8ba4d996…` (HOME-3, the previous CONFIRMED) is kept in `home3_installed/`; `0132b944…` in `home2_installed/`.
 - The eleven client properties are empty. One device is paired, with `identity_v2` on.
 
 **Units.** `privyhub-companion` and `privyhub-diag` are running. `privyhub-diag` is the B36 keeper:
@@ -73,7 +72,7 @@ the save is still made. Off: `PRIVYHUB_REWIND_NEEDS_LOSS=0` (`evidence/B33_NO_RE
 - G-A6 SHELVED (B23's WAN thresholds).
 - G-A8 (`PRIVYHUB_LOSS_GUARD=1`): PREPARED and never applied. The guard is out, and B27 / B29 are not in the confirmed
   APK.
-- Client flags `player_prompt` (B41; C6 not met) and `vod_retry` (B35 / B43; C5'' (b) met, (a) two rows short).
+- `PRIVYHUB_PS2=1` (B49 / B50, bench only; G-A14 waits on C12 — PS2 saving like PS1's, the user's requirement).
 - Host bench flag `PRIVYHUB_VOD_DROP_TEST` (B40 / B43, never a line).
 - `PRIVYHUB_WAN_ADAPTATION` (G5-S2; its live smoke G5-S2-L never ran) and `PRIVYHUB_ENCODER_RC` (G8-S4).
 - The 1080p rung (`PRIVYHUB_ADAPTIVE_BITRATE_TOP`) and `PRIVYHUB_PS1_LOOK` (C5).
@@ -87,12 +86,12 @@ redundancy 2/4 (`P10`); the live ladder's top 7000; the PS1 source 1920×1080 at
 
 ## Next Action
 
-1. **The user's commit** of H3-P2 (`logs/h3_p2_git_status.txt`), A's change included or held for B.
-2. **The user's questions:** PS2 always on (`PRIVYHUB_PS2=1` as the sixteenth line), yes / no; PS2 save states later
-   (through PINE), yes / no.
-3. **B: B49b** — the audio-wait change, player 2, the memory cards, the tears (the record's list).
-4. **A: HOME-4 at the TV** (`handoffs/SESSION_B_DONE_2026-11-07O.md` §A: APK `cfe0211c…`, the chooser, the retry).
-5. **Later:** H0 import (B45's four questions first); the loss guard's return (G-A8 prepared).
+1. **The user's commit** of HOME-4+ (`logs/home4_git_status.txt`), and the two chooser questions (a 1-player game:
+   chooser or skip; a multitap pick: relaunch at once or from the next start).
+2. **B: H0 import slice 1a** (B45's design), after the user's four answers: a real BIOS or OpenBIOS for PS1; `.m3u` for
+   multi-disc or refuse; a "NEW" tag; hide PS1 `.iso`.
+3. **Open:** PS2 save states through PINE (the user's yes, later; tonight's requirement: PS2 saving like PS1 — then
+   C12 and G-A14 again); the drive read-ahead; the loss guard's return (G-A8 prepared).
 
 **Open, not blocking** — the full list is `docs/KNOWN_ISSUES.md`'s open index: G8-S6 and G5-S2-L (`handoffs/QUEUE_2026-10-19N.md`,
 never run); the nightly watch's nights not written up; the overlay-down local check never scored; the reconnect over
@@ -145,7 +144,7 @@ CONFIRMED only by its pre-registered rule (CL-B7 §6); otherwise the previous CO
 
 - G adoptions: `evidence/G_A1_…`, `G_A2_…`, `G_A3_…`, `G_A4_…`, `G_A5_…`, `G_A7_…`, `TRIP_PREP_2026-10-29.md` (G-A9),
   `G_A10_…_2026-11-02.md`, `G_A13_…_2026-11-07.md`, `G9_CHECKPOINT_2026-11-07.md`; `docs/REMOTE_TRUST.md`. Client / trip: `CL_B14_…` (`fcd924c2…`), `CL_B16_…`, `TRIP_R2_…`,
-  `HOME_1_…`, `HOME_2_…`, `HOME_3_…`, queue N's `B41_…` / `B42_…` / `B43_…` and `handoffs/SESSION_B_DONE_2026-11-06N.md`.
+  `HOME_1_…`, `HOME_2_…`, `HOME_3_…`, `HOME_4_PLUS_…`, queue N's `B41_…` / `B42_…` / `B43_…` and `handoffs/SESSION_B_DONE_2026-11-06N.md`.
 - Closers: `evidence/E4_CLOSEOUT_2026-10-15.md`, `E2_S1_…`, `E1_S1_…`, `C5_CLOSE_2026-10-05.md`,
   `D_BASE_CLOSEOUT_2026-09-23.md`; `architecture/E1_WORKLOAD_SUITE.md`.
 - Indexes: `handoffs/README.md`, `patches/PATCH_INDEX.md`, `archive/INDEX.md`; `docs/ROADMAP.md`, `docs/KNOWN_ISSUES.md`,

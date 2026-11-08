@@ -102,6 +102,7 @@ note feeds, or its gate / flag, where the records say; "—" where none applies.
 | CL-B7_LEAN_APK_HASH.md | cl-b | APPLIED | APK pin, since replaced |
 | HOME-2_APK_PIN.md | cl-b | APPLIED | APK pin `0132b944…` (queue M), CONFIRMED 2026-11-06 |
 | HOME-3_APK_PIN.md | cl-b | APPLIED | APK pin `8ba4d996…` (queue N), CONFIRMED 2026-11-07 |
+| HOME-4_APK_PIN.md | cl-b | APPLIED | APK pin `cfe0211c…` (queue O), CONFIRMED 2026-11-08 |
 | D-BASE-C5A_IDR_REJECTION_COUNTERS.md | d-base | APPLIED | D-BASE (closed) |
 | D-BASE-P10_AUDIO_REDUNDANCY.md | d-base | APPLIED | D-BASE (closed) |
 | D-BASE-P1_STALE_THRESHOLD_PROBE_KNOB.md | d-base | APPLIED | D-BASE (closed) |

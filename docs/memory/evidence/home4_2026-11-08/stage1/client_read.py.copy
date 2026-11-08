@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+"""HOME-4 client read (read-only): the APK sha256 on the onn, identity_v2, hub_host set, the identity prefs' key names,
+the host's paired-device count and whether the client's device id is in it. No id, key, token or address printed."""
+import json, re, subprocess, datetime, sys
+from pathlib import Path
+sys.path.insert(0, str(Path.home()/"Projects/onn-stream-test/tools"))
+import e1_suite as m
+PKG = "com.safeiot.privyhub"
+def sh(*a):
+    return subprocess.run(["adb", "shell", "run-as", PKG, *a], capture_output=True, text=True, timeout=20).stdout
+s = sh("cat", "shared_prefs/privyhub_settings.xml")
+mm = re.search(r'<boolean name="identity_v2" value="(true|false)"', s)
+hub = re.search(r'<string name="hub_host">([^<]*)</string>', s)
+idp = sh("cat", "shared_prefs/privyhub_identity.xml")
+keys = sorted(set(re.findall(r'name="([^"]+)"', idp)))
+did = re.search(r'<string name="device_id">([^<]*)</string>', idp)
+store = json.loads((Path.home()/".config/privyhub/paired_devices.json").read_text())
+devs = store.get("devices", store) if isinstance(store, dict) else store
+txt = json.dumps(store)
+perms = None
+if isinstance(devs, dict) and did and did.group(1) in devs:
+    perms = sorted(devs[did.group(1)].get("permissions", []))
+elif isinstance(devs, list) and did:
+    for d in devs:
+        if isinstance(d, dict) and did.group(1) in json.dumps(d):
+            perms = sorted(d.get("permissions", []))
+print(json.dumps({"at_utc": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+  "device_apk_sha256": m.apk_hash(), "identity_v2": mm.group(1) if mm else None,
+  "hub_host_set": bool(hub and hub.group(1).strip()), "identity_prefs_keys": keys,
+  "host_paired_devices": len(devs), "client_device_id_present": bool(did),
+  "client_device_id_in_host_store": bool(did and did.group(1) in txt), "host_stored_permissions": perms}))

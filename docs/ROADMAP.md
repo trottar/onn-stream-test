@@ -40,6 +40,8 @@
 - **Done lately:** the G9 checkpoint (2026-11-07, `docs/memory/evidence/G9_CHECKPOINT_2026-11-07.md`); G-A13 host
   (2026-11-07, the fifteenth line, `docs/memory/evidence/G_A13_VOD_LOG_ADOPTION_2026-11-07.md`); HOME-3 (2026-11-07:
   `8ba4d996…` CONFIRMED); queue N (B41-B45).
+- **HOME-4+ (2026-11-08):** APK `cfe0211c…` (queue O) CONFIRMED, the chooser and the movie retry on by default; G-A14
+  not adopted (C12 not met), fifteen lines (`docs/memory/evidence/HOME_4_PLUS_2026-11-08.md`).
 - **Next:** B's queue O (the player prompt per the user's requirement — 1 player / 2 players / multitap chosen at every
   game start and unpause; the movie retry's client default; HOME-3's two VOD cosmetics; the PS2 probe design H3-P1),
   then A's H3-P1 run (the BIOS and a game on the external drive, the user's hand).
@@ -2484,6 +2486,12 @@ User-supplied PS2 BIOS should enter only through the G0 import boundary.
 > (uncommitted, to B49b). Then T1 and T2 launched in 6-9 s, paused / resumed in < 0.2 s, played with hitch 0.0 / 6.2 per
 > 10 min ("It felt really good to play"). Open: P7f, one 643-ms drive read in T2, player 2 not shown, the save, the
 > tears. The user's questions: PS2 as the sixteenth line; PS2 save states later.
+
+> **HOME-4+ (2026-11-08, A, the user at the TV):** `docs/memory/evidence/HOME_4_PLUS_2026-11-08.md`. Queue O's APK
+> `cfe0211c…` CONFIRMED (the chooser C7 / C9 / C8 and the movie retry C10 met with every property empty; the pin moved).
+> PS2: **C11 met** (both pads driving players 1 and 2 in T1, no tearing noticed, B50's hub lines met); **C12 not met** —
+> not run: PrivyHub's SAVE button answers 503 for PS2 (B49's design) and the user asked for PS2 saving to work like
+> PS1's, so PS2 save states (PINE) move up from "later". **G-A14 not adopted:** PS2 stays bench-only, fifteen lines.
 
 ## H4 — Extended-emulation tiers
 

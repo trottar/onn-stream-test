@@ -1,0 +1,50 @@
+diff --git a/tools/c3_l4_nft_night.py b/tools/c3_l4_nft_night.py
+index bd829ae2..2cad519d 100644
+--- a/tools/c3_l4_nft_night.py
++++ b/tools/c3_l4_nft_night.py
+@@ -127,7 +127,9 @@ PKG = "com.safeiot.privyhub"
+ # (kept at PrivyHub/app/build/cl_b14_installed/app-debug.apk).
+ # HOME-3 (CONFIRMED 2026-11-07): queue N's APK replaced HOME-2's 0132b94430d40e4e5ae78d2679fbee085f4f44273a804bc0ce8dcd040bdae24f
+ # (kept at PrivyHub/app/build/home2_installed/app-debug.apk).
+-ADOPTED_APK_SHA256 = "8ba4d996a96c14d01b1e368c20e656f767062d34b17b9308d984b8c43834605f"
++# HOME-4+ (CONFIRMED 2026-11-08): queue O's APK replaced HOME-3's 8ba4d996a96c14d01b1e368c20e656f767062d34b17b9308d984b8c43834605f
++# (kept at PrivyHub/app/build/home3_installed/app-debug.apk).
++ADOPTED_APK_SHA256 = "cfe0211ca36071901a8be3ea9f77855109cd957c3950903669997d6a0b10a65f"
+ REFERENCE_PROFILE = "native_game_720p60_reference"
+ MODE_ENV = "PRIVYHUB_ADAPTIVE_BITRATE_MODE"
+ # C3-L4-D1 (2026-10-01): live is the companion's default through the systemd drop-in
+diff --git a/tools/e1_suite.py b/tools/e1_suite.py
+index daa5f500..740671bc 100644
+--- a/tools/e1_suite.py
++++ b/tools/e1_suite.py
+@@ -85,7 +85,10 @@ PKG = "com.safeiot.privyhub"
+ # HOME-3 (installed 2026-11-06, CONFIRMED 2026-11-07): queue N's APK (queue M + B41 + B42 + B43; the hold and stable
+ # slots on by default, the prompt and the movie retry behind their properties, all empty); the previous CONFIRMED APK
+ # was 0132b944... (HOME-2), kept at home2_installed/
+-EXPECT_APK = "8ba4d996a96c14d01b1e368c20e656f767062d34b17b9308d984b8c43834605f"
++# HOME-4+ (installed 2026-11-08, CONFIRMED 2026-11-08): queue O's APK (queue N + B46 + B47; the player chooser and the
++# movie retry on by default, `0` / `off` today's; all eleven properties empty); the previous CONFIRMED APK was
++# 8ba4d996... (HOME-3), kept at home3_installed/
++EXPECT_APK = "cfe0211ca36071901a8be3ea9f77855109cd957c3950903669997d6a0b10a65f"
+ LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
+ # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
+ # is exactly these two names, at every precondition and teardown
+diff --git a/tools/test_c3_l4_nft_night.py b/tools/test_c3_l4_nft_night.py
+index ce09bb53..b603c000 100644
+--- a/tools/test_c3_l4_nft_night.py
++++ b/tools/test_c3_l4_nft_night.py
+@@ -264,11 +264,11 @@ class OnlySubset(unittest.TestCase):
+ 
+ 
+ class AdoptedApk(unittest.TestCase):
+-    """HOME-3 (2026-11-07: queue N's APK CONFIRMED; HOME-2 (2026-11-06: queue M's), TRIP-PREP (2026-10-29: CL-B14's APK back, the loss guard out) and CL-B16, CL-B15, CL-B14, CL-B13, CL-B12, CL-B11, CL-B10, BENCH-R3, BENCH-R2, CL-B7, CL-B5, CL-B4, CL-B3, CL-B2 and CL-B1 before it): the preflight checks the CONFIRMED APK."""
++    """HOME-4+ (2026-11-08: queue O's APK CONFIRMED; HOME-3 (2026-11-07: queue N's), HOME-2 (2026-11-06: queue M's), TRIP-PREP (2026-10-29: CL-B14's APK back, the loss guard out) and CL-B16, CL-B15, CL-B14, CL-B13, CL-B12, CL-B11, CL-B10, BENCH-R3, BENCH-R2, CL-B7, CL-B5, CL-B4, CL-B3, CL-B2 and CL-B1 before it): the preflight checks the CONFIRMED APK."""
+ 
+-    def test_the_preflight_expects_the_home3_queue_n_apk(self):
++    def test_the_preflight_expects_the_home4_queue_o_apk(self):
+         self.assertEqual(h.ADOPTED_APK_SHA256,
+-                         "8ba4d996a96c14d01b1e368c20e656f767062d34b17b9308d984b8c43834605f")
++                         "cfe0211ca36071901a8be3ea9f77855109cd957c3950903669997d6a0b10a65f")
+ 
+ 
+ 

@@ -1,0 +1,15 @@
+at_utc 2026-11-08T04:44-04:47Z (reads only; inside the 04:30-05:30Z window: no install, no drop-in, no restart until after 05:30Z)
+head 9682a38e B50: PS2 fixes — audio wait kept, formatted memcards, vsync, SDL3 bindings, keeper labels (B50 committed); the tree clean (git status empty)
+  (first read line 04:2xZ: B50 uncommitted -> stopped "YOU, now: commit B50 first, then send the read line again"; the user: "Committed"; the read line resent)
+drop_ins 15; e3_flag.conf absent: yes
+units: privyhub-companion.service active; privyhub-diag.service active; no other privyhub-* unit
+adb: not connected at first read (check adb False, apk MISMATCH); adb connect from the hub (no address written) -> one device in state "device"
+check: ok True, apk CONFIRMED (8ba4d996...), adb True, game False, 15 lines, retroarch 0, encoder 0, mainpid_serves_8765 True (check_before.json)
+client: 8ba4d996... on the onn, identity_v2 true, hub_host_set False, paired 1, in host store True (client_before.json)
+band: 5180 MHz (5 GHz); routing: newest token_issued lan (2026-11-08T03:14:17Z) (diag_check_before.txt)
+properties: the eleven empty (properties_before.txt)
+paths file runtime/h3_p1_paths.txt present (gitignored, never read into a record); runtime/emulators/pcsx2/ holds one AppImage
+drive (read-only): BIOS folder 3 files, games folder 118 files + 1 subfolder (mtime 2025-09-14, the one H3-P2's files-only listing left out); every file's size + mtime equal to H3-P2's before-listing; listings saved gitignored (data/games/ps2/probe/home4/)
+memcards: Mcd001.ps2 / Mcd002.ps2 both 47ebe237...8358, all 0xFF, ps2_memcard.check formatted False (memcards_before.sha256)
+no game, no movie running
+APK files: home3_installed/ 8ba4d996...605f; queue_o_built/ cfe0211c...a65f = B's; signer 455bde4effefd742... both; apksigner verify OK both

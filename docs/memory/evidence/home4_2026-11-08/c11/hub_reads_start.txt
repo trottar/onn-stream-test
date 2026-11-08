@@ -1,0 +1,11 @@
+C11 hub reads at the start (07:34Z; a two-player PS2 title, the user's pick — T1 in the record; title not copied)
+launch 07:34:02Z; PS2 game log (ps2_game_log.txt, paths stripped):
+  PS2 launch: pcsx2 players=2 multitap=false adapter=named
+  PS2 memcards: Mcd001.ps2=formatted Mcd002.ps2=formatted   (the first launch after B50)
+  PS2 audio: sink-input 0.1s
+  PS2 pause: hotkey  (then PS2 resume: hotkey at the stream's start)
+the cards after the format: Mcd001.ps2 = Mcd002.ps2 = 69358f817fa6b7766ca4eb775bba5897250f533889f64774107bdfccf3f274e1 (the post-format value); ps2_memcard.check formatted True, 8134 free clusters, no problems
+PCSX2's own log (data/games/ps2/config/PCSX2/logs/emulog.txt, read in place, mtime 07:34:17Z): Invalid binding: 0 lines; Opened gamepad ... PrivyHub Virtual Gamepad: 4 lines; "McdSlot 0 [File]: Mcd001.ps2 [8 MB, Formatted]" (and McdSlot 1 Mcd002.ps2 [8 MB, Formatted])
+the hub's ini (inis/PCSX2.ini): [Pad] MultitapPort1 = false; [Pad2] Cross = SDL-1/FaceSouth; [EmuCore/GS] VsyncEnable = true
+rows: pad_slots start count 3 (07:34:04); ps2_session row (07:34:05: ps2_mode true, save_states off); session_started 07:34:08; 19 heartbeats, ps2_mode on all
+on screen (uiautomator text 07:34Z): "Players:  1  /  [2]  /  multitap (3-4)"

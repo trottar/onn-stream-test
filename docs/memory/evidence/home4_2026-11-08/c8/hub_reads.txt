@@ -1,0 +1,10 @@
+C8 hub reads (2026-11-08 07:08-07:11Z; a four-player PS1 title — not copied; the four lines only)
+launch 1 07:08:41Z (log ...-020841-...): "PS1 multitap: port1" (the title's metadata has the multitap on: no "Multitap from the next start" expected)
+  the pick: players_chosen 4; claims P1, P2, P3 (three pads; the user: "3 controllers connected and worked")
+  exit 07:09:54 report: players 4, players_chosen 4, pad_claims slots 0-2 prompt, ports_set players 4 multitap true source metadata
+launch 2 07:10:10Z (log ...-021010-...), the relaunch with the stored pick 4:
+  game log: "PS1 multitap: port1"
+  Beetle .opt (newest, mtime 07:10:10Z = this launch): beetle_psx_hw_enable_multitap_port1 = "enabled"
+  RetroArch's command line (/proc, read): --device=1:1 --device=2:1 --device=3:1 --device=4:1
+  rows: start count 3; change P1 then P1+P2+P3, players_chosen 4
+  ports_set: in this session's exit report (read at the off check)

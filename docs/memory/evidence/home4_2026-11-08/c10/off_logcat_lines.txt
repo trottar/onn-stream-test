@@ -1,0 +1,38 @@
+11-08 03:20:00.668 E/ExoPlayerImplInternal: Playback error
+11-08 03:20:00.668 E/ExoPlayerImplInternal:   androidx.media3.exoplayer.ExoPlaybackException: Source error
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at androidx.media3.exoplayer.ExoPlayerImplInternal.handleIoException(E
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at androidx.media3.exoplayer.ExoPlayerImplInternal.handleMessage(ExoPl
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at android.os.Handler.dispatchMessage(Handler.java:102)
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at android.os.Looper.loopOnce(Looper.java:205)
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at android.os.Looper.loop(Looper.java:294)
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at android.os.HandlerThread.run(HandlerThread.java:67)
+11-08 03:20:00.668 E/ExoPlayerImplInternal:   Caused by: androidx.media3.datasource.HttpDataSource$HttpDataSourceExcepti
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at androidx.media3.datasource.DefaultHttpDataSource.open(DefaultHttpDa
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at androidx.media3.datasource.ResolvingDataSource.open(ResolvingDataSo
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at androidx.media3.datasource.StatsDataSource.open(StatsDataSource.jav
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at androidx.media3.exoplayer.source.ProgressiveMediaPeriod$ExtractingL
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at androidx.media3.exoplayer.upstream.Loader$LoadTask.run(Loader.java:
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecuto
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecut
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at java.lang.Thread.run(Thread.java:1012)
+11-08 03:20:00.668 E/ExoPlayerImplInternal:   Caused by: java.net.SocketException: Connection reset
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at java.net.SocketInputStream.read(SocketInputStream.java:191)
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at java.net.SocketInputStream.read(SocketInputStream.java:143)
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at com.android.okhttp.okio.Okio$2.read(Okio.java:138)
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at com.android.okhttp.okio.AsyncTimeout$2.read(AsyncTimeout.java:213)
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at com.android.okhttp.okio.RealBufferedSource.indexOf(RealBufferedSour
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at com.android.okhttp.okio.RealBufferedSource.indexOf(RealBufferedSour
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at com.android.okhttp.okio.RealBufferedSource.readUtf8LineStrict(RealB
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at com.android.okhttp.internal.http.Http1xStream.readResponse(Http1xSt
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at com.android.okhttp.internal.http.Http1xStream.readResponseHeaders(H
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at com.android.okhttp.internal.http.HttpEngine.readNetworkResponse(Htt
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at com.android.okhttp.internal.http.HttpEngine.readResponse(HttpEngine
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at com.android.okhttp.internal.huc.HttpURLConnectionImpl.execute(HttpU
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at com.android.okhttp.internal.huc.HttpURLConnectionImpl.getResponse(H
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at com.android.okhttp.internal.huc.HttpURLConnectionImpl.getResponseCo
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       at androidx.media3.datasource.DefaultHttpDataSource.open(DefaultHttpDa
+11-08 03:20:00.668 E/ExoPlayerImplInternal:       ... 7 more
+11-08 03:20:00.729 E/PrivyHub: Playback failed
+11-08 03:20:00.729 E/PrivyHub: 	at androidx.media3.exoplayer.ExoPlayerImplInternal.handleIoException(ExoPlayerImplIntern
+11-08 03:20:00.729 E/PrivyHub: 	at androidx.media3.exoplayer.ExoPlayerImplInternal.handleMessage(ExoPlayerImplInternal.j
+11-08 03:20:00.746 D/PrivyHub: Playback state = IDLE

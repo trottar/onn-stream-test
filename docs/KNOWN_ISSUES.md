@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-08 — HOME-4+: queue O's `cfe0211c…` CONFIRMED (C7 / C9 / C8 / C10 met, the off checks met); C11 PS2 two-player MET; C12 PS2 save NOT MET (not run: the user's requirement, PS2 saving like PS1's SAVE button); G-A14 not adopted, fifteen lines — OPEN (to B) — `## 2026-11-08 HOME-4+` below; `docs/memory/evidence/HOME_4_PLUS_2026-11-08.md`
 - 2026-11-08 — H3-P2, PS2 streamed to the onn (bench drop-in): T1 / T2 launched, paused / resumed and played (hitch 0.0 / 6.2 per 10 min); the first launch needed A's audio-wait change (uncommitted); P7f / T2's drive second / player 2 open — OPEN (to B49b) — `## 2026-11-08 H3-P2` below; `docs/memory/evidence/H3_P2_PS2_STREAMED_2026-11-08.md`
 - 2026-11-08 — H3-P1, the PS2 probe (PCSX2 v2.8.2, Vulkan, 1x): full speed with wide margins; P2's minimums and T1's one slow drive second not met; P6 not run (hub-local pads do not match the user's setup) — OPEN (to B49, then HOME-4 / P7) — `## 2026-11-08 H3-P1` below; `docs/memory/evidence/H3_P1_PS2_PROBE_2026-11-07.md`
 - 2026-11-07 — G-A13 (host), `PRIVYHUB_VOD_LOG=1` ADOPTED (the fifteenth line); the client's retry default to B (queue O) — OPEN (to B) — `## 2026-11-07 G-A13` below; `docs/memory/evidence/G_A13_VOD_LOG_ADOPTION_2026-11-07.md`
@@ -51,6 +52,25 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-08 HOME-4+: `cfe0211c…` CONFIRMED; C11 met, C12 not met; G-A14 not adopted — OPEN (to B: PS2 saving like PS1)
+
+(`docs/memory/evidence/HOME_4_PLUS_2026-11-08.md`)
+
+- **Met, every property empty:** C7 (the chooser at a start and an unpause), C9 (the held-Start release; on slot 1,
+  disclosed), C8 (multitap from the launch; off check met), C10 (a) the drop and (b) the restart (off check met). APK
+  `cfe0211c…` CONFIRMED, the pin moved.
+- **C11 met** (attempt 2): both pads drove players 1 and 2 in T1; no tearing noticed; every B50 hub line met (formatted
+  cards, no `Invalid binding`, vsync on, the ini keys).
+- **C12 not met (not run, the user's choice):** every "save" was PrivyHub's save-state button, which answers 503 "Save
+  states are not available for a PS2 session" by B49's design; no in-game card save was made. **The user's requirement:**
+  saving a PS2 game should work like PS1 and the others (the SAVE button) — PS2 save states through PINE move up from
+  "later". G-A14 not adopted; PS2 stays bench-only; fifteen lines.
+- **C10's off check, disclosed:** with `vod_retry` `0`, today's error path writes the status line behind the
+  full-screen player (and only after the player's own retries, +32 s): the user sees the movie paused, no text. B's
+  "'Playback error' at once" to correct.
+- **Open:** the in-game memory-card save on B50's card (still unshown); the drive read-ahead; the two chooser questions
+  (1-player titles; relaunch on a multitap pick).
 
 ## 2026-11-08 B50: H3-P2's PS2 fixes built (inside `PRIVYHUB_PS2=1`) — OPEN (A's HOME-4+: C11 two pads, C12 a save)
 
