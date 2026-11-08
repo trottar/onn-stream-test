@@ -29,6 +29,13 @@ if ((os.environ.get("PRIVYHUB_INPUT_HOLD") or "").strip()
         and (os.environ.get("PRIVYHUB_INPUT_HOLD_REWIND") or "").strip()):
     import hold_rewind as _hold_rewind
 
+# B49: the PS2 launch kind (PCSX2), only with PRIVYHUB_PS2=1. Absent = today: nothing imported, a `ps2` title refused.
+_ps2 = None
+if (os.environ.get("PRIVYHUB_PS2") or "").strip() == "1":
+    import ps2_session as _ps2
+
+PS2_NO_STATES = "Save states are not available for a PS2 session"
+
 
 class EmulatorError(RuntimeError):
     pass
@@ -81,6 +88,10 @@ class EmulatorManager:
 
         # B46: the session's ports from the chooser's pick (`players_chosen` on the launch); None = today's
         self._players_session: dict[str, Any] | None = None
+
+        # B49: "pcsx2" while a PS2 session runs (None = RetroArch, today) and its process helper
+        self._launch_kind: str | None = None
+        self._ps2: Any = None
 
         # PrivyHub A7.3: optional per-launch deterministic cheat profile.
         # A non-null session always uses isolated save/state storage, and any
@@ -172,6 +183,8 @@ class EmulatorManager:
         self._network_cmd_port = None
         self._active_cheat_session = None
         self._players_session = None
+        self._launch_kind = None
+        self._ps2 = None
 
         if cheat_runtime_cleanup:
             self._cleanup_cheat_runtime()
@@ -1813,6 +1826,10 @@ class EmulatorManager:
             )
         ).strip()
 
+        # B49: a PS2 title has no RetroArch controller profiles (Core default, not selectable)
+        if _ps2 is not None and system_id == _ps2.SYSTEM_ID:
+            return system_id, "", {}
+
         config = self._load_config()
         systems = config.get(
             "systems",
@@ -2110,6 +2127,10 @@ class EmulatorManager:
             return self.controller_profile(
                 game
             )
+
+    # B49: class defaults, so a manager made without __init__ (a test's) reads RetroArch (today)
+    _launch_kind: str | None = None
+    _ps2: Any = None
 
     # PRIVYHUB_PHASE_A_PS1_MULTITAP_GAME_OPTIONS
     PS1_MULTITAP_CORE_LIBRARY = "Beetle PSX HW"
@@ -5464,6 +5485,10 @@ class EmulatorManager:
                     "A PrivyHub game session is already running"
                 )
 
+            # B49: a PS2 title launches PCSX2 (only with PRIVYHUB_PS2=1; absent = today's refusal below)
+            if _ps2 is not None and str(game.get("system", "")).strip().casefold() == _ps2.SYSTEM_ID:
+                return self._launch_pcsx2(game, players_chosen)
+
             # B46: the chooser's pick for this launch (None = today: the metadata alone)
             players_plan: dict[str, Any] | None = None
             if players_chosen is not None:
@@ -6770,6 +6795,147 @@ class EmulatorManager:
         )
 
     # PrivyHub A2/A3 patch 03: verified paused game-session lifecycle.
+    # ------------------------------------------------------------------
+    # B49: the PS2 launch kind (PCSX2), reached only with PRIVYHUB_PS2=1
+    # ------------------------------------------------------------------
+
+    def _launch_pcsx2(
+        self,
+        game: dict[str, Any],
+        players_chosen: int | None,
+    ) -> dict[str, Any]:
+        import players_session as _players_session
+
+        root = self.project_root
+        try:
+            paths = _ps2.read_paths(root)
+            content = _ps2.resolve_title(paths["games_dir"], str(game.get("relative_path", "")))
+            appimage = _ps2.find_appimage(root)
+            data = self._project_path(_ps2.DATA_DIR)
+            for sub in ("config", "memcards", "sstates", "bios"):
+                (data / sub).mkdir(parents=True, exist_ok=True)
+            _ps2.bios_copy_once(paths["bios_dir"], data / "bios")
+            ini = _ps2.ini_path(root)
+            text = ini.read_text(encoding="utf-8") if ini.is_file() else ""
+            bios = _ps2.choose_bios(data / "bios", _ps2.ini_get(text, "Filenames", "BIOS"))
+        except (_ps2.PS2Error, OSError) as exc:
+            raise EmulatorError(f"PS2 launch refused: {exc}") from exc
+
+        chosen = _players_session.parse(players_chosen) if players_chosen is not None else None
+        plan = _players_session.plan(_ps2.SYSTEM_ID, chosen or 2, None)
+        adapter = _ps2.pick_adapter(_ps2.ini_get(text, "EmuCore/GS", "Adapter"), _ps2.default_runner)
+        merged = _ps2.ini_merge(
+            text,
+            _ps2.settings_for(root, bios, adapter, int(plan["ports"]), bool(plan["multitap"])),
+        )
+        ini.parent.mkdir(parents=True, exist_ok=True)
+        temporary = ini.with_name(ini.name + ".privyhub.tmp")
+        temporary.write_text(merged, encoding="utf-8")
+        temporary.replace(ini)
+
+        logs_dir = self._project_path("logs/games")
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        log_path = logs_dir / (time.strftime("%Y%m%d-%H%M%S") + "-ps2.log")
+        log_handle = log_path.open("a", encoding="utf-8", buffering=1)
+        def utc_ms() -> str:
+            t = time.time()
+            return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(t)) + f".{int((t % 1) * 1000):03d}Z"
+
+        log_handle.write("PrivyHub game session (PS2)\n")
+        log_handle.write(
+            f"{utc_ms()} PS2 launch: pcsx2 players={plan['ports']} multitap={str(bool(plan['multitap'])).lower()} "
+            f"adapter={'named' if adapter else 'unset'}\n"
+        )
+        log_handle.flush()
+
+        try:
+            process = subprocess.Popen(
+                _ps2.command(appimage, root, content),
+                cwd=str(root),
+                stdin=subprocess.DEVNULL,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                env=_ps2.launch_env(os.environ),
+                start_new_session=True,
+            )
+        except Exception as exc:
+            log_handle.close()
+            raise EmulatorError(f"PS2 launch failed: {exc}") from exc
+
+        def log_line(line: str) -> None:
+            try:
+                log_handle.write(f"{utc_ms()} {line}\n")   # UTC, for A's pause / resume timings
+                log_handle.flush()
+            except Exception:
+                pass
+
+        self.process = process
+        self.log_handle = log_handle
+        self.active_game = dict(game)
+        self.started_at = time.monotonic()
+        self._paused = False
+        self._host_window_policy = None
+        self._network_cmd_port = None
+        self._active_cheat_session = None
+        self._players_session = plan if chosen is not None else None
+        self._hold_rewind_core = None
+        self._launch_kind = "pcsx2"
+        self._ps2 = _ps2.Session(process.pid, log_line)
+
+        if self._ps2.wait_window(alive=lambda: process.poll() is None) is None:
+            try:
+                self._pcsx2_stop()
+            except Exception:
+                pass
+            raise EmulatorError("PS2 launch failed: PCSX2 showed no window")
+
+        payload = self.status()
+        payload["action"] = "launch"
+        payload["launch_kind"] = "pcsx2"
+        payload["ps2_mode"] = True
+        payload["ps2_multitap"] = bool(plan["multitap"])
+        if chosen is not None:
+            payload["players_session"] = dict(plan)
+        return payload
+
+    def _pcsx2_pause_resume(self, action: str) -> dict[str, Any]:
+        try:
+            how = self._ps2.pause() if action == "pause" else self._ps2.resume()
+        except Exception as exc:
+            raise EmulatorError(f"PS2 {action} failed: {exc}") from exc
+        self._paused = action == "pause"
+        payload = self.status()
+        payload["action"] = action
+        payload["paused"] = self._paused
+        payload["ps2_" + action] = how
+        payload["ps2_mode"] = True
+        return payload
+
+    def _pcsx2_stop(self) -> dict[str, Any]:
+        process = self.process
+        how = "gone"
+        if process is not None and self._ps2 is not None:
+            how = self._ps2.stop(process)
+        self._close_quietly(self.log_handle)
+        self.process = None
+        self.log_handle = None
+        self.active_game = None
+        self.started_at = None
+        self._paused = False
+        self._host_window_policy = None
+        self._network_cmd_port = None
+        self._active_cheat_session = None
+        self._players_session = None
+        self._launch_kind = None
+        self._ps2 = None
+        payload = self.status()
+        payload["action"] = "stop"
+        payload["stopped"] = True
+        payload["graceful"] = how.startswith("sigterm")
+        payload["save_flush_confirmed"] = how.startswith("sigterm")
+        payload["ps2_exit"] = how
+        return payload
+
     def pause(self) -> dict[str, Any]:
         with self.lock:
             self._refresh_process()
@@ -6777,6 +6943,9 @@ class EmulatorManager:
                 raise EmulatorError(
                     "No PrivyHub game session is running"
                 )
+            # B49: PCSX2's pause (the hotkey confirmed by PINE, else SIGSTOP)
+            if self._launch_kind == "pcsx2":
+                return self._pcsx2_pause_resume("pause")
 
             observed = self._retroarch_network_status()
 
@@ -6813,6 +6982,9 @@ class EmulatorManager:
                 raise EmulatorError(
                     "No PrivyHub game session is running"
                 )
+            # B49: PCSX2's resume (the way it was paused)
+            if self._launch_kind == "pcsx2":
+                return self._pcsx2_pause_resume("resume")
 
             observed = self._retroarch_network_status()
 
@@ -6993,6 +7165,9 @@ class EmulatorManager:
 
     def save_recovery_state(self) -> dict[str, Any]:
         """Same SAVE_STATE_SLOT 0 + copy mechanism, recovery destination."""
+        # B49: no save states in a PS2 session: the give-up save is skipped (no recovery prompt follows)
+        if self._launch_kind == "pcsx2":
+            return {"skipped": "ps2_mode", "ps2_mode": True, "state_file": None}
         with self.lock:
             self._refresh_process()
             if (
@@ -7101,6 +7276,9 @@ class EmulatorManager:
 
     def load_recovery_state(self) -> dict[str, Any]:
         """Stage <stem>.state.recovery as slot 0 and LOAD_STATE_SLOT 0."""
+        # B49: refused in a PS2 session
+        if self._launch_kind == "pcsx2":
+            raise EmulatorError(PS2_NO_STATES)
         with self.lock:
             self._refresh_process()
             if (
@@ -7223,6 +7401,9 @@ class EmulatorManager:
         verification, same LOAD_STATE_SLOT 0; the precondition is inverted
         and RetroArch's own `[State] Loading` line is required.
         """
+        # B49: refused in a PS2 session
+        if self._launch_kind == "pcsx2":
+            raise EmulatorError(PS2_NO_STATES)
         with self.lock:
             self._refresh_process()
             if (
@@ -7375,6 +7556,9 @@ class EmulatorManager:
         The live emulator state is not re-saved: the recovery file is what
         the user is choosing to keep.
         """
+        # B49: refused in a PS2 session
+        if self._launch_kind == "pcsx2":
+            raise EmulatorError(PS2_NO_STATES)
         with self.lock:
             normalized = self._normalize_save_state_slot(slot)
 
@@ -7668,6 +7852,9 @@ class EmulatorManager:
         *,
         replace: bool = False,
     ) -> dict[str, Any]:
+        # B49: refused in a PS2 session
+        if self._launch_kind == "pcsx2":
+            raise EmulatorError(PS2_NO_STATES)
         with self.lock:
             normalized = self._normalize_save_state_slot(
                 slot
@@ -7818,6 +8005,9 @@ class EmulatorManager:
         self,
         slot: int,
     ) -> dict[str, Any]:
+        # B49: refused in a PS2 session
+        if self._launch_kind == "pcsx2":
+            raise EmulatorError(PS2_NO_STATES)
         with self.lock:
             normalized = (
                 self._normalize_save_state_slot(
@@ -8647,6 +8837,10 @@ class EmulatorManager:
                 payload["save_flush_confirmed"] = True
                 return payload
 
+            # B49: a PCSX2 session ends by SIGTERM (SIGKILL after 5 s)
+            if self._launch_kind == "pcsx2":
+                return self._pcsx2_stop()
+
             process = self.process
             active_cheat_session = (
                 dict(self._active_cheat_session)
@@ -8765,6 +8959,8 @@ class EmulatorManager:
             self._network_cmd_port = None
             self._active_cheat_session = None
             self._players_session = None
+            self._launch_kind = None
+            self._ps2 = None
 
             if cheat_runtime_cleanup:
                 cleanup_error = self._cleanup_cheat_runtime()

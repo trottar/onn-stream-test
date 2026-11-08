@@ -2454,6 +2454,16 @@ User-supplied PS2 BIOS should enter only through the G0 import boundary.
 > moves the files, when the boundary applies. The metrics and pass rows P0-P7 are pre-registered there. The run is A's,
 > unattended then attended, and PCSX2 is fetched only with the user's go. The stream over PCSX2 is B49 (the launch,
 > pause and keep-awake need code).
+>
+> **H3-P1 run (2026-11-07 / 08, `docs/memory/evidence/H3_P1_PS2_PROBE_2026-11-07.md`):** both titles at full speed in
+> hardware Vulkan at 1x with wide margins. The capture and audio carry over by PID. P6 was not run: the user's pads are
+> always on the onn, so the play test is streamed.
+>
+> **B49 (2026-11-08, `docs/memory/evidence/B49_PS2_LAUNCH_KIND_2026-11-08.md`):** the `pcsx2` launch kind behind
+> `PRIVYHUB_PS2=1`. It covers the `ps2` system on the onn's list, the launch / pause / resume / exit, the pads (SDL,
+> DualShock 2), the multitap at launch, the hub-side BIOS copy and saves, and the save-state behaviours off for PS2. No
+> client change. Next: A's **H3-P2**, the streamed session on the TV through the onn with the user's pads, beside a PS1
+> session (`docs/memory/handoffs/SESSION_B_DONE_2026-11-08P.md`).
 
 > **H3-P1 RUN (2026-11-07 / 08, A):** `docs/memory/evidence/H3_P1_PS2_PROBE_2026-11-07.md`. PCSX2 v2.8.2 (the
 > user's "Yes"), Vulkan on RADV at 1x: T1 (light) and T2 (heavy, menu only) at full speed — P0a-P0c, P1, P3, P4 met;

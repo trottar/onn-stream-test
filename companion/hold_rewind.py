@@ -247,6 +247,10 @@ class Rewinder:
             # B8: the carried hold's split (pre-hold frames + the stall's own), only B8 writes it
             if "b8" in pending:
                 fields.update(pending["b8"])
+            # B49: a PS2 session has no save states: no rewind, no state load (the hold still resumes the game)
+            if getattr(self.emulator, "_launch_kind", None) == "pcsx2":
+                return self._row(recovery, "rewind_skipped", fields, reason="ps2_mode: no save states",
+                                 ps2_mode=True)
             # B9: a core off the allow-list is skipped; `state` loads the scratch savestate instead of rewinding
             if self.b9 is not None and self.b9.handles(pending):
                 return self.b9.release(self, recovery, fields, pending)

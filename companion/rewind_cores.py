@@ -219,6 +219,10 @@ class Cores:
         if getattr(self.emulator, "_paused", False):
             self.saves_skipped_paused += 1
             return
+        # B49: a PS2 session has no save states (slot 9 never sent)
+        if getattr(self.emulator, "_launch_kind", None) == "pcsx2":
+            self.saves_skipped_ps2 = getattr(self, "saves_skipped_ps2", 0) + 1
+            return
         port = getattr(self.emulator, "_network_cmd_port", None)
         if port is None or self.nci_factory is None:
             return

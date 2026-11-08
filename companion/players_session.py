@@ -19,7 +19,7 @@ from typing import Any
 CHOICES = (1, 2, 4)
 SNES_MULTITAP_DEVICE = 257   # RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_JOYPAD, 0) in both SNES cores' libretro sources
 NONE_DEVICE = 0              # RETRO_DEVICE_NONE
-MULTITAP_SYSTEMS = ("ps1", "snes")
+MULTITAP_SYSTEMS = ("ps1", "snes", "ps2")   # B49: ps2 = PCSX2's [Pad] MultitapPort1, no --device
 
 
 def parse(raw: Any) -> int | None:
@@ -42,6 +42,8 @@ def plan(system: str, players_chosen: int, libretro_device: int | None) -> dict[
         ports = 4 if multitap else 2
         for player in range(1, ports + 1):
             args.append(f"--device={player}:{libretro_device}" if (n > 1 or player == 1) else f"--device=2:{NONE_DEVICE}")
+    elif system == "ps2":
+        pass   # B49: PCSX2 takes its ports from its ini (ps2_session.pad_sections), not RetroArch's --device
     elif system == "snes" and multitap:
         args.append(f"--device=2:{SNES_MULTITAP_DEVICE}")
     elif n == 1:

@@ -51,6 +51,25 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
 
+## 2026-11-08 B49: the PS2 launch kind (PCSX2) built behind `PRIVYHUB_PS2=1` — OPEN (A's H3-P2, the streamed run)
+
+(`docs/memory/evidence/B49_PS2_LAUNCH_KIND_2026-11-08.md`; nothing adopted; no client change)
+
+- **Built:**
+  - PS2 titles listed on the onn from the drive's games folder (read-only);
+  - PCSX2 launched, paused, resumed and exited like any title (the hotkey confirmed by PINE, else SIGSTOP /
+    SIGCONT);
+  - the four virtual pads mapped for SDL in the DualShock 2 layout; the multitap at launch;
+  - memory cards, save states and a BIOS copy (its NVRAM) on the hub;
+  - the RetroArch save-state behaviours off for a PS2 session (`ps2_mode` rows);
+  - the P2 metric corrected (`tools/ps2_p2_frames.py`).
+- **Open:**
+  - **H3-P1's P6 / P7:** the streamed play test on the onn with the user's pads is A's H3-P2.
+  - **Recalled and unverified on the hub** (read back at H3-P2): PINE's status protocol (else every pause is a SIGSTOP,
+    still correct), PCSX2's SDL binding names and multitap pad numbering, and SDL's open order of the four pads.
+  - **No PS2 save states:** the hold has no rewind, a stall resumes without one, and a link give-up leaves no recovery
+    save.
+
 ## 2026-11-07 Queue O (B46-B48): the player chooser at every start and unpause, the movie retry on by default, the PS2 probe designed — OPEN (HOME-4, then H3-P1)
 
 (`docs/memory/handoffs/SESSION_B_DONE_2026-11-07O.md`; APK `cfe0211c…a65f` built and pinned, NOT installed;

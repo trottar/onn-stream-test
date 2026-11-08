@@ -120,6 +120,12 @@ if (os.environ.get("PRIVYHUB_IMPAIRMENT") or "").strip():
     _impairment_uplink = _impairment.uplink_gate_from_environ(os.environ)
 
 
+# B49: the PS2 system and launch kind, only with PRIVYHUB_PS2=1. Absent = today: nothing imported, SYSTEMS unchanged.
+_ps2_session = None
+if (os.environ.get("PRIVYHUB_PS2") or "").strip() == "1":
+    import ps2_session as _ps2_session
+
+
 class GamesPlugin:
     """Trusted-local, catalog-only Games plugin for PrivyHub."""
 
@@ -168,6 +174,10 @@ class GamesPlugin:
     }
 
     def __init__(self) -> None:
+        # B49: the PS2 system listed from the drive's games folder (instance only; absent = the class dict, today)
+        if _ps2_session is not None:
+            self.SYSTEMS = {**type(self).SYSTEMS, _ps2_session.SYSTEM_ID: {
+                "name": _ps2_session.SYSTEM_NAME, "folder": None, "extensions": set()}}
         self._lock = threading.RLock()
         self._cached_at = 0.0
         self._cached_games: list[dict[str, Any]] = []
@@ -1823,6 +1833,14 @@ class GamesPlugin:
         games: list[dict[str, Any]] = []
 
         for system_id, config in self.SYSTEMS.items():
+            # B49: PS2 titles read from the drive's folder, never written (no mkdir there); absent: never reached
+            if _ps2_session is not None and system_id == _ps2_session.SYSTEM_ID:
+                games.extend(_ps2_session.titles_for_plugin(
+                    _ps2_session.read_paths(self.PROJECT_ROOT)["games_dir"], self._stable_id, self._clean_name)
+                    [:max(0, self.MAX_GAMES - len(games))])
+                if len(games) >= self.MAX_GAMES:
+                    break
+                continue
             system_root = (
                 self.GAMES_ROOT / str(config["folder"])
             )
@@ -3811,6 +3829,9 @@ class GamesPlugin:
                 raise ValueError(
                     "Missing native stream heartbeat fields"
                 )
+            # B49: every heartbeat row of a PS2 session says so (absent: never set)
+            if _ps2_session is not None and _ps2_session.active(self._emulator):
+                values["ps2_mode"] = True
 
             result = append_native_stream_heartbeat(
                 self.PROJECT_ROOT,
@@ -3984,6 +4005,11 @@ class GamesPlugin:
                 # B17: the guarded client's end acknowledged (absent: no key)
                 if guard_end:
                     payload["guard_end"] = True
+                # B49: a PS2 session: no save states (the four behaviours off), said in the response and a row
+                if _ps2_session is not None and _ps2_session.active(self._emulator):
+                    payload["ps2_mode"] = True
+                    self._recovery._log("ps2_session", ps2_mode=True, save_states="off",
+                                        off=list(_ps2_session.OFF_BEHAVIOURS))
                 # B41: the title's player count for the client's prompt (only a client with player_prompt=1 asks)
                 if self._first(query, "player_prompt") == "1":
                     import player_count as _player_count
