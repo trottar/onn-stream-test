@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-08 — H3-P2, PS2 streamed to the onn (bench drop-in): T1 / T2 launched, paused / resumed and played (hitch 0.0 / 6.2 per 10 min); the first launch needed A's audio-wait change (uncommitted); P7f / T2's drive second / player 2 open — OPEN (to B49b) — `## 2026-11-08 H3-P2` below; `docs/memory/evidence/H3_P2_PS2_STREAMED_2026-11-08.md`
 - 2026-11-08 — H3-P1, the PS2 probe (PCSX2 v2.8.2, Vulkan, 1x): full speed with wide margins; P2's minimums and T1's one slow drive second not met; P6 not run (hub-local pads do not match the user's setup) — OPEN (to B49, then HOME-4 / P7) — `## 2026-11-08 H3-P1` below; `docs/memory/evidence/H3_P1_PS2_PROBE_2026-11-07.md`
 - 2026-11-07 — G-A13 (host), `PRIVYHUB_VOD_LOG=1` ADOPTED (the fifteenth line); the client's retry default to B (queue O) — OPEN (to B) — `## 2026-11-07 G-A13` below; `docs/memory/evidence/G_A13_VOD_LOG_ADOPTION_2026-11-07.md`
 - 2026-11-07 — HOME-3: C1'' / C4'' met with no property; C6 the prompt NOT MET (valid; the user's requirement: the prompt at every start and unpause); C5'' (b) met, (a) met on behaviour with two rows short; `8ba4d996…` CONFIRMED — OPEN (G-A13 the user's; C6 and two VOD items to B) — `## 2026-11-07 HOME-3` below; `docs/memory/evidence/HOME_3_DEFAULTS_PROMPT_VOD_2026-11-06.md`
@@ -95,6 +96,19 @@ One line per open item: date — item — status — where it lives.
   - Pause / exit and the launch need code (B49).
   - BIOS and games go on the movies drive at the user's folders; the G0 import boundary is deferred by the user.
   - Nothing fetched.
+
+## 2026-11-08 H3-P2: PS2 through the stream — OPEN (to B49b)
+
+(`docs/memory/evidence/H3_P2_PS2_STREAMED_2026-11-08.md`)
+
+- **The first launch failed:** the paused handoff froze PCSX2 (SIGSTOP) before its audio stream existed; no audio, no
+  release, the onn's "Game stream isn't ready". A's change (uncommitted): the launch waits ≤ 45 s for the PID's
+  sink-input. After it (and with PINE answering), both titles launched (6-9 s to play), paused / resumed in < 0.2 s and
+  played: hitch 0.0 (T1) and 6.2 (T2) per 10 min.
+- **Open:** P7f (T1 54 against 55 in the capture's first second; T2 not measured: the Back fell in the capture);
+  T2's one 643-ms drive read; player 2 barely exercised; "Save failed" (the hub memory cards unformatted); "occasional
+  frame tears"; PCSX2's invalid A / B / X / Y bindings; the keeper labels PS2 sessions PS1; the change's tests wait 45 s.
+- The user's questions: `PRIVYHUB_PS2=1` as the sixteenth line; PS2 save states later.
 
 ## 2026-11-08 H3-P1: the PS2 probe — OPEN (to B49)
 

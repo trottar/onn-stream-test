@@ -372,6 +372,32 @@ def find_window(pid: int, run: Callable[..., Any] = _run) -> str | None:
     return ids[0] if ids else None
 
 
+AUDIO_WAIT_S = 45.0
+
+
+def has_sink_input(pid: int, run: Callable[..., Any] = _run) -> bool:
+    """H3-P2 (A, 2026-11-08): does the PID own a PulseAudio sink-input yet (`application.process.id`)? The session's
+    audio is found by exactly this match, so the paused handoff must not freeze PCSX2 before its stream exists."""
+    try:
+        r = run(["pactl", "list", "sink-inputs"])
+    except Exception:
+        return False
+    return f'application.process.id = "{int(pid)}"' in (getattr(r, "stdout", "") or "")
+
+
+def wait_sink_input(pid: int, bound: float = AUDIO_WAIT_S, alive: Callable[[], bool] = lambda: True,
+                    run: Callable[..., Any] = _run, sleep: Callable[[float], None] = time.sleep,
+                    clock: Callable[[], float] = time.monotonic) -> float | None:
+    """Seconds until the PID's sink-input appeared, or None at the bound / if the process ended."""
+    t0 = clock()
+    end = t0 + bound
+    while clock() < end and alive():
+        if has_sink_input(pid, run):
+            return clock() - t0
+        sleep(0.25)
+    return None
+
+
 def pine_socket_path(environ: Mapping[str, str] | None = None) -> Path:
     env = os.environ if environ is None else environ
     base = env.get("XDG_RUNTIME_DIR") or "/tmp"

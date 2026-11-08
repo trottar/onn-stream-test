@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-11-07
-baseline_commit: 9329eeee (queue O; H3-P1 uncommitted beside it; the user commits)
+as_of: 2026-11-08
+baseline_commit: b665a9c7 (B49; H3-P2 and A's audio-wait change uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -19,10 +19,10 @@ is G-A13's host half, `PRIVYHUB_VOD_LOG=1`, on the user's "Reconnect by default 
 
 ## Current Work Item
 
-- **H3-P1 done, uncommitted** (`evidence/H3_P1_PS2_PROBE_2026-11-07.md`; PCSX2 v2.8.2, Vulkan, 1x):
-  - **T1 (light):** full speed (PCSX2 100 %); P0-P1, P3, P4 met; P2 minimum 2 (black seconds) and P5 (one 552-ms
-    drive second) not met; P6 not run (the user's pads are on the onn) → B49's streamed run.
-  - **T2 (heavy, menu only):** full speed; P0-P1, P3-P5 met; P2 minimum 53 (by 2) not met; gameplay unmeasured.
+- **H3-P2 done, uncommitted** (`evidence/H3_P2_PS2_STREAMED_2026-11-08.md`; PS2 to the onn, bench drop-in removed;
+  A's launch change waiting for PCSX2's audio, uncommitted, inert without `PRIVYHUB_PS2=1`):
+  - **T1:** launch 9.4 s, pause / resume < 0.2 s, hitch 0.0 / 10 min, P7g met; P7f 54 < 55 (first capture second).
+  - **T2:** launch 6.2 s, pause / resume < 0.2 s, hitch 6.2 / 10 min; one 643-ms drive read (P7g); P7f not measured.
 
 ## Verified State
 
@@ -87,12 +87,12 @@ redundancy 2/4 (`P10`); the live ladder's top 7000; the PS1 source 1920×1080 at
 
 ## Next Action
 
-1. **The user's commit** of H3-P1 (`logs/h3_p1_git_status.txt`).
-2. **B: B49** — PCSX2 as a launch kind, pause / exit from the onn, the SDL map of the virtual pads (the user's pads
-   are on the onn over Bluetooth), the NVRAM write, P2's metric (the record's B49 list); no keep-awake.
-3. **A: HOME-4 at the TV** (`handoffs/SESSION_B_DONE_2026-11-07O.md` §A: queue O's APK `cfe0211c…`, the chooser, the
-   movie retry by default), then P6 / P7 over the stream after B49 (the user's two answers given: PCSX2; T1 / T2).
-4. **Later:** H0 import (B45's four questions first); the loss guard's return (G-A8 prepared).
+1. **The user's commit** of H3-P2 (`logs/h3_p2_git_status.txt`), A's change included or held for B.
+2. **The user's questions:** PS2 always on (`PRIVYHUB_PS2=1` as the sixteenth line), yes / no; PS2 save states later
+   (through PINE), yes / no.
+3. **B: B49b** — the audio-wait change, player 2, the memory cards, the tears (the record's list).
+4. **A: HOME-4 at the TV** (`handoffs/SESSION_B_DONE_2026-11-07O.md` §A: APK `cfe0211c…`, the chooser, the retry).
+5. **Later:** H0 import (B45's four questions first); the loss guard's return (G-A8 prepared).
 
 **Open, not blocking** — the full list is `docs/KNOWN_ISSUES.md`'s open index: G8-S6 and G5-S2-L (`handoffs/QUEUE_2026-10-19N.md`,
 never run); the nightly watch's nights not written up; the overlay-down local check never scored; the reconnect over

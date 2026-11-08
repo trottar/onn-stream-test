@@ -6889,6 +6889,11 @@ class EmulatorManager:
                 pass
             raise EmulatorError("PS2 launch failed: PCSX2 showed no window")
 
+        # H3-P2 (A, 2026-11-08): PCSX2 opens its PulseAudio stream ~10-15 s after its window; the stream's start
+        # (and its stabilization pause) must not come before it, or the session's audio finds no sink-input.
+        waited = _ps2.wait_sink_input(process.pid, alive=lambda: process.poll() is None)
+        log_line(f"PS2 audio: sink-input {'%.1fs' % waited if waited is not None else 'none'}")
+
         payload = self.status()
         payload["action"] = "launch"
         payload["launch_kind"] = "pcsx2"

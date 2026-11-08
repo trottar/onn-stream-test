@@ -1,0 +1,153 @@
+#!/usr/bin/env python3
+"""H3-P2 hub-side samplers for one title's turn (unattended). Raw files under data/games/ps2/probe/h3p2/<tag>/
+(gitignored). Runs until /tmp/h3p2/stop_<tag> exists. Prints no path, filename or title.
+
+- mpstat -P ALL 1, iostat -x -t -d sda 1 (from start);
+- 1 Hz: gpu_busy_percent, k10temp Tctl (sensors' source), /sys/block/sda/stat, the PCSX2 PID;
+- pidstat -t -p <pid> 1 attached when PCSX2 (AppRun, a child of the companion) appears;
+- the P2 capture at minute 6-7 after the turn's first session_started (B's command), or the first whole minute after a
+  resume if paused then; then tools/ps2_p2_frames.py on it.
+"""
+import glob, json, os, re, subprocess, sys, time
+from pathlib import Path
+
+ROOT = Path.home() / "Projects/onn-stream-test"
+tag = sys.argv[1]
+out = ROOT / "data/games/ps2/probe/h3p2" / tag
+out.mkdir(parents=True, exist_ok=True)
+STOP = Path(f"/tmp/h3p2/stop_{tag}")
+REC = ROOT / "logs/games/native_stream_recovery.log"
+
+
+def utc(t=None):
+    t = time.time() if t is None else t
+    return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(t)) + f".{int((t % 1) * 1000):03d}Z"
+
+
+def companion_pid():
+    return subprocess.run(["systemctl", "--user", "show", "privyhub-companion", "-p", "MainPID", "--value"],
+                          capture_output=True, text=True).stdout.strip()
+
+
+ENV = dict(os.environ)
+for kv in Path(f"/proc/{companion_pid()}/environ").read_bytes().split(b"\0"):
+    k, _, v = kv.decode(errors="replace").partition("=")
+    if k in ("DISPLAY", "XAUTHORITY"):
+        ENV[k] = v
+
+ev = open(out / "events.jsonl", "a")
+
+
+def log(event, **kw):
+    kw = {"at_utc": utc(), "event": event, **kw}
+    ev.write(json.dumps(kw) + "\n")
+    ev.flush()
+    print(json.dumps(kw), flush=True)
+
+
+def apprun():
+    for p in Path("/proc").iterdir():
+        if p.name.isdigit():
+            try:
+                if (p / "comm").read_text().strip() == "AppRun":
+                    return int(p.name)
+            except OSError:
+                pass
+    return None
+
+
+def ps2_log():
+    xs = sorted(glob.glob(str(ROOT / "logs/games/*-ps2.log")), key=os.path.getmtime)
+    return Path(xs[-1]) if xs else None
+
+
+def paused():
+    lg = ps2_log()
+    if not lg:
+        return False
+    st = None
+    for ln in lg.read_text(errors="replace").splitlines():
+        if "PS2 pause:" in ln:
+            st = True
+        elif "PS2 resume:" in ln:
+            st = False
+    return bool(st)
+
+
+procs = []
+
+
+def bg(name, cmd):
+    procs.append(subprocess.Popen(cmd, stdout=open(out / name, "a"), stderr=subprocess.STDOUT,
+                                  env={**ENV, "LC_ALL": "C", "S_TIME_FORMAT": "ISO"}))
+
+
+t_start = time.time()
+rec_off = REC.stat().st_size
+bg("mpstat.txt", ["mpstat", "-P", "ALL", "1"])
+bg("iostat.txt", ["iostat", "-x", "-t", "-d", "sda", "1"])
+log("samplers_start")
+f = open(out / "sys_1hz.csv", "a")
+f.write("t_utc,gpu_busy_pct,tctl_c,rd_ios,rd_sectors,rd_ms,wr_ios,pcsx2_pid\n")
+pid_seen = None
+first_started = float(os.environ["H3P2_FIRST"]) if os.environ.get("H3P2_FIRST") else None
+capture_done = False
+capture_at = first_started + 360 if first_started else None
+while not STOP.exists():
+    t = time.time()
+    try:
+        g = Path("/sys/class/drm/card0/device/gpu_busy_percent").read_text().strip()
+    except OSError:
+        g = ""
+    tc = int(Path("/sys/class/hwmon/hwmon3/temp1_input").read_text()) / 1000
+    s = Path("/sys/block/sda/stat").read_text().split()
+    pid = apprun()
+    f.write(f"{utc(t)},{g},{tc},{s[0]},{s[2]},{s[3]},{s[4]},{pid or ''}\n")
+    f.flush()
+    if pid and pid != pid_seen:
+        pid_seen = pid
+        bg(f"pidstat_{pid}.txt", ["pidstat", "-t", "-u", "-h", "-p", str(pid), "1"])
+        log("pcsx2_seen", pid_attached=True)
+    # the turn's first session_started (after the samplers started)
+    if first_started is None:
+        with open(REC) as r:
+            r.seek(rec_off)
+            while True:
+                ln = r.readline()
+                if not ln:
+                    break
+                if '"event": "session_started"' in ln and pid:
+                    first_started = time.time()
+                    log("first_session_started_seen", recovery_at=json.loads(ln)["at_utc"])
+                    capture_at = first_started + 360
+                    break
+            rec_off = r.tell()
+    if capture_at and not capture_done and time.time() >= capture_at and pid:
+        if paused():
+            # wait for the resume, then the next whole minute counted from the first start
+            while paused() and not STOP.exists():
+                time.sleep(1)
+            el = time.time() - first_started
+            capture_at = first_started + 60 * (int(el // 60) + 1)
+            log("capture_deferred_after_resume", minute=int((capture_at - first_started) // 60))
+            continue
+        win = subprocess.run(["xdotool", "search", "--onlyvisible", "--pid", str(pid)], capture_output=True,
+                             text=True, env=ENV).stdout.split()
+        if not win:
+            log("capture_no_window")
+            capture_done = True
+            continue
+        m = int((time.time() - first_started) // 60)
+        log("capture_start", minute_from_first_start=m)
+        subprocess.run(["ffmpeg", "-f", "x11grab", "-framerate", "60000/1001", "-window_id", win[0], "-t", "60",
+                        "-i", ENV["DISPLAY"], "-vf", "format=yuv420p,showinfo", "-f", "null", "-"],
+                       stdout=subprocess.DEVNULL, stderr=open(out / "showinfo.txt", "w"), env=ENV)
+        log("capture_done", paused_during=paused())
+        r = subprocess.run(["python3", str(ROOT / "tools/ps2_p2_frames.py"), str(out / "showinfo.txt"), "--json",
+                            str(out / "p2.json")], capture_output=True, text=True)
+        (out / "p2_stdout.txt").write_text(r.stdout + r.stderr)
+        capture_done = True
+    time.sleep(max(0, 1 - (time.time() - t)))
+for p in procs:
+    p.terminate()
+log("samplers_stop")

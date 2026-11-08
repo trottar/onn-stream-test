@@ -2472,6 +2472,13 @@ User-supplied PS2 BIOS should enter only through the G0 import boundary.
 > the pads are on the onn over Bluetooth); it is folded into B49's streamed run (P7). B49: the PCSX2 launch kind, the
 > SDL map of the virtual pads, pause / exit, the NVRAM write; not the PID / audio workarounds or the keep-awake.
 
+> **H3-P2 RUN (2026-11-08, A, the user at the TV):** `docs/memory/evidence/H3_P2_PS2_STREAMED_2026-11-08.md`. PS2
+> streamed to the onn for the first time (`PRIVYHUB_PS2=1` in a bench drop-in, removed after). The first launch failed
+> (PCSX2 frozen before its audio stream; no release); A's change makes the launch wait for the PID's sink-input
+> (uncommitted, to B49b). Then T1 and T2 launched in 6-9 s, paused / resumed in < 0.2 s, played with hitch 0.0 / 6.2 per
+> 10 min ("It felt really good to play"). Open: P7f, one 643-ms drive read in T2, player 2 not shown, the save, the
+> tears. The user's questions: PS2 as the sixteenth line; PS2 save states later.
+
 ## H4 — Extended-emulation tiers
 
 Possible evidence-driven outcome:

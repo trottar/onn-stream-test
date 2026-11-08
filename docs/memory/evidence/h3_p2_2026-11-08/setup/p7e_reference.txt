@@ -1,0 +1,7 @@
+P7e reference, the user's rule (2026-11-08): the diagnostics keeper's PS1 sessions of the last 30 days (since 2026-10-09), LAN, game class, >= 10 min; hitch seconds per 10 min (UX-R3, the keeper's own figure)
+source: ~/privyhub_diag/sessions.jsonl (24 sessions, the keeper's whole span, 2026-11-03..2026-11-07); evidence/reads/ holds only the trip read (remote sessions, not LAN)
+PS1 sessions: 24; LAN: 22; LAN and >= 600 s: 1
+  2026-11-03T02:32:04Z length 692 s, hitch 32 s, 27.7 / 10 min, by R/C/G/L {'C': 0, 'G': 9, 'L': 25, 'R': 6}
+COUNT 1; MEDIAN 27.7; SPREAD min 27.7 max 27.7 (one session: no spread)
+P7e bar: T1's hitch seconds per 10 min <= 27.7 + 2 = 29.7
+Disclosed: the one session is G-A10's automated E1-PS1-STREAM window (2026-11-03, no user), on an evening the onn sat at -67..-69 dBm with post-FEC loss bursts; the next-longest LAN PS1 sessions are 556 s (2.2 / 10 min) and 227 s (5.3 / 10 min), under the 10-min rule.
