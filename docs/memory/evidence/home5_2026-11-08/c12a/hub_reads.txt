@@ -1,0 +1,11 @@
+C12'a SAVE hub reads (2026-11-08 16:13-16:14Z; T1 = the PS2 title the user picked, not named; launched 16:11:15Z, players=1)
+the game log: 16:13:30.044Z "PS2 pause: hotkey" (Back); 16:13:58.229Z "PS2 save: slot 1 pine 0x09 ok; file complete 0.5s"
+the API: POST save-state (slot 1) 16:13:58 -> HTTP 200
+the hub's state folder data/games/ps2/sstates/: 1 file (was 0), ends ".01.p2s", 16181232 B, mtime 16:13:57.968Z (the save's write time); no .backup (first save); name not copied (it carries the serial)
+PCSX2's own log (read in place): "OSD [SaveStateSlot1]: Saving state to slot 1..." (t 161.653) -> "OSD [SaveStateSlot1]: Saved state to slot 1." (t 161.899, 0.25 s); beside it PCSX2's own warning "MTVU speedhack is enabled, saved states may not be stable" (t 161.664)
+the PS1 slot index (read in place, key not copied): 16 games; the PS2 title's entry, system ps2, slots {"1": modified 16:13:57.968Z, size_bytes 16181232, state_file under data/games/ps2/sstates/}; the index file mtime 16:13:58Z (was 2026-10-31)
+the ps2_session row (16:11:19Z): savestates "pine", off [hold_rewind, state_save_slot9, stall_resume_load, recovery_save]
+the drive's folders: equal to stage 1 (listing + mtimes)
+the user's line: "Stage 2 done" (no line on what the onn showed: asked)
+the user's line (verbatim, 16:16:16Z): "I was able to save like a ps1 game"
+beside C12' (not a row): a LOAD in the same launch, before any Stop: 16:15:59.443Z "PS2 load: slot 1 pine 0x0a ok; confirmed"

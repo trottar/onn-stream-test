@@ -2479,6 +2479,11 @@ User-supplied PS2 BIOS should enter only through the G0 import boundary.
 > PS1 answers and index. Next: A's **HOME-5** (C12': SAVE, Stop, relaunch, LOAD on the TV), then **G-A14** if met
 > (`docs/memory/handoffs/SESSION_B_DONE_2026-11-08R.md`).
 
+> **HOME-5 (2026-11-08, A, the user at the TV):** `docs/memory/evidence/HOME_5_PS2_SAVE_2026-11-08.md`. PS2 SAVE
+> with PrivyHub's button works like PS1 (C12'a, the write 0.5 s; C12'b the list; C12'd the files); **LOAD not met**
+> (C12'c: the PINE load answers OK, then PCSX2's guest faults — `TLB Miss` — and the picture is black). **G-A14 not
+> adopted;** H3 feasibility stays OPEN. The user's bench flag `b49-ps2.conf` stays on (PS2 playable, the load to B).
+
 > **H3-P1 RUN (2026-11-07 / 08, A):** `docs/memory/evidence/H3_P1_PS2_PROBE_2026-11-07.md`. PCSX2 v2.8.2 (the
 > user's "Yes"), Vulkan on RADV at 1x: T1 (light) and T2 (heavy, menu only) at full speed — P0a-P0c, P1, P3, P4 met;
 > GPU median 17 / 23 %, Tctl max 56 / 62.5 °C. Not met as measured: P2's minimums (black seconds; the 59.94-Hz beat)

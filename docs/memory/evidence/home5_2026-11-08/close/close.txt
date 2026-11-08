@@ -1,0 +1,10 @@
+HOME-5 close (2026-11-08 16:23-16:25Z; the user's "Stage 4 and slot 1 had save state labeled"; the game stopped 16:22:54Z)
+nothing of PCSX2 running; no game; no movie
+the eleven properties empty (properties_end.txt); no setprop in this run
+the drive's two folders: before = after (files_after.json); no .p2s on the drive
+the state file: data/games/ps2/sstates/ holds one file (.01.p2s, 16181232 B, mtime 16:13:57Z), no backup; the hub only
+G-A14: NOT adopted (C12'c not met). b49-ps2.conf LEFT as the user set it (the user's decision; B's "remove" overridden). No restart at the close (nothing changed since stage 1's).
+sixteen drop-ins (drop_ins_end.txt); no e3_flag.conf; the adopted count 15 (e1_suite.ADOPTED)
+--check (check_end.json): ok false — the preflight's environ = the fifteen adopted + PRIVYHUB_PS2=1, the user's bench flag (every other key true); the APK CONFIRMED (cfe0211c...); adb true
+flags_absent (flags_absent.json): false, for the same one line (the bench flag); manager [], e4 drop-in absent
+units: privyhub-companion, privyhub-diag active, no other (units_end.txt); client cfe0211c..., paired (client_end.json)

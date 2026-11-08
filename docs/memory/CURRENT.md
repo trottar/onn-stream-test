@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-08
-baseline_commit: 9682a38e (B50; HOME-4+ uncommitted beside it; the user commits)
+baseline_commit: 7d4b067b (B51; HOME-5 uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -19,9 +19,9 @@ is G-A13's host half, `PRIVYHUB_VOD_LOG=1`, on the user's "Reconnect by default 
 
 ## Current Work Item
 
-- **HOME-4+ done, uncommitted** (`evidence/HOME_4_PLUS_2026-11-08.md`): queue O's APK `cfe0211c…` CONFIRMED (C7 /
-  C9 / C8 / C10 met, off checks met); PS2 C11 met, **C12 not met** (not run: PrivyHub's SAVE button answers 503 for
-  PS2; the user wants PS2 saving to work like PS1's); **G-A14 not adopted**, PS2 bench-only, fifteen lines.
+- **HOME-5 done, uncommitted** (`evidence/HOME_5_PS2_SAVE_2026-11-08.md`): B51 live; PS2 SAVE works like PS1 (write
+  0.5 s; C12'a / b / d met); **LOAD not met** (C12'c: black screen, PCSX2 `TLB Miss` after the PINE load; to B);
+  **G-A14 not adopted**: fifteen adopted lines + the user's bench flag.
 
 ## Verified State
 
@@ -72,9 +72,8 @@ the save is still made. Off: `PRIVYHUB_REWIND_NEEDS_LOSS=0` (`evidence/B33_NO_RE
 - G-A6 SHELVED (B23's WAN thresholds).
 - G-A8 (`PRIVYHUB_LOSS_GUARD=1`): PREPARED and never applied. The guard is out, and B27 / B29 are not in the confirmed
   APK.
-- `PRIVYHUB_PS2=1` (B49 / B50, bench only; G-A14 waits on C12 — PS2 saving like PS1's, the user's requirement).
-  **Bench drop-in on:** `b49-ps2.conf` (user, 2026-11-08) until G-A14; 16 lines, `--check` fails on
-  environ only; SAVE/LOAD error on PS2 until B51.
+- `PRIVYHUB_PS2=1` (B49-B51): **bench drop-in `b49-ps2.conf` on** at the user's decision until G-A14 (16 lines live,
+  `--check` not ok on the environ only); SAVE works, LOAD goes black (HOME-5 C12'c).
 - Host bench flag `PRIVYHUB_VOD_DROP_TEST` (B40 / B43, never a line).
 - `PRIVYHUB_WAN_ADAPTATION` (G5-S2; its live smoke G5-S2-L never ran) and `PRIVYHUB_ENCODER_RC` (G8-S4).
 - The 1080p rung (`PRIVYHUB_ADAPTIVE_BITRATE_TOP`) and `PRIVYHUB_PS1_LOOK` (C5).
@@ -88,12 +87,11 @@ redundancy 2/4 (`P10`); the live ladder's top 7000; the PS1 source 1920×1080 at
 
 ## Next Action
 
-1. **The user's commit** of HOME-4+ (`logs/home4_git_status.txt`), and the two chooser questions (a 1-player game:
-   chooser or skip; a multitap pick: relaunch at once or from the next start).
+1. **The user's commit** of HOME-5 (`logs/home5_git_status.txt`).
 2. **B: H0 import slice 1a** (B45's design), after the user's four answers: a real BIOS or OpenBIOS for PS1; `.m3u` for
    multi-disc or refuse; a "NEW" tag; hide PS1 `.iso`.
-3. **Open:** PS2 save states through PINE (the user's yes, later; tonight's requirement: PS2 saving like PS1 — then
-   C12 and G-A14 again); the drive read-ahead; the loss guard's return (G-A8 prepared).
+3. **Open:** the PS2 load (C12'c, then G-A14); PS2 hold / stall through PINE states (the user's question; save 0.5 s);
+   the two chooser questions; the drive read-ahead; the loss guard's return (G-A8 prepared).
 
 **Open, not blocking** — the full list is `docs/KNOWN_ISSUES.md`'s open index: G8-S6 and G5-S2-L (`handoffs/QUEUE_2026-10-19N.md`,
 never run); the nightly watch's nights not written up; the overlay-down local check never scored; the reconnect over
@@ -146,7 +144,7 @@ CONFIRMED only by its pre-registered rule (CL-B7 §6); otherwise the previous CO
 
 - G adoptions: `evidence/G_A1_…`, `G_A2_…`, `G_A3_…`, `G_A4_…`, `G_A5_…`, `G_A7_…`, `TRIP_PREP_2026-10-29.md` (G-A9),
   `G_A10_…_2026-11-02.md`, `G_A13_…_2026-11-07.md`, `G9_CHECKPOINT_2026-11-07.md`; `docs/REMOTE_TRUST.md`. Client / trip: `CL_B14_…` (`fcd924c2…`), `CL_B16_…`, `TRIP_R2_…`,
-  `HOME_1_…`, `HOME_2_…`, `HOME_3_…`, `HOME_4_PLUS_…`, queue N's `B41_…` / `B42_…` / `B43_…` and `handoffs/SESSION_B_DONE_2026-11-06N.md`.
+  `HOME_1_…`, `HOME_2_…`, `HOME_3_…`, `HOME_4_PLUS_…`, `HOME_5_…`, queue N's `B41_…` / `B42_…` / `B43_…` and `handoffs/SESSION_B_DONE_2026-11-06N.md`.
 - Closers: `evidence/E4_CLOSEOUT_2026-10-15.md`, `E2_S1_…`, `E1_S1_…`, `C5_CLOSE_2026-10-05.md`,
   `D_BASE_CLOSEOUT_2026-09-23.md`; `architecture/E1_WORKLOAD_SUITE.md`.
 - Indexes: `handoffs/README.md`, `patches/PATCH_INDEX.md`, `archive/INDEX.md`; `docs/ROADMAP.md`, `docs/KNOWN_ISSUES.md`,

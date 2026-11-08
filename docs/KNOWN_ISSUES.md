@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-08 — HOME-5: PS2 SAVE like PS1 MET (C12'a / b / d; the write 0.5 s); LOAD NOT MET (C12'c: black screen, PCSX2 `TLB Miss` after the PINE load); G-A14 not adopted; the user's bench flag `b49-ps2.conf` stays on — OPEN (to B: the PS2 load) — `## 2026-11-08 HOME-5` below; `docs/memory/evidence/HOME_5_PS2_SAVE_2026-11-08.md`
 - 2026-11-08 — HOME-4+: queue O's `cfe0211c…` CONFIRMED (C7 / C9 / C8 / C10 met, the off checks met); C11 PS2 two-player MET; C12 PS2 save NOT MET (not run: the user's requirement, PS2 saving like PS1's SAVE button); G-A14 not adopted, fifteen lines — OPEN (to B) — `## 2026-11-08 HOME-4+` below; `docs/memory/evidence/HOME_4_PLUS_2026-11-08.md`
 - 2026-11-08 — H3-P2, PS2 streamed to the onn (bench drop-in): T1 / T2 launched, paused / resumed and played (hitch 0.0 / 6.2 per 10 min); the first launch needed A's audio-wait change (uncommitted); P7f / T2's drive second / player 2 open — OPEN (to B49b) — `## 2026-11-08 H3-P2` below; `docs/memory/evidence/H3_P2_PS2_STREAMED_2026-11-08.md`
 - 2026-11-08 — H3-P1, the PS2 probe (PCSX2 v2.8.2, Vulkan, 1x): full speed with wide margins; P2's minimums and T1's one slow drive second not met; P6 not run (hub-local pads do not match the user's setup) — OPEN (to B49, then HOME-4 / P7) — `## 2026-11-08 H3-P1` below; `docs/memory/evidence/H3_P1_PS2_PROBE_2026-11-07.md`
@@ -52,6 +53,21 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-08 HOME-5: PS2 SAVE met, LOAD not met; G-A14 not adopted; the bench flag stays — OPEN (to B: the PS2 load)
+
+(`docs/memory/evidence/HOME_5_PS2_SAVE_2026-11-08.md`)
+
+- **Met:** C12'a SAVE with PrivyHub's button (200, `pine 0x09 ok; file complete 0.5s`, the `.01.p2s` on the hub, "I was
+  able to save like a ps1 game"); C12'b Slot 1 listed after Stop and relaunch ("slot 1 had save state labeled");
+  C12'd the file on the hub only, the drive unchanged, `savestates: "pine"`.
+- **C12'c LOAD not met:** two loads after the relaunch, both 200 / `pine 0x0a ok; confirmed` / PCSX2 `Loaded state from
+  slot 1.`, then on resume PCSX2's guest faults (`TLB Miss` at EE hardware registers): "Load is just a black screen".
+  PCSX2 warns at the load that MTVU (`vuThread = true` in the hub's ini) makes states unstable. The hub's `confirmed`
+  reads PCSX2's log line, not the game running from the state. To B.
+- **The bench flag** `b49-ps2.conf` stays at the user's decision (the HOME-4+ note below still stands, with SAVE now
+  working and LOAD failing); `--check` not ok on the environ only; G-A14 waits on C12'c.
+- **Open:** the user's question on PS2 hold / stall through PINE states (save 0.5 s; the load first).
 
 ## 2026-11-08 HOME-4+: `cfe0211c…` CONFIRMED; C11 met, C12 not met; G-A14 not adopted — OPEN (to B: PS2 saving like PS1)
 
