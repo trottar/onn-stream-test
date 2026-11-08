@@ -71,6 +71,10 @@ One line per open item: date — item — status — where it lives.
   "'Playback error' at once" to correct.
 - **Open:** the in-game memory-card save on B50's card (still unshown); the drive read-ahead; the two chooser questions
   (1-player titles; relaunch on a multitap pick).
+- **Bench flag on by the user's decision (2026-11-08, 08:32Z):** `PRIVYHUB_PS2=1` in the drop-in `b49-ps2.conf` (as
+  HOME-4+ stage 1 wrote it) stands until G-A14 adopts it: sixteen `PRIVYHUB_` lines, the "PlayStation 2" entry listed;
+  `--check` reads not ok on the environ (16 ≠ the adopted 15) while it stands, the APK CONFIRMED. **PrivyHub's SAVE /
+  LOAD answer an error on PS2 until B51.** Off: delete `b49-ps2.conf`, `daemon-reload`, restart.
 
 ## 2026-11-08 B50: H3-P2's PS2 fixes built (inside `PRIVYHUB_PS2=1`) — OPEN (A's HOME-4+: C11 two pads, C12 a save)
 

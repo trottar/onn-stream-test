@@ -73,6 +73,8 @@ the save is still made. Off: `PRIVYHUB_REWIND_NEEDS_LOSS=0` (`evidence/B33_NO_RE
 - G-A8 (`PRIVYHUB_LOSS_GUARD=1`): PREPARED and never applied. The guard is out, and B27 / B29 are not in the confirmed
   APK.
 - `PRIVYHUB_PS2=1` (B49 / B50, bench only; G-A14 waits on C12 — PS2 saving like PS1's, the user's requirement).
+  **Bench drop-in on:** `b49-ps2.conf` (user, 2026-11-08) until G-A14; 16 lines, `--check` fails on
+  environ only; SAVE/LOAD error on PS2 until B51.
 - Host bench flag `PRIVYHUB_VOD_DROP_TEST` (B40 / B43, never a line).
 - `PRIVYHUB_WAN_ADAPTATION` (G5-S2; its live smoke G5-S2-L never ran) and `PRIVYHUB_ENCODER_RC` (G8-S4).
 - The 1080p rung (`PRIVYHUB_ADAPTIVE_BITRATE_TOP`) and `PRIVYHUB_PS1_LOOK` (C5).
