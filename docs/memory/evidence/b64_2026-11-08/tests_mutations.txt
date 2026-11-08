@@ -1,0 +1,10 @@
+B64 mutations, each in a fresh copy (removed after); tests/b64_stale_pad_rows once per mutation.
+First run:
+M1 the tag condition dropped: CAUGHT -- tests/b64_stale_pad_rows: Ran 4 tests in 0.001s / FAILED (failures=2)
+M2 the start does not arm it: CAUGHT -- tests/b64_stale_pad_rows: Ran 4 tests in 0.001s / FAILED (failures=2)
+M3 a claim does not disarm it: SURVIVED -- tests/b64_stale_pad_rows: Ran 4 tests in 0.000s / OK
+
+M3 survived (after a claim, no test sent an unclaimed row). Test added; all three re-run:
+M1 the tag condition dropped: CAUGHT -- tests/b64_stale_pad_rows: Ran 5 tests in 0.001s / FAILED (failures=2)
+M2 the start does not arm it: CAUGHT -- tests/b64_stale_pad_rows: Ran 5 tests in 0.001s / FAILED (failures=2)
+M3 a claim does not disarm it: CAUGHT -- tests/b64_stale_pad_rows: Ran 5 tests in 0.001s / FAILED (failures=1)

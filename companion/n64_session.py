@@ -223,6 +223,126 @@ def write_options(config_dir: Path, core: str) -> dict[str, Any]:
     return {"library": library, "keys": len(OPTIONS), "written": True}
 
 
+# --- B62: the layout (a core remap written and verified at launch; a per-title value from the metadata) ---------
+
+# RetroArch's remap values for a button bound to an analog half-axis (recalled: 16-23 = left X+ X- Y+ Y-, right X+ X-
+# Y+ Y-; the right stick is Mupen64Plus-Next's "C Buttons X / Y", so right X+ = C-right, right Y- = C-up).
+RIGHT_X_PLUS, RIGHT_Y_MINUS = "20", "23"
+LAYOUTS: dict[str, dict[str, str]] = {
+    "face_c": {"btn_a": RIGHT_X_PLUS, "btn_x": RIGHT_Y_MINUS},   # east (o) = C-right, north (triangle) = C-up
+    "core": {},                                                   # the core's own layout (o / triangle idle)
+}
+DEFAULT_LAYOUT = "face_c"
+LAYOUT_KEY = "n64_layout"                                          # controller_overrides.json games[<id>]
+LABELS = {
+    "face_c": "A = \u2a09, B = \u25a1, C-buttons = right stick (also \u25b3 = C-up, \u25cb = C-right), Z = L2",
+    "core": "A = \u2a09, B = \u25a1, C-buttons = right stick, Z = L2",
+}
+INPUT_CFG_LINES = ['auto_remaps_enable = "true"', 'remap_save_on_exit = "false"']
+_RMP_LINE = re.compile(r'^\s*(input_player\d+_[a-z0-9_]+)\s*=\s*"([^"]*)"\s*$')
+
+
+def layout_of(entry: Any) -> tuple[str, str | None]:
+    """(the layout, the ignored value or None) from a title's controller-overrides entry."""
+    raw = entry.get(LAYOUT_KEY) if isinstance(entry, dict) else None
+    if raw is None or str(raw).strip() == "":
+        return DEFAULT_LAYOUT, None
+    value = str(raw).strip().casefold()
+    if value in LAYOUTS:
+        return value, None
+    return DEFAULT_LAYOUT, str(raw)[:32]
+
+
+def layout_label(layout: str) -> str:
+    return LABELS.get(layout, LABELS[DEFAULT_LAYOUT])
+
+
+def remap_binds(layout: str) -> dict[str, str]:
+    return {f"input_player{p}_{k}": v for p in range(1, PORTS + 1) for k, v in LAYOUTS[layout].items()}
+
+
+def remap_text(layout: str) -> str:
+    lines = [f"# PrivyHub B62: the N64 layout `{layout}` (written at every N64 launch; do not edit)"]
+    lines += [f'{k} = "{v}"' for k, v in remap_binds(layout).items()]
+    return "\n".join(lines) + "\n"
+
+
+def parse_remap(text: str) -> dict[str, str]:
+    return {m.group(1): m.group(2) for m in map(_RMP_LINE.match, text.splitlines()) if m}
+
+
+def remap_path(config_dir: Path, core: str) -> Path | None:
+    library = options_library(core)
+    if library is None:
+        return None
+    root = Path(config_dir).resolve()
+    target = (root / "remaps" / library / (library + ".rmp")).resolve()
+    try:
+        target.relative_to(root)
+    except ValueError as exc:
+        raise N64Error("N64 remap path escaped the RetroArch config directory") from exc
+    return target
+
+
+def shadowing(target: Path) -> int:
+    """Other remap files beside the core's (a game or content-directory remap outranks it in RetroArch)."""
+    try:
+        return sum(1 for p in target.parent.glob("*.rmp") if p.name != target.name)
+    except OSError:
+        return 0
+
+
+def write_remap(config_dir: Path, core: str, layout: str) -> dict[str, Any]:
+    """Write the layout's core remap (temp + rename), read it back and compare; a mismatch raises (no launch)."""
+    target = remap_path(config_dir, core)
+    if target is None:
+        return {"library": None, "layout": layout, "binds": 0, "written": False, "verified": False, "shadowed": 0}
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_name(target.name + ".privyhub.tmp")
+    temporary.write_text(remap_text(layout), encoding="utf-8")
+    temporary.replace(target)
+    try:
+        back = parse_remap(target.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError) as exc:
+        raise N64Error(f"N64 remap could not be verified: {exc}") from exc
+    if back != remap_binds(layout):
+        raise N64Error("N64 remap could not be verified")
+    return {"library": options_library(core), "layout": layout, "binds": len(back), "written": True,
+            "verified": True, "shadowed": shadowing(target)}
+
+
+def remap_check(config_dir: Path, core: str) -> dict[str, Any]:
+    """Read-only (the tool, before any launch): the core remap against the default layout."""
+    target = remap_path(config_dir, core)
+    if target is None:
+        return {"state": "no remap for this core"}
+    out: dict[str, Any] = {"folder_exists": target.parent.is_dir(), "shadowed": shadowing(target)}
+    probe = target.parent if target.parent.is_dir() else Path(config_dir)
+    out["writable"] = os.access(probe, os.W_OK)
+    if not target.is_file():
+        out["state"] = "absent (the first N64 launch writes it)"
+    else:
+        try:
+            got = parse_remap(target.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError):
+            got = None
+        out["state"] = ("matches" if got == remap_binds(DEFAULT_LAYOUT)
+                        else "matches core" if got == remap_binds("core") else "differs")
+    return out
+
+
+def remap_line(remap: Mapping[str, Any], ignored: str | None = None) -> str:
+    if not remap.get("written"):
+        return "N64 remap: none (no remap for this core)"
+    line = (f"N64 remap: {remap['layout']} (players 1-{PORTS}, {remap['binds']} binds) verified"
+            if remap["binds"] else f"N64 remap: {remap['layout']} (no binds) verified")
+    if remap.get("shadowed"):
+        line += f" + shadowed {remap['shadowed']}"
+    if ignored is not None:
+        line += f" (n64_layout ignored: {ignored!r})"
+    return line
+
+
 def log_lines(core: str, ports: int, options: Mapping[str, Any]) -> list[str]:
     name = core[:-len("_libretro.so")] if core.endswith("_libretro.so") else core
     opt = (f"{options['keys']} keys ({options['library']})" if options.get("written") else f"none ({name})")

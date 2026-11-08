@@ -57,6 +57,34 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
 
+## 2026-11-08 Queue W (B61-B64): the HOME-7 fixes — the N64 hold freeze, the N64 layout, the PS1 multitap rule, stale pad rows — OPEN (A's HOME-8 C24-C28)
+
+(`docs/memory/evidence/B61_N64_HOLD_FREEZE_2026-11-08.md`, `…/B62_N64_MAPPING_2026-11-08.md`,
+`…/B63_PS1_MULTITAP_CAPABILITY_2026-11-08.md`, `…/B64_STALE_PAD_ROWS_2026-11-08.md`; no APK)
+
+- **B61 — the core's part of the freeze is not identified.**
+  - The trigger is: a state save sent into a running Mupen64Plus-Next on that title. A synthetic fixture does not
+    hang, and T6's own reproduction is A's (HOME-8 stage 1).
+  - The fix avoids it: no N64 path saves into a running core.
+  - **The cost:** an N64 hold or stall no longer rewinds to the onset (0.4-1.3 s unseen).
+  - A port that stays silent anyway gets one `command_port_silent` row and a 10-s retry, not a storm. A hung core
+    still needs the user's Stop.
+- **B62:**
+  - the remap's analog indices (○ = right X+ = C-right, △ = right Y− = C-up) are recalled; C24 reads them back;
+  - whether the onn's font draws ⨉ □ △ ○ on the details line is read at C24;
+  - **for the next APK (listed):** the layout shown once at the first N64 launch.
+- **B63 (default-on):**
+  - three players on a PS1 title not flagged multitap-capable are no longer possible (player 2 would be dead);
+  - the onn shows today's note "No multitap on this system — 2 players" (the words "This game supports 2 players" and
+    capping the onn's stored count are listed for the next APK);
+  - the onn's stored count for T1 stays 3, capped by the host at every launch.
+- **B64:** the client still sends the previous game's joined count first; the host tags it `stale: true`. The order
+  fix is a client change.
+- **For the user — leftovers, not deleted:**
+  - `/tmp/b_q15w_{base,work,after_b61..b64,scratch}` (~81 MB);
+  - `~/.cache/b_q15w_tmp/` (~76 MB: the fixture runs' temp folders, the extracted RetroArch binary removed, and the other host
+    suites' temp).
+
 ## 2026-11-08 Queue V (B59-B60): N64 through RetroArch built behind `PRIVYHUB_N64=1`; the GameCube probe designed — OPEN (the core's fetch, the user's go; A's HOME-7+N64 C21-C23; H2-P1)
 
 (`docs/memory/evidence/B59_N64_LAUNCH_2026-11-08.md`, `docs/memory/architecture/H2_P1_GAMECUBE_PROBE_DESIGN_2026-11-08.md`;

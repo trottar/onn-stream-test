@@ -26,6 +26,15 @@ CHOICES = (1, 2, 4)
 SNES_MULTITAP_DEVICE = 257   # RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_JOYPAD, 0) in both SNES cores' libretro sources
 NONE_DEVICE = 0              # RETRO_DEVICE_NONE
 MULTITAP_SYSTEMS = ("ps1", "snes", "ps2")   # B49: ps2 = PCSX2's [Pad] MultitapPort1, no --device
+# B63: a PS1 title gets the multitap from a join or a pick only when its metadata says it is multitap-capable
+# (`ps1_multitap: port1` or `ps1_multitap_capable: true`; unknown = not). `=0` = today (every PS1 title capable).
+CAPABILITY_ENV = "PRIVYHUB_PS1_MULTITAP_CAPABILITY"
+
+
+def capability_rule_on(environ: Any = None) -> bool:
+    import os
+    env = os.environ if environ is None else environ
+    return (env.get(CAPABILITY_ENV) or "").strip() != "0"
 
 
 def parse(raw: Any) -> int | None:
@@ -51,11 +60,13 @@ def ports_for_joined(n: int) -> int:
     return 4 if int(n) >= 3 else 2
 
 
-def plan(system: str, players_chosen: int, libretro_device: int | None, source: str = "launch") -> dict[str, Any]:
-    """The launch's ports for the pick: the `.opt` mode (PS1), the `--device` arguments, the ports read."""
+def plan(system: str, players_chosen: int, libretro_device: int | None, source: str = "launch",
+         capable: bool | None = None) -> dict[str, Any]:
+    """The launch's ports for the pick: the `.opt` mode (PS1), the `--device` arguments, the ports read.
+    B63: `capable` False (a PS1 title not multitap-capable) -> no multitap, 2 ports; None = today."""
     system = str(system or "").strip().casefold()
     n = int(players_chosen)
-    available = system in MULTITAP_SYSTEMS
+    available = system in MULTITAP_SYSTEMS and not (system == "ps1" and capable is False)
     multitap = n == 4 and available
     args: list[str] = []
     if system == "ps1" and isinstance(libretro_device, int) and not isinstance(libretro_device, bool):
@@ -68,7 +79,7 @@ def plan(system: str, players_chosen: int, libretro_device: int | None, source: 
         args.append(f"--device=2:{SNES_MULTITAP_DEVICE}")
     elif n == 1:
         args.append(f"--device=2:{NONE_DEVICE}")
-    return {
+    out = {
         "players_chosen": n,
         "ports": 4 if multitap else (1 if n == 1 else 2),
         "multitap": multitap,
@@ -77,6 +88,11 @@ def plan(system: str, players_chosen: int, libretro_device: int | None, source: 
         "device_args": args,
         "source": source,
     }
+    if system == "ps1" and capable is not None:               # B63 (absent: no key, today's plan)
+        out["capable"] = bool(capable)
+        if capable is False and n == 4:
+            out["capped_from"] = 4
+    return out
 
 
 def ports_set(emulator: Any, game_status: dict[str, Any] | None) -> dict[str, Any]:
@@ -87,7 +103,8 @@ def ports_set(emulator: Any, game_status: dict[str, Any] | None) -> dict[str, An
         # B59: an N64 launch's four ports are a plan too (`n64`; reached only with PRIVYHUB_N64=1)
         if isinstance(session, dict) and session.get("source") in ("launch", "join", "relaunch", "n64"):
             return {"ports_set": {k: session[k] for k in ("players_chosen", "ports", "multitap", "multitap_available",
-                                                          "source")} | {"players": int(session["ports"])}}
+                                                          "source")} | {"players": int(session["ports"])}
+                    | {k: session[k] for k in ("capable", "capped_from") if k in session}}   # B63
         game = getattr(emulator, "active_game", None) or (game_status or {}).get("game") or {}
         system = str(game.get("system", "")).strip().casefold()
         multitap = False
@@ -96,8 +113,14 @@ def ports_set(emulator: Any, game_status: dict[str, Any] | None) -> dict[str, An
                 multitap = bool(emulator.ps1_multitap(game).get("enabled", False))
             except Exception:
                 multitap = False
+        available = system in MULTITAP_SYSTEMS
+        extra: dict[str, Any] = {}
+        # B63: a PS1 title's multitap is available only when it is multitap-capable (or its metadata turns it on)
+        if system == "ps1" and capability_rule_on() and hasattr(emulator, "ps1_multitap_capable"):
+            capable = bool(multitap) or bool(emulator.ps1_multitap_capable(game))
+            available, extra = capable, {"capable": capable}
         return {"ports_set": {"players": 4 if multitap else 2, "ports": 4 if multitap else 2, "multitap": multitap,
-                              "multitap_available": system in MULTITAP_SYSTEMS, "source": "metadata"}}
+                              "multitap_available": available, "source": "metadata"} | extra}
     except Exception:
         return {"ports_set": {"players": 2, "ports": 2, "multitap": False, "multitap_available": False,
                               "source": "default"}}

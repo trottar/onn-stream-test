@@ -272,6 +272,7 @@ out = {"em_n64": em._n64 is not None}
 try:
     r = m.launch(game, **kw)
     out["n64_session"] = r.get("n64_session")
+    out["n64_core"] = getattr(m, "_n64_core", None)      # B61
     out["ports_set"] = ps.ports_set(m, None)["ports_set"]
 except em.EmulatorError as exc:
     out["error"] = str(exc)
@@ -282,6 +283,12 @@ for name in ("privyhub-input.cfg", "privyhub-session.cfg"):
     out[name] = p.read_text() if p.is_file() else None
 opt = Path(os.environ["XDG_CONFIG_HOME"]) / "retroarch/config/Mupen64Plus-Next/Mupen64Plus-Next.opt"
 out["opt"] = opt.read_text() if opt.is_file() else None
+rmp = Path(os.environ["XDG_CONFIG_HOME"]) / "retroarch/config/remaps/Mupen64Plus-Next/Mupen64Plus-Next.rmp"
+out["rmp"] = rmp.read_text() if rmp.is_file() else None                       # B62
+try:
+    out["label"] = m.controller_profile(game)["label"]                        # B62
+except em.EmulatorError as exc:
+    out["label"] = "EmulatorError"
 logs = sorted((proj / "logs/games").glob("*.log")) if (proj / "logs/games").is_dir() else []
 out["log"] = logs[-1].read_text() if logs else ""
 print(json.dumps(out))
@@ -351,7 +358,9 @@ class Launch(unittest.TestCase):
         self.assertIn("N64 launch: core=mupen64plus_next ports=4\n", out["log"])
         self.assertIn(f"N64 core options: {len(n64.OPTIONS)} keys (Mupen64Plus-Next)\n", out["log"])
         self.assertEqual(out["n64_session"], {"core": "mupen64plus_next_libretro.so", "ports": 4,
-                                              "options_keys": len(n64.OPTIONS)})
+                                              "options_keys": len(n64.OPTIONS),
+                                              "layout": "face_c", "remap_binds": 8})       # B62's two keys
+        self.assertEqual(out["n64_core"], "mupen64plus_next_libretro.so")            # B61: the session is N64
         self.assertEqual({k: out["ports_set"][k] for k in ("players", "multitap", "multitap_available")},
                          {"players": 4, "multitap": False, "multitap_available": False})
         self.assertEqual(before, snapshot(self.drive))
@@ -402,6 +411,7 @@ class Launch(unittest.TestCase):
                          out["n64_session"], out["ports_set"]))
         self.assertEqual(runs[0], runs[1])
         self.assertIsNone(runs[1][3])
+        self.assertIsNone(run_launch("1", self.proj, SNES_GAME)["n64_core"])          # B61: not an N64 session
         self.assertFalse(runs[1][4])
 
 

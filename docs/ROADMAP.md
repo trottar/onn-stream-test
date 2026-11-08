@@ -834,6 +834,15 @@ Coverage-aware exclusions:
 Final classification:
 `D4_FINAL_GAMES_REGRESSION_CONFIRMED_WITH_NO_FIXTURE_SKIPS`
 
+> **The multitap rule (2026-11-08, B63; `docs/memory/evidence/B63_PS1_MULTITAP_CAPABILITY_2026-11-08.md`):**
+> - B54's hold-to-join put the port-1 multitap on any PS1 title a third pad joined. On a title without multitap
+>   support, player 2 (on 1B) is then dead (HOME-7 C17).
+> - **The rule now:** the multitap comes from a join or a pick only for a title whose metadata says it is
+>   multitap-capable (`ps1_multitap: port1`, the Phase-A four-player set, or `ps1_multitap_capable: true`); unknown =
+>   not. Any other PS1 title stays at 2 ports, and a third pad's hold shows the onn's note with no relaunch.
+> - The onn's stored count is capped by the host at every launch. A default-on host change;
+>   `PRIVYHUB_PS1_MULTITAP_CAPABILITY=0` = the earlier behaviour.
+
 Proceed to D5 media/server restoration.
 
 ## D5 — Restore media/server functionality
@@ -2484,6 +2493,20 @@ Question:
 > good to play") and C22 (SAVE / LOAD, a ~16-MB state) met; **C23 not met**: the Home hold froze the game (RetroArch's
 > network commands timed out) and one title's buttons were dead; the internal rate 60 fps, 16.5 internal hitch s / 10
 > min. **G-A15 ADOPTED** on the user's word (`PRIVYHUB_N64=1`, the seventeenth line) with the issues open → B61.
+>
+> **B61-B62 (2026-11-08, B; inside the adopted `PRIVYHUB_N64=1`) — the HOME-7 N64 fixes:**
+> - **B61** (`evidence/B61_N64_HOLD_FREEZE_2026-11-08.md`):
+>   - the freeze began within ~2 frames of the hold's slot-9 save sent into a **running** Mupen64Plus-Next. RetroArch
+>     then spun inside the core and never answered again. Every N64 save that worked was into a paused core;
+>   - a synthetic fixture ROM (headless, no title) does not hang, with or without a capture, so T6's own reproduction
+>     is A's;
+>   - **built:** no state save into a running N64 core (the hold's release a plain resume; the slot-0 capture paused
+>     first), and a bound on the silent-port retry storm.
+> - **B62** (`evidence/B62_N64_MAPPING_2026-11-08.md`):
+>   - "half the buttons" = ○ and △, which do nothing in the core's own layout; the title's jump is a C-button;
+>   - **built:** a verified core remap at every N64 launch (○ = C-right, △ = C-up; the right stick keeps all four), a
+>     per-title `n64_layout`, and the layout on the game's details line.
+> - **Next:** A's HOME-8 (`docs/memory/handoffs/SESSION_B_DONE_2026-11-08W.md`).
 
 ## H2 — GameCube
 

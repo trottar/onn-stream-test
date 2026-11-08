@@ -33,6 +33,8 @@ MATCH_S = 0.005             # the pending's onset and the saved silence's onset 
 STALL_MATCH_S = 0.10        # B12: a stall save and the stall pause estimate the same client frame (receive - age)
 FILE_SLACK_S = 1.0
 PAUSE_CONFIRM_LAG_FRAMES = 4   # B4's
+N64_SKIP = "n64: no save into a running core"          # B61 (only an N64 session, PRIVYHUB_N64=1)
+N64_RELEASE = "n64: plain resume (no state)"           # B61
 
 
 def mode(environ: Mapping[str, str]) -> str | None:
@@ -195,6 +197,7 @@ class Cores:
         self.last_save: dict[str, Any] | None = None
         self.saves = 0
         self.saves_skipped_paused = 0
+        self.saves_skipped_n64 = 0             # B61
         self.nci_factory: Callable[[int], Any] | None = None
         if threaded and mode_value == "state":
             threading.Thread(target=self._run, name="PrivyHub-Rewind-State", daemon=True).start()
@@ -218,6 +221,12 @@ class Cores:
     def save(self, silence_start: float, mark_at: float, kind: str = "silence") -> None:
         if getattr(self.emulator, "_paused", False):
             self.saves_skipped_paused += 1
+            return
+        # B61: an N64 session sends no state save into its running core (C23: the core never came back)
+        if getattr(self.emulator, "_n64_core", None):
+            self.saves_skipped_n64 += 1
+            self.recovery._log("state_save_skipped", reason=N64_SKIP, core=self.core(), kind=kind,
+                               silence_ms=round((mark_at - silence_start) * 1000.0, 1))
             return
         # B55: a PS2 session's slot-9 save goes through PINE (B49 skipped it)
         if getattr(self.emulator, "_launch_kind", None) == "pcsx2":
@@ -257,6 +266,10 @@ class Cores:
             return rw._row(recovery, "rewind_skipped", fields, core=self.core(),
                            reason="the core is not on the rewind allow-list (PRIVYHUB_INPUT_HOLD_REWIND=1)")
         fields.update(method="state", slot=SLOT, core=self.core())
+        # B61: an N64 session's release is a plain resume (no state was saved; the recovery's resume follows)
+        if getattr(self.emulator, "_n64_core", None):
+            fields.pop("slot", None)
+            return rw._row(recovery, "rewind_skipped", fields, reason=N64_RELEASE)
         onset = pending.get("b8_hold_onset", pending["onset"])
         # B33: under 1 s with no loss behind it: resume, no load (the save stays); else today's load, with its why
         if self.no_loss is not None:

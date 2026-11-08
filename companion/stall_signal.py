@@ -18,6 +18,7 @@ The receive loop only parses and queues; one worker does the rest.
 
 from __future__ import annotations
 
+import os
 import queue
 import struct
 import threading
@@ -36,6 +37,11 @@ REASON = "client_stall"
 QUIET_S = 0.30              # no stall for this long while the stall owns the pause = stall_end lost
 DEFER_S = 0.06              # the hold's release waits this long for a stall (> one 50-ms stall interval)
 READY_AFTER_S = 20.0
+# B61: an N64 session's resume against a silent command port: after N64_SILENT_FAILS "did not respond" failures in a
+# row, one `command_port_silent` row, then one try per N64_BACKOFF_S (no storm). Other sessions: every try, as today.
+N64_SILENT_FAILS = 3
+N64_BACKOFF_S = 10.0
+SILENT_MARK = "did not respond"
 
 
 def parse(raw: Any) -> tuple[int | None, str | None]:
@@ -47,6 +53,23 @@ def parse(raw: Any) -> tuple[int | None, str | None]:
     if v.isdigit() and MIN_MS <= int(v) <= MAX_MS:
         return int(v), None
     return None, f"ignored: {v[:32]!r} is not 1 / {MIN_MS}-{MAX_MS}"
+
+
+def _process_reading(emulator: Any, window_s: float = 0.2) -> dict[str, Any] | None:
+    """B61: the emulator process's state letter and CPU % over a short window (spinning vs stopped); best effort."""
+    try:
+        pid = int(getattr(getattr(emulator, "process", None), "pid"))
+        def sample() -> tuple[str, int]:
+            raw = open(f"/proc/{pid}/stat", encoding="ascii", errors="replace").read()
+            rest = raw[raw.rfind(")") + 2:].split()
+            return rest[0], int(rest[11]) + int(rest[12])
+        st, a = sample()
+        time.sleep(window_s)
+        _st, b = sample()
+        hz = os.sysconf("SC_CLK_TCK")
+        return {"state": st, "cpu_pct": round((b - a) / hz / window_s * 100.0, 1)}
+    except Exception:
+        return None
 
 
 def decode(data: bytes) -> tuple[int, bool, int, int, int] | None:
@@ -72,6 +95,7 @@ class StallSignal:
         self.ends = 0
         self._ready_until = 0.0
         self._acted = False                       # this stall episode paused the game or took a hold over
+        self._silent: dict[str, Any] | None = None   # B61: an N64 session's silent-port bound (None = none running)
         if threaded:
             threading.Thread(target=self._run, name="PrivyHub-Stall-Signal", daemon=True).start()
 
@@ -167,6 +191,16 @@ class StallSignal:
     def resume(self, via: str, frame: int | None) -> bool:
         r = self.recovery
         rw = getattr(r, "_input_hold_rewind", None)
+        # B61: an N64 session past the silent-port bound tries once per N64_BACKOFF_S (the skipped calls are counted)
+        emu = getattr(rw, "emulator", None) if rw is not None else None
+        n64 = bool(getattr(emu, "_n64_core", None))
+        pid = getattr(getattr(emu, "process", None), "pid", None)
+        if self._silent is not None and self._silent.get("pid") != pid:
+            self._silent = None                         # another process: a new session starts unbounded
+        silent = self._silent if n64 else None
+        if silent is not None and silent["fails"] >= N64_SILENT_FAILS and self._clock() < silent["next_try"]:
+            silent["skipped"] += 1
+            return False
         if rw is not None:
             rw.rewind(r, via)
         error = ""
@@ -179,6 +213,9 @@ class StallSignal:
             if r._state != "PAUSED_RECOVERING" or r._last_desync_reason != REASON:
                 return False
             if error:
+                if n64 and SILENT_MARK in error:
+                    self._n64_silent_failure(r, via, error, rw)
+                    return False
                 r._log("stall_resume_failed", resume_error=error, via=via)
                 return False                          # the client's gate or the give-up still apply
             recovering_ms = int((time.monotonic() - r._state_since) * 1000.0)
@@ -188,9 +225,33 @@ class StallSignal:
             r._last_restart_at = None
             r._client_present_since = time.monotonic()
             self._ready_until = self._clock() + READY_AFTER_S
+            extra = {}
+            if self._silent is not None:                # B61: the port answered again
+                extra["after_silent_fails"] = self._silent["fails"]
+                self._silent = None
             r._log("resumed", from_state="PAUSED_RECOVERING", recovering_ms=recovering_ms, restarts=r._restarts,
-                   via=via, client_frame=frame)
+                   via=via, client_frame=frame, **extra)
             return True
+
+    def _n64_silent_failure(self, r: Any, via: str, error: str, rw: Any) -> None:
+        """B61 (under the recovery's lock): count an N64 resume against a silent port; the third in a row logs
+        `command_port_silent` once and starts the back-off; later failures log once per try with the back-off."""
+        now = self._clock()
+        s = self._silent
+        if s is None:
+            s = self._silent = {"fails": 0, "since": now, "next_try": 0.0, "skipped": 0,
+                                "pid": getattr(getattr(getattr(rw, "emulator", None), "process", None), "pid", None)}
+        s["fails"] += 1
+        if s["fails"] < N64_SILENT_FAILS:
+            r._log("stall_resume_failed", resume_error=error, via=via)
+            return
+        s["next_try"] = now + N64_BACKOFF_S
+        if s["fails"] == N64_SILENT_FAILS:
+            r._log("command_port_silent", fails=s["fails"], since_ms=int((now - s["since"]) * 1000.0), via=via,
+                   backoff_s=N64_BACKOFF_S, retroarch=_process_reading(getattr(rw, "emulator", None)))
+            return
+        r._log("stall_resume_failed", resume_error=error, via=via, backoff_s=N64_BACKOFF_S, skipped=s["skipped"])
+        s["skipped"] = 0
 
     # --- the recovery's own methods --------------------------------------------------------------------------------
 

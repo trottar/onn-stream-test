@@ -98,6 +98,8 @@ class EmulatorManager:
         # B49: "pcsx2" while a PS2 session runs (None = RetroArch, today) and its process helper
         self._launch_kind: str | None = None
         self._ps2: Any = None
+        # B61: the N64 core while an N64 session runs (only with PRIVYHUB_N64=1); None = every other session (today)
+        self._n64_core: str | None = None
 
         # PrivyHub A7.3: optional per-launch deterministic cheat profile.
         # A non-null session always uses isolated save/state storage, and any
@@ -191,6 +193,7 @@ class EmulatorManager:
         self._players_session = None
         self._launch_kind = None
         self._ps2 = None
+        self._n64_core = None
 
         if cheat_runtime_cleanup:
             self._cleanup_cheat_runtime()
@@ -582,6 +585,14 @@ class EmulatorManager:
             )
 
         return content_path, core_path
+
+    def _n64_layout(self, game: dict[str, Any]) -> tuple[str, str | None]:
+        """B62 (only with PRIVYHUB_N64=1): the title's layout from controller_overrides.json (`n64_layout`)."""
+        try:
+            entry = self._load_controller_overrides()["games"].get(str(game.get("id", "")).strip())
+        except EmulatorError:
+            entry = None
+        return _n64.layout_of(entry)
 
     def _resolve_n64(
         self,
@@ -1987,7 +1998,12 @@ class EmulatorManager:
                     "system": system_id,
                     "profile": "core_default",
                     "default_profile": "core_default",
-                    "label": "Core default",
+                    # B62: an N64 title's label is its layout (the onn's details line); every other: today's
+                    "label": (
+                        _n64.layout_label(self._n64_layout(game)[0])
+                        if _n64 is not None and system_id == _n64.SYSTEM_ID
+                        else "Core default"
+                    ),
                     "source": "core_default",
                     "libretro_device": None,
                     "selectable": False,
@@ -2167,6 +2183,23 @@ class EmulatorManager:
         "port1": "beetle_psx_hw_enable_multitap_port1",
         "port2": "beetle_psx_hw_enable_multitap_port2",
     }
+
+    def ps1_multitap_capable(
+        self,
+        game: dict[str, Any],
+    ) -> bool:
+        """B63: the title's metadata says it is multitap-capable (`ps1_multitap: port1` or `ps1_multitap_capable:
+        true`); unknown = not. A non-PS1 title is not."""
+        if str(game.get("system", "")).strip().casefold() != "ps1":
+            return False
+        try:
+            entry = self._load_controller_overrides()["games"].get(self._input_profile_game_id(game))
+        except EmulatorError:
+            return False
+        if not isinstance(entry, dict):
+            return False
+        return (str(entry.get("ps1_multitap", "")).strip().casefold() == "port1"
+                or entry.get("ps1_multitap_capable") is True)
 
     def ps1_multitap(
         self,
@@ -3301,6 +3334,12 @@ class EmulatorManager:
             # command interface instead of unproven controller meta binds.
             'network_cmd_enable = "true"',
             f'network_cmd_port = "{command_port}"',
+            # B62: an N64 launch loads its core remap and never rewrites it (only with PRIVYHUB_N64=1)
+            *(
+                list(_n64.INPUT_CFG_LINES)
+                if _n64 is not None and system_id.casefold() == _n64.SYSTEM_ID
+                else []
+            ),
         ]
 
         libretro_device = controller.get(
@@ -5551,10 +5590,18 @@ class EmulatorManager:
 
             # B46: with a pick, the PS1 multitap for this launch from the pick (None = today's metadata read)
             if players_chosen is not None:
+                # B63: a PS1 title's capability caps the pick / the join (None with the knob 0 = today's plan)
+                ps1_capable = (
+                    self.ps1_multitap_capable(game)
+                    if str(game.get("system", "")).strip().casefold() == "ps1"
+                    and _players_session.capability_rule_on()
+                    else None
+                )
                 players_plan = _players_session.plan(
                     str(game.get("system", "")),
                     int(players_chosen),
                     self.controller_profile(game).get("libretro_device"),
+                    capable=ps1_capable,
                 )
             # B59: four ports on every N64 launch, whatever the pick or the join (no multitap, no relaunch)
             n64_options: dict[str, Any] | None = None
@@ -5562,6 +5609,10 @@ class EmulatorManager:
                 players_plan = _n64.plan()
                 try:
                     n64_options = _n64.write_options(self._retroarch_config_directory(runtime), core_path.name)
+                    # B62: the layout's core remap, written and verified before the launch
+                    n64_layout, n64_layout_ignored = self._n64_layout(game)
+                    n64_remap = _n64.write_remap(self._retroarch_config_directory(runtime), core_path.name,
+                                                 n64_layout)
                 except (_n64.N64Error, OSError) as exc:
                     raise EmulatorError(f"N64 launch refused: {exc}") from exc
             ps1_multitap = self._prepare_ps1_multitap_options(
@@ -5784,9 +5835,15 @@ class EmulatorManager:
                     )
                     + "\n"
                 )
+            if players_plan is not None and players_plan.get("capped_from"):   # B63
+                log_handle.write(
+                    f"PS1 ports capped: {players_plan['capped_from']} -> {players_plan['ports']} "
+                    "(not multitap-capable)\n"
+                )
             if n64_launch and n64_options is not None:   # B59
                 for line in _n64.log_lines(core_path.name, int(players_plan["ports"]), n64_options):
                     log_handle.write(line + "\n")
+                log_handle.write(_n64.remap_line(n64_remap, n64_layout_ignored) + "\n")   # B62
             log_handle.write("Command uses project-local paths only.\n\n")
             log_handle.flush()
 
@@ -5810,6 +5867,8 @@ class EmulatorManager:
             self.active_game = dict(game)
             # B46: the session's ports from the pick (None = today)
             self._players_session = players_plan
+            # B61: an N64 session (no state save is ever sent into its running core); None for every other launch
+            self._n64_core = core_path.name if n64_launch else None
             self.started_at = time.monotonic()
             self._paused = False
             isolated_session = cheat_session if cheat_session is not None else mod_session
@@ -5911,7 +5970,8 @@ class EmulatorManager:
             # B59: the N64 launch's core, ports and options (only on an N64 launch)
             if n64_launch and n64_options is not None:
                 payload["n64_session"] = {"core": core_path.name, "ports": int(players_plan["ports"]),
-                                          "options_keys": int(n64_options["keys"])}
+                                          "options_keys": int(n64_options["keys"]), "layout": n64_remap["layout"],
+                                          "remap_binds": int(n64_remap["binds"])}
             payload["ps1_look"] = (
                 {k: v for k, v in ps1_look_session.items() if k != "cfg_text"}
                 if ps1_look_session["preset"] or ps1_look_session["ignored_value"]
@@ -7280,6 +7340,7 @@ class EmulatorManager:
         self._players_session = None
         self._launch_kind = None
         self._ps2 = None
+        self._n64_core = None
         payload = self.status()
         payload["action"] = "stop"
         payload["stopped"] = True
@@ -8081,6 +8142,29 @@ class EmulatorManager:
     # recovery save uses the identical RetroArch command, the identical
     # artifact observation and the identical stability wait. Only the
     # destination differs, and the recovery destination is never a slot.
+    def _n64_pause_for_save(self, probe_slot: int) -> bool:
+        """B61 (an N64 session only): pause a PLAYING core before its save. True = it was paused here (resume after).
+        A core that does not pause refuses the save (never sent into a running N64 core)."""
+        observed = self._retroarch_network_status()
+        if observed == "PAUSED":
+            return False
+        self._retroarch_network_request("PAUSE_TOGGLE", expect_response=False)
+        try:
+            self._wait_for_retroarch_state("PAUSED")
+        except EmulatorError as exc:
+            raise EmulatorError(f"N64: the core did not pause for the save ({exc})") from exc
+        self.record_save_state_probe_event("n64_paused_for_save", slot=probe_slot)
+        return True
+
+    def _n64_resume_after_save(self) -> None:
+        """B61: the PAUSE_TOGGLE back after a save the N64 path paused for (best effort; the session's own resume
+        path still applies if this fails)."""
+        try:
+            self._retroarch_network_request("PAUSE_TOGGLE", expect_response=False)
+            self._wait_for_retroarch_state("PLAYING")
+        except EmulatorError:
+            pass
+
     def _capture_slot0_state(
         self,
         *,
@@ -8108,14 +8192,22 @@ class EmulatorManager:
             ),
         )
 
-        command_response = (
-            self._retroarch_network_request(
-                "SAVE_STATE_SLOT 0",
-                expect_response=True,
-                timeout=2.0,
-                retries=1,
+        # B61: an N64 core is never saved while running (C23's hang): paused first, resumed after
+        n64_resume_after = False
+        if getattr(self, "_n64_core", None):
+            n64_resume_after = self._n64_pause_for_save(probe_slot)
+        try:
+            command_response = (
+                self._retroarch_network_request(
+                    "SAVE_STATE_SLOT 0",
+                    expect_response=True,
+                    timeout=2.0,
+                    retries=1,
+                )
             )
-        )
+        finally:
+            if n64_resume_after:
+                self._n64_resume_after_save()
 
         if (
             not command_response
@@ -9358,6 +9450,7 @@ class EmulatorManager:
             self._players_session = None
             self._launch_kind = None
             self._ps2 = None
+            self._n64_core = None
 
             if cheat_runtime_cleanup:
                 cleanup_error = self._cleanup_cheat_runtime()

@@ -1,0 +1,616 @@
+diff --git a/companion/games/emulator_manager.py b/companion/games/emulator_manager.py
+index eefd7b7..58852f6 100644
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -98,6 +98,8 @@ class EmulatorManager:
+         # B49: "pcsx2" while a PS2 session runs (None = RetroArch, today) and its process helper
+         self._launch_kind: str | None = None
+         self._ps2: Any = None
++        # B61: the N64 core while an N64 session runs (only with PRIVYHUB_N64=1); None = every other session (today)
++        self._n64_core: str | None = None
+ 
+         # PrivyHub A7.3: optional per-launch deterministic cheat profile.
+         # A non-null session always uses isolated save/state storage, and any
+@@ -191,6 +193,7 @@ class EmulatorManager:
+         self._players_session = None
+         self._launch_kind = None
+         self._ps2 = None
++        self._n64_core = None
+ 
+         if cheat_runtime_cleanup:
+             self._cleanup_cheat_runtime()
+@@ -5810,6 +5813,8 @@ class EmulatorManager:
+             self.active_game = dict(game)
+             # B46: the session's ports from the pick (None = today)
+             self._players_session = players_plan
++            # B61: an N64 session (no state save is ever sent into its running core); None for every other launch
++            self._n64_core = core_path.name if n64_launch else None
+             self.started_at = time.monotonic()
+             self._paused = False
+             isolated_session = cheat_session if cheat_session is not None else mod_session
+@@ -7280,6 +7285,7 @@ class EmulatorManager:
+         self._players_session = None
+         self._launch_kind = None
+         self._ps2 = None
++        self._n64_core = None
+         payload = self.status()
+         payload["action"] = "stop"
+         payload["stopped"] = True
+@@ -8081,6 +8087,29 @@ class EmulatorManager:
+     # recovery save uses the identical RetroArch command, the identical
+     # artifact observation and the identical stability wait. Only the
+     # destination differs, and the recovery destination is never a slot.
++    def _n64_pause_for_save(self, probe_slot: int) -> bool:
++        """B61 (an N64 session only): pause a PLAYING core before its save. True = it was paused here (resume after).
++        A core that does not pause refuses the save (never sent into a running N64 core)."""
++        observed = self._retroarch_network_status()
++        if observed == "PAUSED":
++            return False
++        self._retroarch_network_request("PAUSE_TOGGLE", expect_response=False)
++        try:
++            self._wait_for_retroarch_state("PAUSED")
++        except EmulatorError as exc:
++            raise EmulatorError(f"N64: the core did not pause for the save ({exc})") from exc
++        self.record_save_state_probe_event("n64_paused_for_save", slot=probe_slot)
++        return True
++
++    def _n64_resume_after_save(self) -> None:
++        """B61: the PAUSE_TOGGLE back after a save the N64 path paused for (best effort; the session's own resume
++        path still applies if this fails)."""
++        try:
++            self._retroarch_network_request("PAUSE_TOGGLE", expect_response=False)
++            self._wait_for_retroarch_state("PLAYING")
++        except EmulatorError:
++            pass
++
+     def _capture_slot0_state(
+         self,
+         *,
+@@ -8108,14 +8137,22 @@ class EmulatorManager:
+             ),
+         )
+ 
+-        command_response = (
+-            self._retroarch_network_request(
+-                "SAVE_STATE_SLOT 0",
+-                expect_response=True,
+-                timeout=2.0,
+-                retries=1,
++        # B61: an N64 core is never saved while running (C23's hang): paused first, resumed after
++        n64_resume_after = False
++        if getattr(self, "_n64_core", None):
++            n64_resume_after = self._n64_pause_for_save(probe_slot)
++        try:
++            command_response = (
++                self._retroarch_network_request(
++                    "SAVE_STATE_SLOT 0",
++                    expect_response=True,
++                    timeout=2.0,
++                    retries=1,
++                )
+             )
+-        )
++        finally:
++            if n64_resume_after:
++                self._n64_resume_after_save()
+ 
+         if (
+             not command_response
+@@ -9358,6 +9395,7 @@ class EmulatorManager:
+             self._players_session = None
+             self._launch_kind = None
+             self._ps2 = None
++            self._n64_core = None
+ 
+             if cheat_runtime_cleanup:
+                 cleanup_error = self._cleanup_cheat_runtime()
+diff --git a/companion/rewind_cores.py b/companion/rewind_cores.py
+index eef9512..9293937 100644
+--- a/companion/rewind_cores.py
++++ b/companion/rewind_cores.py
+@@ -33,6 +33,8 @@ MATCH_S = 0.005             # the pending's onset and the saved silence's onset
+ STALL_MATCH_S = 0.10        # B12: a stall save and the stall pause estimate the same client frame (receive - age)
+ FILE_SLACK_S = 1.0
+ PAUSE_CONFIRM_LAG_FRAMES = 4   # B4's
++N64_SKIP = "n64: no save into a running core"          # B61 (only an N64 session, PRIVYHUB_N64=1)
++N64_RELEASE = "n64: plain resume (no state)"           # B61
+ 
+ 
+ def mode(environ: Mapping[str, str]) -> str | None:
+@@ -195,6 +197,7 @@ class Cores:
+         self.last_save: dict[str, Any] | None = None
+         self.saves = 0
+         self.saves_skipped_paused = 0
++        self.saves_skipped_n64 = 0             # B61
+         self.nci_factory: Callable[[int], Any] | None = None
+         if threaded and mode_value == "state":
+             threading.Thread(target=self._run, name="PrivyHub-Rewind-State", daemon=True).start()
+@@ -219,6 +222,12 @@ class Cores:
+         if getattr(self.emulator, "_paused", False):
+             self.saves_skipped_paused += 1
+             return
++        # B61: an N64 session sends no state save into its running core (C23: the core never came back)
++        if getattr(self.emulator, "_n64_core", None):
++            self.saves_skipped_n64 += 1
++            self.recovery._log("state_save_skipped", reason=N64_SKIP, core=self.core(), kind=kind,
++                               silence_ms=round((mark_at - silence_start) * 1000.0, 1))
++            return
+         # B55: a PS2 session's slot-9 save goes through PINE (B49 skipped it)
+         if getattr(self.emulator, "_launch_kind", None) == "pcsx2":
+             return self._save_ps2(silence_start, mark_at, kind)
+@@ -257,6 +266,10 @@ class Cores:
+             return rw._row(recovery, "rewind_skipped", fields, core=self.core(),
+                            reason="the core is not on the rewind allow-list (PRIVYHUB_INPUT_HOLD_REWIND=1)")
+         fields.update(method="state", slot=SLOT, core=self.core())
++        # B61: an N64 session's release is a plain resume (no state was saved; the recovery's resume follows)
++        if getattr(self.emulator, "_n64_core", None):
++            fields.pop("slot", None)
++            return rw._row(recovery, "rewind_skipped", fields, reason=N64_RELEASE)
+         onset = pending.get("b8_hold_onset", pending["onset"])
+         # B33: under 1 s with no loss behind it: resume, no load (the save stays); else today's load, with its why
+         if self.no_loss is not None:
+diff --git a/companion/stall_signal.py b/companion/stall_signal.py
+index 858ce19..6df3ee5 100644
+--- a/companion/stall_signal.py
++++ b/companion/stall_signal.py
+@@ -18,6 +18,7 @@ The receive loop only parses and queues; one worker does the rest.
+ 
+ from __future__ import annotations
+ 
++import os
+ import queue
+ import struct
+ import threading
+@@ -36,6 +37,11 @@ REASON = "client_stall"
+ QUIET_S = 0.30              # no stall for this long while the stall owns the pause = stall_end lost
+ DEFER_S = 0.06              # the hold's release waits this long for a stall (> one 50-ms stall interval)
+ READY_AFTER_S = 20.0
++# B61: an N64 session's resume against a silent command port: after N64_SILENT_FAILS "did not respond" failures in a
++# row, one `command_port_silent` row, then one try per N64_BACKOFF_S (no storm). Other sessions: every try, as today.
++N64_SILENT_FAILS = 3
++N64_BACKOFF_S = 10.0
++SILENT_MARK = "did not respond"
+ 
+ 
+ def parse(raw: Any) -> tuple[int | None, str | None]:
+@@ -49,6 +55,23 @@ def parse(raw: Any) -> tuple[int | None, str | None]:
+     return None, f"ignored: {v[:32]!r} is not 1 / {MIN_MS}-{MAX_MS}"
+ 
+ 
++def _process_reading(emulator: Any, window_s: float = 0.2) -> dict[str, Any] | None:
++    """B61: the emulator process's state letter and CPU % over a short window (spinning vs stopped); best effort."""
++    try:
++        pid = int(getattr(getattr(emulator, "process", None), "pid"))
++        def sample() -> tuple[str, int]:
++            raw = open(f"/proc/{pid}/stat", encoding="ascii", errors="replace").read()
++            rest = raw[raw.rfind(")") + 2:].split()
++            return rest[0], int(rest[11]) + int(rest[12])
++        st, a = sample()
++        time.sleep(window_s)
++        _st, b = sample()
++        hz = os.sysconf("SC_CLK_TCK")
++        return {"state": st, "cpu_pct": round((b - a) / hz / window_s * 100.0, 1)}
++    except Exception:
++        return None
++
++
+ def decode(data: bytes) -> tuple[int, bool, int, int, int] | None:
+     """(kind, in_gate, seq, client frame, output age ms) or None."""
+     if len(data) != PACKET.size or data[:4] != MAGIC:
+@@ -72,6 +95,7 @@ class StallSignal:
+         self.ends = 0
+         self._ready_until = 0.0
+         self._acted = False                       # this stall episode paused the game or took a hold over
++        self._silent: dict[str, Any] | None = None   # B61: an N64 session's silent-port bound (None = none running)
+         if threaded:
+             threading.Thread(target=self._run, name="PrivyHub-Stall-Signal", daemon=True).start()
+ 
+@@ -167,6 +191,16 @@ class StallSignal:
+     def resume(self, via: str, frame: int | None) -> bool:
+         r = self.recovery
+         rw = getattr(r, "_input_hold_rewind", None)
++        # B61: an N64 session past the silent-port bound tries once per N64_BACKOFF_S (the skipped calls are counted)
++        emu = getattr(rw, "emulator", None) if rw is not None else None
++        n64 = bool(getattr(emu, "_n64_core", None))
++        pid = getattr(getattr(emu, "process", None), "pid", None)
++        if self._silent is not None and self._silent.get("pid") != pid:
++            self._silent = None                         # another process: a new session starts unbounded
++        silent = self._silent if n64 else None
++        if silent is not None and silent["fails"] >= N64_SILENT_FAILS and self._clock() < silent["next_try"]:
++            silent["skipped"] += 1
++            return False
+         if rw is not None:
+             rw.rewind(r, via)
+         error = ""
+@@ -179,6 +213,9 @@ class StallSignal:
+             if r._state != "PAUSED_RECOVERING" or r._last_desync_reason != REASON:
+                 return False
+             if error:
++                if n64 and SILENT_MARK in error:
++                    self._n64_silent_failure(r, via, error, rw)
++                    return False
+                 r._log("stall_resume_failed", resume_error=error, via=via)
+                 return False                          # the client's gate or the give-up still apply
+             recovering_ms = int((time.monotonic() - r._state_since) * 1000.0)
+@@ -188,10 +225,34 @@ class StallSignal:
+             r._last_restart_at = None
+             r._client_present_since = time.monotonic()
+             self._ready_until = self._clock() + READY_AFTER_S
++            extra = {}
++            if self._silent is not None:                # B61: the port answered again
++                extra["after_silent_fails"] = self._silent["fails"]
++                self._silent = None
+             r._log("resumed", from_state="PAUSED_RECOVERING", recovering_ms=recovering_ms, restarts=r._restarts,
+-                   via=via, client_frame=frame)
++                   via=via, client_frame=frame, **extra)
+             return True
+ 
++    def _n64_silent_failure(self, r: Any, via: str, error: str, rw: Any) -> None:
++        """B61 (under the recovery's lock): count an N64 resume against a silent port; the third in a row logs
++        `command_port_silent` once and starts the back-off; later failures log once per try with the back-off."""
++        now = self._clock()
++        s = self._silent
++        if s is None:
++            s = self._silent = {"fails": 0, "since": now, "next_try": 0.0, "skipped": 0,
++                                "pid": getattr(getattr(getattr(rw, "emulator", None), "process", None), "pid", None)}
++        s["fails"] += 1
++        if s["fails"] < N64_SILENT_FAILS:
++            r._log("stall_resume_failed", resume_error=error, via=via)
++            return
++        s["next_try"] = now + N64_BACKOFF_S
++        if s["fails"] == N64_SILENT_FAILS:
++            r._log("command_port_silent", fails=s["fails"], since_ms=int((now - s["since"]) * 1000.0), via=via,
++                   backoff_s=N64_BACKOFF_S, retroarch=_process_reading(getattr(rw, "emulator", None)))
++            return
++        r._log("stall_resume_failed", resume_error=error, via=via, backoff_s=N64_BACKOFF_S, skipped=s["skipped"])
++        s["skipped"] = 0
++
+     # --- the recovery's own methods --------------------------------------------------------------------------------
+ 
+     def defer_release(self, recovery: Any) -> bool:
+diff --git a/tests/b61_n64_hold/_tmp_cleanup.py b/tests/b61_n64_hold/_tmp_cleanup.py
+new file mode 100644
+index 0000000..b1f7f69
+--- /dev/null
++++ b/tests/b61_n64_hold/_tmp_cleanup.py
+@@ -0,0 +1,25 @@
++"""B53 (test hygiene): every temporary directory a tests/b61_n64_hold run creates is removed when that run ends.
++
++HOME-6 prep found ~6.9 GiB of these suites' fixture trees (formatted 8-MB cards, fake game trees) left in the hub's /tmp
++tmpfs by B49-B52's runs, which never removed their mkdtemp() dirs. Imported by each test module; it tracks only the
++dirs made in this process and removes them at exit (never anything else)."""
++
++from __future__ import annotations
++
++import atexit
++import shutil
++import tempfile
++
++_made: list[str] = []
++_mkdtemp = tempfile.mkdtemp
++
++
++def _tracked(*args, **kwargs):
++    d = _mkdtemp(*args, **kwargs)
++    _made.append(d)
++    return d
++
++
++if getattr(tempfile.mkdtemp, "__name__", "") != "_tracked":
++    tempfile.mkdtemp = _tracked
++    atexit.register(lambda: [shutil.rmtree(d, ignore_errors=True) for d in _made])
+diff --git a/tests/b61_n64_hold/test_b61.py b/tests/b61_n64_hold/test_b61.py
+new file mode 100644
+index 0000000..1f6aa01
+--- /dev/null
++++ b/tests/b61_n64_hold/test_b61.py
+@@ -0,0 +1,281 @@
++#!/usr/bin/env python3
++"""B61 (host): the N64 Home-hold freeze -- no state save into a running N64 core (the hold's scratch skipped, the
++release a plain resume, the slot-0 capture paused first) and the silent-port bound on the stall resume; PS1 and the
++flag-absent paths as today. Fakes only (B9's fake core on loopback, a fake clock); temp dirs removed at exit.
++
++    python3 -m unittest discover -s tests/b61_n64_hold -v
++"""
++
++from __future__ import annotations
++
++import json
++import os
++import sys
++import tempfile
++import time
++import types
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401
++sys.path.insert(0, str(ROOT / "tests" / "rewind_cores"))
++
++import rewind_cores as rc  # noqa: E402
++import stall_signal as ss  # noqa: E402
++from games import emulator_manager as em  # noqa: E402
++from games import link_drop_recovery as ldr  # noqa: E402
++from test_rewind_cores import PSX, Rig, rows  # noqa: E402
++
++N64 = "mupen64plus_next_libretro.so"
++SILENT = "EmulatorError: RetroArch network command did not respond: GET_STATUS (timed out)"
++
++
++def n64_rig() -> Rig:
++    rig = Rig("state", N64)
++    rig.emu._n64_core = N64
++    return rig
++
++
++class HoldSave(unittest.TestCase):
++    def test_n64_sends_no_scratch_save(self):
++        rig = n64_rig()
++        try:
++            last = time.monotonic()
++            rig.det.on_quiet(last + 0.41, last)                       # a silence: today's save point
++            rig.rw.b9.save(last, last + 1.27, "stall")                # the stall's save, called directly
++            end = time.monotonic() + 1.0
++            while (len([r for r in rows(rig.rec) if r["event"] == "state_save_skipped"]) < 2
++                   and time.monotonic() < end):
++                time.sleep(0.01)
++            self.assertEqual(rig.rw.b9.saves_skipped_n64, 2)
++            self.assertEqual(rig.rw.b9.saves, 0)
++            self.assertEqual(rig.core.log, [])                         # nothing reached the core
++            skipped = [r for r in rows(rig.rec) if r["event"] == "state_save_skipped"]
++            self.assertEqual(sorted((r["reason"], r["core"], r["kind"]) for r in skipped),
++                             sorted([(rc.N64_SKIP, N64, "silence"), (rc.N64_SKIP, N64, "stall")]))
++        finally:
++            rig.stop()
++
++    def test_ps1_saves_as_today(self):
++        rig = Rig("state", PSX)
++        try:
++            last = time.monotonic()
++            rig.det.on_quiet(last + 0.41, last)
++            self.assertEqual(rig.wait_saves(1), 1)
++            self.assertEqual(rig.core.log, [f"SAVE_STATE_SLOT {rc.SLOT}"])
++            self.assertEqual(rig.rw.b9.saves_skipped_n64, 0)
++        finally:
++            rig.stop()
++
++
++class HoldRelease(unittest.TestCase):
++    def test_n64_release_is_a_plain_resume(self):
++        rig = n64_rig()
++        try:
++            last = time.monotonic() - 1.2
++            rig.pause_for_hold(last, last + 1.05)
++            row = rig.rw.rewind(rig.rec, "stall_end")
++            self.assertEqual(row["event"] if "event" in row else rows(rig.rec)[-1]["event"], "rewind_skipped")
++            self.assertEqual(rows(rig.rec)[-1]["reason"], rc.N64_RELEASE)
++            self.assertNotIn("slot", rows(rig.rec)[-1])
++            self.assertEqual(rig.core.log, [])                          # no PAUSE_TOGGLE, no LOAD_STATE_SLOT
++        finally:
++            rig.stop()
++
++    def test_ps1_release_loads_as_today(self):
++        rig = Rig("state", PSX)
++        try:
++            last = time.monotonic() - 0.41
++            rig.det.on_quiet(last + 0.41, last)
++            rig.wait_saves(1)
++            rig.pause_for_hold(last, last + 1.05)
++            rig.rw.rewind(rig.rec, "input_release")
++            self.assertEqual(rows(rig.rec)[-1]["event"], "input_release")
++            self.assertEqual(rig.core.log[1:3], ["PAUSE_TOGGLE", f"LOAD_STATE_SLOT {rc.SLOT}"])
++        finally:
++            rig.stop()
++
++
++# --- the slot-0 capture (the user's SAVE, the recovery save) ---------------------------------------------------
++
++def capture_manager(n64_core, status="PLAYING", pauses=True):
++    m = object.__new__(em.EmulatorManager)
++    m._n64_core = n64_core
++    m.active_game = {"system": "n64" if n64_core else "ps1", "relative_path": "x/stem.z64"}
++    calls = []
++    state = {"s": status}
++
++    def net(cmd, expect_response=False, timeout=None, retries=None):
++        calls.append(cmd)
++        if cmd == "PAUSE_TOGGLE" and pauses:
++            state["s"] = "PAUSED" if state["s"] == "PLAYING" else "PLAYING"
++        return None                                                     # the save is not acknowledged (stops it)
++
++    def status_fn():
++        calls.append("GET_STATUS")
++        return state["s"]
++
++    def wait(wanted, timeout=1.5):
++        calls.append(f"wait:{wanted}")
++        if state["s"] != wanted:
++            raise em.EmulatorError(f"RetroArch did not reach {wanted}")
++        return wanted
++
++    m._retroarch_network_request = net
++    m._retroarch_network_status = status_fn
++    m._wait_for_retroarch_state = wait
++    m.record_save_state_probe_event = lambda event, **kw: calls.append(f"probe:{event}")
++    m._active_state_stem = lambda: "stem"
++    m._save_state_probe_snapshot = lambda: {}
++    m._retroarch_session_log_position = lambda: 0
++    m._retroarch_session_log_since = lambda offset: ""
++    return m, calls
++
++
++class Capture(unittest.TestCase):
++    def run_capture(self, m):
++        with self.assertRaises(em.EmulatorError):
++            m._capture_slot0_state(probe_action="t", probe_slot=1)
++
++    def test_n64_playing_is_paused_saved_and_resumed(self):
++        m, calls = capture_manager(N64)
++        self.run_capture(m)
++        core = [c for c in calls if not c.startswith("probe:manager_action") and not c.startswith("probe:save_state_failure")]
++        self.assertEqual(core, ["GET_STATUS", "PAUSE_TOGGLE", "wait:PAUSED", "probe:n64_paused_for_save",
++                                "SAVE_STATE_SLOT 0", "PAUSE_TOGGLE", "wait:PLAYING"])
++
++    def test_n64_already_paused_no_toggle(self):
++        m, calls = capture_manager(N64, status="PAUSED")
++        self.run_capture(m)
++        self.assertNotIn("PAUSE_TOGGLE", calls)
++        self.assertIn("SAVE_STATE_SLOT 0", calls)
++
++    def test_n64_that_will_not_pause_is_refused_unsaved(self):
++        m, calls = capture_manager(N64, pauses=False)
++        with self.assertRaises(em.EmulatorError) as cm:
++            m._capture_slot0_state(probe_action="t", probe_slot=1)
++        self.assertIn("N64: the core did not pause for the save", str(cm.exception))
++        self.assertNotIn("SAVE_STATE_SLOT 0", calls)
++
++    def test_ps1_as_today(self):
++        for core in (None,):
++            m, calls = capture_manager(core)
++            self.run_capture(m)
++            self.assertEqual([c for c in calls if not c.startswith("probe:")], ["SAVE_STATE_SLOT 0"])
++        m, calls = capture_manager(None)
++        del m._n64_core                                                 # a manager built without __init__ (old tests)
++        self.run_capture(m)
++        self.assertEqual([c for c in calls if not c.startswith("probe:")], ["SAVE_STATE_SLOT 0"])
++
++
++# --- the silent-port bound on the stall resume ------------------------------------------------------------------
++
++class Clock:
++    def __init__(self):
++        self.t = 1000.0
++
++    def __call__(self):
++        return self.t
++
++
++def bound_rig(n64: bool, answer_on_try: int | None = None, rewinder: bool = True):
++    root = Path(tempfile.mkdtemp(prefix="b61_rec_"))
++    tries = []
++
++    def resume_game():
++        tries.append(1)
++        if answer_on_try is not None and len(tries) >= answer_on_try:
++            return {}
++        raise em.EmulatorError(SILENT.split(": ", 1)[1])
++
++    rec = ldr.LinkDropRecovery(
++        root, pause_game=lambda: None, resume_game=resume_game, save_recovery_state=lambda: {},
++        restart_encoder=lambda: {}, full_start_encoder=lambda: {}, stream_active=lambda: True,
++        end_session=lambda: None, client_packet_age_ms=lambda: 10.0, recovery_save_detail=lambda: {})
++    rec._state = ldr.STATE_PAUSED_RECOVERING
++    rec._state_since = time.monotonic()
++    rec._last_desync_reason = ss.REASON
++    emu = types.SimpleNamespace(_n64_core=N64 if n64 else None, process=types.SimpleNamespace(pid=os.getpid()))
++    rewinds = []
++    if rewinder:
++        rec._input_hold_rewind = types.SimpleNamespace(emulator=emu, rewind=lambda r, via: rewinds.append(via))
++    clock = Clock()
++    sig = ss.StallSignal(rec, 400, clock=clock, threaded=False)
++    return rec, sig, clock, tries, rewinds
++
++
++def drive(sig, clock, seconds=60.0, every=1.4):
++    end = clock.t + seconds
++    while clock.t < end:
++        sig.resume("stall_quiet", None)
++        clock.t += every
++
++
++def events(rec):
++    p = rec.log_path()
++    return [json.loads(x) for x in p.read_text().splitlines()] if p.exists() else []
++
++
++class Bound(unittest.TestCase):
++    def test_n64_silent_port_backs_off_after_three(self):
++        rec, sig, clock, tries, rewinds = bound_rig(True)
++        drive(sig, clock)
++        ev = events(rec)
++        names = [r["event"] for r in ev]
++        self.assertEqual(names[:3], ["stall_resume_failed", "stall_resume_failed", "command_port_silent"])
++        self.assertEqual(names.count("command_port_silent"), 1)
++        self.assertLessEqual(len(tries), 3 + 6)                         # ~43 tries at 1.4 s without the bound
++        self.assertGreaterEqual(len(tries), 3 + 5)
++        silent = ev[2]
++        self.assertEqual((silent["fails"], silent["backoff_s"]), (3, ss.N64_BACKOFF_S))
++        self.assertIsNotNone(silent["retroarch"])
++        later = [r for r in ev[3:] if r["event"] == "stall_resume_failed"]
++        self.assertTrue(later and all(r["backoff_s"] == ss.N64_BACKOFF_S and r["skipped"] >= 6 for r in later))
++        self.assertEqual(len(rewinds), len(tries))                      # a skipped call makes no rewind call
++
++    def test_a_late_answer_resumes(self):
++        rec, sig, clock, tries, _ = bound_rig(True, answer_on_try=5)
++        drive(sig, clock, seconds=40.0)
++        ev = events(rec)
++        resumed = [r for r in ev if r["event"] == "resumed"]
++        self.assertEqual(len(resumed), 1)
++        self.assertEqual(resumed[0]["after_silent_fails"], 4)
++        self.assertEqual(rec._state, ldr.STATE_PLAYING)
++        self.assertIsNone(sig._silent)
++
++    def test_ps1_every_try_and_every_failure_as_today(self):
++        rec, sig, clock, tries, _ = bound_rig(False)
++        drive(sig, clock)
++        ev = events(rec)
++        self.assertEqual(len(tries), 43)
++        self.assertEqual({r["event"] for r in ev}, {"stall_resume_failed"})
++        self.assertEqual(len(ev), 43)
++        self.assertTrue(all("backoff_s" not in r for r in ev))
++
++    def test_no_rewinder_is_today(self):
++        rec, sig, clock, tries, _ = bound_rig(True, rewinder=False)
++        drive(sig, clock)
++        self.assertEqual(len(tries), 43)
++
++    def test_a_new_process_starts_unbounded(self):
++        rec, sig, clock, tries, _ = bound_rig(True)
++        drive(sig, clock, seconds=6.0)
++        self.assertIsNotNone(sig._silent)
++        rec._input_hold_rewind.emulator.process = types.SimpleNamespace(pid=os.getpid() + 1)
++        n = len(tries)
++        sig.resume("stall_quiet", None)
++        self.assertEqual(len(tries), n + 1)
++        self.assertEqual(sig._silent["fails"], 1)
++
++
++class Absent(unittest.TestCase):
++    def test_a_fresh_manager_is_not_n64(self):
++        m = em.EmulatorManager(Path(tempfile.mkdtemp(prefix="b61_proj_")))
++        self.assertIsNone(m._n64_core)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/n64_session/test_n64_session.py b/tests/n64_session/test_n64_session.py
+index c7bb789..4a6f92b 100644
+--- a/tests/n64_session/test_n64_session.py
++++ b/tests/n64_session/test_n64_session.py
+@@ -272,6 +272,7 @@ out = {"em_n64": em._n64 is not None}
+ try:
+     r = m.launch(game, **kw)
+     out["n64_session"] = r.get("n64_session")
++    out["n64_core"] = getattr(m, "_n64_core", None)      # B61
+     out["ports_set"] = ps.ports_set(m, None)["ports_set"]
+ except em.EmulatorError as exc:
+     out["error"] = str(exc)
+@@ -352,6 +353,7 @@ class Launch(unittest.TestCase):
+         self.assertIn(f"N64 core options: {len(n64.OPTIONS)} keys (Mupen64Plus-Next)\n", out["log"])
+         self.assertEqual(out["n64_session"], {"core": "mupen64plus_next_libretro.so", "ports": 4,
+                                               "options_keys": len(n64.OPTIONS)})
++        self.assertEqual(out["n64_core"], "mupen64plus_next_libretro.so")            # B61: the session is N64
+         self.assertEqual({k: out["ports_set"][k] for k in ("players", "multitap", "multitap_available")},
+                          {"players": 4, "multitap": False, "multitap_available": False})
+         self.assertEqual(before, snapshot(self.drive))
+@@ -402,6 +404,7 @@ class Launch(unittest.TestCase):
+                          out["n64_session"], out["ports_set"]))
+         self.assertEqual(runs[0], runs[1])
+         self.assertIsNone(runs[1][3])
++        self.assertIsNone(run_launch("1", self.proj, SNES_GAME)["n64_core"])          # B61: not an N64 session
+         self.assertFalse(runs[1][4])
+ 
+ 

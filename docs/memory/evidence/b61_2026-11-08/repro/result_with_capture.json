@@ -1,0 +1,283 @@
+{
+ "capture": true,
+ "steps": [
+  {
+   "status": [
+    "GET_STATUS",
+    "PLAYING"
+   ],
+   "after_s": 0.6,
+   "exited": null,
+   "t_s": 0.6,
+   "step": "up"
+  },
+  {
+   "answered": 12,
+   "timeouts": 0,
+   "longest_silence_s": 0.27,
+   "states": [
+    "PLAYING"
+   ],
+   "t_s": 5.77,
+   "step": "baseline_running"
+  },
+  {
+   "window_found": true,
+   "t_s": 5.78,
+   "step": "capture_started"
+  },
+  {
+   "ack": [
+    "SAVE_STATE_SLOT",
+    "9"
+   ],
+   "ack_ms": 13.5,
+   "t_s": 7.79,
+   "step": "save_running_1"
+  },
+  {
+   "answered": 16,
+   "timeouts": 0,
+   "longest_silence_s": 0.27,
+   "states": [
+    "PLAYING"
+   ],
+   "t_s": 12.04,
+   "step": "after_save_running_1"
+  },
+  {
+   "ack": [
+    "SAVE_STATE_SLOT",
+    "9"
+   ],
+   "ack_ms": 23.7,
+   "t_s": 12.06,
+   "step": "save_running_2"
+  },
+  {
+   "answered": 16,
+   "timeouts": 0,
+   "longest_silence_s": 0.27,
+   "states": [
+    "PLAYING"
+   ],
+   "t_s": 16.3,
+   "step": "after_save_running_2"
+  },
+  {
+   "ack": [
+    "SAVE_STATE_SLOT",
+    "9"
+   ],
+   "ack_ms": 24.2,
+   "t_s": 16.33,
+   "step": "save_running_3"
+  },
+  {
+   "answered": 16,
+   "timeouts": 0,
+   "longest_silence_s": 0.27,
+   "states": [
+    "PLAYING"
+   ],
+   "t_s": 20.57,
+   "step": "after_save_running_3"
+  },
+  {
+   "status": [
+    "GET_STATUS",
+    "PAUSED"
+   ],
+   "t_s": 20.87,
+   "step": "paused"
+  },
+  {
+   "ack": [
+    "SAVE_STATE_SLOT",
+    "9"
+   ],
+   "ack_ms": 21.9,
+   "t_s": 20.89,
+   "step": "save_paused"
+  },
+  {
+   "answered": 8,
+   "timeouts": 0,
+   "longest_silence_s": 0.27,
+   "states": [
+    "PAUSED"
+   ],
+   "t_s": 23.02,
+   "step": "after_save_paused"
+  },
+  {
+   "answered": 8,
+   "timeouts": 0,
+   "longest_silence_s": 0.27,
+   "states": [
+    "PLAYING"
+   ],
+   "t_s": 25.45,
+   "step": "resumed"
+  },
+  {
+   "threads": [
+    {
+     "comm": "AppRun",
+     "state": "S",
+     "wchan": "do_sys_poll",
+     "utime": 184,
+     "stime": 26
+    },
+    {
+     "comm": "ra-task",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 17,
+     "stime": 0
+    },
+    {
+     "comm": "AppRun",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroArch-:cs0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 2,
+     "stime": 15
+    },
+    {
+     "comm": "RetroAr:disk$0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroArch-:sh0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroA:sh_opt0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroA:traceq0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroA:traceq0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroA:traceq0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroA:traceq0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroArc:gdrv0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroArch-:gl0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 1,
+     "stime": 1
+    },
+    {
+     "comm": "RetroA:traceq0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroArc:gdrv0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroArch-:gl0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroArch-:sh1",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroArch-:sh2",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "ra-audio",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 1,
+     "stime": 1
+    },
+    {
+     "comm": "threaded-ml",
+     "state": "S",
+     "wchan": "do_sys_poll",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroArch-:sh3",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    }
+   ],
+   "t_s": 25.46,
+   "step": "threads_at_end"
+  },
+  {
+   "how": "sigterm",
+   "returncode": 0,
+   "t_s": 30.57,
+   "step": "exit"
+  }
+ ]
+}

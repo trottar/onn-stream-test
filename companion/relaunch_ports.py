@@ -57,6 +57,11 @@ def run(plugin: Any, players: int, players_joined: int | None = None, *,
     system = str(game.get("system", "")).strip().casefold()
     if target == 4 and system not in _players_session.MULTITAP_SYSTEMS:
         raise RelaunchRefused("No multitap on this system")
+    # B63: a PS1 title not multitap-capable is never relaunched onto the multitap (its player 2 would be dead)
+    capable = getattr(emulator, "ps1_multitap_capable", None)
+    if (target == 4 and system == "ps1" and _players_session.capability_rule_on() and callable(capable)
+            and not capable(game)):
+        raise RelaunchRefused("This game supports 2 players")
     args = getattr(plugin, "_recovery_start_args", None)
     if not isinstance(args, dict) or not args.get("client_ip"):
         raise RelaunchRefused("No stream client to restart the picture for")

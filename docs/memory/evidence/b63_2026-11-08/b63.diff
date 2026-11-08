@@ -1,0 +1,374 @@
+diff --git a/companion/games/emulator_manager.py b/companion/games/emulator_manager.py
+index da56005..ec09ce8 100644
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -2184,6 +2184,23 @@ class EmulatorManager:
+         "port2": "beetle_psx_hw_enable_multitap_port2",
+     }
+ 
++    def ps1_multitap_capable(
++        self,
++        game: dict[str, Any],
++    ) -> bool:
++        """B63: the title's metadata says it is multitap-capable (`ps1_multitap: port1` or `ps1_multitap_capable:
++        true`); unknown = not. A non-PS1 title is not."""
++        if str(game.get("system", "")).strip().casefold() != "ps1":
++            return False
++        try:
++            entry = self._load_controller_overrides()["games"].get(self._input_profile_game_id(game))
++        except EmulatorError:
++            return False
++        if not isinstance(entry, dict):
++            return False
++        return (str(entry.get("ps1_multitap", "")).strip().casefold() == "port1"
++                or entry.get("ps1_multitap_capable") is True)
++
+     def ps1_multitap(
+         self,
+         game: dict[str, Any],
+@@ -5573,10 +5590,18 @@ class EmulatorManager:
+ 
+             # B46: with a pick, the PS1 multitap for this launch from the pick (None = today's metadata read)
+             if players_chosen is not None:
++                # B63: a PS1 title's capability caps the pick / the join (None with the knob 0 = today's plan)
++                ps1_capable = (
++                    self.ps1_multitap_capable(game)
++                    if str(game.get("system", "")).strip().casefold() == "ps1"
++                    and _players_session.capability_rule_on()
++                    else None
++                )
+                 players_plan = _players_session.plan(
+                     str(game.get("system", "")),
+                     int(players_chosen),
+                     self.controller_profile(game).get("libretro_device"),
++                    capable=ps1_capable,
+                 )
+             # B59: four ports on every N64 launch, whatever the pick or the join (no multitap, no relaunch)
+             n64_options: dict[str, Any] | None = None
+@@ -5810,6 +5835,11 @@ class EmulatorManager:
+                     )
+                     + "\n"
+                 )
++            if players_plan is not None and players_plan.get("capped_from"):   # B63
++                log_handle.write(
++                    f"PS1 ports capped: {players_plan['capped_from']} -> {players_plan['ports']} "
++                    "(not multitap-capable)\n"
++                )
+             if n64_launch and n64_options is not None:   # B59
+                 for line in _n64.log_lines(core_path.name, int(players_plan["ports"]), n64_options):
+                     log_handle.write(line + "\n")
+diff --git a/companion/players_session.py b/companion/players_session.py
+index 6d39ab1..fdd8580 100644
+--- a/companion/players_session.py
++++ b/companion/players_session.py
+@@ -26,6 +26,15 @@ CHOICES = (1, 2, 4)
+ SNES_MULTITAP_DEVICE = 257   # RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_JOYPAD, 0) in both SNES cores' libretro sources
+ NONE_DEVICE = 0              # RETRO_DEVICE_NONE
+ MULTITAP_SYSTEMS = ("ps1", "snes", "ps2")   # B49: ps2 = PCSX2's [Pad] MultitapPort1, no --device
++# B63: a PS1 title gets the multitap from a join or a pick only when its metadata says it is multitap-capable
++# (`ps1_multitap: port1` or `ps1_multitap_capable: true`; unknown = not). `=0` = today (every PS1 title capable).
++CAPABILITY_ENV = "PRIVYHUB_PS1_MULTITAP_CAPABILITY"
++
++
++def capability_rule_on(environ: Any = None) -> bool:
++    import os
++    env = os.environ if environ is None else environ
++    return (env.get(CAPABILITY_ENV) or "").strip() != "0"
+ 
+ 
+ def parse(raw: Any) -> int | None:
+@@ -51,11 +60,13 @@ def ports_for_joined(n: int) -> int:
+     return 4 if int(n) >= 3 else 2
+ 
+ 
+-def plan(system: str, players_chosen: int, libretro_device: int | None, source: str = "launch") -> dict[str, Any]:
+-    """The launch's ports for the pick: the `.opt` mode (PS1), the `--device` arguments, the ports read."""
++def plan(system: str, players_chosen: int, libretro_device: int | None, source: str = "launch",
++         capable: bool | None = None) -> dict[str, Any]:
++    """The launch's ports for the pick: the `.opt` mode (PS1), the `--device` arguments, the ports read.
++    B63: `capable` False (a PS1 title not multitap-capable) -> no multitap, 2 ports; None = today."""
+     system = str(system or "").strip().casefold()
+     n = int(players_chosen)
+-    available = system in MULTITAP_SYSTEMS
++    available = system in MULTITAP_SYSTEMS and not (system == "ps1" and capable is False)
+     multitap = n == 4 and available
+     args: list[str] = []
+     if system == "ps1" and isinstance(libretro_device, int) and not isinstance(libretro_device, bool):
+@@ -68,7 +79,7 @@ def plan(system: str, players_chosen: int, libretro_device: int | None, source:
+         args.append(f"--device=2:{SNES_MULTITAP_DEVICE}")
+     elif n == 1:
+         args.append(f"--device=2:{NONE_DEVICE}")
+-    return {
++    out = {
+         "players_chosen": n,
+         "ports": 4 if multitap else (1 if n == 1 else 2),
+         "multitap": multitap,
+@@ -77,6 +88,11 @@ def plan(system: str, players_chosen: int, libretro_device: int | None, source:
+         "device_args": args,
+         "source": source,
+     }
++    if system == "ps1" and capable is not None:               # B63 (absent: no key, today's plan)
++        out["capable"] = bool(capable)
++        if capable is False and n == 4:
++            out["capped_from"] = 4
++    return out
+ 
+ 
+ def ports_set(emulator: Any, game_status: dict[str, Any] | None) -> dict[str, Any]:
+@@ -87,7 +103,8 @@ def ports_set(emulator: Any, game_status: dict[str, Any] | None) -> dict[str, An
+         # B59: an N64 launch's four ports are a plan too (`n64`; reached only with PRIVYHUB_N64=1)
+         if isinstance(session, dict) and session.get("source") in ("launch", "join", "relaunch", "n64"):
+             return {"ports_set": {k: session[k] for k in ("players_chosen", "ports", "multitap", "multitap_available",
+-                                                          "source")} | {"players": int(session["ports"])}}
++                                                          "source")} | {"players": int(session["ports"])}
++                    | {k: session[k] for k in ("capable", "capped_from") if k in session}}   # B63
+         game = getattr(emulator, "active_game", None) or (game_status or {}).get("game") or {}
+         system = str(game.get("system", "")).strip().casefold()
+         multitap = False
+@@ -96,8 +113,14 @@ def ports_set(emulator: Any, game_status: dict[str, Any] | None) -> dict[str, An
+                 multitap = bool(emulator.ps1_multitap(game).get("enabled", False))
+             except Exception:
+                 multitap = False
++        available = system in MULTITAP_SYSTEMS
++        extra: dict[str, Any] = {}
++        # B63: a PS1 title's multitap is available only when it is multitap-capable (or its metadata turns it on)
++        if system == "ps1" and capability_rule_on() and hasattr(emulator, "ps1_multitap_capable"):
++            capable = bool(multitap) or bool(emulator.ps1_multitap_capable(game))
++            available, extra = capable, {"capable": capable}
+         return {"ports_set": {"players": 4 if multitap else 2, "ports": 4 if multitap else 2, "multitap": multitap,
+-                              "multitap_available": system in MULTITAP_SYSTEMS, "source": "metadata"}}
++                              "multitap_available": available, "source": "metadata"} | extra}
+     except Exception:
+         return {"ports_set": {"players": 2, "ports": 2, "multitap": False, "multitap_available": False,
+                               "source": "default"}}
+diff --git a/companion/relaunch_ports.py b/companion/relaunch_ports.py
+index 7c27662..d8d5945 100644
+--- a/companion/relaunch_ports.py
++++ b/companion/relaunch_ports.py
+@@ -57,6 +57,11 @@ def run(plugin: Any, players: int, players_joined: int | None = None, *,
+     system = str(game.get("system", "")).strip().casefold()
+     if target == 4 and system not in _players_session.MULTITAP_SYSTEMS:
+         raise RelaunchRefused("No multitap on this system")
++    # B63: a PS1 title not multitap-capable is never relaunched onto the multitap (its player 2 would be dead)
++    capable = getattr(emulator, "ps1_multitap_capable", None)
++    if (target == 4 and system == "ps1" and _players_session.capability_rule_on() and callable(capable)
++            and not capable(game)):
++        raise RelaunchRefused("This game supports 2 players")
+     args = getattr(plugin, "_recovery_start_args", None)
+     if not isinstance(args, dict) or not args.get("client_ip"):
+         raise RelaunchRefused("No stream client to restart the picture for")
+diff --git a/tests/b63_ps1_multitap/_tmp_cleanup.py b/tests/b63_ps1_multitap/_tmp_cleanup.py
+new file mode 100644
+index 0000000..8d0bf91
+--- /dev/null
++++ b/tests/b63_ps1_multitap/_tmp_cleanup.py
+@@ -0,0 +1,25 @@
++"""B53 (test hygiene): every temporary directory a tests/b63_ps1_multitap run creates is removed when that run ends.
++
++HOME-6 prep found ~6.9 GiB of these suites' fixture trees (formatted 8-MB cards, fake game trees) left in the hub's /tmp
++tmpfs by B49-B52's runs, which never removed their mkdtemp() dirs. Imported by each test module; it tracks only the
++dirs made in this process and removes them at exit (never anything else)."""
++
++from __future__ import annotations
++
++import atexit
++import shutil
++import tempfile
++
++_made: list[str] = []
++_mkdtemp = tempfile.mkdtemp
++
++
++def _tracked(*args, **kwargs):
++    d = _mkdtemp(*args, **kwargs)
++    _made.append(d)
++    return d
++
++
++if getattr(tempfile.mkdtemp, "__name__", "") != "_tracked":
++    tempfile.mkdtemp = _tracked
++    atexit.register(lambda: [shutil.rmtree(d, ignore_errors=True) for d in _made])
+diff --git a/tests/b63_ps1_multitap/test_b63.py b/tests/b63_ps1_multitap/test_b63.py
+new file mode 100644
+index 0000000..bafdce9
+--- /dev/null
++++ b/tests/b63_ps1_multitap/test_b63.py
+@@ -0,0 +1,178 @@
++#!/usr/bin/env python3
++"""B63 (host): the PS1 multitap only for a multitap-capable title -- the capability from the metadata, the plan's cap
++(2 ports, the multitap off) for a join / pick on any other PS1 title, the echo the client reads, the relaunch refused,
++the knob `PRIVYHUB_PS1_MULTITAP_CAPABILITY=0` = today. Fakes only; temp dirs removed at exit.
++
++    python3 -m unittest discover -s tests/b63_ps1_multitap -v
++"""
++
++from __future__ import annotations
++
++import json
++import os
++import sys
++import tempfile
++import types
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401
++sys.path.insert(0, str(ROOT / "tests" / "n64_session"))
++
++import players_session as ps  # noqa: E402
++import relaunch_ports as rp  # noqa: E402
++from games import emulator_manager as em  # noqa: E402
++from test_n64_session import fake_project, run_launch, tree  # noqa: E402
++
++CAPABLE = "game_ps1_aaaaaaaaaaaaaaaa"
++OFF = "game_ps1_bbbbbbbbbbbbbbbb"
++UNKNOWN = "game_ps1_cccccccccccccccc"
++FLAGGED = "game_ps1_dddddddddddddddd"
++OVERRIDES = {CAPABLE: {"ps1_multitap": "port1", "controller_profile": "dualshock"}, OFF: {"ps1_multitap": "off"},
++             FLAGGED: {"ps1_multitap_capable": True}}
++
++
++def write_overrides(proj: Path) -> None:
++    p = proj / "data/games/retroarch/controller_overrides.json"
++    p.parent.mkdir(parents=True, exist_ok=True)
++    p.write_text(json.dumps({"version": 1, "games": OVERRIDES}))
++
++
++class Plan(unittest.TestCase):
++    def test_capable_and_not(self):
++        p = ps.plan("ps1", 4, 1, capable=True)
++        self.assertEqual((p["ports"], p["multitap"], p["ps1_mode"], p["capable"]), (4, True, "port1", True))
++        self.assertNotIn("capped_from", p)
++        p = ps.plan("ps1", 4, 1, source="join", capable=False)
++        self.assertEqual((p["ports"], p["multitap"], p["multitap_available"], p["ps1_mode"], p["capped_from"]),
++                         (2, False, False, "off", 4))
++        self.assertEqual(p["device_args"], ["--device=1:1", "--device=2:1"])
++        self.assertEqual(ps.plan("ps1", 1, 1, capable=False)["ports"], 1)
++
++    def test_none_is_todays_plan_and_other_systems(self):
++        self.assertEqual(ps.plan("ps1", 4, 1), {"players_chosen": 4, "ports": 4, "multitap": True,
++                                                "multitap_available": True, "ps1_mode": "port1",
++                                                "device_args": [f"--device={i}:1" for i in range(1, 5)],
++                                                "source": "launch"})
++        for system in ("snes", "ps2", "n64"):
++            self.assertEqual(ps.plan(system, 4, None, capable=False), ps.plan(system, 4, None))
++
++
++class Capability(unittest.TestCase):
++    def setUp(self):
++        self.proj = Path(tempfile.mkdtemp(prefix="b63_proj_"))
++        write_overrides(self.proj)
++        self.m = em.EmulatorManager(self.proj)
++
++    def test_from_the_metadata(self):
++        g = lambda gid, system="ps1": {"id": gid, "system": system}
++        self.assertTrue(self.m.ps1_multitap_capable(g(CAPABLE)))
++        self.assertTrue(self.m.ps1_multitap_capable(g(FLAGGED)))
++        self.assertFalse(self.m.ps1_multitap_capable(g(OFF)))
++        self.assertFalse(self.m.ps1_multitap_capable(g(UNKNOWN)))
++        self.assertFalse(self.m.ps1_multitap_capable(g(CAPABLE, "snes")))
++        self.assertFalse(self.m.ps1_multitap_capable({"id": "bad id!", "system": "ps1"}))
++
++    def test_the_knob(self):
++        self.assertTrue(ps.capability_rule_on({}))
++        self.assertTrue(ps.capability_rule_on({ps.CAPABILITY_ENV: "1"}))
++        self.assertFalse(ps.capability_rule_on({ps.CAPABILITY_ENV: "0"}))
++
++
++class Echo(unittest.TestCase):
++    def emu(self, session=None, capable=False, multitap_on=False):
++        return types.SimpleNamespace(_players_session=session, active_game={"id": OFF, "system": "ps1"},
++                                     ps1_multitap_capable=lambda game: capable,
++                                     ps1_multitap=lambda game: {"enabled": multitap_on})
++
++    def test_a_capped_join_says_two_and_no_multitap(self):
++        got = ps.ports_set(self.emu(ps.plan("ps1", 4, 1, source="join", capable=False)), None)["ports_set"]
++        self.assertEqual({k: got[k] for k in ("players", "multitap", "multitap_available", "capable", "capped_from")},
++                         {"players": 2, "multitap": False, "multitap_available": False, "capable": False,
++                          "capped_from": 4})
++
++    def test_the_metadata_fallback(self):
++        self.assertFalse(ps.ports_set(self.emu(), None)["ports_set"]["multitap_available"])
++        self.assertTrue(ps.ports_set(self.emu(capable=True), None)["ports_set"]["multitap_available"])
++        self.assertTrue(ps.ports_set(self.emu(multitap_on=True), None)["ports_set"]["multitap_available"])
++        old = os.environ.get(ps.CAPABILITY_ENV)
++        os.environ[ps.CAPABILITY_ENV] = "0"
++        try:
++            got = ps.ports_set(self.emu(), None)["ports_set"]
++            self.assertTrue(got["multitap_available"])
++            self.assertNotIn("capable", got)
++        finally:
++            os.environ.pop(ps.CAPABILITY_ENV) if old is None else os.environ.__setitem__(ps.CAPABILITY_ENV, old)
++
++
++class Relaunch(unittest.TestCase):
++    def plugin(self, capable):
++        calls = []
++        emu = types.SimpleNamespace(status=lambda: {"active": True, "paused": False},
++                                    active_game={"id": OFF, "system": "ps1"}, ps1_multitap_capable=lambda g: capable,
++                                    pause=lambda: calls.append("pause"), stop=lambda: calls.append("stop"))
++        return types.SimpleNamespace(_emulator=emu, _native_stream=types.SimpleNamespace(stop=lambda: calls.append(
++            "stream_stop")), _recovery_start_args={}), calls
++
++    def test_incapable_refused_nothing_stopped(self):
++        plugin, calls = self.plugin(False)
++        with self.assertRaises(rp.RelaunchRefused) as cm:
++            rp.run(plugin, 4, 3)
++        self.assertEqual(str(cm.exception), "This game supports 2 players")
++        self.assertEqual(calls, [])
++
++    def test_capable_passes_the_rule(self):
++        plugin, calls = self.plugin(True)
++        with self.assertRaises(rp.RelaunchRefused) as cm:          # stops later, at the next check (no client)
++            rp.run(plugin, 4, 3)
++        self.assertNotEqual(str(cm.exception), "This game supports 2 players")
++
++
++class Launch(unittest.TestCase):
++    """A PS1 launch through B59's fake RetroArch tree: the join's 3 -> 4 asked, capped to 2 on an incapable title."""
++
++    def setUp(self):
++        self.proj = fake_project(tree({}), cores=("mednafen_psx_hw_libretro.so",))
++        (self.proj / "games/ps1").mkdir(parents=True, exist_ok=True)
++        (self.proj / "games/ps1/made-up.cue").write_text('FILE "made-up.bin" BINARY\n')
++        (self.proj / "games/ps1/made-up.bin").write_bytes(b"\0" * 16)
++        write_overrides(self.proj)
++        self.xdg = Path(tempfile.mkdtemp(prefix="b63_xdg_"))
++        base = self.xdg / "retroarch/config/Beetle PSX HW/Beetle PSX HW.opt"
++        base.parent.mkdir(parents=True)
++        base.write_text('beetle_psx_hw_enable_multitap_port1 = "enabled"\nbeetle_psx_hw_enable_multitap_port2 = '
++                        '"disabled"\n')
++
++    def launch(self, gid, extra=None):
++        game = {"id": gid, "system": "ps1", "title": "made-up", "relative_path": "games/ps1/made-up.cue"}
++        out = run_launch(None, self.proj, game, joined=3, xdg=self.xdg, extra=extra)
++        opt = (self.xdg / "retroarch/config/Beetle PSX HW/made-up.opt").read_text()
++        return out, opt
++
++    def test_incapable_is_capped_to_two(self):
++        out, opt = self.launch(OFF)
++        dev = [a for a in out["calls"][0] if a.startswith("--device=")]
++        self.assertEqual(len(dev), 2, dev)
++        self.assertIn('beetle_psx_hw_enable_multitap_port1 = "disabled"', opt)
++        self.assertIn("PS1 multitap: off", out["log"])
++        self.assertIn("PS1 ports capped: 4 -> 2 (not multitap-capable)", out["log"])
++        self.assertEqual((out["ports_set"]["players"], out["ports_set"]["multitap_available"]), (2, False))
++
++    def test_capable_keeps_the_multitap(self):
++        out, opt = self.launch(CAPABLE)
++        self.assertEqual(len([a for a in out["calls"][0] if a.startswith("--device=")]), 4)
++        self.assertIn('beetle_psx_hw_enable_multitap_port1 = "enabled"', opt)
++        self.assertNotIn("PS1 ports capped", out["log"])
++
++    def test_the_knob_zero_is_today(self):
++        out, opt = self.launch(OFF, extra={ps.CAPABILITY_ENV: "0"})
++        self.assertEqual(len([a for a in out["calls"][0] if a.startswith("--device=")]), 4)
++        self.assertIn('beetle_psx_hw_enable_multitap_port1 = "enabled"', opt)
++        self.assertNotIn("capable", out["ports_set"])
++
++
++if __name__ == "__main__":
++    unittest.main()

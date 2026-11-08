@@ -1,0 +1,173 @@
+diff --git a/companion/pad_slots.py b/companion/pad_slots.py
+index 0c12380..7057be7 100644
+--- a/companion/pad_slots.py
++++ b/companion/pad_slots.py
+@@ -118,6 +118,7 @@ class SlotsLog:
+         self.last: list[dict[str, Any]] | None = None
+         self.last_chosen: int | None = None
+         self.last_joined: int | None = None
++        self.since_start = False                 # B64: a start was written and no claimed row has followed yet
+ 
+     def _row(self, recovery: Any, when: str, slots: list[dict[str, Any]] | None, **extra: Any) -> None:
+         fields: dict[str, Any] = {"when": when}
+@@ -141,6 +142,7 @@ class SlotsLog:
+             self.last = slots
+         self.last_chosen = players_chosen
+         self.last_joined = players_joined
++        self.since_start = True
+         return slots
+ 
+     def heartbeat(self, recovery: Any, raw: str, values: dict[str, Any], updates_by_player: Any = None,
+@@ -169,11 +171,19 @@ class SlotsLog:
+                 values["packets_by_player"] = [int(x) for x in updates_by_player["packets"]]
+         elif isinstance(updates_by_player, (list, tuple)):
+             values["updates_by_player"] = [int(x) for x in updates_by_player]
++        claimed = any(e.get("claimed_by") for e in slots)
++        if claimed or players_joined == 0:
++            self.since_start = False
++        # B64: the client's first heartbeat after a start carries the previous game's count with no claim yet
++        stale = self.since_start and bool(players_joined) and not claimed
++        if stale:
++            values["pad_slots_stale"] = True
+         if slots != self.last or players_chosen != self.last_chosen or players_joined != self.last_joined:
+-            self._row(recovery, "change", slots, heartbeat_sequence=values.get("sequence"), **extra)
++            self._row(recovery, "change", slots, heartbeat_sequence=values.get("sequence"), **extra,
++                      **({"stale": True} if stale else {}))
+             self.last = slots
+             self.last_chosen = players_chosen
+-            self.last_joined = players_joined
++            self.last_joined = players_joined     # (a stale row too: else it would repeat at every heartbeat)
+ 
+ 
+ def enable_changes(controller: Any) -> bool:
+diff --git a/tests/b64_stale_pad_rows/_tmp_cleanup.py b/tests/b64_stale_pad_rows/_tmp_cleanup.py
+new file mode 100644
+index 0000000..8045294
+--- /dev/null
++++ b/tests/b64_stale_pad_rows/_tmp_cleanup.py
+@@ -0,0 +1,25 @@
++"""B53 (test hygiene): every temporary directory a tests/b64_stale_pad_rows run creates is removed when that run ends.
++
++HOME-6 prep found ~6.9 GiB of these suites' fixture trees (formatted 8-MB cards, fake game trees) left in the hub's /tmp
++tmpfs by B49-B52's runs, which never removed their mkdtemp() dirs. Imported by each test module; it tracks only the
++dirs made in this process and removes them at exit (never anything else)."""
++
++from __future__ import annotations
++
++import atexit
++import shutil
++import tempfile
++
++_made: list[str] = []
++_mkdtemp = tempfile.mkdtemp
++
++
++def _tracked(*args, **kwargs):
++    d = _mkdtemp(*args, **kwargs)
++    _made.append(d)
++    return d
++
++
++if getattr(tempfile.mkdtemp, "__name__", "") != "_tracked":
++    tempfile.mkdtemp = _tracked
++    atexit.register(lambda: [shutil.rmtree(d, ignore_errors=True) for d in _made])
+diff --git a/tests/b64_stale_pad_rows/test_b64.py b/tests/b64_stale_pad_rows/test_b64.py
+new file mode 100644
+index 0000000..02720ed
+--- /dev/null
++++ b/tests/b64_stale_pad_rows/test_b64.py
+@@ -0,0 +1,94 @@
++#!/usr/bin/env python3
++"""B64 (host): the first heartbeat after a start carries the previous game's joined count with no claim -- its
++`pad_slots` change row is tagged `stale: true` (and the heartbeat row `pad_slots_stale`); real joins are not. HOME-7's
++sequence replayed with a fake recovery; no files outside the temp dirs (removed at exit).
++
++    python3 -m unittest discover -s tests/b64_stale_pad_rows -v
++"""
++
++from __future__ import annotations
++
++import sys
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401
++
++import pad_slots as pslots  # noqa: E402
++
++MAP2 = "0:aaaaaa:sony,1:bbbbbb:sony"
++
++
++class Rec:
++    def __init__(self):
++        self.rows = []
++
++    def _log(self, event, **fields):
++        self.rows.append({"event": event, **fields})
++
++
++def beat(log, rec, seq, joined=None, claims=None, raw=MAP2):
++    values = {"sequence": seq}
++    log.heartbeat(rec, raw, values, claims=claims, players_joined=joined)
++    return values
++
++
++class Stale(unittest.TestCase):
++    def test_homes_sequence(self):
++        rec, log = Rec(), pslots.SlotsLog()
++        log.start(rec, MAP2)                                              # the start: no join fields
++        v1 = beat(log, rec, 1, joined=2)                                  # the carry-over, no claims
++        v2 = beat(log, rec, 2, joined=2)                                  # the same again: no new row
++        v3 = beat(log, rec, 3, joined=1, claims="0:p")                    # the first real join
++        v4 = beat(log, rec, 4, joined=2, claims="0:p,1:p")
++        changes = [r for r in rec.rows if r["when"] == "change"]
++        self.assertEqual([(r["heartbeat_sequence"], r.get("stale")) for r in changes], [(1, True), (3, None), (4, None)])
++        self.assertTrue(v1.get("pad_slots_stale"))
++        self.assertTrue(v2.get("pad_slots_stale"))
++        self.assertNotIn("pad_slots_stale", v3)
++        self.assertNotIn("pad_slots_stale", v4)
++
++    def test_a_restart_is_tagged_again(self):
++        rec, log = Rec(), pslots.SlotsLog()
++        log.start(rec, MAP2)
++        beat(log, rec, 1, joined=2)
++        beat(log, rec, 3, joined=2, claims="0:p,1:p")
++        log.start(rec, MAP2)                                              # the next game
++        beat(log, rec, 1, joined=2)
++        changes = [r for r in rec.rows if r["when"] == "change"]
++        self.assertEqual([r.get("stale") for r in changes], [True, None, True])
++
++    def test_not_tagged(self):
++        rec, log = Rec(), pslots.SlotsLog()
++        log.start(rec, MAP2)
++        beat(log, rec, 1, joined=2, claims="0:p,1:p")                     # a claimed row before session_started
++        beat(log, rec, 2)                                                 # no join key (B46's client): no row field
++        self.assertTrue(all("stale" not in r for r in rec.rows))
++        rec2, log2 = Rec(), pslots.SlotsLog()
++        log2.start(rec2, MAP2)
++        v = beat(log2, rec2, 1, joined=0)
++        self.assertNotIn("pad_slots_stale", v)
++        self.assertTrue(all("stale" not in r for r in rec2.rows))
++
++    def test_after_a_claim_an_unclaimed_row_is_not_stale(self):
++        rec, log = Rec(), pslots.SlotsLog()
++        log.start(rec, MAP2)
++        beat(log, rec, 1, joined=1, claims="0:p")
++        v = beat(log, rec, 2, joined=2, claims="")                       # claims gone mid-session: not a carry-over
++        self.assertNotIn("pad_slots_stale", v)
++        self.assertTrue(all("stale" not in r for r in rec.rows))
++
++    def test_no_join_client_is_byte_for_byte(self):
++        rec, log = Rec(), pslots.SlotsLog()
++        log.start(rec, MAP2)
++        v = beat(log, rec, 1, raw="0:aaaaaa:sony")
++        self.assertEqual(rec.rows[-1], {"event": "pad_slots", "when": "change", "slots": [
++            {"slot": 0, "pad": "aaaaaa", "class": "sony"}], "count": 1, "heartbeat_sequence": 1})
++        self.assertEqual(set(v), {"sequence", "pad_slots"})
++
++
++if __name__ == "__main__":
++    unittest.main()

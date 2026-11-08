@@ -1,0 +1,160 @@
+{
+ "capture": false,
+ "steps": [
+  {
+   "status": [
+    "GET_STATUS",
+    "PLAYING"
+   ],
+   "after_s": 0.6,
+   "exited": null,
+   "t_s": 0.6,
+   "step": "up"
+  },
+  {
+   "threads": [
+    {
+     "comm": "AppRun",
+     "state": "R",
+     "wchan": "0",
+     "utime": 29,
+     "stime": 10
+    },
+    {
+     "comm": "ra-task",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "AppRun",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroArch-:cs0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 2
+    },
+    {
+     "comm": "RetroAr:disk$0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroArch-:sh0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroA:sh_opt0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroA:traceq0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroA:traceq0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroA:traceq0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroA:traceq0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroArc:gdrv0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroArch-:gl0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 1,
+     "stime": 0
+    },
+    {
+     "comm": "RetroA:traceq0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroArc:gdrv0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroArch-:gl0",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "RetroArch-:sh1",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "ra-audio",
+     "state": "S",
+     "wchan": "futex_wait_queue",
+     "utime": 0,
+     "stime": 0
+    },
+    {
+     "comm": "threaded-ml",
+     "state": "S",
+     "wchan": "do_sys_poll",
+     "utime": 0,
+     "stime": 0
+    }
+   ],
+   "t_s": 3.61,
+   "step": "threads_at_end"
+  },
+  {
+   "how": "sigterm",
+   "returncode": 0,
+   "t_s": 8.72,
+   "step": "exit"
+  }
+ ]
+}

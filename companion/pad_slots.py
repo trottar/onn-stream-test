@@ -118,6 +118,7 @@ class SlotsLog:
         self.last: list[dict[str, Any]] | None = None
         self.last_chosen: int | None = None
         self.last_joined: int | None = None
+        self.since_start = False                 # B64: a start was written and no claimed row has followed yet
 
     def _row(self, recovery: Any, when: str, slots: list[dict[str, Any]] | None, **extra: Any) -> None:
         fields: dict[str, Any] = {"when": when}
@@ -141,6 +142,7 @@ class SlotsLog:
             self.last = slots
         self.last_chosen = players_chosen
         self.last_joined = players_joined
+        self.since_start = True
         return slots
 
     def heartbeat(self, recovery: Any, raw: str, values: dict[str, Any], updates_by_player: Any = None,
@@ -169,11 +171,19 @@ class SlotsLog:
                 values["packets_by_player"] = [int(x) for x in updates_by_player["packets"]]
         elif isinstance(updates_by_player, (list, tuple)):
             values["updates_by_player"] = [int(x) for x in updates_by_player]
+        claimed = any(e.get("claimed_by") for e in slots)
+        if claimed or players_joined == 0:
+            self.since_start = False
+        # B64: the client's first heartbeat after a start carries the previous game's count with no claim yet
+        stale = self.since_start and bool(players_joined) and not claimed
+        if stale:
+            values["pad_slots_stale"] = True
         if slots != self.last or players_chosen != self.last_chosen or players_joined != self.last_joined:
-            self._row(recovery, "change", slots, heartbeat_sequence=values.get("sequence"), **extra)
+            self._row(recovery, "change", slots, heartbeat_sequence=values.get("sequence"), **extra,
+                      **({"stale": True} if stale else {}))
             self.last = slots
             self.last_chosen = players_chosen
-            self.last_joined = players_joined
+            self.last_joined = players_joined     # (a stale row too: else it would repeat at every heartbeat)
 
 
 def enable_changes(controller: Any) -> bool:
