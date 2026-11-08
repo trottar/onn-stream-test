@@ -2464,6 +2464,12 @@ User-supplied PS2 BIOS should enter only through the G0 import boundary.
 > DualShock 2), the multitap at launch, the hub-side BIOS copy and saves, and the save-state behaviours off for PS2. No
 > client change. Next: A's **H3-P2**, the streamed session on the TV through the onn with the user's pads, beside a PS1
 > session (`docs/memory/handoffs/SESSION_B_DONE_2026-11-08P.md`).
+>
+> **B50 (2026-11-08, `docs/memory/evidence/B50_PS2_FIXES_2026-11-08.md`):** H3-P2's PS2 defects fixed inside
+> `PRIVYHUB_PS2=1` — the audio wait reviewed (kept), formatted memory cards, a tear-free present, the SDL3 face names, the
+> keeper's PS2 label, and the P2 capture window. Next: A's **HOME-4+**, one sitting at the TV (the chooser APK
+> `cfe0211c…`, then PS2 two-player and a save). **G-A14** (`PRIVYHUB_PS2=1` as the sixteenth line) waits on the user's
+> "PS2 always on" (`docs/memory/handoffs/SESSION_B_DONE_2026-11-08Q.md`).
 
 > **H3-P1 RUN (2026-11-07 / 08, A):** `docs/memory/evidence/H3_P1_PS2_PROBE_2026-11-07.md`. PCSX2 v2.8.2 (the
 > user's "Yes"), Vulkan on RADV at 1x: T1 (light) and T2 (heavy, menu only) at full speed — P0a-P0c, P1, P3, P4 met;

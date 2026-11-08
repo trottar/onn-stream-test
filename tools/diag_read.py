@@ -42,6 +42,13 @@ DIAG_ROOT = Path.home() / "privyhub_diag"
 EPOCH = datetime(1970, 1, 1)
 DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 GAME_LOG = re.compile(r"^(\d{8})-(\d{6})-game_([a-z0-9]+)_([0-9a-f]{4})[0-9a-f]*\.log$")
+# B50: a PS2 session's game log (B49: no id or title in its name); its sessions read system `ps2`, core `pcsx2`
+PS2_LOG = re.compile(r"^(\d{8})-(\d{6})-ps2\.log$")
+PS2_CORE = "pcsx2"
+
+
+def is_game_log(name: str) -> bool:
+    return bool(GAME_LOG.match(name) or PS2_LOG.match(name))
 
 # the trip's known titles (game id prefix -> class + tag); others read "<SYSTEM> <4-hex>"
 TAGS = {"04ff": "PS1 platformer", "ee3b": "SNES action-adventure", "2ef9": "PS1 first-person RPG",
@@ -154,7 +161,7 @@ class Logs:
                 if base == "decoder_sessions":
                     for f in files:
                         self._report((p / f).read_bytes())
-                elif GAME_LOG.match(base):
+                elif is_game_log(base):
                     if base not in self.game_logs:
                         self.game_logs.append(base)
                 elif base in names:
@@ -174,7 +181,7 @@ class Logs:
         for f in sorted(glob.glob(str(d / "decoder_sessions" / "*.json"))):
             self._report(Path(f).read_bytes())
         for f in sorted(os.listdir(d / "game_logs")) if (d / "game_logs").is_dir() else []:
-            if GAME_LOG.match(f) and f not in self.game_logs:
+            if is_game_log(f) and f not in self.game_logs:
                 self.game_logs.append(f)
         if (d / "overlay.jsonl").is_file():
             self.overlay += rows((d / "overlay.jsonl").read_bytes())
@@ -198,7 +205,7 @@ class Logs:
             except OSError:
                 continue
         for f in sorted(os.listdir(games)) if games.is_dir() else []:
-            if GAME_LOG.match(f) and f not in self.game_logs:
+            if is_game_log(f) and f not in self.game_logs:
                 self.game_logs.append(f)
         if diag_root is not None and Path(diag_root).is_dir():
             for day in sorted(os.listdir(diag_root)):
@@ -253,6 +260,13 @@ class Analysis:
         self.launches = []
         for f in sorted(logs.game_logs):
             m = GAME_LOG.match(f)
+            if m is None:                                   # B50: a PS2 launch
+                m2 = PS2_LOG.match(f)
+                if m2 is None:
+                    continue
+                t = local_to_utc(datetime.strptime(m2.group(1) + m2.group(2), "%Y%m%d%H%M%S"), tz)
+                self.launches.append((t, "PS2", PS2_CORE))
+                continue
             t = local_to_utc(datetime.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M%S"), tz)
             tag = self.tags.get(m.group(4), f"{m.group(3).upper()} {m.group(4)}")
             self.launches.append((t, tag, CORES.get(m.group(3), m.group(3))))
@@ -285,12 +299,19 @@ class Analysis:
         self.sessions: list[dict[str, Any]] = []
         cur = None
         last_cfg = None
+        ps2_at = None                                       # B50: the newest `ps2_session` row (the stream's start)
         for r in self.rec:
             t, ev = ts(r["at_utc"]), r.get("event")
+            if ev == "ps2_session":
+                ps2_at = t
             if ev == "remote_config":
                 last_cfg = r
             elif ev == "session_started":
                 cur = {"start": t, "class": (last_cfg or {}).get("class"), "events": [], "end": None, "end_kind": None}
+                # B50: the title's system node: a PS2 stream start just before this release makes it a PS2 session
+                if ps2_at is not None and timedelta(0) <= t - ps2_at <= timedelta(seconds=120):
+                    cur["ps2"] = True
+                ps2_at = None
                 self.sessions.append(cur)
             elif cur is not None:
                 cur["events"].append(r)
@@ -309,6 +330,8 @@ class Analysis:
             if s["end_kind"] is None:
                 s["end_kind"] = "user exit (bye)" if s.get("bye") else ("open" if s["end"] is None else "?")
             s["tag"], s["core"] = self.title_at(s["start"])
+            if s.get("ps2"):                                # B50: the session's own row wins over the launch order
+                s["tag"], s["core"] = "PS2", PS2_CORE
         self.restarts = [r for r in self.rec if r.get("event") == "restart_fast"]
         self.transitions = [r for r in self.lad if r.get("event") == "transition"]
         # B32-host writes `in_place` on the step's `transition_done` row (adaptive_bitrate_live), not on `transition`:
@@ -479,6 +502,11 @@ class Analysis:
         return out
 
     # -- one session as a sessions.jsonl row (G4-S4's columns + B34's slots + the restarts and their triggers)
+    @staticmethod
+    def ps1_reference(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """B50: the PS1 sessions a comparison may use as its reference (a PS2 session never)."""
+        return [r for r in rows if r.get("core") == CORES["ps1"] and r.get("system") != "ps2"]
+
     def session_row(self, s: dict[str, Any]) -> dict[str, Any]:
         end = s["end"] or s["start"]
         m = self.summarize(s["start"], end + timedelta(seconds=1))
@@ -513,6 +541,8 @@ class Analysis:
             "end_kind": s["end_kind"], "resets": m["resets"],
             "hitch_s": m["hitch_s"], "hitch_by": m["hitch_by"],
             "hitch_s_per_10min": round(m["hitch_s"] / per10, 1) if per10 else None,
+            # B50: a PS2 session says its system (other sessions' rows as before)
+            **({"system": "ps2"} if s["core"] == PS2_CORE else {}),
             "silences": m["silences"], "silences_user": m["silences_user"],
             "silences_per_10min": round(m["silences"] / per10, 1) if per10 else None,
             "max_silence_ms": round(m["max_silence_ms"]), "underruns": m["underruns"], "starvation": m["starvation"],

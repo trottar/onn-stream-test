@@ -1,0 +1,1011 @@
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -6815,6 +6815,8 @@
+             for sub in ("config", "memcards", "sstates", "bios"):
+                 (data / sub).mkdir(parents=True, exist_ok=True)
+             _ps2.bios_copy_once(paths["bios_dir"], data / "bios")
++            # B50: the slots' cards formatted on the hub when absent or all 0xFF (H3-P2's "Save failed")
++            memcards = _ps2.ensure_memcards(root)
+             ini = _ps2.ini_path(root)
+             text = ini.read_text(encoding="utf-8") if ini.is_file() else ""
+             bios = _ps2.choose_bios(data / "bios", _ps2.ini_get(text, "Filenames", "BIOS"))
+@@ -6846,6 +6848,10 @@
+             f"{utc_ms()} PS2 launch: pcsx2 players={plan['ports']} multitap={str(bool(plan['multitap'])).lower()} "
+             f"adapter={'named' if adapter else 'unset'}\n"
+         )
++        # B50: what the launch did to the slots' cards (created / formatted / kept)
++        log_handle.write(
++            f"{utc_ms()} PS2 memcards: " + " ".join(f"{k}={v}" for k, v in sorted(memcards.items())) + "\n"
++        )
+         log_handle.flush()
+ 
+         try:
+@@ -6891,7 +6897,8 @@
+ 
+         # H3-P2 (A, 2026-11-08): PCSX2 opens its PulseAudio stream ~10-15 s after its window; the stream's start
+         # (and its stabilization pause) must not come before it, or the session's audio finds no sink-input.
+-        waited = _ps2.wait_sink_input(process.pid, alive=lambda: process.poll() is None)
++        # B50: kept (the sink-input is the earliest proof of the audio stream), on the session's injectable clock
++        waited = self._ps2.wait_audio(alive=lambda: process.poll() is None)
+         log_line(f"PS2 audio: sink-input {'%.1fs' % waited if waited is not None else 'none'}")
+ 
+         payload = self.status()
+--- /dev/null
++++ b/companion/ps2_memcard.py
+@@ -0,0 +1,208 @@
++"""B50: a formatted 8 MB PS2 memory card for PCSX2, and a checker that reads one back.
++
++Used only by the PS2 launch kind (`ps2_session`, behind `PRIVYHUB_PS2=1`); nothing imports it otherwise.
++
++H3-P2: the hub's cards were PCSX2's unformatted image (all `0xFF`), so a game's save failed. PCSX2 2.8.2 offers no CLI
++or ini path that creates a formatted card, so the companion writes one -- only where a slot's card is absent or all
++`0xFF`. A card with any other byte (a user's saves) is never touched.
++
++The layout (16,384 pages of 512 data bytes + 16 spare bytes = 8,650,752 bytes):
++- page 0: the superblock;
++- cluster 8: the indirect FAT, naming FAT clusters 9-40;
++- the FAT: the root's cluster as the end of its chain, the rest free;
++- absolute cluster 41: the root directory (`.` / `..`);
++- every written page carries its ECC (4 x 3-byte Hamming codes over 128-byte chunks, then 4 zero bytes); unwritten
++  pages are all `0xFF`.
++
++The ECC tables equal the two 256-byte tables in PCSX2 2.8.2's own binary
++(`docs/memory/evidence/b50_2026-11-08/ecc_table_check.txt`). Design:
++`docs/memory/evidence/b50_2026-11-08/design_written_before_code.md` §S2.
++"""
++
++from __future__ import annotations
++
++import struct
++import time
++from pathlib import Path
++from typing import Any
++
++MAGIC = b"Sony PS2 Memory Card Format "
++VERSION = b".".join((b"1", b"2", b"0", b"0"))   # the format's version, dotted
++PAGE = 512
++SPARE = 16
++RAW_PAGE = PAGE + SPARE
++PAGES = 16384
++CARD_BYTES = PAGES * RAW_PAGE                 # 8,650,752
++PAGES_PER_CLUSTER = 2
++PAGES_PER_BLOCK = 16
++CLUSTER = PAGE * PAGES_PER_CLUSTER
++CLUSTERS = PAGES // PAGES_PER_CLUSTER         # 8192
++EPC = CLUSTER // 4                            # FAT entries per cluster
++IFC = 8                                       # the indirect FAT's cluster
++FAT_CLUSTERS = 32
++ALLOC_OFFSET = IFC + 1 + FAT_CLUSTERS         # 41
++ALLOC_END = CLUSTERS - ALLOC_OFFSET - 2 * (PAGES_PER_BLOCK // PAGES_PER_CLUSTER)   # 8135
++BACKUP1, BACKUP2 = 1023, 1022
++CARD_TYPE, CARD_FLAGS = 2, 0x52
++FREE, END = 0x7FFFFFFF, 0xFFFFFFFF
++MODE_DOT, MODE_DOTDOT = 0x8427, 0xA426
++
++_SB = struct.Struct("<28s12sHHHHIIIIII8x128s128sBBxx")
++_DIRENT = struct.Struct("<HHI8sII8sI28x448s")
++
++
++def _parity(a: int) -> int:
++    a ^= a >> 1
++    a ^= a >> 2
++    a ^= a >> 4
++    return a & 1
++
++
++def _cpmask(a: int) -> int:
++    return ((_parity(a & 0x55) << 0) | (_parity(a & 0x33) << 1) | (_parity(a & 0x0F) << 2)
++            | (_parity(a & 0xAA) << 4) | (_parity(a & 0xCC) << 5) | (_parity(a & 0xF0) << 6))
++
++
++PARITY = bytes(_parity(b) for b in range(256))
++COLUMN_MASKS = bytes(_cpmask(b) for b in range(256))
++
++
++def ecc128(chunk: bytes) -> bytes:
++    """The 3-byte Hamming code of a 128-byte chunk (column parity, line parity 0, line parity 1)."""
++    cp, lp0, lp1 = 0x77, 0x7F, 0x7F
++    for i, b in enumerate(chunk):
++        cp ^= COLUMN_MASKS[b]
++        if PARITY[b]:
++            lp0 ^= ~i
++            lp1 ^= i
++    return bytes((cp & 0xFF, lp0 & 0x7F, lp1 & 0xFF))
++
++
++def spare_for(page: bytes) -> bytes:
++    return b"".join(ecc128(page[i:i + 128]) for i in range(0, PAGE, 128)) + b"\x00" * 4
++
++
++def _tod(t: float) -> bytes:
++    """The card's time of day (Japan time, as the console keeps it): pad, sec, min, hour, day, month, year."""
++    g = time.gmtime(t + 9 * 3600)
++    return struct.pack("<xBBBBBH", g.tm_sec, g.tm_min, g.tm_hour, g.tm_mday, g.tm_mon, g.tm_year)
++
++
++def superblock() -> bytes:
++    ifc = struct.pack("<32I", IFC, *([0] * 31))
++    bad = struct.pack("<32i", *([-1] * 32))
++    sb = _SB.pack(MAGIC, VERSION, PAGE, PAGES_PER_CLUSTER, PAGES_PER_BLOCK, 0xFF00, CLUSTERS, ALLOC_OFFSET, ALLOC_END,
++                  0, BACKUP1, BACKUP2, ifc, bad, CARD_TYPE, CARD_FLAGS)
++    return sb + b"\xFF" * (PAGE - len(sb))
++
++
++def _dirent(mode: int, length: int, name: bytes, t: float) -> bytes:
++    tod = _tod(t)
++    return _DIRENT.pack(mode, 0, length, tod, 0, 0, tod, 0, name)
++
++
++def format_card(now: float | None = None) -> bytes:
++    """A whole formatted 8 MB card image (`.ps2`, with ECC)."""
++    t = time.time() if now is None else now
++    pages: dict[int, bytes] = {0: superblock()}
++    ifc_entries = list(range(IFC + 1, IFC + 1 + FAT_CLUSTERS)) + [END] * (EPC - FAT_CLUSTERS)
++    ifc = struct.pack(f"<{EPC}I", *ifc_entries)
++    pages[IFC * 2], pages[IFC * 2 + 1] = ifc[:PAGE], ifc[PAGE:]
++    fat = [END] + [FREE] * (ALLOC_END - 1) + [END] * (FAT_CLUSTERS * EPC - ALLOC_END)
++    for k in range(FAT_CLUSTERS):
++        raw = struct.pack(f"<{EPC}I", *fat[k * EPC:(k + 1) * EPC])
++        c = IFC + 1 + k
++        pages[c * 2], pages[c * 2 + 1] = raw[:PAGE], raw[PAGE:]
++    root = ALLOC_OFFSET
++    pages[root * 2] = _dirent(MODE_DOT, 2, b".", t)
++    pages[root * 2 + 1] = _dirent(MODE_DOTDOT, 0, b"..", t)
++    blank = b"\xFF" * RAW_PAGE
++    out = bytearray()
++    for n in range(PAGES):
++        data = pages.get(n)
++        out += blank if data is None else data + spare_for(data)
++    return bytes(out)
++
++
++def is_unformatted(data: bytes) -> bool:
++    """PCSX2's unformatted image: the full size, every byte 0xFF."""
++    return len(data) == CARD_BYTES and data.count(0xFF) == CARD_BYTES
++
++
++def _page(data: bytes, n: int) -> tuple[bytes, bytes]:
++    raw = data[n * RAW_PAGE:(n + 1) * RAW_PAGE]
++    return raw[:PAGE], raw[PAGE:]
++
++
++def check(data: bytes) -> dict[str, Any]:
++    """Read a card back: {"formatted": bool, "problems": [...], ...}. Never raises."""
++    problems: list[str] = []
++    out: dict[str, Any] = {"bytes": len(data)}
++    if len(data) != CARD_BYTES:
++        return {**out, "formatted": False, "problems": ["size"]}
++    if is_unformatted(data):
++        return {**out, "formatted": False, "problems": ["unformatted (all 0xFF)"]}
++    sb_page, _ = _page(data, 0)
++    f = _SB.unpack(sb_page[:_SB.size])
++    names = ("magic", "version", "page_len", "pages_per_cluster", "pages_per_block", "unknown", "clusters",
++             "alloc_offset", "alloc_end", "rootdir", "backup1", "backup2", "ifc", "bad", "card_type", "card_flags")
++    sb = dict(zip(names, f))
++    expect = {"magic": MAGIC, "page_len": PAGE, "pages_per_cluster": PAGES_PER_CLUSTER,
++              "pages_per_block": PAGES_PER_BLOCK, "clusters": CLUSTERS, "alloc_offset": ALLOC_OFFSET,
++              "alloc_end": ALLOC_END, "rootdir": 0, "backup1": BACKUP1, "backup2": BACKUP2, "card_type": CARD_TYPE}
++    for k, v in expect.items():
++        if sb[k] != v:
++            problems.append(f"superblock {k}")
++    if not sb["version"].startswith(VERSION):
++        problems.append("superblock version")
++    ecc_bad = 0
++    for n in range(PAGES):
++        page, spare = _page(data, n)
++        if page == b"\xFF" * PAGE and spare == b"\xFF" * SPARE:
++            continue
++        if spare[:12] != spare_for(page)[:12]:
++            ecc_bad += 1
++    if ecc_bad:
++        problems.append(f"ecc on {ecc_bad} page(s)")
++    ifc_cluster = struct.unpack_from("<I", sb["ifc"], 0)[0]
++    ifc_raw = b"".join(_page(data, ifc_cluster * 2 + i)[0] for i in range(PAGES_PER_CLUSTER))
++    fat_clusters = list(struct.unpack(f"<{EPC}I", ifc_raw))[:FAT_CLUSTERS]
++    fat: list[int] = []
++    for c in fat_clusters:
++        raw = b"".join(_page(data, c * 2 + i)[0] for i in range(PAGES_PER_CLUSTER))
++        fat += struct.unpack(f"<{EPC}I", raw)
++    if not fat or fat[0] != END:
++        problems.append("fat: the root's cluster not an end of chain")
++    free = sum(1 for e in fat[:sb["alloc_end"]] if e == FREE)
++    out["free_clusters"] = free
++    root = sb["alloc_offset"] + sb["rootdir"]
++    e0 = _DIRENT.unpack(_page(data, root * 2)[0])
++    e1 = _DIRENT.unpack(_page(data, root * 2 + 1)[0])
++    if (e0[0], e0[2], e0[8].rstrip(b"\x00")) != (MODE_DOT, 2, b"."):
++        problems.append("root: '.' entry")
++    if (e1[0], e1[8].rstrip(b"\x00")) != (MODE_DOTDOT, b".."):
++        problems.append("root: '..' entry")
++    return {**out, "formatted": not problems, "problems": problems}
++
++
++def ensure_cards(folder: Path, names: list[str], now: float | None = None) -> dict[str, str]:
++    """Each named card: `created` (absent), `formatted` (was all 0xFF), or `kept` (holds data; never touched)."""
++    folder.mkdir(parents=True, exist_ok=True)
++    result: dict[str, str] = {}
++    for name in names:
++        p = folder / name
++        if p.exists():
++            if not p.is_file():
++                result[name] = "kept"          # a folder card, PCSX2's own: not ours
++                continue
++            if not is_unformatted(p.read_bytes()):
++                result[name] = "kept"
++                continue
++            how = "formatted"
++        else:
++            how = "created"
++        tmp = p.with_name(p.name + ".privyhub.tmp")
++        tmp.write_bytes(format_card(now))
++        tmp.replace(p)
++        result[name] = how
++    return result
+--- a/companion/ps2_session.py
++++ b/companion/ps2_session.py
+@@ -66,13 +66,23 @@
+ # The DualShock 2 layout from the SDL game-controller names (PCSX2's `SDL-<k>/<name>` bindings)
+ DS2_BINDINGS = (
+     ("Up", "DPadUp"), ("Right", "DPadRight"), ("Down", "DPadDown"), ("Left", "DPadLeft"),
+-    ("Triangle", "Y"), ("Circle", "B"), ("Cross", "A"), ("Square", "X"),
++    # B50: PCSX2 2.8.2 is built on SDL3: the face buttons are FaceNorth / FaceEast / FaceSouth / FaceWest (its log
++    # rejected `SDL-k/A` / `B` / `X` / `Y`); every other name below was accepted
++    ("Triangle", "FaceNorth"), ("Circle", "FaceEast"), ("Cross", "FaceSouth"), ("Square", "FaceWest"),
+     ("Select", "Back"), ("Start", "Start"),
+     ("L1", "LeftShoulder"), ("L2", "+LeftTrigger"), ("R1", "RightShoulder"), ("R2", "+RightTrigger"),
+     ("L3", "LeftStick"), ("R3", "RightStick"),
+     ("LUp", "-LeftY"), ("LRight", "+LeftX"), ("LDown", "+LeftY"), ("LLeft", "-LeftX"),
+     ("RUp", "-RightY"), ("RRight", "+RightX"), ("RDown", "+RightY"), ("RLeft", "-RightX"),
+ )
++# B50: the SDL names PCSX2 2.8.2 accepts (its binary; its log of H3-P2), for the bindings above
++SDL_BUTTONS = frozenset(("FaceSouth", "FaceEast", "FaceWest", "FaceNorth", "Back", "Guide", "Start", "LeftStick",
++                         "RightStick", "LeftShoulder", "RightShoulder", "DPadUp", "DPadDown", "DPadLeft", "DPadRight"))
++SDL_AXES = frozenset(s + a for s in "+-" for a in ("LeftX", "LeftY", "RightX", "RightY", "LeftTrigger", "RightTrigger"))
++# B50: the two slots' cards on the hub, formatted by the companion when absent or all 0xFF (ps2_memcard)
++MEMCARDS = ("Mcd001.ps2", "Mcd002.ps2")
++PINE_LATE_S = 1.0
++
+ # PCSX2's pad numbering: 1A = Pad1, 2A = Pad2, 1B-1D = Pad3-Pad5, 2B-2D = Pad6-Pad8
+ MULTITAP_PORT1_PADS = (1, 3, 4, 5)
+ PLAIN_PADS = (1, 2)
+@@ -319,7 +329,8 @@
+ def settings_for(project_root: Path, bios_name: str, adapter: str | None, players: int,
+                  multitap: bool) -> dict[str, dict[str, str]]:
+     data = (Path(project_root) / DATA_DIR).resolve()
+-    gs = {"Renderer": "14", "upscale_multiplier": "1"}
++    # B50: vsync on with mailbox allowed: a tear-free present (MAILBOX where the driver offers it, else FIFO)
++    gs = {"Renderer": "14", "upscale_multiplier": "1", "VsyncEnable": "true", "DisableMailboxPresentation": "false"}
+     for k in ("OsdShowSpeed", "OsdShowFPS", "OsdShowVPS", "OsdShowCPU", "OsdShowGPU", "OsdShowResolution"):
+         gs[k] = "false"
+     if adapter:
+@@ -336,6 +347,9 @@
+         "AutoUpdater": {"CheckAtStartup": "false"},
+         "InputSources": {"SDL": "true", "Keyboard": "true", "Mouse": "false"},
+         "Hotkeys": {"TogglePause": "Keyboard/Space"},
++        # B50: both slots on the hub's formatted cards
++        "MemoryCards": {"Slot1_Enable": "true", "Slot1_Filename": MEMCARDS[0], "Slot2_Enable": "true",
++                        "Slot2_Filename": MEMCARDS[1]},
+     }
+     s.update(pad_sections(players, multitap))
+     return s
+@@ -394,10 +408,16 @@
+     while clock() < end and alive():
+         if has_sink_input(pid, run):
+             return clock() - t0
+-        sleep(0.25)
++        sleep(0.1)      # B50: 0.1 s (A's 0.25); the sink-input came 0.1-0.3 s after the window in H3-P2
+     return None
+ 
+ 
++def ensure_memcards(project_root: Path) -> dict[str, str]:
++    """B50: the hub's two cards formatted when absent or all 0xFF (never a card holding data)."""
++    import ps2_memcard
++    return ps2_memcard.ensure_cards(Path(project_root) / DATA_DIR / "memcards", list(MEMCARDS))
++
++
+ def pine_socket_path(environ: Mapping[str, str] | None = None) -> Path:
+     env = os.environ if environ is None else environ
+     base = env.get("XDG_RUNTIME_DIR") or "/tmp"
+@@ -449,6 +469,11 @@
+             self.sleep(0.25)
+         return None
+ 
++    def wait_audio(self, bound: float = AUDIO_WAIT_S, alive: Callable[[], bool] = lambda: True) -> float | None:
++        """B50: A's H3-P2 wait (the PID's sink-input, the earliest proof of PCSX2's audio stream), on this session's
++        own run / sleep / clock, so the tests fake it."""
++        return wait_sink_input(self.pid, bound, alive, self.run, self.sleep, self.clock)
++
+     def _hotkey(self) -> bool:
+         w = find_window(self.pid, self.run)
+         if not w:
+@@ -473,6 +498,14 @@
+         if self.paused_by is not None:
+             return self.paused_by
+         st = self.status()
++        # B50: PINE answers ~0.1 s after the audio stream (after the VM's init): a late first answer is waited for
++        if st is None and not getattr(self, "_pine_seen", False):
++            end = self.clock() + PINE_LATE_S
++            while st is None and self.clock() < end:
++                self.sleep(0.1)
++                st = self.status()
++        if st is not None:
++            self._pine_seen = True
+         if st == PINE_PAUSED:
+             self.paused_by = "hotkey"
+         elif st == PINE_RUNNING and self._hotkey() and self._await(PINE_PAUSED):
+--- /dev/null
++++ b/tests/ps2_session/test_b50.py
+@@ -0,0 +1,311 @@
++#!/usr/bin/env python3
++"""B50 (host): H3-P2's PS2 fixes -- the audio wait vs. PINE on a fake PCSX2 timeline, the formatted memory cards, the
++tear-free present keys, the SDL3 binding names, the keeper's PS2 label, the P2 capture window. Fakes only (no PCSX2,
++no BIOS, no title, no real folder); the whole directory runs in well under 10 s.
++
++    python3 -m unittest discover -s tests/ps2_session -v
++"""
++
++from __future__ import annotations
++
++import json
++import signal
++import struct
++import sys
++import tempfile
++import types
++import unittest
++from datetime import datetime, timedelta, timezone
++from pathlib import Path
++from zoneinfo import ZoneInfo
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(ROOT / "tools"))
++
++import ps2_session as ps2  # noqa: E402
++import ps2_memcard as mc  # noqa: E402
++import diag_read as dr  # noqa: E402
++import diag_check as dc  # noqa: E402
++import ps2_p2_window as win  # noqa: E402
++
++
++class FakePCSX2:
++    """PCSX2's startup order (its own H3-P2 log: the audio stream, then the VM's init, then PINE) with the game logs'
++    gaps: the window found, the sink-input 0.3 s later (0.1-0.3 s in H3-P2), PINE 0.1 s after that. The stream is
++    created only by a running process; SIGSTOP freezes everything."""
++
++    WINDOW, AUDIO, PINE = 1.40, 1.70, 1.80
++
++    def __init__(self, pine_never=False):
++        self.t = 0.0
++        self.stopped = False
++        self.audio = False
++        self.paused = False
++        self.pine_never = pine_never
++        self.hotkeys = 0
++
++    def _advance(self, d):
++        if not self.stopped and not self.audio and self.t < self.AUDIO <= self.t + d:
++            self.audio = True                      # the stream is created only by a running process
++        self.t += d
++
++    def sleep(self, d):
++        self._advance(d)
++
++    def clock(self):
++        return self.t
++
++    def run(self, cmd, **kw):
++        out = ""
++        if "search" in cmd:
++            out = "77\n" if self.t >= self.WINDOW else ""
++        elif cmd[:3] == ["pactl", "list", "sink-inputs"]:
++            out = 'application.process.id = "4242"\n' if self.audio else ""
++        elif cmd[:2] == ["xdotool", "key"] and not self.stopped and self.t >= self.PINE:
++            self.paused = not self.paused
++            self.hotkeys += 1
++        self._advance(0.005)
++        return types.SimpleNamespace(stdout=out)
++
++    def status(self):
++        if self.stopped or self.pine_never or self.t < self.PINE:
++            return None
++        return ps2.PINE_PAUSED if self.paused else ps2.PINE_RUNNING
++
++    def kill(self, pid, sig):
++        if sig == signal.SIGSTOP:
++            self.stopped = True
++        elif sig == signal.SIGCONT:
++            self.stopped = False
++
++
++def handoff(fake, wait_audio=True, pine_late_s=None):
++    """The launch's steps (the window, A's audio wait) then the plugin's paused handoff."""
++    s = ps2.Session(4242, lambda line: None, run=fake.run, status=fake.status, kill=fake.kill, sleep=fake.sleep,
++                    clock=fake.clock)
++    old = ps2.PINE_LATE_S
++    if pine_late_s is not None:
++        ps2.PINE_LATE_S = pine_late_s
++    try:
++        assert s.wait_window() == "77"
++        waited = s.wait_audio() if wait_audio else None
++        how = s.pause()
++    finally:
++        ps2.PINE_LATE_S = old
++    return how, waited
++
++
++class AudioWaitVsPine(unittest.TestCase):
++    def test_the_wait_and_pine_late_is_the_hotkey_with_the_audio_present(self):
++        f = FakePCSX2()
++        how, waited = handoff(f)
++        self.assertEqual(how, "hotkey")
++        self.assertTrue(f.audio and f.paused and not f.stopped)
++        self.assertIsNotNone(waited)
++
++    def test_the_wait_and_pine_never_is_sigstop_after_the_audio_exists(self):
++        f = FakePCSX2(pine_never=True)
++        how, _ = handoff(f)
++        self.assertEqual(how, "sigstop")
++        self.assertTrue(f.audio and f.stopped)              # the picture frozen, the audio stream present
++
++    def test_the_wait_alone_without_the_pine_poll_is_still_ok(self):
++        f = FakePCSX2()
++        how, _ = handoff(f, pine_late_s=0.0)
++        self.assertTrue(f.audio)                            # A's change alone already fixes the defect
++        self.assertEqual(how, "sigstop")
++
++    def test_b49_no_wait_and_pine_late_reproduces_the_defect(self):
++        f = FakePCSX2()
++        how, _ = handoff(f, wait_audio=False, pine_late_s=0.0)
++        self.assertEqual(how, "sigstop")
++        f.sleep(60.0)                                       # a whole minute later: still no stream
++        self.assertFalse(f.audio)                           # "Game stream isn't ready": no sink-input, ever
++
++    def test_the_wait_is_bounded(self):
++        f = FakePCSX2()
++        f.stopped = True                                    # a PCSX2 that never makes its stream
++        s = ps2.Session(4242, lambda line: None, run=f.run, status=f.status, kill=f.kill, sleep=f.sleep, clock=f.clock)
++        self.assertIsNone(s.wait_audio(bound=ps2.AUDIO_WAIT_S))
++        self.assertGreaterEqual(f.t, ps2.AUDIO_WAIT_S)
++
++
++class MemoryCards(unittest.TestCase):
++    NOW = 1_762_560_000.0
++
++    def test_a_formatted_card_reads_back_formatted(self):
++        data = mc.format_card(self.NOW)
++        self.assertEqual(len(data), 8_650_752)
++        r = mc.check(data)
++        self.assertTrue(r["formatted"], r["problems"])
++        self.assertEqual(r["free_clusters"], mc.ALLOC_END - 1)
++        self.assertEqual(data[:28], b"Sony PS2 Memory Card Format ")
++        self.assertEqual(data[0x1C:0x23], mc.VERSION)
++        self.assertEqual(struct.unpack_from("<HHHHIIIIII", data, 0x28),
++                         (512, 2, 16, 0xFF00, 8192, 41, 8135, 0, 1023, 1022))
++        self.assertEqual(struct.unpack_from("<I", data, 0x50)[0], 8)
++        self.assertEqual(data[0x150:0x152], bytes((2, 0x52)))
++        self.assertEqual(mc.format_card(self.NOW), data)    # deterministic for a given time
++
++    def test_the_unformatted_and_the_corrupt_are_caught(self):
++        self.assertFalse(mc.check(b"\xFF" * mc.CARD_BYTES)["formatted"])
++        self.assertTrue(mc.is_unformatted(b"\xFF" * mc.CARD_BYTES))
++        good = bytearray(mc.format_card(self.NOW))
++        bad = bytearray(good)
++        bad[100] ^= 0x01                                    # a superblock data byte: its ECC no longer matches
++        self.assertIn("ecc on 1 page(s)", mc.check(bytes(bad))["problems"])
++        bad2 = bytearray(good)
++        bad2[0] = ord("X")
++        self.assertFalse(mc.check(bytes(bad2))["formatted"])
++        self.assertFalse(mc.check(b"\x00" * 10)["formatted"])
++
++    def test_the_ecc_tables_equal_pcsx2s_own(self):
++        # the first 80 bytes of the column-parity table in PCSX2 2.8.2's binary (the full 2 x 256 compared in
++        # docs/memory/evidence/b50_2026-11-08/ecc_table_check.txt)
++        pcsx2 = bytes.fromhex(
++            "0007161125223334343322251116070043445552666170777770616652554443"
++            "5255444377706166666170774344555211160700343322252522333400071611"
++            "61667770444352555552434470776661")
++        self.assertEqual(mc.COLUMN_MASKS[:80], pcsx2)
++        self.assertEqual(mc.PARITY[:8], bytes((0, 1, 1, 0, 1, 0, 0, 1)))
++        self.assertEqual(mc.ecc128(b"\xFF" * 128), bytes((0x77, 0x7F, 0x7F)))
++        # the Hamming property: a lone odd-parity byte at index i is located by the line parities (lp1 = i, lp0 = ~i)
++        for i in range(128):
++            chunk = bytearray(128)
++            chunk[i] = 0x01
++            cp, lp0, lp1 = mc.ecc128(bytes(chunk))
++            self.assertEqual((lp1 ^ 0x7F, lp0 ^ 0x7F, cp ^ 0x77), (i, ~i & 0x7F, mc.COLUMN_MASKS[1]))
++
++    def test_ensure_cards_never_touches_a_card_with_data(self):
++        d = Path(tempfile.mkdtemp())
++        (d / "Mcd002.ps2").write_bytes(b"\xFF" * mc.CARD_BYTES)
++        user = bytearray(mc.format_card(self.NOW))
++        user[5000] = 0x42
++        (d / "Mcd003.ps2").write_bytes(bytes(user))
++        r = mc.ensure_cards(d, ["Mcd001.ps2", "Mcd002.ps2", "Mcd003.ps2"], self.NOW)
++        self.assertEqual(r, {"Mcd001.ps2": "created", "Mcd002.ps2": "formatted", "Mcd003.ps2": "kept"})
++        self.assertTrue(mc.check((d / "Mcd001.ps2").read_bytes())["formatted"])
++        self.assertTrue(mc.check((d / "Mcd002.ps2").read_bytes())["formatted"])
++        self.assertEqual((d / "Mcd003.ps2").read_bytes(), bytes(user))
++        self.assertEqual(mc.ensure_cards(d, ["Mcd001.ps2"], self.NOW), {"Mcd001.ps2": "kept"})
++        self.assertFalse(list(d.glob("*.tmp")))
++
++
++class IniKeys(unittest.TestCase):
++    def test_vsync_mailbox_and_the_card_slots(self):
++        s = ps2.settings_for(Path("/proj"), "image.bin", None, 2, False)
++        self.assertEqual((s["EmuCore/GS"]["VsyncEnable"], s["EmuCore/GS"]["DisableMailboxPresentation"]),
++                         ("true", "false"))
++        self.assertEqual(s["MemoryCards"], {"Slot1_Enable": "true", "Slot1_Filename": "Mcd001.ps2",
++                                            "Slot2_Enable": "true", "Slot2_Filename": "Mcd002.ps2"})
++
++    def test_every_binding_is_a_name_pcsx2_accepts(self):
++        accepted = ps2.SDL_BUTTONS | ps2.SDL_AXES
++        for players, tap in ((1, False), (2, False), (4, True)):
++            secs = ps2.pad_sections(players, tap)
++            bound = [v for k, sec in secs.items() if k.startswith("Pad") and k != "Pad" for kk, v in sec.items()
++                     if kk != "Type"]
++            self.assertEqual(len(bound), 24 * players)
++            for v in bound:
++                prefix, name = v.split("/", 1)
++                self.assertRegex(prefix, r"^SDL-[0-3]$")
++                self.assertIn(name, accepted, v)
++                self.assertNotIn(name, {"A", "B", "X", "Y"})
++        self.assertEqual({n for n in dict(ps2.DS2_BINDINGS).values()} - accepted, set())
++        self.assertEqual(len(ps2.DS2_BINDINGS), 24)          # every DualShock 2 button and stick direction
++
++
++class Keeper(unittest.TestCase):
++    def logs(self, with_ps2_row=True, ps2_log=True):
++        root = Path(tempfile.mkdtemp())
++        games = root / "games"
++        games.mkdir()
++        rows = [
++            {"at_utc": "2026-11-08T02:00:00.000Z", "event": "remote_config", "class": "lan"},
++            {"at_utc": "2026-11-08T02:00:05.000Z", "event": "session_started"},
++            {"at_utc": "2026-11-08T02:10:05.000Z", "event": "session_ended"},
++            {"at_utc": "2026-11-08T02:12:10.000Z", "event": "remote_config", "class": "lan"},
++        ]
++        if with_ps2_row:
++            rows.append({"at_utc": "2026-11-08T02:12:15.000Z", "event": "ps2_session", "ps2_mode": True,
++                         "save_states": "off"})
++        rows += [{"at_utc": "2026-11-08T02:12:16.000Z", "event": "session_started"},
++                 {"at_utc": "2026-11-08T02:22:16.000Z", "event": "session_ended"}]
++        (games / "native_stream_recovery.log").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
++        (games / "20261107-205900-game_ps1_04ff1234.log").write_text("x\n")      # a PS1 launch (local time, NY)
++        if ps2_log:
++            (games / "20261107-211207-ps2.log").write_text("x\n")
++        logs = dr.Logs()
++        logs.add_live(root)
++        return dr.Analysis(logs, datetime(2026, 11, 8, 1, 0), datetime(2026, 11, 8, 3, 0), ZoneInfo("America/New_York"))
++
++    def test_a_ps2_session_is_labelled_ps2_and_a_ps1_one_as_before(self):
++        an = self.logs()
++        rows = [an.session_row(s) for s in an.sessions]
++        self.assertEqual([(r["core"], r.get("system")) for r in rows], [("beetle-psx-hw", None), ("pcsx2", "ps2")])
++        self.assertNotIn("system", rows[0])
++        self.assertEqual(rows[1]["title"], "PS2")
++        self.assertEqual(dr.Analysis.ps1_reference(rows), [rows[0]])
++
++    def test_the_row_alone_or_the_log_alone_label_it(self):
++        for kw in ({"ps2_log": False}, {"with_ps2_row": False}):
++            an = self.logs(**kw)
++            self.assertEqual(an.session_row(an.sessions[1]).get("system"), "ps2", kw)
++
++    def test_the_keepers_copier_takes_the_ps2_log(self):
++        import trip_log_keeper as tlk
++        self.assertTrue(tlk.GAME_LOG.match("20261107-211207-ps2.log"))
++        self.assertTrue(tlk.GAME_LOG.match("20261107-205900-game_ps1_04ff1234.log"))
++        self.assertTrue(dr.is_game_log("20261107-211207-ps2.log"))
++
++    def test_diag_check_prints_a_seventh_line_only_for_a_ps2_newest_row(self):
++        d = Path(tempfile.mkdtemp())
++        p = d / "sessions.jsonl"
++        self.assertIsNone(dc.line_last_session(p))
++        p.write_text(json.dumps({"core": "beetle-psx-hw", "end_utc": "2026-11-08T02:10:05Z"}) + "\n")
++        self.assertIsNone(dc.line_last_session(p))
++        with p.open("a") as fh:
++            fh.write(json.dumps({"core": "pcsx2", "system": "ps2", "end_utc": "2026-11-08T02:22:16Z",
++                                 "hitch_s_per_10min": 0.0}) + "\n")
++        self.assertEqual(dc.line_last_session(p),
++                         "last session: ps2 (pcsx2) 2026-11-08T02:22:16Z, hitch s / 10 min 0.0")
++
++
++class CaptureWindow(unittest.TestCase):
++    T0 = datetime(2026, 11, 8, 2, 0, 0, tzinfo=timezone.utc)
++
++    def at(self, s):
++        return self.T0 + timedelta(seconds=s)
++
++    def test_minute_3_when_clear(self):
++        p = win.plan([self.at(0)], [], self.at(10))
++        self.assertEqual((p["start_utc"], p["wait_s"], p["fallback"]), ("2026-11-08T02:03:00Z", 170, False))
++
++    def test_pushed_past_a_back_and_a_new_release(self):
++        # a Back at 3:20, the Resume's release at 3:40: the capture starts >= 60 s after 3:40 and >= 90 s after 3:20
++        p = win.plan([self.at(0), self.at(220)], [self.at(200)], self.at(100))
++        self.assertEqual(p["start_utc"], "2026-11-08T02:04:50Z")
++        self.assertFalse(p["fallback"])
++
++    def test_the_fallback_is_minute_3(self):
++        pauses = [self.at(s) for s in range(120, 700, 60)]
++        p = win.plan([self.at(0)], pauses, self.at(0))
++        self.assertEqual((p["start_utc"], p["fallback"]), ("2026-11-08T02:03:00Z", True))
++
++    def test_check_after_a_back_inside(self):
++        self.assertTrue(win.valid(self.at(180), [self.at(0)], []))
++        self.assertFalse(win.valid(self.at(180), [self.at(0)], [self.at(260)]))     # P7f's case
++        self.assertFalse(win.valid(self.at(30), [self.at(0)], []))                   # too soon after the release
++
++    def test_the_cli_reads_the_two_logs(self):
++        d = Path(tempfile.mkdtemp())
++        (d / "rec.log").write_text(json.dumps({"at_utc": "2026-11-08T02:00:00.000Z", "event": "session_started"}) + "\n")
++        (d / "g-ps2.log").write_text("2026-11-08T02:02:30.000Z PS2 pause: hotkey\n")
++        starts, pauses = win.read_events(d / "rec.log", d / "g-ps2.log")
++        self.assertEqual((len(starts), len(pauses)), (1, 1))
++        self.assertEqual(win.plan(starts, pauses, self.at(0))["start_utc"], "2026-11-08T02:04:00Z")
++
++
++if __name__ == "__main__":
++    unittest.main()
+--- a/tests/ps2_session/test_ps2_session.py
++++ b/tests/ps2_session/test_ps2_session.py
+@@ -101,7 +101,7 @@
+         self.assertEqual(ps2.ini_get(out, "UI", "Theme"), "dark")
+         self.assertEqual(ps2.ini_get(out, "UI", "StartFullscreen"), "true")
+         self.assertEqual(ps2.ini_get(out, "EmuCore/GS", "Renderer"), "14")
+-        self.assertEqual(ps2.ini_get(out, "EmuCore/GS", "VsyncEnable"), "false")
++        self.assertEqual(ps2.ini_get(out, "EmuCore/GS", "VsyncEnable"), "true")          # B50: ours now (tears)
+         self.assertEqual(ps2.ini_get(out, "EmuCore/GS", "upscale_multiplier"), "1")
+         for k in ("OsdShowSpeed", "OsdShowFPS", "OsdShowVPS", "OsdShowCPU", "OsdShowGPU", "OsdShowResolution"):
+             self.assertEqual(ps2.ini_get(out, "EmuCore/GS", k), "false")
+@@ -128,8 +128,8 @@
+     def test_two_players_no_multitap(self):
+         s = ps2.pad_sections(2, False)
+         self.assertEqual(s["Pad"], {"MultitapPort1": "false", "MultitapPort2": "false"})
+-        self.assertEqual(s["Pad1"]["Cross"], "SDL-0/A")
+-        self.assertEqual(s["Pad2"]["Cross"], "SDL-1/A")
++        self.assertEqual(s["Pad1"]["Cross"], "SDL-0/FaceSouth")
++        self.assertEqual(s["Pad2"]["Cross"], "SDL-1/FaceSouth")
+         self.assertEqual(s["Pad2"]["Type"], "DualShock2")
+         self.assertTrue(all(s[f"Pad{n}"] == {"Type": "None"} for n in range(3, 9)))
+ 
+@@ -137,7 +137,8 @@
+         p1 = ps2.pad_sections(2, False)["Pad1"]
+         self.assertEqual({k: p1[k] for k in ("Triangle", "Circle", "Square", "Select", "Start", "L2", "R2", "L3", "R3",
+                                              "LUp", "LRight", "RDown", "Up")},
+-                         {"Triangle": "SDL-0/Y", "Circle": "SDL-0/B", "Square": "SDL-0/X", "Select": "SDL-0/Back",
++                         {"Triangle": "SDL-0/FaceNorth", "Circle": "SDL-0/FaceEast", "Square": "SDL-0/FaceWest",
++                          "Select": "SDL-0/Back",
+                           "Start": "SDL-0/Start", "L2": "SDL-0/+LeftTrigger", "R2": "SDL-0/+RightTrigger",
+                           "L3": "SDL-0/LeftStick", "R3": "SDL-0/RightStick", "LUp": "SDL-0/-LeftY",
+                           "LRight": "SDL-0/+LeftX", "RDown": "SDL-0/+RightY", "Up": "SDL-0/DPadUp"})
+@@ -146,7 +147,8 @@
+     def test_four_on_the_multitap_in_creation_order(self):
+         s = ps2.pad_sections(4, True)
+         self.assertEqual(s["Pad"]["MultitapPort1"], "true")
+-        self.assertEqual([s[f"Pad{n}"].get("Cross") for n in (1, 3, 4, 5)], ["SDL-0/A", "SDL-1/A", "SDL-2/A", "SDL-3/A"])
++        self.assertEqual([s[f"Pad{n}"].get("Cross") for n in (1, 3, 4, 5)],
++                         ["SDL-0/FaceSouth", "SDL-1/FaceSouth", "SDL-2/FaceSouth", "SDL-3/FaceSouth"])
+         self.assertEqual(s["Pad2"], {"Type": "None"})
+ 
+     def test_one_player_one_port(self):
+@@ -386,8 +388,17 @@
+     P = em._ps2
+     class FakeSession(P.Session):
+         def __init__(self, pid, log):
+-            super().__init__(pid, log, run=lambda cmd, **kw: types.SimpleNamespace(stdout="77\n" if "search" in cmd else ""),
+-                             status=lambda: None, kill=lambda pid, sig: calls["kill"].append(int(sig)), sleep=lambda d: None)
++            clock = [0.0]
++            def run(cmd, **kw):
++                if "search" in cmd:
++                    return types.SimpleNamespace(stdout="77\n")
++                if cmd[:3] == ["pactl", "list", "sink-inputs"]:
++                    calls.setdefault("pactl", 0)
++                    calls["pactl"] += 1
++                    return types.SimpleNamespace(stdout=f'application.process.id = "{pid}"\n')
++                return types.SimpleNamespace(stdout="")
++            super().__init__(pid, log, run=run, status=lambda: None, kill=lambda pid, sig: calls["kill"].append(int(sig)),
++                             sleep=lambda d: clock.__setitem__(0, clock[0] + d), clock=lambda: clock[0])
+     P.Session = FakeSession
+     P.default_runner = lambda cmd: "deviceName = AMD Fake (RADV FAKE)\n"
+ m = em.EmulatorManager(proj, config_path=Path("companion/games/config/emulators.json").resolve())
+@@ -447,7 +458,7 @@
+         self.assertEqual(out["calls"]["popen"][0]["env_sdl"], ps2.SDL_MAPPING[:40])
+         text = self.ini.read_text()
+         self.assertEqual(ps2.ini_get(text, "Pad", "MultitapPort1"), "true")
+-        self.assertEqual(ps2.ini_get(text, "Pad5", "Cross"), "SDL-3/A")
++        self.assertEqual(ps2.ini_get(text, "Pad5", "Cross"), "SDL-3/FaceSouth")
+         self.assertEqual(ps2.ini_get(text, "EmuCore/GS", "Adapter"), "AMD Fake (RADV FAKE)")
+         self.assertEqual(ps2.ini_get(text, "Filenames", "BIOS"), "image.bin")
+         self.assertEqual(sorted(p.name for p in (self.proj / "data/games/ps2/bios").iterdir()), ["image.bin", "image.nvm"])
+@@ -458,7 +469,8 @@
+         self.assertEqual(out["calls"]["kill"], [int(signal.SIGSTOP), int(signal.SIGCONT), int(signal.SIGTERM)])
+         log = next((self.proj / "logs/games").glob("*-ps2.log")).read_text()
+         self.assertIn("PS2 launch: pcsx2 players=4 multitap=true adapter=named", log)
+-        for line in ("PS2 pause: sigstop", "PS2 resume: sigcont", "PS2 exit: sigterm"):
++        for line in ("PS2 pause: sigstop", "PS2 resume: sigcont", "PS2 exit: sigterm", "PS2 audio: sink-input 0.0s",
++                     "PS2 memcards: Mcd001.ps2=created Mcd002.ps2=created"):
+             self.assertIn(line, log)
+         self.assertNotIn("one.chd", log); self.assertNotIn("made-up", log); self.assertNotIn("game_ps2_x", log)
+         self.assertEqual(before_g, snapshot(self.games)); self.assertEqual(before_b, snapshot(self.bios))
+@@ -467,7 +479,7 @@
+         run_launch("1", self.proj)
+         text = self.ini.read_text()
+         self.assertEqual(ps2.ini_get(text, "Pad", "MultitapPort1"), "false")
+-        self.assertEqual(ps2.ini_get(text, "Pad2", "Cross"), "SDL-1/A")
++        self.assertEqual(ps2.ini_get(text, "Pad2", "Cross"), "SDL-1/FaceSouth")
+         self.assertEqual(ps2.ini_get(text, "Pad3", "Type"), "None")
+ 
+     def test_unconfigured_folders_refuse(self):
+--- a/tools/diag_check.py
++++ b/tools/diag_check.py
+@@ -162,8 +162,30 @@
+         p = Path(root).expanduser() / "status.txt"
+         return line_keeper(p.read_text() if p.is_file() else None, unit_state())
+ 
+-    return [safe(adopted, "adopted"), safe(apk, "apk"), safe(overlay, "overlay"), safe(routing, "routing"),
+-            safe(band, "band"), safe(keeper, "diag-keeper")]
++    out = [safe(adopted, "adopted"), safe(apk, "apk"), safe(overlay, "overlay"), safe(routing, "routing"),
++           safe(band, "band"), safe(keeper, "diag-keeper")]
++    # B50: a seventh line only when the keeper's newest session row is a PS2 one (otherwise today's six)
++    try:
++        extra = line_last_session(Path(root).expanduser() / "sessions.jsonl")
++    except Exception:
++        extra = None
++    return out + ([extra] if extra else [])
++
++
++def line_last_session(path: Path) -> str | None:
++    """B50: `last session: ps2 (pcsx2) <end>` when the newest sessions.jsonl row is PS2; else None."""
++    if not path.is_file():
++        return None
++    rows = [ln for ln in tail_lines(path, 64_000) if ln.strip()]
++    if not rows:
++        return None
++    try:
++        r = json.loads(rows[-1])
++    except ValueError:
++        return None
++    if r.get("system") != "ps2":
++        return None
++    return f"last session: ps2 ({r.get('core')}) {r.get('end_utc') or 'open'}, hitch s / 10 min {r.get('hitch_s_per_10min')}"
+ 
+ 
+ def main(argv: list[str] | None = None) -> int:
+--- a/tools/diag_read.py
++++ b/tools/diag_read.py
+@@ -42,6 +42,13 @@
+ EPOCH = datetime(1970, 1, 1)
+ DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+ GAME_LOG = re.compile(r"^(\d{8})-(\d{6})-game_([a-z0-9]+)_([0-9a-f]{4})[0-9a-f]*\.log$")
++# B50: a PS2 session's game log (B49: no id or title in its name); its sessions read system `ps2`, core `pcsx2`
++PS2_LOG = re.compile(r"^(\d{8})-(\d{6})-ps2\.log$")
++PS2_CORE = "pcsx2"
++
++
++def is_game_log(name: str) -> bool:
++    return bool(GAME_LOG.match(name) or PS2_LOG.match(name))
+ 
+ # the trip's known titles (game id prefix -> class + tag); others read "<SYSTEM> <4-hex>"
+ TAGS = {"04ff": "PS1 platformer", "ee3b": "SNES action-adventure", "2ef9": "PS1 first-person RPG",
+@@ -154,7 +161,7 @@
+                 if base == "decoder_sessions":
+                     for f in files:
+                         self._report((p / f).read_bytes())
+-                elif GAME_LOG.match(base):
++                elif is_game_log(base):
+                     if base not in self.game_logs:
+                         self.game_logs.append(base)
+                 elif base in names:
+@@ -174,7 +181,7 @@
+         for f in sorted(glob.glob(str(d / "decoder_sessions" / "*.json"))):
+             self._report(Path(f).read_bytes())
+         for f in sorted(os.listdir(d / "game_logs")) if (d / "game_logs").is_dir() else []:
+-            if GAME_LOG.match(f) and f not in self.game_logs:
++            if is_game_log(f) and f not in self.game_logs:
+                 self.game_logs.append(f)
+         if (d / "overlay.jsonl").is_file():
+             self.overlay += rows((d / "overlay.jsonl").read_bytes())
+@@ -198,7 +205,7 @@
+             except OSError:
+                 continue
+         for f in sorted(os.listdir(games)) if games.is_dir() else []:
+-            if GAME_LOG.match(f) and f not in self.game_logs:
++            if is_game_log(f) and f not in self.game_logs:
+                 self.game_logs.append(f)
+         if diag_root is not None and Path(diag_root).is_dir():
+             for day in sorted(os.listdir(diag_root)):
+@@ -253,6 +260,13 @@
+         self.launches = []
+         for f in sorted(logs.game_logs):
+             m = GAME_LOG.match(f)
++            if m is None:                                   # B50: a PS2 launch
++                m2 = PS2_LOG.match(f)
++                if m2 is None:
++                    continue
++                t = local_to_utc(datetime.strptime(m2.group(1) + m2.group(2), "%Y%m%d%H%M%S"), tz)
++                self.launches.append((t, "PS2", PS2_CORE))
++                continue
+             t = local_to_utc(datetime.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M%S"), tz)
+             tag = self.tags.get(m.group(4), f"{m.group(3).upper()} {m.group(4)}")
+             self.launches.append((t, tag, CORES.get(m.group(3), m.group(3))))
+@@ -285,12 +299,19 @@
+         self.sessions: list[dict[str, Any]] = []
+         cur = None
+         last_cfg = None
++        ps2_at = None                                       # B50: the newest `ps2_session` row (the stream's start)
+         for r in self.rec:
+             t, ev = ts(r["at_utc"]), r.get("event")
++            if ev == "ps2_session":
++                ps2_at = t
+             if ev == "remote_config":
+                 last_cfg = r
+             elif ev == "session_started":
+                 cur = {"start": t, "class": (last_cfg or {}).get("class"), "events": [], "end": None, "end_kind": None}
++                # B50: the title's system node: a PS2 stream start just before this release makes it a PS2 session
++                if ps2_at is not None and timedelta(0) <= t - ps2_at <= timedelta(seconds=120):
++                    cur["ps2"] = True
++                ps2_at = None
+                 self.sessions.append(cur)
+             elif cur is not None:
+                 cur["events"].append(r)
+@@ -309,6 +330,8 @@
+             if s["end_kind"] is None:
+                 s["end_kind"] = "user exit (bye)" if s.get("bye") else ("open" if s["end"] is None else "?")
+             s["tag"], s["core"] = self.title_at(s["start"])
++            if s.get("ps2"):                                # B50: the session's own row wins over the launch order
++                s["tag"], s["core"] = "PS2", PS2_CORE
+         self.restarts = [r for r in self.rec if r.get("event") == "restart_fast"]
+         self.transitions = [r for r in self.lad if r.get("event") == "transition"]
+         # B32-host writes `in_place` on the step's `transition_done` row (adaptive_bitrate_live), not on `transition`:
+@@ -479,6 +502,11 @@
+         return out
+ 
+     # -- one session as a sessions.jsonl row (G4-S4's columns + B34's slots + the restarts and their triggers)
++    @staticmethod
++    def ps1_reference(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
++        """B50: the PS1 sessions a comparison may use as its reference (a PS2 session never)."""
++        return [r for r in rows if r.get("core") == CORES["ps1"] and r.get("system") != "ps2"]
++
+     def session_row(self, s: dict[str, Any]) -> dict[str, Any]:
+         end = s["end"] or s["start"]
+         m = self.summarize(s["start"], end + timedelta(seconds=1))
+@@ -513,6 +541,8 @@
+             "end_kind": s["end_kind"], "resets": m["resets"],
+             "hitch_s": m["hitch_s"], "hitch_by": m["hitch_by"],
+             "hitch_s_per_10min": round(m["hitch_s"] / per10, 1) if per10 else None,
++            # B50: a PS2 session says its system (other sessions' rows as before)
++            **({"system": "ps2"} if s["core"] == PS2_CORE else {}),
+             "silences": m["silences"], "silences_user": m["silences_user"],
+             "silences_per_10min": round(m["silences"] / per10, 1) if per10 else None,
+             "max_silence_ms": round(m["max_silence_ms"]), "underruns": m["underruns"], "starvation": m["starvation"],
+--- /dev/null
++++ b/tools/ps2_p2_window.py
+@@ -0,0 +1,115 @@
++#!/usr/bin/env python3
++"""B50: when to take H3's P2 capture in a streamed PS2 session (H3-P2's P7f overlapped the user's Back).
++
++The rule (QUEUE_2026-11-08Q §B50.6): the 60-s capture starts **>= 60 s after the last `session_started`** and has **no
++pause within 90 s of it** (no pause in [start - 90 s, start + 60 s + 90 s]). Minute 3 of the session (its first
++`session_started` + 180 s) is preferred when it is valid. If no valid start comes before minute 9, the plan falls back
++to minute 3, marked `fallback`.
++
++The pauses are the recovery log's `session_ended` rows (the onn's Back) and the PS2 game log's `PS2 pause:` lines (its
++UTC prefix). The starts are the recovery log's `session_started` rows. The tool reads only the two files given and
++prints times and seconds (no path or title):
++
++    python3 tools/ps2_p2_window.py plan  --recovery logs/games/native_stream_recovery.log --ps2-log <the session's -ps2.log> [--now <UTC>]
++    python3 tools/ps2_p2_window.py check --recovery ... --ps2-log ... --start <UTC of the capture's start>
++
++`plan` prints `wait_s` (0 = start now) and the planned start; A starts the capture then. `check`, after the capture,
++says whether the window is valid with the pauses seen since (a Back during or within 90 s after it → retake later).
++Design: `docs/memory/evidence/b50_2026-11-08/design_written_before_code.md` §S6.
++"""
++
++from __future__ import annotations
++
++import argparse
++import json
++import re
++import sys
++from datetime import datetime, timedelta, timezone
++from pathlib import Path
++
++AFTER_START_S = 60
++PAUSE_GUARD_S = 90
++CAPTURE_S = 60
++PREFERRED_S = 180
++LAST_PREFERRED_S = 540
++_PS2_PAUSE = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z) PS2 pause:")
++
++
++def ts(s: str) -> datetime:
++    s = s.strip().replace("Z", "+00:00")
++    t = datetime.fromisoformat(s)
++    return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
++
++
++def read_events(recovery: Path, ps2_log: Path | None) -> tuple[list[datetime], list[datetime]]:
++    starts, pauses = [], []
++    for line in recovery.read_text(errors="replace").splitlines():
++        try:
++            r = json.loads(line)
++        except ValueError:
++            continue
++        if not isinstance(r, dict) or not r.get("at_utc"):
++            continue
++        if r.get("event") == "session_started":
++            starts.append(ts(r["at_utc"]))
++        elif r.get("event") == "session_ended":
++            pauses.append(ts(r["at_utc"]))
++    if ps2_log is not None and ps2_log.is_file():
++        for line in ps2_log.read_text(errors="replace").splitlines():
++            m = _PS2_PAUSE.match(line)
++            if m:
++                pauses.append(ts(m.group(1)))
++    return sorted(starts), sorted(pauses)
++
++
++def valid(t: datetime, starts: list[datetime], pauses: list[datetime]) -> bool:
++    before = [s for s in starts if s <= t]
++    if not before or (t - before[-1]).total_seconds() < AFTER_START_S:
++        return False
++    lo, hi = t - timedelta(seconds=PAUSE_GUARD_S), t + timedelta(seconds=CAPTURE_S + PAUSE_GUARD_S)
++    return not any(lo < p < hi for p in pauses)            # exactly 90 s away is not "within"
++
++
++def plan(starts: list[datetime], pauses: list[datetime], now: datetime) -> dict:
++    """The earliest valid start >= now (minute 3 preferred), else minute 3 as the fallback."""
++    if not starts:
++        return {"error": "no session_started yet"}
++    first = starts[0]
++    minute3 = first + timedelta(seconds=PREFERRED_S)
++    t = max(now, minute3)
++    t = t.replace(microsecond=0)
++    limit = first + timedelta(seconds=LAST_PREFERRED_S)
++    while t <= limit:
++        if valid(t, starts, pauses):
++            return {"start_utc": t.strftime("%Y-%m-%dT%H:%M:%SZ"), "wait_s": max(0, int((t - now).total_seconds())),
++                    "fallback": False}
++        t += timedelta(seconds=1)
++    return {"start_utc": minute3.strftime("%Y-%m-%dT%H:%M:%SZ"), "wait_s": max(0, int((minute3 - now).total_seconds())),
++            "fallback": True}
++
++
++def main(argv: list[str] | None = None) -> int:
++    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
++    ap.add_argument("mode", choices=("plan", "check"))
++    ap.add_argument("--recovery", type=Path, required=True)
++    ap.add_argument("--ps2-log", type=Path, default=None)
++    ap.add_argument("--now", default=None)
++    ap.add_argument("--start", default=None)
++    a = ap.parse_args(argv)
++    starts, pauses = read_events(a.recovery, a.ps2_log)
++    if a.mode == "plan":
++        now = ts(a.now) if a.now else datetime.now(timezone.utc)
++        out = plan(starts, pauses, now)
++    else:
++        if not a.start:
++            ap.error("check needs --start")
++        t = ts(a.start)
++        out = {"start_utc": a.start, "valid": valid(t, starts, pauses),
++               "pauses_near": sum(1 for p in pauses
++                                  if t - timedelta(seconds=PAUSE_GUARD_S) < p < t + timedelta(seconds=CAPTURE_S + PAUSE_GUARD_S))}
++    print(json.dumps(out))
++    return 0 if "error" not in out else 2
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+--- a/tools/trip_log_keeper.py
++++ b/tools/trip_log_keeper.py
+@@ -42,7 +42,8 @@
+                "native_pulseaudio.log", "native_video_alpha.log"]
+ TOP_TAILS = ["wan_sessions.jsonl", "session_audit.jsonl", "impairment.jsonl"]
+ NEWDIRS = ["decoder_sessions", "audio_timing"]
+-GAME_LOG = re.compile(r"^\d{8}-\d{6}-game_[a-z0-9]+_[0-9a-f]+\.log$")
++# B50: a PS2 session's game log (`<date>-<time>-ps2.log`, no id or title by B49's design) is a game log too
++GAME_LOG = re.compile(r"^\d{8}-\d{6}-(?:game_[a-z0-9]+_[0-9a-f]+|ps2)\.log$")
+ UNIT = "privyhub-companion"
+ STATUS_URL = "http://127.0.0.1:8765/plugins/games/status"
+ QUIET_S = 10.0

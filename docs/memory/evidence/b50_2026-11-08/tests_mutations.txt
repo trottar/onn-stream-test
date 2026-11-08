@@ -1,0 +1,9 @@
+B50 mutations, /tmp/b_q09q_scratch/mut (each reverted after its run; tests/ps2_session, 55 tests)
+M1 the face names back to A / B / X / Y: 5 fail (test_every_binding_is_a_name_pcsx2_accepts and four B49 binding cases)
+M2 the audio wait returns at once (never finds the stream): 4 fail (three timeline cases + the launch test)
+M3 ensure_cards overwrites a card holding data: 1 fail (test_ensure_cards_never_touches_a_card_with_data)
+M4 the ECC line parity without ~i: first run 0 fail (survived: the ECC test used an all-0xFF chunk and the checker
+   reuses the same function) -> the Hamming-property test added (a lone odd byte located by lp1 = i, lp0 = ~i);
+   rerun 1 fail (test_the_ecc_tables_equal_pcsx2s_own)
+M5 the keeper ignores the ps2_session row and the -ps2.log: 3 fail (the labels, the copier, row-or-log)
+M6 vsync left off: 2 fail (the vsync / mailbox keys; the ini merge)

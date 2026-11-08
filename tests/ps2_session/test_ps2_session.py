@@ -101,7 +101,7 @@ class Ini(unittest.TestCase):
         self.assertEqual(ps2.ini_get(out, "UI", "Theme"), "dark")
         self.assertEqual(ps2.ini_get(out, "UI", "StartFullscreen"), "true")
         self.assertEqual(ps2.ini_get(out, "EmuCore/GS", "Renderer"), "14")
-        self.assertEqual(ps2.ini_get(out, "EmuCore/GS", "VsyncEnable"), "false")
+        self.assertEqual(ps2.ini_get(out, "EmuCore/GS", "VsyncEnable"), "true")          # B50: ours now (tears)
         self.assertEqual(ps2.ini_get(out, "EmuCore/GS", "upscale_multiplier"), "1")
         for k in ("OsdShowSpeed", "OsdShowFPS", "OsdShowVPS", "OsdShowCPU", "OsdShowGPU", "OsdShowResolution"):
             self.assertEqual(ps2.ini_get(out, "EmuCore/GS", k), "false")
@@ -128,8 +128,8 @@ class Pads(unittest.TestCase):
     def test_two_players_no_multitap(self):
         s = ps2.pad_sections(2, False)
         self.assertEqual(s["Pad"], {"MultitapPort1": "false", "MultitapPort2": "false"})
-        self.assertEqual(s["Pad1"]["Cross"], "SDL-0/A")
-        self.assertEqual(s["Pad2"]["Cross"], "SDL-1/A")
+        self.assertEqual(s["Pad1"]["Cross"], "SDL-0/FaceSouth")
+        self.assertEqual(s["Pad2"]["Cross"], "SDL-1/FaceSouth")
         self.assertEqual(s["Pad2"]["Type"], "DualShock2")
         self.assertTrue(all(s[f"Pad{n}"] == {"Type": "None"} for n in range(3, 9)))
 
@@ -137,7 +137,8 @@ class Pads(unittest.TestCase):
         p1 = ps2.pad_sections(2, False)["Pad1"]
         self.assertEqual({k: p1[k] for k in ("Triangle", "Circle", "Square", "Select", "Start", "L2", "R2", "L3", "R3",
                                              "LUp", "LRight", "RDown", "Up")},
-                         {"Triangle": "SDL-0/Y", "Circle": "SDL-0/B", "Square": "SDL-0/X", "Select": "SDL-0/Back",
+                         {"Triangle": "SDL-0/FaceNorth", "Circle": "SDL-0/FaceEast", "Square": "SDL-0/FaceWest",
+                          "Select": "SDL-0/Back",
                           "Start": "SDL-0/Start", "L2": "SDL-0/+LeftTrigger", "R2": "SDL-0/+RightTrigger",
                           "L3": "SDL-0/LeftStick", "R3": "SDL-0/RightStick", "LUp": "SDL-0/-LeftY",
                           "LRight": "SDL-0/+LeftX", "RDown": "SDL-0/+RightY", "Up": "SDL-0/DPadUp"})
@@ -146,7 +147,8 @@ class Pads(unittest.TestCase):
     def test_four_on_the_multitap_in_creation_order(self):
         s = ps2.pad_sections(4, True)
         self.assertEqual(s["Pad"]["MultitapPort1"], "true")
-        self.assertEqual([s[f"Pad{n}"].get("Cross") for n in (1, 3, 4, 5)], ["SDL-0/A", "SDL-1/A", "SDL-2/A", "SDL-3/A"])
+        self.assertEqual([s[f"Pad{n}"].get("Cross") for n in (1, 3, 4, 5)],
+                         ["SDL-0/FaceSouth", "SDL-1/FaceSouth", "SDL-2/FaceSouth", "SDL-3/FaceSouth"])
         self.assertEqual(s["Pad2"], {"Type": "None"})
 
     def test_one_player_one_port(self):
@@ -386,8 +388,17 @@ if em._ps2 is not None:
     P = em._ps2
     class FakeSession(P.Session):
         def __init__(self, pid, log):
-            super().__init__(pid, log, run=lambda cmd, **kw: types.SimpleNamespace(stdout="77\n" if "search" in cmd else ""),
-                             status=lambda: None, kill=lambda pid, sig: calls["kill"].append(int(sig)), sleep=lambda d: None)
+            clock = [0.0]
+            def run(cmd, **kw):
+                if "search" in cmd:
+                    return types.SimpleNamespace(stdout="77\n")
+                if cmd[:3] == ["pactl", "list", "sink-inputs"]:
+                    calls.setdefault("pactl", 0)
+                    calls["pactl"] += 1
+                    return types.SimpleNamespace(stdout=f'application.process.id = "{pid}"\n')
+                return types.SimpleNamespace(stdout="")
+            super().__init__(pid, log, run=run, status=lambda: None, kill=lambda pid, sig: calls["kill"].append(int(sig)),
+                             sleep=lambda d: clock.__setitem__(0, clock[0] + d), clock=lambda: clock[0])
     P.Session = FakeSession
     P.default_runner = lambda cmd: "deviceName = AMD Fake (RADV FAKE)\n"
 m = em.EmulatorManager(proj, config_path=Path("companion/games/config/emulators.json").resolve())
@@ -447,7 +458,7 @@ class Launch(unittest.TestCase):
         self.assertEqual(out["calls"]["popen"][0]["env_sdl"], ps2.SDL_MAPPING[:40])
         text = self.ini.read_text()
         self.assertEqual(ps2.ini_get(text, "Pad", "MultitapPort1"), "true")
-        self.assertEqual(ps2.ini_get(text, "Pad5", "Cross"), "SDL-3/A")
+        self.assertEqual(ps2.ini_get(text, "Pad5", "Cross"), "SDL-3/FaceSouth")
         self.assertEqual(ps2.ini_get(text, "EmuCore/GS", "Adapter"), "AMD Fake (RADV FAKE)")
         self.assertEqual(ps2.ini_get(text, "Filenames", "BIOS"), "image.bin")
         self.assertEqual(sorted(p.name for p in (self.proj / "data/games/ps2/bios").iterdir()), ["image.bin", "image.nvm"])
@@ -458,7 +469,8 @@ class Launch(unittest.TestCase):
         self.assertEqual(out["calls"]["kill"], [int(signal.SIGSTOP), int(signal.SIGCONT), int(signal.SIGTERM)])
         log = next((self.proj / "logs/games").glob("*-ps2.log")).read_text()
         self.assertIn("PS2 launch: pcsx2 players=4 multitap=true adapter=named", log)
-        for line in ("PS2 pause: sigstop", "PS2 resume: sigcont", "PS2 exit: sigterm"):
+        for line in ("PS2 pause: sigstop", "PS2 resume: sigcont", "PS2 exit: sigterm", "PS2 audio: sink-input 0.0s",
+                     "PS2 memcards: Mcd001.ps2=created Mcd002.ps2=created"):
             self.assertIn(line, log)
         self.assertNotIn("one.chd", log); self.assertNotIn("made-up", log); self.assertNotIn("game_ps2_x", log)
         self.assertEqual(before_g, snapshot(self.games)); self.assertEqual(before_b, snapshot(self.bios))
@@ -467,7 +479,7 @@ class Launch(unittest.TestCase):
         run_launch("1", self.proj)
         text = self.ini.read_text()
         self.assertEqual(ps2.ini_get(text, "Pad", "MultitapPort1"), "false")
-        self.assertEqual(ps2.ini_get(text, "Pad2", "Cross"), "SDL-1/A")
+        self.assertEqual(ps2.ini_get(text, "Pad2", "Cross"), "SDL-1/FaceSouth")
         self.assertEqual(ps2.ini_get(text, "Pad3", "Type"), "None")
 
     def test_unconfigured_folders_refuse(self):

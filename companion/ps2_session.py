@@ -66,13 +66,23 @@ SDL_MAPPING = (
 # The DualShock 2 layout from the SDL game-controller names (PCSX2's `SDL-<k>/<name>` bindings)
 DS2_BINDINGS = (
     ("Up", "DPadUp"), ("Right", "DPadRight"), ("Down", "DPadDown"), ("Left", "DPadLeft"),
-    ("Triangle", "Y"), ("Circle", "B"), ("Cross", "A"), ("Square", "X"),
+    # B50: PCSX2 2.8.2 is built on SDL3: the face buttons are FaceNorth / FaceEast / FaceSouth / FaceWest (its log
+    # rejected `SDL-k/A` / `B` / `X` / `Y`); every other name below was accepted
+    ("Triangle", "FaceNorth"), ("Circle", "FaceEast"), ("Cross", "FaceSouth"), ("Square", "FaceWest"),
     ("Select", "Back"), ("Start", "Start"),
     ("L1", "LeftShoulder"), ("L2", "+LeftTrigger"), ("R1", "RightShoulder"), ("R2", "+RightTrigger"),
     ("L3", "LeftStick"), ("R3", "RightStick"),
     ("LUp", "-LeftY"), ("LRight", "+LeftX"), ("LDown", "+LeftY"), ("LLeft", "-LeftX"),
     ("RUp", "-RightY"), ("RRight", "+RightX"), ("RDown", "+RightY"), ("RLeft", "-RightX"),
 )
+# B50: the SDL names PCSX2 2.8.2 accepts (its binary; its log of H3-P2), for the bindings above
+SDL_BUTTONS = frozenset(("FaceSouth", "FaceEast", "FaceWest", "FaceNorth", "Back", "Guide", "Start", "LeftStick",
+                         "RightStick", "LeftShoulder", "RightShoulder", "DPadUp", "DPadDown", "DPadLeft", "DPadRight"))
+SDL_AXES = frozenset(s + a for s in "+-" for a in ("LeftX", "LeftY", "RightX", "RightY", "LeftTrigger", "RightTrigger"))
+# B50: the two slots' cards on the hub, formatted by the companion when absent or all 0xFF (ps2_memcard)
+MEMCARDS = ("Mcd001.ps2", "Mcd002.ps2")
+PINE_LATE_S = 1.0
+
 # PCSX2's pad numbering: 1A = Pad1, 2A = Pad2, 1B-1D = Pad3-Pad5, 2B-2D = Pad6-Pad8
 MULTITAP_PORT1_PADS = (1, 3, 4, 5)
 PLAIN_PADS = (1, 2)
@@ -319,7 +329,8 @@ def pick_adapter(existing: str | None, run: Callable[[list[str]], str] | None) -
 def settings_for(project_root: Path, bios_name: str, adapter: str | None, players: int,
                  multitap: bool) -> dict[str, dict[str, str]]:
     data = (Path(project_root) / DATA_DIR).resolve()
-    gs = {"Renderer": "14", "upscale_multiplier": "1"}
+    # B50: vsync on with mailbox allowed: a tear-free present (MAILBOX where the driver offers it, else FIFO)
+    gs = {"Renderer": "14", "upscale_multiplier": "1", "VsyncEnable": "true", "DisableMailboxPresentation": "false"}
     for k in ("OsdShowSpeed", "OsdShowFPS", "OsdShowVPS", "OsdShowCPU", "OsdShowGPU", "OsdShowResolution"):
         gs[k] = "false"
     if adapter:
@@ -336,6 +347,9 @@ def settings_for(project_root: Path, bios_name: str, adapter: str | None, player
         "AutoUpdater": {"CheckAtStartup": "false"},
         "InputSources": {"SDL": "true", "Keyboard": "true", "Mouse": "false"},
         "Hotkeys": {"TogglePause": "Keyboard/Space"},
+        # B50: both slots on the hub's formatted cards
+        "MemoryCards": {"Slot1_Enable": "true", "Slot1_Filename": MEMCARDS[0], "Slot2_Enable": "true",
+                        "Slot2_Filename": MEMCARDS[1]},
     }
     s.update(pad_sections(players, multitap))
     return s
@@ -394,8 +408,14 @@ def wait_sink_input(pid: int, bound: float = AUDIO_WAIT_S, alive: Callable[[], b
     while clock() < end and alive():
         if has_sink_input(pid, run):
             return clock() - t0
-        sleep(0.25)
+        sleep(0.1)      # B50: 0.1 s (A's 0.25); the sink-input came 0.1-0.3 s after the window in H3-P2
     return None
+
+
+def ensure_memcards(project_root: Path) -> dict[str, str]:
+    """B50: the hub's two cards formatted when absent or all 0xFF (never a card holding data)."""
+    import ps2_memcard
+    return ps2_memcard.ensure_cards(Path(project_root) / DATA_DIR / "memcards", list(MEMCARDS))
 
 
 def pine_socket_path(environ: Mapping[str, str] | None = None) -> Path:
@@ -449,6 +469,11 @@ class Session:
             self.sleep(0.25)
         return None
 
+    def wait_audio(self, bound: float = AUDIO_WAIT_S, alive: Callable[[], bool] = lambda: True) -> float | None:
+        """B50: A's H3-P2 wait (the PID's sink-input, the earliest proof of PCSX2's audio stream), on this session's
+        own run / sleep / clock, so the tests fake it."""
+        return wait_sink_input(self.pid, bound, alive, self.run, self.sleep, self.clock)
+
     def _hotkey(self) -> bool:
         w = find_window(self.pid, self.run)
         if not w:
@@ -473,6 +498,14 @@ class Session:
         if self.paused_by is not None:
             return self.paused_by
         st = self.status()
+        # B50: PINE answers ~0.1 s after the audio stream (after the VM's init): a late first answer is waited for
+        if st is None and not getattr(self, "_pine_seen", False):
+            end = self.clock() + PINE_LATE_S
+            while st is None and self.clock() < end:
+                self.sleep(0.1)
+                st = self.status()
+        if st is not None:
+            self._pine_seen = True
         if st == PINE_PAUSED:
             self.paused_by = "hotkey"
         elif st == PINE_RUNNING and self._hotkey() and self._await(PINE_PAUSED):

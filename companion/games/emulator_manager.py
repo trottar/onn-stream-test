@@ -6815,6 +6815,8 @@ class EmulatorManager:
             for sub in ("config", "memcards", "sstates", "bios"):
                 (data / sub).mkdir(parents=True, exist_ok=True)
             _ps2.bios_copy_once(paths["bios_dir"], data / "bios")
+            # B50: the slots' cards formatted on the hub when absent or all 0xFF (H3-P2's "Save failed")
+            memcards = _ps2.ensure_memcards(root)
             ini = _ps2.ini_path(root)
             text = ini.read_text(encoding="utf-8") if ini.is_file() else ""
             bios = _ps2.choose_bios(data / "bios", _ps2.ini_get(text, "Filenames", "BIOS"))
@@ -6845,6 +6847,10 @@ class EmulatorManager:
         log_handle.write(
             f"{utc_ms()} PS2 launch: pcsx2 players={plan['ports']} multitap={str(bool(plan['multitap'])).lower()} "
             f"adapter={'named' if adapter else 'unset'}\n"
+        )
+        # B50: what the launch did to the slots' cards (created / formatted / kept)
+        log_handle.write(
+            f"{utc_ms()} PS2 memcards: " + " ".join(f"{k}={v}" for k, v in sorted(memcards.items())) + "\n"
         )
         log_handle.flush()
 
@@ -6891,7 +6897,8 @@ class EmulatorManager:
 
         # H3-P2 (A, 2026-11-08): PCSX2 opens its PulseAudio stream ~10-15 s after its window; the stream's start
         # (and its stabilization pause) must not come before it, or the session's audio finds no sink-input.
-        waited = _ps2.wait_sink_input(process.pid, alive=lambda: process.poll() is None)
+        # B50: kept (the sink-input is the earliest proof of the audio stream), on the session's injectable clock
+        waited = self._ps2.wait_audio(alive=lambda: process.poll() is None)
         log_line(f"PS2 audio: sink-input {'%.1fs' % waited if waited is not None else 'none'}")
 
         payload = self.status()

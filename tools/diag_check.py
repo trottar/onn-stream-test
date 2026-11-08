@@ -162,8 +162,30 @@ def lines(root: Path = DIAG_ROOT) -> list[str]:
         p = Path(root).expanduser() / "status.txt"
         return line_keeper(p.read_text() if p.is_file() else None, unit_state())
 
-    return [safe(adopted, "adopted"), safe(apk, "apk"), safe(overlay, "overlay"), safe(routing, "routing"),
-            safe(band, "band"), safe(keeper, "diag-keeper")]
+    out = [safe(adopted, "adopted"), safe(apk, "apk"), safe(overlay, "overlay"), safe(routing, "routing"),
+           safe(band, "band"), safe(keeper, "diag-keeper")]
+    # B50: a seventh line only when the keeper's newest session row is a PS2 one (otherwise today's six)
+    try:
+        extra = line_last_session(Path(root).expanduser() / "sessions.jsonl")
+    except Exception:
+        extra = None
+    return out + ([extra] if extra else [])
+
+
+def line_last_session(path: Path) -> str | None:
+    """B50: `last session: ps2 (pcsx2) <end>` when the newest sessions.jsonl row is PS2; else None."""
+    if not path.is_file():
+        return None
+    rows = [ln for ln in tail_lines(path, 64_000) if ln.strip()]
+    if not rows:
+        return None
+    try:
+        r = json.loads(rows[-1])
+    except ValueError:
+        return None
+    if r.get("system") != "ps2":
+        return None
+    return f"last session: ps2 ({r.get('core')}) {r.get('end_utc') or 'open'}, hitch s / 10 min {r.get('hitch_s_per_10min')}"
 
 
 def main(argv: list[str] | None = None) -> int:

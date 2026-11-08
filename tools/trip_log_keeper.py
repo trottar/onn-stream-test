@@ -42,7 +42,8 @@ GAMES_TAILS = ["adaptive_bitrate_shadow.jsonl", "native_stream_heartbeat.log", "
                "native_pulseaudio.log", "native_video_alpha.log"]
 TOP_TAILS = ["wan_sessions.jsonl", "session_audit.jsonl", "impairment.jsonl"]
 NEWDIRS = ["decoder_sessions", "audio_timing"]
-GAME_LOG = re.compile(r"^\d{8}-\d{6}-game_[a-z0-9]+_[0-9a-f]+\.log$")
+# B50: a PS2 session's game log (`<date>-<time>-ps2.log`, no id or title by B49's design) is a game log too
+GAME_LOG = re.compile(r"^\d{8}-\d{6}-(?:game_[a-z0-9]+_[0-9a-f]+|ps2)\.log$")
 UNIT = "privyhub-companion"
 STATUS_URL = "http://127.0.0.1:8765/plugins/games/status"
 QUIET_S = 10.0

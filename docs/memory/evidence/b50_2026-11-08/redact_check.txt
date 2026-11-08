@@ -1,0 +1,45 @@
+OK docs/memory/evidence/b50_2026-11-08/predecessor_sha256.txt
+OK docs/memory/evidence/b50_2026-11-08/started_at.txt
+OK docs/memory/evidence/b50_2026-11-08/tests_mutations.txt
+OK docs/memory/evidence/b50_2026-11-08/design.sha256
+OK docs/memory/evidence/b50_2026-11-08/git_status_at_start.txt
+OK docs/memory/evidence/b50_2026-11-08/tests_tree_after_apply.txt
+FAIL ipv4_literal docs/memory/evidence/b50_2026-11-08/design_written_before_code.md
+OK docs/memory/evidence/b50_2026-11-08/units_before_apply.txt
+OK docs/memory/evidence/b50_2026-11-08/tests_ps2_session_x3.txt
+OK docs/memory/evidence/b50_2026-11-08/tests_host_b50.txt
+OK docs/memory/evidence/b50_2026-11-08/applied_to_tree_at.txt
+OK docs/memory/evidence/b50_2026-11-08/baseline_head.txt
+OK docs/memory/evidence/b50_2026-11-08/ecc_table_check.txt
+OK docs/memory/evidence/b50_2026-11-08/units_at_start.txt
+OK docs/memory/evidence/b50_2026-11-08/design_hashed_at.txt
+OK docs/memory/evidence/b50_2026-11-08/after_sha256.txt
+OK docs/memory/evidence/b50_2026-11-08/tests_host_baseline.txt
+OK docs/memory/evidence/b50_2026-11-08/proof_flag_absent.md
+OK docs/memory/evidence/b50_2026-11-08/redact_check.py
+OK docs/memory/evidence/b50_2026-11-08/b50.diff
+OK docs/memory/evidence/b50_2026-11-08/predecessors/emulator_manager.py
+OK docs/memory/evidence/b50_2026-11-08/predecessors/ps2_session.py
+OK docs/memory/evidence/b50_2026-11-08/predecessors/trip_log_keeper.py
+OK docs/memory/evidence/b50_2026-11-08/predecessors/diag_check.py
+OK docs/memory/evidence/b50_2026-11-08/predecessors/test_ps2_session.py
+OK docs/memory/evidence/b50_2026-11-08/predecessors/diag_read.py
+OK docs/memory/evidence/B50_PS2_FIXES_2026-11-08.md
+OK docs/memory/patches/B50_PS2_FIXES.md
+OK docs/memory/handoffs/SESSION_B_DONE_2026-11-08Q.md
+OK docs/KNOWN_ISSUES.md
+OK docs/ROADMAP.md
+OK companion/ps2_session.py
+OK companion/ps2_memcard.py
+OK tools/ps2_p2_window.py
+OK tools/diag_read.py
+OK tools/diag_check.py
+OK tools/trip_log_keeper.py
+OK tests/ps2_session/test_b50.py
+OK tests/ps2_session/test_ps2_session.py
+FAILS 1
+
+The one FAIL is a false positive: the hashed design names the PS2 card format's version string (four dotted digits,
+the format's own constant), which the IPv4 pattern matches. It is not an address, and the design is left byte-equal to
+its hash. The code builds that string from its parts and the record spells it out, so neither carries the literal.
+Extra check (in process, values never printed): the paths file's folders and basenames, the BIOS folder's file names, and 522 title stems (the PS1 library and the PS2 games folder), over 41 files: identifying hits 0, title hits 0. A generic one-word basename of length [4] was seen (the BIOS folder's, the same word as the hub folder data/games/ps2/<it>/).

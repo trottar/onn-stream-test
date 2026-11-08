@@ -52,6 +52,26 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
 
+## 2026-11-08 B50: H3-P2's PS2 fixes built (inside `PRIVYHUB_PS2=1`) — OPEN (A's HOME-4+: C11 two pads, C12 a save)
+
+(`docs/memory/evidence/B50_PS2_FIXES_2026-11-08.md`)
+
+- **Fixed in code:**
+  - A's audio wait reviewed and kept (the sink-input is the earliest proof of PCSX2's audio stream; PINE answers
+    later), plus a ≤ 1-s wait for PINE's first answer;
+  - memory cards formatted by the companion when absent or all `0xFF` ("Save failed");
+  - vsync on with mailbox allowed (the tears: an immediate present to an unredirected fullscreen window);
+  - the SDL3 face-button names (`Invalid binding`);
+  - the keeper's PS2 label;
+  - the P2 capture's window (`tools/ps2_p2_window.py`).
+- **Open:**
+  - **Not yet seen on the hub:** PCSX2 reading the companion's card as `[8 MB, Formatted]` and a save surviving a
+    relaunch (C12), and both pads driving players 1 and 2 (C11).
+  - **The tear fix's cost:** none under MAILBOX; up to ~17 ms latency if the driver gives FIFO (A reads PCSX2's
+    frame-time p95 and the user's feel).
+  - **Not built:** the drive read-ahead (H3-P2's one 643-ms read second) and PS2 save states through PINE (the user's
+    question).
+
 ## 2026-11-08 B49: the PS2 launch kind (PCSX2) built behind `PRIVYHUB_PS2=1` — OPEN (A's H3-P2, the streamed run)
 
 (`docs/memory/evidence/B49_PS2_LAUNCH_KIND_2026-11-08.md`; nothing adopted; no client change)
