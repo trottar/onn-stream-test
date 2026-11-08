@@ -1,0 +1,11 @@
+PCSX2 ini: data/games/ps2/config/PCSX2/inis/PCSX2.ini (gitignored; the folders and the BIOS file name only there)
+[Folders] Bios = BIOS_DIR (from the paths file); MemoryCards = data/games/ps2/memcards; Savestates = data/games/ps2/sstates
+[Filenames] BIOS = the one BIOS image in BIOS_DIR (region class NTSC-J)
+[GameList] RecursivePaths = GAMES_DIR (from the paths file)
+[EmuCore/GS] Renderer = 14 (Vulkan); Adapter = the AMD Radeon (RADV RENOIR) device, named (the hub's Vulkan also lists llvmpipe, a software device); upscale_multiplier = 1 (native)
+[EmuCore/GS] the performance overlay on (speed, FPS, VPS, CPU, GPU, resolution), top-right
+[Pad] MultitapPort1 / MultitapPort2 = false
+[UI] StartFullscreen = true, SetupWizardIncomplete = false, ConfirmShutdown = false, HideMouseCursor = true
+[EmuCore] EnableFastBoot = true, EnableDiscordPresence = false; [AutoUpdater] CheckAtStartup = false (no other telemetry in the ini; achievements off by default)
+the run: -datapath data/games/ps2/config -nogui -fullscreen -logfile data/games/ps2/probe/<t>/emulog.txt -- <the title>
+renderer used (both titles, from PCSX2's log): Vulkan on the AMD Radeon (RADV), hardware; OpenGL fallback not needed

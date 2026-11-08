@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-07
-baseline_commit: 953231d6 (HOME-3; G-A13 host and the G9 checkpoint uncommitted beside it; the user commits)
+baseline_commit: 9329eeee (queue O; H3-P1 uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -19,8 +19,10 @@ is G-A13's host half, `PRIVYHUB_VOD_LOG=1`, on the user's "Reconnect by default 
 
 ## Current Work Item
 
-- **G-A13 host and the G9 checkpoint are done, uncommitted** (session A, 2026-11-07). The user's commit is the G
-  checkpoint commit (§G9 item 14); item 13's hand check is the user's, optional (Next Action).
+- **H3-P1 done, uncommitted** (`evidence/H3_P1_PS2_PROBE_2026-11-07.md`; PCSX2 v2.8.2, Vulkan, 1x):
+  - **T1 (light):** full speed (PCSX2 100 %); P0-P1, P3, P4 met; P2 minimum 2 (black seconds) and P5 (one 552-ms
+    drive second) not met; P6 not run (the user's pads are on the onn) → B49's streamed run.
+  - **T2 (heavy, menu only):** full speed; P0-P1, P3-P5 met; P2 minimum 53 (by 2) not met; gameplay unmeasured.
 
 ## Verified State
 
@@ -85,14 +87,12 @@ redundancy 2/4 (`P10`); the live ladder's top 7000; the PS1 source 1920×1080 at
 
 ## Next Action
 
-1. **The user's commit** — the G checkpoint commit (`logs/g_a13_git_status.txt`, `logs/g9_checkpoint_git_status.txt`).
-2. **Optional, the user's hand (§G9 item 13):** one LAN game with the hub's Tailscale turned off, then back on; "item
-   13 done" closes it.
-3. **B: queue O** (`handoffs/QUEUE_2026-11-07O.md`): the player prompt per the user's requirement ("1 player, 2
-   player, multitap" chosen at every game start and unpause); the movie retry's client default; HOME-3's two VOD
-   cosmetics; the PS2 probe design H3-P1.
-4. **A: the H3-P1 run** after queue O (the BIOS and a game on the external drive, the user's hand).
-5. **Later:** H0 import (B45's four questions to the user first); the loss guard's return (G-A8 prepared).
+1. **The user's commit** of H3-P1 (`logs/h3_p1_git_status.txt`).
+2. **B: B49** — PCSX2 as a launch kind, pause / exit from the onn, the SDL map of the virtual pads (the user's pads
+   are on the onn over Bluetooth), the NVRAM write, P2's metric (the record's B49 list); no keep-awake.
+3. **A: HOME-4 at the TV** (`handoffs/SESSION_B_DONE_2026-11-07O.md` §A: queue O's APK `cfe0211c…`, the chooser, the
+   movie retry by default), then P6 / P7 over the stream after B49 (the user's two answers given: PCSX2; T1 / T2).
+4. **Later:** H0 import (B45's four questions first); the loss guard's return (G-A8 prepared).
 
 **Open, not blocking** — the full list is `docs/KNOWN_ISSUES.md`'s open index: G8-S6 and G5-S2-L (`handoffs/QUEUE_2026-10-19N.md`,
 never run); the nightly watch's nights not written up; the overlay-down local check never scored; the reconnect over

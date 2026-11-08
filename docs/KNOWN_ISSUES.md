@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-08 — H3-P1, the PS2 probe (PCSX2 v2.8.2, Vulkan, 1x): full speed with wide margins; P2's minimums and T1's one slow drive second not met; P6 not run (hub-local pads do not match the user's setup) — OPEN (to B49, then HOME-4 / P7) — `## 2026-11-08 H3-P1` below; `docs/memory/evidence/H3_P1_PS2_PROBE_2026-11-07.md`
 - 2026-11-07 — G-A13 (host), `PRIVYHUB_VOD_LOG=1` ADOPTED (the fifteenth line); the client's retry default to B (queue O) — OPEN (to B) — `## 2026-11-07 G-A13` below; `docs/memory/evidence/G_A13_VOD_LOG_ADOPTION_2026-11-07.md`
 - 2026-11-07 — HOME-3: C1'' / C4'' met with no property; C6 the prompt NOT MET (valid; the user's requirement: the prompt at every start and unpause); C5'' (b) met, (a) met on behaviour with two rows short; `8ba4d996…` CONFIRMED — OPEN (G-A13 the user's; C6 and two VOD items to B) — `## 2026-11-07 HOME-3` below; `docs/memory/evidence/HOME_3_DEFAULTS_PROMPT_VOD_2026-11-06.md`
 - 2026-11-06 — Queue N (B41-B45): the prompt, the two defaults, the movie retry made real, the G9 draft, the H0 design; APK built, not installed — OPEN (HOME-3) — `## 2026-11-06 Queue N` below; `docs/memory/handoffs/SESSION_B_DONE_2026-11-06N.md`
@@ -75,6 +76,22 @@ One line per open item: date — item — status — where it lives.
   - Pause / exit and the launch need code (B49).
   - BIOS and games go on the movies drive at the user's folders; the G0 import boundary is deferred by the user.
   - Nothing fetched.
+
+## 2026-11-08 H3-P1: the PS2 probe — OPEN (to B49)
+
+(`docs/memory/evidence/H3_P1_PS2_PROBE_2026-11-07.md`)
+
+- T1 / T2 run at full speed in PCSX2 v2.8.2, Vulkan on RADV at 1x: P0a-P0c, P1, P3, P4 met; GPU median 17 / 23 %,
+  Tctl max 56 / 62.5 °C, no core near 90 %.
+- **Not met as measured:** P2's minimum (T1 2: black fade / loading seconds; T2 53: repeated single frames from a
+  59.94-Hz picture captured at 60); P5 on T1 (one 552-ms read second on the USB drive). The unique-frame metric needs
+  static seconds and the 59.94-Hz beat accounted for before P7.
+- **P6 not run:** the design asked for pads on the hub; the user's pads are always on the onn over Bluetooth. Folded
+  into B49's streamed run (P7).
+- **To B49:** the PCSX2 launch kind (exit by SIGTERM to the started PID, named `AppRun`), the SDL map of the four
+  virtual pads, pause / resume / exit from the onn, the BIOS NVRAM write at exit (refused by the read-only mount).
+  Not needed on this evidence: the PID and audio workarounds, the keep-awake.
+- The drive's SMART counters are unreadable without root (USB); 0 writes throughout.
 
 ## 2026-11-07 G-A13 (host): the movie range log, the fifteenth line — OPEN (the client default to B)
 

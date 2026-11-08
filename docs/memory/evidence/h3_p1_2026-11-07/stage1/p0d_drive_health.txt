@@ -1,0 +1,12 @@
+P0d, the movies drive's health, read-only, no sudo (2026-11-07T19:02:32Z)
+device: sda (USB, rotational, 1.8 TB, exFAT, one partition); model class: a Seagate 2.5-inch portable USB disk
+smartctl: not installed (not run)
+udisksctl info: no Drive.Ata interface for this USB disk; no Smart* fields (SmartPowerOnSeconds, SmartTemperature, SmartFailing unreadable)
+/sys/block/sda/device: no SMART attributes exposed
+UNREADABLE without root: power-on hours, start/stop count, load-cycle count, reallocated sectors, pending sectors, temperature
+READABLE (since the hub's boot, the SCSI layer's counters):
+  iorequest_cnt 78648  iodone_cnt 78648  ioerr_cnt 25  iotmo_cnt 0
+  /sys/block/sda/stat: reads_completed 78591, sectors_read 1345808, read_ms 875790, writes_completed 0
+  runtime power: active, control on; manage_start_stop 0
+  ioerr_cnt counts SCSI-layer command errors (a USB bridge's refused pass-through commands count here too); no timeouts; not a media-error count
+No hdparm, no writes, no setting changed.

@@ -1,0 +1,10 @@
+P0a: PCSX2's log "BIOS Found" (region class NTSC-J) at every launch (T1, T2, T1 diag); its BIOS list non-empty.
+P0a nothing written: the BIOS and games folders' listings and mtimes before (19:01Z) = after (19:46Z), both; the drive's writes since boot 0.
+  At each exit PCSX2 tried to open the BIOS's NVRAM file in the BIOS folder for updating and was refused: the data mount is read-only (errno 30). Nothing written. To B49: point the NVRAM / BIOS settings write at the hub, or accept the refusal.
+P5 T1: the title (0.35 GB) was read almost whole in its first ~7 min (883 reads, 320 MB); the last read at 19:15:13Z; then 11 min with no read at all (served from memory).
+  The provoked read (Start, then Cross, 19:26:09Z) reached no disk (0 reads in 40 s): no PCSX2 spin-up to time.
+  Instead, one 4-KiB O_DIRECT read of an uncached offset of T2's file at 19:27:20Z (12 min after the drive's last read): 0.324 s (one read, 320 ms); a second: 0.049 s. No multi-second spin-up: the drive had not stood by in 12 min (or wakes in < 0.4 s).
+P5 T2: idle with no spin-up read, as the task says.
+Exit: T1's harness sent no signal (it looked for a process named pcsx2; the emulator is the started PID, named AppRun) and timed out after 30 s; a SIGTERM to the started PID then exited it in 1.0 s, the AppImage's FUSE helper with it. T2 and T1-diag: SIGTERM, exit 0 in 2.4 s, nothing left.
+T2's idle ran ~9 min, not 3: its capture's second output (the diagnostic low-res copy) was not bounded by -t and recorded until stopped by SIGINT at 19:40:24Z (a harness error; the 60-s frame count was bounded and is valid). The 1-Hz series over that span include a 480p encode.
+Diagnostic (beside the pre-registration, not a row): a second T1 run (19:41-19:45Z) with a 60-s capture and a low-res video kept, to classify the low seconds of M1.

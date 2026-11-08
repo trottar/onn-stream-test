@@ -1,0 +1,93 @@
+# H3-P1 redact check, at the close (2026-11-08T00:44:41Z)
+# (1) scripts/redact_extra.py over every file here, the record, and the docs' added lines: the paths file's four values (with the folders' basenames and the titles' stems), the titles' words (3+ letters, word-bounded), IPv4-like strings, mount paths.
+#     Hits, all false positives: preregistration.md (the BIOS folder's basename is the plain word 'bios', in the design's placeholder path; one common English word in P1's row, verbatim from the design, also occurs in a title); this file (it names those two cases and the pattern); scripts/redact_extra.py (its own mount-path pattern).
+OK   manifest.sha256
+HIT  preregistration.md  (a paths-file value, 1 title word(s))
+OK   preregistration.sha256
+HIT  redact_check.txt  (a paths-file value, a mount path)
+OK   scripts/analyze.py
+OK   scripts/probe.py
+HIT  scripts/redact_extra.py  (a mount path)
+OK   t2/m1_unique_fps_per_s.csv
+OK   t2/m2_core_busy_1hz.csv
+OK   t2/m2_threads_mean_cpu.csv
+OK   t2/m3_m6_gpu_tctl_1hz.csv
+OK   t2/m4_frame_intervals_ms.csv
+OK   t2/m5_disk_1hz.csv
+OK   t2/m5_iostat_1hz.csv
+OK   t2/summary.json
+OK   t1/m1_unique_fps_per_s.csv
+OK   t1/m2_core_busy_1hz.csv
+OK   t1/m2_threads_mean_cpu.csv
+OK   t1/m3_m6_gpu_tctl_1hz.csv
+OK   t1/m4_frame_intervals_ms.csv
+OK   t1/m5_disk_1hz.csv
+OK   t1/m5_iostat_1hz.csv
+OK   t1/summary.json
+OK   stage2/check_end.json
+OK   stage2/pads_first_read.txt
+OK   stage1/check_before.json
+OK   stage1/fetch.txt
+OK   stage1/ini_settings.txt
+OK   stage1/p0a_p5_notes.txt
+OK   stage1/p0d_drive_health.txt
+OK   stage1/preconditions.txt
+OK   t1_diag/m1_unique_fps_per_s.csv
+OK   t1_diag/m2_core_busy_1hz.csv
+OK   t1_diag/m2_threads_mean_cpu.csv
+OK   t1_diag/m3_m6_gpu_tctl_1hz.csv
+OK   t1_diag/m4_frame_intervals_ms.csv
+OK   t1_diag/m5_disk_1hz.csv
+OK   t1_diag/m5_iostat_1hz.csv
+OK   t1_diag/summary.json
+files with hits: 3
+OK   H3_P1_PS2_PROBE_2026-11-07.md
+OK   added_CURRENT.md.txt
+OK   added_KNOWN_ISSUES.md.txt
+OK   added_ROADMAP.md.txt
+files with hits: 0
+# (2) tools/e3_redact_check.sh (addresses, identifiers) over its file types; the same redactor over every CSV and over the docs' added lines
+E3 redactor check (h2_prep_redact.py --check, stdin per file), 2026-11-08T00:44:40Z
+OK   docs/memory/evidence/h3_p1_2026-11-07/manifest.sha256
+OK   docs/memory/evidence/h3_p1_2026-11-07/preregistration.md
+OK   docs/memory/evidence/h3_p1_2026-11-07/preregistration.sha256
+OK   docs/memory/evidence/h3_p1_2026-11-07/redact_check.txt
+OK   docs/memory/evidence/h3_p1_2026-11-07/scripts/analyze.py
+OK   docs/memory/evidence/h3_p1_2026-11-07/scripts/probe.py
+OK   docs/memory/evidence/h3_p1_2026-11-07/scripts/redact_extra.py
+OK   docs/memory/evidence/h3_p1_2026-11-07/stage1/check_before.json
+OK   docs/memory/evidence/h3_p1_2026-11-07/stage1/fetch.txt
+OK   docs/memory/evidence/h3_p1_2026-11-07/stage1/ini_settings.txt
+OK   docs/memory/evidence/h3_p1_2026-11-07/stage1/p0a_p5_notes.txt
+OK   docs/memory/evidence/h3_p1_2026-11-07/stage1/p0d_drive_health.txt
+OK   docs/memory/evidence/h3_p1_2026-11-07/stage1/preconditions.txt
+OK   docs/memory/evidence/h3_p1_2026-11-07/stage2/check_end.json
+OK   docs/memory/evidence/h3_p1_2026-11-07/stage2/pads_first_read.txt
+OK   docs/memory/evidence/h3_p1_2026-11-07/t1_diag/summary.json
+OK   docs/memory/evidence/h3_p1_2026-11-07/t1/summary.json
+OK   docs/memory/evidence/h3_p1_2026-11-07/t2/summary.json
+OK   docs/memory/evidence/H3_P1_PS2_PROBE_2026-11-07.md
+OK   docs/memory/evidence/h3_p1_2026-11-07/t1_diag/m1_unique_fps_per_s.csv
+OK   docs/memory/evidence/h3_p1_2026-11-07/t1_diag/m2_core_busy_1hz.csv
+OK   docs/memory/evidence/h3_p1_2026-11-07/t1_diag/m2_threads_mean_cpu.csv
+OK   docs/memory/evidence/h3_p1_2026-11-07/t1_diag/m3_m6_gpu_tctl_1hz.csv
+OK   docs/memory/evidence/h3_p1_2026-11-07/t1_diag/m4_frame_intervals_ms.csv
+OK   docs/memory/evidence/h3_p1_2026-11-07/t1_diag/m5_disk_1hz.csv
+OK   docs/memory/evidence/h3_p1_2026-11-07/t1_diag/m5_iostat_1hz.csv
+OK   docs/memory/evidence/h3_p1_2026-11-07/t1/m1_unique_fps_per_s.csv
+OK   docs/memory/evidence/h3_p1_2026-11-07/t1/m2_core_busy_1hz.csv
+OK   docs/memory/evidence/h3_p1_2026-11-07/t1/m2_threads_mean_cpu.csv
+OK   docs/memory/evidence/h3_p1_2026-11-07/t1/m3_m6_gpu_tctl_1hz.csv
+OK   docs/memory/evidence/h3_p1_2026-11-07/t1/m4_frame_intervals_ms.csv
+OK   docs/memory/evidence/h3_p1_2026-11-07/t1/m5_disk_1hz.csv
+OK   docs/memory/evidence/h3_p1_2026-11-07/t1/m5_iostat_1hz.csv
+OK   docs/memory/evidence/h3_p1_2026-11-07/t2/m1_unique_fps_per_s.csv
+OK   docs/memory/evidence/h3_p1_2026-11-07/t2/m2_core_busy_1hz.csv
+OK   docs/memory/evidence/h3_p1_2026-11-07/t2/m2_threads_mean_cpu.csv
+OK   docs/memory/evidence/h3_p1_2026-11-07/t2/m3_m6_gpu_tctl_1hz.csv
+OK   docs/memory/evidence/h3_p1_2026-11-07/t2/m4_frame_intervals_ms.csv
+OK   docs/memory/evidence/h3_p1_2026-11-07/t2/m5_disk_1hz.csv
+OK   docs/memory/evidence/h3_p1_2026-11-07/t2/m5_iostat_1hz.csv
+OK   (added lines) docs/KNOWN_ISSUES.md
+OK   (added lines) docs/ROADMAP.md
+OK   (added lines) docs/memory/CURRENT.md

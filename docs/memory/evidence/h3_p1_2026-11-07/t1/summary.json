@@ -1,0 +1,197 @@
+{
+ "m1": {
+  "seconds": 60,
+  "unique_frames": 3359,
+  "median_fps": 60.0,
+  "min_fps": 2,
+  "max_fps": 60,
+  "mean_fps": 55.98,
+  "native": 60.0
+ },
+ "m4": {
+  "p50_ms": 16.67,
+  "p95_ms": 16.92,
+  "p99_ms": 33.32,
+  "max_ms": 516.63,
+  "gaps_gt_100ms": 10
+ },
+ "m2": {
+  "cores": 12,
+  "per_core_median": {
+   "0": 6.7,
+   "1": 8.2,
+   "2": 4.1,
+   "3": 3.0,
+   "4": 4.0,
+   "5": 2.0,
+   "6": 4.0,
+   "7": 4.0,
+   "8": 4.0,
+   "9": 3.0,
+   "10": 3.1,
+   "11": 4.0
+  },
+  "per_core_max": {
+   "0": 48.1,
+   "1": 50.0,
+   "2": 46.0,
+   "3": 51.5,
+   "4": 62.4,
+   "5": 50.5,
+   "6": 57.4,
+   "7": 55.0,
+   "8": 64.3,
+   "9": 57.4,
+   "10": 58.4,
+   "11": 64.4
+  },
+  "longest_run_ge90_s": 0,
+  "busiest_core": 1,
+  "threads_top": [
+   {
+    "thread": "CPU Thread",
+    "mean": 30.6,
+    "max": 62.0
+   },
+   {
+    "thread": "GS",
+    "mean": 18.7,
+    "max": 43.0
+   },
+   {
+    "thread": "MTVU",
+    "mean": 18.0,
+    "max": 49.0
+   },
+   {
+    "thread": "ISO Decompress",
+    "mean": 1.8,
+    "max": 10.0
+   },
+   {
+    "thread": "threaded-ml",
+    "mean": 0.8,
+    "max": 2.0
+   },
+   {
+    "thread": "WSI swapchain q",
+    "mean": 0.2,
+    "max": 2.0
+   },
+   {
+    "thread": "WSI swapchain e",
+    "mean": 0.2,
+    "max": 2.0
+   },
+   {
+    "thread": "QXcbEventQueue",
+    "mean": 0.1,
+    "max": 2.0
+   }
+  ]
+ },
+ "m3": {
+  "samples": 1163,
+  "median": 17.0,
+  "p95": 25.0,
+  "max": 27.0
+ },
+ "m6": {
+  "samples": 1163,
+  "median": 48.75,
+  "max": 56.0
+ },
+ "m5": {
+  "iostat_seconds": 1166,
+  "stall_seconds_r_await_gt_500": 1,
+  "stall_at_s": [
+   409
+  ],
+  "max_r_await_ms": 551.75,
+  "writes_total": 0,
+  "reads_total": 883
+ },
+ "events": [
+  {
+   "at_utc": "2026-11-07T19:08:02.205Z",
+   "event": "launch",
+   "started_pid_comm": "pcsx2-v2.8.2-li"
+  },
+  {
+   "at_utc": "2026-11-07T19:10:08.505Z",
+   "event": "p0b",
+   "hit": true,
+   "pid_is": "started",
+   "at_s": 3.0
+  },
+  {
+   "at_utc": "2026-11-07T19:10:08.505Z",
+   "event": "p0c",
+   "started_pid_inputs": 1,
+   "child_inputs": {},
+   "at_s": 12.5
+  },
+  {
+   "at_utc": "2026-11-07T19:10:08.505Z",
+   "event": "tree",
+   "comms": [
+    "AppRun"
+   ]
+  },
+  {
+   "at_utc": "2026-11-07T19:10:08.505Z",
+   "event": "emu_main",
+   "comm": "AppRun"
+  },
+  {
+   "at_utc": "2026-11-07T19:10:08.510Z",
+   "event": "window",
+   "geometry": "0,0 (screen: 0) Geometry: 1920x1080"
+  },
+  {
+   "at_utc": "2026-11-07T19:15:08.697Z",
+   "event": "idle1_done",
+   "alive": true
+  },
+  {
+   "at_utc": "2026-11-07T19:15:08.697Z",
+   "event": "capture_start"
+  },
+  {
+   "at_utc": "2026-11-07T19:16:09.021Z",
+   "event": "capture_done"
+  },
+  {
+   "at_utc": "2026-11-07T19:26:09.210Z",
+   "event": "idle2_done",
+   "alive": true
+  },
+  {
+   "at_utc": "2026-11-07T19:26:09.243Z",
+   "event": "provoke",
+   "keys": "Return,k (Start, then Cross)"
+  },
+  {
+   "at_utc": "2026-11-07T19:26:50.779Z",
+   "event": "provoke_result",
+   "first_read_done_s": null,
+   "reads": 0,
+   "read_ms": 0
+  },
+  {
+   "at_utc": "2026-11-07T19:27:20.914Z",
+   "event": "exit_timeout"
+  },
+  {
+   "at_utc": "2026-11-07T19:27:22.932Z",
+   "event": "exit",
+   "rc": null,
+   "exit_s": 32.0,
+   "left": 2
+  }
+ ],
+ "windows_seen": {
+  "distinct_names": 2,
+  "max_windows": 2
+ }
+}

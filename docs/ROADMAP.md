@@ -2455,6 +2455,13 @@ User-supplied PS2 BIOS should enter only through the G0 import boundary.
 > unattended then attended, and PCSX2 is fetched only with the user's go. The stream over PCSX2 is B49 (the launch,
 > pause and keep-awake need code).
 
+> **H3-P1 RUN (2026-11-07 / 08, A):** `docs/memory/evidence/H3_P1_PS2_PROBE_2026-11-07.md`. PCSX2 v2.8.2 (the
+> user's "Yes"), Vulkan on RADV at 1x: T1 (light) and T2 (heavy, menu only) at full speed — P0a-P0c, P1, P3, P4 met;
+> GPU median 17 / 23 %, Tctl max 56 / 62.5 °C. Not met as measured: P2's minimums (black seconds; the 59.94-Hz beat)
+> and T1's P5 (one 552-ms drive second). **P6 not run** (the design's hub-local pads do not match how the user plays:
+> the pads are on the onn over Bluetooth); it is folded into B49's streamed run (P7). B49: the PCSX2 launch kind, the
+> SDL map of the virtual pads, pause / exit, the NVRAM write; not the PID / audio workarounds or the keep-awake.
+
 ## H4 — Extended-emulation tiers
 
 Possible evidence-driven outcome:

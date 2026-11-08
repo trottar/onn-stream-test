@@ -1,0 +1,10 @@
+PCSX2, fetched on the user's "Yes" (2026-11-07)
+source: the project's own GitHub release page, releases/latest (not a prerelease, not a draft)
+release: v2.8.2 (published 2026-09-04)
+asset: the Linux x86-64 Qt AppImage, 60,119,544 B
+sha256 0c46bb6a88aa2782b10853a7b07cf3387ba99cbef2b966372cd2315b8571abea (= the digest GitHub publishes for the asset)
+fetched_at 2026-11-07T19:03:06Z into runtime/emulators/pcsx2/ (gitignored); chmod +x; nothing run as root; nothing installed system-wide
+FUSE: /dev/fuse present, fusermount / fusermount3 present; the AppImage mounts and runs (no extraction needed)
+-help (v2.8.2): -batch, -nogui (implies batch), -fullscreen, -- confirmed as the design recalled; the settings dir is -datapath <path>
+  (not -portable, which uses the AppImage's own folder); -logfile <path>; -testconfig created the default ini under -datapath
+nothing written to ~/.config (no ~/.config/PCSX2)
