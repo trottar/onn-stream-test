@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-08
-baseline_commit: 4aa08d3d (B52 / B53; HOME-6 and G-A14 uncommitted beside it; the user commits)
+baseline_commit: 017153b6 (queue T; IMPORT-1 uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -19,8 +19,8 @@ feasibility CLOSED**. APK `cfe0211c…` CONFIRMED (HOME-4+).
 
 ## Current Work Item
 
-- **HOME-6 done, uncommitted** (`evidence/HOME_6_PS2_LOAD_2026-11-08.md`): B52 / B53 live; PS2 LOAD met (C12'' / C14,
-  `picture ok 0.9s`, 0 `TLB Miss`); **G-A14 adopted** (`ps2.conf`, sixteen lines, `--check` ok); EE 42 % / 49 % (MTVU off).
+- **IMPORT-1 done, uncommitted** (`evidence/IMPORT_1_2026-11-08.md`): 72 PS1 titles on the drive, all DUPLICATE, 0
+  placed; no PS1 BIOS there; the drive untouched. Bench drop-in `b56-import.conf` on (17 lines live) until HOME-7 C19.
 
 ## Verified State
 
@@ -85,11 +85,11 @@ redundancy 2/4 (`P10`); the live ladder's top 7000; the PS1 source 1920×1080 at
 
 ## Next Action
 
-1. **The user's commit** of HOME-6 and G-A14 (`logs/home6_git_status.txt`).
-2. **B: H0 import slice 1a** (B45's design), after the user's four answers: a real BIOS or OpenBIOS for PS1; `.m3u` for
-   multi-disc or refuse; a "NEW" tag; hide PS1 `.iso`.
-3. **Open:** PS2 hold / stall through PINE states (the user's question; a save ~0.5 s); the two chooser questions (the
-   1-player extra press); the drive read-ahead; a heavy PS2 title's long play; the loss guard's return (G-A8).
+1. **The user's commit** of IMPORT-1 (`logs/import1_git_status.txt`).
+2. **A: HOME-7** at the TV (`handoffs/SESSION_B_DONE_2026-11-08T.md` §A: APK `9aa00ba2…`, C15-C18) + **C19**, the onn
+   check of the import (the list's marks, "(OpenBIOS)", a PS1 title under the flag); then the bench flag's fate.
+3. **B: queue U** — the PS2 relaunch through B55's slot; the `.gitignore` line for `PrivyHub-Import/`; slice 1b (a plain
+   source folder, the other systems). **Open:** the drive read-ahead; a heavy PS2 title's long play; G-A8.
 
 **Open, not blocking** — the full list is `docs/KNOWN_ISSUES.md`'s open index: G8-S6 and G5-S2-L (`handoffs/QUEUE_2026-10-19N.md`,
 never run); the nightly watch's nights not written up; the overlay-down local check never scored; the reconnect over
@@ -142,7 +142,7 @@ CONFIRMED only by its pre-registered rule (CL-B7 §6); otherwise the previous CO
 
 - G adoptions: `evidence/G_A1_…`, `G_A2_…`, `G_A3_…`, `G_A4_…`, `G_A5_…`, `G_A7_…`, `TRIP_PREP_2026-10-29.md` (G-A9),
   `G_A10_…_2026-11-02.md`, `G_A13_…_2026-11-07.md`, `G9_CHECKPOINT_2026-11-07.md`; `docs/REMOTE_TRUST.md`. Client / trip: `CL_B14_…` (`fcd924c2…`), `CL_B16_…`, `TRIP_R2_…`,
-  `HOME_1_…`, `HOME_2_…`, `HOME_3_…`, `HOME_4_PLUS_…`, `HOME_5_…`, `HOME_6_…`, queue N's `B41_…` / `B42_…` / `B43_…` and `handoffs/SESSION_B_DONE_2026-11-06N.md`.
+  `HOME_1_…`, `HOME_2_…`, `HOME_3_…`, `HOME_4_PLUS_…`, `HOME_5_…`, `HOME_6_…`, `IMPORT_1_…`, queue N's `B41_…` / `B42_…` / `B43_…` and `handoffs/SESSION_B_DONE_2026-11-06N.md`.
 - Closers: `evidence/E4_CLOSEOUT_2026-10-15.md`, `E2_S1_…`, `E1_S1_…`, `C5_CLOSE_2026-10-05.md`,
   `D_BASE_CLOSEOUT_2026-09-23.md`; `architecture/E1_WORKLOAD_SUITE.md`.
 - Indexes: `handoffs/README.md`, `patches/PATCH_INDEX.md`, `archive/INDEX.md`; `docs/ROADMAP.md`, `docs/KNOWN_ISSUES.md`,

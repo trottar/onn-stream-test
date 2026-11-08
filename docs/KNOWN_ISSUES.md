@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-08 — IMPORT-1: the first real import, from the external drive (a symlinked `PrivyHub-Import/` root): 72 PS1 titles, all DUPLICATE, 0 placed, 1 stray file rejected; no PS1 BIOS on the drive; the drive untouched; the bench drop-in `b56-import.conf` on at the user's decision until HOME-7's C19 — OPEN (HOME-7 C19; slice 1b) — `## 2026-11-08 IMPORT-1` below; `docs/memory/evidence/IMPORT_1_2026-11-08.md`
 - 2026-11-08 — HOME-6: PS2 LOAD fixed on the onn (C12'' / C14 MET, `picture ok 0.9s`, 0 TLB Miss); **G-A14 ADOPTED, `PRIVYHUB_PS2=1` the sixteenth line** (`ps2.conf`; the bench flag and HOME-5's load note CLOSED); open: the hold / stall through PINE states (the user's question), the drive read-ahead, a heavy title's long play, the 1-player chooser's extra press — OPEN (the user's questions) — `## 2026-11-08 HOME-6` below; `docs/memory/evidence/HOME_6_PS2_LOAD_2026-11-08.md`
 - 2026-11-08 — HOME-5: PS2 SAVE like PS1 MET (C12'a / b / d; the write 0.5 s); LOAD NOT MET (C12'c: black screen, PCSX2 `TLB Miss` after the PINE load); G-A14 not adopted; the user's bench flag `b49-ps2.conf` stays on — OPEN (to B: the PS2 load) — `## 2026-11-08 HOME-5` below; `docs/memory/evidence/HOME_5_PS2_SAVE_2026-11-08.md`
 - 2026-11-08 — HOME-4+: queue O's `cfe0211c…` CONFIRMED (C7 / C9 / C8 / C10 met, the off checks met); C11 PS2 two-player MET; C12 PS2 save NOT MET (not run: the user's requirement, PS2 saving like PS1's SAVE button); G-A14 not adopted, fifteen lines — OPEN (to B) — `## 2026-11-08 HOME-4+` below; `docs/memory/evidence/HOME_4_PLUS_2026-11-08.md`
@@ -104,6 +105,19 @@ One line per open item: date — item — status — where it lives.
     3,905 leftover dirs, so they remain.
   - **The fix is in:** B53's `_tmp_cleanup` makes every run remove its own temp dirs.
   - **The user (or a reboot, which empties the tmpfs) frees the rest.** `/tmp` read 40 MB free at the queue's end.
+
+## 2026-11-08 IMPORT-1: PS1 from the drive — all duplicate, nothing placed — OPEN (HOME-7 C19; the bench flag)
+
+(`docs/memory/evidence/IMPORT_1_2026-11-08.md`)
+
+- **Run:** `tools/import_usb.py` from the movies drive through `/tmp/privyhub_import_root/PrivyHub-Import/games/ps1`
+  (a symlink; the tool unchanged): I1 72 candidates (6 multi-disc), 1 file `unknown_type`; I2 **72 DUPLICATE**, 0
+  accepted; I3 placed 0 (exit 0 both); I4 the log name-free; I6 idempotent. The drive's listing hash before = after.
+- **No PS1 BIOS on the drive** (the only BIOS files are the PS2 folder's): PlayStation keeps OpenBIOS.
+- **The bench drop-in `b56-import.conf` (`PRIVYHUB_IMPORT=1`) stays on at the user's decision** until HOME-7's C19
+  (the onn check of the list's marks): seventeen lines, `--check` not ok on the environ only; the list reads
+  "PlayStation (OpenBIOS) (80)" while it is in. Off: delete it, `daemon-reload`, restart.
+- **Open:** C19 at HOME-7; slice 1b (a plain source folder instead of the symlink root; the other systems).
 
 ## 2026-11-08 HOME-6: PS2 LOAD met; G-A14 ADOPTED (the sixteenth line) — OPEN (the user's questions)
 

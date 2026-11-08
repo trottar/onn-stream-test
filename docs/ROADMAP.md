@@ -2431,6 +2431,12 @@ rather than create a second game-library path.
 > - The log holds counts and labels only. Tested on fixture trees; nothing imported.
 > - **Next:** A's IMPORT-1 with the user's stick (`docs/memory/handoffs/SESSION_B_DONE_2026-11-08T.md`); then slice 1b
 >   (the journal's resume across a crash, other systems) and the `.gitignore` line for `PrivyHub-Import/`.
+>
+> **IMPORT-1 (2026-11-08, A; `docs/memory/evidence/IMPORT_1_2026-11-08.md`):** slice 1a run for real **from the
+> external movies drive** through a symlinked `PrivyHub-Import/` root (not a stick): 72 PS1 titles, **all DUPLICATE**
+> (the hub already holds them), 0 placed, 1 stray file rejected; no PS1 BIOS on the drive (OpenBIOS stays); the drive
+> untouched (hash equal); idempotent. The onn check is HOME-7's C19. **Next, slice 1b:** the tool taking a plain
+> source folder (no symlinks needed); the other systems; the journal's resume across a crash.
 
 ## H1 — N64
 
