@@ -2446,6 +2446,10 @@ rather than create a second game-library path.
 > interrupted apply is cleaned, and resumed if its plan still accepts it, by the next apply, and the list (with the
 > flag) never shows a half-placed title. Fixture trees only. **Next:** HOME-7's C19; then **IMPORT-2** (the drive's
 > SNES / NES / Genesis folders through the plain form, duplicates expected; `SESSION_B_DONE_2026-11-08U.md`).
+>
+> **IMPORT-2 DEFERRED by the user (2026-11-08):** "I don't really care about the NES and Genesis. I'd rather do the
+> PS2+ ones I have already in there (e.g. n64 and GameCube)". The handoff stays written, not run. N64 and GameCube are
+> listed in place from the drive like PS2 (§H1, §H2), not imported.
 
 ## H1 — N64
 
@@ -2456,7 +2460,27 @@ Question:
 
 > Does the optimized core/alpha hardware already have enough margin for N64?
 
+> **H1 OPENED with B59 (2026-11-08, B; `docs/memory/evidence/B59_N64_LAUNCH_2026-11-08.md`):** N64 through RetroArch
+> (decided 2026-11-06), behind `PRIVYHUB_N64=1`.
+> - **The pieces:** the core Mupen64Plus-Next (GLideN64, native resolution); the titles listed in place from the
+>   drive's N64 folder (`N64_DIR=` in the gitignored paths file); four ports always, so hold-to-join fills P1-P4 with
+>   no relaunch; the C-buttons on the right stick; RetroArch's save states and recovery as PS1's; the N64 frame metric
+>   `tools/n64_frames.py`.
+> - **Not live yet:** the core must be fetched (A, the user's go).
+> - **Next:** A's HOME-7+N64 C21-C23 (`docs/memory/handoffs/SESSION_B_DONE_2026-11-08V.md`), then B61 for any N64
+>   fix, and G-A15 on the user's word.
+
 ## H2 — GameCube
+
+> **H2 OPENED with the H2-P1 probe design (2026-11-08, B60;
+> `docs/memory/architecture/H2_P1_GAMECUBE_PROBE_DESIGN_2026-11-08.md`):**
+> - **The emulator:** standalone Dolphin, not the unmaintained libretro core. Fetched with the user's go: an upstream
+>   AppImage if published, else Debian 13's packages extracted in user space.
+> - **The titles:** in place from the drive's GameCube folder.
+> - **No IPC socket:** pause by hotkey, confirmed by the CPU thread's standing time; SIGSTOP as the fallback; save
+>   states by hotkey, read back by the file's mtime and B52's picture check.
+> - **The run:** pre-registered pass rows as H3-P1's. A runs it unattended to the menu, then the streamed play at the
+>   TV once B61 builds the launch kind.
 
 Evaluate bounded representative titles:
 

@@ -36,6 +36,12 @@ if (os.environ.get("PRIVYHUB_PS2") or "").strip() == "1":
 
 PS2_NO_STATES = "Save states are not available for a PS2 session"
 
+# B59: the N64 system (RetroArch + an N64 core, titles in place), only with PRIVYHUB_N64=1. Absent = today: nothing
+# imported, an `n64` title refused (no `n64` profile in emulators.json).
+_n64 = None
+if (os.environ.get("PRIVYHUB_N64") or "").strip() == "1":
+    import n64_session as _n64
+
 
 class EmulatorError(RuntimeError):
     pass
@@ -576,6 +582,19 @@ class EmulatorManager:
             )
 
         return content_path, core_path
+
+    def _resolve_n64(
+        self,
+        game: dict[str, Any],
+        runtime: dict[str, Any],
+    ) -> tuple[Path, Path]:
+        """B59 (only with PRIVYHUB_N64=1): the title from the in-place folder, the core from the cores directory."""
+        try:
+            content = _n64.resolve_title(_n64.read_dir(self.project_root), str(game.get("relative_path", "")))
+            core = _n64.core_path(runtime["cores_directory"])
+        except _n64.N64Error as exc:
+            raise EmulatorError(f"N64 launch refused: {exc}") from exc
+        return content, core
 
     def _controller_overrides_path(
         self,
@@ -1828,6 +1847,9 @@ class EmulatorManager:
 
         # B49: a PS2 title has no RetroArch controller profiles (Core default, not selectable)
         if _ps2 is not None and system_id == _ps2.SYSTEM_ID:
+            return system_id, "", {}
+        # B59: nor an N64 title (Core default; its ports are the launch's four, n64_session.plan)
+        if _n64 is not None and system_id == _n64.SYSTEM_ID:
             return system_id, "", {}
 
         config = self._load_config()
@@ -5497,6 +5519,13 @@ class EmulatorManager:
                     raise EmulatorError("players_chosen must be 1, 2 or 4")
 
             runtime = self._runtime_details()
+            # B59: an N64 title: the profile injected into this launch's runtime copy only (absent: never true)
+            n64_launch = _n64 is not None and str(game.get("system", "")).strip().casefold() == _n64.SYSTEM_ID
+            if n64_launch:
+                try:
+                    runtime = _n64.runtime_with_profile(runtime)
+                except _n64.N64Error as exc:
+                    raise EmulatorError(f"N64 launch refused: {exc}") from exc
             executable = runtime["executable"]
             retroarch_config = runtime["retroarch_config"]
 
@@ -5512,10 +5541,13 @@ class EmulatorManager:
                     "scripts/setup_retroarch_portable.ps1."
                 )
 
-            content_path, core_path = self._resolve_game(
-                game,
-                runtime,
-            )
+            if n64_launch:   # B59: the title in place on the drive, the N64 core by name
+                content_path, core_path = self._resolve_n64(game, runtime)
+            else:
+                content_path, core_path = self._resolve_game(
+                    game,
+                    runtime,
+                )
 
             # B46: with a pick, the PS1 multitap for this launch from the pick (None = today's metadata read)
             if players_chosen is not None:
@@ -5524,6 +5556,14 @@ class EmulatorManager:
                     int(players_chosen),
                     self.controller_profile(game).get("libretro_device"),
                 )
+            # B59: four ports on every N64 launch, whatever the pick or the join (no multitap, no relaunch)
+            n64_options: dict[str, Any] | None = None
+            if n64_launch:
+                players_plan = _n64.plan()
+                try:
+                    n64_options = _n64.write_options(self._retroarch_config_directory(runtime), core_path.name)
+                except (_n64.N64Error, OSError) as exc:
+                    raise EmulatorError(f"N64 launch refused: {exc}") from exc
             ps1_multitap = self._prepare_ps1_multitap_options(
                 game,
                 runtime,
@@ -5744,6 +5784,9 @@ class EmulatorManager:
                     )
                     + "\n"
                 )
+            if n64_launch and n64_options is not None:   # B59
+                for line in _n64.log_lines(core_path.name, int(players_plan["ports"]), n64_options):
+                    log_handle.write(line + "\n")
             log_handle.write("Command uses project-local paths only.\n\n")
             log_handle.flush()
 
@@ -5865,6 +5908,10 @@ class EmulatorManager:
             # B46: the pick's ports, only for a launch that carried one (no key = today's payload)
             if players_plan is not None:
                 payload["players_session"] = dict(players_plan)
+            # B59: the N64 launch's core, ports and options (only on an N64 launch)
+            if n64_launch and n64_options is not None:
+                payload["n64_session"] = {"core": core_path.name, "ports": int(players_plan["ports"]),
+                                          "options_keys": int(n64_options["keys"])}
             payload["ps1_look"] = (
                 {k: v for k, v in ps1_look_session.items() if k != "cfg_text"}
                 if ps1_look_session["preset"] or ps1_look_session["ignored_value"]

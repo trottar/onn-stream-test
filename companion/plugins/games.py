@@ -125,6 +125,12 @@ _ps2_session = None
 if (os.environ.get("PRIVYHUB_PS2") or "").strip() == "1":
     import ps2_session as _ps2_session
 
+# B59: the N64 system listed in place (RetroArch + an N64 core), only with PRIVYHUB_N64=1. Absent = today: nothing
+# imported, SYSTEMS unchanged.
+_n64_session = None
+if (os.environ.get("PRIVYHUB_N64") or "").strip() == "1":
+    import n64_session as _n64_session
+
 # B56: an import's marks on the list (NEW for 7 days, a hidden .iso, "(OpenBIOS)"), only with PRIVYHUB_IMPORT=1.
 # Absent = today: nothing imported.
 _import_marks = None
@@ -184,6 +190,10 @@ class GamesPlugin:
         if _ps2_session is not None:
             self.SYSTEMS = {**type(self).SYSTEMS, _ps2_session.SYSTEM_ID: {
                 "name": _ps2_session.SYSTEM_NAME, "folder": None, "extensions": set()}}
+        # B59: the N64 system listed from the drive's N64 folder (instance only; absent = today)
+        if _n64_session is not None:
+            self.SYSTEMS = {**self.SYSTEMS, _n64_session.SYSTEM_ID: {
+                "name": _n64_session.SYSTEM_NAME, "folder": None, "extensions": set()}}
         self._lock = threading.RLock()
         self._cached_at = 0.0
         self._cached_games: list[dict[str, Any]] = []
@@ -1843,6 +1853,14 @@ class GamesPlugin:
             if _ps2_session is not None and system_id == _ps2_session.SYSTEM_ID:
                 games.extend(_ps2_session.titles_for_plugin(
                     _ps2_session.read_paths(self.PROJECT_ROOT)["games_dir"], self._stable_id, self._clean_name)
+                    [:max(0, self.MAX_GAMES - len(games))])
+                if len(games) >= self.MAX_GAMES:
+                    break
+                continue
+            # B59: N64 titles read in place from the folder the paths file names, never written; absent: never reached
+            if _n64_session is not None and system_id == _n64_session.SYSTEM_ID:
+                games.extend(_n64_session.titles_for_plugin(
+                    _n64_session.read_dir(self.PROJECT_ROOT), self._stable_id, self._clean_name)
                     [:max(0, self.MAX_GAMES - len(games))])
                 if len(games) >= self.MAX_GAMES:
                     break

@@ -86,7 +86,7 @@ def pcsx2_events(name: str, data: bytes) -> list[tuple[datetime, str]]:
 TAGS = {"04ff": "PS1 platformer", "ee3b": "SNES action-adventure", "2ef9": "PS1 first-person RPG",
         "3699": "PS1 football (Blitz)", "7bf5": "PS1 brawler", "6d53": "PS1 kart racer", "33df": "PS1 golf",
         "9f2b": "PS1 hockey A", "e2cd": "PS1 hockey B"}
-CORES = {"snes": "snes9x", "ps1": "beetle-psx-hw"}
+CORES = {"snes": "snes9x", "ps1": "beetle-psx-hw", "n64": "mupen64plus-next"}   # B59: an N64 launch's log
 
 # the log names (as in logs/games/ or logs/) the reader uses
 LOGS = {"rec": "native_stream_recovery.log", "lad": "adaptive_bitrate_shadow.jsonl", "hb": "native_stream_heartbeat.log",

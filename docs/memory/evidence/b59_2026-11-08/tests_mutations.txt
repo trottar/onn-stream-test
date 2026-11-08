@@ -1,0 +1,18 @@
+B59 mutations, each in a fresh copy of companion/ tools/ tests/ (removed after), tests/n64_session run once per mutation.
+First run (the suite as first written):
+M1 the flag gate removed (emulator manager imports n64 always): CAUGHT -- Ran 28 tests in 0.957s / FAILED (failures=2)
+M2 the four ports cut to two: CAUGHT -- Ran 28 tests in 1.133s / FAILED (failures=4)
+M3 the .opt written for another core: CAUGHT -- Ran 28 tests in 1.266s / FAILED (failures=2)
+M4 .v64 preferred over .z64: CAUGHT -- Ran 28 tests in 1.266s / FAILED (failures=2)
+M5 the listing makes the folder: SURVIVED -- Ran 28 tests in 1.264s / OK
+M6 the n64 source dropped from ports_set: CAUGHT -- Ran 28 tests in 1.138s / FAILED (failures=3)
+M7 the hitch threshold not scaled: CAUGHT -- Ran 28 tests in 1.267s / FAILED (failures=3)
+
+M5 survived: the absent-folder test checked only the empty list. Strengthened (the folder must not exist after the listing); all seven re-run:
+M1 the flag gate removed (emulator manager imports n64 always): CAUGHT -- Ran 28 tests in 0.958s / FAILED (failures=2)
+M2 the four ports cut to two: CAUGHT -- Ran 28 tests in 1.139s / FAILED (failures=4)
+M3 the .opt written for another core: CAUGHT -- Ran 28 tests in 1.265s / FAILED (failures=2)
+M4 .v64 preferred over .z64: CAUGHT -- Ran 28 tests in 1.261s / FAILED (failures=2)
+M5 the listing makes the folder: CAUGHT -- Ran 28 tests in 1.264s / FAILED (failures=1)
+M6 the n64 source dropped from ports_set: CAUGHT -- Ran 28 tests in 1.137s / FAILED (failures=3)
+M7 the hitch threshold not scaled: CAUGHT -- Ran 28 tests in 1.271s / FAILED (failures=3)

@@ -1,0 +1,1193 @@
+diff --git a/companion/games/emulator_manager.py b/companion/games/emulator_manager.py
+index b52e94a..eefd7b7 100644
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -36,6 +36,12 @@ if (os.environ.get("PRIVYHUB_PS2") or "").strip() == "1":
+ 
+ PS2_NO_STATES = "Save states are not available for a PS2 session"
+ 
++# B59: the N64 system (RetroArch + an N64 core, titles in place), only with PRIVYHUB_N64=1. Absent = today: nothing
++# imported, an `n64` title refused (no `n64` profile in emulators.json).
++_n64 = None
++if (os.environ.get("PRIVYHUB_N64") or "").strip() == "1":
++    import n64_session as _n64
++
+ 
+ class EmulatorError(RuntimeError):
+     pass
+@@ -577,6 +583,19 @@ class EmulatorManager:
+ 
+         return content_path, core_path
+ 
++    def _resolve_n64(
++        self,
++        game: dict[str, Any],
++        runtime: dict[str, Any],
++    ) -> tuple[Path, Path]:
++        """B59 (only with PRIVYHUB_N64=1): the title from the in-place folder, the core from the cores directory."""
++        try:
++            content = _n64.resolve_title(_n64.read_dir(self.project_root), str(game.get("relative_path", "")))
++            core = _n64.core_path(runtime["cores_directory"])
++        except _n64.N64Error as exc:
++            raise EmulatorError(f"N64 launch refused: {exc}") from exc
++        return content, core
++
+     def _controller_overrides_path(
+         self,
+     ) -> Path:
+@@ -1829,6 +1848,9 @@ class EmulatorManager:
+         # B49: a PS2 title has no RetroArch controller profiles (Core default, not selectable)
+         if _ps2 is not None and system_id == _ps2.SYSTEM_ID:
+             return system_id, "", {}
++        # B59: nor an N64 title (Core default; its ports are the launch's four, n64_session.plan)
++        if _n64 is not None and system_id == _n64.SYSTEM_ID:
++            return system_id, "", {}
+ 
+         config = self._load_config()
+         systems = config.get(
+@@ -5497,6 +5519,13 @@ class EmulatorManager:
+                     raise EmulatorError("players_chosen must be 1, 2 or 4")
+ 
+             runtime = self._runtime_details()
++            # B59: an N64 title: the profile injected into this launch's runtime copy only (absent: never true)
++            n64_launch = _n64 is not None and str(game.get("system", "")).strip().casefold() == _n64.SYSTEM_ID
++            if n64_launch:
++                try:
++                    runtime = _n64.runtime_with_profile(runtime)
++                except _n64.N64Error as exc:
++                    raise EmulatorError(f"N64 launch refused: {exc}") from exc
+             executable = runtime["executable"]
+             retroarch_config = runtime["retroarch_config"]
+ 
+@@ -5512,10 +5541,13 @@ class EmulatorManager:
+                     "scripts/setup_retroarch_portable.ps1."
+                 )
+ 
+-            content_path, core_path = self._resolve_game(
+-                game,
+-                runtime,
+-            )
++            if n64_launch:   # B59: the title in place on the drive, the N64 core by name
++                content_path, core_path = self._resolve_n64(game, runtime)
++            else:
++                content_path, core_path = self._resolve_game(
++                    game,
++                    runtime,
++                )
+ 
+             # B46: with a pick, the PS1 multitap for this launch from the pick (None = today's metadata read)
+             if players_chosen is not None:
+@@ -5524,6 +5556,14 @@ class EmulatorManager:
+                     int(players_chosen),
+                     self.controller_profile(game).get("libretro_device"),
+                 )
++            # B59: four ports on every N64 launch, whatever the pick or the join (no multitap, no relaunch)
++            n64_options: dict[str, Any] | None = None
++            if n64_launch:
++                players_plan = _n64.plan()
++                try:
++                    n64_options = _n64.write_options(self._retroarch_config_directory(runtime), core_path.name)
++                except (_n64.N64Error, OSError) as exc:
++                    raise EmulatorError(f"N64 launch refused: {exc}") from exc
+             ps1_multitap = self._prepare_ps1_multitap_options(
+                 game,
+                 runtime,
+@@ -5744,6 +5784,9 @@ class EmulatorManager:
+                     )
+                     + "\n"
+                 )
++            if n64_launch and n64_options is not None:   # B59
++                for line in _n64.log_lines(core_path.name, int(players_plan["ports"]), n64_options):
++                    log_handle.write(line + "\n")
+             log_handle.write("Command uses project-local paths only.\n\n")
+             log_handle.flush()
+ 
+@@ -5865,6 +5908,10 @@ class EmulatorManager:
+             # B46: the pick's ports, only for a launch that carried one (no key = today's payload)
+             if players_plan is not None:
+                 payload["players_session"] = dict(players_plan)
++            # B59: the N64 launch's core, ports and options (only on an N64 launch)
++            if n64_launch and n64_options is not None:
++                payload["n64_session"] = {"core": core_path.name, "ports": int(players_plan["ports"]),
++                                          "options_keys": int(n64_options["keys"])}
+             payload["ps1_look"] = (
+                 {k: v for k, v in ps1_look_session.items() if k != "cfg_text"}
+                 if ps1_look_session["preset"] or ps1_look_session["ignored_value"]
+diff --git a/companion/inplace_library.py b/companion/inplace_library.py
+new file mode 100644
+index 0000000..4dcd9e7
+--- /dev/null
++++ b/companion/inplace_library.py
+@@ -0,0 +1,91 @@
++"""B59: a system listed in place from a folder the gitignored paths file names (B49's PS2 listing, generalised).
++
++The paths file is PS2's: the file `PRIVYHUB_PS2_PATHS` names, else `runtime/h3_p1_paths.txt` (gitignored). A system
++reads one key from it (`N64_DIR=` for N64; `GAMECUBE_DIR=` later) and nothing else. Folders are only read: no `mkdir`,
++no write, hidden names skipped. Imported only by a flag-gated system module (`n64_session`); absent = never imported.
++PS2's own listing (`ps2_session`) is not moved onto this module (B49-B57's tested path untouched).
++
++Design: `docs/memory/evidence/b59_2026-11-08/design_written_before_code.md` (hashed before this code).
++"""
++
++from __future__ import annotations
++
++import os
++from pathlib import Path
++from typing import Any, Mapping
++
++PATHS_ENV = "PRIVYHUB_PS2_PATHS"
++DEFAULT_PATHS = "runtime/h3_p1_paths.txt"
++
++
++class InPlaceError(Exception):
++    pass
++
++
++def read_dir(project_root: Path, key: str, environ: Mapping[str, str] | None = None) -> Path | None:
++    """The folder `key=` names in the paths file; None for a missing file, key or value. Only that key is read."""
++    env = os.environ if environ is None else environ
++    named = (env.get(PATHS_ENV) or "").strip()
++    path = Path(named) if named else Path(project_root) / DEFAULT_PATHS
++    try:
++        lines = path.read_text(encoding="utf-8").splitlines()
++    except (OSError, UnicodeDecodeError):
++        return None
++    for line in lines:
++        k, sep, value = line.partition("=")
++        if sep and k.strip() == key and value.strip():
++            return Path(value.strip())
++    return None
++
++
++def list_titles(folder: Path | None, rank: Mapping[str, int]) -> list[dict[str, Any]]:
++    """The titles under `folder`, read-only: one per (folder, stem case-folded), the lowest `rank` suffix kept;
++    other suffixes and hidden names skipped. [] when the folder is not configured or not there."""
++    if folder is None:
++        return []
++    root = Path(folder)
++    try:
++        if not root.is_dir():
++            return []
++    except OSError:
++        return []
++    best: dict[tuple[str, str], tuple[int, Path]] = {}
++    for dirpath, dirnames, filenames in os.walk(root):
++        dirnames[:] = sorted(d for d in dirnames if not d.startswith("."))
++        for name in filenames:
++            if name.startswith("."):
++                continue
++            p = Path(dirpath) / name
++            r = rank.get(p.suffix.casefold())
++            if r is None:
++                continue
++            key = (str(p.parent), p.stem.casefold())
++            if key not in best or r < best[key][0]:
++                best[key] = (r, p)
++    out = []
++    for _, p in sorted(best.values(), key=lambda v: str(v[1]).casefold()):
++        try:
++            size = p.stat().st_size
++        except OSError:
++            size = 0
++        out.append({"path": p, "relative": p.relative_to(root).as_posix(), "suffix": p.suffix.casefold(),
++                    "size_bytes": size})
++    return out
++
++
++def resolve(folder: Path | None, relative_path: str, prefix: str, what: str) -> Path:
++    """`<prefix><inside folder>` -> the file; a missing folder, a wrong prefix, an escape or a missing file refuses."""
++    if folder is None:
++        raise InPlaceError(f"{what} folder is not configured")
++    rel = str(relative_path or "")
++    if not rel.startswith(prefix):
++        raise InPlaceError(f"not a {what} title path")
++    root = Path(folder).resolve()
++    target = (root / rel[len(prefix):]).resolve()
++    try:
++        target.relative_to(root)
++    except ValueError as exc:
++        raise InPlaceError(f"{what} title path escapes its folder") from exc
++    if not target.is_file():
++        raise InPlaceError(f"{what} title not found")
++    return target
+diff --git a/companion/n64_session.py b/companion/n64_session.py
+new file mode 100644
+index 0000000..8cbd932
+--- /dev/null
++++ b/companion/n64_session.py
+@@ -0,0 +1,229 @@
++"""B59: the N64 system through RetroArch, only with `PRIVYHUB_N64=1` in the companion's environment.
++
++**Absent = today byte for byte:** the plugin and the emulator manager never import this module, `SYSTEMS` has no
++`n64`, an `n64` launch is today's refusal (no `n64` profile in `emulators.json`), and no core-options file is written.
++
++With the flag:
++- titles are listed read-only in place from the folder `N64_DIR=` names in the gitignored paths file (B49's file;
++  `inplace_library`): `.z64` / `.v64` / `.n64`, one entry per stem, `.z64` preferred. **Nothing is written there**;
++- the launch is RetroArch's with the N64 core (`PRIVYHUB_N64_CORE`, SNES_CORE's form; default `mupen64plus_next`),
++  the system profile injected per launch (never into `status()`), **four ports always** (`--device=1..4:1`, no
++  multitap, so hold-to-join fills P1-P4 with no relaunch), and Mupen64Plus-Next's per-core `.opt` merged at launch
++  (GLideN64, native resolution, the original frame rate, the C-buttons on the right stick, a memory pak per port);
++- save states, the hold's scratch state, the stall resume and the recovery save are RetroArch's, as PS1's (no skip).
++
++The fetch of the core is A's, with the user's go; `presence()` only looks (no network, the core never loaded).
++Design: `docs/memory/evidence/b59_2026-11-08/design_written_before_code.md` (hashed before this code).
++"""
++
++from __future__ import annotations
++
++import copy
++import os
++import re
++from pathlib import Path
++from typing import Any, Callable, Mapping
++
++import inplace_library as _inplace
++
++FLAG_ENV = "PRIVYHUB_N64"
++CORE_ENV = "PRIVYHUB_N64_CORE"
++DIR_KEY = "N64_DIR"
++SYSTEM_ID = "n64"
++SYSTEM_NAME = "Nintendo 64"
++RELATIVE_PREFIX = "n64/"
++SUFFIX_RANK = {".z64": 0, ".v64": 1, ".n64": 2}
++DEFAULT_CORE = "mupen64plus_next"
++CORES_DIR = "runtime/emulators/retroarch/cores-linux"
++PORTS = 4
++JOYPAD_DEVICE = 1            # RETRO_DEVICE_JOYPAD
++PLAN_SOURCE = "n64"
++
++PROFILE: dict[str, Any] = {
++    "name": SYSTEM_NAME,
++    "license": "GPL-2.0",
++    "extensions": sorted(SUFFIX_RANK),
++    "controls": {"analog_dpad": "none"},   # the left stick stays the analog stick, never a D-pad
++}
++
++# Mupen64Plus-Next's per-core options (recalled key names; tools/n64_core_check.py --keys checks the fetched .so)
++OPTIONS_LIBRARY = {"mupen64plus_next_libretro.so": "Mupen64Plus-Next"}
++OPTIONS: dict[str, str] = {
++    "mupen64plus-rdp-plugin": "gliden64",
++    "mupen64plus-rsp-plugin": "hle",
++    "mupen64plus-cpucore": "dynamic_recompiler",
++    "mupen64plus-EnableNativeResFactor": "1",
++    "mupen64plus-43screensize": "320x240",
++    "mupen64plus-aspect": "4:3",
++    "mupen64plus-Framerate": "Original",
++    "mupen64plus-alt-map": "False",
++    "mupen64plus-pak1": "memory",
++    "mupen64plus-pak2": "memory",
++    "mupen64plus-pak3": "memory",
++    "mupen64plus-pak4": "memory",
++}
++
++
++class N64Error(Exception):
++    pass
++
++
++def enabled(environ: Mapping[str, str] | None = None) -> bool:
++    env = os.environ if environ is None else environ
++    return (env.get(FLAG_ENV) or "").strip() == "1"
++
++
++# --- the folder and the list (read-only) -------------------------------------------------------------------------
++
++def read_dir(project_root: Path, environ: Mapping[str, str] | None = None) -> Path | None:
++    return _inplace.read_dir(project_root, DIR_KEY, environ)
++
++
++def list_titles(folder: Path | None) -> list[dict[str, Any]]:
++    return _inplace.list_titles(folder, SUFFIX_RANK)
++
++
++def resolve_title(folder: Path | None, relative_path: str) -> Path:
++    try:
++        return _inplace.resolve(folder, relative_path, RELATIVE_PREFIX, "N64")
++    except _inplace.InPlaceError as exc:
++        raise N64Error(str(exc)) from exc
++
++
++def titles_for_plugin(folder: Path | None, stable_id: Callable[[str, str], str],
++                      clean_name: Callable[[Path], str]) -> list[dict[str, Any]]:
++    """The scan's entries for the `n64` system (the plugin's own id and title rules)."""
++    out = []
++    for t in list_titles(folder):
++        rel = RELATIVE_PREFIX + t["relative"]
++        out.append({"id": stable_id(SYSTEM_ID, rel), "title": clean_name(t["path"]), "system": SYSTEM_ID,
++                    "system_name": SYSTEM_NAME, "relative_path": rel, "format": t["suffix"].lstrip("."),
++                    "size_bytes": t["size_bytes"]})
++    return out
++
++
++# --- the core ----------------------------------------------------------------------------------------------------
++
++def core_name(environ: Mapping[str, str] | None = None) -> str:
++    env = os.environ if environ is None else environ
++    name = (env.get(CORE_ENV) or "").strip() or DEFAULT_CORE
++    if not re.fullmatch(r"[a-z0-9_]+", name):
++        raise N64Error(f"{CORE_ENV} is not a core name")
++    return name
++
++
++def core_file(environ: Mapping[str, str] | None = None) -> str:
++    return f"{core_name(environ)}_libretro.so"
++
++
++def core_path(cores_dir: Path, environ: Mapping[str, str] | None = None) -> Path:
++    name = core_file(environ)
++    root = Path(cores_dir).resolve()
++    path = (root / name).resolve()
++    try:
++        path.relative_to(root)
++    except ValueError as exc:
++        raise N64Error("N64 core path is invalid") from exc
++    if not path.is_file():
++        raise N64Error(f"N64 core not installed (fetch needed): {name}")
++    return path
++
++
++def presence(project_root: Path, environ: Mapping[str, str] | None = None) -> dict[str, Any]:
++    """"bundled" when the core is in the cores folder, else "fetch needed". Looks only: no network, no load.
++    `appimage_bundles` is B59's reading of the AppImage (no libretro core inside, listed with 7z)."""
++    name = core_file(environ)
++    folder = Path(project_root) / CORES_DIR
++    try:
++        present = (folder / name).is_file()
++    except OSError:
++        present = False
++    return {"state": "bundled" if present else "fetch needed", "core": name, "cores_dir": CORES_DIR,
++            "appimage_bundles": False}
++
++
++def keys_in_core(path: Path, keys: Mapping[str, str] | None = None) -> dict[str, list[str]]:
++    """The option keys found / missing as byte strings in the core file (read, never loaded)."""
++    data = Path(path).read_bytes()
++    wanted = list(OPTIONS if keys is None else keys)
++    found = [k for k in wanted if k.encode() in data]
++    return {"found": found, "missing": [k for k in wanted if k not in found]}
++
++
++# --- the launch pieces -------------------------------------------------------------------------------------------
++
++def runtime_with_profile(runtime: dict[str, Any]) -> dict[str, Any]:
++    """A copy of the runtime with the `n64` profile and core added (the launch's only; `status()` never sees it)."""
++    out = dict(runtime)
++    config = copy.deepcopy(runtime["config"])
++    config.setdefault("systems", {})[SYSTEM_ID] = {**copy.deepcopy(PROFILE), "core": core_file()}
++    out["config"] = config
++    return out
++
++
++def plan(source: str = PLAN_SOURCE) -> dict[str, Any]:
++    """Four ports on every N64 launch (B46's plan shape): no multitap, so the client never asks for a relaunch."""
++    return {
++        "players_chosen": PORTS,
++        "ports": PORTS,
++        "multitap": False,
++        "multitap_available": False,
++        "ps1_mode": None,
++        "device_args": [f"--device={p}:{JOYPAD_DEVICE}" for p in range(1, PORTS + 1)],
++        "source": source,
++    }
++
++
++def options_library(core: str) -> str | None:
++    return OPTIONS_LIBRARY.get(core)
++
++
++_OPT_LINE = re.compile(r'^\s*([^=\s]+)\s*=')
++
++
++def merge_options(text: str, keys: Mapping[str, str]) -> str:
++    """Our keys set (`key = "value"`), every other line kept in place; missing keys appended."""
++    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
++    if lines and lines[-1] == "":
++        lines.pop()
++    seen: set[str] = set()
++    out = []
++    for line in lines:
++        m = _OPT_LINE.match(line)
++        if m and m.group(1) in keys:
++            if m.group(1) in seen:
++                continue
++            seen.add(m.group(1))
++            out.append(f'{m.group(1)} = "{keys[m.group(1)]}"')
++        else:
++            out.append(line)
++    out.extend(f'{k} = "{v}"' for k, v in keys.items() if k not in seen)
++    return "\n".join(out) + "\n"
++
++
++def write_options(config_dir: Path, core: str) -> dict[str, Any]:
++    """Merge OPTIONS into `<config dir>/<library>/<library>.opt` (temp + rename). Another core: nothing written."""
++    library = options_library(core)
++    if library is None:
++        return {"library": None, "keys": 0, "written": False}
++    root = Path(config_dir).resolve()
++    target = (root / library / (library + ".opt")).resolve()
++    try:
++        target.relative_to(root)
++    except ValueError as exc:
++        raise N64Error("N64 core-options path escaped the RetroArch config directory") from exc
++    target.parent.mkdir(parents=True, exist_ok=True)
++    try:
++        text = target.read_text(encoding="utf-8-sig") if target.is_file() else ""
++    except (OSError, UnicodeDecodeError) as exc:
++        raise N64Error(f"N64 core options unreadable: {exc}") from exc
++    temporary = target.with_name(target.name + ".privyhub.tmp")
++    temporary.write_text(merge_options(text, OPTIONS), encoding="utf-8")
++    temporary.replace(target)
++    return {"library": library, "keys": len(OPTIONS), "written": True}
++
++
++def log_lines(core: str, ports: int, options: Mapping[str, Any]) -> list[str]:
++    name = core[:-len("_libretro.so")] if core.endswith("_libretro.so") else core
++    opt = (f"{options['keys']} keys ({options['library']})" if options.get("written") else f"none ({name})")
++    return [f"N64 launch: core={name} ports={int(ports)}", f"N64 core options: {opt}"]
+diff --git a/companion/players_session.py b/companion/players_session.py
+index 28005f9..6d39ab1 100644
+--- a/companion/players_session.py
++++ b/companion/players_session.py
+@@ -84,7 +84,8 @@ def ports_set(emulator: Any, game_status: dict[str, Any] | None) -> dict[str, An
+     try:
+         session = getattr(emulator, "_players_session", None)
+         # B54: a hold-to-join launch (`join`) and a mid-session relaunch (`relaunch`) are plans too
+-        if isinstance(session, dict) and session.get("source") in ("launch", "join", "relaunch"):
++        # B59: an N64 launch's four ports are a plan too (`n64`; reached only with PRIVYHUB_N64=1)
++        if isinstance(session, dict) and session.get("source") in ("launch", "join", "relaunch", "n64"):
+             return {"ports_set": {k: session[k] for k in ("players_chosen", "ports", "multitap", "multitap_available",
+                                                           "source")} | {"players": int(session["ports"])}}
+         game = getattr(emulator, "active_game", None) or (game_status or {}).get("game") or {}
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index a14e8c6..cb9ba90 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -125,6 +125,12 @@ _ps2_session = None
+ if (os.environ.get("PRIVYHUB_PS2") or "").strip() == "1":
+     import ps2_session as _ps2_session
+ 
++# B59: the N64 system listed in place (RetroArch + an N64 core), only with PRIVYHUB_N64=1. Absent = today: nothing
++# imported, SYSTEMS unchanged.
++_n64_session = None
++if (os.environ.get("PRIVYHUB_N64") or "").strip() == "1":
++    import n64_session as _n64_session
++
+ # B56: an import's marks on the list (NEW for 7 days, a hidden .iso, "(OpenBIOS)"), only with PRIVYHUB_IMPORT=1.
+ # Absent = today: nothing imported.
+ _import_marks = None
+@@ -184,6 +190,10 @@ class GamesPlugin:
+         if _ps2_session is not None:
+             self.SYSTEMS = {**type(self).SYSTEMS, _ps2_session.SYSTEM_ID: {
+                 "name": _ps2_session.SYSTEM_NAME, "folder": None, "extensions": set()}}
++        # B59: the N64 system listed from the drive's N64 folder (instance only; absent = today)
++        if _n64_session is not None:
++            self.SYSTEMS = {**self.SYSTEMS, _n64_session.SYSTEM_ID: {
++                "name": _n64_session.SYSTEM_NAME, "folder": None, "extensions": set()}}
+         self._lock = threading.RLock()
+         self._cached_at = 0.0
+         self._cached_games: list[dict[str, Any]] = []
+@@ -1847,6 +1857,14 @@ class GamesPlugin:
+                 if len(games) >= self.MAX_GAMES:
+                     break
+                 continue
++            # B59: N64 titles read in place from the folder the paths file names, never written; absent: never reached
++            if _n64_session is not None and system_id == _n64_session.SYSTEM_ID:
++                games.extend(_n64_session.titles_for_plugin(
++                    _n64_session.read_dir(self.PROJECT_ROOT), self._stable_id, self._clean_name)
++                    [:max(0, self.MAX_GAMES - len(games))])
++                if len(games) >= self.MAX_GAMES:
++                    break
++                continue
+             system_root = (
+                 self.GAMES_ROOT / str(config["folder"])
+             )
+diff --git a/tests/n64_session/_tmp_cleanup.py b/tests/n64_session/_tmp_cleanup.py
+new file mode 100644
+index 0000000..b017237
+--- /dev/null
++++ b/tests/n64_session/_tmp_cleanup.py
+@@ -0,0 +1,25 @@
++"""B53 (test hygiene): every temporary directory a tests/n64_session run creates is removed when that run ends.
++
++HOME-6 prep found ~6.9 GiB of these suites' fixture trees (formatted 8-MB cards, fake game trees) left in the hub's /tmp
++tmpfs by B49-B52's runs, which never removed their mkdtemp() dirs. Imported by each test module; it tracks only the
++dirs made in this process and removes them at exit (never anything else)."""
++
++from __future__ import annotations
++
++import atexit
++import shutil
++import tempfile
++
++_made: list[str] = []
++_mkdtemp = tempfile.mkdtemp
++
++
++def _tracked(*args, **kwargs):
++    d = _mkdtemp(*args, **kwargs)
++    _made.append(d)
++    return d
++
++
++if getattr(tempfile.mkdtemp, "__name__", "") != "_tracked":
++    tempfile.mkdtemp = _tracked
++    atexit.register(lambda: [shutil.rmtree(d, ignore_errors=True) for d in _made])
+diff --git a/tests/n64_session/test_n64_session.py b/tests/n64_session/test_n64_session.py
+new file mode 100644
+index 0000000..c7bb789
+--- /dev/null
++++ b/tests/n64_session/test_n64_session.py
+@@ -0,0 +1,463 @@
++#!/usr/bin/env python3
++"""B59 (host): N64 through RetroArch behind PRIVYHUB_N64=1 -- the in-place list, the plugin's system, the launch (the
++command, four ports, the core options, the input file, the log, the ports echo), the core's presence check, the frame
++metric, the keeper's label -- and absent = today. Fakes only: temp folders with made-up names, a fake RetroArch tree
++and core files of a few bytes; RetroArch is never started and nothing is fetched.
++
++    python3 -m unittest discover -s tests/n64_session -v
++"""
++
++from __future__ import annotations
++
++import contextlib
++import io
++import json
++import os
++import re
++import socket
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401  (this run's temp dirs removed at exit)
++sys.path.insert(0, str(ROOT / "tools"))
++
++import inplace_library  # noqa: E402
++import n64_session as n64  # noqa: E402
++import players_session  # noqa: E402
++import n64_frames  # noqa: E402
++import n64_core_check  # noqa: E402
++
++RA_EXE = "runtime/emulators/retroarch-nightly-20260907-linux/RetroArch-Linux-x86_64/RetroArch-Linux-x86_64.AppImage"
++CORES = "runtime/emulators/retroarch/cores-linux"
++
++
++def tree(files: dict[str, bytes | str]) -> Path:
++    root = Path(tempfile.mkdtemp(prefix="b59_"))
++    for rel, data in files.items():
++        p = root / rel
++        p.parent.mkdir(parents=True, exist_ok=True)
++        p.write_bytes(data if isinstance(data, bytes) else data.encode())
++    return root
++
++
++def snapshot(root: Path) -> list[tuple[str, int, float]]:
++    return sorted((str(p.relative_to(root)), p.stat().st_size, p.stat().st_mtime) for p in root.rglob("*"))
++
++
++# --- the list --------------------------------------------------------------------------------------------------
++
++class Listing(unittest.TestCase):
++    def test_one_per_stem_z64_first_and_nothing_written(self):
++        d = tree({"one.v64": b"1", "one.z64": b"1", "one.n64": b"1", "two.n64": b"2", "two.v64": b"2",
++                  "three.V64": b"3", ".hidden.z64": b"h", "notes.txt": b"t", "four.zip": b"z",
++                  "sub/five.n64": b"5", ".dot/six.z64": b"6"})
++        before = snapshot(d)
++        got = [(t["relative"], t["suffix"]) for t in n64.list_titles(d)]
++        self.assertEqual(got, [("one.z64", ".z64"), ("sub/five.n64", ".n64"), ("three.V64", ".v64"),
++                               ("two.v64", ".v64")])
++        self.assertEqual(before, snapshot(d))
++
++    def test_no_folder_is_an_empty_list(self):
++        self.assertEqual(n64.list_titles(None), [])
++        absent = Path(tempfile.mkdtemp()) / "absent"
++        self.assertEqual(n64.list_titles(absent), [])
++        self.assertFalse(absent.exists())                                       # never made (no mkdir on the drive)
++
++    def test_the_paths_file_key_only(self):
++        proj = tree({"runtime/h3_p1_paths.txt": "GAMES_DIR=/x/ps2\nN64_DIR=/y/n64\nT1=secret\n"})
++        self.assertEqual(n64.read_dir(proj, {}), Path("/y/n64"))
++        self.assertIsNone(inplace_library.read_dir(proj, "GAMECUBE_DIR", {}))
++        other = tree({"p.txt": "N64_DIR=/z\n"})
++        self.assertEqual(n64.read_dir(proj, {"PRIVYHUB_PS2_PATHS": str(other / "p.txt")}), Path("/z"))
++        self.assertIsNone(n64.read_dir(tree({}), {}))
++
++    def test_resolve_refuses_escapes_prefixes_and_missing(self):
++        d = tree({"one.z64": b"1"})
++        outside = tree({"x.z64": b"x"})
++        self.assertEqual(n64.resolve_title(d, "n64/one.z64"), (d / "one.z64").resolve())
++        for bad in ("n64/../" + os.path.relpath(outside / "x.z64", d), "ps2/one.z64", "n64/none.z64", "one.z64"):
++            with self.assertRaises(n64.N64Error):
++                n64.resolve_title(d, bad)
++        with self.assertRaises(n64.N64Error):
++            n64.resolve_title(None, "n64/one.z64")
++
++
++# --- the pieces ------------------------------------------------------------------------------------------------
++
++class Pieces(unittest.TestCase):
++    def test_four_ports_always_no_multitap(self):
++        p = n64.plan()
++        self.assertEqual(p["device_args"], ["--device=1:1", "--device=2:1", "--device=3:1", "--device=4:1"])
++        self.assertEqual((p["ports"], p["multitap"], p["multitap_available"], p["source"]), (4, False, False, "n64"))
++
++    def test_the_ports_echo_reads_the_plan(self):
++        class Emu:
++            _players_session = n64.plan()
++            active_game = {"system": "n64"}
++        got = players_session.ports_set(Emu(), None)["ports_set"]
++        self.assertEqual(got, {"players_chosen": 4, "ports": 4, "multitap": False, "multitap_available": False,
++                               "source": "n64", "players": 4})
++
++    def test_the_options_merge(self):
++        text = '# keep\nmupen64plus-cpucore = "pure_interpreter"\nother-core-key = "x"\nmupen64plus-cpucore = "dup"\n'
++        out = n64.merge_options(text, n64.OPTIONS)
++        self.assertIn("# keep\n", out)
++        self.assertIn('other-core-key = "x"\n', out)
++        self.assertEqual(out.count("mupen64plus-cpucore"), 1)
++        for k, v in n64.OPTIONS.items():
++            self.assertIn(f'{k} = "{v}"\n', out)
++        self.assertEqual(n64.merge_options(out, n64.OPTIONS), out)               # idempotent
++
++    def test_the_option_values(self):
++        self.assertEqual(n64.OPTIONS["mupen64plus-rdp-plugin"], "gliden64")
++        self.assertEqual(n64.OPTIONS["mupen64plus-EnableNativeResFactor"], "1")
++        self.assertEqual(n64.OPTIONS["mupen64plus-alt-map"], "False")              # the C-buttons on the right stick
++        self.assertEqual([n64.OPTIONS[f"mupen64plus-pak{i}"] for i in range(1, 5)], ["memory"] * 4)
++
++    def test_options_only_for_mupen64plus_next(self):
++        cfg = Path(tempfile.mkdtemp())
++        self.assertEqual(n64.write_options(cfg, "parallel_n64_libretro.so"), {"library": None, "keys": 0,
++                                                                              "written": False})
++        self.assertEqual(list(cfg.iterdir()), [])
++
++    def test_core_names(self):
++        self.assertEqual(n64.core_file({}), "mupen64plus_next_libretro.so")
++        self.assertEqual(n64.core_file({"PRIVYHUB_N64_CORE": "parallel_n64"}), "parallel_n64_libretro.so")
++        for bad in ("../x", "Mupen", "a b"):
++            with self.assertRaises(n64.N64Error):
++                n64.core_file({"PRIVYHUB_N64_CORE": bad})
++
++    def test_the_profile_is_injected_into_a_copy(self):
++        rt = {"config": {"systems": {"snes": {"core": "x"}}}, "core_status": {"snes": {}}}
++        out = n64.runtime_with_profile(rt)
++        self.assertIn("n64", out["config"]["systems"])
++        self.assertEqual(out["config"]["systems"]["n64"]["controls"], {"analog_dpad": "none"})
++        self.assertNotIn("n64", rt["config"]["systems"])
++        self.assertNotIn("n64", out["core_status"])
++
++
++# --- the presence check ----------------------------------------------------------------------------------------
++
++def quiet(fn, *args):
++    with contextlib.redirect_stdout(io.StringIO()):
++        return fn(*args)
++
++
++class Presence(unittest.TestCase):
++    def setUp(self):
++        self._connect = socket.socket.connect
++
++        def refuse(*a, **k):
++            raise AssertionError("the presence check opened a connection")
++        socket.socket.connect = refuse
++
++    def tearDown(self):
++        socket.socket.connect = self._connect
++
++    def test_fetch_needed_then_bundled(self):
++        proj = tree({f"{CORES}/bsnes_libretro.so": b"x"})
++        self.assertEqual(n64.presence(proj, {})["state"], "fetch needed")
++        self.assertEqual(quiet(n64_core_check.main, ["--root", str(proj)]), 3)
++        (proj / CORES / "mupen64plus_next_libretro.so").write_bytes(b"\0" + b"\0".join(k.encode() for k in n64.OPTIONS))
++        self.assertEqual(n64.presence(proj, {})["state"], "bundled")
++        self.assertEqual(quiet(n64_core_check.main, ["--root", str(proj), "--keys"]), 0)
++
++    def test_keys_found_and_missing(self):
++        some = list(n64.OPTIONS)[:3]
++        core = tree({"c.so": b"\x7fELF" + b"\0".join(k.encode() for k in some)}) / "c.so"
++        got = n64.keys_in_core(core)
++        self.assertEqual(got["found"], some)
++        self.assertEqual(len(got["missing"]), len(n64.OPTIONS) - 3)
++        proj = tree({f"{CORES}/mupen64plus_next_libretro.so": core.read_bytes()})
++        self.assertEqual(quiet(n64_core_check.main, ["--root", str(proj), "--keys"]), 4)
++
++
++# --- the plugin and the catalog, a fresh interpreter per flag state -------------------------------------------
++
++PLUGIN_CODE = r'''
++import json, os, sys, threading, importlib.util
++from pathlib import Path
++sys.path.insert(0, "companion")
++spec = importlib.util.spec_from_file_location("g", "companion/plugins/games.py")
++G = importlib.util.module_from_spec(spec); spec.loader.exec_module(G)
++from games import emulator_manager as em
++out = {"n64_imported": "n64_session" in sys.modules, "inplace_imported": "inplace_library" in sys.modules,
++       "em_n64": em._n64 is not None}
++p = object.__new__(G.GamesPlugin)
++if G._n64_session is not None:
++    p.SYSTEMS = {**G.GamesPlugin.SYSTEMS, "n64": {"name": "Nintendo 64", "folder": None, "extensions": set()}}
++out["systems"] = sorted(p.SYSTEMS)
++proj = Path(os.environ["B59_PROJ"])
++p.PROJECT_ROOT = proj; p.GAMES_ROOT = proj / "games"
++p._lock = threading.RLock(); p._cached_at = 0.0; p._cached_games = []
++out["scan"] = sorted((g["system"], g["relative_path"], g["format"]) for g in p._scan())
++out["ids"] = sorted(g["id"].split("_")[1] for g in p._scan())
++m = em.EmulatorManager(Path("."), config_path=Path("companion/games/config/emulators.json"))
++try:
++    out["catalog"] = list(m._controller_profile_catalog({"system": "n64"}))
++except Exception as exc:
++    out["catalog"] = type(exc).__name__
++print(json.dumps(out))
++'''
++
++
++def run_plugin(flag, proj):
++    env = {"PATH": "/usr/bin:/bin", "B59_PROJ": str(proj)}
++    if flag is not None:
++        env["PRIVYHUB_N64"] = flag
++    r = subprocess.run([sys.executable, "-c", PLUGIN_CODE], cwd=ROOT, env=env, capture_output=True, text=True)
++    if r.returncode:
++        raise AssertionError(r.stderr[-1500:])
++    return json.loads(r.stdout.strip().splitlines()[-1])
++
++
++class Plugin(unittest.TestCase):
++    def setUp(self):
++        self.drive = tree({"one.z64": b"1", "one.v64": b"1", "two.v64": b"2"})
++        self.proj = tree({"games/snes/s.sfc": b"x"})
++        (self.proj / "runtime").mkdir()
++        (self.proj / "runtime/h3_p1_paths.txt").write_text(f"N64_DIR={self.drive}\n")
++
++    def test_absent_is_today(self):
++        out = run_plugin(None, self.proj)
++        self.assertEqual((out["n64_imported"], out["inplace_imported"], out["em_n64"]), (False, False, False))
++        self.assertNotIn("n64", out["systems"])
++        self.assertEqual([s for s, _, _ in out["scan"]], ["snes"])
++        self.assertEqual(out["catalog"], "EmulatorError")
++        self.assertEqual(run_plugin("0", self.proj), out)
++        self.assertEqual(run_plugin("yes", self.proj), out)
++
++    def test_with_the_flag_listed_in_place(self):
++        before = snapshot(self.drive)
++        out = run_plugin("1", self.proj)
++        self.assertTrue(out["n64_imported"] and out["em_n64"])
++        self.assertIn("n64", out["systems"])
++        self.assertEqual(out["scan"], [["n64", "n64/one.z64", "z64"], ["n64", "n64/two.v64", "v64"],
++                                       ["snes", "games/snes/s.sfc", "sfc"]])
++        self.assertEqual(out["ids"], ["n64", "n64", "snes"])
++        self.assertEqual(out["catalog"], ["n64", "", {}])
++        self.assertEqual(before, snapshot(self.drive))
++        self.assertFalse((self.proj / "games" / "n64").exists())
++
++
++# --- the launch: a fake RetroArch tree, a fake Popen, a fresh interpreter -------------------------------------
++
++LAUNCH_CODE = r"""
++import json, os, sys
++from pathlib import Path
++sys.path.insert(0, "companion")
++from games import emulator_manager as em
++import players_session as ps
++proj = Path(os.environ["B59_PROJ"])
++calls = []
++class FakePopen:
++    def __init__(self, cmd, **kw):
++        calls.append(list(cmd)); self.pid = 999999999; self.returncode = None; self.stdin = None
++    def poll(self): return self.returncode
++    def wait(self, timeout=None): self.returncode = 0; return 0
++em.subprocess.Popen = FakePopen
++em.time.sleep = lambda s: None
++em.EmulatorManager._wait_for_retroarch_command_ready = lambda self, *a, **k: {"fake": True}
++m = em.EmulatorManager(proj, config_path=Path("companion/games/config/emulators.json").resolve())
++game = json.loads(os.environ["B59_GAME"])
++joined = os.environ.get("B59_JOINED")
++kw = {"players_chosen": ps.ports_for_joined(int(joined))} if joined else {}
++out = {"em_n64": em._n64 is not None}
++try:
++    r = m.launch(game, **kw)
++    out["n64_session"] = r.get("n64_session")
++    out["ports_set"] = ps.ports_set(m, None)["ports_set"]
++except em.EmulatorError as exc:
++    out["error"] = str(exc)
++out["calls"] = calls
++cfg = proj / "data/games/retroarch/config"
++for name in ("privyhub-input.cfg", "privyhub-session.cfg"):
++    p = cfg / name
++    out[name] = p.read_text() if p.is_file() else None
++opt = Path(os.environ["XDG_CONFIG_HOME"]) / "retroarch/config/Mupen64Plus-Next/Mupen64Plus-Next.opt"
++out["opt"] = opt.read_text() if opt.is_file() else None
++logs = sorted((proj / "logs/games").glob("*.log")) if (proj / "logs/games").is_dir() else []
++out["log"] = logs[-1].read_text() if logs else ""
++print(json.dumps(out))
++"""
++
++
++def fake_project(drive: Path, cores=("mupen64plus_next_libretro.so", "bsnes_libretro.so", "snes9x_libretro.so")) -> Path:
++    files = {RA_EXE: b"#!/bin/false\n", "games/snes/made-up.sfc": b"s",
++             "data/games/retroarch/retroarch.cfg": 'config_save_on_exit = "false"\n'
++                                                   'joypad_autoconfig_dir = "data/games/retroarch/autoconfig"\n',
++             "data/games/retroarch/autoconfig/udev/x.cfg": 'input_device = "x"\n',
++             "runtime/h3_p1_paths.txt": f"N64_DIR={drive}\n"}
++    files.update({f"{CORES}/{c}": b"\x7fELF" for c in cores})
++    return tree(files)
++
++
++def run_launch(flag, proj, game, joined=None, xdg=None, extra=None):
++    xdg = xdg or Path(tempfile.mkdtemp(prefix="b59_xdg_"))
++    env = {"PATH": "/usr/bin:/bin", "B59_PROJ": str(proj), "B59_GAME": json.dumps(game), "XDG_CONFIG_HOME": str(xdg),
++           "HOME": str(xdg)}
++    if flag is not None:
++        env["PRIVYHUB_N64"] = flag
++    if joined is not None:
++        env["B59_JOINED"] = str(joined)
++    env.update(extra or {})
++    r = subprocess.run([sys.executable, "-c", LAUNCH_CODE], cwd=ROOT, env=env, capture_output=True, text=True)
++    if r.returncode:
++        raise AssertionError(r.stderr[-2500:])
++    return json.loads(r.stdout.strip().splitlines()[-1])
++
++
++N64_GAME = {"id": "game_n64_0123456789abcdef", "system": "n64", "title": "made-up", "relative_path": "n64/one.z64"}
++SNES_GAME = {"id": "game_snes_0123456789abcdef", "system": "snes", "title": "made-up",
++             "relative_path": "games/snes/made-up.sfc"}
++PORT = re.compile(r'network_cmd_port = "\d+"')
++
++
++class Launch(unittest.TestCase):
++    def setUp(self):
++        self.drive = tree({"one.z64": b"N64"})
++        self.proj = fake_project(self.drive)
++
++    def test_absent_is_todays_refusal_nothing_written(self):
++        for flag in (None, "0"):
++            out = run_launch(flag, self.proj, N64_GAME)
++            self.assertFalse(out["em_n64"])
++            self.assertEqual(out["calls"], [])
++            self.assertIn("No emulator profile configured for system: n64", out["error"])
++            self.assertIsNone(out["opt"])
++
++    def test_the_command_the_options_the_input_file_and_the_log(self):
++        before = snapshot(self.drive)
++        out = run_launch("1", self.proj, N64_GAME)
++        cmd = out["calls"][0]
++        self.assertEqual(cmd[1:3], ["--config", str((self.proj / "data/games/retroarch/config/privyhub-session.cfg")
++                                                     .resolve())])
++        self.assertEqual([a for a in cmd if a.startswith("--device=")],
++                         ["--device=1:1", "--device=2:1", "--device=3:1", "--device=4:1"])
++        self.assertEqual(cmd[-4:], ["--verbose", "-L", str((self.proj / CORES / "mupen64plus_next_libretro.so").resolve()),
++                                    str((self.drive / "one.z64").resolve())])
++        for k, v in n64.OPTIONS.items():
++            self.assertIn(f'{k} = "{v}"\n', out["opt"])
++        inp = out["privyhub-input.cfg"]
++        for i in range(1, 5):
++            self.assertIn(f'input_player{i}_analog_dpad_mode = "0"', inp)
++        self.assertNotRegex(inp, r"_(btn|axis) =")                                 # no remap binds
++        self.assertIn("N64 launch: core=mupen64plus_next ports=4\n", out["log"])
++        self.assertIn(f"N64 core options: {len(n64.OPTIONS)} keys (Mupen64Plus-Next)\n", out["log"])
++        self.assertEqual(out["n64_session"], {"core": "mupen64plus_next_libretro.so", "ports": 4,
++                                              "options_keys": len(n64.OPTIONS)})
++        self.assertEqual({k: out["ports_set"][k] for k in ("players", "multitap", "multitap_available")},
++                         {"players": 4, "multitap": False, "multitap_available": False})
++        self.assertEqual(before, snapshot(self.drive))
++
++    def test_four_ports_for_every_join_count(self):
++        for joined in (1, 2, 3, 4):
++            out = run_launch("1", self.proj, N64_GAME, joined=joined)
++            self.assertEqual([a for a in out["calls"][0] if a.startswith("--device=")],
++                             [f"--device={p}:1" for p in range(1, 5)], joined)
++            self.assertEqual(out["ports_set"]["players"], 4)
++
++    def test_the_options_merge_keeps_a_foreign_key(self):
++        xdg = Path(tempfile.mkdtemp(prefix="b59_xdg_"))
++        opt = xdg / "retroarch/config/Mupen64Plus-Next/Mupen64Plus-Next.opt"
++        opt.parent.mkdir(parents=True)
++        opt.write_text('mupen64plus-other = "kept"\nmupen64plus-rdp-plugin = "angrylion"\n')
++        out = run_launch("1", self.proj, N64_GAME, xdg=xdg)
++        self.assertIn('mupen64plus-other = "kept"\n', out["opt"])
++        self.assertIn('mupen64plus-rdp-plugin = "gliden64"\n', out["opt"])
++        self.assertNotIn("angrylion", out["opt"])
++
++    def test_another_core_by_name_no_options(self):
++        proj = fake_project(self.drive, cores=("parallel_n64_libretro.so",))
++        out = run_launch("1", proj, N64_GAME, extra={"PRIVYHUB_N64_CORE": "parallel_n64"})
++        self.assertTrue(out["calls"][0][-2].endswith("/parallel_n64_libretro.so"))
++        self.assertIsNone(out["opt"])
++        self.assertIn("N64 core options: none (parallel_n64)\n", out["log"])
++
++    def test_a_missing_core_or_folder_refuses(self):
++        proj = fake_project(self.drive, cores=("bsnes_libretro.so",))
++        out = run_launch("1", proj, N64_GAME)
++        self.assertEqual(out["calls"], [])
++        self.assertIn("N64 core not installed (fetch needed)", out["error"])
++        out = run_launch("1", self.proj, N64_GAME, extra={"PRIVYHUB_N64_CORE": "../x"})
++        self.assertEqual(out["calls"], [])
++        self.assertIn("N64 launch refused: PRIVYHUB_N64_CORE is not a core name", out["error"])
++        (self.proj / "runtime/h3_p1_paths.txt").write_text("")
++        out = run_launch("1", self.proj, N64_GAME)
++        self.assertEqual(out["calls"], [])
++        self.assertIn("N64 folder is not configured", out["error"])
++
++    def test_another_systems_launch_is_byte_for_byte_with_the_flag(self):
++        runs = []
++        for flag in (None, "1"):
++            out = run_launch(flag, self.proj, SNES_GAME, joined=2)
++            runs.append((out["calls"], PORT.sub("P", out["privyhub-input.cfg"]),
++                         PORT.sub("P", out["privyhub-session.cfg"]), out["opt"], "N64" in out["log"],
++                         out["n64_session"], out["ports_set"]))
++        self.assertEqual(runs[0], runs[1])
++        self.assertIsNone(runs[1][3])
++        self.assertFalse(runs[1][4])
++
++
++# --- the metric -------------------------------------------------------------------------------------------------
++
++def frames(per_second: list[int], fps: int = 60, y: float = 100.0) -> list[tuple[float, str, float]]:
++    """`per_second[i]` distinct pictures in second i, each held for an equal run of the 60 captured frames."""
++    out = []
++    for s, distinct in enumerate(per_second):
++        for f in range(fps):
++            idx = f * distinct // fps
++            out.append((s + f / fps, f"C{s}_{idx}", y))
++    return out + [(len(per_second) + 0.0, "END", y)]
++
++
++class Metric(unittest.TestCase):
++    def test_a_thirty_fps_title_is_not_a_hitch(self):
++        r = n64_frames.analyze(frames([30] * 20))
++        self.assertEqual((r["internal_fps"], r["hitch_seconds"], r["median_distinct_fps"]), (30, 0, 30))
++
++    def test_a_drop_below_five_sixths_is_a_hitch(self):
++        r = n64_frames.analyze(frames([30] * 18 + [20, 26]))
++        self.assertEqual(r["internal_fps"], 30)
++        self.assertEqual(r["hitch_at_s"], [18])                                  # 20 < 25; 26 is not
++        self.assertEqual(r["hitch_per_10min"], round(1 / (20 / 60) * 10, 2))
++
++    def test_twenty_and_sixty_and_the_beat(self):
++        self.assertEqual(n64_frames.analyze(frames([20] * 10 + [16]))["hitch_seconds"], 1)
++        f = frames([60] * 10)
++        f[30] = (f[30][0], f[29][1], f[30][2])                                   # one isolated repeat (the beat)
++        r = n64_frames.analyze(f)
++        self.assertEqual((r["internal_fps"], r["hitch_seconds"], r["min_distinct_fps"]), (60, 0, 60))
++
++    def test_black_seconds_excluded_and_the_given_rate(self):
++        f = [x if not 5 <= x[0] < 7 else (x[0], x[1], 10.0) for x in frames([30] * 10)]
++        r = n64_frames.analyze(f)
++        self.assertEqual((r["excluded_static_or_black_seconds"], r["kept_seconds"]), (2, 8))
++        self.assertEqual(n64_frames.analyze(frames([30] * 10), internal_fps=60)["hitch_seconds"], 10)
++
++    def test_the_cli_refuses_packed_rgb(self):
++        p = Path(tempfile.mkdtemp()) / "s.txt"
++        p.write_text("n:0 pts_time:0 fmt:bgr0 checksum:AA mean:[10]\n")
++        with self.assertRaises(ValueError):
++            quiet(n64_frames.main, [str(p)])
++
++
++# --- the keeper's label -----------------------------------------------------------------------------------------
++
++class Keeper(unittest.TestCase):
++    def test_an_n64_log_reads_its_core(self):
++        import diag_read
++        m = diag_read.GAME_LOG.match("20261108-210000-game_n64_0123456789abcdef.log")
++        self.assertIsNotNone(m)
++        self.assertEqual(diag_read.CORES.get(m.group(3)), "mupen64plus-next")
++        self.assertEqual(diag_read.CORES["ps1"], "beetle-psx-hw")
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tools/diag_read.py b/tools/diag_read.py
+index 72b4ef0..8930ef0 100644
+--- a/tools/diag_read.py
++++ b/tools/diag_read.py
+@@ -86,7 +86,7 @@ def pcsx2_events(name: str, data: bytes) -> list[tuple[datetime, str]]:
+ TAGS = {"04ff": "PS1 platformer", "ee3b": "SNES action-adventure", "2ef9": "PS1 first-person RPG",
+         "3699": "PS1 football (Blitz)", "7bf5": "PS1 brawler", "6d53": "PS1 kart racer", "33df": "PS1 golf",
+         "9f2b": "PS1 hockey A", "e2cd": "PS1 hockey B"}
+-CORES = {"snes": "snes9x", "ps1": "beetle-psx-hw"}
++CORES = {"snes": "snes9x", "ps1": "beetle-psx-hw", "n64": "mupen64plus-next"}   # B59: an N64 launch's log
+ 
+ # the log names (as in logs/games/ or logs/) the reader uses
+ LOGS = {"rec": "native_stream_recovery.log", "lad": "adaptive_bitrate_shadow.jsonl", "hb": "native_stream_heartbeat.log",
+diff --git a/tools/n64_core_check.py b/tools/n64_core_check.py
+new file mode 100644
+index 0000000..6a079b4
+--- /dev/null
++++ b/tools/n64_core_check.py
+@@ -0,0 +1,55 @@
++#!/usr/bin/env python3
++"""B59: is the N64 core in place? -- "bundled" (in RetroArch's cores folder) or "fetch needed". Looks only: no network,
++the core is never loaded or run. With --keys: the core-options keys B59 writes, found / missing as byte strings in the
++installed core (A runs this after the fetch, before the first launch; a missing key is inert -- the core default runs).
++
++    python3 tools/n64_core_check.py [--keys] [--core mupen64plus_next] [--root <repo>]
++
++Prints one JSON object (no path outside the repo, no title). Exit 0 bundled, 3 fetch needed, 4 a key missing.
++Design: docs/memory/evidence/b59_2026-11-08/design_written_before_code.md.
++"""
++
++from __future__ import annotations
++
++import argparse
++import json
++import os
++import sys
++from pathlib import Path
++
++REPO = Path(__file__).resolve().parents[1]
++sys.path.insert(0, str(REPO / "companion"))
++
++import n64_session  # noqa: E402  (imported directly: the check needs no flag and changes nothing)
++
++FETCH_HINT = ("A, with the user's go: the core's zip from the libretro buildbot for this RetroArch "
++              "(stable/<version>/linux/x86_64/ if it lists per-core files, else nightly/linux/x86_64/latest/), "
++              "unzipped into " + n64_session.CORES_DIR + "/, the zip's and the .so's sha256 recorded")
++
++
++def main(argv: list[str] | None = None) -> int:
++    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
++    ap.add_argument("--keys", action="store_true", help="check the option keys in the installed core")
++    ap.add_argument("--core", default=None, help="a core name (default: PRIVYHUB_N64_CORE, else mupen64plus_next)")
++    ap.add_argument("--root", type=Path, default=REPO)
++    a = ap.parse_args(argv)
++    env = dict(os.environ)
++    if a.core is not None:
++        env[n64_session.CORE_ENV] = a.core
++    out = n64_session.presence(a.root, env)
++    code = 0 if out["state"] == "bundled" else 3
++    if code:
++        out["next"] = FETCH_HINT
++    elif a.keys:
++        core = Path(a.root) / n64_session.CORES_DIR / out["core"]
++        if n64_session.options_library(out["core"]) is None:
++            out["keys"] = {"found": [], "missing": [], "note": "no options written for this core"}
++        else:
++            out["keys"] = n64_session.keys_in_core(core)
++            code = 4 if out["keys"]["missing"] else 0
++    print(json.dumps(out, indent=1))
++    return code
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/tools/n64_frames.py b/tools/n64_frames.py
+new file mode 100644
+index 0000000..50489a1
+--- /dev/null
++++ b/tools/n64_frames.py
+@@ -0,0 +1,109 @@
++#!/usr/bin/env python3
++"""B59: the N64 frame metric -- distinct frames per second against the title's own internal rate, and the hitch rate.
++
++The stream carries 60 frames a second whatever an N64 title draws (x11grab at a fixed 60, `-r 60`), so UX-R3's R rule
++(rendered < 50 fps) never fires on a title that draws 20 or 30 frames, and it does not see the title's own slowdowns.
++This tool reads the title's drawn frames from a capture of the RetroArch window:
++
++- **distinct frames per second** (a frame differing from the one before), static / black seconds excluded as H3's P2
++  (`ps2_p2_frames`: >= 90 % near-black, or <= 2 distinct);
++- **the internal rate:** the most common distinct count of the kept seconds, snapped to 20 / 30 / 60 (or
++  `--internal-fps`); at 60 one isolated repeat per second is forgiven (the 59.94-Hz beat), as P2's;
++- **a hitch second:** a kept second with distinct frames < 5/6 of the internal rate (UX-R3's 50-of-60, scaled:
++  < 50 at 60, < 25 at 30, < 17 at 20); **the hitch rate** per 10 min, to set beside the stream's UX-R3 hitch rate
++  (`tools/diag_read.py`) and a PS1 session's.
++
++The input is ffmpeg's `showinfo` log of the capture with every frame, YUV first:
++
++    ffmpeg -f x11grab -framerate 60 -window_id <wid> -t 600 -i :0 -vf format=yuv420p,showinfo -f null - 2> showinfo.txt
++
++    python3 tools/n64_frames.py showinfo.txt [--internal-fps 30] [--json out.json]
++
++Prints numbers only (no path, no title). Design: docs/memory/evidence/b59_2026-11-08/design_written_before_code.md.
++"""
++
++from __future__ import annotations
++
++import argparse
++import json
++import statistics
++import sys
++from collections import Counter
++from pathlib import Path
++
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import ps2_p2_frames as _p2  # noqa: E402  (the showinfo parser and the static / black rule)
++
++RATES = (20, 30, 60)
++HITCH_SHARE = 5 / 6
++
++
++def snap(n: float) -> int:
++    return min(RATES, key=lambda r: (abs(r - n), -r))
++
++
++def analyze(frames: list[tuple[float, str, float]], internal_fps: int | None = None) -> dict:
++    if not frames:
++        return {"frames": 0, "error": "no frames"}
++    t0 = frames[0][0]
++    n = len(frames)
++    repeat = [i > 0 and frames[i][1] == frames[i - 1][1] for i in range(n)]
++    single = [repeat[i] and (i == 0 or not repeat[i - 1]) and (i + 1 >= n or not repeat[i + 1]) for i in range(n)]
++    seconds: dict[int, dict] = {}
++    for i, (t, _, y) in enumerate(frames):
++        s = seconds.setdefault(int(t - t0), {"frames": 0, "distinct": 0, "singles": 0, "black": 0})
++        s["frames"] += 1
++        if not repeat[i]:
++            s["distinct"] += 1
++        elif single[i]:
++            s["singles"] += 1
++        if y <= _p2.BLACK_Y:
++            s["black"] += 1
++    last = max(seconds)
++    full = {k: v for k, v in seconds.items() if k < last} or seconds   # the partial last second dropped
++    excluded = sorted(k for k, v in full.items()
++                      if v["black"] >= _p2.BLACK_SHARE * v["frames"] or v["distinct"] <= _p2.STATIC_UNIQUE)
++    kept = {k: v for k, v in full.items() if k not in excluded}
++    if not kept:
++        return {"frames": n, "seconds": len(full), "error": "every second static or black",
++                "excluded_static_or_black_seconds": len(excluded)}
++    mode = Counter(v["distinct"] for v in kept.values()).most_common(1)[0][0]
++    rate = int(internal_fps) if internal_fps else snap(mode)
++    # the 59.94-Hz beat: one isolated repeat per second counted as distinct, at 60 only
++    counted = {k: v["distinct"] + (1 if rate == 60 and v["singles"] else 0) for k, v in kept.items()}
++    bar = rate * HITCH_SHARE
++    hitches = sorted(k for k, c in counted.items() if c < bar)
++    minutes = len(kept) / 60.0
++    return {
++        "frames": n,
++        "seconds": len(full),
++        "kept_seconds": len(kept),
++        "excluded_static_or_black_seconds": len(excluded),
++        "internal_fps": rate,
++        "internal_fps_source": "given" if internal_fps else "mode",
++        "distinct_mode": mode,
++        "median_distinct_fps": statistics.median(counted.values()),
++        "min_distinct_fps": min(counted.values()),
++        "hitch_bar_lt": round(bar, 2),
++        "hitch_seconds": len(hitches),
++        "hitch_at_s": hitches[:30],
++        "hitch_per_10min": round(len(hitches) / minutes * 10, 2) if minutes else None,
++    }
++
++
++def main(argv: list[str] | None = None) -> int:
++    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
++    ap.add_argument("showinfo", type=Path)
++    ap.add_argument("--internal-fps", type=int, choices=RATES, default=None)
++    ap.add_argument("--json", type=Path, default=None)
++    a = ap.parse_args(argv)
++    result = analyze(_p2.parse(a.showinfo.read_text(errors="replace")), a.internal_fps)
++    text = json.dumps(result, indent=1)
++    if a.json:
++        a.json.write_text(text + "\n")
++    print(text)
++    return 0 if result.get("frames") and "error" not in result else 2
++
++
++if __name__ == "__main__":
++    sys.exit(main())

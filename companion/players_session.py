@@ -84,7 +84,8 @@ def ports_set(emulator: Any, game_status: dict[str, Any] | None) -> dict[str, An
     try:
         session = getattr(emulator, "_players_session", None)
         # B54: a hold-to-join launch (`join`) and a mid-session relaunch (`relaunch`) are plans too
-        if isinstance(session, dict) and session.get("source") in ("launch", "join", "relaunch"):
+        # B59: an N64 launch's four ports are a plan too (`n64`; reached only with PRIVYHUB_N64=1)
+        if isinstance(session, dict) and session.get("source") in ("launch", "join", "relaunch", "n64"):
             return {"ports_set": {k: session[k] for k in ("players_chosen", "ports", "multitap", "multitap_available",
                                                           "source")} | {"players": int(session["ports"])}}
         game = getattr(emulator, "active_game", None) or (game_status or {}).get("game") or {}

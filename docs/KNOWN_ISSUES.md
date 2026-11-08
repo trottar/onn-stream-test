@@ -56,6 +56,34 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
 
+## 2026-11-08 Queue V (B59-B60): N64 through RetroArch built behind `PRIVYHUB_N64=1`; the GameCube probe designed — OPEN (the core's fetch, the user's go; A's HOME-7+N64 C21-C23; H2-P1)
+
+(`docs/memory/evidence/B59_N64_LAUNCH_2026-11-08.md`, `docs/memory/architecture/H2_P1_GAMECUBE_PROBE_DESIGN_2026-11-08.md`;
+no APK)
+
+- **B59 is not live until the core exists.**
+  - No N64 core is on the hub, and the RetroArch AppImage bundles none: `tools/n64_core_check.py` reads "fetch
+    needed".
+  - The fetch (`mupen64plus_next_libretro.so` from the libretro buildbot, the sha256 recorded) is A's, with the
+    user's go.
+  - With the flag but no core, the onn lists N64 and every launch refuses, so the bench drop-in goes on only after
+    the core.
+- **Recalled, not yet read on the hub:**
+  - Mupen64Plus-Next's core-option key names (`--keys` checks them on the fetched file; a wrong one is inert);
+  - its default pad mapping (A on south, B on west, the C-buttons on the right stick, Z on the left trigger);
+  - the R2 face-button C mode;
+  - the size of an N64 save state.
+- **N64 always has four ports** (no "Setting up 4 players…"). A title that shows the plugged controllers shows four.
+- **The stream's fixed 60-fps capture hides an N64 title's own frame rate:** UX-R3's R rule never fires on a 20-30 fps
+  title. `tools/n64_frames.py` measures the title's drawn frames against its internal rate instead.
+- **B60 (design only):** Dolphin is not on the hub, Flatpak is absent, and Debian 13's `dolphin-emu` 2503 lacks 10 of
+  its 44 dependencies. The rootless way is an upstream AppImage if one exists, else the Debian packages extracted into
+  `runtime/`. The user's own `sudo apt install dolphin-emu` is the alternative. Nothing fetched.
+- **IMPORT-2 (NES / Genesis from the drive) is DEFERRED by the user** (2026-11-08); its handoff stays written in
+  `handoffs/SESSION_B_DONE_2026-11-08U.md`, not run.
+- **For the user — leftovers, not deleted:** `/tmp/b_q14v_{base,b59,scratch}` (~25 MB); `~/.cache/b_q14v_tmp/` (the
+  other host suites' temp; this queue's suite cleans up).
+
 ## 2026-11-08 Queue U (B57-B58): the PS2 multitap relaunch through PINE; import slice 1b — OPEN (A's HOME-7 C20 / C19; IMPORT-2 later)
 
 (`docs/memory/evidence/B57_PS2_RELAUNCH_STATE_2026-11-08.md`, `…/B58_IMPORT_SLICE_1B_2026-11-08.md`; no APK)
