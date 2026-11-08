@@ -1,0 +1,12 @@
+C15 reads at the user's "Stage 2" (21:58Z; a two-player PS1 title, T1 — not named; launch 21:57:06Z, "PS1 multitap: off")
+the start: native-stream-start with pad_slots (empty: the first start after the install, no pad pressed yet) & player_prompt=1; no start pad_slots row (empty map, as at HOME-4+'s first start) — B's "start row join hold, players_joined 0" not written for that reason (disclosed)
+session_started 21:57:21.881Z; NO change row before the hold (the tap claimed nothing)
+change 21:57:47.118Z: slot 0 padA P1 prompt, join "hold", players_joined 1
+change 21:57:51.171Z: + slot 1 padB P2 prompt, join "hold", players_joined 2
+heartbeats: join "hold" and players_joined 1 -> 2 after the joins; updates_by_player [2, 0, 0, 0] at 21:58:31 (little play yet); packets on all four
+relaunch_ports rows in the log: 0
+ports_set: in the exit report (read at the user's Stop)
+the user's line: "Stage 2"
+
+at the exit (21:59:04 Back / Stop): the report players 2, players_joined 2, pad_claims slots 0 / 1 prompt, ports_set players 2 multitap false source metadata, relaunches count 0
+updates_by_player after 21:58:31 not readable: the heartbeat log is rewritten at the next start (17:00 local) and the keeper's copies hold no row of 21:57-21:59 — slot 1's movement not shown on the hub (disclosed); the user's line covers the play only as "Stage 2"

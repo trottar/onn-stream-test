@@ -1,0 +1,15 @@
+C17 — the multitap at once (T1 again, launch 22:01:30Z; PS1 multitap off at the launch)
+joins: change 22:02:23.268 P1 prompt joined 1; 22:02:25.278 + P2 joined 2 (a pre-session row 22:01:32.646 P1 joined 1, no claimed_by, before session_started 22:01:36 — the stale carry-over again)
+the third pad's hold -> POST native-stream-relaunch-ports players=4 players_joined=2
+relaunch_ports 22:02:32.911Z: ok true, state loaded, kind retroarch, players 4, landed_ports 4, total_ms 4318, within_budget true; steps_ms save 286, stream_stop 902, stop 235, launch 623, resume 16, settle 1000, load 138, pause_after 91, stream_start 1019
+ports_set 22:02:32.911Z: source relaunch, players 4, ports 4, multitap true, players_chosen 4
+the relaunch's game log: "PS1 multitap: port1"; RetroArch "[State] Loading state" (the relaunch save) ; Autoconf P1-P4 in ports 1-4
+native-stream-ready 22:02:35 (HTTP log second) -> the time: start (22:02:32.911 - 4.318 s = 22:02:28.59) to the ready ~6.4 s (budget 15 s); the user's count: not given
+change 22:02:33.376: + P3 (padC) prompt, players_joined 3
+heartbeats after: players_joined 3; updates_by_player [14, 18, 12, 0] by 22:04:26 (slot 1 and slot 2 changes reach the hub)
+22:03:52.065 slot 1 (P2) released, 22:03:54.086 P2 re-joined (the user re-joining pad 2)
+the user's line (verbatim): "Stage 4, game paused to initiate more players and hold to add 4 as expected" / "Player 2 buttons not working now"
+reading: the pause, "Setting up 4 players…", the resume and P3 as B wrote; BUT player 2 does not respond in the game after the relaunch, although pad 2's changes reach the hub (slot 1 updates rising) and RetroArch maps P2 to port 2. A likely cause for B: the state loaded into the 4-port (multitap) console carries the game's 2-port controller setup from before, so the game reads player 2 where the multitap moved it. Diagnostic asked: the next launch (stored count 3 -> multitap from boot), does player 2 work?
+
+the diagnostic (asked): T1 relaunched 22:05:38Z with the stored count -> "PS1 multitap: port1" from boot; P1 / P2 joined by hold (22:05:48 / 22:05:50, players_joined 2); the user (verbatim): "Player 2 still doesn't work (has worked in the past for this game as you know)"
+  -> player 2 fails whenever T1 runs with the port-1 multitap (from boot as after the relaunch), not only after a loaded state; with the multitap off (C7 at HOME-4+, C15 here) player 2 worked. For B: T1 reads player 2 from port 2 when the multitap is in; the multitap-at-once (B54) and the stored count 3 now start T1 with the multitap every time, so player 2 stays broken on T1 until the stored count is reset (a client-side value on the onn) or B changes the rule.

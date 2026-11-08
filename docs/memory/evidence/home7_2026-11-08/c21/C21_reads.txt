@@ -1,0 +1,9 @@
+C21 — the first N64 title from the onn (2026-11-08 22:24-22:27Z; T5, the first title in the list, not named)
+the list: "Nintendo 64 (13)" (the host's list; the user: "13 games")
+launch 22:24:54Z; the game log: "Core: mupen64plus_next_libretro.so", "N64 launch: core=mupen64plus_next ports=4", "N64 core options: 12 keys (Mupen64Plus-Next)"
+RetroArch: the core loaded (libretro API 1; geometry 320x240, 60 fps, 44100 Hz); "[Video] Using HW render, glcore driver forced"; GLCore context 3.3 on radeonsi (Mesa 25.0.7, GL 4.6 core); "Initializing HW render (512x512)"; Autoconf P1-P4 in ports 1-4; the only [ERROR] line "[Wayland] Failed to connect to Wayland server." (RetroArch's probe before X11; the display found "x11"); no core error. GLideN64's own init line is not printed by this core build: the HW GL render initialised is the reading (disclosed)
+the start payload's players_session.device_args: not in a log; read from RetroArch's command line at the next launch (C22)
+pad_slots: start 22:24:56.915 (3 pads, no labels); a pre-session change 22:24:57.337 (P1-P3, joined 3, no claimed_by — the previous PS2 session's carry-over, as at C16 / C17); session_started 22:25:01.109; change 22:25:01.486 P1 prompt joined 1; 22:25:03.513 + P2 joined 2; no relaunch_ports row; no "Setting up 4 players…"
+the exit (22:27:00): report players 2, players_joined 2, ports_set players 4, multitap false, multitap_available false, source n64; relaunches count 0
+the user's line (verbatim): "Stage 8" / "13 games" / "Felt good to play, no issues" — the mapping (stick, A, B, C-buttons, Z) with no issue named: nothing to B61 from the mapping
+native-stream-ready: logged once 22:24:50-22:25:10 (the HTTP log)

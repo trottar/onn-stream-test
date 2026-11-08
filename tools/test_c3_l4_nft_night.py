@@ -264,11 +264,11 @@ class OnlySubset(unittest.TestCase):
 
 
 class AdoptedApk(unittest.TestCase):
-    """HOME-4+ (2026-11-08: queue O's APK CONFIRMED; HOME-3 (2026-11-07: queue N's), HOME-2 (2026-11-06: queue M's), TRIP-PREP (2026-10-29: CL-B14's APK back, the loss guard out) and CL-B16, CL-B15, CL-B14, CL-B13, CL-B12, CL-B11, CL-B10, BENCH-R3, BENCH-R2, CL-B7, CL-B5, CL-B4, CL-B3, CL-B2 and CL-B1 before it): the preflight checks the CONFIRMED APK."""
+    """HOME-7 (2026-11-08: queue T's APK CONFIRMED; HOME-4+ (2026-11-08: queue O's), HOME-3 (2026-11-07: queue N's), HOME-2 (2026-11-06: queue M's), TRIP-PREP (2026-10-29: CL-B14's APK back, the loss guard out) and CL-B16, CL-B15, CL-B14, CL-B13, CL-B12, CL-B11, CL-B10, BENCH-R3, BENCH-R2, CL-B7, CL-B5, CL-B4, CL-B3, CL-B2 and CL-B1 before it): the preflight checks the CONFIRMED APK."""
 
-    def test_the_preflight_expects_the_home4_queue_o_apk(self):
+    def test_the_preflight_expects_the_home7_queue_t_apk(self):
         self.assertEqual(h.ADOPTED_APK_SHA256,
-                         "cfe0211ca36071901a8be3ea9f77855109cd957c3950903669997d6a0b10a65f")
+                         "9aa00ba2afe19a7f36b869454d7d5e683185dc97fc116cc6f8f75878bc5fe73f")
 
 
 

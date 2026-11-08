@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-08
-baseline_commit: 017153b6 (queue T; IMPORT-1 uncommitted beside it; the user commits)
+baseline_commit: 32abb425 (queue V; HOME-7+N64 and G-A15 uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -13,19 +13,19 @@ Headings are fixed by `tools/check_memory_health.py`; do not rename. The history
 
 **Phase H OPEN — H3 (PS2) first** by the user's decision (2026-11-07), then H0 (import), then H1 / H2. **The G track
 CLOSED at its checkpoint 2026-11-07** (ROADMAP §G9: 9 met, 3 deferred, 2 open; `evidence/G9_CHECKPOINT_2026-11-07.md`).
-Phase E stays ACTIVE (E1 FROZEN, E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **SIXTEEN lines**; the sixteenth
-is G-A14, `PRIVYHUB_PS2=1`, on the user's "PS2 always on — yes" (`evidence/HOME_6_PS2_LOAD_2026-11-08.md`); **H3
-feasibility CLOSED**. APK `cfe0211c…` CONFIRMED (HOME-4+).
+Phase E stays ACTIVE (E1 FROZEN, E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **SEVENTEEN lines**; the
+seventeenth is G-A15, `PRIVYHUB_N64=1` (`evidence/HOME_7_HOLD_TO_JOIN_N64_2026-11-08.md`); H3 feasibility CLOSED.
+APK `9aa00ba2…` CONFIRMED (HOME-7).
 
 ## Current Work Item
 
-- **IMPORT-1 done, uncommitted** (`evidence/IMPORT_1_2026-11-08.md`): 72 PS1 titles on the drive, all DUPLICATE, 0
-  placed; no PS1 BIOS there; the drive untouched. Bench drop-in `b56-import.conf` on (17 lines live) until HOME-7 C19.
+- **HOME-7+N64 done, uncommitted** (`evidence/HOME_7_HOLD_TO_JOIN_N64_2026-11-08.md`): `9aa00ba2…` CONFIRMED; PS2
+  C18 / C20 met; N64 C21 / C22 met, C23 not met (Home freeze, a title's buttons); **G-A15 adopted** (seventeen lines).
 
 ## Verified State
 
-**The sixteen adopted lines.** Each one is its own drop-in under
-`~/.config/systemd/user/privyhub-companion.service.d/`. `tools/e1_suite.py` `ADOPTED` lists the same sixteen, and
+**The seventeen adopted lines.** Each one is its own drop-in under
+`~/.config/systemd/user/privyhub-companion.service.d/`. `tools/e1_suite.py` `ADOPTED` lists the same seventeen, and
 `e3_state.py --check` reads them back.
 
 | # | Line | Drop-in | Gate (record) |
@@ -46,19 +46,19 @@ feasibility CLOSED**. APK `cfe0211c…` CONFIRMED (HOME-4+).
 | 14 | `PRIVYHUB_STEP_IN_PLACE=1` | `step-in-place.conf` | G-A10 (`G_A10_…_2026-11-02`) |
 | 15 | `PRIVYHUB_VOD_LOG=1` | `vod-log.conf` | G-A13 host (`G_A13_…_2026-11-07`) |
 | 16 | `PRIVYHUB_PS2=1` | `ps2.conf` | G-A14 (`HOME_6_…_2026-11-08`) |
+| 17 | `PRIVYHUB_N64=1` | `n64.conf` | G-A15 (`HOME_7_…_2026-11-08`) |
 
 Records under `evidence/`. Line 10 implies the input hold, B6, B8, the `state` path, the stall signal and resume (B33
 live inside it); line 13 acts only on a remote-class session (floor start and climb, remote ladder, 7000 cap, WAN
 telemetry; the LAN as before); line 14 splices each ladder step onto the same stream at one IDR (2-s fallback);
-line 15 writes one redacted row per movie range request and a retrying client's rows; line 16 offers PS2 (PCSX2).
+line 15 writes one redacted row per movie range request and a retrying client's rows; line 16 offers PS2 (PCSX2); line 17 N64 (RetroArch).
 **The off switch, every line:** delete its drop-in, `systemctl --user daemon-reload`, restart the companion, and take
 the name out of `tools/e1_suite.py` `ADOPTED`. Each record names its exceptions; `docs/REMOTE_TRUST.md` has the G lines.
 
 **The client.**
-- APK **`cfe0211c…` is CONFIRMED** on the onn (HOME-4+; queue O: queue N + B46 + B47; `home4_installed/`), pinned in
-  the three places. On by default: the hold and stable slots (G-A11 / G-A12), the player chooser (B46) and the movie
-  retry (B47); `0` / `off` give the old behaviour.
-- `8ba4d996…` (HOME-3, the previous CONFIRMED) is kept in `home3_installed/`; `0132b944…` in `home2_installed/`.
+- APK **`9aa00ba2…` is CONFIRMED** on the onn (HOME-7; queue T: queue O + B54 hold-to-join; `home7_installed/`), pinned
+  in the three places. On by default: the hold and stable slots, hold-to-join (B54), the movie retry (B47).
+- `cfe0211c…` (HOME-4+, the previous CONFIRMED) is kept in `home7_previous/`.
 - The eleven client properties are empty. One device is paired, with `identity_v2` on.
 
 **Units.** `privyhub-companion` and `privyhub-diag` are running. `privyhub-diag` is the B36 keeper:
@@ -85,11 +85,11 @@ redundancy 2/4 (`P10`); the live ladder's top 7000; the PS1 source 1920×1080 at
 
 ## Next Action
 
-1. **The user's commit** of IMPORT-1 (`logs/import1_git_status.txt`).
-2. **A: HOME-7** at the TV (`handoffs/SESSION_B_DONE_2026-11-08T.md` §A: APK `9aa00ba2…`, C15-C18) + **C19**, the onn
-   check of the import (the list's marks, "(OpenBIOS)", a PS1 title under the flag); then the bench flag's fate.
-3. **B: queue U** — the PS2 relaunch through B55's slot; the `.gitignore` line for `PrivyHub-Import/`; slice 1b (a plain
-   source folder, the other systems). **Open:** the drive read-ahead; a heavy PS2 title's long play; G-A8.
+1. **The user's commit** of HOME-7+N64 and G-A15 (`logs/home7_git_status.txt`), and the two answers: one entry per
+   multi-disc PS1 game (yes / no); Dolphin for the GameCube probe (yes / no).
+2. **B: B61** — the GameCube launch kind after H2-P1; the N64 fixes (the Home-hold freeze, a title's mapping); PS1
+   player 2 under the multitap; the multi-disc `.m3u` on the user's word.
+3. **A: H2-P1** (Dolphin) on the user's go. **Open:** the drive read-ahead; a heavy PS2 title's long play; G-A8.
 
 **Open, not blocking** — the full list is `docs/KNOWN_ISSUES.md`'s open index: G8-S6 and G5-S2-L (`handoffs/QUEUE_2026-10-19N.md`,
 never run); the nightly watch's nights not written up; the overlay-down local check never scored; the reconnect over
@@ -106,7 +106,7 @@ Phase C: met (C7, `docs/ROADMAP.md`). **Phase E** (`docs/ROADMAP.md`):
   table, which must stay met.
 - No perceptual gate unless the user sets one.
 
-**The G adoption rule** (G-A1 … G-A14): a line is adopted only on the user's word, after a pre-registered, hashed
+**The G adoption rule** (G-A1 … G-A15): a line is adopted only on the user's word, after a pre-registered, hashed
 confirmation window with every row met, through its own drop-in, with `--check` ok on the new count. An APK is
 CONFIRMED only by its pre-registered rule (CL-B7 §6); otherwise the previous CONFIRMED goes back on.
 
@@ -142,7 +142,7 @@ CONFIRMED only by its pre-registered rule (CL-B7 §6); otherwise the previous CO
 
 - G adoptions: `evidence/G_A1_…`, `G_A2_…`, `G_A3_…`, `G_A4_…`, `G_A5_…`, `G_A7_…`, `TRIP_PREP_2026-10-29.md` (G-A9),
   `G_A10_…_2026-11-02.md`, `G_A13_…_2026-11-07.md`, `G9_CHECKPOINT_2026-11-07.md`; `docs/REMOTE_TRUST.md`. Client / trip: `CL_B14_…` (`fcd924c2…`), `CL_B16_…`, `TRIP_R2_…`,
-  `HOME_1_…`, `HOME_2_…`, `HOME_3_…`, `HOME_4_PLUS_…`, `HOME_5_…`, `HOME_6_…`, `IMPORT_1_…`, queue N's `B41_…` / `B42_…` / `B43_…` and `handoffs/SESSION_B_DONE_2026-11-06N.md`.
+  `HOME_1_…`, `HOME_2_…`, `HOME_3_…`, `HOME_4_PLUS_…`, `HOME_5_…`, `HOME_6_…`, `IMPORT_1_…`, `HOME_7_…`, queue N's `B41_…` / `B42_…` / `B43_…` and `handoffs/SESSION_B_DONE_2026-11-06N.md`.
 - Closers: `evidence/E4_CLOSEOUT_2026-10-15.md`, `E2_S1_…`, `E1_S1_…`, `C5_CLOSE_2026-10-05.md`,
   `D_BASE_CLOSEOUT_2026-09-23.md`; `architecture/E1_WORKLOAD_SUITE.md`.
 - Indexes: `handoffs/README.md`, `patches/PATCH_INDEX.md`, `archive/INDEX.md`; `docs/ROADMAP.md`, `docs/KNOWN_ISSUES.md`,

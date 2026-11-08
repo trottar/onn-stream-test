@@ -88,7 +88,10 @@ PKG = "com.safeiot.privyhub"
 # HOME-4+ (installed 2026-11-08, CONFIRMED 2026-11-08): queue O's APK (queue N + B46 + B47; the player chooser and the
 # movie retry on by default, `0` / `off` today's; all eleven properties empty); the previous CONFIRMED APK was
 # 8ba4d996... (HOME-3), kept at home3_installed/
-EXPECT_APK = "cfe0211ca36071901a8be3ea9f77855109cd957c3950903669997d6a0b10a65f"
+# HOME-7 (installed 2026-11-08, CONFIRMED 2026-11-08): queue T's APK (queue O + B54 hold-to-join and the multitap at
+# once); C15 / C16 / C17 met with every property empty; the previous CONFIRMED APK was cfe0211c... (HOME-4+), kept at
+# home7_previous/
+EXPECT_APK = "9aa00ba2afe19a7f36b869454d7d5e683185dc97fc116cc6f8f75878bc5fe73f"
 LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
 # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
 # is exactly these two names, at every precondition and teardown
@@ -146,8 +149,14 @@ VOD_LOG = "PRIVYHUB_VOD_LOG=1"
 # 2" entry in the games list -- the user's "PS2 always on -- yes" -- through its own drop-in (ps2.conf); the adopted
 # environ is exactly these sixteen names
 PS2 = "PRIVYHUB_PS2=1"
+# G-A15 (adopted 2026-11-08, the user): the N64 launch kind -- RetroArch with mupen64plus_next (the core fetched on the
+# user's go), four ports from the start, hold-to-join, the "Nintendo 64" entry from the drive's N64 folder (read in
+# place), SAVE / LOAD through RetroArch (B59; HOME-7 C21 / C22) -- the user's "Yes keep on" with C23's Home-hold freeze
+# and a title's mapping open (B61) -- through its own drop-in (n64.conf); the adopted environ is exactly these
+# seventeen names
+N64 = "PRIVYHUB_N64=1"
 ADOPTED = sorted([LIVE, INDEX, SNES_CORE, RECOVERY, SNES_CAPTURE, OVERLAY, IDENTITY, AUDIO_CODEC, LINK_REPORT,
-                  LINK_RECOVERY, RESTART_FAST, RESTART_FAST_UNLOCK, REMOTE, STEP_IN_PLACE, VOD_LOG, PS2])
+                  LINK_RECOVERY, RESTART_FAST, RESTART_FAST_UNLOCK, REMOTE, STEP_IN_PLACE, VOD_LOG, PS2, N64])
 FLAG_NAMES = ["PRIVYHUB_ADAPTIVE_BITRATE_INJECT", "PRIVYHUB_ADAPTIVE_BITRATE_TOP", "PRIVYHUB_PS1_LOOK",
               "PRIVYHUB_NATIVE_PROFILE_ID", "PRIVYHUB_FEC_SCHEME"]
 RA_CFG = Path.home() / ".config/retroarch/config"
@@ -1055,12 +1064,13 @@ def preflight() -> dict:
          "drop_in_step_in_place": f"Environment={STEP_IN_PLACE}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_vod_log": f"Environment={VOD_LOG}" in sh(["systemctl", "--user", "cat", UNIT]),
          "drop_in_ps2": f"Environment={PS2}" in sh(["systemctl", "--user", "cat", UNIT]),
+         "drop_in_n64": f"Environment={N64}" in sh(["systemctl", "--user", "cat", UNIT]),
          "e3_dropin_absent": not DROPIN.exists(), "e4_constraint_absent": not E4_DROPIN.exists()}
     d["ok"] = (d["manager"] == [] and d["environ"] == ADOPTED and d["adb"] and d["drop_in_live"] and d["drop_in_index"]
                and d["drop_in_snes_core"] and d["drop_in_recovery"] and d["drop_in_snes_capture"] and d["drop_in_overlay"]
                and d["drop_in_identity"] and d["drop_in_audio_codec"] and d["drop_in_link_report"]
                and d["drop_in_link_recovery"] and d["drop_in_restart_fast"] and d["drop_in_restart_fast_unlock"]
-               and d["drop_in_remote"] and d["drop_in_step_in_place"] and d["drop_in_vod_log"] and d["drop_in_ps2"]
+               and d["drop_in_remote"] and d["drop_in_step_in_place"] and d["drop_in_vod_log"] and d["drop_in_ps2"] and d["drop_in_n64"]
                and d["e3_dropin_absent"] and d["e4_constraint_absent"])
     return d
 

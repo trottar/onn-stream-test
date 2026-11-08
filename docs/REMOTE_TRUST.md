@@ -1,6 +1,6 @@
 # PrivyHub remote trust (G0)
 
-> **Superseded (2026-11-03):** the status below is G0's (2026-10-15). Since then G-A1 … G-A10, G-A13 (host) and G-A14 (PS2, 2026-11-08) adopted lines: the adopted environ is sixteen lines (fifteen until G-A14) (`tools/e1_suite.py` `ADOPTED`), §4-§6 and §8 are in force, and §8a-§17 record each adoption with its off switch (G-A6 shelved, G-A8 never applied) — see docs/memory/CURRENT.md.
+> **Superseded (2026-11-03):** the status below is G0's (2026-10-15). Since then G-A1 … G-A10, G-A13 (host), G-A14 (PS2) and G-A15 (N64, 2026-11-08) adopted lines: the adopted environ is seventeen lines (sixteen until G-A15) (`tools/e1_suite.py` `ADOPTED`), §4-§6 and §8 are in force, and §8a-§18 record each adoption with its off switch (G-A6 shelved, G-A8 never applied) — see docs/memory/CURRENT.md.
 
 **Status: G0 written 2026-10-15 (G1-S1).** Every statement is either
 quoted from `docs/ROADMAP.md` (marked **[ROADMAP §…]**) or marked
@@ -418,3 +418,21 @@ Every point below is a **[G3-S3 proposal]**.
      `docs/memory/evidence/home6_2026-11-08/ga14/g_a14_applied.diff`).
 
   The games list then has no "PlayStation 2" entry; the other systems are unchanged.
+
+## 18. N64 (adopted G-A15, 2026-11-08)
+
+- **Adopted:** `PRIVYHUB_N64=1` through the drop-in
+  `~/.config/systemd/user/privyhub-companion.service.d/n64.conf`, the **seventeenth adopted line** (the user's "Yes
+  keep on but we should try to resolve the issues too", 2026-11-08, HOME-7 stage 10; C23's Home-hold freeze and a
+  title's mapping open, B61).
+  - **What it does (B59):** the games list offers "Nintendo 64"; a launch runs RetroArch with mupen64plus_next on the
+    hub (the core fetched once from the libretro buildbot on the user's go), four ports, the onn's pads through the same
+    controller channel as every game; SAVE / LOAD through RetroArch as PS1.
+  - **Measured:** HOME-7 C21-C23 (`evidence/HOME_7_HOLD_TO_JOIN_N64_2026-11-08.md`).
+- **What leaves the onn / the hub:** nothing new. The drive's N64 folder is read in place, never written; the stream to
+  the onn is the same native stream as every game.
+- **Turning it off (host):**
+  1. Delete `n64.conf`.
+  2. Run `systemctl --user daemon-reload && systemctl --user restart privyhub-companion`.
+  3. Take `N64` out of `tools/e1_suite.py` `ADOPTED` (reverse
+     `docs/memory/evidence/home7_2026-11-08/ga15/g_a15_applied.diff`).

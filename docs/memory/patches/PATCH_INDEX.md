@@ -103,6 +103,7 @@ note feeds, or its gate / flag, where the records say; "—" where none applies.
 | HOME-2_APK_PIN.md | cl-b | APPLIED | APK pin `0132b944…` (queue M), CONFIRMED 2026-11-06 |
 | HOME-3_APK_PIN.md | cl-b | APPLIED | APK pin `8ba4d996…` (queue N), CONFIRMED 2026-11-07 |
 | HOME-4_APK_PIN.md | cl-b | APPLIED | APK pin `cfe0211c…` (queue O), CONFIRMED 2026-11-08 |
+| HOME-7_APK_PIN.md | cl-b | APPLIED | APK pin `9aa00ba2…` (queue T), CONFIRMED 2026-11-08 |
 | D-BASE-C5A_IDR_REJECTION_COUNTERS.md | d-base | APPLIED | D-BASE (closed) |
 | D-BASE-P10_AUDIO_REDUNDANCY.md | d-base | APPLIED | D-BASE (closed) |
 | D-BASE-P1_STALE_THRESHOLD_PROBE_KNOB.md | d-base | APPLIED | D-BASE (closed) |
@@ -198,6 +199,7 @@ note feeds, or its gate / flag, where the records say; "—" where none applies.
 | G-A10_STEP_IN_PLACE_ADOPTION.md | g-track | APPLIED | line 14 (`evidence/G_A10_STEP_IN_PLACE_ADOPTION_2026-11-02.md`) |
 | G-A13_VOD_LOG_ADOPTION.md | g-track | APPLIED | line 15, `PRIVYHUB_VOD_LOG=1` (G-A13 host, 2026-11-07) |
 | G-A14_PS2_ADOPTION.md | g-track | APPLIED | line 16, `PRIVYHUB_PS2=1` (G-A14, 2026-11-08) |
+| G-A15_N64_ADOPTION.md | g-track | APPLIED | line 17, `PRIVYHUB_N64=1` (G-A15, 2026-11-08) |
 | G-A1_OVERLAY_AND_IDENTITY_ADOPTED.md | g-track | APPLIED | lines 6 and 7 |
 | G-A2_OPUS_ADOPTED.md | g-track | APPLIED | line 8 |
 | G-A3_LINK_REPORT_ADOPTED.md | g-track | APPLIED | line 9 |

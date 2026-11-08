@@ -1806,6 +1806,12 @@ on HOME-6's C12'' and C14 met. `--check` ok on sixteen, `flags_absent` true.
 - **Off:** delete `ps2.conf`, `daemon-reload`, restart, reverse `home6_2026-11-08/ga14/g_a14_applied.diff`.
 - Record: `docs/memory/evidence/HOME_6_PS2_LOAD_2026-11-08.md`; patch `docs/memory/patches/G-A14_PS2_ADOPTION.md`.
 
+**G-A15 ADOPTED (2026-11-08, the user's "Yes keep on but we should try to resolve the issues too"): `PRIVYHUB_N64=1`,
+the seventeenth line (`n64.conf`).** The N64 launch kind (B59), on HOME-7's C21 / C22 met; C23 (the Home-hold freeze,
+a title's mapping) open to B61. `--check` ok on seventeen, `flags_absent` true.
+- **Off:** delete `n64.conf`, `daemon-reload`, restart, reverse `home7_2026-11-08/ga15/g_a15_applied.diff`.
+- Record: `docs/memory/evidence/HOME_7_HOLD_TO_JOIN_N64_2026-11-08.md`; patch `docs/memory/patches/G-A15_N64_ADOPTION.md`.
+
 ## G5 — WAN-aware telemetry and adaptation
 
 > **Superseded (2026-11-03):** G5-S1's WAN telemetry and the remote ladder, start floor and 7000 cap act on every remote-class session through adopted line 13, `PRIVYHUB_REMOTE=1` (G-A9); `PRIVYHUB_WAN_ADAPTATION` itself is not adopted — see docs/WAN_ADAPTATION_RULES.md.
@@ -2450,6 +2456,9 @@ rather than create a second game-library path.
 > **IMPORT-2 DEFERRED by the user (2026-11-08):** "I don't really care about the NES and Genesis. I'd rather do the
 > PS2+ ones I have already in there (e.g. n64 and GameCube)". The handoff stays written, not run. N64 and GameCube are
 > listed in place from the drive like PS2 (§H1, §H2), not imported.
+>
+> **The multi-disc reading (HOME-7 C19):** without the import flag the list reads "PlayStation (80)"; the library's
+> multi-disc PS1 sets show one entry per disc (no `.m3u` in the library) — one entry per game waits on the user's word.
 
 ## H1 — N64
 
@@ -2469,6 +2478,12 @@ Question:
 > - **Not live yet:** the core must be fetched (A, the user's go).
 > - **Next:** A's HOME-7+N64 C21-C23 (`docs/memory/handoffs/SESSION_B_DONE_2026-11-08V.md`), then B61 for any N64
 >   fix, and G-A15 on the user's word.
+
+> **HOME-7+N64 (2026-11-08, A; `docs/memory/evidence/HOME_7_HOLD_TO_JOIN_N64_2026-11-08.md`) — the first N64 run:** the
+> core fetched on the user's "go N64" (the nightly per-core zip). C21 (13 titles; four ports; two pads by the hold; "Felt
+> good to play") and C22 (SAVE / LOAD, a ~16-MB state) met; **C23 not met**: the Home hold froze the game (RetroArch's
+> network commands timed out) and one title's buttons were dead; the internal rate 60 fps, 16.5 internal hitch s / 10
+> min. **G-A15 ADOPTED** on the user's word (`PRIVYHUB_N64=1`, the seventeenth line) with the issues open → B61.
 
 ## H2 — GameCube
 

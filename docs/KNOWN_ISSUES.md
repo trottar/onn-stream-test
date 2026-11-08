@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-08 — HOME-7+N64: `9aa00ba2…` CONFIRMED (hold-to-join C15-C17 met); PS2 hold through PINE (C18) and the PS2 multitap relaunch (C20) met; **G-A15 ADOPTED, `PRIVYHUB_N64=1` the seventeenth line**; open: the N64 Home hold freezes (C23), an N64 title's buttons, PS1 player 2 under the multitap (C17), the multi-disc `.m3u`; the import bench flag CLOSED (removed) — OPEN (to B61) — `## 2026-11-08 HOME-7+N64` below; `docs/memory/evidence/HOME_7_HOLD_TO_JOIN_N64_2026-11-08.md`
 - 2026-11-08 — IMPORT-1: the first real import, from the external drive (a symlinked `PrivyHub-Import/` root): 72 PS1 titles, all DUPLICATE, 0 placed, 1 stray file rejected; no PS1 BIOS on the drive; the drive untouched; the bench drop-in `b56-import.conf` on at the user's decision until HOME-7's C19 — OPEN (HOME-7 C19; slice 1b) — `## 2026-11-08 IMPORT-1` below; `docs/memory/evidence/IMPORT_1_2026-11-08.md`
 - 2026-11-08 — HOME-6: PS2 LOAD fixed on the onn (C12'' / C14 MET, `picture ok 0.9s`, 0 TLB Miss); **G-A14 ADOPTED, `PRIVYHUB_PS2=1` the sixteenth line** (`ps2.conf`; the bench flag and HOME-5's load note CLOSED); open: the hold / stall through PINE states (the user's question), the drive read-ahead, a heavy title's long play, the 1-player chooser's extra press — OPEN (the user's questions) — `## 2026-11-08 HOME-6` below; `docs/memory/evidence/HOME_6_PS2_LOAD_2026-11-08.md`
 - 2026-11-08 — HOME-5: PS2 SAVE like PS1 MET (C12'a / b / d; the write 0.5 s); LOAD NOT MET (C12'c: black screen, PCSX2 `TLB Miss` after the PINE load); G-A14 not adopted; the user's bench flag `b49-ps2.conf` stays on — OPEN (to B: the PS2 load) — `## 2026-11-08 HOME-5` below; `docs/memory/evidence/HOME_5_PS2_SAVE_2026-11-08.md`
@@ -158,6 +159,27 @@ no APK)
     3,905 leftover dirs, so they remain.
   - **The fix is in:** B53's `_tmp_cleanup` makes every run remove its own temp dirs.
   - **The user (or a reboot, which empties the tmpfs) frees the rest.** `/tmp` read 40 MB free at the queue's end.
+
+## 2026-11-08 HOME-7+N64: hold-to-join confirmed; PS2 recovery and relaunch met; G-A15 adopted; N64 issues open — OPEN (to B61)
+
+(`docs/memory/evidence/HOME_7_HOLD_TO_JOIN_N64_2026-11-08.md`)
+
+- **Met:** C15 / C16 / C17 (hold-to-join, a 1-player title, the multitap at once in ~6 s) → `9aa00ba2…` CONFIRMED; C18
+  (the PS2 Home hold through PINE: load 401 ms, picture ok) → B55; C20 (the PS2 multitap relaunch: state loaded, ~13 s)
+  → B57; C21 / C22 (the first N64 title, four ports, SAVE / LOAD).
+- **G-A15 ADOPTED** on the user's word ("Yes keep on but we should try to resolve the issues too"): `n64.conf`,
+  seventeen lines, `--check` ok.
+- **CLOSED here:** the import bench flag (IMPORT-1's note): `b56-import.conf` removed at stage 1 (nothing was placed);
+  the list reads "PlayStation (80)" again.
+- **Open, to B61:**
+  1. **The N64 Home hold freezes the game** (C23): RetroArch's network commands time out at the stall save (GET_STATUS;
+     `state_save_failed` ack null; 46 `stall_resume_failed`); reproduce without a window capture (A's capture overlapped).
+  2. **An N64 title's buttons** (C23): jump and others dead for every player on one title (another title fine).
+  3. **PS1 player 2 under the multitap** (C17): a two-player title reads player 2 from port 2 when the port-1 multitap
+     is in; after the multitap at once its stored count keeps it on the multitap at every launch, so player 2 stays dead
+     on that title.
+  4. Stale pre-session `pad_slots` rows carrying the previous game's joins; the PS2 game's own pause after a relaunch.
+  5. The multi-disc `.m3u` (C19: one entry per disc) on the user's word.
 
 ## 2026-11-08 IMPORT-1: PS1 from the drive — all duplicate, nothing placed — OPEN (HOME-7 C19; the bench flag)
 

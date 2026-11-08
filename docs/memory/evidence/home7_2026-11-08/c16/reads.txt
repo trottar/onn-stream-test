@@ -1,0 +1,7 @@
+C16 — a 1-player PS1 title (T2, not named; launch 21:59:36Z)
+start: native-stream-start with player_prompt=1; pad_slots start row 21:59:39.629 (slots 0, 1, no labels)
+a change row at 21:59:40.129, BEFORE session_started (21:59:43.753): slots 0 / 1 labelled P1 / P2, no claimed_by, players_joined 2, join hold — the previous session's join state carried into the new start's first heartbeat (for B: a stale row; it did not show on screen per the user's line)
+change 21:59:56.245: slot 0 P1 prompt, players_joined 1, join hold; no later change row; no slot-1 entry
+heartbeats 22:00:28-22:00:38: players_joined 1; updates_by_player [45..63, 0, 0, 0] (P1 playing, slot 1 none)
+the start response's players 1: read in this session's exit report (below)
+the user's line: "Stage 3, only P1 showed"
