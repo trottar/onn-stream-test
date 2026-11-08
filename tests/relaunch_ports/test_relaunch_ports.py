@@ -146,11 +146,14 @@ class Sequence(unittest.TestCase):
         self.assertEqual(rows(rec, "ports_set")[-1]["source"], "relaunch")
 
     def test_ps2_restarts_the_title_recorded(self):
-        p, rec, calls, clock, _ = rig(kind="pcsx2", system="ps2")
+        # B57 moved this test to its meaning (disclosed): PS2 saves through PINE's slot 7 now; B54's recorded restart
+        # is what a failed PS2 save gives (no refusal, no load), with B57's reason
+        p, rec, calls, clock, _ = rig(kind="pcsx2", system="ps2", fail_save=True)
         r = rp.run(p, 4, 3, clock=clock, sleep=clock.sleep)
-        self.assertEqual(calls, ["pause", "stream_stop", "stop", ("launch", 4), "pause", ("stream_start", 11, 48100)])
+        self.assertEqual(calls, ["pause", "save", "stream_stop", "stop", ("launch", 4), "pause",
+                                 ("stream_start", 11, 48100)])
         self.assertEqual(r["relaunch"]["state"], "restarted")
-        self.assertEqual(rows(rec, "relaunch_ports")[-1]["reason"], "ps2_no_relaunch_state")
+        self.assertEqual(rows(rec, "relaunch_ports")[-1]["reason"], "ps2_relaunch_save_failed")
 
     def test_the_launch_failing_brings_the_previous_ports_back(self):
         p, rec, calls, clock, state = rig(fail_launch=1)

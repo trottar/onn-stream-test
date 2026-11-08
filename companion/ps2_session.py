@@ -79,6 +79,7 @@ OFF_BEHAVIOURS = ("rewind",)
 SKIP_REASON = "ps2_mode: no save states"
 SCRATCH_SLOT = 9          # B55: the hold / stall scratch (as RetroArch's slot 9); PrivyHub's user slots are 1-3
 RECOVERY_SLOT = 8         # B55: the link give-up save (the recovery prompt's file)
+RELAUNCH_SLOT = 7         # B57: the multitap relaunch's state (B54's relaunch, loaded into the relaunched title)
 RELEASE_SHARE_S = 0.45    # B55: the load's share of B16's R1 (<= 1.0 s from the return; the fast ready <= 0.55 s)
 VERIFY_RUNNING_S = 2.0    # B55: the verifier's wait for the recovery's resume before B52's picture check
 

@@ -56,6 +56,31 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
 
+## 2026-11-08 Queue U (B57-B58): the PS2 multitap relaunch through PINE; import slice 1b — OPEN (A's HOME-7 C20 / C19; IMPORT-2 later)
+
+(`docs/memory/evidence/B57_PS2_RELAUNCH_STATE_2026-11-08.md`, `…/B58_IMPORT_SLICE_1B_2026-11-08.md`; no APK)
+
+- **B57 (inside `PRIVYHUB_PS2=1`):** a third pad in a PS2 game now brings the game back where it was through PINE's
+  slot 7 (queue T's "PS2's relaunch restarts the title" is answered in code).
+  - **Not yet on the hub:** the real time against B54's 15 s (expected ~9.5-13 s; the boot to the ELF dominates; the
+    worst bounds can pass 15 s, recorded as `within_budget: false`).
+  - A failed save, ELF hold or picture restarts the title without the state (`state: restarted` and the reason); a
+    static / faulted picture costs a second launch.
+  - The onn waits 30 s for the relaunch's answer (B54's client timeout): a second launch after a bad picture can come
+    near it; past it the client counts a failure while the game still comes back (a client change if C20 shows it).
+  - The `.gitignore` line for `PrivyHub-Import/` is in (queue T's follow-up).
+- **B58 (behind `PRIVYHUB_IMPORT=1`):** the plain source folder, SNES / NES / Genesis, the journal. Fixture trees only;
+  nothing imported.
+  - **Without the companion's flag** the list does not read the journal: an interrupted multi-disc PS1 set could show
+    its placed discs until the next `apply` cleans them (with the flag — the bench drop-in today — it is hidden).
+  - A headered and a headerless SNES dump of one title are not matched by hash (the title rule catches the same name).
+  - Zipped games are not imported (unzip first); the plain form takes no BIOS (the stick's `bios/ps1/` only).
+  - Re-applying a plan whose titles are already whole is now `already_placed` (exit 0), not B56's `target_exists`
+    (exit 4).
+- **For the user — leftovers, not deleted:** `/tmp/b_q13u_{base,b57,b58,all,scratch}` (~62 MB); this queue's test temp
+  under `~/.cache/b_q13u_tmp/` (~47 MB, from the other host suites, which do not clean up); queue T's leftovers as
+  listed below.
+
 ## 2026-11-08 Queue T (B54-B56): hold-to-join and the multitap at once; PS2 recovery through PINE; the PS1 USB import — OPEN (A's HOME-7, IMPORT-1)
 
 (`docs/memory/evidence/B54_HOLD_TO_JOIN_2026-11-08.md`, `…/B55_PS2_RECOVERY_STATES_2026-11-08.md`,

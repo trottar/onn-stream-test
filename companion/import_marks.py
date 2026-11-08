@@ -15,6 +15,7 @@ from typing import Any
 
 FLAG_ENV = "PRIVYHUB_IMPORT"
 MARKS_REL = Path("data") / "import" / "marks.json"
+JOURNAL_REL = Path("data") / "import" / "journal.json"      # B58
 BIOS_REL = Path("data") / "games" / "retroarch" / "system"
 BIOS_FILES = ("scph5500.bin", "scph5501.bin", "scph5502.bin")
 BIOS_SIZE = 524_288
@@ -31,6 +32,20 @@ def read(project_root: Path) -> dict[str, Any]:
     except (OSError, ValueError):
         pass
     return {"new": {}, "hide": {}}
+
+
+def pending(project_root: Path) -> dict[str, str]:
+    """B58: the ids of titles an import is copying, or left half-placed by an interrupted apply (the tool's journal,
+    `data/import/journal.json`): left out of the list until the next apply finishes or cleans them. Never raises."""
+    try:
+        j = json.loads((Path(project_root) / JOURNAL_REL).read_text(encoding="utf-8"))
+        entries = j.get("entries") if isinstance(j, dict) else None
+        if not isinstance(entries, dict):
+            return {}
+        return {str(i): "import in progress" for e in entries.values() if isinstance(e, dict)
+                for i in (e.get("list_ids") or []) if isinstance(i, str)}
+    except (OSError, ValueError, AttributeError, TypeError):
+        return {}
 
 
 def is_new(marks: dict[str, Any], game_id: str, now_ms: int) -> bool:

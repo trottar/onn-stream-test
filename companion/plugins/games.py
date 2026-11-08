@@ -1933,8 +1933,9 @@ class GamesPlugin:
                 break
 
         # B56: a library .iso the import marked hidden (a .chd of the title exists) is left out (absent: never)
+        # B58: and a title the import is copying or left half-placed (its journal)
         if _import_marks is not None:
-            hidden = _import_marks.read(self.PROJECT_ROOT)["hide"]
+            hidden = {**_import_marks.read(self.PROJECT_ROOT)["hide"], **_import_marks.pending(self.PROJECT_ROOT)}
             if hidden:
                 games = [g for g in games if g["id"] not in hidden]
 

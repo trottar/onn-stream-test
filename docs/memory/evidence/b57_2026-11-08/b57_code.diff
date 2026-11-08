@@ -1,0 +1,611 @@
+diff --git a/companion/games/emulator_manager.py b/companion/games/emulator_manager.py
+index 09934e5..b52e94a 100644
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -7076,22 +7076,67 @@ class EmulatorManager:
+             raise EmulatorError("The recovery save is not this session's PS2 state")
+         return source
+ 
+-    def _pcsx2_load_recovery_state_running(self) -> dict[str, Any]:
+-        """The prompt's Resume in a fresh PS2 launch: B52's ELF hold, PINE 0x0A slot 8, the picture; left running."""
++    def _pcsx2_save_relaunch_state(self) -> dict[str, Any]:
++        """B57: PINE 0x09 to the reserved slot 7, B52's file-complete check; no index (as PS1's relaunch save)."""
++        with self.lock:
++            self._refresh_process()
++            if self.process is None or self.active_game is None or self._ps2 is None:
++                raise EmulatorError("No PrivyHub game session is running")
++            slot = _ps2.RELAUNCH_SLOT
++            try:
++                self._ps2.ensure_pine_pause()
++            except _ps2.PS2Error as exc:
++                raise EmulatorError(str(exc)) from exc
++            folder = self._project_path(_ps2.DATA_DIR) / "sstates"
++            folder.mkdir(parents=True, exist_ok=True)
++            before = _ps2.state_files(folder)
++            result = self._ps2.state_message(_ps2.MSG_SAVE_STATE, slot)
++            if result != _ps2.PINE_OK:
++                self._ps2.log(f"PS2 relaunch save: slot {slot} pine 0x09 {'no answer' if result is None else 'fail'}")
++                raise EmulatorError("PCSX2 did not acknowledge the save state")
++            got = self._ps2.wait_state_file(folder, slot, before)
++            if got is None:
++                self._ps2.log(f"PS2 relaunch save: slot {slot} pine 0x09 ok; file not complete in "
++                              f"{_ps2.SAVE_BOUND_S:.1f}s")
++                raise EmulatorError("PrivyHub could not verify the relaunch savestate")
++            path, seconds = got
++            self._ps2.log(f"PS2 relaunch save: slot {slot} pine 0x09 ok; file complete {seconds:.1f}s")
++            return {
++                "ok": True,
++                "action": "save_relaunch_state",
++                "state_path": path,
++                "size_bytes": int(path.stat().st_size),
++                "slot": slot,
++                "ps2_states": "pine",
++            }
++
++    def _pcsx2_load_recovery_state_running(self, relaunch_source: Path | None = None) -> dict[str, Any]:
++        """The prompt's Resume in a fresh PS2 launch: B52's ELF hold, PINE 0x0A slot 8, the picture; left running.
++
++        B57: `relaunch_source` (the relaunch's `.07.p2s`) loads slot 7 the same way; a static / faulted picture raises
++        with `ps2_picture` set (the state was loaded and the game did not run from it)."""
+         with self.lock:
+             self._refresh_process()
+             if self.process is None or self.active_game is None or self._ps2 is None:
+                 raise EmulatorError("No active game session is available to load")
+             if self._paused:
+                 raise EmulatorError("The running-core recovery load requires the game to be running")
+-            source = self._pcsx2_recovery_source()
+-            slot = _ps2.RECOVERY_SLOT
++            if relaunch_source is None:
++                source = self._pcsx2_recovery_source()
++                slot = _ps2.RECOVERY_SLOT
++                what = "recovery"
++            else:
++                source = Path(relaunch_source)
++                slot = _ps2.RELAUNCH_SLOT
++                what = "relaunch"
++                if not source.name.endswith(f".{slot:02d}.p2s") or not source.is_file():
++                    raise EmulatorError("The relaunch save is not this session's PS2 state")
+             sess = self._ps2
+             if sess.log_path is None:
+                 sess.log_path = _ps2.pcsx2_log_path(self.project_root)
+             try:
+                 if not sess.elf_started() and not sess.wait_elf():
+-                    sess.log(f"PS2 recovery load: slot {slot} held; the game's ELF not up in {_ps2.ELF_WAIT_S:.0f}s")
++                    sess.log(f"PS2 {what} load: slot {slot} held; the game's ELF not up in {_ps2.ELF_WAIT_S:.0f}s")
+                     raise EmulatorError("The game is still starting; play a moment, then load again")
+                 sess.ensure_pine_pause()
+             except _ps2.PS2Error as exc:
+@@ -7100,7 +7145,7 @@ class EmulatorManager:
+             offset = sess.log_size()
+             result = sess.state_message(_ps2.MSG_LOAD_STATE, slot)
+             if result != _ps2.PINE_OK:
+-                sess.log(f"PS2 recovery load: slot {slot} pine 0x0a {'no answer' if result is None else 'fail'}")
++                sess.log(f"PS2 {what} load: slot {slot} pine 0x0a {'no answer' if result is None else 'fail'}")
+                 try:
+                     sess.resume()
+                 except _ps2.PS2Error:
+@@ -7112,9 +7157,11 @@ class EmulatorManager:
+                 verdict, seconds = sess.check_picture(pre[0] if pre else None, offset)
+             except _ps2.PS2Error:
+                 verdict, seconds = "static", 0.0
+-            sess.log(f"PS2 recovery load: slot {slot} pine 0x0a ok; picture {verdict} {seconds:.1f}s")
++            sess.log(f"PS2 {what} load: slot {slot} pine 0x0a ok; picture {verdict} {seconds:.1f}s")
+             if verdict != "ok":
+-                raise EmulatorError("The game did not resume from the save")
++                error = EmulatorError("The game did not resume from the save")
++                error.ps2_picture = verdict
++                raise error
+             payload = self.status()
+             payload["action"] = "load_recovery_state_running"
+             payload["accepted"] = True
+@@ -7123,6 +7170,8 @@ class EmulatorManager:
+             payload["retroarch_loading_line"] = None
+             payload["source_sha256"] = self._state_file_diagnostic(source).get("sha256")
+             payload["ps2_states"] = "pine"
++            if relaunch_source is not None:
++                payload["slot"] = slot
+             return payload
+ 
+     def _pcsx2_copy_recovery_state_to_slot(self, slot: int, *, replace: bool = False) -> dict[str, Any]:
+@@ -7654,8 +7703,9 @@ class EmulatorManager:
+         Only the multitap relaunch calls this (`relaunch_ports.py`); no index is written, and the file is overwritten at
+         the title's next relaunch. RetroArch sessions only.
+         """
++        # B54 refused it; B57: a PS2 relaunch saves to PINE's reserved slot 7 (B52's file-complete check)
+         if self._launch_kind == "pcsx2":
+-            raise EmulatorError(PS2_NO_STATES)
++            return self._pcsx2_save_relaunch_state()
+         with self.lock:
+             self._refresh_process()
+             if self.process is None or self.process.poll() is not None:
+@@ -7700,7 +7750,10 @@ class EmulatorManager:
+         """
+         # B49 refused it; B55: a PS2 recovery save loads through PINE (B52's ELF hold and picture check)
+         if self._launch_kind == "pcsx2":
+-            return self._pcsx2_load_recovery_state_running()
++            # B57: the relaunch's slot-7 save when `source` names it; None = B55's slot-8 call exactly
++            if source is None:
++                return self._pcsx2_load_recovery_state_running()
++            return self._pcsx2_load_recovery_state_running(source)
+         with self.lock:
+             self._refresh_process()
+             if (
+diff --git a/companion/ps2_session.py b/companion/ps2_session.py
+index 61a33d6..6265c6e 100644
+--- a/companion/ps2_session.py
++++ b/companion/ps2_session.py
+@@ -79,6 +79,7 @@ OFF_BEHAVIOURS = ("rewind",)
+ SKIP_REASON = "ps2_mode: no save states"
+ SCRATCH_SLOT = 9          # B55: the hold / stall scratch (as RetroArch's slot 9); PrivyHub's user slots are 1-3
+ RECOVERY_SLOT = 8         # B55: the link give-up save (the recovery prompt's file)
++RELAUNCH_SLOT = 7         # B57: the multitap relaunch's state (B54's relaunch, loaded into the relaunched title)
+ RELEASE_SHARE_S = 0.45    # B55: the load's share of B16's R1 (<= 1.0 s from the return; the fast ready <= 0.55 s)
+ VERIFY_RUNNING_S = 2.0    # B55: the verifier's wait for the recovery's resume before B52's picture check
+ 
+diff --git a/companion/relaunch_ports.py b/companion/relaunch_ports.py
+index 80c15fd..7c27662 100644
+--- a/companion/relaunch_ports.py
++++ b/companion/relaunch_ports.py
+@@ -12,6 +12,13 @@ PINE slot is the follow-up) -> the encoder stopped -> the core stopped -> the la
+ 1.0-s settle, the running-core load of the relaunch save (D-BASE-R3c2's way), pause -> the encoder started for the
+ remembered client on the new window. The new launch failing -> the previous ports again (the same load); that failing
+ too -> the session ends and the error is the answer. The load failing -> the title runs from its start (`restarted`).
++
++B57 (a PS2 session only, so only with `PRIVYHUB_PS2=1`): the state goes through PINE's reserved slot 7 -- the save
++with B52's file-complete check, SIGTERM, the launch with `MultitapPort1` per the count, resume, the load holding until
++the game's ELF is up, B52's picture check -> `loaded`. No 1.0-s settle (the ELF hold is it). Any failed step -> the
++title restarts without the state (B54's PS2 behaviour) with `state: restarted` and a `reason`: a save failure is not
++a refusal on PS2; a loaded state whose picture is static / faulted -> the title launched once more, clean. Design:
++`docs/memory/evidence/b57_2026-11-08/design_written_before_code.md` (hashed before this code).
+ """
+ 
+ from __future__ import annotations
+@@ -83,37 +90,71 @@ def run(plugin: Any, players: int, players_joined: int | None = None, *,
+             raise RelaunchRefused(f"The game's state could not be saved; nothing was changed: {exc}") from exc
+         state_path = saved.get("state_path")
+     else:
+-        row["reason"] = "ps2_no_relaunch_state"
++        # B57: PINE's slot 7; a failure is not a refusal on PS2 -- the title restarts without the state (B54's PS2 path)
++        try:
++            saved = step("save", emulator.save_relaunch_state)
++            state_path = saved.get("state_path")
++            row["ps2_states"] = "pine"
++            row["slot"] = saved.get("slot")
++        except Exception as exc:
++            row["reason"] = "ps2_relaunch_save_failed"
++            row["save_error"] = str(exc)[:200]
+     step("stream_stop", stream.stop)
+     step("stop", emulator.stop)
+ 
+     ok = True
+-    try:
+-        step("launch", lambda: emulator.launch(game, players_chosen=target))
+-        landed = target
+-    except Exception as exc:
+-        ok = False
+-        row["fallback"] = "previous_ports"
+-        row["launch_error"] = str(exc)[:200]
++
++    def launch_ports(name: str, ports: int) -> int:
++        nonlocal ok
+         try:
+-            step("launch_previous", lambda: emulator.launch(game, players_chosen=previous))
+-            landed = previous
+-        except Exception as exc2:
+-            row["ok"] = False
+-            row["total_ms"] = _ms(t_all, clock)
+-            row["ended"] = True
+-            plugin._recovery._log("relaunch_ports", **row)
++            step(name, lambda: emulator.launch(game, players_chosen=ports))
++            return ports
++        except Exception as exc:
++            ok = False
++            row["fallback"] = "previous_ports"
++            row["launch_error"] = str(exc)[:200]
+             try:
+-                stream.end_game_session()
+-            except Exception:
+-                pass
+-            raise RuntimeError(f"The game could not restart with {target} players and was stopped: {exc2}") from exc2
++                step(name + "_previous", lambda: emulator.launch(game, players_chosen=previous))
++                return previous
++            except Exception as exc2:
++                row["ok"] = False
++                row["total_ms"] = _ms(t_all, clock)
++                row["ended"] = True
++                plugin._recovery._log("relaunch_ports", **row)
++                try:
++                    stream.end_game_session()
++                except Exception:
++                    pass
++                raise RuntimeError(
++                    f"The game could not restart with {target} players and was stopped: {exc2}") from exc2
++
++    landed = launch_ports("launch", target)
+     session = getattr(emulator, "_players_session", None)
+     if isinstance(session, dict):
+         session["source"] = "relaunch"
+ 
+     state = "restarted"
+-    if state_path is not None:
++    if state_path is not None and kind == "pcsx2":
++        # B57: resume (PCSX2 boots on), the load holds until the ELF, B52's picture check; no settle
++        try:
++            step("resume", emulator.resume)
++            step("load", lambda: emulator.load_recovery_state_running(source=state_path))
++            state = "loaded"
++        except Exception as exc:
++            row["load_error"] = str(exc)[:200]
++            picture = getattr(exc, "ps2_picture", None)
++            if picture:
++                # the loaded state did not run: the title once more, clean (today's restart)
++                row["reason"] = f"ps2_relaunch_picture_{picture}"
++                step("stop_clean", emulator.stop)
++                landed = launch_ports("launch_clean", landed)
++                session = getattr(emulator, "_players_session", None)
++                if isinstance(session, dict):
++                    session["source"] = "relaunch"
++            else:
++                row["reason"] = "ps2_relaunch_load_failed"
++        step("pause_after", emulator.pause)
++    elif state_path is not None:
+         try:
+             step("resume", emulator.resume)
+             step("settle", lambda: sleep(SETTLE_S))
+@@ -139,6 +180,7 @@ def run(plugin: Any, players: int, players_joined: int | None = None, *,
+                 "within_budget": total <= BUDGET_S * 1000.0})
+     plugin._recovery._log("relaunch_ports", **row)
+     plugin._recovery._log("ports_set", **ports)
+-    return {"ok": ok, "relaunch": {k: row[k] for k in ("state", "steps_ms", "total_ms", "landed_ports", "kind")
++    keys = ("state", "steps_ms", "total_ms", "landed_ports", "kind", "reason")    # B57: + reason (only PS2 sets it)
++    return {"ok": ok, "relaunch": {k: row[k] for k in keys
+                                    if k in row} | ({"fallback": row["fallback"]} if "fallback" in row else {}),
+             "ports_set": ports}
+diff --git a/tests/relaunch_ports/test_b57.py b/tests/relaunch_ports/test_b57.py
+new file mode 100644
+index 0000000..f42275b
+--- /dev/null
++++ b/tests/relaunch_ports/test_b57.py
+@@ -0,0 +1,320 @@
++#!/usr/bin/env python3
++"""B57 (host): the PS2 multitap relaunch through PINE's reserved slot 7 -- the save with B52's file-complete check,
++SIGTERM, the launch with `MultitapPort1` per the count, the hold until the game's ELF, the load, B52's picture check,
++`state: loaded`; a failed step -> the title restarts without the state (`state: restarted` and the reason), never a
++dead session. B51's PINE socket double and B52's fake window / log on the real EmulatorManager; the launch is faked as
++a new PCSX2 whose log gains `ELF Loading:` once it has run ~6 s. No PCSX2, no BIOS, no title, no real folder.
++
++    python3 -m unittest discover -s tests/relaunch_ports -v
++"""
++
++from __future__ import annotations
++
++import importlib.util
++import json
++import signal
++import struct
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(ROOT / "tests" / "ps2_session"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401  (this run's temp dirs removed at exit)
++
++import players_session as ps  # noqa: E402
++import ps2_session as ps2  # noqa: E402
++import relaunch_ports as rp  # noqa: E402
++from games import emulator_manager as em  # noqa: E402
++from games import link_drop_recovery as ldr  # noqa: E402
++import test_b51 as b51  # noqa: E402
++
++spec = importlib.util.spec_from_file_location("b57_games_plugin", ROOT / "companion" / "plugins" / "games.py")
++G = importlib.util.module_from_spec(spec)
++spec.loader.exec_module(G)
++
++STEM = b51.FAKE_STEM
++BOOT_S = 6.0          # the fake PCSX2's boot to the ELF, in its running time (H3-P2: ~6-9 s)
++SAVE = lambda slot: struct.pack("<IBB", 6, 0x09, slot)          # noqa: E731
++LOAD = lambda slot: struct.pack("<IBB", 6, 0x0A, slot)          # noqa: E731
++
++
++class Proc(b51.FakeProc):
++    def __init__(self, pid):
++        self.pid = pid
++        self.waited = 0
++
++    def wait(self, timeout=None):
++        self.waited += 1
++        return 0
++
++
++class Rig:
++    """One PS2 session on the real manager; `launch` / the clock / the window are the fakes."""
++
++    def __init__(self, root: Path, picture="moving", tlb=False, elf=True, **pine):
++        self.root = root
++        self.d = b51.PineDouble(root, **pine)
++        self.m, self.lines, self.kills = b51.session_manager(self.d)
++        self.picture, self.tlb, self.elf = picture, tlb, elf
++        self.t = [100.0]
++        self.calls: list = []
++        self.launches: list[dict] = []
++        self.pid = 4242
++        self.m.process = Proc(self.pid)
++        self.m._players_session = ps.plan("ps2", 2, None, source="join")
++        self.m._paused = False
++        self.fake = self.m._fake
++        self.fake.paused = False
++        self.m._ps2.paused_by = None
++        self.wire(self.m._ps2, self.fake, booted=True)
++        m = self.m
++        orig_stop = m.stop
++
++        def stop():
++            self.calls.append("stop")
++            return orig_stop()
++
++        def launch(game, **kw):
++            n = kw.get("players_chosen")
++            self.calls.append(("launch", n))
++            plan = ps.plan("ps2", n, None)
++            pads = ps2.pad_sections(int(plan["ports"]), bool(plan["multitap"]))      # the PS2 launch's own call
++            self.launches.append({"players": n, "pad": pads["Pad"]})
++            self.pid += 1
++            m.process = Proc(self.pid)
++            m.active_game = dict(game)
++            m._launch_kind = "pcsx2"
++            m._players_session = plan
++            m._paused = False
++            fake = b51.FakePcsx2(ps2.PINE_RUNNING)
++            # a new PCSX2: a fresh per-launch log (no ELF yet), running from its boot
++            self.d.emulog.write_text("[    0.1] PCSX2 log start\n")
++            m._ps2 = ps2.Session(self.pid, self.lines.append, run=None, status=fake.status,
++                                 kill=lambda pid, sig: self.kills.append(int(sig)), pine_path=self.d.path,
++                                 log_path=self.d.emulog)
++            self.fake = fake
++            self.wire(m._ps2, fake, booted=False)
++            self.t[0] += 2.0                                   # the window and the sink-input
++            return {"active": True}
++
++        m.stop, m.launch = stop, launch
++        for name in ("pause", "resume", "save_relaunch_state"):
++            orig = getattr(m, name)
++            setattr(m, name, self.recorded(name, orig))
++        orig_load = m.load_recovery_state_running
++        m.load_recovery_state_running = lambda source=None: (self.calls.append(("load", source)),
++                                                             orig_load(source=source))[1]
++
++    def recorded(self, name, fn):
++        def call(*a, **k):
++            self.calls.append(name)
++            return fn(*a, **k)
++        return call
++
++    def wire(self, sess, fake, booted):
++        """The session's clock / sleep / window on this rig: running time boots the game (the ELF line) after BOOT_S;
++        a TLB Miss after a load when asked; a static picture when asked."""
++        run_s = [BOOT_S if booted else 0.0]
++        orig_run, orig_grab = fake.run, fake.grab
++        emulog = self.d.emulog
++
++        def sleep(s):
++            self.t[0] += s
++            if not fake.paused:
++                before = run_s[0]
++                run_s[0] += s
++                if self.elf and before < BOOT_S <= run_s[0]:
++                    with open(emulog, "a") as fh:
++                        fh.write("[    4.7] ELF Loading: <elf>, Game CRC = 00000000, EntryPoint = 0x00100008\n")
++
++        def run(cmd, **kw):
++            return orig_run(cmd, **kw)
++
++        def grab(w):
++            # the loaded state faults as the game runs from it (the running load sends no hotkey, so the frame is it)
++            text = emulog.read_text()
++            if self.tlb and not fake.paused and "Loaded state" in text and ps2.TLB_MISS not in text:
++                with open(emulog, "a") as fh:
++                    fh.write("[   15.3] TLB Miss, pc=0x0 addr=0x0 [store]\n")
++            if self.picture == "moving":
++                return orig_grab(w)
++            return bytes([90] * (ps2.GRAB_W * ps2.GRAB_H))
++
++        sess.sleep, sess.clock, sess.run, sess.grab = sleep, (lambda: self.t[0]), run, grab
++
++    def clock(self):
++        return self.t[0]
++
++    def plugin(self):
++        rec = ldr.LinkDropRecovery(
++            self.root, pause_game=lambda: None, resume_game=lambda: None, save_recovery_state=lambda: {},
++            restart_encoder=lambda: {}, full_start_encoder=lambda: {}, stream_active=lambda: True,
++            end_session=lambda: None, client_packet_age_ms=lambda: 10.0, recovery_save_detail=lambda: {})
++        calls, t = self.calls, self.t
++
++        class Stream:
++            DEFAULT_PORT = 48100
++
++            def stop(self):
++                calls.append("stream_stop"); return {}
++
++            def start(self, **kw):
++                calls.append(("stream_start", kw["managed_process_id"])); t[0] += 0.8; return {"active": True}
++
++            def end_game_session(self):
++                calls.append("end_game_session"); return {}
++
++        p = object.__new__(G.GamesPlugin)
++        p.PROJECT_ROOT = self.root
++        p._emulator = self.m
++        p._recovery = rec
++        p._native_stream = Stream()
++        p._recovery_start_args = {"client_ip": "127.0.0.1", "port": 48100}
++        return p, rec
++
++    def run(self):
++        p, rec = self.plugin()
++        r = rp.run(p, 4, 3, clock=self.clock, sleep=lambda s: self.t.__setitem__(0, self.t[0] + s))
++        return r, rec
++
++
++def rows(rec, event):
++    path = rec.log_path()
++    return [r for r in (json.loads(x) for x in path.read_text().splitlines()) if r["event"] == event] \
++        if path.exists() else []
++
++
++class Base(unittest.TestCase):
++    def setUp(self):
++        self.old = em._ps2
++        em._ps2 = ps2                         # what PRIVYHUB_PS2=1 sets at import
++        self.root = Path(tempfile.mkdtemp(prefix="b57_"))
++
++    def tearDown(self):
++        em._ps2 = self.old
++
++    def rig(self, **kw):
++        r = Rig(self.root, **kw)
++        self.addCleanup(r.d.close)
++        return r
++
++
++class FullSequence(Base):
++    def test_save_sigterm_launch_four_elf_load_picture_ready(self):
++        g = self.rig()
++        r, rec = g.run()
++        self.assertEqual(g.calls, ["pause", "save_relaunch_state", "stream_stop", "stop", ("launch", 4), "resume",
++                                   ("load", g.d.sstates / f"{STEM}.07.p2s"), "pause", ("stream_start", 4243)])
++        # PINE: the save to slot 7, then the load of slot 7 -- nothing else (slots 8 / 9 untouched)
++        self.assertEqual(g.d.requests, [SAVE(7), LOAD(7)])
++        self.assertEqual(sorted(p.name for p in g.d.sstates.iterdir()), [f"{STEM}.07.p2s"])
++        self.assertIn(signal.SIGTERM, g.kills)                                   # B49's stop: SIGTERM
++        self.assertEqual(g.launches, [{"players": 4, "pad": {"MultitapPort1": "true", "MultitapPort2": "false"}}])
++        self.assertTrue(r["ok"])
++        self.assertEqual((r["relaunch"]["state"], r["relaunch"]["kind"], r["relaunch"]["landed_ports"]),
++                         ("loaded", "pcsx2", 4))
++        self.assertNotIn("reason", r["relaunch"])
++        steps = r["relaunch"]["steps_ms"]
++        self.assertNotIn("settle", steps)                                        # the ELF hold is the settle
++        self.assertGreaterEqual(steps["load"], int((BOOT_S - 0.5) * 1000))       # the load held for the boot
++        self.assertEqual(r["ports_set"], {"players_chosen": 4, "ports": 4, "players": 4, "multitap": True,
++                                          "multitap_available": True, "source": "relaunch"})
++        row = rows(rec, "relaunch_ports")[-1]
++        self.assertEqual((row["ok"], row["state"], row["slot"], row["ps2_states"], row["players_joined"]),
++                         (True, "loaded", 7, "pine", 3))
++        self.assertTrue(row["within_budget"])
++        self.assertLessEqual(row["total_ms"], rp.BUDGET_S * 1000)
++        self.assertEqual(rows(rec, "ports_set")[-1]["source"], "relaunch")
++        self.assertTrue(any(l.startswith("PS2 relaunch save: slot 7 pine 0x09 ok; file complete") for l in g.lines))
++        self.assertTrue(any(l.startswith("PS2 relaunch load: slot 7 pine 0x0a ok; picture ok") for l in g.lines))
++        self.assertTrue(g.fake.paused)                                           # paused for the client's gate
++        # no slot index: the Game State list shows nothing new
++        self.assertFalse(any(x["exists"] for x in g.m.status()["save_state_slot_details"]))
++
++    def test_the_slot_numbers(self):
++        self.assertEqual((ps2.RELAUNCH_SLOT, ps2.RECOVERY_SLOT, ps2.SCRATCH_SLOT), (7, 8, 9))
++
++
++class Failures(Base):
++    def assert_restarted(self, g, r, rec, reason):
++        self.assertEqual(r["relaunch"]["state"], "restarted")
++        self.assertEqual(r["relaunch"]["reason"], reason)
++        row = rows(rec, "relaunch_ports")[-1]
++        self.assertEqual((row["state"], row["reason"], row.get("ended")), ("restarted", reason, None))
++        self.assertTrue(g.m.status()["active"])                                  # never a dead session
++        self.assertEqual(r["ports_set"]["ports"], 4)
++        self.assertEqual(g.calls[-1][0], "stream_start")
++
++    def test_a_save_failure_restarts_the_title_not_a_refusal(self):
++        for kw in ({"result": ps2.PINE_FAIL}, {"write_file": False}, {"answer": False}):
++            with self.subTest(**kw):
++                self.root = Path(tempfile.mkdtemp(prefix="b57_"))
++                g = self.rig(**kw)
++                r, rec = g.run()
++                self.assert_restarted(g, r, rec, "ps2_relaunch_save_failed")
++                self.assertNotIn(LOAD(7), g.d.requests)
++                self.assertNotIn("resume", g.calls)
++                self.assertIn("save_error", rows(rec, "relaunch_ports")[-1])
++
++    def test_a_static_picture_restarts_the_title_clean(self):
++        g = self.rig(picture="static")
++        r, rec = g.run()
++        self.assert_restarted(g, r, rec, "ps2_relaunch_picture_static")
++        self.assertEqual([c for c in g.calls if c in ("stop",) or (isinstance(c, tuple) and c[0] == "launch")],
++                         ["stop", ("launch", 4), "stop", ("launch", 4)])
++        self.assertIn("stop_clean", r["relaunch"]["steps_ms"])
++        self.assertIn("launch_clean", r["relaunch"]["steps_ms"])
++        self.assertTrue(r["ok"])
++        self.assertTrue(any(l.startswith("PS2 relaunch load: slot 7 pine 0x0a ok; picture static") for l in g.lines))
++
++    def test_a_tlb_miss_restarts_the_title_clean(self):
++        g = self.rig(tlb=True)
++        r, rec = g.run()
++        self.assert_restarted(g, r, rec, "ps2_relaunch_picture_fault")
++        self.assertEqual(sum(1 for c in g.calls if isinstance(c, tuple) and c[0] == "launch"), 2)
++
++    def test_the_elf_never_up_is_a_restart_without_a_second_launch(self):
++        g = self.rig(elf=False)
++        r, rec = g.run()
++        self.assert_restarted(g, r, rec, "ps2_relaunch_load_failed")
++        self.assertNotIn(LOAD(7), g.d.requests)
++        self.assertEqual(sum(1 for c in g.calls if isinstance(c, tuple) and c[0] == "launch"), 1)
++        self.assertFalse(r["relaunch"]["steps_ms"].get("launch_clean"))
++        self.assertFalse(rows(rec, "relaunch_ports")[-1]["within_budget"])      # the 30-s ELF bound, recorded
++
++
++class Unchanged(Base):
++    def test_the_source_less_running_load_is_b55s_slot_8(self):
++        g = self.rig()
++        g.m._paused = True
++        g.m.save_recovery_state()                                               # slot 8 + the index (B55)
++        g.m._ps2.resume(); g.m._paused = False
++        g.m.load_recovery_state_running()
++        self.assertEqual(g.d.requests[-1], LOAD(8))
++        self.assertTrue(any(l.startswith("PS2 recovery load: slot 8 pine 0x0a ok; picture ok") for l in g.lines))
++
++    def test_a_foreign_source_is_refused_before_pine(self):
++        g = self.rig()
++        other = g.d.sstates / f"{STEM}.08.p2s"
++        other.write_bytes(b51.zip_bytes())
++        with self.assertRaises(em.EmulatorError):
++            g.m.load_recovery_state_running(source=other)
++        self.assertEqual(g.d.requests, [])
++
++    def test_absent_no_ps2_session_exists(self):
++        # without PRIVYHUB_PS2=1 the plugin never imports ps2_session (B49); a RetroArch manager's relaunch save is
++        # B54's own path (its capture), never PINE
++        em._ps2 = None
++        m = em.EmulatorManager(self.root, config_path=(ROOT / "companion/games/config/emulators.json"))
++        self.assertIsNone(m._launch_kind)
++        with self.assertRaises(em.EmulatorError) as cm:
++            m.save_relaunch_state()
++        self.assertEqual(str(cm.exception), "No PrivyHub game session is running")
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/relaunch_ports/test_relaunch_ports.py b/tests/relaunch_ports/test_relaunch_ports.py
+index 469339d..db13bb4 100644
+--- a/tests/relaunch_ports/test_relaunch_ports.py
++++ b/tests/relaunch_ports/test_relaunch_ports.py
+@@ -146,11 +146,14 @@ class Sequence(unittest.TestCase):
+         self.assertEqual(rows(rec, "ports_set")[-1]["source"], "relaunch")
+ 
+     def test_ps2_restarts_the_title_recorded(self):
+-        p, rec, calls, clock, _ = rig(kind="pcsx2", system="ps2")
++        # B57 moved this test to its meaning (disclosed): PS2 saves through PINE's slot 7 now; B54's recorded restart
++        # is what a failed PS2 save gives (no refusal, no load), with B57's reason
++        p, rec, calls, clock, _ = rig(kind="pcsx2", system="ps2", fail_save=True)
+         r = rp.run(p, 4, 3, clock=clock, sleep=clock.sleep)
+-        self.assertEqual(calls, ["pause", "stream_stop", "stop", ("launch", 4), "pause", ("stream_start", 11, 48100)])
++        self.assertEqual(calls, ["pause", "save", "stream_stop", "stop", ("launch", 4), "pause",
++                                 ("stream_start", 11, 48100)])
+         self.assertEqual(r["relaunch"]["state"], "restarted")
+-        self.assertEqual(rows(rec, "relaunch_ports")[-1]["reason"], "ps2_no_relaunch_state")
++        self.assertEqual(rows(rec, "relaunch_ports")[-1]["reason"], "ps2_relaunch_save_failed")
+ 
+     def test_the_launch_failing_brings_the_previous_ports_back(self):
+         p, rec, calls, clock, state = rig(fail_launch=1)

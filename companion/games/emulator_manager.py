@@ -7076,22 +7076,67 @@ class EmulatorManager:
             raise EmulatorError("The recovery save is not this session's PS2 state")
         return source
 
-    def _pcsx2_load_recovery_state_running(self) -> dict[str, Any]:
-        """The prompt's Resume in a fresh PS2 launch: B52's ELF hold, PINE 0x0A slot 8, the picture; left running."""
+    def _pcsx2_save_relaunch_state(self) -> dict[str, Any]:
+        """B57: PINE 0x09 to the reserved slot 7, B52's file-complete check; no index (as PS1's relaunch save)."""
+        with self.lock:
+            self._refresh_process()
+            if self.process is None or self.active_game is None or self._ps2 is None:
+                raise EmulatorError("No PrivyHub game session is running")
+            slot = _ps2.RELAUNCH_SLOT
+            try:
+                self._ps2.ensure_pine_pause()
+            except _ps2.PS2Error as exc:
+                raise EmulatorError(str(exc)) from exc
+            folder = self._project_path(_ps2.DATA_DIR) / "sstates"
+            folder.mkdir(parents=True, exist_ok=True)
+            before = _ps2.state_files(folder)
+            result = self._ps2.state_message(_ps2.MSG_SAVE_STATE, slot)
+            if result != _ps2.PINE_OK:
+                self._ps2.log(f"PS2 relaunch save: slot {slot} pine 0x09 {'no answer' if result is None else 'fail'}")
+                raise EmulatorError("PCSX2 did not acknowledge the save state")
+            got = self._ps2.wait_state_file(folder, slot, before)
+            if got is None:
+                self._ps2.log(f"PS2 relaunch save: slot {slot} pine 0x09 ok; file not complete in "
+                              f"{_ps2.SAVE_BOUND_S:.1f}s")
+                raise EmulatorError("PrivyHub could not verify the relaunch savestate")
+            path, seconds = got
+            self._ps2.log(f"PS2 relaunch save: slot {slot} pine 0x09 ok; file complete {seconds:.1f}s")
+            return {
+                "ok": True,
+                "action": "save_relaunch_state",
+                "state_path": path,
+                "size_bytes": int(path.stat().st_size),
+                "slot": slot,
+                "ps2_states": "pine",
+            }
+
+    def _pcsx2_load_recovery_state_running(self, relaunch_source: Path | None = None) -> dict[str, Any]:
+        """The prompt's Resume in a fresh PS2 launch: B52's ELF hold, PINE 0x0A slot 8, the picture; left running.
+
+        B57: `relaunch_source` (the relaunch's `.07.p2s`) loads slot 7 the same way; a static / faulted picture raises
+        with `ps2_picture` set (the state was loaded and the game did not run from it)."""
         with self.lock:
             self._refresh_process()
             if self.process is None or self.active_game is None or self._ps2 is None:
                 raise EmulatorError("No active game session is available to load")
             if self._paused:
                 raise EmulatorError("The running-core recovery load requires the game to be running")
-            source = self._pcsx2_recovery_source()
-            slot = _ps2.RECOVERY_SLOT
+            if relaunch_source is None:
+                source = self._pcsx2_recovery_source()
+                slot = _ps2.RECOVERY_SLOT
+                what = "recovery"
+            else:
+                source = Path(relaunch_source)
+                slot = _ps2.RELAUNCH_SLOT
+                what = "relaunch"
+                if not source.name.endswith(f".{slot:02d}.p2s") or not source.is_file():
+                    raise EmulatorError("The relaunch save is not this session's PS2 state")
             sess = self._ps2
             if sess.log_path is None:
                 sess.log_path = _ps2.pcsx2_log_path(self.project_root)
             try:
                 if not sess.elf_started() and not sess.wait_elf():
-                    sess.log(f"PS2 recovery load: slot {slot} held; the game's ELF not up in {_ps2.ELF_WAIT_S:.0f}s")
+                    sess.log(f"PS2 {what} load: slot {slot} held; the game's ELF not up in {_ps2.ELF_WAIT_S:.0f}s")
                     raise EmulatorError("The game is still starting; play a moment, then load again")
                 sess.ensure_pine_pause()
             except _ps2.PS2Error as exc:
@@ -7100,7 +7145,7 @@ class EmulatorManager:
             offset = sess.log_size()
             result = sess.state_message(_ps2.MSG_LOAD_STATE, slot)
             if result != _ps2.PINE_OK:
-                sess.log(f"PS2 recovery load: slot {slot} pine 0x0a {'no answer' if result is None else 'fail'}")
+                sess.log(f"PS2 {what} load: slot {slot} pine 0x0a {'no answer' if result is None else 'fail'}")
                 try:
                     sess.resume()
                 except _ps2.PS2Error:
@@ -7112,9 +7157,11 @@ class EmulatorManager:
                 verdict, seconds = sess.check_picture(pre[0] if pre else None, offset)
             except _ps2.PS2Error:
                 verdict, seconds = "static", 0.0
-            sess.log(f"PS2 recovery load: slot {slot} pine 0x0a ok; picture {verdict} {seconds:.1f}s")
+            sess.log(f"PS2 {what} load: slot {slot} pine 0x0a ok; picture {verdict} {seconds:.1f}s")
             if verdict != "ok":
-                raise EmulatorError("The game did not resume from the save")
+                error = EmulatorError("The game did not resume from the save")
+                error.ps2_picture = verdict
+                raise error
             payload = self.status()
             payload["action"] = "load_recovery_state_running"
             payload["accepted"] = True
@@ -7123,6 +7170,8 @@ class EmulatorManager:
             payload["retroarch_loading_line"] = None
             payload["source_sha256"] = self._state_file_diagnostic(source).get("sha256")
             payload["ps2_states"] = "pine"
+            if relaunch_source is not None:
+                payload["slot"] = slot
             return payload
 
     def _pcsx2_copy_recovery_state_to_slot(self, slot: int, *, replace: bool = False) -> dict[str, Any]:
@@ -7654,8 +7703,9 @@ class EmulatorManager:
         Only the multitap relaunch calls this (`relaunch_ports.py`); no index is written, and the file is overwritten at
         the title's next relaunch. RetroArch sessions only.
         """
+        # B54 refused it; B57: a PS2 relaunch saves to PINE's reserved slot 7 (B52's file-complete check)
         if self._launch_kind == "pcsx2":
-            raise EmulatorError(PS2_NO_STATES)
+            return self._pcsx2_save_relaunch_state()
         with self.lock:
             self._refresh_process()
             if self.process is None or self.process.poll() is not None:
@@ -7700,7 +7750,10 @@ class EmulatorManager:
         """
         # B49 refused it; B55: a PS2 recovery save loads through PINE (B52's ELF hold and picture check)
         if self._launch_kind == "pcsx2":
-            return self._pcsx2_load_recovery_state_running()
+            # B57: the relaunch's slot-7 save when `source` names it; None = B55's slot-8 call exactly
+            if source is None:
+                return self._pcsx2_load_recovery_state_running()
+            return self._pcsx2_load_recovery_state_running(source)
         with self.lock:
             self._refresh_process()
             if (

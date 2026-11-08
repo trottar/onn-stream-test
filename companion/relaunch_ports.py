@@ -12,6 +12,13 @@ PINE slot is the follow-up) -> the encoder stopped -> the core stopped -> the la
 1.0-s settle, the running-core load of the relaunch save (D-BASE-R3c2's way), pause -> the encoder started for the
 remembered client on the new window. The new launch failing -> the previous ports again (the same load); that failing
 too -> the session ends and the error is the answer. The load failing -> the title runs from its start (`restarted`).
+
+B57 (a PS2 session only, so only with `PRIVYHUB_PS2=1`): the state goes through PINE's reserved slot 7 -- the save
+with B52's file-complete check, SIGTERM, the launch with `MultitapPort1` per the count, resume, the load holding until
+the game's ELF is up, B52's picture check -> `loaded`. No 1.0-s settle (the ELF hold is it). Any failed step -> the
+title restarts without the state (B54's PS2 behaviour) with `state: restarted` and a `reason`: a save failure is not
+a refusal on PS2; a loaded state whose picture is static / faulted -> the title launched once more, clean. Design:
+`docs/memory/evidence/b57_2026-11-08/design_written_before_code.md` (hashed before this code).
 """
 
 from __future__ import annotations
@@ -83,37 +90,71 @@ def run(plugin: Any, players: int, players_joined: int | None = None, *,
             raise RelaunchRefused(f"The game's state could not be saved; nothing was changed: {exc}") from exc
         state_path = saved.get("state_path")
     else:
-        row["reason"] = "ps2_no_relaunch_state"
+        # B57: PINE's slot 7; a failure is not a refusal on PS2 -- the title restarts without the state (B54's PS2 path)
+        try:
+            saved = step("save", emulator.save_relaunch_state)
+            state_path = saved.get("state_path")
+            row["ps2_states"] = "pine"
+            row["slot"] = saved.get("slot")
+        except Exception as exc:
+            row["reason"] = "ps2_relaunch_save_failed"
+            row["save_error"] = str(exc)[:200]
     step("stream_stop", stream.stop)
     step("stop", emulator.stop)
 
     ok = True
-    try:
-        step("launch", lambda: emulator.launch(game, players_chosen=target))
-        landed = target
-    except Exception as exc:
-        ok = False
-        row["fallback"] = "previous_ports"
-        row["launch_error"] = str(exc)[:200]
+
+    def launch_ports(name: str, ports: int) -> int:
+        nonlocal ok
         try:
-            step("launch_previous", lambda: emulator.launch(game, players_chosen=previous))
-            landed = previous
-        except Exception as exc2:
-            row["ok"] = False
-            row["total_ms"] = _ms(t_all, clock)
-            row["ended"] = True
-            plugin._recovery._log("relaunch_ports", **row)
+            step(name, lambda: emulator.launch(game, players_chosen=ports))
+            return ports
+        except Exception as exc:
+            ok = False
+            row["fallback"] = "previous_ports"
+            row["launch_error"] = str(exc)[:200]
             try:
-                stream.end_game_session()
-            except Exception:
-                pass
-            raise RuntimeError(f"The game could not restart with {target} players and was stopped: {exc2}") from exc2
+                step(name + "_previous", lambda: emulator.launch(game, players_chosen=previous))
+                return previous
+            except Exception as exc2:
+                row["ok"] = False
+                row["total_ms"] = _ms(t_all, clock)
+                row["ended"] = True
+                plugin._recovery._log("relaunch_ports", **row)
+                try:
+                    stream.end_game_session()
+                except Exception:
+                    pass
+                raise RuntimeError(
+                    f"The game could not restart with {target} players and was stopped: {exc2}") from exc2
+
+    landed = launch_ports("launch", target)
     session = getattr(emulator, "_players_session", None)
     if isinstance(session, dict):
         session["source"] = "relaunch"
 
     state = "restarted"
-    if state_path is not None:
+    if state_path is not None and kind == "pcsx2":
+        # B57: resume (PCSX2 boots on), the load holds until the ELF, B52's picture check; no settle
+        try:
+            step("resume", emulator.resume)
+            step("load", lambda: emulator.load_recovery_state_running(source=state_path))
+            state = "loaded"
+        except Exception as exc:
+            row["load_error"] = str(exc)[:200]
+            picture = getattr(exc, "ps2_picture", None)
+            if picture:
+                # the loaded state did not run: the title once more, clean (today's restart)
+                row["reason"] = f"ps2_relaunch_picture_{picture}"
+                step("stop_clean", emulator.stop)
+                landed = launch_ports("launch_clean", landed)
+                session = getattr(emulator, "_players_session", None)
+                if isinstance(session, dict):
+                    session["source"] = "relaunch"
+            else:
+                row["reason"] = "ps2_relaunch_load_failed"
+        step("pause_after", emulator.pause)
+    elif state_path is not None:
         try:
             step("resume", emulator.resume)
             step("settle", lambda: sleep(SETTLE_S))
@@ -139,6 +180,7 @@ def run(plugin: Any, players: int, players_joined: int | None = None, *,
                 "within_budget": total <= BUDGET_S * 1000.0})
     plugin._recovery._log("relaunch_ports", **row)
     plugin._recovery._log("ports_set", **ports)
-    return {"ok": ok, "relaunch": {k: row[k] for k in ("state", "steps_ms", "total_ms", "landed_ports", "kind")
+    keys = ("state", "steps_ms", "total_ms", "landed_ports", "kind", "reason")    # B57: + reason (only PS2 sets it)
+    return {"ok": ok, "relaunch": {k: row[k] for k in keys
                                    if k in row} | ({"fallback": row["fallback"]} if "fallback" in row else {}),
             "ports_set": ports}

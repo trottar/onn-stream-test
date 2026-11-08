@@ -13,6 +13,21 @@ contract `docs/memory/architecture/H0_IMPORT_CONTRACT_DESIGN_2026-11-06.md`. The
 The stick is only read. The library is `<repo>/games/ps1/` (no other target can be given); the BIOS folder is the
 PS1 core's, `data/games/retroarch/system/`. The terminal shows labels (`T1`, `T2`, ...) unless `--names`; the plan
 (local, under the git-ignored `data/`) holds names; the log under `data/import/logs/` holds counts and labels only.
+
+B58 (slice 1b, the same flag): the systems the hub lists -- PS1 (as above), SNES (`.sfc` / `.smc`), NES (`.nes`),
+Genesis (`.md` / `.gen` / `.bin`), each into its own `<repo>/games/<system>/` with a header check and the duplicate
+check; N64 / GameCube folders reported "not supported yet", a PS2 folder reported "stays on the external drive" (B49
+lists it in place), nothing planned for either. A plain source folder instead of a stick, read in place (no symlink
+root):
+
+    python3 tools/import_usb.py inspect --source <folder> --system <ps1|snes|nes|genesis>
+    python3 tools/import_usb.py plan --source <folder> --system <ps1|snes|nes|genesis>
+
+And the journal (`data/import/journal.json`): a candidate's entry is written before its first file and removed after
+its last; an apply that was interrupted (a crash, a power loss, Ctrl-C) leaves it, and the next apply first removes that
+candidate's own parts, the finals it linked and the folders it made, then copies it again if its plan accepts it. The
+list (with the flag) leaves the journal's titles out, so a half-placed title is never listed. Design:
+`docs/memory/evidence/b58_2026-11-08/design_written_before_code.md` (hashed before this code).
 """
 
 from __future__ import annotations
@@ -48,6 +63,16 @@ LIST_EXT = {".chd", ".cue", ".m3u", ".iso"}         # what the plugin lists for 
 DISC_RE = re.compile(r"\s*[\(\[]\s*dis[ck]\s*(\d+)(?:\s*of\s*\d+)?\s*[\)\]]", re.IGNORECASE)
 FILE_RE = re.compile(r'^\s*FILE\s+(?:"([^"]+)"|(\S+))\s+\S+', re.IGNORECASE)
 TRACK_RE = re.compile(r"^\s*TRACK\s+(\d+)\s+(\S+)", re.IGNORECASE)
+# B58: the systems the hub lists (plugins/games.py SYSTEMS), each into <repo>/games/<system>/; the cartridge ones
+SYSTEMS = ("ps1", "snes", "nes", "genesis")
+ROM_EXT = {"snes": (".sfc", ".smc"), "nes": (".nes",), "genesis": (".md", ".gen", ".bin")}
+SYSTEM_NAMES = {"ps1": "PS1", "snes": "SNES", "nes": "NES", "genesis": "Genesis"}
+# folders reported, never planned: B45's reserved ones (no core yet) and PS2 (B49 lists it in place from the drive)
+REPORTED = {"n64": "not supported yet", "gamecube": "not supported yet",
+            "ps2": "PS2 games stay on the external drive and are listed from there - not imported"}
+UNKNOWN_FOLDER = "unknown_system_folder"
+JOURNAL_NAME = "journal.json"
+SNES_HEADERS = (0x7FDC, 0xFFDC, 0x40FFDC)       # LoROM, HiROM, ExHiROM: the complement, then the checksum (LE)
 
 EXIT_OK, EXIT_USAGE, EXIT_NOTHING, EXIT_PARTIAL, EXIT_VERIFY, EXIT_SOURCE, EXIT_SPACE, EXIT_ACTIVE, EXIT_FLAG = (
     0, 2, 3, 4, 5, 6, 7, 8, 9)
@@ -57,6 +82,8 @@ OPENBIOS_WARNING = ("A real BIOS changes the firmware every PS1 game starts with
 
 # test hook: called after each file's copy as (cid, n); a raise there is a failure midway
 _FAIL_HOOK: Callable[[str, int], None] | None = None
+# B58 test hook: called inside _place with the part written and synced, before its link (a crash mid-copy)
+_PART_HOOK: Callable[[Path], None] | None = None
 
 
 class Usage(Exception):
@@ -83,6 +110,15 @@ def stable_id(system: str, relative_path: str) -> str:
 
 def title_key(path: Path) -> str:
     return " ".join(DISC_RE.sub(" ", clean_name(path)).split()).casefold()
+
+
+def title_key_for(system: str, path: Path) -> str:
+    """B58: PS1 drops the disc number (B56); a cartridge title is its clean name."""
+    return title_key(path) if system == SYSTEM else " ".join(clean_name(path).split()).casefold()
+
+
+def lib_rel(system: str) -> Path:
+    return Path("games") / system
 
 
 def disc_number(path: Path) -> int | None:
@@ -156,14 +192,15 @@ def parse_cue(cue: Path) -> tuple[list[tuple[str, Path | None]], str | None, str
 
 def scan_stick(root: Path) -> dict[str, Any]:
     """inspect: candidates and rejections from PrivyHub-Import/games/ps1/, the BIOS report, the other folders."""
-    games = root / "games" / SYSTEM
-    out: dict[str, Any] = {"candidates": [], "rejected": [], "ignored_hidden": 0, "other_systems": [],
-                           "bios": scan_bios(root / "bios" / SYSTEM)}
+    out = scan_ps1(root / "games" / SYSTEM, root / "bios" / SYSTEM)
     gdir = root / "games"
     if gdir.is_dir():
         out["other_systems"] = sorted(p.name for p in gdir.iterdir() if p.is_dir() and p.name != SYSTEM)
-    if not games.is_dir():
-        return out
+    return out
+
+
+def _walk(games: Path, out: dict[str, Any]) -> list[Path]:
+    """The source folder's files (B56's rules): hidden ones counted and ignored, symlinks and bad names rejected."""
     files: list[Path] = []
     for p in sorted(games.rglob("*"), key=lambda q: str(q).casefold()):
         if p.name.startswith("."):
@@ -180,6 +217,95 @@ def scan_stick(root: Path) -> dict[str, Any]:
                 out["rejected"].append({"source": p, "reason": "bad_name"})
                 continue
             files.append(p)
+    return files
+
+
+def scan_rom(games: Path, system: str) -> dict[str, Any]:
+    """B58: a cartridge system's folder -- one candidate per file with the system's extension; others rejected."""
+    out: dict[str, Any] = {"candidates": [], "rejected": [], "ignored_hidden": 0, "other_systems": [], "bios": []}
+    if not games.is_dir():
+        return out
+    for p in _walk(games, out):
+        if p.suffix.casefold() in ROM_EXT[system]:
+            out["candidates"].append({"kind": "rom", "entry": p, "make_m3u": False, "title": clean_name(p),
+                                      "error": None, "discs": [{"entry": p, "kind": "rom", "files": [p],
+                                                                "mode": None, "error": None}]})
+        else:
+            out["rejected"].append({"source": p, "reason": "unknown_type"})
+    for i, c in enumerate(out["candidates"], 1):
+        c["label"] = f"T{i}"
+    return out
+
+
+def _inside(path: Path, folder: Path) -> bool:
+    try:
+        path.resolve().relative_to(folder.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def scan_source(source: str | Path | None, project_root: Path, *, plain_system: str | None = None,
+                folder: str | Path | None = None) -> dict[str, Any]:
+    """B58: the stick form (`source` = a mount holding PrivyHub-Import/) or the plain-folder form (`folder` with
+    `plain_system`): every planned system's candidates (labels across systems), the reported folders, the BIOS."""
+    out: dict[str, Any] = {"form": "plain" if folder is not None else "stick", "systems": [], "candidates": [],
+                           "rejected": [], "ignored_hidden": 0, "reported": {}, "bios": [], "bases": {},
+                           "journal_pending": len(read_journal(project_root))}
+    parts: list[tuple[str, Path]] = []
+    if folder is not None:
+        base = Path(folder)
+        if not base.is_dir():
+            raise Usage("that source folder does not exist")
+        if _inside(base, project_root / "games"):
+            raise Usage("the source is inside the hub's own library")
+        out["root"] = base
+        if plain_system in REPORTED:
+            out["reported"][plain_system] = {"why": REPORTED[plain_system], "files": _count_files(base)}
+        else:
+            parts.append((str(plain_system), base))
+    else:
+        root = find_root(source)
+        out["root"] = root
+        out["bios"] = scan_bios(root / "bios" / SYSTEM)
+        gdir = root / "games"
+        for d in sorted((p for p in gdir.iterdir() if p.is_dir()), key=lambda q: q.name.casefold()) \
+                if gdir.is_dir() else []:
+            name = d.name.casefold()
+            if d.is_symlink():
+                out["rejected"].append({"source": d, "reason": "symlink"})
+            elif name in SYSTEMS:
+                parts.append((name, d))
+            elif name in REPORTED:
+                out["reported"][d.name] = {"why": REPORTED[name], "files": _count_files(d)}
+            else:
+                out["reported"][d.name] = {"why": UNKNOWN_FOLDER, "files": _count_files(d)}
+    for system, base in parts:
+        st = scan_ps1(base, None) if system == SYSTEM else scan_rom(base, system)
+        out["systems"].append(system)
+        out["bases"][system] = base
+        for c in st["candidates"]:
+            c["system"] = system
+        out["candidates"].extend(st["candidates"])
+        out["rejected"].extend(dict(r, system=system) for r in st["rejected"])
+        out["ignored_hidden"] += st["ignored_hidden"]
+    for i, c in enumerate(out["candidates"], 1):
+        c["label"] = f"T{i}"
+    out["other_systems"] = sorted(out["reported"])
+    return out
+
+
+def _count_files(d: Path) -> int:
+    return sum(1 for p in d.rglob("*") if p.is_file() and not p.is_symlink() and not p.name.startswith("."))
+
+
+def scan_ps1(games: Path, bios_dir: Path | None) -> dict[str, Any]:
+    """B56's scan of a PS1 games folder (B58: any folder -- the stick's games/ps1/ or a plain source folder)."""
+    out: dict[str, Any] = {"candidates": [], "rejected": [], "ignored_hidden": 0, "other_systems": [],
+                           "bios": scan_bios(bios_dir) if bios_dir is not None else []}
+    if not games.is_dir():
+        return out
+    files = _walk(games, out)
     by_ext: dict[str, list[Path]] = {}
     for p in files:
         by_ext.setdefault(p.suffix.casefold(), []).append(p)
@@ -329,23 +455,58 @@ def check_unit(unit: Mapping[str, Any]) -> str | None:
     return None
 
 
+def snes_copier_header(size: int) -> bool:
+    return size % 1024 == 512
+
+
+def check_rom(system: str, p: Path) -> str | None:
+    """B58 (B45 section 3.4): NES `NES\\x1a` at 0; SNES a sane size (less a 512-byte copier header) and the internal
+    header's checksum + complement = 0xFFFF at LoROM / HiROM / ExHiROM; Genesis `SEGA` at 0x100-0x10F."""
+    size = p.stat().st_size
+    with open(p, "rb") as fh:
+        if system == "nes":
+            return None if fh.read(4) == b"NES\x1a" else "bad_header"
+        if system == "genesis":
+            fh.seek(0x100)
+            return None if b"SEGA" in fh.read(16) else "bad_header"
+        if system == "snes":
+            skip = 512 if snes_copier_header(size) else 0
+            body = size - skip
+            if body % 1024 or body < 32 * 1024:
+                return "bad_header"
+            for off in SNES_HEADERS:
+                if skip + off + 4 > size:
+                    continue
+                fh.seek(skip + off)
+                b = fh.read(4)
+                complement, checksum = int.from_bytes(b[:2], "little"), int.from_bytes(b[2:], "little")
+                if complement ^ checksum == 0xFFFF:
+                    return None
+            return "bad_header"
+    return "unknown_type"
+
+
 # --- the library ----------------------------------------------------------------------------------------------------
 
-def library(project_root: Path) -> dict[str, Any]:
-    """The PS1 entries as the plugin lists them (an .m3u hides what it names), every file's size, the titles."""
-    lib = project_root / LIB_REL
+def library(project_root: Path, system: str = SYSTEM, exclude: frozenset | set = frozenset()) -> dict[str, Any]:
+    """The PS1 entries as the plugin lists them (an .m3u hides what it names), every file's size, the titles.
+
+    B58: any listed system (its own folder and extensions; the .m3u rule is PS1's), leaving out `exclude` (the journal's
+    half-placed files: an interrupted import is not "already in the library")."""
+    rel_root = lib_rel(system)
+    lib = project_root / rel_root
     out: dict[str, Any] = {"entries": [], "sizes": {}, "titles": {}}
     if not lib.is_dir():
         return out
-    files = [p for p in lib.rglob("*") if p.is_file() and not p.name.startswith(".")]
+    files = [p for p in lib.rglob("*") if p.is_file() and not p.name.startswith(".") and p not in exclude]
     for p in files:
         try:
             out["sizes"].setdefault(p.stat().st_size, []).append(p)
         except OSError:
             pass
-    listed = [p for p in files if p.suffix.casefold() in LIST_EXT]
+    listed = [p for p in files if p.suffix.casefold() in (LIST_EXT if system == SYSTEM else ROM_EXT[system])]
     hidden: set[Path] = set()
-    for m in (p for p in listed if p.suffix.casefold() == ".m3u"):
+    for m in (p for p in listed if system == SYSTEM and p.suffix.casefold() == ".m3u"):
         for raw in m.read_text(encoding="utf-8", errors="replace").splitlines():
             line = raw.strip()
             if line and not line.startswith("#"):
@@ -353,9 +514,9 @@ def library(project_root: Path) -> dict[str, Any]:
     for p in sorted(listed, key=lambda q: str(q).casefold()):
         if p.resolve() in hidden and p.suffix.casefold() != ".m3u":
             continue
-        rel = (LIB_REL / p.relative_to(lib)).as_posix()
-        e = {"path": p, "rel": rel, "id": stable_id(SYSTEM, rel), "format": p.suffix.casefold().lstrip("."),
-             "title_key": title_key(p)}
+        rel = (rel_root / p.relative_to(lib)).as_posix()
+        e = {"path": p, "rel": rel, "id": stable_id(system, rel), "format": p.suffix.casefold().lstrip("."),
+             "title_key": title_key_for(system, p)}
         out["entries"].append(e)
         out["titles"].setdefault(e["title_key"], []).append(e)
     return out
@@ -387,27 +548,36 @@ def library_entry_for(lib: Mapping[str, Any], f: Path) -> str | None:
 
 # --- plan -----------------------------------------------------------------------------------------------------------
 
-def make_plan(mount: str | Path, project_root: Path, *, free_bytes: Callable[[Path], int] | None = None) -> dict[str, Any]:
-    root = find_root(mount)
-    st = scan_stick(root)
-    lib = library(project_root)
+def make_plan(mount: str | Path | None, project_root: Path, *, free_bytes: Callable[[Path], int] | None = None,
+              source: str | Path | None = None, system: str | None = None) -> dict[str, Any]:
+    """B56's plan; B58: every planned system of the stick (or the plain folder `source` as `system`), the journal's
+    half-placed files treated as absent."""
+    st = scan_source(mount, project_root, folder=source, plain_system=system)
+    journal = read_journal(project_root)
+    excluded = {project_root / t for e in journal.values() for t in e.get("targets", [])
+                if t not in e.get("preexisting", [])}
+    libs = {sysid: library(project_root, sysid, excluded) for sysid in st["systems"]}
     hashes = HashCache()
-    lib_dir = project_root / LIB_REL
-    games_root = root / "games" / SYSTEM
     cands: list[dict[str, Any]] = []
     seen_content: dict[tuple, str] = {}
-    stick_chd_titles = {title_key(c["entry"]) for c in st["candidates"] if c["kind"] == "chd" and not c["error"]}
-    stick_chd_titles |= {c["title"].casefold() for c in st["candidates"]
+    ps1_c = [c for c in st["candidates"] if c["system"] == SYSTEM]
+    stick_chd_titles = {title_key(c["entry"]) for c in ps1_c if c["kind"] == "chd" and not c["error"]}
+    stick_chd_titles |= {c["title"].casefold() for c in ps1_c
                          if c["kind"] == "m3u_set" and all(d["kind"] == "chd" for d in c["discs"])}
-    lib_chd_titles = {k for k, es in lib["titles"].items() if any(e["format"] == "chd" for e in es)}
+    lib_ps1 = libs.get(SYSTEM, {"entries": [], "sizes": {}, "titles": {}})
+    lib_chd_titles = {k for k, es in lib_ps1["titles"].items() if any(e["format"] == "chd" for e in es)}
 
     for c in st["candidates"]:
+        sysid = c["system"]
+        rel_root = lib_rel(sysid)
+        games_root = st["bases"][sysid]
+        lib = libs[sysid]
         entry: Path = c["entry"]
-        rel_entry = (LIB_REL / entry.relative_to(games_root)).as_posix()
-        key = title_key(entry) if c["kind"] != "m3u_set" else c["title"].casefold()
-        item: dict[str, Any] = {"label": c["label"], "kind": c["kind"], "title": c["title"],
+        rel_entry = (rel_root / entry.relative_to(games_root)).as_posix()
+        key = c["title"].casefold() if c["kind"] == "m3u_set" else title_key_for(sysid, entry)
+        item: dict[str, Any] = {"label": c["label"], "system": sysid, "kind": c["kind"], "title": c["title"],
                                 "cid": "c_" + hashlib.sha256(rel_entry.encode()).hexdigest()[:12],
-                                "entry_target": rel_entry, "game_id": stable_id(SYSTEM, rel_entry),
+                                "entry_target": rel_entry, "game_id": stable_id(sysid, rel_entry),
                                 "files": [], "make_m3u": None, "decision": "accept", "reason": None,
                                 "duplicate_of": None}
         cands.append(item)
@@ -419,14 +589,19 @@ def make_plan(mount: str | Path, project_root: Path, *, free_bytes: Callable[[Pa
             else:
                 item.update(decision="reject", reason="iso_not_launchable")
             continue
-        err = c["error"] or next((check_unit(d) for d in c["discs"] if check_unit(d)), None)
+        if c["kind"] == "rom":
+            err = c["error"] or check_rom(sysid, entry)
+            if sysid == "snes":
+                item["copier_header"] = snes_copier_header(entry.stat().st_size)
+        else:
+            err = c["error"] or next((check_unit(d) for d in c["discs"] if check_unit(d)), None)
         files: list[dict[str, Any]] = []
         for d in c["discs"]:
             for f in d["files"]:
                 role = "entry" if f == d["entry"] else "track"
                 if c["kind"] == "m3u_set" and role == "entry":
                     role = "disc"
-                files.append({"source": str(f), "target_rel": (LIB_REL / f.relative_to(games_root)).as_posix(),
+                files.append({"source": str(f), "target_rel": (rel_root / f.relative_to(games_root)).as_posix(),
                               "bytes": f.stat().st_size if f.exists() else 0, "sha256": None, "role": role})
         if c["kind"] == "m3u_set":
             lines = [Path(d["entry"]).relative_to(entry.parent).as_posix() for d in c["discs"]]
@@ -444,8 +619,9 @@ def make_plan(mount: str | Path, project_root: Path, *, free_bytes: Callable[[Pa
         for f in files:
             f["sha256"] = hashes(Path(f["source"]))
         # the content: the data files (a .chd, a cue's tracks), never a cue sheet's or a playlist's text
-        data = [f for f in files if f["role"] != "playlist" and Path(f["source"]).suffix.casefold() != ".cue"]
-        content = tuple(sorted((f["bytes"], f["sha256"]) for f in data))
+        data = [f for f in files if f["role"] != "playlist" and
+                not (sysid == SYSTEM and Path(f["source"]).suffix.casefold() == ".cue")]
+        content = (sysid,) + tuple(sorted((f["bytes"], f["sha256"]) for f in data))
         # against the library by hash, size-gated
         matched_ids = []
         for f in data:
@@ -469,27 +645,31 @@ def make_plan(mount: str | Path, project_root: Path, *, free_bytes: Callable[[Pa
             continue
         seen_content[content] = item["label"]
         # by title: two entries for one title would split saves and play counts (a library .iso alone gives way to a
-        # .chd: it is hidden instead)
+        # .chd: it is hidden instead -- PS1 only; a cartridge title in a second format is a duplicate, nothing hidden)
         same = lib["titles"].get(key, [])
-        chd_like = c["kind"] == "chd" or (c["kind"] == "m3u_set" and all(
-            Path(f["source"]).suffix.casefold() == ".chd" for f in files if f["role"] == "disc"))
+        chd_like = sysid == SYSTEM and (c["kind"] == "chd" or (c["kind"] == "m3u_set" and all(
+            Path(f["source"]).suffix.casefold() == ".chd" for f in files if f["role"] == "disc")))
         if same and not (chd_like and all(e["format"] == "iso" for e in same)):
             item.update(decision="duplicate", reason="duplicate: title present", duplicate_of=same[0]["id"])
             continue
-        # the target exists with other bytes: never renamed, never overwritten
-        clash = any((project_root / f["target_rel"]).exists() for f in files)
-        if item["make_m3u"] and (project_root / item["make_m3u"]["target_rel"]).exists():
+        # the target exists with other bytes: never renamed, never overwritten (the journal's half-placed files are
+        # not "existing": the next apply removes them first)
+        def taken(rel: str) -> bool:
+            t = project_root / rel
+            return t.exists() and t not in excluded
+        clash = any(taken(f["target_rel"]) for f in files)
+        if item["make_m3u"] and taken(item["make_m3u"]["target_rel"]):
             clash = True
         if clash:
             item.update(decision="reject", reason="target_exists_different")
             continue
 
-    # hide: a library .iso whose title has a .chd (in the library, or accepted here)
+    # hide: a library .iso whose title has a .chd (in the library, or accepted here) -- PS1 only
     accepted_chd = {title_key(Path(i["entry_target"])) if i["kind"] == "chd" else i["title"].casefold()
-                    for i in cands if i["decision"] == "accept" and (i["kind"] == "chd" or (
+                    for i in cands if i["system"] == SYSTEM and i["decision"] == "accept" and (i["kind"] == "chd" or (
                         i["kind"] == "m3u_set" and all(Path(f["source"]).suffix.casefold() == ".chd"
                                                        for f in i["files"] if f["role"] == "disc")))}
-    hide = {e["id"]: "chd present" for e in lib["entries"]
+    hide = {e["id"]: "chd present" for e in lib_ps1["entries"]
             if e["format"] == "iso" and (e["title_key"] in lib_chd_titles or e["title_key"] in accepted_chd)}
 
     # BIOS: real files on the stick not already in the core's folder
@@ -507,15 +687,21 @@ def make_plan(mount: str | Path, project_root: Path, *, free_bytes: Callable[[Pa
 
     need = sum(f["bytes"] for i in cands if i["decision"] == "accept" for f in i["files"])
     need += sum(b["bytes"] for b in bios if b["decision"] == "accept")
-    target_fs = lib_dir if lib_dir.exists() else project_root
+    games_dir = project_root / "games"
+    target_fs = games_dir if games_dir.exists() else project_root
     free = (free_bytes or _free_bytes)(target_fs)
     plan = {
         "schema": "privyhub.import.plan/1",
         "created_utc": now_utc(),
-        "source_root": str(root),
+        "source_root": str(st["root"]),
+        "source_form": st["form"],
+        "systems": list(st["systems"]),
+        "reported": {k: v["why"] for k, v in st["reported"].items()},
+        "journal_pending": st["journal_pending"],
         "library_root": LIB_REL.as_posix(),
         "candidates": cands,
-        "rejected": [{"source": str(r["source"]), "reason": r["reason"]} for r in st["rejected"]],
+        "rejected": [{"source": str(r["source"]), "reason": r["reason"], "system": r.get("system")}
+                     for r in st["rejected"]],
         "ignored_hidden": st["ignored_hidden"],
         "other_systems": st["other_systems"],
         "hide": hide,
@@ -555,6 +741,8 @@ def _place(write: Callable[[Any], str], final: Path, part: Path, want: str | Non
         fh.flush()
         os.fsync(fh.fileno())
     _fsync_dir(part.parent)
+    if _PART_HOOK is not None:
+        _PART_HOOK(part)
     if want is not None and got != want:
         raise RuntimeError("verify")
     os.link(part, final)                    # FileExistsError if the final exists: no overwrite
@@ -619,6 +807,135 @@ def game_active(url: str = STATUS_URL) -> bool:
         return False
 
 
+# --- B58: the journal ------------------------------------------------------------------------------------------------
+
+def journal_path(project_root: Path) -> Path:
+    return project_root / DATA_REL / JOURNAL_NAME
+
+
+def read_journal(project_root: Path) -> dict[str, dict[str, Any]]:
+    try:
+        j = json.loads(journal_path(project_root).read_text(encoding="utf-8"))
+        entries = j.get("entries") if isinstance(j, dict) else None
+        return dict(entries) if isinstance(entries, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def write_json_durable(path: Path, data: Any) -> None:
+    """write_json_atomic with the temp file and the folder fsynced (the journal must survive a power loss)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.tmp")
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write(json.dumps(data, indent=2, sort_keys=True) + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, path)
+    _fsync_dir(path.parent)
+
+
+def _journal_set(project_root: Path, cid: str, entry: dict[str, Any] | None) -> None:
+    entries = read_journal(project_root)
+    if entry is None:
+        entries.pop(cid, None)
+    else:
+        entries[cid] = entry
+    if entries:
+        write_json_durable(journal_path(project_root), {"schema": "privyhub.import.journal/1", "entries": entries})
+    else:
+        try:
+            journal_path(project_root).unlink()
+            _fsync_dir(journal_path(project_root).parent)
+        except FileNotFoundError:
+            pass
+
+
+def journal_entry(c: Mapping[str, Any], project_root: Path, plan_name: str | None) -> dict[str, Any]:
+    """What a crash would leave for this candidate: its targets, parts, the folders it would make, the list's ids."""
+    sysid = c.get("system", SYSTEM)
+    targets = [f["target_rel"] for f in c["files"]] + ([c["make_m3u"]["target_rel"]] if c.get("make_m3u") else [])
+    parts = [(Path(f["target_rel"]).parent / f".import-{c['cid']}-{n}.part").as_posix()
+             for n, f in enumerate(c["files"])]
+    if c.get("make_m3u"):
+        parts.append((Path(c["make_m3u"]["target_rel"]).parent / f".import-{c['cid']}-m3u.part").as_posix())
+    hashes = {f["target_rel"]: f["sha256"] for f in c["files"]}
+    if c.get("make_m3u"):
+        hashes[c["make_m3u"]["target_rel"]] = hashlib.sha256(m3u_bytes(c["make_m3u"]["lines"])).hexdigest()
+    dirs_new: list[str] = []
+    for t in targets:
+        d = (project_root / t).parent
+        while not d.exists() and d != project_root:
+            rel = d.relative_to(project_root).as_posix()
+            if rel not in dirs_new:
+                dirs_new.append(rel)
+            d = d.parent
+    listed = LIST_EXT if sysid == SYSTEM else set(ROM_EXT[sysid])
+    return {"system": sysid, "label": c["label"], "plan": plan_name, "started_utc": now_utc(), "targets": targets,
+            "parts": parts, "preexisting": [t for t in targets if (project_root / t).exists()],
+            "dirs_new": dirs_new, "sha256": hashes,
+            "list_ids": [stable_id(sysid, t) for t in targets if Path(t).suffix.casefold() in listed]}
+
+
+def _confined(project_root: Path, rel: str) -> Path | None:
+    """A journal path inside <repo>/games/<a listed system>/ (or the PS1 core's BIOS folder), else None (never
+    followed)."""
+    parts = Path(rel).parts
+    if ".." in parts or Path(rel).is_absolute():
+        return None
+    if len(parts) >= 3 and parts[0] == "games" and parts[1] in SYSTEMS:
+        return project_root / rel
+    if len(parts) == len(BIOS_REL.parts) + 1 and Path(*parts[:-1]) == BIOS_REL:
+        return project_root / rel
+    return None
+
+
+def recover_journal(project_root: Path) -> list[dict[str, Any]]:
+    """An interrupted apply's candidates: their own parts, the finals they linked (the journal's bytes only), the
+    folders they made (if empty) removed; the entries dropped. Nothing outside the journal's paths is touched."""
+    out = []
+    for cid, e in sorted(read_journal(project_root).items()):
+        conflicts = 0
+        for rel in e.get("parts", []):
+            p = _confined(project_root, rel)
+            if p is None or not (p.name.startswith(f".import-{cid}-") or p.name == f".import-{cid}.part"):
+                conflicts += 1
+                continue
+            try:
+                p.unlink()
+            except FileNotFoundError:
+                pass
+        pre = set(e.get("preexisting", []))
+        for rel in e.get("targets", []):
+            p = _confined(project_root, rel)
+            if rel in pre:
+                continue
+            if p is None:
+                conflicts += 1
+                continue
+            if not p.exists():
+                continue
+            try:
+                same = p.is_file() and not p.is_symlink() and sha256(p) == e.get("sha256", {}).get(rel)
+            except OSError:
+                same = False
+            if same:
+                p.unlink()
+            else:
+                conflicts += 1                      # not the bytes this import linked: left for the user
+        for rel in sorted(e.get("dirs_new", []), key=lambda r: len(Path(r).parts), reverse=True):
+            p = _confined(project_root, rel + "/x")
+            if p is None:
+                continue
+            try:
+                p.parent.rmdir()
+            except OSError:
+                pass
+        _journal_set(project_root, cid, None)
+        out.append({"cid": cid, "label": e.get("label"), "system": e.get("system"),
+                    "result": "journal_conflict" if conflicts else "cleaned"})
+    return out
+
+
 def apply_plan(plan: dict[str, Any], project_root: Path, *, while_playing: bool = False,
                active: Callable[[], bool] = game_active, now_ms: int | None = None,
                free_bytes: Callable[[Path], int] | None = None) -> tuple[int, dict[str, Any]]:
@@ -629,6 +946,8 @@ def apply_plan(plan: dict[str, Any], project_root: Path, *, while_playing: bool 
     except OSError:
         pass
     now_ms = int(time.time() * 1000) if now_ms is None else now_ms
+    # B58: an interrupted apply first (its candidates removed; one this plan accepts is copied again below)
+    recovered = recover_journal(project_root)
     results: list[dict[str, Any]] = []
     todo = [c for c in plan["candidates"] if c["decision"] == "accept"]
     for c in todo:
@@ -643,8 +962,8 @@ def apply_plan(plan: dict[str, Any], project_root: Path, *, while_playing: bool 
                 break
     need = sum(f["bytes"] for c in todo if "_skip" not in c for f in c["files"])
     need += sum(b["bytes"] for b in plan["bios"]["stick"] if b["decision"] == "accept")
-    lib_dir = project_root / LIB_REL
-    free = (free_bytes or _free_bytes)(lib_dir if lib_dir.exists() else project_root)
+    games_dir = project_root / "games"
+    free = (free_bytes or _free_bytes)(games_dir if games_dir.exists() else project_root)
     if free < need * SPACE_MARGIN:
         return EXIT_SPACE, {"error": "not enough space", "needed_bytes": need, "free_bytes": free}
     placed: list[dict[str, Any]] = []
@@ -654,8 +973,22 @@ def apply_plan(plan: dict[str, Any], project_root: Path, *, while_playing: bool 
             results.append({"label": c["label"], "kind": c["kind"], "result": c["_skip"]})
             source_error = source_error or c["_skip"] == "source_unreadable"
             continue
+        # B58: a title an interrupted run of this plan placed whole before the crash (every target with the plan's
+        # bytes) is not copied again; it gets the marks that run never wrote
+        whole = [(project_root / f["target_rel"], f["sha256"]) for f in c["files"]]
+        if c.get("make_m3u"):
+            whole.append((project_root / c["make_m3u"]["target_rel"],
+                          hashlib.sha256(m3u_bytes(c["make_m3u"]["lines"])).hexdigest()))
+        if all(t.is_file() and not t.is_symlink() and sha256(t) == h for t, h in whole):
+            placed.append({"label": c["label"], "game_id": c["game_id"], "again": True,
+                           "files": [{"target_rel": t.relative_to(project_root).as_posix(), "sha256": h}
+                                     for t, h in whole]})
+            results.append({"label": c["label"], "kind": c["kind"], "result": "already_placed",
+                            "files": len(whole), "bytes": sum(f["bytes"] for f in c["files"])})
+            continue
         created: list[Path] = []
         made: list[Path] = []
+        _journal_set(project_root, c["cid"], journal_entry(c, project_root, plan.get("_plan_name")))
         try:
             for n, f in enumerate(c["files"]):
                 final = project_root / f["target_rel"]
@@ -678,8 +1011,10 @@ def apply_plan(plan: dict[str, Any], project_root: Path, *, while_playing: bool 
             results.append({"label": c["label"], "kind": c["kind"], "result": "placed",
                             "files": len(c["files"]) + (1 if c.get("make_m3u") else 0),
                             "bytes": sum(f["bytes"] for f in c["files"])})
+            _journal_set(project_root, c["cid"], None)
         except Exception as exc:
             _rollback(created, made)
+            _journal_set(project_root, c["cid"], None)
             reason = ("verify_failed" if str(exc) == "verify" else
                       "target_exists" if isinstance(exc, FileExistsError) else
                       "source_unreadable" if isinstance(exc, OSError) else "failed")
@@ -692,35 +1027,55 @@ def apply_plan(plan: dict[str, Any], project_root: Path, *, while_playing: bool 
             continue
         created, made = [], []
         final = project_root / BIOS_REL / b["name"]
+        # B58: journaled as a title is (the core's folder is made by RetroArch's setup; no folder is recorded)
+        bid = f"bios-{b['region']}"
+        target = (BIOS_REL / b["name"]).as_posix()
+        _journal_set(project_root, bid, {
+            "system": SYSTEM, "label": bid, "plan": plan.get("_plan_name"), "started_utc": now_utc(),
+            "targets": [target], "parts": [(BIOS_REL / f".import-{bid}.part").as_posix()],
+            "preexisting": [target] if final.exists() else [], "dirs_new": [], "sha256": {target: b.get("sha256")},
+            "list_ids": []})
         try:
             _mkdirs(final.parent, made)
             _place(_copier(Path(b["source"])), final, final.parent / f".import-bios-{b['region']}.part",
                    b.get("sha256"), created)
             bios_done.append(b["region"])
+            _journal_set(project_root, bid, None)
         except Exception:
             _rollback(created, made)
+            _journal_set(project_root, bid, None)
     # the marks the list reads: NEW for 7 days, the hidden .iso
     marks_path = project_root / DATA_REL / MARKS_NAME
     marks = read_marks(marks_path)
     for p in placed:
-        marks["new"][p["game_id"]] = now_ms
+        if p.get("again"):
+            marks["new"].setdefault(p["game_id"], now_ms)      # B58: a title placed before keeps its own date
+        else:
+            marks["new"][p["game_id"]] = now_ms
     for gid, why in plan.get("hide", {}).items():
         marks["hide"][gid] = why
     if placed or plan.get("hide"):
         write_json_atomic(marks_path, marks)
+    placed_cids = {c["cid"] for c in todo if any(p["game_id"] == c["game_id"] for p in placed)
+                   and any(r["label"] == c["label"] and r["result"] == "placed" for r in results)}
+    for r in recovered:
+        if r["result"] == "cleaned" and r["cid"] in placed_cids:
+            r["result"] = "resumed"
     summary = {
-        "results": results, "placed": placed, "bios_copied": bios_done,
+        "results": results, "placed": placed, "bios_copied": bios_done, "journal": recovered,
         "hidden": len(plan.get("hide", {})),
-        "totals": {"placed": len(placed), "failed": sum(1 for r in results if r["result"] != "placed"),
+        "totals": {"placed": len(placed), "failed": sum(1 for r in results
+                                                        if r["result"] not in ("placed", "already_placed")),
                    "duplicate": plan["totals"]["duplicate"], "reject": plan["totals"]["reject"]},
     }
     if any(r["result"] == "verify_failed" for r in results):
         code = EXIT_VERIFY
     elif source_error:
         code = EXIT_SOURCE
-    elif any(r["result"] != "placed" for r in results):
+    elif any(r["result"] not in ("placed", "already_placed") for r in results) or \
+            any(r["result"] == "journal_conflict" for r in recovered):
         code = EXIT_PARTIAL
-    elif not todo and not bios_done and plan["totals"]["duplicate"] == 0 and not plan.get("hide"):
+    elif not todo and not bios_done and plan["totals"]["duplicate"] == 0 and not plan.get("hide") and not recovered:
         code = EXIT_NOTHING
     else:
         code = EXIT_OK
@@ -764,10 +1119,18 @@ def sanitized_rows(command: str, plan: Mapping[str, Any], summary: Mapping[str, 
     rows = [{"event": command, "utc": now_utc(), "totals": dict(plan.get("totals", {})),
              "hidden_iso": len(plan.get("hide", {})), "ignored_hidden": plan.get("ignored_hidden", 0),
              "other_systems": len(plan.get("other_systems", []))}]
+    # B58: the form, the systems, the reported folders by reason (a folder's own name never), the journal's count
+    if "source_form" in plan:
+        reported: dict[str, int] = {}
+        for folder, why in plan.get("reported", {}).items():
+            code = folder if folder in REPORTED else UNKNOWN_FOLDER
+            reported[code] = reported.get(code, 0) + 1
+        rows[0].update({"source_form": plan["source_form"], "systems": list(plan.get("systems", [])),
+                        "reported": reported, "journal_pending": plan.get("journal_pending", 0)})
     for c in plan.get("candidates", []):
         rows.append({"label": c["label"], "kind": c["kind"], "files": len(c["files"]) + (1 if c.get("make_m3u") else 0),
                      "bytes": sum(f["bytes"] for f in c["files"]), "decision": c["decision"],
-                     "reason": _reason_code(c.get("reason"))})
+                     "reason": _reason_code(c.get("reason"))} | ({"system": c["system"]} if "system" in c else {}))
     reasons: dict[str, int] = {}
     for r in plan.get("rejected", []):
         reasons[r["reason"]] = reasons.get(r["reason"], 0) + 1
@@ -780,6 +1143,8 @@ def sanitized_rows(command: str, plan: Mapping[str, Any], summary: Mapping[str, 
         for r in summary.get("results", []):
             rows.append({"label": r["label"], "result": r["result"], "files": r.get("files"), "bytes": r.get("bytes")})
         rows.append({"bios_copied": list(summary.get("bios_copied", [])), "summary": dict(summary.get("totals", {}))})
+        for r in summary.get("journal", []):
+            rows.append({"journal": r["result"], "label": r.get("label"), "system": r.get("system")})
     return rows
 
 
@@ -811,20 +1176,32 @@ def mb(n: int) -> str:
 
 
 def print_inspect(st: Mapping[str, Any], names: bool, project_root: Path) -> None:
-    print(f"PS1 candidates: {len(st['candidates'])}")
-    for c in st["candidates"]:
-        n = sum(len(d["files"]) for d in c["discs"])
-        extra = f"  {c['title']}" if names else ""
-        print(f"  {c['label']}  {c['kind']:8s} {n} file(s){' + an .m3u made on the hub' if c['make_m3u'] else ''}"
-              f"{'  REJECT ' + c['error'] if c['error'] else ''}{extra}")
+    systems = st.get("systems", [SYSTEM])
+    for sysid in systems if systems else [SYSTEM]:
+        cs = [c for c in st["candidates"] if c.get("system", SYSTEM) == sysid]
+        print(f"{SYSTEM_NAMES[sysid]} candidates: {len(cs)}")
+        for c in cs:
+            n = sum(len(d["files"]) for d in c["discs"])
+            extra = f"  {c['title']}" if names else ""
+            print(f"  {c['label']}  {c['kind']:8s} {n} file(s){' + an .m3u made on the hub' if c['make_m3u'] else ''}"
+                  f"{'  REJECT ' + c['error'] if c['error'] else ''}{extra}")
     if st["rejected"]:
         print(f"Rejected files: {len(st['rejected'])}")
         for r in st["rejected"]:
             print(f"  {r['reason']}" + (f"  {Path(r['source']).name}" if names else ""))
     if st["ignored_hidden"]:
         print(f"Hidden files ignored: {st['ignored_hidden']}")
-    if st["other_systems"]:
+    # B58: the folders reported, never planned (a folder's own name only with --names, unless it is a system id)
+    for folder, r in sorted(st.get("reported", {}).items()):
+        shown = folder if folder.casefold() in REPORTED or names else "a folder"
+        why = r["why"] if r["why"] != UNKNOWN_FOLDER else "not a system the hub lists; nothing planned"
+        print(f"  {shown}/: {r['files']} file(s) - {why}")
+    if not st.get("reported") and st.get("other_systems"):
         print(f"Other system folders (not in this slice): {len(st['other_systems'])}")
+    if st.get("journal_pending"):
+        print(f"An interrupted import was found ({st['journal_pending']} title(s)): the next apply cleans it up first")
+    if st.get("form", "stick") == "plain":
+        return
     real = [b for b in st["bios"] if b["real"]]
     print(f"BIOS on the stick: {', '.join(b['region'] for b in real) if real else 'none'}"
           f"{'; ' + str(len(st['bios']) - len(real)) + ' other file(s) not used' if len(st['bios']) > len(real) else ''}")
@@ -836,8 +1213,14 @@ def print_plan(plan: Mapping[str, Any], names: bool) -> None:
     for c in plan["candidates"]:
         size = sum(f["bytes"] for f in c["files"])
         extra = f"  {c['title']}" if names else ""
-        print(f"  {c['label']}  {c['kind']:8s} {len(c['files']) + (1 if c.get('make_m3u') else 0)} file(s) "
+        system = f"{SYSTEM_NAMES.get(c.get('system', SYSTEM), '?'):8s}" if len(plan.get("systems", [])) > 1 else ""
+        print(f"  {c['label']}  {system}{c['kind']:8s} {len(c['files']) + (1 if c.get('make_m3u') else 0)} file(s) "
               f"{mb(size):>8s}  {c['decision'].upper()}{'  ' + c['reason'] if c['reason'] else ''}{extra}")
+    for folder, why in sorted(plan.get("reported", {}).items()):
+        shown = folder if folder.casefold() in REPORTED or names else "a folder"
+        print(f"  {shown}/: nothing planned - {why if why != UNKNOWN_FOLDER else 'not a system the hub lists'}")
+    if plan.get("journal_pending"):
+        print(f"An interrupted import was found ({plan['journal_pending']} title(s)): apply cleans it up first")
     t = plan["totals"]
     print(f"Accept {t['accept']}, duplicate {t['duplicate']}, reject {t['reject']}; "
           f"{t['rejected_files']} other file(s) rejected")
@@ -846,7 +1229,8 @@ def print_plan(plan: Mapping[str, Any], names: bool) -> None:
     acc = [b for b in plan["bios"]["stick"] if b["decision"] == "accept"]
     if acc:
         print(f"BIOS to copy: {', '.join(b['region'] for b in acc)}.  {OPENBIOS_WARNING}")
-    elif plan["bios"]["openbios_fallback"]:
+    elif plan["bios"]["openbios_fallback"] and SYSTEM in plan.get("systems", [SYSTEM]) \
+            and plan.get("source_form", "stick") == "stick":
         print("BIOS: none to copy; PlayStation keeps its built-in OpenBIOS (the list shows \"(OpenBIOS)\")")
     s = plan["space"]
     print(f"Space: {mb(s['needed_bytes'])} needed, {mb(s['free_bytes'])} free: {'ok' if s['ok'] else 'NOT ENOUGH'}")
@@ -864,8 +1248,11 @@ def main(argv: list[str] | None = None, *, project_root: Path = REPO, environ: M
     sub = ap.add_subparsers(dest="command", required=True)
     for name in ("inspect", "plan"):
         p = sub.add_parser(name)
-        p.add_argument("mount")
+        p.add_argument("mount", nargs="?")
         p.add_argument("--names", action="store_true")
+        # B58: the plain-folder form (a system's games folder itself, read in place; no symlink root)
+        p.add_argument("--source")
+        p.add_argument("--system", choices=SYSTEMS + tuple(REPORTED))
     for name in ("apply", "verify"):
         p = sub.add_parser(name)
         p.add_argument("plan", nargs="?")
@@ -877,12 +1264,20 @@ def main(argv: list[str] | None = None, *, project_root: Path = REPO, environ: M
     except SystemExit:
         return EXIT_USAGE
     try:
+        if args.command in ("inspect", "plan"):
+            if (args.mount is None) == (args.source is None):
+                raise Usage("give either a mount (holding PrivyHub-Import/) or --source <folder> --system <system>")
+            if args.source is not None and args.system is None:
+                raise Usage("--source needs --system (ps1, snes, nes or genesis)")
+            if args.mount is not None and args.system is not None:
+                raise Usage("--system goes with --source; a mount is read for every system")
         if args.command == "inspect":
-            st = scan_stick(find_root(args.mount))
+            st = scan_source(args.mount, project_root, folder=args.source, plain_system=args.system)
             print_inspect(st, args.names, project_root)
             return EXIT_OK if st["candidates"] else EXIT_NOTHING
         if args.command == "plan":
-            plan = make_plan(args.mount, project_root, free_bytes=free_bytes)
+            plan = make_plan(args.mount, project_root, free_bytes=free_bytes, source=args.source,
+                             system=args.system)
             path = project_root / DATA_REL / "plans" / f"{plan['created_utc']}.json"
             write_json_atomic(path, plan)
             log = write_log(project_root, sanitized_rows("plan", plan, None))
@@ -898,6 +1293,7 @@ def main(argv: list[str] | None = None, *, project_root: Path = REPO, environ: M
             return EXIT_USAGE
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
         applied_path = project_root / DATA_REL / "applied" / plan_path.name
+        plan["_plan_name"] = plan_path.name
         if args.command == "apply":
             code, summary = apply_plan(plan, project_root, while_playing=args.while_playing, active=active,
                                        free_bytes=free_bytes)
@@ -905,6 +1301,8 @@ def main(argv: list[str] | None = None, *, project_root: Path = REPO, environ: M
                 write_json_atomic(applied_path, {"plan": plan_path.name, "placed": summary["placed"],
                                                  "bios_copied": summary["bios_copied"]})
                 log = write_log(project_root, sanitized_rows("apply", plan, summary))
+                for r in summary.get("journal", []):
+                    print(f"  {r['label']}  interrupted before: {r['result']}")
                 for r in summary["results"]:
                     print(f"  {r['label']}  {r['result']}")
                 if summary["bios_copied"]:

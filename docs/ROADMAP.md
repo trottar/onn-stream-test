@@ -2437,6 +2437,15 @@ rather than create a second game-library path.
 > (the hub already holds them), 0 placed, 1 stray file rejected; no PS1 BIOS on the drive (OpenBIOS stays); the drive
 > untouched (hash equal); idempotent. The onn check is HOME-7's C19. **Next, slice 1b:** the tool taking a plain
 > source folder (no symlinks needed); the other systems; the journal's resume across a crash.
+>
+> **B58, H0 slice 1b (2026-11-08, B; `docs/memory/evidence/B58_IMPORT_SLICE_1B_2026-11-08.md`, `docs/IMPORT.md`
+> extended):** behind `PRIVYHUB_IMPORT=1`, `tools/import_usb.py` takes **a plain source folder** (`--source <folder>
+> --system <ps1|snes|nes|genesis>`, read in place, no symlink root) as well as a stick, and **SNES / NES / Genesis**
+> (header checks; the per-system duplicate check by hash and title; NEW for every system; the hidden rule PS1's only);
+> N64 / GameCube folders reported "not supported yet", a PS2 folder "stays on the external drive"; **the journal**: an
+> interrupted apply is cleaned, and resumed if its plan still accepts it, by the next apply, and the list (with the
+> flag) never shows a half-placed title. Fixture trees only. **Next:** HOME-7's C19; then **IMPORT-2** (the drive's
+> SNES / NES / Genesis folders through the plain form, duplicates expected; `SESSION_B_DONE_2026-11-08U.md`).
 
 ## H1 — N64
 
@@ -2519,6 +2528,13 @@ User-supplied PS2 BIOS should enter only through the G0 import boundary.
 > - **Off:** the rewind (PCSX2 has none).
 > - A failed picture is the PS1-shaped `rewind_failed` row.
 > - **Next:** A's HOME-7 C18 (Home, count to 2, back).
+
+> **B57 (2026-11-08, B; `docs/memory/evidence/B57_PS2_RELAUNCH_STATE_2026-11-08.md`):** B54's multitap relaunch on PS2
+> through PINE's **slot 7** (beside B55's 9 and 8), inside `PRIVYHUB_PS2=1`: save with B52's file-complete check →
+> SIGTERM → the launch with `MultitapPort1` per the count → the hold to the ELF → load → B52's picture check →
+> `state: loaded`; a failed step → the title restarts without the state (`state: restarted` and the reason), never a
+> dead session. Expected ~9.5-13 s against B54's 15 s (the boot dominates). **Next:** A's HOME-7 C20 (a third pad in a
+> PS2 game).
 
 > **HOME-6 (2026-11-08, A, the user at the TV) — H3 feasibility CLOSED:** `docs/memory/evidence/HOME_6_PS2_LOAD_2026-11-08.md`.
 > After B52 (MTVU off, the load after the boot, the picture check) PS2 plays, pauses, saves and loads from the onn with
