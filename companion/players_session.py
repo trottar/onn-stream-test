@@ -10,6 +10,12 @@ holds the title's last pick; **without the key nothing here runs and the launch 
 RetroArch cannot change a core option or a port device mid-session (no network command does), so a pick made at the
 chooser after the launch applies at the next launch (the client says so). Design:
 `docs/memory/evidence/b46_2026-11-07/design_written_before_code.md` (hashed before this code). Never raises.
+
+B54 (hold-to-join): the client sends `players_joined=<1-4>` (the title's highest joined count) instead; 1 / 2 -> two
+ports (B46's plan for 2: one joined player last time must not cost a relaunch when a second pad holds), 3 / 4 -> the
+multitap (B46's plan for 4); `source` `join`. A third pad mid-session asks `native-stream-relaunch-ports`
+(`relaunch_ports.py`): the same plan with `source` `relaunch`. Without either key: B46 / today, byte for byte. Design:
+`docs/memory/evidence/b54_2026-11-08/design_written_before_code.md` (hashed before this code).
 """
 
 from __future__ import annotations
@@ -31,7 +37,21 @@ def parse(raw: Any) -> int | None:
     return n if n in CHOICES else None
 
 
-def plan(system: str, players_chosen: int, libretro_device: int | None) -> dict[str, Any]:
+def parse_joined(raw: Any) -> int | None:
+    """B54: the client's `players_joined` (0-4), else None."""
+    try:
+        n = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return None
+    return n if 0 <= n <= 4 else None
+
+
+def ports_for_joined(n: int) -> int:
+    """B54: the plan's count for a joined count: 1 / 2 -> 2 ports, 3 / 4 -> the multitap (sent as 4)."""
+    return 4 if int(n) >= 3 else 2
+
+
+def plan(system: str, players_chosen: int, libretro_device: int | None, source: str = "launch") -> dict[str, Any]:
     """The launch's ports for the pick: the `.opt` mode (PS1), the `--device` arguments, the ports read."""
     system = str(system or "").strip().casefold()
     n = int(players_chosen)
@@ -55,7 +75,7 @@ def plan(system: str, players_chosen: int, libretro_device: int | None) -> dict[
         "multitap_available": available,
         "ps1_mode": ("port1" if multitap else "off") if system == "ps1" else None,
         "device_args": args,
-        "source": "launch",
+        "source": source,
     }
 
 
@@ -63,7 +83,8 @@ def ports_set(emulator: Any, game_status: dict[str, Any] | None) -> dict[str, An
     """The start response's echo: the launch's plan, else the metadata's ports (4 with the PS1 multitap on, else 2)."""
     try:
         session = getattr(emulator, "_players_session", None)
-        if isinstance(session, dict) and session.get("source") == "launch":
+        # B54: a hold-to-join launch (`join`) and a mid-session relaunch (`relaunch`) are plans too
+        if isinstance(session, dict) and session.get("source") in ("launch", "join", "relaunch"):
             return {"ports_set": {k: session[k] for k in ("players_chosen", "ports", "multitap", "multitap_available",
                                                           "source")} | {"players": int(session["ports"])}}
         game = getattr(emulator, "active_game", None) or (game_status or {}).get("game") or {}

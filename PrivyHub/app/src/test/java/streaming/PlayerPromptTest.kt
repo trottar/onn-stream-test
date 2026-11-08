@@ -8,9 +8,9 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * B46: the player chooser over the stable slots (debug.privyhub.player_prompt, on by default). Fake devices as B38 /
- * B41's tests: the onn's virtual remote (C4), real pads with controller numbers 2-5. B41's cases moved to B46's
- * meaning (disclosed, as B42): the prompt no longer skips a start whose pads hold slots, nor a 1-player title.
+ * B54: hold-to-join over the stable slots (debug.privyhub.player_prompt, on by default). Fake devices as B38 / B41 /
+ * B46's tests (the onn's virtual remote, real pads with controller numbers 2-5) and a fake clock (every time below is
+ * a number of ms passed in). B46's chooser tests are replaced (disclosed): the chooser is gone.
  */
 class PlayerPromptTest {
 
@@ -35,12 +35,11 @@ class PlayerPromptTest {
         const val X = PlayerPrompt.KEYCODE_BUTTON_X
         const val START = PlayerPrompt.KEYCODE_BUTTON_START
         const val SELECT = PlayerPrompt.KEYCODE_BUTTON_SELECT
-        const val LEFT = PlayerPrompt.KEYCODE_DPAD_LEFT
-        const val RIGHT = PlayerPrompt.KEYCODE_DPAD_RIGHT
         const val CENTER = PlayerPrompt.KEYCODE_DPAD_CENTER
         const val L1 = 102
-        val TWO = PortsSet(2, multitap = false, multitapAvailable = true, source = "launch")
-        val FOUR = PortsSet(4, multitap = true, multitapAvailable = true, source = "launch")
+        val TWO = PortsSet(2, multitap = false, multitapAvailable = true, source = "join")
+        val FOUR = PortsSet(4, multitap = true, multitapAvailable = true, source = "relaunch")
+        val NO_TAP = PortsSet(2, multitap = false, multitapAvailable = false, source = "metadata")
         const val GAME = "ps1-two-player-title"
     }
 
@@ -50,238 +49,229 @@ class PlayerPromptTest {
         hasGamepadButton = true, isVirtual = false, hasFaceButton = true, hasStickOrHat = true)
     private val padA = pad(1)
     private val padB = pad(2)
-    private val onn = listOf(virtualRemote, padA, padB)
-    private val conn = { onn }
+    private val padC = pad(3)
+    private val padD = pad(4)
+    private val onn = listOf(virtualRemote, padA, padB, padC, padD)
 
     @Before
     fun clearProcess() {
-        PlayerPromptProcess.lastChoice = null
+        PlayerPromptProcess.lastJoined = null
     }
 
-    private fun open(p: PlayerPrompt, devs: List<PadDevice> = onn, ports: PortsSet = TWO, hostPlayers: Int = 2,
-                     self: Boolean = false) {
-        p.beginStart(devs)
-        p.onStartResponse(self, hostPlayers, ports, PlayerPrompt.gameKey(GAME), devs)
-    }
-
-    private fun fresh(ports: PortsSet = TWO, devs: List<PadDevice> = onn, hostPlayers: Int = 2,
+    private fun fresh(ports: PortsSet = TWO, hostPlayers: Int = 2,
                       store: PlayerChoiceStore = MemoryPlayerChoiceStore()): Pair<PadSlots, PlayerPrompt> {
         val s = PadSlots()
         val p = PlayerPrompt(s, store)
-        open(p, devs, ports, hostPlayers)
+        p.beginStart(onn)
+        p.onStartResponse(false, hostPlayers, ports, PlayerPrompt.gameKey(GAME), onn)
         return s to p
     }
 
-    private fun press(p: PlayerPrompt, d: PadDevice, key: Int, now: Long, devs: List<PadDevice> = onn): Int? {
-        val slot = p.slotForKey(d, key, true, now, { devs })
-        p.slotForKey(d, key, false, now + 50, { devs })
-        return slot
-    }
+    /** The activity's order: the join hook first; only a key it does not take goes to the sender. */
+    private fun key(p: PlayerPrompt, d: PadDevice, code: Int, down: Boolean, now: Long, repeat: Int = 0): Int? =
+        if (p.onJoinKey(code, down, repeat, d, now)) null
+        else p.slotForKey(d, code, down, now, { onn }, repeat)
 
-    /** A pick from a pad: the chooser consumes the down; the up reaches the sender as on the onn. */
-    private fun pick(p: PlayerPrompt, d: PadDevice, now: Long) {
-        assertTrue(p.onChooserKey(A, true, 0, d, now))
-        assertFalse(p.onChooserKey(A, false, 0, d, now + 40))
-        p.slotForKey(d, A, false, now + 40, conn)
+    /** A hold of [ms] with the 50-ms tick running, then the release of the key. */
+    private fun hold(p: PlayerPrompt, d: PadDevice, code: Int, from: Long, ms: Long): Long {
+        key(p, d, code, true, from)
+        var t = from
+        while (t < from + ms) { t += 50; p.tick(t, onn) }
+        key(p, d, code, false, from + ms)
+        return from + ms
     }
 
     @Test
-    fun atTheStartTheChooserThenTwoThenBIsPlayerOneAndAIsPlayerTwo() {
+    fun theOpeningLineAtAStart() {
         val (s, p) = fresh()
-        assertEquals(PlayerPrompt.Phase.CHOOSING, p.phase)
-        assertEquals("Players:  1  /  [2]  /  multitap (3-4)", p.view(0, onn).prompt)
+        assertEquals("Hold any button to join", p.view(0, onn).prompt)
+        assertEquals(0, p.joined)
         assertTrue(s.map().isEmpty())
-        assertNull(p.slotForKey(padA, A, true, 10, conn))           // no pad holds a slot while choosing
-        pick(p, padB, 100)
-        assertEquals(2, p.chosen); assertEquals(2, p.count)
-        assertEquals("Player 1 — press any button", p.view(120, onn).prompt)
-        assertTrue(s.map().isEmpty())                                 // the pick's own up claimed nothing
-        assertEquals(0, press(p, padB, A, 150))                       // B's fresh press takes P1
-        assertEquals("P1", p.view(250, onn).badge)
-        assertEquals("Player 2 — press any button", p.view(250, onn).prompt)
-        assertEquals(1, press(p, padA, START, 300))
-        assertEquals("P2", p.view(400, onn).badge)
-        assertEquals(PlayerPrompt.Phase.DONE, p.phase)
-        assertNull(p.view(400, onn).prompt)                          // no further prompt
-        assertNull(p.view(2_400, onn).badge)
-        assertEquals("0:p,1:p", p.claimsString())
-        assertEquals(0, p.slotForKey(padB, L1, true, 500, conn))     // claimed: every key goes to its slot
     }
 
     @Test
-    fun thePickItselfNeverClaims() {
+    fun aTapClaimsNothingAndAJoinedPadsTapReachesTheGame() {
         val (s, p) = fresh()
-        assertTrue(p.onChooserKey(A, true, 0, padB, 0))
-        // a repeat of the held pick key, then a down without an up: no claim
-        assertNull(p.slotForKey(padB, A, true, 30, conn, repeat = 1))
-        assertNull(p.slotForKey(padB, A, true, 60, conn))
-        assertTrue(s.map().isEmpty())
-        p.slotForKey(padB, A, false, 90, conn)
-        assertEquals(0, press(p, padB, A, 120))
+        assertNull(key(p, padA, A, true, 0)); assertNull(key(p, padA, A, false, 120))   // a tap
+        p.tick(600, onn)
+        assertEquals(0, p.joined); assertTrue(s.map().isEmpty())
+        assertEquals("Hold any button to join", p.view(600, onn).prompt)
+        hold(p, padA, A, 1_000, 600)
+        assertEquals(0, s.slotOf(padA))
+        assertEquals(0, key(p, padA, X, true, 2_000))     // a joined pad's tap: its slot, so the game gets it
+        assertEquals(0, key(p, padA, X, false, 2_080))
     }
 
     @Test
-    fun anUnpauseOpensTheChooserAgainWithTheLastChoice() {
+    fun aHoldOf500MsJoinsAndNotBefore() {
+        val (s, p) = fresh()
+        key(p, padA, START, true, 1_000)
+        p.tick(1_499, onn)
+        assertNull(s.slotOf(padA))                       // 499 ms: not yet
+        assertTrue(p.holdPending())
+        p.tick(1_500, onn)
+        assertEquals(0, s.slotOf(padA))                  // 500 ms: P1
+        assertFalse(p.holdPending())
+        assertEquals("P1", p.view(1_500, onn).badge)
+        assertNull(p.view(3_600, onn).badge)             // the badge's 2 s
+        assertEquals("P1 joined — hold to add Player 2", p.view(1_500, onn).prompt)
+        assertEquals("0:p", p.claimsString())
+        // the joining key is not play: its repeats and its up never reach the sender
+        assertNull(key(p, padA, START, true, 1_600, repeat = 3))
+        assertNull(key(p, padA, START, false, 1_700))
+        assertEquals(0, key(p, padA, START, true, 2_000))   // a fresh press of it is play
+    }
+
+    @Test
+    fun repeatsNeverStartAHoldAndTheRemoteNeverJoins() {
+        val (s, p) = fresh()
+        key(p, padA, A, true, 0, repeat = 2)
+        p.tick(1_000, onn)
+        assertNull(s.slotOf(padA))
+        assertFalse(p.onJoinKey(CENTER, true, 0, virtualRemote, 0))
+        assertNull(key(p, virtualRemote, CENTER, true, 0))
+        p.tick(2_000, onn)
+        assertTrue(s.map().isEmpty())
+        assertFalse(p.onJoinKey(L1, true, 0, padA, 0) && s.slotOf(padA) != null)   // L1 is no join key
+        p.tick(3_000, onn)
+        assertNull(s.slotOf(padA))
+        assertNull(p.slotForMotion(padA) { onn })        // a stick never joins
+    }
+
+    @Test
+    fun aSecondPadIsP2AndTheLineClosesOnTwoPorts() {
+        val (s, p) = fresh()
+        val t = hold(p, padB, X, 0, 600)                 // the first to hold is P1, whichever pad
+        assertEquals(0, s.slotOf(padB))
+        hold(p, padA, A, t + 100, 600)
+        assertEquals(1, s.slotOf(padA))
+        assertEquals("P2", p.view(t + 800, onn).badge)
+        assertNull(p.view(t + 800, onn).prompt)          // two ports taken: the line closes
+        assertEquals(2, p.joined)
+        assertEquals(2, PlayerPromptProcess.lastJoined)
+    }
+
+    @Test
+    fun aThirdPadAsksForTheMultitapAtOnceThenJoinsAsP3() {
         val store = MemoryPlayerChoiceStore()
         val (s, p) = fresh(store = store)
-        assertTrue(p.onChooserKey(LEFT, true, 0, virtualRemote, 0))   // the remote moves to 1
-        assertTrue(p.onChooserKey(CENTER, true, 0, virtualRemote, 10))
-        assertEquals(1, p.chosen)
-        assertEquals(0, press(p, padA, A, 100))
-        // Back, then Resume: a new start of the running game (not a self-restart)
-        open(p)
-        assertEquals(PlayerPrompt.Phase.CHOOSING, p.phase)
-        assertTrue(s.map().isEmpty())                                 // the map cleared for the prompt
-        assertEquals("Players:  [1]  /  2  /  multitap (3-4)", p.view(1_000, onn).prompt)
-        assertNull(p.chosen)
-        // a fresh PlayerPrompt (a new activity) reads the same store
-        val p2 = PlayerPrompt(s, store); open(p2)
-        assertEquals("Players:  [1]  /  2  /  multitap (3-4)", p2.view(0, onn).prompt)
+        var t = hold(p, padA, A, 0, 600)
+        t = hold(p, padB, A, t + 100, 600)
+        assertNull(p.takeRelaunchRequest())
+        key(p, padC, START, true, t + 100)
+        p.tick(t + 300, onn)
+        assertEquals("P1, P2 joined — hold to add Player 3", p.view(t + 300, onn).prompt)   // back while it holds
+        p.tick(t + 600, onn)
+        assertEquals(PlayerPrompt.Phase.RELAUNCHING, p.phase)
+        assertEquals(4, p.takeRelaunchRequest())
+        assertNull(p.takeRelaunchRequest())              // asked once
+        assertEquals("Setting up 4 players…", p.view(t + 700, onn).prompt)
+        assertNull(s.slotOf(padC))
+        key(p, padD, A, true, t + 800); p.tick(t + 1_400, onn)
+        assertNull(s.slotOf(padD))                       // other holds wait out the relaunch
+        p.onRelaunchResult(true, FOUR, "loaded", 7_400, t + 8_000, onn)
+        assertEquals(2, s.slotOf(padC))                  // P3
+        assertEquals(0, s.slotOf(padA)); assertEquals(1, s.slotOf(padB))   // P1 / P2 kept
+        assertEquals("P3", p.view(t + 8_000, onn).badge)
+        assertEquals("P1, P2, P3 joined — hold to add Player 4", p.view(t + 8_000, onn).prompt)
+        assertEquals(1, p.relaunches)
+        assertEquals(PlayerPrompt.Relaunch(true, "loaded", 7_400), p.lastRelaunch)
+        assertEquals(3, store.get(PlayerPrompt.gameKey(GAME)!!))   // the next launch's ports
+        // a fourth pad: four ports now, no relaunch
+        hold(p, padD, X, t + 9_000, 600)
+        assertEquals(3, s.slotOf(padD))
+        assertNull(p.takeRelaunchRequest())
+        assertNull(p.view(t + 9_700, onn).prompt)        // four joined: closed
     }
 
     @Test
-    fun multitapOnAFourPortSessionTakesFourClaims() {
-        val four = listOf(virtualRemote, pad(1), pad(2), pad(3), pad(4))
-        val (s, p) = fresh(ports = FOUR, devs = four)
-        assertTrue(p.onChooserKey(RIGHT, true, 0, pad(1), 0))
-        assertTrue(p.onChooserKey(RIGHT, true, 0, pad(1), 10))        // stops at the last option
-        assertEquals("Players:  1  /  2  /  [multitap (3-4)]", p.view(20, four).prompt)
-        assertTrue(p.onChooserKey(X, true, 0, pad(1), 30)); p.slotForKey(pad(1), X, false, 60, { four })
-        assertEquals(4, p.chosen); assertEquals(4, p.count)
-        assertEquals(0, press(p, pad(3), A, 100, four))
-        assertEquals(1, press(p, pad(1), A, 200, four))
-        assertEquals("Player 3 — press any button", p.view(250, four).prompt)
-        assertEquals(2, press(p, pad(4), A, 300, four))
-        assertEquals(3, press(p, pad(2), A, 400, four))
-        assertEquals("0:p,1:p,2:p,3:p", p.claimsString())
-        assertEquals(PlayerPrompt.Phase.DONE, p.phase)
-        assertEquals(4, s.map().size)
-    }
-
-    @Test
-    fun multitapOnATwoPortSessionStopsAtTwoAndSaysSo() {
-        val three = onn + pad(3)
-        val (s, p) = fresh(ports = TWO, devs = three)
-        p.onChooserKey(RIGHT, true, 0, padA, 0)
-        p.onChooserKey(A, true, 0, padA, 10); p.slotForKey(padA, A, false, 20, { three })
-        assertEquals(4, p.chosen); assertEquals(2, p.count)
-        assertEquals("Player 1 — press any button\nMultitap from the next start", p.view(30, three).prompt)
-        press(p, padA, A, 100, three); press(p, padB, A, 200, three)
-        assertNull(press(p, pad(3), A, 300, three))                   // beyond the ports: no slot
-        assertEquals(2, s.map().size)
-        // a system with no multitap
-        val (_, q) = fresh(ports = PortsSet(2, false, false, "metadata"))
-        q.onChooserKey(RIGHT, true, 0, padA, 0); q.onChooserKey(A, true, 0, padA, 10)
-        assertEquals("Player 1 — press any button\nNo multitap on this system — 2 players", q.view(20, onn).prompt)
-    }
-
-    @Test
-    fun oneTakesOneClaimAndTheOtherPadGetsNoSlot() {
+    fun aFailedRelaunchJoinsNobodyAndSaysSo() {
         val (s, p) = fresh()
-        p.onChooserKey(LEFT, true, 0, padA, 0)
-        p.onChooserKey(A, true, 0, padA, 10); p.slotForKey(padA, A, false, 20, conn)
-        assertEquals(1, p.chosen); assertEquals(1, p.count)
-        assertEquals(0, press(p, padB, A, 100))
-        assertEquals(PlayerPrompt.Phase.DONE, p.phase)
-        assertNull(press(p, padA, A, 200))                            // the other pad: no slot, no input
-        assertNull(p.view(300, onn).prompt)
-        assertEquals("0:p", p.claimsString())
-        assertEquals(1, s.map().size)
+        var t = hold(p, padA, A, 0, 600)
+        t = hold(p, padB, A, t + 100, 600)
+        hold(p, padC, A, t + 100, 600)
+        assertEquals(4, p.takeRelaunchRequest())
+        p.onRelaunchResult(false, null, null, null, t + 5_000, onn)
+        assertNull(s.slotOf(padC))
+        assertEquals("Couldn't set up 4 players", p.view(t + 5_000, onn).prompt)
+        assertEquals(PlayerPrompt.Phase.JOINING, p.phase)
+        assertEquals(PortsSet(2, false, true, "join"), p.ports)
     }
 
     @Test
-    fun theHeldStartReleaseReclaimsOnlyAfterAFreshPress() {
-        val (s, p) = fresh()
-        pick(p, padA, 0)
-        press(p, padA, A, 100); press(p, padB, A, 200)
-        // HOME-3 C6 try 1: Select first, Start last and still held when the release fires
-        p.slotForKey(padA, SELECT, true, 1_000, conn)
-        p.slotForKey(padA, START, true, 1_050, conn)
-        p.tick(3_060)
-        assertNull(s.slotOf(padA))
-        assertEquals("P1 released", p.view(3_100, onn).badge)
-        assertEquals("Player 1 — press any button", p.view(3_100, onn).prompt)
-        // Android repeats the held Start: no claim; Select lifted, Start still held: no claim
-        assertNull(p.slotForKey(padA, START, true, 3_100, conn, repeat = 20))
-        p.slotForKey(padA, SELECT, false, 3_150, conn)
-        assertNull(p.slotForKey(padA, START, true, 3_200, conn, repeat = 21))
-        assertNull(s.slotOf(padA))
-        // Start lifted, then a fresh press: claimed
-        p.slotForKey(padA, START, false, 3_300, conn)
-        assertEquals(0, press(p, padA, START, 3_400))
-        assertEquals("0:p,1:p", p.claimsString())
+    fun noMultitapOnTheSystemSaysSoAndJoinsNobody() {
+        val (s, p) = fresh(ports = NO_TAP)
+        var t = hold(p, padA, A, 0, 600)
+        t = hold(p, padB, A, t + 100, 600)
+        hold(p, padC, A, t + 100, 600)
+        assertNull(p.takeRelaunchRequest())
+        assertNull(s.slotOf(padC))
+        assertEquals("No multitap on this system — 2 players", p.view(t + 800, onn).prompt)
     }
 
     @Test
-    fun aShortHoldReleasesNothing() {
-        val (s, p) = fresh()
-        pick(p, padA, 0); press(p, padA, A, 100)
-        p.slotForKey(padA, SELECT, true, 1_000, conn); p.slotForKey(padA, START, true, 1_000, conn)
-        p.tick(2_400)
+    fun aOnePlayerTitleClosesAfterP1() {
+        val (s, p) = fresh(hostPlayers = 1)
+        assertEquals("Hold any button to join", p.view(0, onn).prompt)
+        val t = hold(p, padA, A, 0, 600)
         assertEquals(0, s.slotOf(padA))
-        p.slotForKey(padA, START, false, 2_500, conn)
-        p.tick(4_000)
+        assertNull(p.view(t, onn).prompt)
+        key(p, padB, A, true, t + 100)
+        assertNull(p.view(t + 200, onn).prompt)          // no line comes back for a second pad
+        p.tick(t + 1_000, onn)
+        assertNull(s.slotOf(padB))
+        assertNull(p.takeRelaunchRequest())
+    }
+
+    @Test
+    fun theReleaseThenAFreshHoldRejoinsButAHeldStartDoesNot() {
+        val (s, p) = fresh()
+        val t = hold(p, padA, A, 0, 600)
+        key(p, padA, SELECT, true, t + 100); key(p, padA, START, true, t + 100)
+        p.tick(t + 1_000, onn)
+        assertEquals(0, s.slotOf(padA))                  // a short hold releases nothing
+        p.tick(t + 2_100, onn)
+        assertNull(s.slotOf(padA))
+        assertEquals("P1 released", p.view(t + 2_100, onn).badge)
+        p.tick(t + 5_000, onn)                           // Start still held: no re-join
+        assertNull(s.slotOf(padA))
+        key(p, padA, START, false, t + 5_100); key(p, padA, SELECT, false, t + 5_100)
+        hold(p, padA, START, t + 6_000, 600)             // a fresh hold
         assertEquals(0, s.slotOf(padA))
     }
 
     @Test
-    fun aSelfRestartKeepsTheMapAndTheChoiceWithNoChooser() {
-        val (s, p) = fresh()
-        pick(p, padB, 0); press(p, padB, A, 100); press(p, padA, A, 200)
-        val p2 = PlayerPrompt(s)                                      // the guard's new activity, same process
-        open(p2, self = true)
-        assertEquals(PlayerPrompt.Phase.DONE, p2.phase)
-        assertEquals(2, p2.chosen)
-        assertEquals("0:s,1:s", p2.claimsString())
-        assertNull(p2.view(0, onn).prompt)
-        assertEquals(0, s.slotOf(padB)); assertEquals(1, s.slotOf(padA))
+    fun theLineGoesTenSecondsAfterTheLastJoinAndReturnsWhileAPadHolds() {
+        val (_, p) = fresh(ports = FOUR)
+        val t = hold(p, padA, A, 0, 600)
+        assertEquals("P1 joined — hold to add Player 2", p.view(t + 9_000, onn).prompt)
+        assertNull(p.view(t + 10_100, onn).prompt)
+        key(p, padB, A, true, t + 11_000)
+        assertEquals("P1 joined — hold to add Player 2", p.view(t + 11_100, onn).prompt)
+        key(p, padB, A, false, t + 11_200)               // a tap: the line goes again
+        assertNull(p.view(t + 11_300, onn).prompt)
     }
 
     @Test
-    fun theDefaultIsTheLastChoiceElseTwoElseOneForASinglePlayerTitle() {
-        val (_, p) = fresh(hostPlayers = 1)
-        assertEquals("Players:  [1]  /  2  /  multitap (3-4)", p.view(0, onn).prompt)
-        val store = MemoryPlayerChoiceStore()
-        store.put(PlayerPrompt.gameKey(GAME)!!, 4)
-        val (_, q) = fresh(hostPlayers = 1, store = store)
-        assertEquals("Players:  1  /  2  /  [multitap (3-4)]", q.view(0, onn).prompt)
-        assertEquals(12, PlayerPrompt.gameKey(GAME)!!.length)
-        assertNull(PlayerPrompt.gameKey(" "))
-    }
-
-    @Test
-    fun theRemoteAndTheHatMoveTheChooserAndTheRemoteNeverClaims() {
+    fun anUnpauseClearsTheMapAndASelfRestartKeepsIt() {
         val (s, p) = fresh()
-        assertTrue(p.onChooserHat(padA, -1f))
-        assertTrue(p.onChooserHat(padA, -1f))                         // held: one move
-        assertEquals("Players:  [1]  /  2  /  multitap (3-4)", p.view(0, onn).prompt)
-        assertTrue(p.onChooserHat(padA, 0f)); assertTrue(p.onChooserHat(padA, 1f))
-        assertEquals("Players:  1  /  [2]  /  multitap (3-4)", p.view(0, onn).prompt)
-        assertFalse(p.onChooserHat(virtualRemote, 1f))                // not a pad
-        assertFalse(p.onChooserKey(L1, true, 0, padA, 0))             // not a chooser key: passed on
-        p.onChooserKey(CENTER, true, 0, virtualRemote, 10)
-        assertNull(press(p, virtualRemote, A, 100))
+        hold(p, padA, A, 0, 600)
+        // a self-restart: the map stands, no line
+        p.beginStart(onn)
+        p.onStartResponse(true, 2, TWO, PlayerPrompt.gameKey(GAME), onn)
+        assertEquals(0, s.slotOf(padA))
+        assertEquals("0:s", p.claimsString())
+        assertNull(p.view(5_000, onn).prompt)
+        // an unpause: cleared, the line again
+        p.beginStart(onn)
+        p.onStartResponse(false, 2, TWO, PlayerPrompt.gameKey(GAME), onn)
         assertTrue(s.map().isEmpty())
-        assertFalse(p.onChooserKey(RIGHT, true, 0, virtualRemote, 200))  // closed: the remote's keys pass on
+        assertEquals("Hold any button to join", p.view(6_000, onn).prompt)
     }
 
     @Test
-    fun aStickNeverClaims() {
-        val (s, p) = fresh()
-        assertNull(p.slotForMotion(padA, conn))
-        pick(p, padA, 0)
-        assertNull(p.slotForMotion(padA, conn))
-        assertNull(p.slotForKey(padA, L1, true, 10, conn))
-        assertTrue(s.map().isEmpty())
-        press(p, padA, A, 100)
-        assertEquals(0, p.slotForMotion(padA, conn))
-    }
-
-    @Test
-    fun thePortsEchoParses() {
-        assertEquals(PortsSet.UNKNOWN, PortsSet.parse(null))          // an old host: no key, 2 ports
-        assertEquals(2, PortsSet.UNKNOWN.players)
-        assertEquals(FOUR, PortsSet.of(4, true, true, "launch"))
+    fun portsSetParsesTheEcho() {
+        assertEquals(PortsSet(4, true, true, "relaunch"), PortsSet.of(4, true, true, "relaunch"))
         assertEquals(4, PortsSet.of(9, true, true, "launch").players)  // clamped
         assertEquals(1, PortsSet.of(0, false, false, "launch").players)
     }
@@ -300,7 +290,7 @@ class PlayerPromptTest {
 
     @Test
     fun offThePadSlotsAloneAreB34AndB38sAsBuilt() {
-        // `0`: the activity builds no PlayerPrompt; the sender's path is PadSlots alone (8ba4d996…'s absent)
+        // `0`: the activity builds no PlayerPrompt; the sender's path is PadSlots alone (the CONFIRMED build's `0`)
         val s = PadSlots()
         s.beginStart(onn)
         assertEquals(0, s.slotFor(padA) { onn }); assertEquals(1, s.slotFor(padB) { onn })

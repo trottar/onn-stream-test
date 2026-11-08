@@ -2419,6 +2419,19 @@ The import system should:
 The import tooling should integrate content **into the existing infrastructure**
 rather than create a second game-library path.
 
+> **B56, H0 slice 1a (2026-11-08, B; `docs/memory/evidence/B56_IMPORT_SLICE_1A_2026-11-08.md`, the user's page
+> `docs/IMPORT.md`):** `tools/import_usb.py` for **PS1**, behind `PRIVYHUB_IMPORT=1` (absent: it refuses, nothing
+> written).
+> - The commands: `inspect` → `plan` (hash, headers, duplicates by hash size-gated and by title, the destinations, the
+>   space, a labels-only summary) → `apply` (re-checked, a temp copy beside the target, verify, a no-overwrite link,
+>   the entry last, a rollback of only its own files) → `verify`.
+> - The user's four defaults are built: a real BIOS when present ("(OpenBIOS)" on PlayStation until then); multi-disc
+>   as one entry with an `.m3u` made on the hub; " · NEW" for 7 days; an `.iso` hidden when its `.chd` exists. The
+>   marks are in `data/import/marks.json`, which the list reads (no client change).
+> - The log holds counts and labels only. Tested on fixture trees; nothing imported.
+> - **Next:** A's IMPORT-1 with the user's stick (`docs/memory/handoffs/SESSION_B_DONE_2026-11-08T.md`); then slice 1b
+>   (the journal's resume across a crash, other systems) and the `.gitignore` line for `PrivyHub-Import/`.
+
 ## H1 — N64
 
 Evaluate representative N64 emulation, controllers, saves, local rendering,
@@ -2489,6 +2502,17 @@ User-supplied PS2 BIOS should enter only through the G0 import boundary.
 > with PrivyHub's button works like PS1 (C12'a, the write 0.5 s; C12'b the list; C12'd the files); **LOAD not met**
 > (C12'c: the PINE load answers OK, then PCSX2's guest faults — `TLB Miss` — and the picture is black). **G-A14 not
 > adopted;** H3 feasibility stays OPEN. The user's bench flag `b49-ps2.conf` stays on (PS2 playable, the load to B).
+
+> **B55 (2026-11-08, B; `docs/memory/evidence/B55_PS2_RECOVERY_STATES_2026-11-08.md`):** the PS2 hold / stall through
+> PINE states (the user's "Yes"), inside `PRIVYHUB_PS2=1`.
+> - **Live:**
+>   - the slot-9 save (PCSX2 slot 9, at a silence or the client's stall);
+>   - its load at the hold's return and the stall resume. The load (≤ 0.31 s measured) blocks; B52's picture check runs
+>     after the resume. That keeps B16's ≤ 1.0-s return; check-then-resume would be 1.45 s;
+>   - the link give-up save (slot 8), with the recovery prompt's Resume / Copy / Discard.
+> - **Off:** the rewind (PCSX2 has none).
+> - A failed picture is the PS1-shaped `rewind_failed` row.
+> - **Next:** A's HOME-7 C18 (Home, count to 2, back).
 
 > **HOME-6 (2026-11-08, A, the user at the TV) — H3 feasibility CLOSED:** `docs/memory/evidence/HOME_6_PS2_LOAD_2026-11-08.md`.
 > After B52 (MTVU off, the load after the boot, the picture check) PS2 plays, pauses, saves and loads from the onn with

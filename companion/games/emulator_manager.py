@@ -7019,6 +7019,141 @@ class EmulatorManager:
             payload["state_file"] = detail.get("state_file")
             return payload
 
+    # --- B55: the PS2 recovery save and the prompt's paths (only in a PCSX2 session, i.e. with PRIVYHUB_PS2=1) ------
+
+    def _pcsx2_save_recovery_state(self) -> dict[str, Any]:
+        """PINE 0x09 to the reserved slot 8, the file waited, the recovery index written as PS1's."""
+        with self.lock:
+            self._refresh_process()
+            if self.process is None or self.active_game is None or self._ps2 is None:
+                raise EmulatorError("No PrivyHub game session is running")
+            slot = _ps2.RECOVERY_SLOT
+            try:
+                self._ps2.ensure_pine_pause()
+            except _ps2.PS2Error as exc:
+                raise EmulatorError(str(exc)) from exc
+            folder = self._project_path(_ps2.DATA_DIR) / "sstates"
+            folder.mkdir(parents=True, exist_ok=True)
+            before = _ps2.state_files(folder)
+            result = self._ps2.state_message(_ps2.MSG_SAVE_STATE, slot)
+            if result != _ps2.PINE_OK:
+                self._ps2.log(f"PS2 recovery save: slot {slot} pine 0x09 {'no answer' if result is None else 'fail'}")
+                raise EmulatorError("PCSX2 did not acknowledge the save state")
+            got = self._ps2.wait_state_file(folder, slot, before)
+            if got is None:
+                self._ps2.log(f"PS2 recovery save: slot {slot} pine 0x09 ok; file not complete in "
+                              f"{_ps2.SAVE_BOUND_S:.1f}s")
+                raise EmulatorError("PrivyHub could not verify the recovery savestate")
+            path, seconds = got
+            identity = self._active_game_state_identity()
+            game = self.active_game if isinstance(self.active_game, dict) else {}
+            relative = str(path.relative_to(self.project_root)).replace("\\", "/")
+            saved_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+            self._write_recovery_index({
+                "schema": "privyhub_recovery_save_v1",
+                "state_file": relative,
+                "saved_at": saved_at,
+                "game_id": game.get("id"),
+                "game_title": identity.get("game_title"),
+                "game_key": identity.get("game_key"),
+            })
+            self._ps2.log(f"PS2 recovery save: slot {slot} pine 0x09 ok; file complete {seconds:.1f}s")
+            return {
+                "ok": True,
+                "action": "save_recovery_state",
+                "state_file": relative,
+                "saved_at": saved_at,
+                "size_bytes": int(path.stat().st_size),
+                "ps2_states": "pine",
+            }
+
+    def _pcsx2_recovery_source(self) -> Path:
+        detail = self.recovery_state_detail()
+        if not detail.get("exists") or not detail.get("state_file"):
+            raise EmulatorError("No recovery save exists for this game")
+        source = self._project_path(str(detail["state_file"]))
+        if not source.name.endswith(f".{_ps2.RECOVERY_SLOT:02d}.p2s"):
+            raise EmulatorError("The recovery save is not this session's PS2 state")
+        return source
+
+    def _pcsx2_load_recovery_state_running(self) -> dict[str, Any]:
+        """The prompt's Resume in a fresh PS2 launch: B52's ELF hold, PINE 0x0A slot 8, the picture; left running."""
+        with self.lock:
+            self._refresh_process()
+            if self.process is None or self.active_game is None or self._ps2 is None:
+                raise EmulatorError("No active game session is available to load")
+            if self._paused:
+                raise EmulatorError("The running-core recovery load requires the game to be running")
+            source = self._pcsx2_recovery_source()
+            slot = _ps2.RECOVERY_SLOT
+            sess = self._ps2
+            if sess.log_path is None:
+                sess.log_path = _ps2.pcsx2_log_path(self.project_root)
+            try:
+                if not sess.elf_started() and not sess.wait_elf():
+                    sess.log(f"PS2 recovery load: slot {slot} held; the game's ELF not up in {_ps2.ELF_WAIT_S:.0f}s")
+                    raise EmulatorError("The game is still starting; play a moment, then load again")
+                sess.ensure_pine_pause()
+            except _ps2.PS2Error as exc:
+                raise EmulatorError(str(exc)) from exc
+            pre = sess.picture()
+            offset = sess.log_size()
+            result = sess.state_message(_ps2.MSG_LOAD_STATE, slot)
+            if result != _ps2.PINE_OK:
+                sess.log(f"PS2 recovery load: slot {slot} pine 0x0a {'no answer' if result is None else 'fail'}")
+                try:
+                    sess.resume()
+                except _ps2.PS2Error:
+                    pass
+                raise EmulatorError("PCSX2 did not acknowledge the load state")
+            sess.wait_log_line(sess.log_path, offset, f"Loaded state from slot {slot}.")
+            try:
+                sess.resume()
+                verdict, seconds = sess.check_picture(pre[0] if pre else None, offset)
+            except _ps2.PS2Error:
+                verdict, seconds = "static", 0.0
+            sess.log(f"PS2 recovery load: slot {slot} pine 0x0a ok; picture {verdict} {seconds:.1f}s")
+            if verdict != "ok":
+                raise EmulatorError("The game did not resume from the save")
+            payload = self.status()
+            payload["action"] = "load_recovery_state_running"
+            payload["accepted"] = True
+            payload["verification"] = "picture"
+            payload["retroarch_response"] = None
+            payload["retroarch_loading_line"] = None
+            payload["source_sha256"] = self._state_file_diagnostic(source).get("sha256")
+            payload["ps2_states"] = "pine"
+            return payload
+
+    def _pcsx2_copy_recovery_state_to_slot(self, slot: int, *, replace: bool = False) -> dict[str, Any]:
+        """The slot-8 file copied to the user slot's PCSX2 name (`.0N.p2s`), verified, the slot index written."""
+        with self.lock:
+            normalized = self._normalize_save_state_slot(slot)
+            source = self._pcsx2_recovery_source()
+            source_diag = self._state_file_diagnostic(source)
+            if int(source_diag.get("size_bytes", 0) or 0) <= 0:
+                raise EmulatorError("The recovery save is an invalid 0-byte file")
+            prefix = source.name[: -len(f".{_ps2.RECOVERY_SLOT:02d}.p2s")]
+            destination = source.with_name(f"{prefix}.{normalized:02d}.p2s")
+            self._copy_state_file(source, destination)
+            destination_diag = self._state_file_diagnostic(destination)
+            if (
+                int(destination_diag.get("size_bytes", 0) or 0) <= 0
+                or destination_diag.get("sha256") != source_diag.get("sha256")
+            ):
+                raise EmulatorError("PrivyHub could not verify the copied savestate")
+            self._record_state_slot_index(normalized, destination)
+            payload = self.status()
+            payload["action"] = "copy_recovery_state"
+            payload["slot"] = normalized
+            payload["accepted"] = True
+            payload["confirmed"] = True
+            payload["replaced_existing"] = False
+            payload["slot_detail"] = self._save_state_slot_detail(normalized)
+            payload["state_file"] = str(destination.relative_to(self.project_root)).replace("\\", "/")
+            payload["ps2_states"] = "pine"
+            return payload
+
     def _pcsx2_pause_resume(self, action: str) -> dict[str, Any]:
         try:
             how = self._ps2.pause() if action == "pause" else self._ps2.resume()
@@ -7143,6 +7278,8 @@ class EmulatorManager:
     # ------------------------------------------------------------------
 
     RECOVERY_STATE_SUFFIX = ".recovery"
+    # B54: the multitap relaunch's own state (the user's slots, the slot index and the recovery index untouched)
+    RELAUNCH_STATE_SUFFIX = ".relaunch"
     RECOVERY_INDEX_PATH = (
         "data/games/retroarch/privyhub_recovery_save.json"
     )
@@ -7286,9 +7423,9 @@ class EmulatorManager:
 
     def save_recovery_state(self) -> dict[str, Any]:
         """Same SAVE_STATE_SLOT 0 + copy mechanism, recovery destination."""
-        # B49: no save states in a PS2 session: the give-up save is skipped (no recovery prompt follows)
+        # B49 skipped it; B55: a PS2 session's give-up save goes through PINE (slot 8), the recovery index as PS1's
         if self._launch_kind == "pcsx2":
-            return {"skipped": "ps2_mode", "ps2_mode": True, "state_file": None}
+            return self._pcsx2_save_recovery_state()
         with self.lock:
             self._refresh_process()
             if (
@@ -7511,8 +7648,47 @@ class EmulatorManager:
             payload["retroarch_response"] = response
             return payload
 
-    def load_recovery_state_running(self) -> dict[str, Any]:
+    def save_relaunch_state(self) -> dict[str, Any]:
+        """B54: the SAVE_STATE_SLOT 0 capture the recovery save uses, copied to `<stem>.state.relaunch` and verified.
+
+        Only the multitap relaunch calls this (`relaunch_ports.py`); no index is written, and the file is overwritten at
+        the title's next relaunch. RetroArch sessions only.
+        """
+        if self._launch_kind == "pcsx2":
+            raise EmulatorError(PS2_NO_STATES)
+        with self.lock:
+            self._refresh_process()
+            if self.process is None or self.process.poll() is not None:
+                raise EmulatorError("No PrivyHub game session is running")
+            captured = self._capture_slot0_state(probe_action="save_state_relaunch_ports", probe_slot=0)
+            source = captured["source"]
+            source_diag = captured["source_diag"]
+            destination = source.with_name(source.name + self.RELAUNCH_STATE_SUFFIX)
+            self._copy_state_file(source, destination)
+            destination_diag = self._state_file_diagnostic(destination)
+            if (
+                int(destination_diag.get("size_bytes", 0) or 0) <= 0
+                or destination_diag.get("sha256") != source_diag.get("sha256")
+            ):
+                raise EmulatorError("PrivyHub could not verify the relaunch savestate")
+            self.record_save_state_probe_event(
+                "save_state_observation",
+                slot=0,
+                control="relaunch_ports_save",
+                source=source_diag,
+                destination=destination_diag,
+            )
+            return {
+                "ok": True,
+                "action": "save_relaunch_state",
+                "state_path": destination,
+                "size_bytes": int(destination_diag.get("size_bytes", 0) or 0),
+            }
+
+    def load_recovery_state_running(self, source: Path | None = None) -> dict[str, Any]:
         """D-BASE-R3c2: load the recovery save into a RUNNING core.
+
+        B54: `source` (the relaunch save) replaces the recovery save as the file staged; None = today's path exactly.
 
         The user's option A (2026-09-22). A recovery save captured mid-FMV
         loops when loaded into a paused core, fresh or not, and plays when
@@ -7522,9 +7698,9 @@ class EmulatorManager:
         verification, same LOAD_STATE_SLOT 0; the precondition is inverted
         and RetroArch's own `[State] Loading` line is required.
         """
-        # B49: refused in a PS2 session
+        # B49 refused it; B55: a PS2 recovery save loads through PINE (B52's ELF hold and picture check)
         if self._launch_kind == "pcsx2":
-            raise EmulatorError(PS2_NO_STATES)
+            return self._pcsx2_load_recovery_state_running()
         with self.lock:
             self._refresh_process()
             if (
@@ -7549,7 +7725,7 @@ class EmulatorManager:
                     f"({observed or 'no status'}); not loading"
                 )
 
-            source = self._recovery_state_path_for_active()
+            source = source if source is not None else self._recovery_state_path_for_active()
             source_diag = self._state_file_diagnostic(source)
 
             if int(
@@ -7677,9 +7853,9 @@ class EmulatorManager:
         The live emulator state is not re-saved: the recovery file is what
         the user is choosing to keep.
         """
-        # B49: refused in a PS2 session
+        # B49 refused it; B55: the PS2 recovery file copied to the user slot's PCSX2 name
         if self._launch_kind == "pcsx2":
-            raise EmulatorError(PS2_NO_STATES)
+            return self._pcsx2_copy_recovery_state_to_slot(slot, replace=replace)
         with self.lock:
             normalized = self._normalize_save_state_slot(slot)
 

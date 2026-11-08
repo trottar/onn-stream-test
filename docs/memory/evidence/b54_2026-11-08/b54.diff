@@ -1,0 +1,2100 @@
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -7143,6 +7143,8 @@
+     # ------------------------------------------------------------------
+ 
+     RECOVERY_STATE_SUFFIX = ".recovery"
++    # B54: the multitap relaunch's own state (the user's slots, the slot index and the recovery index untouched)
++    RELAUNCH_STATE_SUFFIX = ".relaunch"
+     RECOVERY_INDEX_PATH = (
+         "data/games/retroarch/privyhub_recovery_save.json"
+     )
+@@ -7511,9 +7513,48 @@
+             payload["retroarch_response"] = response
+             return payload
+ 
+-    def load_recovery_state_running(self) -> dict[str, Any]:
++    def save_relaunch_state(self) -> dict[str, Any]:
++        """B54: the SAVE_STATE_SLOT 0 capture the recovery save uses, copied to `<stem>.state.relaunch` and verified.
++
++        Only the multitap relaunch calls this (`relaunch_ports.py`); no index is written, and the file is overwritten at
++        the title's next relaunch. RetroArch sessions only.
++        """
++        if self._launch_kind == "pcsx2":
++            raise EmulatorError(PS2_NO_STATES)
++        with self.lock:
++            self._refresh_process()
++            if self.process is None or self.process.poll() is not None:
++                raise EmulatorError("No PrivyHub game session is running")
++            captured = self._capture_slot0_state(probe_action="save_state_relaunch_ports", probe_slot=0)
++            source = captured["source"]
++            source_diag = captured["source_diag"]
++            destination = source.with_name(source.name + self.RELAUNCH_STATE_SUFFIX)
++            self._copy_state_file(source, destination)
++            destination_diag = self._state_file_diagnostic(destination)
++            if (
++                int(destination_diag.get("size_bytes", 0) or 0) <= 0
++                or destination_diag.get("sha256") != source_diag.get("sha256")
++            ):
++                raise EmulatorError("PrivyHub could not verify the relaunch savestate")
++            self.record_save_state_probe_event(
++                "save_state_observation",
++                slot=0,
++                control="relaunch_ports_save",
++                source=source_diag,
++                destination=destination_diag,
++            )
++            return {
++                "ok": True,
++                "action": "save_relaunch_state",
++                "state_path": destination,
++                "size_bytes": int(destination_diag.get("size_bytes", 0) or 0),
++            }
++
++    def load_recovery_state_running(self, source: Path | None = None) -> dict[str, Any]:
+         """D-BASE-R3c2: load the recovery save into a RUNNING core.
+ 
++        B54: `source` (the relaunch save) replaces the recovery save as the file staged; None = today's path exactly.
++
+         The user's option A (2026-09-22). A recovery save captured mid-FMV
+         loops when loaded into a paused core, fresh or not, and plays when
+         loaded into a running one (D-BASE-R3c arms P/Q vs R). This is the
+@@ -7549,7 +7590,7 @@
+                     f"({observed or 'no status'}); not loading"
+                 )
+ 
+-            source = self._recovery_state_path_for_active()
++            source = source if source is not None else self._recovery_state_path_for_active()
+             source_diag = self._state_file_diagnostic(source)
+ 
+             if int(
+--- a/companion/games/native_stream_heartbeat.py
++++ b/companion/games/native_stream_heartbeat.py
+@@ -195,8 +195,9 @@
+     # B38: packets_by_player beside the changed-only updates_by_player (a stable-slot client only)
+     # B46: the chooser's pick (only a client that picked sends it)
+     # B49: a PS2 session's heartbeats carry ps2_mode (only set with PRIVYHUB_PS2=1)
++    # B54: hold-to-join's count and mode (only a hold-to-join client sends them)
+     for field in ("pad_slots", "updates_by_player", "packets_by_player", "pad_slots_bad", "players_chosen",
+-                  "ps2_mode"):
++                  "ps2_mode", "join", "players_joined"):
+         if field in values:
+             record[field] = values[field]
+ 
+--- a/companion/pad_slots.py
++++ b/companion/pad_slots.py
+@@ -23,6 +23,9 @@
+ B46: a client whose chooser picked also sends `players_chosen=<1|2|4>`; the rows then carry `players_chosen` and each
+ entry a `label` (`P1`-`P4`), and a changed pick is a change row. No key = B41's rows byte for byte. Design:
+ `docs/memory/evidence/b46_2026-11-07/design_written_before_code.md`.
++B54: a hold-to-join client sends `players_joined=<0-4>` instead; the rows then carry `join: "hold"`,
++`players_joined`, and each entry a `label`; a changed count is a change row. No key = B46's rows byte for byte. Design:
++`docs/memory/evidence/b54_2026-11-08/design_written_before_code.md`.
+ """
+ 
+ from __future__ import annotations
+@@ -75,6 +78,20 @@
+     return n if n in (1, 2, 4) else None
+ 
+ 
++def parse_joined(raw: str | None) -> int | None:
++    """B54: the client's `players_joined` (0-4); None when absent or malformed."""
++    try:
++        n = int(str(raw).strip())
++    except (TypeError, ValueError):
++        return None
++    return n if 0 <= n <= 4 else None
++
++
++def _joined_extra(players_joined: int | None) -> dict[str, Any]:
++    """B54: the rows' hold-to-join fields; {} without the key."""
++    return {} if players_joined is None else {"join": "hold", "players_joined": players_joined}
++
++
+ def parse(raw: str) -> list[dict[str, Any]] | None:
+     """The map as a list of {slot, pad, class}; [] for an empty map; None when malformed."""
+     raw = (raw or "").strip()
+@@ -100,6 +117,7 @@
+     def __init__(self) -> None:
+         self.last: list[dict[str, Any]] | None = None
+         self.last_chosen: int | None = None
++        self.last_joined: int | None = None
+ 
+     def _row(self, recovery: Any, when: str, slots: list[dict[str, Any]] | None, **extra: Any) -> None:
+         fields: dict[str, Any] = {"when": when}
+@@ -112,19 +130,24 @@
+         recovery._log("pad_slots", **fields)
+ 
+     def start(self, recovery: Any, raw: str, claims: str | None = None,
+-              players_chosen: int | None = None) -> list[dict[str, Any]] | None:
++              players_chosen: int | None = None, players_joined: int | None = None) -> list[dict[str, Any]] | None:
+         slots = with_chosen(with_claims(parse(raw), claims), players_chosen)
++        # B54: hold-to-join's labels (a joined slot's number is its player)
++        slots = with_chosen(slots, players_joined)
+         # B46: the chooser's pick, only when the client sent one
+-        self._row(recovery, "start", slots, **({"players_chosen": players_chosen} if players_chosen is not None else {}))
++        self._row(recovery, "start", slots, **({"players_chosen": players_chosen} if players_chosen is not None else {}),
++                  **_joined_extra(players_joined))
+         if slots is not None:
+             self.last = slots
+         self.last_chosen = players_chosen
++        self.last_joined = players_joined
+         return slots
+ 
+     def heartbeat(self, recovery: Any, raw: str, values: dict[str, Any], updates_by_player: Any = None,
+-                  claims: str | None = None, players_chosen: int | None = None) -> None:
++                  claims: str | None = None, players_chosen: int | None = None,
++                  players_joined: int | None = None) -> None:
+         """One heartbeat's key: the row's fields, and a change row when the map moved."""
+-        slots = with_chosen(with_claims(parse(raw), claims), players_chosen)
++        slots = with_chosen(with_chosen(with_claims(parse(raw), claims), players_chosen), players_joined)
+         if slots is None:
+             values["pad_slots_bad"] = True
+             return
+@@ -134,6 +157,10 @@
+         if players_chosen is not None:
+             values["players_chosen"] = players_chosen
+             extra["players_chosen"] = players_chosen
++        # B54: hold-to-join's count (only a hold-to-join client sends it)
++        if players_joined is not None:
++            values.update(_joined_extra(players_joined))
++            extra.update(_joined_extra(players_joined))
+         if isinstance(updates_by_player, dict):
+             # B38: changes as updates_by_player, today's per-packet counts beside them
+             if isinstance(updates_by_player.get("changes"), (list, tuple)):
+@@ -142,10 +169,11 @@
+                 values["packets_by_player"] = [int(x) for x in updates_by_player["packets"]]
+         elif isinstance(updates_by_player, (list, tuple)):
+             values["updates_by_player"] = [int(x) for x in updates_by_player]
+-        if slots != self.last or players_chosen != self.last_chosen:
++        if slots != self.last or players_chosen != self.last_chosen or players_joined != self.last_joined:
+             self._row(recovery, "change", slots, heartbeat_sequence=values.get("sequence"), **extra)
+             self.last = slots
+             self.last_chosen = players_chosen
++            self.last_joined = players_joined
+ 
+ 
+ def enable_changes(controller: Any) -> bool:
+--- a/companion/players_session.py
++++ b/companion/players_session.py
+@@ -10,6 +10,12 @@
+ RetroArch cannot change a core option or a port device mid-session (no network command does), so a pick made at the
+ chooser after the launch applies at the next launch (the client says so). Design:
+ `docs/memory/evidence/b46_2026-11-07/design_written_before_code.md` (hashed before this code). Never raises.
++
++B54 (hold-to-join): the client sends `players_joined=<1-4>` (the title's highest joined count) instead; 1 / 2 -> two
++ports (B46's plan for 2: one joined player last time must not cost a relaunch when a second pad holds), 3 / 4 -> the
++multitap (B46's plan for 4); `source` `join`. A third pad mid-session asks `native-stream-relaunch-ports`
++(`relaunch_ports.py`): the same plan with `source` `relaunch`. Without either key: B46 / today, byte for byte. Design:
++`docs/memory/evidence/b54_2026-11-08/design_written_before_code.md` (hashed before this code).
+ """
+ 
+ from __future__ import annotations
+@@ -31,7 +37,21 @@
+     return n if n in CHOICES else None
+ 
+ 
+-def plan(system: str, players_chosen: int, libretro_device: int | None) -> dict[str, Any]:
++def parse_joined(raw: Any) -> int | None:
++    """B54: the client's `players_joined` (0-4), else None."""
++    try:
++        n = int(str(raw).strip())
++    except (TypeError, ValueError):
++        return None
++    return n if 0 <= n <= 4 else None
++
++
++def ports_for_joined(n: int) -> int:
++    """B54: the plan's count for a joined count: 1 / 2 -> 2 ports, 3 / 4 -> the multitap (sent as 4)."""
++    return 4 if int(n) >= 3 else 2
++
++
++def plan(system: str, players_chosen: int, libretro_device: int | None, source: str = "launch") -> dict[str, Any]:
+     """The launch's ports for the pick: the `.opt` mode (PS1), the `--device` arguments, the ports read."""
+     system = str(system or "").strip().casefold()
+     n = int(players_chosen)
+@@ -55,7 +75,7 @@
+         "multitap_available": available,
+         "ps1_mode": ("port1" if multitap else "off") if system == "ps1" else None,
+         "device_args": args,
+-        "source": "launch",
++        "source": source,
+     }
+ 
+ 
+@@ -63,7 +83,8 @@
+     """The start response's echo: the launch's plan, else the metadata's ports (4 with the PS1 multitap on, else 2)."""
+     try:
+         session = getattr(emulator, "_players_session", None)
+-        if isinstance(session, dict) and session.get("source") == "launch":
++        # B54: a hold-to-join launch (`join`) and a mid-session relaunch (`relaunch`) are plans too
++        if isinstance(session, dict) and session.get("source") in ("launch", "join", "relaunch"):
+             return {"ports_set": {k: session[k] for k in ("players_chosen", "ports", "multitap", "multitap_available",
+                                                           "source")} | {"players": int(session["ports"])}}
+         game = getattr(emulator, "active_game", None) or (game_status or {}).get("game") or {}
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -3823,7 +3823,10 @@
+                                               claims=self._first(query, "pad_claims") if "pad_claims" in query else None,
+                                               # B46: the chooser's pick (only a client that picked sends it)
+                                               **({"players_chosen": _pad_slots.parse_chosen(self._first(query, "players_chosen"))}
+-                                                 if "players_chosen" in query else {}))
++                                                 if "players_chosen" in query else {}),
++                                              # B54: hold-to-join's count (only a hold-to-join client sends it)
++                                              **({"players_joined": _pad_slots.parse_joined(self._first(query, "players_joined"))}
++                                                 if "players_joined" in query else {}))
+ 
+             if not values:
+                 raise ValueError(
+@@ -3949,7 +3952,10 @@
+                                           claims=self._first(query, "pad_claims") if "pad_claims" in query else None,
+                                           # B46: the chooser's pick (only a client that picked sends it)
+                                           **({"players_chosen": _pad_slots.parse_chosen(self._first(query, "players_chosen"))}
+-                                             if "players_chosen" in query else {}))
++                                             if "players_chosen" in query else {}),
++                                          # B54: hold-to-join's count (only a hold-to-join client sends it)
++                                          **({"players_joined": _pad_slots.parse_joined(self._first(query, "players_joined"))}
++                                             if "players_joined" in query else {}))
+                 # B38: count only the slots whose state changes (a stable-slot client's key turns it on)
+                 _pad_slots.enable_changes(getattr(getattr(self._native_stream, "_session_io", None), "controller", None))
+             try:
+@@ -4078,6 +4084,23 @@
+                 "recovery": self._recovery.status(),
+             }
+ 
++        # B54: a hold-to-join client's third pad: the same title relaunched with the multitap at once (no request =
++        # nothing runs)
++        if action == "native-stream-relaunch-ports":
++            import relaunch_ports as _relaunch_ports
++            import players_session as _players_session
++            target = self._parse_int(self._first(query, "players"), 0)
++            joined = (_players_session.parse_joined(self._first(query, "players_joined"))
++                      if "players_joined" in query else None)
++            try:
++                result = _relaunch_ports.run(self, target, joined)
++            except _relaunch_ports.RelaunchRefused as exc:
++                self._recovery._log("relaunch_ports", ok=False, refused=str(exc)[:200], players=target,
++                                    players_joined=joined)
++                return {"plugin": self.PLUGIN_ID, "ok": False, "refused": str(exc),
++                        **_players_session.ports_set(self._emulator, self._emulator.status())}
++            return {"plugin": self.PLUGIN_ID, **result}
++
+         if action == "native-stream-stop":
+             self._recovery.session_ended()
+             self._adaptive_bitrate_session_ended()
+@@ -4543,7 +4566,15 @@
+                         raise ValueError("mod_index must be a non-negative integer")
+                 # B46: the chooser's last pick for this title sets the session's ports (no key = today's call)
+                 launch_extra: dict[str, Any] = {}
+-                if "players_chosen" in query:
++                joined_source = False
++                # B54: hold-to-join's count (1 / 2 -> two ports, 3 / 4 -> the multitap); B46's key still accepted
++                if "players_joined" in query:
++                    import players_session as _players_session
++                    joined = _players_session.parse_joined(self._first(query, "players_joined"))
++                    if joined:   # 0 or a malformed value: today's launch
++                        launch_extra["players_chosen"] = _players_session.ports_for_joined(joined)
++                        joined_source = True
++                elif "players_chosen" in query:
+                     import players_session as _players_session
+                     chosen = _players_session.parse(self._first(query, "players_chosen"))
+                     if chosen is not None:   # a malformed value: today's launch
+@@ -4555,6 +4586,9 @@
+                     mod_index=mod_index,
+                     **launch_extra,
+                 )
++                # B54: the session's ports came from the joined count
++                if joined_source and isinstance(getattr(self._emulator, "_players_session", None), dict):
++                    self._emulator._players_session["source"] = "join"
+ 
+                 return payload
+ 
+--- /dev/null
++++ b/companion/relaunch_ports.py
+@@ -0,0 +1,144 @@
++"""B54: the multitap at once -- the same title relaunched mid-session with new ports, play resuming where it was.
++
++Only `native-stream-relaunch-ports` calls this, and only a hold-to-join client (`debug.privyhub.player_prompt`, on by
++default) asks it, when a pad holds for a port the session does not have (P3 on two ports). **No request = nothing
++here runs: today byte for byte.** RetroArch cannot change a port device or a core option mid-session (B46 S2), so the
++core is stopped and the title launched again with the new ports; the encoder (which captures the core's own window)
++is restarted on the new window; the controller session stays up. Design:
++`docs/memory/evidence/b54_2026-11-08/design_written_before_code.md` (hashed before this code).
++
++The sequence: pause -> the state (RetroArch: `save_relaunch_state`; PS2: none, the title restarts -- B55's reserved
++PINE slot is the follow-up) -> the encoder stopped -> the core stopped -> the launch with the new ports -> resume, a
++1.0-s settle, the running-core load of the relaunch save (D-BASE-R3c2's way), pause -> the encoder started for the
++remembered client on the new window. The new launch failing -> the previous ports again (the same load); that failing
++too -> the session ends and the error is the answer. The load failing -> the title runs from its start (`restarted`).
++"""
++
++from __future__ import annotations
++
++import time
++from typing import Any, Callable
++
++import players_session as _players_session
++
++BUDGET_S = 15.0        # from the join to play (the client's gate included); the row's steps are what A reads
++SETTLE_S = 1.0         # RECOVERY_LOAD_SETTLE_S: the running-core load after the relaunch
++
++
++class RelaunchRefused(Exception):
++    """A request the host will not act on (nothing was touched)."""
++
++
++def _ms(t0: float, clock: Callable[[], float]) -> int:
++    return int(round((clock() - t0) * 1000.0))
++
++
++def run(plugin: Any, players: int, players_joined: int | None = None, *,
++        clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep) -> dict[str, Any]:
++    """The relaunch for `players` ports (2 or 4). Raises RelaunchRefused (untouched) or RuntimeError (ended)."""
++    emulator = plugin._emulator
++    stream = plugin._native_stream
++    status = emulator.status()
++    if not status.get("active", False):
++        raise RelaunchRefused("No game is running")
++    game = getattr(emulator, "active_game", None)
++    if not isinstance(game, dict) or not game.get("id"):
++        raise RelaunchRefused("No game is running")
++    target = int(players)
++    if target not in (2, 4):
++        raise RelaunchRefused("players must be 2 or 4")
++    system = str(game.get("system", "")).strip().casefold()
++    if target == 4 and system not in _players_session.MULTITAP_SYSTEMS:
++        raise RelaunchRefused("No multitap on this system")
++    args = getattr(plugin, "_recovery_start_args", None)
++    if not isinstance(args, dict) or not args.get("client_ip"):
++        raise RelaunchRefused("No stream client to restart the picture for")
++    if getattr(emulator, "_active_cheat_session", None) is not None:
++        raise RelaunchRefused("A cheat or mod session is not relaunched")
++    current = _players_session.ports_set(emulator, status)["ports_set"]
++    if int(current.get("ports", current.get("players", 2))) == target:
++        raise RelaunchRefused("The session already has these ports")
++    previous = 4 if current.get("multitap") else 2
++    kind = "pcsx2" if getattr(emulator, "_launch_kind", None) == "pcsx2" else "retroarch"
++
++    steps: dict[str, int] = {}
++    t_all = clock()
++    row: dict[str, Any] = {"players": target, "players_joined": players_joined, "kind": kind, "steps_ms": steps}
++
++    def step(name: str, fn: Callable[[], Any]) -> Any:
++        t0 = clock()
++        try:
++            return fn()
++        finally:
++            steps[name] = _ms(t0, clock)
++
++    if not status.get("paused", False):
++        step("pause", emulator.pause)
++    state_path = None
++    if kind == "retroarch":
++        try:
++            saved = step("save", emulator.save_relaunch_state)
++        except Exception as exc:
++            # nothing stopped: the client's gate releases and the game resumes as it was
++            raise RelaunchRefused(f"The game's state could not be saved; nothing was changed: {exc}") from exc
++        state_path = saved.get("state_path")
++    else:
++        row["reason"] = "ps2_no_relaunch_state"
++    step("stream_stop", stream.stop)
++    step("stop", emulator.stop)
++
++    ok = True
++    try:
++        step("launch", lambda: emulator.launch(game, players_chosen=target))
++        landed = target
++    except Exception as exc:
++        ok = False
++        row["fallback"] = "previous_ports"
++        row["launch_error"] = str(exc)[:200]
++        try:
++            step("launch_previous", lambda: emulator.launch(game, players_chosen=previous))
++            landed = previous
++        except Exception as exc2:
++            row["ok"] = False
++            row["total_ms"] = _ms(t_all, clock)
++            row["ended"] = True
++            plugin._recovery._log("relaunch_ports", **row)
++            try:
++                stream.end_game_session()
++            except Exception:
++                pass
++            raise RuntimeError(f"The game could not restart with {target} players and was stopped: {exc2}") from exc2
++    session = getattr(emulator, "_players_session", None)
++    if isinstance(session, dict):
++        session["source"] = "relaunch"
++
++    state = "restarted"
++    if state_path is not None:
++        try:
++            step("resume", emulator.resume)
++            step("settle", lambda: sleep(SETTLE_S))
++            step("load", lambda: emulator.load_recovery_state_running(source=state_path))
++            state = "loaded"
++        except Exception as exc:
++            row["load_error"] = str(exc)[:200]
++        step("pause_after", emulator.pause)
++    else:
++        step("pause_after", emulator.pause)
++
++    pid = emulator.status().get("pid")
++    port = int(args.get("port") or getattr(stream, "DEFAULT_PORT", 0))
++    try:
++        step("stream_start", lambda: stream.start(client_ip=str(args["client_ip"]), port=port, managed_process_id=pid))
++    except Exception as exc:
++        row.update({"ok": False, "state": state, "stream_error": str(exc)[:200], "total_ms": _ms(t_all, clock)})
++        plugin._recovery._log("relaunch_ports", **row)
++        raise RuntimeError(f"The game restarted but its picture did not: {exc}") from exc
++    ports = _players_session.ports_set(emulator, emulator.status())["ports_set"]
++    total = _ms(t_all, clock)
++    row.update({"ok": ok, "state": state, "landed_ports": landed, "total_ms": total,
++                "within_budget": total <= BUDGET_S * 1000.0})
++    plugin._recovery._log("relaunch_ports", **row)
++    plugin._recovery._log("ports_set", **ports)
++    return {"ok": ok, "relaunch": {k: row[k] for k in ("state", "steps_ms", "total_ms", "landed_ports", "kind")
++                                   if k in row} | ({"fallback": row["fallback"]} if "fallback" in row else {}),
++            "ports_set": ports}
+--- a/PrivyHub/app/src/main/java/MainActivity.kt
++++ b/PrivyHub/app/src/main/java/MainActivity.kt
+@@ -9104,7 +9104,8 @@
+     }
+ 
+ 
+-    // B46: `&players_chosen=N` from the title's last pick, only with the prompt on (debug.privyhub.player_prompt)
++    // B46: the title's last count sets the session's ports, only with the prompt on (debug.privyhub.player_prompt)
++    // B54: hold-to-join's `&players_joined=N` (the title's highest joined count) replaces B46's `players_chosen`
+     private fun playersChosenLaunchSuffix(gameId: String): String =
+         try {
+             if (!com.safeiot.privyhub.streaming.PlayerPromptFlag.fromSystem()) {
+@@ -9112,7 +9113,7 @@
+             } else {
+                 com.safeiot.privyhub.streaming.PlayerPrompt.gameKey(gameId)
+                     ?.let { com.safeiot.privyhub.streaming.PrefsPlayerChoiceStore(this).get(it) }
+-                    ?.let { "&players_chosen=$it" }
++                    ?.let { "&players_joined=$it" }
+                     ?: ""
+             }
+         } catch (_: Exception) {
+@@ -12296,7 +12297,7 @@
+                     httpPost(
+                         "http://$host:$CONTROL_PORT" +
+                             "/plugins/games/launch?id=$gameId$cheatQuerySuffix$modQuerySuffix" +
+-                            // B46: the title's last chooser pick sets the session's ports (no pick, or the prompt off: today)
++                            // B46 / B54: the title's last joined count sets the session's ports (none, or the prompt off: today)
+                             playersChosenLaunchSuffix(gameId)
+                     )
+ 
+--- a/PrivyHub/app/src/main/java/streaming/NativeControllerSender.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeControllerSender.kt
+@@ -219,7 +219,7 @@
+             return false
+         }
+ 
+-        // B41: the prompt claims on a face button / Start (null = today's line)
++        // B41: the prompt's slots (null = today's line); B54: only a joined pad has one (the join is a hold)
+         val prompt = playerPrompt
+         val player =
+             (if (prompt != null) prompt.slotForKey(
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -101,6 +101,9 @@
+             6
+         private const val STABILIZATION_TIMEOUT_MS =
+             15_000L
++        // B54: the relaunch's answer (the host's budget is 15 s; its steps are bounded)
++        private const val RELAUNCH_READ_TIMEOUT_MS =
++            30_000
+         private const val STABILIZATION_MIN_FPS =
+             45.0
+         private const val STABILIZATION_MAX_OUTPUT_GAP_MS =
+@@ -858,8 +861,8 @@
+                             "?port=$VIDEO_PORT" + (if (restart != null) "&guard_end=1" else "") + padSlotsQuery() +
+                             // B41: the prompt asks for the title's players and sends its claims (null = today: nothing)
+                             (if (playerPrompt != null) "&player_prompt=1" + promptClaimsQuery() else "") +
+-                            // B46: a self-restart carries the session's choice (null = today: nothing)
+-                            (if (playerPrompt != null && restart != null) promptChosenQuery(PlayerPromptProcess.lastChoice) else ""),
++                            // B54: a self-restart carries the session's joined count (null = today: nothing)
++                            (if (playerPrompt != null && restart != null) promptJoinedQuery(PlayerPromptProcess.lastJoined) else ""),
+                         readTimeoutMs =
+                             30_000
+                     )
+@@ -2451,8 +2454,10 @@
+         playerPrompt?.let { p ->
+             root.put("players", p.players)
+             root.put("pad_claims", p.claimsJson())
+-            // B46: the pick and the session's ports
+-            root.put("players_chosen", p.chosen ?: JSONObject.NULL)
++            // B54: hold-to-join's count, the relaunches and the session's ports
++            root.put("join", "hold")
++            root.put("players_joined", p.joined)
++            root.put("relaunches", p.relaunchesJson())
+             root.put("ports_set", p.ports.toJson())
+         }
+ 
+@@ -2625,17 +2630,80 @@
+     private var promptBadgeView: TextView? = null
+     private fun promptClaimsQuery(): String =
+         playerPrompt?.let { "&pad_claims=" + URLEncoder.encode(it.claimsString(), "UTF-8") } ?: ""
+-    // B46: the chooser's pick for the host (absent until picked)
+-    private fun promptChosenQuery(n: Int? = playerPrompt?.chosen): String = n?.let { "&players_chosen=$it" } ?: ""
++    // B54: hold-to-join's count for the host (every start and heartbeat)
++    private fun promptJoinedQuery(n: Int? = playerPrompt?.joined): String = n?.let { "&players_joined=$it" } ?: ""
+     private val promptTick = object : Runnable {
+         override fun run() {
+             playerPrompt?.let { p ->
+                 val now = System.nanoTime() / 1_000_000L
+-                p.tick(now)
+-                val v = p.view(now, AndroidPadDevice.connected())
++                val connected = AndroidPadDevice.connected()
++                p.tick(now, connected)
++                // B54: a hold that needs more ports: the multitap relaunch, at once
++                p.takeRelaunchRequest()?.let { n -> startRelaunch(n) }
++                val v = p.view(now, connected)
+                 promptView?.let { t -> t.text = v.prompt ?: ""; t.visibility = if (v.prompt != null) View.VISIBLE else View.GONE }
+                 promptBadgeView?.let { t -> t.text = v.badge ?: ""; t.visibility = if (v.badge != null) View.VISIBLE else View.GONE }
+-                uiHandler.postDelayed(this, 200)
++                // B54: every 50 ms while a pad is holding (the join lands 500-550 ms after the press), else 200 ms
++                uiHandler.postDelayed(this, if (p.holdPending()) PlayerPrompt.TICK_HOLD_MS else PlayerPrompt.TICK_MS)
++            }
++        }
++    }
++
++    // B54: the multitap relaunch (only from the prompt's request; null prompt = never). The gate is re-entered as the
++    // link recovery's (nothing torn down, the last frame kept), with no desync post and no release until the host's
++    // answer; then the new encoder's frames pass the gate and the ready resumes the relaunched core.
++    @Volatile
++    private var relaunchActive = false
++    private var relaunchPlayers = PlayerPrompt.MAX_PLAYERS
++
++    private fun startRelaunch(players: Int) {
++        val p = playerPrompt ?: return
++        val host = intent.getStringExtra(EXTRA_COMPANION_HOST)?.trim().orEmpty()
++        if (host.isBlank()) {
++            p.onRelaunchResult(false, null, null, null, System.nanoTime() / 1_000_000L, AndroidPadDevice.connected())
++            return
++        }
++        relaunchActive = true
++        relaunchPlayers = players
++        recoveryActive = true
++        desyncPostedForEpisode = true
++        gameplayReleased = false
++        stabilizationFailed = false
++        releaseRequestInFlight = false
++        stabilizationBaselineSet = false
++        stabilizationCleanTicks = 0
++        stabilizationStartedAtNs = System.nanoTime()
++        stabilizationPhase = "Setting up $players players"
++        streamState = "Reconnecting"
++        publishStreamStatus()
++        updateStabilizationOverlay()
++        thread(start = true, isDaemon = true, name = "PrivyHub-Relaunch-Ports") {
++            var ok = false
++            var ports: PortsSet? = null
++            var state: String? = null
++            var totalMs: Long? = null
++            try {
++                val json = JSONObject(httpPost("http://$host:$CONTROL_PORT" +
++                    "/plugins/games/native-stream-relaunch-ports?players=$players" + promptJoinedQuery(),
++                    readTimeoutMs = RELAUNCH_READ_TIMEOUT_MS))
++                ok = json.optBoolean("ok", false)
++                ports = json.optJSONObject("ports_set")?.let { PortsSet.parse(it) }
++                json.optJSONObject("relaunch")?.let { r ->
++                    state = r.optString("state", "").ifEmpty { null }
++                    totalMs = r.optLong("total_ms", -1L).takeIf { it >= 0L }
++                }
++            } catch (_: Exception) {
++                ok = false
++            }
++            runOnUiThread {
++                p.onRelaunchResult(ok, ports, state, totalMs, System.nanoTime() / 1_000_000L, AndroidPadDevice.connected())
++                relaunchActive = false
++                stabilizationStartedAtNs = System.nanoTime()
++                stabilizationBaselineSet = false
++                stabilizationCleanTicks = 0
++                stabilizationPhase = "Reconnecting"
++                publishStreamStatus()
++                updateStabilizationOverlay()
+             }
+         }
+     }
+@@ -2859,8 +2927,8 @@
+                 (surfaceHold?.query() ?: "") +
+                 // B34: the slot map (null = today: nothing)
+                 padSlotsQuery() +
+-                // B41: the prompt's claims (null = today: nothing)
+-                promptClaimsQuery() + promptChosenQuery() +
++                // B41: the prompt's claims (null = today: nothing); B54: the joined count
++                promptClaimsQuery() + promptJoinedQuery() +
+                 // D-BASE-T1: the onn's own thermal state travels with the
+                 // heartbeat, so a session that never posts a report still
+                 // leaves a temperature trace on the host.
+@@ -3212,6 +3280,10 @@
+                         stabilizationFailed ->
+                             "Game stream isn't ready"
+ 
++                        // B54: the multitap relaunch (false = today)
++                        relaunchActive ->
++                            "Setting up $relaunchPlayers players…"
++
+                         recoveryActive ->
+                             "Reconnecting…"
+ 
+@@ -3220,7 +3292,9 @@
+                     }
+                 )
+                 append(
+-                    if (recoveryActive) {
++                    if (relaunchActive) {
++                        "\nThe game restarts with $relaunchPlayers controller ports and comes back where it was"
++                    } else if (recoveryActive) {
+                         "\nThe game is paused until the stream returns"
+                     } else {
+                         "\nPreparing smooth playback"
+@@ -3582,6 +3656,15 @@
+             return
+         }
+ 
++        // B54: no release until the host answers the relaunch (false = today)
++        if (relaunchActive) {
++            stabilizationCleanTicks = 0
++            stabilizationBaselineSet = false
++            publishStreamStatus()
++            updateStabilizationOverlay()
++            return
++        }
++
+         val elapsedMs =
+             if (
+                 stabilizationStartedAtNs >
+@@ -4466,9 +4549,9 @@
+             return true
+         }
+ 
+-        // B46: the chooser's left / right / pick from any pad or the remote (null = today)
++        // B54: hold-to-join: an unclaimed pad's keys are its hold, never play (null = today)
+         playerPrompt?.let { p ->
+-            if (p.onChooserKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.repeatCount,
++            if (p.onJoinKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.repeatCount,
+                     event.device?.let { AndroidPadDevice(it) }, System.nanoTime() / 1_000_000L)) {
+                 return true
+             }
+@@ -4497,14 +4580,6 @@
+     override fun dispatchGenericMotionEvent(
+         event: MotionEvent
+     ): Boolean {
+-        // B46: a pad's hat moves the chooser (null = today)
+-        playerPrompt?.let { p ->
+-            val d = event.device
+-            if (d != null && event.action == MotionEvent.ACTION_MOVE &&
+-                p.onChooserHat(AndroidPadDevice(d), event.getAxisValue(MotionEvent.AXIS_HAT_X))) {
+-                return true
+-            }
+-        }
+         if (
+             !gameplayReleased
+         ) {
+--- a/PrivyHub/app/src/main/java/streaming/PlayerChoiceStoreAndroid.kt
++++ b/PrivyHub/app/src/main/java/streaming/PlayerChoiceStoreAndroid.kt
+@@ -5,13 +5,15 @@
+ /**
+  * B46: the title's last chooser pick on the onn, a private preference keyed by [PlayerPrompt.gameKey] (sha256 of the
+  * host's game id, 12 hex; no title or id stored). Built only with the prompt on; a failed read is no choice.
++ * B54: hold-to-join keeps the title's highest joined count (1-4) in its own file, [FILE_JOINED]; B46's picks are not
++ * read.
+  */
+-class PrefsPlayerChoiceStore(context: Context) : PlayerChoiceStore {
+-    private val prefs = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
++class PrefsPlayerChoiceStore(context: Context, file: String = FILE_JOINED) : PlayerChoiceStore {
++    private val prefs = context.applicationContext.getSharedPreferences(file, Context.MODE_PRIVATE)
+ 
+     override fun get(key: String): Int? =
+         try {
+-            prefs.getInt(key, 0).takeIf { it in PlayerPrompt.OPTIONS }
++            prefs.getInt(key, 0).takeIf { it in 1..PlayerPrompt.MAX_PLAYERS }
+         } catch (_: Exception) {
+             null
+         }
+@@ -25,5 +27,6 @@
+ 
+     companion object {
+         const val FILE = "privyhub_players_chosen"
++        const val FILE_JOINED = "privyhub_players_joined"
+     }
+ }
+--- a/PrivyHub/app/src/main/java/streaming/PlayerPrompt.kt
++++ b/PrivyHub/app/src/main/java/streaming/PlayerPrompt.kt
+@@ -6,20 +6,19 @@
+ 
+ /**
+  * B41: the player prompt, behind the system property `debug.privyhub.player_prompt` (CL-B7P's convention).
+- * B46 (the user, 2026-11-07: "Player one press any button by default also"; "I want every game to have that 1 player,
+- * 2 player, and multitap"; "It should pop up every time a game is active or unpaused"): **on by default** --
+- * absent / empty / junk / `1` = the chooser; `0` / `off` = no prompt at all (no object, no view, no query or report
+- * key: `8ba4d996…`'s absent).
+- *
+- * At every session start that is not a self-restart (a game's start, and every unpause: the Resume tile's new start),
+- * the slot map is cleared and a bottom-centre chooser reads "Players:  1  /  2  /  multitap (3-4)"; left / right (a
+- * pad's d-pad or hat, or the remote) moves, a face button (or the remote's centre) picks; the default is the title's
+- * last choice, else 2 (1 when the host's `players` is 1). Then "Player N — press any button" up to the chosen count
+- * (capped by the session's ports, `ports_set`); the first fresh face-button / Start press of an unclaimed pad takes the
+- * lowest open slot with a 2-s "PN" badge; the press reaches the game. Key repeats never claim, and a key held through
+- * a pick or a release must be lifted first (HOME-3 C6's held-Start re-claim). A pad beyond the count gets no slot.
+- * Select + Start held 2 s releases a slot. The game is never paused.
+- * Design: `docs/memory/evidence/b46_2026-11-07/design_written_before_code.md` (hashed before this code).
++ * B46: on by default -- absent / empty / junk / `1` = on; `0` / `off` = no prompt at all (no object, no view, no query
++ * or report key).
++ * B54 (the user, 2026-11-08: "a quick press and hold might be a more clear and intuitive check"; a multitap change "At
++ * once"): **hold-to-join replaces B46's chooser.** At every session start that is not a self-restart (a game's start,
++ * every unpause) the slot map is cleared and a bottom-centre line reads "Hold any button to join"; an unclaimed real
++ * pad holding a face button or Start for [HOLD_MS] becomes the next player with a 2-s "PN" badge, and the line reads
++ * "P1 joined — hold to add Player 2". A 1-player title closes the join after P1; the line closes when the session's
++ * ports are taken and 10 s after the last join, and comes back while an unclaimed pad holds. A hold that needs a port
++ * beyond the session's (P3 on two ports) asks the host to relaunch the title with the multitap at once ("Setting up 4
++ * players…"); the pad joins when the host answers. An unclaimed pad's keys go nowhere (it has no port) and the joining
++ * hold is not sent to the game; a joined pad's keys are play. Key repeats never start a hold. Select + Start held 2 s
++ * releases a slot; a fresh hold re-joins.
++ * Design: `docs/memory/evidence/b54_2026-11-08/design_written_before_code.md` (hashed before this code).
+  */
+ object PlayerPromptFlag {
+     const val PROPERTY = "debug.privyhub.player_prompt"
+@@ -37,7 +36,7 @@
+         }
+ }
+ 
+-/** B46: the title's last choice, keyed by [PlayerPrompt.gameKey] (a private preference on the onn; fakes on the JVM). */
++/** B46 / B54: the title's highest joined count, keyed by [PlayerPrompt.gameKey] (a private preference on the onn). */
+ interface PlayerChoiceStore {
+     fun get(key: String): Int?
+     fun put(key: String, players: Int)
+@@ -49,7 +48,7 @@
+     override fun put(key: String, players: Int) { m[key] = players }
+ }
+ 
+-/** B46: the session's ports as the host set them at the launch (`ports_set`); an old host's absent key = 2 ports. */
++/** B46: the session's ports as the host set them (`ports_set`); an old host's absent key = 2 ports. */
+ data class PortsSet(val players: Int, val multitap: Boolean, val multitapAvailable: Boolean, val source: String) {
+     fun toJson(): JSONObject = JSONObject().put("players", players).put("multitap", multitap)
+         .put("multitap_available", multitapAvailable).put("source", source)
+@@ -71,18 +70,21 @@
+     }
+ }
+ 
+-/** B46: the session's choice across a self-restart (a new activity in the same process). */
++/** B46 / B54: the session's joined count across a self-restart (a new activity in the same process). */
+ object PlayerPromptProcess {
+     @Volatile
+-    var lastChoice: Int? = null
++    var lastJoined: Int? = null
+ }
+ 
+ class PlayerPrompt(private val slots: PadSlots, private val store: PlayerChoiceStore = MemoryPlayerChoiceStore()) {
+     data class View(val prompt: String?, val badge: String?)
+ 
+-    enum class Phase { NONE, CHOOSING, CLAIMING, DONE }
++    /** B54: a relaunch's answer, for the report. */
++    data class Relaunch(val ok: Boolean, val state: String?, val totalMs: Long?)
+ 
+-    /** The host's B41 `players` (the default's input and the report's `players`). */
++    enum class Phase { NONE, JOINING, RELAUNCHING }
++
++    /** The host's B41 `players` (1 = a 1-player title: the join closes after P1). */
+     @Volatile
+     var players: Int = DEFAULT_PLAYERS
+         private set
+@@ -91,103 +93,107 @@
+     var phase: Phase = Phase.NONE
+         private set
+ 
+-    /** 1 / 2 / 4 once picked (the queries' and the report's `players_chosen`). */
+     @Volatile
+-    var chosen: Int? = null
++    var ports: PortsSet = PortsSet.UNKNOWN
+         private set
+ 
++    /** B54: relaunches asked this session, and the last answer. */
+     @Volatile
+-    var ports: PortsSet = PortsSet.UNKNOWN
++    var relaunches: Int = 0
++        private set
++
++    @Volatile
++    var lastRelaunch: Relaunch? = null
+         private set
+ 
++    private class Hold(val pad: PadDevice, val keyCode: Int, val sinceMs: Long)
++
+     private val lock = Any()
+     private val claimedBy = HashMap<Int, String>()      // slot -> prompt | stable
+-    private val badgeShown = HashSet<String>()           // pad keys badged this session
++    private val holds = HashMap<String, Hold>()          // B54: unclaimed pad key -> its hold in progress
+     private val holdBits = HashMap<String, Int>()        // pad key -> Select (1) / Start (2) held
+     private val holdSince = HashMap<String, Long>()      // pad key -> both held since
+-    private val needsUp = HashSet<Pair<String, Int>>()   // (pad key, key code) held through a pick / release
+-    private val hatX = HashMap<String, Int>()            // pad key -> the hat's last side (-1 / 0 / 1)
+-    private var highlight = 1                            // index into OPTIONS
++    private val needsUp = HashSet<Pair<String, Int>>()   // (pad key, key code) held through a join / release
+     private var gameKey: String? = null
+     private var badgeText: String? = null
+     private var badgeUntilMs = 0L
+     private var noteText: String? = null
+     private var noteUntilMs = 0L
++    private var lastJoinAtMs: Long? = null
++    private var relaunchAsk: Int? = null                 // the ports to ask the host for (taken by the activity)
++    private var relaunchPad: PadDevice? = null           // the pad waiting for the relaunch
++    private var relaunchTarget = MAX_PLAYERS             // the ports asked for (the line's count)
+ 
+-    /** The claims' target: the choice capped by the session's ports. */
+-    val count: Int get() = chosen?.let { capped(it) } ?: 0
++    /** The joined count (the queries' and the report's `players_joined`). */
++    val joined: Int get() = synchronized(lock) { slots.map().size }
+ 
+     /** The sender's start: no pre-assignment; the opening waits for the start response. */
+     fun beginStart(connected: List<PadDevice>) {
+         synchronized(lock) {
+-            badgeShown.clear()
++            holds.clear()
+             holdBits.clear()
+             holdSince.clear()
+             needsUp.clear()
+-            hatX.clear()
+             badgeText = null
+         }
+     }
+ 
+     /**
+-     * After the start response: [selfRestart] keeps the map and the session's choice (no chooser); any other start
+-     * (a game's start, an unpause) clears the map and opens the chooser.
++     * After the start response: [selfRestart] keeps the map (no line); any other start (a game's start, an unpause)
++     * clears the map and opens "Hold any button to join".
+      */
+     fun onStartResponse(selfRestart: Boolean, hostPlayers: Int, portsSet: PortsSet, key: String?, connected: List<PadDevice>) {
+         synchronized(lock) {
+             players = hostPlayers.coerceIn(1, 4)
+             ports = portsSet
+             gameKey = key
++            relaunchAsk = null
++            relaunchPad = null
++            phase = Phase.JOINING
+             if (selfRestart) {
+-                chosen = PlayerPromptProcess.lastChoice ?: key?.let { store.get(it) } ?: defaultChoice()
+                 markStable()
+-                phase = Phase.DONE
++                lastJoinAtMs = Long.MIN_VALUE / 2   // the line stays closed until an unclaimed pad holds
+                 return
+             }
+             slots.clearAll()
+             claimedBy.clear()
+-            chosen = null
+             noteText = null
+-            highlight = OPTIONS.indexOf((key?.let { store.get(it) }) ?: defaultChoice()).coerceAtLeast(0)
+-            phase = Phase.CHOOSING
++            lastJoinAtMs = null
+         }
+     }
+ 
+-    /** A key from any device while the chooser is open: true = consumed (left / right / pick). */
+-    fun onChooserKey(keyCode: Int, down: Boolean, repeat: Int, pad: PadDevice?, nowMs: Long): Boolean {
++    /**
++     * B54: every key of a real pad, before the gameplay gate. An unclaimed pad's key is consumed (true; its hold is
++     * tracked); a joined pad's key goes on to the sender (false). Not a pad, or the prompt not open: false.
++     */
++    fun onJoinKey(keyCode: Int, down: Boolean, repeat: Int, pad: PadDevice?, nowMs: Long): Boolean {
++        if (pad == null || !PadSlots.eligible(pad)) return false
++        val k = PadSlots.key(pad)
+         synchronized(lock) {
+-            if (phase != Phase.CHOOSING) return false
+-            val k = pad?.takeIf { PadSlots.eligible(it) }?.let { PadSlots.key(it) }
+-            when (keyCode) {
+-                KEYCODE_DPAD_LEFT, KEYCODE_DPAD_RIGHT -> {
+-                    if (down && repeat == 0) move(if (keyCode == KEYCODE_DPAD_LEFT) -1 else 1)
+-                    return true
+-                }
+-                in PICK_KEYS -> {
+-                    if (down && repeat == 0) {
+-                        k?.let { needsUp.add(it to keyCode) }
+-                        pick(OPTIONS[highlight], nowMs)
+-                    }
+-                    return true
+-                }
+-                else -> return false
++            if (phase == Phase.NONE) return false
++            if (slots.slotOfKey(k) != null) {
++                // the joining key (and its repeats) is not play until lifted
++                if ((k to keyCode) !in needsUp) return false
++                if (!down) needsUp.remove(k to keyCode)
++                return true
++            }
++            if (!down) {
++                needsUp.remove(k to keyCode)
++                if (holds[k]?.keyCode == keyCode) holds.remove(k)   // a tap: no join
++                return true
++            }
++            if (phase == Phase.RELAUNCHING) return true             // holds wait out the relaunch
++            if (repeat == 0 && keyCode in CLAIM_KEYS && (k to keyCode) !in needsUp && k !in holds) {
++                holds[k] = Hold(pad, keyCode, nowMs)
+             }
+-        }
+-    }
+-
+-    /** A pad's hat while the chooser is open: a crossing of ±0.5 moves once; true = consumed. */
+-    fun onChooserHat(pad: PadDevice, x: Float): Boolean {
+-        synchronized(lock) {
+-            if (phase != Phase.CHOOSING || !PadSlots.eligible(pad)) return false
+-            val k = PadSlots.key(pad)
+-            val side = if (x <= -0.5f) -1 else if (x >= 0.5f) 1 else 0
+-            if (side != 0 && hatX[k] != side) move(side)
+-            hatX[k] = side
+             return true
+         }
+     }
+ 
+-    /** A key event's slot: null = no player (the chooser is open, an unclaimed pad's non-claim key, not a gamepad). */
++    /** True while an unclaimed pad is holding (the activity ticks every 50 ms then). */
++    fun holdPending(): Boolean = synchronized(lock) { holds.isNotEmpty() }
++
++    /** A key event's slot: null = no player (an unclaimed pad, not a gamepad). A joined pad's key is play. */
+     fun slotForKey(
+         d: PadDevice,
+         keyCode: Int,
+@@ -200,31 +206,20 @@
+         val k = PadSlots.key(d)
+         synchronized(lock) {
+             if (!down) needsUp.remove(k to keyCode)
+-            if (phase == Phase.CHOOSING) return null
+-            slots.slotOfKey(k)?.let { s ->
+-                trackHold(k, keyCode, down, nowMs)
+-                if (down && badgeShown.add(k)) badge("P${s + 1}", nowMs)
+-                return s
+-            }
+-            // a fresh press only: no repeat, and not a key held through a pick or a release
+-            if (!down || repeat > 0 || keyCode !in CLAIM_KEYS || (k to keyCode) in needsUp) return null
+-            val s = openSlot(connected()) ?: return null
+-            slots.claim(d, s)
+-            claimedBy[s] = PROMPT
+-            holdBits.remove(k)
+-            badgeShown.add(k)
+-            badge("P${s + 1}", nowMs)
+-            if ((0 until count).all { slots.holderOf(it) != null }) phase = Phase.DONE
++            val s = slots.slotOfKey(k) ?: return null
++            trackHold(k, keyCode, down, nowMs)
+             return s
+         }
+     }
+ 
+-    /** A motion event's slot: a stick never claims. */
+-    fun slotForMotion(d: PadDevice, connected: () -> List<PadDevice>): Int? =
+-        if (phase == Phase.CHOOSING) null else slots.slotOf(d)
++    /** A motion event's slot: a stick never joins. */
++    fun slotForMotion(d: PadDevice, connected: () -> List<PadDevice>): Int? = slots.slotOf(d)
+ 
+-    /** The UI tick: a Select + Start hold of [RELEASE_MS] frees the pad's slot; both keys must be lifted first. */
+-    fun tick(nowMs: Long) {
++    /**
++     * The UI tick: a hold of [HOLD_MS] joins (or asks for the relaunch); a Select + Start hold of [RELEASE_MS] frees
++     * the pad's slot (both keys must then be lifted).
++     */
++    fun tick(nowMs: Long, connected: List<PadDevice> = emptyList()) {
+         synchronized(lock) {
+             val due = holdSince.filter { nowMs - it.value >= RELEASE_MS }.keys.toList()
+             for (k in due) {
+@@ -233,27 +228,56 @@
+                 val s = slots.slotOfKey(k) ?: continue
+                 slots.release(s)
+                 claimedBy.remove(s)
+-                badgeShown.remove(k)
+                 needsUp.add(k to KEYCODE_BUTTON_SELECT)
+                 needsUp.add(k to KEYCODE_BUTTON_START)
+                 badge("P${s + 1} released", nowMs)
+-                if (phase == Phase.DONE) phase = Phase.CLAIMING
++            }
++            if (phase != Phase.JOINING) return
++            val ready = holds.entries.filter { nowMs - it.value.sinceMs >= HOLD_MS }.sortedBy { it.value.sinceMs }
++            for ((k, h) in ready) {
++                holds.remove(k)
++                needsUp.add(k to h.keyCode)   // the joining key is not play until lifted
++                join(h.pad, k, nowMs, connected)
++                if (phase != Phase.JOINING) break
++            }
++        }
++    }
++
++    /** B54: the ports to ask the host for, once (the activity posts the relaunch). */
++    fun takeRelaunchRequest(): Int? = synchronized(lock) { relaunchAsk.also { relaunchAsk = null } }
++
++    /** B54: the host's answer to the relaunch: success → the new ports and the waiting pad joins; failure → a note. */
++    fun onRelaunchResult(ok: Boolean, portsSet: PortsSet?, state: String?, totalMs: Long?, nowMs: Long,
++                         connected: List<PadDevice>) {
++        synchronized(lock) {
++            if (phase != Phase.RELAUNCHING) return
++            lastRelaunch = Relaunch(ok, state, totalMs)
++            phase = Phase.JOINING
++            val pad = relaunchPad
++            relaunchPad = null
++            if (ok && portsSet != null) ports = portsSet
++            if (!ok || portsSet == null) {
++                note("Couldn't set up $relaunchTarget players", nowMs)
++                return
++            }
++            if (pad != null && connected.any { PadSlots.eligible(it) && PadSlots.key(it) == PadSlots.key(pad) }) {
++                join(pad, PadSlots.key(pad), nowMs, connected)
+             }
+         }
+     }
+ 
+     fun view(nowMs: Long, connected: List<PadDevice>): View = synchronized(lock) {
+         val badgeNow = badgeText?.takeIf { nowMs < badgeUntilMs }
+-        if (phase == Phase.CHOOSING) return@synchronized View(chooserLine(), badgeNow)
+-        val note = noteText?.takeIf { phase == Phase.CLAIMING || nowMs < noteUntilMs }
+-        val ask = if (phase == Phase.CLAIMING || phase == Phase.DONE) {
+-            val unclaimed = connected.any { PadSlots.eligible(it) && slots.slotOf(it) == null }
+-            openSlot(connected)?.takeIf { unclaimed }?.let { "Player ${it + 1} — press any button" }
+-        } else null
+-        View(listOfNotNull(ask, note).joinToString("\n").ifEmpty { null }, badgeNow)
++        val note = noteText?.takeIf { nowMs < noteUntilMs }
++        val line = when (phase) {
++            Phase.NONE -> null
++            Phase.RELAUNCHING -> "Setting up $relaunchTarget players…"
++            Phase.JOINING -> joinLine(nowMs)
++        }
++        View(listOfNotNull(line, note).joinToString("\n").ifEmpty { null }, badgeNow)
+     }
+ 
+-    /** `slot:p|s` for each claimed or kept slot (the start's and the heartbeat's `pad_claims`). */
++    /** `slot:p|s` for each joined or kept slot (the start's and the heartbeat's `pad_claims`). */
+     fun claimsString(): String = synchronized(lock) {
+         claimedBy.entries.sortedBy { it.key }.joinToString(",") { "${it.key}:${if (it.value == PROMPT) "p" else "s"}" }
+     }
+@@ -266,47 +290,70 @@
+ 
+     fun claimedBy(slot: Int): String? = synchronized(lock) { claimedBy[slot] }
+ 
+-    /** The chooser's line, the highlighted option in brackets. */
+-    fun chooserLine(): String = synchronized(lock) {
+-        "Players:  " + OPTIONS.indices.joinToString("  /  ") { i ->
+-            val label = LABELS[i]
+-            if (i == highlight) "[$label]" else label
++    /** B54: the report's `relaunches`. */
++    fun relaunchesJson(): JSONObject = synchronized(lock) {
++        JSONObject().put("count", relaunches).apply {
++            lastRelaunch?.let { r ->
++                put("last", JSONObject().put("ok", r.ok).put("state", r.state ?: JSONObject.NULL)
++                    .put("total_ms", r.totalMs ?: JSONObject.NULL))
++            }
+         }
+     }
+ 
+-    private fun defaultChoice(): Int = if (players == 1) 1 else 2
++    /** The most players this title's ports can take now (1 for a 1-player title). */
++    private fun cap(): Int = if (players == 1) 1 else ports.players
+ 
+-    private fun move(step: Int) {
+-        highlight = (highlight + step).coerceIn(0, OPTIONS.size - 1)
+-    }
++    private fun full(): Boolean = joinedLocked() >= cap()
+ 
+-    private fun pick(n: Int, nowMs: Long) {
+-        chosen = n
+-        PlayerPromptProcess.lastChoice = n
+-        gameKey?.let { store.put(it, n) }
+-        noteText = noteFor(n)
+-        noteUntilMs = nowMs + NOTE_MS
+-        phase = Phase.CLAIMING
+-    }
++    private fun joinedLocked(): Int = slots.map().size
+ 
+-    /** The choice capped by the session's ports (the host cannot change them mid-session, B46 S2). */
+-    private fun capped(n: Int): Int = when (n) {
+-        4 -> if (ports.multitap && ports.players >= 4) 4 else minOf(2, ports.players)
+-        else -> minOf(n, ports.players)
++    private fun joinLine(nowMs: Long): String? {
++        val n = joinedLocked()
++        if (n == 0) return "Hold any button to join"
++        if (players == 1) return null                                   // a 1-player title: closed after P1
++        val next = openSlot(emptyList(), ignorePresence = true) ?: return null   // four joined
++        val holding = holds.isNotEmpty()
++        if (!holding) {
++            if (full()) return null
++            val last = lastJoinAtMs
++            if (last != null && nowMs - last >= LINE_MS) return null
++        }
++        val labels = slots.map().joinToString(", ") { "P${it.slot + 1}" }
++        return "$labels joined — hold to add Player ${next + 1}"
+     }
+ 
+-    private fun noteFor(n: Int): String? = when {
+-        n == 4 && !ports.multitapAvailable && !ports.multitap -> "No multitap on this system — 2 players"
+-        n == 4 && !(ports.multitap && ports.players >= 4) -> "Multitap from the next start"
+-        n < 4 && ports.multitap -> "Multitap off from the next start"
+-        n == 2 && ports.players < 2 -> "2 players from the next start"
+-        else -> null
++    private fun join(pad: PadDevice, k: String, nowMs: Long, connected: List<PadDevice>) {
++        if (players == 1 && joinedLocked() >= 1) return   // a 1-player title: closed after P1
++        val s = openSlot(connected) ?: return
++        if (s >= ports.players) {
++            if (s < MAX_PLAYERS && ports.multitapAvailable) {
++                relaunchAsk = if (s < 2) 2 else MAX_PLAYERS
++                relaunchTarget = relaunchAsk ?: MAX_PLAYERS
++                relaunchPad = pad
++                relaunches += 1
++                holds.clear()
++                phase = Phase.RELAUNCHING
++            } else {
++                note("No multitap on this system — ${ports.players} players", nowMs)
++            }
++            return
++        }
++        slots.claim(pad, s)
++        claimedBy[s] = PROMPT
++        holdBits.remove(k)
++        lastJoinAtMs = nowMs
++        badge("P${s + 1}", nowMs)
++        val n = joinedLocked()
++        PlayerPromptProcess.lastJoined = n
++        gameKey?.let { g -> if ((store.get(g) ?: 0) < n) store.put(g, n) }
+     }
+ 
+-    /** The lowest slot below [count] with no holder, or whose holder is not connected. */
+-    private fun openSlot(connected: List<PadDevice>): Int? {
++    /** The lowest slot below 4 with no holder, or whose holder is not connected. */
++    private fun openSlot(connected: List<PadDevice>, ignorePresence: Boolean = false): Int? {
+         val present = connected.filter { PadSlots.eligible(it) }.map { PadSlots.key(it) }.toSet()
+-        return (0 until count).firstOrNull { s -> slots.holderOf(s)?.let { it !in present } ?: true }
++        return (0 until MAX_PLAYERS).firstOrNull { s ->
++            slots.holderOf(s)?.let { !ignorePresence && it !in present } ?: true
++        }
+     }
+ 
+     private fun markStable() {
+@@ -330,18 +377,24 @@
+         badgeUntilMs = nowMs + BADGE_MS
+     }
+ 
++    private fun note(text: String, nowMs: Long) {
++        noteText = text
++        noteUntilMs = nowMs + NOTE_MS
++    }
++
+     companion object {
+         const val DEFAULT_PLAYERS = 2
++        const val MAX_PLAYERS = 4
++        const val HOLD_MS = 500L
++        const val LINE_MS = 10_000L
+         const val BADGE_MS = 2_000L
+         const val RELEASE_MS = 2_000L
+         const val NOTE_MS = 5_000L
++        const val TICK_MS = 200L
++        const val TICK_HOLD_MS = 50L
+         const val PROMPT = "prompt"
+         const val STABLE = "stable"
+ 
+-        /** The chooser's options: 1, 2, multitap (sent as 4). */
+-        val OPTIONS = listOf(1, 2, 4)
+-        val LABELS = listOf("1", "2", "multitap (3-4)")
+-
+         // android.view.KeyEvent's codes, inlined so the JVM tests need no Android stub
+         const val KEYCODE_DPAD_LEFT = 21
+         const val KEYCODE_DPAD_RIGHT = 22
+@@ -354,13 +407,9 @@
+         const val KEYCODE_BUTTON_START = 108
+         const val KEYCODE_BUTTON_SELECT = 109
+ 
+-        /** A face button or Start claims a slot. */
++        /** A face button or Start, held, joins. */
+         val CLAIM_KEYS = setOf(KEYCODE_BUTTON_A, KEYCODE_BUTTON_B, KEYCODE_BUTTON_X, KEYCODE_BUTTON_Y, KEYCODE_BUTTON_START)
+ 
+-        /** A face button, or the remote's centre / Enter, picks in the chooser. */
+-        val PICK_KEYS = setOf(KEYCODE_BUTTON_A, KEYCODE_BUTTON_B, KEYCODE_BUTTON_X, KEYCODE_BUTTON_Y,
+-            KEYCODE_DPAD_CENTER, KEYCODE_ENTER)
+-
+         /** The title's preference key: sha256 of the host's game id, 12 hex (no id or title stored). */
+         fun gameKey(id: String?): String? =
+             id?.trim()?.takeIf { it.isNotEmpty() }?.let { s ->
+--- a/PrivyHub/app/src/test/java/streaming/PlayerPromptTest.kt
++++ b/PrivyHub/app/src/test/java/streaming/PlayerPromptTest.kt
+@@ -8,9 +8,9 @@
+ import org.junit.Test
+ 
+ /**
+- * B46: the player chooser over the stable slots (debug.privyhub.player_prompt, on by default). Fake devices as B38 /
+- * B41's tests: the onn's virtual remote (C4), real pads with controller numbers 2-5. B41's cases moved to B46's
+- * meaning (disclosed, as B42): the prompt no longer skips a start whose pads hold slots, nor a 1-player title.
++ * B54: hold-to-join over the stable slots (debug.privyhub.player_prompt, on by default). Fake devices as B38 / B41 /
++ * B46's tests (the onn's virtual remote, real pads with controller numbers 2-5) and a fake clock (every time below is
++ * a number of ms passed in). B46's chooser tests are replaced (disclosed): the chooser is gone.
+  */
+ class PlayerPromptTest {
+ 
+@@ -35,12 +35,11 @@
+         const val X = PlayerPrompt.KEYCODE_BUTTON_X
+         const val START = PlayerPrompt.KEYCODE_BUTTON_START
+         const val SELECT = PlayerPrompt.KEYCODE_BUTTON_SELECT
+-        const val LEFT = PlayerPrompt.KEYCODE_DPAD_LEFT
+-        const val RIGHT = PlayerPrompt.KEYCODE_DPAD_RIGHT
+         const val CENTER = PlayerPrompt.KEYCODE_DPAD_CENTER
+         const val L1 = 102
+-        val TWO = PortsSet(2, multitap = false, multitapAvailable = true, source = "launch")
+-        val FOUR = PortsSet(4, multitap = true, multitapAvailable = true, source = "launch")
++        val TWO = PortsSet(2, multitap = false, multitapAvailable = true, source = "join")
++        val FOUR = PortsSet(4, multitap = true, multitapAvailable = true, source = "relaunch")
++        val NO_TAP = PortsSet(2, multitap = false, multitapAvailable = false, source = "metadata")
+         const val GAME = "ps1-two-player-title"
+     }
+ 
+@@ -50,238 +49,229 @@
+         hasGamepadButton = true, isVirtual = false, hasFaceButton = true, hasStickOrHat = true)
+     private val padA = pad(1)
+     private val padB = pad(2)
+-    private val onn = listOf(virtualRemote, padA, padB)
+-    private val conn = { onn }
++    private val padC = pad(3)
++    private val padD = pad(4)
++    private val onn = listOf(virtualRemote, padA, padB, padC, padD)
+ 
+     @Before
+     fun clearProcess() {
+-        PlayerPromptProcess.lastChoice = null
++        PlayerPromptProcess.lastJoined = null
+     }
+ 
+-    private fun open(p: PlayerPrompt, devs: List<PadDevice> = onn, ports: PortsSet = TWO, hostPlayers: Int = 2,
+-                     self: Boolean = false) {
+-        p.beginStart(devs)
+-        p.onStartResponse(self, hostPlayers, ports, PlayerPrompt.gameKey(GAME), devs)
+-    }
+-
+-    private fun fresh(ports: PortsSet = TWO, devs: List<PadDevice> = onn, hostPlayers: Int = 2,
++    private fun fresh(ports: PortsSet = TWO, hostPlayers: Int = 2,
+                       store: PlayerChoiceStore = MemoryPlayerChoiceStore()): Pair<PadSlots, PlayerPrompt> {
+         val s = PadSlots()
+         val p = PlayerPrompt(s, store)
+-        open(p, devs, ports, hostPlayers)
++        p.beginStart(onn)
++        p.onStartResponse(false, hostPlayers, ports, PlayerPrompt.gameKey(GAME), onn)
+         return s to p
+     }
+ 
+-    private fun press(p: PlayerPrompt, d: PadDevice, key: Int, now: Long, devs: List<PadDevice> = onn): Int? {
+-        val slot = p.slotForKey(d, key, true, now, { devs })
+-        p.slotForKey(d, key, false, now + 50, { devs })
+-        return slot
+-    }
+-
+-    /** A pick from a pad: the chooser consumes the down; the up reaches the sender as on the onn. */
+-    private fun pick(p: PlayerPrompt, d: PadDevice, now: Long) {
+-        assertTrue(p.onChooserKey(A, true, 0, d, now))
+-        assertFalse(p.onChooserKey(A, false, 0, d, now + 40))
+-        p.slotForKey(d, A, false, now + 40, conn)
++    /** The activity's order: the join hook first; only a key it does not take goes to the sender. */
++    private fun key(p: PlayerPrompt, d: PadDevice, code: Int, down: Boolean, now: Long, repeat: Int = 0): Int? =
++        if (p.onJoinKey(code, down, repeat, d, now)) null
++        else p.slotForKey(d, code, down, now, { onn }, repeat)
++
++    /** A hold of [ms] with the 50-ms tick running, then the release of the key. */
++    private fun hold(p: PlayerPrompt, d: PadDevice, code: Int, from: Long, ms: Long): Long {
++        key(p, d, code, true, from)
++        var t = from
++        while (t < from + ms) { t += 50; p.tick(t, onn) }
++        key(p, d, code, false, from + ms)
++        return from + ms
+     }
+ 
+     @Test
+-    fun atTheStartTheChooserThenTwoThenBIsPlayerOneAndAIsPlayerTwo() {
++    fun theOpeningLineAtAStart() {
+         val (s, p) = fresh()
+-        assertEquals(PlayerPrompt.Phase.CHOOSING, p.phase)
+-        assertEquals("Players:  1  /  [2]  /  multitap (3-4)", p.view(0, onn).prompt)
++        assertEquals("Hold any button to join", p.view(0, onn).prompt)
++        assertEquals(0, p.joined)
+         assertTrue(s.map().isEmpty())
+-        assertNull(p.slotForKey(padA, A, true, 10, conn))           // no pad holds a slot while choosing
+-        pick(p, padB, 100)
+-        assertEquals(2, p.chosen); assertEquals(2, p.count)
+-        assertEquals("Player 1 — press any button", p.view(120, onn).prompt)
+-        assertTrue(s.map().isEmpty())                                 // the pick's own up claimed nothing
+-        assertEquals(0, press(p, padB, A, 150))                       // B's fresh press takes P1
+-        assertEquals("P1", p.view(250, onn).badge)
+-        assertEquals("Player 2 — press any button", p.view(250, onn).prompt)
+-        assertEquals(1, press(p, padA, START, 300))
+-        assertEquals("P2", p.view(400, onn).badge)
+-        assertEquals(PlayerPrompt.Phase.DONE, p.phase)
+-        assertNull(p.view(400, onn).prompt)                          // no further prompt
+-        assertNull(p.view(2_400, onn).badge)
+-        assertEquals("0:p,1:p", p.claimsString())
+-        assertEquals(0, p.slotForKey(padB, L1, true, 500, conn))     // claimed: every key goes to its slot
+     }
+ 
+     @Test
+-    fun thePickItselfNeverClaims() {
++    fun aTapClaimsNothingAndAJoinedPadsTapReachesTheGame() {
+         val (s, p) = fresh()
+-        assertTrue(p.onChooserKey(A, true, 0, padB, 0))
+-        // a repeat of the held pick key, then a down without an up: no claim
+-        assertNull(p.slotForKey(padB, A, true, 30, conn, repeat = 1))
+-        assertNull(p.slotForKey(padB, A, true, 60, conn))
+-        assertTrue(s.map().isEmpty())
+-        p.slotForKey(padB, A, false, 90, conn)
+-        assertEquals(0, press(p, padB, A, 120))
++        assertNull(key(p, padA, A, true, 0)); assertNull(key(p, padA, A, false, 120))   // a tap
++        p.tick(600, onn)
++        assertEquals(0, p.joined); assertTrue(s.map().isEmpty())
++        assertEquals("Hold any button to join", p.view(600, onn).prompt)
++        hold(p, padA, A, 1_000, 600)
++        assertEquals(0, s.slotOf(padA))
++        assertEquals(0, key(p, padA, X, true, 2_000))     // a joined pad's tap: its slot, so the game gets it
++        assertEquals(0, key(p, padA, X, false, 2_080))
+     }
+ 
+     @Test
+-    fun anUnpauseOpensTheChooserAgainWithTheLastChoice() {
+-        val store = MemoryPlayerChoiceStore()
+-        val (s, p) = fresh(store = store)
+-        assertTrue(p.onChooserKey(LEFT, true, 0, virtualRemote, 0))   // the remote moves to 1
+-        assertTrue(p.onChooserKey(CENTER, true, 0, virtualRemote, 10))
+-        assertEquals(1, p.chosen)
+-        assertEquals(0, press(p, padA, A, 100))
+-        // Back, then Resume: a new start of the running game (not a self-restart)
+-        open(p)
+-        assertEquals(PlayerPrompt.Phase.CHOOSING, p.phase)
+-        assertTrue(s.map().isEmpty())                                 // the map cleared for the prompt
+-        assertEquals("Players:  [1]  /  2  /  multitap (3-4)", p.view(1_000, onn).prompt)
+-        assertNull(p.chosen)
+-        // a fresh PlayerPrompt (a new activity) reads the same store
+-        val p2 = PlayerPrompt(s, store); open(p2)
+-        assertEquals("Players:  [1]  /  2  /  multitap (3-4)", p2.view(0, onn).prompt)
++    fun aHoldOf500MsJoinsAndNotBefore() {
++        val (s, p) = fresh()
++        key(p, padA, START, true, 1_000)
++        p.tick(1_499, onn)
++        assertNull(s.slotOf(padA))                       // 499 ms: not yet
++        assertTrue(p.holdPending())
++        p.tick(1_500, onn)
++        assertEquals(0, s.slotOf(padA))                  // 500 ms: P1
++        assertFalse(p.holdPending())
++        assertEquals("P1", p.view(1_500, onn).badge)
++        assertNull(p.view(3_600, onn).badge)             // the badge's 2 s
++        assertEquals("P1 joined — hold to add Player 2", p.view(1_500, onn).prompt)
++        assertEquals("0:p", p.claimsString())
++        // the joining key is not play: its repeats and its up never reach the sender
++        assertNull(key(p, padA, START, true, 1_600, repeat = 3))
++        assertNull(key(p, padA, START, false, 1_700))
++        assertEquals(0, key(p, padA, START, true, 2_000))   // a fresh press of it is play
+     }
+ 
+     @Test
+-    fun multitapOnAFourPortSessionTakesFourClaims() {
+-        val four = listOf(virtualRemote, pad(1), pad(2), pad(3), pad(4))
+-        val (s, p) = fresh(ports = FOUR, devs = four)
+-        assertTrue(p.onChooserKey(RIGHT, true, 0, pad(1), 0))
+-        assertTrue(p.onChooserKey(RIGHT, true, 0, pad(1), 10))        // stops at the last option
+-        assertEquals("Players:  1  /  2  /  [multitap (3-4)]", p.view(20, four).prompt)
+-        assertTrue(p.onChooserKey(X, true, 0, pad(1), 30)); p.slotForKey(pad(1), X, false, 60, { four })
+-        assertEquals(4, p.chosen); assertEquals(4, p.count)
+-        assertEquals(0, press(p, pad(3), A, 100, four))
+-        assertEquals(1, press(p, pad(1), A, 200, four))
+-        assertEquals("Player 3 — press any button", p.view(250, four).prompt)
+-        assertEquals(2, press(p, pad(4), A, 300, four))
+-        assertEquals(3, press(p, pad(2), A, 400, four))
+-        assertEquals("0:p,1:p,2:p,3:p", p.claimsString())
+-        assertEquals(PlayerPrompt.Phase.DONE, p.phase)
+-        assertEquals(4, s.map().size)
++    fun repeatsNeverStartAHoldAndTheRemoteNeverJoins() {
++        val (s, p) = fresh()
++        key(p, padA, A, true, 0, repeat = 2)
++        p.tick(1_000, onn)
++        assertNull(s.slotOf(padA))
++        assertFalse(p.onJoinKey(CENTER, true, 0, virtualRemote, 0))
++        assertNull(key(p, virtualRemote, CENTER, true, 0))
++        p.tick(2_000, onn)
++        assertTrue(s.map().isEmpty())
++        assertFalse(p.onJoinKey(L1, true, 0, padA, 0) && s.slotOf(padA) != null)   // L1 is no join key
++        p.tick(3_000, onn)
++        assertNull(s.slotOf(padA))
++        assertNull(p.slotForMotion(padA) { onn })        // a stick never joins
+     }
+ 
+     @Test
+-    fun multitapOnATwoPortSessionStopsAtTwoAndSaysSo() {
+-        val three = onn + pad(3)
+-        val (s, p) = fresh(ports = TWO, devs = three)
+-        p.onChooserKey(RIGHT, true, 0, padA, 0)
+-        p.onChooserKey(A, true, 0, padA, 10); p.slotForKey(padA, A, false, 20, { three })
+-        assertEquals(4, p.chosen); assertEquals(2, p.count)
+-        assertEquals("Player 1 — press any button\nMultitap from the next start", p.view(30, three).prompt)
+-        press(p, padA, A, 100, three); press(p, padB, A, 200, three)
+-        assertNull(press(p, pad(3), A, 300, three))                   // beyond the ports: no slot
+-        assertEquals(2, s.map().size)
+-        // a system with no multitap
+-        val (_, q) = fresh(ports = PortsSet(2, false, false, "metadata"))
+-        q.onChooserKey(RIGHT, true, 0, padA, 0); q.onChooserKey(A, true, 0, padA, 10)
+-        assertEquals("Player 1 — press any button\nNo multitap on this system — 2 players", q.view(20, onn).prompt)
++    fun aSecondPadIsP2AndTheLineClosesOnTwoPorts() {
++        val (s, p) = fresh()
++        val t = hold(p, padB, X, 0, 600)                 // the first to hold is P1, whichever pad
++        assertEquals(0, s.slotOf(padB))
++        hold(p, padA, A, t + 100, 600)
++        assertEquals(1, s.slotOf(padA))
++        assertEquals("P2", p.view(t + 800, onn).badge)
++        assertNull(p.view(t + 800, onn).prompt)          // two ports taken: the line closes
++        assertEquals(2, p.joined)
++        assertEquals(2, PlayerPromptProcess.lastJoined)
+     }
+ 
+     @Test
+-    fun oneTakesOneClaimAndTheOtherPadGetsNoSlot() {
+-        val (s, p) = fresh()
+-        p.onChooserKey(LEFT, true, 0, padA, 0)
+-        p.onChooserKey(A, true, 0, padA, 10); p.slotForKey(padA, A, false, 20, conn)
+-        assertEquals(1, p.chosen); assertEquals(1, p.count)
+-        assertEquals(0, press(p, padB, A, 100))
+-        assertEquals(PlayerPrompt.Phase.DONE, p.phase)
+-        assertNull(press(p, padA, A, 200))                            // the other pad: no slot, no input
+-        assertNull(p.view(300, onn).prompt)
+-        assertEquals("0:p", p.claimsString())
+-        assertEquals(1, s.map().size)
++    fun aThirdPadAsksForTheMultitapAtOnceThenJoinsAsP3() {
++        val store = MemoryPlayerChoiceStore()
++        val (s, p) = fresh(store = store)
++        var t = hold(p, padA, A, 0, 600)
++        t = hold(p, padB, A, t + 100, 600)
++        assertNull(p.takeRelaunchRequest())
++        key(p, padC, START, true, t + 100)
++        p.tick(t + 300, onn)
++        assertEquals("P1, P2 joined — hold to add Player 3", p.view(t + 300, onn).prompt)   // back while it holds
++        p.tick(t + 600, onn)
++        assertEquals(PlayerPrompt.Phase.RELAUNCHING, p.phase)
++        assertEquals(4, p.takeRelaunchRequest())
++        assertNull(p.takeRelaunchRequest())              // asked once
++        assertEquals("Setting up 4 players…", p.view(t + 700, onn).prompt)
++        assertNull(s.slotOf(padC))
++        key(p, padD, A, true, t + 800); p.tick(t + 1_400, onn)
++        assertNull(s.slotOf(padD))                       // other holds wait out the relaunch
++        p.onRelaunchResult(true, FOUR, "loaded", 7_400, t + 8_000, onn)
++        assertEquals(2, s.slotOf(padC))                  // P3
++        assertEquals(0, s.slotOf(padA)); assertEquals(1, s.slotOf(padB))   // P1 / P2 kept
++        assertEquals("P3", p.view(t + 8_000, onn).badge)
++        assertEquals("P1, P2, P3 joined — hold to add Player 4", p.view(t + 8_000, onn).prompt)
++        assertEquals(1, p.relaunches)
++        assertEquals(PlayerPrompt.Relaunch(true, "loaded", 7_400), p.lastRelaunch)
++        assertEquals(3, store.get(PlayerPrompt.gameKey(GAME)!!))   // the next launch's ports
++        // a fourth pad: four ports now, no relaunch
++        hold(p, padD, X, t + 9_000, 600)
++        assertEquals(3, s.slotOf(padD))
++        assertNull(p.takeRelaunchRequest())
++        assertNull(p.view(t + 9_700, onn).prompt)        // four joined: closed
+     }
+ 
+     @Test
+-    fun theHeldStartReleaseReclaimsOnlyAfterAFreshPress() {
++    fun aFailedRelaunchJoinsNobodyAndSaysSo() {
+         val (s, p) = fresh()
+-        pick(p, padA, 0)
+-        press(p, padA, A, 100); press(p, padB, A, 200)
+-        // HOME-3 C6 try 1: Select first, Start last and still held when the release fires
+-        p.slotForKey(padA, SELECT, true, 1_000, conn)
+-        p.slotForKey(padA, START, true, 1_050, conn)
+-        p.tick(3_060)
+-        assertNull(s.slotOf(padA))
+-        assertEquals("P1 released", p.view(3_100, onn).badge)
+-        assertEquals("Player 1 — press any button", p.view(3_100, onn).prompt)
+-        // Android repeats the held Start: no claim; Select lifted, Start still held: no claim
+-        assertNull(p.slotForKey(padA, START, true, 3_100, conn, repeat = 20))
+-        p.slotForKey(padA, SELECT, false, 3_150, conn)
+-        assertNull(p.slotForKey(padA, START, true, 3_200, conn, repeat = 21))
+-        assertNull(s.slotOf(padA))
+-        // Start lifted, then a fresh press: claimed
+-        p.slotForKey(padA, START, false, 3_300, conn)
+-        assertEquals(0, press(p, padA, START, 3_400))
+-        assertEquals("0:p,1:p", p.claimsString())
++        var t = hold(p, padA, A, 0, 600)
++        t = hold(p, padB, A, t + 100, 600)
++        hold(p, padC, A, t + 100, 600)
++        assertEquals(4, p.takeRelaunchRequest())
++        p.onRelaunchResult(false, null, null, null, t + 5_000, onn)
++        assertNull(s.slotOf(padC))
++        assertEquals("Couldn't set up 4 players", p.view(t + 5_000, onn).prompt)
++        assertEquals(PlayerPrompt.Phase.JOINING, p.phase)
++        assertEquals(PortsSet(2, false, true, "join"), p.ports)
+     }
+ 
+     @Test
+-    fun aShortHoldReleasesNothing() {
+-        val (s, p) = fresh()
+-        pick(p, padA, 0); press(p, padA, A, 100)
+-        p.slotForKey(padA, SELECT, true, 1_000, conn); p.slotForKey(padA, START, true, 1_000, conn)
+-        p.tick(2_400)
+-        assertEquals(0, s.slotOf(padA))
+-        p.slotForKey(padA, START, false, 2_500, conn)
+-        p.tick(4_000)
+-        assertEquals(0, s.slotOf(padA))
++    fun noMultitapOnTheSystemSaysSoAndJoinsNobody() {
++        val (s, p) = fresh(ports = NO_TAP)
++        var t = hold(p, padA, A, 0, 600)
++        t = hold(p, padB, A, t + 100, 600)
++        hold(p, padC, A, t + 100, 600)
++        assertNull(p.takeRelaunchRequest())
++        assertNull(s.slotOf(padC))
++        assertEquals("No multitap on this system — 2 players", p.view(t + 800, onn).prompt)
+     }
+ 
+     @Test
+-    fun aSelfRestartKeepsTheMapAndTheChoiceWithNoChooser() {
+-        val (s, p) = fresh()
+-        pick(p, padB, 0); press(p, padB, A, 100); press(p, padA, A, 200)
+-        val p2 = PlayerPrompt(s)                                      // the guard's new activity, same process
+-        open(p2, self = true)
+-        assertEquals(PlayerPrompt.Phase.DONE, p2.phase)
+-        assertEquals(2, p2.chosen)
+-        assertEquals("0:s,1:s", p2.claimsString())
+-        assertNull(p2.view(0, onn).prompt)
+-        assertEquals(0, s.slotOf(padB)); assertEquals(1, s.slotOf(padA))
++    fun aOnePlayerTitleClosesAfterP1() {
++        val (s, p) = fresh(hostPlayers = 1)
++        assertEquals("Hold any button to join", p.view(0, onn).prompt)
++        val t = hold(p, padA, A, 0, 600)
++        assertEquals(0, s.slotOf(padA))
++        assertNull(p.view(t, onn).prompt)
++        key(p, padB, A, true, t + 100)
++        assertNull(p.view(t + 200, onn).prompt)          // no line comes back for a second pad
++        p.tick(t + 1_000, onn)
++        assertNull(s.slotOf(padB))
++        assertNull(p.takeRelaunchRequest())
+     }
+ 
+     @Test
+-    fun theDefaultIsTheLastChoiceElseTwoElseOneForASinglePlayerTitle() {
+-        val (_, p) = fresh(hostPlayers = 1)
+-        assertEquals("Players:  [1]  /  2  /  multitap (3-4)", p.view(0, onn).prompt)
+-        val store = MemoryPlayerChoiceStore()
+-        store.put(PlayerPrompt.gameKey(GAME)!!, 4)
+-        val (_, q) = fresh(hostPlayers = 1, store = store)
+-        assertEquals("Players:  1  /  2  /  [multitap (3-4)]", q.view(0, onn).prompt)
+-        assertEquals(12, PlayerPrompt.gameKey(GAME)!!.length)
+-        assertNull(PlayerPrompt.gameKey(" "))
++    fun theReleaseThenAFreshHoldRejoinsButAHeldStartDoesNot() {
++        val (s, p) = fresh()
++        val t = hold(p, padA, A, 0, 600)
++        key(p, padA, SELECT, true, t + 100); key(p, padA, START, true, t + 100)
++        p.tick(t + 1_000, onn)
++        assertEquals(0, s.slotOf(padA))                  // a short hold releases nothing
++        p.tick(t + 2_100, onn)
++        assertNull(s.slotOf(padA))
++        assertEquals("P1 released", p.view(t + 2_100, onn).badge)
++        p.tick(t + 5_000, onn)                           // Start still held: no re-join
++        assertNull(s.slotOf(padA))
++        key(p, padA, START, false, t + 5_100); key(p, padA, SELECT, false, t + 5_100)
++        hold(p, padA, START, t + 6_000, 600)             // a fresh hold
++        assertEquals(0, s.slotOf(padA))
+     }
+ 
+     @Test
+-    fun theRemoteAndTheHatMoveTheChooserAndTheRemoteNeverClaims() {
+-        val (s, p) = fresh()
+-        assertTrue(p.onChooserHat(padA, -1f))
+-        assertTrue(p.onChooserHat(padA, -1f))                         // held: one move
+-        assertEquals("Players:  [1]  /  2  /  multitap (3-4)", p.view(0, onn).prompt)
+-        assertTrue(p.onChooserHat(padA, 0f)); assertTrue(p.onChooserHat(padA, 1f))
+-        assertEquals("Players:  1  /  [2]  /  multitap (3-4)", p.view(0, onn).prompt)
+-        assertFalse(p.onChooserHat(virtualRemote, 1f))                // not a pad
+-        assertFalse(p.onChooserKey(L1, true, 0, padA, 0))             // not a chooser key: passed on
+-        p.onChooserKey(CENTER, true, 0, virtualRemote, 10)
+-        assertNull(press(p, virtualRemote, A, 100))
+-        assertTrue(s.map().isEmpty())
+-        assertFalse(p.onChooserKey(RIGHT, true, 0, virtualRemote, 200))  // closed: the remote's keys pass on
++    fun theLineGoesTenSecondsAfterTheLastJoinAndReturnsWhileAPadHolds() {
++        val (_, p) = fresh(ports = FOUR)
++        val t = hold(p, padA, A, 0, 600)
++        assertEquals("P1 joined — hold to add Player 2", p.view(t + 9_000, onn).prompt)
++        assertNull(p.view(t + 10_100, onn).prompt)
++        key(p, padB, A, true, t + 11_000)
++        assertEquals("P1 joined — hold to add Player 2", p.view(t + 11_100, onn).prompt)
++        key(p, padB, A, false, t + 11_200)               // a tap: the line goes again
++        assertNull(p.view(t + 11_300, onn).prompt)
+     }
+ 
+     @Test
+-    fun aStickNeverClaims() {
++    fun anUnpauseClearsTheMapAndASelfRestartKeepsIt() {
+         val (s, p) = fresh()
+-        assertNull(p.slotForMotion(padA, conn))
+-        pick(p, padA, 0)
+-        assertNull(p.slotForMotion(padA, conn))
+-        assertNull(p.slotForKey(padA, L1, true, 10, conn))
++        hold(p, padA, A, 0, 600)
++        // a self-restart: the map stands, no line
++        p.beginStart(onn)
++        p.onStartResponse(true, 2, TWO, PlayerPrompt.gameKey(GAME), onn)
++        assertEquals(0, s.slotOf(padA))
++        assertEquals("0:s", p.claimsString())
++        assertNull(p.view(5_000, onn).prompt)
++        // an unpause: cleared, the line again
++        p.beginStart(onn)
++        p.onStartResponse(false, 2, TWO, PlayerPrompt.gameKey(GAME), onn)
+         assertTrue(s.map().isEmpty())
+-        press(p, padA, A, 100)
+-        assertEquals(0, p.slotForMotion(padA, conn))
++        assertEquals("Hold any button to join", p.view(6_000, onn).prompt)
+     }
+ 
+     @Test
+-    fun thePortsEchoParses() {
+-        assertEquals(PortsSet.UNKNOWN, PortsSet.parse(null))          // an old host: no key, 2 ports
+-        assertEquals(2, PortsSet.UNKNOWN.players)
+-        assertEquals(FOUR, PortsSet.of(4, true, true, "launch"))
++    fun portsSetParsesTheEcho() {
++        assertEquals(PortsSet(4, true, true, "relaunch"), PortsSet.of(4, true, true, "relaunch"))
+         assertEquals(4, PortsSet.of(9, true, true, "launch").players)  // clamped
+         assertEquals(1, PortsSet.of(0, false, false, "launch").players)
+     }
+@@ -300,7 +290,7 @@
+ 
+     @Test
+     fun offThePadSlotsAloneAreB34AndB38sAsBuilt() {
+-        // `0`: the activity builds no PlayerPrompt; the sender's path is PadSlots alone (8ba4d996…'s absent)
++        // `0`: the activity builds no PlayerPrompt; the sender's path is PadSlots alone (the CONFIRMED build's `0`)
+         val s = PadSlots()
+         s.beginStart(onn)
+         assertEquals(0, s.slotFor(padA) { onn }); assertEquals(1, s.slotFor(padB) { onn })
+--- /dev/null
++++ b/tests/players_session/test_b54.py
+@@ -0,0 +1,107 @@
++#!/usr/bin/env python3
++"""B54 (host): hold-to-join's `players_joined` sets the launch's ports (1 / 2 -> two, 3 / 4 -> the multitap, `source`
++`join`); B46's `players_chosen` is still accepted as B46; the start / heartbeat rows carry `join: hold`,
++`players_joined` and the labels; without the key, B46's rows byte for byte.
++
++    python3 -m unittest discover -s tests/players_session -v
++"""
++
++from __future__ import annotations
++
++import importlib.util
++import json
++import sys
++import types
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401
++
++import pad_slots  # noqa: E402
++import players_session as ps  # noqa: E402
++from test_players_session import HB, TWO, plugin  # noqa: E402
++
++BASE = {"cheat_source_index": None, "cheat_enabled_indexes": None, "mod_index": None}
++
++
++class Joined(unittest.TestCase):
++    def test_parse_and_the_ports(self):
++        self.assertEqual([ps.parse_joined(x) for x in ("0", "1", "4", "5", "-1", "x", None)], [0, 1, 4, None, None, None, None])
++        self.assertEqual([ps.ports_for_joined(n) for n in (1, 2, 3, 4)], [2, 2, 4, 4])
++        self.assertEqual(ps.plan("ps1", 4, 1, source="join")["source"], "join")
++        self.assertEqual(ps.plan("ps1", 4, 1)["source"], "launch")   # B46's default kept
++
++    def test_players_joined_sets_the_launch_ports_with_source_join(self):
++        p, _, _, calls = plugin()
++        p._emulator.launch = lambda game, **kw: (calls.append(kw), setattr(p._emulator, "_players_session",
++                                                 ps.plan("ps1", kw["players_chosen"], 1)) if "players_chosen" in kw
++                                                 else None, {"active": True})[-1]
++        p.handle_post("launch", "id=g1&players_joined=1")
++        self.assertEqual(calls[-1], {**BASE, "players_chosen": 2})
++        self.assertEqual(p._emulator._players_session["source"], "join")
++        p.handle_post("launch", "id=g1&players_joined=3")
++        self.assertEqual(calls[-1], {**BASE, "players_chosen": 4})
++        r = p.handle_post_request("native-stream-start", "port=48100&player_prompt=1", "127.0.0.1")
++        self.assertEqual(r["ports_set"], {"players_chosen": 4, "ports": 4, "players": 4, "multitap": True,
++                                          "multitap_available": True, "source": "join"})
++        p.handle_post("launch", "id=g1&players_joined=0")          # nobody joined last time: today's call
++        self.assertEqual(calls[-1], BASE)
++        p.handle_post("launch", "id=g1&players_joined=x")          # malformed: today's call
++        self.assertEqual(calls[-1], BASE)
++
++    def test_players_chosen_is_still_b46s(self):
++        p, _, _, calls = plugin()
++        p.handle_post("launch", "id=g1&players_chosen=1")
++        self.assertEqual(calls[-1], {**BASE, "players_chosen": 1})   # B46's 1 (port 2 off), unchanged
++        p.handle_post("launch", "id=g1&players_chosen=4")
++        self.assertEqual(calls[-1], {**BASE, "players_chosen": 4})
++
++    def test_the_rows_carry_join_hold_the_count_and_the_labels(self):
++        p, root, rec, _ = plugin()
++        p.handle_post_request("native-stream-start",
++                              "port=48100&player_prompt=1&pad_slots=0:a1b2c3:sony&pad_claims=0:p&players_joined=0",
++                              "127.0.0.1")   # the start carries the old map (the client clears it at the answer)
++        p.handle_post_request("native-stream-heartbeat",
++                              HB.format(1) + "&pad_slots=" + TWO + "&pad_claims=0:p,1:p&players_joined=2", "127.0.0.1")
++        p.handle_post_request("native-stream-heartbeat",
++                              HB.format(2) + "&pad_slots=" + TWO + "&pad_claims=0:p,1:p&players_joined=2", "127.0.0.1")
++        rows = [json.loads(x) for x in rec.log_path().read_text().splitlines()]
++        rows = [r for r in rows if r["event"] == "pad_slots"]
++        self.assertEqual([r["when"] for r in rows], ["start", "change"])
++        self.assertEqual((rows[0]["join"], rows[0]["players_joined"], rows[0]["count"]), ("hold", 0, 1))
++        self.assertEqual((rows[1]["join"], rows[1]["players_joined"]), ("hold", 2))
++        self.assertEqual([(e["label"], e["claimed_by"]) for e in rows[1]["slots"]], [("P1", "prompt"), ("P2", "prompt")])
++        hb = [json.loads(x) for x in (root / "logs" / "games" / "native_stream_heartbeat.log").read_text().splitlines()]
++        self.assertEqual((hb[-1]["join"], hb[-1]["players_joined"]), ("hold", 2))
++        self.assertNotIn("players_chosen", hb[-1])
++
++    def test_a_changed_count_alone_is_a_change_row(self):
++        rows = []
++        log = pad_slots.SlotsLog()
++        rec = types.SimpleNamespace(_log=lambda ev, **f: rows.append({"event": ev, **f}))
++        log.start(rec, TWO, claims="0:p,1:p", players_joined=2)
++        log.heartbeat(rec, TWO, {"sequence": 1}, claims="0:p,1:p", players_joined=2)
++        log.heartbeat(rec, TWO, {"sequence": 2}, claims="0:p,1:p", players_joined=3)
++        self.assertEqual([r["when"] for r in rows], ["start", "change"])
++        self.assertEqual(rows[1]["players_joined"], 3)
++
++    def test_without_the_key_the_rows_are_b46s(self):
++        rows_a, rows_b = [], []
++        a, b = pad_slots.SlotsLog(), pad_slots.SlotsLog()
++        fa = types.SimpleNamespace(_log=lambda ev, **f: rows_a.append({"event": ev, **f}))
++        fb = types.SimpleNamespace(_log=lambda ev, **f: rows_b.append({"event": ev, **f}))
++        a.start(fa, TWO, claims="0:p,1:s", players_chosen=2)
++        b.start(fb, TWO, claims="0:p,1:s", players_chosen=2, players_joined=None)
++        va, vb = {"sequence": 1}, {"sequence": 1}
++        a.heartbeat(fa, TWO, va, claims="0:p,1:p", players_chosen=4)
++        b.heartbeat(fb, TWO, vb, claims="0:p,1:p", players_chosen=4, players_joined=None)
++        self.assertEqual(rows_a, rows_b); self.assertEqual(va, vb)
++        self.assertNotIn("players_joined", json.dumps(rows_a)); self.assertNotIn('"join"', json.dumps(rows_a))
++        self.assertIsNone(pad_slots.parse_joined("5")); self.assertEqual(pad_slots.parse_joined("0"), 0)
++
++
++if __name__ == "__main__":
++    unittest.main()
+--- a/tests/players_session/test_players_session.py
++++ b/tests/players_session/test_players_session.py
+@@ -18,6 +18,8 @@
+ 
+ ROOT = Path(__file__).resolve().parents[2]
+ sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401  (B54: this suite's temp dirs removed at exit)
+ 
+ from games import emulator_manager as em  # noqa: E402
+ from games import link_drop_recovery as ldr  # noqa: E402
+--- /dev/null
++++ b/tests/players_session/_tmp_cleanup.py
+@@ -0,0 +1,26 @@
++"""B54 (test hygiene, as B53 for tests/ps2_session): every temporary directory a run of this suite creates is removed
++when that run ends.
++
++HOME-6 prep found ~6.9 GiB of these suites' fixture trees (formatted 8-MB cards, fake game trees) left in the hub's /tmp
++tmpfs by B49-B52's runs, which never removed their mkdtemp() dirs. Imported by each test module; it tracks only the
++dirs made in this process and removes them at exit (never anything else)."""
++
++from __future__ import annotations
++
++import atexit
++import shutil
++import tempfile
++
++_made: list[str] = []
++_mkdtemp = tempfile.mkdtemp
++
++
++def _tracked(*args, **kwargs):
++    d = _mkdtemp(*args, **kwargs)
++    _made.append(d)
++    return d
++
++
++if getattr(tempfile.mkdtemp, "__name__", "") != "_tracked":
++    tempfile.mkdtemp = _tracked
++    atexit.register(lambda: [shutil.rmtree(d, ignore_errors=True) for d in _made])
+--- /dev/null
++++ b/tests/relaunch_ports/test_relaunch_ports.py
+@@ -0,0 +1,259 @@
++#!/usr/bin/env python3
++"""B54 (host): `native-stream-relaunch-ports` -- the same title relaunched mid-session with the multitap, play resuming
++where it was. Fakes record the call order: pause / save / stream stop / stop / launch(4) / resume / settle /
++load(the relaunch save) / pause / stream start on PS1; the recorded `restarted` path on PS2 (no save, no load); the
++refusals touch nothing; the new launch failing -> the previous ports; the load failing -> `restarted`; the rows.
++`load_recovery_state_running()` with no source = today's path.
++
++    python3 -m unittest discover -s tests/relaunch_ports -v
++"""
++
++from __future__ import annotations
++
++import importlib.util
++import json
++import sys
++import tempfile
++import threading
++import types
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401
++
++from games import emulator_manager as em  # noqa: E402
++from games import link_drop_recovery as ldr  # noqa: E402
++import players_session as ps  # noqa: E402
++import relaunch_ports as rp  # noqa: E402
++
++spec = importlib.util.spec_from_file_location("b54_games_plugin", ROOT / "companion" / "plugins" / "games.py")
++G = importlib.util.module_from_spec(spec)
++spec.loader.exec_module(G)
++
++
++class Clock:
++    def __init__(self):
++        self.t = 100.0
++
++    def __call__(self):
++        return self.t
++
++    def sleep(self, s):
++        self.t += s
++
++
++def rig(kind="retroarch", system="ps1", multitap=False, cheat=False, fail_launch=0, fail_load=False,
++        args=True, fail_save=False):
++    root = Path(tempfile.mkdtemp(prefix="b54_relaunch_"))
++    rec = ldr.LinkDropRecovery(
++        root, pause_game=lambda: None, resume_game=lambda: None, save_recovery_state=lambda: {},
++        restart_encoder=lambda: {}, full_start_encoder=lambda: {}, stream_active=lambda: True,
++        end_session=lambda: None, client_packet_age_ms=lambda: 10.0, recovery_save_detail=lambda: {})
++    calls = []
++    clock = Clock()
++    state = Path(root / "content-one.state.relaunch")
++
++    class Emu:
++        active_game = {"id": "g1", "system": system, "title": "t"}
++        _launch_kind = "pcsx2" if kind == "pcsx2" else None
++        _active_cheat_session = {"session_kind": "cheat"} if cheat else None
++        _players_session = ps.plan(system, 4, 1) if multitap else None
++        pid = 10
++        paused = False
++        launches = 0
++
++        def status(self):
++            return {"active": True, "paused": self.paused, "pid": self.pid}
++
++        def ps1_multitap(self, g):
++            return {"enabled": False}
++
++        def pause(self):
++            calls.append("pause"); clock.t += 0.1; self.paused = True; return self.status()
++
++        def resume(self):
++            calls.append("resume"); self.paused = False; return self.status()
++
++        def save_relaunch_state(self):
++            calls.append("save"); clock.t += 1.2
++            if fail_save:
++                raise em.EmulatorError("no state")
++            return {"ok": True, "state_path": state}
++
++        def stop(self):
++            calls.append("stop"); clock.t += 1.5; return {"stopped": True}
++
++        def launch(self, game, **kw):
++            calls.append(("launch", kw.get("players_chosen"))); clock.t += 2.5
++            Emu.launches += 1
++            if Emu.launches <= fail_launch:
++                raise em.EmulatorError("RetroArch exited during startup")
++            self.pid += 1
++            self.paused = False
++            self._players_session = ps.plan(system, kw["players_chosen"], 1)
++            return {"active": True}
++
++        def load_recovery_state_running(self, source=None):
++            calls.append(("load", source)); clock.t += 0.4
++            if fail_load:
++                raise em.EmulatorError("RetroArch reported Failed to load state")
++            return {"accepted": True}
++
++    class Stream:
++        DEFAULT_PORT = 48100
++
++        def stop(self):
++            calls.append("stream_stop"); return {}
++
++        def start(self, **kw):
++            calls.append(("stream_start", kw["managed_process_id"], kw["port"])); clock.t += 0.8; return {"active": True}
++
++        def end_game_session(self):
++            calls.append("end_game_session"); return {}
++
++    p = object.__new__(G.GamesPlugin)
++    p.PROJECT_ROOT = root
++    p._emulator = Emu()
++    p._recovery = rec
++    p._native_stream = Stream()
++    p._recovery_start_args = {"client_ip": "127.0.0.1", "port": 48100} if args else None
++    return p, rec, calls, clock, state
++
++
++def rows(rec, event):
++    return [r for r in (json.loads(x) for x in rec.log_path().read_text().splitlines()) if r["event"] == event] \
++        if rec.log_path().exists() else []
++
++
++class Sequence(unittest.TestCase):
++    def test_ps1_the_state_round_trip_in_order(self):
++        p, rec, calls, clock, state = rig()
++        r = rp.run(p, 4, 3, clock=clock, sleep=clock.sleep)
++        self.assertEqual(calls, ["pause", "save", "stream_stop", "stop", ("launch", 4), "resume",
++                                 ("load", state), "pause", ("stream_start", 11, 48100)])
++        self.assertTrue(r["ok"])
++        self.assertEqual(r["relaunch"]["state"], "loaded")
++        self.assertEqual(r["relaunch"]["steps_ms"]["settle"], 1000)          # the 1.0-s settle before the load
++        self.assertEqual(r["relaunch"]["total_ms"], 7600)          # 0.1+1.2+1.5+2.5+1.0+0.4+0.1+0.8 s
++        self.assertEqual(r["ports_set"], {"players_chosen": 4, "ports": 4, "players": 4, "multitap": True,
++                                          "multitap_available": True, "source": "relaunch"})
++        row = rows(rec, "relaunch_ports")[-1]
++        self.assertEqual((row["ok"], row["state"], row["players"], row["players_joined"], row["within_budget"]),
++                         (True, "loaded", 4, 3, True))
++        self.assertEqual(rows(rec, "ports_set")[-1]["source"], "relaunch")
++
++    def test_ps2_restarts_the_title_recorded(self):
++        p, rec, calls, clock, _ = rig(kind="pcsx2", system="ps2")
++        r = rp.run(p, 4, 3, clock=clock, sleep=clock.sleep)
++        self.assertEqual(calls, ["pause", "stream_stop", "stop", ("launch", 4), "pause", ("stream_start", 11, 48100)])
++        self.assertEqual(r["relaunch"]["state"], "restarted")
++        self.assertEqual(rows(rec, "relaunch_ports")[-1]["reason"], "ps2_no_relaunch_state")
++
++    def test_the_launch_failing_brings_the_previous_ports_back(self):
++        p, rec, calls, clock, state = rig(fail_launch=1)
++        r = rp.run(p, 4, 3, clock=clock, sleep=clock.sleep)
++        self.assertIn(("launch", 4), calls); self.assertIn(("launch", 2), calls)
++        self.assertIn(("load", state), calls)
++        self.assertFalse(r["ok"])
++        self.assertEqual(r["relaunch"]["fallback"], "previous_ports")
++        self.assertEqual(r["ports_set"]["players"], 2)
++
++    def test_both_launches_failing_end_the_session(self):
++        p, rec, calls, clock, _ = rig(fail_launch=2)
++        with self.assertRaises(RuntimeError):
++            rp.run(p, 4, 3, clock=clock, sleep=clock.sleep)
++        self.assertEqual(calls[-1], "end_game_session")
++        self.assertTrue(rows(rec, "relaunch_ports")[-1]["ended"])
++
++    def test_the_load_failing_is_a_restart(self):
++        p, rec, calls, clock, _ = rig(fail_load=True)
++        r = rp.run(p, 4, 3, clock=clock, sleep=clock.sleep)
++        self.assertTrue(r["ok"])
++        self.assertEqual(r["relaunch"]["state"], "restarted")
++        self.assertIn("load_error", rows(rec, "relaunch_ports")[-1])
++        self.assertEqual(calls[-1][0], "stream_start")
++
++    def test_refusals_touch_nothing(self):
++        for kw, n in (({"system": "nes"}, 4), ({"cheat": True}, 4), ({"args": False}, 4), ({"multitap": True}, 4),
++                      ({}, 3)):
++            p, rec, calls, clock, _ = rig(**kw)
++            with self.assertRaises(rp.RelaunchRefused):
++                rp.run(p, n, 3, clock=clock, sleep=clock.sleep)
++            self.assertEqual(calls, [], kw)
++        p, rec, calls, clock, _ = rig(fail_save=True)        # the save fails: only the pause happened
++        with self.assertRaises(rp.RelaunchRefused):
++            rp.run(p, 4, 3, clock=clock, sleep=clock.sleep)
++        self.assertEqual(calls, ["pause", "save"])
++
++    def test_the_endpoint(self):
++        p, rec, calls, clock, state = rig()
++        orig = rp.run
++        rp.run = lambda plugin, players, joined: orig(plugin, players, joined, clock=clock, sleep=clock.sleep)
++        try:
++            r = p.handle_post_request("native-stream-relaunch-ports", "players=4&players_joined=3", "127.0.0.1")
++            self.assertTrue(r["ok"]); self.assertEqual(r["ports_set"]["source"], "relaunch")
++            r2 = p.handle_post_request("native-stream-relaunch-ports", "players=4&players_joined=3", "127.0.0.1")
++            self.assertFalse(r2["ok"]); self.assertIn("already", r2["refused"])   # four ports already
++            self.assertEqual(r2["ports_set"]["players"], 4)
++            self.assertEqual(rows(rec, "relaunch_ports")[-1]["refused"], "The session already has these ports")
++        finally:
++            rp.run = orig
++
++
++class Manager(unittest.TestCase):
++    def bare(self):
++        m = object.__new__(em.EmulatorManager)
++        m._launch_kind = None
++        m.lock = threading.RLock()
++        m._refresh_process = lambda: None
++        m.process = types.SimpleNamespace(poll=lambda: None)
++        m.active_game = {"id": "g1"}
++        m._paused = False
++        m._retroarch_network_status = lambda: "PLAYING"
++        root = Path(tempfile.mkdtemp(prefix="b54_mgr_"))
++        rec_path = root / "content-one.state.recovery"
++        rec_path.write_bytes(b"R" * 64)
++        rel_path = root / "content-one.state.relaunch"
++        rel_path.write_bytes(b"L" * 64)
++        m._recovery_state_path_for_active = lambda: rec_path
++        m._active_state_stem = lambda: "content-one"
++        staged = []
++        m._copy_state_file = lambda a, b: (staged.append(a), b.write_bytes(a.read_bytes()))
++        import hashlib
++        m._state_file_diagnostic = lambda p: {"size_bytes": p.stat().st_size,
++                                              "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
++        m._retroarch_session_log_position = lambda: 0
++        m.record_save_state_probe_event = lambda *a, **k: None
++        m._retroarch_network_request = lambda *a, **k: "LOAD_STATE_SLOT 0"
++        m._retroarch_session_log_since = lambda off: ["[State] Loading state slot 0"]
++        m.status = lambda: {"active": True}
++        return m, staged, rec_path, rel_path
++
++    def test_no_source_is_todays_recovery_path(self):
++        m, staged, rec_path, rel_path = self.bare()
++        m.load_recovery_state_running()
++        self.assertEqual(staged, [rec_path])
++
++    def test_the_relaunch_source_is_staged(self):
++        m, staged, rec_path, rel_path = self.bare()
++        m.load_recovery_state_running(source=rel_path)
++        self.assertEqual(staged, [rel_path])
++
++    def test_save_relaunch_state_copies_and_verifies(self):
++        m, staged, rec_path, rel_path = self.bare()
++        src = rel_path.with_name("content-one.state")
++        src.write_bytes(b"S" * 80)
++        m._capture_slot0_state = lambda **k: {"source": src, "source_diag": m._state_file_diagnostic(src)}
++        r = m.save_relaunch_state()
++        self.assertEqual(r["state_path"], src.with_name("content-one.state.relaunch"))
++        self.assertEqual(r["state_path"].read_bytes(), b"S" * 80)
++        m._launch_kind = "pcsx2"
++        with self.assertRaises(em.EmulatorError):
++            m.save_relaunch_state()
++
++
++if __name__ == "__main__":
++    unittest.main()
+--- /dev/null
++++ b/tests/relaunch_ports/_tmp_cleanup.py
+@@ -0,0 +1,26 @@
++"""B54 (test hygiene, as B53 for tests/ps2_session): every temporary directory a run of this suite creates is removed
++when that run ends.
++
++HOME-6 prep found ~6.9 GiB of these suites' fixture trees (formatted 8-MB cards, fake game trees) left in the hub's /tmp
++tmpfs by B49-B52's runs, which never removed their mkdtemp() dirs. Imported by each test module; it tracks only the
++dirs made in this process and removes them at exit (never anything else)."""
++
++from __future__ import annotations
++
++import atexit
++import shutil
++import tempfile
++
++_made: list[str] = []
++_mkdtemp = tempfile.mkdtemp
++
++
++def _tracked(*args, **kwargs):
++    d = _mkdtemp(*args, **kwargs)
++    _made.append(d)
++    return d
++
++
++if getattr(tempfile.mkdtemp, "__name__", "") != "_tracked":
++    tempfile.mkdtemp = _tracked
++    atexit.register(lambda: [shutil.rmtree(d, ignore_errors=True) for d in _made])

@@ -55,6 +55,31 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
 
+## 2026-11-08 Queue T (B54-B56): hold-to-join and the multitap at once; PS2 recovery through PINE; the PS1 USB import — OPEN (A's HOME-7, IMPORT-1)
+
+(`docs/memory/evidence/B54_HOLD_TO_JOIN_2026-11-08.md`, `…/B55_PS2_RECOVERY_STATES_2026-11-08.md`,
+`…/B56_IMPORT_SLICE_1A_2026-11-08.md`; APK `9aa00ba2…` pinned, NOT installed)
+
+- **B54 (client, on by default; `player_prompt` `0` = none):**
+  - a 500-ms hold joins, and B46's chooser is gone;
+  - a third pad on two ports relaunches the title with the multitap at once — the paused frame, "Setting up 4
+    players…", the budget 15 s, ~6-10 s expected;
+  - PS1 resumes where it was (a relaunch save, then the running-core load). **PS2's relaunch restarts the title**
+    (B55's PINE slot is not yet wired into it);
+  - a cheat or mod session is not relaunched.
+- **B55 (inside `PRIVYHUB_PS2=1`):** the slot-9 save, its load at the hold's return and the stall resume (the picture
+  checked after the resume), and the give-up save (slot 8) go through PINE. The rewind stays off.
+  - **Not yet on the hub:** the return's time against B16's ≤ 1.0 s.
+  - A failed picture leaves the game running with a `rewind_failed` row.
+- **B56 (behind `PRIVYHUB_IMPORT=1`):** the PS1 import tool with the user's four defaults. Tested on fixture trees
+  only; nothing imported.
+  - A hand-copied `PrivyHub-Import/` folder in the repo is not git-ignored (a one-line follow-up).
+  - The title rule skips a second format of a title already listed ("duplicate: title present"); to replace one, the
+    user removes the old file first.
+- **For the user — leftovers, not deleted:**
+  - 308 `b46_*` dirs in `/tmp`, from B46's `tests/players_session` runs (small; that suite now cleans up after itself);
+  - this queue's test temp under `~/.cache/b_q12t_tmp/` (~60 MB, from the other host suites, which do not clean up).
+
 ## 2026-11-08 Queue S (B52-B53): the PS2 load fixed in code, PCSX2's log kept per launch — OPEN (A's HOME-6)
 
 (`docs/memory/evidence/B52_PS2_LOAD_2026-11-08.md`, `docs/memory/evidence/B53_PCSX2_LOG_PER_LAUNCH_2026-11-08.md`)

@@ -219,7 +219,7 @@ class NativeControllerSender(
             return false
         }
 
-        // B41: the prompt claims on a face button / Start (null = today's line)
+        // B41: the prompt's slots (null = today's line); B54: only a joined pad has one (the join is a hold)
         val prompt = playerPrompt
         val player =
             (if (prompt != null) prompt.slotForKey(

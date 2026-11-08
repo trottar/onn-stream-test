@@ -23,6 +23,9 @@ s = kept from the stable map); each slot entry of the rows then carries `claimed
 B46: a client whose chooser picked also sends `players_chosen=<1|2|4>`; the rows then carry `players_chosen` and each
 entry a `label` (`P1`-`P4`), and a changed pick is a change row. No key = B41's rows byte for byte. Design:
 `docs/memory/evidence/b46_2026-11-07/design_written_before_code.md`.
+B54: a hold-to-join client sends `players_joined=<0-4>` instead; the rows then carry `join: "hold"`,
+`players_joined`, and each entry a `label`; a changed count is a change row. No key = B46's rows byte for byte. Design:
+`docs/memory/evidence/b54_2026-11-08/design_written_before_code.md`.
 """
 
 from __future__ import annotations
@@ -75,6 +78,20 @@ def parse_chosen(raw: str | None) -> int | None:
     return n if n in (1, 2, 4) else None
 
 
+def parse_joined(raw: str | None) -> int | None:
+    """B54: the client's `players_joined` (0-4); None when absent or malformed."""
+    try:
+        n = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return None
+    return n if 0 <= n <= 4 else None
+
+
+def _joined_extra(players_joined: int | None) -> dict[str, Any]:
+    """B54: the rows' hold-to-join fields; {} without the key."""
+    return {} if players_joined is None else {"join": "hold", "players_joined": players_joined}
+
+
 def parse(raw: str) -> list[dict[str, Any]] | None:
     """The map as a list of {slot, pad, class}; [] for an empty map; None when malformed."""
     raw = (raw or "").strip()
@@ -100,6 +117,7 @@ class SlotsLog:
     def __init__(self) -> None:
         self.last: list[dict[str, Any]] | None = None
         self.last_chosen: int | None = None
+        self.last_joined: int | None = None
 
     def _row(self, recovery: Any, when: str, slots: list[dict[str, Any]] | None, **extra: Any) -> None:
         fields: dict[str, Any] = {"when": when}
@@ -112,19 +130,24 @@ class SlotsLog:
         recovery._log("pad_slots", **fields)
 
     def start(self, recovery: Any, raw: str, claims: str | None = None,
-              players_chosen: int | None = None) -> list[dict[str, Any]] | None:
+              players_chosen: int | None = None, players_joined: int | None = None) -> list[dict[str, Any]] | None:
         slots = with_chosen(with_claims(parse(raw), claims), players_chosen)
+        # B54: hold-to-join's labels (a joined slot's number is its player)
+        slots = with_chosen(slots, players_joined)
         # B46: the chooser's pick, only when the client sent one
-        self._row(recovery, "start", slots, **({"players_chosen": players_chosen} if players_chosen is not None else {}))
+        self._row(recovery, "start", slots, **({"players_chosen": players_chosen} if players_chosen is not None else {}),
+                  **_joined_extra(players_joined))
         if slots is not None:
             self.last = slots
         self.last_chosen = players_chosen
+        self.last_joined = players_joined
         return slots
 
     def heartbeat(self, recovery: Any, raw: str, values: dict[str, Any], updates_by_player: Any = None,
-                  claims: str | None = None, players_chosen: int | None = None) -> None:
+                  claims: str | None = None, players_chosen: int | None = None,
+                  players_joined: int | None = None) -> None:
         """One heartbeat's key: the row's fields, and a change row when the map moved."""
-        slots = with_chosen(with_claims(parse(raw), claims), players_chosen)
+        slots = with_chosen(with_chosen(with_claims(parse(raw), claims), players_chosen), players_joined)
         if slots is None:
             values["pad_slots_bad"] = True
             return
@@ -134,6 +157,10 @@ class SlotsLog:
         if players_chosen is not None:
             values["players_chosen"] = players_chosen
             extra["players_chosen"] = players_chosen
+        # B54: hold-to-join's count (only a hold-to-join client sends it)
+        if players_joined is not None:
+            values.update(_joined_extra(players_joined))
+            extra.update(_joined_extra(players_joined))
         if isinstance(updates_by_player, dict):
             # B38: changes as updates_by_player, today's per-packet counts beside them
             if isinstance(updates_by_player.get("changes"), (list, tuple)):
@@ -142,10 +169,11 @@ class SlotsLog:
                 values["packets_by_player"] = [int(x) for x in updates_by_player["packets"]]
         elif isinstance(updates_by_player, (list, tuple)):
             values["updates_by_player"] = [int(x) for x in updates_by_player]
-        if slots != self.last or players_chosen != self.last_chosen:
+        if slots != self.last or players_chosen != self.last_chosen or players_joined != self.last_joined:
             self._row(recovery, "change", slots, heartbeat_sequence=values.get("sequence"), **extra)
             self.last = slots
             self.last_chosen = players_chosen
+            self.last_joined = players_joined
 
 
 def enable_changes(controller: Any) -> bool:

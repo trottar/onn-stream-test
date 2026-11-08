@@ -1,0 +1,697 @@
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -7019,6 +7019,141 @@
+             payload["state_file"] = detail.get("state_file")
+             return payload
+ 
++    # --- B55: the PS2 recovery save and the prompt's paths (only in a PCSX2 session, i.e. with PRIVYHUB_PS2=1) ------
++
++    def _pcsx2_save_recovery_state(self) -> dict[str, Any]:
++        """PINE 0x09 to the reserved slot 8, the file waited, the recovery index written as PS1's."""
++        with self.lock:
++            self._refresh_process()
++            if self.process is None or self.active_game is None or self._ps2 is None:
++                raise EmulatorError("No PrivyHub game session is running")
++            slot = _ps2.RECOVERY_SLOT
++            try:
++                self._ps2.ensure_pine_pause()
++            except _ps2.PS2Error as exc:
++                raise EmulatorError(str(exc)) from exc
++            folder = self._project_path(_ps2.DATA_DIR) / "sstates"
++            folder.mkdir(parents=True, exist_ok=True)
++            before = _ps2.state_files(folder)
++            result = self._ps2.state_message(_ps2.MSG_SAVE_STATE, slot)
++            if result != _ps2.PINE_OK:
++                self._ps2.log(f"PS2 recovery save: slot {slot} pine 0x09 {'no answer' if result is None else 'fail'}")
++                raise EmulatorError("PCSX2 did not acknowledge the save state")
++            got = self._ps2.wait_state_file(folder, slot, before)
++            if got is None:
++                self._ps2.log(f"PS2 recovery save: slot {slot} pine 0x09 ok; file not complete in "
++                              f"{_ps2.SAVE_BOUND_S:.1f}s")
++                raise EmulatorError("PrivyHub could not verify the recovery savestate")
++            path, seconds = got
++            identity = self._active_game_state_identity()
++            game = self.active_game if isinstance(self.active_game, dict) else {}
++            relative = str(path.relative_to(self.project_root)).replace("\\", "/")
++            saved_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
++            self._write_recovery_index({
++                "schema": "privyhub_recovery_save_v1",
++                "state_file": relative,
++                "saved_at": saved_at,
++                "game_id": game.get("id"),
++                "game_title": identity.get("game_title"),
++                "game_key": identity.get("game_key"),
++            })
++            self._ps2.log(f"PS2 recovery save: slot {slot} pine 0x09 ok; file complete {seconds:.1f}s")
++            return {
++                "ok": True,
++                "action": "save_recovery_state",
++                "state_file": relative,
++                "saved_at": saved_at,
++                "size_bytes": int(path.stat().st_size),
++                "ps2_states": "pine",
++            }
++
++    def _pcsx2_recovery_source(self) -> Path:
++        detail = self.recovery_state_detail()
++        if not detail.get("exists") or not detail.get("state_file"):
++            raise EmulatorError("No recovery save exists for this game")
++        source = self._project_path(str(detail["state_file"]))
++        if not source.name.endswith(f".{_ps2.RECOVERY_SLOT:02d}.p2s"):
++            raise EmulatorError("The recovery save is not this session's PS2 state")
++        return source
++
++    def _pcsx2_load_recovery_state_running(self) -> dict[str, Any]:
++        """The prompt's Resume in a fresh PS2 launch: B52's ELF hold, PINE 0x0A slot 8, the picture; left running."""
++        with self.lock:
++            self._refresh_process()
++            if self.process is None or self.active_game is None or self._ps2 is None:
++                raise EmulatorError("No active game session is available to load")
++            if self._paused:
++                raise EmulatorError("The running-core recovery load requires the game to be running")
++            source = self._pcsx2_recovery_source()
++            slot = _ps2.RECOVERY_SLOT
++            sess = self._ps2
++            if sess.log_path is None:
++                sess.log_path = _ps2.pcsx2_log_path(self.project_root)
++            try:
++                if not sess.elf_started() and not sess.wait_elf():
++                    sess.log(f"PS2 recovery load: slot {slot} held; the game's ELF not up in {_ps2.ELF_WAIT_S:.0f}s")
++                    raise EmulatorError("The game is still starting; play a moment, then load again")
++                sess.ensure_pine_pause()
++            except _ps2.PS2Error as exc:
++                raise EmulatorError(str(exc)) from exc
++            pre = sess.picture()
++            offset = sess.log_size()
++            result = sess.state_message(_ps2.MSG_LOAD_STATE, slot)
++            if result != _ps2.PINE_OK:
++                sess.log(f"PS2 recovery load: slot {slot} pine 0x0a {'no answer' if result is None else 'fail'}")
++                try:
++                    sess.resume()
++                except _ps2.PS2Error:
++                    pass
++                raise EmulatorError("PCSX2 did not acknowledge the load state")
++            sess.wait_log_line(sess.log_path, offset, f"Loaded state from slot {slot}.")
++            try:
++                sess.resume()
++                verdict, seconds = sess.check_picture(pre[0] if pre else None, offset)
++            except _ps2.PS2Error:
++                verdict, seconds = "static", 0.0
++            sess.log(f"PS2 recovery load: slot {slot} pine 0x0a ok; picture {verdict} {seconds:.1f}s")
++            if verdict != "ok":
++                raise EmulatorError("The game did not resume from the save")
++            payload = self.status()
++            payload["action"] = "load_recovery_state_running"
++            payload["accepted"] = True
++            payload["verification"] = "picture"
++            payload["retroarch_response"] = None
++            payload["retroarch_loading_line"] = None
++            payload["source_sha256"] = self._state_file_diagnostic(source).get("sha256")
++            payload["ps2_states"] = "pine"
++            return payload
++
++    def _pcsx2_copy_recovery_state_to_slot(self, slot: int, *, replace: bool = False) -> dict[str, Any]:
++        """The slot-8 file copied to the user slot's PCSX2 name (`.0N.p2s`), verified, the slot index written."""
++        with self.lock:
++            normalized = self._normalize_save_state_slot(slot)
++            source = self._pcsx2_recovery_source()
++            source_diag = self._state_file_diagnostic(source)
++            if int(source_diag.get("size_bytes", 0) or 0) <= 0:
++                raise EmulatorError("The recovery save is an invalid 0-byte file")
++            prefix = source.name[: -len(f".{_ps2.RECOVERY_SLOT:02d}.p2s")]
++            destination = source.with_name(f"{prefix}.{normalized:02d}.p2s")
++            self._copy_state_file(source, destination)
++            destination_diag = self._state_file_diagnostic(destination)
++            if (
++                int(destination_diag.get("size_bytes", 0) or 0) <= 0
++                or destination_diag.get("sha256") != source_diag.get("sha256")
++            ):
++                raise EmulatorError("PrivyHub could not verify the copied savestate")
++            self._record_state_slot_index(normalized, destination)
++            payload = self.status()
++            payload["action"] = "copy_recovery_state"
++            payload["slot"] = normalized
++            payload["accepted"] = True
++            payload["confirmed"] = True
++            payload["replaced_existing"] = False
++            payload["slot_detail"] = self._save_state_slot_detail(normalized)
++            payload["state_file"] = str(destination.relative_to(self.project_root)).replace("\\", "/")
++            payload["ps2_states"] = "pine"
++            return payload
++
+     def _pcsx2_pause_resume(self, action: str) -> dict[str, Any]:
+         try:
+             how = self._ps2.pause() if action == "pause" else self._ps2.resume()
+@@ -7286,9 +7421,9 @@
+ 
+     def save_recovery_state(self) -> dict[str, Any]:
+         """Same SAVE_STATE_SLOT 0 + copy mechanism, recovery destination."""
+-        # B49: no save states in a PS2 session: the give-up save is skipped (no recovery prompt follows)
++        # B49 skipped it; B55: a PS2 session's give-up save goes through PINE (slot 8), the recovery index as PS1's
+         if self._launch_kind == "pcsx2":
+-            return {"skipped": "ps2_mode", "ps2_mode": True, "state_file": None}
++            return self._pcsx2_save_recovery_state()
+         with self.lock:
+             self._refresh_process()
+             if (
+@@ -7522,9 +7657,9 @@
+         verification, same LOAD_STATE_SLOT 0; the precondition is inverted
+         and RetroArch's own `[State] Loading` line is required.
+         """
+-        # B49: refused in a PS2 session
++        # B49 refused it; B55: a PS2 recovery save loads through PINE (B52's ELF hold and picture check)
+         if self._launch_kind == "pcsx2":
+-            raise EmulatorError(PS2_NO_STATES)
++            return self._pcsx2_load_recovery_state_running()
+         with self.lock:
+             self._refresh_process()
+             if (
+@@ -7677,9 +7812,9 @@
+         The live emulator state is not re-saved: the recovery file is what
+         the user is choosing to keep.
+         """
+-        # B49: refused in a PS2 session
++        # B49 refused it; B55: the PS2 recovery file copied to the user slot's PCSX2 name
+         if self._launch_kind == "pcsx2":
+-            raise EmulatorError(PS2_NO_STATES)
++            return self._pcsx2_copy_recovery_state_to_slot(slot, replace=replace)
+         with self.lock:
+             normalized = self._normalize_save_state_slot(slot)
+ 
+--- a/companion/games/link_drop_recovery.py
++++ b/companion/games/link_drop_recovery.py
+@@ -534,6 +534,8 @@
+                 save_error=error or None,
+                 # B49: a PS2 session takes no save (only the PS2 path returns this key)
+                 **({"ps2_mode": True, "save_skipped": True} if saved.get("skipped") == "ps2_mode" else {}),
++                # B55: a PS2 session's give-up save went through PINE (only the PS2 path returns this key)
++                **({"ps2_states": saved["ps2_states"]} if saved.get("ps2_states") else {}),
+             )
+ 
+     def _end_after_timeout(self) -> None:
+--- a/companion/hold_rewind.py
++++ b/companion/hold_rewind.py
+@@ -247,9 +247,11 @@
+             # B8: the carried hold's split (pre-hold frames + the stall's own), only B8 writes it
+             if "b8" in pending:
+                 fields.update(pending["b8"])
+-            # B49: a PS2 session has no save states: no rewind, no state load (the hold still resumes the game)
+-            if getattr(self.emulator, "_launch_kind", None) == "pcsx2":
+-                return self._row(recovery, "rewind_skipped", fields, reason="ps2_mode: no save states",
++            # B49: a PS2 session has no rewind; B55: in B12's `state` mode its slot-9 load goes through PINE
++            # (Cores.release), so this row is written only for the rewind method
++            if getattr(self.emulator, "_launch_kind", None) == "pcsx2" and not (
++                    self.b9 is not None and getattr(self.b9, "mode", None) == "state"):
++                return self._row(recovery, "rewind_skipped", fields, reason="ps2: no rewind in PCSX2",
+                                  ps2_mode=True)
+             # B9: a core off the allow-list is skipped; `state` loads the scratch savestate instead of rewinding
+             if self.b9 is not None and self.b9.handles(pending):
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -4008,8 +4008,9 @@
+                 # B49: a PS2 session: no save states (the four behaviours off), said in the response and a row
+                 if _ps2_session is not None and _ps2_session.active(self._emulator):
+                     payload["ps2_mode"] = True
+-                    # B51: SAVE / LOAD go through PINE now; `off` keeps the four automatic save-state behaviours
+-                    self._recovery._log("ps2_session", ps2_mode=True, savestates="pine",
++                    # B51: SAVE / LOAD go through PINE; B55: so do the automatic ones (`pine`), only the rewind is off
++                    self._recovery._log("ps2_session", ps2_mode=True, savestates="pine", ps2_states="pine",
++                                        pine=list(_ps2_session.PINE_BEHAVIOURS),
+                                         off=list(_ps2_session.OFF_BEHAVIOURS))
+                 # B41: the title's player count for the client's prompt (only a client with player_prompt=1 asks)
+                 if self._first(query, "player_prompt") == "1":
+--- a/companion/ps2_session.py
++++ b/companion/ps2_session.py
+@@ -71,8 +71,16 @@
+ PINE_RUNNING, PINE_PAUSED = 0, 1
+ 
+ # The save-state behaviours a PS2 session turns off (B49 S3), in the rows' words
+-OFF_BEHAVIOURS = ("hold_rewind", "state_save_slot9", "stall_resume_load", "recovery_save")
++# B55: the four automatic save-state behaviours go through PINE now (the slot-9 save, the hold's return and the stall
++# resume's load of it, the link give-up save); only the rewind stays off (PCSX2 has none). B49's list was
++# ("hold_rewind", "state_save_slot9", "stall_resume_load", "recovery_save").
++PINE_BEHAVIOURS = ("state_save_slot9", "hold_return_load", "stall_resume_load", "recovery_save")
++OFF_BEHAVIOURS = ("rewind",)
+ SKIP_REASON = "ps2_mode: no save states"
++SCRATCH_SLOT = 9          # B55: the hold / stall scratch (as RetroArch's slot 9); PrivyHub's user slots are 1-3
++RECOVERY_SLOT = 8         # B55: the link give-up save (the recovery prompt's file)
++RELEASE_SHARE_S = 0.45    # B55: the load's share of B16's R1 (<= 1.0 s from the return; the fast ready <= 0.55 s)
++VERIFY_RUNNING_S = 2.0    # B55: the verifier's wait for the recovery's resume before B52's picture check
+ 
+ # SDL's mapping of the companion's uinput pad (0x1209 / 0x5048, version 1, USB): buttons in key-code order b0-b9
+ # (SOUTH EAST NORTH WEST TL TR SELECT START THUMBL THUMBR), axes X Y Z RX RY RZ = a0-a5, the hat h0
+--- a/companion/rewind_cores.py
++++ b/companion/rewind_cores.py
+@@ -219,10 +219,9 @@
+         if getattr(self.emulator, "_paused", False):
+             self.saves_skipped_paused += 1
+             return
+-        # B49: a PS2 session has no save states (slot 9 never sent)
++        # B55: a PS2 session's slot-9 save goes through PINE (B49 skipped it)
+         if getattr(self.emulator, "_launch_kind", None) == "pcsx2":
+-            self.saves_skipped_ps2 = getattr(self, "saves_skipped_ps2", 0) + 1
+-            return
++            return self._save_ps2(silence_start, mark_at, kind)
+         port = getattr(self.emulator, "_network_cmd_port", None)
+         if port is None or self.nci_factory is None:
+             return
+@@ -278,6 +277,9 @@
+             onset = s["onset"]
+         if s is None or not s.get("ok") or abs(s["onset"] - onset) > MATCH_S:
+             return rw._row(recovery, "rewind_skipped", fields, reason="no scratch state for this pause")
++        # B55: a PS2 session loads its slot-9 save through PINE (the picture checked after the recovery's resume)
++        if getattr(self.emulator, "_launch_kind", None) == "pcsx2":
++            return self._release_ps2(rw, recovery, fields, pending, s, onset)
+         why = self._file_problem(s)
+         if why:
+             return rw._row(recovery, "rewind_skipped", fields, reason=why)
+@@ -318,6 +320,109 @@
+             return rw._row(recovery, "rewind_failed", fields, reason=f"not playing after the load: {(status or '')[:40]}")
+         return rw._row(recovery, "input_release", fields)
+ 
++    # --- B55: the PS2 branches (reached only in a PCSX2 session, i.e. with PRIVYHUB_PS2=1) ---------------------------
++
++    def _spawn(self, fn: Callable[[], None]) -> None:
++        """The verifier's thread (a test runs it in place, after its resume)."""
++        threading.Thread(target=fn, name="PrivyHub-PS2-State-Verify", daemon=True).start()
++
++    def _ps2_folder(self, ps2: Any) -> Path:
++        return Path(self.emulator._project_path(ps2.DATA_DIR)) / "sstates"
++
++    def _save_ps2(self, silence_start: float, mark_at: float, kind: str) -> None:
++        import ps2_session as _ps2
++        sess = getattr(self.emulator, "_ps2", None)
++        if sess is None:
++            return
++        folder = self._ps2_folder(_ps2)
++        lock = getattr(self.emulator, "lock", None) or threading.RLock()
++        wall = self._wall()
++        with lock:
++            folder.mkdir(parents=True, exist_ok=True)
++            before = _ps2.state_files(folder)
++            t0 = self._clock()
++            result = sess.state_message(_ps2.MSG_SAVE_STATE, _ps2.SCRATCH_SLOT)
++            sent_at = t0
++        ok = result == _ps2.PINE_OK
++        ack = "pine ok" if ok else ("pine no answer" if result is None else "pine fail")
++        with self._lock:
++            self.last_save = {"onset": silence_start, "sent_at": sent_at, "wall": wall, "ack": ack, "ok": ok,
++                              "kind": kind, "p2s_before": before}
++            self.saves += 1
++        self.recovery._log("state_saved" if ok else "state_save_failed", slot=_ps2.SCRATCH_SLOT, core="pcsx2",
++                           kind=kind, silence_ms=round((mark_at - silence_start) * 1000.0, 1),
++                           save_after_onset_ms=round((sent_at - silence_start) * 1000.0, 1), ack=ack,
++                           ps2_states="pine")
++        try:
++            sess.log(f"PS2 state save: slot {_ps2.SCRATCH_SLOT} pine 0x09 {ack[5:]} ({kind})")
++        except Exception:
++            pass
++
++    def _release_ps2(self, rw: Any, recovery: Any, fields: dict[str, Any], pending: Mapping[str, Any],
++                     s: Mapping[str, Any], onset: float) -> dict[str, Any]:
++        import ps2_session as _ps2
++        sess = getattr(self.emulator, "_ps2", None)
++        slot = _ps2.SCRATCH_SLOT
++        fields.update(slot=slot, core="pcsx2", ps2_states="pine",
++                      save_after_onset_ms=round((s["sent_at"] - onset) * 1000.0, 1))
++        if sess is None:
++            return rw._row(recovery, "rewind_failed", fields, reason="no PCSX2 session")
++        got = sess.wait_state_file(self._ps2_folder(_ps2), slot, dict(s.get("p2s_before") or {}),
++                                   bound=_ps2.RELEASE_SHARE_S)
++        if got is None:
++            with self._lock:
++                self.last_save = None
++            return rw._row(recovery, "rewind_skipped", fields, reason="the PS2 state file is not complete")
++        lock = getattr(self.emulator, "lock", None) or threading.RLock()
++        with lock:
++            t0 = self._clock()
++            try:
++                sess.ensure_pine_pause()
++            except Exception as exc:
++                with self._lock:
++                    self.last_save = None
++                return rw._row(recovery, "rewind_failed", fields, reason=f"PCSX2 not paused for the load: {exc}")
++            pre = sess.picture()
++            offset = sess.log_size()
++            result = sess.state_message(_ps2.MSG_LOAD_STATE, slot)
++            line = result == _ps2.PINE_OK and sess.wait_log_line(
++                sess.log_path, offset, f"Loaded state from slot {slot}.", bound=_ps2.RELEASE_SHARE_S)
++            ms = round((self._clock() - t0) * 1000.0, 1)
++        with self._lock:
++            self.last_save = None                                 # one load per save
++        fields.update(rewind_ms=ms, load_ms=ms)
++        if result != _ps2.PINE_OK:
++            return rw._row(recovery, "rewind_failed", fields, reason="PINE load not acknowledged")
++        fields.update(line=bool(line), verification="picture_after_resume")
++        try:
++            sess.log(f"PS2 state load: slot {slot} pine 0x0a ok; {ms:.0f} ms")
++        except Exception:
++            pass
++        row = rw._row(recovery, "input_release", fields)
++        verify_fields = dict(fields)
++        self._spawn(lambda: self._verify_ps2(rw, recovery, sess, pre, offset, verify_fields))
++        return row
++
++    def _verify_ps2(self, rw: Any, recovery: Any, sess: Any, pre: Any, offset: int, fields: dict[str, Any]) -> None:
++        """After the recovery's resume: B52's picture check; static / fault -> the PS1-shaped `rewind_failed` row."""
++        import ps2_session as _ps2
++        try:
++            t0 = sess.clock()
++            while sess.status() != _ps2.PINE_RUNNING and sess.clock() - t0 < _ps2.VERIFY_RUNNING_S:
++                sess.sleep(_ps2.STATE_POLL_S)
++            verdict, seconds = sess.check_picture(pre[0] if pre else None, offset)
++        except Exception:
++            verdict, seconds = "static", 0.0
++        recovery._log("ps2_states", check="picture", verdict=verdict, s=round(float(seconds), 1),
++                      slot=fields.get("slot"), via=fields.get("via"))
++        try:
++            sess.log(f"PS2 state load: slot {fields.get('slot')} picture {verdict} {seconds:.1f}s")
++        except Exception:
++            pass
++        if verdict != "ok":
++            rw._row(recovery, "rewind_failed", fields,
++                    reason=f"the game did not resume from the save (picture {verdict})")
++
+     def _file_problem(self, s: Mapping[str, Any]) -> str | None:
+         try:
+             root = Path(self.emulator._state_root())
+--- /dev/null
++++ b/tests/ps2_session/test_b55.py
+@@ -0,0 +1,260 @@
++#!/usr/bin/env python3
++"""B55 (host): a PS2 session's automatic save states through PINE -- the slot-9 save (a silence or the client's
++stall), its load at the hold's return / the stall resume (the picture checked after the recovery's resume), the link
++give-up save to slot 8 and the recovery prompt's Resume / Copy / Discard. B51's PINE socket double, B52's fake window
++and log; no PCSX2, no BIOS, no title.
++
++    python3 -m unittest discover -s tests/ps2_session -v
++"""
++
++from __future__ import annotations
++
++import json
++import struct
++import sys
++import types
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401
++
++import ps2_session as ps2  # noqa: E402
++import rewind_cores  # noqa: E402
++from games import emulator_manager as em  # noqa: E402
++import test_b51 as b51  # noqa: E402
++
++STEM = b51.FAKE_STEM
++
++
++class Rec:
++    def __init__(self):
++        self.rows = []
++
++    def _log(self, event, **f):
++        self.rows.append({"event": event, **f})
++
++    def of(self, event):
++        return [r for r in self.rows if r["event"] == event]
++
++
++def rw():
++    return types.SimpleNamespace(fps=60.0, _row=lambda recovery, event, fields, **extra: (
++        recovery._log(event, **{**fields, **extra}), {**fields, **extra})[1])
++
++
++class Base(b51.Base):
++    def rig(self, picture="moving", tlb=False, **pine):
++        d = self.double(**pine)
++        m, lines, _ = b51.session_manager(d)
++        fake = m._fake
++        orig_grab, orig_run = fake.grab, fake.run
++
++        def grab(w):
++            if picture == "moving":
++                return orig_grab(w)
++            return bytes([90] * (ps2.GRAB_W * ps2.GRAB_H))          # static: one picture
++
++        def run(cmd, **kw):
++            r = orig_run(cmd, **kw)
++            if tlb and cmd[:2] == ["xdotool", "key"] and not fake.paused and "Loaded state" in d.emulog.read_text():
++                with open(d.emulog, "a") as fh:
++                    fh.write("[   15.3] TLB Miss, pc=0x0 addr=0x0 [store]\n")
++            return r
++        fake.grab, fake.run = grab, run
++        m._ps2.grab, m._ps2.run = grab, run
++        rec = Rec()
++        cores = rewind_cores.Cores("state", m, rec, clock=m._ps2.clock, threaded=False)
++        spawned = []
++        cores._spawn = spawned.append
++        return m, d, lines, rec, cores, spawned
++
++    def playing(self, m):
++        m.resume()
++        self.assertFalse(m._fake.paused)
++
++    def hold(self, kind="silence", onset=10.0, pending_onset=None, **kw):
++        m, d, lines, rec, cores, spawned = self.rig(**kw)
++        self.playing(m)
++        cores.save(onset, onset + 0.4, kind)
++        m.pause()                                               # the hold / the stall owns a pause
++        pending = {"onset": onset if pending_onset is None else pending_onset, "paused_at": onset + 1.0}
++        row = cores.release(rw(), rec, {"via": "client_ready_stall" if kind == "stall" else "input_release"}, pending)
++        return m, d, lines, rec, cores, spawned, row
++
++
++class SlotNineSave(Base):
++    def test_the_save_goes_through_pine_slot_9(self):
++        m, d, lines, rec, cores, _ = self.rig()
++        self.playing(m)
++        cores.save(10.0, 10.4, "silence")
++        self.assertEqual(d.requests[-1], struct.pack("<IBB", 6, 0x09, 9))
++        row = rec.of("state_saved")[-1]
++        self.assertEqual((row["slot"], row["core"], row["kind"], row["ps2_states"]), (9, "pcsx2", "silence", "pine"))
++        self.assertTrue((d.sstates / f"{STEM}.09.p2s").is_file())
++        self.assertIn("PS2 state save: slot 9 pine 0x09 ok (silence)", lines)
++        self.assertFalse(m._fake.paused)                        # a running save: the game never paused for it
++
++    def test_a_pine_failure_is_a_failed_save_row(self):
++        m, d, lines, rec, cores, _ = self.rig(result=ps2.PINE_FAIL)
++        self.playing(m)
++        cores.save(10.0, 10.4, "stall")
++        self.assertEqual(rec.of("state_save_failed")[-1]["ack"], "pine fail")
++        self.assertFalse(cores.last_save["ok"])
++
++
++class HoldReturn(Base):
++    def test_the_hold_s_return_loads_slot_9_then_the_picture_after_the_resume(self):
++        m, d, lines, rec, cores, spawned, row = self.hold()
++        self.assertEqual(d.requests[-1], struct.pack("<IBB", 6, 0x0A, 9))
++        self.assertEqual((rec.of("input_release")[-1]["ps2_states"], row["slot"], row["method"] if "method" in row
++                          else "state", row["verification"], row["line"]), ("pine", 9, "state", "picture_after_resume",
++                                                                           True))
++        self.assertLessEqual(row["load_ms"], ps2.RELEASE_SHARE_S * 1000.0)
++        self.assertTrue(m._fake.paused)                         # the release left the resume to the recovery
++        self.playing(m)                                         # the recovery's resume
++        self.assertEqual(len(spawned), 1)
++        spawned[0]()
++        check = rec.of("ps2_states")[-1]
++        self.assertEqual((check["check"], check["verdict"], check["slot"]), ("picture", "ok", 9))
++        self.assertEqual(rec.of("rewind_failed"), [])
++        self.assertTrue(any(l.startswith("PS2 state load: slot 9 picture ok") for l in lines))
++        self.assertIsNone(cores.last_save)                      # one load per save
++
++    def test_the_stall_resume_loads_the_stall_save(self):
++        m, d, lines, rec, cores, spawned, row = self.hold(kind="stall", onset=20.0, pending_onset=20.06)
++        self.assertEqual(d.requests[-1], struct.pack("<IBB", 6, 0x0A, 9))
++        self.assertEqual((rec.of("input_release")[-1]["via"], rec.of("input_release")[-1]["ps2_states"]),
++                         ("client_ready_stall", "pine"))
++        self.playing(m)
++        spawned[0]()
++        self.assertEqual(rec.of("ps2_states")[-1]["verdict"], "ok")
++
++    def test_a_static_picture_is_the_ps1_shaped_rewind_failed_row(self):
++        m, d, lines, rec, cores, spawned, row = self.hold(picture="static")
++        self.playing(m)
++        spawned[0]()
++        self.assertEqual(rec.of("ps2_states")[-1]["verdict"], "static")
++        self.assertEqual(rec.of("rewind_failed")[-1]["reason"], "the game did not resume from the save (picture static)")
++
++    def test_a_tlb_miss_is_a_fault(self):
++        m, d, lines, rec, cores, spawned, row = self.hold(tlb=True)
++        self.playing(m)
++        spawned[0]()
++        self.assertEqual(rec.of("rewind_failed")[-1]["reason"], "the game did not resume from the save (picture fault)")
++
++    def test_an_incomplete_file_resumes_without_a_load(self):
++        m, d, lines, rec, cores, spawned, row = self.hold(write_file=False)
++        self.assertNotIn(struct.pack("<IBB", 6, 0x0A, 9), d.requests)
++        self.assertEqual(rec.of("rewind_skipped")[-1]["reason"], "the PS2 state file is not complete")
++        self.assertEqual(spawned, [])
++
++
++class ThroughTheRewinder(Base):
++    def test_the_rewinder_hands_a_ps2_release_to_b9s_state_mode(self):
++        import threading
++        import hold_rewind
++        m, d, lines, rec, cores, spawned = self.rig()
++        self.playing(m)
++        cores.save(10.0, 10.4, "silence")
++        m.pause()
++        r = object.__new__(hold_rewind.Rewinder)
++        r._lock = threading.Lock()
++        r.cap, r.b9, r.emulator, r.fps = 30, cores, m, 60.0
++        r.counter_before = lambda pending: 50
++        r._row = rw()._row
++        rec._state_since = 7
++        r._pending = {"key": 7, "onset": 10.0, "paused_at": 11.0}
++        r.rewind(rec, "input_release")
++        self.assertEqual(d.requests[-1], struct.pack("<IBB", 6, 0x0A, 9))
++        self.assertEqual(rec.of("input_release")[-1]["ps2_states"], "pine")
++        self.assertEqual(rec.of("rewind_skipped"), [])
++
++
++class GiveUpAndPrompt(Base):
++    def give_up(self, **kw):
++        m, d, lines, rec, cores, spawned = self.rig(**kw)
++        saved = m.save_recovery_state()                         # the give-up finds the game paused
++        return m, d, lines, saved
++
++    def test_the_give_up_save_is_slot_8_with_the_index(self):
++        m, d, lines, saved = self.give_up()
++        self.assertEqual(d.requests[-1], struct.pack("<IBB", 6, 0x09, 8))
++        self.assertEqual(saved["ps2_states"], "pine")
++        self.assertTrue(saved["state_file"].endswith(".08.p2s"))
++        detail = m.recovery_state_detail()
++        self.assertTrue(detail["exists"]); self.assertEqual(detail["game_id"], "game_ps2_fake")
++        self.assertTrue(any(l.startswith("PS2 recovery save: slot 8 pine 0x09 ok; file complete") for l in lines))
++
++    def test_the_give_up_row_carries_ps2_states(self):
++        from games import link_drop_recovery as ldr
++        import tempfile
++        rec = ldr.LinkDropRecovery(Path(tempfile.mkdtemp(prefix="b55_")), pause_game=lambda: None,
++                                   resume_game=lambda: None,
++                                   save_recovery_state=lambda: {"state_file": "x.08.p2s", "ps2_states": "pine"},
++                                   restart_encoder=lambda: {}, full_start_encoder=lambda: {}, stream_active=lambda: True,
++                                   end_session=lambda: None, client_packet_age_ms=lambda: 10.0,
++                                   recovery_save_detail=lambda: {})
++        rec._give_up_and_save()
++        row = [json.loads(x) for x in rec.log_path().read_text().splitlines() if '"gave_up_saved"' in x][0]
++        self.assertEqual((row["ps2_states"], row["state_file"]), ("pine", "x.08.p2s"))
++        self.assertNotIn("save_skipped", row)
++
++    def test_resume_loads_slot_8_with_the_picture_and_leaves_it_running(self):
++        m, d, lines, saved = self.give_up()
++        self.playing(m)                                          # the fresh launch, running (R3c2's option A)
++        r = m.load_recovery_state_running()
++        self.assertEqual(d.requests[-1], struct.pack("<IBB", 6, 0x0A, 8))
++        self.assertEqual((r["verification"], r["ps2_states"]), ("picture", "pine"))
++        self.assertFalse(m._fake.paused)
++        self.assertTrue(any("PS2 recovery load: slot 8 pine 0x0a ok; picture ok" in l for l in lines))
++
++    def test_resume_with_a_static_picture_is_ps1s_error(self):
++        m, d, lines, saved = self.give_up(picture="static")
++        self.playing(m)
++        with self.assertRaises(em.EmulatorError) as cm:
++            m.load_recovery_state_running()
++        self.assertEqual(str(cm.exception), "The game did not resume from the save")
++
++    def test_copy_to_a_slot_and_discard(self):
++        m, d, lines, saved = self.give_up()
++        r = m.copy_recovery_state_to_slot(2)
++        dest = d.sstates / f"{STEM}.02.p2s"
++        self.assertEqual(dest.read_bytes(), (d.sstates / f"{STEM}.08.p2s").read_bytes())
++        self.assertEqual((r["slot"], r["confirmed"]), (2, True))
++        self.assertTrue(m._save_state_slot_detail(2)["exists"])
++        gone = m.discard_recovery_state()
++        self.assertTrue(gone["removed"])
++        self.assertFalse((d.sstates / f"{STEM}.08.p2s").exists())
++        self.assertTrue(dest.exists())                           # the copy stays
++        self.assertFalse(m.recovery_state_detail()["exists"])
++
++
++class RetroArchUntouched(unittest.TestCase):
++    def test_a_retroarch_session_never_takes_a_pine_branch(self):
++        rec = Rec()
++        sent = []
++
++        class Nci:
++            def send(self, c):
++                sent.append(c)
++
++            def close(self):
++                pass
++        emu = types.SimpleNamespace(_launch_kind=None, _paused=False, _network_cmd_port=55355, _ps2=None)
++        c = rewind_cores.Cores("state", emu, rec, threaded=False)
++        c.nci_factory = lambda port: Nci()
++        orig = rewind_cores._read
++        rewind_cores._read = lambda nci, bound, prefix: "SAVE_STATE_SLOT 9"
++        try:
++            c.save(1.0, 1.4)
++        finally:
++            rewind_cores._read = orig
++        self.assertEqual(sent, ["SAVE_STATE_SLOT 9"])
++        self.assertNotIn("ps2_states", rec.of("state_saved")[-1])
++
++
++if __name__ == "__main__":
++    unittest.main()
+--- a/tests/ps2_session/test_ps2_session.py
++++ b/tests/ps2_session/test_ps2_session.py
+@@ -543,9 +543,11 @@
+         out = run_rows("1", "pcsx2")
+         self.assertTrue(out["start_ps2_mode"])
+         self.assertEqual(len(out["ps2_rows"]), 1)
+-        # B51 (disclosed): SAVE / LOAD through PINE; the four automatic behaviours still off
++        # B51 (disclosed): SAVE / LOAD through PINE; B55 (disclosed): the four automatic behaviours too, the rewind off
+         self.assertEqual((out["ps2_rows"][0]["savestates"], out["ps2_rows"][0]["off"]),
+                          ("pine", list(ps2.OFF_BEHAVIOURS)))
++        self.assertEqual((out["ps2_rows"][0]["ps2_states"], out["ps2_rows"][0]["pine"], out["ps2_rows"][0]["off"]),
++                         ("pine", list(ps2.PINE_BEHAVIOURS), ["rewind"]))
+         self.assertNotIn("save_states", out["ps2_rows"][0])
+         self.assertTrue(out["hb_ps2_mode"])
+ 
+@@ -572,25 +574,32 @@
+         rw._pending = {"key": 7, "onset": 1.0, "paused_at": 2.0}
+         rw.rewind(recovery, "input_release")
+         self.assertEqual(rows[0][0], "rewind_skipped")
+-        self.assertEqual((rows[0][1]["reason"], rows[0][1]["ps2_mode"]), ("ps2_mode: no save states", True))
++        # B55 (disclosed): only the rewind method skips now (B9 not in `state` mode); `state` loads through PINE
++        self.assertEqual((rows[0][1]["reason"], rows[0][1]["ps2_mode"]), ("ps2: no rewind in PCSX2", True))
+ 
+-    def test_the_slot9_save_is_not_sent(self):
++    def test_the_slot9_save_never_goes_through_retroarchs_commands(self):
++        # B55 (disclosed): the PS2 slot-9 save goes through PINE (test_b55); never through the NCI
+         import rewind_cores
+         c = object.__new__(rewind_cores.Cores)
+-        c.emulator = types.SimpleNamespace(_launch_kind="pcsx2", _paused=False, _network_cmd_port=55355)
++        c.emulator = types.SimpleNamespace(_launch_kind="pcsx2", _paused=False, _network_cmd_port=55355, _ps2=None)
+         c.nci_factory = lambda port: (_ for _ in ()).throw(AssertionError("no command may be sent"))
+         c.save(0.0, 0.4)
+-        self.assertEqual(c.saves_skipped_ps2, 1)
++        self.assertFalse(hasattr(c, "saves_skipped_ps2"))
+ 
+     def test_the_recovery_save_and_the_slots(self):
+         from games import emulator_manager as em
+         m = object.__new__(em.EmulatorManager)
+         m._launch_kind = "pcsx2"
+-        self.assertEqual(m.save_recovery_state(), {"skipped": "ps2_mode", "ps2_mode": True, "state_file": None})
+-        # B51 (disclosed): the SAVE / LOAD buttons go through PINE now (test_b51); the recovery paths stay refused
+-        for call in (m.load_recovery_state, m.load_recovery_state_running, lambda: m.copy_recovery_state_to_slot(1)):
+-            with self.assertRaises(em.EmulatorError):
+-                call()
++        # B55 (disclosed): the give-up save, the prompt's Resume and Copy go through PINE (test_b55); the paused
++        # recovery load (unused by the R3c2 flow) stays refused
++        m._pcsx2_save_recovery_state = lambda: "pine-save"
++        m._pcsx2_load_recovery_state_running = lambda: "pine-load"
++        m._pcsx2_copy_recovery_state_to_slot = lambda slot, replace=False: ("pine-copy", slot)
++        self.assertEqual(m.save_recovery_state(), "pine-save")
++        self.assertEqual(m.load_recovery_state_running(), "pine-load")
++        self.assertEqual(m.copy_recovery_state_to_slot(2), ("pine-copy", 2))
++        with self.assertRaises(em.EmulatorError):
++            m.load_recovery_state()
+ 
+     def test_the_give_up_row(self):
+         from games import link_drop_recovery as ldr

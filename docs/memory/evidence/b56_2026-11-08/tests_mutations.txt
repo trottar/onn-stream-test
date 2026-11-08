@@ -1,0 +1,12 @@
+M1 the flag not checked: FAILED (failures=1); test_absent_refuses_and_writes_nothing
+M2 no rollback: FAILED (failures=2); test_a_copy_failing_midway_leaves_nothing_half_written, test_a_verify_mismatch_rolls_back
+M3 the final overwritten: FAILED (failures=1); test_an_existing_final_is_never_overwritten
+M4 the entry not last: FAILED (failures=1); test_the_plan_destinations_ids_m3u_and_space
+M5 the log carries the title: FAILED (failures=1); test_the_log_has_no_name_title_folder_or_hash
+M6 the size gate dropped: FAILED (failures=1); test_duplicates_by_hash_size_gated_and_inside_the_stick
+M7 an .iso with its .chd not skipped: FAILED (failures=1); test_the_iso_and_title_rules_and_hide
+M8 the hidden .iso still listed: FAILED (failures=1); test_new_for_seven_days_the_hidden_iso_and_openbios
+M9 NEW for 30 days: FAILED (failures=1); test_new_for_seven_days_the_hidden_iso_and_openbios
+M10 the OpenBIOS label never shown: OK; SURVIVED
+M10 the OpenBIOS label never shown: FAILED (failures=1); test_new_for_seven_days_the_hidden_iso_and_openbios
+M10 survived the first run (no wrong-size BIOS file in any test); the test was strengthened (a 1000-byte scph5500.bin keeps the label) and M10 was caught on the retake (the last line).

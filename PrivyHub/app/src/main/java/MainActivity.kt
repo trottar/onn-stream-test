@@ -9104,7 +9104,8 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    // B46: `&players_chosen=N` from the title's last pick, only with the prompt on (debug.privyhub.player_prompt)
+    // B46: the title's last count sets the session's ports, only with the prompt on (debug.privyhub.player_prompt)
+    // B54: hold-to-join's `&players_joined=N` (the title's highest joined count) replaces B46's `players_chosen`
     private fun playersChosenLaunchSuffix(gameId: String): String =
         try {
             if (!com.safeiot.privyhub.streaming.PlayerPromptFlag.fromSystem()) {
@@ -9112,7 +9113,7 @@ class MainActivity : AppCompatActivity() {
             } else {
                 com.safeiot.privyhub.streaming.PlayerPrompt.gameKey(gameId)
                     ?.let { com.safeiot.privyhub.streaming.PrefsPlayerChoiceStore(this).get(it) }
-                    ?.let { "&players_chosen=$it" }
+                    ?.let { "&players_joined=$it" }
                     ?: ""
             }
         } catch (_: Exception) {
@@ -12296,7 +12297,7 @@ class MainActivity : AppCompatActivity() {
                     httpPost(
                         "http://$host:$CONTROL_PORT" +
                             "/plugins/games/launch?id=$gameId$cheatQuerySuffix$modQuerySuffix" +
-                            // B46: the title's last chooser pick sets the session's ports (no pick, or the prompt off: today)
+                            // B46 / B54: the title's last joined count sets the session's ports (none, or the prompt off: today)
                             playersChosenLaunchSuffix(gameId)
                     )
 

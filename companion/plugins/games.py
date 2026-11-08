@@ -125,6 +125,12 @@ _ps2_session = None
 if (os.environ.get("PRIVYHUB_PS2") or "").strip() == "1":
     import ps2_session as _ps2_session
 
+# B56: an import's marks on the list (NEW for 7 days, a hidden .iso, "(OpenBIOS)"), only with PRIVYHUB_IMPORT=1.
+# Absent = today: nothing imported.
+_import_marks = None
+if (os.environ.get("PRIVYHUB_IMPORT") or "").strip() == "1":
+    import import_marks as _import_marks
+
 
 class GamesPlugin:
     """Trusted-local, catalog-only Games plugin for PrivyHub."""
@@ -1926,6 +1932,12 @@ class GamesPlugin:
             if len(games) >= self.MAX_GAMES:
                 break
 
+        # B56: a library .iso the import marked hidden (a .chd of the title exists) is left out (absent: never)
+        if _import_marks is not None:
+            hidden = _import_marks.read(self.PROJECT_ROOT)["hide"]
+            if hidden:
+                games = [g for g in games if g["id"] not in hidden]
+
         games.sort(
             key=lambda item: (
                 str(item["system_name"]).casefold(),
@@ -2140,7 +2152,11 @@ class GamesPlugin:
                         + system_id
                     ),
                     name=(
-                        f"{config['name']} "
+                        f"{config['name']}"
+                        # B56: PlayStation on its built-in OpenBIOS until a real BIOS is imported (absent: never)
+                        + (_import_marks.OPENBIOS_LABEL if _import_marks is not None and system_id == "ps1"
+                           and not _import_marks.ps1_bios_present(self.PROJECT_ROOT) else "")
+                        + " "
                         f"({counts[system_id]})"
                     ),
                     lazy_path=(
@@ -2622,6 +2638,15 @@ class GamesPlugin:
             }
             for game in selected
         ]
+
+        # B56: " · NEW" after a title imported in the last 7 days (absent: never)
+        if _import_marks is not None and nodes:
+            marks = _import_marks.read(self.PROJECT_ROOT)
+            if marks["new"]:
+                now_ms = int(time.time() * 1000)
+                for node in nodes:
+                    if _import_marks.is_new(marks, node["id"], now_ms):
+                        node["name"] = node["name"] + _import_marks.NEW_TAG
 
         if not nodes:
             if view:
@@ -3823,7 +3848,10 @@ class GamesPlugin:
                                               claims=self._first(query, "pad_claims") if "pad_claims" in query else None,
                                               # B46: the chooser's pick (only a client that picked sends it)
                                               **({"players_chosen": _pad_slots.parse_chosen(self._first(query, "players_chosen"))}
-                                                 if "players_chosen" in query else {}))
+                                                 if "players_chosen" in query else {}),
+                                              # B54: hold-to-join's count (only a hold-to-join client sends it)
+                                              **({"players_joined": _pad_slots.parse_joined(self._first(query, "players_joined"))}
+                                                 if "players_joined" in query else {}))
 
             if not values:
                 raise ValueError(
@@ -3949,7 +3977,10 @@ class GamesPlugin:
                                           claims=self._first(query, "pad_claims") if "pad_claims" in query else None,
                                           # B46: the chooser's pick (only a client that picked sends it)
                                           **({"players_chosen": _pad_slots.parse_chosen(self._first(query, "players_chosen"))}
-                                             if "players_chosen" in query else {}))
+                                             if "players_chosen" in query else {}),
+                                          # B54: hold-to-join's count (only a hold-to-join client sends it)
+                                          **({"players_joined": _pad_slots.parse_joined(self._first(query, "players_joined"))}
+                                             if "players_joined" in query else {}))
                 # B38: count only the slots whose state changes (a stable-slot client's key turns it on)
                 _pad_slots.enable_changes(getattr(getattr(self._native_stream, "_session_io", None), "controller", None))
             try:
@@ -4008,8 +4039,9 @@ class GamesPlugin:
                 # B49: a PS2 session: no save states (the four behaviours off), said in the response and a row
                 if _ps2_session is not None and _ps2_session.active(self._emulator):
                     payload["ps2_mode"] = True
-                    # B51: SAVE / LOAD go through PINE now; `off` keeps the four automatic save-state behaviours
-                    self._recovery._log("ps2_session", ps2_mode=True, savestates="pine",
+                    # B51: SAVE / LOAD go through PINE; B55: so do the automatic ones (`pine`), only the rewind is off
+                    self._recovery._log("ps2_session", ps2_mode=True, savestates="pine", ps2_states="pine",
+                                        pine=list(_ps2_session.PINE_BEHAVIOURS),
                                         off=list(_ps2_session.OFF_BEHAVIOURS))
                 # B41: the title's player count for the client's prompt (only a client with player_prompt=1 asks)
                 if self._first(query, "player_prompt") == "1":
@@ -4077,6 +4109,23 @@ class GamesPlugin:
                 "recovered": bool(released.get("recovered", False)),
                 "recovery": self._recovery.status(),
             }
+
+        # B54: a hold-to-join client's third pad: the same title relaunched with the multitap at once (no request =
+        # nothing runs)
+        if action == "native-stream-relaunch-ports":
+            import relaunch_ports as _relaunch_ports
+            import players_session as _players_session
+            target = self._parse_int(self._first(query, "players"), 0)
+            joined = (_players_session.parse_joined(self._first(query, "players_joined"))
+                      if "players_joined" in query else None)
+            try:
+                result = _relaunch_ports.run(self, target, joined)
+            except _relaunch_ports.RelaunchRefused as exc:
+                self._recovery._log("relaunch_ports", ok=False, refused=str(exc)[:200], players=target,
+                                    players_joined=joined)
+                return {"plugin": self.PLUGIN_ID, "ok": False, "refused": str(exc),
+                        **_players_session.ports_set(self._emulator, self._emulator.status())}
+            return {"plugin": self.PLUGIN_ID, **result}
 
         if action == "native-stream-stop":
             self._recovery.session_ended()
@@ -4543,7 +4592,15 @@ class GamesPlugin:
                         raise ValueError("mod_index must be a non-negative integer")
                 # B46: the chooser's last pick for this title sets the session's ports (no key = today's call)
                 launch_extra: dict[str, Any] = {}
-                if "players_chosen" in query:
+                joined_source = False
+                # B54: hold-to-join's count (1 / 2 -> two ports, 3 / 4 -> the multitap); B46's key still accepted
+                if "players_joined" in query:
+                    import players_session as _players_session
+                    joined = _players_session.parse_joined(self._first(query, "players_joined"))
+                    if joined:   # 0 or a malformed value: today's launch
+                        launch_extra["players_chosen"] = _players_session.ports_for_joined(joined)
+                        joined_source = True
+                elif "players_chosen" in query:
                     import players_session as _players_session
                     chosen = _players_session.parse(self._first(query, "players_chosen"))
                     if chosen is not None:   # a malformed value: today's launch
@@ -4555,6 +4612,9 @@ class GamesPlugin:
                     mod_index=mod_index,
                     **launch_extra,
                 )
+                # B54: the session's ports came from the joined count
+                if joined_source and isinstance(getattr(self._emulator, "_players_session", None), dict):
+                    self._emulator._players_session["source"] = "join"
 
                 return payload
 

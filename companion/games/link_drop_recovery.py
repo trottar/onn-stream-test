@@ -534,6 +534,8 @@ class LinkDropRecovery:
                 save_error=error or None,
                 # B49: a PS2 session takes no save (only the PS2 path returns this key)
                 **({"ps2_mode": True, "save_skipped": True} if saved.get("skipped") == "ps2_mode" else {}),
+                # B55: a PS2 session's give-up save went through PINE (only the PS2 path returns this key)
+                **({"ps2_states": saved["ps2_states"]} if saved.get("ps2_states") else {}),
             )
 
     def _end_after_timeout(self) -> None:

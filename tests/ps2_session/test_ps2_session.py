@@ -543,9 +543,11 @@ class Rows(unittest.TestCase):
         out = run_rows("1", "pcsx2")
         self.assertTrue(out["start_ps2_mode"])
         self.assertEqual(len(out["ps2_rows"]), 1)
-        # B51 (disclosed): SAVE / LOAD through PINE; the four automatic behaviours still off
+        # B51 (disclosed): SAVE / LOAD through PINE; B55 (disclosed): the four automatic behaviours too, the rewind off
         self.assertEqual((out["ps2_rows"][0]["savestates"], out["ps2_rows"][0]["off"]),
                          ("pine", list(ps2.OFF_BEHAVIOURS)))
+        self.assertEqual((out["ps2_rows"][0]["ps2_states"], out["ps2_rows"][0]["pine"], out["ps2_rows"][0]["off"]),
+                         ("pine", list(ps2.PINE_BEHAVIOURS), ["rewind"]))
         self.assertNotIn("save_states", out["ps2_rows"][0])
         self.assertTrue(out["hb_ps2_mode"])
 
@@ -572,25 +574,32 @@ class SaveStatesOff(unittest.TestCase):
         rw._pending = {"key": 7, "onset": 1.0, "paused_at": 2.0}
         rw.rewind(recovery, "input_release")
         self.assertEqual(rows[0][0], "rewind_skipped")
-        self.assertEqual((rows[0][1]["reason"], rows[0][1]["ps2_mode"]), ("ps2_mode: no save states", True))
+        # B55 (disclosed): only the rewind method skips now (B9 not in `state` mode); `state` loads through PINE
+        self.assertEqual((rows[0][1]["reason"], rows[0][1]["ps2_mode"]), ("ps2: no rewind in PCSX2", True))
 
-    def test_the_slot9_save_is_not_sent(self):
+    def test_the_slot9_save_never_goes_through_retroarchs_commands(self):
+        # B55 (disclosed): the PS2 slot-9 save goes through PINE (test_b55); never through the NCI
         import rewind_cores
         c = object.__new__(rewind_cores.Cores)
-        c.emulator = types.SimpleNamespace(_launch_kind="pcsx2", _paused=False, _network_cmd_port=55355)
+        c.emulator = types.SimpleNamespace(_launch_kind="pcsx2", _paused=False, _network_cmd_port=55355, _ps2=None)
         c.nci_factory = lambda port: (_ for _ in ()).throw(AssertionError("no command may be sent"))
         c.save(0.0, 0.4)
-        self.assertEqual(c.saves_skipped_ps2, 1)
+        self.assertFalse(hasattr(c, "saves_skipped_ps2"))
 
     def test_the_recovery_save_and_the_slots(self):
         from games import emulator_manager as em
         m = object.__new__(em.EmulatorManager)
         m._launch_kind = "pcsx2"
-        self.assertEqual(m.save_recovery_state(), {"skipped": "ps2_mode", "ps2_mode": True, "state_file": None})
-        # B51 (disclosed): the SAVE / LOAD buttons go through PINE now (test_b51); the recovery paths stay refused
-        for call in (m.load_recovery_state, m.load_recovery_state_running, lambda: m.copy_recovery_state_to_slot(1)):
-            with self.assertRaises(em.EmulatorError):
-                call()
+        # B55 (disclosed): the give-up save, the prompt's Resume and Copy go through PINE (test_b55); the paused
+        # recovery load (unused by the R3c2 flow) stays refused
+        m._pcsx2_save_recovery_state = lambda: "pine-save"
+        m._pcsx2_load_recovery_state_running = lambda: "pine-load"
+        m._pcsx2_copy_recovery_state_to_slot = lambda slot, replace=False: ("pine-copy", slot)
+        self.assertEqual(m.save_recovery_state(), "pine-save")
+        self.assertEqual(m.load_recovery_state_running(), "pine-load")
+        self.assertEqual(m.copy_recovery_state_to_slot(2), ("pine-copy", 2))
+        with self.assertRaises(em.EmulatorError):
+            m.load_recovery_state()
 
     def test_the_give_up_row(self):
         from games import link_drop_recovery as ldr

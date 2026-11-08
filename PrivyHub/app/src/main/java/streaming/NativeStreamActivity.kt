@@ -101,6 +101,9 @@ class NativeStreamActivity :
             6
         private const val STABILIZATION_TIMEOUT_MS =
             15_000L
+        // B54: the relaunch's answer (the host's budget is 15 s; its steps are bounded)
+        private const val RELAUNCH_READ_TIMEOUT_MS =
+            30_000
         private const val STABILIZATION_MIN_FPS =
             45.0
         private const val STABILIZATION_MAX_OUTPUT_GAP_MS =
@@ -858,8 +861,8 @@ class NativeStreamActivity :
                             "?port=$VIDEO_PORT" + (if (restart != null) "&guard_end=1" else "") + padSlotsQuery() +
                             // B41: the prompt asks for the title's players and sends its claims (null = today: nothing)
                             (if (playerPrompt != null) "&player_prompt=1" + promptClaimsQuery() else "") +
-                            // B46: a self-restart carries the session's choice (null = today: nothing)
-                            (if (playerPrompt != null && restart != null) promptChosenQuery(PlayerPromptProcess.lastChoice) else ""),
+                            // B54: a self-restart carries the session's joined count (null = today: nothing)
+                            (if (playerPrompt != null && restart != null) promptJoinedQuery(PlayerPromptProcess.lastJoined) else ""),
                         readTimeoutMs =
                             30_000
                     )
@@ -2451,8 +2454,10 @@ class NativeStreamActivity :
         playerPrompt?.let { p ->
             root.put("players", p.players)
             root.put("pad_claims", p.claimsJson())
-            // B46: the pick and the session's ports
-            root.put("players_chosen", p.chosen ?: JSONObject.NULL)
+            // B54: hold-to-join's count, the relaunches and the session's ports
+            root.put("join", "hold")
+            root.put("players_joined", p.joined)
+            root.put("relaunches", p.relaunchesJson())
             root.put("ports_set", p.ports.toJson())
         }
 
@@ -2625,17 +2630,80 @@ class NativeStreamActivity :
     private var promptBadgeView: TextView? = null
     private fun promptClaimsQuery(): String =
         playerPrompt?.let { "&pad_claims=" + URLEncoder.encode(it.claimsString(), "UTF-8") } ?: ""
-    // B46: the chooser's pick for the host (absent until picked)
-    private fun promptChosenQuery(n: Int? = playerPrompt?.chosen): String = n?.let { "&players_chosen=$it" } ?: ""
+    // B54: hold-to-join's count for the host (every start and heartbeat)
+    private fun promptJoinedQuery(n: Int? = playerPrompt?.joined): String = n?.let { "&players_joined=$it" } ?: ""
     private val promptTick = object : Runnable {
         override fun run() {
             playerPrompt?.let { p ->
                 val now = System.nanoTime() / 1_000_000L
-                p.tick(now)
-                val v = p.view(now, AndroidPadDevice.connected())
+                val connected = AndroidPadDevice.connected()
+                p.tick(now, connected)
+                // B54: a hold that needs more ports: the multitap relaunch, at once
+                p.takeRelaunchRequest()?.let { n -> startRelaunch(n) }
+                val v = p.view(now, connected)
                 promptView?.let { t -> t.text = v.prompt ?: ""; t.visibility = if (v.prompt != null) View.VISIBLE else View.GONE }
                 promptBadgeView?.let { t -> t.text = v.badge ?: ""; t.visibility = if (v.badge != null) View.VISIBLE else View.GONE }
-                uiHandler.postDelayed(this, 200)
+                // B54: every 50 ms while a pad is holding (the join lands 500-550 ms after the press), else 200 ms
+                uiHandler.postDelayed(this, if (p.holdPending()) PlayerPrompt.TICK_HOLD_MS else PlayerPrompt.TICK_MS)
+            }
+        }
+    }
+
+    // B54: the multitap relaunch (only from the prompt's request; null prompt = never). The gate is re-entered as the
+    // link recovery's (nothing torn down, the last frame kept), with no desync post and no release until the host's
+    // answer; then the new encoder's frames pass the gate and the ready resumes the relaunched core.
+    @Volatile
+    private var relaunchActive = false
+    private var relaunchPlayers = PlayerPrompt.MAX_PLAYERS
+
+    private fun startRelaunch(players: Int) {
+        val p = playerPrompt ?: return
+        val host = intent.getStringExtra(EXTRA_COMPANION_HOST)?.trim().orEmpty()
+        if (host.isBlank()) {
+            p.onRelaunchResult(false, null, null, null, System.nanoTime() / 1_000_000L, AndroidPadDevice.connected())
+            return
+        }
+        relaunchActive = true
+        relaunchPlayers = players
+        recoveryActive = true
+        desyncPostedForEpisode = true
+        gameplayReleased = false
+        stabilizationFailed = false
+        releaseRequestInFlight = false
+        stabilizationBaselineSet = false
+        stabilizationCleanTicks = 0
+        stabilizationStartedAtNs = System.nanoTime()
+        stabilizationPhase = "Setting up $players players"
+        streamState = "Reconnecting"
+        publishStreamStatus()
+        updateStabilizationOverlay()
+        thread(start = true, isDaemon = true, name = "PrivyHub-Relaunch-Ports") {
+            var ok = false
+            var ports: PortsSet? = null
+            var state: String? = null
+            var totalMs: Long? = null
+            try {
+                val json = JSONObject(httpPost("http://$host:$CONTROL_PORT" +
+                    "/plugins/games/native-stream-relaunch-ports?players=$players" + promptJoinedQuery(),
+                    readTimeoutMs = RELAUNCH_READ_TIMEOUT_MS))
+                ok = json.optBoolean("ok", false)
+                ports = json.optJSONObject("ports_set")?.let { PortsSet.parse(it) }
+                json.optJSONObject("relaunch")?.let { r ->
+                    state = r.optString("state", "").ifEmpty { null }
+                    totalMs = r.optLong("total_ms", -1L).takeIf { it >= 0L }
+                }
+            } catch (_: Exception) {
+                ok = false
+            }
+            runOnUiThread {
+                p.onRelaunchResult(ok, ports, state, totalMs, System.nanoTime() / 1_000_000L, AndroidPadDevice.connected())
+                relaunchActive = false
+                stabilizationStartedAtNs = System.nanoTime()
+                stabilizationBaselineSet = false
+                stabilizationCleanTicks = 0
+                stabilizationPhase = "Reconnecting"
+                publishStreamStatus()
+                updateStabilizationOverlay()
             }
         }
     }
@@ -2859,8 +2927,8 @@ class NativeStreamActivity :
                 (surfaceHold?.query() ?: "") +
                 // B34: the slot map (null = today: nothing)
                 padSlotsQuery() +
-                // B41: the prompt's claims (null = today: nothing)
-                promptClaimsQuery() + promptChosenQuery() +
+                // B41: the prompt's claims (null = today: nothing); B54: the joined count
+                promptClaimsQuery() + promptJoinedQuery() +
                 // D-BASE-T1: the onn's own thermal state travels with the
                 // heartbeat, so a session that never posts a report still
                 // leaves a temperature trace on the host.
@@ -3212,6 +3280,10 @@ class NativeStreamActivity :
                         stabilizationFailed ->
                             "Game stream isn't ready"
 
+                        // B54: the multitap relaunch (false = today)
+                        relaunchActive ->
+                            "Setting up $relaunchPlayers players…"
+
                         recoveryActive ->
                             "Reconnecting…"
 
@@ -3220,7 +3292,9 @@ class NativeStreamActivity :
                     }
                 )
                 append(
-                    if (recoveryActive) {
+                    if (relaunchActive) {
+                        "\nThe game restarts with $relaunchPlayers controller ports and comes back where it was"
+                    } else if (recoveryActive) {
                         "\nThe game is paused until the stream returns"
                     } else {
                         "\nPreparing smooth playback"
@@ -3577,6 +3651,15 @@ class NativeStreamActivity :
             gameplayReleased ||
             stabilizationFailed
         ) {
+            publishStreamStatus()
+            updateStabilizationOverlay()
+            return
+        }
+
+        // B54: no release until the host answers the relaunch (false = today)
+        if (relaunchActive) {
+            stabilizationCleanTicks = 0
+            stabilizationBaselineSet = false
             publishStreamStatus()
             updateStabilizationOverlay()
             return
@@ -4466,9 +4549,9 @@ class NativeStreamActivity :
             return true
         }
 
-        // B46: the chooser's left / right / pick from any pad or the remote (null = today)
+        // B54: hold-to-join: an unclaimed pad's keys are its hold, never play (null = today)
         playerPrompt?.let { p ->
-            if (p.onChooserKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.repeatCount,
+            if (p.onJoinKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.repeatCount,
                     event.device?.let { AndroidPadDevice(it) }, System.nanoTime() / 1_000_000L)) {
                 return true
             }
@@ -4497,14 +4580,6 @@ class NativeStreamActivity :
     override fun dispatchGenericMotionEvent(
         event: MotionEvent
     ): Boolean {
-        // B46: a pad's hat moves the chooser (null = today)
-        playerPrompt?.let { p ->
-            val d = event.device
-            if (d != null && event.action == MotionEvent.ACTION_MOVE &&
-                p.onChooserHat(AndroidPadDevice(d), event.getAxisValue(MotionEvent.AXIS_HAT_X))) {
-                return true
-            }
-        }
         if (
             !gameplayReleased
         ) {

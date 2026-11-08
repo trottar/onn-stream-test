@@ -71,8 +71,16 @@ GRAB_W, GRAB_H = 64, 36
 PINE_RUNNING, PINE_PAUSED = 0, 1
 
 # The save-state behaviours a PS2 session turns off (B49 S3), in the rows' words
-OFF_BEHAVIOURS = ("hold_rewind", "state_save_slot9", "stall_resume_load", "recovery_save")
+# B55: the four automatic save-state behaviours go through PINE now (the slot-9 save, the hold's return and the stall
+# resume's load of it, the link give-up save); only the rewind stays off (PCSX2 has none). B49's list was
+# ("hold_rewind", "state_save_slot9", "stall_resume_load", "recovery_save").
+PINE_BEHAVIOURS = ("state_save_slot9", "hold_return_load", "stall_resume_load", "recovery_save")
+OFF_BEHAVIOURS = ("rewind",)
 SKIP_REASON = "ps2_mode: no save states"
+SCRATCH_SLOT = 9          # B55: the hold / stall scratch (as RetroArch's slot 9); PrivyHub's user slots are 1-3
+RECOVERY_SLOT = 8         # B55: the link give-up save (the recovery prompt's file)
+RELEASE_SHARE_S = 0.45    # B55: the load's share of B16's R1 (<= 1.0 s from the return; the fast ready <= 0.55 s)
+VERIFY_RUNNING_S = 2.0    # B55: the verifier's wait for the recovery's resume before B52's picture check
 
 # SDL's mapping of the companion's uinput pad (0x1209 / 0x5048, version 1, USB): buttons in key-code order b0-b9
 # (SOUTH EAST NORTH WEST TL TR SELECT START THUMBL THUMBR), axes X Y Z RX RY RZ = a0-a5, the hat h0

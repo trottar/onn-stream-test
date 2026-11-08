@@ -18,6 +18,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "companion"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _tmp_cleanup  # noqa: E402,F401  (B54: this suite's temp dirs removed at exit)
 
 from games import emulator_manager as em  # noqa: E402
 from games import link_drop_recovery as ldr  # noqa: E402
