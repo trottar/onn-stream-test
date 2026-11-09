@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-09 — HOME-8: queue W checked — the N64 Home-hold freeze CLOSED (B61; reproduced on the title unattended, gone on the TV), the N64 title's buttons CLOSED (B62), PS1 player 2 under the multitap CLOSED (B63: incapable titles stay at 2 ports; capable keep 4), stale pad rows marked (B64); open: C28's hitch bar (6.6 vs ≤ 2, a Home-return and a link-loss second), a first N64 start whose stream never got ready — OPEN (to B, queue X) — `## 2026-11-09 HOME-8` below; `docs/memory/evidence/HOME_8_N64_FIXES_2026-11-08.md`
 - 2026-11-08 — HOME-7+N64: `9aa00ba2…` CONFIRMED (hold-to-join C15-C17 met); PS2 hold through PINE (C18) and the PS2 multitap relaunch (C20) met; **G-A15 ADOPTED, `PRIVYHUB_N64=1` the seventeenth line**; open: the N64 Home hold freezes (C23), an N64 title's buttons, PS1 player 2 under the multitap (C17), the multi-disc `.m3u`; the import bench flag CLOSED (removed) — OPEN (to B61) — `## 2026-11-08 HOME-7+N64` below; `docs/memory/evidence/HOME_7_HOLD_TO_JOIN_N64_2026-11-08.md`
 - 2026-11-08 — IMPORT-1: the first real import, from the external drive (a symlinked `PrivyHub-Import/` root): 72 PS1 titles, all DUPLICATE, 0 placed, 1 stray file rejected; no PS1 BIOS on the drive; the drive untouched; the bench drop-in `b56-import.conf` on at the user's decision until HOME-7's C19 — OPEN (HOME-7 C19; slice 1b) — `## 2026-11-08 IMPORT-1` below; `docs/memory/evidence/IMPORT_1_2026-11-08.md`
 - 2026-11-08 — HOME-6: PS2 LOAD fixed on the onn (C12'' / C14 MET, `picture ok 0.9s`, 0 TLB Miss); **G-A14 ADOPTED, `PRIVYHUB_PS2=1` the sixteenth line** (`ps2.conf`; the bench flag and HOME-5's load note CLOSED); open: the hold / stall through PINE states (the user's question), the drive read-ahead, a heavy title's long play, the 1-player chooser's extra press — OPEN (the user's questions) — `## 2026-11-08 HOME-6` below; `docs/memory/evidence/HOME_6_PS2_LOAD_2026-11-08.md`
@@ -187,6 +188,22 @@ no APK)
     3,905 leftover dirs, so they remain.
   - **The fix is in:** B53's `_tmp_cleanup` makes every run remove its own temp dirs.
   - **The user (or a reboot, which empties the tmpfs) frees the rest.** `/tmp` read 40 MB free at the queue's end.
+
+## 2026-11-09 HOME-8: queue W's fixes checked — HOME-7's N64 / multitap items closed — OPEN (queue X)
+
+(`docs/memory/evidence/HOME_8_N64_FIXES_2026-11-08.md`)
+
+- **CLOSED (HOME-7's items 1-4):**
+  1. the N64 Home hold freeze — B61: no save into a running N64 core (T6 reproduced the hang unattended: a running save,
+     ack null, the command port silent, the main thread spinning); the hold now pauses and resumes plainly (C25);
+  2. the N64 title's dead buttons — B62's `face_c` remap: △ / ○ jump (C24);
+  3. PS1 player 2 under the multitap — B63: the incapable title capped at 2 ports, its `.opt` migrated, player 2 works
+     (C26); a capable title keeps 4 (C27);
+  4. stale pre-session pad rows — B64: the seq-1 row carries `stale: true` (every start read).
+- **Open (to B, queue X):** C28's hitch bar not met by the number (6.6 vs ≤ 2.0 in a 3-min session: the Home-return
+  second and one link-loss second); the first T6 start whose stream never got ready (frames flowed, no ready, after a
+  Continue load at the launch); the client items (the N64 layout shown once, "This game supports 2 players", the stored
+  count capped on the onn, the pad-slot order); the multi-disc `.m3u` on the user's word.
 
 ## 2026-11-08 HOME-7+N64: hold-to-join confirmed; PS2 recovery and relaunch met; G-A15 adopted; N64 issues open — OPEN (to B61)
 

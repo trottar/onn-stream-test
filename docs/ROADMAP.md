@@ -842,6 +842,11 @@ Final classification:
 >   not. Any other PS1 title stays at 2 ports, and a third pad's hold shows the onn's note with no relaunch.
 > - The onn's stored count is capped by the host at every launch. A default-on host change;
 >   `PRIVYHUB_PS1_MULTITAP_CAPABILITY=0` = the earlier behaviour.
+>
+> **Checked at HOME-8 (2026-11-09, `docs/memory/evidence/HOME_8_N64_FIXES_2026-11-08.md`):** the incapable two-player
+> title (HOME-7's T1) stayed at 2 ports with a stored count of 3 (`PS1 ports capped: 4 -> 2`), its `.opt` multitap
+> migrated to disabled, the third hold showed the note, player 2 worked (C26); a capable four-player title kept four
+> ports and three players joined at once (C27). The rule holds as written.
 
 Proceed to D5 media/server restoration.
 
@@ -2493,6 +2498,12 @@ Question:
 > good to play") and C22 (SAVE / LOAD, a ~16-MB state) met; **C23 not met**: the Home hold froze the game (RetroArch's
 > network commands timed out) and one title's buttons were dead; the internal rate 60 fps, 16.5 internal hitch s / 10
 > min. **G-A15 ADOPTED** on the user's word (`PRIVYHUB_N64=1`, the seventeenth line) with the issues open → B61.
+
+> **HOME-8 (2026-11-09, A; `docs/memory/evidence/HOME_8_N64_FIXES_2026-11-08.md`) — queue W's N64 fixes checked:** the
+> freeze reproduced unattended on the title (a save into a running core hangs RetroArch; no stream, no capture) and gone
+> on the TV with B61 (the hold pauses and resumes plainly, C25); the title's jump works with B62's `face_c` remap (C24).
+> 3 min of N64 with no capture: 6.6 hitch s / 10 min (a Home-return second and one link-loss second) vs PS1 0.0 — the
+> bar not met by the number; no freeze (C28). Open: the first start whose stream never got ready (after a Continue load).
 >
 > **B61-B62 (2026-11-08, B; inside the adopted `PRIVYHUB_N64=1`) — the HOME-7 N64 fixes:**
 > - **B61** (`evidence/B61_N64_HOLD_FREEZE_2026-11-08.md`):

@@ -1,0 +1,6 @@
+The first T6 start at Stage 2's opening (2026-11-08 23:40:59Z): the user's line (verbatim) "Game didn't start, says stream isn't ready"
+- POST launch (players_joined=3, the stored count) 23:40:59 -> 200; the game log: "N64 launch: core=mupen64plus_next ports=4", "N64 core options: 12 keys", "N64 remap: face_c (players 1-4, 8 binds) verified"; RetroArch "[Remap] Core-specific remap found"
+- POST load-state slot 1 at 23:41:03, before the stream (the onn's Continue): RetroArch "[State] Loading state ..., 16793440 bytes" (the title's state from HOME-7) then PrivyHub's staging save
+- native-stream-start 23:41:04; the encoder ran 36 s at 60 fps (2162 frames; native_video_alpha.log) and the client decoded (client_frame 1816 at its bye), but NO native-stream-ready was posted: the session stayed ENDED (pad joins P1-P3 written with state ENDED); the client gave up (bye 23:41:38, decoder-session-log, native-stream-stop 23:41:40)
+- the second start 23:41:43 (the same RetroArch, still running): native-stream-ready 23:41:51, session_started 23:41:51.568 PLAYING; joins P1-P3 again (a stale-carry change row at 23:41:43.245 with labels and no claimed_by)
+- for B: a start whose ready never came while frames flowed — after a Continue load at the launch with the stored count 3 (no such failure at HOME-7's N64 starts)
