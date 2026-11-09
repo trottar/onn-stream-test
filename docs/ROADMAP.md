@@ -2809,6 +2809,8 @@ The actual boundaries come from runtime evidence.
 > The drive read-ahead stays unbuilt, because no stutter in play has been put down to the drive (PS2-R1). It is a
 > caveat on a claim, not a hidden title: every title stays listed.
 
+**H6 parity matrix (B75, 2026-11-09, design; waits for the user's ranking):** `docs/memory/architecture/H6_PARITY_MATRIX_2026-11-09.md`.
+
 ## H5 — Extended-emulation checkpoint
 
 Acceptance:
