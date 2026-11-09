@@ -13,6 +13,8 @@ import android.graphics.drawable.BitmapDrawable
 import com.safeiot.privyhub.streaming.NativeStreamActivity
 import com.safeiot.privyhub.streaming.GameStreamStatusUi
 import com.safeiot.privyhub.streaming.DiscChange
+import com.safeiot.privyhub.streaming.DiscSafe
+import com.safeiot.privyhub.streaming.PausedBar
 import com.safeiot.privyhub.diagnostics.DiagnosticsActivity
 
 import android.os.Bundle
@@ -98,6 +100,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var gameDiscButton: Button
     private var gameSessionDiscs: DiscChange.State? = null
     private val discChangeOn: Boolean by lazy { DiscChange.fromSystem() }
+    // B73: the four-button bar fits the TV (debug.privyhub.paused_bar_fit=0 = B71's bar); a one-disc bar is never touched
+    private val pausedBarFitOn: Boolean by lazy { PausedBar.fromSystem() }
+    // B74: the disc change made safe (debug.privyhub.disc_safe=0 = B71's flow)
+    private val discSafeOn: Boolean by lazy { DiscSafe.fromSystem() }
+    private var pausedBarSaved: IntArray? = null
+    private var pausedBarSavedDiscText: CharSequence? = null
+    private var pausedBarApplied = false
     private lateinit var gameSessionPreview: ImageView
     private lateinit var gameSessionPreviewLabel: TextView
     private var gameSessionPreviewBitmap: Bitmap? = null
@@ -735,7 +744,8 @@ class MainActivity : AppCompatActivity() {
 
         gameDiscButton.setOnClickListener {
 
-            showDiscChooser()
+            // B74: the warning the first time on this onn, then the chooser (property off: B71's chooser at once)
+            showDiscWarningThenChooser()
         }
 
 
@@ -7269,7 +7279,9 @@ class MainActivity : AppCompatActivity() {
 
                                         showGameLaunchModeDialog(
                                             node.id,
-                                            title
+                                            title,
+                                            // B74: a set's disc count ("Start on disc…"); 0 for every other game
+                                            json.optInt("discs", 0)
                                         )
                                     }
                                 }
@@ -9252,15 +9264,44 @@ class MainActivity : AppCompatActivity() {
     // PRIVYHUB_A7_PATCH_11_A7_4_SOFTPATCH_MODS_ADB_FIX
     private fun showGameExtrasMenu(
         gameId: String,
-        title: String
+        title: String,
+        discs: Int = 0
     ) {
+        // B74: a set (discs > 1) also offers "Start on disc…"; every other game: today's two items
+        val items =
+            if (DiscSafe.showStartOnDisc(discSafeOn, discs)) {
+                arrayOf("Cheats", "Mods", DiscSafe.START_LABEL)
+            } else {
+                arrayOf("Cheats", "Mods")
+            }
         AlertDialog.Builder(this)
             .setTitle("Extras — $title")
-            .setItems(arrayOf("Cheats", "Mods")) { _, which ->
+            .setItems(items) { _, which ->
                 when (which) {
                     0 -> showGameCheatSelector(gameId, title)
                     1 -> showGameModSelector(gameId, title)
+                    2 -> showStartDiscChooser(gameId, title, discs)
                 }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    // B74: the set starts on the chosen disc (the host sets RetroArch's record; without a choice it starts on disc 1)
+    private fun showStartDiscChooser(
+        gameId: String,
+        title: String,
+        discs: Int
+    ) {
+        AlertDialog.Builder(this)
+            .setTitle("${DiscSafe.START_TITLE} — $title")
+            .setItems(DiscSafe.startChoices(discs).toTypedArray()) { _, which ->
+                launchGameOnCompanion(
+                    gameId = gameId,
+                    title = title,
+                    loadSaveAfterLaunch = false,
+                    startDisc = DiscChange.discForChoice(which)
+                )
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -12226,7 +12267,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun showGameLaunchModeDialog(
         gameId: String,
-        title: String
+        title: String,
+        discs: Int = 0
     ) {
 
         AlertDialog.Builder(this)
@@ -12262,7 +12304,8 @@ class MainActivity : AppCompatActivity() {
             ) { _, _ ->
                 showGameExtrasMenu(
                     gameId,
-                    title
+                    title,
+                    discs
                 )
             }
             .show()
@@ -12276,7 +12319,8 @@ class MainActivity : AppCompatActivity() {
         cheatSourceIndex: Int? = null,
         cheatEnabledIndexes: List<Int> = emptyList(),
         cheatProfileLabel: String = "Normal",
-        modIndex: Int? = null
+        modIndex: Int? = null,
+        startDisc: Int? = null
     ) {
 
         val host =
@@ -12323,7 +12367,9 @@ class MainActivity : AppCompatActivity() {
                         "http://$host:$CONTROL_PORT" +
                             "/plugins/games/launch?id=$gameId$cheatQuerySuffix$modQuerySuffix" +
                             // B46 / B54: the title's last joined count sets the session's ports (none, or the prompt off: today)
-                            playersChosenLaunchSuffix(gameId)
+                            playersChosenLaunchSuffix(gameId) +
+                            // B74: "Start on disc…"'s pick (none: today's URL; the host starts a set on disc 1)
+                            DiscSafe.launchSuffix(startDisc)
                     )
 
                 val json =
@@ -13745,6 +13791,52 @@ private fun requestGameStateAction(
     }
 
 
+    // B74: "Change discs only when the game asks…" with "I understand" (remembered), then B71's chooser
+    private fun showDiscWarningThenChooser() {
+
+        if (gameSessionDiscs == null || !gameSessionPaused) {
+            return
+        }
+
+        val prefs =
+            getSharedPreferences(
+                PREFS_NAME,
+                MODE_PRIVATE
+            )
+
+        if (!DiscSafe.needsWarning(discSafeOn, prefs.getBoolean(DiscSafe.PREF_UNDERSTOOD, false))) {
+            showDiscChooser()
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(
+                DiscSafe.TITLE
+            )
+            .setMessage(
+                DiscSafe.WARNING
+            )
+            .setPositiveButton(
+                DiscSafe.UNDERSTAND
+            ) { _, _ ->
+
+                prefs.edit()
+                    .putBoolean(
+                        DiscSafe.PREF_UNDERSTOOD,
+                        true
+                    )
+                    .apply()
+
+                showDiscChooser()
+            }
+            .setNegativeButton(
+                "Cancel",
+                null
+            )
+            .show()
+    }
+
+
     private fun showDiscChooser() {
 
         val state =
@@ -13821,9 +13913,12 @@ private fun requestGameStateAction(
                     gameDiscButton.isEnabled =
                         gameSessionPaused
 
+                    // B74: "Disc j of n — if the game freezes, use LOAD or END" (property off: B71's line)
                     statusText.text =
                         (state ?: gameSessionDiscs)
-                            ?.let { DiscChange.statusLine(it) }
+                            ?.let {
+                                if (discSafeOn) DiscSafe.afterChangeLine(it) else DiscChange.statusLine(it)
+                            }
                             ?: "Disc $disc"
 
                     nowPlayingProgress.text =
@@ -14975,6 +15070,8 @@ private fun requestGameStateAction(
 
         gameDiscButton.visibility =
             View.GONE
+
+        restorePausedBar()   // B73
     }
 
 
@@ -15180,6 +15277,98 @@ private fun requestGameStateAction(
 
         gameDiscButton.isEnabled =
             gameSessionPaused
+
+        // B73: the four buttons sized to the screen (three buttons: today's bar, untouched)
+        applyPausedBarPlan(
+            gameDiscButton.visibility == View.VISIBLE
+        )
+    }
+
+
+    // B73: the first four-button plan captures the views' own values; anything else puts them back (only if changed)
+    private fun applyPausedBarPlan(
+        fourButtons: Boolean
+    ) {
+
+        val buttons =
+            listOf(gameSaveButton, gameLoadButton, gameDiscButton, gameEndButton)
+
+        val plan =
+            PausedBar.plan(
+                pausedBarFitOn,
+                fourButtons,
+                (resources.displayMetrics.widthPixels / resources.displayMetrics.density).toInt()
+            )
+
+        if (plan.fourButtons && plan != PausedBar.TODAY.copy(fourButtons = true)) {
+
+            if (pausedBarSaved == null) {
+                pausedBarSaved =
+                    IntArray(buttons.size * 2 + 2).also { saved ->
+                        buttons.forEachIndexed { i, b ->
+                            val lp = b.layoutParams as android.widget.LinearLayout.LayoutParams
+                            saved[i * 2] = lp.width
+                            saved[i * 2 + 1] = lp.marginStart
+                        }
+                        saved[buttons.size * 2] = nowPlayingProgress.layoutParams.width
+                        saved[buttons.size * 2 + 1] = nowPlayingBar.paddingEnd
+                    }
+                pausedBarSavedDiscText =
+                    gameDiscButton.text
+            }
+
+            buttons.forEach { b ->
+                val lp = b.layoutParams as android.widget.LinearLayout.LayoutParams
+                lp.width = dp(if (b === gameDiscButton) plan.discDp else plan.buttonDp)
+                lp.marginStart = dp(plan.marginDp)
+                b.layoutParams = lp
+            }
+            gameDiscButton.text = plan.discLabel
+            nowPlayingProgress.layoutParams =
+                nowPlayingProgress.layoutParams.apply { width = dp(plan.statusDp) }
+            nowPlayingBar.setPaddingRelative(
+                nowPlayingBar.paddingStart,
+                nowPlayingBar.paddingTop,
+                dp(plan.padEndDp),
+                nowPlayingBar.paddingBottom
+            )
+            pausedBarApplied = true
+            return
+        }
+
+        restorePausedBar()
+    }
+
+
+    private fun restorePausedBar() {
+
+        if (!pausedBarApplied) {
+            return
+        }
+
+        val saved =
+            pausedBarSaved
+                ?: return
+
+        val buttons =
+            listOf(gameSaveButton, gameLoadButton, gameDiscButton, gameEndButton)
+
+        buttons.forEachIndexed { i, b ->
+            val lp = b.layoutParams as android.widget.LinearLayout.LayoutParams
+            lp.width = saved[i * 2]
+            lp.marginStart = saved[i * 2 + 1]
+            b.layoutParams = lp
+        }
+        gameDiscButton.text = pausedBarSavedDiscText
+        nowPlayingProgress.layoutParams =
+            nowPlayingProgress.layoutParams.apply { width = saved[buttons.size * 2] }
+        nowPlayingBar.setPaddingRelative(
+            nowPlayingBar.paddingStart,
+            nowPlayingBar.paddingTop,
+            saved[buttons.size * 2 + 1],
+            nowPlayingBar.paddingBottom
+        )
+        pausedBarApplied = false
     }
 
 
@@ -15210,6 +15399,8 @@ private fun requestGameStateAction(
 
         gameDiscButton.visibility =
             View.GONE
+
+        restorePausedBar()   // B73
     }
 
 

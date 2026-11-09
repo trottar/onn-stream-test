@@ -2508,6 +2508,22 @@ rather than create a second game-library path.
 >   title screen → black (1→2 / 1→4 during the intro carried on). END ~95 % off the screen with CHANGE DISC.
 > - `64d02f31…` NOT CONFIRMED; `5f72af4b…` reinstalled. To B: the bar's width; the black screen after an unprompted
 >   change (the game's reaction vs the swap's sequence).
+>
+> **B73 / B74 BUILT (2026-11-09, B; `docs/memory/evidence/B73_PAUSED_BAR_2026-11-09.md`, `…/B74_DISC_CHANGE_SAFE_2026-11-09.md`):**
+> - **B73:** the paused bar on a set reads SAVE · LOAD · **DISC** · END and ends at 880 of the onn's 960 dp. B71's bar
+>   needed 1018 dp; END is visible to about 899 on the TV. One-disc bars are untouched.
+> - **B74, settled:** the HOME-10 black screens were the game's reaction to a lid cycle outside its own prompt, as on a
+>   console. Beetle applies the open, the index and the close in its state at the call and latches the lid bit until
+>   the game reads it. The same five-change sequence carried on twice and went black three times by the game's state.
+>   **The host sequence is unchanged.**
+> - **B74, built:**
+>   - a set's library launch starts on **disc 1** (RetroArch's disk index record is set first), or on the disc picked
+>     under Extras → "Start on disc…";
+>   - CHANGE DISC warns once ("Change discs only when the game asks for the next one …" → "I understand");
+>   - after a change: "Disc j of n — if the game freezes, use LOAD or END";
+>   - `launched_disc` on the rows.
+> - Applied to the tree, uncommitted. The client part is in the APK `85220f99…` (pinned, not installed). **Next:
+>   HOME-11 C40-C43.** A real disc prompt stays untested.
 
 ## H1 — N64
 
@@ -2780,6 +2796,18 @@ The actual boundaries come from runtime evidence.
 >
 > **The user's answer (HOME-10, 2026-11-09): "Keep all games"** — reading (a): every title on the drive is offered,
 > "selected" dropped; ENHANCED = PS2 + GameCube.
+>
+> **Recorded as the H4 decision (2026-11-09, B, queue AA; the user's "Keep all games"):**
+>
+> ```text
+> CORE      NES / SNES / Genesis / PS1
+> EXTENDED  + N64
+> ENHANCED  + PS2 + GameCube — every title on the drive offered ("selected" dropped)
+> ```
+>
+> **The open caveat, written beside PS2:** a heavy PS2 title's long play is unread (H3's T2 was read at its menu only).
+> The drive read-ahead stays unbuilt, because no stutter in play has been put down to the drive (PS2-R1). It is a
+> caveat on a claim, not a hidden title: every title stays listed.
 
 ## H5 — Extended-emulation checkpoint
 

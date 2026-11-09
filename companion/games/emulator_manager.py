@@ -5575,6 +5575,7 @@ class EmulatorManager:
         cheat_enabled_indexes: list[int] | tuple[int, ...] | None = None,
         mod_index: int | None = None,
         players_chosen: int | None = None,
+        start_disc: Any = None,
     ) -> dict[str, Any]:
         with self.lock:
             self._refresh_process()
@@ -5734,6 +5735,10 @@ class EmulatorManager:
                 )
             )
 
+            # B74: a multi-disc set starts on the asked disc (1 unless chosen): RetroArch's disk index record is set
+            # before it starts. start_disc None (B54's relaunch, or PRIVYHUB_DISC_SWAP=0) -> nothing written.
+            disc_start = self._disc_start_prepare(game, content_path, core_path, session_config, start_disc)
+
             logs_dir = self._project_path("logs/games")
             logs_dir.mkdir(parents=True, exist_ok=True)
 
@@ -5889,6 +5894,8 @@ class EmulatorManager:
                 for line in _n64.log_lines(core_path.name, int(players_plan["ports"]), n64_options):
                     log_handle.write(line + "\n")
                 log_handle.write(_n64.remap_line(n64_remap, n64_layout_ignored) + "\n")   # B62
+            if disc_start is not None:   # B74
+                log_handle.write(f"PS1 start disc: {disc_start[0]} of {disc_start[1]} (record {disc_start[2]})\n")
             log_handle.write("Command uses project-local paths only.\n\n")
             log_handle.flush()
 
@@ -5913,6 +5920,11 @@ class EmulatorManager:
             # B71: a PS1 .m3u with more than one disc (None for every other launch, or PRIVYHUB_DISC_SWAP=0)
             self._disc_session = _disc_swap.session_for(content_path, str(game.get("system", "")))
             self._disc_tail = _disc_swap.LogTail(log_path) if self._disc_session is not None else None
+            if self._disc_session is not None:   # B74: the disc the launch put in the tray (its own line)
+                self._disc_session["launched_disc"] = None
+                self._disc_session["_launch_line_open"] = True
+                if disc_start is not None:
+                    self._disc_session.update(disc=disc_start[0], start_disc=disc_start[0])
             # B46: the session's ports from the pick (None = today)
             self._players_session = players_plan
             # B61: an N64 session (no state save is ever sent into its running core); None for every other launch
@@ -8976,9 +8988,26 @@ class EmulatorManager:
         sess, tail = self._disc_session, self._disc_tail
         if sess is None or tail is None:
             return
-        k = _disc_swap.last_index(tail.read(), int(sess["discs"]))
+        text = tail.read()
+        if sess.get("_launch_line_open") and sess.get("launched_disc") is None:   # B74: the first line is the launch's
+            sess["launched_disc"] = _disc_swap.first_index(text, int(sess["discs"]))
+        k = _disc_swap.last_index(text, int(sess["discs"]))
         if k is not None:
             sess["disc"] = k
+
+    def _disc_start_prepare(self, game: dict[str, Any], content_path: Any, core_path: Any, session_config: Any,
+                            start_disc: Any) -> tuple[int, int, str] | None:
+        """B74: (disc, discs, record result) for a multi-disc set's library launch, after its record is set; else None."""
+        if start_disc is None:
+            return None
+        sess = _disc_swap.session_for(content_path, str(game.get("system", "")))
+        if sess is None:
+            return None
+        n = int(sess["discs"])
+        j = _disc_swap.parse_start_disc(start_disc, n)
+        result = _disc_swap.ldci_set(_disc_swap.savefile_dir_from_config(session_config),
+                                     Path(str(core_path)).name, content_path, j)
+        return j, n, result
 
     def _disc_game_log(self, line: str) -> None:
         try:
@@ -9007,6 +9036,7 @@ class EmulatorManager:
             if not self._paused:
                 raise EmulatorError("Pause the game to change disc")
             self._disc_refresh()
+            sess["_launch_line_open"] = False   # B74: after this, a line is a swap's, never the launch's
             start = sess.get("disc")
             t0 = time.monotonic()
             if start == target:
@@ -9024,7 +9054,7 @@ class EmulatorManager:
                     self._disc_game_log(f"PS1 disc swap failed: {start if start is not None else '?'} -> {target} ({exc})")
                     self._disc_event = {"event": "disc_swap", "ok": False, "from_disc": start, "disc": exc.disc,
                                         "target": target, "discs": n, "steps": len(swapper.sent), "ms": ms,
-                                        "reason": str(exc)}
+                                        "reason": str(exc), "launched_disc": sess.get("launched_disc")}
                     raise EmulatorError("PrivyHub could not change the disc") from exc
                 changed = True
                 sess["disc"] = result["disc"]
@@ -9036,7 +9066,8 @@ class EmulatorManager:
             if changed:
                 self._disc_game_log(f"PS1 disc swap: {start if start is not None else '?'} -> {target}")
             self._disc_event = {"event": "disc_swap", "ok": True, "from_disc": start, "disc": target, "discs": n,
-                                "changed": changed, "steps": int(result["steps"]), "ms": ms}
+                                "changed": changed, "steps": int(result["steps"]), "ms": ms,
+                                "launched_disc": sess.get("launched_disc")}   # B74
             payload = self.status()
             payload["action"] = "disc_swap"
             payload["accepted"] = True

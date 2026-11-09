@@ -1,0 +1,354 @@
+diff --git a/PrivyHub/app/src/main/java/MainActivity.kt b/PrivyHub/app/src/main/java/MainActivity.kt
+--- a/PrivyHub/app/src/main/java/MainActivity.kt
++++ b/PrivyHub/app/src/main/java/MainActivity.kt
+@@ -13,6 +13,7 @@
+ import com.safeiot.privyhub.streaming.NativeStreamActivity
+ import com.safeiot.privyhub.streaming.GameStreamStatusUi
+ import com.safeiot.privyhub.streaming.DiscChange
++import com.safeiot.privyhub.streaming.PausedBar
+ import com.safeiot.privyhub.diagnostics.DiagnosticsActivity
+ 
+ import android.os.Bundle
+@@ -98,6 +99,11 @@
+     private lateinit var gameDiscButton: Button
+     private var gameSessionDiscs: DiscChange.State? = null
+     private val discChangeOn: Boolean by lazy { DiscChange.fromSystem() }
++    // B73: the four-button bar fits the TV (debug.privyhub.paused_bar_fit=0 = B71's bar); a one-disc bar is never touched
++    private val pausedBarFitOn: Boolean by lazy { PausedBar.fromSystem() }
++    private var pausedBarSaved: IntArray? = null
++    private var pausedBarSavedDiscText: CharSequence? = null
++    private var pausedBarApplied = false
+     private lateinit var gameSessionPreview: ImageView
+     private lateinit var gameSessionPreviewLabel: TextView
+     private var gameSessionPreviewBitmap: Bitmap? = null
+@@ -14975,6 +14981,8 @@
+ 
+         gameDiscButton.visibility =
+             View.GONE
++
++        restorePausedBar()   // B73
+     }
+ 
+ 
+@@ -15180,6 +15188,98 @@
+ 
+         gameDiscButton.isEnabled =
+             gameSessionPaused
++
++        // B73: the four buttons sized to the screen (three buttons: today's bar, untouched)
++        applyPausedBarPlan(
++            gameDiscButton.visibility == View.VISIBLE
++        )
++    }
++
++
++    // B73: the first four-button plan captures the views' own values; anything else puts them back (only if changed)
++    private fun applyPausedBarPlan(
++        fourButtons: Boolean
++    ) {
++
++        val buttons =
++            listOf(gameSaveButton, gameLoadButton, gameDiscButton, gameEndButton)
++
++        val plan =
++            PausedBar.plan(
++                pausedBarFitOn,
++                fourButtons,
++                (resources.displayMetrics.widthPixels / resources.displayMetrics.density).toInt()
++            )
++
++        if (plan.fourButtons && plan != PausedBar.TODAY.copy(fourButtons = true)) {
++
++            if (pausedBarSaved == null) {
++                pausedBarSaved =
++                    IntArray(buttons.size * 2 + 2).also { saved ->
++                        buttons.forEachIndexed { i, b ->
++                            val lp = b.layoutParams as android.widget.LinearLayout.LayoutParams
++                            saved[i * 2] = lp.width
++                            saved[i * 2 + 1] = lp.marginStart
++                        }
++                        saved[buttons.size * 2] = nowPlayingProgress.layoutParams.width
++                        saved[buttons.size * 2 + 1] = nowPlayingBar.paddingEnd
++                    }
++                pausedBarSavedDiscText =
++                    gameDiscButton.text
++            }
++
++            buttons.forEach { b ->
++                val lp = b.layoutParams as android.widget.LinearLayout.LayoutParams
++                lp.width = dp(if (b === gameDiscButton) plan.discDp else plan.buttonDp)
++                lp.marginStart = dp(plan.marginDp)
++                b.layoutParams = lp
++            }
++            gameDiscButton.text = plan.discLabel
++            nowPlayingProgress.layoutParams =
++                nowPlayingProgress.layoutParams.apply { width = dp(plan.statusDp) }
++            nowPlayingBar.setPaddingRelative(
++                nowPlayingBar.paddingStart,
++                nowPlayingBar.paddingTop,
++                dp(plan.padEndDp),
++                nowPlayingBar.paddingBottom
++            )
++            pausedBarApplied = true
++            return
++        }
++
++        restorePausedBar()
++    }
++
++
++    private fun restorePausedBar() {
++
++        if (!pausedBarApplied) {
++            return
++        }
++
++        val saved =
++            pausedBarSaved
++                ?: return
++
++        val buttons =
++            listOf(gameSaveButton, gameLoadButton, gameDiscButton, gameEndButton)
++
++        buttons.forEachIndexed { i, b ->
++            val lp = b.layoutParams as android.widget.LinearLayout.LayoutParams
++            lp.width = saved[i * 2]
++            lp.marginStart = saved[i * 2 + 1]
++            b.layoutParams = lp
++        }
++        gameDiscButton.text = pausedBarSavedDiscText
++        nowPlayingProgress.layoutParams =
++            nowPlayingProgress.layoutParams.apply { width = saved[buttons.size * 2] }
++        nowPlayingBar.setPaddingRelative(
++            nowPlayingBar.paddingStart,
++            nowPlayingBar.paddingTop,
++            saved[buttons.size * 2 + 1],
++            nowPlayingBar.paddingBottom
++        )
++        pausedBarApplied = false
+     }
+ 
+ 
+@@ -15210,6 +15310,8 @@
+ 
+         gameDiscButton.visibility =
+             View.GONE
++
++        restorePausedBar()   // B73
+     }
+ 
+ 
+diff --git a/PrivyHub/app/src/main/java/streaming/PausedBar.kt b/PrivyHub/app/src/main/java/streaming/PausedBar.kt
+new file mode 100644
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/PausedBar.kt
+@@ -0,0 +1,89 @@
++package com.safeiot.privyhub.streaming
++
++/**
++ * B73: the paused bar (SAVE · LOAD · CHANGE DISC · END) fits the TV. B71's four buttons needed 1018 dp on the onn's
++ * 960-dp screen and HOME-10 saw END "~95 % off" (the TV's visible edge ≈ 899 dp). On a multi-disc session the four
++ * buttons are 80 dp with 6-dp gaps, the disc button reads "DISC" (the bar's status text already carries
++ * "Disc 2 of 4" under PAUSED) and the bar's end padding is 80 dp, so END ends at 880 dp. A one-disc bar (three
++ * buttons) is today's, untouched. `debug.privyhub.paused_bar_fit=0` = B71's bar.
++ */
++object PausedBar {
++    const val PROPERTY = "debug.privyhub.paused_bar_fit"
++
++    // today's bar (activity_main.xml / createGameSessionActionButton / B71)
++    const val TODAY_BUTTON_DP = 104
++    const val TODAY_MARGIN_DP = 8
++    const val B71_DISC_DP = 150
++    const val B71_DISC_LABEL = "CHANGE DISC"
++    const val TODAY_STATUS_DP = 280
++    const val TODAY_PAD_START_DP = 24
++    const val TODAY_PAD_END_DP = 20
++    const val PREVIEW_DP = 184 + 8 + 8
++
++    // B73's four-button bar
++    const val FIT_BUTTON_DP = 80
++    const val FIT_MARGIN_DP = 6
++    const val FIT_DISC_LABEL = "DISC"
++    const val FIT_PAD_END_DP = 80
++    const val TITLE_MIN_DP = 80
++    const val STATUS_MIN_DP = 160
++
++    data class Plan(
++        val buttonDp: Int,
++        val marginDp: Int,
++        val discDp: Int,
++        val discLabel: String,
++        val statusDp: Int,
++        val padEndDp: Int,
++        val fourButtons: Boolean,
++    )
++
++    val TODAY = Plan(TODAY_BUTTON_DP, TODAY_MARGIN_DP, B71_DISC_DP, B71_DISC_LABEL, TODAY_STATUS_DP, TODAY_PAD_END_DP, false)
++
++    /** Today's numbers unless `fit` and four buttons; then the status text takes what the title's minimum leaves. */
++    fun plan(fit: Boolean, fourButtons: Boolean, screenWidthDp: Int): Plan {
++        if (!fourButtons) return TODAY
++        if (!fit) return TODAY.copy(fourButtons = true)
++        val buttons = 4 * (FIT_BUTTON_DP + FIT_MARGIN_DP)
++        val status = (screenWidthDp - TODAY_PAD_START_DP - TITLE_MIN_DP - PREVIEW_DP - buttons - FIT_PAD_END_DP)
++            .coerceIn(STATUS_MIN_DP, TODAY_STATUS_DP)
++        return Plan(FIT_BUTTON_DP, FIT_MARGIN_DP, FIT_BUTTON_DP, FIT_DISC_LABEL, status, FIT_PAD_END_DP, true)
++    }
++
++    /** One child's place in the row, in dp from the screen's left edge. */
++    data class Span(val name: String, val left: Int, val right: Int)
++
++    /**
++     * The row as LinearLayout places it: the start padding, the title column (weight 1: what is left, never below 0),
++     * the status text, the preview, then the buttons each after its margin. A right edge past the screen is off it.
++     */
++    fun layout(plan: Plan, screenWidthDp: Int): List<Span> {
++        val buttons = if (plan.fourButtons) {
++            listOf("SAVE" to plan.buttonDp, "LOAD" to plan.buttonDp, "DISC" to plan.discDp, "END" to plan.buttonDp)
++        } else {
++            listOf("SAVE" to plan.buttonDp, "LOAD" to plan.buttonDp, "END" to plan.buttonDp)
++        }
++        val fixed = plan.statusDp + PREVIEW_DP + buttons.sumOf { it.second + plan.marginDp }
++        val title = (screenWidthDp - TODAY_PAD_START_DP - plan.padEndDp - fixed).coerceAtLeast(0)
++        val out = mutableListOf<Span>()
++        var x = TODAY_PAD_START_DP
++        out += Span("title", x, x + title); x += title
++        out += Span("status", x, x + plan.statusDp); x += plan.statusDp
++        out += Span("preview", x + 8, x + PREVIEW_DP - 8); x += PREVIEW_DP
++        for ((name, w) in buttons) {
++            x += plan.marginDp
++            out += Span(name, x, x + w); x += w
++        }
++        return out
++    }
++
++    fun parse(value: String?): Boolean = value?.trim().let { it != "0" && it != "off" }
++
++    fun fromSystem(): Boolean =
++        try {
++            val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
++            parse(get.invoke(null, PROPERTY) as? String)
++        } catch (_: Throwable) {
++            parse(null)
++        }
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/B73PausedBarTest.kt b/PrivyHub/app/src/test/java/streaming/B73PausedBarTest.kt
+new file mode 100644
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/B73PausedBarTest.kt
+@@ -0,0 +1,115 @@
++package com.safeiot.privyhub.streaming
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++import java.awt.Font
++import java.awt.font.FontRenderContext
++import java.io.File
++
++/**
++ * B73: the paused bar at the onn's density (a 1080p UI: 1920 px at density 2.0 = 960 dp). HOME-10's reading: END
++ * "~95 % off" → the TV's visible right edge ≈ 899 dp; Android TV's overscan guideline: 48 dp a side (912 dp).
++ */
++class B73PausedBarTest {
++
++    private val onnDensity = 2.0f
++    private val onnWidthDp = (1920 / onnDensity).toInt()   // 960
++    private val home10VisibleEdgeDp = 899
++    private val guidelineSafeRightDp = 960 - 48
++    private val guidelineSafeLeftDp = 48
++
++    private fun span(spans: List<PausedBar.Span>, name: String) = spans.first { it.name == name }
++
++    @Test
++    fun fourButtonsFitTheOnnsScreen() {
++        val plan = PausedBar.plan(true, true, onnWidthDp)
++        val spans = PausedBar.layout(plan, onnWidthDp)
++        for (b in listOf("SAVE", "LOAD", "DISC", "END")) {
++            val s = span(spans, b)
++            assertTrue("$b left ${s.left}", s.left >= guidelineSafeLeftDp)
++            assertTrue("$b right ${s.right}", s.right <= 880)
++        }
++        val end = span(spans, "END").right
++        assertEquals(880, end)
++        assertTrue(end < home10VisibleEdgeDp)
++        assertTrue(end <= guidelineSafeRightDp)
++        val title = span(spans, "title")
++        assertTrue("title ${title.right - title.left}", title.right - title.left >= PausedBar.TITLE_MIN_DP)
++        assertEquals(232, plan.statusDp)
++        assertEquals("DISC", plan.discLabel)
++    }
++
++    @Test
++    fun b71sBarReproducesHome10() {
++        val plan = PausedBar.plan(false, true, onnWidthDp)          // the property off: B71's bar
++        assertEquals(150, plan.discDp)
++        assertEquals("CHANGE DISC", plan.discLabel)
++        val end = span(PausedBar.layout(plan, onnWidthDp), "END")
++        assertEquals(998, end.right)                                   // past the 960-dp screen
++        assertTrue(end.left < home10VisibleEdgeDp && end.right > onnWidthDp)
++        // the visible part of END on the TV: (899 - 894) / 104 ≈ 5 % (the user's "~95 % off")
++        val visible = (home10VisibleEdgeDp - end.left).toDouble() / (end.right - end.left)
++        assertTrue("visible $visible", visible in 0.0..0.10)
++    }
++
++    @Test
++    fun oneDiscBarIsTodays() {
++        for (fit in listOf(true, false)) {
++            val plan = PausedBar.plan(fit, false, onnWidthDp)
++            assertEquals(PausedBar.TODAY, plan)
++            assertEquals(104, plan.buttonDp)
++            assertEquals(8, plan.marginDp)
++            assertEquals(280, plan.statusDp)
++            assertEquals(20, plan.padEndDp)
++            val spans = PausedBar.layout(plan, onnWidthDp)
++            assertFalse(spans.any { it.name == "DISC" })
++            assertEquals(940, span(spans, "END").right)                // today's three-button bar
++        }
++    }
++
++    @Test
++    fun narrowScreensClampTheStatusText() {
++        assertEquals(PausedBar.STATUS_MIN_DP, PausedBar.plan(true, true, 700).statusDp)
++        assertEquals(PausedBar.TODAY_STATUS_DP, PausedBar.plan(true, true, 2000).statusDp)
++        for (w in 880..960) {
++            val end = span(PausedBar.layout(PausedBar.plan(true, true, w), w), "END")
++            assertTrue("w $w end ${end.right}", end.right <= w)
++        }
++    }
++
++    private fun boldFont(px: Float): Font {
++        val f = File("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
++        val base = if (f.isFile) Font.createFont(Font.TRUETYPE_FONT, f) else Font(Font.SANS_SERIF, Font.BOLD, 1)
++        return base.deriveFont(Font.BOLD, px)
++    }
++
++    /** A label's width in dp at 13 sp × the onn's density, plus a button's 16-dp padding each side. */
++    private fun neededDp(label: String): Double {
++        val px = 13f * onnDensity
++        val w = boldFont(px).getStringBounds(label, FontRenderContext(null, true, true)).width
++        return w / onnDensity + 2 * 16
++    }
++
++    @Test
++    fun labelsMeasuredAtTheOnnsDensity() {
++        for (label in listOf("SAVE", "LOAD", "DISC", "END", "CHANGE DISC")) {
++            println("B73 measured: \"$label\" needs %.1f dp (DejaVu Sans Bold 26 px + 2 x 16 dp)".format(neededDp(label)))
++        }
++        for (label in listOf("SAVE", "LOAD", "DISC", "END")) {
++            assertTrue("$label ${neededDp(label)}", neededDp(label) <= PausedBar.FIT_BUTTON_DP)
++        }
++        assertTrue(neededDp("CHANGE DISC") > PausedBar.FIT_BUTTON_DP)  // why the label is shortened
++        assertTrue(neededDp("CHANGE DISC") <= PausedBar.B71_DISC_DP)
++    }
++
++    @Test
++    fun theProperty() {
++        assertTrue(PausedBar.parse(null))
++        assertTrue(PausedBar.parse(""))
++        assertTrue(PausedBar.parse("1"))
++        assertFalse(PausedBar.parse("0"))
++        assertFalse(PausedBar.parse(" off "))
++    }
++}

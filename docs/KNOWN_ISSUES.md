@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-09 — Queue AA (B73 / B74): the paused bar fits (SAVE · LOAD · DISC · END, END at 880 of 960 dp); the disc change made safe (the HOME-10 black screens settled as the game's reaction, the sequence unchanged; a set starts on disc 1 by RetroArch's record; the warning once; Extras → "Start on disc…"); APK `85220f99…` built, NOT installed — OPEN (A's HOME-11 C40-C43) — `## 2026-11-09 Queue AA` below
 - 2026-11-09 — HOME-10: APK `64d02f31…` installed with every property empty; C37 no pointer MET (N64, PS1, GameCube; the host's `-draw_mouse 0` live), C39 the N64 card MET, B72 (e) only the evdev four MET, the one-disc bar without CHANGE DISC MET; **C38 NOT MET** (five disc changes `ok` true, but the change back left the game black twice; END ~95 % off the screen with CHANGE DISC) → **`64d02f31…` NOT CONFIRMED, `5f72af4b…` reinstalled**; H4: the user's "Keep all games" (every title offered) — OPEN (to B: the bar's width, the black screen after a change) — `## 2026-11-09 HOME-10` below; `docs/memory/evidence/HOME_10_POINTERS_DISC_2026-11-09.md`
 - 2026-11-09 — Queue Z (B70-B72): the two pointers (the hub's in the capture → `-draw_mouse 0`; the pads' touchpad swallowed and the onn's pointer hidden and captured in a game), "Change disc" on a multi-disc PS1 session (the host's `disc-swap` over RetroArch's disk commands; CHANGE DISC in the paused bar), the small readings (the N64 card above the details line, `fps (min)`, B66 on dolphin, `gc_frames`' 20 class, SDL off the virtual pads, one slot-9 save per stall, `state_reply` rows): built and tested, applied to the tree uncommitted; APK `64d02f31…` pinned NOT installed — OPEN (A's HOME-10 C37-C39) — `## 2026-11-09 Queue Z` below; `docs/memory/evidence/B70_POINTERS_2026-11-09.md`, `…/B71_CHANGE_DISC_2026-11-09.md`, `…/B72_SMALL_READINGS_2026-11-09.md`
 - 2026-11-09 — HOME-9+GC: APK `5f72af4b…` CONFIRMED (C29 / C31) and pinned; the `.m3u` applied ("PlayStation (72)"); C29-C36 all MET — queue X's B65 guard / B66 bar / B67 client items / B68 and B69 through the stream (GameCube plays, pauses, saves and loads from the onn); **G-A16 ADOPTED, `PRIVYHUB_GAMECUBE=1` the eighteenth line**; open: the "Change disc" entry, the two pointers on the TV (the hub's in the capture, the onn's from the pads' touchpads), the N64 card's overlap, diag_read / gc_frames / B66-on-dolphin readings — OPEN (to B, the next queue) — `## 2026-11-09 HOME-9+GC` below; `docs/memory/evidence/HOME_9_GC_2026-11-09.md`
@@ -62,6 +63,28 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-09 Queue AA (B73 / B74): the paused bar fits; the disc change made safe — OPEN (A's HOME-11 C40-C43)
+
+(`docs/memory/evidence/B73_PAUSED_BAR_2026-11-09.md`, `…/B74_DISC_CHANGE_SAFE_2026-11-09.md`; patches
+`docs/memory/patches/B73_PAUSED_BAR.md`, `…/B74_DISC_CHANGE_SAFE.md`)
+
+- **Built, applied to the tree uncommitted, nothing adopted.**
+  - The host part (a set starts on disc 1) goes live at the companion's next restart; `PRIVYHUB_DISC_SWAP=0` = today.
+  - The client part comes with the APK `85220f99…4864` (pinned in `queue_aa_built/`, **NOT installed**). Its
+    properties: `debug.privyhub.paused_bar_fit`, `debug.privyhub.disc_safe` (`0` = before).
+  - `5f72af4b…` stays CONFIRMED until HOME-11's rule.
+- **Settled:**
+  - B71's bar needed 1018 dp on the onn's 960. The four-button bar now ends at 880 dp; one-disc bars are untouched.
+  - **The HOME-10 black screens were the game's reaction** to a lid cycle outside its prompt, as on a console. Beetle
+    applies the open / the index / the close in its state at once and latches the lid bit for the game. The same
+    sequence carried on twice and went black three times, depending on where the game was. **The host's sequence is
+    unchanged.**
+  - RetroArch's per-set disk index record restored the last disc. The host now sets it before the launch (disc 1, or
+    the user's pick). On the hub the record already reads disc 1 (HOME-10's last change was 4 → 1).
+- **Open, at the TV (HOME-11):** C40 the bar, C41 the set starting on disc 1 (after "Start on disc…" → 4), C42 the
+  warning → a change during the intro, C43 C37's client half on this APK. A real disc prompt stays untested (no save
+  near one).
 
 ## 2026-11-09 HOME-10: no pointers and the N64 card met; "Change disc" not met; 64d02f31… not confirmed — OPEN (to B, the next APK)
 

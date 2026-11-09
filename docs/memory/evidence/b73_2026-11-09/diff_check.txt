@@ -1,0 +1,6 @@
+git diff --check after applying b73.diff then b74.diff to the tree (2026-11-09T18:09:38Z): clean
+the reverse, without writing: b74 -R --check: ok
+b73.diff sha256: 3eb19403160e3720aedda3662a766eb0420e7f8197a8330f3eccebc46fe44c4e
+b74.diff sha256: 67732645ef17b36268341e8c6c7508659922ae60283c3b35d07a0cb9b043ae22
+every touched file in the tree = the after-B74 scratch copy (cmp): yes
+(b74.diff was applied once at 18:04Z, reversed at 18:08Z and re-applied in its corrected form: the plugin passes start_disc only for a set)

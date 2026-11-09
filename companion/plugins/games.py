@@ -473,6 +473,24 @@ class GamesPlugin:
             "recovery_saved_at": detail.get("saved_at"),
         }
 
+    def _set_discs(self, game_id: str) -> int:
+        """B74: the disc count of a PS1 `.m3u` set in the library (0 for every other game, or when unreadable)."""
+        try:
+            return self._game_discs(self._find_game_by_id(game_id)) if game_id else 0
+        except Exception:
+            return 0
+
+    def _game_discs(self, game: Any) -> int:
+        """B74: as `_set_discs`, for a game record already found."""
+        try:
+            rel = str(game.get("relative_path", "")).strip()
+            if not rel:
+                return 0
+            sess = _disc_swap.session_for(self._emulator._project_path(rel), str(game.get("system", "")))
+            return int(sess["discs"]) if sess else 0
+        except Exception:
+            return 0
+
     def _end_live_session(self) -> None:
         """The normal stop path: recovery ended, SAVE_FILES, encoder down."""
         if self._emulator.status().get("active", False):
@@ -3291,6 +3309,11 @@ class GamesPlugin:
                     str(payload.get("id", ""))
                 )
             )
+            # B74: a multi-disc set's disc count, for the client's "Start on disc..." (absent on every other game)
+            if _disc_swap.enabled():
+                discs = self._set_discs(str(payload.get("id", "")))
+                if discs > 1:
+                    payload["discs"] = discs
             return payload
 
         # PRIVYHUB_A8_PATCH_01_INPUT_PROFILE_BACKEND
@@ -4275,6 +4298,11 @@ class GamesPlugin:
             # B71: a multi-disc session's discs / disc (absent on every other launch)
             if isinstance(payload, dict) and "discs" in payload:
                 fields.update(discs=payload.get("discs"), disc=payload.get("disc"))
+                # B74: the disc asked for and the one the launch's own line put in the tray (a set's launch only)
+                disc_session = getattr(emu, "_disc_session", None)
+                if isinstance(disc_session, dict) and "start_disc" in disc_session:
+                    fields.update(start_disc=disc_session.get("start_disc"),
+                                  launched_disc=disc_session.get("launched_disc"))
             for key in ("players_joined", "players_chosen"):
                 if key in query:
                     fields[key] = self._first(query, key)
@@ -4746,6 +4774,10 @@ class GamesPlugin:
                     chosen = _players_session.parse(self._first(query, "players_chosen"))
                     if chosen is not None:   # a malformed value: today's launch
                         launch_extra["players_chosen"] = chosen
+                # B74: a library launch of a multi-disc set starts on disc 1, or the disc the user chose (`disc=j`).
+                # Every other game, or PRIVYHUB_DISC_SWAP=0 -> today's call.
+                if _disc_swap.enabled() and self._game_discs(game) > 1:
+                    launch_extra["start_disc"] = self._first(query, "disc").strip() or 1
                 payload = self._emulator.launch(
                     game,
                     cheat_source_index=cheat_source_index,

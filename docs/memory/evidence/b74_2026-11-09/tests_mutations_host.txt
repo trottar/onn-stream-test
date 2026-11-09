@@ -1,0 +1,13 @@
+B74 host mutations in /tmp/b_q19aa_work (each alone; tests/b74_disc_safe run; the file restored), 2026-11-09T18:07:41Z
+(history: a first pass at 18:01:33Z caught 5 / 7 -- M3 and M6 not caught -- two tests were added and all seven re-run at 18:02:32Z, 7 / 7; then the full host run found B74 passing start_disc on every launch, which three B54 suites pin as today's call: the plugin now passes it only for a set, test_launch_query pins a one-disc game's call, M5 was reworded for the changed line and M8 added; all eight re-run here)
+M1 the record never set: CAUGHT (Ran 22 tests in 5.503s FAILED (failures=3, errors=2) )
+M2 the chosen disc's path not written: CAUGHT (Ran 22 tests in 5.505s FAILED (failures=2) )
+M3 launched_disc from the newest line: CAUGHT (Ran 22 tests in 5.506s FAILED (failures=1) )
+M4 the plugin's default disc 1 removed: CAUGHT (Ran 22 tests in 5.488s FAILED (failures=1) )
+M5 the knob ignored on the launch: NOT CAUGHT (Ran 22 tests in 5.553s OK )
+M6 the launch-line guard removed: CAUGHT (Ran 22 tests in 5.502s FAILED (failures=1) )
+M7 a right record rewritten: CAUGHT (Ran 22 tests in 5.501s FAILED (failures=1) )
+M8 start_disc on every launch (the set check removed): CAUGHT (Ran 22 tests in 5.503s FAILED (failures=1) )
+M5 note: an equivalent mutant -- with PRIVYHUB_DISC_SWAP=0, _game_discs() is 0 anyway (session_for checks the same knob), so the plugin's own enabled() is a second guard; M9 removes the knob where it decides:
+M9 the knob removed in session_for: CAUGHT (Ran 22 tests in 5.504s FAILED (failures=1) )
+caught: 8 of the 9 (M5 equivalent, explained above)

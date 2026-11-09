@@ -36,6 +36,15 @@ CLOSED_RE = re.compile(r"\[Disc\] Closed virtual disc tray")
 FAILED_RE = re.compile(r"\[Disc\] Failed to (?:set disc|remove dis[ck]|eject virtual disc tray|close virtual disc tray)")
 
 
+# B74: RetroArch's disk index record (`<savefile dir>/<core library name>/<content stem>.ldci`, JSON with `image_index`
+# / `image_path`), read at the launch and handed to the core's set_initial_image: the set starts on the last disc used.
+# The host sets it to the asked disc (1 unless the user chose one) before RetroArch starts. Paths are never returned or
+# logged. Design: docs/memory/evidence/b74_2026-11-09/.
+LDCI_SUFFIX = ".ldci"
+CORE_LIBRARY_DIRS = {"mednafen_psx_hw_libretro": "Beetle PSX HW", "mednafen_psx_libretro": "Beetle PSX"}
+CFG_SAVEFILE_RE = re.compile(r'^\s*savefile_directory\s*=\s*"([^"]*)"\s*$', re.M)
+
+
 class DiscSwapError(Exception):
     disc: int | None = None          # the disc RetroArch last reported (None = unknown)
 
@@ -171,3 +180,93 @@ class Swapper:
         self._cmd(EJECT)
         m = self._await(CLOSED_RE)
         return m is not None and m.re is CLOSED_RE
+
+
+# --- B74: the set starts on disc 1 (or the disc asked for) ------------------------------------------------------------
+
+def parse_start_disc(value: Any, discs: int) -> int:
+    """The disc a launch asks for: 1..n, anything else (absent, malformed, out of range) -> 1."""
+    try:
+        j = int(str(value).strip())
+    except (TypeError, ValueError):
+        return 1
+    return j if 1 <= j <= int(discs) else 1
+
+
+def m3u_entries(path: Any) -> list[str]:
+    """The `.m3u`'s disc lines (non-empty, not `#`), as written; [] when unreadable."""
+    try:
+        text = Path(str(path)).read_text(encoding="utf-8-sig", errors="replace")
+    except OSError:
+        return []
+    return [line.strip() for line in text.splitlines() if line.strip() and not line.strip().startswith("#")]
+
+
+def savefile_dir_from_config(config_path: Any) -> Path | None:
+    """`savefile_directory` of the session config the launch wrote (None when absent / unreadable)."""
+    try:
+        text = Path(str(config_path)).read_text(encoding="utf-8-sig", errors="replace")
+    except OSError:
+        return None
+    found = CFG_SAVEFILE_RE.findall(text)
+    return Path(found[-1]) if found and found[-1].strip() else None
+
+
+def ldci_set(savefile_dir: Any, core_name: str, content_path: Any, disc: int) -> str:
+    """Make RetroArch's record for this content say `disc` (1-based) before RetroArch starts.
+
+    "set"  : a record was written (an existing one changed, or a new one for a disc > 1);
+    "kept" : the record already says that disc (its bytes untouched);
+    "none" : no record and disc 1 (RetroArch's own start: nothing written);
+    "error": the content / record could not be read or written (the launch goes on; RetroArch decides).
+    Never deletes; the write is a temp file in the same folder, then a replace; the record's other keys are kept.
+    """
+    import json
+    try:
+        content = Path(str(content_path))
+        entries = m3u_entries(content)
+        j = int(disc)
+        if not entries or not 1 <= j <= len(entries) or not savefile_dir:
+            return "error"
+        root = Path(str(savefile_dir))
+        name = content.stem + LDCI_SUFFIX
+        want_index, want_path = j - 1, str(content.parent / entries[j - 1])
+        found = [root / name] if (root / name).is_file() else []
+        if root.is_dir():
+            found += sorted(d / name for d in root.iterdir() if d.is_dir() and (d / name).is_file())
+        if not found:
+            if j == 1:
+                return "none"
+            lib = CORE_LIBRARY_DIRS.get(Path(str(core_name)).stem)
+            found = [(root / lib / name) if lib else (root / name)]
+        result = "kept"
+        for rec in found:
+            data: dict[str, Any] = {}
+            if rec.is_file():
+                try:
+                    loaded = json.loads(rec.read_text(encoding="utf-8"))
+                    data = loaded if isinstance(loaded, dict) else {}
+                except (OSError, ValueError):
+                    data = {}
+                index = data.get("image_index")
+                if index == want_index and (j == 1 or data.get("image_path") == want_path):
+                    continue
+            data.setdefault("version", "1.0")
+            data["image_index"] = want_index
+            data["image_path"] = want_path
+            rec.parent.mkdir(parents=True, exist_ok=True)
+            tmp = rec.with_name(rec.name + ".privyhub-tmp")
+            tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+            os.replace(tmp, rec)
+            result = "set"
+        return result
+    except Exception:
+        return "error"
+
+
+def first_index(text: str, discs: int) -> int | None:
+    """The first `Setting disc in tray: k/n` with this n: the disc the launch put in the tray."""
+    for m in SET_RE.finditer(text or ""):
+        if int(m.group(2)) == int(discs):
+            return int(m.group(1))
+    return None

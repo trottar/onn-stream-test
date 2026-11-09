@@ -1,0 +1,17 @@
+Every host suite (scripts/run_host.sh) on full exports: HEAD a5c51e37 (<copy>_base) and HEAD + B73 + B74 (<copy>_after_b74), TMPDIR on the main disk, 2026-11-09T18:12:10Z
+
+1. HEAD vs the first B74 (18:03Z): the same, apart from the new suite, except tests/players_session FAILED (failures=3): B54's three tests pin the launch() kwargs, and the first B74 passed start_disc=1 on every launch. Fixed: the plugin passes it only for a set (a one-disc launch is today's call).
+2. HEAD vs the corrected B73 + B74 (18:09Z): the same, apart from the new suite (tests/b74_disc_safe 22 OK):
+33a34,36
+> == tests/b74_disc_safe
+> Ran 22 tests
+> OK
+
+The same six tools/ suites fail in both HEAD and after (not B73 / B74's):
+== tools/test_adaptive_bitrate_live.py
+== tools/test_c3_f1_recovery_restart.py
+== tools/test_c3_l4_nft_night.py
+== tools/test_cl_b1_decoder_report_body.py
+== tools/test_e1_remote.py
+== tools/test_fec_xor8_2.py
+Why (read 18:13Z in <copy>_base): each reads a fixture outside the four folders the copies hold, e.g. FileNotFoundError on <copy>/logs/games/a1_sample.h264, <copy>/docs/memory/evidence/e4_s5d_2026-10-15/…, …/c3_l3a_r3_2026-09-24/…, …/c5_m2_2026-09-29/…: the copies' shape, the same in HEAD and after.
