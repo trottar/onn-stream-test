@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-09
-baseline_commit: 7d0056b4 (queue X; H2-P1 uncommitted beside it; the user commits)
+baseline_commit: 1bf0a76c (queue Y; HOME-9 uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -13,21 +13,21 @@ Headings are fixed by `tools/check_memory_health.py`; do not rename. The history
 
 **Phase H OPEN — H3 (PS2) first** by the user's decision (2026-11-07), then H0 (import), then H1 / H2. **The G track
 CLOSED at its checkpoint 2026-11-07** (ROADMAP §G9: 9 met, 3 deferred, 2 open; `evidence/G9_CHECKPOINT_2026-11-07.md`).
-Phase E stays ACTIVE (E1 FROZEN, E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **SEVENTEEN lines**; the
-seventeenth is G-A15, `PRIVYHUB_N64=1` (`evidence/HOME_7_HOLD_TO_JOIN_N64_2026-11-08.md`); H3 feasibility CLOSED.
-APK `9aa00ba2…` CONFIRMED (HOME-7).
+Phase E stays ACTIVE (E1 FROZEN, E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**; the
+eighteenth is G-A16, `PRIVYHUB_GAMECUBE=1` (`evidence/HOME_9_GC_2026-11-09.md`); H3 and H2 feasibility CLOSED.
+APK `5f72af4b…` CONFIRMED (HOME-9).
 
 ## Current Work Item
 
-- **H2-P1 done, uncommitted** (`evidence/H2_P1_GAMECUBE_PROBE_2026-11-09.md`): Dolphin 2609b (the upstream AppImage),
-  Vulkan on RADV, 1x, each title twice, unattended.
-  - T1: all rows met (60 / 30 fps held, CPU thread max 38 %, state 0.21 s, no spin-up).
-  - T2: all met except P2's minimum on run 1 (50 vs 55, capture-side; run 2 59).
+- **HOME-9+GC done, uncommitted** (`evidence/HOME_9_GC_2026-11-09.md`, `logs/home9_git_status.txt`): C29-C36 all met
+  (C32 / C36 short of ~10 min); `5f72af4b…` CONFIRMED and pinned; the `.m3u` applied ("PlayStation (72)"; `undo` the
+  way back); GameCube from the onn: launch → picture 10.2 s, SAVE 0.3 s, LOAD 0.9 s (also after a relaunch), bar 0.0
+  vs PS1 0.0, 60 fps held; **G-A16 adopted** ("Yes keep").
 
 ## Verified State
 
-**The seventeen adopted lines.** Each one is its own drop-in under
-`~/.config/systemd/user/privyhub-companion.service.d/`. `tools/e1_suite.py` `ADOPTED` lists the same seventeen, and
+**The eighteen adopted lines.** Each one is its own drop-in under
+`~/.config/systemd/user/privyhub-companion.service.d/`. `tools/e1_suite.py` `ADOPTED` lists the same eighteen, and
 `e3_state.py --check` reads them back.
 
 | # | Line | Drop-in | Gate (record) |
@@ -49,19 +49,19 @@ APK `9aa00ba2…` CONFIRMED (HOME-7).
 | 15 | `PRIVYHUB_VOD_LOG=1` | `vod-log.conf` | G-A13 host (`G_A13_…_2026-11-07`) |
 | 16 | `PRIVYHUB_PS2=1` | `ps2.conf` | G-A14 (`HOME_6_…_2026-11-08`) |
 | 17 | `PRIVYHUB_N64=1` | `n64.conf` | G-A15 (`HOME_7_…_2026-11-08`) |
+| 18 | `PRIVYHUB_GAMECUBE=1` | `gamecube.conf` | G-A16 (`HOME_9_GC_2026-11-09`) |
 
 Records under `evidence/`. Line 10 implies the input hold, B6, B8, the `state` path, the stall signal and resume (B33
 live inside it); line 13 acts only on a remote-class session (floor start and climb, remote ladder, 7000 cap, WAN
 telemetry; the LAN as before); line 14 splices each ladder step onto the same stream at one IDR (2-s fallback);
-line 15 writes one redacted row per movie range request and a retrying client's rows; line 16 offers PS2 (PCSX2); line 17 N64 (RetroArch).
+line 15 writes one redacted row per movie range request and a retrying client's rows; line 16 offers PS2 (PCSX2); line 17 N64 (RetroArch); line 18 GameCube (Dolphin).
 **The off switch, every line:** delete its drop-in, `systemctl --user daemon-reload`, restart the companion, and take
 the name out of `tools/e1_suite.py` `ADOPTED`. Each record names its exceptions; `docs/REMOTE_TRUST.md` has the G lines.
 
 **The client.**
-- APK **`9aa00ba2…` is CONFIRMED** on the onn (HOME-7; queue T: queue O + B54 hold-to-join; `home7_installed/`), pinned
-  in the three places. On by default: the hold and stable slots, hold-to-join (B54), the movie retry (B47).
-- `cfe0211c…` (HOME-4+, the previous CONFIRMED) is kept in `home7_previous/`.
-- The eleven client properties are empty. One device is paired, with `identity_v2` on.
+- APK **`5f72af4b…` is CONFIRMED** on the onn (HOME-9; queue X: queue T + B67's card, 2-player line, store cap, start
+  re-arm; `home9_installed/`), pinned in the three places. `9aa00ba2…` (HOME-7) is kept in `home9_previous/`.
+- The twelve client properties are empty. One device is paired, with `identity_v2` on.
 
 **Units.** `privyhub-companion` and `privyhub-diag` are running. `privyhub-diag` is the B36 keeper:
 `tools/diag_keeper.py`, read with `tools/diag_read.py` and `tools/diag_check.py`. The nightly watch
@@ -87,11 +87,11 @@ redundancy 2/4 (`P10`); the live ladder's top 7000; the PS1 source 1920×1080 at
 
 ## Next Action
 
-1. **The user's commit** of H2-P1 (`logs/h2_p1_git_status.txt`).
-2. **B69:** the GameCube launch kind (`-b -u <user dir> -e <title>`; the F10 pause checked by `CPU thread`'s time; the
-   state hotkeys; `GCPadNew.ini` for the four virtual pads; no PID / audio / keep-awake item).
-3. **A: HOME-9** (queue X's APK `5f72af4b…` and cells C29-C33), then the GameCube streamed play (P0d / P7) after B69.
-   **Open:** the drive read-ahead; G-A8.
+1. **The user's commit** of HOME-9 (`logs/home9_git_status.txt`).
+2. **B's next queue:** the "Change disc" entry (B68's, next APK); the two pointers on the TV (the hub's `draw_mouse`
+   in the capture; the onn's touchpad pointer); the N64 card overlapping the details line; `diag_read`'s negative
+   `fps (min)`; B66's split on the dolphin kind; `gc_frames.py`'s 20-fps class; the H4 tiers. No mapping fix needed.
+3. **Then what the user names next.** Still not needed: the keep-awake / drive read-ahead. **Open:** G-A8.
 
 **Open, not blocking** — the full list is `docs/KNOWN_ISSUES.md`'s open index: G8-S6 and G5-S2-L (`handoffs/QUEUE_2026-10-19N.md`,
 never run); the nightly watch's nights not written up; the overlay-down local check never scored; the reconnect over

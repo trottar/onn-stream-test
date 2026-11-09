@@ -1,6 +1,6 @@
 # PrivyHub remote trust (G0)
 
-> **Superseded (2026-11-03):** the status below is G0's (2026-10-15). Since then G-A1 … G-A10, G-A13 (host), G-A14 (PS2) and G-A15 (N64, 2026-11-08) adopted lines: the adopted environ is seventeen lines (sixteen until G-A15) (`tools/e1_suite.py` `ADOPTED`), §4-§6 and §8 are in force, and §8a-§18 record each adoption with its off switch (G-A6 shelved, G-A8 never applied) — see docs/memory/CURRENT.md.
+> **Superseded (2026-11-03):** the status below is G0's (2026-10-15). Since then G-A1 … G-A10, G-A13 (host), G-A14 (PS2), G-A15 (N64, 2026-11-08) and G-A16 (GameCube, 2026-11-09) adopted lines: the adopted environ is eighteen lines (seventeen until G-A16) (`tools/e1_suite.py` `ADOPTED`), §4-§6 and §8 are in force, and §8a-§19 record each adoption with its off switch (G-A6 shelved, G-A8 never applied) — see docs/memory/CURRENT.md.
 
 **Status: G0 written 2026-10-15 (G1-S1).** Every statement is either
 quoted from `docs/ROADMAP.md` (marked **[ROADMAP §…]**) or marked
@@ -436,3 +436,24 @@ Every point below is a **[G3-S3 proposal]**.
   2. Run `systemctl --user daemon-reload && systemctl --user restart privyhub-companion`.
   3. Take `N64` out of `tools/e1_suite.py` `ADOPTED` (reverse
      `docs/memory/evidence/home7_2026-11-08/ga15/g_a15_applied.diff`).
+
+## 19. GameCube (adopted G-A16, 2026-11-09)
+
+- **Adopted:** `PRIVYHUB_GAMECUBE=1` through the drop-in
+  `~/.config/systemd/user/privyhub-companion.service.d/gamecube.conf`, the **eighteenth adopted line** (the user's "Yes
+  keep", 2026-11-09, at the close of HOME-9+GC, on C34-C36 met).
+  - **What it does (B69):** the games list offers "GameCube"; a launch runs Dolphin 2609b on the hub (the upstream
+    AppImage fetched once in H2-P1 on the user's go, kept in the repo's gitignored runtime, nothing installed
+    system-wide) with its config written whole per launch, four native ports, the onn's pads through the same controller
+    channel as every game; the pause and SAVE / LOAD by Dolphin's hotkeys, answering as PS1.
+  - **Measured:** HOME-9 C34-C36 (`evidence/HOME_9_GC_2026-11-09.md`); H2-P1 unattended.
+- **What leaves the onn / the hub:** nothing new. The written config keeps Dolphin's analytics off and its update track
+  empty; the drive's GameCube folder is read in place, never written; Dolphin's user dir, logs and save states stay under
+  `data/games/gamecube/` on the hub. The stream to the onn is the same native stream as every game.
+- **Turning it off (host):**
+  1. Delete `gamecube.conf`.
+  2. Run `systemctl --user daemon-reload && systemctl --user restart privyhub-companion`.
+  3. Take `GAMECUBE` out of `tools/e1_suite.py` `ADOPTED` (reverse
+     `docs/memory/evidence/home9_2026-11-09/ga16/g_a16_applied.diff`).
+
+  The games list then has no "GameCube" entry; the other systems are unchanged.

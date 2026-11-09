@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-09 — HOME-9+GC: APK `5f72af4b…` CONFIRMED (C29 / C31) and pinned; the `.m3u` applied ("PlayStation (72)"); C29-C36 all MET — queue X's B65 guard / B66 bar / B67 client items / B68 and B69 through the stream (GameCube plays, pauses, saves and loads from the onn); **G-A16 ADOPTED, `PRIVYHUB_GAMECUBE=1` the eighteenth line**; open: the "Change disc" entry, the two pointers on the TV (the hub's in the capture, the onn's from the pads' touchpads), the N64 card's overlap, diag_read / gc_frames / B66-on-dolphin readings — OPEN (to B, the next queue) — `## 2026-11-09 HOME-9+GC` below; `docs/memory/evidence/HOME_9_GC_2026-11-09.md`
 - 2026-11-09 — B69, the GameCube launch kind (Dolphin) behind `PRIVYHUB_GAMECUBE=1`: built and tested on fakes (54 ×3, 5 mutations caught, every host suite as the baseline), applied to the tree uncommitted, NOT adopted; the pad names, the layout, the paused save / load and the first boot's pre-compile through the stream are unread until the TV — OPEN (HOME-9+GC C34-C36; G-A16 on the user's word) — `## 2026-11-09 B69` below; `docs/memory/evidence/B69_GAMECUBE_LAUNCH_KIND_2026-11-09.md`
 - 2026-11-09 — H2-P1, the GameCube probe (Dolphin 2609b, the upstream AppImage, Vulkan on RADV, 1x): both titles at full speed with wide margins; P0a-P0c, P0e (hotkey), P0f (state 0.21 s), P1, P3, P4, P5 met on all four runs; P2's minimum NOT MET on T2 run 1 (50 vs 55, capture-side repeats; Dolphin's frames clean); no spin-up; P0d / P7 not this run — OPEN (to B69, then the streamed play) — `## 2026-11-09 H2-P1` below; `docs/memory/evidence/H2_P1_GAMECUBE_PROBE_2026-11-09.md`
 - 2026-11-09 — HOME-8: queue W checked — the N64 Home-hold freeze CLOSED (B61; reproduced on the title unattended, gone on the TV), the N64 title's buttons CLOSED (B62), PS1 player 2 under the multitap CLOSED (B63: incapable titles stay at 2 ports; capable keep 4), stale pad rows marked (B64); open: C28's hitch bar (6.6 vs ≤ 2, a Home-return and a link-loss second), a first N64 start whose stream never got ready — OPEN (to B, queue X) — `## 2026-11-09 HOME-8` below; `docs/memory/evidence/HOME_8_N64_FIXES_2026-11-08.md`
@@ -59,6 +60,24 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-09 HOME-9+GC: queue X confirmed, the `.m3u` applied, GameCube from the onn met, G-A16 adopted — OPEN (to B, the next queue)
+
+(`docs/memory/evidence/HOME_9_GC_2026-11-09.md`; `docs/memory/patches/HOME-9_APK_PIN.md`, `…/G-A16_GAMECUBE_ADOPTION.md`)
+
+- **CLOSED here (the HOME-8 / queue X / B69 items, where met):**
+  1. HOME-8 C28's hitch bar — B66's split: N64 bar 0.0 vs PS1 0.0 (C32);
+  2. the first N64 start that never got ready — B65's guard (`continue_load` 4 ms, no skip, C30); the onn's re-arm in the
+     CONFIRMED APK, not exercised (no drop at a start);
+  3. the client items — the N64 layout card once (C29), "This game supports 2 players" with the store capped (C31):
+     **`5f72af4b…` CONFIRMED**;
+  4. the multi-disc `.m3u` — applied on the user's word, 72 from 80, one entry per set, disc 1 (C33; `undo` the way back);
+  5. B69 — the launch, the four pads by name (`evdev/0/PrivyHub Virtual Gamepad P1` … `P4`), the layout, SAVE / LOAD (also
+     after a relaunch), the Home hold, 60 fps through the stream (C34-C36); **G-A16 ADOPTED** (the eighteenth line).
+- **Open (to B):** the "Change disc" entry; the hub's pointer in the capture (`draw_mouse`) and the onn's touchpad pointer;
+  the N64 card overlapping the details line; `diag_read`'s negative `fps (min)`; B66's split on the dolphin kind (a hold
+  read as bar 4.5, hold-resume 0); `gc_frames.py`'s missing 20-fps class; the readings (Dolphin's `SDL/0-3` named "… P1",
+  a back-to-back slot-9 re-save, the SAVE / LOAD replies not logged, audio underruns per session).
 
 ## 2026-11-09 B69: the GameCube launch kind — OPEN (to HOME-9+GC)
 

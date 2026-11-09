@@ -1826,6 +1826,12 @@ a title's mapping) open to B61. `--check` ok on seventeen, `flags_absent` true.
 - **Off:** delete `n64.conf`, `daemon-reload`, restart, reverse `home7_2026-11-08/ga15/g_a15_applied.diff`.
 - Record: `docs/memory/evidence/HOME_7_HOLD_TO_JOIN_N64_2026-11-08.md`; patch `docs/memory/patches/G-A15_N64_ADOPTION.md`.
 
+**G-A16 ADOPTED (2026-11-09, the user's "Yes keep"): `PRIVYHUB_GAMECUBE=1`, the eighteenth line (`gamecube.conf`).**
+The GameCube launch kind (Dolphin, B69), on HOME-9's C34-C36 met (the launch, the four pads, the layout, SAVE / LOAD also
+after a relaunch, the Home hold, 60 fps through the stream). `--check` ok on eighteen, `flags_absent` true.
+- **Off:** delete `gamecube.conf`, `daemon-reload`, restart, reverse `home9_2026-11-09/ga16/g_a16_applied.diff`.
+- Record: `docs/memory/evidence/HOME_9_GC_2026-11-09.md`; patch `docs/memory/patches/G-A16_GAMECUBE_ADOPTION.md`.
+
 ## G5 — WAN-aware telemetry and adaptation
 
 > **Superseded (2026-11-03):** G5-S1's WAN telemetry and the remote ladder, start floor and 7000 cap act on every remote-class session through adopted line 13, `PRIVYHUB_REMOTE=1` (G-A9); `PRIVYHUB_WAN_ADAPTATION` itself is not adopted — see docs/WAN_ADAPTATION_RULES.md.
@@ -2482,6 +2488,11 @@ rather than create a second game-library path.
 >   (`--migrate-states`).
 > - **Disc swap from the onn:** listed for the next APK.
 > - **A applies at HOME-9 only on the user's "apply m3u".**
+>
+> **The `.m3u` APPLIED (HOME-9, 2026-11-09, on the user's "apply m3u" with the card copy;
+> `docs/memory/evidence/HOME_9_GC_2026-11-09.md`):** 6 `.m3u` written, the one in-game card copied; "PlayStation (72)"
+> from "(80)"; one entry per set, starting on disc 1 (C33 met). The way back: `PRIVYHUB_IMPORT=1 python3
+> tools/library_m3u.py undo`. The disc swap from the onn: the next APK ("Change disc").
 
 ## H1 — N64
 
@@ -2542,6 +2553,12 @@ Question:
 >     re-arm;
 >   - APK `5f72af4b…` pinned, not installed.
 > - **Next:** A's HOME-9 (`docs/memory/handoffs/SESSION_B_DONE_2026-11-09X.md`).
+>
+> **HOME-9 (2026-11-09, A, the user at the TV; `docs/memory/evidence/HOME_9_GC_2026-11-09.md`):**
+> - [x] **B65** — C30: T6's Continue loaded in 4 ms, no skip, ready in 12 s (the onn's re-arm not exercised).
+> - [x] **B66** — C32: the N64 bar 0.0 vs PS1 0.0 (HOME-8 C28's open bar answered).
+> - [x] **B67** — C29 / C31 met with every property empty: **APK `5f72af4b…` CONFIRMED**, pinned. To B: the card overlaps
+>   the details line.
 
 ## H2 — GameCube
 
@@ -2573,6 +2590,14 @@ Question:
 > - SAVE / LOAD by Shift+F<n> / F<n> (the file check, B52's picture check); the hold, the stall and the give-up through
 >   slots 9 / 8; four native ports; the `gamecube` list in place; Dolphin's log per launch; `tools/gc_frames.py`.
 > - **Next: HOME-9+GC** (one sitting): queue X's cells, the `.m3u`, then C34-C36 on the TV; G-A16 on the user's word.
+>
+> **HOME-9+GC (2026-11-09, A, the user at the TV) — H2 feasibility CLOSED:** `docs/memory/evidence/HOME_9_GC_2026-11-09.md`.
+> GameCube plays, pauses, saves and loads from the onn with PrivyHub's buttons, as PS1: C34 (launch → picture 10.2 s,
+> the four pads by name `evdev/0/PrivyHub Virtual Gamepad P1` … `P4`, the layout "All as expected"), C35 (SAVE file
+> stable 0.3 s; LOAD `picture ok 0.9s`, also into a relaunched Dolphin; the Home hold's verdict ok) and C36 (bar 0.0 vs
+> PS1 0.0; Dolphin's counters 60 / 60 / 60, VIs 60.11 / s) met; P0d / P7 read here. **G-A16 ADOPTED:**
+> `PRIVYHUB_GAMECUBE=1` the eighteenth line (`gamecube.conf`). To B: `gc_frames.py`'s 20-fps class, B66's split on
+> the dolphin kind, the readings in the record.
 
 Evaluate bounded representative titles:
 

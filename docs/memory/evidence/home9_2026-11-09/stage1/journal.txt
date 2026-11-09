@@ -1,0 +1,33 @@
+Stopping privyhub-companion.service - PrivyHub companion (control API :8765, native game stream)...
+Stopping PrivyHub companion service...
+overlay: provider=tailscale available=True connected=True path=no-peer peer_ready=False mtu=1280 reason=running endpoint=present
+PrivyHub companion service stopped.
+Stopped privyhub-companion.service - PrivyHub companion (control API :8765, native game stream).
+privyhub-companion.service: Consumed 7min 17.670s CPU time, 400M memory peak.
+Starting privyhub-companion.service - PrivyHub companion (control API :8765, native game stream)...
+Started privyhub-companion.service - PrivyHub companion (control API :8765, native game stream).
+PrivyHub companion service
+Project root: <path>
+Media root:   <path>
+VOD root:     /mnt/privyhub-media/onn-stream-test/media/vod
+VOD storage:  configured
+Catalog:      <path>
+Control API:  http://<addr>:8765
+Dynamic media directories are rescanned on GET /sources.
+Endpoints:
+  GET  /status
+  GET  /diagnostics/health
+  POST /diagnostics/self-test
+  POST /diagnostics/bundle
+  POST /diagnostics/client-health
+  GET  /sources
+  GET  /plugins/<plugin>/<action>
+  POST /sources/<id>/start
+  POST /stop
+Logs: <path>
+Starting the PrivyHub media server...
+Listening on <addr>:8765
+Stop with Ctrl+C.
+PrivyHub game metadata startup reconciliation: SKIPPED_CURRENT
+<addr> - 09/Nov/2026 00:41:07 - "GET /plugins/games/status HTTP/1.1" 200 -
+<addr> - 09/Nov/2026 00:41:11 - "GET /plugins/games/status HTTP/1.1" 200 -
